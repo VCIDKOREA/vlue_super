@@ -9,21 +9,21 @@ export type ProductionEnvManifestEntry = {
   aliases?: string[];
 };
 
+/** 부팅 필수 — 없으면 프로세스 종료 */
 export const PRODUCTION_ENV_MANIFEST: ProductionEnvManifestEntry[] = [
   {
     key: "DATABASE_URL",
+    aliases: [
+      "DATABASE_PRIVATE_URL",
+      "DATABASE_PUBLIC_URL",
+      "POSTGRES_URL",
+      "POSTGRESQL_URL"
+    ],
     description: "Prisma/PostgreSQL — 쇼핑·주문·보안함·채팅 히스토리"
   },
   {
-    key: "REDIS_URL",
-    description: "ioredis — 무료 회원 일 15,000 토큰 하드캡·안티 어뷰징"
-  },
-  {
-    key: "GEMINI_API_KEY",
-    description: "Gemini 프로덕션 — Vming·사기 분석·캘린더 파싱 원가 방어"
-  },
-  {
     key: "PORTONE_API_SECRET",
+    aliases: ["PORTONE_IMP_SECRET", "IAMPORT_API_SECRET"],
     description: "포트원 API 시크릿 — 결제·웹훅·vming_unlimited_* 멱등"
   },
   {
@@ -33,11 +33,26 @@ export const PRODUCTION_ENV_MANIFEST: ProductionEnvManifestEntry[] = [
   },
   {
     key: "SESSION_SECRET",
+    aliases: ["JWT_ACCESS_SECRET", "JWT_SECRET"],
     description: "세션·쿠키 서명 (미설정 시 JWT_ACCESS_SECRET 상속)"
   },
   {
     key: "FILE_STORAGE_PROVIDER",
     description: "s3 | mock — 오피스 스캔·자산·보안함 Evidence 격리 저장"
+  }
+];
+
+/** 없어도 기동 가능 — 기능 일부 제한·경고만 */
+export const PRODUCTION_ENV_RECOMMENDED: ProductionEnvManifestEntry[] = [
+  {
+    key: "REDIS_URL",
+    aliases: ["REDIS_PRIVATE_URL", "REDIS_PUBLIC_URL", "REDISCLOUD_URL"],
+    description: "ioredis — 무료 회원 일 15,000 토큰 하드캡 (미설정 시 인메모리 폴백)"
+  },
+  {
+    key: "GEMINI_API_KEY",
+    aliases: ["GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_AI_API_KEY"],
+    description: "Gemini — Vming·사기 분석·캘린더 파싱"
   }
 ];
 
@@ -49,14 +64,37 @@ const S3_STORAGE_KEYS = [
   "S3_SECRET_ACCESS_KEY"
 ] as const;
 
-const PLACEHOLDER_RE =
-  /^(CHANGE_ME|__SET_|REPLACE_ME|<your-|\$\{)/i;
+const PLACEHOLDER_RE = /^(CHANGE_ME|__SET_|REPLACE_ME|<your-)/i;
+
+/** Railway Variables에 `${{Postgres.DATABASE_URL}}` 를 문자열로만 넣은 경우(참조 미연결) */
+function isUnresolvedRailwayReference(value: string): boolean {
+  return /^\$\{\{[^}]+\}\}$/.test(value.trim());
+}
 
 function isSet(value: string | undefined): boolean {
   const v = String(value || "").trim();
   if (!v) return false;
+  if (isUnresolvedRailwayReference(v)) return false;
   if (PLACEHOLDER_RE.test(v)) return false;
   return true;
+}
+
+function copyFirstEnv(targetKey: string, sourceKeys: string[]): void {
+  if (isSet(process.env[targetKey])) return;
+  for (const src of sourceKeys) {
+    const val = process.env[src];
+    if (isSet(val)) {
+      process.env[targetKey] = val!.trim();
+      return;
+    }
+  }
+}
+
+/** 플랫폼·플러그인이 다른 이름으로 주입한 값 → 표준 키로 복사 */
+export function normalizePlatformEnv(): void {
+  for (const entry of [...PRODUCTION_ENV_MANIFEST, ...PRODUCTION_ENV_RECOMMENDED]) {
+    copyFirstEnv(entry.key, entry.aliases ?? []);
+  }
 }
 
 /** 레거시·플랫폼 별칭 → 런타임 process.env 정규화 */
@@ -92,7 +130,25 @@ function isCloudRuntime(): boolean {
   );
 }
 
+function entrySatisfied(entry: ProductionEnvManifestEntry): boolean {
+  if (isSet(process.env[entry.key])) return true;
+  return (entry.aliases ?? []).some((a) => isSet(process.env[a]));
+}
+
+export function envPresenceSummary(): string {
+  const keys = [
+    ...PRODUCTION_ENV_MANIFEST.map((e) => e.key),
+    ...PRODUCTION_ENV_RECOMMENDED.map((e) => e.key),
+    "PORTONE_API_KEY",
+    "DIRECT_URL"
+  ];
+  return keys
+    .map((k) => `${k}=${isSet(process.env[k]) ? "set" : "missing"}`)
+    .join(", ");
+}
+
 export function checkProductionEnv(): ProductionEnvCheckResult {
+  normalizePlatformEnv();
   applyProductionEnvAliases();
 
   if (!isSet(process.env.FILE_STORAGE_PROVIDER)) {
@@ -103,10 +159,14 @@ export function checkProductionEnv(): ProductionEnvCheckResult {
   const warnings: string[] = [];
 
   for (const entry of PRODUCTION_ENV_MANIFEST) {
-    const primary = process.env[entry.key];
-    const aliasHit = entry.aliases?.some((a) => isSet(process.env[a]));
-    if (!isSet(primary) && !aliasHit) {
+    if (!entrySatisfied(entry)) {
       missing.push(entry.key);
+    }
+  }
+
+  for (const entry of PRODUCTION_ENV_RECOMMENDED) {
+    if (!entrySatisfied(entry)) {
+      warnings.push(`${entry.key} — ${entry.description}`);
     }
   }
 
@@ -157,8 +217,11 @@ export function assertProductionEnvLocked(): void {
 
   const result = checkProductionEnv();
   if (!result.ok) {
+    const hint = isCloudRuntime()
+      ? "\n[진단] Variables가 @vlue/api 서비스에 연결됐는지, Postgres는 「Add Reference」로 DATABASE_URL을 넣었는지 확인하세요. `${{...}}` 문자열이 그대로면 미설정으로 간주됩니다."
+      : "";
     throw new Error(
-      `[vlue-api] Production ENV 누락 (${result.missing.length}개):\n${formatProductionEnvHelp(result.missing)}`
+      `[vlue-api] Production ENV 누락 (${result.missing.length}개):\n${formatProductionEnvHelp(result.missing)}${hint}\n[env] ${envPresenceSummary()}`
     );
   }
   for (const w of result.warnings) {

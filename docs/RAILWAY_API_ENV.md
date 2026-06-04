@@ -7,20 +7,39 @@ Railway는 `NODE_ENV=production` 이라 API 시작 시 **7개 필수 변수** �
 
 **Railway** → 프로젝트 → **`@vlue/api` 서비스** → **Variables**
 
-## 필수 변수 (7)
+## 필수 변수 (4 + 1 자동)
 
 | Variable | 설명 |
 |----------|------|
-| `DATABASE_URL` | PostgreSQL (Railway Postgres 플러그인 연결 시 `${{Postgres.DATABASE_URL}}` 참조 가능) |
-| `REDIS_URL` | Redis (플러그인 연결 시 `${{Redis.REDIS_URL}}` 등) |
-| `GEMINI_API_KEY` | Google AI Studio API 키 |
-| `PORTONE_API_SECRET` | 포트원 API Secret (결제) |
-| `PORTONE_API_KEY` | 포트원 API Key (권장, 없으면 경고만) |
-| `JWT_ACCESS_SECRET` | 32자 이상 랜덤 문자열 (또는 `JWT_SECRET`) |
-| `SESSION_SECRET` | 세션 서명 (비우면 JWT와 동일 값으로 별칭 처리) |
-| `FILE_STORAGE_PROVIDER` | `mock` (초기 배포) 또는 `s3` |
+| `DATABASE_URL` | PostgreSQL — **반드시 「Add Reference」** 로 Postgres 서비스 연결 (문자열 `${{...}}`만 붙여넣기 X) |
+| `PORTONE_API_SECRET` | 포트원 API Secret |
+| `JWT_ACCESS_SECRET` | 32자 이상 랜덤 (또는 `JWT_SECRET`) |
+| `SESSION_SECRET` | 비우면 JWT와 동일하게 자동 채움 |
+| `FILE_STORAGE_PROVIDER` | 비우면 **`mock`** 자동 |
 
-`FILE_STORAGE_PROVIDER` 를 비우면 서버가 **`mock`** 으로 기본 설정합니다.
+## 권장 (없어도 API는 기동됨)
+
+| Variable | 설명 |
+|----------|------|
+| `REDIS_URL` | Redis — Vming 토큰 캡 등 (없으면 인메모리 폴백) |
+| `GEMINI_API_KEY` | Google AI — AI 기능 사용 시 필수 |
+| `PORTONE_API_KEY` | 포트원 imp_key |
+
+### Postgres 연결 (Railway)
+
+1. 프로젝트에 **PostgreSQL** 서비스 추가
+2. **@vlue/api** → Variables → **Add Reference** → `DATABASE_URL` = Postgres의 `DATABASE_URL`
+3. 수동 입력 시 `postgresql://...` 전체 URL이어야 함 (`${{Postgres...}}` 그대로면 실패)
+
+### JWT 시크릿 예시
+
+PowerShell:
+
+```powershell
+[Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Maximum 256 }))
+```
+
+생성값을 `JWT_ACCESS_SECRET`에 붙여넣기.
 
 ### `FILE_STORAGE_PROVIDER=s3` 일 때 추가 필수
 

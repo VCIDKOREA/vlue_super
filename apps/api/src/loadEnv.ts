@@ -1,7 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
-import { applyProductionEnvAliases } from "./config/productionEnv.js";
+import { applyProductionEnvAliases, normalizePlatformEnv } from "./config/productionEnv.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const apiDir = resolve(__dirname, "..");
@@ -21,4 +21,5 @@ if (isProduction) {
   dotenv.config({ path: apiProductionEnv, override: true });
 }
 
+normalizePlatformEnv();
 applyProductionEnvAliases();
