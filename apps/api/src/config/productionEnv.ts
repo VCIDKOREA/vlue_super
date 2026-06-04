@@ -81,8 +81,24 @@ export type ProductionEnvCheckResult = {
   warnings: string[];
 };
 
+/** Railway·Render 등 — .env.production 파일 없이 플랫폼 Variables 만 사용 */
+function isCloudRuntime(): boolean {
+  return Boolean(
+    process.env.RAILWAY_ENVIRONMENT ||
+      process.env.RAILWAY_SERVICE_NAME ||
+      process.env.RAILWAY_PROJECT_ID ||
+      process.env.RENDER ||
+      process.env.FLY_APP_NAME
+  );
+}
+
 export function checkProductionEnv(): ProductionEnvCheckResult {
   applyProductionEnvAliases();
+
+  if (!isSet(process.env.FILE_STORAGE_PROVIDER)) {
+    process.env.FILE_STORAGE_PROVIDER = "mock";
+  }
+
   const missing: string[] = [];
   const warnings: string[] = [];
 
@@ -115,15 +131,34 @@ export function checkProductionEnv(): ProductionEnvCheckResult {
   return { ok: missing.length === 0, missing, warnings };
 }
 
+export function formatProductionEnvHelp(missing: string[]): string {
+  const lines = missing.map((key) => {
+    const entry = PRODUCTION_ENV_MANIFEST.find((e) => e.key === key);
+    const aliases = entry?.aliases?.length ? ` (또는 ${entry.aliases.join(", ")})` : "";
+    return `  - ${key}${aliases}: ${entry?.description ?? ""}`;
+  });
+  const where = isCloudRuntime()
+    ? "Railway 대시보드 → @vlue/api 서비스 → Variables 탭에 아래 키를 추가하세요. (PostgreSQL/Redis 플러그인 연결 시 DATABASE_URL·REDIS_URL 자동 주입 가능)"
+    : "로컬: apps/api/.env.production 또는 환경 변수에 설정하세요.";
+  return `${where}\n${lines.join("\n")}`;
+}
+
 export function assertProductionEnvLocked(): void {
   const shouldLock =
     process.env.NODE_ENV === "production" || process.env.VLUE_PRODUCTION_LOCK === "1";
   if (!shouldLock) return;
 
+  if (process.env.VLUE_SKIP_PRODUCTION_ENV_CHECK === "1") {
+    console.warn(
+      "[vlue-api] VLUE_SKIP_PRODUCTION_ENV_CHECK=1 — Production ENV 검증 생략 (스테이징 전용)"
+    );
+    return;
+  }
+
   const result = checkProductionEnv();
   if (!result.ok) {
     throw new Error(
-      `[vlue-api] Production ENV 누락: ${result.missing.join(", ")}. apps/api/.env.production 매핑을 확인하세요.`
+      `[vlue-api] Production ENV 누락 (${result.missing.length}개):\n${formatProductionEnvHelp(result.missing)}`
     );
   }
   for (const w of result.warnings) {

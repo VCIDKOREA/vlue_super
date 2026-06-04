@@ -1,5 +1,9 @@
 # Railway — @vlue/api (모노레포 루트에서 배포할 때)
-# 서비스 Root Directory: 저장소 루트(/) 권장
+# Root Directory: 저장소 루트 (/)
+#
+# 필수: Variables 탭에 DATABASE_URL, REDIS_URL, GEMINI_API_KEY,
+#   PORTONE_API_SECRET, JWT_ACCESS_SECRET, SESSION_SECRET, FILE_STORAGE_PROVIDER
+#   → docs/RAILWAY_API_ENV.md 참고
 
 [build]
 builder = "nixpacks"
