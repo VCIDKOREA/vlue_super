@@ -3,11 +3,22 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./guards/legal-name": "./src/guards/legal-name.immutable.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./guards/legal-name": {
+      "types": "./dist/guards/legal-name.immutable.d.ts",
+      "import": "./dist/guards/legal-name.immutable.js",
+      "default": "./dist/guards/legal-name.immutable.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "generate": "prisma generate",
     "generate:safe": "node ../../scripts/prisma-generate-safe.mjs",
     "migrate": "prisma migrate dev",

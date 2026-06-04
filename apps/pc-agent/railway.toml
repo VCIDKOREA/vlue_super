@@ -1,0 +1,9 @@
+# Railway — @vlue/pc-agent (Windows 전용 에이전트, Linux 컨테이너 비권장)
+# 크래시 시 VLUE_AGENT_USER_ID 환경변수 필수
+
+[build]
+builder = "nixpacks"
+buildCommand = "npm ci"
+
+[deploy]
+startCommand = "npm run start -w @vlue/pc-agent"

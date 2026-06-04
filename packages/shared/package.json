@@ -3,16 +3,41 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./money": "./src/money/moneyKrw.ts",
-    "./membership": "./src/membership/membershipBmConstants.ts",
-    "./settlement": "./src/settlement/referralSettlementPolicy.ts",
-    "./settlement/constants": "./src/settlement/settlementConstants.ts",
-    "./signup": "./src/signup/signupGateCore.ts",
-    "./phone": "./src/phone/krPhone.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./money": {
+      "import": "./dist/money/moneyKrw.js",
+      "default": "./dist/money/moneyKrw.js"
+    },
+    "./membership": {
+      "import": "./dist/membership/membershipBmConstants.js",
+      "default": "./dist/membership/membershipBmConstants.js"
+    },
+    "./settlement": {
+      "import": "./dist/settlement/referralSettlementPolicy.js",
+      "default": "./dist/settlement/referralSettlementPolicy.js"
+    },
+    "./settlement/constants": {
+      "import": "./dist/settlement/settlementConstants.js",
+      "default": "./dist/settlement/settlementConstants.js"
+    },
+    "./signup": {
+      "import": "./dist/signup/signupGateCore.js",
+      "default": "./dist/signup/signupGateCore.js"
+    },
+    "./phone": {
+      "import": "./dist/phone/krPhone.js",
+      "default": "./dist/phone/krPhone.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

@@ -1,5 +1,7 @@
 node_modules/
 dist/
+packages/db/dist/
+packages/shared/dist/
 web/dist/
 .env
 **/.env
