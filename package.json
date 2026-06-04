@@ -1,0 +1,48 @@
+{
+  "name": "vlue-superapp",
+  "private": true,
+  "version": "1.0.0",
+  "description": "VLUE 슈퍼앱 모노레포 — web(웹) + apps(모바일·API) + packages(공통)",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @vlue/web",
+    "build": "npm run build -w @vlue/web",
+    "build:all": "npm run shared:typecheck && npm run api:build && npm run web:build",
+    "preview": "npm run preview -w @vlue/web",
+    "web:dev": "npm run dev -w @vlue/web",
+    "web:build": "npm run build -w @vlue/web",
+    "api:dev": "npm run dev -w @vlue/api",
+    "api:build": "npm run build -w @vlue/api",
+    "api:test:core": "npm run test:core-smoke -w @vlue/api",
+    "api:test:policy": "npm run test:referral-policy -w @vlue/api",
+    "api:test:signup": "npm run test:signup-gate -w @vlue/api",
+    "shared:typecheck": "npm run typecheck -w @vlue/shared",
+    "db:migrate": "npm run migrate -w @vlue/db",
+    "db:deploy": "npm run deploy -w @vlue/db",
+    "db:seed": "npm run seed -w @vlue/db",
+    "db:deploy:safe": "node scripts/migrate-deploy-safe.mjs",
+    "db:generate": "npm run generate -w @vlue/db",
+    "db:generate:safe": "node scripts/prisma-generate-safe.mjs",
+    "seed:test-accounts": "node scripts/seed-test-accounts.mjs",
+    "openbanking:webhook-mock": "node scripts/openbanking-webhook-mock.mjs",
+    "android:sync": "node scripts/sync-android-lettering.mjs",
+    "android:setup": "node scripts/sync-android-lettering.mjs && node scripts/setup-android-local.mjs && node scripts/install-gradle-wrapper.mjs",
+    "android:setup:device": "node scripts/sync-android-lettering.mjs && node scripts/setup-android-local.mjs --device physical && node scripts/install-gradle-wrapper.mjs",
+    "android:assemble": "node scripts/android-assemble.mjs assembleDebug",
+    "android:install": "node scripts/android-assemble.mjs installDebug",
+    "android:launch": "adb shell am start -n kr.vlue.app/kr.vlue.calloverlay.MainActivity",
+    "pc-agent:start": "npm run start -w @vlue/pc-agent",
+    "office:email-sim": "node scripts/simulate-office-email-webhook.mjs",
+    "office:ppt-sim": "node scripts/simulate-office-ppt-progress.mjs",
+    "production:ready": "node scripts/production-ready.mjs",
+    "deploy:lock": "node scripts/production-ready.mjs --lock"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

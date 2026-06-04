@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VLUE</string>
+    <string name="lettering_channel_name">VLUE 레터링</string>
+    <string name="lettering_channel_desc">통화 중 VLUE 명함 오버레이</string>
+    <string name="lettering_notification_title">VLUE 레터링 동작 중</string>
+</resources>

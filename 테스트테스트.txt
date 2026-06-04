@@ -1,0 +1,6 @@
+    <nav id="nav-menu" class="flex-1 flex justify-center items-center gap-1.5 px-2">
+    <button onclick="vSelect(this, 'family')" class="v-btn v-inactive">가족</button>
+    <button onclick="vSelect(this, 'friends')" class="v-btn v-inactive">친구</button>
+    <button onclick="vSelect(this, 'work')" class="v-btn v-inactive">직장</button>
+    <button onclick="vSelect(this, 'sub')" class="v-btn v-inactive">구독</button>
+</nav>

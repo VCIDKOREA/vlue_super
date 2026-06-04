@@ -1,0 +1,6 @@
+## Android SDK — local.properties 로 복사 후 sdk.dir 설정
+# sdk.dir=C\:\\Users\\YOU\\AppData\\Local\\Android\\Sdk
+
+## 선택: gradle.properties 대신 여기서 URL 오버라이드
+# vlue.api.base.url=http://10.0.2.2:8788
+# vlue.web.base.url=http://10.0.2.2:5173

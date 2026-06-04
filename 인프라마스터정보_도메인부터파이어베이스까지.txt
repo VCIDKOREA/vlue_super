@@ -1,0 +1,11 @@
+==================================================
+[VLUE 프로덕션 인프라 마스터 정보] - 최종본
+==================================================
+도메인 = www.vlue.kr
+DATABASE_URL = postgresql://postgres:!Dlwhdrms2282@db.ywhjhdpecwvaujiagaln.supabase.co:5432/postgres
+REDIS_URL = redis://default:gQAAAAAAAb55AAIgcDE1ZTM0N2FiODgxODM0NDAyODc2OTFkZjRlMGM2NjExYQ@amazed-eft-114297.upstash.io:6379
+
+CLOUDFLARE_ACCOUNT_ID = 03064897dd6d6c98d6b5762a5641f960
+CLOUDFLARE_R2_BUCKET = vlue-storage
+FIREBASE_PROJECT_ID = vlue-c6c0b
+==================================================

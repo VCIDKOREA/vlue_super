@@ -1,0 +1,313 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		VLUEBF00000000000000001 /* VlueShellApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = VLUERF00000000000000001 /* VlueShellApp.swift */; };
+		VLUEBF00000000000000002 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = VLUERF00000000000000002 /* MainViewController.swift */; };
+		VLUEBF00000000000000003 /* VlueFamilyBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = VLUERF00000000000000003 /* VlueFamilyBridge.swift */; };
+		VLUEBF00000000000000004 /* VlueFamilyBridgeMessageHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = VLUERF00000000000000004 /* VlueFamilyBridgeMessageHandler.swift */; };
+		VLUEBF00000000000000005 /* VlueLetteringConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = VLUERF00000000000000005 /* VlueLetteringConfig.swift */; };
+		VLUEBF00000000000000006 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = VLUERF00000000000000006 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		VLUERF00000000000000001 /* VlueShellApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VlueShellApp.swift; sourceTree = "<group>"; };
+		VLUERF00000000000000002 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
+		VLUERF00000000000000003 /* VlueFamilyBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VlueFamilyBridge.swift; sourceTree = "<group>"; };
+		VLUERF00000000000000004 /* VlueFamilyBridgeMessageHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VlueFamilyBridgeMessageHandler.swift; sourceTree = "<group>"; };
+		VLUERF00000000000000005 /* VlueLetteringConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VlueLetteringConfig.swift; sourceTree = "<group>"; };
+		VLUERF00000000000000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		VLUERF00000000000000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		VLUERF00000000000000008 /* VlueShell.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VlueShell.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		VLUERF00000000000000009 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		VLUERF0000000000000000A /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		VLUEFR00000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		VLUEGR00000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				VLUEGR00000000000000002 /* Config */,
+				VLUEGR00000000000000003 /* VlueShell */,
+				VLUEGR00000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		VLUEGR00000000000000002 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				VLUERF00000000000000009 /* Debug.xcconfig */,
+				VLUERF0000000000000000A /* Release.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		VLUEGR00000000000000003 /* VlueShell */ = {
+			isa = PBXGroup;
+			children = (
+				VLUERF00000000000000001 /* VlueShellApp.swift */,
+				VLUEGR00000000000000005 /* UI */,
+				VLUEGR00000000000000006 /* Bridge */,
+				VLUEGR00000000000000007 /* Config */,
+				VLUEGR00000000000000008 /* Resources */,
+				VLUERF00000000000000007 /* Info.plist */,
+			);
+			path = VlueShell;
+			sourceTree = "<group>";
+		};
+		VLUEGR00000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				VLUERF00000000000000008 /* VlueShell.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		VLUEGR00000000000000005 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				VLUERF00000000000000002 /* MainViewController.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		VLUEGR00000000000000006 /* Bridge */ = {
+			isa = PBXGroup;
+			children = (
+				VLUERF00000000000000003 /* VlueFamilyBridge.swift */,
+				VLUERF00000000000000004 /* VlueFamilyBridgeMessageHandler.swift */,
+			);
+			path = Bridge;
+			sourceTree = "<group>";
+		};
+		VLUEGR00000000000000007 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				VLUERF00000000000000005 /* VlueLetteringConfig.swift */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		VLUEGR00000000000000008 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				VLUERF00000000000000006 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		VLUETG00000000000000001 /* VlueShell */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = VLUELC00000000000000003 /* Build configuration list for PBXNativeTarget "VlueShell" */;
+			buildPhases = (
+				VLUESP00000000000000001 /* Sources */,
+				VLUEFR00000000000000001 /* Frameworks */,
+				VLUERP00000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VlueShell;
+			productName = VlueShell;
+			productReference = VLUERF00000000000000008 /* VlueShell.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		VLUEPR00000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					VLUETG00000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = VLUELC00000000000000001 /* Build configuration list for PBXProject "VlueShell" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = ko;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				ko,
+			);
+			mainGroup = VLUEGR00000000000000001;
+			productRefGroup = VLUEGR00000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				VLUETG00000000000000001 /* VlueShell */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		VLUERP00000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				VLUEBF00000000000000006 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		VLUESP00000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				VLUEBF00000000000000001 /* VlueShellApp.swift in Sources */,
+				VLUEBF00000000000000002 /* MainViewController.swift in Sources */,
+				VLUEBF00000000000000003 /* VlueFamilyBridge.swift in Sources */,
+				VLUEBF00000000000000004 /* VlueFamilyBridgeMessageHandler.swift in Sources */,
+				VLUEBF00000000000000005 /* VlueLetteringConfig.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		VLUEBC00000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		VLUEBC00000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		VLUEBC00000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = VLUERF00000000000000009 /* Debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = VlueShell/Info.plist;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = kr.vlue.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		VLUEBC00000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = VLUERF0000000000000000A /* Release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = VlueShell/Info.plist;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = kr.vlue.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		VLUELC00000000000000001 /* Build configuration list for PBXProject "VlueShell" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				VLUEBC00000000000000001 /* Debug */,
+				VLUEBC00000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		VLUELC00000000000000003 /* Build configuration list for PBXNativeTarget "VlueShell" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				VLUEBC00000000000000003 /* Debug */,
+				VLUEBC00000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = VLUEPR00000000000000001 /* Project object */;
+}

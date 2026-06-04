@@ -1,0 +1,33 @@
+{
+  "name": "@vlue/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:core-smoke": "tsx src/tests/coreSmoke.ts",
+    "test:referral-policy": "tsx src/tests/referralSettlementPolicy.test.ts",
+    "test:signup-gate": "tsx src/tests/signupAbuseGate.test.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "@vlue/db": "*",
+    "@vlue/shared": "*",
+    "dotenv": "^16.6.1",
+    "firebase-admin": "^13.4.0",
+    "hono": "^4.6.0",
+    "ioredis": "^5.11.0",
+    "jose": "^6.2.3",
+    "sharp": "^0.33.5",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

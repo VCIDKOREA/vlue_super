@@ -1,0 +1,79 @@
+좋아요. 현재 코드 기준으로 VLUE 앱 기능 전체를 서비스 관점에서 정리하면 아래입니다.
+(요청하신 대로 디지털 인증명함부터 시작)
+
+1) 디지털 인증명함 / 명함지갑
+디지털 인증명함 발급/표시 (DigitalAuthCard, digitalCardApi)
+명함 프로필 편집 (이름/직책/소속/연락처/프로모션 문구)
+명함 지갑(수신/보관/조회) (WalletHubModal, cardWalletStorage)
+명함 QR/보안 검증 링크 (bizcardSecurityQr, BizcardInlineQr)
+명함 SVG 내보내기/공유용 이미지 생성 (letteringBizcardSvgExport, bizcardSvgEngineCore)
+VCF(연락처) 저장 연동 (contactVcfSave)
+2) 레터링 명함(고급 명함 표현)
+레터링 명함 템플릿 선택/미리보기/설정 (LetteringBusinessCardPanel, LetteringBizcardTemplatePicker)
+레터링 보안 프레임/유효기간/검증표시
+수신 알림/오버레이/인증 모달 (LetteringIncomingNotification, LetteringOverlayHost, LetteringCertModal)
+레터링 리포트/상세 시트 화면
+3) 인증/로그인/계정
+일반 로그인/온보딩 (LoginScreen, VlueOnboarding)
+카카오 소셜 로그인/OAuth 리턴 처리
+생체인증 게이트 (BiometricGate, webauthnBiometric)
+기기 토큰/세션 저장, 자동로그인 관련 처리
+4) 채팅/메신저 코어
+채팅 목록/채팅방 (ChatList, ChatRoom)
+채팅방 핀/음소거/이름변경/숨김 (chatRoomPrefsStorage)
+DM/친구/가족/업무/구독 탭 기반 대화 구조
+통합 검색 (appUnifiedSearch)
+푸시 알림 인박스 (PushNotificationInbox)
+5) Blue AI / 보조 기능
+Blue AI 채팅 화면 (BlueAIChat)
+상담/가이드형 보조 응답 UX
+활동/홍보 카드 발송 보조 흐름 일부 연동
+6) 가족보호(패밀리 세이프티)
+가족 보호 등록/연동 UI (FamilyProtectionRegister)
+가족 호출/디바이스 브리지/네이티브 릴레이
+사이트 가드/자녀 워드 활성
+가족 보호 상태 API 연동 + 데모 피어 병합
+7) 홈/상점 탐색/구독·알림
+홈 배너/카테고리 상점 탐색
+관심상점(찜) 관리 (favoriteShopsStorage)
+상점 구독/알림 설정 (shopPushStorage)
+상점별 메시지 보내기/전화문의/채팅 진입
+8) 쇼핑/결제
+스토어 장바구니 (shoppingCartStorage, StoreShoppingCartPanel)
+결제 모달(선택 상품 결제) (StoreCartCheckoutModal)
+쇼핑 카트 허브 탭
+구독/예약 (예약상품, 방문예약, 구독항목)
+결제 (통합/부분 결제)
+관심상품
+세금·지출 (CSV 다운로드 데모)
+관심상품 위시리스트 저장/체크/삭제
+9) MY 페이지 / 페이지 운영
+MY 프로필/활동 미리보기
+게시물 작성/업로드
+카테고리 노출 게시물 설정
+페이지 관리 진입/저장 연동
+베타 운영 가이드, 명함 지갑 진입
+10) VLUE PAGE + 상점 운영
+페이지 관리(이름/소개/사진/홈페이지/문의처)
+상점 입점 신청 (VlueStoreApplicationPanel)
+상품 등록/수정/삭제 관리 (VlueStoreProductManager, VlueStoreProductForm)
+상점 판매 상품 쇼케이스
+상품 장바구니 담기/구매/기업 구매요청 분기
+11) 멤버십/요금/업그레이드
+멤버십 종류/요금 계산 로직 (membershipBm)
+업그레이드 모달/혜택 비교 (MembershipUpgradeModal, MembershipBenefitsCompare)
+가입 후 결제 유도 모달 (PostSignupPaymentModal)
+개인 콤보 결제 요약 (PersonalComboPanel)
+12) B2B/기업 기능
+기업 회선·직원 관리 패널 (EnterpriseLineManagePanel)
+기업 구성원 관리/권한/자격 증명
+기업 조달(공용 장바구니/요청)
+기업 그룹채팅
+B2B 가입 폼/회사 연락처/서류 섹션
+그룹 가입/라인 수/청구 주기 계산 로직 (groupSignupBm)
+기업 접근 권한 체크 유틸 (enterpriseLineManageAccess)
+13) 기타 운영/관리자/데모
+VLUER 파트너 대시보드/섹션 (VluerPartnerDashboard, VluerPartnerSection)
+관리자 시크릿 앱/기업 귀속 관리자 패널
+로컬 광고 등록 모달
+리뷰어 체험단 작성 보드(ActiveBoard)

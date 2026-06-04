@@ -1,0 +1,26 @@
+{
+  "name": "@vlue/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "echo \"(JSX) typecheck optional\""
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.1",
+    "@vlue/shared": "*",
+    "gsap": "^3.15.0",
+    "jspdf": "^4.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "sharp": "^0.34.5",
+    "vite": "^5.4.10"
+  }
+}

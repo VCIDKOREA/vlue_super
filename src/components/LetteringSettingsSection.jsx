@@ -1,0 +1,91 @@
+import { useCallback, useEffect, useState } from "react";
+import {
+  readLetteringEnabled,
+  requestLetteringPermissions,
+  writeLetteringEnabled
+} from "../lib/letteringSettings.js";
+
+/** 메인 앱 설정 — VLUE 레터링 켜기/끄기 + 권한 유도 */
+export default function LetteringSettingsSection({ isDarkMode = false, onNotice, onOpenBizcardHub }) {
+  const [enabled, setEnabled] = useState(() => readLetteringEnabled());
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const onChange = () => setEnabled(readLetteringEnabled());
+    window.addEventListener("vlue-lettering-settings-changed", onChange);
+    return () => window.removeEventListener("vlue-lettering-settings-changed", onChange);
+  }, []);
+
+  const handleToggle = useCallback(
+    async (next) => {
+      if (!next) {
+        writeLetteringEnabled(false);
+        setEnabled(false);
+        onNotice?.("VLUE 레터링이 꺼졌습니다.");
+        return;
+      }
+      setBusy(true);
+      const perm = requestLetteringPermissions();
+      writeLetteringEnabled(true);
+      setEnabled(true);
+      setBusy(false);
+      if (perm.ok) {
+        onNotice?.("레터링이 켜졌습니다. 통화 시 VLUE 명함이 표시됩니다.");
+      } else {
+        onNotice?.(
+          "레터링이 켜졌습니다. 다른 앱 위에 표시·통화 상태 권한을 설정에서 허용해 주세요."
+        );
+      }
+    },
+    [onNotice]
+  );
+
+  const border = isDarkMode ? "border-white/10 bg-white/5" : "border-gray-100 bg-white";
+  const label = isDarkMode ? "text-gray-200" : "text-gray-700";
+  const hint = isDarkMode ? "text-gray-400" : "text-gray-500";
+
+  return (
+    <div className={`rounded-2xl border p-3 ${border}`}>
+      <p className={`mb-1 text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
+        VLUE 레터링
+      </p>
+      <p className={`mb-3 text-[11px] leading-snug ${hint}`}>
+        통화 수·발신 시 VLUE 인증 명함을 화면 상단에 표시합니다. 꺼두면 백그라운드 감시가 중지됩니다.
+      </p>
+      <label className={`flex items-center justify-between text-[12px] font-semibold ${label}`}>
+        레터링 기능 켜기
+        <input
+          type="checkbox"
+          checked={enabled}
+          disabled={busy}
+          onChange={(e) => handleToggle(e.target.checked)}
+        />
+      </label>
+      {enabled ? (
+        <button
+          type="button"
+          className={`mt-3 w-full rounded-lg border py-2 text-[11px] font-bold ${
+            isDarkMode ? "border-blue-400/40 text-blue-300" : "border-blue-200 text-blue-700"
+          }`}
+          onClick={() => requestLetteringPermissions()}
+        >
+          통화·오버레이 권한 다시 확인
+        </button>
+      ) : null}
+      <p className={`mt-3 text-[10px] leading-snug ${hint}`}>
+        명함 신청·미리보기·수정은 프로필 메뉴 첫 화면 상단 「디지털인증명함」 카드에서만 할 수 있습니다.
+      </p>
+      {onOpenBizcardHub ? (
+        <button
+          type="button"
+          className={`mt-2 w-full rounded-lg border py-2 text-[11px] font-bold ${
+            isDarkMode ? "border-cyan-500/35 text-cyan-200" : "border-cyan-200 text-cyan-800"
+          }`}
+          onClick={onOpenBizcardHub}
+        >
+          명함 설정 화면으로 이동
+        </button>
+      ) : null}
+    </div>
+  );
+}

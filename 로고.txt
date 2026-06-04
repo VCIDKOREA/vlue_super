@@ -1,0 +1,17 @@
+import sharp from "sharp";
+import { writeFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, "..");
+const outPath = join(root, "vlue-logo-128.png");
+
+const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect x="1" y="1" width="62" height="62" rx="14" fill="#1d5fd3"/>
+  <path d="M32 16l-12 6.5v9.2c0 10 5.8 18.5 12 21.3 6.2-2.8 12-11.3 12-21.3v-9.2L32 16z" fill="none" stroke="#ffffff" stroke-width="4" stroke-linejoin="round"/>
+</svg>`;
+
+await sharp(Buffer.from(svg)).resize(128, 128).png().toFile(outPath);
+console.log("Written:", outPath);

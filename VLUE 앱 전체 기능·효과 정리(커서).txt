@@ -1,0 +1,340 @@
+VLUE 앱 전체 기능·효과 정리
+VLUE는 디지털 명함 + 채팅 + 커머스 + B2B 스마트 오피스 + 가족 보호를 하나의 앱에 묶은 플랫폼입니다. React/Vite 웹앱이 중심이고, Android 네이티브는 전화·레터링 오버레이·가족 보호를 담당합니다.
+
+1. 앱 진입 구조 (3가지 셸)
+셸	주소	역할
+일반 사용자 앱
+/ (localhost:5173)
+메인 VLUE 앱
+시크릿 관리자
+.env의 VITE_ADMIN_PATH
+가입 승인·마케팅·공지 관리
+본사 HQ 관제
+/super-admin-hq
+PC 4:6 분할 홈 레이아웃 편집·배포
+2. 로그인 전 ~ 앱 진입 흐름
+스플래시 (Splash)
+VLUE 브랜드 영상(eye2_vlue.mp4) 재생
+페이드아웃 + VLUE 글자 애니메이션
+탭하면 음소거 해제
+영상 없으면 정적 화면으로 대체
+로그인 (LoginScreen)
+회원 ID + 비밀번호 로그인
+로그인 정보 기억
+카카오 / Google / Naver / Apple / PASS 소셜 로그인 팝업
+비밀번호 표시 토글 시 눈(VlueEyeMark) 깜빡임 애니메이션
+회원가입 (VlueOnboarding)
+멤버십 선택: 무료(free) / 유료(paid) / 기업(B2B)
+약관 동의, PASS 본인인증
+B2B: 사업자번호, 직함, 단체 다회선 가입
+추천인 코드, 생체인증 등록
+디지털 명함 발급 신청
+유료/B2B: 결제 금액·주기(월/년) 미리보기
+가입 후 결제 (PostSignupPaymentModal)
+가입 직후 멤버십 결제 안내 (건너뛰기 가능)
+생체인증 게이트 (BiometricGate)
+WebAuthn 지문/얼굴 인증
+24시간 유예(grace) 동안은 재인증 생략
+3. 메인 네비게이션 (하단 5탭)
+탭	이동 화면	설명
+채팅
+채팅 목록 / 채팅방
+메신저
+BlueAI
+AI 대화
+VLUE AI 어시스턴트
+MY (중앙 아바타)
+마이페이지
+프로필·피드·설정 허브
+쇼핑
+VLUE Store (subhub)
+미디어 커머스·선물함 등
++
+친구 검색
+친구 추가·가족 보호 등록
+UX 효과
+
+탭 누를 때 scale-95 눌림 효과
+미확인 메시지 있으면 아이콘 펄스 애니메이션
+하단바 블러 + safe-area(노치) 대응
+PC(900px+)에서는 최소화된 채팅방 플로팅 필 표시
+상단 헤더 (홈·채팅·쇼핑)
+VLUE 눈 로고 → 홈으로 (눈 깜빡임 애니메이션)
+통합 검색 (메뉴·스토어·채팅)
+CS 스캐너 / 이메일 / QR 스캐너 바로가기
+프로필 패널 슬라이드 오버
+4. 홈 (Home)
+배너·콘텐츠
+공식 광고 배너 캐러셀 — 5.2초 자동 슬라이드, 드래그·화살표·도트
+VLUE PICK / AI 추천 / 핫플레이스 / 카테고리 — HQ에서 편집한 레이아웃 API 반영
+업데이트 스토리 — 구독·친구·추천 탭, NEW 뱃지
+카테고리 조회 — 음식·뷰티·교육·수리·채용·의료 등 6대 분류 + 하위 카테고리
+우리동네 매장 카드 — 거리·평점·좋아요·구독·푸시 토글
+안내·가이드
+VLUE 가이드, 보이스피싱 뉴스, 업데이트 상세 배너
+첫 30초 가이드 오버레이 — 디지털 명함·레터링·스토어 등 기능 소개
+부가 기능
+Vluer 파트너 대시보드 — 추천 수익 UI
+로컬 광고 등록 모달
+멤버십 업그레이드 모달
+다크 모드 지원
+마케팅·공지 (홈 진입 시)
+마케팅 팝업 — 전체 화면 이미지, “오늘 하루 보지 않기”, CTA 링크, 블러 배경
+공지 토스트 — SSE로 실시간 공지 → 탭하면 상세 시트
+5. 채팅
+채팅 목록 (ChatList)
+탭 필터: 전체 / 즐겨찾기 / 비즈니스 / 미확인 / 구독 / 알림
+가족·친구·업무·구독 채널 등 방 목록
+미확인 뱃지 (99+ 상한)
+길게 누르기 → 고정·음소거·숨김·이름 변경·즐겨찾기
+채팅방 (ChatRoom)
+디지털 명함 카드 뒤집기 (card-flip) 애니메이션
+무료 등급 일반 레터링 카드
+전화 걸기 → VLUE 음성 브릿지
+갤러리·카메라·파일 첨부 미리보기
+가족 보호 뱃지 (가족 방)
+VLUE 공식 채널 (vlue:official) 전용 UI
+음성/라이브 표시 핑 애니메이션
+알림 탭
+PushNotificationInbox — 앱 내 푸시 알림함
+서버 연동
+DM(1:1) 서버 동기화 (VlueDmChat)
+읽음 처리·차단·친구 요청 API
+6. BlueAI (BlueAIChat)
+VLUE AI와 대화하는 챗 UI
+답변 시 하단 탭 활동 펄스 표시
+입력창 safe-area 대응, 자동 스크롤
+7. 친구 검색 (FriendSearch)
+이름·핸들·지역으로 사용자 검색
+친구 요청 보내기 / 수락·거절·차단
+받은 요청 인박스
+가족 보호 등록 (FamilyProtectionRegister) 내장
+8. 마이페이지 (MyPage)
+MY VLUE PAGE
+인스타그램형 그리드 피드
+게시 작성 — 캡션, 위치, 해시태그, 공개 범위, 지역 노출 카테고리
+활동·관심
+ActiveBoard — 활동 보드 위젯
+관심상점 / 구독 / 알림설정 (바텀 시트)
+계정·기기
+소셜 계정 연동 (카카오 등)
+새 기기 로그인 승인 (DeviceApprovalPanel)
+개인 콤보 구독 (PersonalComboPanel)
+기업(B2B) 전용
+멤버 관리, 자격증명, 구매·조달, 그룹 채팅
+스토어 운영 (유료+승인)
+VlueStoreShopSection — 내 상점
+AiSourcingUploadScreen — AI 상품 소싱 업로드
+링크
+명함 지갑, 레터링 명함 설정, 베타 가이드, 업데이트 스토리
+9. 프로필 패널 (ProfilePanel) — 사이드 메뉴
+메뉴	기능
+디지털 명함
+필드 편집, VCID 인증 모드
+레터링 명함
+템플릿·보안 오버레이·공유
+명함 지갑
+받은 명함 보관
+이메일 / 스토어 장바구니
+@vlue.kr 메일, 쇼핑
+기업 회선 관리
+B2B 다회선
+쇼핑 카트 허브
+통합 장바구니
+설정
+
+채팅 닉네임·아바타·읽음 확인·방해 금지·전화번호 검색 허용
+멤버십 업그레이드·등급 변경 요청
+Vluer 파트너 섹션·코드 변경
+지갑 카드 공개 (WalletRevealCard)
+로그아웃·회원 탈퇴 (환불·재인증 단계)
+다크 모드 토글
+10. VLUE Store / 쇼핑 (Subscription)
+미디어 커머스 탭
+전체 / 미디어쇼핑 / 페이지쇼핑 / 공동구매
+MediaCommerceFeed — 영상+상품 하이브리드 피드
+ShortsCarousel — 가로 숏츠 캐러셀
+Shorts 탭 → 전체화면 MediaCommerceShortsPlayer (하단바 숨김)
+MediaCommercePlayerSheet — 영상·상품 바텀 시트
+AiRecommendCarousel — AI 추천
+CountdownTicker — 공동구매 카운트다운
+CommerceSideRail — 사이드 레일
+ChannelProfileLink / StoreProfileHome — 채널·스토어 프로필
+유틸 탭
+선물함 (GiftBoxPanel)
+채팅 문의
+쇼핑 보관함
+PartnershipVaultScreen — 파트너 상품 금고
+결제·장바구니
+ShopCheckout, StoreCartCheckoutModal
+선물·장바구니 뱃지, 선물 도착 토스트
+스토어 공지 모달 (오늘 하루 안 보기)
+11. 디지털 명함 & 레터링 (핵심 차별 기능)
+디지털 명함
+무료/유료/B2B 등급별 카드
+카드 뒤집기 3D 플립
+VCID 검증 명함 모드
+vCard 저장 → 연락처 앱에 저장
+카카오 피드용 미리보기 (KakaoBizcardFeedPreview)
+BizcardInlineQr — 카드 내 QR
+레터링 (전화·명함 보안)
+LetteringBusinessCardPanel — 레터링 명함 UI
+LetteringBizcardSettingsView — 템플릿·보안 프레임
+LetteringBizcardSharePanel — 공유
+LetteringCertModal — 인증서 보기
+LetteringReportSheet / DetailPage — 신고·상세
+LetteringPhoneMatchPanel — 전화번호 매칭
+LetteringIncomingNotification — 수신 알림
+LetteringOverlayHost — 통화 중 오버레이
+LetteringNotificationPreviewPage — #lettering-preview 미리보기
+전화번호 신고·차단 API
+Android 네이티브 연동
+통화 중 레터링 오버레이 (CallOverlayService)
+JS ↔ 네이티브 브릿지 (명함 조회, 가족 보호)
+12. 지갑 & 스마트 오피스 (WalletHubModal)
+탭	기능
+받은 명함
+vCard 저장·공유
+내 명함
+내 디지털 카드
+개인 작업실
+PC 원격·스캔·파일
+서류 양식
+PDF 템플릿 생성
+B2B
+기업 회선 장바구니
+멤버
+기업 멤버 관리
+오피스 기능
+CsScannerScreen — 문서 스캔 업로드
+VlueEmailInboxScreen — @vlue.kr 전체 화면 메일함
+OfficeEmailInboxPanel — 메일 패널
+OfficePptWorkshopPanel — AI PPT 생성 작업 (SSE 진행률)
+OfficeRemotePanel — PC 원격 제어 큐
+DocumentTemplatesPanel — 사업 서류 템플릿
+B2BLineCartPanel — 회선 구매·활성화
+앱 모드
+개인 모드 ↔ 오피스 모드 전환
+오피스 카드 만료 시 자동 개인 모드 + 토스트
+13. B2B / 기업 기능
+가입
+B2B 멤버십 트랙, 사업자 정보, 단체 다회선 가입
+GroupSignupSetupModal — 회선 수·요금·결제 요약
+기업 관리 (마이페이지·프로필)
+EnterpriseMemberManagePanel — 멤버·역할
+EnterpriseMemberCredentialsPanel — 직원 로그인 자격
+EnterpriseLineManagePanel — 프리미엄 회선·내선번호
+EnterpriseProcurementPanel — 구매 요청·승인
+EnterpriseGroupChatPanel — 사내 그룹 �AT (SSE 알림)
+EnterpriseBrandingEditor — 로고·브랜딩
+DeviceApprovalPanel — 새 기기 로그인 승인
+API
+B2B 카트·등록·브랜딩·멤버·그룹채팅
+기업 쇼핑: 대시보드·구매·세금 CSV·법인 지갑
+14. 가족 보호 (Family Protection)
+보호자 ↔ 피보호자 연결·초대·해제
+통화 알림 — 위험 통화·부재중 신고
+위험 사이트 신고
+원격 제어 앱 탐지 (Android)
+계좌 거래 모니터링 + 동의 플로우
+사이트 가드 설치 (familyProtectionSiteGuard)
+SSE: vlue-family-protection-alert, -invite, -accepted, -bank-consent-request
+채팅 가족 방에 보호 뱃지 표시
+15. Vluer 파트너 프로그램
+추천 코드 발급·검증
+VluerPartnerDashboard — 수익·조직도
+커미션·정산·티어 업그레이드
+코드 변경 요청/승인
+프로필에서 파트너 문의
+16. 캠페인·리뷰·광고·QR
+ReviewSubmissionForm — 캠페인 리뷰 제출
+LocalAdRegisterModal — 로컬 광고 자가 등록
+MakingStudioModal — 크리에이티브 스튜디오
+QR 스캐너 — 카메라·수동 토큰, 방문 인증(결제 연동 예정)
+캠페인 매칭·리뷰 승인·매장 QR 결제 (API)
+17. 피드 & 페이지 관리
+PersonalFeed — 다른 사용자/명함 피드 보기
+FeedManager — 페이지명·소개·공지·홈·연락처·프로필 이미지
+VlueStoreApplicationPanel — 스토어 입점 신청
+VlueStoreProductManager — 상품 관리
+18. 결제·멤버십·지갑(금융)
+멤버십
+free / paid / b2b 3단계
+월/년 결제, 추천인 할인
+MembershipBenefitsCompare, MembershipUpgradeModal
+PortOne/Iamport 결제 연동
+지갑
+현금 잔액 + 리워드 포인트
+출금 계좌 등록, 입출금 요청
+Vluer 커미션 (포인트 전용)
+결제 API
+구독 완료, 에스크로 홀드, 쇼핑 주문 준비
+19. 실시간(SSE) 효과
+/api/realtime/sse 연결 후 앱 전역 반응:
+
+이벤트	효과
+카드 접근 회수
+강제 개인 모드 + 토스트
+가입 자동 승인
+토스트
+오피스 메일 도착
+토스트 + 파일 갱신
+PPT 진행/완료
+진행 토스트
+공지 배포
+상단 토스트 → 상세 시트
+명함 문의 푸시
+토스트
+가족 보호 알림
+토스트
+기업 그룹채팅
+알림
+HQ 홈 레이아웃 변경
+캐시 갱신 이벤트
+20. 관리자 기능
+시크릿 관리자 (VITE_ADMIN_PATH)
+기기 승인 — PC 6자리 코드 ↔ 마스터 폰 4초 폴링
+가입 승인 — 온보딩 통계·수동 검수 큐 (8초 자동 새로고침)
+마케팅 센터 — 팝업 등록·일정·폰 미리보기
+콘텐츠 센터 — 공지 배포 + SSE 전송 건수
+귀속 승인 — 법인 귀속 관리
+HQ Super Admin (/super-admin-hq)
+SUPER_ADMIN 로그인
+4:6 분할 관제 데스크
+왼쪽: VLUE PICK / AI 추천 / 핫플 / 카테고리 편집
+오른쪽: 1920px 실시간 미리보기 (스케일·스크롤)
+실서비스 배포 → 홈 API + 캐시 반영
+21. Android 앱 (apps/android)
+기능	설명
+통화 오버레이
+수/발신 시 레터링 카드 표시
+레터링 JS 브릿지
+웹↔네이티브 명함 조회
+가족 보호
+통화 로그·부재중·앱 스캔
+WebView
+Vite 앱 로드 (local.properties URL 설정)
+빌드: npm run android:assemble, android:install, android:launch
+
+22. 백엔드 API 도메인 (요약)
+인증·소셜·PASS / 채팅·DM / 명함·vCard·카카오피드 / 피드·게시 / 지갑·출금 / 레터링·신고 / B2B·기업 / Vluer·정산 / 가족보호·OpenBanking / 결제·에스크로 / 캠페인·리뷰 / 광고 / 쇼핑·공동구매 / AI 소싱·라이브 / 오피스(메일·PPT·원격·스캔) / 마케팅·공지·홈레이아웃 / 관리자·HQ / IoT·PC에이전트 / 크론(구독·재인증)
+
+23. 공통 UX·효과
+효과	사용처
+VluePillToast
+하단 알약형 토스트 (로그인·SSE·가족·오피스 등)
+모달·바텀 시트
+마케팅·공지·지갑·QR·티어 결제·레터링
+애니메이션
+스플래시·눈 깜빡임·카드 플립·핑·캐러셀·공지 토스트
+블러 배경
+헤더·하단바·모달·QR
+다크 모드
+셸·채팅·쇼핑
+오늘 하루 안 보기
+마케팅 팝업·스토어 공지
+에러 바운더리
+앱 루트·가입 플로우 크래시 복구
+24. 한 줄 요약
+VLUE = 명함(레터링) + 메신저 + AI + 미디어 쇼핑 + B2B 스마트 오피스 + 가족 보호 + 파트너 수익을 하나의 앱에서 돌리고, 관리자/HQ로 홈·마케팅·공지·가입을 운영하는 B2B2C 슈퍼앱입니다.
+

@@ -1,0 +1,32 @@
+{
+  "name": "@vlue/db",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./guards/legal-name": "./src/guards/legal-name.immutable.ts"
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "generate:safe": "node ../../scripts/prisma-generate-safe.mjs",
+    "migrate": "prisma migrate dev",
+    "migrate:lettering": "prisma db execute --file prisma/migrations/20260519120000_lettering_phone_blocks/migration.sql --schema prisma/schema.prisma && prisma migrate resolve --applied 20260519120000_lettering_phone_blocks",
+    "verify:lettering": "node scripts/verify-lettering-tables.mjs",
+    "deploy": "prisma migrate deploy",
+    "studio": "prisma studio",
+    "postinstall": "prisma generate",
+    "seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.3.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

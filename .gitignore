@@ -1,0 +1,14 @@
+node_modules/
+dist/
+web/dist/
+.env
+**/.env
+.env.*.local
+.env.production
+**/.env.production
+apps/api/.env
+apps/api/.env.production
+web/.env.production
+deployment.lock.json
+*.log
+.DS_Store

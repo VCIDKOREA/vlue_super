@@ -1,0 +1,145 @@
+import { useState } from "react";
+import { formatKrw, isB2bMembershipKind, POST_SIGNUP_PAYMENT_NOTICE } from "../lib/membershipBm.js";
+import { postSubscribeComplete } from "../lib/subscribeCompleteApi.js";
+import { requestIamportBillingPay } from "../lib/iamportClient.js";
+import { getPortoneUserCode } from "../lib/portoneEnv.js";
+import { clearPendingPayment } from "../lib/postSignupPayment.js";
+
+/**
+ * 가입·본인인증 완료 후 첫 구독 결제
+ * @param {{ membershipKind: string, billingCycle: string, amountKrw: number, label?: string }} pending
+ */
+export default function PostSignupPaymentModal({ open, pending, onComplete, onSkip }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  if (!open || !pending) return null;
+
+  const isB2b = isB2bMembershipKind(pending.membershipKind);
+  const title = isB2b ? "기업 단체 멤버십 결제" : "유료 멤버십 결제";
+
+  const runPay = async ({ devBypass = false } = {}) => {
+    setBusy(true);
+    setError("");
+    try {
+      let userId = "";
+      try {
+        userId = localStorage.getItem("vlue_server_user_id") || "";
+      } catch {
+        /* ignore */
+      }
+      if (!userId) throw new Error("로그인 정보가 없습니다. 다시 로그인해 주세요.");
+
+      const customer_uid = `user_customer_${userId}`;
+      const billingCycle = pending.billingCycle === "annual" ? "annual" : "monthly";
+      const amount = Number(pending.amountKrw) || 0;
+
+      if (devBypass) {
+        if (!import.meta.env.DEV) throw new Error("개발 전용 결제 우회는 로컬에서만 가능합니다.");
+        await postSubscribeComplete({
+          customer_uid,
+          merchant_uid: `dev_billing_${Date.now()}`,
+          amount,
+          billingCycle,
+          devBillingBypass: true
+        });
+      } else {
+        const userCode = getPortoneUserCode();
+        let buyerTel;
+        try {
+          const ph = localStorage.getItem("vlue_phone_e164") || localStorage.getItem("myCardPhone");
+          if (ph) buyerTel = String(ph).replace(/\D/g, "").replace(/^82/, "0");
+        } catch {
+          /* ignore */
+        }
+        const rsp = await requestIamportBillingPay({
+          userCode,
+          userId,
+          amount,
+          billingCycle,
+          buyerName: localStorage.getItem("vlue_legal_name") || undefined,
+          buyerTel
+        });
+        await postSubscribeComplete({
+          customer_uid: rsp.customer_uid || customer_uid,
+          merchant_uid: rsp.merchant_uid || `billing_${Date.now()}`,
+          amount,
+          billingCycle
+        });
+      }
+
+      try {
+        localStorage.setItem("vlue_subscription_paid", "1");
+      } catch {
+        /* ignore */
+      }
+      clearPendingPayment();
+      setDone(true);
+      onComplete?.();
+    } catch (e) {
+      setError(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl">
+        <h2 className="text-[17px] font-black text-slate-900">{title}</h2>
+        <p className="mt-2 text-[12px] leading-relaxed text-slate-600">{POST_SIGNUP_PAYMENT_NOTICE}</p>
+        {pending.label ? (
+          <p className="mt-2 text-[11px] font-bold text-indigo-800">{pending.label}</p>
+        ) : null}
+
+        <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/80 px-4 py-3">
+          <p className="text-[11px] font-bold text-slate-500">결제 예정 금액</p>
+          <p className="text-[22px] font-black tabular-nums text-indigo-900">{formatKrw(pending.amountKrw)}</p>
+          <p className="text-[10px] text-slate-600">
+            {pending.billingCycle === "annual" ? "1년 구독" : "월 구독"} · 카드 등록 후 첫 회차 청구
+          </p>
+        </div>
+
+        {error ? <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[12px] text-red-800">{error}</p> : null}
+        {done ? (
+          <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-[12px] font-bold text-emerald-800">
+            결제가 완료되었습니다.
+          </p>
+        ) : null}
+
+        <div className="mt-5 flex flex-col gap-2">
+          <button
+            type="button"
+            disabled={busy || done}
+            onClick={() => runPay()}
+            className="w-full rounded-2xl bg-indigo-600 py-3.5 text-[14px] font-black text-white disabled:opacity-50"
+          >
+            {busy ? "결제 처리 중…" : `카드 등록 및 결제 (${formatKrw(pending.amountKrw)})`}
+          </button>
+          {import.meta.env.DEV ? (
+            <button
+              type="button"
+              disabled={busy || done}
+              onClick={() => runPay({ devBypass: true })}
+              className="w-full rounded-xl border border-dashed border-amber-400 py-2.5 text-[12px] font-bold text-amber-950"
+            >
+              개발 전용: 결제 우회
+            </button>
+          ) : null}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              clearPendingPayment();
+              onSkip?.();
+            }}
+            className="w-full rounded-xl border border-slate-200 py-2.5 text-[13px] font-semibold text-slate-600"
+          >
+            나중에 결제 (마이페이지)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

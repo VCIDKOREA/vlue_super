@@ -1,0 +1,21 @@
+{
+  "name": "@vlue/shared",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./money": "./src/money/moneyKrw.ts",
+    "./membership": "./src/membership/membershipBmConstants.ts",
+    "./settlement": "./src/settlement/referralSettlementPolicy.ts",
+    "./settlement/constants": "./src/settlement/settlementConstants.ts",
+    "./signup": "./src/signup/signupGateCore.ts",
+    "./phone": "./src/phone/krPhone.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

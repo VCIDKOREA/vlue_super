@@ -1,0 +1,3 @@
+// 로컬: Mac에서 Vite/API 실행 후 시뮬레이터에서 127.0.0.1 사용
+VLUE_WEB_BASE_URL = http://127.0.0.1:5173
+VLUE_API_BASE_URL = http://127.0.0.1:8788

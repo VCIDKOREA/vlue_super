@@ -1,0 +1,10 @@
+# 로컬 PostgreSQL — `docker compose up -d` 후 apps/api/.env 의 DATABASE_URL 과 맞출 것
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: vlue

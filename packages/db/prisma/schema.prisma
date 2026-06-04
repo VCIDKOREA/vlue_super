@@ -1,0 +1,2184 @@
+// VLUE — packages/db
+// PostgreSQL + Prisma. User ↔ UserBusinessProfile (1:1), User ↔ FriendRequest (1:N 발신/수신).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------------------
+
+enum UserRole {
+  user
+  admin
+}
+
+enum AccountStatus {
+  /// 본인인증 전
+  pending_identity
+  /// 사업자 등 — 관리자 승인 대기 (가입 시각은 createdAt / 본인인증 후 대기 시작은 pendingApprovalAt)
+  pending_approval
+  active
+  suspended
+}
+
+/// 실서버 매니페스트 User.status — 계정 생명주기(활성·비활성·탈퇴)
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  DELETED
+}
+
+enum FriendRequestStatus {
+  pending
+  accepted
+  rejected
+  cancelled
+}
+
+enum VouchRequestStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+/// 명함 유형: 휴대폰 / 내선 / 대표번호
+enum BusinessCardKind {
+  mobile
+  extension
+  rep_number
+}
+
+enum CardVerificationStatus {
+  pending
+  approved
+  rejected
+}
+
+enum CardMemberRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+enum CampaignStatus {
+  draft
+  recruiting
+  closed
+  cancelled
+}
+
+enum CampaignTierScope {
+  all
+  standard_premium
+  premium_only
+}
+
+enum CampaignApplicationStatus {
+  applied
+  accepted
+  rejected
+  withdrawn
+}
+
+enum MatchStatus {
+  matched
+  verified
+  review_submitted
+  settled
+  overdue
+  cancelled
+}
+
+enum VerificationMethod {
+  gps
+  receipt
+  photo_meta
+}
+
+enum VerificationStatus {
+  pending
+  passed
+  failed
+}
+
+enum ReviewStatus {
+  draft
+  submitted
+  approved
+  rejected
+}
+
+enum EscrowStatus {
+  held
+  released
+  refunded
+}
+
+enum WalletEntryType {
+  escrow_hold
+  escrow_release
+  withdrawal
+  penalty
+  credit
+}
+
+enum NotificationStatus {
+  unread
+  read
+}
+
+// -----------------------------------------------------------------------------
+// User
+// -----------------------------------------------------------------------------
+// legal_name 보호 정책:
+// - INSERT: 본인인증(Portone) 성공 직후 단 한 번만 비-null 로 설정 가능.
+// - UPDATE: legal_name, legal_name_locked_at 은 서비스 코드에서 절대 덮어쓰지 말 것.
+//           (구현 가이드: packages/db/src/guards/legal-name.immutable.ts)
+// - DB 트리거(선택): production 에서 UPDATE 시 OLD.legal_name IS DISTINCT FROM NEW.legal_name 이면 RAISE.
+// -----------------------------------------------------------------------------
+
+model User {
+  id     String  @id @default(uuid()) @db.Uuid
+  email  String? @unique
+
+  /// 매니페스트 phoneNumber — E.164 정규화 연락처 (예: +821012345678)
+  phoneE164 String? @unique @map("phone_e164")
+
+  /// 앱 표시용 회원 ID(슬러그). @ 없이 소문자 영숫자·밑줄 3~20자 권장 — 확정 후 변경 없음.
+  publicHandle String? @unique @map("public_handle") @db.VarChar(32)
+
+  /// 로그인 비밀번호(scrypt 해시). null 이면 비밀번호 로그인 불가(관리자·레거시 등).
+  passwordHash String? @map("password_hash") @db.VarChar(256)
+
+  /// 실명 — 한 번 확정되면 불변. nullable 은 "인증 전" 상태만 허용.
+  legalName         String?   @map("legal_name") @db.VarChar(120)
+  legalNameLockedAt DateTime? @map("legal_name_locked_at") @db.Timestamptz(6)
+
+  identityVerified   Boolean   @default(false) @map("identity_verified")
+  identityVerifiedAt DateTime? @map("identity_verified_at") @db.Timestamptz(6)
+
+  portoneIdentityId String? @unique @map("portone_identity_id") @db.VarChar(255)
+
+  /// 가입 경로 — 신규 회원은 vlue_native 만 허용 (소셜 신규 가입 차단)
+  signupMethod String @default("vlue_native") @map("signup_method") @db.VarChar(32)
+
+  /// @deprecated 레거시 — 신규 연동은 user_social_login_links 사용
+  socialProvider String? @map("social_provider") @db.VarChar(32)
+  socialId       String? @map("social_id") @db.VarChar(80)
+
+  /// 소셜 등에서 이메일 검증 완료 여부(카카오 is_email_verified 등). 본인인증(identityVerified)과 별개.
+  isVerified Boolean @default(false) @map("is_verified")
+
+  /// CI 등: 평문 저장 지양. 해시만 보관(법무·보안 정책에 따라 컬럼 제거 가능).
+  ciHash Bytes? @map("ci_hash")
+
+  /// Portone 본인인증 생년월일 YYYYMMDD
+  birthDate String? @map("birth_date") @db.VarChar(8)
+  /// M / F
+  gender String? @map("gender") @db.VarChar(1)
+
+  role            UserRole        @default(user)
+  accountStatus   AccountStatus   @default(pending_identity) @map("account_status")
+
+  /// 매니페스트 status — ACTIVE / INACTIVE / DELETED (탈퇴 시 DELETED + PII 파기)
+  status UserStatus @default(ACTIVE) @map("user_status")
+
+  /// 매니페스트 referrerCode — 가입 시 입력한 파트너 추천인 코드
+  referrerCode String? @map("referrer_code") @db.VarChar(24)
+
+  /// 첫해 30(월 19,800원) · 13개월차~ 15(월 24,050원). 슬라이딩·스케줄러와 동기화
+  currentDiscountRate Int @default(30) @map("current_discount_rate")
+
+  /// 사업자 회원이 pending_approval 로 들어간 시각 (관리자 큐용)
+  pendingApprovalAt DateTime? @map("pending_approval_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// 1:1 — 사용자당 하나의 비즈니스 프로필 확장
+  businessProfile UserBusinessProfile?
+
+  /// 이 사용자가 보낸 친구 신청
+  friendRequestsSent FriendRequest[] @relation("FriendRequestFrom")
+
+  /// 이 사용자가 받은 친구 신청
+  friendRequestsReceived FriendRequest[] @relation("FriendRequestTo")
+
+  /// VLUE 디지털 명함 — 신규가입 시 신청한 경우에만 1:1 생성
+  digitalCard DigitalCard?
+
+  /// 1:1 DM — participant_low 쪽
+  chatRoomsAsLow ChatRoom[] @relation("ChatRoomParticipantLow")
+  /// 1:1 DM — participant_high 쪽
+  chatRoomsAsHigh ChatRoom[] @relation("ChatRoomParticipantHigh")
+  chatMessages    ChatMessage[]
+
+  vouchRequestsSent     VouchRequest[] @relation("VouchFrom")
+  vouchRequestsReceived VouchRequest[] @relation("VouchTo")
+
+  adminDevices AdminDevice[]
+
+  /// 채팅/피드에 별도 표시할 닉네임(선택)
+  nickChat String? @map("nick_chat") @db.VarChar(64)
+  nickFeed String? @map("nick_feed") @db.VarChar(64)
+
+  /// 클라이언트 TERMS_VERSION 등과 일치하는 마지막 약관 동의 버전
+  termsVersionAccepted String?   @map("terms_version_accepted") @db.VarChar(64)
+  termsAcceptedAt      DateTime? @map("terms_accepted_at") @db.Timestamptz(6)
+
+  businessCardsOwned BusinessCard[]      @relation("BusinessCardOwner")
+  cardMemberships    CardMember[]
+  authoredCardPosts  CardFeedPost[]      @relation("CardFeedPostAuthor")
+  verificationLogs   VerificationLog[]
+
+  authRefreshSessions AuthRefreshSession[]
+  passwordResetTokens PasswordResetToken[]
+  blocksCreated       UserBlock[]         @relation("UserBlocksCreated")
+  blocksReceived      UserBlock[]         @relation("UserBlocksReceived")
+  chatReadStates      ChatReadState[]
+  campaignsOwned      Campaign[]
+  campaignApplications CampaignApplication[]
+  campaignMatches      CampaignMatch[] @relation("CampaignBlogger")
+  campaignMatchOwned   CampaignMatch[] @relation("CampaignOwner")
+  visitVerifications   VisitVerification[]
+  reviewSubmissions    ReviewSubmission[]
+  reviewDrafts         ReviewDraft[]
+  walletAccount              WalletAccount?
+  walletWithdrawalAccount    WalletWithdrawalAccount?
+  trustScoreEvents     TrustScoreLedger[]
+  penaltyEvents        PenaltyEvent[]
+  notificationsOwned   OwnerNotification[] @relation("OwnerNotificationOwner")
+  notificationsActor   OwnerNotification[] @relation("OwnerNotificationActor")
+  boardEvents          ActiveBoardEvent[]
+  letteringPhoneBlocks LetteringPhoneBlock[] @relation("LetteringBlocksOwned")
+  letteringPhoneReports LetteringPhoneReport[] @relation("LetteringReportsFiled")
+
+  vluerProfile                 UserVluerProfile?
+  b2bEnterprisesAdministered   B2BEnterpriseAccount[] @relation("B2BEnterpriseAdmin")
+  corporateAttributionsAsMember CorporateAttributionRequest[] @relation("AttributionMember")
+  corporateMembership          UserCorporateMembership?
+  subscriptions                UserSubscription[]
+  subscriptionPayments         SubscriptionPayment[]
+  refundQueues                 RefundQueue[]
+  commissionsAsVluer           CommissionLedger[] @relation("CommissionVluer")
+  commissionsAsPayer             CommissionLedger[] @relation("CommissionPayer")
+  referralAttribution          ReferralAttribution?
+  referralDownlines            ReferralAttribution[] @relation("ReferralSponsor")
+  vluerCodeChangeRequests      VluerCodeChangeRequest[] @relation("CodeChangeMember")
+  vluerReferralPenalties       VluerReferralPenalty[] @relation("PenaltyMember")
+  b2bEnterprisesAcquired       B2BEnterpriseAccount[] @relation("EnterpriseAcquiredBy")
+
+  familyProtectionAsGuardian FamilyProtectionLink[] @relation("FamilyGuardian")
+  familyProtectionAsWard     FamilyProtectionLink[] @relation("FamilyWard")
+  familyWardPresence         FamilyWardPresence?
+  familyProtectionSettings   FamilyProtectionSettings?
+  localAds                   LocalAd[]
+  storeProducts              StoreProduct[] @relation("StoreProductSeller")
+  shopOrdersAsBuyer          ShopOrder[]    @relation("ShopOrderBuyer")
+  shopOrdersAsSeller         ShopOrder[]    @relation("ShopOrderSeller")
+
+  memberReferralBenefitState MemberReferralBenefitState?
+
+  /// B2B 회선·역할 — enterpriseGroupId = 대표(MASTER) user id
+  lineType          LineType         @default(NONE) @map("line_type")
+  enterpriseRole    EnterpriseRole   @default(NONE) @map("enterprise_role")
+  enterpriseGroupId String?          @map("enterprise_group_id") @db.Uuid
+  enterpriseGroupMaster User?        @relation("EnterpriseGroupMembers", fields: [enterpriseGroupId], references: [id], onDelete: SetNull)
+  enterpriseGroupMembers User[]      @relation("EnterpriseGroupMembers")
+  enterpriseDept    String?          @map("enterprise_dept") @db.VarChar(80)
+
+  /// 복수계정 콤보 — 기업 회선 계정과 FK·ID 연동 없음 (사생활 격리)
+  isEnterpriseVerified        Boolean   @default(false) @map("is_enterprise_verified")
+  enterpriseVerifiedAt        DateTime? @map("enterprise_verified_at") @db.Timestamptz(6)
+  enterpriseVerifiedEmail     String?   @map("enterprise_verified_email") @db.VarChar(254)
+  enterpriseVerifyNextCheckAt DateTime? @map("enterprise_verify_next_check_at") @db.Timestamptz(6)
+
+  personalEnterpriseMailOtps PersonalEnterpriseMailOtp[]
+
+  userDevices              UserDevice[]
+  storePurchaseRequests      StorePurchaseRequest[] @relation("StorePurchaseRequester")
+  enterpriseProcurementAdds  EnterpriseProcurementCartItem[] @relation("ProcurementCartAddedBy")
+
+  /// 사후 연동된 소셜 로그인 (카카오/네이버) — VLUE 마스터 계정 1:1 매핑
+  socialLoginLinks UserSocialLoginLink[]
+
+  @@unique([socialProvider, socialId], map: "users_social_provider_social_id_key")
+  @@index([enterpriseGroupId])
+  @@index([enterpriseRole])
+  @@index([ciHash])
+  @@map("users")
+}
+
+// -----------------------------------------------------------------------------
+// AdminDevice — 휴대폰 마스터 승인제(비밀 URL·6자리 코드·기기 단위 권한)
+// -----------------------------------------------------------------------------
+
+model AdminDevice {
+  id        String @id @default(uuid()) @db.Uuid
+  deviceKey String @unique @map("device_key") @db.VarChar(80)
+
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// 기획자(마스터) 본인인증 완료 시 true — 한 계정·다기기 정책은 운영에서 조정
+  isMaster Boolean @default(false) @map("is_master")
+
+  /// 마스터가 6자리 코드로 승인한 기기만 true
+  isAuthorized Boolean @default(false) @map("is_authorized")
+
+  /// PC 등 비마스터 기기가 비밀 URL로 등록 시 발급되는 6자리(일회)
+  authCode           String?   @map("auth_code") @db.VarChar(6)
+  authCodeExpiresAt DateTime? @map("auth_code_expires_at") @db.Timestamptz(6)
+
+  userAgent String? @map("user_agent") @db.VarChar(512)
+  lastIp    String? @map("last_ip") @db.VarChar(45)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([authCode])
+  @@map("admin_devices")
+}
+
+// -----------------------------------------------------------------------------
+// Auth — JWT refresh rotation / logout invalidation (opaque refresh token 해시 저장)
+// -----------------------------------------------------------------------------
+
+model AuthRefreshSession {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String    @unique @map("token_hash") @db.VarChar(128)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  userAgent String?  @map("user_agent") @db.VarChar(512)
+  lastIp    String?  @map("last_ip") @db.VarChar(45)
+
+  @@index([userId])
+  @@map("auth_refresh_sessions")
+}
+
+model PasswordResetToken {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String    @unique @map("token_hash") @db.VarChar(128)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model UserBlock {
+  blockerId String @map("blocker_id") @db.Uuid
+  blocker   User   @relation("UserBlocksCreated", fields: [blockerId], references: [id], onDelete: Cascade)
+
+  blockedId String @map("blocked_id") @db.Uuid
+  blocked   User   @relation("UserBlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("user_blocks")
+}
+
+// -----------------------------------------------------------------------------
+// Chat — 1:1 DM (두 UUID 를 정렬해 participant_low / participant_high 로 고정)
+// -----------------------------------------------------------------------------
+
+enum ChatMessageType {
+  normal
+  system
+}
+
+model ChatRoom {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  participantLow  String @map("participant_low") @db.Uuid
+  participantHigh String @map("participant_high") @db.Uuid
+
+  participantLowUser  User @relation("ChatRoomParticipantLow", fields: [participantLow], references: [id], onDelete: Cascade)
+  participantHighUser User @relation("ChatRoomParticipantHigh", fields: [participantHigh], references: [id], onDelete: Cascade)
+
+  messages   ChatMessage[]
+  readStates ChatReadState[]
+
+  @@unique([participantLow, participantHigh])
+  @@index([participantLow])
+  @@index([participantHigh])
+  @@map("chat_rooms")
+}
+
+model ChatMessage {
+  id          String          @id @default(uuid()) @db.Uuid
+  roomId      String          @map("room_id") @db.Uuid
+  room        ChatRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId    String?         @map("sender_id") @db.Uuid
+  sender      User?           @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  /// 직장내선·위임 명함으로 송신한 경우 감사용
+  senderCardId String?      @map("sender_card_id") @db.Uuid
+  senderCard   BusinessCard? @relation(fields: [senderCardId], references: [id], onDelete: SetNull)
+  content     String          @db.Text
+  messageType ChatMessageType @default(normal) @map("message_type")
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([roomId, createdAt])
+  @@map("chat_messages")
+}
+
+/// 방별 사용자 읽음 커서(상대방 읽음 확인·동기화용)
+model ChatReadState {
+  roomId String @map("room_id") @db.Uuid
+  room   ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lastReadMessageId String?   @map("last_read_message_id") @db.Uuid
+  lastReadAt        DateTime? @map("last_read_at") @db.Timestamptz(6)
+
+  @@id([roomId, userId])
+  @@index([userId])
+  @@map("chat_read_states")
+}
+
+// -----------------------------------------------------------------------------
+// DigitalCard — 온보딩에서 「디지털 명함 발급 신청」 시에만 발급(행 생성)
+// -----------------------------------------------------------------------------
+
+model DigitalCard {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  issuedAt DateTime @default(now()) @map("issued_at") @db.Timestamptz(6)
+
+  /// 신청 시점 멤버십 스냅샷 (free | paid — legacy standard/premium → paid)
+  membershipTierSnapshot String? @map("membership_tier_snapshot") @db.VarChar(20)
+  /// 외부 HTML 명함 배포용 디자인 템플릿 (modern-dark | professional-gold | creative-gradient)
+  designTemplateSnapshot String? @map("design_template_snapshot") @db.VarChar(40)
+  /// 카카오 OG·썸네일용 명함 스냅샷 (프론트 동기화)
+  exportSnapshotJson Json? @map("export_snapshot_json")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("digital_cards")
+}
+
+// -----------------------------------------------------------------------------
+// UserBusinessProfile — User 와 1:1 (비즈니스 필드 확장·변경 허용)
+// -----------------------------------------------------------------------------
+
+model UserBusinessProfile {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isBusiness             Boolean @default(false) @map("is_business")
+  businessRegistrationNo String? @map("business_registration_no") @db.VarChar(20)
+  companyName            String? @map("company_name") @db.VarChar(200)
+  jobTitle               String? @map("job_title") @db.VarChar(120)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("user_business_profiles")
+}
+
+// -----------------------------------------------------------------------------
+// FriendRequest — User(발신) / User(수신) M:N 을 중간 테이블로 표현
+// -----------------------------------------------------------------------------
+
+model FriendRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  fromUserId String @map("from_user_id") @db.Uuid
+  fromUser   User   @relation("FriendRequestFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+
+  toUserId String @map("to_user_id") @db.Uuid
+  toUser   User   @relation("FriendRequestTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  /// 전송 시점 신청자 실명 — 수신 UI 에 표시; User.legalName 과 독립적으로 보존
+  applicantLegalNameSnapshot String @map("applicant_legal_name_snapshot") @db.VarChar(120)
+
+  isApplicantBusiness Boolean @default(false) @map("is_applicant_business")
+
+  /// 예: ["networking","collaboration"] — 앱 코드와 맞춘 slug 배열
+  purposeChecklist Json @map("purpose_checklist") @db.JsonB
+
+  purposeText String? @map("purpose_text") @db.Text
+
+  status FriendRequestStatus @default(pending)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([toUserId, status])
+  @@index([fromUserId])
+  @@index([fromUserId, toUserId])
+  @@map("friend_requests")
+}
+
+// -----------------------------------------------------------------------------
+// VouchRequest — 신뢰 인증(Vouch) 요청·승인 (공식 알림 채널과 연동)
+// -----------------------------------------------------------------------------
+
+model VouchRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  fromUserId String @map("from_user_id") @db.Uuid
+  fromUser   User   @relation("VouchFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+
+  toUserId String @map("to_user_id") @db.Uuid
+  toUser   User   @relation("VouchTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  note   String?            @db.Text
+  status VouchRequestStatus @default(pending)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([toUserId, status])
+  @@index([fromUserId])
+  @@map("vouch_requests")
+}
+
+// -----------------------------------------------------------------------------
+// BusinessCard — 번호 기준 멀티 명함(휴대폰·내선·대표)
+// -----------------------------------------------------------------------------
+
+model BusinessCard {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation("BusinessCardOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  kind      BusinessCardKind @map("kind")
+  phoneE164 String           @unique @map("phone_e164") @db.VarChar(24)
+
+  displayName String? @map("display_name") @db.VarChar(120)
+  jobTitle    String? @map("job_title") @db.VarChar(120)
+  companyName String? @map("company_name") @db.VarChar(200)
+  profileJson Json?   @map("profile_json") @db.JsonB
+
+  verificationStatus CardVerificationStatus @default(approved) @map("verification_status")
+  /// 내선/대표 등 유료 라인 — 승인된 경우에만 사업 피드 생성 허용
+  isPremiumLine       Boolean @default(false) @map("is_premium_line")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  members           CardMember[]
+  feedPosts         CardFeedPost[]
+  verificationLogs  VerificationLog[]
+  chatMessagesSent  ChatMessage[]
+
+  /// B2B 기업 귀속 회선 — 통화 오버레이 시 대표번호 마스킹용
+  b2bEnterpriseId String? @map("b2b_enterprise_id") @db.Uuid
+  b2bEnterprise   B2BEnterpriseAccount? @relation(fields: [b2bEnterpriseId], references: [id], onDelete: SetNull)
+  b2bCartLineId   String? @unique @map("b2b_cart_line_id") @db.Uuid
+  b2bCartLine     B2BCartLine? @relation(fields: [b2bCartLineId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([b2bEnterpriseId])
+  @@map("business_cards")
+}
+
+model CardMember {
+  id     String @id @default(uuid()) @db.Uuid
+  cardId String @map("card_id") @db.Uuid
+  card   BusinessCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role CardMemberRole @map("role")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([cardId, userId])
+  @@index([userId])
+  @@map("card_members")
+}
+
+model VerificationLog {
+  id     String @id @default(uuid()) @db.Uuid
+  cardId String? @map("card_id") @db.Uuid
+  card   BusinessCard? @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action  String @map("action") @db.VarChar(80)
+  detail  Json?  @map("detail") @db.JsonB
+  outcome String @default("info") @map("outcome") @db.VarChar(32)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([cardId, createdAt])
+  @@map("verification_logs")
+}
+
+/// 게시물은 card_id 에 귀속 (§7)
+model CardFeedPost {
+  id           String @id @default(uuid()) @db.Uuid
+  cardId       String @map("card_id") @db.Uuid
+  card         BusinessCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  authorUserId String @map("author_user_id") @db.Uuid
+  author       User   @relation("CardFeedPostAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  title    String? @map("title") @db.VarChar(200)
+  body     String  @map("body") @db.Text
+  metaJson Json?   @map("meta_json") @db.JsonB
+
+  hashtags FeedPostHashtag[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([cardId, createdAt])
+  @@map("card_feed_posts")
+}
+
+/// 본문에서 추출한 #해시태그 — 검색·피드 스코프 필터와 함께 사용
+model FeedPostHashtag {
+  id     String       @id @default(uuid()) @db.Uuid
+  postId String       @map("post_id") @db.Uuid
+  post   CardFeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    String       @map("tag") @db.VarChar(120)
+
+  @@unique([postId, tag])
+  @@index([tag])
+  @@map("feed_post_hashtags")
+}
+
+model Campaign {
+  id              String            @id @default(uuid()) @db.Uuid
+  ownerUserId     String            @map("owner_user_id") @db.Uuid
+  ownerUser       User              @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  title           String            @db.VarChar(200)
+  description     String            @db.Text
+  rewardCash      Int               @map("reward_cash")
+  capacity        Int               @default(1)
+  status          CampaignStatus    @default(recruiting)
+  tierScope       CampaignTierScope @default(all) @map("tier_scope")
+  locationLat     Float?            @map("location_lat")
+  locationLng     Float?            @map("location_lng")
+  radiusMeters    Int?              @map("radius_meters")
+  reviewDeadlineHours Int           @default(24) @map("review_deadline_hours")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  requiredKeywords CampaignKeyword[]
+  applications     CampaignApplication[]
+  matches          CampaignMatch[]
+  boardEvents      ActiveBoardEvent[]
+
+  @@index([ownerUserId, status])
+  @@map("campaigns")
+}
+
+model CampaignKeyword {
+  id         String   @id @default(uuid()) @db.Uuid
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  keyword    String   @db.VarChar(80)
+
+  @@unique([campaignId, keyword])
+  @@map("campaign_keywords")
+}
+
+model CampaignApplication {
+  id           String                    @id @default(uuid()) @db.Uuid
+  campaignId   String                    @map("campaign_id") @db.Uuid
+  campaign     Campaign                  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  applicantId  String                    @map("applicant_id") @db.Uuid
+  applicant    User                      @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  message      String?                   @db.Text
+  status       CampaignApplicationStatus @default(applied)
+  createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([campaignId, applicantId])
+  @@index([applicantId, status])
+  @@map("campaign_applications")
+}
+
+model CampaignMatch {
+  id              String      @id @default(uuid()) @db.Uuid
+  campaignId      String      @map("campaign_id") @db.Uuid
+  campaign        Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  ownerUserId     String      @map("owner_user_id") @db.Uuid
+  ownerUser       User        @relation("CampaignOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  bloggerUserId   String      @map("blogger_user_id") @db.Uuid
+  bloggerUser     User        @relation("CampaignBlogger", fields: [bloggerUserId], references: [id], onDelete: Cascade)
+  status          MatchStatus @default(matched)
+  matchedAt       DateTime    @default(now()) @map("matched_at") @db.Timestamptz(6)
+  reviewDeadlineAt DateTime?  @map("review_deadline_at") @db.Timestamptz(6)
+  settledAt       DateTime?   @map("settled_at") @db.Timestamptz(6)
+
+  escrowHold       EscrowHold?
+  visitVerifications VisitVerification[]
+  reviewDraft      ReviewDraft?
+  reviewSubmission ReviewSubmission?
+  penalties        PenaltyEvent[]
+
+  @@unique([campaignId, bloggerUserId])
+  @@index([ownerUserId, status])
+  @@index([bloggerUserId, status])
+  @@map("campaign_matches")
+}
+
+model EscrowHold {
+  id           String       @id @default(uuid()) @db.Uuid
+  matchId      String       @unique @map("match_id") @db.Uuid
+  match        CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  amountCash   Int          @map("amount_cash")
+  status       EscrowStatus @default(held)
+  heldAt       DateTime     @default(now()) @map("held_at") @db.Timestamptz(6)
+  releasedAt   DateTime?    @map("released_at") @db.Timestamptz(6)
+
+  @@map("escrow_holds")
+}
+
+model VisitVerification {
+  id             String             @id @default(uuid()) @db.Uuid
+  matchId        String             @map("match_id") @db.Uuid
+  match          CampaignMatch      @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId         String             @map("user_id") @db.Uuid
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  method         VerificationMethod
+  status         VerificationStatus @default(pending)
+  gpsLat         Float?             @map("gps_lat")
+  gpsLng         Float?             @map("gps_lng")
+  receiptImageUrl String?           @map("receipt_image_url") @db.VarChar(800)
+  photoMetaJson  Json?              @map("photo_meta_json") @db.JsonB
+  verifiedAt     DateTime?          @map("verified_at") @db.Timestamptz(6)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([matchId, status])
+  @@map("visit_verifications")
+}
+
+model ReviewDraft {
+  id             String        @id @default(uuid()) @db.Uuid
+  matchId        String        @unique @map("match_id") @db.Uuid
+  match          CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId         String        @map("user_id") @db.Uuid
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blogUrl        String?       @map("blog_url") @db.VarChar(800)
+  bodyText       String?       @map("body_text") @db.Text
+  summary3Lines  String?       @map("summary_3_lines") @db.Text
+  keywordsCheckJson Json?      @map("keywords_check_json") @db.JsonB
+  photosJson     Json?         @map("photos_json") @db.JsonB
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("review_drafts")
+}
+
+model ReviewSubmission {
+  id             String       @id @default(uuid()) @db.Uuid
+  matchId        String       @unique @map("match_id") @db.Uuid
+  match          CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId         String       @map("user_id") @db.Uuid
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blogUrl        String       @map("blog_url") @db.VarChar(800)
+  bodyText       String       @map("body_text") @db.Text
+  summary3Lines  String       @map("summary_3_lines") @db.Text
+  keywordsHit    Boolean      @default(false) @map("keywords_hit")
+  photosCount    Int          @default(0) @map("photos_count")
+  status         ReviewStatus @default(submitted)
+  submittedAt    DateTime     @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  approvedAt     DateTime?    @map("approved_at") @db.Timestamptz(6)
+
+  @@index([userId, submittedAt])
+  @@map("review_submissions")
+}
+
+model WalletAccount {
+  id          String        @id @default(uuid()) @db.Uuid
+  userId      String        @unique @map("user_id") @db.Uuid
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balanceCash Int           @default(0) @map("balance_cash")
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  ledger      WalletLedger[]
+
+  @@map("wallet_accounts")
+}
+
+model WalletWithdrawalAccount {
+  userId        String   @id @map("user_id") @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankCode      String   @map("bank_code") @db.VarChar(10)
+  bankName      String   @map("bank_name") @db.VarChar(40)
+  accountNumber String   @map("account_number") @db.VarChar(30)
+  accountHolder String   @map("account_holder") @db.VarChar(40)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("wallet_withdrawal_accounts")
+}
+
+model WalletLedger {
+  id            String          @id @default(uuid()) @db.Uuid
+  walletAccountId String        @map("wallet_account_id") @db.Uuid
+  walletAccount WalletAccount   @relation(fields: [walletAccountId], references: [id], onDelete: Cascade)
+  userId         String         @map("user_id") @db.Uuid
+  amountCash     Int            @map("amount_cash")
+  entryType      WalletEntryType @map("entry_type")
+  referenceId    String?        @map("reference_id") @db.VarChar(80)
+  note           String?        @db.VarChar(200)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt])
+  @@map("wallet_ledger")
+}
+
+model TrustScoreLedger {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta        Int
+  reason       String   @db.VarChar(120)
+  referenceId  String?  @map("reference_id") @db.VarChar(80)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt])
+  @@map("trust_score_ledger")
+}
+
+model PenaltyEvent {
+  id            String       @id @default(uuid()) @db.Uuid
+  matchId        String      @map("match_id") @db.Uuid
+  match          CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId         String      @map("user_id") @db.Uuid
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scoreDelta     Int         @default(-10) @map("score_delta")
+  reason         String      @db.VarChar(200)
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt])
+  @@map("penalty_events")
+}
+
+model OwnerNotification {
+  id           String             @id @default(uuid()) @db.Uuid
+  ownerUserId  String             @map("owner_user_id") @db.Uuid
+  ownerUser    User               @relation("OwnerNotificationOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  actorUserId  String?            @map("actor_user_id") @db.Uuid
+  actorUser    User?              @relation("OwnerNotificationActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  title        String             @db.VarChar(120)
+  body         String             @db.Text
+  status       NotificationStatus @default(unread)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, status])
+  @@map("owner_notifications")
+}
+
+model ActiveBoardEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  campaignId   String?  @map("campaign_id") @db.Uuid
+  campaign     Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  userId       String?  @map("user_id") @db.Uuid
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  eventType    String   @map("event_type") @db.VarChar(60)
+  payloadJson  Json?    @map("payload_json") @db.JsonB
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([eventType, createdAt])
+  @@map("active_board_events")
+}
+
+// -----------------------------------------------------------------------------
+// Lettering — 통화 중 번호 신고·차단 (사용자별 블랙리스트)
+// -----------------------------------------------------------------------------
+
+/// 통화 레터링 — 사용자(User)별 차단 번호 (FK: owner_id → users.id)
+model LetteringPhoneBlock {
+  id        String   @id @default(uuid()) @db.Uuid
+  ownerId   String   @map("owner_id") @db.Uuid
+  owner     User     @relation("LetteringBlocksOwned", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  phoneE164 String   @map("phone_e164") @db.VarChar(24)
+  reason    String?  @db.VarChar(200)
+  reportId  String?  @map("report_id") @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([ownerId, phoneE164])
+  @@index([ownerId])
+  @@index([phoneE164])
+  @@map("lettering_phone_blocks")
+}
+
+/// 통화 레터링 — 사용자(User)별 신고 이력 (FK: reporter_id → users.id)
+model LetteringPhoneReport {
+  id           String   @id @default(uuid()) @db.Uuid
+  reporterId   String   @map("reporter_id") @db.Uuid
+  reporter     User     @relation("LetteringReportsFiled", fields: [reporterId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  phoneE164    String   @map("phone_e164") @db.VarChar(24)
+  reasonId     String   @map("reason_id") @db.VarChar(32)
+  detail       String?  @db.Text
+  cardSnapshot Json?    @map("card_snapshot") @db.JsonB
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([reporterId])
+  @@index([phoneE164])
+  @@map("lettering_phone_reports")
+}
+
+// -----------------------------------------------------------------------------
+// VLUER — 등급 정책 · B2B 차단 · 정산 (공식 명칭: 일반/전문/마스터 VLUER)
+// -----------------------------------------------------------------------------
+
+enum VluerTierCode {
+  general
+  certified
+  partner
+  official
+}
+
+/// 통합 VLUER(블러) 등급 — 추천 유료 회원 수 기반 선택형 업그레이드
+enum VluerGrade {
+  general
+  certified
+  partner
+  official
+}
+
+enum VluerPayoutMode {
+  reward_only
+  cash_commission
+}
+
+enum B2BTelecomCarrier {
+  LGUPLUS
+  KT
+}
+
+enum B2BBillingCycle {
+  monthly
+  annual
+}
+
+enum B2BCartLineKind {
+  extension
+  mobile
+}
+
+enum B2BEnterpriseStatus {
+  draft
+  pending_doc_verification
+  active
+  suspended
+}
+
+enum CorporateAttributionStatus {
+  pending_doc_verification
+  approved
+  rejected
+  cancelled
+}
+
+enum CommissionLedgerKind {
+  subscription_monthly
+  subscription_annual
+  commerce
+}
+
+/// 시드 테이블 — Vluer_Tier_Policy
+model VluerTierPolicy {
+  tierCode VluerTierCode @id @map("tier_code")
+
+  labelKo String @map("label_ko") @db.VarChar(40)
+  minReferrals Int @map("min_referrals")
+  maxReferrals Int? @map("max_referrals")
+
+  subscriptionRateBp Int @map("subscription_rate_bp")
+  commerceRateBp     Int @default(0) @map("commerce_rate_bp")
+  payoutMode         VluerPayoutMode @map("payout_mode")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("vluer_tier_policies")
+}
+
+enum VluerCodeChangeStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+/// 1단계 레퍼럴 귀속 — 가입 시 스폰서 VLUER 고정
+model ReferralAttribution {
+  userId String @id @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sponsorVluerUserId String? @map("sponsor_vluer_user_id") @db.Uuid
+  sponsorVluer       User?   @relation("ReferralSponsor", fields: [sponsorVluerUserId], references: [id], onDelete: SetNull)
+
+  referralCodeUsed String? @map("referral_code_used") @db.VarChar(24)
+  attributedAt   DateTime @default(now()) @map("attributed_at") @db.Timestamptz(6)
+  /// 가입 후 3개월 — 코드 변경 불가
+  codeChangeLockedUntil DateTime @map("code_change_locked_until") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([sponsorVluerUserId])
+  @@map("referral_attributions")
+}
+
+/// 산하 멤버의 추천 코드(스폰서) 변경 신청 — 이탈 위험 알림용
+model VluerCodeChangeRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  memberUserId String @map("member_user_id") @db.Uuid
+  memberUser   User   @relation("CodeChangeMember", fields: [memberUserId], references: [id], onDelete: Cascade)
+
+  currentSponsorUserId String? @map("current_sponsor_user_id") @db.Uuid
+  requestedReferralCode String @map("requested_referral_code") @db.VarChar(24)
+  status VluerCodeChangeStatus @default(pending) @map("status")
+  adminNote String? @map("admin_note") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([memberUserId, status])
+  @@index([currentSponsorUserId, status])
+  @@map("vluer_code_change_requests")
+}
+
+/// 코드 변경 승인 후 6개월 정가(28,300원) · 커미션 platform_retained
+model VluerReferralPenalty {
+  id String @id @default(uuid()) @db.Uuid
+
+  memberUserId String @map("member_user_id") @db.Uuid
+  memberUser   User   @relation("PenaltyMember", fields: [memberUserId], references: [id], onDelete: Cascade)
+
+  sponsorUserId String? @map("sponsor_user_id") @db.Uuid
+  codeChangeRequestId String? @map("code_change_request_id") @db.Uuid
+
+  startedAt DateTime @default(now()) @map("started_at") @db.Timestamptz(6)
+  endsAt    DateTime @map("ends_at") @db.Timestamptz(6)
+  monthlyFullPriceKrw Int @default(28300) @map("monthly_full_price_krw")
+  isActive  Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([memberUserId, isActive])
+  @@map("vluer_referral_penalties")
+}
+
+model UserVluerProfile {
+  userId String @id @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tierCode VluerTierCode @default(general) @map("tier_code")
+  vluerGrade VluerGrade @default(general) @map("vluer_grade")
+  /// @deprecated 3-2-1 활동 티어 폐기 — vluerGrade 사용
+  activityTier Int? @map("activity_tier")
+  cumulativeB2cReferrals Int @default(0) @map("cumulative_b2c_referrals")
+  cumulativeB2bEnterprises Int @default(0) @map("cumulative_b2b_enterprises")
+
+  referralCode String? @unique @map("referral_code") @db.VarChar(24)
+
+  canActAsVluer Boolean @default(true) @map("can_act_as_vluer")
+  isEligibleForVluerSettlement Boolean @default(true) @map("is_eligible_for_vluer_settlement")
+  rewardsFrozen Boolean @default(false) @map("rewards_frozen")
+  rewardsFrozenAt DateTime? @map("rewards_frozen_at") @db.Timestamptz(6)
+  b2bBlockedAt DateTime? @map("b2b_blocked_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("user_vluer_profiles")
+}
+
+model B2BEnterpriseAccount {
+  id String @id @default(uuid()) @db.Uuid
+
+  adminUserId String @map("admin_user_id") @db.Uuid
+  adminUser   User   @relation("B2BEnterpriseAdmin", fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  acquiredByVluerUserId String? @map("acquired_by_vluer_user_id") @db.Uuid
+  acquiredByVluer     User?   @relation("EnterpriseAcquiredBy", fields: [acquiredByVluerUserId], references: [id], onDelete: SetNull)
+
+  companyName String @map("company_name") @db.VarChar(200)
+  masterDisplayNumber String @map("master_display_number") @db.VarChar(32)
+  carrier B2BTelecomCarrier @map("carrier")
+  billingCycle B2BBillingCycle @default(monthly) @map("billing_cycle")
+  status B2BEnterpriseStatus @default(draft) @map("status")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  totalBillingAmountKrw Int @default(0) @map("total_billing_amount_krw")
+  nextBillingAt DateTime? @map("next_billing_at") @db.Timestamptz(6)
+  companyBrandingJson Json? @map("company_branding_json") @db.JsonB
+
+  cartLines B2BCartLine[]
+  businessCards BusinessCard[]
+  attributions CorporateAttributionRequest[]
+  billingSchedule EnterpriseBillingSchedule?
+  corporateMembers UserCorporateMembership[]
+
+  /// 회사 공용 예산(캐시) · 법인카드 등록 여부(결제 수단)
+  corporateWalletBalanceKrw Int @default(0) @map("corporate_wallet_balance_krw")
+  corporateCardLast4        String? @map("corporate_card_last4") @db.VarChar(4)
+  corporateCardRegisteredAt DateTime? @map("corporate_card_registered_at") @db.Timestamptz(6)
+
+  /// 가입·장바구니 목표 회선 수 (전원 등록 완료 시 그룹 채팅 자동 개설)
+  plannedLineCount     Int?      @map("planned_line_count")
+  groupChatActivatedAt DateTime? @map("group_chat_activated_at") @db.Timestamptz(6)
+
+  groupChat            EnterpriseGroupChat?
+  procurementCartItems EnterpriseProcurementCartItem[]
+  purchaseRequests     StorePurchaseRequest[]
+  memberCredentials    EnterpriseMemberCredential[]
+
+  @@index([adminUserId])
+  @@index([acquiredByVluerUserId])
+  @@map("b2b_enterprise_accounts")
+}
+
+model B2BCartLine {
+  id String @id @default(uuid()) @db.Uuid
+
+  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+
+  lineKind B2BCartLineKind @map("line_kind")
+  realCliPhoneE164 String @map("real_cli_phone_e164") @db.VarChar(24)
+  assigneeName String @map("assignee_name") @db.VarChar(120)
+  assigneeTitle String? @map("assignee_title") @db.VarChar(120)
+  /** 회선 계정 역할 — 가입·등록 시 대표가 지정 */
+  enterpriseRole EnterpriseRole @default(STAFF) @map("enterprise_role")
+  /** true: 고객·디지털 명함에 기업 대표번호 표시 / false: 등록 번호 그대로 */
+  useMasterDisplayNumber Boolean @default(false) @map("use_master_display_number")
+
+  linkedUserId String? @map("linked_user_id") @db.Uuid
+  sortOrder Int @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  businessCard BusinessCard?
+
+  @@index([enterpriseId])
+  @@index([realCliPhoneE164])
+  @@map("b2b_cart_lines")
+}
+
+model CorporateAttributionRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+
+  memberUserId String @map("member_user_id") @db.Uuid
+  memberUser   User   @relation("AttributionMember", fields: [memberUserId], references: [id], onDelete: Cascade)
+
+  memberPhoneE164 String @map("member_phone_e164") @db.VarChar(24)
+  status CorporateAttributionStatus @default(pending_doc_verification) @map("status")
+  documentUrls Json? @map("document_urls") @db.JsonB
+  adminNote String? @map("admin_note") @db.Text
+
+  approvedAt DateTime? @map("approved_at") @db.Timestamptz(6)
+  approvedByAdminId String? @map("approved_by_admin_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([enterpriseId, status])
+  @@index([memberUserId])
+  @@map("corporate_attribution_requests")
+}
+
+model CommissionLedger {
+  id String @id @default(uuid()) @db.Uuid
+
+  vluerUserId String @map("vluer_user_id") @db.Uuid
+  vluerUser   User   @relation("CommissionVluer", fields: [vluerUserId], references: [id], onDelete: Cascade)
+
+  payerUserId String? @map("payer_user_id") @db.Uuid
+  payerUser   User?  @relation("CommissionPayer", fields: [payerUserId], references: [id], onDelete: SetNull)
+
+  kind CommissionLedgerKind @map("kind")
+  tierCode VluerTierCode @map("tier_code")
+  payoutMode VluerPayoutMode @map("payout_mode")
+
+  grossPaymentKrw Int @map("gross_payment_krw")
+  pgFeeKrw Int @default(0) @map("pg_fee_krw")
+  commissionKrw Int @map("commission_krw")
+
+  blockedReason String? @map("blocked_reason") @db.VarChar(80)
+  referralCode String? @map("referral_code") @db.VarChar(24)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([vluerUserId, createdAt])
+  @@map("commission_ledgers")
+}
+
+// -----------------------------------------------------------------------------
+// B2C/B2B 구독 · 기업 통합 청구 · 귀속 승인 후 환불 큐
+// -----------------------------------------------------------------------------
+
+enum UserSubscriptionPlan {
+  b2c_monthly
+  b2c_annual
+}
+
+enum UserSubscriptionStatus {
+  pending_payment
+  active
+  cancelled
+}
+
+enum SubscriptionPaymentStatus {
+  pending
+  paid
+  failed
+}
+
+enum RefundQueueStatus {
+  pending
+  processed
+  failed
+}
+
+enum EnterpriseBillingStatus {
+  active
+  paused
+}
+
+/// 기업 귀속 승인 후 활성 멤버십 — 개인 명함 데이터는 유지, UI만 기업 CI/BI 우선
+model UserCorporateMembership {
+  userId String @id @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+
+  attributionRequestId String? @unique @map("attribution_request_id") @db.Uuid
+
+  overrideByCompany Boolean @default(true) @map("override_by_company")
+  activatedAt DateTime @default(now()) @map("activated_at") @db.Timestamptz(6)
+
+  @@index([enterpriseId])
+  @@map("user_corporate_memberships")
+}
+
+model UserSubscription {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plan UserSubscriptionPlan @map("plan")
+  status UserSubscriptionStatus @default(active) @map("status")
+  amountKrw Int @map("amount_krw")
+  listPriceKrw Int? @map("list_price_krw")
+  isDiscounted Boolean @default(false) @map("is_discounted")
+  /** 사후 추천인 등록 — 다음 결제 주기부터 30% 할인 적용 예약 */
+  isDiscountedNextCycle Boolean @default(false) @map("is_discounted_next_cycle")
+  referralCodeUsed String? @map("referral_code_used") @db.VarChar(24)
+  sponsorVluerUserId String? @map("sponsor_vluer_user_id") @db.Uuid
+
+  cycleStartAt DateTime @map("cycle_start_at") @db.Timestamptz(6)
+  cycleEndAt   DateTime @map("cycle_end_at") @db.Timestamptz(6)
+  nextChargeAt DateTime? @map("next_charge_at") @db.Timestamptz(6)
+
+  cancelledAt DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelReason String? @map("cancel_reason") @db.VarChar(120)
+
+  /** 포트원 V1 정기결제 빌링키(customer_uid) */
+  portoneCustomerUid String? @map("portone_customer_uid") @db.VarChar(64)
+
+  /** 임직원 개인 콤보 — 회사 14,700원 + 개인 5,100원 = 유료 19,800원 수평 */
+  isPersonalCombo Boolean @default(false) @map("is_personal_combo")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  refundQueues RefundQueue[]
+  payments       SubscriptionPayment[]
+
+  @@index([userId, status])
+  @@map("user_subscriptions")
+}
+
+/// B2C 혜택·레퍼럴 정산 개월 차 (탈퇴 재가입·슬라이딩 할인 연동)
+model MemberReferralBenefitState {
+  userId String @id @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 누적 이용 개월(페널티 6개월 포함) — 12 초과 시 15% 할인·5% 레퍼럴 고정
+  accumulatedBenefitMonths Int @default(0) @map("accumulated_benefit_months")
+  /// 재가입 직후 스폰서 레퍼럴 0원 잔여 개월
+  sponsorPenaltyMonthsLeft Int @default(0) @map("sponsor_penalty_months_left")
+  /// 탈퇴 후 동일 신원 재가입
+  isRejoinFromAbuseLog Boolean @default(false) @map("is_rejoin_from_abuse_log")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("member_referral_benefit_states")
+}
+
+/// 탈퇴 회원 신원 해시·혜택 이력 (전자상거래법·개인정보보호법 — PII 미보관, 3~5년 분리 보관)
+model AbusingProtectionLog {
+  /// 휴대폰(CI 우선) SHA-256 hex — PK
+  hashedIdentity String @id @map("hashed_identity") @db.VarChar(64)
+  /// 탈퇴 시점까지 유료 이용 누적 개월 (슬라이딩 30% 잔여 산정)
+  accumulatedUsingMonths Int @default(0) @map("accumulated_using_months")
+  /// 탈퇴 당시 마지막 추천인 코드
+  lastReferralCode String? @map("last_referral_code") @db.VarChar(24)
+  deletedAt DateTime @default(now()) @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([deletedAt])
+  @@map("abusing_protection_logs")
+}
+
+model SubscriptionPayment {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  subscriptionId String? @map("subscription_id") @db.Uuid
+  subscription   UserSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  merchantUid  String @unique @map("merchant_uid") @db.VarChar(80)
+  impUid       String? @map("imp_uid") @db.VarChar(80)
+  customerUid  String @map("customer_uid") @db.VarChar(64)
+  amountKrw    Int    @map("amount_krw")
+  status       SubscriptionPaymentStatus @default(pending) @map("status")
+  portoneStatus String? @map("portone_status") @db.VarChar(40)
+  paidAt       DateTime? @map("paid_at") @db.Timestamptz(6)
+  rawResponse  Json? @map("raw_response") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("subscription_payments")
+}
+
+model EnterpriseBillingSchedule {
+  id String @id @default(uuid()) @db.Uuid
+
+  enterpriseId String @unique @map("enterprise_id") @db.Uuid
+  enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+
+  totalBillingAmountKrw Int @default(0) @map("total_billing_amount_krw")
+  lineCount Int @default(0) @map("line_count")
+  billingCycle B2BBillingCycle @map("billing_cycle")
+  nextBillingAt DateTime @map("next_billing_at") @db.Timestamptz(6)
+  status EnterpriseBillingStatus @default(active) @map("status")
+  corporatePaymentRef String? @map("corporate_payment_ref") @db.VarChar(120)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("enterprise_billing_schedules")
+}
+
+model RefundQueue {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  subscriptionId String? @map("subscription_id") @db.Uuid
+  subscription   UserSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  refundAmountKrw Int @map("refund_amount_krw")
+  reason String @map("reason") @db.VarChar(200)
+  status RefundQueueStatus @default(pending) @map("status")
+  prorationMeta Json? @map("proration_meta") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+
+  @@index([userId, status])
+  @@map("refund_queue")
+}
+
+// -----------------------------------------------------------------------------
+// 가족 보호알림 — 노부모 이탈·자녀 유해 사이트
+// -----------------------------------------------------------------------------
+
+enum FamilyWardRole {
+  elder
+  child
+}
+
+/// 보호 등록 시 관계 — parent: 내 부모(노부모), child: 내 자녀
+enum FamilyRelation {
+  parent
+  child
+}
+
+enum FamilyProtectionLinkStatus {
+  pending
+  active
+  revoked
+}
+
+enum FamilyAlertKind {
+  elder_no_app_24h
+  elder_device_absent
+  elder_missed_calls
+  elder_long_call_unknown
+  elder_remote_control_app
+  elder_government_call
+  child_risky_site
+  child_bank_transaction
+  child_bank_consent
+}
+
+enum FamilyBankConsentStatus {
+  pending
+  accepted
+  rejected
+  revoked
+}
+
+model FamilyProtectionSettings {
+  userId                   String   @id @map("user_id") @db.Uuid
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alertNoAppEnabled        Boolean  @default(true) @map("alert_no_app_enabled")
+  alertNoAppHours          Int      @default(24) @map("alert_no_app_hours")
+  alertMissedCallEnabled   Boolean  @default(true) @map("alert_missed_call_enabled")
+  alertMissedCallThreshold Int      @default(3) @map("alert_missed_call_threshold")
+  alertChildSiteEnabled    Boolean  @default(true) @map("alert_child_site_enabled")
+  alertElderLongCallEnabled      Boolean @default(true) @map("alert_elder_long_call_enabled")
+  alertElderLongCallMinutes      Int     @default(10) @map("alert_elder_long_call_minutes")
+  alertElderRemoteAppEnabled     Boolean @default(true) @map("alert_elder_remote_app_enabled")
+  alertElderGovCallEnabled       Boolean @default(true) @map("alert_elder_gov_call_enabled")
+  alertChildBankEnabled          Boolean @default(true) @map("alert_child_bank_enabled")
+  alertChildBankAllTx            Boolean @default(false) @map("alert_child_bank_all_tx")
+  alertChildBankThresholdKrw     Int     @default(10000) @map("alert_child_bank_threshold_krw")
+  alertChildUnknownPayeeEnabled  Boolean @default(true) @map("alert_child_unknown_payee_enabled")
+  /** 추가 인원 패키지(4→8명) — 추후 결제 연동 */
+  extraMemberPackActive  Boolean  @default(false) @map("extra_member_pack_active")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("family_protection_settings")
+}
+
+model FamilyProtectionLink {
+  id             String                     @id @default(uuid()) @db.Uuid
+  guardianUserId String                     @map("guardian_user_id") @db.Uuid
+  guardianUser   User                       @relation("FamilyGuardian", fields: [guardianUserId], references: [id], onDelete: Cascade)
+  wardUserId     String                     @map("ward_user_id") @db.Uuid
+  wardUser       User                       @relation("FamilyWard", fields: [wardUserId], references: [id], onDelete: Cascade)
+  wardRole       FamilyWardRole             @map("ward_role")
+  familyRelation FamilyRelation             @map("family_relation")
+  status         FamilyProtectionLinkStatus @default(pending)
+  wardAcceptedAt DateTime?                  @map("ward_accepted_at") @db.Timestamptz(6)
+  alertNoAppEnabled        Boolean? @map("alert_no_app_enabled")
+  alertNoAppHours          Int?     @map("alert_no_app_hours")
+  alertMissedCallEnabled   Boolean? @map("alert_missed_call_enabled")
+  alertMissedCallThreshold Int?     @map("alert_missed_call_threshold")
+  createdAt      DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  bankConsent    FamilyBankConsent?
+
+  @@unique([guardianUserId, wardUserId])
+  @@index([wardUserId, status])
+  @@index([guardianUserId, status])
+  @@map("family_protection_links")
+}
+
+model FamilyBankConsent {
+  id              String                  @id @default(uuid()) @db.Uuid
+  linkId          String                  @unique @map("link_id") @db.Uuid
+  link            FamilyProtectionLink    @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  guardianUserId  String                  @map("guardian_user_id") @db.Uuid
+  wardUserId      String                  @map("ward_user_id") @db.Uuid
+  status          FamilyBankConsentStatus @default(pending)
+  accountLabel    String?                 @map("account_label") @db.VarChar(80)
+  bankCode        String?                 @map("bank_code") @db.VarChar(20)
+  accountMasked   String?                 @map("account_masked") @db.VarChar(40)
+  scopesJson      Json?                   @map("scopes_json") @db.JsonB
+  requestedAt     DateTime                @default(now()) @map("requested_at") @db.Timestamptz(6)
+  respondedAt     DateTime?               @map("responded_at") @db.Timestamptz(6)
+
+  @@index([wardUserId, status])
+  @@map("family_bank_consents")
+}
+
+model FamilyBankTransaction {
+  id                 String   @id @default(uuid()) @db.Uuid
+  wardUserId         String   @map("ward_user_id") @db.Uuid
+  linkId             String?  @map("link_id") @db.Uuid
+  amountKrw          Int      @map("amount_krw")
+  direction          String   @db.VarChar(8)
+  counterpartyName   String?  @map("counterparty_name") @db.VarChar(120)
+  counterpartyMasked String?  @map("counterparty_masked") @db.VarChar(40)
+  isUnknownPayee     Boolean  @default(false) @map("is_unknown_payee")
+  source             String   @default("manual") @db.VarChar(32)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([wardUserId, createdAt])
+  @@map("family_bank_transactions")
+}
+
+model FamilyWardPresence {
+  wardUserId            String    @id @map("ward_user_id") @db.Uuid
+  wardUser              User      @relation(fields: [wardUserId], references: [id], onDelete: Cascade)
+  lastAppAccessAt       DateTime? @map("last_app_access_at") @db.Timestamptz(6)
+  lastDeviceSeenAt      DateTime? @map("last_device_seen_at") @db.Timestamptz(6)
+  deviceAbsentSince     DateTime? @map("device_absent_since") @db.Timestamptz(6)
+  missedCallStreak      Int       @default(0) @map("missed_call_streak")
+  missedCallStreakSince DateTime? @map("missed_call_streak_since") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("family_ward_presence")
+}
+
+model FamilyProtectionAlert {
+  id                  String          @id @default(uuid()) @db.Uuid
+  wardUserId          String          @map("ward_user_id") @db.Uuid
+  kind                FamilyAlertKind @map("kind")
+  title               String          @db.VarChar(120)
+  body                String          @db.Text
+  payloadJson         Json?           @map("payload_json") @db.JsonB
+  guardiansNotifiedAt DateTime?       @map("guardians_notified_at") @db.Timestamptz(6)
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([wardUserId, kind, createdAt])
+  @@map("family_protection_alerts")
+}
+
+// -----------------------------------------------------------------------------
+// 지역 광고 (유료 회원 · 홈 핫플레이스)
+// -----------------------------------------------------------------------------
+
+model LocalAd {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 상점·VLUE PAGE 피드 게시물 id (클라이언트·카드피드)
+  feedPostId     String?  @map("feed_post_id") @db.VarChar(64)
+  feedPostSource String?  @map("feed_post_source") @db.VarChar(20)
+  storeName      String   @map("store_name") @db.VarChar(80)
+  description    String   @map("description") @db.VarChar(300)
+  location       String   @map("location") @db.VarChar(120)
+  imageUrl       String?  @map("image_url") @db.VarChar(512)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@index([feedPostId])
+  @@map("local_ads")
+}
+
+// -----------------------------------------------------------------------------
+// VLUE PAGE 상점 — 판매 상품·단발성 주문 (포트원 일반결제)
+// -----------------------------------------------------------------------------
+
+enum ShopOrderStatus {
+  pending_payment
+  paid
+  failed
+  cancelled
+}
+
+/// B2B 회선 — 유선(PC 전용) / 휴대(폰+PC)
+enum LineType {
+  NONE
+  WIRED
+  MOBILE
+}
+
+/// 기업 단체 내 역할
+enum EnterpriseRole {
+  NONE
+  MASTER
+  MANAGER
+  BUYER
+  STAFF
+}
+
+enum StorePurchaseRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model StoreProduct {
+  id String @id @default(uuid()) @db.Uuid
+
+  sellerUserId String @map("seller_user_id") @db.Uuid
+  seller       User   @relation("StoreProductSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+
+  /// 프론트 localStorage 상품 id (`vlue_store_products_v1`)
+  externalId String @map("external_id") @db.VarChar(64)
+
+  name            String @db.VarChar(200)
+  unitPriceKrw    Int    @map("unit_price_krw")
+  salePriceKrw    Int?   @map("sale_price_krw")
+  shippingFeeKrw  Int    @default(0) @map("shipping_fee_krw")
+  stock           Int    @default(0)
+  status          String @default("on_sale") @db.VarChar(24)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orders ShopOrder[]
+
+  @@unique([sellerUserId, externalId])
+  @@index([sellerUserId, status])
+  @@map("store_products")
+}
+
+model ShopOrder {
+  id String @id @default(uuid()) @db.Uuid
+
+  merchantUid String @unique @map("merchant_uid") @db.VarChar(80)
+
+  buyerUserId String @map("buyer_user_id") @db.Uuid
+  buyer       User   @relation("ShopOrderBuyer", fields: [buyerUserId], references: [id], onDelete: Cascade)
+
+  sellerUserId String @map("seller_user_id") @db.Uuid
+  seller       User   @relation("ShopOrderSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+
+  storeProductId String?       @map("store_product_id") @db.Uuid
+  storeProduct   StoreProduct? @relation(fields: [storeProductId], references: [id], onDelete: SetNull)
+
+  productName     String @map("product_name") @db.VarChar(200)
+  unitPriceKrw    Int    @map("unit_price_krw")
+  shippingFeeKrw  Int    @default(0) @map("shipping_fee_krw")
+  quantity        Int    @default(1)
+  totalAmountKrw  Int    @map("total_amount_krw")
+
+  status ShopOrderStatus @default(pending_payment) @map("status")
+  payMethod String? @map("pay_method") @db.VarChar(24)
+
+  impUid         String? @map("imp_uid") @db.VarChar(80)
+  portoneStatus  String? @map("portone_status") @db.VarChar(40)
+  receiptUrl     String? @map("receipt_url") @db.VarChar(512)
+  paidAt         DateTime? @map("paid_at") @db.Timestamptz(6)
+  rawResponse    Json? @map("raw_response") @db.JsonB
+
+  /// B2B 구매 시 세금·증빙 일괄 귀속(대표 그룹 id = MASTER user id)
+  enterpriseGroupId String? @map("enterprise_group_id") @db.Uuid
+  paidByEnterpriseWallet Boolean @default(false) @map("paid_by_enterprise_wallet")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([buyerUserId, createdAt(sort: Desc)])
+  @@index([sellerUserId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([enterpriseGroupId, createdAt(sort: Desc)])
+  @@map("shop_orders")
+}
+
+// -----------------------------------------------------------------------------
+// B2B — 카카오 PC식 기기 인증 · 사내 비품 구매
+// -----------------------------------------------------------------------------
+
+model UserDevice {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deviceToken String @map("device_token") @db.VarChar(128)
+  fcmToken    String? @map("fcm_token") @db.VarChar(512)
+  label       String? @db.VarChar(120)
+  isVerified  Boolean @default(false) @map("is_verified")
+  verifiedAt  DateTime? @map("verified_at") @db.Timestamptz(6)
+
+  userAgent String? @map("user_agent") @db.VarChar(512)
+  lastIp    String? @map("last_ip") @db.VarChar(45)
+  clientKind String? @map("client_kind") @db.VarChar(16)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([userId, deviceToken])
+  @@index([userId, isVerified])
+  @@map("user_devices")
+}
+
+model StorePurchaseRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+
+  enterpriseGroupId String @map("enterprise_group_id") @db.Uuid
+
+  productId           String @map("product_id") @db.VarChar(64)
+  productName         String @map("product_name") @db.VarChar(200)
+  quantity            Int    @default(1)
+  unitPriceKrw        Int    @default(0) @map("unit_price_krw")
+  requestedByUserId   String @map("requested_by_user_id") @db.Uuid
+  requestedByUser     User   @relation("StorePurchaseRequester", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+  requestedByName     String @map("requested_by_name") @db.VarChar(120)
+  requestedByDept     String? @map("requested_by_dept") @db.VarChar(80)
+
+  status StorePurchaseRequestStatus @default(PENDING) @map("status")
+  buyerNote String? @map("buyer_note") @db.Text
+  reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  reviewedByUserId String? @map("reviewed_by_user_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([enterpriseId, status, createdAt(sort: Desc)])
+  @@index([enterpriseGroupId, createdAt(sort: Desc)])
+  @@map("store_purchase_requests")
+}
+
+model EnterpriseProcurementCartItem {
+  id String @id @default(uuid()) @db.Uuid
+
+  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+
+  externalProductId String @map("external_product_id") @db.VarChar(64)
+  productName       String @map("product_name") @db.VarChar(200)
+  quantity          Int    @default(1)
+  unitPriceKrw      Int    @default(0) @map("unit_price_krw")
+
+  addedByUserId String @map("added_by_user_id") @db.Uuid
+  addedByUser   User   @relation("ProcurementCartAddedBy", fields: [addedByUserId], references: [id], onDelete: Cascade)
+  addedByName   String @map("added_by_name") @db.VarChar(120)
+  addedByDept   String? @map("added_by_dept") @db.VarChar(80)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([enterpriseId, createdAt(sort: Desc)])
+  @@map("enterprise_procurement_cart_items")
+}
+
+model EnterpriseGroupChat {
+  id String @id @default(uuid()) @db.Uuid
+
+  enterpriseId String @unique @map("enterprise_id") @db.Uuid
+  enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+
+  title String @default("사내 비품·업무") @db.VarChar(120)
+
+  messages EnterpriseGroupChatMessage[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("enterprise_group_chats")
+}
+
+model EnterpriseGroupChatMessage {
+  id String @id @default(uuid()) @db.Uuid
+
+  chatId String @map("chat_id") @db.Uuid
+  chat   EnterpriseGroupChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  senderId String? @map("sender_id") @db.Uuid
+  content  String @db.Text
+  isSystem Boolean @default(false) @map("is_system")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([chatId, createdAt(sort: Desc)])
+  @@map("enterprise_group_chat_messages")
+}
+
+model EnterpriseMemberCredential {
+  id String @id @default(uuid()) @db.Uuid
+
+  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  publicHandle String @map("public_handle") @db.VarChar(32)
+  assigneeName String @map("assignee_name") @db.VarChar(120)
+  enterpriseRole EnterpriseRole @default(STAFF) @map("enterprise_role")
+  lineKind B2BCartLineKind @map("line_kind")
+  phoneE164 String @map("phone_e164") @db.VarChar(24)
+
+  initialPassword String @map("initial_password") @db.VarChar(64)
+  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([enterpriseId, userId])
+  @@index([enterpriseId, createdAt(sort: Desc)])
+  @@map("enterprise_member_credentials")
+}
+
+/// 개인 계정 회사 메일 OTP — 기업 User FK 없음 (사생활 격리)
+model PersonalEnterpriseMailOtp {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  email   String @db.VarChar(254)
+  otpHash String @map("otp_hash") @db.VarChar(128)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  verifiedAt DateTime? @map("verified_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([email, createdAt(sort: Desc)])
+  @@map("personal_enterprise_mail_otps")
+}
+
+// -----------------------------------------------------------------------------
+// VLUE 순정 가입 + 소셜 로그인 연동 (신규 가입 차단 · 사후 1:1 매핑)
+// -----------------------------------------------------------------------------
+
+enum SocialLoginProvider {
+  kakao
+  naver
+}
+
+model UserSocialLoginLink {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider       SocialLoginProvider @map("provider")
+  providerUserId String              @map("provider_user_id") @db.VarChar(80)
+  providerEmail  String?             @map("provider_email") @db.VarChar(254)
+
+  linkedAt    DateTime  @default(now()) @map("linked_at") @db.Timestamptz(6)
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)
+
+  @@unique([provider, providerUserId])
+  @@unique([userId, provider])
+  @@index([userId])
+  @@map("user_social_login_links")
+}
+
+// -----------------------------------------------------------------------------
+// VLUE 5대 핵심 기능 토대 (Phase 1)
+// -----------------------------------------------------------------------------
+
+enum SourcingDraftStatus {
+  draft
+  reviewed
+  confirmed
+}
+
+enum GroupBuyCampaignStatus {
+  draft
+  live
+  closed
+}
+
+enum RemoteJobStatus {
+  queued
+  running
+  done
+  failed
+  blocked
+}
+
+enum MailMessageDirection {
+  inbound
+  outbound
+}
+
+model StoreProfile {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  displayName String @map("display_name") @db.VarChar(160)
+  introText   String? @map("intro_text") @db.Text
+  metaJson    Json?   @map("meta_json") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("store_profiles")
+}
+
+model SourcingDraft {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId    String @map("owner_user_id") @db.Uuid
+  storeProfileId String? @map("store_profile_id") @db.Uuid
+  sourceImageUrl String? @map("source_image_url") @db.VarChar(1000)
+  sourceUrl      String? @map("source_url") @db.VarChar(1000)
+  contentJson    Json?   @map("content_json") @db.JsonB
+  status         SourcingDraftStatus @default(draft) @map("status")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("sourcing_drafts")
+}
+
+model ExternalSourcingItem {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  sourceUrl   String @map("source_url") @db.VarChar(1000)
+  platform    String @map("platform") @db.VarChar(40)
+  title       String @map("title") @db.VarChar(240)
+  payloadJson Json?  @map("payload_json") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("external_sourcing_items")
+}
+
+model PartnershipVaultItem {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  title       String @map("title") @db.VarChar(200)
+  kind        String @default("product") @map("kind") @db.VarChar(40)
+  payloadJson Json?  @map("payload_json") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("partnership_vault_items")
+}
+
+model PartnershipVaultConnection {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  name        String @map("name") @db.VarChar(200)
+  kind        String @default("linked_info") @map("kind") @db.VarChar(40)
+  payloadJson Json?  @map("payload_json") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("partnership_vault_connections")
+}
+
+model GroupBuyCampaign {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  title       String @map("title") @db.VarChar(240)
+  targetQty   Int    @map("target_qty")
+  soldQty     Int    @default(0) @map("sold_qty")
+  endsAt      DateTime @map("ends_at") @db.Timestamptz(6)
+  status      GroupBuyCampaignStatus @default(draft) @map("status")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, status])
+  @@map("groupbuy_campaigns")
+}
+
+model GroupBuyStockTick {
+  id String @id @default(uuid()) @db.Uuid
+
+  campaignId String @map("campaign_id") @db.Uuid
+  soldQty    Int    @map("sold_qty")
+  remainQty  Int    @map("remain_qty")
+  payloadJson Json? @map("payload_json") @db.JsonB
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([campaignId, createdAt(sort: Desc)])
+  @@map("groupbuy_stock_ticks")
+}
+
+model LiveStreamEndpoint {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  platform    String @map("platform") @db.VarChar(40)
+  streamId    String @map("stream_id") @db.VarChar(120)
+  rtmpUrl     String @map("rtmp_url") @db.VarChar(1000)
+  streamKey   String @map("stream_key") @db.VarChar(220)
+  embedUrl    String @map("embed_url") @db.VarChar(1000)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([platform, streamId])
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("live_stream_endpoints")
+}
+
+model PptJob {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  title       String @map("title") @db.VarChar(200)
+  status      String @default("queued") @map("status") @db.VarChar(20)
+  progress    Int    @default(0) @map("progress")
+  payloadJson Json?  @map("payload_json") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("ppt_jobs")
+}
+
+model PptJobEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  pptJobId  String @map("ppt_job_id") @db.Uuid
+  eventType String @map("event_type") @db.VarChar(60)
+  payloadJson Json? @map("payload_json") @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([pptJobId, createdAt(sort: Desc)])
+  @@map("ppt_job_events")
+}
+
+model CompanyLineWhitelist {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  lineNumber  String @map("line_number") @db.VarChar(40)
+  lineLabel   String? @map("line_label") @db.VarChar(120)
+  active      Boolean @default(true) @map("active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([ownerUserId, lineNumber])
+  @@map("company_line_whitelist")
+}
+
+model PcAgentSession {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId   String @map("owner_user_id") @db.Uuid
+  sessionToken  String @unique @map("session_token") @db.VarChar(160)
+  deviceLabel   String @map("device_label") @db.VarChar(140)
+  lastHeartbeatAt DateTime? @map("last_heartbeat_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("pc_agent_sessions")
+}
+
+model AssetFile {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  folderId    String? @map("folder_id") @db.Uuid
+  fileName    String @map("file_name") @db.VarChar(260)
+  contentType String @map("content_type") @db.VarChar(120)
+  fileSize    Int?   @map("file_size")
+  objectKey   String @map("object_key") @db.VarChar(500)
+  fileUrl     String @map("file_url") @db.VarChar(1000)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("asset_files")
+}
+
+model UserVaultFolder {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  folderName  String @map("folder_name") @db.VarChar(140)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([ownerUserId, folderName])
+  @@map("user_vault_folders")
+}
+
+model RemotePrintJob {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId    String @map("owner_user_id") @db.Uuid
+  sourceAssetId  String @map("source_asset_id") @db.Uuid
+  targetLine     String @map("target_line") @db.VarChar(40)
+  status         RemoteJobStatus @default(queued) @map("status")
+  message        String? @map("message") @db.VarChar(240)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("remote_print_jobs")
+}
+
+model RemoteFaxJob {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId    String @map("owner_user_id") @db.Uuid
+  sourceAssetId  String @map("source_asset_id") @db.Uuid
+  targetLine     String @map("target_line") @db.VarChar(40)
+  status         RemoteJobStatus @default(queued) @map("status")
+  message        String? @map("message") @db.VarChar(240)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("remote_fax_jobs")
+}
+
+model MailAccount {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  address     String @unique @map("address") @db.VarChar(254)
+  status      String @default("active") @map("status") @db.VarChar(20)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("mail_accounts")
+}
+
+model MailMessage {
+  id String @id @default(uuid()) @db.Uuid
+
+  accountId   String @map("account_id") @db.Uuid
+  direction   MailMessageDirection @map("direction")
+  fromAddress String @map("from_address") @db.VarChar(254)
+  toAddress   String @map("to_address") @db.VarChar(254)
+  subject     String @map("subject") @db.VarChar(260)
+  bodyText    String? @map("body_text") @db.Text
+  payloadJson Json? @map("payload_json") @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([accountId, createdAt(sort: Desc)])
+  @@map("mail_messages")
+}
+
+model MailAttachment {
+  id String @id @default(uuid()) @db.Uuid
+
+  messageId String @map("message_id") @db.Uuid
+  assetFileId String? @map("asset_file_id") @db.Uuid
+  fileName String @map("file_name") @db.VarChar(260)
+  contentType String @map("content_type") @db.VarChar(120)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([messageId, createdAt(sort: Desc)])
+  @@map("mail_attachments")
+}

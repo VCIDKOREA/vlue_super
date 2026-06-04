@@ -1,0 +1,109 @@
+import { useCallback, useEffect, useState } from "react";
+import {
+  countUnreadPush,
+  markAllPushRead,
+  markPushRead,
+  PUSH_INBOX_CHANGED,
+  readPushNotifications
+} from "../lib/pushNotificationInbox";
+
+const CATEGORY_STYLE = {
+  쇼핑: "bg-amber-50 text-amber-800",
+  배송: "bg-blue-50 text-blue-700",
+  안심: "bg-emerald-50 text-emerald-700",
+  기타: "bg-gray-100 text-gray-600"
+};
+
+export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProtection }) {
+  const [items, setItems] = useState(() => readPushNotifications());
+
+  const refresh = useCallback(() => {
+    const list = readPushNotifications();
+    setItems(list);
+    onUnreadChange?.(countUnreadPush());
+  }, [onUnreadChange]);
+
+  useEffect(() => {
+    refresh();
+    const onChange = () => refresh();
+    window.addEventListener(PUSH_INBOX_CHANGED, onChange);
+    return () => window.removeEventListener(PUSH_INBOX_CHANGED, onChange);
+  }, [refresh]);
+
+  if (!items.length) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+        <p className="text-sm font-bold text-gray-500">알림이 없습니다</p>
+        <p className="mt-1 text-xs text-gray-400">쇼핑·배송·안심 등 푸시 알림이 이곳에 쌓입니다.</p>
+      </div>
+    );
+  }
+
+  const unread = items.filter((n) => !n.read).length;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {onOpenFamilyProtection ? (
+        <button
+          type="button"
+          onClick={onOpenFamilyProtection}
+          className="mx-3 mt-2 flex shrink-0 items-center justify-between rounded-2xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-left"
+        >
+          <div>
+            <p className="text-[12px] font-black text-indigo-800">가족 보호 등록 · 알림 설정</p>
+            <p className="mt-0.5 text-[11px] text-gray-600">친구검색에서 가족 초대와 안심 알림을 관리합니다.</p>
+          </div>
+          <span className="text-[13px] font-black text-indigo-600">→</span>
+        </button>
+      ) : null}
+      {unread > 0 ? (
+        <div className="flex shrink-0 items-center justify-end border-b border-gray-100 px-3 py-2">
+          <button
+            type="button"
+            className="text-[11px] font-bold text-blue-600"
+            onClick={() => {
+              markAllPushRead();
+              refresh();
+            }}
+          >
+            모두 읽음
+          </button>
+        </div>
+      ) : null}
+      <ul className="min-h-0 flex-1 overflow-y-auto">
+        {items.map((n) => (
+          <li key={n.id}>
+            <button
+              type="button"
+              className={`flex w-full gap-3 border-b border-gray-50 px-4 py-3.5 text-left transition-colors active:bg-gray-50 ${
+                n.read ? "opacity-70" : "bg-blue-50/30"
+              }`}
+              onClick={() => {
+                if (!n.read) markPushRead(n.id);
+                refresh();
+              }}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      CATEGORY_STYLE[n.category] || CATEGORY_STYLE.기타
+                    }`}
+                  >
+                    {n.category}
+                  </span>
+                  <span className="text-[10px] font-medium text-gray-400">{n.time}</span>
+                  {!n.read ? (
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" aria-hidden />
+                  ) : null}
+                </div>
+                <p className="text-[13px] font-bold text-gray-900">{n.title}</p>
+                <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-gray-600">{n.body}</p>
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

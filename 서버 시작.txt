@@ -1,0 +1,435 @@
+출시 준비 순서를 정확히 안내하기 위해 프로젝트의 배포·환경 설정 구성을 확인합니다.
+
+코드·deployment.lock.json·.env.production 매니페스트 기준으로, 실서버 가동 → API 연동 → 출시 순서를 단계별로 정리했습니다. 위에서부터 진행하면 되고, 각 단계에서 준비할 키/계정만 미리 챙기시면 됩니다.
+전체 구조 (한 줄 요약)
+도메인·서버 → DB/Redis → DB 마이그레이션 → API 실 ENV → 외부 API 키 → 프론트 빌드·배포 → 웹훅·크론 → 스모크 테스트 → 오픈
+
+권장 도메인 예시(프로젝트 템플릿 기준):
+용도예시웹(프론트)
+https://www.vlue.kr
+API
+https://api.vlue.kr
+0단계 — 인프라·도메인 (키 없음, 계정만)
+목표: API·웹·DB·Redis가 붙을 자리 확보
+준비물비고VPS/클라우드 1대 이상 (API)
+Node 20+, ffmpeg(오피스 MP4용)
+정적 호스팅 또는 동일 서버 Nginx (웹 dist/)
+PostgreSQL 16 (관리형 Supabase/RDS 또는 자가 호스팅)
+Redis (관리형 ElastiCache/Upstash 또는 자가 호스팅)
+Vming 15k 토큰 캡
+DNS + TLS 인증서
+www, api
+(선택) S3 호환 스토리지 버킷
+오피스 스캔·자산·보안함 Evidence
+이 단계에서 할 일
+api.vlue.kr → API 서버(8788 또는 리버스 프록시)
+www.vlue.kr → dist/ 또는 /api 프록시 → API
+1단계 — 필수 7대 ENV (코어 엔진)
+목표: NODE_ENV=production 으로 API가 ENV 누락 없이 기동
+파일: apps/api/.env.production (실값은 Secrets Manager에 두고 서버에만 주입)
+순서변수준비할 것담당 기능1-1
+DATABASE_URL
+Postgres 접속 URL
+쇼핑·주문·채팅·보안함·캘린더·메모
+1-2
+REDIS_URL
+Redis URL
+무료 Vming 15,000 토큰/일, 어뷰징 카운터
+1-3
+GEMINI_API_KEY
+Google AI Studio 프로덕션 키
+Vming·사기 분석·캘린더 AI
+1-4
+PORTONE_API_KEY
+포트원 REST imp_key
+본인인증·결제 API
+1-5
+PORTONE_API_SECRET
+포트원 imp_secret
+결제 검증·웹훅 연동
+1-6
+JWT_ACCESS_SECRET (+ JWT_SECRET, SESSION_SECRET)
+32자 이상 랜덤 각 1개 (동일해도 됨)
+로그인·세션
+1-7
+FILE_STORAGE_PROVIDER=s3 + S3_* 5종
+버킷·IAM 키
+스캔 PDF·자산·Evidence
+추가로 같은 파일에 맞출 것:
+변수값 예시CORS_ORIGIN
+https://www.vlue.kr
+FRONTEND_URL
+https://www.vlue.kr
+APP_BASE_URL
+https://api.vlue.kr
+검증
+# 로컬에서 매니페스트·빌드만 (실키 없이 구조 확인)
+npm run production:ready
+# 서버에 실 ENV 넣은 뒤
+cd apps/api && NODE_ENV=production node dist/index.js
+# 콘솔: VLUE AI & CORE SERVICE ENGINE - PRODUCTION READY SUCCESS
+curl https://api.vlue.kr/api/health
+2단계 — DB 스키마 배포
+목표: Prisma 스키마가 실 DB에 반영
+준비물없음 (1단계 DATABASE_URL만 있으면 됨)
+할 일
+# DATABASE_URL 을 실서버 값으로 설정한 뒤
+npm run db:deploy:safe
+# 또는 npm run db:deploy
+확인: API 기동 후 쇼핑/메모/캘린더 API가 500 없이 응답하는지.
+3단계 — API 서버 프로덕션 배포
+목표: apps/api/dist 상시 구동 (pm2/systemd/Docker)
+준비물1단계 ENV 전부
+할 일
+npm run api:build
+서버에 apps/api/dist + node_modules 배포
+NODE_ENV=production + .env.production 주입 후 node dist/index.js
+Nginx: https://api.vlue.kr → 127.0.0.1:8788
+이 시점 스모크 (키 최소)
+GET /api/health
+로그인/회원가입 (JWT)
+캘린더·메모 CRUD (Server-Only)
+Vming 1회 (Gemini 키 소량 소모)
+4단계 — 프론트엔드 빌드·배포
+목표: 빌드 시점에 API 주소 고정
+파일: 루트 .env.production
+변수준비할 것VITE_API_URL
+https://api.vlue.kr (또는 동일 오리진이면 비우고 Nginx /api 프록시)
+VITE_PORTONE_USER_CODE
+포트원 가맹점 식별코드 (브라우저 본인인증·결제)
+VITE_IAMPORT_BILLING_PG / VITE_IAMPORT_SHOP_PG
+콘솔에 등록한 PG 채널명
+VITE_CARD_PUBLIC_API_BASE
+https://www.vlue.kr (카카오 명함 Feed PNG)
+할 일
+npm run build          # .env.production 자동 반영
+# dist/ → www.vlue.kr 호스팅
+확인: 앱에서 API 호출이 api.vlue.kr로 가는지, CORS 오류 없는지.
+5단계 — 결제·본인인증 (Portone) 최종 연동
+목표: 실결제·정기결제·상점 결제·웹훅 멱등
+준비물포트원 콘솔PORTONE_API_KEY / PORTONE_API_SECRET
+이미 1단계
+PORTONE_WEBHOOK_SECRET
+웹훅 서명용 시크릿 신규 생성
+VITE_PORTONE_USER_CODE 등
+4단계
+포트원 콘솔 설정
+웹훅 URL: https://api.vlue.kr/api/payment/webhook (실제 라우트는 코드 기준으로 콘솔에 맞춤)
+Redirect URI / 도메인: www.vlue.kr, api.vlue.kr
+정기결제(빌링)·일반결제 PG 채널 라이브 모드
+확인
+멤버십/상점 소액 테스트 결제
+웹훅 수신 후 vming_unlimited_* / shop_order_* merchantUid 멱등
+프로덕션에서 VLUE_ALLOW_DEV_BILLING, VLUE_ALLOW_DEV_SHOP 은 넣지 마세요.
+6단계 — 부가 연동 (출시 직전·기능별)
+아래는 7대 필수 다음이지만, 실서비스에서 곧 쓸 기능이면 같은 주에 붙이는 것을 권장합니다.
+순서영역API/ENV준비할 키6-1
+카카오 로그인
+KAKAO_CLIENT_ID, KAKAO_CLIENT_SECRET, KAKAO_REDIRECT_URI
+카카오 개발자 REST API 키, Redirect: https://www.vlue.kr/api/v1/auth/kakao/callback
+6-2
+푸시(FCM)
+GOOGLE_APPLICATION_CREDENTIALS 또는 FCM_*
+Firebase 서비스 계정 JSON
+6-3
+웹 푸시
+VITE_WEB_PUSH_VAPID_PUBLIC_KEY, WEB_PUSH_VAPID_PRIVATE_KEY
+VAPID 키 쌍
+6-4
+구독 크론
+SUBSCRIPTION_CRON_SECRET
+랜덤 시크릿 + 스케줄러가 POST /api/cron/subscription-billing 호출
+6-5
+가족보호 웹훅
+OPENBANKING_WEBHOOK_SECRET, FAMILY_CRON_SECRET
+오픈뱅킹·크론용
+6-6
+(선택) OpenAI Vision
+OPENAI_API_KEY
+소싱 Vision만 쓸 때
+6-7
+관리자
+ADMIN_ENTRY_PATH, VITE_ADMIN_PATH
+동일 문자열 + ADMIN_MASTER_PHONE_E164
+7단계 — 도메인 기능 통합 스모크 (출시 게이트)
+코드에 반영된 Server-Only / SSE / 보안 기준 체크리스트입니다.
+#시나리오필요 키1
+회원가입 → 로그인 → JWT 유지
+JWT
+2
+Vming 채팅 + 무료 15k 토큰 캡
+Gemini, Redis
+3
+DM SSE 실시간 수신
+API URL, 로그인
+4
+캘린더·메모 CRUD (오프라인 폴백 없음)
+DB
+5
+쇼핑: products/sync → 장바구니 → orders/prepare → 결제
+Portone, DB
+6
+보안함 Evidence 목록·다운로드
+DB, (S3)
+7
+카카오 명함 Feed 공유
+Gemini·DB·VITE_CARD_PUBLIC_API_BASE
+8
+오피스 캘린더 (/api/calendar/all 단일 소스)
+DB
+통과 후:
+npm run deploy:lock   # deployment.lock.json 갱신
+8단계 — 운영·모니터링 (오픈 직후)
+항목권장로그
+API stdout + Nginx access/error
+DB 백업
+일 1회 자동 스냅샷
+Redis
+메모리·연결 수 알람
+Gemini
+일 사용량·비용 알람 (Flash 단가)
+Portone
+웹훅 실패·결제 실패 알람
+크론
+구독 갱신·가족보호 elder job 등록
+API 키 준비 체크리스트 (한 번에 모을 때)
+필수 (1~4단계 전에)
+ DATABASE_URL
+ REDIS_URL
+ GEMINI_API_KEY
+ PORTONE_API_KEY + PORTONE_API_SECRET
+ JWT_ACCESS_SECRET / SESSION_SECRET (랜덤 생성)
+ S3_* + FILE_STORAGE_PROVIDER=s3
+ VITE_API_URL (+ Portone 프론트 3종)
+출시 직전 (5~6단계)
+ PORTONE_WEBHOOK_SECRET
+ 카카오 OAuth 3종
+ FCM / VAPID (푸시 쓸 때)
+ SUBSCRIPTION_CRON_SECRET 등 크론 시크릿
+권장 일정 예시
+주차작업1주차
+0~2단계 (인프라 + DB + API health)
+2주차
+3~4단계 (API·웹 배포, Server-Only 기능)
+3주차
+5단계 Portone 라이브 + 7단계 스모크
+4주차
+6단계 부가 연동 + 소프트 오픈
+다음 단계로 진행하실 때 어느 호스팅을 쓰실지(예: AWS, Cafe24, Supabase+Railway) 알려주시면, 그 환경에 맞춰 DATABASE_URL 형식·Nginx 샘플·크론 등록 예시까지 이어서 적어 드리겠습니다.출시 준비 순서를 정확히 안내하기 위해 프로젝트의 배포·환경 설정 구성을 확인합니다.
+
+코드·deployment.lock.json·.env.production 매니페스트 기준으로, 실서버 가동 → API 연동 → 출시 순서를 단계별로 정리했습니다. 위에서부터 진행하면 되고, 각 단계에서 준비할 키/계정만 미리 챙기시면 됩니다.
+전체 구조 (한 줄 요약)
+도메인·서버 → DB/Redis → DB 마이그레이션 → API 실 ENV → 외부 API 키 → 프론트 빌드·배포 → 웹훅·크론 → 스모크 테스트 → 오픈
+
+권장 도메인 예시(프로젝트 템플릿 기준):
+용도예시웹(프론트)
+https://www.vlue.kr
+API
+https://api.vlue.kr
+0단계 — 인프라·도메인 (키 없음, 계정만)
+목표: API·웹·DB·Redis가 붙을 자리 확보
+준비물비고VPS/클라우드 1대 이상 (API)
+Node 20+, ffmpeg(오피스 MP4용)
+정적 호스팅 또는 동일 서버 Nginx (웹 dist/)
+PostgreSQL 16 (관리형 Supabase/RDS 또는 자가 호스팅)
+Redis (관리형 ElastiCache/Upstash 또는 자가 호스팅)
+Vming 15k 토큰 캡
+DNS + TLS 인증서
+www, api
+(선택) S3 호환 스토리지 버킷
+오피스 스캔·자산·보안함 Evidence
+이 단계에서 할 일
+api.vlue.kr → API 서버(8788 또는 리버스 프록시)
+www.vlue.kr → dist/ 또는 /api 프록시 → API
+1단계 — 필수 7대 ENV (코어 엔진)
+목표: NODE_ENV=production 으로 API가 ENV 누락 없이 기동
+파일: apps/api/.env.production (실값은 Secrets Manager에 두고 서버에만 주입)
+순서변수준비할 것담당 기능1-1
+DATABASE_URL
+Postgres 접속 URL
+쇼핑·주문·채팅·보안함·캘린더·메모
+1-2
+REDIS_URL
+Redis URL
+무료 Vming 15,000 토큰/일, 어뷰징 카운터
+1-3
+GEMINI_API_KEY
+Google AI Studio 프로덕션 키
+Vming·사기 분석·캘린더 AI
+1-4
+PORTONE_API_KEY
+포트원 REST imp_key
+본인인증·결제 API
+1-5
+PORTONE_API_SECRET
+포트원 imp_secret
+결제 검증·웹훅 연동
+1-6
+JWT_ACCESS_SECRET (+ JWT_SECRET, SESSION_SECRET)
+32자 이상 랜덤 각 1개 (동일해도 됨)
+로그인·세션
+1-7
+FILE_STORAGE_PROVIDER=s3 + S3_* 5종
+버킷·IAM 키
+스캔 PDF·자산·Evidence
+추가로 같은 파일에 맞출 것:
+변수값 예시CORS_ORIGIN
+https://www.vlue.kr
+FRONTEND_URL
+https://www.vlue.kr
+APP_BASE_URL
+https://api.vlue.kr
+검증
+# 로컬에서 매니페스트·빌드만 (실키 없이 구조 확인)
+npm run production:ready
+# 서버에 실 ENV 넣은 뒤
+cd apps/api && NODE_ENV=production node dist/index.js
+# 콘솔: VLUE AI & CORE SERVICE ENGINE - PRODUCTION READY SUCCESS
+curl https://api.vlue.kr/api/health
+2단계 — DB 스키마 배포
+목표: Prisma 스키마가 실 DB에 반영
+준비물없음 (1단계 DATABASE_URL만 있으면 됨)
+할 일
+# DATABASE_URL 을 실서버 값으로 설정한 뒤
+npm run db:deploy:safe
+# 또는 npm run db:deploy
+확인: API 기동 후 쇼핑/메모/캘린더 API가 500 없이 응답하는지.
+3단계 — API 서버 프로덕션 배포
+목표: apps/api/dist 상시 구동 (pm2/systemd/Docker)
+준비물1단계 ENV 전부
+할 일
+npm run api:build
+서버에 apps/api/dist + node_modules 배포
+NODE_ENV=production + .env.production 주입 후 node dist/index.js
+Nginx: https://api.vlue.kr → 127.0.0.1:8788
+이 시점 스모크 (키 최소)
+GET /api/health
+로그인/회원가입 (JWT)
+캘린더·메모 CRUD (Server-Only)
+Vming 1회 (Gemini 키 소량 소모)
+4단계 — 프론트엔드 빌드·배포
+목표: 빌드 시점에 API 주소 고정
+파일: 루트 .env.production
+변수준비할 것VITE_API_URL
+https://api.vlue.kr (또는 동일 오리진이면 비우고 Nginx /api 프록시)
+VITE_PORTONE_USER_CODE
+포트원 가맹점 식별코드 (브라우저 본인인증·결제)
+VITE_IAMPORT_BILLING_PG / VITE_IAMPORT_SHOP_PG
+콘솔에 등록한 PG 채널명
+VITE_CARD_PUBLIC_API_BASE
+https://www.vlue.kr (카카오 명함 Feed PNG)
+할 일
+npm run build          # .env.production 자동 반영
+# dist/ → www.vlue.kr 호스팅
+확인: 앱에서 API 호출이 api.vlue.kr로 가는지, CORS 오류 없는지.
+5단계 — 결제·본인인증 (Portone) 최종 연동
+목표: 실결제·정기결제·상점 결제·웹훅 멱등
+준비물포트원 콘솔PORTONE_API_KEY / PORTONE_API_SECRET
+이미 1단계
+PORTONE_WEBHOOK_SECRET
+웹훅 서명용 시크릿 신규 생성
+VITE_PORTONE_USER_CODE 등
+4단계
+포트원 콘솔 설정
+웹훅 URL: https://api.vlue.kr/api/payment/webhook (실제 라우트는 코드 기준으로 콘솔에 맞춤)
+Redirect URI / 도메인: www.vlue.kr, api.vlue.kr
+정기결제(빌링)·일반결제 PG 채널 라이브 모드
+확인
+멤버십/상점 소액 테스트 결제
+웹훅 수신 후 vming_unlimited_* / shop_order_* merchantUid 멱등
+프로덕션에서 VLUE_ALLOW_DEV_BILLING, VLUE_ALLOW_DEV_SHOP 은 넣지 마세요.
+6단계 — 부가 연동 (출시 직전·기능별)
+아래는 7대 필수 다음이지만, 실서비스에서 곧 쓸 기능이면 같은 주에 붙이는 것을 권장합니다.
+순서영역API/ENV준비할 키6-1
+카카오 로그인
+KAKAO_CLIENT_ID, KAKAO_CLIENT_SECRET, KAKAO_REDIRECT_URI
+카카오 개발자 REST API 키, Redirect: https://www.vlue.kr/api/v1/auth/kakao/callback
+6-2
+푸시(FCM)
+GOOGLE_APPLICATION_CREDENTIALS 또는 FCM_*
+Firebase 서비스 계정 JSON
+6-3
+웹 푸시
+VITE_WEB_PUSH_VAPID_PUBLIC_KEY, WEB_PUSH_VAPID_PRIVATE_KEY
+VAPID 키 쌍
+6-4
+구독 크론
+SUBSCRIPTION_CRON_SECRET
+랜덤 시크릿 + 스케줄러가 POST /api/cron/subscription-billing 호출
+6-5
+가족보호 웹훅
+OPENBANKING_WEBHOOK_SECRET, FAMILY_CRON_SECRET
+오픈뱅킹·크론용
+6-6
+(선택) OpenAI Vision
+OPENAI_API_KEY
+소싱 Vision만 쓸 때
+6-7
+관리자
+ADMIN_ENTRY_PATH, VITE_ADMIN_PATH
+동일 문자열 + ADMIN_MASTER_PHONE_E164
+7단계 — 도메인 기능 통합 스모크 (출시 게이트)
+코드에 반영된 Server-Only / SSE / 보안 기준 체크리스트입니다.
+#시나리오필요 키1
+회원가입 → 로그인 → JWT 유지
+JWT
+2
+Vming 채팅 + 무료 15k 토큰 캡
+Gemini, Redis
+3
+DM SSE 실시간 수신
+API URL, 로그인
+4
+캘린더·메모 CRUD (오프라인 폴백 없음)
+DB
+5
+쇼핑: products/sync → 장바구니 → orders/prepare → 결제
+Portone, DB
+6
+보안함 Evidence 목록·다운로드
+DB, (S3)
+7
+카카오 명함 Feed 공유
+Gemini·DB·VITE_CARD_PUBLIC_API_BASE
+8
+오피스 캘린더 (/api/calendar/all 단일 소스)
+DB
+통과 후:
+npm run deploy:lock   # deployment.lock.json 갱신
+8단계 — 운영·모니터링 (오픈 직후)
+항목권장로그
+API stdout + Nginx access/error
+DB 백업
+일 1회 자동 스냅샷
+Redis
+메모리·연결 수 알람
+Gemini
+일 사용량·비용 알람 (Flash 단가)
+Portone
+웹훅 실패·결제 실패 알람
+크론
+구독 갱신·가족보호 elder job 등록
+API 키 준비 체크리스트 (한 번에 모을 때)
+필수 (1~4단계 전에)
+ DATABASE_URL
+ REDIS_URL
+ GEMINI_API_KEY
+ PORTONE_API_KEY + PORTONE_API_SECRET
+ JWT_ACCESS_SECRET / SESSION_SECRET (랜덤 생성)
+ S3_* + FILE_STORAGE_PROVIDER=s3
+ VITE_API_URL (+ Portone 프론트 3종)
+출시 직전 (5~6단계)
+ PORTONE_WEBHOOK_SECRET
+ 카카오 OAuth 3종
+ FCM / VAPID (푸시 쓸 때)
+ SUBSCRIPTION_CRON_SECRET 등 크론 시크릿
+권장 일정 예시
+주차작업1주차
+0~2단계 (인프라 + DB + API health)
+2주차
+3~4단계 (API·웹 배포, Server-Only 기능)
+3주차
+5단계 Portone 라이브 + 7단계 스모크
+4주차
+6단계 부가 연동 + 소프트 오픈
+다음 단계로 진행하실 때 어느 호스팅을 쓰실지(예: AWS, Cafe24, Supabase+Railway) 알려주시면, 그 환경에 맞춰 DATABASE_URL 형식·Nginx 샘플·크론 등록 예시까지 이어서 적어 드리겠습니다.

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VLUE Minimal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100">
+
+<!-- 메인 -->
+<div id="main-screen" class="p-6">
+    <h1 class="text-2xl font-bold mb-4">메인</h1>
+    <button onclick="openChatList('가족')" class="bg-blue-600 text-white px-4 py-2 rounded">
+        가족 채팅 열기
+    </button>
+</div>
+
+<!-- 채팅 리스트 -->
+<div id="chat-list-screen" class="hidden p-6">
+    <button onclick="goHome()" class="mb-4">← 뒤로</button>
+    <h2 id="chat-list-title" class="text-xl font-bold mb-4"></h2>
+
+    <div id="chat-list"></div>
+</div>
+
+<!-- 채팅방 -->
+<div id="chat-room-screen" class="hidden fixed inset-0 bg-white flex flex-col">
+
+    <!-- 상단 -->
+    <div class="p-4 border-b flex justify-between">
+        <button onclick="exitChat()">←</button>
+        <span id="chat-user-name"></span>
+    </div>
+
+    <!-- 메시지 -->
+    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-2"></div>
+
+    <!-- 입력 -->
+    <div class="p-4 border-t flex gap-2">
+        <input id="chat-input" class="flex-1 border rounded px-3 py-2">
+        <button onclick="sendMessage()" class="bg-blue-600 text-white px-4 rounded">
+            전송
+        </button>
+    </div>
+</div>
+
+<script>
+let chatTimer; // 필수 선언
+
+const chatData = {
+    '가족': [
+        { name: '엄마', chats: [
+            { type: 'target', text: '밥 먹었니?' },
+            { type: 'me', text: '네 먹었어요' }
+        ]}
+    ]
+};
+
+// 화면 전환
+function goHome() {
+    hideAll();
+    document.getElementById('main-screen').classList.remove('hidden');
+}
+
+function openChatList(type) {
+    hideAll();
+    document.getElementById('chat-list-screen').classList.remove('hidden');
+
+    document.getElementById('chat-list-title').innerText = type + " 채팅";
+
+    const list = document.getElementById('chat-list');
+    list.innerHTML = '';
+
+    chatData[type].forEach(user => {
+        list.innerHTML += `
+            <div onclick="enterChat('${user.name}')" 
+                 class="p-3 bg-white mb-2 rounded shadow cursor-pointer">
+                ${user.name}
+            </div>
+        `;
+    });
+}
+
+function enterChat(name) {
+    hideAll();
+    document.getElementById('chat-room-screen').classList.remove('hidden');
+
+    document.getElementById('chat-user-name').innerText = name;
+
+    const user = chatData['가족'].find(u => u.name === name);
+
+    const box = document.getElementById('chat-messages');
+    box.innerHTML = '';
+
+    user.chats.forEach(c => {
+        box.innerHTML += c.type === 'me'
+            ? `<div class="text-right"><span class="bg-blue-500 text-white px-3 py-2 rounded inline-block">${c.text}</span></div>`
+            : `<div><span class="bg-gray-200 px-3 py-2 rounded inline-block">${c.text}</span></div>`;
+    });
+
+    box.scrollTop = box.scrollHeight;
+}
+
+function exitChat() {
+    openChatList('가족');
+}
+
+function sendMessage() {
+    const input = document.getElementById('chat-input');
+    if (!input.value) return;
+
+    const box = document.getElementById('chat-messages');
+
+    box.innerHTML += `
+        <div class="text-right">
+            <span class="bg-blue-500 text-white px-3 py-2 rounded inline-block">
+                ${input.value}
+            </span>
+        </div>
+    `;
+
+    input.value = '';
+    box.scrollTop = box.scrollHeight;
+}
+
+function hideAll() {
+    document.getElementById('main-screen').classList.add('hidden');
+    document.getElementById('chat-list-screen').classList.add('hidden');
+    document.getElementById('chat-room-screen').classList.add('hidden');
+}
+</script>
+
+</body>
+</html>

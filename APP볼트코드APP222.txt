@@ -1,0 +1,268 @@
+import { useState, useEffect } from 'react';
+import { View } from './types';
+import AnimatedBackground from './components/AnimatedBackground';
+import Navbar from './components/Navbar';
+import Footer from './components/Footer';
+import ChatBot from './components/ChatBot';
+import AuthModal from './components/AuthModal';
+import EmergencyButton from './components/EmergencyButton';
+import LoginRequiredModal from './components/LoginRequiredModal';
+import HomePage from './pages/HomePage';
+import SearchPage from './pages/SearchPage';
+import ShoppingPage from './pages/ShoppingPage';
+import ResourcesPage from './pages/ResourcesPage';
+import AboutPage from './pages/AboutPage';
+import PricingPage from './pages/PricingPage';
+import SafeZonePage from './pages/SafeZonePage';
+import SecureMailPage from './pages/SecureMailPage';
+import DownloadPage from './pages/DownloadPage';
+import NewsPage from './pages/NewsPage';
+import EventsPage from './pages/EventsPage';
+import JobsPage from './pages/JobsPage';
+import SupportPage from './pages/SupportPage';
+import MyPage from './pages/MyPage';
+import BusinessCardPage from './pages/BusinessCardPage';
+import { supabase, isSupabaseAvailable } from './lib/supabase';
+
+// [대표님 주문] 여백에 부모님 앱 설치용 QR 코드 추가
+const PremiumHeroSection = () => {
+  const [showToast, setShowToast] = useState(false);
+
+  const handleCopyLink = async () => {
+    const shareUrl = window.location.origin + '/pricing'; 
+    const shareText = `[VLUE] 부모님 보안을 위한 자녀 안심 서비스\n상세보기: ${shareUrl}`;
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2000);
+    } catch (err) {
+      alert('복사에 실패했습니다.');
+    }
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-6 mb-12">
+      <div className="bg-white rounded-[48px] overflow-hidden flex flex-col lg:flex-row border border-slate-100 shadow-2xl relative">
+        {/* 왼쪽: AI 실시간 감시 센터 UI (유지) */}
+        <div className="lg:w-5/12 min-h-[500px] bg-[#020617] relative flex flex-col items-center justify-center p-10 overflow-hidden">
+          <div className="absolute inset-0 opacity-30">
+            <div 
+              className="w-[200%] h-[200%] absolute top-[-50%] left-[-50%]" 
+              style={{
+                backgroundImage: 'conic-gradient(from 0deg at 50% 50%, #3b82f6 0deg, transparent 90deg)',
+                animation: 'spin 3s linear infinite'
+              }}
+            ></div>
+          </div>
+          <div className="z-10 w-full bg-slate-900/90 backdrop-blur-xl border border-blue-500/30 rounded-3xl p-8 font-mono shadow-[0_0_50px_rgba(59,130,246,0.15)]">
+            <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-3 text-[10px]">
+              <span className="text-blue-400 font-black animate-pulse">● VLUE_AI_MONITOR_ON</span>
+              <span className="text-slate-500 text-[10px]">REAL-TIME SCAN</span>
+            </div>
+            <div className="space-y-3 text-[12px]">
+              <div className="flex justify-between text-emerald-400 font-bold"><span>VOICE SCANNER</span><span>ACTIVE</span></div>
+              <div className="flex justify-between text-slate-400"><span>PHISHING_ATTACK</span><span>DETECTING</span></div>
+              <div className="flex justify-between text-slate-400"><span>REMOTE_ACCESS</span><span>FILTERING</span></div>
+              <div className="h-[2px] bg-blue-500/10 my-4 overflow-hidden rounded-full">
+                <div className="h-full bg-blue-500 w-1/3" style={{ animation: 'scan 2s ease-in-out infinite' }}></div>
+              </div>
+              <p className="text-blue-300/60 text-center italic text-[10px]">"부모님 폰 보안, AI 분석팀이 24시간 실시간 보호 중"</p>
+            </div>
+          </div>
+          <div className="z-10 mt-12 text-center px-4">
+            <h4 className="text-white text-2xl font-black leading-tight mb-5 tracking-tighter">
+              식당도, 회사도 보안경비업체가 지키는데<br/>
+              <span className="text-blue-500 underline underline-offset-8 decoration-4">왜 부모님 폰은 방치하시나요?</span>
+            </h4>
+            <p className="text-slate-400 text-sm font-medium leading-relaxed">
+              ADT캡스가 건물을 지키듯, VLUE AI 분석팀은<br/>
+              가장 취약한 부모님의 휴대폰을 24시간 실시간 보안합니다.
+            </p>
+          </div>
+        </div>
+
+        {/* 오른쪽: 상세 혜택 안내 */}
+        <div className="lg:w-7/12 p-12 lg:p-20 flex flex-col bg-white relative">
+          <div className="flex-1 flex flex-col justify-center">
+            {/* 홀로그램 효과 뱃지 (유지) */}
+            <div className="relative group mb-6 w-fit h-fit overflow-hidden rounded-full p-[2px]">
+              <div className="absolute inset-0 transition-opacity duration-300 opacity-30 group-hover:opacity-100" style={{
+                backgroundImage: 'linear-gradient(110deg, #ff00ea, #ffdd00 20%, #00ffaa 40%, #00aaff 60%, #ff00ea 80%, #ffdd00)',
+                backgroundSize: '300% 300%',
+                animation: 'hologram 4s linear infinite',
+              }}></div>
+              <div className="relative inline-flex items-center gap-2 px-6 py-2 bg-blue-50 group-hover:bg-blue-50/70 backdrop-blur-sm rounded-full w-fit">
+                <span className="text-blue-700 font-black text-xs uppercase tracking-widest relative z-10 transition-colors group-hover:text-blue-900">
+                  Family Care Event
+                </span>
+              </div>
+            </div>
+
+            <h2 className="text-4xl lg:text-5xl font-black leading-tight mb-8 relative">
+              부모님 폰 보안, 이제<br/>
+              <span className="text-blue-600 underline decoration-blue-100 decoration-8 underline-offset-8">자녀가 직접 챙겨주세요</span>
+            </h2>
+            
+            <div className="space-y-4 mb-12 text-lg text-slate-600 font-bold">
+              <p>✓ 자녀 대리 결제 시스템으로 간편 신청</p>
+              <p>✓ 스탠다드 요금제 가입 시 첫 달 1개월 무료</p>
+              <p>✓ AI 분석팀 이상징후 포착 시 자녀에게 즉시 알림</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full relative mb-12">
+              <button 
+                onClick={() => document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth' })}
+                className="px-8 py-6 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all w-full h-full"
+              >
+                무료 혜택받고 시작하기
+              </button>
+              
+              <button 
+                onClick={handleCopyLink}
+                className="px-8 py-6 bg-slate-50 text-slate-900 border border-slate-200 rounded-2xl font-black text-xl shadow-md hover:bg-slate-100 active:scale-95 transition-all w-full h-full flex items-center justify-center gap-3"
+              >
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                <span>가족에게 공유하기</span>
+              </button>
+
+              {showToast && (
+                <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-xl text-sm font-bold shadow-2xl animate-bounce">
+                  클립보드가 복사되었습니다
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* [대표님 주문 반영] 여백에 추가된 QR 코드 설치 섹션 */}
+          <div className="border-t border-slate-100 pt-8 mt-auto flex flex-col sm:flex-row items-center gap-6 bg-slate-50/50 rounded-3xl p-6">
+            <div className="w-28 h-28 bg-white p-3 rounded-2xl shadow-inner border border-slate-100 flex items-center justify-center shrink-0">
+              {/* 실제 스토어 설치 링크 QR 이미지 (예시 이미지, 서비스 오픈 시 교체) */}
+              <img 
+                src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://vlue.co.kr/install" 
+                alt="VLUE App Install QR"
+                className="w-full h-full"
+              />
+            </div>
+            <div className="flex-1 text-center sm:text-left">
+              <p className="text-slate-500 text-sm font-medium mb-1">가족이 함께 계시다면?</p>
+              <h5 className="text-slate-900 text-lg font-black leading-snug">
+                부모님 휴대폰으로<br/>
+                <span className="text-blue-600">QR 코드를 스캔</span>하여 바로 설치하세요
+              </h5>
+              <p className="text-slate-400 text-xs mt-2 font-medium">스캔 시 앱스토어/플레이스토어로 자동 연결됩니다.</p>
+            </div>
+          </div>
+
+          {/* 하단 스크롤 가이드 (유지) */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 opacity-60 hover:opacity-100 transition-opacity cursor-pointer z-10"
+               onClick={() => document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth' })}>
+            <div className="flex flex-col items-center">
+              <svg className="w-5 h-5 text-blue-500 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+        @keyframes hologram {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default function App() {
+  const [view, setView] = useState<View>('home');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [user, setUser] = useState<{ email: string; grade?: 'basic' | 'certified' } | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showLoginRequired, setShowLoginRequired] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseAvailable) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) setUser({ email: session.user.email ?? '', grade: 'basic' });
+    }).catch(() => {});
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) { setUser({ email: session.user.email ?? '', grade: 'basic' }); } 
+      else { setUser(null); }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    setView('search');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleNavigate = (nextView: View) => {
+    setView(nextView);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLogout = async () => {
+    try { if (isSupabaseAvailable) await supabase.auth.signOut(); } catch {}
+    setUser(null);
+    setView('home');
+  };
+
+  const handleAuthSuccess = (authUser: { email: string; grade?: 'basic' | 'certified' }) => {
+    setUser(authUser);
+    setShowAuth(false);
+    setShowLoginRequired(false);
+  };
+
+  const handleLoginRequired = () => { if (!user) setShowLoginRequired(true); };
+
+  return (
+    <div className="min-h-screen bg-blue-tint relative font-sans">
+      <AnimatedBackground />
+      <div className="relative z-10">
+        <Navbar currentView={view} onNavigate={handleNavigate} user={user} onLoginClick={() => setShowAuth(true)} onLogout={handleLogout} />
+
+        {view === 'home' && <HomePage onSearch={handleSearch} onNavigate={handleNavigate} />}
+        {view === 'search' && <SearchPage initialQuery={searchQuery} onBack={() => handleNavigate('home')} />}
+        {view === 'shopping' && <ShoppingPage user={user} onLoginClick={handleLoginRequired} />}
+        {view === 'about' && <AboutPage />}
+        {view === 'resources' && <ResourcesPage user={user} />}
+        
+        {view === 'pricing' && (
+          <div className="pt-32 pb-20">
+            <PremiumHeroSection />
+            <div id="plans">
+              <PricingPage user={user} onLoginClick={handleLoginRequired} />
+            </div>
+          </div>
+        )}
+
+        {view === 'safezone' && <SafeZonePage onBack={() => handleNavigate('home')} />}
+        {view === 'mail' && <SecureMailPage onBack={() => handleNavigate('home')} />}
+        {view === 'download' && <DownloadPage onBack={() => handleNavigate('home')} />}
+        {view === 'news' && <NewsPage onBack={() => handleNavigate('home')} />}
+        {view === 'events' && <EventsPage onBack={() => handleNavigate('home')} />}
+        {view === 'jobs' && <JobsPage user={user} onLoginClick={handleLoginRequired} onBack={() => handleNavigate('home')} />}
+        {view === 'support' && <SupportPage user={user} onLoginClick={handleLoginRequired} onBack={() => handleNavigate('home')} />}
+        {view === 'mypage' && user && <MyPage user={user} onNavigate={(v) => handleNavigate(v as View)} onLogout={handleLogout} />}
+        {view === 'bizcard' && <BusinessCardPage onBack={() => handleNavigate('home')} />}
+
+        {view !== 'mypage' && <Footer onNavigate={handleNavigate} />}
+      </div>
+      <ChatBot />
+      <EmergencyButton />
+      {showLoginRequired && !user && (
+        <LoginRequiredModal onClose={() => setShowLoginRequired(false)} onLogin={() => { setShowLoginRequired(false); setShowAuth(true); }} />
+      )}
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} onSuccess={handleAuthSuccess} />}
+    </div>
+  );
+}

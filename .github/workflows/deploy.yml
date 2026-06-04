@@ -1,0 +1,51 @@
+name: VLUE Deploy (API + Web)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: DB migrate (production)
+        if: ${{ secrets.DATABASE_URL != '' }}
+        run: npm run db:deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Production build
+        run: npm run build:all
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vlue-web-dist
+          path: web/dist
+
+      - name: Upload api artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vlue-api-dist
+          path: apps/api/dist
+
+      # 호스팅 연동: 아래 중 사용 환경에 맞게 secrets 설정 후 주석 해제
+      # - name: Deploy web to static host
+      #   run: npx wrangler pages deploy web/dist --project-name=vlue-web
+      #   env:
+      #     CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

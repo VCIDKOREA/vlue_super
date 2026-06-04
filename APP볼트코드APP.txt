@@ -1,0 +1,271 @@
+import { useState, useEffect } from 'react';
+
+import { View } from './types';
+
+import AnimatedBackground from './components/AnimatedBackground';
+
+import Navbar from './components/Navbar';
+
+import Footer from './components/Footer';
+
+import ChatBot from './components/ChatBot';
+
+import AuthModal from './components/AuthModal';
+
+import EmergencyButton from './components/EmergencyButton';
+
+import LoginRequiredModal from './components/LoginRequiredModal';
+
+import HomePage from './pages/HomePage';
+
+import SearchPage from './pages/SearchPage';
+
+import ShoppingPage from './pages/ShoppingPage';
+
+import ResourcesPage from './pages/ResourcesPage';
+
+import AboutPage from './pages/AboutPage';
+
+import PricingPage from './pages/PricingPage';
+
+import SafeZonePage from './pages/SafeZonePage';
+
+import SecureMailPage from './pages/SecureMailPage';
+
+import DownloadPage from './pages/DownloadPage';
+
+import NewsPage from './pages/NewsPage';
+
+import EventsPage from './pages/EventsPage';
+
+import JobsPage from './pages/JobsPage';
+
+import SupportPage from './pages/SupportPage';
+
+import MyPage from './pages/MyPage';
+
+import BusinessCardPage from './pages/BusinessCardPage';
+
+import { supabase, isSupabaseAvailable } from './lib/supabase';
+
+
+
+export default function App() {
+
+  const [view, setView] = useState<View>('home');
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [user, setUser] = useState<{ email: string; grade?: 'basic' | 'certified' } | null>(null);
+
+  const [showAuth, setShowAuth] = useState(false);
+
+  const [showLoginRequired, setShowLoginRequired] = useState(false);
+
+
+
+  useEffect(() => {
+
+    if (!isSupabaseAvailable) return;
+
+
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+
+      if (session?.user) setUser({ email: session.user.email ?? '', grade: 'basic' });
+
+    }).catch(() => {});
+
+
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+
+      if (session?.user) {
+
+        setUser({ email: session.user.email ?? '', grade: 'basic' });
+
+      } else {
+
+        setUser(null);
+
+      }
+
+    });
+
+
+
+    return () => subscription.unsubscribe();
+
+  }, []);
+
+
+
+  const handleSearch = (query: string) => {
+
+    setSearchQuery(query);
+
+    setView('search');
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  };
+
+
+
+  const handleNavigate = (nextView: View) => {
+
+    setView(nextView);
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  };
+
+
+
+  const handleLogout = async () => {
+
+    try {
+
+      if (isSupabaseAvailable) await supabase.auth.signOut();
+
+    } catch {}
+
+    setUser(null);
+
+    setView('home');
+
+  };
+
+
+
+  const handleAuthSuccess = (authUser: { email: string; grade?: 'basic' | 'certified' }) => {
+
+    setUser(authUser);
+
+    setShowAuth(false);
+
+    setShowLoginRequired(false);
+
+  };
+
+
+
+  const handleLoginRequired = () => {
+
+    if (!user) setShowLoginRequired(true);
+
+  };
+
+
+
+  return (
+
+    <div className="min-h-screen bg-blue-tint relative">
+
+      <AnimatedBackground />
+
+
+
+      <div className="relative z-10">
+
+        <Navbar
+
+          currentView={view}
+
+          onNavigate={handleNavigate}
+
+          user={user}
+
+          onLoginClick={() => setShowAuth(true)}
+
+          onLogout={handleLogout}
+
+        />
+
+
+
+        {view === 'home' && (
+
+          <HomePage onSearch={handleSearch} onNavigate={handleNavigate} />
+
+        )}
+
+        {view === 'search' && (
+
+          <SearchPage initialQuery={searchQuery} onBack={() => handleNavigate('home')} />
+
+        )}
+
+        {view === 'shopping' && <ShoppingPage user={user} onLoginClick={handleLoginRequired} />}
+
+        {view === 'about' && <AboutPage />}
+
+        {view === 'resources' && <ResourcesPage user={user} />}
+
+        {view === 'pricing' && <PricingPage user={user} onLoginClick={handleLoginRequired} />}
+
+        {view === 'safezone' && <SafeZonePage onBack={() => handleNavigate('home')} />}
+
+        {view === 'mail' && <SecureMailPage onBack={() => handleNavigate('home')} />}
+
+        {view === 'download' && <DownloadPage onBack={() => handleNavigate('home')} />}
+
+        {view === 'news' && <NewsPage onBack={() => handleNavigate('home')} />}
+
+        {view === 'events' && <EventsPage onBack={() => handleNavigate('home')} />}
+
+        {view === 'jobs' && <JobsPage user={user} onLoginClick={handleLoginRequired} onBack={() => handleNavigate('home')} />}
+
+        {view === 'support' && <SupportPage user={user} onLoginClick={handleLoginRequired} onBack={() => handleNavigate('home')} />}
+
+        {view === 'mypage' && user && (
+
+          <MyPage user={user} onNavigate={(v) => handleNavigate(v as View)} onLogout={handleLogout} />
+
+        )}
+
+        {view === 'bizcard' && (
+
+          <BusinessCardPage onBack={() => handleNavigate('home')} />
+
+        )}
+
+
+
+        {view !== 'mypage' && <Footer onNavigate={handleNavigate} />}
+
+      </div>
+
+
+
+      <ChatBot />
+
+      <EmergencyButton />
+
+
+
+      {showLoginRequired && !user && (
+
+        <LoginRequiredModal
+
+          onClose={() => setShowLoginRequired(false)}
+
+          onLogin={() => { setShowLoginRequired(false); setShowAuth(true); }}
+
+        />
+
+      )}
+
+
+
+      {showAuth && (
+
+        <AuthModal onClose={() => setShowAuth(false)} onSuccess={handleAuthSuccess} />
+
+      )}
+
+    </div>
+
+  );
+
+}

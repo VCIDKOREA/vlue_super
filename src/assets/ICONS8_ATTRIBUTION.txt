@@ -1,0 +1,10 @@
+VLUE — Third-party icon attribution (Icons8)
+
+VLUE 브랜드 로고(눈 마크)·헤더 홈 아이콘 등은 Icons8「명백한」Eye 스타일을 참고한 자체 SVG입니다.
+앱 내 표기(프로필 패널 하단) 및 아래 링크 준수를 권장합니다.
+
+HTML (Icons8 제공 형식):
+<a target="_blank" href="https://icons8.com/icon/gMWepjYoqP6M/eye">명백한</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a>
+
+Plain:
+Eye icon — https://icons8.com/icon/gMWepjYoqP6M/eye | Icons8 — https://icons8.com

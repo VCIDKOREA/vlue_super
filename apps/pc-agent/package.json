@@ -1,0 +1,12 @@
+{
+  "name": "@vlue/pc-agent",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node agent.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}

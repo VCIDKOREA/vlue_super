@@ -1,0 +1,35 @@
+/master=2026-qldlTldkdlelzhfldk?26sus4dnjf7dlf-tjfflq (admin주소)
+
+공공데이터포달 API키
+U01TX0FVVEgyMDI2MDUwMzE1MjIyNjExODA4ODQ=
+
+수파베이스
+Project URL: https://qvynpdsxbqvlxhsglib.supabase.co 
+sb_publishable_0YdRXXnquYRX5A2HhNb69A_FY56nozX  (출판가능키)
+sb_secret_kprOQf7rTnGXbe2VB2-LOw_SwseKPoG  (API키)
+
+카카오
+REST API 키 : a0e980da352dc7a7a95e92c035539c1c
+0766546b15756f9f65f5a4cefb17b261
+JavaScript 키 : 220175e6a52564c957ffc1d091becd29
+fe436b5b9c31e4344e70554f5fc5cc93
+네이티브 앱 키 : 3880f8b321aa7ba77ee81558fc0ed062
+d4b3db556d5872ef405c0ae5121daa89
+
+포트원 : jg0715@kakao.com
+!Dlwhdrms2282
+
+# Portone V1 Keys
+VITE_PORTONE_USER_CODE=imp57735111
+VITE_PORTONE_API_KEY=5737347423635572
+VITE_PORTONE_API_SECRET=bjfIoKpSD7khCG90uBxNfxnEyIoXSMOO6g8emZo1hiwuhJIW71FZfuOFTyMtqqAkF8WOPYBkK6snpQP6
+
+수파베이스
+# Connect to Supabase via connection pooling
+DATABASE_URL="postgresql://postgres.qvynpdsxbqvlxkhsglib:[YOUR-PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+
+# Direct connection to the database. Used for migrations
+DIRECT_URL="postgresql://postgres.qvynpdsxbqvlxkhsglib:[YOUR-PASSWORD]@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres"
+
+수파베이스 채팅
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2eW5wZHN4YnF2bHhraHNnbGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3ODcwNTMsImV4cCI6MjA5MzM2MzA1M30.cPAgcvG4o76zqZ7UmXtQXShKjMz_l3r1Vk99ZwI2LyQ
