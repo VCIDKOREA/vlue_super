@@ -60,11 +60,11 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
           >
             <VlueNavLogoMark
               blinkSeq={logoBlinkSeq}
-              size={40}
+              size={32}
               className="mkt-nav-logo-mark transition-opacity group-hover:opacity-90 group-active:scale-90"
             />
             <span
-              className="mkt-nav-logo-text font-black tracking-tight"
+              className="mkt-nav-logo-text font-bold tracking-tight"
               style={{ color: '#3182F6', fontFamily: "'Pretendard Variable', Pretendard, Inter, sans-serif", letterSpacing: '-0.04em' }}
             >
               VLUE
@@ -78,16 +78,16 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
                 onClick={() => handleNav(item.view)}
                 className={
                   item.featured
-                    ? `mkt-nav-featured-cta mkt-nav-link px-4 py-2.5 font-black rounded-xl whitespace-nowrap flex items-center gap-2 bg-gradient-to-r from-violet-600 to-primary-600 text-white shadow-md shadow-violet-500/30 hover:shadow-lg hover:from-violet-500 hover:to-primary-500 transition-all ${
+                    ? `mkt-nav-featured-cta mkt-nav-link px-3 py-1.5 font-semibold rounded-lg whitespace-nowrap flex items-center gap-1.5 bg-gradient-to-r from-violet-600 to-primary-600 text-white shadow-sm shadow-violet-500/25 hover:shadow-md hover:from-violet-500 hover:to-primary-500 transition-all ${
                         item.view === currentView ? 'ring-2 ring-white ring-offset-2 ring-offset-primary-600' : ''
                       }`
                     : item.mailPill
-                      ? `mkt-nav-mail-pill mkt-nav-link px-4 py-2.5 font-semibold rounded-full whitespace-nowrap flex items-center gap-2 border transition-all ${
+                      ? `mkt-nav-mail-pill mkt-nav-link px-3 py-1.5 font-medium rounded-full whitespace-nowrap flex items-center gap-1.5 border transition-all ${
                           item.view === currentView
                             ? 'text-primary-700 bg-primary-50 border-primary-200'
                             : 'text-primary-600 bg-primary-50/80 border-primary-100 hover:bg-primary-50'
                         }`
-                      : `mkt-nav-link px-3 py-2.5 font-medium rounded-xl transition-all duration-150 whitespace-nowrap flex items-center gap-1.5 ${
+                      : `mkt-nav-link px-2.5 py-1.5 font-medium rounded-lg transition-all duration-150 whitespace-nowrap flex items-center gap-1 ${
                           item.view === currentView
                             ? 'text-primary-600 bg-primary-50 font-semibold'
                             : 'text-gray-600 hover:text-primary-600 hover:bg-primary-50'
@@ -102,11 +102,11 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
             ))}
           </nav>
 
-          <div className="hidden lg:flex items-center gap-2.5 ml-4 flex-shrink-0">
+          <div className="mkt-nav-actions hidden lg:flex items-center gap-2 ml-3 flex-shrink-0">
             {/* 앱 다운로드 버튼 */}
             <button
               onClick={() => handleNav('download')}
-              className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all duration-150 whitespace-nowrap ${
+              className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border transition-all duration-150 whitespace-nowrap ${
                 currentView === 'download'
                   ? 'bg-primary-100 border-primary-300 text-primary-700'
                   : 'bg-slate-900 border-slate-700 text-white hover:bg-slate-800'
@@ -177,13 +177,13 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
               <>
                 <button
                   onClick={onLoginClick}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-primary-600 transition-colors whitespace-nowrap"
+                  className="px-2 py-1 text-xs font-medium text-gray-700 hover:text-primary-600 transition-colors whitespace-nowrap"
                 >
                   로그인
                 </button>
                 <button
                   onClick={onLoginClick}
-                  className="btn-primary text-xs px-3.5 py-1.5 whitespace-nowrap"
+                  className="btn-primary text-xs px-2.5 py-1 whitespace-nowrap"
                 >
                   회원가입
                 </button>

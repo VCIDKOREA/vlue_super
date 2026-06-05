@@ -1,0 +1,12 @@
+# Railway — @vlue/web (모노레포 루트에서 배포)
+# Settings → Deploy → Start Command 가 비어 있으면 이 파일 설정을 따릅니다.
+
+[build]
+builder = "nixpacks"
+# npm ci / rm .vite 금지 — Railway 설치 단계와 충돌(EBUSY) 남
+buildCommand = "npm run build -w @vlue/shared && npm run build -w @vlue/web"
+
+[deploy]
+startCommand = "npm run start -w @vlue/web"
+healthcheckPath = "/"
+restartPolicyType = "ON_FAILURE"

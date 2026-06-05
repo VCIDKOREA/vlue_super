@@ -73,6 +73,8 @@ CORS는 @vlue/api 에 www.vlue.kr + Railway web URL 포함
 
 ```
 
+Networking **Port 8080** + Start Command `npm run start -w @vlue/web` (502 방지)
+
 
 
 공통 BM: `@vlue/shared` (`packages/shared`)

@@ -33,12 +33,12 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
           <span style={{ wordBreak: 'keep-all', whiteSpace: 'nowrap' }}>보이스피싱 예방 통합 인증 플랫폼</span>
         </div>
 
-        <h1 className="hero-title font-black text-gray-900" style={{ letterSpacing: '-0.035em', wordBreak: 'keep-all' }}>
+        <h1 className="hero-title font-bold text-gray-900" style={{ letterSpacing: '-0.03em', wordBreak: 'keep-all' }}>
           의심되는 기관,<br />
           <span className="text-primary-500">지금 바로 확인</span>하세요
         </h1>
 
-        <p className="hero-desc mx-auto text-gray-600" style={{ wordBreak: 'keep-all', lineHeight: '1.8' }}>
+        <p className="hero-desc mx-auto text-gray-600" style={{ wordBreak: 'keep-all' }}>
           전화·문자를 받기 전, 공공데이터와 VLUE 인증 데이터를 동시에 비교분석하여{' '}
           <span className="text-primary-500 font-bold">실시간으로 사기 여부를 즉시 판별합니다.</span>
         </p>
@@ -92,7 +92,7 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
               ) : (
                 Icon && <Icon className="hero-stat-icon text-primary-600" />
               )}
-              <span className="font-black text-gray-900 font-inter hero-stat-value leading-tight">
+              <span className="font-bold text-gray-900 font-inter hero-stat-value leading-tight">
                 {value}<span className="text-gray-500 font-semibold hero-stat-unit">{unit}</span>
               </span>
               <span className="text-gray-400 text-center hero-stat-label">{label}</span>

@@ -29,5 +29,11 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  preview: {
+    host: true,
+    port: Number(process.env.PORT) || 8080,
+    strictPort: true,
+    allowedHosts: [".up.railway.app", "localhost"]
   }
 });
