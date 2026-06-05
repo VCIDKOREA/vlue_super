@@ -31,7 +31,7 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
       <div className="hero-glow hero-glow--right pointer-events-none" aria-hidden />
 
       <div className="relative z-10 w-full max-w-5xl mx-auto text-center hero-inner">
-        <div className="hero-badge hero-badge--it inline-flex items-center gap-2 rounded-full font-bold">
+        <div className="hero-badge hero-badge--it hero-animate hero-animate--1 inline-flex items-center gap-2 rounded-full font-bold">
           <span className="hero-live-dot" aria-hidden />
           <span className="hero-live-label">LIVE</span>
           <span className="hero-badge-divider" aria-hidden />
@@ -39,20 +39,21 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
           <span style={{ wordBreak: 'keep-all', whiteSpace: 'nowrap' }}>보이스피싱 예방 통합 인증 플랫폼</span>
         </div>
 
-        <h1 className="hero-title font-extrabold text-slate-900" style={{ letterSpacing: '-0.035em', wordBreak: 'keep-all' }}>
+        <h1 className="hero-title hero-animate hero-animate--2 font-extrabold text-slate-900" style={{ letterSpacing: '-0.035em', wordBreak: 'keep-all' }}>
           의심되는 기관,<br />
           <span className="hero-title-accent">지금 바로 확인</span>하세요
         </h1>
 
-        <p className="hero-desc mx-auto text-slate-700" style={{ wordBreak: 'keep-all' }}>
-          전화·문자를 받기 전, 공공데이터와 VLUE 인증 데이터를 동시에 비교분석하여{' '}
+        <p className="hero-desc hero-animate hero-animate--3 mx-auto text-slate-600" style={{ wordBreak: 'keep-all' }}>
+          전화·문자를 받기 전, 공공데이터와 VLUE 인증 데이터를 동시에 비교분석하여
+          <br />
           <span className="hero-desc-accent">실시간으로 사기 여부를 즉시 판별합니다.</span>
         </p>
 
-        <div className="hero-search-panel mx-auto w-full">
+        <div className="hero-search-panel hero-animate hero-animate--4 mx-auto w-full">
           <div className="hero-search-panel-head">
-            <Shield className="w-4 h-4 text-primary-600" aria-hidden />
-            <span>기관·번호·사업자번호 통합 검증</span>
+            <Shield className="w-4 h-4 text-primary-500" aria-hidden />
+            <span>한 번에 검증 · 기관 · 번호 · 사업자번호</span>
           </div>
           <form onSubmit={handleSubmit} className="w-full hero-search-wrap mx-auto">
             <div className="hero-search-shell flex items-center">
@@ -79,7 +80,7 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
           </form>
         </div>
 
-        <div className="hero-quick flex flex-wrap items-center justify-center">
+        <div className="hero-quick hero-animate hero-animate--5 flex flex-wrap items-center justify-center">
           <span className="hero-quick-label flex-shrink-0">빠른 검색</span>
           {QUICK.map((term) => (
             <button
@@ -92,11 +93,11 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
           ))}
         </div>
 
-        <div className="hero-stats hero-stats--cards mx-auto">
-          {STATS.map((stat) => {
+        <div className="hero-stats hero-stats--cards hero-animate hero-animate--6 mx-auto">
+          {STATS.map((stat, i) => {
             const { label, value, unit, brand, icon: Icon } = stat;
             return (
-            <div key={label} className="hero-stat-card">
+            <div key={label} className="hero-stat-card" style={{ animationDelay: `${0.55 + i * 0.08}s` }}>
               <div className="hero-stat-item flex flex-col items-center">
                 {brand ? (
                   <VlueBrandMark size={20} className="hero-stat-icon mb-0.5" />
@@ -113,7 +114,7 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
           })}
         </div>
 
-        <div className="flex flex-wrap items-center justify-center hero-cta-wrap">
+        <div className="flex flex-wrap items-center justify-center hero-cta-wrap hero-animate hero-animate--7">
           <button onClick={() => onNavigate('pricing')} className="btn-primary hero-cta-primary">
             VLUE 인증 신청하기
             <ChevronRight className="w-4 h-4" />

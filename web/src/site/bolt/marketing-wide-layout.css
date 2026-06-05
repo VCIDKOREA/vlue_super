@@ -364,9 +364,10 @@
 }
 
 [data-vlue-site="marketing"] .mkt-download-bar--top {
-  background: linear-gradient(90deg, #f8fafc 0%, #eff6ff 48%, #f8fafc 100%);
-  border-bottom: 1px solid #dbeafe;
-  color: #334155;
+  background: rgb(255 255 255 / 72%);
+  border-bottom: 1px solid rgb(226 232 240 / 80%);
+  color: #64748b;
+  backdrop-filter: blur(8px);
 }
 
 [data-vlue-site="marketing"] .mkt-download-bar--bottom {
@@ -376,8 +377,8 @@
 }
 
 [data-vlue-site="marketing"] .mkt-download-bar-message {
-  color: #475569 !important;
-  font-weight: 600 !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
 }
 
 [data-vlue-site="marketing"] .mkt-download-bar {
@@ -389,12 +390,13 @@
   align-items: center;
   justify-content: center;
   gap: 0.3125rem;
-  min-height: 2rem;
-  padding: 0.3125rem 0.875rem;
-  border-radius: 0.625rem;
-  font-size: 0.8125rem !important;
+  min-height: 1.875rem;
+  padding: 0.25rem 0.8125rem;
+  border-radius: 9999px;
+  font-size: 0.75rem !important;
   line-height: 1.2 !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
   letter-spacing: -0.01em;
   white-space: nowrap;
   flex-shrink: 0;
@@ -414,9 +416,13 @@
   box-shadow: 0 2px 8px rgb(37 99 235 / 22%);
 }
 
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn:hover {
+  transform: translateY(-1px);
+}
+
 [data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--primary:hover {
-  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
-  box-shadow: 0 4px 12px rgb(37 99 235 / 28%);
+  background: linear-gradient(135deg, #4338ca 0%, #2563eb 100%);
+  box-shadow: 0 4px 14px rgb(99 102 241 / 28%);
 }
 
 [data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--ghost {
@@ -513,7 +519,7 @@
   }
 
   [data-vlue-site="marketing"] .hero-desc-accent {
-    color: #1d4ed8 !important;
+    color: #2563eb !important;
     font-weight: 800 !important;
   }
 
