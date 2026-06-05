@@ -21,7 +21,7 @@ jobs:
         run: npm ci
 
       - name: DB migrate (production)
-        if: ${{ secrets.DATABASE_URL != '' }}
+        if: github.event_name == 'workflow_dispatch'
         run: npm run db:deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

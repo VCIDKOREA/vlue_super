@@ -60,7 +60,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
           >
             <VlueNavLogoMark
               blinkSeq={logoBlinkSeq}
-              size={32}
+              size={36}
               className="mkt-nav-logo-mark transition-opacity group-hover:opacity-90 group-active:scale-90"
             />
             <span
