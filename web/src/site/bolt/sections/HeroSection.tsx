@@ -28,19 +28,19 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
       <div className="absolute inset-0 bg-gradient-to-b from-primary-50/70 via-blue-tint to-blue-tint pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-5xl mx-auto text-center hero-inner">
-        <div className="hero-badge inline-flex items-center gap-1.5 rounded-full bg-primary-50 border border-primary-200 text-primary-600 font-semibold">
+        <div className="hero-badge inline-flex items-center gap-1.5 rounded-full bg-primary-50 border border-primary-200 text-primary-700 font-bold">
           <VlueBrandMark size={14} className="hero-badge-icon" />
           <span style={{ wordBreak: 'keep-all', whiteSpace: 'nowrap' }}>보이스피싱 예방 통합 인증 플랫폼</span>
         </div>
 
-        <h1 className="hero-title font-bold text-gray-900" style={{ letterSpacing: '-0.03em', wordBreak: 'keep-all' }}>
+        <h1 className="hero-title font-extrabold text-slate-900" style={{ letterSpacing: '-0.035em', wordBreak: 'keep-all' }}>
           의심되는 기관,<br />
-          <span className="text-primary-500">지금 바로 확인</span>하세요
+          <span className="hero-title-accent">지금 바로 확인</span>하세요
         </h1>
 
-        <p className="hero-desc mx-auto text-gray-600" style={{ wordBreak: 'keep-all' }}>
+        <p className="hero-desc mx-auto text-slate-700" style={{ wordBreak: 'keep-all' }}>
           전화·문자를 받기 전, 공공데이터와 VLUE 인증 데이터를 동시에 비교분석하여{' '}
-          <span className="text-primary-500 font-bold">실시간으로 사기 여부를 즉시 판별합니다.</span>
+          <span className="hero-desc-accent">실시간으로 사기 여부를 즉시 판별합니다.</span>
         </p>
 
         {/* 검색창: 버튼이 절대 잘리지 않도록 flex-shrink-0 + 최소 너비 고정 */}
@@ -92,10 +92,10 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
               ) : (
                 Icon && <Icon className="hero-stat-icon text-primary-600" />
               )}
-              <span className="font-bold text-gray-900 font-inter hero-stat-value leading-tight">
-                {value}<span className="text-gray-500 font-semibold hero-stat-unit">{unit}</span>
+              <span className="font-extrabold text-slate-900 font-inter hero-stat-value leading-tight">
+                {value}<span className="text-slate-600 font-bold hero-stat-unit">{unit}</span>
               </span>
-              <span className="text-gray-400 text-center hero-stat-label">{label}</span>
+              <span className="text-slate-500 font-semibold text-center hero-stat-label">{label}</span>
             </div>
             );
           })}

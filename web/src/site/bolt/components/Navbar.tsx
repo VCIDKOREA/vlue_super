@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, X, User, ChevronDown, LogOut, MapPin, Lock, CreditCard, LayoutDashboard, Award, Monitor, Smartphone, Sparkles } from 'lucide-react';
+import { Menu, X, User, ChevronDown, LogOut, MapPin, Lock, CreditCard, LayoutDashboard, Award, Sparkles } from 'lucide-react';
 import { VlueNavLogoMark, useVlueLogoBlink } from '../../../components/VlueNavLogoMark.jsx';
 import type { View } from '../types';
 
@@ -78,8 +78,8 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
                 onClick={() => handleNav(item.view)}
                 className={
                   item.featured
-                    ? `mkt-nav-featured-cta mkt-nav-link px-3 py-1.5 font-semibold rounded-lg whitespace-nowrap flex items-center gap-1.5 bg-gradient-to-r from-violet-600 to-primary-600 text-white shadow-sm shadow-violet-500/25 hover:shadow-md hover:from-violet-500 hover:to-primary-500 transition-all ${
-                        item.view === currentView ? 'ring-2 ring-white ring-offset-2 ring-offset-primary-600' : ''
+                    ? `mkt-nav-featured-cta mkt-nav-link whitespace-nowrap flex items-center gap-1.5${
+                        item.view === currentView ? ' mkt-nav-featured-cta--active' : ''
                       }`
                     : item.mailPill
                       ? `mkt-nav-mail-pill mkt-nav-link px-3 py-1.5 font-medium rounded-full whitespace-nowrap flex items-center gap-1.5 border transition-all ${
@@ -102,21 +102,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
             ))}
           </nav>
 
-          <div className="mkt-nav-actions hidden lg:flex items-center gap-2 ml-3 flex-shrink-0">
-            {/* 앱 다운로드 버튼 */}
-            <button
-              onClick={() => handleNav('download')}
-              className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border transition-all duration-150 whitespace-nowrap ${
-                currentView === 'download'
-                  ? 'bg-primary-100 border-primary-300 text-primary-700'
-                  : 'bg-slate-900 border-slate-700 text-white hover:bg-slate-800'
-              }`}
-            >
-              <Smartphone className="w-3 h-3 flex-shrink-0" />
-              <Monitor className="w-3 h-3 flex-shrink-0 -ml-1" />
-              앱·PC 설치
-            </button>
-
+          <div className="mkt-nav-actions hidden lg:flex items-center gap-2.5 ml-4 flex-shrink-0">
             {user ? (
               <div className="relative">
                 <button
@@ -177,13 +163,13 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
               <>
                 <button
                   onClick={onLoginClick}
-                  className="px-2 py-1 text-xs font-medium text-gray-700 hover:text-primary-600 transition-colors whitespace-nowrap"
+                  className="mkt-nav-login whitespace-nowrap"
                 >
                   로그인
                 </button>
                 <button
                   onClick={onLoginClick}
-                  className="btn-primary text-xs px-2.5 py-1 whitespace-nowrap"
+                  className="mkt-nav-signup whitespace-nowrap"
                 >
                   회원가입
                 </button>
@@ -201,14 +187,14 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
       </div>
 
       {mobileOpen && (
-        <div className="lg:hidden bg-white border-t border-gray-100 px-4 py-3 space-y-0.5 animate-fade-in">
+        <div className="mkt-nav-mobile-menu lg:hidden bg-white border-t border-gray-100 px-4 py-3 space-y-0.5 animate-fade-in">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.label}
               onClick={() => handleNav(item.view)}
               className={
                 item.featured
-                  ? 'w-full text-left px-3 py-3 text-sm font-black text-white bg-gradient-to-r from-violet-600 to-primary-600 rounded-xl shadow-md flex items-center gap-2'
+                  ? 'mkt-nav-featured-cta mkt-nav-link w-full text-left flex items-center gap-2'
                   : 'w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all'
               }
             >
@@ -216,16 +202,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
               {item.label}
             </button>
           ))}
-          {/* 모바일 앱 다운로드 */}
-          <button
-            onClick={() => handleNav('download')}
-            className="w-full text-left px-3 py-2.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-all flex items-center gap-2"
-          >
-            <Smartphone className="w-4 h-4" />
-            <Monitor className="w-4 h-4" />
-            앱·PC 프로그램 설치
-          </button>
-          <div className="pt-3 border-t border-gray-100 flex gap-2">
+          <div className="pt-3 border-t border-gray-100 flex gap-2.5">
             {user ? (
               <button
                 onClick={() => { onLogout(); setMobileOpen(false); }}
@@ -237,13 +214,13 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
               <>
                 <button
                   onClick={() => { onLoginClick(); setMobileOpen(false); }}
-                  className="flex-1 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:border-primary-300 transition-colors"
+                  className="mkt-nav-login flex-1"
                 >
                   로그인
                 </button>
                 <button
                   onClick={() => { onLoginClick(); setMobileOpen(false); }}
-                  className="flex-1 py-2 text-sm font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+                  className="mkt-nav-signup flex-1"
                 >
                   회원가입
                 </button>
