@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MessageList from "./MessageList.jsx";
 import ScreenBackHeader from "./common/ScreenBackHeader";
 import { VMING_AI_ENGINES, VMING_QUICK_REPLIES, postVmingChat } from "../lib/vmingApi.js";
+import { VlueBrandMark } from "./VlueBrandLogo.jsx";
 
 const WELCOME_ID = "vming-welcome";
 const VMING_ROOM_ID = "vming:assistant";
@@ -44,11 +45,7 @@ function VmingQuickIcon({ name }) {
     );
   }
   if (name === "shield") {
-    return (
-      <svg {...common}>
-        <path d="M12 3 5 6v5c0 4.2 3 7.4 7 9 4-1.6 7-4.8 7-9V6l-7-3Z" />
-      </svg>
-    );
+    return <VlueBrandMark size={13} className="!rounded-[18%]" />;
   }
   if (name === "video") {
     return (

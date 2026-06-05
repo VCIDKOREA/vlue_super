@@ -174,6 +174,7 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin }) {
                 >
                   <VlueEyeMark
                     key={pwEyeBlinkSeq}
+                    variant="header"
                     tone="muted"
                     svgWidth={22}
                     svgHeight={20}

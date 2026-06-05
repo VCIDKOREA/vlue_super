@@ -12,6 +12,9 @@ export function formatLetteringPhoneDisplay(raw) {
   if (digits.length === 9 && digits.startsWith("02")) {
     return `02-${digits.slice(2, 5)}-${digits.slice(5)}`;
   }
+  if (digits.length === 10 && digits.startsWith("02")) {
+    return `02-${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
   if (digits.length >= 8) return digits;
   return String(raw || "—").trim() || "—";
 }

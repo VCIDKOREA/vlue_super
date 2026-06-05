@@ -17,12 +17,14 @@
     "@vlue/db": "*",
     "@vlue/shared": "*",
     "dotenv": "^16.6.1",
+    "exceljs": "^4.4.0",
     "firebase-admin": "^13.4.0",
     "hono": "^4.6.0",
     "ioredis": "^5.11.0",
     "jose": "^6.2.3",
     "sharp": "^0.33.5",
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -1,15 +1,18 @@
 <!--
-  (= vlue-shield-logo.svg 동기) VLUE 브랜드 눈
+  VLUE 공식 실드 마크(128)—채팅 목록·공식방 타일 등은 `VlueOfficialChannelAvatar.jsx`에서만 img로 참조.
+  앱 상단 홈 **눈** SVG는 `VlueEyeMark.jsx`(별도 규격)만 사용.
+  디자인 참고: Icons8 「명백한」Eye — https://icons8.com/icon/gMWepjYoqP6M/eye
+  광학 보정: 타일(128)에서 동공이 무거워 보여 전체 눈 도형을 소폭 위로 이동.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <title>VLUE logo (eye)</title>
+  <title>VLUE logo</title>
   <defs>
-    <linearGradient id="sbe" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="sb" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#2563eb"/>
       <stop offset="100%" stop-color="#1d4ed8"/>
     </linearGradient>
   </defs>
-  <rect width="128" height="128" rx="36.6" fill="url(#sbe)"/>
+  <rect width="128" height="128" rx="36.6" fill="url(#sb)"/>
   <g transform="translate(0 -5.2)">
     <path
       fill="none"

@@ -90,8 +90,12 @@ export async function saveHqHomeLayout(layout) {
 }
 
 export async function fetchPublicHomeLayout() {
-  const res = await fetch(apiUrl("/api/home/layout"));
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) return null;
-  return data.layout || null;
+  try {
+    const res = await fetch(apiUrl("/api/home/layout"));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return null;
+    return data.layout || null;
+  } catch {
+    return null;
+  }
 }

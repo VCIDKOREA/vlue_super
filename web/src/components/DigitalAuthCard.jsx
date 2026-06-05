@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import GeneralLetteringCard from "./GeneralLetteringCard.jsx";
 import { VLUE_CARD_CAUTION, digitalCardBadgeText, digitalCardRoleLine } from "../lib/vlueDigitalCardUi.js";
+import { VlueBrandMark } from "./VlueBrandLogo.jsx";
 
 const BackIcon = ({ type }) => {
   const cls = "h-3.5 w-3.5 shrink-0 text-violet-200/90";
@@ -35,14 +36,6 @@ const BackIcon = ({ type }) => {
     </svg>
   );
 };
-
-function ShieldFill({ className, fill = "#2563eb" }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} width="14" height="14" viewBox="0 0 24 24" fill={fill} aria-hidden>
-      <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" />
-    </svg>
-  );
-}
 
 /**
  * VLUE 디지털 인증 명함 — 일반(인증 번호) / 스탠다드(라이트 카드) / 프리미엄(다크·뒤집기·버튼)
@@ -102,7 +95,7 @@ export default function DigitalAuthCard({ membershipTier = "free", myCard = {}, 
         />
         <div className="absolute inset-0 z-10 flex flex-col justify-center p-3 text-center">
           <div className="flex items-center justify-center gap-1.5">
-            <ShieldFill className="h-3.5 w-3.5 shrink-0" fill="#2563eb" />
+            <VlueBrandMark size={14} className="shrink-0" />
             <p className="text-[12px] font-bold text-blue-600">{badgeText}</p>
           </div>
           <div className="mt-3 flex items-center justify-center gap-2.5">
@@ -139,7 +132,7 @@ export default function DigitalAuthCard({ membershipTier = "free", myCard = {}, 
         <div className={`card-flip-inner ${flipped ? "is-flipped" : ""}`}>
           <div className="card-face front flex flex-col justify-start text-center">
             <div className="mb-1 flex items-center justify-center gap-1.5">
-              <ShieldFill className="h-3.5 w-3.5 shrink-0" fill="#c4b5fd" />
+              <VlueBrandMark size={14} className="shrink-0" />
               <span className="text-[9px] font-black tracking-widest text-violet-200">{badgeText}</span>
             </div>
             <div className="mb-1 flex items-center justify-center gap-2 px-1">

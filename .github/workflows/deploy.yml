@@ -30,7 +30,7 @@ jobs:
       - name: Production build
         run: npm run build:all
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://api.vlue.kr' }}
 
       - name: Upload web artifact
         uses: actions/upload-artifact@v4

@@ -1,0 +1,401 @@
+/**
+ * www 마케팅 전용 — 와이드·큼직한 UI (앱 /app 과 분리)
+ * [data-vlue-site="marketing"] 하위만 적용
+ */
+
+[data-vlue-site="marketing"] {
+  --mkt-container: min(1720px, 96vw);
+  --mkt-container-narrow: min(1280px, 94vw);
+  --mkt-hero-inner: min(1080px, 92vw);
+  --mkt-hero-search: min(52rem, 90vw);
+  /* 고정 헤더: 네비(4.5rem) + 설치 안내 바 */
+  --mkt-nav-h: 4.5rem;
+  --mkt-download-bar-h: 4.25rem;
+  --mkt-chrome-total: calc(var(--mkt-nav-h) + var(--mkt-download-bar-h));
+  --mkt-sticky-subnav-h: 3.25rem;
+  --mkt-scroll-anchor: calc(var(--mkt-chrome-total) + var(--mkt-sticky-subnav-h) + 0.5rem);
+}
+
+@media (max-width: 639px) {
+  [data-vlue-site="marketing"] {
+    --mkt-download-bar-h: 5.5rem;
+  }
+}
+
+/* 설치 안내 바 높이 고정 → 서비스소개 카테고리 sticky와 동기화 */
+[data-vlue-site="marketing"] .mkt-download-bar-anchor {
+  top: var(--mkt-nav-h);
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar-shell {
+  min-height: var(--mkt-download-bar-h);
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar-wrap {
+  width: 100%;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.625rem;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  [data-vlue-site="marketing"] .mkt-download-bar-inner {
+    flex-direction: row;
+    align-items: center;
+    gap: 1.25rem;
+  }
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar-message {
+  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  font-weight: 600;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 640px) {
+  [data-vlue-site="marketing"] .mkt-download-bar-message {
+    font-size: 1rem;
+    min-width: 12rem;
+  }
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  [data-vlue-site="marketing"] .mkt-download-bar-actions {
+    justify-content: flex-end;
+  }
+}
+
+/* 네비 — VLUE메일 / AI엑셀 간격 */
+[data-vlue-site="marketing"] .mkt-nav-items {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+[data-vlue-site="marketing"] .mkt-nav-mail-pill {
+  margin-left: 0.35rem;
+}
+
+[data-vlue-site="marketing"] .mkt-nav-featured-cta {
+  margin-left: 0.5rem;
+}
+
+[data-vlue-site="marketing"] .mkt-nav-logo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+[data-vlue-site="marketing"] .mkt-nav-logo-mark {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+}
+
+[data-vlue-site="marketing"] .mkt-nav-logo-text {
+  font-size: 1.625rem;
+  line-height: 1;
+}
+
+/* 서비스소개 섹션 카테고리 — 상단 고정바 바로 아래 */
+[data-vlue-site="marketing"] .mkt-about-section-nav {
+  position: sticky;
+  top: var(--mkt-chrome-total);
+  z-index: 38;
+  border-top: 1px solid rgb(226 232 240 / 90%);
+  border-bottom: 1px solid rgb(226 232 240 / 90%);
+  background: rgb(255 255 255 / 98%);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 6%);
+}
+
+[data-vlue-site="marketing"] .mkt-about-section-nav__inner {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.65rem 1rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+[data-vlue-site="marketing"] .mkt-about-section-nav__inner::-webkit-scrollbar {
+  display: none;
+}
+
+[data-vlue-site="marketing"] .mkt-about-section-nav__btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  font-size: var(--mkt-caption, 0.875rem);
+  font-weight: 800;
+  line-height: 1.2;
+  transition: background 0.15s, color 0.15s;
+}
+
+[data-vlue-site="marketing"] .mkt-scroll-section {
+  scroll-margin-top: var(--mkt-scroll-anchor);
+}
+
+/* 레이아웃 컨테이너 확장 */
+[data-vlue-site="marketing"] .max-w-7xl,
+[data-vlue-site="marketing"] .max-w-6xl {
+  max-width: var(--mkt-container) !important;
+}
+
+[data-vlue-site="marketing"] .max-w-5xl {
+  max-width: var(--mkt-container-narrow) !important;
+}
+
+[data-vlue-site="marketing"] .max-w-4xl {
+  max-width: min(1120px, 92vw) !important;
+}
+
+[data-vlue-site="marketing"] .max-w-3xl {
+  max-width: var(--mkt-hero-inner) !important;
+}
+
+[data-vlue-site="marketing"] .max-w-2xl {
+  max-width: min(840px, 88vw) !important;
+}
+
+[data-vlue-site="marketing"] .max-w-xl {
+  max-width: min(720px, 86vw) !important;
+}
+
+/* 공통 컴포넌트 스케일 업 */
+[data-vlue-site="marketing"] .btn-primary {
+  padding: 0.875rem 1.75rem;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  border-radius: 1.25rem;
+}
+
+[data-vlue-site="marketing"] .btn-secondary {
+  padding: 0.875rem 1.75rem;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  border-radius: 1.25rem;
+}
+
+[data-vlue-site="marketing"] .section-title {
+  font-size: clamp(1.75rem, 3vw, 2.75rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+[data-vlue-site="marketing"] .section-subtitle {
+  font-size: clamp(1rem, 1.4vw, 1.25rem);
+  line-height: 1.65;
+}
+
+[data-vlue-site="marketing"] .card {
+  border-radius: 1.5rem;
+}
+
+/* 네비·상단 바 */
+[data-vlue-site="marketing"] .mkt-nav-shell {
+  height: 4.5rem;
+}
+
+[data-vlue-site="marketing"] .mkt-nav-logo-text {
+  font-size: 1.5rem;
+}
+
+[data-vlue-site="marketing"] .mkt-nav-link {
+  font-size: 0.9375rem;
+  padding: 0.5rem 0.875rem;
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar {
+  font-size: 0.9375rem;
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  min-height: 2.25rem;
+  padding: 0.4375rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.8125rem !important;
+  line-height: 1.2 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn-icon {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  flex-shrink: 0;
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--primary {
+  background: var(--color-primary-500, #3b82f6);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--primary:hover {
+  background: var(--color-primary-400, #60a5fa);
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--ghost {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--light {
+  background: #fff;
+  color: #0f172a;
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--light:hover {
+  background: #eff6ff;
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--light .mkt-download-btn-icon {
+  color: #0f172a;
+}
+
+/* 히어로 — 데스크톱에서 큼직하게 */
+@media (min-width: 1024px) {
+  [data-vlue-site="marketing"] .hero-section {
+    padding-top: 5.5rem;
+    padding-bottom: 4rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-badge {
+    font-size: 0.9375rem;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1.75rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-badge-icon {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-title {
+    font-size: clamp(2.75rem, 4.2vw, 4.25rem);
+    margin-bottom: 1.5rem;
+    line-height: 1.15;
+  }
+
+  [data-vlue-site="marketing"] .hero-desc {
+    font-size: 1.25rem;
+    max-width: var(--mkt-hero-search);
+    margin-bottom: 2.25rem;
+    line-height: 1.75;
+  }
+
+  [data-vlue-site="marketing"] .hero-search-wrap {
+    max-width: var(--mkt-hero-search);
+    margin-bottom: 1.25rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-search-input {
+    font-size: 1.125rem;
+    padding-top: 1.125rem;
+    padding-bottom: 1.125rem;
+    padding-left: 3.75rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-search-icon {
+    width: 1.375rem;
+    height: 1.375rem;
+    left: 1.25rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-search-btn {
+    font-size: 1rem;
+    padding: 0.75rem 1.5rem;
+    margin: 0.45rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-quick-label,
+  [data-vlue-site="marketing"] .hero-quick-btn {
+    font-size: 0.875rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-quick-btn {
+    padding: 0.35rem 0.9rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-stats {
+    max-width: min(40rem, 90vw);
+    gap: 2.5rem;
+    margin-bottom: 2.75rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-stat-value {
+    font-size: 1.75rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-stat-unit {
+    font-size: 1rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-stat-label {
+    font-size: 0.9375rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-stat-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-cta-wrap {
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  [data-vlue-site="marketing"] {
+    --mkt-container: min(1800px, 97vw);
+    --mkt-hero-inner: min(1200px, 94vw);
+    --mkt-hero-search: min(56rem, 92vw);
+  }
+
+  [data-vlue-site="marketing"] .hero-title {
+    font-size: 4.5rem;
+  }
+}

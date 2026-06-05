@@ -12,7 +12,8 @@ import LetteringBusinessCardPanel from "./LetteringBusinessCardPanel.jsx";
 import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx";
 import { getLetteringReportsForPhone } from "../lib/letteringPhoneReports.js";
 import { formatLetteringPaidIdentity } from "../lib/letteringPaidIdentityDisplay.js";
-import { LETTERING_DEMO_COMPANY_LOGO } from "../lib/letteringDemoAssets.js";
+import { LETTERING_DEMO_COMPANY_LOGO, resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
+import LetteringBizcardScaledPreview from "./LetteringBizcardScaledPreview.jsx";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 
 const DEMO_CARD = {
@@ -147,6 +148,10 @@ export default function LetteringIncomingNotification({
   onReport,
   /** @deprecated */ onMemo,
   /** @deprecated */ onBlock,
+  /** 미리보기·www: 명함을 빅푸시 폭에 맞게 축소 */
+  fitBizcard = false,
+  /** 미인증 펼침 하단 신고/차단·안내 푸터 숨김(www 데모) */
+  hideUnverifiedFooter = false,
   className = ""
 }) {
   const [expandedInternal, setExpandedInternal] = useState(defaultExpanded);
@@ -365,7 +370,13 @@ export default function LetteringIncomingNotification({
 
         {isExpandedView && isPaidMember ? (
           <div className="lettering-ongoing-scroll relative z-[2] px-3 pb-2 pt-1">
-            <LetteringBusinessCardPanel card={c} />
+            {fitBizcard ? (
+              <LetteringBizcardScaledPreview>
+                <LetteringBusinessCardPanel card={c} />
+              </LetteringBizcardScaledPreview>
+            ) : (
+              <LetteringBusinessCardPanel card={c} />
+            )}
             <p className="lettering-caution lettering-caution--bizcard">{VLUE_CARD_CAUTION}</p>
           </div>
         ) : null}
@@ -389,12 +400,14 @@ export default function LetteringIncomingNotification({
             <div className="lettering-unverified-expanded__scroll lettering-ongoing-scroll--unverified">
               <LetteringUnverifiedReportPanel incomingNumber={incoming} reportHistory={reportHistory} />
             </div>
-            <footer className="lettering-unverified-expanded__footer">
-              <p className="lettering-unverified-footer-note">{VLUE_UNVERIFIED_REPORT_DISCLAIMER}</p>
-              <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger w-full">
-                {"\uC2E0\uACE0/\uCC28\uB2E8"}
-              </button>
-            </footer>
+            {hideUnverifiedFooter ? null : (
+              <footer className="lettering-unverified-expanded__footer">
+                <p className="lettering-unverified-footer-note">{VLUE_UNVERIFIED_REPORT_DISCLAIMER}</p>
+                <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger w-full">
+                  {"\uC2E0\uACE0/\uCC28\uB2E8"}
+                </button>
+              </footer>
+            )}
           </div>
         ) : null}
       </div>

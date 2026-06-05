@@ -1,0 +1,194 @@
+/* Bolt.new VLUE 마케팅 사이트 — Pretendard + blue-tint 분위기 */
+
+[data-vlue-site="marketing"] {
+  --vlue-primary: #0066ff;
+  --vlue-primary-hover: #0052cc;
+  --vlue-blue-tint: #f0f7ff;
+  --vlue-text: #1a1a1b;
+  --vlue-muted: #64748b;
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--vlue-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-vlue-site="marketing"].vlue-marketing-root {
+  min-height: 100dvh;
+  background-color: var(--vlue-blue-tint);
+}
+
+[data-vlue-site="marketing"] .vlue-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1.25rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 102, 255, 0.12);
+  color: var(--vlue-primary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  box-shadow: 0 1px 2px rgba(0, 80, 200, 0.06);
+}
+
+[data-vlue-site="marketing"] .vlue-search-shell {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 42rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0.35rem 0.35rem 0.35rem 1.25rem;
+  background: #fff;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 102, 255, 0.08);
+  box-shadow:
+    0 4px 24px rgba(0, 60, 180, 0.08),
+    0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+[data-vlue-site="marketing"] .vlue-search-shell input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--vlue-text);
+}
+
+[data-vlue-site="marketing"] .vlue-search-shell input::placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+[data-vlue-site="marketing"] .vlue-search-btn {
+  flex-shrink: 0;
+  padding: 0.85rem 2rem;
+  border-radius: 9999px;
+  background: var(--vlue-primary);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+[data-vlue-site="marketing"] .vlue-search-btn:hover {
+  background: var(--vlue-primary-hover);
+}
+
+[data-vlue-site="marketing"] .vlue-stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1rem;
+}
+
+[data-vlue-site="marketing"] .vlue-stat-value {
+  font-size: 1.75rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: var(--vlue-text);
+  line-height: 1.1;
+}
+
+[data-vlue-site="marketing"] .vlue-stat-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--vlue-muted);
+}
+
+[data-vlue-site="marketing"] .vlue-nav-cta-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  border: 1.5px solid var(--vlue-primary);
+  color: var(--vlue-primary);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  background: #fff;
+  transition: background 0.15s ease;
+}
+
+[data-vlue-site="marketing"] .vlue-nav-cta-outline:hover {
+  background: rgba(0, 102, 255, 0.06);
+}
+
+[data-vlue-site="marketing"] .vlue-btn-primary {
+  padding: 1rem 2.25rem;
+  border-radius: 9999px;
+  background: var(--vlue-primary);
+  color: #fff;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 102, 255, 0.28);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+[data-vlue-site="marketing"] .vlue-btn-primary:hover {
+  background: var(--vlue-primary-hover);
+}
+
+[data-vlue-site="marketing"] .vlue-btn-secondary {
+  padding: 1rem 2.25rem;
+  border-radius: 9999px;
+  background: #fff;
+  color: var(--vlue-primary);
+  font-size: 1.0625rem;
+  font-weight: 800;
+  border: 2px solid var(--vlue-primary);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+[data-vlue-site="marketing"] .vlue-btn-secondary:hover {
+  background: rgba(0, 102, 255, 0.05);
+}
+
+@keyframes vlue-blob-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(2%, -2%) scale(1.03);
+  }
+  66% {
+    transform: translate(-2%, 1%) scale(0.98);
+  }
+}
+
+@keyframes vlue-bg-drift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.vlue-animated-bg__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.45;
+  animation: vlue-blob-float 18s ease-in-out infinite;
+}
+
+.vlue-animated-bg__grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background-image: radial-gradient(rgba(0, 102, 255, 0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+}

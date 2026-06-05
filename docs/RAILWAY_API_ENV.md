@@ -11,7 +11,7 @@ Railway는 `NODE_ENV=production` 이라 API 시작 시 **7개 필수 변수** �
 
 | Variable | 설명 |
 |----------|------|
-| `DATABASE_URL` | PostgreSQL — **반드시 「Add Reference」** 로 Postgres 서비스 연결 (문자열 `${{...}}`만 붙여넣기 X) |
+| `DATABASE_URL` | Supabase **ywhjhdpecwvaujiagaln** (`인프라마스터정보` URL). Railway 자체 Postgres가 아니면 **Add Reference 대신** 전체 URL 직접 입력 |
 | `PORTONE_API_SECRET` | 포트원 API Secret |
 | `JWT_ACCESS_SECRET` | 32자 이상 랜덤 (또는 `JWT_SECRET`) |
 | `SESSION_SECRET` | 비우면 JWT와 동일하게 자동 채움 |

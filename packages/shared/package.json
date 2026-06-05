@@ -34,11 +34,20 @@
     "./phone": {
       "import": "./dist/phone/krPhone.js",
       "default": "./dist/phone/krPhone.js"
+    },
+    "./excel": {
+      "types": "./dist/excel/workbookSchema.d.ts",
+      "import": "./dist/excel/workbookSchema.js",
+      "default": "./dist/excel/workbookSchema.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

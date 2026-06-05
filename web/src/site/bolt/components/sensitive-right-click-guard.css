@@ -1,0 +1,52 @@
+.vlue-sensitive-rc-tip {
+  position: fixed;
+  z-index: 10050;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(255, 251, 251, 0.98);
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  pointer-events: none;
+  animation: vlue-sensitive-rc-tip-in 0.2s ease-out both;
+}
+
+.vlue-sensitive-rc-tip__icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: #dc2626;
+}
+
+.vlue-sensitive-rc-tip__text {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  color: #7f1d1d;
+  word-break: keep-all;
+}
+
+@keyframes vlue-sensitive-rc-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vlue-sensitive-rc-tip {
+    animation: none;
+  }
+}

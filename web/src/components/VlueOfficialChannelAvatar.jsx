@@ -5,7 +5,7 @@ import VLUE_BRAND_LOGO from "../assets/vlue-shield-logo.svg?url";
  *
  * - 채팅 목록·공식방 상단 등 **브랜드 타일**에만 사용합니다.
  * - **그라데이션/글로우 링 없음** — 일반 프로필처럼 테두리+배경만 둡니다.
- * - 앱 홈 네비의 **눈 SVG**는 `VlueEyeMark.jsx` 단일 컴포넌트만 사용합니다(여기에 섞지 않음).
+ * - 앱·웹 Navbar 로고는 `VlueNavLogoMark.jsx`(여기 img 타일과 별도).
  */
 export function VlueOfficialChannelAvatar({ variant = "list" }) {
   if (variant === "header") {

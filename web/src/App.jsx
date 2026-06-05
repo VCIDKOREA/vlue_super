@@ -37,7 +37,7 @@ import PostSignupPaymentModal from "./components/PostSignupPaymentModal.jsx";
 import SignupErrorBoundary from "./components/SignupErrorBoundary.jsx";
 import LoginScreen from "./components/LoginScreen";
 import BiometricGate from "./components/BiometricGate";
-import { VlueEyeMark } from "./components/VlueEyeMark.jsx";
+import { VlueNavLogoMark } from "./components/VlueNavLogoMark.jsx";
 import BackButton from "./components/common/BackButton";
 import ModalCloseButton from "./components/common/ModalCloseButton";
 
@@ -106,6 +106,7 @@ import {
 import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./lib/kakaoSocialLogin.js";
 import { consumeKakaoOAuthReturn } from "./lib/kakaoOAuthReturn.js";
 import { formatSocialLoginError } from "./lib/socialLoginPolicy.js";
+import { VLUE_MARKETING_SIGNUP_KEY } from "./lib/vlueAuthApi.js";
 import LetteringNotificationPreviewPage from "./components/LetteringNotificationPreviewPage.jsx";
 import LetteringOverlayHost from "./components/LetteringOverlayHost.jsx";
 import LetteringCertModal from "./components/LetteringCertModal.jsx";
@@ -315,6 +316,23 @@ function App() {
     return stored;
   });
   const [signupOnboardingOpen, setSignupOnboardingOpen] = useState(false);
+
+  /** 마케팅 웹(www) 회원가입 탭 → /app 동일 온보딩 */
+  useEffect(() => {
+    try {
+      const flag = sessionStorage.getItem(VLUE_MARKETING_SIGNUP_KEY);
+      if (!flag) return;
+      sessionStorage.removeItem(VLUE_MARKETING_SIGNUP_KEY);
+      localStorage.removeItem(ONBOARDING_DONE_KEY);
+      localStorage.setItem(SESSION_KEY, "0");
+      setIsLoggedIn(false);
+      setShowSplash(false);
+      setOnboardingComplete(false);
+      setSignupOnboardingOpen(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
   /** 생체·24h 유예 갱신 후 메인으로 넘기기 위한 리렌더 트리거 */
   const [biometricSeq, setBiometricSeq] = useState(0);
   const [page, setPage] = useState("main");
@@ -2886,24 +2904,19 @@ function App() {
       {!showSplash && isLoggedIn && !showOnboardingFlow && biometricAllowed && (
         <>
       <header className={`sticky top-0 z-50 relative w-full bg-white/90 backdrop-blur-lg border-b border-gray-100 ${topHeaderVisible ? "block" : "hidden"}`}>
-        <div className="flex h-[48px] w-full items-center justify-between gap-1.5 px-2">
-          <div className="flex min-w-0 flex-1 items-center gap-1">
+        <div className="flex h-[52px] w-full items-center justify-between gap-2 px-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             {subhubUtilBack ? (
               <BackButton variant="inline" onBack={() => setSubscriptionSubTab("all")} />
             ) : (
             <button
               type="button"
               onClick={goMainAndReset}
-              className="h-[24px] w-[32px] shrink-0 overflow-visible rounded-md bg-blue-600 flex items-center justify-center shadow-md active:scale-90 transition-all cursor-pointer"
+              className="shrink-0 overflow-visible border-0 bg-transparent p-0 shadow-none active:scale-90 transition-transform cursor-pointer"
               aria-label="VLUE 홈"
               title="홈"
             >
-              <VlueEyeMark
-                key={eyeNavSeq}
-                wrapClassName={`vlue-header-eye-wrap ${eyeNavSeq > 0 ? "vlue-header-eye-wrap--nav-loading" : ""}`}
-                svgWidth={32}
-                svgHeight={30}
-              />
+              <VlueNavLogoMark blinkSeq={eyeNavSeq} size={36} className="shadow-md shrink-0" />
             </button>
             )}
             {isSearchOpen ? (

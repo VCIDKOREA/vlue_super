@@ -405,28 +405,25 @@ function Home({
   const membershipKind = normalizeMembershipKind(membershipTier);
   const isPaidUser = isPaidMembershipKind(membershipKind);
   const [feedNickTick, setFeedNickTick] = useState(0);
-  const [publishedLayout, setPublishedLayout] = useState(() => readCachedHomeLayout());
-  const [layoutLoadFailed, setLayoutLoadFailed] = useState(false);
+  const [publishedLayout, setPublishedLayout] = useState(
+    () => readCachedHomeLayout() || mergeHomeLayout(null)
+  );
   const feedDisplayLabel = useMemo(() => getFeedDisplayName("회원"), [feedNickTick]);
   useEffect(() => {
     let cancelled = false;
-    fetchPublicHomeLayout()
-      .then((layout) => {
-        if (cancelled) return;
-        setLayoutLoadFailed(false);
+    fetchPublicHomeLayout().then((layout) => {
+      if (cancelled) return;
+      if (layout) {
         const merged = mergeHomeLayout(layout);
         setPublishedLayout(merged);
-        if (layout) writeCachedHomeLayout(merged);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setLayoutLoadFailed(true);
-        setPublishedLayout((prev) => prev || mergeHomeLayout(readCachedHomeLayout() || null));
-      });
+        writeCachedHomeLayout(merged);
+        return;
+      }
+      setPublishedLayout((prev) => prev || readCachedHomeLayout() || mergeHomeLayout(null));
+    });
     const onLayout = (ev) => {
       const next = ev.detail || readCachedHomeLayout() || mergeHomeLayout(null);
       setPublishedLayout(next);
-      setLayoutLoadFailed(false);
     };
     window.addEventListener(HQ_HOME_LAYOUT_CHANGED, onLayout);
     return () => {
@@ -869,8 +866,8 @@ function Home({
   }, []);
 
   return (
-    <main className="home-main-feed min-h-0 w-full max-w-none min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-32 pt-1.5">
-      <section className="mb-3">
+    <main className="home-main-feed home-main-feed--spaced min-h-0 w-full max-w-none min-w-0 flex-1 flex flex-col gap-5 overflow-y-auto overflow-x-hidden px-2.5 pb-32 pt-2">
+      <section>
         <div className="relative w-full min-w-0 max-w-full">
           <button
             type="button"
@@ -923,7 +920,9 @@ function Home({
           </div>
         </div>
       </section>
-      <VluerPartnerDashboard onOpenFamilyProtection={onOpenFamilyProtection} />
+      <div className="home-vluer-dashboard-wrap">
+        <VluerPartnerDashboard onOpenFamilyProtection={onOpenFamilyProtection} />
+      </div>
       {activeDetailId === "vlue-guide" && (
         <section
           className="fixed inset-x-0 top-[48px] bottom-[calc(48px+env(safe-area-inset-bottom,0px))] z-[140] flex w-full max-w-none flex-col bg-[#f8fafc]"
@@ -1080,7 +1079,7 @@ function Home({
         </div>
       )}
       {/* 1. 업데이트 스토리 */}
-      <section ref={updateStorySectionRef} className="mb-5 scroll-mt-3">
+      <section ref={updateStorySectionRef} className="scroll-mt-3">
         <div className="home-update-story-panel rounded-[1.25rem] border border-sky-200/45 bg-gradient-to-br from-white via-sky-50/55 to-indigo-50/45 p-4 shadow-[0_16px_44px_-18px_rgba(30,58,138,0.22)] ring-1 ring-white/90">
           <SectionHeader
             title="업데이트 스토리"
@@ -1187,17 +1186,6 @@ function Home({
           )}
         </div>
       </section>
-
-      {layoutLoadFailed ? (
-        <div
-          className={`mb-3 rounded-xl border px-3 py-2 text-[11px] font-medium leading-snug ${
-            isDarkMode ? "border-white/10 bg-white/5 text-gray-400" : "border-gray-100 bg-gray-50 text-gray-500"
-          }`}
-          role="status"
-        >
-          홈 배너를 최신으로 불러오지 못했습니다. API 서버(8788) 실행 후 새로고침해 주세요.
-        </div>
-      ) : null}
 
       {/* 2. VLUE PICK */}
       <section className="mb-5">

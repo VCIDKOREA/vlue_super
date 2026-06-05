@@ -234,11 +234,13 @@ body,
 }
 
 .vlue-app-brand-title {
-  font-size: clamp(13px, 4.2vw, 17px);
+  font-size: clamp(20px, 5.5vw, 26px);
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  align-self: center;
+  letter-spacing: -0.04em;
 }
 
 .vlue-fluid-header-line {
@@ -1216,6 +1218,15 @@ body,
   overscroll-behavior-x: contain;
 }
 
+.home-main-feed--spaced > section,
+.home-main-feed--spaced > .home-vluer-dashboard-wrap {
+  margin-bottom: 0;
+}
+
+.home-vluer-dashboard-wrap > section {
+  margin-bottom: 0 !important;
+}
+
 .home-banner-slide {
   flex: 0 0 min(92%, calc(100% - 1.75rem));
   max-width: min(92%, calc(100% - 1.75rem));
@@ -1365,6 +1376,7 @@ body,
 
 /* VLUE 헤더 눈: 동공 globe inset 100% · 뚜껑 rotateX · 덮인 순간 속눈썹(윗레이어) 페이드. 채팅 타일은 img */
 
+/* 얇은 눈(앱 헤더·로그인 토글) — 원래 rotateX 깜빡임 */
 @keyframes vlue-header-eye-lid-wink {
   0%,
   100% {
@@ -1379,7 +1391,6 @@ body,
   32% {
     transform: rotateX(80deg);
   }
-  /* 덮인 채 매우 짧게 */
   38% {
     transform: rotateX(93deg);
   }
@@ -1406,7 +1417,6 @@ body,
     -webkit-clip-path: inset(68% 0% 0% 0%);
     clip-path: inset(68% 0% 0% 0%);
   }
-  /* 동공 완전 가림(속눈썹은 별도 레이어) */
   36%,
   43% {
     -webkit-clip-path: inset(100% 0% 0% 0%);
@@ -1414,15 +1424,71 @@ body,
   }
 }
 
-/* 클립이 거의 덮였을 때 원 아래쪽 호가 픽셀 잔선으로 보이는 것 방지 */
 @keyframes vlue-header-eye-pupil-peek-guard {
   0%,
   100% {
     opacity: 1;
   }
-  28%,
-  48% {
+  22%,
+  52% {
     opacity: 0;
+  }
+}
+
+/* 정사각 로고: 뜬 눈(U) → 감은 눈(가로 —) */
+@keyframes vlue-header-eye-lid-open-shield {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  18% {
+    opacity: 0.35;
+  }
+  28%,
+  46% {
+    opacity: 0;
+  }
+}
+
+@keyframes vlue-header-eye-lid-closed-shield {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  24% {
+    opacity: 0.5;
+  }
+  32%,
+  44% {
+    opacity: 1;
+  }
+  52% {
+    opacity: 0;
+  }
+}
+
+/* 감을 때 타일색이 위에서 내려와 동공 가림 */
+@keyframes vlue-header-eye-shield-lid-cover {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  14% {
+    opacity: 1;
+    transform: scaleY(0.3);
+  }
+  28% {
+    transform: scaleY(0.65);
+  }
+  36%,
+  44% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  54% {
+    opacity: 0;
+    transform: scaleY(0);
   }
 }
 
@@ -1467,6 +1533,14 @@ body,
   transform-box: fill-box;
 }
 
+.vlue-header-eye-wrap--shield-square .vlue-header-eye-lid-closed {
+  opacity: 0;
+}
+
+.vlue-header-eye-wrap--shield-square svg.vlue-header-eye-svg--shield {
+  transform: none;
+}
+
 .vlue-header-eye-wrap svg .vlue-header-eye-lid path {
   vector-effect: non-scaling-stroke;
 }
@@ -1497,7 +1571,7 @@ body,
 }
 
 /* 첫 진입(seq=0)에는 클래스 없음 → 애니 없음 */
-.vlue-header-eye-wrap--nav-loading .vlue-header-eye-lid {
+.vlue-header-eye-wrap--nav-loading:not(.vlue-header-eye-wrap--shield-square) .vlue-header-eye-lid {
   animation: vlue-header-eye-lid-wink 0.44s cubic-bezier(0.28, 0.08, 0.24, 1) 1;
 }
 
@@ -1513,8 +1587,31 @@ body,
   animation: vlue-header-eye-lashes-wink 0.44s cubic-bezier(0.28, 0.08, 0.24, 1) 1;
 }
 
+.vlue-header-eye-wrap--shield-square .vlue-header-eye-lid-cover {
+  opacity: 0;
+  pointer-events: none;
+  transform: scaleY(0);
+  transform-origin: 64px 22px;
+  transform-box: fill-box;
+}
+
+.vlue-header-eye-wrap--nav-loading.vlue-header-eye-wrap--shield-square .vlue-header-eye-lid-cover {
+  animation: vlue-header-eye-shield-lid-cover 0.44s cubic-bezier(0.28, 0.08, 0.24, 1) 1;
+}
+
+.vlue-header-eye-wrap--nav-loading.vlue-header-eye-wrap--shield-square .vlue-header-eye-lid-open {
+  animation: vlue-header-eye-lid-open-shield 0.44s cubic-bezier(0.28, 0.08, 0.24, 1) 1;
+}
+
+.vlue-header-eye-wrap--nav-loading.vlue-header-eye-wrap--shield-square .vlue-header-eye-lid-closed {
+  animation: vlue-header-eye-lid-closed-shield 0.44s cubic-bezier(0.28, 0.08, 0.24, 1) 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .vlue-header-eye-wrap--nav-loading .vlue-header-eye-lid,
+  .vlue-header-eye-wrap--nav-loading.vlue-header-eye-wrap--shield-square .vlue-header-eye-lid-open,
+  .vlue-header-eye-wrap--nav-loading.vlue-header-eye-wrap--shield-square .vlue-header-eye-lid-closed,
+  .vlue-header-eye-wrap--nav-loading.vlue-header-eye-wrap--shield-square .vlue-header-eye-lid-cover,
   .vlue-header-eye-wrap--nav-loading .vlue-header-eye-globe,
   .vlue-header-eye-wrap--nav-loading .vlue-header-eye-pupil,
   .vlue-header-eye-wrap--nav-loading .vlue-header-eye-lashes {
@@ -2300,6 +2397,66 @@ body,
   width: 100%;
   height: auto;
   line-height: 0;
+}
+
+/* 통화 스크린샷 위 번호 — 데모·www에서 스크린 번호와 incoming 일치 */
+.lettering-call-screen--photo .lettering-call-screen__photo-number {
+  position: absolute;
+  top: 22%;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.lettering-call-screen--photo[data-platform="ios"] .lettering-call-screen__photo-number {
+  top: 27%;
+}
+
+.lettering-call-screen--photo .lettering-call-screen__photo-number-text {
+  padding: 0.12em 0.55em 0.18em;
+  font-size: clamp(2.35rem, 11.5vw, 3.2rem);
+  font-weight: 200;
+  line-height: 1;
+  color: #f8fafc;
+  letter-spacing: -0.04em;
+  text-shadow: 0 2px 28px rgba(0, 0, 0, 0.9);
+  background: radial-gradient(
+    ellipse 72% 120% at 50% 50%,
+    rgba(10, 10, 14, 0.94) 0%,
+    rgba(10, 10, 14, 0.72) 55%,
+    transparent 100%
+  );
+}
+
+.lettering-call-screen--photo[data-expanded="true"] .lettering-call-screen__photo-number {
+  opacity: 0.32;
+  transition: opacity 0.25s ease;
+}
+
+/* www 인증신청 — 펼친 명함·버튼이 잘리지 않도록 */
+.lettering-call-screen--marketing-demo.lettering-call-screen--photo {
+  overflow: visible;
+}
+
+.lettering-call-screen--marketing-demo.lettering-call-screen--photo[data-expanded="true"] {
+  overflow: visible;
+}
+
+.lettering-call-screen--marketing-demo .lettering-ongoing--on-photo.lettering-ongoing--expanded {
+  max-height: none;
+}
+
+.lettering-call-screen--marketing-demo .lettering-ongoing--on-photo.lettering-ongoing--expanded .lettering-ongoing-body {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.lettering-call-screen--marketing-demo .lettering-ongoing-scroll {
+  overflow: visible;
+  max-height: none;
 }
 
 /* 신고 시트 — line-height 상속·겹침 방지 */
@@ -3871,6 +4028,25 @@ body,
   font-size: 11px;
   font-weight: 900;
   color: #92400e;
+}
+
+.lettering-unverified-reports__list-scroll {
+  max-height: min(28vh, 200px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin: 0 -2px 0 0;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.lettering-unverified-reports__list-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.lettering-unverified-reports__list-scroll::-webkit-scrollbar-thumb {
+  background: rgba(180, 83, 9, 0.35);
+  border-radius: 999px;
 }
 
 .lettering-unverified-reports__list {

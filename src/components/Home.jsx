@@ -405,28 +405,25 @@ function Home({
   const membershipKind = normalizeMembershipKind(membershipTier);
   const isPaidUser = isPaidMembershipKind(membershipKind);
   const [feedNickTick, setFeedNickTick] = useState(0);
-  const [publishedLayout, setPublishedLayout] = useState(() => readCachedHomeLayout());
-  const [layoutLoadFailed, setLayoutLoadFailed] = useState(false);
+  const [publishedLayout, setPublishedLayout] = useState(
+    () => readCachedHomeLayout() || mergeHomeLayout(null)
+  );
   const feedDisplayLabel = useMemo(() => getFeedDisplayName("회원"), [feedNickTick]);
   useEffect(() => {
     let cancelled = false;
-    fetchPublicHomeLayout()
-      .then((layout) => {
-        if (cancelled) return;
-        setLayoutLoadFailed(false);
+    fetchPublicHomeLayout().then((layout) => {
+      if (cancelled) return;
+      if (layout) {
         const merged = mergeHomeLayout(layout);
         setPublishedLayout(merged);
-        if (layout) writeCachedHomeLayout(merged);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setLayoutLoadFailed(true);
-        setPublishedLayout((prev) => prev || mergeHomeLayout(readCachedHomeLayout() || null));
-      });
+        writeCachedHomeLayout(merged);
+        return;
+      }
+      setPublishedLayout((prev) => prev || readCachedHomeLayout() || mergeHomeLayout(null));
+    });
     const onLayout = (ev) => {
       const next = ev.detail || readCachedHomeLayout() || mergeHomeLayout(null);
       setPublishedLayout(next);
-      setLayoutLoadFailed(false);
     };
     window.addEventListener(HQ_HOME_LAYOUT_CHANGED, onLayout);
     return () => {
@@ -1187,17 +1184,6 @@ function Home({
           )}
         </div>
       </section>
-
-      {layoutLoadFailed ? (
-        <div
-          className={`mb-3 rounded-xl border px-3 py-2 text-[11px] font-medium leading-snug ${
-            isDarkMode ? "border-white/10 bg-white/5 text-gray-400" : "border-gray-100 bg-gray-50 text-gray-500"
-          }`}
-          role="status"
-        >
-          홈 배너를 최신으로 불러오지 못했습니다. API 서버(8788) 실행 후 새로고침해 주세요.
-        </div>
-      ) : null}
 
       {/* 2. VLUE PICK */}
       <section className="mb-5">

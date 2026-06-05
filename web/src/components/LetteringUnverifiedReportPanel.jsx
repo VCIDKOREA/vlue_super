@@ -59,11 +59,13 @@ export default function LetteringUnverifiedReportPanel({
         </p>
 
         {reports.length ? (
-          <ul className="lettering-unverified-reports__list">
-            {reports.map((entry) => (
-              <ReportEntry key={entry.id || `${entry.reasonLabel}-${entry.createdAt}`} entry={entry} />
-            ))}
-          </ul>
+          <div className="lettering-unverified-reports__list-scroll">
+            <ul className="lettering-unverified-reports__list">
+              {reports.map((entry) => (
+                <ReportEntry key={entry.id || `${entry.reasonLabel}-${entry.createdAt}`} entry={entry} />
+              ))}
+            </ul>
+          </div>
         ) : (
           <p className="lettering-unverified-reports__empty">
             {"아직 등록된 신고·제보가 없습니다. 의심스러운 통화는 신고해 주세요."}

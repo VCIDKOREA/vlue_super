@@ -21,8 +21,30 @@ const USER_ID = process.env.VLUE_AGENT_USER_ID || "";
 const DEVICE_ID = process.env.VLUE_AGENT_DEVICE_ID || os.hostname();
 const DEVICE_LABEL = process.env.VLUE_AGENT_DEVICE_LABEL || DEVICE_ID;
 
+function isCloudRuntime() {
+  return Boolean(
+    process.env.RAILWAY_ENVIRONMENT ||
+      process.env.RAILWAY_SERVICE_NAME ||
+      process.env.RAILWAY_PROJECT_ID
+  );
+}
+
 if (!USER_ID) {
-  console.error("[vlue-pc-agent] VLUE_AGENT_USER_ID 가 필요합니다.");
+  console.error("[vlue-pc-agent] VLUE_AGENT_USER_ID 가 필요합니다. (VLUE 회원 UUID)");
+  if (isCloudRuntime()) {
+    console.error(
+      "[vlue-pc-agent] Railway/cloud 배포는 지원하지 않습니다. 대시보드에서 @vlue/pc-agent 서비스를 제거하고,"
+    );
+    console.error("  사무실 Windows PC에서 npm run pc-agent:start 로 실행하세요. → apps/pc-agent/README.md");
+  }
+  console.error("[vlue-pc-agent] 선택: VLUE_AGENT_WS_URL=wss://<api-host>/api/office/ws/agent");
+  process.exit(1);
+}
+
+if (isCloudRuntime() && /localhost|127\.0\.0\.1/i.test(WS_URL)) {
+  console.error(
+    "[vlue-pc-agent] Railway에서는 VLUE_AGENT_WS_URL 에 @vlue/api Public URL(wss://...)을 설정해야 합니다."
+  );
   process.exit(1);
 }
 

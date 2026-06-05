@@ -1,0 +1,182 @@
+/**
+ * www 마케팅 본문 가독성 — 네이버 포털급 읽기 크기·굵기
+ * (10~11px + 얇은 회색 + 넓은 tracking → 깨져 보이는 현상 완화)
+ */
+
+[data-vlue-site="marketing"] {
+  --mkt-body: 1rem; /* 16px × root scale */
+  --mkt-body-lg: 1.0625rem;
+  --mkt-caption: 0.875rem; /* 최소 캡션 14px급 */
+  --mkt-label: 0.9375rem;
+  --mkt-text: #1a1a1b;
+  --mkt-text-secondary: #424242;
+  --mkt-text-muted: #5c5c5c;
+
+  color: var(--mkt-text);
+  font-weight: 500;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+}
+
+[data-vlue-site="marketing"] p,
+[data-vlue-site="marketing"] li,
+[data-vlue-site="marketing"] button,
+[data-vlue-site="marketing"] input,
+[data-vlue-site="marketing"] textarea {
+  font-family: inherit;
+}
+
+/* Tailwind 본문 단계 상향 (네이버: 본문 14~15px, 부가 13px) */
+[data-vlue-site="marketing"] .text-xs {
+  font-size: var(--mkt-caption) !important;
+  line-height: 1.55 !important;
+  font-weight: 600 !important;
+}
+
+[data-vlue-site="marketing"] .text-sm {
+  font-size: var(--mkt-body) !important;
+  line-height: 1.65 !important;
+  font-weight: 500 !important;
+}
+
+[data-vlue-site="marketing"] .text-base {
+  font-size: var(--mkt-body-lg) !important;
+  line-height: 1.7 !important;
+}
+
+[data-vlue-site="marketing"] .text-lg {
+  font-size: 1.1875rem !important;
+  line-height: 1.6 !important;
+}
+
+[data-vlue-site="marketing"] .text-\[10px\] {
+  font-size: var(--mkt-caption) !important;
+  line-height: 1.5 !important;
+  letter-spacing: 0.02em !important;
+  font-weight: 700 !important;
+}
+
+[data-vlue-site="marketing"] .text-\[11px\] {
+  font-size: var(--mkt-caption) !important;
+  line-height: 1.55 !important;
+  font-weight: 600 !important;
+}
+
+[data-vlue-site="marketing"] .text-\[12px\] {
+  font-size: var(--mkt-label) !important;
+  line-height: 1.55 !important;
+  font-weight: 600 !important;
+}
+
+[data-vlue-site="marketing"] .text-\[13px\] {
+  font-size: var(--mkt-body) !important;
+  line-height: 1.6 !important;
+}
+
+[data-vlue-site="marketing"] .text-\[15px\] {
+  font-size: 1.0625rem !important;
+  line-height: 1.65 !important;
+}
+
+/* 회색 본문 대비 강화 (연한 회색 → 읽기 가능한 톤) */
+[data-vlue-site="marketing"] .text-gray-400,
+[data-vlue-site="marketing"] .text-slate-400 {
+  color: var(--mkt-text-muted) !important;
+}
+
+[data-vlue-site="marketing"] .text-gray-500,
+[data-vlue-site="marketing"] .text-slate-500 {
+  color: var(--mkt-text-secondary) !important;
+}
+
+[data-vlue-site="marketing"] .text-gray-600,
+[data-vlue-site="marketing"] .text-slate-600 {
+  color: #333333 !important;
+}
+
+[data-vlue-site="marketing"] .text-gray-700,
+[data-vlue-site="marketing"] .text-slate-700 {
+  color: #262626 !important;
+}
+
+/* 설명·카드 본문 전용 */
+[data-vlue-site="marketing"] .mkt-desc {
+  font-size: var(--mkt-body);
+  line-height: 1.75;
+  font-weight: 500;
+  color: #333333;
+  word-break: keep-all;
+}
+
+[data-vlue-site="marketing"] .mkt-desc-lg {
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  font-weight: 500;
+  color: #262626;
+  word-break: keep-all;
+}
+
+[data-vlue-site="marketing"] .mkt-card-title {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  color: #111111;
+  line-height: 1.4;
+}
+
+[data-vlue-site="marketing"] .mkt-section-lead {
+  font-size: 1.125rem;
+  line-height: 1.75;
+  font-weight: 500;
+  color: #333333;
+}
+
+/* 초소형 uppercase 라벨 — 자간 축소 (깨짐 방지) */
+[data-vlue-site="marketing"] .tracking-widest,
+[data-vlue-site="marketing"] .tracking-wider {
+  letter-spacing: 0.06em !important;
+}
+
+[data-vlue-site="marketing"] .font-normal {
+  font-weight: 500 !important;
+}
+
+[data-vlue-site="marketing"] .font-medium {
+  font-weight: 600 !important;
+}
+
+/* 블러 패널 위 흰 글자 선명도 */
+[data-vlue-site="marketing"] .backdrop-blur-sm,
+[data-vlue-site="marketing"] .backdrop-blur-md {
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-vlue-site="marketing"] .text-white\/75,
+[data-vlue-site="marketing"] .text-white\/70 {
+  color: rgb(255 255 255 / 0.92) !important;
+  font-weight: 500 !important;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+}
+
+@media (min-width: 1024px) {
+  [data-vlue-site="marketing"] {
+    --mkt-body: 1.0625rem;
+    --mkt-body-lg: 1.125rem;
+    --mkt-caption: 0.9375rem;
+    --mkt-label: 1rem;
+  }
+
+  [data-vlue-site="marketing"] .text-sm {
+    font-size: var(--mkt-body-lg) !important;
+  }
+
+  [data-vlue-site="marketing"] .mkt-desc {
+    font-size: var(--mkt-body-lg);
+  }
+
+  [data-vlue-site="marketing"] .mkt-section-lead {
+    font-size: 1.1875rem;
+  }
+}

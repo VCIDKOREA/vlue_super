@@ -30,11 +30,30 @@ export const PAID_LIST_PRICE_MONTHLY_KRW = 28300;
 export const PAID_LIST_PRICE_ANNUAL_KRW = 283000;
 export const ANNUAL_FREE_MONTHS = 2;
 export const REFERRAL_DISCOUNT_RATE = 0.3;
+export const REFERRAL_DISCOUNT_RATE_SLIDING = 0.15;
+export const REFERRAL_BENEFIT_PROMO_MONTHS = 12;
 export const PAID_MONTHLY_DISCOUNTED_KRW = 19800;
 export const PAID_ANNUAL_DISCOUNTED_KRW = 198000;
+/** 13개월째부터 피추천인 영구 15% 할인 (정가 28,300원 기준) */
+export const PAID_MONTHLY_SLIDING_DISCOUNTED_KRW = 24050;
 
+/** 피추천인(가입자) 구독 할인 */
 export const REFERRAL_DISCOUNT_NOTICE =
-  "※ 추천인 코드 입력 시 30% 즉시 할인이 적용됩니다. (월결제 19,800원 / 1년 구독 198,000원 — 2개월 무료 포함) 추천인 없이 정가로 가입하더라도 언제든지 사후 등록이 가능하며, 이 경우 '가입일자에 맞춰 다음 결제 주기부터 할인이 갱신·적용'됩니다. (예: 12일 정가 가입 후 20일 추천인 등록 시, 다음 달 12일부터 할인 가격으로 결제)";
+  `※ 피추천인(가입자) 구독 할인: 추천인 코드로 유료 가입 시 최초 ${REFERRAL_BENEFIT_PROMO_MONTHS}개월 30% 할인(월 ${PAID_MONTHLY_DISCOUNTED_KRW.toLocaleString("ko-KR")}원 / 1년 ${PAID_ANNUAL_DISCOUNTED_KRW.toLocaleString("ko-KR")}원·2개월 무료). ${REFERRAL_BENEFIT_PROMO_MONTHS + 1}개월째부터 15% 할인(월 ${PAID_MONTHLY_SLIDING_DISCOUNTED_KRW.toLocaleString("ko-KR")}원)이 영구 적용됩니다.`;
+
+/** 추천인(코드 제공 VLUER) 구독 리워드 */
+export const REFERRAL_SPONSOR_REWARD_NOTICE =
+  `※ 추천인(코드 제공 VLUER) 적립: 추천 코드로 가입·결제한 회원의 구독료 기준, 가입 후 ${REFERRAL_BENEFIT_PROMO_MONTHS}개월 동안 VLUER 등급별 구독 리워드(인증 10%·파트너 15% 캐시 등). ${REFERRAL_BENEFIT_PROMO_MONTHS + 1}개월째부터 해당 회원 구독 분은 5% 고정(영구)으로 조정됩니다.`;
+
+export const REFERRAL_POST_SIGNUP_NOTICE =
+  "※ 추천인 없이 정가로 가입해도 사후 등록이 가능하며, 등록 시점의 가입일·결제 주기에 맞춰 위 할인·적립이 순차 적용됩니다. (예: 12일 정가 가입 후 20일 추천인 등록 → 다음 달 12일 결제부터 30% 구간 시작)";
+
+/** 서비스소개·약관용 — 할인 + 스폰서 + 사후등록 */
+export const REFERRAL_PROGRAM_NOTICES = [
+  REFERRAL_DISCOUNT_NOTICE,
+  REFERRAL_SPONSOR_REWARD_NOTICE,
+  REFERRAL_POST_SIGNUP_NOTICE
+];
 
 export const PAID_MEMBERSHIP_SUBLINE =
   `월 ${PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString("ko-KR")}원 · 1년 ${PAID_LIST_PRICE_ANNUAL_KRW.toLocaleString("ko-KR")}원 (2개월 무료)`;

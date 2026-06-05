@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buildPaymentPreview, REFERRAL_DISCOUNT_NOTICE } from "../lib/membershipBm.js";
+import {
+  buildPaymentPreview,
+  REFERRAL_DISCOUNT_NOTICE,
+  REFERRAL_SPONSOR_REWARD_NOTICE
+} from "../lib/membershipBm.js";
 import { verifyReferralCode } from "../lib/referralVerifyApi.js";
 
 const IDLE = { status: "idle", message: "", sponsorDisplayName: "", sponsorHandle: "", referralCode: "" };
@@ -223,6 +227,7 @@ export default function ReferralCodeVerifyBlock({
           />
           <span className={`text-[10px] leading-relaxed ${verified ? textSub : "text-slate-400"}`}>
             {REFERRAL_DISCOUNT_NOTICE}
+            <span className="mt-1.5 block">{REFERRAL_SPONSOR_REWARD_NOTICE}</span>
             {!verified ? (
               <span className="mt-1 block font-bold text-amber-800">※ 「추천인 인증」 후 동의할 수 있습니다.</span>
             ) : null}
@@ -231,7 +236,10 @@ export default function ReferralCodeVerifyBlock({
       )}
 
       {!hasCode && !noReferrer && (
-        <p className={`text-[10px] leading-relaxed ${textSub}`}>{REFERRAL_DISCOUNT_NOTICE}</p>
+        <p className={`text-[10px] leading-relaxed ${textSub}`}>
+          {REFERRAL_DISCOUNT_NOTICE}
+          <span className="mt-1.5 block">{REFERRAL_SPONSOR_REWARD_NOTICE}</span>
+        </p>
       )}
 
       {!hidePaymentPreview ? (

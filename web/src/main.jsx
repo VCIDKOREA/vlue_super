@@ -3,9 +3,11 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import AdminSecretApp from "./components/AdminSecretApp.jsx";
 import SuperAdminHqApp from "./components/hq/SuperAdminHqApp.jsx";
+import VlueMarketingApp from "./site/VlueMarketingApp.jsx";
 import AppRootErrorBoundary from "./components/AppRootErrorBoundary.jsx";
 import { isCurrentUrlAdminEntry } from "./lib/adminEntryPath.js";
 import { isSuperAdminHqEntry } from "./lib/hqRoute.js";
+import { resolveSiteShell } from "./lib/siteMode.js";
 import "./styles.css";
 import { applyAppSettingsToDocument } from "./lib/vlueAppSettings.js";
 import { logProductionEnvBinding } from "./config.js";
@@ -16,6 +18,7 @@ logProductionEnvBinding();
 const adminPath = import.meta.env.VITE_ADMIN_PATH;
 const showHq = isSuperAdminHqEntry();
 const showAdminGate = !showHq && adminPath && isCurrentUrlAdminEntry(adminPath);
+const siteShell = resolveSiteShell();
 
 const rootEl = document.getElementById("root");
 if (!rootEl) {
@@ -25,6 +28,7 @@ if (!rootEl) {
   let Shell = App;
   if (showHq) Shell = SuperAdminHqApp;
   else if (showAdminGate) Shell = AdminSecretApp;
+  else if (siteShell === "marketing") Shell = VlueMarketingApp;
 
   createRoot(rootEl).render(
     <React.StrictMode>

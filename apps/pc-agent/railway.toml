@@ -1,5 +1,10 @@
-# Railway — @vlue/pc-agent (Windows 전용 에이전트, Linux 컨테이너 비권장)
-# 크래시 시 VLUE_AGENT_USER_ID 환경변수 필수
+# ⚠️ @vlue/pc-agent — Railway 배포 비권장 (사무실 Windows PC 전용)
+# 대시보드 Crashed → 서비스 Remove 권장. docs/RAILWAY_PC_AGENT.md
+#
+# 부득이하게 유지할 때 Variables:
+#   VLUE_AGENT_USER_ID=<User.uuid>
+#   VLUE_AGENT_WS_URL=wss://<@vlue-api-host>/api/office/ws/agent
+# Root Directory: 모노레포 루트 /
 
 [build]
 builder = "nixpacks"
@@ -7,3 +12,4 @@ buildCommand = "npm ci"
 
 [deploy]
 startCommand = "npm run start -w @vlue/pc-agent"
+restartPolicyType = "ON_FAILURE"

@@ -32,6 +32,7 @@ import {
 } from "../services/office/mediaCampaignService.js";
 import { readFile } from "node:fs/promises";
 import { allowVmingRequest } from "../services/vming/vmingUsageService.js";
+import { officeExcelRoutes } from "./officeExcel.js";
 
 export const officeRoutes = new Hono();
 
@@ -407,3 +408,6 @@ officeRoutes.get("/media/files/:campaignId/:fileName", async (c) => {
     return c.json({ error: "NOT_FOUND" }, 404);
   }
 });
+
+/** AI 엑셀 에디터 — /api/office/excel/* */
+officeRoutes.route("/excel", officeExcelRoutes);

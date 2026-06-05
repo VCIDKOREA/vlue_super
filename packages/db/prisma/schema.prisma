@@ -2182,3 +2182,95 @@ model MailAttachment {
   @@index([messageId, createdAt(sort: Desc)])
   @@map("mail_attachments")
 }
+
+// -----------------------------------------------------------------------------
+// Office — AI 엑셀 에디터 (웹 전용)
+// -----------------------------------------------------------------------------
+
+enum ExcelWorkbookStatus {
+  draft
+  active
+  archived
+}
+
+enum ExcelGenerationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model OfficeExcelWorkbook {
+  id                  String              @id @default(uuid()) @db.Uuid
+  ownerUserId         String              @map("owner_user_id") @db.Uuid
+  title               String              @db.VarChar(300)
+  templateId          String?             @map("template_id") @db.VarChar(80)
+  status              ExcelWorkbookStatus @default(draft)
+  headRevisionId      String?             @unique @map("head_revision_id") @db.Uuid
+  headRevisionNum     Int                 @default(0) @map("head_revision_num")
+  lastExportedAssetId String?             @map("last_exported_asset_id") @db.Uuid
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  headRevision OfficeExcelRevision?  @relation("WorkbookHead", fields: [headRevisionId], references: [id], onDelete: SetNull)
+  revisions    OfficeExcelRevision[] @relation("WorkbookRevisions")
+  jobs         OfficeExcelGenerationJob[]
+
+  @@index([ownerUserId, updatedAt(sort: Desc)])
+  @@map("office_excel_workbooks")
+}
+
+model OfficeExcelRevision {
+  id               String   @id @default(uuid()) @db.Uuid
+  workbookId       String   @map("workbook_id") @db.Uuid
+  revisionNum      Int      @map("revision_num")
+  parentRevisionId String?  @map("parent_revision_id") @db.Uuid
+  modelJson        Json     @map("model_json") @db.JsonB
+  patchJson        Json?    @map("patch_json") @db.JsonB
+  changeSummary    String?  @map("change_summary") @db.VarChar(500)
+  authorUserId     String   @map("author_user_id") @db.Uuid
+  authorClient     String   @default("web") @map("author_client") @db.VarChar(20)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workbook     OfficeExcelWorkbook  @relation("WorkbookRevisions", fields: [workbookId], references: [id], onDelete: Cascade)
+  headOf       OfficeExcelWorkbook? @relation("WorkbookHead")
+  resultOfJobs OfficeExcelGenerationJob[] @relation("JobResultRevision")
+
+  @@unique([workbookId, revisionNum])
+  @@index([workbookId, revisionNum(sort: Desc)])
+  @@map("office_excel_revisions")
+}
+
+model OfficeExcelGenerationJob {
+  id                 String                @id @default(uuid()) @db.Uuid
+  workbookId         String?               @map("workbook_id") @db.Uuid
+  ownerUserId        String                @map("owner_user_id") @db.Uuid
+  promptText         String                @map("prompt_text") @db.Text
+  templateId         String?               @map("template_id") @db.VarChar(80)
+  status             ExcelGenerationStatus @default(PENDING)
+  progress           Int                   @default(0)
+  resultRevisionId   String?               @map("result_revision_id") @db.Uuid
+  errorMessage       String?               @map("error_message") @db.VarChar(500)
+  agentTraceJson     Json?                 @map("agent_trace_json") @db.JsonB
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workbook       OfficeExcelWorkbook?  @relation(fields: [workbookId], references: [id], onDelete: SetNull)
+  resultRevision OfficeExcelRevision?  @relation("JobResultRevision", fields: [resultRevisionId], references: [id], onDelete: SetNull)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@map("office_excel_generation_jobs")
+}
+
+model OfficeExcelTemplate {
+  id          String  @id @db.VarChar(80)
+  category    String  @db.VarChar(40)
+  title       String  @db.VarChar(200)
+  description String? @db.Text
+  modelJson   Json    @map("model_json") @db.JsonB
+  promptHints Json?   @map("prompt_hints") @db.JsonB
+  isActive    Boolean @default(true) @map("is_active")
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  @@map("office_excel_templates")
+}

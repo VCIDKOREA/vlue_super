@@ -13,7 +13,9 @@ import { submitLetteringReport } from "../lib/letteringReport.js";
 import { buildLetteringCertUniversalLink } from "../lib/letteringOpenVlueApp.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { DEMO_UNVERIFIED_REPORT_HISTORY } from "../lib/letteringPhoneReports.js";
+import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
+import LetteringNativeCallScreen from "./LetteringNativeCallScreen.jsx";
 import LetteringReportSheet from "./LetteringReportSheet.jsx";
 
 /**
@@ -29,10 +31,25 @@ export default function LetteringCallScreenPreview({
   isRecording = false,
   platform = "android",
   callDurationSec = 8,
-  recordingDurationSec = 8
+  recordingDurationSec = 8,
+  /** 데모: 명함 데이터 직접 주입 (#lettering-preview) */
+  card: cardOverride = null,
+  incomingNumber: incomingNumberOverride = null,
+  /** true면 빅푸시·펼치기·버튼 터치 가능 */
+  interactive = false,
+  /** 통화 스크린샷에 박힌 번호 대신 표시(www·데모) */
+  callScreenNumber = "",
+  /** 명함을 빅푸시 폭에 맞게 축소 */
+  fitBizcard = false,
+  /** www 데모: 신고·차단 네이티브 호출 생략 */
+  demoQuiet = false,
+  /** photo: 스크린샷 · native: CSS 통화 UI (www) */
+  callUi = "photo",
+  className = ""
 }) {
   const onCall = callPhase === "active";
   const layout = getLetteringLayout(platform);
+  const useNativeCallUi = callUi === "native";
   const screenSrc = platform === "ios" ? IOS_CALL_SCREEN : SAMSUNG_CALL_SCREEN;
   const drag = useDraggableY({
     initialY: layout.dragInitialY,
@@ -58,7 +75,8 @@ export default function LetteringCallScreenPreview({
 
   const previewCard = verified
     ? withLetteringBizcardPreviewFallback(
-        buildUserLetteringCard({ membershipTier: membershipTier || "premium" })
+        cardOverride ||
+          buildUserLetteringCard({ membershipTier: membershipTier || "premium" })
       )
     : {
         name: "",
@@ -69,7 +87,10 @@ export default function LetteringCallScreenPreview({
         organization: ""
       };
 
-  const incomingNumber = verified ? "010-1234-5678" : "010-9876-5432";
+  const incomingNumber =
+    incomingNumberOverride ?? (verified ? "010-1234-5678" : "010-9876-5432");
+  const callNumberLabel = String(callScreenNumber || incomingNumber || "").trim();
+  const callNumberDisplay = callNumberLabel ? formatLetteringPhoneDisplay(callNumberLabel) : "";
   const isFreePreview = verified && !isPaidLetteringTier(membershipTier);
 
   const openReport = ({ card, incomingNumber: phone, verified: isVerified }) => {
@@ -83,6 +104,10 @@ export default function LetteringCallScreenPreview({
   };
 
   const handleSaveCard = ({ card }) => {
+    if (demoQuiet) {
+      showToast("데모 — 명함 저장은 앱에서 이용해 주세요");
+      return;
+    }
     const result = saveLetteringCardToWallet(card);
     if (result.ok) {
       showToast("명함이 지갑에 저장되었습니다");
@@ -98,6 +123,11 @@ export default function LetteringCallScreenPreview({
       : "앱 차단 목록에 등록되었습니다. 휴대폰 설정에서 VLUE 차단 권한을 허용해 주세요.";
 
   const handleBlockOnly = async () => {
+    if (demoQuiet) {
+      showToast("데모 화면입니다");
+      setReportOpen(false);
+      return;
+    }
     const blockResult = await blockLetteringPhoneOnly(reportTarget.phone, {
       cardName: reportTarget.cardName
     });
@@ -110,6 +140,11 @@ export default function LetteringCallScreenPreview({
   };
 
   const handleReportSubmit = async ({ reasonId, detail }) => {
+    if (demoQuiet) {
+      showToast("데모 화면입니다");
+      setReportOpen(false);
+      return;
+    }
     const { report, blockResult } = await submitLetteringReport({
       phone: reportTarget.phone,
       reasonId,
@@ -121,30 +156,60 @@ export default function LetteringCallScreenPreview({
     setReportOpen(false);
   };
 
+  const shellTone = useNativeCallUi
+    ? "lettering-call-screen--native"
+    : "lettering-call-screen--photo";
+  const overlayTone = useNativeCallUi
+    ? "lettering-ongoing-overlay--native"
+    : "lettering-ongoing-overlay--photo";
+
   return (
     <>
       <div
-        className="lettering-call-screen lettering-call-screen--photo relative mx-auto w-full max-w-[390px] overflow-hidden rounded-[32px] border border-white/10 shadow-2xl"
+        className={`lettering-call-screen ${shellTone} relative mx-auto w-full max-w-[390px] overflow-hidden rounded-[32px] border border-white/10 shadow-2xl ${demoQuiet ? "lettering-call-screen--marketing-demo" : ""} ${className}`.trim()}
         data-expanded={expanded ? "true" : "false"}
         data-platform={platform}
         data-report-open={reportOpen ? "true" : "false"}
         style={letteringLayoutStyle(platform)}
       >
-        <img
-          src={screenSrc}
-          alt=""
-          className="lettering-call-screen__photo pointer-events-none block h-auto w-full select-none"
-          draggable={false}
-          decoding="async"
-        />
+        {useNativeCallUi ? (
+          <div className="lettering-call-screen__native-stage">
+            <LetteringNativeCallScreen
+              platform={platform}
+              callNumber={callNumberLabel || incomingNumber}
+              expanded={expanded}
+            />
+          </div>
+        ) : (
+          <>
+            <img
+              src={screenSrc}
+              alt=""
+              className="lettering-call-screen__photo pointer-events-none block h-auto w-full select-none"
+              draggable={false}
+              decoding="async"
+            />
+            {callNumberDisplay ? (
+              <div className="lettering-call-screen__photo-number" aria-hidden>
+                <span className="lettering-call-screen__photo-number-text">{callNumberDisplay}</span>
+              </div>
+            ) : null}
+          </>
+        )}
 
-        <div className="lettering-call-screen__overlay-stage pointer-events-none absolute inset-0">
+        <div
+          className={`lettering-call-screen__overlay-stage absolute inset-0 ${
+            interactive ? "pointer-events-auto" : "pointer-events-none"
+          }`}
+        >
           <div
-            className="lettering-ongoing-overlay lettering-ongoing-overlay--photo lettering-ongoing-overlay--draggable absolute inset-x-0"
+            className={`lettering-ongoing-overlay ${overlayTone} lettering-ongoing-overlay--draggable absolute inset-x-0`}
             style={{ transform: `translate3d(0, ${drag.offsetY}px, 0)` }}
           >
             <LetteringIncomingNotification
-              className="lettering-ongoing--on-photo"
+              className="lettering-ongoing--on-photo lettering-ongoing--on-call"
+              fitBizcard={fitBizcard}
+              hideUnverifiedFooter={demoQuiet}
               verified={verified}
               callPhase={onCall ? "active" : "ringing"}
               platform={platform}

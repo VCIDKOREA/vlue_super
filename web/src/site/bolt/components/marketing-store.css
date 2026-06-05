@@ -1,0 +1,238 @@
+/* VLUE 스토어 — www 웹 레이아웃 (앱 피드 동기화) */
+
+.mkt-store {
+  --mkt-primary: #2563eb;
+  --mkt-border: #e2e8f0;
+}
+
+.mkt-store__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.mkt-store__tab {
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  border: 1px solid var(--mkt-border);
+  background: #fff;
+  color: #64748b;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.mkt-store__tab.is-active {
+  background: var(--mkt-primary);
+  border-color: var(--mkt-primary);
+  color: #fff;
+}
+
+.mkt-store__sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.mkt-store__hero {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .mkt-store__hero {
+    grid-template-columns: 1.35fr 1fr;
+  }
+}
+
+.mkt-store__featured {
+  position: relative;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--mkt-border);
+  background: #0f172a;
+  aspect-ratio: 16 / 9;
+  cursor: pointer;
+}
+
+.mkt-store__featured img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.92;
+}
+
+.mkt-store__play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 18%);
+}
+
+.mkt-store__play span {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 55%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.mkt-store__card {
+  border-radius: 1rem;
+  border: 1px solid var(--mkt-border);
+  background: #fff;
+  overflow: hidden;
+  transition: box-shadow 0.15s, transform 0.15s;
+  text-align: left;
+}
+
+.mkt-store__card:hover {
+  box-shadow: 0 8px 24px rgb(15 23 42 / 8%);
+  transform: translateY(-2px);
+}
+
+.mkt-store__thumb {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: #f1f5f9;
+}
+
+.mkt-store__thumb--square {
+  aspect-ratio: 1;
+}
+
+.mkt-store__badge-live {
+  position: absolute;
+  left: 0.5rem;
+  top: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.mkt-store__badge-platform {
+  position: absolute;
+  left: 0.5rem;
+  top: 0.5rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.mkt-store__duration {
+  position: absolute;
+  right: 0.45rem;
+  bottom: 0.45rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  background: rgb(0 0 0 / 78%);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.mkt-store__body {
+  padding: 0.75rem 0.85rem 0.9rem;
+}
+
+.mkt-store__title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mkt-store__meta {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.mkt-store__price {
+  margin-top: 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.mkt-store__rail {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scroll-snap-type: x mandatory;
+}
+
+.mkt-store__rail-card {
+  flex: 0 0 220px;
+  scroll-snap-align: start;
+}
+
+.mkt-store__profile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #fff;
+  overflow: auto;
+}
+
+.mkt-store__sentinel {
+  height: 1px;
+}
+
+/* AI 추천 영상 — 다열 카드 (www 스토어) */
+.mkt-ai-carousel__track {
+  padding: 0.15rem 0.25rem 0.35rem;
+}
+
+.mkt-ai-carousel__card {
+  flex: 0 0 auto;
+  width: clamp(200px, 72vw, 260px);
+}
+
+@media (min-width: 640px) {
+  .mkt-ai-carousel__card {
+    width: clamp(220px, 32vw, 280px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .mkt-ai-carousel__card {
+    width: clamp(240px, 24vw, 300px);
+  }
+}
+
+.mkt-ai-carousel__thumb {
+  aspect-ratio: 16 / 10;
+  max-height: 148px;
+}
+
+@media (min-width: 1024px) {
+  .mkt-ai-carousel__thumb {
+    max-height: 160px;
+  }
+}
