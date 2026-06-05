@@ -1,0 +1,8 @@
+#!/bin/sh
+git rm -rf --cached --ignore-unmatch "Firebase 서비스 계정 키.txt" || true
+git rm -rf --cached --ignore-unmatch "수파베이스 암호.txt" || true
+git rm -rf --cached --ignore-unmatch "외부서비스연동API정보!!!!!!!!.txt" || true
+git rm -rf --cached --ignore-unmatch "커서 api키.txt" || true
+git rm -rf --cached --ignore-unmatch "재목없음.txt" || true
+git rm -rf --cached --ignore-unmatch "중소기업현황 계정.txt" || true
+git rm -rf --cached --ignore-unmatch "web/.env.local" || true
