@@ -155,12 +155,37 @@
 [data-vlue-site="marketing"] .mkt-about-section-nav__btn {
   flex: 0 0 auto;
   white-space: nowrap;
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.875rem;
+  border-radius: 9999px;
+  padding: 0.4375rem 0.9375rem;
   font-size: var(--mkt-caption, 0.875rem);
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.2;
-  transition: background 0.15s, color 0.15s;
+  color: #64748b;
+  background: rgb(241 245 249 / 90%);
+  border: 1px solid transparent;
+  transition:
+    background 0.28s ease,
+    color 0.28s ease,
+    box-shadow 0.28s ease,
+    border-color 0.28s ease,
+    transform 0.2s ease;
+}
+
+[data-vlue-site="marketing"] .mkt-about-section-nav__btn:hover {
+  color: #334155;
+  background: #e2e8f0;
+}
+
+[data-vlue-site="marketing"] .mkt-about-section-nav__btn--active {
+  color: #fff !important;
+  background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%) !important;
+  border-color: rgb(99 102 241 / 35%);
+  box-shadow: 0 4px 14px rgb(79 70 229 / 28%);
+  transform: translateY(-1px);
+}
+
+[data-vlue-site="marketing"] .mkt-about-section-nav__btn--active:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #1d4ed8 100%) !important;
 }
 
 [data-vlue-site="marketing"] .mkt-scroll-section {

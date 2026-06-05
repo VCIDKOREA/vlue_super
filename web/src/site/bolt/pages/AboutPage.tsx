@@ -251,14 +251,70 @@ interface AboutPageProps {
   onNavigate: (view: string) => void;
 }
 
+const SCROLL_SPY_SECTIONS = ABOUT_CATEGORIES.filter((c) => c.id !== 'all');
+
+function getAboutScrollSpyAnchor() {
+  const nav = document.querySelector('.mkt-about-section-nav');
+  if (nav) return nav.getBoundingClientRect().bottom + 10;
+  return 148;
+}
+
 export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
   const [activeCategory, setActiveCategory] = useState<AboutCategoryId>('all');
   const [forceOpenId, setForceOpenId] = useState<string | null>(null);
+  const clickScrollLock = useRef(false);
+  const clickScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navBtnRefs = useRef<Partial<Record<AboutCategoryId, HTMLButtonElement | null>>>({});
+
+  const scrollToSection = (sectionId: string, categoryId: AboutCategoryId) => {
+    setActiveCategory(categoryId);
+    clickScrollLock.current = true;
+    if (clickScrollTimer.current) clearTimeout(clickScrollTimer.current);
+
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    clickScrollTimer.current = setTimeout(() => {
+      clickScrollLock.current = false;
+    }, 720);
+  };
+
+  useEffect(() => {
+    const syncActiveFromScroll = () => {
+      if (clickScrollLock.current) return;
+
+      const anchor = getAboutScrollSpyAnchor();
+      let current: AboutCategoryId | null = null;
+
+      for (const cat of SCROLL_SPY_SECTIONS) {
+        const el = document.getElementById(cat.sectionId);
+        if (el && el.getBoundingClientRect().top <= anchor) {
+          current = cat.id;
+        }
+      }
+
+      if (current) {
+        setActiveCategory((prev) => (prev === current ? prev : current));
+      }
+    };
+
+    syncActiveFromScroll();
+    window.addEventListener('scroll', syncActiveFromScroll, { passive: true });
+    window.addEventListener('resize', syncActiveFromScroll);
+    return () => {
+      window.removeEventListener('scroll', syncActiveFromScroll);
+      window.removeEventListener('resize', syncActiveFromScroll);
+      if (clickScrollTimer.current) clearTimeout(clickScrollTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeCategory === 'all') return;
+    const btn = navBtnRefs.current[activeCategory];
+    btn?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [activeCategory]);
 
   const handleFeatureSelect = (feature: CatalogFeature) => {
-    setActiveCategory(feature.category);
     setForceOpenId(feature.id);
-    document.getElementById(feature.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToSection(feature.sectionId, feature.category);
   };
 
   const excelNav = () => onNavigate('exceleditor');
@@ -306,19 +362,15 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
 
       <nav aria-label="서비스소개 섹션" className="mkt-about-section-nav">
         <div className="max-w-6xl mx-auto mkt-about-section-nav__inner">
-          {ABOUT_CATEGORIES.filter((c) => c.id !== 'all').map((cat) => (
+          {SCROLL_SPY_SECTIONS.map((cat) => (
             <button
               key={cat.id}
+              ref={(el) => { navBtnRefs.current[cat.id] = el; }}
               type="button"
-              onClick={() => {
-                setActiveCategory(cat.id);
-                const el = document.getElementById(cat.sectionId);
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }}
-              className={`mkt-about-section-nav__btn ${
-                activeCategory === cat.id
-                  ? 'bg-primary-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              aria-current={activeCategory === cat.id ? 'true' : undefined}
+              onClick={() => scrollToSection(cat.sectionId, cat.id)}
+              className={`mkt-about-section-nav__btn${
+                activeCategory === cat.id ? ' mkt-about-section-nav__btn--active' : ''
               }`}
             >
               {cat.label}
