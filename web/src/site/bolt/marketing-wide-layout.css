@@ -264,9 +264,9 @@
 }
 
 [data-vlue-site="marketing"] .mkt-nav-link {
-  font-size: 0.875rem !important;
-  padding: 0.375rem 0.75rem !important;
-  font-weight: 500 !important;
+  font-size: 0.9375rem !important;
+  padding: 0.4375rem 0.8125rem !important;
+  font-weight: 600 !important;
   line-height: 1.35 !important;
 }
 
@@ -502,11 +502,12 @@
   }
 
   [data-vlue-site="marketing"] .hero-title {
-    font-size: clamp(2.375rem, 3.6vw, 3.5rem);
+    font-size: clamp(2.5rem, 3.8vw, 3.625rem);
     font-weight: 800 !important;
+    font-variation-settings: "wght" 800;
     margin-bottom: 1.5rem;
-    line-height: 1.18;
-    letter-spacing: -0.038em;
+    line-height: 1.16;
+    letter-spacing: -0.04em;
     color: #0f172a !important;
   }
 
@@ -535,12 +536,13 @@
   }
 
   [data-vlue-site="marketing"] .hero-desc {
-    font-size: 1.1875rem;
+    font-size: 1.25rem;
     max-width: min(44rem, 92vw);
     margin-bottom: 2.375rem;
-    line-height: 1.78;
+    line-height: 1.75;
     font-weight: 600 !important;
-    color: #334155 !important;
+    font-variation-settings: "wght" 600;
+    color: #1e293b !important;
   }
 
   [data-vlue-site="marketing"] .hero-desc-accent {

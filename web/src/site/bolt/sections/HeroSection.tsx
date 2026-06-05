@@ -39,7 +39,7 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
           <span style={{ wordBreak: 'keep-all', whiteSpace: 'nowrap' }}>보이스피싱 예방 통합 인증 플랫폼</span>
         </div>
 
-        <h1 className="hero-title hero-animate hero-animate--2 font-extrabold text-slate-900" style={{ letterSpacing: '-0.035em', wordBreak: 'keep-all' }}>
+        <h1 className="hero-title hero-animate hero-animate--2 text-slate-900" style={{ wordBreak: 'keep-all' }}>
           의심되는 기관,<br />
           <span className="hero-title-accent">지금 바로 확인</span>하세요
         </h1>

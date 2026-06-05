@@ -70,9 +70,10 @@
 }
 
 .hero-title {
-  font-size: clamp(1.875rem, 5.2vw, 3.125rem);
-  line-height: 1.2;
+  font-size: clamp(2rem, 5.4vw, 3.25rem);
+  line-height: 1.18;
   font-weight: 800;
+  font-variation-settings: "wght" 800;
   margin-bottom: clamp(0.75rem, 2vw, 1.5rem);
   white-space: normal;
   word-break: keep-all;
@@ -86,13 +87,14 @@
 }
 
 .hero-desc {
-  font-size: clamp(1rem, 2.3vw, 1.1875rem);
+  font-size: clamp(1.0625rem, 2.4vw, 1.25rem);
   max-width: min(44rem, 92vw);
   margin-bottom: clamp(1rem, 3vw, 2.25rem);
   word-break: keep-all;
   font-weight: 600;
-  line-height: 1.75;
-  color: #334155;
+  font-variation-settings: "wght" 600;
+  line-height: 1.72;
+  color: #1e293b;
 }
 
 .hero-desc-accent {
