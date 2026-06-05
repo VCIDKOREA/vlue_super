@@ -413,14 +413,16 @@
 
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    // 이메일 구독 (클라이언트 검증 + 로컬 저장)
+    // 이메일 구독 → Formspree (구독 시 등록 메일로 알림)
+    const FORMSPREE_ENDPOINT = 'https://formspree.io/f/xpqewkwk';
     const form = document.getElementById('subscribe-form');
     const emailInput = document.getElementById('email');
+    const submitBtn = form.querySelector('button[type="submit"]');
     const errorEl = document.getElementById('form-error');
     const hintEl = document.getElementById('form-hint');
     const toastEl = document.getElementById('success-toast');
 
-    form.addEventListener('submit', function (e) {
+    form.addEventListener('submit', async function (e) {
       e.preventDefault();
       errorEl.classList.add('hidden');
       const email = emailInput.value.trim();
@@ -432,15 +434,31 @@
         return;
       }
 
-      try {
-        const list = JSON.parse(localStorage.getItem('vlue-coming-soon-subscribers') || '[]');
-        if (!list.includes(email)) list.push(email);
-        localStorage.setItem('vlue-coming-soon-subscribers', JSON.stringify(list));
-      } catch (_) { /* ignore */ }
+      const prevLabel = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = '전송 중…';
 
-      form.classList.add('hidden');
-      hintEl.classList.add('hidden');
-      toastEl.classList.remove('hidden');
+      try {
+        const res = await fetch(FORMSPREE_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            email,
+            _subject: 'VLUE Coming Soon — 새 구독 신청',
+            message: '구독 이메일: ' + email,
+          }),
+        });
+        if (!res.ok) throw new Error('submit failed');
+
+        form.classList.add('hidden');
+        hintEl.classList.add('hidden');
+        toastEl.classList.remove('hidden');
+      } catch {
+        errorEl.textContent = '전송에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+        errorEl.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = prevLabel;
+      }
     });
   </script>
 </body>
