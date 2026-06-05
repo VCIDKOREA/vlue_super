@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="VLUE — 더 나은 내일을 설계하고 있습니다. 곧 찾아뵙겠습니다." />
+  <title>VLUE — Coming Soon</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            vlue: {
+              400: '#60a5fa',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            },
+          },
+          fontFamily: {
+            sans: ['"Pretendard Variable"', 'Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <style>
+    :root {
+      --vlue-glow: rgba(37, 99, 235, 0.45);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: #070b14;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+
+    /* 배경 그리드 */
+    .bg-grid {
+      background-image:
+        linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 20%, transparent 75%);
+    }
+
+    .bg-grid-drift {
+      animation: grid-drift 28s linear infinite;
+    }
+
+    @keyframes grid-drift {
+      0% { background-position: 0 0, 0 0; }
+      100% { background-position: 48px 48px, 48px 48px; }
+    }
+
+    /* 오로라 오브 */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    .orb-1 {
+      width: 420px;
+      height: 420px;
+      background: radial-gradient(circle, #2563eb 0%, transparent 70%);
+      top: -8%;
+      left: -6%;
+      animation: orb-float-1 14s ease-in-out infinite;
+    }
+
+    .orb-2 {
+      width: 360px;
+      height: 360px;
+      background: radial-gradient(circle, #6366f1 0%, transparent 70%);
+      bottom: -10%;
+      right: -4%;
+      animation: orb-float-2 18s ease-in-out infinite;
+    }
+
+    .orb-3 {
+      width: 280px;
+      height: 280px;
+      background: radial-gradient(circle, #0ea5e9 0%, transparent 70%);
+      top: 42%;
+      right: 18%;
+      opacity: 0.2;
+      animation: orb-float-3 12s ease-in-out infinite;
+    }
+
+    @keyframes orb-float-1 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(40px, 30px) scale(1.08); }
+    }
+
+    @keyframes orb-float-2 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(-50px, -20px) scale(1.05); }
+    }
+
+    @keyframes orb-float-3 {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-30px, 25px); }
+    }
+
+    /* 스캔 라인 */
+    .scan-line {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(37, 99, 235, 0.03) 48%,
+        rgba(37, 99, 235, 0.06) 50%,
+        rgba(37, 99, 235, 0.03) 52%,
+        transparent 100%
+      );
+      background-size: 100% 200%;
+      animation: scan 6s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes scan {
+      0% { background-position: 0 -100%; }
+      100% { background-position: 0 200%; }
+    }
+
+    /* 파티클 */
+    .particle {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      border-radius: 50%;
+      background: rgba(96, 165, 250, 0.6);
+      animation: particle-rise linear infinite;
+    }
+
+    @keyframes particle-rise {
+      0% { transform: translateY(0) scale(0); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 0.4; }
+      100% { transform: translateY(-100vh) scale(1); opacity: 0; }
+    }
+
+    /* 로고 글로우 링 */
+    .logo-ring {
+      position: absolute;
+      inset: -18px;
+      border-radius: 2rem;
+      border: 1px solid rgba(96, 165, 250, 0.25);
+      animation: ring-pulse 3s ease-in-out infinite;
+    }
+
+    .logo-ring-2 {
+      inset: -32px;
+      border-color: rgba(96, 165, 250, 0.1);
+      animation-delay: 1.2s;
+    }
+
+    @keyframes ring-pulse {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50% { transform: scale(1.06); opacity: 1; }
+    }
+
+    .logo-float {
+      animation: logo-float 5s ease-in-out infinite;
+    }
+
+    @keyframes logo-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .logo-glow {
+      filter: drop-shadow(0 0 24px var(--vlue-glow)) drop-shadow(0 0 48px rgba(37, 99, 235, 0.2));
+    }
+
+    /* 눈 깜빡임 */
+    .eye-blink {
+      transform-origin: 64px 76.9px;
+      animation: eye-blink 5s ease-in-out infinite;
+    }
+
+    @keyframes eye-blink {
+      0%, 42%, 46%, 100% { transform: scaleY(1); }
+      44% { transform: scaleY(0.08); }
+    }
+
+    /* 배지 shimmer */
+    .badge-shimmer {
+      background: linear-gradient(
+        110deg,
+        rgba(37, 99, 235, 0.15) 0%,
+        rgba(96, 165, 250, 0.35) 45%,
+        rgba(37, 99, 235, 0.15) 90%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 4s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* 타이핑 점 */
+    .typing-dot {
+      animation: typing-bounce 1.4s ease-in-out infinite;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typing-bounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+      30% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    /* 페이드 인 */
+    .fade-up {
+      animation: fade-up 1s ease-out both;
+    }
+
+    .fade-up-d1 { animation-delay: 0.15s; }
+    .fade-up-d2 { animation-delay: 0.35s; }
+    .fade-up-d3 { animation-delay: 0.55s; }
+    .fade-up-d4 { animation-delay: 0.75s; }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 구독 폼 */
+    .subscribe-input:focus {
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25), 0 0 32px rgba(37, 99, 235, 0.12);
+    }
+
+    .subscribe-btn {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .subscribe-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 28px rgba(37, 99, 235, 0.4);
+    }
+
+    .subscribe-btn:active {
+      transform: translateY(0);
+    }
+
+    /* 성공 토스트 */
+    .toast-in {
+      animation: toast-in 0.4s ease-out both;
+    }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* 회로 라인 장식 */
+    .circuit {
+      stroke-dasharray: 120;
+      stroke-dashoffset: 120;
+      animation: circuit-draw 3s ease-in-out infinite alternate;
+    }
+
+    @keyframes circuit-draw {
+      to { stroke-dashoffset: 0; }
+    }
+  </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+  <!-- 배경 레이어 -->
+  <div class="fixed inset-0 -z-10 overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-b from-[#0a1020] via-[#070b14] to-[#050810]"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="absolute inset-0 bg-grid bg-grid-drift"></div>
+    <div class="scan-line"></div>
+    <div id="particles" class="absolute inset-0 overflow-hidden" aria-hidden="true"></div>
+  </div>
+
+  <!-- 회로 장식 SVG -->
+  <svg class="fixed top-8 left-8 w-24 h-24 text-vlue-600/20 pointer-events-none hidden sm:block" viewBox="0 0 96 96" fill="none" aria-hidden="true">
+    <path class="circuit" d="M8 48 H32 M32 48 V24 M32 24 H56" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="56" cy="24" r="3" fill="currentColor" opacity="0.5"/>
+    <path class="circuit" style="animation-delay:1s" d="M88 48 H64 M64 48 V72 M64 72 H40" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="40" cy="72" r="3" fill="currentColor" opacity="0.5"/>
+  </svg>
+  <svg class="fixed bottom-8 right-8 w-24 h-24 text-vlue-600/20 pointer-events-none hidden sm:block" viewBox="0 0 96 96" fill="none" aria-hidden="true">
+    <path class="circuit" style="animation-delay:0.5s" d="M48 8 V32 M48 32 H72 M72 32 V56" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="72" cy="56" r="3" fill="currentColor" opacity="0.5"/>
+  </svg>
+
+  <main class="relative min-h-screen flex flex-col items-center justify-center px-5 py-16">
+    <!-- 로고 -->
+    <div class="relative mb-8 fade-up">
+      <div class="logo-ring logo-ring-2" aria-hidden="true"></div>
+      <div class="logo-ring" aria-hidden="true"></div>
+      <div class="logo-float relative">
+        <div class="logo-glow w-[88px] h-[88px] sm:w-[104px] sm:h-[104px]">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%" role="img" aria-label="VLUE 로고">
+            <defs>
+              <linearGradient id="logo-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#2563eb"/>
+                <stop offset="100%" stop-color="#1d4ed8"/>
+              </linearGradient>
+            </defs>
+            <rect width="128" height="128" rx="36.6" fill="url(#logo-bg)"/>
+            <g class="eye-blink" transform="translate(0 -5.2)">
+              <path fill="none" stroke="#ffffff" stroke-width="7.7333" stroke-linecap="butt" stroke-linejoin="round"
+                d="M 22.4 70.267 Q 64 29.733 105.6 70.267"/>
+              <circle cx="64" cy="76.9333" r="21.3333" fill="#ffffff"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- 브랜드명 + Coming Soon -->
+    <div class="text-center mb-10 fade-up fade-up-d1">
+      <h1 class="text-4xl sm:text-5xl font-black tracking-tight text-white mb-3" style="letter-spacing: -0.04em;">
+        VLUE
+      </h1>
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-vlue-600/30 badge-shimmer">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-vlue-400 opacity-60"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-vlue-500"></span>
+        </span>
+        <span class="text-xs sm:text-sm font-bold text-vlue-400 tracking-widest uppercase">Coming Soon</span>
+      </div>
+    </div>
+
+    <!-- 메인 카피 -->
+    <div class="text-center max-w-xl mx-auto mb-12 fade-up fade-up-d2">
+      <p class="text-lg sm:text-xl text-slate-300 leading-relaxed font-medium" style="word-break: keep-all; letter-spacing: -0.02em;">
+        우리는 지금 더 나은 내일을 설계하고 있습니다.<br class="hidden sm:block" />
+        곧 찾아뵙겠습니다.
+      </p>
+      <div class="flex items-center justify-center gap-1.5 mt-5" aria-hidden="true">
+        <span class="typing-dot w-1.5 h-1.5 rounded-full bg-vlue-500"></span>
+        <span class="typing-dot w-1.5 h-1.5 rounded-full bg-vlue-500"></span>
+        <span class="typing-dot w-1.5 h-1.5 rounded-full bg-vlue-500"></span>
+      </div>
+    </div>
+
+    <!-- 이메일 구독 -->
+    <div class="w-full max-w-md fade-up fade-up-d3">
+      <form id="subscribe-form" class="relative" novalidate>
+        <label for="email" class="sr-only">이메일 주소</label>
+        <div class="flex flex-col sm:flex-row gap-2.5 p-1.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-md">
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autocomplete="email"
+            placeholder="이메일을 입력하고 소식을 받아보세요"
+            class="subscribe-input flex-1 min-w-0 px-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-vlue-500/50"
+          />
+          <button
+            type="submit"
+            class="subscribe-btn px-6 py-3.5 rounded-xl text-sm font-bold text-white whitespace-nowrap shrink-0"
+          >
+            알림 받기
+          </button>
+        </div>
+        <p id="form-hint" class="mt-3 text-center text-xs text-slate-500">
+          출시 소식과 업데이트를 가장 먼저 전해드립니다.
+        </p>
+        <p id="form-error" class="mt-2 text-center text-xs text-red-400 hidden" role="alert"></p>
+      </form>
+
+      <div id="success-toast" class="hidden mt-4 p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-center toast-in" role="status">
+        <p class="text-sm font-semibold text-emerald-300">구독 신청이 완료되었습니다.</p>
+        <p class="text-xs text-emerald-400/80 mt-1">출시되면 가장 먼저 알려드리겠습니다.</p>
+      </div>
+    </div>
+
+    <!-- 하단 -->
+    <footer class="mt-16 text-center fade-up fade-up-d4">
+      <p class="text-xs text-slate-600 tracking-wide">&copy; <span id="year"></span> VLUE. All rights reserved.</p>
+    </footer>
+  </main>
+
+  <script>
+    // 파티클 생성
+    (function initParticles() {
+      const container = document.getElementById('particles');
+      if (!container) return;
+      for (let i = 0; i < 24; i++) {
+        const p = document.createElement('span');
+        p.className = 'particle';
+        p.style.left = Math.random() * 100 + '%';
+        p.style.bottom = '-' + Math.random() * 10 + '%';
+        p.style.animationDuration = 8 + Math.random() * 14 + 's';
+        p.style.animationDelay = Math.random() * 10 + 's';
+        p.style.width = p.style.height = (1 + Math.random() * 2) + 'px';
+        container.appendChild(p);
+      }
+    })();
+
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // 이메일 구독 (클라이언트 검증 + 로컬 저장)
+    const form = document.getElementById('subscribe-form');
+    const emailInput = document.getElementById('email');
+    const errorEl = document.getElementById('form-error');
+    const hintEl = document.getElementById('form-hint');
+    const toastEl = document.getElementById('success-toast');
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      errorEl.classList.add('hidden');
+      const email = emailInput.value.trim();
+
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errorEl.textContent = '올바른 이메일 주소를 입력해 주세요.';
+        errorEl.classList.remove('hidden');
+        emailInput.focus();
+        return;
+      }
+
+      try {
+        const list = JSON.parse(localStorage.getItem('vlue-coming-soon-subscribers') || '[]');
+        if (!list.includes(email)) list.push(email);
+        localStorage.setItem('vlue-coming-soon-subscribers', JSON.stringify(list));
+      } catch (_) { /* ignore */ }
+
+      form.classList.add('hidden');
+      hintEl.classList.add('hidden');
+      toastEl.classList.remove('hidden');
+    });
+  </script>
+</body>
+</html>

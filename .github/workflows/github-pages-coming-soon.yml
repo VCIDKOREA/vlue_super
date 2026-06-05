@@ -1,0 +1,54 @@
+# www.vlue.kr Coming Soon 랜딩 — GitHub Pages 자동 배포
+# 저장소 Settings → Pages → Source: "GitHub Actions" 로 설정해야 합니다.
+
+name: Deploy Coming Soon (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/public/coming-soon.html"
+      - "web/public/favicon.svg"
+      - "github-pages/**"
+      - ".github/workflows/github-pages-coming-soon.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages-coming-soon
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare static site
+        run: |
+          mkdir -p _site
+          cp web/public/coming-soon.html _site/index.html
+          cp web/public/favicon.svg _site/favicon.svg
+          echo "www.vlue.kr" > _site/CNAME
+          touch _site/.nojekyll
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
