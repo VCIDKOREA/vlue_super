@@ -10,6 +10,9 @@ Firebase 서비스 계정 키.txt
 외부서비스연동API정보!!!!!!!!.txt
 커서 api키.txt
 재목없음.txt
+중소기업현황 계정.txt
+*계정.txt
+*서비스 계정*
 *API정보*.txt
 *api키*.txt
 *api 키*.txt
@@ -23,6 +26,7 @@ Firebase 서비스 계정 키.txt
 **/.env
 .env.local
 **/.env.local
+web/.env.local
 .env.*.local
 .env.production
 **/.env.production

@@ -1,8 +1,15 @@
-import.meta.env = {"BASE_URL": "/", "DEV": true, "MODE": "development", "PROD": false, "SSR": false, "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtb3VrbWxmZmlpam93dXRsbmdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0MzA0MTQsImV4cCI6MjA5MjAwNjQxNH0.fZ8PJqpDT2T1iy_kjOeolVPcO7n7t02vIG9-hycjt5g", "VITE_SUPABASE_URL": "https://tmoukmlffiijowutlngp.supabase.co"};import { createClient } from "/node_modules/.vite/deps/@supabase_supabase-js.js?v=4b28e2bb";
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const isConfigured = supabaseUrl && supabaseUrl.startsWith("http");
-export const supabase = isConfigured ? createClient(supabaseUrl, supabaseAnonKey) : createClient("https://placeholder.supabase.co", "placeholder-key");
-export const isSupabaseAvailable = isConfigured;
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInN1cGFiYXNlLnRzIl0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IGNyZWF0ZUNsaWVudCwgU3VwYWJhc2VDbGllbnQgfSBmcm9tICdAc3VwYWJhc2Uvc3VwYWJhc2UtanMnO1xuXG5jb25zdCBzdXBhYmFzZVVybCA9IGltcG9ydC5tZXRhLmVudi5WSVRFX1NVUEFCQVNFX1VSTCBhcyBzdHJpbmc7XG5jb25zdCBzdXBhYmFzZUFub25LZXkgPSBpbXBvcnQubWV0YS5lbnYuVklURV9TVVBBQkFTRV9BTk9OX0tFWSBhcyBzdHJpbmc7XG5cbmNvbnN0IGlzQ29uZmlndXJlZCA9IHN1cGFiYXNlVXJsICYmIHN1cGFiYXNlVXJsLnN0YXJ0c1dpdGgoJ2h0dHAnKTtcblxuZXhwb3J0IGNvbnN0IHN1cGFiYXNlOiBTdXBhYmFzZUNsaWVudCA9IGlzQ29uZmlndXJlZFxuICA/IGNyZWF0ZUNsaWVudChzdXBhYmFzZVVybCwgc3VwYWJhc2VBbm9uS2V5KVxuICA6IGNyZWF0ZUNsaWVudCgnaHR0cHM6Ly9wbGFjZWhvbGRlci5zdXBhYmFzZS5jbycsICdwbGFjZWhvbGRlci1rZXknKTtcblxuZXhwb3J0IGNvbnN0IGlzU3VwYWJhc2VBdmFpbGFibGUgPSBpc0NvbmZpZ3VyZWQ7XG4iXSwibWFwcGluZ3MiOiJBQUFBLFNBQVMsb0JBQW9DO0FBRTdDLE1BQU0sY0FBYyxZQUFZLElBQUk7QUFDcEMsTUFBTSxrQkFBa0IsWUFBWSxJQUFJO0FBRXhDLE1BQU0sZUFBZSxlQUFlLFlBQVksV0FBVyxNQUFNO0FBRTFELGFBQU0sV0FBMkIsZUFDcEMsYUFBYSxhQUFhLGVBQWUsSUFDekMsYUFBYSxtQ0FBbUMsaUJBQWlCO0FBRTlELGFBQU0sc0JBQXNCOyIsIm5hbWVzIjpbXX0=
+const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").trim();
+const supabaseAnonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
+
+export const isSupabaseAvailable =
+  supabaseUrl.startsWith("http") && supabaseAnonKey.length > 0;
+
+const PLACEHOLDER_URL = "https://placeholder.supabase.co";
+const PLACEHOLDER_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1zWPJY7od_xYHGBiCo0n4E4Tcf574apZ3mE7_Q";
+
+export const supabase: SupabaseClient = isSupabaseAvailable
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : createClient(PLACEHOLDER_URL, PLACEHOLDER_ANON_KEY);
