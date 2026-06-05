@@ -357,6 +357,29 @@
   font-size: 0.9375rem !important;
 }
 
+/* 상단 크롬 — 네비·알림바 톤 통일 (라이트 블루) */
+[data-vlue-site="marketing"] .mkt-site-header {
+  border-bottom-color: #dbeafe !important;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 80%), 0 4px 14px rgb(37 99 235 / 5%);
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar--top {
+  background: linear-gradient(90deg, #f8fafc 0%, #eff6ff 48%, #f8fafc 100%);
+  border-bottom: 1px solid #dbeafe;
+  color: #334155;
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar--bottom {
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+[data-vlue-site="marketing"] .mkt-download-bar-message {
+  color: #475569 !important;
+  font-weight: 600 !important;
+}
+
 [data-vlue-site="marketing"] .mkt-download-bar {
   font-size: 0.8125rem;
 }
@@ -385,36 +408,43 @@
 }
 
 [data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--primary {
-  background: var(--color-primary-500, #3b82f6);
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   color: #fff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+  border: 1px solid #3b82f6;
+  box-shadow: 0 2px 8px rgb(37 99 235 / 22%);
 }
 
 [data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--primary:hover {
-  background: var(--color-primary-400, #60a5fa);
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  box-shadow: 0 4px 12px rgb(37 99 235 / 28%);
 }
 
 [data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--ghost {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: #fff;
+  color: #1d4ed8;
+  border: 1.5px solid #93c5fd;
 }
 
 [data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--ghost:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: #eff6ff;
+  border-color: #60a5fa;
 }
 
 [data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--light {
-  background: #fff;
-  color: #0f172a;
+  background: transparent;
+  color: #475569;
+  border: 1.5px solid #cbd5e1;
 }
 
 [data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--light:hover {
-  background: #eff6ff;
+  background: #fff;
+  color: #1d4ed8;
+  border-color: #93c5fd;
 }
 
-[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--light .mkt-download-btn-icon {
-  color: #0f172a;
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--light .mkt-download-btn-icon,
+[data-vlue-site="marketing"] .mkt-download-bar .mkt-download-btn--ghost .mkt-download-btn-icon {
+  color: inherit;
 }
 
 /* 히어로 — 데스크톱 균형 스케일 */
@@ -450,8 +480,27 @@
   }
 
   [data-vlue-site="marketing"] .hero-title-accent {
-    color: #1d4ed8 !important;
     font-weight: 800 !important;
+  }
+
+  [data-vlue-site="marketing"] .hero-search-panel {
+    max-width: var(--mkt-hero-search);
+    padding: 0.875rem 1rem;
+    border-radius: 1.625rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-search-panel-head {
+    font-size: 0.6875rem;
+    margin-bottom: 0.625rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-stats--cards {
+    max-width: min(44rem, 92vw);
+    gap: 1rem;
+  }
+
+  [data-vlue-site="marketing"] .hero-stat-card {
+    padding: 1rem 0.75rem;
   }
 
   [data-vlue-site="marketing"] .hero-desc {

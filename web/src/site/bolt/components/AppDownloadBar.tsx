@@ -31,8 +31,8 @@ export default function AppDownloadBar({ onNavigate, currentView, variant = 'top
     <div
       className={
         isTop
-          ? 'mkt-download-bar mkt-download-bar-shell bg-gradient-to-r from-slate-900 via-primary-900 to-slate-900 text-white border-b border-white/10'
-          : 'mkt-download-bar bg-slate-900 text-white border-t border-white/10'
+          ? 'mkt-download-bar mkt-download-bar-shell mkt-download-bar--top'
+          : 'mkt-download-bar mkt-download-bar--bottom'
       }
       role="region"
       aria-label="VLUE 앱 및 PC 프로그램 설치"
@@ -41,7 +41,7 @@ export default function AppDownloadBar({ onNavigate, currentView, variant = 'top
       <div className="mkt-download-bar-wrap max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
         <div className="mkt-download-bar-inner">
           <p
-            className={`mkt-download-bar-message text-white/95 text-center sm:text-left transition-opacity duration-200 ${
+            className={`mkt-download-bar-message text-center sm:text-left transition-opacity duration-200 ${
               visible ? 'opacity-100' : 'opacity-0'
             }`}
           >

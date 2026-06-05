@@ -46,7 +46,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
+    <header className="mkt-site-header fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-blue-100/80 shadow-sm">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
         <div className="flex items-center mkt-nav-shell">
           <button
