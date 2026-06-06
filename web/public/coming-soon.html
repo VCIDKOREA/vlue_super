@@ -357,7 +357,14 @@
 
     <!-- 이메일 구독 -->
     <div class="w-full max-w-md fade-up fade-up-d3">
-      <form id="subscribe-form" class="relative" novalidate>
+      <form
+        id="subscribe-form"
+        class="relative"
+        action="https://formspree.io/f/xpqewkwk"
+        method="POST"
+        novalidate
+      >
+        <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true" />
         <label for="email" class="sr-only">이메일 주소</label>
         <div class="flex flex-col sm:flex-row gap-2.5 p-1.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-md">
           <input
@@ -444,8 +451,10 @@
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({
             email,
+            _replyto: email,
             _subject: 'VLUE Coming Soon — 새 구독 신청',
             message: '구독 이메일: ' + email,
+            source: 'vlue-coming-soon',
           }),
         });
         if (!res.ok) throw new Error('submit failed');
