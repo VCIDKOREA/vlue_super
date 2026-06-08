@@ -54,7 +54,7 @@ function SocialPass() {
  * - 간편 로그인은 팝업으로만 제공 (이미 가입한 사용자용)
  * - 아이디·비밀번호 저장 체크 후 로그인 시 다음 접속에서 둘 다 불러옴
  */
-function LoginScreen({ onLogin, onSignup, onSocialLogin }) {
+function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt }) {
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [rememberLogin, setRememberLogin] = useState(false);
@@ -128,7 +128,21 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin }) {
   return (
     <div className="flex min-h-[100dvh] w-full flex-col bg-[#fafbfc] antialiased">
       <div className="relative mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        {onDismiss ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-bold text-slate-600 shadow-sm active:scale-95"
+          >
+            둘러보기 계속
+          </button>
+        ) : null}
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto overscroll-y-contain py-8 sm:py-10">
+          {browsePrompt ? (
+            <div className="mb-5 w-full max-w-[300px] rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-center text-[12px] font-semibold leading-relaxed text-blue-800 [word-break:keep-all]">
+              {browsePrompt}
+            </div>
+          ) : null}
           <div className="flex w-full flex-col items-center px-1">
             <img src={VLUE_BRAND_LOGO} alt="" width={56} height={56} className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-sm ring-1 ring-blue-900/10" draggable={false} />
             <h1 className="mt-4 text-[24px] font-bold tracking-tight text-slate-900">VLUE</h1>

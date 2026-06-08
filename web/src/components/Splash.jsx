@@ -316,11 +316,6 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
               />
             </div>
           </div>
-          {typeof window !== "undefined" && !splashSoundOn && !revealing && !videoBroken ? (
-            <p className="vlue-splash-sound-hint" role="note">
-              효과음을 들으려면 화면을 한 번 클릭(또는 탭)해 주세요.
-            </p>
-          ) : null}
           <p className={`vlue-splash-tagline${lettersIn ? " vlue-splash-tagline--in" : ""}`}>VLUE로 눈을 뜨다.</p>
         </div>
       </div>

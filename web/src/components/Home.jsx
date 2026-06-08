@@ -400,7 +400,8 @@ function Home({
   onOpenFamilyProtection,
   onOpenMyPageFeed,
   membershipTier = "free",
-  isDarkMode = false
+  isDarkMode = false,
+  browseAsGuest = false
 }) {
   const membershipKind = normalizeMembershipKind(membershipTier);
   const isPaidUser = isPaidMembershipKind(membershipKind);
@@ -551,7 +552,7 @@ function Home({
   const categoryScrollRef = useRef(null);
   const updateStorySectionRef = useRef(null);
   const [favoriteTick, setFavoriteTick] = useState(0);
-  const [updateTab, setUpdateTab] = useState("subscribe");
+  const [updateTab, setUpdateTab] = useState(browseAsGuest ? "recommend" : "subscribe");
   const [selectedStoryId, setSelectedStoryId] = useState(() => UPDATE_SHOPS_BY_TAB.subscribe?.[0]?.id || "");
   /** 스토리 행에서 한 번 탭해 연 스토어 id — 인스타처럼 본 뒤 링은 연블루(그라데이션 해제). 선택만으로는 그라데이션 유지하지 않음 */
   const [openedUpdateStoryIds, setOpenedUpdateStoryIds] = useState(() => new Set());
@@ -620,14 +621,41 @@ function Home({
     return false;
   }, []);
 
-  const currentUpdatePosts = useMemo(
-    () => (UPDATE_POSTS_BY_TAB[updateTab] || []).filter((p) => within24Hours(p.time)),
-    [updateTab, within24Hours]
-  );
+  const guestMergedUpdatePosts = useMemo(() => {
+    if (!browseAsGuest) return [];
+    const seen = new Set();
+    const merged = [];
+    for (const tab of ["recommend", "subscribe", "friends"]) {
+      for (const post of UPDATE_POSTS_BY_TAB[tab] || []) {
+        if (seen.has(post.id) || !within24Hours(post.time)) continue;
+        seen.add(post.id);
+        merged.push(post);
+      }
+    }
+    return merged;
+  }, [browseAsGuest, within24Hours]);
+
+  const currentUpdatePosts = useMemo(() => {
+    if (browseAsGuest) return guestMergedUpdatePosts;
+    return (UPDATE_POSTS_BY_TAB[updateTab] || []).filter((p) => within24Hours(p.time));
+  }, [browseAsGuest, guestMergedUpdatePosts, updateTab, within24Hours]);
+
   const subscribedShopIds = useMemo(() => readSubscribedShopIds(), [favoriteTick]);
 
   const currentUpdateShops = useMemo(() => {
     const shopSet = new Set(currentUpdatePosts.map((p) => p.shopId));
+    if (browseAsGuest) {
+      const seen = new Set();
+      const merged = [];
+      for (const tab of ["recommend", "subscribe", "friends"]) {
+        for (const shop of UPDATE_SHOPS_BY_TAB[tab] || []) {
+          if (seen.has(shop.id) || !shopSet.has(shop.id)) continue;
+          seen.add(shop.id);
+          merged.push(shop);
+        }
+      }
+      return merged;
+    }
     let shops = (UPDATE_SHOPS_BY_TAB[updateTab] || []).filter((s) => shopSet.has(s.id));
     if (updateTab === "subscribe" && subscribedShopIds.length > 0) {
       const subSet = new Set(subscribedShopIds);
@@ -635,7 +663,7 @@ function Home({
       if (picked.length > 0) shops = picked;
     }
     return shops;
-  }, [updateTab, currentUpdatePosts, subscribedShopIds]);
+  }, [browseAsGuest, updateTab, currentUpdatePosts, subscribedShopIds]);
 
   useEffect(() => {
     if (!currentUpdateShops.length) return;
@@ -1083,32 +1111,40 @@ function Home({
         <div className="home-update-story-panel rounded-[1.25rem] border border-sky-200/45 bg-gradient-to-br from-white via-sky-50/55 to-indigo-50/45 p-4 shadow-[0_16px_44px_-18px_rgba(30,58,138,0.22)] ring-1 ring-white/90">
           <SectionHeader
             title="업데이트 스토리"
-            subtitle={`활동 표시명: ${feedDisplayLabel}`}
+            subtitle={
+              browseAsGuest ? "동네 · 전국 · AI 추천 큐레이션" : `활동 표시명: ${feedDisplayLabel}`
+            }
             subtitleClassName="home-update-story-subtitle text-[12px] normal-case tracking-tight text-sky-950/90"
             right={
-              <div className="home-update-story-tabs vlue-fluid-chip-row rounded-full bg-slate-200/55 p-0.5 font-black ring-1 ring-sky-300/30">
-                <button
-                  type="button"
-                  onClick={() => setUpdateTab("subscribe")}
-                  className={`rounded-full transition ${updateTab === "subscribe" ? "bg-white text-blue-600 shadow-md shadow-blue-900/10" : "text-slate-600"}`}
-                >
-                  구독
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUpdateTab("friends")}
-                  className={`rounded-full transition ${updateTab === "friends" ? "bg-white text-blue-600 shadow-md shadow-blue-900/10" : "text-slate-600"}`}
-                >
-                  친구
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUpdateTab("recommend")}
-                  className={`rounded-full transition ${updateTab === "recommend" ? "bg-white text-blue-600 shadow-md shadow-blue-900/10" : "text-slate-600"}`}
-                >
+              browseAsGuest ? (
+                <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-black text-white shadow-sm">
                   추천
-                </button>
-              </div>
+                </span>
+              ) : (
+                <div className="home-update-story-tabs vlue-fluid-chip-row rounded-full bg-slate-200/55 p-0.5 font-black ring-1 ring-sky-300/30">
+                  <button
+                    type="button"
+                    onClick={() => setUpdateTab("subscribe")}
+                    className={`rounded-full transition ${updateTab === "subscribe" ? "bg-white text-blue-600 shadow-md shadow-blue-900/10" : "text-slate-600"}`}
+                  >
+                    구독
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUpdateTab("friends")}
+                    className={`rounded-full transition ${updateTab === "friends" ? "bg-white text-blue-600 shadow-md shadow-blue-900/10" : "text-slate-600"}`}
+                  >
+                    친구
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUpdateTab("recommend")}
+                    className={`rounded-full transition ${updateTab === "recommend" ? "bg-white text-blue-600 shadow-md shadow-blue-900/10" : "text-slate-600"}`}
+                  >
+                    추천
+                  </button>
+                </div>
+              )
             }
           />
           {currentUpdateShops.length ? (

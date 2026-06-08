@@ -13,7 +13,9 @@ export default function MediaCommerceShortsPlayer({
   onBack,
   onToast,
   onOpenStore,
-  isDarkMode = false
+  isDarkMode = false,
+  isGuestMode = false,
+  onRequireAuth
 }) {
   const [items, setItems] = useState(() => itemsProp || []);
   const [index, setIndex] = useState(initialIndex);
@@ -113,7 +115,14 @@ export default function MediaCommerceShortsPlayer({
             </div>
             {i === index ? (
               <div className="pointer-events-auto absolute right-2 top-1/2 z-20 -translate-y-1/2">
-                <CommerceSideRail item={row} onToast={onToast} onOpenStore={onOpenStore} compact />
+                <CommerceSideRail
+                  item={row}
+                  onToast={onToast}
+                  onOpenStore={onOpenStore}
+                  compact
+                  isGuestMode={isGuestMode}
+                  onRequireAuth={onRequireAuth}
+                />
               </div>
             ) : null}
           </section>

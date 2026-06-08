@@ -144,7 +144,7 @@ export default function SearchPage({ initialQuery, onBack }: SearchPageProps) {
 
   return (
     <main className="min-h-screen bg-blue-tint pt-16">
-      <div className="bg-white border-b border-gray-100 sticky top-16 z-40 shadow-sm">
+      <div className="bg-white border-b border-gray-100 sticky z-40 shadow-sm" style={{ top: 'var(--mkt-chrome-total)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center gap-3">
             <button onClick={onBack} className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded-xl transition-all flex-shrink-0">

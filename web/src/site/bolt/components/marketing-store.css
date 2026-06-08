@@ -1,44 +1,306 @@
-/* VLUE 스토어 — www 웹 레이아웃 (앱 피드 동기화) */
+/* VLUE 스토어 — www (YouTube형 정렬·선명 타이포) */
 
 .mkt-store {
   --mkt-primary: #2563eb;
   --mkt-border: #e2e8f0;
+  --mkt-store-text: #0f172a;
+  --mkt-store-muted: #475569;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* 상단 고정바 — 블러 제거(글씨 깨짐 방지), 본문과 동일 max-w-7xl */
+[data-vlue-site="marketing"] .mkt-store__subnav-shell {
+  position: sticky;
+  top: var(--mkt-chrome-total);
+  z-index: 38;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgb(15 23 42 / 4%);
+}
+
+[data-vlue-site="marketing"] .mkt-store__subnav-track {
+  --mkt-store-gutter: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding-top: 0.875rem;
+  padding-bottom: 0.875rem;
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  [data-vlue-site="marketing"] .mkt-store__subnav-track {
+    --mkt-store-gutter: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-vlue-site="marketing"] .mkt-store__subnav-track {
+    --mkt-store-gutter: 2rem;
+  }
+}
+
+[data-vlue-site="marketing"] .mkt-store__feed {
+  padding-top: 1.25rem;
+  min-width: 0;
+}
+
+[data-vlue-site="marketing"] .mkt-ai-carousel {
+  min-width: 0;
+  max-width: 100%;
+}
+
+[data-vlue-site="marketing"] .mkt-store__subnav-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+[data-vlue-site="marketing"] .mkt-store__subnav-row--tabs {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+[data-vlue-site="marketing"] .mkt-store__search {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 2.75rem;
+  border-radius: 2.5rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgb(15 23 42 / 4%);
+}
+
+[data-vlue-site="marketing"] .mkt-store__search:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 15%);
+}
+
+[data-vlue-site="marketing"] .mkt-store__search-field {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+[data-vlue-site="marketing"] .mkt-store__search-icon {
+  position: absolute;
+  left: 1rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: #64748b;
+  pointer-events: none;
+}
+
+[data-vlue-site="marketing"] .mkt-store__search-input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 2.5rem 0 2.75rem;
+  border: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--mkt-store-text);
+  background: transparent;
+  outline: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-vlue-site="marketing"] .mkt-store__search-input::placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+[data-vlue-site="marketing"] .mkt-store__search-clear {
+  position: absolute;
+  right: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  color: #64748b;
+}
+
+[data-vlue-site="marketing"] .mkt-store__search-clear:hover {
+  color: #334155;
+  background: #f1f5f9;
+}
+
+[data-vlue-site="marketing"] .mkt-store__search-btn {
+  flex: 0 0 auto;
+  height: 100%;
+  padding: 0 1.25rem;
+  border: 0;
+  border-left: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: var(--mkt-store-text);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  white-space: nowrap;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-vlue-site="marketing"] .mkt-store__search-btn:hover {
+  background: #f1f5f9;
+}
+
+/* 카테고리 — 가로 스크롤 (clip 제거 → 마우스·Tab 접근 가능) */
+[data-vlue-site="marketing"] .mkt-store__chip-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.35rem;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  scroll-behavior: smooth;
+  scroll-padding-inline: 0.5rem;
+}
+
+[data-vlue-site="marketing"] .mkt-store__chip-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+[data-vlue-site="marketing"] .mkt-store__chip-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+[data-vlue-site="marketing"] .mkt-store__chip-scroll:focus-within {
+  outline: 2px solid rgb(59 130 246 / 35%);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+[data-vlue-site="marketing"] .mkt-store__chip-rail {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.625rem;
+  width: max-content;
+  min-width: min(100%, max-content);
+  box-sizing: border-box;
+  padding: 0.125rem 0.25rem;
+}
+
+[data-vlue-site="marketing"] .mkt-store__chip-rail-end {
+  flex: 0 0 1.5rem;
+  width: 1.5rem;
+  height: 1px;
+}
+
+[data-vlue-site="marketing"] .mkt-store__chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: var(--mkt-store-muted);
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+[data-vlue-site="marketing"] .mkt-store__chip.is-active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+
+[data-vlue-site="marketing"] .mkt-store__video-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 1.25rem 1rem;
+}
+
+@media (min-width: 640px) {
+  [data-vlue-site="marketing"] .mkt-store__video-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-vlue-site="marketing"] .mkt-store__video-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  [data-vlue-site="marketing"] .mkt-store__video-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .mkt-store__tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 0.125rem;
+  scrollbar-width: none;
+}
+
+.mkt-store__tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .mkt-store__tab {
-  padding: 0.45rem 0.9rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 800;
-  border: 1px solid var(--mkt-border);
-  background: #fff;
-  color: #64748b;
+  flex: 0 0 auto;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.2;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: var(--mkt-store-muted);
+  -webkit-font-smoothing: antialiased;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 
 .mkt-store__tab.is-active {
   background: var(--mkt-primary);
   border-color: var(--mkt-primary);
-  color: #fff;
+  color: #ffffff;
 }
 
 .mkt-store__sync {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.68rem;
-  font-weight: 800;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
+  gap: 0.375rem;
+  flex: 0 0 auto;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.5rem;
   background: #ecfdf5;
   color: #047857;
   border: 1px solid #a7f3d0;
+  white-space: nowrap;
+  -webkit-font-smoothing: antialiased;
 }
 
 .mkt-store__hero {
@@ -54,7 +316,7 @@
 
 .mkt-store__featured {
   position: relative;
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   overflow: hidden;
   border: 1px solid var(--mkt-border);
   background: #0f172a;
@@ -90,7 +352,7 @@
 }
 
 .mkt-store__card {
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   border: 1px solid var(--mkt-border);
   background: #fff;
   overflow: hidden;
@@ -151,15 +413,15 @@
   font-weight: 700;
 }
 
-.mkt-store__body {
+.mkt-store__card .mkt-store__body {
   padding: 0.75rem 0.85rem 0.9rem;
 }
 
 .mkt-store__title {
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
   font-weight: 800;
   color: #0f172a;
-  line-height: 1.35;
+  line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -168,7 +430,7 @@
 
 .mkt-store__meta {
   margin-top: 0.35rem;
-  font-size: 0.72rem;
+  font-size: 0.8125rem;
   color: #64748b;
 }
 

@@ -29,6 +29,7 @@
     "db:generate": "npm run generate -w @vlue/db",
     "db:generate:safe": "node scripts/prisma-generate-safe.mjs",
     "seed:test-accounts": "node scripts/seed-test-accounts.mjs",
+    "seed:admin-account": "node scripts/seed-admin-account.mjs",
     "openbanking:webhook-mock": "node scripts/openbanking-webhook-mock.mjs",
     "android:sync": "node scripts/sync-android-lettering.mjs",
     "android:setup": "node scripts/sync-android-lettering.mjs && node scripts/setup-android-local.mjs && node scripts/install-gradle-wrapper.mjs",
@@ -41,7 +42,8 @@
     "office:ppt-sim": "node scripts/simulate-office-ppt-progress.mjs",
     "production:ready": "node scripts/production-ready.mjs",
     "deploy:lock": "node scripts/production-ready.mjs --lock",
-    "pages:sync": "node scripts/sync-coming-soon-docs.mjs"
+    "pages:sync": "node scripts/sync-coming-soon-docs.mjs",
+    "pages:dev": "npx serve . -l 4173"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

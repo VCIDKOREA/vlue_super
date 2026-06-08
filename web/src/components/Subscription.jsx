@@ -26,7 +26,9 @@ function Subscription({
   chatRooms = [],
   chatUnreadTotal = 0,
   onOpenChat,
-  onFamilyAlertToast
+  onFamilyAlertToast,
+  isGuestMode = false,
+  onRequireAuth
 }) {
   const [giftToast, setGiftToast] = useState("");
   const [giftAvailableCount, setGiftAvailableCount] = useState(() => countAvailableGifts(readGiftBox()));
@@ -91,7 +93,13 @@ function Subscription({
           <button
             key={tab.id}
             type="button"
-            onClick={() => onChangeSubTab?.(tab.id)}
+            onClick={() => {
+              if (isGuestMode) {
+                onRequireAuth?.(() => onChangeSubTab?.(tab.id));
+                return;
+              }
+              onChangeSubTab?.(tab.id);
+            }}
             className={`relative shrink-0 rounded-full font-black transition ${
               active ? "bg-blue-600 text-white shadow-sm" : isDarkMode ? "bg-white/10 text-gray-300" : "bg-slate-100 text-slate-600"
             }`}
@@ -125,6 +133,8 @@ function Subscription({
           onToast={showGiftToast}
           onShortsFullscreenChange={setShortsFullscreen}
           isDarkMode={isDarkMode}
+          isGuestMode={isGuestMode}
+          onRequireAuth={onRequireAuth}
         />
       ) : null}
 

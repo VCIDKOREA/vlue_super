@@ -4,7 +4,6 @@ import {
   X,
   Loader,
   RefreshCw,
-  Smartphone,
   Play,
   Radio,
   LayoutGrid,
@@ -31,6 +30,13 @@ import {
 import { feedTheme } from '../../../lib/mediaCommerceTheme.js';
 import { SHOPPING_CATEGORIES, inferShoppingCategory, normalizeShoppingCategory } from '../../../lib/shoppingCategories.js';
 import { VAULT_CHANGED } from '../../../lib/shoppingCoreStorage.js';
+import {
+  readStoreFeedTab,
+  writeStoreFeedTab,
+  readStoreFeedCategory,
+  writeStoreFeedCategory,
+  STORE_FEED_PREFS_CHANGED,
+} from '../../../lib/storeFeedPrefs.js';
 import './marketing-store.css';
 
 const STORE_TABS = MEDIA_FEED_TABS.filter((t) =>
@@ -168,7 +174,7 @@ interface Props {
 
 export default function MarketingMediaCommerceStore({ user, onLoginClick }: Props) {
   const theme = feedTheme(false);
-  const [mediaTab, setMediaTab] = useState('all');
+  const [mediaTab, setMediaTab] = useState(() => readStoreFeedTab('all'));
   const [items, setItems] = useState<FeedItem[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -177,10 +183,15 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
   const [storeProfileId, setStoreProfileId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [category, setCategory] = useState('전체');
+  const [category, setCategory] = useState(() => readStoreFeedCategory('전체'));
   const [toast, setToast] = useState('');
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const chipScrollRef = useRef<HTMLDivElement>(null);
   const loadingMoreRef = useRef(false);
+
+  const scrollChipIntoView = useCallback((e: React.FocusEvent<HTMLButtonElement>) => {
+    e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  }, []);
 
   const isPageMode = mediaTab === 'page';
 
@@ -213,6 +224,27 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
     },
     [mediaTab, isPageMode, onToast]
   );
+
+  useEffect(() => {
+    const onPrefs = (e: Event) => {
+      const detail = (e as CustomEvent<{ tab?: string; category?: string }>).detail || {};
+      if (detail.tab) setMediaTab(detail.tab);
+      if (detail.category) setCategory(detail.category);
+    };
+    window.addEventListener(STORE_FEED_PREFS_CHANGED, onPrefs);
+    return () => window.removeEventListener(STORE_FEED_PREFS_CHANGED, onPrefs);
+  }, []);
+
+  const changeMediaTab = useCallback((tabId: string) => {
+    setMediaTab(tabId);
+    writeStoreFeedTab(tabId);
+  }, []);
+
+  const changeCategory = useCallback((cat: string) => {
+    const next = normalizeShoppingCategory(cat);
+    setCategory(next);
+    writeStoreFeedCategory(next);
+  }, []);
 
   useEffect(() => {
     setItems([]);
@@ -282,79 +314,105 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
     return LayoutGrid;
   };
 
+  const storeContainer = 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8';
+
   return (
     <div className="mkt-store">
+      <div className="mkt-store__subnav-shell" role="region" aria-label="VLUE 스토어 필터">
+        <div className={`mkt-store__subnav-track ${storeContainer}`}>
+          <div className="mkt-store__subnav-row mkt-store__subnav-row--tabs">
+            <div className="mkt-store__tabs" role="tablist" aria-label="스토어 탭">
+              {STORE_TABS.map((tab) => {
+                const Icon = tabIcon(tab.id);
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={mediaTab === tab.id}
+                    onClick={() => changeMediaTab(tab.id)}
+                    className={`mkt-store__tab inline-flex items-center gap-1.5 ${mediaTab === tab.id ? 'is-active' : ''}`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="mkt-store__sync">
+              <RefreshCw className="w-3 h-3 shrink-0" />
+              앱·웹 동일 피드
+            </span>
+          </div>
+
+          <form onSubmit={handleSearch} className="mkt-store__search">
+            <div className="mkt-store__search-field">
+              <Search className="mkt-store__search-icon" aria-hidden />
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="찾고 싶은 상품·채널을 검색해보세요"
+                className="mkt-store__search-input"
+              />
+              {searchInput ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput('');
+                    setQuery('');
+                  }}
+                  className="mkt-store__search-clear"
+                  aria-label="검색어 지우기"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              ) : null}
+            </div>
+            <button type="submit" className="mkt-store__search-btn">
+              검색
+            </button>
+          </form>
+
+          <div
+            ref={chipScrollRef}
+            className="mkt-store__chip-scroll"
+            aria-label="카테고리 스크롤"
+            tabIndex={0}
+            onWheel={(e) => {
+              const el = chipScrollRef.current;
+              if (!el || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+              if (el.scrollWidth <= el.clientWidth) return;
+              el.scrollLeft += e.deltaY;
+              e.preventDefault();
+            }}
+          >
+            <div className="mkt-store__chip-rail" role="tablist" aria-label="카테고리">
+              {SHOPPING_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  role="tab"
+                  aria-selected={category === cat}
+                  onClick={() => changeCategory(cat)}
+                  onFocus={scrollChipIntoView}
+                  className={`mkt-store__chip ${category === cat ? 'is-active' : ''}`}
+                >
+                  {cat}
+                </button>
+              ))}
+              <span className="mkt-store__chip-rail-end" aria-hidden />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={`mkt-store__feed ${storeContainer} pb-16`}>
       {toast ? (
-        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-lg">
+        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
           {toast}
         </div>
       ) : null}
-
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="mkt-store__tabs">
-          {STORE_TABS.map((tab) => {
-            const Icon = tabIcon(tab.id);
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setMediaTab(tab.id)}
-                className={`mkt-store__tab inline-flex items-center gap-1.5 ${mediaTab === tab.id ? 'is-active' : ''}`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-        <span className="mkt-store__sync">
-          <RefreshCw className="w-3 h-3" />
-          앱 VLUE 스토어와 동일 피드
-        </span>
-      </div>
-
-      <form onSubmit={handleSearch} className="mb-4 flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="찾고 싶은 상품·채널을 검색해보세요"
-            className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-          />
-          {searchInput ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchInput('');
-                setQuery('');
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          ) : null}
-        </div>
-        <button type="submit" className="px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-bold hover:bg-primary-700">
-          검색
-        </button>
-      </form>
-
-      <div className="mb-4 flex items-center gap-1 overflow-x-auto hide-scrollbar pb-1">
-        {SHOPPING_CATEGORIES.slice(0, 10).map((cat) => (
-          <button
-            key={cat}
-            type="button"
-            onClick={() => setCategory(normalizeShoppingCategory(cat))}
-            className={`px-3 py-1.5 text-xs font-bold rounded-full whitespace-nowrap transition-colors ${
-              category === cat ? 'bg-primary-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-200'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
 
       {!isPageMode ? (
         <AiRecommendCarousel
@@ -365,20 +423,6 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
           isDarkMode={false}
         />
       ) : null}
-
-      {!user && (
-        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <Smartphone className="w-5 h-5 text-amber-600 shrink-0" />
-          <p className="text-xs text-amber-900 flex-1" style={{ wordBreak: 'keep-all' }}>
-            결제·블루페이·주문 알림은 <strong>모바일 앱</strong>과 동일합니다. 웹에서는 피드 열람·상세 확인, 앱에서 구매를 이어갑니다.
-          </p>
-          {onLoginClick ? (
-            <button type="button" onClick={onLoginClick} className="shrink-0 text-xs font-bold text-amber-800 underline">
-              로그인
-            </button>
-          ) : null}
-        </div>
-      )}
 
       {loading && items.length === 0 ? (
         <div className="flex justify-center py-20">
@@ -438,7 +482,7 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
               </div>
             </div>
           ) : null}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="mkt-store__video-grid">
             {gridItems.map((item) => (
               <WebVideoCard key={item.id} item={item} onOpen={setSelected} onOpenStore={openStore} />
             ))}
@@ -450,6 +494,7 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
       {loading && items.length > 0 ? (
         <p className="text-center text-xs text-slate-400 py-4">더 불러오는 중…</p>
       ) : null}
+      </div>
 
       <MediaCommercePlayerSheet
         item={selected}

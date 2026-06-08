@@ -1,0 +1,251 @@
+import { prisma } from "../../db/client.js";
+import { sseConnectionStats, ssePublishAllConnected } from "../../realtime/sseHub.js";
+import {
+  createMarketingPopup,
+  deleteMarketingPopup,
+  listMarketingPopups,
+  updateMarketingPopup
+} from "../office/marketingPopupService.js";
+import {
+  deleteNotice,
+  listNotices,
+  releaseNotice,
+  updateNotice
+} from "../office/noticeService.js";
+import {
+  getOnboardingStats,
+  listManualReviewQueue,
+  mapManualReviewRows,
+  resolveManualReview
+} from "../onboarding/automatedOnboardingService.js";
+
+export async function listAdminUsers(opts: { q?: string; limit?: number; offset?: number }) {
+  const q = String(opts.q || "").trim();
+  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
+  const offset = Math.max(opts.offset ?? 0, 0);
+
+  const where = q
+    ? {
+        OR: [
+          { publicHandle: { contains: q, mode: "insensitive" as const } },
+          { legalName: { contains: q, mode: "insensitive" as const } },
+          { email: { contains: q, mode: "insensitive" as const } },
+          { phoneE164: { contains: q } }
+        ]
+      }
+    : {};
+
+  const [users, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        publicHandle: true,
+        legalName: true,
+        email: true,
+        phoneE164: true,
+        role: true,
+        accountStatus: true,
+        status: true,
+        identityVerified: true,
+        createdAt: true,
+        updatedAt: true
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip: offset
+    }),
+    prisma.user.count({ where })
+  ]);
+
+  return {
+    users: users.map((u) => ({
+      ...u,
+      createdAt: u.createdAt.toISOString(),
+      updatedAt: u.updatedAt.toISOString()
+    })),
+    total,
+    limit,
+    offset
+  };
+}
+
+export async function patchAdminUser(
+  userId: string,
+  patch: { accountStatus?: string; status?: string; role?: string; legalName?: string }
+) {
+  const data: Record<string, unknown> = {};
+  if (patch.accountStatus) {
+    const allowed = ["pending_identity", "pending_approval", "active", "suspended"];
+    if (!allowed.includes(patch.accountStatus)) throw new Error("유효하지 않은 accountStatus");
+    data.accountStatus = patch.accountStatus;
+  }
+  if (patch.status) {
+    const allowed = ["ACTIVE", "INACTIVE", "DELETED"];
+    if (!allowed.includes(patch.status)) throw new Error("유효하지 않은 status");
+    data.status = patch.status;
+  }
+  if (patch.role) {
+    if (!["user", "admin"].includes(patch.role)) throw new Error("유효하지 않은 role");
+    data.role = patch.role;
+  }
+  if (patch.legalName !== undefined) {
+    data.legalName = String(patch.legalName || "").trim().slice(0, 120) || null;
+  }
+  if (!Object.keys(data).length) throw new Error("변경할 필드가 없습니다.");
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data,
+    select: {
+      id: true,
+      publicHandle: true,
+      legalName: true,
+      role: true,
+      accountStatus: true,
+      status: true
+    }
+  });
+  return user;
+}
+
+export async function listAdminFeedPosts(limit = 50) {
+  const posts = await prisma.cardFeedPost.findMany({
+    take: limit,
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      cardId: true,
+      authorUserId: true,
+      title: true,
+      body: true,
+      createdAt: true,
+      author: { select: { publicHandle: true, legalName: true } },
+      card: { select: { displayName: true } }
+    }
+  });
+  return posts.map((p) => ({
+    id: p.id,
+    type: "feed",
+    cardId: p.cardId,
+    cardName: p.card?.displayName || "",
+    authorUserId: p.authorUserId,
+    authorHandle: p.author?.publicHandle || "",
+    authorName: p.author?.legalName || "",
+    title: p.title || "",
+    bodyPreview: p.body.slice(0, 160),
+    createdAt: p.createdAt.toISOString()
+  }));
+}
+
+export async function deleteAdminFeedPost(postId: string) {
+  const result = await prisma.cardFeedPost.deleteMany({ where: { id: postId } });
+  return result.count > 0;
+}
+
+export async function listAdminMediaCampaigns(limit = 50) {
+  try {
+    const rows = await prisma.$queryRawUnsafe<
+      { id: string; user_id: string; shop_id: string; title: string; status: string; created_at: Date }[]
+    >(
+      `
+        SELECT id, user_id, shop_id, title, status, created_at
+        FROM shop_media_campaigns
+        ORDER BY created_at DESC
+        LIMIT $1;
+      `,
+      limit
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      type: "media_campaign",
+      userId: r.user_id,
+      shopId: r.shop_id,
+      title: r.title,
+      status: r.status,
+      createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at)
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function getAdminHealthStatus() {
+  const checks: { id: string; label: string; ok: boolean; detail?: string }[] = [];
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.push({ id: "database", label: "PostgreSQL", ok: true, detail: "connected" });
+  } catch (e) {
+    checks.push({
+      id: "database",
+      label: "PostgreSQL",
+      ok: false,
+      detail: e instanceof Error ? e.message : "connection failed"
+    });
+  }
+
+  const sse = sseConnectionStats();
+  checks.push({
+    id: "sse",
+    label: "실시간 SSE",
+    ok: true,
+    detail: `${sse.users} users · ${sse.connections} connections`
+  });
+
+  const fcmOk = Boolean(
+    process.env.FIREBASE_PROJECT_ID ||
+      (process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.FCM_ENABLED !== "0")
+  );
+  checks.push({
+    id: "fcm",
+    label: "푸시(FCM)",
+    ok: fcmOk,
+    detail: fcmOk ? "configured" : "not configured (mock mode)"
+  });
+
+  const scannerOk = Boolean(process.env.PORTONE_API_KEY || process.env.IAMPORT_IMP_CODE);
+  checks.push({
+    id: "scanner",
+    label: "스캐너/결제(Portone)",
+    ok: scannerOk,
+    detail: scannerOk ? "API key present" : "env missing"
+  });
+
+  const jwtOk = Boolean(process.env.JWT_ACCESS_SECRET);
+  checks.push({
+    id: "jwt",
+    label: "JWT 시크릿",
+    ok: jwtOk,
+    detail: jwtOk ? "set" : "using dev fallback"
+  });
+
+  return {
+    ok: checks.every((c) => c.id === "fcm" || c.id === "scanner" ? true : c.ok),
+    checks,
+    time: new Date().toISOString()
+  };
+}
+
+export async function testAdminNotificationBroadcast(message: string) {
+  const delivered = ssePublishAllConnected({
+    type: "vlue-admin-health-test",
+    message: message || "관리자 점검 테스트 알림"
+  });
+  return { deliveredConnections: delivered };
+}
+
+export {
+  listNotices,
+  releaseNotice,
+  updateNotice,
+  deleteNotice,
+  listMarketingPopups,
+  createMarketingPopup,
+  updateMarketingPopup,
+  deleteMarketingPopup,
+  getOnboardingStats,
+  listManualReviewQueue,
+  mapManualReviewRows,
+  resolveManualReview
+};

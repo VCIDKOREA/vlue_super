@@ -13,7 +13,16 @@ function formatKrw(n) {
   return `${Number(n || 0).toLocaleString("ko-KR")}원`;
 }
 
-export default function MediaCommercePlayerSheet({ item, open, onClose, onToast, isDarkMode = false, onOpenStore }) {
+export default function MediaCommercePlayerSheet({
+  item,
+  open,
+  onClose,
+  onToast,
+  isDarkMode = false,
+  onOpenStore,
+  isGuestMode = false,
+  onRequireAuth
+}) {
   const [tick, setTick] = useState(null);
   const [campaignId, setCampaignId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -67,7 +76,7 @@ export default function MediaCommercePlayerSheet({ item, open, onClose, onToast,
 
   if (!open || !item) return null;
 
-  const pay = async () => {
+  const runCheckout = async () => {
     if (!agreed) {
       setError("구매 조건에 동의해 주세요.");
       return;
@@ -88,6 +97,14 @@ export default function MediaCommercePlayerSheet({ item, open, onClose, onToast,
     } finally {
       setBusy(false);
     }
+  };
+
+  const pay = () => {
+    if (isGuestMode) {
+      onRequireAuth?.(() => runCheckout());
+      return;
+    }
+    runCheckout();
   };
 
   return (

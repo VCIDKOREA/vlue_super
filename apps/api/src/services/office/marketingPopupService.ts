@@ -116,3 +116,56 @@ export async function listMarketingPopups(limit = 20) {
   );
   return rows.map(mapPopupRow);
 }
+
+export async function updateMarketingPopup(
+  id: string,
+  input: {
+    title?: string;
+    imageUrl?: string;
+    linkUrl?: string;
+    linkType?: "internal" | "external";
+    startsAt?: string;
+    endsAt?: string;
+    isActive?: boolean;
+    priority?: number;
+  }
+) {
+  await ensureTable();
+  const rows = await prisma.$queryRawUnsafe<MarketingPopupRow[]>(
+    `
+      UPDATE marketing_popups
+      SET
+        title = COALESCE($2, title),
+        image_url = COALESCE($3, image_url),
+        link_url = COALESCE($4, link_url),
+        link_type = COALESCE($5, link_type),
+        starts_at = COALESCE($6::timestamptz, starts_at),
+        ends_at = COALESCE($7::timestamptz, ends_at),
+        is_active = COALESCE($8, is_active),
+        priority = COALESCE($9, priority),
+        updated_at = NOW()
+      WHERE id = $1::uuid
+      RETURNING *;
+    `,
+    id,
+    input.title?.slice(0, 200) ?? null,
+    input.imageUrl ?? null,
+    input.linkUrl !== undefined ? input.linkUrl?.slice(0, 2000) || null : null,
+    input.linkType ? (input.linkType === "internal" ? "internal" : "external") : null,
+    input.startsAt ?? null,
+    input.endsAt ?? null,
+    input.isActive ?? null,
+    input.priority ?? null
+  );
+  if (!rows[0]) return null;
+  return mapPopupRow(rows[0]);
+}
+
+export async function deleteMarketingPopup(id: string) {
+  await ensureTable();
+  const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
+    `DELETE FROM marketing_popups WHERE id = $1::uuid RETURNING id;`,
+    id
+  );
+  return rows.length > 0;
+}

@@ -9,7 +9,7 @@ interface ShoppingPageProps {
 
 export default function ShoppingPage({ user, onLoginClick }: ShoppingPageProps) {
   return (
-    <main className="min-h-screen bg-gray-50 pt-16">
+    <main className="min-h-screen bg-gray-50">
       <div className="bg-gradient-to-br from-primary-600 via-primary-600 to-indigo-700 py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -51,9 +51,9 @@ export default function ShoppingPage({ user, onLoginClick }: ShoppingPageProps) 
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-16">
-        {!user && (
-          <div className="mb-5 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center gap-3">
+      {!user && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center gap-3">
             <Lock className="w-4 h-4 text-amber-500 flex-shrink-0" />
             <p className="text-amber-800 text-sm font-medium flex-1" style={{ wordBreak: 'keep-all' }}>
               로그인 시 앱과 동일 계정으로 피드·결제가 연동됩니다.
@@ -66,10 +66,10 @@ export default function ShoppingPage({ user, onLoginClick }: ShoppingPageProps) 
               로그인
             </button>
           </div>
-        )}
+        </div>
+      )}
 
-        <MarketingMediaCommerceStore user={user} onLoginClick={onLoginClick} />
-      </div>
+      <MarketingMediaCommerceStore user={user} onLoginClick={onLoginClick} />
     </main>
   );
 }

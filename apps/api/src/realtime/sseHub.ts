@@ -30,6 +30,16 @@ export function ssePublish(userId: string, event: Record<string, unknown>): void
 }
 
 /** 현재 SSE에 연결된 모든 클라이언트에 브로드캐스트 */
+export function sseConnectionStats() {
+  let connections = 0;
+  let users = 0;
+  for (const set of subscribers.values()) {
+    users += 1;
+    connections += set.size;
+  }
+  return { users, connections };
+}
+
 export function ssePublishAllConnected(event: Record<string, unknown>): number {
   let count = 0;
   for (const set of subscribers.values()) {

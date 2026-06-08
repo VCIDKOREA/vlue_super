@@ -22,6 +22,11 @@ import {
   inferShoppingCategory,
   normalizeShoppingCategory
 } from "../../lib/shoppingCategories.js";
+import {
+  readStoreFeedCategory,
+  writeStoreFeedCategory,
+  STORE_FEED_PREFS_CHANGED
+} from "../../lib/storeFeedPrefs.js";
 
 function DurationBadge({ label, isLive }) {
   if (isLive) {
@@ -189,9 +194,22 @@ export default function MediaCommerceFeed({
   onChangeMediaTab,
   onToast,
   onShortsFullscreenChange,
-  isDarkMode = false
+  isDarkMode = false,
+  isGuestMode = false,
+  onRequireAuth
 }) {
   const theme = feedTheme(isDarkMode);
+
+  const guardGuestAction = useCallback(
+    (action) => {
+      if (!isGuestMode) {
+        action?.();
+        return;
+      }
+      onRequireAuth?.(action);
+    },
+    [isGuestMode, onRequireAuth]
+  );
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -202,8 +220,12 @@ export default function MediaCommerceFeed({
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [storeProfileId, setStoreProfileId] = useState(null);
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("전체");
-  const setCategorySafe = useCallback((next) => setCategory(normalizeShoppingCategory(next)), []);
+  const [category, setCategory] = useState(() => readStoreFeedCategory("전체"));
+  const setCategorySafe = useCallback((next) => {
+    const cat = normalizeShoppingCategory(next);
+    setCategory(cat);
+    writeStoreFeedCategory(cat);
+  }, []);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const scrollRef = useRef(null);
   const sentinelRef = useRef(null);
@@ -212,6 +234,7 @@ export default function MediaCommerceFeed({
   const searchBarRef = useRef(null);
 
   const openStore = useCallback((id) => setStoreProfileId(id), []);
+  const openItemDetail = useCallback((item) => setSelected(item), []);
 
   const isPageMode = mediaTab === "page";
 
@@ -237,6 +260,15 @@ export default function MediaCommerceFeed({
     },
     [mediaTab, isPageMode, onToast]
   );
+
+  useEffect(() => {
+    const onPrefs = (e) => {
+      const cat = e?.detail?.category;
+      if (cat) setCategory(cat);
+    };
+    window.addEventListener(STORE_FEED_PREFS_CHANGED, onPrefs);
+    return () => window.removeEventListener(STORE_FEED_PREFS_CHANGED, onPrefs);
+  }, []);
 
   useEffect(() => {
     setItems([]);
@@ -319,6 +351,8 @@ export default function MediaCommerceFeed({
         onBack={() => setStoreProfileId(null)}
         onToast={onToast}
         isDarkMode={isDarkMode}
+        isGuestMode={isGuestMode}
+        onRequireAuth={onRequireAuth}
       />
     );
   }
@@ -420,7 +454,7 @@ export default function MediaCommerceFeed({
                       key={`${mediaTab}-${item.id}`}
                       item={item}
                       theme={theme}
-                      onOpen={setSelected}
+                      onOpen={openItemDetail}
                       onOpenStore={openStore}
                     />
                   ))}
@@ -436,7 +470,9 @@ export default function MediaCommerceFeed({
               <PageProductCard
                 key={`page-${item.id}`}
                 item={item}
-                onCheckout={() => onToast?.(`${item.product?.title || feedDisplayTitle(item)} 결제 준비`)}
+                onCheckout={() =>
+                  guardGuestAction(() => onToast?.(`${item.product?.title || feedDisplayTitle(item)} 결제 준비`))
+                }
               />
             ))}
           </div>
@@ -456,7 +492,7 @@ export default function MediaCommerceFeed({
 
       <button
         type="button"
-        onClick={() => setOwnerOpen(true)}
+        onClick={() => guardGuestAction(() => setOwnerOpen(true))}
         className="fixed right-4 z-[90] flex h-11 w-11 items-center justify-center rounded-full border border-blue-500 bg-blue-600 text-[24px] font-light text-white shadow-md"
         style={{ bottom: FEED_SCROLL_BOTTOM_PAD }}
         aria-label="AI 소싱"
@@ -472,6 +508,8 @@ export default function MediaCommerceFeed({
           onToast={onToast}
           isDarkMode={false}
           onOpenStore={openStore}
+          isGuestMode={isGuestMode}
+          onRequireAuth={onRequireAuth}
         />
       ) : null}
 
@@ -485,6 +523,8 @@ export default function MediaCommerceFeed({
             onToast={onToast}
             onOpenStore={openStore}
             isDarkMode={false}
+            isGuestMode={isGuestMode}
+            onRequireAuth={onRequireAuth}
           />
         </div>
       ) : null}

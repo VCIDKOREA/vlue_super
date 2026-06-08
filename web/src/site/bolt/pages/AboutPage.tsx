@@ -558,8 +558,8 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
                 <span className="leading-snug">{tip}</span>
               </div>
             ))}
-          </div>
-        </section>
+        </div>
+      </section>
 
         {/* VLUE 대응 */}
         <section id="about-protect" className="mkt-scroll-section">
@@ -567,7 +567,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
             tone="primary"
             badge={
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-600 bg-primary-50 border border-primary-100 px-2.5 py-1 rounded-full">
-                <Zap className="w-3.5 h-3.5" />
+              <Zap className="w-3.5 h-3.5" />
                 VLUE 대응
               </span>
             }
@@ -612,7 +612,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
                     <div className="rounded-xl bg-primary-50 border border-primary-100 px-3 py-2 text-center min-w-[72px]">
                       <p className="text-[11px] font-bold text-primary-800">{item.label}</p>
                       <p className="text-[10px] text-slate-500">{item.sub}</p>
-                    </div>
+                </div>
                   </Fragment>
                 ))}
               </div>
@@ -701,7 +701,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
                 />
               );
             })}
-          </div>
+                  </div>
 
           <ServiceAccordion items={INSTALL_EXCLUSIVE_FEATURES} forceOpenId={forceOpenId} className="mb-6" />
 
@@ -720,8 +720,8 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
               <Download className="w-4 h-4" />
               설치 다운로드
             </button>
-          </div>
-        </section>
+        </div>
+      </section>
 
         {/* 요금제 */}
         <section id="about-pricing" className="mkt-scroll-section">
@@ -859,10 +859,10 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
                     </div>
                   </div>
                 ))}
-              </div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
         <section className="pb-8">
           <div className="card p-8 sm:p-10 bg-gradient-to-br from-primary-600 to-primary-700 border-0 text-center text-white">
@@ -890,7 +890,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
             </div>
           </div>
         </section>
-      </div>
+        </div>
     </main>
   );
 }

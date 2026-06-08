@@ -14,7 +14,14 @@ function formatKrw(n) {
 }
 
 /** 숏폼·라이브 우측 오버레이 — 타이머 + 결제 */
-export default function CommerceSideRail({ item, onToast, onOpenStore, compact = false }) {
+export default function CommerceSideRail({
+  item,
+  onToast,
+  onOpenStore,
+  compact = false,
+  isGuestMode = false,
+  onRequireAuth
+}) {
   const [tick, setTick] = useState(null);
   const [campaignId, setCampaignId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -64,7 +71,7 @@ export default function CommerceSideRail({ item, onToast, onOpenStore, compact =
     return () => window.clearInterval(id);
   }, [campaignId, refreshTick]);
 
-  const pay = async () => {
+  const runCheckout = async () => {
     setBusy(true);
     setError("");
     try {
@@ -76,6 +83,14 @@ export default function CommerceSideRail({ item, onToast, onOpenStore, compact =
     } finally {
       setBusy(false);
     }
+  };
+
+  const pay = () => {
+    if (isGuestMode) {
+      onRequireAuth?.(() => runCheckout());
+      return;
+    }
+    runCheckout();
   };
 
   if (!item) return null;

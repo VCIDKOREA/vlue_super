@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { feedDisplayTitle } from "../../lib/mediaCommerceCatalog.js";
 import { enrichFeedBatch } from "../../lib/mediaCommerceFeedService.js";
 import { getStoreProfile, isFavoriteStore, toggleFavoriteStore } from "../../lib/mediaCommerceStores.js";
+import { readSubscribedShopIds, toggleSubscribedShop } from "../../lib/shopPushStorage.js";
 import { feedTheme } from "../../lib/mediaCommerceTheme.js";
 import MediaCommercePlayerSheet from "./MediaCommercePlayerSheet.jsx";
 import FeedThumbImage from "./FeedThumbImage.jsx";
@@ -28,12 +29,28 @@ function filterProfileItems(items, tabId) {
   return items;
 }
 
-export default function StoreProfileHome({ storeId, onBack, onToast, isDarkMode = false }) {
+export default function StoreProfileHome({
+  storeId,
+  onBack,
+  onToast,
+  isDarkMode = false,
+  isGuestMode = false,
+  onRequireAuth
+}) {
+  const guardGuest = (action) => {
+    if (!isGuestMode) {
+      action?.();
+      return;
+    }
+    onRequireAuth?.(action);
+  };
+
   const [profile, setProfile] = useState(() => getStoreProfile(storeId));
   const [items, setItems] = useState([]);
   const [profileTab, setProfileTab] = useState("archive");
   const [videoFilterTab, setVideoFilterTab] = useState("all");
   const [fav, setFav] = useState(() => isFavoriteStore(storeId));
+  const [subscribed, setSubscribed] = useState(() => readSubscribedShopIds().includes(storeId));
   const [selected, setSelected] = useState(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("전체");
@@ -43,6 +60,8 @@ export default function StoreProfileHome({ storeId, onBack, onToast, isDarkMode 
   useEffect(() => {
     const p = getStoreProfile(storeId);
     setProfile(p);
+    setFav(isFavoriteStore(storeId));
+    setSubscribed(readSubscribedShopIds().includes(storeId));
     if (!p) return;
     setProfileTab(p.shopMode === "PAGE" ? "catalog" : "archive");
     enrichFeedBatch(p.items).then(setItems);
@@ -80,16 +99,35 @@ export default function StoreProfileHome({ storeId, onBack, onToast, isDarkMode 
         onBack={onBack}
         isDarkMode={isDarkMode}
         right={
-          <button
-            type="button"
-            onClick={() => {
-              toggleFavoriteStore(storeId);
-              setFav((v) => !v);
-            }}
-            className={`rounded-lg px-2 py-1 text-[12px] font-bold ${fav ? "text-rose-600" : "text-slate-500"}`}
-          >
-            {fav ? "♥" : "♡"}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() =>
+                guardGuest(() => {
+                  toggleFavoriteStore(storeId);
+                  setFav((v) => !v);
+                })
+              }
+              aria-label={fav ? "좋아요 취소" : "좋아요"}
+              className={`rounded-lg px-2 py-1 text-[12px] font-bold ${fav ? "text-rose-600" : "text-slate-500"}`}
+            >
+              {fav ? "♥" : "♡"}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                guardGuest(() => {
+                  const result = toggleSubscribedShop(storeId);
+                  if (result?.ok) setSubscribed(!!result.subscribed);
+                })
+              }
+              className={`rounded-lg px-2 py-1 text-[11px] font-black ${
+                subscribed ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {subscribed ? "구독중" : "구독"}
+            </button>
+          </div>
         }
       />
       <div className={`shrink-0 border-b ${t.bar}`}>
@@ -197,7 +235,9 @@ export default function StoreProfileHome({ storeId, onBack, onToast, isDarkMode 
                         </p>
                         <button
                           type="button"
-                          onClick={() => onToast?.(`${title} 결제 준비`)}
+                          onClick={() =>
+                            guardGuest(() => onToast?.(`${title} 결제 준비`))
+                          }
                           className="mt-2 w-full rounded-lg bg-blue-600 py-2 text-[11px] font-black text-white"
                         >
                           바로결제
@@ -233,6 +273,8 @@ export default function StoreProfileHome({ storeId, onBack, onToast, isDarkMode 
           onToast={onToast}
           isDarkMode={false}
           onOpenStore={() => {}}
+          isGuestMode={isGuestMode}
+          onRequireAuth={onRequireAuth}
         />
       ) : null}
     </div>

@@ -98,3 +98,36 @@ export async function listNotices(limit = 20) {
   );
   return rows.map(mapNoticeRow);
 }
+
+export async function updateNotice(
+  id: string,
+  input: { title?: string; highlightText?: string; bodyText?: string }
+) {
+  await ensureTable();
+  const rows = await prisma.$queryRawUnsafe<NoticeRow[]>(
+    `
+      UPDATE notices
+      SET
+        title = COALESCE($2, title),
+        highlight_text = COALESCE($3, highlight_text),
+        body_text = COALESCE($4, body_text)
+      WHERE id = $1::uuid
+      RETURNING *;
+    `,
+    id,
+    input.title?.slice(0, 300) ?? null,
+    input.highlightText !== undefined ? input.highlightText?.slice(0, 500) || null : null,
+    input.bodyText ?? null
+  );
+  if (!rows[0]) return null;
+  return mapNoticeRow(rows[0]);
+}
+
+export async function deleteNotice(id: string) {
+  await ensureTable();
+  const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
+    `DELETE FROM notices WHERE id = $1::uuid RETURNING id;`,
+    id
+  );
+  return rows.length > 0;
+}

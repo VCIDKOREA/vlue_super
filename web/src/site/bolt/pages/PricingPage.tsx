@@ -201,7 +201,7 @@ export default function PricingPage({ user, onLoginClick }: PricingPageProps) {
                 <p className="text-xs text-gray-600 mt-0.5">{s.desc}</p>
               </div>
             ))}
-          </div>
+                      </div>
 
           <div className="overflow-visible bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-6 sm:p-10 lg:p-12">
             <div className="flex flex-col gap-10 overflow-visible">
@@ -229,8 +229,8 @@ export default function PricingPage({ user, onLoginClick }: PricingPageProps) {
                       <VlueBrandMark size={20} />
                     );
                   return (
-                    <>
-                      <div className="flex items-center gap-3 mb-4">
+                  <>
+                    <div className="flex items-center gap-3 mb-4">
                         <div
                           className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                             activeGrade === 'premium'
@@ -250,8 +250,8 @@ export default function PricingPage({ user, onLoginClick }: PricingPageProps) {
                         <span className="font-black text-xl" style={{ letterSpacing: '-0.02em' }}>
                           {guide.title}
                         </span>
-                      </div>
-                      <p className="text-white/60 text-sm mb-5 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+                    </div>
+                    <p className="text-white/60 text-sm mb-5 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
                         {guide.intro}
                       </p>
                       <p className="text-[11px] font-bold text-white/50 uppercase tracking-wide mb-3">명함 구성 안내</p>
