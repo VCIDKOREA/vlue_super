@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   FileImage,
   Users,
+  CreditCard,
 } from 'lucide-react';
 import FeedThumbImage from '../../../components/shopping/FeedThumbImage.jsx';
 import MediaCommercePlayerSheet from '../../../components/shopping/MediaCommercePlayerSheet.jsx';
@@ -314,66 +315,124 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
     return LayoutGrid;
   };
 
-  const storeContainer = 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8';
+  const storeSearchForm = (className = 'mkt-store__search') => (
+    <form onSubmit={handleSearch} className={className}>
+      <div className="mkt-store__search-field">
+        <Search className="mkt-store__search-icon" aria-hidden />
+        <input
+          type="search"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="상품·채널 검색"
+          className="mkt-store__search-input"
+        />
+        {searchInput ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchInput('');
+              setQuery('');
+            }}
+            className="mkt-store__search-clear"
+            aria-label="검색어 지우기"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        ) : null}
+      </div>
+      <button type="submit" className="mkt-store__search-btn">
+        검색
+      </button>
+    </form>
+  );
+
+  const sidebarNav = (
+    <>
+      <nav className="mkt-store__sidebar-nav" role="tablist" aria-label="스토어 탭">
+        {STORE_TABS.map((tab) => {
+          const Icon = tabIcon(tab.id);
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={mediaTab === tab.id}
+              onClick={() => changeMediaTab(tab.id)}
+              className={`mkt-store__sidebar-tab ${mediaTab === tab.id ? 'is-active' : ''}`}
+            >
+              <Icon className="mkt-store__sidebar-tab-icon" aria-hidden />
+              <span className="mkt-store__sidebar-tab-label">{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="mkt-store__sidebar-cats" role="tablist" aria-label="카테고리">
+        <p className="mkt-store__sidebar-section">카테고리</p>
+        {SHOPPING_CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            role="tab"
+            aria-selected={category === cat}
+            onClick={() => changeCategory(cat)}
+            className={`mkt-store__sidebar-cat ${category === cat ? 'is-active' : ''}`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      <p className="mkt-store__sidebar-sync">
+        <RefreshCw className="w-3 h-3 shrink-0" aria-hidden />
+        앱·웹 동일 피드
+      </p>
+    </>
+  );
 
   return (
     <div className="mkt-store">
-      <div className="mkt-store__subnav-shell" role="region" aria-label="VLUE 스토어 필터">
-        <div className={`mkt-store__subnav-track ${storeContainer}`}>
-          <div className="mkt-store__subnav-row mkt-store__subnav-row--tabs">
-            <div className="mkt-store__tabs" role="tablist" aria-label="스토어 탭">
-              {STORE_TABS.map((tab) => {
-                const Icon = tabIcon(tab.id);
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={mediaTab === tab.id}
-                    onClick={() => changeMediaTab(tab.id)}
-                    className={`mkt-store__tab inline-flex items-center gap-1.5 ${mediaTab === tab.id ? 'is-active' : ''}`}
-                  >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-            <span className="mkt-store__sync">
-              <RefreshCw className="w-3 h-3 shrink-0" />
-              앱·웹 동일 피드
-            </span>
-          </div>
+      <div className="mkt-store__topbar" role="region" aria-label="스토어 검색">
+        <div className="mkt-store__topbar-center">
+          {storeSearchForm('mkt-store__search mkt-store__search--top')}
+          <button
+            type="button"
+            onClick={() => {
+              if (!user && onLoginClick) onLoginClick();
+            }}
+            className="mkt-store__bluepay"
+          >
+            <CreditCard className="w-3.5 h-3.5 shrink-0" aria-hidden />
+            블루페이
+          </button>
+        </div>
+      </div>
 
-          <form onSubmit={handleSearch} className="mkt-store__search">
-            <div className="mkt-store__search-field">
-              <Search className="mkt-store__search-icon" aria-hidden />
-              <input
-                type="search"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="찾고 싶은 상품·채널을 검색해보세요"
-                className="mkt-store__search-input"
-              />
-              {searchInput ? (
+      <div className="mkt-store__layout">
+        <aside className="mkt-store__sidebar" aria-label="VLUE 스토어 탐색">
+          {sidebarNav}
+        </aside>
+
+        <div className="mkt-store__content-col">
+        <div className="mkt-store__mobile-rail" aria-label="VLUE 스토어 필터 (모바일)">
+          <div className="mkt-store__mobile-tabs" role="tablist">
+            {STORE_TABS.map((tab) => {
+              const Icon = tabIcon(tab.id);
+              return (
                 <button
+                  key={tab.id}
                   type="button"
-                  onClick={() => {
-                    setSearchInput('');
-                    setQuery('');
-                  }}
-                  className="mkt-store__search-clear"
-                  aria-label="검색어 지우기"
+                  role="tab"
+                  aria-selected={mediaTab === tab.id}
+                  onClick={() => changeMediaTab(tab.id)}
+                  className={`mkt-store__tab inline-flex items-center gap-1.5 ${mediaTab === tab.id ? 'is-active' : ''}`}
                 >
-                  <X className="w-4 h-4" />
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  {tab.label}
                 </button>
-              ) : null}
-            </div>
-            <button type="submit" className="mkt-store__search-btn">
-              검색
-            </button>
-          </form>
-
+              );
+            })}
+          </div>
           <div
             ref={chipScrollRef}
             className="mkt-store__chip-scroll"
@@ -405,9 +464,9 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
             </div>
           </div>
         </div>
-      </div>
 
-      <div className={`mkt-store__feed ${storeContainer} pb-16`}>
+        <div className="mkt-store__main">
+      <div className="mkt-store__feed pb-16">
       {toast ? (
         <div className="mb-4 rounded-xl border border-slate-200 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
           {toast}
@@ -450,7 +509,7 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
       ) : (
         <>
           {featured ? (
-            <div className="mkt-store__hero mb-6">
+            <div className="mkt-store__hero-compact mb-5">
               <button
                 type="button"
                 className="mkt-store__featured text-left"
@@ -469,17 +528,6 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
                   <p className="text-white/80 text-xs mt-1">{feedMetaLine(featured)}</p>
                 </div>
               </button>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col justify-center">
-                <p className="text-xs font-black text-primary-600 mb-2 uppercase tracking-wide">미디어 · 페이지 · 공구</p>
-                <p className="text-sm text-slate-700 leading-relaxed mb-3" style={{ wordBreak: 'keep-all' }}>
-                  앱 <strong>VLUE 스토어</strong>와 같은 게시물입니다. 미디어쇼핑(영상·라이브), 페이지쇼핑(상점 카탈로그), 공동구매(라이브·공구)를 웹에서 넓은 화면으로 탐색하세요.
-                </p>
-                <ul className="text-xs text-slate-500 space-y-1.5">
-                  <li>· 미디어쇼핑 — YouTube·TikTok·Reels 연동 소싱</li>
-                  <li>· 페이지쇼핑 — 자료실·상점 등록 상품 (API 동기화)</li>
-                  <li>· 공동구매 — 라이브·공구 마감 타이머 (앱 결제)</li>
-                </ul>
-              </div>
             </div>
           ) : null}
           <div className="mkt-store__video-grid">
@@ -494,6 +542,9 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
       {loading && items.length > 0 ? (
         <p className="text-center text-xs text-slate-400 py-4">더 불러오는 중…</p>
       ) : null}
+      </div>
+        </div>
+        </div>
       </div>
 
       <MediaCommercePlayerSheet

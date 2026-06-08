@@ -1,0 +1,66 @@
+/* www — 디지털인증명함 미리보기(앱 LetteringBusinessCardPanel) 스코프 */
+[data-vlue-shell="www"] .lettering-bizcard-secure-frame,
+[data-vlue-site="marketing"] .lettering-bizcard-secure-frame {
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+[data-vlue-shell="www"] .lettering-bizcard-scaled-host,
+[data-vlue-site="marketing"] .lettering-bizcard-scaled-host {
+  width: 100%;
+}
+
+/* 인증명함 송출 토글 — styles.css 전역 transform 간섭 방지 */
+.mkt-bizcard-toggle-row .mkt-bizcard-toggle {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 1.5rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 9999px;
+  background: #cbd5e1;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mkt-bizcard-toggle-row .mkt-bizcard-toggle[data-on="true"] {
+  background: #2563eb;
+}
+
+.mkt-bizcard-toggle-row .mkt-bizcard-toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 22%);
+  transition: left 0.2s ease;
+  transform: none !important;
+}
+
+.mkt-bizcard-toggle-row .mkt-bizcard-toggle[data-on="true"] .mkt-bizcard-toggle__knob {
+  left: calc(100% - 1.25rem - 2px);
+}
+
+.mkt-bizcard-preview--off {
+  opacity: 0.45;
+  filter: grayscale(0.35);
+  pointer-events: none;
+}
+
+.mkt-bizcard-toggle-row .mkt-bizcard-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 웹 명함 허브 — 기업 회선 탭 내 뒤로는 탭 전환용이라 유지 */
+.web-bizcard-enterprise {
+  max-height: none;
+}

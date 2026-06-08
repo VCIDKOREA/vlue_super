@@ -14,6 +14,7 @@ import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./kakaoSoc
 import { formatSocialLoginError } from "./socialLoginPolicy.js";
 import { isValidMemberPassword, MEMBER_PASSWORD_INVALID_MESSAGE } from "./memberPasswordRules.js";
 import { normalizeMemberHandleSlug } from "./memberHandleRules.js";
+import { hydrateBizcardFromLoginPayload } from "./bizcardAccountSync.js";
 
 export const VLUE_MARKETING_SESSION_KEY = "vlue_marketing_logged_in";
 export const VLUE_MARKETING_SIGNUP_KEY = "vlue_marketing_signup";
@@ -74,6 +75,7 @@ export function persistVlueAuthSession(data) {
     }
   }
   if (data?.deviceToken) saveDeviceToken(data.deviceToken);
+  hydrateBizcardFromLoginPayload(data);
 
   try {
     localStorage.setItem(VLUE_MARKETING_SESSION_KEY, "1");

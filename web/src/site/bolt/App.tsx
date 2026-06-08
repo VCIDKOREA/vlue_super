@@ -177,7 +177,13 @@ export default function App() {
           <ExcelEditorPage user={user} onLoginClick={handleLoginRequired} onNavigate={handleNavigate} />
         )}
         {view === 'mypage' && user && <MyPage user={user} onNavigate={(v) => handleNavigate(v as View)} onLogout={handleLogout} />}
-        {view === 'bizcard' && <BusinessCardPage onBack={() => handleNavigate('home')} />}
+        {view === 'bizcard' && (
+          <BusinessCardPage
+            user={user}
+            onLoginClick={handleLoginRequired}
+            onBack={() => handleNavigate('home')}
+          />
+        )}
 
         {view !== 'mypage' && <Footer onNavigate={handleNavigate} />}
         </div>

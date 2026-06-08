@@ -6,7 +6,12 @@ import {
 } from "../lib/letteringSettings.js";
 
 /** 메인 앱 설정 — VLUE 레터링 켜기/끄기 + 권한 유도 */
-export default function LetteringSettingsSection({ isDarkMode = false, onNotice, onOpenBizcardHub }) {
+export default function LetteringSettingsSection({
+  isDarkMode = false,
+  onNotice,
+  onOpenBizcardHub,
+  variant = "app"
+}) {
   const [enabled, setEnabled] = useState(() => readLetteringEnabled());
   const [busy, setBusy] = useState(false);
 
@@ -73,7 +78,9 @@ export default function LetteringSettingsSection({ isDarkMode = false, onNotice,
         </button>
       ) : null}
       <p className={`mt-3 text-[10px] leading-snug ${hint}`}>
-        명함 신청·미리보기·수정은 프로필 메뉴 첫 화면 상단 「디지털인증명함」 카드에서만 할 수 있습니다.
+        {variant === "web"
+          ? "명함 신청·수정은 이 페이지 「디지털인증명함」 탭에서 할 수 있습니다. 실제 통화 오버레이는 모바일 앱에서 동작합니다."
+          : "명함 신청·미리보기·수정은 프로필 메뉴 첫 화면 상단 「디지털인증명함」 카드에서만 할 수 있습니다."}
       </p>
       {onOpenBizcardHub ? (
         <button
