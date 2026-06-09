@@ -1,0 +1,34 @@
+{
+  "lines": [
+    {
+      "userId": "44a70246-3bd1-4824-a0f2-59196e90a94a",
+      "phoneE164": "01067689859",
+      "phoneVerified": false,
+      "broadcastEnabled": false,
+      "status": "cancelled",
+      "billingCycle": "monthly",
+      "createdAt": "2026-06-09T11:22:46.072Z",
+      "updatedAt": "2026-06-09T11:44:33.445Z",
+      "amountKrw": 4200,
+      "paidAt": "2026-06-09T11:43:48.457Z",
+      "merchantUid": "dev_broadcast_1781005428387",
+      "refundPolicyAgreedAt": "2026-06-09T11:43:48.457Z",
+      "verifiedAt": "2026-06-09T11:43:48.457Z"
+    },
+    {
+      "userId": "44a70246-3bd1-4824-a0f2-59196e90a94a",
+      "phoneE164": "0106668759",
+      "phoneVerified": false,
+      "broadcastEnabled": false,
+      "status": "cancelled",
+      "billingCycle": "monthly",
+      "createdAt": "2026-06-09T12:02:50.890Z",
+      "updatedAt": "2026-06-09T12:03:03.525Z",
+      "amountKrw": 4200,
+      "paidAt": "2026-06-09T12:02:53.252Z",
+      "merchantUid": "dev_broadcast_1781006573177",
+      "refundPolicyAgreedAt": "2026-06-09T12:02:53.252Z",
+      "verifiedAt": "2026-06-09T12:02:53.252Z"
+    }
+  ]
+}

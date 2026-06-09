@@ -70,7 +70,7 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
           </button>
         </div>
       ) : null}
-      <ul className="min-h-0 flex-1 overflow-y-auto">
+      <ul className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto">
         {items.map((n) => (
           <li key={n.id}>
             <button

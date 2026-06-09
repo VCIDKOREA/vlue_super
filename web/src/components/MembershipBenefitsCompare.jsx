@@ -100,7 +100,7 @@ export default function MembershipBenefitsCompare({ open, onClose, initialTab = 
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-3 sm:px-4">
+        <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-3 sm:px-4">
           {isCompare ? (
             <div className="w-full">
               <div className="w-full overflow-hidden rounded-xl border border-slate-200/90">

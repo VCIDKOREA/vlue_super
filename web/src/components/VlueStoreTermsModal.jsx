@@ -12,7 +12,7 @@ export default function VlueStoreTermsModal({ open, onClose, onAgree }) {
             수수료: {VLUE_STORE_FEE_SUMMARY}
           </p>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-3 text-[12px] leading-relaxed text-slate-700">
+        <div className="vlue-scroll-pad-bottom-nav flex-1 overflow-y-auto px-4 py-3 text-[12px] leading-relaxed text-slate-700">
           {VLUE_STORE_SELLER_TERMS.map((art) => (
             <div key={art.title} className="mb-4 last:mb-0">
               <p className="text-[13px] font-black text-slate-900">{art.title}</p>

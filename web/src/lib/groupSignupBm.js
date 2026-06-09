@@ -2,19 +2,30 @@
 
 import { resolveMasterDisplayNumber, validateCompanyContact } from "./b2bCompanyContact.js";
 import { normalizeLineEnterpriseRoles, validateLineEnterpriseRoles } from "./enterpriseRoles.js";
-import {
-  PAID_LIST_PRICE_ANNUAL_KRW,
-  PAID_LIST_PRICE_MONTHLY_KRW
-} from "./membershipBm.js";
+import { pricingNumbers } from "./pricingConfig.js";
 
 export { COMPANY_CONTACT_TYPES, B2B_ADMIN_VERIFY_NOTICE } from "./b2bCompanyContact.js";
 
 export const GROUP_SIGNUP_MIN_LINES = 10;
+export function groupMonthlyPerLineKrw() {
+  return pricingNumbers().b2bMonthly;
+}
+
+export function groupAnnualPerLineKrw() {
+  return pricingNumbers().b2bAnnual;
+}
+
+/** @deprecated — groupMonthlyPerLineKrw() 사용 */
 export const GROUP_MONTHLY_PER_LINE_KRW = 14_700;
 export const GROUP_ANNUAL_PER_LINE_KRW = GROUP_MONTHLY_PER_LINE_KRW * 10;
 export const GROUP_SIGNUP_STORAGE_KEY = "vlue_group_signup_draft_v1";
 
 /** 가입 단계에서 「단체 가입」을 선택한 경우 */
+export function groupSignupAtRegistrationNotice() {
+  const n = pricingNumbers();
+  return `추천인 없을 때: 대표(VLUE 인증) 회선 월 ${n.paidListMonthly.toLocaleString("ko-KR")}원 · 직원 회선 월 ${n.b2bMonthly.toLocaleString("ko-KR")}원. 추천인 있으면 전 회선 B2B 풀 패키지(${n.b2bMonthly.toLocaleString("ko-KR")}원/회선)가 적용됩니다. PC 전용·채팅·회사업무·사내소통·쇼핑(부분) 이용.`;
+}
+
 export const GROUP_SIGNUP_AT_REGISTRATION_NOTICE =
   "추천인 없을 때: 대표(VLUE 인증) 회선 월 28,300원 · 직원 회선 월 14,700원. 추천인 있으면 전 회선 단체 요금(14,700원)이 적용됩니다. 첫 결제부터 위 요금이 반영됩니다.";
 
@@ -90,22 +101,26 @@ export function syncDraftToPlannedLineCount(draft) {
 }
 
 export function groupLineTotalKrw(lineCount, billingCycle, { hasReferral = false } = {}) {
-  const n = Math.max(0, lineCount);
-  if (n === 0) return 0;
-  const subUnit = billingCycle === "annual" ? GROUP_ANNUAL_PER_LINE_KRW : GROUP_MONTHLY_PER_LINE_KRW;
-  if (hasReferral) return n * subUnit;
-  const master =
-    billingCycle === "annual" ? PAID_LIST_PRICE_ANNUAL_KRW : PAID_LIST_PRICE_MONTHLY_KRW;
-  const subs = Math.max(0, n - 1);
+  const n = nums();
+  const nLines = Math.max(0, lineCount);
+  if (nLines === 0) return 0;
+  const subUnit = billingCycle === "annual" ? n.b2bAnnual : n.b2bMonthly;
+  if (hasReferral) return nLines * subUnit;
+  const master = billingCycle === "annual" ? n.paidListAnnual : n.paidListMonthly;
+  const subs = Math.max(0, nLines - 1);
   return master + subs * subUnit;
+}
+
+function nums() {
+  return pricingNumbers();
 }
 
 export function buildGroupPaymentPreview(billingCycle, lineCount, { hasReferral = false } = {}) {
   const lines = Math.max(0, lineCount);
   const amountKrw = groupLineTotalKrw(lines, billingCycle, { hasReferral });
-  const subUnit = billingCycle === "annual" ? GROUP_ANNUAL_PER_LINE_KRW : GROUP_MONTHLY_PER_LINE_KRW;
-  const masterUnit =
-    billingCycle === "annual" ? PAID_LIST_PRICE_ANNUAL_KRW : PAID_LIST_PRICE_MONTHLY_KRW;
+  const n = nums();
+  const subUnit = billingCycle === "annual" ? n.b2bAnnual : n.b2bMonthly;
+  const masterUnit = billingCycle === "annual" ? n.paidListAnnual : n.paidListMonthly;
   const cycleLabel = billingCycle === "annual" ? "1년 구독" : "월결제";
   const employeeCount = Math.max(0, lines - 1);
   return {

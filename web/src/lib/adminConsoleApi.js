@@ -196,3 +196,26 @@ export async function resolveAdminManualReview(reviewId, action) {
   });
   return parseJson(res);
 }
+
+export async function fetchAdminPricingConfig() {
+  const res = await fetch(apiUrl("/api/admin/console/pricing-config"), { headers: adminHeaders() });
+  return parseJson(res);
+}
+
+export async function saveAdminPricingConfig(config) {
+  const res = await fetch(apiUrl("/api/admin/console/pricing-config"), {
+    method: "PUT",
+    headers: adminHeaders(),
+    body: JSON.stringify({ config })
+  });
+  return parseJson(res);
+}
+
+export async function fetchAdminPricingRevenueStats({ planSku, from, to } = {}) {
+  const qs = new URLSearchParams();
+  if (planSku) qs.set("planSku", planSku);
+  if (from) qs.set("from", from);
+  if (to) qs.set("to", to);
+  const res = await fetch(apiUrl(`/api/pricing/revenue-stats?${qs}`), { headers: adminHeaders() });
+  return parseJson(res);
+}

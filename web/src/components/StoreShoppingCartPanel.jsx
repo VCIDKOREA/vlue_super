@@ -84,7 +84,7 @@ export default function StoreShoppingCartPanel({ onToast }) {
           <span className="ml-auto text-[11px] font-semibold text-gray-400">{items.length}개 상품</span>
         </div>
 
-        <ul className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+        <ul className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-3 py-2">
           {items.map((it) => (
             <li
               key={it.id}

@@ -265,7 +265,7 @@ export default function MakingStudioModal({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-6 sm:px-5">
+          <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 sm:px-5">
             {studioTab === "create" ? (
               <div className="space-y-4">
                 <div className="flex gap-2">

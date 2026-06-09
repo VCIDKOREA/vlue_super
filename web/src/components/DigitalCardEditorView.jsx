@@ -224,7 +224,7 @@ export default function DigitalCardEditorView({ mode, myCard, isDarkMode = false
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-3">
           <RowReadonly label="실명 (본인인증)" value={legalName} isDarkMode={isDarkMode} />
           {mode !== "apply" ? <RowReadonly label="회원 ID" value={memberHandle} isDarkMode={isDarkMode} /> : null}

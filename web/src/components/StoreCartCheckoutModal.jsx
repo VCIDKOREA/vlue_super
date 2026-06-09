@@ -143,7 +143,7 @@ export default function StoreCartCheckoutModal({ open, items, onClose, onPaid, o
           </div>
         </div>
 
-        <ul className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <ul className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {items.map((it) => (
             <li key={it.id} className="mb-2 flex gap-3 rounded-xl border border-gray-100 bg-gray-50/80 p-2.5">
               <CartProductThumb item={it} size="sm" />

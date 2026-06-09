@@ -7,6 +7,7 @@ import {
   resolveAdminConsoleRole
 } from "../services/admin/adminConsoleAuth.js";
 import { issueTokenPair } from "../services/authSessions.js";
+import { adminPricingConfigRoutes } from "./pricingConfig.js";
 import {
   createMarketingPopup,
   deleteAdminFeedPost,
@@ -245,4 +246,5 @@ authed.post("/health/test-scanner", async (c) => {
   });
 });
 
+authed.route("/pricing-config", adminPricingConfigRoutes);
 adminConsoleRoutes.route("/", authed);

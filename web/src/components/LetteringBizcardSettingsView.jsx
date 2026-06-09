@@ -224,7 +224,7 @@ export default function LetteringBizcardSettingsView({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 no-scrollbar">
+      <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-5 py-4 no-scrollbar">
         <div className="space-y-3">
           <p className={`text-[11px] font-bold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
             {"\uAC00\uC785 \uC2DC \uD655\uC815 (\uC218\uC815 \uBD88\uAC00)"}

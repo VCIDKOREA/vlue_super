@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BackButton from "./common/BackButton";
 import { getSupabase, isSupabaseConfigured } from "../lib/supabaseClient.js";
 import { vlueAuthHeaders, vlueAuthFetch } from "../lib/vlueAuthHeaders.js";
+import { requirePrimaryForFeature } from "../lib/membershipAccessGuard.js";
 
 function readMyUserId() {
   try {
@@ -132,6 +133,11 @@ export default function VlueDmChat() {
       seenIds.current = new Set();
       setPeer(p);
       if (!myId) return;
+
+      const access = await requirePrimaryForFeature("chat", {
+        onBlocked: (msg) => setLoadError(msg)
+      });
+      if (!access.ok) return;
 
       let rid;
       try {
@@ -304,7 +310,7 @@ export default function VlueDmChat() {
 
       {loadError && <div className="mx-3 mt-2 rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-700">{loadError}</div>}
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
+      <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
         {messages.map((m) =>
           m.type === "system" ? (
             <div key={m.id} className="flex justify-center">

@@ -37,6 +37,7 @@ import {
 } from "../lib/shopPushStorage.js";
 import { generatePostDescription } from "../lib/vmingApi.js";
 import SecurityVaultPanel from "./mypage/SecurityVaultPanel.jsx";
+import VluerPartnerDashboard from "./VluerPartnerDashboard.jsx";
 
 const HUB_TABS = [
   { id: "favorites", label: "관심상점", activeClass: "bg-rose-600 text-white shadow-md shadow-rose-900/15" },
@@ -79,7 +80,7 @@ function ProfileHubModal({ open, tab, title, onClose, children }) {
             닫기
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-3">{children}</div>
+        <div className="vlue-scroll-pad-bottom-nav flex-1 overflow-y-auto px-4 py-3">{children}</div>
       </div>
     </div>
   );
@@ -114,6 +115,7 @@ function MyPage({
   onOpenLetteringBizcardSettings,
   onOpenUpdateStory,
   onOpenCalendar,
+  onOpenFamilyProtection,
   resetNonce = 0
 }) {
   const panelCls = isDarkMode
@@ -466,6 +468,7 @@ function MyPage({
   return (
     <section ref={pageScrollRef} data-mypage-scroll="1" className="vlue-mypage mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden">
       <ScreenBackHeader title="마이페이지" onBack={onGoMain} />
+      <VluerPartnerDashboard layout="compact" onOpenFamilyProtection={onOpenFamilyProtection} />
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-24 pt-3">
         {!isCreated ? (
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">

@@ -110,7 +110,7 @@ export default function PersonalMemoEditor({
           </>
         }
       />
-      <div className={`flex-1 overflow-y-auto p-4 ${cardBg}`}>
+      <div className={`vlue-scroll-pad-bottom-nav flex-1 overflow-y-auto p-4 ${cardBg}`}>
         <input
           type="text"
           value={title}

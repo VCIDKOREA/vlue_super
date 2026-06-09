@@ -197,7 +197,7 @@ export default function EnterpriseLineManagePanel({ onToast, onBack, isDarkMode 
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <input
           type="search"
           value={search}

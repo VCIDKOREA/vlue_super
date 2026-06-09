@@ -191,7 +191,7 @@ export default function VlueSettingsPanel({
             저장
           </button>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 pb-2">
           <LetteringSettingsSection
             isDarkMode={isDarkMode}
             onNotice={showSettingNotice}
@@ -441,7 +441,7 @@ export default function VlueSettingsPanel({
         <p className={`text-[17px] font-black ${headText}`}>설정</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-10 no-scrollbar">
+      <div className="vlue-scroll-pad-profile-panel flex-1 overflow-y-auto px-4 py-4 no-scrollbar">
         <SettingsSection title="내 계정" isDarkMode={isDarkMode}>
           <SettingsRowButton label="프로필 관리" sublabel="아바타 · 닉네임 · 상태메시지" onClick={() => onSubView("profileManage")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />

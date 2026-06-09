@@ -412,7 +412,7 @@ export default function VlueEmailInboxScreen({ open, onClose, onToast, onOpenPro
         </button>
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-y-auto p-2">
+      <nav className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto p-2">
         <NavItem active={folder === "all"} label="전체 메일" count={stats.inboxTotal} onClick={() => pickFolder("all")} />
         <NavItem
           active={folder === "inbox"}
@@ -517,7 +517,7 @@ export default function VlueEmailInboxScreen({ open, onClose, onToast, onOpenPro
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto p-4">
             {isSentView ? (
               <SentTable rows={sent} emptyLabel="발송 내역이 없습니다." />
             ) : (

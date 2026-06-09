@@ -117,10 +117,40 @@ function ModalShell({ open, title, children, onClose, footer }) {
   );
 }
 
+function DashboardDetailModal({ open, title, subtitle, onClose, children }) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[150] flex items-end justify-center bg-black/45 sm:items-center sm:p-3"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <button type="button" className="absolute inset-0" aria-label="닫기" onClick={onClose} />
+      <div className="relative flex max-h-[min(88vh,640px)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-4 py-3 text-white">
+          <div className="min-w-0">
+            <p className="text-[14px] font-black leading-tight">{title}</p>
+            {subtitle ? <p className="mt-0.5 truncate text-[10px] font-medium text-indigo-200">{subtitle}</p> : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-lg bg-white/15 px-2.5 py-1 text-[11px] font-black text-white"
+          >
+            닫기
+          </button>
+        </div>
+        <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-2.5 pt-2.5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 /**
- * 홈 상단 — 클린 데이터 대시보드 + 이벤트 기반 정책 모달
+ * VLUER 리워드·수익 — compact: 마이페이지 상단 한 줄 + 모달 상세
  */
-function VluerPartnerDashboardInner({ onOpenFamilyProtection }) {
+function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact" }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("org");
   const [dash, setDash] = useState(null);
@@ -256,77 +286,8 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection }) {
     return () => window.clearTimeout(timer);
   }, [tab, dash, billingCycle, simPersonalCount, simB2bLines, simTarget, runSim]);
 
-  if (loading && !dash) {
-    return (
-      <section className="mb-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-center text-[12px] font-semibold text-slate-500">파트너 대시보드 불러오는 중…</p>
-      </section>
-    );
-  }
-
-  return (
-    <>
-      {offlineDemo && error ? (
-        <section className="mb-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2">
-          <p className="text-[11px] font-semibold leading-snug text-amber-900">{error}</p>
-          <button
-            type="button"
-            onClick={load}
-            className="mt-1.5 text-[10px] font-bold text-amber-800 underline underline-offset-2"
-          >
-            다시 불러오기
-          </button>
-        </section>
-      ) : null}
-      <section className="mb-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-between gap-2 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-3.5 py-3 text-left text-white"
-        >
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-flex rounded-full bg-gradient-to-r ${tierRingClass(tierCode)} px-2.5 py-0.5 text-[10px] font-black text-white`}
-              >
-                {tierCode}
-              </span>
-              <span className="text-[10px] font-semibold text-indigo-200">{dash?.tierDisplay?.label}</span>
-              {offlineDemo && !error ? (
-                <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-200">샘플</span>
-              ) : null}
-            </div>
-            <p
-              className={`mt-1 text-[clamp(17px,4.8vw,20px)] font-black leading-tight tracking-tight ${
-                dash?.stats?.monthlyIsPoints
-                  ? "bg-gradient-to-r from-amber-200 via-amber-300 to-orange-200 bg-clip-text text-transparent drop-shadow-[0_0_16px_rgba(251,191,36,0.5)]"
-                  : "bg-gradient-to-r from-emerald-200 via-teal-200 to-cyan-200 bg-clip-text text-transparent drop-shadow-[0_0_16px_rgba(94,234,212,0.45)]"
-              }`}
-            >
-              {dash?.stats?.monthlyEstimatedLabel}
-            </p>
-            <p className="text-[10px] font-medium text-slate-300">
-              {dash?.stats?.monthlyIsPoints ? "월 예상 리워드" : "월 예상 정산"}
-            </p>
-            <p className="text-[9px] text-indigo-200/90">{dash?.tierDisplay?.benefitLabel}</p>
-            {onOpenFamilyProtection ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenFamilyProtection();
-                }}
-                className="mt-1.5 text-left text-[9px] font-bold text-amber-300/95 underline underline-offset-2"
-              >
-                가족 보호 등록 (친구검색) →
-              </button>
-            ) : null}
-          </div>
-          <span className="shrink-0 text-[11px] font-bold text-indigo-200">{open ? "▲" : "▼"}</span>
-        </button>
-
-        {open && (
-          <div className="border-t border-slate-100 px-2.5 pb-3 pt-2.5">
+  const dashboardBody = (
+    <div className="px-0.5">
             <div className="mb-2 grid grid-cols-3 gap-1.5">
               <div className="rounded-xl bg-slate-50 px-2 py-2 text-center">
                 <p className="text-[9px] font-bold text-slate-500">합산</p>
@@ -599,12 +560,90 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection }) {
               </div>
             )}
 
-            <button type="button" onClick={load} className="mt-2 w-full text-[10px] font-semibold text-slate-400">
-              새로고침
-            </button>
+      <button type="button" onClick={load} className="mt-2 w-full text-[10px] font-semibold text-slate-400">
+        새로고침
+      </button>
+      {onOpenFamilyProtection ? (
+        <button
+          type="button"
+          onClick={onOpenFamilyProtection}
+          className="mt-2 w-full text-left text-[10px] font-bold text-amber-700 underline underline-offset-2"
+        >
+          가족 보호 등록 (친구검색) →
+        </button>
+      ) : null}
+    </div>
+  );
+
+  if (loading && !dash) {
+    return (
+      <div className="vlue-mypage-reward-bar shrink-0 border-b border-slate-800/80 bg-slate-900 px-3 py-2">
+        <p className="text-[11px] font-semibold text-slate-400">리워드 불러오는 중…</p>
+      </div>
+    );
+  }
+
+  const monthlyCaption = dash?.stats?.monthlyIsPoints ? "월 예상 리워드" : "월 예상 정산";
+  const modalSubtitle = [dash?.tierDisplay?.label, dash?.tierDisplay?.benefitLabel].filter(Boolean).join(" · ");
+
+  return (
+    <>
+      {offlineDemo && error ? (
+        <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-1.5">
+          <p className="text-[10px] font-semibold leading-snug text-amber-900">{error}</p>
+          <button
+            type="button"
+            onClick={load}
+            className="text-[10px] font-bold text-amber-800 underline underline-offset-2"
+          >
+            다시 불러오기
+          </button>
+        </div>
+      ) : null}
+
+      <div className="vlue-mypage-reward-bar shrink-0 border-b border-slate-800/80 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-3 py-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span
+            className={`inline-flex shrink-0 rounded-full bg-gradient-to-r ${tierRingClass(tierCode)} px-2 py-0.5 text-[9px] font-black text-white`}
+          >
+            {tierCode}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[10px] font-semibold text-indigo-200/95">
+              {dash?.tierDisplay?.label}
+              {offlineDemo && !error ? (
+                <span className="ml-1 rounded bg-white/10 px-1 py-px text-[8px] font-bold text-amber-200">샘플</span>
+              ) : null}
+            </p>
+            <p className="flex items-baseline gap-1.5 leading-none">
+              <span
+                className={`text-[15px] font-black tabular-nums tracking-tight ${
+                  dash?.stats?.monthlyIsPoints ? "text-amber-300" : "text-emerald-300"
+                }`}
+              >
+                {dash?.stats?.monthlyEstimatedLabel}
+              </span>
+              <span className="text-[9px] font-medium text-slate-400">{monthlyCaption}</span>
+            </p>
           </div>
-        )}
-      </section>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="shrink-0 rounded-lg bg-white/12 px-2.5 py-1 text-[10px] font-black text-white ring-1 ring-white/20 active:scale-[0.98]"
+        >
+          리워드
+        </button>
+      </div>
+
+      <DashboardDetailModal
+        open={open}
+        title={monthlyCaption}
+        subtitle={modalSubtitle}
+        onClose={() => setOpen(false)}
+      >
+        {dashboardBody}
+      </DashboardDetailModal>
 
       {toast && (
         <div className="fixed bottom-24 left-1/2 z-[210] w-[86%] max-w-sm -translate-x-1/2 rounded-xl bg-slate-900/92 px-4 py-2.5 text-center text-[12px] font-semibold text-white shadow-lg">

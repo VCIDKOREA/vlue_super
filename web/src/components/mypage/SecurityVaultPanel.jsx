@@ -60,7 +60,7 @@ export default function SecurityVaultPanel({ open, onClose }) {
             필수입니다.
           </p>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="vlue-scroll-pad-bottom-nav flex-1 overflow-y-auto px-4 py-3">
           {loading ? (
             <p className="text-center text-[12px] text-slate-400">목록 조회 중...</p>
           ) : items.length === 0 ? (

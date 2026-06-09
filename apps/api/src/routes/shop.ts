@@ -8,6 +8,7 @@ import { enforceEnterpriseLineAccess, requireEnterprisePurchaser, requireEnterpr
 import { loadEnterpriseUserContext } from "../services/enterprise/enterpriseContext.js";
 import { listStoreProductsForSeller, syncStoreProduct } from "../services/shop/storeProductService.js";
 import { shopPaymentRoutes } from "./shopPayment.js";
+import { gateShoppingAccess } from "../middleware/membershipFeatureGate.js";
 
 export const shopRoutes = new Hono();
 
@@ -76,6 +77,8 @@ shopRoutes.post("/products/sync", async (c) => {
 shopRoutes.post("/orders/prepare", requireUserHeader, async (c) => {
   try {
     const uid = c.get("vlueUserId") as string;
+    const gate = await gateShoppingAccess(c, uid);
+    if (gate) return gate;
     const body = await c.req.json<{
       sellerUserId?: string;
       externalProductId?: string;

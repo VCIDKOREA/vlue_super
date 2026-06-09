@@ -701,7 +701,7 @@ export default function VlueOnboarding({ onComplete, onCancel }) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div className="mx-auto max-w-md space-y-3 pb-28">
           {step === "tier" && (
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

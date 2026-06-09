@@ -4,7 +4,6 @@ import { fetchLocalAds, mapLocalAdToStoreCard } from "../lib/localAdsApi.js";
 import { isPaidMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
 import LocalAdRegisterModal from "./LocalAdRegisterModal.jsx";
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
-import VluerPartnerDashboard from "./VluerPartnerDashboard.jsx";
 import ScreenBackHeader from "./common/ScreenBackHeader";
 import ModalCloseButton from "./common/ModalCloseButton";
 import { FAVORITE_SHOPS_CHANGED, isFavoriteShop, toggleFavoriteShop } from "../lib/favoriteShopsStorage.js";
@@ -25,6 +24,7 @@ import {
 } from "../lib/homeLayoutConfig.js";
 import { fetchPublicHomeLayout } from "../lib/hqAdminApi.js";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
+import HomeBizDirectorySearch from "./HomeBizDirectorySearch.jsx";
 
 /** 상단 공식 광고 배너 — 샘플(이미지·문구는 교체 가능) / 배지 VLUE 공식 + 부가 라벨 */
 const OFFICIAL_BANNERS = [
@@ -866,7 +866,12 @@ function Home({
   }, []);
 
   return (
-    <main className="home-main-feed min-h-0 w-full max-w-none min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-32 pt-1.5">
+    <main className="home-main-feed min-h-0 w-full max-w-none min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-32 pt-0">
+      <HomeBizDirectorySearch
+        categoryExposedPosts={categoryExposedPosts}
+        onOpenBusinessRoom={onOpenBusinessRoom}
+      />
+
       <section className="mb-3">
         <div className="relative w-full min-w-0 max-w-full">
           <button
@@ -920,7 +925,7 @@ function Home({
           </div>
         </div>
       </section>
-      <VluerPartnerDashboard onOpenFamilyProtection={onOpenFamilyProtection} />
+
       {activeDetailId === "vlue-guide" && (
         <section
           className="fixed inset-x-0 top-[48px] bottom-[calc(48px+env(safe-area-inset-bottom,0px))] z-[140] flex w-full max-w-none flex-col bg-[#f8fafc]"

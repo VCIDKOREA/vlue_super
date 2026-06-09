@@ -97,7 +97,7 @@ export function SettingsToggleRow({ label, checked, onChange, isDarkMode, subtit
 
 export function SettingsSubpageShell({ title, subtitle, onBack, children, isDarkMode }) {
   return (
-    <div className={`flex h-full min-h-0 flex-col ${isDarkMode ? "bg-[#0b0c10] text-gray-100" : "bg-[#f4f6fa] text-gray-900"}`}>
+    <div className={`flex h-full min-h-0 flex-1 flex-col ${isDarkMode ? "bg-[#0b0c10] text-gray-100" : "bg-[#f4f6fa] text-gray-900"}`}>
       <div
         className={`flex shrink-0 items-center gap-2 border-b px-3 py-3 ${
           isDarkMode ? "border-white/10 bg-[#151821]" : "border-gray-100 bg-white"
@@ -120,7 +120,7 @@ export function SettingsSubpageShell({ title, subtitle, onBack, children, isDark
           ) : null}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-4 py-4 no-scrollbar">{children}</div>
+      <div className="vlue-scroll-pad-profile-panel flex-1 overflow-y-auto px-4 py-4 no-scrollbar">{children}</div>
     </div>
   );
 }

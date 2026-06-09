@@ -427,7 +427,7 @@ export default function MediaCommerceFeed({
 
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 pt-2"
+        className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 pt-2"
         style={{ paddingBottom: FEED_SCROLL_BOTTOM_PAD }}
       >
         {loading && items.length === 0 ? (

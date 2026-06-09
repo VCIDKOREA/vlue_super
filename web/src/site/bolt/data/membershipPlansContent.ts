@@ -19,7 +19,12 @@ import {
   B2B_MEMBERSHIP_SUBLINE,
   REFERRAL_PROGRAM_NOTICES,
   PERSONAL_COMBO_PRICING_NOTE,
+  broadcastAddonAmountKrw,
+  sohoActivityPlanDescription,
+  sohoBroadcastPlanDescription,
+  b2bPlanDescription,
 } from '../../../lib/membershipBm.js';
+import { pricingNumbers } from '../../../lib/pricingConfig.js';
 export type ServiceAccordionItem = {
   id: string;
   title: string;
@@ -53,13 +58,28 @@ export const MARKETING_PRICING_TIERS = [
   },
   {
     id: 'b2b',
-    name: '기업 회원',
-    price: PAID_LIST_PRICE_MONTHLY_KRW,
-    period: '대표 회선/월',
-    description: `${MEMBERSHIP_PLAN_DETAILS.b2b.headline} · ${B2B_MEMBERSHIP_SUBLINE}`,
+    name: 'B2B 풀 패키지',
+    price: pricingNumbers().b2bMonthly,
+    period: '회선/월 (PC 전용)',
+    description: b2bPlanDescription(),
     color: 'gold' as const,
     features: MEMBERSHIP_PLAN_DETAILS.b2b.bullets,
     priceNote: B2B_ENTERPRISE_SUMMARY_SHORT,
+  },
+  {
+    id: 'soho_broadcast',
+    name: 'SOHO 영업 송출 옵션',
+    price: broadcastAddonAmountKrw('monthly'),
+    period: '추가/월',
+    description: sohoBroadcastPlanDescription(),
+    color: 'purple' as const,
+    features: [
+      'Primary(SOHO 활동형) 필요',
+      '발신번호 등록·인증',
+      '수신 화면 디지털인증명함 송출(Secondary)',
+      '기본 명함과 별도 번호·송출 효과',
+    ],
+    priceNote: `SOHO 활동형 ${pricingNumbers().sohoMonthly.toLocaleString('ko-KR')}원과 별도 SKU`,
   },
 ];
 
@@ -77,6 +97,26 @@ export const MEMBERSHIP_PRICING_FEATURES: ServiceAccordionItem[] = [
     title: '일반 회원 (Free) — 무료',
     summary: MEMBERSHIP_PLAN_DETAILS.free.headline,
     detail: MEMBERSHIP_PLAN_DETAILS.free.bullets,
+  },
+  {
+    id: 'plan-soho',
+    title: 'SOHO 활동형 (Primary)',
+    summary: sohoActivityPlanDescription(),
+    detail: [
+      ...MEMBERSHIP_PLAN_DETAILS.paid.bullets,
+      '채팅·쇼핑 등 핵심 기능 접근 기준',
+      `월 ${pricingNumbers().sohoMonthly.toLocaleString('ko-KR')}원(부가세 포함, 추천인 할인 시)`,
+    ],
+  },
+  {
+    id: 'plan-broadcast',
+    title: 'SOHO 영업 송출 옵션 (Secondary)',
+    summary: sohoBroadcastPlanDescription(),
+    detail: [
+      'Primary 계정 + 월 4,200원(설정값) 추가',
+      '등록·인증된 발신번호로 발신 시 수신 화면에 디지털인증명함 송출',
+      'VLUER 포인트·임직원 콤보와 별개 SKU',
+    ],
   },
   {
     id: 'plan-paid',

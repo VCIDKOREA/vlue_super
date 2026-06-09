@@ -17,9 +17,11 @@ import {
   updateAdminNotice,
   updateAdminPopup
 } from "../../lib/adminConsoleApi.js";
+import PricingManagerPanel from "./PricingManagerPanel.jsx";
 
 const TABS = [
   { id: "health", label: "상태 점검" },
+  { id: "pricing", label: "요금제 관리" },
   { id: "users", label: "회원 관리" },
   { id: "posts", label: "게시물 관리" },
   { id: "onboarding", label: "가입 승인" }
@@ -540,6 +542,7 @@ export default function AdminConsoleDesk({ user, onLogout }) {
 
       <main className="mx-auto max-w-6xl px-4 py-5">
         {tab === "health" ? <HealthTab onToast={showToast} /> : null}
+        {tab === "pricing" ? <PricingManagerPanel onToast={showToast} /> : null}
         {tab === "users" ? <UsersTab onToast={showToast} /> : null}
         {tab === "posts" ? <PostsTab onToast={showToast} /> : null}
         {tab === "onboarding" ? <OnboardingTab onToast={showToast} /> : null}

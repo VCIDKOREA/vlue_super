@@ -3,6 +3,7 @@ import { prisma } from "../db/client.js";
 import { resolveRequestUserId } from "../lib/authContext.js";
 import { userIsStrictPremium } from "../middleware/cardGate.js";
 import { publishChatMessageSse } from "../services/chat/chatRealtime.js";
+import { gateChatAccess } from "../middleware/membershipFeatureGate.js";
 
 async function assertOptionalSenderCard(userId: string, senderCardId: string | null | undefined) {
   if (!senderCardId) return;
@@ -132,6 +133,8 @@ chatRoutes.get("/blocks", async (c) => {
 chatRoutes.post("/rooms/open", async (c) => {
   const me = await resolveRequestUserId(c);
   if (!me) return c.json({ error: "인증 필요" }, 401);
+  const gate = await gateChatAccess(c, me);
+  if (gate) return gate;
 
   let body: { peerId?: string };
   try {
@@ -300,6 +303,8 @@ chatRoutes.post("/rooms/:roomId/read", async (c) => {
 chatRoutes.post("/rooms/:roomId/messages", async (c) => {
   const me = await resolveRequestUserId(c);
   if (!me) return c.json({ error: "인증 필요" }, 401);
+  const gate = await gateChatAccess(c, me);
+  if (gate) return gate;
   const roomId = c.req.param("roomId");
 
   let body: { content?: string; messageType?: "normal" | "system"; senderCardId?: string | null };

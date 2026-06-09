@@ -13,9 +13,11 @@ import { resolveSiteShell } from "./lib/siteMode.js";
 import "./styles.css";
 import { applyAppSettingsToDocument } from "./lib/vlueAppSettings.js";
 import { logProductionEnvBinding } from "./config.js";
+import { ensurePricingConfigLoaded } from "./lib/pricingConfig.js";
 
 applyAppSettingsToDocument();
 logProductionEnvBinding();
+ensurePricingConfigLoaded().catch(() => undefined);
 
 const adminPath = import.meta.env.VITE_ADMIN_PATH;
 const showAdminConsole = isAdminConsoleEntry();

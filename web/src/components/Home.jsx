@@ -4,7 +4,6 @@ import { fetchLocalAds, mapLocalAdToStoreCard } from "../lib/localAdsApi.js";
 import { isPaidMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
 import LocalAdRegisterModal from "./LocalAdRegisterModal.jsx";
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
-import VluerPartnerDashboard from "./VluerPartnerDashboard.jsx";
 import ScreenBackHeader from "./common/ScreenBackHeader";
 import ModalCloseButton from "./common/ModalCloseButton";
 import { FAVORITE_SHOPS_CHANGED, isFavoriteShop, toggleFavoriteShop } from "../lib/favoriteShopsStorage.js";
@@ -25,6 +24,7 @@ import {
 } from "../lib/homeLayoutConfig.js";
 import { fetchPublicHomeLayout } from "../lib/hqAdminApi.js";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
+import HomeBizDirectorySearch from "./HomeBizDirectorySearch.jsx";
 
 /** 상단 공식 광고 배너 — 샘플(이미지·문구는 교체 가능) / 배지 VLUE 공식 + 부가 라벨 */
 const OFFICIAL_BANNERS = [
@@ -894,7 +894,12 @@ function Home({
   }, []);
 
   return (
-    <main className="home-main-feed home-main-feed--spaced min-h-0 w-full max-w-none min-w-0 flex-1 flex flex-col gap-5 overflow-y-auto overflow-x-hidden px-2.5 pb-32 pt-2">
+    <main className="home-main-feed home-main-feed--spaced min-h-0 w-full max-w-none min-w-0 flex-1 flex flex-col gap-5 overflow-y-auto overflow-x-hidden px-2.5 pb-32 pt-0">
+      <HomeBizDirectorySearch
+        categoryExposedPosts={categoryExposedPosts}
+        onOpenBusinessRoom={onOpenBusinessRoom}
+      />
+
       <section>
         <div className="relative w-full min-w-0 max-w-full">
           <button
@@ -948,9 +953,7 @@ function Home({
           </div>
         </div>
       </section>
-      <div className="home-vluer-dashboard-wrap">
-        <VluerPartnerDashboard onOpenFamilyProtection={onOpenFamilyProtection} />
-      </div>
+
       {activeDetailId === "vlue-guide" && (
         <section
           className="fixed inset-x-0 top-[48px] bottom-[calc(48px+env(safe-area-inset-bottom,0px))] z-[140] flex w-full max-w-none flex-col bg-[#f8fafc]"
@@ -973,7 +976,7 @@ function Home({
             <p className="truncate text-[13px] font-semibold text-gray-900">VLUE 100% 활용법</p>
             <span className="text-[11px] font-semibold text-blue-600">VLUE</span>
           </div>
-          <div className="flex-1 overflow-y-auto px-3 py-3">
+          <div className="vlue-scroll-pad-bottom-nav flex-1 overflow-y-auto px-3 py-3">
             <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-600">서비스소개</p>
               <h3 className="mt-1 text-[16px] font-semibold text-slate-900">VLUE 100% 활용법</h3>
@@ -1475,7 +1478,7 @@ function Home({
           />
           {!selectedBusinessId ? (
             <>
-              <div className="flex-1 overflow-y-auto px-3 py-2">
+              <div className="vlue-scroll-pad-bottom-nav flex-1 overflow-y-auto px-3 py-2">
               <div className="space-y-0">
                 {categoryBoardItems.map((biz) => {
                   const favorited = isFavoriteShop(biz.id);
@@ -1586,7 +1589,7 @@ function Home({
               </div>
             </>
           ) : selectedBusiness ? (
-            <div className="flex-1 overflow-y-auto px-3 py-2">
+            <div className="vlue-scroll-pad-bottom-nav flex-1 overflow-y-auto px-3 py-2">
             {(() => {
               const favorited = isFavoriteShop(selectedBusiness.id);
               const shopOwnerKey = `shop:${selectedBusiness.id}`;

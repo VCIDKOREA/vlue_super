@@ -8,8 +8,10 @@ import { runElderProtectionChecks } from "./services/familyProtection/familyProt
 import { attachOfficeAgentWebSocket } from "./services/office/remoteControlHub.js";
 import { seedDemoCompanyLine } from "./services/office/companyLinesService.js";
 import type { Server } from "node:http";
+import { loadPricingConfig } from "./services/pricing/pricingConfigService.js";
 
 assertProductionEnvLocked();
+await loadPricingConfig();
 
 const app = new Hono();
 

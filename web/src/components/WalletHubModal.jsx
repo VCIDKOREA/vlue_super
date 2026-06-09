@@ -189,7 +189,8 @@ export default function WalletHubModal({
 
   useEffect(() => {
     if (open) {
-      setTab(defaultTab || "received");
+      const nextTab = TABS.some((t) => t.id === defaultTab) ? defaultTab : "received";
+      setTab(nextTab);
       refreshOwned();
       refreshVaultFiles();
     }
@@ -339,16 +340,16 @@ export default function WalletHubModal({
               </div>
             </div>
 
-            <div className="relative mt-4 min-w-0">
+            <div className="mt-4 min-w-0">
               <div
                 ref={tabStrip.ref}
                 role="tablist"
                 aria-label="개인 자료실 메뉴"
                 title="드래그하거나 휠로 탭을 넘길 수 있습니다"
                 onMouseDown={tabStrip.onMouseDown}
-                className={`wallet-tab-strip flex overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-mandatory touch-pan-x px-4 pb-2 sm:px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${tabStrip.stripClassName}`}
+                className={`wallet-tab-strip flex overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-proximity touch-pan-x scroll-px-4 px-4 pb-2 sm:scroll-px-5 sm:px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${tabStrip.stripClassName}`}
               >
-                <div className="vlue-tab-strip w-max flex-nowrap pr-10">
+                <div className="vlue-tab-strip w-max flex-nowrap gap-2 pr-4">
                   {TABS.map((t) => (
                     <button
                       key={t.id}
@@ -362,10 +363,10 @@ export default function WalletHubModal({
                       onClick={tabStrip.wrapClick(() => setTab(t.id))}
                       className={`snap-center shrink-0 whitespace-nowrap rounded-full font-black transition-colors ${
                         tab === t.id
-                          ? "bg-slate-900 text-white"
+                          ? "bg-slate-900 text-white shadow-sm"
                           : isDarkMode
-                            ? "bg-white/10 text-gray-300 ring-1 ring-white/15"
-                            : "bg-white text-slate-600 ring-1 ring-slate-200"
+                            ? "bg-white/12 text-gray-100 ring-1 ring-white/20"
+                            : "bg-white text-slate-800 ring-1 ring-slate-300"
                       }`}
                     >
                       {t.label}
@@ -378,16 +379,10 @@ export default function WalletHubModal({
                   ))}
                 </div>
               </div>
-              <div
-                className={`pointer-events-none absolute right-0 top-0 z-10 h-full w-12 bg-gradient-to-l to-transparent ${
-                  isDarkMode ? "from-[#111827] via-[#111827]/90" : "from-slate-50 via-slate-50/90"
-                }`}
-                aria-hidden
-              />
             </div>
           </div>
 
-          <div className="box-border min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 sm:px-5">
+          <div className="vlue-scroll-pad-bottom-nav box-border min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5">
             {tab === "received" && (
               <div className="space-y-4">
                 {receivedCount === 0 ? (

@@ -3652,6 +3652,14 @@ function App() {
             );
             navigate({ nextPage: "main", nextTab: activeTab, nextRoomId: null });
           }}
+          onOpenFamilyProtection={() => {
+            try {
+              sessionStorage.setItem("vlue_expand_family_protection_v1", "1");
+            } catch {
+              /* ignore */
+            }
+            navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
+          }}
         />
       )}
       {page === "betaGuide" && <BetaLaunchGuide onGoMain={goBackStep} />}
@@ -3667,8 +3675,8 @@ function App() {
         onRemoveCardFromWallet={removeCardFromWallet}
       />
 
-      <footer className={`fixed bottom-0 left-0 right-0 z-40 ${showBottomNav ? "block" : "hidden"}`}>
-        <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-center">
+      <footer className={`fixed bottom-0 left-0 right-0 z-[130] ${showBottomNav ? "block" : "hidden"}`}>
+        <nav className="fixed bottom-0 left-0 right-0 z-[131] flex justify-center">
           <div
             ref={bottomNavPulseSyncRef}
             className={`bottom-nav-pulse-root flex min-h-[48px] w-full max-w-none items-center justify-around border-t px-2 pb-[max(0px,env(safe-area-inset-bottom,0px))] pt-[6px] backdrop-blur-md ${

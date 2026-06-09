@@ -1,8 +1,22 @@
 /** BM 명세 — 멤버십(유료/무료) · VLUER 등급(일반/인증/파트너/공식) */
 
+import { getPricingConfigSync, pricingNumbers } from "./pricingConfig.js";
+
+function nums() {
+  return pricingNumbers();
+}
+
 export const PERSONAL_COMBO_ADDON_MONTHLY_KRW = 5100;
 export const PERSONAL_COMBO_ADDON_ANNUAL_KRW = 51000;
 export const B2B_SUBORDINATE_MONTHLY_KRW = 14700;
+export const SOHO_BROADCAST_MONTHLY_KRW = 4200;
+export const SOHO_BROADCAST_ANNUAL_KRW = 42000;
+
+export function personalComboPricingNote() {
+  const n = nums();
+  return `회사 부담 ${n.b2bMonthly.toLocaleString("ko-KR")}원 + 개인 부담 ${n.personalComboMonthly.toLocaleString("ko-KR")}원 = SOHO 활동형 ${n.sohoMonthly.toLocaleString("ko-KR")}원과 동일한 VLUER 혜택`;
+}
+
 export const PERSONAL_COMBO_PRICING_NOTE =
   "회사 부담 14,700원 + 개인 부담 5,100원 = 유료 회원 19,800원과 동일한 VLUER 혜택";
 
@@ -10,7 +24,8 @@ export const ENTERPRISE_REFERRAL_POLICY_NOTE =
   "회사 인증 후 개인 유료(콤보) 가입 시 개인 추천인 코드를 지정할 수 없으며, 해당 기업을 인수한 VLUE(기업 추천인)으로 자동 귀속됩니다.";
 
 export function personalComboAmountKrw(billingCycle) {
-  return billingCycle === "annual" ? PERSONAL_COMBO_ADDON_ANNUAL_KRW : PERSONAL_COMBO_ADDON_MONTHLY_KRW;
+  const n = nums();
+  return billingCycle === "annual" ? n.personalComboAnnual : n.personalComboMonthly;
 }
 
 export function buildPersonalComboPaymentPreview(billingCycle = "monthly") {
@@ -19,8 +34,8 @@ export function buildPersonalComboPaymentPreview(billingCycle = "monthly") {
     amountKrw,
     amountLabel: formatKrw(amountKrw),
     badges: ["임직원 콤보", "회사 인증 필요"],
-    detailLine: PERSONAL_COMBO_PRICING_NOTE,
-    compareFrom: formatKrw(PAID_MONTHLY_DISCOUNTED_KRW),
+    detailLine: personalComboPricingNote(),
+    compareFrom: formatKrw(nums().sohoMonthly),
     compareTo: formatKrw(amountKrw)
   };
 }
@@ -87,15 +102,33 @@ export function normalizeMembershipKind(raw) {
 }
 
 export function paidAmountKrw(billingCycle, withReferralDiscount) {
+  const n = nums();
   if (billingCycle === "annual") {
-    return withReferralDiscount ? PAID_ANNUAL_DISCOUNTED_KRW : PAID_LIST_PRICE_ANNUAL_KRW;
+    return withReferralDiscount ? n.sohoAnnual : n.paidListAnnual;
   }
-  return withReferralDiscount ? PAID_MONTHLY_DISCOUNTED_KRW : PAID_LIST_PRICE_MONTHLY_KRW;
+  return withReferralDiscount ? n.sohoMonthly : n.paidListMonthly;
+}
+
+export function broadcastAddonAmountKrw(billingCycle) {
+  const n = nums();
+  return billingCycle === "annual" ? n.broadcastAnnual : n.broadcastMonthly;
+}
+
+export function sohoActivityPlanDescription() {
+  return getPricingConfigSync().plans.soho_activity.description;
+}
+
+export function sohoBroadcastPlanDescription() {
+  return getPricingConfigSync().plans.soho_broadcast_addon.description;
+}
+
+export function b2bPlanDescription() {
+  return getPricingConfigSync().plans.b2b_full_package.description;
 }
 
 /** 12개월 월정가 합산 — 2개월 무료 비교용 */
 export function annualTwelveMonthListKrw() {
-  return PAID_LIST_PRICE_MONTHLY_KRW * 12;
+  return nums().paidListMonthly * 12;
 }
 
 /**
@@ -113,8 +146,8 @@ export function buildPaymentPreview(billingCycle, withReferralDiscount) {
       compareFrom: null,
       compareTo: null,
       detailLine: withReferralDiscount
-        ? `추천인 할인 (정가 ${PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString("ko-KR")}원)`
-        : `정가 ${PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString("ko-KR")}원`
+        ? `추천인 할인 (정가 ${nums().paidListMonthly.toLocaleString("ko-KR")}원)`
+        : `정가 ${nums().paidListMonthly.toLocaleString("ko-KR")}원`
     };
   }
 
@@ -128,7 +161,7 @@ export function buildPaymentPreview(billingCycle, withReferralDiscount) {
     badges,
     compareFrom: formatKrw(twelveMonth),
     compareTo: formatKrw(amountKrw),
-    detailLine: `월 ${PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString("ko-KR")}원 × 10개월 분 · ${formatKrw(twelveMonth - amountKrw)} 절약`
+    detailLine: `월 ${nums().paidListMonthly.toLocaleString("ko-KR")}원 × 10개월 분 · ${formatKrw(twelveMonth - amountKrw)} 절약`
   };
 }
 

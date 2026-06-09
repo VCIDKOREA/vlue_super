@@ -47,6 +47,8 @@ import { vmingConsentRoutes } from "./vmingConsent.js";
 import { vmingRoutes } from "./vming.js";
 import { fraudRoutes } from "./fraud.js";
 import { calendarNoticeRoutes } from "./calendarNotice.js";
+import { pricingConfigRoutes } from "./pricingConfig.js";
+import { broadcastLineRoutes } from "./broadcastLine.js";
 
 /** `/api` 아래에 마운트되는 라우트 묶음 */
 export const apiRoutes = new Hono();
@@ -99,3 +101,5 @@ apiRoutes.route("/memo", memoRoutes);
 apiRoutes.route("/vming/consent", vmingConsentRoutes);
 apiRoutes.route("/vming", vmingRoutes);
 apiRoutes.route("/fraud", fraudRoutes);
+apiRoutes.route("/pricing", pricingConfigRoutes);
+apiRoutes.route("/broadcast-line", broadcastLineRoutes);

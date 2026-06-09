@@ -339,7 +339,7 @@ export default function PersonalMemoScreen({
           </button>
         ))}
       </div>
-      <div className="relative min-h-0 flex-1 overflow-y-auto px-3 py-2 pb-20">
+      <div className="vlue-scroll-pad-bottom-nav relative min-h-0 flex-1 overflow-y-auto px-3 py-2">
         {loading ? (
           <p className="py-8 text-center text-[13px] opacity-50">불러오는 중…</p>
         ) : filtered.length === 0 ? (
