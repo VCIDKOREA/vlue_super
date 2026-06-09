@@ -1365,27 +1365,7 @@ function App() {
       writeCardWallet(next);
       return next;
     });
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !supabaseKey) return;
-    try {
-      await fetch(`${supabaseUrl}/rest/v1/card_wallet`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: supabaseKey,
-          Authorization: `Bearer ${supabaseKey}`,
-          Prefer: "return=minimal"
-        },
-        body: JSON.stringify({
-          owner_user_id: "me",
-          card_user_id: card.userId,
-          saved_at: nextItem.savedAt
-        })
-      });
-    } catch {
-      // local wallet still works even if Supabase unavailable
-    }
+    // 명함첩은 localStorage 전용 — Supabase REST(card_wallet) 직접 쓰기는 RLS 보안상 사용하지 않음
   }, []);
 
   const removeCardFromWallet = useCallback((userId) => {

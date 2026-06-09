@@ -22,7 +22,8 @@
 
 ## 2. Supabase anon 키 (필수 — 직접 붙여넣기)
 
-DM·Realtime·`card_wallet` REST 는 **ywhj 프로젝트**의 anon 키가 필요합니다.
+DM Realtime(선택)은 **ywhj 프로젝트**의 anon 키가 필요합니다.  
+**`card_wallet` REST 직접 쓰기는 보안상 제거** — 명함첩은 localStorage만 사용합니다.
 
 1. Supabase → **vlue-production** (ref `ywhjhdpecwvaujiagaln`)
 2. **Settings → API** → `anon` `public` 키 복사
@@ -50,7 +51,21 @@ npm run db:deploy:safe
 - **필요 없음** → Supabase에서 `qvyn` 프로젝트 **Pause** 후 나중에 삭제
 - **필요함** → Table 데이터만 pg_dump/pg_restore 또는 Supabase 백업으로 **ywhj** 로 이관 후 3번 재실행
 
-## 6. 확인
+## 6. 보안 — RLS 잠금 (필수)
+
+Supabase Security Advisor 경고(`rls_disabled_in_public`, `sensitive_columns_exposed`) 대응:
+
+1. **SQL 적용** (둘 중 하나)
+   - Dashboard → **SQL Editor** → `supabase/migrations/20260608120000_lockdown_public_rls.sql` 전체 붙여넣기 → Run
+   - 또는 로컬: `npm run db:supabase-rls-lockdown` (`packages/db/.env`에 `DIRECT_URL`)
+2. **Advisor** → Issues에서 Critical 해소 확인 (수 분~24시간)
+3. **원칙**
+   - `public` 모든 테이블: RLS ON + anon/authenticated 거부
+   - `User.password_hash` 등 민감 컬럼: 브라우저 anon 키로 REST 접근 불가
+   - VLUE API(Prisma·`DATABASE_URL`)만 DB 읽기/쓰기
+   - 마케팅 `documents` 테이블만 `is_active=true` 공개 읽기 예외
+
+## 7. 확인
 
 ```bash
 npm run start -w @vlue/api
