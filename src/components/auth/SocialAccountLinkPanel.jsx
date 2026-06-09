@@ -35,11 +35,30 @@ function formatLinkedAt(iso) {
 /**
  * 마이페이지 — VLUE 순정 가입 후 카카오/네이버 사후 연동
  */
-export default function SocialAccountLinkPanel({ onToast }) {
+export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) {
   const [links, setLinks] = useState(() => readCachedSocialLinks());
   const [loading, setLoading] = useState(true);
   const [busyProvider, setBusyProvider] = useState("");
   const [error, setError] = useState("");
+
+  const sectionCls = isDarkMode
+    ? "mt-4 rounded-2xl border border-white/10 bg-[#151821] p-4 shadow-sm"
+    : "mt-4 rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/80 p-4 shadow-sm";
+  const titleCls = isDarkMode ? "text-gray-100" : "text-slate-900";
+  const bodyCls = isDarkMode ? "text-gray-400" : "text-slate-600";
+  const badgeCls = isDarkMode
+    ? "shrink-0 rounded-full bg-indigo-500/20 px-2.5 py-1 text-[10px] font-black text-indigo-200"
+    : "shrink-0 rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-black text-indigo-800";
+  const stepNumCls = isDarkMode
+    ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/30 text-[10px] font-black text-indigo-100"
+    : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white";
+  const errorCls = isDarkMode
+    ? "mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] font-medium text-rose-300"
+    : "mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700";
+  const refreshBtnCls = isDarkMode
+    ? "rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-gray-300 disabled:opacity-50"
+    : "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 disabled:opacity-50";
+  const footnoteCls = isDarkMode ? "text-[10px] text-gray-500" : "text-[10px] text-slate-400";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -89,43 +108,35 @@ export default function SocialAccountLinkPanel({ onToast }) {
   };
 
   return (
-    <section className="mt-4 rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/80 p-4 shadow-sm">
+    <section className={sectionCls}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[14px] font-black text-slate-900">소셜 로그인 연동</p>
-          <p className="mt-1 text-[11px] leading-relaxed text-slate-600 [word-break:keep-all]">
+          <p className={`text-[14px] font-black ${titleCls}`}>소셜 로그인 연동</p>
+          <p className={`mt-1 text-[11px] leading-relaxed [word-break:keep-all] ${bodyCls}`}>
             VLUE는 <b>본인인증 회원가입</b>으로만 계정이 만들어집니다. 가입 후 여기서 카카오·네이버를
             <b> 1:1로 연결</b>하면 다음부터 간편 로그인할 수 있습니다.
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-black text-indigo-800">
-          사후 연동
-        </span>
+        <span className={badgeCls}>사후 연동</span>
       </div>
 
-      <ol className="mt-4 space-y-2 text-[11px] leading-relaxed text-slate-600">
+      <ol className={`mt-4 space-y-2 text-[11px] leading-relaxed ${bodyCls}`}>
         <li className="flex gap-2">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">
-            1
-          </span>
+          <span className={stepNumCls}>1</span>
           <span>VLUE 회원가입(본인인증·아이디·비밀번호)으로 마스터 계정을 만듭니다.</span>
         </li>
         <li className="flex gap-2">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">
-            2
-          </span>
+          <span className={stepNumCls}>2</span>
           <span>아래에서 카카오/네이버를 이 계정에 연결합니다.</span>
         </li>
         <li className="flex gap-2">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">
-            3
-          </span>
+          <span className={stepNumCls}>3</span>
           <span>로그인 화면의 「간편 로그인」으로 1초 만에 접속합니다.</span>
         </li>
       </ol>
 
       {error ? (
-        <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700" role="alert">
+        <p className={errorCls} role="alert">
           {error}
         </p>
       ) : null}
@@ -135,13 +146,21 @@ export default function SocialAccountLinkPanel({ onToast }) {
           const linked = linkedMap[p.id];
           const isLinked = Boolean(linked);
           const isBusy = busyProvider === p.id;
+          const cardCls = isLinked
+            ? isDarkMode
+              ? "rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-3"
+              : "rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-3"
+            : isDarkMode
+              ? "rounded-xl border border-white/10 bg-white/5 px-3 py-3"
+              : "rounded-xl border border-slate-200 bg-white px-3 py-3";
+          const providerTitleCls = isDarkMode ? "text-[13px] font-black text-gray-100" : "text-[13px] font-black text-slate-900";
+          const providerSubCls = isDarkMode ? "text-[10px] text-gray-400" : "text-[10px] text-slate-500";
+          const unlinkedBadgeCls = isDarkMode
+            ? "rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-gray-400"
+            : "rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500";
+
           return (
-            <div
-              key={p.id}
-              className={`rounded-xl border px-3 py-3 ${
-                isLinked ? "border-emerald-200 bg-emerald-50/60" : "border-slate-200 bg-white"
-              }`}
-            >
+            <div key={p.id} className={cardCls}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
                   <span
@@ -152,8 +171,8 @@ export default function SocialAccountLinkPanel({ onToast }) {
                     </span>
                   </span>
                   <div>
-                    <p className="text-[13px] font-black text-slate-900">{p.label}</p>
-                    <p className="text-[10px] text-slate-500">
+                    <p className={providerTitleCls}>{p.label}</p>
+                    <p className={providerSubCls}>
                       {isLinked
                         ? `연동됨 · ${formatLinkedAt(linked.linkedAt) || "최근"}`
                         : "미연동 — 연결하면 간편 로그인 가능"}
@@ -163,7 +182,7 @@ export default function SocialAccountLinkPanel({ onToast }) {
                 {isLinked ? (
                   <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white">연동 완료</span>
                 ) : (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">미연동</span>
+                  <span className={unlinkedBadgeCls}>미연동</span>
                 )}
               </div>
 
@@ -194,15 +213,10 @@ export default function SocialAccountLinkPanel({ onToast }) {
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={loading}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 disabled:opacity-50"
-        >
+        <button type="button" onClick={refresh} disabled={loading} className={refreshBtnCls}>
           {loading ? "새로고침 중…" : "연동 상태 새로고침"}
         </button>
-        <p className="text-[10px] text-slate-400">소셜로 신규 가입은 되지 않습니다</p>
+        <p className={footnoteCls}>소셜로 신규 가입은 되지 않습니다</p>
       </div>
     </section>
   );

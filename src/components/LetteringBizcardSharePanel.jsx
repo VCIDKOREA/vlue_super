@@ -62,8 +62,8 @@ export default function LetteringBizcardSharePanel({
   };
 
   const btnSecondary = isDarkMode
-    ? "rounded-lg bg-white/10 px-2 py-2 text-[11px] font-bold text-gray-100 active:scale-[0.99] disabled:opacity-50"
-    : "rounded-lg bg-slate-100 px-2 py-2 text-[11px] font-bold text-slate-800 active:scale-[0.99] disabled:opacity-50";
+    ? "rounded-lg border border-white/25 bg-white/5 px-2 py-2 text-[11px] font-bold text-gray-100 shadow-sm active:scale-[0.99] disabled:opacity-50"
+    : "rounded-lg border border-slate-200 bg-slate-100 px-2 py-2 text-[11px] font-bold text-slate-800 active:scale-[0.99] disabled:opacity-50";
 
   const btnKakao =
     "col-span-2 rounded-lg bg-[#FEE500] px-2 py-3 text-[12px] font-black text-[#191919] active:scale-[0.99] disabled:opacity-50";

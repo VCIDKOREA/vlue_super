@@ -471,9 +471,9 @@ function MyPage({
       <VluerPartnerDashboard layout="compact" onOpenFamilyProtection={onOpenFamilyProtection} />
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-24 pt-3">
         {!isCreated ? (
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <h2 className="text-[18px] font-black text-gray-900">MY 페이지 설정</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-gray-500">
+          <div className={`rounded-2xl p-4 shadow-sm ${isDarkMode ? "border border-white/10 bg-[#151821]" : "border border-gray-100 bg-white"}`}>
+            <h2 className={`text-[18px] font-black ${titleCls}`}>MY 페이지 설정</h2>
+            <p className={`mt-1 text-[12px] leading-relaxed ${subCls}`}>
               프로필·활동 소개는 <b>페이지 관리</b>에서 설정합니다. 저장하면 이 MY 화면에 바로 반영됩니다.
             </p>
             <button
@@ -483,10 +483,10 @@ function MyPage({
             >
               페이지 관리로 이동
             </button>
-            <SocialAccountLinkPanel onToast={setToast} />
+            <SocialAccountLinkPanel onToast={setToast} isDarkMode={isDarkMode} />
           </div>
         ) : isComposerOpen ? (
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className={`rounded-2xl p-4 shadow-sm ${isDarkMode ? "border border-white/10 bg-[#151821]" : "border border-gray-100 bg-white"}`}>
             <div className="mb-3 flex items-center justify-between border-b border-gray-100 pb-3">
               <button
                 type="button"
@@ -861,7 +861,11 @@ function MyPage({
             <button
               type="button"
               onClick={() => setSecurityVaultOpen(true)}
-              className="rounded-lg border border-red-300 bg-red-50 py-2 text-[11px] font-black text-red-800"
+              className={
+                isDarkMode
+                  ? "rounded-lg border border-red-400/35 bg-red-500/15 py-2 text-[11px] font-black text-red-200"
+                  : "rounded-lg border border-red-300 bg-red-50 py-2 text-[11px] font-black text-red-800"
+              }
             >
               🛡️ 보안함
             </button>
@@ -892,7 +896,11 @@ function MyPage({
                 setCategoryEventNone(eventInfo === "없음");
                 setIsComposerOpen(true);
               }}
-              className="mt-2 w-full rounded-lg border border-blue-300 bg-white py-2.5 text-[12px] font-black text-blue-700 active:scale-[0.99]"
+              className={
+                isDarkMode
+                  ? "mt-2 w-full rounded-lg border border-blue-400/35 bg-blue-600/15 py-2.5 text-[12px] font-black text-blue-100 active:scale-[0.99]"
+                  : "mt-2 w-full rounded-lg border border-blue-300 bg-white py-2.5 text-[12px] font-black text-blue-700 active:scale-[0.99]"
+              }
             >
               카테고리 게시물 변경
             </button>
@@ -957,15 +965,21 @@ function MyPage({
             })}
           </div>
           {posts === 0 && (
-            <div className="mt-4 rounded-xl bg-gray-50 py-6 text-center">
-              <p className="text-[20px] font-black text-gray-900">첫 번째 게시물을 만들어보세요</p>
-              <p className="mt-1 text-[12px] text-gray-500">「게시물 올리기」에서 사진·영상과 문구를 작성할 수 있습니다.</p>
+            <div className={`mt-4 rounded-xl py-6 text-center ${isDarkMode ? "bg-white/5" : "bg-gray-50"}`}>
+              <p className={`text-[20px] font-black ${titleCls}`}>첫 번째 게시물을 만들어보세요</p>
+              <p className={`mt-1 text-[12px] ${subCls}`}>「게시물 올리기」에서 사진·영상과 문구를 작성할 수 있습니다.</p>
             </div>
           )}
         </div>
-        <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50/80 p-3 shadow-sm">
-          <p className="text-[13px] font-black text-violet-950">사장님 · AI 소싱</p>
-          <p className="mt-1 text-[11px] leading-relaxed text-violet-900/80">
+        <div
+          className={
+            isDarkMode
+              ? "mt-4 rounded-2xl border border-violet-500/25 bg-violet-500/10 p-3 shadow-sm"
+              : "mt-4 rounded-2xl border border-violet-100 bg-violet-50/80 p-3 shadow-sm"
+          }
+        >
+          <p className={`text-[13px] font-black ${isDarkMode ? "text-violet-200" : "text-violet-950"}`}>사장님 · AI 소싱</p>
+          <p className={`mt-1 text-[11px] leading-relaxed ${isDarkMode ? "text-violet-200/80" : "text-violet-900/80"}`}>
             쿠팡·네이버 URL·상품 사진으로 상세 초안을 만들고 보관함에 저장합니다.
           </p>
           <button
@@ -976,7 +990,7 @@ function MyPage({
             AI 소싱 · 업로드 열기
           </button>
         </div>
-        <SocialAccountLinkPanel onToast={setToast} />
+        <SocialAccountLinkPanel onToast={setToast} isDarkMode={isDarkMode} />
         <DeviceApprovalPanel />
         <PersonalComboPanel membershipTier={membershipTier} onToast={setToast} />
         <EnterpriseMemberManagePanel onToast={setToast} />
@@ -985,9 +999,9 @@ function MyPage({
         <EnterpriseGroupChatPanel onToast={setToast} />
         <VlueStoreShopSection isPaid={isPaid} onManageProducts={onOpenManager} onToast={setToast} />
 
-        <div className="mt-4 rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
-          <p className="text-[14px] font-black text-slate-900">리뷰어 체험단 작성 보드</p>
-          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+        <div className={`mt-4 rounded-2xl p-3 shadow-sm ${isDarkMode ? "border border-white/10 bg-[#151821]" : "border border-blue-100 bg-white"}`}>
+          <p className={`text-[14px] font-black ${titleCls}`}>리뷰어 체험단 작성 보드</p>
+          <p className={`mt-1 text-[11px] font-semibold ${subCls}`}>
             이 화면에서 바로 캠페인 지원/인증/리뷰 제출/정산 완료 흐름을 진행할 수 있습니다.
           </p>
           <div className="mt-3">
