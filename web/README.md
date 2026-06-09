@@ -75,6 +75,18 @@ CORS는 @vlue/api 에 www.vlue.kr + Railway web URL 포함
 
 Networking **Port 8080** + Start Command `npm run start -w @vlue/web` (502 방지)
 
+### Railway Build / Deploy (zooming-flow · @vlue/web)
+
+| 설정 | 위치 | 값 |
+|------|------|-----|
+| Config file | Settings → General | `web/railway.toml` (모노레포 루트 배포 시) |
+| Build Command | Settings → **Build** | `npm run build -w @vlue/shared && npm run build -w @vlue/web` (`npm ci`·`rm .vite` 금지) |
+| Start Command | Settings → **Deploy** | `npm run start -w @vlue/web` |
+| Port | Settings → **Networking** | `8080` |
+
+빌드가 `vite: not found` / `tsc: not found` 로 실패하면 Variables에  
+`NIXPACKS_NODE_INSTALL_DEV_DEPS=true` 추가 후 Redeploy.
+
 
 
 공통 BM: `@vlue/shared` (`packages/shared`)
