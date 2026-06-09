@@ -56,6 +56,7 @@ final class MainViewController: UIViewController {
 
 extension MainViewController: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        bridgeHandler.webView = webView
         VlueFamilyBridge.inject(into: webView)
         VlueFamilyBridge.evaluateBridgeSelfTest(on: webView)
     }

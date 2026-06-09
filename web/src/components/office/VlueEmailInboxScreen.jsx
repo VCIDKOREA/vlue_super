@@ -9,6 +9,7 @@ import { getChatDisplayName } from "../../lib/memberCardStorage.js";
 import { readAvatar } from "../../lib/vlueAvatar.js";
 import OfficeRemotePanel from "./OfficeRemotePanel.jsx";
 import BackButton from "../common/BackButton";
+import { useSensitiveScreenSecure } from "../../hooks/useSensitiveScreenSecure.js";
 
 function readVlueMailAddress() {
   try {
@@ -198,6 +199,7 @@ function SentTable({ rows, emptyLabel }) {
 }
 
 export default function VlueEmailInboxScreen({ open, onClose, onToast, onOpenProfileSettings }) {
+  useSensitiveScreenSecure(open);
   const [folder, setFolder] = useState("inbox");
   const [quickFilter, setQuickFilter] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);

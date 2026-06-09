@@ -8,6 +8,72 @@ import { checkVmingFeature } from "./vmingApi.js";
  * @param {Blob} pdfBlob
  * @param {string} [fileName]
  */
+/** POS 빌지 OCR 텍스트 → 서버 장부 적재 */
+export async function postPosLedgerIngest(ocrText, assetFileId = "") {
+  const res = await vlueAuthFetch(apiUrl("/api/office/pos-ledger/ingest"), {
+    method: "POST",
+    headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ ocrText, assetFileId })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "POS 장부 저장에 실패했습니다.");
+  return data;
+}
+
+export async function fetchPosLedgerDashboard() {
+  const res = await vlueAuthFetch(apiUrl("/api/office/pos-ledger/dashboard"));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "POS 장부를 불러오지 못했습니다.");
+  return data;
+}
+
+export async function fetchPosLedgerRole() {
+  const res = await vlueAuthFetch(apiUrl("/api/office/pos-ledger/role"));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "POS 권한을 불러오지 못했습니다.");
+  return data;
+}
+
+export async function invitePosStaff(staffHandle) {
+  const res = await vlueAuthFetch(apiUrl("/api/office/pos-ledger/staff"), {
+    method: "POST",
+    headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ staffHandle })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "직원 등록에 실패했습니다.");
+  return data;
+}
+
+export async function fetchPosStaffList() {
+  const res = await vlueAuthFetch(apiUrl("/api/office/pos-ledger/staff"));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "직원 목록을 불러오지 못했습니다.");
+  return data;
+}
+
+export async function patchPosStaffTransmit(staffUserId, transmitEnabled) {
+  const res = await vlueAuthFetch(apiUrl(`/api/office/pos-ledger/staff/${staffUserId}`), {
+    method: "PATCH",
+    headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ transmitEnabled })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "직원 권한 변경에 실패했습니다.");
+  return data;
+}
+
+export async function patchPosLedgerEntry(entryId, patch) {
+  const res = await vlueAuthFetch(apiUrl(`/api/office/pos-ledger/entries/${entryId}`), {
+    method: "PATCH",
+    headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(patch || {})
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "장부 수정에 실패했습니다.");
+  return data;
+}
+
 export async function postOfficeScanUpload(pdfBlob, fileName = "") {
   const name = fileName || `cs-scan-${Date.now()}.pdf`;
   const form = new FormData();

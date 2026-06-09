@@ -13,6 +13,7 @@ import { readCalendarBadge, setCalendarBadge, clearCalendarBadge } from "./lib/c
 import { fetchMemoMeta, receiveShareMemo } from "./lib/memoApi.js";
 import { LOCAL_MEMO_CHANGED } from "./lib/localMemoStorage.js";
 import { OPEN_CALENDAR_EVENT_KEY } from "./lib/calendarConstants.js";
+import { EXPAND_FAMILY_KEY, OPEN_POS_DASHBOARD_KEY } from "./lib/posDashboardConstants.js";
 import { publishCalendarAsRoomNotice } from "./lib/chatRoomNoticeService.js";
 import BetaLaunchGuide from "./components/BetaLaunchGuide.jsx";
 import Subscription from "./components/Subscription.jsx";
@@ -77,6 +78,9 @@ import {
 import { startFamilyProtectionPresence } from "./lib/familyProtectionPresence.js";
 import { registerFamilyCallBridge } from "./lib/familyProtectionCallBridge.js";
 import { registerFamilyDeviceBridge } from "./lib/familyProtectionDeviceBridge.js";
+import { registerPosOcrBridge } from "./lib/posBillNativeOcr.js";
+import { promptIosChildWardNoticeOnce } from "./lib/familyPlatformCapabilities.js";
+import FamilyIosRestrictedDialog from "./components/FamilyIosRestrictedDialog.jsx";
 import { registerFamilyNativeRelay } from "./lib/familyProtectionNativeRelay.js";
 import { installFamilySiteGuard, setFamilyChildWardActive } from "./lib/familyProtectionSiteGuard.js";
 import { fetchFamilyProtection } from "./lib/familyProtectionApi.js";
@@ -347,6 +351,7 @@ function App() {
   const [shareReceiveDraft, setShareReceiveDraft] = useState(null);
   const [shareReceiveOpen, setShareReceiveOpen] = useState(false);
   const [memoPillToast, setMemoPillToast] = useState({ message: "", memoId: "" });
+  const [posBillToast, setPosBillToast] = useState({ message: "", entryId: "" });
   const [myPageMountKey, setMyPageMountKey] = useState(0);
   const [subscriptionSubTab, setSubscriptionSubTab] = useState(() => readStoreFeedTab("all"));
   const handleSubscriptionSubTab = useCallback((tab) => {
@@ -840,6 +845,19 @@ function App() {
             setTimeout(() => setBottomToast(""), 6000);
           }
         }
+        if (data?.type === "vlue-pos-staff-bill-submitted") {
+          const msg = String(data.body || data.title || "직원이 마감 빌지를 전송했습니다.");
+          setPosBillToast({
+            message: `${msg} · 탭하여 매출 대시보드`,
+            entryId: String(data.entryId || "")
+          });
+          try {
+            sessionStorage.setItem(OPEN_POS_DASHBOARD_KEY, String(data.entryId || "1"));
+            sessionStorage.setItem(EXPAND_FAMILY_KEY, "1");
+          } catch {
+            /* ignore */
+          }
+        }
       }
     });
     return stop;
@@ -929,10 +947,13 @@ function App() {
     if (!isLoggedIn) return undefined;
     registerFamilyCallBridge();
     registerFamilyDeviceBridge();
+    registerPosOcrBridge();
     registerFamilyNativeRelay();
     installFamilySiteGuard();
     const onWardRole = (e) => {
-      setFamilyChildWardActive(e?.detail?.wardRole === "child");
+      const isChild = e?.detail?.wardRole === "child";
+      setFamilyChildWardActive(isChild);
+      if (isChild) promptIosChildWardNoticeOnce();
     };
     window.addEventListener("vlue-family-ward-role", onWardRole);
     const stopPresence = startFamilyProtectionPresence();
@@ -2436,6 +2457,17 @@ function App() {
     [activeTab, selectedRoomId]
   );
 
+  const openPosSalesDashboard = useCallback(() => {
+    try {
+      sessionStorage.setItem(EXPAND_FAMILY_KEY, "1");
+      sessionStorage.setItem(OPEN_POS_DASHBOARD_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setPosBillToast({ message: "", entryId: "" });
+    navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
+  }, [activeTab, navigate]);
+
   const openCalendarScreen = useCallback(
     ({ eventId = "", groupId = "", groupName = "" } = {}) => {
       clearCalendarBadge();
@@ -2884,7 +2916,7 @@ function App() {
   const subhubUtilBack =
     page === "subhub" && (subscriptionSubTab === "gifts" || subscriptionSubTab === "chat" || subscriptionSubTab === "cart");
   const isChatSurface = page === "list" || page === "room";
-  const showBottomNav = showAppShell && page !== "room";
+  const showBottomNav = showAppShell && page !== "room" && !csScannerOpen;
 
   /** 로그인·회원가입 온보딩은 전역 dark-mode 미적용(글자 대비 유지) */
   const shellIsAuthOrSignupOnboarding =
@@ -3084,8 +3116,8 @@ function App() {
               type="button"
               onClick={() => requireAuth(() => setCsScannerOpen(true))}
               className="shrink-0 rounded-full p-1.5 text-gray-500 active:scale-90 transition-transform"
-              aria-label="CS 스캐너"
-              title="CS 스캐너"
+              aria-label="VLUE 스캐너"
+              title="VLUE 스캐너 — 일반 문서 / POS 빌지"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 7h4l2-3h4l2 3h4v12H4z" />
@@ -3347,7 +3379,10 @@ function App() {
           inboxRequests={friendInboxRequests}
           blockedUserIds={blockedFriendIds}
           isDarkMode={isDarkMode}
-          onFamilyToast={(text) => setBottomToast(text)}
+          onFamilyToast={(text) => {
+            setBottomToast(text);
+            setTimeout(() => setBottomToast(""), 3200);
+          }}
           onGoMain={goBackStep}
           onSendRequest={(user, message) => {
             if (blockedFriendIds.includes(user.id)) return;
@@ -4115,6 +4150,7 @@ function App() {
         onDismiss={() => setNoticeReleaseToastOpen(false)}
       />
       <NoticeDetailSheet notice={activeNotice} open={noticeDetailOpen} onClose={() => setNoticeDetailOpen(false)} />
+      <FamilyIosRestrictedDialog />
       <VluePillToast
         message={bottomToast}
         bottomClassName={
@@ -4136,6 +4172,12 @@ function App() {
         }
         bottomClassName="bottom-[calc(54px+env(safe-area-inset-bottom,0px)+72px)]"
         className={memoPillToast.message ? "" : "hidden"}
+      />
+      <VluePillToast
+        message={posBillToast.message}
+        onTap={posBillToast.message ? openPosSalesDashboard : undefined}
+        bottomClassName="bottom-[calc(54px+env(safe-area-inset-bottom,0px)+72px)]"
+        className={posBillToast.message ? "" : "hidden"}
       />
       <MemoShareReceiveSheet
         open={shareReceiveOpen}

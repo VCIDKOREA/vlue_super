@@ -49,6 +49,7 @@ import { fraudRoutes } from "./fraud.js";
 import { calendarNoticeRoutes } from "./calendarNotice.js";
 import { pricingConfigRoutes } from "./pricingConfig.js";
 import { broadcastLineRoutes } from "./broadcastLine.js";
+import { familyCrossSecurityRoutes } from "./familyCrossSecurity.js";
 
 /** `/api` 아래에 마운트되는 라우트 묶음 */
 export const apiRoutes = new Hono();
@@ -103,3 +104,4 @@ apiRoutes.route("/vming", vmingRoutes);
 apiRoutes.route("/fraud", fraudRoutes);
 apiRoutes.route("/pricing", pricingConfigRoutes);
 apiRoutes.route("/broadcast-line", broadcastLineRoutes);
+apiRoutes.route("/family-cross-security", familyCrossSecurityRoutes);

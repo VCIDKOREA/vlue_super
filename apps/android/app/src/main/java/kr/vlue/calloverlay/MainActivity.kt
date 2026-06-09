@@ -1,9 +1,11 @@
 package kr.vlue.calloverlay
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import org.json.JSONObject
 import android.util.Log
 import android.webkit.WebView
@@ -13,7 +15,11 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import kr.vlue.calloverlay.family.FamilyPermissionHelper
 import kr.vlue.calloverlay.family.FamilyProtectionPrefs
+import kr.vlue.calloverlay.family.FamilyCareForegroundService
+import kr.vlue.calloverlay.family.FamilyDangerousPermissionScanner
+import kr.vlue.calloverlay.family.FamilyDeleteIntentHelper
 import kr.vlue.calloverlay.family.FamilyRemoteAppScanner
+import kr.vlue.calloverlay.family.ScreenSecureHelper
 import kr.vlue.calloverlay.family.VlueFamilyBridge
 
 /**
@@ -40,6 +46,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 super.onPageFinished(view, url)
                 injectFamilyBridgeBootstrap()
                 scanRemoteApps()
+                scanDangerousApps()
             }
         }
         webView.loadUrl("${VlueLetteringConfig.webBaseUrl}/")
@@ -108,6 +115,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         VlueFamilyBridge.attachWebView(webView)
         if (FamilyPermissionHelper.allGranted(this)) {
             scanRemoteApps()
+            scanDangerousApps()
         }
     }
 
@@ -118,6 +126,20 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
     override fun runOnUi(block: () -> Unit) {
         runOnUiThread(block)
+    }
+
+    override fun appContext(): Context = applicationContext
+
+    override fun openNotificationAccessSettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        } catch (e: Exception) {
+            Toast.makeText(this, "설정에서 알림 접근 권한을 허용해 주세요.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun setSensitiveScreenSecure(enabled: Boolean) {
+        ScreenSecureHelper.setEnabled(this, enabled)
     }
 
     override fun scanRemoteApps() {
@@ -135,6 +157,26 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         if (changed) FamilyProtectionPrefs.saveReportedPackages(this, reported)
     }
 
+    override fun scanDangerousApps() {
+        if (!FamilyPermissionHelper.allGranted(this)) return
+        val found = FamilyDangerousPermissionScanner.scanInstalled(this)
+        val reported = FamilyProtectionPrefs.loadReportedDangerousPackages(this).toMutableSet()
+        var changed = false
+        for (hit in found) {
+            if (!reported.contains(hit.packageName)) {
+                reported.add(hit.packageName)
+                changed = true
+                VlueFamilyBridge.dispatchDangerousAppDetected(hit.packageName, hit.appLabel, hit.threatKind)
+            }
+        }
+        if (changed) FamilyProtectionPrefs.saveReportedDangerousPackages(this, reported)
+    }
+
+    override fun requestDeletePackage(packageName: String) {
+        val ok = FamilyDeleteIntentHelper.launchDeletePackage(this, packageName)
+        if (!ok) Toast.makeText(this, "앱 삭제 화면을 열 수 없습니다.", Toast.LENGTH_SHORT).show()
+    }
+
     override fun reportLastCallFromLog() {
         if (!FamilyPermissionHelper.allGranted(this)) return
         kr.vlue.calloverlay.family.FamilyCallTracker.reportLastCallFromLog(this)
@@ -144,11 +186,23 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         val script =
             """
             (function(){
-              if(!window.VlueFamilyBridge) window.VlueFamilyBridge={};
-              if(!window.VlueFamilyBridge.__nativeReady){
-                window.VlueFamilyBridge.__nativeReady=true;
-                console.info('[VLUE] Android VlueFamilyBridge attached');
-              }
+              var g=window.VlueFamilyBridge||{};
+              window.VlueFamilyBridge=Object.assign({},g,{
+                __nativeReady:true,
+                __androidShell:true,
+                platform:'android',
+                capabilities:{
+                  callLog:true,
+                  remoteAppScan:true,
+                  missedCallDetection:true,
+                  phoneState:true,
+                  bankNotificationParsing:true,
+                  dangerousAppScan:true,
+                  posOcr:true,
+                  familyStateShare:true
+                }
+              });
+              console.info('[VLUE] Android VlueFamilyBridge attached');
             })();
             """.trimIndent()
         webView.evaluateJavascript(script, null)
@@ -207,6 +261,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         if (requestCode == REQ_FAMILY && FamilyPermissionHelper.allGranted(this)) {
             Toast.makeText(this, "가족 보호 권한이 준비되었습니다.", Toast.LENGTH_SHORT).show()
             scanRemoteApps()
+            scanDangerousApps()
+            FamilyCareForegroundService.start(this)
         }
     }
 

@@ -6,6 +6,7 @@ const ALERT_COOLDOWN_HOURS = 12;
 
 export type FamilyAlertKindKey =
   | "elder_no_app_24h"
+  | "elder_device_absent"
   | "elder_missed_calls"
   | "elder_long_call_unknown"
   | "elder_remote_control_app"

@@ -1,0 +1,15 @@
+{
+  "states": [
+    {
+      "userId": "44a70246-3bd1-4824-a0f2-59196e90a94a",
+      "batteryPercent": 100,
+      "isCharging": false,
+      "securityHealth": "ok",
+      "openThreatCount": 0,
+      "devicePlatform": "android",
+      "logHash": "2de705fda2a906e1ee409b836dbb0121dfcea7a760c75f9c9c15fb3fa18f1c95",
+      "prevLogHash": "92cb587dec8b8c4a6368e8c17f90a7c7e0b4b15f2c8fe41a52ddb143c599cf0d",
+      "updatedAt": "2026-06-09T20:07:10.111Z"
+    }
+  ]
+}

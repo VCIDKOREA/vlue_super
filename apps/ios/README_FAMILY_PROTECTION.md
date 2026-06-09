@@ -11,7 +11,11 @@ window.VlueFamilyBridge.capabilities === {
   callLog: false,
   remoteAppScan: false,
   missedCallDetection: false,
-  phoneState: false
+  phoneState: false,
+  bankNotificationParsing: false,
+  dangerousAppScan: false,
+  posOcr: true,
+  familyStateShare: 'limited'
 }
 ```
 
@@ -39,6 +43,17 @@ const iosLimited =
 | `VlueFamilyBridgeNative.ping()` | `postMessage({ action: 'ping' })` → 로그 |
 | `scanRemoteControlAppsNow()` | 제약 안내 로그 |
 | `reportLastCallFromLog()` | 제약 안내 로그 |
+| `runPosBillOcr(dataUrl)` | Vision OCR → `onPosOcrResult(text)` |
+| `wipePosScanCache()` | no-op (웹 메모리 wipe) |
+
+## iOS 제한 안내 (웹)
+
+자녀 iPhone 또는 iOS 전용 기능 시도 시 확인창:
+
+> 아이폰(애플iso)은 규정상 해당기능이 제한됩니다.
+
+- `FamilyIosRestrictedDialog.jsx` — 전역 모달
+- `familyPlatformCapabilities.js` — Android/iOS 기능 매트릭스
 
 ## API (웹만)
 

@@ -11,6 +11,7 @@ import OfficePptWorkshopPanel from "./office/OfficePptWorkshopPanel.jsx";
 import { useHorizontalScrollStrip } from "../lib/useHorizontalScrollStrip.js";
 import { fetchOfficeFiles } from "../lib/vlueOfficeApi.js";
 import { ASSET_FILES_CHANGED, mapOfficeFilesForUi } from "../lib/vlueAssetFilesStorage.js";
+import { useSensitiveScreenSecure } from "../hooks/useSensitiveScreenSecure.js";
 
 const TABS = [
   { id: "received", label: "받은 명함" },
@@ -151,6 +152,7 @@ export default function WalletHubModal({
   const [remoteFocusFileId, setRemoteFocusFileId] = useState("");
   const tabButtonRefs = useRef({});
   const tabStrip = useHorizontalScrollStrip(open);
+  useSensitiveScreenSecure(open && tab === "docs");
 
   const saveContactsFn = onSaveToContacts || saveProfileToDeviceContacts;
 

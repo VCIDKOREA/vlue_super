@@ -6,6 +6,7 @@ import android.content.Context
 object FamilyProtectionPrefs {
     private const val PREFS = "vlue_family_protection"
     private const val KEY_REPORTED_APPS = "reported_remote_apps"
+    private const val KEY_REPORTED_DANGEROUS = "reported_dangerous_apps"
 
     fun loadReportedPackages(context: Context): Set<String> {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -17,6 +18,19 @@ object FamilyProtectionPrefs {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putStringSet(KEY_REPORTED_APPS, packages)
+            .apply()
+    }
+
+    fun loadReportedDangerousPackages(context: Context): Set<String> {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getStringSet(KEY_REPORTED_DANGEROUS, emptySet())
+        return raw?.toSet() ?: emptySet()
+    }
+
+    fun saveReportedDangerousPackages(context: Context, packages: Set<String>) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet(KEY_REPORTED_DANGEROUS, packages)
             .apply()
     }
 }

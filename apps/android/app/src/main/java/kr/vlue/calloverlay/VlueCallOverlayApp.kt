@@ -9,6 +9,11 @@ class VlueCallOverlayApp : Application() {
         super.onCreate()
         instance = this
         try {
+            System.loadLibrary("sqlcipher")
+        } catch (e: Exception) {
+            Log.w("VlueApp", "sqlcipher load skipped", e)
+        }
+        try {
             LetteringIntegration.onApplicationCreate(this)
         } catch (e: Exception) {
             Log.e("VlueLettering", "Application bootstrap failed", e)

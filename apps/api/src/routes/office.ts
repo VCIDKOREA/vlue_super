@@ -33,6 +33,15 @@ import {
 import { readFile } from "node:fs/promises";
 import { allowVmingRequest } from "../services/vming/vmingUsageService.js";
 import { officeExcelRoutes } from "./officeExcel.js";
+import {
+  getPosLedgerDashboard,
+  getPosLedgerRole,
+  ingestPosBillFromOcr,
+  invitePosStaff,
+  listPosStaffForOwner,
+  patchPosLedgerEntry,
+  updatePosStaffTransmit
+} from "../services/office/posBillOcrService.js";
 
 export const officeRoutes = new Hono();
 
@@ -406,6 +415,92 @@ officeRoutes.get("/media/files/:campaignId/:fileName", async (c) => {
     return new Response(buf, { headers: { "Content-Type": type, "Cache-Control": "public, max-age=3600" } });
   } catch {
     return c.json({ error: "NOT_FOUND" }, 404);
+  }
+});
+
+/** POS RBAC — OWNER / STAFF 역할 */
+officeRoutes.get("/pos-ledger/role", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const role = await getPosLedgerRole(userId);
+    return c.json({ ok: true, ...role });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+officeRoutes.post("/pos-ledger/staff", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const body = (await c.req.json().catch(() => ({}))) as { staffHandle?: string };
+    const result = await invitePosStaff(userId, String(body.staffHandle || ""));
+    return c.json({ ok: true, ...result });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+officeRoutes.get("/pos-ledger/staff", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const result = await listPosStaffForOwner(userId);
+    return c.json({ ok: true, ...result });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+officeRoutes.patch("/pos-ledger/staff/:staffUserId", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const body = (await c.req.json().catch(() => ({}))) as { transmitEnabled?: boolean };
+    if (typeof body.transmitEnabled !== "boolean") {
+      return c.json({ error: "transmitEnabled(boolean)가 필요합니다." }, 400);
+    }
+    const result = await updatePosStaffTransmit(userId, c.req.param("staffUserId"), body.transmitEnabled);
+    return c.json({ ok: true, ...result });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+/** POS 빌지 OCR 장부 — CS 스캐너 연동 */
+officeRoutes.post("/pos-ledger/ingest", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const result = await ingestPosBillFromOcr(userId, body);
+    return c.json({ ok: true, ...result });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+officeRoutes.get("/pos-ledger/dashboard", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const dash = await getPosLedgerDashboard(userId);
+    return c.json({ ok: true, ...dash });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+officeRoutes.patch("/pos-ledger/entries/:id", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const result = await patchPosLedgerEntry(userId, c.req.param("id"), body);
+    return c.json({ ok: true, ...result });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
   }
 });
 
