@@ -1,5 +1,11 @@
 import { prisma } from "../../db/client.js";
 import { referralDb } from "../../db/referralDb.js";
+import { normalizeKrPhone } from "@vlue/shared/phone";
+import {
+  inferReferralChannelFromCode,
+  type ReferralChannel
+} from "@vlue/shared/referral";
+import { resolveProfileGrade, isVluerPromoActiveGrade } from "../vluer/tierEngine.js";
 import type { B2BBillingCycle } from "../vluer/pricingConstants.js";
 import {
   type PaidBillingCycle,
@@ -14,20 +20,65 @@ function addMonths(d: Date, months: number) {
   return x;
 }
 
-export async function resolveReferralSponsor(referralCodeInput: string | null | undefined) {
-  const code = String(referralCodeInput || "")
-    .trim()
-    .toUpperCase();
-  if (!code) return { sponsorUserId: null as string | null, referralCodeUsed: null as string | null };
+export type ReferralSponsorResolution = {
+  sponsorUserId: string | null;
+  referralCodeUsed: string | null;
+  channel: ReferralChannel | null;
+};
 
+export async function resolveReferralSponsor(
+  referralCodeInput: string | null | undefined
+): Promise<ReferralSponsorResolution> {
+  const raw = String(referralCodeInput || "").trim();
+  if (!raw) {
+    return { sponsorUserId: null, referralCodeUsed: null, channel: null };
+  }
+
+  const channelGuess = inferReferralChannelFromCode(raw);
+
+  /** 지인 추천 — 추천인 전화번호 */
+  if (channelGuess === "friend") {
+    const phoneE164 = normalizeKrPhone(raw);
+    if (!phoneE164) {
+      throw new Error("유효하지 않은 추천인 전화번호입니다.");
+    }
+    const sponsor = await prisma.user.findFirst({
+      where: { phoneE164 },
+      select: { id: true, phoneE164: true }
+    });
+    if (!sponsor) {
+      throw new Error("해당 전화번호로 가입한 VLUE 회원을 찾을 수 없습니다.");
+    }
+    const digits = raw.replace(/\D/g, "");
+    return {
+      sponsorUserId: sponsor.id,
+      referralCodeUsed: digits,
+      channel: "friend"
+    };
+  }
+
+  /** 홍보 추천 — VLUER 고유 코드 (SNS 인증·승인 후) */
+  const code = raw.toUpperCase();
   const sponsor = await prisma.userVluerProfile.findFirst({
     where: { referralCode: code },
-    select: { userId: true, referralCode: true }
+    select: { userId: true, referralCode: true, tierCode: true, vluerGrade: true }
   });
   if (!sponsor?.referralCode) {
     throw new Error("유효하지 않은 추천인 코드입니다.");
   }
-  return { sponsorUserId: sponsor.userId, referralCodeUsed: sponsor.referralCode };
+
+  const grade = resolveProfileGrade(sponsor);
+  if (!isVluerPromoActiveGrade(grade)) {
+    throw new Error(
+      "홍보 추천 코드는 SNS·유튜브·틱톡 인증 후 VLUER 승인을 받은 회원만 사용할 수 있습니다."
+    );
+  }
+
+  return {
+    sponsorUserId: sponsor.userId,
+    referralCodeUsed: sponsor.referralCode,
+    channel: "promo"
+  };
 }
 
 export async function attachReferralAttribution(

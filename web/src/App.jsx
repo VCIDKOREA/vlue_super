@@ -18,6 +18,7 @@ import { publishCalendarAsRoomNotice } from "./lib/chatRoomNoticeService.js";
 import BetaLaunchGuide from "./components/BetaLaunchGuide.jsx";
 import Subscription from "./components/Subscription.jsx";
 import WalletHubModal from "./components/WalletHubModal.jsx";
+import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
 import PersonalFeed from "./components/PersonalFeed";
 import ProfilePanel from "./components/ProfilePanel";
 import VluePillToast from "./components/VluePillToast.jsx";
@@ -70,11 +71,7 @@ import {
   forcePersonalMode
 } from "./lib/vlueOfficeMode.js";
 import { startVlueSse, VLUE_SSE_CHAT_MESSAGE } from "./lib/vlueSse.js";
-import {
-  emitAssetFilesChanged,
-  emitOfficeEmailInboxChanged,
-  emitOfficePptTasksChanged
-} from "./lib/vlueAssetFilesStorage.js";
+import { emitAssetFilesChanged, emitOfficeEmailInboxChanged } from "./lib/vlueAssetFilesStorage.js";
 import { startFamilyProtectionPresence } from "./lib/familyProtectionPresence.js";
 import { registerFamilyCallBridge } from "./lib/familyProtectionCallBridge.js";
 import { registerFamilyDeviceBridge } from "./lib/familyProtectionDeviceBridge.js";
@@ -425,6 +422,7 @@ function App() {
   const [cardWallet, setCardWallet] = useState(() => readCardWallet());
   const [cardWalletModalOpen, setCardWalletModalOpen] = useState(false);
   const [walletDefaultTab, setWalletDefaultTab] = useState("received");
+  const [officeRemoteOpen, setOfficeRemoteOpen] = useState(false);
   const [appMode, setAppMode] = useState(() => readAppMode());
   const [activeOfficeCardId, setActiveOfficeCardId] = useState(() => readActiveOfficeCardId());
   const [hasOfficeGrant, setHasOfficeGrant] = useState(false);
@@ -757,14 +755,6 @@ function App() {
           emitAssetFilesChanged();
           emitOfficeEmailInboxChanged();
           setEmailInboxOpen(true);
-        }
-        if (data?.type === "vlue-office-ppt-progress" || data?.type === "ppt.job.progress") {
-          emitOfficePptTasksChanged();
-          if (data?.status === "COMPLETED" || data?.status === "done") {
-            emitAssetFilesChanged();
-            setBottomToast("AI PPT 생성이 완료되었습니다. 자료실에서 확인하세요.");
-            setTimeout(() => setBottomToast(""), 4200);
-          }
         }
         if (data?.type === "vlue-notice-released") {
           const notice = data.notice || null;
@@ -2713,7 +2703,7 @@ function App() {
 
   useEffect(() => {
     if (page !== "documentTemplates") return;
-    setWalletDefaultTab("docs");
+    setWalletDefaultTab("mydocs");
     setCardWalletModalOpen(true);
     setPage("mypage");
   }, [page]);
@@ -3786,6 +3776,15 @@ function App() {
         isDarkMode={isDarkMode}
         onRemoveCardFromWallet={removeCardFromWallet}
       />
+      <OfficeRemoteModal
+        open={officeRemoteOpen}
+        onClose={() => setOfficeRemoteOpen(false)}
+        isDarkMode={isDarkMode}
+        onToast={(msg) => {
+          setBottomToast(msg);
+          setTimeout(() => setBottomToast(""), 2800);
+        }}
+      />
 
       <footer className={`fixed bottom-0 left-0 right-0 z-[130] ${showBottomNav ? "block" : "hidden"}`}>
         <nav className="fixed bottom-0 left-0 right-0 z-[131] flex justify-center">
@@ -4265,6 +4264,10 @@ function App() {
           setProfileOpen(false);
           setWalletDefaultTab("received");
           setCardWalletModalOpen(true);
+        }}
+        onOpenOfficeRemote={() => {
+          setProfileOpen(false);
+          setOfficeRemoteOpen(true);
         }}
         onOpenEmailInbox={() => {
           setProfileOpen(false);

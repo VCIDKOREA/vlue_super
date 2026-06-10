@@ -17,6 +17,11 @@ export function resolveProfileGrade(profile: {
   return "general";
 }
 
+/** 홍보 추천(캐시 정산) 활성 — SNS 인증·승인된 VLUER */
+export function isVluerPromoActiveGrade(grade: VluerGrade): boolean {
+  return grade === "certified" || grade === "partner";
+}
+
 export async function getTierPolicy(grade: VluerGrade) {
   return prisma.vluerTierPolicy.findUnique({ where: { tierCode: grade } });
 }

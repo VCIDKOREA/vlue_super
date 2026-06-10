@@ -40,7 +40,6 @@
     "android:launch": "adb shell am start -n kr.vlue.app/kr.vlue.calloverlay.MainActivity",
     "pc-agent:start": "npm run start -w @vlue/pc-agent",
     "office:email-sim": "node scripts/simulate-office-email-webhook.mjs",
-    "office:ppt-sim": "node scripts/simulate-office-ppt-progress.mjs",
     "production:ready": "node scripts/production-ready.mjs",
     "deploy:lock": "node scripts/production-ready.mjs --lock",
     "pages:sync": "node scripts/sync-coming-soon-docs.mjs",

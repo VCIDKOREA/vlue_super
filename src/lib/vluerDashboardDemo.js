@@ -3,15 +3,17 @@ export function buildVluerDashboardDemoFallback() {
   return {
     tierCode: "general",
     vluerGrade: "general",
+    referralChannel: "friend",
+    promoActive: false,
     tierDisplay: {
-      code: "VLUER",
-      label: "일반 VLUER",
-      commissionPct: 5,
-      tagline: "5% 포인트 리워드",
-      memberRange: "VLUER 활동",
+      code: "지인",
+      label: "지인 추천",
+      commissionPct: 10,
+      tagline: "10% 포인트 (2번째 유료 추천부터)",
+      memberRange: "누구나 가능",
       payoutMode: "reward_only",
       canWithdraw: false,
-      benefitLabel: "5% 포인트 리워드 적립",
+      benefitLabel: "지인 추천 10% 포인트 · 출금 불가",
       grade: "general"
     },
     stats: {
@@ -20,8 +22,8 @@ export function buildVluerDashboardDemoFallback() {
       totalMembers: 12,
       paidReferrals: 8,
       monthlyEstimatedKrw: 0,
-      monthlyEstimatedPoints: 4200,
-      monthlyEstimatedLabel: "4,200P",
+      monthlyEstimatedPoints: 2160,
+      monthlyEstimatedLabel: "2,160P",
       monthlyIsPoints: true,
       canWithdraw: false,
       pendingChurnRequests: 0,
@@ -29,19 +31,14 @@ export function buildVluerDashboardDemoFallback() {
       platformRetainedTotalKrw: 0
     },
     upgrade: {
-      nextTierCode: "certified",
-      nextTierDisplay: {
-        code: "CV",
-        label: "인증 VLUER",
-        commissionPct: 10,
-        benefitLabel: "10% 캐시 적립"
-      },
-      projectedMonthlyLabel: "8,400원",
+      nextTierCode: null,
+      nextTierDisplay: null,
+      projectedMonthlyLabel: "4,320원",
       certifiedAvailable: false,
       partnerAvailable: false,
-      certifiedNotice: "정가 28,300원으로 전환되며, 리워드 요율이 10% 캐시 적립으로 상승합니다.",
-      partnerNotice: "정가 28,300원으로 전환되며, 리워드 요율이 15% 캐시 적립으로 상승합니다.",
-      priceChangeNotice: "기존 할인이 종료되며 정가 28,300원으로 전환되고, 리워드 요율이 상향됩니다."
+      certifiedNotice: "SNS·유튜브·틱톡 인증 후 VLUER 승인 시 홍보 추천(15%/5% 캐시)으로 전환됩니다.",
+      partnerNotice: "",
+      priceChangeNotice: ""
     }
   };
 }

@@ -143,7 +143,7 @@ export default function VluerPartnerSection({ isDarkMode = false, onForceMainVie
         <>
           <p className={`text-[14px] font-black ${headText}`}>추천 코드 발급</p>
           <p className={`mt-1 text-[11px] ${subText}`}>
-            티어: {vluerMe?.tierLabel || "일반 VLUER"}
+            {vluerMe?.tierLabel || "지인 추천"} · SNS 인증·승인 후 홍보 VLUER 고유 코드 발급
           </p>
           <p className="mt-3 rounded-xl bg-violet-50 px-3 py-3 text-center text-[18px] font-black tracking-widest text-violet-900">
             {referralCode || "미발급"}

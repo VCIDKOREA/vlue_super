@@ -24,61 +24,6 @@ export function markMailReceivedFileName(name: string) {
   return `${raw}[메일수신]`;
 }
 
-export function markPptGeneratedFileName(name: string) {
-  let raw = sanitizeVaultFileName(name, "presentation.pptx");
-  if (!raw.toLowerCase().endsWith(".pptx")) raw = `${raw}.pptx`;
-  const dot = raw.lastIndexOf(".");
-  if (dot > 0) return `${raw.slice(0, dot)}[AI PPT]${raw.slice(dot)}`;
-  return `${raw}[AI PPT]`;
-}
-
-const PPT_CONTENT_TYPE =
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-
-export async function ingestPptVaultBuffer(input: {
-  userId: string;
-  fileName: string;
-  buffer: Buffer;
-}) {
-  const fileName = markPptGeneratedFileName(input.fileName);
-  const id = crypto.randomUUID();
-  const objectKey = `personal-vault/${input.userId}/${id}-${fileName}`;
-  const storage = resolveStorageProvider();
-  const uploaded = await storage.upload({
-    key: objectKey,
-    contentType: PPT_CONTENT_TYPE,
-    contentBase64: input.buffer.toString("base64")
-  });
-
-  try {
-    const dir = path.join(vaultRootDir(), input.userId);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, `${id}-${fileName}`), input.buffer);
-  } catch {
-    /* local mirror optional */
-  }
-
-  const row = await addAssetFile({
-    ownerUserId: input.userId,
-    fileName,
-    contentType: PPT_CONTENT_TYPE,
-    fileSize: input.buffer.length,
-    objectKey: uploaded.key || objectKey,
-    fileUrl: uploaded.url
-  });
-  if (!row) throw new Error("AssetFile insert failed");
-
-  return {
-    id: row.id,
-    fileName: row.file_name,
-    fileUrl: row.file_url,
-    objectKey: row.object_key,
-    contentType: PPT_CONTENT_TYPE,
-    fileSize: input.buffer.length,
-    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : new Date().toISOString()
-  };
-}
-
 const ALLOWED_MAIL_TYPES = new Set([
   "application/pdf",
   "image/jpeg",

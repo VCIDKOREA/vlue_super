@@ -168,7 +168,7 @@ function staticScreens(membershipTier) {
       id: "scr-wallet",
       category: "바로가기",
       title: "개인 자료실 · Wallet",
-      subtitle: "명함 · 서류 양식",
+      subtitle: "명함 · 내 문서",
       fields: ["지갑", "wallet", "명함", "카드", "자료실"],
       action: { type: "wallet" }
     },
@@ -178,7 +178,7 @@ function staticScreens(membershipTier) {
       title: "업무·일상 서류 양식",
       subtitle: "개인 자료실 · 서류 양식 다운로드",
       fields: ["서류", "양식", "다운로드", "위임장", "근로계약", "내용증명", "계약서", "문서", "자료실"],
-      action: { type: "wallet", tab: "docs" }
+      action: { type: "wallet", tab: "mydocs" }
     },
     {
       id: "scr-local-ad",

@@ -28,7 +28,7 @@ const DEFAULT_STORAGE_FILES = [
   { id: "f1", name: "보험약관_요약.pdf" },
   { id: "f2", name: "상담기록_2026-04.docx" },
   { id: "f3", name: "제안서_수정본.hwp" },
-  { id: "f4", name: "고객안내문_v2.pptx" }
+  { id: "f4", name: "매출집계표_v2.xlsx" }
 ];
 
 const readSavedFiles = () => {
@@ -212,7 +212,7 @@ const ChatInput = forwardRef(function ChatInput(
       return;
     }
     if (action.id === "file") {
-      setWalletHubTab("docs");
+      setWalletHubTab("mydocs");
       setWalletHubOpen(true);
       setOpenPlus(false);
       return;

@@ -130,8 +130,8 @@ export async function generatePostDescription({ message, roomId }) {
   });
 }
 
-/** AI 기능 선체크(카운터 미증가) — PPT/post_desc 작업 전 */
-export async function checkVmingFeature({ featureType = "web_ppt", message = "", roomId } = {}) {
+/** AI 기능 선체크(카운터 미증가) — 엑셀/post_desc 작업 전 */
+export async function checkVmingFeature({ featureType = "web_excel", message = "", roomId } = {}) {
   const res = await vlueAuthFetch(apiUrl("/api/vming/feature/check"), {
     method: "POST",
     headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },

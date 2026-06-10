@@ -5,7 +5,9 @@ import { resolveProfileGrade } from "../vluer/tierEngine.js";
 import { recordCommissionLedger } from "../vluer/settlementEngine.js";
 import type { CommissionLedgerKind } from "../vluer/settlementEngine.js";
 import { quoteSubscriptionReferralCommission } from "../vluer/referralSettlementPolicy.js";
-import { gradeSpec } from "../vluer/tierPolicyConstants.js";
+import { inferReferralChannelFromCode } from "@vlue/shared/referral";
+import { isVluerPromoActiveGrade } from "../vluer/tierEngine.js";
+import type { ReferralChannel } from "@vlue/shared/referral";
 import type { VluerTierCode } from "../vluer/tierEngine.js";
 import { countPaidDirectReferrals } from "../vluer/paidReferralCount.js";
 import { billingCycleFromPlan } from "./subscriptionBilling.js";
@@ -23,7 +25,11 @@ function ledgerKind(cycle: PaidBillingCycle): CommissionLedgerKind {
   return cycle === "annual" ? "subscription_annual" : "subscription_monthly";
 }
 
-/** 구독 결제 완료·갱신 시 VLUER 레퍼럴 정산 (멱등) */
+function resolveAttributionChannel(referralCodeUsed: string | null): ReferralChannel {
+  return inferReferralChannelFromCode(referralCodeUsed) ?? "promo";
+}
+
+/** 구독 결제 완료·갱신 시 추천인 정산 (멱등) */
 export async function settleSubscriptionReferralCommission(input: {
   payerUserId: string;
   subscriptionId: string;
@@ -67,7 +73,7 @@ export async function settleSubscriptionReferralCommission(input: {
   }
 
   if (!sponsorUserId) {
-    await advanceBenefitStateAfterPaid(input.payerUserId, cycle);
+    await advanceBenefitStateAfterPaid(input.payerUserId, cycle, referralCodeUsed);
     return { skipped: true as const, reason: "no_sponsor" as const };
   }
 
@@ -75,7 +81,7 @@ export async function settleSubscriptionReferralCommission(input: {
   const vluerIsB2bBlocked = await isUserB2bSettlementExcluded(sponsorUserId);
 
   if (payerIsB2b || vluerIsB2bBlocked) {
-    await advanceBenefitStateAfterPaid(input.payerUserId, cycle);
+    await advanceBenefitStateAfterPaid(input.payerUserId, cycle, referralCodeUsed);
     return {
       skipped: true as const,
       reason: "b2b_settlement_excluded" as const,
@@ -89,30 +95,30 @@ export async function settleSubscriptionReferralCommission(input: {
   const profile = await prisma.userVluerProfile.findUnique({ where: { userId: sponsorUserId } });
   const grade = profile ? resolveProfileGrade(profile) : "general";
   const tierCode = grade as VluerTierCode;
-  const paidReferrals = profile ? await countPaidDirectReferrals(sponsorUserId) : 0;
+  const paidReferrals = await countPaidDirectReferrals(sponsorUserId);
+  const attributionChannel = resolveAttributionChannel(referralCodeUsed);
+  const sponsorVluerPromoActive = isVluerPromoActiveGrade(grade);
 
-  if (paidReferrals < 1) {
-    await advanceBenefitStateAfterPaid(input.payerUserId, cycle);
-    return { skipped: true as const, reason: "no_b2c_referrals" as const, commissionKrw: 0 };
-  }
+  const benefitAfterPay = await advanceBenefitStateAfterPaid(
+    input.payerUserId,
+    cycle,
+    referralCodeUsed
+  );
 
-  const benefitAfterPay = await advanceBenefitStateAfterPaid(input.payerUserId, cycle);
   const quote = quoteSubscriptionReferralCommission({
-    sponsorGrade: grade,
+    attributionChannel,
+    sponsorVluerPromoActive,
     benefitMonthIndex: benefitAfterPay.benefitMonthIndex,
     sponsorPenaltyActive,
-    billingCycle: cycle
+    billingCycle: cycle,
+    sponsorPaidReferralCount: paidReferrals
   });
-
-  const spec = gradeSpec(grade);
-  const payoutMode = spec.payoutMode;
-  const blockedReason = quote.blockedReason;
 
   const result = {
     commissionKrw: quote.commissionKrw,
-    blockedReason,
+    blockedReason: quote.blockedReason,
     tierCode,
-    payoutMode,
+    payoutMode: quote.payoutMode,
     pgFeeKrw: 0
   };
 
@@ -131,8 +137,9 @@ export async function settleSubscriptionReferralCommission(input: {
     skipped: false as const,
     commissionKrw: quote.commissionKrw,
     tierCode,
+    channel: quote.channel,
     phase: quote.phase,
-    blockedReason,
+    blockedReason: quote.blockedReason,
     ledgerId: ledger?.id ?? null,
     benefitMonthIndex: benefitAfterPay.benefitMonthIndex
   };

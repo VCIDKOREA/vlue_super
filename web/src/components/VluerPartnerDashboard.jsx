@@ -5,9 +5,11 @@ import {
   fetchVluerSettlements,
   simulateVluerRevenue
 } from "../lib/vluerDashboardApi.js";
-import { SIMULATOR_MAX } from "../lib/vluerRevenueSimulator.js";
+import { SIMULATOR_MAX, REFERRAL_CHANNEL_OPTIONS } from "../lib/vluerRevenueSimulator.js";
 import { buildVluerDashboardDemoFallback, buildVluerOrgMapDemoFallback } from "../lib/vluerDashboardDemo.js";
 import { hasVlueServerSession } from "../lib/vlueSession.js";
+import { fetchVluerPromoApplyStatus } from "../lib/vluerPromoApplyApi.js";
+import VluerPromoApplyModal from "./VluerPromoApplyModal.jsx";
 
 const TABS = [
   { id: "org", label: "조직 맵" },
@@ -15,11 +17,11 @@ const TABS = [
   { id: "ledger", label: "정산 내역" }
 ];
 
-const TIER_RING = {
-  PV: "from-amber-500 via-yellow-500 to-orange-600",
-  CV: "from-violet-600 to-indigo-700",
-  OV: "from-emerald-600 to-teal-700",
-  VLUER: "from-slate-600 to-slate-800"
+const CHANNEL_RING = {
+  friend: "from-slate-600 to-slate-800",
+  promo: "from-violet-600 to-indigo-700",
+  지인: "from-slate-600 to-slate-800",
+  홍보: "from-violet-600 to-indigo-700"
 };
 
 function formatKrw(n) {
@@ -64,8 +66,8 @@ function clampSim(n) {
   return Math.min(SIMULATOR_MAX, Math.max(0, Math.floor(Number(n) || 0)));
 }
 
-function tierRingClass(code) {
-  return TIER_RING[code] || TIER_RING.VLUER;
+function channelRingClass(code, channel) {
+  return CHANNEL_RING[channel] || CHANNEL_RING[code] || CHANNEL_RING.friend;
 }
 
 function pct(current, target) {
@@ -127,7 +129,7 @@ function DashboardDetailModal({ open, title, subtitle, onClose, children }) {
       aria-label={title}
     >
       <button type="button" className="absolute inset-0" aria-label="닫기" onClick={onClose} />
-      <div className="relative flex max-h-[min(88vh,640px)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+      <div className="relative flex h-[min(72vh,640px)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-4 py-3 text-white">
           <div className="min-w-0">
             <p className="text-[14px] font-black leading-tight">{title}</p>
@@ -141,7 +143,7 @@ function DashboardDetailModal({ open, title, subtitle, onClose, children }) {
             닫기
           </button>
         </div>
-        <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-2.5 pt-2.5">{children}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2.5 pt-2.5">{children}</div>
       </div>
     </div>
   );
@@ -161,12 +163,18 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
   const [simPersonalCount, setSimPersonalCount] = useState(0);
   const [simB2bLines, setSimB2bLines] = useState(0);
   const [billingCycle, setBillingCycle] = useState("monthly");
-  const [simTarget, setSimTarget] = useState("");
+  const [simChannel, setSimChannel] = useState("friend");
   const [simResult, setSimResult] = useState(null);
   const [simBusy, setSimBusy] = useState(false);
-  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [offlineDemo, setOfflineDemo] = useState(false);
+  const [promoApplyOpen, setPromoApplyOpen] = useState(false);
+  const [promoApplyStatus, setPromoApplyStatus] = useState("none");
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2400);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -178,15 +186,20 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
       setDash(demo);
       setOrg(buildVluerOrgMapDemoFallback());
       setSettlements([]);
-      setSimTarget((prev) => prev || demo.tierCode || "general");
+      setSimChannel((prev) => prev || demo.referralChannel || "friend");
+      setPromoApplyStatus("none");
       setLoading(false);
       return;
     }
 
     try {
-      const d = await fetchVluerDashboard();
+      const [d, promoStatus] = await Promise.all([
+        fetchVluerDashboard(),
+        fetchVluerPromoApplyStatus().catch(() => ({ status: "none" }))
+      ]);
       setDash(d);
-      setSimTarget((prev) => prev || d?.tierCode || "general");
+      setPromoApplyStatus(promoStatus?.status || (promoStatus?.promoActive ? "approved" : "none"));
+      setSimChannel((prev) => prev || d?.referralChannel || "friend");
       try {
         const o = await fetchVluerOrgMap();
         setOrg(o);
@@ -207,7 +220,7 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
       setDash(demo);
       setOrg(buildVluerOrgMapDemoFallback());
       setSettlements([]);
-      setSimTarget((prev) => prev || demo.tierCode || "general");
+      setSimChannel((prev) => prev || demo.referralChannel || "friend");
       setOfflineDemo(true);
       const msg = e?.message || "대시보드를 불러오지 못했습니다.";
       const needsAction =
@@ -231,7 +244,9 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
     load();
   }, [load]);
 
-  const tierCode = dash?.tierDisplay?.code || "VLUER";
+  const tierCode = dash?.tierDisplay?.code || "지인";
+  const referralChannel = dash?.referralChannel || "friend";
+  const promoActive = Boolean(dash?.promoActive);
   const churnCount = dash?.stats?.pendingChurnRequests ?? 0;
   const downline = dash?.stats?.downlineUsers ?? 0;
   const enterprises = dash?.stats?.enterprises ?? 0;
@@ -247,28 +262,24 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
     setSimB2bLines(Math.max(0, baseB2bLines || enterprises * 10));
   }, [dash, downline, enterprises, baseB2bLines]);
   const totalMembers = dash?.stats?.totalMembers ?? downline + enterprises;
-  const upgrade = dash?.upgrade;
   const canWithdraw = dash?.stats?.canWithdraw ?? dash?.tierDisplay?.canWithdraw ?? false;
-
-  const canUpgradeCertified = upgrade?.certifiedAvailable;
-  const canUpgradePartner = upgrade?.partnerAvailable;
 
   const selectTab = (id) => {
     setTab(id);
-    if (id === "sim" && (canUpgradeCertified || canUpgradePartner) && !simResult) {
-      setUpgradeModalOpen(true);
-    }
   };
 
   const runSim = useCallback(async () => {
     if (!dash) return;
     setSimBusy(true);
     try {
+      const channel = simChannel === "promo_sliding" ? "promo" : simChannel;
+      const benefitPhase = simChannel === "promo_sliding" ? "months_13_plus" : "months_1_12";
       const r = await simulateVluerRevenue({
         billingCycle,
         personalMemberCount: Number(simPersonalCount) || 0,
         b2bLineCount: Number(simB2bLines) || 0,
-        targetTier: simTarget || dash.tierCode
+        referralChannel: channel,
+        benefitPhase
       });
       setSimResult(r);
     } catch (e) {
@@ -276,7 +287,7 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
     } finally {
       setSimBusy(false);
     }
-  }, [dash, billingCycle, simPersonalCount, simB2bLines, simTarget]);
+  }, [dash, billingCycle, simPersonalCount, simB2bLines, simChannel]);
 
   useEffect(() => {
     if (tab !== "sim" || !dash) return undefined;
@@ -284,11 +295,14 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
       runSim();
     }, 320);
     return () => window.clearTimeout(timer);
-  }, [tab, dash, billingCycle, simPersonalCount, simB2bLines, simTarget, runSim]);
+  }, [tab, dash, billingCycle, simPersonalCount, simB2bLines, simChannel, runSim]);
+
+  const promoPending = promoApplyStatus === "pending";
 
   const dashboardBody = (
-    <div className="px-0.5">
-            <div className="mb-2 grid grid-cols-3 gap-1.5">
+    <>
+      <div className="shrink-0 space-y-2 px-0.5">
+            <div className="grid grid-cols-3 gap-1.5">
               <div className="rounded-xl bg-slate-50 px-2 py-2 text-center">
                 <p className="text-[9px] font-bold text-slate-500">합산</p>
                 <p className="text-[15px] font-black text-slate-900">{totalMembers}</p>
@@ -312,32 +326,37 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
               )}
             </div>
 
-            {(canUpgradeCertified || canUpgradePartner) && (
-              <div className="mb-2 rounded-xl border border-violet-100 bg-violet-50/90 px-3 py-2">
-                <p className="text-[11px] font-bold text-violet-950">VLUER 업그레이드 안내</p>
-                <p className="mt-0.5 text-[10px] leading-snug text-violet-800/90">
-                  활동 규모에 따라 인증·파트너 VLUER 업그레이드를 신청할 수 있습니다. 마이페이지에서 확인하세요.
-                </p>
+            {!promoActive ? (
+              promoPending ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-[11px] font-bold text-amber-900">
+                  홍보 VLUER 심사 중
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPromoApplyOpen(true)}
+                  className="w-full rounded-xl bg-violet-600 py-2.5 text-[12px] font-black text-white shadow-sm active:scale-[0.99]"
+                >
+                  홍보 VLUER 신청
+                </button>
+              )
+            ) : (
+              <div className="flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2">
+                <span aria-hidden>✓</span>
+                <p className="text-[11px] font-bold text-violet-900">홍보 VLUER 승인됨</p>
               </div>
             )}
 
-            {dash?.tierCode === "partner" && (
-              <div className="mb-2 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-                <span className="text-lg" aria-hidden>
-                  ★
-                </span>
-                <p className="text-[11px] font-bold text-amber-900">파트너 VLUER</p>
-              </div>
-            )}
-
-            <div className="mb-2 flex gap-1">
+            <div className="flex gap-1 border-b border-slate-100 pb-2">
               {TABS.map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => selectTab(t.id)}
-                  className={`relative flex-1 rounded-full py-1.5 text-[10px] font-black ${
-                    tab === t.id ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
+                  className={`relative flex-1 rounded-full border py-1.5 text-[10px] font-black ${
+                    tab === t.id
+                      ? "border-indigo-600 bg-indigo-600 text-white"
+                      : "border-slate-200 bg-white text-slate-600"
                   }`}
                 >
                   {t.label}
@@ -347,10 +366,11 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
                 </button>
               ))}
             </div>
+      </div>
 
+      <div className="min-h-0 flex-1 overflow-y-auto px-0.5 pb-1">
             {tab === "org" && (
-              <div>
-                <div className="max-h-[200px] space-y-1.5 overflow-y-auto">
+              <div className="space-y-1.5 pt-1">
                   {(org?.members || []).length === 0 && (org?.enterprises || []).length === 0 ? (
                     <p className="py-6 text-center text-[11px] text-slate-400">조직 데이터 없음</p>
                   ) : null}
@@ -381,12 +401,11 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
                       <span className="text-[10px] font-bold tabular-nums text-violet-700">{e.lineCount}L</span>
                     </div>
                   ))}
-                </div>
               </div>
             )}
 
             {tab === "sim" && (
-              <div className="space-y-2.5">
+              <div className="space-y-2.5 pt-1">
                 <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
                   <button
                     type="button"
@@ -463,14 +482,19 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
                 </label>
 
                 <select
-                  value={simTarget}
-                  onChange={(e) => setSimTarget(e.target.value)}
+                  value={simChannel}
+                  onChange={(e) => setSimChannel(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-[11px] font-bold"
                 >
-                  <option value="general">일반 VLUER · 5% 포인트</option>
-                  <option value="certified">인증 VLUER · 10% 캐시</option>
-                  <option value="partner">파트너 VLUER · 15% 캐시</option>
+                  {REFERRAL_CHANNEL_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
                 </select>
+                <p className="text-[9px] leading-snug text-slate-500">
+                  {REFERRAL_CHANNEL_OPTIONS.find((o) => o.id === simChannel)?.detail || ""}
+                </p>
 
                 {simBusy && !simResult && (
                   <p className="text-center text-[10px] font-semibold text-slate-400">계산 중…</p>
@@ -503,7 +527,7 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
                             : ""}
                         </p>
                         <p>
-                          ② 공급가액(÷1.1) {formatKrw(simResult.totalSupplyKrw)} × {simResult.tierRatePct}% ={" "}
+                          ② 공급가액(÷1.1) {formatKrw(simResult.totalSupplyKrw)} × {simResult.channelRatePct ?? simResult.tierRatePct}% ={" "}
                           <span className="font-black">세전 {formatKrw(simResult.preTaxCommissionKrw)}</span>
                         </p>
                         <p>
@@ -515,7 +539,7 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
                     )}
                     {simResult.isRewardPoints && Number(simResult.preTaxCommissionKrw) > 0 && (
                       <p className="mt-1 text-[9px] tabular-nums text-emerald-800/80">
-                        공급가 {formatKrw(simResult.totalSupplyKrw ?? 0)} × {simResult.tierRatePct ?? 0}% ={" "}
+                        공급가 {formatKrw(simResult.totalSupplyKrw ?? 0)} × {simResult.channelRatePct ?? simResult.tierRatePct ?? 0}% ={" "}
                         {formatPoints(simResult.afterTaxPoints)}
                       </p>
                     )}
@@ -531,7 +555,7 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
             )}
 
             {tab === "ledger" && (
-              <div className="max-h-[220px] space-y-1.5 overflow-y-auto">
+              <div className="space-y-1.5 pt-1">
                 {settlements.length === 0 ? (
                   <p className="py-4 text-center text-[11px] text-slate-400">정산 없음</p>
                 ) : (
@@ -559,26 +583,50 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
                 )}
               </div>
             )}
+      </div>
 
-      <button type="button" onClick={load} className="mt-2 w-full text-[10px] font-semibold text-slate-400">
-        새로고침
-      </button>
-      {onOpenFamilyProtection ? (
-        <button
-          type="button"
-          onClick={onOpenFamilyProtection}
-          className="mt-2 w-full text-left text-[10px] font-bold text-amber-700 underline underline-offset-2"
-        >
-          가족 보호 등록 (친구검색) →
+      <div className="shrink-0 border-t border-slate-100 px-0.5 py-2">
+        <button type="button" onClick={load} className="w-full text-[10px] font-semibold text-slate-400">
+          새로고침
         </button>
-      ) : null}
-    </div>
+        {onOpenFamilyProtection ? (
+          <button
+            type="button"
+            onClick={onOpenFamilyProtection}
+            className="mt-1 w-full text-left text-[10px] font-bold text-amber-700 underline underline-offset-2"
+          >
+            가족 보호 등록 →
+          </button>
+        ) : null}
+      </div>
+    </>
   );
+
+  const promoCornerSubtitle = promoActive
+    ? "승인됨 · 고유 코드로 15%/5% 캐시 리워드"
+    : promoPending
+      ? "심사 중 — SNS 확인 후 코드 발급"
+      : "SNS·유튜브·틱톡 링크 제출";
+
+  const promoCornerActionLabel = promoActive ? "내 리워드" : promoPending ? "심사 중" : "신청하기";
+
+  const onPromoCornerAction = () => {
+    if (promoActive || promoPending) {
+      setOpen(true);
+      return;
+    }
+    setPromoApplyOpen(true);
+  };
+
+  const openSimulator = () => {
+    setTab("sim");
+    setOpen(true);
+  };
 
   if (loading && !dash) {
     return (
-      <div className="vlue-mypage-reward-bar shrink-0 border-b border-slate-800/80 bg-slate-900 px-3 py-2">
-        <p className="text-[11px] font-semibold text-slate-400">리워드 불러오는 중…</p>
+      <div className="vlue-mypage-promo-vluer-bar shrink-0 border-b border-violet-300/40 bg-gradient-to-r from-violet-700 to-indigo-800 px-3 py-2.5">
+        <p className="text-[11px] font-semibold text-violet-100">홍보 VLUER 불러오는 중…</p>
       </div>
     );
   }
@@ -601,93 +649,73 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
         </div>
       ) : null}
 
-      <div className="vlue-mypage-reward-bar shrink-0 border-b border-slate-800/80 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-3 py-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="vlue-mypage-promo-vluer-bar shrink-0 border-b border-violet-400/30 bg-gradient-to-r from-violet-600 via-violet-700 to-indigo-800 px-3 py-2.5 shadow-sm">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <span
-            className={`inline-flex shrink-0 rounded-full bg-gradient-to-r ${tierRingClass(tierCode)} px-2 py-0.5 text-[9px] font-black text-white`}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20 text-[18px] shadow-inner"
+            aria-hidden
           >
-            {tierCode}
+            📣
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] font-semibold text-indigo-200/95">
-              {dash?.tierDisplay?.label}
+            <p className="flex items-center gap-1.5 leading-tight">
+              <span className="text-[13px] font-black tracking-tight text-white">홍보 VLUER 신청</span>
               {offlineDemo && !error ? (
-                <span className="ml-1 rounded bg-white/10 px-1 py-px text-[8px] font-bold text-amber-200">샘플</span>
+                <span className="rounded bg-white/20 px-1 py-px text-[8px] font-bold text-amber-100">샘플</span>
               ) : null}
             </p>
-            <p className="flex items-baseline gap-1.5 leading-none">
-              <span
-                className={`text-[15px] font-black tabular-nums tracking-tight ${
-                  dash?.stats?.monthlyIsPoints ? "text-amber-300" : "text-emerald-300"
-                }`}
-              >
-                {dash?.stats?.monthlyEstimatedLabel}
-              </span>
-              <span className="text-[9px] font-medium text-slate-400">{monthlyCaption}</span>
-            </p>
+            <p className="mt-0.5 truncate text-[10px] font-medium text-violet-100/95">{promoCornerSubtitle}</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="shrink-0 rounded-lg bg-white/12 px-2.5 py-1 text-[10px] font-black text-white ring-1 ring-white/20 active:scale-[0.98]"
-        >
-          리워드
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={openSimulator}
+            className="rounded-xl bg-white/20 px-2.5 py-2 text-[11px] font-black text-white ring-1 ring-white/30 shadow-sm active:scale-[0.98]"
+          >
+            계산기
+          </button>
+          <button
+            type="button"
+            onClick={onPromoCornerAction}
+            disabled={promoPending}
+            className={`rounded-xl px-3 py-2 text-[11px] font-black shadow-sm active:scale-[0.98] ${
+              promoPending
+                ? "cursor-default bg-white/15 text-violet-100/80 ring-1 ring-white/25"
+                : promoActive
+                  ? "bg-white text-violet-800"
+                  : "bg-white text-violet-700"
+            }`}
+          >
+            {promoCornerActionLabel}
+          </button>
+        </div>
       </div>
 
       <DashboardDetailModal
         open={open}
-        title={monthlyCaption}
+        title="홍보 VLUER · 리워드"
         subtitle={modalSubtitle}
         onClose={() => setOpen(false)}
       >
         {dashboardBody}
       </DashboardDetailModal>
 
+      <VluerPromoApplyModal
+        open={promoApplyOpen}
+        onClose={() => setPromoApplyOpen(false)}
+        onToast={showToast}
+        onSubmitted={() => {
+          setPromoApplyStatus("pending");
+          load();
+        }}
+      />
+
       {toast && (
         <div className="fixed bottom-24 left-1/2 z-[210] w-[86%] max-w-sm -translate-x-1/2 rounded-xl bg-slate-900/92 px-4 py-2.5 text-center text-[12px] font-semibold text-white shadow-lg">
           {toast}
         </div>
       )}
-
-      <ModalShell
-        open={upgradeModalOpen}
-        title="VLUER 업그레이드 시뮬레이션"
-        onClose={() => setUpgradeModalOpen(false)}
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setUpgradeModalOpen(false)}
-              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-[13px] font-semibold text-slate-600"
-            >
-              닫기
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setUpgradeModalOpen(false);
-                runSim();
-              }}
-              className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-[13px] font-bold text-white"
-            >
-              시뮬레이션 실행
-            </button>
-          </>
-        }
-      >
-        {upgrade?.nextTierDisplay && (
-          <div className="space-y-2 text-[12px] leading-relaxed text-slate-700">
-            <p>
-              다음 단계 <strong>{upgrade.nextTierDisplay.label}</strong>
-            </p>
-            <p className="font-bold text-slate-900">예상 {upgrade.projectedMonthlyLabel}</p>
-            <p className="text-[11px] text-slate-600">{upgrade.nextTierDisplay.benefitLabel}</p>
-            <p className="text-[10px] text-slate-500">{upgrade.priceChangeNotice}</p>
-          </div>
-        )}
-      </ModalShell>
 
     </>
   );

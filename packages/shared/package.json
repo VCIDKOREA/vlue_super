@@ -35,6 +35,10 @@
       "import": "./dist/phone/krPhone.js",
       "default": "./dist/phone/krPhone.js"
     },
+    "./referral": {
+      "import": "./dist/referral/referralChannelPolicy.js",
+      "default": "./dist/referral/referralChannelPolicy.js"
+    },
     "./pricing/pricingConfigTypes": {
       "import": "./dist/pricing/pricingConfigTypes.js",
       "default": "./dist/pricing/pricingConfigTypes.js"

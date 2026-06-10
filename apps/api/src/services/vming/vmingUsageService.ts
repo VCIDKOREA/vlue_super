@@ -3,8 +3,8 @@ import { userHasPremiumTier } from "../../middleware/cardGate.js";
 import { getRateValue, incrRateValue } from "./vmingRateRedis.js";
 
 type TierKind = "FREE" | "PREMIUM" | "UNLIMITED";
-type IntentType = "summary_ppt" | "create_contract" | "group_schedule" | "generate_evidence" | "general_chat";
-export type FeatureType = "daily_chat" | "room_command" | "post_desc" | "web_ppt";
+type IntentType = "summary_excel" | "create_contract" | "group_schedule" | "generate_evidence" | "general_chat";
+export type FeatureType = "daily_chat" | "room_command" | "post_desc" | "web_excel";
 
 let addonReady = false;
 
@@ -19,21 +19,21 @@ const LIMITS_BY_TIER = {
     dailyChatToken: FREE_DAILY_CHAT_TOKEN_LIMIT,
     roomCommandDaily: 1,
     postDescDaily: 1,
-    webPptMonthly: 1
+    webExcelMonthly: 1
   },
   PREMIUM: {
     dailyChatCalls: 50,
     dailyChatToken: null as number | null,
     roomCommandDaily: 10,
     postDescDaily: 5,
-    webPptMonthly: 10
+    webExcelMonthly: 10
   },
   UNLIMITED: {
     dailyChatCalls: null as number | null,
     dailyChatToken: null as number | null,
     roomCommandDaily: null as number | null,
     postDescDaily: null as number | null,
-    webPptMonthly: null as number | null
+    webExcelMonthly: null as number | null
   }
 } as const;
 
@@ -222,7 +222,7 @@ export async function getVmingUserStatus(userId: string) {
     projectLimits: {
       roomCommandDaily: spec.roomCommandDaily,
       postDescDaily: spec.postDescDaily,
-      webPptMonthly: spec.webPptMonthly
+      webExcelMonthly: spec.webExcelMonthly
     },
     tokenCostKrw: { input: INPUT_TOKEN_COST_KRW, output: OUTPUT_TOKEN_COST_KRW, fxBase: FX_KRW },
     statusLabel:
@@ -251,12 +251,12 @@ export async function analyzeVmingIntent(message: string): Promise<{
         highlight: true
       };
     }
-    if (/요약|ppt|슬라이드/.test(text)) {
+    if (/요약|엑셀|excel|스프레드시트|표/.test(text)) {
       return {
         is_suspicious: false,
         risk_level: "low" as const,
-        intent_type: "summary_ppt" as const,
-        reason: "요약 자료 생성 의도",
+        intent_type: "summary_excel" as const,
+        reason: "엑셀·표 자료 생성 의도",
         highlight: false
       };
     }
@@ -294,7 +294,7 @@ export async function analyzeVmingIntent(message: string): Promise<{
 {
   "is_suspicious": true/false,
   "risk_level": "low"|"medium"|"high"|"critical",
-  "intent_type": "summary_ppt"|"create_contract"|"group_schedule"|"generate_evidence"|"general_chat",
+  "intent_type": "summary_excel"|"create_contract"|"group_schedule"|"generate_evidence"|"general_chat",
   "reason": "1줄",
   "highlight": true/false
 }`;
@@ -444,7 +444,7 @@ export async function allowVmingRequest(input: {
       : input.featureType === "post_desc"
         ? limits.postDescDaily
         : null;
-  const monthlyLimit = input.featureType === "web_ppt" ? limits.webPptMonthly : null;
+  const monthlyLimit = input.featureType === "web_excel" ? limits.webExcelMonthly : null;
 
   if (dailyLimit != null && dailyUsed >= dailyLimit) {
     return {

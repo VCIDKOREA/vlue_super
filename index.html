@@ -372,7 +372,11 @@
             name="email"
             type="email"
             required
+            inputmode="email"
             autocomplete="email"
+            maxlength="254"
+            spellcheck="false"
+            aria-describedby="form-hint form-error"
             placeholder="이메일을 입력하고 소식을 받아보세요"
             class="subscribe-input flex-1 min-w-0 px-4 py-3.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-vlue-500/50"
           />
@@ -420,23 +424,76 @@
 
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    // 이메일 구독 → Formspree (구독 시 등록 메일로 알림)
+    // 이메일 구독 → Formspree (클라이언트 + Formspree Workflow 서버 검증)
     const FORMSPREE_ENDPOINT = 'https://formspree.io/f/xpqewkwk';
     const form = document.getElementById('subscribe-form');
     const emailInput = document.getElementById('email');
+    const gotchaInput = form.querySelector('[name="_gotcha"]');
     const submitBtn = form.querySelector('button[type="submit"]');
     const errorEl = document.getElementById('form-error');
     const hintEl = document.getElementById('form-hint');
     const toastEl = document.getElementById('success-toast');
 
+    function normalizeEmail(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    function isValidSubscribeEmail(value) {
+      const email = normalizeEmail(value);
+      if (!email || email.length > 254) return false;
+      if (!/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(email)) {
+        return false;
+      }
+      if (/^(test|admin|noreply|no-reply)@/i.test(email)) return false;
+      if (/@(example\.(com|org|net)|test\.com|localhost)$/i.test(email)) return false;
+      return true;
+    }
+
+    function showEmailError(message) {
+      errorEl.textContent = message;
+      errorEl.classList.remove('hidden');
+      emailInput.setAttribute('aria-invalid', 'true');
+    }
+
+    function clearEmailError() {
+      errorEl.classList.add('hidden');
+      emailInput.removeAttribute('aria-invalid');
+    }
+
+    function formspreeErrorMessage(payload) {
+      const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+      const fieldMsg = errors.find((e) => e.field === 'email')?.message;
+      if (fieldMsg) return fieldMsg;
+      if (payload?.error) return String(payload.error);
+      return '전송에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+    }
+
+    emailInput.addEventListener('input', function () {
+      const email = normalizeEmail(emailInput.value);
+      if (!email) {
+        clearEmailError();
+        return;
+      }
+      if (isValidSubscribeEmail(email)) clearEmailError();
+    });
+
+    emailInput.addEventListener('blur', function () {
+      const email = normalizeEmail(emailInput.value);
+      if (!email) return;
+      if (!isValidSubscribeEmail(email)) {
+        showEmailError('올바른 이메일 주소를 입력해 주세요.');
+      }
+    });
+
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
-      errorEl.classList.add('hidden');
-      const email = emailInput.value.trim();
+      clearEmailError();
 
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        errorEl.textContent = '올바른 이메일 주소를 입력해 주세요.';
-        errorEl.classList.remove('hidden');
+      if (gotchaInput && gotchaInput.value.trim()) return;
+
+      const email = normalizeEmail(emailInput.value);
+      if (!isValidSubscribeEmail(email)) {
+        showEmailError(email ? '올바른 이메일 주소를 입력해 주세요.' : '이메일 주소를 입력해 주세요.');
         emailInput.focus();
         return;
       }
@@ -457,14 +514,14 @@
             source: 'vlue-coming-soon',
           }),
         });
-        if (!res.ok) throw new Error('submit failed');
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(formspreeErrorMessage(payload));
 
         form.classList.add('hidden');
         hintEl.classList.add('hidden');
         toastEl.classList.remove('hidden');
-      } catch {
-        errorEl.textContent = '전송에 실패했습니다. 잠시 후 다시 시도해 주세요.';
-        errorEl.classList.remove('hidden');
+      } catch (err) {
+        showEmailError(err?.message || '전송에 실패했습니다. 잠시 후 다시 시도해 주세요.');
         submitBtn.disabled = false;
         submitBtn.textContent = prevLabel;
       }

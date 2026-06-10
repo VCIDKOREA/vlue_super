@@ -1,7 +1,7 @@
 import { runRevenueSimulation } from "../src/services/vluer/revenueSimulatorEngine.js";
 
 const r = runRevenueSimulation({
-  tierCode: "professional",
+  referralChannel: "promo",
   billingCycle: "monthly",
   personalMemberCount: 200,
   b2bLineCount: 20

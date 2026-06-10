@@ -18,7 +18,10 @@ import { countPaidDirectReferrals } from "./paidReferralCount.js";
 import { getActivePenaltyForPayer, platformRetainedCommissionResult } from "./referralLockEngine.js";
 import { getOrCreateBenefitState } from "../membership/memberReferralBenefitService.js";
 import { quoteSubscriptionReferralCommission } from "./referralSettlementPolicy.js";
+import { inferReferralChannelFromCode } from "@vlue/shared/referral";
+import { isVluerPromoActiveGrade } from "./tierEngine.js";
 import { SLIDING_RENEWAL_MONTHLY_KRW } from "../membership/membershipBmConstants.js";
+import { referralDb } from "../../db/referralDb.js";
 
 export type SettlementInput = {
   vluerUserId: string;
@@ -112,16 +115,6 @@ export async function calculateVluerCommission(input: SettlementInput): Promise<
     };
   }
 
-  if (paidReferrals < 1) {
-    return {
-      commissionKrw: 0,
-      blockedReason: "no_b2c_referrals",
-      tierCode,
-      payoutMode: "reward_only",
-      pgFeeKrw: 0
-    };
-  }
-
   const policy = await getTierPolicy(tierCode);
   if (!policy) {
     return {
@@ -158,17 +151,32 @@ export async function calculateVluerCommission(input: SettlementInput): Promise<
   const cycle = kind === "subscription_annual" ? "annual" : "monthly";
   let benefitMonthIndex = grossPaymentKrw >= SLIDING_RENEWAL_MONTHLY_KRW ? 13 : 1;
   let sponsorPenaltyActive = false;
+  let referralCodeUsed: string | null = null;
   if (payerUserId) {
     const state = await getOrCreateBenefitState(payerUserId);
     benefitMonthIndex = state.accumulatedBenefitMonths + 1;
     sponsorPenaltyActive = state.sponsorPenaltyMonthsLeft > 0;
+    try {
+      const attr = await referralDb.referralAttribution.findUnique({
+        where: { userId: payerUserId },
+        select: { referralCodeUsed: true }
+      });
+      referralCodeUsed = attr?.referralCodeUsed ?? null;
+    } catch {
+      referralCodeUsed = null;
+    }
   }
 
+  const attributionChannel = inferReferralChannelFromCode(referralCodeUsed) ?? "promo";
+  const sponsorVluerPromoActive = isVluerPromoActiveGrade(grade);
+
   const quote = quoteSubscriptionReferralCommission({
-    sponsorGrade: grade,
+    attributionChannel,
+    sponsorVluerPromoActive,
     benefitMonthIndex,
     sponsorPenaltyActive,
-    billingCycle: cycle
+    billingCycle: cycle,
+    sponsorPaidReferralCount: paidReferrals
   });
 
   const pgFeeKrw = b2cPgFeeKrw(cycle === "annual" ? "annual" : "monthly");
@@ -177,7 +185,7 @@ export async function calculateVluerCommission(input: SettlementInput): Promise<
     commissionKrw: quote.commissionKrw,
     blockedReason: quote.blockedReason,
     tierCode,
-    payoutMode: policy.payoutMode,
+    payoutMode: quote.payoutMode,
     pgFeeKrw
   };
 }
@@ -236,10 +244,12 @@ export function expectedSubscriptionCommissionKrw(
       ? tierCode
       : "general";
   const quote = quoteSubscriptionReferralCommission({
-    sponsorGrade: grade,
+    attributionChannel: "promo",
+    sponsorVluerPromoActive: isVluerPromoActiveGrade(grade),
     benefitMonthIndex: opts.benefitMonthIndex ?? 1,
     sponsorPenaltyActive: false,
-    billingCycle: plan === "annual" ? "annual" : "monthly"
+    billingCycle: plan === "annual" ? "annual" : "monthly",
+    sponsorPaidReferralCount: 1
   });
   return quote.commissionKrw;
 }

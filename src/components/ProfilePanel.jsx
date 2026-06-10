@@ -13,7 +13,10 @@ import WalletRevealCard from "./WalletRevealCard.jsx";
 import MyPageDigitalLetteringSection from "./MyPageDigitalLetteringSection.jsx";
 import EnterpriseLineManagePanel from "./EnterpriseLineManagePanel.jsx";
 import ShoppingCartHubPanel from "./ShoppingCartHubPanel.jsx";
+import BroadcastLineSetupPanel from "./BroadcastLineSetupPanel.jsx";
+import BackButton from "./common/BackButton";
 import { isBillableMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
+import { pricingNumbers } from "../lib/pricingConfig.js";
 import { probeEnterpriseSidebarAccess } from "../lib/enterpriseLineManageAccess.js";
 import { fileToDataUrl, readAvatar, writeAvatar } from "../lib/vlueAvatar.js";
 import { getMemberHandle, getChatDisplayName } from "../lib/memberCardStorage.js";
@@ -63,6 +66,8 @@ function ProfilePanel({
   calendarBadgeCount = 0,
   /** Wallet · 개인 자료실 (§2) */
   onOpenWallet,
+  /** PC 복합기 리모컨 */
+  onOpenOfficeRemote,
   /** @vlue.kr 통합 이메일함 */
   onOpenEmailInbox,
   /** 무료 회원 — 스토어 일반 장바구니로 이동 */
@@ -184,6 +189,11 @@ function ProfilePanel({
       setUpgradeOpen(true);
       return;
     }
+    if (initialView === "broadcastSetup") {
+      setPanelView("broadcastSetup");
+      setUpgradeOpen(false);
+      return;
+    }
     setPanelView("main");
     setDigitalCardMode("edit");
     setUpgradeOpen(false);
@@ -203,6 +213,7 @@ function ProfilePanel({
     };
   }, [open, panelView]);
 
+  const broadcastMonthlyKrw = useMemo(() => pricingNumbers().broadcastMonthly, []);
   const tierUi = useMemo(() => tierLabelStyle(membershipTier, isDarkMode), [membershipTier, isDarkMode]);
   const membershipKind = useMemo(() => normalizeMembershipKind(membershipTier), [membershipTier]);
   const canUseShoppingCartHub = useMemo(() => isBillableMembershipKind(membershipKind), [membershipKind]);
@@ -300,11 +311,11 @@ function ProfilePanel({
     setTimeout(() => setPartnerInquiryNotice(""), 3000);
   };
   return (
-    <div className={`fixed inset-0 z-[70] ${open ? "" : "pointer-events-none"}`}>
+    <div className={`fixed inset-0 ${open ? "z-[140]" : "z-[70] pointer-events-none"}`}>
       <button className={`absolute inset-0 bg-black/30 transition ${open ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
       <aside
         id="profile-menu"
-        className={`absolute right-0 top-0 h-full w-[85%] max-w-[340px] z-[70] shadow-2xl flex flex-col overflow-hidden transition-all duration-300 border-l ${
+        className={`absolute right-0 top-0 h-full w-[85%] max-w-[340px] shadow-2xl flex flex-col overflow-hidden transition-all duration-300 border-l ${
           isDarkMode ? "border-white/10 bg-[#111827]" : "border-gray-100 bg-white"
         } ${open ? "translate-x-0" : "translate-x-full"}`}
       >
@@ -372,6 +383,21 @@ function ProfilePanel({
             onBack={() => setPanelView("main")}
             onToast={showSettingNotice}
           />
+        ) : panelView === "broadcastSetup" ? (
+          <div className={`flex min-h-0 flex-1 flex-col ${isDarkMode ? "text-gray-100" : ""}`}>
+            <div
+              className={`flex shrink-0 items-center gap-1 border-b px-3 py-2.5 ${isDarkMode ? "border-white/10" : "border-gray-100"}`}
+            >
+              <BackButton variant="inline" onBack={() => setPanelView("main")} isDarkMode={isDarkMode} />
+              <div className="min-w-0 flex-1">
+                <p className={`text-[17px] font-black ${headText}`}>영업용 명함 송출</p>
+                <p className={`text-[11px] ${subText}`}>발신번호 등록 · 송출 옵션</p>
+              </div>
+            </div>
+            <div className="vlue-scroll-pad-profile-panel min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              <BroadcastLineSetupPanel onToast={showSettingNotice} />
+            </div>
+          </div>
         ) : panelView === "shoppingCart" ? (
           <ShoppingCartHubPanel
             membershipTier={membershipTier}
@@ -380,6 +406,7 @@ function ProfilePanel({
             onToast={showSettingNotice}
           />
         ) : panelView === "settings" ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <VlueSettingsPanel
             isDarkMode={isDarkMode}
             onToggleDarkMode={handleDarkModeToggle}
@@ -410,6 +437,7 @@ function ProfilePanel({
             myEmail="user@vlue.kr"
             openLetteringBizcardHub={openLetteringBizcardHub}
           />
+          </div>
         ) : panelView === "main" ? (
         <>
         <div className={`px-5 py-2 ${isDarkMode ? "text-gray-300" : ""}`}>
@@ -462,7 +490,7 @@ function ProfilePanel({
           </div>
         </div>
 
-        <div ref={mainPanelScrollRef} className="flex-1 overflow-y-auto px-6 no-scrollbar py-6 pb-12">
+        <div ref={mainPanelScrollRef} className="vlue-scroll-pad-profile-panel flex-1 overflow-y-auto px-6 py-6 no-scrollbar">
           {isCorporateAccount ? (
             <button
               type="button"
@@ -500,6 +528,26 @@ function ProfilePanel({
               </span>
             </button>
           ) : null}
+
+          <button
+            type="button"
+            onClick={() => setPanelView("broadcastSetup")}
+            className={`relative mb-4 flex w-full items-center justify-between gap-3 rounded-[26px] border-2 p-4 text-left shadow-sm transition-all active:scale-[0.98] ${
+              isDarkMode
+                ? "border-teal-500/40 bg-teal-500/15"
+                : "border-teal-200 bg-gradient-to-br from-teal-50 to-emerald-50"
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <p className={`text-[15px] font-black leading-tight ${headText}`}>영업용 명함 송출</p>
+              <p className={`mt-0.5 text-[11px] font-semibold ${subText}`}>
+                발신번호 등록 · 월 {broadcastMonthlyKrw.toLocaleString("ko-KR")}원(부가세 포함)
+              </p>
+            </div>
+            <span className={`shrink-0 text-lg ${subText}`} aria-hidden>
+              ›
+            </span>
+          </button>
 
           <MyPageDigitalLetteringSection
             isDarkMode={isDarkMode}
@@ -587,10 +635,27 @@ function ProfilePanel({
                   <br />
                   자료실
                 </p>
-                <p className="mt-1 text-[9px] font-bold text-orange-700">명함 · 서류 양식</p>
+                <p className="mt-1 text-[9px] font-bold text-orange-700">명함 · 내 문서</p>
               </div>
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => onOpenOfficeRemote?.()}
+            className={`relative z-[1] mx-1 mt-3 flex w-[calc(100%-0.5rem)] items-center gap-3 rounded-[22px] border-2 p-4 text-left shadow-sm transition-all active:scale-[0.99] ${
+              isDarkMode ? "border-white/10 bg-white/5" : "border-gray-100 bg-white"
+            }`}
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-lg">
+              🖨
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className={`text-[14px] font-black ${headText}`}>복합기 리모컨</p>
+              <p className={`text-[10px] font-semibold ${subText}`}>PC 연동 · 인쇄 · 팩스</p>
+            </div>
+            <span className={`shrink-0 text-lg ${subText}`}>›</span>
+          </button>
 
           <div className="relative mt-3 px-1">
             <div

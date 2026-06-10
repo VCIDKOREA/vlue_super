@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildPaymentPreview,
-  REFERRAL_DISCOUNT_NOTICE,
-  REFERRAL_SPONSOR_REWARD_NOTICE
+  REFERRAL_FRIEND_DISCOUNT_NOTICE,
+  REFERRAL_PROMO_DISCOUNT_NOTICE,
+  REFERRAL_PROMO_SPONSOR_NOTICE
 } from "../lib/membershipBm.js";
 import { verifyReferralCode } from "../lib/referralVerifyApi.js";
 
@@ -124,12 +125,16 @@ export default function ReferralCodeVerifyBlock({
   return (
     <div className="space-y-3">
       <label className={`block text-[12px] font-bold ${textStrong}`}>
-        추천인 코드
+        추천인 (전화번호 또는 VLUER 코드)
         <div className="mt-1.5 space-y-1.5">
           <input
             value={noReferrer ? "" : referralCode}
-            onChange={(e) => onCodeChange(e.target.value.toUpperCase())}
-            placeholder={requireReferrer ? "추천인 코드 필수" : "선택 입력"}
+            onChange={(e) => {
+              const v = e.target.value;
+              const digits = v.replace(/\D/g, "");
+              onCodeChange(digits.length >= 10 ? digits : v.toUpperCase());
+            }}
+            placeholder={requireReferrer ? "전화번호 또는 VLUER 코드" : "01012345678 또는 VLUER 코드"}
             disabled={noReferrer}
             className={`w-full rounded-lg border px-2.5 py-2 text-[13px] outline-none focus:border-blue-400 disabled:opacity-60 ${fieldBorder}`}
           />
@@ -226,8 +231,9 @@ export default function ReferralCodeVerifyBlock({
             className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 disabled:opacity-40"
           />
           <span className={`text-[10px] leading-relaxed ${verified ? textSub : "text-slate-400"}`}>
-            {REFERRAL_DISCOUNT_NOTICE}
-            <span className="mt-1.5 block">{REFERRAL_SPONSOR_REWARD_NOTICE}</span>
+            {REFERRAL_FRIEND_DISCOUNT_NOTICE}
+            <span className="mt-1.5 block">{REFERRAL_PROMO_DISCOUNT_NOTICE}</span>
+            <span className="mt-1.5 block">{REFERRAL_PROMO_SPONSOR_NOTICE}</span>
             {!verified ? (
               <span className="mt-1 block font-bold text-amber-800">※ 「추천인 인증」 후 동의할 수 있습니다.</span>
             ) : null}
@@ -237,8 +243,8 @@ export default function ReferralCodeVerifyBlock({
 
       {!hasCode && !noReferrer && (
         <p className={`text-[10px] leading-relaxed ${textSub}`}>
-          {REFERRAL_DISCOUNT_NOTICE}
-          <span className="mt-1.5 block">{REFERRAL_SPONSOR_REWARD_NOTICE}</span>
+          {REFERRAL_FRIEND_DISCOUNT_NOTICE}
+          <span className="mt-1.5 block">{REFERRAL_PROMO_DISCOUNT_NOTICE}</span>
         </p>
       )}
 

@@ -5,6 +5,7 @@ import {
   REJOIN_REFERRAL_PENALTY_MONTHS,
   type PaidBillingCycle
 } from "./membershipBmConstants.js";
+import { inferReferralChannelFromCode } from "@vlue/shared/referral";
 import {
   promoMonthsRemaining,
   resolveSlidingConsumerChargeKrw
@@ -49,10 +50,11 @@ export async function resolveBenefitAwareChargeKrw(
 ): Promise<{ amountKrw: number; inPromoWindow: boolean; accumulatedBefore: number }> {
   const state = await getOrCreateBenefitState(userId);
   const hadPromo = hadPromoEligibility(sub, state);
+  const referralChannel = inferReferralChannelFromCode(sub.referralCodeUsed);
   const { amountKrw, inPromoWindow } = resolveSlidingConsumerChargeKrw(
     state.accumulatedBenefitMonths,
     cycle,
-    { hadPromoEligibility: hadPromo }
+    { hadPromoEligibility: hadPromo, referralChannel }
   );
   return { amountKrw, inPromoWindow, accumulatedBefore: state.accumulatedBenefitMonths };
 }
@@ -70,7 +72,8 @@ export type PostPaymentBenefitAdvance = {
  */
 export async function advanceBenefitStateAfterPaid(
   userId: string,
-  cycle: PaidBillingCycle
+  cycle: PaidBillingCycle,
+  referralCodeUsed?: string | null
 ): Promise<PostPaymentBenefitAdvance> {
   const monthsAdded = billingCycleMonthsAdded(cycle);
   const current = await getOrCreateBenefitState(userId);

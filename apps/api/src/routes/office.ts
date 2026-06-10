@@ -14,10 +14,6 @@ import {
   mapInboxRowsForApi
 } from "../services/office/emailWebhookService.js";
 import { listOfficeEmailSent, mapSentRowsForApi } from "../services/office/officeEmailSent.js";
-import {
-  listOfficePptTasks,
-  updateOfficePptTaskMock
-} from "../services/office/officePptTaskService.js";
 import { getActiveMarketingPopup } from "../services/office/marketingPopupService.js";
 import { getLatestNotice } from "../services/office/noticeService.js";
 import {
@@ -31,7 +27,6 @@ import {
   resolveMediaFilePath
 } from "../services/office/mediaCampaignService.js";
 import { readFile } from "node:fs/promises";
-import { allowVmingRequest } from "../services/vming/vmingUsageService.js";
 import { officeExcelRoutes } from "./officeExcel.js";
 import {
   getPosLedgerDashboard,
@@ -44,14 +39,6 @@ import {
 } from "../services/office/posBillOcrService.js";
 
 export const officeRoutes = new Hono();
-
-function pptBlockedReason(gateCode: string) {
-  const isChatSoftLimit =
-    gateCode === "SOFT_LIMIT_REACHED" ||
-    gateCode === "FREE_MINUTE_RATE_LIMIT" ||
-    gateCode === "DAILY_CHAT_CALL_LIMIT_EXCEEDED";
-  return isChatSoftLimit ? "DAILY_CHAT_EXCEEDED" : "PROJECT_LIMIT_EXCEEDED";
-}
 
 officeRoutes.post("/email-webhook", async (c) => {
   const secret =
@@ -242,72 +229,6 @@ officeRoutes.get("/remote-control/queue", async (c) => {
 officeRoutes.get("/remote-control/agents", async (c) => {
   const userId = c.get("vlueUserId") as string;
   return c.json({ ok: true, agents: listConnectedAgents(userId) });
-});
-
-officeRoutes.get("/ppt-tasks", async (c) => {
-  try {
-    const userId = c.get("vlueUserId") as string;
-    const tasks = await listOfficePptTasks(userId, 60);
-    return c.json({ ok: true, tasks });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "unknown error";
-    return c.json({ error: message }, 400);
-  }
-});
-
-officeRoutes.post("/ppt-tasks/mock-progress", async (c) => {
-  try {
-    const userId = c.get("vlueUserId") as string;
-    const body = await c.req.json<{
-      taskId?: string;
-      projectTitle?: string;
-      progress?: number;
-      status?: string;
-      resultFileUrl?: string;
-      resultFileName?: string;
-      resultFileBase64?: string;
-      errorMessage?: string;
-    }>();
-    const isFreshPptTask = !body?.taskId;
-    if (isFreshPptTask) {
-      const gate = await allowVmingRequest({
-        userId,
-        featureType: "web_ppt",
-        intentType: "summary_ppt",
-        message: "office-ppt-task"
-      });
-      if (!gate.allowed) {
-        const blockedReasonType = pptBlockedReason(gate.code);
-        return c.json(
-          {
-            ok: false,
-            code: gate.code,
-            blocked_reason_type: blockedReasonType,
-            message:
-              "오늘 제공된 무료 체험 한도를 모두 소모하셨습니다. 환율 상승에도 부담 없는 가격! 월 4,900원 무제한 패키지로 VLUE의 모든 AI 기능을 제한 없이 고용해 보세요!",
-            openUnlimitedPurchase: true
-          },
-          429
-        );
-      }
-    }
-    const task = await updateOfficePptTaskMock({
-      userId,
-      taskId: body?.taskId,
-      projectTitle: body?.projectTitle,
-      progress: body?.progress,
-      status: body?.status,
-      resultFileUrl: body?.resultFileUrl,
-      resultFileName: body?.resultFileName,
-      resultFileBase64: body?.resultFileBase64,
-      errorMessage: body?.errorMessage
-    });
-    return c.json({ ok: true, task });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "unknown error";
-    const code = message === "TASK_NOT_FOUND" ? 404 : 400;
-    return c.json({ error: message }, code);
-  }
 });
 
 /** 원터치 그룹 일정 */

@@ -5,9 +5,7 @@ import { resolveWalletProfile } from "../lib/cardWalletStorage.js";
 import { saveProfileToDeviceContacts } from "../lib/contactVcfSave.js";
 import B2BLineCartPanel from "./B2BLineCartPanel.jsx";
 import DocumentTemplatesPanel from "./DocumentTemplatesPanel.jsx";
-import OfficeRemotePanel from "./office/OfficeRemotePanel.jsx";
-import OfficeEmailInboxPanel from "./office/OfficeEmailInboxPanel.jsx";
-import OfficePptWorkshopPanel from "./office/OfficePptWorkshopPanel.jsx";
+import VaultSavedFileRow from "./VaultSavedFileRow.jsx";
 import { useHorizontalScrollStrip } from "../lib/useHorizontalScrollStrip.js";
 import { fetchOfficeFiles } from "../lib/vlueOfficeApi.js";
 import { ASSET_FILES_CHANGED, mapOfficeFilesForUi } from "../lib/vlueAssetFilesStorage.js";
@@ -16,8 +14,7 @@ import { useSensitiveScreenSecure } from "../hooks/useSensitiveScreenSecure.js";
 const TABS = [
   { id: "received", label: "받은 명함" },
   { id: "mine", label: "내 명함" },
-  { id: "workshop", label: "개인 작업실" },
-  { id: "docs", label: "서류 양식" },
+  { id: "mydocs", label: "내 문서" },
   { id: "b2b", label: "B2B" },
   { id: "members", label: "멤버" }
 ];
@@ -149,10 +146,9 @@ export default function WalletHubModal({
   const [showAdvancedMine, setShowAdvancedMine] = useState(false);
   const [vaultFiles, setVaultFiles] = useState([]);
   const [vaultLoading, setVaultLoading] = useState(false);
-  const [remoteFocusFileId, setRemoteFocusFileId] = useState("");
   const tabButtonRefs = useRef({});
   const tabStrip = useHorizontalScrollStrip(open);
-  useSensitiveScreenSecure(open && tab === "docs");
+  useSensitiveScreenSecure(open && tab === "mydocs");
 
   const saveContactsFn = onSaveToContacts || saveProfileToDeviceContacts;
 
@@ -283,23 +279,6 @@ export default function WalletHubModal({
     return out;
   }, [vaultFiles, storageFiles]);
 
-  const remoteControlFiles = useMemo(
-    () =>
-      mergedStorageFiles.filter((f) => {
-        if (!f.id) return false;
-        const ct = String(f.contentType || "").toLowerCase();
-        const name = String(f.name || "").toLowerCase();
-        return (
-          f.fileUrl &&
-          (ct.includes("pdf") ||
-            ct.includes("presentation") ||
-            ct.includes("ppt") ||
-            /\.(pdf|pptx?)$/i.test(name))
-        );
-      }),
-    [mergedStorageFiles]
-  );
-
   if (!open) return null;
 
   return (
@@ -309,7 +288,7 @@ export default function WalletHubModal({
         onMouseDown={onClose}
       >
         <div
-          className={`box-border flex max-h-[88vh] w-full min-w-0 max-w-[min(28rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-t-3xl shadow-2xl sm:max-h-[85vh] sm:rounded-3xl ${
+          className={`box-border flex h-[min(72vh,640px)] w-full min-w-0 max-w-[min(28rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-t-3xl shadow-2xl sm:rounded-3xl ${
             isDarkMode ? "bg-[#111827] text-gray-100" : "bg-slate-50"
           }`}
           onMouseDown={(e) => e.stopPropagation()}
@@ -342,14 +321,13 @@ export default function WalletHubModal({
               </div>
             </div>
 
-            <div className="mt-4 min-w-0">
+            <div className="mt-3 min-w-0 border-b border-slate-200/80 pb-0">
               <div
                 ref={tabStrip.ref}
                 role="tablist"
                 aria-label="개인 자료실 메뉴"
-                title="드래그하거나 휠로 탭을 넘길 수 있습니다"
                 onMouseDown={tabStrip.onMouseDown}
-                className={`wallet-tab-strip flex overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-proximity touch-pan-x scroll-px-4 px-4 pb-2 sm:scroll-px-5 sm:px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${tabStrip.stripClassName}`}
+                className={`wallet-tab-strip flex overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-proximity touch-pan-x scroll-px-4 px-4 py-2 sm:scroll-px-5 sm:px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${tabStrip.stripClassName}`}
               >
                 <div className="vlue-tab-strip w-max flex-nowrap gap-2 pr-4">
                   {TABS.map((t) => (
@@ -363,12 +341,12 @@ export default function WalletHubModal({
                       role="tab"
                       aria-selected={tab === t.id}
                       onClick={tabStrip.wrapClick(() => setTab(t.id))}
-                      className={`snap-center shrink-0 whitespace-nowrap rounded-full font-black transition-colors ${
+                      className={`snap-center shrink-0 whitespace-nowrap rounded-full border font-black transition-colors ${
                         tab === t.id
-                          ? "bg-slate-900 text-white shadow-sm"
+                          ? "border-slate-900 bg-slate-900 text-white shadow-sm"
                           : isDarkMode
-                            ? "bg-white/12 text-gray-100 ring-1 ring-white/20"
-                            : "bg-white text-slate-800 ring-1 ring-slate-300"
+                            ? "border-white/20 bg-white/10 text-gray-100"
+                            : "border-slate-300 bg-white text-slate-800"
                       }`}
                     >
                       {t.label}
@@ -395,9 +373,6 @@ export default function WalletHubModal({
                   >
                     <p className={`text-[14px] font-bold ${isDarkMode ? "text-gray-300" : "text-slate-500"}`}>
                       받은 명함이 없습니다
-                    </p>
-                    <p className={`mt-1 text-[12px] ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
-                      채팅에서 명함을 저장하면 여기에 모입니다.
                     </p>
                   </div>
                 ) : (
@@ -518,40 +493,12 @@ export default function WalletHubModal({
               </div>
             )}
 
-            {tab === "workshop" && (
-              <div className="min-w-0 space-y-4">
-                <OfficePptWorkshopPanel
-                  onToast={showToast}
-                  onCompletedAsset={(file) => {
-                    if (file?.id) setRemoteFocusFileId(file.id);
-                    refreshVaultFiles();
-                  }}
-                />
-                <OfficeRemotePanel
-                  files={remoteControlFiles}
-                  focusFileId={remoteFocusFileId}
-                  onToast={showToast}
-                />
-              </div>
-            )}
-
-            {tab === "docs" && (
-              <div className="min-w-0 space-y-4">
-                <DocumentTemplatesPanel embedded membershipTier={membershipTier} isDarkMode={isDarkMode} />
-                <OfficeEmailInboxPanel
-                  vaultFiles={remoteControlFiles}
-                  onSelectAttachment={(file) => setRemoteFocusFileId(file.id)}
-                  onToast={showToast}
-                />
-                <OfficeRemotePanel
-                  files={remoteControlFiles}
-                  focusFileId={remoteFocusFileId}
-                  onToast={showToast}
-                />
+            {tab === "mydocs" && (
+              <div className="min-w-0 space-y-4 pb-2">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between px-0.5">
-                    <p className={`text-[11px] font-black uppercase tracking-wide ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-                      내 저장 문서
+                    <p className={`text-[13px] font-black ${isDarkMode ? "text-gray-200" : "text-slate-800"}`}>
+                      저장된 파일
                     </p>
                     <button
                       type="button"
@@ -561,50 +508,33 @@ export default function WalletHubModal({
                         isDarkMode ? "text-blue-300" : "text-blue-600"
                       }`}
                     >
-                      {vaultLoading ? "불러오는 중…" : "새로고침"}
+                      {vaultLoading ? "…" : "새로고침"}
                     </button>
                   </div>
                   {mergedStorageFiles.length === 0 ? (
                     <p
-                      className={`rounded-xl px-4 py-6 text-center text-[12px] ring-1 ${
+                      className={`rounded-xl px-4 py-8 text-center text-[12px] ring-1 ${
                         isDarkMode
                           ? "bg-white/5 text-gray-400 ring-white/10"
                           : "bg-white text-slate-500 ring-slate-100"
                       }`}
                     >
-                      CS 스캐너로 저장한 PDF가 여기에 표시됩니다.
+                      PDF · 엑셀 · 스캔 문서가 여기에 모입니다.
                     </p>
                   ) : (
-                    mergedStorageFiles.map((f) => (
-                      <button
-                        key={f.id || f.name}
-                        type="button"
-                        onClick={() => {
-                          if (f.fileUrl) {
-                            window.open(f.fileUrl, "_blank", "noopener,noreferrer");
-                            return;
-                          }
-                          onPickDocument?.(f.name);
-                          onClose?.();
-                        }}
-                        className={`flex w-full items-center justify-between gap-2 rounded-xl px-4 py-3 text-left ring-1 active:opacity-90 ${
-                          isDarkMode
-                            ? "bg-white/5 ring-white/10 active:bg-white/10"
-                            : "bg-white ring-slate-100 active:bg-slate-50"
-                        }`}
-                      >
-                        <span className={`min-w-0 truncate text-[13px] font-medium ${isDarkMode ? "text-gray-200" : "text-slate-800"}`}>
-                          {f.name}
-                        </span>
-                        {f.fileUrl ? (
-                          <span className={`shrink-0 text-[10px] font-bold ${isDarkMode ? "text-blue-300" : "text-blue-600"}`}>
-                            열기
-                          </span>
-                        ) : null}
-                      </button>
-                    ))
+                    <ul className="space-y-2">
+                      {mergedStorageFiles.map((f) => (
+                        <VaultSavedFileRow
+                          key={f.id || f.name}
+                          file={f}
+                          isDarkMode={isDarkMode}
+                          onToast={showToast}
+                        />
+                      ))}
+                    </ul>
                   )}
                 </div>
+                <DocumentTemplatesPanel embedded compact membershipTier={membershipTier} isDarkMode={isDarkMode} />
               </div>
             )}
 

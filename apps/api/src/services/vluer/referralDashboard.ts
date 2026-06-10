@@ -13,8 +13,13 @@ import {
   PREMIUM_LIST_PRICE_KRW,
   supplyValueKrw
 } from "./pricingConstants.js";
-import { tierCommissionRateBp } from "./tierLabels.js";
-import { gradeSpec, totalMemberCount } from "./tierPolicyConstants.js";
+import {
+  FRIEND_SPONSOR_RATE_MONTHS_1_12,
+  PROMO_SPONSOR_RATE_MONTHS_1_12,
+  type ReferralChannel
+} from "@vlue/shared/referral";
+import { totalMemberCount } from "./tierPolicyConstants.js";
+import { isVluerPromoActiveGrade } from "./tierEngine.js";
 
 function formatKrw(n: number) {
   return `${floorWon(n).toLocaleString("ko-KR")}원`;
@@ -24,24 +29,26 @@ function formatPoints(n: number) {
   return `${floorWon(n).toLocaleString("ko-KR")}P`;
 }
 
-/** 월 환산 — Junior는 리워드 포인트, SV/MV는 출금 가능 커미션(원) */
+/** 월 환산 — 지인 추천 10% 포인트 · 홍보 VLUER 15% 캐시 */
 function estimateMonthlyBenefit(
   tierCode: VluerGrade,
   downlineUsers: number,
   enterprises: number
-): { amount: number; label: string; isPoints: boolean } {
-  const rate = tierCommissionRateBp(tierCode) / 10_000;
+): { amount: number; label: string; isPoints: boolean; channel: ReferralChannel } {
+  const promoActive = isVluerPromoActiveGrade(tierCode);
+  const channel: ReferralChannel = promoActive ? "promo" : "friend";
+  const rate = promoActive ? PROMO_SPONSOR_RATE_MONTHS_1_12 : FRIEND_SPONSOR_RATE_MONTHS_1_12;
   const b2cMonthly = b2cPlanPriceKrw("monthly");
   const entPaymentPerEnterprise = b2bLineTotalKrw(B2B_MIN_LINES, "monthly");
   const userRev = downlineUsers * floorWon(supplyValueKrw(b2cMonthly) * rate);
   const entRev = enterprises * floorWon(supplyValueKrw(entPaymentPerEnterprise) * rate);
   const amount = floorWon(userRev + entRev);
-  const spec = gradeSpec(tierCode);
-  const isPoints = spec.payoutMode === "reward_only";
+  const isPoints = !promoActive;
   return {
     amount,
     label: isPoints ? formatPoints(amount) : formatKrw(amount),
-    isPoints
+    isPoints,
+    channel
   };
 }
 
@@ -75,6 +82,7 @@ export async function buildVluerDashboard(userId: string) {
   const enterprises = await countAcquiredEnterprises(userId);
   const totalMembers = totalMemberCount(downlineUsers, enterprises);
   const monthly = estimateMonthlyBenefit(tierCode, downlineUsers, enterprises);
+  const promoActive = isVluerPromoActiveGrade(tierCode);
 
   let pendingChurn = 0;
   let activePenalties = 0;
@@ -125,6 +133,8 @@ export async function buildVluerDashboard(userId: string) {
     tierCode,
     vluerGrade: tierCode,
     tierDisplay: display,
+    referralChannel: monthly.channel,
+    promoActive,
     stats: {
       downlineUsers,
       enterprises,

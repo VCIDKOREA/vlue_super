@@ -1241,12 +1241,13 @@ body,
   margin-bottom: 0;
 }
 
-/* 마이페이지 상단 — VLUER 리워드 컴팩트 바 */
+/* 마이페이지 상단 — 홍보 VLUER 신청 코너 */
+.vlue-mypage-promo-vluer-bar,
 .vlue-mypage-reward-bar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  min-height: 2.5rem;
+  min-height: 3.25rem;
 }
 
 /* 홈 — 업체·디지털명함 검색 (네이버형) */
@@ -4857,6 +4858,8 @@ body,
 .wallet-tab-strip {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
+  padding-top: 2px;
+  padding-bottom: 2px;
 }
 
 .wallet-tab-strip:active {

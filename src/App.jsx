@@ -13,10 +13,12 @@ import { readCalendarBadge, setCalendarBadge, clearCalendarBadge } from "./lib/c
 import { fetchMemoMeta, receiveShareMemo } from "./lib/memoApi.js";
 import { LOCAL_MEMO_CHANGED } from "./lib/localMemoStorage.js";
 import { OPEN_CALENDAR_EVENT_KEY } from "./lib/calendarConstants.js";
+import { EXPAND_FAMILY_KEY, OPEN_POS_DASHBOARD_KEY } from "./lib/posDashboardConstants.js";
 import { publishCalendarAsRoomNotice } from "./lib/chatRoomNoticeService.js";
 import BetaLaunchGuide from "./components/BetaLaunchGuide.jsx";
 import Subscription from "./components/Subscription.jsx";
 import WalletHubModal from "./components/WalletHubModal.jsx";
+import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
 import PersonalFeed from "./components/PersonalFeed";
 import ProfilePanel from "./components/ProfilePanel";
 import VluePillToast from "./components/VluePillToast.jsx";
@@ -37,7 +39,8 @@ import PostSignupPaymentModal from "./components/PostSignupPaymentModal.jsx";
 import SignupErrorBoundary from "./components/SignupErrorBoundary.jsx";
 import LoginScreen from "./components/LoginScreen";
 import BiometricGate from "./components/BiometricGate";
-import { VlueEyeMark } from "./components/VlueEyeMark.jsx";
+import { GUEST_PROTECTED_SUBHUB_TABS, runWithGuestAuthGate } from "./lib/guestAuthGate.js";
+import { VlueNavLogoMark } from "./components/VlueNavLogoMark.jsx";
 import BackButton from "./components/common/BackButton";
 import ModalCloseButton from "./components/common/ModalCloseButton";
 
@@ -68,14 +71,13 @@ import {
   forcePersonalMode
 } from "./lib/vlueOfficeMode.js";
 import { startVlueSse, VLUE_SSE_CHAT_MESSAGE } from "./lib/vlueSse.js";
-import {
-  emitAssetFilesChanged,
-  emitOfficeEmailInboxChanged,
-  emitOfficePptTasksChanged
-} from "./lib/vlueAssetFilesStorage.js";
+import { emitAssetFilesChanged, emitOfficeEmailInboxChanged } from "./lib/vlueAssetFilesStorage.js";
 import { startFamilyProtectionPresence } from "./lib/familyProtectionPresence.js";
 import { registerFamilyCallBridge } from "./lib/familyProtectionCallBridge.js";
 import { registerFamilyDeviceBridge } from "./lib/familyProtectionDeviceBridge.js";
+import { registerPosOcrBridge } from "./lib/posBillNativeOcr.js";
+import { promptIosChildWardNoticeOnce } from "./lib/familyPlatformCapabilities.js";
+import FamilyIosRestrictedDialog from "./components/FamilyIosRestrictedDialog.jsx";
 import { registerFamilyNativeRelay } from "./lib/familyProtectionNativeRelay.js";
 import { installFamilySiteGuard, setFamilyChildWardActive } from "./lib/familyProtectionSiteGuard.js";
 import { fetchFamilyProtection } from "./lib/familyProtectionApi.js";
@@ -94,6 +96,7 @@ import {
   mergeFamilyPeers
 } from "./lib/familyProtectionDemo.js";
 import { apiUrl } from "./lib/apiBase.js";
+import { readStoreFeedTab, writeStoreFeedTab, STORE_FEED_PREFS_CHANGED } from "./lib/storeFeedPrefs.js";
 import { getDeviceToken, saveDeviceToken, clientKindHeaders } from "./lib/deviceAuth.js";
 import { runUnifiedSearch, tabForRoom } from "./lib/appUnifiedSearch.js";
 import {
@@ -106,6 +109,7 @@ import {
 import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./lib/kakaoSocialLogin.js";
 import { consumeKakaoOAuthReturn } from "./lib/kakaoOAuthReturn.js";
 import { formatSocialLoginError } from "./lib/socialLoginPolicy.js";
+import { VLUE_MARKETING_SIGNUP_KEY } from "./lib/vlueAuthApi.js";
 import LetteringNotificationPreviewPage from "./components/LetteringNotificationPreviewPage.jsx";
 import LetteringOverlayHost from "./components/LetteringOverlayHost.jsx";
 import LetteringCertModal from "./components/LetteringCertModal.jsx";
@@ -315,6 +319,25 @@ function App() {
     return stored;
   });
   const [signupOnboardingOpen, setSignupOnboardingOpen] = useState(false);
+  const [pendingAuthAction, setPendingAuthAction] = useState(null);
+  const [guestAuthOverlay, setGuestAuthOverlay] = useState(false);
+
+  /** 마케팅 웹(www) 회원가입 탭 → /app 동일 온보딩 */
+  useEffect(() => {
+    try {
+      const flag = sessionStorage.getItem(VLUE_MARKETING_SIGNUP_KEY);
+      if (!flag) return;
+      sessionStorage.removeItem(VLUE_MARKETING_SIGNUP_KEY);
+      localStorage.removeItem(ONBOARDING_DONE_KEY);
+      localStorage.setItem(SESSION_KEY, "0");
+      setIsLoggedIn(false);
+      setShowSplash(false);
+      setOnboardingComplete(false);
+      setSignupOnboardingOpen(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
   /** 생체·24h 유예 갱신 후 메인으로 넘기기 위한 리렌더 트리거 */
   const [biometricSeq, setBiometricSeq] = useState(0);
   const [page, setPage] = useState("main");
@@ -325,8 +348,13 @@ function App() {
   const [shareReceiveDraft, setShareReceiveDraft] = useState(null);
   const [shareReceiveOpen, setShareReceiveOpen] = useState(false);
   const [memoPillToast, setMemoPillToast] = useState({ message: "", memoId: "" });
+  const [posBillToast, setPosBillToast] = useState({ message: "", entryId: "" });
   const [myPageMountKey, setMyPageMountKey] = useState(0);
-  const [subscriptionSubTab, setSubscriptionSubTab] = useState("all");
+  const [subscriptionSubTab, setSubscriptionSubTab] = useState(() => readStoreFeedTab("all"));
+  const handleSubscriptionSubTab = useCallback((tab) => {
+    setSubscriptionSubTab(tab);
+    writeStoreFeedTab(tab);
+  }, []);
   const [chatPrefsTick, setChatPrefsTick] = useState(0);
   const [pushUnreadCount, setPushUnreadCount] = useState(() => countUnreadPush());
   const [floatingRoomIds, setFloatingRoomIds] = useState(() => new Set());
@@ -394,6 +422,7 @@ function App() {
   const [cardWallet, setCardWallet] = useState(() => readCardWallet());
   const [cardWalletModalOpen, setCardWalletModalOpen] = useState(false);
   const [walletDefaultTab, setWalletDefaultTab] = useState("received");
+  const [officeRemoteOpen, setOfficeRemoteOpen] = useState(false);
   const [appMode, setAppMode] = useState(() => readAppMode());
   const [activeOfficeCardId, setActiveOfficeCardId] = useState(() => readActiveOfficeCardId());
   const [hasOfficeGrant, setHasOfficeGrant] = useState(false);
@@ -415,6 +444,15 @@ function App() {
   }, []);
   useEffect(() => {
     if (subscriptionSubTab === "notice") setSubscriptionSubTab("cart");
+  }, [subscriptionSubTab]);
+  useEffect(() => {
+    const onStorePrefs = (e) => {
+      const tab = e?.detail?.tab;
+      if (!tab || tab === subscriptionSubTab) return;
+      setSubscriptionSubTab(tab);
+    };
+    window.addEventListener(STORE_FEED_PREFS_CHANGED, onStorePrefs);
+    return () => window.removeEventListener(STORE_FEED_PREFS_CHANGED, onStorePrefs);
   }, [subscriptionSubTab]);
   useEffect(() => {
     const bumpPrefs = () => setChatPrefsTick((n) => n + 1);
@@ -718,14 +756,6 @@ function App() {
           emitOfficeEmailInboxChanged();
           setEmailInboxOpen(true);
         }
-        if (data?.type === "vlue-office-ppt-progress" || data?.type === "ppt.job.progress") {
-          emitOfficePptTasksChanged();
-          if (data?.status === "COMPLETED" || data?.status === "done") {
-            emitAssetFilesChanged();
-            setBottomToast("AI PPT 생성이 완료되었습니다. 자료실에서 확인하세요.");
-            setTimeout(() => setBottomToast(""), 4200);
-          }
-        }
         if (data?.type === "vlue-notice-released") {
           const notice = data.notice || null;
           if (notice) setActiveNotice(notice);
@@ -803,6 +833,19 @@ function App() {
           if (data.risk_level === "critical" || data.risk_level === "high") {
             setBottomToast(String(data.reason || "사기 의심 메시지가 감지되었습니다."));
             setTimeout(() => setBottomToast(""), 6000);
+          }
+        }
+        if (data?.type === "vlue-pos-staff-bill-submitted") {
+          const msg = String(data.body || data.title || "직원이 마감 빌지를 전송했습니다.");
+          setPosBillToast({
+            message: `${msg} · 탭하여 매출 대시보드`,
+            entryId: String(data.entryId || "")
+          });
+          try {
+            sessionStorage.setItem(OPEN_POS_DASHBOARD_KEY, String(data.entryId || "1"));
+            sessionStorage.setItem(EXPAND_FAMILY_KEY, "1");
+          } catch {
+            /* ignore */
           }
         }
       }
@@ -894,10 +937,13 @@ function App() {
     if (!isLoggedIn) return undefined;
     registerFamilyCallBridge();
     registerFamilyDeviceBridge();
+    registerPosOcrBridge();
     registerFamilyNativeRelay();
     installFamilySiteGuard();
     const onWardRole = (e) => {
-      setFamilyChildWardActive(e?.detail?.wardRole === "child");
+      const isChild = e?.detail?.wardRole === "child";
+      setFamilyChildWardActive(isChild);
+      if (isChild) promptIosChildWardNoticeOnce();
     };
     window.addEventListener("vlue-family-ward-role", onWardRole);
     const stopPresence = startFamilyProtectionPresence();
@@ -2381,6 +2427,17 @@ function App() {
     [activeTab, selectedRoomId]
   );
 
+  const openPosSalesDashboard = useCallback(() => {
+    try {
+      sessionStorage.setItem(EXPAND_FAMILY_KEY, "1");
+      sessionStorage.setItem(OPEN_POS_DASHBOARD_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setPosBillToast({ message: "", entryId: "" });
+    navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
+  }, [activeTab, navigate]);
+
   const openCalendarScreen = useCallback(
     ({ eventId = "", groupId = "", groupName = "" } = {}) => {
       clearCalendarBadge();
@@ -2646,7 +2703,7 @@ function App() {
 
   useEffect(() => {
     if (page !== "documentTemplates") return;
-    setWalletDefaultTab("docs");
+    setWalletDefaultTab("mydocs");
     setCardWalletModalOpen(true);
     setPage("mypage");
   }, [page]);
@@ -2792,15 +2849,48 @@ function App() {
   const bottomNavPulseBlueAi = blueAiActivitySeq > blueAiSeenSeq && activeBottomTab !== "blueai";
   const bottomNavPulseShopping = subscribeChatUnreadTotal > 0 && activeBottomTab !== "shopping";
 
+  const isBrowseGuest =
+    !isLoggedIn && !showSplash && !signupOnboardingOpen && !showOnboardingFlow;
+  const showAppShell =
+    !showSplash && !showOnboardingFlow && ((isLoggedIn && biometricAllowed) || isBrowseGuest);
+
+  const promptGuestSignup = useCallback((action) => {
+    setPendingAuthAction(() => (typeof action === "function" ? action : null));
+    setGuestAuthOverlay(true);
+  }, []);
+
+  const closeGuestAuthOverlay = useCallback(() => {
+    setGuestAuthOverlay(false);
+    setPendingAuthAction(null);
+  }, []);
+
+  const denyDesktopAuth = useCallback(() => {
+    setBottomToast("로그인 후 이용할 수 있습니다.");
+    setTimeout(() => setBottomToast(""), 1800);
+  }, []);
+
+  const requireAuth = useCallback(
+    (action) =>
+      runWithGuestAuthGate({
+        isLoggedIn,
+        isBrowseGuest,
+        onPromptSignup: promptGuestSignup,
+        onDesktopDenied: denyDesktopAuth,
+        action
+      }),
+    [isLoggedIn, isBrowseGuest, promptGuestSignup, denyDesktopAuth]
+  );
+
   const headerVisible = page === "main" || page === "list" || page === "subhub";
-  const topHeaderVisible = isLoggedIn && biometricAllowed && headerVisible;
+  const topHeaderVisible = showAppShell && headerVisible;
   const subhubUtilBack =
     page === "subhub" && (subscriptionSubTab === "gifts" || subscriptionSubTab === "chat" || subscriptionSubTab === "cart");
   const isChatSurface = page === "list" || page === "room";
-  const showBottomNav = isLoggedIn && biometricAllowed && !showOnboardingFlow && page !== "room";
+  const showBottomNav = showAppShell && page !== "room" && !csScannerOpen;
 
   /** 로그인·회원가입 온보딩은 전역 dark-mode 미적용(글자 대비 유지) */
-  const shellIsAuthOrSignupOnboarding = signupOnboardingOpen || (!showSplash && !isLoggedIn);
+  const shellIsAuthOrSignupOnboarding =
+    signupOnboardingOpen || (!showSplash && !isLoggedIn && !isBrowseGuest);
 
   const bottomNavPulseSyncRef = useRef(null);
   useLayoutEffect(() => {
@@ -2810,13 +2900,25 @@ function App() {
     root.style.setProperty("--nav-pulse-delay", `${-(performance.now() % period)}ms`);
   }, [showBottomNav]);
   const requireApp = (fn) => {
-    if (!isLoggedIn) {
-      setBottomToast("로그인 후 이용할 수 있습니다.");
-      setTimeout(() => setBottomToast(""), 1800);
-      return;
-    }
-    fn();
+    requireAuth(fn);
   };
+
+  const executeUnifiedSearchActionGuarded = useCallback(
+    (action) => {
+      const browseAllowed =
+        action?.type === "main" ||
+        (action?.type === "page" &&
+          (action.page === "main" || action.page === "subhub") &&
+          (!action.subscriptionSubTab || !GUEST_PROTECTED_SUBHUB_TABS.has(action.subscriptionSubTab)));
+
+      if (isBrowseGuest && !browseAllowed) {
+        requireAuth(() => executeUnifiedSearchAction(action));
+        return;
+      }
+      executeUnifiedSearchAction(action);
+    },
+    [executeUnifiedSearchAction, isBrowseGuest, requireAuth]
+  );
 
   if (letteringPreviewOpen) {
     return <LetteringNotificationPreviewPage />;
@@ -2833,7 +2935,7 @@ function App() {
       ref={appBodyRef}
       className={`flex h-[100dvh] w-full max-w-none min-w-0 flex-col overflow-hidden text-[#1A1F27] relative ${
         shellIsAuthOrSignupOnboarding ? "bg-[#F8F9FA]" : isChatSurface ? "bg-[#f3f8ff]" : "bg-[#F8F9FA]"
-      } ${!shellIsAuthOrSignupOnboarding && isDarkMode ? "dark-mode" : ""}`}
+      } ${!shellIsAuthOrSignupOnboarding && isDarkMode ? "dark-mode" : ""} ${showBottomNav ? "has-bottom-nav" : ""}`}
     >
       {showSplash && !showOnboardingFlow && <Splash onDone={() => setShowSplash(false)} />}
       {showOnboardingFlow && (
@@ -2855,35 +2957,50 @@ function App() {
         }}
       />
 
-      {!showSplash && !isLoggedIn && !signupOnboardingOpen && (
-        <LoginScreen onLogin={handleLogin} onSignup={handleSignup} onSocialLogin={handleSocialLogin} />
+      {guestAuthOverlay && !isLoggedIn && (
+        <div className="fixed inset-0 z-[100]">
+          <LoginScreen
+            browsePrompt="이 기능은 회원가입 후 이용할 수 있습니다. VLUE 인증을 시작해 주세요."
+            onDismiss={closeGuestAuthOverlay}
+            onLogin={async (payload) => {
+              const result = await handleLogin(payload);
+              if (result?.ok) {
+                setGuestAuthOverlay(false);
+                const resume = pendingAuthAction;
+                setPendingAuthAction(null);
+                if (resume) setTimeout(() => resume(), 0);
+              }
+              return result;
+            }}
+            onSignup={() => {
+              closeGuestAuthOverlay();
+              handleSignup();
+            }}
+            onSocialLogin={handleSocialLogin}
+          />
+        </div>
       )}
 
       {!showSplash && isLoggedIn && !showOnboardingFlow && !biometricAllowed && (
         <BiometricGate onPassed={handleBiometricPassed} />
       )}
 
-      {!showSplash && isLoggedIn && !showOnboardingFlow && biometricAllowed && (
+      {showAppShell && (
         <>
       <header className={`sticky top-0 z-50 relative w-full bg-white/90 backdrop-blur-lg border-b border-gray-100 ${topHeaderVisible ? "block" : "hidden"}`}>
-        <div className="flex h-[48px] w-full items-center justify-between gap-1.5 px-2">
-          <div className="flex min-w-0 flex-1 items-center gap-1">
+        <div className="flex h-[52px] w-full items-center justify-between gap-2 px-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             {subhubUtilBack ? (
               <BackButton variant="inline" onBack={() => setSubscriptionSubTab("all")} />
             ) : (
             <button
               type="button"
               onClick={goMainAndReset}
-              className="h-[24px] w-[32px] shrink-0 overflow-visible rounded-md bg-blue-600 flex items-center justify-center shadow-md active:scale-90 transition-all cursor-pointer"
+              className="shrink-0 overflow-visible border-0 bg-transparent p-0 shadow-none active:scale-90 transition-transform cursor-pointer"
               aria-label="VLUE 홈"
               title="홈"
             >
-              <VlueEyeMark
-                key={eyeNavSeq}
-                wrapClassName={`vlue-header-eye-wrap ${eyeNavSeq > 0 ? "vlue-header-eye-wrap--nav-loading" : ""}`}
-                svgWidth={32}
-                svgHeight={30}
-              />
+              <VlueNavLogoMark blinkSeq={eyeNavSeq} size={36} className="shadow-md shrink-0" />
             </button>
             )}
             {isSearchOpen ? (
@@ -2916,10 +3033,12 @@ function App() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setProfileInitialView("profileSettings");
-                    setProfileOpen(true);
-                  }}
+                  onClick={() =>
+                    requireAuth(() => {
+                      setProfileInitialView("profileSettings");
+                      setProfileOpen(true);
+                    })
+                  }
                   className="shrink-0 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 active:scale-95"
                   aria-label="채팅 프로필 설정"
                   title="채팅 프로필 설정"
@@ -2965,10 +3084,10 @@ function App() {
           <div className="relative flex shrink-0 items-center gap-1">
             <button
               type="button"
-              onClick={() => setCsScannerOpen(true)}
+              onClick={() => requireAuth(() => setCsScannerOpen(true))}
               className="shrink-0 rounded-full p-1.5 text-gray-500 active:scale-90 transition-transform"
-              aria-label="CS 스캐너"
-              title="CS 스캐너"
+              aria-label="VLUE 스캐너"
+              title="VLUE 스캐너 — 일반 문서 / POS 빌지"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 7h4l2-3h4l2 3h4v12H4z" />
@@ -2977,11 +3096,13 @@ function App() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setQrManualValue("");
-                setQrCameraError("");
-                setQrScannerOpen(true);
-              }}
+              onClick={() =>
+                requireAuth(() => {
+                  setQrManualValue("");
+                  setQrCameraError("");
+                  setQrScannerOpen(true);
+                })
+              }
               className="shrink-0 rounded-full p-1.5 text-gray-500 active:scale-90 transition-transform"
               aria-label="QR 스캐너 열기"
               title="QR 스캐너"
@@ -3005,23 +3126,36 @@ function App() {
                 <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
             </button>
-            <div
-              id="profile-trigger"
-              onClick={() => {
-                setProfileInitialView("main");
-                setProfileOpen(true);
-              }}
-              className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-100 text-gray-400"
-            >
-              {headerProfileAvatar ? (
-                <img src={headerProfileAvatar} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full text-gray-400 p-1">
-                  <path d="M12 11C14.2091 11 16 9.20914 16 7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7C8 9.20914 9.79086 11 12 11Z" fill="currentColor"/>
-                  <path d="M18 19C18 16.7909 15.3137 15 12 15C8.68629 15 6 16.7909 6 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              )}
-            </div>
+            {isBrowseGuest ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingAuthAction(null);
+                  setGuestAuthOverlay(true);
+                }}
+                className="shrink-0 rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-black text-white shadow-sm active:scale-95"
+              >
+                로그인/가입
+              </button>
+            ) : (
+              <div
+                id="profile-trigger"
+                onClick={() => {
+                  setProfileInitialView("main");
+                  setProfileOpen(true);
+                }}
+                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-100 text-gray-400"
+              >
+                {headerProfileAvatar ? (
+                  <img src={headerProfileAvatar} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full text-gray-400 p-1">
+                    <path d="M12 11C14.2091 11 16 9.20914 16 7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7C8 9.20914 9.79086 11 12 11Z" fill="currentColor"/>
+                    <path d="M18 19C18 16.7909 15.3137 15 12 15C8.68629 15 6 16.7909 6 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -3067,7 +3201,7 @@ function App() {
                         role="option"
                         className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left active:bg-blue-50"
                         onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => executeUnifiedSearchAction(row.action)}
+                        onClick={() => executeUnifiedSearchActionGuarded(row.action)}
                       >
                         <span
                           className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-black ${thumbTone}`}
@@ -3097,31 +3231,37 @@ function App() {
           <Subscription
             isDarkMode={isDarkMode}
             activeSubTab={subscriptionSubTab}
-            onChangeSubTab={setSubscriptionSubTab}
+            onChangeSubTab={(tab) => {
+              if (isBrowseGuest && GUEST_PROTECTED_SUBHUB_TABS.has(tab)) {
+                requireAuth(() => handleSubscriptionSubTab(tab));
+                return;
+              }
+              handleSubscriptionSubTab(tab);
+            }}
             chatRooms={subscribeHubRooms}
             chatUnreadTotal={subscribeChatUnreadTotal}
+            isGuestMode={isBrowseGuest}
+            onRequireAuth={requireAuth}
             onFamilyAlertToast={(text) => {
               addPushNotification({ category: "안심", title: "가족 보호", body: text });
               setBottomToast(text);
               setTimeout(() => setBottomToast(""), 4000);
             }}
-            onOpenChat={(roomId) => {
-              if (!roomId) return;
-              setUnreadByRoom((prev) => ({ ...prev, [roomId]: 0 }));
-              navigate({ nextPage: "room", nextTab: "subscribe", nextRoomId: roomId });
-            }}
+            onOpenChat={(roomId) =>
+              requireAuth(() => {
+                if (!roomId) return;
+                setUnreadByRoom((prev) => ({ ...prev, [roomId]: 0 }));
+                navigate({ nextPage: "room", nextTab: "subscribe", nextRoomId: roomId });
+              })
+            }
           />
         </div>
       )}
 
       {page === "main" && (
         <Home
-          onOpenStoryTarget={(payload) => {
-            if (!isLoggedIn) {
-              setBottomToast("로그인 후 이용할 수 있습니다.");
-              setTimeout(() => setBottomToast(""), 1800);
-              return;
-            }
+          onOpenStoryTarget={(payload) =>
+            requireAuth(() => {
             const roomId = payload?.roomId || "";
             const [group, id] = String(roomId).split(":");
             const found = group && id ? (roomCatalog[group] || []).find((r) => r.id === id) : null;
@@ -3133,34 +3273,22 @@ function App() {
               organization: found?.cardOrg || titleName
             });
             navigate({ nextPage: "feed", nextTab: activeTab, nextRoomId: null });
-          }}
-          onOpenBlueConsultRoom={(roomId) => {
-            if (!isLoggedIn) {
-              setBottomToast("로그인 후 이용할 수 있습니다.");
-              setTimeout(() => setBottomToast(""), 1800);
-              return;
-            }
+          })}
+          onOpenBlueConsultRoom={(roomId) =>
+            requireAuth(() => {
             if (!roomId) return;
             setUnreadByRoom((prev) => ({ ...prev, [roomId]: 0 }));
             navigate({ nextPage: "room", nextTab: "subscribe", nextRoomId: roomId });
-          }}
-          onOpenBusinessRoom={(roomId) => {
-            if (!isLoggedIn) {
-              setBottomToast("로그인 후 이용할 수 있습니다.");
-              setTimeout(() => setBottomToast(""), 1800);
-              return;
-            }
+          })}
+          onOpenBusinessRoom={(roomId) =>
+            requireAuth(() => {
             if (!roomId) return;
             const tab = tabForRoom(roomId);
             setUnreadByRoom((prev) => ({ ...prev, [roomId]: 0 }));
             navigate({ nextPage: "room", nextTab: tab, nextRoomId: roomId });
-          }}
-          onOpenGuideFeature={(featureId) => {
-            if (!isLoggedIn) {
-              setBottomToast("로그인 후 이용할 수 있습니다.");
-              setTimeout(() => setBottomToast(""), 1800);
-              return;
-            }
+          })}
+          onOpenGuideFeature={(featureId) =>
+            requireAuth(() => {
             if (featureId === "pricing") {
               setProfileInitialView("upgrade");
               setProfileOpen(true);
@@ -3186,38 +3314,32 @@ function App() {
               return;
             }
             if (featureId === "live") {
-              navigate({ nextPage: "shopping", nextTab: activeTab, nextRoomId: null });
+              handleSubscriptionSubTab("media");
+              navigate({ nextPage: "subhub", nextTab: activeTab, nextRoomId: null });
               return;
             }
             if (featureId === "hotplace") {
               requestOpenMyPageComposer({ alsoStore: true });
               navigate({ nextPage: "mypage", nextTab: activeTab, nextRoomId: null });
             }
-          }}
-          onOpenFamilyProtection={() => {
-            if (!isLoggedIn) {
-              setBottomToast("로그인 후 이용할 수 있습니다.");
-              setTimeout(() => setBottomToast(""), 1800);
-              return;
-            }
+          })}
+          onOpenFamilyProtection={() =>
+            requireAuth(() => {
             try {
               sessionStorage.setItem("vlue_expand_family_protection_v1", "1");
             } catch {
               /* ignore */
             }
             navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
-          }}
-          onOpenMyPageFeed={() => {
-            if (!isLoggedIn) {
-              setBottomToast("로그인 후 이용할 수 있습니다.");
-              setTimeout(() => setBottomToast(""), 1800);
-              return;
-            }
+          })}
+          onOpenMyPageFeed={() =>
+            requireAuth(() => {
             requestOpenMyPageComposer({ alsoStore: true });
             navigate({ nextPage: "mypage", nextTab: activeTab, nextRoomId: null });
-          }}
+          })}
           membershipTier={membershipTier}
           isDarkMode={isDarkMode}
+          browseAsGuest={isBrowseGuest}
         />
       )}
       {page === "friendSearch" && (
@@ -3227,7 +3349,10 @@ function App() {
           inboxRequests={friendInboxRequests}
           blockedUserIds={blockedFriendIds}
           isDarkMode={isDarkMode}
-          onFamilyToast={(text) => setBottomToast(text)}
+          onFamilyToast={(text) => {
+            setBottomToast(text);
+            setTimeout(() => setBottomToast(""), 3200);
+          }}
           onGoMain={goBackStep}
           onSendRequest={(user, message) => {
             if (blockedFriendIds.includes(user.id)) return;
@@ -3368,19 +3493,16 @@ function App() {
           {listFilterTab === "push" ? (
             <PushNotificationInbox
               onUnreadChange={setPushUnreadCount}
-              onOpenFamilyProtection={() => {
-                if (!isLoggedIn) {
-                  setBottomToast("로그인 후 이용할 수 있습니다.");
-                  setTimeout(() => setBottomToast(""), 1800);
-                  return;
-                }
-                try {
-                  sessionStorage.setItem("vlue_expand_family_protection_v1", "1");
-                } catch {
-                  /* ignore */
-                }
-                navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
-              }}
+              onOpenFamilyProtection={() =>
+                requireAuth(() => {
+                  try {
+                    sessionStorage.setItem("vlue_expand_family_protection_v1", "1");
+                  } catch {
+                    /* ignore */
+                  }
+                  navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
+                })
+              }
             />
           ) : (
             <ChatList
@@ -3654,6 +3776,15 @@ function App() {
         isDarkMode={isDarkMode}
         onRemoveCardFromWallet={removeCardFromWallet}
       />
+      <OfficeRemoteModal
+        open={officeRemoteOpen}
+        onClose={() => setOfficeRemoteOpen(false)}
+        isDarkMode={isDarkMode}
+        onToast={(msg) => {
+          setBottomToast(msg);
+          setTimeout(() => setBottomToast(""), 2800);
+        }}
+      />
 
       <footer className={`fixed bottom-0 left-0 right-0 z-[130] ${showBottomNav ? "block" : "hidden"}`}>
         <nav className="fixed bottom-0 left-0 right-0 z-[131] flex justify-center">
@@ -3667,17 +3798,28 @@ function App() {
           >
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                triggerHeaderEyeNavBlink();
+                if (isBrowseGuest) {
+                  requireAuth(() => {
+                    const chatSurface = page === "list" || page === "room" || page === "feed" || page === "manage";
+                    navigate({
+                      nextPage: "list",
+                      nextTab: chatSurface && page === "list" ? activeTab || "all" : "all",
+                      nextRoomId: null
+                    });
+                  });
+                  return;
+                }
                 requireApp(() => {
-                  triggerHeaderEyeNavBlink();
                   const chatSurface = page === "list" || page === "room" || page === "feed" || page === "manage";
                   navigate({
                     nextPage: "list",
                     nextTab: chatSurface && page === "list" ? activeTab || "all" : "all",
                     nextRoomId: null
                   });
-                })
-              }
+                });
+              }}
               className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
             >
               <svg
@@ -3707,12 +3849,14 @@ function App() {
 
             <button
               type="button"
-              onClick={() =>
-                requireApp(() => {
-                  triggerHeaderEyeNavBlink();
-                  navigate({ nextPage: "blueai", nextTab: activeTab, nextRoomId: null });
-                })
-              }
+              onClick={() => {
+                triggerHeaderEyeNavBlink();
+                if (isBrowseGuest) {
+                  requireAuth(() => navigate({ nextPage: "blueai", nextTab: activeTab, nextRoomId: null }));
+                  return;
+                }
+                requireApp(() => navigate({ nextPage: "blueai", nextTab: activeTab, nextRoomId: null }));
+              }}
               className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
             >
               <svg
@@ -3741,12 +3885,14 @@ function App() {
 
             <button
               type="button"
-              onClick={() =>
-                requireApp(() => {
-                  triggerHeaderEyeNavBlink();
-                  navigate({ nextPage: "mypage", nextTab: activeTab, nextRoomId: null });
-                })
-              }
+              onClick={() => {
+                triggerHeaderEyeNavBlink();
+                if (isBrowseGuest) {
+                  requireAuth(() => navigate({ nextPage: "mypage", nextTab: activeTab, nextRoomId: null }));
+                  return;
+                }
+                requireApp(() => navigate({ nextPage: "mypage", nextTab: activeTab, nextRoomId: null }));
+              }}
               className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
             >
               <span
@@ -3783,13 +3929,18 @@ function App() {
 
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                triggerHeaderEyeNavBlink();
+                if (isBrowseGuest) {
+                  handleSubscriptionSubTab("media");
+                  navigate({ nextPage: "subhub", nextTab: activeTab || "subscribe", nextRoomId: null });
+                  return;
+                }
                 requireApp(() => {
-                  triggerHeaderEyeNavBlink();
                   setSubscriptionSubTab("recommend");
                   navigate({ nextPage: "subhub", nextTab: activeTab || "subscribe", nextRoomId: null });
-                })
-              }
+                });
+              }}
               className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
             >
               <svg
@@ -3818,12 +3969,14 @@ function App() {
 
             <button
               type="button"
-              onClick={() =>
-                requireApp(() => {
-                  triggerHeaderEyeNavBlink();
-                  navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
-                })
-              }
+              onClick={() => {
+                triggerHeaderEyeNavBlink();
+                if (isBrowseGuest) {
+                  requireAuth(() => navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null }));
+                  return;
+                }
+                requireApp(() => navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null }));
+              }}
               className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
             >
               <svg
@@ -3976,10 +4129,11 @@ function App() {
         onDismiss={() => setNoticeReleaseToastOpen(false)}
       />
       <NoticeDetailSheet notice={activeNotice} open={noticeDetailOpen} onClose={() => setNoticeDetailOpen(false)} />
+      <FamilyIosRestrictedDialog />
       <VluePillToast
         message={bottomToast}
         bottomClassName={
-          isLoggedIn
+          isLoggedIn || isBrowseGuest
             ? "bottom-[calc(54px+env(safe-area-inset-bottom,0px)+12px)]"
             : "bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))]"
         }
@@ -3997,6 +4151,12 @@ function App() {
         }
         bottomClassName="bottom-[calc(54px+env(safe-area-inset-bottom,0px)+72px)]"
         className={memoPillToast.message ? "" : "hidden"}
+      />
+      <VluePillToast
+        message={posBillToast.message}
+        onTap={posBillToast.message ? openPosSalesDashboard : undefined}
+        bottomClassName="bottom-[calc(54px+env(safe-area-inset-bottom,0px)+72px)]"
+        className={posBillToast.message ? "" : "hidden"}
       />
       <MemoShareReceiveSheet
         open={shareReceiveOpen}
@@ -4104,6 +4264,10 @@ function App() {
           setProfileOpen(false);
           setWalletDefaultTab("received");
           setCardWalletModalOpen(true);
+        }}
+        onOpenOfficeRemote={() => {
+          setProfileOpen(false);
+          setOfficeRemoteOpen(true);
         }}
         onOpenEmailInbox={() => {
           setProfileOpen(false);

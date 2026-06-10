@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import { prisma } from "../db/client.js";
 import { requireUserHeader } from "../middleware/cardGate.js";
@@ -29,7 +30,8 @@ import {
   createCodeChangeRequest,
   approveCodeChangeRequest
 } from "../services/vluer/referralLockEngine.js";
-import { resolveProfileGrade, type VluerTierCode } from "../services/vluer/tierEngine.js";
+import { resolveProfileGrade, isVluerPromoActiveGrade, type VluerTierCode } from "../services/vluer/tierEngine.js";
+import type { ReferralChannel } from "@vlue/shared/referral";
 import {
   buildVluerUpgradeEligibility,
   upgradeVluerGrade
@@ -187,6 +189,9 @@ vluerRoutes.post("/dashboard/simulate", async (c) => {
       extraDownlineUsers?: number;
       extraEnterprises?: number;
       extraB2bLines?: number;
+      referralChannel?: string;
+      benefitPhase?: string;
+      /** @deprecated — referralChannel 사용 */
       targetTier?: string;
     };
     const profile = await syncUserVluerTier(me);
@@ -194,13 +199,21 @@ vluerRoutes.post("/dashboard/simulate", async (c) => {
     const downline = profile.cumulativeB2cReferrals;
     const ent = await countAcquiredEnterprises(me);
 
-    const target =
-      body.targetTier === "partner" ||
+    const defaultChannel: ReferralChannel = isVluerPromoActiveGrade(tierCode) ? "promo" : "friend";
+    let referralChannel: ReferralChannel = defaultChannel;
+    if (body.referralChannel === "friend" || body.referralChannel === "promo") {
+      referralChannel = body.referralChannel;
+    } else if (
       body.targetTier === "certified" ||
-      body.targetTier === "general" ||
-      body.targetTier === "official"
-        ? body.targetTier
-        : tierCode;
+      body.targetTier === "partner"
+    ) {
+      referralChannel = "promo";
+    } else if (body.targetTier === "general") {
+      referralChannel = "friend";
+    }
+
+    const benefitPhase =
+      body.benefitPhase === "months_13_plus" ? "months_13_plus" : "months_1_12";
 
     const billingCycle = body.billingCycle === "annual" ? "annual" : "monthly";
 
@@ -215,7 +228,8 @@ vluerRoutes.post("/dashboard/simulate", async (c) => {
         : ent * 10 + (Number(body.extraB2bLines) || Number(body.extraEnterprises) * 10 || 0);
 
     const result = runRevenueSimulation({
-      tierCode: target,
+      referralChannel,
+      benefitPhase,
       billingCycle,
       personalMemberCount: personal,
       b2bLineCount: b2bLine
@@ -223,7 +237,7 @@ vluerRoutes.post("/dashboard/simulate", async (c) => {
 
     return c.json({
       ...result,
-      tierDisplay: TIER_DISPLAY[target],
+      tierRatePct: result.channelRatePct,
       projectedMonthlyLabel: result.displayLabel,
       projectedMonthlyKrw: result.isRewardPoints ? 0 : result.afterTaxCommissionKrw,
       projectedMonthlyPoints: result.isRewardPoints ? result.afterTaxPoints : 0
@@ -231,6 +245,108 @@ vluerRoutes.post("/dashboard/simulate", async (c) => {
   } catch (e) {
     return handleVluerRouteError(c, "/dashboard/simulate", e);
   }
+});
+
+/** 홍보 VLUER 신청 — SNS 인증 링크 접수 (승인은 운영 처리) */
+vluerRoutes.get("/promo/apply/status", async (c) => {
+  const me = c.get("vlueUserId")!;
+  const profile = await prisma.userVluerProfile.findUnique({ where: { userId: me } });
+  const grade = resolveProfileGrade(profile ?? { tierCode: "general" });
+  if (isVluerPromoActiveGrade(grade)) {
+    return c.json({ status: "approved", promoActive: true });
+  }
+  try {
+    const pending = await prisma.verificationLog.findFirst({
+      where: { userId: me, action: "vluer_promo_apply", outcome: "pending" },
+      orderBy: { createdAt: "desc" }
+    });
+    if (pending) {
+      return c.json({ status: "pending", promoActive: false, appliedAt: pending.createdAt });
+    }
+  } catch {
+    /* verification_logs 미준비 */
+  }
+  return c.json({ status: "none", promoActive: false });
+});
+
+function isPromoUrl(raw: string): boolean {
+  const t = String(raw || "").trim();
+  if (!t) return false;
+  try {
+    const url = /^https?:\/\//i.test(t) ? new URL(t) : new URL(`https://${t}`);
+    const host = url.hostname.replace(/^www\./i, "");
+    if (!host || !host.includes(".")) return false;
+    if (host === "localhost") return false;
+    return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host);
+  } catch {
+    return false;
+  }
+}
+
+vluerRoutes.post("/promo/apply", async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = (await c.req.json().catch(() => ({}))) as {
+    links?: string[];
+    snsInstagram?: string;
+    snsYoutube?: string;
+    snsTiktok?: string;
+    note?: string;
+  };
+  const profile = await prisma.userVluerProfile.findUnique({ where: { userId: me } });
+  const grade = resolveProfileGrade(profile ?? { tierCode: "general" });
+  if (isVluerPromoActiveGrade(grade)) {
+    return c.json({ error: "이미 홍보 VLUER로 승인되었습니다." }, 400);
+  }
+
+  const legacy = [body.snsInstagram, body.snsYoutube, body.snsTiktok]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+  const fromArray = Array.isArray(body.links)
+    ? body.links.map((v) => String(v || "").trim()).filter(Boolean)
+    : [];
+  const allLinks = [...new Set([...fromArray, ...legacy])];
+  const note = String(body.note || "").trim().slice(0, 200);
+
+  if (allLinks.length === 0) {
+    return c.json({ error: "계정 링크를 하나 이상 입력해 주세요." }, 400);
+  }
+  if (allLinks.some((link) => !isPromoUrl(link))) {
+    return c.json({ error: "정확한 주소를 입력하세요" }, 400);
+  }
+
+  const [snsInstagram = "", snsYoutube = "", snsTiktok = ""] = allLinks;
+
+  try {
+    const pending = await prisma.verificationLog.findFirst({
+      where: { userId: me, action: "vluer_promo_apply", outcome: "pending" },
+      orderBy: { createdAt: "desc" }
+    });
+    if (pending) {
+      return c.json({ error: "이미 홍보 VLUER 신청이 접수되어 심사 중입니다." }, 400);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    await prisma.verificationLog.create({
+      data: {
+        id: randomUUID(),
+        userId: me,
+        action: "vluer_promo_apply",
+        detail: { links: allLinks, snsInstagram, snsYoutube, snsTiktok, note, at: new Date().toISOString() },
+        outcome: "pending"
+      }
+    });
+  } catch {
+    /* 로그 저장 실패해도 접수 완료 응답 */
+  }
+
+  return c.json({
+    ok: true,
+    status: "pending",
+    message: "홍보 VLUER 신청이 접수되었습니다. SNS 인증 확인 후 승인됩니다."
+  });
 });
 
 vluerRoutes.post("/code-change/request", async (c) => {

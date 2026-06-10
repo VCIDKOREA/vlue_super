@@ -338,7 +338,7 @@ authRoutes.get("/referral/verify", async (c) => {
     }
     const ref = await resolveReferralSponsor(code);
     if (!ref.sponsorUserId) {
-      return c.json({ valid: false, error: "유효하지 않은 추천인 코드입니다." });
+      return c.json({ valid: false, error: "유효하지 않은 추천인 정보입니다." });
     }
     const sponsor = await prisma.user.findUnique({
       where: { id: ref.sponsorUserId },
@@ -349,7 +349,9 @@ authRoutes.get("/referral/verify", async (c) => {
     return c.json({
       valid: true,
       referralCode: ref.referralCodeUsed,
-      sponsorDisplayName: name || handle || "VLUER 파트너",
+      channel: ref.channel,
+      channelLabel: ref.channel === "friend" ? "지인 추천" : "홍보 추천",
+      sponsorDisplayName: name || handle || "VLUE 회원",
       sponsorHandle: handle
     });
   } catch (e) {

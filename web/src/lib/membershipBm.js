@@ -52,21 +52,30 @@ export const PAID_ANNUAL_DISCOUNTED_KRW = 198000;
 /** 13개월째부터 피추천인 영구 15% 할인 (정가 28,300원 기준) */
 export const PAID_MONTHLY_SLIDING_DISCOUNTED_KRW = 24050;
 
-/** 피추천인(가입자) 구독 할인 */
-export const REFERRAL_DISCOUNT_NOTICE =
-  `※ 피추천인(가입자) 구독 할인: 추천인 코드로 유료 가입 시 최초 ${REFERRAL_BENEFIT_PROMO_MONTHS}개월 30% 할인(월 ${PAID_MONTHLY_DISCOUNTED_KRW.toLocaleString("ko-KR")}원 / 1년 ${PAID_ANNUAL_DISCOUNTED_KRW.toLocaleString("ko-KR")}원·2개월 무료). ${REFERRAL_BENEFIT_PROMO_MONTHS + 1}개월째부터 15% 할인(월 ${PAID_MONTHLY_SLIDING_DISCOUNTED_KRW.toLocaleString("ko-KR")}원)이 영구 적용됩니다.`;
+/** 지인 추천 — 피추천인 할인 */
+export const REFERRAL_FRIEND_DISCOUNT_NOTICE =
+  `※ 지인 추천(추천인 전화번호): 피추천인 구독 시 30% 할인(월 ${PAID_MONTHLY_DISCOUNTED_KRW.toLocaleString("ko-KR")}원)이 적용됩니다. 추천인은 2번째 유료 추천부터 가입 후 ${REFERRAL_BENEFIT_PROMO_MONTHS}개월간 10% 포인트 적립, ${REFERRAL_BENEFIT_PROMO_MONTHS + 1}개월째부터 적립 없음. 언제든 VLUER 홍보 신청 가능.`;
 
-/** 추천인(코드 제공 VLUER) 구독 리워드 */
-export const REFERRAL_SPONSOR_REWARD_NOTICE =
-  `※ 추천인(코드 제공 VLUER) 적립: 추천 코드로 가입·결제한 회원의 구독료 기준, 가입 후 ${REFERRAL_BENEFIT_PROMO_MONTHS}개월 동안 VLUER 등급별 구독 리워드(인증 10%·파트너 15% 캐시 등). ${REFERRAL_BENEFIT_PROMO_MONTHS + 1}개월째부터 해당 회원 구독 분은 5% 고정(영구)으로 조정됩니다.`;
+/** 홍보 추천 — 피추천인 할인 */
+export const REFERRAL_PROMO_DISCOUNT_NOTICE =
+  `※ 홍보 추천(VLUER 고유 코드): 피추천인 최초 ${REFERRAL_BENEFIT_PROMO_MONTHS}개월 30% 할인, ${REFERRAL_BENEFIT_PROMO_MONTHS + 1}개월째부터 15% 할인(월 ${PAID_MONTHLY_SLIDING_DISCOUNTED_KRW.toLocaleString("ko-KR")}원) 영구.`;
+
+/** 홍보 추천 — 추천인 캐시 */
+export const REFERRAL_PROMO_SPONSOR_NOTICE =
+  `※ 홍보 VLUER 적립: SNS·유튜브·틱톡 인증·승인 후 고유 코드로 추천 시 1~${REFERRAL_BENEFIT_PROMO_MONTHS}개월 15% 캐시(출금 가능), ${REFERRAL_BENEFIT_PROMO_MONTHS + 1}개월째부터 5% 캐시 영구. VLUER 승인 시 기존 지인 추천 회원도 캐시 적립으로 전환됩니다.`;
+
+/** @deprecated — 하위 호환 */
+export const REFERRAL_DISCOUNT_NOTICE = REFERRAL_PROMO_DISCOUNT_NOTICE;
+export const REFERRAL_SPONSOR_REWARD_NOTICE = REFERRAL_PROMO_SPONSOR_NOTICE;
 
 export const REFERRAL_POST_SIGNUP_NOTICE =
   "※ 추천인 없이 정가로 가입해도 사후 등록이 가능하며, 등록 시점의 가입일·결제 주기에 맞춰 위 할인·적립이 순차 적용됩니다. (예: 12일 정가 가입 후 20일 추천인 등록 → 다음 달 12일 결제부터 30% 구간 시작)";
 
 /** 서비스소개·약관용 — 할인 + 스폰서 + 사후등록 */
 export const REFERRAL_PROGRAM_NOTICES = [
-  REFERRAL_DISCOUNT_NOTICE,
-  REFERRAL_SPONSOR_REWARD_NOTICE,
+  REFERRAL_FRIEND_DISCOUNT_NOTICE,
+  REFERRAL_PROMO_DISCOUNT_NOTICE,
+  REFERRAL_PROMO_SPONSOR_NOTICE,
   REFERRAL_POST_SIGNUP_NOTICE
 ];
 

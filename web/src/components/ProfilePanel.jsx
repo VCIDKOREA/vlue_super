@@ -66,6 +66,8 @@ function ProfilePanel({
   calendarBadgeCount = 0,
   /** Wallet · 개인 자료실 (§2) */
   onOpenWallet,
+  /** PC 복합기 리모컨 */
+  onOpenOfficeRemote,
   /** @vlue.kr 통합 이메일함 */
   onOpenEmailInbox,
   /** 무료 회원 — 스토어 일반 장바구니로 이동 */
@@ -633,10 +635,27 @@ function ProfilePanel({
                   <br />
                   자료실
                 </p>
-                <p className="mt-1 text-[9px] font-bold text-orange-700">명함 · 서류 양식</p>
+                <p className="mt-1 text-[9px] font-bold text-orange-700">명함 · 내 문서</p>
               </div>
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => onOpenOfficeRemote?.()}
+            className={`relative z-[1] mx-1 mt-3 flex w-[calc(100%-0.5rem)] items-center gap-3 rounded-[22px] border-2 p-4 text-left shadow-sm transition-all active:scale-[0.99] ${
+              isDarkMode ? "border-white/10 bg-white/5" : "border-gray-100 bg-white"
+            }`}
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-lg">
+              🖨
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className={`text-[14px] font-black ${headText}`}>복합기 리모컨</p>
+              <p className={`text-[10px] font-semibold ${subText}`}>PC 연동 · 인쇄 · 팩스</p>
+            </div>
+            <span className={`shrink-0 text-lg ${subText}`}>›</span>
+          </button>
 
           <div className="relative mt-3 px-1">
             <div

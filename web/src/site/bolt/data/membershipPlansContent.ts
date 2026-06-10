@@ -84,10 +84,8 @@ export const MARKETING_PRICING_TIERS = [
 ];
 
 export const VLUER_REFERRAL_GRADES = [
-  { title: '일반 VLUER', desc: '구독 5% 포인트 · 쇼핑 쉐어 없음' },
-  { title: '인증 VLUER', desc: '구독 10% 캐시 · 쇼핑 0.3% 쉐어' },
-  { title: '파트너 VLUER', desc: '구독 15% 캐시 · 쇼핑 0.8% 쉐어' },
-  { title: '공식 VLUER', desc: 'B2B 제휴 전용' },
+  { title: '지인 추천', desc: '추천인 전화번호 · 피추천인 30% 할인 · 2번째 추천부터 10% 포인트(1~12개월)' },
+  { title: '홍보 추천 (VLUER)', desc: '고유 코드 · SNS 인증·승인 · 15% 캐시(1~12개월) · 5% 캐시 영구(13개월~)' },
 ] as const;
 
 /** 서비스소개 — 요금제 아코디언 (앱 설정 문구) */
@@ -136,12 +134,12 @@ export const MEMBERSHIP_PRICING_FEATURES: ServiceAccordionItem[] = [
   },
   {
     id: 'plan-referral',
-    title: 'VLUER 추천·리워드 프로그램',
-    summary: '12개월 30% → 이후 15% 영구 · 추천인 15%→5% 영구 · 등급별 리워드',
+    title: '추천·리워드 (2단계)',
+    summary: '지인 추천(전화번호) · 홍보 추천(VLUER 코드)',
     detail: [
       ...REFERRAL_PROGRAM_NOTICES,
       ...VLUER_REFERRAL_GRADES.map((g) => `${g.title}: ${g.desc}`),
-      '※ 위 구독 리워드 %는 추천 가입 회원의 첫 12개월 기준입니다. 13개월째부터 해당 회원 구독 분은 5% 고정(영구) 적립입니다.',
+      '※ VLUER 홍보 승인 시 기존 지인 추천 회원도 캐시 적립으로 전환됩니다.',
       VLUER_REFERRAL_B2B_NOTE,
       `임직원 콤보: ${PERSONAL_COMBO_PRICING_NOTE}`,
     ],

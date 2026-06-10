@@ -23,8 +23,8 @@
 - `POST /api/iot/fax-jobs`
 - `POST /api/mail/accounts/provision`
 - `POST /api/mail/send`
-- `POST /api/ppt/jobs`
-- `POST /api/ppt/jobs/:id/progress`
+- `GET /api/office/excel/templates`
+- `POST /api/office/excel/workbooks/generate`
 
 ## Adapter Strategy
 - PG uses `PaymentProviderPort`, default implementation is `MockEscrowProvider`.
@@ -47,4 +47,4 @@
 ## Local Verification
 1. `npm run dev` in `apps/api`.
 2. Run `npm run test:core-smoke` in `apps/api`.
-3. Subscribe to `GET /api/realtime/sse` and confirm `groupbuy.tick`/`ppt.job.progress`.
+3. Subscribe to `GET /api/realtime/sse` and confirm `groupbuy.tick` events.

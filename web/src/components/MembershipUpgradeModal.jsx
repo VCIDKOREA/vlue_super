@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { isPaidMembershipKind, normalizeMembershipKind, PAID_MEMBERSHIP_SUBLINE } from "../lib/membershipBm.js";
 import ReferralCodeVerifyBlock from "./ReferralCodeVerifyBlock.jsx";
-import { fetchVluerUpgradeStatus, postVluerUpgrade } from "../lib/vluerUpgradeApi.js";
 
 const MEMBERSHIP_OPTIONS = [
   {
@@ -17,12 +16,16 @@ const MEMBERSHIP_OPTIONS = [
   }
 ];
 
-const GRADE_COPY = {
-  general: { title: "일반 VLUER", desc: "구독 5% 포인트 · 쇼핑 쉐어 없음" },
-  certified: { title: "인증 VLUER", desc: "구독 10% 캐시 · 쇼핑 0.3% 쉐어" },
-  partner: { title: "파트너 VLUER", desc: "구독 15% 캐시 · 쇼핑 0.8% 쉐어" },
-  official: { title: "공식 VLUER", desc: "B2B 제휴 전용" }
-};
+const REFERRAL_CHANNELS = [
+  {
+    title: "지인 추천",
+    desc: "추천인 전화번호 · 피추천인 30% 할인 · 2번째 유료 추천부터 10% 포인트(1~12개월)"
+  },
+  {
+    title: "홍보 추천 (VLUER)",
+    desc: "SNS·유튜브·틱톡 인증·승인 후 고유 코드 · 15% 캐시(1~12개월) · 5% 캐시 영구(13개월~)"
+  }
+];
 
 /**
  * 마이페이지 — 멤버십 변경 + VLUER 업그레이드(선택형)
@@ -39,33 +42,16 @@ export default function MembershipUpgradeModal({
   const [planToast, setPlanToast] = useState("");
   const [paidBillingCycle, setPaidBillingCycle] = useState("monthly");
   const [referralCode, setReferralCode] = useState("");
-  const [upgradeBusy, setUpgradeBusy] = useState(false);
-  const [upgradeStatus, setUpgradeStatus] = useState(null);
-  const [statusLoading, setStatusLoading] = useState(false);
-
   const currentKind = normalizeMembershipKind(membershipTier);
-
-  const loadUpgradeStatus = useCallback(async () => {
-    setStatusLoading(true);
-    try {
-      const s = await fetchVluerUpgradeStatus();
-      setUpgradeStatus(s);
-    } catch {
-      setUpgradeStatus(null);
-    } finally {
-      setStatusLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    loadUpgradeStatus();
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open, loadUpgradeStatus]);
+  }, [open]);
 
   useEffect(() => {
     if (!planToast) return;
@@ -73,37 +59,11 @@ export default function MembershipUpgradeModal({
     return () => clearTimeout(t);
   }, [planToast]);
 
-  const runVluerUpgrade = async (targetGrade) => {
-    const notice =
-      targetGrade === "partner"
-        ? upgradeStatus?.partnerRewardNotice
-        : upgradeStatus?.certifiedRewardNotice;
-    const ok = window.confirm(
-      `${notice || "정가 28,300원으로 전환되고 리워드 요율이 상승합니다."}\n\nVLUER 업그레이드를 진행할까요?`
-    );
-    if (!ok) return;
-
-    setUpgradeBusy(true);
-    try {
-      await postVluerUpgrade(targetGrade, true);
-      setPlanToast("VLUER 업그레이드가 완료되었습니다.");
-      await loadUpgradeStatus();
-      onVluerUpgraded?.();
-    } catch (e) {
-      setPlanToast(e instanceof Error ? e.message : "업그레이드에 실패했습니다.");
-    } finally {
-      setUpgradeBusy(false);
-    }
-  };
-
   if (!open) return null;
 
   const panel = isDarkMode ? "border-white/10 bg-[#151821]" : "border-gray-200 bg-white";
   const textStrong = isDarkMode ? "text-gray-100" : "text-gray-900";
   const textSub = isDarkMode ? "text-gray-400" : "text-gray-500";
-
-  const currentGrade = upgradeStatus?.currentGrade || "general";
-  const gradeInfo = GRADE_COPY[currentGrade] || GRADE_COPY.general;
 
   const handleMembershipSelect = async (kind) => {
     const next = normalizeMembershipKind(kind);
@@ -144,7 +104,7 @@ export default function MembershipUpgradeModal({
               id="membership-upgrade-title"
               className={`min-w-0 flex-1 text-[clamp(15px,4vw,17px)] font-black leading-snug ${textStrong}`}
             >
-              멤버십 · VLUER 업그레이드
+              멤버십 · 추천 안내
             </h2>
             <button
               type="button"
@@ -157,67 +117,20 @@ export default function MembershipUpgradeModal({
           </div>
 
           <p className={`mb-4 text-[clamp(11px,3.2vw,12px)] leading-relaxed ${textSub}`}>
-            VLUER(블러) 활동은 <b>일반 → 인증 → 파트너</b> 순으로 선택 업그레이드할 수 있습니다. 활동 규모에
-            따라 안내되며, 업그레이드 시 유료 멤버십이 정가로 전환될 수 있습니다.
+            추천·리워드는 <b>지인 추천</b>과 <b>홍보 추천(VLUER)</b> 두 가지로만 운영됩니다. 언제든 VLUER 홍보 신청이 가능합니다.
           </p>
 
-          <div
-            className={`rounded-xl border px-3 py-2.5 ${isDarkMode ? "border-violet-500/30 bg-violet-500/10" : "border-violet-100 bg-violet-50/80"}`}
-          >
-            <p className={`text-[11px] font-bold uppercase tracking-wide text-violet-700`}>현재 VLUER</p>
-            <p className={`mt-0.5 text-[14px] font-black ${textStrong}`}>{gradeInfo.title}</p>
-            <p className={`mt-0.5 text-[11px] ${textSub}`}>{gradeInfo.desc}</p>
-            {statusLoading ? (
-              <p className={`mt-2 text-[10px] ${textSub}`}>업그레이드 조건 확인 중…</p>
-            ) : null}
-          </div>
-
-          <p className={`mt-5 mb-2 text-[11px] font-black ${textStrong}`}>VLUER 업그레이드</p>
+          <p className={`mb-2 text-[11px] font-black ${textStrong}`}>추천 채널</p>
           <div className="space-y-2">
-            <div
-              className={`rounded-xl border px-3 py-2.5 ${isDarkMode ? "border-white/10 bg-white/5" : "border-slate-100 bg-white"}`}
-            >
-              <p className={`text-[12px] font-black ${textStrong}`}>인증 VLUER</p>
-              <p className={`mt-0.5 text-[10px] leading-relaxed ${textSub}`}>
-                활동이 충분히 성장한 경우 신청할 수 있습니다. 구독 10% 캐시·쇼핑 0.3% 쉐어로 상향됩니다.
-              </p>
-              <button
-                type="button"
-                disabled={upgradeBusy || !upgradeStatus?.certified?.available || currentGrade !== "general"}
-                onClick={() => runVluerUpgrade("certified")}
-                className="mt-2 w-full rounded-lg bg-indigo-600 py-2 text-[11px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
+            {REFERRAL_CHANNELS.map((ch) => (
+              <div
+                key={ch.title}
+                className={`rounded-xl border px-3 py-2.5 ${isDarkMode ? "border-white/10 bg-white/5" : "border-slate-100 bg-white"}`}
               >
-                {upgradeStatus?.certified?.available ? "인증 VLUER 업그레이드" : "아직 이용할 수 없음"}
-              </button>
-              {upgradeStatus?.certified?.reason && !upgradeStatus?.certified?.available ? (
-                <p className={`mt-1.5 text-[10px] ${textSub}`}>{upgradeStatus.certified.reason}</p>
-              ) : null}
-            </div>
-
-            <div
-              className={`rounded-xl border px-3 py-2.5 ${isDarkMode ? "border-white/10 bg-white/5" : "border-slate-100 bg-white"}`}
-            >
-              <p className={`text-[12px] font-black ${textStrong}`}>파트너 VLUER</p>
-              <p className={`mt-0.5 text-[10px] leading-relaxed ${textSub}`}>
-                장기적으로 활동을 이어온 VLUER에게 제공됩니다. 구독 15% 캐시·쇼핑 0.8% 쉐어로 상향됩니다.
-              </p>
-              <button
-                type="button"
-                disabled={
-                  upgradeBusy ||
-                  !upgradeStatus?.partner?.available ||
-                  currentGrade === "partner" ||
-                  currentGrade === "official"
-                }
-                onClick={() => runVluerUpgrade("partner")}
-                className="mt-2 w-full rounded-lg bg-violet-700 py-2 text-[11px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {upgradeStatus?.partner?.available ? "파트너 VLUER 업그레이드" : "아직 이용할 수 없음"}
-              </button>
-              {upgradeStatus?.partner?.reason && !upgradeStatus?.partner?.available ? (
-                <p className={`mt-1.5 text-[10px] ${textSub}`}>{upgradeStatus.partner.reason}</p>
-              ) : null}
-            </div>
+                <p className={`text-[12px] font-black ${textStrong}`}>{ch.title}</p>
+                <p className={`mt-0.5 text-[10px] leading-relaxed ${textSub}`}>{ch.desc}</p>
+              </div>
+            ))}
           </div>
 
           <p className={`mt-5 mb-2 text-[11px] font-black ${textStrong}`}>멤버십 유형</p>

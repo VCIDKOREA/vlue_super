@@ -1,6 +1,5 @@
 export const ASSET_FILES_CHANGED = "vlue-files-updated";
 export const OFFICE_EMAIL_INBOX_CHANGED = "vlue-office-email-inbox";
-export const OFFICE_PPT_TASKS_CHANGED = "vlue-office-ppt-tasks";
 
 export function emitAssetFilesChanged() {
   window.dispatchEvent(new Event(ASSET_FILES_CHANGED));
@@ -8,10 +7,6 @@ export function emitAssetFilesChanged() {
 
 export function emitOfficeEmailInboxChanged() {
   window.dispatchEvent(new Event(OFFICE_EMAIL_INBOX_CHANGED));
-}
-
-export function emitOfficePptTasksChanged() {
-  window.dispatchEvent(new Event(OFFICE_PPT_TASKS_CHANGED));
 }
 
 /**

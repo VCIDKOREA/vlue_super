@@ -16,7 +16,8 @@
 ### 핵심 (웹 전용 UI)
 | 기능 | 설명 |
 |------|------|
-| **AI PPT 제작** | 오피스 PPT 워크샵 — 웹 대시보드·전용 UI (`OfficePptWorkshopPanel`, SSE 진행률) |
+| **AI 엑셀 제작 (MVP)** | `OfficeExcelWorkshop` — www 웹 전용 · `/api/office/excel/*` · Vming `web_excel` |
+| **PPT 자료** | 저장·공유·인쇄만 (`WalletHubModal`, `remote-control`) — **AI 제작 없음** |
 | **통합 검색** | 기관명·전화·사업자번호 — 마케팅 홈 히어로 검색, 공공+VLUE DB 교차 검증 |
 
 ### 공통 (앱과 동일 API·데이터)
@@ -93,5 +94,6 @@
 | 마케팅 셸 | `web/src/site/bolt/` |
 | 슈퍼앱 셸 | `web/src/App.jsx` |
 | API 서버 | `apps/api/` |
-| PPT·오피스 | `web/src/components/office/` |
+| 오피스·자료실 | `web/src/components/office/`, `WalletHubModal`, `OfficeRemoteModal` |
+| AI 엑셀 (www) | `web/src/site/bolt/components/OfficeExcelWorkshop.tsx` |
 | 쇼핑 | `web/src/components/Subscription.jsx`, `lib/shopApi.js` |

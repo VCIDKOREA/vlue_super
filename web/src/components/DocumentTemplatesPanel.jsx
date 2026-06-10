@@ -132,6 +132,7 @@ function TemplateCard({ item, isPaidUser, isDarkMode, onNeedUpgrade }) {
 /** 업무·일상 서류 양식 — 전체 화면·개인 자료실 공용 */
 export default function DocumentTemplatesPanel({
   embedded = false,
+  compact = false,
   onGoBack,
   membershipTier = "free",
   isDarkMode = false
@@ -177,34 +178,33 @@ export default function DocumentTemplatesPanel({
     <div className={`min-w-0 ${embedded ? "" : "flex flex-col"}`}>
       {!embedded && onGoBack ? <ScreenBackHeader title="업무·일상 서류 양식" onBack={onGoBack} isDarkMode={isDarkMode} /> : null}
       <div className={`${embedded ? "" : "flex-1 overflow-y-auto px-3 pb-24 pt-3"}`}>
-      <div
-        className={`rounded-2xl border p-4 shadow-sm ${
-          isDarkMode ? "border-white/10 bg-[#151821]" : embedded ? "border-teal-100 bg-teal-50/40" : "border-gray-100 bg-white"
-        }`}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Document Center</p>
-            {embedded ? (
-              <>
+      {!compact ? (
+        <div
+          className={`rounded-2xl border p-4 shadow-sm ${
+            isDarkMode ? "border-white/10 bg-[#151821]" : embedded ? "border-teal-100 bg-teal-50/40" : "border-gray-100 bg-white"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Document Center</p>
+              {embedded ? (
                 <h2 className={`text-[16px] font-black ${headText}`}>업무·일상 서류 양식</h2>
+              ) : (
                 <p className={`mt-1 text-[12px] ${subText}`}>
                   위임장 · 근로계약서 · 내용증명 등 VLUE 검수 서식을 다운로드합니다.
                 </p>
-              </>
-            ) : (
-              <p className={`mt-1 text-[12px] ${subText}`}>
-                위임장 · 근로계약서 · 내용증명 등 VLUE 검수 서식을 다운로드합니다.
-              </p>
-            )}
+              )}
+            </div>
           </div>
+          {meta ? (
+            <p className={`mt-3 text-[11px] font-semibold ${subText}`}>
+              제공 {meta.available}건 · 준비 중 {meta.comingSoon}건
+            </p>
+          ) : null}
         </div>
-        {meta ? (
-          <p className={`mt-3 text-[11px] font-semibold ${subText}`}>
-            제공 {meta.available}건 · 준비 중 {meta.comingSoon}건
-          </p>
-        ) : null}
-      </div>
+      ) : (
+        <p className={`px-0.5 text-[13px] font-black ${headText}`}>서류 양식</p>
+      )}
 
       <div
         ref={categoryStrip.ref}
@@ -234,7 +234,7 @@ export default function DocumentTemplatesPanel({
         </div>
       </div>
 
-      {notice ? (
+      {notice && !compact ? (
         <div
           className={`mt-3 rounded-2xl border px-3 py-3 ${
             isDarkMode ? "border-indigo-500/25 bg-indigo-500/10" : "border-indigo-100 bg-indigo-50/90"
@@ -264,7 +264,7 @@ export default function DocumentTemplatesPanel({
         </div>
       ) : null}
 
-      {!loading && !error && comingSoon.length > 0 ? (
+      {!loading && !error && !compact && comingSoon.length > 0 ? (
         <div className="mt-5 space-y-3">
           <p className={`px-0.5 text-[11px] font-black uppercase tracking-wide ${subText}`}>순차 업데이트 예정</p>
           {comingSoon.map((item) => (

@@ -54,8 +54,8 @@ function matchSmartFolder(row, folderId) {
   if (folderId === "scan") {
     return names.includes("[메일수신]") || /스캔|scan/.test(subj);
   }
-  if (folderId === "ppt") {
-    return /\.pptx?|ai ppt|\[ai ppt\]/i.test(names) || /ppt|슬라이드/.test(subj);
+  if (folderId === "excel") {
+    return /\.xlsx?|ai excel|\[ai excel\]/i.test(names) || /엑셀|excel|스프레드시트/.test(subj);
   }
   return true;
 }
@@ -231,7 +231,7 @@ export default function VlueEmailInboxScreen({ open, onClose, onToast, onOpenPro
         if (!f.id || !f.fileUrl) return false;
         const ct = String(f.contentType || "").toLowerCase();
         const name = String(f.name || "").toLowerCase();
-        return ct.includes("pdf") || ct.includes("presentation") || ct.includes("ppt") || /\.(pdf|pptx?)$/i.test(name);
+        return ct.includes("pdf") || ct.includes("spreadsheet") || ct.includes("excel") || /\.(pdf|xlsx?)$/i.test(name);
       }),
     [vaultFiles]
   );
@@ -249,7 +249,7 @@ export default function VlueEmailInboxScreen({ open, onClose, onToast, onOpenPro
   const filteredInbox = useMemo(() => {
     let rows = [...inbox];
     if (folder === "vault") rows = rows.filter(hasAttachments);
-    else if (folder === "bills" || folder === "scan" || folder === "ppt") {
+    else if (folder === "bills" || folder === "scan" || folder === "excel") {
       rows = rows.filter((r) => matchSmartFolder(r, folder));
     }
     if (quickFilter === "attach") rows = rows.filter(hasAttachments);
@@ -264,7 +264,7 @@ export default function VlueEmailInboxScreen({ open, onClose, onToast, onOpenPro
       vault: "자료실 자동 인입",
       bills: "청구·계약서",
       scan: "CS·스캔 연계",
-      ppt: "AI PPT 연계"
+      excel: "AI 엑셀 연계"
     };
     return map[folder] || "메일함";
   }, [folder]);
@@ -433,7 +433,7 @@ export default function VlueEmailInboxScreen({ open, onClose, onToast, onOpenPro
         <p className="mb-1 mt-4 px-3 text-[10px] font-black uppercase tracking-wider text-slate-400">스마트 오피스</p>
         <NavItem active={folder === "bills"} label="청구·계약서" onClick={() => pickFolder("bills")} indent />
         <NavItem active={folder === "scan"} label="CS·스캔 연계" onClick={() => pickFolder("scan")} indent />
-        <NavItem active={folder === "ppt"} label="AI PPT 연계" onClick={() => pickFolder("ppt")} indent />
+        <NavItem active={folder === "excel"} label="AI 엑셀 연계" onClick={() => pickFolder("excel")} indent />
       </nav>
 
       <div className="border-t border-slate-100 p-3 text-[11px] text-slate-500">

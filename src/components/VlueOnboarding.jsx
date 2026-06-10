@@ -701,7 +701,7 @@ export default function VlueOnboarding({ onComplete, onCancel }) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div className="mx-auto max-w-md space-y-3 pb-28">
           {step === "tier" && (
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -1465,7 +1465,7 @@ export default function VlueOnboarding({ onComplete, onCancel }) {
                     <span className="block text-indigo-800">→ VLUE 시작하기 후 결제창</span>
                   </li>
                 ) : null}
-                <li>VLUER: 일반 VLUER (5% 포인트 리워드)</li>
+                <li>추천: 지인(전화번호 10% 포인트) · 홍보 VLUER(고유 코드 15%/5% 캐시)</li>
                 <li>주소: {roadAddress || "—"} {addressDetail}</li>
               </ul>
               <button
