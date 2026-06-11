@@ -6,9 +6,83 @@ import {
   detectDocumentLiteFromVideo,
   sanitizeScanFileName
 } from "../../lib/csScannerOpenCv.js";
-import { postOfficeScanUpload } from "../../lib/vlueOfficeApi.js";
+import { fetchPosLedgerRole, postOfficeScanUpload, postPosLedgerIngest } from "../../lib/vlueOfficeApi.js";
 import { emitAssetFilesChanged } from "../../lib/vlueAssetFilesStorage.js";
+import { parsePosBillFromText } from "../../lib/posBillOcrParser.js";
+import { appendLocalPosEntry } from "../../lib/localPosLedger.js";
+import { hasNativePosOcr, runNativePosBillOcr } from "../../lib/posBillNativeOcr.js";
+import { wipeStaffScanArtifacts } from "../../lib/staffZeroRetention.js";
+import { useSensitiveScreenSecure } from "../../hooks/useSensitiveScreenSecure.js";
 import BackButton from "../common/BackButton";
+import ScanDocumentReviewPanel from "./ScanDocumentReviewPanel.jsx";
+
+const SCAN_MODES = {
+  document: {
+    title: "일반 문서 스캐너",
+    subtitle: "명함·계약서·영수증 등을 촬영해 PDF로 개인 자료실에 저장합니다.",
+    frameHint: "문서를 프레임 안에 맞춰 주세요",
+    detectedHint: "문서 영역 자동 감지 · 모서리 드래그로 조정",
+    completeLabel: "스캔 완료",
+    accent: "blue"
+  },
+  pos: {
+    title: "POS 빌지 스캐너",
+    subtitle: "매출전표·마감 빌지를 촬영하면 일·월 장부에 자동 반영됩니다. (사업자 전용)",
+    frameHint: "매출전표를 프레임 안에 맞춰 주세요",
+    detectedHint: "빌지 영역 자동 감지 · 모서리 드래그로 조정",
+    completeLabel: "장부 반영",
+    staffCompleteLabel: "빌지 전송",
+    accent: "emerald"
+  }
+};
+
+function ScannerModeTabs({ mode, canUsePos, onSelect, staffOnly = false }) {
+  if (staffOnly) {
+    return (
+      <div className="px-3 pb-2 pt-0.5">
+        <p className="text-center text-[10px] font-semibold leading-snug text-emerald-700">
+          직원 전용 · 마감 빌지 촬영 후 사장님에게만 전송 (로컬 즉시 삭제)
+        </p>
+        <p className="mt-0.5 text-center text-[10px] leading-snug text-slate-400">
+          {SCAN_MODES.pos.subtitle}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="px-3 pb-2 pt-0.5">
+      <div className="flex h-8 items-stretch gap-0.5 rounded-full bg-slate-100 p-0.5">
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => onSelect("document")}
+          className={`flex-1 touch-manipulation rounded-full px-2 text-[11px] font-semibold transition-all active:scale-[0.97] ${
+            mode === "document" ? "bg-white text-blue-700 shadow-sm ring-1 ring-blue-100" : "text-slate-500"
+          }`}
+        >
+          일반 문서
+        </button>
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => onSelect("pos")}
+          className={`flex-1 touch-manipulation rounded-full px-2 text-[11px] font-semibold transition-all active:scale-[0.97] ${
+            !canUsePos
+              ? "text-slate-400"
+              : mode === "pos"
+                ? "bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100"
+                : "text-slate-500"
+          }`}
+        >
+          POS 빌지{!canUsePos ? " · 사업자" : ""}
+        </button>
+      </div>
+      <p className="mt-1 text-center text-[10px] leading-snug text-slate-400">
+        {SCAN_MODES[mode]?.subtitle}
+      </p>
+    </div>
+  );
+}
 
 const DEFAULT_CORNERS = {
   tl: { x: 10, y: 16 },
@@ -94,6 +168,55 @@ function CornerHandle({ label, style, onPointerDown }) {
   );
 }
 
+function PosOcrDialog({ open, busy, ocrLoading, ocrText, onChange, parsed, onCancel, onSave, isOwner, isStaff }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 px-4">
+      <div className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+        <p className="text-[14px] font-black text-slate-900">POS 빌지 OCR</p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          {ocrLoading
+            ? "ML Kit이 빌지 텍스트를 인식 중입니다…"
+            : isStaff
+              ? "마감 빌지를 확인한 뒤 사장님에게 전송합니다. 전송 후 기기 데이터는 삭제됩니다."
+              : isOwner
+                ? "매출전표 텍스트를 확인·수정한 뒤 장부에 반영합니다."
+                : "빌지 텍스트를 확인한 뒤 저장합니다."}
+        </p>
+        <textarea
+          value={ocrText}
+          onChange={(e) => onChange(e.target.value)}
+          rows={6}
+          placeholder={isOwner ? "총매출, 카드, 현금, 부가세…" : "합계, 카드, 현금, 부가세…"}
+          className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[12px] text-slate-900 outline-none focus:border-blue-500"
+        />
+        {parsed ? (
+          <div className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900">
+            <p>날짜 {parsed.saleDate}</p>
+            <p>
+              {isOwner ? "총매출" : "합계"} {parsed.totalKrw?.toLocaleString("ko-KR")}원 · 카드{" "}
+              {parsed.cardKrw?.toLocaleString("ko-KR")} · 현금 {parsed.cashKrw?.toLocaleString("ko-KR")}
+            </p>
+          </div>
+        ) : null}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button type="button" disabled={busy} onClick={onCancel} className="rounded-xl border border-slate-300 py-2.5 text-[12px] font-bold text-slate-600 disabled:opacity-50">
+            취소
+          </button>
+          <button
+            type="button"
+            disabled={busy || ocrLoading || !ocrText.trim()}
+            onClick={onSave}
+            className="rounded-xl bg-emerald-600 py-2.5 text-[12px] font-black text-white disabled:opacity-50"
+          >
+            {busy ? "저장 중…" : ocrLoading ? "OCR 중…" : isStaff ? "사장님에게 전송" : "장부 반영"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SaveFileDialog({ open, busy, fileName, onChange, onCancel, onSave }) {
   if (!open) return null;
   return (
@@ -120,7 +243,17 @@ function SaveFileDialog({ open, busy, fileName, onChange, onCancel, onSave }) {
   );
 }
 
-export default function CsScannerScreen({ open, onClose, onToast }) {
+export default function CsScannerScreen({
+  open,
+  onClose,
+  onToast,
+  initialMode = "document"
+}) {
+  useSensitiveScreenSecure(open);
+  const [posRole, setPosRole] = useState(null);
+  const canUsePos = Boolean(posRole?.canScanPos);
+  const isOwner = posRole?.role === "OWNER";
+  const isStaff = posRole?.role === "STAFF";
   const maskId = useId().replace(/:/g, "");
   const videoRef = useRef(null);
   const galleryRef = useRef(null);
@@ -137,8 +270,15 @@ export default function CsScannerScreen({ open, onClose, onToast }) {
   const [pages, setPages] = useState([]);
   const [corners, setCorners] = useState(DEFAULT_CORNERS);
   const [busy, setBusy] = useState(false);
+  const [scanMode, setScanMode] = useState(
+    initialMode === "pos" && canUsePos ? "pos" : "document"
+  );
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveFileName, setSaveFileName] = useState("");
+  const [posDialogOpen, setPosDialogOpen] = useState(false);
+  const [posOcrText, setPosOcrText] = useState("");
+  const [posOcrLoading, setPosOcrLoading] = useState(false);
+  const [documentReviewOpen, setDocumentReviewOpen] = useState(false);
 
   const stopCamera = useCallback(() => {
     const stream = streamRef.current;
@@ -153,10 +293,35 @@ export default function CsScannerScreen({ open, onClose, onToast }) {
       window.clearTimeout(detectTimerRef.current);
       detectTimerRef.current = 0;
     }
+    if (isStaff && pages.length > 0) {
+      wipeStaffScanArtifacts(pages);
+      setPages([]);
+      setPosOcrText("");
+    }
     stopCamera();
     setSaveDialogOpen(false);
+    setPosDialogOpen(false);
+    setDocumentReviewOpen(false);
     onClose?.();
-  }, [onClose, stopCamera]);
+  }, [isStaff, onClose, pages, stopCamera]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetchPosLedgerRole()
+      .then((r) => setPosRole(r))
+      .catch(() => setPosRole(null));
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (isStaff) {
+      setScanMode("pos");
+      return;
+    }
+    setScanMode(initialMode === "pos" && canUsePos ? "pos" : "document");
+  }, [open, initialMode, canUsePos, isStaff]);
+
+  const modeCopy = SCAN_MODES[scanMode] || SCAN_MODES.document;
 
   const runLiteDetect = useCallback(() => {
     if (Date.now() < manualUntilRef.current) return;
@@ -212,6 +377,7 @@ export default function CsScannerScreen({ open, onClose, onToast }) {
     setCorners(DEFAULT_CORNERS);
     setAutoDetected(false);
     setSaveDialogOpen(false);
+    setDocumentReviewOpen(false);
     setSaveFileName("");
     manualUntilRef.current = 0;
 
@@ -293,6 +459,10 @@ export default function CsScannerScreen({ open, onClose, onToast }) {
   };
 
   const onGalleryPick = async (fileList) => {
+    if (isStaff) {
+      onToast?.("직원 계정은 갤러리 저장·불러오기가 차단됩니다. 카메라로만 촬영해 주세요.");
+      return;
+    }
     const file = fileList?.[0];
     if (!file) return;
     try {
@@ -320,8 +490,79 @@ export default function CsScannerScreen({ open, onClose, onToast }) {
       onToast?.("먼저 문서를 촬영하거나 갤러리에서 추가해 주세요.");
       return;
     }
-    setSaveFileName("");
-    setSaveDialogOpen(true);
+    if (scanMode === "pos") {
+      if (!canUsePos) {
+        onToast?.("POS 빌지 스캔은 사업자 등록·승인 회원만 이용할 수 있습니다.");
+        return;
+      }
+      setPosOcrText("");
+      setPosDialogOpen(true);
+      const lastPage = pages[pages.length - 1];
+      if (hasNativePosOcr() && lastPage) {
+        setPosOcrLoading(true);
+        runNativePosBillOcr(lastPage)
+          .then((text) => {
+            if (text) {
+              setPosOcrText(text);
+              onToast?.("빌지 OCR 인식 완료");
+            } else {
+              onToast?.("OCR 결과가 없습니다. 직접 입력해 주세요.");
+            }
+          })
+          .finally(() => setPosOcrLoading(false));
+      }
+      return;
+    }
+    setDocumentReviewOpen(true);
+  };
+
+  const posParsed = posOcrText.trim() ? parsePosBillFromText(posOcrText) : null;
+
+  const confirmPosLedger = async () => {
+    const text = posOcrText.trim();
+    if (!text) return;
+    setBusy(true);
+    try {
+      const parsed = parsePosBillFromText(text);
+      let assetFileId = "";
+      if (!isStaff) {
+        try {
+          const pdfBlob = await buildScanPdfBlob(pages);
+          const fileName = sanitizeScanFileName(`pos-bill-${parsed.saleDate}`);
+          const { file } = await postOfficeScanUpload(pdfBlob, fileName);
+          assetFileId = file?.id || "";
+          emitAssetFilesChanged();
+        } catch {
+          /* PDF 부가 저장 실패는 장부 반영과 분리 */
+        }
+        await appendLocalPosEntry({ ...parsed, rawOcrText: text });
+        try {
+          window.VlueFamilyBridgeNative?.savePosLedgerLocal?.(
+            JSON.stringify({ ...parsed, rawOcrText: text })
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+      const result = await postPosLedgerIngest(text, assetFileId);
+      const wipe = Boolean(result?.wipeLocalAfterSync);
+      if (wipe) {
+        wipeStaffScanArtifacts(pages);
+        setPages([]);
+        setPosOcrText("");
+      }
+      onToast?.(
+        isStaff
+          ? "마감 빌지가 사장님에게 전송되었습니다."
+          : `매출 장부 반영: ${parsed.totalKrw.toLocaleString("ko-KR")}원`
+      );
+      setPosDialogOpen(false);
+      handleClose();
+    } catch (e) {
+      onToast?.(e instanceof Error ? e.message : "장부 저장에 실패했습니다.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const confirmSave = async () => {
@@ -344,26 +585,45 @@ export default function CsScannerScreen({ open, onClose, onToast }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[96] flex flex-col bg-white">
-      <header className="relative z-[110] flex shrink-0 items-center gap-1 border-b border-slate-200 bg-white px-2 py-2 pt-[max(0px,env(safe-area-inset-top,0px))]">
-        <BackButton variant="inline" onBack={handleClose} />
-        <p className="min-w-0 flex-1 text-center text-[15px] font-black text-slate-900">CS 스캐너</p>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="text-[11px] font-bold text-blue-600">{pages.length}장</span>
-          <button
-            type="button"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleClose();
-            }}
-            onClick={handleClose}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-slate-500 active:bg-slate-100"
-            aria-label="닫기"
-          >
-            ✕
-          </button>
+    <div className="fixed inset-0 z-[200] flex flex-col bg-white">
+      <header className="relative z-[120] shrink-0 border-b border-slate-100 bg-white pt-[max(0px,env(safe-area-inset-top,0px))]">
+        <div className="flex items-center gap-1 px-2 py-1.5">
+          <BackButton variant="inline" onBack={handleClose} />
+          <p className="min-w-0 flex-1 text-center text-[15px] font-black text-slate-900">{modeCopy.title}</p>
+          <div className="flex shrink-0 items-center gap-1">
+            <span className={`text-[11px] font-bold ${scanMode === "pos" ? "text-emerald-600" : "text-blue-600"}`}>
+              {pages.length}장
+            </span>
+            <button
+              type="button"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleClose();
+              }}
+              onClick={handleClose}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-slate-500 active:bg-slate-100"
+              aria-label="닫기"
+            >
+              ✕
+            </button>
+          </div>
         </div>
+        <ScannerModeTabs
+          mode={scanMode}
+          canUsePos={canUsePos}
+          staffOnly={isStaff}
+          onSelect={(next) => {
+            if (isStaff) return;
+            if (next === "pos" && !canUsePos) {
+              onToast?.("POS 빌지는 사업자 등록·승인 후 이용할 수 있습니다.");
+              return;
+            }
+            if (next === scanMode) return;
+            setScanMode(next);
+            onToast?.(next === "pos" ? "POS 빌지 스캔 모드" : "일반 문서 스캔 모드");
+          }}
+        />
       </header>
 
       <div ref={overlayRef} className="relative min-h-0 flex-1 bg-slate-200">
@@ -387,18 +647,28 @@ export default function CsScannerScreen({ open, onClose, onToast }) {
           />
         ))}
         <p className="pointer-events-none absolute left-0 right-0 top-3 z-10 text-center text-[11px] font-semibold text-white drop-shadow">
-          {autoDetected ? "문서 영역 자동 감지 · 모서리 드래그로 조정" : "문서를 프레임 안에 맞춰 주세요"}
+          {autoDetected ? modeCopy.detectedHint : modeCopy.frameHint}
         </p>
         {cameraError ? (
           <div className="absolute bottom-4 left-3 right-3 z-20 space-y-2">
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-center text-[12px] font-bold text-rose-700">{cameraError}</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={startCamera} className="rounded-xl border border-rose-200 bg-white py-2 text-[12px] font-bold text-rose-700">
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={startCamera}
+                className="touch-manipulation rounded-lg border border-rose-200 bg-white py-2 text-[11px] font-semibold text-rose-700 active:bg-rose-50"
+              >
                 카메라 재시도
               </button>
-              <button type="button" onClick={() => galleryRef.current?.click()} className="rounded-xl bg-blue-600 py-2 text-[12px] font-black text-white">
-                갤러리에서 추가
-              </button>
+              {!isStaff ? (
+                <button
+                  type="button"
+                  onClick={() => galleryRef.current?.click()}
+                  className="touch-manipulation rounded-lg bg-blue-600 py-2 text-[11px] font-semibold text-white active:bg-blue-700"
+                >
+                  갤러리에서 추가
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -406,7 +676,7 @@ export default function CsScannerScreen({ open, onClose, onToast }) {
 
       <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={(e) => onGalleryPick(e.target.files)} />
 
-      <div className="relative z-[110] shrink-0 border-t border-slate-200 bg-white px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="relative z-[120] shrink-0 border-t border-slate-100 bg-white px-3 py-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mb-2 flex gap-2 overflow-x-auto">
           {pages.map((url, i) => (
             <div key={`${url.slice(0, 24)}-${i}`} className="relative h-14 w-10 shrink-0 overflow-hidden rounded border border-slate-200">
@@ -415,18 +685,49 @@ export default function CsScannerScreen({ open, onClose, onToast }) {
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-4 gap-2">
-          <button type="button" disabled={busy || !cameraReady} onClick={capturePage} className="rounded-xl border border-slate-300 py-3 text-[12px] font-bold text-slate-700 disabled:opacity-50">
+        <div className="grid grid-cols-4 gap-1.5">
+          <button
+            type="button"
+            disabled={busy || !cameraReady}
+            onClick={capturePage}
+            className="touch-manipulation rounded-lg border border-slate-200 py-2.5 text-[11px] font-semibold text-slate-700 active:bg-slate-50 disabled:opacity-50"
+          >
             촬영
           </button>
-          <button type="button" disabled={busy} onClick={() => galleryRef.current?.click()} className="rounded-xl border border-slate-300 py-3 text-[12px] font-bold text-slate-600">
-            갤러리
-          </button>
-          <button type="button" disabled={busy || pages.length === 0} onClick={() => setPages((p) => p.slice(0, -1))} className="rounded-xl border border-slate-300 py-3 text-[12px] font-bold text-slate-600 disabled:opacity-50">
+          {!isStaff ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => galleryRef.current?.click()}
+              className="touch-manipulation rounded-lg border border-slate-200 py-2.5 text-[11px] font-semibold text-slate-600 active:bg-slate-50"
+            >
+              갤러리
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="touch-manipulation rounded-lg border border-slate-100 py-2.5 text-[11px] font-semibold text-slate-300"
+              title="직원은 갤러리 사용 불가"
+            >
+              갤러리
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={busy || pages.length === 0}
+            onClick={() => setPages((p) => p.slice(0, -1))}
+            className="touch-manipulation rounded-lg border border-slate-200 py-2.5 text-[11px] font-semibold text-slate-600 active:bg-slate-50 disabled:opacity-50"
+          >
             되돌리기
           </button>
-          <button type="button" disabled={busy || !pages.length} onClick={openSaveDialog} className="rounded-xl bg-blue-600 py-3 text-[12px] font-black text-white disabled:opacity-50">
-            스캔 완료
+          <button
+            type="button"
+            disabled={busy || !pages.length}
+            onClick={openSaveDialog}
+            className={`touch-manipulation rounded-lg py-2.5 text-[11px] font-semibold text-white active:opacity-90 disabled:opacity-50 ${scanMode === "pos" ? "bg-emerald-600" : "bg-blue-600"}`}
+          >
+            {isStaff ? SCAN_MODES.pos.staffCompleteLabel : modeCopy.completeLabel}
           </button>
         </div>
       </div>
@@ -438,6 +739,30 @@ export default function CsScannerScreen({ open, onClose, onToast }) {
         onChange={setSaveFileName}
         onCancel={() => !busy && setSaveDialogOpen(false)}
         onSave={confirmSave}
+      />
+      <PosOcrDialog
+        open={posDialogOpen}
+        busy={busy}
+        ocrLoading={posOcrLoading}
+        ocrText={posOcrText}
+        onChange={setPosOcrText}
+        parsed={posParsed}
+        isOwner={isOwner}
+        isStaff={isStaff}
+        onCancel={() => !busy && !posOcrLoading && setPosDialogOpen(false)}
+        onSave={confirmPosLedger}
+      />
+      <ScanDocumentReviewPanel
+        open={documentReviewOpen}
+        pages={pages}
+        busy={busy}
+        onToast={onToast}
+        onClose={() => !busy && setDocumentReviewOpen(false)}
+        onSave={() => {
+          setDocumentReviewOpen(false);
+          setSaveFileName("");
+          setSaveDialogOpen(true);
+        }}
       />
     </div>
   );

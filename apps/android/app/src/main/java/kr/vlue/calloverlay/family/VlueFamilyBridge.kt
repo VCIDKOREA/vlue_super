@@ -12,6 +12,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kr.vlue.calloverlay.family.ledger.VlueLocalStore
 import kr.vlue.calloverlay.family.ocr.PosBillMlKitOcr
+import kr.vlue.calloverlay.family.translate.MlKitTranslate
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import java.lang.ref.WeakReference
 
@@ -74,6 +76,26 @@ object VlueFamilyBridge {
         dispatchJs("onPosOcrResult", JSONObject().put("text", text))
     }
 
+    /** ML Kit Translation — web: onMlKitTranslateResult({ translated, confidence }) */
+    fun dispatchMlKitTranslateResult(json: String) {
+        val payload = try {
+            JSONObject(json)
+        } catch (_: Exception) {
+            JSONObject().put("translated", "").put("confidence", 0.0)
+        }
+        dispatchJs("onMlKitTranslateResult", payload)
+    }
+
+    /** ML Kit 블록 OCR — web: onDocumentOcrResult({ text, blocks, imageWidth, imageHeight }) */
+    fun dispatchDocumentOcrResult(json: String) {
+        val payload = try {
+            JSONObject(json)
+        } catch (_: Exception) {
+            JSONObject().put("text", "").put("blocks", org.json.JSONArray())
+        }
+        dispatchJs("onDocumentOcrResult", payload)
+    }
+
     /** 은행 입출금 알림 — web: onBankNotification({ direction, amountKrw, maskedSummary, bankLabel }) */
     fun dispatchBankNotification(
         direction: String,
@@ -120,6 +142,20 @@ object VlueFamilyBridge {
                 val text = jsQuote(payload!!.optString("text"))
                 "window.VlueFamilyBridge&&window.VlueFamilyBridge.onPosOcrResult&&" +
                     "window.VlueFamilyBridge.onPosOcrResult($text);"
+            }
+            "onMlKitTranslateResult" -> {
+                val translated = jsQuote(payload!!.optString("translated"))
+                val conf = payload.optDouble("confidence", 0.0)
+                "window.VlueFamilyBridge&&window.VlueFamilyBridge.onMlKitTranslateResult&&" +
+                    "window.VlueFamilyBridge.onMlKitTranslateResult({translated:$translated,confidence:$conf});"
+            }
+            "onDocumentOcrResult" -> {
+                val text = jsQuote(payload!!.optString("text"))
+                val blocks = payload.optJSONArray("blocks")?.toString() ?: "[]"
+                val iw = payload.optInt("imageWidth", 0)
+                val ih = payload.optInt("imageHeight", 0)
+                "window.VlueFamilyBridge&&window.VlueFamilyBridge.onDocumentOcrResult&&" +
+                    "window.VlueFamilyBridge.onDocumentOcrResult({text:$text,blocks:$blocks,imageWidth:$iw,imageHeight:$ih});"
             }
             "onBankNotification" -> {
                 val dir = jsQuote(payload!!.optString("direction"))
@@ -185,6 +221,39 @@ object VlueFamilyBridge {
             ioScope.launch {
                 val text = PosBillMlKitOcr.recognizeFromDataUrl(dataUrl)
                 dispatchPosOcrResult(text)
+            }
+        }
+
+        /** 일반 문서 — 라인 bounding box JSON → onDocumentOcrResult */
+        @android.webkit.JavascriptInterface
+        fun runDocumentOcr(dataUrl: String) {
+            ioScope.launch {
+                val json = PosBillMlKitOcr.recognizeBlocksFromDataUrl(dataUrl)
+                dispatchDocumentOcrResult(json)
+            }
+        }
+
+        /** ML Kit 온디바이스 번역 — JSON { text, sourceLang, targetLang } */
+        @android.webkit.JavascriptInterface
+        fun runMlKitTranslate(json: String) {
+            ioScope.launch {
+                val out = MlKitTranslate.translateJson(json)
+                dispatchMlKitTranslateResult(out)
+            }
+        }
+
+        /** Room 번역 캐시 조회 — 동기 */
+        @android.webkit.JavascriptInterface
+        fun getTranslationCache(cacheKey: String): String {
+            return runBlocking {
+                VlueLocalStore.getTranslationCache(host.appContext(), cacheKey).orEmpty()
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun saveTranslationCache(json: String) {
+            ioScope.launch {
+                VlueLocalStore.saveTranslationCache(host.appContext(), json)
             }
         }
 

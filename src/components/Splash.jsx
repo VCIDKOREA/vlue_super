@@ -7,7 +7,7 @@ function publicAsset(fileName) {
   return `${root}${String(fileName).replace(/^\//, "")}`;
 }
 
-/** `public/eye2_vlue.mp4` — 없으면 404 → 정적 대체(아래 SVG)만 표시되며 소리는 없음 */
+/** `public/eye2_vlue.mp4` — moov가 파일 끝에 있어 모바일 스트리밍 시 ? 아이콘 → blob 전체 로드 후 재생 */
 const SPLASH_VIDEO_SRC = publicAsset("eye2_vlue.mp4");
 const SPLASH_FALLBACK_IMG = publicAsset("vlue-shield-eye-logo-preview.svg");
 
@@ -29,6 +29,12 @@ const SPLASH_HOLD_MS_DEFAULT = 5200;
 
 const SPLASH_FADE_OUT_MS = 520;
 
+/** 모바일·느린망: mp4 전체 fetch 상한(ms) */
+const VIDEO_FETCH_TIMEOUT_MS = 18000;
+
+/** blob 로드 후 메타데이터 대기 상한(ms) */
+const VIDEO_METADATA_TIMEOUT_MS = 8000;
+
 /**
  * 트림 시작 시점 기준, 눈이 뜬 뒤 `V L U E`·하단 카피 페이드가 같이 시작할 때까지(초).
  * eye2_vlue.mp4 안 **띵** 효과음 타이밍에 맞추려면 이 값만 미세 조정하면 됩니다.
@@ -44,10 +50,13 @@ const SPLASH_VIDEO_VOLUME = 1;
 function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
   const videoRef = useRef(null);
   const revealedRef = useRef(false);
+  const blobUrlRef = useRef("");
   /** 영상 seek·timeupdate 정리 — `splashHoldMs` effect와 분리(그 effect가 리스너를 지우면 문구가 영원히 안 뜸) */
   const videoCleanupFnsRef = useRef([]);
   const [revealing, setRevealing] = useState(false);
   const [videoBroken, setVideoBroken] = useState(false);
+  /** blob URL 준비 전에는 포스터만 표시(? 아이콘 방지) */
+  const [videoBlobSrc, setVideoBlobSrc] = useState("");
   const [lettersIn, setLettersIn] = useState(false);
   /** 자동재생은 muted로 시작; 첫 터치 시 해제 — 실제 출력은 기기 매너/볼륨에 따름 */
   const [splashSoundOn, setSplashSoundOn] = useState(false);
@@ -94,11 +103,59 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
 
   const failVideo = useCallback(() => {
     setVideoBroken(true);
+    setVideoBlobSrc("");
     segmentRef.current = null;
     setSplashHoldMs(2600);
     videoCleanupFnsRef.current.forEach((fn) => fn());
     videoCleanupFnsRef.current = [];
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = "";
+    }
   }, []);
+
+  /** 모바일 Safari: moov-at-end mp4는 스트리밍 재생 불가 → 전체 blob 로드 후 object URL 재생 */
+  useEffect(() => {
+    if (videoBroken) return undefined;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    if (reduce) return undefined;
+
+    let cancelled = false;
+    const ac = new AbortController();
+    const fetchTimeout = window.setTimeout(() => {
+      if (!cancelled) {
+        console.warn("[splash] video fetch timeout");
+        failVideo();
+      }
+    }, VIDEO_FETCH_TIMEOUT_MS);
+
+    (async () => {
+      try {
+        const res = await fetch(SPLASH_VIDEO_SRC, { signal: ac.signal, cache: "force-cache" });
+        if (!res.ok) throw new Error(`http ${res.status}`);
+        const blob = await res.blob();
+        if (cancelled) return;
+        if (!blob || blob.size < 4096) throw new Error("empty blob");
+        if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+        const url = URL.createObjectURL(blob);
+        blobUrlRef.current = url;
+        setVideoBlobSrc(url);
+      } catch (e) {
+        if (!cancelled && !ac.signal.aborted) {
+          console.warn("[splash] video prefetch failed", e);
+          failVideo();
+        }
+      } finally {
+        window.clearTimeout(fetchTimeout);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      ac.abort();
+      window.clearTimeout(fetchTimeout);
+    };
+  }, [failVideo, videoBroken]);
 
   const wireVideo = useCallback(
     (v) => {
@@ -117,7 +174,6 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
       const playSpanS = Math.max(0.05, segmentEnd - segmentStart);
       segmentRef.current = { segmentStart, segmentEnd, playSpanS, lettersAt };
       setLoadProgress(0);
-      /* 영상 끝 + 짧은 여유 — 진행 바는 timeupdate로 맞추므로 과도한 +ms 제거 */
       const holdMs = Math.min(9200, Math.max(2800, Math.round(playSpanS * 1000) + 200));
       setSplashHoldMs(holdMs);
 
@@ -128,7 +184,6 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
         }
         const p = Math.min(1, Math.max(0, (t - segmentStart) / playSpanS));
         setLoadProgress(p);
-        /* 한 프레임 여유로 정지해 timeupdate 경계에서 떨림 완화 */
         if (t >= segmentEnd - 0.04) {
           v.pause();
           v.removeEventListener("timeupdate", onTimeUpdate);
@@ -142,12 +197,14 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
       videoCleanupFnsRef.current.push(() => v.removeEventListener("timeupdate", onTimeUpdate));
 
       const startPlayback = () => {
+        try {
+          v.muted = !splashSoundOn;
+          v.playsInline = true;
+        } catch {
+          /* ignore */
+        }
         v.play()
-          .then(() => {
-            /* 제스처 없이 unmute 하면 Chrome 등에서 재생이 즉시 멈출 수 있음 → 끝까지 muted 유지, 소리는 클릭/터치 시에만 */
-          })
           .catch(() => {
-            /* 일부 환경에서 첫 play만 거절되는 경우 — 명시적 mute 후 재시도 */
             try {
               v.muted = true;
             } catch {
@@ -155,9 +212,6 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
             }
             setSplashSoundOn(false);
             return v.play();
-          })
-          .then(() => {
-            /* 동일: 자동 unmute 없음 */
           })
           .catch(failVideo);
       };
@@ -175,7 +229,7 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
       v.addEventListener("seeked", afterSeek, { once: true });
       videoCleanupFnsRef.current.push(() => window.clearTimeout(seekFallback));
     },
-    [failVideo, reveal]
+    [failVideo, reveal, splashSoundOn]
   );
 
   const onLoadedMetadata = useCallback(
@@ -185,6 +239,18 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
     },
     [wireVideo]
   );
+
+  /** blob 준비 후에도 메타데이터가 안 오면 정적 대체 */
+  useEffect(() => {
+    if (!videoBlobSrc || videoBroken) return undefined;
+    const metaTimeout = window.setTimeout(() => {
+      if (!segmentRef.current) {
+        console.warn("[splash] video metadata timeout");
+        failVideo();
+      }
+    }, VIDEO_METADATA_TIMEOUT_MS);
+    return () => window.clearTimeout(metaTimeout);
+  }, [videoBlobSrc, videoBroken, failVideo]);
 
   /** mp4 로드 실패 시: 정적 이미지 + 진행 바를 영상과 비슷한 리듬으로 */
   useEffect(() => {
@@ -230,7 +296,6 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
 
     if (videoBroken) return undefined;
 
-    /* 영상 끝에서 주로 reveal — timeupdate 누락·백그라운드 탭 등 안전망 */
     const revealId = window.setTimeout(() => {
       if (!revealedRef.current) reveal();
     }, splashHoldMs + 900);
@@ -244,6 +309,10 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
     () => () => {
       videoCleanupFnsRef.current.forEach((fn) => fn());
       videoCleanupFnsRef.current = [];
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = "";
+      }
     },
     []
   );
@@ -253,6 +322,8 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
     const t = window.setTimeout(() => onDone?.(), SPLASH_FADE_OUT_MS);
     return () => window.clearTimeout(t);
   }, [revealing, onDone]);
+
+  const showVideo = !videoBroken && Boolean(videoBlobSrc);
 
   return (
     <div
@@ -280,12 +351,14 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
                 <div className="vlue-splash-eye-mount">
                   <span className="vlue-splash-eye-ring-home vlue-splash-eye-ring-bg" aria-hidden />
                   <div className="vlue-splash-eye-content">
-                    {!videoBroken ? (
+                    {showVideo ? (
                       <video
                         ref={videoRef}
                         className="vlue-splash-video"
-                        src={SPLASH_VIDEO_SRC}
+                        src={videoBlobSrc}
+                        poster={SPLASH_FALLBACK_IMG}
                         muted={!splashSoundOn}
+                        autoPlay
                         playsInline
                         preload="auto"
                         onLoadedMetadata={onLoadedMetadata}
@@ -296,7 +369,7 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
                       <img
                         src={SPLASH_FALLBACK_IMG}
                         alt=""
-                        className="vlue-splash-video"
+                        className={`vlue-splash-video${videoBroken ? " vlue-splash-eye-fallback-pulse" : ""}`}
                         draggable={false}
                         aria-hidden
                       />
@@ -316,7 +389,7 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
               />
             </div>
           </div>
-          {typeof window !== "undefined" && !splashSoundOn && !revealing && !videoBroken ? (
+          {typeof window !== "undefined" && !splashSoundOn && !revealing && showVideo ? (
             <p className="vlue-splash-sound-hint" role="note">
               효과음을 들으려면 화면을 한 번 클릭(또는 탭)해 주세요.
             </p>

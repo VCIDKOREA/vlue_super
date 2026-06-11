@@ -49,6 +49,8 @@ import { calendarNoticeRoutes } from "./calendarNotice.js";
 import { pricingConfigRoutes } from "./pricingConfig.js";
 import { broadcastLineRoutes } from "./broadcastLine.js";
 import { familyCrossSecurityRoutes } from "./familyCrossSecurity.js";
+import { translateRoutes } from "./translate.js";
+import { spellV1Routes } from "./spellV1.js";
 
 /** `/api` 아래에 마운트되는 라우트 묶음 */
 export const apiRoutes = new Hono();
@@ -103,3 +105,5 @@ apiRoutes.route("/fraud", fraudRoutes);
 apiRoutes.route("/pricing", pricingConfigRoutes);
 apiRoutes.route("/broadcast-line", broadcastLineRoutes);
 apiRoutes.route("/family-cross-security", familyCrossSecurityRoutes);
+apiRoutes.route("/translate", translateRoutes);
+apiRoutes.route("/v1/spell", spellV1Routes);

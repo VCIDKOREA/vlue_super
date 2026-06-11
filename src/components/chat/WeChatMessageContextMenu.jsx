@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const MENU_ITEMS = [
   { id: "reply", label: "답장" },
+  { id: "translate", label: "번역" },
+  { id: "translate-enhanced", label: "고도화 번역" },
   { id: "copy", label: "복사" },
   { id: "forward", label: "전달" },
   { id: "delete", label: "삭제", danger: true },

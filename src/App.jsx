@@ -75,6 +75,8 @@ import { emitAssetFilesChanged, emitOfficeEmailInboxChanged } from "./lib/vlueAs
 import { startFamilyProtectionPresence } from "./lib/familyProtectionPresence.js";
 import { registerFamilyCallBridge } from "./lib/familyProtectionCallBridge.js";
 import { registerFamilyDeviceBridge } from "./lib/familyProtectionDeviceBridge.js";
+import { registerDocumentOcrBridge } from "./lib/documentOcrBridge.js";
+import { registerMlKitTranslationBridge } from "./lib/mlKitTranslationBridge.js";
 import { registerPosOcrBridge } from "./lib/posBillNativeOcr.js";
 import { promptIosChildWardNoticeOnce } from "./lib/familyPlatformCapabilities.js";
 import FamilyIosRestrictedDialog from "./components/FamilyIosRestrictedDialog.jsx";
@@ -938,6 +940,8 @@ function App() {
     registerFamilyCallBridge();
     registerFamilyDeviceBridge();
     registerPosOcrBridge();
+    registerDocumentOcrBridge();
+    registerMlKitTranslationBridge();
     registerFamilyNativeRelay();
     installFamilySiteGuard();
     const onWardRole = (e) => {
@@ -3584,6 +3588,7 @@ function App() {
           onRealtimeChatMessage={mergeIncomingServerChatMessage}
           onBack={goBackStep}
           membershipTier={membershipTier}
+          onOpenSubscription={() => setPage("mypage")}
           digitalCardActive={digitalCardActive}
           myCard={myCardProfile}
           myCardUserId="me"

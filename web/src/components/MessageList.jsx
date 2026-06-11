@@ -7,6 +7,7 @@ import VoiceWaveform from "./chat/VoiceWaveform.jsx";
 import { getRoomNotice } from "../lib/chatRoomNoticeStorage.js";
 import { noticeReadLabel } from "../lib/chatRoomNoticeService.js";
 import VmingConsentChatBubble from "./chat/VmingConsentChatBubble.jsx";
+import ChatMessageTranslation from "./chat/ChatMessageTranslation.jsx";
 
 const MessageList = forwardRef(function MessageList({
   roomId,
@@ -35,7 +36,12 @@ const MessageList = forwardRef(function MessageList({
   myName = "",
   onVmingAcceptConsent,
   onVmingDeclineConsent,
-  onVmingOpenConsentModal
+  onVmingOpenConsentModal,
+  messageTranslations = {},
+  chatTargetLang = "en",
+  onTranslateMessage,
+  onToggleTranslation,
+  translationEnabled = true
 }, ref) {
   const scrollToBottom = (behavior = "smooth") => {
     const el = scrollerRef.current;
@@ -645,20 +651,60 @@ const MessageList = forwardRef(function MessageList({
                   ) : null}
                 </div>
               ) : (
-                <div
-                  className={`chat-bubble-unit inline-block w-fit rounded-2xl px-3 py-2 text-sm ${
-                    isMe
-                      ? `${sameAsPrev ? "" : "rounded-tr-none"} bg-blue-600 text-white`
-                      : isDarkMode
-                        ? `${msg.uiClusterHead ? "rounded-tl-none" : ""} border border-white/10 bg-[#1f2937] text-gray-100`
-                        : `${msg.uiClusterHead ? "rounded-tl-none" : ""} border border-gray-100 bg-white text-gray-800`
-                  }`}
-                  onContextMenu={bindLongPress(msg, true)}
-                  onTouchStart={bindLongPress(msg, true)}
-                  onTouchEnd={(e) => clearTimeout(e.currentTarget._holdTimer)}
-                  onTouchMove={(e) => clearTimeout(e.currentTarget._holdTimer)}
-                >
-                  {msg.text}
+                <div className="flex max-w-full flex-col items-stretch">
+                  <div className="flex items-start gap-1">
+                    <div
+                      className={`chat-bubble-unit inline-block w-fit rounded-2xl px-3 py-2 text-sm ${
+                        isMe
+                          ? `${sameAsPrev ? "" : "rounded-tr-none"} bg-blue-600 text-white`
+                          : isDarkMode
+                            ? `${msg.uiClusterHead ? "rounded-tl-none" : ""} border border-white/10 bg-[#1f2937] text-gray-100`
+                            : `${msg.uiClusterHead ? "rounded-tl-none" : ""} border border-gray-100 bg-white text-gray-800`
+                      }`}
+                      onContextMenu={bindLongPress(msg, true)}
+                      onTouchStart={bindLongPress(msg, true)}
+                      onTouchEnd={(e) => clearTimeout(e.currentTarget._holdTimer)}
+                      onTouchMove={(e) => clearTimeout(e.currentTarget._holdTimer)}
+                    >
+                      {msg.text}
+                    </div>
+                    {translationEnabled && onTranslateMessage && String(msg.text || "").trim() ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const row = messageTranslations[msg.id];
+                          if (row?.translated) {
+                            onToggleTranslation?.(msg.id);
+                          } else {
+                            onTranslateMessage?.(msg, { enhanced: false });
+                          }
+                        }}
+                        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
+                          messageTranslations[msg.id]?.visible
+                            ? isDarkMode
+                              ? "bg-sky-500/20 text-sky-300"
+                              : "bg-sky-50 text-sky-600"
+                            : isDarkMode
+                              ? "bg-white/10 text-gray-300"
+                              : "bg-slate-100 text-slate-500"
+                        }`}
+                        aria-label="번역"
+                        title="말풍선 번역"
+                      >
+                        🌐
+                      </button>
+                    ) : null}
+                  </div>
+                  <ChatMessageTranslation
+                    visible={Boolean(messageTranslations[msg.id]?.visible)}
+                    loading={Boolean(messageTranslations[msg.id]?.loading)}
+                    translated={messageTranslations[msg.id]?.translated}
+                    targetLang={chatTargetLang}
+                    source={messageTranslations[msg.id]?.source}
+                    cacheHit={messageTranslations[msg.id]?.cacheHit}
+                    isMe={isMe}
+                    isDarkMode={isDarkMode}
+                  />
                 </div>
               )}
               <div

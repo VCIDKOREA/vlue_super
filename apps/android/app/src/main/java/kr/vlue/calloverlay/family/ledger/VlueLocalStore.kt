@@ -3,8 +3,10 @@ package kr.vlue.calloverlay.family.ledger
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kr.vlue.calloverlay.family.translate.TranslationCacheEntity
 import java.security.MessageDigest
 import java.nio.charset.StandardCharsets
+import org.json.JSONObject
 
 /** Room + SQLCipher 로컬 저장소 — POS 장부·가족 상태 */
 object VlueLocalStore {
@@ -54,6 +56,35 @@ object VlueLocalStore {
     suspend fun wipePosScanCache(context: Context) = withContext(Dispatchers.IO) {
         val db = VlueEncryptedDatabase.get(context)
         db.posLedgerDao().deleteAll()
+    }
+
+    suspend fun getTranslationCache(context: Context, cacheKey: String): String? = withContext(Dispatchers.IO) {
+        if (cacheKey.isBlank()) return@withContext null
+        val db = VlueEncryptedDatabase.get(context)
+        db.translationCacheDao().findTranslated(cacheKey)
+    }
+
+    suspend fun saveTranslationCache(context: Context, json: String) = withContext(Dispatchers.IO) {
+        val o = try {
+            JSONObject(json)
+        } catch (_: Exception) {
+            return@withContext
+        }
+        val key = o.optString("key", "").trim()
+        val original = o.optString("original", "").trim()
+        val translated = o.optString("translated", "").trim()
+        if (key.isEmpty() || original.isEmpty() || translated.isEmpty()) return@withContext
+        val db = VlueEncryptedDatabase.get(context)
+        db.translationCacheDao().upsert(
+            TranslationCacheEntity(
+                cacheKey = key,
+                originalText = original,
+                translatedText = translated,
+                sourceLang = o.optString("sourceLang", "ko"),
+                targetLang = o.optString("targetLang", "en"),
+                updatedAt = java.time.Instant.now().toString()
+            )
+        )
     }
 
     suspend fun upsertSecurityState(

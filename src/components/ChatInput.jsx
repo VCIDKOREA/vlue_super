@@ -2,6 +2,8 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import ModalCloseButton from "./common/ModalCloseButton";
 import WalletHubModal from "./WalletHubModal.jsx";
 import { buildMyCardChatPayload } from "../lib/shareMyCardToChat.js";
+import SpellingCorrectionField from "./spell/SpellingCorrectionField.jsx";
+import { useSpellingCheckMode } from "../hooks/useSpellingCheckMode.js";
 
 /** 위챗 스타일 8칸 + VLUE 기존 확장 */
 const PRIMARY_ACTIONS = [
@@ -88,6 +90,7 @@ const ChatInput = forwardRef(function ChatInput(
   },
   ref
 ) {
+  const spellingCheck = useSpellingCheckMode();
   const [value, setValue] = useState("");
   const [openPlus, setOpenPlus] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -569,23 +572,47 @@ const ChatInput = forwardRef(function ChatInput(
             <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V19H9v2h6v-2h-2v-1.08A7 7 0 0 0 19 11h-2z" />
           </svg>
         </button>
-        <input
-          ref={assignMessageInputRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onFocus={() => setEmojiOpen(false)}
-          onKeyDown={(e) => {
-            if (e.isComposing) return;
-            if (e.key === "Enter") {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          placeholder="메시지를 입력하세요..."
-          className={`flex-1 min-w-0 rounded-full px-4 py-2.5 text-[clamp(12px,3vw,14px)] outline-none ${
-            isDarkMode ? "bg-white/10 text-gray-100 placeholder:text-gray-500" : "bg-gray-100"
+        <div
+          className={`relative flex min-w-0 flex-1 items-center rounded-full ${
+            isDarkMode ? "bg-white/10" : "bg-gray-100"
           }`}
-        />
+        >
+          <button
+            type="button"
+            onClick={() => spellingCheck.toggle()}
+            title={spellingCheck.enabled ? "맞춤법 검사 켜짐" : "맞춤법 검사"}
+            aria-pressed={spellingCheck.enabled}
+            className={`shrink-0 pl-3 pr-1.5 text-[13px] font-extrabold leading-none transition active:scale-95 ${
+              spellingCheck.enabled
+                ? "text-emerald-600 grayscale-0"
+                : "text-gray-500 grayscale opacity-60"
+            }`}
+          >
+            Aa
+          </button>
+          <SpellingCorrectionField
+            enabled={spellingCheck.enabled}
+            value={value}
+            onChange={setValue}
+            inputRef={assignMessageInputRef}
+            onFocus={() => setEmojiOpen(false)}
+            onKeyDown={(e) => {
+              if (e.isComposing) return;
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder={
+              spellingCheck.enabled ? "맞춤법 검사 — 입력 후 자동 교정" : "메시지를 입력하세요..."
+            }
+            isDarkMode={isDarkMode}
+            className="min-w-0 flex-1"
+            inputClassName={`w-full bg-transparent py-2.5 pr-3 text-[clamp(12px,3vw,14px)] outline-none ${
+              isDarkMode ? "text-gray-100 placeholder:text-gray-500" : "text-gray-900 placeholder:text-gray-400"
+            }`}
+          />
+        </div>
         <button
           type="button"
           onClick={toggleEmojiPanel}

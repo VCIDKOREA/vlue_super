@@ -2,6 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MessageList from "./MessageList.jsx";
 import ScreenBackHeader from "./common/ScreenBackHeader";
 import { VMING_AI_ENGINES, VMING_QUICK_REPLIES, postVmingChat } from "../lib/vmingApi.js";
+import { SCAN_TRANSLATE_LANGS } from "../lib/clientTranslation.js";
+import {
+  formatVoiceTranslateMessage,
+  hasClientSpeechRecognition,
+  runVmingVoiceTranslate
+} from "../lib/vmingVoiceTranslate.js";
+import { VlueBrandMark } from "./VlueBrandLogo.jsx";
 
 const WELCOME_ID = "vming-welcome";
 const VMING_ROOM_ID = "vming:assistant";
@@ -44,11 +51,7 @@ function VmingQuickIcon({ name }) {
     );
   }
   if (name === "shield") {
-    return (
-      <svg {...common}>
-        <path d="M12 3 5 6v5c0 4.2 3 7.4 7 9 4-1.6 7-4.8 7-9V6l-7-3Z" />
-      </svg>
-    );
+    return <VlueBrandMark size={13} className="!rounded-[18%]" />;
   }
   if (name === "video") {
     return (
@@ -88,7 +91,10 @@ function BlueAIChat({ onGoMain, onAssistantReply, isDarkMode = false }) {
   const [quickClosing, setQuickClosing] = useState(false);
   const [engineMenuOpen, setEngineMenuOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceTargetLang, setVoiceTargetLang] = useState("en");
   const messageListRef = useRef(null);
+  const voiceSupported = hasClientSpeechRecognition();
 
   const hasUserMessage = messages.some((m) => m.role === "user");
 
@@ -163,6 +169,38 @@ function BlueAIChat({ onGoMain, onAssistantReply, isDarkMode = false }) {
     },
     [dismissQuickReplies, messages, onAssistantReply, sending]
   );
+
+  const runVoiceInput = useCallback(async () => {
+    if (voiceListening || sending) return;
+    dismissQuickReplies();
+    setEngineMenuOpen(false);
+    setVoiceListening(true);
+    try {
+      const result = await runVmingVoiceTranslate({ targetLang: voiceTargetLang, sourceLang: "ko" });
+      const text = formatVoiceTranslateMessage({
+        original: result.original,
+        translated: result.translated,
+        targetLang: voiceTargetLang
+      });
+      if (!text.trim()) return;
+      setMessages((prev) => [
+        ...prev,
+        { id: `u-voice-${Date.now()}`, role: "user", text, at: new Date().toISOString() }
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `a-voice-err-${Date.now()}`,
+          role: "ai",
+          text: "음성 인식에 실패했어요. 텍스트로 입력해 주세요.",
+          at: new Date().toISOString()
+        }
+      ]);
+    } finally {
+      setVoiceListening(false);
+    }
+  }, [dismissQuickReplies, sending, voiceListening, voiceTargetLang]);
 
   const headSub = isDarkMode ? "text-gray-500" : "text-gray-400";
   const inputShell = isDarkMode
@@ -304,7 +342,47 @@ function BlueAIChat({ onGoMain, onAssistantReply, isDarkMode = false }) {
         className={`fixed inset-x-0 z-[38] ${inputShell}`}
         style={{ bottom: "calc(54px + env(safe-area-inset-bottom, 0px))" }}
       >
+        <div className="mb-1.5 flex items-center gap-2">
+          <label className={`text-[10px] font-semibold ${headSub}`} htmlFor="vming-voice-lang">
+            음성 번역
+          </label>
+          <select
+            id="vming-voice-lang"
+            value={voiceTargetLang}
+            onChange={(e) => setVoiceTargetLang(e.target.value)}
+            className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${
+              isDarkMode ? "border-white/10 bg-white/5 text-gray-200" : "border-gray-200 bg-white text-gray-700"
+            }`}
+          >
+            {SCAN_TRANSLATE_LANGS.filter((l) => l.id !== "ko").map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          {!voiceSupported ? (
+            <span className={`text-[9px] ${headSub}`}>STT 미지원 · 텍스트 입력</span>
+          ) : null}
+        </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            disabled={sending || !voiceSupported}
+            onClick={runVoiceInput}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-95 disabled:opacity-40 ${
+              voiceListening
+                ? "bg-rose-500 text-white"
+                : isDarkMode
+                  ? "bg-white/10 text-gray-200"
+                  : "bg-gray-100 text-gray-700"
+            }`}
+            aria-label={voiceListening ? "음성 인식 중" : "음성 번역"}
+            title={voiceSupported ? "마이크 — 온디바이스 STT 후 텍스트 번역" : "음성 인식 미지원"}
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
+              <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z" />
+            </svg>
+          </button>
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}

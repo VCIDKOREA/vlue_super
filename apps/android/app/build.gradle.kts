@@ -55,8 +55,10 @@ dependencies {
     implementation("androidx.webkit:webkit:1.10.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // ML Kit OCR (POS 빌지)
+    // ML Kit OCR (POS 빌지·일반 문서)
     implementation("com.google.mlkit:text-recognition-korean:16.0.1")
+    // ML Kit Translation (온디바이스 무료 번역)
+    implementation("com.google.mlkit:translate:17.0.3")
 
     // Room + SQLCipher AES-256
     implementation("androidx.room:room-runtime:2.6.1")

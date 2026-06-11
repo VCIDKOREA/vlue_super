@@ -33,6 +33,13 @@ import WeChatMessageContextMenu from "./chat/WeChatMessageContextMenu.jsx";
 import ChatRoomSettingsSheet from "./chat/ChatRoomSettingsSheet.jsx";
 import ChatRoomNoticeBanner from "./chat/ChatRoomNoticeBanner.jsx";
 import { simulatePeerOnline } from "../lib/chatMessageUi.js";
+import { translateUniversal } from "../lib/universalTranslationManager.js";
+import {
+  isTranslationEnabled,
+  isTranslatableChatMessage,
+  shouldAutoTranslateMessage,
+  shouldManualTranslateMessage
+} from "../lib/chatTranslationPolicy.js";
 import { postVmingChat } from "../lib/vmingApi.js";
 import { subscribeVlueSseAppEvents, VLUE_SSE_CHAT_MESSAGE } from "../lib/vlueSse.js";
 import {
@@ -421,7 +428,8 @@ function ChatRoom({
   canManageGroupCalendar = false,
   onOpenCalendarFromNotice,
   /** SSE 수신 메시지를 상위 messagesByRoom에 병합 */
-  onRealtimeChatMessage
+  onRealtimeChatMessage,
+  onOpenSubscription
 }) {
   const LANG_OPTIONS = [
     { id: "en", label: "영어", badge: "EN" },
@@ -452,6 +460,9 @@ function ChatRoom({
   const [isTranslating, setIsTranslating] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [liveSubtitles, setLiveSubtitles] = useState([]);
+  const [messageTranslations, setMessageTranslations] = useState({});
+  const [autoTranslateOn, setAutoTranslateOn] = useState(false);
+  const autoTranslatedIdsRef = useRef(new Set());
   const [vmingConsent, setVmingConsent] = useState(null);
   const [vmingRequestOpen, setVmingRequestOpen] = useState(false);
   const [vmingRespondOpen, setVmingRespondOpen] = useState(false);
@@ -771,32 +782,129 @@ function ChatRoom({
   const mm = String(Math.floor(callSec / 60)).padStart(2, "0");
   const ss = String(callSec % 60).padStart(2, "0");
 
-  const simulateTranslate = useCallback((src, lang) => {
-    const compact = String(src || "").trim();
-    if (!compact) return "";
-    const phraseMap = [
-      { ko: "안녕하세요", en: "Hello", ja: "こんにちは", zh: "你好", vi: "Xin chao", th: "Sawasdee" },
-      { ko: "어디서 봤는데", en: "I think I saw it somewhere.", ja: "どこかで見た気がします。", zh: "我好像在哪里见过。", vi: "Toi nghi toi da thay o dau do.", th: "ฉันเหมือนเคยเห็นที่ไหนสักแห่ง" },
-      { ko: "내가 언제 그랬어", en: "When did I do that?", ja: "私がいつそうしたの？", zh: "我什么时候那样做了？", vi: "Khi nao toi da lam vay?", th: "ฉันทำแบบนั้นเมื่อไหร่?" }
-    ];
-    const selected = LANG_OPTIONS.find((x) => x.id === lang) || LANG_OPTIONS[0];
-    const hit = phraseMap.find((p) => compact.includes(p.ko));
-    const translated = hit?.[lang] || `[${selected.label} 번역] ${compact}`;
-    return `${selected.badge}) ${translated}`;
-  }, []);
+  const translationEnabled = isTranslationEnabled(targetLang);
+  const targetLangBadge = LANG_OPTIONS.find((x) => x.id === targetLang)?.badge || String(targetLang).toUpperCase();
 
-  const processVoiceText = useCallback((text) => {
-    if (!text || isTranslating) return;
-    const stamp = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-    setLiveSubtitles((prev) => [...prev, { id: `me-${Date.now()}`, speaker: "나", text, stamp }]);
-    setIsTranslating(true);
-    const translated = simulateTranslate(text, targetLang);
-    setTimeout(() => {
-      const aiStamp = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-      setLiveSubtitles((prev) => [...prev, { id: `ai-${Date.now()}`, speaker: "AI 통역", text: translated, stamp: aiStamp }]);
-      setIsTranslating(false);
-    }, 900);
-  }, [isTranslating, simulateTranslate, targetLang]);
+  const processVoiceText = useCallback(
+    async (text) => {
+      if (!text || isTranslating || !translationEnabled) return;
+      const stamp = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+      setLiveSubtitles((prev) => [...prev, { id: `me-${Date.now()}`, speaker: "나", text, stamp }]);
+      setIsTranslating(true);
+      try {
+        const result = await translateUniversal({
+          text,
+          sourceLang: "ko",
+          targetLang,
+          origin: "chat"
+        });
+        const selected = LANG_OPTIONS.find((x) => x.id === targetLang) || LANG_OPTIONS[0];
+        const line = `${selected.badge}) ${result.translated || text}`;
+        const aiStamp = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+        setLiveSubtitles((prev) => [
+          ...prev,
+          { id: `ai-${Date.now()}`, speaker: "AI 통역", text: line, stamp: aiStamp }
+        ]);
+      } catch {
+        const selected = LANG_OPTIONS.find((x) => x.id === targetLang) || LANG_OPTIONS[0];
+        const aiStamp = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+        setLiveSubtitles((prev) => [
+          ...prev,
+          { id: `ai-${Date.now()}`, speaker: "AI 통역", text: `${selected.badge}) ${text}`, stamp: aiStamp }
+        ]);
+      } finally {
+        setIsTranslating(false);
+      }
+    },
+    [isTranslating, targetLang, translationEnabled]
+  );
+
+  useEffect(() => {
+    autoTranslatedIdsRef.current = new Set();
+    setAutoTranslateOn(false);
+    setMessageTranslations({});
+  }, [roomId]);
+
+  useEffect(() => {
+    if (!translationEnabled && autoTranslateOn) {
+      setAutoTranslateOn(false);
+    }
+  }, [translationEnabled, autoTranslateOn]);
+
+  const translateChatMessage = useCallback(
+    async (message, { enhanced = false, force = false } = {}) => {
+      const text = String(message?.text || "").trim();
+      const id = message?.id;
+      if (!text || !id) return;
+      if (!force && !shouldManualTranslateMessage(text, targetLang)) {
+        setFavoriteNotice("한국어 대상일 때는 번역이 필요 없습니다.");
+        setTimeout(() => setFavoriteNotice(""), 1400);
+        return;
+      }
+      setMessageTranslations((prev) => ({
+        ...prev,
+        [id]: { ...(prev[id] || {}), loading: true, visible: true }
+      }));
+      try {
+        const result = await translateUniversal({
+          text,
+          sourceLang: "ko",
+          targetLang,
+          enhanced,
+          origin: "chat"
+        });
+        setMessageTranslations((prev) => ({
+          ...prev,
+          [id]: {
+            translated: result.translated,
+            source: result.source,
+            cacheHit: result.cacheHit,
+            loading: false,
+            visible: true
+          }
+        }));
+      } catch {
+        setMessageTranslations((prev) => ({
+          ...prev,
+          [id]: {
+            ...(prev[id] || {}),
+            translated: "번역에 실패했습니다.",
+            loading: false,
+            visible: true
+          }
+        }));
+      }
+    },
+    [targetLang]
+  );
+
+  useEffect(() => {
+    if (!autoTranslateOn || !translationEnabled || readOnlyBroadcast) return;
+    messages.forEach((msg) => {
+      if (!isTranslatableChatMessage(msg)) return;
+      if (!shouldAutoTranslateMessage(msg.text, targetLang)) return;
+      if (autoTranslatedIdsRef.current.has(msg.id)) return;
+      if (messageTranslations[msg.id]?.translated || messageTranslations[msg.id]?.loading) return;
+      autoTranslatedIdsRef.current.add(msg.id);
+      translateChatMessage(msg, { enhanced: false, force: true });
+    });
+  }, [
+    autoTranslateOn,
+    translationEnabled,
+    messages,
+    messageTranslations,
+    readOnlyBroadcast,
+    targetLang,
+    translateChatMessage
+  ]);
+
+  const toggleChatTranslation = useCallback((msgId) => {
+    setMessageTranslations((prev) => {
+      const row = prev[msgId];
+      if (!row) return prev;
+      return { ...prev, [msgId]: { ...row, visible: !row.visible } };
+    });
+  }, []);
 
   const submitVoiceSimulation = useCallback(() => {
     const text = voiceInput.trim();
@@ -920,8 +1028,14 @@ function ChatRoom({
       setTimeout(() => setFavoriteNotice(""), 1400);
     }
     if (action === "translate") {
-      setFavoriteNotice("번역은 VLUE Voice 다국어 통화에서 바로 사용할 수 있습니다.");
-      setTimeout(() => setFavoriteNotice(""), 2000);
+      translateChatMessage(message, { enhanced: false });
+      return;
+    }
+    if (action === "translate-enhanced") {
+      translateChatMessage(message, { enhanced: true });
+      setFavoriteNotice("Gemini 고도화 번역을 적용합니다.");
+      setTimeout(() => setFavoriteNotice(""), 1400);
+      return;
     }
   };
 
@@ -1187,6 +1301,40 @@ function ChatRoom({
 
         {!isSearchOpen ? (
           <div className="flex shrink-0 items-center gap-2 pl-2 text-gray-500">
+            {!readOnlyBroadcast ? (
+              <button
+                type="button"
+                disabled={!translationEnabled}
+                onClick={() => {
+                  if (!translationEnabled) {
+                    setFavoriteNotice("번역 대상이 한국어일 때는 번역을 사용할 수 없습니다.");
+                    setTimeout(() => setFavoriteNotice(""), 1600);
+                    return;
+                  }
+                  setAutoTranslateOn((v) => !v);
+                }}
+                title={
+                  !translationEnabled
+                    ? "한국어 대상 — 번역 불필요"
+                    : autoTranslateOn
+                      ? `자동 번역 켜짐 · ${targetLangBadge}`
+                      : `자동 번역 꺼짐 · ${targetLangBadge}`
+                }
+                aria-pressed={autoTranslateOn}
+                className={`flex h-9 w-9 items-center justify-center rounded-full border transition active:scale-90 ${
+                  !translationEnabled
+                    ? "cursor-not-allowed border-gray-200 bg-gray-50 opacity-40 grayscale"
+                    : autoTranslateOn
+                      ? "border-sky-300 bg-sky-50 text-sky-600 shadow-[0_0_10px_rgba(14,165,233,0.35)]"
+                      : "border-gray-200 bg-white text-gray-400 grayscale"
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+                </svg>
+              </button>
+            ) : null}
             <button
               type="button"
               disabled={readOnlyBroadcast || isGroupRoom || !phoneDigits}
@@ -1278,6 +1426,11 @@ function ChatRoom({
           refreshVmingConsent();
         }}
         onVmingOpenConsentModal={() => setVmingRespondOpen(true)}
+        messageTranslations={messageTranslations}
+        chatTargetLang={targetLang}
+        onTranslateMessage={translateChatMessage}
+        onToggleTranslation={toggleChatTranslation}
+        translationEnabled={translationEnabled}
       />
       {isSubscribeRoom && !readOnlyBroadcast && (
         <div className="shrink-0 border-t border-blue-100 bg-blue-50/65 px-3 py-2">

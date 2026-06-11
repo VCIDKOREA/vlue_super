@@ -14,6 +14,7 @@ import { hasNativePosOcr, runNativePosBillOcr } from "../../lib/posBillNativeOcr
 import { wipeStaffScanArtifacts } from "../../lib/staffZeroRetention.js";
 import { useSensitiveScreenSecure } from "../../hooks/useSensitiveScreenSecure.js";
 import BackButton from "../common/BackButton";
+import ScanDocumentReviewPanel from "./ScanDocumentReviewPanel.jsx";
 
 const SCAN_MODES = {
   document: {
@@ -242,7 +243,12 @@ function SaveFileDialog({ open, busy, fileName, onChange, onCancel, onSave }) {
   );
 }
 
-export default function CsScannerScreen({ open, onClose, onToast, initialMode = "document" }) {
+export default function CsScannerScreen({
+  open,
+  onClose,
+  onToast,
+  initialMode = "document"
+}) {
   useSensitiveScreenSecure(open);
   const [posRole, setPosRole] = useState(null);
   const canUsePos = Boolean(posRole?.canScanPos);
@@ -272,6 +278,7 @@ export default function CsScannerScreen({ open, onClose, onToast, initialMode = 
   const [posDialogOpen, setPosDialogOpen] = useState(false);
   const [posOcrText, setPosOcrText] = useState("");
   const [posOcrLoading, setPosOcrLoading] = useState(false);
+  const [documentReviewOpen, setDocumentReviewOpen] = useState(false);
 
   const stopCamera = useCallback(() => {
     const stream = streamRef.current;
@@ -294,6 +301,7 @@ export default function CsScannerScreen({ open, onClose, onToast, initialMode = 
     stopCamera();
     setSaveDialogOpen(false);
     setPosDialogOpen(false);
+    setDocumentReviewOpen(false);
     onClose?.();
   }, [isStaff, onClose, pages, stopCamera]);
 
@@ -369,6 +377,7 @@ export default function CsScannerScreen({ open, onClose, onToast, initialMode = 
     setCorners(DEFAULT_CORNERS);
     setAutoDetected(false);
     setSaveDialogOpen(false);
+    setDocumentReviewOpen(false);
     setSaveFileName("");
     manualUntilRef.current = 0;
 
@@ -504,8 +513,7 @@ export default function CsScannerScreen({ open, onClose, onToast, initialMode = 
       }
       return;
     }
-    setSaveFileName("");
-    setSaveDialogOpen(true);
+    setDocumentReviewOpen(true);
   };
 
   const posParsed = posOcrText.trim() ? parsePosBillFromText(posOcrText) : null;
@@ -743,6 +751,18 @@ export default function CsScannerScreen({ open, onClose, onToast, initialMode = 
         isStaff={isStaff}
         onCancel={() => !busy && !posOcrLoading && setPosDialogOpen(false)}
         onSave={confirmPosLedger}
+      />
+      <ScanDocumentReviewPanel
+        open={documentReviewOpen}
+        pages={pages}
+        busy={busy}
+        onToast={onToast}
+        onClose={() => !busy && setDocumentReviewOpen(false)}
+        onSave={() => {
+          setDocumentReviewOpen(false);
+          setSaveFileName("");
+          setSaveDialogOpen(true);
+        }}
       />
     </div>
   );

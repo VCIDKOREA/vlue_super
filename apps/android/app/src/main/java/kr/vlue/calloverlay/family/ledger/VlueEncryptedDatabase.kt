@@ -4,16 +4,19 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import kr.vlue.calloverlay.family.translate.TranslationCacheEntity
+import kr.vlue.calloverlay.family.translate.TranslationCacheDao
 import net.zetetic.database.sqlcipher.SupportFactory
 
 @Database(
-    entities = [PosLedgerEntity::class, FamilySecurityStateEntity::class],
-    version = 1,
+    entities = [PosLedgerEntity::class, FamilySecurityStateEntity::class, TranslationCacheEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class VlueEncryptedDatabase : RoomDatabase() {
     abstract fun posLedgerDao(): PosLedgerDao
     abstract fun familySecurityStateDao(): FamilySecurityStateDao
+    abstract fun translationCacheDao(): TranslationCacheDao
 
     companion object {
         @Volatile private var instance: VlueEncryptedDatabase? = null
