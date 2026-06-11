@@ -90,22 +90,52 @@
   }
 }
 
-/* 네비 — VLUE메일 / AI엑셀 간격 */
-[data-vlue-site="marketing"] .mkt-nav-items {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
+/* 네비 — VLUE메일 / AI엑셀 간격 (데스크탑 xl 이상만 가로 메뉴) */
+@media (min-width: 1280px) {
+  [data-vlue-site="marketing"] .mkt-nav-items {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  [data-vlue-site="marketing"] .mkt-nav-mail-pill {
+    margin-left: 0.35rem;
+  }
+
+  [data-vlue-site="marketing"] .mkt-nav-featured-cta {
+    margin-left: 0.5rem;
+  }
 }
 
-[data-vlue-site="marketing"] .mkt-nav-mail-pill {
-  margin-left: 0.35rem;
-}
+@media (max-width: 1279px) {
+  [data-vlue-site="marketing"] .mkt-nav-items,
+  [data-vlue-site="marketing"] .mkt-nav-actions {
+    display: none !important;
+  }
 
-[data-vlue-site="marketing"] .mkt-nav-featured-cta {
-  margin-left: 0.5rem;
+  [data-vlue-site="marketing"] .mkt-nav-mobile-excel {
+    flex-shrink: 0;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #fff;
+    white-space: nowrap;
+    background: linear-gradient(120deg, #6d28d9 0%, #4f46e5 45%, #2563eb 100%);
+    border: 1px solid rgb(255 255 255 / 22%);
+    box-shadow: 0 2px 8px rgb(79 70 229 / 32%);
+  }
+
+  [data-vlue-site="marketing"] .mkt-nav-mobile-excel--active {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 3px #4f46e5, 0 2px 8px rgb(79 70 229 / 35%);
+  }
+
+  [data-vlue-site="marketing"] .mkt-nav-mobile-excel-label {
+    letter-spacing: -0.02em;
+  }
 }
 
 [data-vlue-site="marketing"] .mkt-nav-logo-btn {
@@ -324,11 +354,16 @@
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px #4f46e5, 0 4px 14px rgb(79 70 229 / 40%);
 }
 
-[data-vlue-site="marketing"] .mkt-nav-mobile-menu .mkt-nav-featured-cta.mkt-nav-link {
+[data-vlue-site="marketing"] .mkt-nav-mobile-menu .mkt-nav-featured-cta.mkt-nav-link,
+[data-vlue-site="marketing"] .mkt-nav-mobile-menu-featured {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0;
   justify-content: flex-start;
   padding: 0.75rem 1rem !important;
   font-size: 0.9375rem !important;
+  border-radius: 0.75rem !important;
 }
 
 [data-vlue-site="marketing"] header .mkt-nav-login {
@@ -380,6 +415,22 @@
 [data-vlue-site="marketing"] .mkt-nav-mobile-menu .mkt-nav-signup {
   padding: 0.625rem 1rem !important;
   font-size: 0.9375rem !important;
+}
+
+/* 플로팅 버튼 — 채팅·긴급신고 세로 스택 (겹침 방지) */
+[data-vlue-site="marketing"] .mkt-fab-dock {
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  right: calc(1rem + env(safe-area-inset-right, 0px));
+  pointer-events: none;
+}
+
+[data-vlue-site="marketing"] .mkt-fab-dock > * {
+  pointer-events: auto;
+}
+
+[data-vlue-site="marketing"] .mkt-chat-fab,
+[data-vlue-site="marketing"] .mkt-emergency-fab {
+  position: relative;
 }
 
 /* 상단 크롬 — 네비·알림바 톤 통일 (라이트 블루) */

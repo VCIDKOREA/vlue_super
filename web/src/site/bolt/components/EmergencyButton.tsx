@@ -30,7 +30,7 @@ export default function EmergencyButton() {
         }
       `}</style>
 
-      <div className="mkt-emergency-fab fixed bottom-6 right-5 z-40 flex flex-col items-end gap-3">
+      <div className="mkt-emergency-fab relative flex flex-col items-end gap-3">
         {open && (
           <div
             className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-72 overflow-hidden"

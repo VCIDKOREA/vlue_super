@@ -228,10 +228,16 @@
     justify-content: flex-start;
   }
 
-  /* 네비 — 로고+햄버거만, 가로 스크롤 방지 */
+  /* 네비 — 로고 + AI엑셀 + 햄버거만 (가로 메뉴 숨김) */
+  [data-vlue-site="marketing"] .mkt-nav-items,
+  [data-vlue-site="marketing"] .mkt-nav-actions {
+    display: none !important;
+  }
+
   [data-vlue-site="marketing"] .mkt-nav-shell {
     min-width: 0;
     overflow: hidden;
+    gap: 0.25rem;
   }
 
   [data-vlue-site="marketing"] .mkt-site-header .max-w-7xl {
@@ -240,7 +246,30 @@
   }
 
   [data-vlue-site="marketing"] .mkt-nav-logo-btn {
-    margin-right: 0.5rem;
+    margin-right: 0;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  [data-vlue-site="marketing"] .mkt-nav-mobile-excel {
+    flex-shrink: 0;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #fff;
+    white-space: nowrap;
+    background: linear-gradient(120deg, #6d28d9 0%, #4f46e5 45%, #2563eb 100%);
+    border: 1px solid rgb(255 255 255 / 22%);
+    box-shadow: 0 2px 8px rgb(79 70 229 / 32%);
+  }
+
+  [data-vlue-site="marketing"] .mkt-nav-mobile-excel--active {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 3px #4f46e5, 0 2px 8px rgb(79 70 229 / 35%);
+  }
+
+  [data-vlue-site="marketing"] .mkt-nav-mobile-excel-label {
+    letter-spacing: -0.02em;
   }
 
   /* VLUE 스토어·쇼핑 탭 줄바꿈 */
@@ -256,15 +285,66 @@
     padding-top: 1.5rem !important;
   }
 
-  /* 플로팅 버튼 겹침 방지 */
-  [data-vlue-site="marketing"] .mkt-chat-fab {
-    bottom: 5.5rem;
-    right: 1rem;
+  /* 플로팅 버튼이 본문·푸터를 가리지 않도록 */
+  [data-vlue-site="marketing"] .mkt-fab-dock {
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    right: calc(0.75rem + env(safe-area-inset-right, 0px));
   }
 
-  [data-vlue-site="marketing"] .mkt-emergency-fab {
-    bottom: 1rem;
-    right: 1rem;
+  [data-vlue-site="marketing"] .mkt-footer {
+    padding-bottom: 5.5rem;
+  }
+
+  [data-vlue-site="marketing"] main,
+  [data-vlue-site="marketing"] .mkt-app-shell--home {
+    scroll-padding-bottom: 6rem;
+  }
+
+  /* 푸터 — 2열 링크 + 컴팩트 연락처 */
+  [data-vlue-site="marketing"] .mkt-footer-inner {
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+  }
+
+  [data-vlue-site="marketing"] .mkt-footer-grid {
+    gap: 0.75rem 1rem;
+    margin-bottom: 1rem !important;
+  }
+
+  [data-vlue-site="marketing"] .mkt-footer-brand {
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid rgb(31 41 55 / 80%);
+  }
+
+  [data-vlue-site="marketing"] .mkt-footer-tagline {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  [data-vlue-site="marketing"] .mkt-footer-contact {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem 0.5rem;
+  }
+
+  [data-vlue-site="marketing"] .mkt-footer-address {
+    grid-column: 1 / -1;
+  }
+
+  [data-vlue-site="marketing"] .mkt-footer-section h4 {
+    margin-bottom: 0.35rem;
+  }
+
+  [data-vlue-site="marketing"] .mkt-footer-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  [data-vlue-site="marketing"] .mkt-footer-bottom {
+    padding-top: 0.75rem !important;
   }
 }
 

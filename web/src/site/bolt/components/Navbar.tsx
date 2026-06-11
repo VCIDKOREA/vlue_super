@@ -34,6 +34,13 @@ const NAV_ITEMS: NavItem[] = [
   { label: '고객지원', view: 'support' },
 ];
 
+const USER_MENU_ITEMS: { label: string; view: View; icon: typeof LayoutDashboard }[] = [
+  { label: '마이페이지', view: 'mypage', icon: LayoutDashboard },
+  { label: '디지털 명함', view: 'bizcard', icon: CreditCard },
+  { label: '신뢰인증 신청', view: 'pricing', icon: Award },
+  { label: '안심영역 설정', view: 'safezone', icon: MapPin },
+];
+
 export default function Navbar({ currentView, onNavigate, user, onLoginClick, onLogout }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -177,12 +184,27 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
             )}
           </div>
 
-          <button
-            className="xl:hidden ml-auto p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+          <div className="xl:hidden ml-auto flex items-center gap-1 flex-shrink-0 min-w-0">
+            <button
+              type="button"
+              onClick={() => handleNav('exceleditor')}
+              className={`mkt-nav-mobile-excel flex items-center gap-1 rounded-lg transition-all active:scale-95${
+                currentView === 'exceleditor' ? ' mkt-nav-mobile-excel--active' : ''
+              }`}
+              aria-label="AI엑셀에디터"
+            >
+              <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="mkt-nav-mobile-excel-label">AI엑셀</span>
+            </button>
+            <button
+              type="button"
+              className="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors flex-shrink-0"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? '메뉴 닫기' : '메뉴 열기'}
+            >
+              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -194,14 +216,39 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
               onClick={() => handleNav(item.view)}
               className={
                 item.featured
-                  ? 'mkt-nav-featured-cta mkt-nav-link w-full text-left flex items-center gap-2'
+                  ? 'mkt-nav-featured-cta mkt-nav-link mkt-nav-mobile-menu-featured w-full text-left flex items-center gap-2'
                   : 'w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all'
               }
             >
-              {item.featured && <Sparkles className="w-4 h-4" />}
+              {item.featured && <Sparkles className="w-4 h-4 flex-shrink-0" />}
               {item.label}
             </button>
           ))}
+
+          <div className="pt-2 mt-1 border-t border-gray-100 space-y-0.5">
+            {user ? (
+              <p className="px-3 py-1.5 text-xs text-gray-500 truncate">{user.email}</p>
+            ) : null}
+            {USER_MENU_ITEMS.map(({ label, view, icon: Icon }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  if (user) {
+                    handleNav(view);
+                  } else {
+                    onLoginClick();
+                    setMobileOpen(false);
+                  }
+                }}
+                className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all flex items-center gap-2.5"
+              >
+                <Icon className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                {label}
+              </button>
+            ))}
+          </div>
+
           <div className="pt-3 border-t border-gray-100 flex gap-2.5">
             {user ? (
               <button

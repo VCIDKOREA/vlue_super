@@ -192,8 +192,10 @@ export default function App() {
         {view !== 'mypage' && <Footer onNavigate={handleNavigate} />}
         </div>
       </div>
-      <ChatBot />
-      <EmergencyButton />
+      <div className="mkt-fab-dock fixed z-50 flex flex-col items-end gap-3">
+        <ChatBot />
+        <EmergencyButton />
+      </div>
       {showLoginRequired && !user && (
         <LoginRequiredModal onClose={() => setShowLoginRequired(false)} onLogin={() => { setShowLoginRequired(false); setShowAuth(true); }} />
       )}
