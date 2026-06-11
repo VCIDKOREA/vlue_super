@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node ../scripts/faststart-mp4.mjs public/eye2_vlue.mp4",
     "build": "vite build",
     "start": "serve dist -s -l 8080",
     "preview": "vite preview",
