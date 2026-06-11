@@ -2,6 +2,7 @@ import { useState, FormEvent, useEffect } from 'react';
 import { Search, AlertCircle, Shield, ArrowLeft, Loader2 } from 'lucide-react';
 import { verifySearchKeyword } from '../../../lib/searchVerifyApi.js';
 import SearchVerifyCrossTabs, { type CrossVerifyData } from '../components/SearchVerifyCrossTabs';
+import { SearchVerifySourceList } from '../components/SearchVerifySourceLogos';
 
 interface SearchPageProps {
   initialQuery: string;
@@ -91,11 +92,11 @@ export default function SearchPage({ initialQuery, onBack }: SearchPageProps) {
             <Shield className="w-4 h-4 text-primary-600" />
           </div>
           <div className="flex-1">
-            <h2 className="text-gray-900 font-bold text-sm" style={{ letterSpacing: '-0.02em' }}>VLUE 4사 통합 교차 검증</h2>
-            <p className="text-gray-400 text-xs">카카오 · 네이버 · 공공·국세청 · VLUE 독자검증</p>
+            <h2 className="text-gray-900 font-bold text-sm" style={{ letterSpacing: '-0.02em' }}>VLUE 통합 교차검증</h2>
+            <SearchVerifySourceList compact />
           </div>
           {verifyData ? (
-            <span className={`sv-header-pill${verifyData.is_registered ? ' sv-header-pill--gold' : ''}`}>
+            <span className={`sv-header-pill${verifyData.is_registered ? ' sv-header-pill--premium' : ''}`}>
               {verifyData.is_registered ? 'PREMIUM' : '요약본'}
             </span>
           ) : null}
@@ -104,8 +105,10 @@ export default function SearchPage({ initialQuery, onBack }: SearchPageProps) {
         {pubLoading ? (
           <div className="mkt-search-loading">
             <Loader2 className="w-8 h-8 text-primary-400 mx-auto mb-3 animate-spin" />
-            <p className="text-gray-500 text-sm font-medium">4사 데이터를 동시 조회 중…</p>
-            <p className="text-gray-400 text-xs mt-1">카카오 · 네이버 · 공공·국세청 · VLUE 교차 검증</p>
+            <p className="text-gray-500 text-sm font-medium">통합 교차검증 데이터를 조회 중…</p>
+            <div className="mt-2 flex justify-center">
+              <SearchVerifySourceList compact />
+            </div>
           </div>
         ) : verifyData ? (
           <SearchVerifyCrossTabs key={`${activeQuery}-${verifyData.is_registered}`} data={verifyData} />

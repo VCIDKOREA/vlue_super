@@ -128,9 +128,31 @@ async function run() {
               bizno: "1234567890",
               rdnmadr: "대구광역시 달서구 갈발로 24",
               telno: "053-111-2222",
-              indsMclsNm: "카페"
+              indsMclsNm: "카페",
+              rprsvNm: "홍길동"
             }
           ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    if (url.includes("GetCorpBasicInfoService")) {
+      return new Response(
+        JSON.stringify({
+          response: {
+            body: {
+              items: {
+                item: [
+                  {
+                    corpNm: "투썸플레이스 대구대곡점",
+                    bzno: "1234567890",
+                    enpRprFnm: "홍길동",
+                    enpBsadr: "대구광역시 달서구 갈발로 24"
+                  }
+                ]
+              }
+            }
+          }
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
@@ -144,6 +166,8 @@ async function run() {
     assert(cafe.data.kakao.place_name.includes("대구대곡"), "kakao place");
     assert(cafe.data.public.matched === true, "public store matched");
     assert(cafe.data.public.business_number.includes("123"), "business number");
+    assert(cafe.data.public.ceo_name === "홍**", "ceo name masked");
+    assert(Array.isArray(cafe.data.public.candidates), "public candidates array");
   }
 
   globalThis.fetch = async (input: RequestInfo | URL) => {
@@ -209,6 +233,97 @@ async function run() {
     assert(partner.data.is_registered === true, "registered partner");
     assert(partner.data.vlue_auth.safety_score >= 90, "premium safety score");
     assert(partner.data.vlue_auth.cert_number.includes("VLUE"), "cert number");
+    assert(partner.data.public.matched === true, "dada public matched via hint");
+    assert(partner.data.public.business_number.includes("504"), "dada business number");
+    assert(partner.data.public.ceo_name === "박**", "dada ceo masked");
+  }
+
+  globalThis.fetch = async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("dapi.kakao.com")) {
+      return new Response(
+        JSON.stringify({
+          documents: [
+            {
+              place_name: "다다오피스 본점",
+              phone: "053-355-7011",
+              address_name: "대구 북구",
+              road_address_name: "대구 북구 노원로 262",
+              category_name: "가정,생활 > 문구,사무용품",
+              x: "128.58",
+              y: "35.90"
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    if (url.includes("openapi.naver.com")) {
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              title: "<b>다다오피스 본점</b>",
+              roadAddress: "대구 북구 노원로 262",
+              address: "대구 북구",
+              category: "문구,사무용품",
+              mapx: "1285800000",
+              mapy: "359000000",
+              link: "https://map.naver.com/dada"
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    if (url.includes("sbdcStoreInfoService") || url.includes("small_business")) {
+      return new Response(
+        JSON.stringify({
+          data: [
+            {
+              bizesNm: "다다오피스 본점",
+              bizno: "1111111111",
+              rdnmadr: "대구 북구 노원로 262",
+              telno: "053-355-7011",
+              indsMclsNm: "종합사무용품",
+              rprsvNm: "박다다"
+            },
+            {
+              bizesNm: "다다오피스 화원점",
+              bizno: "2222222222",
+              rdnmadr: "대구 달서구 화원로 10",
+              telno: "053-222-3333",
+              indsMclsNm: "종합사무용품",
+              rprsvNm: "이화원"
+            },
+            {
+              bizesNm: "네오다다 서신점",
+              bizno: "3333333333",
+              rdnmadr: "대구 서구 서신로 5",
+              telno: "053-444-5555",
+              indsMclsNm: "종합사무용품",
+              rprsvNm: "김서신"
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    if (url.includes("GetCorpBasicInfoService")) {
+      return new Response(JSON.stringify({ response: { body: { items: { item: [] } } } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    return new Response(JSON.stringify({ data: [] }), { status: 200 });
+  };
+
+  const dada = await runSearchVerify("다다오피스");
+  assert(dada.status === "success", "dada list search success");
+  if (dada.status === "success") {
+    assert(dada.data.public.matched === true, "dada public matched");
+    assert(dada.data.public.candidates.length >= 2, "dada multi candidates");
+    assert(dada.data.public.ceo_name.includes("**"), "dada ceo masked");
   }
 
   console.log("searchVerifyService.test.ts OK");

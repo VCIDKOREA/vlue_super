@@ -1,12 +1,21 @@
 /** 공공데이터포털 / odcloud 서비스 키 (인증키 버그 대비 이중 시도) */
 
-export function getPublicDataServiceKey(): string {
+export function getPublicDataServiceKey(override?: string): string {
   return String(
-    process.env.PUBLIC_DATA_SERVICE_KEY ||
+    override ||
+      process.env.PUBLIC_DATA_SERVICE_KEY ||
       process.env.DATA_GO_KR_SERVICE_KEY ||
       process.env.NTS_BUSINESS_API_KEY ||
       ""
   ).trim();
+}
+
+export function getFscCorpServiceKey(): string {
+  return getPublicDataServiceKey(process.env.FSC_CORP_BASIC_SERVICE_KEY);
+}
+
+export function getSmallBusinessStoreServiceKey(): string {
+  return getPublicDataServiceKey(process.env.SMALL_BUSINESS_STORE_SERVICE_KEY);
 }
 
 function isServiceKeyAuthFailure(status: number, body: unknown): boolean {
@@ -29,9 +38,10 @@ export type PublicDataFetchResult = {
 export async function fetchPublicDataJson(
   endpoint: string,
   params: Record<string, string> = {},
-  init?: RequestInit
+  init?: RequestInit,
+  serviceKeyOverride?: string
 ): Promise<PublicDataFetchResult> {
-  const key = getPublicDataServiceKey();
+  const key = getPublicDataServiceKey(serviceKeyOverride);
   if (!key) {
     return { ok: false, status: 0, json: { error: "PUBLIC_DATA_SERVICE_KEY_MISSING" }, usedEncodedKey: false };
   }
@@ -71,9 +81,10 @@ export async function fetchPublicDataJson(
 export async function postPublicDataJson(
   endpoint: string,
   query: Record<string, string>,
-  body: unknown
+  body: unknown,
+  serviceKeyOverride?: string
 ): Promise<PublicDataFetchResult> {
-  const key = getPublicDataServiceKey();
+  const key = getPublicDataServiceKey(serviceKeyOverride);
   if (!key) {
     return { ok: false, status: 0, json: { error: "PUBLIC_DATA_SERVICE_KEY_MISSING" }, usedEncodedKey: false };
   }

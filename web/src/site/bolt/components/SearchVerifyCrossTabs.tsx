@@ -5,6 +5,7 @@ import {
   ExternalLink,
   Hash,
   Briefcase,
+  User,
   ShieldCheck,
   Info,
   Navigation,
@@ -12,6 +13,12 @@ import {
   AlertTriangle,
   Sparkles,
 } from 'lucide-react';
+import {
+  KakaoSourceLogo,
+  NaverSourceLogo,
+  PublicSourceLogo,
+  VlueSourceLogo,
+} from './SearchVerifySourceLogos';
 
 export type KakaoSourceData = {
   place_name: string;
@@ -35,15 +42,29 @@ export type NaverSourceData = {
   longitude?: number | null;
 };
 
+export type PublicBusinessCandidate = {
+  store_name: string;
+  business_number: string;
+  ceo_name: string;
+  business_status: string;
+  biz_type: string;
+  biz_item: string;
+  address: string;
+  telephone: string;
+  source?: string;
+};
+
 export type PublicSourceData = {
   matched: boolean;
   business_status: string;
   business_number: string;
   biz_type: string;
   biz_item: string;
+  ceo_name: string;
   telephone: string;
   address: string;
   fail_safe_message: string;
+  candidates: PublicBusinessCandidate[];
 };
 
 export type VlueAuthData = {
@@ -67,11 +88,16 @@ export type CrossVerifyData = {
 
 type TabKey = 'kakao' | 'naver' | 'public' | 'vlue';
 
-const TABS: { key: TabKey; label: string; accent: string }[] = [
-  { key: 'kakao', label: '카카오 인증', accent: 'sv-tab--kakao' },
-  { key: 'naver', label: '네이버 인증', accent: 'sv-tab--naver' },
-  { key: 'public', label: '공공·국세청', accent: 'sv-tab--public' },
-  { key: 'vlue', label: 'VLUE 독자검증', accent: 'sv-tab--vlue' },
+const TABS: {
+  key: TabKey;
+  label: string;
+  accent: string;
+  Logo: typeof KakaoSourceLogo;
+}[] = [
+  { key: 'kakao', label: '카카오 인증', accent: 'sv-tab--kakao', Logo: KakaoSourceLogo },
+  { key: 'naver', label: '네이버 인증', accent: 'sv-tab--naver', Logo: NaverSourceLogo },
+  { key: 'public', label: '공공·국세청', accent: 'sv-tab--public', Logo: PublicSourceLogo },
+  { key: 'vlue', label: 'VLUE 독자검증', accent: 'sv-tab--vlue', Logo: VlueSourceLogo },
 ];
 
 function buildMapEmbed(lat: number, lng: number) {
@@ -83,6 +109,17 @@ function buildMapEmbed(lat: number, lng: number) {
 function telHref(phone: string) {
   const digits = phone.replace(/[^\d+]/g, '');
   return digits ? `tel:${digits}` : '';
+}
+
+function maskCeoName(raw: string) {
+  const name = String(raw || '').trim();
+  if (!name || name === '미확인') return name;
+  const first = [...name][0];
+  return first ? `${first}**` : '미확인';
+}
+
+function isActiveBusinessStatus(status: string) {
+  return /계속|정상|영업/.test(status);
 }
 
 function FieldRow({
@@ -221,22 +258,139 @@ function NaverPanel({ data }: { data: NaverSourceData }) {
   );
 }
 
+function PublicBiznoRow({
+  label,
+  value,
+  emphasis,
+  note,
+  alwaysShow,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+  note?: string;
+  alwaysShow?: boolean;
+}) {
+  const displayValue = value?.trim() || '미확인';
+  if (!alwaysShow && displayValue === '미확인') return null;
+  const active = emphasis && isActiveBusinessStatus(displayValue);
+  return (
+    <div className="sv-public-bizno-row">
+      <div className="sv-public-bizno-label">{label}</div>
+      <div className="sv-public-bizno-value">
+        <span className={active || (emphasis && displayValue !== '미확인') ? 'sv-public-bizno-emphasis' : undefined}>
+          {displayValue}
+        </span>
+        {note && active ? <span className="sv-public-bizno-note">{note}</span> : null}
+      </div>
+    </div>
+  );
+}
+
 function PublicPanel({ data }: { data: PublicSourceData }) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const candidates = data.candidates?.length
+    ? data.candidates
+    : data.matched
+      ? [{
+          store_name: data.address ? '선택된 사업자' : '조회 결과',
+          business_number: data.business_number,
+          ceo_name: data.ceo_name,
+          business_status: data.business_status,
+          biz_type: data.biz_type,
+          biz_item: data.biz_item,
+          address: data.address,
+          telephone: data.telephone,
+        }]
+      : [];
+
+  const active = candidates[selectedIndex] || null;
+  const display = active
+    ? {
+        business_status: active.business_status,
+        business_number: active.business_number,
+        biz_type: active.biz_type,
+        biz_item: active.biz_item,
+        ceo_name: active.ceo_name,
+        telephone: active.telephone,
+        address: active.address,
+      }
+    : {
+        business_status: data.business_status,
+        business_number: data.business_number,
+        biz_type: data.biz_type,
+        biz_item: data.biz_item,
+        ceo_name: data.ceo_name,
+        telephone: data.telephone,
+        address: data.address,
+      };
+
+  const ceoDisplay = display.ceo_name ? maskCeoName(display.ceo_name) : '미확인';
+
   return (
     <div className="sv-cross-panel sv-cross-panel--enter">
-      <p className="sv-cross-source">출처: 소상공인 상가정보 · 국세청 사업자상태</p>
+      <p className="sv-cross-source">출처: 소상공인 상가정보 · 금융위 기업기본정보 · 국세청</p>
       <div className={`sv-cross-failsafe${data.matched ? ' sv-cross-failsafe--ok' : ''}`}>
         {data.matched ? <ShieldCheck className="w-4 h-4 flex-shrink-0" /> : <Info className="w-4 h-4 flex-shrink-0" />}
         <p>{data.fail_safe_message}</p>
       </div>
-      <div className="sv-cross-fields">
-        <FieldRow icon={ShieldCheck} label="검증 상태" value={data.business_status} />
-        <FieldRow icon={Hash} label="사업자등록번호" value={data.business_number} />
-        <FieldRow icon={Briefcase} label="업종" value={data.biz_type} />
-        <FieldRow icon={Briefcase} label="업태" value={data.biz_item} />
-        <FieldRow icon={Phone} label="전화번호" value={data.telephone} href={telHref(data.telephone) || undefined} highlight={Boolean(data.telephone)} />
-        <FieldRow icon={MapPin} label="주소" value={data.address} />
+      <div className="sv-public-bizno-table">
+        <PublicBiznoRow label="업태" value={display.biz_item} />
+        <PublicBiznoRow label="업종" value={display.biz_type} />
+        <PublicBiznoRow label="전화번호" value={display.telephone} />
+        <PublicBiznoRow
+          label="과세유형"
+          value={/과세|면세|일반/.test(display.biz_type) ? display.biz_type : ''}
+        />
+        <PublicBiznoRow label="대표자명" value={ceoDisplay} alwaysShow />
+        <PublicBiznoRow
+          label="사업자 현재 상태"
+          value={display.business_status}
+          emphasis
+          alwaysShow
+          note="※국세청 홈택스 실시간 정보제공"
+        />
+        <div className="sv-public-bizno-divider" />
+        <PublicBiznoRow label="사업자등록번호" value={display.business_number} emphasis alwaysShow />
+        <PublicBiznoRow label="회사주소" value={display.address} />
       </div>
+      {display.telephone ? (
+        <a href={telHref(display.telephone)} className="sv-cross-action sv-cross-action--route">
+          <Phone className="w-4 h-4" />
+          {display.telephone}
+        </a>
+      ) : null}
+
+      {candidates.length > 1 ? (
+        <div className="sv-public-candidates">
+          <p className="sv-public-candidates-title">동일·유사 상호 검색 결과 <span>{candidates.length}건</span></p>
+          <div className="sv-public-candidate-list">
+            {candidates.map((item, index) => {
+              const activeCard = index === selectedIndex;
+              return (
+                <button
+                  key={`${item.business_number}-${index}`}
+                  type="button"
+                  className={`sv-public-candidate-card${activeCard ? ' sv-public-candidate-card--active' : ''}`}
+                  onClick={() => setSelectedIndex(index)}
+                >
+                  <div className="sv-public-candidate-head">
+                    <strong>{item.store_name}</strong>
+                    {item.biz_type && item.biz_type !== '미확인' ? <span>{item.biz_type}</span> : null}
+                  </div>
+                  {item.telephone ? <p className="sv-public-candidate-phone">{item.telephone}</p> : null}
+                  {item.address ? <p className="sv-public-candidate-address">{item.address}</p> : null}
+                  <div className="sv-public-candidate-meta">
+                    <span>사업자 {item.business_number}</span>
+                    {item.ceo_name ? <span>대표 {maskCeoName(item.ceo_name)}</span> : null}
+                    {item.business_status && item.business_status !== '미확인' ? <span>{item.business_status}</span> : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -252,7 +406,7 @@ function VluePanel({ data, isRegistered }: { data: CrossVerifyData; isRegistered
           VLUE PREMIUM PARTNER
         </div>
         <p className="sv-cross-source">출처: VLUE 보이스피싱 예방 센터</p>
-        <h3 className="sv-cross-title sv-cross-title--gold">{auth.partner_name || data.query}</h3>
+        <h3 className="sv-cross-title sv-cross-title--premium">{auth.partner_name || data.query}</h3>
         {auth.category ? <p className="sv-cross-sub">{auth.category}</p> : null}
         <div className="sv-premium-hero">
           <SafetyScoreRing score={auth.safety_score} premium />
@@ -288,13 +442,10 @@ function VluePanel({ data, isRegistered }: { data: CrossVerifyData; isRegistered
         <div>
           <p className="sv-cross-sub">{auth.status_text}</p>
           <p className="sv-standard-desc">
-            본 기관은 카카오/네이버/공공데이터의 통합 정보 요약본만 제공되는 &apos;미등록&apos; 대상입니다. 허위 사칭 차단 및 전용 골드 배지 활성화를 위해 정식 파트너십 인증을 권장합니다.
+            본 기관은 카카오/네이버/공공·국세청의 통합 정보 요약본만 제공되는 &apos;미등록&apos; 대상입니다. 사업자번호·대표자명은 [공공·국세청] 탭에서 확인해 주세요.
           </p>
         </div>
       </div>
-      <a href="#pricing" className="sv-partner-cta">
-        VLUE 파트너십 신청하기
-      </a>
     </div>
   );
 }
@@ -305,9 +456,10 @@ export default function SearchVerifyCrossTabs({ data }: { data: CrossVerifyData 
 
   return (
     <div className={`sv-cross${isPremium ? ' sv-cross--premium' : ' sv-cross--standard'}`}>
-      <div className="sv-cross-tabs sv-cross-tabs--4" role="tablist" aria-label="4사 교차 검증">
+      <div className="sv-cross-tabs sv-cross-tabs--4" role="tablist" aria-label="VLUE 통합 교차검증">
         {TABS.map((tab) => {
           const active = activeTab === tab.key;
+          const Logo = tab.Logo;
           return (
             <button
               key={tab.key}
@@ -317,9 +469,12 @@ export default function SearchVerifyCrossTabs({ data }: { data: CrossVerifyData 
               className={`sv-tab ${tab.accent}${active ? ' sv-tab--active' : ''}`}
               onClick={() => setActiveTab(tab.key)}
             >
-              {tab.label}
-              {tab.key === 'kakao' && data.kakao.telephone ? <span className="sv-tab-dot" /> : null}
-              {tab.key === 'vlue' && isPremium ? <span className="sv-tab-dot sv-tab-dot--gold" /> : null}
+              <span className="sv-tab-inner">
+                <Logo className="sv-tab-logo" />
+                <span>{tab.label}</span>
+              </span>
+              {tab.key === 'kakao' && data.kakao.telephone ? <span className="sv-tab-dot sv-tab-dot--kakao" /> : null}
+              {tab.key === 'vlue' && isPremium ? <span className="sv-tab-dot sv-tab-dot--premium" /> : null}
             </button>
           );
         })}
@@ -328,7 +483,7 @@ export default function SearchVerifyCrossTabs({ data }: { data: CrossVerifyData 
       <div className="sv-cross-body" role="tabpanel">
         {activeTab === 'kakao' ? <KakaoPanel data={data.kakao} /> : null}
         {activeTab === 'naver' ? <NaverPanel data={data.naver} /> : null}
-        {activeTab === 'public' ? <PublicPanel data={data.public} /> : null}
+        {activeTab === 'public' ? <PublicPanel key={`public-${data.query}-${data.public.candidates?.length || 0}`} data={data.public} /> : null}
         {activeTab === 'vlue' ? <VluePanel data={data} isRegistered={isPremium} /> : null}
       </div>
     </div>

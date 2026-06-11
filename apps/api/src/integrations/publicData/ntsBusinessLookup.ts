@@ -10,9 +10,9 @@ export type NtsBusinessDetail = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  "01": "정상영업",
-  "02": "휴업",
-  "03": "폐업"
+  "01": "계속사업자",
+  "02": "휴업자",
+  "03": "폐업자"
 };
 
 function digitsOnly(raw: string) {

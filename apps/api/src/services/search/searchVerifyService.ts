@@ -1,6 +1,8 @@
-import { searchKakaoLocalDetailed } from "../../integrations/kakao/kakaoLocalSearch.js";
+import { maskCeoName } from "../../lib/maskCeoName.js";
+import { searchKakaoLocalDetailed, searchKakaoLocalList } from "../../integrations/kakao/kakaoLocalSearch.js";
 import { searchNaverLocal, searchNaverLocalList } from "../../integrations/naver/naverLocalSearch.js";
 import { lookupNtsBusinessByNumber } from "../../integrations/publicData/ntsBusinessLookup.js";
+import { searchBusinessesByTradeName, type TradeNameBusinessCandidate } from "../../integrations/publicData/businessTradeNameSearch.js";
 import { findSmallBusinessStore } from "../../integrations/publicData/smallBusinessStoreSearch.js";
 import { findVluePartner } from "./vluePartnerRegistry.js";
 
@@ -26,15 +28,19 @@ export type NaverSourceData = {
   longitude: number | null;
 };
 
+export type PublicBusinessCandidate = TradeNameBusinessCandidate;
+
 export type PublicSourceData = {
   business_status: string;
   business_number: string;
   biz_type: string;
   biz_item: string;
+  ceo_name: string;
   telephone: string;
   address: string;
   matched: boolean;
   fail_safe_message: string;
+  candidates: PublicBusinessCandidate[];
 };
 
 export type VlueAuthData = {
@@ -147,87 +153,172 @@ function formatPhoneFromStore(raw: string): string {
   return String(raw || "").trim();
 }
 
+function emptyPublicFields(): Pick<
+  PublicSourceData,
+  | "business_status"
+  | "business_number"
+  | "biz_type"
+  | "biz_item"
+  | "ceo_name"
+  | "telephone"
+  | "address"
+> {
+  return {
+    business_status: "미확인",
+    business_number: "미확인",
+    biz_type: "미확인",
+    biz_item: "미확인",
+    ceo_name: "",
+    telephone: "",
+    address: ""
+  };
+}
+
+function fromCandidate(candidate: PublicBusinessCandidate): Pick<
+  PublicSourceData,
+  | "business_status"
+  | "business_number"
+  | "biz_type"
+  | "biz_item"
+  | "ceo_name"
+  | "telephone"
+  | "address"
+  | "matched"
+> {
+  return {
+    matched: true,
+    business_status: candidate.business_status,
+    business_number: candidate.business_number,
+    biz_type: candidate.biz_type,
+    biz_item: candidate.biz_item,
+    ceo_name: candidate.ceo_name ? maskCeoName(candidate.ceo_name) : "",
+    telephone: formatPhoneFromStore(candidate.telephone),
+    address: candidate.address
+  };
+}
+
 async function buildPublicSource(input: {
   keyword: string;
   matchName: string;
   matchPhone: string;
   matchAddress: string;
+  latitude: number | null;
+  longitude: number | null;
+  extraNames: string[];
   hasExternalPlace: boolean;
 }): Promise<PublicSourceData> {
-  const { keyword, matchName, matchPhone, matchAddress, hasExternalPlace } = input;
+  const { keyword, matchName, matchPhone, matchAddress, latitude, longitude, extraNames, hasExternalPlace } =
+    input;
   const directBno = digitsOnly(keyword);
+  const searchTerms = [
+    ...new Set([keyword, matchName, ...extraNames].map((v) => String(v || "").trim()).filter(Boolean))
+  ];
+  const searchContext = {
+    matchName,
+    matchPhone,
+    matchAddress,
+    latitude,
+    longitude
+  };
 
   if (directBno.length === 10) {
     const nts = await lookupNtsBusinessByNumber(directBno);
     if (nts) {
       return {
+        ...emptyPublicFields(),
         matched: true,
         business_status: nts.businessStatus,
         business_number: nts.businessNumber,
         biz_type: nts.bizType,
         biz_item: nts.bizItem,
-        telephone: "",
-        address: "",
-        fail_safe_message: "국세청 사업자상태 API 기준으로 영업 정보가 확인되었습니다."
+        fail_safe_message: "국세청 사업자상태 API 기준으로 영업 정보가 확인되었습니다.",
+        candidates: []
       };
     }
   }
 
   if (isPublicInstitution(matchName)) {
     return {
+      ...emptyPublicFields(),
       matched: true,
       business_status: "공공기관 / 정상 운영중",
       business_number: "해당없음(공공기관)",
       biz_type: "공공 행정",
       biz_item: inferPublicBizItem(matchName),
-      telephone: "",
       address: matchAddress,
       fail_safe_message:
-        "공공기관은 사업자등록 체계와 별도로 운영됩니다. 행정기관 분류 및 네이버·카카오 장소 정보를 함께 참고해 주세요."
+        "공공기관은 사업자등록 체계와 별도로 운영됩니다. 행정기관 분류 및 네이버·카카오 장소 정보를 함께 참고해 주세요.",
+      candidates: []
     };
   }
 
-  const store = await findSmallBusinessStore({
-    storeName: matchName,
-    telephone: matchPhone,
-    roadAddress: matchAddress
-  });
+  const [store, ...nameSearchBatches] = await Promise.all([
+    findSmallBusinessStore({
+      storeName: matchName,
+      telephone: matchPhone,
+      roadAddress: matchAddress,
+      latitude,
+      longitude
+    }),
+    ...searchTerms.map((term) => searchBusinessesByTradeName(term, 15, searchContext))
+  ]);
+
+  const candidateMap = new Map<string, PublicBusinessCandidate>();
+  for (const batch of nameSearchBatches) {
+    for (const row of batch) candidateMap.set(row.business_number, row);
+  }
 
   if (store?.businessNumber) {
-    const nts = await lookupNtsBusinessByNumber(store.businessNumber);
-    if (nts) {
-      return {
-        matched: true,
-        business_status: nts.businessStatus,
-        business_number: nts.businessNumber,
-        biz_type: nts.bizType || store.industry || "미확인",
-        biz_item: nts.bizItem || store.industry || "미확인",
-        telephone: formatPhoneFromStore(store.telephone),
-        address: store.address || matchAddress,
-        fail_safe_message: "소상공인 상가정보와 국세청 사업자상태가 교차 확인되었습니다."
-      };
-    }
-    return {
-      matched: true,
-      business_status: "사업자번호 확인 · 국세청 상태 미응답",
+    const existing = candidateMap.get(store.businessNumber);
+    candidateMap.set(store.businessNumber, {
+      store_name: store.storeName,
       business_number: store.businessNumber,
-      biz_type: store.industry || "미확인",
-      biz_item: store.industry || "미확인",
-      telephone: formatPhoneFromStore(store.telephone),
+      ceo_name: existing?.ceo_name || "",
+      business_status: existing?.business_status || "미확인",
+      biz_type: existing?.biz_type || store.industry || "미확인",
+      biz_item: existing?.biz_item || store.industry || "미확인",
       address: store.address || matchAddress,
-      fail_safe_message: "상가정보에서 사업자번호는 확인했으나, 국세청 상태 조회에 응답이 없습니다."
+      telephone: store.telephone || matchPhone,
+      source: existing?.source || store.source
+    });
+    const nts = await lookupNtsBusinessByNumber(store.businessNumber);
+    const merged = candidateMap.get(store.businessNumber)!;
+    if (nts) {
+      merged.business_status = nts.businessStatus;
+      if (merged.biz_type === "미확인") merged.biz_type = nts.bizType;
+      if (merged.biz_item === "미확인") merged.biz_item = nts.bizItem;
+    }
+  }
+
+  const candidates = [...candidateMap.values()]
+    .map((row) => ({
+      ...row,
+      ceo_name: row.ceo_name ? maskCeoName(row.ceo_name) : ""
+    }))
+    .slice(0, 15);
+  const primary = candidates[0] || null;
+
+  if (primary) {
+    const fromStoreExact = store?.businessNumber === primary.business_number;
+    const fromHint = primary.source?.includes("public_hint_registry");
+    return {
+      ...fromCandidate(primary),
+      fail_safe_message: fromStoreExact
+        ? "소상공인 상가정보·금융위 기업기본정보 교차 조회로 사업자 정보를 확인했습니다."
+        : fromHint
+          ? "공공·국세청 교차 조회로 사업자등록번호와 대표자명을 확인했습니다. 대표자명은 보안을 위해 일부 마스킹됩니다."
+          : candidates.length > 1
+            ? `상호명 기준 ${candidates.length}건의 유사 사업자를 조회했습니다. 아래 목록에서 해당 지점을 선택해 주세요.`
+            : "상호명 기준 사업자등록번호·대표자명을 조회했습니다.",
+      candidates
     };
   }
 
   return {
+    ...emptyPublicFields(),
     matched: false,
-    business_status: "상가정보·국세청 미매칭",
-    business_number: "미확인",
-    biz_type: "미확인",
-    biz_item: "미확인",
-    telephone: "",
-    address: "",
-    fail_safe_message: hasExternalPlace ? FAIL_SAFE_UNMATCHED : "공공데이터에서 일치하는 사업자 정보를 찾지 못했습니다."
+    fail_safe_message: hasExternalPlace ? FAIL_SAFE_UNMATCHED : "공공데이터에서 일치하는 사업자 정보를 찾지 못했습니다.",
+    candidates: []
   };
 }
 
@@ -272,8 +363,9 @@ export async function runSearchVerify(keyword: string): Promise<SearchVerifyResp
   const q = String(keyword || "").trim();
   if (!q) return { status: "error", message: "검색어(keyword)가 필요합니다." };
 
-  const [kakaoResult, naverList] = await Promise.all([
+  const [kakaoResult, kakaoList, naverList] = await Promise.all([
     searchKakaoLocalDetailed(q),
+    searchKakaoLocalList(q, 5),
     searchNaverLocalList(q, 5)
   ]);
 
@@ -306,6 +398,9 @@ export async function runSearchVerify(keyword: string): Promise<SearchVerifyResp
       matchName,
       matchPhone,
       matchAddress,
+      latitude: kakaoBest?.latitude ?? naverBest?.latitude ?? null,
+      longitude: kakaoBest?.longitude ?? naverBest?.longitude ?? null,
+      extraNames: kakaoList.map((item) => item.place_name).filter(Boolean),
       hasExternalPlace: Boolean(kakaoBest || naverBest)
     }),
     Promise.resolve(findVluePartner(q, matchName))
