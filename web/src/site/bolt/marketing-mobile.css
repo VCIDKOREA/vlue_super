@@ -18,28 +18,28 @@
     padding-top: var(--mkt-nav-h) !important;
   }
 
-  /* 설치 바(다른 페이지): 문구 2줄 제한 + 버튼 컴팩트 */
+  /* 설치 바(다른 페이지): 좁은 폭 — 안내 문구 숨김, 버튼만 */
   [data-vlue-site="marketing"] .mkt-download-bar-inner {
     flex-direction: row;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: flex-end;
+    gap: 0.35rem;
   }
 
   [data-vlue-site="marketing"] .mkt-download-bar-message {
-    font-size: 0.6875rem;
-    line-height: 1.35;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    flex: 1 1 0;
-    min-width: 0;
+    display: none !important;
   }
 
   [data-vlue-site="marketing"] .mkt-download-bar-actions {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     flex-wrap: nowrap;
+    justify-content: flex-end;
     gap: 0.35rem;
+  }
+
+  [data-vlue-site="marketing"] .mkt-download-bar-wrap {
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
   }
 
   [data-vlue-site="marketing"] .mkt-download-btn {

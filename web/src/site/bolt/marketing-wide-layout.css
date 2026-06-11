@@ -16,9 +16,37 @@
   --mkt-scroll-anchor: calc(var(--mkt-chrome-total) + var(--mkt-sticky-subnav-h) + 0.5rem);
 }
 
-@media (max-width: 639px) {
+/* 앱 셸이 chrome 여백을 담당 — 각 페이지 main 의 중복 pt 제거 (설치바·히어로 사이 이질감 방지) */
+[data-vlue-site="marketing"] .mkt-app-shell > main,
+[data-vlue-site="marketing"] .mkt-app-shell > div > main,
+[data-vlue-site="marketing"] .mkt-app-shell .mkt-page-shell {
+  padding-top: 0 !important;
+}
+
+[data-vlue-site="marketing"] .mkt-app-shell .mkt-pricing-shell {
+  padding-top: 0 !important;
+}
+
+/* 태블릿·좁은 폭 — 설치 바 안내 문구 숨김 (자료실… 등 잘림 방지) */
+@media (max-width: 1023px) {
+  [data-vlue-site="marketing"] .mkt-download-bar-message {
+    display: none !important;
+  }
+
+  [data-vlue-site="marketing"] .mkt-download-bar-inner {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  [data-vlue-site="marketing"] .mkt-download-bar-actions {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
   [data-vlue-site="marketing"] {
-    --mkt-download-bar-h: 5.5rem;
+    --mkt-download-bar-h: 2.75rem;
   }
 }
 

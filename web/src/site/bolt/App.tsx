@@ -130,7 +130,7 @@ export default function App() {
         )}
 
         <div
-          className={`relative z-10 ${
+          className={`mkt-app-shell relative z-10 ${
             view === 'exceleditor'
               ? 'pt-[var(--mkt-nav-h,4.5rem)]'
               : 'pt-[var(--mkt-chrome-total,8.25rem)]'
