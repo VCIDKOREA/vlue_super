@@ -71,7 +71,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
             </span>
           </button>
 
-          <nav className="hidden lg:flex mkt-nav-items">
+          <nav className="hidden xl:flex mkt-nav-items">
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.label}
@@ -102,7 +102,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
             ))}
           </nav>
 
-          <div className="mkt-nav-actions hidden lg:flex items-center gap-2.5 ml-4 flex-shrink-0">
+          <div className="mkt-nav-actions hidden xl:flex items-center gap-2.5 ml-4 flex-shrink-0">
             {user ? (
               <div className="relative">
                 <button
@@ -178,7 +178,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
           </div>
 
           <button
-            className="lg:hidden ml-auto p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+            className="xl:hidden ml-auto p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -187,7 +187,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
       </div>
 
       {mobileOpen && (
-        <div className="mkt-nav-mobile-menu lg:hidden bg-white border-t border-gray-100 px-4 py-3 space-y-0.5 animate-fade-in">
+        <div className="mkt-nav-mobile-menu xl:hidden bg-white border-t border-gray-100 px-4 py-3 space-y-0.5 animate-fade-in max-h-[min(70vh,28rem)] overflow-y-auto">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.label}

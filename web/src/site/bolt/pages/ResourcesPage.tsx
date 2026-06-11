@@ -157,7 +157,7 @@ export default function ResourcesPage({ user }: ResourcesPageProps) {
         </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+        <div className="mkt-pill-row--wrap flex items-center gap-2 mb-6 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {categories.map((cat) => {
             const Icon = CATEGORY_ICONS[cat];
             return (

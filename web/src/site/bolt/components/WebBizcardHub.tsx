@@ -258,7 +258,7 @@ function WebBizcardHubInner({ user }: { user: MarketingAuthUser }) {
         </div>
       ) : null}
 
-      <div className="flex border-b border-gray-200">
+      <div className="mkt-pill-row--wrap flex flex-wrap border-b border-gray-200">
         {tabs.map(({ key, label }) => (
           <button
             key={key}

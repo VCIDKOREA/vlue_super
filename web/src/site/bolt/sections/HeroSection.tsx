@@ -40,14 +40,18 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
         </div>
 
         <h1 className="hero-title hero-animate hero-animate--2 text-slate-900" style={{ wordBreak: 'keep-all' }}>
-          의심되는 기관,<br />
+          <span className="hidden sm:inline">의심되는 기관,</span>
+          <span className="sm:hidden">의심 기관,</span>
+          <br className="hidden sm:block" />
           <span className="hero-title-accent">지금 바로 확인</span>하세요
         </h1>
 
         <p className="hero-desc hero-animate hero-animate--3 mx-auto text-slate-600" style={{ wordBreak: 'keep-all' }}>
-          전화·문자를 받기 전, 공공데이터와 VLUE 인증 데이터를 동시에 비교분석하여
-          <br />
-          <span className="hero-desc-accent">실시간으로 사기 여부를 즉시 판별합니다.</span>
+          <span className="hidden md:inline">
+            전화·문자를 받기 전, 공공데이터와 VLUE 인증 데이터를 동시에 비교분석하여
+            <br />
+          </span>
+          <span className="hero-desc-accent">기관·번호·사업자번호를 한 번에 검증합니다.</span>
         </p>
 
         <div className="hero-search-panel hero-animate hero-animate--4 mx-auto w-full">

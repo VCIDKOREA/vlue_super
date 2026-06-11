@@ -5,6 +5,7 @@
 @import "./components/marketing-store.css";
 @import "./marketing-wide-layout.css";
 @import "./marketing-typography.css";
+@import "./marketing-mobile.css";
 
 @tailwind base;
 @tailwind components;

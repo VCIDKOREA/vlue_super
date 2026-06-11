@@ -31,7 +31,9 @@ export default function AppDownloadBar({ onNavigate, currentView, variant = 'top
     <div
       className={
         isTop
-          ? 'mkt-download-bar mkt-download-bar-shell mkt-download-bar--top'
+          ? `mkt-download-bar mkt-download-bar-shell mkt-download-bar--top${
+              currentView === 'home' ? ' mkt-download-bar--home' : ''
+            }`
           : 'mkt-download-bar mkt-download-bar--bottom'
       }
       role="region"

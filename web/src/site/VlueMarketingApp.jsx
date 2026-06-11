@@ -14,7 +14,8 @@ export default function VlueMarketingApp() {
     const applyRootScale = () => {
       const wide = window.matchMedia("(min-width: 1024px)").matches;
       /* 네이버 본문(14~15px)에 맞춘 www 기준 — 설명 문구 가독성 */
-      document.documentElement.style.fontSize = wide ? "118.75%" : "106.25%";
+      const narrow = window.matchMedia("(max-width: 767px)").matches;
+      document.documentElement.style.fontSize = wide ? "118.75%" : narrow ? "100%" : "106.25%";
     };
     applyRootScale();
     window.addEventListener("resize", applyRootScale);

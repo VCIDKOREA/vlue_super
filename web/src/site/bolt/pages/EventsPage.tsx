@@ -105,7 +105,7 @@ export default function EventsPage({ onBack }: EventsPageProps) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center gap-2 mb-6 overflow-x-auto hide-scrollbar pb-1">
+        <div className="mkt-pill-row--wrap flex items-center gap-2 mb-6 overflow-x-auto hide-scrollbar pb-1">
           {regions.map((r) => (
             <button
               key={r}

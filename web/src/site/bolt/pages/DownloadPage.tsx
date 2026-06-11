@@ -35,7 +35,7 @@ const MOBILE_SYSTEMS = [
 
 export default function DownloadPage({ onBack }: DownloadPageProps) {
   return (
-    <main className="min-h-screen bg-blue-tint pt-[60px]">
+    <main className="min-h-screen bg-blue-tint">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
 
         <button

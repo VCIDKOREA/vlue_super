@@ -130,7 +130,11 @@ export default function App() {
         )}
 
         <div
-          className={`relative z-10 ${view === 'exceleditor' ? 'pt-[var(--mkt-nav-h,4.5rem)]' : 'pt-[var(--mkt-chrome-total,8.25rem)]'}`}
+          className={`relative z-10 ${
+            view === 'exceleditor'
+              ? 'pt-[var(--mkt-nav-h,4.5rem)]'
+              : 'pt-[var(--mkt-chrome-total,8.25rem)]'
+          }${view === 'home' ? ' mkt-app-shell--home' : ''}`}
         >
         {view === 'home' && <HomePage onSearch={handleSearch} onNavigate={handleNavigate} />}
         {view === 'search' && <SearchPage initialQuery={searchQuery} onBack={() => handleNavigate('home')} />}
@@ -143,7 +147,7 @@ export default function App() {
         {view === 'resources' && <ResourcesPage user={user} />}
         
         {view === 'pricing' && (
-          <div className="pt-32 pb-20">
+          <div className="mkt-pricing-shell pt-8 sm:pt-16 lg:pt-32 pb-12 sm:pb-20">
             <PremiumHeroSection onStartFamily={handleStartFamilyProtection} />
             <div id="plans">
               <PricingPage user={user} onLoginClick={handleLoginRequired} />

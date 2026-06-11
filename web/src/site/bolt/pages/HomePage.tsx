@@ -15,9 +15,11 @@ export default function HomePage({ onSearch, onNavigate }: HomePageProps) {
     <main>
       <HeroSection onSearch={onSearch} onNavigate={onNavigate} />
       <PhishingSection />
-      <StoreSection onNavigate={onNavigate} />
-      <EventsSection />
-      <DownloadSection onNavigate={onNavigate} />
+      <div className="mkt-home-section--defer hidden md:block">
+        <StoreSection onNavigate={onNavigate} />
+        <EventsSection />
+        <DownloadSection onNavigate={onNavigate} />
+      </div>
     </main>
   );
 }
