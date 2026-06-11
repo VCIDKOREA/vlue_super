@@ -15,16 +15,26 @@ await loadPricingConfig();
 
 const app = new Hono();
 
-const origins =
+const LOCAL_DEV_ORIGINS = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+  "http://localhost:5176"
+];
+
+const PLATFORM_ORIGINS = [
+  "https://vlueweb-production.up.railway.app",
+  "https://www.vlue.kr",
+  "https://vlue.kr"
+];
+
+const envOrigins =
   process.env.CORS_ORIGIN?.split(",")
     .map((s) => s.trim())
-    .filter(Boolean) ?? [
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "http://localhost:5174",
-      "http://localhost:5175",
-      "http://localhost:5176"
-    ];
+    .filter(Boolean) ?? [];
+
+const origins = [...new Set([...envOrigins, ...LOCAL_DEV_ORIGINS, ...PLATFORM_ORIGINS])];
 
 app.use(
   "*",
