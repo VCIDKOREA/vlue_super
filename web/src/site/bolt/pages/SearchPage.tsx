@@ -1,19 +1,13 @@
-import { useState, FormEvent } from 'react';
-import { Search, CheckCircle, AlertCircle, ExternalLink, Building2, Phone, MapPin, Calendar, Hash, Clock, ArrowLeft } from 'lucide-react';
+import { useState, FormEvent, useEffect } from 'react';
+import { Search, CheckCircle, AlertCircle, ExternalLink, Building2, Phone, MapPin, Calendar, Hash, Clock, ArrowLeft, Loader2 } from 'lucide-react';
 import { VlueBrandMark } from '../../../components/VlueBrandLogo.jsx';
+import { verifySearchKeyword } from '../../../lib/searchVerifyApi.js';
 import type { CertifiedOrg, PublicDataResult } from '../types';
-import { certifiedOrgs, publicDataResults } from '../data/mockData';
+import { certifiedOrgs } from '../data/mockData';
 
 interface SearchPageProps {
   initialQuery: string;
   onBack: () => void;
-}
-
-function matchPublic(q: string): PublicDataResult[] {
-  const lower = q.toLowerCase();
-  return publicDataResults.filter(
-    (r) => r.name.toLowerCase().includes(lower) || r.address.toLowerCase().includes(lower) || r.phone.includes(lower)
-  );
 }
 
 function matchCertified(q: string): CertifiedOrg[] {
@@ -130,12 +124,74 @@ function CertifiedCard({ item }: { item: CertifiedOrg }) {
   );
 }
 
+function mapVerifyToPublicCard(data: {
+  company_name: string;
+  telephone: string;
+  address: string;
+  business_status: string;
+  biz_type: string;
+  biz_item: string;
+  business_number: string;
+}): PublicDataResult {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    id: `verify-${data.company_name}-${data.business_number}`,
+    name: data.company_name,
+    category: [data.biz_type, data.biz_item].filter(Boolean).join(' · '),
+    address: data.address,
+    phone: data.telephone,
+    source: '네이버·국세청·공공데이터',
+    lastUpdated: today,
+    status: data.business_status,
+  };
+}
+
 export default function SearchPage({ initialQuery, onBack }: SearchPageProps) {
   const [query, setQuery] = useState(initialQuery);
   const [activeQuery, setActiveQuery] = useState(initialQuery);
+  const [pubResults, setPubResults] = useState<PublicDataResult[]>([]);
+  const [pubLoading, setPubLoading] = useState(false);
+  const [pubError, setPubError] = useState<string | null>(null);
 
-  const pubResults = matchPublic(activeQuery);
   const certResults = matchCertified(activeQuery);
+
+  useEffect(() => {
+    const q = activeQuery.trim();
+    if (!q) {
+      setPubResults([]);
+      setPubError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setPubLoading(true);
+    setPubError(null);
+
+    verifySearchKeyword(q)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.status === 'success' && res.data) {
+          setPubResults([mapVerifyToPublicCard(res.data as Parameters<typeof mapVerifyToPublicCard>[0])]);
+          setPubError(null);
+        } else {
+          setPubResults([]);
+          setPubError(res.message || '공공데이터에서 결과를 찾을 수 없습니다.');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPubResults([]);
+          setPubError('검증 API 연결에 실패했습니다.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPubLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeQuery]);
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -186,15 +242,19 @@ export default function SearchPage({ initialQuery, onBack }: SearchPageProps) {
               <span className="badge-blue">{pubResults.length}건</span>
             </div>
             <div className="space-y-3">
-              {pubResults.length > 0
-                ? pubResults.map((item) => <PublicCard key={item.id} item={item} />)
-                : (
-                  <div className="bg-white rounded-3xl border border-gray-100 py-14 text-center shadow-card">
-                    <AlertCircle className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                    <p className="text-gray-400 text-sm">공공데이터에서 결과를 찾을 수 없습니다.</p>
-                  </div>
-                )
-              }
+              {pubLoading ? (
+                <div className="bg-white rounded-3xl border border-gray-100 py-14 text-center shadow-card">
+                  <Loader2 className="w-8 h-8 text-primary-400 mx-auto mb-3 animate-spin" />
+                  <p className="text-gray-400 text-sm">네이버·국세청 데이터를 조회하는 중…</p>
+                </div>
+              ) : pubResults.length > 0 ? (
+                pubResults.map((item) => <PublicCard key={item.id} item={item} />)
+              ) : (
+                <div className="bg-white rounded-3xl border border-gray-100 py-14 text-center shadow-card">
+                  <AlertCircle className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                  <p className="text-gray-400 text-sm">{pubError || '공공데이터에서 결과를 찾을 수 없습니다.'}</p>
+                </div>
+              )}
             </div>
           </div>
 

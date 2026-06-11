@@ -446,3 +446,53 @@ authRoutes.post("/devices/fcm-token", requireUserHeader, async (c) => {
     return c.json({ error: msg }, 500);
   }
 });
+
+/** 네이버 OAuth 콜백 뼈대 — NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 설정 후 토큰 교환 확장 */
+authRoutes.get("/callback/naver", async (c) => {
+  const error = c.req.query("error");
+  const errorDescription = c.req.query("error_description");
+  if (error) {
+    return c.json(
+      {
+        status: "error",
+        provider: "naver",
+        message:
+          (errorDescription && String(errorDescription).trim()) ||
+          (error === "access_denied" ? "네이버 로그인이 취소되었습니다." : `네이버 인증 오류: ${error}`)
+      },
+      400
+    );
+  }
+
+  const code = c.req.query("code")?.trim() || "";
+  const state = c.req.query("state")?.trim() || "";
+  if (!code) {
+    return c.json({ status: "error", provider: "naver", message: "네이버 인가 코드가 없습니다." }, 400);
+  }
+
+  const clientId = String(process.env.NAVER_CLIENT_ID || "").trim();
+  const clientSecret = String(process.env.NAVER_CLIENT_SECRET || "").trim();
+  if (!clientId || !clientSecret) {
+    return c.json(
+      {
+        status: "pending",
+        provider: "naver",
+        message: "네이버 OAuth 콜백 라우트가 준비되었습니다. NAVER_CLIENT_ID/SECRET 설정 후 토큰 교환을 연결하세요.",
+        code_received: Boolean(code),
+        state
+      },
+      501
+    );
+  }
+
+  return c.json(
+    {
+      status: "pending",
+      provider: "naver",
+      message: "네이버 토큰 교환·VLUE 계정 연동 로직은 후속 단계에서 completeSocialLogin 과 연결됩니다.",
+      code_received: true,
+      state
+    },
+    501
+  );
+});

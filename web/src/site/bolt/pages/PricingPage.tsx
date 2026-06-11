@@ -21,11 +21,12 @@ interface PricingPageProps {
 function BrandTierIcon({ className }: { className?: string }) {
   return <VlueBrandMark size={14} className={className} />;
 }
-const TIER_ICONS = [BrandTierIcon, Zap, Star];
+const TIER_ICONS = [BrandTierIcon, Zap, Star, Sparkles];
 const TIER_COLORS = {
   gray: { header: 'bg-gray-50', badge: 'bg-gray-100 text-gray-600', border: 'border-gray-200' },
   blue: { header: 'bg-primary-600', badge: 'bg-white/20 text-white', border: 'border-primary-300' },
   gold: { header: 'bg-gray-900', badge: 'bg-amber-400/20 text-amber-300', border: 'border-gray-700' },
+  purple: { header: 'bg-violet-700', badge: 'bg-white/20 text-violet-100', border: 'border-violet-300' },
 };
 
 type DeviceGrade = 'basic' | 'standard' | 'premium';
@@ -97,10 +98,12 @@ export default function PricingPage({ user, onLoginClick }: PricingPageProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
           {pricingTiers.map((tier, idx) => {
-            const Icon = TIER_ICONS[idx];
+            const Icon = TIER_ICONS[idx] ?? Sparkles;
             const colors = TIER_COLORS[tier.color as keyof typeof TIER_COLORS] ?? TIER_COLORS.gray;
             const isBlue = tier.color === 'blue';
             const isGold = tier.color === 'gold';
+            const isPurple = tier.color === 'purple';
+            const isDarkHeader = isBlue || isGold || isPurple;
 
             return (
               <div
@@ -117,15 +120,15 @@ export default function PricingPage({ user, onLoginClick }: PricingPageProps) {
                     <Icon className="w-3.5 h-3.5" />
                     {tier.name}
                   </div>
-                  <div className={`mb-2 ${isBlue || isGold ? 'text-white' : 'text-gray-900'}`}>
+                  <div className={`mb-2 ${isDarkHeader ? 'text-white' : 'text-gray-900'}`}>
                     <span className="text-4xl font-black font-inter">
                       {tier.price === 0 ? '무료' : tier.price.toLocaleString()}
                     </span>
                     {tier.price > 0 && <span className="text-base font-medium">원/{tier.period}</span>}
                   </div>
-                  <p className={`text-sm ${isBlue || isGold ? 'text-white/70' : 'text-gray-500'}`}>{tier.description}</p>
+                  <p className={`text-sm ${isDarkHeader ? 'text-white/70' : 'text-gray-500'}`}>{tier.description}</p>
                   {'priceNote' in tier && tier.priceNote ? (
-                    <p className={`text-xs mt-2 ${isBlue || isGold ? 'text-white/55' : 'text-gray-400'}`}>{tier.priceNote}</p>
+                    <p className={`text-xs mt-2 ${isDarkHeader ? 'text-white/55' : 'text-gray-400'}`}>{tier.priceNote}</p>
                   ) : null}
                 </div>
 
@@ -143,7 +146,9 @@ export default function PricingPage({ user, onLoginClick }: PricingPageProps) {
                     className={`w-full py-2.5 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-1.5 ${
                       isBlue ? 'btn-primary' : isGold
                         ? 'bg-amber-400 text-gray-900 hover:bg-amber-300 font-bold'
-                        : 'btn-secondary'
+                        : isPurple
+                          ? 'bg-violet-500 text-white hover:bg-violet-600 font-bold'
+                          : 'btn-secondary'
                     }`}
                   >
                     {tier.price === 0 ? '무료로 시작하기' : '인증 신청하기'}
