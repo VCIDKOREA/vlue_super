@@ -9,7 +9,10 @@ export async function verifySearchKeyword(keyword) {
   const q = String(keyword || "").trim();
   if (!q) return { status: "error", message: "검색어가 필요합니다." };
 
-  const res = await fetch(apiUrl(`/api/v1/search/verify?keyword=${encodeURIComponent(q)}`));
+  const res = await fetch(
+    apiUrl(`/api/v1/search/verify?keyword=${encodeURIComponent(q)}&_ts=${Date.now()}`),
+    { cache: "no-store" }
+  );
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     return {

@@ -15,7 +15,10 @@ searchV1Routes.get("/verify", async (c) => {
     if (result.status === "error") {
       return c.json(result, 404);
     }
-    return c.json(result);
+    return c.json(result, 200, {
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      Pragma: "no-cache"
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : "검증 처리 중 오류가 발생했습니다.";
     return c.json({ status: "error", message }, 500);
