@@ -2,6 +2,7 @@ export type View =
   | "home"
   | "search"
   | "shopping"
+  | "auction"
   | "about"
   | "resources"
   | "pricing"

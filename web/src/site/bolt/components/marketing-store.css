@@ -10,6 +10,42 @@
   min-width: 0;
 }
 
+/* 앱과 동일 — 상품 등록 FAB (채팅 FAB 위) */
+[data-vlue-site="marketing"] .mkt-store__upload-fab {
+  position: fixed;
+  z-index: 45;
+  right: calc(1rem + env(safe-area-inset-right, 0px));
+  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  height: 2.75rem;
+  width: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid #3b82f6;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: 300;
+  line-height: 1;
+  box-shadow: 0 4px 14px rgb(37 99 235 / 35%);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+[data-vlue-site="marketing"] .mkt-store__upload-fab:hover {
+  background: #1d4ed8;
+  transform: scale(1.04);
+}
+
+[data-vlue-site="marketing"] .mkt-store__upload-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
 /* YouTube형 — 왼쪽 사이드바 + 오른쪽 피드 */
 [data-vlue-site="marketing"] .mkt-store__layout {
   display: flex;
@@ -489,6 +525,145 @@
   background: #0f172a;
   border-color: #0f172a;
   color: #ffffff;
+}
+
+/* 카테고리 — 드롭다운 */
+[data-vlue-site="marketing"] .mkt-store__category-dropdown {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-dropdown--mobile {
+  margin-top: 0.35rem;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  color: var(--mkt-store-text);
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: left;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-trigger:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-trigger-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  background: #eff6ff;
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-trigger-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-trigger-caret {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  color: #94a3b8;
+  transition: transform 0.15s;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-trigger-caret.is-open {
+  transform: rotate(180deg);
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  margin-top: 0.35rem;
+  max-height: min(18rem, 52dvh);
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 12%);
+  padding: 0.25rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-dropdown--sidebar .mkt-store__category-menu {
+  max-height: min(16rem, 45dvh);
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--mkt-store-muted);
+  padding: 0.5rem 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-option:hover {
+  background: #f8fafc;
+  color: var(--mkt-store-text);
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-option.is-active {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 800;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-option-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 0.45rem;
+  background: #f1f5f9;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-option.is-active .mkt-store__category-option-icon {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-option-label {
+  min-width: 0;
+  flex: 1;
+}
+
+[data-vlue-site="marketing"] .mkt-store__category-option-check {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  color: #2563eb;
+  font-weight: 800;
 }
 
 [data-vlue-site="marketing"] .mkt-store__video-grid {

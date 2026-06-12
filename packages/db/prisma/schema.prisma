@@ -311,6 +311,13 @@ model User {
   /// 사후 연동된 소셜 로그인 (카카오/네이버) — VLUE 마스터 계정 1:1 매핑
   socialLoginLinks UserSocialLoginLink[]
 
+  auctionsSold       Auction[]              @relation("AuctionSeller")
+  auctionBids        AuctionBid[]           @relation("AuctionBidder")
+  auctionWins        Auction[]              @relation("AuctionWinner")
+  auctionEscrowsBuy  AuctionEscrow[]        @relation("AuctionEscrowBuyer")
+  auctionEscrowsSell AuctionEscrow[]        @relation("AuctionEscrowSeller")
+  interestKeywords   UserInterestKeyword[]
+
   @@unique([socialProvider, socialId], map: "users_social_provider_social_id_key")
   @@index([enterpriseGroupId])
   @@index([enterpriseRole])
@@ -2273,4 +2280,138 @@ model OfficeExcelTemplate {
   sortOrder   Int     @default(0) @map("sort_order")
 
   @@map("office_excel_templates")
+}
+
+// -----------------------------------------------------------------------------
+// VLUE 경매 — 입찰 · 에스크로 · 키워드 알림
+// -----------------------------------------------------------------------------
+
+enum AuctionCondition {
+  new_item
+  used_item
+}
+
+enum AuctionStatus {
+  scheduled
+  live
+  ended
+  settled
+  cancelled
+}
+
+enum AuctionEscrowStatus {
+  pending
+  held
+  released
+  refunded
+}
+
+enum InterestKeywordSource {
+  watchlist
+  search
+}
+
+model Auction {
+  id String @id @default(uuid()) @db.Uuid
+
+  sellerUserId String @map("seller_user_id") @db.Uuid
+  seller       User   @relation("AuctionSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+
+  title       String @db.VarChar(200)
+  description String @default("") @db.Text
+  category    String @default("전체") @db.VarChar(40)
+  keywords    String @default("") @db.VarChar(300)
+
+  condition      AuctionCondition @default(used_item)
+  shippingFeeKrw Int              @default(0) @map("shipping_fee_krw")
+  imageUrls      Json             @default("[]") @map("image_urls") @db.JsonB
+
+  startPriceKrw  Int  @map("start_price_krw")
+  currentPriceKrw Int @map("current_price_krw")
+  buyNowPriceKrw Int? @map("buy_now_price_krw")
+  bidCount       Int  @default(0) @map("bid_count")
+
+  startsAt DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt   DateTime @map("ends_at") @db.Timestamptz(6)
+  status   AuctionStatus @default(scheduled)
+
+  winnerUserId String? @map("winner_user_id") @db.Uuid
+  winner       User?   @relation("AuctionWinner", fields: [winnerUserId], references: [id], onDelete: SetNull)
+
+  marketPriceJson Json? @map("market_price_json") @db.JsonB
+
+  bids   AuctionBid[]
+  escrow AuctionEscrow?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, endsAt])
+  @@index([sellerUserId, createdAt(sort: Desc)])
+  @@index([category, status])
+  @@map("auctions")
+}
+
+model AuctionBid {
+  id String @id @default(uuid()) @db.Uuid
+
+  auctionId String  @map("auction_id") @db.Uuid
+  auction   Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+
+  bidderUserId String @map("bidder_user_id") @db.Uuid
+  bidder       User   @relation("AuctionBidder", fields: [bidderUserId], references: [id], onDelete: Cascade)
+
+  amountKrw Int @map("amount_krw")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([auctionId, amountKrw(sort: Desc)])
+  @@index([bidderUserId, createdAt(sort: Desc)])
+  @@map("auction_bids")
+}
+
+model AuctionEscrow {
+  id String @id @default(uuid()) @db.Uuid
+
+  auctionId String  @unique @map("auction_id") @db.Uuid
+  auction   Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+
+  buyerUserId String @map("buyer_user_id") @db.Uuid
+  buyer       User   @relation("AuctionEscrowBuyer", fields: [buyerUserId], references: [id], onDelete: Cascade)
+
+  sellerUserId String @map("seller_user_id") @db.Uuid
+  seller       User   @relation("AuctionEscrowSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+
+  amountKrw      Int @map("amount_krw")
+  shippingFeeKrw Int @default(0) @map("shipping_fee_krw")
+  status         AuctionEscrowStatus @default(pending)
+
+  merchantUid String? @map("merchant_uid") @db.VarChar(80)
+  escrowRef   String? @map("escrow_ref") @db.VarChar(120)
+
+  heldAt     DateTime? @map("held_at") @db.Timestamptz(6)
+  releasedAt DateTime? @map("released_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([buyerUserId, status])
+  @@index([sellerUserId, status])
+  @@map("auction_escrows")
+}
+
+model UserInterestKeyword {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  keyword String @db.VarChar(80)
+  source  InterestKeywordSource @default(watchlist)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([userId, keyword])
+  @@index([keyword])
+  @@map("user_interest_keywords")
 }

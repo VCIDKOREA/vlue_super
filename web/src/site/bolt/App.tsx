@@ -11,6 +11,7 @@ import LoginRequiredModal from './components/LoginRequiredModal';
 import HomePage from './pages/HomePage';
 import SearchPage from './pages/SearchPage';
 import ShoppingPage from './pages/ShoppingPage';
+import AuctionPage from './pages/AuctionPage';
 import ResourcesPage from './pages/ResourcesPage';
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 import PricingPage from './pages/PricingPage';
@@ -34,7 +35,7 @@ import {
 } from '../../lib/vlueAuthApi.js';
 
 const VALID_VIEWS: View[] = [
-  'home', 'search', 'shopping', 'about', 'resources', 'pricing', 'safezone',
+  'home', 'search', 'shopping', 'auction', 'about', 'resources', 'pricing', 'safezone',
   'mail', 'download', 'news', 'events', 'jobs', 'support', 'exceleditor', 'family', 'mypage', 'bizcard',
 ];
 
@@ -139,6 +140,7 @@ export default function App() {
         {view === 'home' && <HomePage onSearch={handleSearch} onNavigate={handleNavigate} />}
         {view === 'search' && <SearchPage initialQuery={searchQuery} onBack={() => handleNavigate('home')} />}
         {view === 'shopping' && <ShoppingPage user={user} onLoginClick={handleLoginRequired} />}
+        {view === 'auction' && <AuctionPage user={user} onLoginClick={handleLoginRequired} />}
         {view === 'about' && (
           <Suspense fallback={<div className="min-h-[40vh] flex items-center justify-center text-sm font-semibold text-slate-500">서비스소개 불러오는 중…</div>}>
             <AboutPage onSearch={handleSearch} onNavigate={handleNavigate} />

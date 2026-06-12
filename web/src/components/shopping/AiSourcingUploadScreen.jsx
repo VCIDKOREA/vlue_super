@@ -39,6 +39,11 @@ import {
 import { publishSourcingToMyPage } from "../../lib/sourcingMyPageSync.js";
 import { getPageDisplayProfile, isPageCreated } from "../../lib/pageProfileStorage.js";
 import { generatePostDescription } from "../../lib/vmingApi.js";
+import AuctionRegisterFields, {
+  auctionPayloadFromForm,
+  buildDefaultAuctionFields
+} from "../auction/AuctionRegisterFields.jsx";
+import { postCreateAuction } from "../../lib/auctionApi.js";
 
 const AI_VIOLET = "bg-[#A78BFA] hover:bg-[#9F7AEE]";
 
@@ -53,6 +58,7 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
   const [tagInput, setTagInput] = useState("");
   const [nameSuggestions, setNameSuggestions] = useState([]);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [saleType, setSaleType] = useState("normal");
   const patch = useCallback((partial) => setForm((f) => ({ ...f, ...partial })), []);
 
   const inputCls = isDarkMode
@@ -64,7 +70,7 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
     () => calcDiscountPercent(form.salePrice, form.listPrice),
     [form.salePrice, form.listPrice]
   );
-  const missing = useMemo(() => validateSourcingForm(form), [form]);
+  const missing = useMemo(() => validateSourcingForm(form, { saleType }), [form, saleType]);
   const canRegister = missing.length === 0 && !busy;
 
   useEffect(() => {
@@ -186,7 +192,7 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
   };
 
   const submitRegister = async () => {
-    const miss = validateSourcingForm(form);
+    const miss = validateSourcingForm(form, { saleType });
     if (miss.length) {
       setError(`${miss.map((m) => m.label).join(", ")}을(를) 입력해 주세요.`);
       scrollToSection(miss[0].id);
@@ -197,6 +203,15 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
     try {
       const media = buildRegisterMediaFromForm(form);
       const feedCategory = mapSourcingCategoryToFeed(form.category);
+
+      if (saleType === "auction") {
+        await postCreateAuction(auctionPayloadFromForm(form, media));
+        clearSourcingDraft();
+        onToast?.("VLUE 개인 경매가 등록되었습니다.");
+        onBack?.();
+        return;
+      }
+
       const reg = await postRegisterPageProduct({
         title: form.title.trim(),
         priceKrw: Number(parsePriceDigits(form.salePrice)) || 0,
@@ -267,6 +282,33 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
       <ScreenBackHeader title="소싱 · 등록" onBack={onBack} isDarkMode={isDarkMode} />
 
       <div className="mx-auto w-full max-w-lg flex-1 space-y-3 overflow-y-auto px-3 py-4 pb-32">
+        <div className={`flex rounded-2xl border p-1 ${isDarkMode ? "border-white/10 bg-[#12151c]" : "border-slate-200 bg-white"}`}>
+          {[
+            { id: "normal", label: "일반 판매" },
+            { id: "auction", label: "개인 경매" }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setSaleType(tab.id);
+                if (tab.id === "auction" && !form.auction) {
+                  patch({ auction: buildDefaultAuctionFields() });
+                }
+              }}
+              className={`flex-1 rounded-xl py-2.5 text-[12px] font-black transition ${
+                saleType === tab.id
+                  ? "bg-violet-600 text-white shadow-sm"
+                  : isDarkMode
+                    ? "text-gray-400"
+                    : "text-slate-500"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* 1. 기본 정보 */}
         <SourcingFormSection
           id="basic"
@@ -363,7 +405,29 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
           ) : null}
         </SourcingFormSection>
 
+        {saleType === "auction" ? (
+          <SourcingFormSection
+            id="auction"
+            title="경매 설정"
+            required
+            complete={Boolean(form.auction?.startPrice && form.auction?.startsAt && form.auction?.endsAt)}
+            isDarkMode={isDarkMode}
+          >
+            <AuctionRegisterFields
+              form={form}
+              patch={patch}
+              inputCls={inputCls}
+              sub={sub}
+              busy={busy}
+              setBusy={setBusy}
+              setError={setError}
+              onToast={onToast}
+            />
+          </SourcingFormSection>
+        ) : null}
+
         {/* 2. 가격 */}
+        {saleType === "normal" ? (
         <SourcingFormSection
           id="price"
           title="가격"
@@ -433,6 +497,7 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
             </button>
           </div>
         </SourcingFormSection>
+        ) : null}
 
         {/* 3. 상세 */}
         <SourcingFormSection
@@ -742,8 +807,14 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
 
       {previewOpen ? (
         <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/50 p-3 sm:items-center">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="미리보기 닫기"
+            onClick={() => setPreviewOpen(false)}
+          />
           <div
-            className={`max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl p-4 ${
+            className={`relative z-[1] max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl p-4 ${
               isDarkMode ? "bg-[#151821] text-gray-100" : "bg-white text-slate-900"
             }`}
           >

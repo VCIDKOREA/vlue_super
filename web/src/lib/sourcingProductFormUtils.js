@@ -165,11 +165,18 @@ export function buildDefaultFormState() {
   };
 }
 
-export function validateSourcingForm(state) {
+export function validateSourcingForm(state, opts = {}) {
   const missing = [];
   if (!state.title.trim()) missing.push({ id: "basic", label: "상품명" });
   if (!state.category) missing.push({ id: "basic", label: "카테고리" });
-  if (!parsePriceDigits(state.salePrice)) missing.push({ id: "price", label: "판매가" });
+  if (opts.saleType === "auction") {
+    const auction = state.auction || {};
+    if (!parsePriceDigits(auction.startPrice)) missing.push({ id: "auction", label: "시작 금액" });
+    if (!auction.startsAt) missing.push({ id: "auction", label: "경매 시작 일시" });
+    if (!auction.endsAt) missing.push({ id: "auction", label: "경매 종료 일시" });
+  } else if (!parsePriceDigits(state.salePrice)) {
+    missing.push({ id: "price", label: "판매가" });
+  }
   if (state.listingType === "media_single" && !state.mediaPrimary?.url) {
     missing.push({ id: "media", label: "미디어(사진·영상)" });
   }

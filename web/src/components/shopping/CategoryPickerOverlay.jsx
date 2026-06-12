@@ -73,10 +73,7 @@ export default function CategoryPickerOverlay({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <ul
-          className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto overscroll-y-contain py-1 [-webkit-overflow-scrolling:touch]"
-          onWheel={(e) => e.stopPropagation()}
-        >
+        <ul className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto overscroll-y-contain py-1 [-webkit-overflow-scrolling:touch]">
           {options.map((name) => {
             const active = value === name;
             return (

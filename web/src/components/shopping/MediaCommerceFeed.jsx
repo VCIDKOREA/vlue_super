@@ -27,6 +27,9 @@ import {
   writeStoreFeedCategory,
   STORE_FEED_PREFS_CHANGED
 } from "../../lib/storeFeedPrefs.js";
+import AuctionListSection from "../auction/AuctionListSection.jsx";
+import AuctionDetailSheet from "../auction/AuctionDetailSheet.jsx";
+import { postRecordSearchKeyword } from "../../lib/auctionApi.js";
 
 function DurationBadge({ label, isLive }) {
   if (isLive) {
@@ -215,6 +218,7 @@ export default function MediaCommerceFeed({
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [auctionSelectedId, setAuctionSelectedId] = useState(null);
   const [shortsOpen, setShortsOpen] = useState(false);
   const [shortsStartIndex, setShortsStartIndex] = useState(0);
   const [ownerOpen, setOwnerOpen] = useState(false);
@@ -279,6 +283,10 @@ export default function MediaCommerceFeed({
   }, [mediaTab, loadPage]);
 
   useEffect(() => {
+    setCategoryOpen(false);
+  }, [mediaTab]);
+
+  useEffect(() => {
     if (!isPageMode) return undefined;
     const onVault = () => {
       invalidatePageFeedCache();
@@ -313,6 +321,15 @@ export default function MediaCommerceFeed({
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, [categoryOpen]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q || q.length < 2 || isGuestMode) return undefined;
+    const timer = window.setTimeout(() => {
+      postRecordSearchKeyword(q).catch(() => {});
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [query, isGuestMode]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -354,6 +371,26 @@ export default function MediaCommerceFeed({
         isGuestMode={isGuestMode}
         onRequireAuth={onRequireAuth}
       />
+    );
+  }
+
+  if (mediaTab === "auction") {
+    return (
+      <div className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${theme.shell}`}>
+        <div className={`sticky top-0 z-10 min-w-0 shrink-0 border-b ${theme.bar} backdrop-blur-md`}>
+          <SwipeableChipTabs tabs={MEDIA_FEED_TABS} activeId={mediaTab} onChange={onChangeMediaTab} theme={theme} />
+        </div>
+        <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-3 py-3">
+          <AuctionListSection category={category} onSelect={(item) => setAuctionSelectedId(item.id)} />
+        </div>
+        <AuctionDetailSheet
+          auctionId={auctionSelectedId}
+          open={Boolean(auctionSelectedId)}
+          onClose={() => setAuctionSelectedId(null)}
+          onToast={onToast}
+          isLoggedIn={!isGuestMode}
+        />
+      </div>
     );
   }
 

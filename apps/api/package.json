@@ -11,7 +11,8 @@
     "test:core-smoke": "tsx src/tests/coreSmoke.ts",
     "test:referral-policy": "tsx src/tests/referralSettlementPolicy.test.ts",
     "test:signup-gate": "tsx src/tests/signupAbuseGate.test.ts",
-    "test:search-verify": "tsx src/tests/searchVerifyService.test.ts"
+    "test:search-verify": "tsx src/tests/searchVerifyService.test.ts",
+    "test:auction": "tsx src/tests/auctionService.test.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",

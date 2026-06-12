@@ -1,7 +1,9 @@
 /** 모달·시트 공통 닫기(X) — 우상단 고정 */
 
 export type ModalCloseButtonProps = {
-  onClick: () => void;
+  onClick?: () => void;
+  /** onClick 별칭 — 경매·시중가 모달 등 */
+  onClose?: () => void;
   /** default: 밝은 패널 | onDark: 그라데이션·어두운 헤더 | subtle: 반투명 밝은 배경 */
   variant?: "default" | "onDark" | "subtle";
   className?: string;
@@ -21,15 +23,17 @@ const variantClass: Record<NonNullable<ModalCloseButtonProps["variant"]>, string
 
 export default function ModalCloseButton({
   onClick,
+  onClose,
   variant = "default",
   className = "",
   topClassName = "top-3",
   rightClassName = "right-3"
 }: ModalCloseButtonProps) {
+  const handleClose = onClick ?? onClose;
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClose}
       aria-label="닫기"
       className={`absolute z-20 flex h-10 w-10 min-h-[44px] min-w-[44px] items-center justify-center rounded-full transition-transform active:scale-95 ${topClassName} ${rightClassName} ${variantClass[variant]} ${className}`}
     >

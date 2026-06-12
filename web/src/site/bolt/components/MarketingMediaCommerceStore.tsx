@@ -10,12 +10,17 @@ import {
   FileImage,
   Users,
   CreditCard,
+  Gavel,
 } from 'lucide-react';
 import FeedThumbImage from '../../../components/shopping/FeedThumbImage.jsx';
 import MediaCommercePlayerSheet from '../../../components/shopping/MediaCommercePlayerSheet.jsx';
 import StoreProfileHome from '../../../components/shopping/StoreProfileHome.jsx';
 import AiRecommendCarousel from '../../../components/shopping/AiRecommendCarousel.jsx';
+import ShoppingCategoryDropdown from '../../../components/shopping/ShoppingCategoryDropdown.jsx';
 import ChannelProfileLink from '../../../components/shopping/ChannelProfileLink.jsx';
+import AiSourcingUploadScreen from '../../../components/shopping/AiSourcingUploadScreen.jsx';
+import AuctionListSection from '../../../components/auction/AuctionListSection.jsx';
+import AuctionDetailSheet from '../../../components/auction/AuctionDetailSheet.jsx';
 import {
   MEDIA_FEED_TABS,
   feedDisplayTitle,
@@ -42,7 +47,7 @@ import { consumePendingVlueStoreId } from '../../../lib/vluePartnerStoreNav.js';
 import './marketing-store.css';
 
 const STORE_TABS = MEDIA_FEED_TABS.filter((t) =>
-  ['all', 'media', 'page', 'groupbuy'].includes(t.id)
+  ['all', 'media', 'page', 'groupbuy', 'auction'].includes(t.id)
 );
 
 type FeedItem = {
@@ -187,15 +192,13 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
   const [searchInput, setSearchInput] = useState('');
   const [category, setCategory] = useState(() => readStoreFeedCategory('전체'));
   const [toast, setToast] = useState('');
+  const [ownerOpen, setOwnerOpen] = useState(false);
+  const [auctionSelectedId, setAuctionSelectedId] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const chipScrollRef = useRef<HTMLDivElement>(null);
   const loadingMoreRef = useRef(false);
 
-  const scrollChipIntoView = useCallback((e: React.FocusEvent<HTMLButtonElement>) => {
-    e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-  }, []);
-
   const isPageMode = mediaTab === 'page';
+  const isAuctionMode = mediaTab === 'auction';
 
   const onToast = useCallback((msg: string) => {
     setToast(msg);
@@ -318,8 +321,17 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
     if (id === 'media') return Radio;
     if (id === 'page') return FileImage;
     if (id === 'groupbuy') return Users;
+    if (id === 'auction') return Gavel;
     return LayoutGrid;
   };
+
+  const openProductUpload = useCallback(() => {
+    if (!user && onLoginClick) {
+      onLoginClick();
+      return;
+    }
+    setOwnerOpen(true);
+  }, [user, onLoginClick]);
 
   const storeSearchForm = (className = 'mkt-store__search') => (
     <form onSubmit={handleSearch} className={className}>
@@ -439,36 +451,12 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
               );
             })}
           </div>
-          <div
-            ref={chipScrollRef}
-            className="mkt-store__chip-scroll"
-            aria-label="카테고리 스크롤"
-            tabIndex={0}
-            onWheel={(e) => {
-              const el = chipScrollRef.current;
-              if (!el || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-              if (el.scrollWidth <= el.clientWidth) return;
-              el.scrollLeft += e.deltaY;
-              e.preventDefault();
-            }}
-          >
-            <div className="mkt-store__chip-rail" role="tablist" aria-label="카테고리">
-              {SHOPPING_CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  role="tab"
-                  aria-selected={category === cat}
-                  onClick={() => changeCategory(cat)}
-                  onFocus={scrollChipIntoView}
-                  className={`mkt-store__chip ${category === cat ? 'is-active' : ''}`}
-                >
-                  {cat}
-                </button>
-              ))}
-              <span className="mkt-store__chip-rail-end" aria-hidden />
-            </div>
-          </div>
+          <ShoppingCategoryDropdown
+            value={category}
+            options={SHOPPING_CATEGORIES}
+            onChange={changeCategory}
+            className="mkt-store__category-dropdown--mobile"
+          />
         </div>
 
         <div className="mkt-store__main">
@@ -479,7 +467,11 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
         </div>
       ) : null}
 
-      {!isPageMode ? (
+      {isAuctionMode ? (
+        <AuctionListSection category={category} onSelect={(item) => setAuctionSelectedId(item.id)} />
+      ) : null}
+
+      {!isAuctionMode && !isPageMode ? (
         <AiRecommendCarousel
           variant="strip"
           theme={theme}
@@ -489,16 +481,20 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
         />
       ) : null}
 
-      {loading && items.length === 0 ? (
+      {!isAuctionMode && loading && items.length === 0 ? (
         <div className="flex justify-center py-20">
           <Loader className="w-8 h-8 animate-spin text-primary-500" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : null}
+
+      {!isAuctionMode && !loading && filtered.length === 0 ? (
         <div className="text-center py-20 text-sm text-slate-500">
           <p className="font-bold text-slate-700 mb-1">표시할 게시물이 없습니다</p>
           <p className="text-xs">다른 탭·카테고리 또는 검색어를 바꿔 보세요.</p>
         </div>
-      ) : isPageMode ? (
+      ) : null}
+
+      {!isAuctionMode && isPageMode && filtered.length > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filtered.map((item) => (
             <WebPageCard
@@ -512,7 +508,9 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
             />
           ))}
         </div>
-      ) : (
+      ) : null}
+
+      {!isAuctionMode && !isPageMode && filtered.length > 0 ? (
         <>
           {featured ? (
             <div className="mkt-store__hero-compact mb-5">
@@ -542,7 +540,7 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
             ))}
           </div>
         </>
-      )}
+      ) : null}
 
       <div ref={sentinelRef} className="mkt-store__sentinel" aria-hidden />
       {loading && items.length > 0 ? (
@@ -572,6 +570,34 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
           />
         </div>
       ) : null}
+
+      <button
+        type="button"
+        onClick={openProductUpload}
+        className="mkt-store__upload-fab"
+        aria-label="상품 등록"
+        title="상품 등록"
+      >
+        +
+      </button>
+
+      {ownerOpen ? (
+        <div className="mkt-store__upload-overlay">
+          <AiSourcingUploadScreen
+            onBack={() => setOwnerOpen(false)}
+            onToast={onToast}
+            isDarkMode={false}
+          />
+        </div>
+      ) : null}
+
+      <AuctionDetailSheet
+        auctionId={auctionSelectedId}
+        open={Boolean(auctionSelectedId)}
+        onClose={() => setAuctionSelectedId(null)}
+        onToast={onToast}
+        isLoggedIn={Boolean(user)}
+      />
     </div>
   );
 }
