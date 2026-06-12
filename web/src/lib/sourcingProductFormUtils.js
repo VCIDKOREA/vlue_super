@@ -40,43 +40,27 @@ export async function readSourcingMediaFile(file) {
 }
 
 export function buildRegisterMediaFromForm(form) {
-  if (form.listingType === "media_single" && form.mediaPrimary?.url) {
-    if (form.mediaPrimary.type === "video") {
-      return {
-        imageUrls: [],
-        videoUrl: form.mediaPrimary.url,
-        mediaKind: "video",
-        listingType: "media_single",
-        posterUrl: form.mediaPrimary.posterUrl || ""
-      };
-    }
-    return {
-      imageUrls: [form.mediaPrimary.url],
-      videoUrl: "",
-      mediaKind: "image",
-      listingType: "media_single",
-      posterUrl: ""
-    };
-  }
   const imageUrls = [
     ...form.previews,
     ...(form.inlineItem?.imageUrl && !form.previews.includes(form.inlineItem.imageUrl)
       ? [form.inlineItem.imageUrl]
       : [])
   ].filter(Boolean);
+  const videoUrl = String(form.videoUrl || "").trim();
+  const hasVideo = Boolean(videoUrl);
   return {
     imageUrls,
-    videoUrl: "",
-    mediaKind: "gallery",
+    videoUrl,
+    mediaKind: hasVideo && !imageUrls.length ? "video" : "gallery",
     listingType: "photo_gallery",
-    posterUrl: ""
+    posterUrl: imageUrls[0] || ""
   };
 }
 
 export function sourcingHasVisualMedia(state) {
-  if (state.listingType === "media_single" && state.mediaPrimary?.url) return true;
   if (state.previews?.length) return true;
   if (state.inlineItem?.imageUrl) return true;
+  if (String(state.videoUrl || "").trim()) return true;
   return false;
 }
 
@@ -154,6 +138,9 @@ export function buildDefaultFormState() {
       leadDays: "3"
     },
     previews: [],
+    videoUrl: "",
+    useExternalUrl: false,
+    scrapeHint: "",
     listingType: "photo_gallery",
     mediaPrimary: null,
     syncToMyPage: false,

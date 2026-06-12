@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ChatList from "./components/ChatList";
+import ChatListTabDropdown from "./components/ChatListTabDropdown.jsx";
 import ChatRoom from "./components/ChatRoom";
 import BlueAIChat from "./components/BlueAIChat";
 import FriendSearch from "./components/FriendSearch";
@@ -1339,11 +1340,6 @@ function App() {
       logoUrl: logoResolved
     };
   }, [membershipTier, digitalCardActive, cardFieldsTick, avatarTick]);
-  const listTabHeaderSubtitle = useMemo(() => {
-    const tab = tabs.find((t) => t.id === listFilterTab);
-    if (!tab) return "전체";
-    return tab.id === "favorites" ? "즐겨찾기" : tab.label;
-  }, [listFilterTab]);
   const headerProfileAvatar = useMemo(() => readAvatar("chat") || readAvatar("primary"), [avatarTick]);
   const profileByRoomId = useMemo(() => {
     const out = {};
@@ -3033,7 +3029,7 @@ function App() {
               <div className="flex min-w-0 flex-1 items-center gap-1">
                 <div className="min-w-0 flex-1 text-left leading-tight">
                   <p className="vlue-fluid-header-line font-black text-gray-900">VLUE 채팅</p>
-                  <p className="vlue-fluid-header-line font-semibold text-blue-600">{listTabHeaderSubtitle}</p>
+                  <p className="vlue-fluid-header-line font-semibold text-blue-600">대화 목록</p>
                 </div>
                 <button
                   type="button"
@@ -3468,31 +3464,13 @@ function App() {
                 </div>
               </div>
             )}
-            <div
-              className={`flex w-full min-w-0 justify-center overflow-x-auto no-scrollbar pt-0.5 text-[12px] font-bold ${
-                isDarkMode ? "text-gray-300" : "text-gray-500"
-              }`}
-            >
-              <div className="flex min-w-max items-center gap-1 px-0.5">
-                {tabs.map((tab, idx) => (
-                  <div key={tab.id} className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => navigate({ nextPage: "list", nextTab: tab.id, nextRoomId: null })}
-                      className={`relative whitespace-nowrap px-1 py-0.5 ${
-                        listFilterTab === tab.id ? "text-blue-600" : isDarkMode ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    >
-                      {tab.id === "favorites" ? "즐겨찾기" : tab.label}
-                      {(unreadByTab[tab.id] || 0) > 0 && listFilterTab !== tab.id ? (
-                        <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-blue-500" />
-                      ) : null}
-                    </button>
-                    {idx < tabs.length - 1 ? <span className={isDarkMode ? "text-gray-600" : "text-gray-300"}>|</span> : null}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ChatListTabDropdown
+              tabs={tabs}
+              activeId={listFilterTab}
+              unreadByTab={unreadByTab}
+              isDarkMode={isDarkMode}
+              onSelect={(tabId) => navigate({ nextPage: "list", nextTab: tabId, nextRoomId: null })}
+            />
           </div>
           {listFilterTab === "push" ? (
             <PushNotificationInbox

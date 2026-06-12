@@ -104,6 +104,7 @@ auctionRoutes.post("/", async (c) => {
       condition?: "new_item" | "used_item";
       shippingFeeKrw?: number;
       imageUrls?: string[];
+      videoUrl?: string | null;
       startPriceKrw?: number;
       buyNowPriceKrw?: number | null;
       startsAt?: string;
@@ -118,6 +119,7 @@ auctionRoutes.post("/", async (c) => {
       condition: body.condition,
       shippingFeeKrw: body.shippingFeeKrw,
       imageUrls: body.imageUrls,
+      videoUrl: body.videoUrl,
       startPriceKrw: Number(body.startPriceKrw),
       buyNowPriceKrw: body.buyNowPriceKrw,
       startsAt: String(body.startsAt || ""),

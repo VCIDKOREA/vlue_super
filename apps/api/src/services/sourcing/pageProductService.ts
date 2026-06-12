@@ -17,13 +17,21 @@ export type RegisterPageProductInput = {
   draft?: Record<string, unknown> | null;
 };
 
+function isExternalHttpUrl(url: string) {
+  const u = String(url || "").trim();
+  return /^https?:\/\//i.test(u) && !u.startsWith("data:");
+}
+
 export async function registerPageProduct(input: RegisterPageProductInput) {
   const imageUrls = (input.imageUrls || []).filter(Boolean).slice(0, 10);
   const videoUrl = String(input.videoUrl || "").trim();
-  const assets = imageUrls.length
-    ? await addAssetFilesFromUrls(input.userId, imageUrls, "page-shopping")
+  const externalImages = imageUrls.filter(isExternalHttpUrl);
+  const localImages = imageUrls.filter((u) => !isExternalHttpUrl(u));
+  const assets = localImages.length
+    ? await addAssetFilesFromUrls(input.userId, localImages, "page-shopping")
     : [];
-  const primaryImage = assets[0]?.file_url || imageUrls[0] || "";
+  const storedImageUrls = [...externalImages, ...assets.map((a) => a.file_url)].filter(Boolean);
+  const primaryImage = storedImageUrls[0] || "";
 
   const payload = {
     commerceChannel: "page",
@@ -31,7 +39,7 @@ export async function registerPageProduct(input: RegisterPageProductInput) {
     priceKrw: input.priceKrw,
     description: input.description || "",
     imageUrl: primaryImage,
-    imageUrls: assets.map((a) => a.file_url).length ? assets.map((a) => a.file_url) : imageUrls,
+    imageUrls: storedImageUrls.length ? storedImageUrls : imageUrls,
     videoUrl: videoUrl || "",
     mediaKind: input.mediaKind || (videoUrl ? "video" : imageUrls.length ? "gallery" : "gallery"),
     listingType: input.listingType || "photo_gallery",

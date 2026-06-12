@@ -53,6 +53,9 @@ import { translateRoutes } from "./translate.js";
 import { spellV1Routes } from "./spellV1.js";
 import { searchV1Routes } from "./searchV1.js";
 import { auctionRoutes } from "./auction.js";
+import { scrapeProductRoutes } from "./scrapeProduct.js";
+import { mediaRoutes } from "./media.js";
+import { sellerVodRoutes } from "./sellerVod.js";
 
 /** `/api` 아래에 마운트되는 라우트 묶음 */
 export const apiRoutes = new Hono();
@@ -111,3 +114,6 @@ apiRoutes.route("/translate", translateRoutes);
 apiRoutes.route("/v1/spell", spellV1Routes);
 apiRoutes.route("/v1/search", searchV1Routes);
 apiRoutes.route("/auction", auctionRoutes);
+apiRoutes.route("/scrape-product", scrapeProductRoutes);
+apiRoutes.route("/media", mediaRoutes);
+apiRoutes.route("/media-commerce", sellerVodRoutes);

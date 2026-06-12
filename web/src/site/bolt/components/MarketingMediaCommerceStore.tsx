@@ -46,6 +46,7 @@ import {
 } from '../../../lib/storeFeedPrefs.js';
 import { consumePendingVlueStoreId } from '../../../lib/vluePartnerStoreNav.js';
 import { STORE_UPLOAD_OPEN } from '../../../lib/storeUploadBridge.js';
+import { useHorizontalDragScroll } from '../../../hooks/useHorizontalDragScroll.js';
 import './marketing-store.css';
 
 const STORE_TABS = MEDIA_FEED_TABS.filter((t) =>
@@ -190,6 +191,7 @@ interface Props {
 }
 
 export default function MarketingMediaCommerceStore({ user, onLoginClick }: Props) {
+  const { scrollerRef, scrollerProps, guardClick } = useHorizontalDragScroll();
   const theme = feedTheme(false);
   const [mediaTab, setMediaTab] = useState(() => readStoreFeedTab('all'));
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -457,8 +459,14 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
 
         <div className="mkt-store__content-col">
         <div className="mkt-store__mobile-rail" aria-label="VLUE 스토어 필터 (모바일)">
-          <div className="mkt-store__mobile-toolbar">
-            <div className="mkt-store__mobile-tabs" role="tablist" aria-label="스토어 탭">
+          <div className="mkt-store__mobile-tabs-row">
+            <div
+              ref={scrollerRef}
+              {...scrollerProps}
+              className="mkt-store__mobile-tabs"
+              role="tablist"
+              aria-label="스토어 탭"
+            >
               {STORE_TABS.map((tab) => {
                 const Icon = tabIcon(tab.id);
                 const active = mediaTab === tab.id;
@@ -468,7 +476,7 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
                     type="button"
                     role="tab"
                     aria-selected={active}
-                    onClick={() => changeMediaTab(tab.id)}
+                    onClick={guardClick(() => changeMediaTab(tab.id))}
                     className={`mkt-store__tab mkt-store__tab--mobile ${active ? 'is-active' : ''}`}
                   >
                     <Icon className="mkt-store__tab-icon" aria-hidden />
@@ -477,11 +485,13 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
                 );
               })}
             </div>
+          </div>
+          <div className="mkt-store__mobile-category-row">
             <ShoppingCategoryDropdown
               value={category}
               options={SHOPPING_CATEGORIES}
               onChange={changeCategory}
-              className="mkt-store__category-dropdown--inline"
+              className="mkt-store__category-dropdown--mobile-row"
             />
           </div>
         </div>
@@ -585,6 +595,7 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
         onToast={onToast}
         isDarkMode={false}
         onOpenStore={openStore}
+        onOpenRelated={setSelected}
       />
 
       {storeProfileId ? (

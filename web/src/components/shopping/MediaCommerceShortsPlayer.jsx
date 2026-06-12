@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { youtubeEmbedUrl, feedDisplayTitle, FEED_SCROLL_BOTTOM_PAD } from "../../lib/mediaCommerceCatalog.js";
+import { feedDisplayTitle, FEED_SCROLL_BOTTOM_PAD } from "../../lib/mediaCommerceCatalog.js";
+import LiveCommerceShell from "./LiveCommerceShell.jsx";
 import { enrichFeedBatch, getAllShortsItems } from "../../lib/mediaCommerceFeedService.js";
 import CommerceSideRail from "./CommerceSideRail.jsx";
 import ChannelProfileLink from "./ChannelProfileLink.jsx";
@@ -93,11 +94,12 @@ export default function MediaCommerceShortsPlayer({
           >
             <div className="absolute inset-0">
               {i === index ? (
-                <iframe
+                <LiveCommerceShell
+                  videoUrl={row.videoUrl || ""}
+                  youtubeVideoId={row.youtubeVideoId}
                   title={feedDisplayTitle(row)}
-                  src={youtubeEmbedUrl(row.youtubeVideoId, i === index)}
-                  className="h-full w-full border-0"
-                  allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                  isLive={Boolean(row.isLive)}
+                  className="h-full"
                 />
               ) : (
                 <img src={row.product?.imageUrl || row.thumbUrl} alt="" className="h-full w-full object-cover opacity-80" />

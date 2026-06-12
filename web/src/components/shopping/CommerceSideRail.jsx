@@ -6,6 +6,8 @@ import {
   ensureCampaignForFeedItem,
   readCampaignCommerceMeta
 } from "../../lib/mediaCommerceFeedService.js";
+import { runMediaCommerceEscrowPay } from "../../lib/mediaCommerceEscrowCheckout.js";
+import { getPortoneUserCode } from "../../lib/portoneEnv.js";
 import { fetchGroupBuyTick } from "../../lib/vlueCoreShoppingApi.js";
 import ChannelProfileLink from "./ChannelProfileLink.jsx";
 
@@ -75,8 +77,13 @@ export default function CommerceSideRail({
     setBusy(true);
     setError("");
     try {
-      await completeFeedCheckout({ item, campaignId });
-      onToast?.("결제 완료 · 보관함 저장");
+      if (getPortoneUserCode()) {
+        await runMediaCommerceEscrowPay({ item, campaignId });
+        onToast?.("에스크로 결제 · ESCROW_HOLD");
+      } else {
+        await completeFeedCheckout({ item, campaignId });
+        onToast?.("결제 완료 · 보관함 저장");
+      }
       await refreshTick();
     } catch (e) {
       setError(e instanceof Error ? e.message : "결제 실패");
@@ -118,7 +125,7 @@ export default function CommerceSideRail({
         onClick={pay}
         className="w-full rounded-xl bg-gradient-to-r from-rose-500 to-orange-500 py-2.5 text-[11px] font-black disabled:opacity-50"
       >
-        {busy ? "…" : "바로 결제"}
+        {busy ? "…" : item.isLive ? "라이브 특가" : "바로 결제"}
       </button>
       {error ? <p className="text-[9px] text-rose-300">{error}</p> : null}
     </div>

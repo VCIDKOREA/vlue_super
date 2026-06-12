@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, LayoutGrid, MessageCircle, Plus, X } from 'lucide-react';
 import type { View } from '../types';
 import ChatBot from './ChatBot';
@@ -62,27 +63,27 @@ export default function MarketingFabDock({
 
   const panelOpen = chatOpen || emergencyOpen;
 
-  return (
-    <div className="mkt-fab-dock fixed z-50 flex flex-col items-end gap-3">
-      <ChatBot
-        hideTrigger
-        open={chatOpen}
-        onOpenChange={setChatOpen}
-      />
-      <EmergencyButton
-        hideTrigger
-        open={emergencyOpen}
-        onOpenChange={setEmergencyOpen}
-      />
-
-      {menuOpen && !panelOpen ? (
-        <>
+  const backdrop =
+    menuOpen && !panelOpen && typeof document !== 'undefined'
+      ? createPortal(
           <button
             type="button"
             className="mkt-fab-dock__backdrop"
             aria-label="메뉴 닫기"
             onClick={closeMenu}
-          />
+          />,
+          document.body
+        )
+      : null;
+
+  return (
+    <>
+      {backdrop}
+      <div className="mkt-fab-dock fixed z-[60] flex flex-col items-end gap-3">
+        <ChatBot hideTrigger open={chatOpen} onOpenChange={setChatOpen} />
+        <EmergencyButton hideTrigger open={emergencyOpen} onOpenChange={setEmergencyOpen} />
+
+        {menuOpen && !panelOpen ? (
           <div className="mkt-fab-dock__menu" role="menu" aria-label="빠른 실행">
             {showUpload ? (
               <button type="button" role="menuitem" className="mkt-fab-dock__item" onClick={openUpload}>
@@ -105,20 +106,20 @@ export default function MarketingFabDock({
               <span className="mkt-fab-dock__item-label">긴급 신고</span>
             </button>
           </div>
-        </>
-      ) : null}
+        ) : null}
 
-      {!panelOpen ? (
-        <button
-          type="button"
-          className={`mkt-fab-dock__main ${menuOpen ? 'is-open' : ''}`}
-          aria-label={menuOpen ? '메뉴 닫기' : '빠른 실행 메뉴'}
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((v) => !v)}
-        >
-          {menuOpen ? <X className="w-6 h-6" aria-hidden /> : <LayoutGrid className="w-6 h-6" aria-hidden />}
-        </button>
-      ) : null}
-    </div>
+        {!panelOpen ? (
+          <button
+            type="button"
+            className={`mkt-fab-dock__main ${menuOpen ? 'is-open' : ''}`}
+            aria-label={menuOpen ? '메뉴 닫기' : '빠른 실행 메뉴'}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            {menuOpen ? <X className="w-6 h-6" aria-hidden /> : <LayoutGrid className="w-6 h-6" aria-hidden />}
+          </button>
+        ) : null}
+      </div>
+    </>
   );
 }

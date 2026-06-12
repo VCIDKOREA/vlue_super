@@ -17,6 +17,15 @@ Railway는 `NODE_ENV=production` 이라 API 시작 시 **7개 필수 변수** �
 | `SESSION_SECRET` | 비우면 JWT와 동일하게 자동 채움 |
 | `FILE_STORAGE_PROVIDER` | 비우면 **`mock`** 자동 |
 
+## 미디어 커머스 (Direct Upload · 에스크로 · VOD)
+
+| Variable | 설명 |
+|----------|------|
+| `SUPABASE_URL` | `https://ywhjhdpecwvaujiagaln.supabase.co` — Presigned URL 발급 |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role — **필수** (5GB Direct PUT) |
+| `LIVE_VOD_WEBHOOK_SECRET` | `POST /api/live/webhook/recording-complete` 인증 |
+| `APP_BASE_URL` | `https://api.vlue.kr` |
+
 ## 권장 (없어도 API는 기동됨)
 
 | Variable | 설명 |

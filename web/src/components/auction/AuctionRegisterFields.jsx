@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { fetchAuctionMarketPrice, postAuctionAiDescription } from "../../lib/auctionApi.js";
 import MarketPriceModal from "./MarketPriceModal.jsx";
 import { parsePriceDigits } from "../../lib/sourcingProductFormUtils.js";
 
@@ -37,55 +36,29 @@ export default function AuctionRegisterFields({
 }) {
   const [marketOpen, setMarketOpen] = useState(false);
 
-  const runAiDescription = async () => {
-    if (!form.title?.trim()) {
-      setError("상품명을 먼저 입력해 주세요.");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const result = await postAuctionAiDescription({
-        title: form.title.trim(),
-        keywords: form.hashtags?.join?.(" ") || form.keywords,
-        condition: form.auction?.condition,
-        category: form.category
-      });
-      patch({
-        description: result.description || form.description,
-        draft: { ...(form.draft || {}), marketingDescription: result.description }
-      });
-      onToast?.("AI 상세 설명을 생성했습니다.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "AI 설명 생성 실패");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const auction = form.auction || buildDefaultAuctionFields();
 
   const patchAuction = (partial) => patch({ auction: { ...auction, ...partial } });
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className={`block text-[12px] font-semibold ${sub}`}>
+      <div className="space-y-3">
+        <label className={`block min-w-0 text-[12px] font-semibold ${sub}`}>
           경매 시작 일시 <span className="text-rose-500">*</span>
           <input
             type="datetime-local"
             value={auction.startsAt}
             onChange={(e) => patchAuction({ startsAt: e.target.value })}
-            className={`${inputCls} mt-1`}
+            className={`${inputCls} sourcing-datetime-input mt-1 w-full min-w-0 max-w-full`}
           />
         </label>
-        <label className={`block text-[12px] font-semibold ${sub}`}>
+        <label className={`block min-w-0 text-[12px] font-semibold ${sub}`}>
           경매 종료 일시 <span className="text-rose-500">*</span>
           <input
             type="datetime-local"
             value={auction.endsAt}
             onChange={(e) => patchAuction({ endsAt: e.target.value })}
-            className={`${inputCls} mt-1`}
+            className={`${inputCls} sourcing-datetime-input mt-1 w-full min-w-0 max-w-full`}
           />
         </label>
       </div>
@@ -152,15 +125,6 @@ export default function AuctionRegisterFields({
         />
       </label>
 
-      <button
-        type="button"
-        disabled={busy}
-        onClick={runAiDescription}
-        className="mt-3 w-full rounded-xl bg-violet-500 py-2.5 text-[12px] font-black text-white hover:bg-violet-600 disabled:opacity-60"
-      >
-        AI 설명 생성
-      </button>
-
       <MarketPriceModal
         open={marketOpen}
         keyword={form.title}
@@ -181,6 +145,7 @@ export function auctionPayloadFromForm(form, media) {
     condition: auction.condition,
     shippingFeeKrw: Number(parsePriceDigits(auction.shippingFee)) || 0,
     imageUrls: media?.imageUrls?.slice(0, 12) || form.previews?.slice(0, 12) || [],
+    videoUrl: media?.videoUrl || form.videoUrl || null,
     startPriceKrw: Number(parsePriceDigits(auction.startPrice)) || 0,
     buyNowPriceKrw: Number(parsePriceDigits(auction.buyNowPrice)) || null,
     startsAt: new Date(auction.startsAt).toISOString(),

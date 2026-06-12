@@ -24,6 +24,7 @@ function serializeAuction(row: {
   condition: AuctionCondition;
   shippingFeeKrw: number;
   imageUrls: unknown;
+  videoUrl?: string | null;
   startPriceKrw: number;
   currentPriceKrw: number;
   buyNowPriceKrw: number | null;
@@ -48,6 +49,7 @@ function serializeAuction(row: {
     condition: row.condition,
     shippingFeeKrw: row.shippingFeeKrw,
     imageUrls: Array.isArray(row.imageUrls) ? row.imageUrls : [],
+    videoUrl: row.videoUrl || null,
     startPriceKrw: row.startPriceKrw,
     currentPriceKrw: row.currentPriceKrw,
     buyNowPriceKrw: row.buyNowPriceKrw,
@@ -74,6 +76,7 @@ export async function createAuction(
     condition?: AuctionCondition;
     shippingFeeKrw?: number;
     imageUrls?: string[];
+    videoUrl?: string | null;
     startPriceKrw: number;
     buyNowPriceKrw?: number | null;
     startsAt: string;
@@ -107,6 +110,7 @@ export async function createAuction(
       condition: input.condition || "used_item",
       shippingFeeKrw: Math.max(0, Number(input.shippingFeeKrw) || 0),
       imageUrls: (input.imageUrls || []).slice(0, 12),
+      videoUrl: String(input.videoUrl || "").trim().slice(0, 1000) || null,
       startPriceKrw,
       currentPriceKrw: startPriceKrw,
       buyNowPriceKrw: input.buyNowPriceKrw ? Math.max(startPriceKrw, Number(input.buyNowPriceKrw)) : null,

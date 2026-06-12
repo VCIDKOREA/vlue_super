@@ -12,8 +12,13 @@
   --mkt-nav-h: 3.75rem;
   --mkt-download-bar-h: 3.375rem;
   --mkt-chrome-total: calc(var(--mkt-nav-h) + var(--mkt-download-bar-h));
+  --mkt-chrome-active: var(--mkt-nav-h);
   --mkt-sticky-subnav-h: 3.25rem;
   --mkt-scroll-anchor: calc(var(--mkt-chrome-total) + var(--mkt-sticky-subnav-h) + 0.5rem);
+}
+
+[data-vlue-site="marketing"] .mkt-app-shell--home {
+  --mkt-chrome-active: var(--mkt-chrome-total);
 }
 
 /* 앱 셸이 chrome 여백을 담당 — 각 페이지 main 의 중복 pt 제거 (설치바·히어로 사이 이질감 방지) */
@@ -187,7 +192,7 @@
 /* 서비스소개 섹션 카테고리 — 상단 고정바 바로 아래 */
 [data-vlue-site="marketing"] .mkt-about-section-nav {
   position: sticky;
-  top: var(--mkt-chrome-total);
+  top: var(--mkt-chrome-active);
   z-index: 38;
   border-top: 1px solid rgb(226 232 240 / 90%);
   border-bottom: 1px solid rgb(226 232 240 / 90%);
@@ -452,7 +457,10 @@
   pointer-events: none;
 }
 
-[data-vlue-site="marketing"] .mkt-fab-dock > * {
+[data-vlue-site="marketing"] .mkt-fab-dock > *,
+[data-vlue-site="marketing"] .mkt-fab-dock__menu,
+[data-vlue-site="marketing"] .mkt-fab-dock__item,
+[data-vlue-site="marketing"] .mkt-fab-dock__main {
   pointer-events: auto;
 }
 
@@ -465,18 +473,22 @@
 [data-vlue-site="marketing"] .mkt-fab-dock__backdrop {
   position: fixed;
   inset: 0;
-  z-index: 49;
+  z-index: 55;
   border: 0;
   background: rgb(15 23 42 / 28%);
   cursor: default;
+  pointer-events: auto;
 }
 
 [data-vlue-site="marketing"] .mkt-fab-dock__menu {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 0.625rem;
   margin-bottom: 0.25rem;
+  pointer-events: auto;
   animation: mktFabMenuIn 0.2s ease-out;
 }
 

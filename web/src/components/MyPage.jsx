@@ -1107,7 +1107,7 @@ function MyPage({
       </ProfileHubModal>
 
       {ownerSourcingOpen ? (
-        <div className="fixed inset-0 z-[1000003] flex flex-col bg-white">
+        <div className="fixed inset-0 z-[1000003] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-white">
           <AiSourcingUploadScreen onBack={() => setOwnerSourcingOpen(false)} onToast={setToast} />
         </div>
       ) : null}

@@ -2,15 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   dataUrlToBase64,
   postAiGenerate,
-  postInlineSourcingImport,
   postRegisterPageProduct
 } from "../../lib/vlueCoreShoppingApi.js";
+import { fetchScrapeProduct } from "../../lib/scrapeProductApi.js";
 import { syncStoreProductToServer } from "../../lib/shopApi.js";
 import { invalidatePageFeedCache } from "../../lib/mediaCommerceFeedService.js";
 import { emitVaultChanged } from "../../lib/shoppingCoreStorage.js";
 import ScreenBackHeader from "../common/ScreenBackHeader";
 import SourcingFormSection from "./sourcing/SourcingFormSection.jsx";
-import SourcingMediaSection from "./sourcing/SourcingMediaSection.jsx";
+import SourcingUnifiedMediaSection from "./sourcing/SourcingUnifiedMediaSection.jsx";
+import ProductMediaDisplay from "./ProductMediaDisplay.jsx";
 import SourcingCategorySelect from "./sourcing/SourcingCategorySelect.jsx";
 import {
   getSourcingCategoryFields,
@@ -28,17 +29,12 @@ import {
   formatPriceDisplay,
   parsePriceDigits,
   readSourcingDraft,
-  readSourcingMediaFile,
   sectionComplete,
-  sourcingHasVisualMedia,
-  suggestPriceKrw,
-  suggestProductNames,
   validateSourcingForm,
   writeSourcingDraft
 } from "../../lib/sourcingProductFormUtils.js";
 import { publishSourcingToMyPage } from "../../lib/sourcingMyPageSync.js";
 import { getPageDisplayProfile, isPageCreated } from "../../lib/pageProfileStorage.js";
-import { generatePostDescription } from "../../lib/vmingApi.js";
 import AuctionRegisterFields, {
   auctionPayloadFromForm,
   buildDefaultAuctionFields
@@ -56,8 +52,9 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [tagInput, setTagInput] = useState("");
-  const [nameSuggestions, setNameSuggestions] = useState([]);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [scrapeLoading, setScrapeLoading] = useState(false);
+  const aiAutoRunRef = useRef(false);
   const [saleType, setSaleType] = useState("normal");
   const patch = useCallback((partial) => setForm((f) => ({ ...f, ...partial })), []);
 
@@ -78,36 +75,22 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
     if (saved) setForm((f) => ({ ...f, ...saved }));
   }, []);
 
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
   const scrollToSection = (id) => {
     document.getElementById(`sourcing-section-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const onPickFiles = useCallback(async (fileList) => {
-    const files = Array.from(fileList || []);
-    if (!files.length) return;
-    setError("");
-    try {
-      const urls = await Promise.all(files.map((f) => compressImageFile(f)));
-      setForm((f) => ({
-        ...f,
-        previews: [...f.previews, ...urls].slice(0, MAX_SOURCING_PHOTOS),
-        draft: null
-      }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "이미지를 불러오지 못했습니다.");
-    }
-  }, []);
-
-  const aiImageSources = useMemo(() => {
-    if (form.listingType === "media_single" && form.mediaPrimary?.type === "image") {
-      return [form.mediaPrimary.url];
-    }
-    return form.previews;
-  }, [form.listingType, form.mediaPrimary, form.previews]);
-
-  const runAiAutofill = async () => {
-    if (!aiImageSources.length) {
-      setError("상품 사진을 1장 이상 업로드해 주세요. (미디어 모드는 사진만 AI 분석 가능)");
+  const runAiAutofill = useCallback(async (sourcesOverride) => {
+    const sources = sourcesOverride || form.previews;
+    if (!sources.length) {
+      setError("상품 사진을 1장 이상 업로드해 주세요.");
       scrollToSection("media");
       return;
     }
@@ -115,8 +98,7 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
     setError("");
     try {
       const data = await postAiGenerate({
-        imageBase64List: aiImageSources.map((u) => dataUrlToBase64(u)),
-        keywords: form.keywords.trim()
+        imageBase64List: sources.map((u) => dataUrlToBase64(u))
       });
       const d = data.draft || {};
       patch({
@@ -126,53 +108,88 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
         description: d.marketingDescription || d.summary || form.description,
         salePrice: String(d.priceKrw || d.suggestedPrice || "").replace(/\D/g, "") || form.salePrice
       });
-      onToast?.(`AI 자동완성 완료 (${data.provider === "openai" ? "Vision" : "템플릿"})`);
+      onToast?.(`사진 분석 완료 · 상품명·설명을 확인해 주세요 (${data.provider === "openai" ? "Vision" : "템플릿"})`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "AI 자동완성에 실패했습니다.");
+      setError(e instanceof Error ? e.message : "사진 분석에 실패했습니다.");
     } finally {
       setBusy(false);
     }
-  };
+  }, [form.previews, form.title, form.description, form.salePrice, onToast, patch]);
 
-  const runAiNameSuggest = () => {
-    if (!sourcingHasVisualMedia(form) && !form.keywords.trim()) {
-      setError("사진 또는 키워드를 입력해 주세요.");
-      return;
+  const queuePhotoAi = useCallback(
+    (sources) => {
+      if (!sources.length || busy) return;
+      window.setTimeout(() => runAiAutofill(sources), 0);
+    },
+    [busy, runAiAutofill]
+  );
+
+  const onPickFiles = useCallback(async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setError("");
+    try {
+      const urls = await Promise.all(files.map((f) => compressImageFile(f)));
+      const hadPhotos = form.previews.length > 0;
+      const nextPreviews = [...form.previews, ...urls].slice(0, MAX_SOURCING_PHOTOS);
+      setForm((f) => ({
+        ...f,
+        previews: nextPreviews,
+        draft: null
+      }));
+      if (!hadPhotos && nextPreviews.length > 0 && !aiAutoRunRef.current) {
+        aiAutoRunRef.current = true;
+        queuePhotoAi(nextPreviews);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "이미지를 불러오지 못했습니다.");
     }
-    setNameSuggestions(suggestProductNames(form.keywords, form.title || form.draft?.title));
-    onToast?.("상품명 추천 3건을 표시했습니다.");
-  };
+  }, [form.previews, queuePhotoAi]);
 
-  const runAiPriceSuggest = () => {
-    const p = suggestPriceKrw(form.keywords, form.category);
-    patch({ salePrice: p });
-    onToast?.("키워드 기반 적정가를 제안했습니다.");
-  };
+  const aiImageSources = useMemo(() => form.previews, [form.previews]);
 
-  const runInlineImport = async () => {
+  const runScrapeImport = async () => {
     const url = form.inlineUrl.trim();
     if (!url) {
       setError("상품 URL을 입력해 주세요.");
-      scrollToSection("url");
       return;
     }
-    setBusy(true);
+    setScrapeLoading(true);
     setError("");
+    patch({ scrapeHint: "" });
     try {
-      const data = await postInlineSourcingImport(url);
-      const item = data.item;
+      const data = await fetchScrapeProduct(url);
+      if (data.blocked || !data.ok) {
+        patch({
+          scrapeHint: data.message || "해당 사이트는 직접 입력이 필요합니다"
+        });
+        return;
+      }
+      const imageUrl = data.imageUrl || "";
       patch({
-        inlineItem: item,
-        title: (item.title || "").slice(0, MAX_TITLE_LEN),
-        salePrice: String(item.priceKrw || "0"),
-        description: item.description || form.description,
-        previews: item.imageUrl ? [item.imageUrl, ...form.previews.filter((u) => u !== item.imageUrl)].slice(0, MAX_SOURCING_PHOTOS) : form.previews
+        inlineItem: {
+          sourceUrl: url,
+          platform: /coupang/i.test(url) ? "coupang" : /smartstore|naver/i.test(url) ? "smartstore" : "store",
+          title: data.title,
+          priceKrw: data.price || 0,
+          imageUrl,
+          description: data.description || ""
+        },
+        inlineUrl: url,
+        title: (data.title || "").slice(0, MAX_TITLE_LEN),
+        salePrice: data.price ? String(data.price) : form.salePrice,
+        description: data.description || form.description,
+        previews: imageUrl
+          ? [imageUrl, ...form.previews.filter((u) => u !== imageUrl)].slice(0, MAX_SOURCING_PHOTOS)
+          : form.previews,
+        scrapeHint: ""
       });
-      onToast?.(`${item.platform === "store" ? "자사몰" : item.platform} 연동`);
+      onToast?.("상품 정보를 성공적으로 불러왔습니다! 수정할 부분을 확인하세요.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "URL 소싱에 실패했습니다.");
+      patch({ scrapeHint: "해당 사이트는 직접 입력이 필요합니다" });
+      setError(e instanceof Error ? e.message : "스크래핑에 실패했습니다.");
     } finally {
-      setBusy(false);
+      setScrapeLoading(false);
     }
   };
 
@@ -278,10 +295,10 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
   const categoryFields = getSourcingCategoryFields(form.category);
 
   return (
-    <div className={`flex min-h-0 flex-1 flex-col ${isDarkMode ? "bg-[#0b0c10]" : "bg-[#f4f6fa]"}`}>
+    <div className={`flex h-full min-h-0 flex-1 flex-col overflow-hidden ${isDarkMode ? "bg-[#0b0c10]" : "bg-[#f4f6fa]"}`}>
       <ScreenBackHeader title="소싱 · 등록" onBack={onBack} isDarkMode={isDarkMode} />
 
-      <div className="mx-auto w-full max-w-lg flex-1 space-y-3 overflow-y-auto px-3 py-4 pb-32">
+      <div className="mx-auto w-full max-w-lg min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-4 pb-32">
         <div className={`flex rounded-2xl border p-1 ${isDarkMode ? "border-white/10 bg-[#12151c]" : "border-slate-200 bg-white"}`}>
           {[
             { id: "normal", label: "일반 판매" },
@@ -309,7 +326,85 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
           ))}
         </div>
 
-        {/* 1. 기본 정보 */}
+        <label
+          className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 ${
+            isDarkMode ? "border-white/10 bg-[#12151c]" : "border-slate-200 bg-white"
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={form.useExternalUrl}
+            onChange={(e) => patch({ useExternalUrl: e.target.checked, scrapeHint: "" })}
+          />
+          <span className={`text-[13px] font-black ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
+            외부 쇼핑몰 URL로 불러오기
+          </span>
+        </label>
+
+        {form.useExternalUrl ? (
+          <div
+            id="sourcing-section-url"
+            className={`rounded-xl border px-3 py-3 ${
+              isDarkMode ? "border-blue-500/30 bg-blue-950/20" : "border-blue-100 bg-blue-50/60"
+            }`}
+          >
+            <p className={`text-[11px] ${sub}`}>쿠팡 · 네이버 스마트스토어 등</p>
+            <input
+              value={form.inlineUrl}
+              onChange={(e) => patch({ inlineUrl: e.target.value, scrapeHint: "" })}
+              placeholder="https://..."
+              className={`${inputCls} mt-2`}
+            />
+            <button
+              type="button"
+              disabled={scrapeLoading || busy}
+              onClick={runScrapeImport}
+              className={`mt-2 w-full rounded-xl py-2.5 text-[12px] font-black text-white disabled:opacity-50 ${
+                isDarkMode ? "bg-blue-600" : "bg-blue-600 hover:bg-blue-700"
+              }`}
+            >
+              {scrapeLoading ? "정보를 읽어오는 중…" : "가져오기"}
+            </button>
+            {form.scrapeHint ? (
+              <p className="mt-2 text-[11px] font-semibold leading-relaxed text-amber-700">{form.scrapeHint}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* 1. 사진 + 비디오 URL (통합 등록) */}
+        <SourcingFormSection
+          id="media"
+          title="상품 미디어"
+          required
+          complete={sectionComplete(form, "media")}
+          isDarkMode={isDarkMode}
+        >
+          <p className={`text-[11px] leading-relaxed ${sub}`}>
+            사진과 설명 영상 URL을 한곳에서 등록합니다. 노출 시 영상과 사진이 분리되어 표시됩니다.
+          </p>
+          <SourcingUnifiedMediaSection
+            previews={form.previews}
+            onPreviewsChange={(previews) => patch({ previews, draft: null })}
+            onPickGalleryFiles={onPickFiles}
+            videoUrl={form.videoUrl}
+            onVideoUrlChange={(videoUrl) => patch({ videoUrl })}
+            onToast={onToast}
+            isDarkMode={isDarkMode}
+          />
+          <button
+            type="button"
+            disabled={busy || !aiImageSources.length}
+            onClick={() => runAiAutofill()}
+            className={`mt-3 w-full rounded-xl py-3 text-[13px] font-black text-white disabled:opacity-50 ${AI_VIOLET}`}
+          >
+            {busy ? "사진 분석 중…" : "사진으로 AI 자동완성"}
+          </button>
+          {form.provider ? (
+            <p className={`mt-1 text-[10px] ${sub}`}>분석 엔진: {form.provider === "openai" ? "Vision" : "템플릿"}</p>
+          ) : null}
+        </SourcingFormSection>
+
+        {/* 2. 기본 정보 */}
         <SourcingFormSection
           id="basic"
           title="상품 기본 정보"
@@ -330,32 +425,6 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
           <p className={`mt-0.5 text-right text-[10px] ${sub}`}>
             {form.title.length}/{MAX_TITLE_LEN}
           </p>
-          {nameSuggestions.length ? (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {nameSuggestions.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => patch({ title: n.slice(0, MAX_TITLE_LEN) })}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                    isDarkMode ? "bg-violet-600/25 text-violet-200" : "bg-violet-50 text-violet-700"
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={runAiNameSuggest}
-            className={`mt-2 w-full rounded-xl border py-2 text-[12px] font-bold ${
-              isDarkMode ? "border-violet-500/40 text-violet-200" : "border-violet-200 text-violet-700"
-            }`}
-          >
-            AI 상품명 추천
-          </button>
 
           <label className={`mt-4 block text-[12px] font-semibold ${sub}`}>
             카테고리 <span className="text-rose-500">*</span>
@@ -448,17 +517,6 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
             />
             <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[13px] font-bold ${sub}`}>원</span>
           </div>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={runAiPriceSuggest}
-            className={`mt-2 w-full rounded-xl border py-2 text-[12px] font-bold ${
-              isDarkMode ? "border-violet-500/40 text-violet-200" : "border-violet-200 text-violet-700"
-            }`}
-          >
-            AI 가격 추천
-          </button>
-
           <label className={`mt-3 block text-[12px] font-semibold ${sub}`}>정가 (선택)</label>
           <div className="relative mt-1">
             <input
@@ -499,7 +557,65 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
         </SourcingFormSection>
         ) : null}
 
-        {/* 3. 상세 */}
+        {/* 배송 */}
+        {form.tradeMethods.parcel ? (
+          <SourcingFormSection
+            id="shipping"
+            title="배송"
+            complete={sectionComplete(form, "shipping")}
+            isDarkMode={isDarkMode}
+          >
+            <p className={`text-[12px] font-semibold ${sub}`}>배송비 부담</p>
+            <div className="mt-2 space-y-1.5 text-[13px]">
+              {[
+                { id: "seller", label: "판매자 부담" },
+                { id: "buyer", label: "구매자 부담" }
+              ].map((o) => (
+                <label key={o.id} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="feePayer"
+                    checked={form.shipping.feePayer === o.id}
+                    onChange={() => patch({ shipping: { ...form.shipping, feePayer: o.id } })}
+                  />
+                  {o.label}
+                </label>
+              ))}
+            </div>
+            {form.shipping.feePayer === "buyer" ? (
+              <div className="relative mt-2">
+                <input
+                  inputMode="numeric"
+                  value={formatPriceDisplay(form.shipping.shippingFee)}
+                  onChange={(e) =>
+                    patch({
+                      shipping: {
+                        ...form.shipping,
+                        shippingFee: parsePriceDigits(e.target.value)
+                      }
+                    })
+                  }
+                  placeholder="배송비"
+                  className={`${inputCls} pr-10`}
+                />
+                <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[13px] ${sub}`}>원</span>
+              </div>
+            ) : null}
+            <label className={`mt-3 block text-[12px] font-semibold ${sub}`}>출고 소요일</label>
+            <select
+              value={form.shipping.leadDays}
+              onChange={(e) => patch({ shipping: { ...form.shipping, leadDays: e.target.value } })}
+              className={`${inputCls} mt-1`}
+            >
+              <option value="1">1일 이내</option>
+              <option value="2">2일 이내</option>
+              <option value="3">3일 이내</option>
+              <option value="5">5일 이내</option>
+            </select>
+          </SourcingFormSection>
+        ) : null}
+
+        {/* 마지막: 상품 상세 (직접 작성) */}
         <SourcingFormSection
           id="detail"
           title="상품 상세"
@@ -507,38 +623,9 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
           isDarkMode={isDarkMode}
         >
           <label className={`text-[12px] font-semibold ${sub}`}>상품 설명</label>
-          <p className={`text-[10px] ${sub}`}>AI 자동완성 후에도 수정할 수 있습니다.</p>
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                const seed = [
-                  form.name.trim(),
-                  form.category ? `카테고리: ${form.category}` : "",
-                  form.salePrice ? `가격: ${formatKrw(form.salePrice)}` : "",
-                  form.description.trim()
-                ]
-                  .filter(Boolean)
-                  .join("\n");
-                const r = await generatePostDescription({
-                  message: seed || "상품 소개 문구를 신뢰형 톤으로 4~6문장 작성해줘."
-                });
-                const text = String(r?.reply || "").trim();
-                if (text) patch({ description: text });
-              } catch (e) {
-                setError(
-                  e instanceof Error
-                    ? e.message
-                    : "오늘 제공된 무료 체험 한도를 모두 소모하셨습니다. 월 4,900원 무제한 패키지를 이용해 보세요!"
-                );
-              }
-            }}
-            className={`mt-1 rounded-full border px-2.5 py-1 text-[11px] font-black ${
-              isDarkMode ? "border-violet-400/40 bg-violet-900/30 text-violet-200" : "border-violet-200 bg-violet-50 text-violet-700"
-            }`}
-          >
-            🤖 AI 상세설명 생성
-          </button>
+          <p className={`text-[10px] ${sub}`}>
+            사진 분석으로 채워진 내용을 확인·수정하세요. 직접 작성도 가능합니다.
+          </p>
           <textarea
             value={form.description}
             onChange={(e) => patch({ description: e.target.value })}
@@ -619,148 +706,6 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
           </label>
         </SourcingFormSection>
 
-        {/* 4. 배송 */}
-        {form.tradeMethods.parcel ? (
-          <SourcingFormSection
-            id="shipping"
-            title="배송"
-            complete={sectionComplete(form, "shipping")}
-            isDarkMode={isDarkMode}
-          >
-            <p className={`text-[12px] font-semibold ${sub}`}>배송비 부담</p>
-            <div className="mt-2 space-y-1.5 text-[13px]">
-              {[
-                { id: "seller", label: "판매자 부담" },
-                { id: "buyer", label: "구매자 부담" }
-              ].map((o) => (
-                <label key={o.id} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="feePayer"
-                    checked={form.shipping.feePayer === o.id}
-                    onChange={() => patch({ shipping: { ...form.shipping, feePayer: o.id } })}
-                  />
-                  {o.label}
-                </label>
-              ))}
-            </div>
-            {form.shipping.feePayer === "buyer" ? (
-              <div className="relative mt-2">
-                <input
-                  inputMode="numeric"
-                  value={formatPriceDisplay(form.shipping.shippingFee)}
-                  onChange={(e) =>
-                    patch({
-                      shipping: {
-                        ...form.shipping,
-                        shippingFee: parsePriceDigits(e.target.value)
-                      }
-                    })
-                  }
-                  placeholder="배송비"
-                  className={`${inputCls} pr-10`}
-                />
-                <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[13px] ${sub}`}>원</span>
-              </div>
-            ) : null}
-            <label className={`mt-3 block text-[12px] font-semibold ${sub}`}>출고 소요일</label>
-            <select
-              value={form.shipping.leadDays}
-              onChange={(e) => patch({ shipping: { ...form.shipping, leadDays: e.target.value } })}
-              className={`${inputCls} mt-1`}
-            >
-              <option value="1">1일 이내</option>
-              <option value="2">2일 이내</option>
-              <option value="3">3일 이내</option>
-              <option value="5">5일 이내</option>
-            </select>
-          </SourcingFormSection>
-        ) : null}
-
-        {/* 6. 미디어 */}
-        <SourcingFormSection
-          id="media"
-          title="미디어 · 사진"
-          complete={sectionComplete(form, "media")}
-          isDarkMode={isDarkMode}
-        >
-          <SourcingMediaSection
-            listingType={form.listingType}
-            onListingTypeChange={(listingType) =>
-              patch({
-                listingType,
-                ...(listingType === "photo_gallery" ? { mediaPrimary: null } : { previews: [] })
-              })
-            }
-            previews={form.previews}
-            onPreviewsChange={(previews) => patch({ previews, draft: null })}
-            onPickGalleryFiles={onPickFiles}
-            mediaPrimary={form.mediaPrimary}
-            onMediaPrimaryChange={(mediaPrimary) => patch({ mediaPrimary, draft: null })}
-            onPickMediaFile={async (file) => {
-              try {
-                return await readSourcingMediaFile(file);
-              } catch (e) {
-                setError(e instanceof Error ? e.message : "미디어를 불러오지 못했습니다.");
-                throw e;
-              }
-            }}
-            isDarkMode={isDarkMode}
-          />
-        </SourcingFormSection>
-
-        {/* 7. AI */}
-        <SourcingFormSection
-          id="ai"
-          title="AI 기능"
-          complete={sectionComplete(form, "ai")}
-          isDarkMode={isDarkMode}
-        >
-          <input
-            value={form.keywords}
-            onChange={(e) => patch({ keywords: e.target.value })}
-            placeholder='키워드 (예: "중고 가구, 상태 양호")'
-            className={inputCls}
-          />
-          <button
-            type="button"
-            disabled={busy || !aiImageSources.length}
-            onClick={runAiAutofill}
-            className={`mt-2 w-full rounded-xl py-3 text-[13px] font-black text-white disabled:opacity-50 ${AI_VIOLET}`}
-          >
-            AI 자동완성
-          </button>
-          {form.provider ? (
-            <p className={`mt-1 text-[10px] ${sub}`}>엔진: {form.provider === "openai" ? "Vision" : "템플릿"}</p>
-          ) : null}
-        </SourcingFormSection>
-
-        {/* 8. URL */}
-        <SourcingFormSection
-          id="url"
-          title="상품 URL"
-          complete={sectionComplete(form, "url")}
-          isDarkMode={isDarkMode}
-        >
-          <p className={`text-[11px] ${sub}`}>쿠팡 · 네이버 · 자사몰</p>
-          <input
-            value={form.inlineUrl}
-            onChange={(e) => patch({ inlineUrl: e.target.value })}
-            placeholder="https://..."
-            className={`${inputCls} mt-2`}
-          />
-          <button
-            type="button"
-            disabled={busy}
-            onClick={runInlineImport}
-            className={`mt-2 w-full rounded-xl border py-2.5 text-[12px] font-bold ${
-              isDarkMode ? "border-white/15 text-gray-200" : "border-slate-200 text-slate-700"
-            }`}
-          >
-            URL 가져오기
-          </button>
-        </SourcingFormSection>
-
         {error ? <p className="text-[12px] font-semibold text-rose-600">{error}</p> : null}
       </div>
 
@@ -824,15 +769,11 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
                 닫기
               </button>
             </div>
-            {form.listingType === "media_single" && form.mediaPrimary?.url ? (
-              form.mediaPrimary.type === "video" ? (
-                <video src={form.mediaPrimary.url} controls className="mt-3 aspect-square w-full rounded-xl object-cover" />
-              ) : (
-                <img src={form.mediaPrimary.url} alt="" className="mt-3 aspect-square w-full rounded-xl object-cover" />
-              )
-            ) : form.previews[0] ? (
-              <img src={form.previews[0]} alt="" className="mt-3 aspect-square w-full rounded-xl object-cover" />
-            ) : null}
+            <ProductMediaDisplay
+              videoUrl={form.videoUrl}
+              imageUrls={form.previews}
+              className="mt-3"
+            />
             <p className="mt-2 text-[16px] font-black">{form.title || "상품명 없음"}</p>
             <p className="text-[14px] font-bold text-violet-600">{formatKrw(parsePriceDigits(form.salePrice))}</p>
             {discount != null ? (

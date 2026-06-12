@@ -317,6 +317,10 @@ model User {
   auctionEscrowsBuy  AuctionEscrow[]        @relation("AuctionEscrowBuyer")
   auctionEscrowsSell AuctionEscrow[]        @relation("AuctionEscrowSeller")
   interestKeywords   UserInterestKeyword[]
+  mediaLiveSessions  MediaLiveSession[]     @relation("MediaLiveSeller")
+  sellerVodProducts  SellerVodProduct[]     @relation("SellerVodOwner")
+  mediaEscrowsBuy    MediaCommerceEscrow[]  @relation("MediaEscrowBuyer")
+  mediaEscrowsSell   MediaCommerceEscrow[]  @relation("MediaEscrowSeller")
 
   @@unique([socialProvider, socialId], map: "users_social_provider_social_id_key")
   @@index([enterpriseGroupId])
@@ -1611,6 +1615,7 @@ model LocalAd {
 enum ShopOrderStatus {
   pending_payment
   paid
+  escrow_hold
   failed
   cancelled
 }
@@ -2325,6 +2330,8 @@ model Auction {
   condition      AuctionCondition @default(used_item)
   shippingFeeKrw Int              @default(0) @map("shipping_fee_krw")
   imageUrls      Json             @default("[]") @map("image_urls") @db.JsonB
+  /// YouTube/Vimeo 등 외부 임베드 URL (서버 스토리지 미사용)
+  videoUrl       String?          @map("video_url") @db.VarChar(1000)
 
   startPriceKrw  Int  @map("start_price_krw")
   currentPriceKrw Int @map("current_price_krw")
@@ -2414,4 +2421,119 @@ model UserInterestKeyword {
   @@unique([userId, keyword])
   @@index([keyword])
   @@map("user_interest_keywords")
+}
+
+// -----------------------------------------------------------------------------
+// 실시간 라이브 · VOD 커머스 — 미디어 바이트는 외부 CDN/플랫폼만 사용 (API 비용 0원)
+// -----------------------------------------------------------------------------
+
+enum SellerVodSource {
+  live_recording
+  direct_upload
+  external_link
+}
+
+enum SellerVodStatus {
+  processing
+  ready
+  archived
+}
+
+enum MediaLiveStatus {
+  scheduled
+  live
+  ended
+}
+
+enum MediaEscrowPaymentStatus {
+  pending_payment
+  ESCROW_HOLD
+  released
+  refunded
+  failed
+}
+
+/// 판매자 외부 라이브 스트림 세션 — streamUrl 메타데이터만 보관
+model MediaLiveSession {
+  id String @id @default(uuid()) @db.Uuid
+
+  sellerUserId String @map("seller_user_id") @db.Uuid
+  seller       User   @relation("MediaLiveSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+
+  title       String @default("") @db.VarChar(200)
+  /// Instagram/TikTok/YouTube Live HLS·m3u8·임베드 URL — 서버 스트리밍 없음
+  streamUrl   String @map("stream_url") @db.VarChar(1000)
+  platform    String @default("youtube") @db.VarChar(32)
+  aspectRatio String @default("16:9") @map("aspect_ratio") @db.VarChar(8)
+  status      MediaLiveStatus @default(live)
+
+  startedAt DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt   DateTime? @map("ended_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  vodProducts SellerVodProduct[]
+
+  @@index([sellerUserId, status])
+  @@map("media_live_sessions")
+}
+
+/// 라이브 종료 후 VOD · 직접 업로드 영상 — 개인 상점 [지난 라이브 특가] 리스팅
+model SellerVodProduct {
+  id String @id @default(uuid()) @db.Uuid
+
+  sellerUserId String @map("seller_user_id") @db.Uuid
+  seller       User   @relation("SellerVodOwner", fields: [sellerUserId], references: [id], onDelete: Cascade)
+
+  liveSessionId String?           @map("live_session_id") @db.Uuid
+  liveSession   MediaLiveSession?   @relation(fields: [liveSessionId], references: [id], onDelete: SetNull)
+
+  title        String @db.VarChar(200)
+  productTitle String? @map("product_title") @db.VarChar(200)
+  /// CDN public URL 또는 외부 스트리밍 주소 (텍스트만 저장)
+  videoUrl     String @map("video_url") @db.VarChar(1000)
+  thumbUrl     String? @map("thumb_url") @db.VarChar(1000)
+  aspectRatio  String @default("16:9") @map("aspect_ratio") @db.VarChar(8)
+  platform     String? @db.VarChar(32)
+  source       SellerVodSource @default(external_link)
+  status       SellerVodStatus @default(ready)
+  category     String @default("past_live_deals") @db.VarChar(40)
+  priceKrw     Int?    @map("price_krw")
+  durationSec  Int?    @map("duration_sec")
+  viewCount    Int     @default(0) @map("view_count")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([sellerUserId, category, status])
+  @@map("seller_vod_products")
+}
+
+/// 라이브/VOD 인앱 결제 — 에스크로 예치 (payment_status: ESCROW_HOLD)
+model MediaCommerceEscrow {
+  id String @id @default(uuid()) @db.Uuid
+
+  buyerUserId String @map("buyer_user_id") @db.Uuid
+  buyer       User   @relation("MediaEscrowBuyer", fields: [buyerUserId], references: [id], onDelete: Cascade)
+
+  sellerUserId String @map("seller_user_id") @db.Uuid
+  seller       User   @relation("MediaEscrowSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+
+  feedId     String  @map("feed_id") @db.VarChar(120)
+  campaignId String? @map("campaign_id") @db.VarChar(120)
+  productTitle String @map("product_title") @db.VarChar(200)
+  amountKrw    Int    @map("amount_krw")
+
+  merchantUid String @unique @map("merchant_uid") @db.VarChar(80)
+  impUid      String? @map("imp_uid") @db.VarChar(80)
+  paymentStatus MediaEscrowPaymentStatus @default(pending_payment) @map("payment_status")
+  receiptUrl    String? @map("receipt_url") @db.VarChar(512)
+  paidAt        DateTime? @map("paid_at") @db.Timestamptz(6)
+  rawResponse   Json? @map("raw_response") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([buyerUserId, paymentStatus])
+  @@index([sellerUserId, paymentStatus])
+  @@map("media_commerce_escrows")
 }

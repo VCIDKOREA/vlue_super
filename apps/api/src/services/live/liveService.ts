@@ -42,7 +42,7 @@ export function getEmbedMeta(platform: string, streamId: string) {
     platform: row.platform,
     streamId: row.streamId,
     embedUrl: row.embedUrl,
-    note: "traffic-cost-zero rule: media bytes are served by external streaming infra, API stores metadata only."
+    note: "traffic-cost-zero: media bytes served by external streaming infra only; API stores metadata."
   };
 }
 

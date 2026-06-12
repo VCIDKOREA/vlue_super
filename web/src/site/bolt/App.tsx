@@ -123,7 +123,7 @@ export default function App() {
       <AnimatedBackground />
       <div className="relative z-10">
         <Navbar currentView={view} onNavigate={handleNavigate} user={user} onLoginClick={() => setShowAuth(true)} onLogout={handleLogout} />
-        {view !== 'exceleditor' && (
+        {view === 'home' && (
           <div className="fixed left-0 right-0 z-40 mkt-download-bar-anchor">
             <AppDownloadBar variant="top" currentView={view} onNavigate={handleNavigate} />
           </div>
@@ -131,10 +131,10 @@ export default function App() {
 
         <div
           className={`mkt-app-shell relative z-10 ${
-            view === 'exceleditor'
-              ? 'pt-[var(--mkt-nav-h,4.5rem)]'
-              : 'pt-[var(--mkt-chrome-total,8.25rem)]'
-          }${view === 'home' ? ' mkt-app-shell--home' : ''}`}
+            view === 'home'
+              ? 'pt-[var(--mkt-chrome-total,8.25rem)] mkt-app-shell--home'
+              : 'pt-[var(--mkt-nav-h,3.75rem)]'
+          }`}
         >
         {view === 'home' && <HomePage onSearch={handleSearch} onNavigate={handleNavigate} />}
         {view === 'search' && <SearchPage initialQuery={searchQuery} onBack={() => handleNavigate('home')} />}

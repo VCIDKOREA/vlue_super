@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import CountdownTicker from "./CountdownTicker.jsx";
-import { platformLabel, youtubeEmbedUrl } from "../../lib/mediaCommerceCatalog.js";
+import { platformLabel } from "../../lib/mediaCommerceCatalog.js";
+import { isEmbeddableVideoUrl } from "../../lib/embedVideo.js";
+import ProductMediaDisplay from "./ProductMediaDisplay.jsx";
+import LiveCommerceShell from "./LiveCommerceShell.jsx";
+import CommerceSideRail from "./CommerceSideRail.jsx";
+import { runMediaCommerceEscrowPay } from "../../lib/mediaCommerceEscrowCheckout.js";
+import { getPortoneUserCode } from "../../lib/portoneEnv.js";
 import {
   completeFeedCheckout,
   ensureCampaignForFeedItem,
@@ -8,6 +14,7 @@ import {
 } from "../../lib/mediaCommerceFeedService.js";
 import { fetchGroupBuyTick } from "../../lib/vlueCoreShoppingApi.js";
 import ChannelProfileLink from "./ChannelProfileLink.jsx";
+import RelatedProductsStrip from "./RelatedProductsStrip.jsx";
 
 function formatKrw(n) {
   return `${Number(n || 0).toLocaleString("ko-KR")}원`;
@@ -20,6 +27,7 @@ export default function MediaCommercePlayerSheet({
   onToast,
   isDarkMode = false,
   onOpenStore,
+  onOpenRelated,
   isGuestMode = false,
   onRequireAuth
 }) {
@@ -31,6 +39,15 @@ export default function MediaCommercePlayerSheet({
   const [error, setError] = useState("");
 
   const product = item?.product;
+  const sellerVideoUrl = product?.videoUrl || item?.videoUrl || "";
+  const pageImageUrls = product?.imageUrls?.length
+    ? product.imageUrls
+    : product?.imageUrl
+      ? [product.imageUrl]
+      : item?.thumbUrl
+        ? [item.thumbUrl]
+        : [];
+  const isPageLike = item?.commerceChannel === "page" || Boolean(sellerVideoUrl && !item?.youtubeVideoId);
   const meta = campaignId ? readCampaignCommerceMeta(campaignId) : null;
   const priceKrw = Number(product?.priceKrw) || meta?.priceKrw || 0;
   const compareKrw = meta?.comparePriceKrw || (priceKrw ? Math.round(priceKrw * 1.2) : 0);
@@ -88,9 +105,14 @@ export default function MediaCommercePlayerSheet({
     setBusy(true);
     setError("");
     try {
-      const nextTick = await completeFeedCheckout({ item, campaignId });
-      setTick(nextTick);
-      onToast?.("결제 완료 · 파트너십 보관함에 저장되었습니다.");
+      if (getPortoneUserCode()) {
+        await runMediaCommerceEscrowPay({ item, campaignId });
+        onToast?.("에스크로 결제 완료 · 대금이 안전하게 예치되었습니다 (ESCROW_HOLD).");
+      } else {
+        const nextTick = await completeFeedCheckout({ item, campaignId });
+        setTick(nextTick);
+        onToast?.("결제 완료 · 파트너십 보관함에 저장되었습니다.");
+      }
       onClose?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "결제에 실패했습니다.");
@@ -118,14 +140,32 @@ export default function MediaCommercePlayerSheet({
         ) : null}
       </div>
 
-      <div className="relative w-full shrink-0 bg-black" style={{ aspectRatio: "16/9" }}>
-        <iframe
-          title="미디어 플레이어"
-          src={youtubeEmbedUrl(item.youtubeVideoId, true)}
-          className="absolute inset-0 h-full w-full border-0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
+      <div className="relative w-full shrink-0 bg-black">
+        {sellerVideoUrl || item.youtubeVideoId ? (
+          <LiveCommerceShell
+            videoUrl={sellerVideoUrl}
+            youtubeVideoId={item.youtubeVideoId}
+            title={product?.title || "상품 영상"}
+            isLive={Boolean(item.isLive)}
+            commerceRail={
+              <CommerceSideRail
+                item={item}
+                onToast={onToast}
+                onOpenStore={onOpenStore}
+                isGuestMode={isGuestMode}
+                onRequireAuth={onRequireAuth}
+              />
+            }
+          />
+        ) : isPageLike && pageImageUrls.length ? (
+          <div className="aspect-square max-h-[50vh] w-full overflow-hidden">
+            <img src={pageImageUrls[0]} alt="" className="h-full w-full object-cover" />
+          </div>
+        ) : (
+          <div className="flex aspect-video items-center justify-center text-[12px] text-white/70">
+            미디어 없음
+          </div>
+        )}
       </div>
 
       <div
@@ -139,6 +179,15 @@ export default function MediaCommercePlayerSheet({
           ) : null}
 
           <ChannelProfileLink item={item} onOpenStore={onOpenStore} isDarkMode={isDarkMode} />
+
+          {isPageLike && (pageImageUrls.length > 1 || (isEmbeddableVideoUrl(sellerVideoUrl) && pageImageUrls.length)) ? (
+            <ProductMediaDisplay
+              videoUrl=""
+              imageUrls={pageImageUrls}
+              item={item}
+              isDarkMode={isDarkMode}
+            />
+          ) : null}
 
           <div>
             <p className="text-[11px] font-bold text-indigo-600">
@@ -189,8 +238,14 @@ export default function MediaCommercePlayerSheet({
             onClick={pay}
             className="w-full rounded-xl bg-gradient-to-r from-rose-600 to-orange-500 py-3.5 text-[15px] font-black text-white shadow-lg disabled:opacity-50"
           >
-            {busy ? "처리 중…" : ended ? "마감됨" : "바로 결제"}
+            {busy ? "처리 중…" : ended ? "마감됨" : item.isLive ? "라이브 특가 구매하기" : "바로 결제"}
           </button>
+
+          <RelatedProductsStrip
+            currentItem={item}
+            isDarkMode={isDarkMode}
+            onOpen={(next) => onOpenRelated?.(next)}
+          />
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { slugStoreId } from "./mediaCommerceStores.js";
+import { inferShoppingCategory } from "./shoppingCategories.js";
 
 export const MEDIA_FEED_TABS = [
   { id: "all", label: "전체" },
@@ -272,6 +273,48 @@ export function filterByMediaTab(items, tabId, favoriteStoreIds = []) {
 
 export function getAiRecommendItems(items) {
   return items.filter((row) => row.isAiPick).slice(0, 6);
+}
+
+function relatedHashScore(id) {
+  let h = 0;
+  for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) % 997;
+  return h % 7;
+}
+
+/** 현재 상품과 유사한 추천 (카테고리·스토어·가격대·플랫폼 가중) */
+export function getRelatedFeedItems(pool, currentItem, limit = 10) {
+  if (!currentItem?.id || !Array.isArray(pool)) return [];
+  const currentId = currentItem.id;
+  const currentCat = inferShoppingCategory(currentItem);
+  const currentPlatform = currentItem.mediaPlatform;
+  const currentStore = currentItem.storeId;
+  const currentPrice = Number(currentItem.product?.priceKrw) || 0;
+  const currentMall = currentItem.product?.platform;
+
+  const scored = pool
+    .filter((row) => row.id !== currentId)
+    .map((item) => {
+      let score = 0;
+      const cat = inferShoppingCategory(item);
+      if (currentCat !== "전체" && cat === currentCat) score += 45;
+      if (item.mediaPlatform === currentPlatform) score += 12;
+      if (currentStore && item.storeId === currentStore) score += 30;
+      const price = Number(item.product?.priceKrw) || 0;
+      if (currentPrice > 0 && price > 0) {
+        const ratio = Math.min(price, currentPrice) / Math.max(price, currentPrice);
+        score += Math.round(ratio * 18);
+      }
+      if (currentMall && item.product?.platform === currentMall) score += 8;
+      score += Number(item.isAiPick) * 4;
+      score += parseViews(item.viewsLabel) * 0.0008;
+      score += relatedHashScore(item.id);
+      return { item, score };
+    });
+
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((row) => row.item);
 }
 
 export function sortForTab(items, tabId) {

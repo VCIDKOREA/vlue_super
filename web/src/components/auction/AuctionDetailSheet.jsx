@@ -3,6 +3,7 @@ import ModalCloseButton from "../common/ModalCloseButton";
 import AuctionCountdown from "./AuctionCountdown.jsx";
 import MarketPriceModal from "./MarketPriceModal.jsx";
 import MarketPriceReport from "./MarketPriceReport.jsx";
+import ProductMediaDisplay from "../shopping/ProductMediaDisplay.jsx";
 import {
   fetchAuctionDetail,
   postAuctionBid,
@@ -141,6 +142,11 @@ export default function AuctionDetailSheet({ auctionId, open, onClose, onToast, 
 
         {auction ? (
           <div className="space-y-4">
+            <ProductMediaDisplay
+              videoUrl={auction.videoUrl}
+              imageUrls={Array.isArray(auction.imageUrls) ? auction.imageUrls : []}
+            />
+
             <div className={`rounded-xl border px-4 py-3 ${auction.urgent ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"}`}>
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-bold text-slate-500">마감까지</p>

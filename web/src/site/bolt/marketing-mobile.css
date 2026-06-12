@@ -9,16 +9,7 @@
     overflow-x: hidden;
   }
 
-  /* 홈: 상단 설치 안내 바 숨김 → 검색이 첫 화면 */
-  [data-vlue-site="marketing"] .mkt-download-bar--home {
-    display: none !important;
-  }
-
-  [data-vlue-site="marketing"] .mkt-app-shell--home {
-    padding-top: var(--mkt-nav-h) !important;
-  }
-
-  /* 설치 바(다른 페이지): 좁은 폭 — 안내 문구 숨김, 버튼만 */
+  /* 홈 설치 바: 좁은 폭 — 안내 문구 숨김, 버튼만 */
   [data-vlue-site="marketing"] .mkt-download-bar-inner {
     flex-direction: row;
     align-items: center;

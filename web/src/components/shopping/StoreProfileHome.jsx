@@ -5,6 +5,8 @@ import { getStoreProfile, isFavoriteStore, toggleFavoriteStore } from "../../lib
 import { readSubscribedShopIds, toggleSubscribedShop } from "../../lib/shopPushStorage.js";
 import { feedTheme } from "../../lib/mediaCommerceTheme.js";
 import MediaCommercePlayerSheet from "./MediaCommercePlayerSheet.jsx";
+import SellerVodSwipeFeed from "./SellerVodSwipeFeed.jsx";
+import { getServerUserId } from "../../lib/shopApi.js";
 import FeedThumbImage from "./FeedThumbImage.jsx";
 import SwipeableChipTabs from "./SwipeableChipTabs.jsx";
 import ScreenBackHeader from "../common/ScreenBackHeader";
@@ -19,7 +21,8 @@ const VIDEO_FILTER_TABS = [
   { id: "all", label: "전체" },
   { id: "live", label: "라이브" },
   { id: "short", label: "숏츠" },
-  { id: "vod", label: "다시보기" }
+  { id: "vod", label: "다시보기" },
+  { id: "past_live", label: "지난 라이브 특가" }
 ];
 
 function filterProfileItems(items, tabId) {
@@ -52,6 +55,7 @@ export default function StoreProfileHome({
   const [fav, setFav] = useState(() => isFavoriteStore(storeId));
   const [subscribed, setSubscribed] = useState(() => readSubscribedShopIds().includes(storeId));
   const [selected, setSelected] = useState(null);
+  const [vodSwipeOpen, setVodSwipeOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("전체");
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -89,6 +93,20 @@ export default function StoreProfileHome({
         <ScreenBackHeader title="상점" onBack={onBack} isDarkMode={isDarkMode} />
         <p className="px-3 py-8 text-center text-[13px]">상점을 찾을 수 없습니다.</p>
       </div>
+    );
+  }
+
+  if (vodSwipeOpen) {
+    return (
+      <SellerVodSwipeFeed
+        sellerUserId={profile.sellerUserId || getServerUserId() || storeId}
+        storeProfile={profile}
+        onBack={() => setVodSwipeOpen(false)}
+        onToast={onToast}
+        onOpenStore={() => {}}
+        isGuestMode={isGuestMode}
+        onRequireAuth={onRequireAuth}
+      />
     );
   }
 
@@ -154,9 +172,18 @@ export default function StoreProfileHome({
         {profileTab === "archive" ? (
           <>
             <SwipeableChipTabs tabs={VIDEO_FILTER_TABS} activeId={videoFilterTab} onChange={setVideoFilterTab} theme={t} />
-            {filteredVideos.length === 0 ? (
+            {videoFilterTab === "past_live" ? (
+              <button
+                type="button"
+                onClick={() => setVodSwipeOpen(true)}
+                className="mt-3 w-full rounded-xl bg-gradient-to-r from-violet-600 to-rose-500 py-3.5 text-[14px] font-black text-white shadow-lg"
+              >
+                지난 라이브 특가 — 위아래 스와이프로 보기
+              </button>
+            ) : null}
+            {videoFilterTab !== "past_live" && filteredVideos.length === 0 ? (
               <p className={`py-12 text-center text-[13px] ${t.meta}`}>이 카테고리에 영상이 없습니다.</p>
-            ) : (
+            ) : videoFilterTab !== "past_live" ? (
               <div className="grid grid-cols-3 gap-1.5 pt-2">
                 {filteredVideos.map((item) => (
                   <button
@@ -175,7 +202,7 @@ export default function StoreProfileHome({
                   </button>
                 ))}
               </div>
-            )}
+            ) : null}
           </>
         ) : (
           <>
@@ -273,6 +300,7 @@ export default function StoreProfileHome({
           onToast={onToast}
           isDarkMode={false}
           onOpenStore={() => {}}
+          onOpenRelated={setSelected}
           isGuestMode={isGuestMode}
           onRequireAuth={onRequireAuth}
         />

@@ -545,6 +545,7 @@ export default function MediaCommerceFeed({
           onToast={onToast}
           isDarkMode={false}
           onOpenStore={openStore}
+          onOpenRelated={setSelected}
           isGuestMode={isGuestMode}
           onRequireAuth={onRequireAuth}
         />
@@ -567,7 +568,7 @@ export default function MediaCommerceFeed({
       ) : null}
 
       {ownerOpen ? (
-        <div className="fixed inset-0 z-[180] flex flex-col bg-white">
+        <div className="fixed inset-0 z-[180] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-white">
           <AiSourcingUploadScreen onBack={() => setOwnerOpen(false)} onToast={onToast} isDarkMode={isDarkMode} />
         </div>
       ) : null}

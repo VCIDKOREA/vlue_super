@@ -4,6 +4,7 @@ import {
   buildPageCatalogPool,
   filterByMediaTab,
   getAiRecommendItems,
+  getRelatedFeedItems,
   paginateFeed,
   sortForTab
 } from "./mediaCommerceCatalog.js";
@@ -121,6 +122,7 @@ export function mapVaultRowToFeedItem(row) {
       title,
       priceKrw: Number(payload.priceKrw) || 0,
       imageUrl,
+      imageUrls: Array.isArray(payload.imageUrls) ? payload.imageUrls : imageUrl ? [imageUrl] : [],
       videoUrl: videoUrl || undefined,
       platform: payload.platform || "store",
       description: payload.description || "",
@@ -193,6 +195,23 @@ export function getAllShortsItems() {
 /** AI 추천 스트립 전용 — 페이지네이션과 무관하게 전체 AI 픽 로드 */
 export async function loadAiRecommendEnriched() {
   const picks = getAiRecommendItems(buildCatalogPool());
+  return enrichFeedBatch(picks);
+}
+
+function mergeFeedPools() {
+  const seen = new Set();
+  const out = [];
+  for (const row of [...buildCatalogPool(), ...buildPageCatalogPool()]) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+  return out;
+}
+
+/** 상품 상세 — 함께 보면 좋을 상품 (알고리즘 추천) */
+export async function loadRelatedFeedItemsEnriched(currentItem, limit = 10) {
+  const picks = getRelatedFeedItems(mergeFeedPools(), currentItem, limit);
   return enrichFeedBatch(picks);
 }
 
