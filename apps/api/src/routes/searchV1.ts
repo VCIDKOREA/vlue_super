@@ -6,12 +6,17 @@ export const searchV1Routes = new Hono();
 /** GET /api/v1/search/verify?keyword=구미세무서 */
 searchV1Routes.get("/verify", async (c) => {
   const keyword = c.req.query("keyword")?.trim() || c.req.query("q")?.trim() || "";
+  const userLatitude = Number(c.req.query("user_lat") || c.req.query("lat"));
+  const userLongitude = Number(c.req.query("user_lng") || c.req.query("lng"));
   if (!keyword) {
     return c.json({ status: "error", message: "keyword 쿼리 파라미터가 필요합니다." }, 400);
   }
 
   try {
-    const result = await runSearchVerify(keyword);
+    const result = await runSearchVerify(keyword, {
+      userLatitude: Number.isFinite(userLatitude) ? userLatitude : null,
+      userLongitude: Number.isFinite(userLongitude) ? userLongitude : null
+    });
     if (result.status === "error") {
       return c.json(result, 404);
     }

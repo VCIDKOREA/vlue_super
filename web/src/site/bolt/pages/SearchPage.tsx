@@ -1,8 +1,11 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, useRef } from 'react';
 import { Search, AlertCircle, Shield, ArrowLeft, Loader2 } from 'lucide-react';
 import { verifySearchKeyword } from '../../../lib/searchVerifyApi.js';
 import SearchVerifyCrossTabs, { type CrossVerifyData } from '../components/SearchVerifyCrossTabs';
+import SearchVerifyPlaceList from '../components/SearchVerifyPlaceList';
 import { SearchVerifySourceList } from '../components/SearchVerifySourceLogos';
+
+type UserCoords = { latitude: number; longitude: number } | null;
 
 interface SearchPageProps {
   initialQuery: string;
@@ -15,6 +18,37 @@ export default function SearchPage({ initialQuery, onBack }: SearchPageProps) {
   const [verifyData, setVerifyData] = useState<CrossVerifyData | null>(null);
   const [pubLoading, setPubLoading] = useState(false);
   const [pubError, setPubError] = useState<string | null>(null);
+  const userCoordsRef = useRef<UserCoords>(null);
+  const activeQueryRef = useRef(activeQuery);
+  activeQueryRef.current = activeQuery;
+
+  const refineWithGeo = (coords: UserCoords) => {
+    const q = activeQueryRef.current.trim();
+    if (!q) return;
+    verifySearchKeyword(q, coords).then((res) => {
+      if (res.status === 'success' && res.data) {
+        setVerifyData(res.data as CrossVerifyData);
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        };
+        userCoordsRef.current = coords;
+        refineWithGeo(coords);
+      },
+      () => {
+        userCoordsRef.current = null;
+      },
+      { enableHighAccuracy: false, timeout: 4000, maximumAge: 600000 }
+    );
+  }, []);
 
   useEffect(() => {
     const q = activeQuery.trim();
@@ -28,7 +62,7 @@ export default function SearchPage({ initialQuery, onBack }: SearchPageProps) {
     setPubLoading(true);
     setPubError(null);
 
-    verifySearchKeyword(q)
+    verifySearchKeyword(q, userCoordsRef.current ?? undefined)
       .then((res) => {
         if (cancelled) return;
         if (res.status === 'success' && res.data) {
@@ -106,12 +140,21 @@ export default function SearchPage({ initialQuery, onBack }: SearchPageProps) {
           <div className="mkt-search-loading">
             <Loader2 className="w-8 h-8 text-primary-400 mx-auto mb-3 animate-spin" />
             <p className="text-gray-500 text-sm font-medium">통합 교차검증 데이터를 조회 중…</p>
+            <p className="text-gray-400 text-xs mt-1">카카오 · 네이버 · 공공·국세청 · VLUE 인증</p>
             <div className="mt-2 flex justify-center">
               <SearchVerifySourceList compact />
             </div>
           </div>
         ) : verifyData ? (
-          <SearchVerifyCrossTabs key={`${activeQuery}-${verifyData.is_registered}`} data={verifyData} />
+          <div className="sv-search-stack">
+            <SearchVerifyCrossTabs key={`${activeQuery}-${verifyData.is_registered}`} data={verifyData} />
+            <SearchVerifyPlaceList
+              query={verifyData.query}
+              branches={verifyData.place_branches ?? []}
+              locationSorted={Boolean(verifyData.location_sorted)}
+              onSelectBranch={(placeName) => setActiveQuery(placeName)}
+            />
+          </div>
         ) : (
           <div className="mkt-search-empty">
             <AlertCircle className="w-10 h-10 text-gray-200 mx-auto mb-3" />

@@ -1,4 +1,5 @@
 import { buildCatalogPool } from "./mediaCommerceCatalog.js";
+import { getVlueCertifiedStoreProfile } from "./vlueCertifiedStoreProfiles.js";
 
 const FAVORITES_KEY = "vlue_favorite_stores_v1";
 
@@ -45,6 +46,9 @@ export function isFavoriteStore(storeId) {
 }
 
 export function getStoreProfile(storeId) {
+  const certified = getVlueCertifiedStoreProfile(storeId);
+  if (certified) return certified;
+
   const items = buildCatalogPool().filter((row) => row.storeId === storeId);
   if (!items.length) return null;
   const first = items[0];

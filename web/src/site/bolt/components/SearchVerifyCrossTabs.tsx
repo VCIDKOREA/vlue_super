@@ -12,7 +12,9 @@ import {
   Crown,
   AlertTriangle,
   Sparkles,
+  Store,
 } from 'lucide-react';
+import { navigateToVluePartnerStore } from '../../../lib/vluePartnerStoreNav.js';
 import {
   KakaoSourceLogo,
   NaverSourceLogo,
@@ -56,6 +58,8 @@ export type PublicBusinessCandidate = {
 
 export type PublicSourceData = {
   matched: boolean;
+  store_name: string;
+  category: string;
   business_status: string;
   business_number: string;
   biz_type: string;
@@ -67,10 +71,24 @@ export type PublicSourceData = {
   candidates: PublicBusinessCandidate[];
 };
 
+export type PlaceBranchItem = {
+  place_name: string;
+  category: string;
+  telephone: string;
+  address: string;
+  road_address: string;
+  place_url: string;
+  latitude: number | null;
+  longitude: number | null;
+  distance_m: number | null;
+};
+
 export type VlueAuthData = {
   status_text: string;
   safety_score: number;
   partner_name?: string;
+  partner_id?: string;
+  store_id?: string;
   cert_number?: string;
   category?: string;
   phone?: string;
@@ -84,6 +102,8 @@ export type CrossVerifyData = {
   naver: NaverSourceData;
   public: PublicSourceData;
   vlue_auth: VlueAuthData;
+  place_branches?: PlaceBranchItem[];
+  location_sorted?: boolean;
 };
 
 type TabKey = 'kakao' | 'naver' | 'public' | 'vlue';
@@ -97,7 +117,7 @@ const TABS: {
   { key: 'kakao', label: '카카오 인증', accent: 'sv-tab--kakao', Logo: KakaoSourceLogo },
   { key: 'naver', label: '네이버 인증', accent: 'sv-tab--naver', Logo: NaverSourceLogo },
   { key: 'public', label: '공공·국세청', accent: 'sv-tab--public', Logo: PublicSourceLogo },
-  { key: 'vlue', label: 'VLUE 독자검증', accent: 'sv-tab--vlue', Logo: VlueSourceLogo },
+  { key: 'vlue', label: 'VLUE 인증', accent: 'sv-tab--vlue', Logo: VlueSourceLogo },
 ];
 
 function buildMapEmbed(lat: number, lng: number) {
@@ -307,15 +327,19 @@ function PublicPanel({ data }: { data: PublicSourceData }) {
   const active = candidates[selectedIndex] || null;
   const display = active
     ? {
+        store_name: active.store_name || data.store_name,
+        category: data.category,
         business_status: active.business_status,
         business_number: active.business_number,
         biz_type: active.biz_type,
         biz_item: active.biz_item,
         ceo_name: active.ceo_name,
-        telephone: active.telephone,
-        address: active.address,
+        telephone: active.telephone || data.telephone,
+        address: active.address || data.address,
       }
     : {
+        store_name: data.store_name,
+        category: data.category,
         business_status: data.business_status,
         business_number: data.business_number,
         biz_type: data.biz_type,
@@ -334,7 +358,14 @@ function PublicPanel({ data }: { data: PublicSourceData }) {
         {data.matched ? <ShieldCheck className="w-4 h-4 flex-shrink-0" /> : <Info className="w-4 h-4 flex-shrink-0" />}
         <p>{data.fail_safe_message}</p>
       </div>
+      {display.store_name ? (
+        <div className="sv-public-store-head">
+          <h3 className="sv-public-store-name">{display.store_name}</h3>
+          {display.category ? <p className="sv-public-store-category">{display.category}</p> : null}
+        </div>
+      ) : null}
       <div className="sv-public-bizno-table">
+        <PublicBiznoRow label="상호" value={display.store_name} alwaysShow />
         <PublicBiznoRow label="업태" value={display.biz_item} />
         <PublicBiznoRow label="업종" value={display.biz_type} />
         <PublicBiznoRow label="전화번호" value={display.telephone} />
@@ -426,6 +457,16 @@ function VluePanel({ data, isRegistered }: { data: CrossVerifyData; isRegistered
           <FieldRow icon={Phone} label="공식 연락처" value={auth.phone || ''} href={telHref(auth.phone || '') || undefined} highlight />
           <FieldRow icon={MapPin} label="등록 주소" value={auth.address || ''} />
         </div>
+        {auth.store_id ? (
+          <button
+            type="button"
+            className="sv-cross-action sv-cross-action--vlue-store"
+            onClick={() => navigateToVluePartnerStore(auth.store_id!)}
+          >
+            <Store className="w-4 h-4" />
+            VLUE 인증 상점 방문하기
+          </button>
+        ) : null}
       </div>
     );
   }

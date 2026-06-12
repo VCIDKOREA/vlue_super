@@ -124,10 +124,11 @@ export async function searchFscCorpByName(corpNm: string, max = 15): Promise<Fsc
     process.env.FSC_CORP_BASIC_API_URL ||
     "https://apis.data.go.kr/1160100/service/GetCorpBasicInfoService_V2/getCorpOutline_V2";
 
-  for (const basDt of basDtCandidates()) {
-    const rows = await fetchFscByBasDt(endpoint, name, basDt, max);
-    if (rows.length) return rows.slice(0, max);
+  const dates = basDtCandidates(4);
+  const batches = await Promise.all(dates.map((basDt) => fetchFscByBasDt(endpoint, name, basDt, max)));
+  const merged = new Map<string, FscCorpRecord>();
+  for (const rows of batches) {
+    for (const row of rows) merged.set(row.business_number, row);
   }
-
-  return [];
+  return [...merged.values()].slice(0, max);
 }

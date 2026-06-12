@@ -55,7 +55,7 @@ export function SearchVerifySourceList({ compact = false }: { compact?: boolean 
     { key: 'kakao', label: '카카오', Logo: KakaoSourceLogo },
     { key: 'naver', label: '네이버', Logo: NaverSourceLogo },
     { key: 'public', label: '공공·국세청', Logo: PublicSourceLogo },
-    { key: 'vlue', label: 'VLUE 독자검증', Logo: VlueSourceLogo },
+    { key: 'vlue', label: 'VLUE 인증', Logo: VlueSourceLogo },
   ] as const;
 
   return (

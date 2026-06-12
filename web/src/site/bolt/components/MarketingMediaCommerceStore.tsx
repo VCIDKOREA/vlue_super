@@ -38,6 +38,7 @@ import {
   writeStoreFeedCategory,
   STORE_FEED_PREFS_CHANGED,
 } from '../../../lib/storeFeedPrefs.js';
+import { consumePendingVlueStoreId } from '../../../lib/vluePartnerStoreNav.js';
 import './marketing-store.css';
 
 const STORE_TABS = MEDIA_FEED_TABS.filter((t) =>
@@ -202,6 +203,11 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
   }, []);
 
   const openStore = useCallback((id: string) => setStoreProfileId(id), []);
+
+  useEffect(() => {
+    const pending = consumePendingVlueStoreId();
+    if (pending) setStoreProfileId(pending);
+  }, []);
 
   const loadFeedPage = useCallback(
     async (nextPage: number, replace = false) => {

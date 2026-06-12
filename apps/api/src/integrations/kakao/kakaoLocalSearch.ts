@@ -7,7 +7,13 @@ export type KakaoLocalItem = {
   place_url: string;
   latitude: number | null;
   longitude: number | null;
+  distance_m: number | null;
   rank: number;
+};
+
+export type KakaoSearchCenter = {
+  latitude: number;
+  longitude: number;
 };
 
 export type KakaoSearchResult = {
@@ -71,6 +77,7 @@ function parseKakaoDoc(doc: Record<string, string>, keyword: string, rank: numbe
   const jibun = String(doc.address_name || "").trim();
   const x = Number(doc.x || 0);
   const y = Number(doc.y || 0);
+  const distanceRaw = Number(doc.distance || 0);
 
   return {
     place_name: String(doc.place_name || keyword).trim(),
@@ -81,13 +88,15 @@ function parseKakaoDoc(doc: Record<string, string>, keyword: string, rank: numbe
     place_url: String(doc.place_url || "").trim(),
     latitude: y > 0 ? y : null,
     longitude: x > 0 ? x : null,
+    distance_m: Number.isFinite(distanceRaw) && distanceRaw > 0 ? distanceRaw : null,
     rank
   };
 }
 
 async function fetchKakaoDocs(
   keyword: string,
-  size = 10
+  size = 10,
+  center?: KakaoSearchCenter
 ): Promise<{ docs: Record<string, string>[]; httpStatus: number; apiMessage: string }> {
   const restKey = getKakaoRestKey();
   if (!restKey) {
@@ -97,6 +106,11 @@ async function fetchKakaoDocs(
   const url = new URL("https://dapi.kakao.com/v2/local/search/keyword.json");
   url.searchParams.set("query", keyword);
   url.searchParams.set("size", String(Math.min(Math.max(size, 1), 15)));
+  if (center && Number.isFinite(center.longitude) && Number.isFinite(center.latitude)) {
+    url.searchParams.set("x", String(center.longitude));
+    url.searchParams.set("y", String(center.latitude));
+    url.searchParams.set("sort", "distance");
+  }
 
   try {
     const res = await fetch(url.toString(), {
@@ -120,12 +134,18 @@ async function fetchKakaoDocs(
   }
 }
 
-export async function searchKakaoLocalList(keyword: string, max = 10): Promise<KakaoLocalItem[]> {
-  const { docs } = await fetchKakaoDocs(keyword, max);
+export async function searchKakaoLocalList(
+  keyword: string,
+  max = 10,
+  center?: KakaoSearchCenter
+): Promise<KakaoLocalItem[]> {
+  const { docs } = await fetchKakaoDocs(keyword, max, center);
   const q = String(keyword || "").trim();
   if (!docs.length) return [];
 
   const parsed = docs.map((doc, index) => parseKakaoDoc(doc, q, index + 1));
+  if (center) return parsed;
+
   const ranked = parsed
     .map((item, index) => ({ item, score: scoreKakaoDoc(docs[index]!, q) }))
     .sort((a, b) => b.score - a.score);
@@ -134,18 +154,21 @@ export async function searchKakaoLocalList(keyword: string, max = 10): Promise<K
   return [parsed[0]!];
 }
 
-export async function searchKakaoLocalDetailed(keyword: string): Promise<KakaoSearchResult> {
+export async function searchKakaoLocalDetailed(
+  keyword: string,
+  center?: KakaoSearchCenter
+): Promise<KakaoSearchResult> {
   const q = String(keyword || "").trim();
   if (!q) {
     return { item: null, unavailable_reason: "검색어가 비어 있습니다.", http_status: null };
   }
 
-  const { docs, httpStatus, apiMessage } = await fetchKakaoDocs(q, 10);
+  const { docs, httpStatus, apiMessage } = await fetchKakaoDocs(q, 10, center);
   if (!docs.length) {
     return { item: null, unavailable_reason: apiMessage, http_status: httpStatus || null };
   }
 
-  const list = await searchKakaoLocalList(q, 10);
+  const list = await searchKakaoLocalList(q, 10, center);
   return {
     item: list[0] ?? null,
     unavailable_reason: list[0] ? "" : apiMessage || "카카오 결과 파싱 실패",

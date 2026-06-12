@@ -1,5 +1,10 @@
 import { maskCeoName } from "../../lib/maskCeoName.js";
-import { searchKakaoLocalDetailed, searchKakaoLocalList } from "../../integrations/kakao/kakaoLocalSearch.js";
+import {
+  searchKakaoLocalDetailed,
+  searchKakaoLocalList,
+  type KakaoLocalItem,
+  type KakaoSearchCenter
+} from "../../integrations/kakao/kakaoLocalSearch.js";
 import { searchNaverLocal, searchNaverLocalList } from "../../integrations/naver/naverLocalSearch.js";
 import { lookupNtsBusinessByNumber } from "../../integrations/publicData/ntsBusinessLookup.js";
 import { searchBusinessesByTradeName, type TradeNameBusinessCandidate } from "../../integrations/publicData/businessTradeNameSearch.js";
@@ -31,6 +36,8 @@ export type NaverSourceData = {
 export type PublicBusinessCandidate = TradeNameBusinessCandidate;
 
 export type PublicSourceData = {
+  store_name: string;
+  category: string;
   business_status: string;
   business_number: string;
   biz_type: string;
@@ -43,10 +50,29 @@ export type PublicSourceData = {
   candidates: PublicBusinessCandidate[];
 };
 
+export type PlaceBranchItem = {
+  place_name: string;
+  category: string;
+  telephone: string;
+  address: string;
+  road_address: string;
+  place_url: string;
+  latitude: number | null;
+  longitude: number | null;
+  distance_m: number | null;
+};
+
+export type SearchVerifyOptions = {
+  userLatitude?: number | null;
+  userLongitude?: number | null;
+};
+
 export type VlueAuthData = {
   status_text: string;
   safety_score: number;
   partner_name: string;
+  partner_id: string;
+  store_id: string;
   cert_number: string;
   category: string;
   phone: string;
@@ -60,6 +86,8 @@ export type CrossVerifyData = {
   naver: NaverSourceData;
   public: PublicSourceData;
   vlue_auth: VlueAuthData;
+  place_branches: PlaceBranchItem[];
+  location_sorted: boolean;
 };
 
 export type SearchVerifyResponse =
@@ -153,8 +181,10 @@ function formatPhoneFromStore(raw: string): string {
   return String(raw || "").trim();
 }
 
-function emptyPublicFields(): Pick<
+function emptyPublicFields(storeName = "", category = ""): Pick<
   PublicSourceData,
+  | "store_name"
+  | "category"
   | "business_status"
   | "business_number"
   | "biz_type"
@@ -164,6 +194,8 @@ function emptyPublicFields(): Pick<
   | "address"
 > {
   return {
+    store_name: storeName,
+    category,
     business_status: "미확인",
     business_number: "미확인",
     biz_type: "미확인",
@@ -174,8 +206,34 @@ function emptyPublicFields(): Pick<
   };
 }
 
-function fromCandidate(candidate: PublicBusinessCandidate): Pick<
+function mapPlaceBranches(items: KakaoLocalItem[]): PlaceBranchItem[] {
+  return items.map((item) => ({
+    place_name: item.place_name,
+    category: item.category,
+    telephone: item.telephone,
+    address: item.address,
+    road_address: item.road_address,
+    place_url: item.place_url,
+    latitude: item.latitude,
+    longitude: item.longitude,
+    distance_m: item.distance_m
+  }));
+}
+
+function userSearchCenter(options: SearchVerifyOptions): KakaoSearchCenter | undefined {
+  const lat = Number(options.userLatitude);
+  const lng = Number(options.userLongitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+  return { latitude: lat, longitude: lng };
+}
+
+function fromCandidate(
+  candidate: PublicBusinessCandidate,
+  fallback: { storeName: string; category: string; telephone: string; address: string }
+): Pick<
   PublicSourceData,
+  | "store_name"
+  | "category"
   | "business_status"
   | "business_number"
   | "biz_type"
@@ -187,13 +245,15 @@ function fromCandidate(candidate: PublicBusinessCandidate): Pick<
 > {
   return {
     matched: true,
+    store_name: candidate.store_name || fallback.storeName,
+    category: fallback.category,
     business_status: candidate.business_status,
     business_number: candidate.business_number,
     biz_type: candidate.biz_type,
     biz_item: candidate.biz_item,
     ceo_name: candidate.ceo_name ? maskCeoName(candidate.ceo_name) : "",
-    telephone: formatPhoneFromStore(candidate.telephone),
-    address: candidate.address
+    telephone: formatPhoneFromStore(candidate.telephone || fallback.telephone),
+    address: candidate.address || fallback.address
   };
 }
 
@@ -202,17 +262,24 @@ async function buildPublicSource(input: {
   matchName: string;
   matchPhone: string;
   matchAddress: string;
+  matchCategory: string;
   latitude: number | null;
   longitude: number | null;
   extraNames: string[];
   hasExternalPlace: boolean;
 }): Promise<PublicSourceData> {
-  const { keyword, matchName, matchPhone, matchAddress, latitude, longitude, extraNames, hasExternalPlace } =
+  const { keyword, matchName, matchPhone, matchAddress, matchCategory, latitude, longitude, extraNames, hasExternalPlace } =
     input;
+  const placeFallback = {
+    storeName: matchName,
+    category: matchCategory,
+    telephone: matchPhone,
+    address: matchAddress
+  };
   const directBno = digitsOnly(keyword);
   const searchTerms = [
-    ...new Set([keyword, matchName, ...extraNames].map((v) => String(v || "").trim()).filter(Boolean))
-  ];
+    ...new Set([keyword, matchName, ...extraNames.slice(0, 2)].map((v) => String(v || "").trim()).filter(Boolean))
+  ].slice(0, 3);
   const searchContext = {
     matchName,
     matchPhone,
@@ -225,12 +292,14 @@ async function buildPublicSource(input: {
     const nts = await lookupNtsBusinessByNumber(directBno);
     if (nts) {
       return {
-        ...emptyPublicFields(),
+        ...emptyPublicFields(matchName, matchCategory),
         matched: true,
         business_status: nts.businessStatus,
         business_number: nts.businessNumber,
         biz_type: nts.bizType,
         biz_item: nts.bizItem,
+        telephone: matchPhone,
+        address: matchAddress,
         fail_safe_message: "국세청 사업자상태 API 기준으로 영업 정보가 확인되었습니다.",
         candidates: []
       };
@@ -238,13 +307,14 @@ async function buildPublicSource(input: {
   }
 
   if (isPublicInstitution(matchName)) {
-    return {
-      ...emptyPublicFields(),
+      return {
+      ...emptyPublicFields(matchName, matchCategory),
       matched: true,
       business_status: "공공기관 / 정상 운영중",
       business_number: "해당없음(공공기관)",
       biz_type: "공공 행정",
       biz_item: inferPublicBizItem(matchName),
+      telephone: matchPhone,
       address: matchAddress,
       fail_safe_message:
         "공공기관은 사업자등록 체계와 별도로 운영됩니다. 행정기관 분류 및 네이버·카카오 장소 정보를 함께 참고해 주세요.",
@@ -302,7 +372,7 @@ async function buildPublicSource(input: {
     const fromStoreExact = store?.businessNumber === primary.business_number;
     const fromHint = primary.source?.includes("public_hint_registry");
     return {
-      ...fromCandidate(primary),
+      ...fromCandidate(primary, placeFallback),
       fail_safe_message: fromStoreExact
         ? "소상공인 상가정보·금융위 기업기본정보 교차 조회로 사업자 정보를 확인했습니다."
         : fromHint
@@ -315,8 +385,10 @@ async function buildPublicSource(input: {
   }
 
   return {
-    ...emptyPublicFields(),
+    ...emptyPublicFields(matchName, matchCategory),
     matched: false,
+    telephone: matchPhone,
+    address: matchAddress,
     fail_safe_message: hasExternalPlace ? FAIL_SAFE_UNMATCHED : "공공데이터에서 일치하는 사업자 정보를 찾지 못했습니다.",
     candidates: []
   };
@@ -334,6 +406,8 @@ function buildVlueAuth(
       status_text: "VLUE 보이스피싱 예방 센터 교차 검증 완료",
       safety_score: partner.safety_score,
       partner_name: partner.name,
+      partner_id: partner.id,
+      store_id: partner.store_id,
       cert_number: partner.cert_number,
       category: partner.category,
       phone: partner.phone,
@@ -352,6 +426,8 @@ function buildVlueAuth(
     status_text: "VLUE 예방 센터 교차 검증 진행 중",
     safety_score: Math.min(Math.max(score, 35), 78),
     partner_name: "",
+    partner_id: "",
+    store_id: "",
     cert_number: "",
     category: "",
     phone: "",
@@ -359,23 +435,31 @@ function buildVlueAuth(
   };
 }
 
-export async function runSearchVerify(keyword: string): Promise<SearchVerifyResponse> {
+export async function runSearchVerify(
+  keyword: string,
+  options: SearchVerifyOptions = {}
+): Promise<SearchVerifyResponse> {
   const q = String(keyword || "").trim();
   if (!q) return { status: "error", message: "검색어(keyword)가 필요합니다." };
 
-  const [kakaoResult, kakaoList, naverList] = await Promise.all([
-    searchKakaoLocalDetailed(q),
-    searchKakaoLocalList(q, 5),
+  const userCenter = userSearchCenter(options);
+  const [kakaoList, naverList] = await Promise.all([
+    searchKakaoLocalList(q, 15, userCenter),
     searchNaverLocalList(q, 5)
   ]);
 
-  let kakaoResolved = kakaoResult;
+  let kakaoResolved: Awaited<ReturnType<typeof searchKakaoLocalDetailed>> = {
+    item: kakaoList[0] ?? null,
+    unavailable_reason: kakaoList[0] ? "" : "카카오에서 일치하는 장소를 찾지 못했습니다.",
+    http_status: kakaoList.length ? 200 : null
+  };
   const naverBest = naverList[0] ?? null;
 
   if (!kakaoResolved.item && naverBest?.title) {
-    const retry = await searchKakaoLocalDetailed(naverBest.title);
-    if (retry.item) kakaoResolved = retry;
-    else if (!kakaoResolved.unavailable_reason) kakaoResolved = retry;
+    const retryList = await searchKakaoLocalList(naverBest.title, 5, userCenter);
+    if (retryList[0]) {
+      kakaoResolved = { item: retryList[0], unavailable_reason: "", http_status: 200 };
+    }
   }
 
   if (!kakaoResolved.item && !naverBest) {
@@ -398,6 +482,7 @@ export async function runSearchVerify(keyword: string): Promise<SearchVerifyResp
       matchName,
       matchPhone,
       matchAddress,
+      matchCategory: kakaoBest?.category || naverBest?.category || "",
       latitude: kakaoBest?.latitude ?? naverBest?.latitude ?? null,
       longitude: kakaoBest?.longitude ?? naverBest?.longitude ?? null,
       extraNames: kakaoList.map((item) => item.place_name).filter(Boolean),
@@ -421,7 +506,9 @@ export async function runSearchVerify(keyword: string): Promise<SearchVerifyResp
       kakao,
       naver,
       public: publicData,
-      vlue_auth
+      vlue_auth,
+      place_branches: mapPlaceBranches(kakaoList),
+      location_sorted: Boolean(userCenter)
     }
   };
 }

@@ -1,6 +1,8 @@
 /** VLUE 정식 파트너 목록 (추후 DB 연동) */
 export type VluePartnerRecord = {
   id: string;
+  /** VLUE 스토어 프로필 ID (쇼핑 탭 상점 연결) */
+  store_id: string;
   name: string;
   aliases: string[];
   cert_number: string;
@@ -15,6 +17,7 @@ export type VluePartnerRecord = {
 const PARTNERS: VluePartnerRecord[] = [
   {
     id: "vlue-002",
+    store_id: "vlue-002",
     name: "다다오피스",
     aliases: ["다다오피스", "dada office", "dadaoffice"],
     cert_number: "VLUE-BIZ-2024-0087",
@@ -27,6 +30,7 @@ const PARTNERS: VluePartnerRecord[] = [
   },
   {
     id: "vlue-001",
+    store_id: "vlue-001",
     name: "명경채 요양병원",
     aliases: ["명경채", "명경채요양병원"],
     cert_number: "VLUE-MED-2024-0031",
@@ -39,6 +43,7 @@ const PARTNERS: VluePartnerRecord[] = [
   },
   {
     id: "vlue-003",
+    store_id: "vlue-003",
     name: "한국신뢰금융",
     aliases: ["한국신뢰금융", "신뢰금융"],
     cert_number: "VLUE-FIN-2025-0012",

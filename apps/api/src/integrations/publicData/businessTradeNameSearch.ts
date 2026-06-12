@@ -89,7 +89,7 @@ export async function searchBusinessesByTradeName(
       ...deriveFscSearchTerms(q),
       ...(context.matchName ? deriveFscSearchTerms(context.matchName) : [])
     ])
-  ];
+  ].slice(0, 3);
 
   const [stores, fscBatches, hints, sbizRows] = await Promise.all([
     searchSmallBusinessStoresByName(q, max, {

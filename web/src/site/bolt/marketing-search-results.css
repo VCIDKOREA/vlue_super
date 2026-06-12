@@ -362,6 +362,16 @@
   border-color: #2563eb;
 }
 
+.sv-cross-action--vlue-store {
+  margin-top: 0.75rem;
+  width: 100%;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+  border-color: #4338ca;
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.22);
+}
+
 .sv-cross-note {
   margin: 0.75rem 0 0;
   padding: 0.6rem 0.7rem;
@@ -812,4 +822,202 @@
   border: 1px solid #e2e8f0;
   border-radius: 9999px;
   padding: 0.15rem 0.45rem;
+}
+
+.sv-search-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sv-public-store-head {
+  margin-bottom: 0.75rem;
+}
+
+.sv-public-store-name {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  color: #1d4ed8;
+  letter-spacing: -0.02em;
+}
+
+.sv-public-store-category {
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* 네이버 플레이스 스타일 전국 지점 목록 */
+.sv-place-section {
+  margin-top: 0.25rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: #fff;
+  border: 1px solid #e8edf5;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.sv-place-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.sv-place-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.02em;
+}
+
+.sv-place-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.6875rem;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.sv-place-count {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #3182f6;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 9999px;
+  padding: 0.2rem 0.55rem;
+}
+
+.sv-place-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.sv-place-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.sv-place-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e8edf5;
+  border-radius: 0.85rem;
+  background: #fafbfc;
+  overflow: hidden;
+  min-height: 100%;
+}
+
+.sv-place-card-main {
+  flex: 1;
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 0.8rem 0.55rem;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sv-place-card-main:hover {
+  background: #f8fbff;
+}
+
+.sv-place-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sv-place-name {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #1d4ed8;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.sv-place-category {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
+.sv-place-distance {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sv-place-phone {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.sv-place-phone--muted {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.sv-place-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.sv-place-actions {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.45rem 0.65rem 0.6rem;
+  border-top: 1px solid #edf0f4;
+}
+
+.sv-place-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.55rem;
+  color: #64748b;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  text-decoration: none;
+}
+
+.sv-place-action:hover {
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.sv-place-more {
+  margin: 0.85rem 0 0;
+  text-align: center;
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
+.sv-place-more span {
+  font-weight: 700;
+  color: #334155;
+}
+
+@media (max-width: 720px) {
+  .sv-place-grid {
+    grid-template-columns: 1fr;
+  }
 }
