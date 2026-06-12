@@ -128,7 +128,7 @@ export async function searchFscCorpByName(corpNm: string, max = 15): Promise<Fsc
   const batches = await Promise.all(dates.map((basDt) => fetchFscByBasDt(endpoint, name, basDt, max)));
   const merged = new Map<string, FscCorpRecord>();
   for (const rows of batches) {
-    for (const row of rows) merged.set(row.business_number, row);
+    for (const row of rows) merged.set(row.businessNumber, row);
   }
   return [...merged.values()].slice(0, max);
 }
