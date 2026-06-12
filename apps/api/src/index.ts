@@ -41,7 +41,14 @@ app.use(
   cors({
     origin: origins,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "X-VLUE-User-Id", "X-Admin-Device-Id", "Last-Event-ID"]
+    allowHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-VLUE-User-Id",
+      "X-VLUE-Client",
+      "X-Admin-Device-Id",
+      "Last-Event-ID"
+    ]
   })
 );
 
