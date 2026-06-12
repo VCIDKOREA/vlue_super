@@ -10,31 +10,57 @@
   min-width: 0;
 }
 
-/* 앱과 동일 — 상품 등록 FAB (채팅 FAB 위) */
+/* 상품 등록 — 상단 버튼 + 우하단 FAB (앱과 동일) */
+.mkt-store__upload-btn,
+[data-vlue-site="marketing"] .mkt-store__upload-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 0.75rem;
+  border: 1px solid #3b82f6;
+  background: #2563eb;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgb(37 99 235 / 28%);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.mkt-store__upload-btn:hover,
+[data-vlue-site="marketing"] .mkt-store__upload-btn:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.mkt-store__upload-fab,
 [data-vlue-site="marketing"] .mkt-store__upload-fab {
   position: fixed;
-  z-index: 45;
+  z-index: 60;
   right: calc(1rem + env(safe-area-inset-right, 0px));
-  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
   display: flex;
-  height: 2.75rem;
-  width: 2.75rem;
+  height: 3rem;
+  width: 3rem;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
   border: 1px solid #3b82f6;
   background: #2563eb;
   color: #ffffff;
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 300;
   line-height: 1;
-  box-shadow: 0 4px 14px rgb(37 99 235 / 35%);
+  box-shadow: 0 6px 18px rgb(37 99 235 / 40%);
   transition: transform 0.15s ease, background 0.15s ease;
+  cursor: pointer;
 }
 
+.mkt-store__upload-fab:hover,
 [data-vlue-site="marketing"] .mkt-store__upload-fab:hover {
   background: #1d4ed8;
-  transform: scale(1.04);
+  transform: scale(1.06);
 }
 
 [data-vlue-site="marketing"] .mkt-store__upload-overlay {

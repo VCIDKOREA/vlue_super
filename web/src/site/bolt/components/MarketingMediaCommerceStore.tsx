@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search,
   X,
@@ -11,6 +12,7 @@ import {
   Users,
   CreditCard,
   Gavel,
+  Plus,
 } from 'lucide-react';
 import FeedThumbImage from '../../../components/shopping/FeedThumbImage.jsx';
 import MediaCommercePlayerSheet from '../../../components/shopping/MediaCommercePlayerSheet.jsx';
@@ -415,6 +417,14 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
           {storeSearchForm('mkt-store__search mkt-store__search--top')}
           <button
             type="button"
+            onClick={openProductUpload}
+            className="mkt-store__upload-btn"
+          >
+            <Plus className="w-4 h-4 shrink-0" aria-hidden />
+            상품 등록
+          </button>
+          <button
+            type="button"
             onClick={() => {
               if (!user && onLoginClick) onLoginClick();
             }}
@@ -571,15 +581,20 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
         </div>
       ) : null}
 
-      <button
-        type="button"
-        onClick={openProductUpload}
-        className="mkt-store__upload-fab"
-        aria-label="상품 등록"
-        title="상품 등록"
-      >
-        +
-      </button>
+      {typeof document !== 'undefined'
+        ? createPortal(
+            <button
+              type="button"
+              onClick={openProductUpload}
+              className="mkt-store__upload-fab"
+              aria-label="상품 등록"
+              title="상품 등록"
+            >
+              +
+            </button>,
+            document.body
+          )
+        : null}
 
       {ownerOpen ? (
         <div className="mkt-store__upload-overlay">
