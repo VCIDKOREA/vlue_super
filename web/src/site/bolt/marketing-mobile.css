@@ -272,12 +272,25 @@
     letter-spacing: -0.02em;
   }
 
-  /* VLUE 스토어·쇼핑 탭 줄바꿈 */
+  /* VLUE 스토어 — 탭 한 줄 가로 스크롤 */
   [data-vlue-site="marketing"] .mkt-store__mobile-tabs,
   [data-vlue-site="marketing"] .mkt-store__tabs {
-    flex-wrap: wrap !important;
-    overflow-x: visible !important;
-    justify-content: flex-start;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+
+  [data-vlue-site="marketing"] .mkt-store__upload-btn--desktop {
+    display: none !important;
+  }
+
+  [data-vlue-site="marketing"] .mkt-store__topbar-center {
+    gap: 0.375rem;
+  }
+
+  [data-vlue-site="marketing"] .mkt-store__bluepay {
+    display: none;
   }
 
   /* 인증 요금제 상단 여백 */

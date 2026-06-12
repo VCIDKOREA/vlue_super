@@ -38,8 +38,16 @@ const INITIAL: Message = {
   time: now(),
 };
 
-export default function ChatBot() {
-  const [open, setOpen] = useState(false);
+type ChatBotProps = {
+  hideTrigger?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+};
+
+export default function ChatBot({ hideTrigger = false, open: openProp, onOpenChange }: ChatBotProps = {}) {
+  const [openInternal, setOpenInternal] = useState(false);
+  const open = openProp ?? openInternal;
+  const setOpen = onOpenChange ?? setOpenInternal;
   const [messages, setMessages] = useState<Message[]>([INITIAL]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -152,18 +160,20 @@ export default function ChatBot() {
         </div>
       )}
 
-      <button
-        onClick={() => setOpen(!open)}
-        className={`w-13 h-13 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 ${
-          open ? 'bg-gray-600' : 'bg-primary-600 hover:bg-primary-700'
-        }`}
-        style={{ width: '52px', height: '52px' }}
-      >
-        {open
-          ? <X className="w-5 h-5 text-white" />
-          : <MessageCircle className="w-5.5 h-5.5 text-white" style={{ width: '22px', height: '22px' }} />
-        }
-      </button>
+      {!hideTrigger ? (
+        <button
+          onClick={() => setOpen(!open)}
+          className={`w-13 h-13 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 ${
+            open ? 'bg-gray-600' : 'bg-primary-600 hover:bg-primary-700'
+          }`}
+          style={{ width: '52px', height: '52px' }}
+        >
+          {open
+            ? <X className="w-5 h-5 text-white" />
+            : <MessageCircle className="w-5.5 h-5.5 text-white" style={{ width: '22px', height: '22px' }} />
+          }
+        </button>
+      ) : null}
     </div>
   );
 }

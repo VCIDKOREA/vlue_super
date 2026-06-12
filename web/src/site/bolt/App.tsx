@@ -4,9 +4,8 @@ import AnimatedBackground from './components/AnimatedBackground';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import AppDownloadBar from './components/AppDownloadBar';
-import ChatBot from './components/ChatBot';
 import AuthModal from './components/AuthModal';
-import EmergencyButton from './components/EmergencyButton';
+import MarketingFabDock from './components/MarketingFabDock';
 import LoginRequiredModal from './components/LoginRequiredModal';
 import HomePage from './pages/HomePage';
 import SearchPage from './pages/SearchPage';
@@ -194,10 +193,11 @@ export default function App() {
         {view !== 'mypage' && <Footer onNavigate={handleNavigate} />}
         </div>
       </div>
-      <div className="mkt-fab-dock fixed z-50 flex flex-col items-end gap-3">
-        <ChatBot />
-        <EmergencyButton />
-      </div>
+      <MarketingFabDock
+        currentView={view}
+        isLoggedIn={Boolean(user)}
+        onLoginRequired={handleLoginRequired}
+      />
       {showLoginRequired && !user && (
         <LoginRequiredModal onClose={() => setShowLoginRequired(false)} onLogin={() => { setShowLoginRequired(false); setShowAuth(true); }} />
       )}

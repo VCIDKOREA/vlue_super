@@ -461,6 +461,101 @@
   position: relative;
 }
 
+/* 통합 FAB — 탭 시 메뉴 펼침 */
+[data-vlue-site="marketing"] .mkt-fab-dock__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  border: 0;
+  background: rgb(15 23 42 / 28%);
+  cursor: default;
+}
+
+[data-vlue-site="marketing"] .mkt-fab-dock__menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.625rem;
+  margin-bottom: 0.25rem;
+  animation: mktFabMenuIn 0.2s ease-out;
+}
+
+@keyframes mktFabMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+[data-vlue-site="marketing"] .mkt-fab-dock__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.875rem 0.5rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 12%);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
+  transition: transform 0.12s ease;
+}
+
+[data-vlue-site="marketing"] .mkt-fab-dock__item:active {
+  transform: scale(0.97);
+}
+
+[data-vlue-site="marketing"] .mkt-fab-dock__item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  color: #ffffff;
+}
+
+[data-vlue-site="marketing"] .mkt-fab-dock__item-icon--blue {
+  background: #2563eb;
+}
+
+[data-vlue-site="marketing"] .mkt-fab-dock__item-icon--primary {
+  background: #2563eb;
+}
+
+[data-vlue-site="marketing"] .mkt-fab-dock__item-icon--danger {
+  background: #ef4444;
+}
+
+[data-vlue-site="marketing"] .mkt-fab-dock__main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 9999px;
+  border: 0;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 28px rgb(37 99 235 / 38%);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+[data-vlue-site="marketing"] .mkt-fab-dock__main.is-open {
+  background: #475569;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 22%);
+}
+
+[data-vlue-site="marketing"] .mkt-fab-dock__main:active {
+  transform: scale(0.96);
+}
+
 /* 상단 크롬 — 네비·알림바 톤 통일 (라이트 블루) */
 [data-vlue-site="marketing"] .mkt-site-header {
   border-bottom-color: #dbeafe !important;

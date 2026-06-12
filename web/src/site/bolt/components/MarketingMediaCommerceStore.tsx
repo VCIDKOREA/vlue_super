@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
   Search,
   X,
@@ -46,11 +45,20 @@ import {
   STORE_FEED_PREFS_CHANGED,
 } from '../../../lib/storeFeedPrefs.js';
 import { consumePendingVlueStoreId } from '../../../lib/vluePartnerStoreNav.js';
+import { STORE_UPLOAD_OPEN } from '../../../lib/storeUploadBridge.js';
 import './marketing-store.css';
 
 const STORE_TABS = MEDIA_FEED_TABS.filter((t) =>
   ['all', 'media', 'page', 'groupbuy', 'auction'].includes(t.id)
 );
+
+const TAB_SHORT_LABEL: Record<string, string> = {
+  all: '전체',
+  media: '미디어',
+  page: '페이지',
+  groupbuy: '공구',
+  auction: '경매',
+};
 
 type FeedItem = {
   id: string;
@@ -335,6 +343,12 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
     setOwnerOpen(true);
   }, [user, onLoginClick]);
 
+  useEffect(() => {
+    const onUpload = () => openProductUpload();
+    window.addEventListener(STORE_UPLOAD_OPEN, onUpload);
+    return () => window.removeEventListener(STORE_UPLOAD_OPEN, onUpload);
+  }, [openProductUpload]);
+
   const storeSearchForm = (className = 'mkt-store__search') => (
     <form onSubmit={handleSearch} className={className}>
       <div className="mkt-store__search-field">
@@ -418,7 +432,7 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
           <button
             type="button"
             onClick={openProductUpload}
-            className="mkt-store__upload-btn"
+            className="mkt-store__upload-btn mkt-store__upload-btn--desktop"
           >
             <Plus className="w-4 h-4 shrink-0" aria-hidden />
             상품 등록
@@ -443,30 +457,33 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
 
         <div className="mkt-store__content-col">
         <div className="mkt-store__mobile-rail" aria-label="VLUE 스토어 필터 (모바일)">
-          <div className="mkt-store__mobile-tabs" role="tablist">
-            {STORE_TABS.map((tab) => {
-              const Icon = tabIcon(tab.id);
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={mediaTab === tab.id}
-                  onClick={() => changeMediaTab(tab.id)}
-                  className={`mkt-store__tab inline-flex items-center gap-1.5 ${mediaTab === tab.id ? 'is-active' : ''}`}
-                >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  {tab.label}
-                </button>
-              );
-            })}
+          <div className="mkt-store__mobile-toolbar">
+            <div className="mkt-store__mobile-tabs" role="tablist" aria-label="스토어 탭">
+              {STORE_TABS.map((tab) => {
+                const Icon = tabIcon(tab.id);
+                const active = mediaTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => changeMediaTab(tab.id)}
+                    className={`mkt-store__tab mkt-store__tab--mobile ${active ? 'is-active' : ''}`}
+                  >
+                    <Icon className="mkt-store__tab-icon" aria-hidden />
+                    <span>{TAB_SHORT_LABEL[tab.id] || tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <ShoppingCategoryDropdown
+              value={category}
+              options={SHOPPING_CATEGORIES}
+              onChange={changeCategory}
+              className="mkt-store__category-dropdown--inline"
+            />
           </div>
-          <ShoppingCategoryDropdown
-            value={category}
-            options={SHOPPING_CATEGORIES}
-            onChange={changeCategory}
-            className="mkt-store__category-dropdown--mobile"
-          />
         </div>
 
         <div className="mkt-store__main">
@@ -580,21 +597,6 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
           />
         </div>
       ) : null}
-
-      {typeof document !== 'undefined'
-        ? createPortal(
-            <button
-              type="button"
-              onClick={openProductUpload}
-              className="mkt-store__upload-fab"
-              aria-label="상품 등록"
-              title="상품 등록"
-            >
-              +
-            </button>,
-            document.body
-          )
-        : null}
 
       {ownerOpen ? (
         <div className="mkt-store__upload-overlay">

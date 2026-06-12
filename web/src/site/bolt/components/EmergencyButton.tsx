@@ -2,8 +2,20 @@ import { useState } from 'react';
 import { AlertTriangle, X, Phone, Shield, ChevronRight, Bell } from 'lucide-react';
 import { VlueBrandMark } from '../../../components/VlueBrandLogo.jsx';
 
-export default function EmergencyButton() {
-  const [open, setOpen] = useState(false);
+type EmergencyButtonProps = {
+  hideTrigger?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+};
+
+export default function EmergencyButton({
+  hideTrigger = false,
+  open: openProp,
+  onOpenChange,
+}: EmergencyButtonProps = {}) {
+  const [openInternal, setOpenInternal] = useState(false);
+  const open = openProp ?? openInternal;
+  const setOpen = onOpenChange ?? setOpenInternal;
   const [reported, setReported] = useState(false);
 
   const handleReport = () => {
@@ -116,17 +128,19 @@ export default function EmergencyButton() {
           </div>
         )}
 
-        <button
-          onClick={() => setOpen(!open)}
-          className="emergency-btn w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-white shadow-2xl transition-all active:scale-95"
-          aria-label="긴급 신고"
-        >
-          {open ? (
-            <X className="w-6 h-6" />
-          ) : (
-            <AlertTriangle className="w-6 h-6" strokeWidth={2.5} />
-          )}
-        </button>
+        {!hideTrigger ? (
+          <button
+            onClick={() => setOpen(!open)}
+            className="emergency-btn w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-white shadow-2xl transition-all active:scale-95"
+            aria-label="긴급 신고"
+          >
+            {open ? (
+              <X className="w-6 h-6" />
+            ) : (
+              <AlertTriangle className="w-6 h-6" strokeWidth={2.5} />
+            )}
+          </button>
+        ) : null}
       </div>
     </>
   );
