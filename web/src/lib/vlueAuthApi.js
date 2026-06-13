@@ -213,17 +213,22 @@ export async function vlueSocialLogin(provider) {
   }
 }
 
-/** 슈퍼앱과 동일한 본인인증·약관 가입 플로우로 이동 */
-export function redirectToAppSignup(mode = "signup") {
+/** www 회원가입 시작 — 앱(/app) 리다이렉트 없이 동일 온보딩 플로우 */
+export function beginWebSignup(mode = "signup") {
   try {
-    sessionStorage.setItem(VLUE_MARKETING_SIGNUP_KEY, mode);
     if (mode === "signup_certified") {
       sessionStorage.setItem("vlue_onboarding_prefer_trust", "1");
+    } else {
+      sessionStorage.removeItem("vlue_onboarding_prefer_trust");
     }
   } catch {
     /* ignore */
   }
-  window.location.href = "/app";
+}
+
+/** @deprecated beginWebSignup 사용 — /app 이동 제거(마켓·PC 설치형 앱 정책) */
+export function redirectToAppSignup(mode = "signup") {
+  beginWebSignup(mode);
 }
 
 export async function vlueMarketingLogout() {

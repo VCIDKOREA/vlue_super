@@ -1,11 +1,19 @@
 import { useState } from 'react';
 import { X, Eye, EyeOff, Loader, CheckCircle, Lock, ArrowRight } from 'lucide-react';
 import { VlueBrandLogo } from '../../../components/VlueBrandLogo.jsx';
+import VlueOnboarding from '../../../components/VlueOnboarding.jsx';
+import SignupErrorBoundary from '../../../components/SignupErrorBoundary.jsx';
+import PostSignupPaymentModal from '../../../components/PostSignupPaymentModal.jsx';
 import {
-  redirectToAppSignup,
+  beginWebSignup,
+  restoreMarketingAuthUser,
+  VLUE_MARKETING_SESSION_KEY,
+  VLUE_APP_SESSION_KEY,
   vlueLoginWithCredentials,
   vlueSocialLogin,
 } from '../../../lib/vlueAuthApi.js';
+import { isBillableMembershipKind, normalizeMembershipKind } from '../../../lib/membershipBm.js';
+import { writePendingPayment } from '../../../lib/postSignupPayment.js';
 
 export type MarketingAuthUser = {
   userId: string;
@@ -37,11 +45,62 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [postSignupPaymentOpen, setPostSignupPaymentOpen] = useState(false);
+  const [postSignupPending, setPostSignupPending] = useState<{
+    membershipKind: string;
+    billingCycle: string;
+    amountKrw: number;
+    label?: string;
+  } | null>(null);
 
   const reset = () => {
     setError('');
     setLoginId('');
     setPassword('');
+  };
+
+  const startSignup = () => {
+    beginWebSignup(mode);
+    setOnboardingOpen(true);
+  };
+
+  const finishPostSignupPayment = () => {
+    setPostSignupPaymentOpen(false);
+    setPostSignupPending(null);
+    onClose();
+  };
+
+  const handleOnboardingComplete = (payload?: {
+    membershipKind?: string;
+    membershipTier?: string;
+    postSignupPayment?: {
+      membershipKind: string;
+      billingCycle: string;
+      amountKrw: number;
+      label?: string;
+    } | null;
+  }) => {
+    try {
+      localStorage.setItem(VLUE_MARKETING_SESSION_KEY, '1');
+      localStorage.setItem(VLUE_APP_SESSION_KEY, '1');
+    } catch {
+      /* ignore */
+    }
+
+    const tier = normalizeMembershipKind(payload?.membershipKind || payload?.membershipTier);
+    const needsPayment = Boolean(payload?.postSignupPayment && isBillableMembershipKind(tier));
+
+    if (needsPayment && payload?.postSignupPayment) {
+      writePendingPayment(payload.postSignupPayment);
+      setPostSignupPending(payload.postSignupPayment);
+      setPostSignupPaymentOpen(true);
+    }
+
+    setOnboardingOpen(false);
+    const user = restoreMarketingAuthUser();
+    if (user) onSuccess(user);
+    if (!needsPayment) onClose();
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -81,6 +140,26 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
 
   const isSignup = mode === 'signup' || mode === 'signup_certified';
 
+  if (onboardingOpen) {
+    return (
+      <>
+        <SignupErrorBoundary onCancel={() => setOnboardingOpen(false)}>
+          <VlueOnboarding
+            signupIntent={mode === 'signup_certified' ? 'trust' : 'general'}
+            onComplete={handleOnboardingComplete}
+            onCancel={() => setOnboardingOpen(false)}
+          />
+        </SignupErrorBoundary>
+        <PostSignupPaymentModal
+          open={postSignupPaymentOpen && Boolean(postSignupPending)}
+          pending={postSignupPending}
+          onComplete={finishPostSignupPayment}
+          onSkip={finishPostSignupPayment}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -115,8 +194,8 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           </h2>
           <p className="text-white/70 text-sm mt-1 relative z-10" style={{ wordBreak: 'keep-all' }}>
             {mode === 'login'
-              ? '앱·PC와 동일한 VLUE 계정으로 로그인합니다'
-              : '앱과 동일한 본인인증·약관 절차로 가입합니다'}
+              ? '모바일·PC·www 어디서나 동일한 VLUE 계정으로 로그인합니다'
+              : '모바일 앱과 동일한 본인인증·약관 절차로 브라우저에서 가입합니다'}
           </p>
         </div>
 
@@ -166,7 +245,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />
-                  앱에서 가입한 계정으로 www에서도 로그인 가능
+                  모바일·PC·www 어디서 가입해도 동일 계정으로 로그인
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />
@@ -177,15 +256,16 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
             <button
               type="button"
               disabled={loading}
-              onClick={() => redirectToAppSignup(mode)}
+              onClick={startSignup}
               className="btn-primary w-full justify-center gap-2"
             >
               {loading ? <Loader className="w-4 h-4 animate-spin" /> : null}
-              VLUE 앱에서 가입 시작
+              가입 시작
               <ArrowRight className="w-4 h-4" />
             </button>
             <p className="text-center text-[11px] text-gray-400">
-              가입 완료 후 이 페이지에서 <strong>동일 아이디</strong>로 로그인하세요.
+              VLUE 앱은 앱스토어·플레이스토어에서 설치하세요. 가입 완료 후 이 페이지에서 <strong>동일 아이디</strong>로
+              로그인할 수 있습니다.
             </p>
           </div>
         ) : (
@@ -202,7 +282,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
                   autoComplete="username"
                   spellCheck={false}
                 />
-                <p className="text-[10px] text-gray-400 mt-1">앱 가입 시 설정한 VLUE 아이디를 입력하세요.</p>
+                <p className="text-[10px] text-gray-400 mt-1">가입 시 설정한 VLUE 아이디를 입력하세요.</p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">비밀번호</label>
@@ -262,6 +342,12 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           </>
         )}
       </div>
+      <PostSignupPaymentModal
+        open={postSignupPaymentOpen && Boolean(postSignupPending)}
+        pending={postSignupPending}
+        onComplete={finishPostSignupPayment}
+        onSkip={finishPostSignupPayment}
+      />
     </div>
   );
 }

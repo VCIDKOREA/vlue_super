@@ -87,7 +87,7 @@ function IconLayers({ className }) {
   );
 }
 
-export default function VlueOnboarding({ onComplete, onCancel }) {
+export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "general" }) {
   const [step, setStep] = useState("tier");
   const [busy, setBusy] = useState(false);
   const [agreedById, setAgreedById] = useState(() =>
@@ -456,8 +456,14 @@ export default function VlueOnboarding({ onComplete, onCancel }) {
       }
       setVerifyZone(null);
       setPassOk(true);
-      setAuthMode("direct");
-      setStep("direct_detail");
+      if (signupIntent === "trust") {
+        setAuthMode("recommend");
+        setRecPhase(1);
+        setStep("recommend_detail");
+      } else {
+        setAuthMode("direct");
+        setStep("direct_detail");
+      }
     } catch (e) {
       setVerifyZone({ ok: false, text: e?.message || String(e) });
     } finally {
