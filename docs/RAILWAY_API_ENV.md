@@ -21,8 +21,11 @@ Railway는 `NODE_ENV=production` 이라 API 시작 시 **7개 필수 변수** �
 
 | Variable | 설명 |
 |----------|------|
-| `SUPABASE_URL` | `https://ywhjhdpecwvaujiagaln.supabase.co` — Presigned URL 발급 |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role — **필수** (5GB Direct PUT) |
+| `R2_ACCOUNT_ID` | Cloudflare 계정 ID |
+| `R2_ACCESS_KEY_ID` | R2 API 액세스 키 |
+| `R2_SECRET_ACCESS_KEY` | R2 API 시크릿 키 |
+| `R2_BUCKET_NAME` | `vlue-product-media` (기본값) |
+| `R2_PUBLIC_BASE_URL` | 퍼블릭 CDN 베이스 (`https://pub-xxx.r2.dev` 또는 커스텀 도메인) |
 | `LIVE_VOD_WEBHOOK_SECRET` | `POST /api/live/webhook/recording-complete` 인증 |
 | `APP_BASE_URL` | `https://api.vlue.kr` |
 

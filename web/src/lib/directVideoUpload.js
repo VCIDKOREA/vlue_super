@@ -40,7 +40,7 @@ async function requestVideoUploadUrl({ fileName, contentType, fileSize }) {
 }
 
 /**
- * 브라우저 → Supabase Storage 직접 업로드 (API 서버 디스크 미사용)
+ * 브라우저 → Cloudflare R2 직접 업로드 (Presigned PUT, API 서버 디스크 미사용)
  * @returns {Promise<string>} public CDN URL
  */
 export async function uploadVideoDirectToCdn(file, onProgress) {

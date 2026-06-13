@@ -4,7 +4,7 @@
 
 | 서비스 | URL | 비고 |
 |--------|-----|------|
-| **API (동작 중)** | https://vlueapi-production.up.railway.app | Supabase Direct Upload ✅ |
+| **API (동작 중)** | https://vlueapi-production.up.railway.app | Cloudflare R2 Direct Upload |
 | API 상태 | https://vlueapi-production.up.railway.app/api/media/video-upload/status | `configured:true` 확인됨 |
 | **웹 (QA)** | https://vlueweb-production.up.railway.app | 쇼핑 `#shopping`, 앱 `/app` |
 | www 티저 | https://www.vlue.kr | GitHub Pages Coming Soon (미디어 커머스 아님) |
@@ -18,16 +18,20 @@
 
 ```bash
 npm run db:deploy:safe          # baseline 이슈 시 prisma db execute 로 개별 SQL 적용
-npm run db:supabase-product-media
 ```
 
 적용 마이그레이션:
 - `20260602200000_auction_video_url`
 - `20260602220000_live_vod_commerce`
-- `supabase/migrations/20260602210000_product_media_bucket.sql` (5GB, public read)
 
-**Supabase Storage CORS:** 최신 Dashboard에 전용 CORS 메뉴 없음. **Public 버킷**이면 브라우저 Direct PUT은 Supabase가 자동 처리.  
-확인: Storage → `vlue-product-media` → **Public bucket** ON.
+**Cloudflare R2 버킷 (`vlue-product-media`):**
+1. R2 → Create bucket → `vlue-product-media`
+2. **Settings → Public access** — `r2.dev` 서브도메인 또는 커스텀 도메인 연결 → `R2_PUBLIC_BASE_URL`에 입력
+3. **CORS** — 브라우저 Direct PUT 허용:
+   - `AllowedOrigins`: `https://vlueweb-production.up.railway.app`, `https://www.vlue.kr`, `http://localhost:5173`
+   - `AllowedMethods`: `PUT`, `GET`, `HEAD`
+   - `AllowedHeaders`: `Content-Type`, `*`
+4. **API Token** — R2 Read & Write → `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
 
 ## 2단계 — Railway @vlue/api Variables
 
@@ -35,8 +39,11 @@ npm run db:supabase-product-media
 |----------|------|------|
 | `DATABASE_URL` | ✅ | Supabase Postgres |
 | `DIRECT_URL` | 권장 | Prisma migrate |
-| `SUPABASE_URL` | ✅ | Presigned URL 발급 |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Direct Upload |
+| `R2_ACCOUNT_ID` | ✅ | Cloudflare R2 Presigned PUT |
+| `R2_ACCESS_KEY_ID` | ✅ | R2 API 키 |
+| `R2_SECRET_ACCESS_KEY` | ✅ | R2 API 시크릿 |
+| `R2_BUCKET_NAME` | ✅ | `vlue-product-media` |
+| `R2_PUBLIC_BASE_URL` | ✅ | 퍼블릭 CDN URL (DB `video_url` 매핑) |
 | `PORTONE_API_KEY` | ✅ | 에스크로 결제 |
 | `PORTONE_API_SECRET` | ✅ | 에스크로 결제 |
 | `LIVE_VOD_WEBHOOK_SECRET` | 권장 | 라이브 녹화 웹훅 |
@@ -47,8 +54,6 @@ npm run db:supabase-product-media
 | Variable | 권장값 |
 |----------|--------|
 | `VITE_API_URL` | `https://vlueapi-production.up.railway.app` (또는 DNS 후 `https://api.vlue.kr`) |
-| `VITE_SUPABASE_URL` | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | anon key |
 | `VITE_PORTONE_USER_CODE` | `imp57735111` |
 
 ## 3단계 — E2E 테스트 (Railway URL)

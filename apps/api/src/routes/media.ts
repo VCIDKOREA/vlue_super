@@ -8,10 +8,11 @@ import {
 export const mediaRoutes = new Hono();
 
 mediaRoutes.get("/video-upload/status", (c) => {
+  const configured = isDirectVideoStorageConfigured();
   return c.json({
     ok: true,
-    configured: isDirectVideoStorageConfigured(),
-    provider: "supabase"
+    configured,
+    provider: configured ? "cloudflare-r2" : null
   });
 });
 
