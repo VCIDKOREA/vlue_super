@@ -10,6 +10,7 @@ import { isCurrentUrlAdminEntry } from "./lib/adminEntryPath.js";
 import { isSuperAdminHqEntry } from "./lib/hqRoute.js";
 import { isAdminConsoleEntry } from "./lib/adminRoute.js";
 import { resolveSiteShell } from "./lib/siteMode.js";
+import BrowserAppBlockedPage from "./components/BrowserAppBlockedPage.jsx";
 import "./styles.css";
 import { applyAppSettingsToDocument } from "./lib/vlueAppSettings.js";
 import { logProductionEnvBinding } from "./config.js";
@@ -34,6 +35,7 @@ if (!rootEl) {
   if (showAdminConsole) Shell = AdminConsoleApp;
   else if (showHq) Shell = SuperAdminHqApp;
   else if (showAdminGate) Shell = AdminSecretApp;
+  else if (siteShell === "blocked") Shell = BrowserAppBlockedPage;
   else if (siteShell === "marketing") Shell = VlueMarketingApp;
 
   createRoot(rootEl).render(

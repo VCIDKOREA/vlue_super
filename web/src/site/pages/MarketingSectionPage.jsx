@@ -48,7 +48,7 @@ export default function MarketingSectionPage({ viewId, searchQuery, onNavigate }
       )}
       <div className="mt-10 flex flex-wrap gap-3">
         <a href={appEntryUrl()} className="btn-primary no-underline">
-          VLUE 앱에서 계속하기
+          앱·PC 설치 안내
         </a>
         <button type="button" onClick={() => onNavigate("home")} className="btn-secondary">
           홈으로 돌아가기

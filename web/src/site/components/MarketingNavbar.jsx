@@ -120,7 +120,7 @@ export default function MarketingNavbar({ currentView, onNavigate }) {
               href={appEntryUrl()}
               className="mt-2 rounded-xl bg-primary-600 px-3 py-2.5 text-center text-sm font-bold text-white"
             >
-              VLUE 앱 열기
+              앱·PC 설치 안내
             </a>
           </div>
         </div>
