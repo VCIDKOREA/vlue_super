@@ -1,0 +1,198 @@
+/**
+ * www 회원가입 온보딩 — portal(document.body) 전용 마케팅 와이드 UI
+ * [data-vlue-onboarding="marketing"] (앱 /app max-w-md 와 분리)
+ */
+
+[data-vlue-onboarding="marketing"] {
+  --mkt-onb-container: min(1280px, 94vw);
+  --mkt-onb-body: 1rem;
+  --mkt-onb-body-lg: 1.0625rem;
+  --mkt-onb-caption: 0.875rem;
+  --mkt-onb-label: 0.9375rem;
+  --mkt-onb-text: #1a1a1b;
+  --mkt-onb-text-secondary: #424242;
+  --mkt-onb-text-muted: #5c5c5c;
+
+  font-family: "Pretendard Variable", Pretendard, Inter, -apple-system, BlinkMacSystemFont, system-ui,
+    sans-serif;
+  font-weight: 500;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-content-max {
+  width: 100%;
+  max-width: var(--mkt-onb-container);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-scroll {
+  padding: 1.25rem 1.5rem 2rem;
+}
+
+@media (min-width: 768px) {
+  [data-vlue-onboarding="marketing"] .vlue-onb-scroll {
+    padding: 1.5rem 2rem 2.5rem;
+  }
+}
+
+/* 마케팅 타이포 스케일 (portal 이슈 보정) */
+[data-vlue-onboarding="marketing"] .text-\[10px\] {
+  font-size: var(--mkt-onb-caption) !important;
+  line-height: 1.5 !important;
+  font-weight: 700 !important;
+}
+
+[data-vlue-onboarding="marketing"] .text-\[11px\] {
+  font-size: var(--mkt-onb-caption) !important;
+  line-height: 1.55 !important;
+  font-weight: 600 !important;
+}
+
+[data-vlue-onboarding="marketing"] .text-\[12px\] {
+  font-size: var(--mkt-onb-label) !important;
+  line-height: 1.55 !important;
+  font-weight: 600 !important;
+}
+
+[data-vlue-onboarding="marketing"] .text-\[13px\] {
+  font-size: var(--mkt-onb-body) !important;
+  line-height: 1.6 !important;
+}
+
+[data-vlue-onboarding="marketing"] .text-\[14px\] {
+  font-size: var(--mkt-onb-body-lg) !important;
+  line-height: 1.6 !important;
+  font-weight: 700 !important;
+}
+
+[data-vlue-onboarding="marketing"] .text-\[15px\] {
+  font-size: 1.0625rem !important;
+  line-height: 1.65 !important;
+}
+
+[data-vlue-onboarding="marketing"] .text-\[16px\] {
+  font-size: 1.25rem !important;
+  line-height: 1.45 !important;
+  font-weight: 800 !important;
+}
+
+[data-vlue-onboarding="marketing"] .text-slate-400,
+[data-vlue-onboarding="marketing"] .text-slate-500 {
+  color: var(--mkt-onb-text-muted) !important;
+}
+
+[data-vlue-onboarding="marketing"] .text-slate-600 {
+  color: var(--mkt-onb-text-secondary) !important;
+}
+
+[data-vlue-onboarding="marketing"] .text-slate-700,
+[data-vlue-onboarding="marketing"] .text-slate-800 {
+  color: #262626 !important;
+}
+
+/* 멤버십 카드 — 요금제 페이지처럼 3열 */
+[data-vlue-onboarding="marketing"] .vlue-onb-tier-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  [data-vlue-onboarding="marketing"] .vlue-onb-tier-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-tier-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-tier-card > button:first-of-type {
+  flex: 1;
+  padding: 1.125rem 1.25rem !important;
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-tier-card .border-t {
+  margin-top: auto;
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-section {
+  padding: 1.5rem !important;
+  border-radius: 1.5rem !important;
+}
+
+@media (min-width: 768px) {
+  [data-vlue-onboarding="marketing"] .vlue-onb-section {
+    padding: 2rem !important;
+  }
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-form-row > div:first-child {
+  width: 22% !important;
+  min-width: 9.5rem !important;
+  padding: 0.75rem 1rem !important;
+  font-size: var(--mkt-onb-label) !important;
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-form-row > div:last-child {
+  padding: 0.625rem 0.875rem !important;
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-form-row input,
+[data-vlue-onboarding="marketing"] .vlue-onb-form-row textarea,
+[data-vlue-onboarding="marketing"] .vlue-onb-form-row select {
+  font-size: var(--mkt-onb-body) !important;
+  padding: 0.625rem 0.75rem !important;
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-terms-scroll {
+  max-height: min(52vh, 520px) !important;
+  padding: 1.25rem !important;
+  font-size: var(--mkt-onb-label) !important;
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-primary-btn {
+  padding-top: 0.875rem !important;
+  padding-bottom: 0.875rem !important;
+  font-size: 1rem !important;
+  border-radius: 1rem !important;
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-paid-panel {
+  margin-top: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  [data-vlue-onboarding="marketing"] .vlue-onb-paid-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  [data-vlue-onboarding="marketing"] .vlue-onb-paid-panel > *:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-actions-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  [data-vlue-onboarding="marketing"] .vlue-onb-actions-row--split {
+    flex-direction: row;
+  }
+
+  [data-vlue-onboarding="marketing"] .vlue-onb-actions-row--split > button {
+    flex: 1;
+  }
+}

@@ -145,6 +145,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
       <>
         <SignupErrorBoundary onCancel={() => setOnboardingOpen(false)}>
           <VlueOnboarding
+            layout="marketing"
             signupIntent={mode === 'signup_certified' ? 'trust' : 'general'}
             onComplete={handleOnboardingComplete}
             onCancel={() => setOnboardingOpen(false)}

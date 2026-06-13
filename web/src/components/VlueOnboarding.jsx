@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 import { TERMS_ARTICLES, TERMS_CHECKLIST_IDS, TERMS_VERSION } from "../legal/vlueTermsArticles.js";
 import { REFERRAL_PRECAUTION_AGREE, REFERRAL_PRECAUTION_BULLETS, REFERRAL_PRECAUTION_TITLE } from "../legal/vlueReferralNotice.js";
 import { setVlueSessionTokens } from "../lib/vlueAuthHeaders.js";
@@ -38,7 +39,7 @@ import {
 /** 좌측 라벨 + 우측 필드 (공공기관 스타일 행) */
 function FormRow({ icon, label, children, className = "" }) {
   return (
-    <div className={`flex w-full overflow-hidden rounded-xl border border-slate-200/90 bg-white text-[13px] shadow-sm ${className}`}>
+    <div className={`vlue-onb-form-row flex w-full overflow-hidden rounded-xl border border-slate-200/90 bg-white text-[13px] shadow-sm ${className}`}>
       <div className="flex w-[30%] min-w-[92px] shrink-0 items-center gap-1.5 border-r border-slate-100 bg-[#eef3f9] px-2.5 py-2.5">
         <span className="shrink-0 text-slate-500">{icon}</span>
         <span className="font-bold leading-tight text-slate-800">{label}</span>
@@ -87,7 +88,11 @@ function IconLayers({ className }) {
   );
 }
 
-export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "general" }) {
+export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "general", layout = "app" }) {
+  const isWeb = layout === "marketing";
+  const contentWrap = isWeb ? "vlue-onb-content-max mx-auto w-full space-y-4 pb-10" : "mx-auto max-w-md space-y-3 pb-28";
+  const progressWrap = isWeb ? "vlue-onb-content-max mx-auto w-full" : "mx-auto max-w-md";
+  const sectionCls = isWeb ? "vlue-onb-section rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm";
   const [step, setStep] = useState("tier");
   const [busy, setBusy] = useState(false);
   const [agreedById, setAgreedById] = useState(() =>
@@ -685,36 +690,88 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   };
 
   const shell = (
-    <div className="fixed inset-0 z-[1000002] flex flex-col bg-[#eef2f7]">
-      <div className="shrink-0 border-b border-slate-200 bg-white px-3 pb-3 pt-[max(12px,env(safe-area-inset-top,0px))]">
-        <div className="flex items-center gap-1 py-2">
-          <BackButton variant="inline" onBack={goBack} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-[13px] font-bold text-slate-800">VLUE 가입 · 검증</p>
-              <span className="shrink-0 text-[10px] font-medium text-slate-400">{TERMS_VERSION}</span>
+    <div
+      data-vlue-onboarding={isWeb ? "marketing" : "app"}
+      className={
+        isWeb
+          ? "fixed inset-0 z-[1000002] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm sm:p-6"
+          : "fixed inset-0 z-[1000002] flex flex-col bg-[#eef2f7]"
+      }
+      onClick={isWeb ? (e) => { if (e.target === e.currentTarget) onCancel?.(); } : undefined}
+      onKeyDown={undefined}
+      role={isWeb ? "dialog" : undefined}
+      aria-modal={isWeb ? true : undefined}
+    >
+      <div
+        className={
+          isWeb
+            ? "flex max-h-[min(92vh,980px)] w-full max-w-[min(1280px,96vw)] flex-col overflow-hidden rounded-3xl bg-[#eef2f7] shadow-2xl"
+            : "flex min-h-0 flex-1 flex-col"
+        }
+        onClick={isWeb ? (e) => e.stopPropagation() : undefined}
+      >
+      {isWeb ? (
+        <div className="shrink-0 bg-gradient-to-br from-primary-600 to-blue-700 px-5 pb-5 pt-5 text-white sm:px-8">
+          <div className={`${progressWrap} flex items-start justify-between gap-4`}>
+            <div className="min-w-0">
+              <p className="text-lg font-black tracking-tight sm:text-xl">회원가입</p>
+              <p className="mt-1 text-sm text-white/75 sm:text-base">모바일 앱과 동일한 본인인증·약관 절차</p>
             </div>
+            <button
+              type="button"
+              onClick={() => onCancel?.()}
+              className="shrink-0 rounded-xl p-2 text-white/80 transition hover:bg-white/15 hover:text-white"
+              aria-label="가입 닫기"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className={`${progressWrap} mt-4 h-2 overflow-hidden rounded-full bg-white/25`}>
+            <div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: `${progress}%` }} />
+          </div>
+          <p className={`${progressWrap} mt-2 text-sm text-white/70`}>
+            멤버십 선택 → 약관 → 아이디·비밀번호 → PASS 본인확인 → 주소 확인 → 완료
+          </p>
+          <div className={`${progressWrap} mt-3 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm leading-relaxed text-white/90 [word-break:keep-all]`}>
+            <b>회원가입</b>으로만 계정이 생성됩니다. 카카오·네이버는 가입 완료 후 마이페이지 「소셜 로그인 연동」에서 1:1로 연결하세요.
           </div>
         </div>
-        <div className="mx-auto h-1.5 max-w-md overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-blue-600 transition-all duration-500" style={{ width: `${progress}%` }} />
+      ) : (
+        <div className="shrink-0 border-b border-slate-200 bg-white px-3 pb-3 pt-[max(12px,env(safe-area-inset-top,0px))]">
+          <div className="flex items-center gap-1 py-2">
+            <BackButton variant="inline" onBack={goBack} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate text-[13px] font-bold text-slate-800">VLUE 가입 · 검증</p>
+                <span className="shrink-0 text-[10px] font-medium text-slate-400">{TERMS_VERSION}</span>
+              </div>
+            </div>
+          </div>
+          <div className={`${progressWrap} h-1.5 overflow-hidden rounded-full bg-slate-100`}>
+            <div className="h-full rounded-full bg-blue-600 transition-all duration-500" style={{ width: `${progress}%` }} />
+          </div>
+          <p className={`${progressWrap} mt-1 text-[10px] text-slate-500`}>
+            멤버십 선택 → 약관 → 아이디·비밀번호 → PASS 본인확인 → 주소 확인 → 완료
+          </p>
+          <div className={`${progressWrap} mt-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-[10px] leading-relaxed text-indigo-950 [word-break:keep-all]`}>
+            <b>회원가입</b>으로만 계정이 생성됩니다. 카카오·네이버는 가입 완료 후 마이페이지 「소셜 로그인 연동」에서 1:1로 연결하세요.
+          </div>
         </div>
-        <p className="mx-auto mt-1 max-w-md text-[10px] text-slate-500">
-          멤버십 선택 → 약관 → 아이디·비밀번호 → PASS 본인확인 → 주소 확인 → 완료
-        </p>
-        <div className="mx-auto mt-2 max-w-md rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-[10px] leading-relaxed text-indigo-950 [word-break:keep-all]">
-          <b>회원가입</b>으로만 계정이 생성됩니다. 카카오·네이버는 가입 완료 후 마이페이지 「소셜 로그인 연동」에서 1:1로 연결하세요.
-        </div>
-      </div>
+      )}
 
-      <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        <div className="mx-auto max-w-md space-y-3 pb-28">
+      <div className={`vlue-onb-scroll vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto ${isWeb ? "" : "px-4 py-4"}`}>
+        <div className={contentWrap}>
+          {isWeb && step !== "tier" ? (
+            <div className="mb-1">
+              <BackButton variant="inline" onBack={goBack} />
+            </div>
+          ) : null}
           {step === "tier" && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
+            <section className={sectionCls}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-[16px] font-black text-slate-900">멤버십 선택</h2>
-                  <p className="mt-1 text-[12px] leading-relaxed text-slate-500">
+                  <h2 className="text-[16px] font-black text-slate-900 sm:text-xl">멤버십 선택</h2>
+                  <p className="mt-1 text-[12px] leading-relaxed text-slate-500 sm:text-base">
                     일반(무료) · 유료 · 기업 단체(B2B) 중 선택하세요. 유료·기업은 <b>가입 완료 후</b> 결제창에서 첫 요금을 결제합니다.
                   </p>
                 </div>
@@ -724,13 +781,13 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                     setBenefitsModalTab("compare");
                     setBenefitsModalOpen(true);
                   }}
-                  className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[10px] font-black text-blue-700"
+                  className="shrink-0 self-start rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-black text-blue-700 sm:text-sm"
                 >
                   혜택 비교
                 </button>
               </div>
 
-              <div className="mt-4 space-y-2">
+              <div className={isWeb ? "vlue-onb-tier-grid mt-6" : "mt-4 space-y-2"}>
                 {[
                   {
                     id: "free",
@@ -750,7 +807,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 ].map((t) => (
                   <div
                     key={t.id}
-                    className={`overflow-hidden rounded-xl border transition ${
+                    className={`vlue-onb-tier-card overflow-hidden rounded-xl border transition ${
                       membershipKind === t.id
                         ? t.id === "b2b"
                           ? "border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200"
@@ -789,7 +846,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
               />
 
               {isPaidMembershipKind(membershipKind) && (
-                <div className="mt-4 space-y-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+                <div className="vlue-onb-paid-panel mt-4 space-y-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3 sm:p-4">
                   <p className="text-[12px] font-black text-slate-900">유료 회원 · 결제 주기 (가입 후 결제)</p>
                   <div className="flex gap-2">
                     {[
@@ -859,7 +916,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 type="button"
                 disabled={busy}
                 onClick={registerBiometric}
-                className="mt-4 w-full rounded-2xl bg-slate-900 py-3 text-[14px] font-black text-white shadow-md disabled:opacity-50"
+                className="vlue-onb-primary-btn mt-4 w-full rounded-2xl bg-slate-900 py-3 text-[14px] font-black text-white shadow-md disabled:opacity-50"
               >
                 {busy
                   ? "처리 중…"
@@ -905,7 +962,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                   setVerifyZone(null);
                   setStep("terms");
                 }}
-                className="mt-3 w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-black text-white shadow-md disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="vlue-onb-primary-btn mt-3 w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-black text-white shadow-md disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 다음 · 서비스 약관
               </button>
@@ -913,13 +970,13 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
           )}
 
           {step === "terms" && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-[16px] font-black text-slate-900">서비스 이용 약관 · 통합 동의</h2>
-              <p className="mt-1 text-[12px] leading-relaxed text-slate-500">
+            <section className={sectionCls}>
+              <h2 className="text-[16px] font-black text-slate-900 sm:text-xl">서비스 이용 약관 · 통합 동의</h2>
+              <p className="mt-1 text-[12px] leading-relaxed text-slate-500 sm:text-base">
                 <span className="font-bold text-slate-700">약관 동의 및 PASS 본인확인(필수)</span> · 서비스 이용약관 · 개인정보 처리방침 ·{" "}
                 <span className="font-bold text-amber-900/95">[중요] {REFERRAL_PRECAUTION_TITLE}</span> · 실명·생체 보안 설정에 동의합니다.
               </p>
-              <div className="mt-3 max-h-[min(42vh,360px)] overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-[12px] leading-relaxed text-slate-800">
+              <div className="vlue-onb-terms-scroll mt-3 max-h-[min(42vh,360px)] overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-[12px] leading-relaxed text-slate-800">
                 {TERMS_ARTICLES.map((art) => (
                   <div key={art.id} className="mb-4 last:mb-0">
                     <h3 className="text-[13px] font-black text-slate-900">{art.title}</h3>
@@ -981,7 +1038,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
           )}
 
           {step === "account" && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section className={sectionCls}>
               <h2 className="text-[16px] font-black text-slate-900">회원 ID · 비밀번호</h2>
               <p className="mt-2 text-[12px] leading-relaxed text-slate-600">
                 로그인에 사용할 <b>ID</b>와 <b>비밀번호</b>를 설정합니다. 세부 규정은 약관 제8조를 확인해 주세요.
@@ -1060,7 +1117,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
           )}
 
           {step === "pass" && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section className={sectionCls}>
               <h2 className="text-[16px] font-black text-slate-900">PASS 본인확인</h2>
               <p className="mt-2 text-[12px] leading-relaxed text-slate-600">
                 포트원(아임포트) 휴대폰 본인인증입니다. 완료 후 실명·CI 해시가 저장되며 실명은 <b>변경 불가</b>입니다.
@@ -1189,13 +1246,14 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                   ))}
                 </ul>
               </div>
+              <div className={isWeb ? "vlue-onb-actions-row vlue-onb-actions-row--split" : "space-y-3"}>
               <button
                 type="button"
                 onClick={() => {
                   setAuthMode("direct");
                   setStep("direct_detail");
                 }}
-                className="w-full rounded-2xl bg-blue-600 py-4 text-[14px] font-black text-white shadow-md"
+                className="vlue-onb-primary-btn w-full rounded-2xl bg-blue-600 py-4 text-[14px] font-black text-white shadow-md"
               >
                 직접 인증 — 직군·표준정보 입력
               </button>
@@ -1206,10 +1264,11 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                   setRecPhase(1);
                   setStep("recommend_detail");
                 }}
-                className="w-full rounded-2xl border-2 border-indigo-200 bg-indigo-50/80 py-4 text-[14px] font-black text-indigo-950"
+                className="vlue-onb-primary-btn w-full rounded-2xl border-2 border-indigo-200 bg-indigo-50/80 py-4 text-[14px] font-black text-indigo-950"
               >
                 추천(보증) 인증 — 지인·동료 인증
               </button>
+              </div>
             </section>
           )}
 
@@ -1443,7 +1502,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
           )}
 
           {step === "complete" && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section className={sectionCls}>
               <h2 className="text-[16px] font-black text-slate-900">검증 신청 완료</h2>
               <p className="mt-2 text-[13px] leading-relaxed text-slate-600">
                 신청이 접수되었습니다. 최대 <b>24시간</b> 이내에 심사 결과를 알려드립니다. VLUE 추천 안내 및 이용 정책이 적용됩니다.
@@ -1484,6 +1543,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             </section>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
