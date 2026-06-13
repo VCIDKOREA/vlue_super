@@ -43,6 +43,7 @@
     "office:email-sim": "node scripts/simulate-office-email-webhook.mjs",
     "production:ready": "node scripts/production-ready.mjs",
     "deploy:lock": "node scripts/production-ready.mjs --lock",
+    "verify:api-domain": "node scripts/verify-api-domain.mjs",
     "pages:sync": "node scripts/sync-coming-soon-docs.mjs",
     "pages:dev": "npx serve . -l 4173"
   },
