@@ -7,18 +7,18 @@ const RAILWAY_API_BASE = "https://vlueapi-production.up.railway.app";
  * LAN에서 프론트만 열었을 때도 상대 경로 `/api/...` 로 요청 가능.
  */
 export function getApiBase() {
+  const raw = String(import.meta.env.VITE_API_URL ?? "").trim().replace(/\/$/, "");
+  if (raw) return raw;
+
   if (typeof window !== "undefined") {
     const host = window.location?.hostname || "";
-    /* Railway 웹 호스트에서는 api.vlue.kr 미연결 시에도 페어링된 API 로 고정 */
+    /* VITE_API_URL 미설정 시 Railway QA 웹 → 페어링 API 폴백 */
     if (host === RAILWAY_WEB_HOST) {
       return RAILWAY_API_BASE;
     }
-  }
-
-  const raw = String(import.meta.env.VITE_API_URL ?? "").trim().replace(/\/$/, "");
-  if (raw) return raw;
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return window.location.origin.replace(/\/$/, "");
+    if (window.location?.origin) {
+      return window.location.origin.replace(/\/$/, "");
+    }
   }
   return "";
 }

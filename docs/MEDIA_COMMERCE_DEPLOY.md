@@ -12,7 +12,7 @@
 | Supabase | https://ywhjhdpecwvaujiagaln.supabase.co | |
 
 `api.vlue.kr` DNS 연결 전까지 E2E 테스트는 **Railway URL** 사용.  
-`@vlue/web` on Railway는 `vlueapi-production.up.railway.app` API를 자동 페어링 (`web/src/lib/apiBase.js`).
+`@vlue/web` Variables `VITE_API_URL=https://api.vlue.kr` (빌드 타임 — 변경 후 Redeploy 필수).
 
 ## 1단계 — DB / Storage
 
@@ -53,7 +53,7 @@ npm run db:deploy:safe          # baseline 이슈 시 prisma db execute 로 개�
 
 | Variable | 권장값 |
 |----------|--------|
-| `VITE_API_URL` | `https://vlueapi-production.up.railway.app` (또는 DNS 후 `https://api.vlue.kr`) |
+| `VITE_API_URL` | `https://api.vlue.kr` |
 | `VITE_PORTONE_USER_CODE` | `imp57735111` |
 
 ## 3단계 — E2E 테스트 (Railway URL)
