@@ -36,6 +36,7 @@ export default function LetteringBizcardScaledPreview({ children, className = ""
 
   const slotWidth = PREVIEW_DESIGN_WIDTH_PX * scale;
   const slotHeight = Math.ceil(innerHeight * scale) + 12;
+  const supportsZoom = typeof CSS !== "undefined" && CSS.supports("zoom", "0.5");
 
   return (
     <div
@@ -54,12 +55,16 @@ export default function LetteringBizcardScaledPreview({ children, className = ""
       >
         <div
           ref={innerRef}
-          className="lettering-bizcard-preview-host__inner"
-          style={{
-            width: PREVIEW_DESIGN_WIDTH_PX,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left"
-          }}
+          className={`lettering-bizcard-preview-host__inner${supportsZoom ? " lettering-bizcard-preview-host__inner--zoom" : ""}`}
+          style={
+            supportsZoom
+              ? { width: PREVIEW_DESIGN_WIDTH_PX, zoom: scale }
+              : {
+                  width: PREVIEW_DESIGN_WIDTH_PX,
+                  transform: `scale(${scale})`,
+                  transformOrigin: "top left"
+                }
+          }
         >
           {children}
         </div>

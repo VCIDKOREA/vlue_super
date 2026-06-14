@@ -13,8 +13,10 @@ import {
   AlertTriangle,
   Sparkles,
   Store,
+  Share2,
 } from 'lucide-react';
 import { navigateToVluePartnerStore } from '../../../lib/vluePartnerStoreNav.js';
+import { shareCrossVerifyViaKakao, SOURCE_LABELS } from '../../../lib/searchVerifyKakaoShare.js';
 import {
   KakaoSourceLogo,
   NaverSourceLogo,
@@ -491,6 +493,77 @@ function VluePanel({ data, isRegistered }: { data: CrossVerifyData; isRegistered
   );
 }
 
+function CrossVerifyShareBar({
+  data,
+  activeTab,
+}: {
+  data: CrossVerifyData;
+  activeTab: TabKey;
+}) {
+  const [busy, setBusy] = useState<TabKey | null>(null);
+  const [msg, setMsg] = useState('');
+
+  const onShare = async (tab: TabKey) => {
+    setBusy(tab);
+    setMsg('');
+    try {
+      const res = await shareCrossVerifyViaKakao(data, tab);
+      if (res.ok) {
+        setMsg('카카오톡 공유 창이 열렸습니다.');
+        window.setTimeout(() => setMsg(''), 3200);
+      } else if (!res.cancelled) {
+        setMsg(res.error || '공유에 실패했습니다.');
+        window.setTimeout(() => setMsg(''), 4200);
+      }
+    } catch (e) {
+      const text = (e as Error)?.message || '공유에 실패했습니다.';
+      setMsg(text);
+      window.setTimeout(() => setMsg(''), 4200);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="sv-cross-share">
+      <p className="sv-cross-share-title">
+        <Share2 className="w-4 h-4" aria-hidden />
+        VLUE 교차검증 결과 공유
+      </p>
+      <p className="sv-cross-share-hint">카카오톡으로 내도 VLUE에서 검증·공유된 정보임을 확인할 수 있습니다.</p>
+      <div className="sv-cross-share-grid">
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.key;
+          const loading = busy === tab.key;
+          const accentClass =
+            tab.key === 'kakao'
+              ? 'sv-cross-share-btn--kakao'
+              : tab.key === 'naver'
+                ? 'sv-cross-share-btn--naver'
+                : tab.key === 'public'
+                  ? 'sv-cross-share-btn--public'
+                  : 'sv-cross-share-btn--vlue';
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              disabled={Boolean(busy)}
+              className={`sv-cross-share-btn ${accentClass}${isActive ? ' sv-cross-share-btn--current' : ''}`}
+              onClick={() => onShare(tab.key)}
+            >
+              <tab.Logo className="sv-cross-share-btn-logo" />
+              <span className="sv-cross-share-btn-label">
+                {loading ? '공유 중…' : `${SOURCE_LABELS[tab.key]} 카톡`}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {msg ? <p className="sv-cross-share-msg">{msg}</p> : null}
+    </div>
+  );
+}
+
 export default function SearchVerifyCrossTabs({ data }: { data: CrossVerifyData }) {
   const [activeTab, setActiveTab] = useState<TabKey>('kakao');
   const isPremium = data.is_registered;
@@ -526,6 +599,7 @@ export default function SearchVerifyCrossTabs({ data }: { data: CrossVerifyData 
         {activeTab === 'naver' ? <NaverPanel data={data.naver} /> : null}
         {activeTab === 'public' ? <PublicPanel key={`public-${data.query}-${data.public.candidates?.length || 0}`} data={data.public} /> : null}
         {activeTab === 'vlue' ? <VluePanel data={data} isRegistered={isPremium} /> : null}
+        <CrossVerifyShareBar data={data} activeTab={activeTab} />
       </div>
     </div>
   );

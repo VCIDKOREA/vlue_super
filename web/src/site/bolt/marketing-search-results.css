@@ -1021,3 +1021,112 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* 교차검증 — 카카오톡 공유 (4출처) */
+.sv-cross-share {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.sv-cross-share-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.sv-cross-share-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.sv-cross-share-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (min-width: 480px) {
+  .sv-cross-share-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.sv-cross-share-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 4.25rem;
+  padding: 0.55rem 0.4rem;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  font-size: 0.625rem;
+  font-weight: 800;
+  color: #334155;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sv-cross-share-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.sv-cross-share-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.sv-cross-share-btn--current {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+}
+
+.sv-cross-share-btn--kakao {
+  border-color: #facc15;
+  background: #fffbeb;
+}
+
+.sv-cross-share-btn--naver {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.sv-cross-share-btn--public {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.sv-cross-share-btn--vlue {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.sv-cross-share-btn-logo {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
+}
+
+.sv-cross-share-btn-label {
+  text-align: center;
+  line-height: 1.25;
+  word-break: keep-all;
+}
+
+.sv-cross-share-msg {
+  margin: 0.65rem 0 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #2563eb;
+  text-align: center;
+}

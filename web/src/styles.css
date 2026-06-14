@@ -4021,6 +4021,7 @@ body,
 /* 유료 명함 — 앞·뒷면 플립 */
 .lettering-bizcard--paid {
   perspective: 900px;
+  -webkit-perspective: 900px;
 }
 
 .lettering-bizcard--paid .lettering-bizcard__flip {
@@ -4106,6 +4107,7 @@ body,
 .lettering-bizcard__flip {
   position: relative;
   transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
   transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -4116,12 +4118,17 @@ body,
 .lettering-bizcard__face--front,
 .lettering-bizcard__face--back {
   backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.lettering-bizcard__face--front {
+  transform: rotateY(0deg) translateZ(0.1px);
 }
 
 .lettering-bizcard__face--back {
   position: absolute;
   inset: 0;
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) translateZ(0.1px);
   min-height: 100%;
   overflow: hidden;
 }
@@ -4530,6 +4537,15 @@ body,
 
 .lettering-bizcard-preview-host__inner {
   will-change: transform;
+  /* iOS Safari: scale() + rotateY 플립 시 뒷면 글자 미러링 방지 */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+@supports (zoom: 0.5) {
+  .lettering-bizcard-preview-host__inner--zoom {
+    transform: none !important;
+  }
 }
 
 .lettering-bizcard-preview-host .lettering-bizcard__face {

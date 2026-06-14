@@ -70,6 +70,17 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const q = (params.get('vlue_verify') || params.get('q') || '').trim();
+    if (!q) return;
+    setSearchQuery(q);
+    setView('search');
+    window.location.hash = 'search';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     setView('search');

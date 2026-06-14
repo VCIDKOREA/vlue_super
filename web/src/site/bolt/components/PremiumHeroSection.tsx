@@ -38,28 +38,31 @@ export default function PremiumHeroSection({ onStartFamily }: Props) {
               }}
             />
           </div>
-          <div className="z-10 w-full bg-slate-900/90 backdrop-blur-xl border border-blue-500/30 rounded-3xl p-8 font-mono shadow-[0_0_50px_rgba(59,130,246,0.15)]">
-            <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-3 text-[10px]">
-              <span className="text-blue-400 font-black animate-pulse">● VLUE_AI_MONITOR_ON</span>
-              <span className="text-slate-500 text-[10px]">REAL-TIME SCAN</span>
+          <div className="z-10 w-full bg-slate-900/90 backdrop-blur-xl border border-blue-500/30 rounded-3xl p-5 sm:p-8 font-mono shadow-[0_0_50px_rgba(59,130,246,0.15)]">
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between mb-6 border-b border-white/10 pb-3 text-[10px]">
+              <span className="text-blue-400 font-black animate-pulse shrink-0">● VLUE_AI_MONITOR_ON</span>
+              <span className="text-slate-500 text-[10px] sm:text-right shrink-0">REAL-TIME SCAN</span>
             </div>
-            <div className="space-y-3 text-[12px]">
-              <div className="flex justify-between text-emerald-400 font-bold">
-                <span>VOICE SCANNER</span>
-                <span>ACTIVE</span>
+            <div className="space-y-3 text-[11px] sm:text-[12px]">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-emerald-400 font-bold">
+                <span className="shrink-0">VOICE SCANNER</span>
+                <span className="shrink-0">ACTIVE</span>
               </div>
-              <div className="flex justify-between text-slate-400">
-                <span>PHISHING_ATTACK</span>
-                <span>DETECTING</span>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-slate-400">
+                <span className="shrink-0">PHISHING_ATTACK</span>
+                <span className="shrink-0">DETECTING</span>
               </div>
-              <div className="flex justify-between text-slate-400">
-                <span>REMOTE_ACCESS</span>
-                <span>FILTERING</span>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-slate-400">
+                <span className="shrink-0">REMOTE_ACCESS</span>
+                <span className="shrink-0">FILTERING</span>
               </div>
               <div className="h-[2px] bg-blue-500/10 my-4 overflow-hidden rounded-full">
                 <div className="h-full bg-blue-500 w-1/3" style={{ animation: 'scan 2s ease-in-out infinite' }} />
               </div>
-              <p className="text-blue-300/60 text-center italic text-[10px]">
+              <p
+                className="text-blue-300/80 text-center text-[10px] leading-relaxed not-italic"
+                style={{ wordBreak: 'keep-all' }}
+              >
                 &quot;가족 폰 보안, AI 분석팀이 24시간 실시간 보호 중&quot;
               </p>
             </div>
