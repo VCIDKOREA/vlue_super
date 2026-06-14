@@ -39,6 +39,7 @@ import VlueOnboarding from "./components/VlueOnboarding";
 import PostSignupPaymentModal from "./components/PostSignupPaymentModal.jsx";
 import ParentalConsentApproveModal from "./components/ParentalConsentApproveModal.jsx";
 import { fetchPendingParentalConsents } from "./lib/parentalConsentApi.js";
+import { bindFcmForegroundListener, registerFcmWebPushToken } from "./lib/fcmWebPush.js";
 import SignupErrorBoundary from "./components/SignupErrorBoundary.jsx";
 import LoginScreen from "./components/LoginScreen";
 import BiometricGate from "./components/BiometricGate";
@@ -707,6 +708,49 @@ function App() {
     })();
     return () => {
       cancelled = true;
+    };
+  }, [isLoggedIn]);
+
+  /** FCM 웹 토큰 — 부모 승인·가족보호 백그라운드 푸시 */
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await registerFcmWebPushToken();
+        if (!cancelled && !result.ok && !result.skipped) {
+          console.warn("[fcm] register_failed", result.error);
+        }
+      } catch (err) {
+        if (!cancelled) console.warn("[fcm] register_error", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    let unsubscribe = () => {};
+    bindFcmForegroundListener()
+      .then((off) => {
+        if (typeof off === "function") unsubscribe = off;
+      })
+      .catch(() => {});
+    const onFcmForeground = (e) => {
+      const data = e.detail?.data || {};
+      if (data.type === "vlue-parental-consent-request" && data.wardUserId) {
+        setParentalConsentRequest({
+          wardUserId: data.wardUserId,
+          wardLabel: data.wardLabel || "자녀"
+        });
+      }
+    };
+    window.addEventListener("vlue-fcm-foreground", onFcmForeground);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("vlue-fcm-foreground", onFcmForeground);
     };
   }, [isLoggedIn]);
 
