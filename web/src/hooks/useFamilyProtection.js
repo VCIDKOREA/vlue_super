@@ -189,7 +189,7 @@ export function useFamilyProtection() {
         setBusy(false);
       }
     },
-    async addLink(wardHandle, familyRelation) {
+    async addLink(wardHandle, familyRelation, guardianImpUid) {
       if (!data?.canInviteFamily) {
         const err = new Error(data?.inviteBlockReason || "유료 회원만 가족을 등록할 수 있습니다.");
         err.code = data?.inviteBlockCode;
@@ -198,7 +198,7 @@ export function useFamilyProtection() {
       }
       setBusy(true);
       try {
-        await createFamilyProtectionLink(wardHandle.trim(), familyRelation);
+        await createFamilyProtectionLink(wardHandle.trim(), familyRelation, guardianImpUid);
         await load();
         notifyChanged();
         return "가족에게 승인 요청 메시지를 보냈습니다. 수락 후 보호가 시작됩니다.";

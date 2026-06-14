@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const EXPAND_FAMILY_KEY = "vlue_expand_family_protection_v1";
-import { FAMILY_MEMBER_DISPLAY_LABEL } from "../lib/familyProtectionDemo.js";
+import { requestGuardianPassImpUid } from "../lib/parentalConsentApi.js";
 import { normalizeMembershipKind } from "../lib/membershipBm.js";
 import { displayFamilyUser, useFamilyProtection } from "../hooks/useFamilyProtection.js";
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
@@ -77,7 +77,11 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
   const onAdd = async () => {
     setSlotHint("");
     try {
-      const text = await fp.addLink(wardHandle, familyRelation);
+      let guardianImpUid;
+      if (familyRelation === "child") {
+        guardianImpUid = await requestGuardianPassImpUid();
+      }
+      const text = await fp.addLink(wardHandle, familyRelation, guardianImpUid);
       setWardHandle("");
       toast(text);
     } catch (e) {
@@ -317,7 +321,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             onClick={onAdd}
             className="mt-3 w-full rounded-xl bg-blue-600 py-3.5 text-[14px] font-black text-white shadow-sm disabled:opacity-50"
           >
-            가족 초대 (승인 요청 보내기)
+            {familyRelation === "child" ? "PASS 인증 후 자녀 초대" : "가족 초대 (승인 요청 보내기)"}
           </button>
 
           {fp.loading ? (

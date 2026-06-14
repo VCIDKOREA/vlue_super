@@ -1,7 +1,8 @@
 # api.vlue.kr → Railway @vlue/api 연결
 
 `api.vlue.kr`은 **가비아(Gabia) DNS**에서 관리됩니다.  
-`www.vlue.kr`은 GitHub Pages(`vcidkorea.github.io`)로 이미 연결되어 있습니다.
+`www.vlue.kr`은 GitHub Pages(`vcidkorea.github.io`)로 연결되어 있습니다.  
+**웹 런칭:** [DNS_WWW_VLUE_KR_SETUP.md](./DNS_WWW_VLUE_KR_SETUP.md)
 
 Railway 커스텀 도메인은 **CNAME + TXT 두 레코드**가 모두 있어야 검증됩니다. CNAME만 넣으면 `NXDOMAIN` 또는 `404`가 납니다.
 

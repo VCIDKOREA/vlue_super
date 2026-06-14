@@ -37,6 +37,8 @@ import { addPushNotification, countUnreadPush, PUSH_INBOX_CHANGED } from "./lib/
 import Splash from "./components/Splash";
 import VlueOnboarding from "./components/VlueOnboarding";
 import PostSignupPaymentModal from "./components/PostSignupPaymentModal.jsx";
+import ParentalConsentApproveModal from "./components/ParentalConsentApproveModal.jsx";
+import { fetchPendingParentalConsents } from "./lib/parentalConsentApi.js";
 import SignupErrorBoundary from "./components/SignupErrorBoundary.jsx";
 import LoginScreen from "./components/LoginScreen";
 import BiometricGate from "./components/BiometricGate";
@@ -112,7 +114,7 @@ import {
 import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./lib/kakaoSocialLogin.js";
 import { consumeKakaoOAuthReturn } from "./lib/kakaoOAuthReturn.js";
 import { formatSocialLoginError } from "./lib/socialLoginPolicy.js";
-import { VLUE_MARKETING_SIGNUP_KEY } from "./lib/vlueAuthApi.js";
+import { VLUE_MARKETING_SIGNUP_KEY, withdrawVlueAccount } from "./lib/vlueAuthApi.js";
 import LetteringNotificationPreviewPage from "./components/LetteringNotificationPreviewPage.jsx";
 import LetteringOverlayHost from "./components/LetteringOverlayHost.jsx";
 import LetteringCertModal from "./components/LetteringCertModal.jsx";
@@ -366,6 +368,7 @@ function App() {
   );
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileInitialView, setProfileInitialView] = useState("main");
+  const [parentalConsentRequest, setParentalConsentRequest] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
@@ -682,6 +685,32 @@ function App() {
   }, [isLoggedIn]);
 
   useEffect(() => {
+    if (!isLoggedIn) {
+      setParentalConsentRequest(null);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchPendingParentalConsents();
+        const first = data?.pending?.[0];
+        if (!cancelled && first?.wardUserId) {
+          setParentalConsentRequest((prev) =>
+            prev?.wardUserId === first.wardUserId
+              ? prev
+              : { wardUserId: first.wardUserId, wardLabel: first.wardLabel || "자녀" }
+          );
+        }
+      } catch {
+        /* ignore — 비보호자·미로그인 등 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
+
+  useEffect(() => {
     refreshFamilyPeers();
   }, [refreshFamilyPeers]);
 
@@ -797,6 +826,27 @@ function App() {
         if (data?.type === "vlue-family-protection-accepted") {
           setBottomToast("가족이 보호 초대를 수락했습니다.");
           setTimeout(() => setBottomToast(""), 4000);
+        }
+        if (data?.type === "vlue-parental-consent-request") {
+          setBottomToast(String(data.body || "자녀 가입 승인 요청이 도착했습니다."));
+          setTimeout(() => setBottomToast(""), 6000);
+          if (data.wardUserId) {
+            setParentalConsentRequest({
+              wardUserId: data.wardUserId,
+              wardLabel: data.wardLabel || "자녀"
+            });
+          }
+        }
+        if (data?.type === "vlue-parental-consent-approved") {
+          setParentalConsentRequest((prev) =>
+            prev?.wardUserId === data.wardUserId ? null : prev
+          );
+          window.dispatchEvent(new CustomEvent("vlue-parental-consent-approved", { detail: data }));
+          window.dispatchEvent(new CustomEvent("vlue-family-protection-changed"));
+          if (data.message) {
+            setBottomToast(String(data.message));
+            setTimeout(() => setBottomToast(""), 5000);
+          }
         }
         if (
           data?.type === "vlue-calendar-new" ||
@@ -1816,7 +1866,14 @@ function App() {
     setBiometricSeq((s) => s + 1);
   }, []);
 
-  const handleWithdrawAccount = useCallback(() => {
+  const handleWithdrawAccount = useCallback(async () => {
+    try {
+      await withdrawVlueAccount();
+    } catch (e) {
+      setBottomToast(e instanceof Error ? e.message : "탈퇴에 실패했습니다.");
+      setTimeout(() => setBottomToast(""), 3200);
+      return;
+    }
     clearVlueSessionTokens();
     try {
       const extraKeys = [
@@ -2954,6 +3011,21 @@ function App() {
         onSkip={() => {
           setPostSignupPaymentOpen(false);
           setPostSignupPending(null);
+        }}
+      />
+
+      <ParentalConsentApproveModal
+        open={Boolean(parentalConsentRequest)}
+        request={parentalConsentRequest}
+        isDarkMode={isDarkMode}
+        onClose={() => setParentalConsentRequest(null)}
+        onApproved={() => {
+          setParentalConsentRequest(null);
+          window.dispatchEvent(new CustomEvent("vlue-family-protection-changed"));
+        }}
+        onToast={(text) => {
+          setBottomToast(text);
+          setTimeout(() => setBottomToast(""), 5000);
         }}
       />
 

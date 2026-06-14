@@ -13,10 +13,16 @@ familyInviteRoutes.post("/invite", requireUserHeader, async (c) => {
       wardHandle?: string;
       wardRole?: string;
       familyRelation?: string;
+      guardianImpUid?: string;
     };
     const familyRelation =
       body.familyRelation === "child" || body.wardRole === "child" ? "child" : "parent";
-    const result = await createProtectionLink(me, String(body.wardHandle || ""), familyRelation);
+    const result = await createProtectionLink(
+      me,
+      String(body.wardHandle || ""),
+      familyRelation,
+      body.guardianImpUid
+    );
     if ("error" in result && result.error) {
       return c.json({ error: result.error, code: result.code ?? "FAMILY_INVITE_FAILED" }, 400);
     }

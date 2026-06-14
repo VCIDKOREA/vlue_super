@@ -21,6 +21,18 @@ import {
 } from "../services/authService.js";
 import { completeSocialLogin } from "../services/socialAuthService.js";
 import { resolveReferralSponsor } from "../services/membership/signupMembership.js";
+import {
+  AccountWithdrawalError,
+  withdrawUserAccount
+} from "../services/auth/accountWithdrawalService.js";
+import {
+  approveParentalConsentByGuardianSession,
+  approveParentalConsentWithGuardianPass,
+  listPendingParentalConsentsForGuardian,
+  ParentalConsentError,
+  requestParentalConsentToGuardian
+} from "../services/auth/parentalConsentService.js";
+import { PARENTAL_CONSENT_PENDING_LOGIN_MESSAGE } from "@vlue/shared/policy/minor-signup";
 
 export const authRoutes = new Hono();
 
@@ -171,6 +183,114 @@ authRoutes.post("/logout-all", async (c) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
     return c.json({ error: msg }, 400);
+  }
+});
+
+/** 회원 탈퇴 — PII 파기·구독 해지·세션 무효화 */
+authRoutes.post("/account/withdraw", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    if (!uid) return c.json({ error: "인증 필요" }, 401);
+
+    let body: { confirm?: boolean } = {};
+    try {
+      body = await c.req.json<{ confirm?: boolean }>();
+    } catch {
+      body = {};
+    }
+    if (!body.confirm) {
+      return c.json({ error: "confirm: true 가 필요합니다." }, 400);
+    }
+
+    await withdrawUserAccount(uid);
+    return c.json({ ok: true });
+  } catch (e) {
+    if (e instanceof AccountWithdrawalError) {
+      return c.json({ error: e.message, code: e.code }, e.statusCode as 400 | 403 | 404 | 409);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 500);
+  }
+});
+
+/** 만 14세 미만 — 부모 VLUE 아이디로 승인 요청 푸시 (자녀 세션) */
+authRoutes.post("/parental-consent/request", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    if (!uid) return c.json({ error: "인증 필요" }, 401);
+    const body = await c.req.json<{ guardianHandle?: string }>();
+    const guardianHandle = String(body?.guardianHandle ?? "").trim();
+    const result = await requestParentalConsentToGuardian(uid, guardianHandle);
+    return c.json(result);
+  } catch (e) {
+    if (e instanceof ParentalConsentError) {
+      return c.json({ error: e.message, code: e.code }, e.statusCode as 400 | 403 | 404 | 409);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 500);
+  }
+});
+
+/** 보호자 앱 — 승인 대기 자녀 목록 */
+authRoutes.get("/parental-consent/pending", requireUserHeader, async (c) => {
+  try {
+    const guardianUserId = c.get("vlueUserId") as string;
+    return c.json(await listPendingParentalConsentsForGuardian(guardianUserId));
+  } catch (e) {
+    if (e instanceof ParentalConsentError) {
+      return c.json({ error: e.message, code: e.code }, e.statusCode as 400 | 403 | 404 | 409);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 500);
+  }
+});
+
+/** 보호자 앱 — 부모 폰에서 PASS 승인 (보호자 JWT) */
+authRoutes.post("/parental-consent/approve-guardian", requireUserHeader, async (c) => {
+  try {
+    const guardianUserId = c.get("vlueUserId") as string;
+    const body = await c.req.json<{ wardUserId?: string; guardianImpUid?: string }>();
+    const wardUserId = String(body?.wardUserId ?? "").trim();
+    const guardianImpUid = String(body?.guardianImpUid ?? "").trim();
+    if (!wardUserId) return c.json({ error: "자녀 계정 ID가 필요합니다." }, 400);
+    if (!guardianImpUid) return c.json({ error: "보호자 본인인증(imp_uid)이 필요합니다." }, 400);
+    const result = await approveParentalConsentByGuardianSession(
+      guardianUserId,
+      wardUserId,
+      guardianImpUid
+    );
+    return c.json(result);
+  } catch (e) {
+    if (e instanceof ParentalConsentError) {
+      return c.json({ error: e.message, code: e.code }, e.statusCode as 400 | 403 | 404 | 409);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 500);
+  }
+});
+
+/** 만 14세 미만 — 법정대리인(부모) PASS 승인 (자녀 기기·같은 기기) */
+authRoutes.post("/parental-consent/approve", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    if (!uid) return c.json({ error: "인증 필요" }, 401);
+    const body = await c.req.json<{ guardianImpUid?: string; wardUserId?: string }>();
+    const guardianImpUid = String(body?.guardianImpUid ?? "").trim();
+    const wardUserId = String(body?.wardUserId ?? uid).trim();
+    if (!guardianImpUid) {
+      return c.json({ error: "부모 본인인증(imp_uid)이 필요합니다." }, 400);
+    }
+    if (wardUserId !== uid) {
+      return c.json({ error: "자녀 본인 계정으로만 부모 승인을 요청할 수 있습니다." }, 403);
+    }
+    const result = await approveParentalConsentWithGuardianPass(wardUserId, guardianImpUid);
+    return c.json(result);
+  } catch (e) {
+    if (e instanceof ParentalConsentError) {
+      return c.json({ error: e.message, code: e.code }, e.statusCode as 400 | 403 | 404 | 409);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 500);
   }
 });
 

@@ -16,7 +16,9 @@ export type View =
   | "exceleditor"
   | "family"
   | "mypage"
-  | "bizcard";
+  | "bizcard"
+  | "terms"
+  | "privacy";
 
 export interface CertifiedOrg {
   id: string;

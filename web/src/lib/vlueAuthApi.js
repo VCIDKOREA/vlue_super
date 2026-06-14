@@ -8,7 +8,8 @@ import {
   getAccessToken,
   getRefreshToken,
   setVlueSessionTokens,
-  vlueAuthFetch
+  vlueAuthFetch,
+  vlueAuthHeaders
 } from "./vlueAuthHeaders.js";
 import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./kakaoSocialLogin.js";
 import { formatSocialLoginError } from "./socialLoginPolicy.js";
@@ -229,6 +230,22 @@ export function beginWebSignup(mode = "signup") {
 /** @deprecated beginWebSignup 사용 — /app 이동 제거(마켓·PC 설치형 앱 정책) */
 export function redirectToAppSignup(mode = "signup") {
   beginWebSignup(mode);
+}
+
+/** 회원 탈퇴 — 서버 PII 파기 + 로컬 세션 정리는 호출측에서 처리 */
+export async function withdrawVlueAccount() {
+  const res = await vlueAuthFetch(apiUrl("/api/auth/account/withdraw"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...vlueAuthHeaders() },
+    body: JSON.stringify({ confirm: true })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data?.error || `탈퇴 실패 (${res.status})`);
+    err.code = data?.code;
+    throw err;
+  }
+  return data;
 }
 
 export async function vlueMarketingLogout() {

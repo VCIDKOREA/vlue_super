@@ -22,6 +22,11 @@ import { applySignupMembershipBundle } from "./membership/applySignupMembership.
 import { applyAbuseProtectionOnNewSignup } from "./auth/abusingProtectionService.js";
 import { isB2bMembershipKind, normalizeMembershipKind } from "./membership/membershipBmConstants.js";
 import { runAutomatedBusinessOnboarding } from "./onboarding/automatedOnboardingService.js";
+import {
+  isMinorForParentalConsent,
+  PARENTAL_CONSENT_REQUIRED_MESSAGE
+} from "@vlue/shared/policy/minor-signup";
+import { syncParentalConsentFromPendingChildInvites } from "./auth/parentalConsentService.js";
 
 /** Prisma Bytes 필드와 TS 제네릭 호환 */
 function toPrismaBytes(buf: Buffer): Uint8Array<ArrayBuffer> {
@@ -50,6 +55,9 @@ export type IdentityCompleteResult = {
   membershipKind?: string;
   activityTier?: number;
   isDiscounted?: boolean;
+  /** 만 14세 미만 — 부모 PASS 승인 대기 */
+  requiresParentalConsent?: boolean;
+  parentalConsentAt?: string | null;
 };
 
 function requireEnv(name: string): string {
@@ -226,15 +234,7 @@ export async function completePortoneIdentity(params: {
     declaresNoJob
   );
 
-  const desiredSlug = normalizeDesiredPublicHandle(params.desiredPublicHandle);
-  const bizDigits = params.isBusinessMember
-    ? String(params.businessRegistrationNo || "").replace(/\D/g, "").slice(0, 10)
-    : "";
-  const bizTitleForDb: string | null = params.isBusinessMember
-    ? declaresNoJob
-      ? null
-      : String(params.businessJobTitle || "").trim() || null
-    : null;
+  const adminBypass = Boolean(params.adminDeviceKey);
 
   const existing = await prisma.user.findFirst({
     where: { ciHash: { equals: ciPrisma } },
@@ -247,7 +247,20 @@ export async function completePortoneIdentity(params: {
     }
   });
 
-  const adminBypass = Boolean(params.adminDeviceKey);
+  const minorSignup = !existing && !adminBypass && isMinorForParentalConsent(birthDate);
+  if (minorSignup && params.isBusinessMember) {
+    throw new Error("만 14세 미만은 사업자 가입이 불가합니다. 일반(자녀) 가입만 가능합니다.");
+  }
+
+  const desiredSlug = normalizeDesiredPublicHandle(params.desiredPublicHandle);
+  const bizDigits = params.isBusinessMember
+    ? String(params.businessRegistrationNo || "").replace(/\D/g, "").slice(0, 10)
+    : "";
+  const bizTitleForDb: string | null = params.isBusinessMember
+    ? declaresNoJob
+      ? null
+      : String(params.businessJobTitle || "").trim() || null
+    : null;
 
   let userId: string;
   let base: Pick<
@@ -290,14 +303,18 @@ export async function completePortoneIdentity(params: {
     }
     const passwordHash =
       !adminBypass && params.passwordPlain ? await hashPassword(String(params.passwordPlain)) : null;
-    const status = params.isBusinessMember ? "pending_approval" : "active";
+    const status = params.isBusinessMember
+      ? "pending_approval"
+      : minorSignup
+        ? "pending_approval"
+        : "active";
     const now = new Date();
     const initial = buildInitialLegalNameData({
       legalName,
       portoneIdentityId: params.impUid,
       identityVerifiedAt: now,
       accountStatus: status,
-      pendingApprovalAt: params.isBusinessMember ? now : null
+      pendingApprovalAt: params.isBusinessMember || minorSignup ? now : null
     });
 
     const created = await prisma.user.create({
@@ -320,10 +337,27 @@ export async function completePortoneIdentity(params: {
         currentDiscountRate: 30,
         referrerCode: String(params.referralCode || "")
           .trim()
-          .toUpperCase() || null
+          .toUpperCase() || null,
+        requiresParentalConsent: minorSignup,
+        ...(minorSignup ? { pendingApprovalAt: now } : {})
       }
     });
     userId = created.id;
+    if (minorSignup) {
+      await prisma.verificationLog.create({
+        data: {
+          userId,
+          action: "parental_consent_pending",
+          detail: { birthDate, message: PARENTAL_CONSENT_REQUIRED_MESSAGE },
+          outcome: "pending"
+        }
+      });
+      try {
+        await syncParentalConsentFromPendingChildInvites(userId);
+      } catch (err) {
+        console.warn("[parental-consent] sync_pending_invites_failed", { userId, err });
+      }
+    }
     base = {
       userId,
       legalName: created.legalName || legalName,
@@ -470,6 +504,10 @@ export async function completePortoneIdentity(params: {
   }
 
   const resolvedPhoneE164 = phoneE164 ?? existing?.phoneE164 ?? null;
+  const consentRow = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { requiresParentalConsent: true, parentalConsentAt: true }
+  });
   return {
     ...base,
     digitalCard,
@@ -481,6 +519,8 @@ export async function completePortoneIdentity(params: {
     identityMatchedByCi: Boolean(existing),
     membershipKind: normalizeMembershipKind(membershipKindRaw),
     isDiscounted:
-      signupMembership && signupMembership.applied ? signupMembership.isDiscounted : undefined
+      signupMembership && signupMembership.applied ? signupMembership.isDiscounted : undefined,
+    requiresParentalConsent: Boolean(consentRow?.requiresParentalConsent),
+    parentalConsentAt: consentRow?.parentalConsentAt?.toISOString() ?? null
   };
 }

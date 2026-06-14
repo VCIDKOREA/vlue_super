@@ -1,24 +1,13 @@
-# www.vlue.kr Coming Soon 랜딩 — GitHub Pages
+# www.vlue.kr Coming Soon — GitHub Pages (레거시)
 #
-# 설정 A (권장·간단): Settings → Pages → Deploy from a branch → main → / (root)
-#   → 루트의 index.html, favicon.svg, CNAME 이 바로 서빙됩니다.
+# www.vlue.kr 은 Railway @vlue/web 으로 이전합니다.
+# docs/DNS_WWW_VLUE_KR_SETUP.md 참고.
 #
-# 설정 B: Settings → Pages → Source: GitHub Actions
-#   → 이 워크플로가 배포합니다.
+# 이 워크플로는 수동 실행만 허용합니다 (push 자동 배포 비활성).
 
 name: Deploy Coming Soon (GitHub Pages)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "index.html"
-      - "favicon.svg"
-      - "CNAME"
-      - ".nojekyll"
-      - "web/public/coming-soon.html"
-      - "web/public/favicon.svg"
-      - ".github/workflows/github-pages-coming-soon.yml"
   workflow_dispatch:
 
 permissions:

@@ -39,8 +39,8 @@ const FOOTER_SECTIONS = [
   {
     label: '법적 고지',
     links: [
-      { text: '이용약관', view: 'home' as View },
-      { text: '개인정보처리방침', view: 'home' as View },
+      { text: '이용약관', view: 'terms' as View },
+      { text: '개인정보처리방침', view: 'privacy' as View },
       { text: '저작권 정책', view: 'home' as View },
       { text: '쿠키 정책', view: 'home' as View },
     ],

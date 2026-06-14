@@ -47,6 +47,10 @@
       "types": "./dist/excel/workbookSchema.d.ts",
       "import": "./dist/excel/workbookSchema.js",
       "default": "./dist/excel/workbookSchema.js"
+    },
+    "./policy/minor-signup": {
+      "import": "./dist/policy/minorSignupPolicy.js",
+      "default": "./dist/policy/minorSignupPolicy.js"
     }
   },
   "scripts": {

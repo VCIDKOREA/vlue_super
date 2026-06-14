@@ -7,12 +7,14 @@ import { setVlueSessionTokens } from "../lib/vlueAuthHeaders.js";
 import { logTermsAgreement } from "../lib/termsLog.js";
 import { apiUrl } from "../lib/apiBase.js";
 import { makeDevLocalImpUid, postPortoneIdentityComplete } from "../lib/identityCompleteApi.js";
+import { approveParentalConsentWithPass, requestParentalConsentToGuardian } from "../lib/parentalConsentApi.js";
 import { requestIamportCertification } from "../lib/iamportClient.js";
 import { getPortoneUserCode } from "../lib/portoneEnv.js";
 import { DEV_SAMPLE_ROAD_ADDRESS, openDaumPostcode } from "../lib/daumPostcode.js";
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
 import { isValidMemberHandleSlug, normalizeMemberHandleSlug } from "../lib/memberHandleRules.js";
 import { isValidMemberPassword, MEMBER_PASSWORD_HINT, MEMBER_PASSWORD_INVALID_MESSAGE } from "../lib/memberPasswordRules.js";
+import { marketingLegalUrl } from "../lib/legalPageLinks.js";
 import {
   getBiometricProfile,
   isWebAuthnSupported,
@@ -159,6 +161,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const [recName, setRecName] = useState("");
 
   const [verifyZone, setVerifyZone] = useState(null);
+  const [requiresParentalConsent, setRequiresParentalConsent] = useState(false);
+  const [parentalConsentDone, setParentalConsentDone] = useState(false);
+  const [guardianHandle, setGuardianHandle] = useState("");
+  const [parentRequestSent, setParentRequestSent] = useState(false);
 
   const [signupPassword, setSignupPassword] = useState("");
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
@@ -461,6 +467,14 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       }
       setVerifyZone(null);
       setPassOk(true);
+      const needsParent =
+        Boolean(data.requiresParentalConsent) && !data.parentalConsentAt;
+      setRequiresParentalConsent(needsParent);
+      setParentalConsentDone(!needsParent);
+      if (needsParent) {
+        setStep("parent_consent");
+        return;
+      }
       if (signupIntent === "trust") {
         setAuthMode("recommend");
         setRecPhase(1);
@@ -554,7 +568,92 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       setVerifyZone({ ok: false, text: "이름과 등본상 주소를 입력해 주세요." });
       return;
     }
+    if (requiresParentalConsent && !parentalConsentDone) {
+      setVerifyZone({ ok: false, text: "법정대리인(부모) VLUE 본인인증 승인을 먼저 완료해 주세요." });
+      setStep("parent_consent");
+      return;
+    }
     setStep("complete");
+  };
+
+  const runSendParentRequest = async () => {
+    const handle = guardianHandle.trim().replace(/^@+/, "");
+    if (!handle) {
+      setVerifyZone({ ok: false, text: "부모 VLUE 아이디를 입력해 주세요." });
+      return;
+    }
+    setBusy(true);
+    setVerifyZone(null);
+    try {
+      await requestParentalConsentToGuardian(handle);
+      setParentRequestSent(true);
+      setVerifyZone({
+        ok: true,
+        text: "부모님 폰으로 승인 요청을 보냈습니다. PASS 승인이 완료되면 자동으로 다음 단계로 이동합니다."
+      });
+    } catch (e) {
+      setVerifyZone({ ok: false, text: e?.message || String(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!requiresParentalConsent || parentalConsentDone) return undefined;
+    const onRemoteApproved = () => {
+      setParentalConsentDone(true);
+      setRequiresParentalConsent(false);
+      try {
+        localStorage.setItem("vlue_account_status", "active");
+      } catch {
+        /* ignore */
+      }
+      setVerifyZone({
+        ok: true,
+        text: "부모님 폰에서 승인이 완료되었습니다. 가족보호(자녀) 연동이 시작됩니다."
+      });
+      if (signupIntent === "trust") {
+        setAuthMode("recommend");
+        setRecPhase(1);
+        setStep("recommend_detail");
+      } else {
+        setAuthMode("direct");
+        setStep("direct_detail");
+      }
+    };
+    window.addEventListener("vlue-parental-consent-approved", onRemoteApproved);
+    return () => window.removeEventListener("vlue-parental-consent-approved", onRemoteApproved);
+  }, [requiresParentalConsent, parentalConsentDone, signupIntent]);
+
+  const runGuardianPass = async ({ devBypass = false } = {}) => {
+    setBusy(true);
+    setVerifyZone(null);
+    try {
+      await approveParentalConsentWithPass({ devBypass });
+      setParentalConsentDone(true);
+      setRequiresParentalConsent(false);
+      try {
+        localStorage.setItem("vlue_account_status", "active");
+      } catch {
+        /* ignore */
+      }
+      setVerifyZone({
+        ok: true,
+        text: "부모 승인이 완료되었습니다. 가족보호(자녀) 연동이 시작됩니다."
+      });
+      if (signupIntent === "trust") {
+        setAuthMode("recommend");
+        setRecPhase(1);
+        setStep("recommend_detail");
+      } else {
+        setAuthMode("direct");
+        setStep("direct_detail");
+      }
+    } catch (e) {
+      setVerifyZone({ ok: false, text: e?.message || String(e) });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const persistAndComplete = useCallback(
@@ -678,6 +777,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
     }
     if (step === "account") {
       setStep("terms");
+      return;
+    }
+    if (step === "parent_consent") {
+      setStep("pass");
       return;
     }
     if (step === "direct_detail") {
@@ -976,6 +1079,15 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 <span className="font-bold text-slate-700">약관 동의 및 PASS 본인확인(필수)</span> · 서비스 이용약관 · 개인정보 처리방침 ·{" "}
                 <span className="font-bold text-amber-900/95">[중요] {REFERRAL_PRECAUTION_TITLE}</span> · 실명·생체 보안 설정에 동의합니다.
               </p>
+              <p className="mt-2 text-[11px] text-slate-500">
+                <a href={marketingLegalUrl("terms")} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 underline">
+                  이용약관 전문
+                </a>
+                {" · "}
+                <a href={marketingLegalUrl("privacy")} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 underline">
+                  개인정보처리방침 전문
+                </a>
+              </p>
               <div className="vlue-onb-terms-scroll mt-3 max-h-[min(42vh,360px)] overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-[12px] leading-relaxed text-slate-800">
                 {TERMS_ARTICLES.map((art) => (
                   <div key={art.id} className="mb-4 last:mb-0">
@@ -1272,6 +1384,65 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             </section>
           )}
 
+          {step === "parent_consent" && (
+            <section className="space-y-4">
+              <h2 className="text-[16px] font-black text-slate-900 sm:text-xl">법정대리인(부모) 동의</h2>
+              <p className="text-[12px] leading-relaxed text-slate-600 sm:text-sm">
+                만 14세 미만은 <strong>개인정보보호법</strong>에 따라 법정대리인 동의가 필요합니다.
+                가족보호(자녀) 기능을 쓰려면 <strong>부모님 VLUE 계정</strong>으로 PASS 본인인증 승인을 받아야 합니다.
+              </p>
+              <ul className="list-disc space-y-1 pl-4 text-[11px] text-slate-600 sm:text-xs">
+                <li>부모님이 이미 VLUE 회원이어야 합니다 (만 14세 이상).</li>
+                <li>부모 VLUE 아이디로 <strong>승인 요청 푸시</strong>를 보내거나, 이 기기에서 부모님 PASS로 승인할 수 있습니다.</li>
+                <li>승인 완료 시 가족보호 「내 자녀」 연동이 자동으로 시작됩니다.</li>
+              </ul>
+              <label className="mt-2 block text-[11px] font-bold text-slate-700">부모 VLUE 아이디</label>
+              <input
+                type="text"
+                value={guardianHandle}
+                onChange={(e) => setGuardianHandle(e.target.value)}
+                placeholder="예: mom, dad"
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-[13px] font-bold outline-none"
+              />
+              <button
+                type="button"
+                disabled={busy || parentRequestSent}
+                onClick={runSendParentRequest}
+                className="w-full rounded-2xl border-2 border-violet-200 bg-violet-50 py-3.5 text-[13px] font-black text-violet-900 disabled:opacity-50"
+              >
+                {parentRequestSent ? "부모 폰으로 승인 요청 전송됨" : "부모 폰으로 승인 요청 보내기"}
+              </button>
+              <p className="text-center text-[10px] font-bold text-slate-400">또는 같은 기기에서</p>
+              {verifyZone && (
+                <div
+                  className={`rounded-xl px-3 py-2 text-[12px] font-bold ${
+                    verifyZone.ok ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-950"
+                  }`}
+                >
+                  {verifyZone.text}
+                </div>
+              )}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => runGuardianPass({ devBypass: false })}
+                className="vlue-onb-primary-btn w-full rounded-2xl bg-indigo-600 py-4 text-[14px] font-black text-white shadow-md disabled:opacity-50"
+              >
+                부모님 PASS 본인인증으로 승인
+              </button>
+              {import.meta.env.DEV && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => runGuardianPass({ devBypass: true })}
+                  className="w-full rounded-2xl border border-dashed border-slate-300 py-3 text-[12px] font-bold text-slate-500"
+                >
+                  [DEV] 부모 인증 우회 (부모 VLUE 계정·CI 필요)
+                </button>
+              )}
+            </section>
+          )}
+
           {step === "direct_detail" && (
             <section className="space-y-3">
               <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-[11px] font-semibold text-blue-950/90">
@@ -1382,6 +1553,11 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
               <button
                 type="button"
                 onClick={() => {
+                  if (requiresParentalConsent && !parentalConsentDone) {
+                    setVerifyZone({ ok: false, text: "법정대리인(부모) 승인을 먼저 완료해 주세요." });
+                    setStep("parent_consent");
+                    return;
+                  }
                   if (!roadAddress.trim()) {
                     setVerifyZone({ ok: false, text: "「우편번호 · 주소 찾기」로 등본 주소를 선택해 주세요." });
                     return;

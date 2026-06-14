@@ -4,6 +4,7 @@ import { prisma } from "../db/client.js";
 import { verifyPassword } from "../lib/passwordHash.js";
 import { issueTokenPair } from "./authSessions.js";
 import { assertLineTypeAllowsClient, detectClientKind, type ClientKind } from "../middleware/enterpriseAccess.js";
+import { PARENTAL_CONSENT_PENDING_LOGIN_MESSAGE } from "@vlue/shared/policy/minor-signup";
 import { isVlueSeedTestHandle } from "../lib/testAccounts.js";
 import { upsertEnterpriseDraft } from "./b2b/cartEngine.js";
 
@@ -22,6 +23,7 @@ type LoginUserRow = {
   passwordHash: string | null;
   phoneE164: string | null;
   lineType: string;
+  status: string;
 };
 
 export type LoginResult =
@@ -86,6 +88,16 @@ export async function loginWithCredentials(
 
   if (!user?.passwordHash) {
     throw new Error("비밀번호가 설정되지 않았거나 아이디가 올바르지 않습니다.");
+  }
+  if (user.status === "DELETED") {
+    throw new Error("탈퇴한 계정입니다. 재가입하려면 본인인증부터 다시 진행해 주세요.");
+  }
+  const consentGate = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { requiresParentalConsent: true, parentalConsentAt: true }
+  });
+  if (consentGate?.requiresParentalConsent && !consentGate.parentalConsentAt) {
+    throw new Error(PARENTAL_CONSENT_PENDING_LOGIN_MESSAGE);
   }
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) {

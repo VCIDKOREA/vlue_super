@@ -6,9 +6,9 @@
 |--------|-----|------|
 | **API (동작 중)** | https://vlueapi-production.up.railway.app | Cloudflare R2 Direct Upload |
 | API 상태 | https://vlueapi-production.up.railway.app/api/media/video-upload/status | `configured:true` 확인됨 |
-| **웹 (QA)** | https://vlueweb-production.up.railway.app | 쇼핑 `#shopping`, 앱 `/app` |
-| www 티저 | https://www.vlue.kr | GitHub Pages Coming Soon (미디어 커머스 아님) |
-| `api.vlue.kr` | — | DNS 미설정 (NXDOMAIN) — Railway CNAME 연결 전 |
+| **웹 (QA)** | https://vlueweb-production.up.railway.app | 쇼핑 `#shopping`, `/app` 브라우저 차단 |
+| **API (커스텀)** | https://api.vlue.kr | Railway CNAME `rahwnlov.up.railway.app`, R2 OK |
+| www 티저 | https://www.vlue.kr | GitHub Pages Coming Soon → **Railway 전환 대기** |
 | Supabase | https://ywhjhdpecwvaujiagaln.supabase.co | |
 
 `api.vlue.kr` DNS 연결 전까지 E2E 테스트는 **Railway URL** 사용.  

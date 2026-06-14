@@ -9,3 +9,4 @@ export * from "./vluer/vluerGradeTypes.js";
 export * from "./vluer/tierPolicy.js";
 export * from "./referral/referralChannelPolicy.js";
 export * from "./excel/workbookSchema.js";
+export * from "./policy/minorSignupPolicy.js";

@@ -13,6 +13,7 @@ import {
   fetchFamilyProtection,
   revokeFamilyProtectionLink,
 } from '../../../lib/familyProtectionApi.js';
+import { requestGuardianPassImpUid } from '../../../lib/parentalConsentApi.js';
 import type { MarketingAuthUser } from '../components/AuthModal';
 import type { View } from '../types';
 
@@ -103,7 +104,11 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
     setBusy(true);
     setMsg('');
     try {
-      await createFamilyProtectionLink(handle, familyRelation);
+      let guardianImpUid: string | undefined;
+      if (familyRelation === 'child') {
+        guardianImpUid = await requestGuardianPassImpUid();
+      }
+      await createFamilyProtectionLink(handle, familyRelation, guardianImpUid);
       setWardHandle('');
       setMsg('초대를 보냈습니다. 상대가 앱에서 수락하면 보호가 시작됩니다.');
       await load();

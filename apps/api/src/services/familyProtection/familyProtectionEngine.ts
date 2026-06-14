@@ -1,6 +1,12 @@
 import { prisma } from "../../db/client.js";
 import { familyProtectionDb } from "../../db/familyProtectionDb.js";
 import { ssePublish } from "../../realtime/sseHub.js";
+import { sendFamilyProtectionPush } from "../fcmNotificationService.js";
+import {
+  notifyParentalConsentAfterChildInvite,
+  ParentalConsentError,
+  verifyGuardianPassCiMatchesUser
+} from "../auth/parentalConsentService.js";
 import { canRegisterFamilyMembers } from "./familyProtectionPaidGate.js";
 import { assertCanInviteFamilyMember, getFamilyProtectionSlots } from "./familyProtectionSlots.js";
 import { matchRiskySite } from "./riskySiteMatcher.js";
@@ -311,7 +317,8 @@ export async function runElderProtectionChecks() {
 export async function createProtectionLink(
   guardianUserId: string,
   wardHandle: string,
-  familyRelation: FamilyRelation
+  familyRelation: FamilyRelation,
+  guardianImpUid?: string
 ) {
   const paid = await canRegisterFamilyMembers(guardianUserId);
   if (!paid.ok) return { error: paid.reason, code: "FAMILY_FREE_TIER" };
@@ -325,6 +332,24 @@ export async function createProtectionLink(
   });
   if (!ward) return { error: "해당 아이디의 회원을 찾을 수 없습니다." };
   if (ward.id === guardianUserId) return { error: "본인은 가족으로 등록할 수 없습니다." };
+
+  if (familyRelation === "child") {
+    const impUid = String(guardianImpUid || "").trim();
+    if (!impUid) {
+      return {
+        error: "자녀 초대 시 보호자 PASS 본인인증이 필요합니다. (보이스피싱·가족보호 정책)",
+        code: "GUARDIAN_PASS_REQUIRED"
+      };
+    }
+    try {
+      await verifyGuardianPassCiMatchesUser(guardianUserId, impUid);
+    } catch (e) {
+      if (e instanceof ParentalConsentError) {
+        return { error: e.message, code: e.code };
+      }
+      throw e;
+    }
+  }
 
   const slotCheck = await assertCanInviteFamilyMember(guardianUserId, ward.id);
   if (!slotCheck.ok) {
@@ -364,6 +389,25 @@ export async function createProtectionLink(
     title: inviteTitle,
     body: inviteBody
   });
+
+  try {
+    await sendFamilyProtectionPush(ward.id, inviteTitle, inviteBody, {
+      type: "vlue-family-protection-invite",
+      linkId: link.id,
+      guardianUserId,
+      familyRelation
+    });
+  } catch {
+    /* FCM 실패는 초대 자체를 막지 않음 */
+  }
+
+  if (familyRelation === "child") {
+    try {
+      await notifyParentalConsentAfterChildInvite(guardianUserId, ward.id);
+    } catch (err) {
+      console.warn("[family-protection] parental_consent_notify_failed", err);
+    }
+  }
 
   return { ok: true, link };
 }

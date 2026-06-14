@@ -235,6 +235,13 @@ model User {
   termsVersionAccepted String?   @map("terms_version_accepted") @db.VarChar(64)
   termsAcceptedAt      DateTime? @map("terms_accepted_at") @db.Timestamptz(6)
 
+  /// 만 14세 미만 — 법정대리인 동의 필요 (가족보호 자녀)
+  requiresParentalConsent Boolean   @default(false) @map("requires_parental_consent")
+  parentalConsentAt       DateTime? @map("parental_consent_at") @db.Timestamptz(6)
+  parentalGuardianUserId  String?   @map("parental_guardian_user_id") @db.Uuid
+  parentalGuardianUser    User?   @relation("ParentalGuardianFor", fields: [parentalGuardianUserId], references: [id], onDelete: SetNull)
+  parentalConsentWards    User[]  @relation("ParentalGuardianFor")
+
   businessCardsOwned BusinessCard[]      @relation("BusinessCardOwner")
   cardMemberships    CardMember[]
   authoredCardPosts  CardFeedPost[]      @relation("CardFeedPostAuthor")

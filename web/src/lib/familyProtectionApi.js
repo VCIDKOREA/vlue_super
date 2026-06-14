@@ -30,21 +30,21 @@ export async function updateFamilyProtectionSettings(payload) {
   return parseJson(res);
 }
 
-export async function createFamilyProtectionLink(wardHandle, familyRelation) {
+export async function createFamilyProtectionLink(wardHandle, familyRelation, guardianImpUid) {
   const res = await vlueAuthFetch(apiUrl("/api/family-protection/links"), {
     method: "POST",
     headers: vlueAuthHeaders(),
-    body: JSON.stringify({ wardHandle, familyRelation })
+    body: JSON.stringify({ wardHandle, familyRelation, guardianImpUid })
   });
   return parseJson(res);
 }
 
 /** 별칭: POST /api/family/invite */
-export async function inviteFamilyMember(wardHandle, familyRelation) {
+export async function inviteFamilyMember(wardHandle, familyRelation, guardianImpUid) {
   const res = await vlueAuthFetch(apiUrl("/api/family/invite"), {
     method: "POST",
     headers: vlueAuthHeaders(),
-    body: JSON.stringify({ wardHandle, familyRelation })
+    body: JSON.stringify({ wardHandle, familyRelation, guardianImpUid })
   });
   return parseJson(res);
 }

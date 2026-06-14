@@ -24,6 +24,8 @@ import SupportPage from './pages/SupportPage';
 import ExcelEditorPage from './pages/ExcelEditorPage';
 import MyPage from './pages/MyPage';
 import BusinessCardPage from './pages/BusinessCardPage';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
 import FamilyProtectionPage, { AFTER_LOGIN_KEY } from './pages/FamilyProtectionPage';
 import PremiumHeroSection from './components/PremiumHeroSection';
 import type { MarketingAuthUser } from './components/AuthModal';
@@ -36,6 +38,7 @@ import {
 const VALID_VIEWS: View[] = [
   'home', 'search', 'shopping', 'auction', 'about', 'resources', 'pricing', 'safezone',
   'mail', 'download', 'news', 'events', 'jobs', 'support', 'exceleditor', 'family', 'mypage', 'bizcard',
+  'terms', 'privacy',
 ];
 
 function readViewFromHash(): View {
@@ -189,8 +192,10 @@ export default function App() {
             onBack={() => handleNavigate('home')}
           />
         )}
+        {view === 'terms' && <TermsPage onBack={() => handleNavigate('home')} />}
+        {view === 'privacy' && <PrivacyPage onBack={() => handleNavigate('home')} />}
 
-        {view !== 'mypage' && <Footer onNavigate={handleNavigate} />}
+        {view !== 'mypage' && view !== 'terms' && view !== 'privacy' && <Footer onNavigate={handleNavigate} />}
         </div>
       </div>
       <MarketingFabDock

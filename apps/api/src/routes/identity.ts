@@ -123,6 +123,8 @@ identityRoutes.post("/portone/complete", async (c) => {
       membershipKind: result.membershipKind,
       activityTier: result.activityTier,
       isDiscounted: result.isDiscounted,
+      requiresParentalConsent: result.requiresParentalConsent ?? false,
+      parentalConsentAt: result.parentalConsentAt ?? null,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       accessExpiresInSec: tokens.accessExpiresInSec,
@@ -130,10 +132,14 @@ identityRoutes.post("/portone/complete", async (c) => {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
+    const code = (e as Error & { code?: string }).code;
+    const statusCode = (e as Error & { statusCode?: number }).statusCode;
     const status =
-      msg.includes("포트원") || msg.includes("토큰") || msg.includes("본인인증 정보")
-        ? 502
-        : 400;
-    return c.json({ error: msg, code: "IDENTITY_COMPLETE_FAILED" }, status);
+      statusCode === 403
+        ? 403
+        : msg.includes("포트원") || msg.includes("토큰") || msg.includes("본인인증 정보")
+          ? 502
+          : 400;
+    return c.json({ error: msg, code: code || "IDENTITY_COMPLETE_FAILED" }, status);
   }
 });
