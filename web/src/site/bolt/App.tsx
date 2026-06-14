@@ -41,20 +41,22 @@ const VALID_VIEWS: View[] = [
   'terms', 'privacy',
 ];
 
-function readViewFromHash(): View {
+function readViewFromHash(): { view: View; legalScrollId?: string } {
   const raw = (typeof window !== 'undefined' ? window.location.hash : '').replace(/^#/, '');
-  return (VALID_VIEWS.includes(raw as View) ? raw : 'home') as View;
+  const [viewPart, anchor] = raw.split('/');
+  const view = (VALID_VIEWS.includes(viewPart as View) ? viewPart : 'home') as View;
+  return { view, legalScrollId: anchor || undefined };
 }
 
 export default function App() {
-  const [view, setView] = useState<View>(readViewFromHash);
+  const [{ view, legalScrollId }, setRoute] = useState(readViewFromHash);
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<MarketingAuthUser | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
 
   useEffect(() => {
-    const onHash = () => setView(readViewFromHash());
+    const onHash = () => setRoute(readViewFromHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -76,21 +78,27 @@ export default function App() {
     const q = (params.get('vlue_verify') || params.get('q') || '').trim();
     if (!q) return;
     setSearchQuery(q);
-    setView('search');
+    setRoute({ view: 'search' });
     window.location.hash = 'search';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    setView('search');
+    setRoute({ view: 'search' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleNavigate = (nextView: View) => {
-    setView(nextView);
+  const handleNavigate = (nextView: View, legalAnchor?: string) => {
+    setRoute({ view: nextView, legalScrollId: legalAnchor });
     if (typeof window !== 'undefined') {
-      window.location.hash = nextView === 'home' ? '' : nextView;
+      if (nextView === 'home' && !legalAnchor) {
+        window.location.hash = '';
+      } else if (legalAnchor) {
+        window.location.hash = `${nextView}/${legalAnchor}`;
+      } else {
+        window.location.hash = nextView;
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -98,7 +106,7 @@ export default function App() {
   const handleLogout = async () => {
     await vlueMarketingLogout();
     setUser(null);
-    setView('home');
+    setRoute({ view: 'home' });
   };
 
   const handleAuthSuccess = (authUser: MarketingAuthUser) => {
@@ -108,7 +116,7 @@ export default function App() {
     try {
       if (sessionStorage.getItem(AFTER_LOGIN_KEY) === 'family') {
         sessionStorage.removeItem(AFTER_LOGIN_KEY);
-        setView('family');
+        setRoute({ view: 'family' });
         window.location.hash = 'family';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
@@ -204,7 +212,9 @@ export default function App() {
           />
         )}
         {view === 'terms' && <TermsPage onBack={() => handleNavigate('home')} />}
-        {view === 'privacy' && <PrivacyPage onBack={() => handleNavigate('home')} />}
+        {view === 'privacy' && (
+          <PrivacyPage onBack={() => handleNavigate('home')} scrollToId={legalScrollId} />
+        )}
 
         {view !== 'mypage' && view !== 'terms' && view !== 'privacy' && <Footer onNavigate={handleNavigate} />}
         </div>

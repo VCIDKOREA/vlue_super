@@ -14,7 +14,19 @@ export function marketingLegalUrl(kind) {
   const host = window.location.hostname.toLowerCase();
   const hash = marketingLegalHash(kind);
   if (host === "www.vlue.kr" || host === "vlue.kr" || host === "localhost" || host === "127.0.0.1") {
-    return `${window.location.origin}/${hash}`;
+    return `${window.location.origin}${hash}`;
   }
-  return `https://www.vlue.kr/${hash}`;
+  return `https://www.vlue.kr${hash}`;
+}
+
+/** 만 14세 미만 아동 정책 — 개인정보처리방침 3조 */
+export function marketingMinorPolicyUrl() {
+  if (typeof window === "undefined") {
+    return "https://www.vlue.kr/#privacy/legal-article-3";
+  }
+  const host = window.location.hostname.toLowerCase();
+  if (host === "www.vlue.kr" || host === "vlue.kr" || host === "localhost" || host === "127.0.0.1") {
+    return `${window.location.origin}#privacy/legal-article-3`;
+  }
+  return "https://www.vlue.kr/#privacy/legal-article-3";
 }

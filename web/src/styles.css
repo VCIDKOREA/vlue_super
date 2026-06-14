@@ -4548,6 +4548,21 @@ body,
   }
 }
 
+.lettering-bizcard-preview-host .lettering-bizcard__flip {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.lettering-bizcard-preview-host .lettering-bizcard__flip--back {
+  transform: rotateY(180deg) translateZ(0);
+  -webkit-transform: rotateY(180deg) translateZ(0);
+}
+
+.lettering-bizcard-preview-host .lettering-bizcard__face--back {
+  -webkit-transform: rotateY(180deg) translateZ(1px);
+  transform: rotateY(180deg) translateZ(1px);
+}
+
 .lettering-bizcard-preview-host .lettering-bizcard__face {
   padding: 9px 10px 8px;
 }

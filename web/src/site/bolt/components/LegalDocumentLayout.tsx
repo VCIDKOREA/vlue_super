@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 export interface LegalArticle {
@@ -12,6 +13,8 @@ interface LegalDocumentLayoutProps {
   version: string;
   articles: LegalArticle[];
   onBack: () => void;
+  /** 예: legal-article-3 — 해시 앵커 스크롤 */
+  scrollToId?: string;
 }
 
 export default function LegalDocumentLayout({
@@ -19,7 +22,17 @@ export default function LegalDocumentLayout({
   version,
   articles,
   onBack,
+  scrollToId,
 }: LegalDocumentLayoutProps) {
+  useEffect(() => {
+    if (!scrollToId || typeof document === 'undefined') return;
+    const el = document.getElementById(scrollToId);
+    if (!el) return;
+    const t = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [scrollToId, articles]);
   return (
     <main className="min-h-screen bg-blue-tint pt-[60px] pb-16">
       <div className="bg-white border-b border-slate-100">
@@ -40,7 +53,7 @@ export default function LegalDocumentLayout({
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <article className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-8 shadow-sm text-slate-800 leading-relaxed">
           {articles.map((art) => (
-            <section key={art.id} className="mb-8 last:mb-0">
+            <section key={art.id} id={`legal-article-${art.id}`} className="mb-8 last:mb-0 scroll-mt-24">
               <h2 className="text-base sm:text-lg font-black text-slate-900">{art.title}</h2>
               {art.paragraphs?.map((p, i) => (
                 <p key={i} className="mt-3 text-sm sm:text-[15px] text-slate-700">

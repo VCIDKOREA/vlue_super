@@ -3,10 +3,12 @@ import { VlueBrandLogo } from '../../../components/VlueBrandLogo.jsx';
 import type { View } from '../types';
 
 interface FooterProps {
-  onNavigate: (view: View) => void;
+  onNavigate: (view: View, legalAnchor?: string) => void;
 }
 
-const FOOTER_SECTIONS = [
+type FooterLink = { text: string; view: View; anchor?: string };
+
+const FOOTER_SECTIONS: { label: string; links: FooterLink[] }[] = [
   {
     label: '서비스',
     links: [
@@ -41,6 +43,7 @@ const FOOTER_SECTIONS = [
     links: [
       { text: '이용약관', view: 'terms' as View },
       { text: '개인정보처리방침', view: 'privacy' as View },
+      { text: '만 14세 미만 정책', view: 'privacy' as View, anchor: 'legal-article-3' },
       { text: '저작권 정책', view: 'home' as View },
       { text: '쿠키 정책', view: 'home' as View },
     ],
@@ -81,11 +84,11 @@ export default function Footer({ onNavigate }: FooterProps) {
             <div key={label} className="mkt-footer-section min-w-0">
               <h4 className="text-white text-[0.6875rem] sm:text-xs font-bold uppercase tracking-wider mb-1.5 sm:mb-3">{label}</h4>
               <ul className="mkt-footer-links space-y-1 sm:space-y-2">
-                {links.map(({ text, view }) => (
+                {links.map(({ text, view, anchor }) => (
                   <li key={text}>
                     <button
                       type="button"
-                      onClick={() => onNavigate(view)}
+                      onClick={() => onNavigate(view, anchor)}
                       className="text-gray-400 text-[0.6875rem] sm:text-xs hover:text-white transition-colors text-left"
                     >
                       {text}

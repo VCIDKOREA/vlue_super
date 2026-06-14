@@ -14,7 +14,7 @@ import { DEV_SAMPLE_ROAD_ADDRESS, openDaumPostcode } from "../lib/daumPostcode.j
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
 import { isValidMemberHandleSlug, normalizeMemberHandleSlug } from "../lib/memberHandleRules.js";
 import { isValidMemberPassword, MEMBER_PASSWORD_HINT, MEMBER_PASSWORD_INVALID_MESSAGE } from "../lib/memberPasswordRules.js";
-import { marketingLegalUrl } from "../lib/legalPageLinks.js";
+import { marketingLegalUrl, marketingMinorPolicyUrl } from "../lib/legalPageLinks.js";
 import {
   getBiometricProfile,
   isWebAuthnSupported,
@@ -1389,7 +1389,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
               <h2 className="text-[16px] font-black text-slate-900 sm:text-xl">법정대리인(부모) 동의</h2>
               <p className="text-[12px] leading-relaxed text-slate-600 sm:text-sm">
                 만 14세 미만은 <strong>개인정보보호법</strong>에 따라 법정대리인 동의가 필요합니다.
-                가족보호(자녀) 기능을 쓰려면 <strong>부모님 VLUE 계정</strong>으로 PASS 본인인증 승인을 받아야 합니다.
+                가족보호(자녀) 기능을 쓰려면 <strong>부모님 VLUE 계정</strong>으로 PASS 본인인증 승인을 받아야 합니다.{" "}
+                <a href={marketingMinorPolicyUrl()} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 underline">
+                  만 14세 미만 정책 보기
+                </a>
               </p>
               <ul className="list-disc space-y-1 pl-4 text-[11px] text-slate-600 sm:text-xs">
                 <li>부모님이 이미 VLUE 회원이어야 합니다 (만 14세 이상).</li>

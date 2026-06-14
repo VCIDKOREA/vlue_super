@@ -16,7 +16,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { navigateToVluePartnerStore } from '../../../lib/vluePartnerStoreNav.js';
-import { shareCrossVerifyViaKakao, SOURCE_LABELS } from '../../../lib/searchVerifyKakaoShare.js';
+import { shareCrossVerify, SOURCE_LABELS } from '../../../lib/searchVerifyKakaoShare.js';
 import {
   KakaoSourceLogo,
   NaverSourceLogo,
@@ -507,9 +507,9 @@ function CrossVerifyShareBar({
     setBusy(tab);
     setMsg('');
     try {
-      const res = await shareCrossVerifyViaKakao(data, tab);
+      const res = await shareCrossVerify(data, tab);
       if (res.ok) {
-        setMsg('카카오톡 공유 창이 열렸습니다.');
+        setMsg(res.message || (tab === 'kakao' ? '카카오톡 공유 창이 열렸습니다.' : '공유가 완료되었습니다.'));
         window.setTimeout(() => setMsg(''), 3200);
       } else if (!res.cancelled) {
         setMsg(res.error || '공유에 실패했습니다.');
@@ -530,7 +530,9 @@ function CrossVerifyShareBar({
         <Share2 className="w-4 h-4" aria-hidden />
         VLUE 교차검증 결과 공유
       </p>
-      <p className="sv-cross-share-hint">카카오톡으로 내도 VLUE에서 검증·공유된 정보임을 확인할 수 있습니다.</p>
+      <p className="sv-cross-share-hint">
+        카카오는 카카오톡, 나머지는 기기 공유(또는 복사)로 VLUE 검증 정보를 전달합니다.
+      </p>
       <div className="sv-cross-share-grid">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -553,7 +555,11 @@ function CrossVerifyShareBar({
             >
               <tab.Logo className="sv-cross-share-btn-logo" />
               <span className="sv-cross-share-btn-label">
-                {loading ? '공유 중…' : `${SOURCE_LABELS[tab.key]} 카톡`}
+                {loading
+                  ? '공유 중…'
+                  : tab.key === 'kakao'
+                    ? `${SOURCE_LABELS[tab.key]} 카톡`
+                    : `${SOURCE_LABELS[tab.key]} 공유`}
               </span>
             </button>
           );

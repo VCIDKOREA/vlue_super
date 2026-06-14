@@ -164,3 +164,48 @@ export async function shareCrossVerifyViaKakao(data, tab) {
 }
 
 export { SOURCE_LABELS };
+
+/**
+ * VLUE 통합 교차검증 — 탭별 공유
+ * - 카카오: 카카오톡 Feed
+ * - 네이버/공공/VLUE: Web Share API → 클립보드 → 카카오 폴백
+ */
+export async function shareCrossVerify(data, tab) {
+  if (tab === "kakao") {
+    return shareCrossVerifyViaKakao(data, tab);
+  }
+  return shareCrossVerifyNative(data, tab);
+}
+
+async function shareCrossVerifyNative(data, tab) {
+  if (!data?.query?.trim()) {
+    return { ok: false, error: "공유할 검색어가 없습니다." };
+  }
+
+  const shareUrl = buildCrossVerifyShareUrl(data.query);
+  const title = buildShareTitle(data, tab);
+  const text = `${buildShareLines(data, tab).join("\n")}\n\n${shareUrl}`;
+
+  if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+    try {
+      await navigator.share({ title, text, url: shareUrl });
+      return { ok: true, tab, channel: "native", shareUrl };
+    } catch (err) {
+      const name = err?.name || "";
+      if (name === "AbortError" || /cancel|취소/i.test(String(err?.message || ""))) {
+        return { ok: false, cancelled: true };
+      }
+    }
+  }
+
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return { ok: true, tab, channel: "clipboard", message: "클립보드에 복사했습니다." };
+    } catch {
+      /* fall through */
+    }
+  }
+
+  return shareCrossVerifyViaKakao(data, tab);
+}
