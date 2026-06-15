@@ -7,11 +7,11 @@
 
 export const LETTERING_PLATFORMS = ["android", "ios"];
 
-/** iOS 기준 빅푸시 가로 폭 */
-export const LETTERING_PUSH_WIDTH = "calc(74.5% + 15px)";
+/** iOS/Android 공통 — 통화 화면 빅푸시 좌우 여백 없음 */
+export const LETTERING_PUSH_WIDTH = "100%";
 
-/** Android — iOS 대비 가로 +6px */
-export const LETTERING_PUSH_WIDTH_ANDROID = "calc(74.5% + 21px)";
+/** Android — iOS와 동일 풀폭 */
+export const LETTERING_PUSH_WIDTH_ANDROID = "100%";
 
 /** @param {"android"|"ios"} platform */
 export function getLetteringLayout(platform = "android") {
@@ -33,10 +33,11 @@ export function getLetteringLayout(platform = "android") {
 
   return {
     platform: "android",
-    overlayPaddingTop: "6px",
+    /** 상태바 아래 — 통화 번호와 겹치지 않게 상단 고정 */
+    overlayPaddingTop: "calc(max(env(safe-area-inset-top, 0px), 4.5%) + 2px)",
     pushWidth: LETTERING_PUSH_WIDTH_ANDROID,
     dragInitialY: 0,
-    dragMaxY: 420,
+    dragMaxY: 280,
     liveBarPadding: "7px 12px",
     summaryPadding: "10px 12px",
     statusFontSize: "10px",

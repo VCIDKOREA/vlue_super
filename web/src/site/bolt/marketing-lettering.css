@@ -22,11 +22,13 @@
   flex-direction: column;
   align-items: center;
   min-width: 0;
+  overflow: visible;
 }
 
 .vlue-marketing-lettering-scene {
   width: 100%;
   max-width: 390px;
+  overflow: visible;
 }
 
 [data-vlue-site="marketing"] .vlue-marketing-dual {

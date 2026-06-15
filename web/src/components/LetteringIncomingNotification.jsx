@@ -8,12 +8,11 @@ import {
   resolveFreeTierSummary,
   VLUE_FREE_TIER_CAUTION
 } from "../lib/letteringFreeTierDisplay.js";
-import LetteringBusinessCardPanel from "./LetteringBusinessCardPanel.jsx";
+import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
 import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx";
 import { getLetteringReportsForPhone } from "../lib/letteringPhoneReports.js";
-import { formatLetteringPaidIdentity } from "../lib/letteringPaidIdentityDisplay.js";
+import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDisplay.js";
 import { LETTERING_DEMO_COMPANY_LOGO, resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
-import LetteringBizcardScaledPreview from "./LetteringBizcardScaledPreview.jsx";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 
 const DEMO_CARD = {
@@ -148,13 +147,13 @@ export default function LetteringIncomingNotification({
   onReport,
   /** @deprecated */ onMemo,
   /** @deprecated */ onBlock,
-  /** 미리보기·www: 명함을 빅푸시 폭에 맞게 축소 */
-  fitBizcard = false,
+  /** @deprecated */ fitBizcard = false,
   /** 미인증 펼침 하단 신고/차단·안내 푸터 숨김(www 데모) */
   hideUnverifiedFooter = false,
   className = ""
 }) {
   const [expandedInternal, setExpandedInternal] = useState(defaultExpanded);
+  const [receptionFace, setReceptionFace] = useState("front");
   const expanded = expandedProp !== undefined ? expandedProp : expandedInternal;
 
   const setExpanded = useCallback(
@@ -165,7 +164,10 @@ export default function LetteringIncomingNotification({
     [expandedProp, onExpandedChange]
   );
 
-  const toggle = () => setExpanded(!expanded);
+  const toggle = () => {
+    setExpanded(!expanded);
+    if (expanded) setReceptionFace("front");
+  };
   const c = normalizeLetteringCard({ ...DEMO_CARD, ...card });
   const onCall = callPhase === "active";
   const statusLabel = getLetteringCallStatusLabel({
@@ -258,9 +260,13 @@ export default function LetteringIncomingNotification({
     return phoneDisplay && phoneDisplay !== "\u2014" ? phoneDisplay : "";
   }, [isUnverified, incoming]);
 
-  const paidIdentity = isPaidMember ? formatLetteringPaidIdentity(c) : null;
-  const displayLabel = isUnverified || isFreeMember ? null : paidIdentity?.companyLine || c.name;
-  const orgLine = paidIdentity?.roleLine || "";
+  const receptionLines = isPaidMember
+    ? formatLetteringReceptionLines(c, { incomingNumber: incoming })
+    : null;
+  const displayLabel = isUnverified || isFreeMember ? null : receptionLines?.collapsedPrimary || c.name;
+  const collapsedPhoneDisplay = receptionLines?.phone
+    ? formatLetteringPhoneDisplay(receptionLines.phone)
+    : "";
 
   const handleOpenFeed = () => {
     const payload = {
@@ -301,9 +307,11 @@ export default function LetteringIncomingNotification({
 
       <div className="lettering-ongoing-body relative flex min-h-0 flex-col">
         <div
-          className={`lettering-ongoing-summary relative z-[2] flex items-center gap-2.5 px-3 py-2.5 ${
-            isFreeMember ? "lettering-ongoing-summary--free" : ""
-          } ${isUnverified ? "lettering-ongoing-summary--unverified" : ""}`}
+          className={`lettering-ongoing-summary relative z-[2] flex gap-2.5 px-3 py-2.5 ${
+            isExpandedView ? "items-center" : "items-start"
+          } ${isFreeMember ? "lettering-ongoing-summary--free" : ""} ${
+            isUnverified ? "lettering-ongoing-summary--unverified" : ""
+          } ${!isExpandedView && isPaidMember ? "pb-3" : ""}`}
         >
           {isPaidMember || isUnverified ? (
             <LetteringProfileThumb card={c} verified={verified} size="sm" />
@@ -336,16 +344,31 @@ export default function LetteringIncomingNotification({
                 </span>
               </p>
             ) : (
-              <p className="lettering-ongoing-name-row flex min-w-0 items-center gap-1.5">
-                <span className="lettering-ongoing-name min-w-0 truncate text-[16px] font-black leading-snug">
-                  {displayLabel}
-                </span>
-                {verified ? <VlueVerifiedBadge /> : null}
-              </p>
+              <>
+                <p className="lettering-ongoing-name-row flex min-w-0 items-center gap-1.5">
+                  <span className="lettering-ongoing-name min-w-0 truncate text-[15px] font-semibold leading-snug">
+                    {displayLabel}
+                  </span>
+                  {verified ? <VlueVerifiedBadge /> : null}
+                </p>
+                {receptionLines && collapsedPhoneDisplay ? (
+                  <p className="lettering-ongoing-subline mt-0.5 min-w-0 truncate text-[11px] leading-snug">
+                    {receptionLines.organization ? (
+                      <>
+                        <span className="font-medium text-slate-600">{receptionLines.organization}</span>
+                        <span className="text-slate-400"> / </span>
+                      </>
+                    ) : null}
+                    <span className="lettering-ongoing-phone-em font-bold text-blue-700">
+                      {collapsedPhoneDisplay}
+                    </span>
+                  </p>
+                ) : null}
+              </>
             )}
-            {isPaidMember && orgLine ? (
-              <p className="lettering-ongoing-subtitle mt-0.5 truncate text-[11px] font-semibold leading-snug">
-                {orgLine}
+            {isPaidMember && !collapsedPhoneDisplay && receptionLines?.expandedContactLine ? (
+              <p className="lettering-ongoing-subtitle mt-0.5 truncate text-[11px] font-medium leading-snug text-slate-500">
+                {receptionLines.expandedContactLine}
               </p>
             ) : null}
             {isUnverified && phoneReports.length ? (
@@ -368,46 +391,65 @@ export default function LetteringIncomingNotification({
           ) : null}
         </div>
 
-        {isExpandedView && isPaidMember ? (
-          <div className="lettering-ongoing-scroll relative z-[2] px-3 pb-2 pt-1">
-            {fitBizcard ? (
-              <LetteringBizcardScaledPreview>
-                <LetteringBusinessCardPanel card={c} />
-              </LetteringBizcardScaledPreview>
-            ) : (
-              <LetteringBusinessCardPanel card={c} />
-            )}
-            <p className="lettering-caution lettering-caution--bizcard">{VLUE_CARD_CAUTION}</p>
-          </div>
-        ) : null}
-
-        {isExpandedView && isPaidMember ? (
-          <div className="lettering-ongoing-actions relative z-[2] grid shrink-0 grid-cols-3 gap-1.5 px-3 py-2">
-            <button type="button" onClick={handleOpenFeed} className="lettering-action lettering-action--primary">
-              {"\uC778\uC99D\uC815\uBCF4"}
-            </button>
-            <button type="button" onClick={handleSaveCard} className="lettering-action lettering-action--ghost">
-              {"\uBA85\uD568\uC800\uC7A5"}
-            </button>
-            <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger">
-              {"\uC2E0\uACE0/\uCC28\uB2E8"}
-            </button>
-          </div>
-        ) : null}
-
-        {isExpandedView && isUnverified ? (
-          <div className="lettering-unverified-expanded relative z-[2]">
-            <div className="lettering-unverified-expanded__scroll lettering-ongoing-scroll--unverified">
-              <LetteringUnverifiedReportPanel incomingNumber={incoming} reportHistory={reportHistory} />
+        {canExpand && isPaidMember ? (
+          <div
+            className="lettering-ongoing-expand-slot lettering-ongoing-expand-slot--reception"
+            data-open={isExpandedView ? "true" : "false"}
+            aria-hidden={!isExpandedView}
+          >
+            <div className="lettering-ongoing-expand-slot__inner">
+              <div className="lettering-ongoing-reception relative z-[2] flex min-h-0 flex-1 flex-col">
+                <div className="lettering-ongoing-scroll lettering-ongoing-scroll--reception flex-1 min-h-0">
+                  <LetteringDigitalReception
+                    card={c}
+                    verified={verified}
+                    verificationItems={verificationList}
+                    incomingNumber={incoming}
+                    embeddedInPush
+                    face={receptionFace}
+                    onFaceChange={setReceptionFace}
+                  />
+                </div>
+                <div className="lettering-ongoing-actions-secondary lettering-ongoing-actions-secondary--reception relative z-[2] grid shrink-0 grid-cols-3 gap-1.5 px-3 py-2">
+                  <p className="lettering-caution lettering-caution--reception-footer col-span-3">
+                    {VLUE_CARD_CAUTION}
+                  </p>
+                  <button type="button" onClick={handleOpenFeed} className="lettering-action lettering-action--primary">
+                    {"\uC778\uC99D\uC815\uBCF4"}
+                  </button>
+                  <button type="button" onClick={handleSaveCard} className="lettering-action lettering-action--ghost">
+                    {"\uBA85\uD568\uC800\uC7A5"}
+                  </button>
+                  <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger">
+                    {"\uC2E0\uACE0/\uCC28\uB2E8"}
+                  </button>
+                </div>
+              </div>
             </div>
-            {hideUnverifiedFooter ? null : (
-              <footer className="lettering-unverified-expanded__footer">
-                <p className="lettering-unverified-footer-note">{VLUE_UNVERIFIED_REPORT_DISCLAIMER}</p>
-                <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger w-full">
-                  {"\uC2E0\uACE0/\uCC28\uB2E8"}
-                </button>
-              </footer>
-            )}
+          </div>
+        ) : null}
+
+        {canExpand && isUnverified ? (
+          <div
+            className="lettering-ongoing-expand-slot lettering-ongoing-expand-slot--unverified"
+            data-open={isExpandedView ? "true" : "false"}
+            aria-hidden={!isExpandedView}
+          >
+            <div className="lettering-ongoing-expand-slot__inner">
+              <div className="lettering-unverified-expanded relative z-[2]">
+                <div className="lettering-unverified-expanded__scroll lettering-ongoing-scroll--unverified">
+                  <LetteringUnverifiedReportPanel incomingNumber={incoming} reportHistory={reportHistory} />
+                </div>
+                {hideUnverifiedFooter ? null : (
+                  <footer className="lettering-unverified-expanded__footer">
+                    <p className="lettering-unverified-footer-note">{VLUE_UNVERIFIED_REPORT_DISCLAIMER}</p>
+                    <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger w-full">
+                      {"\uC2E0\uACE0/\uCC28\uB2E8"}
+                    </button>
+                  </footer>
+                )}
+              </div>
+            </div>
           </div>
         ) : null}
       </div>

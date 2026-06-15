@@ -7,13 +7,53 @@ export const LETTERING_BIZCARD_CHANGED_EVENT = "vlue-lettering-bizcard-changed";
 export const LETTERING_BIZCARD_EMAIL_MAX = 26;
 export const LETTERING_BIZCARD_EMAIL_WARN = 22;
 
+export function compactLetteringMemberEmail(raw) {
+  const email = String(raw ?? "").trim();
+  if (!email) return "";
+
+  const legacy = email.match(/^member\.([0-9a-f]+)(?:@member(?:\.vlue\.kr)?)?/i);
+  if (legacy) {
+    const digits = legacy[1].replace(/^0+/, "") || legacy[1].slice(-4) || "1";
+    const tail = digits.slice(-4).padStart(4, "0");
+    return `m.${tail}@vlue.kr`;
+  }
+
+  if (/^m\.[a-z0-9]{1,8}@vlue\.kr$/i.test(email)) {
+    return email.toLowerCase();
+  }
+
+  return email;
+}
+
+/** 연락처 한 줄 표시용 — 긴 주소는 가운데 생략 */
+export function formatLetteringContactEmailDisplay(raw) {
+  const email = compactLetteringMemberEmail(raw);
+  if (!email) return "";
+  if (email.length <= 24) return email;
+  const at = email.indexOf("@");
+  if (at < 1) return `${email.slice(0, 22)}…`;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (local.length <= 10) return email;
+  return `${local.slice(0, 7)}…@${domain}`;
+}
+
 export function clampLetteringBizcardEmail(raw) {
-  return String(raw ?? "").slice(0, LETTERING_BIZCARD_EMAIL_MAX);
+  return compactLetteringMemberEmail(raw).slice(0, LETTERING_BIZCARD_EMAIL_MAX);
 }
 
 export function isLetteringBizcardEmailLong(raw) {
   return String(raw ?? "").trim().length > LETTERING_BIZCARD_EMAIL_WARN;
 }
+
+export const LETTERING_PHOTO_RULES = {
+  fileNamePrefix: "lettering-profile-photo",
+  maxBytes: 1024 * 1024,
+  maxWidth: 1200,
+  maxHeight: 1600,
+  accept: "image/png,image/jpeg,image/webp",
+  acceptLabel: "PNG, JPG, WEBP"
+};
 
 export const LETTERING_LOGO_RULES = {
   fileNamePrefix: "lettering-company-logo",
@@ -33,9 +73,12 @@ const DEFAULT_EDITABLE = {
   email: "",
   website: "",
   companyIntro: "",
+  customBackText: "",
   address: "",
   logoDataUrl: "",
-  logoFileName: ""
+  logoFileName: "",
+  photoDataUrl: "",
+  photoFileName: ""
 };
 
 export function readLetteringFixedIdentity() {
@@ -99,21 +142,20 @@ function readImageSize(dataUrl) {
   });
 }
 
-/** 로고 파일 검증 후 data URL 반환 */
-export async function prepareLetteringLogoFromFile(file) {
+/** 로고·프로필 사진 파일 검증 후 data URL 반환 */
+async function prepareLetteringImageFromFile(file, rules, label = "이미지") {
   if (!file) return { ok: false, error: "파일을 선택해 주세요." };
 
   const type = String(file.type || "").toLowerCase();
-  if (!LETTERING_LOGO_RULES.accept.split(",").includes(type)) {
-    return { ok: false, error: `${LETTERING_LOGO_RULES.acceptLabel}만 업로드할 수 있습니다.` };
+  if (!rules.accept.split(",").includes(type)) {
+    return { ok: false, error: `${rules.acceptLabel}만 업로드할 수 있습니다.` };
   }
-  if (file.size > LETTERING_LOGO_RULES.maxBytes) {
-    return { ok: false, error: "파일 크기는 512KB 이하여야 합니다." };
+  if (file.size > rules.maxBytes) {
+    return { ok: false, error: `파일 크기는 ${Math.round(rules.maxBytes / 1024)}KB 이하여야 합니다.` };
   }
 
-  const ext =
-    type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
-  const fileName = `${LETTERING_LOGO_RULES.fileNamePrefix}.${ext}`;
+  const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
+  const fileName = `${rules.fileNamePrefix}.${ext}`;
 
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -128,10 +170,10 @@ export async function prepareLetteringLogoFromFile(file) {
 
   try {
     const { width, height } = await readImageSize(dataUrl);
-    if (width > LETTERING_LOGO_RULES.maxWidth || height > LETTERING_LOGO_RULES.maxHeight) {
+    if (width > rules.maxWidth || height > rules.maxHeight) {
       return {
         ok: false,
-        error: `이미지는 가로·세로 각 ${LETTERING_LOGO_RULES.maxWidth}px 이하여야 합니다. (현재 ${width}×${height})`
+        error: `${label}은 가로·세로 각 ${rules.maxWidth}×${rules.maxHeight}px 이하여야 합니다. (현재 ${width}×${height})`
       };
     }
   } catch (e) {
@@ -139,4 +181,14 @@ export async function prepareLetteringLogoFromFile(file) {
   }
 
   return { ok: true, dataUrl, fileName };
+}
+
+/** 로고 파일 검증 후 data URL 반환 */
+export async function prepareLetteringLogoFromFile(file) {
+  return prepareLetteringImageFromFile(file, LETTERING_LOGO_RULES, "로고");
+}
+
+/** 프로필 사진 검증 후 data URL 반환 */
+export async function prepareLetteringPhotoFromFile(file) {
+  return prepareLetteringImageFromFile(file, LETTERING_PHOTO_RULES, "프로필 사진");
 }

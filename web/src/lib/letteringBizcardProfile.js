@@ -2,7 +2,8 @@ import { normalizeLetteringCard } from "./letteringCardNormalize.js";
 import { resolveLetteringDemoLogoUrl } from "./letteringDemoAssets.js";
 import {
   readLetteringBizcardEditable,
-  readLetteringFixedIdentity
+  readLetteringFixedIdentity,
+  formatLetteringContactEmailDisplay
 } from "./letteringBizcardStorage.js";
 import { normalizeLetteringBizcardTemplate } from "./letteringBizcardTemplates.js";
 
@@ -20,6 +21,9 @@ const PREVIEW_FALLBACK_CARD = {
 function pickPreviewField(card, key) {
   const value = String(card?.[key] ?? "").trim();
   if (!value || value === "\u2014") return String(PREVIEW_FALLBACK_CARD[key] || "").trim();
+  if (key === "email") {
+    return formatLetteringContactEmailDisplay(value) || String(PREVIEW_FALLBACK_CARD.email || "").trim();
+  }
   return value;
 }
 
@@ -80,9 +84,10 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
     email: ed.email,
     website: ed.website,
     companyIntro: ed.companyIntro,
+    customBackText: ed.customBackText,
     address: ed.address || fallbackAddress,
     logoUrl: ed.logoDataUrl,
-    photoUrl: "",
+    photoUrl: ed.photoDataUrl || "",
     membershipTier,
     feedId: userId ? `user-${userId}` : "",
     feedType: "personal",

@@ -39,8 +39,7 @@ export const MARKETING_DEMO_CARDS = {
     email: '1332@fss.or.kr',
     website: 'fss.or.kr',
     logoUrl: '',
-    companyIntro:
-      '금융감독원 금융민원센터 1332입니다. 유료 인증 기관은 Lettering 골드 톤으로 강조됩니다.',
+    companyIntro: 'VLUE 인증 기관 대표번호입니다.',
     roleLine: '금융민원',
   },
 } as const satisfies Record<string, MarketingDemoCard>;

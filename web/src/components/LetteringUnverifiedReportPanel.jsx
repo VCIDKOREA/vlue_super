@@ -26,6 +26,9 @@ function ReportEntry({ entry }) {
   );
 }
 
+/** 미인증 펼침 — 이 건수 이상이면 신고 목록만 내부 스크롤 */
+export const LETTERING_UNVERIFIED_REPORT_SCROLL_MIN = 3;
+
 /** 미인증 번호 펼침 — 신고·제보 이력 + 주의 문구 */
 export default function LetteringUnverifiedReportPanel({
   incomingNumber = "",
@@ -59,7 +62,13 @@ export default function LetteringUnverifiedReportPanel({
         </p>
 
         {reports.length ? (
-          <div className="lettering-unverified-reports__list-scroll">
+          <div
+            className={`lettering-unverified-reports__list-scroll${
+              reports.length >= LETTERING_UNVERIFIED_REPORT_SCROLL_MIN
+                ? " lettering-unverified-reports__list-scroll--bounded"
+                : ""
+            }`}
+          >
             <ul className="lettering-unverified-reports__list">
               {reports.map((entry) => (
                 <ReportEntry key={entry.id || `${entry.reasonLabel}-${entry.createdAt}`} entry={entry} />

@@ -4,11 +4,13 @@ export const VLUE_CARD_PROMO_MAX = 120;
 
 export function getDefaultMemberVlueEmail() {
   try {
-    const id = localStorage.getItem("vlue_server_user_id") || "";
-    const slug = id.replace(/-/g, "").slice(0, 12) || "guest";
-    return `member.${slug}@member.vlue.kr`;
+    const id = String(localStorage.getItem("vlue_server_user_id") || "").trim();
+    const hex = id.replace(/-/g, "");
+    const significant = hex.replace(/^0+/, "");
+    const tail = (significant || hex).slice(-4).padStart(4, "0");
+    return `m.${tail.toLowerCase()}@vlue.kr`;
   } catch {
-    return "member.guest@member.vlue.kr";
+    return "m.guest@vlue.kr";
   }
 }
 

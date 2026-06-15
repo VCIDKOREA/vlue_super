@@ -1,10 +1,24 @@
 /* www — CSS 통화 화면 (Galaxy / iPhone) */
 
+.lettering-call-screen--native {
+  --vlue-native-call-base: #0c0c10;
+  --vlue-native-call-surface:
+    radial-gradient(ellipse 110% 70% at 50% 0%, rgba(68, 44, 92, 0.2) 0%, transparent 58%),
+    linear-gradient(180deg, #121018 0%, var(--vlue-native-call-base) 36%, var(--vlue-native-call-base) 100%);
+  display: flex;
+  flex-direction: column;
+  min-height: 520px;
+  --lettering-native-controls-reserve: 108px;
+  background-color: var(--vlue-native-call-base);
+  background-image: var(--vlue-native-call-surface);
+}
+
 .vlue-native-call {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 520px;
+  min-height: 100%;
+  height: 100%;
   color: #f8fafc;
   transition: opacity 0.28s ease;
 }
@@ -16,10 +30,11 @@
 .vlue-native-call__bg {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse 90% 55% at 50% 16%, rgba(88, 52, 120, 0.48), transparent 58%),
-    radial-gradient(ellipse 70% 45% at 82% 78%, rgba(40, 30, 60, 0.38), transparent),
-    linear-gradient(180deg, #1a141f 0%, #0d0d0f 42%, #101016 100%);
+  background-color: var(--vlue-native-call-base, #0c0c10);
+  background-image: var(
+    --vlue-native-call-surface,
+    linear-gradient(180deg, #121018 0%, #0c0c10 36%, #0c0c10 100%)
+  );
 }
 
 .vlue-native-call__status {
@@ -102,9 +117,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 8% 16px 12%;
+  justify-content: flex-end;
+  padding: 0 16px 10%;
   text-align: center;
+  pointer-events: none;
+}
+
+.lettering-call-screen--native .vlue-native-call__main .vlue-native-call__number {
+  display: none;
 }
 
 .vlue-native-call__number {
@@ -176,16 +196,55 @@
 }
 
 /* native + 빅푸시 오버레이 */
-.lettering-call-screen--native {
-  display: flex;
-  flex-direction: column;
-  min-height: 520px;
-}
-
 .lettering-call-screen--native .lettering-call-screen__native-stage {
   position: relative;
   flex: 1;
   min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--vlue-native-call-base);
+  background-image: var(--vlue-native-call-surface);
+}
+
+/* 통화 화면 대형 번호 — 빅푸시 아래, 비교용 항상 노출 */
+.lettering-call-screen--native .lettering-call-screen__native-number {
+  position: absolute;
+  top: 24%;
+  right: 0;
+  left: 0;
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  padding: 0 14px;
+  pointer-events: none;
+}
+
+.lettering-call-screen--native[data-platform="ios"] .lettering-call-screen__native-number {
+  top: 27%;
+}
+
+.lettering-call-screen--native .lettering-call-screen__native-number-text {
+  max-width: 100%;
+  padding: 0.1em 0.35em 0.16em;
+  font-size: clamp(2.35rem, 12vw, 3.2rem);
+  font-weight: 200;
+  line-height: 1;
+  color: #f8fafc;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-shadow: 0 4px 32px rgba(0, 0, 0, 0.65);
+}
+
+.lettering-call-screen--native .lettering-call-screen__native-number-text--long {
+  font-size: clamp(1.28rem, 6.2vw, 1.65rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.lettering-call-screen--native[data-expanded="true"] .lettering-call-screen__native-number {
+  opacity: 0.34;
+  transition: opacity 0.28s ease;
 }
 
 .lettering-call-screen--native .lettering-call-screen__overlay-stage {
@@ -194,38 +253,78 @@
   z-index: 5;
 }
 
-.lettering-call-screen--native .lettering-ongoing-overlay--native {
+.lettering-ongoing-overlay--native {
   top: 0;
-  padding-top: var(--lettering-overlay-top, 6px);
+  right: 0;
+  left: 0;
+  display: flex;
+  justify-content: stretch;
+  padding: var(--lettering-overlay-top, 6px) 0 0;
 }
 
-.lettering-call-screen--marketing-demo.lettering-call-screen--native {
-  overflow: visible;
+.lettering-call-screen--native:not(.lettering-call-screen--marketing-demo)
+  .lettering-ongoing--on-call.lettering-ongoing--expanded,
+.lettering-call-screen--native:not(.lettering-call-screen--marketing-demo)
+  .lettering-ongoing--on-photo.lettering-ongoing--expanded {
+  max-height: calc(100% - var(--lettering-overlay-top, 6px) - var(--lettering-native-controls-reserve, 108px));
 }
 
-.lettering-call-screen--marketing-demo.lettering-call-screen--native[data-expanded="true"] {
-  overflow: visible;
-  padding-bottom: 12px;
+.lettering-ongoing--on-call .lettering-live-bar,
+.lettering-ongoing--on-photo .lettering-live-bar {
+  border-radius: 0;
 }
 
 .lettering-call-screen--native .lettering-ongoing--on-photo,
 .lettering-call-screen--native .lettering-ongoing--on-call {
   box-sizing: border-box;
-  width: var(--lettering-push-width, calc(74.5% + 21px));
-  max-width: var(--lettering-push-width, calc(74.5% + 21px));
-  margin: 0 auto;
-  border-radius: var(--lettering-card-radius, 16px);
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  border-radius: 0 0 var(--lettering-card-radius, 16px) var(--lettering-card-radius, 16px);
 }
 
 .lettering-call-screen--native[data-platform="ios"] .lettering-ongoing--on-photo,
 .lettering-call-screen--native[data-platform="ios"] .lettering-ongoing--on-call {
-  width: var(--lettering-push-width, calc(74.5% + 15px));
-  max-width: var(--lettering-push-width, calc(74.5% + 15px));
+  width: 100%;
+  max-width: 100%;
+}
+
+.lettering-call-screen--marketing-demo.lettering-call-screen--native {
+  overflow: visible;
+  min-height: 740px;
+  height: auto;
+  background-color: var(--vlue-native-call-base);
+  background-image: var(--vlue-native-call-surface);
+}
+
+.lettering-call-screen--marketing-demo.lettering-call-screen--native[data-expanded="true"] {
+  overflow: visible;
+  min-height: 740px;
+  padding-bottom: 0;
+}
+
+.lettering-call-screen--marketing-demo .lettering-call-screen__native-stage {
+  min-height: 740px;
+}
+
+.lettering-call-screen--marketing-demo[data-expanded="true"] .lettering-call-screen__native-stage {
+  min-height: 740px;
+}
+
+.lettering-call-screen--native:not(.lettering-call-screen--marketing-demo)
+  .lettering-ongoing--on-call.lettering-ongoing--expanded,
+.lettering-call-screen--native:not(.lettering-call-screen--marketing-demo)
+  .lettering-ongoing--on-photo.lettering-ongoing--expanded {
+  max-height: calc(100% - var(--lettering-overlay-top, 6px) - var(--lettering-native-controls-reserve, 108px));
+  display: flex;
+  flex-direction: column;
 }
 
 .lettering-call-screen--marketing-demo
   .lettering-ongoing--on-call.lettering-ongoing--expanded:not(.lettering-ongoing--unverified) {
-  max-height: none;
+  --lettering-push-expanded-max: min(920px, 94dvh);
+  --lettering-push-expanded-max-fb: min(920px, 94vh);
+  height: auto;
 }
 
 .lettering-call-screen--marketing-demo
@@ -233,38 +332,123 @@
   .lettering-ongoing-body {
   flex: 0 0 auto;
   min-height: 0;
+  max-height: none;
+  overflow: visible;
 }
 
-/* 인증 명함 펼침만 전체 높이 허용 — 미인증은 통화 버튼 영역 위에서 끝 */
+.lettering-call-screen--marketing-demo
+  .lettering-ongoing--on-call.lettering-ongoing--expanded:not(.lettering-ongoing--unverified)
+  .lettering-ongoing-reception {
+  min-height: 0;
+  max-height: none;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+/* 인증 명함 펼침 — 데모: 전체 노출 / 실제 통화: 내부 스크롤 */
 .lettering-call-screen--marketing-demo .lettering-ongoing--paid.lettering-ongoing--expanded .lettering-ongoing-scroll:not(.lettering-ongoing-scroll--unverified) {
   overflow: visible;
   max-height: none;
+  flex: 0 0 auto;
+}
+
+.lettering-call-screen--marketing-demo .lettering-ongoing-scroll--reception {
+  overflow: visible;
+  max-height: none;
+  flex: 0 0 auto;
+}
+
+.lettering-call-screen--native:not(.lettering-call-screen--marketing-demo)
+  .lettering-ongoing--on-call.lettering-ongoing--expanded
+  .lettering-ongoing-reception {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.lettering-call-screen--native:not(.lettering-call-screen--marketing-demo)
+  .lettering-ongoing-scroll--reception {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.lettering-ongoing--on-call .ldr-hero__visual:not(.ldr-hero__visual--logo) {
+  max-height: 132px;
 }
 
 .lettering-call-screen--marketing-demo .lettering-ongoing--unverified.lettering-ongoing--expanded {
-  max-height: min(calc(100% - 108px), 300px) !important;
+  --lettering-push-expanded-max: min(920px, 94dvh);
+  --lettering-push-expanded-max-fb: min(920px, 94vh);
+  height: auto;
+}
+
+.lettering-call-screen--marketing-demo
+  .lettering-ongoing--unverified.lettering-ongoing--expanded
+  .lettering-ongoing-body {
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .lettering-call-screen--marketing-demo .lettering-ongoing--unverified .lettering-unverified-expanded {
-  max-height: min(240px, calc(100% - 56px));
+  max-height: none;
+  flex: 0 0 auto;
+  height: auto;
+  overflow: visible;
 }
 
 .lettering-call-screen--marketing-demo .lettering-unverified-expanded__scroll {
-  overflow: hidden !important;
-  max-height: 100% !important;
+  overflow-y: visible !important;
+  max-height: none !important;
+  flex: 0 0 auto;
 }
 
 .lettering-call-screen--marketing-demo .lettering-ongoing-scroll--unverified {
-  overflow: hidden !important;
-  max-height: 100% !important;
+  overflow-y: visible !important;
+  max-height: none !important;
+  flex: 0 0 auto;
 }
 
-.lettering-call-screen--marketing-demo .lettering-unverified-reports__list-scroll {
-  max-height: min(150px, 32vh);
+.lettering-call-screen--marketing-demo .lettering-unverified-reports__list-scroll--bounded {
+  max-height: min(200px, 34vh);
+  overflow-y: auto;
 }
 
 .lettering-call-screen--marketing-demo .lettering-unverified-expanded__footer {
   display: none;
+}
+
+.lettering-call-screen--marketing-demo[data-expanded="true"]
+  .lettering-ongoing--unverified.lettering-ongoing--expanded {
+  min-height: 0;
+}
+
+.lettering-call-screen--marketing-demo
+  .lettering-call-screen__native-stage:has(.lettering-ongoing--unverified) {
+  min-height: 740px;
+}
+
+.lettering-call-screen--native:not(.lettering-call-screen--marketing-demo)
+  .lettering-ongoing--unverified.lettering-ongoing--expanded {
+  max-height: calc(100% - var(--lettering-overlay-top, 6px) - var(--lettering-native-controls-reserve, 108px));
+}
+
+.lettering-call-screen--native:not(.lettering-call-screen--marketing-demo)
+  .lettering-ongoing--unverified.lettering-ongoing--expanded
+  .lettering-unverified-expanded__scroll {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.lettering-call-screen--native:not(.lettering-call-screen--marketing-demo)
+  .lettering-ongoing--unverified.lettering-ongoing--expanded
+  .lettering-unverified-reports__list-scroll--bounded {
+  max-height: min(168px, 26vh);
 }
 
 .lettering-call-screen--native .lettering-ongoing--on-photo.lettering-ongoing--collapsed,

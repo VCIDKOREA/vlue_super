@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { LETTERING_BIZCARD_CHANGED_EVENT, readLetteringBizcardEditable } from "../lib/letteringBizcardStorage.js";
+import { LETTERING_BIZCARD_CHANGED_EVENT } from "../lib/letteringBizcardStorage.js";
 import { buildUserLetteringCard, withLetteringBizcardPreviewFallback } from "../lib/letteringBizcardProfile.js";
 import { fetchDigitalCardMeta } from "../lib/digitalCardApi.js";
-import LetteringBusinessCardWithMembership from "./LetteringBusinessCardWithMembership.jsx";
-import LetteringBizcardSecureFrame from "./LetteringBizcardSecureFrame.jsx";
-import LetteringBizcardScaledPreview from "./LetteringBizcardScaledPreview.jsx";
+import { isPaidLetteringTier } from "../lib/letteringMembership.js";
+import LetteringMypagePushInteractivePreview from "./LetteringMypagePushInteractivePreview.jsx";
 import LetteringBizcardSharePanel from "./LetteringBizcardSharePanel.jsx";
 
 /**
@@ -21,16 +20,14 @@ export default function MyPageDigitalLetteringSection({
   onToast
 }) {
   const [previewTick, setPreviewTick] = useState(0);
-  const [cardId, setCardId] = useState("");
   const [cardIssuedAt, setCardIssuedAt] = useState(null);
 
   const isApproved = Boolean(digitalCardActive) && digitalCardIssued !== false;
 
-  const designTemplate = useMemo(() => readLetteringBizcardEditable().designTemplate, [previewTick]);
-
   const previewCard = useMemo(() => {
-    const base = withLetteringBizcardPreviewFallback(buildUserLetteringCard({ membershipTier }));
-    return { ...base, issuedAt: cardIssuedAt };
+    const tier = isPaidLetteringTier(membershipTier) ? membershipTier : "premium";
+    const base = withLetteringBizcardPreviewFallback(buildUserLetteringCard({ membershipTier: tier }));
+    return { ...base, membershipTier: tier, issuedAt: cardIssuedAt };
   }, [membershipTier, previewTick, cardIssuedAt]);
 
   useEffect(() => {
@@ -43,7 +40,6 @@ export default function MyPageDigitalLetteringSection({
     let cancelled = false;
     fetchDigitalCardMeta().then((meta) => {
       if (cancelled) return;
-      if (meta.cardId) setCardId(meta.cardId);
       setCardIssuedAt(meta.issuedAt || null);
     });
     return () => {
@@ -89,7 +85,7 @@ export default function MyPageDigitalLetteringSection({
         </button>
       </div>
       <p
-        className={`mb-1 text-[10px] font-semibold leading-relaxed ${
+        className={`mb-2 text-[10px] font-semibold leading-relaxed ${
           isVCIDOn
             ? isDarkMode
               ? "text-blue-400"
@@ -101,11 +97,7 @@ export default function MyPageDigitalLetteringSection({
       >
         {isVCIDOn ? "현재 디지털인증명함이 송출중입니다." : "현재 디지털인증명함이 꺼짐 상태입니다."}
       </p>
-      <LetteringBizcardScaledPreview isDarkMode={isDarkMode}>
-        <LetteringBizcardSecureFrame designTemplate={designTemplate} card={previewCard} cardId={cardId}>
-          <LetteringBusinessCardWithMembership card={previewCard} />
-        </LetteringBizcardSecureFrame>
-      </LetteringBizcardScaledPreview>
+      <LetteringMypagePushInteractivePreview card={previewCard} dimmed={!isVCIDOn} />
       <LetteringBizcardSharePanel
         card={previewCard}
         isDarkMode={isDarkMode}

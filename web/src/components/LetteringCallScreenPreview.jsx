@@ -91,6 +91,7 @@ export default function LetteringCallScreenPreview({
     incomingNumberOverride ?? (verified ? "010-1234-5678" : "010-9876-5432");
   const callNumberLabel = String(callScreenNumber || incomingNumber || "").trim();
   const callNumberDisplay = callNumberLabel ? formatLetteringPhoneDisplay(callNumberLabel) : "";
+  const isShortCallNumber = String(callNumberLabel).replace(/\D/g, "").length <= 4;
   const isFreePreview = verified && !isPaidLetteringTier(membershipTier);
 
   const openReport = ({ card, incomingNumber: phone, verified: isVerified }) => {
@@ -196,6 +197,18 @@ export default function LetteringCallScreenPreview({
             ) : null}
           </>
         )}
+
+        {useNativeCallUi && callNumberDisplay ? (
+          <div className="lettering-call-screen__native-number" aria-hidden>
+            <span
+              className={`lettering-call-screen__native-number-text${
+                isShortCallNumber ? "" : " lettering-call-screen__native-number-text--long"
+              }`}
+            >
+              {callNumberDisplay}
+            </span>
+          </div>
+        ) : null}
 
         <div
           className={`lettering-call-screen__overlay-stage absolute inset-0 ${

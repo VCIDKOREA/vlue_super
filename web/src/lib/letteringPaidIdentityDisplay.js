@@ -17,3 +17,25 @@ export function formatLetteringPaidIdentity(card = {}) {
     hasPersonLine: Boolean(name || title)
   };
 }
+
+/** 빅푸시·수신 UI — 상호 / 번호·직함 한 줄 포맷 */
+export function formatLetteringReceptionLines(card = {}, { incomingNumber = "" } = {}) {
+  const identity = formatLetteringPaidIdentity(card);
+  const org = identity.organization || identity.name || "";
+  const title = identity.title;
+  const phoneRaw = String(incomingNumber || card.phone || "").trim();
+  const phone = phoneRaw;
+  const collapsedPrimary = org || identity.name || "\u2014";
+  const expandedOrgLine = collapsedPrimary;
+  const expandedContactLine = [phone, title].filter(Boolean).join(" / ");
+
+  return {
+    ...identity,
+    phone,
+    phoneRaw,
+    collapsedPrimary,
+    expandedOrgLine,
+    expandedContactLine,
+    collapsedHasOrgPhone: Boolean(org && phone)
+  };
+}

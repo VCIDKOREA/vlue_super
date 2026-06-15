@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { formatLetteringPaidIdentity } from "../lib/letteringPaidIdentityDisplay.js";
+import { clampLetteringBizcardEmail } from "../lib/letteringBizcardStorage.js";
 import { resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
 import { corporateBrandingStyleVars } from "../lib/b2bCorporateBranding.js";
 import BizcardInlineQr from "./BizcardInlineQr.jsx";
@@ -46,7 +47,7 @@ function buildBizcardContactRows(card) {
     { label: "T", value: card.phone ? formatLetteringPhoneDisplay(card.phone) : "" },
     { label: "F", value: fax ? formatLetteringPhoneDisplay(fax) : "" },
     { label: "H", value: formatWebsiteDisplay(card.website || card.homepage || card.url) },
-    { label: "E", value: String(card.email || "").trim() }
+    { label: "E", value: clampLetteringBizcardEmail(String(card.email || "").trim()) }
   ];
   return rows.filter((row) => row.value);
 }

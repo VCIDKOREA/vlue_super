@@ -7,8 +7,38 @@ export const LETTERING_BIZCARD_CHANGED_EVENT = "vlue-lettering-bizcard-changed";
 export const LETTERING_BIZCARD_EMAIL_MAX = 26;
 export const LETTERING_BIZCARD_EMAIL_WARN = 22;
 
+export function compactLetteringMemberEmail(raw) {
+  const email = String(raw ?? "").trim();
+  if (!email) return "";
+
+  const legacy = email.match(/^member\.([0-9a-f]+)(?:@member(?:\.vlue\.kr)?)?/i);
+  if (legacy) {
+    const digits = legacy[1].replace(/^0+/, "") || legacy[1].slice(-4) || "1";
+    const tail = digits.slice(-4).padStart(4, "0");
+    return `m.${tail}@vlue.kr`;
+  }
+
+  if (/^m\.[a-z0-9]{1,8}@vlue\.kr$/i.test(email)) {
+    return email.toLowerCase();
+  }
+
+  return email;
+}
+
+export function formatLetteringContactEmailDisplay(raw) {
+  const email = compactLetteringMemberEmail(raw);
+  if (!email) return "";
+  if (email.length <= 24) return email;
+  const at = email.indexOf("@");
+  if (at < 1) return `${email.slice(0, 22)}…`;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (local.length <= 10) return email;
+  return `${local.slice(0, 7)}…@${domain}`;
+}
+
 export function clampLetteringBizcardEmail(raw) {
-  return String(raw ?? "").slice(0, LETTERING_BIZCARD_EMAIL_MAX);
+  return compactLetteringMemberEmail(raw).slice(0, LETTERING_BIZCARD_EMAIL_MAX);
 }
 
 export function isLetteringBizcardEmailLong(raw) {
@@ -33,6 +63,7 @@ const DEFAULT_EDITABLE = {
   email: "",
   website: "",
   companyIntro: "",
+  customBackText: "",
   address: "",
   logoDataUrl: "",
   logoFileName: ""
