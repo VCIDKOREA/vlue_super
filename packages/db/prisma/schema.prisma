@@ -318,6 +318,9 @@ model User {
   /// 사후 연동된 소셜 로그인 (카카오/네이버) — VLUE 마스터 계정 1:1 매핑
   socialLoginLinks UserSocialLoginLink[]
 
+  userEmailMapping UserEmailMapping?
+  emailForwardingNotifications EmailForwardingNotificationLog[]
+
   auctionsSold       Auction[]              @relation("AuctionSeller")
   auctionBids        AuctionBid[]           @relation("AuctionBidder")
   auctionWins        Auction[]              @relation("AuctionWinner")
@@ -2200,6 +2203,41 @@ model MailAttachment {
 
   @@index([messageId, createdAt(sort: Desc)])
   @@map("mail_attachments")
+}
+
+/// 0단계 — 가상 이메일 포워딩 매핑 (서버 비보관 · 외부 메일 즉시 릴레이)
+model UserEmailMapping {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @unique @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  membershipStatus   String  @default("FREE") @map("membership_status") @db.VarChar(20)
+  virtualEmailPrefix String  @map("virtual_email_prefix") @db.VarChar(64)
+  userCompanySlug    String? @map("user_company_slug") @db.VarChar(64)
+  fullVirtualEmail   String  @unique @map("full_virtual_email") @db.VarChar(254)
+  targetMasterEmail  String? @map("target_master_email") @db.VarChar(254)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([fullVirtualEmail])
+  @@map("user_email_mappings")
+}
+
+model EmailForwardingNotificationLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fromAddress      String @map("from_address") @db.VarChar(254)
+  subject          String @default("") @db.VarChar(500)
+  fullVirtualEmail String @map("full_virtual_email") @db.VarChar(254)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("email_forwarding_notification_logs")
 }
 
 // -----------------------------------------------------------------------------

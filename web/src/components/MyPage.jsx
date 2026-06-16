@@ -20,6 +20,7 @@ import EnterpriseMemberManagePanel from "./EnterpriseMemberManagePanel.jsx";
 import EnterpriseGroupChatPanel from "./EnterpriseGroupChatPanel.jsx";
 import PersonalComboPanel from "./PersonalComboPanel.jsx";
 import SocialAccountLinkPanel from "./auth/SocialAccountLinkPanel.jsx";
+import VlueEmailMappingPanel from "./VlueEmailMappingPanel.jsx";
 import AiSourcingUploadScreen from "./shopping/AiSourcingUploadScreen.jsx";
 import { isPaidMembershipKind } from "../lib/membershipBm.js";
 import { isStoreApproved } from "../lib/vlueStoreStorage.js";
@@ -484,6 +485,7 @@ function MyPage({
               페이지 관리로 이동
             </button>
             <SocialAccountLinkPanel onToast={setToast} isDarkMode={isDarkMode} />
+        <VlueEmailMappingPanel membershipTier={membershipTier} onToast={setToast} isDarkMode={isDarkMode} />
           </div>
         ) : isComposerOpen ? (
           <div className={`rounded-2xl p-4 shadow-sm ${isDarkMode ? "border border-white/10 bg-[#151821]" : "border border-gray-100 bg-white"}`}>
@@ -991,6 +993,7 @@ function MyPage({
           </button>
         </div>
         <SocialAccountLinkPanel onToast={setToast} isDarkMode={isDarkMode} />
+        <VlueEmailMappingPanel membershipTier={membershipTier} onToast={setToast} isDarkMode={isDarkMode} />
         <DeviceApprovalPanel />
         <PersonalComboPanel membershipTier={membershipTier} onToast={setToast} />
         <EnterpriseMemberManagePanel onToast={setToast} />

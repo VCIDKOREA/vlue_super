@@ -13,8 +13,8 @@
       "billingUnit": "per_line",
       "minLines": 10,
       "platforms": ["pc"],
-      "features": ["chat", "company_work", "internal_comms", "shopping_partial", "independent_id"],
-      "description": "회선당 월 14,700원(부가세 포함). 로그인·채팅·자료실 등 VLUE 전체 계정 인프라. 8자리 대표번호는 상호만 송출, 지역번호(9~10자리) 담당자는 서류 승인·1회 인증 후 반영."
+      "features": ["chat", "company_work", "internal_comms", "shopping_partial", "independent_id", "virtual_email_brand"],
+      "description": "회선당 월 14,700원(부가세 포함). 로그인·채팅·자료실 등 VLUE 전체 계정 인프라. 8자리 대표번호는 상호만 송출, 지역번호(9~10자리) 담당자는 서류 승인·1회 인증 후 반영. 아이디@유저회사명.vlue.kr 프리미엄 메일 주소 선택형 제공."
     },
     "soho_activity": {
       "sku": "soho_activity",
@@ -23,8 +23,8 @@
       "annualKrw": 198000,
       "billingUnit": "per_account",
       "platforms": ["mobile", "web"],
-      "features": ["chat", "shopping", "digital_card_primary", "vluer_rewards"],
-      "description": "월 19,800원(부가세 포함). 모바일·웹 풀 기능. Primary 계정."
+      "features": ["chat", "shopping", "digital_card_primary", "vluer_rewards", "virtual_email_standard", "virtual_email_brand"],
+      "description": "월 19,800원(부가세 포함). 모바일·웹 풀 기능. Primary 계정. 아이디@유저회사명.vlue.kr 프리미엄 메일 주소 선택형 제공."
     },
     "soho_broadcast_addon": {
       "sku": "soho_broadcast_addon",
@@ -42,6 +42,8 @@
     "paidListMonthlyKrw": 28300,
     "paidListAnnualKrw": 283000,
     "referralDiscountRate": 0.3,
-    "personalComboAddonMonthlyKrw": 5100
+    "personalComboAddonMonthlyKrw": 5100,
+    "freeTierFeatures": ["virtual_email_standard"],
+    "freeTierEmailNote": "아이디@vlue.kr 무료 제공"
   }
 }

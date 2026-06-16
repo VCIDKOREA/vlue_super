@@ -20,6 +20,10 @@ export type PricingConfigLegacy = {
   paidListAnnualKrw: number;
   referralDiscountRate: number;
   personalComboAddonMonthlyKrw: number;
+  /** 무료 회원 이메일 혜택 feature 키 */
+  freeTierFeatures?: string[];
+  /** 무료 회원 이메일 혜택 문구 */
+  freeTierEmailNote?: string;
 };
 
 export type PricingConfigFile = {

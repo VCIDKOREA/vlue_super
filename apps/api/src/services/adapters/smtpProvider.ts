@@ -4,7 +4,13 @@ export type MailSendInput = {
   subject: string;
   html?: string;
   text?: string;
-  attachments?: Array<{ fileName: string; contentType?: string; sourceUrl?: string }>;
+  replyTo?: string;
+  attachments?: Array<{
+    fileName: string;
+    contentType?: string;
+    sourceUrl?: string;
+    content?: Buffer;
+  }>;
 };
 
 export type MailSendResult = {

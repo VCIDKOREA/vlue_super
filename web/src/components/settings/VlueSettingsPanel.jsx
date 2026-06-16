@@ -22,6 +22,7 @@ import {
   SettingsSubpageShell,
   FontScalePicker
 } from "./VlueSettingsUi.jsx";
+import VlueEmailSettingsSection from "./VlueEmailSettingsSection.jsx";
 
 const BLOCKED_USER_DIRECTORY = [
   { id: "u-minsu", name: "민수", handle: "@minsu" },
@@ -75,6 +76,8 @@ export default function VlueSettingsPanel({
   onUnblockUser,
   myPhone = "",
   myEmail = "user@vlue.kr",
+  membershipTier = "free",
+  companyName = "",
   openLetteringBizcardHub
 }) {
   const [settings, patchSettings] = useAppSettingsState();
@@ -224,6 +227,19 @@ export default function VlueSettingsPanel({
     );
   }
 
+  if (subView === "vlueEmailSettings") {
+    return (
+      <VlueEmailSettingsSection
+        isDarkMode={isDarkMode}
+        onBack={() => onSubView(null)}
+        membershipTier={membershipTier}
+        companyName={companyName}
+        onOpenUpgrade={onOpenUpgrade}
+        showSettingNotice={showSettingNotice}
+      />
+    );
+  }
+
   if (subView === "contactInfo") {
     return (
       <SettingsSubpageShell title="전화번호 및 이메일" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
@@ -234,11 +250,18 @@ export default function VlueSettingsPanel({
           </div>
           <SettingsDivider isDarkMode={isDarkMode} />
           <div>
-            <p className={`text-[11px] font-bold ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>VLUE 메일</p>
+            <p className={`text-[11px] font-bold ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>VLUE 가상 메일</p>
             <p className={`mt-1 text-[15px] font-bold ${headText}`}>{myEmail}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => onSubView("vlueEmailSettings")}
+            className="mt-2 w-full rounded-xl bg-blue-600 py-2.5 text-[13px] font-black text-white"
+          >
+            VLUE 메일 설정
+          </button>
           <p className={`text-[11px] leading-relaxed ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-            번호·메일 변경은 본인인증 후 고객센터를 통해 지원됩니다.
+            가상 메일은 외부 메일로 즉시 포워딩됩니다. 휴대전화 번호 변경은 본인인증 후 고객센터를 통해 지원됩니다.
           </p>
         </div>
       </SettingsSubpageShell>
@@ -447,7 +470,7 @@ export default function VlueSettingsPanel({
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="VLUE ID 확인" value={getMemberHandle()} onClick={() => onSubView("vlueId")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
-          <SettingsRowButton label="전화번호 및 이메일" onClick={() => onSubView("contactInfo")} isDarkMode={isDarkMode} />
+          <SettingsRowButton label="전화번호 및 이메일" sublabel="VLUE 가상 메일 · 마스터 메일 연동" onClick={() => onSubView("contactInfo")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton
             label="멤버십 등급 및 업그레이드"

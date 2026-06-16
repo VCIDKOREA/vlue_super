@@ -21,6 +21,7 @@ import { probeEnterpriseSidebarAccess } from "../lib/enterpriseLineManageAccess.
 import { fileToDataUrl, readAvatar, writeAvatar } from "../lib/vlueAvatar.js";
 import { getMemberHandle, getChatDisplayName } from "../lib/memberCardStorage.js";
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
+import { fetchEmailForwardingMapping } from "../lib/vlueEmailMappingsApi.js";
 
 function tierLabelStyle(tier, isDarkMode) {
   if (tier === "premium") return { label: "프리미엄", className: "text-[#722f37]" };
@@ -111,6 +112,27 @@ function ProfilePanel({
   const [enterpriseLineAccessChecked, setEnterpriseLineAccessChecked] = useState(false);
   const { vluerLocked, membershipCtx } = useB2bMembership();
   const mainPanelScrollRef = useRef(null);
+  const [virtualEmail, setVirtualEmail] = useState(null);
+
+  const companyLockedName = useMemo(
+    () =>
+      String(localStorage.getItem("vlue_company_locked") || "").trim() ||
+      String(myCard?.organization || "").trim(),
+    [myCard?.organization, open]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    fetchEmailForwardingMapping().then((data) => {
+      if (!cancelled) {
+        setVirtualEmail(data.mapping?.fullVirtualEmail || null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, panelView]);
 
   const openSettings = useCallback(() => {
     setSettingsSubView(null);
@@ -434,7 +456,9 @@ function ProfilePanel({
             blockedUserIds={blockedUserIds}
             onUnblockUser={onUnblockUser}
             myPhone={myPhone || myCard?.phone || ""}
-            myEmail="user@vlue.kr"
+            myEmail={virtualEmail || "(미설정)"}
+            membershipTier={membershipTier}
+            companyName={companyLockedName}
             openLetteringBizcardHub={openLetteringBizcardHub}
           />
           </div>
