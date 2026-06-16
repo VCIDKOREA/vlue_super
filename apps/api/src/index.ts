@@ -9,6 +9,7 @@ import { attachOfficeAgentWebSocket } from "./services/office/remoteControlHub.j
 import { seedDemoCompanyLine } from "./services/office/companyLinesService.js";
 import type { Server } from "node:http";
 import { loadPricingConfig } from "./services/pricing/pricingConfigService.js";
+import { startExternalMailSyncScheduler } from "./services/email/externalMailSyncQueue.js";
 
 assertProductionEnvLocked();
 await loadPricingConfig();
@@ -96,6 +97,8 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
       })
       .catch((e) => console.warn("[family-protection] elder check failed", e));
   }, elderCheckMs);
+
+  startExternalMailSyncScheduler();
 });
 
 attachOfficeAgentWebSocket(server as Server);

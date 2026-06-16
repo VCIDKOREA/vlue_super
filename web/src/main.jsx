@@ -11,6 +11,7 @@ import { isSuperAdminHqEntry } from "./lib/hqRoute.js";
 import { isAdminConsoleEntry } from "./lib/adminRoute.js";
 import { resolveSiteShell } from "./lib/siteMode.js";
 import BrowserAppBlockedPage from "./components/BrowserAppBlockedPage.jsx";
+import WwwStagingLockGate from "./components/WwwStagingLockGate.jsx";
 import "./styles.css";
 import { applyAppSettingsToDocument } from "./lib/vlueAppSettings.js";
 import { logProductionEnvBinding } from "./config.js";
@@ -41,7 +42,9 @@ if (!rootEl) {
   createRoot(rootEl).render(
     <React.StrictMode>
       <AppRootErrorBoundary>
-        <Shell />
+        <WwwStagingLockGate>
+          <Shell />
+        </WwwStagingLockGate>
       </AppRootErrorBoundary>
     </React.StrictMode>
   );

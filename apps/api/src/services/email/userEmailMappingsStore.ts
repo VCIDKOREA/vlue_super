@@ -56,7 +56,94 @@ export async function ensureUserEmailMappingsTables() {
   await prisma.$executeRawUnsafe(
     "CREATE INDEX IF NOT EXISTS idx_email_fwd_notif_user ON email_forwarding_notification_logs(user_id, created_at DESC);"
   );
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS user_email_master_targets (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      email VARCHAR(254) NOT NULL,
+      is_primary BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(user_id, email)
+    );
+  `);
+  await prisma.$executeRawUnsafe(
+    "CREATE INDEX IF NOT EXISTS idx_email_master_targets_user ON user_email_master_targets(user_id, is_primary DESC, created_at ASC);"
+  );
   initialized = true;
+}
+
+export type MasterTargetRow = {
+  id: string;
+  user_id: string;
+  email: string;
+  is_primary: boolean;
+  created_at: Date;
+};
+
+export async function listMasterTargets(userId: string): Promise<MasterTargetRow[]> {
+  await ensureUserEmailMappingsTables();
+  return prisma.$queryRawUnsafe<MasterTargetRow[]>(
+    `
+      SELECT * FROM user_email_master_targets
+      WHERE user_id = $1::uuid
+      ORDER BY is_primary DESC, created_at ASC
+    `,
+    userId
+  );
+}
+
+export async function addMasterTarget(userId: string, email: string, setPrimary: boolean) {
+  await ensureUserEmailMappingsTables();
+  const normalized = email.toLowerCase();
+  const existing = await prisma.$queryRawUnsafe<MasterTargetRow[]>(
+    `SELECT * FROM user_email_master_targets WHERE user_id = $1::uuid AND email = $2 LIMIT 1`,
+    userId,
+    normalized
+  );
+  if (existing[0]) {
+    if (setPrimary) {
+      const primary = await setPrimaryMasterTarget(userId, normalized);
+      if (!primary) throw new Error("MASTER_EMAIL_NOT_FOUND");
+      return primary;
+    }
+    return existing[0];
+  }
+  if (setPrimary) {
+    await prisma.$executeRawUnsafe(
+      `UPDATE user_email_master_targets SET is_primary = false WHERE user_id = $1::uuid`,
+      userId
+    );
+  }
+  const rows = await prisma.$queryRawUnsafe<MasterTargetRow[]>(
+    `
+      INSERT INTO user_email_master_targets (user_id, email, is_primary)
+      VALUES ($1::uuid, $2, $3)
+      RETURNING *;
+    `,
+    userId,
+    normalized,
+    setPrimary
+  );
+  return rows[0]!;
+}
+
+export async function setPrimaryMasterTarget(userId: string, email: string) {
+  await ensureUserEmailMappingsTables();
+  const normalized = email.toLowerCase();
+  await prisma.$executeRawUnsafe(
+    `UPDATE user_email_master_targets SET is_primary = false WHERE user_id = $1::uuid`,
+    userId
+  );
+  const rows = await prisma.$queryRawUnsafe<MasterTargetRow[]>(
+    `
+      UPDATE user_email_master_targets SET is_primary = true
+      WHERE user_id = $1::uuid AND email = $2
+      RETURNING *;
+    `,
+    userId,
+    normalized
+  );
+  return rows[0] || null;
 }
 
 export async function findMappingByFullVirtualEmail(

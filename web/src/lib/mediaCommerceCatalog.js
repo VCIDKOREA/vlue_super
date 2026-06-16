@@ -3,7 +3,6 @@ import { inferShoppingCategory } from "./shoppingCategories.js";
 
 export const MEDIA_FEED_TABS = [
   { id: "all", label: "전체" },
-  { id: "media", label: "미디어쇼핑" },
   { id: "page", label: "페이지쇼핑" },
   { id: "groupbuy", label: "공동구매" },
   { id: "auction", label: "VLUE 경매" }
@@ -407,15 +406,15 @@ export function mediaPlatformBadge(platform) {
 export const FEED_SCROLL_BOTTOM_PAD = "calc(7.5rem + env(safe-area-inset-bottom, 0px))";
 
 export const LEGACY_TAB_MAP = {
-  media: "media",
+  media: "all",
   page: "page",
   groupbuy: "groupbuy",
-  ai: "media",
-  shorts: "media",
-  live: "media",
-  favorites: "media",
+  ai: "all",
+  shorts: "all",
+  live: "all",
+  favorites: "all",
   all: "all",
-  local: "media",
-  popular: "media",
+  local: "all",
+  popular: "all",
   recommend: "all"
 };

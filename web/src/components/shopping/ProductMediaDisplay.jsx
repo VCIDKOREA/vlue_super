@@ -1,4 +1,4 @@
-import ExternalEmbedPlayer from "./ExternalEmbedPlayer.jsx";
+import ProductVideoHero from "./ProductVideoHero.jsx";
 import FeedThumbImage from "./FeedThumbImage.jsx";
 import { isEmbeddableVideoUrl } from "../../lib/embedVideo.js";
 
@@ -25,7 +25,7 @@ export default function ProductMediaDisplay({
           <p className={`mb-1.5 text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
             설명 영상
           </p>
-          <ExternalEmbedPlayer videoUrl={videoUrl} />
+          <ProductVideoHero videoUrl={videoUrl} title="상품 설명 영상" />
         </section>
       ) : null}
 

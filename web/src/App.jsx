@@ -22,6 +22,7 @@ import WalletHubModal from "./components/WalletHubModal.jsx";
 import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
 import PersonalFeed from "./components/PersonalFeed";
 import ProfilePanel from "./components/ProfilePanel";
+import VlueEmailSettingsSection from "./components/settings/VlueEmailSettingsSection.jsx";
 import VluePillToast from "./components/VluePillToast.jsx";
 import PushNotificationInbox from "./components/PushNotificationInbox.jsx";
 import {
@@ -49,7 +50,7 @@ import BackButton from "./components/common/BackButton";
 import ModalCloseButton from "./components/common/ModalCloseButton";
 
 const CsScannerScreen = lazy(() => import("./components/office/CsScannerScreen.jsx"));
-const VlueEmailInboxScreen = lazy(() => import("./components/office/VlueEmailInboxScreen.jsx"));
+const VlueUnifiedInboxScreen = lazy(() => import("./components/email/VlueUnifiedInboxScreen.jsx"));
 import VLUE_BRAND_LOGO from "./assets/vlue-shield-logo.svg?url";
 import { isBiometricGraceActive, setBiometricGraceNow, clearBiometricSessionOnly } from "./lib/webauthnBiometric";
 import {
@@ -76,6 +77,7 @@ import {
 } from "./lib/vlueOfficeMode.js";
 import { startVlueSse, VLUE_SSE_CHAT_MESSAGE } from "./lib/vlueSse.js";
 import { emitAssetFilesChanged, emitOfficeEmailInboxChanged } from "./lib/vlueAssetFilesStorage.js";
+import { emitEmailInboxChanged } from "./lib/vlueEmailMappingsApi.js";
 import { startFamilyProtectionPresence } from "./lib/familyProtectionPresence.js";
 import { registerFamilyCallBridge } from "./lib/familyProtectionCallBridge.js";
 import { registerFamilyDeviceBridge } from "./lib/familyProtectionDeviceBridge.js";
@@ -387,6 +389,11 @@ function App() {
   });
   const [csScannerOpen, setCsScannerOpen] = useState(false);
   const [emailInboxOpen, setEmailInboxOpen] = useState(false);
+  const [emailForwardingSettingsOpen, setEmailForwardingSettingsOpen] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      (window.location.hash === "#email" || window.location.hash === "#email-settings")
+  );
   const [marketingPopup, setMarketingPopup] = useState(null);
   const [marketingPopupOpen, setMarketingPopupOpen] = useState(false);
   const [noticeReleaseToastOpen, setNoticeReleaseToastOpen] = useState(false);
@@ -830,6 +837,12 @@ function App() {
           setTimeout(() => setBottomToast(""), 4200);
           emitAssetFilesChanged();
           emitOfficeEmailInboxChanged();
+          setEmailInboxOpen(true);
+        }
+        if (data?.type === "vlue-email-forwarded") {
+          setBottomToast(String(data.message || "새 메일이 도착했습니다."));
+          setTimeout(() => setBottomToast(""), 4200);
+          emitEmailInboxChanged();
           setEmailInboxOpen(true);
         }
         if (data?.type === "vlue-notice-released") {
@@ -2258,7 +2271,17 @@ function App() {
       const h = window.location.hash || "";
       setLetteringPreviewOpen(h === "#lettering-preview");
       setLetteringOverlayOpen(h.startsWith("#lettering-overlay"));
+      if (h === "#email-settings" || h === "#email") {
+        setEmailForwardingSettingsOpen(true);
+        setProfileOpen(false);
+        return;
+      }
+      if (h === "#email-inbox" || h === "#mail") {
+        setEmailForwardingSettingsOpen(false);
+        setEmailInboxOpen(true);
+      }
     };
+    onHash();
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -2638,6 +2661,10 @@ function App() {
           return;
         }
         if (path === "email" || path === "mail") {
+          setEmailForwardingSettingsOpen(true);
+          return;
+        }
+        if (path === "email-inbox") {
           setEmailInboxOpen(true);
           return;
         }
@@ -4117,18 +4144,18 @@ function App() {
             setTimeout(() => setBottomToast(""), 2800);
           }}
         />
-        <VlueEmailInboxScreen
+        <VlueUnifiedInboxScreen
           open={emailInboxOpen}
+          isDarkMode={isDarkMode}
           onClose={() => setEmailInboxOpen(false)}
-          onOpenProfileSettings={() => {
+          onOpenSettings={() => {
             setEmailInboxOpen(false);
-            setProfileInitialView("profileSettings");
-            setProfileOpen(true);
-          }}
-          onToast={(msg) => {
-            if (!msg) return;
-            setBottomToast(msg);
-            setTimeout(() => setBottomToast(""), 2800);
+            setEmailForwardingSettingsOpen(true);
+            try {
+              window.location.hash = "#email-settings";
+            } catch {
+              /* ignore */
+            }
           }}
         />
       </Suspense>
@@ -4329,6 +4356,45 @@ function App() {
           </div>
         </div>
       )}
+
+      {emailForwardingSettingsOpen && showAppShell ? (
+        <div className="fixed inset-0 z-[160] flex flex-col bg-[#F8F9FA] dark:bg-[#0f1118]">
+          <VlueEmailSettingsSection
+            isDarkMode={isDarkMode}
+            membershipTier={membershipTier}
+            companyName={
+              String(localStorage.getItem("vlue_company_locked") || "").trim() ||
+              String(myCardProfile?.organization || "").trim()
+            }
+            onOpenUpgrade={() => {
+              setEmailForwardingSettingsOpen(false);
+              try {
+                window.history.replaceState(null, "", window.location.pathname + window.location.search);
+              } catch {
+                /* ignore */
+              }
+              setProfileInitialView("upgrade");
+              setProfileOpen(true);
+            }}
+            showSettingNotice={(msg) => {
+              if (!msg) return;
+              setBottomToast(msg);
+              setTimeout(() => setBottomToast(""), 2800);
+            }}
+            onBack={() => {
+              setEmailForwardingSettingsOpen(false);
+              const h = window.location.hash || "";
+              if (h === "#email" || h === "#email-settings") {
+                try {
+                  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+                } catch {
+                  /* ignore */
+                }
+              }
+            }}
+          />
+        </div>
+      ) : null}
 
       <ProfilePanel
         open={profileOpen}

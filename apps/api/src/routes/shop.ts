@@ -33,6 +33,7 @@ shopRoutes.get("/products", async (c) => {
         shippingFeeKrw: p.shippingFeeKrw,
         stock: p.stock,
         status: p.status,
+        videoUrl: (p as { videoUrl?: string | null }).videoUrl ?? null,
         updatedAt: p.updatedAt.toISOString()
       }))
     });
@@ -54,6 +55,7 @@ shopRoutes.post("/products/sync", async (c) => {
       shippingFeeKrw?: number;
       stock?: number;
       status?: string;
+      videoUrl?: string | null;
     }>();
 
     const product = await syncStoreProduct(uid, {
@@ -63,7 +65,8 @@ shopRoutes.post("/products/sync", async (c) => {
       salePriceKrw: body?.salePriceKrw,
       shippingFeeKrw: Number(body?.shippingFeeKrw || 0),
       stock: Number(body?.stock || 0),
-      status: body?.status
+      status: body?.status,
+      videoUrl: body?.videoUrl
     });
 
     return c.json({ ok: true, productId: product.id, externalId: product.externalId });

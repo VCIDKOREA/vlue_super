@@ -97,26 +97,26 @@ export function SettingsToggleRow({ label, checked, onChange, isDarkMode, subtit
 
 export function SettingsSubpageShell({ title, subtitle, onBack, children, isDarkMode }) {
   return (
-    <div className={`flex h-full min-h-0 flex-1 flex-col ${isDarkMode ? "bg-[#0b0c10] text-gray-100" : "bg-[#f4f6fa] text-gray-900"}`}>
+    <div className={`flex h-full min-h-0 flex-1 flex-col ${isDarkMode ? "bg-[#0b0c10] text-gray-100" : "bg-[#f7f8fa] text-[#191f28]"}`}>
       <div
-        className={`flex shrink-0 items-center gap-2 border-b px-3 py-3 ${
-          isDarkMode ? "border-white/10 bg-[#151821]" : "border-gray-100 bg-white"
+        className={`flex shrink-0 items-center gap-2 border-b px-4 py-3.5 ${
+          isDarkMode ? "border-white/10 bg-[#151821]" : "border-[#f0f1f3] bg-white"
         }`}
       >
         <button
           type="button"
           onClick={onBack}
-          className={`grid h-9 w-9 place-items-center rounded-full text-[20px] ${
-            isDarkMode ? "text-gray-300 hover:bg-white/10" : "text-gray-600 hover:bg-gray-100"
+          className={`grid h-9 w-9 place-items-center rounded-full text-[20px] font-light ${
+            isDarkMode ? "text-gray-300 hover:bg-white/10" : "text-[#4e5968] hover:bg-[#f2f3f5]"
           }`}
           aria-label="뒤로"
         >
           ‹
         </button>
         <div className="min-w-0 flex-1">
-          <p className={`truncate text-[15px] font-semibold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>{title}</p>
+          <p className={`vlue-type-title truncate ${isDarkMode ? "text-gray-100" : "text-[#191f28]"}`}>{title}</p>
           {subtitle ? (
-            <p className={`truncate text-[11px] font-normal ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>{subtitle}</p>
+            <p className={`vlue-type-caption truncate text-[#8b95a1]`}>{subtitle}</p>
           ) : null}
         </div>
       </div>

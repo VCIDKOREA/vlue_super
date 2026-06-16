@@ -6,6 +6,8 @@ import {
   insertForwardingNotification,
   type UserEmailMappingRow
 } from "./userEmailMappingsStore.js";
+import { insertInappMailCache } from "./inappMailCacheStore.js";
+import { sendOfficePushToUser } from "../fcmNotificationService.js";
 
 function parseAddressField(raw: string) {
   const s = String(raw || "").trim();
@@ -57,6 +59,16 @@ export async function triggerForwardingNotification(
 ) {
   const fromAddress = parseAddressField(parsed.from || "unknown@unknown");
   const subject = String(parsed.subject || "(제목 없음)").trim();
+  const bodyText = String(parsed.text || parsed.html || "").replace(/<[^>]+>/g, " ");
+
+  const cache = await insertInappMailCache({
+    userId,
+    mailSource: "VIRTUAL_FORWARD",
+    fromAddress,
+    subject,
+    bodyText,
+    receivedAt: new Date()
+  });
 
   const log = await insertForwardingNotification({
     userId,
@@ -72,10 +84,18 @@ export async function triggerForwardingNotification(
     subject,
     fullVirtualEmail,
     notificationId: log.id,
+    cacheId: cache.id,
     at: new Date().toISOString()
   });
 
-  return log;
+  await sendOfficePushToUser(userId, "VLUE 메일", subject, {
+    type: "vlue-email-inapp",
+    mailSource: "VIRTUAL_FORWARD",
+    cacheId: cache.id,
+    from: fromAddress
+  });
+
+  return { log, cache };
 }
 
 export async function processInboundForwarding(parsed: ParsedInboundEmail) {
@@ -88,9 +108,16 @@ export async function processInboundForwarding(parsed: ParsedInboundEmail) {
     return { ok: false as const, status: 404, error: "UNKNOWN_RECIPIENT" };
   }
 
-  const relay = await relayInboundEmail(mapping, parsed);
-  if (!relay.ok) {
-    return { ok: false as const, status: 422, error: relay.error };
+  const forwardMode = (process.env.VLUE_EMAIL_FORWARD_MODE || "cloudflare_edge").toLowerCase();
+  const shouldRelay = forwardMode === "smtp_relay";
+
+  if (shouldRelay) {
+    const relay = await relayInboundEmail(mapping, parsed);
+    if (!relay.ok) {
+      return { ok: false as const, status: 422, error: relay.error };
+    }
+  } else if (!mapping.target_master_email) {
+    return { ok: false as const, status: 422, error: "NO_TARGET_MASTER_EMAIL" };
   }
 
   await triggerForwardingNotification(mapping.user_id, parsed, mapping.full_virtual_email);
@@ -99,6 +126,6 @@ export async function processInboundForwarding(parsed: ParsedInboundEmail) {
     ok: true as const,
     userId: mapping.user_id,
     forwardedTo: mapping.target_master_email,
-    messageId: relay.result.messageId
+    mode: forwardMode
   };
 }

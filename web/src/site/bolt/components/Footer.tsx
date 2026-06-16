@@ -25,7 +25,7 @@ const FOOTER_SECTIONS: { label: string; links: FooterLink[] }[] = [
     links: [
       { text: '서비스소개', view: 'about' as View },
       { text: '지역 이벤트', view: 'events' as View },
-      { text: 'VLUE메일', view: 'mail' as View },
+      { text: 'VLUE메일', view: 'mail-settings' as View },
       { text: '인증절차안내', view: 'pricing' as View },
     ],
   },

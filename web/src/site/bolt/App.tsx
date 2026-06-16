@@ -16,6 +16,7 @@ const AboutPage = lazy(() => import('./pages/AboutPage'));
 import PricingPage from './pages/PricingPage';
 import SafeZonePage from './pages/SafeZonePage';
 import SecureMailPage from './pages/SecureMailPage';
+import MarketingEmailSettingsPage from './pages/MarketingEmailSettingsPage';
 import DownloadPage from './pages/DownloadPage';
 import NewsPage from './pages/NewsPage';
 import EventsPage from './pages/EventsPage';
@@ -37,13 +38,16 @@ import {
 
 const VALID_VIEWS: View[] = [
   'home', 'search', 'shopping', 'auction', 'about', 'resources', 'pricing', 'safezone',
-  'mail', 'download', 'news', 'events', 'jobs', 'support', 'exceleditor', 'family', 'mypage', 'bizcard',
+  'mail', 'mail-settings', 'download', 'news', 'events', 'jobs', 'support', 'exceleditor', 'family', 'mypage', 'bizcard',
   'terms', 'privacy',
 ];
 
 function readViewFromHash(): { view: View; legalScrollId?: string } {
   const raw = (typeof window !== 'undefined' ? window.location.hash : '').replace(/^#/, '');
   const [viewPart, anchor] = raw.split('/');
+  if (viewPart === 'email-settings' || viewPart === 'email') {
+    return { view: 'mail-settings', legalScrollId: anchor || undefined };
+  }
   const view = (VALID_VIEWS.includes(viewPart as View) ? viewPart : 'home') as View;
   return { view, legalScrollId: anchor || undefined };
 }
@@ -194,6 +198,14 @@ export default function App() {
         )}
 
         {view === 'safezone' && <SafeZonePage onBack={() => handleNavigate('home')} />}
+        {view === 'mail-settings' && (
+          <MarketingEmailSettingsPage
+            user={user}
+            onLoginClick={handleLoginRequired}
+            onBack={() => handleNavigate('home')}
+            onNavigate={handleNavigate}
+          />
+        )}
         {view === 'mail' && <SecureMailPage onBack={() => handleNavigate('home')} />}
         {view === 'download' && <DownloadPage onBack={() => handleNavigate('home')} />}
         {view === 'news' && <NewsPage onBack={() => handleNavigate('home')} />}

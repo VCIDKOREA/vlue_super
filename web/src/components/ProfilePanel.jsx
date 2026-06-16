@@ -200,6 +200,13 @@ function ProfilePanel({
       setUpgradeOpen(false);
       return;
     }
+    if (initialView === "emailSettings") {
+      setPanelView("settings");
+      setSettingsSubView("vlueEmailSettings");
+      setDigitalCardMode("edit");
+      setUpgradeOpen(false);
+      return;
+    }
     if (initialView === "digitalCardApply" || initialView === "digitalCardEdit" || initialView === "letteringBizcard") {
       setPanelView("letteringBizcard");
       setUpgradeOpen(false);

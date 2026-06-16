@@ -50,12 +50,11 @@ import { useHorizontalDragScroll } from '../../../hooks/useHorizontalDragScroll.
 import './marketing-store.css';
 
 const STORE_TABS = MEDIA_FEED_TABS.filter((t) =>
-  ['all', 'media', 'page', 'groupbuy', 'auction'].includes(t.id)
+  ['all', 'page', 'groupbuy', 'auction'].includes(t.id)
 );
 
 const TAB_SHORT_LABEL: Record<string, string> = {
   all: '전체',
-  media: '미디어',
   page: '페이지',
   groupbuy: '공구',
   auction: '경매',

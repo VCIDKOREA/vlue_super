@@ -1,0 +1,205 @@
+/**
+ * VLUE 에디토리얼 타이포그래피 — font-black 남용 대신 weight·크기·자간으로 계층 표현
+ * Pretendard Variable 기준 (index.html)
+ */
+
+.vlue-type-display {
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.35;
+}
+
+.vlue-type-title {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+}
+
+.vlue-type-subtitle {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.45;
+}
+
+.vlue-type-body {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.65;
+}
+
+.vlue-type-caption {
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+
+.vlue-type-eyebrow {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.vlue-type-email {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 프로모 카드 — 카카오톡 스타일 에디토리얼 */
+.vlue-promo-card {
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: #fff;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.06);
+}
+
+.vlue-promo-card__hero {
+  position: relative;
+  padding: 1.5rem 1.25rem 2.75rem;
+  background: linear-gradient(145deg, #00d4e8 0%, #00b8d4 48%, #0097c7 100%);
+  color: #fff;
+}
+
+.vlue-promo-card__hero-title {
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.38;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+.vlue-promo-card__float {
+  position: relative;
+  z-index: 2;
+  margin: -2rem 1rem 0;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1rem 1.125rem;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08), 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+.vlue-promo-card__body {
+  padding: 1.25rem 1.25rem 1.375rem;
+}
+
+.vlue-promo-card__divider {
+  height: 1px;
+  margin: 0.875rem 0 1rem;
+  background: #f0f1f3;
+}
+
+.vlue-promo-card__cta {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+  background: #f2f3f5;
+  padding: 0.8125rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: #191f28;
+  transition: background 0.15s ease;
+}
+
+.vlue-promo-card__cta:hover {
+  background: #e8eaed;
+}
+
+.vlue-promo-card__cta--primary {
+  background: #3182f6;
+  color: #fff;
+}
+
+.vlue-promo-card__cta--primary:hover {
+  background: #1b6ef3;
+}
+
+/* 설정 섹션 카드 */
+.vlue-settings-card {
+  border-radius: 1rem;
+  border: 1px solid #f0f1f3;
+  background: #fff;
+  padding: 1.125rem 1.125rem 1.25rem;
+}
+
+.vlue-settings-card + .vlue-settings-card {
+  margin-top: 0.75rem;
+}
+
+.vlue-settings-card__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #191f28;
+}
+
+.vlue-settings-card__hint {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.55;
+  color: #8b95a1;
+}
+
+.vlue-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.vlue-inbox-item {
+  border-radius: 1rem;
+  border: 1px solid #f0f1f3;
+  background: #fff;
+  padding: 1rem 1.125rem;
+  text-align: left;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.vlue-inbox-item:active {
+  transform: scale(0.99);
+}
+
+.vlue-inbox-item:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+/* 다크 모드 */
+.dark-mode .vlue-promo-card,
+.dark-mode .vlue-settings-card,
+.dark-mode .vlue-inbox-item {
+  background: #151821;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark-mode .vlue-promo-card__divider {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dark-mode .vlue-settings-card__label {
+  color: #f2f4f6;
+}
+
+.dark-mode .vlue-settings-card__hint {
+  color: #8b95a1;
+}
+
+.dark-mode .vlue-promo-card__cta {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f2f4f6;
+}

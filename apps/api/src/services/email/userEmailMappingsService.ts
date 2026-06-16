@@ -1,9 +1,13 @@
+import { prisma } from "../../db/client.js";
 import { userHasPremiumTier } from "../../middleware/cardGate.js";
 import {
+  addMasterTarget,
   findMappingByFullVirtualEmailExceptUser,
   findMappingByUserId,
+  listMasterTargets,
   type MembershipStatus,
   type UserEmailMappingRow,
+  setPrimaryMasterTarget,
   updateTargetMasterEmail,
   upsertUserEmailMapping
 } from "./userEmailMappingsStore.js";
@@ -18,6 +22,7 @@ export function normalizeEmailPrefix(raw: string): string {
   return String(raw || "")
     .trim()
     .toLowerCase()
+    .replace(/^@+/, "")
     .replace(/@.*$/, "");
 }
 
@@ -44,25 +49,57 @@ export async function resolveMembershipStatus(userId: string): Promise<Membershi
   return premium ? "PREMIUM" : "FREE";
 }
 
-export function mapRowForApi(row: UserEmailMappingRow | null, isPremium: boolean) {
+export async function resolveUserLoginPrefix(userId: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { publicHandle: true }
+  });
+  const prefix = normalizeEmailPrefix(user?.publicHandle || "");
+  if (!prefix || prefix.length < 2 || !PREFIX_RE.test(prefix)) {
+    throw new Error("LOGIN_ID_REQUIRED");
+  }
+  return prefix;
+}
+
+function mapMasterTargetsForApi(rows: Awaited<ReturnType<typeof listMasterTargets>>) {
+  return rows.map((row) => ({
+    email: row.email,
+    isPrimary: Boolean(row.is_primary),
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at
+  }));
+}
+
+export function mapRowForApi(
+  row: UserEmailMappingRow | null,
+  isPremium: boolean,
+  loginPrefix: string,
+  masterTargets: Awaited<ReturnType<typeof listMasterTargets>> = []
+) {
+  const masters = mapMasterTargetsForApi(masterTargets);
+  const primary = masters.find((m) => m.isPrimary)?.email || row?.target_master_email || null;
+
   if (!row) {
     return {
       configured: false,
       membershipStatus: isPremium ? "PREMIUM" : "FREE",
-      virtualEmailPrefix: "",
+      loginPrefix,
+      virtualEmailPrefix: loginPrefix,
       userCompanySlug: null,
-      fullVirtualEmail: null,
-      targetMasterEmail: null,
+      fullVirtualEmail: loginPrefix ? buildFullVirtualEmail(loginPrefix, null) : null,
+      targetMasterEmail: primary,
+      masterEmails: masters,
       addressKind: "standard" as AddressKind
     };
   }
   return {
     configured: true,
     membershipStatus: row.membership_status,
+    loginPrefix,
     virtualEmailPrefix: row.virtual_email_prefix,
     userCompanySlug: row.user_company_slug,
     fullVirtualEmail: row.full_virtual_email,
-    targetMasterEmail: row.target_master_email,
+    targetMasterEmail: primary,
+    masterEmails: masters,
     addressKind: row.user_company_slug ? ("brand" as AddressKind) : ("standard" as AddressKind),
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at
@@ -71,17 +108,19 @@ export function mapRowForApi(row: UserEmailMappingRow | null, isPremium: boolean
 
 export async function getUserEmailMapping(userId: string) {
   const isPremium = (await resolveMembershipStatus(userId)) === "PREMIUM";
+  let loginPrefix = "";
+  try {
+    loginPrefix = await resolveUserLoginPrefix(userId);
+  } catch {
+    loginPrefix = "";
+  }
   const row = await findMappingByUserId(userId);
-  return { mapping: mapRowForApi(row, isPremium), isPremium };
-}
-
-function assertValidPrefix(prefix: string) {
-  if (!prefix || prefix.length < 2 || prefix.length > 64) {
-    throw new Error("INVALID_PREFIX");
+  let masterTargets = await listMasterTargets(userId);
+  if (masterTargets.length === 0 && row?.target_master_email) {
+    await addMasterTarget(userId, row.target_master_email, true);
+    masterTargets = await listMasterTargets(userId);
   }
-  if (!PREFIX_RE.test(prefix)) {
-    throw new Error("INVALID_PREFIX");
-  }
+  return { mapping: mapRowForApi(row, isPremium, loginPrefix, masterTargets), isPremium };
 }
 
 function assertValidMasterEmail(email: string) {
@@ -93,14 +132,12 @@ function assertValidMasterEmail(email: string) {
 export async function saveVirtualEmailMapping(
   userId: string,
   input: {
-    virtualEmailPrefix: string;
     addressKind: AddressKind;
     userCompanySlug?: string | null;
   }
 ) {
   const membershipStatus = await resolveMembershipStatus(userId);
-  const prefix = normalizeEmailPrefix(input.virtualEmailPrefix);
-  assertValidPrefix(prefix);
+  const prefix = await resolveUserLoginPrefix(userId);
 
   let companySlug: string | null = null;
   if (input.addressKind === "brand") {
@@ -111,8 +148,6 @@ export async function saveVirtualEmailMapping(
     if (!companySlug || !SLUG_RE.test(companySlug)) {
       throw new Error("INVALID_COMPANY_SLUG");
     }
-  } else if (membershipStatus === "FREE") {
-    companySlug = null;
   }
 
   const fullVirtualEmail = buildFullVirtualEmail(prefix, companySlug);
@@ -131,10 +166,43 @@ export async function saveVirtualEmailMapping(
     targetMasterEmail: existing?.target_master_email ?? null
   });
 
-  return mapRowForApi(row, membershipStatus === "PREMIUM");
+  const masterTargets = await listMasterTargets(userId);
+  return mapRowForApi(row, membershipStatus === "PREMIUM", prefix, masterTargets);
 }
 
-export async function saveTargetMasterEmail(userId: string, targetMasterEmail: string) {
+export async function addUserMasterEmail(userId: string, targetMasterEmail: string) {
+  const email = String(targetMasterEmail || "").trim().toLowerCase();
+  assertValidMasterEmail(email);
+
+  let existing = await findMappingByUserId(userId);
+  if (!existing) {
+    const membershipStatus = await resolveMembershipStatus(userId);
+    const prefix = await resolveUserLoginPrefix(userId);
+    existing = await upsertUserEmailMapping({
+      userId,
+      membershipStatus,
+      virtualEmailPrefix: prefix,
+      userCompanySlug: null,
+      fullVirtualEmail: buildFullVirtualEmail(prefix, null),
+      targetMasterEmail: null
+    });
+  }
+
+  const targets = await listMasterTargets(userId);
+  const setPrimary = targets.length === 0;
+  await addMasterTarget(userId, email, setPrimary);
+  if (setPrimary) {
+    await updateTargetMasterEmail(userId, email);
+  }
+
+  const isPremium = (await resolveMembershipStatus(userId)) === "PREMIUM";
+  const loginPrefix = await resolveUserLoginPrefix(userId);
+  const row = await findMappingByUserId(userId);
+  const masterTargets = await listMasterTargets(userId);
+  return mapRowForApi(row, isPremium, loginPrefix, masterTargets);
+}
+
+export async function setUserPrimaryMasterEmail(userId: string, targetMasterEmail: string) {
   const email = String(targetMasterEmail || "").trim().toLowerCase();
   assertValidMasterEmail(email);
 
@@ -143,9 +211,16 @@ export async function saveTargetMasterEmail(userId: string, targetMasterEmail: s
     throw new Error("MAPPING_NOT_CONFIGURED");
   }
 
+  const updated = await setPrimaryMasterTarget(userId, email);
+  if (!updated) {
+    throw new Error("MASTER_EMAIL_NOT_FOUND");
+  }
+
   const row = await updateTargetMasterEmail(userId, email);
   if (!row) throw new Error("MAPPING_NOT_CONFIGURED");
 
   const isPremium = (await resolveMembershipStatus(userId)) === "PREMIUM";
-  return mapRowForApi(row, isPremium);
+  const loginPrefix = await resolveUserLoginPrefix(userId);
+  const masterTargets = await listMasterTargets(userId);
+  return mapRowForApi(row, isPremium, loginPrefix, masterTargets);
 }

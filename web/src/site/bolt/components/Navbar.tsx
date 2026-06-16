@@ -30,7 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: '지역 이벤트', view: 'events' },
   { label: '개인자료실', view: 'resources' },
   { label: '공식 채용', view: 'jobs' },
-  { label: 'VLUE메일', view: 'mail', mailPill: true },
+  { label: 'VLUE메일', view: 'mail-settings', mailPill: true },
   { label: 'AI엑셀에디터', view: 'exceleditor', featured: true },
   { label: '고객지원', view: 'support' },
 ];

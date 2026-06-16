@@ -320,6 +320,7 @@ model User {
 
   userEmailMapping UserEmailMapping?
   emailForwardingNotifications EmailForwardingNotificationLog[]
+  inappMailCaches InappMailCache[]
 
   auctionsSold       Auction[]              @relation("AuctionSeller")
   auctionBids        AuctionBid[]           @relation("AuctionBidder")
@@ -1667,6 +1668,8 @@ model StoreProduct {
   shippingFeeKrw  Int    @default(0) @map("shipping_fee_krw")
   stock           Int    @default(0)
   status          String @default("on_sale") @db.VarChar(24)
+  /// 숏폼·제품 소개 동영상 URL (mp4/HLS/YouTube 등 — 서버 장기 보관 없음)
+  videoUrl        String? @map("video_url") @db.VarChar(2048)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -2238,6 +2241,25 @@ model EmailForwardingNotificationLog {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("email_forwarding_notification_logs")
+}
+
+/// 인앱 메일함 타임라인 인덱스 — 본문·첨부는 DB에 장기 보관하지 않음
+model InappMailCache {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  mailSource  String @map("mail_source") @db.VarChar(24)
+  fromAddress String @map("from_address") @db.VarChar(254)
+  subject     String @default("") @db.VarChar(500)
+  snippet     String @default("") @db.Text
+  receivedAt  DateTime @map("received_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, receivedAt(sort: Desc)])
+  @@map("inapp_mail_caches")
 }
 
 // -----------------------------------------------------------------------------

@@ -8,6 +8,7 @@ export type View =
   | "pricing"
   | "safezone"
   | "mail"
+  | "mail-settings"
   | "download"
   | "news"
   | "events"

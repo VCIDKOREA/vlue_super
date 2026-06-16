@@ -39,7 +39,8 @@ export default function HybridMediaPlayer({
   title = "상품 영상",
   className = "",
   onAspectRatioChange,
-  fill = false
+  fill = false,
+  autoplayMuted = false
 }) {
   const embed = parseEmbedVideoUrl(videoUrl);
   const videoRef = useRef(null);
@@ -106,10 +107,11 @@ export default function HybridMediaPlayer({
         <video
           ref={videoRef}
           src={embed.kind === "stream" ? embed.embedUrl : undefined}
-          controls
+          controls={!autoplayMuted}
           playsInline
-          autoPlay={embed.isLive}
-          muted={embed.isLive}
+          autoPlay={embed.isLive || autoplayMuted}
+          muted={embed.isLive || autoplayMuted}
+          loop={autoplayMuted}
           preload="metadata"
           className="absolute inset-0 h-full w-full object-contain"
         />

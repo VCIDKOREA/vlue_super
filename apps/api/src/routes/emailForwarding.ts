@@ -6,12 +6,22 @@ import {
   mapNotificationRowsForApi
 } from "../services/email/inboundEmailWebhookService.js";
 import {
+  addUserMasterEmail,
   getUserEmailMapping,
-  saveTargetMasterEmail,
   saveVirtualEmailMapping,
+  setUserPrimaryMasterEmail,
   type AddressKind
 } from "../services/email/userEmailMappingsService.js";
 import { listForwardingNotifications } from "../services/email/userEmailMappingsStore.js";
+import {
+  getInappMailCacheById,
+  listInappMailCaches
+} from "../services/email/inappMailCacheStore.js";
+import {
+  listExternalMailAccounts,
+  runExternalMailSyncBatch,
+  upsertExternalMailAccount
+} from "../services/email/externalMailSyncQueue.js";
 
 export const emailForwardingRoutes = new Hono();
 
@@ -45,7 +55,7 @@ emailForwardingRoutes.post("/inbound", async (c) => {
       ok: true,
       userId: result.userId,
       forwardedTo: result.forwardedTo,
-      messageId: result.messageId
+      mode: result.mode
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "unknown error";
@@ -70,32 +80,79 @@ emailForwardingRoutes.put("/mapping", async (c) => {
   try {
     const userId = c.get("vlueUserId") as string;
     const body = await c.req.json<{
-      virtualEmailPrefix?: string;
       addressKind?: AddressKind;
       userCompanySlug?: string | null;
     }>();
-    const prefix = String(body.virtualEmailPrefix || "").trim();
     const addressKind = body.addressKind === "brand" ? "brand" : "standard";
-    if (!prefix) {
-      return c.json({ error: "virtualEmailPrefix is required" }, 400);
-    }
 
     const mapping = await saveVirtualEmailMapping(userId, {
-      virtualEmailPrefix: prefix,
       addressKind,
       userCompanySlug: body.userCompanySlug
     });
     return c.json({ ok: true, mapping });
   } catch (e) {
     const code = e instanceof Error ? e.message : "unknown error";
+    if (code === "LOGIN_ID_REQUIRED") {
+      return c.json({ error: "로그인 아이디가 설정되지 않았습니다. VLUE 가입·본인인증을 완료해 주세요.", code }, 400);
+    }
     if (code === "PREMIUM_REQUIRED") {
-      return c.json({ error: "프리미엄 회원만 상호 브랜드 메일을 사용할 수 있습니다.", code }, 403);
+      return c.json(
+        { error: "상호 브랜드형은 유료회원·비즈니스회원만 사용할 수 있습니다.", code },
+        403
+      );
     }
     if (code === "EMAIL_ALREADY_TAKEN") {
       return c.json({ error: "이미 사용 중인 메일 주소입니다.", code }, 409);
     }
-    if (code === "INVALID_PREFIX" || code === "INVALID_COMPANY_SLUG") {
-      return c.json({ error: "메일 아이디 또는 상호 슬러그 형식이 올바르지 않습니다.", code }, 400);
+    if (code === "INVALID_COMPANY_SLUG") {
+      return c.json({ error: "상호 슬러그 형식이 올바르지 않습니다.", code }, 400);
+    }
+    return c.json({ error: code }, 400);
+  }
+});
+
+emailForwardingRoutes.post("/masters", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const body = await c.req.json<{ email?: string }>();
+    const email = String(body.email || "").trim();
+    if (!email) {
+      return c.json({ error: "email is required" }, 400);
+    }
+    const mapping = await addUserMasterEmail(userId, email);
+    return c.json({ ok: true, mapping });
+  } catch (e) {
+    const code = e instanceof Error ? e.message : "unknown error";
+    if (code === "LOGIN_ID_REQUIRED") {
+      return c.json({ error: "로그인 아이디가 없습니다.", code }, 400);
+    }
+    if (code === "INVALID_MASTER_EMAIL") {
+      return c.json({ error: "유효한 이메일 주소를 입력해 주세요.", code }, 400);
+    }
+    return c.json({ error: code }, 400);
+  }
+});
+
+emailForwardingRoutes.patch("/masters/primary", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const body = await c.req.json<{ email?: string }>();
+    const email = String(body.email || "").trim();
+    if (!email) {
+      return c.json({ error: "email is required" }, 400);
+    }
+    const mapping = await setUserPrimaryMasterEmail(userId, email);
+    return c.json({ ok: true, mapping });
+  } catch (e) {
+    const code = e instanceof Error ? e.message : "unknown error";
+    if (code === "MAPPING_NOT_CONFIGURED") {
+      return c.json({ error: "먼저 VLUE 가상 메일 주소를 선택해 주세요.", code }, 400);
+    }
+    if (code === "MASTER_EMAIL_NOT_FOUND") {
+      return c.json({ error: "등록된 메일이 아닙니다.", code }, 404);
+    }
+    if (code === "INVALID_MASTER_EMAIL") {
+      return c.json({ error: "유효한 이메일 주소를 입력해 주세요.", code }, 400);
     }
     return c.json({ error: code }, 400);
   }
@@ -109,8 +166,7 @@ emailForwardingRoutes.patch("/target", async (c) => {
     if (!target) {
       return c.json({ error: "targetMasterEmail is required" }, 400);
     }
-
-    const mapping = await saveTargetMasterEmail(userId, target);
+    const mapping = await setUserPrimaryMasterEmail(userId, target);
     return c.json({ ok: true, mapping });
   } catch (e) {
     const code = e instanceof Error ? e.message : "unknown error";
@@ -129,6 +185,117 @@ emailForwardingRoutes.get("/notifications", async (c) => {
     const userId = c.get("vlueUserId") as string;
     const rows = await listForwardingNotifications(userId, 50);
     return c.json({ ok: true, notifications: mapNotificationRowsForApi(rows) });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+function mapInappMailForApi(
+  rows: Awaited<ReturnType<typeof listInappMailCaches>>
+) {
+  return rows.map((row) => ({
+    id: row.id,
+    mailSource: row.mail_source,
+    fromAddress: row.from_address,
+    subject: row.subject,
+    snippet: row.snippet,
+    receivedAt: row.received_at instanceof Date ? row.received_at.toISOString() : row.received_at
+  }));
+}
+
+/** 올인원 통합 인앱 메일함 피드 */
+emailForwardingRoutes.get("/inbox", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const rows = await listInappMailCaches(userId, 100);
+    return c.json({ ok: true, inbox: mapInappMailForApi(rows) });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+emailForwardingRoutes.get("/inbox/:id", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const row = await getInappMailCacheById(userId, c.req.param("id"));
+    if (!row) return c.json({ error: "NOT_FOUND" }, 404);
+    return c.json({
+      ok: true,
+      mail: {
+        id: row.id,
+        mailSource: row.mail_source,
+        fromAddress: row.from_address,
+        subject: row.subject,
+        snippet: row.snippet,
+        bodyText: row.snippet,
+        receivedAt: row.received_at instanceof Date ? row.received_at.toISOString() : row.received_at
+      }
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+emailForwardingRoutes.get("/external-accounts", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const rows = await listExternalMailAccounts(userId);
+    return c.json({
+      ok: true,
+      accounts: rows.map((r) => ({
+        id: r.id,
+        email: r.email,
+        provider: r.provider,
+        syncStatus: r.sync_status,
+        lastSyncAt: r.last_sync_at instanceof Date ? r.last_sync_at.toISOString() : r.last_sync_at
+      }))
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+emailForwardingRoutes.post("/external-accounts", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const body = await c.req.json<{ email?: string; provider?: string; imapHost?: string }>();
+    const email = String(body.email || "").trim();
+    if (!email) return c.json({ error: "email is required" }, 400);
+    const account = await upsertExternalMailAccount({
+      userId,
+      email,
+      provider: body.provider,
+      imapHost: body.imapHost
+    });
+    return c.json({
+      ok: true,
+      account: {
+        id: account.id,
+        email: account.email,
+        provider: account.provider,
+        syncStatus: account.sync_status
+      }
+    });
+  } catch (e) {
+    const code = e instanceof Error ? e.message : "unknown error";
+    if (code === "PREMIUM_REQUIRED") {
+      return c.json(
+        { error: "외부 메일(IMAP) 연동은 유료회원·비즈니스회원 전용입니다.", code },
+        403
+      );
+    }
+    return c.json({ error: code }, 400);
+  }
+});
+
+emailForwardingRoutes.post("/sync/run-batch", async (c) => {
+  try {
+    const result = await runExternalMailSyncBatch();
+    return c.json({ ok: true, ...result });
   } catch (e) {
     const message = e instanceof Error ? e.message : "unknown error";
     return c.json({ error: message }, 400);

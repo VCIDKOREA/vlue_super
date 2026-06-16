@@ -75,7 +75,7 @@ export default function StoreSection({ onNavigate }: Props) {
             </div>
             <h2 className="section-title">VLUE 스토어</h2>
             <p className="section-subtitle" style={{ wordBreak: 'keep-all' }}>
-              앱과 동일한 미디어쇼핑·페이지쇼핑·공동구매 피드를 웹에서 탐색하세요. VLUE 인증 판매자만 노출됩니다.
+              앱과 동일한 쇼핑·페이지쇼핑·공동구매 피드를 웹에서 탐색하세요. VLUE 인증 판매자만 노출됩니다.
             </p>
           </div>
           <button

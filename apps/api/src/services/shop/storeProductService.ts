@@ -8,6 +8,7 @@ export type StoreProductSyncInput = {
   shippingFeeKrw?: number;
   stock?: number;
   status?: string;
+  videoUrl?: string | null;
 };
 
 export function resolveStoreUnitPrice(product: {
@@ -34,6 +35,18 @@ export async function syncStoreProduct(sellerUserId: string, input: StoreProduct
   const shippingFeeKrw = Math.max(0, Math.floor(Number(input.shippingFeeKrw) || 0));
   const stock = Math.max(0, Math.floor(Number(input.stock) || 0));
   const status = String(input.status || "on_sale").trim() || "on_sale";
+  const videoUrlRaw = input.videoUrl == null ? null : String(input.videoUrl).trim();
+  const videoUrl = videoUrlRaw || null;
+
+  const rowData = {
+    name,
+    unitPriceKrw,
+    salePriceKrw,
+    shippingFeeKrw,
+    stock,
+    status,
+    videoUrl
+  };
 
   return prisma.storeProduct.upsert({
     where: {
@@ -42,22 +55,10 @@ export async function syncStoreProduct(sellerUserId: string, input: StoreProduct
     create: {
       sellerUserId,
       externalId,
-      name,
-      unitPriceKrw,
-      salePriceKrw,
-      shippingFeeKrw,
-      stock,
-      status
+      ...rowData
     },
-    update: {
-      name,
-      unitPriceKrw,
-      salePriceKrw,
-      shippingFeeKrw,
-      stock,
-      status
-    }
-  });
+    update: rowData
+  } as Parameters<typeof prisma.storeProduct.upsert>[0]);
 }
 
 export async function listStoreProductsForSeller(
