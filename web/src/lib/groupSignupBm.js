@@ -42,6 +42,8 @@ export function emptyGroupSignupDraft() {
     companyName: "",
     companyContactType: "company_rep",
     masterRepNumber: "",
+    masterAssigneeName: "",
+    masterAssigneeTitle: "",
     repExtensionMain: "",
     repExtensionNo: "",
     carrier: "LGUPLUS",

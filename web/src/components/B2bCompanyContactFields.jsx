@@ -3,6 +3,12 @@ import {
   COMPANY_CONTACT_OPTIONS,
   COMPANY_CONTACT_TYPES
 } from "../lib/b2bCompanyContact.js";
+import {
+  classifyOutboundPhone,
+  isCompanyNameOnlyOutbound,
+  isStaffLineOutbound,
+  outboundPhoneKindLabel
+} from "../lib/phoneOutboundRules.js";
 
 const CARRIERS = [
   { id: "LGUPLUS", label: "LG U+" },
@@ -15,6 +21,12 @@ const CARRIERS = [
 export default function B2bCompanyContactFields({ draft, onPatch, compact = false }) {
   const type = draft.companyContactType || COMPANY_CONTACT_TYPES.COMPANY_REP;
   const patch = (partial) => onPatch?.({ ...draft, ...partial });
+  const repNumber = draft.masterRepNumber || "";
+  const outboundKind = classifyOutboundPhone(repNumber);
+  const companyOnly = isCompanyNameOnlyOutbound(repNumber);
+  const staffLine = isStaffLineOutbound(repNumber);
+  const companyName = String(draft.companyName || "").trim();
+  const repLegalName = String(draft.representativeName || draft.vlueAuthPhoneHint || "PASS 본인인증 성명").trim();
 
   return (
     <div className={`space-y-2 ${compact ? "" : "rounded-xl border border-slate-200 bg-white p-3"}`}>
@@ -70,6 +82,63 @@ export default function B2bCompanyContactFields({ draft, onPatch, compact = fals
               className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-[13px]"
             />
           </label>
+          {repNumber.replace(/\D/g, "").length >= 4 ? (
+            <p className="text-[10px] font-semibold text-slate-600">{outboundPhoneKindLabel(outboundKind)}</p>
+          ) : null}
+          <label className="block text-[10px] font-bold text-slate-600">
+            상호 (송출)
+            <input
+              readOnly
+              value={companyName}
+              placeholder="회사명 입력 후 자동 반영"
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-[13px] font-bold text-slate-800"
+            />
+          </label>
+          <label className="block text-[10px] font-bold text-slate-400">
+            대표자 성명
+            <input
+              readOnly
+              disabled
+              value={repLegalName}
+              className={`mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-[13px] ${
+                companyOnly
+                  ? "cursor-not-allowed bg-slate-100 text-slate-400 line-through decoration-slate-400"
+                  : "bg-white text-slate-700"
+              }`}
+            />
+          </label>
+          {companyOnly ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-semibold leading-relaxed text-amber-950">
+              8자리 전국 대표번호는 <b>상호만</b> 송출됩니다. 대표자 성명은 수신 화면에 표시되지 않습니다.
+            </p>
+          ) : null}
+          {staffLine ? (
+            <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/80 p-2.5">
+              <p className="text-[10px] font-black text-blue-950">지역번호 대표전화 — 담당자 확인 필요</p>
+              <p className="text-[10px] leading-relaxed text-blue-900/90">
+                재직증명서·4대보험 가입명부 등 <b>1개월 이내 발급</b> 서류 제출 후 승인됩니다. 신청 완료 시 회사 대표자 또는
+                위임 계정의 <b>1회 인증</b>이 필요합니다.
+              </p>
+              <label className="block text-[10px] font-bold text-slate-700">
+                담당자 성명
+                <input
+                  value={draft.masterAssigneeName || ""}
+                  onChange={(e) => patch({ masterAssigneeName: e.target.value })}
+                  placeholder="예: 홍길동"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-[13px]"
+                />
+              </label>
+              <label className="block text-[10px] font-bold text-slate-700">
+                담당자 직책·부서
+                <input
+                  value={draft.masterAssigneeTitle || ""}
+                  onChange={(e) => patch({ masterAssigneeTitle: e.target.value })}
+                  placeholder="예: 영업팀 과장"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-[13px]"
+                />
+              </label>
+            </div>
+          ) : null}
           <label className="block text-[10px] font-bold text-slate-600">
             통신사 (대표번호)
             <select

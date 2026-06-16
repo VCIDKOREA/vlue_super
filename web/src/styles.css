@@ -59,6 +59,28 @@ body,
 
 .vlue-scroll-pad-bottom-nav {
   padding-bottom: calc(var(--vlue-bottom-nav-offset) + 28px);
+  overflow-anchor: none;
+}
+
+/* 명함 만들기 — 숨김 file input이 스크롤 영역을 밀지 않도록 */
+.lbq-hidden-file-input {
+  position: fixed;
+  left: -100vw;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  pointer-events: none;
+}
+
+.lbq-builder {
+  overflow-anchor: none;
 }
 
 /* 프로필·설정 드로어(z-140) — 탭바 위에 표시, 하단 여유 확보 */
@@ -5286,7 +5308,9 @@ body,
 }
 
 .ldr-panel--push .ldr-contact-list,
-.ldr-panel--push .ldr-front-intro {
+.ldr-panel--push .ldr-front-intro,
+.ldr-panel--push .ldr-back-contact-stack,
+.ldr-panel--push .ldr-contact-extra {
   position: relative;
   z-index: 1;
 }
@@ -5357,8 +5381,30 @@ body,
   flex: 0 0 auto;
 }
 
-.ldr-panel--push.ldr-panel--back .ldr-contact-list {
-  flex: 1;
+.ldr-panel--push.ldr-panel--back .ldr-back-contact-stack {
+  flex: 0 0 auto;
+  align-self: stretch;
+  margin: 4px 12px 0;
+  border-radius: 12px 12px 0 0;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-bottom: 0;
+  background: rgba(15, 23, 42, 0.5);
+  overflow: hidden;
+}
+
+.ldr-panel--push.ldr-panel--back .ldr-back-contact-stack:only-child,
+.ldr-panel--push.ldr-panel--back .ldr-back-contact-stack:last-child {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 12px;
+}
+
+.ldr-panel--push.ldr-panel--back .ldr-back-contact-stack .ldr-contact-list {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .ldr-reception--push .ldr-panel--front .vlue-push-auth-seal {
@@ -5374,6 +5420,13 @@ body,
   border: 1px solid rgba(148, 163, 184, 0.14);
   background: rgba(15, 23, 42, 0.5);
   overflow: hidden;
+}
+
+.ldr-reception--push .ldr-panel--back .ldr-back-contact-stack .ldr-contact-list {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .ldr-reception--push .ldr-contact-list > * {
@@ -5454,19 +5507,22 @@ body,
   margin-top: 3px;
 }
 
-.ldr-panel--push.ldr-panel--back .ldr-contact-list {
+.ldr-reception--push .ldr-panel--back .ldr-contact-extra {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  align-self: stretch;
+  min-height: 72px;
+  margin: 0 12px 10px;
+  padding: 10px 12px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 0 0 12px 12px;
+  background: rgba(15, 23, 42, 0.5);
 }
 
-.ldr-reception--push .ldr-contact-extra {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 88px;
-  padding: 10px 12px 12px;
-  border-top: 1px solid rgba(148, 163, 184, 0.1);
+.ldr-reception--push:not(.ldr-reception--preview) .ldr-panel--back .ldr-contact-extra {
+  flex: 1 1 auto;
 }
 
 .ldr-reception--push .ldr-contact-extra__label {
@@ -6284,12 +6340,11 @@ body,
 
 .ldr-panel--push.ldr-panel--back {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
   padding: 0 0 12px;
-}
-
-.ldr-panel--push.ldr-panel--back .ldr-contact-list {
-  position: relative;
-  z-index: 1;
 }
 
 .ldr-profile-media {
@@ -6484,8 +6539,70 @@ body,
   box-shadow: 0 6px 18px rgba(239, 68, 68, 0.3);
 }
 
+.lbq-preview-phone {
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
 .lbq-preview-phone .ldr-reception {
   border-radius: 18px;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.lbq-preview-phone .ldr-reception--push {
+  flex: 0 0 auto;
+}
+
+/* 명함 만들기 미리보기 — 앞면 기준 고정 프레임, 탭 전환 시 동일 높이 */
+.ldr-reception--preview .ldr-panel-wrap {
+  --ldr-preview-panel-h: 380px;
+  flex: 0 0 var(--ldr-preview-panel-h);
+  height: var(--ldr-preview-panel-h);
+  min-height: var(--ldr-preview-panel-h);
+  max-height: var(--ldr-preview-panel-h);
+  overflow: hidden;
+}
+
+.ldr-reception--preview .ldr-panel {
+  position: relative;
+  inset: auto;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 100%;
+  max-height: 100%;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ldr-reception--preview .ldr-panel--back,
+.ldr-reception--preview .ldr-panel--front {
+  justify-content: flex-start;
+  align-content: flex-start;
+  padding-bottom: 12px;
+}
+
+.ldr-reception--preview .ldr-panel--front .vlue-push-auth-seal {
+  margin-top: auto;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.ldr-reception--preview .ldr-panel--back .ldr-back-contact-stack {
+  flex: 0 0 auto;
+}
+
+.ldr-reception--preview .ldr-panel--back .ldr-contact-extra {
+  flex: 1 1 auto;
+  min-height: 64px;
+  margin-bottom: 0;
 }
 
 .lbq-preview-phone .ldr-hero__visual {

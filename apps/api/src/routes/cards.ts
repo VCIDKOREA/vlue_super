@@ -11,6 +11,10 @@ import {
   requireCardOwnerOrMember,
   requireCardNotifyAccess
 } from "../middleware/cardGate.js";
+import {
+  getTitleDeptStatusForUser,
+  submitTitleDeptReview
+} from "../services/bizcard/titleDeptReviewService.js";
 
 export const cardsRoutes = new Hono();
 
@@ -358,4 +362,46 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
   });
 
   return c.json({ ok: true, cardId: updated.id, designTemplate: updated.designTemplateSnapshot });
+});
+
+/** 직책·부서 확인 서류 — 최신 검토 상태 */
+cardsRoutes.get("/title-dept/status", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const status = await getTitleDeptStatusForUser(me);
+  return c.json({ ok: true, ...status });
+});
+
+/** 직책·부서 변경 신청 (서류 첨부) */
+cardsRoutes.post("/title-dept/submit", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = (await c.req.json().catch(() => ({}))) as {
+    title?: string;
+    department?: string;
+    docKind?: string;
+    docFileName?: string;
+    docIssuedAt?: string;
+    docDataUrl?: string;
+    docUrl?: string;
+  };
+  try {
+    const result = await submitTitleDeptReview(me, {
+      title: body.title,
+      department: body.department,
+      docKind: String(body.docKind || ""),
+      docFileName: String(body.docFileName || ""),
+      docIssuedAt: String(body.docIssuedAt || ""),
+      docDataUrl: body.docDataUrl,
+      docUrl: body.docUrl,
+      source: "bizcard_settings"
+    });
+    return c.json({ ok: true, ...result });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    const map: Record<string, string> = {
+      INVALID_DOC_KIND: "유효하지 않은 서류 종류입니다.",
+      DOC_ISSUED_AT_INVALID: "발급일 기준 1개월 이내 서류만 제출할 수 있습니다.",
+      DOC_REQUIRED: "확인 서류를 첨부해 주세요."
+    };
+    return c.json({ error: map[msg] || msg }, 400);
+  }
 });

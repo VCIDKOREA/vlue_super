@@ -269,3 +269,59 @@ export async function submitEnterpriseEnrollment(adminUserId: string) {
     message: "본사 어드민 승인 대기(PENDING_DOC_VERIFICATION) 상태로 접수되었습니다."
   };
 }
+
+const ASSIGNEE_DOC_KINDS = new Set(["employment_certificate", "insurance_enrollment", "business_registration"]);
+
+const ASSIGNEE_DOC_LABELS: Record<string, string> = {
+  employment_certificate: "재직증명서",
+  insurance_enrollment: "4대보험 가입명부",
+  business_registration: "사업자등록증"
+};
+
+/** B2B 담당자 회선 — 귀속 요청별 증빙 서류 첨부 */
+export async function appendAttributionRequestDocument(
+  adminUserId: string,
+  requestId: string,
+  input: { kind: string; fileName: string; url?: string }
+) {
+  const ent = await prisma.b2BEnterpriseAccount.findFirst({
+    where: { adminUserId },
+    orderBy: { updatedAt: "desc" }
+  });
+  if (!ent) {
+    return { ok: false as const, error: "B2B 기업 계정이 없습니다." };
+  }
+
+  const kind = String(input.kind || "").trim();
+  if (!ASSIGNEE_DOC_KINDS.has(kind)) {
+    return { ok: false as const, error: "유효하지 않은 서류 종류입니다." };
+  }
+
+  const req = await prisma.corporateAttributionRequest.findFirst({
+    where: { id: requestId, enterpriseId: ent.id }
+  });
+  if (!req) {
+    return { ok: false as const, error: "귀속 요청을 찾을 수 없습니다." };
+  }
+
+  const fileName = String(input.fileName || "document.pdf").trim();
+  const url =
+    String(input.url || "").trim() || buildMockStorageUrl(ent.id, kind, fileName);
+
+  const merged = mergeDocumentUrls(req.documentUrls, [
+    {
+      kind: kind as EnrollmentDocKind,
+      label: ASSIGNEE_DOC_LABELS[kind] || kind,
+      url,
+      fileName,
+      uploadedAt: new Date().toISOString()
+    }
+  ]);
+
+  await prisma.corporateAttributionRequest.update({
+    where: { id: req.id },
+    data: { documentUrls: merged as unknown as Prisma.InputJsonValue }
+  });
+
+  return { ok: true as const, requestId: req.id };
+}

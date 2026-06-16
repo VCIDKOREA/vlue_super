@@ -3,9 +3,12 @@ import { resolveLetteringDemoLogoUrl } from "./letteringDemoAssets.js";
 import {
   readLetteringBizcardEditable,
   readLetteringFixedIdentity,
-  formatLetteringContactEmailDisplay
+  formatLetteringContactEmailDisplay,
+  combineLetteringBizcardAddress,
+  readLetteringBizcardAddressFields
 } from "./letteringBizcardStorage.js";
 import { normalizeLetteringBizcardTemplate } from "./letteringBizcardTemplates.js";
+import { resolveDisplayTitleDepartment } from "./letteringBizcardVerification.js";
 
 const PREVIEW_FALLBACK_CARD = {
   name: "\uD64D\uAE38\uB3D9",
@@ -41,7 +44,10 @@ export function withLetteringBizcardPreviewFallback(card = {}) {
     fax: pickPreviewField(card, "fax"),
     email: pickPreviewField(card, "email"),
     website: pickPreviewField(card, "website"),
-    logoUrl: String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl({ organization })
+    logoUrl: card.noCompanyLogo
+      ? ""
+      : String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl({ organization }),
+    photoUrl: card.noProfilePhoto ? "" : String(card.photoUrl || "").trim()
   };
   return merged;
 }
@@ -71,6 +77,9 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
   const ed = readLetteringBizcardEditable();
   const fallbackAddress = readOnboardingAddress();
   const userId = readUserId();
+  const { road, detail } = readLetteringBizcardAddressFields(ed);
+  const address = combineLetteringBizcardAddress(road, detail) || String(ed.address || "").trim() || fallbackAddress;
+  const titleDept = resolveDisplayTitleDepartment(ed);
 
   return normalizeLetteringCard({
     designTemplate: normalizeLetteringBizcardTemplate(ed.designTemplate),
@@ -78,16 +87,17 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
     displayName: fixed.name,
     organization: fixed.organization,
     phone: fixed.phone,
-    title: ed.title,
-    department: ed.department,
-    fax: ed.fax,
+    title: titleDept.title,
+    department: titleDept.department,
+    titleDeptPending: titleDept.pending,
+    fax: ed.noFax ? "" : ed.fax,
     email: ed.email,
-    website: ed.website,
+    website: ed.noWebsite ? "" : ed.website,
     companyIntro: ed.companyIntro,
     customBackText: ed.customBackText,
-    address: ed.address || fallbackAddress,
-    logoUrl: ed.logoDataUrl,
-    photoUrl: ed.photoDataUrl || "",
+    address,
+    logoUrl: ed.noCompanyLogo ? "" : ed.logoDataUrl,
+    photoUrl: ed.noProfilePhoto ? "" : ed.photoDataUrl || "",
     membershipTier,
     feedId: userId ? `user-${userId}` : "",
     feedType: "personal",

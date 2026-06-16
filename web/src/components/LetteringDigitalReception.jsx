@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Phone,
   Mail,
@@ -301,16 +301,22 @@ function BackPanel({ card, verified, embeddedInPush = false }) {
   return (
     <div className={`ldr-panel ldr-panel--back${embeddedInPush ? " ldr-panel--push" : ""}`}>
       {embeddedInPush ? <WatermarkBackdrop card={card} /> : null}
-      <div className="ldr-contact-list">
-        <ContactRow icon={Mail} label="이메일" value={email} href={emailRaw ? `mailto:${emailRaw}` : undefined} />
-        <ContactRow icon={MapPin} label="주소" value={card.address} />
-        <ContactRow
-          icon={Globe}
-          label="웹사이트"
-          value={website}
-          href={website ? `https://${website}` : undefined}
-        />
-        {fax ? <ContactRow icon={Phone} label="팩스" value={fax} /> : null}
+      <div className="ldr-back-contact-stack">
+        <div className="ldr-contact-list">
+          <ContactRow icon={Mail} label="이메일" value={email} href={emailRaw ? `mailto:${emailRaw}` : undefined} />
+          <ContactRow icon={MapPin} label="주소" value={card.address} />
+          {website ? (
+            <ContactRow
+              icon={Globe}
+              label="웹사이트"
+              value={website}
+              href={website ? `https://${website}` : undefined}
+            />
+          ) : null}
+          {fax ? <ContactRow icon={Phone} label="팩스" value={fax} /> : null}
+        </div>
+      </div>
+      {embeddedInPush || additionalNote ? (
         <div className="ldr-contact-extra">
           <p className="ldr-contact-extra__label">추가 설명</p>
           <p
@@ -321,7 +327,7 @@ function BackPanel({ card, verified, embeddedInPush = false }) {
             {additionalNote || (embeddedInPush ? additionalPlaceholder : "")}
           </p>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -335,16 +341,29 @@ export default function LetteringDigitalReception({
   verificationItems = [],
   incomingNumber = "",
   embeddedInPush = false,
+  previewMode = false,
   face = "front",
   onFaceChange,
   className = ""
 }) {
   const card = useMemo(() => normalizeLetteringCard(cardRaw || {}), [cardRaw]);
   const items = verificationItems.length ? verificationItems : card.verificationItems;
+  const panelWrapRef = useRef(null);
+  const useStackedPanels = embeddedInPush && !previewMode;
+
+  useEffect(() => {
+    const root = panelWrapRef.current;
+    if (!root) return;
+    root.querySelectorAll(".ldr-panel").forEach((panel) => {
+      panel.scrollTop = 0;
+    });
+  }, [face]);
 
   return (
     <div
-      className={`ldr-reception${embeddedInPush ? " ldr-reception--push" : ""} ${className}`.trim()}
+      className={`ldr-reception${embeddedInPush ? " ldr-reception--push" : ""}${
+        previewMode ? " ldr-reception--preview" : ""
+      } ${className}`.trim()}
       data-face={face}
     >
       <div className="ldr-face-tabs" role="tablist" aria-label="명함 면">
@@ -368,12 +387,18 @@ export default function LetteringDigitalReception({
         </button>
       </div>
 
-      <div className="ldr-panel-wrap" role="tabpanel">
-        {embeddedInPush ? (
+      <div className="ldr-panel-wrap" role="tabpanel" ref={panelWrapRef}>
+        {useStackedPanels ? (
           <div className="ldr-panel-stage">
             <FrontPanel card={card} verified={verified} verificationItems={items} embeddedInPush />
             <BackPanel card={card} verified={verified} embeddedInPush />
           </div>
+        ) : embeddedInPush && previewMode ? (
+          face === "back" ? (
+            <BackPanel card={card} verified={verified} embeddedInPush />
+          ) : (
+            <FrontPanel card={card} verified={verified} verificationItems={items} embeddedInPush />
+          )
         ) : face === "back" ? (
           <BackPanel card={card} verified={verified} embeddedInPush={false} />
         ) : (

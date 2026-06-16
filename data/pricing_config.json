@@ -7,14 +7,14 @@
   "plans": {
     "b2b_full_package": {
       "sku": "b2b_full_package",
-      "label": "B2B 풀 패키지",
+      "label": "기업 B2B 회선",
       "monthlyKrw": 14700,
       "annualKrw": 147000,
       "billingUnit": "per_line",
       "minLines": 10,
       "platforms": ["pc"],
-      "features": ["chat", "company_work", "internal_comms", "shopping_partial"],
-      "description": "회선당 월 14,700원(부가세 포함). PC 전용. 채팅·회사업무·사내소통·쇼핑(부분) 이용."
+      "features": ["chat", "company_work", "internal_comms", "shopping_partial", "independent_id"],
+      "description": "회선당 월 14,700원(부가세 포함). 로그인·채팅·자료실 등 VLUE 전체 계정 인프라. 8자리 대표번호는 상호만 송출, 지역번호(9~10자리) 담당자는 서류 승인·1회 인증 후 반영."
     },
     "soho_activity": {
       "sku": "soho_activity",
@@ -28,14 +28,14 @@
     },
     "soho_broadcast_addon": {
       "sku": "soho_broadcast_addon",
-      "label": "SOHO 영업 송출 옵션",
+      "label": "가맹점·대표번호 송출",
       "monthlyKrw": 4200,
       "annualKrw": 42000,
       "billingUnit": "per_addon",
       "platforms": ["mobile"],
       "requiresPrimary": "soho_activity",
-      "features": ["digital_card_broadcast", "outbound_caller_id_overlay", "info_card_secondary"],
-      "description": "월 4,200원(부가세 포함) 추가. 등록·인증된 발신번호로 전화 시 수신 화면에 디지털인증명함 송출(Secondary)."
+      "features": ["digital_card_broadcast", "outbound_caller_id_overlay", "merchant_rep_number_only"],
+      "description": "월 4,200원(부가세 포함). 대표자 성명 없이 [상호 + 대표번호]만 수신 화면에 송출. 8자리 전국 대표번호(1588·070 등) 등록 시 적용."
     }
   },
   "legacy": {

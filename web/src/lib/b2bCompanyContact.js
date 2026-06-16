@@ -1,5 +1,7 @@
 /** 기업(B2B) — 대표자 인증·고객 표시 연락처 */
 
+import { isStaffLineOutbound } from "./phoneOutboundRules.js";
+
 export const COMPANY_CONTACT_TYPES = {
   COMPANY_REP: "company_rep",
   REP_MOBILE: "rep_mobile",
@@ -52,6 +54,16 @@ export function validateCompanyContact(draft) {
     const rep = String(draft.masterRepNumber || "").trim();
     if (rep.replace(/\D/g, "").length < 4) {
       return { ok: false, message: "회사 대표번호를 입력해 주세요. (없으면 「대표번호 없음」 옵션을 선택하세요)" };
+    }
+    if (isStaffLineOutbound(rep)) {
+      const name = String(draft.masterAssigneeName || "").trim();
+      const title = String(draft.masterAssigneeTitle || "").trim();
+      if (!name) {
+        return { ok: false, message: "지역번호 대표전화는 담당자 성명을 입력해 주세요." };
+      }
+      if (!title) {
+        return { ok: false, message: "지역번호 대표전화는 담당자 직책·부서를 입력해 주세요." };
+      }
     }
     return { ok: true };
   }

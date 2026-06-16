@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ImagePlus, Upload } from "lucide-react";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
+import LetteringBizcardAddressField from "./LetteringBizcardAddressField.jsx";
+import LetteringBizcardTitleDeptVerifySection from "./LetteringBizcardTitleDeptVerifySection.jsx";
 import {
   LETTERING_BIZCARD_EMAIL_MAX,
   LETTERING_BIZCARD_EMAIL_WARN,
@@ -24,30 +26,135 @@ function Field({ label, hint, children, isDarkMode }) {
   );
 }
 
-function ImageUploadTile({ preview, placeholder, onPick, acceptLabel, isDarkMode }) {
-  const tile = isDarkMode
-    ? "flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/5"
-    : "flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50";
+function OmitCheckbox({ checked, onChange, label, isDarkMode }) {
+  const checkCls = isDarkMode
+    ? "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-gray-300"
+    : "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-slate-600";
   return (
-    <div className="flex items-center gap-3">
-      <span className={tile}>
-        {preview ? (
-          <img src={preview} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <ImagePlus className={`h-6 w-6 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
-        )}
-      </span>
-      <label className="min-w-0 flex-1 cursor-pointer">
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold ${
-            isDarkMode ? "bg-blue-600 text-white" : "bg-blue-600 text-white"
-          }`}
-        >
-          <Upload className="h-3.5 w-3.5" />
-          {placeholder}
+    <label className={checkCls}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+      />
+      {label}
+    </label>
+  );
+}
+
+function ImageUploadTile({
+  preview,
+  placeholder,
+  onPick,
+  acceptLabel,
+  isDarkMode,
+  disabled = false,
+  omitChecked = false,
+  onOmitChange,
+  omitLabel
+}) {
+  const inputRef = useRef(null);
+  const scrollSnapshot = useRef({ top: 0, el: null });
+
+  const captureScroll = useCallback(() => {
+    const scrollEl =
+      inputRef.current?.closest(".overflow-y-auto, .vlue-scroll-pad-bottom-nav") ||
+      document.scrollingElement;
+    scrollSnapshot.current = {
+      top: scrollEl?.scrollTop ?? window.scrollY ?? 0,
+      el: scrollEl
+    };
+  }, []);
+
+  const restoreScroll = useCallback(() => {
+    const { top, el } = scrollSnapshot.current;
+    requestAnimationFrame(() => {
+      if (el && el !== document.documentElement && el !== document.body) {
+        el.scrollTop = top;
+      } else {
+        window.scrollTo(0, top);
+      }
+    });
+  }, []);
+
+  const openPicker = useCallback(
+    (e) => {
+      e.preventDefault();
+      if (disabled || omitChecked) return;
+      captureScroll();
+      const onWindowFocus = () => {
+        restoreScroll();
+        window.removeEventListener("focus", onWindowFocus);
+      };
+      window.addEventListener("focus", onWindowFocus);
+      inputRef.current?.click();
+    },
+    [captureScroll, disabled, omitChecked, restoreScroll]
+  );
+
+  const handleChange = useCallback(
+    (e) => {
+      onPick(e);
+      restoreScroll();
+    },
+    [onPick, restoreScroll]
+  );
+
+  const tile = isDarkMode
+    ? `flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/5${
+        disabled || omitChecked ? " opacity-40" : ""
+      }`
+    : `flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50${
+        disabled || omitChecked ? " opacity-40" : ""
+      }`;
+  const btnCls = disabled || omitChecked
+    ? "inline-flex cursor-not-allowed items-center gap-1.5 rounded-xl bg-slate-400 px-3 py-2 text-[11px] font-bold text-white opacity-60"
+    : `inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold ${
+        isDarkMode ? "bg-blue-600 text-white" : "bg-blue-600 text-white"
+      } active:scale-[0.99]`;
+  const checkCls = isDarkMode
+    ? "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-gray-300"
+    : "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-slate-600";
+
+  return (
+    <div>
+      <div className={`flex items-center gap-3${disabled || omitChecked ? " pointer-events-none" : ""}`}>
+        <span className={tile}>
+          {preview && !omitChecked ? (
+            <img src={preview} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <ImagePlus className={`h-6 w-6 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
+          )}
         </span>
-        <input type="file" accept={acceptLabel} onChange={onPick} className="sr-only" />
-      </label>
+        <div className="min-w-0 flex-1">
+          <button type="button" onClick={openPicker} disabled={disabled || omitChecked} className={btnCls}>
+            <Upload className="h-3.5 w-3.5" />
+            {placeholder}
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={acceptLabel}
+            onChange={handleChange}
+            className="lbq-hidden-file-input"
+            tabIndex={-1}
+            aria-hidden
+            disabled={disabled || omitChecked}
+          />
+        </div>
+      </div>
+      {onOmitChange ? (
+        <label className={checkCls}>
+          <input
+            type="checkbox"
+            checked={omitChecked}
+            onChange={(e) => onOmitChange(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          {omitLabel}
+        </label>
+      ) : null}
     </div>
   );
 }
@@ -73,8 +180,10 @@ export default function LetteringBizcardQuickBuilder({
   setCompanyIntro,
   customBackText,
   setCustomBackText,
-  address,
-  setAddress,
+  addressRoad,
+  setAddressRoad,
+  addressDetail,
+  setAddressDetail,
   logoPreview,
   logoFileName,
   pendingLogo,
@@ -85,6 +194,23 @@ export default function LetteringBizcardQuickBuilder({
   pendingPhoto,
   onPhotoPick,
   photoError,
+  noProfilePhoto,
+  setNoProfilePhoto,
+  noCompanyLogo,
+  setNoCompanyLogo,
+  noFax,
+  setNoFax,
+  noWebsite,
+  setNoWebsite,
+  titleDeptApprovalStatus,
+  titleDeptNeedsSubmit,
+  verifyDocKind,
+  setVerifyDocKind,
+  verifyDocName,
+  verifyDocIssuedAt,
+  setVerifyDocIssuedAt,
+  onVerifyDocPick,
+  verifyDocError,
   onApply,
   applyLabel = "적용",
   toast = ""
@@ -106,11 +232,12 @@ export default function LetteringBizcardQuickBuilder({
         <p className={`mb-2 text-[12px] font-black ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
           수신 화면 미리보기
         </p>
-        <div className="lbq-preview-phone mx-auto max-w-[320px] overflow-hidden rounded-[22px] border border-slate-200/80 bg-slate-950 shadow-lg">
+        <div className="lbq-preview-phone mx-auto max-w-[320px] rounded-[22px] border border-slate-200/80 bg-slate-950 shadow-lg">
           <LetteringDigitalReception
             card={previewCard}
             verified
             embeddedInPush
+            previewMode
             face={previewFace}
             onFaceChange={setPreviewFace}
           />
@@ -150,8 +277,11 @@ export default function LetteringBizcardQuickBuilder({
             onPick={onPhotoPick}
             acceptLabel={LETTERING_PHOTO_RULES.accept}
             isDarkMode={isDarkMode}
+            omitChecked={noProfilePhoto}
+            onOmitChange={setNoProfilePhoto}
+            omitLabel="사진 업로드 없음"
           />
-          {photoFileName ? (
+          {photoFileName && !noProfilePhoto ? (
             <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
               {photoFileName}
               {pendingPhoto ? " (미적용)" : ""}
@@ -166,8 +296,11 @@ export default function LetteringBizcardQuickBuilder({
             onPick={onLogoPick}
             acceptLabel={LETTERING_LOGO_RULES.accept}
             isDarkMode={isDarkMode}
+            omitChecked={noCompanyLogo}
+            onOmitChange={setNoCompanyLogo}
+            omitLabel="회사 로고 없음"
           />
-          {logoFileName ? (
+          {logoFileName && !noCompanyLogo ? (
             <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
               {logoFileName}
               {pendingLogo ? " (미적용)" : ""}
@@ -184,6 +317,19 @@ export default function LetteringBizcardQuickBuilder({
         <Field label="부서" isDarkMode={isDarkMode}>
           <input type="text" value={department} onChange={(e) => setDepartment(e.target.value)} className={inputBase} />
         </Field>
+        <LetteringBizcardTitleDeptVerifySection
+          isDarkMode={isDarkMode}
+          inputBase={inputBase}
+          approvalStatus={titleDeptApprovalStatus}
+          verifyDocKind={verifyDocKind}
+          setVerifyDocKind={setVerifyDocKind}
+          verifyDocName={verifyDocName}
+          verifyDocIssuedAt={verifyDocIssuedAt}
+          setVerifyDocIssuedAt={setVerifyDocIssuedAt}
+          onDocPick={onVerifyDocPick}
+          docError={verifyDocError}
+          needsSubmit={titleDeptNeedsSubmit}
+        />
         <Field label="이메일" isDarkMode={isDarkMode}>
           <input
             type="email"
@@ -204,14 +350,33 @@ export default function LetteringBizcardQuickBuilder({
           ) : null}
         </Field>
         <Field label="홈페이지" isDarkMode={isDarkMode}>
-          <input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} className={inputBase} />
+          <input
+            type="text"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            disabled={noWebsite}
+            className={`${inputBase}${noWebsite ? " cursor-not-allowed opacity-50" : ""}`}
+          />
+          <OmitCheckbox checked={noWebsite} onChange={setNoWebsite} label="홈페이지 없음" isDarkMode={isDarkMode} />
         </Field>
         <Field label="팩스" isDarkMode={isDarkMode}>
-          <input type="tel" value={fax} onChange={(e) => setFax(e.target.value)} className={inputBase} />
+          <input
+            type="tel"
+            value={fax}
+            onChange={(e) => setFax(e.target.value)}
+            disabled={noFax}
+            className={`${inputBase}${noFax ? " cursor-not-allowed opacity-50" : ""}`}
+          />
+          <OmitCheckbox checked={noFax} onChange={setNoFax} label="팩스 없음" isDarkMode={isDarkMode} />
         </Field>
-        <Field label="주소" isDarkMode={isDarkMode}>
-          <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className={inputBase} />
-        </Field>
+        <LetteringBizcardAddressField
+          addressRoad={addressRoad}
+          setAddressRoad={setAddressRoad}
+          addressDetail={addressDetail}
+          setAddressDetail={setAddressDetail}
+          isDarkMode={isDarkMode}
+          inputBase={inputBase}
+        />
         <div className="sm:col-span-2">
           <Field label="소개 (앞면 프로필)" hint="통화 수신 시 앞면 탭에 표시됩니다" isDarkMode={isDarkMode}>
             <textarea

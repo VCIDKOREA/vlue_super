@@ -45,6 +45,12 @@ identityRoutes.post("/portone/complete", async (c) => {
           useMasterDisplayNumber?: boolean;
         }>;
       } | null;
+      digitalCardDoc?: {
+        kind?: string;
+        fileName?: string;
+        issuedAt?: string;
+        dataUrl?: string;
+      } | null;
     }>();
     const impUid = body?.impUid?.trim();
     if (!impUid) {
@@ -95,6 +101,14 @@ identityRoutes.post("/portone/complete", async (c) => {
             extensionNo: row.extensionNo ? String(row.extensionNo).trim() : undefined,
             useMasterDisplayNumber: Boolean(row.useMasterDisplayNumber)
           }))
+          }
+        : null,
+      digitalCardDoc: body?.digitalCardDoc
+        ? {
+            kind: String(body.digitalCardDoc.kind || ""),
+            fileName: String(body.digitalCardDoc.fileName || ""),
+            issuedAt: String(body.digitalCardDoc.issuedAt || ""),
+            dataUrl: body.digitalCardDoc.dataUrl
           }
         : null
     });

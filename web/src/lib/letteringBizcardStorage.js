@@ -46,6 +46,23 @@ export function isLetteringBizcardEmailLong(raw) {
   return String(raw ?? "").trim().length > LETTERING_BIZCARD_EMAIL_WARN;
 }
 
+/** 도로명·지번 + 상세주소 → 명함 표시용 한 줄 */
+export function combineLetteringBizcardAddress(road, detail) {
+  const r = String(road ?? "").trim();
+  const d = String(detail ?? "").trim();
+  if (r && d) return `${r} ${d}`;
+  return r || d;
+}
+
+/** 저장값 → 주소 입력 폼 필드 (기존 address 단일 필드 호환) */
+export function readLetteringBizcardAddressFields(ed = {}) {
+  const road = String(ed.addressRoad ?? "").trim();
+  const detail = String(ed.addressDetail ?? "").trim();
+  if (road || detail) return { road, detail };
+  const legacy = String(ed.address ?? "").trim();
+  return { road: legacy, detail: "" };
+}
+
 export const LETTERING_PHOTO_RULES = {
   fileNamePrefix: "lettering-profile-photo",
   maxBytes: 1024 * 1024,
@@ -75,10 +92,26 @@ const DEFAULT_EDITABLE = {
   companyIntro: "",
   customBackText: "",
   address: "",
+  addressRoad: "",
+  addressDetail: "",
   logoDataUrl: "",
   logoFileName: "",
   photoDataUrl: "",
-  photoFileName: ""
+  photoFileName: "",
+  noProfilePhoto: false,
+  noCompanyLogo: false,
+  noFax: false,
+  noWebsite: false,
+  approvedTitle: "",
+  approvedDepartment: "",
+  titleDeptApprovalStatus: "",
+  titleDeptPendingTitle: "",
+  titleDeptPendingDepartment: "",
+  titleDeptVerifyDocKind: "",
+  titleDeptVerifyDocName: "",
+  titleDeptVerifyDocDataUrl: "",
+  titleDeptVerifyDocIssuedAt: "",
+  titleDeptSubmittedAt: ""
 };
 
 export function readLetteringFixedIdentity() {

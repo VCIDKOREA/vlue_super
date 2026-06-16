@@ -83,7 +83,10 @@ export const PAID_MEMBERSHIP_SUBLINE =
   `월 ${PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString("ko-KR")}원 · 1년 ${PAID_LIST_PRICE_ANNUAL_KRW.toLocaleString("ko-KR")}원 (2개월 무료)`;
 
 export const B2B_MEMBERSHIP_SUBLINE =
-  "10회선↑ · 대표 28,300원/월(추천인 없음) · 하부 14,700원/월 · AI광고 · 가족보호";
+  "10회선↑ · 회선당 14,700원 · VLUE 전체 계정 · 8자리 대표번호=상호만 송출";
+
+export const SOHO_BROADCAST_MEMBERSHIP_SUBLINE =
+  "월 4,200원 · [상호+대표번호]만 송출 · 대표자 성명 미표시";
 
 export const POST_SIGNUP_PAYMENT_NOTICE =
   "회원가입·본인인증이 완료되었습니다. 유료·기업 멤버십은 아래 결제창에서 첫 구독 요금을 결제해 주세요.";

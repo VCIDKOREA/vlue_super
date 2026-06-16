@@ -4,8 +4,10 @@ import { readCardEmail, readCardFax, readCardPromo } from "../lib/memberCardStor
 import {
   LETTERING_BIZCARD_CHANGED_EVENT,
   clampLetteringBizcardEmail,
+  combineLetteringBizcardAddress,
   prepareLetteringLogoFromFile,
   prepareLetteringPhotoFromFile,
+  readLetteringBizcardAddressFields,
   readLetteringBizcardEditable,
   readLetteringFixedIdentity,
   writeLetteringBizcardEditable
@@ -23,6 +25,13 @@ import {
   syncDigitalCardExportSnapshot,
   fetchDigitalCardMeta
 } from "../lib/digitalCardApi.js";
+import { fetchTitleDeptStatus, submitTitleDeptReview } from "../lib/titleDeptReviewApi.js";
+import {
+  TITLE_DEPT_APPROVAL,
+  isTitleDeptChangePending,
+  isVerifyDocIssuedWithinLimit,
+  prepareLetteringVerifyDocFromFile
+} from "../lib/letteringBizcardVerification.js";
 
 export default function LetteringBizcardSettingsView({
   membershipTier = "free",
@@ -41,7 +50,8 @@ export default function LetteringBizcardSettingsView({
   const [website, setWebsite] = useState("");
   const [companyIntro, setCompanyIntro] = useState("");
   const [customBackText, setCustomBackText] = useState("");
-  const [address, setAddress] = useState("");
+  const [addressRoad, setAddressRoad] = useState("");
+  const [addressDetail, setAddressDetail] = useState("");
   const [logoFileName, setLogoFileName] = useState("");
   const [logoPreview, setLogoPreview] = useState("");
   const [pendingLogo, setPendingLogo] = useState(null);
@@ -52,27 +62,90 @@ export default function LetteringBizcardSettingsView({
   const [toast, setToast] = useState("");
   const [logoError, setLogoError] = useState("");
   const [photoError, setPhotoError] = useState("");
+  const [noProfilePhoto, setNoProfilePhoto] = useState(false);
+  const [noCompanyLogo, setNoCompanyLogo] = useState(false);
+  const [noFax, setNoFax] = useState(false);
+  const [noWebsite, setNoWebsite] = useState(false);
+  const [approvedTitle, setApprovedTitle] = useState("");
+  const [approvedDepartment, setApprovedDepartment] = useState("");
+  const [titleDeptApprovalStatus, setTitleDeptApprovalStatus] = useState("");
+  const [verifyDocKind, setVerifyDocKind] = useState("");
+  const [verifyDocName, setVerifyDocName] = useState("");
+  const [verifyDocDataUrl, setVerifyDocDataUrl] = useState("");
+  const [verifyDocIssuedAt, setVerifyDocIssuedAt] = useState("");
+  const [verifyDocError, setVerifyDocError] = useState("");
   const [designTemplate, setDesignTemplate] = useState("classic-light");
   const [cardId, setCardId] = useState("");
   const { refresh: refreshMembership } = useB2bMembership();
 
-  const reload = useCallback(() => {
+  const reload = useCallback(async () => {
+    try {
+      const remote = await fetchTitleDeptStatus();
+      if (remote?.reviewStatus) {
+        const status =
+          remote.reviewStatus === "pending"
+            ? TITLE_DEPT_APPROVAL.PENDING
+            : remote.reviewStatus === "approved"
+              ? TITLE_DEPT_APPROVAL.APPROVED
+              : remote.reviewStatus === "rejected"
+                ? TITLE_DEPT_APPROVAL.REJECTED
+                : "";
+        writeLetteringBizcardEditable({
+          titleDeptApprovalStatus: status,
+          approvedTitle: remote.approvedTitle || "",
+          approvedDepartment: remote.approvedDepartment || "",
+          titleDeptPendingTitle: remote.pendingTitle || "",
+          titleDeptPendingDepartment: remote.pendingDepartment || "",
+          ...(status === TITLE_DEPT_APPROVAL.APPROVED
+            ? {
+                title: remote.approvedTitle || "",
+                department: remote.approvedDepartment || ""
+              }
+            : {})
+        });
+      }
+    } catch {
+      /* 비로그인·오프라인 — 로컬만 */
+    }
+
     const ed = readLetteringBizcardEditable();
     const cardFax = readCardFax();
     const cardEmail = readCardEmail();
     const cardPromo = readCardPromo();
-    setTitle(ed.title);
-    setDepartment(ed.department);
+    setTitle(
+      ed.titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.PENDING
+        ? ed.titleDeptPendingTitle || ed.title
+        : ed.title
+    );
+    setDepartment(
+      ed.titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.PENDING
+        ? ed.titleDeptPendingDepartment || ed.department
+        : ed.department
+    );
     setFax(ed.fax || cardFax || "");
     setEmail(clampLetteringBizcardEmail(ed.email || cardEmail || ""));
     setWebsite(ed.website);
     setCompanyIntro(ed.companyIntro || cardPromo || "");
     setCustomBackText(ed.customBackText || "");
-    setAddress(ed.address);
+    const addr = readLetteringBizcardAddressFields(ed);
+    setAddressRoad(addr.road);
+    setAddressDetail(addr.detail);
     setLogoFileName(ed.logoFileName);
     setLogoPreview(ed.logoDataUrl);
     setPhotoFileName(ed.photoFileName || "");
     setPhotoPreview(ed.photoDataUrl || "");
+    setNoProfilePhoto(Boolean(ed.noProfilePhoto));
+    setNoCompanyLogo(Boolean(ed.noCompanyLogo));
+    setNoFax(Boolean(ed.noFax));
+    setNoWebsite(Boolean(ed.noWebsite));
+    setApprovedTitle(ed.approvedTitle || "");
+    setApprovedDepartment(ed.approvedDepartment || "");
+    setTitleDeptApprovalStatus(ed.titleDeptApprovalStatus || "");
+    setVerifyDocKind(ed.titleDeptVerifyDocKind || "");
+    setVerifyDocName(ed.titleDeptVerifyDocName || "");
+    setVerifyDocDataUrl(ed.titleDeptVerifyDocDataUrl || "");
+    setVerifyDocIssuedAt(ed.titleDeptVerifyDocIssuedAt || "");
+    setVerifyDocError("");
     setDesignTemplate(normalizeLetteringBizcardTemplate(ed.designTemplate));
     setPendingLogo(null);
     setPendingPhoto(null);
@@ -99,44 +172,114 @@ export default function LetteringBizcardSettingsView({
     return () => window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onChange);
   }, [reload]);
 
+  const titleDeptNeedsSubmit = useMemo(
+    () =>
+      isTitleDeptChangePending(
+        {
+          approvedTitle,
+          approvedDepartment,
+          titleDeptApprovalStatus,
+          titleDeptPendingTitle: title,
+          titleDeptPendingDepartment: department
+        },
+        title,
+        department
+      ),
+    [approvedTitle, approvedDepartment, titleDeptApprovalStatus, title, department]
+  );
+
   const previewCard = useMemo(() => {
     const draft = buildUserLetteringCard({ membershipTier });
+    const address = combineLetteringBizcardAddress(addressRoad, addressDetail);
+    const photoUrl = noProfilePhoto ? "" : pendingPhoto?.dataUrl || photoPreview || "";
+    const logoUrl = noCompanyLogo ? "" : pendingLogo?.dataUrl || logoPreview || "";
     return withLetteringBizcardPreviewFallback({
       ...draft,
-      title,
-      department,
-      fax,
+      fax: noFax ? "" : fax,
       email,
-      website,
+      website: noWebsite ? "" : website,
       companyIntro,
       customBackText,
       address,
-      logoUrl: pendingLogo?.dataUrl || logoPreview || draft.logoUrl,
-      photoUrl: pendingPhoto?.dataUrl || photoPreview || draft.photoUrl
+      noProfilePhoto,
+      noCompanyLogo,
+      noFax,
+      noWebsite,
+      logoUrl,
+      photoUrl
     });
   }, [
     membershipTier,
-    title,
-    department,
     fax,
     email,
     website,
     companyIntro,
     customBackText,
-    address,
+    addressRoad,
+    addressDetail,
     logoPreview,
     pendingLogo,
     photoPreview,
     pendingPhoto,
+    noProfilePhoto,
+    noCompanyLogo,
+    noFax,
+    noWebsite,
     previewTick
   ]);
+
+  const applyLabel = useMemo(() => {
+    if (titleDeptNeedsSubmit) return "신청하기";
+    if (isFirstApply) return "신청 · 적용";
+    return "적용";
+  }, [titleDeptNeedsSubmit, isFirstApply]);
 
   const showToast = (msg) => {
     setToast(msg);
     window.setTimeout(() => setToast(""), 2400);
   };
 
+  const handleNoProfilePhotoChange = (checked) => {
+    setNoProfilePhoto(checked);
+    if (checked) {
+      setPhotoError("");
+      setPendingPhoto(null);
+    }
+  };
+
+  const handleNoCompanyLogoChange = (checked) => {
+    setNoCompanyLogo(checked);
+    if (checked) {
+      setLogoError("");
+      setPendingLogo(null);
+    }
+  };
+
+  const handleNoFaxChange = (checked) => {
+    setNoFax(checked);
+    if (checked) setFax("");
+  };
+
+  const handleNoWebsiteChange = (checked) => {
+    setNoWebsite(checked);
+    if (checked) setWebsite("");
+  };
+
+  const handleVerifyDocPick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setVerifyDocError("");
+    const result = await prepareLetteringVerifyDocFromFile(file);
+    if (!result.ok) {
+      setVerifyDocError(result.error);
+      return;
+    }
+    setVerifyDocDataUrl(result.dataUrl);
+    setVerifyDocName(result.fileName);
+  };
+
   const handleLogoPick = async (e) => {
+    if (noCompanyLogo) return;
     const file = e.target.files?.[0];
     e.target.value = "";
     setLogoError("");
@@ -148,9 +291,11 @@ export default function LetteringBizcardSettingsView({
     setPendingLogo({ dataUrl: result.dataUrl, fileName: result.fileName });
     setLogoPreview(result.dataUrl);
     setLogoFileName(result.fileName);
+    setNoCompanyLogo(false);
   };
 
   const handlePhotoPick = async (e) => {
+    if (noProfilePhoto) return;
     const file = e.target.files?.[0];
     e.target.value = "";
     setPhotoError("");
@@ -162,25 +307,94 @@ export default function LetteringBizcardSettingsView({
     setPendingPhoto({ dataUrl: result.dataUrl, fileName: result.fileName });
     setPhotoPreview(result.dataUrl);
     setPhotoFileName(result.fileName);
+    setNoProfilePhoto(false);
   };
 
   const handleApply = async () => {
     const tpl = normalizeLetteringBizcardTemplate(designTemplate);
-    writeLetteringBizcardEditable({
+    const road = addressRoad.trim();
+    const detail = addressDetail.trim();
+    const trimmedTitle = title.trim();
+    const trimmedDept = department.trim();
+
+    if (titleDeptNeedsSubmit) {
+      if (!verifyDocKind) {
+        setVerifyDocError("서류 종류를 선택해 주세요.");
+        return;
+      }
+      if (!verifyDocDataUrl || !verifyDocName) {
+        setVerifyDocError("직책·부서 확인 서류를 첨부해 주세요.");
+        return;
+      }
+      if (!verifyDocIssuedAt || !isVerifyDocIssuedWithinLimit(verifyDocIssuedAt)) {
+        setVerifyDocError("발급일 기준 1개월 이내 서류만 제출할 수 있습니다.");
+        return;
+      }
+    }
+
+    const basePatch = {
       designTemplate: tpl,
-      title: title.trim(),
-      department: department.trim(),
-      fax: fax.trim(),
+      title: trimmedTitle,
+      department: trimmedDept,
+      fax: noFax ? "" : fax.trim(),
       email: clampLetteringBizcardEmail(email).trim(),
-      website: website.trim(),
+      website: noWebsite ? "" : website.trim(),
       companyIntro: companyIntro.trim(),
       customBackText: customBackText.trim(),
-      address: address.trim(),
-      logoDataUrl: pendingLogo?.dataUrl || logoPreview || "",
-      logoFileName: pendingLogo?.fileName || logoFileName || "",
-      photoDataUrl: pendingPhoto?.dataUrl || photoPreview || "",
-      photoFileName: pendingPhoto?.fileName || photoFileName || ""
-    });
+      addressRoad: road,
+      addressDetail: detail,
+      address: combineLetteringBizcardAddress(road, detail),
+      noProfilePhoto,
+      noCompanyLogo,
+      noFax,
+      noWebsite,
+      logoDataUrl: noCompanyLogo ? "" : pendingLogo?.dataUrl || logoPreview || "",
+      logoFileName: noCompanyLogo ? "" : pendingLogo?.fileName || logoFileName || "",
+      photoDataUrl: noProfilePhoto ? "" : pendingPhoto?.dataUrl || photoPreview || "",
+      photoFileName: noProfilePhoto ? "" : pendingPhoto?.fileName || photoFileName || ""
+    };
+
+    if (titleDeptNeedsSubmit) {
+      try {
+        await submitTitleDeptReview({
+          title: trimmedTitle,
+          department: trimmedDept,
+          docKind: verifyDocKind,
+          docFileName: verifyDocName,
+          docIssuedAt: verifyDocIssuedAt,
+          docDataUrl: verifyDocDataUrl
+        });
+      } catch (e) {
+        setVerifyDocError(e?.message || "서류 제출에 실패했습니다.");
+        return;
+      }
+      writeLetteringBizcardEditable({
+        ...basePatch,
+        titleDeptApprovalStatus: TITLE_DEPT_APPROVAL.PENDING,
+        titleDeptPendingTitle: trimmedTitle,
+        titleDeptPendingDepartment: trimmedDept,
+        titleDeptVerifyDocKind: verifyDocKind,
+        titleDeptVerifyDocName: verifyDocName,
+        titleDeptVerifyDocDataUrl: verifyDocDataUrl,
+        titleDeptVerifyDocIssuedAt: verifyDocIssuedAt,
+        titleDeptSubmittedAt: new Date().toISOString()
+      });
+      setTitleDeptApprovalStatus(TITLE_DEPT_APPROVAL.PENDING);
+    } else {
+      writeLetteringBizcardEditable({
+        ...basePatch,
+        approvedTitle: trimmedTitle,
+        approvedDepartment: trimmedDept,
+        titleDeptApprovalStatus:
+          trimmedTitle || trimmedDept ? TITLE_DEPT_APPROVAL.APPROVED : titleDeptApprovalStatus
+      });
+      if (trimmedTitle || trimmedDept) {
+        setApprovedTitle(trimmedTitle);
+        setApprovedDepartment(trimmedDept);
+        setTitleDeptApprovalStatus(TITLE_DEPT_APPROVAL.APPROVED);
+      }
+    }
+
     void syncDigitalCardDesignTemplate(tpl);
     void syncDigitalCardExportSnapshot({ ...previewCard, designTemplate: tpl });
     if (isFirstApply) {
@@ -195,9 +409,11 @@ export default function LetteringBizcardSettingsView({
     setPendingPhoto(null);
     setPreviewTick((n) => n + 1);
     showToast(
-      isFirstApply
-        ? "디지털인증명함 신청이 완료되었습니다. 통화 중 수신 화면에 반영됩니다."
-        : "디지털 인증 명함에 적용되었습니다."
+      titleDeptNeedsSubmit
+        ? "직책·부서 변경 신청이 접수되었습니다. 서류 확인 후 승인됩니다."
+        : isFirstApply
+          ? "디지털인증명함 신청이 완료되었습니다. 통화 중 수신 화면에 반영됩니다."
+          : "디지털 인증 명함에 적용되었습니다."
     );
     onApplied?.();
   };
@@ -236,8 +452,10 @@ export default function LetteringBizcardSettingsView({
           setCompanyIntro={setCompanyIntro}
           customBackText={customBackText}
           setCustomBackText={setCustomBackText}
-          address={address}
-          setAddress={setAddress}
+          addressRoad={addressRoad}
+          setAddressRoad={setAddressRoad}
+          addressDetail={addressDetail}
+          setAddressDetail={setAddressDetail}
           logoPreview={logoPreview}
           logoFileName={logoFileName}
           pendingLogo={pendingLogo}
@@ -248,8 +466,25 @@ export default function LetteringBizcardSettingsView({
           pendingPhoto={pendingPhoto}
           onPhotoPick={handlePhotoPick}
           photoError={photoError}
+          noProfilePhoto={noProfilePhoto}
+          setNoProfilePhoto={handleNoProfilePhotoChange}
+          noCompanyLogo={noCompanyLogo}
+          setNoCompanyLogo={handleNoCompanyLogoChange}
+          noFax={noFax}
+          setNoFax={handleNoFaxChange}
+          noWebsite={noWebsite}
+          setNoWebsite={handleNoWebsiteChange}
+          titleDeptApprovalStatus={titleDeptApprovalStatus}
+          titleDeptNeedsSubmit={titleDeptNeedsSubmit}
+          verifyDocKind={verifyDocKind}
+          setVerifyDocKind={setVerifyDocKind}
+          verifyDocName={verifyDocName}
+          verifyDocIssuedAt={verifyDocIssuedAt}
+          setVerifyDocIssuedAt={setVerifyDocIssuedAt}
+          onVerifyDocPick={handleVerifyDocPick}
+          verifyDocError={verifyDocError}
           onApply={handleApply}
-          applyLabel={isFirstApply ? "신청 · 적용" : "적용"}
+          applyLabel={applyLabel}
           toast={toast}
         />
         {cardId ? (

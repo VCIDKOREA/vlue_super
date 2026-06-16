@@ -27,6 +27,7 @@ import {
   PARENTAL_CONSENT_REQUIRED_MESSAGE
 } from "@vlue/shared/policy/minor-signup";
 import { syncParentalConsentFromPendingChildInvites } from "./auth/parentalConsentService.js";
+import { recordOnboardingDigitalCardDoc } from "./bizcard/titleDeptReviewService.js";
 
 /** Prisma Bytes 필드와 TS 제네릭 호환 */
 function toPrismaBytes(buf: Buffer): Uint8Array<ArrayBuffer> {
@@ -210,6 +211,13 @@ export async function completePortoneIdentity(params: {
   passwordPlain?: string | null;
   /** 유료 단체 가입(10회선+) — 가입 시 B2B draft 생성 */
   groupSignup?: GroupSignupPayload | null;
+  /** 디지털 인증명함 발급 증빙 서류 */
+  digitalCardDoc?: {
+    kind?: string;
+    fileName?: string;
+    issuedAt?: string;
+    dataUrl?: string;
+  } | null;
 }): Promise<IdentityCompleteResult> {
   let parsed: Awaited<ReturnType<typeof fetchAndParseIamportCertification>>;
   if (isDevLocalImpUid(params.impUid)) {
@@ -457,6 +465,19 @@ export async function completePortoneIdentity(params: {
     Boolean(params.requestDigitalCard),
     membershipKindRaw
   );
+
+  if (params.requestDigitalCard && params.digitalCardDoc?.kind) {
+    try {
+      await recordOnboardingDigitalCardDoc(userId, digitalCard.cardId, {
+        docKind: String(params.digitalCardDoc.kind || ""),
+        docFileName: String(params.digitalCardDoc.fileName || "document.pdf"),
+        docIssuedAt: String(params.digitalCardDoc.issuedAt || ""),
+        docDataUrl: params.digitalCardDoc.dataUrl
+      });
+    } catch {
+      /* 증빙 저장 실패는 가입 본흐름 차단하지 않음 — 관리자 재제출 유도 */
+    }
+  }
 
   let signupMembership: Awaited<ReturnType<typeof applySignupMembershipBundle>> | null = null;
   const hasGroupSignup = Boolean(params.groupSignup?.companyName) || isB2bSignup;

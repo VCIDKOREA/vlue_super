@@ -109,6 +109,30 @@ export async function uploadB2bEnrollmentDocument({ kind, fileName, file }) {
   return parseJson(res);
 }
 
+/** 담당자 회선 귀속 요청 — 증빙 서류 첨부 */
+export async function uploadB2bAttributionDocument({ requestId, kind, fileName, file }) {
+  let url;
+  if (file && typeof FileReader !== "undefined") {
+    url = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+  const res = await vlueAuthFetch(apiUrl("/api/b2b/attribution/documents"), {
+    method: "POST",
+    headers: vlueAuthHeaders(),
+    body: JSON.stringify({
+      requestId,
+      kind,
+      fileName: fileName || file?.name || "document.pdf",
+      url: url?.startsWith("data:") ? undefined : url
+    })
+  });
+  return parseJson(res);
+}
+
 export async function submitB2bEnrollment() {
   const res = await vlueAuthFetch(apiUrl("/api/b2b/enrollment/submit"), {
     method: "POST",

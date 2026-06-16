@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { pricingNumbers } from "../lib/pricingConfig.js";
+import { readLetteringFixedIdentity } from "../lib/letteringBizcardStorage.js";
+import {
+  classifyOutboundPhone,
+  isCompanyNameOnlyOutbound,
+  isStaffLineOutbound,
+  outboundPhoneKindLabel
+} from "../lib/phoneOutboundRules.js";
 import { clearMembershipAccessCache } from "../lib/membershipAccessGuard.js";
 import {
   deleteBroadcastLine,
@@ -54,6 +61,49 @@ export default function BroadcastLineSetupPanel({ onToast, onClose }) {
   const isActive = line?.status === "active" && line?.phoneVerified && line?.paidAt;
   const isPaused = line?.status === "paused";
   const needsPrimary = access && !access.hasPrimarySoho;
+  const fixedIdentity = useMemo(() => readLetteringFixedIdentity(), []);
+  const draftPhone = editMode ? editPhone : phone;
+  const outboundKind = useMemo(() => classifyOutboundPhone(draftPhone), [draftPhone]);
+  const companyOnlyOutbound = isCompanyNameOnlyOutbound(draftPhone);
+  const staffLineOutbound = isStaffLineOutbound(draftPhone);
+
+  const OutboundPreviewFields = () =>
+    !String(draftPhone || "").trim() ? null : (
+      <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/90 p-3">
+        <p className="text-[11px] font-black text-slate-800">송출 명함 구성</p>
+        <p className="text-[10px] font-semibold text-slate-600">{outboundPhoneKindLabel(outboundKind)}</p>
+        <label className="block text-[10px] font-bold text-slate-600">
+          상호 (송출)
+          <input
+            readOnly
+            value={fixedIdentity.organization || ""}
+            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-800"
+          />
+        </label>
+        <label className="block text-[10px] font-bold text-slate-400">
+          대표자 성명
+          <input
+            readOnly
+            disabled
+            value={fixedIdentity.name || ""}
+            className="mt-1 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-[13px] text-slate-400 line-through decoration-slate-400"
+          />
+        </label>
+        {companyOnlyOutbound ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-semibold leading-relaxed text-amber-950">
+            8자리 대표·가맹점 번호는 <b>상호 + 번호만</b> 송출됩니다. 대표자 성명은 적용되지 않습니다.
+          </p>
+        ) : staffLineOutbound ? (
+          <p className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-[10px] font-semibold leading-relaxed text-blue-950">
+            지역번호 대표전화는 담당자 정보·확인 서류 승인 후 송출됩니다.
+          </p>
+        ) : (
+          <p className="text-[10px] leading-relaxed text-slate-500">
+            번호 형식에 따라 송출 항목이 달라집니다. 등록 후 안내를 확인해 주세요.
+          </p>
+        )}
+      </div>
+    );
 
   const openCheckout = async () => {
     const trimmed = phone.trim();
@@ -164,9 +214,8 @@ export default function BroadcastLineSetupPanel({ onToast, onClose }) {
           <div>
             <p className="text-[15px] font-black text-slate-900">영업 송출 옵션 · 발신번호 등록</p>
             <p className="mt-1 text-[12px] leading-relaxed text-slate-600">
-              명함 상세(이름·직함·연락처 등)는 기본 디지털인증명함 설정과 동일합니다. 추가로 등록·인증한 발신번호로
-              전화할 때, 수신 화면에 해당 번호 전용 송출 명함이 함께 표시됩니다. 월{" "}
-              {nums.broadcastMonthly.toLocaleString("ko-KR")}원(부가세 포함). Primary SOHO 활동형(
+              월 {nums.broadcastMonthly.toLocaleString("ko-KR")}원(부가세 포함) · 가맹점·대표번호 송출. 대표자 성명 없이{" "}
+              <b>[상호 + 등록번호]</b>만 수신 화면에 표시됩니다. Primary SOHO 활동형(
               {nums.sohoMonthly.toLocaleString("ko-KR")}원) 보유 후 이용.
             </p>
           </div>
@@ -251,6 +300,7 @@ export default function BroadcastLineSetupPanel({ onToast, onClose }) {
                     placeholder="추가 발신번호를 입력하세요."
                   />
                 </label>
+                <OutboundPreviewFields />
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -328,6 +378,7 @@ export default function BroadcastLineSetupPanel({ onToast, onClose }) {
                 placeholder="추가 발신번호를 입력하세요."
               />
             </label>
+            <OutboundPreviewFields />
 
             <button
               type="button"

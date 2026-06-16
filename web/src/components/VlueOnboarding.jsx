@@ -21,6 +21,13 @@ import {
   registerBiometric as webauthnRegisterBiometric
 } from "../lib/webauthnBiometric.js";
 import { formatKrw, isBillableMembershipKind, isB2bMembershipKind, isPaidMembershipKind, paidAmountKrw, buildPaymentPreview, PAID_MEMBERSHIP_SUBLINE, B2B_MEMBERSHIP_SUBLINE, POST_SIGNUP_PAYMENT_NOTICE } from "../lib/membershipBm.js";
+import {
+  LETTERING_SIGNUP_DOC_KINDS,
+  LETTERING_VERIFY_DOC_ACCEPT,
+  LETTERING_VERIFY_DOC_ACCEPT_LABEL,
+  isVerifyDocIssuedWithinLimit,
+  prepareLetteringVerifyDocFromFile
+} from "../lib/letteringBizcardVerification.js";
 import ReferralCodeVerifyBlock, { validateReferralMeta } from "./ReferralCodeVerifyBlock.jsx";
 import B2bSignupFields, { validateReferralMetaB2b } from "./B2bSignupFields.jsx";
 import MembershipBenefitsCompare from "./MembershipBenefitsCompare.jsx";
@@ -117,6 +124,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const [desiredMemberId, setDesiredMemberId] = useState("");
   /** 체크 시 본인인증 완료 API에서 digital_cards 행 생성 */
   const [requestDigitalCard, setRequestDigitalCard] = useState(false);
+  const [digitalCardDocKind, setDigitalCardDocKind] = useState("");
+  const [digitalCardDocName, setDigitalCardDocName] = useState("");
+  const [digitalCardDocDataUrl, setDigitalCardDocDataUrl] = useState("");
+  const [digitalCardDocIssuedAt, setDigitalCardDocIssuedAt] = useState("");
 
   /** BM: free | paid (구 standard/premium 폐기) */
   const [membershipKind, setMembershipKind] = useState("free");
@@ -369,6 +380,17 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
           throw new Error("직책을 입력하거나 「직책 없음」을 선택해 주세요.");
         }
       }
+      if (requestDigitalCard) {
+        if (!digitalCardDocKind) {
+          throw new Error("디지털 인증명함 발급을 위해 증빙 서류 종류를 선택해 주세요.");
+        }
+        if (!digitalCardDocDataUrl || !digitalCardDocName) {
+          throw new Error("재직증명서 사본 또는 사업자등록증 사본을 첨부해 주세요.");
+        }
+        if (!digitalCardDocIssuedAt || !isVerifyDocIssuedWithinLimit(digitalCardDocIssuedAt)) {
+          throw new Error("증빙 서류는 발급일 기준 1개월 이내 서류만 제출할 수 있습니다.");
+        }
+      }
       let impUid;
       if (devBypass) {
         if (!import.meta.env.DEV) {
@@ -391,6 +413,15 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         impUid,
         isBusinessMember: passBusinessMember,
         requestDigitalCard,
+        digitalCardDoc:
+          requestDigitalCard && digitalCardDocDataUrl
+            ? {
+                kind: digitalCardDocKind,
+                fileName: digitalCardDocName,
+                issuedAt: digitalCardDocIssuedAt,
+                dataUrl: digitalCardDocDataUrl
+              }
+            : null,
         membershipKind,
         billingCycle: paidBillingCycle,
         referralCode: referralMeta.codeForApi || null,
@@ -456,6 +487,16 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         }
         if (data.digitalCard?.issued) {
           localStorage.setItem("vlue_digital_card_active", "1");
+          if (requestDigitalCard && digitalCardDocDataUrl) {
+            localStorage.setItem("vlue_onboarding_digital_card_doc_kind", digitalCardDocKind);
+            localStorage.setItem("vlue_onboarding_digital_card_doc_name", digitalCardDocName);
+            localStorage.setItem("vlue_onboarding_digital_card_doc_issued_at", digitalCardDocIssuedAt);
+            try {
+              localStorage.setItem("vlue_onboarding_digital_card_doc_data", digitalCardDocDataUrl);
+            } catch {
+              /* data URL too large — server should collect on API later */
+            }
+          }
           if (data.legalName) localStorage.setItem("myCardDisplayName", String(data.legalName).trim());
           if (data.digitalCard?.cardId) localStorage.setItem("vlue_digital_card_id", data.digitalCard.cardId);
         } else {
@@ -1297,13 +1338,74 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 <input
                   type="checkbox"
                   checked={requestDigitalCard}
-                  onChange={(e) => setRequestDigitalCard(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setRequestDigitalCard(checked);
+                    if (!checked) {
+                      setDigitalCardDocKind("");
+                      setDigitalCardDocName("");
+                      setDigitalCardDocDataUrl("");
+                      setDigitalCardDocIssuedAt("");
+                    }
+                  }}
                   className="mt-0.5 h-4 w-4 shrink-0 rounded border-blue-300 text-blue-600"
                 />
                 <span>
-                  <b>VLUE 명함</b> 발급을 신청합니다. 체크 시 본인인증 완료 직후 서버에 명함 레코드가 생성되며, 앱에서 명함 공유·표시가 활성화됩니다. 미체크 시 명함은 만들어지지 않습니다.
+                  <b>디지털 인증명함</b> 발급을 신청합니다. 재직증명서 또는 사업자등록증 사본(발급 1개월 이내) 첨부 후
+                  본인인증을 완료해야 발급됩니다.
                 </span>
               </label>
+              {requestDigitalCard ? (
+                <div className="mt-2 space-y-2 rounded-xl border border-blue-100 bg-white p-3">
+                  <p className="text-[11px] font-black text-slate-900">디지털 인증명함 증빙 서류 (필수)</p>
+                  <label className="block text-[10px] font-bold text-slate-600">
+                    서류 종류
+                    <select
+                      value={digitalCardDocKind}
+                      onChange={(e) => setDigitalCardDocKind(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-[13px]"
+                    >
+                      <option value="">선택</option>
+                      {LETTERING_SIGNUP_DOC_KINDS.map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-[10px] font-bold text-slate-600">
+                    발급일 (1개월 이내)
+                    <input
+                      type="date"
+                      value={digitalCardDocIssuedAt}
+                      onChange={(e) => setDigitalCardDocIssuedAt(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-[13px]"
+                    />
+                  </label>
+                  <label className="block text-[10px] font-bold text-slate-600">
+                    서류 사본 ({LETTERING_VERIFY_DOC_ACCEPT_LABEL})
+                    <input
+                      type="file"
+                      accept={LETTERING_VERIFY_DOC_ACCEPT}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        const result = await prepareLetteringVerifyDocFromFile(file);
+                        if (!result.ok) {
+                          setVerifyZone({ ok: false, text: result.error });
+                          return;
+                        }
+                        setDigitalCardDocDataUrl(result.dataUrl);
+                        setDigitalCardDocName(result.fileName);
+                      }}
+                      className="mt-1 block w-full text-[11px] file:mr-2 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white"
+                    />
+                  </label>
+                  {digitalCardDocName ? (
+                    <p className="text-[10px] font-semibold text-emerald-800">첨부됨: {digitalCardDocName}</p>
+                  ) : null}
+                </div>
+              ) : null}
               {verifyZone && !verifyZone.ok && (
                 <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[12px] text-red-800">{verifyZone.text}</p>
               )}

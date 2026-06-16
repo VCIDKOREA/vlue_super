@@ -58,6 +58,22 @@ export async function resolveOnboardingReview(reviewId, action, adminNote = "") 
   return parseJson(res);
 }
 
+export async function fetchTitleDeptPendingReviews() {
+  const res = await fetch(apiUrl("/api/v1/admin/title-dept/pending"), {
+    headers: adminDeviceHeaders()
+  });
+  return parseJson(res);
+}
+
+export async function resolveTitleDeptReview(reviewId, action, adminNote = "") {
+  const res = await fetch(apiUrl("/api/v1/admin/title-dept/resolve"), {
+    method: "POST",
+    headers: adminDeviceHeaders(),
+    body: JSON.stringify({ reviewId, action, adminNote: adminNote || undefined })
+  });
+  return parseJson(res);
+}
+
 export async function createMarketingPopup(payload) {
   const res = await fetch(apiUrl("/api/admin/marketing/popups"), {
     method: "POST",

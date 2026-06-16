@@ -26,6 +26,7 @@ import { roleLabelKo } from "../services/enterprise/enterpriseRoles.js";
 import { getMembershipUiContext } from "../services/b2b/membershipUiContext.js";
 import {
   appendEnrollmentDocuments,
+  appendAttributionRequestDocument,
   buildMockStorageUrl,
   ENROLLMENT_DOC_KINDS,
   ENROLLMENT_DOC_LABELS,
@@ -528,6 +529,26 @@ b2bRoutes.post("/attribution/request", async (c) => {
   const result = await requestCorporateAttribution(ent.id, String(body.phone || ""));
   if (!result.ok) return c.json({ error: result.error }, 400);
   return c.json({ request: result.request, alreadyExists: result.alreadyExists });
+});
+
+/** 담당자 회선 — 귀속 요청별 증빙 서류 (1회 인증 전) */
+b2bRoutes.post("/attribution/documents", async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = (await c.req.json().catch(() => ({}))) as {
+    requestId?: string;
+    kind?: string;
+    fileName?: string;
+    url?: string;
+  };
+  const requestId = String(body.requestId || "").trim();
+  if (!requestId) return c.json({ error: "requestId 가 필요합니다." }, 400);
+  const result = await appendAttributionRequestDocument(me, requestId, {
+    kind: String(body.kind || ""),
+    fileName: String(body.fileName || "document.pdf"),
+    url: body.url
+  });
+  if (!result.ok) return c.json({ error: result.error }, 400);
+  return c.json(result);
 });
 
 /** 대표/대리인 — 경리(BUYER)·대리인(MANAGER) 역할 지정 */
