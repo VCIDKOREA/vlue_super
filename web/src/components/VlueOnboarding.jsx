@@ -46,15 +46,17 @@ import {
   GROUP_SIGNUP_MIN_LINES
 } from "../lib/groupSignupBm.js";
 
-/** 좌측 라벨 + 우측 필드 (공공기관 스타일 행) */
+/** 좌측 라벨 + 우측 필드 — 모바일은 세로 스택 */
 function FormRow({ icon, label, children, className = "" }) {
   return (
-    <div className={`vlue-onb-form-row flex w-full overflow-hidden rounded-xl border border-slate-200/90 bg-white text-[13px] shadow-sm ${className}`}>
-      <div className="flex w-[30%] min-w-[92px] shrink-0 items-center gap-1.5 border-r border-slate-100 bg-[#eef3f9] px-2.5 py-2.5">
-        <span className="shrink-0 text-slate-500">{icon}</span>
-        <span className="font-bold leading-tight text-slate-800">{label}</span>
+    <div
+      className={`vlue-onb-form-row flex w-full flex-col overflow-hidden rounded-xl border border-slate-200/90 bg-white text-[13px] shadow-sm sm:flex-row ${className}`}
+    >
+      <div className="vlue-onb-form-row__label flex shrink-0 items-center gap-1.5 border-b border-slate-100 bg-[#eef3f9] px-3 py-2 sm:w-[7.5rem] sm:border-b-0 sm:border-r sm:px-2.5 sm:py-2">
+        <span className="shrink-0 text-slate-500 [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>
+        <span className="text-[11px] font-medium leading-snug text-slate-700 sm:text-[12px]">{label}</span>
       </div>
-      <div className="min-w-0 flex-1 bg-white px-2 py-1.5">{children}</div>
+      <div className="vlue-onb-form-row__field min-w-0 flex-1 bg-white px-3 py-2 sm:px-2 sm:py-1.5">{children}</div>
     </div>
   );
 }
@@ -187,6 +189,14 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const [businessEmail, setBusinessEmail] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
   const [emailVerify, setEmailVerify] = useState({ status: "idle", message: "", token: "" });
+  const [businessVirtualId, setBusinessVirtualId] = useState("");
+  const [needsCustomVirtualId, setNeedsCustomVirtualId] = useState(false);
+  const [virtualIdCheck, setVirtualIdCheck] = useState({
+    status: "idle",
+    message: "",
+    normalized: "",
+    fullVirtualEmail: ""
+  });
 
   const runCheckLoginId = useCallback(async (slug) => {
     const s = String(slug || "").trim();
@@ -203,6 +213,8 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       const data = await res.json().catch(() => ({}));
       if (data.available) {
         setIdCheck({ status: "ok", message: "사용 가능한 아이디입니다." });
+      } else if (data.code === "RESERVED") {
+        setIdCheck({ status: "invalid", message: data.reason || "사칭 방지 및 회원 보호를 위해 사용할 수 없는 아이디입니다." });
       } else if (data.normalized == null) {
         setIdCheck({ status: "invalid", message: data.reason || "아이디 형식이 올바르지 않습니다." });
       } else {
@@ -210,6 +222,49 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       }
     } catch {
       setIdCheck({ status: "invalid", message: "중복 확인 요청에 실패했습니다." });
+    }
+  }, []);
+
+  const runCheckVirtualId = useCallback(async (slug) => {
+    const s = String(slug || "").trim();
+    if (!s) {
+      setVirtualIdCheck({
+        status: "invalid",
+        message: "비즈니스 메일 ID를 입력해 주세요.",
+        normalized: "",
+        fullVirtualEmail: ""
+      });
+      return;
+    }
+    setVirtualIdCheck({ status: "checking", message: "", normalized: "", fullVirtualEmail: "" });
+    try {
+      const res = await fetch(
+        apiUrl(`/api/auth/check-virtual-email-id?virtualId=${encodeURIComponent(s)}`)
+      );
+      const data = await res.json().catch(() => ({}));
+      if (data.available && data.normalized) {
+        setBusinessVirtualId(data.normalized);
+        setVirtualIdCheck({
+          status: "ok",
+          message: `사용 가능: ${data.fullVirtualEmail || `${data.normalized}@vlue.kr`}`,
+          normalized: data.normalized,
+          fullVirtualEmail: data.fullVirtualEmail || ""
+        });
+      } else {
+        setVirtualIdCheck({
+          status: data.code === "RESERVED" ? "error" : "conflict",
+          message: data.reason || "사용할 수 없는 ID입니다.",
+          normalized: data.normalized || "",
+          fullVirtualEmail: data.fullVirtualEmail || ""
+        });
+      }
+    } catch {
+      setVirtualIdCheck({
+        status: "error",
+        message: "중복 확인 요청에 실패했습니다.",
+        normalized: "",
+        fullVirtualEmail: ""
+      });
     }
   }, []);
 
@@ -339,6 +394,15 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         setVerifyZone({ ok: false, text: "이메일 인증을 완료해 주세요." });
         return;
       }
+      if (virtualIdCheck.status !== "ok" || !virtualIdCheck.normalized) {
+        setVerifyZone({
+          ok: false,
+          text: needsCustomVirtualId
+            ? "나만의 비즈니스 메일 ID 중복확인을 완료해 주세요."
+            : "@vlue.kr 주소 확인을 기다려 주세요."
+        });
+        return;
+      }
       setStep("pass");
       return;
     }
@@ -376,6 +440,8 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         }
       } else if (emailVerify.status !== "ok" || !emailVerify.token) {
         throw new Error("이메일 인증을 완료해 주세요.");
+      } else if (!virtualIdCheck.normalized || virtualIdCheck.status !== "ok") {
+        throw new Error("비즈니스 메일 @vlue.kr ID 확인을 완료해 주세요.");
       }
       const pw = String(signupPassword || "");
       if (!isValidMemberPassword(pw)) {
@@ -460,6 +526,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         signupTrack,
         businessEmail: trackA ? String(businessEmail || "").trim() : null,
         emailVerificationToken: trackA ? emailVerify.token : null,
+        virtualEmailPrefix: trackA ? virtualIdCheck.normalized : null,
         password: pw,
         groupSignup: isB2b ? serializeGroupSignupForApi(groupSignupDraft) : null,
         ...(passBusinessMember
@@ -1225,8 +1292,8 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
 
           {step === "account" && (
             <section className={sectionCls}>
-              <h2 className="text-[16px] font-black text-slate-900">가입 방식 · 비밀번호</h2>
-              <p className="mt-2 text-[12px] leading-relaxed text-slate-600">
+              <h2 className="text-[15px] font-bold text-slate-900 sm:text-[16px]">가입 방식 · 비밀번호</h2>
+              <p className="mt-2 text-[11px] font-normal leading-relaxed text-slate-600 sm:text-[12px]">
                 상황에 맞는 경로를 선택하세요. 비즈니스 메일 경로는 휴대폰·이메일 인증 후 가상 메일이 자동 생성됩니다.
               </p>
               <TwoTrackSignupFields
@@ -1235,6 +1302,9 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                   setSignupTrack(t);
                   setVerifyZone(null);
                   setEmailVerify({ status: "idle", message: "", token: "" });
+                  setBusinessVirtualId("");
+                  setNeedsCustomVirtualId(false);
+                  setVirtualIdCheck({ status: "idle", message: "", normalized: "", fullVirtualEmail: "" });
                 }}
                 businessEmail={businessEmail}
                 onBusinessEmailChange={setBusinessEmail}
@@ -1242,34 +1312,43 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 onEmailOtpChange={setEmailOtp}
                 emailVerify={emailVerify}
                 onEmailVerifyChange={setEmailVerify}
+                businessVirtualId={businessVirtualId}
+                onBusinessVirtualIdChange={setBusinessVirtualId}
+                virtualIdCheck={virtualIdCheck}
+                onVirtualIdCheckChange={setVirtualIdCheck}
+                onRunCheckVirtualId={runCheckVirtualId}
+                needsCustomVirtualId={needsCustomVirtualId}
+                onNeedsCustomVirtualIdChange={setNeedsCustomVirtualId}
                 desiredMemberId={desiredMemberId}
                 onDesiredMemberIdChange={setDesiredMemberId}
                 idCheck={idCheck}
                 onRunCheckLoginId={runCheckLoginId}
                 busy={busy}
               />
-              <div className="mt-4 space-y-2">
-                <FormRow icon={<span className="text-slate-500">🔑</span>} label="비밀번호">
+              <div className="mt-4 space-y-3">
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-medium text-slate-600">비밀번호</span>
                   <input
                     type="password"
                     autoComplete="new-password"
                     value={signupPassword}
                     onChange={(e) => setSignupPassword(e.target.value)}
                     placeholder={MEMBER_PASSWORD_HINT}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[13px] outline-none focus:border-blue-400"
+                    className="vlue-onb-plain-input w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14px] font-normal outline-none focus:border-blue-400"
                   />
-                </FormRow>
-                <FormRow icon={<span className="text-slate-500">🔑</span>} label="비밀번호 확인">
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-medium text-slate-600">비밀번호 확인</span>
                   <input
                     type="password"
                     autoComplete="new-password"
                     value={signupPasswordConfirm}
                     onChange={(e) => setSignupPasswordConfirm(e.target.value)}
                     placeholder="비밀번호 재입력"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[13px] outline-none focus:border-blue-400"
+                    className="vlue-onb-plain-input w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14px] font-normal outline-none focus:border-blue-400"
                   />
-                </FormRow>
-                <p className="text-[10px] leading-relaxed text-slate-500 pl-0.5">
+                </label>
+                <p className="text-[10px] font-normal leading-relaxed text-slate-500">
                   {MEMBER_PASSWORD_HINT}
                 </p>
               </div>

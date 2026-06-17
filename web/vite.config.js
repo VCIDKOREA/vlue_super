@@ -10,7 +10,11 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@vlue/shared": resolve(__dirname, "../packages/shared/src/index.ts")
+      "@vlue/shared": resolve(__dirname, "../packages/shared/src/index.ts"),
+      "@vlue/shared/signup/reservedIds": resolve(
+        __dirname,
+        "../packages/shared/src/signup/reservedIds.js"
+      )
     }
   },
   build: {

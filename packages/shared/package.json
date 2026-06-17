@@ -31,6 +31,11 @@
       "import": "./dist/signup/signupGateCore.js",
       "default": "./dist/signup/signupGateCore.js"
     },
+    "./signup/reservedIds": {
+      "types": "./dist/signup/reservedIds.d.ts",
+      "import": "./dist/signup/reservedIds.js",
+      "default": "./dist/signup/reservedIds.js"
+    },
     "./phone": {
       "import": "./dist/phone/krPhone.js",
       "default": "./dist/phone/krPhone.js"

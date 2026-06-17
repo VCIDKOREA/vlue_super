@@ -37,6 +37,11 @@ import {
   sendSignupEmailOtp,
   verifySignupEmailOtp
 } from "../services/email/signupEmailVerifyService.js";
+import {
+  checkVirtualEmailIdAvailability,
+  previewBusinessVirtualEmail
+} from "../services/email/virtualEmailIdService.js";
+import { isReservedId, RESERVED_ID_MESSAGE } from "@vlue/shared/signup/reservedIds";
 
 export const authRoutes = new Hono();
 
@@ -45,6 +50,14 @@ const RESET_TTL_MS = 60 * 60 * 1000;
 authRoutes.get("/check-login-id", async (c) => {
   try {
     const raw = c.req.query("loginId");
+    if (isReservedId(String(raw || ""))) {
+      return c.json({
+        available: false,
+        normalized: null,
+        reason: RESERVED_ID_MESSAGE,
+        code: "RESERVED"
+      });
+    }
     const normalized = normalizeDesiredPublicHandle(raw);
     if (!normalized) {
       return c.json(
@@ -68,6 +81,29 @@ authRoutes.get("/check-login-id", async (c) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
     return c.json({ available: false, normalized: null, reason: msg }, 500);
+  }
+});
+
+/** @vlue.kr 가상 메일 ID — 예약어·중복 확인 (경로 A/B 공통) */
+authRoutes.get("/check-virtual-email-id", async (c) => {
+  try {
+    const email = c.req.query("email");
+    const virtualId = c.req.query("virtualId");
+
+    if (email && !virtualId) {
+      const preview = await previewBusinessVirtualEmail(String(email));
+      return c.json({ ok: true, ...preview });
+    }
+
+    if (virtualId) {
+      const result = await checkVirtualEmailIdAvailability(String(virtualId));
+      return c.json({ ok: true, ...result });
+    }
+
+    return c.json({ ok: false, error: "email 또는 virtualId 가 필요합니다." }, 400);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ ok: false, error: msg }, 500);
   }
 });
 

@@ -5,20 +5,31 @@
 
 [data-vlue-onboarding="marketing"] {
   --mkt-onb-container: min(1280px, 94vw);
-  --mkt-onb-body: 1rem;
-  --mkt-onb-body-lg: 1.0625rem;
-  --mkt-onb-caption: 0.875rem;
-  --mkt-onb-label: 0.9375rem;
+  --mkt-onb-body: 0.9375rem;
+  --mkt-onb-body-lg: 1rem;
+  --mkt-onb-caption: 0.75rem;
+  --mkt-onb-label: 0.8125rem;
   --mkt-onb-text: #1a1a1b;
   --mkt-onb-text-secondary: #424242;
   --mkt-onb-text-muted: #5c5c5c;
 
   font-family: "Pretendard Variable", Pretendard, Inter, -apple-system, BlinkMacSystemFont, system-ui,
     sans-serif;
-  font-weight: 500;
-  line-height: 1.65;
+  font-weight: 400;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@media (min-width: 768px) {
+  [data-vlue-onboarding="marketing"] {
+    --mkt-onb-body: 1rem;
+    --mkt-onb-body-lg: 1.0625rem;
+    --mkt-onb-caption: 0.875rem;
+    --mkt-onb-label: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.65;
+  }
 }
 
 [data-vlue-onboarding="marketing"] .vlue-onb-content-max {
@@ -38,45 +49,63 @@
   }
 }
 
-/* 마케팅 타이포 스케일 (portal 이슈 보정) */
+/* 마케팅 타이포 스케일 (portal 이슈 보정) — 모바일은 가볍게 */
 [data-vlue-onboarding="marketing"] .text-\[10px\] {
-  font-size: var(--mkt-onb-caption) !important;
-  line-height: 1.5 !important;
-  font-weight: 700 !important;
+  font-size: 0.6875rem !important;
+  line-height: 1.45 !important;
+  font-weight: 400 !important;
 }
 
 [data-vlue-onboarding="marketing"] .text-\[11px\] {
   font-size: var(--mkt-onb-caption) !important;
-  line-height: 1.55 !important;
-  font-weight: 600 !important;
+  line-height: 1.5 !important;
+  font-weight: 500 !important;
 }
 
 [data-vlue-onboarding="marketing"] .text-\[12px\] {
   font-size: var(--mkt-onb-label) !important;
-  line-height: 1.55 !important;
-  font-weight: 600 !important;
+  line-height: 1.5 !important;
+  font-weight: 500 !important;
 }
 
 [data-vlue-onboarding="marketing"] .text-\[13px\] {
   font-size: var(--mkt-onb-body) !important;
-  line-height: 1.6 !important;
+  line-height: 1.55 !important;
+  font-weight: 400 !important;
 }
 
 [data-vlue-onboarding="marketing"] .text-\[14px\] {
   font-size: var(--mkt-onb-body-lg) !important;
-  line-height: 1.6 !important;
-  font-weight: 700 !important;
+  line-height: 1.55 !important;
+  font-weight: 600 !important;
 }
 
 [data-vlue-onboarding="marketing"] .text-\[15px\] {
-  font-size: 1.0625rem !important;
-  line-height: 1.65 !important;
+  font-size: 1rem !important;
+  line-height: 1.55 !important;
+  font-weight: 500 !important;
 }
 
 [data-vlue-onboarding="marketing"] .text-\[16px\] {
-  font-size: 1.25rem !important;
-  line-height: 1.45 !important;
-  font-weight: 800 !important;
+  font-size: 1.0625rem !important;
+  line-height: 1.4 !important;
+  font-weight: 700 !important;
+}
+
+@media (min-width: 768px) {
+  [data-vlue-onboarding="marketing"] .text-\[10px\] {
+    font-size: var(--mkt-onb-caption) !important;
+    font-weight: 600 !important;
+  }
+
+  [data-vlue-onboarding="marketing"] .text-\[14px\] {
+    font-weight: 700 !important;
+  }
+
+  [data-vlue-onboarding="marketing"] .text-\[16px\] {
+    font-size: 1.25rem !important;
+    font-weight: 800 !important;
+  }
 }
 
 [data-vlue-onboarding="marketing"] .text-slate-400,
@@ -133,22 +162,62 @@
   }
 }
 
-[data-vlue-onboarding="marketing"] .vlue-onb-form-row > div:first-child {
-  width: 22% !important;
-  min-width: 9.5rem !important;
-  padding: 0.75rem 1rem !important;
-  font-size: var(--mkt-onb-label) !important;
+[data-vlue-onboarding="marketing"] .vlue-onb-form-row {
+  flex-direction: column;
 }
 
+[data-vlue-onboarding="marketing"] .vlue-onb-form-row > .vlue-onb-form-row__label,
+[data-vlue-onboarding="marketing"] .vlue-onb-form-row > div:first-child {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  border-right: none !important;
+}
+
+[data-vlue-onboarding="marketing"] .vlue-onb-form-row > .vlue-onb-form-row__field,
 [data-vlue-onboarding="marketing"] .vlue-onb-form-row > div:last-child {
-  padding: 0.625rem 0.875rem !important;
+  padding: 0.5rem 0.75rem !important;
 }
 
 [data-vlue-onboarding="marketing"] .vlue-onb-form-row input,
 [data-vlue-onboarding="marketing"] .vlue-onb-form-row textarea,
-[data-vlue-onboarding="marketing"] .vlue-onb-form-row select {
-  font-size: var(--mkt-onb-body) !important;
+[data-vlue-onboarding="marketing"] .vlue-onb-form-row select,
+[data-vlue-onboarding="marketing"] .vlue-onb-plain-input {
+  font-size: 1rem !important;
+  font-weight: 400 !important;
   padding: 0.625rem 0.75rem !important;
+  min-height: 2.75rem;
+}
+
+@media (min-width: 640px) {
+  [data-vlue-onboarding="marketing"] .vlue-onb-form-row {
+    flex-direction: row;
+  }
+
+  [data-vlue-onboarding="marketing"] .vlue-onb-form-row > .vlue-onb-form-row__label,
+  [data-vlue-onboarding="marketing"] .vlue-onb-form-row > div:first-child {
+    width: 7.5rem !important;
+    min-width: 7.5rem !important;
+    padding: 0.625rem 0.75rem !important;
+    font-size: var(--mkt-onb-label) !important;
+    border-right: 1px solid rgb(241 245 249) !important;
+    border-bottom: none !important;
+  }
+
+  [data-vlue-onboarding="marketing"] .vlue-onb-form-row > .vlue-onb-form-row__field,
+  [data-vlue-onboarding="marketing"] .vlue-onb-form-row > div:last-child {
+    padding: 0.625rem 0.875rem !important;
+  }
+
+  [data-vlue-onboarding="marketing"] .vlue-onb-form-row input,
+  [data-vlue-onboarding="marketing"] .vlue-onb-form-row textarea,
+  [data-vlue-onboarding="marketing"] .vlue-onb-form-row select {
+    font-size: var(--mkt-onb-body) !important;
+    min-height: auto;
+  }
 }
 
 [data-vlue-onboarding="marketing"] .vlue-onb-terms-scroll {

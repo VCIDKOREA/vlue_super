@@ -103,11 +103,11 @@ export async function deriveHandleFromBusinessEmail(
 
 export async function provisionSignupEmailMapping(input: {
   userId: string;
-  publicHandle: string;
+  virtualEmailPrefix: string;
   targetMasterEmail: string | null;
   membershipStatus?: "FREE" | "PREMIUM";
 }): Promise<UserEmailMappingRow> {
-  const prefix = deriveVirtualPrefixFromHandle(input.publicHandle);
+  const prefix = deriveVirtualPrefixFromHandle(input.virtualEmailPrefix);
   const full = buildFullVirtualEmail(prefix);
 
   const taken = await findMappingByFullVirtualEmail(full);
@@ -128,7 +128,7 @@ export async function provisionSignupEmailMapping(input: {
 export async function applySignupEmailBundle(params: {
   userId: string;
   signupTrack: SignupTrack;
-  publicHandle: string;
+  virtualEmailPrefix: string;
   businessEmail?: string | null;
   membershipStatus?: "FREE" | "PREMIUM";
 }): Promise<UserEmailMappingRow | null> {
@@ -137,7 +137,7 @@ export async function applySignupEmailBundle(params: {
     if (!email) throw new Error("비즈니스 메일 주소가 필요합니다.");
     return provisionSignupEmailMapping({
       userId: params.userId,
-      publicHandle: params.publicHandle,
+      virtualEmailPrefix: params.virtualEmailPrefix,
       targetMasterEmail: email,
       membershipStatus: params.membershipStatus
     });
@@ -145,7 +145,7 @@ export async function applySignupEmailBundle(params: {
 
   return provisionSignupEmailMapping({
     userId: params.userId,
-    publicHandle: params.publicHandle,
+    virtualEmailPrefix: params.virtualEmailPrefix,
     targetMasterEmail: null,
     membershipStatus: params.membershipStatus
   });

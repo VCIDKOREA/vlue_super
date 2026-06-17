@@ -31,11 +31,15 @@ import { recordOnboardingDigitalCardDoc } from "./bizcard/titleDeptReviewService
 import {
   applySignupEmailBundle,
   applyCompanyVerifiedIfEligible,
-  deriveHandleFromBusinessEmail,
   normalizeBusinessEmail,
   type SignupTrack
 } from "./email/signupEmailProvision.js";
 import { consumeSignupEmailToken } from "./email/signupEmailVerifyService.js";
+import {
+  assertVirtualEmailIdForSignup,
+  assertSignupLoginIdNotReserved
+} from "./email/virtualEmailIdService.js";
+import { RESERVED_ID_MESSAGE, isReservedId } from "@vlue/shared/signup/reservedIds";
 
 /** Prisma Bytes 필드와 TS 제네릭 호환 */
 function toPrismaBytes(buf: Buffer): Uint8Array<ArrayBuffer> {
@@ -232,6 +236,8 @@ export async function completePortoneIdentity(params: {
   businessEmail?: string | null;
   /** 경로 A: 이메일 OTP 검증 후 발급 토큰 */
   emailVerificationToken?: string | null;
+  /** 경로 A: 확정된 @vlue.kr 접두사 (로그인 ID는 businessEmail) */
+  virtualEmailPrefix?: string | null;
 }): Promise<IdentityCompleteResult> {
   let parsed: Awaited<ReturnType<typeof fetchAndParseIamportCertification>>;
   if (isDevLocalImpUid(params.impUid)) {
@@ -319,8 +325,16 @@ export async function completePortoneIdentity(params: {
         throw new Error("비즈니스 메일 주소를 입력해 주세요.");
       }
       consumeSignupEmailToken(businessEmailNorm, params.emailVerificationToken);
-      publicHandleForCreate = await deriveHandleFromBusinessEmail(prisma, businessEmailNorm);
+      const virtualPrefix = await assertVirtualEmailIdForSignup(
+        String(params.virtualEmailPrefix || "")
+      );
+      publicHandleForCreate = virtualPrefix;
     } else {
+      if (desiredSlug) {
+        await assertSignupLoginIdNotReserved(desiredSlug);
+      } else if (isReservedId(String(params.desiredPublicHandle || ""))) {
+        throw new Error(RESERVED_ID_MESSAGE);
+      }
       publicHandleForCreate = await resolvePublicHandleForNewUser(prisma, desiredSlug);
     }
     publicHandle = publicHandleForCreate;
@@ -417,7 +431,7 @@ export async function completePortoneIdentity(params: {
       await applySignupEmailBundle({
         userId,
         signupTrack,
-        publicHandle,
+        virtualEmailPrefix: publicHandle,
         businessEmail: businessEmailNorm || null
       });
       if (signupTrack === "business_email") {

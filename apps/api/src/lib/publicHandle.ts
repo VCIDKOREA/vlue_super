@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
+import { isReservedId, RESERVED_ID_MESSAGE } from "@vlue/shared/signup/reservedIds";
 
 /** @ 접두사 제거 후 소문자. 유효하면 슬러그만 반환, 아니면 null */
 export function normalizeDesiredPublicHandle(raw: string | undefined | null): string | null {
@@ -30,6 +31,9 @@ export async function resolvePublicHandleForNewUser(
   desired: string | null
 ): Promise<string> {
   if (desired) {
+    if (isReservedId(desired)) {
+      throw new Error(RESERVED_ID_MESSAGE);
+    }
     const clash = await prisma.user.findFirst({ where: { publicHandle: desired }, select: { id: true } });
     if (clash) {
       throw new Error("이미 사용 중인 회원 ID입니다. 다른 ID를 입력해 주세요.");

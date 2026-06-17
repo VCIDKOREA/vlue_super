@@ -54,6 +54,7 @@ identityRoutes.post("/portone/complete", async (c) => {
       signupTrack?: "business_email" | "vlue_id_only";
       businessEmail?: string | null;
       emailVerificationToken?: string | null;
+      virtualEmailPrefix?: string | null;
     }>();
     const impUid = body?.impUid?.trim();
     if (!impUid) {
@@ -121,6 +122,9 @@ identityRoutes.post("/portone/complete", async (c) => {
       businessEmail: body?.businessEmail ? String(body.businessEmail).trim() : null,
       emailVerificationToken: body?.emailVerificationToken
         ? String(body.emailVerificationToken).trim()
+        : null,
+      virtualEmailPrefix: body?.virtualEmailPrefix
+        ? String(body.virtualEmailPrefix).trim()
         : null
     });
 
