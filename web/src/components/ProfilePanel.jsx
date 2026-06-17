@@ -21,7 +21,7 @@ import { probeEnterpriseSidebarAccess } from "../lib/enterpriseLineManageAccess.
 import { fileToDataUrl, readAvatar, writeAvatar } from "../lib/vlueAvatar.js";
 import { getMemberHandle, getChatDisplayName } from "../lib/memberCardStorage.js";
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
-import { fetchEmailForwardingMapping } from "../lib/vlueEmailMappingsApi.js";
+import { fetchEmailForwardingMapping, readLocalLoginPrefix } from "../lib/vlueEmailMappingsApi.js";
 
 function tierLabelStyle(tier, isDarkMode) {
   if (tier === "premium") return { label: "프리미엄", className: "text-[#722f37]" };
@@ -113,6 +113,24 @@ function ProfilePanel({
   const { vluerLocked, membershipCtx } = useB2bMembership();
   const mainPanelScrollRef = useRef(null);
   const [virtualEmail, setVirtualEmail] = useState(null);
+  const [virtualEmailConfigured, setVirtualEmailConfigured] = useState(false);
+
+  const reloadVirtualEmail = useCallback(() => {
+    fetchEmailForwardingMapping().then((data) => {
+      const m = data.mapping || {};
+      const fromApi = m.fullVirtualEmail || null;
+      const prefix = m.loginPrefix || m.virtualEmailPrefix || readLocalLoginPrefix();
+      const fallback = prefix ? `${prefix}@vlue.kr` : null;
+      setVirtualEmail(fromApi || fallback);
+      setVirtualEmailConfigured(Boolean(m.configured && fromApi));
+    });
+  }, []);
+
+  const displayMailAddress = useMemo(() => {
+    if (virtualEmail) return virtualEmail;
+    const prefix = readLocalLoginPrefix();
+    return prefix ? `${prefix}@vlue.kr` : "메일 설정 필요";
+  }, [virtualEmail]);
 
   const companyLockedName = useMemo(
     () =>
@@ -123,16 +141,15 @@ function ProfilePanel({
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    fetchEmailForwardingMapping().then((data) => {
-      if (!cancelled) {
-        setVirtualEmail(data.mapping?.fullVirtualEmail || null);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, panelView]);
+    reloadVirtualEmail();
+  }, [open, panelView, settingsSubView, reloadVirtualEmail]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onMappingChanged = () => reloadVirtualEmail();
+    window.addEventListener("vlue-email-mapping-changed", onMappingChanged);
+    return () => window.removeEventListener("vlue-email-mapping-changed", onMappingChanged);
+  }, [open, reloadVirtualEmail]);
 
   const openSettings = useCallback(() => {
     setSettingsSubView(null);
@@ -463,7 +480,7 @@ function ProfilePanel({
             blockedUserIds={blockedUserIds}
             onUnblockUser={onUnblockUser}
             myPhone={myPhone || myCard?.phone || ""}
-            myEmail={virtualEmail || "(미설정)"}
+            myEmail={displayMailAddress}
             membershipTier={membershipTier}
             companyName={companyLockedName}
             openLetteringBizcardHub={openLetteringBizcardHub}
@@ -690,20 +707,41 @@ function ProfilePanel({
 
           <div className="relative mt-3 px-1">
             <div
-              className={`flex items-center justify-between rounded-[28px] border p-4 ${
+              className={`relative flex items-center justify-between rounded-[28px] border p-4 ${
                 isDarkMode
                   ? "border-white/10 bg-white/5"
                   : "border-blue-100/50 bg-blue-50/40"
               }`}
             >
+              {showCopied ? (
+                <div
+                  className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <span className="whitespace-nowrap rounded-full bg-gray-800 px-4 py-1.5 text-[12px] font-medium text-white shadow-lg">
+                    메일주소가 복사되었습니다!
+                  </span>
+                </div>
+              ) : null}
               <div
-                onClick={() => copyToClipboard("blue_user@vlue.kr")}
+                onClick={() => {
+                  if (!virtualEmail && !readLocalLoginPrefix()) {
+                    setSettingsSubView("vlueEmailSettings");
+                    setPanelView("settings");
+                    return;
+                  }
+                  copyToClipboard(displayMailAddress);
+                }}
                 className="flex min-w-0 flex-1 cursor-pointer flex-col active:opacity-60 transition-all group"
               >
                 <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-blue-400">Personal Mail</p>
-                <p className="text-[15px] font-black tracking-tight text-gray-800 border-b-2 border-blue-200/50 group-hover:border-blue-400 transition-colors dark:text-gray-100">
-                  user@vlue.kr
+                <p className="truncate text-[15px] font-black tracking-tight text-gray-800 border-b-2 border-blue-200/50 group-hover:border-blue-400 transition-colors dark:text-gray-100">
+                  {displayMailAddress}
                 </p>
+                {!virtualEmailConfigured && displayMailAddress !== "메일 설정 필요" ? (
+                  <p className={`mt-1 text-[10px] font-medium ${subText}`}>탭하여 적용 · 메일 설정에서 저장</p>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -718,13 +756,6 @@ function ProfilePanel({
               >
                 ✉
               </button>
-            </div>
-            <div
-              className={`pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full rounded-full bg-gray-800 px-4 py-1.5 text-[12px] text-white transition-opacity ${
-                showCopied ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              메일주소가 복사되었습니다!
             </div>
           </div>
 

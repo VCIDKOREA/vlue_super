@@ -7,6 +7,7 @@ import {
   type UserEmailMappingRow
 } from "./userEmailMappingsStore.js";
 import { insertInappMailCache } from "./inappMailCacheStore.js";
+import { insertUserEmail } from "./userEmailsStore.js";
 import { sendOfficePushToUser } from "../fcmNotificationService.js";
 
 function parseAddressField(raw: string) {
@@ -59,15 +60,29 @@ export async function triggerForwardingNotification(
 ) {
   const fromAddress = parseAddressField(parsed.from || "unknown@unknown");
   const subject = String(parsed.subject || "(제목 없음)").trim();
-  const bodyText = String(parsed.text || parsed.html || "").replace(/<[^>]+>/g, " ");
+  const bodyText = String(parsed.text || "").replace(/<[^>]+>/g, " ").trim() || String(parsed.html || "").replace(/<[^>]+>/g, " ").trim();
+  const bodyHtml = parsed.html ? String(parsed.html) : null;
+  const receivedAt = new Date();
+
+  const mail = await insertUserEmail({
+    userId,
+    direction: "inbound",
+    mailSource: "VIRTUAL_FORWARD",
+    fromAddress,
+    toAddress: fullVirtualEmail,
+    subject,
+    bodyText: bodyText || subject,
+    bodyHtml,
+    receivedAt
+  });
 
   const cache = await insertInappMailCache({
     userId,
     mailSource: "VIRTUAL_FORWARD",
     fromAddress,
     subject,
-    bodyText,
-    receivedAt: new Date()
+    bodyText: bodyText || subject,
+    receivedAt
   });
 
   const log = await insertForwardingNotification({
@@ -85,6 +100,7 @@ export async function triggerForwardingNotification(
     fullVirtualEmail,
     notificationId: log.id,
     cacheId: cache.id,
+    mailId: mail.id,
     at: new Date().toISOString()
   });
 
@@ -92,10 +108,11 @@ export async function triggerForwardingNotification(
     type: "vlue-email-inapp",
     mailSource: "VIRTUAL_FORWARD",
     cacheId: cache.id,
+    mailId: mail.id,
     from: fromAddress
   });
 
-  return { log, cache };
+  return { log, cache, mail };
 }
 
 export async function processInboundForwarding(parsed: ParsedInboundEmail) {
@@ -110,14 +127,13 @@ export async function processInboundForwarding(parsed: ParsedInboundEmail) {
 
   const forwardMode = (process.env.VLUE_EMAIL_FORWARD_MODE || "cloudflare_edge").toLowerCase();
   const shouldRelay = forwardMode === "smtp_relay";
+  const hasForwardTarget = Boolean(String(mapping.target_master_email || "").trim());
 
-  if (shouldRelay) {
+  if (shouldRelay && hasForwardTarget) {
     const relay = await relayInboundEmail(mapping, parsed);
     if (!relay.ok) {
       return { ok: false as const, status: 422, error: relay.error };
     }
-  } else if (!mapping.target_master_email) {
-    return { ok: false as const, status: 422, error: "NO_TARGET_MASTER_EMAIL" };
   }
 
   await triggerForwardingNotification(mapping.user_id, parsed, mapping.full_virtual_email);
@@ -125,7 +141,8 @@ export async function processInboundForwarding(parsed: ParsedInboundEmail) {
   return {
     ok: true as const,
     userId: mapping.user_id,
-    forwardedTo: mapping.target_master_email,
-    mode: forwardMode
+    forwardedTo: hasForwardTarget ? mapping.target_master_email : null,
+    mode: forwardMode,
+    inAppOnly: !hasForwardTarget
   };
 }

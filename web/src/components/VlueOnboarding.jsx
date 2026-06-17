@@ -29,6 +29,7 @@ import {
   prepareLetteringVerifyDocFromFile
 } from "../lib/letteringBizcardVerification.js";
 import ReferralCodeVerifyBlock, { validateReferralMeta } from "./ReferralCodeVerifyBlock.jsx";
+import TwoTrackSignupFields from "./TwoTrackSignupFields.jsx";
 import B2bSignupFields, { validateReferralMetaB2b } from "./B2bSignupFields.jsx";
 import MembershipBenefitsCompare from "./MembershipBenefitsCompare.jsx";
 import BackButton from "./common/BackButton";
@@ -181,6 +182,11 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
   /** idle | checking | ok | taken | invalid */
   const [idCheck, setIdCheck] = useState({ status: "idle", message: "" });
+  /** business_email | vlue_id_only */
+  const [signupTrack, setSignupTrack] = useState("business_email");
+  const [businessEmail, setBusinessEmail] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [emailVerify, setEmailVerify] = useState({ status: "idle", message: "", token: "" });
 
   const runCheckLoginId = useCallback(async (slug) => {
     const s = String(slug || "").trim();
@@ -313,6 +319,30 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
 
   const submitAccountNext = () => {
     setVerifyZone(null);
+    const pw = String(signupPassword || "");
+    if (!isValidMemberPassword(pw)) {
+      setVerifyZone({ ok: false, text: MEMBER_PASSWORD_INVALID_MESSAGE });
+      return;
+    }
+    if (pw !== String(signupPasswordConfirm || "")) {
+      setVerifyZone({ ok: false, text: "비밀번호 확인이 일치하지 않습니다." });
+      return;
+    }
+
+    if (signupTrack === "business_email") {
+      const email = String(businessEmail || "").trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setVerifyZone({ ok: false, text: "비즈니스 메일 주소를 올바르게 입력해 주세요." });
+        return;
+      }
+      if (emailVerify.status !== "ok" || !emailVerify.token) {
+        setVerifyZone({ ok: false, text: "이메일 인증을 완료해 주세요." });
+        return;
+      }
+      setStep("pass");
+      return;
+    }
+
     const slug = normalizeMemberHandleSlug(desiredMemberId);
     if (!isValidMemberHandleSlug(slug)) {
       setVerifyZone({
@@ -324,17 +354,8 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
     if (idCheck.status !== "ok") {
       setVerifyZone({
         ok: false,
-        text: "아이디 사용 가능 여부가 확인되지 않았습니다. 잠시 기다리거나 「아이디 중복확인」을 눌러 주세요."
+        text: "아이디 사용 가능 여부가 확인되지 않았습니다. 「중복확인」을 눌러 주세요."
       });
-      return;
-    }
-    const pw = String(signupPassword || "");
-    if (!isValidMemberPassword(pw)) {
-      setVerifyZone({ ok: false, text: MEMBER_PASSWORD_INVALID_MESSAGE });
-      return;
-    }
-    if (pw !== String(signupPasswordConfirm || "")) {
-      setVerifyZone({ ok: false, text: "비밀번호 확인이 일치하지 않습니다." });
       return;
     }
     setStep("pass");
@@ -344,12 +365,17 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
     setBusy(true);
     setVerifyZone(null);
     try {
-      const slug = normalizeMemberHandleSlug(desiredMemberId);
-      if (!isValidMemberHandleSlug(slug)) {
-        throw new Error("회원 ID는 영문 소문자로 시작하는 3~20자(소문자·숫자·_)이며 숫자를 한 글자 이상 포함해야 합니다.");
-      }
-      if (idCheck.status !== "ok") {
-        throw new Error("아이디 중복 확인이 완료되지 않았습니다. 잠시 기다리거나 「아이디 중복확인」을 눌러 주세요.");
+      const trackA = signupTrack === "business_email";
+      const slug = trackA ? "auto" : normalizeMemberHandleSlug(desiredMemberId);
+      if (!trackA) {
+        if (!isValidMemberHandleSlug(slug)) {
+          throw new Error("회원 ID는 영문 소문자로 시작하는 3~20자(소문자·숫자·_)이며 숫자를 한 글자 이상 포함해야 합니다.");
+        }
+        if (idCheck.status !== "ok") {
+          throw new Error("아이디 중복 확인이 완료되지 않았습니다.");
+        }
+      } else if (emailVerify.status !== "ok" || !emailVerify.token) {
+        throw new Error("이메일 인증을 완료해 주세요.");
       }
       const pw = String(signupPassword || "");
       if (!isValidMemberPassword(pw)) {
@@ -362,7 +388,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         typeof sessionStorage !== "undefined" && sessionStorage.getItem("vlue-admin-entry") === "1"
           ? localStorage.getItem("vlue-admin-device-key")
           : null;
-      if (!adminDeviceKeyPre) {
+      if (!adminDeviceKeyPre && !trackA) {
         const recheckRes = await fetch(
           apiUrl(`/api/auth/check-login-id?loginId=${encodeURIComponent(slug)}`)
         );
@@ -396,7 +422,11 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         if (!import.meta.env.DEV) {
           throw new Error("개발 전용 본인인증 우회는 로컬 개발 빌드에서만 사용할 수 있습니다.");
         }
-        impUid = makeDevLocalImpUid(slug);
+        const devSlug =
+          trackA && businessEmail
+            ? String(businessEmail).split("@")[0].replace(/[^a-z0-9_]/gi, "").slice(0, 20) || "biz"
+            : slug;
+        impUid = makeDevLocalImpUid(devSlug);
       } else {
         const userCode = getPortoneUserCode();
         const rsp = await requestIamportCertification(userCode);
@@ -426,7 +456,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         billingCycle: paidBillingCycle,
         referralCode: referralMeta.codeForApi || null,
         termsVersion: TERMS_VERSION,
-        desiredPublicHandle: slug,
+        desiredPublicHandle: trackA ? null : slug,
+        signupTrack,
+        businessEmail: trackA ? String(businessEmail || "").trim() : null,
+        emailVerificationToken: trackA ? emailVerify.token : null,
         password: pw,
         groupSignup: isB2b ? serializeGroupSignupForApi(groupSignupDraft) : null,
         ...(passBusinessMember
@@ -1192,45 +1225,29 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
 
           {step === "account" && (
             <section className={sectionCls}>
-              <h2 className="text-[16px] font-black text-slate-900">회원 ID · 비밀번호</h2>
+              <h2 className="text-[16px] font-black text-slate-900">가입 방식 · 비밀번호</h2>
               <p className="mt-2 text-[12px] leading-relaxed text-slate-600">
-                로그인에 사용할 <b>ID</b>와 <b>비밀번호</b>를 설정합니다. 세부 규정은 약관 제8조를 확인해 주세요.
+                상황에 맞는 경로를 선택하세요. 비즈니스 메일 경로는 휴대폰·이메일 인증 후 가상 메일이 자동 생성됩니다.
               </p>
-              <div className="mt-4 space-y-2">
-                <FormRow icon={<IconLayers className="h-4 w-4 text-slate-500" />} label="회원 ID">
-                  <input
-                    type="text"
-                    inputMode="text"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    value={desiredMemberId}
-                    onChange={(e) => setDesiredMemberId(e.target.value)}
-                    placeholder="예: hong_gildong"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[13px] outline-none focus:border-blue-400"
-                  />
-                </FormRow>
-                <p className="text-[10px] leading-relaxed text-slate-500 pl-0.5">
-                  영문 소문자 시작 · 3~20자 · 숫자 1자 이상
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => runCheckLoginId(normalizeMemberHandleSlug(desiredMemberId))}
-                    className="rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-[11px] font-black text-slate-800 active:scale-[0.99] disabled:opacity-50"
-                  >
-                    아이디 중복확인
-                  </button>
-                  {idCheck.status === "checking" ? (
-                    <span className="text-[11px] text-slate-500">확인 중…</span>
-                  ) : idCheck.status === "ok" ? (
-                    <span className="text-[11px] font-bold text-emerald-700">{idCheck.message}</span>
-                  ) : idCheck.status === "taken" || idCheck.status === "invalid" ? (
-                    <span className="text-[11px] font-bold text-red-700">{idCheck.message}</span>
-                  ) : null}
-                </div>
-              </div>
+              <TwoTrackSignupFields
+                signupTrack={signupTrack}
+                onSignupTrackChange={(t) => {
+                  setSignupTrack(t);
+                  setVerifyZone(null);
+                  setEmailVerify({ status: "idle", message: "", token: "" });
+                }}
+                businessEmail={businessEmail}
+                onBusinessEmailChange={setBusinessEmail}
+                emailOtp={emailOtp}
+                onEmailOtpChange={setEmailOtp}
+                emailVerify={emailVerify}
+                onEmailVerifyChange={setEmailVerify}
+                desiredMemberId={desiredMemberId}
+                onDesiredMemberIdChange={setDesiredMemberId}
+                idCheck={idCheck}
+                onRunCheckLoginId={runCheckLoginId}
+                busy={busy}
+              />
               <div className="mt-4 space-y-2">
                 <FormRow icon={<span className="text-slate-500">🔑</span>} label="비밀번호">
                   <input

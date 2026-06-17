@@ -56,12 +56,18 @@ export default function WwwStagingLockGate({ children }) {
           </p>
         </div>
         <div className="vlue-promo-card__body -mt-6">
-          <p className="vlue-type-body text-[#4e5968]">
-            가비아 DNS는 그대로 두고, 내부 스테이징만 잠금 처리했습니다. 개발자·화이트리스트 IP만 미리보기에
-            접근할 수 있습니다.
+          <p className="vlue-type-body text-center leading-[1.75] text-[#4e5968]">
+            멀리 있어도 마음은 닿을 수 있어요.
+            <br />
+            VLUE는 그 거리를 조금 더 가깝게 이어 드리려고
+            <br />
+            지금, 조용히 준비하고 있습니다.
+          </p>
+          <p className="vlue-type-caption mt-4 text-center text-[#8b95a1]">
+            곧 만나요. 당신의 연결을 기다리고 있을게요.
           </p>
           {checking ? (
-            <p className="vlue-type-caption mt-6 text-center text-[#8b95a1]">접근 권한 확인 중…</p>
+            <p className="vlue-type-caption mt-2 text-center text-[#8b95a1]">접근 권한 확인 중…</p>
           ) : (
             <>
               <button type="button" onClick={handleDevLogin} className="vlue-promo-card__cta mt-5">

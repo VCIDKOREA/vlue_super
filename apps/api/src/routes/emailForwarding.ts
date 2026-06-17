@@ -18,6 +18,11 @@ import {
   listInappMailCaches
 } from "../services/email/inappMailCacheStore.js";
 import {
+  getUserEmailById,
+  listUserEmails
+} from "../services/email/userEmailsStore.js";
+import { sendUserOutboundEmail } from "../services/email/outboundEmailService.js";
+import {
   listExternalMailAccounts,
   runExternalMailSyncBatch,
   upsertExternalMailAccount
@@ -200,7 +205,25 @@ function mapInappMailForApi(
     fromAddress: row.from_address,
     subject: row.subject,
     snippet: row.snippet,
+    direction: "inbound",
     receivedAt: row.received_at instanceof Date ? row.received_at.toISOString() : row.received_at
+  }));
+}
+
+function mapUserEmailsForApi(rows: Awaited<ReturnType<typeof listUserEmails>>) {
+  return rows.map((row) => ({
+    id: row.id,
+    mailSource: row.mail_source,
+    fromAddress: row.from_address,
+    toAddress: row.to_address,
+    subject: row.subject,
+    snippet: String(row.body_text || "").slice(0, 280),
+    bodyText: row.body_text,
+    direction: row.direction,
+    receivedAt:
+      (row.received_at || row.sent_at || row.created_at) instanceof Date
+        ? (row.received_at || row.sent_at || row.created_at)!.toISOString()
+        : row.received_at || row.sent_at || row.created_at
   }));
 }
 
@@ -208,6 +231,10 @@ function mapInappMailForApi(
 emailForwardingRoutes.get("/inbox", async (c) => {
   try {
     const userId = c.get("vlueUserId") as string;
+    const userRows = await listUserEmails(userId, 100);
+    if (userRows.length > 0) {
+      return c.json({ ok: true, inbox: mapUserEmailsForApi(userRows) });
+    }
     const rows = await listInappMailCaches(userId, 100);
     return c.json({ ok: true, inbox: mapInappMailForApi(rows) });
   } catch (e) {
@@ -219,7 +246,29 @@ emailForwardingRoutes.get("/inbox", async (c) => {
 emailForwardingRoutes.get("/inbox/:id", async (c) => {
   try {
     const userId = c.get("vlueUserId") as string;
-    const row = await getInappMailCacheById(userId, c.req.param("id"));
+    const mailId = c.req.param("id");
+    const userMail = await getUserEmailById(userId, mailId);
+    if (userMail) {
+      return c.json({
+        ok: true,
+        mail: {
+          id: userMail.id,
+          mailSource: userMail.mail_source,
+          fromAddress: userMail.from_address,
+          toAddress: userMail.to_address,
+          subject: userMail.subject,
+          snippet: String(userMail.body_text || "").slice(0, 280),
+          bodyText: userMail.body_text,
+          bodyHtml: userMail.body_html,
+          direction: userMail.direction,
+          receivedAt:
+            (userMail.received_at || userMail.sent_at || userMail.created_at) instanceof Date
+              ? (userMail.received_at || userMail.sent_at || userMail.created_at)!.toISOString()
+              : userMail.received_at || userMail.sent_at || userMail.created_at
+        }
+      });
+    }
+    const row = await getInappMailCacheById(userId, mailId);
     if (!row) return c.json({ error: "NOT_FOUND" }, 404);
     return c.json({
       ok: true,
@@ -232,6 +281,33 @@ emailForwardingRoutes.get("/inbox/:id", async (c) => {
         bodyText: row.snippet,
         receivedAt: row.received_at instanceof Date ? row.received_at.toISOString() : row.received_at
       }
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+/** 인앱 메일 발송·답장 */
+emailForwardingRoutes.post("/send", async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const body = await c.req.json<{
+      to?: string;
+      subject?: string;
+      text?: string;
+      html?: string;
+    }>();
+    const result = await sendUserOutboundEmail(userId, {
+      to: String(body.to || ""),
+      subject: String(body.subject || ""),
+      text: body.text,
+      html: body.html
+    });
+    return c.json({
+      ok: true,
+      messageId: result.result.messageId,
+      mailId: result.mail.id
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "unknown error";

@@ -83,7 +83,11 @@ export async function loginWithCredentials(
 ): Promise<LoginResult> {
   const loginIdNorm = String(loginId || "").trim().toLowerCase().replace(/^@/, "");
   const user = (await prisma.user.findFirst({
-    where: { publicHandle: loginIdNorm }
+    where: loginIdNorm.includes("@")
+      ? {
+          OR: [{ publicHandle: loginIdNorm }, { email: loginIdNorm }]
+        }
+      : { publicHandle: loginIdNorm }
   })) as LoginUserRow | null;
 
   if (!user?.passwordHash) {

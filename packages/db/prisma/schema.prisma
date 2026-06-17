@@ -178,6 +178,10 @@ model User {
   /// 소셜 등에서 이메일 검증 완료 여부(카카오 is_email_verified 등). 본인인증(identityVerified)과 별개.
   isVerified Boolean @default(false) @map("is_verified")
 
+  /// 직장(회사) 도메인 메일로 가입·인증 — 디지털 명함 하이패스 연동용
+  isCompanyVerified Boolean   @default(false) @map("is_company_verified")
+  companyVerifiedAt DateTime? @map("company_verified_at") @db.Timestamptz(6)
+
   /// CI 등: 평문 저장 지양. 해시만 보관(법무·보안 정책에 따라 컬럼 제거 가능).
   ciHash Bytes? @map("ci_hash")
 
@@ -321,6 +325,7 @@ model User {
   userEmailMapping UserEmailMapping?
   emailForwardingNotifications EmailForwardingNotificationLog[]
   inappMailCaches InappMailCache[]
+  userEmails      UserEmail[]
 
   auctionsSold       Auction[]              @relation("AuctionSeller")
   auctionBids        AuctionBid[]           @relation("AuctionBidder")
@@ -2260,6 +2265,28 @@ model InappMailCache {
 
   @@index([userId, receivedAt(sort: Desc)])
   @@map("inapp_mail_caches")
+}
+
+/// 인앱 메일함 — 수신·발신 본문 보관 (1:1 가상메일)
+model UserEmail {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  direction  String @default("inbound") @db.VarChar(12)
+  mailSource String @default("VIRTUAL_FORWARD") @map("mail_source") @db.VarChar(24)
+  fromAddress String @map("from_address") @db.VarChar(254)
+  toAddress   String @map("to_address") @db.VarChar(254)
+  subject     String @default("") @db.VarChar(500)
+  bodyText    String @default("") @map("body_text") @db.Text
+  bodyHtml    String? @map("body_html") @db.Text
+  receivedAt  DateTime? @map("received_at") @db.Timestamptz(6)
+  sentAt      DateTime? @map("sent_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("user_emails")
 }
 
 // -----------------------------------------------------------------------------

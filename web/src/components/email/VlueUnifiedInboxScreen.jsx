@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchEmailInbox,
-  fetchEmailInboxDetail
+  fetchEmailInboxDetail,
+  sendOutboundEmail,
+  emitEmailInboxChanged
 } from "../../lib/vlueEmailMappingsApi.js";
 import BackButton from "../common/BackButton";
 
@@ -41,6 +43,12 @@ export default function VlueUnifiedInboxScreen({
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeTo, setComposeTo] = useState("");
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,6 +74,41 @@ export default function VlueUnifiedInboxScreen({
       setDetail(data.mail || null);
     });
   }, [selected]);
+
+  const openReply = () => {
+    const from = detail?.fromAddress || selected?.fromAddress || "";
+    setComposeTo(from);
+    setComposeSubject(
+      String(detail?.subject || selected?.subject || "").startsWith("Re:")
+        ? detail?.subject || selected?.subject || ""
+        : `Re: ${detail?.subject || selected?.subject || ""}`
+    );
+    setComposeBody("");
+    setComposeOpen(true);
+    setSendError("");
+  };
+
+  const handleSend = async () => {
+    setSending(true);
+    setSendError("");
+    try {
+      await sendOutboundEmail({
+        to: composeTo,
+        subject: composeSubject,
+        text: composeBody
+      });
+      setComposeOpen(false);
+      setComposeTo("");
+      setComposeSubject("");
+      setComposeBody("");
+      emitEmailInboxChanged();
+      await load();
+    } catch (e) {
+      setSendError(e instanceof Error ? e.message : "발송에 실패했습니다.");
+    } finally {
+      setSending(false);
+    }
+  };
 
   if (!open) return null;
 
@@ -99,6 +142,58 @@ export default function VlueUnifiedInboxScreen({
               {detail?.bodyText || detail?.snippet || selected.snippet || "본문 미리보기가 없습니다."}
             </p>
           </article>
+          {selected.direction !== "outbound" ? (
+            <button
+              type="button"
+              onClick={openReply}
+              className="vlue-promo-card__cta mt-4 !w-full"
+            >
+              답장
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (composeOpen) {
+    return (
+      <div className={`fixed inset-0 z-[150] flex flex-col ${shellBg}`}>
+        <header className={`flex items-center gap-2 border-b px-4 py-3.5 ${isDarkMode ? "border-white/8 bg-[#151821]" : "border-[#f0f1f3] bg-white"}`}>
+          <BackButton variant="inline" onBack={() => setComposeOpen(false)} />
+          <p className={`vlue-type-title flex-1 ${head}`}>메일 작성</p>
+          <button
+            type="button"
+            disabled={sending}
+            onClick={handleSend}
+            className="vlue-promo-card__cta !w-auto px-3.5 py-2"
+          >
+            {sending ? "발송 중…" : "보내기"}
+          </button>
+        </header>
+        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+          <input
+            type="email"
+            value={composeTo}
+            onChange={(e) => setComposeTo(e.target.value)}
+            placeholder="받는 사람"
+            className={`w-full rounded-xl border px-3 py-2.5 text-[13px] outline-none ${isDarkMode ? "border-white/10 bg-[#151821] text-white" : "border-[#e5e8eb] bg-white"}`}
+          />
+          <input
+            type="text"
+            value={composeSubject}
+            onChange={(e) => setComposeSubject(e.target.value)}
+            placeholder="제목"
+            className={`w-full rounded-xl border px-3 py-2.5 text-[13px] outline-none ${isDarkMode ? "border-white/10 bg-[#151821] text-white" : "border-[#e5e8eb] bg-white"}`}
+          />
+          <textarea
+            value={composeBody}
+            onChange={(e) => setComposeBody(e.target.value)}
+            placeholder="내용"
+            rows={12}
+            className={`w-full rounded-xl border px-3 py-2.5 text-[13px] outline-none ${isDarkMode ? "border-white/10 bg-[#151821] text-white" : "border-[#e5e8eb] bg-white"}`}
+          />
+          {sendError ? <p className="text-[12px] text-rose-500">{sendError}</p> : null}
         </div>
       </div>
     );
@@ -117,6 +212,19 @@ export default function VlueUnifiedInboxScreen({
             설정
           </button>
         ) : null}
+        <button
+          type="button"
+          onClick={() => {
+            setComposeTo("");
+            setComposeSubject("");
+            setComposeBody("");
+            setSendError("");
+            setComposeOpen(true);
+          }}
+          className="vlue-promo-card__cta !w-auto px-3.5 py-2"
+        >
+          작성
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-3 py-3">

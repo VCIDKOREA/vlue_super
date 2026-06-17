@@ -28,6 +28,14 @@ import {
 } from "@vlue/shared/policy/minor-signup";
 import { syncParentalConsentFromPendingChildInvites } from "./auth/parentalConsentService.js";
 import { recordOnboardingDigitalCardDoc } from "./bizcard/titleDeptReviewService.js";
+import {
+  applySignupEmailBundle,
+  applyCompanyVerifiedIfEligible,
+  deriveHandleFromBusinessEmail,
+  normalizeBusinessEmail,
+  type SignupTrack
+} from "./email/signupEmailProvision.js";
+import { consumeSignupEmailToken } from "./email/signupEmailVerifyService.js";
 
 /** Prisma Bytes 필드와 TS 제네릭 호환 */
 function toPrismaBytes(buf: Buffer): Uint8Array<ArrayBuffer> {
@@ -218,6 +226,12 @@ export async function completePortoneIdentity(params: {
     issuedAt?: string;
     dataUrl?: string;
   } | null;
+  /** business_email | vlue_id_only — 투트랙 가입 */
+  signupTrack?: SignupTrack | null;
+  /** 경로 A: 기존 비즈니스/개인 메일 (로그인 ID·포워딩 타깃) */
+  businessEmail?: string | null;
+  /** 경로 A: 이메일 OTP 검증 후 발급 토큰 */
+  emailVerificationToken?: string | null;
 }): Promise<IdentityCompleteResult> {
   let parsed: Awaited<ReturnType<typeof fetchAndParseIamportCertification>>;
   if (isDevLocalImpUid(params.impUid)) {
@@ -261,6 +275,10 @@ export async function completePortoneIdentity(params: {
   }
 
   const desiredSlug = normalizeDesiredPublicHandle(params.desiredPublicHandle);
+  const signupTrack: SignupTrack =
+    params.signupTrack === "business_email" ? "business_email" : "vlue_id_only";
+  const businessEmailNorm =
+    signupTrack === "business_email" ? normalizeBusinessEmail(params.businessEmail || "") : "";
   const bizDigits = params.isBusinessMember
     ? String(params.businessRegistrationNo || "").replace(/\D/g, "").slice(0, 10)
     : "";
@@ -295,7 +313,17 @@ export async function completePortoneIdentity(params: {
       desiredSlug
     );
   } else {
-    publicHandle = await resolvePublicHandleForNewUser(prisma, desiredSlug);
+    let publicHandleForCreate: string;
+    if (signupTrack === "business_email") {
+      if (!businessEmailNorm) {
+        throw new Error("비즈니스 메일 주소를 입력해 주세요.");
+      }
+      consumeSignupEmailToken(businessEmailNorm, params.emailVerificationToken);
+      publicHandleForCreate = await deriveHandleFromBusinessEmail(prisma, businessEmailNorm);
+    } else {
+      publicHandleForCreate = await resolvePublicHandleForNewUser(prisma, desiredSlug);
+    }
+    publicHandle = publicHandleForCreate;
     if (!adminBypass) {
       const pw = String(params.passwordPlain || "");
       if (!isValidMemberPassword(pw)) {
@@ -340,6 +368,7 @@ export async function completePortoneIdentity(params: {
         gender,
         publicHandle,
         signupMethod: "vlue_native",
+        ...(signupTrack === "business_email" && businessEmailNorm ? { email: businessEmailNorm } : {}),
         ...(passwordHash ? { passwordHash } : {}),
         status: "ACTIVE",
         currentDiscountRate: 30,
@@ -382,6 +411,20 @@ export async function completePortoneIdentity(params: {
       });
     } catch (e) {
       console.error("[abuse-protection] rejoin check failed", userId, e);
+    }
+
+    try {
+      await applySignupEmailBundle({
+        userId,
+        signupTrack,
+        publicHandle,
+        businessEmail: businessEmailNorm || null
+      });
+      if (signupTrack === "business_email") {
+        await applyCompanyVerifiedIfEligible(userId, businessEmailNorm);
+      }
+    } catch (e) {
+      console.error("[signup-email] provision failed", userId, e);
     }
   }
 

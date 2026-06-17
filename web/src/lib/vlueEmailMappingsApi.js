@@ -53,6 +53,7 @@ export async function saveVirtualEmailMapping(payload) {
     err.code = data.code;
     throw err;
   }
+  emitEmailMappingChanged();
   return data;
 }
 
@@ -68,6 +69,7 @@ export async function addMasterEmail(email) {
     err.code = data.code;
     throw err;
   }
+  emitEmailMappingChanged();
   return data;
 }
 
@@ -83,6 +85,7 @@ export async function setPrimaryMasterEmail(email) {
     err.code = data.code;
     throw err;
   }
+  emitEmailMappingChanged();
   return data;
 }
 
@@ -120,6 +123,20 @@ export async function fetchEmailInboxDetail(id) {
   return data;
 }
 
+export async function sendOutboundEmail(payload) {
+  const res = await vlueAuthFetch(apiUrl("/api/email-forwarding/send"), {
+    method: "POST",
+    headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {})
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "메일 발송에 실패했습니다.");
+  }
+  emitEmailInboxChanged();
+  return data;
+}
+
 export async function connectExternalMailAccount(payload) {
   const res = await vlueAuthFetch(apiUrl("/api/email-forwarding/external-accounts"), {
     method: "POST",
@@ -143,6 +160,14 @@ export async function fetchExternalMailAccounts() {
     return data;
   } catch {
     return { ok: false, accounts: [] };
+  }
+}
+
+export function emitEmailMappingChanged() {
+  try {
+    window.dispatchEvent(new CustomEvent("vlue-email-mapping-changed"));
+  } catch {
+    /* ignore */
   }
 }
 

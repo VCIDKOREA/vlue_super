@@ -33,12 +33,15 @@ import {
   requestParentalConsentToGuardian
 } from "../services/auth/parentalConsentService.js";
 import { PARENTAL_CONSENT_PENDING_LOGIN_MESSAGE } from "@vlue/shared/policy/minor-signup";
+import {
+  sendSignupEmailOtp,
+  verifySignupEmailOtp
+} from "../services/email/signupEmailVerifyService.js";
 
 export const authRoutes = new Hono();
 
 const RESET_TTL_MS = 60 * 60 * 1000;
 
-/** 가입·로그인용 아이디(public_handle) 즉시 중복 확인 (최종 확정은 본인인증 완료 시 서버에서 재검증) */
 authRoutes.get("/check-login-id", async (c) => {
   try {
     const raw = c.req.query("loginId");
@@ -65,6 +68,30 @@ authRoutes.get("/check-login-id", async (c) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
     return c.json({ available: false, normalized: null, reason: msg }, 500);
+  }
+});
+
+/** 경로 A 가입 — 이메일 인증번호 발송 */
+authRoutes.post("/signup-email/send", async (c) => {
+  try {
+    const body = await c.req.json<{ email?: string }>();
+    const result = await sendSignupEmailOtp(String(body?.email || ""));
+    return c.json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+/** 경로 A 가입 — 이메일 인증번호 확인 → 일회용 토큰 */
+authRoutes.post("/signup-email/verify", async (c) => {
+  try {
+    const body = await c.req.json<{ email?: string; code?: string }>();
+    const token = verifySignupEmailOtp(String(body?.email || ""), String(body?.code || ""));
+    return c.json({ ok: true, token });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
   }
 });
 
