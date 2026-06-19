@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Users, Shield } from "lucide-react";
-import ModalCloseButton from "./common/ModalCloseButton.jsx";
+import ModalCloseButton from "./common/ModalCloseButton";
 import { pickDeviceContacts, isContactPickerSupported, getDemoContacts } from "../lib/contactDevicePicker.js";
 import { matchContactsWithVlue, recordContactSyncConsent } from "../lib/contactFriendsApi.js";
 import { setContactSyncConsent, saveContactMatchCache } from "../lib/contactSyncStorage.js";
