@@ -7,7 +7,7 @@ export function isWwwStagingLockEnabled() {
   if (!isMarketingHost(window.location.hostname)) return false;
   if (isLocalDevHost(window.location.hostname)) return false;
   if (import.meta.env.DEV) return false;
-  const flag = String(import.meta.env.VITE_WWW_STAGING_LOCK ?? "true").toLowerCase();
+  const flag = String(import.meta.env.VITE_WWW_STAGING_LOCK ?? "false").toLowerCase();
   return flag !== "false" && flag !== "0";
 }
 

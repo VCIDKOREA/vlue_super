@@ -36,7 +36,7 @@ function checkBasicAuth(authHeader: string | undefined): boolean {
 
 /** www.vlue.kr 스테이징 잠금 — IP 화이트리스트·Basic Auth 우회 확인 */
 stagingRoutes.get("/staging-access", (c) => {
-  const lockEnabled = String(process.env.VLUE_WWW_STAGING_LOCK || "true").toLowerCase() !== "false";
+  const lockEnabled = String(process.env.VLUE_WWW_STAGING_LOCK || "false").toLowerCase() === "true";
   if (!lockEnabled) {
     return c.json({ ok: true, bypass: true, reason: "lock_disabled" });
   }

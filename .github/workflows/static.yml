@@ -1,28 +1,26 @@
-# Simple workflow for deploying static content to GitHub Pages
+# 레거시 GitHub Pages 정적 배포
+#
+# www.vlue.kr 은 Railway @vlue/web 으로 서비스 중입니다.
+# docs/DNS_WWW_VLUE_KR_SETUP.md 참고.
+#
+# main push 시 GitHub Pages 배포를 시도하면 deploy 단계 403 등으로
+# "pages build and deployment" 실패 알림이 발생하므로 수동 실행만 허용합니다.
+
 name: Deploy static content to Pages
 
 on:
-  # Runs on pushes targeting the default branch
-  push:
-    branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
     environment:
       name: github-pages
@@ -36,7 +34,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
           path: '.'
       - name: Deploy to GitHub Pages
         id: deployment
