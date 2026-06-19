@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import FamilyProtectionRegister from "./FamilyProtectionRegister.jsx";
+import ContactFriendsPanel from "./ContactFriendsPanel.jsx";
 import ScreenBackHeader from "./common/ScreenBackHeader";
 import ModalCloseButton from "./common/ModalCloseButton";
 
@@ -16,18 +17,22 @@ function FriendSearch({
   requests = [],
   inboxRequests = [],
   blockedUserIds = [],
+  contactMatchData = null,
   isDarkMode = false,
   onSendRequest,
   onApproveRequest,
   onRejectRequest,
   onBlockUser,
   onGoMain,
-  onFamilyToast
+  onFamilyToast,
+  onContactMatchUpdate,
+  onContactResyncRequest,
+  onOpenContactChat
 }) {
   const [query, setQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
   const [requestMessage, setRequestMessage] = useState("");
-  const [tab, setTab] = useState("search");
+  const [tab, setTab] = useState(contactMatchData ? "friends" : "search");
   const [notice, setNotice] = useState("");
 
   const users = useMemo(() => {
@@ -50,41 +55,24 @@ function FriendSearch({
     return out;
   }, [requests, approvedFriendIds, blockedUserIds]);
 
+  const tabs = [
+    { id: "friends", label: "주소록 친구" },
+    { id: "search", label: "검색" },
+    { id: "inbox", label: `받은 요청 (${inboxRequests.length})` },
+    { id: "sent", label: "보낸 요청" }
+  ];
+
   return (
     <section className="mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden">
-      <ScreenBackHeader title="친구검색" onBack={onGoMain} isDarkMode={isDarkMode} />
+      <ScreenBackHeader title="친구" onBack={onGoMain} isDarkMode={isDarkMode} />
       <div className="flex-1 overflow-y-auto px-3 pb-24 pt-3">
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-[12px] text-gray-500">검색 후 친구 신청을 보내고, 승인되면 대화를 시작할 수 있습니다.</p>
-
-          <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="이름/아이디/지역으로 검색"
-              className="w-full bg-transparent text-[13px] outline-none"
-            />
-          </div>
-        </div>
-
-        <div className="mt-3">
-        <FamilyProtectionRegister
-          isDarkMode={isDarkMode}
-          onToast={onFamilyToast}
-        />
-        </div>
-
-        <div className="mt-3 flex gap-2">
-          {[
-            { id: "search", label: "검색" },
-            { id: "inbox", label: `받은 요청 (${inboxRequests.length})` },
-            { id: "sent", label: "보낸 요청" }
-          ].map((t) => (
+        <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
+          {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`rounded-full px-3 py-1.5 text-[11px] font-black ${
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-black ${
                 tab === t.id ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"
               }`}
             >
@@ -95,11 +83,42 @@ function FriendSearch({
 
         {notice ? <p className="mt-2 text-center text-[11px] font-bold text-blue-600">{notice}</p> : null}
 
-        <div className="mt-3 space-y-2">
-          {(tab === "search" ? users : tab === "inbox" ? inboxRequests : requests.filter((r) => r.status === "pending")).map(
-            (row) => {
-              if (tab === "search") {
-                const user = row;
+        {tab === "friends" ? (
+          <div className="mt-3">
+            <ContactFriendsPanel
+              matchData={contactMatchData}
+              onMatchUpdate={onContactMatchUpdate}
+              onResyncRequest={onContactResyncRequest}
+              onOpenChat={onOpenContactChat}
+              onFriendAdded={(user) => {
+                setNotice(`${user.displayName}님에게 친구 신청을 보냈습니다.`);
+              }}
+            />
+          </div>
+        ) : null}
+
+        {tab === "search" ? (
+          <>
+            <div className="mt-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <p className="text-[12px] text-gray-500">
+                검색 후 친구 신청을 보내고, 승인되면 대화를 시작할 수 있습니다.
+              </p>
+              <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="이름/아이디/지역으로 검색"
+                  className="w-full bg-transparent text-[13px] outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <FamilyProtectionRegister isDarkMode={isDarkMode} onToast={onFamilyToast} />
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {users.map((user) => {
                 const status = statusByUserId[user.id] || "none";
                 return (
                   <div key={user.id} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
@@ -131,41 +150,51 @@ function FriendSearch({
                     </div>
                   </div>
                 );
-              }
-              const req = row;
-              return (
-                <div key={req.id} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-                  <p className="text-[13px] font-bold text-gray-900">{req.fromName || req.toUserId}</p>
-                  {tab === "inbox" ? (
-                    <div className="mt-2 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onApproveRequest?.(req.id);
-                          setNotice("친구 요청을 수락했습니다.");
-                        }}
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white"
-                      >
-                        수락
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onRejectRequest?.(req.id)}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-gray-600"
-                      >
-                        거절
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            }
-          )}
-        </div>
+              })}
+            </div>
+          </>
+        ) : null}
+
+        {tab === "inbox" || tab === "sent" ? (
+          <div className="mt-3 space-y-2">
+            {(tab === "inbox" ? inboxRequests : requests.filter((r) => r.status === "pending")).map((req) => (
+              <div key={req.id} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+                <p className="text-[13px] font-bold text-gray-900">{req.fromName || req.toUserId}</p>
+                {tab === "inbox" ? (
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onApproveRequest?.(req.id);
+                        setNotice("친구 요청을 수락했습니다.");
+                      }}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white"
+                    >
+                      수락
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRejectRequest?.(req.id)}
+                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-gray-600"
+                    >
+                      거절
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {selectedUser ? (
-          <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 px-3 pb-6" onMouseDown={() => setSelectedUser(null)}>
-            <div className="relative w-full max-w-md rounded-2xl bg-white p-4 pt-12 shadow-xl" onMouseDown={(e) => e.stopPropagation()}>
+          <div
+            className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 px-3 pb-6"
+            onMouseDown={() => setSelectedUser(null)}
+          >
+            <div
+              className="relative w-full max-w-md rounded-2xl bg-white p-4 pt-12 shadow-xl"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
               <ModalCloseButton variant="default" onClick={() => setSelectedUser(null)} />
               <p className="text-[15px] font-black text-gray-900">{selectedUser.name}에게 친구 신청</p>
               <textarea
@@ -186,7 +215,7 @@ function FriendSearch({
                 <button
                   type="button"
                   onClick={() => {
-                    onSendRequest?.(selectedUser.id, requestMessage);
+                    onSendRequest?.(selectedUser, requestMessage);
                     setSelectedUser(null);
                     setNotice("친구 신청을 보냈습니다.");
                   }}

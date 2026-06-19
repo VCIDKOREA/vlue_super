@@ -5,7 +5,7 @@
 builder = "nixpacks"
 # npm ci / rm .vite 금지 — Railway 설치 단계와 충돌(EBUSY) 남
 # NODE_ENV=production 이면 vite·typescript(devDeps) 미설치 → 빌드 실패 방지
-buildCommand = "npm run build -w @vlue/shared && npm run build -w @vlue/web"
+buildCommand = "npm run build -w @vlue/shared && node scripts/sync-pc-installer-to-web.mjs && npm run build -w @vlue/web"
 
 [build.env]
 NIXPACKS_NODE_INSTALL_DEV_DEPS = "true"

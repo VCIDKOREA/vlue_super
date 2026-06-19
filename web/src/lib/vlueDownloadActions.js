@@ -47,8 +47,9 @@ export function openVlueDownload(platform) {
   const anchor = document.createElement("a");
   anchor.href = target.url;
   anchor.rel = "noopener noreferrer";
-  if (isInstaller) {
-    anchor.download = target.url.split("/").pop()?.split("?")[0] || "";
+  if (platform === "windows" || isInstaller) {
+    anchor.setAttribute("download", VLUE_PC_WINDOWS_FILENAME);
+    anchor.download = VLUE_PC_WINDOWS_FILENAME;
   } else {
     anchor.target = "_blank";
   }

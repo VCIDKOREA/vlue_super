@@ -7,7 +7,7 @@
     "dev": "node scripts/generate-fcm-sw.mjs && vite",
     "prebuild": "node ../scripts/faststart-mp4.mjs public/eye2_vlue.mp4 && node scripts/generate-fcm-sw.mjs",
     "build": "vite build",
-    "start": "serve dist -s -l 8080",
+    "start": "node scripts/serve-production.mjs",
     "preview": "vite preview",
     "typecheck": "echo \"(JSX) typecheck optional\""
   },

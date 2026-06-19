@@ -9,6 +9,7 @@ import MailTalkElectronShell from "./components/mailTalk/MailTalkElectronShell.j
 import ChatRoom from "./components/ChatRoom";
 import BlueAIChat from "./components/BlueAIChat";
 import FriendSearch from "./components/FriendSearch";
+import ContactSyncConsentModal from "./components/ContactSyncConsentModal.jsx";
 import FeedManager from "./components/FeedManager";
 import Home from "./components/Home";
 import MyPage from "./components/MyPage";
@@ -67,6 +68,11 @@ import {
 } from "./lib/memberCardStorage.js";
 import { readCardWallet, writeCardWallet, buildCardSnapshot } from "./lib/cardWalletStorage.js";
 import { saveProfileToDeviceContacts } from "./lib/contactVcfSave.js";
+import {
+  markContactSyncPending,
+  readContactMatchCache,
+  shouldShowContactSyncPrompt
+} from "./lib/contactSyncStorage.js";
 import { effectiveCardJobTitle } from "./lib/jobTitleVerify.js";
 import { readAvatar } from "./lib/vlueAvatar.js";
 import { fetchActiveMarketingPopup, fetchLatestNotice } from "./lib/vlueOfficeApi.js";
@@ -437,6 +443,8 @@ function App() {
     }
   ]);
   const [blockedFriendIds, setBlockedFriendIds] = useState([]);
+  const [contactSyncModalOpen, setContactSyncModalOpen] = useState(false);
+  const [contactMatchData, setContactMatchData] = useState(() => readContactMatchCache());
   const [messagesByRoom, setMessagesByRoom] = useState(() => JSON.parse(JSON.stringify(seedMessages)));
   const [roomCatalog, setRoomCatalog] = useState(initialRoomCatalog);
   const [unreadByRoom, setUnreadByRoom] = useState(() => ({ ...initialUnreadByRoom }));
@@ -1719,6 +1727,7 @@ function App() {
     }
     localStorage.setItem(ONBOARDING_DONE_KEY, "1");
     localStorage.setItem(SESSION_KEY, "1");
+    markContactSyncPending();
     setDigitalCardActive(readDigitalCardActive());
     setOnboardingComplete(true);
     setSignupOnboardingOpen(false);
@@ -3082,6 +3091,17 @@ function App() {
   const showAppShell =
     !showSplash && !showOnboardingFlow && ((isLoggedIn && biometricAllowed) || isBrowseGuest);
 
+  useEffect(() => {
+    if (!shouldShowContactSyncPrompt({ isLoggedIn, showAppShell })) return;
+    setContactSyncModalOpen(true);
+  }, [isLoggedIn, showAppShell]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const cached = readContactMatchCache();
+    if (cached) setContactMatchData(cached);
+  }, [isLoggedIn]);
+
   const promptGuestSignup = useCallback((action) => {
     setPendingAuthAction(() => (typeof action === "function" ? action : null));
     setGuestAuthOverlay(true);
@@ -3193,6 +3213,16 @@ function App() {
         onSkip={() => {
           setPostSignupPaymentOpen(false);
           setPostSignupPending(null);
+        }}
+      />
+
+      <ContactSyncConsentModal
+        open={contactSyncModalOpen && isLoggedIn && showAppShell}
+        onClose={() => setContactSyncModalOpen(false)}
+        onSynced={(result) => {
+          setContactMatchData(result);
+          setBottomToast("연락처 동기화가 완료되었습니다.");
+          setTimeout(() => setBottomToast(""), 2800);
         }}
       />
 
@@ -3602,7 +3632,14 @@ function App() {
           requests={friendRequests}
           inboxRequests={friendInboxRequests}
           blockedUserIds={blockedFriendIds}
+          contactMatchData={contactMatchData}
           isDarkMode={isDarkMode}
+          onContactMatchUpdate={setContactMatchData}
+          onContactResyncRequest={() => setContactSyncModalOpen(true)}
+          onOpenContactChat={(user) => {
+            ensureFriendRoom(user.userId, user.displayName || user.contactName);
+            navigate({ nextPage: "list", nextTab: "friends", nextRoomId: `friends:${user.userId}` });
+          }}
           onFamilyToast={(text) => {
             setBottomToast(text);
             setTimeout(() => setBottomToast(""), 3200);

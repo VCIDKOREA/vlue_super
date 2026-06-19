@@ -36,6 +36,7 @@ npm run verify:www-domain
 | `VITE_VLUE_LANDING_URL` | `https://www.vlue.kr` | |
 | `VITE_VLUE_CREATE_CARD_URL` | `https://www.vlue.kr/membership` | |
 | `VITE_VLUE_PC_WINDOWS_URL` | `https://www.vlue.kr/downloads/VLUE-Setup-1.0.0.exe` | PC 설치 파일 (빌드 후 `npm run web:sync-pc-installer`) |
+| `VLUE_PC_INSTALLER_URL` | (선택) 원격 `.exe` 직접 URL | Railway 빌드 시 `web/public/downloads`로 자동 복사 |
 | `VITE_VLUE_PC_MAC_URL` | (출시 전 비움) | macOS DMG URL |
 | `VITE_VLUE_PLAY_STORE_URL` | (출시 전 비움) | |
 | `VITE_VLUE_APP_STORE_URL` | (출시 전 비움) | |

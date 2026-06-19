@@ -59,6 +59,7 @@ import { scrapeProductRoutes } from "./scrapeProduct.js";
 import { mediaRoutes } from "./media.js";
 import { sellerVodRoutes } from "./sellerVod.js";
 import { stagingRoutes } from "./stagingAccess.js";
+import { contactRoutes } from "./contacts.js";
 
 /** `/api` 아래에 마운트되는 라우트 묶음 */
 export const apiRoutes = new Hono();
@@ -123,3 +124,4 @@ apiRoutes.route("/scrape-product", scrapeProductRoutes);
 apiRoutes.route("/media", mediaRoutes);
 apiRoutes.route("/media-commerce", sellerVodRoutes);
 apiRoutes.route("/public", stagingRoutes);
+apiRoutes.route("/contacts", contactRoutes);
