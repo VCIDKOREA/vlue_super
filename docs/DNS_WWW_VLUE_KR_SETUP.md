@@ -35,6 +35,10 @@ npm run verify:www-domain
 | `VITE_CARD_PUBLIC_API_BASE` | `https://www.vlue.kr` | 카카오 명함 |
 | `VITE_VLUE_LANDING_URL` | `https://www.vlue.kr` | |
 | `VITE_VLUE_CREATE_CARD_URL` | `https://www.vlue.kr/membership` | |
+| `VITE_VLUE_PC_WINDOWS_URL` | `https://www.vlue.kr/downloads/VLUE-Setup-1.0.0.exe` | PC 설치 파일 (빌드 후 `npm run web:sync-pc-installer`) |
+| `VITE_VLUE_PC_MAC_URL` | (출시 전 비움) | macOS DMG URL |
+| `VITE_VLUE_PLAY_STORE_URL` | (출시 전 비움) | |
+| `VITE_VLUE_APP_STORE_URL` | (출시 전 비움) | |
 | `NIXPACKS_NODE_INSTALL_DEV_DEPS` | `true` | 빌드 실패 시 |
 
 `VITE_*` 는 **빌드 타임** 변수입니다. 변경 후 **Redeploy** 필수.

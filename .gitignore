@@ -33,6 +33,7 @@ web/.env.local
 apps/api/.env
 apps/api/.env.production
 web/.env.production
+web/public/downloads/*.exe
 *.pem
 *.key
 *.p12

@@ -1,5 +1,6 @@
 import { Smartphone, Monitor, Apple, Star, Table2, Sparkles, ArrowRight } from 'lucide-react';
 import { VlueBrandLogo } from '../../../components/VlueBrandLogo.jsx';
+import { openVlueDownload } from '../../../lib/vlueDownloadActions.js';
 import type { View } from '../types';
 
 const FEATURES = ['실시간 보이스피싱 경보', 'VLUE 기관 인증 조회', '위치기반 안심영역 설정', '피해 즉시 신고 기능'];
@@ -40,6 +41,7 @@ export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
+                onClick={() => openVlueDownload('appStore')}
                 className="flex items-center gap-3 px-5 py-3 bg-black hover:bg-gray-900 rounded-xl transition-colors group"
               >
                 <Apple className="w-6 h-6 text-white" />
@@ -50,6 +52,7 @@ export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
               </button>
               <button
                 type="button"
+                onClick={() => openVlueDownload('playStore')}
                 className="flex items-center gap-3 px-5 py-3 bg-black hover:bg-gray-900 rounded-xl transition-colors group"
               >
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="white" aria-hidden>
@@ -80,14 +83,14 @@ export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => onNavigate?.('download')}
+                  onClick={() => openVlueDownload('windows')}
                   className="flex-1 py-2 text-sm font-semibold text-primary-600 bg-white hover:bg-primary-50 rounded-xl transition-colors"
                 >
                   Windows 다운로드
                 </button>
                 <button
                   type="button"
-                  onClick={() => onNavigate?.('download')}
+                  onClick={() => openVlueDownload('mac')}
                   className="flex-1 py-2 text-sm font-semibold text-primary-600 bg-white hover:bg-primary-50 rounded-xl transition-colors"
                 >
                   macOS 다운로드

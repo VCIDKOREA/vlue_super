@@ -39,7 +39,7 @@ export function shouldBlockBrowserAppShell(pathname = "") {
   return !isBrowserAppAccessAllowed();
 }
 
-/** @returns {{ downloadPage: string, home: string, playStore: string, appStore: string, pcWindows: string, pcMac: string }} */
+/** @returns {{ downloadPage: string, home: string, playStore: string, appStore: string, pcWindows: string, pcMac: string, pcWindowsReady: boolean, pcMacReady: boolean, playStoreReady: boolean, appStoreReady: boolean }} */
 export function getVlueDownloadLinks() {
   const origin =
     typeof window !== "undefined" && window.location?.origin
@@ -47,12 +47,23 @@ export function getVlueDownloadLinks() {
       : String(import.meta.env.VITE_VLUE_LANDING_URL || "https://www.vlue.kr").replace(/\/$/, "");
   const base = origin.replace(/\/$/, "");
   const downloadPage = `${base}/#download`;
+  const defaultWindowsUrl = `${base}/downloads/VLUE-Setup-1.0.0.exe`;
+
+  const pcWindowsEnv = String(import.meta.env.VITE_VLUE_PC_WINDOWS_URL || "").trim();
+  const pcMacEnv = String(import.meta.env.VITE_VLUE_PC_MAC_URL || "").trim();
+  const playStoreEnv = String(import.meta.env.VITE_VLUE_PLAY_STORE_URL || "").trim();
+  const appStoreEnv = String(import.meta.env.VITE_VLUE_APP_STORE_URL || "").trim();
+
   return {
     downloadPage,
     home: `${base}/`,
-    playStore: String(import.meta.env.VITE_VLUE_PLAY_STORE_URL || "").trim() || downloadPage,
-    appStore: String(import.meta.env.VITE_VLUE_APP_STORE_URL || "").trim() || downloadPage,
-    pcWindows: String(import.meta.env.VITE_VLUE_PC_WINDOWS_URL || "").trim() || downloadPage,
-    pcMac: String(import.meta.env.VITE_VLUE_PC_MAC_URL || "").trim() || downloadPage
+    pcWindows: pcWindowsEnv || defaultWindowsUrl,
+    pcMac: pcMacEnv,
+    playStore: playStoreEnv,
+    appStore: appStoreEnv,
+    pcWindowsReady: Boolean(pcWindowsEnv || defaultWindowsUrl),
+    pcMacReady: Boolean(pcMacEnv),
+    playStoreReady: Boolean(playStoreEnv),
+    appStoreReady: Boolean(appStoreEnv)
   };
 }

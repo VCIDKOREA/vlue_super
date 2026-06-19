@@ -1,0 +1,61 @@
+/**
+ * VLUE 앱·PC 다운로드 URL 및 클릭 핸들링 (마케팅 홈 · BrowserAppBlockedPage 공통)
+ */
+
+import { getVlueDownloadLinks } from "./vlueClientAccess.js";
+
+export const VLUE_PC_WINDOWS_FILENAME = "VLUE-Setup-1.0.0.exe";
+export const VLUE_APP_VERSION = "1.0.0";
+
+const UNAVAILABLE = {
+  windows: "VLUE PC(Windows) 설치 파일을 준비 중입니다.\n잠시 후 다시 시도해 주세요.",
+  mac: "VLUE PC(macOS) 버전은 준비 중입니다.",
+  playStore: "Google Play 스토어 출시 준비 중입니다.",
+  appStore: "App Store 출시 준비 중입니다."
+};
+
+/** @typedef {"windows" | "mac" | "playStore" | "appStore"} VlueDownloadPlatform */
+
+/**
+ * @param {VlueDownloadPlatform} platform
+ * @returns {boolean} 다운로드·이동을 시도했으면 true
+ */
+export function openVlueDownload(platform) {
+  if (typeof window === "undefined") return false;
+
+  const links = getVlueDownloadLinks();
+  /** @type {Record<VlueDownloadPlatform, { url: string; ready: boolean }>} */
+  const targets = {
+    windows: { url: links.pcWindows, ready: links.pcWindowsReady },
+    mac: { url: links.pcMac, ready: links.pcMacReady },
+    playStore: { url: links.playStore, ready: links.playStoreReady },
+    appStore: { url: links.appStore, ready: links.appStoreReady }
+  };
+
+  const target = targets[platform];
+  if (!target?.ready || !target.url) {
+    window.alert(UNAVAILABLE[platform] || "다운로드 준비 중입니다.");
+    return false;
+  }
+
+  if (target.url.includes("#download")) {
+    window.location.assign(target.url);
+    return true;
+  }
+
+  const isInstaller = /\.(exe|dmg|msi|zip)(\?|#|$)/i.test(target.url);
+  const anchor = document.createElement("a");
+  anchor.href = target.url;
+  anchor.rel = "noopener noreferrer";
+  if (isInstaller) {
+    anchor.download = target.url.split("/").pop()?.split("?")[0] || "";
+  } else {
+    anchor.target = "_blank";
+  }
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  return true;
+}
+
+export { getVlueDownloadLinks };

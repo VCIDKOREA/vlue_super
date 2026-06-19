@@ -1,5 +1,6 @@
 import { Monitor, Smartphone, Download, CheckCircle, Apple, Chrome, ArrowLeft } from 'lucide-react';
 import { VlueBrandMark, VlueBrandLogo } from '../../../components/VlueBrandLogo.jsx';
+import { openVlueDownload, VLUE_APP_VERSION } from '../../../lib/vlueDownloadActions.js';
 
 interface DownloadPageProps {
   onBack: () => void;
@@ -107,18 +108,22 @@ export default function DownloadPage({ onBack }: DownloadPageProps) {
 
               <div className="space-y-2.5">
                 <button
+                  type="button"
+                  onClick={() => openVlueDownload('windows')}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-semibold text-sm transition-all shadow-soft"
                 >
                   <Download className="w-4 h-4" />
                   Windows 다운로드
-                  <span className="text-primary-200 text-xs font-normal ml-1">v2.4.1</span>
+                  <span className="text-primary-200 text-xs font-normal ml-1">v{VLUE_APP_VERSION}</span>
                 </button>
                 <button
+                  type="button"
+                  onClick={() => openVlueDownload('mac')}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold text-sm border border-gray-200 transition-all"
                 >
                   <Monitor className="w-4 h-4" />
                   macOS 다운로드
-                  <span className="text-gray-400 text-xs font-normal ml-1">v2.4.1</span>
+                  <span className="text-gray-400 text-xs font-normal ml-1">준비 중</span>
                 </button>
               </div>
 
@@ -168,6 +173,8 @@ export default function DownloadPage({ onBack }: DownloadPageProps) {
 
               <div className="space-y-2.5">
                 <button
+                  type="button"
+                  onClick={() => openVlueDownload('appStore')}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gray-900 hover:bg-gray-800 active:bg-black text-white font-semibold text-sm transition-all shadow-soft"
                 >
                   <Apple className="w-4 h-4" />
@@ -175,6 +182,8 @@ export default function DownloadPage({ onBack }: DownloadPageProps) {
                   <span className="text-gray-400 text-xs font-normal ml-1">iOS</span>
                 </button>
                 <button
+                  type="button"
+                  onClick={() => openVlueDownload('playStore')}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-sm transition-all shadow-soft"
                 >
                   <Smartphone className="w-4 h-4" />

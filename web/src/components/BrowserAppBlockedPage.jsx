@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { Monitor, Smartphone, Download, ArrowLeft, Store, Apple } from "lucide-react";
 import { VlueBrandLogo } from "./VlueBrandLogo.jsx";
 import { getVlueDownloadLinks } from "../lib/vlueClientAccess.js";
+import { openVlueDownload } from "../lib/vlueDownloadActions.js";
 import "../site/bolt/index.css";
 
 /**
@@ -78,9 +79,10 @@ export default function BrowserAppBlockedPage() {
               Play 스토어 · App Store에서 VLUE 앱을 설치하세요.
             </p>
             <div className="space-y-2">
-              <a
-                href={links.playStore}
-                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40"
+              <button
+                type="button"
+                onClick={() => openVlueDownload("playStore")}
+                className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40"
               >
                 <Smartphone className="h-5 w-5 shrink-0 text-blue-600" aria-hidden />
                 <span>
@@ -88,10 +90,11 @@ export default function BrowserAppBlockedPage() {
                   <span className="text-[10px] text-gray-400">Android 다운로드</span>
                 </span>
                 <Store className="ml-auto h-4 w-4 text-gray-300" aria-hidden />
-              </a>
-              <a
-                href={links.appStore}
-                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40"
+              </button>
+              <button
+                type="button"
+                onClick={() => openVlueDownload("appStore")}
+                className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40"
               >
                 <Apple className="h-5 w-5 shrink-0 text-gray-700" aria-hidden />
                 <span>
@@ -99,7 +102,7 @@ export default function BrowserAppBlockedPage() {
                   <span className="text-[10px] text-gray-400">iOS 다운로드</span>
                 </span>
                 <Store className="ml-auto h-4 w-4 text-gray-300" aria-hidden />
-              </a>
+              </button>
             </div>
           </div>
 
@@ -114,9 +117,10 @@ export default function BrowserAppBlockedPage() {
               Windows · macOS 설치형 프로그램으로 멀티태스킹 채팅·메일톡을 이용하세요.
             </p>
             <div className="space-y-2">
-              <a
-                href={links.pcWindows}
-                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40"
+              <button
+                type="button"
+                onClick={() => openVlueDownload("windows")}
+                className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40"
               >
                 <Monitor className="h-5 w-5 shrink-0 text-blue-600" aria-hidden />
                 <span>
@@ -124,10 +128,11 @@ export default function BrowserAppBlockedPage() {
                   <span className="text-[10px] text-gray-400">PC 설치형 다운로드</span>
                 </span>
                 <Download className="ml-auto h-4 w-4 text-gray-300" aria-hidden />
-              </a>
-              <a
-                href={links.pcMac}
-                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40"
+              </button>
+              <button
+                type="button"
+                onClick={() => openVlueDownload("mac")}
+                className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40"
               >
                 <Monitor className="h-5 w-5 shrink-0 text-gray-700" aria-hidden />
                 <span>
@@ -135,7 +140,7 @@ export default function BrowserAppBlockedPage() {
                   <span className="text-[10px] text-gray-400">PC 설치형 다운로드</span>
                 </span>
                 <Download className="ml-auto h-4 w-4 text-gray-300" aria-hidden />
-              </a>
+              </button>
             </div>
           </div>
         </div>

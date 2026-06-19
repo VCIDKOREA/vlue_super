@@ -16,6 +16,7 @@
     "preview": "npm run preview -w @vlue/web",
     "web:dev": "npm run dev -w @vlue/web",
     "web:build": "npm run build -w @vlue/web",
+    "web:sync-pc-installer": "node scripts/sync-pc-installer-to-web.mjs",
     "api:dev": "npm run dev -w @vlue/api",
     "api:build": "npm run build -w @vlue/db && npm run build -w @vlue/shared && npm run build -w @vlue/api",
     "api:test:core": "npm run test:core-smoke -w @vlue/api",
@@ -50,7 +51,7 @@
     "electron:dev": "concurrently -k \"npm run dev -w @vlue/web\" \"wait-on http://127.0.0.1:5173 && cross-env VLUE_ELECTRON_DEV=1 electron apps/electron/main.cjs\"",
     "web:build:electron": "cross-env VITE_ELECTRON_PACK=1 npm run build -w @vlue/web",
     "electron:build": "npm run web:build:electron && node scripts/prepare-electron-pack.mjs && npm run dist -w @vlue/electron",
-    "electron:build:win": "npm run web:build:electron && node scripts/prepare-electron-pack.mjs && npm run dist:win -w @vlue/electron",
+    "electron:build:win": "npm run web:build:electron && node scripts/prepare-electron-pack.mjs && npm run dist:win -w @vlue/electron && node scripts/sync-pc-installer-to-web.mjs",
     "electron:build:mac": "npm run web:build:electron && node scripts/prepare-electron-pack.mjs && npm run dist:mac -w @vlue/electron"
   },
   "devDependencies": {
