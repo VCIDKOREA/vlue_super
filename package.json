@@ -17,6 +17,7 @@
     "web:dev": "npm run dev -w @vlue/web",
     "web:build": "npm run build -w @vlue/web",
     "web:sync-pc-installer": "node scripts/sync-pc-installer-to-web.mjs",
+    "publish:pc-installer": "node scripts/publish-pc-installer-github-release.mjs",
     "api:dev": "npm run dev -w @vlue/api",
     "api:build": "npm run build -w @vlue/db && npm run build -w @vlue/shared && npm run build -w @vlue/api",
     "api:test:core": "npm run test:core-smoke -w @vlue/api",

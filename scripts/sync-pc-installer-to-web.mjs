@@ -17,6 +17,8 @@ const dest = join(destDir, "VLUE-Setup-1.0.0.exe");
 const distDestDir = join(root, "web/dist/downloads");
 const distDest = join(distDestDir, "VLUE-Setup-1.0.0.exe");
 const MIN_BYTES = 5_000_000;
+const DEFAULT_INSTALLER_URL =
+  "https://github.com/VCIDKOREA/vlue_super/releases/download/pc-v1.0.0/VLUE-Setup-1.0.0.exe";
 
 const strict =
   process.env.REQUIRE_PC_INSTALLER === "1" || Boolean(process.env.RAILWAY_ENVIRONMENT);
@@ -72,12 +74,12 @@ async function main() {
     return;
   }
 
-  const remote = String(process.env.VLUE_PC_INSTALLER_URL || "").trim();
+  const remote = String(process.env.VLUE_PC_INSTALLER_URL || DEFAULT_INSTALLER_URL).trim();
   if (remote.startsWith("http")) {
     mkdirSync(destDir, { recursive: true });
     await downloadFile(remote, dest);
     verifyInstaller(dest);
-    console.log(`[sync-pc-installer] OK (remote) → ${dest}`);
+    console.log(`[sync-pc-installer] OK (remote: ${remote}) → ${dest}`);
 
     if (existsSync(join(root, "web/dist"))) {
       mkdirSync(distDestDir, { recursive: true });
