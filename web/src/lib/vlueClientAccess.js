@@ -2,7 +2,7 @@
  * VLUE 클라이언트 접근 식별 — Electron UA 토큰 · 네이티브 셸 · 브라우저 차단
  */
 
-import { VLUE_PC_GITHUB_RELEASE_URL } from "./vluePcInstaller.js";
+import { buildSameOriginInstallerUrl } from "./vluePcInstaller.js";
 
 /** Electron main.cjs 와 동일 — User-Agent suffix */
 export const VLUE_PC_APP_UA_TOKEN = "VLUE-PC-App";
@@ -49,7 +49,7 @@ export function getVlueDownloadLinks() {
       : String(import.meta.env.VITE_VLUE_LANDING_URL || "https://www.vlue.kr").replace(/\/$/, "");
   const base = origin.replace(/\/$/, "");
   const downloadPage = `${base}/#download`;
-  const defaultWindowsUrl = VLUE_PC_GITHUB_RELEASE_URL;
+  const defaultWindowsUrl = buildSameOriginInstallerUrl(base);
 
   const pcWindowsEnv = String(import.meta.env.VITE_VLUE_PC_WINDOWS_URL || "").trim();
   const pcMacEnv = String(import.meta.env.VITE_VLUE_PC_MAC_URL || "").trim();

@@ -18,6 +18,32 @@ const UNAVAILABLE = {
 /** @typedef {"windows" | "mac" | "playStore" | "appStore"} VlueDownloadPlatform */
 
 /**
+ * @param {string} url
+ * @param {string} [filename]
+ */
+function triggerFileDownload(url, filename = VLUE_PC_WINDOWS_FILENAME) {
+  let sameOrigin = false;
+  try {
+    sameOrigin = new URL(url, window.location.href).origin === window.location.origin;
+  } catch {
+    /* ignore */
+  }
+
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.rel = "noopener noreferrer";
+  if (sameOrigin) {
+    anchor.download = filename;
+    anchor.setAttribute("download", filename);
+  } else {
+    anchor.target = "_blank";
+  }
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+/**
  * @param {VlueDownloadPlatform} platform
  * @returns {boolean} 다운로드·이동을 시도했으면 true
  */
@@ -45,20 +71,20 @@ export function openVlueDownload(platform) {
   }
 
   if (platform === "windows") {
-    window.location.assign(target.url);
+    triggerFileDownload(target.url, VLUE_PC_WINDOWS_FILENAME);
     return true;
   }
 
   const isInstaller = /\.(exe|dmg|msi|zip)(\?|#|$)/i.test(target.url);
+  if (isInstaller) {
+    triggerFileDownload(target.url, VLUE_PC_WINDOWS_FILENAME);
+    return true;
+  }
+
   const anchor = document.createElement("a");
   anchor.href = target.url;
   anchor.rel = "noopener noreferrer";
-  if (isInstaller) {
-    anchor.setAttribute("download", VLUE_PC_WINDOWS_FILENAME);
-    anchor.download = VLUE_PC_WINDOWS_FILENAME;
-  } else {
-    anchor.target = "_blank";
-  }
+  anchor.target = "_blank";
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
