@@ -138,6 +138,13 @@ export async function processInboundForwarding(parsed: ParsedInboundEmail) {
 
   await triggerForwardingNotification(mapping.user_id, parsed, mapping.full_virtual_email);
 
+  try {
+    const { ingestInboundMailToMailTalk } = await import("../mailTalk/mailTalkInboundService.js");
+    await ingestInboundMailToMailTalk(mapping.user_id, parsed);
+  } catch (e) {
+    console.warn("[mail-talk] inbound ingest skipped:", e instanceof Error ? e.message : e);
+  }
+
   return {
     ok: true as const,
     userId: mapping.user_id,

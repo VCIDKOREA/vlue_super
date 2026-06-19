@@ -1,6 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ChatList from "./components/ChatList";
 import ChatListTabDropdown from "./components/ChatListTabDropdown.jsx";
+import ChatListChannelSwitch from "./components/mailTalk/ChatListChannelSwitch.jsx";
+import MailTalkRoomList from "./components/mailTalk/MailTalkRoomList.jsx";
+import MailTalkRoomView from "./components/mailTalk/MailTalkRoomView.jsx";
+import MailTalkComposeModal from "./components/mailTalk/MailTalkComposeModal.jsx";
 import ChatRoom from "./components/ChatRoom";
 import BlueAIChat from "./components/BlueAIChat";
 import FriendSearch from "./components/FriendSearch";
@@ -76,6 +80,12 @@ import {
   forcePersonalMode
 } from "./lib/vlueOfficeMode.js";
 import { startVlueSse, VLUE_SSE_CHAT_MESSAGE } from "./lib/vlueSse.js";
+import {
+  fetchMailTalkRooms,
+  isMailTalkRoomId,
+  mailTalkNavRoomId,
+  mailTalkRoomIdFromNav
+} from "./lib/mailTalkApi.js";
 import { emitAssetFilesChanged, emitOfficeEmailInboxChanged } from "./lib/vlueAssetFilesStorage.js";
 import { emitEmailInboxChanged } from "./lib/vlueEmailMappingsApi.js";
 import { startFamilyProtectionPresence } from "./lib/familyProtectionPresence.js";
@@ -440,6 +450,19 @@ function App() {
   const [appMode, setAppMode] = useState(() => readAppMode());
   const [activeOfficeCardId, setActiveOfficeCardId] = useState(() => readActiveOfficeCardId());
   const [hasOfficeGrant, setHasOfficeGrant] = useState(false);
+  const [chatListChannel, setChatListChannel] = useState(() => {
+    try {
+      const v = localStorage.getItem("vlue_chat_list_channel_v1");
+      return v === "mailTalk" ? "mailTalk" : "general";
+    } catch {
+      return "general";
+    }
+  });
+  const [mailTalkRooms, setMailTalkRooms] = useState([]);
+  const [mailTalkRoomsLoading, setMailTalkRoomsLoading] = useState(false);
+  const [mailTalkRoomsError, setMailTalkRoomsError] = useState("");
+  const [mailTalkSseVersion, setMailTalkSseVersion] = useState(0);
+  const [mailTalkComposeOpen, setMailTalkComposeOpen] = useState(false);
   const cardAccessSnapRef = useRef("");
   const [digitalCardActive, setDigitalCardActive] = useState(() => readDigitalCardActive());
   const [cardFieldsTick, setCardFieldsTick] = useState(0);
@@ -630,6 +653,42 @@ function App() {
     tick();
     return () => clearInterval(id);
   }, [isLoggedIn, appMode, activeOfficeCardId]);
+
+  const refreshMailTalkRooms = useCallback(async () => {
+    if (!isLoggedIn) {
+      setMailTalkRooms([]);
+      return;
+    }
+    setMailTalkRoomsLoading(true);
+    setMailTalkRoomsError("");
+    try {
+      const rooms = await fetchMailTalkRooms();
+      setMailTalkRooms(Array.isArray(rooms) ? rooms : []);
+    } catch (e) {
+      setMailTalkRoomsError(e instanceof Error ? e.message : "목록 불러오기 실패");
+    } finally {
+      setMailTalkRoomsLoading(false);
+    }
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (chatListChannel === "mailTalk" && isLoggedIn) {
+      refreshMailTalkRooms();
+    }
+  }, [chatListChannel, isLoggedIn, refreshMailTalkRooms]);
+
+  const handleChatListChannelChange = useCallback(
+    (channel) => {
+      setChatListChannel(channel);
+      try {
+        localStorage.setItem("vlue_chat_list_channel_v1", channel);
+      } catch {
+        /* ignore */
+      }
+      if (channel === "mailTalk") refreshMailTalkRooms();
+    },
+    [refreshMailTalkRooms]
+  );
 
   useEffect(() => {
     if (!isLoggedIn) setHasOfficeGrant(false);
@@ -844,6 +903,16 @@ function App() {
           setTimeout(() => setBottomToast(""), 4200);
           emitEmailInboxChanged();
           setEmailInboxOpen(true);
+          setMailTalkSseVersion((v) => v + 1);
+          if (chatListChannel === "mailTalk") refreshMailTalkRooms();
+        }
+        if (data?.type === "mail-talk-received" || data?.type === "mail-talk-sent") {
+          setMailTalkSseVersion((v) => v + 1);
+          if (chatListChannel === "mailTalk") refreshMailTalkRooms();
+          if (data?.type === "mail-talk-received") {
+            setBottomToast("메일톡: 새 메시지가 도착했습니다.");
+            setTimeout(() => setBottomToast(""), 3200);
+          }
         }
         if (data?.type === "vlue-notice-released") {
           const notice = data.notice || null;
@@ -961,7 +1030,7 @@ function App() {
       }
     });
     return stop;
-  }, [isLoggedIn]);
+  }, [isLoggedIn, refreshMailTalkRooms, chatListChannel]);
 
   useEffect(() => {
     if (!isLoggedIn) return undefined;
@@ -3539,83 +3608,89 @@ function App() {
           <div className="flex min-h-0 min-w-0 w-full max-w-none flex-1 flex-col">
           <div className="shrink-0 px-2 pt-3">
             {isLoggedIn && (
-              <div
-                className={`mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 ${
-                  isDarkMode ? "border border-white/10 bg-[#0f172a] text-gray-100" : "border border-indigo-100 bg-white text-gray-900"
-                }`}
-              >
-                <div className="min-w-0">
-                  <p className={`truncate text-[11px] font-bold ${isDarkMode ? "text-gray-100" : "text-slate-700"}`}>
-                    {appMode === "office"
-                      ? `직장내선 · 카드 ${activeOfficeCardId ? activeOfficeCardId.slice(0, 8) + "…" : "미선택"}`
-                      : "개인모드"}
-                  </p>
-                </div>
-                <div className="flex items-center shrink-0 gap-1.5 text-[11px] font-bold">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      writeAppMode("personal");
-                      setAppMode("personal");
-                    }}
-                    className={`px-1 py-0.5 ${appMode === "personal" ? "text-blue-600" : isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              <>
+                <ChatListChannelSwitch
+                  value={chatListChannel}
+                  onChange={handleChatListChannelChange}
+                  isDarkMode={isDarkMode}
+                />
+                {hasOfficeGrant ? (
+                  <div
+                    className={`mb-2 flex items-center justify-end gap-2 text-[10px] font-bold ${
+                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                    }`}
                   >
-                    개인
-                  </button>
-                  {hasOfficeGrant ? (
-                    <>
-                      <span className={isDarkMode ? "text-gray-600" : "text-gray-300"}>|</span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const uid = localStorage.getItem("vlue_server_user_id");
-                          if (!uid) {
-                            setBottomToast("직장내선 모드는 서버 API 로그인 후 사용할 수 있습니다.");
-                            setTimeout(() => setBottomToast(""), 2800);
-                            return;
-                          }
-                          try {
-                            const res = await vlueAuthFetch(apiUrl("/api/cards/me-context"), {
-                              headers: vlueAuthHeaders()
-                            });
-                            const data = await res.json();
-                            const cid =
-                              readActiveOfficeCardId() ||
-                              data.owned?.[0]?.id ||
-                              data.memberships?.[0]?.cardId ||
-                              "";
-                            if (!cid) {
-                              setBottomToast("Wallet에서 내선·대표 카드를 등록·승인한 뒤 다시 시도하세요.");
-                              setTimeout(() => setBottomToast(""), 2800);
-                              return;
-                            }
-                            writeActiveOfficeCardId(cid);
-                            setActiveOfficeCardId(cid);
-                            writeAppMode("office");
-                            setAppMode("office");
-                          } catch {
-                            setBottomToast("직장내선 모드 전환에 실패했습니다.");
-                            setTimeout(() => setBottomToast(""), 2400);
-                          }
-                        }}
-                        className={`px-1 py-0.5 ${appMode === "office" ? "text-blue-600" : isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                      >
-                        직장내선
-                      </button>
-                    </>
-                  ) : null}
-                </div>
-              </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        writeAppMode("personal");
+                        setAppMode("personal");
+                      }}
+                      className={appMode === "personal" ? "text-blue-600" : ""}
+                    >
+                      개인
+                    </button>
+                    <span className="opacity-40">|</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const uid = localStorage.getItem("vlue_server_user_id");
+                        if (!uid) return;
+                        try {
+                          const res = await vlueAuthFetch(apiUrl("/api/cards/me-context"), {
+                            headers: vlueAuthHeaders()
+                          });
+                          const data = await res.json();
+                          const cid =
+                            readActiveOfficeCardId() ||
+                            data.owned?.[0]?.id ||
+                            data.memberships?.[0]?.cardId ||
+                            "";
+                          if (!cid) return;
+                          writeActiveOfficeCardId(cid);
+                          setActiveOfficeCardId(cid);
+                          writeAppMode("office");
+                          setAppMode("office");
+                        } catch {
+                          /* ignore */
+                        }
+                      }}
+                      className={appMode === "office" ? "text-blue-600" : ""}
+                    >
+                      직장내선
+                    </button>
+                  </div>
+                ) : null}
+              </>
             )}
-            <ChatListTabDropdown
-              tabs={tabs}
-              activeId={listFilterTab}
-              unreadByTab={unreadByTab}
-              isDarkMode={isDarkMode}
-              onSelect={(tabId) => navigate({ nextPage: "list", nextTab: tabId, nextRoomId: null })}
-            />
+            {chatListChannel === "general" ? (
+              <ChatListTabDropdown
+                tabs={tabs}
+                activeId={listFilterTab}
+                unreadByTab={unreadByTab}
+                isDarkMode={isDarkMode}
+                onSelect={(tabId) => navigate({ nextPage: "list", nextTab: tabId, nextRoomId: null })}
+              />
+            ) : null}
           </div>
-          {listFilterTab === "push" ? (
+          {chatListChannel === "mailTalk" ? (
+            <MailTalkRoomList
+              rooms={mailTalkRooms}
+              loading={mailTalkRoomsLoading}
+              error={mailTalkRoomsError}
+              isDarkMode={isDarkMode}
+              onCompose={() => requireAuth(() => setMailTalkComposeOpen(true))}
+              onSelect={(roomId) =>
+                requireAuth(() => {
+                  navigate({
+                    nextPage: "room",
+                    nextTab: listFilterTab,
+                    nextRoomId: mailTalkNavRoomId(roomId)
+                  });
+                })
+              }
+            />
+          ) : listFilterTab === "push" ? (
             <PushNotificationInbox
               onUnreadChange={setPushUnreadCount}
               onOpenFamilyProtection={() =>
@@ -3662,6 +3737,14 @@ function App() {
           </div>
         </>
       )}
+      {page === "room" && isMailTalkRoomId(selectedRoomId) && (
+        <MailTalkRoomView
+          roomId={mailTalkRoomIdFromNav(selectedRoomId)}
+          onBack={goBackStep}
+          isDarkMode={isDarkMode}
+          sseVersion={mailTalkSseVersion}
+        />
+      )}
       {page === "room" && selectedRoomId === "vlue:official" && (
         <ChatRoom
           roomId="vlue:official"
@@ -3700,7 +3783,7 @@ function App() {
           isDarkMode={isDarkMode}
         />
       )}
-      {page === "room" && selectedRoomId && selectedRoomId !== "vlue:official" && (
+      {page === "room" && selectedRoomId && selectedRoomId !== "vlue:official" && !isMailTalkRoomId(selectedRoomId) && (
         <ChatRoom
           roomId={selectedRoomId}
           roomName={currentRoomInfo.name}
@@ -3759,6 +3842,19 @@ function App() {
           }
         />
       )}
+      <MailTalkComposeModal
+        open={mailTalkComposeOpen}
+        onClose={() => setMailTalkComposeOpen(false)}
+        isDarkMode={isDarkMode}
+        onSent={(roomId) => {
+          refreshMailTalkRooms();
+          navigate({
+            nextPage: "room",
+            nextTab: listFilterTab,
+            nextRoomId: mailTalkNavRoomId(roomId)
+          });
+        }}
+      />
       <VmingUpgradePromptModal
         open={vmingUpgradePrompt.open}
         message={vmingUpgradePrompt.message}

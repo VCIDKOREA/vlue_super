@@ -327,6 +327,9 @@ model User {
   inappMailCaches InappMailCache[]
   userEmails      UserEmail[]
 
+  mailTalkRooms         MailTalkRoom[]
+  mailTalkEmailTemplate MailTalkEmailTemplate?
+
   auctionsSold       Auction[]              @relation("AuctionSeller")
   auctionBids        AuctionBid[]           @relation("AuctionBidder")
   auctionWins        Auction[]              @relation("AuctionWinner")
@@ -2287,6 +2290,103 @@ model UserEmail {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("user_emails")
+}
+
+// -----------------------------------------------------------------------------
+// Mail Talk — 거래처 이메일별 채팅방형 메일 수발신 (Phase 1)
+// -----------------------------------------------------------------------------
+
+enum MailTalkMessageDirection {
+  SENT
+  RECEIVED
+}
+
+/// 유저 × 상대방 이메일 = 단일 채팅방
+model MailTalkRoom {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 거래처·상대방 이메일 (소문자 정규화 저장)
+  counterpartyEmail String @map("counterparty_email") @db.VarChar(254)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  messages MailTalkMessage[]
+
+  @@unique([userId, counterpartyEmail])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("mail_talk_rooms")
+}
+
+/// 채팅방 말풍선 — SENT(유저 발신) / RECEIVED(상대 수신)
+model MailTalkMessage {
+  id String @id @default(uuid()) @db.Uuid
+
+  roomId String       @map("room_id") @db.Uuid
+  room   MailTalkRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  direction MailTalkMessageDirection @map("direction")
+
+  /// 파싱된 최신 본문 (답장 히스토리 제거)
+  bodyText String @map("body_text") @db.Text
+  /// 원본 텍스트 (본문 탭용)
+  rawBodyText String? @map("raw_body_text") @db.Text
+  /// 원본 HTML (본문 탭용)
+  bodyHtml String? @map("body_html") @db.Text
+  subject  String @default("") @db.VarChar(500)
+
+  /// 첨부파일 공개 URL 목록
+  attachmentUrls String[] @default([]) @map("attachment_urls")
+
+  /// AWS SES MessageId (발신 시)
+  sesMessageId String? @map("ses_message_id") @db.VarChar(120)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([roomId, createdAt(sort: Asc)])
+  @@map("mail_talk_messages")
+}
+
+/// 유저별 비즈니스 메일 템플릿 (인사말·서명·로고)
+model MailTalkEmailTemplate {
+  userId String @id @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  greetingText  String? @map("greeting_text") @db.Text
+  closingText   String? @map("closing_text") @db.Text
+  signatureHtml String? @map("signature_html") @db.Text
+  logoUrl       String? @map("logo_url") @db.VarChar(1000)
+
+  displayName String? @map("display_name") @db.VarChar(120)
+  jobTitle    String? @map("job_title") @db.VarChar(120)
+  companyName String? @map("company_name") @db.VarChar(200)
+  phone       String? @db.VarChar(40)
+  email       String? @db.VarChar(254)
+  website     String? @db.VarChar(500)
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("mail_talk_email_templates")
+}
+
+/// AWS SNS — Bounce / Complaint 이벤트 감사 로그
+model MailTalkSesEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  eventType      String @map("event_type") @db.VarChar(40)
+  recipientEmail String @map("recipient_email") @db.VarChar(254)
+  sesMessageId   String? @map("ses_message_id") @db.VarChar(120)
+  payloadJson    Json   @map("payload_json") @db.JsonB
+
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([eventType, createdAt(sort: Desc)])
+  @@index([recipientEmail])
+  @@map("mail_talk_ses_events")
 }
 
 // -----------------------------------------------------------------------------
