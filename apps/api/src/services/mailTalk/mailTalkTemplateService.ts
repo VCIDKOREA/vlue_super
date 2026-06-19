@@ -18,7 +18,7 @@ export async function resolveMailTalkTemplateForUser(userId: string): Promise<Ma
         select: { companyName: true, jobTitle: true }
       },
       digitalCard: {
-        select: { exportSnapshotJson: true }
+        select: { exportSnapshotJson: true, id: true }
       },
       businessCardsOwned: {
         where: { kind: "mobile" },
@@ -79,6 +79,10 @@ export async function resolveMailTalkTemplateForUser(userId: string): Promise<Ma
     website:
       saved?.website ||
       String(profile.website || profile.homepage || snapshot.website || "").trim() ||
-      null
+      null,
+    cardId: user?.digitalCard?.id || null,
+    shopUrl:
+      String(profile.shopUrl || profile.storeUrl || snapshot.shopUrl || `${process.env.VLUE_PUBLIC_WEB_URL || "https://www.vlue.kr"}/store`).trim(),
+    verified: true
   };
 }

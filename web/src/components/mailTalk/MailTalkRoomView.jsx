@@ -6,6 +6,8 @@ import {
   sendMailTalkMessage
 } from "../../lib/mailTalkApi.js";
 import { uploadMailTalkAttachment } from "../../lib/mailTalkAttachmentUpload.js";
+import { isLongFormMailMessage } from "../../lib/electronBridge.js";
+import MailTalkLongFormViewer from "./MailTalkLongFormViewer.jsx";
 
 const TABS = [
   { id: "chat", label: "💬 채팅" },
@@ -32,7 +34,10 @@ export default function MailTalkRoomView({
   counterpartyEmail: counterpartyEmailProp,
   onBack,
   isDarkMode = false,
-  sseVersion = 0
+  sseVersion = 0,
+  electronMode = false,
+  onOpenLongForm,
+  onMailActivity
 }) {
   const [activeTab, setActiveTab] = useState("chat");
   const [room, setRoom] = useState(null);
@@ -45,6 +50,7 @@ export default function MailTalkRoomView({
   const [uploadPct, setUploadPct] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [bodyIndex, setBodyIndex] = useState(0);
+  const [viewerMessage, setViewerMessage] = useState(null);
   const scrollRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -92,6 +98,14 @@ export default function MailTalkRoomView({
 
   const selectedBodyMessage = receivedForBody[bodyIndex] || receivedForBody[receivedForBody.length - 1] || null;
 
+  const openLongForm = (message) => {
+    if (onOpenLongForm) {
+      onOpenLongForm(message);
+      return;
+    }
+    setViewerMessage(message);
+  };
+
   const handleSend = async () => {
     const text = draft.trim();
     if (!text || sending) return;
@@ -119,6 +133,7 @@ export default function MailTalkRoomView({
       } else {
         await loadMessages();
       }
+      onMailActivity?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "발송 실패");
     } finally {
@@ -198,10 +213,24 @@ export default function MailTalkRoomView({
             ) : (
               messages.map((m) => {
                 const sent = m.direction === "SENT";
+                const longForm = !sent && isLongFormMailMessage(m);
                 return (
                   <div key={m.id} className={`mb-3 flex ${sent ? "justify-end" : "justify-start"}`}>
                     <div
+                      role={longForm ? "button" : undefined}
+                      tabIndex={longForm ? 0 : undefined}
+                      onClick={() => {
+                        if (longForm) openLongForm(m);
+                      }}
+                      onKeyDown={(e) => {
+                        if (longForm && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          openLongForm(m);
+                        }
+                      }}
                       className={`max-w-[85%] rounded-2xl px-3 py-2 shadow-sm ${
+                        longForm ? "cursor-pointer ring-1 ring-blue-200 hover:ring-blue-400" : ""
+                      } ${
                         sent
                           ? "rounded-br-md bg-blue-600 text-white"
                           : isDarkMode
@@ -214,21 +243,35 @@ export default function MailTalkRoomView({
                           {m.subject}
                         </p>
                       ) : null}
-                      <p className="whitespace-pre-wrap break-words text-[14px] leading-relaxed">{m.bodyText}</p>
+                      <p className="whitespace-pre-wrap break-words text-[14px] leading-relaxed">
+                        {longForm ? `${String(m.bodyText || "").slice(0, 160)}…` : m.bodyText}
+                      </p>
+                      {longForm ? (
+                        <p className={`mt-1 text-[10px] font-bold ${sent ? "text-blue-100" : "text-blue-600"}`}>
+                          📧 장문 메일 — 탭하여 인앱 뷰어 열기
+                        </p>
+                      ) : null}
                       {(m.attachmentUrls || []).length > 0 ? (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {m.attachmentUrls.map((url) => (
-                            <a
+                            <button
                               key={url}
-                              href={url}
-                              target="_blank"
-                              rel="noreferrer"
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = fileNameFromUrl(url);
+                                a.target = "_self";
+                                a.rel = "noopener";
+                                a.click();
+                              }}
                               className={`rounded-lg px-2 py-1 text-[11px] font-semibold underline ${
                                 sent ? "text-blue-100" : "text-blue-600"
                               }`}
                             >
                               📎 {fileNameFromUrl(url)}
-                            </a>
+                            </button>
                           ))}
                         </div>
                       ) : null}
@@ -397,6 +440,21 @@ export default function MailTalkRoomView({
             </div>
           )}
         </div>
+      ) : null}
+
+      {!electronMode && viewerMessage ? (
+        <MailTalkLongFormViewer
+          message={viewerMessage}
+          roomId={roomId}
+          counterpartyEmail={counterpartyEmail}
+          isDarkMode={isDarkMode}
+          onClose={() => setViewerMessage(null)}
+          onSent={() => {
+            setViewerMessage(null);
+            loadMessages();
+            onMailActivity?.();
+          }}
+        />
       ) : null}
     </div>
   );

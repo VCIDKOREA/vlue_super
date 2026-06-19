@@ -1,8 +1,16 @@
 /**
  * www.vlue.kr(마케팅) vs /app(슈퍼앱) 셸 분기
- * - 프로덕션: www.vlue.kr / vlue.kr → 마케팅, /app/* → 브라우저 차단(설치 안내)
- * - 로컬: http://localhost:5173/ → 마케팅, http://localhost:5173/app → 앱(개발)
+ * - /app: Electron(VLUE-PC-App UA) · 모바일/PC 네이티브만 허용
+ * - 순수 웹 브라우저 → BrowserAppBlockedPage (다운로드 안내)
  */
+
+import {
+  hasVluePcAppUserAgent,
+  isBrowserAppAccessAllowed,
+  shouldBlockBrowserAppShell
+} from "./vlueClientAccess.js";
+
+export { hasVluePcAppUserAgent, isBrowserAppAccessAllowed, shouldBlockBrowserAppShell };
 
 export const APP_BASE_PATH = "/app";
 
@@ -24,9 +32,11 @@ export function isLocalDevHost(hostname = "") {
   return h === "localhost" || h === "127.0.0.1" || /^192\.168\.\d+\.\d+$/.test(h);
 }
 
-/** Android WebView · iOS 셸 · PC 설치형 클라이언트 */
+/** Android WebView · iOS 셸 · PC 설치형(Electron UA 포함) 클라이언트 */
 export function isNativeVlueClient() {
   if (typeof window === "undefined") return false;
+  if (hasVluePcAppUserAgent()) return true;
+  if (window.vlueElectron?.isElectron) return true;
   if (window.VlueFamilyBridgeNative) return true;
   if (window.vluePcAgentShell) return true;
   if (String(import.meta.env.VITE_ALLOW_BROWSER_APP || "").trim() === "true") return true;
@@ -34,16 +44,10 @@ export function isNativeVlueClient() {
 }
 
 /**
- * 프로덕션 웹 브라우저에서 /app 슈퍼앱 셸 차단
+ * 순수 웹 브라우저에서 /app 슈퍼앱 셸 차단 (로컬·프로덕션 공통)
  */
 export function isBrowserAppShellBlocked(pathname = "") {
-  if (typeof window === "undefined") return false;
-  const path = pathname || window.location.pathname || "";
-  if (!isAppShellPath(path)) return false;
-  if (isNativeVlueClient()) return false;
-  if (isLocalDevHost(window.location.hostname)) return false;
-  if (import.meta.env.DEV) return false;
-  return true;
+  return shouldBlockBrowserAppShell(pathname);
 }
 
 export function marketingHomeUrl() {

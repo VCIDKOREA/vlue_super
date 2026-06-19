@@ -1,0 +1,7 @@
+{
+  "name": "@vlue/electron",
+  "private": true,
+  "version": "1.0.0",
+  "description": "VLUE Electron desktop shell — KakaoTalk-style multi-window chat",
+  "main": "main.cjs"
+}

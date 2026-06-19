@@ -1,4 +1,5 @@
 import { counterpartyInitial, formatMailTalkTime } from "../../lib/mailTalkApi.js";
+import { useRef } from "react";
 
 function emailLocalPart(email) {
   const s = String(email || "");
@@ -11,9 +12,11 @@ export default function MailTalkRoomList({
   loading,
   error,
   onSelect,
+  onRoomDoubleClick,
   onCompose,
   isDarkMode = false
 }) {
+  const clickDelayRef = useRef(null);
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center py-16 text-[13px] text-gray-500">
@@ -67,7 +70,21 @@ export default function MailTalkRoomList({
                 <button
                   key={room.id}
                   type="button"
-                  onClick={() => onSelect(room.id)}
+                  onClick={() => {
+                    if (clickDelayRef.current) clearTimeout(clickDelayRef.current);
+                    clickDelayRef.current = setTimeout(() => {
+                      onSelect(room.id);
+                      clickDelayRef.current = null;
+                    }, 220);
+                  }}
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    if (clickDelayRef.current) {
+                      clearTimeout(clickDelayRef.current);
+                      clickDelayRef.current = null;
+                    }
+                    onRoomDoubleClick?.(room);
+                  }}
                   className={`flex w-full items-center gap-3 border-b px-3 py-3 text-left active:bg-blue-50/80 ${
                     isDarkMode ? "border-white/5 active:bg-white/5" : "border-gray-100"
                   }`}

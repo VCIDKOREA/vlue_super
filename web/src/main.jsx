@@ -39,12 +39,18 @@ if (!rootEl) {
   else if (siteShell === "blocked") Shell = BrowserAppBlockedPage;
   else if (siteShell === "marketing") Shell = VlueMarketingApp;
 
+  const appBlocked = siteShell === "blocked";
+
   createRoot(rootEl).render(
     <React.StrictMode>
       <AppRootErrorBoundary>
-        <WwwStagingLockGate>
+        {appBlocked ? (
           <Shell />
-        </WwwStagingLockGate>
+        ) : (
+          <WwwStagingLockGate>
+            <Shell />
+          </WwwStagingLockGate>
+        )}
       </AppRootErrorBoundary>
     </React.StrictMode>
   );

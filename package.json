@@ -46,9 +46,14 @@
     "verify:api-domain": "node scripts/verify-api-domain.mjs",
     "verify:www-domain": "node scripts/verify-www-domain.mjs",
     "pages:sync": "node scripts/sync-coming-soon-docs.mjs",
-    "pages:dev": "npx serve . -l 4173"
+    "pages:dev": "npx serve . -l 4173",
+    "electron:dev": "concurrently -k \"npm run dev -w @vlue/web\" \"wait-on http://127.0.0.1:5173 && cross-env VLUE_ELECTRON_DEV=1 electron apps/electron/main.cjs\""
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "concurrently": "^9.2.3",
+    "cross-env": "^7.0.3",
+    "electron": "^35.7.5",
+    "typescript": "^5.7.0",
+    "wait-on": "^8.0.5"
   }
 }

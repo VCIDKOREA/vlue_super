@@ -5,6 +5,7 @@ import ChatListChannelSwitch from "./components/mailTalk/ChatListChannelSwitch.j
 import MailTalkRoomList from "./components/mailTalk/MailTalkRoomList.jsx";
 import MailTalkRoomView from "./components/mailTalk/MailTalkRoomView.jsx";
 import MailTalkComposeModal from "./components/mailTalk/MailTalkComposeModal.jsx";
+import MailTalkElectronShell from "./components/mailTalk/MailTalkElectronShell.jsx";
 import ChatRoom from "./components/ChatRoom";
 import BlueAIChat from "./components/BlueAIChat";
 import FriendSearch from "./components/FriendSearch";
@@ -86,6 +87,11 @@ import {
   mailTalkNavRoomId,
   mailTalkRoomIdFromNav
 } from "./lib/mailTalkApi.js";
+import {
+  getElectronRoomBootParams,
+  isElectronRoomWindow,
+  openElectronRoomWindow
+} from "./lib/electronBridge.js";
 import { emitAssetFilesChanged, emitOfficeEmailInboxChanged } from "./lib/vlueAssetFilesStorage.js";
 import { emitEmailInboxChanged } from "./lib/vlueEmailMappingsApi.js";
 import { startFamilyProtectionPresence } from "./lib/familyProtectionPresence.js";
@@ -463,6 +469,8 @@ function App() {
   const [mailTalkRoomsError, setMailTalkRoomsError] = useState("");
   const [mailTalkSseVersion, setMailTalkSseVersion] = useState(0);
   const [mailTalkComposeOpen, setMailTalkComposeOpen] = useState(false);
+  const [electronRoomBoot] = useState(() => getElectronRoomBootParams());
+  const isElectronRoomWindowMode = isElectronRoomWindow();
   const cardAccessSnapRef = useRef("");
   const [digitalCardActive, setDigitalCardActive] = useState(() => readDigitalCardActive());
   const [cardFieldsTick, setCardFieldsTick] = useState(0);
@@ -2620,6 +2628,29 @@ function App() {
     [activeTab, selectedRoomId]
   );
 
+  useEffect(() => {
+    if (!electronRoomBoot || electronRoomBoot.roomType !== "GENERAL") return;
+    setPage("room");
+    setSelectedRoomId(electronRoomBoot.roomId);
+  }, [electronRoomBoot]);
+
+  const handleGeneralRoomDoubleClick = useCallback((room) => {
+    openElectronRoomWindow({
+      roomId: room.roomId,
+      roomType: "GENERAL",
+      title: room.name || room.roomId
+    });
+  }, []);
+
+  const handleMailTalkRoomDoubleClick = useCallback((room) => {
+    openElectronRoomWindow({
+      roomId: room.id,
+      roomType: "MAIL_TALK",
+      title: room.counterpartyEmail,
+      counterpartyEmail: room.counterpartyEmail
+    });
+  }, []);
+
   const openPosSalesDashboard = useCallback(() => {
     try {
       sessionStorage.setItem(EXPAND_FAMILY_KEY, "1");
@@ -3079,11 +3110,12 @@ function App() {
   );
 
   const headerVisible = page === "main" || page === "list" || page === "subhub";
-  const topHeaderVisible = showAppShell && headerVisible;
+  const electronRoomChromeHidden = isElectronRoomWindowMode && page === "room";
+  const topHeaderVisible = showAppShell && headerVisible && !electronRoomChromeHidden;
   const subhubUtilBack =
     page === "subhub" && (subscriptionSubTab === "gifts" || subscriptionSubTab === "chat" || subscriptionSubTab === "cart");
   const isChatSurface = page === "list" || page === "room";
-  const showBottomNav = showAppShell && page !== "room" && !csScannerOpen;
+  const showBottomNav = showAppShell && page !== "room" && !csScannerOpen && !electronRoomChromeHidden;
 
   /** 로그인·회원가입 온보딩은 전역 dark-mode 미적용(글자 대비 유지) */
   const shellIsAuthOrSignupOnboarding =
@@ -3123,6 +3155,16 @@ function App() {
 
   if (letteringOverlayOpen) {
     return <LetteringOverlayHost />;
+  }
+
+  if (isElectronRoomWindowMode && electronRoomBoot?.roomType === "MAIL_TALK") {
+    return (
+      <MailTalkElectronShell
+        roomId={electronRoomBoot.roomId}
+        counterpartyEmail={electronRoomBoot.counterpartyEmail}
+        isDarkMode={isDarkMode}
+      />
+    );
   }
 
   return (
@@ -3680,6 +3722,7 @@ function App() {
               error={mailTalkRoomsError}
               isDarkMode={isDarkMode}
               onCompose={() => requireAuth(() => setMailTalkComposeOpen(true))}
+              onRoomDoubleClick={handleMailTalkRoomDoubleClick}
               onSelect={(roomId) =>
                 requireAuth(() => {
                   navigate({
@@ -3711,6 +3754,7 @@ function App() {
               floatingRoomIds={floatingRoomIds}
               isDesktopPd={isDesktopPd}
               onRoomAction={handleChatRoomAction}
+              onRoomDoubleClick={handleGeneralRoomDoubleClick}
               onSelect={(roomId) => {
                 if (roomId === "vlue:memo") {
                   openMemoScreen();

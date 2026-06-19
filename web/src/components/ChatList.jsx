@@ -13,10 +13,11 @@ const BASE_MENU = [
 
 const FLOAT_MENU = { id: "toggleFloat", label: "플로팅띄우기&접기" };
 
-function ChatList({ rooms, selectedRoomId, onSelect, onOpenProfile, onRoomAction, isDesktopPd = false, floatingRoomIds }) {
+function ChatList({ rooms, selectedRoomId, onSelect, onOpenProfile, onRoomAction, onRoomDoubleClick, isDesktopPd = false, floatingRoomIds }) {
   const [menu, setMenu] = useState(null);
   const longPressRef = useRef(null);
   const suppressClickRef = useRef(false);
+  const clickDelayRef = useRef(null);
 
   const closeMenu = useCallback(() => setMenu(null), []);
 
@@ -86,7 +87,19 @@ function ChatList({ rooms, selectedRoomId, onSelect, onOpenProfile, onRoomAction
                   type="button"
                   onClick={() => {
                     if (suppressClickRef.current) return;
-                    onSelect(room.roomId);
+                    if (clickDelayRef.current) clearTimeout(clickDelayRef.current);
+                    clickDelayRef.current = setTimeout(() => {
+                      onSelect(room.roomId);
+                      clickDelayRef.current = null;
+                    }, 220);
+                  }}
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    if (clickDelayRef.current) {
+                      clearTimeout(clickDelayRef.current);
+                      clickDelayRef.current = null;
+                    }
+                    onRoomDoubleClick?.(room);
                   }}
                   onContextMenu={(e) => {
                     e.preventDefault();
