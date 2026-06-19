@@ -125,7 +125,7 @@ async function main() {
   writeFileSync(iconPng, png512);
   console.log("[electron-icons] wrote", iconPng);
 
-  const icoSizes = [256, 48, 32, 16];
+  const icoSizes = [256, 128, 64, 48, 32, 16];
   const images = await Promise.all(icoSizes.map((size) => renderRgba(size)));
   writeFileSync(iconIco, buildStandardIco(images));
   console.log("[electron-icons] wrote", iconIco);

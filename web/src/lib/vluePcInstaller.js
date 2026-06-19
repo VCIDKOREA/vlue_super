@@ -1,6 +1,6 @@
 /** Windows PC 설치 파일 — 단일 출처 */
 export const VLUE_PC_INSTALLER_FILENAME = "VLUE-Setup-1.0.0.exe";
-export const VLUE_PC_INSTALLER_VERSION = "1.0.1";
+export const VLUE_PC_INSTALLER_VERSION = "1.0.2";
 
 /** GitHub Release (Cloudflare·SPA 캐시 우회용 기본 다운로드 URL) */
 export const VLUE_PC_GITHUB_RELEASE_URL =

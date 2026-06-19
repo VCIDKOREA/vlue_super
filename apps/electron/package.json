@@ -2,7 +2,7 @@
   "name": "@vlue/electron",
   "private": true,
   "version": "1.0.0",
-  "description": "VLUE Electron desktop shell — KakaoTalk-style multi-window chat",
+  "description": "VLUE Electron desktop shell",
   "author": "VCID KOREA",
   "main": "main.cjs",
   "scripts": {

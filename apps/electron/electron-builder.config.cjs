@@ -14,8 +14,8 @@ function pickIcon(candidates) {
   return null;
 }
 
-// Windows: PNG 우선 — app-builder가 표준 ICO로 변환 (PNG-in-ICO 는 rcedit 실패 가능)
-const winIcon = pickIcon([iconPng, iconIco]);
+// Windows exe·NSIS 모두 icon.ico 우선 (PNG→ICO 변환은 바로가기 아이콘이 깨질 수 있음)
+const winIcon = pickIcon([iconIco, iconPng]);
 const winNsisIcon = pickIcon([iconIco, iconPng]);
 const macIcon = pickIcon([iconIcns, iconPng]);
 
