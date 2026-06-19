@@ -1,0 +1,8 @@
+# Nixpacks — @vlue/web (Railway zooming-flow)
+# railway.toml 과 함께 devDependencies(vite 등) 설치 보장
+
+[variables]
+NIXPACKS_NODE_INSTALL_DEV_DEPS = "true"
+NPM_CONFIG_PRODUCTION = "false"
+REQUIRE_PC_INSTALLER = "1"
+VLUE_PC_INSTALLER_URL = "https://github.com/VCIDKOREA/vlue_super/releases/download/pc-v1.0.0/VLUE-Setup-1.0.0.exe"

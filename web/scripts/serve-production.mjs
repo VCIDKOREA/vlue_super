@@ -14,6 +14,10 @@ const dist = join(__dirname, "..", "dist");
 const downloadsRoot = normalize(join(dist, "downloads"));
 const port = Number(process.env.PORT || 8080);
 const installerName = "VLUE-Setup-1.0.0.exe";
+const fallbackInstallerUrl = String(
+  process.env.VLUE_PC_INSTALLER_URL ||
+    "https://github.com/VCIDKOREA/vlue_super/releases/download/pc-v1.0.0/VLUE-Setup-1.0.0.exe"
+).trim();
 
 /** @type {Record<string, unknown>} */
 let serveConfig = {};
@@ -62,6 +66,12 @@ function serveDownload(request, response, pathname) {
   }
 
   if (!existsSync(filePath)) {
+    if (pathname.endsWith(".exe") && fallbackInstallerUrl.startsWith("http")) {
+      console.warn(`[serve] 302 downloads redirect: ${pathname} → ${fallbackInstallerUrl}`);
+      response.writeHead(302, { Location: fallbackInstallerUrl, "Cache-Control": "no-store" });
+      response.end();
+      return;
+    }
     console.warn(`[serve] 404 downloads missing: ${pathname}`);
     sendPlain(response, 404, `404 Not Found: ${pathname}`);
     return;

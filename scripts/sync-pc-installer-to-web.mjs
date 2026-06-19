@@ -3,7 +3,7 @@
  * npm run electron:build:win 이후 실행하거나 web:build 전에 연동
  * Railway: VLUE_PC_INSTALLER_URL 환경 변수로 원격 .exe 다운로드 가능
  */
-import { copyFileSync, createWriteStream, existsSync, mkdirSync, statSync } from "node:fs";
+import { copyFileSync, createWriteStream, existsSync, mkdirSync, statSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { get } from "node:https";
@@ -34,23 +34,67 @@ function verifyInstaller(path) {
   return size;
 }
 
-function downloadFile(url, outPath) {
+function hasValidInstaller(path) {
+  try {
+    verifyInstaller(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function downloadFile(url, outPath, redirects = 0) {
   return new Promise((resolve, reject) => {
+    if (redirects > 8) {
+      reject(new Error("download failed: too many redirects"));
+      return;
+    }
+
     const client = url.startsWith("https:") ? get : httpGet;
-    client(url, (res) => {
-      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        downloadFile(res.headers.location, outPath).then(resolve).catch(reject);
-        return;
+    const req = client(
+      url,
+      {
+        headers: {
+          "User-Agent": "vlue-build-sync/1.0",
+          Accept: "*/*"
+        }
+      },
+      (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          const next = new URL(res.headers.location, url).toString();
+          res.resume();
+          downloadFile(next, outPath, redirects + 1).then(resolve).catch(reject);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          reject(new Error(`download failed: HTTP ${res.statusCode} for ${url}`));
+          res.resume();
+          return;
+        }
+
+        const tmp = `${outPath}.part`;
+        const file = createWriteStream(tmp);
+        res.pipe(file);
+        file.on("finish", () => {
+          file.close(() => {
+            try {
+              if (existsSync(outPath)) unlinkSync(outPath);
+              copyFileSync(tmp, outPath);
+              unlinkSync(tmp);
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          });
+        });
+        file.on("error", reject);
       }
-      if (res.statusCode !== 200) {
-        reject(new Error(`download failed: HTTP ${res.statusCode}`));
-        return;
-      }
-      const file = createWriteStream(outPath);
-      res.pipe(file);
-      file.on("finish", () => file.close(() => resolve()));
-      file.on("error", reject);
-    }).on("error", reject);
+    );
+
+    req.on("error", reject);
+    req.setTimeout(10 * 60 * 1000, () => {
+      req.destroy(new Error(`download timeout: ${url}`));
+    });
   });
 }
 
@@ -74,18 +118,30 @@ async function main() {
     return;
   }
 
+  if (hasValidInstaller(dest)) {
+    const size = statSync(dest).size;
+    console.log(`[sync-pc-installer] SKIP (already present) → ${dest} (${size} bytes)`);
+    if (existsSync(join(root, "web/dist")) && !hasValidInstaller(distDest)) {
+      mkdirSync(distDestDir, { recursive: true });
+      copyFileSync(dest, distDest);
+      console.log(`[sync-pc-installer] OK (public→dist) → ${distDest}`);
+    }
+    return;
+  }
+
   const remote = String(process.env.VLUE_PC_INSTALLER_URL || DEFAULT_INSTALLER_URL).trim();
   if (remote.startsWith("http")) {
     mkdirSync(destDir, { recursive: true });
+    console.log(`[sync-pc-installer] downloading ${remote}`);
     await downloadFile(remote, dest);
     verifyInstaller(dest);
-    console.log(`[sync-pc-installer] OK (remote: ${remote}) → ${dest}`);
+    console.log(`[sync-pc-installer] OK (remote) → ${dest}`);
 
     if (existsSync(join(root, "web/dist"))) {
       mkdirSync(distDestDir, { recursive: true });
       copyFileSync(dest, distDest);
       verifyInstaller(distDest);
-      console.log(`[sync-pc-installer] OK (remote) → ${distDest}`);
+      console.log(`[sync-pc-installer] OK (remote→dist) → ${distDest}`);
     }
     return;
   }

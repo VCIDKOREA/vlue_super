@@ -79,13 +79,17 @@ Networking **Port 8080** + Start Command `npm run start -w @vlue/web` (502 방�
 
 | 설정 | 위치 | 값 |
 |------|------|-----|
-| Config file | Settings → General | `web/railway.toml` (모노레포 루트 배포 시) |
-| Build Command | Settings → **Build** | `npm run build -w @vlue/shared && npm run build -w @vlue/web` (`npm ci`·`rm .vite` 금지) |
+| Config file | Settings → General | **`web/railway.toml`** (필수) |
+| Build Command | `web/railway.toml` 또는 비움 | `npm run build -w @vlue/shared && npm run build -w @vlue/web` |
 | Start Command | Settings → **Deploy** | `npm run start -w @vlue/web` |
 | Port | Settings → **Networking** | `8080` |
 
 빌드가 `vite: not found` / `tsc: not found` 로 실패하면 Variables에  
 `NIXPACKS_NODE_INSTALL_DEV_DEPS=true` 추가 후 Redeploy.
+
+빌드가 `sync-pc-installer` / `verify-pc-installer` 로 실패하면 Variables에  
+`VLUE_PC_INSTALLER_URL=https://github.com/VCIDKOREA/vlue_super/releases/download/pc-v1.0.0/VLUE-Setup-1.0.0.exe`  
+(또는 `web/railway.toml` · `web/nixpacks.toml` 적용 확인) 후 Redeploy.
 
 
 
