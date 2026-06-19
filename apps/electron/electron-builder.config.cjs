@@ -40,6 +40,8 @@ module.exports = {
   buildDependenciesFromSource: false,
   win: {
     target: [{ target: "nsis", arch: ["x64"] }],
+    // Windows에서 winCodeSign 추출 시 symlink 권한 오류 회피 (Developer Mode 미사용 환경)
+    signAndEditExecutable: false,
     ...(winIcon ? { icon: winIcon } : {})
   },
   mac: {
