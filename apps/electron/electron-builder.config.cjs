@@ -33,7 +33,7 @@ module.exports = {
     {
       from: "../../web/dist",
       to: "web-dist",
-      filter: ["**/*"]
+      filter: ["**/*", "!downloads/**", "!downloads"]
     }
   ],
   asar: true,

@@ -31,6 +31,11 @@ const DEFAULT_INSTALLER_URL =
 const strict =
   process.env.REQUIRE_PC_INSTALLER === "1" || Boolean(process.env.RAILWAY_ENVIRONMENT);
 
+/** Electron 패키징용 web/dist — 설치 파일을 넣으면 exe 안에 exe가 중첩되어 용량이 폭증함 */
+function isElectronPackBuild() {
+  return String(process.env.VITE_ELECTRON_PACK || "").trim() === "1";
+}
+
 function isCircularBuildUrl(url) {
   try {
     const host = new URL(url).hostname.toLowerCase();
@@ -201,6 +206,11 @@ async function ensureDistCopy() {
 }
 
 async function main() {
+  if (isElectronPackBuild()) {
+    console.log("[sync-pc-installer] SKIP (VITE_ELECTRON_PACK=1 — Electron 번들에 설치 파일 포함 금지)");
+    return;
+  }
+
   if (existsSync(src)) {
     copyInstaller(src, "local");
     return;
@@ -241,7 +251,9 @@ async function main() {
 }
 
 main()
-  .then(() => ensureDistCopy())
+  .then(() => {
+    if (!isElectronPackBuild()) return ensureDistCopy();
+  })
   .catch((e) => {
   console.error("[sync-pc-installer]", e.message || e);
   process.exit(1);

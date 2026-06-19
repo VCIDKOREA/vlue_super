@@ -14,6 +14,10 @@ const MIN_BYTES = 5_000_000;
 const strict =
   process.env.REQUIRE_PC_INSTALLER === "1" || Boolean(process.env.RAILWAY_ENVIRONMENT);
 
+function isElectronPackBuild() {
+  return String(process.env.VITE_ELECTRON_PACK || "").trim() === "1";
+}
+
 function isValidPe(path) {
   if (!existsSync(path)) return false;
   if (statSync(path).size < MIN_BYTES) return false;
@@ -27,6 +31,11 @@ function fail(message) {
     process.exit(1);
   }
   console.warn(`[verify-pc-installer] SKIP (non-strict): ${message}`);
+  process.exit(0);
+}
+
+if (isElectronPackBuild()) {
+  console.log("[verify-pc-installer] SKIP (VITE_ELECTRON_PACK=1 — Electron web/dist 검증 생략)");
   process.exit(0);
 }
 
