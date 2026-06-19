@@ -87,9 +87,12 @@ Networking **Port 8080** + Start Command `npm run start -w @vlue/web` (502 방�
 빌드가 `vite: not found` / `tsc: not found` 로 실패하면 Variables에  
 `NIXPACKS_NODE_INSTALL_DEV_DEPS=true` 추가 후 Redeploy.
 
-빌드가 `sync-pc-installer` / `verify-pc-installer` 로 실패하면 Variables에  
-`VLUE_PC_INSTALLER_URL=https://github.com/VCIDKOREA/vlue_super/releases/download/pc-v1.0.0/VLUE-Setup-1.0.0.exe`  
-(또는 `web/railway.toml` · `web/nixpacks.toml` 적용 확인) 후 Redeploy.
+빌드가 `sync-pc-installer` / `verify-pc-installer` 로 실패하면 Variables 확인:
+
+- `VLUE_PC_INSTALLER_URL` 은 **GitHub Release** 등 외부 URL만 사용  
+  (`https://www.vlue.kr/downloads/...` 는 배포 전 순환 참조로 HTML이 받아져 실패함)
+- 권장값: `https://github.com/VCIDKOREA/vlue_super/releases/download/pc-v1.0.0/VLUE-Setup-1.0.0.exe`
+- `web/railway.toml` · `web/nixpacks.toml` 적용 여부 확인 후 Redeploy
 
 
 

@@ -1,9 +1,17 @@
 /**
  * Electron Windows 설치 파일 → web/public/downloads (Vite 정적 배포용)
  * npm run electron:build:win 이후 실행하거나 web:build 전에 연동
- * Railway: VLUE_PC_INSTALLER_URL 환경 변수로 원격 .exe 다운로드 가능
+ * Railway: VLUE_PC_INSTALLER_URL — GitHub Release 등 외부 URL만 사용 (www.vlue.kr 금지: 순환)
  */
-import { copyFileSync, createWriteStream, existsSync, mkdirSync, statSync, unlinkSync } from "node:fs";
+import {
+  copyFileSync,
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { get } from "node:https";
@@ -23,6 +31,42 @@ const DEFAULT_INSTALLER_URL =
 const strict =
   process.env.REQUIRE_PC_INSTALLER === "1" || Boolean(process.env.RAILWAY_ENVIRONMENT);
 
+function isCircularBuildUrl(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === "www.vlue.kr" ||
+      host === "vlue.kr" ||
+      host.endsWith(".up.railway.app") ||
+      host === "localhost" ||
+      host === "127.0.0.1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getRemoteCandidates() {
+  const candidates = [];
+  const envUrl = String(process.env.VLUE_PC_INSTALLER_URL || "").trim();
+
+  if (envUrl.startsWith("http")) {
+    if (isCircularBuildUrl(envUrl)) {
+      console.warn(
+        `[sync-pc-installer] SKIP circular build URL (배포 중인 사이트 자체 URL 불가): ${envUrl}`
+      );
+    } else {
+      candidates.push(envUrl);
+    }
+  }
+
+  if (!candidates.includes(DEFAULT_INSTALLER_URL)) {
+    candidates.push(DEFAULT_INSTALLER_URL);
+  }
+
+  return candidates;
+}
+
 function verifyInstaller(path) {
   if (!existsSync(path)) {
     throw new Error(`installer missing after sync: ${path}`);
@@ -30,6 +74,10 @@ function verifyInstaller(path) {
   const size = statSync(path).size;
   if (size < MIN_BYTES) {
     throw new Error(`installer too small (${size} bytes): ${path}`);
+  }
+  const head = readFileSync(path).subarray(0, 2);
+  if (head[0] !== 0x4d || head[1] !== 0x5a) {
+    throw new Error(`installer is not a Windows .exe (MZ header missing): ${path}`);
   }
   return size;
 }
@@ -56,7 +104,7 @@ function downloadFile(url, outPath, redirects = 0) {
       {
         headers: {
           "User-Agent": "vlue-build-sync/1.0",
-          Accept: "*/*"
+          Accept: "application/octet-stream,*/*"
         }
       },
       (res) => {
@@ -68,6 +116,13 @@ function downloadFile(url, outPath, redirects = 0) {
         }
         if (res.statusCode !== 200) {
           reject(new Error(`download failed: HTTP ${res.statusCode} for ${url}`));
+          res.resume();
+          return;
+        }
+
+        const contentType = String(res.headers["content-type"] || "").toLowerCase();
+        if (contentType.includes("text/html")) {
+          reject(new Error(`download returned HTML, not binary: ${url}`));
           res.resume();
           return;
         }
@@ -112,6 +167,30 @@ function copyInstaller(fromPath, label) {
   }
 }
 
+async function downloadInstallerRemote() {
+  const candidates = getRemoteCandidates();
+  let lastError = null;
+
+  for (const url of candidates) {
+    try {
+      mkdirSync(destDir, { recursive: true });
+      console.log(`[sync-pc-installer] downloading ${url}`);
+      await downloadFile(url, dest);
+      verifyInstaller(dest);
+      console.log(`[sync-pc-installer] OK (remote: ${url}) → ${dest}`);
+      return;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[sync-pc-installer] retry — ${url}: ${err instanceof Error ? err.message : err}`);
+      for (const p of [dest, `${dest}.part`]) {
+        if (existsSync(p)) unlinkSync(p);
+      }
+    }
+  }
+
+  throw lastError || new Error("installer download failed");
+}
+
 async function main() {
   if (existsSync(src)) {
     copyInstaller(src, "local");
@@ -129,13 +208,8 @@ async function main() {
     return;
   }
 
-  const remote = String(process.env.VLUE_PC_INSTALLER_URL || DEFAULT_INSTALLER_URL).trim();
-  if (remote.startsWith("http")) {
-    mkdirSync(destDir, { recursive: true });
-    console.log(`[sync-pc-installer] downloading ${remote}`);
-    await downloadFile(remote, dest);
-    verifyInstaller(dest);
-    console.log(`[sync-pc-installer] OK (remote) → ${dest}`);
+  if (getRemoteCandidates().length > 0) {
+    await downloadInstallerRemote();
 
     if (existsSync(join(root, "web/dist"))) {
       mkdirSync(distDestDir, { recursive: true });
@@ -147,7 +221,7 @@ async function main() {
   }
 
   const message =
-    "설치 파일 없음 — npm run electron:build:win 또는 VLUE_PC_INSTALLER_URL 설정 필요";
+    "설치 파일 없음 — npm run electron:build:win 또는 VLUE_PC_INSTALLER_URL(GitHub Release 등) 설정";
 
   if (strict) {
     console.error(`[sync-pc-installer] FAIL: ${message}`);
