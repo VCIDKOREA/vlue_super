@@ -59,11 +59,14 @@ coverage/
 # --- 빌드 산출물 ---
 dist/
 build/
+!apps/electron/build/
+!apps/electron/build/**
 out/
 packages/db/dist/
 packages/shared/dist/
 web/dist/
 apps/api/dist/
+apps/electron/dist/
 
 # --- Python ---
 __pycache__/

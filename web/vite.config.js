@@ -7,6 +7,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: __dirname,
+  /** Electron 패키징 시 file:// 프로토콜 상대 경로 로딩 */
+  base: process.env.VITE_ELECTRON_PACK === "1" ? "./" : "/",
   plugins: [react()],
   resolve: {
     alias: {

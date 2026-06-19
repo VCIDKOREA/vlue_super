@@ -71,6 +71,12 @@ export function resolveSiteShell() {
 
   const { pathname, hostname } = window.location;
 
+  /** Electron PC 앱 — file:// 로드 시 pathname이 /app 이 아니므로 UA 기준으로 앱 셸 고정 */
+  if (hasVluePcAppUserAgent() || (typeof window !== "undefined" && window.vlueElectron?.isElectron)) {
+    if (isBrowserAppShellBlocked("/app")) return "blocked";
+    return "app";
+  }
+
   if (isAppShellPath(pathname) && isBrowserAppShellBlocked(pathname)) {
     return "blocked";
   }

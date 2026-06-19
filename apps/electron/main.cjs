@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, screen, session } = require("electron");
 const path = require("path");
+const { pathToFileURL } = require("url");
 
 const isDev = !app.isPackaged || process.env.VLUE_ELECTRON_DEV === "1";
 const DEV_URL = process.env.VLUE_ELECTRON_DEV_URL || "http://127.0.0.1:5173";
@@ -11,21 +12,41 @@ let mainWindow = null;
 /** @type {Map<string, BrowserWindow>} */
 const roomWindows = new Map();
 
-function baseAppUrl() {
-  if (isDev) return `${DEV_URL}/app`;
-  return `file://${path.join(__dirname, "../../web/dist/index.html")}#/app`;
+/** Vite 빌드 산출물 (개발: web/dist, 패키징: resources/web-dist) */
+function getWebDistDir() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "web-dist");
+  }
+  return path.join(__dirname, "../../web/dist");
 }
 
-function buildRoomUrl(params) {
-  const q = new URLSearchParams({
+function getIndexHtmlPath() {
+  return path.join(getWebDistDir(), "index.html");
+}
+
+function buildProductionLoadUrl(searchParams = "") {
+  const indexPath = getIndexHtmlPath();
+  const q = searchParams ? (searchParams.startsWith("?") ? searchParams : `?${searchParams}`) : "";
+  return `${pathToFileURL(indexPath).href}${q}`;
+}
+
+function buildRoomSearchParams(params) {
+  return new URLSearchParams({
     vlueElectronRoom: "1",
     roomType: params.roomType || "GENERAL",
     roomId: params.roomId || "",
     title: params.title || "",
     counterpartyEmail: params.counterpartyEmail || ""
-  });
-  const joiner = baseAppUrl().includes("?") ? "&" : "?";
-  return `${baseAppUrl()}${joiner}${q.toString()}`;
+  }).toString();
+}
+
+function loadAppUrl(win, { search = "" } = {}) {
+  if (isDev) {
+    const q = search ? (search.startsWith("?") ? search : `?${search}`) : "";
+    win.loadURL(`${DEV_URL}/app${q}`);
+    return;
+  }
+  win.loadURL(buildProductionLoadUrl(search));
 }
 
 function windowPreload() {
@@ -84,7 +105,7 @@ function createMainWindow() {
     }
   });
 
-  mainWindow.loadURL(baseAppUrl());
+  loadAppUrl(mainWindow);
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 
@@ -129,7 +150,7 @@ function openRoomWindow(payload) {
   win.vlueRoomParams = payload;
   roomWindows.set(roomId, win);
 
-  win.loadURL(buildRoomUrl(payload));
+  loadAppUrl(win, { search: buildRoomSearchParams(payload) });
 
   if (isMailTalk) {
     win.on("moved", () => emitMagneticSide(win));
