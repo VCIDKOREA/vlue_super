@@ -10,6 +10,8 @@ buildCommand = "npm run build -w @vlue/shared && node scripts/sync-pc-installer-
 [build.env]
 NIXPACKS_NODE_INSTALL_DEV_DEPS = "true"
 NPM_CONFIG_PRODUCTION = "false"
+# Railway 빌드 시 설치 파일 필수 — 대시보드에 VLUE_PC_INSTALLER_URL(공개 .exe URL) 설정
+REQUIRE_PC_INSTALLER = "1"
 
 [deploy]
 startCommand = "npm run start -w @vlue/web"
