@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, screen, session } = require("electron");
+const { app, BrowserWindow, ipcMain, nativeImage, screen, session } = require("electron");
+const fs = require("fs");
 const path = require("path");
 const { pathToFileURL } = require("url");
 
@@ -53,6 +54,23 @@ function windowPreload() {
   return path.join(__dirname, "preload.cjs");
 }
 
+/** 패키징·개발 공통 — 눈 로고 (build/icons) */
+function getAppIcon() {
+  const candidates = [
+    path.join(__dirname, "build/icons/icon.png"),
+    path.join(__dirname, "build/icons/icon.ico")
+  ];
+  for (const iconPath of candidates) {
+    if (fs.existsSync(iconPath)) {
+      const image = nativeImage.createFromPath(iconPath);
+      if (!image.isEmpty()) return image;
+    }
+  }
+  return undefined;
+}
+
+const appIcon = getAppIcon();
+
 /** Vite dev·프로덕션 요청 User-Agent 에 VLUE-PC-App 식별자 부착 */
 function applyVlueDesktopUserAgent() {
   const ses = session.defaultSession;
@@ -97,6 +115,7 @@ function createMainWindow() {
     resizable: true,
     autoHideMenuBar: true,
     title: "VLUE",
+    ...(appIcon ? { icon: appIcon } : {}),
     webPreferences: {
       preload: windowPreload(),
       contextIsolation: true,
@@ -139,6 +158,7 @@ function openRoomWindow(payload) {
     resizable: true,
     autoHideMenuBar: true,
     title: payload.title || (isMailTalk ? "VLUE 메일톡" : "VLUE 채팅"),
+    ...(appIcon ? { icon: appIcon } : {}),
     webPreferences: {
       preload: windowPreload(),
       contextIsolation: true,

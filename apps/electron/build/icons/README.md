@@ -11,14 +11,17 @@ electron-builder 패키징 시 사용하는 아이콘 경로입니다.
 | `icon.ico` | Windows NSIS 설치 파일 | 256×256 멀ti |
 | `icon.icns` | macOS DMG | Apple 규격 |
 
-## 자동 생성 (favicon 기반)
+## 자동 생성 (눈 로고 SVG)
 
-루트에서 패키징 전 스크립트가 `web/public/favicon.svg` → `icon.png` 를 생성합니다.
+루트에서 패키징 전 스크립트가 `web/src/assets/vlue-shield-eye-logo.svg` → `icon.png` + `icon.ico` 를 **매 빌드** 생성합니다.
 
 ```bash
-npm run electron:build
+npm run electron:build:win
 # 내부: node scripts/prepare-electron-icons.mjs
 ```
+
+Windows exe·바로가기 아이콘은 `electron-builder` `win.sign: false` (서명 생략, rcedit 아이콘 적용) 설정이 필요합니다.  
+`signAndEditExecutable: false` 는 아이콘까지 Electron 기본 원자 마크로 남습니다.
 
 ## 공식 브랜드 아이콘 교체
 

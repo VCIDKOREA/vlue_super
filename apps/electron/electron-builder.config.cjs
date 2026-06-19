@@ -40,8 +40,8 @@ module.exports = {
   buildDependenciesFromSource: false,
   win: {
     target: [{ target: "nsis", arch: ["x64"] }],
-    // Windows에서 winCodeSign 추출 시 symlink 권한 오류 회피 (Developer Mode 미사용 환경)
-    signAndEditExecutable: false,
+    // 코드 서명은 생략하되 exe·바로가기 아이콘(rcedit)은 적용 (signAndEditExecutable:false 는 아이콘까지 차단함)
+    sign: false,
     ...(winIcon ? { icon: winIcon } : {})
   },
   mac: {
@@ -63,7 +63,8 @@ module.exports = {
     shortcutName: "VLUE",
     uninstallDisplayName: "VLUE",
     artifactName: "VLUE-Setup-${version}.${ext}",
-    deleteAppDataOnUninstall: false
+    deleteAppDataOnUninstall: false,
+    ...(winIcon ? { installerIcon: winIcon, uninstallerIcon: winIcon } : {})
   },
   publish: null,
   electronVersion: "35.7.5"
