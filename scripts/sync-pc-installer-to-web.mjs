@@ -191,6 +191,15 @@ async function downloadInstallerRemote() {
   throw lastError || new Error("installer download failed");
 }
 
+async function ensureDistCopy() {
+  if (!hasValidInstaller(dest)) return;
+  if (!existsSync(join(root, "web/dist"))) return;
+  mkdirSync(distDestDir, { recursive: true });
+  copyFileSync(dest, distDest);
+  verifyInstaller(distDest);
+  console.log(`[sync-pc-installer] OK (public→dist) → ${distDest}`);
+}
+
 async function main() {
   if (existsSync(src)) {
     copyInstaller(src, "local");
@@ -231,7 +240,9 @@ async function main() {
   console.warn(`[sync-pc-installer] ${message}`);
 }
 
-main().catch((e) => {
+main()
+  .then(() => ensureDistCopy())
+  .catch((e) => {
   console.error("[sync-pc-installer]", e.message || e);
   process.exit(1);
 });

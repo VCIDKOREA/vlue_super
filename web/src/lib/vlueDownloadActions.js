@@ -3,8 +3,9 @@
  */
 
 import { getVlueDownloadLinks } from "./vlueClientAccess.js";
+import { VLUE_PC_INSTALLER_FILENAME } from "./vluePcInstaller.js";
 
-export const VLUE_PC_WINDOWS_FILENAME = "VLUE-Setup-1.0.0.exe";
+export const VLUE_PC_WINDOWS_FILENAME = VLUE_PC_INSTALLER_FILENAME;
 export const VLUE_APP_VERSION = "1.0.0";
 
 const UNAVAILABLE = {
@@ -43,11 +44,16 @@ export function openVlueDownload(platform) {
     return true;
   }
 
+  if (platform === "windows") {
+    window.location.assign(target.url);
+    return true;
+  }
+
   const isInstaller = /\.(exe|dmg|msi|zip)(\?|#|$)/i.test(target.url);
   const anchor = document.createElement("a");
   anchor.href = target.url;
   anchor.rel = "noopener noreferrer";
-  if (platform === "windows" || isInstaller) {
+  if (isInstaller) {
     anchor.setAttribute("download", VLUE_PC_WINDOWS_FILENAME);
     anchor.download = VLUE_PC_WINDOWS_FILENAME;
   } else {
