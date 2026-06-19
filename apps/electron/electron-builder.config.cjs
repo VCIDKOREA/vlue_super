@@ -14,7 +14,9 @@ function pickIcon(candidates) {
   return null;
 }
 
-const winIcon = pickIcon([iconIco, iconPng]);
+// Windows: PNG 우선 — app-builder가 표준 ICO로 변환 (PNG-in-ICO 는 rcedit 실패 가능)
+const winIcon = pickIcon([iconPng, iconIco]);
+const winNsisIcon = pickIcon([iconIco, iconPng]);
 const macIcon = pickIcon([iconIcns, iconPng]);
 
 /** @type {import('electron-builder').Configuration} */
@@ -40,8 +42,7 @@ module.exports = {
   buildDependenciesFromSource: false,
   win: {
     target: [{ target: "nsis", arch: ["x64"] }],
-    // 코드 서명은 생략하되 exe·바로가기 아이콘(rcedit)은 적용 (signAndEditExecutable:false 는 아이콘까지 차단함)
-    sign: false,
+    // signAndEditExecutable 기본 true — rcedit으로 exe 아이콘·메타데이터 적용 (서명 cert 없으면 서명만 스킵)
     ...(winIcon ? { icon: winIcon } : {})
   },
   mac: {
@@ -64,7 +65,7 @@ module.exports = {
     uninstallDisplayName: "VLUE",
     artifactName: "VLUE-Setup-${version}.${ext}",
     deleteAppDataOnUninstall: false,
-    ...(winIcon ? { installerIcon: winIcon, uninstallerIcon: winIcon } : {})
+    ...(winNsisIcon ? { installerIcon: winNsisIcon, uninstallerIcon: winNsisIcon } : {})
   },
   publish: null,
   electronVersion: "35.7.5"

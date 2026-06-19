@@ -1,6 +1,6 @@
 /**
  * VLUE Electron 패키징용 아이콘 생성
- * vlue-shield-eye-logo.svg → icon.png + icon.ico
+ * vlue-shield-eye-logo.svg → icon.png + icon.ico (BMP DIB, rcedit/NSIS 호환)
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -14,38 +14,73 @@ const iconIco = join(iconsDir, "icon.ico");
 const logoSvg = join(root, "web/src/assets/vlue-shield-eye-logo.svg");
 const faviconSvg = join(root, "web/public/favicon.svg");
 
-/** Windows Vista+ PNG-in-ICO (multi-size) */
-function createIcoFromPngs(entries) {
-  const headerSize = 6;
-  const entrySize = 16;
-  let offset = headerSize + entrySize * entries.length;
-  const parts = [];
+/** @param {{ size: number, rgba: Buffer, width: number, height: number }[]} images */
+function buildStandardIco(images) {
+  const count = images.length;
+  const headerSize = 6 + 16 * count;
+  let offset = headerSize;
+  const entries = [];
 
-  const header = Buffer.alloc(headerSize);
-  header.writeUInt16LE(0, 0);
-  header.writeUInt16LE(1, 2);
-  header.writeUInt16LE(entries.length, 4);
-  parts.push(header);
+  for (const { size, rgba, width, height } of images) {
+    const maskRowBytes = Math.ceil(width / 32) * 4;
+    const andMaskSize = maskRowBytes * height;
+    const xorSize = width * height * 4;
+    const dibSize = 40 + xorSize + andMaskSize;
+    const body = Buffer.alloc(dibSize);
+    body.writeUInt32LE(40, 0);
+    body.writeInt32LE(width, 4);
+    body.writeInt32LE(height * 2, 8);
+    body.writeUInt16LE(1, 12);
+    body.writeUInt16LE(32, 14);
+    body.writeUInt32LE(0, 16);
+    body.writeUInt32LE(xorSize, 20);
+    let o = 40;
 
-  for (const { size, png } of entries) {
-    const entry = Buffer.alloc(entrySize);
-    entry.writeUInt8(size >= 256 ? 0 : size, 0);
-    entry.writeUInt8(size >= 256 ? 0 : size, 1);
-    entry.writeUInt8(0, 2);
-    entry.writeUInt8(0, 3);
-    entry.writeUInt16LE(1, 4);
-    entry.writeUInt16LE(32, 6);
-    entry.writeUInt32LE(png.length, 8);
-    entry.writeUInt32LE(offset, 12);
-    parts.push(entry);
-    offset += png.length;
+    for (let y = height - 1; y >= 0; y--) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        body[o++] = rgba[i + 2];
+        body[o++] = rgba[i + 1];
+        body[o++] = rgba[i];
+        body[o++] = rgba[i + 3];
+      }
+    }
+
+    entries.push({ size, dibSize, offset, body });
+    offset += dibSize;
   }
 
-  for (const { png } of entries) {
-    parts.push(png);
+  const out = Buffer.alloc(offset);
+  let p = 0;
+  out.writeUInt16LE(0, p);
+  p += 2;
+  out.writeUInt16LE(1, p);
+  p += 2;
+  out.writeUInt16LE(count, p);
+  p += 2;
+
+  for (const e of entries) {
+    out.writeUInt8(e.size >= 256 ? 0 : e.size, p);
+    p += 1;
+    out.writeUInt8(e.size >= 256 ? 0 : e.size, p);
+    p += 1;
+    out.writeUInt8(0, p);
+    p += 2;
+    out.writeUInt16LE(1, p);
+    p += 2;
+    out.writeUInt16LE(32, p);
+    p += 2;
+    out.writeUInt32LE(e.dibSize, p);
+    p += 4;
+    out.writeUInt32LE(e.offset, p);
+    p += 4;
   }
 
-  return Buffer.concat(parts);
+  for (const e of entries) {
+    e.body.copy(out, e.offset);
+  }
+
+  return out;
 }
 
 async function loadSharp() {
@@ -74,22 +109,25 @@ async function main() {
     return;
   }
 
-  const renderPng = async (size) => {
-    const buf = await sharp(svgPath)
+  const renderRgba = async (size) => {
+    const { data, info } = await sharp(svgPath)
       .resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
-      .png()
-      .toBuffer();
-    return buf;
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { rgba: data, width: info.width, height: info.height, size };
   };
 
-  await renderPng(512).then((buf) => writeFileSync(iconPng, buf));
+  const png512 = await sharp(svgPath)
+    .resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+  writeFileSync(iconPng, png512);
   console.log("[electron-icons] wrote", iconPng);
 
   const icoSizes = [256, 48, 32, 16];
-  const icoEntries = await Promise.all(
-    icoSizes.map(async (size) => ({ size, png: await renderPng(size) }))
-  );
-  writeFileSync(iconIco, createIcoFromPngs(icoEntries));
+  const images = await Promise.all(icoSizes.map((size) => renderRgba(size)));
+  writeFileSync(iconIco, buildStandardIco(images));
   console.log("[electron-icons] wrote", iconIco);
 }
 

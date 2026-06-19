@@ -20,8 +20,8 @@ npm run electron:build:win
 # 내부: node scripts/prepare-electron-icons.mjs
 ```
 
-Windows exe·바로가기 아이콘은 `electron-builder` `win.sign: false` (서명 생략, rcedit 아이콘 적용) 설정이 필요합니다.  
-`signAndEditExecutable: false` 는 아이콘까지 Electron 기본 원자 마크로 남습니다.
+Windows exe·바로가기 아이콘은 `signAndEditExecutable: false` 를 **쓰지 마세요** (Electron 기본 원자 아이콘).  
+서명 인증서 없이도 rcedit 아이콘 적용은 기본 동작입니다. `icon.ico` 는 BMP DIB 형식이어야 합니다.
 
 ## 공식 브랜드 아이콘 교체
 
