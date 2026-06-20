@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { VlueBrandLogo } from '../../../components/VlueBrandLogo.jsx';
 import VlueOnboarding from '../../../components/VlueOnboarding.jsx';
@@ -28,6 +28,8 @@ import { MEMBER_PASSWORD_HINT } from '../../../lib/memberPasswordRules.js';
 interface AuthModalProps {
   onClose: () => void;
   onSuccess: (user: MarketingAuthUser) => void;
+  initialMode?: Mode;
+  autoStartSignup?: boolean;
 }
 
 type Mode = 'login' | 'signup' | 'signup_certified';
@@ -38,8 +40,13 @@ const SOCIAL = [
   { id: 'google' as const, label: 'Google 로그인', color: '#fff', textColor: '#374151', icon: 'G', border: true },
 ];
 
-export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
-  const [mode, setMode] = useState<Mode>('login');
+export default function AuthModal({
+  onClose,
+  onSuccess,
+  initialMode = 'login',
+  autoStartSignup = false,
+}: AuthModalProps) {
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -64,6 +71,13 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
     beginWebSignup(mode);
     setOnboardingOpen(true);
   };
+
+  useEffect(() => {
+    if (!autoStartSignup) return;
+    if (initialMode !== 'signup' && initialMode !== 'signup_certified') return;
+    beginWebSignup(initialMode);
+    setOnboardingOpen(true);
+  }, [autoStartSignup, initialMode]);
 
   const finishPostSignupPayment = () => {
     setPostSignupPaymentOpen(false);

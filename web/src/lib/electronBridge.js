@@ -62,6 +62,33 @@ export function isElectronRoomWindow() {
   return Boolean(getElectronRoomBootParams());
 }
 
+/** @returns {boolean} 패키징된 PC 앱(file://) — WebAuthn 불가, 회원가입은 외부 브라우저 */
+export function shouldOpenSignupInExternalBrowser() {
+  if (!isElectronApp()) return false;
+  try {
+    return window.location.protocol === "file:";
+  } catch {
+    return true;
+  }
+}
+
+/** @returns {string} www.vlue.kr 회원가입(HTTPS) 딥링크 */
+export function buildVlueWebSignupUrl() {
+  const base = String(import.meta.env.VITE_VLUE_LANDING_URL || "https://www.vlue.kr").replace(/\/$/, "");
+  return `${base}/?auth=signup&start=1`;
+}
+
+/** PC 앱(file://)에서 회원가입 — 기본 브라우저로 www.vlue.kr 열기 */
+export function openElectronExternalSignup() {
+  const url = buildVlueWebSignupUrl();
+  if (isElectronApp() && window.vlueElectron?.openExternalUrl) {
+    void window.vlueElectron.openExternalUrl(url);
+    return true;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+  return true;
+}
+
 /** @param {string} url */
 export function openInAppLink(url) {
   if (!url) return;

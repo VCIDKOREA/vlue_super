@@ -96,7 +96,9 @@ import {
 import {
   getElectronRoomBootParams,
   isElectronRoomWindow,
-  openElectronRoomWindow
+  openElectronExternalSignup,
+  openElectronRoomWindow,
+  shouldOpenSignupInExternalBrowser
 } from "./lib/electronBridge.js";
 import { emitAssetFilesChanged, emitOfficeEmailInboxChanged } from "./lib/vlueAssetFilesStorage.js";
 import { emitEmailInboxChanged } from "./lib/vlueEmailMappingsApi.js";
@@ -352,12 +354,18 @@ function App() {
   const [pendingAuthAction, setPendingAuthAction] = useState(null);
   const [guestAuthOverlay, setGuestAuthOverlay] = useState(false);
 
-  /** 마케팅 웹(www) 회원가입 탭 → /app 동일 온보딩 */
+  /** 마케팅 웹(www) 회원가입 탭 → /app 동일 온보딩 (PC file:// 앱은 외부 브라우저) */
   useEffect(() => {
     try {
       const flag = sessionStorage.getItem(VLUE_MARKETING_SIGNUP_KEY);
       if (!flag) return;
       sessionStorage.removeItem(VLUE_MARKETING_SIGNUP_KEY);
+      if (shouldOpenSignupInExternalBrowser()) {
+        openElectronExternalSignup();
+        setBottomToast("브라우저에서 가입을 완료한 뒤, PC 앱에서 로그인해 주세요.");
+        const t = setTimeout(() => setBottomToast(""), 5000);
+        return () => clearTimeout(t);
+      }
       localStorage.removeItem(ONBOARDING_DONE_KEY);
       localStorage.setItem(SESSION_KEY, "0");
       setIsLoggedIn(false);
@@ -1755,6 +1763,14 @@ function App() {
   }, []);
 
   const handleSignup = useCallback(() => {
+    if (shouldOpenSignupInExternalBrowser()) {
+      openElectronExternalSignup();
+      setGuestAuthOverlay(false);
+      setPendingAuthAction(null);
+      setBottomToast("브라우저에서 가입을 완료한 뒤, PC 앱에서 로그인해 주세요.");
+      setTimeout(() => setBottomToast(""), 5000);
+      return;
+    }
     localStorage.removeItem(ONBOARDING_DONE_KEY);
     try {
       localStorage.removeItem(DIGITAL_CARD_ACTIVE_KEY);
@@ -2062,6 +2078,16 @@ function App() {
   }, []);
 
   const showOnboardingFlow = signupOnboardingOpen;
+
+  /** file:// PC 앱에서 인앱 온보딩이 열리면 외부 브라우저로 우회 */
+  useEffect(() => {
+    if (!signupOnboardingOpen || !shouldOpenSignupInExternalBrowser()) return;
+    setSignupOnboardingOpen(false);
+    openElectronExternalSignup();
+    setBottomToast("브라우저에서 가입을 완료한 뒤, PC 앱에서 로그인해 주세요.");
+    const t = setTimeout(() => setBottomToast(""), 5000);
+    return () => clearTimeout(t);
+  }, [signupOnboardingOpen]);
 
   const biometricAllowed = useMemo(() => isBiometricGraceActive(), [biometricSeq, isLoggedIn]);
 

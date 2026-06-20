@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeImage, screen, session } = require("electron");
+const { app, BrowserWindow, ipcMain, nativeImage, screen, session, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const { pathToFileURL } = require("url");
@@ -204,6 +204,14 @@ ipcMain.handle("vlue:is-room-window", (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!win || win === mainWindow) return false;
   return Boolean(win.vlueRoomParams);
+});
+
+ipcMain.handle("vlue:open-external-url", (_event, url) => {
+  if (typeof url !== "string") return false;
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return false;
+  shell.openExternal(trimmed);
+  return true;
 });
 
 app.whenReady().then(() => {

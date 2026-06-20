@@ -57,6 +57,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<MarketingAuthUser | null>(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup' | 'signup_certified'>('login');
+  const [authAutoStartSignup, setAuthAutoStartSignup] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
 
   useEffect(() => {
@@ -74,6 +76,24 @@ export default function App() {
         void vlueMarketingLogout();
       }
     });
+  }, []);
+
+  /** PC 앱 등에서 ?auth=signup&start=1 로 회원가입 딥링크 */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const auth = params.get('auth');
+    if (auth !== 'signup' && auth !== 'signup_certified') return;
+
+    setAuthInitialMode(auth);
+    setAuthAutoStartSignup(params.get('start') === '1');
+    setShowAuth(true);
+
+    params.delete('auth');
+    params.delete('start');
+    const q = params.toString();
+    const next = `${window.location.pathname}${q ? `?${q}` : ''}${window.location.hash}`;
+    window.history.replaceState(null, '', next);
   }, []);
 
   useEffect(() => {
@@ -148,7 +168,7 @@ export default function App() {
     <div className="min-h-screen bg-blue-tint relative font-sans">
       <AnimatedBackground />
       <div className="relative z-10">
-        <Navbar currentView={view} onNavigate={handleNavigate} user={user} onLoginClick={() => setShowAuth(true)} onLogout={handleLogout} />
+        <Navbar currentView={view} onNavigate={handleNavigate} user={user} onLoginClick={() => { setAuthInitialMode('login'); setAuthAutoStartSignup(false); setShowAuth(true); }} onLogout={handleLogout} />
         {view === 'home' && (
           <div className="fixed left-0 right-0 z-40 mkt-download-bar-anchor">
             <AppDownloadBar variant="top" currentView={view} onNavigate={handleNavigate} />
@@ -237,9 +257,16 @@ export default function App() {
         onLoginRequired={handleLoginRequired}
       />
       {showLoginRequired && !user && (
-        <LoginRequiredModal onClose={() => setShowLoginRequired(false)} onLogin={() => { setShowLoginRequired(false); setShowAuth(true); }} />
+        <LoginRequiredModal onClose={() => setShowLoginRequired(false)} onLogin={() => { setShowLoginRequired(false); setAuthInitialMode('login'); setAuthAutoStartSignup(false); setShowAuth(true); }} />
       )}
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} onSuccess={handleAuthSuccess} />}
+      {showAuth && (
+        <AuthModal
+          initialMode={authInitialMode}
+          autoStartSignup={authAutoStartSignup}
+          onClose={() => { setShowAuth(false); setAuthAutoStartSignup(false); }}
+          onSuccess={handleAuthSuccess}
+        />
+      )}
     </div>
   );
 }

@@ -25,5 +25,10 @@ contextBridge.exposeInMainWorld("vlueElectron", {
 
   isRoomWindow() {
     return ipcRenderer.invoke("vlue:is-room-window");
+  },
+
+  /** @param {string} url */
+  openExternalUrl(url) {
+    return ipcRenderer.invoke("vlue:open-external-url", url);
   }
 });
