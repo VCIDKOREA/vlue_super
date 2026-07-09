@@ -168,7 +168,7 @@ function staticScreens(membershipTier) {
       id: "scr-wallet",
       category: "바로가기",
       title: "개인케이스 · Wallet",
-      subtitle: "명함저장 · 내문서",
+      subtitle: "명함저장 · 저장된케이스 · 내문서",
       fields: ["지갑", "wallet", "명함", "카드", "케이스", "자료실"],
       action: { type: "wallet" }
     },

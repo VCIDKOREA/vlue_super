@@ -76,8 +76,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         subtitle="통화 쇼케이스 다시보기"
         icon={Phone}
         isDarkMode={isDarkMode}
+        reserveBottomNav
       >
-        <div className="px-3 py-3">
+        <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
           {loading ? (
             <p className="py-16 text-center text-[13px] font-semibold text-slate-500">쇼케이스 불러오는 중…</p>
           ) : previewCard ? (
@@ -100,6 +101,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       subtitle="종료 후 상대방 쇼케이스 다시보기"
       icon={Phone}
       isDarkMode={isDarkMode}
+      reserveBottomNav
     >
       {items.length === 0 ? (
         <p className="px-4 py-16 text-center text-[13px] font-semibold text-slate-500">통화 기록이 없습니다.</p>

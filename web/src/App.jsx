@@ -20,12 +20,14 @@ import { readCalendarBadge, setCalendarBadge, clearCalendarBadge } from "./lib/c
 import { fetchMemoMeta, receiveShareMemo } from "./lib/memoApi.js";
 import { LOCAL_MEMO_CHANGED } from "./lib/localMemoStorage.js";
 import { OPEN_CALENDAR_EVENT_KEY } from "./lib/calendarConstants.js";
+import { SHOWCASE_OPEN_SETTINGS_EVENT } from "./lib/showcase/showcaseStyleStorage.js";
 import { EXPAND_FAMILY_KEY, OPEN_POS_DASHBOARD_KEY } from "./lib/posDashboardConstants.js";
 import { publishCalendarAsRoomNotice } from "./lib/chatRoomNoticeService.js";
 import BetaLaunchGuide from "./components/BetaLaunchGuide.jsx";
 import Subscription from "./components/Subscription.jsx";
 import WalletHubModal from "./components/WalletHubModal.jsx";
 import AppNotificationSheet from "./components/AppNotificationSheet.jsx";
+import ShowcaseStyleSettingsSheet from "./components/showcase/ShowcaseStyleSettingsSheet.jsx";
 import CallShowcaseHistorySheet from "./components/CallShowcaseHistorySheet.jsx";
 import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
 import PersonalFeed from "./components/PersonalFeed";
@@ -435,6 +437,16 @@ function App() {
   );
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileInitialView, setProfileInitialView] = useState("main");
+  useEffect(() => {
+    const openShowcaseSettings = () => {
+      setAppNotificationOpen(false);
+      setCallShowcaseSheetOpen(false);
+      setProfileOpen(false);
+      setShowcaseStyleSheetOpen(true);
+    };
+    window.addEventListener(SHOWCASE_OPEN_SETTINGS_EVENT, openShowcaseSettings);
+    return () => window.removeEventListener(SHOWCASE_OPEN_SETTINGS_EVENT, openShowcaseSettings);
+  }, []);
   const [parentalConsentRequest, setParentalConsentRequest] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -504,6 +516,7 @@ function App() {
   const [walletDefaultTab, setWalletDefaultTab] = useState("received");
   const [appNotificationOpen, setAppNotificationOpen] = useState(false);
   const [callShowcaseSheetOpen, setCallShowcaseSheetOpen] = useState(false);
+  const [showcaseStyleSheetOpen, setShowcaseStyleSheetOpen] = useState(false);
   const [officeRemoteOpen, setOfficeRemoteOpen] = useState(false);
   const [appMode, setAppMode] = useState(() => readAppMode());
   const [activeOfficeCardId, setActiveOfficeCardId] = useState(() => readActiveOfficeCardId());
@@ -3033,6 +3046,7 @@ function App() {
   }, [page]);
 
   const activeBottomTab = useMemo(() => {
+    if (showcaseStyleSheetOpen) return "home";
     if (callShowcaseSheetOpen) return "calls";
     if (appNotificationOpen) return "notifications";
     if (page === "main") return "";
@@ -3046,7 +3060,7 @@ function App() {
     if (page === "manage") return "chat";
     if (page === "list" || page === "room" || page === "feed") return "chat";
     return "";
-  }, [page, appNotificationOpen, callShowcaseSheetOpen]);
+  }, [page, appNotificationOpen, callShowcaseSheetOpen, showcaseStyleSheetOpen]);
 
   const bottomNavPulseChat = totalUnread > 0 && activeBottomTab !== "chat";
   const bottomNavPulseFriendSearch = friendInboxRequests.length > 0 && activeBottomTab !== "home";
@@ -4213,6 +4227,17 @@ function App() {
           navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
         }}
       />
+      <ShowcaseStyleSettingsSheet
+        open={v1AppShell.showcaseStyleSettings && showcaseStyleSheetOpen}
+        onClose={() => setShowcaseStyleSheetOpen(false)}
+        membershipTier={membershipTier}
+        isDarkMode={isDarkMode}
+        onOpenUpgrade={() => {
+          setShowcaseStyleSheetOpen(false);
+          setProfileInitialView("upgrade");
+          setProfileOpen(true);
+        }}
+      />
       <CallShowcaseHistorySheet
         open={v1AppShell.callShowcaseHistoryNav && callShowcaseSheetOpen}
         onClose={() => setCallShowcaseSheetOpen(false)}
@@ -4228,8 +4253,8 @@ function App() {
         }}
       />
 
-      <footer className={`fixed bottom-0 left-0 right-0 z-[130] ${showBottomNav ? "block" : "hidden"}`}>
-        <nav className="fixed bottom-0 left-0 right-0 z-[131] flex justify-center">
+      <footer className={`fixed bottom-0 left-0 right-0 z-[150] ${showBottomNav ? "block" : "hidden"}`}>
+        <nav className="fixed bottom-0 left-0 right-0 z-[151] flex justify-center">
           <div
             ref={bottomNavPulseSyncRef}
             className={`bottom-nav-pulse-root flex min-h-[48px] w-full max-w-none items-center justify-around border-t px-2 pb-[max(0px,env(safe-area-inset-bottom,0px))] pt-[6px] backdrop-blur-md ${
@@ -4424,6 +4449,7 @@ function App() {
                 triggerHeaderEyeNavBlink();
                 requireApp(() => {
                   setCallShowcaseSheetOpen(false);
+                  setShowcaseStyleSheetOpen(false);
                   setAppNotificationOpen(true);
                 });
               }}
@@ -4468,6 +4494,7 @@ function App() {
                 triggerHeaderEyeNavBlink();
                 requireApp(() => {
                   setAppNotificationOpen(false);
+                  setShowcaseStyleSheetOpen(false);
                   setCallShowcaseSheetOpen(true);
                 });
               }}
@@ -4503,6 +4530,7 @@ function App() {
                 triggerHeaderEyeNavBlink();
                 setAppNotificationOpen(false);
                 setCallShowcaseSheetOpen(false);
+                setShowcaseStyleSheetOpen(false);
                 if (isBrowseGuest) {
                   requireAuth(() => navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null }));
                   return;

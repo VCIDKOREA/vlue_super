@@ -21,6 +21,24 @@ export function writeCardWallet(items) {
   }
 }
 
+/** 통화 쇼케이스 스크랩(업체 저장하기) 항목 여부 */
+export function isShowcaseScrapWalletItem(item) {
+  if (!item || typeof item !== "object") return false;
+  if (item.source === "showcase_scrap") return true;
+  return String(item.userId || "").startsWith("showcase-");
+}
+
+/** 명함저장 / 저장된케이스 분리 */
+export function partitionCardWallet(wallet = []) {
+  const showcases = [];
+  const received = [];
+  for (const item of wallet) {
+    if (isShowcaseScrapWalletItem(item)) showcases.push(item);
+    else received.push(item);
+  }
+  return { showcases, received };
+}
+
 /** 지갑 행 + 최신 프로필(있으면) 병합 — 오프라인/삭제된 방에도 저장 명함 표시 */
 export function resolveWalletProfile(item, profileByRoomId) {
   const live = profileByRoomId[item.userId];

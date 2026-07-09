@@ -7,6 +7,7 @@ import {
 } from "../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { showcasePreviewLabel, VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
+import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
 
 /**
@@ -33,6 +34,13 @@ export default function CallBigPushPreviewSection({ membershipTier = "free", cla
           <p className="text-[12px] font-black text-slate-900">{showcasePreviewLabel()}</p>
           <p className="text-[10px] font-medium text-slate-500">{VLUE_SHOWCASE.tagline}</p>
         </div>
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT))}
+          className="shrink-0 rounded-full bg-blue-600 px-3 py-1.5 text-[10px] font-black text-white shadow-sm active:scale-95"
+        >
+          스타일 설정
+        </button>
       </div>
 
       {showTierTabs ? (

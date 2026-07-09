@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Hash, Link2, Music2, Palette, ShoppingBag, Sparkles } from "lucide-react";
+import { Check, Hash, Link2, Music2, Palette, ShoppingBag, Sparkles } from "lucide-react";
 import BackButton from "../common/BackButton";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import { getShowcasePermissions, requiresPremium } from "../../lib/showcase/showcaseStylePermissions.js";
@@ -37,7 +37,11 @@ export default function ShowcaseStyleSettingsPanel({
   membershipTier = "free",
   isDarkMode = false,
   onBack,
-  onOpenUpgrade
+  onOpenUpgrade,
+  /** AppFullScreenView 안 — 상단 헤더 숨김 */
+  hideHeader = false,
+  /** V1 전체 화면 시트 레이아웃 */
+  fullscreen = false
 }) {
   const isPaid = isPaidLetteringTier(membershipTier);
   const perms = getShowcasePermissions(membershipTier);
@@ -98,14 +102,18 @@ export default function ShowcaseStyleSettingsPanel({
   const inputCls = isDarkMode ? "border-white/10 bg-white/5 text-gray-100" : "border-slate-200 bg-white text-slate-900";
 
   return (
-    <div className={`showcase-style-settings flex min-h-0 flex-1 flex-col ${isDarkMode ? "showcase-style-settings--dark" : ""}`}>
+    <div
+      className={`showcase-style-settings flex min-h-0 flex-1 flex-col ${fullscreen ? "showcase-style-settings--fullscreen" : ""} ${isDarkMode ? "showcase-style-settings--dark" : ""}`}
+    >
+      {!hideHeader ? (
       <div className={`flex shrink-0 items-center gap-2 border-b px-3 py-2.5 ${isDarkMode ? "border-white/10" : "border-slate-100"}`}>
         <BackButton variant="inline" onBack={onBack} isDarkMode={isDarkMode} />
         <div className="min-w-0 flex-1">
           <p className={`text-[17px] font-black ${headText}`}>{VLUE_SHOWCASE.nameKo}</p>
-          <p className={`text-[11px] ${subText}`}>카카오톡·인스타 감성으로 꾸며보세요</p>
+          <p className={`text-[11px] ${subText}`}>아래에서 스타일·사진·음악을 바로 설정하세요</p>
         </div>
       </div>
+      ) : null}
 
       <nav className="showcase-style-settings__tabs" aria-label="쇼케이스 설정 탭">
         {TABS.map(({ id, label, icon: Icon }) => (
@@ -121,25 +129,40 @@ export default function ShowcaseStyleSettingsPanel({
         ))}
       </nav>
 
-      <div className="showcase-style-settings__split min-h-0 flex-1 overflow-hidden">
-        <div className="showcase-style-settings__form vlue-scroll-pad-profile-panel overflow-y-auto px-4 py-4">
+      <div className={`showcase-style-settings__split${fullscreen ? " showcase-style-settings__split--fullscreen" : " min-h-0 flex-1 overflow-hidden"}`}>
+        <div className={`showcase-style-settings__form overflow-y-auto px-4 py-4 ${fullscreen ? "vlue-scroll-pad-bottom-nav min-h-0 flex-1" : "vlue-scroll-pad-profile-panel"}`}>
           {tab === "style" && (
             <>
-              <section className="showcase-style-settings__section showcase-style-settings__section--ig">
-                <h2 className="showcase-style-settings__label">프로필 스타일</h2>
-                <div className="showcase-style-settings__style-grid showcase-style-settings__style-grid--story">
+              <section className="showcase-style-settings__section">
+                <h2 className="showcase-style-settings__label">통화 화면 스타일 선택</h2>
+                <p className={`showcase-style-settings__hint ${subText}`}>원하는 스타일 카드를 누르세요. 아래 미리보기에 바로 반영됩니다.</p>
+                <div className="showcase-style-settings__pick-list">
                   {SHOWCASE_STYLE_LIST.map((s) => {
+                    const meta = SHOWCASE_STYLE_TYPES[s.id] || s;
                     const locked = !perms.allowedStyleIds.includes(s.id);
                     const active = config.styleType === s.id;
                     return (
                       <button
                         key={s.id}
                         type="button"
-                        className={`showcase-style-settings__story-chip${active ? " active" : ""}${locked ? " locked" : ""}`}
+                        className={`showcase-style-settings__pick-card${active ? " active" : ""}${locked ? " locked" : ""}`}
                         onClick={() => onSelectStyle(s.id)}
                       >
-                        <span className="showcase-style-settings__story-ring" />
-                        <span className="showcase-style-settings__story-label">{s.label}</span>
+                        <span
+                          className="showcase-style-settings__pick-icon"
+                          style={{ backgroundColor: meta.accent || "#2b6ff0" }}
+                          aria-hidden
+                        >
+                          {meta.emoji || "📱"}
+                        </span>
+                        <span className="showcase-style-settings__pick-body">
+                          <span className="showcase-style-settings__pick-title">
+                            {s.label}
+                            {locked ? " · 유료" : ""}
+                          </span>
+                          <span className="showcase-style-settings__pick-desc">{meta.shortDesc || s.desc}</span>
+                        </span>
+                        {active ? <Check size={18} className="showcase-style-settings__pick-check" aria-hidden /> : null}
                       </button>
                     );
                   })}
@@ -365,7 +388,8 @@ export default function ShowcaseStyleSettingsPanel({
           </div>
         </div>
 
-        <aside className="showcase-style-settings__preview-pane">
+        <aside className={`showcase-style-settings__preview-pane${fullscreen ? " showcase-style-settings__preview-pane--fullscreen" : ""}`}>
+          <p className="showcase-style-settings__preview-label">통화 화면 미리보기</p>
           <ShowcaseStylePreview styleConfig={config} card={card} membershipTier={membershipTier} phase={previewPhase} />
         </aside>
       </div>

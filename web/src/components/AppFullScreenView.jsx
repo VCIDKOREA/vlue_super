@@ -9,13 +9,16 @@ export default function AppFullScreenView({
   icon: Icon,
   isDarkMode = false,
   children,
-  className = ""
+  className = "",
+  /** true면 하단 카테고리 바 영역을 비워 둠 */
+  reserveBottomNav = false
 }) {
   if (!open) return null;
 
   return (
     <div
-      className={`fixed inset-0 z-[140] flex flex-col ${isDarkMode ? "bg-[#111827] text-gray-100" : "bg-white text-slate-900"} ${className}`.trim()}
+      className={`fixed left-0 right-0 top-0 z-[140] flex flex-col ${isDarkMode ? "bg-[#111827] text-gray-100" : "bg-white text-slate-900"} ${className}`.trim()}
+      style={reserveBottomNav ? { bottom: "var(--vlue-bottom-nav-offset, 0px)" } : undefined}
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -45,7 +48,7 @@ export default function AppFullScreenView({
           </div>
         </div>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
     </div>
   );
 }

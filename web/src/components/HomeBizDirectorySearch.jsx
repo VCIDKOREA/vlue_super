@@ -25,7 +25,7 @@ function BizSearchBar({ query, onQueryChange, onSubmit, logoSize = 22 }) {
               onSubmit?.();
             }
           }}
-          placeholder="업체명·직종·명함 검색"
+          placeholder="업체명·쇼케이스·명함 검색"
           className="home-biz-search__input"
           enterKeyHint="search"
           autoComplete="off"

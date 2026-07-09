@@ -102,7 +102,7 @@ export default function FriendShowcaseList({
       >
         <header className="friend-showcase-list__header">
           <div className="friend-showcase-list__title-row">
-            <h2 className="friend-showcase-list__title">친구</h2>
+            <h2 className="friend-showcase-list__title">친구 쇼케이스</h2>
             <span className="friend-showcase-list__count">{entries.length}</span>
           </div>
           <div className="friend-showcase-list__actions">

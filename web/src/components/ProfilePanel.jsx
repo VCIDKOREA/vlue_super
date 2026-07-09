@@ -11,7 +11,6 @@ import VlueSettingsPanel from "./settings/VlueSettingsPanel.jsx";
 import { applyAppSettingsToDocument } from "../lib/vlueAppSettings.js";
 import WalletRevealCard from "./WalletRevealCard.jsx";
 import MyPageDigitalLetteringSection from "./MyPageDigitalLetteringSection.jsx";
-import ShowcaseStyleSettingsPanel from "./showcase/ShowcaseStyleSettingsPanel.jsx";
 import EnterpriseLineManagePanel from "./EnterpriseLineManagePanel.jsx";
 import ShoppingCartHubPanel from "./ShoppingCartHubPanel.jsx";
 import BroadcastLineSetupPanel from "./BroadcastLineSetupPanel.jsx";
@@ -25,6 +24,7 @@ import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
 import { fetchEmailForwardingMapping, readLocalLoginPrefix } from "../lib/vlueEmailMappingsApi.js";
 import { membershipTierStyleClass } from "../lib/membershipTierDisplay.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
+import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 
 function tierLabelStyle(tier, isDarkMode) {
   return membershipTierStyleClass(tier, isDarkMode);
@@ -238,6 +238,12 @@ function ProfilePanel({
     if (initialView === "broadcastSetup") {
       setPanelView("broadcastSetup");
       setUpgradeOpen(false);
+      return;
+    }
+    if (initialView === "showcaseStyle") {
+      setPanelView("main");
+      setUpgradeOpen(false);
+      window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
       return;
     }
     setPanelView("main");
@@ -485,13 +491,6 @@ function ProfilePanel({
               <BroadcastLineSetupPanel onToast={showSettingNotice} />
             </div>
           </div>
-        ) : panelView === "showcaseStyle" ? (
-          <ShowcaseStyleSettingsPanel
-            membershipTier={membershipTier}
-            isDarkMode={isDarkMode}
-            onBack={() => setPanelView("main")}
-            onOpenUpgrade={() => setUpgradeOpen(true)}
-          />
         ) : panelView === "shoppingCart" && v1AppShell.shoppingCart ? (
           <ShoppingCartHubPanel
             membershipTier={membershipTier}
@@ -653,7 +652,10 @@ function ProfilePanel({
             isVCIDOn={isVCIDOn}
             onApplyDigitalCard={openLetteringBizcardHub}
             onEditLettering={openLetteringBizcardHub}
-            onOpenShowcaseStyle={() => setPanelView("showcaseStyle")}
+            onOpenShowcaseStyle={() => {
+              onClose?.();
+              window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
+            }}
             onToast={(msg) => showSettingNotice(msg)}
           />
 
@@ -739,7 +741,7 @@ function ProfilePanel({
                   <br />
                   케이스
                 </p>
-                <p className="mt-1 text-[9px] font-bold text-orange-700">명함저장 · 내문서</p>
+                <p className="mt-1 text-[9px] font-bold text-orange-700">명함저장 · 저장된케이스 · 내문서</p>
               </div>
             </button>
             ) : null}

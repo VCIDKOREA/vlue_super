@@ -3,35 +3,50 @@ export const SHOWCASE_STYLE_TYPES = {
   default: {
     id: "default",
     label: "기본형",
-    desc: "번호 + VLUE 안심 안내 (BGM 없음)",
+    desc: "번호 + VLUE 안심 안내",
+    shortDesc: "통화 화면에 번호·안심 문구만 표시",
+    emoji: "📞",
+    accent: "#2b6ff0",
     bgmSource: "none",
     tier: "free"
   },
   kakao: {
     id: "kakao",
     label: "카카오톡",
-    desc: "카톡 프로필 링크로 피드 송출 (플랫폼 BGM)",
+    desc: "카톡 프로필 연동",
+    shortDesc: "카카오톡 프로필 링크·피드 스타일",
+    emoji: "💬",
+    accent: "#FEE500",
     bgmSource: "platform",
     tier: "free"
   },
   instagram: {
     id: "instagram",
     label: "인스타그램",
-    desc: "인스타 프로필 링크로 피드 송출 (플랫폼 BGM)",
+    desc: "인스타 프로필 연동",
+    shortDesc: "인스타그램 프로필·사진 피드 스타일",
+    emoji: "📷",
+    accent: "#E1306C",
     bgmSource: "platform",
     tier: "free"
   },
   rich_custom: {
     id: "rich_custom",
     label: "개인스타일",
-    desc: "폰트·이모티·자체 BGM 꾸미기",
+    desc: "폰트·사진·BGM 꾸미기",
+    shortDesc: "사진·글꼴·음악을 직접 꾸미기",
+    emoji: "✨",
+    accent: "#7c3aed",
     bgmSource: "vlue",
     tier: "free"
   },
   certificate: {
     id: "certificate",
     label: "디지털인증명함",
-    desc: "상호·직급·로고 비즈니스 카드 (유료)",
+    desc: "상호·직급 비즈니스 카드",
+    shortDesc: "유료 · 공식 인증 명함형 송출",
+    emoji: "🪪",
+    accent: "#0d9488",
     bgmSource: "vlue",
     tier: "paid"
   }

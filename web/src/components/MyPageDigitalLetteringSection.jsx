@@ -5,6 +5,7 @@ import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { resolveVlueShowcaseCard } from "../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { showcasePreviewLabel, VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
+import { SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import LetteringBizcardSharePanel from "./LetteringBizcardSharePanel.jsx";
 
 /**
@@ -24,6 +25,14 @@ export default function MyPageDigitalLetteringSection({
   const [previewTick, setPreviewTick] = useState(0);
   const [cardIssuedAt, setCardIssuedAt] = useState(null);
 
+  const openSettings = () => {
+    if (onOpenShowcaseStyle) {
+      onOpenShowcaseStyle();
+      return;
+    }
+    window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
+  };
+
   const isApproved = Boolean(digitalCardActive) && digitalCardIssued !== false;
 
   const previewCard = useMemo(() => {
@@ -35,7 +44,11 @@ export default function MyPageDigitalLetteringSection({
   useEffect(() => {
     const bump = () => setPreviewTick((n) => n + 1);
     window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
-    return () => window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
+    window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, bump);
+    return () => {
+      window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
+      window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, bump);
+    };
   }, []);
 
   useEffect(() => {
@@ -80,10 +93,17 @@ export default function MyPageDigitalLetteringSection({
 
   return (
     <section className="w-full">
-      <button
-        type="button"
-        onClick={() => onOpenShowcaseStyle?.()}
-        className={`relative mb-3 flex w-full flex-col gap-3 rounded-[26px] border-2 p-4 text-left shadow-sm transition-all active:scale-[0.98] ${
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={openSettings}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openSettings();
+          }
+        }}
+        className={`relative mb-3 flex w-full cursor-pointer flex-col gap-3 rounded-[26px] border-2 p-4 text-left shadow-sm transition-all active:scale-[0.98] ${
           isDarkMode
             ? "border-blue-500/30 bg-gradient-to-br from-blue-500/10 to-indigo-500/10"
             : "border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50"
@@ -95,7 +115,7 @@ export default function MyPageDigitalLetteringSection({
               {showcasePreviewLabel()}
             </p>
             <p className={`mt-1 text-[11px] font-semibold leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-600"}`}>
-              블루 케이스를 예쁘게 꾸며 통화 화면에 송출하세요
+              스타일 설정을 누르면 전체 화면에서 꾸밀 수 있습니다
             </p>
           </div>
           <span className={`shrink-0 text-lg ${isDarkMode ? "text-gray-400" : "text-slate-400"}`} aria-hidden>
@@ -103,13 +123,18 @@ export default function MyPageDigitalLetteringSection({
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
-          <span
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openSettings();
+            }}
             className={`rounded-full px-3 py-1.5 text-[11px] font-black ${
               isDarkMode ? "bg-blue-500/20 text-blue-200" : "bg-white text-blue-700 ring-1 ring-blue-100"
             }`}
           >
             스타일 설정
-          </span>
+          </button>
           <button
             type="button"
             onClick={(e) => {
@@ -128,7 +153,7 @@ export default function MyPageDigitalLetteringSection({
             ? `현재 ${VLUE_SHOWCASE.nameKo}가 송출중입니다.`
             : `현재 ${VLUE_SHOWCASE.nameKo}가 꺼짐 상태입니다.`}
         </p>
-      </button>
+      </div>
 
       <LetteringBizcardSharePanel
         card={previewCard}

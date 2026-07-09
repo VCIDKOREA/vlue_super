@@ -17,8 +17,9 @@ export default function AppNotificationSheet({
       subtitle="가족보호 · 서비스 알림"
       icon={Bell}
       isDarkMode={isDarkMode}
+      reserveBottomNav
     >
-      <div className="px-3 py-3">
+      <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
         <PushNotificationInbox onOpenFamilyProtection={onOpenFamilyProtection} />
       </div>
     </AppFullScreenView>

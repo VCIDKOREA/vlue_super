@@ -2,6 +2,8 @@ import { SHOWCASE_STYLE_TYPES } from "./showcaseStyleTypes.js";
 
 export const SHOWCASE_STYLE_STORAGE_KEY = "vlue_showcase_style_v1";
 export const SHOWCASE_STYLE_CHANGED_EVENT = "vlue-showcase-style-changed";
+/** 마이페이지·홈에서 쇼케이스 설정 패널 열기 */
+export const SHOWCASE_OPEN_SETTINGS_EVENT = "vlue-showcase-open-settings";
 export const SHOWCASE_MAX_PHOTOS = 10;
 
 /** @typedef {Object} ShowcaseGalleryPhoto
