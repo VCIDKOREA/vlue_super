@@ -4237,6 +4237,10 @@ function App() {
           setProfileInitialView("upgrade");
           setProfileOpen(true);
         }}
+        onToast={(msg) => {
+          setBottomToast(msg);
+          setTimeout(() => setBottomToast(""), 2200);
+        }}
       />
       <CallShowcaseHistorySheet
         open={v1AppShell.callShowcaseHistoryNav && callShowcaseSheetOpen}

@@ -19,7 +19,7 @@ export function getShowcasePermissions(membershipTier = "free") {
     menuWrite: isPaid,
     /** BGM 유튜브 지정 */
     youtubeBgm: isPaid,
-    /** 해시태그 등록 (V2 검색) */
+    /** V1 — 해시태그 등록·홈 검색 노출 (유료 전용) */
     hashtagRegister: isPaid,
     /** 상품 소개 링크아웃 */
     productLinkout: isPaid,

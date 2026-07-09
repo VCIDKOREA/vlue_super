@@ -3949,7 +3949,7 @@ body,
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  border: 2px solid rgba(197, 212, 232, 0.9);
+  border: 1px solid rgba(197, 212, 232, 0.85);
   background: #fff;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
 }
@@ -6544,7 +6544,7 @@ body,
 
 .ldr-profile-media--logo .ldr-profile-media__img {
   object-fit: contain;
-  padding: 8px;
+  padding: 2px;
   background: rgba(255, 255, 255, 0.96);
 }
 

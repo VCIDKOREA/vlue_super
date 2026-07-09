@@ -20,7 +20,7 @@ export const SHOWCASE_MAX_PHOTOS = 10;
 export function createDefaultShowcaseStyle() {
   return {
     styleType: "default",
-    /** V2/V3 — #해시태그 디렉토리 검색용 */
+    /** V1 — #해시태그 (유료 · 홈 디렉토리 검색) */
     tags: [],
     bgm: {
       mode: "none",

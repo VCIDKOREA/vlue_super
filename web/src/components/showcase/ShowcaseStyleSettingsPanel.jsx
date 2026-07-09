@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Hash, Link2, Music2, Palette, ShoppingBag, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, ChevronUp, Hash, Link2, Music2, Palette, ShoppingBag, Sparkles } from "lucide-react";
 import BackButton from "../common/BackButton";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import { getShowcasePermissions, requiresPremium } from "../../lib/showcase/showcaseStylePermissions.js";
@@ -9,6 +9,7 @@ import {
   writeShowcaseStyle,
   parseShowcaseTagsInput
 } from "../../lib/showcase/showcaseStyleStorage.js";
+import { syncShowcaseTagsToServer } from "../../lib/showcase/showcaseTagsApi.js";
 import { SHOWCASE_FONT_SETS, SHOWCASE_CASE_FRAMES, SHOWCASE_STYLE_LIST, SHOWCASE_STYLE_TYPES } from "../../lib/showcase/showcaseStyleTypes.js";
 import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
 import { VLUE_SHOWCASE } from "../../lib/vlueBrandSpaces.js";
@@ -38,6 +39,8 @@ export default function ShowcaseStyleSettingsPanel({
   isDarkMode = false,
   onBack,
   onOpenUpgrade,
+  /** 저장 완료 알림 (예: 「적용되었습니다.」) */
+  onToast,
   /** AppFullScreenView 안 — 상단 헤더 숨김 */
   hideHeader = false,
   /** V1 전체 화면 시트 레이아웃 */
@@ -50,6 +53,31 @@ export default function ShowcaseStyleSettingsPanel({
   const [previewPhase, setPreviewPhase] = useState("preview");
   const [gateOpen, setGateOpen] = useState(false);
   const [tagInput, setTagInput] = useState(() => (config.tags || []).join(" "));
+  /** 전체화면(모바일)에서는 미리보기를 접어 설정 공간을 확보 */
+  const [previewCollapsed, setPreviewCollapsed] = useState(() => Boolean(fullscreen));
+  const previewDragRef = useRef({ startY: 0, dragging: false });
+
+  const onPreviewPointerDown = useCallback((e) => {
+    if (!fullscreen) return;
+    previewDragRef.current = { startY: e.clientY, dragging: true };
+  }, [fullscreen]);
+
+  const onPreviewPointerMove = useCallback((e) => {
+    if (!fullscreen || !previewDragRef.current.dragging) return;
+    const dy = e.clientY - previewDragRef.current.startY;
+    if (Math.abs(dy) < 28) return;
+    if (dy > 28 && !previewCollapsed) {
+      setPreviewCollapsed(true);
+      previewDragRef.current.dragging = false;
+    } else if (dy < -28 && previewCollapsed) {
+      setPreviewCollapsed(false);
+      previewDragRef.current.dragging = false;
+    }
+  }, [fullscreen, previewCollapsed]);
+
+  const onPreviewPointerUp = useCallback(() => {
+    previewDragRef.current.dragging = false;
+  }, []);
 
   const card = useMemo(() => resolveVlueShowcaseCard({ membershipTier }), [membershipTier]);
 
@@ -89,6 +117,22 @@ export default function ShowcaseStyleSettingsPanel({
     });
   };
 
+  const onTagsChange = (raw) => {
+    if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
+    setTagInput(raw);
+    const tags = parseShowcaseTagsInput(raw);
+    persist({ tags });
+  };
+
+  useEffect(() => {
+    if (!isPaid) return undefined;
+    const tags = parseShowcaseTagsInput(tagInput);
+    const timer = setTimeout(() => {
+      void syncShowcaseTagsToServer(tags);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [tagInput, isPaid]);
+
   const onBizTab = () => {
     if (!isPaid) {
       setGateOpen(true);
@@ -97,9 +141,24 @@ export default function ShowcaseStyleSettingsPanel({
     setTab("biz");
   };
 
+  const onSave = useCallback(() => {
+    const latest = readShowcaseStyle();
+    writeShowcaseStyle(latest);
+    if (isPaid) {
+      void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));
+    }
+    onToast?.("적용되었습니다.");
+  }, [isPaid, onToast, tagInput]);
+
   const headText = isDarkMode ? "text-gray-100" : "text-slate-900";
   const subText = isDarkMode ? "text-gray-400" : "text-slate-500";
   const inputCls = isDarkMode ? "border-white/10 bg-white/5 text-gray-100" : "border-slate-200 bg-white text-slate-900";
+
+  const saveButton = (
+    <button type="button" className="showcase-style-settings__save-btn" onClick={onSave}>
+      저장
+    </button>
+  );
 
   return (
     <div
@@ -279,48 +338,62 @@ export default function ShowcaseStyleSettingsPanel({
               <section className="showcase-style-settings__section">
                 <h2 className="showcase-style-settings__label">
                   <Hash size={13} className="inline mr-1" aria-hidden />
-                  해시태그 (V2 검색 예정)
+                  해시태그
                 </h2>
+                <p className={`showcase-style-settings__hint ${subText}`}>
+                  홈 검색에서 #태그로 내 쇼케이스를 찾을 수 있습니다. 유료 회원 전용.
+                </p>
                 <input
                   className={`showcase-style-settings__input w-full ${inputCls}`}
                   placeholder="#소금빵 #대구소금빵"
                   value={tagInput}
+                  readOnly={!isPaid}
                   onFocus={() => {
                     if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
                   }}
-                  onChange={(e) => {
-                    if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
-                    setTagInput(e.target.value);
-                    persist({ tags: parseShowcaseTagsInput(e.target.value) });
-                  }}
+                  onChange={(e) => onTagsChange(e.target.value)}
                 />
-                {!isPaid ? <p className={`mt-1 text-[10px] ${subText}`}>유료 회원만 해시태그 등록 가능 (V2 마이케이스 검색)</p> : null}
+                {!isPaid ? (
+                  <p className={`mt-1 text-[10px] ${subText}`}>유료 회원만 해시태그를 등록·검색 노출할 수 있습니다.</p>
+                ) : (
+                  <p className={`mt-1 text-[10px] ${subText}`}>공백으로 구분 · 최대 12개 · 저장 시 서버에 동기화됩니다.</p>
+                )}
               </section>
+              {saveButton}
             </>
           )}
 
           {tab === "photos" && (
-            <section className="showcase-style-settings__section">
-              <ShowcasePhotoEditor
-                photos={config.gallery?.photos || []}
-                onChange={(photos) => persist({ gallery: { photos } })}
-                inputCls={inputCls}
-              />
-            </section>
+            <>
+              <section className="showcase-style-settings__section">
+                <ShowcasePhotoEditor
+                  photos={config.gallery?.photos || []}
+                  onChange={(photos) => persist({ gallery: { photos } })}
+                  inputCls={inputCls}
+                />
+              </section>
+              {saveButton}
+            </>
           )}
 
           {tab === "bgm" && config.styleType !== "default" && (
-            <section className="showcase-style-settings__section">
-              <ShowcaseBgmPicker
-                value={config.bgm}
-                inputCls={inputCls}
-                onChange={(bgm) => persist({ bgm: { ...config.bgm, ...bgm } })}
-              />
-            </section>
+            <>
+              <section className="showcase-style-settings__section">
+                <ShowcaseBgmPicker
+                  value={config.bgm}
+                  inputCls={inputCls}
+                  onChange={(bgm) => persist({ bgm: { ...config.bgm, ...bgm } })}
+                />
+              </section>
+              {saveButton}
+            </>
           )}
 
           {tab === "bgm" && config.styleType === "default" && (
-            <p className={`text-[12px] ${subText}`}>기본형은 BGM 없음. 개인스타일·인스타·인증명함에서 설정하세요.</p>
+            <>
+              <p className={`text-[12px] ${subText}`}>기본형은 BGM 없음. 개인스타일·인스타·인증명함에서 설정하세요.</p>
+              {saveButton}
+            </>
           )}
 
           {tab === "biz" && isPaid && (
@@ -375,6 +448,7 @@ export default function ShowcaseStyleSettingsPanel({
                 />
                 VLUE 공식 인증 마크 표시
               </label>
+              {saveButton}
             </>
           )}
 
@@ -388,9 +462,42 @@ export default function ShowcaseStyleSettingsPanel({
           </div>
         </div>
 
-        <aside className={`showcase-style-settings__preview-pane${fullscreen ? " showcase-style-settings__preview-pane--fullscreen" : ""}`}>
-          <p className="showcase-style-settings__preview-label">통화 화면 미리보기</p>
-          <ShowcaseStylePreview styleConfig={config} card={card} membershipTier={membershipTier} phase={previewPhase} />
+        <aside
+          className={`showcase-style-settings__preview-pane${fullscreen ? " showcase-style-settings__preview-pane--fullscreen" : ""}${fullscreen && previewCollapsed ? " showcase-style-settings__preview-pane--collapsed" : ""}`}
+        >
+          {fullscreen ? (
+            <button
+              type="button"
+              className="showcase-style-settings__preview-toggle"
+              onClick={() => setPreviewCollapsed((v) => !v)}
+              onPointerDown={onPreviewPointerDown}
+              onPointerMove={onPreviewPointerMove}
+              onPointerUp={onPreviewPointerUp}
+              onPointerCancel={onPreviewPointerUp}
+              aria-expanded={!previewCollapsed}
+              aria-controls="showcase-call-preview"
+            >
+              <span className="showcase-style-settings__preview-toggle-handle" aria-hidden />
+              <span className="showcase-style-settings__preview-label">통화 화면 미리보기</span>
+              <span className="showcase-style-settings__preview-toggle-hint" data-collapsed={previewCollapsed ? "1" : "0"}>
+                <span className="showcase-style-settings__preview-toggle-shimmer">
+                  {previewCollapsed ? "올리기" : "내리기"}
+                </span>
+                {previewCollapsed ? <ChevronUp size={15} aria-hidden /> : <ChevronDown size={15} aria-hidden />}
+              </span>
+            </button>
+          ) : (
+            <p className="showcase-style-settings__preview-label showcase-style-settings__preview-label--static">
+              통화 화면 미리보기
+            </p>
+          )}
+          <div
+            id="showcase-call-preview"
+            className={`showcase-style-settings__preview-body${previewCollapsed && fullscreen ? " is-collapsed" : ""}`}
+            aria-hidden={fullscreen && previewCollapsed}
+          >
+            <ShowcaseStylePreview styleConfig={config} card={card} membershipTier={membershipTier} phase={previewPhase} />
+          </div>
         </aside>
       </div>
 

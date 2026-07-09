@@ -10,7 +10,8 @@ export default function ShowcaseStyleSettingsSheet({
   onClose,
   membershipTier = "free",
   isDarkMode = false,
-  onOpenUpgrade
+  onOpenUpgrade,
+  onToast
 }) {
   return (
     <AppFullScreenView
@@ -29,6 +30,7 @@ export default function ShowcaseStyleSettingsSheet({
         isDarkMode={isDarkMode}
         onBack={onClose}
         onOpenUpgrade={onOpenUpgrade}
+        onToast={onToast}
       />
     </AppFullScreenView>
   );

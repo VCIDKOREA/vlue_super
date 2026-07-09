@@ -2,6 +2,13 @@ import { Hono } from "hono";
 import { prisma } from "../db/client.js";
 import { normalizeToE164KR } from "../lib/phoneE164.js";
 import { requireUserHeader } from "../middleware/cardGate.js";
+import {
+  normalizeShowcaseTag,
+  sanitizeShowcaseTags,
+  searchUsersByShowcaseTag,
+  updateUserShowcaseTags,
+  userHasPaidMembership
+} from "../services/showcase/showcaseTagsService.js";
 
 export const letteringRoutes = new Hono();
 
@@ -127,4 +134,25 @@ letteringRoutes.post("/reports", requireUserHeader, async (c) => {
   });
 
   return c.json({ ok: true, reportId: report.id, phoneE164: e164, autoBlocked: true }, 201);
+});
+
+/** V1 — 유료 회원 쇼케이스 #해시태그 등록 */
+letteringRoutes.put("/showcase/tags", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = await c.req.json().catch(() => ({}));
+  const paid = await userHasPaidMembership(me);
+  if (!paid) {
+    return c.json({ error: "해시태그는 유료 회원만 등록할 수 있습니다." }, 403);
+  }
+  const tags = sanitizeShowcaseTags(body?.tags);
+  const saved = await updateUserShowcaseTags(me, tags);
+  return c.json({ ok: true, tags: saved });
+});
+
+/** V1 — #해시태그로 쇼케이스 검색 (홈 디렉토리) */
+letteringRoutes.get("/showcase/tags/search", async (c) => {
+  const q = String(c.req.query("q") ?? c.req.query("tag") ?? "").trim();
+  if (!q) return c.json({ ok: true, items: [] });
+  const items = await searchUsersByShowcaseTag(q, 24);
+  return c.json({ ok: true, tag: normalizeShowcaseTag(q), items });
 });

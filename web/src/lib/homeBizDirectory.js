@@ -43,6 +43,7 @@ export const BIZ_DIRECTORY_BASE = [
     address: "서울 강남구 테헤란로 12",
     intro: "스페셜티 원두와 브런치가 강점인 카페",
     menu: ["시그니처 라떼", "플랫화이트", "바질 샌드위치"],
+    showcaseTags: ["#소금빵", "#대구소금빵"],
     img: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=900&q=80",
     publicExposure: true,
     card: cardFor("소울 커피 로스터스", "김소울", "매니저", "운영팀", "02-1234-5678", "soulcoffee.kr")
@@ -229,6 +230,9 @@ function tokenize(q) {
 
 function matchScore(biz, tokens) {
   if (!tokens.length) return 1;
+  const tagBlob = (Array.isArray(biz.showcaseTags) ? biz.showcaseTags : [])
+    .map((t) => String(t).toLowerCase())
+    .join(" ");
   const blob = [
     biz.name,
     biz.subcat,
@@ -238,15 +242,20 @@ function matchScore(biz, tokens) {
     biz.card?.name,
     biz.card?.title,
     biz.card?.department,
+    tagBlob,
     ...(biz.menu || [])
   ]
     .join(" ")
     .toLowerCase();
   let score = 0;
   for (const t of tokens) {
-    if (blob.includes(t)) score += 2;
-    if (biz.name.toLowerCase().includes(t)) score += 3;
+    const bare = t.replace(/^#/, "");
+    if (blob.includes(t) || (bare && blob.includes(bare))) score += 2;
+    if (biz.name.toLowerCase().includes(t) || (bare && biz.name.toLowerCase().includes(bare))) score += 3;
     if (biz.subcat.toLowerCase().includes(t)) score += 2;
+    if (tagBlob && (tagBlob.includes(t) || (bare && tagBlob.includes(`#${bare}`)) || (bare && tagBlob.includes(bare)))) {
+      score += 5;
+    }
   }
   return score;
 }
@@ -274,7 +283,27 @@ export function searchBusinessDirectory(query, { sort = "popular", categoryExpos
 export function suggestIndustries(query, { limit = 8 } = {}) {
   const tokens = tokenize(query);
   const q = tokens.join(" ");
+  const bareQ = q.replace(/^#/, "").toLowerCase();
   const items = [];
+
+  const tagHints = new Set();
+  if (bareQ) {
+    for (const biz of BIZ_DIRECTORY_BASE) {
+      for (const tag of biz.showcaseTags || []) {
+        const t = String(tag).trim();
+        if (!t) continue;
+        const normalized = t.startsWith("#") ? t : `#${t}`;
+        const bare = normalized.slice(1).toLowerCase();
+        if (bare.includes(bareQ) || normalized.toLowerCase().includes(q.toLowerCase())) {
+          tagHints.add(normalized);
+        }
+      }
+    }
+  }
+  for (const tag of tagHints) {
+    items.push({ type: "hashtag", label: tag, value: tag });
+  }
+
   for (const cat of BIZ_DIRECTORY_CATEGORIES) {
     if (!q || cat.label.toLowerCase().includes(q)) {
       items.push({ type: "category", label: cat.label, value: cat.label, categoryId: cat.id });

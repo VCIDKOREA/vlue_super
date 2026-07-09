@@ -5,6 +5,7 @@ import {
   searchBusinessDirectory,
   suggestIndustries
 } from "../lib/homeBizDirectory.js";
+import { searchShowcaseByTag } from "../lib/showcase/showcaseTagsApi.js";
 import LetteringBusinessCardPanel from "./LetteringBusinessCardPanel.jsx";
 import LetteringBizcardScaledPreview from "./LetteringBizcardScaledPreview.jsx";
 import LetteringBizcardSecureFrame from "./LetteringBizcardSecureFrame.jsx";
@@ -73,12 +74,39 @@ export default function HomeBizDirectorySearch({
   const [resultsOpen, setResultsOpen] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [stuck, setStuck] = useState(false);
+  const [tagHits, setTagHits] = useState([]);
   const stickySentinelRef = useRef(null);
 
-  const results = useMemo(
+  const localResults = useMemo(
     () => searchBusinessDirectory(query, { sort, categoryExposedPosts }),
     [query, sort, categoryExposedPosts]
   );
+
+  const results = useMemo(() => {
+    if (!tagHits.length) return localResults;
+    const mapped = tagHits.map((hit, i) => ({
+      id: `tag-${hit.userId || hit.phone || i}`,
+      categoryId: "showcase",
+      categoryLabel: "쇼케이스",
+      subcat: "해시태그",
+      name: hit.organization || hit.name || hit.phone || "쇼케이스",
+      popular: 90,
+      distance: 0,
+      rating: 5,
+      likes: 0,
+      roomId: null,
+      phone: hit.phone || "",
+      address: "",
+      intro: (hit.tags || []).join(" ") || "해시태그 매칭 쇼케이스",
+      menu: [],
+      showcaseTags: hit.tags || [],
+      img: hit.logoUrl || "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=900&q=80",
+      publicExposure: true,
+      card: null
+    }));
+    const seen = new Set(localResults.map((b) => b.id));
+    return [...mapped.filter((m) => !seen.has(m.id)), ...localResults];
+  }, [localResults, tagHits]);
 
   const suggestions = useMemo(() => suggestIndustries(query), [query]);
 
@@ -90,6 +118,25 @@ export default function HomeBizDirectorySearch({
   useEffect(() => {
     if (!resultsOpen) setSelectedId("");
   }, [resultsOpen]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!resultsOpen || !q.includes("#")) {
+      setTagHits([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      searchShowcaseByTag(q).then((res) => {
+        if (cancelled) return;
+        setTagHits(res.ok ? res.items || [] : []);
+      });
+    }, 280);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, resultsOpen]);
 
   useEffect(() => {
     const sentinel = stickySentinelRef.current;
@@ -215,6 +262,11 @@ export default function HomeBizDirectorySearch({
                                 {biz.categoryLabel} · {biz.subcat}
                               </p>
                               <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-slate-600">{biz.intro}</p>
+                              {Array.isArray(biz.showcaseTags) && biz.showcaseTags.length > 0 ? (
+                                <p className="mt-1 truncate text-[10px] font-bold text-indigo-500">
+                                  {biz.showcaseTags.slice(0, 4).join(" ")}
+                                </p>
+                              ) : null}
                               <p className="mt-1 text-[10px] font-bold text-slate-400">
                                 {sort === "distance"
                                   ? `${biz.distance}km`

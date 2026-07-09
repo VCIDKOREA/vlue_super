@@ -156,7 +156,7 @@ model User {
   /// 앱 표시용 회원 ID(슬러그). @ 없이 소문자 영숫자·밑줄 3~20자 권장 — 확정 후 변경 없음.
   publicHandle String? @unique @map("public_handle") @db.VarChar(32)
 
-  /// V2 마이케이스·#해시태그 디렉토리 검색용 (예: #소금빵 #대구소금빵)
+  /// V1 — #해시태그 홈 디렉토리 검색용 (유료 회원 등록, 예: #소금빵 #대구소금빵)
   showcaseTags String[] @default([]) @map("showcase_tags")
 
   /// 로그인 비밀번호(scrypt 해시). null 이면 비밀번호 로그인 불가(관리자·레거시 등).

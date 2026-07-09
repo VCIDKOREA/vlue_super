@@ -14,11 +14,13 @@
 
 ---
 
-## 2. V2/V3 확장 인프라 (스키마)
+## 2. V1 해시태그 (유료 전용)
 
 - [ ] `packages/db/prisma/schema.prisma` — `User.showcaseTags String[]` 필드 존재 확인
 - [ ] `web/src/lib/showcase/showcaseStyleStorage.js` — 클라이언트 `tags: []` 배열 저장·복원 확인
-- [ ] 유료 계정에서 `#소금빵 #대구소금빵` 등 해시태그 입력 후 localStorage 재로드 시 유지
+- [ ] **유료 계정**에서 `#소금빵 #대구소금빵` 입력 → localStorage 유지 + 서버 `PUT /api/lettering/showcase/tags` 동기화
+- [ ] **무료 계정**에서 해시태그 입력 시도 → 프리미엄 게이트 차단 (등록 불가)
+- [ ] 홈 검색에 `#소금빵` 입력 → 해시태그 매칭 업체·쇼케이스 결과 노출
 
 ---
 

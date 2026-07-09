@@ -100,7 +100,7 @@ function BizAvatar({ card }) {
         <img
           src={src}
           alt=""
-          className={`h-full w-full ${isLogoOnly ? "object-contain p-1" : "object-cover"}`}
+          className={`h-full w-full ${isLogoOnly ? "object-contain p-0.5" : "object-cover"}`}
           onError={() => setImgBroken(true)}
         />
       ) : (

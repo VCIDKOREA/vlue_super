@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Check, ExternalLink } from "lucide-react";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import { getShowcasePermissions } from "../../lib/showcase/showcaseStylePermissions.js";
@@ -8,6 +8,7 @@ import ShowcaseBgmMuteButton from "./ShowcaseBgmMuteButton.jsx";
 import ShowcaseBgmMarquee from "./ShowcaseBgmMarquee.jsx";
 import ShowcasePhotoGallery from "./ShowcasePhotoGallery.jsx";
 import ShowcaseYoutubePlayer from "./ShowcaseYoutubePlayer.jsx";
+import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 
 const FONT_MAP = Object.fromEntries(SHOWCASE_FONT_SETS.map((f) => [f.id, f.css]));
 
@@ -25,6 +26,8 @@ export default function ShowcaseStylePreview({
   const perms = getShowcasePermissions(membershipTier);
   const isPaid = isPaidLetteringTier(membershipTier);
   const style = SHOWCASE_STYLE_TYPES[styleConfig?.styleType] || SHOWCASE_STYLE_TYPES.default;
+  const isCertificate = style.id === "certificate";
+  const [certFace, setCertFace] = useState("front");
   const {
     bindStyleConfig,
     setPlaybackPhase,
@@ -41,11 +44,14 @@ export default function ShowcaseStylePreview({
     return () => setPlaybackPhase("idle");
   }, [styleConfig, phase, bindStyleConfig, setPlaybackPhase]);
 
+  useEffect(() => {
+    if (!isCertificate) setCertFace("front");
+  }, [isCertificate]);
+
   const rc = styleConfig?.richCustom || {};
   const caseTheme = styleConfig?.caseTheme || {};
   const phone = card?.phone || "010-0000-0000";
   const showName = perms.showNameOrg && card?.name;
-  const showOrg = perms.showNameOrg && card?.organization;
   const photos = styleConfig?.gallery?.photos || [];
   const isCallActive = phase === "call_active";
   const sleepMode = proximityNear && isCallActive;
@@ -57,6 +63,46 @@ export default function ShowcaseStylePreview({
     if (onProductClick) onProductClick(product);
     else if (product?.url) window.open(product.url, "_blank", "noopener,noreferrer");
   };
+
+  /** 디지털인증명함 — 하단 미리보기에 실제 디지털 명함 UI */
+  if (isCertificate && isPaid) {
+    return (
+      <div
+        className={`showcase-style-preview showcase-style-preview--certificate ${className}`.trim()}
+        data-phase={phase}
+        onClick={onTapUnlock}
+        onTouchStart={onTapUnlock}
+        role="presentation"
+      >
+        <div className="showcase-style-preview__cert-shell">
+          <div className="showcase-style-preview__cert-top">
+            <span className="showcase-style-preview__trust">
+              <Check size={12} strokeWidth={3} /> VLUE 인증
+            </span>
+            <ShowcaseBgmMuteButton />
+          </div>
+          <LetteringDigitalReception
+            card={card}
+            verified={styleConfig?.verifiedBadgeOn !== false}
+            embeddedInPush
+            previewMode
+            face={certFace}
+            onFaceChange={setCertFace}
+            className="showcase-style-preview__cert-card"
+          />
+          <ShowcaseBgmMarquee styleConfig={styleConfig} visible={isCallActive && !sleepMode} />
+        </div>
+        {sleepMode ? (
+          <div className="showcase-style-preview__sleep" aria-hidden>
+            <p>근접 센서 · 화면 잠금</p>
+          </div>
+        ) : null}
+        <p className="showcase-style-preview__caption">
+          디지털인증명함 · 앞면/뒷면 탭으로 확인
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -126,14 +172,11 @@ export default function ShowcaseStylePreview({
           </div>
         )}
 
-        {style.id === "certificate" && isPaid && (
-          <div className="showcase-style-preview__body showcase-style-preview__body--cert">
-            {styleConfig?.verifiedBadgeOn ? <span className="showcase-style-preview__badge">✓ VLUE 공식 인증</span> : null}
-            <p className="showcase-style-preview__org">{showOrg || "상호명"}</p>
-            <p className="showcase-style-preview__name">{showName || card?.name || "대표명"}</p>
-            <p className="showcase-style-preview__phone showcase-style-preview__phone--sm">{phone}</p>
+        {style.id === "certificate" && !isPaid ? (
+          <div className="showcase-style-preview__body showcase-style-preview__body--locked">
+            디지털인증명함은 유료 회원 전용입니다
           </div>
-        )}
+        ) : null}
 
         {isPaid && (styleConfig?.commercial?.products || []).length > 0 ? (
           <div className="showcase-style-preview__products">
