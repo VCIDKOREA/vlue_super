@@ -1,6 +1,7 @@
 import { Mail, MapPin } from 'lucide-react';
 import { VlueBrandLogo } from '../../../components/VlueBrandLogo.jsx';
 import type { View } from '../types';
+import { isWebViewV1Enabled } from '../../../lib/v1ReleaseScope.js';
 
 interface FooterProps {
   onNavigate: (view: View, legalAnchor?: string) => void;
@@ -81,11 +82,14 @@ export default function Footer({ onNavigate }: FooterProps) {
             </div>
           </div>
 
-          {FOOTER_SECTIONS.map(({ label, links }) => (
+          {FOOTER_SECTIONS.map(({ label, links }) => {
+            const visible = links.filter((link) => isWebViewV1Enabled(link.view));
+            if (!visible.length) return null;
+            return (
             <div key={label} className="mkt-footer-section min-w-0">
               <h4 className="text-white text-[0.6875rem] sm:text-xs font-bold uppercase tracking-wider mb-1.5 sm:mb-3">{label}</h4>
               <ul className="mkt-footer-links space-y-1 sm:space-y-2">
-                {links.map(({ text, view, anchor }) => (
+                {visible.map(({ text, view, anchor }) => (
                   <li key={text}>
                     <button
                       type="button"
@@ -98,7 +102,8 @@ export default function Footer({ onNavigate }: FooterProps) {
                 ))}
               </ul>
             </div>
-          ))}
+          );
+          })}
         </div>
 
         <div className="mkt-footer-bottom pt-4 sm:pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">

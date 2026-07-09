@@ -8,6 +8,8 @@
  *   webkit.messageHandlers.vlueFamilyMissedCall.postMessage({})
  */
 import { postFamilyAlertCall, postMissedCall } from "./familyProtectionApi.js";
+import { postCallEndAlimtalk } from "./alimtalkCallEndApi.js";
+import { appendCallShowcaseHistory } from "./callShowcaseHistory.js";
 
 export function registerFamilyCallBridge() {
   if (typeof window === "undefined") return;
@@ -20,7 +22,19 @@ export function registerFamilyCallBridge() {
     },
     /** 통화 종료: { phone, durationSec, direction: 'in'|'out', peerIsVlueMember?: boolean } */
     onCallEnded: (payload) => {
-      postFamilyAlertCall(payload || {}).catch(() => {});
+      const p = payload || {};
+      postFamilyAlertCall(p).catch(() => {});
+      postCallEndAlimtalk({
+        peerPhone: p.phone,
+        durationSec: p.durationSec,
+        direction: p.direction
+      }).catch(() => {});
+      appendCallShowcaseHistory({
+        phone: p.phone,
+        name: p.name || p.peerName,
+        direction: p.direction,
+        durationSec: p.durationSec
+      });
     }
   };
 }

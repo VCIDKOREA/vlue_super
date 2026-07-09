@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, User, Minimize2 } from 'lucide-react';
+import { isWebAiExcelEnabled } from '../../../lib/v1ReleaseScope.js';
 
 interface Message {
   id: string;
@@ -15,7 +16,9 @@ const RESPONSES: [RegExp, string][] = [
   [new RegExp('요금|가격|비용|얼마|추천|vluer', 'i'), '무료·유료·기업 3단계입니다. 유료 추천 할인은 12개월 30% 후 15% 영구, 추천인 적립은 12개월 등급별(최대 15%) 후 5% 영구입니다. [서비스소개·요금제] 또는 [인증신청]을 확인하세요.'],
   [/쇼핑|블루쇼핑|vlue 스토어|구매/, 'VLUE 스토어는 VLUE 인증 업체만 입점 가능한 안전한 커머스입니다. 상단 메뉴 [VLUE 스토어]에서 이용하세요.'],
   [/자료|템플릿|서류|개인자료실/, '개인자료실에서 거래처 안전 확인서, 피해 신고서 등 템플릿을 무료로 이용하실 수 있습니다. 웹에서 편집 후 .vlue 보안 파일로 저장 가능합니다.'],
-  [new RegExp('엑셀|excel|장부|스프레드시트', 'i'), 'AI엑셀에디터는 웹 전용 기능입니다. 상단 메뉴의 보라색 [AI엑셀에디터]에서 작업실을 열 수 있습니다.'],
+  [new RegExp('엑셀|excel|장부|스프레드시트', 'i'), isWebAiExcelEnabled()
+    ? 'AI엑셀에디터는 웹 전용 기능입니다. 상단 메뉴의 보라색 [AI엑셀에디터]에서 작업실을 열 수 있습니다.'
+    : 'AI엑셀에디터는 MVP 이후 순차 오픈 예정입니다. 현재는 기관 검색·인증 서비스를 이용해 주세요.'],
   [/연락|전화|이메일/, 'VLUE 고객센터: 1588-0000 (평일 09:00~18:00) / support@vlue.kr 로 문의하시면 됩니다.'],
   [/안녕|반가워|안녕하세요/, '안녕하세요! VLUE AI 고객센터입니다. 보이스피싱 예방, 기관 인증, 서비스 이용에 관해 무엇이든 도와드릴게요.'],
   [/감사|고마워|고맙습니다/, '도움이 되어 기쁩니다! 추가로 궁금한 사항이 있으시면 언제든지 질문해 주세요.'],

@@ -25,6 +25,10 @@ import {
 import { fetchPublicHomeLayout } from "../lib/hqAdminApi.js";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
 import HomeBizDirectorySearch from "./HomeBizDirectorySearch.jsx";
+import CallBigPushPreviewSection from "./CallBigPushPreviewSection.jsx";
+import FriendShowcaseList from "./FriendShowcaseList.jsx";
+import HomeNotificationPanel from "./HomeNotificationPanel.jsx";
+import { v1AppShell } from "../lib/v1ReleaseScope.js";
 
 /** 상단 공식 광고 배너 — 샘플(이미지·문구는 교체 가능) / 배지 VLUE 공식 + 부가 라벨 */
 const OFFICIAL_BANNERS = [
@@ -399,6 +403,9 @@ function Home({
   onOpenGuideFeature,
   onOpenFamilyProtection,
   onOpenMyPageFeed,
+  onOpenFriendSearch,
+  catalogFriends = [],
+  contactMatchData = null,
   membershipTier = "free",
   isDarkMode = false,
   browseAsGuest = false
@@ -893,13 +900,42 @@ function Home({
     if (id === "vlue-guide") setActiveGuideIdx(-1);
   }, []);
 
+  const v1FriendHomeLayout = v1AppShell.friendShowcaseFeed && !v1AppShell.homeLegacyFeed;
+
   return (
-    <main className="home-main-feed home-main-feed--spaced min-h-0 w-full max-w-none min-w-0 flex-1 flex flex-col gap-5 overflow-y-auto overflow-x-hidden px-2.5 pb-32 pt-0">
+    <main
+      className={`home-main-feed home-main-feed--spaced min-h-0 w-full max-w-none min-w-0 flex-1 flex flex-col overflow-y-auto overflow-x-hidden ${
+        v1FriendHomeLayout
+          ? "home-main-feed--kakao px-0 pb-[calc(56px+env(safe-area-inset-bottom,0px))] pt-0"
+          : "gap-5 px-2.5 pb-32 pt-0"
+      }`}
+    >
+      <div className={v1FriendHomeLayout ? "flex flex-col gap-5 px-2.5 pt-0" : "contents"}>
+      {v1AppShell.homeBizSearch ? (
       <HomeBizDirectorySearch
         categoryExposedPosts={categoryExposedPosts}
         onOpenBusinessRoom={onOpenBusinessRoom}
       />
+      ) : null}
 
+      {v1AppShell.callBigPush ? <CallBigPushPreviewSection membershipTier={membershipTier} /> : null}
+      </div>
+
+      {v1AppShell.friendShowcaseFeed ? (
+        <FriendShowcaseList
+          variant={v1FriendHomeLayout ? "home" : "card"}
+          catalogFriends={catalogFriends}
+          contactMatchData={contactMatchData}
+          onOpenFriendSearch={browseAsGuest ? undefined : onOpenFriendSearch}
+        />
+      ) : null}
+
+      {!v1FriendHomeLayout && v1AppShell.notificationInbox && !v1AppShell.notificationBottomNavOnly ? (
+        <HomeNotificationPanel onOpenFamilyProtection={onOpenFamilyProtection} />
+      ) : null}
+
+      {v1AppShell.homeLegacyFeed ? (
+      <>
       <section>
         <div className="relative w-full min-w-0 max-w-full">
           <button
@@ -1703,6 +1739,9 @@ function Home({
           ) : null}
         </section>
       )}
+
+      </>
+      ) : null}
 
       <LocalAdRegisterModal
         open={adModalOpen}

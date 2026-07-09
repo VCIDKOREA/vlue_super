@@ -11,6 +11,7 @@ import VlueSettingsPanel from "./settings/VlueSettingsPanel.jsx";
 import { applyAppSettingsToDocument } from "../lib/vlueAppSettings.js";
 import WalletRevealCard from "./WalletRevealCard.jsx";
 import MyPageDigitalLetteringSection from "./MyPageDigitalLetteringSection.jsx";
+import ShowcaseStyleSettingsPanel from "./showcase/ShowcaseStyleSettingsPanel.jsx";
 import EnterpriseLineManagePanel from "./EnterpriseLineManagePanel.jsx";
 import ShoppingCartHubPanel from "./ShoppingCartHubPanel.jsx";
 import BroadcastLineSetupPanel from "./BroadcastLineSetupPanel.jsx";
@@ -22,12 +23,11 @@ import { fileToDataUrl, readAvatar, writeAvatar } from "../lib/vlueAvatar.js";
 import { getMemberHandle, getChatDisplayName } from "../lib/memberCardStorage.js";
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
 import { fetchEmailForwardingMapping, readLocalLoginPrefix } from "../lib/vlueEmailMappingsApi.js";
+import { membershipTierStyleClass } from "../lib/membershipTierDisplay.js";
+import { v1AppShell } from "../lib/v1ReleaseScope.js";
 
 function tierLabelStyle(tier, isDarkMode) {
-  if (tier === "premium") return { label: "프리미엄", className: "text-[#722f37]" };
-  if (tier === "standard") return { label: "스탠다드", className: "text-blue-600" };
-  /* 일반: 라이트는 진한 글자, 사이드바 다크모드는 흰색 (html.dark 미사용 대비) */
-  return { label: "일반", className: isDarkMode ? "text-white" : "text-gray-900" };
+  return membershipTierStyleClass(tier, isDarkMode);
 }
 
 function SettingsSlidersIcon({ className = "h-4 w-4" }) {
@@ -271,7 +271,7 @@ function ProfilePanel({
     [isEnterpriseMember, vluerLocked, membershipCtx]
   );
   const showVluerPartner = useMemo(
-    () => enterpriseLineAccessChecked && !isCorporateAccount,
+    () => v1AppShell.vluerPartnerSection && enterpriseLineAccessChecked && !isCorporateAccount,
     [enterpriseLineAccessChecked, isCorporateAccount]
   );
   const headerName = useMemo(
@@ -296,6 +296,47 @@ function ProfilePanel({
   const openLetteringBizcardHub = useCallback(() => {
     setPanelView("letteringBizcard");
   }, []);
+
+  const handleHeaderClose = useCallback(() => {
+    if (upgradeOpen) {
+      setUpgradeOpen(false);
+      return;
+    }
+    if (logoutConfirmOpen) {
+      setLogoutConfirmOpen(false);
+      return;
+    }
+    if (withdrawConsultOpen) {
+      setWithdrawConsultOpen(false);
+      return;
+    }
+    if (withdrawTermsOpen) {
+      setWithdrawTermsOpen(false);
+      return;
+    }
+    if (partnerInquiryOpen) {
+      setPartnerInquiryOpen(false);
+      return;
+    }
+    if (panelView === "settings" && settingsSubView) {
+      setSettingsSubView(null);
+      return;
+    }
+    if (panelView !== "main") {
+      setPanelView("main");
+      return;
+    }
+    onClose?.();
+  }, [
+    upgradeOpen,
+    logoutConfirmOpen,
+    withdrawConsultOpen,
+    withdrawTermsOpen,
+    partnerInquiryOpen,
+    panelView,
+    settingsSubView,
+    onClose
+  ]);
 
   const showSettingNotice = useCallback(
     (msg) => {
@@ -395,7 +436,7 @@ function ProfilePanel({
               </button>
             </div>
           </div>
-          <button onClick={onClose} className={`p-2 text-2xl ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+          <button onClick={handleHeaderClose} className={`p-2 text-2xl ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
             ✕
           </button>
         </div>
@@ -444,7 +485,14 @@ function ProfilePanel({
               <BroadcastLineSetupPanel onToast={showSettingNotice} />
             </div>
           </div>
-        ) : panelView === "shoppingCart" ? (
+        ) : panelView === "showcaseStyle" ? (
+          <ShowcaseStyleSettingsPanel
+            membershipTier={membershipTier}
+            isDarkMode={isDarkMode}
+            onBack={() => setPanelView("main")}
+            onOpenUpgrade={() => setUpgradeOpen(true)}
+          />
+        ) : panelView === "shoppingCart" && v1AppShell.shoppingCart ? (
           <ShoppingCartHubPanel
             membershipTier={membershipTier}
             isDarkMode={isDarkMode}
@@ -605,12 +653,18 @@ function ProfilePanel({
             isVCIDOn={isVCIDOn}
             onApplyDigitalCard={openLetteringBizcardHub}
             onEditLettering={openLetteringBizcardHub}
+            onOpenShowcaseStyle={() => setPanelView("showcaseStyle")}
             onToast={(msg) => showSettingNotice(msg)}
           />
 
-          <WalletRevealCard isDarkMode={isDarkMode} />
+          {v1AppShell.walletCash ? <WalletRevealCard isDarkMode={isDarkMode} /> : null}
 
-          <div className="relative z-[1] mt-6 grid grid-cols-2 gap-3 px-1">
+          <div
+            className={`relative z-[1] mt-6 grid gap-3 px-1 ${
+              v1AppShell.shoppingCart ? "grid-cols-2" : "grid-cols-1"
+            }`}
+          >
+            {v1AppShell.shoppingCart ? (
             <button
               type="button"
               onClick={() => {
@@ -667,6 +721,8 @@ function ProfilePanel({
                 </p>
               </div>
             </button>
+            ) : null}
+            {v1AppShell.personalVault ? (
             <button
               type="button"
               onClick={() => onOpenWallet?.()}
@@ -681,13 +737,15 @@ function ProfilePanel({
                 <p className="text-[14px] font-black leading-tight text-gray-900">
                   개인
                   <br />
-                  자료실
+                  케이스
                 </p>
-                <p className="mt-1 text-[9px] font-bold text-orange-700">명함 · 내 문서</p>
+                <p className="mt-1 text-[9px] font-bold text-orange-700">명함저장 · 내문서</p>
               </div>
             </button>
+            ) : null}
           </div>
 
+          {v1AppShell.printerRemote ? (
           <button
             type="button"
             onClick={() => onOpenOfficeRemote?.()}
@@ -704,7 +762,9 @@ function ProfilePanel({
             </div>
             <span className={`shrink-0 text-lg ${subText}`}>›</span>
           </button>
+          ) : null}
 
+          {v1AppShell.personalMail ? (
           <div className="relative mt-3 px-1">
             <div
               className={`relative flex items-center justify-between rounded-[28px] border p-4 ${
@@ -758,6 +818,7 @@ function ProfilePanel({
               </button>
             </div>
           </div>
+          ) : null}
 
           {showVluerPartner ? (
             <VluerPartnerSection

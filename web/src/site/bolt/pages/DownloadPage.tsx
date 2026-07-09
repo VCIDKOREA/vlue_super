@@ -1,6 +1,7 @@
 import { Monitor, Smartphone, Download, CheckCircle, Apple, Chrome, ArrowLeft } from 'lucide-react';
 import { VlueBrandMark, VlueBrandLogo } from '../../../components/VlueBrandLogo.jsx';
 import { openVlueDownload, VLUE_APP_VERSION } from '../../../lib/vlueDownloadActions.js';
+import { isWebPcDownloadEnabled } from '../../../lib/v1ReleaseScope.js';
 
 interface DownloadPageProps {
   onBack: () => void;
@@ -35,6 +36,8 @@ const MOBILE_SYSTEMS = [
 ];
 
 export default function DownloadPage({ onBack }: DownloadPageProps) {
+  const showPc = isWebPcDownloadEnabled();
+
   return (
     <main className="min-h-screen bg-blue-tint">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
@@ -60,15 +63,16 @@ export default function DownloadPage({ onBack }: DownloadPageProps) {
             VLUE 앱 다운로드
           </h1>
           <p className="text-gray-500 text-sm sm:text-base max-w-xl mx-auto" style={{ wordBreak: 'keep-all' }}>
-            PC와 모바일 모두에서 사기 피해를 예방하세요.<br />
-            어떤 환경에서도 실시간으로 기관 신뢰도를 확인할 수 있습니다.
+            {showPc
+              ? <>PC와 모바일 모두에서 사기 피해를 예방하세요.<br />어떤 환경에서도 실시간으로 기관 신뢰도를 확인할 수 있습니다.</>
+              : <>모바일 앱으로 사기 피해를 예방하세요.<br />수신 전화·문자를 실시간으로 분석하고 기관 신뢰도를 확인할 수 있습니다.</>}
           </p>
         </div>
 
         {/* 2-컬럼 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <div className={`grid grid-cols-1 gap-6 mb-10${showPc ? ' md:grid-cols-2' : ' max-w-lg mx-auto'}`}>
 
-          {/* PC 버전 */}
+          {showPc ? (
           <div className="bg-white rounded-3xl border border-gray-100 shadow-card overflow-hidden flex flex-col">
             <div className="bg-gradient-to-br from-primary-600 to-primary-500 px-7 pt-8 pb-6">
               <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center mb-4">
@@ -132,6 +136,7 @@ export default function DownloadPage({ onBack }: DownloadPageProps) {
               </p>
             </div>
           </div>
+          ) : null}
 
           {/* 모바일 버전 */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-card overflow-hidden flex flex-col">

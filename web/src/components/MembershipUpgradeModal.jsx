@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { isPaidMembershipKind, normalizeMembershipKind, PAID_MEMBERSHIP_SUBLINE } from "../lib/membershipBm.js";
+import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import ReferralCodeVerifyBlock from "./ReferralCodeVerifyBlock.jsx";
 
 const MEMBERSHIP_OPTIONS = [
@@ -37,7 +38,8 @@ export default function MembershipUpgradeModal({
   isDarkMode = false,
   onMembershipTierChange,
   onRequestTierChange,
-  onVluerUpgraded
+  onVluerUpgraded,
+  hideReferral = !v1AppShell.referralProgram
 }) {
   const [planToast, setPlanToast] = useState("");
   const [paidBillingCycle, setPaidBillingCycle] = useState("monthly");
@@ -104,7 +106,7 @@ export default function MembershipUpgradeModal({
               id="membership-upgrade-title"
               className={`min-w-0 flex-1 text-[clamp(15px,4vw,17px)] font-black leading-snug ${textStrong}`}
             >
-              멤버십 · 추천 안내
+              {hideReferral ? "멤버십 안내" : "멤버십 · 추천 안내"}
             </h2>
             <button
               type="button"
@@ -117,9 +119,17 @@ export default function MembershipUpgradeModal({
           </div>
 
           <p className={`mb-4 text-[clamp(11px,3.2vw,12px)] leading-relaxed ${textSub}`}>
-            추천·리워드는 <b>지인 추천</b>과 <b>홍보 추천(VLUER)</b> 두 가지로만 운영됩니다. 언제든 VLUER 홍보 신청이 가능합니다.
+            {hideReferral
+              ? "무료·유료 멤버십에 따라 블루 쇼케이스·디지털 인증명함 기능이 달라집니다."
+              : (
+                <>
+                  추천·리워드는 <b>지인 추천</b>과 <b>홍보 추천(VLUER)</b> 두 가지로만 운영됩니다. 언제든 VLUER 홍보 신청이 가능합니다.
+                </>
+              )}
           </p>
 
+          {!hideReferral ? (
+            <>
           <p className={`mb-2 text-[11px] font-black ${textStrong}`}>추천 채널</p>
           <div className="space-y-2">
             {REFERRAL_CHANNELS.map((ch) => (
@@ -132,6 +142,8 @@ export default function MembershipUpgradeModal({
               </div>
             ))}
           </div>
+            </>
+          ) : null}
 
           <p className={`mt-5 mb-2 text-[11px] font-black ${textStrong}`}>멤버십 유형</p>
           <div className="space-y-2">
@@ -160,7 +172,7 @@ export default function MembershipUpgradeModal({
             })}
           </div>
 
-          {isPaidMembershipKind(currentKind) && (
+          {isPaidMembershipKind(currentKind) && !hideReferral ? (
             <div
               className={`mt-4 rounded-xl border p-3 ${isDarkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-slate-50/90"}`}
             >
@@ -193,7 +205,7 @@ export default function MembershipUpgradeModal({
                 isDarkMode={isDarkMode}
               />
             </div>
-          )}
+          ) : null}
 
           {planToast ? (
             <p

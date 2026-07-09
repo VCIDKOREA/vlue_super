@@ -1,0 +1,12 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "vlue_super"
+    }
+  ],
+  "settings": {
+    "npm.autoDetect": "on",
+    "npm.packageManager": "npm"
+  }
+}

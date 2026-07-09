@@ -1265,6 +1265,11 @@ body,
   margin-bottom: 0;
 }
 
+.home-main-feed--kakao .friend-showcase-list--home .friend-showcase-list__header {
+  position: sticky;
+  top: 0;
+}
+
 /* 마이페이지 상단 — 홍보 VLUER 신청 코너 */
 .vlue-mypage-promo-vluer-bar,
 .vlue-mypage-reward-bar {
@@ -2598,6 +2603,15 @@ body,
   overflow: hidden;
   max-height: var(--lettering-push-expanded-max);
   max-height: var(--lettering-push-expanded-max-fb);
+}
+
+/* 펼침 시 상단 VLUE 작동중 바가 flex 수축으로 잘리지 않도록 */
+.lettering-ongoing--expanded > .lettering-live-bar {
+  flex-shrink: 0;
+}
+
+.lettering-ongoing--expanded > .lettering-ongoing-body > .lettering-ongoing-summary {
+  flex-shrink: 0;
 }
 
 /* 독립 오버레이(네이티브 WebView) — 기존 좌우 여백 유지 */
@@ -4190,6 +4204,154 @@ body,
   font-size: 14px;
 }
 
+.lettering-ongoing--expanded.lettering-ongoing--free-tier {
+  --lettering-push-expanded-max: 78dvh;
+  --lettering-push-expanded-max-fb: 78vh;
+}
+
+.lettering-ongoing-expand-slot--emotional .lettering-ongoing-expand-slot__inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.lettering-ongoing-scroll--emotional {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.lettering-emotional-feed {
+  margin: 0 10px 8px;
+  border-radius: 14px;
+  border: 1px solid #e8edf3;
+  background: #fff;
+  overflow: hidden;
+}
+
+.lettering-emotional-feed__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.lettering-emotional-feed__user {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lettering-emotional-feed__tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 800;
+  color: #e1306c;
+}
+
+.lettering-emotional-feed__image-wrap {
+  aspect-ratio: 1;
+  background: #f8fafc;
+}
+
+.lettering-emotional-feed__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lettering-emotional-feed__caption {
+  margin: 0;
+  padding: 10px 12px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.lettering-emotional-feed__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 12px 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563eb;
+  cursor: pointer;
+}
+
+.lettering-ongoing-actions-secondary--emotional {
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  background: #f8fafc;
+}
+
+/* 홈·프로필(VLUE Case) Showcase 미리보기 — 펼침 시 문서 흐름 유지, 친구 목록이 아래로 밀림 */
+.lettering-ongoing--showcase-preview.lettering-ongoing--expanded,
+.lettering-ongoing--home-preview.lettering-ongoing--expanded,
+.lettering-ongoing--case-preview.lettering-ongoing--expanded {
+  --lettering-push-expanded-max: none;
+  --lettering-push-expanded-max-fb: none;
+  max-height: none;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+}
+
+.lettering-ongoing--showcase-preview.lettering-ongoing--expanded.lettering-ongoing--paid,
+.lettering-ongoing--home-preview.lettering-ongoing--expanded.lettering-ongoing--paid,
+.lettering-ongoing--case-preview.lettering-ongoing--expanded.lettering-ongoing--paid,
+.lettering-ongoing--showcase-preview.lettering-ongoing--on-call.lettering-ongoing--expanded,
+.lettering-ongoing--home-preview.lettering-ongoing--on-call.lettering-ongoing--expanded,
+.lettering-ongoing--case-preview.lettering-ongoing--on-call.lettering-ongoing--expanded {
+  max-height: none;
+}
+
+.lettering-ongoing--showcase-preview.lettering-ongoing--expanded .lettering-ongoing-body,
+.lettering-ongoing--home-preview.lettering-ongoing--expanded .lettering-ongoing-body,
+.lettering-ongoing--case-preview.lettering-ongoing--expanded .lettering-ongoing-body {
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
+}
+
+.lettering-ongoing--showcase-preview.lettering-ongoing--expanded .lettering-ongoing-scroll--reception,
+.lettering-ongoing--showcase-preview.lettering-ongoing--expanded .lettering-ongoing-scroll--emotional,
+.lettering-ongoing--home-preview.lettering-ongoing--expanded .lettering-ongoing-scroll--reception,
+.lettering-ongoing--home-preview.lettering-ongoing--expanded .lettering-ongoing-scroll--emotional,
+.lettering-ongoing--case-preview.lettering-ongoing--expanded .lettering-ongoing-scroll--reception,
+.lettering-ongoing--case-preview.lettering-ongoing--expanded .lettering-ongoing-scroll--emotional {
+  flex: 0 0 auto;
+  max-height: min(52dvh, 420px);
+  max-height: min(52vh, 420px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.lettering-ongoing--showcase-preview.lettering-ongoing--expanded .lettering-ongoing-reception,
+.lettering-ongoing--home-preview.lettering-ongoing--expanded .lettering-ongoing-reception,
+.lettering-ongoing--case-preview.lettering-ongoing--expanded .lettering-ongoing-reception {
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
+}
+
+.lettering-ongoing--showcase-preview.lettering-ongoing--expanded .lettering-ongoing-expand-slot__inner,
+.lettering-ongoing--home-preview.lettering-ongoing--expanded .lettering-ongoing-expand-slot__inner,
+.lettering-ongoing--case-preview.lettering-ongoing--expanded .lettering-ongoing-expand-slot__inner {
+  min-height: auto;
+  overflow: visible;
+}
+
 /* 유료 명함 — 앞·뒷면 플립 */
 .lettering-bizcard--paid {
   perspective: 900px;
@@ -5145,7 +5307,10 @@ body,
   padding: 0;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
 }
@@ -5165,10 +5330,11 @@ body,
 }
 
 .lettering-ongoing-scroll--reception .ldr-reception--push .ldr-panel-wrap {
-  flex: 0 0 var(--ldr-push-panel-h, 360px);
-  height: var(--ldr-push-panel-h, 360px);
-  min-height: var(--ldr-push-panel-h, 360px);
-  max-height: var(--ldr-push-panel-h, 360px);
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 300px;
+  max-height: min(480px, 52dvh);
+  overflow: hidden;
 }
 
 .lettering-ongoing-scroll--reception .ldr-reception--push .ldr-panel-stage {
@@ -5200,7 +5366,8 @@ body,
 .lettering-ongoing-actions-secondary--reception {
   flex-shrink: 0;
   position: relative;
-  z-index: 2;
+  z-index: 3;
+  margin-top: 2px;
   border-top: 1px solid rgba(255, 255, 255, 0.38);
   background: linear-gradient(
     180deg,
@@ -5339,11 +5506,10 @@ body,
 .ldr-reception--push .ldr-panel-wrap {
   position: relative;
   z-index: 1;
-  --ldr-push-panel-h: 360px;
-  flex: 0 0 var(--ldr-push-panel-h);
-  height: var(--ldr-push-panel-h);
-  min-height: var(--ldr-push-panel-h);
-  max-height: var(--ldr-push-panel-h);
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 300px;
+  max-height: min(480px, 52dvh);
   overflow: hidden;
   background:
     radial-gradient(ellipse 90% 55% at 50% 0%, rgba(37, 99, 235, 0.12) 0%, transparent 62%),
@@ -5410,7 +5576,8 @@ body,
 }
 
 .ldr-reception--push .ldr-panel--front .vlue-push-auth-seal {
-  margin-top: auto;
+  margin-top: 10px;
+  margin-bottom: 14px;
   flex-shrink: 0;
 }
 
@@ -6312,7 +6479,7 @@ body,
 
 .ldr-panel--push.ldr-panel--front {
   position: relative;
-  padding: 0 0 12px;
+  padding: 0 0 16px;
 }
 
 .ldr-panel--push.ldr-panel--front .ldr-back-head,
@@ -6668,37 +6835,52 @@ body,
   border-radius: 0 0 14px 14px;
 }
 
+.lettering-mypage-push-interactive[data-expanded="true"] .lettering-mypage-push-interactive__frame {
+  overflow: visible;
+}
+
 .lettering-mypage-push-interactive[data-expanded="true"] .lettering-ongoing--expanded {
-  --lettering-push-expanded-max: min(920px, 120vh);
-  --lettering-push-expanded-max-fb: min(920px, 120vh);
+  --lettering-push-expanded-max: none;
+  --lettering-push-expanded-max-fb: none;
   max-height: none;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.lettering-mypage-push-interactive[data-expanded="true"] .lettering-ongoing--expanded.lettering-ongoing--paid,
+.lettering-mypage-push-interactive[data-expanded="true"] .lettering-ongoing--on-call.lettering-ongoing--expanded {
+  max-height: none;
 }
 
 .lettering-mypage-push-interactive[data-expanded="true"] .lettering-ongoing-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
 }
 
 .lettering-mypage-push-interactive[data-expanded="true"] .lettering-ongoing-expand-slot__inner {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  height: 100%;
+  min-height: auto;
+  height: auto;
+  overflow: visible;
 }
 
 .lettering-mypage-push-interactive[data-expanded="true"] .lettering-ongoing-reception {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
   display: flex;
   flex-direction: column;
 }
 
-.lettering-mypage-push-interactive[data-expanded="true"] .lettering-ongoing-scroll--reception {
-  flex: 1;
+.lettering-mypage-push-interactive[data-expanded="true"] .lettering-ongoing-scroll--reception,
+.lettering-mypage-push-interactive[data-expanded="true"] .lettering-ongoing-scroll--emotional {
+  flex: 0 0 auto;
+  max-height: min(52dvh, 420px);
+  max-height: min(52vh, 420px);
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 

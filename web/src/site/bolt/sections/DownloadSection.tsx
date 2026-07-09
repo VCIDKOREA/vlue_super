@@ -1,6 +1,7 @@
 import { Smartphone, Monitor, Apple, Star, Table2, Sparkles, ArrowRight } from 'lucide-react';
 import { VlueBrandLogo } from '../../../components/VlueBrandLogo.jsx';
 import { openVlueDownload } from '../../../lib/vlueDownloadActions.js';
+import { isWebAiExcelEnabled, isWebPcDownloadEnabled } from '../../../lib/v1ReleaseScope.js';
 import type { View } from '../types';
 
 const FEATURES = ['실시간 보이스피싱 경보', 'VLUE 기관 인증 조회', '위치기반 안심영역 설정', '피해 즉시 신고 기능'];
@@ -10,6 +11,9 @@ interface DownloadSectionProps {
 }
 
 export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
+  const showAiExcel = isWebAiExcelEnabled();
+  const showPc = isWebPcDownloadEnabled();
+
   return (
     <section className="bg-gradient-to-br from-primary-600 to-primary-800 py-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -24,7 +28,13 @@ export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
               <span className="text-primary-200">VLUE와 함께</span>
             </h2>
             <p className="text-white/70 text-base leading-relaxed mb-6">
-              모바일·PC 앱으로 보이스피싱을 막고, 웹에서는 AI엑셀에디터로 업무 장부까지 한곳에서 이어가세요.
+              {showAiExcel
+                ? showPc
+                  ? '모바일·PC 앱으로 보이스피싱을 막고, 웹에서는 AI엑셀에디터로 업무 장부까지 한곳에서 이어가세요.'
+                  : '모바일 앱으로 보이스피싱을 막고, 웹에서는 AI엑셀에디터로 업무 장부까지 이어가세요.'
+                : showPc
+                  ? '모바일·PC 앱으로 보이스피싱을 막고, 웹에서는 기관 검색과 인증 서비스를 이용하세요.'
+                  : '모바일 앱으로 보이스피싱을 막고, 웹에서는 기관 검색과 인증 서비스를 이용하세요.'}
             </p>
 
             <ul className="space-y-2 mb-8">
@@ -67,6 +77,7 @@ export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
           </div>
 
           <div className="flex flex-col items-center gap-4">
+            {showPc ? (
             <div className="bg-white/10 border border-white/20 rounded-3xl p-6 w-full max-w-sm">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -97,6 +108,7 @@ export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
                 </button>
               </div>
             </div>
+            ) : null}
 
             <div className="bg-white/10 border border-white/20 rounded-2xl p-4 w-full max-w-sm flex items-center gap-3">
               <VlueBrandLogo size={36} className="flex-shrink-0 rounded-xl ring-1 ring-white/20" />
@@ -106,6 +118,7 @@ export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
               </div>
             </div>
 
+            {showAiExcel ? (
             <div className="w-full max-w-sm rounded-2xl p-4 bg-gradient-to-r from-violet-600/90 to-primary-600/90 border border-white/25 shadow-lg shadow-violet-900/20">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
@@ -131,6 +144,7 @@ export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
+            ) : null}
           </div>
         </div>
       </div>

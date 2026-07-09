@@ -25,6 +25,8 @@ import { publishCalendarAsRoomNotice } from "./lib/chatRoomNoticeService.js";
 import BetaLaunchGuide from "./components/BetaLaunchGuide.jsx";
 import Subscription from "./components/Subscription.jsx";
 import WalletHubModal from "./components/WalletHubModal.jsx";
+import AppNotificationSheet from "./components/AppNotificationSheet.jsx";
+import CallShowcaseHistorySheet from "./components/CallShowcaseHistorySheet.jsx";
 import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
 import PersonalFeed from "./components/PersonalFeed";
 import ProfilePanel from "./components/ProfilePanel";
@@ -129,6 +131,7 @@ import {
 } from "./lib/familyProtectionDemo.js";
 import { apiUrl } from "./lib/apiBase.js";
 import { readStoreFeedTab, writeStoreFeedTab, STORE_FEED_PREFS_CHANGED } from "./lib/storeFeedPrefs.js";
+import { v1AppShell, coerceAppPageForV1, isAppPageV1Enabled } from "./lib/v1ReleaseScope.js";
 import { getDeviceToken, saveDeviceToken, clientKindHeaders } from "./lib/deviceAuth.js";
 import { runUnifiedSearch, tabForRoom } from "./lib/appUnifiedSearch.js";
 import {
@@ -147,6 +150,7 @@ import LetteringOverlayHost from "./components/LetteringOverlayHost.jsx";
 import LetteringCertModal from "./components/LetteringCertModal.jsx";
 import { readLetteringEnabled, writeLetteringEnabled } from "./lib/letteringSettings.js";
 import { B2bMembershipProvider } from "./context/B2bMembershipContext.jsx";
+import { ShowcaseBgmProvider } from "./context/ShowcaseBgmContext.jsx";
 import { normalizeMembershipKind, isBillableMembershipKind } from "./lib/membershipBm.js";
 import { writePendingPayment, readPendingPayment } from "./lib/postSignupPayment.js";
 
@@ -241,16 +245,42 @@ const seedData = {
   ],
   friends: [
     {
-    id: "friend-kim",
-    name: "김친구",
-    lastMsg: "주말에 축구 고?",
-    time: "오후 8:00",
-    membershipTier: "standard",
-    cardName: "김블루",
-    cardTitle: "프리랜서 디자이너",
-    cardOrg: "Blue Design Studio",
-    verifiedLegalName: "김철수"
-  }
+      id: "friend-kim",
+      name: "김친구",
+      phone: "010-5555-1234",
+      lastMsg: "주말에 축구 고?",
+      time: "오후 8:00",
+      membershipTier: "standard",
+      cardName: "김블루",
+      cardTitle: "프리랜서 디자이너",
+      cardOrg: "Blue Design Studio",
+      verifiedLegalName: "김철수",
+      avatarUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&q=80"
+    },
+    {
+      id: "friend-jiyeon",
+      name: "지연",
+      phone: "010-7777-8888",
+      lastMsg: "쇼케이스 한번 봐봐!",
+      time: "오후 6:12",
+      membershipTier: "paid",
+      cardName: "이지연",
+      cardTitle: "마케터",
+      cardOrg: "VLUE 파트너스",
+      avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80"
+    },
+    {
+      id: "friend-minsu",
+      name: "민수",
+      phone: "010-3333-4444",
+      lastMsg: "통화 끝나고 쇼케이스 떴어",
+      time: "오전 11:40",
+      membershipTier: "free",
+      cardName: "민수",
+      cardTitle: "영업팀",
+      cardOrg: "역삼 블루정비",
+      avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80"
+    }
   ],
   work: [
     {
@@ -379,6 +409,10 @@ function App() {
   /** 생체·24h 유예 갱신 후 메인으로 넘기기 위한 리렌더 트리거 */
   const [biometricSeq, setBiometricSeq] = useState(0);
   const [page, setPage] = useState("main");
+
+  useEffect(() => {
+    if (!isAppPageV1Enabled(page)) setPage("main");
+  }, [page]);
   const [calendarBadge, setCalendarBadgeCount] = useState(() => readCalendarBadge());
   const [calendarNav, setCalendarNav] = useState({ eventId: "", groupId: "", groupName: "" });
   const [memoMeta, setMemoMeta] = useState({ count: 0, preview: "", unreadShareCount: 0 });
@@ -468,6 +502,8 @@ function App() {
   const [cardWallet, setCardWallet] = useState(() => readCardWallet());
   const [cardWalletModalOpen, setCardWalletModalOpen] = useState(false);
   const [walletDefaultTab, setWalletDefaultTab] = useState("received");
+  const [appNotificationOpen, setAppNotificationOpen] = useState(false);
+  const [callShowcaseSheetOpen, setCallShowcaseSheetOpen] = useState(false);
   const [officeRemoteOpen, setOfficeRemoteOpen] = useState(false);
   const [appMode, setAppMode] = useState(() => readAppMode());
   const [activeOfficeCardId, setActiveOfficeCardId] = useState(() => readActiveOfficeCardId());
@@ -941,8 +977,14 @@ function App() {
         if (data?.type === "vlue-notice-released") {
           const notice = data.notice || null;
           if (notice) setActiveNotice(notice);
-          setNoticeReleaseMessage(String(data.message || "📢 새로운 시스템 업데이트가 배포되었습니다!"));
+          const noticeMsg = String(data.message || "📢 새로운 시스템 업데이트가 배포되었습니다!");
+          setNoticeReleaseMessage(noticeMsg);
           setNoticeReleaseToastOpen(true);
+          addPushNotification({
+            category: "공지",
+            title: String(notice?.title || "시스템 공지"),
+            body: noticeMsg
+          });
         }
         if (data?.type === VLUE_SSE_CHAT_MESSAGE) {
           mergeIncomingServerChatMessage(data.message, {
@@ -951,17 +993,24 @@ function App() {
           });
         }
         if (data?.type === "vlue-push-inquiry") {
-          setBottomToast(String(data.message || "명함 문의 알림"));
+          const msg = String(data.message || "명함 문의 알림");
+          setBottomToast(msg);
           setTimeout(() => setBottomToast(""), 4200);
+          addPushNotification({ category: "앱", title: "명함 문의", body: msg });
         }
         if (data?.type === "vlue-family-protection-alert") {
-          setBottomToast(String(data.body || data.title || "가족 보호 알림"));
+          const title = String(data.title || "가족 보호");
+          const body = String(data.body || title || "가족 보호 알림");
+          setBottomToast(body);
           setTimeout(() => setBottomToast(""), 6000);
+          addPushNotification({ category: "가족보호", title, body });
           window.dispatchEvent(new CustomEvent("vlue-family-alert", { detail: data }));
         }
         if (data?.type === "vlue-family-protection-invite") {
-          setBottomToast(String(data.body || "가족 보호 승인 요청이 도착했습니다."));
+          const body = String(data.body || "가족 보호 승인 요청이 도착했습니다.");
+          setBottomToast(body);
           setTimeout(() => setBottomToast(""), 6000);
+          addPushNotification({ category: "가족보호", title: "가족 보호 초대", body });
         }
         if (data?.type === "enterprise-group-chat" && data.message) {
           window.dispatchEvent(new CustomEvent("vlue-enterprise-chat", { detail: data }));
@@ -970,16 +1019,22 @@ function App() {
           window.dispatchEvent(new CustomEvent("vlue-enterprise-chat", { detail: data }));
         }
         if (data?.type === "vlue-family-bank-consent-request") {
-          setBottomToast(data?.body || "계좌 모니터링 동의 요청이 도착했습니다.");
+          const body = String(data?.body || "계좌 모니터링 동의 요청이 도착했습니다.");
+          setBottomToast(body);
           setTimeout(() => setBottomToast(""), 4500);
+          addPushNotification({ category: "가족보호", title: "계좌 모니터링 동의", body });
         }
         if (data?.type === "vlue-family-protection-accepted") {
-          setBottomToast("가족이 보호 초대를 수락했습니다.");
+          const body = "가족이 보호 초대를 수락했습니다.";
+          setBottomToast(body);
           setTimeout(() => setBottomToast(""), 4000);
+          addPushNotification({ category: "가족보호", title: "가족 보호 연결", body });
         }
         if (data?.type === "vlue-parental-consent-request") {
-          setBottomToast(String(data.body || "자녀 가입 승인 요청이 도착했습니다."));
+          const body = String(data.body || "자녀 가입 승인 요청이 도착했습니다.");
+          setBottomToast(body);
           setTimeout(() => setBottomToast(""), 6000);
+          addPushNotification({ category: "가족보호", title: "자녀 가입 승인", body });
           if (data.wardUserId) {
             setParentalConsentRequest({
               wardUserId: data.wardUserId,
@@ -996,6 +1051,11 @@ function App() {
           if (data.message) {
             setBottomToast(String(data.message));
             setTimeout(() => setBottomToast(""), 5000);
+            addPushNotification({
+              category: "가족보호",
+              title: "자녀 가입 승인 완료",
+              body: String(data.message)
+            });
           }
         }
         if (
@@ -2637,9 +2697,10 @@ function App() {
       });
       setActiveTab(nextTab);
       setSelectedRoomId(nextRoomId);
-      if (nextPage === "mypage") setMyPageMountKey((n) => n + 1);
-      setPage(nextPage);
-      if (nextPage === "main") {
+      const safePage = coerceAppPageForV1(nextPage);
+      if (safePage === "mypage") setMyPageMountKey((n) => n + 1);
+      setPage(safePage);
+      if (safePage === "main") {
         requestAnimationFrame(() => {
           try {
             const root = appBodyRef.current || document.getElementById("app-body");
@@ -2972,6 +3033,8 @@ function App() {
   }, [page]);
 
   const activeBottomTab = useMemo(() => {
+    if (callShowcaseSheetOpen) return "calls";
+    if (appNotificationOpen) return "notifications";
     if (page === "main") return "";
     if (page === "friendSearch") return "home";
     if (page === "calendar") return "mypage";
@@ -2983,7 +3046,7 @@ function App() {
     if (page === "manage") return "chat";
     if (page === "list" || page === "room" || page === "feed") return "chat";
     return "";
-  }, [page]);
+  }, [page, appNotificationOpen, callShowcaseSheetOpen]);
 
   const bottomNavPulseChat = totalUnread > 0 && activeBottomTab !== "chat";
   const bottomNavPulseFriendSearch = friendInboxRequests.length > 0 && activeBottomTab !== "home";
@@ -3111,6 +3174,7 @@ function App() {
     friendRequests.some((r) => r.status === "pending") && activeBottomTab !== "mypage";
   const bottomNavPulseBlueAi = blueAiActivitySeq > blueAiSeenSeq && activeBottomTab !== "blueai";
   const bottomNavPulseShopping = subscribeChatUnreadTotal > 0 && activeBottomTab !== "shopping";
+  const bottomNavPulseNotifications = pushUnreadCount > 0 && activeBottomTab !== "notifications";
 
   const isBrowseGuest =
     !isLoggedIn && !showSplash && !signupOnboardingOpen && !showOnboardingFlow;
@@ -3156,6 +3220,7 @@ function App() {
   );
 
   const headerVisible = page === "main" || page === "list" || page === "subhub";
+  const homeHeaderMinimal = page === "main" && v1AppShell.homeHeaderMinimal;
   const electronRoomChromeHidden = isElectronRoomWindowMode && page === "room";
   const topHeaderVisible = showAppShell && headerVisible && !electronRoomChromeHidden;
   const subhubUtilBack =
@@ -3215,6 +3280,7 @@ function App() {
 
   return (
     <B2bMembershipProvider enabled={isLoggedIn}>
+    <ShowcaseBgmProvider>
     <div
       id="app-body"
       ref={appBodyRef}
@@ -3392,6 +3458,21 @@ function App() {
           </div>
 
           <div className="relative flex shrink-0 items-center gap-1">
+            {v1AppShell.bizcardScanner && homeHeaderMinimal ? (
+            <button
+              type="button"
+              onClick={() => requireAuth(() => setCsScannerOpen(true))}
+              className="shrink-0 rounded-full p-1.5 text-gray-500 active:scale-90 transition-transform"
+              aria-label="명함 스캐너"
+              title="명함 스캐너 — 촬영 후 개인 자료실 저장"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 7h4l2-3h4l2 3h4v12H4z" />
+                <circle cx="12" cy="13" r="3.5" />
+              </svg>
+            </button>
+            ) : null}
+            {!homeHeaderMinimal && v1AppShell.storeScanner ? (
             <button
               type="button"
               onClick={() => requireAuth(() => setCsScannerOpen(true))}
@@ -3404,6 +3485,8 @@ function App() {
                 <circle cx="12" cy="13" r="3.5" />
               </svg>
             </button>
+            ) : null}
+            {!homeHeaderMinimal ? (
             <button
               type="button"
               onClick={() =>
@@ -3425,6 +3508,8 @@ function App() {
                 <path d="M8 12h8" />
               </svg>
             </button>
+            ) : null}
+            {!homeHeaderMinimal ? (
             <button
               type="button"
               id="search-trigger"
@@ -3436,6 +3521,7 @@ function App() {
                 <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
             </button>
+            ) : null}
             {isBrowseGuest ? (
               <button
                 type="button"
@@ -3553,7 +3639,7 @@ function App() {
             isGuestMode={isBrowseGuest}
             onRequireAuth={requireAuth}
             onFamilyAlertToast={(text) => {
-              addPushNotification({ category: "안심", title: "가족 보호", body: text });
+              addPushNotification({ category: "가족보호", title: "가족 보호", body: text });
               setBottomToast(text);
               setTimeout(() => setBottomToast(""), 4000);
             }}
@@ -3569,6 +3655,7 @@ function App() {
       )}
 
       {page === "main" && (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Home
           onOpenStoryTarget={(payload) =>
             requireAuth(() => {
@@ -3647,10 +3734,17 @@ function App() {
             requestOpenMyPageComposer({ alsoStore: true });
             navigate({ nextPage: "mypage", nextTab: activeTab, nextRoomId: null });
           })}
+          onOpenFriendSearch={() =>
+            requireAuth(() => {
+            navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
+          })}
+          catalogFriends={roomCatalog.friends || []}
+          contactMatchData={contactMatchData}
           membershipTier={membershipTier}
           isDarkMode={isDarkMode}
           browseAsGuest={isBrowseGuest}
         />
+        </div>
       )}
       {page === "friendSearch" && (
         <FriendSearch
@@ -4105,8 +4199,27 @@ function App() {
         isDarkMode={isDarkMode}
         onRemoveCardFromWallet={removeCardFromWallet}
       />
+      <AppNotificationSheet
+        open={v1AppShell.notificationInbox && appNotificationOpen}
+        onClose={() => setAppNotificationOpen(false)}
+        isDarkMode={isDarkMode}
+        onOpenFamilyProtection={() => {
+          setAppNotificationOpen(false);
+          try {
+            sessionStorage.setItem("vlue_expand_family_protection_v1", "1");
+          } catch {
+            /* ignore */
+          }
+          navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
+        }}
+      />
+      <CallShowcaseHistorySheet
+        open={v1AppShell.callShowcaseHistoryNav && callShowcaseSheetOpen}
+        onClose={() => setCallShowcaseSheetOpen(false)}
+        isDarkMode={isDarkMode}
+      />
       <OfficeRemoteModal
-        open={officeRemoteOpen}
+        open={v1AppShell.printerRemote && officeRemoteOpen}
         onClose={() => setOfficeRemoteOpen(false)}
         isDarkMode={isDarkMode}
         onToast={(msg) => {
@@ -4125,6 +4238,7 @@ function App() {
                 : "bg-white/95 border-gray-100 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]"
             }`}
           >
+            {v1AppShell.chat ? (
             <button
               type="button"
               onClick={() => {
@@ -4175,7 +4289,9 @@ function App() {
                 <path d="M21 12c0 4.97-4.03 9-9 9a9.9 9.9 0 0 1-4-.84L3 21l.84-5A9 9 0 1 1 21 12z" />
               </svg>
             </button>
+            ) : null}
 
+            {v1AppShell.vumingAi ? (
             <button
               type="button"
               onClick={() => {
@@ -4211,7 +4327,9 @@ function App() {
                 <path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path>
               </svg>
             </button>
+            ) : null}
 
+            {v1AppShell.mypageShop ? (
             <button
               type="button"
               onClick={() => {
@@ -4255,7 +4373,9 @@ function App() {
                 </svg>
               </span>
             </button>
+            ) : null}
 
+            {v1AppShell.shoppingCart ? (
             <button
               type="button"
               onClick={() => {
@@ -4295,11 +4415,94 @@ function App() {
                 <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path>
               </svg>
             </button>
+            ) : null}
+
+            {v1AppShell.notificationInbox ? (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHeaderEyeNavBlink();
+                requireApp(() => {
+                  setCallShowcaseSheetOpen(false);
+                  setAppNotificationOpen(true);
+                });
+              }}
+              className="relative flex flex-col items-center justify-center w-full active:scale-95 transition-all"
+              aria-label="앱 알림"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="21"
+                height="21"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`${
+                  activeBottomTab === "notifications"
+                    ? "text-blue-500"
+                    : bottomNavPulseNotifications
+                      ? `${isDarkMode ? "text-blue-300" : "text-gray-500"} nav-bottom-icon-pulse`
+                      : isDarkMode
+                        ? "text-gray-400"
+                        : "text-gray-400"
+                }`}
+              >
+                <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              {pushUnreadCount > 0 ? (
+                <span className="absolute right-[calc(50%-18px)] top-0 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">
+                  {pushUnreadCount > 9 ? "9+" : pushUnreadCount}
+                </span>
+              ) : null}
+            </button>
+            ) : null}
+
+            {v1AppShell.callShowcaseHistoryNav ? (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHeaderEyeNavBlink();
+                requireApp(() => {
+                  setAppNotificationOpen(false);
+                  setCallShowcaseSheetOpen(true);
+                });
+              }}
+              className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
+              aria-label="통화 목록"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="21"
+                height="21"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`${
+                  activeBottomTab === "calls"
+                    ? "text-blue-500"
+                    : isDarkMode
+                      ? "text-gray-400"
+                      : "text-gray-400"
+                }`}
+              >
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+              </svg>
+            </button>
+            ) : null}
 
             <button
               type="button"
               onClick={() => {
                 triggerHeaderEyeNavBlink();
+                setAppNotificationOpen(false);
+                setCallShowcaseSheetOpen(false);
                 if (isBrowseGuest) {
                   requireAuth(() => navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null }));
                   return;
@@ -4339,7 +4542,8 @@ function App() {
       </footer>
       <Suspense fallback={null}>
         <CsScannerScreen
-          open={csScannerOpen}
+          open={v1AppShell.bizcardScanner && csScannerOpen}
+          documentOnly={v1AppShell.homeHeaderMinimal}
           onClose={() => setCsScannerOpen(false)}
           onToast={(msg) => {
             if (!msg) return;
@@ -4668,6 +4872,7 @@ function App() {
         </>
       )}
     </div>
+    </ShowcaseBgmProvider>
     </B2bMembershipProvider>
   );
 }

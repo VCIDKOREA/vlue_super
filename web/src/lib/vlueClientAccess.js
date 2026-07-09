@@ -3,6 +3,7 @@
  */
 
 import { buildSameOriginInstallerUrl } from "./vluePcInstaller.js";
+import { isWebPcDownloadEnabled } from "./v1ReleaseScope.js";
 
 /** Electron main.cjs 와 동일 — User-Agent suffix */
 export const VLUE_PC_APP_UA_TOKEN = "VLUE-PC-App";
@@ -10,6 +11,12 @@ export const VLUE_PC_APP_UA_TOKEN = "VLUE-PC-App";
 function isAppShellPath(pathname = "") {
   const p = String(pathname || "");
   return p === "/app" || p.startsWith("/app/");
+}
+
+/** 로컬 개발·LAN — 브라우저 /app 미리보기 허용 */
+function isLocalDevHost(hostname = "") {
+  const h = String(hostname || "").toLowerCase();
+  return h === "localhost" || h === "127.0.0.1" || /^192\.168\.\d+\.\d+$/.test(h);
 }
 
 /** @returns {boolean} */
@@ -38,6 +45,7 @@ export function shouldBlockBrowserAppShell(pathname = "") {
   if (typeof window === "undefined") return false;
   const path = pathname || window.location.pathname || "";
   if (!isAppShellPath(path)) return false;
+  if (import.meta.env.DEV && isLocalDevHost(window.location.hostname)) return false;
   return !isBrowserAppAccessAllowed();
 }
 
@@ -55,16 +63,17 @@ export function getVlueDownloadLinks() {
   const pcMacEnv = String(import.meta.env.VITE_VLUE_PC_MAC_URL || "").trim();
   const playStoreEnv = String(import.meta.env.VITE_VLUE_PLAY_STORE_URL || "").trim();
   const appStoreEnv = String(import.meta.env.VITE_VLUE_APP_STORE_URL || "").trim();
+  const pcEnabled = isWebPcDownloadEnabled();
 
   return {
     downloadPage,
     home: `${base}/`,
-    pcWindows: pcWindowsEnv || defaultWindowsUrl,
-    pcMac: pcMacEnv,
+    pcWindows: pcEnabled ? pcWindowsEnv || defaultWindowsUrl : "",
+    pcMac: pcEnabled ? pcMacEnv : "",
     playStore: playStoreEnv,
     appStore: appStoreEnv,
-    pcWindowsReady: Boolean(pcWindowsEnv || defaultWindowsUrl),
-    pcMacReady: Boolean(pcMacEnv),
+    pcWindowsReady: pcEnabled && Boolean(pcWindowsEnv || defaultWindowsUrl),
+    pcMacReady: pcEnabled && Boolean(pcMacEnv),
     playStoreReady: Boolean(playStoreEnv),
     appStoreReady: Boolean(appStoreEnv)
   };

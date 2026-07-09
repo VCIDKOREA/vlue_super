@@ -1,10 +1,23 @@
 import { MARKETING_VIEW_LABELS } from "../siteViews.js";
 import { appEntryUrl } from "../../lib/siteMode.js";
+import { isWebAiExcelEnabled, isWebPcDownloadEnabled } from "../../lib/v1ReleaseScope.js";
+
+function aboutSectionBody() {
+  const webPart = isWebAiExcelEnabled()
+    ? "웹(www)은 통합검색·AI엑셀에디터"
+    : "웹(www)은 통합검색";
+  const appPart = isWebPcDownloadEnabled()
+    ? "앱(PC·모바일)은 리모컨·실시간 알림·하드웨어 제어"
+    : "모바일 앱은 실시간 알림·하드웨어 제어";
+  return `${webPart}, ${appPart}를 담당합니다. 쇼핑·결제·메일·자료실은 @vlue/api로 웹·앱 동일 데이터가 실시간 동기화됩니다.`;
+}
 
 const SECTION_COPY = {
   about: {
     title: "서비스소개",
-    body: "웹(www)은 통합검색·AI엑셀에디터, 앱(PC·모바일)은 리모컨·실시간 알림·하드웨어 제어를 담당합니다. 쇼핑·결제·메일·자료실은 @vlue/api로 웹·앱 동일 데이터가 실시간 동기화됩니다.",
+    get body() {
+      return aboutSectionBody();
+    },
   },
   news: { title: "기업뉴스", body: "VLUE의 공지·보도자료·업데이트 소식이 이곳에 표시됩니다." },
   events: { title: "지역별행사", body: "전국 지역협력사와 함께하는 안심 캠페인 일정입니다." },

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-
-const EXPAND_FAMILY_KEY = "vlue_expand_family_protection_v1";
 import { requestGuardianPassImpUid } from "../lib/parentalConsentApi.js";
 import { normalizeMembershipKind } from "../lib/membershipBm.js";
+import { FAMILY_MEMBER_DISPLAY_LABEL } from "../lib/familyProtectionDemo.js";
 import { displayFamilyUser, useFamilyProtection } from "../hooks/useFamilyProtection.js";
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
 import FamilySecurityDashboard from "./FamilySecurityDashboard.jsx";
+
+const EXPAND_FAMILY_KEY = "vlue_expand_family_protection_v1";
 
 /** 친구검색 — 가족 보호 등록·알림 설정 (대버튼 탭 시 펼침) */
 export default function FamilyProtectionRegister({ isDarkMode = false, prefillHandle = "", onToast }) {

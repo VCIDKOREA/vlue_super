@@ -10,14 +10,24 @@ import { useHorizontalScrollStrip } from "../lib/useHorizontalScrollStrip.js";
 import { fetchOfficeFiles } from "../lib/vlueOfficeApi.js";
 import { ASSET_FILES_CHANGED, mapOfficeFilesForUi } from "../lib/vlueAssetFilesStorage.js";
 import { useSensitiveScreenSecure } from "../hooks/useSensitiveScreenSecure.js";
+import { v1AppShell } from "../lib/v1ReleaseScope.js";
 
-const TABS = [
+const FULL_TABS = [
   { id: "received", label: "받은 명함" },
   { id: "mine", label: "내 명함" },
   { id: "mydocs", label: "내 문서" },
   { id: "b2b", label: "B2B" },
   { id: "members", label: "멤버" }
 ];
+
+const V1_VAULT_TABS = [
+  { id: "received", label: "명함저장" },
+  { id: "mydocs", label: "내문서" }
+];
+
+function resolveVaultTabs() {
+  return v1AppShell.vaultTabsMinimal ? V1_VAULT_TABS : FULL_TABS;
+}
 
 function readUserId() {
   try {
@@ -137,6 +147,7 @@ export default function WalletHubModal({
   onPickDocument,
   isDarkMode = false
 }) {
+  const tabs = useMemo(() => resolveVaultTabs(), [open]);
   const [tab, setTab] = useState(defaultTab);
   const [toast, setToast] = useState("");
   const [memberLoginId, setMemberLoginId] = useState("");
@@ -187,12 +198,12 @@ export default function WalletHubModal({
 
   useEffect(() => {
     if (open) {
-      const nextTab = TABS.some((t) => t.id === defaultTab) ? defaultTab : "received";
+      const nextTab = tabs.some((t) => t.id === defaultTab) ? defaultTab : tabs[0]?.id || "received";
       setTab(nextTab);
       refreshOwned();
       refreshVaultFiles();
     }
-  }, [open, defaultTab, refreshOwned, refreshVaultFiles]);
+  }, [open, defaultTab, refreshOwned, refreshVaultFiles, tabs]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -266,7 +277,7 @@ export default function WalletHubModal({
   }, [open]);
 
   const receivedCount = walletCards.length;
-  const activeTabLabel = TABS.find((t) => t.id === tab)?.label || "";
+  const activeTabLabel = tabs.find((t) => t.id === tab)?.label || "";
   const mergedStorageFiles = useMemo(() => {
     const seen = new Set();
     const out = [];
@@ -301,7 +312,7 @@ export default function WalletHubModal({
               <div className="flex min-w-0 items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <h4 className={`truncate text-[18px] font-black tracking-tight ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
-                    개인 자료실
+                    개인케이스
                   </h4>
                   <p className={`mt-0.5 truncate text-[12px] ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
                     {activeTabLabel}
@@ -325,12 +336,12 @@ export default function WalletHubModal({
               <div
                 ref={tabStrip.ref}
                 role="tablist"
-                aria-label="개인 자료실 메뉴"
+                aria-label="개인케이스 메뉴"
                 onMouseDown={tabStrip.onMouseDown}
                 className={`wallet-tab-strip flex overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-proximity touch-pan-x scroll-px-4 px-4 py-2 sm:scroll-px-5 sm:px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${tabStrip.stripClassName}`}
               >
                 <div className="vlue-tab-strip w-max flex-nowrap gap-2 pr-4">
-                  {TABS.map((t) => (
+                  {tabs.map((t) => (
                     <button
                       key={t.id}
                       ref={(el) => {

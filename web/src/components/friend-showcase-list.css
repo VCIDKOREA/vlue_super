@@ -1,0 +1,265 @@
+/* 홈 — 친구 쇼케이스 목록 (카카오톡 친구 리스트 참고) */
+.friend-showcase-list {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 28rem;
+  border-radius: 20px;
+  border: 1px solid #f0f0f0;
+  background: #fff;
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.friend-showcase-list--home {
+  display: block;
+  flex: none;
+  min-height: auto;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  border-top: 1px solid #ebebeb;
+  box-shadow: none;
+  background: #fff;
+}
+
+.friend-showcase-list--home .friend-showcase-list__scroll {
+  overflow: visible;
+  padding-bottom: 8px;
+}
+
+.friend-showcase-list__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #f4f4f5;
+  flex-shrink: 0;
+}
+
+.friend-showcase-list--home .friend-showcase-list__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid #ebebeb;
+  background: #fff;
+}
+
+.friend-showcase-list__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.friend-showcase-list__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: #191f28;
+  letter-spacing: -0.02em;
+}
+
+.friend-showcase-list__count {
+  font-size: 12px;
+  font-weight: 800;
+  color: #94a3b8;
+}
+
+.friend-showcase-list__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.friend-showcase-list__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: #191f28;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.friend-showcase-list__icon-btn:hover,
+.friend-showcase-list__icon-btn--active {
+  background: #f2f4f6;
+}
+
+.friend-showcase-list__search {
+  flex-shrink: 0;
+  padding: 0 16px 10px;
+  border-bottom: 1px solid #f4f4f5;
+  background: #fff;
+}
+
+.friend-showcase-list__search-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 8px;
+  background: #f2f4f6;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #191f28;
+  outline: none;
+}
+
+.friend-showcase-list__search-input::placeholder {
+  color: #8b95a1;
+}
+
+.friend-showcase-list__scroll {
+  min-height: 0;
+}
+
+.friend-showcase-list__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.friend-showcase-list__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 16px;
+  border: 0;
+  border-bottom: 1px solid #f5f5f5;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.friend-showcase-list__row:hover,
+.friend-showcase-list__row--active {
+  background: #f8fbff;
+}
+
+.friend-showcase-list__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.friend-showcase-list__avatar--initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #dbeafe, #e0e7ff);
+  color: #1d4ed8;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.friend-showcase-list__meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.friend-showcase-list__name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #191f28;
+  letter-spacing: -0.02em;
+}
+
+.friend-showcase-list__subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #8b95a1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.friend-showcase-list__preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+
+.friend-showcase-list__preview-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+}
+
+.friend-showcase-list__preview-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  cursor: pointer;
+}
+
+.friend-showcase-list__empty {
+  padding: 28px 20px 32px;
+  text-align: center;
+}
+
+.friend-showcase-list__empty-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #334155;
+}
+
+.friend-showcase-list__empty-desc {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.friend-showcase-list__empty-btn {
+  margin-top: 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #2b6ff0;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.friend-showcase-list__preview-loading {
+  margin: 0;
+  padding: 20px 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.friend-showcase-list__preview-card {
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}

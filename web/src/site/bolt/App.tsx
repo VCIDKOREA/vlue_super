@@ -35,6 +35,7 @@ import {
   vlueMarketingLogout,
   pingAuthSession,
 } from '../../lib/vlueAuthApi.js';
+import { coerceWebViewForV1, isWebViewV1Enabled } from '../../lib/v1ReleaseScope.js';
 
 const VALID_VIEWS: View[] = [
   'home', 'search', 'shopping', 'auction', 'about', 'resources', 'pricing', 'safezone',
@@ -49,7 +50,7 @@ function readViewFromHash(): { view: View; legalScrollId?: string } {
     return { view: 'mail-settings', legalScrollId: anchor || undefined };
   }
   const view = (VALID_VIEWS.includes(viewPart as View) ? viewPart : 'home') as View;
-  return { view, legalScrollId: anchor || undefined };
+  return { view: coerceWebViewForV1(view) as View, legalScrollId: anchor || undefined };
 }
 
 export default function App() {
@@ -114,14 +115,15 @@ export default function App() {
   };
 
   const handleNavigate = (nextView: View, legalAnchor?: string) => {
-    setRoute({ view: nextView, legalScrollId: legalAnchor });
+    const safeView = coerceWebViewForV1(nextView) as View;
+    setRoute({ view: safeView, legalScrollId: legalAnchor });
     if (typeof window !== 'undefined') {
-      if (nextView === 'home' && !legalAnchor) {
+      if (safeView === 'home' && !legalAnchor) {
         window.location.hash = '';
       } else if (legalAnchor) {
-        window.location.hash = `${nextView}/${legalAnchor}`;
+        window.location.hash = `${safeView}/${legalAnchor}`;
       } else {
-        window.location.hash = nextView;
+        window.location.hash = safeView;
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -184,8 +186,8 @@ export default function App() {
         >
         {view === 'home' && <HomePage onSearch={handleSearch} onNavigate={handleNavigate} />}
         {view === 'search' && <SearchPage initialQuery={searchQuery} onBack={() => handleNavigate('home')} />}
-        {view === 'shopping' && <ShoppingPage user={user} onLoginClick={handleLoginRequired} />}
-        {view === 'auction' && <AuctionPage user={user} onLoginClick={handleLoginRequired} />}
+        {view === 'shopping' && isWebViewV1Enabled('shopping') && <ShoppingPage user={user} onLoginClick={handleLoginRequired} />}
+        {view === 'auction' && isWebViewV1Enabled('auction') && <AuctionPage user={user} onLoginClick={handleLoginRequired} />}
         {view === 'about' && (
           <Suspense fallback={<div className="min-h-[40vh] flex items-center justify-center text-sm font-semibold text-slate-500">서비스소개 불러오는 중…</div>}>
             <AboutPage onSearch={handleSearch} onNavigate={handleNavigate} />
@@ -218,7 +220,7 @@ export default function App() {
         )}
 
         {view === 'safezone' && <SafeZonePage onBack={() => handleNavigate('home')} />}
-        {view === 'mail-settings' && (
+        {view === 'mail-settings' && isWebViewV1Enabled('mail-settings') && (
           <MarketingEmailSettingsPage
             user={user}
             onLoginClick={handleLoginRequired}
@@ -226,13 +228,13 @@ export default function App() {
             onNavigate={handleNavigate}
           />
         )}
-        {view === 'mail' && <SecureMailPage onBack={() => handleNavigate('home')} />}
+        {view === 'mail' && isWebViewV1Enabled('mail') && <SecureMailPage onBack={() => handleNavigate('home')} />}
         {view === 'download' && <DownloadPage onBack={() => handleNavigate('home')} />}
         {view === 'news' && <NewsPage onBack={() => handleNavigate('home')} />}
-        {view === 'events' && <EventsPage onBack={() => handleNavigate('home')} />}
-        {view === 'jobs' && <JobsPage user={user} onLoginClick={handleLoginRequired} onBack={() => handleNavigate('home')} />}
+        {view === 'events' && isWebViewV1Enabled('events') && <EventsPage onBack={() => handleNavigate('home')} />}
+        {view === 'jobs' && isWebViewV1Enabled('jobs') && <JobsPage user={user} onLoginClick={handleLoginRequired} onBack={() => handleNavigate('home')} />}
         {view === 'support' && <SupportPage user={user} onLoginClick={handleLoginRequired} onBack={() => handleNavigate('home')} />}
-        {view === 'exceleditor' && (
+        {view === 'exceleditor' && isWebViewV1Enabled('exceleditor') && (
           <ExcelEditorPage user={user} onLoginClick={handleLoginRequired} onNavigate={handleNavigate} />
         )}
         {view === 'mypage' && user && <MyPage user={user} onNavigate={(v) => handleNavigate(v as View)} onLogout={handleLogout} />}

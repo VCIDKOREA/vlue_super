@@ -4,13 +4,18 @@
 
 import { getVlueDownloadLinks } from "./vlueClientAccess.js";
 import { VLUE_PC_INSTALLER_FILENAME } from "./vluePcInstaller.js";
+import { isWebPcDownloadEnabled } from "./v1ReleaseScope.js";
 
 export const VLUE_PC_WINDOWS_FILENAME = VLUE_PC_INSTALLER_FILENAME;
 export const VLUE_APP_VERSION = "1.0.0";
 
 const UNAVAILABLE = {
-  windows: "VLUE PC(Windows) 설치 파일을 준비 중입니다.\n잠시 후 다시 시도해 주세요.",
-  mac: "VLUE PC(macOS) 버전은 준비 중입니다.",
+  windows: isWebPcDownloadEnabled()
+    ? "VLUE PC(Windows) 설치 파일을 준비 중입니다.\n잠시 후 다시 시도해 주세요."
+    : "PC 버전은 V2(채팅 연동) 업데이트에서 제공될 예정입니다.",
+  mac: isWebPcDownloadEnabled()
+    ? "VLUE PC(macOS) 버전은 준비 중입니다."
+    : "PC 버전은 V2(채팅 연동) 업데이트에서 제공될 예정입니다.",
   playStore: "Google Play 스토어 출시 준비 중입니다.",
   appStore: "App Store 출시 준비 중입니다."
 };

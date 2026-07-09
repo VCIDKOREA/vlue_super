@@ -1,38 +1,61 @@
-/** 푸시 알림 수신함 — 채팅 목록 「알림」 탭 */
+/** 푸시 알림 수신함 — 메인 화면 · 채팅 목록 「알림」 탭 */
 
-const KEY = "vlue_push_inbox_v1";
+const KEY = "vlue_push_inbox_v2";
 
 export const PUSH_INBOX_CHANGED = "vlue-push-inbox-changed";
 
 const DEMO = [
   {
-    id: "push-demo-1",
-    category: "쇼핑",
-    title: "장바구니 품절",
-    body: "장바구니에 담아 두신 「VLUE 텀블러」이 품절되었습니다.",
-    time: "방금",
+    id: "push-demo-family-1",
+    category: "가족보호",
+    title: "미등록 앱 실행 감지",
+    body: "자녀 기기에서 미등록 앱 실행이 감지되었습니다. 원격 앱 목록을 확인해 주세요.",
     read: false,
-    createdAt: new Date().toISOString()
+    createdAt: new Date(Date.now() - 18 * 60 * 1000).toISOString()
   },
   {
-    id: "push-demo-2",
-    category: "배송",
-    title: "배송 시작",
-    body: "구매하신 상품이 배송 시작되었습니다. (송장번호 000-0000-000)",
-    time: "32분 전",
+    id: "push-demo-family-2",
+    category: "가족보호",
+    title: "부재중 통화 알림",
+    body: "피보호자에게 알 수 없는 번호(010-****-1234)로 부재중 통화가 있었습니다.",
     read: false,
-    createdAt: new Date(Date.now() - 32 * 60 * 1000).toISOString()
-  },
-  {
-    id: "push-demo-3",
-    category: "안심",
-    title: "가족 보호",
-    body: "자녀 기기에서 미등록 앱 실행이 감지되었습니다.",
-    time: "2시간 전",
-    read: true,
     createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString()
+  },
+  {
+    id: "push-demo-app-1",
+    category: "앱",
+    title: "VLUE 인증 명함 송출",
+    body: "발신 통화 시 디지털 인증명함이 정상적으로 송출되었습니다.",
+    read: true,
+    createdAt: new Date(Date.now() - 26 * 3600 * 1000).toISOString()
   }
 ];
+
+/** 알림 목록용 날짜·시간 (예: 7월 6일 오후 3:24) */
+export function formatPushNotificationDateTime(iso) {
+  try {
+    const d = new Date(iso || Date.now());
+    if (Number.isNaN(d.getTime())) return "";
+    const now = new Date();
+    const sameYear = d.getFullYear() === now.getFullYear();
+    return d.toLocaleString("ko-KR", {
+      ...(sameYear ? {} : { year: "numeric" }),
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true
+    });
+  } catch {
+    return "";
+  }
+}
+
+export function resolvePushDisplayTime(item) {
+  const fromIso = formatPushNotificationDateTime(item?.createdAt);
+  if (fromIso) return fromIso;
+  return String(item?.time || "").trim();
+}
 
 function readList() {
   try {
@@ -62,15 +85,16 @@ export function countUnreadPush() {
   return readList().filter((n) => !n.read).length;
 }
 
-export function addPushNotification({ category = "기타", title = "", body = "", time }) {
+export function addPushNotification({ category = "기타", title = "", body = "", time, createdAt }) {
+  const at = createdAt || new Date().toISOString();
   const entry = {
     id: `push-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     category: String(category || "기타").slice(0, 12),
     title: String(title || "").slice(0, 80),
     body: String(body || "").slice(0, 280),
-    time: time || "방금",
+    time: time || formatPushNotificationDateTime(at),
     read: false,
-    createdAt: new Date().toISOString()
+    createdAt: at
   };
   writeList([entry, ...readList()]);
   return entry;

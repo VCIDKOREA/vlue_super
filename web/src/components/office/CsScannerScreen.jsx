@@ -247,7 +247,9 @@ export default function CsScannerScreen({
   open,
   onClose,
   onToast,
-  initialMode = "document"
+  initialMode = "document",
+  /** V1 메인 — 명함·문서만 (POS 탭 숨김) */
+  documentOnly = false
 }) {
   useSensitiveScreenSecure(open);
   const [posRole, setPosRole] = useState(null);
@@ -321,7 +323,15 @@ export default function CsScannerScreen({
     setScanMode(initialMode === "pos" && canUsePos ? "pos" : "document");
   }, [open, initialMode, canUsePos, isStaff]);
 
-  const modeCopy = SCAN_MODES[scanMode] || SCAN_MODES.document;
+  const modeCopy = documentOnly
+    ? {
+        ...SCAN_MODES.document,
+        title: "명함 스캐너",
+        subtitle: "명함을 촬영해 PDF로 개인 자료실에 저장합니다.",
+        frameHint: "명함을 프레임 안에 맞춰 주세요",
+        detectedHint: "명함 영역 자동 감지 · 모서리 드래그로 조정"
+      }
+    : SCAN_MODES[scanMode] || SCAN_MODES.document;
 
   const runLiteDetect = useCallback(() => {
     if (Date.now() < manualUntilRef.current) return;
@@ -609,6 +619,11 @@ export default function CsScannerScreen({
             </button>
           </div>
         </div>
+        {documentOnly ? (
+          <p className="px-3 pb-2 pt-0.5 text-center text-[10px] font-semibold leading-snug text-blue-700">
+            명함·문서 촬영 후 개인 자료실에 저장됩니다
+          </p>
+        ) : (
         <ScannerModeTabs
           mode={scanMode}
           canUsePos={canUsePos}
@@ -624,6 +639,7 @@ export default function CsScannerScreen({
             onToast?.(next === "pos" ? "POS 빌지 스캔 모드" : "일반 문서 스캔 모드");
           }}
         />
+        )}
       </header>
 
       <div ref={overlayRef} className="relative min-h-0 flex-1 bg-slate-200">

@@ -3,6 +3,7 @@ import { Monitor, Smartphone, Download, ArrowLeft, Store, Apple } from "lucide-r
 import { VlueBrandLogo } from "./VlueBrandLogo.jsx";
 import { getVlueDownloadLinks } from "../lib/vlueClientAccess.js";
 import { openVlueDownload } from "../lib/vlueDownloadActions.js";
+import { isWebPcDownloadEnabled } from "../lib/v1ReleaseScope.js";
 import "../site/bolt/index.css";
 
 /**
@@ -11,6 +12,7 @@ import "../site/bolt/index.css";
  */
 export default function BrowserAppBlockedPage() {
   const links = useMemo(() => getVlueDownloadLinks(), []);
+  const showPc = isWebPcDownloadEnabled();
 
   useEffect(() => {
     document.documentElement.classList.remove("dark");
@@ -44,8 +46,8 @@ export default function BrowserAppBlockedPage() {
             style={{ wordBreak: "keep-all" }}
           >
             홈페이지(www)에서는 검색·쇼핑·가입·AI 엑셀 등을 이용하세요. 통화 알림·명함·가족보호 등{" "}
-            <strong className="font-semibold text-gray-800">전체 앱 기능</strong>은 스토어 앱 또는 PC
-            설치형 프로그램에서 동일 계정으로 이용합니다.
+            <strong className="font-semibold text-gray-800">전체 앱 기능</strong>은{" "}
+            {showPc ? "스토어 앱 또는 PC 설치형 프로그램" : "모바일 앱"}에서 동일 계정으로 이용합니다.
           </p>
         </div>
 
@@ -55,7 +57,7 @@ export default function BrowserAppBlockedPage() {
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3.5 text-[15px] font-bold text-white shadow-md transition-colors hover:bg-blue-700 active:bg-blue-800"
           >
             <span aria-hidden>📥</span>
-            앱·PC 다운로드 안내
+            {showPc ? "앱·PC 다운로드 안내" : "모바일 앱 다운로드 안내"}
             <Download className="h-4 w-4 opacity-80" aria-hidden />
           </a>
           <a
@@ -67,7 +69,7 @@ export default function BrowserAppBlockedPage() {
           </a>
         </div>
 
-        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className={`mt-10 grid grid-cols-1 gap-4${showPc ? " sm:grid-cols-2" : ""}`}>
           <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-5 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <span className="text-lg" aria-hidden>
@@ -106,6 +108,7 @@ export default function BrowserAppBlockedPage() {
             </div>
           </div>
 
+          {showPc ? (
           <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-5 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <span className="text-lg" aria-hidden>
@@ -143,6 +146,7 @@ export default function BrowserAppBlockedPage() {
               </button>
             </div>
           </div>
+          ) : null}
         </div>
 
         <p

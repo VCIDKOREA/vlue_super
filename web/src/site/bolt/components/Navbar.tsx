@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Menu, X, User, ChevronDown, LogOut, MapPin, Lock, CreditCard, LayoutDashboard, Award, Sparkles } from 'lucide-react';
 import { VlueNavLogoMark, useVlueLogoBlink } from '../../../components/VlueNavLogoMark.jsx';
 import type { View } from '../types';
+import { isWebViewV1Enabled } from '../../../lib/v1ReleaseScope.js';
 
 interface NavbarProps {
   currentView: View;
@@ -33,7 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'VLUE메일', view: 'mail-settings', mailPill: true },
   { label: 'AI엑셀에디터', view: 'exceleditor', featured: true },
   { label: '고객지원', view: 'support' },
-];
+].filter((item) => isWebViewV1Enabled(item.view));
 
 const USER_MENU_ITEMS: { label: string; view: View; icon: typeof LayoutDashboard }[] = [
   { label: '마이페이지', view: 'mypage', icon: LayoutDashboard },
@@ -186,6 +187,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
           </div>
 
           <div className="xl:hidden ml-auto flex items-center gap-1 flex-shrink-0 min-w-0">
+            {isWebViewV1Enabled('exceleditor') ? (
             <button
               type="button"
               onClick={() => handleNav('exceleditor')}
@@ -197,6 +199,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
               <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="mkt-nav-mobile-excel-label">AI엑셀</span>
             </button>
+            ) : null}
             <button
               type="button"
               className="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors flex-shrink-0"

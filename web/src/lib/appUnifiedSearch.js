@@ -1,6 +1,7 @@
 /**
  * 헤더 통합검색 — 채팅·메시지·화면 이동·메인(홈) 라벨 등 앱 내 문자열 인덱싱
  */
+import { formatMembershipTierLabel } from "./membershipTierDisplay.js";
 
 export function tabForRoom(roomId) {
   if (!roomId) return "all";
@@ -84,8 +85,7 @@ const MAIN_DISCOVER = [
 ];
 
 function staticScreens(membershipTier) {
-  const tierKo =
-    membershipTier === "premium" ? "프리미엄" : membershipTier === "standard" ? "스탠다드" : "일반";
+  const tierKo = formatMembershipTierLabel(membershipTier);
   return [
     {
       id: "scr-chat",
@@ -167,9 +167,9 @@ function staticScreens(membershipTier) {
     {
       id: "scr-wallet",
       category: "바로가기",
-      title: "개인 자료실 · Wallet",
-      subtitle: "명함 · 내 문서",
-      fields: ["지갑", "wallet", "명함", "카드", "자료실"],
+      title: "개인케이스 · Wallet",
+      subtitle: "명함저장 · 내문서",
+      fields: ["지갑", "wallet", "명함", "카드", "케이스", "자료실"],
       action: { type: "wallet" }
     },
     {
@@ -193,7 +193,7 @@ function staticScreens(membershipTier) {
       category: "멤버십",
       title: `현재 등급 · ${tierKo}`,
       subtitle: "멤버십 · 등급 안내는 프로필에서",
-      fields: ["등급", "멤버십", "프리미엄", "스탠다드", "일반", "구독료"],
+      fields: ["등급", "멤버십", "무료", "유료", "가족보호", "구독료"],
       action: { type: "profile", view: "main" }
     },
     {

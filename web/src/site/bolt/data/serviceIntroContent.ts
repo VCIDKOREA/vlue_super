@@ -1,6 +1,7 @@
 /** 서비스소개 — 회사소개 + 기능소개 (중복 제거·카테고리 재정의) */
 
 import { MEMBERSHIP_PRICING_FEATURES } from './membershipPlansContent';
+import { isWebAiExcelEnabled } from '../../../lib/v1ReleaseScope.js';
 
 export type ServiceAccordionItem = {
   id: string;
@@ -327,7 +328,7 @@ export function buildFeatureCatalog(): CatalogFeature[] {
   }));
 
   const platform = [
-    ...PLATFORM_SPLIT.web.exclusive,
+    ...PLATFORM_SPLIT.web.exclusive.filter((f) => f.id !== 'excel' || isWebAiExcelEnabled()),
     ...PLATFORM_SPLIT.install.exclusive,
   ].map((f, i) => ({
     id: `plat-${f.id}-${i}`,
@@ -366,7 +367,9 @@ export function buildFeatureCatalog(): CatalogFeature[] {
     sectionId: 'about-protect',
   }));
 
-  const web = WEB_EXCLUSIVE_FEATURES.map((item) => ({
+  const web = WEB_EXCLUSIVE_FEATURES.filter(
+    (item) => item.id !== 'web-excel' || isWebAiExcelEnabled()
+  ).map((item) => ({
     ...item,
     category: 'web' as const,
     sectionId: 'about-web',

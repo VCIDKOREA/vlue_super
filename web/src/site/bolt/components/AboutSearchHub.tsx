@@ -10,6 +10,7 @@ import {
   type AboutCategoryId,
   type CatalogFeature,
 } from '../data/serviceIntroContent';
+import { isWebAiExcelEnabled } from '../../../lib/v1ReleaseScope.js';
 
 type Props = {
   onInstitutionSearch: (query: string) => void;
@@ -25,6 +26,11 @@ export default function AboutSearchHub({
   const [mode, setMode] = useState<'institution' | 'feature'>('institution');
   const [instQuery, setInstQuery] = useState('');
   const [featureQuery, setFeatureQuery] = useState('');
+
+  const featureKeywords = useMemo(
+    () => FEATURE_KEYWORD_QUICK.filter((kw) => kw !== 'AI엑셀에디터' || isWebAiExcelEnabled()),
+    []
+  );
 
   const catalog = useMemo(() => buildFeatureCatalog(), []);
 
@@ -128,7 +134,7 @@ export default function AboutSearchHub({
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {FEATURE_KEYWORD_QUICK.map((kw) => (
+              {featureKeywords.map((kw) => (
                 <button
                   key={kw}
                   type="button"

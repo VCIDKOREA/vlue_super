@@ -40,6 +40,7 @@ import {
 } from '../data/membershipPlansContent';
 import { REFERRAL_PROGRAM_NOTICES } from '../../../lib/membershipBm.js';
 import { SYNC_PRINCIPLES } from '../data/platformArchitectureContent';
+import { isWebAiExcelEnabled, isWebPcDownloadEnabled } from '../../../lib/v1ReleaseScope.js';
 
 const CHART_DATA = [
   { year: '2019', value: 3209, label: '3,209억' },
@@ -317,7 +318,34 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
     scrollToSection(feature.sectionId, feature.category);
   };
 
-  const excelNav = () => onNavigate('exceleditor');
+  const showAiExcel = isWebAiExcelEnabled();
+  const showPc = isWebPcDownloadEnabled();
+  const webPlatformExclusive = PLATFORM_SPLIT.web.exclusive.filter(
+    (f) => f.id !== 'excel' || showAiExcel
+  );
+  const installPlatformExclusive = PLATFORM_SPLIT.install.exclusive.filter(
+    (f) => showPc || f.id !== 'remote'
+  );
+  const webExclusiveFeatures = WEB_EXCLUSIVE_FEATURES.filter(
+    (item) => item.id !== 'web-excel' || showAiExcel
+  );
+  const installExclusiveFeatures = INSTALL_EXCLUSIVE_FEATURES.filter(
+    (item) => showPc || item.id !== 'remote'
+  );
+  const aboutHeroSubtitle = showPc
+    ? ABOUT_HERO.subtitle
+    : 'www.vlue.kr에서 기관을 확인하고, 모바일 앱에서 실시간으로 보호받으세요. 하나의 계정으로 데이터가 연결됩니다.';
+  const installSectionTitle = showPc ? 'PC·모바일 설치 프로그램' : '모바일 앱';
+  const installCtaLabel = showPc ? 'PC·모바일 설치' : '모바일 앱 설치';
+  const syncPrinciples = SYNC_PRINCIPLES.map((item) =>
+    item.id === 'sync-one' && !showPc
+      ? { ...item, summary: '웹·모바일 = 한 사용자' }
+      : item
+  );
+
+  const excelNav = () => {
+    if (showAiExcel) onNavigate('exceleditor');
+  };
 
   return (
     <main className="min-h-screen bg-[#e8eef5] pt-6">
@@ -344,7 +372,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
             </p>
           </div>
           <p className="text-white/90 text-base leading-relaxed max-w-2xl mx-auto mt-4 font-medium" style={{ wordBreak: 'keep-all' }}>
-            {ABOUT_HERO.subtitle}
+            {aboutHeroSubtitle}
           </p>
         </div>
 
@@ -431,7 +459,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
                 <p className="text-sm text-primary-100 mt-0.5">{PLATFORM_SPLIT.web.tagline}</p>
               </div>
               <div className="p-4 grid gap-3">
-                {PLATFORM_SPLIT.web.exclusive.map((f, i) => (
+                {webPlatformExclusive.map((f, i) => (
                   <BentoCard
                     key={f.id}
                     icon={WEB_ICONS[i] ?? Search}
@@ -457,11 +485,11 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
             <div className="rounded-3xl border border-indigo-200 bg-white overflow-hidden shadow-sm">
               <div className="bg-gradient-to-r from-indigo-700 to-indigo-500 px-5 py-4 text-white">
                 <Monitor className="w-6 h-6 mb-2 opacity-90" />
-                <p className="text-lg font-black">{PLATFORM_SPLIT.install.title}</p>
+                <p className="text-lg font-black">{showPc ? PLATFORM_SPLIT.install.title : '설치형 (모바일)'}</p>
                 <p className="text-sm text-indigo-100 mt-0.5">{PLATFORM_SPLIT.install.tagline}</p>
               </div>
               <div className="p-4 grid gap-3">
-                {PLATFORM_SPLIT.install.exclusive.map((f) => {
+                {installPlatformExclusive.map((f) => {
                   const icons = { remote: Radio, alert: Bell, hw: Cpu };
                   const Icon = icons[f.id as keyof typeof icons] ?? Smartphone;
                   return <BentoCard key={f.id} icon={Icon} title={f.title} desc={f.desc} accent="indigo" />;
@@ -486,10 +514,10 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
               <span className="text-white/40">↔</span>
               <span className="px-3 py-1.5 rounded-lg bg-primary-500">@vlue/api</span>
               <span className="text-white/40">↔</span>
-              <span className="px-3 py-1.5 rounded-lg bg-white/10">PC · 모바일 설치</span>
+              <span className="px-3 py-1.5 rounded-lg bg-white/10">{showPc ? 'PC · 모바일 설치' : '모바일 앱'}</span>
             </div>
           </div>
-          <ServiceAccordion items={SYNC_PRINCIPLES} forceOpenId={forceOpenId} />
+          <ServiceAccordion items={syncPrinciples} forceOpenId={forceOpenId} />
         </section>
 
         {/* 보이스피싱 */}
@@ -630,10 +658,14 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
               </span>
             }
             title="www에서만 제공하는 기능"
-            desc="통합 검색·AI엑셀에디터는 브라우저에서 바로 사용합니다. 공통 서비스는 설치형 앱과 데이터가 연결됩니다."
+            desc={
+              showAiExcel
+                ? '통합 검색·AI엑셀에디터는 브라우저에서 바로 사용합니다. 공통 서비스는 설치형 앱과 데이터가 연결됩니다.'
+                : '통합 기관 검색은 브라우저에서 바로 사용합니다. 공통 서비스는 설치형 앱과 데이터가 연결됩니다.'
+            }
           />
           <div className="grid sm:grid-cols-2 gap-4 mb-5 max-w-2xl">
-            {WEB_EXCLUSIVE_FEATURES.map((item, i) => (
+            {webExclusiveFeatures.map((item, i) => (
               <BentoCard
                 key={item.id}
                 icon={WEB_ICONS[i] ?? Search}
@@ -664,7 +696,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
               </button>
             ))}
           </div>
-          <ServiceAccordion items={WEB_EXCLUSIVE_FEATURES} forceOpenId={forceOpenId} />
+          <ServiceAccordion items={webExclusiveFeatures} forceOpenId={forceOpenId} />
         </section>
 
         {/* 설치형 */}
@@ -676,8 +708,8 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
                 설치형 앱
               </span>
             }
-            title="PC·모바일 설치 프로그램"
-            desc="리모컨·실시간 알림·하드웨어 연동은 설치 후 이용합니다. 브라우저 웹앱(/app)은 제공하지 않습니다."
+            title={installSectionTitle}
+            desc="리모컨·실시간 알림·하드웨어 연동은 모바일 앱 설치 후 이용합니다. 브라우저 웹앱(/app)은 제공하지 않습니다."
           />
 
           <div className="flex flex-wrap gap-2 mb-6">
@@ -689,7 +721,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {INSTALL_EXCLUSIVE_FEATURES.map((item) => {
+            {installExclusiveFeatures.map((item) => {
               const Mapped = INSTALL_ICON_MAP[item.id] ?? Shield;
               return (
                 <BentoCard
@@ -703,13 +735,15 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
             })}
                   </div>
 
-          <ServiceAccordion items={INSTALL_EXCLUSIVE_FEATURES} forceOpenId={forceOpenId} className="mb-6" />
+          <ServiceAccordion items={installExclusiveFeatures} forceOpenId={forceOpenId} className="mb-6" />
 
           <div className="flex flex-wrap gap-3 rounded-2xl bg-slate-50 border border-slate-200 p-5">
             <div className="flex-1 min-w-[200px]">
-              <p className="text-sm font-bold text-slate-900">PC·모바일 설치 안내</p>
+              <p className="text-sm font-bold text-slate-900">{installCtaLabel} 안내</p>
               <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                실시간 보호·리모컨·명함 레터링은 설치형 프로그램에서 이용하세요. 웹 AI엑셀·검색과 동일 계정으로 로그인됩니다.
+                {showAiExcel
+                  ? '실시간 보호·리모컨·명함 레터링은 설치형 프로그램에서 이용하세요. 웹 AI엑셀·검색과 동일 계정으로 로그인됩니다.'
+                  : '실시간 보호·리모컨·명함 레터링은 설치형 프로그램에서 이용하세요. 웹 검색과 동일 계정으로 로그인됩니다.'}
               </p>
             </div>
             <button
@@ -869,7 +903,13 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
             <Eye className="w-10 h-10 mx-auto mb-3 opacity-90" />
             <h2 className="text-xl font-black mb-2">웹에서 확인하고, 설치형으로 보호까지</h2>
             <p className="text-primary-100 text-sm max-w-md mx-auto mb-6" style={{ wordBreak: 'keep-all' }}>
-              기관 검색·AI엑셀에디터는 www에서, 실시간 경보·명함·가족 보호는 PC·모바일 설치 프로그램에서 이어가세요.
+              {showAiExcel
+                ? showPc
+                  ? '기관 검색·AI엑셀에디터는 www에서, 실시간 경보·명함·가족 보호는 PC·모바일 설치 프로그램에서 이어가세요.'
+                  : '기관 검색·AI엑셀에디터는 www에서, 실시간 경보·명함·가족 보호는 모바일 앱에서 이어가세요.'
+                : showPc
+                  ? '기관 검색은 www에서, 실시간 경보·명함·가족 보호는 PC·모바일 설치 프로그램에서 이어가세요.'
+                  : '기관 검색은 www에서, 실시간 경보·명함·가족 보호는 모바일 앱에서 이어가세요.'}
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <button
@@ -885,7 +925,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-white/15 border border-white/30 text-white font-bold text-sm rounded-2xl"
               >
                 <Download className="w-4 h-4" />
-                PC·모바일 설치
+                {installCtaLabel}
               </button>
             </div>
           </div>

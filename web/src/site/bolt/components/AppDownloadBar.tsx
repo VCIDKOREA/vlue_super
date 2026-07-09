@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download, Monitor, Smartphone } from 'lucide-react';
 import { getTopDownloadBarMessage, DOWNLOAD_BAR_BOTTOM } from '../data/appDownloadBarContent';
+import { isWebPcDownloadEnabled } from '../../../lib/v1ReleaseScope.js';
 import type { View } from '../types';
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
 /** 앱·PC 설치 유도 — 뷰(메뉴)별 문구 + 설치 버튼 */
 export default function AppDownloadBar({ onNavigate, currentView, variant = 'top' }: Props) {
   const isTop = variant === 'top';
+  const showPc = isWebPcDownloadEnabled();
   const [message, setMessage] = useState(() => getTopDownloadBarMessage(currentView));
   const [visible, setVisible] = useState(true);
 
@@ -37,7 +39,7 @@ export default function AppDownloadBar({ onNavigate, currentView, variant = 'top
           : 'mkt-download-bar mkt-download-bar--bottom'
       }
       role="region"
-      aria-label="VLUE 앱 및 PC 프로그램 설치"
+      aria-label={showPc ? 'VLUE 앱 및 PC 프로그램 설치' : 'VLUE 모바일 앱 설치'}
       aria-live="polite"
     >
       <div className="mkt-download-bar-wrap max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
@@ -58,6 +60,7 @@ export default function AppDownloadBar({ onNavigate, currentView, variant = 'top
               <Smartphone className="mkt-download-btn-icon" aria-hidden />
               <span>모바일 앱</span>
             </button>
+            {showPc ? (
             <button
               type="button"
               onClick={() => onNavigate('download')}
@@ -66,6 +69,7 @@ export default function AppDownloadBar({ onNavigate, currentView, variant = 'top
               <Monitor className="mkt-download-btn-icon" aria-hidden />
               <span>PC 프로그램</span>
             </button>
+            ) : null}
             <button
               type="button"
               onClick={() => onNavigate('download')}

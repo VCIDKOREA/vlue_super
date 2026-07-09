@@ -4,13 +4,15 @@ import {
   markAllPushRead,
   markPushRead,
   PUSH_INBOX_CHANGED,
-  readPushNotifications
+  readPushNotifications,
+  resolvePushDisplayTime
 } from "../lib/pushNotificationInbox";
 
 const CATEGORY_STYLE = {
-  쇼핑: "bg-amber-50 text-amber-800",
-  배송: "bg-blue-50 text-blue-700",
+  가족보호: "bg-emerald-50 text-emerald-700",
   안심: "bg-emerald-50 text-emerald-700",
+  앱: "bg-blue-50 text-blue-700",
+  공지: "bg-indigo-50 text-indigo-700",
   기타: "bg-gray-100 text-gray-600"
 };
 
@@ -34,7 +36,7 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
         <p className="text-sm font-bold text-gray-500">알림이 없습니다</p>
-        <p className="mt-1 text-xs text-gray-400">쇼핑·배송·안심 등 푸시 알림이 이곳에 쌓입니다.</p>
+        <p className="mt-1 text-xs text-gray-400">가족보호·앱 알림이 이곳에 쌓입니다.</p>
       </div>
     );
   }
@@ -92,7 +94,9 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
                   >
                     {n.category}
                   </span>
-                  <span className="text-[10px] font-medium text-gray-400">{n.time}</span>
+                  <span className="text-[10px] font-medium text-gray-400">
+                    {resolvePushDisplayTime(n)}
+                  </span>
                   {!n.read ? (
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" aria-hidden />
                   ) : null}

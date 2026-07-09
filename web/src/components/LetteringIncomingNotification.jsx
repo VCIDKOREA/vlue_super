@@ -9,6 +9,7 @@ import {
   VLUE_FREE_TIER_CAUTION
 } from "../lib/letteringFreeTierDisplay.js";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
+import LetteringEmotionalFeedPanel from "./LetteringEmotionalFeedPanel.jsx";
 import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx";
 import { getLetteringReportsForPhone } from "../lib/letteringPhoneReports.js";
 import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDisplay.js";
@@ -41,6 +42,20 @@ const DEMO_CARD = {
     "\uC0AC\uC5C5\uC790 \uC815\uBCF4 \uD655\uC778",
     "\uC804\uD654\uBC88\uD638 \uC77C\uCE58 \uD655\uC778"
   ]
+};
+
+/** 무료 플랜 — 인스타 감성 단일 게시물 데모 */
+export const LETTERING_EMOTIONAL_DEMO_CARD = {
+  name: "\uD64D\uAE38\uB3D9",
+  displayName: "\uD64D\uAE38\uB3D9",
+  phone: "010-1234-5678",
+  photoUrl: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&q=80",
+  companyIntro: "\uBAA8\uB974\uB294 \uBC88\uD638\uC5D0 \uC18D\uC9C0 \uB9C8\uB77C \u2014 \uC544\uB294 \uBC88\uD638\uB77C\uB3C4 \uD655\uC778\uD558\uB77C \uD83D\uDC99",
+  website: "https://www.vlue.kr",
+  membershipTier: "free",
+  feedId: "user-honggildong-free",
+  feedType: "personal",
+  verificationItems: ["PASS \uBCF8\uC778\uC778\uC99D \uC644\uB8CC"]
 };
 
 function VlueVerifiedBadge({ className = "" }) {
@@ -150,6 +165,8 @@ export default function LetteringIncomingNotification({
   /** @deprecated */ fitBizcard = false,
   /** 미인증 펼침 하단 신고/차단·안내 푸터 숨김(www 데모) */
   hideUnverifiedFooter = false,
+  /** 홈·친구 쇼케이스 미리보기 — 통화 수신 UI가 아닌 쇼케이스 열람 */
+  previewMode = false,
   className = ""
 }) {
   const [expandedInternal, setExpandedInternal] = useState(defaultExpanded);
@@ -211,7 +228,7 @@ export default function LetteringIncomingNotification({
   const isPaidMember = verified && isPaidLetteringTier(c.membershipTier);
   const isFreeMember = verified && !isPaidMember;
   const isUnverified = !verified;
-  const canExpand = isPaidMember || isUnverified;
+  const canExpand = isPaidMember || isFreeMember || isUnverified;
   const [reportTick, setReportTick] = useState(0);
   const [walletTick, setWalletTick] = useState(0);
 
@@ -241,8 +258,11 @@ export default function LetteringIncomingNotification({
       : "lettering-ongoing--verified lettering-ongoing--free-tier";
   const platformClass = platform === "ios" ? "lettering-ongoing--ios" : "lettering-ongoing--android";
   const heightClass = isExpandedView
-    ? "lettering-ongoing--expanded lettering-ongoing--expanded-layer"
+    ? previewMode
+      ? "lettering-ongoing--expanded lettering-ongoing--showcase-preview"
+      : "lettering-ongoing--expanded lettering-ongoing--expanded-layer"
     : "lettering-ongoing--collapsed";
+  const shellPreviewClass = previewMode ? "lettering-ongoing--showcase-preview" : "";
 
   const freeTierSummary = useMemo(() => {
     if (!isFreeMember) return null;
@@ -268,6 +288,22 @@ export default function LetteringIncomingNotification({
     ? formatLetteringPhoneDisplay(receptionLines.phone)
     : "";
 
+  const incomingStatusShort = previewMode
+    ? [c.organization, c.title].filter(Boolean).join(" · ") || "블루 쇼케이스"
+    : onCall
+      ? isRecording
+        ? statusLabel || "통화 중"
+        : "통화 중"
+      : "수신 중…";
+
+  const previewStatusLabel = previewMode
+    ? isPaidMember && onCall && statusLabel
+      ? statusLabel
+      : isPaidMember
+        ? "미리보기"
+        : ""
+    : statusLabel;
+
   const handleOpenFeed = () => {
     const payload = {
       feedId: c.feedId,
@@ -284,7 +320,7 @@ export default function LetteringIncomingNotification({
 
   return (
     <article
-      className={`${shellBase} ${shellTone} ${platformClass} ${heightClass} ${className}`.trim()}
+      className={`${shellBase} ${shellTone} ${platformClass} ${heightClass} ${shellPreviewClass} ${className}`.trim()}
       data-platform={platform}
       data-expanded={isExpandedView ? "true" : "false"}
       data-tier={isPaidMember ? "paid" : isFreeMember ? "free" : isUnverified ? "unverified" : "none"}
@@ -296,10 +332,10 @@ export default function LetteringIncomingNotification({
       >
         <div className="lettering-live-bar__left">
           <LetteringLiveIndicator />
-          <span className="lettering-live-bar__brand">VLUE {"\uC791\uB3D9\uC911"}</span>
+          <span className="lettering-live-bar__brand">{previewMode ? "쇼케이스 미리보기" : "VLUE 작동중"}</span>
         </div>
-        {statusLabel ? (
-          <span className="lettering-live-bar__status">{statusLabel}</span>
+        {previewStatusLabel ? (
+          <span className="lettering-live-bar__status">{previewStatusLabel}</span>
         ) : (
           <span className="lettering-live-bar__status lettering-live-bar__status--empty" aria-hidden />
         )}
@@ -311,32 +347,28 @@ export default function LetteringIncomingNotification({
             isExpandedView ? "items-center" : "items-start"
           } ${isFreeMember ? "lettering-ongoing-summary--free" : ""} ${
             isUnverified ? "lettering-ongoing-summary--unverified" : ""
-          } ${!isExpandedView && isPaidMember ? "pb-3" : ""}`}
+          } ${!isExpandedView && (isPaidMember || isFreeMember) ? "pb-3" : ""}`}
         >
-          {isPaidMember || isUnverified ? (
-            <LetteringProfileThumb card={c} verified={verified} size="sm" />
-          ) : null}
+          {verified ? <LetteringProfileThumb card={c} verified={verified} size="sm" /> : null}
           <div className="min-w-0 flex-1">
             {isFreeMember && freeTierSummary ? (
-              <div className="lettering-free-tier-block">
-                <p className="lettering-free-tier-row lettering-ongoing-name-row">
+              <>
+                <p className="lettering-ongoing-name-row flex min-w-0 items-center gap-1.5">
+                  <span className="lettering-ongoing-phone-em min-w-0 truncate text-[15px] font-bold leading-snug text-blue-700">
+                    {freeTierSummary.phoneDisplay || freeTierSummary.primary}
+                  </span>
+                  <VlueVerifiedBadge />
+                </p>
+                <p className="lettering-ongoing-subline mt-0.5 min-w-0 truncate text-[11px] leading-snug text-slate-500">
                   {freeTierSummary.mode === "saved" ? (
                     <>
-                      <span className="lettering-free-tier-name">{freeTierSummary.primary}</span>
-                      <VlueVerifiedBadge className="lettering-free-tier-badge" />
-                      <span className="lettering-free-tier-phone">{freeTierSummary.phoneDisplay}</span>
+                      <span className="font-medium text-slate-600">{freeTierSummary.primary}</span>
+                      <span className="text-slate-400"> {"\u00B7"} </span>
                     </>
-                  ) : (
-                    <>
-                      <span className="lettering-free-tier-phone-only">{freeTierSummary.primary}</span>
-                      <VlueVerifiedBadge className="lettering-free-tier-badge" />
-                    </>
-                  )}
+                  ) : null}
+                  <span>{incomingStatusShort}</span>
                 </p>
-                <p className="lettering-ongoing-free-caution" role="note">
-                  {VLUE_FREE_TIER_CAUTION}
-                </p>
-              </div>
+              </>
             ) : isUnverified ? (
               <p className="lettering-ongoing-name-row min-w-0">
                 <span className="lettering-unverified-collapsed-phone">
@@ -390,6 +422,40 @@ export default function LetteringIncomingNotification({
             />
           ) : null}
         </div>
+
+        {canExpand && isFreeMember ? (
+          <div
+            className="lettering-ongoing-expand-slot lettering-ongoing-expand-slot--emotional"
+            data-open={isExpandedView ? "true" : "false"}
+            aria-hidden={!isExpandedView}
+          >
+            <div className="lettering-ongoing-expand-slot__inner">
+              <div className="lettering-ongoing-reception relative z-[2] flex min-h-0 flex-1 flex-col">
+                <div className="lettering-ongoing-scroll lettering-ongoing-scroll--emotional flex-1 min-h-0">
+                  <LetteringEmotionalFeedPanel
+                    card={c}
+                    instagramHandle="@vlue.official"
+                    creatorLink={c.website}
+                  />
+                </div>
+                <div className="lettering-ongoing-actions-secondary lettering-ongoing-actions-secondary--emotional relative z-[2] grid shrink-0 grid-cols-3 gap-1.5 px-3 py-2">
+                  <p className="lettering-caution lettering-caution--reception-footer col-span-3">
+                    {VLUE_FREE_TIER_CAUTION}
+                  </p>
+                  <button type="button" onClick={handleOpenFeed} className="lettering-action lettering-action--primary">
+                    {"\uC778\uC99D\uC815\uBCF4"}
+                  </button>
+                  <button type="button" onClick={handleSaveCard} className="lettering-action lettering-action--ghost">
+                    {"\uBA85\uD568\uC800\uC7A5"}
+                  </button>
+                  <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger">
+                    {"\uC2E0\uACE0/\uCC28\uB2E8"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {canExpand && isPaidMember ? (
           <div

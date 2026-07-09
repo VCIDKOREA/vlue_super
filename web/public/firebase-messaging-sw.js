@@ -1,2 +1,2 @@
-// VLUE FCM — 빌드 시 web/scripts/generate-fcm-sw.mjs 가 덮어씁니다.
+// VLUE FCM — Firebase web config 미설정 (VITE_FIREBASE_*)
 self.addEventListener("push", () => {});

@@ -17,7 +17,7 @@ import android.view.animation.DecelerateInterpolator
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.widget.FrameLayout
-import androidx.core.app.NotificationCompat
+import kr.vlue.calloverlay.showcase.ShowcaseProximitySensor
 
 /**
  * SYSTEM_ALERT_WINDOW + WebView 레터링 UI
@@ -89,6 +89,7 @@ class CallOverlayService : Service() {
         windowManager?.addView(container, params)
         rootContainer = container
         webView = wv
+        ShowcaseProximitySensor.attach(this, wv)
 
         wv.loadUrl(VlueLetteringConfig.overlayUrl(phone, verified, outgoing))
 
@@ -119,6 +120,7 @@ class CallOverlayService : Service() {
     }
 
     private fun removeOverlayImmediate() {
+        ShowcaseProximitySensor.detach()
         webView?.destroy()
         webView = null
         rootContainer?.let { v ->

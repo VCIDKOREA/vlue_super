@@ -5,6 +5,8 @@ import AdminSecretApp from "./components/AdminSecretApp.jsx";
 import AdminConsoleApp from "./components/admin-console/AdminConsoleApp.jsx";
 import SuperAdminHqApp from "./components/hq/SuperAdminHqApp.jsx";
 import VlueMarketingApp from "./site/VlueMarketingApp.jsx";
+import ShowcaseWebApp from "./site/web/ShowcaseWebApp.jsx";
+import { isShowcaseWebRoute } from "./lib/showcaseWebRoute.js";
 import AppRootErrorBoundary from "./components/AppRootErrorBoundary.jsx";
 import { isCurrentUrlAdminEntry } from "./lib/adminEntryPath.js";
 import { isSuperAdminHqEntry } from "./lib/hqRoute.js";
@@ -36,6 +38,7 @@ if (!rootEl) {
   if (showAdminConsole) Shell = AdminConsoleApp;
   else if (showHq) Shell = SuperAdminHqApp;
   else if (showAdminGate) Shell = AdminSecretApp;
+  else if (typeof window !== "undefined" && isShowcaseWebRoute(window.location.pathname)) Shell = ShowcaseWebApp;
   else if (siteShell === "blocked") Shell = BrowserAppBlockedPage;
   else if (siteShell === "marketing") Shell = VlueMarketingApp;
 
