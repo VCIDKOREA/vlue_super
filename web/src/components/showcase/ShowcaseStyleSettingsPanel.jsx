@@ -19,7 +19,10 @@ import ShowcaseStylePreview from "./ShowcaseStylePreview.jsx";
 import ShowcasePremiumGateModal from "./ShowcasePremiumGateModal.jsx";
 import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
 import ShowcasePhotoEditor from "./ShowcasePhotoEditor.jsx";
+import KakaoAlimtalkConsentModal from "./KakaoAlimtalkConsentModal.jsx";
+import { writeKakaoAlimtalkAgreed } from "../../lib/showcase/kakaoAlimtalkConsent.js";
 import "./showcase-style-settings.css";
+import "../../styles/kakao-alimtalk-consent.css";
 
 const TABS = [
   { id: "style", label: "스타일", icon: Palette },
@@ -57,6 +60,7 @@ export default function ShowcaseStyleSettingsPanel({
   const [tagInput, setTagInput] = useState(() => (config.tags || []).join(" "));
   /** 전체화면(모바일)에서는 미리보기를 접어 설정 공간을 확보 */
   const [previewCollapsed, setPreviewCollapsed] = useState(() => Boolean(fullscreen));
+  const [consentOpen, setConsentOpen] = useState(false);
   const previewDragRef = useRef({ startY: 0, dragging: false });
 
   const onPreviewPointerDown = useCallback((e) => {
@@ -143,14 +147,28 @@ export default function ShowcaseStyleSettingsPanel({
     setTab("biz");
   };
 
+  const commitApply = useCallback(
+    (isKakaoAgreed) => {
+      const latest = readShowcaseStyle();
+      writeShowcaseStyle(latest);
+      writeKakaoAlimtalkAgreed(isKakaoAgreed);
+      if (isPaid) {
+        void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));
+      }
+      setConsentOpen(false);
+      onToast?.(
+        isKakaoAgreed
+          ? "적용되었습니다. 통화 종료 시 카카오 알림톡이 발송됩니다."
+          : "적용되었습니다. 알림톡 발송은 동의하지 않았습니다."
+      );
+    },
+    [isPaid, onToast, tagInput]
+  );
+
   const onSave = useCallback(() => {
-    const latest = readShowcaseStyle();
-    writeShowcaseStyle(latest);
-    if (isPaid) {
-      void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));
-    }
-    onToast?.("적용되었습니다.");
-  }, [isPaid, onToast, tagInput]);
+    /* 최종 적용 전 카카오 알림톡 선택 동의 팝업 */
+    setConsentOpen(true);
+  }, []);
 
   const headText = isDarkMode ? "text-gray-100" : "text-slate-900";
   const subText = isDarkMode ? "text-gray-400" : "text-slate-500";
@@ -158,7 +176,7 @@ export default function ShowcaseStyleSettingsPanel({
 
   const saveButton = (
     <button type="button" className="showcase-style-settings__save-btn" onClick={onSave}>
-      저장
+      최종 적용하기
     </button>
   );
 
@@ -544,6 +562,13 @@ export default function ShowcaseStyleSettingsPanel({
           setGateOpen(false);
           onOpenUpgrade?.();
         }}
+      />
+
+      <KakaoAlimtalkConsentModal
+        open={consentOpen}
+        isDarkMode={isDarkMode}
+        onAgree={() => commitApply(true)}
+        onDisagree={() => commitApply(false)}
       />
     </div>
   );

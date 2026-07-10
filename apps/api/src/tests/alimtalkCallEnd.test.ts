@@ -24,7 +24,12 @@ async function run() {
   assert(payload.body.includes("010-9876-5432"), "body must highlight phone number");
   assert(payload.buttons.length === 2, "two outbound buttons");
   assert(payload.buttons[0].url_mobile.includes("/site/web/showcase/"), "showcase link");
+  assert(payload.buttons[0].url_mobile.includes("01098765432"), "URL phone must be digits only");
+  assert(!payload.buttons[0].url_mobile.includes("010-9876"), "URL must not contain hyphens");
+  assert(payload.phoneDisplayHyphen === "010-9876-5432", "hyphen display field");
+  assert(payload.phoneDigitsForUrl === "01098765432", "digits-only URL field");
   console.log("[test] template body:", payload.body.slice(0, 60), "...");
+  console.log("[test] showcase url:", payload.buttons[0].url_mobile);
 
   const first = await processCallEndAlimtalk(callerId, {
     peerPhone: peerNonMember,

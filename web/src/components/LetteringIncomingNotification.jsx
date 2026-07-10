@@ -446,37 +446,40 @@ export default function LetteringIncomingNotification({
     >
       {showCallEndBar ? (
         <>
-          {/* 유료만 인증정보·명함저장 — 무료는 디지털 명함 없음 */}
           {isPaidMember ? (
             <div
-              className={`lettering-ongoing-actions-secondary__row${
+              className={`lettering-ongoing-actions-secondary__row lettering-ongoing-actions-secondary__row--save-end${
                 isGlassTent ? " lettering-ongoing-actions-secondary__row--glass" : ""
               }`}
             >
               <button
                 type="button"
-                onClick={handleOpenFeed}
-                className={`lettering-action ${isGlassTent ? "lettering-action--glass" : "lettering-action--primary"}`}
-              >
-                인증정보
-              </button>
-              <button
-                type="button"
                 onClick={handleSaveCard}
-                className={`lettering-action ${isGlassTent ? "lettering-action--glass-ghost" : "lettering-action--ghost"}`}
+                className={`lettering-action lettering-action--save-inline ${
+                  isGlassTent ? "lettering-action--glass" : "lettering-action--primary"
+                }`}
               >
                 명함저장
               </button>
+              <button
+                type="button"
+                onClick={handleEndCall}
+                className="lettering-action lettering-action--end-call-circle"
+                aria-label="통화 종료"
+              >
+                <PhoneOff size={22} strokeWidth={2.2} aria-hidden />
+              </button>
             </div>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleEndCall}
-            className="lettering-action lettering-action--end-call-circle"
-            aria-label="통화 종료"
-          >
-            <PhoneOff size={24} strokeWidth={2.2} aria-hidden />
-          </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleEndCall}
+              className="lettering-action lettering-action--end-call-circle"
+              aria-label="통화 종료"
+            >
+              <PhoneOff size={24} strokeWidth={2.2} aria-hidden />
+            </button>
+          )}
         </>
       ) : (
         <>

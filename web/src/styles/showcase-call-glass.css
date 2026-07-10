@@ -110,16 +110,46 @@
   ) !important;
   border-top: 0 !important;
   box-shadow: none !important;
-  padding: 10px 16px max(18px, env(safe-area-inset-bottom, 0px));
-  gap: 12px;
+  padding: 8px 16px max(14px, env(safe-area-inset-bottom, 0px));
+  gap: 8px;
   align-items: center;
 }
 
 .lettering-ongoing-actions-secondary__row--glass {
   width: 100%;
-  max-width: 320px;
+  max-width: 360px;
   margin: 0 auto;
-  gap: 10px;
+  gap: 12px;
+}
+
+/* 왼쪽 명함저장 · 오른쪽 통화종료 — 한 줄 */
+.lettering-ongoing-actions-secondary__row--save-end {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 340px;
+  margin: 0 auto;
+  grid-template-columns: none;
+}
+
+.lettering-ongoing-actions-secondary__row--save-end .lettering-action--save-inline {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 200px;
+  min-height: 48px;
+}
+
+.lettering-ongoing-actions-secondary__row--save-end .lettering-action--end-call-circle {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  margin: 0;
+  border-radius: 28px;
 }
 
 .lettering-action--glass,
@@ -297,18 +327,18 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
 .showcase-call-carousel__card {
-  /* 콘텐츠 높이로 수축 — 하단 빈 검은 웰 방지 */
-  height: auto;
+  /* 뷰포트 높이를 채워 명함·쇼케이스를 더 길게 */
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: min(62dvh, 560px);
   max-height: 100%;
-  min-height: 0;
-  flex: 0 1 auto;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border-radius: 20px;
   background: transparent;
   border: 0;
@@ -317,8 +347,9 @@
 
 .showcase-call-carousel__banner {
   position: relative;
+  flex: 1 1 auto;
   height: 100%;
-  min-height: 280px;
+  min-height: min(62dvh, 560px);
   overflow: hidden;
   border-radius: 20px;
   background: #0b1220;
@@ -423,7 +454,9 @@
 .lettering-ongoing--fullscreen-tent .lettering-ongoing-scroll--emotional,
 .lettering-ongoing--fullscreen-tent .lettering-ongoing-scroll--carousel {
   background: transparent !important;
-  padding: 8px 12px 4px;
+  padding: 4px 10px 2px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* 글래스 톤 VLUE 인증 프레임 (숨기지 않음) */
@@ -456,11 +489,12 @@
   color: #f8fafc;
 }
 
-/* 캐러셀 명함: 콘텐츠 높이 + 탭 클릭 가능 */
+/* 캐러셀 명함: 세로로 길게 · 내부 스크롤 */
 .showcase-call-carousel .ldr-reception--push {
   display: flex;
   flex-direction: column;
-  height: auto;
+  flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
   border-radius: 20px;
   overflow: hidden;
@@ -487,41 +521,57 @@
 }
 
 .showcase-call-carousel .ldr-reception--push .ldr-panel-wrap {
-  flex: 0 0 auto !important;
+  flex: 1 1 auto !important;
   height: auto !important;
   min-height: 0 !important;
   max-height: none !important;
-  overflow: visible;
+  overflow: hidden;
   background: transparent;
   pointer-events: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .showcase-call-carousel .ldr-reception--push .ldr-panel-stage {
   position: relative;
   width: 100%;
-  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
 }
 
 .showcase-call-carousel .ldr-reception--push .ldr-panel {
-  position: relative !important;
-  inset: auto !important;
+  position: absolute !important;
+  inset: 0 !important;
   display: none;
   flex-direction: column;
   justify-content: flex-start;
   height: auto !important;
-  min-height: 0 !important;
+  min-height: 100% !important;
   max-height: none !important;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   opacity: 1 !important;
   visibility: visible !important;
   pointer-events: auto !important;
   background: transparent;
-  padding-bottom: 4px;
+  padding-bottom: 12px;
 }
 
 .showcase-call-carousel .ldr-reception--push[data-face="front"] .ldr-panel--front,
 .showcase-call-carousel .ldr-reception--push[data-face="back"] .ldr-panel--back {
   display: flex !important;
+}
+
+.showcase-call-carousel .ldr-reception--push .ldr-front-profile-stack {
+  flex: 1 1 auto;
+  gap: 16px;
+  padding-bottom: 8px;
+}
+
+.showcase-call-carousel .ldr-reception--push .ldr-panel--front .vlue-push-auth-seal {
+  margin-top: auto !important;
 }
 
 .lettering-ongoing--fullscreen-tent .ldr-reception--push .ldr-panel--front,

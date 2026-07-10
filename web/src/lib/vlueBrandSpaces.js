@@ -19,11 +19,11 @@ export const VLUE_SHOWCASE = {
   tagline: "통화 순간 전면을 장악하며 일상·명함을 공개하는 화면"
 };
 
-/** 웹뷰 포털 쇼케이스 경로 (알림톡 아웃링크) */
+/** 웹뷰 포털 쇼케이스 경로 (알림톡 아웃링크) — 숫자만 */
 export function buildShowcaseWebPath(phoneE164OrRaw) {
   const digits = String(phoneE164OrRaw || "").replace(/\D/g, "");
   const local = digits.startsWith("82") ? `0${digits.slice(2)}` : digits;
-  return `/site/web/showcase/${encodeURIComponent(local || "")}`;
+  return `/site/web/showcase/${local || ""}`;
 }
 
 export function showcasePreviewLabel() {

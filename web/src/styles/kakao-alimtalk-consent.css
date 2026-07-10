@@ -1,0 +1,104 @@
+/* 카카오 알림톡 발송 동의 팝업 */
+.kakao-alimtalk-consent-root {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.kakao-alimtalk-consent-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.55);
+  cursor: pointer;
+}
+
+.kakao-alimtalk-consent-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 340px;
+  padding: 22px 20px 18px;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.28);
+  box-sizing: border-box;
+}
+
+.kakao-alimtalk-consent-card--dark {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+.kakao-alimtalk-consent-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.kakao-alimtalk-consent-card--dark .kakao-alimtalk-consent-title {
+  color: #f8fafc;
+}
+
+.kakao-alimtalk-consent-body {
+  margin: 0 0 18px;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+  white-space: pre-line;
+  color: #475569;
+}
+
+.kakao-alimtalk-consent-card--dark .kakao-alimtalk-consent-body {
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.kakao-alimtalk-consent-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.kakao-alimtalk-consent-btn {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 0;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+}
+
+.kakao-alimtalk-consent-btn--ghost {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.kakao-alimtalk-consent-card--dark .kakao-alimtalk-consent-btn--ghost {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+}
+
+.kakao-alimtalk-consent-btn--primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.28);
+}
+
+.kakao-alimtalk-consent-btn:active {
+  transform: scale(0.98);
+}

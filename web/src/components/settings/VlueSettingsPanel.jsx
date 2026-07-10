@@ -23,6 +23,13 @@ import {
   FontScalePicker
 } from "./VlueSettingsUi.jsx";
 import VlueEmailSettingsSection from "./VlueEmailSettingsSection.jsx";
+import KakaoAlimtalkConsentModal from "../showcase/KakaoAlimtalkConsentModal.jsx";
+import {
+  readKakaoAlimtalkAgreed,
+  writeKakaoAlimtalkAgreed,
+  KAKAO_ALIMTALK_CONSENT_CHANGED_EVENT
+} from "../../lib/showcase/kakaoAlimtalkConsent.js";
+import "../../styles/kakao-alimtalk-consent.css";
 
 const BLOCKED_USER_DIRECTORY = [
   { id: "u-minsu", name: "민수", handle: "@minsu" },
@@ -81,9 +88,28 @@ export default function VlueSettingsPanel({
   openLetteringBizcardHub
 }) {
   const [settings, patchSettings] = useAppSettingsState();
+  const [kakaoAgreed, setKakaoAgreed] = useState(() => readKakaoAlimtalkAgreed());
+  const [kakaoConsentOpen, setKakaoConsentOpen] = useState(false);
   const [chatNickInput, setChatNickInput] = useState("");
   const [feedNickInput, setFeedNickInput] = useState("");
   const [statusInput, setStatusInput] = useState("");
+
+  useEffect(() => {
+    const onConsent = () => setKakaoAgreed(readKakaoAlimtalkAgreed());
+    window.addEventListener(KAKAO_ALIMTALK_CONSENT_CHANGED_EVENT, onConsent);
+    return () => window.removeEventListener(KAKAO_ALIMTALK_CONSENT_CHANGED_EVENT, onConsent);
+  }, []);
+
+  const onToggleKakaoAlimtalk = (nextOn) => {
+    if (nextOn) {
+      /* 켤 때 동의 팝업 재노출 */
+      setKakaoConsentOpen(true);
+      return;
+    }
+    writeKakaoAlimtalkAgreed(false);
+    setKakaoAgreed(false);
+    showSettingNotice?.("카카오 알림톡 발송이 꺼졌습니다.");
+  };
   const [showIdCopied, setShowIdCopied] = useState(false);
   const avatarInputRef = useRef(null);
 
@@ -540,6 +566,14 @@ export default function VlueSettingsPanel({
             isDarkMode={isDarkMode}
           />
           <SettingsDivider isDarkMode={isDarkMode} />
+          <SettingsToggleRow
+            label="통화 종료 카카오 알림톡"
+            subtitle="상대방에게 쇼케이스 인증 알림톡 발송"
+            checked={kakaoAgreed}
+            onChange={onToggleKakaoAlimtalk}
+            isDarkMode={isDarkMode}
+          />
+          <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="가족보호 등록·상세 설정" onClick={() => onOpenFamilyProtection?.()} isDarkMode={isDarkMode} />
           {onMarkAllChatsRead ? (
             <>
@@ -626,6 +660,23 @@ export default function VlueSettingsPanel({
           ) : null}
         </SettingsSection>
       </div>
+
+      <KakaoAlimtalkConsentModal
+        open={kakaoConsentOpen}
+        isDarkMode={isDarkMode}
+        onAgree={() => {
+          writeKakaoAlimtalkAgreed(true);
+          setKakaoAgreed(true);
+          setKakaoConsentOpen(false);
+          showSettingNotice?.("카카오 알림톡 발송에 동의했습니다.");
+        }}
+        onDisagree={() => {
+          writeKakaoAlimtalkAgreed(false);
+          setKakaoAgreed(false);
+          setKakaoConsentOpen(false);
+          showSettingNotice?.("알림톡 발송에 동의하지 않았습니다.");
+        }}
+      />
     </div>
   );
 }
