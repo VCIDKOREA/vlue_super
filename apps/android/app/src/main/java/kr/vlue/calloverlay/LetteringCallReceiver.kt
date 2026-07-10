@@ -32,7 +32,8 @@ class LetteringCallReceiver : BroadcastReceiver() {
                     LetteringCallCoordinator.onCallEnded(context)
                 }
                 TelephonyManager.EXTRA_STATE_OFFHOOK -> {
-                    /* 통화 연결 — 오버레이 유지 */
+                    /* 통화 연결 — 천막 전체화면 + 웹 상태 동기화 */
+                    CallOverlayService.notifyConnected(context.applicationContext)
                 }
             }
         } catch (e: Exception) {

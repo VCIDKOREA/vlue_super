@@ -5,6 +5,7 @@ export const SHOWCASE_STYLE_CHANGED_EVENT = "vlue-showcase-style-changed";
 /** 마이페이지·홈에서 쇼케이스 설정 패널 열기 */
 export const SHOWCASE_OPEN_SETTINGS_EVENT = "vlue-showcase-open-settings";
 export const SHOWCASE_MAX_PHOTOS = 10;
+export { SHOWCASE_MAX_PHOTOS_FREE, SHOWCASE_MAX_PHOTOS_PAID, maxShowcasePhotosForTier } from "./tentShowcaseTypes.js";
 
 /** @typedef {Object} ShowcaseGalleryPhoto
  * @property {string} id
@@ -20,6 +21,8 @@ export const SHOWCASE_MAX_PHOTOS = 10;
 export function createDefaultShowcaseStyle() {
   return {
     styleType: "default",
+    /** V1 — 무료: friend_only 기본 / 유료: public 고정 */
+    privacyMode: "friend_only",
     /** V1 — #해시태그 (유료 · 홈 디렉토리 검색) */
     tags: [],
     bgm: {
@@ -78,7 +81,8 @@ function mergeDeep(defaults, parsed) {
     },
     platformFeed: { ...defaults.platformFeed, ...parsed?.platformFeed },
     caseTheme: { ...defaults.caseTheme, ...parsed?.caseTheme },
-    tags: Array.isArray(parsed?.tags) ? parsed.tags : defaults.tags
+    tags: Array.isArray(parsed?.tags) ? parsed.tags : defaults.tags,
+    privacyMode: parsed?.privacyMode === "public" ? "public" : defaults.privacyMode
   };
 }
 

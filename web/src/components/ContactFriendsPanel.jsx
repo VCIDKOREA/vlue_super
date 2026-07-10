@@ -5,6 +5,8 @@ import { sendContactFriendRequest } from "../lib/contactFriendsApi.js";
 import { pickDeviceContacts, isContactPickerSupported, getDemoContacts } from "../lib/contactDevicePicker.js";
 import { matchContactsWithVlue } from "../lib/contactFriendsApi.js";
 import { saveContactMatchCache, hasContactSyncConsent } from "../lib/contactSyncStorage.js";
+import { mergeDeviceContactsCache } from "../lib/contacts/deviceContactsCache.js";
+import { upsertKnownPhonesFromFriends } from "../lib/contacts/knownPhonesIndex.js";
 
 export default function ContactFriendsPanel({
   matchData,
@@ -31,8 +33,10 @@ export default function ContactFriendsPanel({
         contacts = getDemoContacts();
       }
       if (!contacts?.length) return;
+      mergeDeviceContactsCache(contacts);
       const result = await matchContactsWithVlue(contacts);
       saveContactMatchCache(result);
+      upsertKnownPhonesFromFriends({ contactMatchData: result });
       onMatchUpdate?.(result);
     } finally {
       setResyncing(false);

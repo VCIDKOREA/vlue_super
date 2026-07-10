@@ -10,6 +10,7 @@
 import { postFamilyAlertCall, postMissedCall } from "./familyProtectionApi.js";
 import { postCallEndAlimtalk } from "./alimtalkCallEndApi.js";
 import { appendCallShowcaseHistory } from "./callShowcaseHistory.js";
+import { readShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
 
 export function registerFamilyCallBridge() {
   if (typeof window === "undefined") return;
@@ -17,8 +18,19 @@ export function registerFamilyCallBridge() {
   const prev = window.VlueFamilyBridge || {};
   window.VlueFamilyBridge = {
     ...prev,
-    onMissedCall: () => {
+    onMissedCall: (payload) => {
+      const p = payload || {};
       postMissedCall().catch(() => {});
+      if (p.phone) {
+        appendCallShowcaseHistory({
+          phone: p.phone,
+          name: p.name || p.peerName,
+          direction: p.direction === "out" ? "out" : "in",
+          durationSec: 0,
+          callState: "missed",
+          showcaseSnapshot: readShowcaseStyle()
+        });
+      }
     },
     /** 통화 종료: { phone, durationSec, direction: 'in'|'out', peerIsVlueMember?: boolean } */
     onCallEnded: (payload) => {
@@ -33,7 +45,12 @@ export function registerFamilyCallBridge() {
         phone: p.phone,
         name: p.name || p.peerName,
         direction: p.direction,
-        durationSec: p.durationSec
+        durationSec: p.durationSec,
+        callState: Number(p.durationSec) > 0 ? "ended" : "missed",
+        showcaseSnapshot: p.showcaseSnapshot || readShowcaseStyle(),
+        cardSnapshot: p.cardSnapshot || null,
+        membershipTier: p.membershipTier || "free",
+        verified: p.peerIsVlueMember !== false
       });
     }
   };

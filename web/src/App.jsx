@@ -77,6 +77,8 @@ import {
   readContactMatchCache,
   shouldShowContactSyncPrompt
 } from "./lib/contactSyncStorage.js";
+import { upsertKnownPhonesFromFriends } from "./lib/contacts/knownPhonesIndex.js";
+import { syncDeviceContactsFromNative } from "./lib/contacts/deviceContactsCache.js";
 import { effectiveCardJobTitle } from "./lib/jobTitleVerify.js";
 import { readAvatar } from "./lib/vlueAvatar.js";
 import { fetchActiveMarketingPopup, fetchLatestNotice } from "./lib/vlueOfficeApi.js";
@@ -3205,6 +3207,17 @@ function App() {
     const cached = readContactMatchCache();
     if (cached) setContactMatchData(cached);
   }, [isLoggedIn]);
+
+  /** 하이브리드 주소록 인덱스 — VLUE 친구 + 디바이스 주소록 동기화 */
+  useEffect(() => {
+    if (!showAppShell) return undefined;
+    upsertKnownPhonesFromFriends({
+      catalogFriends: roomCatalog?.friends || [],
+      contactMatchData
+    });
+    void syncDeviceContactsFromNative();
+    return undefined;
+  }, [showAppShell, roomCatalog?.friends, contactMatchData]);
 
   const promptGuestSignup = useCallback((action) => {
     setPendingAuthAction(() => (typeof action === "function" ? action : null));

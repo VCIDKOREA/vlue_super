@@ -227,7 +227,12 @@ function FrontPanel({ card, verified, verificationItems = [], embeddedInPush = f
         ) : null}
         <div className="ldr-back-head__copy">
           <p className="ldr-back-kicker">Digital ID · Profile</p>
-          <h3 className="ldr-back-title">{card.name}</h3>
+          <div className="ldr-back-title-row">
+            <h3 className="ldr-back-title">{card.name}</h3>
+            {verified ? (
+              <ShieldCheck className="ldr-name-shield h-5 w-5" strokeWidth={2.35} aria-label="VLUE 인증됨" />
+            ) : null}
+          </div>
           <p className="ldr-back-sub">
             {[card.title, card.department, card.organization].filter(Boolean).join(" · ")}
           </p>
@@ -372,7 +377,11 @@ export default function LetteringDigitalReception({
           role="tab"
           aria-selected={face === "front"}
           className={`ldr-face-tab${face === "front" ? " ldr-face-tab--active" : ""}`}
-          onClick={() => onFaceChange?.("front")}
+          onClick={(e) => {
+            e.stopPropagation();
+            onFaceChange?.("front");
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           앞면 · 프로필
         </button>
@@ -381,7 +390,11 @@ export default function LetteringDigitalReception({
           role="tab"
           aria-selected={face === "back"}
           className={`ldr-face-tab${face === "back" ? " ldr-face-tab--active" : ""}`}
-          onClick={() => onFaceChange?.("back")}
+          onClick={(e) => {
+            e.stopPropagation();
+            onFaceChange?.("back");
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           뒷면 · 연락
         </button>

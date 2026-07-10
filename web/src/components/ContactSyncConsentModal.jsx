@@ -4,6 +4,8 @@ import ModalCloseButton from "./common/ModalCloseButton";
 import { pickDeviceContacts, isContactPickerSupported, getDemoContacts } from "../lib/contactDevicePicker.js";
 import { matchContactsWithVlue, recordContactSyncConsent } from "../lib/contactFriendsApi.js";
 import { setContactSyncConsent, saveContactMatchCache } from "../lib/contactSyncStorage.js";
+import { mergeDeviceContactsCache } from "../lib/contacts/deviceContactsCache.js";
+import { upsertKnownPhonesFromFriends } from "../lib/contacts/knownPhonesIndex.js";
 
 export default function ContactSyncConsentModal({ open, onClose, onSynced }) {
   const [busy, setBusy] = useState(false);
@@ -16,9 +18,11 @@ export default function ContactSyncConsentModal({ open, onClose, onSynced }) {
     setError("");
     try {
       await recordContactSyncConsent().catch(() => {});
+      mergeDeviceContactsCache(contacts);
       const result = await matchContactsWithVlue(contacts);
       setContactSyncConsent(true);
       saveContactMatchCache(result);
+      upsertKnownPhonesFromFriends({ contactMatchData: result });
       onSynced?.(result);
       onClose?.();
     } catch (e) {

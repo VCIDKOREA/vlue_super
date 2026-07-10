@@ -5,16 +5,20 @@ import { openLetteringCertInVlueApp } from "../lib/letteringOpenVlueApp.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { VLUE_CARD_CAUTION, VLUE_UNVERIFIED_REPORT_DISCLAIMER } from "../lib/vlueDigitalCardUi.js";
 import {
-  resolveFreeTierSummary,
-  VLUE_FREE_TIER_CAUTION
+  resolveFreeTierSummary
 } from "../lib/letteringFreeTierDisplay.js";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
-import LetteringEmotionalFeedPanel from "./LetteringEmotionalFeedPanel.jsx";
 import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx";
+import ShowcaseCallCarousel from "./showcase/ShowcaseCallCarousel.jsx";
+import FreeTierCallShowcase from "./showcase/FreeTierCallShowcase.jsx";
 import { getLetteringReportsForPhone } from "../lib/letteringPhoneReports.js";
 import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDisplay.js";
 import { LETTERING_DEMO_COMPANY_LOGO, resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
+import { nativeEndCall } from "../lib/call/nativeCallControl.js";
+import { resolveIsKnownContact } from "../lib/contacts/hybridKnownContact.js";
+import { PhoneOff, ShieldCheck } from "lucide-react";
+import "../styles/showcase-call-glass.css";
 
 const DEMO_CARD = {
   name: "\uD64D\uAE38\uB3D9",
@@ -167,11 +171,39 @@ export default function LetteringIncomingNotification({
   hideUnverifiedFooter = false,
   /** 홈·친구 쇼케이스 미리보기 — 통화 수신 UI가 아닌 쇼케이스 열람 */
   previewMode = false,
+  /** 통화 종료 (연결 중·미리보기 전체화면) */
+  onEndCall,
+  /** 주소록 판별 — 미지정 시 하이브리드 해석 */
+  isKnownContact: isKnownContactProp,
+  /** 미리보기·액션 안내 토스트 */
+  onToast,
   className = ""
 }) {
   const [expandedInternal, setExpandedInternal] = useState(defaultExpanded);
   const [receptionFace, setReceptionFace] = useState("front");
+  const [guideToast, setGuideToast] = useState("");
+  const [knownContact, setKnownContact] = useState(() => ({
+    isKnownContact: Boolean(savedContactName),
+    matchedName: savedContactName || "",
+    sources: savedContactName ? ["prop"] : []
+  }));
   const expanded = expandedProp !== undefined ? expandedProp : expandedInternal;
+
+  const showGuide = useCallback(
+    (message) => {
+      const msg = String(message || "").trim();
+      if (!msg) return;
+      onToast?.(msg);
+      setGuideToast(msg);
+    },
+    [onToast]
+  );
+
+  useEffect(() => {
+    if (!guideToast) return undefined;
+    const t = setTimeout(() => setGuideToast(""), 2800);
+    return () => clearTimeout(t);
+  }, [guideToast]);
 
   const setExpanded = useCallback(
     (next) => {
@@ -182,11 +214,18 @@ export default function LetteringIncomingNotification({
   );
 
   const toggle = () => {
+    if (previewMode) {
+      showGuide(
+        expanded
+          ? "미리보기입니다. 실제 통화 화면에서 명함을 접을 수 있습니다."
+          : "미리보기입니다. 실제 통화 화면에서 명함을 펼칠 수 있습니다."
+      );
+    }
     setExpanded(!expanded);
     if (expanded) setReceptionFace("front");
   };
   const c = normalizeLetteringCard({ ...DEMO_CARD, ...card });
-  const onCall = callPhase === "active";
+  const onCall = callPhase === "active" || callPhase === "connected";
   const statusLabel = getLetteringCallStatusLabel({
     callActive: onCall,
     isRecording,
@@ -196,6 +235,39 @@ export default function LetteringIncomingNotification({
   });
 
   const incoming = String(incomingNumber || (verified ? c.phone : "") || "").trim();
+
+  useEffect(() => {
+    if (typeof isKnownContactProp === "boolean") {
+      setKnownContact({
+        isKnownContact: isKnownContactProp,
+        matchedName: savedContactName || "",
+        sources: ["prop"]
+      });
+      return undefined;
+    }
+    let cancelled = false;
+    resolveIsKnownContact(incoming).then((r) => {
+      if (cancelled) return;
+      if (savedContactName && !r.isKnownContact) {
+        setKnownContact({
+          isKnownContact: true,
+          matchedName: savedContactName,
+          sources: ["savedContactName"]
+        });
+        return;
+      }
+      setKnownContact(r);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [incoming, isKnownContactProp, savedContactName]);
+
+  const isKnownContact =
+    typeof isKnownContactProp === "boolean"
+      ? isKnownContactProp
+      : Boolean(knownContact.isKnownContact || savedContactName);
+
   const verificationList = useMemo(() => {
     const list = c.verificationItems.length ? c.verificationItems : DEMO_CARD.verificationItems;
     return list.slice(0, 8);
@@ -208,6 +280,10 @@ export default function LetteringIncomingNotification({
   }, [verified, incoming, c.phone]);
 
   const handleSaveCard = () => {
+    if (previewMode) {
+      showGuide("미리보기입니다. 실제 통화 중에는 디지털 명함을 저장할 수 있습니다.");
+      return;
+    }
     if (onSaveCard) {
       onSaveCard({ card: c, incomingNumber: incoming });
       return;
@@ -216,6 +292,10 @@ export default function LetteringIncomingNotification({
   };
 
   const handleReport = () => {
+    if (previewMode) {
+      showGuide("미리보기입니다. 실제 통화에서 신고·차단할 수 있습니다.");
+      return;
+    }
     if (onReport) {
       onReport({ card: c, incomingNumber: incoming, verified });
       return;
@@ -305,6 +385,10 @@ export default function LetteringIncomingNotification({
     : statusLabel;
 
   const handleOpenFeed = () => {
+    if (previewMode) {
+      showGuide("미리보기입니다. 실제 통화 중에는 VLUE 인증정보를 확인할 수 있습니다.");
+      return;
+    }
     const payload = {
       feedId: c.feedId,
       feedType: c.feedType,
@@ -318,6 +402,99 @@ export default function LetteringIncomingNotification({
     onDetail?.({ ...payload, result });
   };
 
+  const handleEndCall = () => {
+    if (previewMode) {
+      showGuide("미리보기를 종료합니다.");
+      window.setTimeout(() => {
+        if (onEndCall) onEndCall();
+        else nativeEndCall();
+        if (isExpandedView) setExpanded(false);
+      }, 700);
+      return;
+    }
+    if (onEndCall) {
+      onEndCall();
+    } else {
+      nativeEndCall();
+    }
+  };
+
+  const handleFaceChange = (nextFace) => {
+    if (previewMode) {
+      showGuide(
+        nextFace === "back"
+          ? "뒷면 · 연락 미리보기입니다."
+          : "앞면 · 프로필 미리보기입니다."
+      );
+    }
+    setReceptionFace(nextFace);
+  };
+
+  /** 통화 중·쇼케이스 미리보기: 하단을 통화 종료 중심으로 */
+  const showCallEndBar = previewMode || onCall || Boolean(onEndCall);
+  const isGlassTent = /\blettering-ongoing--fullscreen-tent\b/.test(String(className || ""));
+  const carouselScrollEnabled = isPaidMember && (previewMode || onCall);
+  const showcasePhotos = c.showcaseStyle?.gallery?.photos || [];
+
+  const renderExpandedFooter = () => (
+    <div
+      className={`lettering-ongoing-actions-secondary relative z-[2] shrink-0 ${
+        showCallEndBar
+          ? `lettering-ongoing-actions-secondary--call${isGlassTent ? " lettering-ongoing-actions-secondary--glass" : ""}`
+          : "lettering-ongoing-actions-secondary--reception grid grid-cols-3 gap-1.5 px-3 py-2"
+      }`}
+    >
+      {showCallEndBar ? (
+        <>
+          {/* 유료만 인증정보·명함저장 — 무료는 디지털 명함 없음 */}
+          {isPaidMember ? (
+            <div
+              className={`lettering-ongoing-actions-secondary__row${
+                isGlassTent ? " lettering-ongoing-actions-secondary__row--glass" : ""
+              }`}
+            >
+              <button
+                type="button"
+                onClick={handleOpenFeed}
+                className={`lettering-action ${isGlassTent ? "lettering-action--glass" : "lettering-action--primary"}`}
+              >
+                인증정보
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCard}
+                className={`lettering-action ${isGlassTent ? "lettering-action--glass-ghost" : "lettering-action--ghost"}`}
+              >
+                명함저장
+              </button>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleEndCall}
+            className="lettering-action lettering-action--end-call-circle"
+            aria-label="통화 종료"
+          >
+            <PhoneOff size={24} strokeWidth={2.2} aria-hidden />
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="lettering-caution lettering-caution--reception-footer col-span-3">{VLUE_CARD_CAUTION}</p>
+          <button type="button" onClick={handleOpenFeed} className="lettering-action lettering-action--primary">
+            인증정보
+          </button>
+          <button type="button" onClick={handleSaveCard} className="lettering-action lettering-action--ghost">
+            명함저장
+          </button>
+          <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger">
+            신고/차단
+          </button>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <article
       className={`${shellBase} ${shellTone} ${platformClass} ${heightClass} ${shellPreviewClass} ${className}`.trim()}
@@ -327,7 +504,9 @@ export default function LetteringIncomingNotification({
       aria-live="polite"
     >
       <div
-        className={`lettering-live-bar ${dragHandleProps ? "lettering-live-bar--draggable" : ""}`}
+        className={`lettering-live-bar ${dragHandleProps ? "lettering-live-bar--draggable" : ""} ${
+          isGlassTent ? "lettering-live-bar--glass" : ""
+        }`.trim()}
         {...(dragHandleProps || {})}
       >
         <div className="lettering-live-bar__left">
@@ -381,7 +560,19 @@ export default function LetteringIncomingNotification({
                   <span className="lettering-ongoing-name min-w-0 truncate text-[15px] font-semibold leading-snug">
                     {displayLabel}
                   </span>
-                  {verified ? <VlueVerifiedBadge /> : null}
+                  {verified ? (
+                    isGlassTent ? (
+                      <span
+                        className="lettering-vlue-verified-badge lettering-vlue-verified-badge--metal inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center"
+                        title="VLUE 인증"
+                        aria-label="VLUE 인증됨"
+                      >
+                        <ShieldCheck className="h-3 w-3" strokeWidth={2.6} aria-hidden />
+                      </span>
+                    ) : (
+                      <VlueVerifiedBadge />
+                    )
+                  ) : null}
                 </p>
                 {receptionLines && collapsedPhoneDisplay ? (
                   <p className="lettering-ongoing-subline mt-0.5 min-w-0 truncate text-[11px] leading-snug">
@@ -431,27 +622,36 @@ export default function LetteringIncomingNotification({
           >
             <div className="lettering-ongoing-expand-slot__inner">
               <div className="lettering-ongoing-reception relative z-[2] flex min-h-0 flex-1 flex-col">
-                <div className="lettering-ongoing-scroll lettering-ongoing-scroll--emotional flex-1 min-h-0">
-                  <LetteringEmotionalFeedPanel
-                    card={c}
-                    instagramHandle="@vlue.official"
-                    creatorLink={c.website}
-                  />
+                <div
+                  className={`lettering-ongoing-scroll flex-1 min-h-0 ${
+                    isGlassTent
+                      ? "lettering-ongoing-scroll--carousel"
+                      : "lettering-ongoing-scroll--emotional"
+                  }`}
+                >
+                  {isGlassTent ? (
+                    <ShowcaseCallCarousel
+                      card={c}
+                      verified={verified}
+                      incomingNumber={incoming}
+                      photos={showcasePhotos}
+                      membershipTier="free"
+                      isKnownContact={isKnownContact}
+                      scrollEnabled={false}
+                      previewMode={previewMode}
+                    />
+                  ) : (
+                    <FreeTierCallShowcase
+                      isKnownContact={isKnownContact}
+                      card={c}
+                      phone={incoming}
+                      verified={verified}
+                      instagramHandle="@vlue.official"
+                      creatorLink={c.website}
+                    />
+                  )}
                 </div>
-                <div className="lettering-ongoing-actions-secondary lettering-ongoing-actions-secondary--emotional relative z-[2] grid shrink-0 grid-cols-3 gap-1.5 px-3 py-2">
-                  <p className="lettering-caution lettering-caution--reception-footer col-span-3">
-                    {VLUE_FREE_TIER_CAUTION}
-                  </p>
-                  <button type="button" onClick={handleOpenFeed} className="lettering-action lettering-action--primary">
-                    {"\uC778\uC99D\uC815\uBCF4"}
-                  </button>
-                  <button type="button" onClick={handleSaveCard} className="lettering-action lettering-action--ghost">
-                    {"\uBA85\uD568\uC800\uC7A5"}
-                  </button>
-                  <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger">
-                    {"\uC2E0\uACE0/\uCC28\uB2E8"}
-                  </button>
-                </div>
+                {renderExpandedFooter()}
               </div>
             </div>
           </div>
@@ -465,31 +665,40 @@ export default function LetteringIncomingNotification({
           >
             <div className="lettering-ongoing-expand-slot__inner">
               <div className="lettering-ongoing-reception relative z-[2] flex min-h-0 flex-1 flex-col">
-                <div className="lettering-ongoing-scroll lettering-ongoing-scroll--reception flex-1 min-h-0">
-                  <LetteringDigitalReception
-                    card={c}
-                    verified={verified}
-                    verificationItems={verificationList}
-                    incomingNumber={incoming}
-                    embeddedInPush
-                    face={receptionFace}
-                    onFaceChange={setReceptionFace}
-                  />
+                <div
+                  className={`lettering-ongoing-scroll flex-1 min-h-0 ${
+                    isGlassTent
+                      ? "lettering-ongoing-scroll--carousel"
+                      : "lettering-ongoing-scroll--reception"
+                  }`}
+                >
+                  {isGlassTent ? (
+                    <ShowcaseCallCarousel
+                      card={c}
+                      verified={verified}
+                      verificationItems={verificationList}
+                      incomingNumber={incoming}
+                      photos={showcasePhotos}
+                      membershipTier={c.membershipTier}
+                      isKnownContact={isKnownContact}
+                      scrollEnabled={carouselScrollEnabled}
+                      previewMode={previewMode}
+                      face={receptionFace}
+                      onFaceChange={handleFaceChange}
+                    />
+                  ) : (
+                    <LetteringDigitalReception
+                      card={c}
+                      verified={verified}
+                      verificationItems={verificationList}
+                      incomingNumber={incoming}
+                      embeddedInPush
+                      face={receptionFace}
+                      onFaceChange={handleFaceChange}
+                    />
+                  )}
                 </div>
-                <div className="lettering-ongoing-actions-secondary lettering-ongoing-actions-secondary--reception relative z-[2] grid shrink-0 grid-cols-3 gap-1.5 px-3 py-2">
-                  <p className="lettering-caution lettering-caution--reception-footer col-span-3">
-                    {VLUE_CARD_CAUTION}
-                  </p>
-                  <button type="button" onClick={handleOpenFeed} className="lettering-action lettering-action--primary">
-                    {"\uC778\uC99D\uC815\uBCF4"}
-                  </button>
-                  <button type="button" onClick={handleSaveCard} className="lettering-action lettering-action--ghost">
-                    {"\uBA85\uD568\uC800\uC7A5"}
-                  </button>
-                  <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger">
-                    {"\uC2E0\uACE0/\uCC28\uB2E8"}
-                  </button>
-                </div>
+                {renderExpandedFooter()}
               </div>
             </div>
           </div>
@@ -519,6 +728,12 @@ export default function LetteringIncomingNotification({
           </div>
         ) : null}
       </div>
+
+      {guideToast ? (
+        <div className="lettering-preview-guide-toast" role="status" aria-live="polite">
+          {guideToast}
+        </div>
+      ) : null}
     </article>
   );
 }

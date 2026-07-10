@@ -2,17 +2,26 @@ import { useRef } from "react";
 import { ImagePlus, Sticker, Type } from "lucide-react";
 import { SHOWCASE_FONT_SETS } from "../../lib/showcase/showcaseStyleTypes.js";
 import { SHOWCASE_MAX_PHOTOS } from "../../lib/showcase/showcaseStyleStorage.js";
+import { maxShowcasePhotosForTier } from "../../lib/showcase/tentShowcaseTypes.js";
 
 const EMOJI_PICKS = ["😀", "🚀", "🔥", "✨", "💙", "☕", "🎵", "📸", "💼", "🌸"];
 
 /**
  * 갤러리 멀티 선택 + 사진 꾸미기 (폰트·이모지 스티커)
+ * 무료: 1장 · 유료: 최대 10장
  */
-export default function ShowcasePhotoEditor({ photos = [], onChange, inputCls = "" }) {
+export default function ShowcasePhotoEditor({
+  photos = [],
+  onChange,
+  inputCls = "",
+  membershipTier = "paid",
+  maxPhotos
+}) {
   const fileRef = useRef(null);
+  const limit = Math.max(1, Number(maxPhotos) || maxShowcasePhotosForTier(membershipTier) || SHOWCASE_MAX_PHOTOS);
 
   const onFiles = async (fileList) => {
-    const files = Array.from(fileList || []).slice(0, SHOWCASE_MAX_PHOTOS - photos.length);
+    const files = Array.from(fileList || []).slice(0, limit - photos.length);
     if (!files.length) return;
     const next = [...photos];
     for (const file of files) {
@@ -26,9 +35,9 @@ export default function ShowcasePhotoEditor({ photos = [], onChange, inputCls = 
         overlayFont: "pretendard",
         emojiStickers: []
       });
-      if (next.length >= SHOWCASE_MAX_PHOTOS) break;
+      if (next.length >= limit) break;
     }
-    onChange(next.slice(0, SHOWCASE_MAX_PHOTOS));
+    onChange(next.slice(0, limit));
   };
 
   const updatePhoto = (id, patch) => {
@@ -51,9 +60,9 @@ export default function ShowcasePhotoEditor({ photos = [], onChange, inputCls = 
     <div className="showcase-photo-editor">
       <div className="showcase-photo-editor__header">
         <p className="showcase-photo-editor__count">
-          <ImagePlus size={14} aria-hidden /> 사진 {photos.length}/{SHOWCASE_MAX_PHOTOS}
+          <ImagePlus size={14} aria-hidden /> 사진 {photos.length}/{limit}
         </p>
-        {photos.length < SHOWCASE_MAX_PHOTOS ? (
+        {photos.length < limit ? (
           <button type="button" className="showcase-photo-editor__add" onClick={() => fileRef.current?.click()}>
             갤러리에서 추가
           </button>
@@ -62,7 +71,7 @@ export default function ShowcasePhotoEditor({ photos = [], onChange, inputCls = 
           ref={fileRef}
           type="file"
           accept="image/*"
-          multiple
+          multiple={limit > 1}
           className="sr-only"
           onChange={(e) => {
             onFiles(e.target.files);

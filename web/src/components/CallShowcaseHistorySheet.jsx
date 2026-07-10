@@ -9,9 +9,12 @@ import {
 import { resolveVlueShowcaseByPhone } from "../lib/resolveVlueShowcaseByPhone.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
-import ShowcaseReplayViewer from "./showcase/ShowcaseReplayViewer.jsx";
+import TentShowcaseOverlay from "./showcase/TentShowcaseOverlay.jsx";
 import AppFullScreenView from "./AppFullScreenView.jsx";
+import { readShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
+import { CALL_STATES } from "../lib/showcase/tentShowcaseTypes.js";
 import "./friend-showcase-list.css";
+import "../styles/tent-showcase.css";
 
 export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = false }) {
   const [items, setItems] = useState(() => readCallShowcaseHistory());
@@ -44,6 +47,18 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     setPreviewCard(null);
     setLoading(true);
     try {
+      if (call.cardSnapshot || call.showcaseSnapshot) {
+        const tier = call.membershipTier || call.cardSnapshot?.membershipTier || "free";
+        setPreviewCard({
+          ...call.cardSnapshot,
+          name: call.cardSnapshot?.name || call.name,
+          phone: call.phoneDisplay || call.phone,
+          membershipTier: tier,
+          showcaseStyle: call.showcaseSnapshot || readShowcaseStyle(),
+          fromHistoryCache: true
+        });
+        return;
+      }
       const payload = await resolveVlueShowcaseByPhone(call.phone);
       const tier = payload.card?.membershipTier || "free";
       setPreviewCard(
@@ -75,17 +90,26 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         title={selected.name}
         subtitle="통화 쇼케이스 다시보기"
         icon={Phone}
-        isDarkMode={isDarkMode}
-        reserveBottomNav
+        isDarkMode
+        coverBottomNav
+        className="bg-[#0B101B]"
       >
-        <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
+        <div className="flex min-h-0 flex-1 flex-col">
           {loading ? (
-            <p className="py-16 text-center text-[13px] font-semibold text-slate-500">쇼케이스 불러오는 중…</p>
+            <p className="py-16 text-center text-[13px] font-semibold text-slate-400">쇼케이스 불러오는 중…</p>
           ) : previewCard ? (
-            <ShowcaseReplayViewer
-              phone={previewCard.phone || selected.phone}
-              card={previewCard}
+            <TentShowcaseOverlay
+              previewMode
+              forceInteractive
+              callState={CALL_STATES.CONNECTED}
+              verified={selected?.verified !== false}
               membershipTier={previewCard.membershipTier || "free"}
+              peerPhone={previewCard.phone || selected.phone}
+              displayName={previewCard.name || selected.name}
+              organization={previewCard.organization || ""}
+              card={previewCard}
+              showcaseStyle={previewCard.showcaseStyle || readShowcaseStyle()}
+              className="tent-showcase--fill"
             />
           ) : null}
         </div>

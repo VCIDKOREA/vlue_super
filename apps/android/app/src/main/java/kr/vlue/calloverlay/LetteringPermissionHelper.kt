@@ -12,10 +12,18 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 object LetteringPermissionHelper {
-    val REQUIRED = arrayOf(
-        Manifest.permission.READ_PHONE_STATE,
-        Manifest.permission.READ_CALL_LOG
-    )
+    val REQUIRED: Array<String>
+        get() {
+            val base = mutableListOf(
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.READ_CALL_LOG,
+                Manifest.permission.READ_CONTACTS
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                base.add(Manifest.permission.ANSWER_PHONE_CALLS)
+            }
+            return base.toTypedArray()
+        }
 
     fun hasPhonePermissions(context: Context): Boolean =
         REQUIRED.all {

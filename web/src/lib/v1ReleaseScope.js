@@ -89,7 +89,7 @@ export const v1AppShell = {
   /** 메인 헤더 — 명함 스캐너만 (검색·QR 숨김) */
   homeHeaderMinimal: true,
   /** 메인 빅푸시 — 일상/비즈 탭 숨김 */
-  callBigPushTierTabs: false,
+  callBigPushTierTabs: true,
   /** 명함 스캐너 (문서 스캔 → 개인 자료실) */
   bizcardScanner: true,
   webViewProfile: true,

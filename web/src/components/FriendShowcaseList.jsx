@@ -3,12 +3,14 @@ import { Search, UserPlus } from "lucide-react";
 import { buildFriendShowcaseEntries } from "../lib/friendShowcaseEntries.js";
 import { resolveVlueShowcaseByPhone } from "../lib/resolveVlueShowcaseByPhone.js";
 import { VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
-import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
+import TentShowcaseOverlay from "./showcase/TentShowcaseOverlay.jsx";
 import AppFullScreenView from "./AppFullScreenView.jsx";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
-import { VLUE_SHOWCASE_DEMO_RECORDING_SEC } from "../lib/vlueShowcaseCard.js";
+import { readShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
+import { CALL_STATES } from "../lib/showcase/tentShowcaseTypes.js";
 import "./friend-showcase-list.css";
+import "../styles/tent-showcase.css";
 
 function FriendAvatar({ name, avatarUrl }) {
   if (avatarUrl) {
@@ -185,27 +187,29 @@ export default function FriendShowcaseList({
         onClose={closePreview}
         title={selected ? `${selected.name}님의 ${VLUE_SHOWCASE.nameKo}` : ""}
         subtitle="친구 쇼케이스"
+        isDarkMode
+        coverBottomNav
+        className="bg-[#0B101B]"
       >
-        <div className="px-3 py-3">
+        <div className="flex min-h-0 flex-1 flex-col">
           {previewLoading ? (
-            <p className="py-16 text-center text-[13px] font-semibold text-slate-500">불러오는 중…</p>
+            <p className="py-16 text-center text-[13px] font-semibold text-slate-400">불러오는 중…</p>
           ) : previewCard ? (
-            <LetteringIncomingNotification
-              verified
+            <TentShowcaseOverlay
               previewMode
-              callPhase={previewPaid ? "active" : "ringing"}
-              platform="android"
-              isRecording={previewPaid}
-              callDurationSec={previewPaid ? VLUE_SHOWCASE_DEMO_RECORDING_SEC : 0}
-              recordingDurationSec={previewPaid ? VLUE_SHOWCASE_DEMO_RECORDING_SEC : 0}
-              incomingNumber={previewCard.phone || selected?.phoneDisplay}
-              savedContactName={previewCard.name || selected?.name}
+              forceInteractive
+              callState={CALL_STATES.CONNECTED}
+              verified
+              membershipTier={previewPaid ? "paid" : "free"}
+              peerPhone={previewCard.phone || selected?.phoneDisplay}
+              displayName={previewCard.name || selected?.name}
+              organization={previewCard.organization || ""}
               card={previewCard}
-              defaultExpanded
-              className="lettering-ongoing--home-preview rounded-[20px] border border-slate-100 bg-white shadow-sm"
+              showcaseStyle={previewCard.showcaseStyle || readShowcaseStyle()}
+              className="tent-showcase--fill"
             />
           ) : (
-            <p className="py-16 text-center text-[13px] font-semibold text-slate-500">
+            <p className="py-16 text-center text-[13px] font-semibold text-slate-400">
               전화번호가 등록되지 않아 미리보기를 표시할 수 없습니다.
             </p>
           )}

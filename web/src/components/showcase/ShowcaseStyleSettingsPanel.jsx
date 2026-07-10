@@ -9,6 +9,8 @@ import {
   writeShowcaseStyle,
   parseShowcaseTagsInput
 } from "../../lib/showcase/showcaseStyleStorage.js";
+import { writeShowcasePrivacyMode } from "../../lib/showcase/showcasePrivacyMode.js";
+import { PRIVACY_MODES } from "../../lib/showcase/tentShowcaseTypes.js";
 import { syncShowcaseTagsToServer } from "../../lib/showcase/showcaseTagsApi.js";
 import { SHOWCASE_FONT_SETS, SHOWCASE_CASE_FRAMES, SHOWCASE_STYLE_LIST, SHOWCASE_STYLE_TYPES } from "../../lib/showcase/showcaseStyleTypes.js";
 import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
@@ -195,6 +197,38 @@ export default function ShowcaseStyleSettingsPanel({
               <section className="showcase-style-settings__section">
                 <h2 className="showcase-style-settings__label">통화 화면 스타일 선택</h2>
                 <p className={`showcase-style-settings__hint ${subText}`}>원하는 스타일 카드를 누르세요. 아래 미리보기에 바로 반영됩니다.</p>
+                {!isPaid ? (
+                  <div className="showcase-style-settings__privacy mb-4">
+                    <h2 className="showcase-style-settings__label">공유 범위</h2>
+                    <p className={`showcase-style-settings__hint ${subText}`}>
+                      친구 공유: 주소록·VLUE 친구에게만 프로필 노출. 모르는 번호에는 인증 마크·번호만 표시됩니다.
+                    </p>
+                    <div className="showcase-style-settings__phase-toggle">
+                      <button
+                        type="button"
+                        className={(config.privacyMode || PRIVACY_MODES.FRIEND_ONLY) === PRIVACY_MODES.FRIEND_ONLY ? "active" : ""}
+                        onClick={() => {
+                          writeShowcasePrivacyMode(PRIVACY_MODES.FRIEND_ONLY, membershipTier);
+                          persist({ privacyMode: PRIVACY_MODES.FRIEND_ONLY });
+                        }}
+                      >
+                        친구 공유
+                      </button>
+                      <button
+                        type="button"
+                        className={config.privacyMode === PRIVACY_MODES.PUBLIC ? "active" : ""}
+                        onClick={() => {
+                          writeShowcasePrivacyMode(PRIVACY_MODES.PUBLIC, membershipTier);
+                          persist({ privacyMode: PRIVACY_MODES.PUBLIC });
+                        }}
+                      >
+                        전체 공유
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className={`showcase-style-settings__hint mb-3 ${subText}`}>비즈니스 요금제 · 전체 공유 모드로 고정됩니다.</p>
+                )}
                 <div className="showcase-style-settings__pick-list">
                   {SHOWCASE_STYLE_LIST.map((s) => {
                     const meta = SHOWCASE_STYLE_TYPES[s.id] || s;
@@ -370,6 +404,7 @@ export default function ShowcaseStyleSettingsPanel({
                   photos={config.gallery?.photos || []}
                   onChange={(photos) => persist({ gallery: { photos } })}
                   inputCls={inputCls}
+                  membershipTier={membershipTier}
                 />
               </section>
               {saveButton}

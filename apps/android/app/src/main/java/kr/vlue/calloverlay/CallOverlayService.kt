@@ -1,6 +1,5 @@
 package kr.vlue.calloverlay
 
-import android.animation.ObjectAnimator
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,25 +8,29 @@ import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.widget.FrameLayout
+import androidx.core.app.NotificationCompat
 import kr.vlue.calloverlay.showcase.ShowcaseProximitySensor
 
 /**
- * SYSTEM_ALERT_WINDOW + WebView 레터링 UI
- * 페이드·슬라이드 인 / 아웃 후 removeView
+ * SYSTEM_ALERT_WINDOW + WebView 천막 쇼케이스
+ * 링잉: 상단 컴팩트 → 연결 후: MATCH_PARENT 전체화면
  */
 class CallOverlayService : Service() {
     private var windowManager: WindowManager? = null
     private var rootContainer: FrameLayout? = null
     private var webView: WebView? = null
+    private var layoutParams: WindowManager.LayoutParams? = null
     private var dismissing = false
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -35,12 +38,20 @@ class CallOverlayService : Service() {
         super.onCreate()
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
+        activeInstance = this
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_DISMISS) {
-            dismissOverlay()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_DISMISS -> {
+                dismissOverlay()
+                return START_NOT_STICKY
+            }
+            ACTION_CONNECTED -> {
+                setOverlayFullscreen(true)
+                notifyWebCallState("connected")
+                return START_NOT_STICKY
+            }
         }
         val phone = intent?.getStringExtra(EXTRA_PHONE).orEmpty()
         val verified = intent?.getBooleanExtra(EXTRA_VERIFIED, false) ?: false
@@ -61,10 +72,13 @@ class CallOverlayService : Service() {
             cacheMode = WebSettings.LOAD_NO_CACHE
         }
         wv.setBackgroundColor(0x00000000)
-        container.addView(wv, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ))
+        container.addView(
+            wv,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -74,14 +88,16 @@ class CallOverlayService : Service() {
         }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            y = 48
+            gravity = Gravity.TOP or Gravity.START
+            y = 0
         }
 
         container.alpha = 0f
@@ -89,6 +105,7 @@ class CallOverlayService : Service() {
         windowManager?.addView(container, params)
         rootContainer = container
         webView = wv
+        layoutParams = params
         ShowcaseProximitySensor.attach(this, wv)
 
         wv.loadUrl(VlueLetteringConfig.overlayUrl(phone, verified, outgoing))
@@ -99,6 +116,39 @@ class CallOverlayService : Service() {
             .setDuration(320)
             .setInterpolator(DecelerateInterpolator())
             .start()
+    }
+
+    fun setOverlayFullscreen(fullscreen: Boolean) {
+        mainHandler.post {
+            val wm = windowManager ?: return@post
+            val view = rootContainer ?: return@post
+            val params = layoutParams ?: return@post
+            if (fullscreen) {
+                params.height = WindowManager.LayoutParams.MATCH_PARENT
+                params.width = WindowManager.LayoutParams.MATCH_PARENT
+                params.y = 0
+                params.gravity = Gravity.TOP or Gravity.START
+                params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+            } else {
+                params.height = WindowManager.LayoutParams.WRAP_CONTENT
+                params.width = WindowManager.LayoutParams.MATCH_PARENT
+                params.y = 48
+                params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            }
+            try {
+                wm.updateViewLayout(view, params)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun notifyWebCallState(state: String) {
+        mainHandler.post {
+            val js =
+                "try{window.VlueLettering&&window.VlueLettering.onNativeCallState&&window.VlueLettering.onNativeCallState('${state}');" +
+                    "window.dispatchEvent(new CustomEvent('vlue-native-call-state',{detail:{callState:'${state}'}}));}catch(e){}"
+            webView?.evaluateJavascript(js, null)
+        }
     }
 
     fun dismissOverlay() {
@@ -126,13 +176,16 @@ class CallOverlayService : Service() {
         rootContainer?.let { v ->
             try {
                 windowManager?.removeView(v)
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
         rootContainer = null
+        layoutParams = null
         dismissing = false
     }
 
     override fun onDestroy() {
+        if (activeInstance === this) activeInstance = null
         removeOverlayImmediate()
         super.onDestroy()
     }
@@ -170,7 +223,23 @@ class CallOverlayService : Service() {
         const val EXTRA_OUTGOING = "outgoing"
         const val EXTRA_CARD_JSON = "card_json"
         const val ACTION_DISMISS = "kr.vlue.calloverlay.DISMISS"
+        const val ACTION_CONNECTED = "kr.vlue.calloverlay.CONNECTED"
         private const val CHANNEL_ID = "vlue_lettering_overlay"
         private const val NOTIFICATION_ID = 41001
+
+        @Volatile
+        private var activeInstance: CallOverlayService? = null
+
+        fun notifyConnected(context: android.content.Context) {
+            try {
+                val intent = Intent(context, CallOverlayService::class.java).apply {
+                    action = ACTION_CONNECTED
+                }
+                context.startService(intent)
+            } catch (_: Exception) {
+                activeInstance?.setOverlayFullscreen(true)
+                activeInstance?.notifyWebCallState("connected")
+            }
+        }
     }
 }

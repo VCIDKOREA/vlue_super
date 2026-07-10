@@ -56,7 +56,13 @@ export function appendCallShowcaseHistory(entry) {
     name: String(entry.name || "").trim() || formatLetteringPhoneDisplay(phone),
     direction: entry.direction === "out" ? "out" : "in",
     durationSec: Math.max(0, Number(entry.durationSec) || 0),
-    endedAt: entry.endedAt || new Date().toISOString()
+    endedAt: entry.endedAt || new Date().toISOString(),
+    callState: entry.callState || (Number(entry.durationSec) > 0 ? "ended" : "missed"),
+    verified: entry.verified !== false,
+    membershipTier: entry.membershipTier || "free",
+    /** 통화 종료·부재중 시 쇼케이스 메타데이터 스냅샷 */
+    showcaseSnapshot: entry.showcaseSnapshot || null,
+    cardSnapshot: entry.cardSnapshot || null
   };
   const next = [row, ...readCallShowcaseHistory().filter((r) => r.id !== row.id)].slice(0, 80);
   try {

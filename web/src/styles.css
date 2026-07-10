@@ -4106,7 +4106,54 @@ body,
 }
 
 .lettering-cert-modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  background: rgba(0, 0, 0, 0.55);
   line-height: normal;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .lettering-cert-modal-root {
+    align-items: center;
+  }
+}
+
+.lettering-cert-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 390px;
+  max-height: min(78dvh, calc(100dvh - 32px - env(safe-area-inset-bottom, 0px)));
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.28);
+  box-sizing: border-box;
+}
+
+.lettering-cert-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 48px 16px 12px;
+}
+
+.lettering-cert-modal__footer {
+  flex-shrink: 0;
+  padding: 12px 16px 16px;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  background: #fff;
 }
 
 .lettering-bizcard__vlue-mark {
@@ -4350,6 +4397,200 @@ body,
 .lettering-ongoing--case-preview.lettering-ongoing--expanded .lettering-ongoing-expand-slot__inner {
   min-height: auto;
   overflow: visible;
+}
+
+/* 홈·마이페이지 쇼케이스 펼침 — 하단 내비까지 덮는 전체화면 천막 */
+.lettering-showcase-fs {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  flex-direction: column;
+  background: #0f172a;
+  padding: 0;
+  animation: lettering-showcase-fs-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes lettering-showcase-fs-in {
+  from {
+    opacity: 0.7;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.lettering-showcase-fs__shell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  height: 100dvh;
+  padding: 0;
+  background: #0f172a;
+}
+
+.lettering-ongoing--fullscreen-tent {
+  display: flex !important;
+  flex-direction: column;
+  flex: 1 1 auto;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 100% !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  background: #0f172a;
+}
+
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded,
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded.lettering-ongoing--paid,
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--on-call.lettering-ongoing--expanded {
+  max-height: none !important;
+  height: 100% !important;
+  position: relative;
+  z-index: 1;
+}
+
+.lettering-ongoing--fullscreen-tent > .lettering-ongoing-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-scroll--reception,
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-scroll--emotional,
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-scroll--carousel {
+  flex: 1 1 auto !important;
+  max-height: none !important;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-reception {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-expand-slot__inner {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-expand-slot[data-open="true"] {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-rows: 1fr !important;
+  opacity: 1 !important;
+  overflow: hidden;
+}
+
+.lettering-ongoing--fullscreen-tent .lettering-live-bar {
+  flex-shrink: 0;
+}
+
+.lettering-ongoing--fullscreen-tent .lettering-ongoing-summary {
+  flex-shrink: 0;
+}
+
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-actions-secondary--call {
+  background: transparent;
+  border-top: 0;
+  box-shadow: none;
+}
+
+.lettering-ongoing-actions-secondary--call {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px max(12px, env(safe-area-inset-bottom, 0px));
+}
+
+.lettering-ongoing-actions-secondary--call .lettering-caution--reception-footer {
+  margin: 0;
+  width: 100%;
+}
+
+.lettering-ongoing-actions-secondary__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.lettering-action--end-call {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  margin-top: 2px;
+  border: 0;
+  border-radius: 16px;
+  background: radial-gradient(circle at 30% 25%, #f87171, #ef4444 72%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.35);
+  cursor: pointer;
+}
+
+.lettering-action--end-call:active {
+  transform: scale(0.98);
+  filter: brightness(0.96);
+}
+
+.lettering-action--end-call-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  min-height: 64px;
+  margin: 4px auto 0;
+  padding: 0;
+  border: 0;
+  border-radius: 32px;
+  background: radial-gradient(circle at 35% 28%, #b91c1c, #991b1b 70%);
+  color: #fff;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 1px rgba(153, 27, 27, 0.45),
+    0 8px 28px rgba(127, 29, 29, 0.45),
+    0 0 24px rgba(153, 27, 27, 0.35);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.lettering-action--end-call-circle:active {
+  transform: scale(0.94);
+  filter: brightness(0.95);
 }
 
 /* 유료 명함 — 앞·뒷면 플립 */

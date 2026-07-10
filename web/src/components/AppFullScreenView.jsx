@@ -11,14 +11,20 @@ export default function AppFullScreenView({
   children,
   className = "",
   /** true면 하단 카테고리 바 영역을 비워 둠 */
-  reserveBottomNav = false
+  reserveBottomNav = false,
+  /** true면 하단 내비까지 덮는 진짜 전체화면 (쇼케이스 천막 등) */
+  coverBottomNav = false
 }) {
   if (!open) return null;
 
+  const zClass = coverBottomNav ? "z-[220]" : "z-[140]";
+
   return (
     <div
-      className={`fixed left-0 right-0 top-0 z-[140] flex flex-col ${isDarkMode ? "bg-[#111827] text-gray-100" : "bg-white text-slate-900"} ${className}`.trim()}
-      style={reserveBottomNav ? { bottom: "var(--vlue-bottom-nav-offset, 0px)" } : undefined}
+      className={`fixed inset-x-0 top-0 flex flex-col ${zClass} ${isDarkMode ? "bg-[#111827] text-gray-100" : "bg-white text-slate-900"} ${className}`.trim()}
+      style={{
+        bottom: reserveBottomNav && !coverBottomNav ? "var(--vlue-bottom-nav-offset, 0px)" : 0
+      }}
       role="dialog"
       aria-modal="true"
       aria-label={title}

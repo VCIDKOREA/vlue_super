@@ -232,9 +232,10 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         AlertDialog.Builder(this)
             .setTitle("VLUE 레터링 권한")
             .setMessage(
-                "통화 중 명함을 표시하려면\n" +
+                "통화 중 쇼케이스를 표시하려면\n" +
                     "· 다른 앱 위에 표시\n" +
-                    "· 전화 상태 읽기\n권한이 필요합니다."
+                    "· 전화 상태·통화 제어\n" +
+                    "· 주소록(친구 공유 프라이버시)\n권한이 필요합니다."
             )
             .setPositiveButton("권한 설정") { _, _ ->
                 if (!LetteringPermissionHelper.hasPhonePermissions(this)) {

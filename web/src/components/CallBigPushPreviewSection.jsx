@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import {
@@ -12,17 +13,35 @@ import { v1AppShell } from "../lib/v1ReleaseScope.js";
 
 /**
  * VLUE Showcase — 홈 메인 통화 빅푸시 미리보기
- * 프로필(VLUE Case) 사이드바 미리보기와 동일 카드 데이터
+ * 펼침 시 하단 내비까지 덮는 전체화면(천막)으로 전환
  */
-export default function CallBigPushPreviewSection({ membershipTier = "free", className = "" }) {
+export default function CallBigPushPreviewSection({ membershipTier = "free", className = "", onToast }) {
   const showTierTabs = v1AppShell.callBigPushTierTabs;
-  const [tier, setTier] = useState(showTierTabs ? "free" : "free");
+  const [tier, setTier] = useState(showTierTabs ? "paid" : "free");
   const [expanded, setExpanded] = useState(false);
 
   const effectiveTier = showTierTabs && tier === "paid" ? "premium" : membershipTier;
   const card = applyShowcaseStyleToCard(resolveVlueShowcaseCard({ membershipTier: effectiveTier }), effectiveTier);
   const isPaid = isPaidLetteringTier(effectiveTier);
   const incomingNumber = card.phone || "";
+
+  const notificationProps = {
+    verified: true,
+    previewMode: true,
+    callPhase: isPaid || expanded ? "connected" : "ringing",
+    platform: "android",
+    isRecording: isPaid,
+    callDurationSec: isPaid ? VLUE_SHOWCASE_DEMO_RECORDING_SEC : 0,
+    recordingDurationSec: isPaid ? VLUE_SHOWCASE_DEMO_RECORDING_SEC : 0,
+    incomingNumber,
+    savedContactName: !isPaid ? card.name || "" : "",
+    isKnownContact: !isPaid ? Boolean(card.name) : true,
+    card,
+    expanded,
+    onExpandedChange: setExpanded,
+    onEndCall: () => setExpanded(false),
+    onToast
+  };
 
   return (
     <section
@@ -76,21 +95,33 @@ export default function CallBigPushPreviewSection({ membershipTier = "free", cla
         </div>
       ) : null}
 
-      <LetteringIncomingNotification
-        verified
-        previewMode
-        callPhase={isPaid ? "active" : "ringing"}
-        platform="android"
-        isRecording={isPaid}
-        callDurationSec={isPaid ? VLUE_SHOWCASE_DEMO_RECORDING_SEC : 0}
-        recordingDurationSec={isPaid ? VLUE_SHOWCASE_DEMO_RECORDING_SEC : 0}
-        incomingNumber={incomingNumber}
-        savedContactName={!isPaid ? card.name || "" : ""}
-        card={card}
-        expanded={expanded}
-        onExpandedChange={setExpanded}
-        className="lettering-ongoing--on-call lettering-ongoing--home-preview rounded-[20px] border border-slate-100 bg-white shadow-sm"
-      />
+      {!expanded ? (
+        <LetteringIncomingNotification
+          {...notificationProps}
+          className="lettering-ongoing--on-call lettering-ongoing--home-preview rounded-[20px] border border-slate-100 bg-white shadow-sm"
+        />
+      ) : (
+        <div
+          className="lettering-ongoing--home-preview rounded-[20px] border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-[11px] font-semibold text-slate-400"
+          aria-hidden
+        >
+          전체화면 쇼케이스 미리보기 중
+        </div>
+      )}
+
+      {expanded && typeof document !== "undefined"
+        ? createPortal(
+            <div className="lettering-showcase-fs" role="dialog" aria-modal="true" aria-label="쇼케이스 미리보기">
+              <div className="lettering-showcase-fs__shell">
+                <LetteringIncomingNotification
+                  {...notificationProps}
+                  className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent"
+                />
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </section>
   );
 }
