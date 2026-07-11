@@ -36,6 +36,7 @@
     "db:generate:safe": "node scripts/prisma-generate-safe.mjs",
     "seed:test-accounts": "node scripts/seed-test-accounts.mjs",
     "seed:admin-account": "node scripts/seed-admin-account.mjs",
+    "seed:platform-accounts": "node scripts/seed-platform-accounts.mjs",
     "openbanking:webhook-mock": "node scripts/openbanking-webhook-mock.mjs",
     "android:sync": "node scripts/sync-android-lettering.mjs",
     "android:setup": "node scripts/sync-android-lettering.mjs && node scripts/setup-android-local.mjs && node scripts/install-gradle-wrapper.mjs",

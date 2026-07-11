@@ -2,24 +2,35 @@ import type { BusinessCard } from "@prisma/client";
 import type { Context, Next } from "hono";
 import { prisma } from "../db/client.js";
 import { resolveRequestUserId } from "../lib/authContext.js";
+import { isPlatformCeoHandle } from "../services/admin/platformAccountRoles.js";
 
-/** 스탠다드/프리미엄 — DigitalCard 발급 시 스냅샷 기준 (추가 필드 없이 .env 만으로 티어 조정 불가 → DB 스냅샷 사용) */
+/** 스탠다드/프리미엄 — DigitalCard 스냅샷 (+ 플랫폼 ceo = 항상 유료) */
 export async function userHasPremiumTier(userId: string): Promise<boolean> {
-  const row = await prisma.digitalCard.findUnique({
-    where: { userId },
-    select: { membershipTierSnapshot: true }
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      publicHandle: true,
+      digitalCard: { select: { membershipTierSnapshot: true } }
+    }
   });
-  const t = row?.membershipTierSnapshot;
+  if (!user) return false;
+  if (isPlatformCeoHandle(user.publicHandle)) return true;
+  const t = user.digitalCard?.membershipTierSnapshot;
   return t === "paid" || t === "standard" || t === "premium" || t === "b2b";
 }
 
-/** 내선(extension)·대표(rep_number) 명함 — 카드 소유자가 프리미엄 티어인지 (DigitalCard 스냅샷) */
+/** 내선·대표 명함 — premium 스냅샷 (ceo 는 premium 과 동일) */
 export async function userIsStrictPremium(userId: string): Promise<boolean> {
-  const row = await prisma.digitalCard.findUnique({
-    where: { userId },
-    select: { membershipTierSnapshot: true }
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      publicHandle: true,
+      digitalCard: { select: { membershipTierSnapshot: true } }
+    }
   });
-  return row?.membershipTierSnapshot === "premium";
+  if (!user) return false;
+  if (isPlatformCeoHandle(user.publicHandle)) return true;
+  return user.digitalCard?.membershipTierSnapshot === "premium";
 }
 
 export type CardActor = "owner" | "member" | "none";

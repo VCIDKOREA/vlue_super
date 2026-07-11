@@ -6,6 +6,11 @@ import {
   isAdminConsoleUser,
   resolveAdminConsoleRole
 } from "../services/admin/adminConsoleAuth.js";
+import { denyAdminAccessReasonForUser } from "../services/admin/superAdminAuth.js";
+import {
+  listMasterCapabilities,
+  PLATFORM_MASTER_ADMIN
+} from "../services/admin/platformAccountRoles.js";
 import { issueTokenPair } from "../services/authSessions.js";
 import { adminPricingConfigRoutes } from "./pricingConfig.js";
 import {
@@ -62,8 +67,11 @@ adminConsoleRoutes.post("/login", async (c) => {
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) return c.json({ error: "아이디 또는 비밀번호가 올바르지 않습니다." }, 401);
 
+  const ceoDeny = denyAdminAccessReasonForUser(user);
+  if (ceoDeny) return c.json({ error: ceoDeny, code: "CEO_NOT_SYSTEM_ADMIN" }, 403);
+
   if (!isAdminConsoleUser(user)) {
-    return c.json({ error: "관리자 권한이 없습니다. role=admin 계정만 접근할 수 있습니다." }, 403);
+    return c.json({ error: "관리자 권한이 없습니다. 마스터 관리자(admin) 계정만 접근할 수 있습니다." }, 403);
   }
 
   const pair = await issueTokenPair(user.id, { header: (n) => c.req.header(n) });
@@ -71,6 +79,8 @@ adminConsoleRoutes.post("/login", async (c) => {
   return c.json({
     ok: true,
     role,
+    accountKind: PLATFORM_MASTER_ADMIN.accountKind,
+    capabilities: listMasterCapabilities(user),
     userId: user.id,
     legalName: user.legalName || "",
     publicHandle: user.publicHandle || loginId,
@@ -86,6 +96,8 @@ adminConsoleRoutes.get("/me", async (c) => {
   return c.json({
     ok: true,
     role: resolveAdminConsoleRole(user),
+    accountKind: PLATFORM_MASTER_ADMIN.accountKind,
+    capabilities: listMasterCapabilities(user),
     userId: user.id,
     legalName: user.legalName || "",
     publicHandle: user.publicHandle || ""

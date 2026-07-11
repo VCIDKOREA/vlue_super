@@ -992,7 +992,9 @@ function Home({
 
       {activeDetailId === "vlue-guide" && (
         <section
-          className="fixed inset-x-0 top-[48px] bottom-[calc(48px+env(safe-area-inset-bottom,0px))] z-[140] flex w-full max-w-none flex-col bg-[#f8fafc]"
+          className={`fixed inset-x-0 top-[48px] bottom-[calc(48px+env(safe-area-inset-bottom,0px))] z-[140] flex w-full max-w-none flex-col ${
+            isDarkMode ? "bg-[#111827]" : "bg-[#f8fafc]"
+          }`}
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setActiveDetailId("");
           }}
@@ -1498,7 +1500,9 @@ function Home({
       </section>
 
       {categoryBoardOpen && (
-        <section className="fixed inset-x-0 top-[48px] bottom-[calc(54px+env(safe-area-inset-bottom,0px))] z-[125] flex w-full max-w-none flex-col bg-[#f8fafc]">
+        <section className={`fixed inset-x-0 top-[48px] bottom-[calc(54px+env(safe-area-inset-bottom,0px))] z-[125] flex w-full max-w-none flex-col ${
+          isDarkMode ? "bg-[#111827]" : "bg-[#f8fafc]"
+        }`}>
           <ScreenBackHeader
             sticky={false}
             title={`${activeCategory.label} · ${subCategory}`}

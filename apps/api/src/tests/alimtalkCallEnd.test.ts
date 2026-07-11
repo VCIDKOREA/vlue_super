@@ -22,7 +22,11 @@ async function run() {
 
   const payload = buildCallEndAlimtalkPayload(peerE164);
   assert(payload.body.includes("010-9876-5432"), "body must highlight phone number");
+  assert(payload.body.includes("보이스피싱"), "body must include phishing-prevention copy");
+  assert(payload.body.includes("스미싱"), "body must include smishing-prevention copy");
+  assert(payload.body.includes("최초 1회"), "body must include first-send limit copy");
   assert(payload.buttons.length === 2, "two outbound buttons");
+  assert(payload.buttons[0].name === "▶발신자 쇼케이스 확인하기", "button 1 label must match Kakao apply copy");
   assert(payload.buttons[0].url_mobile.includes("/site/web/showcase/"), "showcase link");
   assert(payload.buttons[0].url_mobile.includes("01098765432"), "URL phone must be digits only");
   assert(!payload.buttons[0].url_mobile.includes("010-9876"), "URL must not contain hyphens");

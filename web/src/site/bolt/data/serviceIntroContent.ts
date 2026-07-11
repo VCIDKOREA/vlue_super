@@ -204,7 +204,6 @@ export const INSTALL_EXCLUSIVE_FEATURES: ServiceAccordionItem[] = [
 
 export const INSTALL_HIGHLIGHTS = [
   '수신 전화 실시간 위험 알림',
-  '문자·링크 스미싱 분석',
   '위치 기반 안심영역',
   '지문·Face ID 로그인',
 ] as const;
@@ -222,19 +221,6 @@ export const TRUST_ITEMS = [
 
 export const CHART_FOOTNOTE =
   '2019년 대비 2.3배 증가 · 2023년 피해액 7,500억원+ 돌파 · 전년 대비 32% 급증';
-
-export const PLATFORM_STATS = [
-  { label: 'VLUE 인증 기관', value: '2,847', unit: '개', brand: true as const },
-  { label: '검증 완료', value: '18.3만', unit: '건', brand: false as const },
-  { label: '사기 차단', value: '9,402', unit: '건', brand: false as const },
-] as const;
-
-export const INSTITUTION_QUICK_SEARCH = [
-  '명경채 요양병원',
-  '다다오피스',
-  '한국신뢰금융',
-  '02-1234-5678',
-] as const;
 
 export const FEATURE_KEYWORD_QUICK = [
   '통합 검색',

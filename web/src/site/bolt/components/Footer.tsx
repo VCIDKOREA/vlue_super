@@ -17,7 +17,6 @@ const FOOTER_SECTIONS: { label: string; links: FooterLink[] }[] = [
       { text: '인증신청', view: 'pricing' as View },
       { text: '개인케이스', view: 'resources' as View },
       { text: '가족보호', view: 'family' as View },
-      { text: '마이페이지', view: 'mypage' as View },
     ],
   },
   {

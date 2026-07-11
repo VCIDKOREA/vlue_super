@@ -21,6 +21,7 @@ import { probeEnterpriseSidebarAccess } from "../lib/enterpriseLineManageAccess.
 import { fileToDataUrl, readAvatar, writeAvatar } from "../lib/vlueAvatar.js";
 import { getMemberHandle, getChatDisplayName } from "../lib/memberCardStorage.js";
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
+import { readLetteringFixedIdentity } from "../lib/letteringBizcardStorage.js";
 import { fetchEmailForwardingMapping, readLocalLoginPrefix } from "../lib/vlueEmailMappingsApi.js";
 import { membershipTierStyleClass } from "../lib/membershipTierDisplay.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
@@ -286,10 +287,11 @@ function ProfilePanel({
   );
   const memberIdDisplay = getMemberHandle();
   const profilePhoneDisplay = useMemo(() => {
-    const raw = String(myPhone || myCard?.phone || "").trim();
+    const fromIdentity = String(readLetteringFixedIdentity().phone || "").trim();
+    const raw = String(fromIdentity || myPhone || myCard?.phone || "").trim();
     const formatted = formatPhoneE164ForKoreaDisplay(raw);
     return formatted || raw || "—";
-  }, [myPhone, myCard?.phone]);
+  }, [myPhone, myCard?.phone, open]);
   const headText = isDarkMode ? "text-gray-100" : "text-gray-900";
   const subText = isDarkMode ? "text-gray-400" : "text-gray-400";
   const profileFieldLabelText = isVCIDOn
@@ -404,7 +406,7 @@ function ProfilePanel({
     setTimeout(() => setPartnerInquiryNotice(""), 3000);
   };
   return (
-    <div className={`fixed inset-0 ${open ? "z-[140]" : "z-[70] pointer-events-none"}`}>
+    <div className={`fixed inset-0 ${open ? "z-[160]" : "z-[70] pointer-events-none"}`}>
       <button className={`absolute inset-0 bg-black/30 transition ${open ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
       <aside
         id="profile-menu"
@@ -864,7 +866,9 @@ function ProfilePanel({
 
           <div className={`mx-1 mt-4 rounded-2xl border p-3 ${isDarkMode ? "border-white/10 bg-white/5" : "border-gray-100 bg-gray-50/90"}`}>
             <p className={`text-[12px] font-black ${headText}`}>프로필 이미지</p>
-            <p className={`mt-0.5 text-[10px] ${subText}`}>대표 이미지가 채팅·활동·명함 기본값으로 쓰입니다. 슬롯별로 따로 넣으면 해당 영역에 우선합니다.</p>
+            <p className={`mt-0.5 text-[10px] ${subText}`}>
+              대표 이미지가 기본값입니다. 쇼케이스 슬롯에 따로 넣으면 통화·쇼케이스에 우선 적용됩니다.
+            </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <label className={`cursor-pointer rounded-lg border px-2 py-1.5 text-[10px] font-bold ${isDarkMode ? "border-white/20 text-gray-200" : "border-gray-200 text-gray-700"}`}>
                 대표
@@ -883,37 +887,7 @@ function ProfilePanel({
                 />
               </label>
               <label className={`cursor-pointer rounded-lg border px-2 py-1.5 text-[10px] font-bold ${isDarkMode ? "border-white/20 text-gray-200" : "border-gray-200 text-gray-700"}`}>
-                채팅
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    writeAvatar("chat", await fileToDataUrl(f));
-                    setAvatarTick((n) => n + 1);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              <label className={`cursor-pointer rounded-lg border px-2 py-1.5 text-[10px] font-bold ${isDarkMode ? "border-white/20 text-gray-200" : "border-gray-200 text-gray-700"}`}>
-                활동
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    writeAvatar("feed", await fileToDataUrl(f));
-                    setAvatarTick((n) => n + 1);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              <label className={`cursor-pointer rounded-lg border px-2 py-1.5 text-[10px] font-bold ${isDarkMode ? "border-white/20 text-gray-200" : "border-gray-200 text-gray-700"}`}>
-                명함
+                쇼케이스
                 <input
                   type="file"
                   accept="image/*"
@@ -930,9 +904,11 @@ function ProfilePanel({
             </div>
           </div>
 
-          <VluerCodeChangeSidebar isDarkMode={isDarkMode} />
+          {v1AppShell.referralProgram ? <VluerCodeChangeSidebar isDarkMode={isDarkMode} /> : null}
 
+          {v1AppShell.chat || !v1AppShell.vaultTabsMinimal ? (
           <div className="mt-4 space-y-2 px-1">
+            {!v1AppShell.vaultTabsMinimal || v1AppShell.chat ? (
             <button
               type="button"
               onClick={() => {
@@ -952,6 +928,8 @@ function ProfilePanel({
                 </span>
               ) : null}
             </button>
+            ) : null}
+            {v1AppShell.mypageShop ? (
             <button
               type="button"
               onClick={() => onOpenPageManager?.()}
@@ -959,7 +937,9 @@ function ProfilePanel({
             >
               페이지관리
             </button>
+            ) : null}
           </div>
+          ) : null}
 
           <div className="mt-8 mb-10 flex flex-col items-center justify-center gap-2">
             <div className="w-full h-[1px] bg-gray-100 mb-4 px-4"></div>
@@ -994,11 +974,12 @@ function ProfilePanel({
         ) : null}
         {settingNotice ? (
           <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-[90] flex justify-center px-4 pb-[max(14px,env(safe-area-inset-bottom,0px))] pt-2"
+            className="pointer-events-none absolute inset-x-0 z-[90] flex justify-center px-3"
+            style={{ bottom: "max(5.75rem, calc(env(safe-area-inset-bottom, 0px) + 4.75rem))" }}
             role="status"
             aria-live="polite"
           >
-            <p className="mx-auto w-fit max-w-full rounded-full bg-[#121212] px-5 py-2.5 text-center text-[12px] font-bold leading-snug text-white shadow-[0_8px_24px_rgba(0,0,0,0.38)] ring-1 ring-black/15">
+            <p className="mx-auto max-w-[min(100%,20rem)] rounded-2xl bg-[#121212] px-4 py-2.5 text-center text-[12px] font-bold leading-snug text-white shadow-[0_8px_24px_rgba(0,0,0,0.38)] ring-1 ring-black/15 break-keep">
               {settingNotice}
             </p>
           </div>

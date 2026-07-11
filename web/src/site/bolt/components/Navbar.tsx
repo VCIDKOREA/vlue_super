@@ -31,8 +31,7 @@ const NAV_ITEMS: NavItem[] = [
 ].filter((item) => isWebViewV1Enabled(item.view));
 
 const USER_MENU_ITEMS: { label: string; view: View; icon: typeof LayoutDashboard }[] = [
-  { label: '마이페이지', view: 'mypage', icon: LayoutDashboard },
-  { label: '디지털 명함', view: 'bizcard', icon: CreditCard },
+  { label: '마이 쇼케이스', view: 'bizcard', icon: CreditCard },
   { label: '신뢰인증 신청', view: 'pricing', icon: Award },
   { label: '안심영역 설정', view: 'safezone', icon: MapPin },
 ];
@@ -125,18 +124,11 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
                       <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
                     </div>
                     <button
-                      onClick={() => { handleNav('mypage'); }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-colors"
-                    >
-                      <LayoutDashboard className="w-4 h-4" />
-                      마이페이지
-                    </button>
-                    <button
                       onClick={() => { handleNav('bizcard'); }}
                       className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-colors"
                     >
                       <CreditCard className="w-4 h-4" />
-                      디지털 명함
+                      마이 쇼케이스
                     </button>
                     <button
                       onClick={() => { handleNav('pricing'); }}

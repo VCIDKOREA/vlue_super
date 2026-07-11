@@ -18,7 +18,6 @@ const PC_FEATURES = [
 
 const MOBILE_FEATURES = [
   '수신 전화 실시간 사기 위험 알림',
-  '문자 링크 자동 안전 분석',
   '위치 기반 안심영역 설정',
   '음성 통화 중 즉시 기관 조회',
   '지문·Face ID 간편 인증',

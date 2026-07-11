@@ -5,7 +5,7 @@ import type { BizcardClassicSnapshot } from "./bizcardClassicSpec.js";
 export const KAKAO_FEED_CARD_WIDTH = 800;
 export const KAKAO_FEED_CARD_HEIGHT = 520;
 
-const FONT = "Pretendard, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
+const FONT = "NanumGothic, Nanum Gothic, Noto Sans CJK KR, Pretendard, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
 const NAVY = "#0b1a33";
 const HEADER_H = 268;
 

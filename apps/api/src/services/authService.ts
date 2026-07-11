@@ -5,8 +5,9 @@ import { verifyPassword } from "../lib/passwordHash.js";
 import { issueTokenPair } from "./authSessions.js";
 import { assertLineTypeAllowsClient, detectClientKind, type ClientKind } from "../middleware/enterpriseAccess.js";
 import { PARENTAL_CONSENT_PENDING_LOGIN_MESSAGE } from "@vlue/shared/policy/minor-signup";
-import { isVlueSeedTestHandle } from "../lib/testAccounts.js";
+import { isDeviceAutoApproveHandle, isVlueSeedTestHandle } from "../lib/testAccounts.js";
 import { upsertEnterpriseDraft } from "./b2b/cartEngine.js";
+import { resolveLoginMembershipTier } from "./membership/platformCeoPremium.js";
 
 export type { ClientKind };
 export { detectClientKind };
@@ -34,6 +35,7 @@ export type LoginResult =
       publicHandle: string;
       accountStatus: string;
       phoneE164: string | null;
+      membershipTier: string;
       accessToken: string;
       refreshToken: string;
       accessExpiresInSec: number;
@@ -57,15 +59,18 @@ async function issueLoginOk(
   const pair = await issueTokenPair(user.id, { header: (n) => c.req.header(n) });
   const full = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { enterpriseRole: true, lineType: true }
+    select: { enterpriseRole: true, lineType: true, publicHandle: true }
   });
+  const handle = full?.publicHandle || user.publicHandle || loginId;
+  const membershipTier = await resolveLoginMembershipTier(user.id, handle);
   return {
     status: "ok",
     userId: user.id,
     legalName: user.legalName || "",
-    publicHandle: user.publicHandle || loginId,
+    publicHandle: handle,
     accountStatus: user.accountStatus,
     phoneE164: user.phoneE164,
+    membershipTier,
     accessToken: pair.accessToken,
     refreshToken: pair.refreshToken,
     accessExpiresInSec: pair.accessExpiresInSec,
@@ -180,8 +185,8 @@ export async function loginWithCredentials(
     return issueLoginOk(user, loginId, first.deviceToken, c);
   }
 
-  /** 시드 테스트 계정은 QA용으로 신규 기기도 즉시 승인 */
-  if (isVlueSeedTestHandle(loginId)) {
+  /** 시드 테스트·플랫폼(admin/ceo) 계정은 QA/운영 부트스트랩용으로 신규 기기 즉시 승인 */
+  if (isDeviceAutoApproveHandle(loginId)) {
     const approved = await prisma.userDevice.upsert({
       where: { userId_deviceToken: { userId: user.id, deviceToken } },
       create: {
@@ -192,7 +197,7 @@ export async function loginWithCredentials(
         userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
         lastIp: c.req.header("x-forwarded-for")?.split(",")[0]?.trim()?.slice(0, 45) || null,
         clientKind,
-        label: clientKind === "mobile" ? "휴대폰 (테스트)" : "PC (테스트)"
+        label: clientKind === "mobile" ? "휴대폰 (부트스트랩)" : "PC (부트스트랩)"
       },
       update: {
         isVerified: true,

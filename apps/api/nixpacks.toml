@@ -1,0 +1,8 @@
+# Nixpacks — @vlue/api
+# Sharp SVG→PNG 한글 렌더용 시스템 폰트 (카카오 Feed 명함 카드)
+
+[phases.setup]
+aptPkgs = ["fonts-nanum", "fontconfig"]
+
+[variables]
+NIXPACKS_NODE_INSTALL_DEV_DEPS = "true"

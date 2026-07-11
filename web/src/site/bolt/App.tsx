@@ -35,7 +35,7 @@ import {
   vlueMarketingLogout,
   pingAuthSession,
 } from '../../lib/vlueAuthApi.js';
-import { coerceWebViewForV1, isWebViewV1Enabled } from '../../lib/v1ReleaseScope.js';
+import { coerceWebViewForV1, isWebViewV1Enabled, v1WebShell } from '../../lib/v1ReleaseScope.js';
 
 const VALID_VIEWS: View[] = [
   'home', 'search', 'shopping', 'auction', 'about', 'resources', 'pricing', 'safezone',
@@ -253,11 +253,13 @@ export default function App() {
         {view !== 'mypage' && view !== 'terms' && view !== 'privacy' && <Footer onNavigate={handleNavigate} />}
         </div>
       </div>
-      <MarketingFabDock
-        currentView={view}
-        isLoggedIn={Boolean(user)}
-        onLoginRequired={handleLoginRequired}
-      />
+      {v1WebShell.marketingFabChat ? (
+        <MarketingFabDock
+          currentView={view}
+          isLoggedIn={Boolean(user)}
+          onLoginRequired={handleLoginRequired}
+        />
+      ) : null}
       {showLoginRequired && !user && (
         <LoginRequiredModal onClose={() => setShowLoginRequired(false)} onLogin={() => { setShowLoginRequired(false); setAuthInitialMode('login'); setAuthAutoStartSignup(false); setShowAuth(true); }} />
       )}

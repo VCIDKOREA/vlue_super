@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { requireAdminConsoleBearer } from "../middleware/adminConsoleGate.js";
+import { requireMasterCapability } from "../middleware/masterCapabilityGate.js";
 import { requireUserHeader } from "../middleware/cardGate.js";
 import type { PricingConfigFile } from "../services/pricing/pricingConfigSchema.js";
 import type { AdminConsoleUserVar } from "../middleware/adminConsoleGate.js";
+import { MasterCapability } from "../services/admin/platformAccountRoles.js";
 import { loadPricingConfig, savePricingConfig } from "../services/pricing/pricingConfigService.js";
 import { getPricingRevenueStats } from "../services/pricing/pricingRevenueStats.js";
 import { resolveMembershipAccess } from "../services/membership/membershipAccessService.js";
@@ -22,14 +24,19 @@ pricingConfigRoutes.get("/access", requireUserHeader, async (c) => {
   return c.json({ ok: true, access });
 });
 
-/** GET /api/pricing/revenue-stats — 관리자 매출 (planSku 필터) */
-pricingConfigRoutes.get("/revenue-stats", requireAdminConsoleBearer, async (c) => {
-  const planSku = c.req.query("planSku") || "";
-  const from = c.req.query("from") || "";
-  const to = c.req.query("to") || "";
-  const stats = await getPricingRevenueStats({ planSku, from, to });
-  return c.json({ ok: true, stats });
-});
+/** GET /api/pricing/revenue-stats — 마스터(admin) 결제·매출 모니터링 */
+pricingConfigRoutes.get(
+  "/revenue-stats",
+  requireAdminConsoleBearer,
+  requireMasterCapability(MasterCapability.MONITOR_PAYMENT_LOGS, "adminConsoleUser"),
+  async (c) => {
+    const planSku = c.req.query("planSku") || "";
+    const from = c.req.query("from") || "";
+    const to = c.req.query("to") || "";
+    const stats = await getPricingRevenueStats({ planSku, from, to });
+    return c.json({ ok: true, stats });
+  }
+);
 
 /** Admin mount: /api/admin/console/pricing-config */
 export const adminPricingConfigRoutes = new Hono<{ Variables: { adminConsoleUser: AdminConsoleUserVar } }>();

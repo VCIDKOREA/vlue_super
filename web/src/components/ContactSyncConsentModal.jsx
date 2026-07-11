@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Users, Shield } from "lucide-react";
 import ModalCloseButton from "./common/ModalCloseButton";
-import { pickDeviceContacts, isContactPickerSupported, getDemoContacts } from "../lib/contactDevicePicker.js";
 import { matchContactsWithVlue, recordContactSyncConsent } from "../lib/contactFriendsApi.js";
 import { setContactSyncConsent, saveContactMatchCache } from "../lib/contactSyncStorage.js";
 import { mergeDeviceContactsCache } from "../lib/contacts/deviceContactsCache.js";
 import { upsertKnownPhonesFromFriends } from "../lib/contacts/knownPhonesIndex.js";
+import { collectDeviceContactsForSync } from "../lib/collectDeviceContacts.js";
 
 export default function ContactSyncConsentModal({ open, onClose, onSynced }) {
   const [busy, setBusy] = useState(false);
@@ -33,19 +33,12 @@ export default function ContactSyncConsentModal({ open, onClose, onSynced }) {
   };
 
   const handleAgree = async () => {
-    const picked = await pickDeviceContacts();
-    if (picked && picked.length) {
-      await runSync(picked);
+    const contacts = await collectDeviceContactsForSync({ allowDemoConfirm: true });
+    if (contacts?.length) {
+      await runSync(contacts);
       return;
     }
-    if (!isContactPickerSupported()) {
-      const useDemo = window.confirm(
-        "이 기기에서는 주소록 API를 직접 열 수 없습니다.\n데모 연락처로 VLUE 친구 매칭을 체험할까요?"
-      );
-      if (useDemo) await runSync(getDemoContacts());
-      return;
-    }
-    setError("선택한 연락처가 없습니다. 다시 시도해 주세요.");
+    setError("가져온 연락처가 없습니다. 앱에서 주소록 권한을 허용한 뒤 다시 시도해 주세요.");
   };
 
   const handleDecline = () => {
@@ -68,10 +61,11 @@ export default function ContactSyncConsentModal({ open, onClose, onSynced }) {
         </div>
 
         <h2 id="contact-sync-title" className="text-[18px] font-black text-gray-900" style={{ wordBreak: "keep-all" }}>
-          연락처를 동기화하여 거래처 및 지인들과 바로 메일톡을 시작해 보세요
+          전화부를 동기화해 지인을 찾고 VLUE를 추천하세요
         </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-gray-500" style={{ wordBreak: "keep-all" }}>
-          주소록의 번호만 서버에서 VLUE 가입 여부를 확인합니다. 동기화하지 않아도 앱 이용은 가능합니다.
+          휴대폰에 저장된 명단을 불러옵니다. VLUE를 쓰는 번호는 <b>신청</b>, 아직 미가입이면 <b>추천</b>으로
+          카톡·문자 공유가 가능합니다.
         </p>
 
         <div className="mt-4 flex items-start gap-2 rounded-xl bg-gray-50 px-3 py-2.5 text-[11px] text-gray-600">
@@ -90,7 +84,7 @@ export default function ContactSyncConsentModal({ open, onClose, onSynced }) {
             onClick={handleAgree}
             className="w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-black text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
           >
-            {busy ? "동기화 중…" : "연락처 동기화 동의"}
+            {busy ? "동기화 중…" : "전화부 동기화 동의"}
           </button>
           <button
             type="button"

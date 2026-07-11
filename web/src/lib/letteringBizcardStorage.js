@@ -1,5 +1,7 @@
 /** 레터링 명함 — 사용자 편집 필드 (회사명·성명·전화는 가입 고정) */
 
+import { formatPhoneE164ForKoreaDisplay } from "./phoneDisplay.js";
+
 export const LETTERING_BIZCARD_STORAGE_KEY = "vlue_lettering_bizcard_v1";
 export const LETTERING_BIZCARD_CHANGED_EVENT = "vlue-lettering-bizcard-changed";
 
@@ -119,17 +121,84 @@ export function readLetteringFixedIdentity() {
   let name = "";
   let phone = "";
   try {
-    organization =
-      String(localStorage.getItem("vlue_company_locked") || "").trim() ||
-      String(localStorage.getItem("myCardOrganization") || "").trim();
-    name =
-      String(localStorage.getItem("vlue_legal_name") || "").trim() ||
-      String(localStorage.getItem("myCardDisplayName") || "").trim();
-    phone = String(localStorage.getItem("myCardPhone") || "").trim();
+    const handle = String(localStorage.getItem("vlue_member_handle") || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^@/, "");
+
+    /* 플랫폼 ceo — 표시명·번호·잔여 데모 직책/부서 정리 */
+    if (handle === "ceo") {
+      const ceoName = "CEO · VCID KOREA";
+      localStorage.setItem("vlue_phone_e164", "+821080144666");
+      localStorage.setItem("myCardPhone", "010-8014-4666");
+      localStorage.setItem("myCardDisplayName", ceoName);
+      localStorage.setItem("vlue_legal_name", ceoName);
+      if (!String(localStorage.getItem("vlue_company_locked") || "").trim()) {
+        localStorage.setItem("myCardOrganization", "VCID KOREA");
+      }
+      phone = "010-8014-4666";
+      name = ceoName;
+      organization =
+        String(localStorage.getItem("vlue_company_locked") || "").trim() ||
+        String(localStorage.getItem("myCardOrganization") || "").trim() ||
+        "VCID KOREA";
+      scrubCeoDemoTitleDepartment();
+    } else {
+      organization =
+        String(localStorage.getItem("vlue_company_locked") || "").trim() ||
+        String(localStorage.getItem("myCardOrganization") || "").trim();
+      name =
+        String(localStorage.getItem("vlue_legal_name") || "").trim() ||
+        String(localStorage.getItem("myCardDisplayName") || "").trim();
+      const e164 = String(localStorage.getItem("vlue_phone_e164") || "").trim();
+      const fromE164 = e164 ? formatPhoneE164ForKoreaDisplay(e164) : "";
+      phone = fromE164 || String(localStorage.getItem("myCardPhone") || "").trim();
+      if (fromE164) {
+        localStorage.setItem("myCardPhone", fromE164);
+        phone = fromE164;
+      }
+    }
   } catch {
     /* ignore */
   }
   return { organization, name, phone };
+}
+
+/** ceo 계정에 남은 데모 직책·부서(과장·설계팀 등) 제거 */
+function scrubCeoDemoTitleDepartment() {
+  try {
+    const raw = localStorage.getItem(LETTERING_BIZCARD_STORAGE_KEY);
+    const prev = raw ? JSON.parse(raw) : {};
+    if (!prev || typeof prev !== "object") return;
+    const next = {
+      ...prev,
+      title: "",
+      department: "",
+      approvedTitle: "",
+      approvedDepartment: "",
+      titleDeptPendingTitle: "",
+      titleDeptPendingDepartment: "",
+      titleDeptApprovalStatus: ""
+    };
+    if (String(prev.companyIntro || "").trim() === "보안 솔루션 통합 플랫폼") {
+      next.companyIntro = "";
+    }
+    const changed =
+      prev.title ||
+      prev.department ||
+      prev.approvedTitle ||
+      prev.approvedDepartment ||
+      prev.titleDeptPendingTitle ||
+      prev.titleDeptPendingDepartment ||
+      prev.titleDeptApprovalStatus ||
+      next.companyIntro !== prev.companyIntro;
+    if (changed) {
+      localStorage.setItem(LETTERING_BIZCARD_STORAGE_KEY, JSON.stringify({ ...DEFAULT_EDITABLE, ...next }));
+      window.dispatchEvent(new Event(LETTERING_BIZCARD_CHANGED_EVENT));
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function readLetteringBizcardEditable() {

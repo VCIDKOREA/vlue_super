@@ -22,6 +22,15 @@ import {
   SettingsSubpageShell,
   FontScalePicker
 } from "./VlueSettingsUi.jsx";
+import VlueEmailSettingsSection from "./VlueEmailSettingsSection.jsx";
+import KakaoAlimtalkConsentModal from "../showcase/KakaoAlimtalkConsentModal.jsx";
+import {
+  readKakaoAlimtalkAgreed,
+  writeKakaoAlimtalkAgreed,
+  KAKAO_ALIMTALK_CONSENT_CHANGED_EVENT
+} from "../../lib/showcase/kakaoAlimtalkConsent.js";
+import { v1AppShell } from "../../lib/v1ReleaseScope.js";
+import "../../styles/kakao-alimtalk-consent.css";
 
 const BLOCKED_USER_DIRECTORY = [
   { id: "u-minsu", name: "민수", handle: "@minsu" },
@@ -75,12 +84,33 @@ export default function VlueSettingsPanel({
   onUnblockUser,
   myPhone = "",
   myEmail = "user@vlue.kr",
+  membershipTier = "free",
+  companyName = "",
   openLetteringBizcardHub
 }) {
   const [settings, patchSettings] = useAppSettingsState();
+  const [kakaoAgreed, setKakaoAgreed] = useState(() => readKakaoAlimtalkAgreed());
+  const [kakaoConsentOpen, setKakaoConsentOpen] = useState(false);
   const [chatNickInput, setChatNickInput] = useState("");
   const [feedNickInput, setFeedNickInput] = useState("");
   const [statusInput, setStatusInput] = useState("");
+
+  useEffect(() => {
+    const onConsent = () => setKakaoAgreed(readKakaoAlimtalkAgreed());
+    window.addEventListener(KAKAO_ALIMTALK_CONSENT_CHANGED_EVENT, onConsent);
+    return () => window.removeEventListener(KAKAO_ALIMTALK_CONSENT_CHANGED_EVENT, onConsent);
+  }, []);
+
+  const onToggleKakaoAlimtalk = (nextOn) => {
+    if (nextOn) {
+      /* 켤 때 동의 팝업 재노출 */
+      setKakaoConsentOpen(true);
+      return;
+    }
+    writeKakaoAlimtalkAgreed(false);
+    setKakaoAgreed(false);
+    showSettingNotice?.("카카오 알림톡 발송이 꺼졌습니다.");
+  };
   const [showIdCopied, setShowIdCopied] = useState(false);
   const avatarInputRef = useRef(null);
 
@@ -155,18 +185,20 @@ export default function VlueSettingsPanel({
               }`}
             />
           </label>
-          <label className={`mt-3 block text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-            채팅 닉네임
-            <input
-              type="text"
-              maxLength={VLUE_NICKNAME_MAX}
-              value={chatNickInput}
-              onChange={(e) => setChatNickInput(e.target.value)}
-              className={`mt-1 w-full rounded-lg border px-3 py-2 text-[13px] outline-none ${
-                isDarkMode ? "border-white/15 bg-[#1f2937] text-gray-100" : "border-gray-200 bg-white text-gray-900"
-              }`}
-            />
-          </label>
+          {v1AppShell.chat ? (
+            <label className={`mt-3 block text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              채팅 닉네임
+              <input
+                type="text"
+                maxLength={VLUE_NICKNAME_MAX}
+                value={chatNickInput}
+                onChange={(e) => setChatNickInput(e.target.value)}
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-[13px] outline-none ${
+                  isDarkMode ? "border-white/15 bg-[#1f2937] text-gray-100" : "border-gray-200 bg-white text-gray-900"
+                }`}
+              />
+            </label>
+          ) : null}
           <label className={`mt-3 block text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
             활동 닉네임
             <input
@@ -182,7 +214,10 @@ export default function VlueSettingsPanel({
           <button
             type="button"
             onClick={() => {
-              writeDisplayNicknames({ chat: chatNickInput, feed: feedNickInput });
+              writeDisplayNicknames({
+                chat: v1AppShell.chat ? chatNickInput : readChatNickname(),
+                feed: feedNickInput
+              });
               patchSettings({ statusMessage: statusInput.trim() || readAppSettings().statusMessage });
               showSettingNotice?.("프로필이 저장되었습니다.");
             }}
@@ -191,7 +226,7 @@ export default function VlueSettingsPanel({
             저장
           </button>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 pb-2">
           <LetteringSettingsSection
             isDarkMode={isDarkMode}
             onNotice={showSettingNotice}
@@ -224,6 +259,19 @@ export default function VlueSettingsPanel({
     );
   }
 
+  if (subView === "vlueEmailSettings") {
+    return (
+      <VlueEmailSettingsSection
+        isDarkMode={isDarkMode}
+        onBack={() => onSubView(null)}
+        membershipTier={membershipTier}
+        companyName={companyName}
+        onOpenUpgrade={onOpenUpgrade}
+        showSettingNotice={showSettingNotice}
+      />
+    );
+  }
+
   if (subView === "contactInfo") {
     return (
       <SettingsSubpageShell title="전화번호 및 이메일" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
@@ -234,11 +282,18 @@ export default function VlueSettingsPanel({
           </div>
           <SettingsDivider isDarkMode={isDarkMode} />
           <div>
-            <p className={`text-[11px] font-bold ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>VLUE 메일</p>
+            <p className={`text-[11px] font-bold ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>VLUE 가상 메일</p>
             <p className={`mt-1 text-[15px] font-bold ${headText}`}>{myEmail}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => onSubView("vlueEmailSettings")}
+            className="mt-2 w-full rounded-xl bg-blue-600 py-2.5 text-[13px] font-black text-white"
+          >
+            VLUE 메일 설정
+          </button>
           <p className={`text-[11px] leading-relaxed ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-            번호·메일 변경은 본인인증 후 고객센터를 통해 지원됩니다.
+            가상 메일은 외부 메일로 즉시 포워딩됩니다. 휴대전화 번호 변경은 본인인증 후 고객센터를 통해 지원됩니다.
           </p>
         </div>
       </SettingsSubpageShell>
@@ -373,6 +428,10 @@ export default function VlueSettingsPanel({
   }
 
   if (subView === "chatFont") {
+    if (!v1AppShell.chat) {
+      onSubView?.(null);
+      return null;
+    }
     return (
       <SettingsSubpageShell title="채팅 글자 크기" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
         <FontScalePicker
@@ -403,6 +462,10 @@ export default function VlueSettingsPanel({
   }
 
   if (subView === "backup") {
+    if (!v1AppShell.chat) {
+      onSubView?.(null);
+      return null;
+    }
     return (
       <SettingsSubpageShell title="대화 백업 및 복원" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
         <div className={`rounded-2xl border p-4 space-y-3 ${boxClass}`}>
@@ -441,13 +504,13 @@ export default function VlueSettingsPanel({
         <p className={`text-[17px] font-black ${headText}`}>설정</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-10 no-scrollbar">
+      <div className="vlue-scroll-pad-profile-panel flex-1 overflow-y-auto px-4 py-4 no-scrollbar">
         <SettingsSection title="내 계정" isDarkMode={isDarkMode}>
           <SettingsRowButton label="프로필 관리" sublabel="아바타 · 닉네임 · 상태메시지" onClick={() => onSubView("profileManage")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="VLUE ID 확인" value={getMemberHandle()} onClick={() => onSubView("vlueId")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
-          <SettingsRowButton label="전화번호 및 이메일" onClick={() => onSubView("contactInfo")} isDarkMode={isDarkMode} />
+          <SettingsRowButton label="전화번호 및 이메일" sublabel="VLUE 가상 메일 · 마스터 메일 연동" onClick={() => onSubView("contactInfo")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton
             label="멤버십 등급 및 업그레이드"
@@ -489,20 +552,24 @@ export default function VlueSettingsPanel({
         </SettingsSection>
 
         <SettingsSection title="알림" isDarkMode={isDarkMode}>
-          <SettingsToggleRow
-            label="채팅 알림"
-            checked={settings.chatNotifications}
-            onChange={(v) => patchSettings({ chatNotifications: v })}
-            isDarkMode={isDarkMode}
-          />
-          <SettingsDivider isDarkMode={isDarkMode} />
-          <SettingsToggleRow
-            label="메시지 미리보기"
-            checked={settings.messagePreview}
-            onChange={(v) => patchSettings({ messagePreview: v })}
-            isDarkMode={isDarkMode}
-          />
-          <SettingsDivider isDarkMode={isDarkMode} />
+          {v1AppShell.chat ? (
+            <>
+              <SettingsToggleRow
+                label="채팅 알림"
+                checked={settings.chatNotifications}
+                onChange={(v) => patchSettings({ chatNotifications: v })}
+                isDarkMode={isDarkMode}
+              />
+              <SettingsDivider isDarkMode={isDarkMode} />
+              <SettingsToggleRow
+                label="메시지 미리보기"
+                checked={settings.messagePreview}
+                onChange={(v) => patchSettings({ messagePreview: v })}
+                isDarkMode={isDarkMode}
+              />
+              <SettingsDivider isDarkMode={isDarkMode} />
+            </>
+          ) : null}
           <SettingsRowButton
             label="방해 금지 시간 설정"
             value={settings.quietMode ? `${settings.quietHoursStart}–${settings.quietHoursEnd}` : "꺼짐"}
@@ -517,8 +584,16 @@ export default function VlueSettingsPanel({
             isDarkMode={isDarkMode}
           />
           <SettingsDivider isDarkMode={isDarkMode} />
+          <SettingsToggleRow
+            label="통화 종료 카카오 알림톡"
+            subtitle="상대방에게 쇼케이스 인증 알림톡 발송"
+            checked={kakaoAgreed}
+            onChange={onToggleKakaoAlimtalk}
+            isDarkMode={isDarkMode}
+          />
+          <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="가족보호 등록·상세 설정" onClick={() => onOpenFamilyProtection?.()} isDarkMode={isDarkMode} />
-          {onMarkAllChatsRead ? (
+          {v1AppShell.chat && onMarkAllChatsRead ? (
             <>
               <SettingsDivider isDarkMode={isDarkMode} />
               <button
@@ -538,6 +613,7 @@ export default function VlueSettingsPanel({
           ) : null}
         </SettingsSection>
 
+        {v1AppShell.chat ? (
         <SettingsSection title="채팅" isDarkMode={isDarkMode}>
           <SettingsRowButton
             label="채팅방 배경화면"
@@ -561,6 +637,7 @@ export default function VlueSettingsPanel({
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="대화 백업 및 복원" onClick={() => onSubView("backup")} isDarkMode={isDarkMode} />
         </SettingsSection>
+        ) : null}
 
         <SettingsSection title="화면" isDarkMode={isDarkMode}>
           <SettingsToggleRow
@@ -603,6 +680,23 @@ export default function VlueSettingsPanel({
           ) : null}
         </SettingsSection>
       </div>
+
+      <KakaoAlimtalkConsentModal
+        open={kakaoConsentOpen}
+        isDarkMode={isDarkMode}
+        onAgree={() => {
+          writeKakaoAlimtalkAgreed(true);
+          setKakaoAgreed(true);
+          setKakaoConsentOpen(false);
+          showSettingNotice?.("카카오 알림톡 발송에 동의했습니다.");
+        }}
+        onDisagree={() => {
+          writeKakaoAlimtalkAgreed(false);
+          setKakaoAgreed(false);
+          setKakaoConsentOpen(false);
+          showSettingNotice?.("알림톡 발송에 동의하지 않았습니다.");
+        }}
+      />
     </div>
   );
 }

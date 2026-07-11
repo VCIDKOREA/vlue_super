@@ -41,6 +41,7 @@ web/public/downloads/*.exe
 credentials.json
 secrets.json
 deployment.lock.json
+apps/api/data/v1-release-scope.json
 
 # --- Node / JavaScript ---
 node_modules/

@@ -23,6 +23,24 @@ export async function resolveMembershipAccess(userId: string): Promise<Membershi
   const primaryKrw = cfg.plans.soho_activity.monthlyKrw;
   const broadcastKrw = cfg.plans.soho_broadcast_addon.monthlyKrw;
 
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { publicHandle: true }
+  });
+  const { isPlatformCeoHandle } = await import("../admin/platformAccountRoles.js");
+  if (isPlatformCeoHandle(user?.publicHandle)) {
+    return {
+      hasPrimarySoho: true,
+      hasBroadcastAddon: true,
+      hasB2bLine: false,
+      canUseChat: true,
+      canUseShopping: true,
+      canBroadcastDigitalCard: true,
+      primaryMonthlyKrw: primaryKrw,
+      broadcastMonthlyKrw: broadcastKrw
+    };
+  }
+
   const [activeSub, corp, broadcast] = await Promise.all([
     prisma.userSubscription.findFirst({
       where: { userId, status: "active" },

@@ -8,6 +8,7 @@
 [build]
 builder = "nixpacks"
 buildCommand = "npm ci && npm run build -w @vlue/db && npm run build -w @vlue/shared && npm run build -w @vlue/api"
+nixpacksConfigPath = "apps/api/nixpacks.toml"
 
 [deploy]
 startCommand = "npm run start -w @vlue/api"

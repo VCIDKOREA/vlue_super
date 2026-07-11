@@ -1,10 +1,7 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { Search, Building2, ListFilter, ChevronRight, CheckCircle, AlertTriangle } from 'lucide-react';
-import { VlueBrandMark } from '../../../components/VlueBrandLogo.jsx';
+import { Search, Building2, ListFilter, ChevronRight } from 'lucide-react';
 import {
-  INSTITUTION_QUICK_SEARCH,
   FEATURE_KEYWORD_QUICK,
-  PLATFORM_STATS,
   buildFeatureCatalog,
   matchFeatureQuery,
   type AboutCategoryId,
@@ -99,22 +96,6 @@ export default function AboutSearchHub({
                 </button>
               </div>
             </form>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-slate-400">빠른 조회</span>
-              {INSTITUTION_QUICK_SEARCH.map((term) => (
-                <button
-                  key={term}
-                  type="button"
-                  onClick={() => {
-                    setInstQuery(term);
-                    onInstitutionSearch(term);
-                  }}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 transition-colors"
-                >
-                  {term}
-                </button>
-              ))}
-            </div>
           </>
         ) : (
           <>
@@ -166,25 +147,6 @@ export default function AboutSearchHub({
             ) : null}
           </>
         )}
-
-        <div className="mt-5 pt-5 border-t border-slate-100 grid grid-cols-3 gap-3 sm:gap-6">
-          {PLATFORM_STATS.map((stat) => (
-            <div key={stat.label} className="text-center">
-              {stat.brand ? (
-                <VlueBrandMark size={18} className="mx-auto mb-1 text-primary-600" />
-              ) : stat.label === '검증 완료' ? (
-                <CheckCircle className="w-[18px] h-[18px] mx-auto mb-1 text-primary-600" />
-              ) : (
-                <AlertTriangle className="w-[18px] h-[18px] mx-auto mb-1 text-amber-500" />
-              )}
-              <p className="text-lg sm:text-xl font-black text-slate-900 font-inter leading-tight">
-                {stat.value}
-                <span className="text-xs font-semibold text-slate-500">{stat.unit}</span>
-              </p>
-              <p className="text-sm text-slate-600 font-semibold mt-1">{stat.label}</p>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

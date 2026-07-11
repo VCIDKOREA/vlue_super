@@ -129,7 +129,9 @@ export const v1WebShell = {
   jobs: false,
   events: false,
   vlueEmail: false,
-  aiExcel: false
+  aiExcel: false,
+  /** V1 — 우측 하단 AI 고객센터 FAB 숨김 */
+  marketingFabChat: false
 };
 
 /** hash view → v1WebShell 키 (없으면 셸 검사 생략) */

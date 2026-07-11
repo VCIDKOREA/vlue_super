@@ -15,6 +15,7 @@
     "test:auction": "tsx src/tests/auctionService.test.ts",
     "test:mail-talk": "tsx src/tests/mailTalkEmailParser.test.ts",
     "test:alimtalk-call-end": "tsx src/tests/alimtalkCallEnd.test.ts",
+    "test:platform-roles": "tsx src/tests/platformAccountRoles.test.ts",
     "test:alimtalk-live": "tsx scripts/test-live-alimtalk.ts"
   },
   "dependencies": {

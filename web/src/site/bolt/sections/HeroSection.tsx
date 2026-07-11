@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { Search, CheckCircle, AlertTriangle, ChevronRight, Shield } from 'lucide-react';
+import { Search, ChevronRight, Shield } from 'lucide-react';
 import { VlueBrandMark } from '../../../components/VlueBrandLogo.jsx';
 import { v1WebShell } from '../../../lib/v1ReleaseScope.js';
 
@@ -7,14 +7,6 @@ interface HeroSectionProps {
   onSearch: (query: string) => void;
   onNavigate: (view: 'pricing' | 'shopping') => void;
 }
-
-const QUICK = ['명경채 요양병원', '다다오피스', '한국신뢰금융', '02-1234-5678'];
-
-const STATS = [
-  { brand: true, label: 'VLUE 인증 기관', value: '2,847', unit: '개' },
-  { icon: CheckCircle, label: '검증 완료', value: '18.3만', unit: '건' },
-  { icon: AlertTriangle, label: '사기 차단', value: '9,402', unit: '건' },
-];
 
 export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) {
   const [query, setQuery] = useState('');
@@ -86,41 +78,7 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
           </form>
         </div>
 
-        <div className="hero-quick hero-animate hero-animate--5 flex flex-wrap items-center justify-center">
-          <span className="hero-quick-label flex-shrink-0">빠른 검색</span>
-          {QUICK.map((term) => (
-            <button
-              key={term}
-              onClick={() => { setQuery(term); onSearch(term); }}
-              className="hero-quick-btn rounded-full transition-all duration-150 whitespace-nowrap"
-            >
-              {term}
-            </button>
-          ))}
-        </div>
-
-        <div className="hero-stats hero-stats--cards hero-animate hero-animate--6 mx-auto">
-          {STATS.map((stat, i) => {
-            const { label, value, unit, brand, icon: Icon } = stat;
-            return (
-            <div key={label} className="hero-stat-card" style={{ animationDelay: `${0.55 + i * 0.08}s` }}>
-              <div className="hero-stat-item flex flex-col items-center">
-                {brand ? (
-                  <VlueBrandMark size={20} className="hero-stat-icon mb-0.5" />
-                ) : (
-                  Icon && <Icon className="hero-stat-icon text-primary-600" />
-                )}
-                <span className="font-extrabold text-slate-900 font-inter hero-stat-value leading-tight">
-                  {value}<span className="text-slate-600 font-bold hero-stat-unit">{unit}</span>
-                </span>
-                <span className="text-slate-500 font-semibold text-center hero-stat-label">{label}</span>
-              </div>
-            </div>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center hero-cta-wrap hero-animate hero-animate--7">
+        <div className="flex flex-wrap items-center justify-center hero-cta-wrap hero-animate hero-animate--5">
           <button onClick={() => onNavigate('pricing')} className="btn-primary hero-cta-primary">
             VLUE 인증 신청하기
             <ChevronRight className="w-4 h-4" />

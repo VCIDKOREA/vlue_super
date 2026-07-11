@@ -1,5 +1,7 @@
 /** 레터링 명함 — 사용자 편집 필드 (회사명·성명·전화는 가입 고정) */
 
+import { formatPhoneE164ForKoreaDisplay } from "./phoneDisplay.js";
+
 export const LETTERING_BIZCARD_STORAGE_KEY = "vlue_lettering_bizcard_v1";
 export const LETTERING_BIZCARD_CHANGED_EVENT = "vlue-lettering-bizcard-changed";
 
@@ -25,6 +27,7 @@ export function compactLetteringMemberEmail(raw) {
   return email;
 }
 
+/** 연락처 한 줄 표시용 — 긴 주소는 가운데 생략 */
 export function formatLetteringContactEmailDisplay(raw) {
   const email = compactLetteringMemberEmail(raw);
   if (!email) return "";
@@ -44,6 +47,32 @@ export function clampLetteringBizcardEmail(raw) {
 export function isLetteringBizcardEmailLong(raw) {
   return String(raw ?? "").trim().length > LETTERING_BIZCARD_EMAIL_WARN;
 }
+
+/** 도로명·지번 + 상세주소 → 명함 표시용 한 줄 */
+export function combineLetteringBizcardAddress(road, detail) {
+  const r = String(road ?? "").trim();
+  const d = String(detail ?? "").trim();
+  if (r && d) return `${r} ${d}`;
+  return r || d;
+}
+
+/** 저장값 → 주소 입력 폼 필드 (기존 address 단일 필드 호환) */
+export function readLetteringBizcardAddressFields(ed = {}) {
+  const road = String(ed.addressRoad ?? "").trim();
+  const detail = String(ed.addressDetail ?? "").trim();
+  if (road || detail) return { road, detail };
+  const legacy = String(ed.address ?? "").trim();
+  return { road: legacy, detail: "" };
+}
+
+export const LETTERING_PHOTO_RULES = {
+  fileNamePrefix: "lettering-profile-photo",
+  maxBytes: 1024 * 1024,
+  maxWidth: 1200,
+  maxHeight: 1600,
+  accept: "image/png,image/jpeg,image/webp",
+  acceptLabel: "PNG, JPG, WEBP"
+};
 
 export const LETTERING_LOGO_RULES = {
   fileNamePrefix: "lettering-company-logo",
@@ -65,8 +94,26 @@ const DEFAULT_EDITABLE = {
   companyIntro: "",
   customBackText: "",
   address: "",
+  addressRoad: "",
+  addressDetail: "",
   logoDataUrl: "",
-  logoFileName: ""
+  logoFileName: "",
+  photoDataUrl: "",
+  photoFileName: "",
+  noProfilePhoto: false,
+  noCompanyLogo: false,
+  noFax: false,
+  noWebsite: false,
+  approvedTitle: "",
+  approvedDepartment: "",
+  titleDeptApprovalStatus: "",
+  titleDeptPendingTitle: "",
+  titleDeptPendingDepartment: "",
+  titleDeptVerifyDocKind: "",
+  titleDeptVerifyDocName: "",
+  titleDeptVerifyDocDataUrl: "",
+  titleDeptVerifyDocIssuedAt: "",
+  titleDeptSubmittedAt: ""
 };
 
 export function readLetteringFixedIdentity() {
@@ -74,17 +121,84 @@ export function readLetteringFixedIdentity() {
   let name = "";
   let phone = "";
   try {
-    organization =
-      String(localStorage.getItem("vlue_company_locked") || "").trim() ||
-      String(localStorage.getItem("myCardOrganization") || "").trim();
-    name =
-      String(localStorage.getItem("vlue_legal_name") || "").trim() ||
-      String(localStorage.getItem("myCardDisplayName") || "").trim();
-    phone = String(localStorage.getItem("myCardPhone") || "").trim();
+    const handle = String(localStorage.getItem("vlue_member_handle") || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^@/, "");
+
+    /* 플랫폼 ceo — 표시명·번호·잔여 데모 직책/부서 정리 */
+    if (handle === "ceo") {
+      const ceoName = "CEO · VCID KOREA";
+      localStorage.setItem("vlue_phone_e164", "+821080144666");
+      localStorage.setItem("myCardPhone", "010-8014-4666");
+      localStorage.setItem("myCardDisplayName", ceoName);
+      localStorage.setItem("vlue_legal_name", ceoName);
+      if (!String(localStorage.getItem("vlue_company_locked") || "").trim()) {
+        localStorage.setItem("myCardOrganization", "VCID KOREA");
+      }
+      phone = "010-8014-4666";
+      name = ceoName;
+      organization =
+        String(localStorage.getItem("vlue_company_locked") || "").trim() ||
+        String(localStorage.getItem("myCardOrganization") || "").trim() ||
+        "VCID KOREA";
+      scrubCeoDemoTitleDepartment();
+    } else {
+      organization =
+        String(localStorage.getItem("vlue_company_locked") || "").trim() ||
+        String(localStorage.getItem("myCardOrganization") || "").trim();
+      name =
+        String(localStorage.getItem("vlue_legal_name") || "").trim() ||
+        String(localStorage.getItem("myCardDisplayName") || "").trim();
+      const e164 = String(localStorage.getItem("vlue_phone_e164") || "").trim();
+      const fromE164 = e164 ? formatPhoneE164ForKoreaDisplay(e164) : "";
+      phone = fromE164 || String(localStorage.getItem("myCardPhone") || "").trim();
+      if (fromE164) {
+        localStorage.setItem("myCardPhone", fromE164);
+        phone = fromE164;
+      }
+    }
   } catch {
     /* ignore */
   }
   return { organization, name, phone };
+}
+
+/** ceo 계정에 남은 데모 직책·부서(과장·설계팀 등) 제거 */
+function scrubCeoDemoTitleDepartment() {
+  try {
+    const raw = localStorage.getItem(LETTERING_BIZCARD_STORAGE_KEY);
+    const prev = raw ? JSON.parse(raw) : {};
+    if (!prev || typeof prev !== "object") return;
+    const next = {
+      ...prev,
+      title: "",
+      department: "",
+      approvedTitle: "",
+      approvedDepartment: "",
+      titleDeptPendingTitle: "",
+      titleDeptPendingDepartment: "",
+      titleDeptApprovalStatus: ""
+    };
+    if (String(prev.companyIntro || "").trim() === "보안 솔루션 통합 플랫폼") {
+      next.companyIntro = "";
+    }
+    const changed =
+      prev.title ||
+      prev.department ||
+      prev.approvedTitle ||
+      prev.approvedDepartment ||
+      prev.titleDeptPendingTitle ||
+      prev.titleDeptPendingDepartment ||
+      prev.titleDeptApprovalStatus ||
+      next.companyIntro !== prev.companyIntro;
+    if (changed) {
+      localStorage.setItem(LETTERING_BIZCARD_STORAGE_KEY, JSON.stringify({ ...DEFAULT_EDITABLE, ...next }));
+      window.dispatchEvent(new Event(LETTERING_BIZCARD_CHANGED_EVENT));
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function readLetteringBizcardEditable() {
@@ -130,21 +244,20 @@ function readImageSize(dataUrl) {
   });
 }
 
-/** 로고 파일 검증 후 data URL 반환 */
-export async function prepareLetteringLogoFromFile(file) {
+/** 로고·프로필 사진 파일 검증 후 data URL 반환 */
+async function prepareLetteringImageFromFile(file, rules, label = "이미지") {
   if (!file) return { ok: false, error: "파일을 선택해 주세요." };
 
   const type = String(file.type || "").toLowerCase();
-  if (!LETTERING_LOGO_RULES.accept.split(",").includes(type)) {
-    return { ok: false, error: `${LETTERING_LOGO_RULES.acceptLabel}만 업로드할 수 있습니다.` };
+  if (!rules.accept.split(",").includes(type)) {
+    return { ok: false, error: `${rules.acceptLabel}만 업로드할 수 있습니다.` };
   }
-  if (file.size > LETTERING_LOGO_RULES.maxBytes) {
-    return { ok: false, error: "파일 크기는 512KB 이하여야 합니다." };
+  if (file.size > rules.maxBytes) {
+    return { ok: false, error: `파일 크기는 ${Math.round(rules.maxBytes / 1024)}KB 이하여야 합니다.` };
   }
 
-  const ext =
-    type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
-  const fileName = `${LETTERING_LOGO_RULES.fileNamePrefix}.${ext}`;
+  const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
+  const fileName = `${rules.fileNamePrefix}.${ext}`;
 
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -159,10 +272,10 @@ export async function prepareLetteringLogoFromFile(file) {
 
   try {
     const { width, height } = await readImageSize(dataUrl);
-    if (width > LETTERING_LOGO_RULES.maxWidth || height > LETTERING_LOGO_RULES.maxHeight) {
+    if (width > rules.maxWidth || height > rules.maxHeight) {
       return {
         ok: false,
-        error: `이미지는 가로·세로 각 ${LETTERING_LOGO_RULES.maxWidth}px 이하여야 합니다. (현재 ${width}×${height})`
+        error: `${label}은 가로·세로 각 ${rules.maxWidth}×${rules.maxHeight}px 이하여야 합니다. (현재 ${width}×${height})`
       };
     }
   } catch (e) {
@@ -170,4 +283,14 @@ export async function prepareLetteringLogoFromFile(file) {
   }
 
   return { ok: true, dataUrl, fileName };
+}
+
+/** 로고 파일 검증 후 data URL 반환 */
+export async function prepareLetteringLogoFromFile(file) {
+  return prepareLetteringImageFromFile(file, LETTERING_LOGO_RULES, "로고");
+}
+
+/** 프로필 사진 검증 후 data URL 반환 */
+export async function prepareLetteringPhotoFromFile(file) {
+  return prepareLetteringImageFromFile(file, LETTERING_PHOTO_RULES, "프로필 사진");
 }

@@ -158,6 +158,7 @@ authRoutes.post("/login", async (c) => {
       publicHandle: result.publicHandle,
       accountStatus: result.accountStatus,
       phoneE164: result.phoneE164,
+      membershipTier: result.membershipTier,
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
       accessExpiresInSec: result.accessExpiresInSec,

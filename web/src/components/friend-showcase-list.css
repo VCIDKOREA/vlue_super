@@ -263,3 +263,75 @@
   background: #fff;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
 }
+
+/* 다크모드 — 친구 쇼케이스 (홈 본문) */
+.dark-mode .friend-showcase-list,
+.dark-mode .friend-showcase-list--home {
+  background: #111827;
+  border-color: #1f2937;
+  box-shadow: none;
+}
+
+.dark-mode .friend-showcase-list__header,
+.dark-mode .friend-showcase-list--home .friend-showcase-list__header,
+.dark-mode .friend-showcase-list__search {
+  background: #111827;
+  border-bottom-color: #1f2937;
+}
+
+.dark-mode .friend-showcase-list__title,
+.dark-mode .friend-showcase-list__name,
+.dark-mode .friend-showcase-list__icon-btn {
+  color: #f1f5f9;
+}
+
+.dark-mode .friend-showcase-list__count,
+.dark-mode .friend-showcase-list__subtitle,
+.dark-mode .friend-showcase-list__empty-desc,
+.dark-mode .friend-showcase-list__preview-loading {
+  color: #94a3b8;
+}
+
+.dark-mode .friend-showcase-list__icon-btn:hover,
+.dark-mode .friend-showcase-list__icon-btn--active {
+  background: #1e293b;
+}
+
+.dark-mode .friend-showcase-list__search-input {
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+.dark-mode .friend-showcase-list__search-input::placeholder {
+  color: #64748b;
+}
+
+.dark-mode .friend-showcase-list__row {
+  background: #111827;
+  border-bottom-color: #1f2937;
+}
+
+.dark-mode .friend-showcase-list__row:hover,
+.dark-mode .friend-showcase-list__row--active {
+  background: #1e293b;
+}
+
+.dark-mode .friend-showcase-list__empty-title,
+.dark-mode .friend-showcase-list__preview-label {
+  color: #e2e8f0;
+}
+
+.dark-mode .friend-showcase-list__preview-close {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+.dark-mode .friend-showcase-list__preview-card {
+  background: #1e293b;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.dark-mode .friend-showcase-list__avatar--initial {
+  background: linear-gradient(135deg, #1e3a5f, #312e81);
+  color: #93c5fd;
+}

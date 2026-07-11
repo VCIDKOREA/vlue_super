@@ -126,8 +126,8 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
   };
 
   return (
-    <div className="flex min-h-[100dvh] w-full flex-col bg-[#fafbfc] antialiased">
-      <div className="relative mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+    <div className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden bg-[#fafbfc] antialiased">
+      <div className="relative mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-5">
         {onDismiss ? (
           <button
             type="button"
@@ -137,7 +137,7 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
             둘러보기 계속
           </button>
         ) : null}
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto overscroll-y-contain py-8 sm:py-10">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto overscroll-y-contain py-6 sm:py-8">
           {browsePrompt ? (
             <div className="mb-5 w-full max-w-[300px] rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-center text-[12px] font-semibold leading-relaxed text-blue-800 [word-break:keep-all]">
               {browsePrompt}
@@ -283,7 +283,9 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
           </div>
         </div>
 
-        <p className="shrink-0 pb-4 pt-2 text-center text-[11px] font-medium text-slate-400">VLUE</p>
+        <p className="shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-center text-[11px] font-medium leading-snug text-slate-400">
+          © 2026 VLUE Inc. · VCID KOREA
+        </p>
       </div>
 
       {socialOpen && (

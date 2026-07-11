@@ -23,12 +23,12 @@ export default function BusinessCardPage({ user, onLoginClick, onBack }: Busines
 
         <div className="mb-6">
           <h1 className="text-2xl font-black text-gray-900 mb-1" style={{ letterSpacing: '-0.03em', wordBreak: 'keep-all' }}>
-            VLUE 디지털 명함
+            마이 쇼케이스
           </h1>
           <p className="text-gray-500 text-sm" style={{ wordBreak: 'keep-all' }}>
             {user
-              ? '내 계정의 디지털인증명함 · 레터링 · 기업 회선을 웹에서 설정합니다.'
-              : '로그인 후 내 명함 정보를 확인·수정할 수 있습니다.'}
+              ? '내가 설정한 디지털 인증명함과 블루 쇼케이스를 확인하고 관리합니다.'
+              : '로그인 후 내 인증명함·쇼케이스를 확인할 수 있습니다.'}
           </p>
         </div>
 

@@ -1,5 +1,3 @@
-import { normalizeFamilyHandle } from "./familyProtectionPeers.js";
-
 /** 데모 채팅방 ↔ 가족 보호 등록(활성) 매핑 */
 export const DEMO_FAMILY_BY_ROOM_ID = {
   "family:mom": {
@@ -32,38 +30,20 @@ export function getDemoFamilyRoomIds() {
   return Object.keys(DEMO_FAMILY_BY_ROOM_ID);
 }
 
+/** 가족 보호 패널 — V1 실가입 UX: 데모 가족 링크를 넣지 않음 */
+export function getDemoFamilyGuardianLinks() {
+  return [];
+}
+
 export function getDemoFamilyPeers() {
-  const userIds = new Set();
-  const handles = new Set();
-  for (const row of Object.values(DEMO_FAMILY_BY_ROOM_ID)) {
-    userIds.add(row.peerUserId);
-    handles.add(normalizeFamilyHandle(row.peerPublicHandle));
-  }
-  return { userIds, handles };
+  return { userIds: new Set(), handles: new Set() };
 }
 
 export function mergeFamilyPeers(apiPeers) {
-  const demo = getDemoFamilyPeers();
   return {
-    userIds: new Set([...(apiPeers?.userIds || []), ...demo.userIds]),
-    handles: new Set([...(apiPeers?.handles || []), ...demo.handles])
+    userIds: new Set([...(apiPeers?.userIds || [])]),
+    handles: new Set([...(apiPeers?.handles || [])])
   };
-}
-
-/** 가족 보호 패널 — 내가 등록한 가족(데모 활성) */
-export function getDemoFamilyGuardianLinks() {
-  return Object.values(DEMO_FAMILY_BY_ROOM_ID).map((row) => ({
-    id: row.linkId,
-    status: "active",
-    familyRelation: row.familyRelation,
-    wardRole: row.wardRole,
-    wardUser: {
-      id: row.peerUserId,
-      publicHandle: row.peerPublicHandle,
-      legalName: row.displayName,
-      nickFeed: null
-    }
-  }));
 }
 
 export function demoFamilyMetaForRoom(roomId, room = {}) {
@@ -102,7 +82,7 @@ export function buildDemoFamilyProtectionApiFallback() {
       alertMissedCallThreshold: 3,
       alertChildSiteEnabled: true
     },
-    asGuardian: getDemoFamilyGuardianLinks(),
+    asGuardian: [],
     asWard: [],
     alerts: [],
     familyPeers: [],

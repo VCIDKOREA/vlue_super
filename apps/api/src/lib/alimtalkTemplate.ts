@@ -54,9 +54,10 @@ export function buildAlimtalkShowcaseUrl(rawPhone: string, base = DEFAULT_SHOWCA
 }
 
 /**
- * 카카오 알림톡 — 통화 종료 안심 인증 (번호 중심 본문)
- * - 본문: 하이픈 포함 번호
- * - 버튼 URL: 숫자만 번호
+ * 카카오 알림톡 — 통화 종료 안심 인증 (신청 템플릿과 동기)
+ * - 본문 최상단: 보이스피싱·스미싱 예방 + 최초 1회 제한
+ * - 본문 번호: 하이픈 포함
+ * - 버튼 URL: 숫자만
  */
 export function buildCallEndAlimtalkPayload(peerPhoneE164: string): AlimtalkCallEndPayload {
   const phoneDisplayHyphen = formatAlimtalkBodyPhone(peerPhoneE164);
@@ -64,7 +65,9 @@ export function buildCallEndAlimtalkPayload(peerPhoneE164: string): AlimtalkCall
   const showcaseUrl = buildAlimtalkShowcaseUrl(peerPhoneE164);
 
   const body =
-    `[VLUE 스마트 명함·쇼케이스] 방금 통화하신 '${phoneDisplayHyphen}' 번호의 인증 프로필입니다. ` +
+    `[보이스피싱·스미싱 예방] 안심하세요. ` +
+    `방금 통화하신 '${phoneDisplayHyphen}' 번호의 VLUE 스마트 명함·쇼케이스입니다. ` +
+    `(발신자·수신자 기준 최초 1회만 발송됩니다.) ` +
     `안전한 연결과 신뢰할 수 있는 디지털 명함, VLUE가 함께합니다. 지금 확인해 보세요.`;
 
   return {
@@ -75,7 +78,7 @@ export function buildCallEndAlimtalkPayload(peerPhoneE164: string): AlimtalkCall
     phoneDigitsForUrl,
     buttons: [
       {
-        name: "수신된 번호 인증서보기",
+        name: "▶발신자 쇼케이스 확인하기",
         type: "WL",
         url_mobile: showcaseUrl,
         url_pc: showcaseUrl

@@ -3,11 +3,15 @@ import { resolveLetteringDemoLogoUrl } from "./letteringDemoAssets.js";
 import {
   readLetteringBizcardEditable,
   readLetteringFixedIdentity,
-  formatLetteringContactEmailDisplay
+  formatLetteringContactEmailDisplay,
+  combineLetteringBizcardAddress,
+  readLetteringBizcardAddressFields
 } from "./letteringBizcardStorage.js";
 import { normalizeLetteringBizcardTemplate } from "./letteringBizcardTemplates.js";
+import { resolveDisplayTitleDepartment } from "./letteringBizcardVerification.js";
 
-const PREVIEW_FALLBACK_CARD = {
+/** 마케팅·문서용 데모 명함만. 실사용자 미리보기에는 절대 주입하지 않음. */
+export const LETTERING_MARKETING_DEMO_CARD = Object.freeze({
   name: "\uD64D\uAE38\uB3D9",
   title: "\uB300\uB9AC",
   organization: "\uC0BC\uC131\uC0DD\uBA85",
@@ -16,34 +20,59 @@ const PREVIEW_FALLBACK_CARD = {
   fax: "02-123-7895",
   email: "hgildong@sam-life.co.kr",
   website: "samsunglife.com"
-};
+});
 
-function pickPreviewField(card, key) {
-  const value = String(card?.[key] ?? "").trim();
-  if (!value || value === "\u2014") return String(PREVIEW_FALLBACK_CARD[key] || "").trim();
-  if (key === "email") {
-    return formatLetteringContactEmailDisplay(value) || String(PREVIEW_FALLBACK_CARD.email || "").trim();
-  }
-  return value;
+function cleanField(value) {
+  const v = String(value ?? "").trim();
+  if (!v || v === "\u2014") return "";
+  return v;
 }
 
-/** \uBBF8\uB9AC\uBCF4\uAE30\uB9CC \u2014 \uBE44\uC5B4 \uC788\uB294 \uAC00\uC785 \uD56D\uBAA9\uC744 \uB370\uBAA8 \uAC12\uC73C\uB85C \uCC44\uC6C0 (\uC67C\uCABD \uBD80\uC11C\u00B7\uC131\uBA85 \uC601\uC5ED \uBCF4\uC7A5) */
-export function withLetteringBizcardPreviewFallback(card = {}) {
-  const organization = pickPreviewField(card, "organization");
-  const merged = {
-    ...PREVIEW_FALLBACK_CARD,
+/**
+ * 실사용자 미리보기용 — 빈 칸을 데모값으로 채우지 않음.
+ * (과거 PREVIEW_FALLBACK이 삼성생명·설계팀을 넣어 출시 UX를 오염시킴)
+ */
+export function withLetteringBizcardPreviewFallback(card = {}, opts = {}) {
+  if (opts.fillMarketingDemo) {
+    const demo = LETTERING_MARKETING_DEMO_CARD;
+    const pick = (key) => cleanField(card?.[key]) || demo[key] || "";
+    const organization = pick("organization");
+    return {
+      ...demo,
+      ...card,
+      name: pick("name"),
+      title: pick("title"),
+      organization,
+      department: pick("department"),
+      phone: cleanField(card?.phone) || demo.phone,
+      fax: pick("fax"),
+      email:
+        formatLetteringContactEmailDisplay(cleanField(card?.email)) ||
+        demo.email,
+      website: pick("website"),
+      logoUrl: card.noCompanyLogo
+        ? ""
+        : String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl({ organization }),
+      photoUrl: card.noProfilePhoto ? "" : String(card.photoUrl || "").trim()
+    };
+  }
+
+  const organization = cleanField(card?.organization);
+  const phoneRaw = cleanField(card?.phone);
+  const emailRaw = cleanField(card?.email);
+  return {
     ...card,
-    name: pickPreviewField(card, "name"),
-    title: pickPreviewField(card, "title"),
+    name: cleanField(card?.name),
+    title: cleanField(card?.title),
     organization,
-    department: pickPreviewField(card, "department"),
-    phone: pickPreviewField(card, "phone"),
-    fax: pickPreviewField(card, "fax"),
-    email: pickPreviewField(card, "email"),
-    website: pickPreviewField(card, "website"),
-    logoUrl: String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl({ organization })
+    department: cleanField(card?.department),
+    phone: phoneRaw,
+    fax: cleanField(card?.fax),
+    email: formatLetteringContactEmailDisplay(emailRaw) || emailRaw,
+    website: cleanField(card?.website),
+    logoUrl: card.noCompanyLogo ? "" : String(card.logoUrl || "").trim(),
+    photoUrl: card.noProfilePhoto ? "" : String(card.photoUrl || "").trim()
   };
-  return merged;
 }
 
 function readOnboardingAddress() {
@@ -65,28 +94,33 @@ function readUserId() {
   }
 }
 
-/** 가입 고정값 + 사용자 편집 → Lettering 명함 카드 */
+/** 가입 고정값 + 사용자 편집 → Lettering 명함 카드 (미작성 필드는 빈 칸) */
 export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
   const fixed = readLetteringFixedIdentity();
   const ed = readLetteringBizcardEditable();
   const fallbackAddress = readOnboardingAddress();
   const userId = readUserId();
+  const { road, detail } = readLetteringBizcardAddressFields(ed);
+  const address = combineLetteringBizcardAddress(road, detail) || String(ed.address || "").trim() || fallbackAddress;
+  const titleDept = resolveDisplayTitleDepartment(ed);
 
   return normalizeLetteringCard({
     designTemplate: normalizeLetteringBizcardTemplate(ed.designTemplate),
-    name: fixed.name || "\u2014",
+    name: fixed.name || "",
     displayName: fixed.name,
-    organization: fixed.organization,
-    phone: fixed.phone,
-    title: ed.title,
-    department: ed.department,
-    fax: ed.fax,
+    organization: fixed.organization || "",
+    phone: fixed.phone || "",
+    title: titleDept.title,
+    department: titleDept.department,
+    titleDeptPending: titleDept.pending,
+    fax: ed.noFax ? "" : ed.fax,
     email: ed.email,
-    website: ed.website,
+    website: ed.noWebsite ? "" : ed.website,
     companyIntro: ed.companyIntro,
-    address: ed.address || fallbackAddress,
-    logoUrl: ed.logoDataUrl,
-    photoUrl: "",
+    customBackText: ed.customBackText,
+    address,
+    logoUrl: ed.noCompanyLogo ? "" : ed.logoDataUrl,
+    photoUrl: ed.noProfilePhoto ? "" : ed.photoDataUrl || "",
     membershipTier,
     feedId: userId ? `user-${userId}` : "",
     feedType: "personal",

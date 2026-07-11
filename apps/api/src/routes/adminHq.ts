@@ -2,9 +2,10 @@ import { Hono } from "hono";
 import { prisma } from "../db/client.js";
 import { verifyPassword } from "../lib/passwordHash.js";
 import { issueTokenPair } from "../services/authSessions.js";
-import { isSuperAdminUser } from "../services/admin/superAdminAuth.js";
+import { denyAdminAccessReasonForUser, isSuperAdminUser } from "../services/admin/superAdminAuth.js";
 import { requireSuperAdminBearer } from "../middleware/superAdminGate.js";
 import { getHomeLayout, saveHomeLayout } from "../services/office/hqHomeLayoutService.js";
+import { listMasterCapabilities, PLATFORM_MASTER_ADMIN } from "../services/admin/platformAccountRoles.js";
 
 type HqUser = {
   id: string;
@@ -42,14 +43,19 @@ adminHqRoutes.post("/login", async (c) => {
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) return c.json({ error: "아이디 또는 비밀번호가 올바르지 않습니다." }, 401);
 
+  const ceoDeny = denyAdminAccessReasonForUser(user);
+  if (ceoDeny) return c.json({ error: ceoDeny, code: "CEO_NOT_SYSTEM_ADMIN" }, 403);
+
   if (!isSuperAdminUser(user)) {
-    return c.json({ error: "SUPER_ADMIN 권한이 없습니다. 본사 최고 관제소 전용 계정만 접근할 수 있습니다." }, 403);
+    return c.json({ error: "SUPER_ADMIN 권한이 없습니다. 마스터 관리자(admin) 전용입니다." }, 403);
   }
 
   const pair = await issueTokenPair(user.id, { header: (n) => c.req.header(n) });
   return c.json({
     ok: true,
     role: "SUPER_ADMIN",
+    accountKind: PLATFORM_MASTER_ADMIN.accountKind,
+    capabilities: listMasterCapabilities(user),
     userId: user.id,
     legalName: user.legalName || "",
     publicHandle: user.publicHandle || loginId,
@@ -65,6 +71,8 @@ adminHqRoutes.get("/me", async (c) => {
   return c.json({
     ok: true,
     role: "SUPER_ADMIN",
+    accountKind: PLATFORM_MASTER_ADMIN.accountKind,
+    capabilities: listMasterCapabilities(user),
     userId: user.id,
     legalName: user.legalName || "",
     publicHandle: user.publicHandle || ""

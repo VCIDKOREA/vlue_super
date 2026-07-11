@@ -77,10 +77,11 @@ export async function shareBizcardViaKakaoFeed(card) {
   try {
     Kakao = await ensureKakaoSdk();
   } catch (e) {
-    return {
-      ok: false,
-      error: e?.message || "카카오 SDK를 불러오지 못했습니다. VITE_KAKAO_JAVASCRIPT_KEY를 확인해 주세요."
-    };
+    const raw = String(e?.message || "");
+    const friendly = /키|KEY|설정/i.test(raw)
+      ? "카카오톡 공유를 사용할 수 없습니다. (공유 키 미설정)"
+      : raw || "카카오 SDK를 불러오지 못했습니다.";
+    return { ok: false, error: friendly };
   }
 
   if (!Kakao?.Share?.sendDefault) {

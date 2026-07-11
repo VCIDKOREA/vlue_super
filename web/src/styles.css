@@ -23,7 +23,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scrollbar-gutter: stable;
-  /* 좁은 폭에서 한글 단어가 글자 단위로 쪼개지는 현상 완화 */
+  /* ?? ??? ?? ??? ?? ??? ???? ?? ?? */
   word-break: keep-all;
   overflow-wrap: break-word;
   line-break: strict;
@@ -44,7 +44,7 @@ body,
   scrollbar-gutter: stable;
 }
 
-/* 네비게이션/노치용 safe-area는 Tailwind arbitrary의 env(…,…) 쉼표 파싱 이슈를 피하기 위해 여기서만 지정 */
+/* ?????/??? safe-area? Tailwind arbitrary? env(?,?) ?? ?? ??? ??? ?? ???? ?? */
 #app-body {
   width: 100%;
   max-width: 100%;
@@ -54,7 +54,7 @@ body,
   --vlue-bottom-nav-offset: 0px;
 }
 
-/* 하단 고정 탭바 높이(≈60px) + safe-area — 패널·스크롤 하단 여백 */
+/* ?? ?? ?? ??(?60px) + safe-area ? ????? ?? ?? */
 #app-body.has-bottom-nav {
   --vlue-bottom-nav-offset: calc(60px + env(safe-area-inset-bottom, 0px));
 }
@@ -64,7 +64,7 @@ body,
   overflow-anchor: none;
 }
 
-/* 명함 만들기 — 숨김 file input이 스크롤 영역을 밀지 않도록 */
+/* ?? ??? ? ?? file input? ??? ??? ?? ??? */
 .lbq-hidden-file-input {
   position: fixed;
   left: -100vw;
@@ -85,17 +85,17 @@ body,
   overflow-anchor: none;
 }
 
-/* 프로필·설정 드로어(z-140) — 탭바 위에 표시, 하단 여유 확보 */
+/* ????? ??? ? ?? ??????? + ???? ?? ??? ?? */
 .vlue-scroll-pad-profile-panel {
-  padding-bottom: max(2.75rem, calc(env(safe-area-inset-bottom, 0px) + 2.25rem));
+  padding-bottom: max(3.5rem, calc(env(safe-area-inset-bottom, 0px) + 3rem));
 }
 
 #profile-menu .vlue-scroll-pad-bottom-nav {
-  padding-bottom: max(2.75rem, calc(env(safe-area-inset-bottom, 0px) + 2.25rem));
+  padding-bottom: max(3.5rem, calc(env(safe-area-inset-bottom, 0px) + 3rem));
 }
 
 /*
- * 좁은 화면: 2줄로 깨지지 않게 한 줄 유지 + clamp로 글자만 축소
+ * ?? ??: 2?? ??? ?? ? ? ?? + clamp? ??? ??
  */
 .vlue-section-header {
   display: flex;
@@ -147,7 +147,7 @@ body,
   gap: clamp(4px, 1.2vw, 8px);
 }
 
-/* 프로필 등 좁은 2열 헤더용 — 모달 탭은 .vlue-tab-strip 사용 */
+/* ??? ? ?? 2? ??? ? ?? ?? .vlue-tab-strip ?? */
 .vlue-fluid-chip-row > button,
 .vlue-fluid-chip-row > a {
   flex: 0 1 auto;
@@ -160,7 +160,7 @@ body,
   text-rendering: optimizeLegibility;
 }
 
-/** 가로 탭/필터 칩 — 글자 깨짐 방지(최소 13px, fluid-chip-row !important 미사용) */
+/** ?? ?/?? ? ? ?? ?? ??(?? 13px, fluid-chip-row !important ???) */
 .vlue-tab-strip {
   display: flex;
   flex-wrap: nowrap;
@@ -225,7 +225,7 @@ body,
   min-width: 0;
 }
 
-/* 프로필 패널 — ID/tel/등급/인증명함 (2열 정렬·본문과 맞는 글자 크기) */
+/* ??? ?? ? ID/tel/??/???? (2? ????? ?? ?? ??) */
 .vlue-profile-info {
   display: flex;
   flex-direction: column;
@@ -362,13 +362,13 @@ body,
   border-radius: 10px;
 }
 
-/* 하단 탭 펄스: 동일 주기·동일 위상(App에서 --nav-pulse-delay 설정) */
+/* ?? ? ??: ?? ???? ??(App?? --nav-pulse-delay ??) */
 .bottom-nav-pulse-root {
   --nav-pulse-ms: 2400ms;
   --nav-pulse-delay: 0ms;
 }
 
-/* 하단 탭: 새 정보·읽지 않음 시 아이콘만 천천히 강조 (currentColor + 약한 글로우) */
+/* ?? ?: ? ???? ?? ? ???? ??? ?? (currentColor + ?? ???) */
 @keyframes nav-bottom-icon-notify {
   0%,
   100% {
@@ -408,7 +408,7 @@ body,
   display: flex;
   align-items: center;
   gap: 10px;
-  /* 채팅 목록은 가로 풀블리드 — 좌우 패딩 없음 */
+  /* ?? ??? ?? ???? ? ?? ?? ?? */
   padding: 8px 0 !important;
   min-height: 64px;
   background-color: transparent !important;
@@ -706,12 +706,12 @@ body,
   right: 0;
 }
 
-/* 채팅 목록 시간 위 읽지 않음 숫자: 테두리 없이 빨간 숫자만 */
+/* ?? ?? ?? ? ?? ?? ??: ??? ?? ?? ??? */
 .chat-list-surface .unread-badge.unread-badge-time {
   color: #ef4444;
 }
 
-/* 쇼핑 카테고리 — 작은 라벨 선명도 */
+/* ?? ???? ? ?? ?? ??? */
 .shop-category-strip {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -736,8 +736,22 @@ body,
   color: #e5e7eb !important;
 }
 
+/* hex ?? ?? ? Tailwind arbitrary ?? attribute selector? ? ??? ?? */
+.dark-mode [class*="bg-[#F8"],
+.dark-mode [class*="bg-[#f8"],
+.dark-mode [class*="bg-[#f3"],
+.dark-mode [class*="bg-[#F3"] {
+  background-color: #111827 !important;
+}
+
+.dark-mode [class*="text-[#1A"],
+.dark-mode [class*="text-[#19"],
+.dark-mode [class*="text-[#191f28]"] {
+  color: #e5e7eb !important;
+}
+
 /*
- * 폼 컨트롤: 상속된 밝은 글자색 + 브라우저 기본(흰) 필드 배경 → 대비 붕괴 방지
+ * ? ???: ??? ?? ??? + ???? ??(?) ?? ?? ? ?? ?? ??
  */
 .dark-mode textarea,
 .dark-mode select,
@@ -753,7 +767,7 @@ body,
   opacity: 1;
 }
 
-/* 미발급 명함 등: 밝은 박스 안에서 텍스트만 밝게 덮어쓰인 경우 복구 */
+/* ??? ?? ?: ?? ?? ??? ???? ?? ???? ?? ?? */
 .dark-mode .digital-card-unissued {
   background-color: #1e293b !important;
   border-color: #475569 !important;
@@ -768,7 +782,7 @@ body,
   color: #f1f5f9 !important;
 }
 
-.dark-mode [class*="bg-white"] {
+.dark-mode [class*="bg-white"]:not([class*="bg-white/"]) {
   background-color: #0f172a !important;
 }
 
@@ -780,7 +794,7 @@ body,
   background-color: #374151 !important;
 }
 
-/* slate 계열: 배경은 밝은데 글자만 밝게 덮어써져 대비가 사라지는 경우 */
+/* slate ??: ??? ??? ??? ?? ???? ??? ???? ?? */
 .dark-mode [class*="bg-slate-50"] {
   background-color: #1e293b !important;
 }
@@ -793,7 +807,7 @@ body,
   background-color: #475569 !important;
 }
 
-/* bg-white는 어둡게, bg-blue-50·amber-50 등 틴트는 밝게 남아 글자(#93c5fd)와 겹치는 문제 보정 */
+/* bg-white? ???, bg-blue-50?amber-50 ? ??? ?? ?? ??(#93c5fd)? ??? ?? ?? */
 .dark-mode [class*="bg-blue-50"] {
   background-color: rgba(37, 99, 235, 0.22) !important;
 }
@@ -900,8 +914,8 @@ body,
 }
 
 /*
- * MY·피드 등: 카드가 bg-white → 슬레이트로 바뀌었는데 indigo/violet 원색 글자는 그대로여서
- * 대비가 사라지는 경우 보정 (같은 요소 또는 자손)
+ * MY?? ?: ??? bg-white ? ????? ????? indigo/violet ?? ??? ?????
+ * ??? ???? ?? ?? (?? ?? ?? ??)
  */
 .dark-mode [class*="bg-white"] [class*="text-indigo-"],
 .dark-mode [class*="bg-white/"] [class*="text-indigo-"],
@@ -936,7 +950,7 @@ body,
   color: #93c5fd !important;
 }
 
-/* BiometricGate — 다크모드에서 본문은 slate→밝은색인데 배경만 라이트라 대비 붕괴 */
+/* BiometricGate ? ?????? ??? slate?????? ??? ???? ?? ?? */
 .dark-mode .biometric-gate-root {
   background-color: #111827 !important;
 }
@@ -958,7 +972,7 @@ body,
   color: #93c5fd !important;
 }
 
-/* ActiveBoard embedded(마이페이지·내 활동) — 다크에서 라이트 그라데이션 + 밝은 글자 대비 붕괴 방지 */
+/* ActiveBoard embedded(?????? ??) ? ???? ??? ????? + ?? ?? ?? ?? ?? */
 .dark-mode .vlue-active-board-embedded {
   border-color: rgba(59, 130, 246, 0.28) !important;
   background: linear-gradient(180deg, #0f172a 0%, #1e293b 55%, #111827 100%) !important;
@@ -1004,7 +1018,7 @@ body,
   color: #60a5fa !important;
 }
 
-/* peer-checked:bg-blue-600 문자열 때문에 원형 토글까지 잡히지 않도록 제외 */
+/* peer-checked:bg-blue-600 ??? ??? ?? ???? ??? ??? ?? */
 .dark-mode #profile-menu [class*="bg-blue-600"]:not(.vlue-vcid-toggle-circle) {
   background-color: #1d4ed8 !important;
   color: #ffffff !important;
@@ -1057,7 +1071,7 @@ body,
   color: #f87171;
 }
 
-/* 채팅 목록: 본문(#app-body) 배경과 한 덩어리 — 별도 패널(박스) 그라데이션 없음 */
+/* ?? ??: ??(#app-body) ??? ? ??? ? ?? ??(??) ????? ?? */
 .dark-mode .chat-list-surface {
   background: transparent !important;
 }
@@ -1183,7 +1197,7 @@ body,
   }
 }
 
-/* 업데이트 스토리 링 — 베이스는 연블루, 새 글은 ::before 그라데이션을 opacity로 페이드(클래스 토글만으로는 배경이 뚝 끊김) */
+/* ???? ??? ? ? ???? ???, ? ?? ::before ?????? opacity? ???(??? ?????? ??? ? ??) */
 .home-story-ring-outer {
   position: relative;
   box-sizing: border-box;
@@ -1241,7 +1255,7 @@ body,
   border-color: #f8fafc;
 }
 
-/* Splash 인트로 링 — 앱 헤더 블루·인디고 톤과 통일(스토리 피드 링과 분리) */
+/* Splash ??? ? ? ? ?? ????? ?? ??(??? ?? ?? ??) */
 .vlue-splash-eye-ring-home {
   background: linear-gradient(155deg, #1d4ed8 0%, #2563eb 46%, #4f46e5 100%);
   box-shadow:
@@ -1256,7 +1270,7 @@ body,
     inset 0 0 0 1px rgba(15, 23, 42, 0.35);
 }
 
-/* Home (로고 탭) — 배너/카드 폭은 컨테이너 기준(vw 남용 금지), 가로 드래그(PC) */
+/* Home (?? ?) ? ??/?? ?? ???? ??(vw ?? ??), ?? ???(PC) */
 .home-main-feed {
   overscroll-behavior-x: contain;
 }
@@ -1270,7 +1284,7 @@ body,
   top: 0;
 }
 
-/* 마이페이지 상단 — 홍보 VLUER 신청 코너 */
+/* ????? ?? ? ?? VLUER ?? ?? */
 .vlue-mypage-promo-vluer-bar,
 .vlue-mypage-reward-bar {
   display: flex;
@@ -1279,7 +1293,7 @@ body,
   min-height: 3.25rem;
 }
 
-/* 홈 — 업체·디지털명함 검색 (네이버형) */
+/* ? ? ??????? ?? (????) */
 .home-biz-search {
   width: 100%;
   box-sizing: border-box;
@@ -1514,7 +1528,7 @@ body,
   box-shadow: 0 -4px 16px rgb(15 23 42 / 6%);
 }
 
-/* 홈 업체 검색 — 다크모드 (흰 셸 + 어두운 input 이중 배경 방지) */
+/* ? ?? ?? ? ???? (? ? + ??? input ?? ?? ??) */
 .dark-mode .home-biz-search--sticky {
   background: #111827 !important;
   border-bottom-color: rgb(255 255 255 / 8%);
@@ -1635,7 +1649,7 @@ body,
   pointer-events: none;
 }
 
-/* 인증형 광고 배지: 방패 안에 AD */
+/* ??? ?? ??: ?? ?? AD */
 .ad-shield-badge {
   display: inline-flex;
   align-items: center;
@@ -1673,7 +1687,7 @@ body,
   box-shadow: 0 14px 28px rgba(2, 6, 23, 0.5), inset 0 0 0 1px rgba(148, 163, 184, 0.2);
 }
 
-/* 홈 — 업데이트 스토리 카드: 라이트 전용 그라데이션이 다크에서 그대로 남아 글자 대비가 깨지는 문제 */
+/* ? ? ???? ??? ??: ??? ?? ?????? ???? ??? ?? ?? ??? ??? ?? */
 .dark-mode .home-update-story-panel {
   background: linear-gradient(152deg, #0f172a 0%, #1e293b 48%, #172554 100%) !important;
   border-color: rgba(125, 211, 252, 0.26) !important;
@@ -1713,9 +1727,9 @@ body,
   color: #fda4af !important;
 }
 
-/* VLUE 헤더 눈: 동공 globe inset 100% · 뚜껑 rotateX · 덮인 순간 속눈썹(윗레이어) 페이드. 채팅 타일은 img */
+/* VLUE ?? ?: ?? globe inset 100% ??? rotateX ??? ?? ???(????) ???. ?? ??? img */
 
-/* 얇은 눈(앱 헤더·로그인 토글) — 원래 rotateX 깜빡임 */
+/* ?? ?(? ????? ??) ? ?? rotateX ??? */
 @keyframes vlue-header-eye-lid-wink {
   0%,
   100% {
@@ -1774,7 +1788,7 @@ body,
   }
 }
 
-/* 정사각 로고: 뜬 눈(U) → 감은 눈(가로 —) */
+/* ??? ??: ? ?(U) ? ?? ?(?? ?) */
 @keyframes vlue-header-eye-lid-open-shield {
   0%,
   100% {
@@ -1806,7 +1820,7 @@ body,
   }
 }
 
-/* 감을 때 타일색이 위에서 내려와 동공 가림 */
+/* ?? ? ???? ??? ??? ?? ?? */
 @keyframes vlue-header-eye-shield-lid-cover {
   0%,
   100% {
@@ -1909,7 +1923,7 @@ body,
   object-position: 50% 50%;
 }
 
-/* 첫 진입(seq=0)에는 클래스 없음 → 애니 없음 */
+/* ? ??(seq=0)?? ??? ?? ? ?? ?? */
 .vlue-header-eye-wrap--nav-loading:not(.vlue-header-eye-wrap--shield-square) .vlue-header-eye-lid {
   animation: vlue-header-eye-lid-wink 0.44s cubic-bezier(0.28, 0.08, 0.24, 1) 1;
 }
@@ -1962,9 +1976,9 @@ body,
   }
 }
 
-/* Splash intro: `public/eye2_vlue.mp4` — 글래스 카드 + 필름 스크린 + 홍채 위 V L U E(타이밍 연동) */
+/* Splash intro: `public/eye2_vlue.mp4` ? ??? ?? + ?? ??? + ?? ? V L U E(??? ??) */
 
-/* `position: relative`만 두면 Tailwind `fixed`보다 뒤에 오는 경우 뷰포트 고정이 깨져 카드가 화면 상단에 붙음 */
+/* `position: relative`? ?? Tailwind `fixed`?? ?? ?? ?? ??? ??? ?? ??? ?? ??? ?? */
 .vlue-splash-root {
   position: fixed;
   inset: 0;
@@ -1979,7 +1993,7 @@ body,
   opacity: 0;
 }
 
-/* 차콜 풀스크린 — 앰비언트는 거의 단색, 상·하단만 살짝 깊이 */
+/* ?? ???? ? ????? ?? ??, ???? ?? ?? */
 .vlue-splash-root--charcoal .vlue-splash-ambient {
   background: linear-gradient(
     180deg,
@@ -2004,7 +2018,7 @@ body,
   background-color: var(--vlue-splash-bg, #111827);
 }
 
-/* 셸 깊이: 중앙 블루 + 상·하단 아주 옅은 비네트(카드만 떠 있지 않게) */
+/* ? ??: ?? ?? + ??? ?? ?? ???(??? ? ?? ??) */
 .vlue-splash-ambient {
   position: absolute;
   inset: 0;
@@ -2021,7 +2035,7 @@ body,
     linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, transparent 16%, transparent 84%, rgba(0, 0, 0, 0.28) 100%);
 }
 
-/* 동일 특이도에서 위 규칙보다 뒤에 두어 차콜 스플래시는 푸른 링 없이 거의 단색 유지 */
+/* ?? ????? ? ???? ?? ?? ?? ????? ?? ? ?? ?? ?? ?? */
 .dark-mode .vlue-splash-root--charcoal .vlue-splash-ambient {
   background: linear-gradient(
     180deg,
@@ -2032,7 +2046,7 @@ body,
   );
 }
 
-/* 상단·하단만 살짝 있는 ‘앱 프레임’ 힌트(텍스트 없음) */
+/* ????? ?? ?? ?? ???? ??(??? ??) */
 .vlue-splash-shell-chrome {
   position: fixed;
   top: 0;
@@ -2126,7 +2140,7 @@ body,
   height: 100%;
 }
 
-/* 카피: 인트로 영상 `lettersAt`(띵·VLUE 타이밍)과 동시에 페이드 시작 — `.vlue-splash-tagline--in` */
+/* ??: ??? ?? `lettersAt`(??VLUE ???)? ??? ??? ?? ? `.vlue-splash-tagline--in` */
 .vlue-splash-root--charcoal .vlue-splash-tagline {
   margin: 0;
   max-width: min(26rem, 100%);
@@ -2169,7 +2183,7 @@ body,
   animation: vlue-splash-card-in 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* CF형: 필름 스크린 + 홍채 위 `V L U E`만(타이밍은 Splash.jsx 상수) */
+/* CF?: ?? ??? + ?? ? `V L U E`?(???? Splash.jsx ??) */
 .vlue-splash-card-cf {
   max-width: min(22rem, 90vw);
   align-items: stretch;
@@ -2177,7 +2191,7 @@ body,
   padding: 1.05rem 0.95rem 0.95rem;
 }
 
-/* 진입 후 은은한 ‘호흡’(그림자만) — VLUE 페이드와 별도 리듬 */
+/* ?? ? ??? ????(????) ? VLUE ???? ?? ?? */
 @keyframes vlue-splash-card-breathe {
   0%,
   100% {
@@ -2201,7 +2215,7 @@ body,
     vlue-splash-card-breathe 2.75s ease-in-out 0.52s infinite;
 }
 
-/* animation 제거 시 카드 인·호흡 값이 날아가며 한 프레임 튀는 현상 방지 — 종료 프레임 고정 */
+/* animation ?? ? ?? ??? ?? ???? ? ??? ?? ?? ?? ? ?? ??? ?? */
 .vlue-splash-card.vlue-splash-card-cf.vlue-splash-card-cf--reveal {
   animation: none;
   opacity: 1;
@@ -2242,7 +2256,7 @@ body,
   }
 }
 
-/* 로딩 맥락: 진행 너비는 Splash.jsx에서 영상 currentTime과 동기 */
+/* ?? ??: ?? ??? Splash.jsx?? ?? currentTime? ?? */
 .vlue-splash-load-track {
   margin-top: 0.65rem;
   height: 2.5px;
@@ -2260,7 +2274,7 @@ body,
   width: 0;
   border-radius: inherit;
   background: linear-gradient(90deg, #38bdf8, #6366f1 55%, #818cf8);
-  /* 너비는 Splash.jsx에서 영상 currentTime과 동기 */
+  /* ??? Splash.jsx?? ?? currentTime? ?? */
   transition: width 0.08s linear;
 }
 
@@ -2288,14 +2302,14 @@ body,
   overflow: hidden;
   border-radius: 0.65rem;
   background: linear-gradient(168deg, #0f172a 0%, #1e293b 52%, #0f172a 100%);
-  /* 위·아래·좌우 동일 — 링·원이 패널 안에서 기울어 보이거나 한쪽만 닿는 느낌 완화 */
+  /* ????? ?? ? ??? ?? ??? ??? ???? ??? ?? ?? ?? */
   padding: 0.78rem;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.07),
     0 12px 32px rgba(0, 0, 0, 0.25);
 }
 
-/* 필름 패널 상단 하이라이트(입체 한 겹) */
+/* ?? ?? ?? ?????(?? ? ?) */
 .vlue-splash-cf-screen::before {
   content: "";
   position: absolute;
@@ -2403,12 +2417,12 @@ body,
   height: auto;
   max-width: min(34vmin, 152px);
   max-height: min(34vmin, 152px);
-  /* 서브픽셀 안티앨리어싱으로 원 상단이 납작해 보이는 현상 완화 */
+  /* ???? ???????? ? ??? ??? ??? ?? ?? */
   transform: translateZ(0);
   backface-visibility: hidden;
 }
 
-/* 인트로 눈 영역 — 컬러 링(전체 채움) */
+/* ??? ? ?? ? ?? ?(?? ??) */
 .vlue-splash-eye-ring-bg {
   position: absolute;
   inset: 0;
@@ -2453,7 +2467,7 @@ body,
   box-shadow: inset 0 0 0 1.5px rgba(15, 23, 42, 0.88), inset 0 0 0 2.5px rgba(255, 255, 255, 0.22);
 }
 
-/* mp4 로드 실패 시 정적 눈 — 최소 맥박으로 ? 대체 UX 완화 */
+/* mp4 ?? ?? ? ?? ? ? ?? ???? ? ?? UX ?? */
 .vlue-splash-eye-fallback-pulse {
   animation: vlue-splash-fallback-pulse 2.4s ease-in-out infinite;
 }
@@ -2474,14 +2488,14 @@ body,
   position: absolute;
   left: 50%;
   top: 50%;
-  /* 100% 정확히 맞추면 원 클립과 비디오 레이어 사이에 서브픽셀 틈(특히 하단)이 남는 경우가 있어 소폭 확대 */
+  /* 100% ??? ??? ? ??? ??? ??? ??? ???? ?(?? ??)? ?? ??? ?? ?? ?? */
   width: 104%;
   height: 104%;
   transform: translate(-50%, -50%);
   display: block;
   object-fit: cover;
   object-position: 50% 50%;
-  /* 클립은 부모 .vlue-splash-eye-content(원 + overflow:hidden)에만 맡김 = 영상이 채운 원과 1:1 */
+  /* ??? ?? .vlue-splash-eye-content(? + overflow:hidden)?? ?? = ??? ?? ?? 1:1 */
   -webkit-mask-image: none;
   mask-image: none;
   -webkit-clip-path: none;
@@ -2498,12 +2512,12 @@ body,
   }
 }
 
-/* 가장자리를 흐리게 덮던 비네팅 비활성화 */
+/* ????? ??? ?? ??? ???? */
 .vlue-splash-vignette {
   display: none;
 }
 
-/* 레터링 수신 알림 — 통화 중 실시간 강조 */
+/* ??? ?? ?? ? ?? ? ??? ?? */
 @keyframes lettering-card-enter {
   0% {
     opacity: 0;
@@ -2574,7 +2588,7 @@ body,
   }
 }
 
-/* Ongoing 빅푸시 — 통화 화면 풀폭(좌우 여백 없음) */
+/* Ongoing ??? ? ?? ?? ??(?? ?? ??) */
 .lettering-ongoing {
   --lettering-push-expanded-max: 72dvh;
   --lettering-push-expanded-max-fb: 72vh;
@@ -2605,7 +2619,7 @@ body,
   max-height: var(--lettering-push-expanded-max-fb);
 }
 
-/* 펼침 시 상단 VLUE 작동중 바가 flex 수축으로 잘리지 않도록 */
+/* ?? ? ?? VLUE ??? ?? flex ???? ??? ??? */
 .lettering-ongoing--expanded > .lettering-live-bar {
   flex-shrink: 0;
 }
@@ -2614,7 +2628,7 @@ body,
   flex-shrink: 0;
 }
 
-/* 독립 오버레이(네이티브 WebView) — 기존 좌우 여백 유지 */
+/* ?? ????(???? WebView) ? ?? ?? ?? ?? */
 .lettering-overlay-host .lettering-ongoing {
   width: calc(100% - var(--lettering-sheet-gutter, 16px));
   max-width: var(--lettering-push-max-width, none);
@@ -2809,7 +2823,7 @@ body,
   pointer-events: none;
 }
 
-/* Samsung One UI 통화 중 (스크린샷 기준 좌표) */
+/* Samsung One UI ?? ? (???? ?? ??) */
 .lettering-call-screen--samsung {
   --vlue-slot-collapsed: 20dvh;
   --vlue-slot-collapsed-fb: 20vh;
@@ -2825,7 +2839,7 @@ body,
     linear-gradient(180deg, #1a141f 0%, #0d0d0f 45%, #121212 100%);
 }
 
-/* 116 번호 — 푸시 이동과 무관 고정 */
+/* 116 ?? ? ?? ??? ?? ?? */
 .lettering-call-screen__number-block {
   top: 23%;
 }
@@ -2848,7 +2862,7 @@ body,
   z-index: 50;
 }
 
-/* 사용자 제공 통화 스크린샷 위 오버레이 */
+/* ??? ?? ?? ???? ? ???? */
 .lettering-call-screen--photo {
   --lettering-push-width: 100%;
   --lettering-native-controls-reserve: 108px;
@@ -2871,7 +2885,7 @@ body,
   line-height: 0;
 }
 
-/* 통화 스크린샷 위 번호 — 데모·www에서 스크린 번호와 incoming 일치 */
+/* ?? ???? ? ?? ? ???www?? ??? ??? incoming ?? */
 .lettering-call-screen--photo .lettering-call-screen__photo-number {
   position: absolute;
   top: 22%;
@@ -2908,7 +2922,7 @@ body,
   transition: opacity 0.25s ease;
 }
 
-/* www 인증신청 — 펼친 명함·버튼이 잘리지 않도록 */
+/* www ???? ? ?? ????? ??? ??? */
 .lettering-call-screen--marketing-demo.lettering-call-screen--photo {
   overflow: visible;
   min-height: 740px;
@@ -2941,7 +2955,7 @@ body,
   flex: 0 0 auto;
 }
 
-/* 신고 시트 — line-height 상속·겹침 방지 */
+/* ?? ?? ? line-height ???? ?? */
 .lettering-report-sheet-root {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
@@ -3058,7 +3072,7 @@ body,
   z-index: 50;
 }
 
-/* 스크린샷·네이티브 통화 — 빅푸시 풀폭 */
+/* ???????? ?? ? ??? ?? */
 .lettering-call-screen--photo .lettering-ongoing--on-photo,
 .lettering-call-screen--photo .lettering-ongoing--on-photo.w-full,
 .lettering-call-screen--native .lettering-ongoing--on-photo,
@@ -3070,7 +3084,7 @@ body,
   border-radius: 0 0 var(--lettering-card-radius, 16px) var(--lettering-card-radius, 16px);
 }
 
-/* iOS — 상단 통화 밴드가 좁음: 라이브 바·요약 행 압축 */
+/* iOS ? ?? ?? ??? ??: ??? ??? ? ?? */
 .lettering-call-screen--photo[data-platform="ios"] .lettering-live-bar {
   padding: var(--lettering-live-bar-padding, 5px 10px);
 }
@@ -3339,7 +3353,7 @@ body,
   animation: lettering-avatar-pulse 2s ease-in-out infinite;
 }
 
-/* VLUE 라이브 — 시그널 바 (상단 파란 바와 톤 맞춤) */
+/* VLUE ??? ? ??? ? (?? ?? ?? ? ??) */
 @keyframes lettering-live-bar {
   0%,
   100% {
@@ -3669,7 +3683,7 @@ body,
   padding: 0 2px;
 }
 
-/* 펼침 — 명함 한 장 (Android/iOS 공통) */
+/* ?? ? ?? ? ? (Android/iOS ??) */
 .lettering-bizcard {
   margin: 0;
   position: relative;
@@ -3739,7 +3753,7 @@ body,
   z-index: 2;
 }
 
-/* VLUE 인증 명함 — 도용 방지 홀로그램 */
+/* VLUE ?? ?? ? ?? ?? ???? */
 .lettering-bizcard__hologram {
   position: absolute;
   inset: 0;
@@ -4165,7 +4179,7 @@ body,
   color: rgba(37, 99, 235, 0.35);
 }
 
-/* 무료 회원 — 접힌 빅푸시 (로고·상호·펼침 없음) */
+/* ?? ?? ? ?? ??? (?????? ??) */
 .lettering-ongoing--free-tier .lettering-ongoing-summary--free {
   padding: 10px 12px 11px 14px;
 }
@@ -4341,7 +4355,7 @@ body,
   background: #f8fafc;
 }
 
-/* 홈·프로필(VLUE Case) Showcase 미리보기 — 펼침 시 문서 흐름 유지, 친구 목록이 아래로 밀림 */
+/* ????(VLUE Case) Showcase ???? ? ?? ? ?? ?? ??, ?? ??? ??? ?? */
 .lettering-ongoing--showcase-preview.lettering-ongoing--expanded,
 .lettering-ongoing--home-preview.lettering-ongoing--expanded,
 .lettering-ongoing--case-preview.lettering-ongoing--expanded {
@@ -4399,7 +4413,7 @@ body,
   overflow: visible;
 }
 
-/* 홈·마이페이지 쇼케이스 펼침 — 하단 내비까지 덮는 전체화면 천막 */
+/* ?????? ???? ?? ? ?? ???? ?? ???? ?? */
 .lettering-showcase-fs {
   position: fixed;
   inset: 0;
@@ -4593,7 +4607,7 @@ body,
   filter: brightness(0.95);
 }
 
-/* 유료 명함 — 앞·뒷면 플립 */
+/* ?? ?? ? ??? ?? */
 .lettering-bizcard--paid {
   perspective: 900px;
   -webkit-perspective: 900px;
@@ -5098,8 +5112,8 @@ body,
   min-height: 0;
 }
 
-/* —— 디지털 인증명함: 테마 + 보안 오버레이 + HTML 배포 프레임 —— */
-/* 미리보기 — 컨테이너에 맞춰 균일 축소 */
+/* ?? ??? ????: ?? + ?? ???? + HTML ?? ??? ?? */
+/* ???? ? ????? ?? ?? ?? */
 .lettering-bizcard-preview-host {
   position: relative;
   width: 100%;
@@ -5115,7 +5129,7 @@ body,
 
 .lettering-bizcard-preview-host__inner {
   will-change: transform;
-  /* iOS Safari: scale() + rotateY 플립 시 뒷면 글자 미러링 방지 */
+  /* iOS Safari: scale() + rotateY ?? ? ?? ?? ??? ?? */
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
 }
@@ -5165,7 +5179,7 @@ body,
   border-radius: inherit;
 }
 
-/* 앞면 — 홀로그램 우상단, QR 이름·직책 열 하단 */
+/* ?? ? ???? ???, QR ???? ? ?? */
 .lettering-bizcard-security-overlay--front .lettering-bizcard-security-overlay__holo {
   position: absolute;
   top: 7px;
@@ -5191,7 +5205,7 @@ body,
   display: none;
 }
 
-/* 뒷면 — 사용유효기간 · LIVE (우하단, 본문과 겹치지 않음) */
+/* ?? ? ?????? ?LIVE (???, ??? ??? ??) */
 .lettering-bizcard--with-security .lettering-bizcard__face--back .lettering-bizcard__face-content {
   padding: 10px 10px 6px;
   padding-right: 46%;
@@ -5288,7 +5302,7 @@ body,
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
 }
 
-/* 테마 — 기본형 (밝은 정통) */
+/* ?? ? ??? (?? ??) */
 .lettering-bizcard-secure-frame.lettering-bizcard--theme-classic-light .lettering-bizcard__face {
   background: linear-gradient(145deg, #ffffff 0%, #f8fbff 48%, #eff6ff 100%);
   border-color: rgba(147, 197, 253, 0.55);
@@ -5312,7 +5326,7 @@ body,
   color: #64748b;
 }
 
-/* 테마 — modern-dark */
+/* ?? ? modern-dark */
 .lettering-bizcard-secure-frame.lettering-bizcard--theme-modern-dark .lettering-bizcard__face {
   background: linear-gradient(160deg, #0f172a 0%, #1e293b 55%, #0b1220 100%);
   border-color: rgba(56, 189, 248, 0.35);
@@ -5351,7 +5365,7 @@ body,
   border-top-color: rgba(148, 163, 184, 0.35);
 }
 
-/* 테마 — professional-gold */
+/* ?? ? professional-gold */
 .lettering-bizcard-secure-frame.lettering-bizcard--theme-professional-gold .lettering-bizcard__face {
   background: linear-gradient(145deg, #1a1508 0%, #2d2410 48%, #1f1a0c 100%);
   border-color: rgba(212, 175, 55, 0.45);
@@ -5386,7 +5400,7 @@ body,
   color: #faf6eb;
 }
 
-/* 테마 — creative-gradient */
+/* ?? ? creative-gradient */
 .lettering-bizcard-secure-frame.lettering-bizcard--theme-creative-gradient .lettering-bizcard__face {
   background: linear-gradient(135deg, #312e81 0%, #7c3aed 42%, #db2777 100%);
   border-color: rgba(249, 168, 212, 0.4);
@@ -5426,7 +5440,7 @@ body,
   color: #334155;
 }
 
-/* 다크모드 — 플립 버튼·보존 안내 가독성 */
+/* ???? ? ?? ???? ?? ??? */
 .lettering-bizcard-preview-host--dark .lettering-bizcard__flip-btn,
 .dark-mode .lettering-bizcard-preview-host .lettering-bizcard__flip-btn {
   border-color: rgba(56, 189, 248, 0.45);
@@ -5438,7 +5452,7 @@ body,
   color: #94a3b8;
 }
 
-/* 영업 송출 — iOS형 토글 */
+/* ?? ?? ? iOS? ?? */
 .vlue-broadcast-switch {
   position: relative;
   display: inline-flex;
@@ -5480,7 +5494,7 @@ body,
   transform: translateX(20px);
 }
 
-/* 개인 자료실 — 상단 탭 가로 슬라이드 */
+/* ?? ??? ? ?? ? ?? ???? */
 .wallet-tab-strip {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
@@ -5543,7 +5557,7 @@ body,
   pointer-events: none;
 }
 
-/* 디지털 신분증 수신 UI */
+/* ??? ??? ?? UI */
 .lettering-ongoing-scroll--reception {
   padding: 0;
   flex: 1;
@@ -5862,7 +5876,7 @@ body,
   padding-top: 10px;
 }
 
-/* 앞면 — 라벨 : 내용 가로 정렬 (뒷면은 기존 ContactRow 유지) */
+/* ?? ? ?? : ?? ?? ?? (??? ?? ContactRow ??) */
 .ldr-front-info-row {
   display: grid;
   grid-template-columns: minmax(7.75rem, 40%) minmax(0, 1fr);
@@ -5917,6 +5931,40 @@ body,
   line-height: 1.5;
   word-break: keep-all;
   overflow-wrap: anywhere;
+}
+
+/* ???/?? ??? ??? ?? ? ?? ??? ????? (?? ??) */
+.ldr-panel--push .ldr-front-info-row__value,
+.ldr-panel--push .ldr-front-info-row__text,
+.ldr-panel--push .ldr-front-info-row__list,
+.ldr-panel--push .ldr-front-info-row__list li,
+.ldr-panel--push .ldr-front-phone-link,
+.ldr-reception--push .ldr-front-info-row__value,
+.ldr-reception--push .ldr-front-info-row__text,
+.ldr-reception--push .ldr-front-info-row__list,
+.ldr-reception--push .ldr-front-info-row__list li,
+.ldr-reception--push .ldr-front-phone-link {
+  color: #f1f5f9 !important;
+}
+
+.ldr-panel--push .ldr-front-info-row__text--placeholder,
+.ldr-reception--push .ldr-front-info-row__text--placeholder {
+  color: #94a3b8 !important;
+  font-weight: 500;
+}
+
+.ldr-panel--push .ldr-front-info-row__label,
+.ldr-reception--push .ldr-front-info-row__label {
+  color: #cbd5e1;
+}
+
+.dark-mode .ldr-panel--push .ldr-front-info-row__value,
+.dark-mode .ldr-panel--push .ldr-front-info-row__text,
+.dark-mode .ldr-panel--push .ldr-front-info-row__list li,
+.dark-mode .ldr-reception--push .ldr-front-info-row__value,
+.dark-mode .ldr-reception--push .ldr-front-info-row__text,
+.dark-mode .ldr-reception--push .ldr-front-info-row__list li {
+  color: #f8fafc !important;
 }
 
 .ldr-front-info-row__phone-line {
@@ -6501,7 +6549,7 @@ body,
   background: transparent;
 }
 
-/* VLUE 빅푸시 — 실시간 인증 봉인 */
+/* VLUE ??? ? ??? ?? ?? */
 .vlue-push-auth-seal {
   position: relative;
   overflow: hidden;
@@ -6965,11 +7013,29 @@ body,
   color: rgba(96, 165, 250, 0.95);
 }
 
+.ldr-back-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 4px;
+}
+
 .ldr-back-title {
-  margin: 4px 0 0;
+  margin: 0;
+  min-width: 0;
   font-size: 18px;
   font-weight: 600;
   color: #fff;
+  line-height: 1.25;
+}
+
+.ldr-name-shield {
+  flex-shrink: 0;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: #f8fafc;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.55));
 }
 
 .ldr-back-sub {
@@ -6977,6 +7043,10 @@ body,
   font-size: 12px;
   font-weight: 600;
   color: rgba(203, 213, 225, 0.85);
+}
+
+.ldr-back-sub:empty {
+  display: none;
 }
 
 .ldr-back-section {
@@ -7089,7 +7159,7 @@ body,
   flex: 0 0 auto;
 }
 
-/* 명함 만들기 미리보기 — 앞면 기준 고정 프레임, 탭 전환 시 동일 높이 */
+/* ?? ??? ???? ? ?? ?? ?? ???, ? ?? ? ?? ?? */
 .ldr-reception--preview .ldr-panel-wrap {
   --ldr-preview-panel-h: 380px;
   flex: 0 0 var(--ldr-preview-panel-h);
@@ -7153,7 +7223,7 @@ body,
   white-space: nowrap;
 }
 
-/* 마이페이지 — 빅푸시 접힘·펼침 인터랙티브 미리보기 */
+/* ????? ? ??? ???? ????? ???? */
 .lettering-mypage-push-interactive {
   max-width: 320px;
   margin: 0 auto;
@@ -7249,3 +7319,168 @@ body,
   -webkit-overflow-scrolling: touch;
 }
 
+
+/* ???? ???? Feed ??????? ? ?????? [class*=bg-white] ?????? ??? */
+.vlue-kakao-feed-preview {
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: #ffffff !important;
+  box-shadow: 0 8px 28px -8px rgba(15, 23, 42, 0.28);
+  color: #0f172a;
+}
+.vlue-kakao-feed-preview__header {
+  background: #0b1a33 !important;
+  padding: 14px;
+}
+.vlue-kakao-feed-preview__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.vlue-kakao-feed-preview__avatar {
+  position: relative;
+  height: 56px;
+  width: 56px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: #334155 !important;
+}
+.vlue-kakao-feed-preview__initial {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+.vlue-kakao-feed-preview__meta {
+  min-width: 0;
+  flex: 1;
+  padding-top: 2px;
+}
+.vlue-kakao-feed-preview__name {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.25;
+  color: #ffffff !important;
+}
+.vlue-kakao-feed-preview__role {
+  margin: 4px 0 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #e2e8f0 !important;
+}
+.vlue-kakao-feed-preview__org {
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  color: #cbd5e1 !important;
+}
+.vlue-kakao-feed-preview__tags {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.vlue-kakao-feed-preview__tag {
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1) !important;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #f1f5f9 !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+.vlue-kakao-feed-preview__body {
+  background: #ffffff !important;
+  padding: 12px 14px;
+}
+.vlue-kakao-feed-preview[data-theme="dark"] .vlue-kakao-feed-preview__body {
+  background: #151821 !important;
+}
+.vlue-kakao-feed-preview__cta-line {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #1e293b !important;
+}
+.vlue-kakao-feed-preview[data-theme="dark"] .vlue-kakao-feed-preview__cta-line {
+  color: #e5e7eb !important;
+}
+.vlue-kakao-feed-preview__cta-name {
+  color: #0f172a !important;
+}
+.vlue-kakao-feed-preview[data-theme="dark"] .vlue-kakao-feed-preview__cta-name {
+  color: #ffffff !important;
+}
+.vlue-kakao-feed-preview__cta-rest {
+  font-weight: 600;
+  color: #475569 !important;
+}
+.vlue-kakao-feed-preview[data-theme="dark"] .vlue-kakao-feed-preview__cta-rest {
+  color: #9ca3af !important;
+}
+.vlue-kakao-feed-preview__cta-btn {
+  margin-top: 10px;
+  display: flex;
+  height: 44px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #eceff3 !important;
+  font-size: 14px;
+  font-weight: 900;
+  color: #1e293b !important;
+}
+.vlue-kakao-feed-preview[data-theme="dark"] .vlue-kakao-feed-preview__cta-btn {
+  background: rgba(37, 99, 235, 0.3) !important;
+  color: #dbeafe !important;
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.4);
+}
+.vlue-kakao-feed-preview__footer {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 8px;
+}
+.vlue-kakao-feed-preview[data-theme="dark"] .vlue-kakao-feed-preview__footer {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+.vlue-kakao-feed-preview__brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #334155 !important;
+}
+.vlue-kakao-feed-preview[data-theme="dark"] .vlue-kakao-feed-preview__brand {
+  color: #e2e8f0 !important;
+}
+.vlue-kakao-feed-preview__chev {
+  font-size: 14px;
+  font-weight: 700;
+  color: #94a3b8 !important;
+}

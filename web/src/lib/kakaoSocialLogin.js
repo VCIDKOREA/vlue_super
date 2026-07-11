@@ -42,7 +42,7 @@ function loadExternalScript(src) {
 export async function ensureKakaoSdk() {
   const key = getKakaoJavaScriptKey();
   if (!key) {
-    throw new Error("VITE_KAKAO_JAVASCRIPT_KEY가 .env에 설정되어 있지 않습니다. 카카오 개발자 콘솔의 JavaScript 키를 넣어 주세요.");
+    throw new Error("카카오 공유 키가 설정되지 않았습니다. 관리자에게 문의해 주세요.");
   }
   await loadExternalScript(KAKAO_SDK_SRC);
   const Kakao = window.Kakao;

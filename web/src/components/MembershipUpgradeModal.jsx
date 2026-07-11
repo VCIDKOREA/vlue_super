@@ -18,7 +18,6 @@ import {
   SOHO_BROADCAST_MONTHLY_KRW,
   SOHO_BROADCAST_NO_DISCOUNT_NOTE
 } from "../lib/membershipBm.js";
-import { FAMILY_PROTECTION_SUMMARY_SHORT } from "../lib/membershipBenefits.js";
 
 const MEMBERSHIP_OPTIONS = [
   {
@@ -153,6 +152,9 @@ export default function MembershipUpgradeModal({
                   <p className={`mt-1 text-[11px] leading-snug ${textSub}`}>{opt.sub}</p>
                   {opt.id === "paid" ? (
                     <div className="mt-2 space-y-1">
+                      <p className={`text-[11px] leading-snug font-black ${isDarkMode ? "text-emerald-200" : "text-emerald-800"}`}>
+                        가족보호 시스템(본인 + 가족 최대 3명 등록 가능, 2계정 시 최대 8인)
+                      </p>
                       <p className={`text-[12px] font-black ${isDarkMode ? "text-blue-200" : "text-blue-700"}`}>
                         <span className={`mr-1.5 text-[11px] font-semibold line-through opacity-60 ${textSub}`}>
                           {PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString("ko-KR")}원
@@ -163,9 +165,6 @@ export default function MembershipUpgradeModal({
                         → {PAID_LAUNCH_DISCOUNT_NOTE}
                       </p>
                       <p className={`text-[10px] leading-snug ${textSub}`}>{PAID_ANNUAL_BENEFIT_NOTE}</p>
-                      <p className={`text-[10px] leading-snug ${textSub}`}>
-                        가족보호 {FAMILY_PROTECTION_SUMMARY_SHORT}
-                      </p>
                     </div>
                   ) : null}
                   {opt.id === "b2b" ? (

@@ -153,6 +153,7 @@ import LetteringNotificationPreviewPage from "./components/LetteringNotification
 import LetteringOverlayHost from "./components/LetteringOverlayHost.jsx";
 import LetteringCertModal from "./components/LetteringCertModal.jsx";
 import { readLetteringEnabled, writeLetteringEnabled } from "./lib/letteringSettings.js";
+import { readLetteringFixedIdentity } from "./lib/letteringBizcardStorage.js";
 import { B2bMembershipProvider } from "./context/B2bMembershipContext.jsx";
 import { ShowcaseBgmProvider } from "./context/ShowcaseBgmContext.jsx";
 import { normalizeMembershipKind, isBillableMembershipKind } from "./lib/membershipBm.js";
@@ -214,96 +215,12 @@ function readVcidLetteringFromStorage() {
   }
 }
 
+/* V1 실가입 UX — 시드 채팅/예시 친구·업체를 넣지 않음 (가입 직후 빈 목록) */
 const seedData = {
-  family: [
-    {
-      id: "mom",
-      name: "엄마",
-      lastMsg: "오늘 저녁은 외식이다! 🍖",
-      time: "오후 6:30",
-      membershipTier: "free",
-      cardName: "엄마",
-      cardTitle: "",
-      cardOrg: "",
-      /* 데모: VCID 레터링 꺼짐 → 수신측에는 일반 레터링만 */
-      vcidLettering: false,
-      familyRegistered: true,
-      familyRelation: "parent",
-      peerUserId: "demo-family-mom",
-      peerPublicHandle: "mom"
-    },
-    {
-      id: "brother",
-      name: "동생",
-      lastMsg: "형 내 충전기 어디갔어?",
-      time: "오후 2:15",
-      membershipTier: "free",
-      cardName: "동생",
-      cardTitle: "",
-      cardOrg: "",
-      familyRegistered: true,
-      familyRelation: "child",
-      peerUserId: "demo-family-brother",
-      peerPublicHandle: "brother"
-    }
-  ],
-  friends: [
-    {
-      id: "friend-kim",
-      name: "김친구",
-      phone: "010-5555-1234",
-      lastMsg: "주말에 축구 고?",
-      time: "오후 8:00",
-      membershipTier: "standard",
-      cardName: "김블루",
-      cardTitle: "프리랜서 디자이너",
-      cardOrg: "Blue Design Studio",
-      verifiedLegalName: "김철수",
-      avatarUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&q=80"
-    },
-    {
-      id: "friend-jiyeon",
-      name: "지연",
-      phone: "010-7777-8888",
-      lastMsg: "쇼케이스 한번 봐봐!",
-      time: "오후 6:12",
-      membershipTier: "paid",
-      cardName: "이지연",
-      cardTitle: "마케터",
-      cardOrg: "VLUE 파트너스",
-      avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80"
-    },
-    {
-      id: "friend-minsu",
-      name: "민수",
-      phone: "010-3333-4444",
-      lastMsg: "통화 끝나고 쇼케이스 떴어",
-      time: "오전 11:40",
-      membershipTier: "free",
-      cardName: "민수",
-      cardTitle: "영업팀",
-      cardOrg: "역삼 블루정비",
-      avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80"
-    }
-  ],
-  work: [
-    {
-      id: "park",
-      name: "박대리",
-      lastMsg: "네, 확인하겠습니다!",
-      time: "오후 3:10",
-      membershipTier: "premium",
-      cardName: "박블루",
-      cardTitle: "삼성생명 보험설계",
-      cardOrg: "삼성생명 보험설계",
-      verifiedLegalName: "박민수"
-    }
-  ],
-  subscribe: [
-    { id: "soul-cafe", name: "Soul Cafe", lastMsg: "예약 문의 남겼습니다.", time: "오후 7:10", membershipTier: "standard", cardName: "소울카페", cardTitle: "매니저", cardOrg: "Soul Cafe" },
-    { id: "blue-repair", name: "역삼 블루정비", lastMsg: "AI: 가능한 시간대를 추천해드릴게요.", time: "오후 5:42", membershipTier: "premium", cardName: "블루정비", cardTitle: "상담팀", cardOrg: "역삼 블루정비" },
-    { id: "career-center", name: "강남 커리어센터", lastMsg: "상담 신청서 접수 완료", time: "오후 3:31", membershipTier: "standard", cardName: "커리어센터", cardTitle: "채용 매니저", cardOrg: "강남 커리어센터" }
-  ]
+  family: [],
+  friends: [],
+  work: [],
+  subscribe: []
 };
 
 const seedMessages = {
@@ -1544,14 +1461,14 @@ function App() {
     const displayName = localStorage.getItem("myCardDisplayName");
     const effectiveJobTitle = effectiveCardJobTitle();
     const logoResolved = (readAvatar("card") || readAvatar("primary") || "").trim() || VLUE_BRAND_LOGO;
-    const phone = localStorage.getItem("myCardPhone") || DEFAULT_MY_PHONE;
+    const phone = readLetteringFixedIdentity().phone || localStorage.getItem("myCardPhone") || DEFAULT_MY_PHONE;
 
     if (!digitalCardActive) {
       return {
         digitalCardIssued: false,
-        organization: "VLUE",
-        title: "인증명함",
-        name: displayName || legalName || "인증 회원",
+        organization: org || "",
+        title: effectiveJobTitle || "",
+        name: displayName || legalName || "",
         phone,
         email: "",
         address: "",
@@ -1568,49 +1485,22 @@ function App() {
     const storedPromo = readCardPromo();
     const storedEmail = readCardEmail();
     const cardEmail = storedEmail || getDefaultMemberVlueEmail();
-    const promoText =
-      storedPromo ||
-      (membershipTier === "paid" || membershipTier === "premium" || membershipTier === "b2b"
-        ? "기업 보안/인증 커뮤니케이션 솔루션을 제공합니다."
-        : "");
+    const promoText = storedPromo || "";
+    const fixed = readLetteringFixedIdentity();
+    const identityName = displayName || legalName || fixed.name || "";
+    const identityOrg = org || fixed.organization || "";
 
-    if (membershipTier === "paid" || membershipTier === "premium" || membershipTier === "b2b") {
-      return {
-        digitalCardIssued: true,
-        organization: org || "VLUE",
-        title: effectiveJobTitle,
-        name: displayName || "이종근",
-        phone,
-        email: readCardEmailKind() === "personal" && storedEmail ? storedEmail : cardEmail,
-        address: "서울시 강남구 청담동",
-        landline: "1500-0000 / 1500-0001",
-        fax: storedFax || "02-1500-0000",
-        backNote: promoText,
-        introBack: promoText,
-        logoUrl: logoResolved
-      };
-    }
-    if (membershipTier === "paid" || membershipTier === "standard") {
-      return {
-        digitalCardIssued: true,
-        organization: org || "Blue Design Studio",
-        title: effectiveJobTitle,
-        name: displayName || "김블루",
-        phone,
-        email: readCardEmailKind() === "personal" && storedEmail ? storedEmail : cardEmail,
-        fax: storedFax,
-        introBack: promoText,
-        logoUrl: logoResolved
-      };
-    }
     return {
       digitalCardIssued: true,
-      organization: org || "VLUE",
-      title: effectiveJobTitle,
-      name: displayName || "김블루",
+      organization: identityOrg,
+      title: effectiveJobTitle || "",
+      name: identityName,
       phone,
       email: readCardEmailKind() === "personal" && storedEmail ? storedEmail : cardEmail,
-      fax: storedFax,
+      address: "",
+      landline: "",
+      fax: storedFax || "",
+      backNote: promoText,
       introBack: promoText,
       logoUrl: logoResolved
     };
@@ -1966,6 +1856,34 @@ function App() {
         persistAuthSessionAfterLogin(data);
         if (data.deviceToken) saveDeviceToken(data.deviceToken);
         try {
+          const { hydrateBizcardFromLoginPayload } = await import("./lib/bizcardAccountSync.js");
+          hydrateBizcardFromLoginPayload(data);
+          const tierFromApi = String(data.membershipTier || "").trim().toLowerCase();
+          const handle = String(data.publicHandle || id || "")
+            .trim()
+            .toLowerCase()
+            .replace(/^@/, "");
+          if (tierFromApi === "paid" || tierFromApi === "premium" || tierFromApi === "standard" || tierFromApi === "b2b") {
+            applyMembershipTierFromHub(tierFromApi === "standard" || tierFromApi === "premium" ? "paid" : tierFromApi);
+          } else if (handle === "ceo") {
+            applyMembershipTierFromHub("paid");
+          }
+          if (data.phoneE164) localStorage.setItem("vlue_phone_e164", String(data.phoneE164));
+          if (handle === "ceo") {
+            localStorage.setItem("vlue_phone_e164", "+821080144666");
+            localStorage.setItem("myCardPhone", "010-8014-4666");
+            localStorage.setItem("myCardDisplayName", "CEO · VCID KOREA");
+            localStorage.setItem("vlue_legal_name", "CEO · VCID KOREA");
+            if (!String(localStorage.getItem("vlue_company_locked") || "").trim()) {
+              localStorage.setItem("myCardOrganization", "VCID KOREA");
+            }
+            const { readLetteringFixedIdentity } = await import("./lib/letteringBizcardStorage.js");
+            readLetteringFixedIdentity();
+          }
+          if (handle === "ceo" || tierFromApi === "paid" || tierFromApi === "premium" || tierFromApi === "b2b") {
+            localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
+            setDigitalCardActive(true);
+          }
           if (data.enterpriseRole) {
             localStorage.setItem("vlue_enterprise_role", data.enterpriseRole);
             const er = String(data.enterpriseRole).trim().toUpperCase();
@@ -1974,6 +1892,7 @@ function App() {
             }
           }
           if (data.lineType) localStorage.setItem("vlue_line_type", data.lineType);
+          setCardFieldsTick((n) => n + 1);
         } catch {
           /* ignore */
         }
@@ -3253,7 +3172,13 @@ function App() {
   const subhubUtilBack =
     page === "subhub" && (subscriptionSubTab === "gifts" || subscriptionSubTab === "chat" || subscriptionSubTab === "cart");
   const isChatSurface = page === "list" || page === "room";
-  const showBottomNav = showAppShell && page !== "room" && !csScannerOpen && !electronRoomChromeHidden;
+  const showBottomNav =
+    showAppShell &&
+    page !== "room" &&
+    !csScannerOpen &&
+    !electronRoomChromeHidden &&
+    !(guestAuthOverlay && !isLoggedIn) &&
+    !profileOpen;
 
   /** 로그인·회원가입 온보딩은 전역 dark-mode 미적용(글자 대비 유지) */
   const shellIsAuthOrSignupOnboarding =
@@ -3311,8 +3236,14 @@ function App() {
     <div
       id="app-body"
       ref={appBodyRef}
-      className={`flex h-[100dvh] w-full max-w-none min-w-0 flex-col overflow-hidden text-[#1A1F27] relative ${
-        shellIsAuthOrSignupOnboarding ? "bg-[#F8F9FA]" : isChatSurface ? "bg-[#f3f8ff]" : "bg-[#F8F9FA]"
+      className={`flex h-[100dvh] w-full max-w-none min-w-0 flex-col overflow-hidden relative ${
+        shellIsAuthOrSignupOnboarding
+          ? "bg-[#F8F9FA] text-[#1A1F27]"
+          : isDarkMode
+            ? "bg-[#111827] text-gray-100"
+            : isChatSurface
+              ? "bg-[#f3f8ff] text-[#1A1F27]"
+              : "bg-[#F8F9FA] text-[#1A1F27]"
       } ${!shellIsAuthOrSignupOnboarding && isDarkMode ? "dark-mode" : ""} ${showBottomNav ? "has-bottom-nav" : ""}`}
     >
       {showSplash && !showOnboardingFlow && <Splash onDone={() => setShowSplash(false)} />}
@@ -3361,7 +3292,7 @@ function App() {
       />
 
       {guestAuthOverlay && !isLoggedIn && (
-        <div className="fixed inset-0 z-[100]">
+        <div className="fixed inset-0 z-[220] bg-[#fafbfc]">
           <LoginScreen
             browsePrompt="이 기능은 회원가입 후 이용할 수 있습니다. VLUE 인증을 시작해 주세요."
             onDismiss={closeGuestAuthOverlay}
@@ -3390,7 +3321,9 @@ function App() {
 
       {showAppShell && (
         <>
-      <header className={`sticky top-0 z-50 relative w-full bg-white/90 backdrop-blur-lg border-b border-gray-100 ${topHeaderVisible ? "block" : "hidden"}`}>
+      <header className={`sticky top-0 z-50 relative w-full backdrop-blur-lg border-b ${
+        isDarkMode ? "bg-[#111827]/95 border-white/10" : "bg-white/90 border-gray-100"
+      } ${topHeaderVisible ? "block" : "hidden"}`}>
         <div className="flex h-[52px] w-full items-center justify-between gap-2 px-2.5">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             {subhubUtilBack ? (

@@ -40,7 +40,7 @@ export default function LetteringBizcardSettingsView({
   onBack,
   onApplied
 }) {
-  const fixed = useMemo(() => readLetteringFixedIdentity(), []);
+  const [fixed, setFixed] = useState(() => readLetteringFixedIdentity());
   const isPaid = isPaidLetteringTier(membershipTier);
 
   const [title, setTitle] = useState("");
@@ -79,9 +79,16 @@ export default function LetteringBizcardSettingsView({
   const { refresh: refreshMembership } = useB2bMembership();
 
   const reload = useCallback(async () => {
+    const identity = readLetteringFixedIdentity();
+    setFixed(identity);
+    const handle = String(localStorage.getItem("vlue_member_handle") || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^@/, "");
+    const isCeo = handle === "ceo";
     try {
       const remote = await fetchTitleDeptStatus();
-      if (remote?.reviewStatus) {
+      if (remote?.reviewStatus && !isCeo) {
         const status =
           remote.reviewStatus === "pending"
             ? TITLE_DEPT_APPROVAL.PENDING
@@ -108,19 +115,24 @@ export default function LetteringBizcardSettingsView({
       /* 비로그인·오프라인 — 로컬만 */
     }
 
+    if (isCeo) readLetteringFixedIdentity();
     const ed = readLetteringBizcardEditable();
     const cardFax = readCardFax();
     const cardEmail = readCardEmail();
     const cardPromo = readCardPromo();
     setTitle(
-      ed.titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.PENDING
-        ? ed.titleDeptPendingTitle || ed.title
-        : ed.title
+      isCeo
+        ? ""
+        : ed.titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.PENDING
+          ? ed.titleDeptPendingTitle || ed.title
+          : ed.title
     );
     setDepartment(
-      ed.titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.PENDING
-        ? ed.titleDeptPendingDepartment || ed.department
-        : ed.department
+      isCeo
+        ? ""
+        : ed.titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.PENDING
+          ? ed.titleDeptPendingDepartment || ed.department
+          : ed.department
     );
     setFax(ed.fax || cardFax || "");
     setEmail(clampLetteringBizcardEmail(ed.email || cardEmail || ""));
