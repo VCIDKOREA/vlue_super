@@ -26,13 +26,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { label: '서비스소개', view: 'about' },
   { label: '인증신청', view: 'pricing' },
-  { label: 'VLUE 스토어', view: 'shopping', highlight: true },
-  { label: 'VLUE 경매', view: 'auction', highlight: true },
-  { label: '지역 이벤트', view: 'events' },
-  { label: '개인자료실', view: 'resources' },
-  { label: '공식 채용', view: 'jobs' },
-  { label: 'VLUE메일', view: 'mail-settings', mailPill: true },
-  { label: 'AI엑셀에디터', view: 'exceleditor', featured: true },
+  { label: '개인케이스', view: 'resources' },
   { label: '고객지원', view: 'support' },
 ].filter((item) => isWebViewV1Enabled(item.view));
 

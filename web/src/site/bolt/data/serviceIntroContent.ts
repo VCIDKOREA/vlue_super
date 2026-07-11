@@ -15,16 +15,16 @@ export const ABOUT_HERO = {
   badge: '서비스소개',
   title: '믿을 수 있는 연결,\n안전한 일상',
   companyLead:
-    'VLUE(블루)는 보이스피싱·기관 사칭 피해를 줄이고, 검증된 기관과 사람이 안심하고 소통할 수 있도록 돕는 디지털 신뢰 플랫폼입니다. 공공데이터와 자체 인증을 결합해 “이 전화, 이 업체를 믿어도 될까?”에 답하고, 웹과 설치형 앱으로 일상 업무까지 이어갑니다.',
+    'VLUE(블루)는 보이스피싱·기관 사칭 피해를 줄이고, 검증된 기관과 사람이 안심하고 소통할 수 있도록 돕는 디지털 신뢰 플랫폼입니다. 공공데이터와 자체 인증을 결합해 “이 전화, 이 업체를 믿어도 될까?”에 답하고, 웹 검색과 설치형 앱의 통화 쇼케이스·인증명함·가족보호로 이어갑니다.',
   companyPoweredBy: 'Powered by VCID KOREA',
   subtitle:
-    'www.vlue.kr에서 기관을 확인하고 문서를 만들고, PC·모바일 설치 프로그램에서 실시간으로 보호받으세요. 하나의 계정으로 데이터가 연결됩니다.',
+    'www.vlue.kr에서 기관을 확인하고, 모바일 앱에서 블루 쇼케이스·디지털 인증명함·가족보호로 실시간 보호받으세요. 하나의 계정으로 개인케이스가 연결됩니다.',
   searchHint: '아래에서 기관을 조회하거나, 궁금한 기능을 바로 찾아볼 수 있습니다.',
 };
 
 export const COMPANY_PROFILE = {
   mission: '사기 전화·문자를 받기 전에 확인하고, 피해를 예방합니다.',
-  vision: '검증된 데이터 위에 쌓인 국내 대표 보안·커머스 통합 플랫폼.',
+  vision: '검증된 데이터 위에 쌓인 국내 대표 디지털 신뢰·통화 보호 플랫폼.',
   pillars: [
     {
       id: 'trust',
@@ -34,12 +34,12 @@ export const COMPANY_PROFILE = {
     {
       id: 'protect',
       title: '실시간 보호',
-      desc: '설치형 앱에서 통화·가족·계좌 이상 징후를 알리고 대응을 돕습니다.',
+      desc: '설치형 앱에서 통화 쇼케이스·인증명함·가족 이상 징후를 알리고 대응을 돕습니다.',
     },
     {
       id: 'work',
-      title: '업무 생산성',
-      desc: '웹에서 AI엑셀에디터, 앱에서 명함·쇼핑·메일을 한 흐름으로 운영합니다.',
+      title: '개인케이스',
+      desc: '웹·앱에서 명함저장·저장된케이스·내문서를 동일하게 모아 관리합니다.',
     },
   ],
 } as const;
@@ -47,28 +47,28 @@ export const COMPANY_PROFILE = {
 export const PLATFORM_SPLIT = {
   web: {
     title: '웹 (www.vlue.kr)',
-    tagline: '홍보·검색·문서 작업',
+    tagline: '검색·인증·요금 안내',
     color: 'primary' as const,
     exclusive: [
       { id: 'search', title: '통합 기관 검색', desc: '기관명·전화·사업자번호 즉시 검증' },
-      { id: 'excel', title: 'AI엑셀에디터', desc: '장부·보고서를 www에서 만들고 편집' },
+      { id: 'pricing', title: 'V1 멤버십·요금제', desc: '무료·유료·B2B 요금 비교' },
     ],
     sharedLabel: '웹·앱 공통',
-    shared: ['VLUE 스토어', 'VLUE메일', '개인자료실', '인증신청', '지역 이벤트', '공식 채용'],
+    shared: ['개인케이스', '인증신청', '고객지원', '가족보호'],
   },
   install: {
     title: '설치형 (PC·모바일)',
-    tagline: '도구·제어·실시간 알림',
+    tagline: '쇼케이스·명함·가족보호',
     color: 'indigo' as const,
     exclusive: [
-      { id: 'remote', title: '복합기 리모컨', desc: 'PC 에이전트·오피스 원격 제어' },
-      { id: 'alert', title: '실시간 알림', desc: '피싱·가족·공지 SSE·푸시' },
+      { id: 'showcase', title: '블루 쇼케이스', desc: '통화 중 프로필·SNS 연동' },
+      { id: 'alert', title: '실시간 알림', desc: '피싱·가족·공지 푸시' },
       { id: 'hw', title: '하드웨어 연동', desc: '통화 화면 명함·Android 보호 브릿지' },
     ],
     sharedLabel: '웹·앱 공통',
-    shared: ['VLUE 스토어', 'VLUE메일', '개인자료실', '쇼핑·결제·채팅'],
+    shared: ['개인케이스', '디지털 인증명함', '가족보호'],
   },
-  syncNote: '쇼핑·결제·메일·자료실·엑셀 데이터는 @vlue/api로 동기화됩니다. 브라우저 웹앱(/app)은 제공하지 않습니다.',
+  syncNote: 'V1은 블루 쇼케이스·디지털 인증명함·가족보호·기관 검색·개인케이스가 핵심입니다. 웹과 앱이 동일 계정으로 연결됩니다.',
 } as const;
 
 /** @deprecated — 플랫폼 섹션에서 PLATFORM_SPLIT 사용 */
@@ -139,7 +139,7 @@ export const ARCHITECTURE_FLOW = [
   { label: '결과', sub: '안전/주의/위험' },
 ] as const;
 
-/** 웹 전용 기능 — 메뉴 중복·PC기능 중복 제거 */
+/** 웹 전용 기능 — V1 */
 export const WEB_EXCLUSIVE_FEATURES: ServiceAccordionItem[] = [
   {
     id: 'web-search',
@@ -151,33 +151,30 @@ export const WEB_EXCLUSIVE_FEATURES: ServiceAccordionItem[] = [
     ],
   },
   {
-    id: 'web-excel',
-    title: 'AI엑셀에디터',
-    summary: 'www 전용 장부·보고서',
+    id: 'web-pricing',
+    title: 'V1 멤버십 · 요금제',
+    summary: '무료·유료·B2B 안내',
     detail: [
-      '공구·매출·입금 대조 등 표준 템플릿으로 AI가 시트를 생성합니다.',
-      '웹에서 바로 편집·저장하며, PC 설치 프로그램과 동일 데이터로 연동됩니다.',
+      '블루 쇼케이스·디지털 인증명함·가족보호 중심의 V1 요금제를 비교합니다.',
+      '가입·결제는 VLUE 앱에서 진행합니다.',
     ],
   },
 ];
 
-/** 웹·앱 공통 — 한 번만 노출 (네비 메뉴와 1:1) */
+/** 웹·앱 공통 — V1 노출 (네비와 동기) */
 export const SHARED_SERVICES: Array<{
   id: string;
   title: string;
   summary: string;
   nav?: string;
 }> = [
-  { id: 'store', title: 'VLUE 스토어', summary: '인증 판매자 안전 쇼핑', nav: 'shopping' },
-  { id: 'mail', title: 'VLUE메일', summary: '@vlue.kr 보안 메일', nav: 'mail' },
-  { id: 'vault', title: '개인자료실', summary: '문서·스캔 파일', nav: 'resources' },
+  { id: 'vault', title: '개인케이스', summary: '명함·저장된케이스·내문서', nav: 'resources' },
   { id: 'pricing', title: '인증신청', summary: 'V1 무료·유료·B2B 요금제', nav: 'pricing' },
-  { id: 'events', title: '지역 이벤트', summary: '캠페인·일정', nav: 'events' },
-  { id: 'jobs', title: '공식 채용', summary: '파트너·채용', nav: 'jobs' },
+  { id: 'family', title: '가족보호', summary: '부모·자녀 안심 모니터링', nav: 'family' },
   { id: 'support', title: '고객지원', summary: 'FAQ·문의', nav: 'support' },
 ];
 
-/** 설치형 전용 — 앱 가이드 핵심만 (시스템 상세 목록 제거) */
+/** 설치형 전용 — V1 앱 가이드 */
 export const INSTALL_EXCLUSIVE_FEATURES: ServiceAccordionItem[] = [
   {
     id: 'lettering',
@@ -186,28 +183,16 @@ export const INSTALL_EXCLUSIVE_FEATURES: ServiceAccordionItem[] = [
     detail: '통화 중 VLUE 인증 명함이 노출되어 사칭·피싱 의심을 줄이고, 홍보·상담 접점으로 활용합니다.',
   },
   {
+    id: 'showcase',
+    title: '블루 쇼케이스',
+    summary: '무료 프로필 · SNS 연동',
+    detail: '카카오·인스타 프로필과 개인 스타일로 통화 중 쇼케이스를 보여 줍니다.',
+  },
+  {
     id: 'family',
     title: '가족 보호',
     summary: '부모·자녀 안심 모니터링',
     detail: '통화·원격앱·유해 링크·계좌 이상 징후를 보호자에게 알립니다. Android 네이티브 연동을 지원합니다.',
-  },
-  {
-    id: 'remote',
-    title: '스마트 오피스 · 리모컨',
-    summary: 'PC·복합기 원격',
-    detail: 'PC 에이전트로 스캔·인쇄·팩스를 요청하고, 오피스 메일을 앱에서 확인합니다.',
-  },
-  {
-    id: 'chat',
-    title: '채팅 · BlueAI',
-    summary: '1:1 상담·AI 비서',
-    detail: '고객·가족방·공식 채널 DM과 VLUE AI 대화를 한 앱에서 운영합니다.',
-  },
-  {
-    id: 'commerce',
-    title: '미디어 커머스 · 라이브',
-    summary: '쇼핑·방송·공구',
-    detail: '숏츠·라이브·공동구매와 스토어 운영을 연결해 매출·상담을 한곳에서 처리합니다.',
   },
   {
     id: 'partner',
@@ -304,7 +289,7 @@ export const VISION_CARDS = [
 export const MARKET_BARS = [
   { label: '보이스피싱 예방 솔루션', pct: 68 },
   { label: '기업 보안 B2B API', pct: 45 },
-  { label: '설치형 보안·커머스', pct: 30 },
+  { label: '설치형 통화 보호·명함', pct: 30 },
 ] as const;
 
 export type CatalogFeature = ServiceAccordionItem & {

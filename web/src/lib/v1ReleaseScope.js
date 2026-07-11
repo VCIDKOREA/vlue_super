@@ -31,7 +31,11 @@ export const V1_APP_EXCLUDED_PAGES = new Set([
 
 /** @param {string} view */
 export function isWebViewV1Enabled(view) {
-  return !V1_WEB_EXCLUDED_VIEWS.has(String(view || ""));
+  const v = String(view || "");
+  if (V1_WEB_EXCLUDED_VIEWS.has(v)) return false;
+  const shellKey = WEB_VIEW_SHELL_KEY[v];
+  if (shellKey && v1WebShell[shellKey] === false) return false;
+  return true;
 }
 
 /** MVP — 웹 AI엑셀에디터 노출 여부 */
@@ -127,3 +131,23 @@ export const v1WebShell = {
   vlueEmail: false,
   aiExcel: false
 };
+
+/** hash view → v1WebShell 키 (없으면 셸 검사 생략) */
+const WEB_VIEW_SHELL_KEY = Object.freeze({
+  shopping: "vlueStore",
+  auction: "auction",
+  events: "events",
+  jobs: "jobs",
+  "mail-settings": "vlueEmail",
+  mail: "vlueEmail",
+  exceleditor: "aiExcel",
+  resources: "resources",
+  pricing: "pricing",
+  download: "download",
+  family: "familyProtection"
+});
+
+/** 홈 — 스토어·이벤트 블록 */
+export function isWebHomeCommerceEnabled() {
+  return Boolean(v1WebShell.vlueStore || v1WebShell.events);
+}

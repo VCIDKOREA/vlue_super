@@ -4,7 +4,7 @@ const FOOTER_LINKS = [
   { label: "서비스소개", id: "about" },
   { label: "고객지원", id: "support" },
   { label: "인증신청", id: "pricing" },
-  { label: "자료실", id: "resources" },
+  { label: "개인케이스", id: "resources" },
 ];
 
 export default function MarketingFooter({ onNavigate }) {

@@ -2,8 +2,8 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle, CheckCircle, TrendingUp, Globe, Monitor, Smartphone,
   ArrowRight, Phone, Server, Zap, Eye, Users, Award,
-  Lock, Shield, PhoneOff, ShieldX, Search, FileSpreadsheet,
-  Radio, Bell, Cpu, Heart, MessageCircle, ShoppingBag,
+  Lock, Shield, PhoneOff, ShieldX, Search,
+  Radio, Bell, Cpu, Heart,
   Target, Sparkles, Download,
 } from 'lucide-react';
 import { VlueBrandMark } from '../../../components/VlueBrandLogo.jsx';
@@ -38,7 +38,7 @@ import {
   MARKETING_PRICING_TIERS,
 } from '../data/membershipPlansContent';
 import { SYNC_PRINCIPLES } from '../data/platformArchitectureContent';
-import { isWebAiExcelEnabled, isWebPcDownloadEnabled } from '../../../lib/v1ReleaseScope.js';
+import { isWebAiExcelEnabled, isWebPcDownloadEnabled, isWebViewV1Enabled } from '../../../lib/v1ReleaseScope.js';
 
 const CHART_DATA = [
   { year: '2019', value: 3209, label: '3,209억' },
@@ -68,14 +68,14 @@ const WARNING_COLORS = [
 ] as const;
 
 const PILLAR_ICONS = [Shield, Zap, Sparkles] as const;
-const WEB_ICONS = [Search, FileSpreadsheet] as const;
+const WEB_ICONS = [Search, Sparkles] as const;
 const INSTALL_ICON_MAP: Record<string, typeof Radio> = {
   lettering: Shield,
+  showcase: Sparkles,
   family: Heart,
-  remote: Radio,
-  chat: MessageCircle,
-  commerce: ShoppingBag,
   partner: Target,
+  alert: Bell,
+  hw: Cpu,
 };
 
 function yPos(v: number) {
@@ -656,11 +656,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
               </span>
             }
             title="www에서만 제공하는 기능"
-            desc={
-              showAiExcel
-                ? '통합 검색·AI엑셀에디터는 브라우저에서 바로 사용합니다. 공통 서비스는 설치형 앱과 데이터가 연결됩니다.'
-                : '통합 기관 검색은 브라우저에서 바로 사용합니다. 공통 서비스는 설치형 앱과 데이터가 연결됩니다.'
-            }
+            desc="통합 기관 검색·V1 요금제 안내는 브라우저에서 바로 확인합니다. 개인케이스·가족보호는 설치형 앱과 동일 계정으로 연결됩니다."
           />
           <div className="grid sm:grid-cols-2 gap-4 mb-5 max-w-2xl">
             {webExclusiveFeatures.map((item, i) => (
@@ -682,7 +678,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
           </div>
           <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">웹·앱 공통 서비스</p>
           <div className="flex flex-wrap gap-2 mb-4">
-            {SHARED_SERVICES.map((s) => (
+            {SHARED_SERVICES.filter((s) => !s.nav || isWebViewV1Enabled(s.nav)).map((s) => (
               <button
                 key={s.id}
                 type="button"
@@ -707,7 +703,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
               </span>
             }
             title={installSectionTitle}
-            desc="리모컨·실시간 알림·하드웨어 연동은 모바일 앱 설치 후 이용합니다. 브라우저 웹앱(/app)은 제공하지 않습니다."
+            desc="블루 쇼케이스·디지털 인증명함·실시간 알림·가족보호는 모바일 앱 설치 후 이용합니다. 브라우저 웹앱(/app)은 제공하지 않습니다."
           />
 
           <div className="flex flex-wrap gap-2 mb-6">
@@ -739,9 +735,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
             <div className="flex-1 min-w-[200px]">
               <p className="text-sm font-bold text-slate-900">{installCtaLabel} 안내</p>
               <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                {showAiExcel
-                  ? '실시간 보호·리모컨·명함 레터링은 설치형 프로그램에서 이용하세요. 웹 AI엑셀·검색과 동일 계정으로 로그인됩니다.'
-                  : '실시간 보호·리모컨·명함 레터링은 설치형 프로그램에서 이용하세요. 웹 검색과 동일 계정으로 로그인됩니다.'}
+                블루 쇼케이스·디지털 인증명함·가족보호는 설치형 앱에서 이용하세요. 웹 검색·개인케이스와 동일 계정으로 로그인됩니다.
               </p>
             </div>
             <button
@@ -911,13 +905,9 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
             <Eye className="w-10 h-10 mx-auto mb-3 opacity-90" />
             <h2 className="text-xl font-black mb-2">웹에서 확인하고, 설치형으로 보호까지</h2>
             <p className="text-primary-100 text-sm max-w-md mx-auto mb-6" style={{ wordBreak: 'keep-all' }}>
-              {showAiExcel
-                ? showPc
-                  ? '기관 검색·AI엑셀에디터는 www에서, 실시간 경보·명함·가족 보호는 PC·모바일 설치 프로그램에서 이어가세요.'
-                  : '기관 검색·AI엑셀에디터는 www에서, 실시간 경보·명함·가족 보호는 모바일 앱에서 이어가세요.'
-                : showPc
-                  ? '기관 검색은 www에서, 실시간 경보·명함·가족 보호는 PC·모바일 설치 프로그램에서 이어가세요.'
-                  : '기관 검색은 www에서, 실시간 경보·명함·가족 보호는 모바일 앱에서 이어가세요.'}
+              {showPc
+                ? '기관 검색·요금 안내는 www에서, 블루 쇼케이스·디지털 인증명함·가족 보호는 PC·모바일 설치 프로그램에서 이어가세요.'
+                : '기관 검색·요금 안내는 www에서, 블루 쇼케이스·디지털 인증명함·가족 보호는 모바일 앱에서 이어가세요.'}
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <button

@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { Search, CheckCircle, AlertTriangle, ChevronRight, Shield } from 'lucide-react';
 import { VlueBrandMark } from '../../../components/VlueBrandLogo.jsx';
+import { v1WebShell } from '../../../lib/v1ReleaseScope.js';
 
 interface HeroSectionProps {
   onSearch: (query: string) => void;
@@ -17,6 +18,7 @@ const STATS = [
 
 export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) {
   const [query, setQuery] = useState('');
+  const showStoreCta = Boolean(v1WebShell.vlueStore);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -123,9 +125,15 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
             VLUE 인증 신청하기
             <ChevronRight className="w-4 h-4" />
           </button>
-          <button onClick={() => onNavigate('shopping')} className="btn-secondary hero-cta-secondary">
-            VLUE 스토어 바로가기
-          </button>
+          {showStoreCta ? (
+            <button onClick={() => onNavigate('shopping')} className="btn-secondary hero-cta-secondary">
+              VLUE 스토어 바로가기
+            </button>
+          ) : (
+            <button onClick={() => onNavigate('pricing')} className="btn-secondary hero-cta-secondary">
+              V1 요금제 보기
+            </button>
+          )}
         </div>
       </div>
     </section>

@@ -2,6 +2,7 @@
  * 헤더 통합검색 — 채팅·메시지·화면 이동·메인(홈) 라벨 등 앱 내 문자열 인덱싱
  */
 import { formatMembershipTierLabel } from "./membershipTierDisplay.js";
+import { isAppPageV1Enabled, v1AppShell } from "./v1ReleaseScope.js";
 
 export function tabForRoom(roomId) {
   if (!roomId) return "all";
@@ -86,14 +87,15 @@ const MAIN_DISCOVER = [
 
 function staticScreens(membershipTier) {
   const tierKo = formatMembershipTierLabel(membershipTier);
-  return [
+  const all = [
     {
       id: "scr-chat",
       category: "바로가기",
       title: "채팅",
       subtitle: "대화 목록 · 미확인 메시지",
       fields: ["채팅", "대화", "목록", "메시지"],
-      action: { type: "page", page: "list", tab: "all" }
+      action: { type: "page", page: "list", tab: "all" },
+      v1: () => v1AppShell.chat
     },
     {
       id: "scr-blueai",
@@ -101,7 +103,8 @@ function staticScreens(membershipTier) {
       title: "블루AI",
       subtitle: "AI 상담",
       fields: ["블루", "ai", "인공지능"],
-      action: { type: "page", page: "blueai" }
+      action: { type: "page", page: "blueai" },
+      v1: () => v1AppShell.vumingAi
     },
     {
       id: "scr-my",
@@ -109,7 +112,8 @@ function staticScreens(membershipTier) {
       title: "MY · 마이페이지",
       subtitle: "프로필 · 명함 · 설정",
       fields: ["my", "마이", "프로필", "설정", "명함"],
-      action: { type: "page", page: "mypage" }
+      action: { type: "page", page: "mypage" },
+      v1: () => v1AppShell.mypageShop || v1AppShell.webViewProfile
     },
     {
       id: "scr-shop",
@@ -130,7 +134,8 @@ function staticScreens(membershipTier) {
         "딜",
         "라이브"
       ],
-      action: { type: "page", page: "subhub", subscriptionSubTab: "recommend" }
+      action: { type: "page", page: "subhub", subscriptionSubTab: "recommend" },
+      v1: () => v1AppShell.vlueStore || v1AppShell.shoppingCart
     },
     {
       id: "scr-gift-box",
@@ -138,7 +143,8 @@ function staticScreens(membershipTier) {
       title: "선물함",
       subtitle: "받은 선물 · 쿠폰 · 교환권",
       fields: ["선물", "선물함", "쿠폰", "교환", "이벤트", "혜택", "gift"],
-      action: { type: "page", page: "subhub", subscriptionSubTab: "gifts" }
+      action: { type: "page", page: "subhub", subscriptionSubTab: "gifts" },
+      v1: () => v1AppShell.vlueStore || v1AppShell.shoppingCart
     },
     {
       id: "scr-friend",
@@ -146,7 +152,8 @@ function staticScreens(membershipTier) {
       title: "친구검색",
       subtitle: "친구 찾기 · 요청",
       fields: ["친구", "검색", "추천"],
-      action: { type: "page", page: "friendSearch" }
+      action: { type: "page", page: "friendSearch" },
+      v1: () => true
     },
     {
       id: "scr-feedmgr",
@@ -154,7 +161,8 @@ function staticScreens(membershipTier) {
       title: "페이지관리 · 활동",
       subtitle: "활동 글 관리",
       fields: ["활동", "페이지", "관리", "글"],
-      action: { type: "page", page: "manage" }
+      action: { type: "page", page: "manage" },
+      v1: () => isAppPageV1Enabled("manage")
     },
     {
       id: "scr-profile",
@@ -162,23 +170,26 @@ function staticScreens(membershipTier) {
       title: "사이드 메뉴 (설정)",
       subtitle: "알림 · 레터링 · 프로필 패널",
       fields: ["설정", "알림", "vcid", "다크"],
-      action: { type: "profile", view: "main" }
+      action: { type: "profile", view: "main" },
+      v1: () => true
     },
     {
       id: "scr-wallet",
       category: "바로가기",
       title: "개인케이스 · Wallet",
       subtitle: "명함저장 · 저장된케이스 · 내문서",
-      fields: ["지갑", "wallet", "명함", "카드", "케이스", "자료실"],
-      action: { type: "wallet" }
+      fields: ["지갑", "wallet", "명함", "카드", "케이스", "개인케이스", "자료실"],
+      action: { type: "wallet" },
+      v1: () => v1AppShell.personalVault
     },
     {
       id: "scr-documents",
       category: "바로가기",
       title: "업무·일상 서류 양식",
-      subtitle: "개인 자료실 · 서류 양식 다운로드",
-      fields: ["서류", "양식", "다운로드", "위임장", "근로계약", "내용증명", "계약서", "문서", "자료실"],
-      action: { type: "wallet", tab: "mydocs" }
+      subtitle: "개인케이스 · 내문서 · 서류 양식",
+      fields: ["서류", "양식", "다운로드", "위임장", "근로계약", "내용증명", "계약서", "문서", "자료실", "개인케이스"],
+      action: { type: "wallet", tab: "mydocs" },
+      v1: () => v1AppShell.personalVault
     },
     {
       id: "scr-local-ad",
@@ -186,7 +197,8 @@ function staticScreens(membershipTier) {
       title: "우리동네 핫플레이스 · 지역 광고",
       subtitle: "상점 피드 게시물 선택 · AI 송출",
       fields: ["광고", "핫플", "핫플레이스", "지역", "매장", "홍보", "동네"],
-      action: { type: "main" }
+      action: { type: "main" },
+      v1: () => v1AppShell.homeLegacyFeed
     },
     {
       id: "scr-tier",
@@ -194,7 +206,8 @@ function staticScreens(membershipTier) {
       title: `현재 등급 · ${tierKo}`,
       subtitle: "멤버십 · 등급 안내는 프로필에서",
       fields: ["등급", "멤버십", "무료", "유료", "가족보호", "쇼케이스", "구독료", "9900"],
-      action: { type: "profile", view: "main" }
+      action: { type: "profile", view: "main" },
+      v1: () => true
     },
     {
       id: "scr-tabs-all",
@@ -202,7 +215,8 @@ function staticScreens(membershipTier) {
       title: "탭 · 전체",
       subtitle: "채팅 목록 필터",
       fields: ["전체", "탭"],
-      action: { type: "page", page: "list", tab: "all" }
+      action: { type: "page", page: "list", tab: "all" },
+      v1: () => v1AppShell.chat
     },
     {
       id: "scr-tabs-fav",
@@ -210,7 +224,8 @@ function staticScreens(membershipTier) {
       title: "탭 · 즐겨찾기",
       subtitle: "채팅 목록 필터",
       fields: ["즐겨찾기", "즐겨"],
-      action: { type: "page", page: "list", tab: "favorites" }
+      action: { type: "page", page: "list", tab: "favorites" },
+      v1: () => v1AppShell.chat
     },
     {
       id: "scr-tabs-biz",
@@ -218,7 +233,8 @@ function staticScreens(membershipTier) {
       title: "탭 · 비즈니스",
       subtitle: "직장·내선 대화",
       fields: ["비즈니스", "비지니스", "직장"],
-      action: { type: "page", page: "list", tab: "clients" }
+      action: { type: "page", page: "list", tab: "clients" },
+      v1: () => v1AppShell.chat
     },
     {
       id: "scr-tabs-unread",
@@ -226,7 +242,8 @@ function staticScreens(membershipTier) {
       title: "탭 · 미확인",
       subtitle: "읽지 않은 방",
       fields: ["미확인", "안읽음"],
-      action: { type: "page", page: "list", tab: "unread" }
+      action: { type: "page", page: "list", tab: "unread" },
+      v1: () => v1AppShell.chat
     },
     {
       id: "scr-tabs-sub",
@@ -234,12 +251,20 @@ function staticScreens(membershipTier) {
       title: "탭 · 구독",
       subtitle: "매장·브랜드 채널",
       fields: ["구독", "매장"],
-      action: { type: "page", page: "list", tab: "subscribe" }
+      action: { type: "page", page: "list", tab: "subscribe" },
+      v1: () => v1AppShell.chat
     }
   ];
+  return all.filter((s) => {
+    if (typeof s.v1 === "function") return Boolean(s.v1());
+    const page = s.action?.page;
+    if (page) return isAppPageV1Enabled(page);
+    return true;
+  });
 }
 
 function collectRooms(roomCatalog, officialChannelMeta) {
+  if (!v1AppShell.chat) return [];
   const rows = [];
   const groups = ["friends", "family", "work", "subscribe"];
   for (const g of groups) {
@@ -267,6 +292,7 @@ function collectRooms(roomCatalog, officialChannelMeta) {
 }
 
 function collectMainDiscover() {
+  if (!v1AppShell.homeLegacyFeed) return [];
   return MAIN_DISCOVER.map((d) => ({
     id: `main-${d.id}`,
     category: "메인 홈",
@@ -327,7 +353,7 @@ export function runUnifiedSearch(query, ctx) {
 
   if (!q) {
     const shortcuts = screens.filter((s) =>
-      ["scr-chat", "scr-blueai", "scr-my", "scr-shop", "scr-friend", "scr-profile"].includes(s.id)
+      ["scr-wallet", "scr-friend", "scr-profile", "scr-documents"].includes(s.id)
     );
     return shortcuts.map((c) => ({ ...c, score: 1 }));
   }

@@ -15,9 +15,8 @@ const FOOTER_SECTIONS: { label: string; links: FooterLink[] }[] = [
     links: [
       { text: '기관 검색', view: 'home' as View },
       { text: '인증신청', view: 'pricing' as View },
-      { text: 'VLUE 스토어', view: 'shopping' as View },
-      { text: '개인자료실', view: 'resources' as View },
-      { text: 'AI엑셀에디터', view: 'exceleditor' as View },
+      { text: '개인케이스', view: 'resources' as View },
+      { text: '가족보호', view: 'family' as View },
       { text: '마이페이지', view: 'mypage' as View },
     ],
   },
@@ -25,18 +24,15 @@ const FOOTER_SECTIONS: { label: string; links: FooterLink[] }[] = [
     label: '정보',
     links: [
       { text: '서비스소개', view: 'about' as View },
-      { text: '지역 이벤트', view: 'events' as View },
-      { text: 'VLUE메일', view: 'mail-settings' as View },
       { text: '인증절차안내', view: 'pricing' as View },
+      { text: '앱 다운로드', view: 'download' as View },
     ],
   },
   {
     label: '지원',
     links: [
       { text: '고객지원', view: 'support' as View },
-      { text: '공식 채용', view: 'jobs' as View },
       { text: '피해신고', view: 'home' as View },
-      { text: 'API 문서', view: 'home' as View },
     ],
   },
   {
@@ -45,8 +41,6 @@ const FOOTER_SECTIONS: { label: string; links: FooterLink[] }[] = [
       { text: '이용약관', view: 'terms' as View },
       { text: '개인정보처리방침', view: 'privacy' as View },
       { text: '만 14세 미만 정책', view: 'privacy' as View, anchor: 'legal-article-3' },
-      { text: '저작권 정책', view: 'home' as View },
-      { text: '쿠키 정책', view: 'home' as View },
     ],
   },
 ];

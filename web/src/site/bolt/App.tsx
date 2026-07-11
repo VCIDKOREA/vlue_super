@@ -193,7 +193,7 @@ export default function App() {
             <AboutPage onSearch={handleSearch} onNavigate={handleNavigate} />
           </Suspense>
         )}
-        {view === 'resources' && <ResourcesPage user={user} />}
+        {view === 'resources' && isWebViewV1Enabled('resources') && <ResourcesPage user={user} />}
         
         {view === 'pricing' && (
           <div className="mkt-pricing-shell pt-8 sm:pt-16 lg:pt-32 pb-12 sm:pb-20">

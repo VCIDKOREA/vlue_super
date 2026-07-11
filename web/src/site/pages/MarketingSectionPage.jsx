@@ -1,15 +1,13 @@
 import { MARKETING_VIEW_LABELS } from "../siteViews.js";
 import { appEntryUrl } from "../../lib/siteMode.js";
-import { isWebAiExcelEnabled, isWebPcDownloadEnabled } from "../../lib/v1ReleaseScope.js";
+import { isWebPcDownloadEnabled } from "../../lib/v1ReleaseScope.js";
 
 function aboutSectionBody() {
-  const webPart = isWebAiExcelEnabled()
-    ? "웹(www)은 통합검색·AI엑셀에디터"
-    : "웹(www)은 통합검색";
+  const webPart = "웹(www)은 통합검색·V1 요금 안내";
   const appPart = isWebPcDownloadEnabled()
-    ? "앱(PC·모바일)은 리모컨·실시간 알림·하드웨어 제어"
-    : "모바일 앱은 실시간 알림·하드웨어 제어";
-  return `${webPart}, ${appPart}를 담당합니다. 쇼핑·결제·메일·자료실은 @vlue/api로 웹·앱 동일 데이터가 실시간 동기화됩니다.`;
+    ? "앱(PC·모바일)은 블루 쇼케이스·디지털 인증명함·가족보호"
+    : "모바일 앱은 블루 쇼케이스·디지털 인증명함·가족보호";
+  return `${webPart}, ${appPart}를 담당합니다. 개인케이스는 웹·앱 동일 구성(명함저장·저장된케이스·내문서)으로 @vlue/api 계정 데이터와 동기화됩니다.`;
 }
 
 const SECTION_COPY = {
@@ -21,8 +19,14 @@ const SECTION_COPY = {
   },
   news: { title: "기업뉴스", body: "VLUE의 공지·보도자료·업데이트 소식이 이곳에 표시됩니다." },
   events: { title: "지역별행사", body: "전국 지역협력사와 함께하는 안심 캠페인 일정입니다." },
-  support: { title: "고객지원", body: "문의·FAQ·원격 지원은 VLUE 앱 또는 고객센터를 이용해 주세요." },
-  resources: { title: "자료실", body: "교육 자료, 가이드, 정책 문서를 제공합니다." },
+  support: {
+    title: "고객지원",
+    body: "V1 FAQ·1:1 문의는 쇼케이스·인증명함·가족보호·개인케이스·요금제 중심으로 안내합니다.",
+  },
+  resources: {
+    title: "개인케이스",
+    body: "앱과 동일하게 명함저장·저장된케이스·내문서를 제공합니다.",
+  },
   pricing: {
     title: "인증신청(요금제)",
     body: "V1 요금제: 무료·유료(월 9,900원·정가 28,300원 65% 특별 할인)·B2B 풀 패키지(직원 회선 이벤트 5,200원)·SOHO 영업 송출(+4,200원). 쇼케이스·디지털 인증명함·가족보호 중심. 가입·결제는 VLUE 앱에서 진행합니다.",
@@ -30,9 +34,9 @@ const SECTION_COPY = {
   jobs: { title: "구인구직", body: "VLUE 파트너·지역협력 채용 공고가 연동됩니다." },
   shopping: {
     title: "블루쇼핑",
-    body: "인증 판매자만 입점하는 안전 쇼핑은 VLUE 앱에서 이용하세요.",
+    body: "쇼핑·스토어는 V1에서 제공하지 않습니다. 블루 쇼케이스·디지털 인증명함·가족보호를 이용해 주세요.",
   },
-  mail: { title: "보안메일", body: "보안 예약·암호화 메일 기능은 앱과 연동됩니다." },
+  mail: { title: "보안메일", body: "보안 메일은 V1에서 제공하지 않습니다." },
   search: { title: "검색 결과", body: "검색 API 연동 후 결과 목록이 표시됩니다." },
   download: { title: "APP 다운로드", body: "iOS·Android 앱 설치 링크로 이동합니다." },
 };

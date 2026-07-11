@@ -22,7 +22,7 @@ node scripts/extract-web2-sources.mjs
 | news | `pages/NewsPage.tsx` |
 | events | `pages/EventsPage.tsx` |
 | support | `pages/SupportPage.tsx` |
-| resources | `pages/ResourcesPage.tsx` |
+| resources | `pages/ResourcesPage.tsx` (개인케이스) |
 | pricing | `pages/PricingPage.tsx` (+ App 내 PremiumHeroSection) |
 | jobs | `pages/JobsPage.tsx` |
 | shopping | `pages/ShoppingPage.tsx` |

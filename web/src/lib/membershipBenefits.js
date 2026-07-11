@@ -100,7 +100,7 @@ export const MEMBERSHIP_PLAN_DETAILS = {
     headline: "디지털 인증명함 · 풀 쇼케이스 · 가족보호",
     bullets: [
       "수신 화면 발신자 신원 확인 + 디지털 인증명함·쇼케이스 배너(최대 10) 풀 송출을 제공합니다.",
-      "쇼케이스 스타일·소셜 링크·메뉴·상품 소개 등 유료 설정을 이용합니다.",
+      "쇼케이스 스타일·소셜 링크·메뉴 등 유료 설정을 이용합니다.",
       FAMILY_PROTECTION_SUMMARY,
       `정가 월 ${formatKrw(PAID_LIST_PRICE_MONTHLY_KRW)} → 판매가 월 ${formatKrw(PAID_EVENT_MONTHLY_KRW)}. ${PAID_LAUNCH_DISCOUNT_NOTE}`,
       PAID_ANNUAL_BENEFIT_NOTE,
