@@ -59,6 +59,9 @@ export function resolveWalletProfile(item, profileByRoomId) {
       logoUrl: snap.logoUrl || "",
       email: snap.email || "",
       address: snap.address || "",
+      website: snap.website || "",
+      companyIntro: snap.companyIntro || snap.introBack || "",
+      verificationItems: Array.isArray(snap.verificationItems) ? snap.verificationItems : [],
       landline: snap.landline || "",
       fax: snap.fax || "",
       backNote: snap.backNote || "",
@@ -73,6 +76,9 @@ export function resolveWalletProfile(item, profileByRoomId) {
     title: "",
     name: "",
     phone: "",
+    website: "",
+    companyIntro: "",
+    verificationItems: [],
     introBack: "저장 시점 정보가 없습니다. 채팅에서 다시 저장해 주세요.",
     legalName: "",
     logoUrl: ""
@@ -90,13 +96,24 @@ export function buildCardSnapshot(card) {
     address: String(card.address || "").trim(),
     landline: String(card.landline || "").trim(),
     fax: String(card.fax || "").trim(),
-    introBack: String(card.introBack || "").trim(),
+    website: String(card.website || "").trim(),
+    companyIntro: String(card.companyIntro || card.salesContent || "").trim(),
+    introBack: String(card.introBack || card.companyIntro || card.salesContent || "").trim(),
     backNote: String(card.backNote || "").trim(),
     legalName: String(card.legalName || "").trim(),
     logoUrl: String(card.logoUrl || "").trim(),
+    photoUrl: String(card.photoUrl || card.image_url || "").trim(),
     email: String(card.email || "").trim(),
+    verificationItems: Array.isArray(card.verificationItems) ? card.verificationItems.slice(0, 8) : [],
     digitalCardId: String(card.digitalCardId || card.digital_card_id || "").trim(),
-    membershipTier: card.membershipTier === "premium" || card.membershipTier === "standard" ? card.membershipTier : "free",
+    membershipTier:
+      card.membershipTier === "premium" ||
+      card.membershipTier === "standard" ||
+      card.membershipTier === "paid"
+        ? card.membershipTier === "paid"
+          ? "premium"
+          : card.membershipTier
+        : "free",
     vcidLettering: card.vcidLettering !== false
   };
 }

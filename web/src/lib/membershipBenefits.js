@@ -1,15 +1,16 @@
 import {
   formatKrw,
-  PAID_ANNUAL_DISCOUNTED_KRW,
-  PAID_LIST_PRICE_ANNUAL_KRW,
+  PAID_EVENT_MONTHLY_KRW,
   PAID_LIST_PRICE_MONTHLY_KRW,
-  PAID_MONTHLY_DISCOUNTED_KRW
+  PAID_LAUNCH_DISCOUNT_NOTE,
+  PAID_ANNUAL_BENEFIT_NOTE,
+  B2B_REP_LIST_MONTHLY_KRW,
+  B2B_STAFF_LIST_MONTHLY_KRW,
+  B2B_STAFF_EVENT_MONTHLY_KRW,
+  B2B_EVENT_NOTE,
+  SOHO_BROADCAST_MONTHLY_KRW,
+  SOHO_BROADCAST_NO_DISCOUNT_NOTE
 } from "./membershipBm.js";
-import {
-  GROUP_ANNUAL_PER_LINE_KRW,
-  GROUP_MONTHLY_PER_LINE_KRW,
-  GROUP_SIGNUP_MIN_LINES
-} from "./groupSignupBm.js";
 
 /** 유료 전용 — 가족보호 1:3 (유료 1계정=4인, 2계정=8인) */
 export const FAMILY_PROTECTION_SUMMARY_SHORT = "유료 1계정 4인 · 2계정 8인";
@@ -17,15 +18,16 @@ export const FAMILY_PROTECTION_SUMMARY =
   "가족보호시스템(1:3): 유료 개인 계정 1개당 최대 4인(유료회원+가족 3명), 유료 2계정 시 최대 8인까지 등록. 초과 인원 추가 요금.";
 export const FAMILY_PROTECTION_B2B_NOTE =
   "기업 회선은 업무 전용입니다. 가족보호는 기업 계정에 해당하지 않으며, 별도 개인(유료) 계정으로 이용할 수 있습니다.";
-export const VLUER_REFERRAL_B2B_NOTE =
-  "VLUER 추천 프로그램은 개인 회원(일반·유료) 전용입니다. 기업 회선에는 해당하지 않습니다.";
 
-/** 기업(B2B) 전용 — 10회선 이상 단체 특가 */
-export const B2B_ENTERPRISE_SUMMARY_SHORT = `${GROUP_SIGNUP_MIN_LINES}회선↑ · 대표 ${formatKrw(PAID_LIST_PRICE_MONTHLY_KRW)} · 하부 ${formatKrw(GROUP_MONTHLY_PER_LINE_KRW)}/월`;
+/** @deprecated V1 미운영 */
+export const VLUER_REFERRAL_B2B_NOTE = "V1에서는 추천인·리워드 프로그램을 운영하지 않습니다.";
+
+/** 기업(B2B) — V1 풀 패키지 */
+export const B2B_ENTERPRISE_SUMMARY_SHORT = `대표 ${formatKrw(B2B_REP_LIST_MONTHLY_KRW)} + 직원 ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)}(${B2B_EVENT_NOTE})`;
 export const B2B_ENTERPRISE_SUMMARY =
-  `기업 단체(B2B): ${GROUP_SIGNUP_MIN_LINES}회선 이상. 추천인 없을 때 대표(VLUE) ${formatKrw(PAID_LIST_PRICE_MONTHLY_KRW)}/월 · 직원 회선 ${formatKrw(GROUP_MONTHLY_PER_LINE_KRW)}/월. 추천인 있으면 전 회선 단체 요금(${formatKrw(GROUP_MONTHLY_PER_LINE_KRW)}/월). 유료 혜택 포함 + 사내 그룹 채팅·비품 구매·기기 승인·회선·역할 관리.`;
+  `비즈니스 / B2B 풀 패키지: 대표자 계정 ${formatKrw(B2B_REP_LIST_MONTHLY_KRW)} + 직원 회선 정가 ${formatKrw(B2B_STAFF_LIST_MONTHLY_KRW)} → 이벤트 ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)}(${B2B_EVENT_NOTE}). 유료와 동일한 블루 쇼케이스·디지털 인증명함(회선 단위). 가족보호는 개인 유료 계정에서만 이용.`;
 
-/** 가입 멤버십 선택 — 혜택·서비스 비교 (UI용, 짧은 문구) */
+/** V1 가입 멤버십 — 혜택 비교 (쇼케이스·가족보호 중심) */
 export const MEMBERSHIP_BENEFIT_ROWS = [
   {
     label: "통화·신원 확인",
@@ -34,46 +36,28 @@ export const MEMBERSHIP_BENEFIT_ROWS = [
     b2b: "제공"
   },
   {
-    label: "디지털 명함",
-    free: "—",
-    paid: "인증 명함",
-    b2b: "CI 연동"
+    label: "블루 쇼케이스",
+    free: "기본(연락처별)",
+    paid: "풀(명함+배너)",
+    b2b: "풀(회선)"
   },
   {
-    label: "서류 양식",
+    label: "디지털 인증명함",
+    free: "—",
+    paid: "제공",
+    b2b: "CI·대표번호"
+  },
+  {
+    label: "쇼케이스 스타일 설정",
     free: "기본",
     paid: "전체",
-    b2b: "전체+세무"
+    b2b: "전체"
   },
   {
-    label: "VLUE PAGE",
-    free: "이용",
-    paid: "이용",
-    b2b: "이용"
-  },
-  {
-    label: "PASS·생체",
+    label: "PASS·본인확인",
     free: "필수",
     paid: "필수",
     b2b: "필수"
-  },
-  {
-    label: "활동 보드",
-    free: "이용",
-    paid: "이용",
-    b2b: "이용"
-  },
-  {
-    label: "추천·리워드",
-    free: "지인 10% 포인트",
-    paid: "홍보 VLUER 캐시",
-    b2b: "해당 없음"
-  },
-  {
-    label: "AI·지역 광고",
-    free: "—",
-    paid: "제공",
-    b2b: "제공"
   },
   {
     label: "가족보호",
@@ -82,46 +66,16 @@ export const MEMBERSHIP_BENEFIT_ROWS = [
     b2b: "해당 없음"
   },
   {
-    label: "사내 채팅",
+    label: "추가번호 쇼케이스 송출",
     free: "—",
-    paid: "—",
-    b2b: "자동 개설"
-  },
-  {
-    label: "상품구매",
-    free: "VLUE 공급가",
-    paid: "VLUE 공급가",
-    b2b: "기업할인·일부제외"
-  },
-  {
-    label: "기기 승인",
-    free: "—",
-    paid: "—",
-    b2b: "대표 승인"
-  },
-  {
-    label: "회선·역할",
-    free: "—",
-    paid: "—",
-    b2b: "관리"
+    paid: `옵션 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}`,
+    b2b: "대표 외 추가번호"
   },
   {
     label: "구독 요금",
     free: "무료",
-    paid: `월 ${formatKrw(PAID_LIST_PRICE_MONTHLY_KRW)}`,
-    b2b: `대표 ${formatKrw(PAID_LIST_PRICE_MONTHLY_KRW)}`
-  },
-  {
-    label: "추천인 할인",
-    free: "—",
-    paid: "30%→15%",
-    b2b: "단체할인"
-  },
-  {
-    label: "상점",
-    free: "—",
-    paid: "입점 신청 후",
-    b2b: "자동 입점"
+    paid: `월 ${formatKrw(PAID_EVENT_MONTHLY_KRW)}`,
+    b2b: `직원 ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)}`
   }
 ];
 
@@ -131,13 +85,11 @@ export const MEMBERSHIP_PLAN_DETAILS = {
     title: "일반 회원 (Free)",
     badge: "무료",
     accent: "slate",
-    headline: "안전한 통화·생활 업무 지원",
+    headline: "통화 신원 확인 · 기본 쇼케이스",
     bullets: [
       "일반 통화 시 수신 화면에서 발신자 신원 확인 서비스를 이용합니다.",
-      "업무와 일상에 필요한 서류 양식을 제공받습니다.",
-      "VLUE PAGE로 프로필·활동 소개를 운영합니다.",
-      "PASS·휴대폰 본인확인과 생체 등록으로 안전 거래 기반을 만듭니다.",
-      "게시물·활동 보드·지인 추천(전화번호·10% 포인트)을 이용합니다."
+      "무료 티어 블루 쇼케이스: 등록 연락처는 맞춤 프로필, 미등록은 안전 VLUE 표시로 안내합니다.",
+      "PASS·휴대폰 본인확인으로 안전한 이용 기반을 만듭니다."
     ]
   },
   paid: {
@@ -145,32 +97,28 @@ export const MEMBERSHIP_PLAN_DETAILS = {
     title: "유료 회원 (Paid)",
     badge: "구독",
     accent: "blue",
-    headline: "디지털 명함 · AI 광고 · 가족보호",
+    headline: "디지털 인증명함 · 풀 쇼케이스 · 가족보호",
     bullets: [
-      "일반 통화 시 수신 화면 발신자 신원 확인 + 디지털 인증 명함을 제공합니다.",
-      "AI 알고리즘으로 안정적이고 저렴한 광고, 지역 일반 기본 광고 서비스가 제공됩니다.",
+      "수신 화면 발신자 신원 확인 + 디지털 인증명함·쇼케이스 배너(최대 10) 풀 송출을 제공합니다.",
+      "쇼케이스 스타일·소셜 링크·메뉴·상품 소개 등 유료 설정을 이용합니다.",
       FAMILY_PROTECTION_SUMMARY,
-      "일반 회원 혜택(서류 양식·VLUE PAGE·활동 보드 등)을 모두 포함합니다.",
-      "월·연 구독(연간 2개월 무료) 및 추천 할인(지인 30% / 홍보 VLUER 30%→15%)을 선택할 수 있습니다.",
-      "VLUER 업그레이드(인증·파트너)와 리워드·캐시 정산이 적용됩니다.",
-      "입점 신청·승인 후 상점·상품 운영이 가능합니다."
+      `정가 월 ${formatKrw(PAID_LIST_PRICE_MONTHLY_KRW)} → 판매가 월 ${formatKrw(PAID_EVENT_MONTHLY_KRW)}. ${PAID_LAUNCH_DISCOUNT_NOTE}`,
+      PAID_ANNUAL_BENEFIT_NOTE,
+      `SOHO 영업 송출 옵션: 대표자 계정 외 추가번호 쇼케이스만 +월 ${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}).`
     ]
   },
   b2b: {
     id: "b2b",
-    title: "기업 단체 회원 (B2B)",
+    title: "비즈니스 / B2B 풀 패키지",
     badge: "기업",
     accent: "indigo",
-    headline: "유료 혜택 + 사내 협업·구매·보안",
+    headline: "회선 단위 쇼케이스 · 직원 이벤트 요금",
     bullets: [
       B2B_ENTERPRISE_SUMMARY,
-      "유료 회원 혜택(디지털 명함·AI광고·서류 양식 등)을 회선 단위로 포함합니다. 가족보호는 개인(유료) 계정에서만 이용합니다.",
-      "기업 CI/BI가 적용된 디지털 명함과 회사 대표번호 연동을 지원합니다.",
-      "회선 등록이 완료되면 사내 그룹 채팅방이 자동 개설되며, 실시간으로 비품·업무 공지를 확인합니다.",
-      "경리·대표는 공용 장바구니·법인카드·공용 예산으로 사내 비품을 결제하고, 세무·결제 내역을 보낼 수 있습니다.",
-      "직원은 구매 요청을 올리고, 대표·대리인은 PC·기기 로그인을 승인하며, 회선·역할(경리·대리인·직원)을 관리합니다.",
-      "VLUER 추천 프로그램은 해당 없습니다(업무 전용 회선). 개인 계정에서 이용할 수 있습니다.",
-      "판매업·유통 등 해당 사업자는 자동 입점 후 기업 상점을 개설·운영할 수 있습니다."
+      "유료와 동일한 블루 쇼케이스·디지털 인증명함을 회선 단위로 제공합니다.",
+      "기업 CI/BI·회사 대표번호 연동 디지털 인증명함을 지원합니다.",
+      FAMILY_PROTECTION_B2B_NOTE,
+      `SOHO 영업 송출 옵션: 대표자 외 추가번호 쇼케이스만 +월 ${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}).`
     ]
   }
 };

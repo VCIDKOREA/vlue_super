@@ -28,7 +28,7 @@ export default function ShowcasePremiumGateModal({
       <div className={`relative z-10 w-full max-w-sm rounded-t-2xl border p-5 shadow-2xl sm:rounded-2xl ${panel}`}>
         <h3 className={`text-[16px] font-black ${textStrong}`}>유료 멤버십 전용</h3>
         <p className={`mt-2 text-[12px] leading-relaxed ${textSub}`}>
-          소셜 링크·메뉴판·상품 소개·해시태그·디지털 인증명함은 유료(가족보호중) 멤버십에서 이용할 수 있습니다.
+          소셜 링크·메뉴판·상품 소개·해시태그·디지털 인증명함은 유료 멤버십(가족보호 포함)에서 이용할 수 있습니다.
         </p>
         <div className="mt-4 flex gap-2">
           <button

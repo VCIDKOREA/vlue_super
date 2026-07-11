@@ -7,6 +7,7 @@ import B2BLineCartPanel from "./B2BLineCartPanel.jsx";
 import DocumentTemplatesPanel from "./DocumentTemplatesPanel.jsx";
 import VaultSavedFileRow from "./VaultSavedFileRow.jsx";
 import VaultSavedShowcaseRow from "./VaultSavedShowcaseRow.jsx";
+import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
 import { useHorizontalScrollStrip } from "../lib/useHorizontalScrollStrip.js";
 import { fetchOfficeFiles } from "../lib/vlueOfficeApi.js";
 import { ASSET_FILES_CHANGED, mapOfficeFilesForUi } from "../lib/vlueAssetFilesStorage.js";
@@ -64,6 +65,8 @@ function ReceivedCardRow({
   onClose,
   isDarkMode = false
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [face, setFace] = useState("front");
   const org = profile.organization || "—";
   const name =
     `${profile.title || ""} ${profile.name || ""}`.trim() || profile.legalName || "이름 미등록";
@@ -76,7 +79,7 @@ function ReceivedCardRow({
         isDarkMode ? "bg-white/5 ring-white/10" : "bg-white ring-slate-100"
       }`}
     >
-      <div className="flex items-start gap-3">
+      <button type="button" className="flex w-full items-start gap-3 text-left" onClick={() => setExpanded((v) => !v)}>
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-[15px] font-black text-white">
           {(profile.name || "?").slice(0, 1)}
         </div>
@@ -94,7 +97,27 @@ function ReceivedCardRow({
             </p>
           ) : null}
         </div>
-      </div>
+        <span className={`shrink-0 text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-slate-400"}`}>
+          {expanded ? "접기" : "보기"}
+        </span>
+      </button>
+
+      {expanded ? (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/90 p-2 dark:border-white/10 dark:bg-black/20">
+          <LetteringDigitalReception
+            card={{
+              ...profile,
+              companyIntro: profile.companyIntro || profile.introBack || ""
+            }}
+            verified
+            embeddedInPush
+            previewMode
+            enableContactLinks
+            face={face}
+            onFaceChange={setFace}
+          />
+        </div>
+      ) : null}
 
       <button
         type="button"

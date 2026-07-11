@@ -16,22 +16,23 @@ export function groupAnnualPerLineKrw() {
 }
 
 /** @deprecated — groupMonthlyPerLineKrw() 사용 */
-export const GROUP_MONTHLY_PER_LINE_KRW = 14_700;
+export const GROUP_MONTHLY_PER_LINE_KRW = 5_200;
 export const GROUP_ANNUAL_PER_LINE_KRW = GROUP_MONTHLY_PER_LINE_KRW * 10;
 export const GROUP_SIGNUP_STORAGE_KEY = "vlue_group_signup_draft_v1";
 
 /** 가입 단계에서 「단체 가입」을 선택한 경우 */
 export function groupSignupAtRegistrationNotice() {
   const n = pricingNumbers();
-  return `추천인 없을 때: 대표(VLUE 인증) 회선 월 ${n.paidListMonthly.toLocaleString("ko-KR")}원 · 직원 회선 월 ${n.b2bMonthly.toLocaleString("ko-KR")}원. 추천인 있으면 전 회선 B2B 풀 패키지(${n.b2bMonthly.toLocaleString("ko-KR")}원/회선)가 적용됩니다. PC 전용·채팅·회사업무·사내소통·쇼핑(부분) 이용.`;
+  const staffList = n.b2bStaffListMonthly ?? 14700;
+  return `B2B 풀 패키지: 대표자 계정 월 ${n.paidListMonthly.toLocaleString("ko-KR")}원 + 직원 회선 정가 ${staffList.toLocaleString("ko-KR")}원 → 이벤트 ${n.b2bMonthly.toLocaleString("ko-KR")}원(종료시까지). 회선 단위 블루 쇼케이스·디지털 인증명함.`;
 }
 
 export const GROUP_SIGNUP_AT_REGISTRATION_NOTICE =
-  "추천인 없을 때: 대표(VLUE 인증) 회선 월 28,300원 · 직원 회선 월 14,700원. 추천인 있으면 전 회선 단체 요금(14,700원)이 적용됩니다. 첫 결제부터 위 요금이 반영됩니다.";
+  "B2B 풀 패키지: 대표자 계정 월 28,300원 + 직원 회선 정가 14,700원 → 이벤트 5,200원(종료시까지). 회선 단위 블루 쇼케이스·디지털 인증명함.";
 
-/** 개인 30% 할인 가입 후 단체 전환 — 추천인 블록·마이페이지 안내 */
+/** 개인 유료 가입 후 단체 전환 안내 */
 export const INDIVIDUAL_TO_GROUP_CONVERSION_NOTICE =
-  "개인 30% 할인(월 19,800원)으로 먼저 가입·이용하신 뒤, 마이페이지에서 직장 회선 10개 이상을 등록해 단체로 전환할 수 있습니다. 기업 할인(회선당 14,700원)은 단체 등록이 완료된 뒤 익월 결제 주기부터 적용됩니다.";
+  "개인 유료(월 9,900원)로 먼저 가입·이용하신 뒤, 마이페이지에서 B2B 회선을 등록해 단체로 전환할 수 있습니다. 직원 회선 이벤트 요금(5,200원)은 단체 등록 완료 후 익월 결제 주기부터 적용됩니다.";
 
 /** @deprecated — GROUP_SIGNUP_AT_REGISTRATION_NOTICE 사용 */
 export const GROUP_SIGNUP_NOTICE = GROUP_SIGNUP_AT_REGISTRATION_NOTICE;
@@ -137,8 +138,8 @@ export function buildGroupPaymentPreview(billingCycle, lineCount, { hasReferral 
     cycleLabel,
     badges: ["단체 B2B", `${lines}회선`, billingCycle === "annual" ? "2개월 무료" : null].filter(Boolean),
     detailLine: hasReferral
-      ? `VLUE 인증 1 + 직원 ${employeeCount} · 추천인 적용 전 회선 단체 요금 · ${cycleLabel}`
-      : `대표(VLUE) ${masterUnit.toLocaleString("ko-KR")}원 + 직원 ${employeeCount}×${subUnit.toLocaleString("ko-KR")}원 · ${cycleLabel}`,
+      ? `VLUE 인증 1 + 직원 ${employeeCount} · 전 회선 단체 요금 · ${cycleLabel}`
+      : `대표 ${masterUnit.toLocaleString("ko-KR")}원 + 직원 ${employeeCount}×${subUnit.toLocaleString("ko-KR")}원(이벤트) · ${cycleLabel}`,
     hasReferral,
     canCheckout: lines >= GROUP_SIGNUP_MIN_LINES
   };

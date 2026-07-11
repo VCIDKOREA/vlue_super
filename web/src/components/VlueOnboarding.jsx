@@ -20,7 +20,8 @@ import {
   isWebAuthnSupported,
   registerBiometric as webauthnRegisterBiometric
 } from "../lib/webauthnBiometric.js";
-import { formatKrw, isBillableMembershipKind, isB2bMembershipKind, isPaidMembershipKind, paidAmountKrw, buildPaymentPreview, PAID_MEMBERSHIP_SUBLINE, B2B_MEMBERSHIP_SUBLINE, POST_SIGNUP_PAYMENT_NOTICE } from "../lib/membershipBm.js";
+import { formatKrw, isBillableMembershipKind, isB2bMembershipKind, isPaidMembershipKind, paidAmountKrw, buildPaymentPreview, PAID_MEMBERSHIP_SUBLINE, B2B_MEMBERSHIP_SUBLINE, POST_SIGNUP_PAYMENT_NOTICE, PAID_LIST_PRICE_MONTHLY_KRW, PAID_EVENT_MONTHLY_KRW, PAID_LAUNCH_DISCOUNT_NOTE, PAID_ANNUAL_BENEFIT_NOTE } from "../lib/membershipBm.js";
+import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import {
   LETTERING_SIGNUP_DOC_KINDS,
   LETTERING_VERIFY_DOC_ACCEPT,
@@ -1036,16 +1037,16 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                   {
                     id: "free",
                     title: "일반 회원 (Free)",
-                    sub: "통화 신원 확인 · 서류 양식 · VLUE PAGE"
+                    sub: "통화 신원 확인 · 기본 블루 쇼케이스"
                   },
                   {
                     id: "paid",
                     title: "유료 회원 (Paid)",
-                    sub: `${PAID_MEMBERSHIP_SUBLINE} · AI광고 · 가족보호(1:3)`
+                    sub: `${PAID_MEMBERSHIP_SUBLINE} · 풀 쇼케이스 · 가족보호(1:3)`
                   },
                   {
                     id: "b2b",
-                    title: "기업 단체 회원 (B2B)",
+                    title: "비즈니스 / B2B 풀 패키지",
                     sub: B2B_MEMBERSHIP_SUBLINE
                   }
                 ].map((t) => (
@@ -1094,7 +1095,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                   <p className="text-[12px] font-black text-slate-900">유료 회원 · 결제 주기 (가입 후 결제)</p>
                   <div className="flex gap-2">
                     {[
-                      { id: "monthly", label: "월결제" },
+                      { id: "monthly", label: `월 ${PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원` },
                       { id: "annual", label: "1년 구독" }
                     ].map((b) => (
                       <button
@@ -1109,13 +1110,22 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                       </button>
                     ))}
                   </div>
-                  <ReferralCodeVerifyBlock
-                    billingCycle={paidBillingCycle}
-                    referralCode={referralCode}
-                    onReferralCodeChange={setReferralCode}
-                    onMetaChange={setReferralMeta}
-                    hidePaymentPreview
-                  />
+                  <p className="rounded-lg border border-amber-100 bg-amber-50/80 px-3 py-2 text-[10px] leading-relaxed text-amber-950">
+                    <span className="mr-1 line-through opacity-60">
+                      {PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString("ko-KR")}원
+                    </span>
+                    → {PAID_LAUNCH_DISCOUNT_NOTE}
+                    <span className="mt-1 block text-slate-600">{PAID_ANNUAL_BENEFIT_NOTE}</span>
+                  </p>
+                  {v1AppShell.referralProgram ? (
+                    <ReferralCodeVerifyBlock
+                      billingCycle={paidBillingCycle}
+                      referralCode={referralCode}
+                      onReferralCodeChange={setReferralCode}
+                      onMetaChange={setReferralMeta}
+                      hidePaymentPreview
+                    />
+                  ) : null}
                   <p className="rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-[10px] leading-relaxed text-slate-600">
                     {INDIVIDUAL_TO_GROUP_CONVERSION_NOTICE}
                   </p>
@@ -1186,17 +1196,19 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 disabled={!bioRegistered}
                 onClick={() => {
                   if (isB2b) {
-                    const rv = validateReferralMetaB2b(referralMeta);
-                    if (!rv.ok) {
-                      setVerifyZone({ ok: false, text: rv.message });
-                      return;
+                    if (v1AppShell.referralProgram) {
+                      const rv = validateReferralMetaB2b(referralMeta);
+                      if (!rv.ok) {
+                        setVerifyZone({ ok: false, text: rv.message });
+                        return;
+                      }
                     }
                     const gv = validateGroupSignupDraft(syncDraftToPlannedLineCount({ ...groupSignupDraft, enabled: true }));
                     if (!gv.ok) {
                       setVerifyZone({ ok: false, text: gv.message });
                       return;
                     }
-                  } else if (isPaidMembershipKind(membershipKind)) {
+                  } else if (isPaidMembershipKind(membershipKind) && v1AppShell.referralProgram) {
                     const v = validateReferralMeta(referralMeta);
                     if (!v.ok) {
                       setVerifyZone({ ok: false, text: v.message });
@@ -1217,8 +1229,14 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             <section className={sectionCls}>
               <h2 className="text-[16px] font-black text-slate-900 sm:text-xl">서비스 이용 약관 · 통합 동의</h2>
               <p className="mt-1 text-[12px] leading-relaxed text-slate-500 sm:text-base">
-                <span className="font-bold text-slate-700">약관 동의 및 PASS 본인확인(필수)</span> · 서비스 이용약관 · 개인정보 처리방침 ·{" "}
-                <span className="font-bold text-amber-900/95">[중요] {REFERRAL_PRECAUTION_TITLE}</span> · 실명·생체 보안 설정에 동의합니다.
+                <span className="font-bold text-slate-700">약관 동의 및 PASS 본인확인(필수)</span> · 서비스 이용약관 · 개인정보 처리방침
+                {v1AppShell.referralProgram ? (
+                  <>
+                    {" · "}
+                    <span className="font-bold text-amber-900/95">[중요] {REFERRAL_PRECAUTION_TITLE}</span>
+                  </>
+                ) : null}{" "}
+                · 실명·생체 보안 설정에 동의합니다.
               </p>
               <p className="mt-2 text-[11px] text-slate-500">
                 <a href={marketingLegalUrl("terms")} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 underline">
@@ -1898,16 +1916,20 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                     결제 예정: {paidBillingCycle === "annual" ? "1년 구독" : "월결제"} · {formatKrw(paidChargeKrw)}
                     {isB2b
                       ? ` · ${countGroupBillableLines({ ...groupSignupDraft, enabled: true })}회선 (${groupSignupDraft.companyName || "기업"})`
-                      : referralMeta.codeForApi
+                      : v1AppShell.referralProgram && referralMeta.codeForApi
                         ? ` · 추천인 ${referralMeta.codeForApi}`
                         : ""}
-                    {!isB2b && referralMeta.verified && referralMeta.sponsorDisplayName
+                    {v1AppShell.referralProgram && !isB2b && referralMeta.verified && referralMeta.sponsorDisplayName
                       ? ` (${referralMeta.sponsorDisplayName})`
                       : ""}
                     <span className="block text-indigo-800">→ VLUE 시작하기 후 결제창</span>
                   </li>
                 ) : null}
-                <li>추천: 지인(전화번호 10% 포인트) · 홍보 VLUER(고유 코드 15%/5% 캐시)</li>
+                {v1AppShell.referralProgram ? (
+                  <li>추천: 지인(전화번호 10% 포인트) · 홍보 VLUER(고유 코드 15%/5% 캐시)</li>
+                ) : (
+                  <li>V1: 블루 쇼케이스·디지털 인증명함·가족보호 · 추천인 리워드 미운영</li>
+                )}
                 <li>주소: {roadAddress || "—"} {addressDetail}</li>
               </ul>
               <button

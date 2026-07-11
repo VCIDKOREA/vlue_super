@@ -223,6 +223,7 @@ export default function LetteringCallScreenPreview({
               className="lettering-ongoing--on-photo lettering-ongoing--on-call"
               fitBizcard={fitBizcard}
               hideUnverifiedFooter={demoQuiet}
+              previewMode={Boolean(demoQuiet)}
               verified={verified}
               callPhase={onCall ? "active" : "ringing"}
               platform={platform}
@@ -231,6 +232,7 @@ export default function LetteringCallScreenPreview({
               recordingDurationSec={recordingDurationSec}
               incomingNumber={incomingNumber}
               savedContactName={isFreePreview ? previewCard.name || "" : ""}
+              isKnownContact={isFreePreview ? Boolean(previewCard.name) : true}
               reportHistory={verified ? [] : DEMO_UNVERIFIED_REPORT_HISTORY}
               dragHandleProps={dragHandleProps}
               expanded={expanded}

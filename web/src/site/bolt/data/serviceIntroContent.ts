@@ -171,7 +171,7 @@ export const SHARED_SERVICES: Array<{
   { id: 'store', title: 'VLUE 스토어', summary: '인증 판매자 안전 쇼핑', nav: 'shopping' },
   { id: 'mail', title: 'VLUE메일', summary: '@vlue.kr 보안 메일', nav: 'mail' },
   { id: 'vault', title: '개인자료실', summary: '문서·스캔 파일', nav: 'resources' },
-  { id: 'pricing', title: '인증신청', summary: '무료·유료·기업 멤버십', nav: 'pricing' },
+  { id: 'pricing', title: '인증신청', summary: 'V1 무료·유료·B2B 요금제', nav: 'pricing' },
   { id: 'events', title: '지역 이벤트', summary: '캠페인·일정', nav: 'events' },
   { id: 'jobs', title: '공식 채용', summary: '파트너·채용', nav: 'jobs' },
   { id: 'support', title: '고객지원', summary: 'FAQ·문의', nav: 'support' },
@@ -211,9 +211,9 @@ export const INSTALL_EXCLUSIVE_FEATURES: ServiceAccordionItem[] = [
   },
   {
     id: 'partner',
-    title: 'Vluer · 지역 광고',
-    summary: '추천·리워드·동네 노출',
-    detail: '추천 코드·커미션·로컬 광고로 소상공인 성장을 지원합니다.',
+    title: '블루 쇼케이스 · 디지털 인증명함',
+    summary: '통화 수신 화면 송출',
+    detail: '유료·B2B 회선에서 디지털 인증명함과 쇼케이스 배너를 수신 화면에 송출합니다.',
   },
 ];
 
@@ -253,12 +253,11 @@ export const INSTITUTION_QUICK_SEARCH = [
 
 export const FEATURE_KEYWORD_QUICK = [
   '통합 검색',
-  'AI엑셀에디터',
   '디지털명함',
+  '블루 쇼케이스',
   '가족보호',
-  'VLUE 스토어',
   '무료 회원',
-  'VLUER 추천',
+  '유료 요금제',
 ] as const;
 
 export type AboutCategoryId =

@@ -5851,7 +5851,7 @@ body,
   --ldr-front-content-indent: 21px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
   padding: 0 14px;
   position: relative;
   z-index: 1;
@@ -5860,6 +5860,95 @@ body,
 .ldr-reception--push .ldr-panel--front .ldr-back-head {
   margin-bottom: 8px;
   padding-top: 10px;
+}
+
+/* 앞면 — 라벨 : 내용 가로 정렬 (뒷면은 기존 ContactRow 유지) */
+.ldr-front-info-row {
+  display: grid;
+  grid-template-columns: minmax(7.75rem, 40%) minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.ldr-front-info-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 2px;
+}
+
+.ldr-front-info-row__label {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+  padding-top: 1px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.45;
+}
+
+.ldr-front-info-row__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #93c5fd;
+}
+
+.ldr-front-info-row__label-text {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.ldr-front-info-row__colon {
+  flex-shrink: 0;
+  margin-left: 1px;
+  font-weight: 800;
+}
+
+.ldr-front-info-row__value {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.ldr-front-info-row__phone-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.ldr-front-info-row__text {
+  margin: 0;
+}
+
+.ldr-front-info-row__text--placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.ldr-front-info-row__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ldr-front-info-row__list li {
+  margin: 0;
+  padding: 0;
+  line-height: 1.45;
+}
+
+.ldr-front-info-row__list li + li {
+  margin-top: 3px;
 }
 
 .ldr-reception--push .ldr-panel--front .ldr-front-profile-stack .ldr-back-section {
@@ -5899,6 +5988,41 @@ body,
   color: inherit;
   font-weight: 700;
   text-decoration: none;
+}
+
+.ldr-front-phone-link--btn {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 210, 255, 0.45);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.ldr-contact-row__value--link {
+  text-decoration: underline;
+  text-decoration-color: rgba(59, 130, 246, 0.45);
+  text-underline-offset: 2px;
+}
+
+.ldr-contact-row-link {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
 }
 
 .ldr-reception--push .ldr-panel--front .ldr-front-profile-stack .ldr-back-section__body--placeholder {

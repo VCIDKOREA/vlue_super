@@ -16,12 +16,19 @@ export function saveLetteringCardToWallet(card = {}) {
     membershipTier: card.membershipTier || "free",
     organization: card.organization || "",
     title: card.title || "",
+    department: card.department || "",
     name: card.name || "",
     phone: card.phone || "",
+    email: card.email || "",
+    website: card.website || "",
+    fax: card.fax || "",
+    address: card.address || "",
+    companyIntro: card.companyIntro || card.salesContent || "",
     introBack: card.salesContent || card.companyIntro || card.introBack || "",
+    verificationItems: card.verificationItems || [],
     legalName: card.name || "",
     logoUrl: card.logoUrl || "",
-    email: card.email || "",
+    photoUrl: card.photoUrl || "",
     vcidLettering: true
   });
 

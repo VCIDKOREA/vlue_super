@@ -1,30 +1,30 @@
 /**
- * 앱 멤버십 BM(membershipBm · membershipBenefits)과 동일한 무료 / 유료 / 기업(B2B) 요금제
+ * 앱 멤버십 BM(membershipBm · membershipBenefits)과 동일한 무료 / 유료 / 기업(B2B) 요금제 — V1
  */
 import {
   MEMBERSHIP_BENEFIT_ROWS,
   MEMBERSHIP_PLAN_DETAILS,
   FAMILY_PROTECTION_SUMMARY_SHORT,
   B2B_ENTERPRISE_SUMMARY_SHORT,
-  VLUER_REFERRAL_B2B_NOTE,
 } from '../../../lib/membershipBenefits.js';
 import {
   PAID_LIST_PRICE_MONTHLY_KRW,
-  PAID_MONTHLY_DISCOUNTED_KRW,
-  PAID_LIST_PRICE_ANNUAL_KRW,
-  PAID_ANNUAL_DISCOUNTED_KRW,
-  PAID_MONTHLY_SLIDING_DISCOUNTED_KRW,
-  REFERRAL_BENEFIT_PROMO_MONTHS,
+  PAID_EVENT_MONTHLY_KRW,
+  PAID_EVENT_ANNUAL_KRW,
+  PAID_LAUNCH_DISCOUNT_NOTE,
+  PAID_ANNUAL_BENEFIT_NOTE,
   PAID_MEMBERSHIP_SUBLINE,
-  B2B_MEMBERSHIP_SUBLINE,
-  REFERRAL_PROGRAM_NOTICES,
-  PERSONAL_COMBO_PRICING_NOTE,
+  B2B_REP_LIST_MONTHLY_KRW,
+  B2B_STAFF_LIST_MONTHLY_KRW,
+  B2B_STAFF_EVENT_MONTHLY_KRW,
+  B2B_EVENT_NOTE,
+  SOHO_BROADCAST_MONTHLY_KRW,
+  SOHO_BROADCAST_NO_DISCOUNT_NOTE,
   broadcastAddonAmountKrw,
-  sohoActivityPlanDescription,
   sohoBroadcastPlanDescription,
   b2bPlanDescription,
 } from '../../../lib/membershipBm.js';
-import { pricingNumbers } from '../../../lib/pricingConfig.js';
+
 export type ServiceAccordionItem = {
   id: string;
   title: string;
@@ -40,6 +40,7 @@ export const MARKETING_PRICING_TIERS = [
     id: 'free',
     name: '일반 회원',
     price: 0,
+    listPrice: null as number | null,
     period: '무료',
     description: MEMBERSHIP_PLAN_DETAILS.free.headline,
     color: 'gray' as const,
@@ -48,47 +49,50 @@ export const MARKETING_PRICING_TIERS = [
   {
     id: 'paid',
     name: '유료 회원',
-    price: PAID_MONTHLY_DISCOUNTED_KRW,
-    period: '월 (추천인 할인)',
+    price: PAID_EVENT_MONTHLY_KRW,
+    listPrice: PAID_LIST_PRICE_MONTHLY_KRW,
+    period: '월',
     description: `${MEMBERSHIP_PLAN_DETAILS.paid.headline} · ${PAID_MEMBERSHIP_SUBLINE}`,
     color: 'blue' as const,
     recommended: true,
     features: MEMBERSHIP_PLAN_DETAILS.paid.bullets,
-    priceNote: `정가 월 ${PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString('ko-KR')}원 · 연 ${PAID_ANNUAL_DISCOUNTED_KRW.toLocaleString('ko-KR')}원(2개월 무료)`,
+    priceNote: `${PAID_LAUNCH_DISCOUNT_NOTE} / ${PAID_ANNUAL_BENEFIT_NOTE}`,
+    promoBadge: 'V1 65% 할인',
   },
   {
     id: 'b2b',
     name: 'B2B 풀 패키지',
-    price: pricingNumbers().b2bMonthly,
-    period: '회선/월 (PC 전용)',
+    price: B2B_STAFF_EVENT_MONTHLY_KRW,
+    listPrice: B2B_STAFF_LIST_MONTHLY_KRW,
+    period: '직원 회선/월',
     description: b2bPlanDescription(),
     color: 'gold' as const,
     features: MEMBERSHIP_PLAN_DETAILS.b2b.bullets,
-    priceNote: B2B_ENTERPRISE_SUMMARY_SHORT,
+    priceNote: `대표자 계정 ${B2B_REP_LIST_MONTHLY_KRW.toLocaleString('ko-KR')}원 + 직원 회선 정가 ${B2B_STAFF_LIST_MONTHLY_KRW.toLocaleString('ko-KR')}원 → 이벤트 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString('ko-KR')}원(${B2B_EVENT_NOTE}) · ${B2B_ENTERPRISE_SUMMARY_SHORT}`,
+    promoBadge: B2B_EVENT_NOTE,
   },
   {
     id: 'soho_broadcast',
     name: 'SOHO 영업 송출 옵션',
     price: broadcastAddonAmountKrw('monthly'),
+    listPrice: null as number | null,
     period: '추가/월',
     description: sohoBroadcastPlanDescription(),
     color: 'purple' as const,
     features: [
-      'Primary(SOHO 활동형) 필요',
-      '발신번호 등록·인증',
-      '수신 화면 디지털인증명함 송출(Secondary)',
-      '기본 명함과 별도 번호·송출 효과',
+      '대표자 계정 외 추가번호에만 적용',
+      '쇼케이스만 제공되는 기능',
+      `월 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString('ko-KR')}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE})`,
+      '유료·B2B 본 요금과 별도 SKU',
     ],
-    priceNote: `SOHO 활동형 ${pricingNumbers().sohoMonthly.toLocaleString('ko-KR')}원과 별도 SKU`,
+    priceNote: `할인 미적용 · 월 ${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString('ko-KR')}원 고정`,
   },
 ];
 
-export const VLUER_REFERRAL_GRADES = [
-  { title: '지인 추천', desc: '추천인 전화번호 · 피추천인 30% 할인 · 2번째 추천부터 10% 포인트(1~12개월)' },
-  { title: '홍보 추천 (VLUER)', desc: '고유 코드 · SNS 인증·승인 · 15% 캐시(1~12개월) · 5% 캐시 영구(13개월~)' },
-] as const;
+/** @deprecated V1 미운영 — 빈 배열 유지(구 import 호환) */
+export const VLUER_REFERRAL_GRADES = [] as const;
 
-/** 서비스소개 — 요금제 아코디언 (앱 설정 문구) */
+/** 서비스소개 — 요금제 아코디언 (V1) */
 export const MEMBERSHIP_PRICING_FEATURES: ServiceAccordionItem[] = [
   {
     id: 'plan-free',
@@ -97,57 +101,35 @@ export const MEMBERSHIP_PRICING_FEATURES: ServiceAccordionItem[] = [
     detail: MEMBERSHIP_PLAN_DETAILS.free.bullets,
   },
   {
-    id: 'plan-soho',
-    title: 'SOHO 활동형 (Primary)',
-    summary: sohoActivityPlanDescription(),
-    detail: [
-      ...MEMBERSHIP_PLAN_DETAILS.paid.bullets,
-      '채팅·쇼핑 등 핵심 기능 접근 기준',
-      `월 ${pricingNumbers().sohoMonthly.toLocaleString('ko-KR')}원(부가세 포함, 추천인 할인 시)`,
-    ],
-  },
-  {
-    id: 'plan-broadcast',
-    title: 'SOHO 영업 송출 옵션 (Secondary)',
-    summary: sohoBroadcastPlanDescription(),
-    detail: [
-      'Primary 계정 + 월 4,200원(설정값) 추가',
-      '등록·인증된 발신번호로 발신 시 수신 화면에 디지털인증명함 송출',
-      'VLUER 포인트·임직원 콤보와 별개 SKU',
-    ],
-  },
-  {
     id: 'plan-paid',
     title: '유료 회원 (Paid) — 구독',
     summary: `${MEMBERSHIP_PLAN_DETAILS.paid.headline} · ${PAID_MEMBERSHIP_SUBLINE}`,
     detail: [
       ...MEMBERSHIP_PLAN_DETAILS.paid.bullets,
       `가족보호: ${FAMILY_PROTECTION_SUMMARY_SHORT}`,
-      `추천인 할인: 최초 ${REFERRAL_BENEFIT_PROMO_MONTHS}개월 월 ${PAID_MONTHLY_DISCOUNTED_KRW.toLocaleString('ko-KR')}원(30%) / 연 ${PAID_ANNUAL_DISCOUNTED_KRW.toLocaleString('ko-KR')}원 → 이후 영구 월 ${PAID_MONTHLY_SLIDING_DISCOUNTED_KRW.toLocaleString('ko-KR')}원(15%)`,
+      `연간 구독: ${PAID_EVENT_ANNUAL_KRW.toLocaleString('ko-KR')}원 · ${PAID_ANNUAL_BENEFIT_NOTE}`,
     ],
   },
   {
     id: 'plan-b2b',
-    title: '기업 단체 회원 (B2B)',
+    title: '비즈니스 / B2B 풀 패키지',
     summary: MEMBERSHIP_PLAN_DETAILS.b2b.headline,
     detail: MEMBERSHIP_PLAN_DETAILS.b2b.bullets,
   },
   {
-    id: 'plan-referral',
-    title: '추천·리워드 (2단계)',
-    summary: '지인 추천(전화번호) · 홍보 추천(VLUER 코드)',
+    id: 'plan-broadcast',
+    title: 'SOHO 영업 송출 옵션',
+    summary: sohoBroadcastPlanDescription(),
     detail: [
-      ...REFERRAL_PROGRAM_NOTICES,
-      ...VLUER_REFERRAL_GRADES.map((g) => `${g.title}: ${g.desc}`),
-      '※ VLUER 홍보 승인 시 기존 지인 추천 회원도 캐시 적립으로 전환됩니다.',
-      VLUER_REFERRAL_B2B_NOTE,
-      `임직원 콤보: ${PERSONAL_COMBO_PRICING_NOTE}`,
+      '대표자 계정 외 추가번호 쇼케이스만 제공',
+      `월 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString('ko-KR')}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE})`,
+      '유료·B2B 출시 할인과 별개 — 할인 미적용',
     ],
   },
   {
     id: 'plan-compare',
     title: '무료 · 유료 · 기업 혜택 비교표',
-    summary: '통화·명함·가족보호·VLUER·구독 요금 한눈에',
+    summary: '통화·쇼케이스·가족보호·구독 요금 한눈에',
     detail: MEMBERSHIP_BENEFIT_ROWS.map(
       (row) => `${row.label} — 일반: ${row.free} | 유료: ${row.paid} | 기업: ${row.b2b}`,
     ),

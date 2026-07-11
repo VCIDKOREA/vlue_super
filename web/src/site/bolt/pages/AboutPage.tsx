@@ -36,9 +36,7 @@ import {
 import {
   MEMBERSHIP_PLAN_DETAILS,
   MARKETING_PRICING_TIERS,
-  VLUER_REFERRAL_GRADES,
 } from '../data/membershipPlansContent';
-import { REFERRAL_PROGRAM_NOTICES } from '../../../lib/membershipBm.js';
 import { SYNC_PRINCIPLES } from '../data/platformArchitectureContent';
 import { isWebAiExcelEnabled, isWebPcDownloadEnabled } from '../../../lib/v1ReleaseScope.js';
 
@@ -765,36 +763,64 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
                 멤버십 · 요금제
               </span>
             }
-            title="무료 · 유료 · 기업 회원"
-            desc="웹·설치형 앱 모두 동일한 3단계 멤버십입니다."
+            title="V1 멤버십 · 요금제"
+            desc="블루 쇼케이스·디지털 인증명함·가족보호 중심. 웹·앱 동일 요금제입니다."
           />
 
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
-            {(['free', 'paid', 'b2b'] as const).map((kind) => {
-              const plan = MEMBERSHIP_PLAN_DETAILS[kind];
-              const marketing = MARKETING_PRICING_TIERS.find((t) => t.id === kind);
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            {MARKETING_PRICING_TIERS.map((marketing) => {
+              const plan =
+                marketing.id === 'free' || marketing.id === 'paid' || marketing.id === 'b2b'
+                  ? MEMBERSHIP_PLAN_DETAILS[marketing.id]
+                  : null;
               const border =
-                kind === 'paid' ? 'border-t-primary-500' : kind === 'b2b' ? 'border-t-indigo-600' : 'border-t-slate-400';
+                marketing.id === 'paid'
+                  ? 'border-t-primary-500'
+                  : marketing.id === 'b2b'
+                    ? 'border-t-indigo-600'
+                    : marketing.id === 'soho_broadcast'
+                      ? 'border-t-violet-600'
+                      : 'border-t-slate-400';
               return (
-                <div key={kind} className={`card p-5 border-t-4 ${border} ${kind === 'paid' ? 'ring-2 ring-primary-100' : ''}`}>
-                  <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">{plan.badge}</span>
-                  <p className="text-lg font-black text-gray-900 mt-1">{plan.title}</p>
-                  <p className="text-sm font-bold text-primary-700 mt-2">
-                    {marketing?.price === 0
-                      ? '무료'
-                      : `${marketing?.price.toLocaleString('ko-KR')}원/${marketing?.period}`}
+                <div
+                  key={marketing.id}
+                  className={`card p-5 border-t-4 ${border} ${marketing.id === 'paid' ? 'ring-2 ring-primary-100' : ''}`}
+                >
+                  <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                    {plan?.badge || '옵션'}
+                  </span>
+                  <p className="text-lg font-black text-gray-900 mt-1">{marketing.name}</p>
+                  <div className="mt-2">
+                    {marketing.price === 0 ? (
+                      <p className="text-sm font-bold text-primary-700">무료</p>
+                    ) : (
+                      <>
+                        {marketing.listPrice ? (
+                          <p className="text-xs text-slate-400 line-through">
+                            {marketing.listPrice.toLocaleString('ko-KR')}원
+                          </p>
+                        ) : null}
+                        <p className="text-sm font-bold text-primary-700">
+                          {marketing.price.toLocaleString('ko-KR')}원/{marketing.period}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                    {plan?.headline || marketing.description}
                   </p>
-                  <p className="text-xs text-gray-600 mt-2 leading-relaxed">{plan.headline}</p>
                   <ul className="mt-4 space-y-2 border-t border-slate-100 pt-3">
-                    {plan.bullets.slice(0, 5).map((line) => (
+                    {(plan?.bullets || marketing.features).slice(0, 5).map((line) => (
                       <li key={line} className="flex gap-2 text-xs text-gray-700 leading-relaxed">
                         <CheckCircle className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />
                         {line}
                       </li>
                     ))}
                   </ul>
-                  {'priceNote' in (marketing || {}) && marketing?.priceNote ? (
-                    <p className="mt-3 text-[10px] text-slate-500 bg-slate-50 rounded-lg px-2 py-1.5">{marketing.priceNote}</p>
+                  {'priceNote' in marketing && marketing.priceNote ? (
+                    <p className="mt-3 text-[10px] text-slate-500 bg-slate-50 rounded-lg px-2 py-1.5">
+                      {marketing.priceNote}
+                    </p>
                   ) : null}
                 </div>
               );
@@ -803,24 +829,6 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
 
           <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">혜택 비교표</p>
           <MembershipBenefitsTable />
-
-          <div className="mt-6 card p-5 border border-amber-100 bg-amber-50/50">
-            <p className="text-sm font-black text-amber-900 mb-3">VLUER 추천·리워드</p>
-            <div className="grid sm:grid-cols-2 gap-3 mb-3">
-              {VLUER_REFERRAL_GRADES.map((g) => (
-                <div key={g.title} className="rounded-xl bg-white border border-amber-100 px-3 py-2.5">
-                  <p className="text-xs font-bold text-gray-900">{g.title}</p>
-                  <p className="text-[11px] text-gray-600 mt-0.5">{g.desc}</p>
-                </div>
-              ))}
-            </div>
-            <ul className="space-y-2 text-[11px] text-amber-900/90 leading-relaxed list-none">
-              {REFERRAL_PROGRAM_NOTICES.map((line) => (
-                <li key={line.slice(0, 24)}>{line}</li>
-              ))}
-              <li>기업 회선(B2B)은 VLUER 추천·개인 할인 대상이 아닙니다.</li>
-            </ul>
-          </div>
 
           <p className="text-xs font-black text-slate-500 uppercase tracking-wider mt-8 mb-3">상세 설명</p>
           <ServiceAccordion items={PRICING_TIER_FEATURES} forceOpenId={forceOpenId} className="mb-5" />

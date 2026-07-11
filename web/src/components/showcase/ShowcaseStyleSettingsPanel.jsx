@@ -31,6 +31,62 @@ const TABS = [
   { id: "biz", label: "비즈니스", icon: ShoppingBag }
 ];
 
+function readAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result || ""));
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+/** 카톡·인스타 스타일용 프로필 사진 (통화 쇼케이스 마크) */
+function PlatformAvatarField({ label, value, onChange, inputCls = "" }) {
+  const fileRef = useRef(null);
+  return (
+    <div className="showcase-style-settings__avatar-field mt-3">
+      <p className="showcase-style-settings__label">{label}</p>
+      <div className="showcase-style-settings__avatar-row">
+        <span className="showcase-style-settings__avatar-preview" aria-hidden>
+          {value ? (
+            <img src={value} alt="" />
+          ) : (
+            <span className="showcase-style-settings__avatar-empty">사진</span>
+          )}
+        </span>
+        <div className="showcase-style-settings__avatar-actions">
+          <button type="button" className="showcase-style-settings__tool-btn" onClick={() => fileRef.current?.click()}>
+            {value ? "사진 변경" : "프로필 사진 등록"}
+          </button>
+          {value ? (
+            <button type="button" className="showcase-style-settings__tool-btn" onClick={() => onChange("")}>
+              삭제
+            </button>
+          ) : null}
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file || !/^image\//i.test(file.type)) return;
+            onChange(await readAsDataUrl(file));
+          }}
+        />
+      </div>
+      <input
+        className={`showcase-style-settings__input mt-2 w-full ${inputCls}`}
+        placeholder="또는 이미지 URL"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value.trim())}
+      />
+    </div>
+  );
+}
+
 function gatePremium(feature, tier, setGate) {
   if (requiresPremium(feature, tier)) {
     setGate(true);
@@ -295,6 +351,12 @@ export default function ShowcaseStyleSettingsPanel({
                     value={config.platformFeed?.kakaoProfileTitle || ""}
                     onChange={(e) => persist({ platformFeed: { kakaoProfileTitle: e.target.value } })}
                   />
+                  <PlatformAvatarField
+                    label="카톡 프로필 사진"
+                    value={config.platformFeed?.kakaoAvatarUrl || ""}
+                    onChange={(kakaoAvatarUrl) => persist({ platformFeed: { kakaoAvatarUrl } })}
+                    inputCls={inputCls}
+                  />
                 </section>
               )}
 
@@ -321,6 +383,12 @@ export default function ShowcaseStyleSettingsPanel({
                     placeholder="@아이디"
                     value={config.platformFeed?.instagramHandle || ""}
                     onChange={(e) => persist({ platformFeed: { instagramHandle: e.target.value } })}
+                  />
+                  <PlatformAvatarField
+                    label="인스타 프로필 사진"
+                    value={config.platformFeed?.instagramAvatarUrl || ""}
+                    onChange={(instagramAvatarUrl) => persist({ platformFeed: { instagramAvatarUrl } })}
+                    inputCls={inputCls}
                   />
                 </section>
               )}

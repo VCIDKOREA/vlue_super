@@ -250,11 +250,11 @@ export default function B2BLineCartPanel({ onToast, onActivated }) {
             </p>
             <p className="mt-1 break-words text-[10px] leading-snug">
               {invoice?.hasReferral
-                ? `전 회선 ${billingCycle === "annual" ? "연 147,000원" : "월 14,700원"} · 연동비 0원`
-                : `대표 ${billingCycle === "annual" ? "연 283,000원" : "월 28,300원"} · 하부 ${billingCycle === "annual" ? "연 147,000원" : "월 14,700원"}/회선 · 연동비 0원`}
+                ? `전 회선 ${billingCycle === "annual" ? "연 52,000원" : "월 5,200원"}(이벤트) · 연동비 0원`
+                : `대표 ${billingCycle === "annual" ? "연 283,000원" : "월 28,300원"} · 직원 회선 정가 ${billingCycle === "annual" ? "연 147,000원" : "월 14,700원"} → 이벤트 ${billingCycle === "annual" ? "연 52,000원" : "월 5,200원"}/회선 · 연동비 0원`}
             </p>
             <p className="mt-2 break-words text-[10px] font-semibold leading-snug text-indigo-900/90">
-              개인 30% 할인(19,800원) 이용 중 전환 시, 기업 할인은 등록·승인 완료 후 <b>익월</b> 결제부터 적용됩니다.
+              개인 유료(월 9,900원) 이용 중 전환 시, B2B 직원 회선 이벤트 요금은 등록·승인 완료 후 <b>익월</b> 결제부터 적용됩니다.
             </p>
           </div>
 

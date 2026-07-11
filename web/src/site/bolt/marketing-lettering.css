@@ -31,6 +31,39 @@
   overflow: visible;
 }
 
+/* 앱 lettering-showcase-fs 와 동일 UI — 마케팅 폰 프레임 임베드 */
+.vlue-marketing-showcase-phone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 390px;
+}
+
+.lettering-showcase-fs--marketing-embed {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 1 !important;
+  width: 100%;
+  max-width: 390px;
+  height: min(720px, 78vh);
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  animation: none !important;
+}
+
+.lettering-showcase-fs--marketing-embed .lettering-showcase-fs__shell {
+  height: 100% !important;
+  max-height: 100%;
+}
+
+.lettering-showcase-fs--marketing-embed .lettering-ongoing--fullscreen-tent {
+  min-height: 100%;
+  height: 100%;
+}
+
 [data-vlue-site="marketing"] .vlue-marketing-dual {
   overflow: visible;
 }

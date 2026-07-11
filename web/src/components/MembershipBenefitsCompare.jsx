@@ -3,7 +3,6 @@ import {
   B2B_ENTERPRISE_SUMMARY,
   FAMILY_PROTECTION_B2B_NOTE,
   FAMILY_PROTECTION_SUMMARY,
-  VLUER_REFERRAL_B2B_NOTE,
   MEMBERSHIP_BENEFIT_ROWS,
   MEMBERSHIP_PLAN_DETAILS
 } from "../lib/membershipBenefits.js";
@@ -149,9 +148,6 @@ export default function MembershipBenefitsCompare({ open, onClose, initialTab = 
               </p>
               <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[10px] font-normal leading-relaxed text-slate-600">
                 {FAMILY_PROTECTION_B2B_NOTE}
-              </p>
-              <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[10px] font-normal leading-relaxed text-slate-600">
-                {VLUER_REFERRAL_B2B_NOTE}
               </p>
               <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50/40 px-3 py-2 text-[10px] font-normal leading-relaxed text-blue-900/85">
                 {B2B_ENTERPRISE_SUMMARY}

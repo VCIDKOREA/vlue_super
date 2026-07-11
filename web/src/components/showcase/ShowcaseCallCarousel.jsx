@@ -78,7 +78,7 @@ export default function ShowcaseCallCarousel({
   );
 
   const interactiveSelector =
-    "button, a, input, textarea, select, label, [role='tab'], .ldr-face-tabs, .ldr-face-tab, .showcase-call-carousel__nav";
+    "button, a, input, textarea, select, label, [role='tab'], .ldr-face-tabs, .ldr-face-tab, .showcase-call-carousel__nav, .ldr-front-phone-link--btn, .ldr-contact-row-link";
 
   const onPointerDown = (e) => {
     if (!canScroll) return;
@@ -144,6 +144,7 @@ export default function ShowcaseCallCarousel({
                     verificationItems={verificationItems}
                     incomingNumber={incomingNumber}
                     embeddedInPush
+                    enableContactLinks
                     face={face}
                     onFaceChange={onFaceChange}
                   />

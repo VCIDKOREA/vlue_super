@@ -14,7 +14,13 @@ import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDispl
 import { resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
 import { formatLetteringContactEmailDisplay } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
+import {
+  openEmailLink,
+  openWebsiteLink,
+  openPhoneDial
+} from "../lib/showcase/showcaseContactActions.js";
 import VluePushAuthSeal from "./VluePushAuthSeal.jsx";
+import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 
 function formatWebsite(raw) {
   return String(raw || "")
@@ -35,27 +41,37 @@ function PhoneCertBadge({ className = "" }) {
   );
 }
 
-function ContactRow({ icon: Icon, label, value, href, showCertBadge = false }) {
+function ContactRow({ icon: Icon, label, value, onActivate, showCertBadge = false }) {
   if (!value) return null;
+  const interactive = typeof onActivate === "function";
   const inner = (
-    <div className="ldr-contact-row">
+    <div className={`ldr-contact-row${interactive ? " ldr-contact-row--link" : ""}`}>
       <span className="ldr-contact-row__icon" aria-hidden>
         <Icon className="h-4 w-4" />
       </span>
       <div className="ldr-contact-row__body">
         <span className="ldr-contact-row__label">{label}</span>
         <span className="ldr-contact-row__value-line">
-          <span className="ldr-contact-row__value">{value}</span>
+          <span className={`ldr-contact-row__value${interactive ? " ldr-contact-row__value--link" : ""}`}>{value}</span>
           {showCertBadge ? <PhoneCertBadge /> : null}
         </span>
       </div>
     </div>
   );
-  if (href) {
+  if (interactive) {
     return (
-      <a href={href} className="ldr-contact-row-link" target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
+      <button
+        type="button"
+        className="ldr-contact-row-link"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onActivate();
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         {inner}
-      </a>
+      </button>
     );
   }
   return inner;
@@ -203,7 +219,29 @@ function resolveBackAdditionalNote(card) {
   return String(card.customBackText || card.backNote || card.introBack || "").trim();
 }
 
-function FrontPanel({ card, verified, verificationItems = [], embeddedInPush = false }) {
+function FrontInfoRow({ icon: Icon, label, children, className = "" }) {
+  return (
+    <div className={`ldr-front-info-row${className ? ` ${className}` : ""}`.trim()}>
+      <span className="ldr-front-info-row__label">
+        {Icon ? <Icon className="ldr-front-info-row__icon" aria-hidden /> : null}
+        <span className="ldr-front-info-row__label-text">{label}</span>
+        <span className="ldr-front-info-row__colon" aria-hidden>
+          :
+        </span>
+      </span>
+      <div className="ldr-front-info-row__value">{children}</div>
+    </div>
+  );
+}
+
+function FrontPanel({
+  card,
+  verified,
+  verificationItems = [],
+  embeddedInPush = false,
+  enableContactLinks = true,
+  onRequestDial
+}) {
   const intro = card.companyIntro || card.salesContent || "";
   const careers = verificationItems.length
     ? verificationItems
@@ -211,7 +249,7 @@ function FrontPanel({ card, verified, verificationItems = [], embeddedInPush = f
       ? [intro]
       : ["VLUE 디지털 인증 명함이 연결되었습니다."];
   const phone = card.phone ? formatLetteringPhoneDisplay(card.phone) : "";
-  const telHref = card.phone ? `tel:${String(card.phone).replace(/[^\d+]/g, "")}` : undefined;
+  const phoneRaw = String(card.phone || "").trim();
 
   return (
     <div className={`ldr-panel ldr-panel--front${embeddedInPush ? " ldr-panel--push" : ""}`}>
@@ -241,49 +279,46 @@ function FrontPanel({ card, verified, verificationItems = [], embeddedInPush = f
 
       <div className="ldr-front-profile-stack">
         {phone ? (
-          <section className="ldr-back-section ldr-back-section--phone">
-            <h4 className="ldr-back-section__title">
-              <Phone className="h-4 w-4" aria-hidden />
-              전화
-            </h4>
-            <p className="ldr-back-section__body ldr-back-section__body--phone">
-              {telHref ? (
-                <a href={telHref} className="ldr-front-phone-link">
+          <FrontInfoRow icon={Phone} label="전화번호" className="ldr-front-info-row--phone">
+            <span className="ldr-front-info-row__phone-line">
+              {enableContactLinks ? (
+                <button
+                  type="button"
+                  className="ldr-front-phone-link ldr-front-phone-link--btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRequestDial?.(phoneRaw, card.name || card.organization || "");
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
                   {phone}
-                </a>
+                </button>
               ) : (
                 <span className="ldr-front-phone-link">{phone}</span>
               )}
               {verified ? <PhoneCertBadge /> : null}
-            </p>
-          </section>
+            </span>
+          </FrontInfoRow>
         ) : null}
 
-        <section className="ldr-back-section">
-          <h4 className="ldr-back-section__title">
-            <User className="h-4 w-4" aria-hidden />
-            소개
-          </h4>
+        <FrontInfoRow icon={User} label="소개">
           <p
-            className={`ldr-back-section__body${
-              !intro ? " ldr-back-section__body--placeholder" : ""
+            className={`ldr-front-info-row__text${
+              !intro ? " ldr-front-info-row__text--placeholder" : ""
             }`.trim()}
           >
             {intro || "소개 문구를 명함 만들기에서 입력할 수 있습니다."}
           </p>
-        </section>
+        </FrontInfoRow>
 
-        <section className="ldr-back-section">
-          <h4 className="ldr-back-section__title">
-            <Briefcase className="h-4 w-4" aria-hidden />
-            인증 · 경력 요약
-          </h4>
-          <ul className="ldr-back-list">
+        <FrontInfoRow icon={Briefcase} label="인증 · 경력요약" className="ldr-front-info-row--careers">
+          <ul className="ldr-front-info-row__list">
             {careers.slice(0, 6).map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
-        </section>
+        </FrontInfoRow>
       </div>
 
       {embeddedInPush && verified ? (
@@ -295,8 +330,15 @@ function FrontPanel({ card, verified, verificationItems = [], embeddedInPush = f
   );
 }
 
-function BackPanel({ card, verified, embeddedInPush = false }) {
-  const fax = card.fax ? formatLetteringPhoneDisplay(card.fax) : "";
+function BackPanel({
+  card,
+  verified,
+  embeddedInPush = false,
+  enableContactLinks = true,
+  onRequestDial
+}) {
+  const faxRaw = String(card.fax || "").trim();
+  const fax = faxRaw ? formatLetteringPhoneDisplay(faxRaw) : "";
   const website = formatWebsite(card.website);
   const emailRaw = String(card.email || "").trim();
   const email = emailRaw ? formatLetteringContactEmailDisplay(emailRaw) : "";
@@ -308,17 +350,35 @@ function BackPanel({ card, verified, embeddedInPush = false }) {
       {embeddedInPush ? <WatermarkBackdrop card={card} /> : null}
       <div className="ldr-back-contact-stack">
         <div className="ldr-contact-list">
-          <ContactRow icon={Mail} label="이메일" value={email} href={emailRaw ? `mailto:${emailRaw}` : undefined} />
+          <ContactRow
+            icon={Mail}
+            label="이메일"
+            value={email}
+            onActivate={enableContactLinks && emailRaw ? () => openEmailLink(emailRaw) : undefined}
+          />
           <ContactRow icon={MapPin} label="주소" value={card.address} />
           {website ? (
             <ContactRow
               icon={Globe}
               label="웹사이트"
               value={website}
-              href={website ? `https://${website}` : undefined}
+              onActivate={
+                enableContactLinks ? () => openWebsiteLink(card.website || website) : undefined
+              }
             />
           ) : null}
-          {fax ? <ContactRow icon={Phone} label="팩스" value={fax} /> : null}
+          {fax ? (
+            <ContactRow
+              icon={Phone}
+              label="팩스"
+              value={fax}
+              onActivate={
+                enableContactLinks && faxRaw
+                  ? () => onRequestDial?.(faxRaw, card.organization || card.name || "팩스")
+                  : undefined
+              }
+            />
+          ) : null}
         </div>
       </div>
       {embeddedInPush || additionalNote ? (
@@ -347,6 +407,8 @@ export default function LetteringDigitalReception({
   incomingNumber = "",
   embeddedInPush = false,
   previewMode = false,
+  /** 전화·메일·웹 링크 (저장 쇼케이스·통화목록 다시보기 포함) */
+  enableContactLinks = true,
   face = "front",
   onFaceChange,
   className = ""
@@ -355,6 +417,7 @@ export default function LetteringDigitalReception({
   const items = verificationItems.length ? verificationItems : card.verificationItems;
   const panelWrapRef = useRef(null);
   const useStackedPanels = embeddedInPush && !previewMode;
+  const [dialTarget, setDialTarget] = useState(null);
 
   useEffect(() => {
     const root = panelWrapRef.current;
@@ -363,6 +426,31 @@ export default function LetteringDigitalReception({
       panel.scrollTop = 0;
     });
   }, [face]);
+
+  const requestDial = (phone, displayName) => {
+    if (!enableContactLinks) return;
+    setDialTarget({ phone, displayName });
+  };
+
+  const front = (
+    <FrontPanel
+      card={card}
+      verified={verified}
+      verificationItems={items}
+      embeddedInPush={embeddedInPush}
+      enableContactLinks={enableContactLinks}
+      onRequestDial={requestDial}
+    />
+  );
+  const back = (
+    <BackPanel
+      card={card}
+      verified={verified}
+      embeddedInPush={embeddedInPush}
+      enableContactLinks={enableContactLinks}
+      onRequestDial={requestDial}
+    />
+  );
 
   return (
     <div
@@ -403,21 +491,23 @@ export default function LetteringDigitalReception({
       <div className="ldr-panel-wrap" role="tabpanel" ref={panelWrapRef}>
         {useStackedPanels ? (
           <div className="ldr-panel-stage">
-            <FrontPanel card={card} verified={verified} verificationItems={items} embeddedInPush />
-            <BackPanel card={card} verified={verified} embeddedInPush />
+            {front}
+            {back}
           </div>
-        ) : embeddedInPush && previewMode ? (
-          face === "back" ? (
-            <BackPanel card={card} verified={verified} embeddedInPush />
-          ) : (
-            <FrontPanel card={card} verified={verified} verificationItems={items} embeddedInPush />
-          )
         ) : face === "back" ? (
-          <BackPanel card={card} verified={verified} embeddedInPush={false} />
+          back
         ) : (
-          <FrontPanel card={card} verified={verified} verificationItems={items} embeddedInPush={false} />
+          front
         )}
       </div>
+
+      <ShowcaseDialConfirmModal
+        open={Boolean(dialTarget?.phone)}
+        phone={dialTarget?.phone || ""}
+        displayName={dialTarget?.displayName || ""}
+        onClose={() => setDialTarget(null)}
+        onConfirm={(phone) => openPhoneDial(phone)}
+      />
     </div>
   );
 }

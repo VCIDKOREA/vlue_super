@@ -54,8 +54,11 @@ export function createDefaultShowcaseStyle() {
     platformFeed: {
       instagramHandle: "@vlue.official",
       instagramProfileUrl: "",
+      instagramAvatarUrl: "",
       kakaoProfileTitle: "VLUE 프로필",
-      kakaoProfileUrl: ""
+      kakaoProfileUrl: "",
+      kakaoAvatarUrl: "",
+      avatarUrl: ""
     },
     caseTheme: {
       frame: "classic",

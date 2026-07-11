@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import LetteringCallScreenPreview from '../../../components/LetteringCallScreenPreview.jsx';
+import LetteringIncomingNotification from '../../../components/LetteringIncomingNotification.jsx';
 import {
   MARKETING_DEMO_CARDS,
   MARKETING_DEMO_META,
@@ -7,28 +7,32 @@ import {
   toLetteringAppCard,
   type PushExampleId,
 } from '../data/marketingDemoCards';
+import { VLUE_SHOWCASE_DEMO_RECORDING_SEC } from '../../../lib/vlueShowcaseCard.js';
 
+/** 접힘 바 vs 풀 쇼케이스 펼침 */
 export type MarketingViewMode = 'push' | 'card';
+
+export type ShowcaseDemoGrade = PushExampleId | 'unverified';
 
 export const PUSH_EXAMPLES = MARKETING_DEMO_META;
 export { LETTERING_UNVERIFIED_SPOOF_NUMBER };
 
 export const BIG_PUSH_FLOW_STEPS = [
-  { step: '1', title: '빅푸시', desc: '통화 화면 번호 + VLUE 상단 패널.' },
-  { step: '2', title: '디지털인증명함', desc: '앱과 동일 명함·애니메이션.' },
+  { step: '1', title: '쇼케이스 바', desc: '통화 화면 위 VLUE 쇼케이스 요약.' },
+  { step: '2', title: '풀 쇼케이스', desc: '앱과 동일 — 디지털인증명함·배너 캐러셀.' },
   { step: '3', title: 'Galaxy · iPhone', desc: 'OS별 동일 UX.' },
 ] as const;
 
-const DEMO_DURATION_SEC = 4 * 60 + 31;
+export const SHOWCASE_FLOW_STEPS = BIG_PUSH_FLOW_STEPS;
+
+const DEMO_DURATION_SEC = VLUE_SHOWCASE_DEMO_RECORDING_SEC;
 
 function MarketingViewTabs({
   view,
   onChange,
-  disabledCard,
 }: {
   view: MarketingViewMode;
   onChange: (v: MarketingViewMode) => void;
-  disabledCard?: boolean;
 }) {
   return (
     <div className="mb-5 flex flex-wrap justify-center gap-2">
@@ -39,63 +43,103 @@ function MarketingViewTabs({
           view === 'push' ? 'bg-primary-500 text-white shadow-md' : 'border border-white/20 bg-white/5 text-white/70'
         }`}
       >
-        ① 빅푸시
+        ① 쇼케이스 바
       </button>
       <button
         type="button"
-        disabled={disabledCard}
         onClick={() => onChange('card')}
         className={`rounded-full px-4 py-2 text-[11px] font-black ${
-          view === 'card' ? 'bg-amber-400 text-gray-900 shadow-md' : 'border border-white/20 bg-white/5 text-white/70 disabled:opacity-35'
+          view === 'card' ? 'bg-amber-400 text-gray-900 shadow-md' : 'border border-white/20 bg-white/5 text-white/70'
         }`}
       >
-        ② 디지털인증명함
+        ② 풀 쇼케이스
       </button>
     </div>
   );
 }
 
-function MarketingLetteringDualScene({
+/**
+ * 앱 CallBigPushPreviewSection 펼침과 동일 — Midnight Glass 풀 쇼케이스
+ * (마케팅용: fixed 전체화면 대신 폰 프레임에 임베드)
+ */
+function MarketingAppShowcasePhone({
+  platform,
   verified,
-  cardOverride,
+  card,
   incomingNumber,
   expanded,
   setExpanded,
 }: {
+  platform: 'android' | 'ios';
   verified: boolean;
-  cardOverride?: Record<string, unknown> | null;
+  card?: Record<string, unknown> | null;
   incomingNumber: string;
   expanded: boolean;
   setExpanded: (next: boolean) => void;
 }) {
   const showToast = useCallback(() => {}, []);
+  const isPaid = verified && Boolean(card);
 
+  return (
+    <div
+      className="vlue-marketing-showcase-phone"
+      data-platform={platform}
+      data-expanded={expanded ? 'true' : 'false'}
+    >
+      <span className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/40">
+        {platform === 'android' ? 'Galaxy' : 'iPhone'}
+      </span>
+      <div className="lettering-showcase-fs lettering-showcase-fs--marketing-embed">
+        <div className="lettering-showcase-fs__shell">
+          <LetteringIncomingNotification
+            className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent"
+            previewMode
+            verified={verified}
+            callPhase={isPaid || expanded ? 'connected' : 'ringing'}
+            platform={platform}
+            isRecording={isPaid}
+            callDurationSec={isPaid ? DEMO_DURATION_SEC : 0}
+            recordingDurationSec={isPaid ? DEMO_DURATION_SEC : 0}
+            incomingNumber={incomingNumber}
+            savedContactName=""
+            isKnownContact={verified}
+            card={card || undefined}
+            expanded={expanded}
+            onExpandedChange={setExpanded}
+            onEndCall={() => setExpanded(false)}
+            onToast={showToast}
+            hideUnverifiedFooter
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MarketingShowcaseDual({
+  verified,
+  card,
+  incomingNumber,
+  expanded,
+  setExpanded,
+}: {
+  verified: boolean;
+  card?: Record<string, unknown> | null;
+  incomingNumber: string;
+  expanded: boolean;
+  setExpanded: (next: boolean) => void;
+}) {
   return (
     <div className="vlue-marketing-dual">
       {(['android', 'ios'] as const).map((platform) => (
         <div key={platform} className="vlue-marketing-lettering-cell">
-          <span className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/40">
-            {platform === 'android' ? 'Galaxy' : 'iPhone'}
-          </span>
-          <LetteringCallScreenPreview
-            callUi="native"
-            className="vlue-marketing-lettering-scene"
-            verified={verified}
-            membershipTier="premium"
+          <MarketingAppShowcasePhone
             platform={platform}
-            callPhase="active"
-            isRecording={platform === 'android'}
-            callDurationSec={DEMO_DURATION_SEC}
-            recordingDurationSec={DEMO_DURATION_SEC}
+            verified={verified}
+            card={card}
             incomingNumber={incomingNumber}
-            callScreenNumber={incomingNumber}
-            card={cardOverride}
             expanded={expanded}
             setExpanded={setExpanded}
-            interactive
-            fitBizcard
-            demoQuiet
-            showToast={showToast}
           />
         </div>
       ))}
@@ -110,10 +154,11 @@ type PreviewProps = {
   onViewChange?: (v: MarketingViewMode) => void;
 };
 
+/** 112 · 1332 — 앱과 동일 풀 쇼케이스(글래스) */
 export function LetteringBigPushMarketingPreview({
   exampleId,
   view: viewProp,
-  defaultView = 'push',
+  defaultView = 'card',
   onViewChange,
 }: PreviewProps) {
   const [viewInternal, setViewInternal] = useState<MarketingViewMode>(defaultView);
@@ -131,9 +176,9 @@ export function LetteringBigPushMarketingPreview({
   return (
     <div className="flex w-full flex-col items-center">
       <MarketingViewTabs view={view} onChange={setView} />
-      <MarketingLetteringDualScene
+      <MarketingShowcaseDual
         verified
-        cardOverride={card}
+        card={card}
         incomingNumber={meta.callDisplayNumber}
         expanded={expanded}
         setExpanded={setExpanded}
@@ -141,11 +186,11 @@ export function LetteringBigPushMarketingPreview({
       <p className="mt-4 max-w-[360px] text-center text-[11px] font-semibold text-white/55" style={{ wordBreak: 'keep-all' }}>
         {view === 'push' ? (
           <>
-            통화 화면 <strong className="text-white">{meta.callDisplayNumber}</strong> ·{' '}
+            쇼케이스 바 · <strong className="text-white">{meta.callDisplayNumber}</strong> ·{' '}
             <strong className="text-primary-200">{meta.orgName}</strong>
           </>
         ) : (
-          <>디지털인증명함 · {meta.label}</>
+          <>풀 쇼케이스 · 디지털인증명함 · {meta.label} (앱과 동일)</>
         )}
       </p>
     </div>
@@ -172,8 +217,9 @@ export function LetteringUnverifiedBigPushPreview({
   return (
     <div className="flex w-full flex-col items-center">
       <MarketingViewTabs view={view} onChange={setView} />
-      <MarketingLetteringDualScene
+      <MarketingShowcaseDual
         verified={false}
+        card={null}
         incomingNumber={LETTERING_UNVERIFIED_SPOOF_NUMBER}
         expanded={expanded}
         setExpanded={(next) => setView(next ? 'card' : 'push')}
@@ -185,17 +231,48 @@ export function LetteringUnverifiedBigPushPreview({
   );
 }
 
+/** 인증신청 — 112 / 1332 / 미인증자 (앱 풀 쇼케이스 UI) */
+export function ShowcaseMarketingPreview({
+  grade,
+  view: viewProp,
+  defaultView = 'card',
+  onViewChange,
+}: {
+  grade: ShowcaseDemoGrade;
+  view?: MarketingViewMode;
+  defaultView?: MarketingViewMode;
+  onViewChange?: (v: MarketingViewMode) => void;
+}) {
+  if (grade === 'unverified') {
+    return (
+      <LetteringUnverifiedBigPushPreview
+        view={viewProp}
+        defaultView={viewProp ? undefined : 'push'}
+        onViewChange={onViewChange}
+      />
+    );
+  }
+  return (
+    <LetteringBigPushMarketingPreview
+      exampleId={grade}
+      view={viewProp}
+      defaultView={defaultView}
+      onViewChange={onViewChange}
+    />
+  );
+}
+
 export function LetteringMarketingComparePanel({
   tab,
   onTabChange,
 }: {
-  tab: 'unverified' | PushExampleId;
-  onTabChange: (t: 'unverified' | PushExampleId) => void;
+  tab: ShowcaseDemoGrade;
+  onTabChange: (t: ShowcaseDemoGrade) => void;
 }) {
-  const tabs: { id: 'unverified' | PushExampleId; label: string }[] = [
-    { id: 'unverified', label: `미인증자 ${LETTERING_UNVERIFIED_SPOOF_NUMBER}` },
+  const tabs: { id: ShowcaseDemoGrade; label: string }[] = [
     { id: 'police112', label: '112 경찰청' },
     { id: 'fss1332', label: '1332 금융감독원' },
+    { id: 'unverified', label: `미인증자 ${LETTERING_UNVERIFIED_SPOOF_NUMBER}` },
   ];
 
   return (
@@ -220,11 +297,7 @@ export function LetteringMarketingComparePanel({
           </button>
         ))}
       </div>
-      {tab === 'unverified' ? (
-        <LetteringUnverifiedBigPushPreview />
-      ) : (
-        <LetteringBigPushMarketingPreview exampleId={tab} />
-      )}
+      <ShowcaseMarketingPreview grade={tab} defaultView="card" />
     </div>
   );
 }

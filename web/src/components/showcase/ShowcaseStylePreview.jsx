@@ -86,6 +86,7 @@ export default function ShowcaseStylePreview({
             verified={styleConfig?.verifiedBadgeOn !== false}
             embeddedInPush
             previewMode
+            enableContactLinks
             face={certFace}
             onFaceChange={setCertFace}
             className="showcase-style-preview__cert-card"

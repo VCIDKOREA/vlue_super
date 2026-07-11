@@ -13,11 +13,13 @@ import ShowcaseCallCarousel from "./showcase/ShowcaseCallCarousel.jsx";
 import FreeTierCallShowcase from "./showcase/FreeTierCallShowcase.jsx";
 import { getLetteringReportsForPhone } from "../lib/letteringPhoneReports.js";
 import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDisplay.js";
-import { LETTERING_DEMO_COMPANY_LOGO, resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
+import { LETTERING_DEMO_COMPANY_LOGO } from "../lib/letteringDemoAssets.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
+import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAvatar.js";
 import { nativeEndCall } from "../lib/call/nativeCallControl.js";
 import { resolveIsKnownContact } from "../lib/contacts/hybridKnownContact.js";
-import { PhoneOff, ShieldCheck } from "lucide-react";
+import { Phone, PhoneOff, ShieldCheck } from "lucide-react";
+import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import "../styles/showcase-call-glass.css";
 
 const DEMO_CARD = {
@@ -89,11 +91,19 @@ function LetteringProfileThumb({ card, verified, size = "sm" }) {
     );
   }
 
-  const photoUrl = card.photoUrl || "";
-  const logoUrl = card.logoUrl || resolveLetteringDemoLogoUrl(card);
+  const peer = resolveShowcasePeerAvatar({
+    style: card?.showcaseStyle,
+    card,
+    displayName: card?.name || card?.displayName || "",
+    exposeCustom: true
+  });
+  const photoUrl = peer.type === "image" ? peer.url : "";
+  /** 등록 로고만 사용 — 데모/브랜드 로고로 프로필 자리를 채우지 않음 */
+  const logoUrl = !photoUrl && card.logoUrl ? card.logoUrl : "";
   const src = photoUrl || logoUrl;
   const isLogoOnly = !photoUrl && Boolean(logoUrl);
-  const fallbackLabel = (card.organization || card.name || "?").slice(0, 1);
+  const fallbackLabel =
+    peer.type === "initial" ? peer.initial : (card.name || card.organization || "?").slice(0, 1);
   const showImg = Boolean(src) && !imgBroken;
 
   return (
@@ -182,6 +192,7 @@ export default function LetteringIncomingNotification({
   const [expandedInternal, setExpandedInternal] = useState(defaultExpanded);
   const [receptionFace, setReceptionFace] = useState("front");
   const [guideToast, setGuideToast] = useState("");
+  const [dialOpen, setDialOpen] = useState(false);
   const [knownContact, setKnownContact] = useState(() => ({
     isKnownContact: Boolean(savedContactName),
     matchedName: savedContactName || "",
@@ -224,7 +235,22 @@ export default function LetteringIncomingNotification({
     setExpanded(!expanded);
     if (expanded) setReceptionFace("front");
   };
-  const c = normalizeLetteringCard({ ...DEMO_CARD, ...card });
+  const c = normalizeLetteringCard(
+    card && typeof card === "object"
+      ? { ...DEMO_CARD, ...card }
+      : verified
+        ? DEMO_CARD
+        : {
+            name: "",
+            displayName: "",
+            organization: "",
+            title: "",
+            department: "",
+            phone: incomingNumber || "",
+            membershipTier: "free",
+            verificationItems: []
+          }
+  );
   const onCall = callPhase === "active" || callPhase === "connected";
   const statusLabel = getLetteringCallStatusLabel({
     callActive: onCall,
@@ -281,7 +307,7 @@ export default function LetteringIncomingNotification({
 
   const handleSaveCard = () => {
     if (previewMode) {
-      showGuide("미리보기입니다. 실제 통화 중에는 디지털 명함을 저장할 수 있습니다.");
+      showGuide("미리보기입니다. 실제 통화 중에는 쇼케이스를 저장할 수 있습니다.");
       return;
     }
     if (onSaveCard) {
@@ -360,28 +386,19 @@ export default function LetteringIncomingNotification({
     return phoneDisplay && phoneDisplay !== "\u2014" ? phoneDisplay : "";
   }, [isUnverified, incoming]);
 
-  const receptionLines = isPaidMember
+  /** 접힘 빅푸시 — 무료/유료 동일 (상호·이름 + 번호) */
+  const receptionLines = !isUnverified
     ? formatLetteringReceptionLines(c, { incomingNumber: incoming })
     : null;
-  const displayLabel = isUnverified || isFreeMember ? null : receptionLines?.collapsedPrimary || c.name;
+  const displayLabel = isUnverified
+    ? null
+    : receptionLines?.collapsedPrimary || c.name || freeTierSummary?.primary || "—";
   const collapsedPhoneDisplay = receptionLines?.phone
     ? formatLetteringPhoneDisplay(receptionLines.phone)
-    : "";
-
-  const incomingStatusShort = previewMode
-    ? [c.organization, c.title].filter(Boolean).join(" · ") || "블루 쇼케이스"
-    : onCall
-      ? isRecording
-        ? statusLabel || "통화 중"
-        : "통화 중"
-      : "수신 중…";
+    : freeTierSummary?.phoneDisplay || "";
 
   const previewStatusLabel = previewMode
-    ? isPaidMember && onCall && statusLabel
-      ? statusLabel
-      : isPaidMember
-        ? "미리보기"
-        : ""
+    ? ""
     : statusLabel;
 
   const handleOpenFeed = () => {
@@ -419,6 +436,14 @@ export default function LetteringIncomingNotification({
     }
   };
 
+  const handleDialPeer = () => {
+    if (!incoming) {
+      showGuide("연결할 전화번호가 없습니다.");
+      return;
+    }
+    setDialOpen(true);
+  };
+
   const handleFaceChange = (nextFace) => {
     if (previewMode) {
       showGuide(
@@ -430,11 +455,40 @@ export default function LetteringIncomingNotification({
     setReceptionFace(nextFace);
   };
 
-  /** 통화 중·쇼케이스 미리보기: 하단을 통화 종료 중심으로 */
-  const showCallEndBar = previewMode || onCall || Boolean(onEndCall);
+  /** 통화 중: 종료 / 다시보기·미리보기: 전화걸기 */
+  const showLiveEndCall = onCall && !previewMode;
+  const showReplayDial = previewMode;
+  const showCallEndBar = showLiveEndCall || showReplayDial || Boolean(onEndCall && onCall);
   const isGlassTent = /\blettering-ongoing--fullscreen-tent\b/.test(String(className || ""));
+  /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
+  const useShowcaseCarousel = isGlassTent || previewMode;
   const carouselScrollEnabled = isPaidMember && (previewMode || onCall);
   const showcasePhotos = c.showcaseStyle?.gallery?.photos || [];
+
+  const renderCircleAction = () => {
+    if (showLiveEndCall) {
+      return (
+        <button
+          type="button"
+          onClick={handleEndCall}
+          className="lettering-action lettering-action--end-call-circle"
+          aria-label="통화 종료"
+        >
+          <PhoneOff size={22} strokeWidth={2.2} aria-hidden />
+        </button>
+      );
+    }
+    return (
+      <button
+        type="button"
+        onClick={handleDialPeer}
+        className="lettering-action lettering-action--dial-call-circle"
+        aria-label="전화걸기"
+      >
+        <Phone size={22} strokeWidth={2.2} aria-hidden />
+      </button>
+    );
+  };
 
   const renderExpandedFooter = () => (
     <div
@@ -446,7 +500,7 @@ export default function LetteringIncomingNotification({
     >
       {showCallEndBar ? (
         <>
-          {isPaidMember ? (
+          {isPaidMember || previewMode ? (
             <div
               className={`lettering-ongoing-actions-secondary__row lettering-ongoing-actions-secondary__row--save-end${
                 isGlassTent ? " lettering-ongoing-actions-secondary__row--glass" : ""
@@ -459,26 +513,12 @@ export default function LetteringIncomingNotification({
                   isGlassTent ? "lettering-action--glass" : "lettering-action--primary"
                 }`}
               >
-                명함저장
+                쇼케이스 저장하기
               </button>
-              <button
-                type="button"
-                onClick={handleEndCall}
-                className="lettering-action lettering-action--end-call-circle"
-                aria-label="통화 종료"
-              >
-                <PhoneOff size={22} strokeWidth={2.2} aria-hidden />
-              </button>
+              {renderCircleAction()}
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={handleEndCall}
-              className="lettering-action lettering-action--end-call-circle"
-              aria-label="통화 종료"
-            >
-              <PhoneOff size={24} strokeWidth={2.2} aria-hidden />
-            </button>
+            renderCircleAction()
           )}
         </>
       ) : (
@@ -533,25 +573,7 @@ export default function LetteringIncomingNotification({
         >
           {verified ? <LetteringProfileThumb card={c} verified={verified} size="sm" /> : null}
           <div className="min-w-0 flex-1">
-            {isFreeMember && freeTierSummary ? (
-              <>
-                <p className="lettering-ongoing-name-row flex min-w-0 items-center gap-1.5">
-                  <span className="lettering-ongoing-phone-em min-w-0 truncate text-[15px] font-bold leading-snug text-blue-700">
-                    {freeTierSummary.phoneDisplay || freeTierSummary.primary}
-                  </span>
-                  <VlueVerifiedBadge />
-                </p>
-                <p className="lettering-ongoing-subline mt-0.5 min-w-0 truncate text-[11px] leading-snug text-slate-500">
-                  {freeTierSummary.mode === "saved" ? (
-                    <>
-                      <span className="font-medium text-slate-600">{freeTierSummary.primary}</span>
-                      <span className="text-slate-400"> {"\u00B7"} </span>
-                    </>
-                  ) : null}
-                  <span>{incomingStatusShort}</span>
-                </p>
-              </>
-            ) : isUnverified ? (
+            {isUnverified ? (
               <p className="lettering-ongoing-name-row min-w-0">
                 <span className="lettering-unverified-collapsed-phone">
                   {unverifiedCollapsedPhone || "\u2014"}
@@ -577,9 +599,9 @@ export default function LetteringIncomingNotification({
                     )
                   ) : null}
                 </p>
-                {receptionLines && collapsedPhoneDisplay ? (
+                {collapsedPhoneDisplay ? (
                   <p className="lettering-ongoing-subline mt-0.5 min-w-0 truncate text-[11px] leading-snug">
-                    {receptionLines.organization ? (
+                    {receptionLines?.organization ? (
                       <>
                         <span className="font-medium text-slate-600">{receptionLines.organization}</span>
                         <span className="text-slate-400"> / </span>
@@ -592,7 +614,7 @@ export default function LetteringIncomingNotification({
                 ) : null}
               </>
             )}
-            {isPaidMember && !collapsedPhoneDisplay && receptionLines?.expandedContactLine ? (
+            {!isUnverified && !collapsedPhoneDisplay && receptionLines?.expandedContactLine ? (
               <p className="lettering-ongoing-subtitle mt-0.5 truncate text-[11px] font-medium leading-snug text-slate-500">
                 {receptionLines.expandedContactLine}
               </p>
@@ -627,12 +649,12 @@ export default function LetteringIncomingNotification({
               <div className="lettering-ongoing-reception relative z-[2] flex min-h-0 flex-1 flex-col">
                 <div
                   className={`lettering-ongoing-scroll flex-1 min-h-0 ${
-                    isGlassTent
+                    useShowcaseCarousel
                       ? "lettering-ongoing-scroll--carousel"
                       : "lettering-ongoing-scroll--emotional"
                   }`}
                 >
-                  {isGlassTent ? (
+                  {useShowcaseCarousel ? (
                     <ShowcaseCallCarousel
                       card={c}
                       verified={verified}
@@ -649,8 +671,6 @@ export default function LetteringIncomingNotification({
                       card={c}
                       phone={incoming}
                       verified={verified}
-                      instagramHandle="@vlue.official"
-                      creatorLink={c.website}
                     />
                   )}
                 </div>
@@ -670,12 +690,12 @@ export default function LetteringIncomingNotification({
               <div className="lettering-ongoing-reception relative z-[2] flex min-h-0 flex-1 flex-col">
                 <div
                   className={`lettering-ongoing-scroll flex-1 min-h-0 ${
-                    isGlassTent
+                    useShowcaseCarousel
                       ? "lettering-ongoing-scroll--carousel"
                       : "lettering-ongoing-scroll--reception"
                   }`}
                 >
-                  {isGlassTent ? (
+                  {useShowcaseCarousel ? (
                     <ShowcaseCallCarousel
                       card={c}
                       verified={verified}
@@ -737,6 +757,13 @@ export default function LetteringIncomingNotification({
           {guideToast}
         </div>
       ) : null}
+
+      <ShowcaseDialConfirmModal
+        open={dialOpen}
+        phone={incoming}
+        displayName={c.name || savedContactName || ""}
+        onClose={() => setDialOpen(false)}
+      />
     </article>
   );
 }

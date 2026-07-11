@@ -873,6 +873,47 @@
   min-height: 40px;
 }
 
+.tent-vlue__close {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #f8fafc;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+}
+
+.tent-vlue__close:active {
+  transform: translateY(-50%) scale(0.94);
+}
+
+/* 앱 내 다시보기 — 우상단 닫기 버튼과 겹치지 않게 */
+.tent-showcase--fill .tent-vlue__top {
+  padding-top: max(8px, env(safe-area-inset-top, 0px));
+  padding-right: 48px;
+  padding-left: 48px;
+}
+
+.tent-showcase--expanded-embed {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  max-width: none;
+  border-radius: 0;
+}
+
 .tent-vlue__status {
   flex-shrink: 0;
 }
@@ -956,11 +997,33 @@
   box-shadow: 0 14px 32px rgba(43, 111, 240, 0.32);
 }
 
+.tent-vlue__mark-wrap--initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
 .tent-vlue__mark {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.tent-vlue__mark--brand {
+  object-fit: contain;
+  padding: 10px;
+  background: #2b6ff0;
+}
+
+.tent-vlue__mark-initial {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1;
+  user-select: none;
 }
 
 .tent-vlue__org {
@@ -1092,4 +1155,19 @@
   position: relative;
   z-index: 3;
   background: linear-gradient(180deg, transparent, rgba(11, 16, 27, 0.92));
+}
+
+.tent-vlue__phone--link {
+  appearance: none;
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 210, 255, 0.4);
+  text-underline-offset: 3px;
+  cursor: pointer;
 }

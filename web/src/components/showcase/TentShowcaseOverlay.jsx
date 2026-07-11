@@ -5,7 +5,8 @@ import {
   Instagram,
   MessageCircle,
   Pencil,
-  ShieldCheck
+  ShieldCheck,
+  X
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
 import { readShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
@@ -29,26 +30,16 @@ import {
   nativeRejectCall,
   nativeSetOverlayFullscreen
 } from "../../lib/call/nativeCallControl.js";
+import { openExternalHref, formatWebHref } from "../../lib/showcase/showcaseContactActions.js";
+import { resolveShowcasePeerAvatar } from "../../lib/showcase/resolveShowcasePeerAvatar.js";
 import VLUE_BRAND_LOGO from "../../assets/vlue-shield-logo.svg?url";
 import TentCallActionBar from "./TentCallActionBar.jsx";
 import TentFloatingMemo from "./TentFloatingMemo.jsx";
+import ShowcaseDialConfirmModal from "./ShowcaseDialConfirmModal.jsx";
 import "../../styles/tent-showcase.css";
 
 function openExternal(url) {
-  const u = String(url || "").trim();
-  if (!u) return false;
-  const href = /^https?:\/\//i.test(u) || u.startsWith("mailto:") || u.startsWith("tel:") ? u : `https://${u}`;
-  try {
-    window.open(href, "_blank", "noopener,noreferrer");
-    return true;
-  } catch {
-    try {
-      window.location.href = href;
-      return true;
-    } catch {
-      return false;
-    }
-  }
+  return openExternalHref(formatWebHref(url) || url);
 }
 
 function instagramUrlFromHandle(handle) {
@@ -107,11 +98,14 @@ export default function TentShowcaseOverlay({
   onEnd,
   onOpenVault,
   onToast,
+  onClose,
   className = ""
 }) {
   const [callStateInternal, setCallStateInternal] = useState(() => normalizeCallState(callStateProp));
   const callState = callStateProp != null ? normalizeCallState(callStateProp) : callStateInternal;
   const [linkToast, setLinkToast] = useState("");
+  const [dialOpen, setDialOpen] = useState(false);
+  const [avatarBroken, setAvatarBroken] = useState(false);
 
   const setCallState = useCallback(
     (next) => {
@@ -148,17 +142,21 @@ export default function TentShowcaseOverlay({
     };
   }, [peerPhone]);
 
-  const exposeCustom = shouldExposeCustomShowcase({
-    tier,
-    privacyMode,
-    isKnownContact: known.isKnownContact
-  });
+  const exposeCustom =
+    previewMode ||
+    shouldExposeCustomShowcase({
+      tier,
+      privacyMode,
+      isKnownContact: known.isKnownContact
+    });
 
   const linksEnabled = areShowcaseLinksEnabled(callState, { previewMode, forceInteractive });
   const isConnected = callState === CALL_STATES.CONNECTED;
   const isRinging = callState === CALL_STATES.RINGING;
-  /** 실통화 오버레이는 링잉부터 전체화면 글래스 — 연결 시 링크만 해제 */
-  const tentExpanded = !previewMode || isConnected || forceInteractive;
+  const isFillEmbed = /\btent-showcase--fill\b/.test(String(className || ""));
+  /** 실통화만 fixed 전체화면 — 앱 내 다시보기(fill)는 부모 안에 유지해 닫기 버튼이 가려지지 않음 */
+  const useFixedFullscreen = !previewMode && !isFillEmbed && (isConnected || isRinging);
+  const tentExpanded = useFixedFullscreen || isFillEmbed || (previewMode && (isConnected || forceInteractive));
 
   useEffect(() => {
     if (previewMode) return undefined;
@@ -274,9 +272,30 @@ export default function TentShowcaseOverlay({
       ? "더 나은 내일을 디자인합니다.\nVLUE에서 만나요."
       : "VLUE 인증 회원입니다.\n안심하고 통화하세요.");
 
-  const avatarUrl = exposeCustom
-    ? photos[0]?.url || heroFallback || card?.photoUrl || VLUE_BRAND_LOGO
-    : VLUE_BRAND_LOGO;
+  const peerAvatar = useMemo(
+    () =>
+      resolveShowcasePeerAvatar({
+        style,
+        card,
+        displayName: titleName,
+        exposeCustom,
+        brandLogoUrl: VLUE_BRAND_LOGO
+      }),
+    [style, card, titleName, exposeCustom]
+  );
+
+  useEffect(() => {
+    setAvatarBroken(false);
+  }, [peerAvatar.url, peerAvatar.type]);
+
+  const showAvatarImage =
+    (peerAvatar.type === "image" || peerAvatar.type === "brand") &&
+    Boolean(peerAvatar.url) &&
+    !avatarBroken;
+  const avatarInitial =
+    peerAvatar.type === "initial"
+      ? peerAvatar.initial
+      : String(titleName || "?").trim().slice(0, 1) || "?";
 
   const dockLeft = !isPaid
     ? {
@@ -327,7 +346,8 @@ export default function TentShowcaseOverlay({
       className={[
         "tent-showcase",
         "tent-showcase--vlue",
-        tentExpanded ? "tent-showcase--fullscreen" : "tent-showcase--compact",
+        useFixedFullscreen ? "tent-showcase--fullscreen" : "",
+        tentExpanded || isFillEmbed ? "tent-showcase--expanded-embed" : "tent-showcase--compact",
         isConnected ? "tent-showcase--connected" : "",
         isRinging ? "tent-showcase--ringing" : "",
         !linksEnabled ? "tent-showcase--links-locked" : "",
@@ -354,14 +374,38 @@ export default function TentShowcaseOverlay({
             <span className="tent-vlue__status-dot" aria-hidden />
             {statusCopy}
           </span>
+          {onClose ? (
+            <button
+              type="button"
+              className="tent-vlue__close"
+              onClick={onClose}
+              aria-label="닫기"
+            >
+              <X size={18} strokeWidth={2.4} aria-hidden />
+            </button>
+          ) : null}
         </header>
 
         <div className="tent-vlue__spacer" aria-hidden />
 
         <div className="tent-vlue__bottom">
           <div className="tent-vlue__identity">
-            <div className="tent-vlue__mark-wrap">
-              <img src={avatarUrl} alt="" className="tent-vlue__mark" draggable={false} />
+            <div
+              className={`tent-vlue__mark-wrap${showAvatarImage ? "" : " tent-vlue__mark-wrap--initial"}`}
+            >
+              {showAvatarImage ? (
+                <img
+                  src={peerAvatar.url}
+                  alt=""
+                  className={`tent-vlue__mark${peerAvatar.type === "brand" ? " tent-vlue__mark--brand" : ""}`}
+                  draggable={false}
+                  onError={() => setAvatarBroken(true)}
+                />
+              ) : (
+                <span className="tent-vlue__mark-initial" aria-hidden>
+                  {avatarInitial}
+                </span>
+              )}
             </div>
             <div className="tent-vlue__identity-copy">
               <h1 className="tent-vlue__title">
@@ -375,7 +419,21 @@ export default function TentShowcaseOverlay({
                 ) : null}
               </h1>
               {orgLine ? <p className="tent-vlue__org">{orgLine}</p> : null}
-              <p className="tent-vlue__phone">{phoneLabel}</p>
+              {phoneLabel ? (
+                <button
+                  type="button"
+                  className="tent-vlue__phone tent-vlue__phone--link"
+                  onClick={() => {
+                    if (!linksEnabled) {
+                      showLinkToast("통화 연결 후 전화를 걸 수 있습니다.");
+                      return;
+                    }
+                    setDialOpen(true);
+                  }}
+                >
+                  {phoneLabel}
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -441,6 +499,13 @@ export default function TentShowcaseOverlay({
         visible={isConnected || (previewMode && forceInteractive)}
         peerPhone={peerPhone}
         callId={peerPhone || "preview"}
+      />
+
+      <ShowcaseDialConfirmModal
+        open={dialOpen}
+        phone={peerPhone || card?.phone || ""}
+        displayName={titleName}
+        onClose={() => setDialOpen(false)}
       />
     </div>
   );

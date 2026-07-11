@@ -365,11 +365,13 @@ export const pricingTiers: PricingTier[] = MARKETING_PRICING_TIERS.map((tier) =>
   id: tier.id,
   name: tier.name,
   price: tier.price,
+  listPrice: 'listPrice' in tier ? tier.listPrice : null,
   period: tier.period,
   description: tier.description,
   color: tier.color,
   recommended: 'recommended' in tier ? tier.recommended : undefined,
   features: tier.features,
+  priceNote: 'priceNote' in tier ? tier.priceNote : undefined,
 }));
 
 export const jobPosts: JobPost[] = [

@@ -26,12 +26,12 @@ export const MARKETING_DEMO_CARDS = {
     website: 'police.go.kr',
     logoUrl: '',
     companyIntro:
-      '국가공공 긴급신고 112입니다. VLUE 인증 명함으로 수신 화면 위 빅푸시에 기관이 확인됩니다.',
+      '국가공공 긴급신고 112입니다. VLUE 인증 디지털명함으로 수신 화면 풀 쇼케이스에 기관이 확인됩니다.',
     roleLine: '긴급신고 / 112',
   },
   fss1332: {
     organization: '금융감독원',
-    name: '',
+    name: '1332',
     title: '금융민원',
     department: '대표번호 · VLUE 인증',
     phone: '1332',
@@ -39,8 +39,8 @@ export const MARKETING_DEMO_CARDS = {
     email: '1332@fss.or.kr',
     website: 'fss.or.kr',
     logoUrl: '',
-    companyIntro: 'VLUE 인증 기관 대표번호입니다.',
-    roleLine: '금융민원',
+    companyIntro: '금융감독원 대표번호 1332입니다. VLUE 인증 디지털명함으로 풀 쇼케이스에 기관이 확인됩니다.',
+    roleLine: '금융민원 / 1332',
   },
 } as const satisfies Record<string, MarketingDemoCard>;
 
@@ -71,14 +71,18 @@ export function toLetteringAppCard(demo: MarketingDemoCard, id: PushExampleId) {
     email: demo.email,
     website: demo.website,
     photoUrl: '',
+    image_url: '',
     companyIntro: demo.companyIntro,
-    membershipTier: 'premium',
+    roleLine: demo.roleLine,
+    /** DEMO_CARD(삼성생명) 잔여 필드 덮어쓰기 */
+    address: '',
+    membershipTier: 'premium' as const,
     feedId: `marketing-${id}`,
     feedType: 'company' as const,
     verificationItems: [
       'VLUE 명함 승인',
       '전화번호 일치 확인',
-      '사업자 정보 확인',
+      '공공·금융 기관 확인',
     ],
   };
   return {

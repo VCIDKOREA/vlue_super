@@ -121,9 +121,12 @@ export default function LetteringOverlayHost() {
               organization: card.organization,
               phone: card.phone,
               photoUrl: card.photoUrl,
+              avatarUrl: card.avatarUrl || card.photoUrl || "",
               logoUrl: card.logoUrl,
               website: card.website,
-              membershipTier: card.membershipTier
+              membershipTier: card.membershipTier,
+              kakaoAvatarUrl: card.kakaoAvatarUrl || "",
+              instagramAvatarUrl: card.instagramAvatarUrl || ""
             }
           : null
       });

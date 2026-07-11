@@ -1,35 +1,45 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { isPaidMembershipKind, normalizeMembershipKind, PAID_MEMBERSHIP_SUBLINE } from "../lib/membershipBm.js";
-import { v1AppShell } from "../lib/v1ReleaseScope.js";
-import ReferralCodeVerifyBlock from "./ReferralCodeVerifyBlock.jsx";
+import {
+  isPaidMembershipKind,
+  normalizeMembershipKind,
+  PAID_MEMBERSHIP_SUBLINE,
+  PAID_LIST_PRICE_MONTHLY_KRW,
+  PAID_EVENT_MONTHLY_KRW,
+  PAID_EVENT_ANNUAL_KRW,
+  PAID_LAUNCH_DISCOUNT_NOTE,
+  PAID_ANNUAL_BENEFIT_NOTE,
+  B2B_MEMBERSHIP_SUBLINE,
+  B2B_REP_LIST_MONTHLY_KRW,
+  B2B_STAFF_LIST_MONTHLY_KRW,
+  B2B_STAFF_EVENT_MONTHLY_KRW,
+  B2B_EVENT_NOTE,
+  SOHO_BROADCAST_MEMBERSHIP_SUBLINE,
+  SOHO_BROADCAST_MONTHLY_KRW,
+  SOHO_BROADCAST_NO_DISCOUNT_NOTE
+} from "../lib/membershipBm.js";
+import { FAMILY_PROTECTION_SUMMARY_SHORT } from "../lib/membershipBenefits.js";
 
 const MEMBERSHIP_OPTIONS = [
   {
     id: "free",
     title: "일반 회원 (Free)",
-    sub: "기본 기능 및 PASS 실명인증 기반 안전 거래 이용"
+    sub: "통화 신원 확인 · 기본 블루 쇼케이스 · PASS 본인확인"
   },
   {
     id: "paid",
     title: "유료 회원 (Paid)",
     sub: PAID_MEMBERSHIP_SUBLINE
-  }
-];
-
-const REFERRAL_CHANNELS = [
-  {
-    title: "지인 추천",
-    desc: "추천인 전화번호 · 피추천인 30% 할인 · 2번째 유료 추천부터 10% 포인트(1~12개월)"
   },
   {
-    title: "홍보 추천 (VLUER)",
-    desc: "SNS·유튜브·틱톡 인증·승인 후 고유 코드 · 15% 캐시(1~12개월) · 5% 캐시 영구(13개월~)"
+    id: "b2b",
+    title: "비즈니스 / B2B 풀 패키지",
+    sub: B2B_MEMBERSHIP_SUBLINE
   }
 ];
 
 /**
- * 마이페이지 — 멤버십 변경 + VLUER 업그레이드(선택형)
+ * 마이페이지 — V1 멤버십 안내·변경
  */
 export default function MembershipUpgradeModal({
   open,
@@ -37,13 +47,10 @@ export default function MembershipUpgradeModal({
   membershipTier = "free",
   isDarkMode = false,
   onMembershipTierChange,
-  onRequestTierChange,
-  onVluerUpgraded,
-  hideReferral = !v1AppShell.referralProgram
+  onRequestTierChange
 }) {
   const [planToast, setPlanToast] = useState("");
   const [paidBillingCycle, setPaidBillingCycle] = useState("monthly");
-  const [referralCode, setReferralCode] = useState("");
   const currentKind = normalizeMembershipKind(membershipTier);
 
   useEffect(() => {
@@ -73,7 +80,7 @@ export default function MembershipUpgradeModal({
     const label = MEMBERSHIP_OPTIONS.find((p) => p.id === next)?.title || next;
     if (
       !window.confirm(
-        `「${label}」로 변경 신청합니다. 유료 전환 시 결제·인증 절차가 이어질 수 있습니다. 계속할까요?`
+        `「${label}」로 변경 신청합니다. 유료·기업 전환 시 결제·인증 절차가 이어질 수 있습니다. 계속할까요?`
       )
     ) {
       return;
@@ -106,7 +113,7 @@ export default function MembershipUpgradeModal({
               id="membership-upgrade-title"
               className={`min-w-0 flex-1 text-[clamp(15px,4vw,17px)] font-black leading-snug ${textStrong}`}
             >
-              {hideReferral ? "멤버십 안내" : "멤버십 · 추천 안내"}
+              V1 멤버십 안내
             </h2>
             <button
               type="button"
@@ -119,33 +126,10 @@ export default function MembershipUpgradeModal({
           </div>
 
           <p className={`mb-4 text-[clamp(11px,3.2vw,12px)] leading-relaxed ${textSub}`}>
-            {hideReferral
-              ? "무료·유료 멤버십에 따라 블루 쇼케이스·디지털 인증명함 기능이 달라집니다."
-              : (
-                <>
-                  추천·리워드는 <b>지인 추천</b>과 <b>홍보 추천(VLUER)</b> 두 가지로만 운영됩니다. 언제든 VLUER 홍보 신청이 가능합니다.
-                </>
-              )}
+            V1은 블루 쇼케이스·디지털 인증명함·가족보호를 중심으로 운영합니다. 추천인 리워드는 제공하지 않습니다.
           </p>
 
-          {!hideReferral ? (
-            <>
-          <p className={`mb-2 text-[11px] font-black ${textStrong}`}>추천 채널</p>
-          <div className="space-y-2">
-            {REFERRAL_CHANNELS.map((ch) => (
-              <div
-                key={ch.title}
-                className={`rounded-xl border px-3 py-2.5 ${isDarkMode ? "border-white/10 bg-white/5" : "border-slate-100 bg-white"}`}
-              >
-                <p className={`text-[12px] font-black ${textStrong}`}>{ch.title}</p>
-                <p className={`mt-0.5 text-[10px] leading-relaxed ${textSub}`}>{ch.desc}</p>
-              </div>
-            ))}
-          </div>
-            </>
-          ) : null}
-
-          <p className={`mt-5 mb-2 text-[11px] font-black ${textStrong}`}>멤버십 유형</p>
+          <p className={`mb-2 text-[11px] font-black ${textStrong}`}>멤버십 유형</p>
           <div className="space-y-2">
             {MEMBERSHIP_OPTIONS.map((opt) => {
               const active = currentKind === opt.id;
@@ -167,20 +151,71 @@ export default function MembershipUpgradeModal({
                 >
                   <p className={`text-[13px] font-black ${textStrong}`}>{opt.title}</p>
                   <p className={`mt-1 text-[11px] leading-snug ${textSub}`}>{opt.sub}</p>
+                  {opt.id === "paid" ? (
+                    <div className="mt-2 space-y-1">
+                      <p className={`text-[12px] font-black ${isDarkMode ? "text-blue-200" : "text-blue-700"}`}>
+                        <span className={`mr-1.5 text-[11px] font-semibold line-through opacity-60 ${textSub}`}>
+                          {PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString("ko-KR")}원
+                        </span>
+                        {PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원/월
+                      </p>
+                      <p className={`text-[10px] leading-snug ${isDarkMode ? "text-amber-200/90" : "text-amber-800"}`}>
+                        → {PAID_LAUNCH_DISCOUNT_NOTE}
+                      </p>
+                      <p className={`text-[10px] leading-snug ${textSub}`}>{PAID_ANNUAL_BENEFIT_NOTE}</p>
+                      <p className={`text-[10px] leading-snug ${textSub}`}>
+                        가족보호 {FAMILY_PROTECTION_SUMMARY_SHORT}
+                      </p>
+                    </div>
+                  ) : null}
+                  {opt.id === "b2b" ? (
+                    <div className="mt-2 space-y-1">
+                      <p className={`text-[11px] leading-snug ${textSub}`}>
+                        대표자{" "}
+                        <span className="line-through opacity-60">
+                          {B2B_REP_LIST_MONTHLY_KRW.toLocaleString("ko-KR")}원
+                        </span>
+                        {" + "}
+                        직원{" "}
+                        <span className="line-through opacity-60">
+                          {B2B_STAFF_LIST_MONTHLY_KRW.toLocaleString("ko-KR")}원
+                        </span>
+                      </p>
+                      <p className={`text-[12px] font-black ${isDarkMode ? "text-amber-200" : "text-amber-800"}`}>
+                        → 직원 회선 {B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 ({B2B_EVENT_NOTE})
+                      </p>
+                    </div>
+                  ) : null}
                 </button>
               );
             })}
           </div>
 
-          {isPaidMembershipKind(currentKind) && !hideReferral ? (
+          <div
+            className={`mt-4 rounded-xl border p-3 ${isDarkMode ? "border-white/10 bg-white/5" : "border-violet-100 bg-violet-50/80"}`}
+          >
+            <p className={`text-[12px] font-black ${textStrong}`}>SOHO 영업 송출 옵션</p>
+            <p className={`mt-1 text-[11px] leading-snug ${textSub}`}>{SOHO_BROADCAST_MEMBERSHIP_SUBLINE}</p>
+            <p className={`mt-1 text-[12px] font-black ${isDarkMode ? "text-violet-200" : "text-violet-800"}`}>
+              +{SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원/월 ({SOHO_BROADCAST_NO_DISCOUNT_NOTE})
+            </p>
+          </div>
+
+          {isPaidMembershipKind(currentKind) ? (
             <div
               className={`mt-4 rounded-xl border p-3 ${isDarkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-slate-50/90"}`}
             >
-              <p className={`text-[12px] font-black ${textStrong}`}>유료 결제 옵션</p>
+              <p className={`text-[12px] font-black ${textStrong}`}>유료 결제 주기</p>
               <div className="mt-2 flex gap-2">
                 {[
-                  { id: "monthly", label: "월결제" },
-                  { id: "annual", label: "1년 구독" }
+                  {
+                    id: "monthly",
+                    label: `월 ${PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원`
+                  },
+                  {
+                    id: "annual",
+                    label: `연 ${PAID_EVENT_ANNUAL_KRW.toLocaleString("ko-KR")}원`
+                  }
                 ].map((b) => (
                   <button
                     key={b.id}
@@ -198,12 +233,9 @@ export default function MembershipUpgradeModal({
                   </button>
                 ))}
               </div>
-              <ReferralCodeVerifyBlock
-                billingCycle={paidBillingCycle}
-                referralCode={referralCode}
-                onReferralCodeChange={setReferralCode}
-                isDarkMode={isDarkMode}
-              />
+              <p className={`mt-2 text-[10px] leading-relaxed ${textSub}`}>
+                {paidBillingCycle === "annual" ? PAID_ANNUAL_BENEFIT_NOTE : PAID_LAUNCH_DISCOUNT_NOTE}
+              </p>
             </div>
           ) : null}
 

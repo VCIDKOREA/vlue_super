@@ -72,7 +72,9 @@ export default function FriendShowcaseList({
             organization: payload.card?.organization || friend.org,
             title: payload.card?.title || friend.title,
             phone: payload.phone || friend.phoneDisplay || friend.phone,
-            membershipTier: tier
+            membershipTier: tier,
+            photoUrl: payload.card?.photoUrl || friend.avatarUrl || "",
+            avatarUrl: payload.card?.avatarUrl || friend.avatarUrl || ""
           },
           isPaidLetteringTier(tier) ? tier : "free"
         )
@@ -189,6 +191,8 @@ export default function FriendShowcaseList({
         subtitle="친구 쇼케이스"
         isDarkMode
         coverBottomNav
+        hideHeader
+        showFloatingClose={false}
         className="bg-[#0B101B]"
       >
         <div className="flex min-h-0 flex-1 flex-col">
@@ -206,6 +210,7 @@ export default function FriendShowcaseList({
               organization={previewCard.organization || ""}
               card={previewCard}
               showcaseStyle={previewCard.showcaseStyle || readShowcaseStyle()}
+              onClose={closePreview}
               className="tent-showcase--fill"
             />
           ) : (

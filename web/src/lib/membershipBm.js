@@ -1,4 +1,4 @@
-/** BM 명세 — 멤버십(유료/무료) · VLUER 등급(일반/인증/파트너/공식) */
+/** BM 명세 — V1 멤버십(무료/유료/B2B) · 출시 이벤트 요금 */
 
 import { getPricingConfigSync, pricingNumbers } from "./pricingConfig.js";
 
@@ -9,19 +9,20 @@ function nums() {
 export const PERSONAL_COMBO_ADDON_MONTHLY_KRW = 5100;
 export const PERSONAL_COMBO_ADDON_ANNUAL_KRW = 51000;
 export const B2B_SUBORDINATE_MONTHLY_KRW = 14700;
+export const B2B_STAFF_EVENT_MONTHLY_KRW = 5200;
 export const SOHO_BROADCAST_MONTHLY_KRW = 4200;
 export const SOHO_BROADCAST_ANNUAL_KRW = 42000;
 
 export function personalComboPricingNote() {
   const n = nums();
-  return `회사 부담 ${n.b2bMonthly.toLocaleString("ko-KR")}원 + 개인 부담 ${n.personalComboMonthly.toLocaleString("ko-KR")}원 = SOHO 활동형 ${n.sohoMonthly.toLocaleString("ko-KR")}원과 동일한 VLUER 혜택`;
+  return `회사 부담 ${n.b2bMonthly.toLocaleString("ko-KR")}원 + 개인 부담 ${n.personalComboMonthly.toLocaleString("ko-KR")}원`;
 }
 
 export const PERSONAL_COMBO_PRICING_NOTE =
-  "회사 부담 14,700원 + 개인 부담 5,100원 = 유료 회원 19,800원과 동일한 VLUER 혜택";
+  "회사 부담 직원 회선 + 개인 부담 콤보(V2 예정). V1에서는 개인 유료·B2B 회선만 안내합니다.";
 
 export const ENTERPRISE_REFERRAL_POLICY_NOTE =
-  "회사 인증 후 개인 유료(콤보) 가입 시 개인 추천인 코드를 지정할 수 없으며, 해당 기업을 인수한 VLUE(기업 추천인)으로 자동 귀속됩니다.";
+  "V1에서는 추천인 프로그램을 운영하지 않습니다.";
 
 export function personalComboAmountKrw(billingCycle) {
   const n = nums();
@@ -35,58 +36,56 @@ export function buildPersonalComboPaymentPreview(billingCycle = "monthly") {
     amountLabel: formatKrw(amountKrw),
     badges: ["임직원 콤보", "회사 인증 필요"],
     detailLine: personalComboPricingNote(),
-    compareFrom: formatKrw(nums().sohoMonthly),
+    compareFrom: formatKrw(nums().paidListMonthly),
     compareTo: formatKrw(amountKrw)
   };
 }
 
+/** 유료 정가 (표시·취소선용) */
 export const PAID_LIST_PRICE_MONTHLY_KRW = 28300;
-/** 1년 구독 정가 — 2개월 무료(10개월분) */
+/** 1년 구독 정가 — 12개월분 표시용 */
 export const PAID_LIST_PRICE_ANNUAL_KRW = 283000;
 export const ANNUAL_FREE_MONTHS = 2;
-export const REFERRAL_DISCOUNT_RATE = 0.3;
-export const REFERRAL_DISCOUNT_RATE_SLIDING = 0.15;
-export const REFERRAL_BENEFIT_PROMO_MONTHS = 12;
-export const PAID_MONTHLY_DISCOUNTED_KRW = 19800;
-export const PAID_ANNUAL_DISCOUNTED_KRW = 198000;
-/** 13개월째부터 피추천인 영구 15% 할인 (정가 28,300원 기준) */
-export const PAID_MONTHLY_SLIDING_DISCOUNTED_KRW = 24050;
 
-/** 지인 추천 — 피추천인 할인 */
-export const REFERRAL_FRIEND_DISCOUNT_NOTICE =
-  `※ 지인 추천(추천인 전화번호): 피추천인 구독 시 30% 할인(월 ${PAID_MONTHLY_DISCOUNTED_KRW.toLocaleString("ko-KR")}원)이 적용됩니다. 추천인은 2번째 유료 추천부터 가입 후 ${REFERRAL_BENEFIT_PROMO_MONTHS}개월간 10% 포인트 적립, ${REFERRAL_BENEFIT_PROMO_MONTHS + 1}개월째부터 적립 없음. 언제든 VLUER 홍보 신청 가능.`;
+/** V1 출시 이벤트가 — 판매가 */
+export const PAID_EVENT_MONTHLY_KRW = 9900;
+export const PAID_EVENT_ANNUAL_KRW = 99000;
+export const PAID_LAUNCH_DISCOUNT_NOTE =
+  "VLUE V1 출시 기념 파격 65% 특별 할인 (종료 시까지!)";
+export const PAID_ANNUAL_BENEFIT_NOTE =
+  "(연간 구독 시 2개월 추가 무료 혜택: 연 99,000원)";
 
-/** 홍보 추천 — 피추천인 할인 */
-export const REFERRAL_PROMO_DISCOUNT_NOTICE =
-  `※ 홍보 추천(VLUER 고유 코드): 피추천인 최초 ${REFERRAL_BENEFIT_PROMO_MONTHS}개월 30% 할인, ${REFERRAL_BENEFIT_PROMO_MONTHS + 1}개월째부터 15% 할인(월 ${PAID_MONTHLY_SLIDING_DISCOUNTED_KRW.toLocaleString("ko-KR")}원) 영구.`;
+/** @deprecated 별칭 — V1 이벤트가 */
+export const PAID_MONTHLY_DISCOUNTED_KRW = PAID_EVENT_MONTHLY_KRW;
+/** @deprecated 별칭 — V1 연간 이벤트가 */
+export const PAID_ANNUAL_DISCOUNTED_KRW = PAID_EVENT_ANNUAL_KRW;
 
-/** 홍보 추천 — 추천인 캐시 */
-export const REFERRAL_PROMO_SPONSOR_NOTICE =
-  `※ 홍보 VLUER 적립: SNS·유튜브·틱톡 인증·승인 후 고유 코드로 추천 시 1~${REFERRAL_BENEFIT_PROMO_MONTHS}개월 15% 캐시(출금 가능), ${REFERRAL_BENEFIT_PROMO_MONTHS + 1}개월째부터 5% 캐시 영구. VLUER 승인 시 기존 지인 추천 회원도 캐시 적립으로 전환됩니다.`;
+/** V1 미운영 — 하위 호환용 상수 */
+export const REFERRAL_DISCOUNT_RATE = 0;
+export const REFERRAL_DISCOUNT_RATE_SLIDING = 0;
+export const REFERRAL_BENEFIT_PROMO_MONTHS = 0;
+export const PAID_MONTHLY_SLIDING_DISCOUNTED_KRW = PAID_EVENT_MONTHLY_KRW;
 
-/** @deprecated — 하위 호환 */
-export const REFERRAL_DISCOUNT_NOTICE = REFERRAL_PROMO_DISCOUNT_NOTICE;
-export const REFERRAL_SPONSOR_REWARD_NOTICE = REFERRAL_PROMO_SPONSOR_NOTICE;
+export const REFERRAL_FRIEND_DISCOUNT_NOTICE = "※ V1에서는 추천인 할인·리워드를 운영하지 않습니다.";
+export const REFERRAL_PROMO_DISCOUNT_NOTICE = REFERRAL_FRIEND_DISCOUNT_NOTICE;
+export const REFERRAL_PROMO_SPONSOR_NOTICE = REFERRAL_FRIEND_DISCOUNT_NOTICE;
+export const REFERRAL_DISCOUNT_NOTICE = REFERRAL_FRIEND_DISCOUNT_NOTICE;
+export const REFERRAL_SPONSOR_REWARD_NOTICE = REFERRAL_FRIEND_DISCOUNT_NOTICE;
+export const REFERRAL_POST_SIGNUP_NOTICE = REFERRAL_FRIEND_DISCOUNT_NOTICE;
+export const REFERRAL_PROGRAM_NOTICES = [];
 
-export const REFERRAL_POST_SIGNUP_NOTICE =
-  "※ 추천인 없이 정가로 가입해도 사후 등록이 가능하며, 등록 시점의 가입일·결제 주기에 맞춰 위 할인·적립이 순차 적용됩니다. (예: 12일 정가 가입 후 20일 추천인 등록 → 다음 달 12일 결제부터 30% 구간 시작)";
+export const PAID_MEMBERSHIP_SUBLINE = `월 ${PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 · 연 ${PAID_EVENT_ANNUAL_KRW.toLocaleString("ko-KR")}원 · ${PAID_LAUNCH_DISCOUNT_NOTE}`;
 
-/** 서비스소개·약관용 — 할인 + 스폰서 + 사후등록 */
-export const REFERRAL_PROGRAM_NOTICES = [
-  REFERRAL_FRIEND_DISCOUNT_NOTICE,
-  REFERRAL_PROMO_DISCOUNT_NOTICE,
-  REFERRAL_PROMO_SPONSOR_NOTICE,
-  REFERRAL_POST_SIGNUP_NOTICE
-];
+export const B2B_REP_LIST_MONTHLY_KRW = 28300;
+export const B2B_STAFF_LIST_MONTHLY_KRW = 14700;
+export const B2B_EVENT_NOTE = "이벤트가격 (종료시까지)";
 
-export const PAID_MEMBERSHIP_SUBLINE =
-  `월 ${PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString("ko-KR")}원 · 1년 ${PAID_LIST_PRICE_ANNUAL_KRW.toLocaleString("ko-KR")}원 (2개월 무료)`;
-
-export const B2B_MEMBERSHIP_SUBLINE =
-  "10회선↑ · 회선당 14,700원 · VLUE 전체 계정 · 8자리 대표번호=상호만 송출";
+export const B2B_MEMBERSHIP_SUBLINE = `대표자 ${B2B_REP_LIST_MONTHLY_KRW.toLocaleString("ko-KR")}원 + 직원 회선 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원(${B2B_EVENT_NOTE})`;
 
 export const SOHO_BROADCAST_MEMBERSHIP_SUBLINE =
-  "월 4,200원 · [상호+대표번호]만 송출 · 대표자 성명 미표시";
+  "대표자 계정 외 추가번호 쇼케이스만 제공 · 월 +4,200원(할인 적용 안 됨)";
+
+export const SOHO_BROADCAST_NO_DISCOUNT_NOTE = "할인 적용 안 됨";
 
 export const POST_SIGNUP_PAYMENT_NOTICE =
   "회원가입·본인인증이 완료되었습니다. 유료·기업 멤버십은 아래 결제창에서 첫 구독 요금을 결제해 주세요.";
@@ -113,12 +112,13 @@ export function normalizeMembershipKind(raw) {
   return "free";
 }
 
-export function paidAmountKrw(billingCycle, withReferralDiscount) {
+/** V1 판매가 — 출시 이벤트가(추천 할인 미운영) */
+export function paidAmountKrw(billingCycle, _withReferralDiscount) {
   const n = nums();
   if (billingCycle === "annual") {
-    return withReferralDiscount ? n.sohoAnnual : n.paidListAnnual;
+    return n.sohoAnnual;
   }
-  return withReferralDiscount ? n.sohoMonthly : n.paidListMonthly;
+  return n.sohoMonthly;
 }
 
 export function broadcastAddonAmountKrw(billingCycle) {
@@ -144,36 +144,32 @@ export function annualTwelveMonthListKrw() {
 }
 
 /**
- * 예상 결제 UI용 — 금액·할인 문구 분리
+ * 예상 결제 UI용 — 금액·할인 문구 분리 (V1 출시 이벤트)
  */
-export function buildPaymentPreview(billingCycle, withReferralDiscount) {
+export function buildPaymentPreview(billingCycle, _withReferralDiscount) {
   const cycle = billingCycle === "annual" ? "annual" : "monthly";
-  const amountKrw = paidAmountKrw(cycle, withReferralDiscount);
+  const amountKrw = paidAmountKrw(cycle, false);
+  const n = nums();
 
   if (cycle === "monthly") {
     return {
       amountKrw,
       amountLabel: formatKrw(amountKrw),
-      badges: withReferralDiscount ? ["30% 할인"] : [],
-      compareFrom: null,
-      compareTo: null,
-      detailLine: withReferralDiscount
-        ? `추천인 할인 (정가 ${nums().paidListMonthly.toLocaleString("ko-KR")}원)`
-        : `정가 ${nums().paidListMonthly.toLocaleString("ko-KR")}원`
+      badges: ["V1 65% 특별 할인"],
+      compareFrom: formatKrw(n.paidListMonthly),
+      compareTo: formatKrw(amountKrw),
+      detailLine: PAID_LAUNCH_DISCOUNT_NOTE
     };
   }
 
   const twelveMonth = annualTwelveMonthListKrw();
-  const badges = ["12개월 이용", "2개월 무료"];
-  if (withReferralDiscount) badges.push("30% 할인");
-
   return {
     amountKrw,
     amountLabel: formatKrw(amountKrw),
-    badges,
+    badges: ["12개월 이용", "2개월 추가 무료", "V1 특별 할인"],
     compareFrom: formatKrw(twelveMonth),
     compareTo: formatKrw(amountKrw),
-    detailLine: `월 ${nums().paidListMonthly.toLocaleString("ko-KR")}원 × 10개월 분 · ${formatKrw(twelveMonth - amountKrw)} 절약`
+    detailLine: PAID_ANNUAL_BENEFIT_NOTE
   };
 }
 

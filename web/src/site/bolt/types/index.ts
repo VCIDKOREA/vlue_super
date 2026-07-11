@@ -96,11 +96,13 @@ export interface PricingTier {
   id: string;
   name: string;
   price: number;
+  listPrice?: number | null;
   period: string;
   description: string;
   color: string;
   recommended?: boolean;
   features: string[];
+  priceNote?: string;
 }
 
 export interface JobPost {

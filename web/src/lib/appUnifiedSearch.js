@@ -193,7 +193,7 @@ function staticScreens(membershipTier) {
       category: "멤버십",
       title: `현재 등급 · ${tierKo}`,
       subtitle: "멤버십 · 등급 안내는 프로필에서",
-      fields: ["등급", "멤버십", "무료", "유료", "가족보호", "구독료"],
+      fields: ["등급", "멤버십", "무료", "유료", "가족보호", "쇼케이스", "구독료", "9900"],
       action: { type: "profile", view: "main" }
     },
     {

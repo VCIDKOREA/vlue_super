@@ -1,6 +1,6 @@
 /**
- * Fullscreen tent — Midnight Black Glassmorphism
- * Palette: #E2E8F0 · #00D2FF · #0F172A
+ * Fullscreen tent ? Midnight Black Glassmorphism
+ * Palette: #E2E8F0 ? #00D2FF ? #0F172A
  */
 
 .lettering-showcase-fs,
@@ -15,7 +15,7 @@
   color: #e2e8f0;
 }
 
-/* —— Top live bar: dark slate blur, no cyan box —— */
+/* ?? Top live bar: dark slate blur, no cyan box ?? */
 .lettering-ongoing--fullscreen-tent > .lettering-live-bar,
 .lettering-live-bar--glass {
   background: linear-gradient(
@@ -51,7 +51,7 @@
   box-shadow: 0 0 8px rgba(0, 210, 255, 0.45);
 }
 
-/* —— Summary / identity —— */
+/* ?? Summary / identity ?? */
 .lettering-ongoing--fullscreen-tent .lettering-ongoing-summary {
   background: transparent;
   border-bottom: 1px solid rgba(226, 232, 240, 0.08);
@@ -99,7 +99,7 @@
   box-shadow: none;
 }
 
-/* —— Footer glass + circular end-call —— */
+/* ?? Footer glass + circular end-call ?? */
 .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-actions-secondary--call,
 .lettering-ongoing-actions-secondary--glass {
   background: linear-gradient(
@@ -122,7 +122,7 @@
   gap: 12px;
 }
 
-/* 왼쪽 명함저장 · 오른쪽 통화종료 — 한 줄 */
+/* ?? ???? ? ??? ???? ? ? ? */
 .lettering-ongoing-actions-secondary__row--save-end {
   display: flex;
   flex-direction: row;
@@ -138,11 +138,14 @@
 .lettering-ongoing-actions-secondary__row--save-end .lettering-action--save-inline {
   flex: 1 1 auto;
   min-width: 0;
-  max-width: 200px;
+  max-width: 220px;
   min-height: 48px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
-.lettering-ongoing-actions-secondary__row--save-end .lettering-action--end-call-circle {
+.lettering-ongoing-actions-secondary__row--save-end .lettering-action--end-call-circle,
+.lettering-ongoing-actions-secondary__row--save-end .lettering-action--dial-call-circle {
   flex: 0 0 auto;
   width: 56px;
   height: 56px;
@@ -150,6 +153,33 @@
   min-height: 56px;
   margin: 0;
   border-radius: 28px;
+}
+
+.lettering-action--dial-call-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  min-height: 64px;
+  margin: 4px auto 0;
+  padding: 0;
+  border: 0;
+  border-radius: 32px;
+  background: radial-gradient(circle at 35% 28%, #4ade80, #16a34a 70%);
+  color: #fff;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 1px rgba(22, 163, 74, 0.45),
+    0 8px 28px rgba(21, 128, 61, 0.4),
+    0 0 24px rgba(34, 197, 94, 0.35);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.lettering-action--dial-call-circle:active {
+  transform: scale(0.94);
+  filter: brightness(0.95);
 }
 
 .lettering-action--glass,
@@ -208,7 +238,7 @@
   display: none !important;
 }
 
-/* —— Carousel —— */
+/* ?? Carousel ?? */
 .showcase-call-carousel {
   display: flex;
   flex-direction: column;
@@ -331,7 +361,7 @@
 }
 
 .showcase-call-carousel__card {
-  /* 뷰포트 높이를 채워 명함·쇼케이스를 더 길게 */
+  /* ??? ??? ?? ???????? ? ?? */
   flex: 1 1 auto;
   height: 100%;
   min-height: min(62dvh, 560px);
@@ -434,7 +464,7 @@
   cursor: default;
 }
 
-/* —— Digital card: 인증 프레임 유지 + 이름 옆 실드 —— */
+/* ?? Digital card: ?? ??? ?? + ?? ? ?? ?? */
 .lettering-ongoing--fullscreen-tent .ldr-back-title-row,
 .showcase-call-carousel .ldr-back-title-row {
   display: flex;
@@ -459,7 +489,7 @@
   min-height: 0;
 }
 
-/* 글래스 톤 VLUE 인증 프레임 (숨기지 않음) */
+/* ??? ? VLUE ?? ??? (??? ??) */
 .lettering-ongoing--fullscreen-tent .vlue-push-auth-seal,
 .showcase-call-carousel .vlue-push-auth-seal {
   display: block !important;
@@ -489,7 +519,7 @@
   color: #f8fafc;
 }
 
-/* 캐러셀 명함: 세로로 길게 · 내부 스크롤 */
+/* ??? ??: ??? ?? ? ?? ??? */
 .showcase-call-carousel .ldr-reception--push {
   display: flex;
   flex-direction: column;
@@ -566,7 +596,7 @@
 
 .showcase-call-carousel .ldr-reception--push .ldr-front-profile-stack {
   flex: 1 1 auto;
-  gap: 16px;
+  gap: 0;
   padding-bottom: 8px;
 }
 
@@ -586,14 +616,35 @@
   background: transparent !important;
 }
 
+.lettering-ongoing--fullscreen-tent .ldr-front-info-row {
+  border-bottom-color: rgba(226, 232, 240, 0.12);
+}
+
 .lettering-ongoing--fullscreen-tent .ldr-back-kicker,
 .lettering-ongoing--fullscreen-tent .ldr-back-sub,
 .lettering-ongoing--fullscreen-tent .ldr-back-section__title,
 .lettering-ongoing--fullscreen-tent .ldr-back-section__body,
 .lettering-ongoing--fullscreen-tent .ldr-back-list,
 .lettering-ongoing--fullscreen-tent .ldr-contact-row__label,
-.lettering-ongoing--fullscreen-tent .ldr-contact-row__value {
+.lettering-ongoing--fullscreen-tent .ldr-contact-row__value,
+.lettering-ongoing--fullscreen-tent .ldr-front-info-row__label,
+.lettering-ongoing--fullscreen-tent .ldr-front-info-row__value,
+.lettering-ongoing--fullscreen-tent .ldr-front-info-row__list {
   color: #e2e8f0 !important;
+}
+
+.lettering-ongoing--fullscreen-tent .ldr-front-info-row__label {
+  color: rgba(148, 163, 184, 0.92) !important;
+}
+
+.lettering-ongoing--fullscreen-tent .ldr-front-info-row__icon {
+  color: #00d2ff !important;
+}
+
+.lettering-ongoing--fullscreen-tent .ldr-front-phone-link--btn,
+.lettering-ongoing--fullscreen-tent .ldr-contact-row__value--link {
+  color: #00d2ff !important;
+  text-decoration-color: rgba(0, 210, 255, 0.55);
 }
 
 .lettering-ongoing--fullscreen-tent .ldr-back-kicker {
@@ -615,7 +666,7 @@
   border-color: transparent;
 }
 
-/* —— 무료 단독 쇼케이스 (디지털 명함 없음) —— */
+/* ?? ?? ?? ???? (??? ?? ??) ?? */
 .showcase-call-carousel--free .showcase-call-carousel__viewport {
   touch-action: none;
 }
@@ -640,6 +691,21 @@
   border-radius: 20px;
   border: 1px solid rgba(226, 232, 240, 0.1);
   background: rgba(15, 23, 42, 0.55);
+}
+
+.free-tier-solo--tent {
+  overflow: hidden;
+  min-height: min(52dvh, 480px);
+  height: 100%;
+  border: 0;
+  background: #0b101b;
+}
+
+.free-tier-solo__tent.tent-showcase--fill {
+  min-height: 100%;
+  height: 100%;
+  border-radius: 20px;
+  overflow: hidden;
 }
 
 .free-tier-solo--safe {
@@ -704,7 +770,7 @@
   color: rgba(226, 232, 240, 0.55);
 }
 
-/* 쇼케이스 미리보기 — 버튼 탭 안내 토스트 */
+/* ???? ???? ? ?? ? ?? ??? */
 .lettering-preview-guide-toast {
   position: absolute;
   left: 50%;
@@ -727,8 +793,67 @@
   animation: lettering-preview-guide-in 0.22s ease-out both;
 }
 
-.lettering-ongoing--fullscreen-tent .lettering-preview-guide-toast {
-  bottom: max(110px, calc(88px + env(safe-area-inset-bottom, 0px)));
+.lettering-showcase-fs--history-embed {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 1 !important;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  animation: none !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.lettering-showcase-fs--history-embed .lettering-showcase-fs__shell {
+  flex: 1 1 auto;
+  height: 100% !important;
+  max-height: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lettering-showcase-fs--history-embed .lettering-ongoing--fullscreen-tent,
+.lettering-showcase-fs--history-embed .lettering-ongoing--history-replay {
+  flex: 1 1 auto;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 0;
+  border-radius: 0 !important;
+  --lettering-native-controls-reserve: 0px;
+  --lettering-push-expanded-max: none;
+  --lettering-push-expanded-max-fb: none;
+}
+
+.lettering-showcase-fs--history-embed .lettering-ongoing--history-replay.lettering-ongoing--on-call.lettering-ongoing--expanded.lettering-ongoing--paid,
+.lettering-showcase-fs--history-embed .lettering-ongoing--history-replay.lettering-ongoing--showcase-preview.lettering-ongoing--expanded {
+  max-height: none !important;
+  height: 100% !important;
+  overflow: hidden;
+}
+
+.lettering-showcase-fs--history-embed .lettering-ongoing--history-replay .lettering-ongoing-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.lettering-showcase-fs--history-embed .lettering-ongoing--history-replay .lettering-ongoing-scroll--carousel {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.lettering-showcase-fs--history-embed .lettering-ongoing--history-replay .showcase-call-carousel__card,
+.lettering-showcase-fs--history-embed .lettering-ongoing--history-replay .showcase-call-carousel__banner {
+  min-height: 0 !important;
+}
+
+.lettering-ongoing--history-replay > .lettering-live-bar {
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
+  padding-right: 52px;
 }
 
 @keyframes lettering-preview-guide-in {
@@ -740,4 +865,93 @@
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+}
+
+/* ??? ???? ??? ??? */
+.showcase-dial-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.showcase-dial-confirm__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, 0.62);
+  cursor: pointer;
+}
+.showcase-dial-confirm__panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 340px);
+  padding: 22px 20px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.14);
+  background: linear-gradient(165deg, #1e293b 0%, #0f172a 100%);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  color: #e2e8f0;
+}
+.showcase-dial-confirm__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 12px;
+  border-radius: 999px;
+  background: rgba(0, 210, 255, 0.12);
+  color: #00d2ff;
+}
+.showcase-dial-confirm__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.showcase-dial-confirm__name {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: rgba(226, 232, 240, 0.75);
+}
+.showcase-dial-confirm__phone {
+  margin: 6px 0 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.showcase-dial-confirm__hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(148, 163, 184, 0.95);
+}
+.showcase-dial-confirm__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+.showcase-dial-confirm__btn {
+  border-radius: 12px;
+  padding: 12px 10px;
+  font-size: 13px;
+  font-weight: 800;
+  border: 0;
+  cursor: pointer;
+}
+.showcase-dial-confirm__btn--ghost {
+  background: rgba(226, 232, 240, 0.08);
+  color: #e2e8f0;
+}
+.showcase-dial-confirm__btn--call {
+  background: #00d2ff;
+  color: #0f172a;
 }
