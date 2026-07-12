@@ -44,7 +44,7 @@ export default function LetteringUnverifiedReportPanel({
   return (
     <div className={`lettering-unverified-panel ${className}`.trim()}>
       <p className="lettering-unverified-alert">
-        {"VLUE에 등록되지 않은 발신 번호입니다. 아래는 커뮤니티·VLUE 신고·제보 이력입니다."}
+        {"등록되지 않은 발신 번호입니다. 커뮤니티·VLUE 신고·제보 이력을 확인할 수 있습니다."}
       </p>
 
       {incoming ? (

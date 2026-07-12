@@ -9,8 +9,14 @@ export const REFERRAL_LOCK_MONTHS = 3;
 export const SLIDING_RENEWAL_MONTHLY_KRW = 24_050;
 export const SLIDING_RENEWAL_SUPPLY_KRW = 21_863.6;
 export const PROMO_SUPPLY_MONTHLY_KRW = 18_000;
-export const PAID_MONTHLY_DISCOUNTED_KRW = 19800;
-export const PAID_ANNUAL_DISCOUNTED_KRW = 198000;
+
+/** V1 출시 이벤트가(판매가) — 정가 28,300원 대비 */
+export const PAID_EVENT_MONTHLY_KRW = 9900;
+export const PAID_EVENT_ANNUAL_KRW = 99000;
+/** @deprecated V1 — 이벤트 판매가와 동일 */
+export const PAID_MONTHLY_DISCOUNTED_KRW = PAID_EVENT_MONTHLY_KRW;
+/** @deprecated V1 — 이벤트 판매가와 동일 */
+export const PAID_ANNUAL_DISCOUNTED_KRW = PAID_EVENT_ANNUAL_KRW;
 
 export type MembershipKind = "free" | "paid" | "b2b";
 export type PaidBillingCycle = "monthly" | "annual";
@@ -39,9 +45,12 @@ export function paidListAmountKrw(cycle: PaidBillingCycle): number {
   return cycle === "annual" ? PAID_LIST_PRICE_ANNUAL_KRW : PAID_LIST_PRICE_MONTHLY_KRW;
 }
 
-export function paidChargeAmountKrw(cycle: PaidBillingCycle, isDiscounted: boolean): number {
-  if (!isDiscounted) return paidListAmountKrw(cycle);
-  return cycle === "annual" ? PAID_ANNUAL_DISCOUNTED_KRW : PAID_MONTHLY_DISCOUNTED_KRW;
+/**
+ * V1 청구액 — 출시 이벤트 판매가(월 9,900 / 연 99,000).
+ * 정가(list)는 표시·취소선용. `_isDiscounted` 는 하위 호환용으로 무시.
+ */
+export function paidChargeAmountKrw(cycle: PaidBillingCycle, _isDiscounted?: boolean): number {
+  return cycle === "annual" ? PAID_EVENT_ANNUAL_KRW : PAID_EVENT_MONTHLY_KRW;
 }
 
 export const PERSONAL_COMBO_ADDON_MONTHLY_KRW = 5100;

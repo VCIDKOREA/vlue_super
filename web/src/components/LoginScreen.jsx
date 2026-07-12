@@ -51,7 +51,8 @@ function SocialPass() {
 
 /**
  * 앱 최초 진입용 로그인 화면
- * - 간편 로그인은 팝업으로만 제공 (이미 가입한 사용자용)
+ * - V1: 둘러보기(onDismiss) 없음 — 로그인·회원가입만
+ * - 간편 로그인은 이미 가입·연동한 사용자용
  * - 아이디·비밀번호 저장 체크 후 로그인 시 다음 접속에서 둘 다 불러옴
  */
 function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt }) {

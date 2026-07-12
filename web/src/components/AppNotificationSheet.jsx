@@ -20,7 +20,7 @@ export default function AppNotificationSheet({
       reserveBottomNav
     >
       <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
-        <PushNotificationInbox onOpenFamilyProtection={onOpenFamilyProtection} />
+        <PushNotificationInbox onOpenFamilyProtection={onOpenFamilyProtection} isDarkMode={isDarkMode} />
       </div>
     </AppFullScreenView>
   );

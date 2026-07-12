@@ -188,10 +188,18 @@ export default function TentShowcaseOverlay({
   }, [previewMode, setCallState]);
 
   const phoneLabel = formatLetteringPhoneDisplay(peerPhone || card?.phone || "");
+  const hideBroadcastName = Boolean(
+    card?.hideBroadcastName ||
+      card?.showcaseStyle?.showBroadcastName === false ||
+      style?.showBroadcastName === false
+  );
   const titleName = exposeCustom
-    ? displayName || card?.name || card?.displayName || known.matchedName || phoneLabel
+    ? hideBroadcastName
+      ? known.matchedName || phoneLabel
+      : displayName || card?.name || card?.displayName || known.matchedName || phoneLabel
     : phoneLabel;
-  const orgLine = exposeCustom && isPaid ? organization || card?.organization || "" : "";
+  const orgLine =
+    exposeCustom && isPaid && !hideBroadcastName ? organization || card?.organization || "" : "";
 
   const photos = useMemo(() => {
     if (!exposeCustom) return [];

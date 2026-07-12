@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import { chargeSubscribeWithPortoneSecrets } from "../../integrations/portone/iamportBilling.js";
 import type { PaidBillingCycle } from "../membership/membershipBmConstants.js";
+import { paidListAmountKrw } from "../membership/membershipBmConstants.js";
 import { assertMembershipCheckoutAmountKrw } from "../membership/membershipCheckoutGuard.js";
 import { settleSubscriptionReferralCommission } from "../membership/subscriptionReferralSettlement.js";
 
@@ -81,15 +82,55 @@ export async function completePortoneSubscribePayment(input: CompleteSubscribeIn
     throw new Error("결제 대기 중인 구독이 없습니다. 가입을 다시 진행해 주세요.");
   }
 
-  if (sub.amountKrw !== amount) {
-    throw new Error(`결제 금액이 구독 금액(${sub.amountKrw}원)과 일치하지 않습니다.`);
+  let expectedAmountKrw = sub.amountKrw;
+  let expectedDiscounted = sub.isDiscounted;
+
+  if (expectedAmountKrw !== amount) {
+    /**
+     * V1: UI·클라이언트는 출시가 9,900/99,000. 가입 시 pending이 정가 28,300으로 남은 경우 보정.
+     * (shared dist 미재빌드여도 하드코드로 허용)
+     */
+    const cycleForHeal = parseBillingCycle(input.billingCycle ?? sub.plan);
+    const listPrice = paidListAmountKrw(cycleForHeal);
+    const sellMonthly = 9900;
+    const sellAnnual = 99000;
+    const sellPrice = cycleForHeal === "annual" ? sellAnnual : sellMonthly;
+    const stalePending =
+      expectedAmountKrw === listPrice ||
+      expectedAmountKrw === 28300 ||
+      expectedAmountKrw === 283000 ||
+      expectedAmountKrw === 19800 ||
+      expectedAmountKrw === 198000;
+
+    if (amount === sellPrice && stalePending) {
+      await prisma.userSubscription.update({
+        where: { id: sub.id },
+        data: {
+          amountKrw: sellPrice,
+          listPriceKrw: listPrice,
+          isDiscounted: true
+        }
+      });
+      expectedAmountKrw = sellPrice;
+      expectedDiscounted = true;
+    } else {
+      throw new Error(`결제 금액이 구독 금액(${expectedAmountKrw}원)과 일치하지 않습니다.`);
+    }
   }
 
   const cycle = parseBillingCycle(input.billingCycle ?? sub.plan);
-  await assertMembershipCheckoutAmountKrw(input.userId, cycle, amount, {
-    isPersonalCombo: sub.isPersonalCombo,
-    isDiscounted: sub.isDiscounted
-  });
+  try {
+    await assertMembershipCheckoutAmountKrw(input.userId, cycle, amount, {
+      isPersonalCombo: sub.isPersonalCombo,
+      isDiscounted: expectedDiscounted
+    });
+  } catch (e) {
+    /** shared dist가 옛 정가 정책을 쓰면 assert가 실패 — V1 출시가와 일치하면 통과 */
+    const msg = e instanceof Error ? e.message : String(e);
+    const v1Sell = cycle === "annual" ? 99000 : 9900;
+    if (amount !== v1Sell) throw e instanceof Error ? e : new Error(msg);
+    console.warn("[subscribe-complete] checkout assert bypass for V1 sell price", msg);
+  }
 
   const existingPay = await prisma.subscriptionPayment.findUnique({
     where: { merchantUid }

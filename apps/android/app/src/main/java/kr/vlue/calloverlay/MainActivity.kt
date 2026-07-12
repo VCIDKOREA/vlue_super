@@ -62,7 +62,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
 
         if (intent.getBooleanExtra(EXTRA_REQUEST_PERMISSIONS, false)) {
-            promptLetteringPermissions()
+            requestLetteringOsPermissionsDirect()
         }
         if (intent.hasExtra(EXTRA_OPEN_CERT)) {
             val json = intent.getStringExtra(EXTRA_OPEN_CERT).orEmpty()
@@ -232,21 +232,31 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         AlertDialog.Builder(this)
             .setTitle("VLUE 레터링 권한")
             .setMessage(
-                "통화 중 쇼케이스를 표시하려면\n" +
-                    "· 다른 앱 위에 표시\n" +
+                "VLUE 이용을 위해 다음 권한이 필요합니다.\n" +
+                    "· 다른 앱 위에 표시 (통화 쇼케이스)\n" +
                     "· 전화 상태·통화 제어\n" +
-                    "· 주소록(친구 공유 프라이버시)\n권한이 필요합니다."
+                    "· 주소록 (지인 찾기·추천)\n" +
+                    "· 카메라·사진 (명함·쇼케이스)\n" +
+                    "· 위치 (기관·업체 검색)"
             )
             .setPositiveButton("권한 설정") { _, _ ->
-                if (!LetteringPermissionHelper.hasPhonePermissions(this)) {
-                    LetteringPermissionHelper.requestPhonePermissions(this, REQ_PHONE)
-                }
-                if (!LetteringPermissionHelper.canDrawOverlays(this)) {
-                    LetteringPermissionHelper.openOverlaySettings(this)
-                }
+                requestLetteringOsPermissionsDirect()
             }
             .setNegativeButton("취소", null)
             .show()
+    }
+
+    /** 웹「허용하고 계속」— 시스템 권한 다이얼로그를 즉시 요청 */
+    fun requestLetteringOsPermissionsDirect() {
+        if (!LetteringPermissionHelper.hasPhonePermissions(this)) {
+            LetteringPermissionHelper.requestPhonePermissions(this, REQ_PHONE)
+            return
+        }
+        if (!LetteringPermissionHelper.canDrawOverlays(this)) {
+            LetteringPermissionHelper.openOverlaySettings(this)
+        } else {
+            LetteringPrefs.setLetteringEnabled(this, true)
+        }
     }
 
     override fun onRequestPermissionsResult(
@@ -255,15 +265,35 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQ_PHONE && LetteringPermissionHelper.allGranted(this)) {
-            LetteringPrefs.setLetteringEnabled(this, true)
-            Toast.makeText(this, "레터링을 사용할 수 있습니다.", Toast.LENGTH_SHORT).show()
+        if (requestCode == REQ_PHONE) {
+            if (LetteringPermissionHelper.hasPhonePermissions(this)) {
+                LetteringPrefs.setLetteringEnabled(this, true)
+                Toast.makeText(this, "필수 권한이 허용되었습니다.", Toast.LENGTH_SHORT).show()
+                if (!LetteringPermissionHelper.canDrawOverlays(this)) {
+                    LetteringPermissionHelper.openOverlaySettings(this)
+                }
+            } else {
+                Toast.makeText(this, "일부 권한이 거부되었습니다. 설정에서 허용해 주세요.", Toast.LENGTH_LONG).show()
+            }
+            notifyWebPermissionStatus()
         }
         if (requestCode == REQ_FAMILY && FamilyPermissionHelper.allGranted(this)) {
             Toast.makeText(this, "가족 보호 권한이 준비되었습니다.", Toast.LENGTH_SHORT).show()
             scanRemoteApps()
             scanDangerousApps()
             FamilyCareForegroundService.start(this)
+        }
+    }
+
+    private fun notifyWebPermissionStatus() {
+        if (!::webView.isInitialized) return
+        val json = LetteringPermissionHelper.statusJson(this)
+        val quoted = JSONObject.quote(json)
+        webView.post {
+            webView.evaluateJavascript(
+                "(function(){try{window.dispatchEvent(new CustomEvent('vlue-lettering-permissions-result',{detail:$quoted}));}catch(e){}})();",
+                null
+            )
         }
     }
 
@@ -282,7 +312,13 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
         @android.webkit.JavascriptInterface
         fun requestLetteringPermissions() {
-            activity.runOnUiThread { activity.promptLetteringPermissions() }
+            // 웹 사전 고지 후 호출 — 추가 다이얼로그 없이 OS 권한 창을 바로 띄움
+            activity.runOnUiThread { activity.requestLetteringOsPermissionsDirect() }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun getLetteringPermissionStatusJson(): String {
+            return LetteringPermissionHelper.statusJson(activity)
         }
 
         @android.webkit.JavascriptInterface

@@ -10,6 +10,7 @@ import ChatRoom from "./components/ChatRoom";
 import BlueAIChat from "./components/BlueAIChat";
 import FriendSearch from "./components/FriendSearch";
 import ContactSyncConsentModal from "./components/ContactSyncConsentModal.jsx";
+import AppRuntimePermissionsModal from "./components/AppRuntimePermissionsModal.jsx";
 import FeedManager from "./components/FeedManager";
 import Home from "./components/Home";
 import MyPage from "./components/MyPage";
@@ -61,14 +62,15 @@ import ModalCloseButton from "./components/common/ModalCloseButton";
 
 const CsScannerScreen = lazy(() => import("./components/office/CsScannerScreen.jsx"));
 const VlueUnifiedInboxScreen = lazy(() => import("./components/email/VlueUnifiedInboxScreen.jsx"));
-import VLUE_BRAND_LOGO from "./assets/vlue-shield-logo.svg?url";
+import UserProfileAvatar from "./components/UserProfileAvatar.jsx";
 import { isBiometricGraceActive, setBiometricGraceNow, clearBiometricSessionOnly } from "./lib/webauthnBiometric";
 import {
   getDefaultMemberVlueEmail,
   readCardEmail,
   readCardEmailKind,
   readCardFax,
-  readCardPromo
+  readCardPromo,
+  scrubBrandDisplayName
 } from "./lib/memberCardStorage.js";
 import { readCardWallet, writeCardWallet, buildCardSnapshot } from "./lib/cardWalletStorage.js";
 import { saveProfileToDeviceContacts } from "./lib/contactVcfSave.js";
@@ -77,6 +79,10 @@ import {
   readContactMatchCache,
   shouldShowContactSyncPrompt
 } from "./lib/contactSyncStorage.js";
+import {
+  markRuntimePermissionsPending,
+  shouldShowRuntimePermissionsPrompt
+} from "./lib/appRuntimePermissions.js";
 import { upsertKnownPhonesFromFriends } from "./lib/contacts/knownPhonesIndex.js";
 import { syncDeviceContactsFromNative } from "./lib/contacts/deviceContactsCache.js";
 import { effectiveCardJobTitle } from "./lib/jobTitleVerify.js";
@@ -177,10 +183,7 @@ function readFamilyBadgeRoomIds() {
 
 function readDigitalCardActive() {
   try {
-    const v = localStorage.getItem(DIGITAL_CARD_ACTIVE_KEY);
-    if (v === "1") return true;
-    if (v === "0") return false;
-    return localStorage.getItem(ONBOARDING_DONE_KEY) === "1";
+    return localStorage.getItem(DIGITAL_CARD_ACTIVE_KEY) === "1";
   } catch {
     return false;
   }
@@ -406,17 +409,10 @@ function App() {
   /** 탭 이동마다 증가 → 헤더 눈 SVG 리마운트로 깜빡임 재생 */
   const [eyeNavSeq, setEyeNavSeq] = useState(0);
   const [tierBillingPrompt, setTierBillingPrompt] = useState({ open: false, targetTier: "" });
-  const [friendInboxRequests, setFriendInboxRequests] = useState([
-    {
-      id: "in-1",
-      fromUserId: "u-kim",
-      fromUserName: "KIM",
-      message: "안녕하세요! 보안 커뮤니티에서 보고 친구 신청드립니다.",
-      createdAt: new Date().toISOString()
-    }
-  ]);
+  const [friendInboxRequests, setFriendInboxRequests] = useState([]);
   const [blockedFriendIds, setBlockedFriendIds] = useState([]);
   const [contactSyncModalOpen, setContactSyncModalOpen] = useState(false);
+  const [runtimePermsModalOpen, setRuntimePermsModalOpen] = useState(false);
   const [contactMatchData, setContactMatchData] = useState(() => readContactMatchCache());
   const [messagesByRoom, setMessagesByRoom] = useState(() => JSON.parse(JSON.stringify(seedMessages)));
   const [roomCatalog, setRoomCatalog] = useState(initialRoomCatalog);
@@ -1460,7 +1456,8 @@ function App() {
     const org = localStorage.getItem("myCardOrganization");
     const displayName = localStorage.getItem("myCardDisplayName");
     const effectiveJobTitle = effectiveCardJobTitle();
-    const logoResolved = (readAvatar("card") || readAvatar("primary") || "").trim() || VLUE_BRAND_LOGO;
+    /* 미설정 시 VLUE 로고로 채우지 않음 — 프로필/로고 자리는 무지(빈) 상태 유지 */
+    const logoResolved = (readAvatar("card") || readAvatar("primary") || "").trim();
     const phone = readLetteringFixedIdentity().phone || localStorage.getItem("myCardPhone") || DEFAULT_MY_PHONE;
 
     if (!digitalCardActive) {
@@ -1468,7 +1465,7 @@ function App() {
         digitalCardIssued: false,
         organization: org || "",
         title: effectiveJobTitle || "",
-        name: displayName || legalName || "",
+        name: scrubBrandDisplayName(displayName || legalName || "") || "",
         phone,
         email: "",
         address: "",
@@ -1487,8 +1484,15 @@ function App() {
     const cardEmail = storedEmail || getDefaultMemberVlueEmail();
     const promoText = storedPromo || "";
     const fixed = readLetteringFixedIdentity();
-    const identityName = displayName || legalName || fixed.name || "";
+    const identityName = scrubBrandDisplayName(displayName || legalName || fixed.name || "");
     const identityOrg = org || fixed.organization || "";
+    if (/^vlue$/i.test(String(displayName || "").trim())) {
+      try {
+        localStorage.removeItem("myCardDisplayName");
+      } catch {
+        /* ignore */
+      }
+    }
 
     return {
       digitalCardIssued: true,
@@ -1700,7 +1704,7 @@ function App() {
     }
     localStorage.setItem(ONBOARDING_DONE_KEY, "1");
     localStorage.setItem(SESSION_KEY, "1");
-    markContactSyncPending();
+    markRuntimePermissionsPending();
     setDigitalCardActive(readDigitalCardActive());
     setOnboardingComplete(true);
     setSignupOnboardingOpen(false);
@@ -1872,11 +1876,10 @@ function App() {
           if (handle === "ceo") {
             localStorage.setItem("vlue_phone_e164", "+821080144666");
             localStorage.setItem("myCardPhone", "010-8014-4666");
-            localStorage.setItem("myCardDisplayName", "CEO · VCID KOREA");
-            localStorage.setItem("vlue_legal_name", "CEO · VCID KOREA");
-            if (!String(localStorage.getItem("vlue_company_locked") || "").trim()) {
-              localStorage.setItem("myCardOrganization", "VCID KOREA");
-            }
+            localStorage.setItem("myCardDisplayName", "이종근");
+            localStorage.setItem("vlue_legal_name", "이종근");
+            localStorage.setItem("myCardOrganization", "VCID KOREA");
+            localStorage.setItem("vlue_company_locked", "VCID KOREA");
             const { readLetteringFixedIdentity } = await import("./lib/letteringBizcardStorage.js");
             readLetteringFixedIdentity();
           }
@@ -3112,14 +3115,27 @@ function App() {
   const bottomNavPulseNotifications = pushUnreadCount > 0 && activeBottomTab !== "notifications";
 
   const isBrowseGuest =
-    !isLoggedIn && !showSplash && !signupOnboardingOpen && !showOnboardingFlow;
+    Boolean(v1AppShell.guestBrowse) &&
+    !isLoggedIn &&
+    !showSplash &&
+    !signupOnboardingOpen &&
+    !showOnboardingFlow;
   const showAppShell =
     !showSplash && !showOnboardingFlow && ((isLoggedIn && biometricAllowed) || isBrowseGuest);
+  /** 스플래시 이후 · 미로그인 · 가입 온보딩 아님 → 로그인 전면 (둘러보기 없음) */
+  const showLoginGate =
+    !showSplash && !isLoggedIn && !signupOnboardingOpen && !showOnboardingFlow && !isBrowseGuest;
 
   useEffect(() => {
+    if (!shouldShowRuntimePermissionsPrompt({ isLoggedIn, showAppShell })) return;
+    setRuntimePermsModalOpen(true);
+  }, [isLoggedIn, showAppShell]);
+
+  useEffect(() => {
+    if (shouldShowRuntimePermissionsPrompt({ isLoggedIn, showAppShell })) return;
     if (!shouldShowContactSyncPrompt({ isLoggedIn, showAppShell })) return;
     setContactSyncModalOpen(true);
-  }, [isLoggedIn, showAppShell]);
+  }, [isLoggedIn, showAppShell, runtimePermsModalOpen]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -3139,6 +3155,7 @@ function App() {
   }, [showAppShell, roomCatalog?.friends, contactMatchData]);
 
   const promptGuestSignup = useCallback((action) => {
+    if (!v1AppShell.guestBrowse) return;
     setPendingAuthAction(() => (typeof action === "function" ? action : null));
     setGuestAuthOverlay(true);
   }, []);
@@ -3266,8 +3283,14 @@ function App() {
         }}
       />
 
+      <AppRuntimePermissionsModal
+        open={runtimePermsModalOpen && isLoggedIn && showAppShell}
+        onClose={() => setRuntimePermsModalOpen(false)}
+        onContinueContacts={() => setContactSyncModalOpen(true)}
+      />
+
       <ContactSyncConsentModal
-        open={contactSyncModalOpen && isLoggedIn && showAppShell}
+        open={contactSyncModalOpen && isLoggedIn && showAppShell && !runtimePermsModalOpen}
         onClose={() => setContactSyncModalOpen(false)}
         onSynced={(result) => {
           setContactMatchData(result);
@@ -3291,7 +3314,17 @@ function App() {
         }}
       />
 
-      {guestAuthOverlay && !isLoggedIn && (
+      {showLoginGate ? (
+        <div className="fixed inset-0 z-[220] bg-[#fafbfc]">
+          <LoginScreen
+            onLogin={async (payload) => handleLogin(payload)}
+            onSignup={() => handleSignup()}
+            onSocialLogin={handleSocialLogin}
+          />
+        </div>
+      ) : null}
+
+      {v1AppShell.guestBrowse && guestAuthOverlay && !isLoggedIn && (
         <div className="fixed inset-0 z-[220] bg-[#fafbfc]">
           <LoginScreen
             browsePrompt="이 기능은 회원가입 후 이용할 수 있습니다. VLUE 인증을 시작해 주세요."
@@ -3502,14 +3535,7 @@ function App() {
                 }}
                 className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-100 text-gray-400"
               >
-                {headerProfileAvatar ? (
-                  <img src={headerProfileAvatar} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full text-gray-400 p-1">
-                    <path d="M12 11C14.2091 11 16 9.20914 16 7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7C8 9.20914 9.79086 11 12 11Z" fill="currentColor"/>
-                    <path d="M18 19C18 16.7909 15.3137 15 12 15C8.68629 15 6 16.7909 6 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                )}
+                <UserProfileAvatar src={headerProfileAvatar || ""} />
               </div>
             )}
           </div>
@@ -4203,10 +4229,13 @@ function App() {
         }}
       />
 
-      <footer className={`fixed bottom-0 left-0 right-0 z-[150] ${showBottomNav ? "block" : "hidden"}`}>
+      <footer
+        className={`fixed bottom-0 left-0 right-0 z-[150] ${showBottomNav ? "block" : "hidden"}`}
+      >
         <nav className="fixed bottom-0 left-0 right-0 z-[151] flex justify-center">
           <div
             ref={bottomNavPulseSyncRef}
+            data-vlue-bottom-nav
             className={`bottom-nav-pulse-root flex min-h-[48px] w-full max-w-none items-center justify-around border-t px-2 pb-[max(0px,env(safe-area-inset-bottom,0px))] pt-[6px] backdrop-blur-md ${
               isDarkMode
                 ? "bg-[#0b1220]/95 border-white/10 shadow-[0_-2px_12px_rgba(2,6,23,0.65)]"
@@ -4430,9 +4459,10 @@ function App() {
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
               {pushUnreadCount > 0 ? (
-                <span className="absolute right-[calc(50%-18px)] top-0 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">
-                  {pushUnreadCount > 9 ? "9+" : pushUnreadCount}
-                </span>
+                <span
+                  className="absolute right-[calc(50%-14px)] top-0 h-2.5 w-2.5 rounded-full bg-blue-500 shadow-[0_0_0_2px_rgba(255,255,255,0.95)]"
+                  aria-label={`읽지 않은 알림 ${pushUnreadCount}건`}
+                />
               ) : null}
             </button>
             ) : null}

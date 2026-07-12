@@ -45,7 +45,7 @@ export default function MyPageDigitalLetteringSection({
   const isApproved = Boolean(digitalCardActive) && digitalCardIssued !== false;
 
   const previewCard = useMemo(() => {
-    const base = resolveVlueShowcaseCard({ membershipTier });
+    const base = resolveVlueShowcaseCard({ membershipTier, previewExample: true });
     const tier = isPaidLetteringTier(membershipTier) ? membershipTier : "free";
     return applyShowcaseStyleToCard({ ...base, membershipTier: tier, issuedAt: cardIssuedAt }, tier);
   }, [membershipTier, previewTick, cardIssuedAt]);

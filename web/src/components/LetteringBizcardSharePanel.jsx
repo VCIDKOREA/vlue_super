@@ -72,7 +72,7 @@ export default function LetteringBizcardSharePanel({
       </p>
 
       {/* 앱 미리보기는 React UI 고정 — 서버 PNG는 카카오 전송용(폰트 미탑재 시 □ 깨짐) */}
-      <KakaoBizcardFeedPreview card={card} isDarkMode={isDarkMode} />
+      <KakaoBizcardFeedPreview card={card} isDarkMode={isDarkMode} onToast={onToast} />
 
       <div className="mt-2 grid grid-cols-2 gap-1.5">
         <button

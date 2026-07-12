@@ -60,15 +60,14 @@ export default function LetteringMypagePushInteractivePreview({
       data-expanded={expanded ? "true" : "false"}
     >
       {!expanded ? (
-        <div className="lettering-mypage-push-interactive__frame">
-          <div className="lettering-mypage-push-interactive__call-bg" aria-hidden />
+        <div className="lettering-home-push-embed">
           <LetteringIncomingNotification
             {...notificationProps}
-            className="lettering-ongoing--on-call lettering-ongoing--case-preview w-full"
+            className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass"
           />
         </div>
       ) : (
-        <div className="lettering-mypage-push-interactive__frame lettering-mypage-push-interactive__frame--placeholder">
+        <div className="lettering-home-push-embed lettering-home-push-embed--placeholder" aria-hidden>
           <p className="px-3 py-8 text-center text-[11px] font-semibold text-slate-400">전체화면 쇼케이스 미리보기 중</p>
         </div>
       )}

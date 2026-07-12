@@ -33,7 +33,7 @@ export default function ContactSyncConsentModal({ open, onClose, onSynced }) {
   };
 
   const handleAgree = async () => {
-    const contacts = await collectDeviceContactsForSync({ allowDemoConfirm: true });
+    const contacts = await collectDeviceContactsForSync({ allowDemoConfirm: false });
     if (contacts?.length) {
       await runSync(contacts);
       return;

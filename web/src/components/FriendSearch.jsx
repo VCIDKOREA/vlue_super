@@ -105,7 +105,7 @@ function FriendSearch({
             ) : null}
             {(tab === "inbox" ? inboxRequests : requests.filter((r) => r.status === "pending")).map((req) => (
               <div key={req.id} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-                <p className="text-[13px] font-bold text-gray-900">{req.fromName || req.toUserId}</p>
+                <p className="text-[13px] font-bold text-gray-900">{req.fromName || req.fromUserName || req.toUserName || req.toUserId}</p>
                 {tab === "inbox" ? (
                   <div className="mt-2 flex gap-2">
                     <button

@@ -53,7 +53,7 @@ function ensurePostcodeLayer() {
   layer.setAttribute("role", "dialog");
   layer.setAttribute("aria-modal", "true");
   layer.style.cssText =
-    "position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;padding:12px;background:rgba(15,23,42,.55);";
+    "position:fixed;inset:0;z-index:10000150;display:none;align-items:center;justify-content:center;padding:12px;background:rgba(15,23,42,.55);";
 
   const panel = document.createElement("div");
   panel.style.cssText =

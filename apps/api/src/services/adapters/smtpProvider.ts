@@ -83,3 +83,10 @@ export function resolveSmtpProvider(): SmtpProviderPort {
   if (provider === "resend") return new ResendSmtpProvider();
   return new MockSmtpProvider();
 }
+
+/** 실제 수신함으로 메일이 나가는 제공자인지 (mock이면 false) */
+export function isRealSmtpDeliveryConfigured(): boolean {
+  const provider = (process.env.SMTP_PROVIDER || "mock").trim().toLowerCase();
+  if (provider !== "resend") return false;
+  return Boolean(String(process.env.RESEND_API_KEY || "").trim());
+}

@@ -8,6 +8,7 @@ import {
   readPushNotifications,
   resolvePushDisplayTime
 } from "../lib/pushNotificationInbox.js";
+import PushNotificationDetailModal from "./PushNotificationDetailModal.jsx";
 
 const CATEGORY_STYLE = {
   가족보호: "bg-emerald-50 text-emerald-800 ring-emerald-100",
@@ -22,6 +23,7 @@ const CATEGORY_STYLE = {
  */
 export default function HomeNotificationPanel({ onOpenFamilyProtection, className = "" }) {
   const [items, setItems] = useState(() => readPushNotifications());
+  const [detail, setDetail] = useState(null);
 
   const refresh = useCallback(() => {
     setItems(readPushNotifications());
@@ -36,15 +38,24 @@ export default function HomeNotificationPanel({ onOpenFamilyProtection, classNam
 
   const unread = countUnreadPush();
 
+  const openDetail = (n) => {
+    if (!n.read) markPushRead(n.id);
+    setDetail(n);
+    refresh();
+  };
+
   return (
-    <section
-      className={`mx-auto w-full max-w-md px-0.5 ${className}`.trim()}
-      aria-label="알림"
-    >
+    <section className={`mx-auto w-full max-w-md px-0.5 ${className}`.trim()} aria-label="알림">
       <header className="mb-2 flex items-center justify-between gap-2 px-1">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
             <Bell className="h-4 w-4" aria-hidden />
+            {unread > 0 ? (
+              <span
+                className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-blue-500 shadow-[0_0_0_2px_#fff]"
+                aria-hidden
+              />
+            ) : null}
           </span>
           <div className="min-w-0">
             <h2 className="text-[15px] font-black tracking-tight text-slate-900">알림</h2>
@@ -104,27 +115,25 @@ export default function HomeNotificationPanel({ onOpenFamilyProtection, classNam
                 <li key={n.id}>
                   <button
                     type="button"
-                    className={`flex w-full gap-3 px-3.5 py-3 text-left transition active:bg-slate-50 ${
-                      n.read ? "opacity-75" : "bg-blue-50/25"
+                    className={`relative flex w-full cursor-pointer gap-3 px-3.5 py-3 text-left transition hover:bg-slate-50 active:bg-slate-100 ${
+                      n.read ? "opacity-75" : "bg-blue-50/30"
                     }`}
-                    onClick={() => {
-                      if (!n.read) markPushRead(n.id);
-                      refresh();
-                    }}
+                    onClick={() => openDetail(n)}
                   >
-                    <div className="min-w-0 flex-1">
+                    {!n.read ? (
+                      <span
+                        className="absolute left-1.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-blue-500 shadow-[0_0_0_3px_rgba(43,111,240,0.2)]"
+                        aria-label="신규 알림"
+                      />
+                    ) : null}
+                    <div className="min-w-0 flex-1 pl-2">
                       <div className="mb-1 flex flex-wrap items-center gap-1.5">
                         <span
                           className={`rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset ${catStyle}`}
                         >
                           {n.category}
                         </span>
-                        {!n.read ? (
-                          <span
-                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"
-                            aria-label="읽지 않음"
-                          />
-                        ) : null}
+                        <span className="ml-auto text-[11px] font-bold text-blue-600">상세 ›</span>
                       </div>
                       <p className="text-[13px] font-bold leading-snug text-slate-900">{n.title}</p>
                       <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-slate-600">
@@ -146,6 +155,13 @@ export default function HomeNotificationPanel({ onOpenFamilyProtection, classNam
           </ul>
         )}
       </div>
+
+      <PushNotificationDetailModal
+        open={Boolean(detail)}
+        item={detail}
+        displayTime={detail ? resolvePushDisplayTime(detail) : ""}
+        onClose={() => setDetail(null)}
+      />
     </section>
   );
 }

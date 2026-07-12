@@ -1,14 +1,10 @@
 /**
- * 기기 주소록 읽기 — Contact Picker API · 데모 폴백
+ * 기기 주소록 읽기 — Contact Picker API
+ * 데모 연락처 폴백 없음 (김대표·이과장 등 테스트 데이터 제거)
  * @returns {Promise<{ name: string, phone: string }[] | null>} null = 지원 안 됨/취소
  */
 
-const DEMO_CONTACTS = [
-  { name: "김대표", phone: "010-1234-5678" },
-  { name: "이과장", phone: "010-2345-6789" },
-  { name: "박팀장", phone: "010-3456-7890" },
-  { name: "최이사", phone: "010-4567-8901" }
-];
+const LEGACY_DEMO_PHONES = new Set(["01012345678", "01023456789", "01034567890", "01045678901"]);
 
 function flattenContactPickerRows(rows) {
   const out = [];
@@ -24,6 +20,18 @@ function flattenContactPickerRows(rows) {
     }
   }
   return out;
+}
+
+/** 과거 데모 주소록인지 판별 */
+export function isLegacyDemoContact(contact) {
+  const digits = String(contact?.phone || "").replace(/\D/g, "");
+  const name = String(contact?.name || "").trim();
+  if (LEGACY_DEMO_PHONES.has(digits)) return true;
+  return ["김대표", "이과장", "박팀장", "최이사"].includes(name);
+}
+
+export function stripLegacyDemoContacts(contacts = []) {
+  return (contacts || []).filter((c) => !isLegacyDemoContact(c));
 }
 
 export function isContactPickerSupported() {
@@ -44,7 +52,7 @@ export async function pickDeviceContacts() {
   return null;
 }
 
-/** PC·웹 테스트용 데모 주소록 */
+/** @deprecated 데모 제거 — 빈 배열 */
 export function getDemoContacts() {
-  return DEMO_CONTACTS.map((c) => ({ ...c }));
+  return [];
 }

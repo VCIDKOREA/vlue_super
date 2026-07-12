@@ -1,7 +1,15 @@
+import { isLegacyDemoContact } from "./contactDevicePicker.js";
+
 const CONSENT_KEY = "vlue_contact_sync_consent_v1";
 const PROMPT_DONE_KEY = "vlue_contact_sync_prompt_done_v1";
 const PENDING_KEY = "vlue_contact_sync_pending_v1";
 const CACHE_KEY = "vlue_contact_match_cache_v1";
+
+function scrubMatchPayload(payload) {
+  if (!payload || typeof payload !== "object") return payload;
+  const unregistered = (payload.unregistered || []).filter((row) => !isLegacyDemoContact({ name: row.contactName, phone: row.phoneDisplay || row.phoneE164 }));
+  return { ...payload, unregistered };
+}
 
 export function markContactSyncPending() {
   try {
@@ -70,7 +78,8 @@ export function readContactMatchCache() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = scrubMatchPayload(JSON.parse(raw));
+    return parsed;
   } catch {
     return null;
   }

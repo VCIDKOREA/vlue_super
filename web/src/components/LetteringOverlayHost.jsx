@@ -9,10 +9,13 @@ import { readShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { CALL_STATES, normalizeCallState } from "../lib/showcase/tentShowcaseTypes.js";
 import { appendCallShowcaseHistory } from "../lib/callShowcaseHistory.js";
 import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
-import TentShowcaseOverlay from "./showcase/TentShowcaseOverlay.jsx";
+import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
+import { isPaidLetteringTier } from "../lib/letteringMembership.js";
+import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import LetteringReportSheet from "./LetteringReportSheet.jsx";
 import LetteringCertModal from "./LetteringCertModal.jsx";
 import "../styles/tent-showcase.css";
+import "../styles/showcase-call-glass.css";
 
 function parseOverlayParams() {
   const hash = typeof window !== "undefined" ? window.location.hash || "" : "";
@@ -30,10 +33,10 @@ function parseOverlayParams() {
 
 /**
  * 네이티브 CallOverlay WebView / #lettering-overlay 진입점
- * TentShowcaseOverlay 천막 UI + 통화 상태 스트림 융합
+ * 웹 홈·마케팅과 동일 — LetteringIncomingNotification 쇼케이스 바 → 풀 쇼케이스
  */
 export default function LetteringOverlayHost() {
-  const [{ incoming, direction, phase }, setParams] = useState(parseOverlayParams);
+  const [{ incoming, platform, direction, phase }, setParams] = useState(parseOverlayParams);
   const [card, setCard] = useState(null);
   const [verified, setVerified] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -46,6 +49,7 @@ export default function LetteringOverlayHost() {
     normalizeCallState(phase) === CALL_STATES.CONNECTED ? CALL_STATES.CONNECTED : CALL_STATES.RINGING
   );
   const [showcaseStyle, setShowcaseStyle] = useState(() => readShowcaseStyle());
+  const [expanded, setExpanded] = useState(() => normalizeCallState(phase) === CALL_STATES.CONNECTED);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -94,6 +98,28 @@ export default function LetteringOverlayHost() {
     };
   }, [incoming]);
 
+  useEffect(() => {
+    const onNativeCall = (e) => {
+      const next = normalizeCallState(e?.detail?.state || e?.detail?.callState || "");
+      if (!next) return;
+      setCallState(next);
+      if (next === CALL_STATES.CONNECTED) setExpanded(true);
+      if (next === CALL_STATES.RINGING) setExpanded(false);
+    };
+    window.addEventListener("vlue-native-call-state", onNativeCall);
+    return () => window.removeEventListener("vlue-native-call-state", onNativeCall);
+  }, []);
+
+  const membershipTier = card?.membershipTier || "free";
+  const isPaid = isPaidLetteringTier(membershipTier);
+  const styledCard = useMemo(() => {
+    if (!card) return null;
+    return applyShowcaseStyleToCard(
+      { ...card, showcaseStyle: card.showcaseStyle || showcaseStyle },
+      membershipTier
+    );
+  }, [card, showcaseStyle, membershipTier]);
+
   const reportTarget = useMemo(
     () => ({
       phone: incoming,
@@ -113,7 +139,7 @@ export default function LetteringOverlayHost() {
         durationSec: 0,
         callState: state,
         verified,
-        membershipTier: card?.membershipTier || "free",
+        membershipTier,
         showcaseSnapshot: showcaseStyle,
         cardSnapshot: card
           ? {
@@ -131,15 +157,29 @@ export default function LetteringOverlayHost() {
           : null
       });
     },
-    [incoming, card, direction, verified, showcaseStyle]
+    [incoming, card, direction, verified, showcaseStyle, membershipTier]
   );
 
   const handleEnd = useCallback(() => {
     cacheHistory(CALL_STATES.ENDED);
+    setExpanded(false);
+    try {
+      window.VlueLettering?.dismissOverlay?.();
+      window.Android?.dismissOverlay?.();
+    } catch {
+      /* ignore */
+    }
   }, [cacheHistory]);
 
   const handleReject = useCallback(() => {
     cacheHistory(CALL_STATES.MISSED);
+    setExpanded(false);
+    try {
+      window.VlueLettering?.dismissOverlay?.();
+      window.Android?.dismissOverlay?.();
+    } catch {
+      /* ignore */
+    }
   }, [cacheHistory]);
 
   const handleReportSubmit = useCallback(
@@ -195,28 +235,30 @@ export default function LetteringOverlayHost() {
     );
   }
 
+  const onCall = callState === CALL_STATES.CONNECTED;
+  const callPhase = onCall ? "connected" : direction === "outgoing" ? "outgoing" : "ringing";
+
   return (
     <div className="lettering-overlay-host lettering-overlay-host--tent">
       <div className="lettering-overlay-host__tent-shell">
-        <TentShowcaseOverlay
-          callState={callState}
-          onCallStateChange={setCallState}
+        <LetteringIncomingNotification
+          className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent"
           verified={verified}
-          membershipTier={card?.membershipTier || "free"}
-          peerPhone={incoming}
-          displayName={card?.name || card?.displayName || ""}
-          organization={card?.organization || ""}
-          card={card}
-          showcaseStyle={showcaseStyle}
-          onReject={handleReject}
-          onEnd={handleEnd}
-          onOpenVault={() => {
-            showToast("케이스 자료실은 통화 중 앱에서 열 수 있습니다");
-            try {
-              window.VlueLettering?.openCertInfo?.({ type: "vault", phone: incoming });
-            } catch {
-              /* ignore */
-            }
+          previewMode={false}
+          callPhase={callPhase}
+          platform={platform}
+          incomingNumber={incoming}
+          card={styledCard || undefined}
+          expanded={expanded}
+          onExpandedChange={setExpanded}
+          includeDigitalCard={Boolean(verified && isPaid)}
+          isKnownContact={verified}
+          onEndCall={onCall ? handleEnd : handleReject}
+          onToast={showToast}
+          onReport={() => setReportOpen(true)}
+          onOpenFeed={(payload) => {
+            setCertPayload(payload);
+            setCertOpen(true);
           }}
         />
       </div>

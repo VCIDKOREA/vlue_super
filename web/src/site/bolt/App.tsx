@@ -199,7 +199,11 @@ export default function App() {
           <div className="mkt-pricing-shell pt-8 sm:pt-16 lg:pt-32 pb-12 sm:pb-20">
             <PremiumHeroSection onStartFamily={handleStartFamilyProtection} />
             <div id="plans">
-              <PricingPage user={user} onLoginClick={handleLoginRequired} />
+              <PricingPage
+                user={user}
+                onLoginClick={handleLoginRequired}
+                onDownloadClick={() => handleNavigate('download')}
+              />
             </div>
           </div>
         )}

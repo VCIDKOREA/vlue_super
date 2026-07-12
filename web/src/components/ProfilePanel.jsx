@@ -18,17 +18,52 @@ import BackButton from "./common/BackButton";
 import { isBillableMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
 import { pricingNumbers } from "../lib/pricingConfig.js";
 import { probeEnterpriseSidebarAccess } from "../lib/enterpriseLineManageAccess.js";
-import { fileToDataUrl, readAvatar, writeAvatar } from "../lib/vlueAvatar.js";
-import { getMemberHandle, getChatDisplayName } from "../lib/memberCardStorage.js";
+import { fileToDataUrl, readProfileOrLogoAvatar, writeAvatar, scrubBrandAvatarsFromStorage } from "../lib/vlueAvatar.js";
+import UserProfileAvatar from "./UserProfileAvatar.jsx";
+import { getMemberHandle, getProfileHeaderName } from "../lib/memberCardStorage.js";
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
 import { readLetteringFixedIdentity } from "../lib/letteringBizcardStorage.js";
+import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { fetchEmailForwardingMapping, readLocalLoginPrefix } from "../lib/vlueEmailMappingsApi.js";
-import { membershipTierStyleClass } from "../lib/membershipTierDisplay.js";
+import { membershipTierStyleClass, isFamilyProtectionActiveFromPeers } from "../lib/membershipTierDisplay.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
+import { fetchFamilyProtection } from "../lib/familyProtectionApi.js";
+import { familyPeersFromProtectionData } from "../lib/familyProtectionPeers.js";
 
-function tierLabelStyle(tier, isDarkMode) {
-  return membershipTierStyleClass(tier, isDarkMode);
+function tierLabelStyle(tier, isDarkMode, familyProtectionActive = false) {
+  return membershipTierStyleClass(tier, isDarkMode, { familyProtectionActive });
+}
+
+/** 등급 칸 — 유료/무료만 (가족보호는 별도 버튼) */
+function MembershipTierLabelText({ parts, className = "" }) {
+  return <span className={className}>{parts?.base || parts?.label || ""}</span>;
+}
+
+/** 가족보호 상태 버튼 — 신청가능(앰버) ↔ 작동중(초록) */
+function FamilyProtectionActionButton({ active, isDarkMode, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onClick?.()}
+      className={`mt-3 flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-[13px] font-black tracking-tight shadow-sm transition-all duration-300 active:scale-[0.98] ${
+        active
+          ? isDarkMode
+            ? "bg-emerald-500/90 text-white ring-1 ring-emerald-300/40"
+            : "bg-emerald-500 text-white shadow-emerald-500/25"
+          : isDarkMode
+            ? "bg-amber-500/90 text-white ring-1 ring-amber-300/40"
+            : "bg-amber-500 text-white shadow-amber-500/25"
+      }`}
+      aria-label={active ? "가족보호 작동중" : "가족보호 신청가능"}
+    >
+      <span
+        className={`h-2 w-2 shrink-0 rounded-full ${active ? "bg-white/95" : "bg-white animate-pulse"}`}
+        aria-hidden
+      />
+      {active ? "가족보호 작동중" : "가족보호 신청가능"}
+    </button>
+  );
 }
 
 function SettingsSlidersIcon({ className = "h-4 w-4" }) {
@@ -111,6 +146,7 @@ function ProfilePanel({
   const [enterpriseLineAccess, setEnterpriseLineAccess] = useState(false);
   const [isEnterpriseMember, setIsEnterpriseMember] = useState(false);
   const [enterpriseLineAccessChecked, setEnterpriseLineAccessChecked] = useState(false);
+  const [familyProtectionActive, setFamilyProtectionActive] = useState(false);
   const { vluerLocked, membershipCtx } = useB2bMembership();
   const mainPanelScrollRef = useRef(null);
   const [virtualEmail, setVirtualEmail] = useState(null);
@@ -168,14 +204,9 @@ function ProfilePanel({
   const hasDigitalCertCard = Boolean(digitalCardActive) && digitalCardIssued !== false;
 
   useEffect(() => {
-    const storedOn = localStorage.getItem("vcid") === "true";
-    if (storedOn && !hasDigitalCertCard) {
-      localStorage.setItem("vcid", "false");
-      setIsVCIDOn(false);
-      return;
-    }
-    setIsVCIDOn(storedOn && hasDigitalCertCard);
-  }, [hasDigitalCertCard]);
+    setIsVCIDOn(localStorage.getItem("vcid") === "true");
+  }, [open, hasDigitalCertCard]);
+
   useEffect(() => {
     const h = () => setNickTick((n) => n + 1);
     window.addEventListener("vlue-nicknames-changed", h);
@@ -266,8 +297,37 @@ function ProfilePanel({
     };
   }, [open, panelView]);
 
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const applyPeers = (peers) => {
+      if (!cancelled) setFamilyProtectionActive(isFamilyProtectionActiveFromPeers(peers));
+    };
+    const refresh = async () => {
+      try {
+        const d = await fetchFamilyProtection();
+        applyPeers(familyPeersFromProtectionData(d));
+      } catch {
+        if (!cancelled) setFamilyProtectionActive(false);
+      }
+    };
+    refresh();
+    const onPeers = (ev) => applyPeers(ev?.detail);
+    const onChanged = () => refresh();
+    window.addEventListener("vlue-family-peers-updated", onPeers);
+    window.addEventListener("vlue-family-protection-changed", onChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("vlue-family-peers-updated", onPeers);
+      window.removeEventListener("vlue-family-protection-changed", onChanged);
+    };
+  }, [open]);
+
   const broadcastMonthlyKrw = useMemo(() => pricingNumbers().broadcastMonthly, []);
-  const tierUi = useMemo(() => tierLabelStyle(membershipTier, isDarkMode), [membershipTier, isDarkMode]);
+  const tierUi = useMemo(
+    () => tierLabelStyle(membershipTier, isDarkMode, familyProtectionActive),
+    [membershipTier, isDarkMode, familyProtectionActive]
+  );
   const membershipKind = useMemo(() => normalizeMembershipKind(membershipTier), [membershipTier]);
   const canUseShoppingCartHub = useMemo(() => isBillableMembershipKind(membershipKind), [membershipKind]);
   const isCorporateAccount = useMemo(
@@ -282,8 +342,8 @@ function ProfilePanel({
     [enterpriseLineAccessChecked, isCorporateAccount]
   );
   const headerName = useMemo(
-    () => getChatDisplayName(String(myCard?.name || "").trim() || "회원"),
-    [myCard?.name, nickTick]
+    () => getProfileHeaderName(String(myCard?.name || "").trim()),
+    [myCard?.name, nickTick, open]
   );
   const memberIdDisplay = getMemberHandle();
   const profilePhoneDisplay = useMemo(() => {
@@ -299,7 +359,11 @@ function ProfilePanel({
       ? "text-blue-400"
       : "text-blue-600"
     : subText;
-  const primaryAva = useMemo(() => readAvatar("primary"), [avatarTick, open]);
+  /** 사용자가 올린 프로필·로고만 — VLUE 브랜드 마크는 절대 폴백하지 않음 */
+  const primaryAva = useMemo(() => {
+    scrubBrandAvatarsFromStorage();
+    return readProfileOrLogoAvatar();
+  }, [avatarTick, open]);
 
   const openLetteringBizcardHub = useCallback(() => {
     setPanelView("letteringBizcard");
@@ -367,10 +431,6 @@ function ProfilePanel({
   }, [open]);
 
   const onToggle = (next) => {
-    if (next && !hasDigitalCertCard) {
-      showSettingNotice("디지털인증명함을 신청해주세요");
-      return;
-    }
     setIsVCIDOn(next);
     localStorage.setItem("vcid", String(next));
     try {
@@ -378,8 +438,17 @@ function ProfilePanel({
     } catch {
       /* ignore */
     }
-    showSettingNotice(next ? "통화중 디지털인증명함이 송출됩니다." : "통화중 일반문구만 송출됩니다.");
+    showSettingNotice(next ? "통화 중 쇼케이스가 송출됩니다." : "통화 중 쇼케이스 송출이 꺼졌습니다.");
   };
+
+  const handleApplyDigitalCard = useCallback(() => {
+    if (!isPaidLetteringTier(membershipTier)) {
+      setUpgradeOpen(true);
+      showSettingNotice("디지털인증명함은 유료 회원만 신청할 수 있습니다. 등급을 변경해 주세요.");
+      return;
+    }
+    openLetteringBizcardHub();
+  }, [membershipTier, openLetteringBizcardHub, showSettingNotice]);
 
   const handleDarkModeToggle = (next) => {
     onToggleDarkMode?.(next);
@@ -419,17 +488,12 @@ function ProfilePanel({
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className={`h-9 w-9 shrink-0 rounded-full border overflow-hidden flex items-center justify-center font-bold ${
-                isDarkMode ? "border-white/15 bg-white/10 text-gray-200" : "border-gray-200 bg-gray-100 text-gray-500"
+              className={`h-9 w-9 shrink-0 rounded-full border overflow-hidden flex items-center justify-center ${
+                isDarkMode ? "border-white/15" : "border-gray-200"
               }`}
+              aria-label={primaryAva ? "프로필 사진" : "프로필 미설정"}
             >
-              {primaryAva ? (
-                <img src={primaryAva} alt="" className="h-full w-full object-cover" />
-              ) : headerName ? (
-                headerName.slice(0, 1)
-              ) : (
-                "이"
-              )}
+              <UserProfileAvatar src={primaryAva} />
             </div>
             <div className="min-w-0 flex flex-1 items-center gap-1.5 overflow-hidden">
               <p className={`vlue-fluid-profile-name max-w-full font-normal py-[1px] ${headText}`}>{headerName}</p>
@@ -552,11 +616,14 @@ function ProfilePanel({
             <div className="vlue-profile-info__row">
               <div className="vlue-profile-info__cell">
                 <span className={`vlue-profile-info__label transition-colors duration-300 ${profileFieldLabelText}`}>등급</span>
-                <span className={`vlue-profile-info__value font-extrabold ${tierUi.className}`}>{tierUi.label}</span>
+                <MembershipTierLabelText
+                  parts={tierUi.parts}
+                  className={`vlue-profile-info__value font-extrabold ${tierUi.className}`}
+                />
               </div>
               <label className="vlue-profile-info__cell vlue-profile-info__cell--right cursor-pointer">
                 <span className={`vlue-profile-info__label transition-colors duration-300 ${profileFieldLabelText}`}>
-                  인증명함 {isVCIDOn ? "켜짐" : "꺼짐"}
+                  쇼케이스 {isVCIDOn ? "켜짐" : "꺼짐"}
                 </span>
                 <div className="vlue-profile-info__toggle relative">
                   <input
@@ -585,6 +652,16 @@ function ProfilePanel({
               </label>
             </div>
           </div>
+          {v1AppShell.familyProtection && tierUi.parts?.familyStatus ? (
+            <FamilyProtectionActionButton
+              active={familyProtectionActive}
+              isDarkMode={isDarkMode}
+              onClick={() => {
+                onClose?.();
+                onOpenFamilyProtection?.();
+              }}
+            />
+          ) : null}
         </div>
 
         <div ref={mainPanelScrollRef} className="vlue-scroll-pad-profile-panel flex-1 overflow-y-auto px-6 py-6 no-scrollbar">
@@ -652,7 +729,7 @@ function ProfilePanel({
             digitalCardActive={digitalCardActive}
             digitalCardIssued={digitalCardIssued}
             isVCIDOn={isVCIDOn}
-            onApplyDigitalCard={openLetteringBizcardHub}
+            onApplyDigitalCard={handleApplyDigitalCard}
             onEditLettering={openLetteringBizcardHub}
             onOpenShowcaseStyle={() => {
               onClose?.();
@@ -851,9 +928,10 @@ function ProfilePanel({
           >
             <div className="flex min-w-0 flex-nowrap items-baseline gap-x-2">
               <span className={`shrink-0 text-[14px] font-black ${headText}`}>등급:</span>
-              <span className={`min-w-0 truncate text-[clamp(13px,3.5vw,14px)] font-extrabold ${tierUi.className}`}>
-                {tierUi.label}
-              </span>
+              <MembershipTierLabelText
+                parts={tierUi.parts}
+                className={`min-w-0 truncate text-[clamp(13px,3.5vw,14px)] font-extrabold ${tierUi.className}`}
+              />
             </div>
             <button
               type="button"

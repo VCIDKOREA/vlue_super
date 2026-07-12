@@ -4,7 +4,7 @@ import {
   Mail,
   MapPin,
   Globe,
-  Briefcase,
+  Printer,
   User,
   ShieldCheck,
   Check
@@ -15,12 +15,18 @@ import { resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
 import { formatLetteringContactEmailDisplay } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import {
+  formatTitleDeptLine,
+  VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER,
+  VLUE_PREVIEW_EMAIL_PLACEHOLDER
+} from "../lib/vlueShowcasePreviewIdentity.js";
+import {
   openEmailLink,
   openWebsiteLink,
   openPhoneDial
 } from "../lib/showcase/showcaseContactActions.js";
 import VluePushAuthSeal from "./VluePushAuthSeal.jsx";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
+import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
 
 function formatWebsite(raw) {
   return String(raw || "")
@@ -41,9 +47,9 @@ function PhoneCertBadge({ className = "" }) {
   );
 }
 
-function ContactRow({ icon: Icon, label, value, onActivate, showCertBadge = false }) {
+function ContactRow({ icon: Icon, label, value, onActivate, showCertBadge = false, isPlaceholder = false }) {
   if (!value) return null;
-  const interactive = typeof onActivate === "function";
+  const interactive = typeof onActivate === "function" && !isPlaceholder;
   const inner = (
     <div className={`ldr-contact-row${interactive ? " ldr-contact-row--link" : ""}`}>
       <span className="ldr-contact-row__icon" aria-hidden>
@@ -52,7 +58,13 @@ function ContactRow({ icon: Icon, label, value, onActivate, showCertBadge = fals
       <div className="ldr-contact-row__body">
         <span className="ldr-contact-row__label">{label}</span>
         <span className="ldr-contact-row__value-line">
-          <span className={`ldr-contact-row__value${interactive ? " ldr-contact-row__value--link" : ""}`}>{value}</span>
+          <span
+            className={`ldr-contact-row__value${interactive ? " ldr-contact-row__value--link" : ""}${
+              isPlaceholder ? " ldr-contact-row__value--placeholder" : ""
+            }`.trim()}
+          >
+            {value}
+          </span>
           {showCertBadge ? <PhoneCertBadge /> : null}
         </span>
       </div>
@@ -136,6 +148,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
   const isLogoOnly = !photoUrl && Boolean(heroSrc);
   const lines = formatLetteringReceptionLines(card, { incomingNumber });
   const orgLine = lines.expandedOrgLine;
+  const personName = lines.organization && lines.name ? lines.name : "";
   const phoneDisplay = lines.phone ? formatLetteringPhoneDisplay(lines.phone) : "";
   const title = lines.title;
 
@@ -148,8 +161,10 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
         </span>
       ) : null}
       {orgLine ? <p className="ldr-hero__brand">{orgLine}</p> : null}
-      {phoneDisplay || title ? (
+      {personName || phoneDisplay || title ? (
         <p className="ldr-hero__contact">
+          {personName ? <span className="ldr-hero__person">{personName}</span> : null}
+          {personName && (phoneDisplay || title) ? <span className="ldr-hero__contact-sep"> / </span> : null}
           {phoneDisplay ? <span className="ldr-hero__phone">{phoneDisplay}</span> : null}
           {phoneDisplay && title ? <span className="ldr-hero__contact-sep"> / </span> : null}
           {title ? <span className="ldr-hero__title">{title}</span> : null}
@@ -203,8 +218,10 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
       </div>
       <div className="ldr-hero__copy ldr-hero__copy--overlay">
         {orgLine ? <p className="ldr-hero__brand">{orgLine}</p> : null}
-        {phoneDisplay || title ? (
+        {personName || phoneDisplay || title ? (
           <p className="ldr-hero__contact">
+            {personName ? <span className="ldr-hero__person">{personName}</span> : null}
+            {personName && (phoneDisplay || title) ? <span className="ldr-hero__contact-sep"> / </span> : null}
             {phoneDisplay ? <span className="ldr-hero__phone">{phoneDisplay}</span> : null}
             {phoneDisplay && title ? <span className="ldr-hero__contact-sep"> / </span> : null}
             {title ? <span className="ldr-hero__title">{title}</span> : null}
@@ -242,14 +259,26 @@ function FrontPanel({
   enableContactLinks = true,
   onRequestDial
 }) {
-  const intro = card.companyIntro || card.salesContent || "";
-  const careers = verificationItems.length
-    ? verificationItems
-    : intro
-      ? [intro]
-      : ["VLUE 디지털 인증 명함이 연결되었습니다."];
   const phone = card.phone ? formatLetteringPhoneDisplay(card.phone) : "";
   const phoneRaw = String(card.phone || "").trim();
+  const faxRaw = String(card.fax || "").trim();
+  const fax = faxRaw ? formatLetteringPhoneDisplay(faxRaw) : "";
+  const website = formatWebsite(card.website);
+  const emailRaw = String(card.email || "").trim();
+  const email = emailRaw ? formatLetteringContactEmailDisplay(emailRaw) : "";
+  /* 이메일만 필수 — 미입력 시 짧은 안내. 주소·웹·팩스는 값 있을 때만 표기 */
+  const emailValue = email || VLUE_PREVIEW_EMAIL_PLACEHOLDER;
+  const addressRaw = String(card.address || "").trim();
+  const intro = String(card.companyIntro || card.salesContent || "").trim();
+  const validityFromItems = (verificationItems || [])
+    .map((line) => String(line || "").trim())
+    .find((line) => /인증유효기간/.test(line));
+  const validityDisplay = validityFromItems
+    ? validityFromItems.replace(/^인증유효기간\s*[:：]?\s*/, "").trim()
+    : resolveAuthValidityPeriod({
+        paidAt: card.authPaidAt || card.issuedAt || null,
+        billingCycle: card.billingCycle || null
+      }).line;
 
   return (
     <div className={`ldr-panel ldr-panel--front${embeddedInPush ? " ldr-panel--push" : ""}`}>
@@ -266,14 +295,30 @@ function FrontPanel({
         <div className="ldr-back-head__copy">
           <p className="ldr-back-kicker">Digital ID · Profile</p>
           <div className="ldr-back-title-row">
-            <h3 className="ldr-back-title">{card.name}</h3>
+            <h3 className="ldr-back-title">
+              {String(card.organization || "").trim() || card.name}
+            </h3>
             {verified ? (
               <ShieldCheck className="ldr-name-shield" strokeWidth={2.35} aria-label="VLUE 인증됨" />
             ) : null}
           </div>
-          {[card.title, card.department, card.organization].filter(Boolean).length ? (
-            <p className="ldr-back-sub">
-              {[card.title, card.department, card.organization].filter(Boolean).join(" · ")}
+          {String(card.organization || "").trim() && String(card.name || "").trim() ? (
+            <p className="ldr-back-person-name">{card.name}</p>
+          ) : null}
+          {card.previewTitleDeptPlaceholder ||
+          card.previewExampleBrand ||
+          card.title ||
+          card.department ? (
+            <p
+              className={`ldr-back-sub${
+                card.previewTitleDeptPlaceholder || card.previewExampleBrand
+                  ? " ldr-back-sub--placeholder"
+                  : ""
+              }`.trim()}
+            >
+              {card.previewTitleDeptPlaceholder || card.previewExampleBrand
+                ? VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER
+                : formatTitleDeptLine(card.title, card.department)}
             </p>
           ) : null}
         </div>
@@ -304,29 +349,98 @@ function FrontPanel({
           </FrontInfoRow>
         ) : null}
 
-        <FrontInfoRow icon={User} label="소개">
-          <p
-            className={`ldr-front-info-row__text${
-              !intro ? " ldr-front-info-row__text--placeholder" : ""
-            }`.trim()}
-          >
-            {intro || "소개 문구를 명함 만들기에서 입력할 수 있습니다."}
-          </p>
-        </FrontInfoRow>
+        {fax ? (
+          <FrontInfoRow icon={Printer} label="팩스">
+            <span className="ldr-front-info-row__text">
+              {enableContactLinks ? (
+                <button
+                  type="button"
+                  className="ldr-front-phone-link ldr-front-phone-link--btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRequestDial?.(faxRaw, card.organization || card.name || "팩스");
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {fax}
+                </button>
+              ) : (
+                fax
+              )}
+            </span>
+          </FrontInfoRow>
+        ) : null}
 
-        <FrontInfoRow icon={Briefcase} label="인증 · 경력요약" className="ldr-front-info-row--careers">
-          <ul className="ldr-front-info-row__list">
-            {careers.slice(0, 6).map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </FrontInfoRow>
+        {emailValue ? (
+          <FrontInfoRow icon={Mail} label="이메일">
+            <p
+              className={`ldr-front-info-row__text${!email ? " ldr-front-info-row__text--placeholder" : ""}`.trim()}
+            >
+              {enableContactLinks && emailRaw ? (
+                <button
+                  type="button"
+                  className="ldr-front-phone-link ldr-front-phone-link--btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openEmailLink(emailRaw);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {emailValue}
+                </button>
+              ) : (
+                emailValue
+              )}
+            </p>
+          </FrontInfoRow>
+        ) : null}
+
+        {addressRaw ? (
+          <FrontInfoRow icon={MapPin} label="주소">
+            <p className="ldr-front-info-row__text">{addressRaw}</p>
+          </FrontInfoRow>
+        ) : null}
+
+        {website ? (
+          <FrontInfoRow icon={Globe} label="웹사이트">
+            <p className="ldr-front-info-row__text">
+              {enableContactLinks ? (
+                <button
+                  type="button"
+                  className="ldr-front-phone-link ldr-front-phone-link--btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openWebsiteLink(card.website || website);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {website}
+                </button>
+              ) : (
+                website
+              )}
+            </p>
+          </FrontInfoRow>
+        ) : null}
+
+        {intro ? (
+          <FrontInfoRow icon={User} label="소개">
+            <p className="ldr-front-info-row__text">{intro}</p>
+          </FrontInfoRow>
+        ) : null}
+
+        {validityDisplay ? (
+          <FrontInfoRow icon={ShieldCheck} label="인증유효기간" className="ldr-front-info-row--careers">
+            <p className="ldr-front-info-row__text tabular-nums">{validityDisplay}</p>
+          </FrontInfoRow>
+        ) : null}
       </div>
 
       {embeddedInPush && verified ? (
         <VluePushAuthSeal className="ldr-front-intro ldr-front-intro--verified" />
-      ) : !embeddedInPush && card.companyIntro ? (
-        <p className="ldr-front-intro">{card.companyIntro}</p>
       ) : null}
     </div>
   );
@@ -334,67 +448,27 @@ function FrontPanel({
 
 function BackPanel({
   card,
-  verified,
+  verified: _verified,
   embeddedInPush = false,
-  enableContactLinks = true,
-  onRequestDial
+  enableContactLinks: _enableContactLinks = true,
+  onRequestDial: _onRequestDial
 }) {
-  const faxRaw = String(card.fax || "").trim();
-  const fax = faxRaw ? formatLetteringPhoneDisplay(faxRaw) : "";
-  const website = formatWebsite(card.website);
-  const emailRaw = String(card.email || "").trim();
-  const email = emailRaw ? formatLetteringContactEmailDisplay(emailRaw) : "";
   const additionalNote = resolveBackAdditionalNote(card);
   const additionalPlaceholder = "명함 만들기에서 추가 설명을 입력할 수 있습니다.";
 
   return (
     <div className={`ldr-panel ldr-panel--back${embeddedInPush ? " ldr-panel--push" : ""}`}>
       {embeddedInPush ? <WatermarkBackdrop card={card} /> : null}
-      <div className="ldr-back-contact-stack">
-        <div className="ldr-contact-list">
-          <ContactRow
-            icon={Mail}
-            label="이메일"
-            value={email}
-            onActivate={enableContactLinks && emailRaw ? () => openEmailLink(emailRaw) : undefined}
-          />
-          <ContactRow icon={MapPin} label="주소" value={card.address} />
-          {website ? (
-            <ContactRow
-              icon={Globe}
-              label="웹사이트"
-              value={website}
-              onActivate={
-                enableContactLinks ? () => openWebsiteLink(card.website || website) : undefined
-              }
-            />
-          ) : null}
-          {fax ? (
-            <ContactRow
-              icon={Phone}
-              label="팩스"
-              value={fax}
-              onActivate={
-                enableContactLinks && faxRaw
-                  ? () => onRequestDial?.(faxRaw, card.organization || card.name || "팩스")
-                  : undefined
-              }
-            />
-          ) : null}
-        </div>
+      <div className="ldr-contact-extra ldr-contact-extra--back-only">
+        <p className="ldr-contact-extra__label">추가 설명</p>
+        <p
+          className={`ldr-contact-extra__body${
+            !additionalNote ? " ldr-contact-extra__body--placeholder" : ""
+          }`.trim()}
+        >
+          {additionalNote || (embeddedInPush ? additionalPlaceholder : "등록된 추가 설명이 없습니다.")}
+        </p>
       </div>
-      {embeddedInPush || additionalNote ? (
-        <div className="ldr-contact-extra">
-          <p className="ldr-contact-extra__label">추가 설명</p>
-          <p
-            className={`ldr-contact-extra__body${
-              !additionalNote ? " ldr-contact-extra__body--placeholder" : ""
-            }`.trim()}
-          >
-            {additionalNote || (embeddedInPush ? additionalPlaceholder : "")}
-          </p>
-        </div>
-      ) : null}
     </div>
   );
 }

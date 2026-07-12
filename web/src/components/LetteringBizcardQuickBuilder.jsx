@@ -3,6 +3,7 @@ import { ImagePlus, Upload } from "lucide-react";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
 import LetteringBizcardAddressField from "./LetteringBizcardAddressField.jsx";
 import LetteringBizcardTitleDeptVerifySection from "./LetteringBizcardTitleDeptVerifySection.jsx";
+import LetteringBizcardOrgChangeSection from "./LetteringBizcardOrgChangeSection.jsx";
 import {
   LETTERING_BIZCARD_EMAIL_MAX,
   LETTERING_BIZCARD_EMAIL_WARN,
@@ -211,6 +212,10 @@ export default function LetteringBizcardQuickBuilder({
   setVerifyDocIssuedAt,
   onVerifyDocPick,
   verifyDocError,
+  orgChangeApprovalStatus = "",
+  orgChangePendingName = "",
+  onOrgChangeSubmitted,
+  onOrgChangeToast,
   onApply,
   applyLabel = "적용",
   toast = ""
@@ -249,16 +254,17 @@ export default function LetteringBizcardQuickBuilder({
 
       <div className={`grid gap-2 sm:grid-cols-3 ${identityChip}`}>
         <div>
-          <p className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>회사</p>
+          <p className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>상호</p>
           <p className={`truncate text-[12px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
             {fixed.organization || "—"}
           </p>
         </div>
         <div>
-          <p className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>이름</p>
+          <p className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>성함</p>
           <p className={`truncate text-[12px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
             {fixed.name || "—"}
           </p>
+          <p className={`mt-0.5 text-[9px] font-medium ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>수정 불가</p>
         </div>
         <div>
           <p className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>전화</p>
@@ -267,6 +273,18 @@ export default function LetteringBizcardQuickBuilder({
           </p>
         </div>
       </div>
+
+      {onOrgChangeSubmitted ? (
+        <LetteringBizcardOrgChangeSection
+          isDarkMode={isDarkMode}
+          inputBase={inputBase}
+          currentOrganization={fixed.organization || ""}
+          approvalStatus={orgChangeApprovalStatus}
+          pendingName={orgChangePendingName}
+          onSubmitted={onOrgChangeSubmitted}
+          onToast={onOrgChangeToast}
+        />
+      ) : null}
 
       <div className={`${panel} space-y-4`}>
         <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>프로필 · 이미지</p>
@@ -330,7 +348,7 @@ export default function LetteringBizcardQuickBuilder({
           docError={verifyDocError}
           needsSubmit={titleDeptNeedsSubmit}
         />
-        <Field label="이메일" isDarkMode={isDarkMode}>
+        <Field label="이메일 (필수)" hint="명함에 반드시 표시됩니다" isDarkMode={isDarkMode}>
           <input
             type="email"
             value={email}
@@ -338,6 +356,8 @@ export default function LetteringBizcardQuickBuilder({
             onChange={(e) => setEmail(clampLetteringBizcardEmail(e.target.value))}
             className={inputBase}
             autoComplete="email"
+            required
+            placeholder="이메일을 입력할 수 있습니다."
           />
           {isLetteringBizcardEmailLong(email) ? (
             <p className="mt-1 text-[10px] font-bold text-amber-600">
@@ -349,23 +369,25 @@ export default function LetteringBizcardQuickBuilder({
             </p>
           ) : null}
         </Field>
-        <Field label="홈페이지" isDarkMode={isDarkMode}>
+        <Field label="웹사이트 (선택)" hint="입력하지 않으면 명함에 표시되지 않습니다" isDarkMode={isDarkMode}>
           <input
             type="text"
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
             disabled={noWebsite}
             className={`${inputBase}${noWebsite ? " cursor-not-allowed opacity-50" : ""}`}
+            placeholder="웹사이트를 입력할 수 있습니다."
           />
-          <OmitCheckbox checked={noWebsite} onChange={setNoWebsite} label="홈페이지 없음" isDarkMode={isDarkMode} />
+          <OmitCheckbox checked={noWebsite} onChange={setNoWebsite} label="웹사이트 없음" isDarkMode={isDarkMode} />
         </Field>
-        <Field label="팩스" isDarkMode={isDarkMode}>
+        <Field label="팩스 (선택)" hint="입력하지 않으면 명함에 표시되지 않습니다" isDarkMode={isDarkMode}>
           <input
             type="tel"
             value={fax}
             onChange={(e) => setFax(e.target.value)}
             disabled={noFax}
             className={`${inputBase}${noFax ? " cursor-not-allowed opacity-50" : ""}`}
+            placeholder="팩스를 입력할 수 있습니다."
           />
           <OmitCheckbox checked={noFax} onChange={setNoFax} label="팩스 없음" isDarkMode={isDarkMode} />
         </Field>

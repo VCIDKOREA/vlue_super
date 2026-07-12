@@ -65,3 +65,16 @@ export function requestLetteringPermissions() {
   }
   return { ok: false, needsNative: true };
 }
+
+/** 네이티브 권한 허용 상태 JSON (없으면 null) */
+export function readLetteringPermissionStatus() {
+  try {
+    const raw =
+      window.Android?.getLetteringPermissionStatusJson?.() ||
+      window.VlueLettering?.getLetteringPermissionStatusJson?.();
+    if (!raw) return null;
+    return typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+}

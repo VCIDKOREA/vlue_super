@@ -15,6 +15,8 @@ import SensitiveRightClickGuard from '../components/SensitiveRightClickGuard';
 interface PricingPageProps {
   user?: { email: string } | null;
   onLoginClick?: () => void;
+  /** V1 — 가입·결제는 앱: 요금제 CTA → 다운로드 */
+  onDownloadClick?: () => void;
 }
 
 function BrandTierIcon({ className }: { className?: string }) {
@@ -61,7 +63,18 @@ const CARD_PART_GUIDE: Record<ShowcaseDemoGrade, { title: string; intro: string;
   },
 };
 
-export default function PricingPage({ user, onLoginClick }: PricingPageProps) {
+export default function PricingPage({ user, onLoginClick, onDownloadClick }: PricingPageProps) {
+  const goAppForJoinPay = () => {
+    if (onDownloadClick) {
+      onDownloadClick();
+      return;
+    }
+    try {
+      window.location.hash = 'download';
+    } catch {
+      if (!user && onLoginClick) onLoginClick();
+    }
+  };
   const [activeGrade, setActiveGrade] = useState<ShowcaseDemoGrade>('fss1332');
   const [tierView, setTierView] = useState<MarketingViewMode>('card');
   const [compareTab, setCompareTab] = useState<ShowcaseDemoGrade>('fss1332');
@@ -82,6 +95,9 @@ export default function PricingPage({ user, onLoginClick }: PricingPageProps) {
           <p className="text-gray-500 text-base max-w-lg mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
             블루 쇼케이스·디지털 인증명함·가족보호 중심의 V1 요금제입니다.<br />
             유료 월 9,900원(정가 28,300원 65% 특별 할인, 종료 시까지) · 연 99,000원(2개월 추가 무료).
+          </p>
+          <p className="mt-4 text-sm font-semibold text-primary-700 max-w-xl mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+            가입과 결제는 VLUE 앱을 다운로드하여 진행해 주세요. (웹 결제는 지원하지 않습니다)
           </p>
         </div>
       </div>
@@ -140,7 +156,8 @@ export default function PricingPage({ user, onLoginClick }: PricingPageProps) {
                     ))}
                   </ul>
                   <button
-                    onClick={() => { if (!user && onLoginClick) onLoginClick(); }}
+                    type="button"
+                    onClick={goAppForJoinPay}
                     className={`w-full py-2.5 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-1.5 ${
                       isBlue ? 'btn-primary' : isGold
                         ? 'bg-amber-400 text-gray-900 hover:bg-amber-300 font-bold'
@@ -149,7 +166,7 @@ export default function PricingPage({ user, onLoginClick }: PricingPageProps) {
                           : 'btn-secondary'
                     }`}
                   >
-                    {tier.price === 0 ? '무료로 시작하기' : '인증 신청하기'}
+                    {tier.price === 0 ? '앱에서 무료로 시작' : '앱에서 가입·결제'}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -349,11 +366,12 @@ export default function PricingPage({ user, onLoginClick }: PricingPageProps) {
             </div>
             <div className="flex-shrink-0">
               <button
-                onClick={() => { if (!user && onLoginClick) onLoginClick(); }}
+                type="button"
+                onClick={goAppForJoinPay}
                 className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-gray-900 font-bold text-sm rounded-2xl transition-all whitespace-nowrap flex items-center gap-2"
               >
                 <Building2 className="w-4 h-4" />
-                B2B 기업 상담 신청
+                앱에서 B2B 상담·가입
               </button>
             </div>
           </div>

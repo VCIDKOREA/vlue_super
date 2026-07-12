@@ -36,6 +36,31 @@
 
 ## 4. 결제·멤버십 실연동 확인
 
+### 4-A. www (웹) — V1 결제 미지원
+
+- [ ] 인증신청(`#pricing`) 상단에 **「가입과 결제는 VLUE 앱을 다운로드하여 진행해 주세요」** 카피 노출
+- [ ] 요금제 CTA가 웹 결제/로그인 유도가 아니라 **앱 다운로드(`#download`)** 로 이동
+- [ ] www 온보딩 완료 후 **`PostSignupPaymentModal`(포트원)이 뜨지 않음** — 앱 다운로드 안내만
+- [ ] `v1WebShell.webSubscribePayment === false` (웹 구독 결제 V2로 이관)
+
+### 4-B. 앱 — 포트원 테스트 키 가상 결제 1회 (Railway)
+
+환경: Railway에 등록된 **테스트** 키  
+- Web: `VITE_PORTONE_USER_CODE` (및 관련 `VITE_PORTONE_*`)  
+- API: `PORTONE_API_KEY` / `PORTONE_API_SECRET` (테스트)
+
+점검 흐름 (`PostSignupPaymentModal` → `requestIamportBillingPay` → `POST /api/payment/subscribe/complete`):
+
+- [ ] **앱 셸**에서 유료 등급으로 신규 가입(또는 가입 직후 결제 대기 상태) → `PostSignupPaymentModal` 노출
+- [ ] 포트원 테스트 결제창이 에러 없이 열리고, 테스트 카드/가상결제로 **1회 승인** 완료
+- [ ] 클라이언트 로그/네트워크에 `POST /api/payment/subscribe/complete` **200**
+- [ ] 결제 완료 직후 계정 티어가 **Premium(유료)** 로 즉시 반영
+- [ ] 결제 완료 후 **디지털 인증명함·풀 쇼케이스·가족보호** 기능이 즉시 활성화
+- [ ] (참고) 로컬 `import.meta.env.DEV` 의 **개발 전용 결제 우회**는 실연동 검증으로 인정하지 않음 — Railway/빌드 앱 + 테스트 키로만 확인
+- [ ] 결제 실패·취소 시 티어가 유료로 올라가지 않는지 확인
+
+### 4-C. 요금·카피 UI
+
 최신 V1 요금·표시 기준 (`membershipBm.js` · `MembershipUpgradeModal` · 인증신청 페이지):
 
 - [ ] **프리미엄 유료** 결제/업그레이드 화면에서 정가 **28,300원**이 **취소선(`line-through`)** 처리되는지 확인
@@ -44,12 +69,9 @@
 - [ ] 프리미엄 혜택 **최상단(또는 유료 옵션 직하)**에  
   **「가족보호 시스템(본인 + 가족 최대 3명 등록 가능, 2계정 시 최대 8인)」** 이 직관적으로 노출되는지 확인  
   (코드 상수: `FAMILY_PROTECTION_SUMMARY` / `FAMILY_PROTECTION_SUMMARY_SHORT`)
-- [ ] 결제 완료 후 계정 티어가 **Premium(유료)** 로 즉시 반영되는지 확인
-- [ ] 결제 완료 후 **디지털 인증명함·풀 쇼케이스·가족보호** 기능이 즉시 활성화되는지 확인
 - [ ] B2B: 대표 28,300원 + 직원 정가 취소선 → 이벤트 **5,200원** 표시·결제 경로 확인
 - [ ] SOHO 영업 송출 옵션 **+4,200원(할인 미적용)** 별도 SKU 안내 확인
 - [ ] **추천인 리워드/할인 UI 없음** (V1 미운영)
-- [ ] 결제 실패·취소 시 티어가 유료로 올라가지 않는지 확인
 
 ---
 
@@ -154,10 +176,11 @@
 ## 빠른 테스트 시나리오 (15분)
 
 1. 무료 → 비즈니스 탭 게이트 확인  
-2. 유료 결제창: **~~28,300원~~ → 월 9,900원 · 65% · 가족보호(본인+3 / 2계정 8인)** 확인 후 결제 → Premium·가족보호 활성  
-3. 쇼케이스 설정 → 사진·BGM → 알림톡 **동의** 문구 확인  
-4. 통화 목록에서 쇼케이스 다시보기  
-5. www: PC다운로드·스토어·미디어커머스·블루AI **없음** / 개인케이스 3탭 확인  
+2. **앱** 유료 가입 → `PostSignupPaymentModal` 포트원 **테스트** 결제 1회 → complete API 200 → Premium 즉시 반영  
+3. www: 요금제 CTA → 다운로드 / **웹 결제 모달 없음**  
+4. 쇼케이스 설정 → 사진·BGM → 알림톡 **동의** 문구 확인  
+5. 통화 목록에서 쇼케이스 다시보기  
+6. www: PC다운로드·스토어·미디어커머스·블루AI **없음** / 개인케이스 3탭 확인  
 
 ---
 
@@ -165,9 +188,13 @@
 
 | 영역 | 경로 |
 |------|------|
-| V1 플래그 | `web/src/lib/v1ReleaseScope.js` |
+| V1 플래그 | `web/src/lib/v1ReleaseScope.js` (`webSubscribePayment: false`) |
 | 요금·할인 | `web/src/lib/membershipBm.js`, `web/src/lib/membershipBenefits.js` |
-| 결제 UI | `web/src/components/MembershipUpgradeModal.jsx`, `web/src/site/bolt/pages/PricingPage.tsx` |
+| 앱 가입 후 결제 | `web/src/components/PostSignupPaymentModal.jsx`, `web/src/lib/iamportClient.js` |
+| 결제 complete API | `apps/api` `POST /api/payment/subscribe/complete` |
+| 웹 요금제(안내만) | `web/src/site/bolt/pages/PricingPage.tsx` |
+| 웹 가입(결제 게이트) | `web/src/site/bolt/components/AuthModal.tsx` |
+| 멤버십 업그레이드 UI | `web/src/components/MembershipUpgradeModal.jsx` |
 | 쇼케이스 설정 | `web/src/components/showcase/ShowcaseStyleSettingsPanel.jsx` |
 | 알림톡 동의 | `web/src/lib/showcase/kakaoAlimtalkConsent.js` |
 | 알림톡 템플릿 | `apps/api/src/lib/alimtalkTemplate.ts` |
@@ -177,4 +204,4 @@
 
 ---
 
-*마지막 업데이트: V1 출시 QA — 알림톡 신청 문구 · 결제 9,900/취소선 · 가족보호 · V2 숨김 반영*
+*마지막 업데이트: V1 — www 웹 결제 미지원(앱 전용) · 포트원 앱 테스트 점검 절차 · 요금 9,900/취소선 · 가족보호*

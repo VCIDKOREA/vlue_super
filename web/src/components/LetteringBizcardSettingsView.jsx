@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
-import { readCardEmail, readCardFax, readCardPromo } from "../lib/memberCardStorage.js";
 import {
   LETTERING_BIZCARD_CHANGED_EVENT,
   clampLetteringBizcardEmail,
@@ -76,6 +75,8 @@ export default function LetteringBizcardSettingsView({
   const [verifyDocError, setVerifyDocError] = useState("");
   const [designTemplate, setDesignTemplate] = useState("classic-light");
   const [cardId, setCardId] = useState("");
+  const [orgChangeApprovalStatus, setOrgChangeApprovalStatus] = useState("");
+  const [orgChangePendingName, setOrgChangePendingName] = useState("");
   const { refresh: refreshMembership } = useB2bMembership();
 
   const reload = useCallback(async () => {
@@ -117,12 +118,9 @@ export default function LetteringBizcardSettingsView({
 
     if (isCeo) readLetteringFixedIdentity();
     const ed = readLetteringBizcardEditable();
-    const cardFax = readCardFax();
-    const cardEmail = readCardEmail();
-    const cardPromo = readCardPromo();
     setTitle(
       isCeo
-        ? ""
+        ? "CEO"
         : ed.titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.PENDING
           ? ed.titleDeptPendingTitle || ed.title
           : ed.title
@@ -134,10 +132,10 @@ export default function LetteringBizcardSettingsView({
           ? ed.titleDeptPendingDepartment || ed.department
           : ed.department
     );
-    setFax(ed.fax || cardFax || "");
-    setEmail(clampLetteringBizcardEmail(ed.email || cardEmail || ""));
+    setFax(ed.fax || "");
+    setEmail(clampLetteringBizcardEmail(ed.email || ""));
     setWebsite(ed.website);
-    setCompanyIntro(ed.companyIntro || cardPromo || "");
+    setCompanyIntro(ed.companyIntro || "");
     setCustomBackText(ed.customBackText || "");
     const addr = readLetteringBizcardAddressFields(ed);
     setAddressRoad(addr.road);
@@ -150,15 +148,17 @@ export default function LetteringBizcardSettingsView({
     setNoCompanyLogo(Boolean(ed.noCompanyLogo));
     setNoFax(Boolean(ed.noFax));
     setNoWebsite(Boolean(ed.noWebsite));
-    setApprovedTitle(ed.approvedTitle || "");
-    setApprovedDepartment(ed.approvedDepartment || "");
-    setTitleDeptApprovalStatus(ed.titleDeptApprovalStatus || "");
+    setApprovedTitle(isCeo ? "CEO" : ed.approvedTitle || "");
+    setApprovedDepartment(isCeo ? "" : ed.approvedDepartment || "");
+    setTitleDeptApprovalStatus(isCeo ? TITLE_DEPT_APPROVAL.APPROVED : ed.titleDeptApprovalStatus || "");
     setVerifyDocKind(ed.titleDeptVerifyDocKind || "");
     setVerifyDocName(ed.titleDeptVerifyDocName || "");
     setVerifyDocDataUrl(ed.titleDeptVerifyDocDataUrl || "");
     setVerifyDocIssuedAt(ed.titleDeptVerifyDocIssuedAt || "");
     setVerifyDocError("");
     setDesignTemplate(normalizeLetteringBizcardTemplate(ed.designTemplate));
+    setOrgChangeApprovalStatus(ed.orgChangeApprovalStatus || "");
+    setOrgChangePendingName(ed.orgChangePendingName || "");
     setPendingLogo(null);
     setPendingPhoto(null);
     setPreviewTick((n) => n + 1);
@@ -328,6 +328,16 @@ export default function LetteringBizcardSettingsView({
     const detail = addressDetail.trim();
     const trimmedTitle = title.trim();
     const trimmedDept = department.trim();
+    const trimmedEmail = clampLetteringBizcardEmail(email).trim();
+
+    if (!trimmedEmail) {
+      showToast("이메일은 필수입니다. 입력해 주세요.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      showToast("올바른 이메일 형식을 입력해 주세요.");
+      return;
+    }
 
     if (titleDeptNeedsSubmit) {
       if (!verifyDocKind) {
@@ -349,7 +359,7 @@ export default function LetteringBizcardSettingsView({
       title: trimmedTitle,
       department: trimmedDept,
       fax: noFax ? "" : fax.trim(),
-      email: clampLetteringBizcardEmail(email).trim(),
+      email: trimmedEmail,
       website: noWebsite ? "" : website.trim(),
       companyIntro: companyIntro.trim(),
       customBackText: customBackText.trim(),
@@ -411,6 +421,15 @@ export default function LetteringBizcardSettingsView({
     void syncDigitalCardExportSnapshot({ ...previewCard, designTemplate: tpl });
     if (isFirstApply) {
       try {
+        const identity = readLetteringFixedIdentity();
+        if (identity.name) {
+          localStorage.setItem("vlue_legal_name", identity.name);
+          localStorage.setItem("myCardDisplayName", identity.name);
+        }
+        if (identity.organization) {
+          localStorage.setItem("vlue_company_locked", identity.organization);
+          localStorage.setItem("myCardOrganization", identity.organization);
+        }
         localStorage.setItem("vlue_digital_card_active", "1");
         window.dispatchEvent(new CustomEvent("vlue-digital-card-changed"));
       } catch {
@@ -495,6 +514,10 @@ export default function LetteringBizcardSettingsView({
           setVerifyDocIssuedAt={setVerifyDocIssuedAt}
           onVerifyDocPick={handleVerifyDocPick}
           verifyDocError={verifyDocError}
+          orgChangeApprovalStatus={orgChangeApprovalStatus}
+          orgChangePendingName={orgChangePendingName}
+          onOrgChangeSubmitted={reload}
+          onOrgChangeToast={showToast}
           onApply={handleApply}
           applyLabel={applyLabel}
           toast={toast}

@@ -52,7 +52,7 @@ const CEO = {
   password: process.env.VLUE_CEO_PASSWORD || "!Dlwhdrms2282",
   phone: "+821080144666",
   email: "ceo@vlue.kr",
-  legalName: "VLUE 대표",
+  legalName: "이종근",
   nick: "VLUE CEO",
   portoneIdentityId: "seed_ceo_premium_v1",
   role: "user",

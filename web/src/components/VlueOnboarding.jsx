@@ -5,7 +5,7 @@ import { TERMS_ARTICLES, TERMS_CHECKLIST_IDS, TERMS_VERSION } from "../legal/vlu
 import { REFERRAL_PRECAUTION_AGREE, REFERRAL_PRECAUTION_BULLETS, REFERRAL_PRECAUTION_TITLE } from "../legal/vlueReferralNotice.js";
 import { setVlueSessionTokens } from "../lib/vlueAuthHeaders.js";
 import { logTermsAgreement } from "../lib/termsLog.js";
-import { apiUrl } from "../lib/apiBase.js";
+import { apiUrl, getApiBase } from "../lib/apiBase.js";
 import { makeDevLocalImpUid, postPortoneIdentityComplete } from "../lib/identityCompleteApi.js";
 import { approveParentalConsentWithPass, requestParentalConsentToGuardian } from "../lib/parentalConsentApi.js";
 import { requestIamportCertification } from "../lib/iamportClient.js";
@@ -34,6 +34,7 @@ import TwoTrackSignupFields from "./TwoTrackSignupFields.jsx";
 import B2bSignupFields, { validateReferralMetaB2b } from "./B2bSignupFields.jsx";
 import MembershipBenefitsCompare from "./MembershipBenefitsCompare.jsx";
 import BackButton from "./common/BackButton";
+import { VlueEyeMark } from "./VlueEyeMark.jsx";
 import {
   emptyGroupSignupDraft,
   groupLineTotalKrw,
@@ -183,6 +184,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
 
   const [signupPassword, setSignupPassword] = useState("");
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
+  const [signupPwVisible, setSignupPwVisible] = useState(false);
+  const [signupPwConfirmVisible, setSignupPwConfirmVisible] = useState(false);
+  const [signupPwEyeBlink, setSignupPwEyeBlink] = useState(0);
+  const [signupPwConfirmEyeBlink, setSignupPwConfirmEyeBlink] = useState(0);
   /** idle | checking | ok | taken | invalid */
   const [idCheck, setIdCheck] = useState({ status: "idle", message: "" });
   /** business_email | vlue_id_only */
@@ -270,23 +275,27 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   }, []);
 
   useEffect(() => {
+    /** PASS 이후 단계에서는 재조회로 상태를 깨뜨리지 않음 (이미 계정 단계에서 통과함) */
+    if (step !== "account" || signupTrack !== "vlue_id_only") return undefined;
     const slug = normalizeMemberHandleSlug(desiredMemberId);
     if (!slug) {
       setIdCheck({ status: "idle", message: "" });
-      return;
+      return undefined;
     }
     if (!isValidMemberHandleSlug(slug)) {
       setIdCheck({ status: "invalid", message: "형식을 확인해 주세요. (숫자 포함)" });
-      return;
+      return undefined;
     }
     const t = setTimeout(() => {
       runCheckLoginId(slug);
     }, 450);
     return () => clearTimeout(t);
-  }, [desiredMemberId, runCheckLoginId]);
+  }, [desiredMemberId, runCheckLoginId, step, signupTrack]);
 
   const allArticlesAgreed = useMemo(() => TERMS_CHECKLIST_IDS.every((id) => agreedById[id]), [agreedById]);
-  const termsGate = allArticlesAgreed && masterAgree && jointGuarantorAgree;
+  /** V1: 추천·리워드 동의는 미운영 — 체크 불필요 */
+  const termsGate =
+    allArticlesAgreed && masterAgree && (v1AppShell.referralProgram ? jointGuarantorAgree : true);
 
   const paidReferralDiscount =
     referralMeta.verified &&
@@ -326,6 +335,17 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const selectMembershipKind = useCallback(
     (id) => {
       setMembershipKind(id);
+      if (id === "free") {
+        setPassBusinessMember(false);
+        setPassBusinessRegNo("");
+        setPassBusinessJobTitle("");
+        setPassBusinessNoJobTitle(false);
+        setRequestDigitalCard(false);
+        setDigitalCardDocKind("");
+        setDigitalCardDocName("");
+        setDigitalCardDocDataUrl("");
+        setDigitalCardDocIssuedAt("");
+      }
       if (id === "b2b") {
         persistGroupDraft({
           ...groupSignupDraft,
@@ -436,8 +456,12 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         if (!isValidMemberHandleSlug(slug)) {
           throw new Error("회원 ID는 영문 소문자로 시작하는 3~20자(소문자·숫자·_)이며 숫자를 한 글자 이상 포함해야 합니다.");
         }
-        if (idCheck.status !== "ok") {
-          throw new Error("아이디 중복 확인이 완료되지 않았습니다.");
+        /**
+         * 계정 단계에서 이미 통과해도, 백그라운드 재조회가 idCheck를 idle/checking으로 바꿀 수 있음.
+         * PASS 직전 API로 최종 확인 (아래 recheck와 동일).
+         */
+        if (idCheck.status === "taken" || idCheck.status === "invalid") {
+          throw new Error(idCheck.message || "아이디를 다시 확인해 주세요. 이전 단계로 돌아가 「중복확인」을 눌러 주세요.");
         }
       } else if (emailVerify.status !== "ok" || !emailVerify.token) {
         throw new Error("이메일 인증을 완료해 주세요.");
@@ -461,10 +485,14 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         );
         const recheckData = await recheckRes.json().catch(() => ({}));
         if (!recheckData.available) {
-          throw new Error(recheckData.reason || "가입 직전 아이디 중복이 확인되었습니다. 아이디를 변경한 뒤 다시 시도해 주세요.");
+          throw new Error(
+            recheckData.reason ||
+              "가입 직전 아이디 중복이 확인되었습니다. 이전 단계에서 아이디를 바꾼 뒤 다시 시도해 주세요."
+          );
         }
+        setIdCheck({ status: "ok", message: "사용 가능한 아이디입니다." });
       }
-      if (passBusinessMember) {
+      if (isBillableMembershipKind(membershipKind) && passBusinessMember) {
         const digits = String(passBusinessRegNo || "").replace(/\D/g, "");
         if (digits.length !== 10) {
           throw new Error("사업자등록번호 10자리를 입력해 주세요.");
@@ -473,7 +501,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
           throw new Error("직책을 입력하거나 「직책 없음」을 선택해 주세요.");
         }
       }
-      if (requestDigitalCard) {
+      if (isBillableMembershipKind(membershipKind) && requestDigitalCard) {
         if (!digitalCardDocKind) {
           throw new Error("디지털 인증명함 발급을 위해 증빙 서류 종류를 선택해 주세요.");
         }
@@ -488,6 +516,16 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       if (devBypass) {
         if (!import.meta.env.DEV) {
           throw new Error("개발 전용 본인인증 우회는 로컬 개발 빌드에서만 사용할 수 있습니다.");
+        }
+        const apiBase = String(import.meta.env.VITE_API_URL || getApiBase() || "").toLowerCase();
+        const hitsProdApi =
+          apiBase.includes("api.vlue.kr") ||
+          apiBase.includes("vlueapi") ||
+          (apiBase.includes("railway.app") && apiBase.includes("api"));
+        if (hitsProdApi) {
+          throw new Error(
+            "PASS 우회는 로컬 API에서만 됩니다. 지금 프론트가 운영 API(api.vlue.kr)에 연결되어 있어 거부됩니다. 「PASS 본인인증 시작」으로 실연동하거나, VITE_API_URL을 로컬 API로 바꾼 뒤 다시 시도하세요."
+          );
         }
         const devSlug =
           trackA && businessEmail
@@ -506,12 +544,13 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         typeof sessionStorage !== "undefined" && sessionStorage.getItem("vlue-admin-entry") === "1"
           ? localStorage.getItem("vlue-admin-device-key")
           : null;
+      const allowBizCardOpts = isBillableMembershipKind(membershipKind);
       const data = await postPortoneIdentityComplete({
         impUid,
-        isBusinessMember: passBusinessMember,
-        requestDigitalCard,
+        isBusinessMember: allowBizCardOpts && passBusinessMember,
+        requestDigitalCard: allowBizCardOpts && requestDigitalCard,
         digitalCardDoc:
-          requestDigitalCard && digitalCardDocDataUrl
+          allowBizCardOpts && requestDigitalCard && digitalCardDocDataUrl
             ? {
                 kind: digitalCardDocKind,
                 fileName: digitalCardDocName,
@@ -530,7 +569,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         virtualEmailPrefix: trackA ? virtualIdCheck.normalized : null,
         password: pw,
         groupSignup: isB2b ? serializeGroupSignupForApi(groupSignupDraft) : null,
-        ...(passBusinessMember
+        ...(allowBizCardOpts && passBusinessMember
           ? {
               businessRegistrationNo: String(passBusinessRegNo || "").replace(/\D/g, "").slice(0, 10),
               businessJobTitle: passBusinessNoJobTitle ? "" : String(passBusinessJobTitle || "").trim(),
@@ -805,6 +844,9 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         localStorage.setItem("vlue_membership_kind", membershipKind);
         if (isBillableMembershipKind(membershipKind)) {
           localStorage.setItem("vlue_paid_billing_cycle", paidBillingCycle);
+          if (!localStorage.getItem("vlue_subscription_paid_at")) {
+            localStorage.setItem("vlue_subscription_paid_at", new Date().toISOString());
+          }
           if (referralCode.trim()) localStorage.setItem("vlue_referral_code", referralCode.trim());
         }
         localStorage.setItem("vlue_onboarding_address", String(roadAddress || "").trim());
@@ -1170,14 +1212,22 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 type="button"
                 disabled={busy}
                 onClick={registerBiometric}
-                className="vlue-onb-primary-btn mt-4 w-full rounded-2xl bg-slate-900 py-3 text-[14px] font-black text-white shadow-md disabled:opacity-50"
+                className={`vlue-onb-primary-btn mt-4 w-full rounded-2xl py-3 text-[14px] font-black text-white shadow-md transition-colors disabled:opacity-50 ${
+                  bioRegistered
+                    ? "border border-emerald-600/30 bg-emerald-600 ring-2 ring-emerald-200 hover:bg-emerald-700"
+                    : "bg-slate-900 hover:bg-slate-800"
+                }`}
+                aria-pressed={bioRegistered}
               >
                 {busy
                   ? "처리 중…"
                   : bioRegistered
-                    ? `${bioProfile.methodSummary} 등록 완료 · 다시 등록`
+                    ? `✓ ${bioProfile.methodSummary} 등록 완료 · 다시 등록`
                     : bioProfile.registerButtonLabel}
               </button>
+              {bioRegistered ? (
+                <p className="mt-2 text-[11px] font-semibold text-emerald-700">생체 인증이 등록되었습니다. 아래에서 다음 단계로 진행하세요.</p>
+              ) : null}
               {bioNote && <p className="mt-2 text-[11px] text-slate-600">{bioNote}</p>}
 
               {import.meta.env.DEV && (
@@ -1286,15 +1336,17 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                   />
                   <span>필수 약관 전체 동의</span>
                 </label>
-                <label className="flex cursor-pointer items-start gap-2 text-[13px] font-bold text-amber-950/95">
-                  <input
-                    type="checkbox"
-                    checked={jointGuarantorAgree}
-                    onChange={() => setJointGuarantorAgree((v) => !v)}
-                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-700"
-                  />
-                  <span>{REFERRAL_PRECAUTION_AGREE}</span>
-                </label>
+                {v1AppShell.referralProgram ? (
+                  <label className="flex cursor-pointer items-start gap-2 text-[13px] font-bold text-amber-950/95">
+                    <input
+                      type="checkbox"
+                      checked={jointGuarantorAgree}
+                      onChange={() => setJointGuarantorAgree((v) => !v)}
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-700"
+                    />
+                    <span>{REFERRAL_PRECAUTION_AGREE}</span>
+                  </label>
+                ) : null}
               </div>
 
               <button
@@ -1346,25 +1398,67 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
               <div className="mt-4 space-y-3">
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-medium text-slate-600">비밀번호</span>
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    value={signupPassword}
-                    onChange={(e) => setSignupPassword(e.target.value)}
-                    placeholder={MEMBER_PASSWORD_HINT}
-                    className="vlue-onb-plain-input w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14px] font-normal outline-none focus:border-blue-400"
-                  />
+                  <div className="relative flex items-center">
+                    <input
+                      type={signupPwVisible ? "text" : "password"}
+                      autoComplete="new-password"
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                      placeholder={MEMBER_PASSWORD_HINT}
+                      className="vlue-onb-plain-input w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-11 text-[14px] font-normal outline-none focus:border-blue-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSignupPwEyeBlink((n) => n + 1);
+                        setSignupPwVisible((v) => !v);
+                      }}
+                      className="absolute right-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-50 active:scale-95"
+                      aria-label={signupPwVisible ? "비밀번호 숨기기" : "비밀번호 표시"}
+                      title={signupPwVisible ? "비밀번호 숨기기" : "비밀번호 표시"}
+                    >
+                      <VlueEyeMark
+                        key={signupPwEyeBlink}
+                        variant="header"
+                        tone="muted"
+                        svgWidth={22}
+                        svgHeight={20}
+                        wrapClassName={`vlue-header-eye-wrap vlue-login-pw-eye ${signupPwEyeBlink > 0 ? "vlue-header-eye-wrap--nav-loading" : ""}`}
+                      />
+                    </button>
+                  </div>
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-medium text-slate-600">비밀번호 확인</span>
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    value={signupPasswordConfirm}
-                    onChange={(e) => setSignupPasswordConfirm(e.target.value)}
-                    placeholder="비밀번호 재입력"
-                    className="vlue-onb-plain-input w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14px] font-normal outline-none focus:border-blue-400"
-                  />
+                  <div className="relative flex items-center">
+                    <input
+                      type={signupPwConfirmVisible ? "text" : "password"}
+                      autoComplete="new-password"
+                      value={signupPasswordConfirm}
+                      onChange={(e) => setSignupPasswordConfirm(e.target.value)}
+                      placeholder="비밀번호 재입력"
+                      className="vlue-onb-plain-input w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-11 text-[14px] font-normal outline-none focus:border-blue-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSignupPwConfirmEyeBlink((n) => n + 1);
+                        setSignupPwConfirmVisible((v) => !v);
+                      }}
+                      className="absolute right-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-50 active:scale-95"
+                      aria-label={signupPwConfirmVisible ? "비밀번호 확인 숨기기" : "비밀번호 확인 표시"}
+                      title={signupPwConfirmVisible ? "비밀번호 확인 숨기기" : "비밀번호 확인 표시"}
+                    >
+                      <VlueEyeMark
+                        key={signupPwConfirmEyeBlink}
+                        variant="header"
+                        tone="muted"
+                        svgWidth={22}
+                        svgHeight={20}
+                        wrapClassName={`vlue-header-eye-wrap vlue-login-pw-eye ${signupPwConfirmEyeBlink > 0 ? "vlue-header-eye-wrap--nav-loading" : ""}`}
+                      />
+                    </button>
+                  </div>
                 </label>
                 <p className="text-[10px] font-normal leading-relaxed text-slate-500">
                   {MEMBER_PASSWORD_HINT}
@@ -1389,6 +1483,8 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
               <p className="mt-2 text-[12px] leading-relaxed text-slate-600">
                 포트원(아임포트) 휴대폰 본인인증입니다. 완료 후 실명·CI 해시가 저장되며 실명은 <b>변경 불가</b>입니다.
               </p>
+              {isBillableMembershipKind(membershipKind) ? (
+                <>
               <label className="mt-4 flex cursor-pointer items-start gap-2 rounded-xl border border-amber-200/90 bg-amber-50/90 px-3 py-2.5 text-[12px] font-semibold text-amber-950">
                 <input
                   type="checkbox"
@@ -1520,6 +1616,8 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                   ) : null}
                 </div>
               ) : null}
+                </>
+              ) : null}
               {verifyZone && !verifyZone.ok && (
                 <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[12px] text-red-800">{verifyZone.text}</p>
               )}
@@ -1531,30 +1629,30 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
               >
                 {busy ? "본인인증 처리 중…" : "PASS 본인인증 시작"}
               </button>
-              {import.meta.env.DEV && (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => runPortonePass({ devBypass: true })}
-                  className="mt-2 w-full rounded-xl border border-dashed border-amber-400/90 bg-amber-50/80 py-2.5 text-[12px] font-bold text-amber-950/90"
-                >
-                  개발 전용: PASS 우회 (이니시스 오류 시 E2E·멤버십 DB 검증)
-                </button>
-              )}
-              <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
-                팝업에 KG이니시스 「서비스 이용에 불편을 드려 죄송합니다」(
-                <a
-                  href="https://sa.inicis.com/resources/error/error.html"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-600 underline"
-                >
-                  sa.inicis.com
-                </a>
-                )가 뜨면 포트원 콘솔에서 <b>통합본인인증</b> 채널·MID·<code className="text-[9px]">http://localhost:5173</code> 허용을 확인하세요. 루트{" "}
-                <code className="text-[9px]">.env</code>에 <code className="text-[9px]">VITE_IAMPORT_CERT_PG=inicis_unified</code>·필요 시{" "}
-                <code className="text-[9px]">VITE_IAMPORT_CERT_OMIT_MID=true</code>. 콘솔 `[VLUE 본인인증 요청]`의 <code className="text-[9px]">pg</code> 값을 확인하세요.
-              </p>
+              {import.meta.env.DEV ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => runPortonePass({ devBypass: true })}
+                    className="mt-2 w-full rounded-xl border border-dashed border-amber-400/90 bg-amber-50/80 py-2.5 text-[12px] font-bold text-amber-950/90"
+                  >
+                    개발 전용: PASS 우회 (로컬 API 전용)
+                  </button>
+                  <p className="mt-1.5 text-[10px] leading-relaxed text-amber-900/80">
+                    우회는 <b>로컬 API</b>에서만 됩니다. 프론트가 <code className="text-[9px]">api.vlue.kr</code> 등
+                    운영 API에 붙어 있으면 「운영 환경에서 사용할 수 없습니다」가 납니다. 그때는 위{" "}
+                    <b>PASS 본인인증 시작</b>만 사용하세요.
+                  </p>
+                  <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
+                    [개발자] 이니시스 「서비스 이용에 불편…」 → 포트원 콘솔 통합본인인증·MID·사이트 URL(
+                    <code className="text-[9px]">https://www.vlue.kr</code> ·{" "}
+                    <code className="text-[9px]">http://localhost:5173</code>) ·{" "}
+                    <code className="text-[9px]">VITE_IAMPORT_CERT_PG=inicis_unified</code> · 필요 시{" "}
+                    <code className="text-[9px]">VITE_IAMPORT_CERT_OMIT_MID=true</code>
+                  </p>
+                </>
+              ) : null}
             </section>
           )}
 
@@ -1567,11 +1665,13 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 </p>
                 <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px] font-medium text-slate-600">
                   <li>검증·승인 처리 최대 48시간(사업자 가입 등은 운영 정책에 따라 지연될 수 있음)</li>
-                  {REFERRAL_PRECAUTION_BULLETS.map((line) => (
-                    <li key={line} className={line.includes("부정") ? "text-amber-950/95" : undefined}>
-                      {line}
-                    </li>
-                  ))}
+                  {v1AppShell.referralProgram
+                    ? REFERRAL_PRECAUTION_BULLETS.map((line) => (
+                        <li key={line} className={line.includes("부정") ? "text-amber-950/95" : undefined}>
+                          {line}
+                        </li>
+                      ))
+                    : null}
                 </ul>
               </div>
               <div className={isWeb ? "vlue-onb-actions-row vlue-onb-actions-row--split" : "space-y-3"}>
@@ -1740,6 +1840,8 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                   <option value="professional">전문직(면허)</option>
                   <option value="influencer">크리에이터</option>
                   <option value="freelancer">프리랜서(활동목적)</option>
+                  <option value="unemployed">무직</option>
+                  <option value="student">학생</option>
                 </select>
               </FormRow>
 
@@ -1900,7 +2002,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             <section className={sectionCls}>
               <h2 className="text-[16px] font-black text-slate-900">검증 신청 완료</h2>
               <p className="mt-2 text-[13px] leading-relaxed text-slate-600">
-                신청이 접수되었습니다. 최대 <b>24시간</b> 이내에 심사 결과를 알려드립니다. VLUE 추천 안내 및 이용 정책이 적용됩니다.
+                신청이 접수되었습니다. 최대 <b>24시간</b> 이내에 심사 결과를 알려드립니다.
+                {v1AppShell.referralProgram
+                  ? " VLUE 추천 안내 및 이용 정책이 적용됩니다."
+                  : " 서비스 이용약관·개인정보 처리방침이 적용됩니다."}
               </p>
               <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px] text-slate-600">
                 <li>
@@ -1928,7 +2033,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 {v1AppShell.referralProgram ? (
                   <li>추천: 지인(전화번호 10% 포인트) · 홍보 VLUER(고유 코드 15%/5% 캐시)</li>
                 ) : (
-                  <li>V1: 블루 쇼케이스·디지털 인증명함·가족보호 · 추천인 리워드 미운영</li>
+                  <li>V1: 블루 쇼케이스 · 디지털 인증명함 · 가족보호</li>
                 )}
                 <li>주소: {roadAddress || "—"} {addressDetail}</li>
               </ul>

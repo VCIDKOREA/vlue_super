@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronUp, Hash, Link2, Music2, Palette, ShoppingBag, Sparkles } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ChevronUp, Music2 } from "lucide-react";
 import BackButton from "../common/BackButton";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import { getShowcasePermissions, requiresPremium } from "../../lib/showcase/showcaseStylePermissions.js";
@@ -14,78 +14,18 @@ import { PRIVACY_MODES } from "../../lib/showcase/tentShowcaseTypes.js";
 import { syncShowcaseTagsToServer } from "../../lib/showcase/showcaseTagsApi.js";
 import { SHOWCASE_FONT_SETS, SHOWCASE_CASE_FRAMES, SHOWCASE_STYLE_LIST, SHOWCASE_STYLE_TYPES } from "../../lib/showcase/showcaseStyleTypes.js";
 import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
+import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
 import { VLUE_SHOWCASE } from "../../lib/vlueBrandSpaces.js";
-import ShowcaseStylePreview from "./ShowcaseStylePreview.jsx";
+import ShowcaseCallCarousel from "./ShowcaseCallCarousel.jsx";
 import ShowcasePremiumGateModal from "./ShowcasePremiumGateModal.jsx";
 import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
 import ShowcasePhotoEditor from "./ShowcasePhotoEditor.jsx";
 import KakaoAlimtalkConsentModal from "./KakaoAlimtalkConsentModal.jsx";
 import { writeKakaoAlimtalkAgreed } from "../../lib/showcase/kakaoAlimtalkConsent.js";
+import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
 import "./showcase-style-settings.css";
 import "../../styles/kakao-alimtalk-consent.css";
-
-const TABS = [
-  { id: "style", label: "스타일", icon: Palette },
-  { id: "photos", label: "사진", icon: Sparkles },
-  { id: "bgm", label: "음악", icon: Music2 },
-  { id: "biz", label: "비즈니스", icon: ShoppingBag }
-];
-
-function readAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result || ""));
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-}
-
-/** 카톡·인스타 스타일용 프로필 사진 (통화 쇼케이스 마크) */
-function PlatformAvatarField({ label, value, onChange, inputCls = "" }) {
-  const fileRef = useRef(null);
-  return (
-    <div className="showcase-style-settings__avatar-field mt-3">
-      <p className="showcase-style-settings__label">{label}</p>
-      <div className="showcase-style-settings__avatar-row">
-        <span className="showcase-style-settings__avatar-preview" aria-hidden>
-          {value ? (
-            <img src={value} alt="" />
-          ) : (
-            <span className="showcase-style-settings__avatar-empty">사진</span>
-          )}
-        </span>
-        <div className="showcase-style-settings__avatar-actions">
-          <button type="button" className="showcase-style-settings__tool-btn" onClick={() => fileRef.current?.click()}>
-            {value ? "사진 변경" : "프로필 사진 등록"}
-          </button>
-          {value ? (
-            <button type="button" className="showcase-style-settings__tool-btn" onClick={() => onChange("")}>
-              삭제
-            </button>
-          ) : null}
-        </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="sr-only"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (!file || !/^image\//i.test(file.type)) return;
-            onChange(await readAsDataUrl(file));
-          }}
-        />
-      </div>
-      <input
-        className={`showcase-style-settings__input mt-2 w-full ${inputCls}`}
-        placeholder="또는 이미지 URL"
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value.trim())}
-      />
-    </div>
-  );
-}
+import "../../styles/showcase-call-glass.css";
 
 function gatePremium(feature, tier, setGate) {
   if (requiresPremium(feature, tier)) {
@@ -95,37 +35,60 @@ function gatePremium(feature, tier, setGate) {
   return false;
 }
 
+function ProfileRow({ label, hint, children, onClick, trailing }) {
+  if (onClick) {
+    return (
+      <button type="button" className="showcase-profile-row showcase-profile-row--btn" onClick={onClick}>
+        <span className="showcase-profile-row__label">
+          {label}
+          {hint ? <span className="showcase-profile-row__hint">{hint}</span> : null}
+        </span>
+        <span className="showcase-profile-row__trail">
+          {trailing}
+          <ChevronRight size={16} aria-hidden />
+        </span>
+      </button>
+    );
+  }
+  return (
+    <div className="showcase-profile-row">
+      <span className="showcase-profile-row__label">
+        {label}
+        {hint ? <span className="showcase-profile-row__hint">{hint}</span> : null}
+      </span>
+      <div className="showcase-profile-row__control">{children}</div>
+    </div>
+  );
+}
+
 export default function ShowcaseStyleSettingsPanel({
   membershipTier = "free",
   isDarkMode = false,
   onBack,
   onOpenUpgrade,
-  /** 저장 완료 알림 (예: 「적용되었습니다.」) */
   onToast,
-  /** AppFullScreenView 안 — 상단 헤더 숨김 */
   hideHeader = false,
-  /** V1 전체 화면 시트 레이아웃 */
   fullscreen = false
 }) {
   const isPaid = isPaidLetteringTier(membershipTier);
   const perms = getShowcasePermissions(membershipTier);
   const [config, setConfig] = useState(() => readShowcaseStyle());
-  const [tab, setTab] = useState("style");
-  const [previewPhase, setPreviewPhase] = useState("preview");
   const [gateOpen, setGateOpen] = useState(false);
   const [tagInput, setTagInput] = useState(() => (config.tags || []).join(" "));
-  /** 전체화면(모바일)에서는 미리보기를 접어 설정 공간을 확보 */
-  const [previewCollapsed, setPreviewCollapsed] = useState(() => Boolean(fullscreen));
+  /** 미리보기 시트 — 기본 접힘, 「올리기」로 아래에서 상승 */
+  const [previewCollapsed, setPreviewCollapsed] = useState(true);
   const [consentOpen, setConsentOpen] = useState(false);
+  const [openMusic, setOpenMusic] = useState(false);
+  const [openBiz, setOpenBiz] = useState(false);
+  const [openDecorate, setOpenDecorate] = useState(false);
   const previewDragRef = useRef({ startY: 0, dragging: false });
 
   const onPreviewPointerDown = useCallback((e) => {
-    if (!fullscreen) return;
     previewDragRef.current = { startY: e.clientY, dragging: true };
-  }, [fullscreen]);
+  }, []);
 
   const onPreviewPointerMove = useCallback((e) => {
-    if (!fullscreen || !previewDragRef.current.dragging) return;
+    if (!previewDragRef.current.dragging) return;
     const dy = e.clientY - previewDragRef.current.startY;
     if (Math.abs(dy) < 28) return;
     if (dy > 28 && !previewCollapsed) {
@@ -135,13 +98,18 @@ export default function ShowcaseStyleSettingsPanel({
       setPreviewCollapsed(false);
       previewDragRef.current.dragging = false;
     }
-  }, [fullscreen, previewCollapsed]);
+  }, [previewCollapsed]);
 
   const onPreviewPointerUp = useCallback(() => {
     previewDragRef.current.dragging = false;
   }, []);
 
-  const card = useMemo(() => resolveVlueShowcaseCard({ membershipTier }), [membershipTier]);
+  const card = useMemo(() => {
+    const base = resolveVlueShowcaseCard({ membershipTier, previewExample: true });
+    return applyShowcaseStyleToCard({ ...base, showcaseStyle: config }, membershipTier);
+  }, [membershipTier, config]);
+
+  const previewPhotos = config.gallery?.photos || [];
 
   const persist = useCallback((patch) => {
     setConfig((prev) => {
@@ -159,7 +127,11 @@ export default function ShowcaseStyleSettingsPanel({
   }, []);
 
   useEffect(() => {
-    const onExternal = () => setConfig(readShowcaseStyle());
+    const onExternal = () => {
+      const latest = readShowcaseStyle();
+      setConfig(latest);
+      setTagInput((latest.tags || []).join(" "));
+    };
     window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onExternal);
     return () => window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onExternal);
   }, []);
@@ -182,8 +154,7 @@ export default function ShowcaseStyleSettingsPanel({
   const onTagsChange = (raw) => {
     if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
     setTagInput(raw);
-    const tags = parseShowcaseTagsInput(raw);
-    persist({ tags });
+    persist({ tags: parseShowcaseTagsInput(raw) });
   };
 
   useEffect(() => {
@@ -194,14 +165,6 @@ export default function ShowcaseStyleSettingsPanel({
     }, 600);
     return () => clearTimeout(timer);
   }, [tagInput, isPaid]);
-
-  const onBizTab = () => {
-    if (!isPaid) {
-      setGateOpen(true);
-      return;
-    }
-    setTab("biz");
-  };
 
   const commitApply = useCallback(
     (isKakaoAgreed) => {
@@ -221,182 +184,184 @@ export default function ShowcaseStyleSettingsPanel({
     [isPaid, onToast, tagInput]
   );
 
-  const onSave = useCallback(() => {
-    /* 최종 적용 전 카카오 알림톡 선택 동의 팝업 */
-    setConsentOpen(true);
-  }, []);
-
   const headText = isDarkMode ? "text-gray-100" : "text-slate-900";
   const subText = isDarkMode ? "text-gray-400" : "text-slate-500";
   const inputCls = isDarkMode ? "border-white/10 bg-white/5 text-gray-100" : "border-slate-200 bg-white text-slate-900";
-
-  const saveButton = (
-    <button type="button" className="showcase-style-settings__save-btn" onClick={onSave}>
-      최종 적용하기
-    </button>
-  );
+  const styleMeta = SHOWCASE_STYLE_TYPES[config.styleType] || SHOWCASE_STYLE_TYPES.default;
+  const photoCount = (config.gallery?.photos || []).length;
 
   return (
     <div
-      className={`showcase-style-settings flex min-h-0 flex-1 flex-col ${fullscreen ? "showcase-style-settings--fullscreen" : ""} ${isDarkMode ? "showcase-style-settings--dark" : ""}`}
+      className={`showcase-style-settings showcase-style-settings--profile flex min-h-0 flex-1 flex-col ${fullscreen ? "showcase-style-settings--fullscreen" : ""} ${isDarkMode ? "showcase-style-settings--dark" : ""}`}
     >
       {!hideHeader ? (
-      <div className={`flex shrink-0 items-center gap-2 border-b px-3 py-2.5 ${isDarkMode ? "border-white/10" : "border-slate-100"}`}>
-        <BackButton variant="inline" onBack={onBack} isDarkMode={isDarkMode} />
-        <div className="min-w-0 flex-1">
-          <p className={`text-[17px] font-black ${headText}`}>{VLUE_SHOWCASE.nameKo}</p>
-          <p className={`text-[11px] ${subText}`}>아래에서 스타일·사진·음악을 바로 설정하세요</p>
-        </div>
-      </div>
-      ) : null}
-
-      <nav className="showcase-style-settings__tabs" aria-label="쇼케이스 설정 탭">
-        {TABS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            className={`showcase-style-settings__tab${tab === id ? " active" : ""}${id === "biz" && !isPaid ? " locked" : ""}`}
-            onClick={() => (id === "biz" ? onBizTab() : setTab(id))}
-          >
-            <Icon size={15} aria-hidden />
-            {label}
+        <div className={`flex shrink-0 items-center gap-2 border-b px-3 py-2.5 ${isDarkMode ? "border-white/10" : "border-slate-100"}`}>
+          <BackButton variant="inline" onBack={onBack} isDarkMode={isDarkMode} />
+          <div className="min-w-0 flex-1">
+            <p className={`text-[17px] font-black ${headText}`}>{VLUE_SHOWCASE.nameKo}</p>
+            <p className={`text-[11px] ${subText}`}>프로필처럼 사진·스타일만 골라 주세요</p>
+          </div>
+          <button type="button" className="showcase-style-settings__done-btn" onClick={() => setConsentOpen(true)}>
+            완료
           </button>
-        ))}
-      </nav>
+        </div>
+      ) : (
+        <div className="showcase-style-settings__sticky-done">
+          <button type="button" className="showcase-style-settings__save-btn" onClick={() => setConsentOpen(true)}>
+            적용하기
+          </button>
+        </div>
+      )}
 
       <div className={`showcase-style-settings__split${fullscreen ? " showcase-style-settings__split--fullscreen" : " min-h-0 flex-1 overflow-hidden"}`}>
-        <div className={`showcase-style-settings__form overflow-y-auto px-4 py-4 ${fullscreen ? "vlue-scroll-pad-bottom-nav min-h-0 flex-1" : "vlue-scroll-pad-profile-panel"}`}>
-          {tab === "style" && (
-            <>
-              <section className="showcase-style-settings__section">
-                <h2 className="showcase-style-settings__label">통화 화면 스타일 선택</h2>
-                <p className={`showcase-style-settings__hint ${subText}`}>원하는 스타일 카드를 누르세요. 아래 미리보기에 바로 반영됩니다.</p>
-                {!isPaid ? (
-                  <div className="showcase-style-settings__privacy mb-4">
-                    <h2 className="showcase-style-settings__label">공유 범위</h2>
-                    <p className={`showcase-style-settings__hint ${subText}`}>
-                      친구 공유: 주소록·VLUE 친구에게만 프로필 노출. 모르는 번호에는 인증 마크·번호만 표시됩니다.
-                    </p>
-                    <div className="showcase-style-settings__phase-toggle">
-                      <button
-                        type="button"
-                        className={(config.privacyMode || PRIVACY_MODES.FRIEND_ONLY) === PRIVACY_MODES.FRIEND_ONLY ? "active" : ""}
-                        onClick={() => {
-                          writeShowcasePrivacyMode(PRIVACY_MODES.FRIEND_ONLY, membershipTier);
-                          persist({ privacyMode: PRIVACY_MODES.FRIEND_ONLY });
-                        }}
-                      >
-                        친구 공유
-                      </button>
-                      <button
-                        type="button"
-                        className={config.privacyMode === PRIVACY_MODES.PUBLIC ? "active" : ""}
-                        onClick={() => {
-                          writeShowcasePrivacyMode(PRIVACY_MODES.PUBLIC, membershipTier);
-                          persist({ privacyMode: PRIVACY_MODES.PUBLIC });
-                        }}
-                      >
-                        전체 공유
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className={`showcase-style-settings__hint mb-3 ${subText}`}>비즈니스 요금제 · 전체 공유 모드로 고정됩니다.</p>
-                )}
-                <div className="showcase-style-settings__pick-list">
-                  {SHOWCASE_STYLE_LIST.map((s) => {
-                    const meta = SHOWCASE_STYLE_TYPES[s.id] || s;
-                    const locked = !perms.allowedStyleIds.includes(s.id);
-                    const active = config.styleType === s.id;
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        className={`showcase-style-settings__pick-card${active ? " active" : ""}${locked ? " locked" : ""}`}
-                        onClick={() => onSelectStyle(s.id)}
-                      >
-                        <span
-                          className="showcase-style-settings__pick-icon"
-                          style={{ backgroundColor: meta.accent || "#2b6ff0" }}
-                          aria-hidden
-                        >
-                          {meta.emoji || "📱"}
-                        </span>
-                        <span className="showcase-style-settings__pick-body">
-                          <span className="showcase-style-settings__pick-title">
-                            {s.label}
-                            {locked ? " · 유료" : ""}
-                          </span>
-                          <span className="showcase-style-settings__pick-desc">{meta.shortDesc || s.desc}</span>
-                        </span>
-                        {active ? <Check size={18} className="showcase-style-settings__pick-check" aria-hidden /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
+        <div className={`showcase-style-settings__form overflow-y-auto px-4 py-3 ${fullscreen ? "vlue-scroll-pad-bottom-nav min-h-0 flex-1" : "vlue-scroll-pad-profile-panel"}`}>
+          {/* 1. Photos first — like Instagram profile */}
+          <section className="showcase-profile-block">
+            <ShowcasePhotoEditor
+              photos={config.gallery?.photos || []}
+              onChange={(photos) => persist({ gallery: { photos } })}
+              membershipTier={membershipTier}
+            />
+          </section>
 
-              {config.styleType === "kakao" && (
-                <section className="showcase-style-settings__section showcase-style-settings__card">
-                  <h2 className="showcase-style-settings__label">카카오톡 프로필</h2>
+          {/* 2. Style chips */}
+          <section className="showcase-profile-block">
+            <p className="showcase-profile-block__title">화면 스타일</p>
+            <div className="showcase-style-chips" role="listbox" aria-label="통화 화면 스타일">
+              {SHOWCASE_STYLE_LIST.map((s) => {
+                const meta = SHOWCASE_STYLE_TYPES[s.id] || s;
+                const locked = !perms.allowedStyleIds.includes(s.id);
+                const active = config.styleType === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    className={`showcase-style-chip${active ? " is-active" : ""}${locked ? " is-locked" : ""}`}
+                    onClick={() => onSelectStyle(s.id)}
+                  >
+                    <span className="showcase-style-chip__emoji" aria-hidden>
+                      {meta.emoji || "📱"}
+                    </span>
+                    <span className="showcase-style-chip__label">
+                      {s.label.replace("디지털인증명함", "인증명함")}
+                      {locked ? " ·유료" : ""}
+                    </span>
+                    {active ? <Check size={14} className="showcase-style-chip__check" aria-hidden /> : null}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="showcase-profile-block__sub">{styleMeta.shortDesc}</p>
+          </section>
+
+          {/* 3. Profile fields — Kakao/Insta edit rows */}
+          <section className="showcase-profile-group">
+            {!isPaid ? (
+              <div className="showcase-profile-row showcase-profile-row--stack">
+                <span className="showcase-profile-row__label">공유 범위</span>
+                <div className="showcase-style-settings__phase-toggle">
+                  <button
+                    type="button"
+                    className={(config.privacyMode || PRIVACY_MODES.FRIEND_ONLY) === PRIVACY_MODES.FRIEND_ONLY ? "active" : ""}
+                    onClick={() => {
+                      writeShowcasePrivacyMode(PRIVACY_MODES.FRIEND_ONLY, membershipTier);
+                      persist({ privacyMode: PRIVACY_MODES.FRIEND_ONLY });
+                    }}
+                  >
+                    친구만
+                  </button>
+                  <button
+                    type="button"
+                    className={config.privacyMode === PRIVACY_MODES.PUBLIC ? "active" : ""}
+                    onClick={() => {
+                      writeShowcasePrivacyMode(PRIVACY_MODES.PUBLIC, membershipTier);
+                      persist({ privacyMode: PRIVACY_MODES.PUBLIC });
+                    }}
+                  >
+                    전체
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {!readDigitalCardActive() ? (
+              <label className="showcase-profile-row showcase-profile-row--toggle">
+                <span className="showcase-profile-row__label">
+                  이름 보이기
+                  <span className="showcase-profile-row__hint">끄면 사진·번호만 · 상대 전화부 이름 사용</span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="showcase-profile-switch"
+                  checked={config.showBroadcastName !== false}
+                  onChange={(e) => persist({ showBroadcastName: e.target.checked })}
+                />
+              </label>
+            ) : null}
+
+            {config.styleType === "kakao" ? (
+              <>
+                <ProfileRow label="카톡 이름">
                   <input
-                    className={`showcase-style-settings__input w-full ${inputCls}`}
-                    placeholder="카톡 프로필 링크"
-                    value={config.platformFeed?.kakaoProfileUrl || ""}
-                    onChange={(e) => persist({ platformFeed: { kakaoProfileUrl: e.target.value.trim() } })}
-                  />
-                  <input
-                    className={`showcase-style-settings__input mt-2 w-full ${inputCls}`}
+                    className={`showcase-profile-input ${inputCls}`}
                     placeholder="표시 이름"
                     value={config.platformFeed?.kakaoProfileTitle || ""}
                     onChange={(e) => persist({ platformFeed: { kakaoProfileTitle: e.target.value } })}
                   />
-                  <PlatformAvatarField
-                    label="카톡 프로필 사진"
-                    value={config.platformFeed?.kakaoAvatarUrl || ""}
-                    onChange={(kakaoAvatarUrl) => persist({ platformFeed: { kakaoAvatarUrl } })}
-                    inputCls={inputCls}
-                  />
-                </section>
-              )}
-
-              {config.styleType === "instagram" && (
-                <section className="showcase-style-settings__section showcase-style-settings__card">
-                  <h2 className="showcase-style-settings__label">인스타그램 프로필</h2>
+                </ProfileRow>
+                <ProfileRow label="카톡 링크">
                   <input
-                    className={`showcase-style-settings__input w-full ${inputCls}`}
-                    placeholder="https://instagram.com/아이디"
-                    value={config.platformFeed?.instagramProfileUrl || ""}
-                    onChange={(e) => {
-                      const url = e.target.value.trim();
-                      const handle = url.match(/instagram\.com\/([^/?#]+)/i)?.[1];
-                      persist({
-                        platformFeed: {
-                          instagramProfileUrl: url,
-                          ...(handle ? { instagramHandle: `@${handle}` } : {})
-                        }
-                      });
-                    }}
+                    className={`showcase-profile-input ${inputCls}`}
+                    placeholder="카카오톡 프로필 링크"
+                    value={config.platformFeed?.kakaoProfileUrl || ""}
+                    onChange={(e) => persist({ platformFeed: { kakaoProfileUrl: e.target.value.trim() } })}
                   />
-                  <input
-                    className={`showcase-style-settings__input mt-2 w-full ${inputCls}`}
-                    placeholder="@아이디"
-                    value={config.platformFeed?.instagramHandle || ""}
-                    onChange={(e) => persist({ platformFeed: { instagramHandle: e.target.value } })}
-                  />
-                  <PlatformAvatarField
-                    label="인스타 프로필 사진"
-                    value={config.platformFeed?.instagramAvatarUrl || ""}
-                    onChange={(instagramAvatarUrl) => persist({ platformFeed: { instagramAvatarUrl } })}
-                    inputCls={inputCls}
-                  />
-                </section>
-              )}
+                </ProfileRow>
+              </>
+            ) : null}
 
-              {config.styleType === "rich_custom" && (
-                <>
-                  <section className="showcase-style-settings__section">
-                    <h2 className="showcase-style-settings__label">케이스 프레임</h2>
+            {config.styleType === "instagram" ? (
+              <ProfileRow label="인스타그램" hint="@아이디">
+                <input
+                  className={`showcase-profile-input ${inputCls}`}
+                  placeholder="@아이디"
+                  value={
+                    config.platformFeed?.instagramHandle ||
+                    (config.platformFeed?.instagramProfileUrl
+                      ? `@${String(config.platformFeed.instagramProfileUrl).match(/instagram\.com\/([^/?#]+)/i)?.[1] || ""}`
+                      : "")
+                  }
+                  onChange={(e) => {
+                    let handle = e.target.value.trim();
+                    if (handle && !handle.startsWith("@")) handle = `@${handle}`;
+                    const id = handle.replace(/^@/, "");
+                    persist({
+                      platformFeed: {
+                        instagramHandle: handle,
+                        instagramProfileUrl: id ? `https://instagram.com/${id}` : ""
+                      }
+                    });
+                  }}
+                />
+              </ProfileRow>
+            ) : null}
+
+            {config.styleType === "rich_custom" ? (
+              <>
+                <button
+                  type="button"
+                  className="showcase-profile-row showcase-profile-row--btn"
+                  onClick={() => setOpenDecorate((v) => !v)}
+                >
+                  <span className="showcase-profile-row__label">소개·꾸미기</span>
+                  <span className="showcase-profile-row__trail">
+                    {openDecorate ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </span>
+                </button>
+                {openDecorate ? (
+                  <div className="showcase-profile-nested">
                     <div className="showcase-style-settings__frame-grid">
                       {SHOWCASE_CASE_FRAMES.map((frame) => {
                         const active = (config.caseTheme?.frame || "classic") === frame.id;
@@ -414,10 +379,7 @@ export default function ShowcaseStyleSettingsPanel({
                         );
                       })}
                     </div>
-                  </section>
-                  <section className="showcase-style-settings__section">
-                    <h2 className="showcase-style-settings__label">텍스트 꾸미기</h2>
-                    <div className="showcase-style-settings__toolbar">
+                    <div className="showcase-style-settings__toolbar mt-2">
                       <select
                         className={`showcase-style-settings__input ${inputCls}`}
                         value={config.richCustom.fontFamily}
@@ -436,188 +398,171 @@ export default function ShowcaseStyleSettingsPanel({
                         className="showcase-style-settings__color"
                         aria-label="글자 색상"
                       />
-                      <button
-                        type="button"
-                        className="showcase-style-settings__tool-btn"
-                        onClick={() => persist({ richCustom: { emoji: (config.richCustom.emoji || "") + "✨" } })}
-                      >
-                        😊
-                      </button>
                     </div>
                     <textarea
-                      className={`showcase-style-settings__textarea ${inputCls}`}
+                      className={`showcase-style-settings__textarea mt-2 ${inputCls}`}
                       rows={3}
-                      placeholder="소개 문구 (이모지 😀🚀🔥 지원)"
+                      placeholder="소개 한 줄"
                       value={config.richCustom.bodyText}
                       onChange={(e) => persist({ richCustom: { bodyText: e.target.value } })}
                     />
-                  </section>
-                </>
-              )}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
 
-              <section className="showcase-style-settings__section">
-                <h2 className="showcase-style-settings__label">
-                  <Hash size={13} className="inline mr-1" aria-hidden />
-                  해시태그
-                </h2>
-                <p className={`showcase-style-settings__hint ${subText}`}>
-                  홈 검색에서 #태그로 내 쇼케이스를 찾을 수 있습니다. 유료 회원 전용.
-                </p>
-                <input
-                  className={`showcase-style-settings__input w-full ${inputCls}`}
-                  placeholder="#소금빵 #대구소금빵"
-                  value={tagInput}
-                  readOnly={!isPaid}
-                  onFocus={() => {
-                    if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
-                  }}
-                  onChange={(e) => onTagsChange(e.target.value)}
-                />
-                {!isPaid ? (
-                  <p className={`mt-1 text-[10px] ${subText}`}>유료 회원만 해시태그를 등록·검색 노출할 수 있습니다.</p>
-                ) : (
-                  <p className={`mt-1 text-[10px] ${subText}`}>공백으로 구분 · 최대 12개 · 저장 시 서버에 동기화됩니다.</p>
-                )}
-              </section>
-              {saveButton}
-            </>
-          )}
+            <ProfileRow label="#해시태그" hint={isPaid ? "검색용 · 공백으로 구분" : "유료 전용"}>
+              <input
+                className={`showcase-profile-input ${inputCls}`}
+                placeholder={isPaid ? "#카페 #대구" : "유료 회원만 등록"}
+                value={tagInput}
+                readOnly={!isPaid}
+                onFocus={() => {
+                  if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
+                }}
+                onChange={(e) => onTagsChange(e.target.value)}
+              />
+            </ProfileRow>
 
-          {tab === "photos" && (
-            <>
-              <section className="showcase-style-settings__section">
-                <ShowcasePhotoEditor
-                  photos={config.gallery?.photos || []}
-                  onChange={(photos) => persist({ gallery: { photos } })}
-                  inputCls={inputCls}
-                  membershipTier={membershipTier}
-                />
-              </section>
-              {saveButton}
-            </>
-          )}
+            {config.styleType !== "default" ? (
+              <>
+                <button
+                  type="button"
+                  className="showcase-profile-row showcase-profile-row--btn"
+                  onClick={() => setOpenMusic((v) => !v)}
+                >
+                  <span className="showcase-profile-row__label">
+                    <Music2 size={14} className="inline mr-1" aria-hidden />
+                    배경음악
+                  </span>
+                  <span className="showcase-profile-row__trail">
+                    <span className="showcase-profile-row__value">
+                      {config.bgm?.mode === "none" ? "없음" : "설정됨"}
+                    </span>
+                    {openMusic ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </span>
+                </button>
+                {openMusic ? (
+                  <div className="showcase-profile-nested">
+                    <ShowcaseBgmPicker
+                      value={config.bgm}
+                      inputCls={inputCls}
+                      onChange={(bgm) => persist({ bgm: { ...config.bgm, ...bgm } })}
+                    />
+                  </div>
+                ) : null}
+              </>
+            ) : null}
 
-          {tab === "bgm" && config.styleType !== "default" && (
-            <>
-              <section className="showcase-style-settings__section">
-                <ShowcaseBgmPicker
-                  value={config.bgm}
-                  inputCls={inputCls}
-                  onChange={(bgm) => persist({ bgm: { ...config.bgm, ...bgm } })}
-                />
-              </section>
-              {saveButton}
-            </>
-          )}
+            {isPaid ? (
+              <>
+                <button
+                  type="button"
+                  className="showcase-profile-row showcase-profile-row--btn"
+                  onClick={() => setOpenBiz((v) => !v)}
+                >
+                  <span className="showcase-profile-row__label">비즈니스 · 링크</span>
+                  <span className="showcase-profile-row__trail">
+                    {openBiz ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </span>
+                </button>
+                {openBiz ? (
+                  <div className="showcase-profile-nested">
+                    <input
+                      className={`showcase-style-settings__input w-full ${inputCls}`}
+                      placeholder="Instagram URL"
+                      value={config.commercial.outlinks.instagram}
+                      onChange={(e) =>
+                        persist({ commercial: { outlinks: { ...config.commercial.outlinks, instagram: e.target.value } } })
+                      }
+                    />
+                    <input
+                      className={`showcase-style-settings__input mt-2 w-full ${inputCls}`}
+                      placeholder="YouTube URL"
+                      value={config.commercial.outlinks.youtube}
+                      onChange={(e) =>
+                        persist({ commercial: { outlinks: { ...config.commercial.outlinks, youtube: e.target.value } } })
+                      }
+                    />
+                    <p className="showcase-profile-block__sub mt-3">메뉴</p>
+                    <BizListEditor
+                      items={config.commercial.menuItems}
+                      placeholder="메뉴명 · 가격"
+                      inputCls={inputCls}
+                      onChange={(menuItems) => persist({ commercial: { menuItems } })}
+                    />
+                    <p className="showcase-profile-block__sub mt-3">상품 링크</p>
+                    <BizProductEditor
+                      products={config.commercial.products || []}
+                      inputCls={inputCls}
+                      onChange={(products) => persist({ commercial: { products } })}
+                    />
+                    <label className="showcase-style-settings__check mt-3">
+                      <input
+                        type="checkbox"
+                        checked={config.verifiedBadgeOn}
+                        onChange={(e) => persist({ verifiedBadgeOn: e.target.checked })}
+                      />
+                      VLUE 인증 마크 표시
+                    </label>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </section>
 
-          {tab === "bgm" && config.styleType === "default" && (
-            <>
-              <p className={`text-[12px] ${subText}`}>기본형은 BGM 없음. 개인스타일·인스타·인증명함에서 설정하세요.</p>
-              {saveButton}
-            </>
-          )}
-
-          {tab === "biz" && isPaid && (
-            <>
-              <section className="showcase-style-settings__section showcase-style-settings__card">
-                <h2 className="showcase-style-settings__label">
-                  <Link2 size={13} className="inline mr-1" aria-hidden />
-                  소셜 링크
-                </h2>
-                <input
-                  className={`showcase-style-settings__input w-full ${inputCls}`}
-                  placeholder="Instagram URL"
-                  value={config.commercial.outlinks.instagram}
-                  onChange={(e) =>
-                    persist({ commercial: { outlinks: { ...config.commercial.outlinks, instagram: e.target.value } } })
-                  }
-                />
-                <input
-                  className={`showcase-style-settings__input mt-2 w-full ${inputCls}`}
-                  placeholder="YouTube 구독 URL"
-                  value={config.commercial.outlinks.youtube}
-                  onChange={(e) =>
-                    persist({ commercial: { outlinks: { ...config.commercial.outlinks, youtube: e.target.value } } })
-                  }
-                />
-              </section>
-
-              <section className="showcase-style-settings__section">
-                <h2 className="showcase-style-settings__label">메뉴판</h2>
-                <BizListEditor
-                  items={config.commercial.menuItems}
-                  placeholder="메뉴명 · 가격"
-                  inputCls={inputCls}
-                  onChange={(menuItems) => persist({ commercial: { menuItems } })}
-                />
-              </section>
-
-              <section className="showcase-style-settings__section">
-                <h2 className="showcase-style-settings__label">상품 소개 (외부 링크)</h2>
-                <BizProductEditor
-                  products={config.commercial.products || []}
-                  inputCls={inputCls}
-                  onChange={(products) => persist({ commercial: { products } })}
-                />
-              </section>
-
-              <label className="showcase-style-settings__check">
-                <input
-                  type="checkbox"
-                  checked={config.verifiedBadgeOn}
-                  onChange={(e) => persist({ verifiedBadgeOn: e.target.checked })}
-                />
-                VLUE 공식 인증 마크 표시
-              </label>
-              {saveButton}
-            </>
-          )}
-
-          <div className="showcase-style-settings__phase-toggle">
-            <button type="button" className={previewPhase === "call_active" ? "active" : ""} onClick={() => setPreviewPhase("call_active")}>
-              통화 중 (BGM OFF)
+          {!hideHeader ? (
+            <button type="button" className="showcase-style-settings__save-btn" onClick={() => setConsentOpen(true)}>
+              적용하기
             </button>
-            <button type="button" className={previewPhase === "preview" ? "active" : ""} onClick={() => setPreviewPhase("preview")}>
-              종료 후 재생
-            </button>
-          </div>
+          ) : (
+            <div className="h-14" aria-hidden />
+          )}
+
+          <p className={`text-center text-[11px] ${subText}`}>
+            사진 {photoCount}장 · {styleMeta.label}
+          </p>
         </div>
 
         <aside
-          className={`showcase-style-settings__preview-pane${fullscreen ? " showcase-style-settings__preview-pane--fullscreen" : ""}${fullscreen && previewCollapsed ? " showcase-style-settings__preview-pane--collapsed" : ""}`}
+          className={`showcase-style-settings__preview-pane showcase-style-settings__preview-pane--sheet${previewCollapsed ? " showcase-style-settings__preview-pane--collapsed" : " is-open"}`}
         >
-          {fullscreen ? (
-            <button
-              type="button"
-              className="showcase-style-settings__preview-toggle"
-              onClick={() => setPreviewCollapsed((v) => !v)}
-              onPointerDown={onPreviewPointerDown}
-              onPointerMove={onPreviewPointerMove}
-              onPointerUp={onPreviewPointerUp}
-              onPointerCancel={onPreviewPointerUp}
-              aria-expanded={!previewCollapsed}
-              aria-controls="showcase-call-preview"
-            >
-              <span className="showcase-style-settings__preview-toggle-handle" aria-hidden />
-              <span className="showcase-style-settings__preview-label">통화 화면 미리보기</span>
-              <span className="showcase-style-settings__preview-toggle-hint" data-collapsed={previewCollapsed ? "1" : "0"}>
-                <span className="showcase-style-settings__preview-toggle-shimmer">
-                  {previewCollapsed ? "올리기" : "내리기"}
-                </span>
-                {previewCollapsed ? <ChevronUp size={15} aria-hidden /> : <ChevronDown size={15} aria-hidden />}
-              </span>
-            </button>
-          ) : (
-            <p className="showcase-style-settings__preview-label showcase-style-settings__preview-label--static">
-              통화 화면 미리보기
-            </p>
-          )}
+          <button
+            type="button"
+            className="showcase-style-settings__preview-toggle"
+            onClick={() => setPreviewCollapsed((v) => !v)}
+            onPointerDown={onPreviewPointerDown}
+            onPointerMove={onPreviewPointerMove}
+            onPointerUp={onPreviewPointerUp}
+            onPointerCancel={onPreviewPointerUp}
+            aria-expanded={!previewCollapsed}
+            aria-controls="showcase-call-preview"
+          >
+            <span className="showcase-style-settings__preview-toggle-handle" aria-hidden />
+            <span className="showcase-style-settings__preview-label">미리보기</span>
+            <span className="showcase-style-settings__preview-toggle-hint" data-collapsed={previewCollapsed ? "1" : "0"}>
+              {previewCollapsed ? "올리기" : "내리기"}
+              {previewCollapsed ? <ChevronUp size={15} aria-hidden /> : <ChevronDown size={15} aria-hidden />}
+            </span>
+          </button>
           <div
             id="showcase-call-preview"
-            className={`showcase-style-settings__preview-body${previewCollapsed && fullscreen ? " is-collapsed" : ""}`}
-            aria-hidden={fullscreen && previewCollapsed}
+            className={`showcase-style-settings__preview-body showcase-style-settings__preview-body--sheet${previewCollapsed ? " is-collapsed" : ""}`}
+            aria-hidden={previewCollapsed}
           >
-            <ShowcaseStylePreview styleConfig={config} card={card} membershipTier={membershipTier} phase={previewPhase} />
+            <div className="showcase-style-settings__sheet-stage">
+              <ShowcaseCallCarousel
+                card={card}
+                verified={config.verifiedBadgeOn !== false}
+                incomingNumber={card?.phone || ""}
+                photos={previewPhotos}
+                membershipTier={membershipTier}
+                isKnownContact
+                scrollEnabled
+                previewMode
+                includeDigitalCard={false}
+              />
+            </div>
           </div>
         </aside>
       </div>
@@ -653,7 +598,13 @@ function BizListEditor({ items = [], placeholder, inputCls, onChange }) {
   return (
     <div>
       <div className="flex gap-2">
-        <input className={`showcase-style-settings__input flex-1 ${inputCls}`} placeholder={placeholder} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+        <input
+          className={`showcase-style-settings__input flex-1 ${inputCls}`}
+          placeholder={placeholder}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+        />
         <button type="button" className="showcase-bgm-picker__yt-btn" onClick={add}>
           추가
         </button>
@@ -683,8 +634,18 @@ function BizProductEditor({ products = [], inputCls, onChange }) {
   };
   return (
     <div>
-      <input className={`showcase-style-settings__input w-full ${inputCls}`} placeholder="상품명" value={name} onChange={(e) => setName(e.target.value)} />
-      <input className={`showcase-style-settings__input mt-2 w-full ${inputCls}`} placeholder="쿠팡/네이버/카카오 쇼핑 URL" value={url} onChange={(e) => setUrl(e.target.value)} />
+      <input
+        className={`showcase-style-settings__input w-full ${inputCls}`}
+        placeholder="상품명"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+      <input
+        className={`showcase-style-settings__input mt-2 w-full ${inputCls}`}
+        placeholder="쇼핑 URL"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+      />
       <button type="button" className="showcase-bgm-picker__yt-btn mt-2 w-full" onClick={add}>
         상품 추가
       </button>

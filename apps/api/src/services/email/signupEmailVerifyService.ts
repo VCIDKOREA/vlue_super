@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from "node:crypto";
-import { resolveSmtpProvider } from "../adapters/smtpProvider.js";
+import { isRealSmtpDeliveryConfigured, resolveSmtpProvider } from "../adapters/smtpProvider.js";
 import { isValidEmailShape, normalizeBusinessEmail } from "./signupEmailProvision.js";
 
 type OtpEntry = { code: string; expiresAt: number };
@@ -39,7 +39,19 @@ export async function sendSignupEmailOtp(emailRaw: string): Promise<{ ok: true; 
 
   otpStore.set(email, { code, expiresAt: Date.now() + OTP_TTL_MS });
 
-  if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEV_IDENTITY !== "1") {
+  const prodMail =
+    process.env.NODE_ENV === "production" && process.env.ALLOW_DEV_IDENTITY !== "1";
+
+  if (prodMail) {
+    /**
+     * Railway 기본값 SMTP_PROVIDER=mock 이면 콘솔만 찍고 성공 응답 → 수신함에 메일이 안 옴.
+     * 가짜 성공을 막고 Resend 설정을 요구한다.
+     */
+    if (!isRealSmtpDeliveryConfigured()) {
+      throw new Error(
+        "이메일 발송이 아직 설정되지 않았습니다. 「개인 아이디로 가입」으로 진행하거나, 관리자에게 SMTP(Resend) 설정을 요청해 주세요."
+      );
+    }
     const smtp = resolveSmtpProvider();
     await smtp.send({
       from: process.env.VLUE_SIGNUP_FROM_EMAIL || "noreply@vlue.kr",

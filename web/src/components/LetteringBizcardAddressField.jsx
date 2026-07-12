@@ -55,8 +55,8 @@ export default function LetteringBizcardAddressField({
   return (
     <div className="sm:col-span-2 space-y-3">
       <Field
-        label="주소"
-        hint="우편번호 · 주소 찾기로 도로명·지번을 선택한 뒤 상세주소를 입력하세요"
+        label="주소 (선택)"
+        hint="입력하지 않으면 명함에 표시되지 않습니다. 우편번호 · 주소 찾기로 도로명·지번을 선택한 뒤 상세주소를 입력하세요"
         isDarkMode={isDarkMode}
       >
         <div className="mt-1.5 space-y-2">
@@ -75,7 +75,7 @@ export default function LetteringBizcardAddressField({
             type="text"
             value={addressRoad}
             onChange={(e) => setAddressRoad(e.target.value)}
-            placeholder="검색이 안 되면 도로명·지번 주소를 직접 입력"
+            placeholder="주소를 입력할 수 있습니다."
             className={inputBase}
             autoComplete="street-address"
           />

@@ -61,7 +61,7 @@ export default function ContactFriendsPanel({
     setResyncing(true);
     setNotice("");
     try {
-      const contacts = await collectDeviceContactsForSync({ allowDemoConfirm: true });
+      const contacts = await collectDeviceContactsForSync({ allowDemoConfirm: false });
       if (!contacts?.length) {
         setNotice("동기화된 연락처가 없습니다. 권한을 허용했는지 확인해 주세요.");
         return;

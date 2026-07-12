@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
@@ -10,32 +10,65 @@ import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCa
 import { showcasePreviewLabel, VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
+import {
+  readShowcasePreviewDigitalCardApplied
+} from "../lib/vlueShowcasePreviewIdentity.js";
 
 /**
- * VLUE Showcase — 홈 메인 통화 빅푸시 미리보기
- * 펼침 시 하단 내비까지 덮는 전체화면(천막)으로 전환
+ * VLUE Showcase — 홈 메인 통화 빅푸시(픽푸시) 미리보기
+ * 켜짐/꺼짐 모두 접힘→전체화면 펼침. 꺼짐은 내용만 번호+VLUE 인증.
  */
 export default function CallBigPushPreviewSection({ membershipTier = "free", className = "", onToast }) {
   const showTierTabs = v1AppShell.callBigPushTierTabs;
-  const [tier, setTier] = useState(showTierTabs ? "paid" : "free");
+  const [showcaseOn, setShowcaseOn] = useState(true);
   const [expanded, setExpanded] = useState(false);
 
-  const effectiveTier = showTierTabs && tier === "paid" ? "premium" : membershipTier;
-  const card = applyShowcaseStyleToCard(resolveVlueShowcaseCard({ membershipTier: effectiveTier }), effectiveTier);
-  const isPaid = isPaidLetteringTier(effectiveTier);
+  const paidTier = isPaidLetteringTier(membershipTier) ? membershipTier : "premium";
+  const isOn = showcaseOn;
+  const effectiveTier = isOn ? paidTier : "free";
+
+  const card = useMemo(() => {
+    const base = applyShowcaseStyleToCard(
+      resolveVlueShowcaseCard({ membershipTier: effectiveTier, previewExample: true }),
+      effectiveTier
+    );
+    if (isOn) return { ...base, membershipTier: effectiveTier };
+    return {
+      ...base,
+      membershipTier: "free",
+      hideBroadcastName: true,
+      showcaseStyle: {
+        ...(base.showcaseStyle || {}),
+        showBroadcastName: false
+      }
+    };
+  }, [effectiveTier, isOn]);
+
+  const digitalCardApplied = readShowcasePreviewDigitalCardApplied();
   const incomingNumber = card.phone || "";
+  const useFullscreenPortal = expanded;
+
+  const openSettings = () => {
+    setExpanded(false);
+    window.setTimeout(() => {
+      window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
+    }, 40);
+  };
 
   const notificationProps = {
     verified: true,
     previewMode: true,
-    callPhase: isPaid || expanded ? "connected" : "ringing",
+    showOwnerSettings: true,
+    showcaseOffPreview: !isOn,
+    includeDigitalCard: isOn && digitalCardApplied,
+    callPhase: "connected",
     platform: "android",
-    isRecording: isPaid,
-    callDurationSec: isPaid ? VLUE_SHOWCASE_DEMO_RECORDING_SEC : 0,
-    recordingDurationSec: isPaid ? VLUE_SHOWCASE_DEMO_RECORDING_SEC : 0,
+    isRecording: isOn,
+    callDurationSec: isOn ? VLUE_SHOWCASE_DEMO_RECORDING_SEC : 0,
+    recordingDurationSec: isOn ? VLUE_SHOWCASE_DEMO_RECORDING_SEC : 0,
     incomingNumber,
-    savedContactName: !isPaid ? card.name || "" : "",
-    isKnownContact: !isPaid ? Boolean(card.name) : true,
+    savedContactName: "",
+    isKnownContact: isOn,
     card,
     expanded,
     onExpandedChange: setExpanded,
@@ -45,17 +78,17 @@ export default function CallBigPushPreviewSection({ membershipTier = "free", cla
 
   return (
     <section
-      className={`mx-auto w-full max-w-md px-2.5 pb-4 pt-1 ${className}`.trim()}
+      className={`mx-auto w-full max-w-md px-0 pb-0 pt-0 ${className}`.trim()}
       aria-label={VLUE_SHOWCASE.nameEn}
     >
-      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+      <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
         <div>
           <p className="text-[12px] font-black text-slate-900">{showcasePreviewLabel()}</p>
           <p className="text-[10px] font-medium text-slate-500">{VLUE_SHOWCASE.tagline}</p>
         </div>
         <button
           type="button"
-          onClick={() => window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT))}
+          onClick={openSettings}
           className="shrink-0 rounded-full bg-blue-600 px-3 py-1.5 text-[10px] font-black text-white shadow-sm active:scale-95"
         >
           스타일 설정
@@ -63,53 +96,66 @@ export default function CallBigPushPreviewSection({ membershipTier = "free", cla
       </div>
 
       {showTierTabs ? (
-        <div className="mb-2 flex gap-1 rounded-full bg-slate-100 p-1" role="tablist" aria-label="플랜 미리보기">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!isPaid}
-            className={`flex-1 rounded-full px-3 py-1.5 text-xs font-bold transition ${
-              !isPaid ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+        <div className="mb-1.5 space-y-1.5">
+          <div className="flex gap-1 rounded-full bg-slate-100 p-1" role="tablist" aria-label="쇼케이스 켜짐 꺼짐">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={isOn}
+              className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
+                isOn ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+              onClick={() => {
+                setShowcaseOn(true);
+                setExpanded(false);
+              }}
+            >
+              쇼케이스 켜짐
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!isOn}
+              className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
+                !isOn ? "bg-slate-700 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+              onClick={() => {
+                setShowcaseOn(false);
+                setExpanded(false);
+              }}
+            >
+              쇼케이스 꺼짐
+            </button>
+          </div>
+          <p
+            className={`rounded-xl px-3 py-2 text-[10px] font-semibold leading-snug ${
+              isOn
+                ? "border border-blue-100 bg-blue-50 text-blue-900"
+                : "border border-slate-200 bg-slate-50 text-slate-700"
             }`}
-            onClick={() => {
-              setTier("free");
-              setExpanded(false);
-            }}
+            style={{ wordBreak: "keep-all" }}
           >
-            일상 · 무료
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={isPaid}
-            className={`flex-1 rounded-full px-3 py-1.5 text-xs font-bold transition ${
-              isPaid ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-            }`}
-            onClick={() => {
-              setTier("paid");
-              setExpanded(false);
-            }}
-          >
-            비즈 · 유료
-          </button>
+            {isOn ? "켜짐 · 쇼케이스 전면" : "꺼짐 · 번호·인증만"}
+          </p>
         </div>
       ) : null}
 
-      {!expanded ? (
-        <LetteringIncomingNotification
-          {...notificationProps}
-          className="lettering-ongoing--on-call lettering-ongoing--home-preview rounded-[20px] border border-slate-100 bg-white shadow-sm"
-        />
+      {!useFullscreenPortal ? (
+        <div className="lettering-home-push-embed">
+          <LetteringIncomingNotification
+            {...notificationProps}
+            className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass"
+          />
+        </div>
       ) : (
-        <div
-          className="lettering-ongoing--home-preview rounded-[20px] border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-[11px] font-semibold text-slate-400"
-          aria-hidden
-        >
-          전체화면 쇼케이스 미리보기 중
+        <div className="lettering-home-push-embed lettering-home-push-embed--placeholder" aria-hidden>
+          <p className="px-3 py-8 text-center text-[11px] font-semibold text-slate-400">
+            전체화면 쇼케이스 미리보기 중
+          </p>
         </div>
       )}
 
-      {expanded && typeof document !== "undefined"
+      {useFullscreenPortal && typeof document !== "undefined"
         ? createPortal(
             <div className="lettering-showcase-fs" role="dialog" aria-modal="true" aria-label="쇼케이스 미리보기">
               <div className="lettering-showcase-fs__shell">

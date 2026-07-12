@@ -52,12 +52,13 @@ export const DEFAULT_PRICING_CONFIG: PricingConfigFile = {
     soho_activity: {
       sku: "soho_activity",
       label: "SOHO 활동형",
-      monthlyKrw: 19800,
-      annualKrw: 198000,
+      monthlyKrw: 9900,
+      annualKrw: 99000,
       billingUnit: "per_account",
       platforms: ["mobile", "web"],
       features: ["chat", "shopping", "digital_card_primary", "vluer_rewards"],
-      description: "월 19,800원(부가세 포함). 모바일·웹 풀 기능. Primary 계정."
+      description:
+        "월 9,900원(부가세 포함). VLUE V1 출시 기념 65% 특별 할인(종료 시까지). 연 99,000원."
     },
     soho_broadcast_addon: {
       sku: "soho_broadcast_addon",

@@ -67,6 +67,45 @@ PowerShell:
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` / `PUBLIC_DATA_SERVICE_KEY` | `GET /api/v1/search/verify` 기관 검색 |
 | `DIRECT_URL` | Prisma direct URL (Supabase/Neon 사용 시) |
 
+## 가입 이메일 인증번호 (비즈니스 메일 트랙)
+
+`POST /api/auth/signup-email/send` 가 **실제 수신함**으로 메일을 보내려면 아래가 필요합니다.  
+미설정 시(기본 `SMTP_PROVIDER=mock`) API는 더 이상 “발송 성공”으로 위장하지 않고 오류를 반환합니다.
+
+| Variable | 값 예시 | 설명 |
+|----------|---------|------|
+| `SMTP_PROVIDER` | `resend` | `mock` 이면 실발송 없음 |
+| `RESEND_API_KEY` | `re_…` | [Resend](https://resend.com) API 키 |
+| `VLUE_SIGNUP_FROM_EMAIL` | `noreply@vlue.kr` | Resend에서 **도메인 인증**된 From |
+
+1. Resend에 `vlue.kr`(또는 사용할 발신 도메인) 인증  
+2. Railway Variables에 위 3개 설정 후 API 재배포  
+3. 스팸함도 확인 (네이버 등)
+
+임시 QA만 필요하면 가입에서 **「개인 아이디로 가입」** 트랙을 쓰면 이메일 OTP 없이 진행할 수 있습니다.
+
+## PASS 본인인증 (KG이니시스 「서비스 이용에 불편…」)
+
+이 화면은 **VLUE UI 버그가 아니라** 포트원 → 이니시스 통합본인인증 연동 실패 시 자주 납니다.
+
+**@vlue/web** Railway Variables (빌드 시 번들 고정 → 변경 후 **Redeploy**):
+
+| Variable | 예시 | 설명 |
+|----------|------|------|
+| `VITE_PORTONE_USER_CODE` | `imp…` | 가맹점 식별코드 |
+| `VITE_IAMPORT_CERT_PG` | `inicis_unified` | 결제용 `html5_inicis` 금지 |
+| `VITE_IAMPORT_CERT_MID` | 콘솔 MID | 통합본인인증 채널 MID |
+| `VITE_IAMPORT_CERT_OMIT_MID` | `true` (선택) | MID 불일치 시 pg만 전송 |
+
+포트원 관리자 콘솔에서 확인:
+
+1. **본인인증**용 채널 = **KG이니시스 통합본인인증** (`inicis_unified`) — 결제 채널과 별개  
+2. **웹사이트 URL**에 `https://www.vlue.kr`, `https://vlue.kr` (로컬은 `http://localhost:5173`) 등록  
+3. 테스트 MID(`MIIiasTest` 등) / 운영 MID가 가맹점·도메인과 일치하는지  
+4. 그래도 동일하면 MID 생략(`OMIT_MID=true`) 후 웹 재배포해 비교
+
+로컬 DEV만이면 온보딩의 **「PASS 우회(개발)」**로 가입 흐름 E2E를 이어갈 수 있습니다 (운영 빌드에서는 불가).
+
 ## 서비스 설정
 
 | 항목 | 값 |

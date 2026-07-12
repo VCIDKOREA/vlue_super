@@ -19,12 +19,10 @@ export function readMembershipTier() {
   }
 }
 
+/** 명함 신청(또는 서버 발급) 완료 시에만 true — 온보딩 완료만으로는 켜지지 않음 */
 export function readDigitalCardActive() {
   try {
-    const v = localStorage.getItem(DIGITAL_CARD_ACTIVE_KEY);
-    if (v === "1") return true;
-    if (v === "0") return false;
-    return localStorage.getItem(ONBOARDING_DONE_KEY) === "1";
+    return localStorage.getItem(DIGITAL_CARD_ACTIVE_KEY) === "1";
   } catch {
     return false;
   }

@@ -1,5 +1,6 @@
 /**
- * 비로그인 둘러보기(쿠팡·네이버형) 모드에서 보호된 기능 접근 시 회원가입 화면을 띄우는 게이트.
+ * 비로그인 둘러보기 모드(V2·플래그 guestBrowse)에서 보호 기능 접근 시 회원가입 유도.
+ * V1은 guestBrowse=false → 로그인 전면만 사용.
  */
 export function runWithGuestAuthGate({
   isLoggedIn,

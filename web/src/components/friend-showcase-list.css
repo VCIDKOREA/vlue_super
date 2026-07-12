@@ -1,4 +1,4 @@
-/* 홈 — 친구 쇼케이스 목록 (카카오톡 친구 리스트 참고) */
+﻿/* 홈 — 친구 쇼케이스 목록 */
 .friend-showcase-list {
   margin: 0 auto;
   width: 100%;
@@ -188,35 +188,6 @@
   text-overflow: ellipsis;
 }
 
-.friend-showcase-list__preview-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding: 0 4px;
-}
-
-.friend-showcase-list__preview-label {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 800;
-  color: #475569;
-}
-
-.friend-showcase-list__preview-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 999px;
-  background: #e2e8f0;
-  color: #475569;
-  cursor: pointer;
-}
-
 .friend-showcase-list__empty {
   padding: 28px 20px 32px;
   text-align: center;
@@ -248,23 +219,6 @@
   cursor: pointer;
 }
 
-.friend-showcase-list__preview-loading {
-  margin: 0;
-  padding: 20px 8px;
-  text-align: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: #94a3b8;
-}
-
-.friend-showcase-list__preview-card {
-  border-radius: 16px;
-  overflow: hidden;
-  background: #fff;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
-}
-
-/* 다크모드 — 친구 쇼케이스 (홈 본문) */
 .dark-mode .friend-showcase-list,
 .dark-mode .friend-showcase-list--home {
   background: #111827;
@@ -287,8 +241,7 @@
 
 .dark-mode .friend-showcase-list__count,
 .dark-mode .friend-showcase-list__subtitle,
-.dark-mode .friend-showcase-list__empty-desc,
-.dark-mode .friend-showcase-list__preview-loading {
+.dark-mode .friend-showcase-list__empty-desc {
   color: #94a3b8;
 }
 
@@ -302,10 +255,6 @@
   color: #f8fafc;
 }
 
-.dark-mode .friend-showcase-list__search-input::placeholder {
-  color: #64748b;
-}
-
 .dark-mode .friend-showcase-list__row {
   background: #111827;
   border-bottom-color: #1f2937;
@@ -316,22 +265,254 @@
   background: #1e293b;
 }
 
-.dark-mode .friend-showcase-list__empty-title,
-.dark-mode .friend-showcase-list__preview-label {
+.dark-mode .friend-showcase-list__empty-title {
   color: #e2e8f0;
-}
-
-.dark-mode .friend-showcase-list__preview-close {
-  background: #334155;
-  color: #e2e8f0;
-}
-
-.dark-mode .friend-showcase-list__preview-card {
-  background: #1e293b;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 .dark-mode .friend-showcase-list__avatar--initial {
   background: linear-gradient(135deg, #1e3a5f, #312e81);
+  color: #93c5fd;
+}
+
+/* 홈 하단 시트 — 탭에 딱 붙음 / 올리기=쇼케이스 / 드래그=검색창 아래 */
+.friend-showcase-list--home.friend-showcase-list--sheet {
+  border-top: 0 !important;
+  background: transparent !important;
+}
+
+.friend-showcase-list--sheet {
+  flex: 0 0 auto !important;
+  width: 100%;
+  max-width: none !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  min-height: 0 !important;
+  height: 0 !important;
+  pointer-events: none;
+  z-index: 8;
+}
+
+.friend-showcase-list__sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: rgba(15, 23, 42, 0.28);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.friend-showcase-list__sheet-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 140;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: none;
+  overflow: hidden;
+  pointer-events: auto;
+  /* 하단 탭 아래로 흰색이 이어져 틈이 안 보이게 함 (높이는 JS paddingBottom) */
+  box-sizing: border-box;
+}
+
+.friend-showcase-list--sheet.is-collapsed .friend-showcase-list__sheet-panel {
+  height: auto;
+  top: auto;
+}
+
+.friend-showcase-list--sheet.is-mid .friend-showcase-list__sheet-panel,
+.friend-showcase-list--sheet.is-full .friend-showcase-list__sheet-panel {
+  height: auto;
+  max-height: none;
+  box-shadow: 0 -8px 28px rgba(15, 23, 42, 0.16);
+}
+
+.friend-showcase-list__sheet-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 52px;
+  padding: 18px 8px 10px 14px;
+  flex-shrink: 0;
+  background: #fff;
+}
+
+.friend-showcase-list__sheet-handle-hit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 22px;
+  z-index: 2;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.friend-showcase-list__sheet-handle-hit:active {
+  cursor: grabbing;
+}
+
+.friend-showcase-list__sheet-handle {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 999px;
+  background: #d4d4d8;
+  pointer-events: none;
+}
+
+.friend-showcase-list__sheet-title-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 6px 4px 4px 0;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  z-index: 1;
+}
+
+.friend-showcase-list__sheet-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #191f28;
+  letter-spacing: -0.02em;
+}
+
+.friend-showcase-list__sheet-hint {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.friend-showcase-list__sheet-actions {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.friend-showcase-list__sheet-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: #fff;
+  border-top: 1px solid #f1f5f9;
+}
+
+.friend-showcase-list--sheet .friend-showcase-list__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+
+.friend-showcase-list__header-dot,
+.friend-showcase-list__blue-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #2b6ff0;
+  box-shadow: 0 0 0 3px rgba(43, 111, 240, 0.22);
+  flex-shrink: 0;
+}
+
+.friend-showcase-list__header-dot {
+  animation: friend-showcase-pulse 1.6s ease-in-out infinite;
+}
+
+.friend-showcase-list__avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.friend-showcase-list__blue-dot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
+  box-shadow: none;
+}
+
+.friend-showcase-list__update-label {
+  margin-left: 6px;
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #eef5ff;
+  color: #2b6ff0;
+  font-size: 10px;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+.friend-showcase-list__row--unread .friend-showcase-list__name {
+  color: #0f172a;
+}
+
+@keyframes friend-showcase-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(43, 111, 240, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(43, 111, 240, 0.32);
+  }
+}
+
+.dark-mode .friend-showcase-list__sheet-panel,
+.dark-mode .friend-showcase-list__sheet-toggle,
+.dark-mode .friend-showcase-list__sheet-body {
+  background: #0f172a !important;
+}
+
+.dark-mode .friend-showcase-list__sheet-title {
+  color: #f1f5f9;
+}
+
+.dark-mode .friend-showcase-list__blue-dot {
+  border-color: #0f172a;
+}
+
+.dark-mode .friend-showcase-list__update-label {
+  background: rgba(43, 111, 240, 0.22);
   color: #93c5fd;
 }

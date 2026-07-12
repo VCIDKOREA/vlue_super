@@ -18,6 +18,7 @@ import { readLetteringFixedIdentity, LETTERING_BIZCARD_CHANGED_EVENT } from '../
 import { fetchDigitalCardMeta } from '../../../lib/digitalCardApi.js';
 import { probeEnterpriseSidebarAccess } from '../../../lib/enterpriseLineManageAccess.js';
 import { formatPhoneE164ForKoreaDisplay } from '../../../lib/phoneDisplay.js';
+import { isPaidLetteringTier } from '../../../lib/letteringMembership.js';
 import type { MarketingAuthUser } from './AuthModal';
 
 type TabKey = 'card' | 'lettering' | 'enterprise';
@@ -25,33 +26,26 @@ type CardSubview = 'hub' | 'edit';
 
 function BizcardBroadcastToggle({
   on,
-  disabled,
   onChange,
 }: {
   on: boolean;
-  disabled?: boolean;
   onChange: (next: boolean) => void;
 }) {
   return (
     <div className="mkt-bizcard-toggle-row flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div className="min-w-0">
-        <p className="text-sm font-black text-slate-900">인증명함 송출</p>
+        <p className="text-sm font-black text-slate-900">쇼케이스 송출</p>
         <p className={`text-xs font-semibold mt-0.5 ${on ? 'text-blue-600' : 'text-red-600'}`}>
-          {on
-            ? '켜짐 — 통화 중 내 디지털인증명함이 송출됩니다.'
-            : disabled
-              ? '명함 신청·승인 후 사용할 수 있습니다.'
-              : '꺼짐 — 일반 통화 화면만 표시됩니다.'}
+          {on ? '켜짐 — 통화 중 쇼케이스가 송출됩니다.' : '꺼짐 — 통화 중 쇼케이스 송출이 꺼졌습니다.'}
         </p>
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={on}
-        aria-label="인증명함 송출"
+        aria-label="쇼케이스 송출"
         data-on={on ? 'true' : 'false'}
         className="mkt-bizcard-toggle"
-        disabled={disabled}
         onClick={() => onChange(!on)}
       >
         <span className="mkt-bizcard-toggle__knob" aria-hidden />
@@ -200,13 +194,18 @@ function WebBizcardHubInner({ user }: { user: MarketingAuthUser }) {
   );
 
   const handleToggleBroadcast = (next: boolean) => {
-    if (next && !hasDigitalCertCard) {
-      showToast('디지털인증명함을 먼저 신청·승인해 주세요.');
-      return;
-    }
     writeVcidBroadcastOn(next);
     setIsVCIDOn(next);
-    showToast(next ? '통화 중 디지털인증명함이 송출됩니다.' : '통화 중 일반 화면만 표시됩니다.');
+    showToast(next ? '통화 중 쇼케이스가 송출됩니다.' : '통화 중 쇼케이스 송출이 꺼졌습니다.');
+  };
+
+  const handleApplyDigitalCard = () => {
+    if (!isPaidLetteringTier(membershipTier)) {
+      showToast('디지털인증명함은 유료 회원만 신청할 수 있습니다. 등급 변경 페이지로 이동해 주세요.');
+      window.location.assign('/pricing');
+      return;
+    }
+    setCardSubview('edit');
   };
 
   const tabs = useMemo(() => {
@@ -279,7 +278,6 @@ function WebBizcardHubInner({ user }: { user: MarketingAuthUser }) {
 
           <BizcardBroadcastToggle
             on={isVCIDOn}
-            disabled={!hasDigitalCertCard}
             onChange={handleToggleBroadcast}
           />
 
@@ -288,7 +286,7 @@ function WebBizcardHubInner({ user }: { user: MarketingAuthUser }) {
               <p className="text-sm font-black text-slate-900">디지털인증명함</p>
               <button
                 type="button"
-                onClick={() => setCardSubview('edit')}
+                onClick={handleApplyDigitalCard}
                 className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-cyan-800 hover:bg-slate-200"
               >
                 <Pencil className="w-3 h-3" />
@@ -302,7 +300,7 @@ function WebBizcardHubInner({ user }: { user: MarketingAuthUser }) {
               digitalCardIssued={digitalCardIssued}
               isVCIDOn={isVCIDOn}
               isDarkMode={false}
-              onApplyDigitalCard={() => setCardSubview('edit')}
+              onApplyDigitalCard={handleApplyDigitalCard}
               onEditLettering={() => setCardSubview('edit')}
               onToast={showToast}
             />

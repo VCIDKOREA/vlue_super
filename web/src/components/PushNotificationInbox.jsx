@@ -7,6 +7,7 @@ import {
   readPushNotifications,
   resolvePushDisplayTime
 } from "../lib/pushNotificationInbox";
+import PushNotificationDetailModal from "./PushNotificationDetailModal.jsx";
 
 const CATEGORY_STYLE = {
   가족보호: "bg-emerald-50 text-emerald-700",
@@ -16,8 +17,9 @@ const CATEGORY_STYLE = {
   기타: "bg-gray-100 text-gray-600"
 };
 
-export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProtection }) {
+export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProtection, isDarkMode = false }) {
   const [items, setItems] = useState(() => readPushNotifications());
+  const [detail, setDetail] = useState(null);
 
   const refresh = useCallback(() => {
     const list = readPushNotifications();
@@ -31,6 +33,12 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
     window.addEventListener(PUSH_INBOX_CHANGED, onChange);
     return () => window.removeEventListener(PUSH_INBOX_CHANGED, onChange);
   }, [refresh]);
+
+  const openDetail = (n) => {
+    if (!n.read) markPushRead(n.id);
+    setDetail(n);
+    refresh();
+  };
 
   if (!items.length) {
     return (
@@ -77,15 +85,18 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
           <li key={n.id}>
             <button
               type="button"
-              className={`flex w-full gap-3 border-b border-gray-50 px-4 py-3.5 text-left transition-colors active:bg-gray-50 ${
-                n.read ? "opacity-70" : "bg-blue-50/30"
+              className={`relative flex w-full cursor-pointer gap-3 border-b border-gray-50 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 active:bg-gray-100 ${
+                n.read ? "opacity-70" : "bg-blue-50/40"
               }`}
-              onClick={() => {
-                if (!n.read) markPushRead(n.id);
-                refresh();
-              }}
+              onClick={() => openDetail(n)}
             >
-              <div className="min-w-0 flex-1">
+              {!n.read ? (
+                <span
+                  className="absolute left-1.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-blue-500 shadow-[0_0_0_3px_rgba(43,111,240,0.2)]"
+                  aria-label="신규 알림"
+                />
+              ) : null}
+              <div className="min-w-0 flex-1 pl-2">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
@@ -97,9 +108,7 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
                   <span className="text-[10px] font-medium text-gray-400">
                     {resolvePushDisplayTime(n)}
                   </span>
-                  {!n.read ? (
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" aria-hidden />
-                  ) : null}
+                  <span className="ml-auto text-[11px] font-bold text-blue-600">상세 ›</span>
                 </div>
                 <p className="text-[13px] font-bold text-gray-900">{n.title}</p>
                 <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-gray-600">{n.body}</p>
@@ -108,6 +117,14 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
           </li>
         ))}
       </ul>
+
+      <PushNotificationDetailModal
+        open={Boolean(detail)}
+        item={detail}
+        displayTime={detail ? resolvePushDisplayTime(detail) : ""}
+        isDarkMode={isDarkMode}
+        onClose={() => setDetail(null)}
+      />
     </div>
   );
 }

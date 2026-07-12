@@ -906,19 +906,25 @@ function Home({
     <main
       className={`home-main-feed home-main-feed--spaced min-h-0 w-full max-w-none min-w-0 flex-1 flex flex-col overflow-y-auto overflow-x-hidden ${
         v1FriendHomeLayout
-          ? "home-main-feed--kakao px-0 pb-[calc(56px+env(safe-area-inset-bottom,0px))] pt-0"
+          ? "home-main-feed--kakao px-0 pb-0 pt-0"
           : "gap-5 px-2.5 pb-32 pt-0"
       }`}
     >
-      <div className={v1FriendHomeLayout ? "flex flex-col gap-5 px-2.5 pt-0" : "contents"}>
+      <div className={v1FriendHomeLayout ? "home-kakao-stack flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto px-0 pt-0" : "contents"}>
       {v1AppShell.homeBizSearch ? (
+      <div data-home-anchor="search" className="home-kakao-anchor home-kakao-anchor--search shrink-0">
       <HomeBizDirectorySearch
         categoryExposedPosts={categoryExposedPosts}
         onOpenBusinessRoom={onOpenBusinessRoom}
       />
+      </div>
       ) : null}
 
-      {v1AppShell.callBigPush ? <CallBigPushPreviewSection membershipTier={membershipTier} /> : null}
+      {v1AppShell.callBigPush ? (
+      <div data-home-anchor="showcase" className="home-kakao-anchor home-kakao-anchor--showcase shrink-0 px-2.5">
+        <CallBigPushPreviewSection membershipTier={membershipTier} />
+      </div>
+      ) : null}
       </div>
 
       {v1AppShell.friendShowcaseFeed ? (

@@ -52,10 +52,10 @@ export function createDefaultShowcaseStyle() {
       couponLabel: ""
     },
     platformFeed: {
-      instagramHandle: "@vlue.official",
+      instagramHandle: "",
       instagramProfileUrl: "",
       instagramAvatarUrl: "",
-      kakaoProfileTitle: "VLUE 프로필",
+      kakaoProfileTitle: "",
       kakaoProfileUrl: "",
       kakaoAvatarUrl: "",
       avatarUrl: ""
@@ -64,7 +64,9 @@ export function createDefaultShowcaseStyle() {
       frame: "classic",
       accent: "#2b6ff0",
       pattern: "none"
-    }
+    },
+    /** 디지털인증명함 미사용 시 — 쇼케이스에 이름(상호) 송출 여부. 기본 켜짐 */
+    showBroadcastName: true
   };
 }
 
@@ -85,7 +87,8 @@ function mergeDeep(defaults, parsed) {
     platformFeed: { ...defaults.platformFeed, ...parsed?.platformFeed },
     caseTheme: { ...defaults.caseTheme, ...parsed?.caseTheme },
     tags: Array.isArray(parsed?.tags) ? parsed.tags : defaults.tags,
-    privacyMode: parsed?.privacyMode === "public" ? "public" : defaults.privacyMode
+    privacyMode: parsed?.privacyMode === "public" ? "public" : defaults.privacyMode,
+    showBroadcastName: parsed?.showBroadcastName === false ? false : true
   };
 }
 
@@ -98,6 +101,15 @@ export function readShowcaseStyle() {
     if (merged.bgm.customUrl) {
       merged.bgm.mode = merged.bgm.mode === "custom" ? "preset" : merged.bgm.mode;
     }
+    /* 과거 데모 기본값 정리 */
+    const feed = merged.platformFeed || {};
+    if (feed.instagramHandle === "@vlue.official" && !feed.instagramProfileUrl) {
+      feed.instagramHandle = "";
+    }
+    if (feed.kakaoProfileTitle === "VLUE 프로필" && !feed.kakaoProfileUrl) {
+      feed.kakaoProfileTitle = "";
+    }
+    merged.platformFeed = feed;
     return merged;
   } catch {
     return createDefaultShowcaseStyle();

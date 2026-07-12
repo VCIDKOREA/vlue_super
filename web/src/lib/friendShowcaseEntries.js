@@ -1,7 +1,9 @@
 import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
+import { resolveFriendShowcaseUpdatedAt } from "./friendShowcaseActivity.js";
 
 /**
  * 홈 친구 쇼케이스 목록 — roomCatalog.friends + 주소록 친구(isFriend) 병합
+ * 데모/시드 친구는 넣지 않음.
  * @param {{ catalogFriends?: object[], contactMatchData?: object | null }} input
  */
 export function buildFriendShowcaseEntries({ catalogFriends = [], contactMatchData = null } = {}) {
@@ -11,7 +13,7 @@ export function buildFriendShowcaseEntries({ catalogFriends = [], contactMatchDa
     const phone = String(f.phone || f.cardPhone || "").trim();
     const name = String(f.cardName || f.name || "").trim();
     if (!name) continue;
-    byKey.set(`catalog:${f.id}`, {
+    const entry = {
       id: f.id,
       name,
       phone: phone || "",
@@ -23,8 +25,11 @@ export function buildFriendShowcaseEntries({ catalogFriends = [], contactMatchDa
       membershipTier: f.membershipTier || "free",
       avatarUrl: String(f.avatarUrl || f.avatar || "").trim(),
       org: String(f.cardOrg || "").trim(),
-      title: String(f.cardTitle || "").trim()
-    });
+      title: String(f.cardTitle || "").trim(),
+      showcaseUpdatedAt: f.showcaseUpdatedAt || f.updatedAt || f.lastActiveAt || 0
+    };
+    entry.updatedAt = resolveFriendShowcaseUpdatedAt(entry);
+    byKey.set(`catalog:${f.id}`, entry);
   }
 
   for (const u of contactMatchData?.registered || []) {
@@ -34,7 +39,7 @@ export function buildFriendShowcaseEntries({ catalogFriends = [], contactMatchDa
     const phone = String(u.phoneDisplay || u.phoneE164 || "").trim();
     const name = String(u.displayName || u.contactName || "").trim();
     if (!name) continue;
-    byKey.set(key, {
+    const entry = {
       id: u.userId || u.phoneE164,
       name,
       phone,
@@ -43,8 +48,11 @@ export function buildFriendShowcaseEntries({ catalogFriends = [], contactMatchDa
       membershipTier: "paid",
       avatarUrl: "",
       org: "",
-      title: ""
-    });
+      title: "",
+      showcaseUpdatedAt: u.showcaseUpdatedAt || u.updatedAt || 0
+    };
+    entry.updatedAt = resolveFriendShowcaseUpdatedAt(entry);
+    byKey.set(key, entry);
   }
 
   return Array.from(byKey.values()).sort((a, b) => a.name.localeCompare(b.name, "ko"));

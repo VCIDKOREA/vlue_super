@@ -9,8 +9,11 @@ export const REFERRAL_LOCK_MONTHS = 3;
 export const SLIDING_RENEWAL_MONTHLY_KRW = 24_050;
 export const SLIDING_RENEWAL_SUPPLY_KRW = 21_863.6;
 export const PROMO_SUPPLY_MONTHLY_KRW = 18_000;
-export const PAID_MONTHLY_DISCOUNTED_KRW = 19800;
-export const PAID_ANNUAL_DISCOUNTED_KRW = 198000;
+/** V1 출시 이벤트가(판매가) */
+export const PAID_EVENT_MONTHLY_KRW = 9900;
+export const PAID_EVENT_ANNUAL_KRW = 99000;
+export const PAID_MONTHLY_DISCOUNTED_KRW = PAID_EVENT_MONTHLY_KRW;
+export const PAID_ANNUAL_DISCOUNTED_KRW = PAID_EVENT_ANNUAL_KRW;
 export function isB2bMembershipKind(raw) {
     return String(raw || "").toLowerCase() === "b2b";
 }
@@ -32,10 +35,9 @@ export function normalizeMembershipKind(raw) {
 export function paidListAmountKrw(cycle) {
     return cycle === "annual" ? PAID_LIST_PRICE_ANNUAL_KRW : PAID_LIST_PRICE_MONTHLY_KRW;
 }
-export function paidChargeAmountKrw(cycle, isDiscounted) {
-    if (!isDiscounted)
-        return paidListAmountKrw(cycle);
-    return cycle === "annual" ? PAID_ANNUAL_DISCOUNTED_KRW : PAID_MONTHLY_DISCOUNTED_KRW;
+/** V1 청구액 — 출시 이벤트 판매가 */
+export function paidChargeAmountKrw(cycle, _isDiscounted) {
+    return cycle === "annual" ? PAID_EVENT_ANNUAL_KRW : PAID_EVENT_MONTHLY_KRW;
 }
 export const PERSONAL_COMBO_ADDON_MONTHLY_KRW = 5100;
 export const PERSONAL_COMBO_ADDON_ANNUAL_KRW = 51000;

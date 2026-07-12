@@ -1,16 +1,18 @@
 import { resolveLetteringDemoLogoUrl } from "./letteringDemoAssets.js";
 import { clampLetteringBizcardEmail } from "./letteringBizcardStorage.js";
 
-/** Lettering·명함 카드 객체 정규화 */
+/** Lettering·명함 카드 객체 정규화 — 빈 칸을 데모값으로 채우지 않음 */
 export function normalizeLetteringCard(raw = {}) {
   const photoUrl = String(raw.photoUrl || raw.image_url || raw.imageUrl || "").trim();
-  const name = String(raw.name || raw.displayName || "\u2014").trim();
+  const name = String(raw.name || raw.displayName || "").trim();
   const merged = { ...raw, name };
-  const logoUrl = String(raw.logoUrl || "").trim() || resolveLetteringDemoLogoUrl(merged);
+  const explicitLogo = String(raw.logoUrl || "").trim();
+  const logoUrl = explicitLogo || resolveLetteringDemoLogoUrl(merged);
 
   return {
     ...merged,
     name,
+    displayName: String(raw.displayName || name || "").trim(),
     title: String(raw.title || raw.jobTitle || "").trim(),
     organization: String(raw.organization || raw.companyName || "").trim(),
     department: String(
@@ -28,7 +30,7 @@ export function normalizeLetteringCard(raw = {}) {
     feedType: raw.feedType === "company" ? "company" : "personal",
     verificationItems: Array.isArray(raw.verificationItems) ? raw.verificationItems : [],
     membershipTier: String(raw.membershipTier || "free").toLowerCase(),
-    customBackText: String(raw.customBackText || raw.promo || "").trim(),
+    customBackText: String(raw.customBackText || "").trim(),
     promo: String(raw.promo || "").trim(),
     address: String(
       raw.address || raw.businessAddress || raw.companyAddress || raw.officeAddress || ""

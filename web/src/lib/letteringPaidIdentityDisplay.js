@@ -5,6 +5,7 @@ export function formatLetteringPaidIdentity(card = {}) {
   const name = String(card.name || card.displayName || "").trim();
   const roleLine = [title, name].filter(Boolean).join(" / ");
   const personLine = [name, title].filter(Boolean).join(" / ");
+  const orgAndName = [organization, name].filter(Boolean).join(" · ");
 
   return {
     organization,
@@ -12,6 +13,7 @@ export function formatLetteringPaidIdentity(card = {}) {
     title,
     roleLine,
     personLine,
+    orgAndName,
     companyLine: organization || name || "\u2014",
     hasRoleLine: Boolean(roleLine),
     hasPersonLine: Boolean(name || title)
@@ -21,13 +23,15 @@ export function formatLetteringPaidIdentity(card = {}) {
 /** 빅푸시·수신 UI — 상호 / 번호·직함 한 줄 포맷 */
 export function formatLetteringReceptionLines(card = {}, { incomingNumber = "" } = {}) {
   const identity = formatLetteringPaidIdentity(card);
-  const org = identity.organization || identity.name || "";
+  const org = identity.organization;
+  const name = identity.name;
   const title = identity.title;
   const phoneRaw = String(incomingNumber || card.phone || "").trim();
   const phone = phoneRaw;
-  const collapsedPrimary = org || identity.name || "\u2014";
-  const expandedOrgLine = collapsedPrimary;
-  const expandedContactLine = [phone, title].filter(Boolean).join(" / ");
+  /* 디지털 인증명함 — 상호·이름 동시 표현 (사업자 상호 우선) */
+  const collapsedPrimary = identity.orgAndName || org || name || "\u2014";
+  const expandedOrgLine = org || name || "\u2014";
+  const expandedContactLine = [name && org ? name : null, phone, title].filter(Boolean).join(" / ");
 
   return {
     ...identity,
@@ -36,6 +40,6 @@ export function formatLetteringReceptionLines(card = {}, { incomingNumber = "" }
     collapsedPrimary,
     expandedOrgLine,
     expandedContactLine,
-    collapsedHasOrgPhone: Boolean(org && phone)
+    collapsedHasOrgPhone: Boolean((org || name) && phone)
   };
 }

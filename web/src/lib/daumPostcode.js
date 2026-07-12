@@ -46,14 +46,18 @@ function loadPostcodeScript() {
 
 function ensurePostcodeLayer() {
   let layer = document.getElementById(LAYER_ID);
-  if (layer) return layer;
+  if (layer) {
+    /* 온보딩 셸(z≈1000002)보다 위에 오도록 매 오픈 시 보정 */
+    layer.style.zIndex = "10000150";
+    return layer;
+  }
 
   layer = document.createElement("div");
   layer.id = LAYER_ID;
   layer.setAttribute("role", "dialog");
   layer.setAttribute("aria-modal", "true");
   layer.style.cssText =
-    "position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;padding:12px;background:rgba(15,23,42,.55);";
+    "position:fixed;inset:0;z-index:10000150;display:none;align-items:center;justify-content:center;padding:12px;background:rgba(15,23,42,.55);";
 
   const panel = document.createElement("div");
   panel.style.cssText =

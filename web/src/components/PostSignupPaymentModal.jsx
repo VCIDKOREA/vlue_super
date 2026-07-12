@@ -71,6 +71,8 @@ export default function PostSignupPaymentModal({ open, pending, onComplete, onSk
 
       try {
         localStorage.setItem("vlue_subscription_paid", "1");
+        localStorage.setItem("vlue_paid_billing_cycle", billingCycle === "annual" ? "annual" : "monthly");
+        localStorage.setItem("vlue_subscription_paid_at", new Date().toISOString());
       } catch {
         /* ignore */
       }
@@ -78,7 +80,14 @@ export default function PostSignupPaymentModal({ open, pending, onComplete, onSk
       setDone(true);
       onComplete?.();
     } catch (e) {
-      setError(e?.message || String(e));
+      const raw = e?.message || String(e);
+      const pgHint =
+        /PG모듈|등록되지 않은 PG/i.test(raw) && import.meta.env.DEV
+          ? " → 포트원 콘솔에 정기결제(빌링) PG 채널이 없습니다. PC 로컬 테스트는 「개발 전용: 결제 우회」를 쓰거나, 콘솔에 html5_inicis 빌링 채널을 등록하세요."
+          : /PG모듈|등록되지 않은 PG/i.test(raw)
+            ? " → 결제 연동(포트원 정기결제 PG) 설정을 확인해 주세요."
+            : "";
+      setError(raw + pgHint);
     } finally {
       setBusy(false);
     }

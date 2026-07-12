@@ -18,7 +18,7 @@ export default function ShowcaseStyleSettingsSheet({
       open={open}
       onClose={onClose}
       title={VLUE_SHOWCASE.nameKo}
-      subtitle="스타일 · 사진 · 음악 · 명함 연동"
+      subtitle="사진 추가 · 스타일 선택"
       icon={Palette}
       isDarkMode={isDarkMode}
       reserveBottomNav

@@ -520,10 +520,9 @@ export default function VlueSettingsPanel({
           />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsToggleRow
-            label="통화 중 인증명함 송출"
-            sublabel={hasDigitalCertCard ? "VLUE 디지털인증명함" : "명함 신청 후 사용 가능"}
+            label="통화 중 쇼케이스 송출"
+            subtitle={hasDigitalCertCard ? "디지털인증명함 · 쇼케이스" : "쇼케이스 · 프로필 사진 · 번호"}
             checked={isVCIDOn}
-            disabled={!hasDigitalCertCard}
             onChange={onToggleVCID}
             isDarkMode={isDarkMode}
           />

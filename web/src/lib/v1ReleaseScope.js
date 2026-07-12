@@ -66,6 +66,8 @@ export function coerceAppPageForV1(page) {
 }
 
 export const v1AppShell = {
+  /** V1 — 비로그인 둘러보기 없음. 설치·실행 시 로그인/가입 화면부터 */
+  guestBrowse: false,
   callBigPush: true,
   /** 홈 — 등록 친구 블루 쇼케이스 목록 */
   friendShowcaseFeed: true,
@@ -122,6 +124,11 @@ export const v1WebShell = {
   resources: true,
   pricing: true,
   download: true,
+  /**
+   * V1 — www 웹 구독 결제(PostSignupPaymentModal) 비활성.
+   * 가입·결제는 VLUE 앱에서만. 웹 결제는 V2.
+   */
+  webSubscribePayment: false,
   /** V2 — PC 설치형 (채팅 연동 시 지원 예정) */
   pcInstaller: false,
   vlueStore: false,

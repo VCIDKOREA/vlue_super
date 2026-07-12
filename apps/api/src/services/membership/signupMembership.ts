@@ -140,7 +140,7 @@ export async function createPaidSubscriptionForUser(
   sponsorUserId: string | null
 ) {
   const listPrice = paidListAmountKrw(billingCycle);
-  const amount = paidChargeAmountKrw(billingCycle, isDiscounted);
+  const amount = paidChargeAmountKrw(billingCycle, true);
   const now = new Date();
   const cycleEnd = billingCycle === "annual" ? addMonths(now, 12) : addMonths(now, 1);
 
@@ -151,7 +151,8 @@ export async function createPaidSubscriptionForUser(
       status: "pending_payment",
       amountKrw: amount,
       listPriceKrw: listPrice,
-      isDiscounted,
+      /** V1 출시가(9,900) — 추천 여부와 무관 */
+      isDiscounted: true,
       referralCodeUsed,
       sponsorVluerUserId: sponsorUserId,
       cycleStartAt: now,

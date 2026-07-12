@@ -14,6 +14,7 @@ import {
 } from '../../../lib/vlueAuthApi.js';
 import { isBillableMembershipKind, normalizeMembershipKind } from '../../../lib/membershipBm.js';
 import { writePendingPayment } from '../../../lib/postSignupPayment.js';
+import { v1WebShell } from '../../../lib/v1ReleaseScope.js';
 
 export type MarketingAuthUser = {
   userId: string;
@@ -103,7 +104,10 @@ export default function AuthModal({
     }
 
     const tier = normalizeMembershipKind(payload?.membershipKind || payload?.membershipTier);
-    const needsPayment = Boolean(payload?.postSignupPayment && isBillableMembershipKind(tier));
+    const billable = Boolean(payload?.postSignupPayment && isBillableMembershipKind(tier));
+    /** V1: www에서는 포트원 결제 모달을 열지 않고 앱 다운로드로 유도 */
+    const webPayEnabled = Boolean(v1WebShell.webSubscribePayment);
+    const needsPayment = billable && webPayEnabled;
 
     if (needsPayment && payload?.postSignupPayment) {
       writePendingPayment(payload.postSignupPayment);
@@ -114,7 +118,23 @@ export default function AuthModal({
     setOnboardingOpen(false);
     const user = restoreMarketingAuthUser();
     if (user) onSuccess(user);
-    if (!needsPayment) onClose();
+    if (!needsPayment) {
+      if (billable && !webPayEnabled) {
+        try {
+          window.alert(
+            '가입이 완료되었습니다.\n유료 멤버십 결제는 VLUE 앱을 다운로드하여 진행해 주세요.'
+          );
+        } catch {
+          /* ignore */
+        }
+        try {
+          window.location.hash = 'download';
+        } catch {
+          /* ignore */
+        }
+      }
+      onClose();
+    }
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -165,12 +185,14 @@ export default function AuthModal({
             onCancel={() => setOnboardingOpen(false)}
           />
         </SignupErrorBoundary>
-        <PostSignupPaymentModal
-          open={postSignupPaymentOpen && Boolean(postSignupPending)}
-          pending={postSignupPending}
-          onComplete={finishPostSignupPayment}
-          onSkip={finishPostSignupPayment}
-        />
+        {v1WebShell.webSubscribePayment ? (
+          <PostSignupPaymentModal
+            open={postSignupPaymentOpen && Boolean(postSignupPending)}
+            pending={postSignupPending}
+            onComplete={finishPostSignupPayment}
+            onSkip={finishPostSignupPayment}
+          />
+        ) : null}
       </>
     );
   }
@@ -304,12 +326,14 @@ export default function AuthModal({
           </>
         )}
       </div>
-      <PostSignupPaymentModal
-        open={postSignupPaymentOpen && Boolean(postSignupPending)}
-        pending={postSignupPending}
-        onComplete={finishPostSignupPayment}
-        onSkip={finishPostSignupPayment}
-      />
+      {v1WebShell.webSubscribePayment ? (
+        <PostSignupPaymentModal
+          open={postSignupPaymentOpen && Boolean(postSignupPending)}
+          pending={postSignupPending}
+          onComplete={finishPostSignupPayment}
+          onSkip={finishPostSignupPayment}
+        />
+      ) : null}
     </div>
   );
 }

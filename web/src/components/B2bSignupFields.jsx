@@ -10,6 +10,7 @@ import {
 import ReferralCodeVerifyBlock, { validateReferralMetaB2b } from "./ReferralCodeVerifyBlock.jsx";
 import B2bCompanyContactFields from "./B2bCompanyContactFields.jsx";
 import B2bEmployeeLineSlots from "./B2bEmployeeLineSlots.jsx";
+import { v1AppShell } from "../lib/v1ReleaseScope.js";
 
 /**
  * 기업 단체 회원(B2B) — 회선 수 고정 입력 · 추천인 선택(필수 아님) · 가입 후 결제
@@ -38,21 +39,25 @@ export default function B2bSignupFields({
     <div className="mt-3 space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
       <p className="text-[12px] font-black text-indigo-950">기업 단체 회원 (B2B)</p>
       <p className="text-[10px] leading-relaxed text-indigo-900/85">{GROUP_SIGNUP_AT_REGISTRATION_NOTICE}</p>
-      <p className="rounded-lg border border-violet-200 bg-violet-50/90 px-2.5 py-2 text-[10px] font-semibold text-violet-950">
-        추천인 코드는 선택입니다. 「추천인 없음」으로 진행할 수 있습니다. 결제는 가입·본인인증 완료 후 진행합니다.
-      </p>
+      {v1AppShell.referralProgram ? (
+        <p className="rounded-lg border border-violet-200 bg-violet-50/90 px-2.5 py-2 text-[10px] font-semibold text-violet-950">
+          추천인 코드는 선택입니다. 「추천인 없음」으로 진행할 수 있습니다. 결제는 가입·본인인증 완료 후 진행합니다.
+        </p>
+      ) : null}
       <p className="text-[10px] leading-relaxed text-indigo-900/90">{B2B_ADMIN_VERIFY_NOTICE}</p>
 
-      <ReferralCodeVerifyBlock
-        billingCycle={billingCycle}
-        referralCode={referralCode}
-        onReferralCodeChange={onReferralCodeChange}
-        onMetaChange={(m) => {
-          setReferralMeta(m);
-          onReferralMetaChange?.(m);
-        }}
-        hidePaymentPreview
-      />
+      {v1AppShell.referralProgram ? (
+        <ReferralCodeVerifyBlock
+          billingCycle={billingCycle}
+          referralCode={referralCode}
+          onReferralCodeChange={onReferralCodeChange}
+          onMetaChange={(m) => {
+            setReferralMeta(m);
+            onReferralMetaChange?.(m);
+          }}
+          hidePaymentPreview
+        />
+      ) : null}
 
       <div>
         <p className="text-[11px] font-black text-slate-800">결제 주기 (가입 후 결제)</p>

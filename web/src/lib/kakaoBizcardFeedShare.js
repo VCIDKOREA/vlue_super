@@ -3,6 +3,7 @@ import { ensureDigitalCardId, syncDigitalCardExportSnapshot } from "./digitalCar
 import { apiUrl } from "./apiBase.js";
 import { getVlueViralLinks } from "./vlueViralLinks.js";
 import { withLetteringBizcardPreviewFallback } from "./letteringBizcardProfile.js";
+import { scrubLetteringDemoPollution } from "./letteringDemoPollution.js";
 
 const KAKAO_PUBLIC_ORIGIN = "https://www.vlue.kr";
 export const KAKAO_FEED_IMAGE_WIDTH = 800;
@@ -50,7 +51,7 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
     String(viral.createUrl || "").startsWith("http") && viral.createUrl.includes("vlue")
       ? viral.createUrl
       : `${origin}/membership`;
-  const snap = withLetteringBizcardPreviewFallback(card || {});
+  const snap = scrubLetteringDemoPollution(withLetteringBizcardPreviewFallback(card || {}));
   const feedImageUrl = cardId ? getKakaoFeedCardPublicImageUrl(cardId) : getKakaoShareButtonImageUrl();
   return {
     buttonImageUrl: feedImageUrl,

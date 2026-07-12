@@ -10,6 +10,39 @@
       "logHash": "e89377acb99bf76299e5f5e58c6fb13d5dd3ad6fd82df00265c6204832a38271",
       "prevLogHash": "28bb7c54d76795e1e926e14b394edba0920ef7b776e67a91b767a68032592c5e",
       "updatedAt": "2026-07-07T13:55:31.578Z"
+    },
+    {
+      "userId": "d3800998-4b08-47ce-a519-a2038d752a19",
+      "batteryPercent": 100,
+      "isCharging": false,
+      "securityHealth": "ok",
+      "openThreatCount": 0,
+      "devicePlatform": "android",
+      "logHash": "2197851800dcb4de8a60a46251c452bf6390171a741c24f14bf59fd4875c1e8b",
+      "prevLogHash": "41d24198f8bbd1b1f1c457f682769eddc2784a41a6af6c1f16c4144e3fe2d0a6",
+      "updatedAt": "2026-07-12T17:56:46.253Z"
+    },
+    {
+      "userId": "a2a75098-af47-4bc1-8298-6673660c6c0e",
+      "batteryPercent": 100,
+      "isCharging": false,
+      "securityHealth": "ok",
+      "openThreatCount": 0,
+      "devicePlatform": "android",
+      "logHash": "13e91cfc08df8f959a3b4901b601225268862f19cf68411ab7ca70754e90625f",
+      "prevLogHash": "09a2a622ae8947b8778eaedf2e30e48b12e3e8ca5d225f228f28c041517fa88b",
+      "updatedAt": "2026-07-12T14:52:29.454Z"
+    },
+    {
+      "userId": "eec0d51f-2ebe-4359-b2fa-39a305010bf1",
+      "batteryPercent": 100,
+      "isCharging": false,
+      "securityHealth": "ok",
+      "openThreatCount": 0,
+      "devicePlatform": "android",
+      "logHash": "a8d1a0769e86f62c408abe6c7b6730dc04115ccc182b2f159c7c894acf18e8fe",
+      "prevLogHash": "2c042b72f7b73b28f80a5fdafa847746100e7fdb51da7a653081a91c7dde16a1",
+      "updatedAt": "2026-07-12T14:39:44.585Z"
     }
   ]
 }

@@ -58,33 +58,77 @@ export function readFeedNickname() {
 
 /** 채팅 닉 → 실명 → 명함/기본 표시명 */
 export function getChatDisplayName(fallbackName = "") {
-  const nick = readChatNickname();
+  const nick = scrubBrandDisplayName(readChatNickname());
   if (nick) return nick;
-  const legal = getLegalName();
+  const legal = scrubBrandDisplayName(getLegalName());
   if (legal) return legal;
-  const fb = String(fallbackName || "").trim();
+  const fb = scrubBrandDisplayName(fallbackName);
   return fb || "회원";
 }
 
 /** 피드 닉 → 실명 → 기본 표시명 */
 export function getFeedDisplayName(fallbackName = "") {
-  const nick = readFeedNickname();
+  const nick = scrubBrandDisplayName(readFeedNickname());
   if (nick) return nick;
-  const legal = getLegalName();
+  const legal = scrubBrandDisplayName(getLegalName());
   if (legal) return legal;
-  const fb = String(fallbackName || "").trim();
+  const fb = scrubBrandDisplayName(fallbackName);
   return fb || "회원";
+}
+
+/** 브랜드명(VLUE) 오염 — 사용자 이름으로 취급하지 않음 */
+export function isBrandDisplayName(name) {
+  const s = String(name || "").trim();
+  if (!s) return false;
+  return /^vlue$/i.test(s) || /^vlue[\s_-]*official$/i.test(s);
+}
+
+export function scrubBrandDisplayName(name) {
+  const s = String(name || "").trim();
+  if (!s || isBrandDisplayName(s)) return "";
+  return s;
+}
+
+/**
+ * 프로필 패널 헤더용 — 실명/명함 이름 우선 (채팅 닉의 VLUE 오염 제외)
+ */
+export function getProfileHeaderName(fallbackName = "") {
+  try {
+    const nick = readChatNickname();
+    if (isBrandDisplayName(nick)) {
+      localStorage.removeItem(VLUE_NICKNAME_CHAT_KEY);
+    }
+    const feed = readFeedNickname();
+    if (isBrandDisplayName(feed)) {
+      localStorage.removeItem(VLUE_NICKNAME_FEED_KEY);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  const candidates = [
+    getLegalName(),
+    fallbackName,
+    typeof localStorage !== "undefined" ? localStorage.getItem("myCardDisplayName") : "",
+    readChatNickname(),
+    readFeedNickname()
+  ];
+  for (const c of candidates) {
+    const s = scrubBrandDisplayName(c);
+    if (s) return s;
+  }
+  return "회원";
 }
 
 export function writeDisplayNicknames({ chat, feed } = {}) {
   try {
     if (chat != null) {
-      const s = String(chat).trim().slice(0, VLUE_NICKNAME_MAX);
+      const s = scrubBrandDisplayName(String(chat).trim().slice(0, VLUE_NICKNAME_MAX));
       if (s) localStorage.setItem(VLUE_NICKNAME_CHAT_KEY, s);
       else localStorage.removeItem(VLUE_NICKNAME_CHAT_KEY);
     }
     if (feed != null) {
-      const s = String(feed).trim().slice(0, VLUE_NICKNAME_MAX);
+      const s = scrubBrandDisplayName(String(feed).trim().slice(0, VLUE_NICKNAME_MAX));
       if (s) localStorage.setItem(VLUE_NICKNAME_FEED_KEY, s);
       else localStorage.removeItem(VLUE_NICKNAME_FEED_KEY);
     }

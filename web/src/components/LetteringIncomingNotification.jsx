@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getLetteringCallStatusLabel } from "../lib/letteringCallStatus.js";
-import { compareLetteringPhones, formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
+import { compareLetteringPhones, formatLetteringPhoneDisplay, normalizePhoneDigits } from "../lib/letteringPhoneMatch.js";
 import { openLetteringCertInVlueApp } from "../lib/letteringOpenVlueApp.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { VLUE_CARD_CAUTION, VLUE_UNVERIFIED_REPORT_DISCLAIMER } from "../lib/vlueDigitalCardUi.js";
@@ -16,10 +16,13 @@ import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDispl
 import { LETTERING_DEMO_COMPANY_LOGO } from "../lib/letteringDemoAssets.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAvatar.js";
+import { isVlueBrandAssetUrl } from "../lib/vlueAvatar.js";
+import { buildAuthValidityVerificationItems } from "../lib/authValidityPeriod.js";
 import { nativeEndCall } from "../lib/call/nativeCallControl.js";
 import { resolveIsKnownContact } from "../lib/contacts/hybridKnownContact.js";
-import { Phone, PhoneOff, ShieldCheck } from "lucide-react";
+import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
+import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import "../styles/showcase-call-glass.css";
 
 const DEMO_CARD = {
@@ -41,13 +44,7 @@ const DEMO_CARD = {
   feedType: "personal",
   membershipTier: "premium",
   address: "서울특별시 종로구 세종대로 67, 삼성생명빌딩",
-  verificationItems: [
-    "PASS \uBCF8\uC778\uC778\uC99D \uC644\uB8CC",
-    "\uC720\uB8CC \uBA85\uD568 \uB4F1\uAE09 \uC778\uC99D",
-    "VLUE \uBA85\uD568 \uC2B9\uC778 (2026.04)",
-    "\uC0AC\uC5C5\uC790 \uC815\uBCF4 \uD655\uC778",
-    "\uC804\uD654\uBC88\uD638 \uC77C\uCE58 \uD655\uC778"
-  ]
+  verificationItems: ["인증유효기간 : 2027.04.10"]
 };
 
 /** 무료 플랜 — 인스타 감성 단일 게시물 데모 */
@@ -61,7 +58,7 @@ export const LETTERING_EMOTIONAL_DEMO_CARD = {
   membershipTier: "free",
   feedId: "user-honggildong-free",
   feedType: "personal",
-  verificationItems: ["PASS \uBCF8\uC778\uC778\uC99D \uC644\uB8CC"]
+  verificationItems: ["인증유효기간 : 2027.04.10"]
 };
 
 function VlueVerifiedBadge({ className = "" }) {
@@ -99,7 +96,8 @@ function LetteringProfileThumb({ card, verified, size = "sm" }) {
   });
   const photoUrl = peer.type === "image" ? peer.url : "";
   /** 등록 로고만 사용 — 데모/브랜드 로고로 프로필 자리를 채우지 않음 */
-  const logoUrl = !photoUrl && card.logoUrl ? card.logoUrl : "";
+  const rawLogo = !photoUrl && card.logoUrl ? String(card.logoUrl).trim() : "";
+  const logoUrl = rawLogo && !isVlueBrandAssetUrl(rawLogo) ? rawLogo : "";
   const src = photoUrl || logoUrl;
   const isLogoOnly = !photoUrl && Boolean(logoUrl);
   const fallbackLabel =
@@ -166,7 +164,7 @@ export default function LetteringIncomingNotification({
   savedContactPhone = "",
   reportHistory = [],
   dragHandleProps = null,
-  card = DEMO_CARD,
+  card = null,
   expanded: expandedProp,
   defaultExpanded = false,
   onExpandedChange,
@@ -181,10 +179,16 @@ export default function LetteringIncomingNotification({
   hideUnverifiedFooter = false,
   /** 홈·친구 쇼케이스 미리보기 — 통화 수신 UI가 아닌 쇼케이스 열람 */
   previewMode = false,
+  /** 홈 미리보기: 명함 신청자만 true — 미신청 시 쇼케이스만 */
+  includeDigitalCard = true,
   /** 통화 종료 (연결 중·미리보기 전체화면) */
   onEndCall,
   /** 주소록 판별 — 미지정 시 하이브리드 해석 */
   isKnownContact: isKnownContactProp,
+  /** 홈 본인 미리보기 전용 — 통화 중 상대방 오버레이에는 절대 true 금지 */
+  showOwnerSettings = false,
+  /** 쇼케이스 꺼짐 미리보기 — 이름 숨김, 번호+VLUE 인증만 */
+  showcaseOffPreview = false,
   /** 미리보기·액션 안내 토스트 */
   onToast,
   className = ""
@@ -237,9 +241,18 @@ export default function LetteringIncomingNotification({
   };
   const c = normalizeLetteringCard(
     card && typeof card === "object"
-      ? { ...DEMO_CARD, ...card }
+      ? card
       : verified
-        ? DEMO_CARD
+        ? {
+            name: "",
+            displayName: "",
+            organization: "",
+            title: "",
+            department: "",
+            phone: incomingNumber || "",
+            membershipTier: "free",
+            verificationItems: []
+          }
         : {
             name: "",
             displayName: "",
@@ -295,9 +308,19 @@ export default function LetteringIncomingNotification({
       : Boolean(knownContact.isKnownContact || savedContactName);
 
   const verificationList = useMemo(() => {
-    const list = c.verificationItems.length ? c.verificationItems : DEMO_CARD.verificationItems;
-    return list.slice(0, 8);
-  }, [c.verificationItems]);
+    const raw = Array.isArray(c.verificationItems) ? c.verificationItems : [];
+    const cleaned = raw
+      .map((line) => String(line || "").trim())
+      .filter(Boolean)
+      .filter((line) => !/PASS\s*본인인증|명함\s*승인|유료\s*명함\s*등급|사업자\s*정보|전화번호\s*일치/i.test(line));
+    const hasValidity = cleaned.some((line) => /인증유효기간/.test(line));
+    if (hasValidity) return cleaned.slice(0, 4);
+    if (showcaseOffPreview) return [];
+    return buildAuthValidityVerificationItems({
+      paidAt: c.authPaidAt || c.issuedAt || null,
+      billingCycle: c.billingCycle || null
+    });
+  }, [c.verificationItems, c.authPaidAt, c.issuedAt, c.billingCycle, showcaseOffPreview]);
 
   const phoneMatched = useMemo(() => {
     if (!verified) return false;
@@ -375,10 +398,10 @@ export default function LetteringIncomingNotification({
     return resolveFreeTierSummary({
       incomingNumber: incoming,
       cardPhone: c.phone,
-      savedContactName,
+      savedContactName: savedContactName || knownContact.matchedName || "",
       savedContactPhone
     });
-  }, [isFreeMember, incoming, c.phone, savedContactName, savedContactPhone, walletTick]);
+  }, [isFreeMember, incoming, c.phone, savedContactName, savedContactPhone, walletTick, knownContact.matchedName]);
 
   const unverifiedCollapsedPhone = useMemo(() => {
     if (!isUnverified) return "";
@@ -386,16 +409,40 @@ export default function LetteringIncomingNotification({
     return phoneDisplay && phoneDisplay !== "\u2014" ? phoneDisplay : "";
   }, [isUnverified, incoming]);
 
-  /** 접힘 빅푸시 — 무료/유료 동일 (상호·이름 + 번호) */
+  const hideBroadcastName = Boolean(
+    showcaseOffPreview || c.hideBroadcastName || c.showcaseStyle?.showBroadcastName === false
+  );
+  const contactSavedName = String(savedContactName || knownContact.matchedName || "").trim();
+
+  /** 접힘 빅푸시 — 웹 기준: 상호·이름 + 번호 / 이름 송출 OFF 시 전화부 저장명·번호 */
   const receptionLines = !isUnverified
     ? formatLetteringReceptionLines(c, { incomingNumber: incoming })
     : null;
-  const displayLabel = isUnverified
-    ? null
-    : receptionLines?.collapsedPrimary || c.name || freeTierSummary?.primary || "—";
   const collapsedPhoneDisplay = receptionLines?.phone
     ? formatLetteringPhoneDisplay(receptionLines.phone)
-    : freeTierSummary?.phoneDisplay || "";
+    : freeTierSummary?.phoneDisplay || formatLetteringPhoneDisplay(incoming) || "";
+  const displayLabel = isUnverified
+    ? null
+    : showcaseOffPreview
+      ? collapsedPhoneDisplay || formatLetteringPhoneDisplay(incoming) || "—"
+      : hideBroadcastName
+        ? contactSavedName || collapsedPhoneDisplay || "—"
+        : receptionLines?.collapsedPrimary ||
+          c.name ||
+          freeTierSummary?.primary ||
+          contactSavedName ||
+          "—";
+  const phoneSameAsPrimary =
+    Boolean(collapsedPhoneDisplay) &&
+    normalizePhoneDigits(displayLabel) === normalizePhoneDigits(collapsedPhoneDisplay) &&
+    Boolean(normalizePhoneDigits(collapsedPhoneDisplay));
+  const showCollapsedOrg =
+    !showcaseOffPreview &&
+    !hideBroadcastName &&
+    Boolean(receptionLines?.organization) &&
+    String(receptionLines.organization).trim() !== String(displayLabel || "").trim();
+  const showCollapsedPhoneSubline =
+    !showcaseOffPreview && Boolean(collapsedPhoneDisplay) && !phoneSameAsPrimary;
 
   const previewStatusLabel = previewMode
     ? ""
@@ -571,7 +618,16 @@ export default function LetteringIncomingNotification({
             isUnverified ? "lettering-ongoing-summary--unverified" : ""
           } ${!isExpandedView && (isPaidMember || isFreeMember) ? "pb-3" : ""}`}
         >
-          {verified ? <LetteringProfileThumb card={c} verified={verified} size="sm" /> : null}
+          {verified && !showcaseOffPreview ? <LetteringProfileThumb card={c} verified={verified} size="sm" /> : null}
+          {verified && showcaseOffPreview ? (
+            <span
+              className="lettering-vlue-verified-badge lettering-vlue-verified-badge--metal inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600/25 ring-1 ring-blue-300/35"
+              title="VLUE 인증"
+              aria-label="VLUE 인증됨"
+            >
+              <ShieldCheck className="h-5 w-5 text-blue-200" strokeWidth={2.4} aria-hidden />
+            </span>
+          ) : null}
           <div className="min-w-0 flex-1">
             {isUnverified ? (
               <p className="lettering-ongoing-name-row min-w-0">
@@ -599,9 +655,9 @@ export default function LetteringIncomingNotification({
                     )
                   ) : null}
                 </p>
-                {collapsedPhoneDisplay ? (
+                {showCollapsedPhoneSubline ? (
                   <p className="lettering-ongoing-subline mt-0.5 min-w-0 truncate text-[11px] leading-snug">
-                    {receptionLines?.organization ? (
+                    {showCollapsedOrg ? (
                       <>
                         <span className="font-medium text-slate-600">{receptionLines.organization}</span>
                         <span className="text-slate-400"> / </span>
@@ -612,9 +668,12 @@ export default function LetteringIncomingNotification({
                     </span>
                   </p>
                 ) : null}
+                {showcaseOffPreview && !isExpandedView ? (
+                  <p className="mt-0.5 text-[11px] font-semibold text-slate-400">VLUE 인증 번호</p>
+                ) : null}
               </>
             )}
-            {!isUnverified && !collapsedPhoneDisplay && receptionLines?.expandedContactLine ? (
+            {!isUnverified && !showCollapsedPhoneSubline && !phoneSameAsPrimary && receptionLines?.expandedContactLine ? (
               <p className="lettering-ongoing-subtitle mt-0.5 truncate text-[11px] font-medium leading-snug text-slate-500">
                 {receptionLines.expandedContactLine}
               </p>
@@ -630,6 +689,28 @@ export default function LetteringIncomingNotification({
               </p>
             ) : null}
           </div>
+          {previewMode && showOwnerSettings ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                /* 전체화면 미리보기가 설정 시트를 가리므로 먼저 접고 설정 오픈 */
+                if (isExpandedView) {
+                  if (typeof onExpandedChange === "function") onExpandedChange(false);
+                  else if (typeof onEndCall === "function") onEndCall();
+                }
+                window.setTimeout(() => {
+                  window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
+                }, 40);
+              }}
+              className="lettering-owner-settings-btn inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-blue-600 px-2.5 text-[11px] font-black text-white shadow-sm active:scale-95"
+              aria-label="쇼케이스 스타일 설정"
+              title="본인만 보이는 설정"
+            >
+              <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+              설정
+            </button>
+          ) : null}
           {canExpand ? (
             <LetteringExpandButton
               expanded={expanded}
@@ -662,8 +743,10 @@ export default function LetteringIncomingNotification({
                       photos={showcasePhotos}
                       membershipTier="free"
                       isKnownContact={isKnownContact}
-                      scrollEnabled={false}
+                      scrollEnabled={Boolean(previewMode)}
                       previewMode={previewMode}
+                      includeDigitalCard={false}
+                      showcaseOffPreview={showcaseOffPreview}
                     />
                   ) : (
                     <FreeTierCallShowcase
@@ -671,6 +754,7 @@ export default function LetteringIncomingNotification({
                       card={c}
                       phone={incoming}
                       verified={verified}
+                      showcaseOffPreview={showcaseOffPreview}
                     />
                   )}
                 </div>
@@ -706,6 +790,7 @@ export default function LetteringIncomingNotification({
                       isKnownContact={isKnownContact}
                       scrollEnabled={carouselScrollEnabled}
                       previewMode={previewMode}
+                      includeDigitalCard={includeDigitalCard}
                       face={receptionFace}
                       onFaceChange={handleFaceChange}
                     />
@@ -761,7 +846,7 @@ export default function LetteringIncomingNotification({
       <ShowcaseDialConfirmModal
         open={dialOpen}
         phone={incoming}
-        displayName={c.name || savedContactName || ""}
+        displayName={hideBroadcastName ? contactSavedName : c.name || contactSavedName || ""}
         onClose={() => setDialOpen(false)}
       />
     </article>

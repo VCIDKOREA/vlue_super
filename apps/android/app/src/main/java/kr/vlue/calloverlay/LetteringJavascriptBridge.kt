@@ -102,6 +102,11 @@ class LetteringJavascriptBridge(
     }
 
     @JavascriptInterface
+    fun getLetteringPermissionStatusJson(): String {
+        return LetteringPermissionHelper.statusJson(service)
+    }
+
+    @JavascriptInterface
     fun openVlueCertInfo(json: String) {
         val intent = Intent(service, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -126,6 +131,7 @@ class LetteringJavascriptBridge(
                 window.VlueLettering.blockPhoneNumber = function(p){ Android.blockPhoneNumber(p); };
                 window.VlueLettering.setLetteringEnabled = function(v){ Android.setLetteringEnabled(v ? '1' : '0'); };
                 window.VlueLettering.requestLetteringPermissions = function(){ Android.requestLetteringPermissions(); };
+                window.VlueLettering.getLetteringPermissionStatusJson = function(){ return Android.getLetteringPermissionStatusJson(); };
                 window.VlueLettering.openCertInfo = function(msg){ Android.openVlueCertInfo(JSON.stringify(msg||{})); };
                 window.VlueLettering.onNativeCallState = window.VlueLettering.onNativeCallState || function(){};
             """.trimIndent()

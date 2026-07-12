@@ -19,8 +19,8 @@ export const DEFAULT_PRICING_CONFIG = {
         soho_activity: {
             sku: "soho_activity",
             label: "SOHO 활동형",
-            monthlyKrw: 19800,
-            annualKrw: 198000,
+            monthlyKrw: 9900,
+            annualKrw: 99000,
             billingUnit: "per_account",
             platforms: ["mobile", "web"],
             features: ["chat", "shopping", "digital_card_primary", "vluer_rewards"],

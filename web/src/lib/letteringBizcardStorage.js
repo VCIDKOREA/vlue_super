@@ -113,8 +113,98 @@ const DEFAULT_EDITABLE = {
   titleDeptVerifyDocName: "",
   titleDeptVerifyDocDataUrl: "",
   titleDeptVerifyDocIssuedAt: "",
-  titleDeptSubmittedAt: ""
+  titleDeptSubmittedAt: "",
+  orgChangeApprovalStatus: "",
+  orgChangePendingName: "",
+  orgChangeEvidenceKind: "",
+  orgChangeEvidenceName: "",
+  orgChangeEvidenceDataUrl: "",
+  orgChangeSubmittedAt: ""
 };
+
+export const ORG_CHANGE_EVIDENCE_KINDS = [
+  { id: "storefront", label: "가게 간판 사진" },
+  { id: "web_app", label: "서비스 웹/앱 화면" }
+];
+
+export const ORG_CHANGE_APPROVAL = {
+  NONE: "",
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected"
+};
+
+/** 상호 변경 신청 접수 */
+export function submitOrgChangeRequest({
+  pendingName = "",
+  evidenceKind = "",
+  evidenceName = "",
+  evidenceDataUrl = ""
+} = {}) {
+  const name = String(pendingName || "").trim();
+  if (!name) return { ok: false, error: "변경할 상호를 입력해 주세요." };
+  if (!evidenceKind || !ORG_CHANGE_EVIDENCE_KINDS.some((k) => k.id === evidenceKind)) {
+    return { ok: false, error: "증빙 종류(간판·웹/앱)를 선택해 주세요." };
+  }
+  if (!evidenceDataUrl) {
+    return { ok: false, error: "증빙 사진을 첨부해 주세요." };
+  }
+  writeLetteringBizcardEditable({
+    orgChangeApprovalStatus: ORG_CHANGE_APPROVAL.PENDING,
+    orgChangePendingName: name,
+    orgChangeEvidenceKind: evidenceKind,
+    orgChangeEvidenceName: String(evidenceName || "").trim(),
+    orgChangeEvidenceDataUrl: String(evidenceDataUrl || ""),
+    orgChangeSubmittedAt: new Date().toISOString()
+  });
+  return { ok: true };
+}
+
+/** 승인 시 상호 자동 반영 */
+export function applyApprovedOrgChange(approvedName) {
+  const name = String(approvedName || "").trim();
+  if (!name) return false;
+  try {
+    localStorage.setItem("vlue_company_locked", name);
+    localStorage.setItem("myCardOrganization", name);
+  } catch {
+    return false;
+  }
+  writeLetteringBizcardEditable({
+    orgChangeApprovalStatus: ORG_CHANGE_APPROVAL.APPROVED,
+    orgChangePendingName: "",
+    orgChangeEvidenceKind: "",
+    orgChangeEvidenceName: "",
+    orgChangeEvidenceDataUrl: "",
+    orgChangeSubmittedAt: ""
+  });
+  return true;
+}
+
+/**
+ * 승인 상태 반영 — pending 요청이 approved로 바뀌면 상호 자동 변경
+ * @param {{ status: string, approvedName?: string }} result
+ */
+export function syncOrgChangeApprovalResult(result = {}) {
+  const status = String(result.status || "").trim();
+  const ed = readLetteringBizcardEditable();
+  if (status === ORG_CHANGE_APPROVAL.APPROVED) {
+    const name = String(result.approvedName || ed.orgChangePendingName || "").trim();
+    return applyApprovedOrgChange(name);
+  }
+  if (status === ORG_CHANGE_APPROVAL.REJECTED) {
+    writeLetteringBizcardEditable({
+      orgChangeApprovalStatus: ORG_CHANGE_APPROVAL.REJECTED
+    });
+    return false;
+  }
+  if (status === ORG_CHANGE_APPROVAL.PENDING) {
+    writeLetteringBizcardEditable({
+      orgChangeApprovalStatus: ORG_CHANGE_APPROVAL.PENDING
+    });
+  }
+  return false;
+}
 
 export function readLetteringFixedIdentity() {
   let organization = "";
@@ -126,23 +216,22 @@ export function readLetteringFixedIdentity() {
       .toLowerCase()
       .replace(/^@/, "");
 
-    /* 플랫폼 ceo — 표시명·번호·잔여 데모 직책/부서 정리 */
+    /* 플랫폼 ceo — 이름/회사/직책·번호 고정 */
     if (handle === "ceo") {
-      const ceoName = "CEO · VCID KOREA";
+      const ceoName = "이종근";
+      const ceoOrg = "VCID KOREA";
       localStorage.setItem("vlue_phone_e164", "+821080144666");
       localStorage.setItem("myCardPhone", "010-8014-4666");
       localStorage.setItem("myCardDisplayName", ceoName);
       localStorage.setItem("vlue_legal_name", ceoName);
+      localStorage.setItem("myCardOrganization", ceoOrg);
       if (!String(localStorage.getItem("vlue_company_locked") || "").trim()) {
-        localStorage.setItem("myCardOrganization", "VCID KOREA");
+        localStorage.setItem("vlue_company_locked", ceoOrg);
       }
       phone = "010-8014-4666";
       name = ceoName;
-      organization =
-        String(localStorage.getItem("vlue_company_locked") || "").trim() ||
-        String(localStorage.getItem("myCardOrganization") || "").trim() ||
-        "VCID KOREA";
-      scrubCeoDemoTitleDepartment();
+      organization = ceoOrg;
+      ensureCeoLetteringTitle();
     } else {
       organization =
         String(localStorage.getItem("vlue_company_locked") || "").trim() ||
@@ -164,33 +253,33 @@ export function readLetteringFixedIdentity() {
   return { organization, name, phone };
 }
 
-/** ceo 계정에 남은 데모 직책·부서(과장·설계팀 등) 제거 */
-function scrubCeoDemoTitleDepartment() {
+/** ceo 계정 — 직책 CEO, 데모 부서 제거 */
+function ensureCeoLetteringTitle() {
   try {
     const raw = localStorage.getItem(LETTERING_BIZCARD_STORAGE_KEY);
     const prev = raw ? JSON.parse(raw) : {};
     if (!prev || typeof prev !== "object") return;
     const next = {
       ...prev,
-      title: "",
+      title: "CEO",
       department: "",
-      approvedTitle: "",
+      approvedTitle: "CEO",
       approvedDepartment: "",
       titleDeptPendingTitle: "",
       titleDeptPendingDepartment: "",
-      titleDeptApprovalStatus: ""
+      titleDeptApprovalStatus: "approved"
     };
     if (String(prev.companyIntro || "").trim() === "보안 솔루션 통합 플랫폼") {
       next.companyIntro = "";
     }
     const changed =
-      prev.title ||
+      String(prev.title || "") !== "CEO" ||
+      String(prev.approvedTitle || "") !== "CEO" ||
       prev.department ||
-      prev.approvedTitle ||
       prev.approvedDepartment ||
       prev.titleDeptPendingTitle ||
       prev.titleDeptPendingDepartment ||
-      prev.titleDeptApprovalStatus ||
+      String(prev.titleDeptApprovalStatus || "") !== "approved" ||
       next.companyIntro !== prev.companyIntro;
     if (changed) {
       localStorage.setItem(LETTERING_BIZCARD_STORAGE_KEY, JSON.stringify({ ...DEFAULT_EDITABLE, ...next }));

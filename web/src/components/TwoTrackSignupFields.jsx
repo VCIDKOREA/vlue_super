@@ -122,9 +122,10 @@ export default function TwoTrackSignupFields({
       if (data.devCode) {
         setOtpHint(`개발 모드 인증번호: ${data.devCode}`);
       } else {
-        setOtpHint("인증번호를 메일함에서 확인해 주세요.");
+        setOtpHint("인증번호를 메일함(또는 스팸함)에서 확인해 주세요. 수 분 내 미도착 시 「개인 아이디로 가입」을 이용해 주세요.");
       }
     } catch (e) {
+      setOtpHint("");
       onEmailVerifyChange({
         status: "error",
         message: e instanceof Error ? e.message : "발송 실패",

@@ -5,10 +5,26 @@ import {
   readLetteringFixedIdentity,
   formatLetteringContactEmailDisplay,
   combineLetteringBizcardAddress,
-  readLetteringBizcardAddressFields
+  readLetteringBizcardAddressFields,
+  writeLetteringBizcardEditable
 } from "./letteringBizcardStorage.js";
 import { normalizeLetteringBizcardTemplate } from "./letteringBizcardTemplates.js";
 import { resolveDisplayTitleDepartment } from "./letteringBizcardVerification.js";
+import { scrubLetteringDemoPollution, scrubLetteringEditablePollution } from "./letteringDemoPollution.js";
+import { buildAuthValidityVerificationItems } from "./authValidityPeriod.js";
+
+function isPlatformCeoHandle() {
+  try {
+    return (
+      String(localStorage.getItem("vlue_member_handle") || "")
+        .trim()
+        .toLowerCase()
+        .replace(/^@/, "") === "ceo"
+    );
+  } catch {
+    return false;
+  }
+}
 
 /** 마케팅·문서용 데모 명함만. 실사용자 미리보기에는 절대 주입하지 않음. */
 export const LETTERING_MARKETING_DEMO_CARD = Object.freeze({
@@ -57,33 +73,26 @@ export function withLetteringBizcardPreviewFallback(card = {}, opts = {}) {
     };
   }
 
-  const organization = cleanField(card?.organization);
-  const phoneRaw = cleanField(card?.phone);
-  const emailRaw = cleanField(card?.email);
+  const scrubbed = scrubLetteringDemoPollution(card);
+  const organization = cleanField(scrubbed?.organization);
+  const phoneRaw = cleanField(scrubbed?.phone);
+  const emailRaw = cleanField(scrubbed?.email);
   return {
-    ...card,
-    name: cleanField(card?.name),
-    title: cleanField(card?.title),
+    ...scrubbed,
+    name: cleanField(scrubbed?.name),
+    title: cleanField(scrubbed?.title),
     organization,
-    department: cleanField(card?.department),
+    department: cleanField(scrubbed?.department),
     phone: phoneRaw,
-    fax: cleanField(card?.fax),
+    fax: cleanField(scrubbed?.fax),
     email: formatLetteringContactEmailDisplay(emailRaw) || emailRaw,
-    website: cleanField(card?.website),
-    logoUrl: card.noCompanyLogo ? "" : String(card.logoUrl || "").trim(),
-    photoUrl: card.noProfilePhoto ? "" : String(card.photoUrl || "").trim()
+    website: cleanField(scrubbed?.website),
+    logoUrl: scrubbed.noCompanyLogo ? "" : String(scrubbed.logoUrl || "").trim(),
+    photoUrl: scrubbed.noProfilePhoto ? "" : String(scrubbed.photoUrl || "").trim(),
+    customBackText: cleanField(scrubbed?.customBackText),
+    companyIntro: cleanField(scrubbed?.companyIntro),
+    address: cleanField(scrubbed?.address)
   };
-}
-
-function readOnboardingAddress() {
-  try {
-    const road = String(localStorage.getItem("vlue_onboarding_address") || "").trim();
-    const detail = String(localStorage.getItem("vlue_onboarding_address_detail") || "").trim();
-    if (road && detail) return `${road} ${detail}`;
-    return road || detail;
-  } catch {
-    return "";
-  }
 }
 
 function readUserId() {
@@ -94,38 +103,99 @@ function readUserId() {
   }
 }
 
+function purgePollutedLocalIdentity() {
+  try {
+    const org = String(localStorage.getItem("vlue_company_locked") || "").trim();
+    if (org === "VCID KOREA" || org === "삼성생명") {
+      localStorage.removeItem("vlue_company_locked");
+      if (String(localStorage.getItem("myCardOrganization") || "").trim() === org) {
+        localStorage.removeItem("myCardOrganization");
+      }
+    }
+    const email = String(localStorage.getItem("vlue_card_email") || "")
+      .trim()
+      .toLowerCase();
+    if (["vcid@vlue.kr", "ceo@vlue.kr", "user@vlue.kr", "hgildong@sam-life.co.kr"].includes(email)) {
+      localStorage.removeItem("vlue_card_email");
+    }
+    const promo = String(localStorage.getItem("vlue_card_promo") || "").trim();
+    if (/보이스피싱|사칭사기|재산과 개인정보/i.test(promo)) {
+      localStorage.removeItem("vlue_card_promo");
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 /** 가입 고정값 + 사용자 편집 → Lettering 명함 카드 (미작성 필드는 빈 칸) */
 export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
+  const isCeo = isPlatformCeoHandle();
+  if (!isCeo) purgePollutedLocalIdentity();
+
   const fixed = readLetteringFixedIdentity();
-  const ed = readLetteringBizcardEditable();
-  const fallbackAddress = readOnboardingAddress();
+  const rawEd = readLetteringBizcardEditable();
+  const cleanedEd = scrubLetteringEditablePollution(rawEd, { isCeo });
+  if (
+    !isCeo &&
+    (cleanedEd.email !== rawEd.email ||
+      cleanedEd.website !== rawEd.website ||
+      cleanedEd.customBackText !== rawEd.customBackText ||
+      cleanedEd.companyIntro !== rawEd.companyIntro ||
+      cleanedEd.address !== rawEd.address ||
+      cleanedEd.addressRoad !== rawEd.addressRoad)
+  ) {
+    writeLetteringBizcardEditable({
+      email: cleanedEd.email || "",
+      website: cleanedEd.website || "",
+      customBackText: cleanedEd.customBackText || "",
+      companyIntro: cleanedEd.companyIntro || "",
+      address: cleanedEd.address || "",
+      addressRoad: cleanedEd.addressRoad || "",
+      addressDetail: cleanedEd.addressDetail || ""
+    });
+  }
+  const ed = scrubLetteringEditablePollution(readLetteringBizcardEditable(), { isCeo });
   const userId = readUserId();
   const { road, detail } = readLetteringBizcardAddressFields(ed);
-  const address = combineLetteringBizcardAddress(road, detail) || String(ed.address || "").trim() || fallbackAddress;
+  let address = combineLetteringBizcardAddress(road, detail) || String(ed.address || "").trim();
   const titleDept = resolveDisplayTitleDepartment(ed);
 
-  return normalizeLetteringCard({
-    designTemplate: normalizeLetteringBizcardTemplate(ed.designTemplate),
-    name: fixed.name || "",
-    displayName: fixed.name,
-    organization: fixed.organization || "",
-    phone: fixed.phone || "",
-    title: titleDept.title,
-    department: titleDept.department,
-    titleDeptPending: titleDept.pending,
-    fax: ed.noFax ? "" : ed.fax,
-    email: ed.email,
-    website: ed.noWebsite ? "" : ed.website,
-    companyIntro: ed.companyIntro,
-    customBackText: ed.customBackText,
-    address,
-    logoUrl: ed.noCompanyLogo ? "" : ed.logoDataUrl,
-    photoUrl: ed.noProfilePhoto ? "" : ed.photoDataUrl || "",
-    membershipTier,
-    feedId: userId ? `user-${userId}` : "",
-    feedType: "personal",
-    verificationItems: fixed.name
-      ? ["PASS \uBCF8\uC778\uC778\uC99D \uC644\uB8CC", "VLUE \uBA85\uD568 \uC2B9\uC778"]
-      : []
-  });
+  const identity = scrubLetteringDemoPollution(
+    {
+      name: fixed.name || "",
+      organization: fixed.organization || "",
+      email: ed.email,
+      website: ed.website,
+      address,
+      customBackText: ed.customBackText,
+      companyIntro: ed.companyIntro
+    },
+    { isCeo }
+  );
+
+  return scrubLetteringDemoPollution(
+    normalizeLetteringCard({
+      designTemplate: normalizeLetteringBizcardTemplate(ed.designTemplate),
+      name: identity.name || "",
+      displayName: identity.name || "",
+      organization: identity.organization || "",
+      phone: fixed.phone || "",
+      title: isCeo ? titleDept.title : titleDept.title === "CEO" ? "" : titleDept.title,
+      department: titleDept.department,
+      titleDeptPending: titleDept.pending,
+      fax: ed.noFax ? "" : ed.fax,
+      email: identity.email || "",
+      website: ed.noWebsite ? "" : identity.website || "",
+      companyIntro: identity.companyIntro || "",
+      customBackText: identity.customBackText || "",
+      address: identity.address || "",
+      logoUrl: ed.noCompanyLogo ? "" : ed.logoDataUrl,
+      photoUrl: ed.noProfilePhoto ? "" : ed.photoDataUrl || "",
+      membershipTier,
+      feedId: userId ? `user-${userId}` : "",
+      feedType: "personal",
+      verificationItems: identity.name ? buildAuthValidityVerificationItems() : []
+    }),
+    { isCeo }
+  );
 }

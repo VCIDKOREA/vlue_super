@@ -116,6 +116,9 @@ export async function requestIamportCertification(userCode = getPortoneUserCode(
       m_redirect_url: payload.m_redirect_url,
       impUserCode: `${String(userCode).slice(0, 6)}…`
     });
+  } else if (typeof console !== "undefined" && console.info) {
+    /* 운영에서도 pg만 남겨 이니시스 일반 오류 원인 추적 (MID·키 전체는 미출력) */
+    console.info("[VLUE 본인인증 요청]", { pg, company: String(company).slice(0, 64) });
   }
 
   return new Promise((resolve, reject) => {
