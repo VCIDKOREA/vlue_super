@@ -8,15 +8,14 @@
   background: #0f172a !important;
 }
 
-/* 홈·마이페이지 접힘 빅푸시 — 웹 마케팅 쇼케이스 바와 동일 글래스 */
+/* 홈·마이페이지 접힘 빅푸시 — 웹 마케팅 쇼케이스 바와 동일 글래스
+ * radius는 임베드 한 곳에서만 — 안쪽 article 이중 radius가 "이것도 저것도 아닌" 모서리 만듦 */
 .lettering-home-push-embed {
   overflow: hidden;
   border-radius: 20px;
-  background: #0f172a;
+  background: transparent;
   border: 1px solid rgba(148, 163, 184, 0.2);
-  box-shadow:
-    0 14px 40px rgba(15, 23, 42, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.32);
 }
 
 .lettering-home-push-embed--placeholder {
@@ -29,8 +28,17 @@
   min-height: 0 !important;
   max-height: none !important;
   height: auto !important;
-  border-radius: 0 !important;
+  /* 임베드와 동일 라운드 — 뾰족/이중 프레임 방지 */
+  border-radius: 20px !important;
+  border: 0 !important;
   box-shadow: none !important;
+  overflow: hidden !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--home-glass::before {
+  display: none !important;
 }
 
 /* 쇼케이스 꺼짐 접힘 픽푸시 — 높이 고정(강제 펼침 없음) */
@@ -331,6 +339,61 @@
   touch-action: pan-y pinch-zoom;
   border-radius: 20px;
   pointer-events: auto;
+  isolation: isolate;
+}
+
+.showcase-call-carousel__viewport--keypad {
+  touch-action: none;
+  cursor: default;
+}
+
+.showcase-call-carousel__stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  overflow: hidden;
+  transition: opacity 0.26s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.showcase-call-carousel__stage.is-dimmed {
+  opacity: 0;
+  transform: scale(0.985);
+  pointer-events: none;
+}
+
+.showcase-call-carousel__keypad-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  background: rgba(11, 18, 32, 0.98);
+  animation: showcase-keypad-layer-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.showcase-call-carousel__keypad.incall-dtmf-pad--fill {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+@keyframes showcase-keypad-layer-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .showcase-call-carousel--paid .showcase-call-carousel__viewport {
@@ -602,6 +665,7 @@
   flex: 1 1 auto;
   height: 100%;
   min-height: 0;
+  position: relative;
   border-radius: 20px;
   overflow: hidden;
   border: 1px solid rgba(226, 232, 240, 0.1);
@@ -674,6 +738,7 @@
   flex: 1 1 auto;
   gap: 0;
   padding-bottom: 8px;
+  min-height: 0;
 }
 
 .showcase-call-carousel .ldr-reception--push .ldr-panel--front .vlue-push-auth-seal {
@@ -916,10 +981,6 @@
   font-weight: 600;
   line-height: 1.35;
   color: rgba(226, 232, 240, 0.62);
-}
-
-.showcase-call-carousel__viewport {
-  position: relative;
 }
 
 .showcase-call-carousel__paid-sheet {

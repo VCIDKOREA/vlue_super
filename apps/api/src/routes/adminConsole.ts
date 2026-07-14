@@ -258,5 +258,38 @@ authed.post("/health/test-scanner", async (c) => {
   });
 });
 
+/** GET /api/admin/console/security-search-alerts — 쇼케이스 검색 어뷰징 경보 */
+authed.get("/security-search-alerts", async (c) => {
+  const limit = Math.min(100, Math.max(1, Number.parseInt(String(c.req.query("limit") ?? "40"), 10) || 40));
+  const onlyOpen = String(c.req.query("open") ?? "1") !== "0";
+  const rows = await prisma.securitySearchAlert.findMany({
+    where: onlyOpen ? { acknowledged: false } : undefined,
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: {
+      user: {
+        select: {
+          id: true,
+          publicHandle: true,
+          legalName: true,
+          accountStatus: true,
+          searchAbuseStrikeCount: true
+        }
+      }
+    }
+  });
+  return c.json({ ok: true, items: rows });
+});
+
+/** POST /api/admin/console/security-search-alerts/:id/ack */
+authed.post("/security-search-alerts/:id/ack", async (c) => {
+  const id = c.req.param("id");
+  await prisma.securitySearchAlert.update({
+    where: { id },
+    data: { acknowledged: true }
+  });
+  return c.json({ ok: true });
+});
+
 authed.route("/pricing-config", adminPricingConfigRoutes);
 adminConsoleRoutes.route("/", authed);

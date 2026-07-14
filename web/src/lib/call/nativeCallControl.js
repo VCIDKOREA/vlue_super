@@ -1,5 +1,5 @@
 /**
- * 네이티브 통화 제어 브릿지 — 응답 / 종료 / 오버레이 전체화면
+ * 네이티브 통화 제어 브릿지 — 응답 / 종료 / 음소거 / 스피커 / DTMF / 오버레이
  */
 
 function callBridge(method, ...args) {
@@ -28,7 +28,20 @@ export function nativeAnswerCall() {
   return r !== false;
 }
 
-/** 통화 즉시 종료 (Telecom endCall) + 오버레이 닫기 */
+/**
+ * 통화 신호만 종료 — 쇼케이스 오버레이는 유지 (사후 감상)
+ * Android: TelecomManager.endCall / iOS: CallKit CXEndCallAction 브릿지
+ */
+export function nativeEndCallKeepOverlay() {
+  const ended = callBridge("endCallKeepOverlay");
+  if (ended === undefined) {
+    /* 구버전 브릿지: endCall이 dismiss까지 하면 폴백으로 end만 시도 불가 → dismiss 없는 경로 우선 */
+    return callBridge("endCallOnly") !== false;
+  }
+  return ended !== false;
+}
+
+/** 통화 종료 + 오버레이 닫기 (거절·완전 종료) */
 export function nativeEndCall() {
   const ended = callBridge("endCall");
   try {
@@ -44,10 +57,6 @@ export function nativeRejectCall() {
   return nativeEndCall();
 }
 
-/**
- * 시스템 오버레이를 전체화면(MATCH_PARENT)으로 확장
- * @param {boolean} fullscreen
- */
 export function nativeSetOverlayFullscreen(fullscreen) {
   callBridge("setOverlayFullscreen", fullscreen ? "1" : "0");
 }
@@ -56,12 +65,87 @@ export function nativeDismissOverlay() {
   callBridge("dismissOverlay");
 }
 
-/** 브릿지 존재 여부 */
+/** @param {boolean} muted */
+export function nativeSetMicrophoneMute(muted) {
+  const r = callBridge("setMicrophoneMute", muted ? "1" : "0");
+  return r !== false;
+}
+
+/** @returns {boolean} */
+export function nativeIsMicrophoneMute() {
+  const r = callBridge("isMicrophoneMute");
+  return r === true || r === "1" || r === 1;
+}
+
+/** @param {boolean} on */
+export function nativeSetSpeakerphoneOn(on) {
+  const r = callBridge("setSpeakerphoneOn", on ? "1" : "0");
+  return r !== false;
+}
+
+/** @returns {boolean} */
+export function nativeIsSpeakerphoneOn() {
+  const r = callBridge("isSpeakerphoneOn");
+  return r === true || r === "1" || r === 1;
+}
+
+/**
+ * DTMF 송출 (InCall 연결 시) / 로컬 톤 폴백
+ * @param {string} digit 0-9 * #
+ */
+export function nativePlayDtmf(digit) {
+  const d = String(digit || "").slice(0, 1);
+  if (!d) return false;
+  return callBridge("playDtmfTone", d) !== false;
+}
+
+export function nativeStopDtmf() {
+  callBridge("stopDtmfTone");
+}
+
+/** iOS: 쇼케이스 가림 → 순정 통화 UI 노출 (스와이프 업) */
+export function nativeRevealSystemCallUi() {
+  return callBridge("revealSystemCallUi") !== false;
+}
+
+/** iOS: 쇼케이스 복귀 */
+export function nativeRestoreShowcaseOverlay() {
+  return callBridge("restoreShowcaseOverlay") !== false;
+}
+
 export function hasNativeCallControl() {
   return Boolean(
     window.VlueLettering?.endCall ||
       window.Android?.endCall ||
+      window.VlueLettering?.endCallKeepOverlay ||
+      window.Android?.endCallKeepOverlay ||
       window.VlueLettering?.dismissOverlay ||
       window.Android?.dismissOverlay
   );
+}
+
+export function hasNativeAudioControl() {
+  return Boolean(
+    window.VlueLettering?.setSpeakerphoneOn ||
+      window.Android?.setSpeakerphoneOn ||
+      window.VlueLettering?.setMicrophoneMute ||
+      window.Android?.setMicrophoneMute
+  );
+}
+
+/** Android InCallService(기본 전화앱) DTMF 가능 여부 */
+export function getNativeInCallCapability() {
+  try {
+    const raw =
+      window.VlueLettering?.getInCallCapabilityJson?.() ||
+      window.Android?.getInCallCapabilityJson?.();
+    if (!raw) return { defaultDialer: false, realDtmf: false };
+    return typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return { defaultDialer: false, realDtmf: false };
+  }
+}
+
+export function nativeRequestDefaultDialerRole() {
+  callBridge("requestDefaultDialerRole");
 }

@@ -5932,6 +5932,36 @@ body,
   padding: 0 14px;
   position: relative;
   z-index: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* 키패드 — 탭·프로필·연락처·인증배지 포함 명함 프레임 전체 덮기 */
+.ldr-reception--push.ldr-reception--keypad {
+  position: relative;
+  overflow: hidden;
+}
+
+.ldr-reception--push .ldr-reception-keypad-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  background: rgba(11, 18, 32, 0.98);
+  animation: showcase-keypad-layer-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ldr-reception--push .ldr-reception-keypad.incall-dtmf-pad--fill {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: clamp(10px, 2vh, 16px) clamp(12px, 3vw, 18px) clamp(10px, 1.8vh, 14px);
 }
 
 .ldr-reception--push .ldr-panel--front .ldr-back-head {
@@ -6262,6 +6292,7 @@ body,
 .ldr-reception--push {
   flex: 1;
   min-height: 0;
+  position: relative;
 }
 
 .ldr-face-tabs {

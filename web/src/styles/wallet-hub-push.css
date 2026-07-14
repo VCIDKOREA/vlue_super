@@ -1,0 +1,67 @@
+/* 개인케이스 · 명함저장 — 홈 메인 `lettering-home-push-embed` + home-glass 그대로 사용 */
+
+.wallet-hub-push {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wallet-hub-push + .wallet-hub-push {
+  margin-top: 12px;
+}
+
+.wallet-hub-push .lettering-home-push-embed {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+/* collapsed overflow:visible 이 모서리를 깨뜨리지 않도록 */
+.wallet-hub-push .lettering-ongoing--home-glass,
+.wallet-hub-push .lettering-ongoing--home-glass.lettering-ongoing--collapsed {
+  overflow: hidden !important;
+  border-radius: 20px !important;
+}
+
+/* 명함저장: 펼침은 하단 저장·삭제만 — 디지털명함/캐러셀 본문 없음 */
+.wallet-hub-push .lettering-ongoing-expand-slot,
+.wallet-hub-push .lettering-ongoing-actions-secondary {
+  display: none !important;
+}
+
+.wallet-hub-push__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 0 2px;
+}
+
+.wallet-hub-push__footer-btn {
+  flex: 1 1 auto;
+  min-height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(248, 250, 252, 0.95);
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wallet-hub-push__footer.is-dark .wallet-hub-push__footer-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+
+.wallet-hub-push__footer-btn--danger {
+  color: #e11d48;
+  border-color: rgba(244, 63, 94, 0.28);
+  background: rgba(255, 241, 242, 0.9);
+}
+
+.wallet-hub-push__footer.is-dark .wallet-hub-push__footer-btn--danger {
+  color: #fda4af;
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.28);
+}

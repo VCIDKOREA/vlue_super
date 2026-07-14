@@ -186,10 +186,10 @@ function staticScreens(membershipTier) {
       id: "scr-documents",
       category: "바로가기",
       title: "업무·일상 서류 양식",
-      subtitle: "개인케이스 · 내문서 · 서류 양식",
-      fields: ["서류", "양식", "다운로드", "위임장", "근로계약", "내용증명", "계약서", "문서", "자료실", "개인케이스"],
+      subtitle: "V2 예정 · 현재 미제공",
+      fields: ["서류", "양식", "다운로드", "위임장", "근로계약", "내용증명", "계약서"],
       action: { type: "wallet", tab: "mydocs" },
-      v1: () => v1AppShell.personalVault
+      v1: () => false
     },
     {
       id: "scr-local-ad",

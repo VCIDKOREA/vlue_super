@@ -26,6 +26,7 @@ import {
 } from "../lib/showcase/showcaseContactActions.js";
 import VluePushAuthSeal from "./VluePushAuthSeal.jsx";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
+import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
 
 function formatWebsite(raw) {
@@ -487,7 +488,12 @@ export default function LetteringDigitalReception({
   enableContactLinks = true,
   face = "front",
   onFaceChange,
-  className = ""
+  className = "",
+  /** 명함 프레임(탭·프로필·인증배지 포함) 전체를 덮는 DTMF 키패드 */
+  keypadOpen = false,
+  onKeypadClose,
+  keypadDemoMode = false,
+  onToast
 }) {
   const card = useMemo(() => normalizeLetteringCard(cardRaw || {}), [cardRaw]);
   const items = verificationItems.length ? verificationItems : card.verificationItems;
@@ -532,10 +538,10 @@ export default function LetteringDigitalReception({
     <div
       className={`ldr-reception${embeddedInPush ? " ldr-reception--push" : ""}${
         previewMode ? " ldr-reception--preview" : ""
-      } ${className}`.trim()}
+      }${keypadOpen ? " ldr-reception--keypad" : ""} ${className}`.trim()}
       data-face={face}
     >
-      <div className="ldr-face-tabs" role="tablist" aria-label="명함 면">
+      <div className="ldr-face-tabs" role="tablist" aria-label="명함 면" aria-hidden={keypadOpen}>
         <button
           type="button"
           role="tab"
@@ -564,7 +570,7 @@ export default function LetteringDigitalReception({
         </button>
       </div>
 
-      <div className="ldr-panel-wrap" role="tabpanel" ref={panelWrapRef}>
+      <div className="ldr-panel-wrap" role="tabpanel" ref={panelWrapRef} aria-hidden={keypadOpen}>
         {useStackedPanels ? (
           <div className="ldr-panel-stage">
             {front}
@@ -576,6 +582,18 @@ export default function LetteringDigitalReception({
           front
         )}
       </div>
+
+      {keypadOpen ? (
+        <div className="ldr-reception-keypad-layer">
+          <InCallDtmfPad
+            fill
+            className="ldr-reception-keypad"
+            demoMode={keypadDemoMode}
+            onClose={() => onKeypadClose?.()}
+            onToast={onToast}
+          />
+        </div>
+      ) : null}
 
       <ShowcaseDialConfirmModal
         open={Boolean(dialTarget?.phone)}

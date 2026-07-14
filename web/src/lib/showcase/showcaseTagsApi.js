@@ -16,16 +16,57 @@ export async function syncShowcaseTagsToServer(tags = []) {
   }
 }
 
-/** V1 — #해시태그 쇼케이스 검색 (홈 디렉토리) */
-export async function searchShowcaseByTag(query) {
+/**
+ * V1 — 쇼케이스 검색 (인증 필수 · 상호주의 · 마스킹)
+ * @param {string} query
+ * @param {{ mode?: 'hashtag'|'phone'|'name'|'id' }} [opts]
+ */
+export async function searchShowcaseByTag(query, opts = {}) {
   const q = String(query || "").trim();
   if (!q) return { ok: true, items: [] };
+  const mode = opts.mode || "hashtag";
   try {
-    const res = await fetch(apiUrl(`/api/lettering/showcase/tags/search?${new URLSearchParams({ q })}`));
+    const params = new URLSearchParams({ q, mode });
+    const res = await vlueAuthFetch(apiUrl(`/api/lettering/showcase/tags/search?${params}`));
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, items: [], error: data.error };
-    return { ok: true, items: data.items || [], tag: data.tag };
+    if (!res.ok) {
+      return {
+        ok: false,
+        items: [],
+        error: data.error || "search_failed",
+        code: data.code,
+        meta: data.meta,
+        status: res.status
+      };
+    }
+    return { ok: true, items: data.items || [], tag: data.tag, mode: data.mode || mode };
   } catch (e) {
     return { ok: false, items: [], error: e?.message || "network" };
+  }
+}
+
+export async function fetchShowcaseSearchPrivacy() {
+  try {
+    const res = await vlueAuthFetch(apiUrl("/api/lettering/showcase/search-privacy"));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, privacy: null, error: data.error };
+    return { ok: true, privacy: data.privacy };
+  } catch (e) {
+    return { ok: false, privacy: null, error: e?.message || "network" };
+  }
+}
+
+export async function saveShowcaseSearchPrivacy(patch = {}) {
+  try {
+    const res = await vlueAuthFetch(apiUrl("/api/lettering/showcase/search-privacy"), {
+      method: "PUT",
+      headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(patch)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, privacy: null, error: data.error };
+    return { ok: true, privacy: data.privacy };
+  } catch (e) {
+    return { ok: false, privacy: null, error: e?.message || "network" };
   }
 }

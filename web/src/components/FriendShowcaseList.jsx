@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Search, UserPlus } from "lucide-react";
+import { ChevronDown, ChevronUp, Search } from "lucide-react";
 import { buildFriendShowcaseEntries } from "../lib/friendShowcaseEntries.js";
 import {
   FRIEND_SHOWCASE_ACTIVITY_EVENT,
@@ -284,20 +284,6 @@ export default function FriendShowcaseList({
       <button type="button" className={`friend-showcase-list__icon-btn${searchOpen ? " friend-showcase-list__icon-btn--active" : ""}`} onClick={onSearchClick} aria-label="친구 검색" aria-pressed={searchOpen}>
         <Search size={20} strokeWidth={2.2} aria-hidden />
       </button>
-      {onOpenFriendSearch ? (
-        <button
-          type="button"
-          className="friend-showcase-list__icon-btn"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onOpenFriendSearch();
-          }}
-          aria-label="친구 추가"
-        >
-          <UserPlus size={20} strokeWidth={2.2} aria-hidden />
-        </button>
-      ) : null}
     </div>
   );
 

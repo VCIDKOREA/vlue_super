@@ -29,6 +29,7 @@ object LetteringPermissionHelper {
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 base.add(Manifest.permission.ANSWER_PHONE_CALLS)
+                base.add(Manifest.permission.CALL_PHONE)
             }
             return base.toTypedArray()
         }
@@ -71,6 +72,8 @@ object LetteringPermissionHelper {
         o.put("location", hasLocation(context))
         o.put("overlay", canDrawOverlays(context))
         o.put("allRuntime", hasPhonePermissions(context))
+        o.put("defaultDialer", kr.vlue.calloverlay.incall.DialerRoleHelper.isDefaultDialer(context))
+        o.put("inCallBound", kr.vlue.calloverlay.incall.VlueInCallController.isDefaultDialerBound())
         return o.toString()
     }
 

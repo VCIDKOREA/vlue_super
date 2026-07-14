@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Briefcase, AlertCircle, CreditCard, FolderOpen, FileText } from 'lucide-react';
+import { Briefcase, AlertCircle, CreditCard, FolderOpen } from 'lucide-react';
 import {
   readCardWallet,
   writeCardWallet,
@@ -8,10 +8,17 @@ import {
 } from '../../../lib/cardWalletStorage.js';
 import { fetchOfficeFiles } from '../../../lib/vlueOfficeApi.js';
 import { ASSET_FILES_CHANGED, mapOfficeFilesForUi } from '../../../lib/vlueAssetFilesStorage.js';
+import {
+  PERSONAL_CASE_NOTES_CHANGED,
+  readPersonalCaseNotes,
+  removePersonalCaseNote,
+} from '../../../lib/personalCaseNotesStorage.js';
 import VaultSavedShowcaseRow from '../../../components/VaultSavedShowcaseRow.jsx';
 import VaultSavedFileRow from '../../../components/VaultSavedFileRow.jsx';
-import DocumentTemplatesPanel from '../../../components/DocumentTemplatesPanel.jsx';
+import LetteringIncomingNotification from '../../../components/LetteringIncomingNotification.jsx';
 import SensitiveRightClickGuard from '../components/SensitiveRightClickGuard';
+import '../../../styles/wallet-hub-push.css';
+import '../../../styles/showcase-call-glass.css';
 
 interface ResourcesPageProps {
   user?: { email: string } | null;
@@ -43,40 +50,40 @@ function ReceivedCardRow({
   onRemove: (userId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const org = String(profile.organization || '—');
-  const name =
-    `${profile.title || ''} ${profile.name || ''}`.trim() ||
-    String(profile.legalName || '이름 미등록');
   const phone = String(profile.phone || '').trim();
-  const legal = String(profile.legalName || '').trim();
   const userId = String(item.userId || '');
 
   return (
-    <li className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-      <button
-        type="button"
-        className="flex w-full items-start gap-3 text-left"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-[15px] font-black text-white">
-          {String(profile.name || '?').slice(0, 1)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-semibold text-slate-500">{org}</p>
-          <p className="mt-0.5 text-[16px] font-black leading-snug text-slate-900">{name}</p>
-          {phone ? <p className="mt-1 text-[14px] font-medium text-slate-700">{phone}</p> : null}
-          {legal ? (
-            <p className="mt-1 text-[11px] font-semibold text-emerald-600">본인인증 · {legal}</p>
-          ) : null}
-        </div>
-        <span className="shrink-0 text-[11px] font-bold text-slate-400">{expanded ? '접기' : '펼치기'}</span>
-      </button>
+    <li className="wallet-hub-push">
+      <div className="lettering-home-push-embed">
+        <LetteringIncomingNotification
+          verified
+          previewMode
+          showOwnerSettings={false}
+          callPhase="connected"
+          platform="android"
+          isRecording={false}
+          callDurationSec={0}
+          recordingDurationSec={0}
+          incomingNumber={phone}
+          card={{
+            ...profile,
+            membershipTier: (profile.membershipTier as string) || 'premium',
+          }}
+          includeDigitalCard={false}
+          expandContent={false}
+          expanded={expanded}
+          onExpandedChange={setExpanded}
+          onEndCall={() => setExpanded(false)}
+          className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass wallet-hub-push__notification"
+        />
+      </div>
       {expanded && userId ? (
-        <div className="mt-3 flex justify-end border-t border-slate-100 pt-3">
+        <div className="wallet-hub-push__footer">
           <button
             type="button"
+            className="wallet-hub-push__footer-btn wallet-hub-push__footer-btn--danger"
             onClick={() => onRemove(userId)}
-            className="rounded-xl px-3 py-1.5 text-[12px] font-bold text-rose-600 ring-1 ring-rose-200"
           >
             삭제
           </button>
@@ -92,9 +99,14 @@ export default function ResourcesPage({ user }: ResourcesPageProps) {
   const [vaultFiles, setVaultFiles] = useState<unknown[]>([]);
   const [vaultLoading, setVaultLoading] = useState(false);
   const [toast, setToast] = useState('');
+  const [caseNotes, setCaseNotes] = useState(() => readPersonalCaseNotes());
 
   const refreshWallet = useCallback(() => {
     setWalletCards(readCardWallet() as WalletItem[]);
+  }, []);
+
+  const refreshCaseNotes = useCallback(() => {
+    setCaseNotes(readPersonalCaseNotes());
   }, []);
 
   const refreshVaultFiles = useCallback(async () => {
@@ -117,15 +129,19 @@ export default function ResourcesPage({ user }: ResourcesPageProps) {
   useEffect(() => {
     refreshWallet();
     refreshVaultFiles();
+    refreshCaseNotes();
     const onWallet = () => refreshWallet();
     const onFiles = () => refreshVaultFiles();
+    const onNotes = () => refreshCaseNotes();
     window.addEventListener('vlue-card-wallet-changed', onWallet);
     window.addEventListener(ASSET_FILES_CHANGED, onFiles);
+    window.addEventListener(PERSONAL_CASE_NOTES_CHANGED, onNotes);
     return () => {
       window.removeEventListener('vlue-card-wallet-changed', onWallet);
       window.removeEventListener(ASSET_FILES_CHANGED, onFiles);
+      window.removeEventListener(PERSONAL_CASE_NOTES_CHANGED, onNotes);
     };
-  }, [refreshWallet, refreshVaultFiles]);
+  }, [refreshWallet, refreshVaultFiles, refreshCaseNotes]);
 
   const { showcases: showcaseCards, received: receivedCards } = useMemo(
     () => partitionCardWallet(walletCards),
@@ -227,7 +243,7 @@ export default function ResourcesPage({ user }: ResourcesPageProps) {
                     <p className="text-[14px] font-bold text-slate-500">받은 명함이 없습니다</p>
                   </div>
                 ) : (
-                  <ul className="space-y-4">
+                  <ul className="wallet-hub-push-list space-y-3">
                     {receivedCards.map((item: WalletItem) => {
                       const profile = resolveWalletProfile(item, {});
                       return (
@@ -272,6 +288,49 @@ export default function ResourcesPage({ user }: ResourcesPageProps) {
               <div className="min-w-0 space-y-4 pb-2">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between px-0.5">
+                    <p className="text-[13px] font-black text-slate-800">키패드 저장</p>
+                    <span className="text-[11px] font-bold text-slate-400">{caseNotes.length}건</span>
+                  </div>
+                  {caseNotes.length === 0 ? (
+                    <p className="rounded-xl bg-white px-4 py-6 text-center text-[12px] text-slate-500 ring-1 ring-slate-100">
+                      통화 키패드에서 저장한 번호·메모가 여기에 모입니다.
+                    </p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {caseNotes.map((note) => (
+                        <li key={note.id} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[15px] font-black leading-snug text-slate-900">{note.name}</p>
+                              {note.digits ? (
+                                <p className="mt-1 text-[14px] font-semibold tabular-nums text-sky-700">
+                                  {note.digits}
+                                </p>
+                              ) : null}
+                              {note.content ? (
+                                <p className="mt-1 whitespace-pre-wrap text-[12px] font-medium leading-relaxed text-slate-600">
+                                  {note.content}
+                                </p>
+                              ) : null}
+                            </div>
+                            <button
+                              type="button"
+                              className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold text-rose-600"
+                              onClick={() => {
+                                removePersonalCaseNote(note.id);
+                                showToast('삭제했습니다.');
+                              }}
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-0.5">
                     <p className="text-[13px] font-black text-slate-800">저장된 파일</p>
                     <button
                       type="button"
@@ -297,13 +356,6 @@ export default function ResourcesPage({ user }: ResourcesPageProps) {
                       ))}
                     </ul>
                   )}
-                </div>
-                <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-100">
-                  <div className="mb-2 flex items-center gap-2 px-1">
-                    <FileText className="h-4 w-4 text-slate-500" />
-                    <p className="text-[13px] font-black text-slate-800">서류 양식</p>
-                  </div>
-                  <DocumentTemplatesPanel embedded compact membershipTier="free" />
                 </div>
               </div>
             )}

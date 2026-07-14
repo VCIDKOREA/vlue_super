@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kr.vlue.calloverlay.incall.VlueInCallController
 
 /** 통화 이벤트 → API 조회 → 오버레이 생명주기 */
 object LetteringCallCoordinator {
@@ -37,9 +38,18 @@ object LetteringCallCoordinator {
         }
     }
 
+    /**
+     * 통화 종료.
+     * keepOverlayAfterHangup / VlueInCallController 플래그가 있으면 쇼케이스 유지.
+     */
     fun onCallEnded(context: Context) {
         try {
             val app = context.applicationContext
+            if (VlueInCallController.keepOverlayAfterHangup) {
+                VlueInCallController.keepOverlayAfterHangup = false
+                CallOverlayService.notifyKeepAfterEnd(app)
+                return
+            }
             val intent = Intent(app, CallOverlayService::class.java).apply {
                 action = CallOverlayService.ACTION_DISMISS
             }

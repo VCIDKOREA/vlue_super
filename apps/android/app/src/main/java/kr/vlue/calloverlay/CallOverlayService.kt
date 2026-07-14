@@ -52,6 +52,11 @@ class CallOverlayService : Service() {
                 notifyWebCallState("connected")
                 return START_NOT_STICKY
             }
+            ACTION_ENDED_KEEP -> {
+                setOverlayFullscreen(true)
+                notifyWebCallState("ended_keep_overlay")
+                return START_NOT_STICKY
+            }
         }
         val phone = intent?.getStringExtra(EXTRA_PHONE).orEmpty()
         val verified = intent?.getBooleanExtra(EXTRA_VERIFIED, false) ?: false
@@ -224,6 +229,7 @@ class CallOverlayService : Service() {
         const val EXTRA_CARD_JSON = "card_json"
         const val ACTION_DISMISS = "kr.vlue.calloverlay.DISMISS"
         const val ACTION_CONNECTED = "kr.vlue.calloverlay.CONNECTED"
+        const val ACTION_ENDED_KEEP = "kr.vlue.calloverlay.ENDED_KEEP"
         private const val CHANNEL_ID = "vlue_lettering_overlay"
         private const val NOTIFICATION_ID = 41001
 
@@ -239,6 +245,18 @@ class CallOverlayService : Service() {
             } catch (_: Exception) {
                 activeInstance?.setOverlayFullscreen(true)
                 activeInstance?.notifyWebCallState("connected")
+            }
+        }
+
+        fun notifyKeepAfterEnd(context: android.content.Context) {
+            try {
+                val intent = Intent(context, CallOverlayService::class.java).apply {
+                    action = ACTION_ENDED_KEEP
+                }
+                context.startService(intent)
+            } catch (_: Exception) {
+                activeInstance?.setOverlayFullscreen(true)
+                activeInstance?.notifyWebCallState("ended_keep_overlay")
             }
         }
     }

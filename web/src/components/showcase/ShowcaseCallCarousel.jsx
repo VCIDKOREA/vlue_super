@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
 import ShowcaseIdentityCorner from "./ShowcaseIdentityCorner.jsx";
+import InCallDtmfPad from "../call/InCallDtmfPad.jsx";
 import {
   maxShowcasePhotosForTier,
   normalizeUserTier,
@@ -29,7 +30,12 @@ export default function ShowcaseCallCarousel({
   includeDigitalCard = true,
   face = "front",
   onFaceChange,
-  showcaseOffPreview = false
+  showcaseOffPreview = false,
+  /** 키패드 — 뷰포트(쇼케이스 전환 영역) 안에서만 표시 */
+  keypadOpen = false,
+  onKeypadClose,
+  keypadDemoMode = false,
+  onKeypadToast
 }) {
   const [index, setIndex] = useState(0);
   const startX = useRef(0);
@@ -93,6 +99,12 @@ export default function ShowcaseCallCarousel({
     if (!canScroll && index !== 0) setIndex(0);
   }, [canScroll, index]);
 
+  useEffect(() => {
+    if (!keypadOpen || !showDigitalCard) return;
+    const cardIdx = slides.findIndex((s) => s.type === "card");
+    if (cardIdx >= 0 && index !== cardIdx) setIndex(cardIdx);
+  }, [keypadOpen, showDigitalCard, slides, index]);
+
   const go = useCallback(
     (dir) => {
       if (!canScroll) return;
@@ -105,7 +117,7 @@ export default function ShowcaseCallCarousel({
     "button, a, input, textarea, select, label, [role='tab'], .ldr-face-tabs, .ldr-face-tab, .showcase-call-carousel__nav, .ldr-front-phone-link--btn, .ldr-contact-row-link";
 
   const onPointerDown = (e) => {
-    if (!canScroll) return;
+    if (keypadOpen || !canScroll) return;
     if (e.target?.closest?.(interactiveSelector)) return;
     dragging.current = true;
     startX.current = e.clientX;
@@ -162,7 +174,7 @@ export default function ShowcaseCallCarousel({
       ) : null}
 
       <div
-        className="showcase-call-carousel__viewport"
+        className={`showcase-call-carousel__viewport${keypadOpen ? " showcase-call-carousel__viewport--keypad" : ""}`}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onPointerCancel={() => {
@@ -170,106 +182,129 @@ export default function ShowcaseCallCarousel({
         }}
       >
         <div
-          className="showcase-call-carousel__track"
-          style={{ transform: `translate3d(-${index * 100}%, 0, 0)` }}
+          className={`showcase-call-carousel__stage${
+            keypadOpen && current?.type !== "card" ? " is-dimmed" : ""
+          }`}
+          aria-hidden={keypadOpen && current?.type !== "card"}
         >
-          {slides.map((slide) => (
-            <article key={slide.id} className="showcase-call-carousel__slide">
-              {slide.type === "card" && isPaid ? (
-                <div className="showcase-call-carousel__card">
-                  <LetteringDigitalReception
-                    card={card}
-                    verified={verified}
-                    verificationItems={verificationItems}
-                    incomingNumber={incomingNumber}
-                    embeddedInPush
-                    previewMode={previewMode}
-                    enableContactLinks
-                    face={face}
-                    onFaceChange={onFaceChange}
-                  />
-                </div>
-              ) : null}
+          <div
+            className="showcase-call-carousel__track"
+            style={{ transform: `translate3d(-${index * 100}%, 0, 0)` }}
+          >
+            {slides.map((slide) => (
+              <article key={slide.id} className="showcase-call-carousel__slide">
+                {slide.type === "card" && isPaid ? (
+                  <div className="showcase-call-carousel__card">
+                    <LetteringDigitalReception
+                      card={card}
+                      verified={verified}
+                      verificationItems={verificationItems}
+                      incomingNumber={incomingNumber}
+                      embeddedInPush
+                      previewMode={previewMode}
+                      enableContactLinks
+                      face={face}
+                      onFaceChange={onFaceChange}
+                      keypadOpen={keypadOpen}
+                      onKeypadClose={onKeypadClose}
+                      keypadDemoMode={keypadDemoMode}
+                      onToast={onKeypadToast}
+                    />
+                  </div>
+                ) : null}
 
-              {slide.type === "banner" && isPaid ? (
-                <div className="showcase-call-carousel__banner">
-                  <img src={slide.url} alt="" className="showcase-call-carousel__banner-img" draggable={false} />
-                  <div className="showcase-call-carousel__banner-veil" aria-hidden />
-                  {(slide.overlayText || slide.caption) && (
-                    <p className="showcase-call-carousel__banner-caption">{slide.overlayText || slide.caption}</p>
-                  )}
-                </div>
-              ) : null}
+                {slide.type === "banner" && isPaid ? (
+                  <div className="showcase-call-carousel__banner">
+                    <img src={slide.url} alt="" className="showcase-call-carousel__banner-img" draggable={false} />
+                    <div className="showcase-call-carousel__banner-veil" aria-hidden />
+                    {(slide.overlayText || slide.caption) && (
+                      <p className="showcase-call-carousel__banner-caption">{slide.overlayText || slide.caption}</p>
+                    )}
+                  </div>
+                ) : null}
 
-              {slide.type === "paid-identity" ? (
-                <div className="showcase-call-carousel__paid-sheet">
-                  <div className="showcase-call-carousel__paid-sheet-stage" aria-hidden />
-                </div>
-              ) : null}
+                {slide.type === "paid-identity" ? (
+                  <div className="showcase-call-carousel__paid-sheet">
+                    <div className="showcase-call-carousel__paid-sheet-stage" aria-hidden />
+                  </div>
+                ) : null}
 
-              {slide.type === "free-profile" || slide.type === "free-safe" ? (
-                <div className="showcase-call-carousel__free">
-                  <FreeTierCallShowcase
-                    isKnownContact={slide.type === "free-profile" && !showcaseOffPreview}
-                    card={card}
-                    phone={incomingNumber}
-                    verified={verified}
-                    showcaseOffPreview={showcaseOffPreview}
-                  />
-                </div>
-              ) : null}
+                {slide.type === "free-profile" || slide.type === "free-safe" ? (
+                  <div className="showcase-call-carousel__free">
+                    <FreeTierCallShowcase
+                      isKnownContact={slide.type === "free-profile" && !showcaseOffPreview}
+                      card={card}
+                      phone={incomingNumber}
+                      verified={verified}
+                      showcaseOffPreview={showcaseOffPreview}
+                    />
+                  </div>
+                ) : null}
 
-              {slide.type === "empty-slot" ? (
-                <div className="showcase-call-carousel__empty flex h-full min-h-[220px] flex-col items-center justify-center gap-2 border border-dashed border-white/25 bg-slate-900/80 px-6 text-center">
-                  <p className="text-[12px] font-black text-indigo-200">유료 사진 슬롯 {slide.slot}</p>
-                  <p
-                    className="text-[12px] font-semibold leading-relaxed text-white/80"
-                    style={{ wordBreak: "keep-all" }}
-                  >
-                    스타일 설정 → 사진에서 추가하면 여기에 표시됩니다. (최대 {slide.max}장)
-                  </p>
-                </div>
-              ) : null}
-            </article>
-          ))}
+                {slide.type === "empty-slot" ? (
+                  <div className="showcase-call-carousel__empty flex h-full min-h-[220px] flex-col items-center justify-center gap-2 border border-dashed border-white/25 bg-slate-900/80 px-6 text-center">
+                    <p className="text-[12px] font-black text-indigo-200">유료 사진 슬롯 {slide.slot}</p>
+                    <p
+                      className="text-[12px] font-semibold leading-relaxed text-white/80"
+                      style={{ wordBreak: "keep-all" }}
+                    >
+                      스타일 설정 → 사진에서 추가하면 여기에 표시됩니다. (최대 {slide.max}장)
+                    </p>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+
+          {canScroll && !keypadOpen ? (
+            <>
+              <button
+                type="button"
+                className="showcase-call-carousel__nav showcase-call-carousel__nav--prev"
+                aria-label="이전 슬라이드"
+                disabled={index <= 0}
+                onClick={() => go(-1)}
+              >
+                <ChevronLeft size={22} strokeWidth={2.2} aria-hidden />
+              </button>
+              <button
+                type="button"
+                className="showcase-call-carousel__nav showcase-call-carousel__nav--next"
+                aria-label="다음 슬라이드"
+                disabled={index >= count - 1}
+                onClick={() => go(1)}
+              >
+                <ChevronRight size={22} strokeWidth={2.2} aria-hidden />
+              </button>
+            </>
+          ) : null}
+
+          {showCornerIdentity && isPaid && !keypadOpen ? (
+            <ShowcaseIdentityCorner
+              name={cornerName}
+              organization={cornerOrg}
+              phone={incomingNumber || card?.phone || ""}
+              verified={verified}
+              showName={cornerShowName}
+              kicker="유료 · 쇼케이스"
+            />
+          ) : null}
         </div>
 
-        {canScroll ? (
-          <>
-            <button
-              type="button"
-              className="showcase-call-carousel__nav showcase-call-carousel__nav--prev"
-              aria-label="이전 슬라이드"
-              disabled={index <= 0}
-              onClick={() => go(-1)}
-            >
-              <ChevronLeft size={22} strokeWidth={2.2} aria-hidden />
-            </button>
-            <button
-              type="button"
-              className="showcase-call-carousel__nav showcase-call-carousel__nav--next"
-              aria-label="다음 슬라이드"
-              disabled={index >= count - 1}
-              onClick={() => go(1)}
-            >
-              <ChevronRight size={22} strokeWidth={2.2} aria-hidden />
-            </button>
-          </>
-        ) : null}
-
-        {showCornerIdentity && isPaid ? (
-          <ShowcaseIdentityCorner
-            name={cornerName}
-            organization={cornerOrg}
-            phone={incomingNumber || card?.phone || ""}
-            verified={verified}
-            showName={cornerShowName}
-            kicker="유료 · 쇼케이스"
-          />
+        {keypadOpen && current?.type !== "card" ? (
+          <div className="showcase-call-carousel__keypad-layer">
+            <InCallDtmfPad
+              fill
+              className="showcase-call-carousel__keypad"
+              demoMode={keypadDemoMode}
+              onClose={() => onKeypadClose?.()}
+              onToast={onKeypadToast}
+            />
+          </div>
         ) : null}
       </div>
 
-      {canScroll ? (
+      {canScroll && !keypadOpen ? (
         <>
           <div className="showcase-call-carousel__dots" role="tablist" aria-label="쇼케이스 슬라이드">
             {slides.map((slide, i) => (
@@ -289,11 +324,6 @@ export default function ShowcaseCallCarousel({
               />
             ))}
           </div>
-          <p className="showcase-call-carousel__hint">
-            {showDigitalCard
-              ? "← 밀어서 디지털 명함 · 쇼케이스 전환 →"
-              : "← 밀어서 쇼케이스 사진 전환 →"}
-          </p>
         </>
       ) : null}
 

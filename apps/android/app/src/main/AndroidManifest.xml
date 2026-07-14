@@ -14,6 +14,9 @@
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <!-- 발신 번호 수신 (API 28 이하; 29+는 Role/기본 전화앱 정책 확인) -->
     <uses-permission android:name="android.permission.PROCESS_OUTGOING_CALLS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -56,6 +59,32 @@
             </intent-filter>
         </activity>
 
+        <!-- 기본 전화앱 역할용 다이얼 트램펄린 -->
+        <activity
+            android:name=".incall.DialerTrampolineActivity"
+            android:exported="true"
+            android:theme="@style/Theme.VlueCallOverlay">
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="tel" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tel" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.CALL_BUTTON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".ShareReceiverActivity"
             android:exported="true"
@@ -82,6 +111,22 @@
             android:name=".CallOverlayService"
             android:exported="false"
             android:foregroundServiceType="phoneCall" />
+
+        <!-- VLUE 전면 통화 UI (기본 전화앱일 때 DTMF·disconnect) -->
+        <service
+            android:name=".incall.VlueInCallService"
+            android:exported="true"
+            android:permission="android.permission.BIND_INCALL_SERVICE">
+            <meta-data
+                android:name="android.telecom.IN_CALL_SERVICE_UI"
+                android:value="true" />
+            <meta-data
+                android:name="android.telecom.IN_CALL_SERVICE_RINGING"
+                android:value="true" />
+            <intent-filter>
+                <action android:name="android.telecom.InCallService" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".family.FamilyCareForegroundService"

@@ -40,54 +40,31 @@ export async function updateUserShowcaseTags(userId: string, tags: string[]): Pr
     data: { showcaseTags: cleaned },
     select: { showcaseTags: true }
   });
+  const { markShowcaseActiveIfEligible } = await import("./SearchService.js");
+  await markShowcaseActiveIfEligible(userId);
   return row.showcaseTags || [];
 }
 
 /**
- * #해시태그로 유료 회원 쇼케이스 검색 (홈 디렉토리)
+ * @deprecated Use SearchService.searchByHashtag — 마스킹·권한 필터 포함
+ * 하위 호환 래퍼 (평문 PII 미반환)
  */
 export async function searchUsersByShowcaseTag(query: string, limit = 24) {
-  const tag = normalizeShowcaseTag(query);
-  const bare = tag.replace(/^#/, "").toLowerCase();
-  if (!bare) return [];
-
-  const users = await prisma.user.findMany({
-    where: {
-      showcaseTags: { isEmpty: false }
-    },
-    select: {
-      id: true,
-      phoneE164: true,
-      legalName: true,
-      publicHandle: true,
-      showcaseTags: true,
-      businessProfile: { select: { companyName: true, jobTitle: true } },
-      digitalCard: { select: { membershipTierSnapshot: true, exportSnapshotJson: true } }
-    },
-    take: 200
-  });
-
-  const matched = users.filter((u) =>
-    (u.showcaseTags || []).some((t) => {
-      const n = String(t).toLowerCase().replace(/^#/, "");
-      return n === bare || n.includes(bare) || bare.includes(n);
-    })
-  );
-
-  return matched.slice(0, limit).map((u) => {
-    const snap =
-      u.digitalCard?.exportSnapshotJson && typeof u.digitalCard.exportSnapshotJson === "object"
-        ? (u.digitalCard.exportSnapshotJson as Record<string, unknown>)
-        : {};
-    return {
-      userId: u.id,
-      phone: u.phoneE164 || String(snap.phone || ""),
-      name: u.legalName || String(snap.name || ""),
-      organization: u.businessProfile?.companyName || String(snap.organization || ""),
-      title: u.businessProfile?.jobTitle || String(snap.title || ""),
-      logoUrl: String(snap.logoUrl || ""),
-      tags: u.showcaseTags || [],
-      membershipTier: u.digitalCard?.membershipTierSnapshot || "free"
-    };
-  });
+  const { searchByHashtag } = await import("./SearchService.js");
+  const items = await searchByHashtag(query, limit);
+  return items.map((hit) => ({
+    userId: hit.userId,
+    phone: hit.phone,
+    name: hit.displayName,
+    organization: hit.organization,
+    title: hit.title,
+    logoUrl: hit.logoUrl,
+    tags: hit.tags,
+    membershipTier: hit.membershipTier,
+    phoneVisible: hit.phoneVisible,
+    nameVisible: hit.nameVisible,
+    idInquiryEnabled: hit.idInquiryEnabled,
+    publicHandle: hit.publicHandle,
+    privacy: hit.privacy
+  }));
 }

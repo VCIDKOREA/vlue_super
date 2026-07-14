@@ -1625,6 +1625,29 @@
   line-height: 1.35;
 }
 
+.showcase-profile-row--stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.showcase-privacy-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.showcase-privacy-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+}
+
 .showcase-profile-row__control {
   flex: 1;
   min-width: 0;

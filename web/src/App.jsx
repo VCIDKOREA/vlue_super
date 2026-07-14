@@ -502,6 +502,36 @@ function App() {
     window.addEventListener("vlue-card-wallet-changed", sync);
     return () => window.removeEventListener("vlue-card-wallet-changed", sync);
   }, []);
+
+  useEffect(() => {
+    const onSearchAuth = (e) => {
+      const d = e?.detail || {};
+      const msg =
+        d.error ||
+        (d.code === "LOGIN_REQUIRED"
+          ? "쇼케이스 검색은 로그인 후 이용할 수 있습니다."
+          : d.code === "SHOWCASE_REQUIRED"
+            ? "자신의 인증 쇼케이스를 먼저 등록해 주세요."
+            : d.code === "IDENTITY_REQUIRED"
+              ? "휴대폰 본인인증 후 검색할 수 있습니다."
+              : d.code === "RATE_LIMITED"
+                ? "검색 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
+                : "");
+      if (!msg) return;
+      setBottomToast(msg);
+      setTimeout(() => setBottomToast(""), 4200);
+      if (d.code === "LOGIN_REQUIRED") {
+        try {
+          window.dispatchEvent(new CustomEvent("vlue-require-login", { detail: d.meta }));
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    window.addEventListener("vlue-showcase-search-auth", onSearchAuth);
+    return () => window.removeEventListener("vlue-showcase-search-auth", onSearchAuth);
+  }, []);
+
   const [membershipTier, setMembershipTier] = useState(() => {
     const fromOnboard =
       localStorage.getItem("vlue_membership_kind") || localStorage.getItem("vlue_membership_tier");

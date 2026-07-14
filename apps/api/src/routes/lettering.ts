@@ -2,13 +2,19 @@ import { Hono } from "hono";
 import { prisma } from "../db/client.js";
 import { normalizeToE164KR } from "../lib/phoneE164.js";
 import { requireUserHeader } from "../middleware/cardGate.js";
+import { SearchAuthInterceptor } from "../middleware/SearchAuthInterceptor.js";
 import {
   normalizeShowcaseTag,
   sanitizeShowcaseTags,
-  searchUsersByShowcaseTag,
   updateUserShowcaseTags,
   userHasPaidMembership
 } from "../services/showcase/showcaseTagsService.js";
+import {
+  getSearchPrivacy,
+  runShowcaseSearch,
+  updateSearchPrivacy,
+  type ShowcaseSearchMode
+} from "../services/showcase/SearchService.js";
 
 export const letteringRoutes = new Hono();
 
@@ -149,10 +155,42 @@ letteringRoutes.put("/showcase/tags", requireUserHeader, async (c) => {
   return c.json({ ok: true, tags: saved });
 });
 
-/** V1 — #해시태그로 쇼케이스 검색 (홈 디렉토리) */
-letteringRoutes.get("/showcase/tags/search", async (c) => {
+/** V1 — 검색 프라이버시 토글 조회 */
+letteringRoutes.get("/showcase/search-privacy", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const privacy = await getSearchPrivacy(me);
+  return c.json({ ok: true, privacy });
+});
+
+/** V1 — 검색 프라이버시 토글 저장 */
+letteringRoutes.put("/showcase/search-privacy", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = await c.req.json().catch(() => ({}));
+  const privacy = await updateSearchPrivacy(me, {
+    isPhoneSearchAllowed: body?.isPhoneSearchAllowed,
+    isNameSearchAllowed: body?.isNameSearchAllowed,
+    isIdSearchAllowed: body?.isIdSearchAllowed
+  });
+  return c.json({ ok: true, privacy });
+});
+
+/**
+ * V1 — 쇼케이스 검색 (상호주의·레이트리밋·마스킹)
+ * query: q | tag, mode=hashtag|phone|name|id
+ */
+letteringRoutes.get("/showcase/tags/search", SearchAuthInterceptor, async (c) => {
   const q = String(c.req.query("q") ?? c.req.query("tag") ?? "").trim();
-  if (!q) return c.json({ ok: true, items: [] });
-  const items = await searchUsersByShowcaseTag(q, 24);
-  return c.json({ ok: true, tag: normalizeShowcaseTag(q), items });
+  const modeRaw = String(c.req.query("mode") ?? "hashtag").trim().toLowerCase();
+  const mode: ShowcaseSearchMode =
+    modeRaw === "phone" || modeRaw === "name" || modeRaw === "id" ? modeRaw : "hashtag";
+
+  if (!q) return c.json({ ok: true, mode, tag: null, items: [] });
+
+  const { items } = await runShowcaseSearch({ mode, query: q, limit: 24 });
+  return c.json({
+    ok: true,
+    mode,
+    tag: mode === "hashtag" ? normalizeShowcaseTag(q) : null,
+    items
+  });
 });

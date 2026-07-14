@@ -64,6 +64,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         if (intent.getBooleanExtra(EXTRA_REQUEST_PERMISSIONS, false)) {
             requestLetteringOsPermissionsDirect()
         }
+        if (intent.getBooleanExtra(EXTRA_REQUEST_DIALER_ROLE, false)) {
+            kr.vlue.calloverlay.incall.DialerRoleHelper.requestDefaultDialer(this)
+        }
         if (intent.hasExtra(EXTRA_OPEN_CERT)) {
             val json = intent.getStringExtra(EXTRA_OPEN_CERT).orEmpty()
             webView.loadUrl(
@@ -254,8 +257,12 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
         if (!LetteringPermissionHelper.canDrawOverlays(this)) {
             LetteringPermissionHelper.openOverlaySettings(this)
-        } else {
-            LetteringPrefs.setLetteringEnabled(this, true)
+            return
+        }
+        LetteringPrefs.setLetteringEnabled(this, true)
+        /* DTMF·완벽한 종료 제어 — 기본 전화앱 역할 유도 */
+        if (!kr.vlue.calloverlay.incall.DialerRoleHelper.isDefaultDialer(this)) {
+            kr.vlue.calloverlay.incall.DialerRoleHelper.requestDefaultDialer(this)
         }
     }
 
@@ -317,6 +324,13 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
 
         @android.webkit.JavascriptInterface
+        fun requestDefaultDialerRole() {
+            activity.runOnUiThread {
+                kr.vlue.calloverlay.incall.DialerRoleHelper.requestDefaultDialer(activity)
+            }
+        }
+
+        @android.webkit.JavascriptInterface
         fun getLetteringPermissionStatusJson(): String {
             return LetteringPermissionHelper.statusJson(activity)
         }
@@ -329,6 +343,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
     companion object {
         const val EXTRA_REQUEST_PERMISSIONS = "request_permissions"
+        const val EXTRA_REQUEST_DIALER_ROLE = "request_dialer_role"
         const val EXTRA_OPEN_CERT = "open_cert"
         private const val REQ_PHONE = 4102
         private const val REQ_FAMILY = 4103

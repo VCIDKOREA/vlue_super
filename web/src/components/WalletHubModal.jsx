@@ -3,16 +3,23 @@ import { apiUrl } from "../lib/apiBase.js";
 import { vlueAuthHeaders, vlueAuthFetch } from "../lib/vlueAuthHeaders.js";
 import { resolveWalletProfile, partitionCardWallet } from "../lib/cardWalletStorage.js";
 import { saveProfileToDeviceContacts } from "../lib/contactVcfSave.js";
+import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import B2BLineCartPanel from "./B2BLineCartPanel.jsx";
-import DocumentTemplatesPanel from "./DocumentTemplatesPanel.jsx";
 import VaultSavedFileRow from "./VaultSavedFileRow.jsx";
 import VaultSavedShowcaseRow from "./VaultSavedShowcaseRow.jsx";
-import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
+import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import { useHorizontalScrollStrip } from "../lib/useHorizontalScrollStrip.js";
 import { fetchOfficeFiles } from "../lib/vlueOfficeApi.js";
 import { ASSET_FILES_CHANGED, mapOfficeFilesForUi } from "../lib/vlueAssetFilesStorage.js";
+import {
+  PERSONAL_CASE_NOTES_CHANGED,
+  readPersonalCaseNotes,
+  removePersonalCaseNote
+} from "../lib/personalCaseNotesStorage.js";
 import { useSensitiveScreenSecure } from "../hooks/useSensitiveScreenSecure.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
+import "../styles/wallet-hub-push.css";
+import "../styles/showcase-call-glass.css";
 
 const FULL_TABS = [
   { id: "received", label: "받은 명함" },
@@ -66,92 +73,61 @@ function ReceivedCardRow({
   isDarkMode = false
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [face, setFace] = useState("front");
-  const org = profile.organization || "—";
-  const name =
-    `${profile.title || ""} ${profile.name || ""}`.trim() || profile.legalName || "이름 미등록";
   const phone = String(profile.phone || "").trim();
-  const legal = String(profile.legalName || "").trim();
+  const phoneDisplay = phone ? formatLetteringPhoneDisplay(phone) : "";
 
   return (
-    <li
-      className={`rounded-2xl p-4 shadow-sm ring-1 ${
-        isDarkMode ? "bg-white/5 ring-white/10" : "bg-white ring-slate-100"
-      }`}
-    >
-      <button type="button" className="flex w-full items-start gap-3 text-left" onClick={() => setExpanded((v) => !v)}>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-[15px] font-black text-white">
-          {(profile.name || "?").slice(0, 1)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className={`text-[12px] font-semibold ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>{org}</p>
-          <p className={`mt-0.5 text-[16px] font-black leading-snug ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
-            {name}
-          </p>
-          {phone ? (
-            <p className={`mt-1 text-[14px] font-medium ${isDarkMode ? "text-gray-300" : "text-slate-700"}`}>{phone}</p>
-          ) : null}
-          {legal ? (
-            <p className={`mt-1 text-[11px] font-semibold ${isDarkMode ? "text-emerald-400" : "text-emerald-600"}`}>
-              본인인증 · {legal}
-            </p>
-          ) : null}
-        </div>
-        <span className={`shrink-0 text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-slate-400"}`}>
-          {expanded ? "접기" : "보기"}
-        </span>
-      </button>
-
+    <li className="wallet-hub-push">
+      <div className="lettering-home-push-embed">
+        <LetteringIncomingNotification
+          verified
+          previewMode
+          showOwnerSettings={false}
+          callPhase="connected"
+          platform="android"
+          isRecording={false}
+          callDurationSec={0}
+          recordingDurationSec={0}
+          incomingNumber={phone}
+          card={{
+            ...profile,
+            membershipTier: profile.membershipTier || "premium"
+          }}
+          includeDigitalCard={false}
+          expandContent={false}
+          expanded={expanded}
+          onExpandedChange={setExpanded}
+          onEndCall={() => setExpanded(false)}
+          className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass wallet-hub-push__notification"
+        />
+      </div>
       {expanded ? (
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/90 p-2 dark:border-white/10 dark:bg-black/20">
-          <LetteringDigitalReception
-            card={{
-              ...profile,
-              companyIntro: profile.companyIntro || profile.introBack || ""
-            }}
-            verified
-            embeddedInPush
-            previewMode
-            enableContactLinks
-            face={face}
-            onFaceChange={setFace}
-          />
-        </div>
-      ) : null}
-
-      <button
-        type="button"
-        onClick={() => onSave(profile)}
-        className="mt-4 w-full rounded-xl bg-emerald-600 py-3 text-[14px] font-black text-white shadow-sm shadow-emerald-600/20 active:scale-[0.99]"
-      >
-        휴대폰에 저장
-      </button>
-
-      <div className="mt-2 flex gap-2">
-        {typeof onShare === "function" ? (
+        <div className={`wallet-hub-push__footer${isDarkMode ? " is-dark" : ""}`}>
+          <button type="button" className="wallet-hub-push__footer-btn" onClick={() => onSave?.(profile)}>
+            휴대폰에 저장
+          </button>
+          {typeof onShare === "function" ? (
+            <button
+              type="button"
+              className="wallet-hub-push__footer-btn"
+              onClick={() => {
+                onShare(profile);
+                onClose?.();
+              }}
+            >
+              채팅에 공유
+            </button>
+          ) : null}
           <button
             type="button"
-            onClick={() => {
-              onShare(profile);
-              onClose?.();
-            }}
-            className={`flex-1 rounded-lg py-2 text-[12px] font-bold ${
-              isDarkMode ? "bg-white/10 text-gray-200" : "bg-slate-100 text-slate-700"
-            }`}
+            className="wallet-hub-push__footer-btn wallet-hub-push__footer-btn--danger"
+            onClick={() => onRemove?.(item.userId)}
           >
-            채팅에 공유
+            삭제
           </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => onRemove(item.userId)}
-          className={`rounded-lg px-4 py-2 text-[12px] font-bold ${
-            isDarkMode ? "text-gray-500 hover:bg-red-500/15 hover:text-red-400" : "text-slate-400 hover:bg-red-50 hover:text-red-600"
-          }`}
-        >
-          삭제
-        </button>
-      </div>
+        </div>
+      ) : null}
+      <span className="sr-only">{phoneDisplay || "저장된 명함"}</span>
     </li>
   );
 }
@@ -182,6 +158,7 @@ export default function WalletHubModal({
   const [showAdvancedMine, setShowAdvancedMine] = useState(false);
   const [vaultFiles, setVaultFiles] = useState([]);
   const [vaultLoading, setVaultLoading] = useState(false);
+  const [caseNotes, setCaseNotes] = useState(() => readPersonalCaseNotes());
   const tabButtonRefs = useRef({});
   const tabStrip = useHorizontalScrollStrip(open);
   useSensitiveScreenSecure(open && tab === "mydocs");
@@ -192,6 +169,18 @@ export default function WalletHubModal({
     setToast(msg);
     setTimeout(() => setToast(""), 2400);
   }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const sync = () => setCaseNotes(readPersonalCaseNotes());
+    sync();
+    window.addEventListener(PERSONAL_CASE_NOTES_CHANGED, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(PERSONAL_CASE_NOTES_CHANGED, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, [open]);
 
   const refreshOwned = useCallback(async () => {
     const uid = readUserId();
@@ -422,7 +411,7 @@ export default function WalletHubModal({
                     </p>
                   </div>
                 ) : (
-                  <ul className="space-y-4">
+                  <ul className="wallet-hub-push-list space-y-3">
                     {receivedCards.map((item) => {
                       const profile = resolveWalletProfile(item, profileByRoomId);
                       return (
@@ -577,6 +566,80 @@ export default function WalletHubModal({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between px-0.5">
                     <p className={`text-[13px] font-black ${isDarkMode ? "text-gray-200" : "text-slate-800"}`}>
+                      키패드 저장
+                    </p>
+                    <span className={`text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-slate-400"}`}>
+                      {caseNotes.length}건
+                    </span>
+                  </div>
+                  {caseNotes.length === 0 ? (
+                    <p
+                      className={`rounded-xl px-4 py-6 text-center text-[12px] ring-1 ${
+                        isDarkMode
+                          ? "bg-white/5 text-gray-400 ring-white/10"
+                          : "bg-white text-slate-500 ring-slate-100"
+                      }`}
+                    >
+                      통화 키패드에서 저장한 번호·메모가 여기에 모입니다.
+                    </p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {caseNotes.map((note) => (
+                        <li
+                          key={note.id}
+                          className={`rounded-2xl p-4 ring-1 ${
+                            isDarkMode ? "bg-white/5 ring-white/10" : "bg-white ring-slate-100"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p
+                                className={`text-[15px] font-black leading-snug ${
+                                  isDarkMode ? "text-gray-100" : "text-slate-900"
+                                }`}
+                              >
+                                {note.name}
+                              </p>
+                              {note.digits ? (
+                                <p
+                                  className={`mt-1 text-[14px] font-semibold tabular-nums ${
+                                    isDarkMode ? "text-sky-300" : "text-sky-700"
+                                  }`}
+                                >
+                                  {note.digits}
+                                </p>
+                              ) : null}
+                              {note.content ? (
+                                <p
+                                  className={`mt-1 whitespace-pre-wrap text-[12px] font-medium leading-relaxed ${
+                                    isDarkMode ? "text-gray-400" : "text-slate-600"
+                                  }`}
+                                >
+                                  {note.content}
+                                </p>
+                              ) : null}
+                            </div>
+                            <button
+                              type="button"
+                              className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold ${
+                                isDarkMode ? "text-rose-300" : "text-rose-600"
+                              }`}
+                              onClick={() => {
+                                removePersonalCaseNote(note.id);
+                                showToast("삭제했습니다.");
+                              }}
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-0.5">
+                    <p className={`text-[13px] font-black ${isDarkMode ? "text-gray-200" : "text-slate-800"}`}>
                       저장된 파일
                     </p>
                     <button
@@ -613,7 +676,6 @@ export default function WalletHubModal({
                     </ul>
                   )}
                 </div>
-                <DocumentTemplatesPanel embedded compact membershipTier={membershipTier} isDarkMode={isDarkMode} />
               </div>
             )}
 

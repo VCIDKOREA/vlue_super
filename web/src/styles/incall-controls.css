@@ -1,0 +1,617 @@
+/* V1 In-Call 제어 · 카톡 슬롯 · 통화목록 CTA */
+
+.incall-control-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.92));
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.incall-control-bar__row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.incall-control-bar__row--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.incall-control-bar__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 8px 4px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(30, 41, 59, 0.72);
+  color: rgba(248, 250, 252, 0.92);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.incall-control-bar__btn.is-active {
+  border-color: rgba(59, 130, 246, 0.7);
+  color: #93c5fd;
+  background: rgba(37, 99, 235, 0.22);
+}
+
+.incall-control-bar__btn--end {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(185, 28, 28, 0.92);
+  color: #fff;
+}
+
+.incall-control-bar__ios-swipe {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px 2px;
+  border: 0;
+  background: transparent;
+  color: rgba(203, 213, 225, 0.85);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.incall-control-bar__ios-chevron {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.45);
+}
+
+.incall-control-bar__ios-toast {
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(186, 230, 253, 0.95);
+}
+
+.incall-dtmf-pad {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 4px 4px;
+}
+
+.incall-dtmf-pad__display {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: clamp(44px, 7vh, 56px);
+  padding: 0 6px 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(8, 12, 22, 0.72);
+  overflow: hidden;
+}
+
+.incall-dtmf-pad__display.has-digits {
+  border-color: rgba(125, 211, 252, 0.28);
+}
+
+.incall-dtmf-pad__display-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.incall-dtmf-pad__display-value {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #f8fafc;
+  font-size: clamp(22px, 3.4vh, 28px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  text-align: center;
+  animation: incall-dtmf-digit-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.incall-dtmf-pad__display-placeholder {
+  color: rgba(148, 163, 184, 0.55);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.incall-dtmf-pad__backspace {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: rgba(51, 65, 85, 0.35);
+  color: rgba(226, 232, 240, 0.92);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.incall-dtmf-pad__backspace-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.incall-dtmf-pad__backspace:active:not(:disabled) {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(125, 211, 252, 0.35);
+  color: #e0f2fe;
+  transform: scale(0.94);
+}
+
+.incall-dtmf-pad__backspace:disabled {
+  opacity: 0.28;
+  cursor: default;
+  background: transparent;
+}
+
+.incall-dtmf-pad--fill .incall-dtmf-pad__display {
+  min-height: clamp(40px, 6.2vh, 52px);
+}
+
+@keyframes incall-dtmf-digit-pop {
+  from {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.incall-dtmf-pad__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  flex: 1 1 auto;
+  align-content: center;
+  min-height: 0;
+}
+
+.incall-dtmf-pad--stage {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 14px 14px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.88);
+}
+
+.incall-dtmf-pad--fill {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: clamp(8px, 1.8vh, 14px) clamp(10px, 2.8vw, 16px) clamp(8px, 1.6vh, 12px);
+  box-sizing: border-box;
+  gap: clamp(6px, 1.2vh, 10px);
+}
+
+.incall-dtmf-pad.is-entering {
+  animation: incall-dtmf-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.incall-dtmf-pad.is-leaving {
+  animation: incall-dtmf-leave 0.22s ease-in both;
+  pointer-events: none;
+}
+
+.incall-dtmf-pad--fill .incall-dtmf-pad__grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  gap: clamp(5px, 1.1vh, 9px);
+  align-content: stretch;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+}
+
+.lettering-ongoing-scroll--keypad .incall-dtmf-pad--stage {
+  flex: 1;
+}
+
+.tent-vlue__spacer:has(.incall-dtmf-pad) {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  padding: 12px 16px 8px;
+  min-height: 0;
+}
+
+.tent-vlue__keypad.incall-dtmf-pad--stage {
+  min-height: 0;
+}
+
+.incall-dtmf-pad--stage .incall-dtmf-pad__key {
+  min-height: clamp(44px, 7.2vh, 58px);
+  font-size: clamp(18px, 2.6vh, 22px);
+}
+
+.incall-dtmf-pad--fill .incall-dtmf-pad__key {
+  min-height: 0;
+  height: 100%;
+  font-size: clamp(16px, 2.4vh, 22px);
+}
+
+.incall-dtmf-pad__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.incall-dtmf-pad__save {
+  min-height: clamp(36px, 5vh, 44px);
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(14, 116, 144, 0.55);
+  color: #e0f2fe;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.incall-dtmf-pad__save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@keyframes incall-dtmf-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes incall-dtmf-leave {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+}
+
+@keyframes showcase-keypad-layer-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.incall-dtmf-pad__key {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform 0.1s ease,
+    background 0.12s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.incall-dtmf-pad__key-label {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.incall-dtmf-pad__key-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    rgba(148, 197, 255, 0.55) 0%,
+    rgba(56, 189, 248, 0.22) 42%,
+    transparent 70%
+  );
+  opacity: 0;
+  transform: scale(0.55);
+}
+
+.incall-dtmf-pad__key:active {
+  transform: scale(0.94);
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(125, 211, 252, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.18);
+}
+
+.incall-dtmf-pad__key.is-tap {
+  animation: incall-dtmf-key-press 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.incall-dtmf-pad__key.is-tap .incall-dtmf-pad__key-flash {
+  animation: incall-dtmf-key-flash 0.32s ease-out both;
+}
+
+@keyframes incall-dtmf-key-press {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(0.92);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes incall-dtmf-key-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.45);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
+.incall-dtmf-pad__close {
+  min-height: clamp(36px, 5vh, 44px);
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(51, 65, 85, 0.8);
+  color: #e2e8f0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.incall-dtmf-save-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(2, 6, 23, 0.72);
+  border-radius: inherit;
+}
+
+.incall-dtmf-save-modal__card {
+  width: 100%;
+  max-width: 320px;
+  padding: 16px 14px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(165deg, #1e293b 0%, #0f172a 100%);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.incall-dtmf-save-modal__title {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.incall-dtmf-save-modal__digits {
+  margin: 8px 0 12px;
+  color: #7dd3fc;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+.incall-dtmf-save-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.incall-dtmf-save-modal__field input,
+.incall-dtmf-save-modal__field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.9);
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.incall-dtmf-save-modal__field input::placeholder,
+.incall-dtmf-save-modal__field textarea::placeholder {
+  color: rgba(148, 163, 184, 0.55);
+}
+
+.incall-dtmf-save-modal__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.incall-dtmf-save-modal__cancel,
+.incall-dtmf-save-modal__confirm {
+  min-height: 42px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.incall-dtmf-save-modal__cancel {
+  background: rgba(51, 65, 85, 0.75);
+  color: #e2e8f0;
+}
+
+.incall-dtmf-save-modal__confirm {
+  background: rgba(14, 116, 144, 0.75);
+  color: #e0f2fe;
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.incall-kakao-slot {
+  margin: 0 12px 8px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.72);
+  text-align: center;
+}
+
+.incall-kakao-slot__desc {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.incall-kakao-slot__btn {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 0;
+  background: #fee500;
+  color: #191919;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.incall-kakao-slot__btn:disabled {
+  opacity: 0.65;
+}
+
+.call-history-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.call-history-row__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+}
+
+.call-history-row__cta {
+  align-self: stretch;
+  margin: 0 16px 12px;
+  min-height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  background: rgba(37, 99, 235, 0.12);
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.call-history-toast {
+  margin: 8px 16px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  z-index: 5;
+}
+
+.call-history-toast--list {
+  background: rgba(37, 99, 235, 0.15);
+  color: #1e3a8a;
+}
+
+.lettering-ongoing-actions-secondary__row--controls {
+  display: block;
+  width: 100%;
+  padding: 0;
+}
+
+.lettering-ongoing-actions-secondary__row--dial {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 12px 12px;
+}
+
+.lettering-action--dial-call-bar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: min(100%, 280px);
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 14px;
+  border: 0;
+  background: #22c55e;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}

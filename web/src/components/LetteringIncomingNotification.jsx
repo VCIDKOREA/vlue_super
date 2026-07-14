@@ -18,12 +18,22 @@ import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAvatar.js";
 import { isVlueBrandAssetUrl } from "../lib/vlueAvatar.js";
 import { buildAuthValidityVerificationItems } from "../lib/authValidityPeriod.js";
-import { nativeEndCall } from "../lib/call/nativeCallControl.js";
+import { nativeEndCall, nativeEndCallKeepOverlay } from "../lib/call/nativeCallControl.js";
 import { resolveIsKnownContact } from "../lib/contacts/hybridKnownContact.js";
+import {
+  resolveCallPeerMatrixSync,
+  resolveInCallKakaoSlot
+} from "../lib/call/callPeerMatrix.js";
+import { runCallPeerMatrixAction } from "../lib/call/runCallPeerMatrixAction.js";
+import { shareShowcaseInviteViaKakao } from "../lib/call/shareShowcaseInviteKakao.js";
+import InCallKakaoShareSlot from "./call/InCallKakaoShareSlot.jsx";
+import InCallControlBar from "./call/InCallControlBar.jsx";
+import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import "../styles/showcase-call-glass.css";
+import "../styles/incall-controls.css";
 
 const DEMO_CARD = {
   name: "\uD64D\uAE38\uB3D9",
@@ -179,8 +189,15 @@ export default function LetteringIncomingNotification({
   hideUnverifiedFooter = false,
   /** 홈·친구 쇼케이스 미리보기 — 통화 수신 UI가 아닌 쇼케이스 열람 */
   previewMode = false,
+  /** 통화 목록에서 다시보기일 때만 저장/카톡 CTA 노출 */
+  fromCallHistory = false,
   /** 홈 미리보기: 명함 신청자만 true — 미신청 시 쇼케이스만 */
   includeDigitalCard = true,
+  /**
+   * false면 펼침 화살표·외부 액션만 쓰고 디지털명함/쇼케이스 본문은 열지 않음
+   * (개인케이스 명함저장 등 — 보여줄 송출 콘텐츠 없음)
+   */
+  expandContent = true,
   /** 통화 종료 (연결 중·미리보기 전체화면) */
   onEndCall,
   /** 주소록 판별 — 미지정 시 하이브리드 해석 */
@@ -237,7 +254,10 @@ export default function LetteringIncomingNotification({
       );
     }
     setExpanded(!expanded);
-    if (expanded) setReceptionFace("front");
+    if (expanded) {
+      setReceptionFace("front");
+      setKeypadOpen(false);
+    }
   };
   const c = normalizeLetteringCard(
     card && typeof card === "object"
@@ -378,7 +398,7 @@ export default function LetteringIncomingNotification({
     return getLetteringReportsForPhone(incoming, { extra: reportHistory });
   }, [isUnverified, incoming, reportHistory, reportTick]);
 
-  const isExpandedView = expanded && canExpand;
+  const isExpandedView = expanded && canExpand && expandContent !== false;
 
   const shellTone = !verified
     ? "lettering-ongoing--unverified"
@@ -479,7 +499,58 @@ export default function LetteringIncomingNotification({
     if (onEndCall) {
       onEndCall();
     } else {
-      nativeEndCall();
+      /* 통화 신호만 끊고 쇼케이스 유지 */
+      nativeEndCallKeepOverlay();
+    }
+  };
+
+  const peerMatrix = useMemo(
+    () =>
+      resolveCallPeerMatrixSync({
+        phone: incoming || c.phone,
+        isVlueMember: Boolean(verified),
+        knownContact: {
+          isKnownContact,
+          matchedName: knownContact.matchedName || savedContactName || "",
+          sources: knownContact.sources || (isKnownContact ? ["hybrid"] : [])
+        }
+      }),
+    [
+      incoming,
+      c.phone,
+      verified,
+      isKnownContact,
+      knownContact.matchedName,
+      knownContact.sources,
+      savedContactName,
+      walletTick
+    ]
+  );
+  const inCallKakao = resolveInCallKakaoSlot(peerMatrix);
+  const [matrixBusy, setMatrixBusy] = useState(false);
+  const [keypadOpen, setKeypadOpen] = useState(false);
+  const inCallDemoMode = Boolean(previewMode);
+
+  const handleMatrixAction = async () => {
+    if (!peerMatrix.showCallLogAction || matrixBusy) return;
+    setMatrixBusy(true);
+    try {
+      if (peerMatrix.cta === "kakao_share") {
+        await shareShowcaseInviteViaKakao({
+          inviteeName: peerMatrix.contactName || c.name || savedContactName,
+          phone: incoming || c.phone,
+          onToast: showGuide
+        });
+      } else {
+        await runCallPeerMatrixAction({
+          matrix: peerMatrix,
+          card: c,
+          phone: incoming || c.phone,
+          onToast: showGuide
+        });
+      }
+    } finally {
+      setMatrixBusy(false);
     }
   };
 
@@ -507,6 +578,11 @@ export default function LetteringIncomingNotification({
   const showReplayDial = previewMode;
   const showCallEndBar = showLiveEndCall || showReplayDial || Boolean(onEndCall && onCall);
   const isGlassTent = /\blettering-ongoing--fullscreen-tent\b/.test(String(className || ""));
+  /** 통화목록 다시보기에서만 저장 CTA — 홈 미리보기·실통화 풀케이스에는 미노출 */
+  const showCallLogSaveCta = Boolean(fromCallHistory && peerMatrix.showCallLogAction);
+  /** 실통화 또는 풀케이스 미리보기 → 키패드·음소거·스피커 */
+  const showInCallControls =
+    (showLiveEndCall && !previewMode) || (Boolean(previewMode && isGlassTent) && !fromCallHistory);
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;
   const carouselScrollEnabled = isPaidMember && (previewMode || onCall);
@@ -547,7 +623,17 @@ export default function LetteringIncomingNotification({
     >
       {showCallEndBar ? (
         <>
-          {isPaidMember || previewMode ? (
+          {/* 실통화: 미회원+주소록일 때만 카톡 CTA */}
+          {!previewMode && showLiveEndCall && inCallKakao.visible ? (
+            <InCallKakaoShareSlot
+              visible
+              description={inCallKakao.description}
+              label={inCallKakao.label}
+              busy={matrixBusy}
+              onShare={handleMatrixAction}
+            />
+          ) : null}
+          {showCallLogSaveCta ? (
             <div
               className={`lettering-ongoing-actions-secondary__row lettering-ongoing-actions-secondary__row--save-end${
                 isGlassTent ? " lettering-ongoing-actions-secondary__row--glass" : ""
@@ -555,14 +641,46 @@ export default function LetteringIncomingNotification({
             >
               <button
                 type="button"
-                onClick={handleSaveCard}
+                onClick={handleMatrixAction}
+                disabled={matrixBusy}
                 className={`lettering-action lettering-action--save-inline ${
                   isGlassTent ? "lettering-action--glass" : "lettering-action--primary"
                 }`}
               >
-                쇼케이스 저장하기
+                {matrixBusy ? "처리 중…" : peerMatrix.label}
               </button>
-              {renderCircleAction()}
+              <button
+                type="button"
+                onClick={handleDialPeer}
+                className="lettering-action lettering-action--dial-call-circle"
+                aria-label="전화걸기"
+              >
+                <Phone size={22} strokeWidth={2.2} aria-hidden />
+              </button>
+            </div>
+          ) : showInCallControls ? (
+            <div className="lettering-ongoing-actions-secondary__row lettering-ongoing-actions-secondary__row--controls">
+              <InCallControlBar
+                platform={platform}
+                onEnd={handleEndCall}
+                showEndButton
+                endLabel="통화종료"
+                demoMode={Boolean(previewMode && !showLiveEndCall)}
+                keypadOpen={keypadOpen}
+                onKeypadOpenChange={setKeypadOpen}
+              />
+            </div>
+          ) : fromCallHistory ? (
+            <div className="lettering-ongoing-actions-secondary__row lettering-ongoing-actions-secondary__row--dial">
+              <button
+                type="button"
+                onClick={handleDialPeer}
+                className="lettering-action lettering-action--dial-call-bar"
+                aria-label="전화걸기"
+              >
+                <Phone size={20} strokeWidth={2.2} aria-hidden />
+                <span>전화걸기</span>
+              </button>
             </div>
           ) : (
             renderCircleAction()
@@ -574,9 +692,20 @@ export default function LetteringIncomingNotification({
           <button type="button" onClick={handleOpenFeed} className="lettering-action lettering-action--primary">
             인증정보
           </button>
-          <button type="button" onClick={handleSaveCard} className="lettering-action lettering-action--ghost">
-            명함저장
-          </button>
+          {showCallLogSaveCta ? (
+            <button
+              type="button"
+              onClick={handleMatrixAction}
+              disabled={matrixBusy}
+              className="lettering-action lettering-action--ghost"
+            >
+              {peerMatrix.label}
+            </button>
+          ) : (
+            <span className="lettering-action lettering-action--ghost opacity-0 pointer-events-none" aria-hidden>
+              —
+            </span>
+          )}
           <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger">
             신고/차단
           </button>
@@ -747,6 +876,16 @@ export default function LetteringIncomingNotification({
                       previewMode={previewMode}
                       includeDigitalCard={false}
                       showcaseOffPreview={showcaseOffPreview}
+                      keypadOpen={keypadOpen}
+                      onKeypadClose={() => setKeypadOpen(false)}
+                      keypadDemoMode={inCallDemoMode}
+                      onKeypadToast={showGuide}
+                    />
+                  ) : keypadOpen ? (
+                    <InCallDtmfPad
+                      demoMode={inCallDemoMode}
+                      onClose={() => setKeypadOpen(false)}
+                      onToast={showGuide}
                     />
                   ) : (
                     <FreeTierCallShowcase
@@ -793,6 +932,10 @@ export default function LetteringIncomingNotification({
                       includeDigitalCard={includeDigitalCard}
                       face={receptionFace}
                       onFaceChange={handleFaceChange}
+                      keypadOpen={keypadOpen}
+                      onKeypadClose={() => setKeypadOpen(false)}
+                      keypadDemoMode={inCallDemoMode}
+                      onKeypadToast={showGuide}
                     />
                   ) : (
                     <LetteringDigitalReception
@@ -803,6 +946,10 @@ export default function LetteringIncomingNotification({
                       embeddedInPush
                       face={receptionFace}
                       onFaceChange={handleFaceChange}
+                      keypadOpen={keypadOpen}
+                      onKeypadClose={() => setKeypadOpen(false)}
+                      keypadDemoMode={inCallDemoMode}
+                      onToast={showGuide}
                     />
                   )}
                 </div>

@@ -26,7 +26,7 @@ import {
 } from "../../lib/contacts/hybridKnownContact.js";
 import {
   nativeAnswerCall,
-  nativeEndCall,
+  nativeEndCallKeepOverlay,
   nativeRejectCall,
   nativeSetOverlayFullscreen
 } from "../../lib/call/nativeCallControl.js";
@@ -34,9 +34,18 @@ import { openExternalHref, formatWebHref } from "../../lib/showcase/showcaseCont
 import { resolveShowcasePeerAvatar } from "../../lib/showcase/resolveShowcasePeerAvatar.js";
 import VLUE_BRAND_LOGO from "../../assets/vlue-shield-logo.svg?url";
 import TentCallActionBar from "./TentCallActionBar.jsx";
+import InCallControlBar from "../call/InCallControlBar.jsx";
+import InCallKakaoShareSlot from "../call/InCallKakaoShareSlot.jsx";
+import InCallDtmfPad from "../call/InCallDtmfPad.jsx";
+import {
+  resolveCallPeerMatrixSync,
+  resolveInCallKakaoSlot
+} from "../../lib/call/callPeerMatrix.js";
+import { shareShowcaseInviteViaKakao } from "../../lib/call/shareShowcaseInviteKakao.js";
 import TentFloatingMemo from "./TentFloatingMemo.jsx";
 import ShowcaseDialConfirmModal from "./ShowcaseDialConfirmModal.jsx";
 import "../../styles/tent-showcase.css";
+import "../../styles/incall-controls.css";
 
 function openExternal(url) {
   return openExternalHref(formatWebHref(url) || url);
@@ -131,6 +140,8 @@ export default function TentShowcaseOverlay({
   const privacyMode = privacyModeProp || readShowcasePrivacyMode(tier);
 
   const [known, setKnown] = useState(() => resolveIsKnownContactSync(peerPhone));
+  const [kakaoBusy, setKakaoBusy] = useState(false);
+  const [keypadOpen, setKeypadOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,6 +152,17 @@ export default function TentShowcaseOverlay({
       cancelled = true;
     };
   }, [peerPhone]);
+
+  const peerMatrix = useMemo(
+    () =>
+      resolveCallPeerMatrixSync({
+        phone: peerPhone || card?.phone,
+        isVlueMember: Boolean(verified),
+        knownContact: known
+      }),
+    [peerPhone, card?.phone, verified, known]
+  );
+  const kakaoSlot = resolveInCallKakaoSlot(peerMatrix);
 
   const exposeCustom =
     previewMode ||
@@ -257,9 +279,23 @@ export default function TentShowcaseOverlay({
   };
 
   const handleEnd = () => {
-    nativeEndCall();
+    nativeEndCallKeepOverlay();
     setCallState(CALL_STATES.ENDED);
     onEnd?.();
+  };
+
+  const handleKakaoShare = async () => {
+    if (!kakaoSlot.visible || kakaoBusy) return;
+    setKakaoBusy(true);
+    try {
+      await shareShowcaseInviteViaKakao({
+        inviteeName: peerMatrix.contactName || displayName || card?.name,
+        phone: peerPhone || card?.phone,
+        onToast: showLinkToast
+      });
+    } finally {
+      setKakaoBusy(false);
+    }
   };
 
   const statusCopy = previewMode
@@ -394,8 +430,17 @@ export default function TentShowcaseOverlay({
           ) : null}
         </header>
 
-        <div className="tent-vlue__spacer" aria-hidden />
+        <div className="tent-vlue__spacer" aria-hidden={!keypadOpen}>
+          {keypadOpen ? (
+            <InCallDtmfPad
+              className="tent-vlue__keypad"
+              onClose={() => setKeypadOpen(false)}
+              onToast={showLinkToast}
+            />
+          ) : null}
+        </div>
 
+        {!keypadOpen ? (
         <div className="tent-vlue__bottom">
           <div className="tent-vlue__identity">
             <div
@@ -490,17 +535,39 @@ export default function TentShowcaseOverlay({
             </nav>
           )}
         </div>
+        ) : null}
       </div>
 
       {linkToast ? <p className="tent-showcase__toast">{linkToast}</p> : null}
 
-      {!previewMode ? (
-        <TentCallActionBar
-          callState={callState}
-          onAnswer={handleAnswer}
-          onReject={handleReject}
-          onEnd={handleEnd}
+      {!previewMode && isConnected && kakaoSlot.visible ? (
+        <InCallKakaoShareSlot
+          visible
+          description={kakaoSlot.description}
+          label={kakaoSlot.label}
+          busy={kakaoBusy}
+          onShare={handleKakaoShare}
         />
+      ) : null}
+
+      {!previewMode ? (
+        isConnected || callState === CALL_STATES.ENDED ? (
+          <InCallControlBar
+            platform="android"
+            onEnd={handleEnd}
+            showEndButton
+            endLabel="통화종료"
+            keypadOpen={keypadOpen}
+            onKeypadOpenChange={setKeypadOpen}
+          />
+        ) : (
+          <TentCallActionBar
+            callState={callState}
+            onAnswer={handleAnswer}
+            onReject={handleReject}
+            onEnd={handleEnd}
+          />
+        )
       ) : null}
 
       <TentFloatingMemo

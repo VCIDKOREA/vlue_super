@@ -19,6 +19,6 @@
 
 ## 참고
 
-- 본 레포의 웹 클라이언트는 `src/lib/getBusinessCardByNumber.js`로 동일 API를 호출할 수 있습니다.
-- Kotlin 스타터 소스: `apps/android-call-overlay/` (`IncomingCallReceiver`, `CardLookupBridge`, `CallOverlayService`).
-- 실제 통화 가로채기는 OS·제조사·Google Play 정책에 따라 제한되므로, 스토어 배포 시 `ConnectionService` / `InCallService` 기반 통합통화 UI와의 연동을 검토합니다.
+- Kotlin: `apps/android/` — `CallOverlayService` + **`incall/VlueInCallService`**(기본 전화앱 UI).
+- DTMF·완벽한 종료: 사용자가 VLUE를 기본 전화 앱으로 지정해야 `Call.playDtmfTone` / `Call.disconnect` 사용 가능.
+- 상세: `docs/v1_incall_android_ios.md`

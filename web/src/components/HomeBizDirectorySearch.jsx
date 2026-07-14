@@ -84,26 +84,34 @@ export default function HomeBizDirectorySearch({
 
   const results = useMemo(() => {
     if (!tagHits.length) return localResults;
-    const mapped = tagHits.map((hit, i) => ({
-      id: `tag-${hit.userId || hit.phone || i}`,
-      categoryId: "showcase",
-      categoryLabel: "쇼케이스",
-      subcat: "해시태그",
-      name: hit.organization || hit.name || hit.phone || "쇼케이스",
-      popular: 90,
-      distance: 0,
-      rating: 5,
-      likes: 0,
-      roomId: null,
-      phone: hit.phone || "",
-      address: "",
-      intro: (hit.tags || []).join(" ") || "해시태그 매칭 쇼케이스",
-      menu: [],
-      showcaseTags: hit.tags || [],
-      img: hit.logoUrl || "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=900&q=80",
-      publicExposure: true,
-      card: null
-    }));
+    const mapped = tagHits.map((hit, i) => {
+      const displayName = hit.displayName || hit.name || "";
+      const phone = hit.phoneVisible ? hit.phone || "" : "";
+      const nameOk = hit.nameVisible !== false && displayName && displayName !== "비공개 회원";
+      return {
+        id: `tag-${hit.userId || phone || i}`,
+        categoryId: "showcase",
+        categoryLabel: "쇼케이스",
+        subcat: "해시태그",
+        name: hit.organization || (nameOk ? displayName : displayName || "비공개 회원"),
+        popular: 90,
+        distance: 0,
+        rating: 5,
+        likes: 0,
+        roomId: null,
+        phone,
+        phoneVisible: Boolean(hit.phoneVisible),
+        idInquiryEnabled: Boolean(hit.idInquiryEnabled),
+        publicHandle: hit.publicHandle || "",
+        address: "",
+        intro: (hit.tags || []).join(" ") || "해시태그 매칭 쇼케이스",
+        menu: [],
+        showcaseTags: hit.tags || [],
+        img: hit.logoUrl || "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=900&q=80",
+        publicExposure: true,
+        card: null
+      };
+    });
     const seen = new Set(localResults.map((b) => b.id));
     return [...mapped.filter((m) => !seen.has(m.id)), ...localResults];
   }, [localResults, tagHits]);
@@ -129,7 +137,23 @@ export default function HomeBizDirectorySearch({
     const timer = setTimeout(() => {
       searchShowcaseByTag(q).then((res) => {
         if (cancelled) return;
-        setTagHits(res.ok ? res.items || [] : []);
+        if (!res.ok) {
+          setTagHits([]);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("vlue-showcase-search-auth", {
+                detail: {
+                  code: res.code,
+                  error: res.error,
+                  meta: res.meta,
+                  status: res.status
+                }
+              })
+            );
+          }
+          return;
+        }
+        setTagHits(res.items || []);
       });
     }, 280);
     return () => {

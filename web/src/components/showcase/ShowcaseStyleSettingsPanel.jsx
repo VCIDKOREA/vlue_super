@@ -11,7 +11,7 @@ import {
 } from "../../lib/showcase/showcaseStyleStorage.js";
 import { writeShowcasePrivacyMode } from "../../lib/showcase/showcasePrivacyMode.js";
 import { PRIVACY_MODES } from "../../lib/showcase/tentShowcaseTypes.js";
-import { syncShowcaseTagsToServer } from "../../lib/showcase/showcaseTagsApi.js";
+import { syncShowcaseTagsToServer, fetchShowcaseSearchPrivacy, saveShowcaseSearchPrivacy } from "../../lib/showcase/showcaseTagsApi.js";
 import { SHOWCASE_FONT_SETS, SHOWCASE_CASE_FRAMES, SHOWCASE_STYLE_LIST, SHOWCASE_STYLE_TYPES } from "../../lib/showcase/showcaseStyleTypes.js";
 import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
@@ -75,6 +75,11 @@ export default function ShowcaseStyleSettingsPanel({
   const [config, setConfig] = useState(() => readShowcaseStyle());
   const [gateOpen, setGateOpen] = useState(false);
   const [tagInput, setTagInput] = useState(() => (config.tags || []).join(" "));
+  const [searchPrivacy, setSearchPrivacy] = useState({
+    isPhoneSearchAllowed: false,
+    isNameSearchAllowed: false,
+    isIdSearchAllowed: false
+  });
   /** 미리보기 시트 — 기본 접힘, 「올리기」로 아래에서 상승 */
   const [previewCollapsed, setPreviewCollapsed] = useState(true);
   const [consentOpen, setConsentOpen] = useState(false);
@@ -155,6 +160,29 @@ export default function ShowcaseStyleSettingsPanel({
     if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
     setTagInput(raw);
     persist({ tags: parseShowcaseTagsInput(raw) });
+  };
+
+  useEffect(() => {
+    if (!isPaid) return undefined;
+    let cancelled = false;
+    fetchShowcaseSearchPrivacy().then((res) => {
+      if (cancelled || !res.ok || !res.privacy) return;
+      setSearchPrivacy({
+        isPhoneSearchAllowed: Boolean(res.privacy.isPhoneSearchAllowed),
+        isNameSearchAllowed: Boolean(res.privacy.isNameSearchAllowed),
+        isIdSearchAllowed: Boolean(res.privacy.isIdSearchAllowed)
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPaid]);
+
+  const onSearchPrivacyToggle = (key, checked) => {
+    if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
+    const next = { ...searchPrivacy, [key]: checked };
+    setSearchPrivacy(next);
+    void saveShowcaseSearchPrivacy(next);
   };
 
   useEffect(() => {
@@ -414,7 +442,7 @@ export default function ShowcaseStyleSettingsPanel({
             <ProfileRow label="#해시태그" hint={isPaid ? "검색용 · 공백으로 구분" : "유료 전용"}>
               <input
                 className={`showcase-profile-input ${inputCls}`}
-                placeholder={isPaid ? "#카페 #대구" : "유료 회원만 등록"}
+                placeholder={isPaid ? "예: #상호명 #지역" : "유료 회원만 등록"}
                 value={tagInput}
                 readOnly={!isPaid}
                 onFocus={() => {
@@ -423,6 +451,39 @@ export default function ShowcaseStyleSettingsPanel({
                 onChange={(e) => onTagsChange(e.target.value)}
               />
             </ProfileRow>
+
+            {isPaid ? (
+              <div className="showcase-profile-row showcase-profile-row--stack">
+                <span className="showcase-profile-row__label">
+                  검색 공개 설정
+                  <span className="showcase-profile-row__hint">기본 비공개 · 허용한 항목만 검색에 노출</span>
+                </span>
+                <label className="showcase-privacy-check">
+                  <input
+                    type="checkbox"
+                    checked={searchPrivacy.isPhoneSearchAllowed}
+                    onChange={(e) => onSearchPrivacyToggle("isPhoneSearchAllowed", e.target.checked)}
+                  />
+                  전화번호로 검색 허용
+                </label>
+                <label className="showcase-privacy-check">
+                  <input
+                    type="checkbox"
+                    checked={searchPrivacy.isNameSearchAllowed}
+                    onChange={(e) => onSearchPrivacyToggle("isNameSearchAllowed", e.target.checked)}
+                  />
+                  실명으로 검색 허용
+                </label>
+                <label className="showcase-privacy-check">
+                  <input
+                    type="checkbox"
+                    checked={searchPrivacy.isIdSearchAllowed}
+                    onChange={(e) => onSearchPrivacyToggle("isIdSearchAllowed", e.target.checked)}
+                  />
+                  아이디로 검색·문의 허용
+                </label>
+              </div>
+            ) : null}
 
             {config.styleType !== "default" ? (
               <>
