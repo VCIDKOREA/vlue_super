@@ -36,7 +36,7 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
 
   const openDetail = (n) => {
     if (!n.read) markPushRead(n.id);
-    setDetail(n);
+    setDetail({ ...n, read: true });
     refresh();
   };
 
@@ -108,7 +108,13 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
                   <span className="text-[10px] font-medium text-gray-400">
                     {resolvePushDisplayTime(n)}
                   </span>
-                  <span className="ml-auto text-[11px] font-bold text-blue-600">상세 ›</span>
+                  <span
+                    className={`ml-auto text-[11px] font-bold ${
+                      n.read ? "text-slate-400" : "text-blue-600"
+                    }`}
+                  >
+                    {n.read ? "확인" : "미확인"}
+                  </span>
                 </div>
                 <p className="text-[13px] font-bold text-gray-900">{n.title}</p>
                 <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-gray-600">{n.body}</p>
