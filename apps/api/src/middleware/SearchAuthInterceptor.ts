@@ -30,6 +30,8 @@ export type SearchAuthFail = {
     loginRequired?: boolean;
     redirect?: string;
     popup?: string;
+    retryAfterSec?: number;
+    suspended?: boolean;
   };
 };
 
