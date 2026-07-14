@@ -8,10 +8,8 @@
  *   webkit.messageHandlers.vlueFamilyMissedCall.postMessage({})
  */
 import { postFamilyAlertCall, postMissedCall } from "./familyProtectionApi.js";
-import { postCallEndAlimtalk } from "./alimtalkCallEndApi.js";
 import { appendCallShowcaseHistory } from "./callShowcaseHistory.js";
 import { readShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
-import { canSendCallEndAlimtalk } from "./showcase/kakaoAlimtalkConsent.js";
 
 export function registerFamilyCallBridge() {
   if (typeof window === "undefined") return;
@@ -37,14 +35,6 @@ export function registerFamilyCallBridge() {
     onCallEnded: (payload) => {
       const p = payload || {};
       postFamilyAlertCall(p).catch(() => {});
-      /* 쇼케이스 최종 적용 시 동의한 경우에만 알림톡 발송 */
-      if (canSendCallEndAlimtalk()) {
-        postCallEndAlimtalk({
-          peerPhone: p.phone,
-          durationSec: p.durationSec,
-          direction: p.direction
-        }).catch(() => {});
-      }
       appendCallShowcaseHistory({
         phone: p.phone,
         name: p.name || p.peerName,

@@ -133,13 +133,14 @@ export default function ShowcaseCallCarousel({
   };
 
   const photoIndexBase = showDigitalCard ? 1 : 0;
+  const showcaseSlideTotal = Math.max(1, count - photoIndexBase);
   const slideLabel =
     current?.type === "card"
       ? "디지털 인증명함"
       : current?.type === "banner"
-        ? `쇼케이스 ${Math.max(1, index + 1 - photoIndexBase)}/${Math.max(1, count - photoIndexBase)}`
+        ? `쇼케이스 ${Math.max(1, index + 1 - photoIndexBase)}/${showcaseSlideTotal}`
         : current?.type === "empty-slot"
-          ? `빈 슬롯 (${current.slot}/${current.max})`
+          ? `쇼케이스 ${current.slot}/${showcaseSlideTotal}`
           : current?.type === "paid-identity"
             ? "쇼케이스"
             : showcaseOffPreview
@@ -242,12 +243,10 @@ export default function ShowcaseCallCarousel({
                 ) : null}
 
                 {slide.type === "empty-slot" ? (
-                  <div className="showcase-call-carousel__empty flex h-full min-h-[220px] flex-col items-center justify-center gap-2 border border-dashed border-white/25 bg-slate-900/80 px-6 text-center">
-                    <p className="text-[12px] font-black text-indigo-200">유료 사진 슬롯 {slide.slot}</p>
-                    <p
-                      className="text-[12px] font-semibold leading-relaxed text-white/80"
-                      style={{ wordBreak: "keep-all" }}
-                    >
+                  <div className="showcase-call-carousel__banner showcase-call-carousel__banner--empty">
+                    <div className="showcase-call-carousel__paid-sheet-stage" aria-hidden />
+                    <div className="showcase-call-carousel__banner-veil" aria-hidden />
+                    <p className="showcase-call-carousel__banner-caption showcase-call-carousel__banner-caption--empty">
                       스타일 설정 → 사진에서 추가하면 여기에 표시됩니다. (최대 {slide.max}장)
                     </p>
                   </div>
@@ -286,7 +285,6 @@ export default function ShowcaseCallCarousel({
               phone={incomingNumber || card?.phone || ""}
               verified={verified}
               showName={cornerShowName}
-              kicker="유료 · 쇼케이스"
             />
           ) : null}
         </div>

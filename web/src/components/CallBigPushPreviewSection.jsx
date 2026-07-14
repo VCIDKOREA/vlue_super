@@ -84,7 +84,6 @@ export default function CallBigPushPreviewSection({ membershipTier = "free", cla
       <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
         <div>
           <p className="text-[12px] font-black text-slate-900">{showcasePreviewLabel()}</p>
-          <p className="text-[10px] font-medium text-slate-500">{VLUE_SHOWCASE.tagline}</p>
         </div>
         <button
           type="button"

@@ -19,8 +19,8 @@
 }
 
 .lettering-home-push-embed--placeholder {
-  border-style: dashed;
-  border-color: rgba(148, 163, 184, 0.35);
+  border: none;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
   background: #0b1220;
 }
 
@@ -559,6 +559,42 @@
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
 }
 
+.showcase-call-carousel__banner--empty {
+  position: relative;
+  height: 100%;
+  min-height: 220px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: linear-gradient(165deg, #0f172a 0%, #1e293b 50%, #0b1220 100%);
+  border: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.showcase-call-carousel__banner--empty .showcase-call-carousel__paid-sheet-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.showcase-call-carousel__banner-caption--empty {
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(88%, 320px);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: rgba(226, 232, 240, 0.82);
+  word-break: keep-all;
+}
+
+/* 홈 글래스 셸 — 접힘 바에 이름·번호가 있으므로 코너 배지 중복 숨김 */
+.lettering-ongoing--home-glass .showcase-identity-corner {
+  display: none !important;
+}
+
 .showcase-call-carousel__dots {
   display: flex;
   justify-content: center;
@@ -597,6 +633,38 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   color: rgba(226, 232, 240, 0.45);
+}
+
+.showcase-call-carousel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 220px;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  border: none;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.8);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.showcase-call-carousel__empty-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: #c7d2fe;
+}
+
+.showcase-call-carousel__empty-desc {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+  word-break: keep-all;
 }
 
 .showcase-call-carousel--locked .showcase-call-carousel__viewport {

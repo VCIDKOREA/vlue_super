@@ -1,4 +1,19 @@
 /* VLUE Showcase 스타일 설정 — 오늘의 집 미니멀 */
+
+/* 라운드 프레임 — CSS border-dashed는 곡선 모서리가 깨지므로 inset ring 사용 */
+.showcase-round-ring {
+  border: none;
+  box-shadow: inset 0 0 0 1.5px rgba(148, 163, 184, 0.45);
+}
+
+.showcase-round-ring--soft {
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
+}
+
+.showcase-round-ring--dark {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
 .showcase-style-settings__split {
   display: grid;
   grid-template-columns: 1fr;
@@ -207,9 +222,10 @@
   gap: 8px;
   width: 100%;
   padding: 12px 14px;
-  border: 1px dashed #cbd5e1;
+  border: none;
   border-radius: 14px;
   background: #fff;
+  box-shadow: inset 0 0 0 1.5px rgba(148, 163, 184, 0.45);
   font-size: 12px;
   font-weight: 700;
   color: #4e5968;
@@ -812,6 +828,20 @@
 }
 
 /* 열림: 설정 패널 전체(화살표 끝·적용하기 높이까지) 덮어 자세히 보기 */
+/* 라운드 프레임 — CSS border-dashed는 곡선 모서리가 깨지므로 inset ring 사용 */
+.showcase-round-ring {
+  border: none;
+  box-shadow: inset 0 0 0 1.5px rgba(148, 163, 184, 0.45);
+}
+
+.showcase-round-ring--soft {
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
+}
+
+.showcase-round-ring--dark {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
 .showcase-style-settings {
   position: relative;
 }
@@ -855,7 +885,45 @@
   height: 100%;
   border-radius: 16px;
   overflow: hidden;
-  background: #020617;
+  background: #0f172a;
+}
+
+.showcase-style-settings__sheet-stage .lettering-home-push-embed {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.showcase-style-settings__sheet-stage .lettering-ongoing--home-glass {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
+.showcase-style-settings__sheet-stage .lettering-ongoing--expanded {
+  --lettering-push-expanded-max: none;
+  --lettering-push-expanded-max-fb: none;
+  max-height: none !important;
+}
+
+.showcase-style-settings__sheet-stage .lettering-ongoing-expand-slot[data-open="true"] {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.showcase-style-settings__sheet-stage .lettering-ongoing-scroll--carousel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.showcase-style-settings__sheet-stage .lettering-ongoing-actions-secondary {
+  display: none !important;
 }
 
 .showcase-style-settings__sheet-stage .showcase-call-carousel {
@@ -865,20 +933,16 @@
   height: 100%;
 }
 
-.showcase-style-settings__sheet-stage .showcase-call-carousel__hint,
-.showcase-style-settings__sheet-stage .showcase-call-carousel__dots {
-  display: none;
-}
-
 .showcase-style-settings__sheet-stage .showcase-call-carousel__viewport {
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
   border-radius: 14px;
+  overflow: hidden;
 }
 
 .showcase-style-settings__sheet-stage .showcase-call-carousel__banner,
-.showcase-style-settings__sheet-stage .showcase-call-carousel__empty,
+.showcase-style-settings__sheet-stage .showcase-call-carousel__banner--empty,
 .showcase-style-settings__sheet-stage .showcase-call-carousel__paid-sheet,
 .showcase-style-settings__sheet-stage .showcase-call-carousel__free,
 .showcase-style-settings__sheet-stage .showcase-call-carousel__slide {
@@ -1750,9 +1814,10 @@
   gap: 6px;
   width: 100%;
   min-height: 148px;
-  border: 1.5px dashed #cbd5e1;
+  border: none;
   border-radius: 16px;
   background: #fafbfc;
+  box-shadow: inset 0 0 0 1.5px rgba(148, 163, 184, 0.45);
   color: #64748b;
   cursor: pointer;
 }

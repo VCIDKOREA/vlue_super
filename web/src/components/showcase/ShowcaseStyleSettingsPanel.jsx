@@ -15,16 +15,13 @@ import { syncShowcaseTagsToServer, fetchShowcaseSearchPrivacy, saveShowcaseSearc
 import { SHOWCASE_FONT_SETS, SHOWCASE_CASE_FRAMES, SHOWCASE_STYLE_LIST, SHOWCASE_STYLE_TYPES } from "../../lib/showcase/showcaseStyleTypes.js";
 import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
+import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
 import { VLUE_SHOWCASE } from "../../lib/vlueBrandSpaces.js";
-import ShowcaseCallCarousel from "./ShowcaseCallCarousel.jsx";
+import LetteringIncomingNotification from "../LetteringIncomingNotification.jsx";
 import ShowcasePremiumGateModal from "./ShowcasePremiumGateModal.jsx";
 import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
 import ShowcasePhotoEditor from "./ShowcasePhotoEditor.jsx";
-import KakaoAlimtalkConsentModal from "./KakaoAlimtalkConsentModal.jsx";
-import { writeKakaoAlimtalkAgreed } from "../../lib/showcase/kakaoAlimtalkConsent.js";
-import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
 import "./showcase-style-settings.css";
-import "../../styles/kakao-alimtalk-consent.css";
 import "../../styles/showcase-call-glass.css";
 
 function gatePremium(feature, tier, setGate) {
@@ -82,7 +79,6 @@ export default function ShowcaseStyleSettingsPanel({
   });
   /** 미리보기 시트 — 기본 접힘, 「올리기」로 아래에서 상승 */
   const [previewCollapsed, setPreviewCollapsed] = useState(true);
-  const [consentOpen, setConsentOpen] = useState(false);
   const [openMusic, setOpenMusic] = useState(false);
   const [openBiz, setOpenBiz] = useState(false);
   const [openDecorate, setOpenDecorate] = useState(false);
@@ -114,7 +110,7 @@ export default function ShowcaseStyleSettingsPanel({
     return applyShowcaseStyleToCard({ ...base, showcaseStyle: config }, membershipTier);
   }, [membershipTier, config]);
 
-  const previewPhotos = config.gallery?.photos || [];
+  const includeDigitalCard = isPaid && readDigitalCardActive();
 
   const persist = useCallback((patch) => {
     setConfig((prev) => {
@@ -194,23 +190,14 @@ export default function ShowcaseStyleSettingsPanel({
     return () => clearTimeout(timer);
   }, [tagInput, isPaid]);
 
-  const commitApply = useCallback(
-    (isKakaoAgreed) => {
-      const latest = readShowcaseStyle();
-      writeShowcaseStyle(latest);
-      writeKakaoAlimtalkAgreed(isKakaoAgreed);
-      if (isPaid) {
-        void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));
-      }
-      setConsentOpen(false);
-      onToast?.(
-        isKakaoAgreed
-          ? "적용되었습니다. 통화 종료 시 카카오 알림톡이 발송됩니다."
-          : "적용되었습니다. 알림톡 발송은 동의하지 않았습니다."
-      );
-    },
-    [isPaid, onToast, tagInput]
-  );
+  const commitApply = useCallback(() => {
+    const latest = readShowcaseStyle();
+    writeShowcaseStyle(latest);
+    if (isPaid) {
+      void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));
+    }
+    onToast?.("적용되었습니다.");
+  }, [isPaid, onToast, tagInput]);
 
   const headText = isDarkMode ? "text-gray-100" : "text-slate-900";
   const subText = isDarkMode ? "text-gray-400" : "text-slate-500";
@@ -229,13 +216,13 @@ export default function ShowcaseStyleSettingsPanel({
             <p className={`text-[17px] font-black ${headText}`}>{VLUE_SHOWCASE.nameKo}</p>
             <p className={`text-[11px] ${subText}`}>프로필처럼 사진·스타일만 골라 주세요</p>
           </div>
-          <button type="button" className="showcase-style-settings__done-btn" onClick={() => setConsentOpen(true)}>
+          <button type="button" className="showcase-style-settings__done-btn" onClick={commitApply}>
             완료
           </button>
         </div>
       ) : (
         <div className="showcase-style-settings__sticky-done">
-          <button type="button" className="showcase-style-settings__save-btn" onClick={() => setConsentOpen(true)}>
+          <button type="button" className="showcase-style-settings__save-btn" onClick={commitApply}>
             적용하기
           </button>
         </div>
@@ -573,7 +560,7 @@ export default function ShowcaseStyleSettingsPanel({
           </section>
 
           {!hideHeader ? (
-            <button type="button" className="showcase-style-settings__save-btn" onClick={() => setConsentOpen(true)}>
+            <button type="button" className="showcase-style-settings__save-btn" onClick={commitApply}>
               적용하기
             </button>
           ) : (
@@ -612,17 +599,29 @@ export default function ShowcaseStyleSettingsPanel({
             aria-hidden={previewCollapsed}
           >
             <div className="showcase-style-settings__sheet-stage">
-              <ShowcaseCallCarousel
-                card={card}
-                verified={config.verifiedBadgeOn !== false}
-                incomingNumber={card?.phone || ""}
-                photos={previewPhotos}
-                membershipTier={membershipTier}
-                isKnownContact
-                scrollEnabled
-                previewMode
-                includeDigitalCard={false}
-              />
+              <div className="lettering-home-push-embed">
+                <LetteringIncomingNotification
+                  verified={config.verifiedBadgeOn !== false}
+                  previewMode
+                  showOwnerSettings={false}
+                  callPhase="connected"
+                  platform="android"
+                  isRecording={false}
+                  callDurationSec={0}
+                  recordingDurationSec={0}
+                  incomingNumber={card?.phone || ""}
+                  card={card}
+                  includeDigitalCard={includeDigitalCard}
+                  isKnownContact
+                  expanded={!previewCollapsed}
+                  onExpandedChange={(open) => {
+                    if (!open) setPreviewCollapsed(true);
+                  }}
+                  onEndCall={() => setPreviewCollapsed(true)}
+                  onToast={onToast}
+                  className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass"
+                />
+              </div>
             </div>
           </div>
         </aside>
@@ -636,13 +635,6 @@ export default function ShowcaseStyleSettingsPanel({
           setGateOpen(false);
           onOpenUpgrade?.();
         }}
-      />
-
-      <KakaoAlimtalkConsentModal
-        open={consentOpen}
-        isDarkMode={isDarkMode}
-        onAgree={() => commitApply(true)}
-        onDisagree={() => commitApply(false)}
       />
     </div>
   );

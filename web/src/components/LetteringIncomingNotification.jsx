@@ -575,14 +575,13 @@ export default function LetteringIncomingNotification({
 
   /** 통화 중: 종료 / 다시보기·미리보기: 전화걸기 */
   const showLiveEndCall = onCall && !previewMode;
-  const showReplayDial = previewMode;
-  const showCallEndBar = showLiveEndCall || showReplayDial || Boolean(onEndCall && onCall);
+  const showReplayDial = Boolean(fromCallHistory);
+  const showCallEndBar = showLiveEndCall || showReplayDial || Boolean(onEndCall && onCall && !previewMode);
   const isGlassTent = /\blettering-ongoing--fullscreen-tent\b/.test(String(className || ""));
   /** 통화목록 다시보기에서만 저장 CTA — 홈 미리보기·실통화 풀케이스에는 미노출 */
   const showCallLogSaveCta = Boolean(fromCallHistory && peerMatrix.showCallLogAction);
-  /** 실통화 또는 풀케이스 미리보기 → 키패드·음소거·스피커 */
-  const showInCallControls =
-    (showLiveEndCall && !previewMode) || (Boolean(previewMode && isGlassTent) && !fromCallHistory);
+  /** 실통화만 키패드·음소거·스피커 — 홈/설정 미리보기에서는 미노출 */
+  const showInCallControls = Boolean(showLiveEndCall);
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;
   const carouselScrollEnabled = isPaidMember && (previewMode || onCall);
@@ -613,7 +612,11 @@ export default function LetteringIncomingNotification({
     );
   };
 
-  const renderExpandedFooter = () => (
+  const renderExpandedFooter = () => {
+    /* 홈·설정 쇼케이스 미리보기 — 하단 통화키 바 없이 캐러셀만 */
+    if (previewMode && !fromCallHistory) return null;
+
+    return (
     <div
       className={`lettering-ongoing-actions-secondary relative z-[2] shrink-0 ${
         showCallEndBar
@@ -665,7 +668,7 @@ export default function LetteringIncomingNotification({
                 onEnd={handleEndCall}
                 showEndButton
                 endLabel="통화종료"
-                demoMode={Boolean(previewMode && !showLiveEndCall)}
+                demoMode={false}
                 keypadOpen={keypadOpen}
                 onKeypadOpenChange={setKeypadOpen}
               />
@@ -712,7 +715,8 @@ export default function LetteringIncomingNotification({
         </>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <article

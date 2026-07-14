@@ -6,6 +6,35 @@
 
 **V1 출시 범위:** 기관 검색 · 블루 쇼케이스 · 디지털 인증명함 · 가족보호 · 개인케이스 · 요금제 · 앱 다운로드 · 고객지원
 
+**비앱 사용자 쇼케이스 전달:** 카카오 **알림톡은 V1 미사용**. 통화 중 **앱 미사용자**에게는 이미 구현된 **카카오 Share API(쇼케이스 초대 공유)** 로 전달한다. (`shareShowcaseInviteKakao.js` · `InCallKakaoShareSlot`)
+
+---
+
+## 출시 일정 (2주)
+
+> 신규 기능 개발 없음. 아래 순서로 **검증·배포·스토어 제출**만 진행.
+
+### 이번 주 — 인프라 · 결제 · Android 실기기
+
+| 우선 | 작업 | 체크리스트 |
+|------|------|------------|
+| P0 | Railway **API·www** 배포 안정화, 빌드·헬스 스모크 | §12-A |
+| P0 | DB migration `showcase_search_privacy_guards` **deploy** | §12-A |
+| P0 | **포트원 테스트** 결제 1회 + `subscribe/complete` + 티어 즉시 반영 | §4-B |
+| P0 | **Android 릴리즈** 빌드 → 통화 오버레이 · `ROLE_DIALER` · 근접 센서 | §6 · §12-B |
+| P1 | www 결제 미지원 카피·CTA → 앱 다운로드 | §4-A |
+| P1 | 요금·카피 UI (9,900 / 취소선 / 가족보호 / B2B·SOHO) | §4-C |
+
+### 다음 주 — 종합 QA · 스토어 심사 제출
+
+| 우선 | 작업 | 체크리스트 |
+|------|------|------------|
+| P0 | **종합 QA** — 게이트·해시태그·BGM·통화목록·개인케이스·V2 숨김 | §1–§5 · §7–§12 |
+| P0 | **Play Store** (필수) / **App Store** (가능 시) 심사 제출 | §12-C |
+| P1 | iOS CallKit 오버레이 스모크 (PSTN 정책 한계 문서화) | §12-B |
+| P1 | 가족보호 E2E (본인 + 가족 등록) | §4-C (가족보호 혜택 노출 후 실사용) |
+| P1 | 카톡 Share — 앱 미사용자 통화 시 공유 시트·토스트 회귀 | §8 |
+
 ---
 
 ## 1. 회원 등급 · 프리미엄 게이트
@@ -21,7 +50,7 @@
 
 - [ ] **유료 계정**에서 `#소금빵 #대구소금빵` 입력 → 저장 유지 + 서버 `PUT /api/lettering/showcase/tags` 동기화
 - [ ] **무료 계정**에서 해시태그 입력 시도 → 프리미엄 게이트 차단
-- [ ] 홈 검색에 `#소금빵` 입력 → 해시태그 매칭 업체·쇼케이스 결과 노출
+- [ ] 홈 검색에 `#소금빵` 입력 → 해시태그 매칭 업체·쇼케이스 결과 노출 (상호주의·프라이버시·429 — `docs/v1_showcase_search_security.md`)
 
 ---
 
@@ -43,7 +72,7 @@
 - [ ] www 온보딩 완료 후 **`PostSignupPaymentModal`(포트원)이 뜨지 않음** — 앱 다운로드 안내만
 - [ ] `v1WebShell.webSubscribePayment === false` (웹 구독 결제 V2로 이관)
 
-### 4-B. 앱 — 포트원 테스트 키 가상 결제 1회 (Railway)
+### 4-B. 앱 — 포트원 테스트 키 가상 결제 1회 (Railway) 【이번 주 P0】
 
 환경: Railway에 등록된 **테스트** 키  
 - Web: `VITE_PORTONE_USER_CODE` (및 관련 `VITE_PORTONE_*`)  
@@ -85,7 +114,7 @@
 
 ---
 
-## 6. 근접 센서 (실기기 Android)
+## 6. 근접 센서 (실기기 Android) 【이번 주 P0】
 
 - [ ] 통화 중 쇼케이스에서 **귀에 대면** 화면 sleep/잠금 오버레이
 - [ ] **떼면 즉시** 쇼케이스 복구
@@ -102,36 +131,18 @@
 
 ---
 
-## 8. 쇼케이스 설정 UI
+## 8. 쇼케이스 설정 UI · 카톡 Share (앱 미사용자)
 
 - [ ] 상단 **스타일 | 사진 | 음악 | 비즈니스** 탭 네비
 - [ ] 카카오/인스타 프로필 URL 연결
 - [ ] 설정 변경 시 미리보기 즉시 반영
-- [ ] 최종 적용 시 **카카오 알림톡 발송 동의** 팝업  
-  (`보이스피싱 예방…` / `최초 1회만 발송`) — 동의 시에만 알림톡 발송
+- [ ] 통화 중 **VLUE 앱 미사용자**(`callPeerMatrix`) → **카톡 공유** 슬롯 노출
+- [ ] 카톡 Share 시트(`Kakao.Share.sendDefault`) 정상 오픈 · 공유 후 쇼케이스 오버레이 유지
+- [ ] 공유 카드에 쇼케이스 초대 문구·링크 포함 (`shareShowcaseInviteKakao.js`)
 
 ---
 
-## 9. 알림톡 (카카오) — 신청 템플릿 기준
-
-카카오 알림톡 **실제 신청 문구**·API `buildCallEndAlimtalkPayload` 일치 검증:
-
-- [ ] **본문 최상단 고정값**에 **보이스피싱 및 스미싱 예방 안심 문구**와 **최초 1회 제한 문구**가 포함되는지 확인  
-  (동의문·발송 본문 모두: 예방 명분 + 발신자·수신자 기준 최초 1회)
-- [ ] 본문에 통화 상대 번호가 **하이픈 표시**(`010-XXXX-XXXX`)로 강조되는지 확인
-- [ ] 본문에 **스마트 명함·쇼케이스** 안내가 포함되는지 확인
-- [ ] **1번 버튼 텍스트**가 신청 문구와 동일: **`▶발신자 쇼케이스 확인하기`**
-- [ ] 1번 버튼 웹링크: `https://vlue.app/site/web/showcase/{phoneDigits}`  
-  - `{phoneDigits}` = 하이픈·공백 **제거된 숫자만** (예: `010XXXXXXXX`)  
-  - API `formatAlimtalkUrlPhoneDigits` / `buildAlimtalkShowcaseUrl` 결과가 서버·알리고 전달값과 일치  
-  - URL에 `010-…` 형태(하이픈)가 **포함되지 않음**
-- [ ] 2번 버튼: **VLUE 앱 다운로드** (다운로드 랜딩)
-- [ ] 미가입자만 발송 · 가입자/수신거부/일일 중복은 skip
-- [ ] `npm run test:alimtalk-call-end` (apps/api) 통과
-
----
-
-## 10. V1 숨김 · V2 스크리닝
+## 9. V1 숨김 · V2 스크리닝
 
 `web/src/lib/v1ReleaseScope.js` 기준 — **노출되면 출시 차단**:
 
@@ -147,7 +158,7 @@
 
 ---
 
-## 11. 통화 목록 · 친구 쇼케이스 (V1 핵심)
+## 10. 통화 목록 · 친구 쇼케이스 (V1 핵심)
 
 - [ ] 하단 바 **통화 목록** → 쇼케이스 리플레이 (무료/유료)
 - [ ] 유료 통화만 보안 쉴드 마크 표시 (무료/유료 텍스트 라벨 없음)
@@ -156,20 +167,34 @@
 
 ---
 
-## 12. 개인케이스 (웹 = 앱)
+## 11. 개인케이스 (웹 = 앱)
 
 - [ ] 웹·앱 라벨 **「개인케이스」** (개인자료실·이력서 다운로드 없음)
 - [ ] 탭 동일: **명함저장 / 저장된케이스 / 내문서**
+- [ ] 명함저장 행 — 홈 **쇼케이스 미리보기** 글래스 스타일 · 펼침 시 저장/삭제만 (캐러셀 본문 없음)
 - [ ] 빈 상태 문구·저장된 쇼케이스 스크랩 동작이 앱과 동일 계열인지 확인
 
 ---
 
-## 13. 빌드 · 스모크
+## 12. 빌드 · 스모크 · 스토어
+
+### 12-A. 인프라 【이번 주】
 
 - [ ] `cd web && npm run build` 성공
-- [ ] `cd apps/api && npm run test:alimtalk-call-end` 성공
-- [ ] Android 릴리즈 빌드 → 통화 오버레이 + 근접 센서 스모크
-- [ ] www 프로덕션 배포 후 홈·인증신청·고객지원·개인케이스 스모크
+- [ ] `cd apps/api && npm run build` 성공
+- [ ] Railway API·www 배포 후 `/api/health` · www 홈 스모크
+- [ ] `cd packages/db && npx prisma migrate deploy` (검색 프라이버시 migration)
+
+### 12-B. Android · iOS 실기기 【이번 주 Android / 다음 주 iOS】
+
+- [ ] Android 릴리즈 빌드 → 통화 오버레이 + InCall 키패드 + **기본 전화앱(`ROLE_DIALER`)** DTMF·종료
+- [ ] Android 근접 센서 스모크 (§6)
+- [ ] iOS: CallKit 전면 오버레이 · 스와이프 업/다운 (`LetteringCallKitOverlay.swift`) — PSTN 한계 문서 준수
+
+### 12-C. 스토어 【다음 주】
+
+- [ ] Google Play 내부/공개 트랙 — 릴리즈 APK/AAB 업로드 · 스토어 등록정보·스크린샷
+- [ ] (선택) App Store Connect 빌드 업로드 · 심사 제출
 
 ---
 
@@ -178,8 +203,8 @@
 1. 무료 → 비즈니스 탭 게이트 확인  
 2. **앱** 유료 가입 → `PostSignupPaymentModal` 포트원 **테스트** 결제 1회 → complete API 200 → Premium 즉시 반영  
 3. www: 요금제 CTA → 다운로드 / **웹 결제 모달 없음**  
-4. 쇼케이스 설정 → 사진·BGM → 알림톡 **동의** 문구 확인  
-5. 통화 목록에서 쇼케이스 다시보기  
+4. 쇼케이스 설정 → 사진·BGM 미리보기  
+5. 통화 목록에서 쇼케이스 다시보기 · 앱 미사용자 통화 시 **카톡 Share** 슬롯  
 6. www: PC다운로드·스토어·미디어커머스·블루AI **없음** / 개인케이스 3탭 확인  
 
 ---
@@ -196,12 +221,12 @@
 | 웹 가입(결제 게이트) | `web/src/site/bolt/components/AuthModal.tsx` |
 | 멤버십 업그레이드 UI | `web/src/components/MembershipUpgradeModal.jsx` |
 | 쇼케이스 설정 | `web/src/components/showcase/ShowcaseStyleSettingsPanel.jsx` |
-| 알림톡 동의 | `web/src/lib/showcase/kakaoAlimtalkConsent.js` |
-| 알림톡 템플릿 | `apps/api/src/lib/alimtalkTemplate.ts` |
-| 알림톡 발송 | `apps/api/src/services/alimtalk/alimtalkCallEndService.ts` |
+| 카톡 Share (앱 미사용자) | `web/src/lib/call/shareShowcaseInviteKakao.js`, `web/src/components/call/InCallKakaoShareSlot.jsx` |
+| 통화 상대 매트릭스 | `web/src/lib/call/callPeerMatrix.js` |
+| 검색 보안 | `docs/v1_showcase_search_security.md`, `apps/api/src/middleware/SearchAuthInterceptor.ts` |
 | 개인케이스(웹) | `web/src/site/bolt/pages/ResourcesPage.tsx` |
 | 개인케이스(앱) | `web/src/components/WalletHubModal.jsx` |
 
 ---
 
-*마지막 업데이트: V1 — www 웹 결제 미지원(앱 전용) · 포트원 앱 테스트 점검 절차 · 요금 9,900/취소선 · 가족보호*
+*마지막 업데이트: V1 — 알림톡 제외 · 카톡 Share 확정 · 2주 일정(인프라/결제/Android → 종합 QA/스토어)*

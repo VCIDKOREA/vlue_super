@@ -6,14 +6,7 @@ import { resolveVlueShowcaseCard } from "../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { showcasePreviewLabel, VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
 import { SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
-import {
-  readKakaoAlimtalkAgreed,
-  writeKakaoAlimtalkAgreed,
-  KAKAO_ALIMTALK_CONSENT_CHANGED_EVENT
-} from "../lib/showcase/kakaoAlimtalkConsent.js";
 import LetteringBizcardSharePanel from "./LetteringBizcardSharePanel.jsx";
-import KakaoAlimtalkConsentModal from "./showcase/KakaoAlimtalkConsentModal.jsx";
-import "../styles/kakao-alimtalk-consent.css";
 
 /**
  * 프로필 사이드바 — 디지털 인증명함 신청 / 승인 후 레터링 명함 미리보기
@@ -31,8 +24,6 @@ export default function MyPageDigitalLetteringSection({
 }) {
   const [previewTick, setPreviewTick] = useState(0);
   const [cardIssuedAt, setCardIssuedAt] = useState(null);
-  const [kakaoAgreed, setKakaoAgreed] = useState(() => readKakaoAlimtalkAgreed());
-  const [kakaoConsentOpen, setKakaoConsentOpen] = useState(false);
 
   const openSettings = () => {
     if (onOpenShowcaseStyle) {
@@ -52,14 +43,11 @@ export default function MyPageDigitalLetteringSection({
 
   useEffect(() => {
     const bump = () => setPreviewTick((n) => n + 1);
-    const onConsent = () => setKakaoAgreed(readKakaoAlimtalkAgreed());
     window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
     window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, bump);
-    window.addEventListener(KAKAO_ALIMTALK_CONSENT_CHANGED_EVENT, onConsent);
     return () => {
       window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
       window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, bump);
-      window.removeEventListener(KAKAO_ALIMTALK_CONSENT_CHANGED_EVENT, onConsent);
     };
   }, []);
 
@@ -77,8 +65,8 @@ export default function MyPageDigitalLetteringSection({
   if (!isApproved) {
     return (
       <div
-        className={`relative w-full overflow-hidden rounded-[26px] border-2 border-dashed p-4 text-center ${
-          isDarkMode ? "border-white/15 bg-white/[0.03]" : "border-slate-300 bg-slate-50/80"
+        className={`relative w-full overflow-hidden rounded-[26px] p-4 text-center ring-1 ring-inset ${
+          isDarkMode ? "bg-white/[0.03] ring-white/15" : "bg-slate-50/80 ring-slate-300"
         }`}
       >
         <button
@@ -165,30 +153,6 @@ export default function MyPageDigitalLetteringSection({
             ? `현재 ${VLUE_SHOWCASE.nameKo}가 송출중입니다.`
             : `현재 ${VLUE_SHOWCASE.nameKo}가 꺼짐 상태입니다.`}
         </p>
-        <label
-          className={`mt-2 flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${
-            isDarkMode ? "bg-white/5" : "bg-slate-50"
-          }`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span className={`text-[11px] font-bold ${isDarkMode ? "text-gray-200" : "text-slate-700"}`}>
-            통화 종료 카카오 알림톡
-          </span>
-          <input
-            type="checkbox"
-            checked={kakaoAgreed}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setKakaoConsentOpen(true);
-                return;
-              }
-              writeKakaoAlimtalkAgreed(false);
-              setKakaoAgreed(false);
-              onToast?.("카카오 알림톡 발송이 꺼졌습니다.");
-            }}
-            className="h-4 w-4 accent-blue-600"
-          />
-        </label>
       </div>
 
       <LetteringBizcardSharePanel
@@ -196,23 +160,6 @@ export default function MyPageDigitalLetteringSection({
         isDarkMode={isDarkMode}
         embedded
         onToast={onToast}
-      />
-
-      <KakaoAlimtalkConsentModal
-        open={kakaoConsentOpen}
-        isDarkMode={isDarkMode}
-        onAgree={() => {
-          writeKakaoAlimtalkAgreed(true);
-          setKakaoAgreed(true);
-          setKakaoConsentOpen(false);
-          onToast?.("카카오 알림톡 발송에 동의했습니다.");
-        }}
-        onDisagree={() => {
-          writeKakaoAlimtalkAgreed(false);
-          setKakaoAgreed(false);
-          setKakaoConsentOpen(false);
-          onToast?.("알림톡 발송에 동의하지 않았습니다.");
-        }}
       />
     </section>
   );
