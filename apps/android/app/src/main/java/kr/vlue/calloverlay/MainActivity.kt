@@ -9,10 +9,13 @@ import android.provider.Settings
 import org.json.JSONObject
 import android.util.Log
 import android.view.View
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import kr.vlue.calloverlay.applock.AppLockStore
@@ -33,6 +36,28 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     private lateinit var webView: WebView
     private lateinit var mainRoot: FrameLayout
     private lateinit var pinLock: PinLockController
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+
+    private val fileChooserLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val cb = filePathCallback
+            filePathCallback = null
+            if (cb == null) return@registerForActivityResult
+            if (result.resultCode != RESULT_OK) {
+                cb.onReceiveValue(null)
+                return@registerForActivityResult
+            }
+            val data = result.data
+            val uris: Array<Uri>? = when {
+                data?.clipData != null -> {
+                    val clip = data.clipData!!
+                    Array(clip.itemCount) { i -> clip.getItemAt(i).uri }
+                }
+                data?.data != null -> arrayOf(data.data!!)
+                else -> null
+            }
+            cb.onReceiveValue(uris)
+        }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,6 +68,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         webView = findViewById(R.id.main_webview)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        webView.settings.allowFileAccess = true
+        webView.settings.allowContentAccess = true
         val defaultUa = webView.settings.userAgentString.orEmpty()
         if (!defaultUa.contains(VlueLetteringConfig.ANDROID_APP_UA_TOKEN)) {
             webView.settings.userAgentString = "$defaultUa ${VlueLetteringConfig.ANDROID_APP_UA_TOKEN}"
@@ -70,6 +97,33 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 injectAppLockBridgeBootstrap()
                 scanRemoteApps()
                 scanDangerousApps()
+            }
+        }
+
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                this@MainActivity.filePathCallback?.onReceiveValue(null)
+                this@MainActivity.filePathCallback = filePathCallback
+                return try {
+                    val intent = fileChooserParams?.createIntent()
+                        ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "image/*"
+                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                        }
+                    fileChooserLauncher.launch(intent)
+                    true
+                } catch (e: Exception) {
+                    Log.e(TAG, "file chooser failed", e)
+                    this@MainActivity.filePathCallback?.onReceiveValue(null)
+                    this@MainActivity.filePathCallback = null
+                    Toast.makeText(this@MainActivity, "사진 선택 창을 열 수 없습니다.", Toast.LENGTH_SHORT).show()
+                    false
+                }
             }
         }
 

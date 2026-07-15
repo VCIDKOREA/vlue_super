@@ -147,7 +147,7 @@ export default function ShowcasePhotoEditor({
         type="file"
         accept="image/*"
         multiple={limit > 1}
-        className="sr-only"
+        className="lbq-hidden-file-input"
         onChange={(e) => {
           void onFiles(e.target.files);
           e.target.value = "";
@@ -157,7 +157,7 @@ export default function ShowcasePhotoEditor({
         ref={replaceRef}
         type="file"
         accept="image/*"
-        className="sr-only"
+        className="lbq-hidden-file-input"
         onChange={(e) => {
           void onFiles(e.target.files, { replacePhotoId: replaceId });
           setReplaceId(null);

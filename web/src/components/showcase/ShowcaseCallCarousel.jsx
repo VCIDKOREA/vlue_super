@@ -119,19 +119,28 @@ export default function ShowcaseCallCarousel({
   );
 
   const interactiveSelector =
-    "button, a, input, textarea, select, label, [role='tab'], .ldr-face-tabs, .ldr-face-tab, .showcase-call-carousel__nav, .ldr-front-phone-link--btn, .ldr-contact-row-link";
+    "button, a, input, textarea, select, label, [role='tab'], .ldr-face-tabs, .ldr-face-tab, .showcase-call-carousel__nav, .ldr-front-phone-link--btn, .ldr-contact-row-link, .showcase-social-rail, .showcase-banner-footer";
 
   const onPointerDown = (e) => {
     if (keypadOpen || !canScroll) return;
     if (e.target?.closest?.(interactiveSelector)) return;
     dragging.current = true;
     startX.current = e.clientX;
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch {
+      /* ignore */
+    }
   };
 
   const onPointerUp = (e) => {
     if (!dragging.current) return;
     dragging.current = false;
-    if (e.target?.closest?.(interactiveSelector)) return;
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch {
+      /* ignore */
+    }
     const dx = e.clientX - startX.current;
     if (Math.abs(dx) < 36) return;
     go(dx < 0 ? 1 : -1);

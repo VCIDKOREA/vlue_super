@@ -1,32 +1,85 @@
-import { useMemo, useState } from "react";
-import { Music, Search, Sparkles } from "lucide-react";
-import { SHOWCASE_BGM_PRESETS, SHOWCASE_BGM_THEMES } from "../../lib/showcase/showcaseBgmPresets.js";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Music, Search, Sparkles, Volume2 } from "lucide-react";
+import {
+  getBgmPresetById,
+  SHOWCASE_BGM_PRESETS,
+  SHOWCASE_BGM_THEMES
+} from "../../lib/showcase/showcaseBgmPresets.js";
 import {
   extractYoutubeVideoId,
   fetchYoutubeMeta,
   matchYoutubeByKeyword
 } from "../../lib/showcase/showcaseYoutube.js";
 
+const PREVIEW_MS = 8000;
+
 /**
  * RF 큐레이션 + 유튜브 검색/지정 BGM 피커
+ * 프리셋 탭 시 선택 + 짧은 미리듣기
  */
 export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
   const [theme, setTheme] = useState("all");
   const [ytQuery, setYtQuery] = useState(value?.youtube?.query || "");
   const [ytBusy, setYtBusy] = useState(false);
+  const [previewId, setPreviewId] = useState("");
+  const [previewError, setPreviewError] = useState("");
+  const audioRef = useRef(null);
+  const previewTimerRef = useRef(0);
 
   const filtered = useMemo(() => {
     if (theme === "all") return SHOWCASE_BGM_PRESETS;
     return SHOWCASE_BGM_PRESETS.filter((p) => p.theme === theme);
   }, [theme]);
 
+  const stopPreview = () => {
+    window.clearTimeout(previewTimerRef.current);
+    const a = audioRef.current;
+    if (a) {
+      try {
+        a.pause();
+        a.removeAttribute("src");
+        a.load();
+      } catch {
+        /* ignore */
+      }
+      audioRef.current = null;
+    }
+    setPreviewId("");
+  };
+
+  useEffect(() => () => stopPreview(), []);
+
+  const playPreview = (presetId) => {
+    const preset = getBgmPresetById(presetId);
+    if (!preset?.url) {
+      setPreviewError("미리듣기 음원을 찾을 수 없습니다.");
+      return;
+    }
+    stopPreview();
+    setPreviewError("");
+    const audio = new Audio(preset.url);
+    audio.preload = "auto";
+    audio.volume = 0.85;
+    audioRef.current = audio;
+    setPreviewId(presetId);
+    audio.play().catch(() => {
+      setPreviewError("미리듣기를 재생할 수 없습니다. 네트워크·음원 URL을 확인해 주세요.");
+      setPreviewId("");
+    });
+    previewTimerRef.current = window.setTimeout(() => {
+      stopPreview();
+    }, PREVIEW_MS);
+  };
+
   const selectPreset = (presetId) => {
     onChange({ mode: "preset", presetId, youtube: { videoId: "", title: "", artist: "", query: "" } });
+    playPreview(presetId);
   };
 
   const mapYoutube = async () => {
     const q = ytQuery.trim();
     if (!q) return;
+    stopPreview();
     setYtBusy(true);
     try {
       let videoId = extractYoutubeVideoId(q);
@@ -65,6 +118,9 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
         <Sparkles size={14} aria-hidden />
         <span>강력 추천 · VLUE RF 큐레이션</span>
       </div>
+      <p className="showcase-bgm-picker__hint" style={{ wordBreak: "keep-all" }}>
+        곡을 누르면 선택되며 약 {PREVIEW_MS / 1000}초 미리듣기가 재생됩니다.
+      </p>
 
       <div className="showcase-bgm-picker__themes">
         {SHOWCASE_BGM_THEMES.map((t) => (
@@ -82,20 +138,30 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
       <div className="showcase-bgm-picker__grid">
         {filtered.map((p) => {
           const active = value?.mode === "preset" && value?.presetId === p.id;
+          const playing = previewId === p.id;
           return (
             <button
               key={p.id}
               type="button"
-              className={`showcase-bgm-picker__card${active ? " active" : ""}`}
+              className={`showcase-bgm-picker__card${active ? " active" : ""}${playing ? " is-previewing" : ""}`}
               onClick={() => selectPreset(p.id)}
             >
-              <Music size={14} className="showcase-bgm-picker__icon" aria-hidden />
+              {playing ? (
+                <Volume2 size={14} className="showcase-bgm-picker__icon" aria-hidden />
+              ) : (
+                <Music size={14} className="showcase-bgm-picker__icon" aria-hidden />
+              )}
               <span className="showcase-bgm-picker__label">{p.label}</span>
-              <small>{p.tag}</small>
+              <small>{playing ? "미리듣기 중…" : p.tag}</small>
             </button>
           );
         })}
       </div>
+      {previewError ? (
+        <p className="showcase-bgm-picker__preview-error" role="status">
+          {previewError}
+        </p>
+      ) : null}
 
       <div className="showcase-bgm-picker__youtube">
         <p className="showcase-bgm-picker__yt-title">
