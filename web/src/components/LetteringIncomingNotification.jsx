@@ -586,7 +586,7 @@ export default function LetteringIncomingNotification({
   const showInCallControls = Boolean(showLiveEndCall);
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;
-  const carouselScrollEnabled = isPaidMember && (previewMode || onCall);
+  const carouselScrollEnabled = isPaidMember && (previewMode || onCall || isExpandedView);
   const showcasePhotos = c.showcaseStyle?.gallery?.photos || [];
 
   const renderCircleAction = () => {

@@ -37,6 +37,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     private lateinit var mainRoot: FrameLayout
     private lateinit var pinLock: PinLockController
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private var pendingWebPermissionRequest: android.webkit.PermissionRequest? = null
+    private var pendingWebGrantResources: Array<String>? = null
 
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -59,6 +61,31 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             cb.onReceiveValue(uris)
         }
 
+    private val webMediaPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+            val req = pendingWebPermissionRequest
+            val toGrant = pendingWebGrantResources
+            pendingWebPermissionRequest = null
+            pendingWebGrantResources = null
+            if (req == null) return@registerForActivityResult
+            val camOk =
+                LetteringPermissionHelper.hasCamera(this) ||
+                    grants[android.Manifest.permission.CAMERA] == true
+            try {
+                if (camOk && !toGrant.isNullOrEmpty()) {
+                    req.grant(toGrant)
+                } else {
+                    req.deny()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "web permission grant failed", e)
+                try {
+                    req.deny()
+                } catch (_: Exception) {
+                }
+            }
+        }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,6 +97,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         webView.settings.domStorageEnabled = true
         webView.settings.allowFileAccess = true
         webView.settings.allowContentAccess = true
+        webView.settings.mediaPlaybackRequiresUserGesture = false
         val defaultUa = webView.settings.userAgentString.orEmpty()
         if (!defaultUa.contains(VlueLetteringConfig.ANDROID_APP_UA_TOKEN)) {
             webView.settings.userAgentString = "$defaultUa ${VlueLetteringConfig.ANDROID_APP_UA_TOKEN}"
@@ -91,6 +119,16 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         )
 
         webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                val url = request?.url?.toString().orEmpty()
+                return handleSpecialUrl(url)
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                return handleSpecialUrl(url.orEmpty())
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 injectFamilyBridgeBootstrap()
@@ -101,6 +139,50 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
 
         webView.webChromeClient = object : WebChromeClient() {
+            override fun onPermissionRequest(request: android.webkit.PermissionRequest?) {
+                if (request == null) return
+                runOnUiThread {
+                    val grantable = mutableListOf<String>()
+                    val need = mutableListOf<String>()
+                    for (r in request.resources ?: emptyArray()) {
+                        when (r) {
+                            android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE -> {
+                                grantable.add(r)
+                                if (!LetteringPermissionHelper.hasCamera(this@MainActivity)) {
+                                    need.add(android.Manifest.permission.CAMERA)
+                                }
+                            }
+                            // AUDIO: 매니페스트에 RECORD_AUDIO 없음 → 스캐너용으로 생략
+                            else -> {
+                                if (r != android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE) {
+                                    grantable.add(r)
+                                }
+                            }
+                        }
+                    }
+                    if (grantable.isEmpty()) {
+                        request.deny()
+                        return@runOnUiThread
+                    }
+                    if (need.isEmpty()) {
+                        try {
+                            request.grant(grantable.toTypedArray())
+                        } catch (e: Exception) {
+                            Log.e(TAG, "permission grant failed", e)
+                            request.deny()
+                        }
+                        return@runOnUiThread
+                    }
+                    try {
+                        pendingWebPermissionRequest?.deny()
+                    } catch (_: Exception) {
+                    }
+                    pendingWebPermissionRequest = request
+                    pendingWebGrantResources = grantable.toTypedArray()
+                    webMediaPermissionLauncher.launch(need.distinct().toTypedArray())
+                }
+            }
+
             override fun onShowFileChooser(
                 webView: WebView?,
                 filePathCallback: ValueCallback<Array<Uri>>?,
@@ -126,6 +208,41 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 }
             }
         }
+
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : androidx.activity.OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (!::webView.isInitialized) {
+                        moveTaskToBack(true)
+                        return
+                    }
+                    // 1) SPA 내부 뒤로가기 우선 (시트·페이지 스택)
+                    webView.evaluateJavascript(
+                        """
+                        (function(){
+                          try{
+                            if(window.VlueAndroidBack&&typeof window.VlueAndroidBack==='function'){
+                              return window.VlueAndroidBack()?'1':'0';
+                            }
+                          }catch(e){}
+                          return '0';
+                        })();
+                        """.trimIndent()
+                    ) { result ->
+                        val handled = result?.trim('"', ' ') == "1"
+                        if (handled) return@evaluateJavascript
+                        // 2) intent:// 실패 등 WebView 히스토리(에러 페이지)만 되돌림
+                        if (webView.canGoBack()) {
+                            webView.goBack()
+                            return@evaluateJavascript
+                        }
+                        // 3) 홈에서는 앱 종료가 아니라 백그라운드
+                        moveTaskToBack(true)
+                    }
+                }
+            }
+        )
 
         // PIN 게이트가 필요하면 WebView는 아래에서 로드하되 오버레이로 가림
         if (pinLock.shouldBlockLaunch() || AppLockStore.requiresIdentityReset()) {
@@ -193,6 +310,60 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             pinLock.clearSession()
         }
         super.onStop()
+    }
+
+    /** intent:// · kakaolink · tel 등 커스텀 스킴 → 외부 앱 */
+    private fun handleSpecialUrl(url: String): Boolean {
+        if (url.isBlank()) return false
+        val lower = url.lowercase()
+        if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("about:") ||
+            lower.startsWith("data:") || lower.startsWith("blob:")
+        ) {
+            return false
+        }
+        return try {
+            when {
+                lower.startsWith("intent:") -> {
+                    val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                    try {
+                        startActivity(intent)
+                    } catch (_: Exception) {
+                        val fallback = intent.getStringExtra("browser_fallback_url")
+                        val pkg = intent.`package`
+                        when {
+                            !fallback.isNullOrBlank() -> webView.loadUrl(fallback)
+                            !pkg.isNullOrBlank() -> {
+                                startActivity(
+                                    Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("market://details?id=$pkg")
+                                    )
+                                )
+                            }
+                            else -> Toast.makeText(this, "연결할 앱을 찾을 수 없습니다.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    true
+                }
+                lower.startsWith("kakaolink:") || lower.startsWith("kakao") ||
+                    lower.startsWith("tel:") || lower.startsWith("sms:") ||
+                    lower.startsWith("mailto:") || lower.startsWith("market:") -> {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    true
+                }
+                else -> {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        true
+                    } catch (_: Exception) {
+                        false
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "special url failed: $url", e)
+            false
+        }
     }
 
     private fun handleMemoShareIntent(inIntent: Intent) {
@@ -341,6 +512,19 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                   try{return JSON.parse(window.Android.getAppLockStatusJson());}catch(e){return null;}
                 }
               });
+              window.VlueLettering=Object.assign({},window.VlueLettering||{},{
+                getDeviceContactsJson:function(){
+                  try{return window.Android&&window.Android.getDeviceContactsJson?window.Android.getDeviceContactsJson():'[]';}
+                  catch(e){return '[]';}
+                },
+                getLetteringPermissionStatusJson:function(){
+                  try{return window.Android&&window.Android.getLetteringPermissionStatusJson?window.Android.getLetteringPermissionStatusJson():null;}
+                  catch(e){return null;}
+                },
+                requestLetteringPermissions:function(){
+                  try{if(window.Android&&window.Android.requestLetteringPermissions)window.Android.requestLetteringPermissions();}catch(e){}
+                }
+              });
             })();
             """.trimIndent()
         webView.evaluateJavascript(script, null)
@@ -477,6 +661,11 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         @android.webkit.JavascriptInterface
         fun getLetteringPermissionStatusJson(): String {
             return LetteringPermissionHelper.statusJson(activity)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun getDeviceContactsJson(): String {
+            return DeviceContactsReader.readAsJson(activity)
         }
 
         @android.webkit.JavascriptInterface

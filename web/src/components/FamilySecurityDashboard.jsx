@@ -15,13 +15,7 @@ function krw(n) {
   return `${Math.max(0, Math.floor(Number(n) || 0)).toLocaleString("ko-KR")}원`;
 }
 
-function healthLabel(health) {
-  if (health === "critical") return "위험";
-  if (health === "warning") return "주의";
-  return "안전";
-}
-
-/** 통합 대시보드 — 가족 보안·배터리 (+ 사업자만 매출 장부) */
+/** 통합 대시보드 — 가족 보안 (+ 사업자만 매출 장부) */
 export default function FamilySecurityDashboard({ isDarkMode = false, onToast }) {
   const [sec, setSec] = useState(null);
   const [pos, setPos] = useState(null);
@@ -182,36 +176,6 @@ export default function FamilySecurityDashboard({ isDarkMode = false, onToast })
           은행 입출금 알림 연동 (알림 접근 권한)
         </button>
       </div>
-
-      {states.length > 0 ? (
-        <div className="mt-3">
-          <p className={`text-[11px] font-bold ${strong}`}>가족 기기 상태</p>
-          <div className="mt-1.5 space-y-1.5">
-            {states.map((m) => (
-              <button
-                key={m.userId}
-                type="button"
-                onClick={() => {
-                  if (m.devicePlatform === "ios") requestIosRestrictedNotice("familyStateShare");
-                }}
-                className={`flex w-full items-center justify-between rounded-lg border px-2 py-1.5 text-left text-[11px] ${isDarkMode ? "border-white/10" : "border-slate-100"} ${
-                  m.devicePlatform === "ios" ? "active:bg-amber-50" : ""
-                }`}
-              >
-                <span className={strong}>
-                  {m.displayName}
-                  {m.devicePlatform === "ios" ? (
-                    <span className="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-bold text-amber-800">iPhone</span>
-                  ) : null}
-                </span>
-                <span className={sub}>
-                  🔋 {m.batteryPercent}% · {healthLabel(m.securityHealth)}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       {openIncidents.length > 0 ? (
         <div className="mt-3 space-y-2">

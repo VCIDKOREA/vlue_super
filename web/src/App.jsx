@@ -2989,6 +2989,55 @@ function App() {
     setGlobalSearchQuery("");
   }, []);
 
+  /** Android WebView 기기 뒤로가기 — SPA 스택이 있으면 소비, 홈이면 false → 네이티브가 앱을 백그라운드로 */
+  useEffect(() => {
+    window.VlueAndroidBack = () => {
+      try {
+        if (appNotificationOpen) {
+          setAppNotificationOpen(false);
+          return true;
+        }
+        if (callShowcaseSheetOpen) {
+          setCallShowcaseSheetOpen(false);
+          return true;
+        }
+        if (showcaseStyleSheetOpen) {
+          setShowcaseStyleSheetOpen(false);
+          return true;
+        }
+        if (cardWalletModalOpen) {
+          setCardWalletModalOpen(false);
+          return true;
+        }
+        if (navHistoryRef.current.length > 0) {
+          goBackStep();
+          return true;
+        }
+        if (page !== "main") {
+          goMainAndReset();
+          return true;
+        }
+      } catch {
+        /* ignore */
+      }
+      return false;
+    };
+    return () => {
+      try {
+        delete window.VlueAndroidBack;
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [
+    page,
+    appNotificationOpen,
+    callShowcaseSheetOpen,
+    showcaseStyleSheetOpen,
+    cardWalletModalOpen,
+    goBackStep
+  ]);
+
   useEffect(() => {
     if (page !== "documentTemplates") return;
     setWalletDefaultTab("mydocs");

@@ -1,11 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { shareVlueContactInvite } from "../lib/contactInviteShare.js";
 import { sendContactFriendRequest, matchContactsWithVlue } from "../lib/contactFriendsApi.js";
 import { collectDeviceContactsForSync } from "../lib/collectDeviceContacts.js";
-import { saveContactMatchCache, hasContactSyncConsent } from "../lib/contactSyncStorage.js";
+import {
+  saveContactMatchCache,
+  hasContactSyncConsent,
+  setContactSyncConsent
+} from "../lib/contactSyncStorage.js";
 import { mergeDeviceContactsCache } from "../lib/contacts/deviceContactsCache.js";
 import { upsertKnownPhonesFromFriends } from "../lib/contacts/knownPhonesIndex.js";
+import { readLetteringPermissionStatus } from "../lib/letteringSettings.js";
 
 /**
  * 주소록 동기화 결과 — 가입자 [신청] / 미가입자 [추천]
@@ -22,9 +27,11 @@ export default function ContactFriendsPanel({
   const [busyId, setBusyId] = useState(null);
   const [resyncing, setResyncing] = useState(false);
   const [notice, setNotice] = useState("");
+  const [autoTried, setAutoTried] = useState(false);
 
   const registered = matchData?.registered || [];
   const unregistered = matchData?.unregistered || [];
+  const contactsGranted = Boolean(readLetteringPermissionStatus()?.contacts);
 
   const rows = useMemo(() => {
     const q = String(filterQuery || "").trim().toLowerCase();
@@ -53,30 +60,55 @@ export default function ContactFriendsPanel({
     });
   }, [registered, unregistered, filterQuery]);
 
-  const handleResync = async () => {
-    if (!hasContactSyncConsent()) {
-      onResyncRequest?.();
-      return;
-    }
-    setResyncing(true);
+  const runSync = async ({ silent = false } = {}) => {
+    if (!silent) setResyncing(true);
     setNotice("");
     try {
       const contacts = await collectDeviceContactsForSync({ allowDemoConfirm: false });
       if (!contacts?.length) {
-        setNotice("동기화된 연락처가 없습니다. 권한을 허용했는지 확인해 주세요.");
-        return;
+        if (!silent) {
+          setNotice(
+            contactsGranted
+              ? "기기에 저장된 연락처가 없거나 아직 불러오지 못했습니다. 다시 동기화를 눌러 주세요."
+              : "주소록 권한을 허용한 뒤 다시 시도해 주세요."
+          );
+        }
+        return false;
       }
       mergeDeviceContactsCache(contacts);
       const result = await matchContactsWithVlue(contacts);
+      setContactSyncConsent(true);
       saveContactMatchCache(result);
       upsertKnownPhonesFromFriends({ contactMatchData: result });
       onMatchUpdate?.(result);
-      setNotice(`전화부 ${contacts.length}건 동기화 · 가입 ${result.registered?.length || 0} · 추천 ${(result.unregistered || []).length}`);
+      if (!silent) {
+        setNotice(
+          `전화부 ${contacts.length}건 동기화 · 가입 ${result.registered?.length || 0} · 추천 ${(result.unregistered || []).length}`
+        );
+      }
+      return true;
     } catch (e) {
-      setNotice(e?.message || "동기화에 실패했습니다.");
+      if (!silent) setNotice(e?.message || "동기화에 실패했습니다.");
+      return false;
     } finally {
-      setResyncing(false);
+      if (!silent) setResyncing(false);
     }
+  };
+
+  useEffect(() => {
+    if (matchData || autoTried) return;
+    if (!contactsGranted && !hasContactSyncConsent()) return;
+    setAutoTried(true);
+    void runSync({ silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchData, contactsGranted, autoTried]);
+
+  const handleResync = async () => {
+    if (!hasContactSyncConsent() && !contactsGranted) {
+      onResyncRequest?.();
+      return;
+    }
+    await runSync({ silent: false });
   };
 
   const handleFriendRequest = async (user) => {
@@ -119,18 +151,27 @@ export default function ContactFriendsPanel({
     return (
       <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/50 p-4 text-center">
         <p className="text-[13px] font-bold text-gray-800" style={{ wordBreak: "keep-all" }}>
-          전화부를 동기화하면 휴대폰에 저장된 명단이 표시됩니다.
+          {autoTried || resyncing
+            ? "전화부를 불러오는 수 없으면 아래 버튼으로 다시 시도해 주세요."
+            : contactsGranted
+              ? "주소록 권한이 허용되어 있습니다. 동기화하면 휴대폰 명단이 표시됩니다."
+              : "전화부를 동기화하면 휴대폰에 저장된 명단이 표시됩니다."}
           <br />
           VLUE 사용 중이면 <span className="text-blue-700">신청</span>, 아니면{" "}
           <span className="text-violet-700">추천</span>으로 공유할 수 있습니다.
         </p>
         <button
           type="button"
-          onClick={() => onResyncRequest?.()}
-          className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-[12px] font-black text-white"
+          disabled={resyncing}
+          onClick={() => {
+            if (contactsGranted || hasContactSyncConsent()) void handleResync();
+            else onResyncRequest?.();
+          }}
+          className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-[12px] font-black text-white disabled:opacity-60"
         >
-          전화부 동기화하기
+          {resyncing ? "동기화 중…" : "전화부 동기화하기"}
         </button>
+        {notice ? <p className="mt-2 text-[11px] font-bold text-rose-600">{notice}</p> : null}
       </div>
     );
   }
@@ -158,55 +199,41 @@ export default function ContactFriendsPanel({
 
       {rows.length === 0 ? (
         <p className="rounded-xl bg-gray-50 px-3 py-6 text-center text-[12px] text-gray-500">
-          {filterQuery.trim() ? "검색 결과가 없습니다." : "표시할 연락처가 없습니다. 다시 동기화해 보세요."}
+          표시할 연락처가 없습니다.
         </p>
       ) : (
-        <div className="space-y-2">
+        <ul className="space-y-2">
           {rows.map((item) => (
-            <div
+            <li
               key={item.key}
-              className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 bg-white p-3 shadow-sm"
+              className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2.5"
             >
               <div className="min-w-0">
-                <p className="truncate text-[14px] font-black text-gray-900">{item.name}</p>
+                <p className="truncate text-[13px] font-black text-gray-900">{item.name}</p>
                 <p className="truncate text-[11px] text-gray-500">{item.subtitle}</p>
               </div>
               {item.kind === "registered" ? (
-                item.user.isFriend ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenChat?.(item.user)}
-                    className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-black text-white"
-                  >
-                    연결됨
-                  </button>
-                ) : item.user.friendRequestPending === "sent" ? (
-                  <span className="shrink-0 text-[11px] font-bold text-amber-600">신청됨</span>
-                ) : item.user.friendRequestPending === "received" ? (
-                  <span className="shrink-0 text-[11px] font-bold text-blue-600">수락 대기</span>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={busyId === item.user.userId}
-                    onClick={() => handleFriendRequest(item.user)}
-                    className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-60"
-                  >
-                    신청
-                  </button>
-                )
+                <button
+                  type="button"
+                  disabled={busyId === item.user.userId || item.user.friendRequestPending === "sent"}
+                  onClick={() => handleFriendRequest(item.user)}
+                  className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50"
+                >
+                  {item.user.friendRequestPending === "sent" ? "신청됨" : "신청"}
+                </button>
               ) : (
                 <button
                   type="button"
                   disabled={busyId === item.row.phoneE164}
                   onClick={() => handleRecommend(item.row)}
-                  className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-60"
+                  className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50"
                 >
                   추천
                 </button>
               )}
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

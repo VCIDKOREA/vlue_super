@@ -594,6 +594,15 @@ export default function VlueSettingsPanel({
           />
         </SettingsSection>
 
+        <SettingsSection title="보안" isDarkMode={isDarkMode}>
+          <SettingsRowButton
+            label="앱 잠금 (PIN)"
+            sublabel="6자리 PIN 등록 · 앱 실행/중요 기능 보호"
+            onClick={() => onSubView("appLock")}
+            isDarkMode={isDarkMode}
+          />
+        </SettingsSection>
+
         <SettingsSection title="개인정보 보호" isDarkMode={isDarkMode}>
           <SettingsRowButton label="친구 추가 허용 설정" sublabel="전화번호 · QR · ID 검색" onClick={() => onSubView("friendPrivacy")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
@@ -612,8 +621,6 @@ export default function VlueSettingsPanel({
           />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="차단 목록 관리" onClick={() => onSubView("blockList")} isDarkMode={isDarkMode} />
-          <SettingsDivider isDarkMode={isDarkMode} />
-          <SettingsRowButton label="앱 잠금 (PIN)" onClick={() => onSubView("appLock")} isDarkMode={isDarkMode} />
         </SettingsSection>
 
         <SettingsSection title="알림" isDarkMode={isDarkMode}>

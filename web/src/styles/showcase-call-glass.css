@@ -397,8 +397,8 @@
 }
 
 .showcase-call-carousel--paid .showcase-call-carousel__viewport {
-  /* 가로 스와이프는 JS 처리 — pan-x 는 WebView에서 제스처를 가로채 실패함 */
-  touch-action: pan-y;
+  /* 가로 스와이프는 JS pointer 처리 — pan-y 이면 Android에서 가로 제스처가 먹통 */
+  touch-action: none;
   cursor: grab;
 }
 

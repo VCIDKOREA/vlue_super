@@ -81,20 +81,6 @@ function FriendSearch({
             <div className="mt-3">
               <FamilyProtectionRegister isDarkMode={isDarkMode} onToast={onFamilyToast} />
             </div>
-
-            <div className="mt-3">
-              <ContactFriendsPanel
-                matchData={contactMatchData}
-                filterQuery={query}
-                compact
-                onMatchUpdate={onContactMatchUpdate}
-                onResyncRequest={onContactResyncRequest}
-                onOpenChat={onOpenContactChat}
-                onFriendAdded={(user) => {
-                  setNotice(`${user.displayName || user.contactName}님에게 친구 신청을 보냈습니다.`);
-                }}
-              />
-            </div>
           </>
         ) : null}
 

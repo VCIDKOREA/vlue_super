@@ -37,6 +37,8 @@ object FamilyDangerousPermissionScanner {
             for (pkg in packages) {
                 val name = pkg.packageName.orEmpty()
                 if (name.isEmpty() || name == self) continue
+                // 삼성 플로우·Smart Switch 등 원격 미러링 — V1 오탐 제외
+                if (isAllowlistedRemoteTool(name)) continue
                 val perms = pkg.requestedPermissions?.toList().orEmpty()
                 val hasCamera = perms.contains(android.Manifest.permission.CAMERA)
                 val hasMic = perms.contains(android.Manifest.permission.RECORD_AUDIO)
@@ -44,7 +46,7 @@ object FamilyDangerousPermissionScanner {
                 if (!hasCamera && !hasMic && !hasAccessibility) continue
 
                 val label = try {
-                    pm.getApplicationLabel(pkg.applicationInfo).toString()
+                    pm.getApplicationLabel(pkg.applicationInfo!!).toString()
                 } catch (_: Exception) {
                     name
                 }
@@ -59,5 +61,16 @@ object FamilyDangerousPermissionScanner {
             Log.e(TAG, "scan failed", e)
         }
         return hits
+    }
+
+    private fun isAllowlistedRemoteTool(packageName: String): Boolean {
+        val p = packageName.lowercase()
+        return p.contains("galaxycontinuity") ||
+            p.contains("samsung.android.flow") ||
+            p == "com.samsung.android.galaxycontinuity" ||
+            p.contains("teamviewer") ||
+            p.contains("anydesk") ||
+            p.contains("chrome.remote") ||
+            p.contains("microsoft.rdc")
     }
 }

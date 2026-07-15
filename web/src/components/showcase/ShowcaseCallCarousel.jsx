@@ -119,7 +119,7 @@ export default function ShowcaseCallCarousel({
   );
 
   const interactiveSelector =
-    "button, a, input, textarea, select, label, [role='tab'], .ldr-face-tabs, .ldr-face-tab, .showcase-call-carousel__nav, .ldr-front-phone-link--btn, .ldr-contact-row-link, .showcase-social-rail, .showcase-banner-footer";
+    "a, input, textarea, select, label, .showcase-call-carousel__nav, .ldr-face-tab, .ldr-front-phone-link--btn, .ldr-contact-row-link, .showcase-social-rail button, .showcase-banner-footer button, .lettering-action";
 
   const onPointerDown = (e) => {
     if (keypadOpen || !canScroll) return;
