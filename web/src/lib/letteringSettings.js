@@ -66,6 +66,34 @@ export function requestLetteringPermissions() {
   return { ok: false, needsNative: true };
 }
 
+/** 앱 설정(권한) 화면으로 이동 — 거부 후 재허용용 */
+export function openNativeAppSettings() {
+  if (typeof window === "undefined") return { ok: false };
+  try {
+    if (window.VlueLettering?.openAppSettings) {
+      window.VlueLettering.openAppSettings();
+      return { ok: true, channel: "VlueLettering" };
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (window.Android?.openAppSettings) {
+      window.Android.openAppSettings();
+      return { ok: true, channel: "Android" };
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    window.webkit?.messageHandlers?.vlueLetteringSettings?.postMessage({ action: "openAppSettings" });
+    return { ok: true, channel: "webkit" };
+  } catch {
+    /* ignore */
+  }
+  return { ok: false };
+}
+
 /** 네이티브 권한 허용 상태 JSON (없으면 null) */
 export function readLetteringPermissionStatus() {
   try {

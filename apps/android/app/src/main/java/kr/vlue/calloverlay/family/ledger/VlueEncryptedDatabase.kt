@@ -6,7 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import kr.vlue.calloverlay.family.translate.TranslationCacheEntity
 import kr.vlue.calloverlay.family.translate.TranslationCacheDao
-import net.zetetic.database.sqlcipher.SupportFactory
+/** `android-database-sqlcipher` 4.5.x — 패키지는 net.sqlcipher (신규 sqlcipher-android 와 다름) */
+import net.sqlcipher.database.SupportFactory
 
 @Database(
     entities = [PosLedgerEntity::class, FamilySecurityStateEntity::class, TranslationCacheEntity::class],

@@ -15,6 +15,12 @@ import {
   updateSearchPrivacy,
   type ShowcaseSearchMode
 } from "../services/showcase/SearchService.js";
+import {
+  createShowcaseComment,
+  getShowcaseSocialSummary,
+  listShowcaseComments,
+  toggleShowcaseLike
+} from "../services/showcase/ShowcaseSocialService.js";
 
 export const letteringRoutes = new Hono();
 
@@ -193,4 +199,56 @@ letteringRoutes.get("/showcase/tags/search", SearchAuthInterceptor, async (c) =>
     tag: mode === "hashtag" ? normalizeShowcaseTag(q) : null,
     items
   });
+});
+
+/** V2 — 쇼케이스 소셜 요약 (좋아요·최근 댓글) */
+letteringRoutes.get("/showcase/social/:ownerUserId", async (c) => {
+  const ownerUserId = String(c.req.param("ownerUserId") || "").trim();
+  if (!ownerUserId) return c.json({ ok: false, error: "owner required" }, 400);
+  const slideId = c.req.query("slideId");
+  const me = String(c.req.header("x-vlue-user-id") || "").trim() || null;
+  const summary = await getShowcaseSocialSummary({ ownerUserId, actorUserId: me, slideId });
+  return c.json({ ok: true, ...summary });
+});
+
+/** V2 — 좋아요 토글 */
+letteringRoutes.post("/showcase/social/:ownerUserId/like", requireUserHeader, async (c) => {
+  const ownerUserId = String(c.req.param("ownerUserId") || "").trim();
+  const me = String(c.get("vlueUserId") || c.req.header("x-vlue-user-id") || "").trim();
+  if (!ownerUserId || !me) return c.json({ ok: false, error: "auth required" }, 401);
+  const body = await c.req.json().catch(() => ({}));
+  const result = await toggleShowcaseLike({
+    ownerUserId,
+    actorUserId: me,
+    slideId: body?.slideId
+  });
+  return c.json({ ok: true, ...result });
+});
+
+/** V2 — 댓글 목록 */
+letteringRoutes.get("/showcase/social/:ownerUserId/comments", async (c) => {
+  const ownerUserId = String(c.req.param("ownerUserId") || "").trim();
+  if (!ownerUserId) return c.json({ ok: false, error: "owner required" }, 400);
+  const comments = await listShowcaseComments({
+    ownerUserId,
+    slideId: c.req.query("slideId"),
+    limit: Number(c.req.query("limit") || 50)
+  });
+  return c.json({ ok: true, comments });
+});
+
+/** V2 — 댓글 작성 */
+letteringRoutes.post("/showcase/social/:ownerUserId/comments", requireUserHeader, async (c) => {
+  const ownerUserId = String(c.req.param("ownerUserId") || "").trim();
+  const me = String(c.get("vlueUserId") || c.req.header("x-vlue-user-id") || "").trim();
+  if (!ownerUserId || !me) return c.json({ ok: false, error: "auth required" }, 401);
+  const body = await c.req.json().catch(() => ({}));
+  const result = await createShowcaseComment({
+    ownerUserId,
+    authorUserId: me,
+    body: body?.body,
+    slideId: body?.slideId
+  });
+  if (!result.ok) return c.json({ ok: false, error: result.error }, result.status);
+  return c.json({ ok: true, comment: result.comment });
 });

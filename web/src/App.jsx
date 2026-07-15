@@ -54,7 +54,7 @@ import { fetchPendingParentalConsents } from "./lib/parentalConsentApi.js";
 import { bindFcmForegroundListener, registerFcmWebPushToken } from "./lib/fcmWebPush.js";
 import SignupErrorBoundary from "./components/SignupErrorBoundary.jsx";
 import LoginScreen from "./components/LoginScreen";
-import BiometricGate from "./components/BiometricGate";
+import AppLockPinResetModal, { useAppLockResetListener } from "./components/AppLockPinResetModal.jsx";
 import { GUEST_PROTECTED_SUBHUB_TABS, runWithGuestAuthGate } from "./lib/guestAuthGate.js";
 import { VlueNavLogoMark } from "./components/VlueNavLogoMark.jsx";
 import BackButton from "./components/common/BackButton";
@@ -63,7 +63,7 @@ import ModalCloseButton from "./components/common/ModalCloseButton";
 const CsScannerScreen = lazy(() => import("./components/office/CsScannerScreen.jsx"));
 const VlueUnifiedInboxScreen = lazy(() => import("./components/email/VlueUnifiedInboxScreen.jsx"));
 import UserProfileAvatar from "./components/UserProfileAvatar.jsx";
-import { isBiometricGraceActive, setBiometricGraceNow, clearBiometricSessionOnly } from "./lib/webauthnBiometric";
+import { clearBiometricSessionOnly } from "./lib/webauthnBiometric";
 import {
   getDefaultMemberVlueEmail,
   readCardEmail,
@@ -332,6 +332,8 @@ function App() {
   }, []);
   /** 생체·24h 유예 갱신 후 메인으로 넘기기 위한 리렌더 트리거 */
   const [biometricSeq, setBiometricSeq] = useState(0);
+  const [appLockResetOpen, setAppLockResetOpen] = useState(false);
+  useAppLockResetListener(setAppLockResetOpen);
   const [page, setPage] = useState("main");
 
   useEffect(() => {
@@ -2099,11 +2101,6 @@ function App() {
     setBiometricSeq((s) => s + 1);
   }, []);
 
-  const handleBiometricPassed = useCallback(() => {
-    setBiometricGraceNow();
-    setBiometricSeq((s) => s + 1);
-  }, []);
-
   const showOnboardingFlow = signupOnboardingOpen;
 
   /** file:// PC 앱에서 인앱 온보딩이 열리면 외부 브라우저로 우회 */
@@ -2116,7 +2113,7 @@ function App() {
     return () => clearTimeout(t);
   }, [signupOnboardingOpen]);
 
-  const biometricAllowed = useMemo(() => isBiometricGraceActive(), [biometricSeq, isLoggedIn]);
+  const biometricAllowed = true;
 
   const createGroupRoom = useCallback(
     (parentRoomId, invitees, options = {}) => {
@@ -3303,7 +3300,15 @@ function App() {
       <PostSignupPaymentModal
         open={postSignupPaymentOpen && Boolean(postSignupPending)}
         pending={postSignupPending}
-        onComplete={() => {
+        onComplete={(result) => {
+          const tier = result?.membershipTier === "b2b" ? "b2b" : "paid";
+          applyMembershipTierFromHub(tier);
+          try {
+            localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
+          } catch {
+            /* ignore */
+          }
+          setDigitalCardActive(true);
           setPostSignupPaymentOpen(false);
           setPostSignupPending(null);
         }}
@@ -3378,9 +3383,13 @@ function App() {
         </div>
       )}
 
-      {!showSplash && isLoggedIn && !showOnboardingFlow && !biometricAllowed && (
-        <BiometricGate onPassed={handleBiometricPassed} />
-      )}
+      {!showSplash && isLoggedIn && !showOnboardingFlow ? (
+        <AppLockPinResetModal
+          open={appLockResetOpen}
+          onClose={() => setAppLockResetOpen(false)}
+          onPinResetReady={() => setAppLockResetOpen(false)}
+        />
+      ) : null}
 
       {showAppShell && (
         <>

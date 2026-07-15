@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { approveDevice, fetchPendingDevices } from "../lib/enterpriseShopApi.js";
+import { requirePinForSensitiveAction } from "../lib/appLockBridge.js";
 
 /** 마이페이지 — 미승인 PC/기기 승인 (카카오 PC 벤치마킹) */
 export default function DeviceApprovalPanel() {
@@ -24,6 +25,11 @@ export default function DeviceApprovalPanel() {
     setBusy(true);
     setMsg("");
     try {
+      const auth = await requirePinForSensitiveAction("remote_device");
+      if (!auth.ok) {
+        setMsg(auth.requiresReset ? "PIN 재설정이 필요합니다." : "기기 승인 전 PIN 인증이 필요합니다.");
+        return;
+      }
       await approveDevice(id);
       setMsg("기기가 승인되었습니다. 해당 PC에서 다시 로그인해 주세요.");
       await load();

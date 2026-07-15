@@ -6,11 +6,12 @@
 
 import {
   hasVluePcAppUserAgent,
+  hasVlueNativeAppUserAgent,
   isBrowserAppAccessAllowed,
   shouldBlockBrowserAppShell
 } from "./vlueClientAccess.js";
 
-export { hasVluePcAppUserAgent, isBrowserAppAccessAllowed, shouldBlockBrowserAppShell };
+export { hasVluePcAppUserAgent, hasVlueNativeAppUserAgent, isBrowserAppAccessAllowed, shouldBlockBrowserAppShell };
 
 export const APP_BASE_PATH = "/app";
 
@@ -35,9 +36,10 @@ export function isLocalDevHost(hostname = "") {
 /** Android WebView · iOS 셸 · PC 설치형(Electron UA 포함) 클라이언트 */
 export function isNativeVlueClient() {
   if (typeof window === "undefined") return false;
-  if (hasVluePcAppUserAgent()) return true;
+  if (hasVlueNativeAppUserAgent()) return true;
   if (window.vlueElectron?.isElectron) return true;
   if (window.VlueFamilyBridgeNative) return true;
+  if (window.VlueFamilyBridge?.__androidShell || window.VlueFamilyBridge?.__iosShell) return true;
   if (window.vluePcAgentShell) return true;
   if (String(import.meta.env.VITE_ALLOW_BROWSER_APP || "").trim() === "true") return true;
   return false;
@@ -71,8 +73,8 @@ export function resolveSiteShell() {
 
   const { pathname, hostname } = window.location;
 
-  /** Electron PC 앱 — file:// 로드 시 pathname이 /app 이 아니므로 UA 기준으로 앱 셸 고정 */
-  if (hasVluePcAppUserAgent() || (typeof window !== "undefined" && window.vlueElectron?.isElectron)) {
+  /** Electron / 네이티브 UA — pathname 과 무관하게 앱 셸 */
+  if (hasVlueNativeAppUserAgent() || (typeof window !== "undefined" && window.vlueElectron?.isElectron)) {
     if (isBrowserAppShellBlocked("/app")) return "blocked";
     return "app";
   }

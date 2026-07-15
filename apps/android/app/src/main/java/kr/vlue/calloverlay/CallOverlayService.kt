@@ -75,6 +75,10 @@ class CallOverlayService : Service() {
             javaScriptEnabled = true
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_NO_CACHE
+            val ua = userAgentString.orEmpty()
+            if (!ua.contains(VlueLetteringConfig.ANDROID_APP_UA_TOKEN)) {
+                userAgentString = "$ua ${VlueLetteringConfig.ANDROID_APP_UA_TOKEN}"
+            }
         }
         wv.setBackgroundColor(0x00000000)
         container.addView(

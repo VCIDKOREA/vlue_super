@@ -2,8 +2,9 @@ import { useState } from "react";
 import { formatKrw, isB2bMembershipKind, POST_SIGNUP_PAYMENT_NOTICE } from "../lib/membershipBm.js";
 import { postSubscribeComplete } from "../lib/subscribeCompleteApi.js";
 import { requestIamportBillingPay } from "../lib/iamportClient.js";
-import { getPortoneUserCode } from "../lib/portoneEnv.js";
+import { getPortoneUserCode, isPortoneTestMode } from "../lib/portoneEnv.js";
 import { clearPendingPayment } from "../lib/postSignupPayment.js";
+import { requirePinForSensitiveAction } from "../lib/appLockBridge.js";
 
 /**
  * 가입·본인인증 완료 후 첫 구독 결제
@@ -13,16 +14,22 @@ export default function PostSignupPaymentModal({ open, pending, onComplete, onSk
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const testMode = isPortoneTestMode();
 
   if (!open || !pending) return null;
 
   const isB2b = isB2bMembershipKind(pending.membershipKind);
   const title = isB2b ? "기업 단체 멤버십 결제" : "유료 멤버십 결제";
 
-  const runPay = async ({ devBypass = false } = {}) => {
+  const runPay = async ({ forceTestBypass = false } = {}) => {
     setBusy(true);
     setError("");
     try {
+      const auth = await requirePinForSensitiveAction("payment");
+      if (!auth.ok) {
+        throw new Error(auth.requiresReset ? "PIN 재설정이 필요합니다." : "결제 전 PIN 인증이 필요합니다.");
+      }
+
       let userId = "";
       try {
         userId = localStorage.getItem("vlue_server_user_id") || "";
@@ -34,9 +41,9 @@ export default function PostSignupPaymentModal({ open, pending, onComplete, onSk
       const customer_uid = `user_customer_${userId}`;
       const billingCycle = pending.billingCycle === "annual" ? "annual" : "monthly";
       const amount = Number(pending.amountKrw) || 0;
+      const useTestBypass = forceTestBypass || testMode;
 
-      if (devBypass) {
-        if (!import.meta.env.DEV) throw new Error("개발 전용 결제 우회는 로컬에서만 가능합니다.");
+      if (useTestBypass) {
         await postSubscribeComplete({
           customer_uid,
           merchant_uid: `dev_billing_${Date.now()}`,
@@ -73,17 +80,18 @@ export default function PostSignupPaymentModal({ open, pending, onComplete, onSk
         localStorage.setItem("vlue_subscription_paid", "1");
         localStorage.setItem("vlue_paid_billing_cycle", billingCycle === "annual" ? "annual" : "monthly");
         localStorage.setItem("vlue_subscription_paid_at", new Date().toISOString());
+        localStorage.setItem("membershipTier", isB2b ? "b2b" : "paid");
       } catch {
         /* ignore */
       }
       clearPendingPayment();
       setDone(true);
-      onComplete?.();
+      onComplete?.({ membershipTier: isB2b ? "b2b" : "paid", billingCycle, testMode: useTestBypass });
     } catch (e) {
       const raw = e?.message || String(e);
       const pgHint =
-        /PG모듈|등록되지 않은 PG/i.test(raw) && import.meta.env.DEV
-          ? " → 포트원 콘솔에 정기결제(빌링) PG 채널이 없습니다. PC 로컬 테스트는 「개발 전용: 결제 우회」를 쓰거나, 콘솔에 html5_inicis 빌링 채널을 등록하세요."
+        /PG모듈|등록되지 않은 PG/i.test(raw) && (testMode || import.meta.env.DEV)
+          ? " → 포트원 PG 채널 미등록. 테스트 모드(`VITE_PORTONE_TEST_MODE=true`)에서는 결제 버튼으로 Premium이 바로 부여됩니다."
           : /PG모듈|등록되지 않은 PG/i.test(raw)
             ? " → 결제 연동(포트원 정기결제 PG) 설정을 확인해 주세요."
             : "";
@@ -98,22 +106,29 @@ export default function PostSignupPaymentModal({ open, pending, onComplete, onSk
       <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl">
         <h2 className="text-[17px] font-black text-slate-900">{title}</h2>
         <p className="mt-2 text-[12px] leading-relaxed text-slate-600">{POST_SIGNUP_PAYMENT_NOTICE}</p>
+        {testMode ? (
+          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-950">
+            포트원 테스트 모드 — 실결제 없이 Premium이 부여됩니다. 네이버페이/실MID 승인 후 `VITE_PORTONE_TEST_MODE`를
+            끄세요.
+          </p>
+        ) : null}
         {pending.label ? (
           <p className="mt-2 text-[11px] font-bold text-indigo-800">{pending.label}</p>
         ) : null}
 
         <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/80 px-4 py-3">
-          <p className="text-[11px] font-bold text-slate-500">결제 예정 금액</p>
+          <p className="mt-0 text-[11px] font-bold text-slate-500">결제 예정 금액</p>
           <p className="text-[22px] font-black tabular-nums text-indigo-900">{formatKrw(pending.amountKrw)}</p>
           <p className="text-[10px] text-slate-600">
-            {pending.billingCycle === "annual" ? "1년 구독" : "월 구독"} · 카드 등록 후 첫 회차 청구
+            {pending.billingCycle === "annual" ? "1년 구독" : "월 구독"}
+            {testMode ? " · 테스트 모드(실청구 없음)" : " · 카드 등록 후 첫 회차 청구"}
           </p>
         </div>
 
         {error ? <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[12px] text-red-800">{error}</p> : null}
         {done ? (
           <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-[12px] font-bold text-emerald-800">
-            결제가 완료되었습니다.
+            {testMode ? "테스트 결제가 완료되었습니다. Premium이 활성화되었습니다." : "결제가 완료되었습니다."}
           </p>
         ) : null}
 
@@ -124,13 +139,17 @@ export default function PostSignupPaymentModal({ open, pending, onComplete, onSk
             onClick={() => runPay()}
             className="w-full rounded-2xl bg-indigo-600 py-3.5 text-[14px] font-black text-white disabled:opacity-50"
           >
-            {busy ? "결제 처리 중…" : `카드 등록 및 결제 (${formatKrw(pending.amountKrw)})`}
+            {busy
+              ? "처리 중…"
+              : testMode
+                ? `테스트 결제 완료 · Premium 부여 (${formatKrw(pending.amountKrw)})`
+                : `카드 등록 및 결제 (${formatKrw(pending.amountKrw)})`}
           </button>
-          {import.meta.env.DEV ? (
+          {!testMode && import.meta.env.DEV ? (
             <button
               type="button"
               disabled={busy || done}
-              onClick={() => runPay({ devBypass: true })}
+              onClick={() => runPay({ forceTestBypass: true })}
               className="w-full rounded-xl border border-dashed border-amber-400 py-2.5 text-[12px] font-bold text-amber-950"
             >
               개발 전용: 결제 우회

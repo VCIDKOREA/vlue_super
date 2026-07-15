@@ -1,33 +1,18 @@
 /** 푸시 알림 수신함 — 메인 화면 · 채팅 목록 「알림」 탭 */
 
-const KEY = "vlue_push_inbox_v2";
+const KEY = "vlue_push_inbox_v3";
 
 export const PUSH_INBOX_CHANGED = "vlue-push-inbox-changed";
 
-const DEMO = [
+const WELCOME = [
   {
-    id: "push-demo-family-1",
-    category: "가족보호",
-    title: "미등록 앱 실행 감지",
-    body: "자녀 기기에서 미등록 앱 실행이 감지되었습니다. 원격 앱 목록을 확인해 주세요.",
-    read: false,
-    createdAt: new Date(Date.now() - 18 * 60 * 1000).toISOString()
-  },
-  {
-    id: "push-demo-family-2",
-    category: "가족보호",
-    title: "부재중 통화 알림",
-    body: "피보호자에게 알 수 없는 번호(010-****-1234)로 부재중 통화가 있었습니다.",
-    read: false,
-    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString()
-  },
-  {
-    id: "push-demo-app-1",
+    id: "push-welcome-signup-1",
     category: "앱",
-    title: "VLUE 인증 명함 송출",
-    body: "발신 통화 시 디지털 인증명함이 정상적으로 송출되었습니다.",
-    read: true,
-    createdAt: new Date(Date.now() - 26 * 3600 * 1000).toISOString()
+    title: "VLUE에 회원가입을 환영합니다",
+    body:
+      "가입을 환영합니다. 통화 시 VLUE 쇼케이스·디지털 인증명함으로 신뢰를 전달하고, 친구·주소록 연동으로 지인을 찾을 수 있습니다. 가족보호·신고·제보 기능은 설정에서 켜 주세요. 유료 회원은 쇼케이스 스타일·명함 송출 등 혜택을 바로 이용할 수 있습니다. 민감 정보는 본인 기기·계정에서만 관리되며, 의심 통화는 신고해 주세요.",
+    read: false,
+    createdAt: new Date().toISOString()
   }
 ];
 
@@ -60,11 +45,11 @@ export function resolvePushDisplayTime(item) {
 function readList() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return [...DEMO];
+    if (!raw) return [...WELCOME];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length ? parsed : [...DEMO];
+    return Array.isArray(parsed) && parsed.length ? parsed : [...WELCOME];
   } catch {
-    return [...DEMO];
+    return [...WELCOME];
   }
 }
 

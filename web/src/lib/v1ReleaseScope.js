@@ -74,6 +74,8 @@ export const v1AppShell = {
   /** 하단 바 — 통화 목록 시트 */
   callShowcaseHistoryNav: true,
   showcaseStyleSettings: true,
+  /** V1 — 배너 소셜 오버레이 (좋아요·댓글·공유·더보기·로고·상태/한줄) */
+  showcaseSocialOverlay: true,
   instagramFeed: true,
   customCallProfile: true,
   digitalBizcard: true,

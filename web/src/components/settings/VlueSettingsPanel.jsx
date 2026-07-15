@@ -24,6 +24,13 @@ import {
 } from "./VlueSettingsUi.jsx";
 import VlueEmailSettingsSection from "./VlueEmailSettingsSection.jsx";
 import { v1AppShell } from "../../lib/v1ReleaseScope.js";
+import {
+  getAppLockStatus,
+  hasNativeAppLockBridge,
+  requestAppPinSetup,
+  setAppLockEnabled,
+  APP_LOCK_STATUS
+} from "../../lib/appLockBridge.js";
 
 const BLOCKED_USER_DIRECTORY = [
   { id: "u-minsu", name: "민수", handle: "@minsu" },
@@ -34,6 +41,98 @@ const BLOCKED_USER_DIRECTORY = [
 ];
 
 const APP_VERSION = "1.0.0";
+
+function AppLockSettingsBlock({ isDarkMode, boxClass, showSettingNotice }) {
+  const [status, setStatus] = useState(() => getAppLockStatus());
+  const [busy, setBusy] = useState(false);
+  const native = hasNativeAppLockBridge();
+
+  useEffect(() => {
+    const refresh = () => setStatus(getAppLockStatus());
+    window.addEventListener(APP_LOCK_STATUS, refresh);
+    window.addEventListener("vlue-app-lock-setup-result", refresh);
+    refresh();
+    return () => {
+      window.removeEventListener(APP_LOCK_STATUS, refresh);
+      window.removeEventListener("vlue-app-lock-setup-result", refresh);
+    };
+  }, []);
+
+  const onToggleLock = async (on) => {
+    if (!native) {
+      showSettingNotice?.("앱 잠금은 VLUE Android 앱에서 사용할 수 있습니다.");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (on && !status.hasPin) {
+        const setup = await requestAppPinSetup();
+        if (!setup.ok) {
+          showSettingNotice?.("PIN 등록 후 앱 잠금을 켤 수 있습니다.");
+          setBusy(false);
+          return;
+        }
+      }
+      setAppLockEnabled(on);
+      setStatus(getAppLockStatus());
+      showSettingNotice?.(on ? "앱 잠금이 켜졌습니다. 실행 시마다 PIN을 묻습니다." : "앱 잠금이 꺼졌습니다. 중요 기능에서만 PIN을 묻습니다.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onChangePin = async () => {
+    if (!native) {
+      showSettingNotice?.("PIN 변경은 VLUE Android 앱에서 가능합니다.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const setup = await requestAppPinSetup();
+      setStatus(getAppLockStatus());
+      showSettingNotice?.(setup.ok ? "PIN이 갱신되었습니다." : "PIN 변경이 취소되었습니다.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className={`rounded-2xl border p-4 ${boxClass}`}>
+        <p className={`text-[13px] leading-relaxed ${isDarkMode ? "text-gray-300" : "text-gray-700"}`} style={{ wordBreak: "keep-all" }}>
+          지문/얼굴 인식은 추후 업데이트에 추가될 예정이며, 현재는 6자리 PIN으로 안전하게 보호됩니다.
+        </p>
+        <p className={`mt-2 text-[12px] leading-relaxed ${isDarkMode ? "text-gray-500" : "text-gray-500"}`} style={{ wordBreak: "keep-all" }}>
+          잠금 ON: 앱 실행마다 PIN. 잠금 OFF: 결제·본인정보 수정·데이터 내보내기·원격 로그인 등 중요 기능에서만 PIN.
+        </p>
+      </div>
+      <div className={`overflow-hidden rounded-2xl border ${boxClass}`}>
+        <SettingsToggleRow
+          label="앱 잠금"
+          sublabel={status.hasPin ? "6자리 PIN 등록됨" : "PIN 미등록"}
+          checked={Boolean(status.appLockEnabled)}
+          onChange={(v) => onToggleLock(v)}
+          isDarkMode={isDarkMode}
+        />
+      </div>
+      <button
+        type="button"
+        disabled={busy || !native}
+        onClick={onChangePin}
+        className={`w-full rounded-2xl border py-3 text-[13px] font-bold disabled:opacity-40 ${
+          isDarkMode ? "border-white/15 text-gray-200" : "border-gray-200 text-gray-800"
+        }`}
+      >
+        {status.hasPin ? "PIN 변경·재등록" : "6자리 PIN 등록"}
+      </button>
+      {!native ? (
+        <p className={`px-1 text-[11px] ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+          이 화면은 브라우저입니다. Android VLUE 앱에서 앱 잠금을 설정하세요.
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function useAppSettingsState() {
   const [settings, setSettings] = useState(() => readAppSettings());
@@ -344,17 +443,10 @@ export default function VlueSettingsPanel({
     );
   }
 
-  if (subView === "biometrics") {
+  if (subView === "appLock") {
     return (
-      <SettingsSubpageShell title="생체인증" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
-        <div className={`rounded-2xl border p-4 ${boxClass}`}>
-          <p className={`text-[13px] leading-relaxed ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-            VLUE는 앱 실행·민감 기능 접근 시 기기 생체인증(지문·Face ID) 또는 PIN으로 잠금 해제를 요청합니다.
-          </p>
-          <p className={`mt-3 text-[12px] leading-relaxed ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-            기기 「설정」에서 VLUE 앱의 생체인증 권한을 허용해 주세요. 24시간 유예 후 다시 인증이 필요할 수 있습니다.
-          </p>
-        </div>
+      <SettingsSubpageShell title="앱 잠금" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
+        <AppLockSettingsBlock isDarkMode={isDarkMode} boxClass={boxClass} showSettingNotice={showSettingNotice} />
       </SettingsSubpageShell>
     );
   }
@@ -521,7 +613,7 @@ export default function VlueSettingsPanel({
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="차단 목록 관리" onClick={() => onSubView("blockList")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
-          <SettingsRowButton label="생체인증 설정" onClick={() => onSubView("biometrics")} isDarkMode={isDarkMode} />
+          <SettingsRowButton label="앱 잠금 (PIN)" onClick={() => onSubView("appLock")} isDarkMode={isDarkMode} />
         </SettingsSection>
 
         <SettingsSection title="알림" isDarkMode={isDarkMode}>

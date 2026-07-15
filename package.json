@@ -42,6 +42,8 @@
     "android:setup": "node scripts/sync-android-lettering.mjs && node scripts/setup-android-local.mjs && node scripts/install-gradle-wrapper.mjs",
     "android:setup:device": "node scripts/sync-android-lettering.mjs && node scripts/setup-android-local.mjs --device physical && node scripts/install-gradle-wrapper.mjs",
     "android:assemble": "node scripts/android-assemble.mjs assembleDebug",
+    "android:assemble:release": "node scripts/android-assemble.mjs assembleRelease",
+    "android:bundle:release": "node scripts/android-assemble.mjs bundleRelease",
     "android:install": "node scripts/android-assemble.mjs installDebug",
     "android:launch": "adb shell am start -n kr.vlue.app/kr.vlue.calloverlay.MainActivity",
     "pc-agent:start": "npm run start -w @vlue/pc-agent",

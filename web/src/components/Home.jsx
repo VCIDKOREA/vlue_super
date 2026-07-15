@@ -922,7 +922,7 @@ function Home({
 
       {v1AppShell.callBigPush ? (
       <div data-home-anchor="showcase" className="home-kakao-anchor home-kakao-anchor--showcase shrink-0 px-2.5">
-        <CallBigPushPreviewSection membershipTier={membershipTier} />
+        <CallBigPushPreviewSection membershipTier={membershipTier} isDarkMode={isDarkMode} />
       </div>
       ) : null}
       </div>

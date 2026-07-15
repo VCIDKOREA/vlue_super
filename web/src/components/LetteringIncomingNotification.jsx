@@ -530,6 +530,8 @@ export default function LetteringIncomingNotification({
   const [matrixBusy, setMatrixBusy] = useState(false);
   const [keypadOpen, setKeypadOpen] = useState(false);
   const inCallDemoMode = Boolean(previewMode);
+  /** 실통화 중에는 소셜 레일 숨김 — 미리보기·다시보기·열람만 노출 */
+  const socialOverlayEnabled = Boolean(previewMode || fromCallHistory || !onCall);
 
   const handleMatrixAction = async () => {
     if (!peerMatrix.showCallLogAction || matrixBusy) return;
@@ -884,6 +886,8 @@ export default function LetteringIncomingNotification({
                       onKeypadClose={() => setKeypadOpen(false)}
                       keypadDemoMode={inCallDemoMode}
                       onKeypadToast={showGuide}
+                      socialOverlayEnabled={socialOverlayEnabled}
+                      onReport={handleReport}
                     />
                   ) : keypadOpen ? (
                     <InCallDtmfPad
@@ -940,6 +944,8 @@ export default function LetteringIncomingNotification({
                       onKeypadClose={() => setKeypadOpen(false)}
                       keypadDemoMode={inCallDemoMode}
                       onKeypadToast={showGuide}
+                      socialOverlayEnabled={socialOverlayEnabled}
+                      onReport={handleReport}
                     />
                   ) : (
                     <LetteringDigitalReception

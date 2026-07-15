@@ -8,11 +8,15 @@ import android.os.Bundle
 import android.provider.Settings
 import org.json.JSONObject
 import android.util.Log
+import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import kr.vlue.calloverlay.applock.AppLockStore
+import kr.vlue.calloverlay.applock.PinLockController
 import kr.vlue.calloverlay.family.FamilyPermissionHelper
 import kr.vlue.calloverlay.family.FamilyProtectionPrefs
 import kr.vlue.calloverlay.family.FamilyCareForegroundService
@@ -23,33 +27,61 @@ import kr.vlue.calloverlay.family.ScreenSecureHelper
 import kr.vlue.calloverlay.family.VlueFamilyBridge
 
 /**
- * VLUE 메인 WebView + 레터링 + 가족보호 네이티브 브릿지
+ * VLUE 메인 WebView + 레터링 + 가족보호 + 앱 PIN 잠금
  */
 class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     private lateinit var webView: WebView
+    private lateinit var mainRoot: FrameLayout
+    private lateinit var pinLock: PinLockController
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppLockStore.init(this)
         setContentView(R.layout.activity_main)
+        mainRoot = findViewById(R.id.main_root)
         webView = findViewById(R.id.main_webview)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        val defaultUa = webView.settings.userAgentString.orEmpty()
+        if (!defaultUa.contains(VlueLetteringConfig.ANDROID_APP_UA_TOKEN)) {
+            webView.settings.userAgentString = "$defaultUa ${VlueLetteringConfig.ANDROID_APP_UA_TOKEN}"
+        }
         webView.addJavascriptInterface(MainJsBridge(this), LetteringJavascriptBridge.INTERFACE_NAME)
         webView.addJavascriptInterface(
             VlueFamilyBridge.NativeInterface(this),
             VlueFamilyBridge.INTERFACE_NAME
         )
         VlueFamilyBridge.attachWebView(webView)
+
+        pinLock = PinLockController(
+            activity = this,
+            root = mainRoot,
+            onUnlockedForLaunch = {
+                webView.visibility = View.VISIBLE
+            },
+            onNotifyWeb = { event, detail -> dispatchWebCustomEvent(event, detail) }
+        )
+
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 injectFamilyBridgeBootstrap()
+                injectAppLockBridgeBootstrap()
                 scanRemoteApps()
                 scanDangerousApps()
             }
         }
-        webView.loadUrl("${VlueLetteringConfig.webBaseUrl}/")
+
+        // PIN 게이트가 필요하면 WebView는 아래에서 로드하되 오버레이로 가림
+        if (pinLock.shouldBlockLaunch() || AppLockStore.requiresIdentityReset()) {
+            webView.visibility = View.INVISIBLE
+            pinLock.showLaunchGateIfNeeded()
+        } else {
+            webView.visibility = View.VISIBLE
+        }
+
+        webView.loadUrl(VlueLetteringConfig.appShellUrl)
 
         try {
             LetteringIntegration.onMainActivityReady(this)
@@ -57,12 +89,17 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             Log.e(TAG, "lettering init failed", e)
         }
 
-        if (!FamilyPermissionHelper.allGranted(this)) {
+        if (!LetteringPermissionHelper.hasPhonePermissions(this)) {
+            requestLetteringOsPermissionsDirect()
+        } else if (!FamilyPermissionHelper.allGranted(this)) {
             requestFamilyProtectionPermissions()
         }
 
         if (intent.getBooleanExtra(EXTRA_REQUEST_PERMISSIONS, false)) {
             requestLetteringOsPermissionsDirect()
+        }
+        if (intent.getBooleanExtra(EXTRA_OPEN_APP_SETTINGS, false)) {
+            LetteringPermissionHelper.openAppSettings(this)
         }
         if (intent.getBooleanExtra(EXTRA_REQUEST_DIALER_ROLE, false)) {
             kr.vlue.calloverlay.incall.DialerRoleHelper.requestDefaultDialer(this)
@@ -70,8 +107,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         if (intent.hasExtra(EXTRA_OPEN_CERT)) {
             val json = intent.getStringExtra(EXTRA_OPEN_CERT).orEmpty()
             webView.loadUrl(
-                "${VlueLetteringConfig.webBaseUrl}/#mypage?letteringCert=" +
-                    java.net.URLEncoder.encode(json, "UTF-8")
+                VlueLetteringConfig.appUrl(
+                    "mypage?letteringCert=" + java.net.URLEncoder.encode(json, "UTF-8")
+                )
             )
         }
         handleMemoShareIntent(intent)
@@ -83,6 +121,24 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             setIntent(intent)
             handleMemoShareIntent(intent)
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (::pinLock.isInitialized) {
+            if (pinLock.shouldBlockLaunch() || AppLockStore.requiresIdentityReset()) {
+                webView.visibility = View.INVISIBLE
+                pinLock.showLaunchGateIfNeeded()
+            }
+        }
+    }
+
+    override fun onStop() {
+        // 앱 잠금 ON: 백그라운드 후 재진입 시 다시 PIN
+        if (::pinLock.isInitialized && AppLockStore.isAppLockEnabled()) {
+            pinLock.clearSession()
+        }
+        super.onStop()
     }
 
     private fun handleMemoShareIntent(inIntent: Intent) {
@@ -211,6 +267,40 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         webView.evaluateJavascript(script, null)
     }
 
+    private fun injectAppLockBridgeBootstrap() {
+        val script =
+            """
+            (function(){
+              function send(msg){
+                try{
+                  if(window.Android&&window.Android.onWebMessage){
+                    window.Android.onWebMessage(typeof msg==='string'?msg:JSON.stringify(msg));
+                  }
+                }catch(e){}
+              }
+              window.ReactNativeWebView=window.ReactNativeWebView||{postMessage:send};
+              window.VlueAppLock=Object.assign({},window.VlueAppLock||{},{
+                __native:true,
+                requestAuth:function(id){send({type:'requestAuth',requestId:String(id||'')});},
+                requestPinSetup:function(id){send({type:'requestAppPinSetup',requestId:String(id||'')});},
+                getStatus:function(){
+                  try{return JSON.parse(window.Android.getAppLockStatusJson());}catch(e){return null;}
+                }
+              });
+            })();
+            """.trimIndent()
+        webView.evaluateJavascript(script, null)
+    }
+
+    fun dispatchWebCustomEvent(eventName: String, detailJson: String) {
+        if (!::webView.isInitialized) return
+        val nameQ = JSONObject.quote(eventName)
+        // detailJson is already a JSON object string
+        val script =
+            "(function(){try{var d=$detailJson;window.dispatchEvent(new CustomEvent($nameQ,{detail:d}));}catch(e){}})();"
+        webView.post { webView.evaluateJavascript(script, null) }
+    }
+
     fun requestFamilyProtectionPermissions() {
         if (FamilyPermissionHelper.allGranted(this)) return
         AlertDialog.Builder(this)
@@ -336,6 +426,86 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
 
         @android.webkit.JavascriptInterface
+        fun openAppSettings() {
+            activity.runOnUiThread { LetteringPermissionHelper.openAppSettings(activity) }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun getAppLockStatusJson(): String {
+            AppLockStore.init(activity)
+            return AppLockStore.statusJson()
+        }
+
+        @android.webkit.JavascriptInterface
+        fun setAppLockEnabled(value: String) {
+            activity.runOnUiThread {
+                AppLockStore.init(activity)
+                val on = value == "1" || value.equals("true", ignoreCase = true)
+                if (on && !AppLockStore.hasPin()) {
+                    activity.pinLock.showSetup()
+                    return@runOnUiThread
+                }
+                AppLockStore.setAppLockEnabled(on)
+                activity.dispatchWebCustomEvent(
+                    "vlue-app-lock-status",
+                    AppLockStore.statusJson()
+                )
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun requestAppPinSetup(requestId: String?) {
+            activity.runOnUiThread {
+                activity.pinLock.showSetup(requestId.orEmpty())
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun requestAuth(requestId: String?) {
+            activity.runOnUiThread {
+                activity.webView.visibility = View.VISIBLE
+                activity.pinLock.showAuthRequest(requestId.orEmpty())
+            }
+        }
+
+        /** ReactNativeWebView.postMessage / VlueAppLock 공통 진입 */
+        @android.webkit.JavascriptInterface
+        fun onWebMessage(raw: String?) {
+            val msg = raw.orEmpty().trim()
+            if (msg.isEmpty()) return
+            activity.runOnUiThread {
+                try {
+                    if (msg == "requestAuth") {
+                        activity.pinLock.showAuthRequest("")
+                        return@runOnUiThread
+                    }
+                    val o = JSONObject(msg)
+                    when (o.optString("type", o.optString("action", ""))) {
+                        "requestAuth" -> activity.pinLock.showAuthRequest(o.optString("requestId", ""))
+                        "requestAppPinSetup", "setupPin" ->
+                            activity.pinLock.showSetup(o.optString("requestId", ""))
+                        "confirmPinResetIdentity" -> {
+                            if (o.optBoolean("ok", true)) activity.pinLock.allowResetAfterIdentity()
+                        }
+                    }
+                } catch (_: Exception) {
+                    if (msg.contains("requestAuth", ignoreCase = true)) {
+                        activity.pinLock.showAuthRequest("")
+                    }
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun confirmPinResetIdentity(ok: String?) {
+            activity.runOnUiThread {
+                if (ok == "1" || ok.equals("true", ignoreCase = true)) {
+                    activity.pinLock.allowResetAfterIdentity()
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
         fun requestFamilyProtectionPermissions() {
             activity.runOnUiThread { activity.requestFamilyProtectionPermissions() }
         }
@@ -344,6 +514,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     companion object {
         const val EXTRA_REQUEST_PERMISSIONS = "request_permissions"
         const val EXTRA_REQUEST_DIALER_ROLE = "request_dialer_role"
+        const val EXTRA_OPEN_APP_SETTINGS = "open_app_settings"
         const val EXTRA_OPEN_CERT = "open_cert"
         private const val REQ_PHONE = 4102
         private const val REQ_FAMILY = 4103

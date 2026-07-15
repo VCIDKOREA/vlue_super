@@ -46,13 +46,13 @@ function FamilyProtectionActionButton({ active, isDarkMode, onClick }) {
     <button
       type="button"
       onClick={() => onClick?.()}
-      className={`mt-3 flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-[13px] font-black tracking-tight shadow-sm transition-all duration-300 active:scale-[0.98] ${
+      className={`vlue-family-protect-btn mt-3 flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-[13px] font-black tracking-tight shadow-sm transition-all duration-300 active:scale-[0.98] ${
         active
           ? isDarkMode
-            ? "bg-emerald-500/90 text-white ring-1 ring-emerald-300/40"
+            ? "bg-emerald-500 text-white ring-1 ring-emerald-300/50"
             : "bg-emerald-500 text-white shadow-emerald-500/25"
           : isDarkMode
-            ? "bg-amber-500/90 text-white ring-1 ring-amber-300/40"
+            ? "bg-amber-500 text-white ring-1 ring-amber-200/50"
             : "bg-amber-500 text-white shadow-amber-500/25"
       }`}
       aria-label={active ? "가족보호 작동중" : "가족보호 신청가능"}
@@ -1242,7 +1242,10 @@ function ProfilePanel({
               <button
                 type="button"
                 disabled={!canSubmitWithdraw}
-                onClick={() => {
+                onClick={async () => {
+                  const { requirePinForSensitiveAction } = await import("../lib/appLockBridge.js");
+                  const auth = await requirePinForSensitiveAction("profile_edit");
+                  if (!auth.ok) return;
                   setWithdrawTermsOpen(false);
                   onWithdrawAccount?.();
                   onClose?.();

@@ -45,12 +45,17 @@ final class MainViewController: UIViewController {
     }
 
     private func loadServiceURL() {
-        let base = VlueLetteringConfig.webBaseURL
-        guard let url = URL(string: "\(base)/") else {
-            NSLog("[MainViewController] invalid web base URL: %@", base)
+        guard let url = URL(string: VlueLetteringConfig.appShellURL) else {
+            NSLog("[MainViewController] invalid app shell URL: %@", VlueLetteringConfig.appShellURL)
             return
         }
-        webView.load(URLRequest(url: url))
+        var request = URLRequest(url: url)
+        // siteMode 가 /app 슈퍼앱으로 인식하도록 UA 토큰
+        let ua = webView.value(forKey: "userAgent") as? String ?? ""
+        if !ua.contains(VlueLetteringConfig.iosAppUaToken) {
+            webView.customUserAgent = "\(ua) \(VlueLetteringConfig.iosAppUaToken)".trimmingCharacters(in: .whitespaces)
+        }
+        webView.load(request)
     }
 }
 

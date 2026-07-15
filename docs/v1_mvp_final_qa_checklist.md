@@ -4,7 +4,7 @@
 > **기능 추가 금지** — 버그·카피·빌드·결제·배포만 허용.  
 > 테스트 계정: **무료** 일반 / **유료(Premium)** / **B2B** `test_b2b` (`010-9000-0003`)
 
-**V1 출시 범위:** 기관 검색 · 블루 쇼케이스 · 디지털 인증명함 · 가족보호 · 개인케이스 · 요금제 · 앱 다운로드 · 고객지원
+**V1 출시 범위:** 기관 검색 · 블루 쇼케이스(소셜 오버레이 1~6 포함) · 디지털 인증명함 · 가족보호 · 개인케이스 · 요금제 · 앱 다운로드 · 고객지원
 
 **비앱 사용자 쇼케이스 전달:** 카카오 **알림톡은 V1 미사용**. 통화 중 **앱 미사용자**에게는 이미 구현된 **카카오 Share API(쇼케이스 초대 공유)** 로 전달한다. (`shareShowcaseInviteKakao.js` · `InCallKakaoShareSlot`)
 
@@ -20,7 +20,7 @@
 |------|------|------------|
 | P0 | Railway **API·www** 배포 안정화, 빌드·헬스 스모크 | §12-A |
 | P0 | DB migration `showcase_search_privacy_guards` **deploy** | §12-A |
-| P0 | **포트원 테스트** 결제 1회 + `subscribe/complete` + 티어 즉시 반영 | §4-B |
+| P0 | **포트원 테스트** 결제 1회(또는 `VITE_PORTONE_TEST_MODE`) + Premium 즉시 반영 | §4-B |
 | P0 | **Android 릴리즈** 빌드 → 통화 오버레이 · `ROLE_DIALER` · 근접 센서 | §6 · §12-B |
 | P1 | www 결제 미지원 카피·CTA → 앱 다운로드 | §4-A |
 | P1 | 요금·카피 UI (9,900 / 취소선 / 가족보호 / B2B·SOHO) | §4-C |
@@ -29,7 +29,7 @@
 
 | 우선 | 작업 | 체크리스트 |
 |------|------|------------|
-| P0 | **종합 QA** — 게이트·해시태그·BGM·통화목록·개인케이스·V2 숨김 | §1–§5 · §7–§12 |
+| P0 | **종합 QA** — 게이트·해시태그·BGM·소셜오버레이·통화목록·개인케이스·V2 숨김 | §1–§5 · §7–§13 |
 | P0 | **Play Store** (필수) / **App Store** (가능 시) 심사 제출 | §12-C |
 | P1 | iOS CallKit 오버레이 스모크 (PSTN 정책 한계 문서화) | §12-B |
 | P1 | 가족보호 E2E (본인 + 가족 등록) | §4-C (가족보호 혜택 노출 후 실사용) |
@@ -180,10 +180,10 @@
 
 ### 12-A. 인프라 【이번 주】
 
-- [ ] `cd web && npm run build` 성공
-- [ ] `cd apps/api && npm run build` 성공
-- [ ] Railway API·www 배포 후 `/api/health` · www 홈 스모크
-- [ ] `cd packages/db && npx prisma migrate deploy` (검색 프라이버시 migration)
+- [x] `cd web && npm run build` 성공
+- [x] `cd apps/api && npm run build` 성공
+- [x] Railway API·www 배포 후 `/api/health` · www 홈 스모크
+- [x] DB: `showcase_reactions` · `showcase_comments` 테이블 존재 + 검색 프라이버시 컬럼 (`has_active_showcase` 등)
 
 ### 12-B. Android · iOS 실기기 【이번 주 Android / 다음 주 iOS】
 
@@ -198,12 +198,27 @@
 
 ---
 
+## 13. 쇼케이스 소셜 오버레이 (V1 필수) 【종합 QA】
+
+스펙: `docs/v1_showcase_social_overlay.md` · `v1AppShell.showcaseSocialOverlay`
+
+- [ ] **홈/설정 미리보기** — 유료 배너 슬라이드에 우레일(좋아요·댓글·공유·⋯) + 좌하단 로고/아바타 + 상태·한줄설명 노출
+- [ ] **실통화 중** — 소셜 레일 **비노출** (키패드·음소거·스피커·종료만)
+- [ ] **통화 목록 다시보기** — 레일 재노출 · 좋아요 토글·카운트 API 반영
+- [ ] **댓글** — 바텀시트 열림 · 목록·입력·전송 (로그인 시 서버 저장)
+- [ ] **공유** — 카톡 Share / 초대 시트 (`shareShowcaseInviteKakao.js`)
+- [ ] **더보기** — 개인케이스 저장 · 신고 · BGM 음소거
+- [ ] **디지털 인증명함 슬라이드** — 레일 없음 (명함 UX 유지)
+- [ ] 캡션 우선순위: 사진 오버레이문 → 소개 한 줄 → 상태메시지 → 회사소개
+
+---
+
 ## 빠른 테스트 시나리오 (15분)
 
 1. 무료 → 비즈니스 탭 게이트 확인  
 2. **앱** 유료 가입 → `PostSignupPaymentModal` 포트원 **테스트** 결제 1회 → complete API 200 → Premium 즉시 반영  
 3. www: 요금제 CTA → 다운로드 / **웹 결제 모달 없음**  
-4. 쇼케이스 설정 → 사진·BGM 미리보기  
+4. 쇼케이스 설정 → 사진·BGM 미리보기 · **배너 소셜 오버레이(좋아요·댓글·로고·상태)**  
 5. 통화 목록에서 쇼케이스 다시보기 · 앱 미사용자 통화 시 **카톡 Share** 슬롯  
 6. www: PC다운로드·스토어·미디어커머스·블루AI **없음** / 개인케이스 3탭 확인  
 
@@ -213,7 +228,7 @@
 
 | 영역 | 경로 |
 |------|------|
-| V1 플래그 | `web/src/lib/v1ReleaseScope.js` (`webSubscribePayment: false`) |
+| V1 플래그 | `web/src/lib/v1ReleaseScope.js` (`webSubscribePayment: false`, `showcaseSocialOverlay: true`) |
 | 요금·할인 | `web/src/lib/membershipBm.js`, `web/src/lib/membershipBenefits.js` |
 | 앱 가입 후 결제 | `web/src/components/PostSignupPaymentModal.jsx`, `web/src/lib/iamportClient.js` |
 | 결제 complete API | `apps/api` `POST /api/payment/subscribe/complete` |
@@ -221,6 +236,7 @@
 | 웹 가입(결제 게이트) | `web/src/site/bolt/components/AuthModal.tsx` |
 | 멤버십 업그레이드 UI | `web/src/components/MembershipUpgradeModal.jsx` |
 | 쇼케이스 설정 | `web/src/components/showcase/ShowcaseStyleSettingsPanel.jsx` |
+| 쇼케이스 소셜 오버레이 | `web/src/components/showcase/ShowcaseBannerSocialLayer.jsx`, `docs/v1_showcase_social_overlay.md` |
 | 카톡 Share (앱 미사용자) | `web/src/lib/call/shareShowcaseInviteKakao.js`, `web/src/components/call/InCallKakaoShareSlot.jsx` |
 | 통화 상대 매트릭스 | `web/src/lib/call/callPeerMatrix.js` |
 | 검색 보안 | `docs/v1_showcase_search_security.md`, `apps/api/src/middleware/SearchAuthInterceptor.ts` |
@@ -229,4 +245,4 @@
 
 ---
 
-*마지막 업데이트: V1 — 알림톡 제외 · 카톡 Share 확정 · 2주 일정(인프라/결제/Android → 종합 QA/스토어)*
+*마지막 업데이트: V1 — 쇼케이스 소셜 오버레이(1~6) 출시 범위 포함 · 알림톡 제외 · 카톡 Share · 2주 일정*

@@ -42,7 +42,8 @@ export function createDefaultShowcaseStyle() {
       bodyText: "",
       emoji: ""
     },
-    verifiedBadgeOn: false,
+    /** 디지털인증명함 「VLUE 인증」뱃지 표시 — 미등록 번호 UI와 무관 */
+    verifiedBadgeOn: true,
     commercial: {
       menuItems: [],
       products: [],

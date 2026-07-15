@@ -601,7 +601,7 @@ export default function ShowcaseStyleSettingsPanel({
             <div className="showcase-style-settings__sheet-stage">
               <div className="lettering-home-push-embed">
                 <LetteringIncomingNotification
-                  verified={config.verifiedBadgeOn !== false}
+                  verified
                   previewMode
                   showOwnerSettings={false}
                   callPhase="connected"

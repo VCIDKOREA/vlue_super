@@ -72,6 +72,11 @@ export async function completePortoneSubscribePayment(input: CompleteSubscribeIn
       orderBy: { createdAt: "desc" }
     });
     if (active) {
+      await prisma.digitalCard.upsert({
+        where: { userId: input.userId },
+        create: { userId: input.userId, membershipTierSnapshot: "paid" },
+        update: { membershipTierSnapshot: "paid" }
+      });
       return {
         subscriptionId: active.id,
         status: "active" as const,
@@ -146,6 +151,11 @@ export async function completePortoneSubscribePayment(input: CompleteSubscribeIn
         nextChargeAt: sub.cycleEndAt
       }
     });
+    await prisma.digitalCard.upsert({
+      where: { userId: input.userId },
+      create: { userId: input.userId, membershipTierSnapshot: "paid" },
+      update: { membershipTierSnapshot: "paid" }
+    });
     try {
       await settleSubscriptionReferralCommission({
         payerUserId: input.userId,
@@ -176,11 +186,14 @@ export async function completePortoneSubscribePayment(input: CompleteSubscribeIn
 
   const allowDev =
     input.devBillingBypass &&
-    (process.env.NODE_ENV !== "production" || process.env.VLUE_ALLOW_DEV_BILLING === "1");
+    (process.env.NODE_ENV !== "production" ||
+      process.env.VLUE_ALLOW_DEV_BILLING === "1" ||
+      process.env.PORTONE_TEST_MODE === "1" ||
+      String(process.env.PORTONE_TEST_MODE || "").toLowerCase() === "true");
 
   if (allowDev && isDevBillingMerchant(merchantUid)) {
     impUid = `dev_imp_${merchantUid}`;
-    rawResponse = { devBypass: true };
+    rawResponse = { devBypass: true, portoneTestMode: true };
   } else {
     const impKey = requireEnv("PORTONE_API_KEY");
     const impSecret = requireEnv("PORTONE_API_SECRET");
@@ -230,6 +243,18 @@ export async function completePortoneSubscribePayment(input: CompleteSubscribeIn
         cycleStartAt: now,
         cycleEndAt: sub.cycleEndAt,
         nextChargeAt: sub.cycleEndAt
+      }
+    });
+
+    /** 로그인·게이트가 digitalCard.membershipTierSnapshot 을 본다 — 유료 활성화 시 동기화 */
+    await tx.digitalCard.upsert({
+      where: { userId: input.userId },
+      create: {
+        userId: input.userId,
+        membershipTierSnapshot: "paid"
+      },
+      update: {
+        membershipTierSnapshot: "paid"
       }
     });
   });

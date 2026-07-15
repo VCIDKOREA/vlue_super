@@ -47,22 +47,28 @@ export async function lookupCardByRawNumber(raw: string) {
   }
 
   const user = await prisma.user.findFirst({
-    where: { phoneE164: e164, identityVerified: true },
+    where: {
+      phoneE164: e164,
+      OR: [{ identityVerified: true }, { digitalCard: { isNot: null } }]
+    },
     include: { businessProfile: true, digitalCard: true }
   });
 
   if (user) {
+    const tierSnap = String(user.digitalCard?.membershipTierSnapshot || "").toLowerCase();
+    const isPremiumLine = ["paid", "premium", "b2b", "business"].includes(tierSnap);
     return {
       status: 200 as const,
       body: {
         matched: true,
-        is_verified: true,
+        is_verified: Boolean(user.identityVerified) || Boolean(user.digitalCard),
         source: "user_mobile",
         userId: user.id,
         displayName: user.legalName || "",
         jobTitle: user.businessProfile?.jobTitle || "",
         companyName: user.businessProfile?.companyName || "",
         digitalCardActive: Boolean(user.digitalCard),
+        is_premium_line: isPremiumLine,
         phoneE164: user.phoneE164,
         image_url: null as string | null,
         voice_url: null as string | null

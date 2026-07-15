@@ -18,7 +18,12 @@ import {
  * VLUE Showcase — 홈 메인 통화 빅푸시(픽푸시) 미리보기
  * 켜짐/꺼짐 모두 접힘→전체화면 펼침. 꺼짐은 내용만 번호+VLUE 인증.
  */
-export default function CallBigPushPreviewSection({ membershipTier = "free", className = "", onToast }) {
+export default function CallBigPushPreviewSection({
+  membershipTier = "free",
+  className = "",
+  onToast,
+  isDarkMode = false
+}) {
   const showTierTabs = v1AppShell.callBigPushTierTabs;
   const [showcaseOn, setShowcaseOn] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -76,6 +81,15 @@ export default function CallBigPushPreviewSection({ membershipTier = "free", cla
     onToast
   };
 
+  const titleCls = isDarkMode ? "text-[12px] font-black text-slate-100" : "text-[12px] font-black text-slate-900";
+  const tabTrackCls = isDarkMode ? "flex gap-1 rounded-full bg-slate-800 p-1" : "flex gap-1 rounded-full bg-slate-100 p-1";
+  const statusOnCls = isDarkMode
+    ? "border border-blue-400/35 bg-blue-500/20 text-blue-100"
+    : "border border-blue-100 bg-blue-50 text-blue-900";
+  const statusOffCls = isDarkMode
+    ? "border border-slate-600 bg-slate-800 text-slate-200"
+    : "border border-slate-200 bg-slate-50 text-slate-700";
+
   return (
     <section
       className={`mx-auto w-full max-w-md px-0 pb-0 pt-0 ${className}`.trim()}
@@ -83,7 +97,7 @@ export default function CallBigPushPreviewSection({ membershipTier = "free", cla
     >
       <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
         <div>
-          <p className="text-[12px] font-black text-slate-900">{showcasePreviewLabel()}</p>
+          <p className={titleCls}>{showcasePreviewLabel()}</p>
         </div>
         <button
           type="button"
@@ -96,13 +110,17 @@ export default function CallBigPushPreviewSection({ membershipTier = "free", cla
 
       {showTierTabs ? (
         <div className="mb-1.5 space-y-1.5">
-          <div className="flex gap-1 rounded-full bg-slate-100 p-1" role="tablist" aria-label="쇼케이스 켜짐 꺼짐">
+          <div className={tabTrackCls} role="tablist" aria-label="쇼케이스 켜짐 꺼짐">
             <button
               type="button"
               role="tab"
               aria-selected={isOn}
               className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
-                isOn ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+                isOn
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : isDarkMode
+                    ? "text-slate-400 hover:text-slate-200"
+                    : "text-slate-500 hover:text-slate-700"
               }`}
               onClick={() => {
                 setShowcaseOn(true);
@@ -116,7 +134,11 @@ export default function CallBigPushPreviewSection({ membershipTier = "free", cla
               role="tab"
               aria-selected={!isOn}
               className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
-                !isOn ? "bg-slate-700 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+                !isOn
+                  ? "bg-slate-700 text-white shadow-sm"
+                  : isDarkMode
+                    ? "text-slate-400 hover:text-slate-200"
+                    : "text-slate-500 hover:text-slate-700"
               }`}
               onClick={() => {
                 setShowcaseOn(false);
@@ -127,11 +149,7 @@ export default function CallBigPushPreviewSection({ membershipTier = "free", cla
             </button>
           </div>
           <p
-            className={`rounded-xl px-3 py-2 text-[10px] font-semibold leading-snug ${
-              isOn
-                ? "border border-blue-100 bg-blue-50 text-blue-900"
-                : "border border-slate-200 bg-slate-50 text-slate-700"
-            }`}
+            className={`rounded-xl px-3 py-2 text-[10px] font-semibold leading-snug ${isOn ? statusOnCls : statusOffCls}`}
             style={{ wordBreak: "keep-all" }}
           >
             {isOn ? "켜짐 · 쇼케이스 전면" : "꺼짐 · 번호·인증만"}
@@ -148,7 +166,7 @@ export default function CallBigPushPreviewSection({ membershipTier = "free", cla
         </div>
       ) : (
         <div className="lettering-home-push-embed lettering-home-push-embed--placeholder" aria-hidden>
-          <p className="px-3 py-8 text-center text-[11px] font-semibold text-slate-400">
+          <p className={`px-3 py-8 text-center text-[11px] font-semibold ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>
             전체화면 쇼케이스 미리보기 중
           </p>
         </div>

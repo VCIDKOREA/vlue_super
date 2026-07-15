@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { downloadFraudEvidenceSecure, fetchFraudEvidenceList } from "../../lib/fraudApi.js";
+import { requirePinForSensitiveAction } from "../../lib/appLockBridge.js";
 
 export default function SecurityVaultPanel({ open, onClose }) {
   const [items, setItems] = useState([]);
@@ -30,6 +31,11 @@ export default function SecurityVaultPanel({ open, onClose }) {
     try {
       setBusyId(item.reportId);
       setNotice("");
+      const auth = await requirePinForSensitiveAction("data_export");
+      if (!auth.ok) {
+        setNotice(auth.requiresReset ? "PIN 재설정이 필요합니다." : "다운로드 전 PIN 인증이 필요합니다.");
+        return;
+      }
       const data = await downloadFraudEvidenceSecure(item);
       const blob = new Blob([data.html || ""], { type: "text/html;charset=utf-8" });
       const url = URL.createObjectURL(blob);

@@ -173,6 +173,12 @@ model User {
 
   securitySearchAlerts SecuritySearchAlert[]
 
+  /// V2 쇼케이스 소셜 — 내가 누른 반응 / 내가 쓴 댓글 / 내 쇼케이스에 달린 반응·댓글
+  showcaseReactionsGiven    ShowcaseReaction[] @relation("ShowcaseReactionActor")
+  showcaseReactionsReceived ShowcaseReaction[] @relation("ShowcaseReactionOwner")
+  showcaseCommentsAuthored  ShowcaseComment[]  @relation("ShowcaseCommentAuthor")
+  showcaseCommentsReceived  ShowcaseComment[]  @relation("ShowcaseCommentOwner")
+
   /// 로그인 비밀번호(scrypt 해시). null 이면 비밀번호 로그인 불가(관리자·레거시 등).
   passwordHash String? @map("password_hash") @db.VarChar(256)
 
@@ -1427,6 +1433,50 @@ model SecuritySearchAlert {
   @@index([userId, createdAt(sort: Desc)])
   @@index([acknowledged, createdAt(sort: Desc)])
   @@map("security_search_alerts")
+}
+
+/// V2 쇼케이스 소셜 — 좋아요 등 반응
+model ShowcaseReaction {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  owner       User   @relation("ShowcaseReactionOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  actorUserId String @map("actor_user_id") @db.Uuid
+  actor       User   @relation("ShowcaseReactionActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  /// 배너 슬라이드 키 (없으면 쇼케이스 단위 — 빈 문자열)
+  slideId String @default("") @map("slide_id") @db.VarChar(80)
+
+  /// like | ...
+  type String @default("like") @map("type") @db.VarChar(24)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([ownerUserId, actorUserId, type, slideId])
+  @@index([ownerUserId, type, createdAt(sort: Desc)])
+  @@map("showcase_reactions")
+}
+
+/// V2 쇼케이스 소셜 — 댓글
+model ShowcaseComment {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  owner       User   @relation("ShowcaseCommentOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  authorUserId String @map("author_user_id") @db.Uuid
+  author       User   @relation("ShowcaseCommentAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  slideId String @default("") @map("slide_id") @db.VarChar(80)
+  body    String  @map("body") @db.VarChar(1000)
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, slideId, createdAt(sort: Desc)])
+  @@index([authorUserId, createdAt(sort: Desc)])
+  @@map("showcase_comments")
 }
 
 model SubscriptionPayment {

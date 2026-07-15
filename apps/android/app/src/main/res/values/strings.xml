@@ -4,4 +4,5 @@
     <string name="lettering_channel_name">VLUE 레터링</string>
     <string name="lettering_channel_desc">통화 중 VLUE 명함 오버레이</string>
     <string name="lettering_notification_title">VLUE 레터링 동작 중</string>
+    <string name="pin_future_bio_hint">지문/얼굴 인식은 추후 업데이트에 추가될 예정이며, 현재는 6자리 PIN으로 안전하게 보호됩니다</string>
 </resources>

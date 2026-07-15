@@ -191,7 +191,7 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) 
                   type="button"
                   disabled={Boolean(busyProvider)}
                   onClick={linkWithKakaoSdk}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#FEE500] py-2.5 text-[13px] font-semibold text-[#191919] disabled:opacity-60"
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#FEE500] py-2.5 text-[13px] font-semibold text-[rgba(0,0,0,0.85)] disabled:opacity-60"
                 >
                   {isBusy ? "연동 중…" : "카카오로 연동하기"}
                 </button>

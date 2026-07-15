@@ -742,7 +742,7 @@ body,
   color: #e5e7eb !important;
 }
 
-/* hex ?? ?? ? Tailwind arbitrary ?? attribute selector? ? ??? ?? */
+/* hex 라이트 배경 arbitrary — attribute selector는 부분일치 주의 */
 .dark-mode [class*="bg-[#F8"],
 .dark-mode [class*="bg-[#f8"],
 .dark-mode [class*="bg-[#f3"],
@@ -750,10 +750,23 @@ body,
   background-color: #111827 !important;
 }
 
+/* hex 다크텍스트 / Tailwind arbitrary — attribute selector는 부분일치 주의 */
 .dark-mode [class*="text-[#1A"],
 .dark-mode [class*="text-[#19"],
 .dark-mode [class*="text-[#191f28]"] {
   color: #e5e7eb !important;
+}
+
+/* 카카오 브랜드 버튼 — 노란 배경 + 검정 글씨 유지 (위 remap 예외) */
+.dark-mode [class*="bg-[#FEE500]"],
+.dark-mode [class*="bg-[#fee500]"] {
+  color: rgba(0, 0, 0, 0.85) !important;
+}
+.dark-mode [class*="bg-[#FEE500]"][class*="text-"],
+.dark-mode [class*="bg-[#fee500]"][class*="text-"],
+.dark-mode [class*="bg-[#FEE500]"] [class*="text-"],
+.dark-mode [class*="bg-[#fee500]"] [class*="text-"] {
+  color: rgba(0, 0, 0, 0.85) !important;
 }
 
 /*
@@ -792,7 +805,7 @@ body,
   background-color: #0f172a !important;
 }
 
-.dark-mode [class*="bg-gray-50"] {
+.dark-mode [class*="bg-gray-50"]:not([class*="bg-gray-500"]) {
   background-color: #1f2937 !important;
 }
 
@@ -800,8 +813,8 @@ body,
   background-color: #374151 !important;
 }
 
-/* slate ??: ??? ??? ??? ?? ???? ??? ???? ?? */
-.dark-mode [class*="bg-slate-50"] {
+/* slate 톤: tint *-50만 — *-500 솔리드와 substring 충돌 방지 */
+.dark-mode [class*="bg-slate-50"]:not([class*="bg-slate-500"]) {
   background-color: #1e293b !important;
 }
 
@@ -813,40 +826,53 @@ body,
   background-color: #475569 !important;
 }
 
-/* bg-white? ???, bg-blue-50?amber-50 ? ??? ?? ?? ??(#93c5fd)? ??? ?? ?? */
-.dark-mode [class*="bg-blue-50"] {
+/* tint *-50 배경만 변환 — bg-*-500 은 substring 매칭에서 제외 */
+.dark-mode [class*="bg-blue-50"]:not([class*="bg-blue-500"]) {
   background-color: rgba(37, 99, 235, 0.22) !important;
 }
 
-.dark-mode [class*="bg-indigo-50"] {
+.dark-mode [class*="bg-indigo-50"]:not([class*="bg-indigo-500"]) {
   background-color: rgba(99, 102, 241, 0.2) !important;
 }
 
-.dark-mode [class*="bg-emerald-50"],
-.dark-mode [class*="bg-green-50"] {
+.dark-mode [class*="bg-emerald-50"]:not([class*="bg-emerald-500"]),
+.dark-mode [class*="bg-green-50"]:not([class*="bg-green-500"]) {
   background-color: rgba(16, 185, 129, 0.18) !important;
 }
 
-.dark-mode [class*="bg-red-50"] {
+.dark-mode [class*="bg-red-50"]:not([class*="bg-red-500"]) {
   background-color: rgba(239, 68, 68, 0.18) !important;
 }
 
-.dark-mode [class*="bg-amber-50"] {
+.dark-mode [class*="bg-amber-50"]:not([class*="bg-amber-500"]) {
   background-color: rgba(245, 158, 11, 0.18) !important;
 }
 
-.dark-mode [class*="bg-violet-50"] {
+.dark-mode [class*="bg-violet-50"]:not([class*="bg-violet-500"]) {
   background-color: rgba(139, 92, 246, 0.18) !important;
 }
 
-.dark-mode [class*="bg-blue-50"] [class*="text-blue-700"],
-.dark-mode [class*="bg-blue-50"][class*="text-blue-700"] {
+.dark-mode [class*="bg-blue-50"]:not([class*="bg-blue-500"]) [class*="text-blue-700"],
+.dark-mode [class*="bg-blue-50"]:not([class*="bg-blue-500"])[class*="text-blue-700"],
+.dark-mode [class*="bg-blue-50"]:not([class*="bg-blue-500"]) [class*="text-blue-800"],
+.dark-mode [class*="bg-blue-50"]:not([class*="bg-blue-500"])[class*="text-blue-800"],
+.dark-mode [class*="bg-blue-50"]:not([class*="bg-blue-500"]) [class*="text-blue-900"],
+.dark-mode [class*="bg-blue-50"]:not([class*="bg-blue-500"])[class*="text-blue-900"] {
   color: #dbeafe !important;
 }
 
-.dark-mode [class*="bg-amber-50"] [class*="text-amber-900"],
-.dark-mode [class*="bg-amber-50"][class*="text-amber-900"] {
+.dark-mode [class*="bg-amber-50"]:not([class*="bg-amber-500"]) [class*="text-amber-900"],
+.dark-mode [class*="bg-amber-50"]:not([class*="bg-amber-500"])[class*="text-amber-900"] {
   color: #fde68a !important;
+}
+
+.dark-mode .vlue-family-protect-btn {
+  color: #ffffff !important;
+}
+
+.dark-mode .vlue-kakao-brand-btn,
+.dark-mode .vlue-kakao-brand-btn[class*="text-"] {
+  color: rgba(0, 0, 0, 0.85) !important;
 }
 
 .dark-mode [class*="text-gray-900"] {
@@ -974,7 +1000,9 @@ body,
 .dark-mode .text-blue-600,
 .dark-mode .text-blue-700,
 .dark-mode .text-blue-500,
-.dark-mode .text-blue-400 {
+.dark-mode .text-blue-400,
+.dark-mode [class*="text-blue-900"],
+.dark-mode [class*="text-blue-800"] {
   color: #93c5fd !important;
 }
 

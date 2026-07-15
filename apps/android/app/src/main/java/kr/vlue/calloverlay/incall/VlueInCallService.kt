@@ -17,7 +17,7 @@ class VlueInCallService : InCallService() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val callbacks = HashMap<Call, Call.Callback>()
 
-    override fun onBind(intent: android.content.Intent?): android.os.IBinder {
+    override fun onBind(intent: android.content.Intent?): android.os.IBinder? {
         VlueInCallController.attachService(this)
         return super.onBind(intent)
     }

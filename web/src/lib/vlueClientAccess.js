@@ -7,6 +7,10 @@ import { isWebPcDownloadEnabled } from "./v1ReleaseScope.js";
 
 /** Electron main.cjs 와 동일 — User-Agent suffix */
 export const VLUE_PC_APP_UA_TOKEN = "VLUE-PC-App";
+/** Android WebView MainActivity */
+export const VLUE_ANDROID_APP_UA_TOKEN = "VLUE-Android-App";
+/** iOS WKWebView 셸 (예비) */
+export const VLUE_IOS_APP_UA_TOKEN = "VLUE-iOS-App";
 
 function isAppShellPath(pathname = "") {
   const p = String(pathname || "");
@@ -25,12 +29,24 @@ export function hasVluePcAppUserAgent() {
   return String(navigator.userAgent || "").includes(VLUE_PC_APP_UA_TOKEN);
 }
 
+/** @returns {boolean} */
+export function hasVlueNativeAppUserAgent() {
+  if (typeof navigator === "undefined") return false;
+  const ua = String(navigator.userAgent || "");
+  return (
+    ua.includes(VLUE_PC_APP_UA_TOKEN) ||
+    ua.includes(VLUE_ANDROID_APP_UA_TOKEN) ||
+    ua.includes(VLUE_IOS_APP_UA_TOKEN)
+  );
+}
+
 /** @returns {boolean} /app 셸을 이용할 수 있는 공식 클라이언트인지 */
 export function isBrowserAppAccessAllowed() {
   if (typeof window === "undefined") return true;
-  if (hasVluePcAppUserAgent()) return true;
+  if (hasVlueNativeAppUserAgent()) return true;
   if (window.vlueElectron?.isElectron) return true;
   if (window.VlueFamilyBridgeNative) return true;
+  if (window.VlueFamilyBridge?.__androidShell || window.VlueFamilyBridge?.__iosShell) return true;
   if (window.vluePcAgentShell) return true;
   if (String(import.meta.env.VITE_ALLOW_BROWSER_APP || "").trim() === "true") return true;
   return false;

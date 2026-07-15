@@ -15,11 +15,7 @@ import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
 import { isValidMemberHandleSlug, normalizeMemberHandleSlug } from "../lib/memberHandleRules.js";
 import { isValidMemberPassword, MEMBER_PASSWORD_HINT, MEMBER_PASSWORD_INVALID_MESSAGE } from "../lib/memberPasswordRules.js";
 import { marketingLegalUrl, marketingMinorPolicyUrl } from "../lib/legalPageLinks.js";
-import {
-  getBiometricProfile,
-  isWebAuthnSupported,
-  registerBiometric as webauthnRegisterBiometric
-} from "../lib/webauthnBiometric.js";
+import { hasNativeAppLockBridge, requestAppPinSetup, getAppLockStatus } from "../lib/appLockBridge.js";
 import { formatKrw, isBillableMembershipKind, isB2bMembershipKind, isPaidMembershipKind, paidAmountKrw, buildPaymentPreview, PAID_MEMBERSHIP_SUBLINE, B2B_MEMBERSHIP_SUBLINE, POST_SIGNUP_PAYMENT_NOTICE, PAID_LIST_PRICE_MONTHLY_KRW, PAID_EVENT_MONTHLY_KRW, PAID_LAUNCH_DISCOUNT_NOTE, PAID_ANNUAL_BENEFIT_NOTE } from "../lib/membershipBm.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import {
@@ -148,7 +144,6 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   });
   const [authMode, setAuthMode] = useState("direct");
   const [bioRegistered, setBioRegistered] = useState(false);
-  const bioProfile = useMemo(() => getBiometricProfile(), []);
   const [benefitsModalOpen, setBenefitsModalOpen] = useState(false);
   const [benefitsModalTab, setBenefitsModalTab] = useState("compare");
   const [bioNote, setBioNote] = useState("");
@@ -902,48 +897,32 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
     setBusy(true);
     setBioNote("");
     try {
-      if (!isWebAuthnSupported()) {
-        setBioNote(
-          "이 환경에서는 WebAuthn(생체)을 쓸 수 없습니다. HTTPS 또는 localhost, 그리고 최신 Chrome/Samsung Internet 등으로 열어 주세요."
-        );
+      if (!hasNativeAppLockBridge()) {
+        // 브라우저·PC: 앱에서 PIN 등록 — 가입 플로우는 통과
+        setBioRegistered(true);
+        setBioNote("모바일 VLUE 앱에서 6자리 PIN을 등록해 주세요. 지금은 가입을 계속할 수 있습니다.");
         setBusy(false);
         return;
       }
-      const ok = await webauthnRegisterBiometric();
-      if (ok) {
-        try {
-          localStorage.setItem("vlue_biometric_registered", "1");
-          localStorage.removeItem("vlue_biometric_demo");
-        } catch {
-          /* ignore */
-        }
+      const st = getAppLockStatus();
+      if (st.hasPin) {
         setBioRegistered(true);
-        setBioNote(
-          `${bioProfile.methodSummary} 등록이 완료되었습니다. 이후 민감 작업 시 재요청될 수 있습니다.`
-        );
+        setBioNote("앱 PIN이 이미 등록되어 있습니다.");
+        setBusy(false);
+        return;
+      }
+      const result = await requestAppPinSetup();
+      if (result.ok) {
+        setBioRegistered(true);
+        setBioNote("6자리 앱 PIN 등록이 완료되었습니다.");
       } else {
-        setBioNote("등록에 실패했습니다. 저장 공간을 확인하거나 다시 시도해 주세요.");
+        setBioNote("PIN 등록이 완료되지 않았습니다. 다시 시도해 주세요.");
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setBioNote(`등록이 완료되지 않았습니다. (${msg}) ${bioProfile.cancelHint}`);
+      setBioNote(`PIN 등록 중 오류: ${msg}`);
     }
     setBusy(false);
-  };
-
-  /** LAN·HTTP 등 비보안 출처에서는 WebAuthn 자체가 막힘 — npm run dev 빌드에서만 플로우 검증용 우회 */
-  const registerBiometricDevBypass = () => {
-    if (!import.meta.env.DEV) return;
-    try {
-      localStorage.setItem("vlue_biometric_demo", "1");
-      localStorage.removeItem("vlue_biometric_registered");
-    } catch {
-      /* ignore */
-    }
-    setBioRegistered(true);
-    setBioNote(
-      "개발 전용: 실제 생체 등록 없이 통과합니다. 실제 지문·보안키 테스트는 https 또는 localhost에서 하세요."
-    );
   };
 
   const goBack = () => {
@@ -1204,8 +1183,9 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
               )}
 
               <div className="mt-4 rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-[11px] font-semibold leading-relaxed text-amber-950/90">
-                PASS·휴대폰 본인확인 및 {bioProfile.onboardingMandatory}은 필수입니다. 인증된 실명·휴대폰 등은 연동 후{" "}
-                <span className="font-black">수정 불가</span>입니다. 특정 거래 시 생체 재인증이 요구될 수 있습니다.
+                PASS·휴대폰 본인확인 및 6자리 앱 PIN 등록은 필수입니다. 인증된 실명·휴대폰 등은 연동 후{" "}
+                <span className="font-black">수정 불가</span>입니다. 지문/얼굴 인식은 추후 업데이트에 추가될 예정이며,
+                현재는 6자리 PIN으로 안전하게 보호됩니다.
               </div>
 
               <button
@@ -1222,24 +1202,13 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 {busy
                   ? "처리 중…"
                   : bioRegistered
-                    ? `✓ ${bioProfile.methodSummary} 등록 완료 · 다시 등록`
-                    : bioProfile.registerButtonLabel}
+                    ? "✓ 앱 PIN 등록 완료 · 다시 등록"
+                    : "6자리 앱 PIN 등록하기"}
               </button>
               {bioRegistered ? (
-                <p className="mt-2 text-[11px] font-semibold text-emerald-700">생체 인증이 등록되었습니다. 아래에서 다음 단계로 진행하세요.</p>
+                <p className="mt-2 text-[11px] font-semibold text-emerald-700">앱 PIN이 등록되었습니다. 아래에서 다음 단계로 진행하세요.</p>
               ) : null}
               {bioNote && <p className="mt-2 text-[11px] text-slate-600">{bioNote}</p>}
-
-              {import.meta.env.DEV && (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={registerBiometricDevBypass}
-                  className="mt-2 w-full rounded-xl border border-dashed border-amber-400/90 bg-amber-50/80 py-2.5 text-[12px] font-bold text-amber-950/90"
-                >
-                  개발 전용: 생체 없이 다음 단계 허용 (HTTP·LAN 테스트)
-                </button>
-              )}
 
               <button
                 type="button"

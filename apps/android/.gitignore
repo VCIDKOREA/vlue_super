@@ -6,3 +6,6 @@
 .idea/
 captures/
 .externalNativeBuild/
+keystore.properties
+*.keystore
+*.jks

@@ -182,6 +182,15 @@ class LetteringJavascriptBridge(
     }
 
     @JavascriptInterface
+    fun openAppSettings() {
+        val intent = Intent(service, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra(MainActivity.EXTRA_OPEN_APP_SETTINGS, true)
+        }
+        service.startActivity(intent)
+    }
+
+    @JavascriptInterface
     fun openVlueCertInfo(json: String) {
         val intent = Intent(service, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

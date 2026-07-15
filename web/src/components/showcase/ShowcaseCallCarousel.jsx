@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
 import ShowcaseIdentityCorner from "./ShowcaseIdentityCorner.jsx";
+import ShowcaseBannerSocialLayer from "./ShowcaseBannerSocialLayer.jsx";
 import InCallDtmfPad from "../call/InCallDtmfPad.jsx";
 import {
   maxShowcasePhotosForTier,
@@ -10,6 +11,7 @@ import {
   USER_TIERS
 } from "../../lib/showcase/tentShowcaseTypes.js";
 import { resolvePaidShowcaseBanners } from "../../lib/showcase/demoShowcaseBanners.js";
+import { v1AppShell } from "../../lib/v1ReleaseScope.js";
 
 /**
  * 통화 쇼케이스 시네마틱 캐러셀
@@ -35,7 +37,10 @@ export default function ShowcaseCallCarousel({
   keypadOpen = false,
   onKeypadClose,
   keypadDemoMode = false,
-  onKeypadToast
+  onKeypadToast,
+  /** false면 실통화 중 등 — 소셜 레일 숨김 */
+  socialOverlayEnabled = true,
+  onReport
 }) {
   const [index, setIndex] = useState(0);
   const startX = useRef(0);
@@ -218,9 +223,17 @@ export default function ShowcaseCallCarousel({
                   <div className="showcase-call-carousel__banner">
                     <img src={slide.url} alt="" className="showcase-call-carousel__banner-img" draggable={false} />
                     <div className="showcase-call-carousel__banner-veil" aria-hidden />
-                    {(slide.overlayText || slide.caption) && (
+                    {socialOverlayEnabled && v1AppShell.showcaseSocialOverlay && !keypadOpen ? (
+                      <ShowcaseBannerSocialLayer
+                        card={card}
+                        slide={slide}
+                        previewMode={previewMode}
+                        onToast={onKeypadToast}
+                        onReport={onReport}
+                      />
+                    ) : (slide.overlayText || slide.caption) ? (
                       <p className="showcase-call-carousel__banner-caption">{slide.overlayText || slide.caption}</p>
-                    )}
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -278,7 +291,7 @@ export default function ShowcaseCallCarousel({
             </>
           ) : null}
 
-          {showCornerIdentity && isPaid && !keypadOpen ? (
+          {showCornerIdentity && isPaid && !keypadOpen && !socialOverlayEnabled ? (
             <ShowcaseIdentityCorner
               name={cornerName}
               organization={cornerOrg}

@@ -6,6 +6,15 @@ import { setContactSyncConsent, saveContactMatchCache } from "../lib/contactSync
 import { mergeDeviceContactsCache } from "../lib/contacts/deviceContactsCache.js";
 import { upsertKnownPhonesFromFriends } from "../lib/contacts/knownPhonesIndex.js";
 import { collectDeviceContactsForSync } from "../lib/collectDeviceContacts.js";
+import {
+  openNativeAppSettings,
+  readLetteringPermissionStatus,
+  requestLetteringPermissions
+} from "../lib/letteringSettings.js";
+
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 export default function ContactSyncConsentModal({ open, onClose, onSynced }) {
   const [busy, setBusy] = useState(false);
@@ -33,12 +42,41 @@ export default function ContactSyncConsentModal({ open, onClose, onSynced }) {
   };
 
   const handleAgree = async () => {
-    const contacts = await collectDeviceContactsForSync({ allowDemoConfirm: false });
-    if (contacts?.length) {
-      await runSync(contacts);
-      return;
+    setBusy(true);
+    setError("");
+    try {
+      let contacts = await collectDeviceContactsForSync({ allowDemoConfirm: false });
+      if (contacts?.length) {
+        await runSync(contacts);
+        return;
+      }
+
+      const status = readLetteringPermissionStatus();
+      if (!status?.contacts) {
+        const kick = requestLetteringPermissions();
+        if (kick?.ok) {
+          setError("주소록 권한 창에서 허용해 주세요. 허용 후 자동으로 다시 시도합니다…");
+          await sleep(1800);
+          for (let i = 0; i < 8; i++) {
+            await sleep(700);
+            const st = readLetteringPermissionStatus();
+            if (st?.contacts) break;
+          }
+          contacts = await collectDeviceContactsForSync({ allowDemoConfirm: false });
+          if (contacts?.length) {
+            await runSync(contacts);
+            return;
+          }
+        }
+        openNativeAppSettings();
+        setError("설정에서 「연락처(주소록)」 권한을 허용한 뒤 다시 「전화부 동기화 동의」를 눌러 주세요.");
+        return;
+      }
+
+      setError("가져온 연락처가 없습니다. 기기에 저장된 번호가 있는지 확인해 주세요.");
+    } finally {
+      setBusy(false);
     }
-    setError("가져온 연락처가 없습니다. 앱에서 주소록 권한을 허용한 뒤 다시 시도해 주세요.");
   };
 
   const handleDecline = () => {
