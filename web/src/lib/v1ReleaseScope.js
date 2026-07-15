@@ -98,7 +98,7 @@ export const v1AppShell = {
   homeHeaderMinimal: true,
   /** 메인 빅푸시 — 일상/비즈 탭 숨김 */
   callBigPushTierTabs: true,
-  /** 명함 스캐너 (문서 스캔 → 개인 자료실) */
+  /** 명함 스캐너 — 종이명함 OCR → 연락처 저장 */
   bizcardScanner: true,
   webViewProfile: true,
   kakaoAlimtalk: true,

@@ -62,6 +62,7 @@ import BackButton from "./components/common/BackButton";
 import ModalCloseButton from "./components/common/ModalCloseButton";
 
 const CsScannerScreen = lazy(() => import("./components/office/CsScannerScreen.jsx"));
+const BizcardScannerScreen = lazy(() => import("./components/office/BizcardScannerScreen.jsx"));
 const VlueUnifiedInboxScreen = lazy(() => import("./components/email/VlueUnifiedInboxScreen.jsx"));
 import UserProfileAvatar from "./components/UserProfileAvatar.jsx";
 import { clearBiometricSessionOnly } from "./lib/webauthnBiometric";
@@ -3600,7 +3601,7 @@ function App() {
               onClick={() => requireAuth(() => setCsScannerOpen(true))}
               className="shrink-0 rounded-full p-1.5 text-gray-500 active:scale-90 transition-transform"
               aria-label="명함 스캐너"
-              title="명함 스캐너 — 촬영 후 개인 자료실 저장"
+              title="명함 스캐너 — 종이 명함 인식 후 연락처 저장"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 7h4l2-3h4l2 3h4v12H4z" />
@@ -4692,16 +4693,28 @@ function App() {
         </nav>
       </footer>
       <Suspense fallback={null}>
-        <CsScannerScreen
-          open={v1AppShell.bizcardScanner && csScannerOpen}
-          documentOnly={v1AppShell.homeHeaderMinimal}
-          onClose={() => setCsScannerOpen(false)}
-          onToast={(msg) => {
-            if (!msg) return;
-            setBottomToast(msg);
-            setTimeout(() => setBottomToast(""), 2800);
-          }}
-        />
+        {v1AppShell.bizcardScanner && homeHeaderMinimal ? (
+          <BizcardScannerScreen
+            open={csScannerOpen}
+            onClose={() => setCsScannerOpen(false)}
+            onToast={(msg) => {
+              if (!msg) return;
+              setBottomToast(msg);
+              setTimeout(() => setBottomToast(""), 2800);
+            }}
+          />
+        ) : (
+          <CsScannerScreen
+            open={v1AppShell.storeScanner && csScannerOpen}
+            documentOnly={false}
+            onClose={() => setCsScannerOpen(false)}
+            onToast={(msg) => {
+              if (!msg) return;
+              setBottomToast(msg);
+              setTimeout(() => setBottomToast(""), 2800);
+            }}
+          />
+        )}
         <VlueUnifiedInboxScreen
           open={emailInboxOpen}
           isDarkMode={isDarkMode}
