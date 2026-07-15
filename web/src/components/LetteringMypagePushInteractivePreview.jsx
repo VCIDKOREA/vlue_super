@@ -24,9 +24,9 @@ export default function LetteringMypagePushInteractivePreview({
 
   useEffect(() => {
     bindStyleConfig(styledCard?.showcaseStyle);
-    setPlaybackPhase(expanded ? "replay" : "call_active");
+    setPlaybackPhase("preview");
     return () => setPlaybackPhase("idle");
-  }, [expanded, styledCard?.showcaseStyle, bindStyleConfig, setPlaybackPhase]);
+  }, [styledCard?.showcaseStyle, bindStyleConfig, setPlaybackPhase]);
 
   useEffect(() => {
     if (!expanded || !rootRef.current) return;

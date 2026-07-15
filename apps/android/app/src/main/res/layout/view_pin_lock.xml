@@ -178,11 +178,13 @@
                 android:text="9" />
 
             <TextView
-                android:id="@+id/pin_key_blank"
+                android:id="@+id/pin_key_cancel"
                 style="@style/PinKeyButton"
                 android:background="@android:color/transparent"
-                android:clickable="false"
-                android:text="" />
+                android:text="취소"
+                android:textSize="15sp"
+                android:textColor="#64748B"
+                android:visibility="invisible" />
 
             <TextView
                 android:id="@+id/pin_key_0"

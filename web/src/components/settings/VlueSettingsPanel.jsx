@@ -68,7 +68,9 @@ function AppLockSettingsBlock({ isDarkMode, boxClass, showSettingNotice }) {
       if (on && !status.hasPin) {
         const setup = await requestAppPinSetup();
         if (!setup.ok) {
-          showSettingNotice?.("PIN 등록 후 앱 잠금을 켤 수 있습니다.");
+          showSettingNotice?.(
+            setup.cancelled ? "PIN 등록을 취소했습니다." : "PIN 등록 후 앱 잠금을 켤 수 있습니다."
+          );
           setBusy(false);
           return;
         }

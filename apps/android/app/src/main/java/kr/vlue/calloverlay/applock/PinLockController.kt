@@ -124,6 +124,7 @@ class PinLockController(
         buffer.clear()
         updateDots()
         updateCopy()
+        updateCancelVisibility()
         errorView?.text = ""
     }
 
@@ -159,9 +160,33 @@ class PinLockController(
             view.findViewById<View>(id).setOnClickListener { onDigit(digit) }
         }
         view.findViewById<View>(R.id.pin_key_del).setOnClickListener { onDelete() }
+        view.findViewById<View>(R.id.pin_key_cancel).setOnClickListener { onCancelSetup() }
         view.findViewById<View>(R.id.pin_reset_cta).setOnClickListener {
             onNotifyWeb("vlue-app-lock-requires-reset", """{"reason":"user_or_lockout"}""")
         }
+    }
+
+    private fun onCancelSetup() {
+        if (mode != Mode.SETUP && mode != Mode.SETUP_CONFIRM) return
+        pendingSetupPin = ""
+        buffer.clear()
+        updateDots()
+        hide()
+        onNotifyWeb(
+            "vlue-app-lock-setup-result",
+            """{"ok":false,"cancelled":true,"requestId":${JSONObject.quote(authRequestId)}}"""
+        )
+        if (authRequestId.isNotEmpty()) {
+            dispatchAuthResult(false, "cancelled")
+        }
+    }
+
+    private fun updateCancelVisibility() {
+        val cancel = overlay?.findViewById<View>(R.id.pin_key_cancel) ?: return
+        val show = mode == Mode.SETUP || mode == Mode.SETUP_CONFIRM
+        cancel.visibility = if (show) View.VISIBLE else View.INVISIBLE
+        cancel.isClickable = show
+        cancel.isFocusable = show
     }
 
     private fun updateCopy() {

@@ -81,6 +81,13 @@ function ensurePostcodeLayer() {
   header.appendChild(title);
   header.appendChild(closeBtn);
 
+  closeBtn.addEventListener("mousedown", (ev) => {
+    ev.stopPropagation();
+  });
+  closeBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+  });
+
   const embed = document.createElement("div");
   embed.id = EMBED_ID;
   embed.style.cssText = "flex:1;min-height:0;width:100%;";

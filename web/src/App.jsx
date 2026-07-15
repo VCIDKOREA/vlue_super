@@ -1280,15 +1280,25 @@ function App() {
 
   useEffect(() => {
     const onDocClick = (e) => {
+      const t = e.target;
+      if (!(t instanceof Element)) return;
+
       const isSearchArea =
-        e.target.closest("#search-trigger") ||
-        e.target.closest("#search-input-wrap") ||
-        e.target.closest("#global-search-dropdown");
+        t.closest("#search-trigger") ||
+        t.closest("#search-input-wrap") ||
+        t.closest("#global-search-dropdown");
       if (!isSearchArea) setIsSearchOpen(false);
 
-      const isProfileArea =
-        e.target.closest("#profile-trigger") ||
-        e.target.closest("#profile-menu");
+      /* 우편번호·주소 레이어는 body에 붙음 — 닫기 클릭이 사이드바 전체 닫힘으로 전파되면 안 됨 */
+      if (t.closest("#vlue-daum-postcode-layer") || t.closest("[data-vlue-postcode-close]")) {
+        return;
+      }
+      const postcodeLayer = document.getElementById("vlue-daum-postcode-layer");
+      if (postcodeLayer && postcodeLayer.style.display !== "none" && postcodeLayer.style.display !== "") {
+        return;
+      }
+
+      const isProfileArea = t.closest("#profile-trigger") || t.closest("#profile-menu");
       if (!isProfileArea) setProfileOpen(false);
     };
     document.addEventListener("mousedown", onDocClick);

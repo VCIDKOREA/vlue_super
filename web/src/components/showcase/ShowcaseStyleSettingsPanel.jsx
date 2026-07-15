@@ -137,19 +137,23 @@ export default function ShowcaseStyleSettingsPanel({
     return () => window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onExternal);
   }, []);
 
+  /* 예전 「인증명함」화면 스타일 → 쇼케이스 개인스타일로 이전 (명함은 별도 설정) */
+  useEffect(() => {
+    if (config.styleType !== "certificate") return;
+    persist({ styleType: "rich_custom" });
+  }, [config.styleType, persist]);
+
   const onSelectStyle = (id) => {
+    if (id === "certificate") {
+      onToast?.("디지털 인증명함은 마이페이지 명함 설정에서 따로 편집합니다.");
+      return;
+    }
     if (!perms.allowedStyleIds.includes(id)) {
       setGateOpen(true);
       return;
     }
-    const bgmMode = SHOWCASE_STYLE_TYPES[id]?.bgmSource || "none";
-    persist({
-      styleType: id,
-      bgm: {
-        ...config.bgm,
-        mode: bgmMode === "none" ? "none" : bgmMode === "platform" ? "platform" : config.bgm.mode || "preset"
-      }
-    });
+    /* BGM은 스타일과 독립 — 1곡 설정 시 명함·쇼케이스 공통 */
+    persist({ styleType: id });
   };
 
   const onTagsChange = (raw) => {
@@ -242,11 +246,14 @@ export default function ShowcaseStyleSettingsPanel({
           {/* 2. Style chips */}
           <section className="showcase-profile-block">
             <p className="showcase-profile-block__title">화면 스타일</p>
+            <p className="showcase-profile-block__sub mb-2">
+              쇼케이스(사진·피드) 전용입니다. 디지털 인증명함은 마이페이지 명함 설정에서 편집합니다.
+            </p>
             <div className="showcase-style-chips" role="listbox" aria-label="통화 화면 스타일">
-              {SHOWCASE_STYLE_LIST.map((s) => {
+              {SHOWCASE_STYLE_LIST.filter((s) => s.id !== "certificate").map((s) => {
                 const meta = SHOWCASE_STYLE_TYPES[s.id] || s;
                 const locked = !perms.allowedStyleIds.includes(s.id);
-                const active = config.styleType === s.id;
+                const active = config.styleType === s.id || (config.styleType === "certificate" && s.id === "rich_custom");
                 return (
                   <button
                     key={s.id}
@@ -260,7 +267,7 @@ export default function ShowcaseStyleSettingsPanel({
                       {meta.emoji || "📱"}
                     </span>
                     <span className="showcase-style-chip__label">
-                      {s.label.replace("디지털인증명함", "인증명함")}
+                      {s.label}
                       {locked ? " ·유료" : ""}
                     </span>
                     {active ? <Check size={14} className="showcase-style-chip__check" aria-hidden /> : null}
@@ -268,7 +275,11 @@ export default function ShowcaseStyleSettingsPanel({
                 );
               })}
             </div>
-            <p className="showcase-profile-block__sub">{styleMeta.shortDesc}</p>
+            <p className="showcase-profile-block__sub">
+              {config.styleType === "certificate"
+                ? "인증명함 스타일은 더 이상 쓰지 않습니다. 개인스타일 등으로 바꿔 주세요."
+                : styleMeta.shortDesc}
+            </p>
           </section>
 
           {/* 3. Profile fields — Kakao/Insta edit rows */}
@@ -472,8 +483,8 @@ export default function ShowcaseStyleSettingsPanel({
               </div>
             ) : null}
 
-            {config.styleType !== "default" ? (
-              <>
+            {/* BGM — 스타일 무관, 명함·쇼케이스 공통 1곡 */}
+            <>
                 <button
                   type="button"
                   className="showcase-profile-row showcase-profile-row--btn"
@@ -481,17 +492,20 @@ export default function ShowcaseStyleSettingsPanel({
                 >
                   <span className="showcase-profile-row__label">
                     <Music2 size={14} className="inline mr-1" aria-hidden />
-                    배경음악
+                    배경음악 (명함·쇼케이스 공통)
                   </span>
                   <span className="showcase-profile-row__trail">
                     <span className="showcase-profile-row__value">
-                      {config.bgm?.mode === "none" ? "없음" : "설정됨"}
+                      {config.bgm?.mode === "none" || !config.bgm?.mode ? "없음" : "설정됨"}
                     </span>
                     {openMusic ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </span>
                 </button>
                 {openMusic ? (
                   <div className="showcase-profile-nested">
+                    <p className="showcase-profile-block__sub mb-2">
+                      한 곡만 선택하면 디지털 인증명함·쇼케이스 미리보기·다시보기에 함께 재생됩니다.
+                    </p>
                     <ShowcaseBgmPicker
                       value={config.bgm}
                       inputCls={inputCls}
@@ -499,8 +513,7 @@ export default function ShowcaseStyleSettingsPanel({
                     />
                   </div>
                 ) : null}
-              </>
-            ) : null}
+            </>
 
             {isPaid ? (
               <>

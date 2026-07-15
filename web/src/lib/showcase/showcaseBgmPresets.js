@@ -52,8 +52,9 @@ export function getBgmPresetById(id) {
 export function resolveShowcaseBgmUrl(styleConfig) {
   if (!styleConfig?.bgm) return null;
   const { mode, presetId } = styleConfig.bgm;
-  if (mode === "none" || mode === "platform") return null;
-  if (mode === "preset") {
+  if (mode === "none") return null;
+  /* preset · platform(카톡/인스타 스타일) 모두 VLUE 프리셋이 있으면 재생 — 명함·쇼케이스 공통 */
+  if (mode === "preset" || mode === "platform") {
     const preset = getBgmPresetById(presetId);
     return preset?.url || null;
   }

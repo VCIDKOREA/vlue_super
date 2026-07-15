@@ -119,7 +119,11 @@ export async function requestAppPinSetup() {
     return { ok: false, via: "bridge_error" };
   }
   const detail = await waitForEvent(APP_LOCK_SETUP_RESULT, requestId);
-  return { ok: Boolean(detail?.ok), via: detail?.via || "setup" };
+  return {
+    ok: Boolean(detail?.ok),
+    cancelled: Boolean(detail?.cancelled),
+    via: detail?.via || (detail?.cancelled ? "cancelled" : "setup")
+  };
 }
 
 export function setAppLockEnabled(enabled) {

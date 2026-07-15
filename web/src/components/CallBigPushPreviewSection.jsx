@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
@@ -8,11 +8,16 @@ import {
 } from "../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { showcasePreviewLabel, VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
-import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
+import {
+  SHOWCASE_OPEN_SETTINGS_EVENT,
+  SHOWCASE_STYLE_CHANGED_EVENT
+} from "../lib/showcase/showcaseStyleStorage.js";
+import { LETTERING_BIZCARD_CHANGED_EVENT } from "../lib/letteringBizcardStorage.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import {
   readShowcasePreviewDigitalCardApplied
 } from "../lib/vlueShowcasePreviewIdentity.js";
+import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 
 /**
  * VLUE Showcase — 홈 메인 통화 빅푸시(픽푸시) 미리보기
@@ -27,10 +32,24 @@ export default function CallBigPushPreviewSection({
   const showTierTabs = v1AppShell.callBigPushTierTabs;
   const [showcaseOn, setShowcaseOn] = useState(true);
   const [expanded, setExpanded] = useState(false);
+  const [previewTick, setPreviewTick] = useState(0);
+  const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
 
   const paidTier = isPaidLetteringTier(membershipTier) ? membershipTier : "premium";
   const isOn = showcaseOn;
   const effectiveTier = isOn ? paidTier : "free";
+
+  useEffect(() => {
+    const bump = () => setPreviewTick((n) => n + 1);
+    window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, bump);
+    window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
+    window.addEventListener("vlue-digital-card-changed", bump);
+    return () => {
+      window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, bump);
+      window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
+      window.removeEventListener("vlue-digital-card-changed", bump);
+    };
+  }, []);
 
   const card = useMemo(() => {
     const base = applyShowcaseStyleToCard(
@@ -47,7 +66,14 @@ export default function CallBigPushPreviewSection({
         showBroadcastName: false
       }
     };
-  }, [effectiveTier, isOn]);
+  }, [effectiveTier, isOn, previewTick]);
+
+  useEffect(() => {
+    bindStyleConfig(card?.showcaseStyle);
+    /* 홈 미리보기(접힘·펼침)와 명함 슬라이드에서 동일 BGM */
+    setPlaybackPhase(isOn ? "preview" : "idle");
+    return () => setPlaybackPhase("idle");
+  }, [card?.showcaseStyle, isOn, bindStyleConfig, setPlaybackPhase]);
 
   const digitalCardApplied = readShowcasePreviewDigitalCardApplied();
   const incomingNumber = card.phone || "";
