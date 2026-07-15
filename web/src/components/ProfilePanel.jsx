@@ -35,6 +35,7 @@ import {
   readCachedActiveRegion,
   resolveActiveRegion
 } from "../lib/activeRegion.js";
+import { openNativeAppSettings } from "../lib/letteringSettings.js";
 
 function tierLabelStyle(tier, isDarkMode, familyProtectionActive = false) {
   return membershipTierStyleClass(tier, isDarkMode, { familyProtectionActive });
@@ -448,7 +449,8 @@ function ProfilePanel({
       setActiveRegionLabel(r.label || "위치를 확인할 수 없습니다");
       setActiveRegionBusy(false);
       if (r.error === "denied") {
-        setSettingNotice("위치 권한을 허용한 뒤 다시 시도해 주세요.");
+        setSettingNotice("위치 권한이 필요합니다. 앱 설정 화면으로 이동합니다.");
+        openNativeAppSettings();
       }
     });
   }, []);

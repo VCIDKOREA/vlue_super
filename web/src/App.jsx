@@ -1905,6 +1905,12 @@ function App() {
         try {
           const { hydrateBizcardFromLoginPayload } = await import("./lib/bizcardAccountSync.js");
           hydrateBizcardFromLoginPayload(data);
+          try {
+            const { syncBizcardAccountFromApi } = await import("./lib/bizcardAccountSync.js");
+            await syncBizcardAccountFromApi();
+          } catch {
+            /* ignore */
+          }
           const tierFromApi = String(data.membershipTier || "").trim().toLowerCase();
           const handle = String(data.publicHandle || id || "")
             .trim()

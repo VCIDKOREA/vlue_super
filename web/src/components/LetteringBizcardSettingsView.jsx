@@ -88,6 +88,12 @@ export default function LetteringBizcardSettingsView({
       .replace(/^@/, "");
     const isCeo = handle === "ceo";
     try {
+      /* 서버 스냅샷 → 로컬 복원 (이메일·웹·주소 등) */
+      await fetchDigitalCardMeta();
+    } catch {
+      /* ignore */
+    }
+    try {
       const remote = await fetchTitleDeptStatus();
       if (remote?.reviewStatus && !isCeo) {
         const status =
@@ -418,7 +424,10 @@ export default function LetteringBizcardSettingsView({
     }
 
     void syncDigitalCardDesignTemplate(tpl);
-    void syncDigitalCardExportSnapshot({ ...previewCard, designTemplate: tpl });
+    const syncResult = await syncDigitalCardExportSnapshot({ ...previewCard, designTemplate: tpl });
+    if (!syncResult?.ok) {
+      showToast("기기에 저장되었습니다. 서버 동기화에 실패했습니다. 네트워크 확인 후 다시 적용해 주세요.");
+    }
     if (isFirstApply) {
       try {
         const identity = readLetteringFixedIdentity();

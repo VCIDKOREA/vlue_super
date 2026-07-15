@@ -67,6 +67,19 @@ export async function reverseGeocodeLatLng(lat, lng) {
   };
 }
 
+function readNativeLocationGranted() {
+  try {
+    const raw =
+      window.Android?.getLetteringPermissionStatusJson?.() ||
+      window.VlueLettering?.getLetteringPermissionStatusJson?.();
+    if (!raw) return null;
+    const o = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(o?.location);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * @returns {Promise<{ label: string, loading?: boolean, error?: string, fromCache?: boolean }>}
  */
@@ -79,6 +92,8 @@ export function resolveActiveRegion() {
       fromCache: Boolean(cached)
     });
   }
+
+  const nativeGranted = readNativeLocationGranted();
 
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
@@ -96,14 +111,26 @@ export function resolveActiveRegion() {
           });
         }
       },
-      () => {
+      (err) => {
+        const code = err?.code;
+        /* PERMISSION_DENIED = 1 · OS 허용인데 WebView 미연동이면 여기로 옴 */
+        if (code === 1 || nativeGranted === false) {
+          resolve({
+            label: cached?.label || "위치 권한이 필요합니다",
+            error: "denied",
+            fromCache: Boolean(cached),
+            nativeGranted
+          });
+          return;
+        }
         resolve({
-          label: cached?.label || "위치 권한이 필요합니다",
-          error: "denied",
-          fromCache: Boolean(cached)
+          label: cached?.label || "위치를 가져오지 못했습니다",
+          error: "unavailable",
+          fromCache: Boolean(cached),
+          nativeGranted
         });
       },
-      { enableHighAccuracy: false, timeout: 12000, maximumAge: 120000 }
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
     );
   });
 }

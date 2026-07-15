@@ -302,22 +302,33 @@ const ALLOWED_DESIGN_TEMPLATES = new Set([
   "creative-gradient"
 ]);
 
-/** 내 디지털 인증명함 ID · 템플릿 (HTML 배포·검증 연동) */
+/** 내 디지털 인증명함 ID · 템플릿 · 편집 스냅샷 (HTML 배포·검증 연동) */
 cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
   const row = await prisma.digitalCard.findUnique({
     where: { userId: me },
-    select: { id: true, issuedAt: true, designTemplateSnapshot: true, membershipTierSnapshot: true }
+    select: {
+      id: true,
+      issuedAt: true,
+      designTemplateSnapshot: true,
+      membershipTierSnapshot: true,
+      exportSnapshotJson: true
+    }
   });
   if (!row) {
-    return c.json({ issued: false, cardId: null, designTemplate: null });
+    return c.json({ issued: false, cardId: null, designTemplate: null, exportSnapshot: null });
   }
+  const snap =
+    row.exportSnapshotJson && typeof row.exportSnapshotJson === "object"
+      ? (row.exportSnapshotJson as Record<string, unknown>)
+      : null;
   return c.json({
     issued: true,
     cardId: row.id,
     issuedAt: row.issuedAt,
     designTemplate: row.designTemplateSnapshot,
-    membershipTierSnapshot: row.membershipTierSnapshot
+    membershipTierSnapshot: row.membershipTierSnapshot,
+    exportSnapshot: snap
   });
 });
 
@@ -332,7 +343,10 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
     return c.json({ error: "지원하지 않는 디자인 템플릿입니다." }, 400);
   }
 
-  let cardRow = await prisma.digitalCard.findUnique({ where: { userId: me }, select: { id: true } });
+  let cardRow = await prisma.digitalCard.findUnique({
+    where: { userId: me },
+    select: { id: true, exportSnapshotJson: true }
+  });
   if (!cardRow) {
     const sub = await prisma.userSubscription.findFirst({
       where: { userId: me, status: "active" },
@@ -342,14 +356,19 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
     const tier = sub ? "paid" : "free";
     cardRow = await prisma.digitalCard.create({
       data: { userId: me, membershipTierSnapshot: tier },
-      select: { id: true }
+      select: { id: true, exportSnapshotJson: true }
     });
   }
 
   const data: { designTemplateSnapshot?: string; exportSnapshotJson?: object } = {};
   if (tpl) data.designTemplateSnapshot = tpl;
   if (body.exportSnapshot && typeof body.exportSnapshot === "object") {
+    const prev =
+      cardRow.exportSnapshotJson && typeof cardRow.exportSnapshotJson === "object"
+        ? (cardRow.exportSnapshotJson as Record<string, unknown>)
+        : {};
     data.exportSnapshotJson = {
+      ...prev,
       ...body.exportSnapshot,
       ...(tpl ? { designTemplate: tpl } : {})
     };
@@ -358,10 +377,18 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
   const updated = await prisma.digitalCard.update({
     where: { userId: me },
     data,
-    select: { id: true, designTemplateSnapshot: true }
+    select: { id: true, designTemplateSnapshot: true, exportSnapshotJson: true }
   });
 
-  return c.json({ ok: true, cardId: updated.id, designTemplate: updated.designTemplateSnapshot });
+  return c.json({
+    ok: true,
+    cardId: updated.id,
+    designTemplate: updated.designTemplateSnapshot,
+    exportSnapshot:
+      updated.exportSnapshotJson && typeof updated.exportSnapshotJson === "object"
+        ? updated.exportSnapshotJson
+        : null
+  });
 });
 
 /** 직책·부서 확인 서류 — 최신 검토 상태 */

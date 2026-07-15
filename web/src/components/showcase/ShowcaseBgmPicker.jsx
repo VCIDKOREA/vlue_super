@@ -79,29 +79,46 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
     const token = previewTokenRef.current;
     const audio = new Audio();
     audio.preload = "auto";
+    audio.crossOrigin = "anonymous";
     audio.volume = 0.85;
     audioRef.current = audio;
     setPreviewId(presetId);
 
+    let settled = false;
     const fail = (msg) => {
-      if (previewTokenRef.current !== token) return;
+      if (previewTokenRef.current !== token || settled) return;
+      settled = true;
       setPreviewError(msg || "미리듣기를 불러오지 못했습니다. 잠시 후 다시 눌러 주세요.");
       setPreviewLoading(false);
       setPreviewId("");
     };
 
-    audio.onerror = () => fail();
-    audio.oncanplay = () => {
-      if (previewTokenRef.current !== token) return;
+    const startPlay = () => {
+      if (previewTokenRef.current !== token || settled) return;
       setPreviewLoading(false);
       setPreviewError("");
-      audio.play().catch(() => {
-        /* 자동재생 정책 — 사용자 탭 직후이므로 거의 성공. 실패 시만 안내 */
+      audio.play().then(() => {
+        settled = true;
+      }).catch(() => {
         fail("재생이 차단되었습니다. 한 번 더 눌러 주세요.");
       });
     };
+
+    audio.onerror = () => fail("음원 파일을 불러오지 못했습니다. 네트워크를 확인해 주세요.");
+    audio.oncanplay = startPlay;
+    audio.onloadeddata = startPlay;
     audio.src = preset.url;
-    audio.load();
+    try {
+      audio.load();
+    } catch {
+      fail();
+    }
+
+    /* SoundHelix 등 느린 CDN — 로딩 대기 후 재생 시도 */
+    window.setTimeout(() => {
+      if (previewTokenRef.current !== token || settled) return;
+      if (audio.readyState >= 2) startPlay();
+    }, 2500);
 
     previewTimerRef.current = window.setTimeout(() => {
       if (previewTokenRef.current !== token) return;

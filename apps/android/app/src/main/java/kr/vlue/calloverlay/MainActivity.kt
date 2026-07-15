@@ -98,6 +98,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         webView.settings.allowFileAccess = true
         webView.settings.allowContentAccess = true
         webView.settings.mediaPlaybackRequiresUserGesture = false
+        webView.settings.setGeolocationEnabled(true)
         val defaultUa = webView.settings.userAgentString.orEmpty()
         if (!defaultUa.contains(VlueLetteringConfig.ANDROID_APP_UA_TOKEN)) {
             webView.settings.userAgentString = "$defaultUa ${VlueLetteringConfig.ANDROID_APP_UA_TOKEN}"
@@ -139,6 +140,21 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
 
         webView.webChromeClient = object : WebChromeClient() {
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String?,
+                callback: android.webkit.GeolocationPermissions.Callback?
+            ) {
+                val allow = LetteringPermissionHelper.hasLocation(this@MainActivity)
+                callback?.invoke(origin, allow, false)
+                if (!allow) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "위치 권한이 필요합니다. 설정에서 허용해 주세요.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+
             override fun onPermissionRequest(request: android.webkit.PermissionRequest?) {
                 if (request == null) return
                 runOnUiThread {
@@ -526,6 +542,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 },
                 openUrl:function(url){
                   try{if(window.Android&&window.Android.openExternalUrl)window.Android.openExternalUrl(String(url||''));}catch(e){}
+                },
+                openAppSettings:function(){
+                  try{if(window.Android&&window.Android.openAppSettings)window.Android.openAppSettings();}catch(e){}
                 }
               });
             })();
