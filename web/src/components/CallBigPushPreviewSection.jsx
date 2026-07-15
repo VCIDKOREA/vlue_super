@@ -18,6 +18,7 @@ import {
   readShowcasePreviewDigitalCardApplied
 } from "../lib/vlueShowcasePreviewIdentity.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
+import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
 
 /**
  * VLUE Showcase — 홈 메인 통화 빅푸시(픽푸시) 미리보기
@@ -51,6 +52,14 @@ export default function CallBigPushPreviewSection({
     };
   }, []);
 
+  useEffect(() => {
+    if (!expanded) return undefined;
+    return pushAndroidBackHandler(() => {
+      setExpanded(false);
+      return true;
+    });
+  }, [expanded]);
+
   const card = useMemo(() => {
     const base = applyShowcaseStyleToCard(
       resolveVlueShowcaseCard({ membershipTier: effectiveTier, previewExample: true }),
@@ -70,10 +79,10 @@ export default function CallBigPushPreviewSection({
 
   useEffect(() => {
     bindStyleConfig(card?.showcaseStyle);
-    /* 홈 미리보기(접힘·펼침)와 명함 슬라이드에서 동일 BGM */
-    setPlaybackPhase(isOn ? "preview" : "idle");
+    /* 접힘 상태에서는 BGM 정지 — 피커/설정 미리듣기와 충돌·잔향 방지 */
+    setPlaybackPhase(expanded && isOn ? "preview" : "idle");
     return () => setPlaybackPhase("idle");
-  }, [card?.showcaseStyle, isOn, bindStyleConfig, setPlaybackPhase]);
+  }, [card?.showcaseStyle, expanded, isOn, bindStyleConfig, setPlaybackPhase]);
 
   const digitalCardApplied = readShowcasePreviewDigitalCardApplied();
   const incomingNumber = card.phone || "";

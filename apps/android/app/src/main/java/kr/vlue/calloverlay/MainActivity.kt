@@ -523,6 +523,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 },
                 requestLetteringPermissions:function(){
                   try{if(window.Android&&window.Android.requestLetteringPermissions)window.Android.requestLetteringPermissions();}catch(e){}
+                },
+                openUrl:function(url){
+                  try{if(window.Android&&window.Android.openExternalUrl)window.Android.openExternalUrl(String(url||''));}catch(e){}
                 }
               });
             })();
@@ -671,6 +674,21 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         @android.webkit.JavascriptInterface
         fun openAppSettings() {
             activity.runOnUiThread { LetteringPermissionHelper.openAppSettings(activity) }
+        }
+
+        /** https 명함/인증 페이지 — WebView 내 로드 대신 외부 브라우저/카톡 등으로 열어 /app 셸 유지 */
+        @android.webkit.JavascriptInterface
+        fun openExternalUrl(url: String?) {
+            val u = url?.trim().orEmpty()
+            if (u.isEmpty()) return
+            activity.runOnUiThread {
+                try {
+                    activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u)))
+                } catch (e: Exception) {
+                    Log.e(TAG, "openExternalUrl failed: $u", e)
+                    Toast.makeText(activity, "페이지를 열 수 없습니다.", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
 
         @android.webkit.JavascriptInterface

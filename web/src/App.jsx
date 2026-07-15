@@ -162,6 +162,7 @@ import { readLetteringEnabled, writeLetteringEnabled } from "./lib/letteringSett
 import { readLetteringFixedIdentity } from "./lib/letteringBizcardStorage.js";
 import { B2bMembershipProvider } from "./context/B2bMembershipContext.jsx";
 import { ShowcaseBgmProvider } from "./context/ShowcaseBgmContext.jsx";
+import { runAndroidBackHandlers } from "./lib/androidBackStack.js";
 import { normalizeMembershipKind, isBillableMembershipKind } from "./lib/membershipBm.js";
 import { writePendingPayment, readPendingPayment } from "./lib/postSignupPayment.js";
 
@@ -3003,6 +3004,7 @@ function App() {
   useEffect(() => {
     window.VlueAndroidBack = () => {
       try {
+        if (runAndroidBackHandlers()) return true;
         if (appNotificationOpen) {
           setAppNotificationOpen(false);
           return true;
@@ -3017,6 +3019,26 @@ function App() {
         }
         if (cardWalletModalOpen) {
           setCardWalletModalOpen(false);
+          return true;
+        }
+        if (letteringCertOpen) {
+          setLetteringCertOpen(false);
+          return true;
+        }
+        if (emailInboxOpen) {
+          setEmailInboxOpen(false);
+          return true;
+        }
+        if (qrScannerOpen) {
+          setQrScannerOpen(false);
+          return true;
+        }
+        if (isSearchOpen) {
+          setIsSearchOpen(false);
+          return true;
+        }
+        if (profileOpen) {
+          setProfileOpen(false);
           return true;
         }
         if (navHistoryRef.current.length > 0) {
@@ -3045,6 +3067,11 @@ function App() {
     callShowcaseSheetOpen,
     showcaseStyleSheetOpen,
     cardWalletModalOpen,
+    letteringCertOpen,
+    emailInboxOpen,
+    qrScannerOpen,
+    isSearchOpen,
+    profileOpen,
     goBackStep
   ]);
 

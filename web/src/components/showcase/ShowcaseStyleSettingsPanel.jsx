@@ -21,6 +21,7 @@ import LetteringIncomingNotification from "../LetteringIncomingNotification.jsx"
 import ShowcasePremiumGateModal from "./ShowcasePremiumGateModal.jsx";
 import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
 import ShowcasePhotoEditor from "./ShowcasePhotoEditor.jsx";
+import { pushAndroidBackHandler } from "../../lib/androidBackStack.js";
 import "./showcase-style-settings.css";
 import "../../styles/showcase-call-glass.css";
 
@@ -104,6 +105,14 @@ export default function ShowcaseStyleSettingsPanel({
   const onPreviewPointerUp = useCallback(() => {
     previewDragRef.current.dragging = false;
   }, []);
+
+  useEffect(() => {
+    if (previewCollapsed) return undefined;
+    return pushAndroidBackHandler(() => {
+      setPreviewCollapsed(true);
+      return true;
+    });
+  }, [previewCollapsed]);
 
   const card = useMemo(() => {
     const base = resolveVlueShowcaseCard({ membershipTier, previewExample: true });

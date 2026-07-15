@@ -1,46 +1,41 @@
 /**
- * VLUE RF 큐레이션 BGM 프리셋
- * Pixabay download CDN 은 WebView CORS/403 으로 미리듣기 실패 → SoundHelix 공개 샘플 사용
+ * VLUE RF 큐레이션 BGM — 숏폼(릴스·쇼츠) 감성 Mixkit 프리뷰 MP3
+ * (WebView Audio 재생용 CDN · 로컬 미포함)
  */
 
-const HELIX = (n) => `https://www.soundhelix.com/examples/mp3/SoundHelix-Song-${n}.mp3`;
+const MIX = (slug) => `https://assets.mixkit.co/music/preview/${slug}.mp3`;
 
 /** @typedef {{ id: string, label: string, tag: string, theme: string, url: string }} ShowcaseBgmPreset */
 
 /** @type {ShowcaseBgmPreset[]} */
 export const SHOWCASE_BGM_PRESETS = [
-  { id: "cafe-kpop-piano", label: "카페감성 K-POP 피아노", tag: "#카페감성", theme: "cafe", url: HELIX(1) },
-  { id: "biz-trust-piano", label: "비즈니스 신뢰 연주곡", tag: "#비즈니스", theme: "business", url: HELIX(2) },
-  { id: "lofi-chill", label: "잔잔한 로파이 비트", tag: "#로파이", theme: "lofi", url: HELIX(3) },
-  { id: "morning-breeze", label: "모닝 브리즈", tag: "#아침", theme: "cafe", url: HELIX(4) },
-  { id: "soft-rain", label: "소프트 레인", tag: "#비오는날", theme: "ambient", url: HELIX(5) },
-  { id: "trust-blue", label: "Trust Blue", tag: "#안심", theme: "business", url: HELIX(6) },
-  { id: "calm-day", label: "Calm Day", tag: "#일상", theme: "lofi", url: HELIX(7) },
-  { id: "soft-wave", label: "Soft Wave", tag: "#감성", theme: "ambient", url: HELIX(8) },
-  { id: "sunset-glow", label: "선셋 글로우", tag: "#저녁", theme: "cafe", url: HELIX(9) },
-  { id: "focus-flow", label: "포커스 플로우", tag: "#집중", theme: "lofi", url: HELIX(10) },
-  { id: "warm-tea", label: "따뜻한 티타임", tag: "#티타임", theme: "cafe", url: HELIX(1) },
-  { id: "city-lights", label: "시티 라이트", tag: "#도시", theme: "lofi", url: HELIX(2) },
-  { id: "gentle-harp", label: "젠틀 하프", tag: "#하프", theme: "ambient", url: HELIX(3) },
-  { id: "meeting-calm", label: "미팅 캄", tag: "#미팅", theme: "business", url: HELIX(4) },
-  { id: "dreamy-pad", label: "드리미 패드", tag: "#드림", theme: "ambient", url: HELIX(5) },
-  { id: "cozy-fire", label: "코지 파이어", tag: "#겨울", theme: "cafe", url: HELIX(6) },
-  { id: "uplift-start", label: "업리프트 스타트", tag: "#시작", theme: "business", url: HELIX(7) },
-  { id: "night-drive", label: "나이트 드라이브", tag: "#드라이브", theme: "lofi", url: HELIX(8) },
-  { id: "ocean-calm", label: "오션 캄", tag: "#바다", theme: "ambient", url: HELIX(9) },
-  { id: "spring-bloom", label: "스프링 블룸", tag: "#봄", theme: "cafe", url: HELIX(10) },
-  { id: "minimal-groove", label: "미니멀 그루브", tag: "#미니멀", theme: "lofi", url: HELIX(1) },
-  { id: "brand-trust", label: "브랜드 트러스트", tag: "#브랜드", theme: "business", url: HELIX(2) },
-  { id: "lazy-sunday", label: "레이지 선데이", tag: "#주말", theme: "cafe", url: HELIX(3) },
-  { id: "zen-space", label: "젠 스페이스", tag: "#명상", theme: "ambient", url: HELIX(4) },
-  { id: "happy-vibe", label: "해피 바이브", tag: "#해피", theme: "lofi", url: HELIX(5) }
+  { id: "reels-house", label: "릴스 하우스 비트", tag: "#릴스", theme: "lofi", url: MIX("mixkit-tech-house-vibes-130") },
+  { id: "shorts-hiphop", label: "숏츠 힙합 그루브", tag: "#숏츠", theme: "lofi", url: MIX("mixkit-hip-hop-02-738") },
+  { id: "dream-big", label: "드림 빅 업비트", tag: "#업비트", theme: "business", url: MIX("mixkit-dreaming-big-31") },
+  { id: "serene-view", label: "세린 뷰 칠", tag: "#칠", theme: "ambient", url: MIX("mixkit-serene-view-443") },
+  { id: "cat-walk", label: "캣워크 팝", tag: "#팝", theme: "cafe", url: MIX("mixkit-cat-walk-371") },
+  { id: "hazy-hours", label: "헤이즈 애프터아워", tag: "#나이트", theme: "lofi", url: MIX("mixkit-hazy-after-hours-132") },
+  { id: "deep-urban", label: "딥 어반", tag: "#어반", theme: "lofi", url: MIX("mixkit-deep-urban-623") },
+  { id: "silent-trap", label: "사일런트 트랩", tag: "#트랩", theme: "lofi", url: MIX("mixkit-silent-descent-slow-trap-185") },
+  { id: "sun-daughter", label: "선 앤 도터", tag: "#브라이트", theme: "cafe", url: MIX("mixkit-sun-and-his-daughter-580") },
+  { id: "drive-ambition", label: "드라이빙 앰비션", tag: "#드라이브", theme: "business", url: MIX("mixkit-driving-ambition-32") },
+  { id: "worldbeat", label: "월드비트 게임", tag: "#바이브", theme: "cafe", url: MIX("mixkit-games-worldbeat-466") },
+  { id: "sleepy-cat", label: "슬리피 캣 로파이", tag: "#로파이", theme: "lofi", url: MIX("mixkit-sleepy-cat-135") },
+  { id: "soft-piano", label: "소프트 피아노 무드", tag: "#피아노", theme: "ambient", url: MIX("mixkit-beautiful-dream-493") },
+  { id: "raising-me", label: "레이징 미 하이프", tag: "#하이프", theme: "business", url: MIX("mixkit-raising-me-higher-34") },
+  { id: "valley-sunset", label: "밸리 선셋", tag: "#선셋", theme: "cafe", url: MIX("mixkit-valley-sunset-127") },
+  { id: "life-is-a-dream", label: "라이프 이즈 어 드림", tag: "#드림", theme: "ambient", url: MIX("mixkit-life-is-a-dream-837") },
+  { id: "bridge-nights", label: "브릿지 오브 더 나잇", tag: "#시티", theme: "lofi", url: MIX("mixkit-bridge-of-the-night-490") },
+  { id: "island-beat", label: "아일랜드 비트", tag: "#트로피컬", theme: "cafe", url: MIX("mixkit-island-beat-250") },
+  { id: "piano-reflections", label: "피아노 리플렉션", tag: "#감성", theme: "ambient", url: MIX("mixkit-piano-reflections-478") },
+  { id: "cbpd-trap", label: "시티 트랩 플로우", tag: "#트랩", theme: "lofi", url: MIX("mixkit-cbpd-400") }
 ];
 
 export const SHOWCASE_BGM_THEMES = [
   { id: "all", label: "전체" },
   { id: "cafe", label: "카페감성" },
   { id: "business", label: "비즈니스" },
-  { id: "lofi", label: "로파이" },
+  { id: "lofi", label: "로파이·숏폼" },
   { id: "ambient", label: "앰비언트" }
 ];
 
@@ -53,7 +48,6 @@ export function resolveShowcaseBgmUrl(styleConfig) {
   if (!styleConfig?.bgm) return null;
   const { mode, presetId } = styleConfig.bgm;
   if (mode === "none") return null;
-  /* preset · platform(카톡/인스타 스타일) 모두 VLUE 프리셋이 있으면 재생 — 명함·쇼케이스 공통 */
   if (mode === "preset" || mode === "platform") {
     const preset = getBgmPresetById(presetId);
     return preset?.url || null;

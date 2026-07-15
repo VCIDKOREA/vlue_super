@@ -30,6 +30,11 @@ import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { fetchFamilyProtection } from "../lib/familyProtectionApi.js";
 import { familyPeersFromProtectionData } from "../lib/familyProtectionPeers.js";
+import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
+import {
+  readCachedActiveRegion,
+  resolveActiveRegion
+} from "../lib/activeRegion.js";
 
 function tierLabelStyle(tier, isDarkMode, familyProtectionActive = false) {
   return membershipTierStyleClass(tier, isDarkMode, { familyProtectionActive });
@@ -151,6 +156,10 @@ function ProfilePanel({
   const mainPanelScrollRef = useRef(null);
   const [virtualEmail, setVirtualEmail] = useState(null);
   const [virtualEmailConfigured, setVirtualEmailConfigured] = useState(false);
+  const [activeRegionLabel, setActiveRegionLabel] = useState(
+    () => readCachedActiveRegion()?.label || "위치 확인 중…"
+  );
+  const [activeRegionBusy, setActiveRegionBusy] = useState(false);
 
   const reloadVirtualEmail = useCallback(() => {
     fetchEmailForwardingMapping().then((data) => {
@@ -409,6 +418,40 @@ function ProfilePanel({
     settingsSubView,
     onClose
   ]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    return pushAndroidBackHandler(() => {
+      handleHeaderClose();
+      return true;
+    });
+  }, [open, handleHeaderClose]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    setActiveRegionBusy(true);
+    resolveActiveRegion().then((r) => {
+      if (cancelled) return;
+      setActiveRegionLabel(r.label || "위치를 확인할 수 없습니다");
+      setActiveRegionBusy(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const refreshActiveRegion = useCallback(() => {
+    setActiveRegionBusy(true);
+    setActiveRegionLabel("위치 확인 중…");
+    resolveActiveRegion().then((r) => {
+      setActiveRegionLabel(r.label || "위치를 확인할 수 없습니다");
+      setActiveRegionBusy(false);
+      if (r.error === "denied") {
+        setSettingNotice("위치 권한을 허용한 뒤 다시 시도해 주세요.");
+      }
+    });
+  }, []);
 
   const showSettingNotice = useCallback(
     (msg) => {
@@ -909,16 +952,23 @@ function ProfilePanel({
           ) : null}
 
           <div className="mt-6 px-1">
-            <div className="bg-white rounded-[28px] p-5 border-2 border-gray-50 shadow-sm flex items-center gap-3 active:scale-[0.98] transition-all">
-              <div className="w-10 h-10 bg-red-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <button
+              type="button"
+              onClick={refreshActiveRegion}
+              disabled={activeRegionBusy}
+              className="flex w-full items-center gap-3 rounded-[28px] border-2 border-gray-50 bg-white p-5 shadow-sm transition-all active:scale-[0.98] disabled:opacity-70"
+            >
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-red-50">
                 <span className="text-lg">📍</span>
               </div>
-              <div className="flex min-w-0 flex-col">
-                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-tight mb-0.5">Active Region</p>
-                <p className="truncate whitespace-nowrap text-[clamp(13px,3.8vw,15px)] font-black tracking-tight text-gray-900">서울 강남구 역삼동</p>
+              <div className="flex min-w-0 flex-col text-left">
+                <p className="mb-0.5 text-[11px] font-bold uppercase tracking-tight text-gray-400">Active Region</p>
+                <p className="truncate whitespace-nowrap text-[clamp(13px,3.8vw,15px)] font-black tracking-tight text-gray-900">
+                  {activeRegionBusy ? "위치 확인 중…" : activeRegionLabel}
+                </p>
               </div>
               <div className="ml-auto text-gray-300">›</div>
-            </div>
+            </button>
           </div>
 
           <div

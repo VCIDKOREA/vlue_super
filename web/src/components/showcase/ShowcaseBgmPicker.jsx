@@ -10,8 +10,10 @@ import {
   fetchYoutubeMeta,
   matchYoutubeByKeyword
 } from "../../lib/showcase/showcaseYoutube.js";
+import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 
-const PREVIEW_MS = 8000;
+/** 숏폼 감성 미리듣기 — 너무 짧지 않게 */
+const PREVIEW_MS = 20000;
 
 /**
  * RF 큐레이션 + 유튜브 검색/지정 BGM 피커
@@ -23,8 +25,11 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
   const [ytBusy, setYtBusy] = useState(false);
   const [previewId, setPreviewId] = useState("");
   const [previewError, setPreviewError] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
   const audioRef = useRef(null);
   const previewTimerRef = useRef(0);
+  const previewTokenRef = useRef(0);
+  const { setPlaybackPhase } = useShowcaseBgm();
 
   const filtered = useMemo(() => {
     if (theme === "all") return SHOWCASE_BGM_PRESETS;
@@ -33,9 +38,12 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
 
   const stopPreview = () => {
     window.clearTimeout(previewTimerRef.current);
+    previewTokenRef.current += 1;
     const a = audioRef.current;
     if (a) {
       try {
+        a.oncanplay = null;
+        a.onerror = null;
         a.pause();
         a.removeAttribute("src");
         a.load();
@@ -45,9 +53,18 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
       audioRef.current = null;
     }
     setPreviewId("");
+    setPreviewLoading(false);
   };
 
-  useEffect(() => () => stopPreview(), []);
+  useEffect(() => {
+    /* 피커가 열려 있는 동안 홈 글로벌 BGM 정지 */
+    setPlaybackPhase("idle");
+    return () => {
+      stopPreview();
+      setPlaybackPhase("idle");
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setPlaybackPhase]);
 
   const playPreview = (presetId) => {
     const preset = getBgmPresetById(presetId);
@@ -57,16 +74,37 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
     }
     stopPreview();
     setPreviewError("");
-    const audio = new Audio(preset.url);
+    setPreviewLoading(true);
+    setPlaybackPhase("idle");
+    const token = previewTokenRef.current;
+    const audio = new Audio();
     audio.preload = "auto";
     audio.volume = 0.85;
     audioRef.current = audio;
     setPreviewId(presetId);
-    audio.play().catch(() => {
-      setPreviewError("미리듣기를 재생할 수 없습니다. 네트워크·음원 URL을 확인해 주세요.");
+
+    const fail = (msg) => {
+      if (previewTokenRef.current !== token) return;
+      setPreviewError(msg || "미리듣기를 불러오지 못했습니다. 잠시 후 다시 눌러 주세요.");
+      setPreviewLoading(false);
       setPreviewId("");
-    });
+    };
+
+    audio.onerror = () => fail();
+    audio.oncanplay = () => {
+      if (previewTokenRef.current !== token) return;
+      setPreviewLoading(false);
+      setPreviewError("");
+      audio.play().catch(() => {
+        /* 자동재생 정책 — 사용자 탭 직후이므로 거의 성공. 실패 시만 안내 */
+        fail("재생이 차단되었습니다. 한 번 더 눌러 주세요.");
+      });
+    };
+    audio.src = preset.url;
+    audio.load();
+
     previewTimerRef.current = window.setTimeout(() => {
+      if (previewTokenRef.current !== token) return;
       stopPreview();
     }, PREVIEW_MS);
   };
@@ -116,10 +154,10 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
     <div className="showcase-bgm-picker">
       <div className="showcase-bgm-picker__hero">
         <Sparkles size={14} aria-hidden />
-        <span>강력 추천 · VLUE RF 큐레이션</span>
+        <span>강력 추천 · 숏폼(릴스·쇼츠) 감성</span>
       </div>
       <p className="showcase-bgm-picker__hint" style={{ wordBreak: "keep-all" }}>
-        곡을 누르면 선택되며 약 {PREVIEW_MS / 1000}초 미리듣기가 재생됩니다.
+        곡을 누르면 선택되며 약 {PREVIEW_MS / 1000}초 미리듣기가 재생됩니다. 창을 나가면 바로 멈춥니다.
       </p>
 
       <div className="showcase-bgm-picker__themes">
@@ -152,7 +190,9 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
                 <Music size={14} className="showcase-bgm-picker__icon" aria-hidden />
               )}
               <span className="showcase-bgm-picker__label">{p.label}</span>
-              <small>{playing ? "미리듣기 중…" : p.tag}</small>
+              <small>
+                {playing ? (previewLoading ? "불러오는 중…" : "미리듣기 중…") : p.tag}
+              </small>
             </button>
           );
         })}
