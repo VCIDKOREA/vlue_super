@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Bell } from "lucide-react";
 import {
   fetchFamilyCrossSecurityDashboard,
   fetchFamilySecurityState
@@ -160,7 +161,7 @@ export default function FamilySecurityDashboard({ isDarkMode = false, onToast })
 
       {isOwner ? <PosStaffManagementConsole isDarkMode={isDarkMode} onToast={onToast} /> : null}
 
-      <div className="mt-2">
+      <div className="mt-3">
         <button
           type="button"
           onClick={() => {
@@ -171,10 +172,18 @@ export default function FamilySecurityDashboard({ isDarkMode = false, onToast })
             const ok = openNotificationAccessSettings();
             if (!ok) onToast?.("Android 앱에서 알림 접근 권한을 설정해 주세요.");
           }}
-          className="w-full rounded-lg border border-slate-200 py-1.5 text-[10px] font-semibold text-slate-600 active:bg-slate-50"
+          className={`flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3.5 text-[13px] font-black shadow-md active:scale-[0.98] ${
+            isDarkMode
+              ? "bg-blue-500 text-white shadow-blue-900/40"
+              : "bg-blue-600 text-white shadow-blue-600/30"
+          }`}
         >
+          <Bell className="h-4 w-4 shrink-0" aria-hidden />
           은행 입출금 알림 연동 (알림 접근 권한)
         </button>
+        <p className={`mt-1.5 text-center text-[9px] font-semibold ${sub}`}>
+          탭하면 기기 알림 접근 설정으로 이동합니다
+        </p>
       </div>
 
       {openIncidents.length > 0 ? (
