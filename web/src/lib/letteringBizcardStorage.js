@@ -4,6 +4,8 @@ import { formatPhoneE164ForKoreaDisplay } from "./phoneDisplay.js";
 
 export const LETTERING_BIZCARD_STORAGE_KEY = "vlue_lettering_bizcard_v1";
 export const LETTERING_BIZCARD_CHANGED_EVENT = "vlue-lettering-bizcard-changed";
+/** 홈·미리보기에서 디지털 인증명함 설정(프로필 letteringBizcard) 열기 */
+export const LETTERING_OPEN_BIZCARD_SETTINGS_EVENT = "vlue-open-lettering-bizcard-settings";
 
 /** 명함 앞면 E 한 줄 표시 기준 (초과 시 줄바꿈·밀림) */
 export const LETTERING_BIZCARD_EMAIL_MAX = 26;

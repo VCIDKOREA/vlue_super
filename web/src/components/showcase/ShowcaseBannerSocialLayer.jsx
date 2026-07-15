@@ -28,7 +28,7 @@ function firstText(...values) {
 export default function ShowcaseBannerSocialLayer({
   card,
   slide,
-  previewMode = false,
+  previewMode: _previewMode = false,
   onToast,
   onReport: onReportProp
 }) {
@@ -69,7 +69,8 @@ export default function ShowcaseBannerSocialLayer({
     return { avatarUrl: "", logoLetter: peer.initial || displayName };
   }, [style, card, displayName]);
 
-  const localOnly = previewMode || !ownerUserId;
+  /* ownerUserId가 있으면 미리보기에서도 실제 좋아요·댓글 API 사용 (본인 쇼케이스 포함) */
+  const localOnly = !ownerUserId;
   const bgm = useShowcaseBgm();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
@@ -105,7 +106,6 @@ export default function ShowcaseBannerSocialLayer({
         setLikeCount((n) => (v ? Math.max(0, n - 1) : n + 1));
         return !v;
       });
-      if (previewMode) onToast?.("미리보기 좋아요입니다.");
       return;
     }
     const res = await toggleShowcaseLikeApi(ownerUserId, { slideId });
@@ -115,7 +115,7 @@ export default function ShowcaseBannerSocialLayer({
     }
     setLiked(res.likedByMe);
     setLikeCount(res.likeCount);
-  }, [ownerUserId, slideId, localOnly, previewMode, onToast]);
+  }, [ownerUserId, slideId, localOnly, onToast]);
 
   const onShare = useCallback(async () => {
     await shareShowcaseInviteViaKakao({

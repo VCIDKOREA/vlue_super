@@ -22,6 +22,7 @@ import { fetchMemoMeta, receiveShareMemo } from "./lib/memoApi.js";
 import { LOCAL_MEMO_CHANGED } from "./lib/localMemoStorage.js";
 import { OPEN_CALENDAR_EVENT_KEY } from "./lib/calendarConstants.js";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "./lib/showcase/showcaseStyleStorage.js";
+import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "./lib/letteringBizcardStorage.js";
 import { EXPAND_FAMILY_KEY, OPEN_POS_DASHBOARD_KEY } from "./lib/posDashboardConstants.js";
 import { publishCalendarAsRoomNotice } from "./lib/chatRoomNoticeService.js";
 import BetaLaunchGuide from "./components/BetaLaunchGuide.jsx";
@@ -369,8 +370,19 @@ function App() {
       setProfileOpen(false);
       setShowcaseStyleSheetOpen(true);
     };
+    const openBizcardSettings = () => {
+      setAppNotificationOpen(false);
+      setCallShowcaseSheetOpen(false);
+      setShowcaseStyleSheetOpen(false);
+      setProfileInitialView("letteringBizcard");
+      setProfileOpen(true);
+    };
     window.addEventListener(SHOWCASE_OPEN_SETTINGS_EVENT, openShowcaseSettings);
-    return () => window.removeEventListener(SHOWCASE_OPEN_SETTINGS_EVENT, openShowcaseSettings);
+    window.addEventListener(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT, openBizcardSettings);
+    return () => {
+      window.removeEventListener(SHOWCASE_OPEN_SETTINGS_EVENT, openShowcaseSettings);
+      window.removeEventListener(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT, openBizcardSettings);
+    };
   }, []);
   const [parentalConsentRequest, setParentalConsentRequest] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");

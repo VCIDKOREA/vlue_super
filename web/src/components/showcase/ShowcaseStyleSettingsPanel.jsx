@@ -471,7 +471,7 @@ export default function ShowcaseStyleSettingsPanel({
                     checked={searchPrivacy.isPhoneSearchAllowed}
                     onChange={(e) => onSearchPrivacyToggle("isPhoneSearchAllowed", e.target.checked)}
                   />
-                  전화번호로 검색 허용
+                  전화번호 검색 허용
                 </label>
                 <label className="showcase-privacy-check">
                   <input
@@ -479,7 +479,7 @@ export default function ShowcaseStyleSettingsPanel({
                     checked={searchPrivacy.isNameSearchAllowed}
                     onChange={(e) => onSearchPrivacyToggle("isNameSearchAllowed", e.target.checked)}
                   />
-                  실명으로 검색 허용
+                  실명·상호 검색 허용
                 </label>
                 <label className="showcase-privacy-check">
                   <input
@@ -487,7 +487,7 @@ export default function ShowcaseStyleSettingsPanel({
                     checked={searchPrivacy.isIdSearchAllowed}
                     onChange={(e) => onSearchPrivacyToggle("isIdSearchAllowed", e.target.checked)}
                   />
-                  아이디로 검색·문의 허용
+                  아이디·활동명 검색 허용
                 </label>
               </div>
             ) : null}

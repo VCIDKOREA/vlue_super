@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Settings } from "lucide-react";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
 import ShowcaseIdentityCorner from "./ShowcaseIdentityCorner.jsx";
@@ -40,7 +40,13 @@ export default function ShowcaseCallCarousel({
   onKeypadToast,
   /** false면 실통화 중 등 — 소셜 레일 숨김 */
   socialOverlayEnabled = true,
-  onReport
+  onReport,
+  /** 본인 미리보기 — 장면별 설정 버튼 */
+  showOwnerSettings = false,
+  /** @param {"card"|"showcase"} kind */
+  onOpenSlideSettings,
+  /** @param {"card"|"banner"|"empty-slot"|"paid-identity"|"free-profile"|"free-safe"|string} type */
+  onSlideTypeChange
 }) {
   const [index, setIndex] = useState(0);
   const startX = useRef(0);
@@ -110,6 +116,10 @@ export default function ShowcaseCallCarousel({
     if (cardIdx >= 0 && index !== cardIdx) setIndex(cardIdx);
   }, [keypadOpen, showDigitalCard, slides, index]);
 
+  useEffect(() => {
+    onSlideTypeChange?.(current?.type || "");
+  }, [current?.type, onSlideTypeChange]);
+
   const go = useCallback(
     (dir) => {
       if (!canScroll) return;
@@ -119,10 +129,23 @@ export default function ShowcaseCallCarousel({
   );
 
   const interactiveSelector =
-    "a, input, textarea, select, label, .showcase-call-carousel__nav, .ldr-face-tab, .ldr-front-phone-link--btn, .ldr-contact-row-link, .showcase-social-rail button, .showcase-banner-footer button, .lettering-action";
+    "a, button, input, textarea, select, label, .showcase-call-carousel__nav, .showcase-call-carousel__slide-settings, .ldr-face-tab, .ldr-front-phone-link--btn, .ldr-contact-row-link, .showcase-social-rail, .showcase-banner-footer, .lettering-action";
 
-  const onPointerDown = (e) => {
+  const finishSwipe = useCallback(
+    (clientX) => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      const dx = clientX - startX.current;
+      if (Math.abs(dx) < 36) return;
+      go(dx < 0 ? 1 : -1);
+    },
+    [go]
+  );
+
+  /* capture: 명함 패널 stopPropagation / overflow-y 스크롤이 bubble을 가로채도 스와이프 시작 */
+  const onPointerDownCapture = (e) => {
     if (keypadOpen || !canScroll) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     if (e.target?.closest?.(interactiveSelector)) return;
     dragging.current = true;
     startX.current = e.clientX;
@@ -133,17 +156,35 @@ export default function ShowcaseCallCarousel({
     }
   };
 
-  const onPointerUp = (e) => {
+  const onPointerUpCapture = (e) => {
     if (!dragging.current) return;
-    dragging.current = false;
     try {
       e.currentTarget.releasePointerCapture?.(e.pointerId);
     } catch {
       /* ignore */
     }
-    const dx = e.clientX - startX.current;
-    if (Math.abs(dx) < 36) return;
-    go(dx < 0 ? 1 : -1);
+    finishSwipe(e.clientX);
+  };
+
+  const onTouchStartCapture = (e) => {
+    if (keypadOpen || !canScroll) return;
+    if (e.target?.closest?.(interactiveSelector)) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    dragging.current = true;
+    startX.current = t.clientX;
+  };
+
+  const onTouchEndCapture = (e) => {
+    if (!dragging.current) return;
+    const t = e.changedTouches?.[0];
+    finishSwipe(t?.clientX ?? startX.current);
+  };
+
+  const openSlideSettings = (kind) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onOpenSlideSettings?.(kind);
   };
 
   const photoIndexBase = showDigitalCard ? 1 : 0;
@@ -190,9 +231,14 @@ export default function ShowcaseCallCarousel({
 
       <div
         className={`showcase-call-carousel__viewport${keypadOpen ? " showcase-call-carousel__viewport--keypad" : ""}`}
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
+        onPointerDownCapture={onPointerDownCapture}
+        onPointerUpCapture={onPointerUpCapture}
         onPointerCancel={() => {
+          dragging.current = false;
+        }}
+        onTouchStartCapture={onTouchStartCapture}
+        onTouchEndCapture={onTouchEndCapture}
+        onTouchCancel={() => {
           dragging.current = false;
         }}
       >
@@ -210,6 +256,19 @@ export default function ShowcaseCallCarousel({
               <article key={slide.id} className="showcase-call-carousel__slide">
                 {slide.type === "card" && isPaid ? (
                   <div className="showcase-call-carousel__card">
+                    {showOwnerSettings && !keypadOpen ? (
+                      <button
+                        type="button"
+                        className="showcase-call-carousel__slide-settings"
+                        aria-label="디지털 인증명함 설정"
+                        title="명함 설정"
+                        onClick={openSlideSettings("card")}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+                        설정
+                      </button>
+                    ) : null}
                     <LetteringDigitalReception
                       card={card}
                       verified={verified}
@@ -230,6 +289,19 @@ export default function ShowcaseCallCarousel({
 
                 {slide.type === "banner" && isPaid ? (
                   <div className="showcase-call-carousel__banner">
+                    {showOwnerSettings && !keypadOpen ? (
+                      <button
+                        type="button"
+                        className="showcase-call-carousel__slide-settings showcase-call-carousel__slide-settings--banner"
+                        aria-label="블루 쇼케이스 설정"
+                        title="쇼케이스 설정"
+                        onClick={openSlideSettings("showcase")}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+                        설정
+                      </button>
+                    ) : null}
                     <img src={slide.url} alt="" className="showcase-call-carousel__banner-img" draggable={false} />
                     <div className="showcase-call-carousel__banner-veil" aria-hidden />
                     {socialOverlayEnabled && v1AppShell.showcaseSocialOverlay && !keypadOpen ? (
@@ -266,6 +338,19 @@ export default function ShowcaseCallCarousel({
 
                 {slide.type === "empty-slot" ? (
                   <div className="showcase-call-carousel__banner showcase-call-carousel__banner--empty">
+                    {showOwnerSettings && !keypadOpen ? (
+                      <button
+                        type="button"
+                        className="showcase-call-carousel__slide-settings showcase-call-carousel__slide-settings--banner"
+                        aria-label="블루 쇼케이스 설정"
+                        title="쇼케이스 설정"
+                        onClick={openSlideSettings("showcase")}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+                        설정
+                      </button>
+                    ) : null}
                     <div className="showcase-call-carousel__paid-sheet-stage" aria-hidden />
                     <div className="showcase-call-carousel__banner-veil" aria-hidden />
                     <p className="showcase-call-carousel__banner-caption showcase-call-carousel__banner-caption--empty">

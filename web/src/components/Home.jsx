@@ -111,15 +111,8 @@ const CATEGORY_CONFIG = [
   { id: "medical", label: "의료", emoji: "🏥", tone: "from-cyan-500 to-blue-600", subcats: ["종합병원", "대학병원", "요양병원", "소아과", "내과", "외과", "피부과", "성형외과"] }
 ];
 
-const CATEGORY_BUSINESSES = [
-  { id: "biz-food-1", categoryId: "food", subcat: "커피", name: "소울 커피 로스터스", popular: 97, distance: 0.2, rating: 4.9, likes: 2210, roomId: "subscribe:soul-cafe", phone: "0212345678", address: "서울 강남구 테헤란로 12", intro: "스페셜티 원두와 브런치가 강점인 카페", menu: ["시그니처 라떼", "플랫화이트", "바질 샌드위치"], img: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=900&q=80" },
-  { id: "biz-food-2", categoryId: "food", subcat: "중식", name: "청담 만리장성", popular: 88, distance: 0.8, rating: 4.6, likes: 980, roomId: "friends:friend-kim", phone: "0277771111", address: "서울 강남구 청담동 100", intro: "직화 짜장과 탕수육이 인기인 중식당", menu: ["유니짜장", "탕수육", "고추잡채"], img: "https://images.unsplash.com/photo-1583032015879-e5022cb87c3b?w=900&q=80" },
-  { id: "biz-beauty-1", categoryId: "beautyFashion", subcat: "미용실", name: "청담 헤어 라운지", popular: 98, distance: 0.3, rating: 4.9, likes: 1240, roomId: "subscribe:blue-repair", phone: "0211112222", address: "서울 강남구 청담로 21", intro: "예약 기반 프리미엄 헤어 디자인", menu: ["컷/펌", "컬러", "클리닉"], img: "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=900&q=80" },
-  { id: "biz-edu-1", categoryId: "education", subcat: "영수학원", name: "강남 영수 에이스", popular: 90, distance: 1.4, rating: 4.7, likes: 760, roomId: "friends:brother", phone: "0233334444", address: "서울 강남구 역삼동 77", intro: "초중고 영수 집중 코칭", menu: ["중등 수학", "고등 영어", "내신 대비"], img: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=900&q=80" },
-  { id: "biz-repair-1", categoryId: "repair", subcat: "자동차정비", name: "블루 모터스", popular: 95, distance: 0.6, rating: 4.8, likes: 1120, roomId: "subscribe:blue-repair", phone: "0244445555", address: "서울 강남구 논현로 90", intro: "국산/수입차 경정비 전문", menu: ["엔진오일", "브레이크 점검", "타이어 정렬"], img: "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=900&q=80" },
-  { id: "biz-recruit-1", categoryId: "recruit", subcat: "공식 채용정보", name: "커리어 센터", popular: 89, distance: 1.2, rating: 4.7, likes: 680, roomId: "subscribe:career-center", phone: "0255556666", address: "서울 강남구 선릉로 55", intro: "공식 채용공고와 면접 매칭 지원", menu: ["채용 상담", "이력서 코칭", "면접 대비"], img: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=900&q=80" },
-  { id: "biz-med-1", categoryId: "medical", subcat: "내과", name: "강남 메디컬 내과", popular: 94, distance: 0.5, rating: 4.8, likes: 920, roomId: "work:park", phone: "0266667777", address: "서울 강남구 강남대로 130", intro: "건강검진과 만성질환 진료 중심", menu: ["검진센터", "내과진료", "영양수액"], img: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=900&q=80" }
-];
+/** 카테고리 보드 — 데모 업체 제거. 실노출은 categoryExposedPosts만 */
+const CATEGORY_BUSINESSES = [];
 const LOCAL_STORES_BASE = [
   {
     id: "l1",
@@ -593,8 +586,11 @@ function Home({
     return filteredBusinesses.slice(start, start + DASHBOARD_PAGE_SIZE);
   }, [filteredBusinesses, categoryBoardPage]);
   const selectedBusiness = useMemo(
-    () => CATEGORY_BUSINESSES.find((b) => b.id === selectedBusinessId) || null,
-    [selectedBusinessId]
+    () =>
+      filteredBusinesses.find((b) => b.id === selectedBusinessId) ||
+      categoryExposedPosts.find((b) => b.id === selectedBusinessId) ||
+      null,
+    [filteredBusinesses, categoryExposedPosts, selectedBusinessId]
   );
   const localStores = useMemo(() => {
     const base = layoutHotPlaces?.length

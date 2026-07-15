@@ -17,6 +17,22 @@ export async function syncShowcaseTagsToServer(tags = []) {
 }
 
 /**
+ * 검색어로 API mode 추론
+ * @returns {'hashtag'|'phone'|'name'|'id'|null} null = 로컬/업종만
+ */
+export function detectShowcaseSearchMode(query) {
+  const q = String(query || "").trim();
+  if (!q) return null;
+  if (q.includes("#") || /^#[\w가-힣]+/i.test(q)) return "hashtag";
+  const digits = q.replace(/\D/g, "");
+  const nonDigit = q.replace(/[\d\s\-()+.]/g, "");
+  if (digits.length >= 9 && nonDigit.length <= 2) return "phone";
+  if (q.startsWith("@") || /^[a-zA-Z][a-zA-Z0-9._-]{1,31}$/.test(q)) return "id";
+  if (q.length >= 2) return "name";
+  return null;
+}
+
+/**
  * V1 — 쇼케이스 검색 (인증 필수 · 상호주의 · 마스킹)
  * @param {string} query
  * @param {{ mode?: 'hashtag'|'phone'|'name'|'id' }} [opts]
@@ -24,7 +40,7 @@ export async function syncShowcaseTagsToServer(tags = []) {
 export async function searchShowcaseByTag(query, opts = {}) {
   const q = String(query || "").trim();
   if (!q) return { ok: true, items: [] };
-  const mode = opts.mode || "hashtag";
+  const mode = opts.mode || detectShowcaseSearchMode(q) || "hashtag";
   try {
     const params = new URLSearchParams({ q, mode });
     const res = await vlueAuthFetch(apiUrl(`/api/lettering/showcase/tags/search?${params}`));

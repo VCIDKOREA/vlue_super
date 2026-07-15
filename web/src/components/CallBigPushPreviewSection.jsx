@@ -7,11 +7,8 @@ import {
   VLUE_SHOWCASE_DEMO_RECORDING_SEC
 } from "../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
-import { showcasePreviewLabel, VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
-import {
-  SHOWCASE_OPEN_SETTINGS_EVENT,
-  SHOWCASE_STYLE_CHANGED_EVENT
-} from "../lib/showcase/showcaseStyleStorage.js";
+import { VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
+import { SHOWCASE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_BIZCARD_CHANGED_EVENT } from "../lib/letteringBizcardStorage.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import {
@@ -88,13 +85,6 @@ export default function CallBigPushPreviewSection({
   const incomingNumber = card.phone || "";
   const useFullscreenPortal = expanded;
 
-  const openSettings = () => {
-    setExpanded(false);
-    window.setTimeout(() => {
-      window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
-    }, 40);
-  };
-
   const notificationProps = {
     verified: true,
     previewMode: true,
@@ -116,7 +106,6 @@ export default function CallBigPushPreviewSection({
     onToast
   };
 
-  const titleCls = isDarkMode ? "text-[12px] font-black text-slate-100" : "text-[12px] font-black text-slate-900";
   const tabTrackCls = isDarkMode ? "flex gap-1 rounded-full bg-slate-800 p-1" : "flex gap-1 rounded-full bg-slate-100 p-1";
   const statusOnCls = isDarkMode
     ? "border border-blue-400/35 bg-blue-500/20 text-blue-100"
@@ -130,19 +119,6 @@ export default function CallBigPushPreviewSection({
       className={`mx-auto w-full max-w-md px-0 pb-0 pt-0 ${className}`.trim()}
       aria-label={VLUE_SHOWCASE.nameEn}
     >
-      <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
-        <div>
-          <p className={titleCls}>{showcasePreviewLabel()}</p>
-        </div>
-        <button
-          type="button"
-          onClick={openSettings}
-          className="shrink-0 rounded-full bg-blue-600 px-3 py-1.5 text-[10px] font-black text-white shadow-sm active:scale-95"
-        >
-          스타일 설정
-        </button>
-      </div>
-
       {showTierTabs ? (
         <div className="mb-1.5 space-y-1.5">
           <div className={tabTrackCls} role="tablist" aria-label="쇼케이스 켜짐 꺼짐">

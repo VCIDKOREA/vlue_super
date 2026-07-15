@@ -1,5 +1,5 @@
 /**
- * V1 쇼케이스 검색 서비스 — 프라이버시 마스킹 + 해시태그/이름/전화/ID 쿼리
+ * V1 쇼케이스 검색 서비스 — 프라이버시 마스킹 + 해시태그/이름·상호/전화/ID·활동명 쿼리
  * PII는 허용 플래그가 true일 때만 응답에 포함 (DB에서 꺼낼 때부터 가공)
  */
 import { prisma } from "../../db/client.js";
@@ -55,7 +55,7 @@ type UserSearchRow = {
 };
 
 /**
- * 본인인증 + 쇼케이스 유무로 has_active_showcase 동기화
+ * 본인인증 + 쇼케이스/명함/검색공개로 has_active_showcase 동기화
  */
 export async function refreshHasActiveShowcase(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({
@@ -66,16 +66,22 @@ export async function refreshHasActiveShowcase(userId: string): Promise<boolean>
       status: true,
       showcaseTags: true,
       hasActiveShowcase: true,
+      isPhoneSearchAllowed: true,
+      isNameSearchAllowed: true,
+      isIdSearchAllowed: true,
       digitalCard: { select: { id: true } }
     }
   });
   if (!user) return false;
 
+  const searchableOptIn =
+    user.isPhoneSearchAllowed || user.isNameSearchAllowed || user.isIdSearchAllowed;
+
   const eligible =
     user.identityVerified &&
     user.accountStatus === "active" &&
     user.status === "ACTIVE" &&
-    ((user.showcaseTags?.length || 0) > 0 || Boolean(user.digitalCard));
+    ((user.showcaseTags?.length || 0) > 0 || Boolean(user.digitalCard) || searchableOptIn);
 
   if (user.hasActiveShowcase !== eligible) {
     await prisma.user
@@ -98,6 +104,65 @@ function snapOf(u: UserSearchRow): Record<string, unknown> {
   return raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
 }
 
+function digitsOnly(v: unknown): string {
+  return String(v || "").replace(/\D/g, "");
+}
+
+function normalizeKrDigits(d: string): string {
+  if (d.startsWith("82") && d.length >= 10) return `0${d.slice(2)}`;
+  return d;
+}
+
+function phoneMatchesQuery(u: UserSearchRow, queryDigits: string): boolean {
+  if (queryDigits.length < 9) return false;
+  const q = normalizeKrDigits(queryDigits);
+  const candidates = [
+    digitsOnly(u.phoneE164),
+    digitsOnly(snapOf(u).phone),
+    digitsOnly(snapOf(u).phoneE164)
+  ]
+    .map(normalizeKrDigits)
+    .filter(Boolean);
+  return candidates.some((p) => p === q || p.endsWith(q) || q.endsWith(p.slice(-10)) || p.includes(q));
+}
+
+function nameOrOrgMatches(u: UserSearchRow, needle: string): boolean {
+  const n = needle.toLowerCase();
+  const snap = snapOf(u);
+  const fields = [
+    u.legalName,
+    u.businessProfile?.companyName,
+    snap.organization,
+    snap.name,
+    snap.displayName,
+    snap.companyName
+  ];
+  return fields.some((f) => String(f || "").toLowerCase().includes(n));
+}
+
+function idOrActivityMatches(u: UserSearchRow, needle: string): boolean {
+  const n = needle.replace(/^@/, "").toLowerCase();
+  if (n.length < 2) return false;
+  const snap = snapOf(u);
+  const handle = String(u.publicHandle || "")
+    .replace(/^@/, "")
+    .toLowerCase();
+  if (handle && (handle === n || handle.includes(n) || n.includes(handle))) return true;
+  const activity = [
+    snap.activityName,
+    snap.activityDisplayName,
+    snap.displayName,
+    snap.nickname,
+    snap.handle
+  ];
+  return activity.some((f) => {
+    const s = String(f || "")
+      .replace(/^@/, "")
+      .toLowerCase();
+    return Boolean(s) && (s === n || s.includes(n));
+  });
+}
+
 /**
  * Case A/B 마스킹 — 허용되지 않은 PII는 응답에 절대 넣지 않음
  */
@@ -107,15 +172,16 @@ export function maskShowcaseHit(u: UserSearchRow): MaskedShowcaseHit {
   const nameAllowed = Boolean(u.isNameSearchAllowed);
   const idAllowed = Boolean(u.isIdSearchAllowed);
 
-  const rawName = String(u.legalName || snap.name || "").trim();
+  const rawName = String(u.legalName || snap.name || snap.displayName || "").trim();
   const rawPhone = String(u.phoneE164 || snap.phone || "").trim();
-  const handle = String(u.publicHandle || "").trim();
+  const handle = String(u.publicHandle || snap.handle || "").trim();
+  const org = String(u.businessProfile?.companyName || snap.organization || "").trim();
 
   return {
     userId: u.id,
     tags: u.showcaseTags || [],
     membershipTier: u.digitalCard?.membershipTierSnapshot || "free",
-    organization: String(u.businessProfile?.companyName || snap.organization || ""),
+    organization: nameAllowed ? org : "",
     title: String(u.businessProfile?.jobTitle || snap.title || ""),
     logoUrl: String(snap.logoUrl || ""),
     displayName: nameAllowed && rawName ? rawName : MASKED_NAME,
@@ -200,24 +266,41 @@ export async function searchByHashtag(query: string, limit = 24): Promise<Masked
  */
 export async function searchByPhone(rawPhone: string, limit = 12): Promise<MaskedShowcaseHit[]> {
   const e164 = normalizeToE164KR(rawPhone);
-  if (!e164) return [];
+  const queryDigits = digitsOnly(rawPhone);
+  if (!e164 && queryDigits.length < 9) return [];
 
-  const users = (await prisma.user.findMany({
-    where: {
-      ...baseTargetWhere(),
-      isPhoneSearchAllowed: true,
-      phoneE164: e164
-    },
-    select: searchSelect,
-    take: limit
-  })) as UserSearchRow[];
+  let users: UserSearchRow[] = [];
+  if (e164) {
+    users = (await prisma.user.findMany({
+      where: {
+        ...baseTargetWhere(),
+        isPhoneSearchAllowed: true,
+        phoneE164: e164
+      },
+      select: searchSelect,
+      take: limit
+    })) as UserSearchRow[];
+  }
+
+  if (!users.length && queryDigits.length >= 9) {
+    const candidates = (await prisma.user.findMany({
+      where: {
+        ...baseTargetWhere(),
+        isPhoneSearchAllowed: true
+      },
+      select: searchSelect,
+      take: 200
+    })) as UserSearchRow[];
+    users = candidates.filter((u) => phoneMatchesQuery(u, queryDigits)).slice(0, limit);
+  }
 
   const paid = await filterPaidTargets(users);
   return paid.map(maskShowcaseHit);
 }
 
 /**
- * 실명 검색 — isNameSearchAllowed=true 대상만
+ * 실명·상호 검색 — isNameSearchAllowed=true 대상만
+ * legalName + businessProfile.companyName + 명함 스냅샷 상호/성명
  */
 export async function searchByName(rawName: string, limit = 24): Promise<MaskedShowcaseHit[]> {
   const name = String(rawName || "").trim();
@@ -227,18 +310,41 @@ export async function searchByName(rawName: string, limit = 24): Promise<MaskedS
     where: {
       ...baseTargetWhere(),
       isNameSearchAllowed: true,
-      legalName: { contains: name, mode: "insensitive" }
+      OR: [
+        { legalName: { contains: name, mode: "insensitive" } },
+        { businessProfile: { companyName: { contains: name, mode: "insensitive" } } }
+      ]
     },
     select: searchSelect,
     take: 80
   })) as UserSearchRow[];
+
+  /* 스냅샷 상호/성명만 있는 경우 — 허용 플래그 대상 중 추가 매칭 */
+  const extraPool = (await prisma.user.findMany({
+    where: {
+      ...baseTargetWhere(),
+      isNameSearchAllowed: true,
+      digitalCard: { isNot: null }
+    },
+    select: searchSelect,
+    take: 120
+  })) as UserSearchRow[];
+
+  const seen = new Set(users.map((u) => u.id));
+  for (const u of extraPool) {
+    if (seen.has(u.id)) continue;
+    if (nameOrOrgMatches(u, name)) {
+      users.push(u);
+      seen.add(u.id);
+    }
+  }
 
   const paid = await filterPaidTargets(users);
   return paid.slice(0, limit).map(maskShowcaseHit);
 }
 
 /**
- * 플랫폼 ID(publicHandle) 검색 — isIdSearchAllowed=true 대상만
+ * 아이디·활동명 검색 — isIdSearchAllowed=true 대상만
  */
 export async function searchByPublicId(rawId: string, limit = 12): Promise<MaskedShowcaseHit[]> {
   const handle = String(rawId || "")
@@ -247,7 +353,7 @@ export async function searchByPublicId(rawId: string, limit = 12): Promise<Maske
     .toLowerCase();
   if (handle.length < 2) return [];
 
-  const users = (await prisma.user.findMany({
+  const exact = (await prisma.user.findMany({
     where: {
       ...baseTargetWhere(),
       isIdSearchAllowed: true,
@@ -257,8 +363,27 @@ export async function searchByPublicId(rawId: string, limit = 12): Promise<Maske
     take: limit
   })) as UserSearchRow[];
 
-  const paid = await filterPaidTargets(users);
-  return paid.map(maskShowcaseHit);
+  const candidates = (await prisma.user.findMany({
+    where: {
+      ...baseTargetWhere(),
+      isIdSearchAllowed: true
+    },
+    select: searchSelect,
+    take: 120
+  })) as UserSearchRow[];
+
+  const seen = new Set(exact.map((u) => u.id));
+  const merged = [...exact];
+  for (const u of candidates) {
+    if (seen.has(u.id)) continue;
+    if (idOrActivityMatches(u, handle)) {
+      merged.push(u);
+      seen.add(u.id);
+    }
+  }
+
+  const paid = await filterPaidTargets(merged);
+  return paid.slice(0, limit).map(maskShowcaseHit);
 }
 
 export type PrivacyPatch = {
@@ -290,7 +415,7 @@ export async function updateSearchPrivacy(userId: string, patch: PrivacyPatch) {
     });
     return cur;
   }
-  return prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id: userId },
     data,
     select: {
@@ -300,6 +425,11 @@ export async function updateSearchPrivacy(userId: string, patch: PrivacyPatch) {
       hasActiveShowcase: true
     }
   });
+  await markShowcaseActiveIfEligible(userId);
+  return {
+    ...updated,
+    hasActiveShowcase: await refreshHasActiveShowcase(userId)
+  };
 }
 
 export async function getSearchPrivacy(userId: string) {

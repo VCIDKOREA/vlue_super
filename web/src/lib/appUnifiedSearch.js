@@ -74,15 +74,6 @@ const MAIN_DISCOVER = [
   { id: "rec-1", title: "강남역 야경 카페 5곳", subtitle: "추천 활동", keywords: ["카페", "야경"] },
   { id: "rec-2", title: "이번 주 핫한 보안 트렌드", subtitle: "추천 활동", keywords: ["보안"] },
   { id: "rec-3", title: "역삼 골목 맛집 지도", subtitle: "추천 활동", keywords: ["맛집", "역삼"] },
-  { id: "local-1", title: "청담 헤어 라운지", subtitle: "우리 동네 핫플", keywords: ["청담", "헤어"] },
-  { id: "local-2", title: "역삼 브런치 하우스", subtitle: "우리 동네 핫플", keywords: ["브런치"] },
-  { id: "local-3", title: "강남 필라테스", subtitle: "우리 동네 핫플", keywords: ["필라테스"] },
-  { id: "local-4", title: "논현 꽃집 블루", subtitle: "우리 동네 핫플", keywords: ["꽃", "논현"] },
-  { id: "upd-soul", title: "Soul Cafe", subtitle: "업데이트 · 구독", keywords: ["소울", "카페"] },
-  { id: "upd-blue", title: "블루정비", subtitle: "업데이트 · 구독", keywords: ["정비", "역삼"] },
-  { id: "upd-cc", title: "커리어센터", subtitle: "업데이트 · 구독", keywords: ["채용", "강남"] },
-  { id: "upd-kim", title: "김친구", subtitle: "업데이트 · 친구", keywords: [] },
-  { id: "upd-bro", title: "동생", subtitle: "업데이트 · 친구", keywords: [] }
 ];
 
 function staticScreens(membershipTier) {

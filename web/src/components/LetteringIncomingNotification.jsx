@@ -32,6 +32,7 @@ import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
+import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../lib/letteringBizcardStorage.js";
 import "../styles/showcase-call-glass.css";
 import "../styles/incall-controls.css";
 
@@ -214,6 +215,7 @@ export default function LetteringIncomingNotification({
   const [receptionFace, setReceptionFace] = useState("front");
   const [guideToast, setGuideToast] = useState("");
   const [dialOpen, setDialOpen] = useState(false);
+  const [carouselSlideType, setCarouselSlideType] = useState(includeDigitalCard ? "card" : "banner");
   const [knownContact, setKnownContact] = useState(() => ({
     isKnownContact: Boolean(savedContactName),
     matchedName: savedContactName || "",
@@ -243,6 +245,30 @@ export default function LetteringIncomingNotification({
       onExpandedChange?.(next);
     },
     [expandedProp, onExpandedChange]
+  );
+
+  const openOwnerSettings = useCallback(
+    (kind) => {
+      const settingsKind =
+        kind === "card" || kind === "showcase"
+          ? kind
+          : carouselSlideType === "card"
+            ? "card"
+            : "showcase";
+      if (expanded) {
+        if (typeof onExpandedChange === "function") onExpandedChange(false);
+        else if (typeof onEndCall === "function") onEndCall();
+        else setExpanded(false);
+      }
+      window.setTimeout(() => {
+        if (settingsKind === "card") {
+          window.dispatchEvent(new Event(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT));
+        } else {
+          window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
+        }
+      }, 40);
+    },
+    [carouselSlideType, expanded, onExpandedChange, onEndCall, setExpanded]
   );
 
   const toggle = () => {
@@ -736,7 +762,7 @@ export default function LetteringIncomingNotification({
       >
         <div className="lettering-live-bar__left">
           <LetteringLiveIndicator />
-          <span className="lettering-live-bar__brand">{previewMode ? "쇼케이스 미리보기" : "VLUE 작동중"}</span>
+          <span className="lettering-live-bar__brand">{previewMode ? "내 쇼케이스" : "VLUE 작동중"}</span>
         </div>
         {previewStatusLabel ? (
           <span className="lettering-live-bar__status">{previewStatusLabel}</span>
@@ -829,18 +855,11 @@ export default function LetteringIncomingNotification({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                /* 전체화면 미리보기가 설정 시트를 가리므로 먼저 접고 설정 오픈 */
-                if (isExpandedView) {
-                  if (typeof onExpandedChange === "function") onExpandedChange(false);
-                  else if (typeof onEndCall === "function") onEndCall();
-                }
-                window.setTimeout(() => {
-                  window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
-                }, 40);
+                openOwnerSettings(carouselSlideType === "card" ? "card" : "showcase");
               }}
               className="lettering-owner-settings-btn inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-blue-600 px-2.5 text-[11px] font-black text-white shadow-sm active:scale-95"
-              aria-label="쇼케이스 스타일 설정"
-              title="본인만 보이는 설정"
+              aria-label={carouselSlideType === "card" ? "디지털 인증명함 설정" : "블루 쇼케이스 설정"}
+              title={carouselSlideType === "card" ? "명함 설정" : "쇼케이스 설정"}
             >
               <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
               설정
@@ -888,6 +907,9 @@ export default function LetteringIncomingNotification({
                       onKeypadToast={showGuide}
                       socialOverlayEnabled={socialOverlayEnabled}
                       onReport={handleReport}
+                      showOwnerSettings={Boolean(previewMode && showOwnerSettings)}
+                      onOpenSlideSettings={openOwnerSettings}
+                      onSlideTypeChange={setCarouselSlideType}
                     />
                   ) : keypadOpen ? (
                     <InCallDtmfPad
@@ -946,6 +968,9 @@ export default function LetteringIncomingNotification({
                       onKeypadToast={showGuide}
                       socialOverlayEnabled={socialOverlayEnabled}
                       onReport={handleReport}
+                      showOwnerSettings={Boolean(previewMode && showOwnerSettings)}
+                      onOpenSlideSettings={openOwnerSettings}
+                      onSlideTypeChange={setCarouselSlideType}
                     />
                   ) : (
                     <LetteringDigitalReception

@@ -22,11 +22,17 @@
 
 ## 프라이버시 필드 (기본 false)
 
-- `is_phone_search_allowed` — 전화 다이렉트 검색 노출
-- `is_name_search_allowed` — 실명 검색·리스트 이름
-- `is_id_search_allowed` — 핸들 문의 CTA
+- `is_phone_search_allowed` — 전화번호 검색 허용
+- `is_name_search_allowed` — 실명·상호 검색 허용 (legalName + companyName + 명함 스냅샷)
+- `is_id_search_allowed` — 아이디·활동명 검색 허용 (publicHandle + 활동 표시명)
 
-### 해시태그 리스트 마스킹
+검색 공개를 켜면 `has_active_showcase`가 갱신되어 검색 대상·검색자 자격에 반영된다.
+
+### 홈 검색 UI
+
+`HomeBizDirectorySearch`가 검색어로 mode를 추론해
+`GET /api/lettering/showcase/tags/search?q=&mode=hashtag|phone|name|id` 를 호출한다.
+데모 업체 디렉터리는 비어 있으며, 실결과만 표시한다.
 
 | Case | 이름 | 전화 | CTA |
 |------|------|------|-----|

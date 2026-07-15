@@ -5,7 +5,10 @@ import {
   searchBusinessDirectory,
   suggestIndustries
 } from "../lib/homeBizDirectory.js";
-import { searchShowcaseByTag } from "../lib/showcase/showcaseTagsApi.js";
+import {
+  detectShowcaseSearchMode,
+  searchShowcaseByTag
+} from "../lib/showcase/showcaseTagsApi.js";
 import LetteringBusinessCardPanel from "./LetteringBusinessCardPanel.jsx";
 import LetteringBizcardScaledPreview from "./LetteringBizcardScaledPreview.jsx";
 import LetteringBizcardSecureFrame from "./LetteringBizcardSecureFrame.jsx";
@@ -65,6 +68,74 @@ function ResultSortBar({ sort, onSortChange }) {
   );
 }
 
+function modeLabel(mode) {
+  if (mode === "phone") return "전화번호";
+  if (mode === "name") return "실명·상호";
+  if (mode === "id") return "아이디·활동명";
+  if (mode === "hashtag") return "해시태그";
+  return "쇼케이스";
+}
+
+function mapApiHitToBiz(hit, i, mode) {
+  const displayName = hit.displayName || hit.name || "";
+  const phone = hit.phoneVisible ? hit.phone || "" : "";
+  const nameOk = hit.nameVisible !== false && displayName && displayName !== "비공개 회원";
+  const org = String(hit.organization || "").trim();
+  const titleName = org || (nameOk ? displayName : displayName || "비공개 회원");
+  const handle = hit.publicHandle || "";
+  const card =
+    nameOk || phone || org
+      ? {
+          name: nameOk ? displayName : "",
+          displayName: nameOk ? displayName : "",
+          organization: org,
+          phone,
+          title: hit.title || "",
+          logoUrl: hit.logoUrl || "",
+          membershipTier: hit.membershipTier || "paid",
+          feedId: hit.userId ? `user-${hit.userId}` : "",
+          userId: hit.userId || ""
+        }
+      : null;
+
+  return {
+    id: `api-${hit.userId || phone || handle || i}`,
+    categoryId: "showcase",
+    categoryLabel: "쇼케이스·명함",
+    subcat: modeLabel(mode),
+    name: titleName,
+    popular: 90,
+    distance: 0,
+    rating: 5,
+    likes: 0,
+    roomId: null,
+    phone,
+    phoneVisible: Boolean(hit.phoneVisible),
+    idInquiryEnabled: Boolean(hit.idInquiryEnabled),
+    publicHandle: handle,
+    address: "",
+    intro:
+      (hit.tags || []).join(" ") ||
+      [org, nameOk ? displayName : "", handle ? `@${handle}` : ""].filter(Boolean).join(" · ") ||
+      "검색 공개된 쇼케이스",
+    menu: [],
+    showcaseTags: hit.tags || [],
+    img:
+      hit.logoUrl ||
+      "data:image/svg+xml," +
+        encodeURIComponent(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="112" height="112"><rect fill="#e2e8f0" width="112" height="112"/><text x="56" y="62" text-anchor="middle" fill="#64748b" font-size="28" font-family="sans-serif">${String(
+            titleName
+          )
+            .slice(0, 1)
+            .toUpperCase()}</text></svg>`
+        ),
+    publicExposure: true,
+    card,
+    userId: hit.userId || ""
+  };
+}
+
 export default function HomeBizDirectorySearch({
   categoryExposedPosts = [],
   onOpenBusinessRoom
@@ -74,7 +145,10 @@ export default function HomeBizDirectorySearch({
   const [resultsOpen, setResultsOpen] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [stuck, setStuck] = useState(false);
-  const [tagHits, setTagHits] = useState([]);
+  const [apiHits, setApiHits] = useState([]);
+  const [apiMode, setApiMode] = useState(null);
+  const [apiSearching, setApiSearching] = useState(false);
+  const [apiError, setApiError] = useState("");
   const stickySentinelRef = useRef(null);
 
   const localResults = useMemo(
@@ -83,38 +157,12 @@ export default function HomeBizDirectorySearch({
   );
 
   const results = useMemo(() => {
-    if (!tagHits.length) return localResults;
-    const mapped = tagHits.map((hit, i) => {
-      const displayName = hit.displayName || hit.name || "";
-      const phone = hit.phoneVisible ? hit.phone || "" : "";
-      const nameOk = hit.nameVisible !== false && displayName && displayName !== "비공개 회원";
-      return {
-        id: `tag-${hit.userId || phone || i}`,
-        categoryId: "showcase",
-        categoryLabel: "쇼케이스",
-        subcat: "해시태그",
-        name: hit.organization || (nameOk ? displayName : displayName || "비공개 회원"),
-        popular: 90,
-        distance: 0,
-        rating: 5,
-        likes: 0,
-        roomId: null,
-        phone,
-        phoneVisible: Boolean(hit.phoneVisible),
-        idInquiryEnabled: Boolean(hit.idInquiryEnabled),
-        publicHandle: hit.publicHandle || "",
-        address: "",
-        intro: (hit.tags || []).join(" ") || "해시태그 매칭 쇼케이스",
-        menu: [],
-        showcaseTags: hit.tags || [],
-        img: hit.logoUrl || "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=900&q=80",
-        publicExposure: true,
-        card: null
-      };
-    });
-    const seen = new Set(localResults.map((b) => b.id));
-    return [...mapped.filter((m) => !seen.has(m.id)), ...localResults];
-  }, [localResults, tagHits]);
+    const mapped = apiHits.map((hit, i) => mapApiHitToBiz(hit, i, apiMode));
+    if (!mapped.length) return localResults;
+    const seen = new Set(mapped.map((b) => b.id));
+    const localExtra = localResults.filter((b) => !seen.has(b.id) && !seen.has(`api-${b.userId}`));
+    return [...mapped, ...localExtra];
+  }, [localResults, apiHits, apiMode]);
 
   const suggestions = useMemo(() => suggestIndustries(query), [query]);
 
@@ -129,16 +177,24 @@ export default function HomeBizDirectorySearch({
 
   useEffect(() => {
     const q = query.trim();
-    if (!resultsOpen || !q.includes("#")) {
-      setTagHits([]);
+    const mode = detectShowcaseSearchMode(q);
+    if (!resultsOpen || !mode) {
+      setApiHits([]);
+      setApiMode(null);
+      setApiError("");
+      setApiSearching(false);
       return undefined;
     }
     let cancelled = false;
+    setApiSearching(true);
     const timer = setTimeout(() => {
-      searchShowcaseByTag(q).then((res) => {
+      searchShowcaseByTag(q, { mode }).then((res) => {
         if (cancelled) return;
+        setApiSearching(false);
         if (!res.ok) {
-          setTagHits([]);
+          setApiHits([]);
+          setApiMode(mode);
+          setApiError(res.error || "검색에 실패했습니다.");
           if (typeof window !== "undefined") {
             window.dispatchEvent(
               new CustomEvent("vlue-showcase-search-auth", {
@@ -153,7 +209,9 @@ export default function HomeBizDirectorySearch({
           }
           return;
         }
-        setTagHits(res.items || []);
+        setApiError("");
+        setApiMode(res.mode || mode);
+        setApiHits(res.items || []);
       });
     }, 280);
     return () => {
@@ -190,6 +248,15 @@ export default function HomeBizDirectorySearch({
     setResultsOpen(true);
     setSelectedId("");
   };
+
+  const emptyMessage = (() => {
+    if (apiSearching) return "검색 중…";
+    if (apiError) return apiError;
+    if (query.trim()) {
+      return "검색 결과가 없습니다. 상대가 검색 공개를 허용했는지, 본인 쇼케이스가 활성화됐는지 확인해 보세요.";
+    }
+    return "검색어를 입력하면 공개된 쇼케이스·명함이 표시됩니다.";
+  })();
 
   return (
     <>
@@ -237,7 +304,11 @@ export default function HomeBizDirectorySearch({
               ) : (
                 <div className="flex items-center gap-2">
                   <p className="min-w-0 flex-1 text-[11px] font-black text-slate-700">
-                    {query.trim() ? `검색 ${results.length}건` : `노출 ${results.length}건`}
+                    {apiSearching
+                      ? "검색 중…"
+                      : query.trim()
+                        ? `검색 ${results.length}건`
+                        : `노출 ${results.length}건`}
                   </p>
                   <ResultSortBar sort={sort} onSortChange={setSort} />
                   <button type="button" onClick={closeResults} className="shrink-0 text-[12px] font-black text-blue-600">
@@ -266,9 +337,7 @@ export default function HomeBizDirectorySearch({
                 <div className="home-biz-search__sheet-body vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto overscroll-contain">
                   {results.length === 0 ? (
                     <div className="mx-2 mb-2 rounded-xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-[12px] font-semibold text-slate-500">
-                      노출 허용된 업체가 없습니다.
-                      <br />
-                      다른 검색어·업종을 시도해 보세요.
+                      {emptyMessage}
                     </div>
                   ) : (
                     <ul className="px-2 pb-2">
@@ -294,7 +363,11 @@ export default function HomeBizDirectorySearch({
                               <p className="mt-1 text-[10px] font-bold text-slate-400">
                                 {sort === "distance"
                                   ? `${biz.distance}km`
-                                  : `⭐ ${biz.rating} · ❤ ${Number(biz.likes || 0).toLocaleString("ko-KR")}`}
+                                  : biz.phoneVisible && biz.phone
+                                    ? biz.phone
+                                    : biz.publicHandle
+                                      ? `@${biz.publicHandle}`
+                                      : `⭐ ${biz.rating}`}
                               </p>
                             </div>
                           </button>
@@ -307,7 +380,7 @@ export default function HomeBizDirectorySearch({
             ) : selected ? (
               <div className="home-biz-search__sheet-body vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto overscroll-contain px-2">
                 <div className="mb-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                  <div className="h-32 w-full overflow-hidden">
+                  <div className="h-32 w-full overflow-hidden bg-slate-100">
                     <img src={selected.img} alt="" className="h-full w-full object-cover" />
                   </div>
                   <div className="p-3">
@@ -315,7 +388,9 @@ export default function HomeBizDirectorySearch({
                       {selected.categoryLabel} · {selected.subcat}
                     </p>
                     <h3 className="mt-0.5 text-[16px] font-black text-slate-900">{selected.name}</h3>
-                    <p className="mt-1 text-[12px] font-semibold text-slate-600">{selected.address}</p>
+                    {selected.address ? (
+                      <p className="mt-1 text-[12px] font-semibold text-slate-600">{selected.address}</p>
+                    ) : null}
                     <p className="mt-2 text-[12px] leading-relaxed text-slate-700">{selected.intro}</p>
                   </div>
                 </div>
@@ -333,7 +408,9 @@ export default function HomeBizDirectorySearch({
                       </LetteringBizcardSecureFrame>
                     </LetteringBizcardScaledPreview>
                   ) : (
-                    <p className="py-6 text-center text-[11px] text-slate-400">등록된 명함이 없습니다.</p>
+                    <p className="py-6 text-center text-[11px] text-slate-400">
+                      검색 공개 범위에 따라 명함 상세가 제한될 수 있습니다.
+                    </p>
                   )}
                 </div>
 
@@ -349,6 +426,20 @@ export default function HomeBizDirectorySearch({
                     >
                       문의 채팅
                     </button>
+                  ) : selected.idInquiryEnabled && selected.publicHandle ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          navigator.clipboard?.writeText(`@${selected.publicHandle}`);
+                        } catch {
+                          /* noop */
+                        }
+                      }}
+                      className="rounded-xl bg-blue-600 py-2.5 text-[12px] font-black text-white active:opacity-90"
+                    >
+                      @{selected.publicHandle}
+                    </button>
                   ) : (
                     <button
                       type="button"
@@ -360,14 +451,18 @@ export default function HomeBizDirectorySearch({
                   )}
                   <button
                     type="button"
+                    disabled={!selected.phone}
                     onClick={() => {
+                      if (!selected.phone) return;
                       try {
                         window.location.href = `tel:${selected.phone}`;
                       } catch {
                         /* noop */
                       }
                     }}
-                    className="rounded-xl bg-slate-900 py-2.5 text-[12px] font-black text-white active:opacity-90"
+                    className={`rounded-xl py-2.5 text-[12px] font-black active:opacity-90 ${
+                      selected.phone ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-500"
+                    }`}
                   >
                     전화 문의
                   </button>

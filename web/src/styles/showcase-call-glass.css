@@ -406,6 +406,48 @@
   cursor: grabbing;
 }
 
+/* 명함 패널 overflow-y 스크롤이 가로 제스처를 가로채지 않도록 */
+.showcase-call-carousel--paid .showcase-call-carousel__card,
+.showcase-call-carousel--paid .ldr-reception--push,
+.showcase-call-carousel--paid .ldr-reception--push .ldr-panel-wrap,
+.showcase-call-carousel--paid .ldr-reception--push .ldr-panel-stage {
+  touch-action: pan-y;
+}
+
+.showcase-call-carousel--paid .ldr-reception--push .ldr-panel {
+  touch-action: pan-y;
+  overscroll-behavior-x: none;
+}
+
+.showcase-call-carousel__slide-settings {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 0;
+  background: rgba(37, 99, 235, 0.95);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.showcase-call-carousel__slide-settings--banner {
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
 .showcase-call-carousel__meta {
   display: flex;
   align-items: center;
@@ -502,6 +544,7 @@
 
 .showcase-call-carousel__card {
   /* ??? ??? ?? ???????? ? ?? */
+  position: relative;
   flex: 1 1 auto;
   height: 100%;
   min-height: min(62dvh, 560px);

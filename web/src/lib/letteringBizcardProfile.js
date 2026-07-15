@@ -192,6 +192,8 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       logoUrl: ed.noCompanyLogo ? "" : ed.logoDataUrl,
       photoUrl: ed.noProfilePhoto ? "" : ed.photoDataUrl || "",
       membershipTier,
+      userId: userId || "",
+      ownerUserId: userId || "",
       feedId: userId ? `user-${userId}` : "",
       feedType: "personal",
       verificationItems: identity.name ? buildAuthValidityVerificationItems() : []
