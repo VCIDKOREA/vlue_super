@@ -140,6 +140,19 @@ export function parseEmbedVideoUrl(raw) {
     }
 
     if (host.includes("instagram.com")) {
+      const ig = parsed.pathname.match(/^\/(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
+      if (ig?.[2]) {
+        const pathKind = ig[1].toLowerCase() === "reels" ? "reel" : ig[1].toLowerCase();
+        const code = ig[2];
+        return {
+          kind: "instagram",
+          id: code,
+          platform: "instagram",
+          aspectHint: "9:16",
+          isLive: false,
+          embedUrl: `https://www.instagram.com/${pathKind === "reels" ? "reel" : pathKind}/${code}/embed/`
+        };
+      }
       return {
         kind: "instagram",
         id: url,

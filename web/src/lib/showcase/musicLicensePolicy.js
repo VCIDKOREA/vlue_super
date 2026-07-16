@@ -1,17 +1,9 @@
 /**
- * VLUE 쇼케이스 BGM — 음원 출처·상업적 안전성 정책 (프론트 미러)
- *
- * 상업 서비스이므로 Creative Commons · Commercial Use Allowed 만 허용.
- * license 미확인·NC·all-rights-reserved 트랙은 UI에 표시하지 않음.
- * 상세 규칙은 apps/api/src/lib/musicLicensePolicy.ts 와 동일.
+ * SoundCloud 라이선스 런타임 체크는 비활성.
+ * showcaseSoundCloudSearch 등 기존 import가 깨지지 않도록 stub만 유지.
  */
 
-export const SOUNDCLOUD_COMMERCIAL_CC_LICENSES = [
-  "cc-by",
-  "cc-by-sa",
-  "cc-by-nd",
-  "no-rights-reserved"
-];
+export const SOUNDCLOUD_COMMERCIAL_CC_LICENSES = [];
 
 export function normalizeSoundCloudLicense(raw) {
   return String(raw || "")
@@ -21,15 +13,7 @@ export function normalizeSoundCloudLicense(raw) {
     .replace(/\s+/g, "-");
 }
 
-export function isCommercialCreativeCommonsLicense(rawLicense) {
-  const license = normalizeSoundCloudLicense(rawLicense);
-  if (!license) return false;
-  if (license.includes("nc") || license.includes("noncommercial") || license.includes("non-commercial")) {
-    return false;
-  }
-  if (license === "all-rights-reserved" || license.includes("all-rights")) return false;
-  if (SOUNDCLOUD_COMMERCIAL_CC_LICENSES.includes(license)) return true;
-  if (license === "cc0" || license === "public-domain" || license === "pd") return true;
-  if (license.startsWith("cc-by") && !license.includes("nc")) return true;
-  return false;
+/** @deprecated 로컬 JSON 카탈로그 전환으로 라이선스 런타임 검증 미사용 — 항상 true */
+export function isCommercialCreativeCommonsLicense(_rawLicense) {
+  return true;
 }

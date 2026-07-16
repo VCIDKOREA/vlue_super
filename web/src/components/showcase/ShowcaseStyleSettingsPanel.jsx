@@ -365,29 +365,48 @@ export default function ShowcaseStyleSettingsPanel({
             ) : null}
 
             {config.styleType === "instagram" ? (
-              <ProfileRow label="인스타그램" hint="@아이디">
-                <input
-                  className={`showcase-profile-input ${inputCls}`}
-                  placeholder="@아이디"
-                  value={
-                    config.platformFeed?.instagramHandle ||
-                    (config.platformFeed?.instagramProfileUrl
-                      ? `@${String(config.platformFeed.instagramProfileUrl).match(/instagram\.com\/([^/?#]+)/i)?.[1] || ""}`
-                      : "")
-                  }
-                  onChange={(e) => {
-                    let handle = e.target.value.trim();
-                    if (handle && !handle.startsWith("@")) handle = `@${handle}`;
-                    const id = handle.replace(/^@/, "");
-                    persist({
-                      platformFeed: {
-                        instagramHandle: handle,
-                        instagramProfileUrl: id ? `https://instagram.com/${id}` : ""
-                      }
-                    });
-                  }}
-                />
-              </ProfileRow>
+              <>
+                <ProfileRow label="인스타그램" hint="@아이디">
+                  <input
+                    className={`showcase-profile-input ${inputCls}`}
+                    placeholder="@아이디"
+                    value={
+                      config.platformFeed?.instagramHandle ||
+                      (config.platformFeed?.instagramProfileUrl
+                        ? `@${String(config.platformFeed.instagramProfileUrl).match(/instagram\.com\/([^/?#]+)/i)?.[1] || ""}`
+                        : "")
+                    }
+                    onChange={(e) => {
+                      let handle = e.target.value.trim();
+                      if (handle && !handle.startsWith("@")) handle = `@${handle}`;
+                      const id = handle.replace(/^@/, "");
+                      persist({
+                        platformFeed: {
+                          instagramHandle: handle,
+                          instagramProfileUrl: id ? `https://instagram.com/${id}` : ""
+                        }
+                      });
+                    }}
+                  />
+                </ProfileRow>
+                <ProfileRow
+                  label="게시물 임베드"
+                  hint="쇼케이스 박스에 Instagram 원본 표시 · /p/ 또는 /reel/ 링크"
+                >
+                  <input
+                    className={`showcase-profile-input ${inputCls}`}
+                    placeholder="https://www.instagram.com/p/… 또는 /reel/…"
+                    value={config.platformFeed?.instagramPostUrl || ""}
+                    onChange={(e) =>
+                      persist({
+                        platformFeed: {
+                          instagramPostUrl: e.target.value.trim()
+                        }
+                      })
+                    }
+                  />
+                </ProfileRow>
+              </>
             ) : null}
 
             {config.styleType === "rich_custom" ? (

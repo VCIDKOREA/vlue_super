@@ -69,6 +69,8 @@ export function createDefaultShowcaseStyle() {
     platformFeed: {
       instagramHandle: "",
       instagramProfileUrl: "",
+      /** 쇼케이스 박스 Native embed용 — /p/ · /reel/ 게시물 URL */
+      instagramPostUrl: "",
       instagramAvatarUrl: "",
       kakaoProfileTitle: "",
       kakaoProfileUrl: "",

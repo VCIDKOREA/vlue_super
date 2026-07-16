@@ -23,8 +23,8 @@ export const SHOWCASE_STYLE_TYPES = {
   instagram: {
     id: "instagram",
     label: "인스타그램",
-    desc: "인스타 프로필 연동",
-    shortDesc: "인스타그램 프로필·사진 피드 스타일",
+    desc: "인스타 게시물 Native 임베드",
+    shortDesc: "게시물·릴스 URL을 쇼케이스 박스에 원본 표시",
     emoji: "📷",
     accent: "#E1306C",
     bgmSource: "platform",

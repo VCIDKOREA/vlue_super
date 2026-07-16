@@ -4,6 +4,7 @@ import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
 import ShowcaseIdentityCorner from "./ShowcaseIdentityCorner.jsx";
 import ShowcaseBannerSocialLayer from "./ShowcaseBannerSocialLayer.jsx";
+import ShowcaseInstagramEmbed from "./ShowcaseInstagramEmbed.jsx";
 import InCallDtmfPad from "../call/InCallDtmfPad.jsx";
 import {
   maxShowcasePhotosForTier,
@@ -11,6 +12,10 @@ import {
   USER_TIERS
 } from "../../lib/showcase/tentShowcaseTypes.js";
 import { resolvePaidShowcaseBanners } from "../../lib/showcase/demoShowcaseBanners.js";
+import {
+  pickInstagramEmbedSourceUrl,
+  shouldUseInstagramEmbedMode
+} from "../../lib/showcase/instagramEmbed.js";
 import { v1AppShell } from "../../lib/v1ReleaseScope.js";
 
 /**
@@ -46,8 +51,11 @@ export default function ShowcaseCallCarousel({
   /** @param {"card"|"showcase"} kind */
   onOpenSlideSettings,
   /** @param {"card"|"banner"|"empty-slot"|"paid-identity"|"free-profile"|"free-safe"|string} type */
-  onSlideTypeChange
+  onSlideTypeChange,
+  /** 쇼케이스 스타일 — Instagram 게시물 URL 있으면 Native embed 자동 ON */
+  showcaseStyle = null
 }) {
+  const styleConfig = showcaseStyle || card?.showcaseStyle || null;
   const [index, setIndex] = useState(0);
   const startX = useRef(0);
   const dragging = useRef(false);
@@ -68,6 +76,11 @@ export default function ShowcaseCallCarousel({
     [isPaid, photos, previewMode, maxPhotos, showDigitalCard]
   );
 
+  const igGlobalPostUrl = useMemo(
+    () => pickInstagramEmbedSourceUrl(styleConfig, null),
+    [styleConfig]
+  );
+
   const slides = useMemo(() => {
     if (!isPaid) {
       return [
@@ -77,17 +90,28 @@ export default function ShowcaseCallCarousel({
         }
       ];
     }
-    const photoSlides = banners.map((p, i) => ({ type: "banner", id: p.id || `bn-${i}`, ...p }));
+    let photoSlides = banners.map((p, i) => ({ type: "banner", id: p.id || `bn-${i}`, ...p }));
+    /** 사진 없이 Instagram 게시물 URL만 있으면 배너 1장으로 embed */
+    if (photoSlides.length === 0 && igGlobalPostUrl) {
+      photoSlides = [
+        {
+          type: "banner",
+          id: "ig-embed-only",
+          url: "",
+          instagramPostUrl: igGlobalPostUrl
+        }
+      ];
+    }
     const emptyCount =
-      previewMode && showDigitalCard && banners.length < Math.min(3, maxPhotos)
-        ? Math.min(3, maxPhotos) - banners.length
-        : previewMode && !showDigitalCard && banners.length < 1
+      previewMode && showDigitalCard && photoSlides.length < Math.min(3, maxPhotos) && !igGlobalPostUrl
+        ? Math.min(3, maxPhotos) - photoSlides.length
+        : previewMode && !showDigitalCard && photoSlides.length < 1 && !igGlobalPostUrl
           ? 1
           : 0;
     const empties = Array.from({ length: emptyCount }, (_, i) => ({
       type: "empty-slot",
       id: `empty-paid-${i}`,
-      slot: Math.max(1, banners.length + i + 1),
+      slot: Math.max(1, photoSlides.length + i + 1),
       max: maxPhotos
     }));
     const cardSlide = showDigitalCard ? [{ type: "card", id: "cert-card" }] : [];
@@ -96,11 +120,18 @@ export default function ShowcaseCallCarousel({
       return [{ type: "paid-identity", id: "paid-identity-sheet" }];
     }
     return [...cardSlide, ...paidBody];
-  }, [isPaid, isKnownContact, banners, previewMode, maxPhotos, showDigitalCard]);
+  }, [isPaid, isKnownContact, banners, previewMode, maxPhotos, showDigitalCard, igGlobalPostUrl]);
 
   const count = slides.length;
   const canScroll = isPaid && scrollEnabled && count > 1;
   const current = slides[index] || slides[0];
+  const currentIgEmbedUrl =
+    current?.type === "banner"
+      ? pickInstagramEmbedSourceUrl(styleConfig, current)
+      : "";
+  const currentIsIgEmbed = Boolean(currentIgEmbedUrl && shouldUseInstagramEmbedMode(styleConfig, current));
+  /** Instagram 내부 슬라이드와 바깥 캐러셀 제스처 충돌 방지 */
+  const outerNavEnabled = canScroll && !currentIsIgEmbed;
 
   useEffect(() => {
     setIndex(0);
@@ -122,14 +153,14 @@ export default function ShowcaseCallCarousel({
 
   const go = useCallback(
     (dir) => {
-      if (!canScroll) return;
+      if (!outerNavEnabled) return;
       setIndex((i) => Math.max(0, Math.min(count - 1, i + dir)));
     },
-    [canScroll, count]
+    [outerNavEnabled, count]
   );
 
   const interactiveSelector =
-    "a, button, input, textarea, select, label, .showcase-call-carousel__nav, .showcase-call-carousel__slide-settings, .ldr-face-tab, .ldr-front-phone-link--btn, .ldr-contact-row-link, .showcase-social-rail, .showcase-banner-footer, .lettering-action";
+    "a, button, input, textarea, select, label, iframe, .showcase-ig-embed, .showcase-call-carousel__nav, .showcase-call-carousel__slide-settings, .ldr-face-tab, .ldr-front-phone-link--btn, .ldr-contact-row-link, .showcase-social-rail, .showcase-banner-footer, .lettering-action";
 
   const finishSwipe = useCallback(
     (clientX) => {
@@ -144,7 +175,7 @@ export default function ShowcaseCallCarousel({
 
   /* capture: 명함 패널 stopPropagation / overflow-y 스크롤이 bubble을 가로채도 스와이프 시작 */
   const onPointerDownCapture = (e) => {
-    if (keypadOpen || !canScroll) return;
+    if (keypadOpen || !outerNavEnabled) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (e.target?.closest?.(interactiveSelector)) return;
     dragging.current = true;
@@ -167,7 +198,7 @@ export default function ShowcaseCallCarousel({
   };
 
   const onTouchStartCapture = (e) => {
-    if (keypadOpen || !canScroll) return;
+    if (keypadOpen || !outerNavEnabled) return;
     if (e.target?.closest?.(interactiveSelector)) return;
     const t = e.touches?.[0];
     if (!t) return;
@@ -288,7 +319,17 @@ export default function ShowcaseCallCarousel({
                 ) : null}
 
                 {slide.type === "banner" && isPaid ? (
-                  <div className="showcase-call-carousel__banner">
+                  (() => {
+                    const igUrl = pickInstagramEmbedSourceUrl(styleConfig, slide);
+                    const useIgEmbed = Boolean(igUrl && shouldUseInstagramEmbedMode(styleConfig, slide));
+                    return (
+                  <div
+                    className={
+                      useIgEmbed
+                        ? "showcase-call-carousel__banner showcase-call-carousel__banner--ig-embed"
+                        : "showcase-call-carousel__banner"
+                    }
+                  >
                     {showOwnerSettings && !keypadOpen ? (
                       <button
                         type="button"
@@ -302,20 +343,28 @@ export default function ShowcaseCallCarousel({
                         설정
                       </button>
                     ) : null}
-                    <img src={slide.url} alt="" className="showcase-call-carousel__banner-img" draggable={false} />
-                    <div className="showcase-call-carousel__banner-veil" aria-hidden />
-                    {socialOverlayEnabled && v1AppShell.showcaseSocialOverlay && !keypadOpen ? (
-                      <ShowcaseBannerSocialLayer
-                        card={card}
-                        slide={slide}
-                        previewMode={previewMode}
-                        onToast={onKeypadToast}
-                        onReport={onReport}
-                      />
-                    ) : (slide.overlayText || slide.caption) ? (
-                      <p className="showcase-call-carousel__banner-caption">{slide.overlayText || slide.caption}</p>
-                    ) : null}
+                    {useIgEmbed ? (
+                      <ShowcaseInstagramEmbed postUrl={igUrl} title="Instagram 쇼케이스" />
+                    ) : (
+                      <>
+                        <img src={slide.url} alt="" className="showcase-call-carousel__banner-img" draggable={false} />
+                        <div className="showcase-call-carousel__banner-veil" aria-hidden />
+                        {socialOverlayEnabled && v1AppShell.showcaseSocialOverlay && !keypadOpen ? (
+                          <ShowcaseBannerSocialLayer
+                            card={card}
+                            slide={slide}
+                            previewMode={previewMode}
+                            onToast={onKeypadToast}
+                            onReport={onReport}
+                          />
+                        ) : (slide.overlayText || slide.caption) ? (
+                          <p className="showcase-call-carousel__banner-caption">{slide.overlayText || slide.caption}</p>
+                        ) : null}
+                      </>
+                    )}
                   </div>
+                    );
+                  })()
                 ) : null}
 
                 {slide.type === "paid-identity" ? (
@@ -362,7 +411,7 @@ export default function ShowcaseCallCarousel({
             ))}
           </div>
 
-          {canScroll && !keypadOpen ? (
+          {outerNavEnabled && !keypadOpen ? (
             <>
               <button
                 type="button"
