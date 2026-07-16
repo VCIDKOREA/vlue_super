@@ -1287,6 +1287,67 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.showcase-bgm-picker__section-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.showcase-bgm-picker__search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+  margin: 10px 0 8px;
+  padding: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.showcase-bgm-picker__album--row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid #eef2f7;
+  background: #fff;
+  text-align: left;
+}
+
+.showcase-bgm-picker__album--row .showcase-bgm-picker__cover {
+  width: 56px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+}
+
+.showcase-bgm-picker__album-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.showcase-bgm-picker__album--row.active,
+.showcase-bgm-picker__album--row.is-playing {
+  border-color: #2b6ff0;
+  box-shadow: 0 0 0 1px rgba(43, 111, 240, 0.25);
+}
+
+.showcase-bgm-picker__back-curation {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  color: #2b6ff0;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
 .showcase-bgm-picker__album {
   display: flex;
   flex-direction: column;

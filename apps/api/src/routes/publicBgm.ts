@@ -1,9 +1,18 @@
 import { Hono } from "hono";
+import { searchSoundCloudTracksPopular } from "../lib/soundcloudClient.js";
+import {
+  getSoundCloudGenreById,
+  SOUNDCLOUD_CURATION_LIMIT,
+  SOUNDCLOUD_GENRE_CURATIONS,
+  SOUNDCLOUD_SEARCH_LIMIT
+} from "../lib/soundcloudGenreMap.js";
 
 /**
- * 쇼케이스 BGM — SoundHelix 공개 MP3 프록시
- * mount: apiRoutes.route("/bgm", publicBgmRoutes)
- * → GET /api/bgm/:n  (n = 1..10)
+ * 쇼케이스 BGM
+ * - GET /api/bgm/:n — SoundHelix MP3 프록시 (레거시)
+ * - GET /api/bgm/soundcloud/genres
+ * - GET /api/bgm/soundcloud/curation/:genreId — 장르별 고정 6곡 (인기순)
+ * - GET /api/bgm/soundcloud/search?q= — 검색 (인기순, 기본 30곡)
  */
 export const publicBgmRoutes = new Hono();
 
@@ -13,9 +22,89 @@ publicBgmRoutes.get("/", (c) =>
   c.json({
     ok: true,
     service: "vlue-bgm",
-    songs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `/api/bgm/${n}`)
+    songs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `/api/bgm/${n}`),
+    soundcloud: {
+      genres: "/api/bgm/soundcloud/genres",
+      curation: "/api/bgm/soundcloud/curation/:genreId",
+      search: "/api/bgm/soundcloud/search?q="
+    }
   })
 );
+
+publicBgmRoutes.get("/soundcloud/genres", (c) =>
+  c.json({
+    ok: true,
+    curationLimit: SOUNDCLOUD_CURATION_LIMIT,
+    searchLimit: SOUNDCLOUD_SEARCH_LIMIT,
+    genres: SOUNDCLOUD_GENRE_CURATIONS
+  })
+);
+
+publicBgmRoutes.get("/soundcloud/curation/:genreId", async (c) => {
+  const genreId = String(c.req.param("genreId") || "").trim();
+  const genre = getSoundCloudGenreById(genreId);
+  if (!genre) {
+    return c.json({ ok: false, error: "unknown_genre", genres: SOUNDCLOUD_GENRE_CURATIONS }, 404);
+  }
+  try {
+    const tracks = await searchSoundCloudTracksPopular(genre.query, {
+      limit: SOUNDCLOUD_CURATION_LIMIT,
+      fetchLimit: 40
+    });
+    return c.json({
+      ok: true,
+      genre,
+      limit: SOUNDCLOUD_CURATION_LIMIT,
+      sort: "popular",
+      tracks: tracks.slice(0, SOUNDCLOUD_CURATION_LIMIT)
+    });
+  } catch (e) {
+    const status = (e as { status?: number })?.status;
+    return c.json(
+      {
+        ok: false,
+        error: "soundcloud_curation_failed",
+        message: e instanceof Error ? e.message : "search_failed",
+        status
+      },
+      502
+    );
+  }
+});
+
+publicBgmRoutes.get("/soundcloud/search", async (c) => {
+  const q = String(c.req.query("q") || "").trim();
+  if (!q) {
+    return c.json({ ok: false, error: "query_required" }, 400);
+  }
+  const limitRaw = Number.parseInt(String(c.req.query("limit") || SOUNDCLOUD_SEARCH_LIMIT), 10);
+  const limit = Math.min(50, Math.max(20, Number.isFinite(limitRaw) ? limitRaw : SOUNDCLOUD_SEARCH_LIMIT));
+  try {
+    const tracks = await searchSoundCloudTracksPopular(q, {
+      limit,
+      fetchLimit: Math.min(50, Math.max(limit, 40))
+    });
+    return c.json({
+      ok: true,
+      q,
+      sort: "popular",
+      limit,
+      count: tracks.length,
+      tracks
+    });
+  } catch (e) {
+    const status = (e as { status?: number })?.status;
+    return c.json(
+      {
+        ok: false,
+        error: "soundcloud_search_failed",
+        message: e instanceof Error ? e.message : "search_failed",
+        status
+      },
+      502
+    );
+  }
+});
 
 publicBgmRoutes.get("/:n", async (c) => {
   const n = Math.min(10, Math.max(1, Number.parseInt(String(c.req.param("n") || "1"), 10) || 1));
