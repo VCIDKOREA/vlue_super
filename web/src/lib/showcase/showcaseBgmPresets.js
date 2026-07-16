@@ -8,6 +8,8 @@ import { apiUrl } from "../apiBase.js";
 import { getReelsChartTrackById, getWeeklyReelsBgmChart } from "./showcaseBgmChart.js";
 import { extractSoundCloudTrackUrl } from "./showcaseSoundCloud.js";
 
+export { searchShowcaseBgmByGenre, SHOWCASE_BGM_GENRE_CHIPS, getNextAvailableBgmTrack } from "./showcaseBgmChart.js";
+
 /** @param {number} n 1..10 */
 export function showcaseBgmDirectUrl(n) {
   const song = Math.min(10, Math.max(1, Number(n) || 1));
