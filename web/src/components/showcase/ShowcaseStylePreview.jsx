@@ -7,7 +7,6 @@ import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import ShowcaseBgmMuteButton from "./ShowcaseBgmMuteButton.jsx";
 import ShowcaseBgmMarquee from "./ShowcaseBgmMarquee.jsx";
 import ShowcasePhotoGallery from "./ShowcasePhotoGallery.jsx";
-import ShowcaseYoutubePlayer from "./ShowcaseYoutubePlayer.jsx";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 
 const FONT_MAP = Object.fromEntries(SHOWCASE_FONT_SETS.map((f) => [f.id, f.css]));
@@ -31,9 +30,6 @@ export default function ShowcaseStylePreview({
   const {
     bindStyleConfig,
     setPlaybackPhase,
-    youtubeMode,
-    youtubeVideoId,
-    youtubeMuted,
     proximityNear,
     unlockFromUserGesture
   } = useShowcaseBgm();
@@ -113,10 +109,6 @@ export default function ShowcaseStylePreview({
       onTouchStart={onTapUnlock}
       role="presentation"
     >
-      {youtubeMode && youtubeVideoId ? (
-        <ShowcaseYoutubePlayer videoId={youtubeVideoId} muted={youtubeMuted} className="showcase-style-preview__yt-bg" />
-      ) : null}
-
       <div
         className={`showcase-style-preview__device${style.id === "rich_custom" ? " showcase-style-preview__device--framed" : ""}${sleepMode ? " showcase-style-preview__device--sleep" : ""}`}
         style={style.id === "rich_custom" ? { "--case-accent": caseTheme.accent || "#2b6ff0" } : undefined}

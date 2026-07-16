@@ -7643,3 +7643,24 @@ body,
   font-weight: 700;
   color: #94a3b8 !important;
 }
+
+/* Showcase YouTube BGM — audio-only host (always available via ShowcaseBgmProvider) */
+.showcase-bgm-yt-host {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  left: -9999px;
+  top: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+.showcase-bgm-yt-host__player {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 48px !important;
+  height: 48px !important;
+  border: 0 !important;
+  opacity: 1 !important;
+}

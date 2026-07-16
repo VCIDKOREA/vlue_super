@@ -68,6 +68,24 @@ export function buildYoutubeEmbedUrl(videoId, opts = {}) {
   return `https://www.youtube-nocookie.com/embed/${id}?${params}`;
 }
 
+/**
+ * YouTube IFrame API postMessage (enablejsapi=1 필요)
+ * @param {HTMLIFrameElement | null} iframe
+ * @param {string} func
+ * @param {unknown[]} [args]
+ */
+export function postYoutubeCommand(iframe, func, args = []) {
+  if (!iframe?.contentWindow) return;
+  try {
+    iframe.contentWindow.postMessage(
+      JSON.stringify({ event: "command", func, args }),
+      "*"
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 /** @param {string} videoIdOrUrl */
 export async function fetchYoutubeMeta(videoIdOrUrl) {
   const id = extractYoutubeVideoId(videoIdOrUrl) || videoIdOrUrl;

@@ -5,6 +5,7 @@ import {
   resolveShowcaseYoutubeVideoId
 } from "../lib/showcase/showcaseBgmPresets.js";
 import { installShowcaseProximityBridge, subscribeShowcaseProximity } from "../lib/showcase/showcaseProximityBridge.js";
+import ShowcaseYoutubePlayer from "../components/showcase/ShowcaseYoutubePlayer.jsx";
 
 /** @typedef {'call_active' | 'replay' | 'preview' | 'idle'} ShowcasePlaybackPhase */
 
@@ -123,7 +124,22 @@ export function ShowcaseBgmProvider({ children }) {
     ]
   );
 
-  return <ShowcaseBgmContext.Provider value={value}>{children}</ShowcaseBgmContext.Provider>;
+  return (
+    <ShowcaseBgmContext.Provider value={value}>
+      {children}
+      {/* 실제 쇼케이스/미리보기 송출: YouTube 영상은 숨기고 음향만 */}
+      {youtubeMode && youtubeVideoId ? (
+        <div className="showcase-bgm-yt-host" aria-hidden>
+          <ShowcaseYoutubePlayer
+            videoId={youtubeVideoId}
+            muted={youtubeMuted}
+            className="showcase-bgm-yt-host__player"
+            title="Showcase BGM audio"
+          />
+        </div>
+      ) : null}
+    </ShowcaseBgmContext.Provider>
+  );
 }
 
 export function useShowcaseBgm() {

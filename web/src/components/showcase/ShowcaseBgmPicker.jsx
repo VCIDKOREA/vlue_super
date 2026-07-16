@@ -10,7 +10,8 @@ import {
   extractYoutubeVideoId,
   fetchYoutubeMeta,
   matchYoutubeByKeyword,
-  buildYoutubeEmbedUrl
+  buildYoutubeEmbedUrl,
+  postYoutubeCommand
 } from "../../lib/showcase/showcaseYoutube.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 
@@ -19,6 +20,7 @@ const PREVIEW_MS = 22000;
 
 /**
  * 릴스 감성 YouTube 차트 + URL 지정
+ * 실제 쇼케이스 송출은 음향만(영상 화면은 붙지 않음). 아래 미리보기는 곡 확인용.
  */
 export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
   const [theme, setTheme] = useState("all");
@@ -29,9 +31,10 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewEmbed, setPreviewEmbed] = useState("");
   const audioRef = useRef(null);
+  const ytIframeRef = useRef(null);
   const previewTimerRef = useRef(0);
   const previewTokenRef = useRef(0);
-  const { setPlaybackPhase } = useShowcaseBgm();
+  const { setPlaybackPhase, unlockFromUserGesture } = useShowcaseBgm();
 
   const filtered = useMemo(() => buildShowcaseBgmPresets(theme), [theme]);
   const weekLabel = useMemo(() => {
@@ -71,19 +74,34 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setPlaybackPhase]);
 
+  const forceYoutubeUnmute = () => {
+    const iframe = ytIframeRef.current;
+    if (!iframe) return;
+    postYoutubeCommand(iframe, "playVideo");
+    postYoutubeCommand(iframe, "unMute");
+    postYoutubeCommand(iframe, "setVolume", [100]);
+  };
+
   const playYoutubePreview = (videoId, trackId) => {
-    const embed = buildYoutubeEmbedUrl(videoId, { muted: false, autoplay: true, loop: true });
+    // mute=1로 로드 후 클릭 제스처 안에서 unMute (모바일 autoplay 정책)
+    const embed = buildYoutubeEmbedUrl(videoId, { muted: true, autoplay: true, loop: true });
     if (!embed) {
       setPreviewError("미리듣기 영상을 열 수 없습니다.");
       return;
     }
+    unlockFromUserGesture();
     stopPreview();
     setPreviewError("");
     setPreviewLoading(true);
     setPreviewId(trackId);
     setPreviewEmbed(embed);
     setPlaybackPhase("idle");
-    window.setTimeout(() => setPreviewLoading(false), 900);
+    window.setTimeout(() => {
+      setPreviewLoading(false);
+      forceYoutubeUnmute();
+    }, 600);
+    window.setTimeout(forceYoutubeUnmute, 1400);
+    window.setTimeout(forceYoutubeUnmute, 2800);
     previewTimerRef.current = window.setTimeout(() => {
       stopPreview();
     }, PREVIEW_MS);
@@ -219,8 +237,11 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
         <span>이번 주 릴스 감성 TOP · {weekLabel}</span>
       </div>
       <p className="showcase-bgm-picker__hint" style={{ wordBreak: "keep-all" }}>
-        실제 음악(YouTube)입니다. 주마다 순위가 바뀌며, 아래에서 원하는 곡 URL도 지정할 수 있습니다.
+        실제 음악(YouTube)입니다. 쇼케이스에 적용되면 <strong>음향만</strong> 나갑니다(영상 화면은 붙지 않음).
         곡을 누르면 선택 + 약 {PREVIEW_MS / 1000}초 미리듣기.
+      </p>
+      <p className="showcase-bgm-picker__volume-tip" role="note">
+        소리가 안 들리면 폰 상단의 무음(스피커 슬래시)을 끄고, 미디어 볼륨을 올려 주세요.
       </p>
 
       <div className="showcase-bgm-picker__themes">
@@ -274,14 +295,17 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
       </div>
 
       {previewEmbed ? (
-        <div className="showcase-bgm-picker__yt-preview" aria-hidden={false}>
+        <div className="showcase-bgm-picker__yt-preview">
           <iframe
+            ref={ytIframeRef}
             title="BGM preview"
             src={previewEmbed}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             referrerPolicy="strict-origin-when-cross-origin"
             className="showcase-bgm-picker__yt-iframe"
+            onLoad={forceYoutubeUnmute}
           />
+          <p className="showcase-bgm-picker__yt-caption">미리듣기용 화면 · 실제 쇼케이스에는 소리만 재생됩니다</p>
         </div>
       ) : null}
 
@@ -293,7 +317,7 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
 
       <div className="showcase-bgm-picker__youtube">
         <p className="showcase-bgm-picker__yt-title">
-          <Search size={13} aria-hidden /> 내 쇼케이스 배경음악/영상 검색 지정하기
+          <Search size={13} aria-hidden /> 내 쇼케이스 배경음악 검색·지정
         </p>
         <div className="showcase-bgm-picker__yt-row">
           <input
