@@ -1,5 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { resolveShowcaseBgmUrl, isYoutubeBgmMode } from "../lib/showcase/showcaseBgmPresets.js";
+import {
+  resolveShowcaseBgmUrl,
+  isYoutubeBgmMode,
+  resolveShowcaseYoutubeVideoId
+} from "../lib/showcase/showcaseBgmPresets.js";
 import { installShowcaseProximityBridge, subscribeShowcaseProximity } from "../lib/showcase/showcaseProximityBridge.js";
 
 /** @typedef {'call_active' | 'replay' | 'preview' | 'idle'} ShowcasePlaybackPhase */
@@ -16,7 +20,7 @@ export function ShowcaseBgmProvider({ children }) {
 
   const bgmUrl = useMemo(() => resolveShowcaseBgmUrl(styleConfig), [styleConfig]);
   const youtubeMode = useMemo(() => isYoutubeBgmMode(styleConfig), [styleConfig]);
-  const youtubeVideoId = styleConfig?.bgm?.youtube?.videoId || "";
+  const youtubeVideoId = useMemo(() => resolveShowcaseYoutubeVideoId(styleConfig), [styleConfig]);
 
   const shouldPlayAudio = phase === "replay" || phase === "preview";
   const forceMuted = phase === "call_active" || proximityNear;

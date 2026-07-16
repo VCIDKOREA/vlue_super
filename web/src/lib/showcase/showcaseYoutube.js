@@ -91,7 +91,11 @@ export function resolveShowcaseBgmLabel(styleConfig) {
   if (!bgm) return "";
   if (bgm.mode === "preset") {
     const p = getBgmPresetById(bgm.presetId);
-    return p ? `${p.label} · ${p.tag}` : "";
+    if (!p) return "";
+    if (p.kind === "youtube") {
+      return p.artist ? `${p.label} — ${p.artist}` : `${p.label} · ${p.tag}`;
+    }
+    return `${p.label} · ${p.tag}`;
   }
   if (bgm.mode === "youtube" && bgm.youtube?.videoId) {
     const t = bgm.youtube.title || "YouTube BGM";

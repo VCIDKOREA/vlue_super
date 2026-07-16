@@ -2,13 +2,22 @@ import { Hono } from "hono";
 
 /**
  * 쇼케이스 BGM — SoundHelix 공개 MP3 프록시
- * Android WebView 에서 외부 CDN(CORS/차단) 실패를 피하기 위해 동일 API 오리진으로 제공
+ * mount: apiRoutes.route("/bgm", publicBgmRoutes)
+ * → GET /api/bgm/:n  (n = 1..10)
  */
 export const publicBgmRoutes = new Hono();
 
 const HELIX_BASE = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-";
 
-publicBgmRoutes.get("/bgm/:n", async (c) => {
+publicBgmRoutes.get("/", (c) =>
+  c.json({
+    ok: true,
+    service: "vlue-bgm",
+    songs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `/api/bgm/${n}`)
+  })
+);
+
+publicBgmRoutes.get("/:n", async (c) => {
   const n = Math.min(10, Math.max(1, Number.parseInt(String(c.req.param("n") || "1"), 10) || 1));
   const upstream = `${HELIX_BASE}${n}.mp3`;
 
