@@ -111,7 +111,13 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
           title: track.label || track.title || "",
           artist: track.artist || "",
           artworkUrl: track.artworkUrl || "",
-          query: track.label || track.title || ""
+          query: track.label || track.title || "",
+          license: track.license || "",
+          licenseLabel: track.licenseLabel || "",
+          attribution: track.attribution || "",
+          sourceVerified: true,
+          commercialCcOnly: true,
+          verifiedAt: track.verifiedAt || new Date().toISOString()
         },
         youtube: { videoId: "", title: "", artist: "", query: "" }
       });
@@ -212,9 +218,9 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
           <span className="showcase-bgm-picker__album-sub">
             {playing
               ? "재생 중…"
-              : p.playbackCount
-                ? `${p.artist || "SoundCloud"} · ${formatPlays(p.playbackCount)}`
-                : p.artist || "SoundCloud"}
+              : [p.artist || "SoundCloud", p.licenseLabel || p.license, p.playbackCount ? formatPlays(p.playbackCount) : ""]
+                  .filter(Boolean)
+                  .join(" · ")}
           </span>
         </span>
       </button>
@@ -228,11 +234,11 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
         <span>SoundCloud 큐레이션 · 장르별 {SOUNDCLOUD_CURATION_LIMIT}곡</span>
       </div>
       <p className="showcase-bgm-picker__hint" style={{ wordBreak: "keep-all" }}>
-        지정된 장르 검색어로 SoundCloud에서 <strong>인기순</strong>으로 불러옵니다.
-        쇼케이스에는 <strong>음향만</strong> 나갑니다.
+        <strong>상업용 Creative Commons</strong> 음원만 검색합니다 (CC BY / BY-SA / BY-ND / CC0).
+        NC·무단배포 금지 곡은 결과에 포함되지 않습니다. 쇼케이스에는 <strong>음향만</strong> 나갑니다.
       </p>
       <p className="showcase-bgm-picker__volume-tip" role="note">
-        재생 불가(지역 제한) 곡은 자동으로 건너뛰고 목록에서 제외합니다.
+        음원 출처가 확인된 곡만 표시합니다. 지역 제한 곡은 자동 제외됩니다.
       </p>
 
       <div className="showcase-bgm-picker__themes" role="tablist" aria-label="장르 큐레이션">

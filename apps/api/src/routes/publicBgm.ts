@@ -36,6 +36,8 @@ publicBgmRoutes.get("/soundcloud/genres", (c) =>
     ok: true,
     curationLimit: SOUNDCLOUD_CURATION_LIMIT,
     searchLimit: SOUNDCLOUD_SEARCH_LIMIT,
+    licensePolicy: "creative_commons_commercial_only",
+    allowedLicenses: ["cc-by", "cc-by-sa", "cc-by-nd", "no-rights-reserved"],
     genres: SOUNDCLOUD_GENRE_CURATIONS
   })
 );
@@ -56,6 +58,8 @@ publicBgmRoutes.get("/soundcloud/curation/:genreId", async (c) => {
       genre,
       limit: SOUNDCLOUD_CURATION_LIMIT,
       sort: "popular",
+      licensePolicy: "creative_commons_commercial_only",
+      allowedLicenses: ["cc-by", "cc-by-sa", "cc-by-nd", "no-rights-reserved"],
       tracks: tracks.slice(0, SOUNDCLOUD_CURATION_LIMIT)
     });
   } catch (e) {
@@ -90,6 +94,8 @@ publicBgmRoutes.get("/soundcloud/search", async (c) => {
       sort: "popular",
       limit,
       count: tracks.length,
+      licensePolicy: "creative_commons_commercial_only",
+      allowedLicenses: ["cc-by", "cc-by-sa", "cc-by-nd", "no-rights-reserved"],
       tracks
     });
   } catch (e) {

@@ -35,7 +35,13 @@ export function createDefaultShowcaseStyle() {
         title: "",
         artist: "",
         artworkUrl: "",
-        query: ""
+        query: "",
+        license: "",
+        licenseLabel: "",
+        attribution: "",
+        sourceVerified: false,
+        commercialCcOnly: false,
+        verifiedAt: ""
       }
     },
     gallery: {
