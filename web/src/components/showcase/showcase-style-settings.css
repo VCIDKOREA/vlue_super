@@ -1228,9 +1228,27 @@
   opacity: 1 !important;
 }
 
-.showcase-bgm-picker__card.is-previewing {
-  border-color: #2b6ff0;
-  box-shadow: 0 0 0 2px rgba(43, 111, 240, 0.2);
+/* 전역 SoundCloud BGM — 화면 밖, 음향 전용 */
+.showcase-bgm-sc-host {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  left: -9999px;
+  top: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.showcase-bgm-sc-host__player,
+.showcase-soundcloud-player.showcase-bgm-sc-host__player {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100px !important;
+  height: 100px !important;
+  border: 0 !important;
+  opacity: 1 !important;
 }
 
 .showcase-bgm-picker__themes {
@@ -1255,6 +1273,127 @@
   border-color: #2b6ff0;
   background: #eff6ff;
   color: #1d4ed8;
+}
+
+/* SoundCloud 미니앨범 그리드 */
+.showcase-bgm-picker__albums {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  padding: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.showcase-bgm-picker__album {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.showcase-bgm-picker__cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(145deg, #1e293b, #334155);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.showcase-bgm-picker__album.active .showcase-bgm-picker__cover,
+.showcase-bgm-picker__album.is-playing .showcase-bgm-picker__cover {
+  box-shadow: 0 0 0 2px #2b6ff0, 0 4px 14px rgba(43, 111, 240, 0.28);
+}
+
+.showcase-bgm-picker__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.showcase-bgm-picker__cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 22px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.showcase-bgm-picker__play-badge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.42);
+  color: #fff;
+}
+
+.showcase-bgm-picker__album-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: keep-all;
+}
+
+.showcase-bgm-picker__album-sub {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.showcase-bgm-picker__album.is-playing .showcase-bgm-picker__album-sub {
+  color: #2b6ff0;
+}
+
+.showcase-bgm-picker__sc-preview {
+  margin-top: 4px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #0f172a;
+  position: relative;
+  min-height: 120px;
+}
+
+.showcase-bgm-picker__sc-iframe {
+  width: 100%;
+  height: 140px;
+  border: 0;
+  display: block;
+}
+
+.showcase-bgm-picker__selected-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 6px;
 }
 
 .showcase-bgm-picker__grid {
@@ -1282,6 +1421,11 @@
 .showcase-bgm-picker__card.active {
   border-color: #2b6ff0;
   background: #f0f5ff;
+}
+
+.showcase-bgm-picker__card.is-previewing {
+  border-color: #2b6ff0;
+  box-shadow: 0 0 0 2px rgba(43, 111, 240, 0.2);
 }
 
 .showcase-bgm-picker__label {

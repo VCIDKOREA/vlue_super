@@ -1,10 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   resolveShowcaseBgmUrl,
+  isSoundCloudBgmMode,
   isYoutubeBgmMode,
+  resolveShowcaseSoundCloudTrackUrl,
   resolveShowcaseYoutubeVideoId
 } from "../lib/showcase/showcaseBgmPresets.js";
 import { installShowcaseProximityBridge, subscribeShowcaseProximity } from "../lib/showcase/showcaseProximityBridge.js";
+import ShowcaseSoundCloudPlayer from "../components/showcase/ShowcaseSoundCloudPlayer.jsx";
 import ShowcaseYoutubePlayer from "../components/showcase/ShowcaseYoutubePlayer.jsx";
 
 /** @typedef {'call_active' | 'replay' | 'preview' | 'idle'} ShowcasePlaybackPhase */
@@ -20,13 +23,16 @@ export function ShowcaseBgmProvider({ children }) {
   const [proximityNear, setProximityNear] = useState(false);
 
   const bgmUrl = useMemo(() => resolveShowcaseBgmUrl(styleConfig), [styleConfig]);
+  const soundcloudMode = useMemo(() => isSoundCloudBgmMode(styleConfig), [styleConfig]);
+  const soundcloudTrackUrl = useMemo(() => resolveShowcaseSoundCloudTrackUrl(styleConfig), [styleConfig]);
   const youtubeMode = useMemo(() => isYoutubeBgmMode(styleConfig), [styleConfig]);
   const youtubeVideoId = useMemo(() => resolveShowcaseYoutubeVideoId(styleConfig), [styleConfig]);
 
+  const hasStreamBgm = soundcloudMode || youtubeMode;
   const shouldPlayAudio = phase === "replay" || phase === "preview";
   const forceMuted = phase === "call_active" || proximityNear;
-  const effectiveMuted = forceMuted || userMuted || !shouldPlayAudio || (!bgmUrl && !youtubeMode);
-  const youtubeMuted = forceMuted || userMuted || !shouldPlayAudio || !touchUnlocked;
+  const effectiveMuted = forceMuted || userMuted || !shouldPlayAudio || (!bgmUrl && !hasStreamBgm);
+  const streamMuted = forceMuted || userMuted || !shouldPlayAudio || !touchUnlocked;
 
   useEffect(() => {
     installShowcaseProximityBridge();
@@ -41,7 +47,7 @@ export function ShowcaseBgmProvider({ children }) {
     }
     const el = audioRef.current;
 
-    if (youtubeMode || effectiveMuted || !bgmUrl) {
+    if (hasStreamBgm || effectiveMuted || !bgmUrl) {
       el.pause();
       if (!bgmUrl) el.removeAttribute("src");
       return undefined;
@@ -54,7 +60,7 @@ export function ShowcaseBgmProvider({ children }) {
 
     el.play().catch(() => undefined);
     return () => el.pause();
-  }, [bgmUrl, effectiveMuted, youtubeMode]);
+  }, [bgmUrl, effectiveMuted, hasStreamBgm]);
 
   const setPlaybackPhase = useCallback((next) => {
     setPhase(next);
@@ -97,13 +103,16 @@ export function ShowcaseBgmProvider({ children }) {
       effectiveMuted,
       forceMuted,
       bgmUrl,
+      soundcloudMode,
+      soundcloudTrackUrl,
       youtubeMode,
       youtubeVideoId,
-      youtubeMuted,
+      youtubeMuted: streamMuted,
+      soundcloudMuted: streamMuted,
       touchUnlocked,
       unlockFromUserGesture,
       proximityNear,
-      canToggleMute: shouldPlayAudio && Boolean(bgmUrl || youtubeMode) && !proximityNear
+      canToggleMute: shouldPlayAudio && Boolean(bgmUrl || hasStreamBgm) && !proximityNear
     }),
     [
       phase,
@@ -114,25 +123,41 @@ export function ShowcaseBgmProvider({ children }) {
       effectiveMuted,
       forceMuted,
       bgmUrl,
+      soundcloudMode,
+      soundcloudTrackUrl,
       youtubeMode,
       youtubeVideoId,
-      youtubeMuted,
+      streamMuted,
       touchUnlocked,
       unlockFromUserGesture,
       proximityNear,
-      shouldPlayAudio
+      shouldPlayAudio,
+      hasStreamBgm
     ]
   );
 
   return (
     <ShowcaseBgmContext.Provider value={value}>
       {children}
-      {/* 실제 쇼케이스/미리보기 송출: YouTube 영상은 숨기고 음향만 */}
-      {youtubeMode && youtubeVideoId ? (
+      {soundcloudMode && soundcloudTrackUrl ? (
+        <div className="showcase-bgm-sc-host" aria-hidden>
+          <ShowcaseSoundCloudPlayer
+            key={soundcloudTrackUrl}
+            trackUrl={soundcloudTrackUrl}
+            muted={streamMuted}
+            visual={false}
+            hideUi
+            className="showcase-bgm-sc-host__player"
+            title="Showcase BGM audio"
+          />
+        </div>
+      ) : null}
+      {/* YouTube 레거시 설정 호환 */}
+      {!soundcloudMode && youtubeMode && youtubeVideoId ? (
         <div className="showcase-bgm-yt-host" aria-hidden>
           <ShowcaseYoutubePlayer
             videoId={youtubeVideoId}
-            muted={youtubeMuted}
+            muted={streamMuted}
             className="showcase-bgm-yt-host__player"
             title="Showcase BGM audio"
           />
@@ -154,9 +179,12 @@ export function useShowcaseBgm() {
       effectiveMuted: true,
       forceMuted: true,
       bgmUrl: null,
+      soundcloudMode: false,
+      soundcloudTrackUrl: "",
       youtubeMode: false,
       youtubeVideoId: "",
       youtubeMuted: true,
+      soundcloudMuted: true,
       touchUnlocked: false,
       unlockFromUserGesture: () => {},
       proximityNear: false,

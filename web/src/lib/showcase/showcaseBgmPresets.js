@@ -1,11 +1,12 @@
 /**
  * VLUE 쇼케이스 BGM
- * - 기본: 주간 릴스 감성 YouTube 차트 (실제 음악 · iframe 재생)
- * - 레거시 presetId 호환용 SoundHelix 는 폴백으로만 유지
+ * - 기본: 주간 릴스 감성 SoundCloud 차트 (Widget embed)
+ * - 레거시 YouTube / SoundHelix MP3 는 호환용으로만 유지
  */
 
 import { apiUrl } from "../apiBase.js";
 import { getReelsChartTrackById, getWeeklyReelsBgmChart } from "./showcaseBgmChart.js";
+import { extractSoundCloudTrackUrl } from "./showcaseSoundCloud.js";
 
 /** @param {number} n 1..10 */
 export function showcaseBgmDirectUrl(n) {
@@ -34,9 +35,25 @@ export function showcaseBgmUrlCandidates(n) {
   return [direct];
 }
 
-/** @typedef {{ id: string, label: string, tag: string, theme: string, url?: string, helixN?: number, videoId?: string, artist?: string, kind: 'youtube'|'mp3' }} ShowcaseBgmPreset */
+/**
+ * @typedef {{
+ *   id: string,
+ *   label: string,
+ *   tag: string,
+ *   theme: string,
+ *   url?: string,
+ *   helixN?: number,
+ *   videoId?: string,
+ *   trackId?: string,
+ *   trackUrl?: string,
+ *   artworkUrl?: string,
+ *   artist?: string,
+ *   kind: 'soundcloud'|'youtube'|'mp3',
+ *   rank?: number
+ * }} ShowcaseBgmPreset
+ */
 
-/** 레거시 MP3 프리셋 (효과음처럼 들릴 수 있어 UI 기본 목록에서는 숨김) */
+/** 레거시 MP3 프리셋 (UI 기본 목록에서는 숨김) */
 const LEGACY_MP3 = [
   { id: "reels-house", label: "릴스 업비트 그루브", tag: "#릴스", theme: "lofi", helixN: 1 },
   { id: "shorts-hiphop", label: "숏츠 힙합 플로우", tag: "#숏츠", theme: "lofi", helixN: 2 },
@@ -44,21 +61,23 @@ const LEGACY_MP3 = [
   { id: "soft-piano", label: "소프트 피아노", tag: "#피아노", theme: "ambient", helixN: 3 }
 ];
 
-/** UI 기본 목록 = 주간 YouTube 차트 */
+/** UI 기본 목록 = 주간 SoundCloud 차트 */
 export function buildShowcaseBgmPresets(theme = "all") {
   return getWeeklyReelsBgmChart({ theme, limit: 14 }).map((t) => ({
     id: t.id,
     label: t.label,
     tag: t.tag,
     theme: t.theme,
-    videoId: t.videoId,
+    trackId: t.trackId,
+    trackUrl: t.trackUrl,
+    artworkUrl: t.artworkUrl,
     artist: t.artist,
-    kind: "youtube",
+    kind: "soundcloud",
     rank: t.rank
   }));
 }
 
-/** @type {ShowcaseBgmPreset[]} — 정적 export (테마 필터용 메타) */
+/** @type {ShowcaseBgmPreset[]} */
 export const SHOWCASE_BGM_PRESETS = buildShowcaseBgmPresets("all");
 
 export const SHOWCASE_BGM_THEMES = [
@@ -77,9 +96,11 @@ export function getBgmPresetById(id) {
       label: chart.label,
       tag: chart.tag,
       theme: chart.theme,
-      videoId: chart.videoId,
+      trackId: chart.trackId,
+      trackUrl: chart.trackUrl,
+      artworkUrl: chart.artworkUrl,
       artist: chart.artist,
-      kind: "youtube"
+      kind: "soundcloud"
     };
   }
   const legacy = LEGACY_MP3.find((x) => x.id === id);
@@ -99,35 +120,54 @@ export function getBgmPresetById(id) {
 export function resolveShowcaseBgmUrl(styleConfig) {
   if (!styleConfig?.bgm) return null;
   const { mode, presetId } = styleConfig.bgm;
-  if (mode === "none") return null;
-  if (mode === "youtube") return null;
+  if (mode === "none" || mode === "youtube" || mode === "soundcloud") return null;
   if (mode === "preset" || mode === "platform") {
     const preset = getBgmPresetById(presetId);
-    if (preset?.kind === "youtube") return null;
+    if (preset?.kind === "soundcloud" || preset?.kind === "youtube") return null;
     return preset?.url || null;
   }
   return null;
 }
 
-export function isYoutubeBgmMode(styleConfig) {
+export function isSoundCloudBgmMode(styleConfig) {
   const bgm = styleConfig?.bgm;
   if (!bgm) return false;
-  if (bgm.mode === "youtube" && bgm.youtube?.videoId) return true;
+  if (bgm.mode === "soundcloud" && (bgm.soundcloud?.trackUrl || bgm.soundcloud?.trackId)) return true;
   if ((bgm.mode === "preset" || bgm.mode === "platform") && bgm.presetId) {
     const p = getBgmPresetById(bgm.presetId);
-    return p?.kind === "youtube";
+    return p?.kind === "soundcloud";
   }
   return false;
 }
 
-/** preset 이 YouTube 차트곡이면 videoId 반환 */
+/** @deprecated YouTube 레거시 — 새 차트는 SoundCloud */
+export function isYoutubeBgmMode(styleConfig) {
+  const bgm = styleConfig?.bgm;
+  if (!bgm) return false;
+  if (bgm.mode === "youtube" && bgm.youtube?.videoId) return true;
+  return false;
+}
+
+export function resolveShowcaseSoundCloudTrackUrl(styleConfig) {
+  const bgm = styleConfig?.bgm;
+  if (!bgm) return "";
+  if (bgm.mode === "soundcloud") {
+    const fromUrl = extractSoundCloudTrackUrl(bgm.soundcloud?.trackUrl || "");
+    if (fromUrl) return fromUrl;
+    const id = String(bgm.soundcloud?.trackId || "").trim();
+    return id ? `https://api.soundcloud.com/tracks/${id}` : "";
+  }
+  if (bgm.mode === "preset" || bgm.mode === "platform") {
+    const p = getBgmPresetById(bgm.presetId);
+    return p?.kind === "soundcloud" ? String(p.trackUrl || "").trim() : "";
+  }
+  return "";
+}
+
+/** @deprecated */
 export function resolveShowcaseYoutubeVideoId(styleConfig) {
   const bgm = styleConfig?.bgm;
   if (!bgm) return "";
   if (bgm.mode === "youtube") return String(bgm.youtube?.videoId || "").trim();
-  if (bgm.mode === "preset" || bgm.mode === "platform") {
-    const p = getBgmPresetById(bgm.presetId);
-    return p?.kind === "youtube" ? String(p.videoId || "").trim() : "";
-  }
   return "";
 }

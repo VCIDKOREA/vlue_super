@@ -7644,8 +7644,9 @@ body,
   color: #94a3b8 !important;
 }
 
-/* Showcase YouTube BGM — audio-only host (always available via ShowcaseBgmProvider) */
-.showcase-bgm-yt-host {
+/* Showcase YouTube / SoundCloud BGM — audio-only host */
+.showcase-bgm-yt-host,
+.showcase-bgm-sc-host {
   position: fixed;
   width: 1px;
   height: 1px;
@@ -7656,11 +7657,12 @@ body,
   pointer-events: none;
   z-index: -1;
 }
-.showcase-bgm-yt-host__player {
+.showcase-bgm-yt-host__player,
+.showcase-bgm-sc-host__player {
   position: absolute !important;
   inset: 0 !important;
-  width: 48px !important;
-  height: 48px !important;
+  width: 100px !important;
+  height: 100px !important;
   border: 0 !important;
   opacity: 1 !important;
 }

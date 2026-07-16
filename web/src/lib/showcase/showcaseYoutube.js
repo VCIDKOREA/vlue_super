@@ -107,10 +107,15 @@ export async function fetchYoutubeMeta(videoIdOrUrl) {
 export function resolveShowcaseBgmLabel(styleConfig) {
   const bgm = styleConfig?.bgm;
   if (!bgm) return "";
+  if (bgm.mode === "soundcloud" && (bgm.soundcloud?.trackUrl || bgm.soundcloud?.title)) {
+    const t = bgm.soundcloud.title || "SoundCloud BGM";
+    const a = bgm.soundcloud.artist || "";
+    return a ? `${t} — ${a}` : t;
+  }
   if (bgm.mode === "preset") {
     const p = getBgmPresetById(bgm.presetId);
     if (!p) return "";
-    if (p.kind === "youtube") {
+    if (p.kind === "soundcloud" || p.kind === "youtube") {
       return p.artist ? `${p.label} — ${p.artist}` : `${p.label} · ${p.tag}`;
     }
     return `${p.label} · ${p.tag}`;

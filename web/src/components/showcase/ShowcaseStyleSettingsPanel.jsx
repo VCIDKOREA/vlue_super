@@ -124,7 +124,14 @@ export default function ShowcaseStyleSettingsPanel({
   const persist = useCallback((patch) => {
     setConfig((prev) => {
       const next = { ...prev, ...patch };
-      if (patch.bgm) next.bgm = { ...prev.bgm, ...patch.bgm };
+      if (patch.bgm) {
+        next.bgm = {
+          ...prev.bgm,
+          ...patch.bgm,
+          youtube: { ...(prev.bgm?.youtube || {}), ...(patch.bgm?.youtube || {}) },
+          soundcloud: { ...(prev.bgm?.soundcloud || {}), ...(patch.bgm?.soundcloud || {}) }
+        };
+      }
       if (patch.richCustom) next.richCustom = { ...prev.richCustom, ...patch.richCustom };
       if (patch.commercial) next.commercial = { ...prev.commercial, ...patch.commercial };
       if (patch.platformFeed) next.platformFeed = { ...prev.platformFeed, ...patch.platformFeed };

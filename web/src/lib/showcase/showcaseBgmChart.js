@@ -1,142 +1,184 @@
 /**
- * 릴스·숏츠 감성 BGM 차트 (YouTube 공식 embed)
+ * 릴스·숏츠 감성 BGM 차트 (SoundCloud Widget embed)
  *
- * 중요: 인스타/틱톡 공식 TOP100 저작권 음원은 라이선스 없이 MP3로 스트리밍할 수 없음.
- * → YouTube에 공개·임베드 가능한 **실제 음악**(로파이·바이럴 감성·Audio Library 계열)을
- *    주간 순위로 회전해 제공. 사용자가 URL로 원하는 곡도 지정 가능.
+ * YouTube 임베드 실패·지역 제한이 많아 SoundCloud 공개 트랙으로 전환.
+ * trackUrl 은 api.soundcloud.com/tracks/{id} 또는 permalink.
  */
 
-/** @typedef {{ id: string, label: string, tag: string, theme: string, videoId: string, artist: string }} ReelsChartTrack */
+/**
+ * @typedef {{
+ *   id: string,
+ *   label: string,
+ *   tag: string,
+ *   theme: string,
+ *   trackId: string,
+ *   trackUrl: string,
+ *   artworkUrl: string,
+ *   artist: string
+ * }} ReelsChartTrack
+ */
 
 /** @type {ReelsChartTrack[]} */
 export const REELS_BGM_CHART_POOL = [
   {
-    id: "reels-lofi-radio",
-    label: "Lofi Hip Hop Radio",
-    tag: "로파이",
-    theme: "lofi",
-    videoId: "jfKfPfyJRdk",
-    artist: "Lofi Girl"
-  },
-  {
-    id: "reels-synthwave",
-    label: "Synthwave Drive",
-    tag: "신스웨이브",
-    theme: "business",
-    videoId: "4xDzrJKXOOY",
-    artist: "Lofi Girl"
-  },
-  {
-    id: "reels-coffee-shop",
-    label: "Coffee Shop Vibes",
-    tag: "카페",
-    theme: "cafe",
-    videoId: "0n80vO2P2es",
-    artist: "Coffee Shop Vibes"
-  },
-  {
-    id: "reels-chillhop",
-    label: "Chillhop Essentials",
-    tag: "칠합",
-    theme: "lofi",
-    videoId: "7NOSDKbWMlQ",
-    artist: "Chillhop Music"
-  },
-  {
-    id: "reels-study-beats",
-    label: "Study Beats",
-    tag: "집중",
-    theme: "lofi",
-    videoId: "5qap5aO4i9A",
-    artist: "Lofi Girl"
-  },
-  {
-    id: "reels-night-jazz",
-    label: "Late Night Jazz",
-    tag: "재즈",
-    theme: "cafe",
-    videoId: "Dx5iJTaoZuw",
-    artist: "Cafe Music BGM"
-  },
-  {
-    id: "reels-ambient-calm",
-    label: "Calm Ambient Flow",
+    id: "sc-flickermood",
+    label: "Flickermood",
     tag: "앰비언트",
     theme: "ambient",
-    videoId: "n61ULEU7CO0",
-    artist: "Ambient Worlds"
+    trackId: "293",
+    trackUrl: "https://api.soundcloud.com/tracks/293",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000067273316-smsiqx-t500x500.jpg",
+    artist: "Forss"
   },
   {
-    id: "reels-upbeat-work",
-    label: "Upbeat Work Energy",
+    id: "sc-funk-nerds",
+    label: "Funk for Nerds",
     tag: "업비트",
     theme: "business",
-    videoId: "htXuwXA5mxk",
-    artist: "YouTube Audio Library"
+    trackId: "292",
+    trackUrl: "https://api.soundcloud.com/tracks/292",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000067273305-sndpvm-t500x500.jpg",
+    artist: "Forss"
   },
   {
-    id: "reels-rainy-lofi",
-    label: "Rainy Window Lofi",
+    id: "sc-splashes",
+    label: "Using Splashes",
+    tag: "칠",
+    theme: "lofi",
+    trackId: "294",
+    trackUrl: "https://api.soundcloud.com/tracks/294",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000067273321-fasi2k-t500x500.jpg",
+    artist: "Forss"
+  },
+  {
+    id: "sc-journeyman",
+    label: "Journeyman",
+    tag: "카페",
+    theme: "cafe",
+    trackId: "295",
+    trackUrl: "https://api.soundcloud.com/tracks/295",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000067273337-nrnhok-t500x500.jpg",
+    artist: "Forss"
+  },
+  {
+    id: "sc-atomised",
+    label: "Atomised",
+    tag: "로파이",
+    theme: "lofi",
+    trackId: "296",
+    trackUrl: "https://api.soundcloud.com/tracks/296",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000067273344-qyp37r-t500x500.jpg",
+    artist: "Forss"
+  },
+  {
+    id: "sc-characteristics",
+    label: "Characteristics",
+    tag: "비즈니스",
+    theme: "business",
+    trackId: "297",
+    trackUrl: "https://api.soundcloud.com/tracks/297",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000067273350-xb5img-t500x500.jpg",
+    artist: "Forss"
+  },
+  {
+    id: "sc-inversion",
+    label: "Lost Through Inversion",
+    tag: "딥",
+    theme: "ambient",
+    trackId: "298",
+    trackUrl: "https://api.soundcloud.com/tracks/298",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000067273355-i8z5ni-t500x500.jpg",
+    artist: "Forss"
+  },
+  {
+    id: "sc-tacit",
+    label: "Tacit Knowledge",
     tag: "감성",
     theme: "lofi",
-    videoId: "DWcJFNfaf9c",
-    artist: "STEEZYASFUCK"
+    trackId: "299",
+    trackUrl: "https://api.soundcloud.com/tracks/299",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000067273359-vazv3x-t500x500.jpg",
+    artist: "Forss"
   },
   {
-    id: "reels-morning-cafe",
-    label: "Morning Cafe Piano",
-    tag: "피아노",
-    theme: "cafe",
-    videoId: "lTRiuFIWV54",
-    artist: "Cafe Music BGM channel"
-  },
-  {
-    id: "reels-city-walk",
-    label: "City Walk Beats",
-    tag: "시티",
-    theme: "lofi",
-    videoId: "f02mOEt11OQ",
-    artist: "The Jazz Hop Café"
-  },
-  {
-    id: "reels-dream-pop",
-    label: "Dream Pop Soft",
-    tag: "드림",
-    theme: "ambient",
-    videoId: "M7lc1UVf-VE",
-    artist: "YouTube Audio Library"
-  },
-  {
-    id: "reels-focus-deep",
-    label: "Deep Focus",
+    id: "sc-paradigm",
+    label: "Paradigm Shift",
     tag: "포커스",
-    theme: "ambient",
-    videoId: "WPni755-Krg",
-    artist: "Lofi Girl"
-  },
-  {
-    id: "reels-summer-chill",
-    label: "Summer Chill",
-    tag: "썸머",
-    theme: "cafe",
-    videoId: "kgx4WGK0oNU",
-    artist: "Chill Music Lab"
-  },
-  {
-    id: "reels-groove-night",
-    label: "Night Groove",
-    tag: "그루브",
     theme: "business",
-    videoId: "hHW1oY26kxQ",
-    artist: "Chillhop Music"
+    trackId: "300",
+    trackUrl: "https://api.soundcloud.com/tracks/300",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000067273366-0ax7gy-t500x500.jpg",
+    artist: "Forss"
   },
   {
-    id: "reels-soft-morning",
-    label: "Soft Morning",
+    id: "sc-hobnotropic",
+    label: "Hobnotropic",
+    tag: "힐링",
+    theme: "ambient",
+    trackId: "49931",
+    trackUrl: "https://api.soundcloud.com/tracks/49931",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000000103093-941e7e-t500x500.jpg",
+    artist: "matas petrikas"
+  },
+  {
+    id: "sc-new-year",
+    label: "Waiting For The New Year",
     tag: "모닝",
     theme: "cafe",
-    videoId: "1fueZCTYkpA",
-    artist: "Coffee Music"
+    trackId: "215386080",
+    trackUrl: "https://api.soundcloud.com/tracks/215386080",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000166412176-0d9iwn-t500x500.jpg",
+    artist: "Common Static"
+  },
+  {
+    id: "sc-mais",
+    label: "Mais do Que Sou",
+    tag: "그루브",
+    theme: "cafe",
+    trackId: "257876590",
+    trackUrl: "https://api.soundcloud.com/tracks/257876590",
+    artworkUrl: "https://i1.sndcdn.com/artworks-VIKCBWs85kbe-0-t500x500.jpg",
+    artist: "O Giro"
+  },
+  {
+    id: "sc-kungamordet",
+    label: "Kungamordet",
+    tag: "시네마",
+    theme: "ambient",
+    trackId: "309",
+    trackUrl: "https://api.soundcloud.com/tracks/309",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000039607388-y1u9r5-t500x500.jpg",
+    artist: "Jean-Paul Wall"
+  },
+  {
+    id: "sc-lacheln",
+    label: "Lächeln",
+    tag: "브런치",
+    theme: "cafe",
+    trackId: "257876591",
+    trackUrl: "https://api.soundcloud.com/tracks/257876591",
+    artworkUrl: "https://i1.sndcdn.com/artworks-XCNbrKoSAlcq-0-t500x500.jpg",
+    artist: "Adoro"
+  },
+  {
+    id: "sc-kussen",
+    label: "Küssen (Instrumental)",
+    tag: "피아노",
+    theme: "cafe",
+    trackId: "257876592",
+    trackUrl: "https://api.soundcloud.com/tracks/257876592",
+    artworkUrl: "https://i1.sndcdn.com/artworks-Q5hIPqJn7o5r-0-t500x500.jpg",
+    artist: "Adoro"
+  },
+  {
+    id: "sc-lynguistics",
+    label: "Lynguistics",
+    tag: "힙합",
+    theme: "lofi",
+    trackId: "215386082",
+    trackUrl: "https://api.soundcloud.com/tracks/215386082",
+    artworkUrl: "https://i1.sndcdn.com/artworks-000123702397-wq1kc8-t500x500.jpg",
+    artist: "CunninLynguists"
   }
 ];
 

@@ -27,8 +27,16 @@ export function createDefaultShowcaseStyle() {
     tags: [],
     bgm: {
       mode: "none",
-      presetId: "cafe-kpop-piano",
-      youtube: { videoId: "", title: "", artist: "", query: "" }
+      presetId: "",
+      youtube: { videoId: "", title: "", artist: "", query: "" },
+      soundcloud: {
+        trackUrl: "",
+        trackId: "",
+        title: "",
+        artist: "",
+        artworkUrl: "",
+        query: ""
+      }
     },
     gallery: {
       photos: []
@@ -75,7 +83,12 @@ function mergeDeep(defaults, parsed) {
   return {
     ...defaults,
     ...parsed,
-    bgm: { ...defaults.bgm, ...parsed?.bgm, youtube: { ...defaults.bgm.youtube, ...parsed?.bgm?.youtube } },
+    bgm: {
+      ...defaults.bgm,
+      ...parsed?.bgm,
+      youtube: { ...defaults.bgm.youtube, ...parsed?.bgm?.youtube },
+      soundcloud: { ...defaults.bgm.soundcloud, ...parsed?.bgm?.soundcloud }
+    },
     gallery: { photos: parsed?.gallery?.photos || defaults.gallery.photos },
     richCustom: { ...defaults.richCustom, ...parsed?.richCustom },
     commercial: {
