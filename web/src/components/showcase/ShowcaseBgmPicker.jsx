@@ -79,7 +79,7 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
     const token = previewTokenRef.current;
     const audio = new Audio();
     audio.preload = "auto";
-    audio.crossOrigin = "anonymous";
+    /* crossOrigin=anonymous 는 CDN CORS 없으면 onerror → 네트워크 오안내 유발. 재생만 하면 CORS 불필요 */
     audio.volume = 0.85;
     audioRef.current = audio;
     setPreviewId(presetId);
@@ -104,7 +104,8 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
       });
     };
 
-    audio.onerror = () => fail("음원 파일을 불러오지 못했습니다. 네트워크를 확인해 주세요.");
+    audio.onerror = () =>
+      fail("음원을 불러오지 못했습니다. 잠시 후 다시 눌러 주세요. (Wi‑Fi와 무관하게 서버 음원 연결일 수 있습니다)");
     audio.oncanplay = startPlay;
     audio.onloadeddata = startPlay;
     audio.src = preset.url;
@@ -114,11 +115,17 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
       fail();
     }
 
-    /* SoundHelix 등 느린 CDN — 로딩 대기 후 재생 시도 */
+    /* 프록시·CDN 로딩 대기 후 재생 시도 */
     window.setTimeout(() => {
       if (previewTokenRef.current !== token || settled) return;
       if (audio.readyState >= 2) startPlay();
-    }, 2500);
+    }, 3000);
+
+    /* 최종 타임아웃 */
+    window.setTimeout(() => {
+      if (previewTokenRef.current !== token || settled) return;
+      fail("음원 로딩이 지연됩니다. 다시 눌러 주세요.");
+    }, 18000);
 
     previewTimerRef.current = window.setTimeout(() => {
       if (previewTokenRef.current !== token) return;
