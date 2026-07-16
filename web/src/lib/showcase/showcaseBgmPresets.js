@@ -8,7 +8,12 @@ import { apiUrl } from "../apiBase.js";
 import { getReelsChartTrackById, getWeeklyReelsBgmChart } from "./showcaseBgmChart.js";
 import { extractSoundCloudTrackUrl } from "./showcaseSoundCloud.js";
 
-export { searchShowcaseBgmByGenre, SHOWCASE_BGM_GENRE_CHIPS, getNextAvailableBgmTrack } from "./showcaseBgmChart.js";
+export {
+  searchShowcaseBgmByGenre,
+  SHOWCASE_BGM_GENRE_CHIPS,
+  SHOWCASE_BGM_TAG_CURATIONS,
+  getNextAvailableBgmTrack
+} from "./showcaseBgmChart.js";
 
 /** @param {number} n 1..10 */
 export function showcaseBgmDirectUrl(n) {
@@ -63,9 +68,13 @@ const LEGACY_MP3 = [
   { id: "soft-piano", label: "소프트 피아노", tag: "#피아노", theme: "ambient", helixN: 3 }
 ];
 
-/** UI 기본 목록 = 주간 SoundCloud 차트 */
-export function buildShowcaseBgmPresets(theme = "all") {
-  return getWeeklyReelsBgmChart({ theme, limit: 14 }).map((t) => ({
+/** UI 기본 목록 = KR 확인 SoundCloud 차트 */
+export function buildShowcaseBgmPresets(theme = "all", opts = {}) {
+  return getWeeklyReelsBgmChart({
+    theme,
+    limit: 14,
+    genreBoost: opts.genreBoost || ""
+  }).map((t) => ({
     id: t.id,
     label: t.label,
     tag: t.tag,
@@ -82,12 +91,13 @@ export function buildShowcaseBgmPresets(theme = "all") {
 /** @type {ShowcaseBgmPreset[]} */
 export const SHOWCASE_BGM_PRESETS = buildShowcaseBgmPresets("all");
 
+/** @deprecated 태그 큐레이션은 SHOWCASE_BGM_TAG_CURATIONS 사용 */
 export const SHOWCASE_BGM_THEMES = [
-  { id: "all", label: "전체" },
-  { id: "cafe", label: "카페감성" },
-  { id: "business", label: "비즈니스" },
-  { id: "lofi", label: "로파이·숏폼" },
-  { id: "ambient", label: "앰비언트" }
+  { id: "all", label: "#전체" },
+  { id: "cafe", label: "#카페감성" },
+  { id: "business", label: "#비즈니스" },
+  { id: "lofi", label: "#로파이" },
+  { id: "ambient", label: "#앰비언트" }
 ];
 
 export function getBgmPresetById(id) {

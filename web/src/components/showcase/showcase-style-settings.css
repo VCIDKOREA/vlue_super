@@ -1369,66 +1369,12 @@
   color: #2b6ff0;
 }
 
-.showcase-bgm-picker__album.is-blocked {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.showcase-bgm-picker__album.is-blocked .showcase-bgm-picker__cover {
-  filter: grayscale(1);
-  box-shadow: none;
-}
-
-.showcase-bgm-picker__album.is-blocked .showcase-bgm-picker__album-title,
-.showcase-bgm-picker__album.is-blocked .showcase-bgm-picker__album-sub {
-  color: #94a3b8;
-}
-
-.showcase-bgm-picker__blocked-badge {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.55);
-  color: #e2e8f0;
-}
-
-.showcase-bgm-picker__region-toast {
-  margin: 0 0 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.35;
-  word-break: keep-all;
-}
-
-.showcase-bgm-picker__genre-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 8px 0 4px;
-}
-
-.showcase-bgm-picker__genre-chip {
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+.showcase-bgm-picker__search-status {
+  margin: 8px 0 0;
   font-size: 11px;
   font-weight: 700;
   color: #475569;
-  cursor: pointer;
-}
-
-.showcase-bgm-picker__genre-chip.active {
-  border-color: #2b6ff0;
-  background: #eff6ff;
-  color: #1d4ed8;
+  word-break: keep-all;
 }
 
 .showcase-bgm-picker__recommend {

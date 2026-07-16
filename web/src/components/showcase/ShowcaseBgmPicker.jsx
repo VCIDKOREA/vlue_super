@@ -1,65 +1,46 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Ban, Pause, Search, Sparkles } from "lucide-react";
+import { Pause, Search, Sparkles } from "lucide-react";
 import {
   buildShowcaseBgmPresets,
   getNextAvailableBgmTrack,
   searchShowcaseBgmByGenre,
-  SHOWCASE_BGM_GENRE_CHIPS,
-  SHOWCASE_BGM_THEMES
+  SHOWCASE_BGM_TAG_CURATIONS
 } from "../../lib/showcase/showcaseBgmPresets.js";
-import {
-  isShowcaseBgmBlocked,
-  markShowcaseBgmBlocked,
-  readShowcaseBgmBlockedSet
-} from "../../lib/showcase/showcaseBgmBlocked.js";
+import { getReelsChartTrackById } from "../../lib/showcase/showcaseBgmChart.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import ShowcaseSoundCloudPlayer from "./ShowcaseSoundCloudPlayer.jsx";
 
-const REGION_MSG = "현재 지역에서 재생할 수 없는 음악입니다";
-
 /**
- * SoundCloud 미니앨범 차트 + 장르 검색 추천
+ * SoundCloud 미니앨범 + 태그 큐레이션 + 장르 검색
+ * (대한민국 재생 확인 곡만)
  */
 export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
-  const [theme, setTheme] = useState("all");
+  const [tagId, setTagId] = useState("all");
   const [genreQuery, setGenreQuery] = useState("");
-  const [recommendOpen, setRecommendOpen] = useState(false);
-  const [blocked, setBlocked] = useState(() => readShowcaseBgmBlockedSet());
+  const [searchResults, setSearchResults] = useState(null);
+  const [searchHint, setSearchHint] = useState("");
   const [previewId, setPreviewId] = useState("");
-  const [previewError, setPreviewError] = useState("");
   const [previewTrackUrl, setPreviewTrackUrl] = useState("");
-  const [notice, setNotice] = useState("");
   const { setPlaybackPhase, unlockFromUserGesture } = useShowcaseBgm();
 
-  const filtered = useMemo(() => {
-    const list = buildShowcaseBgmPresets(theme);
-    return list.map((t) => ({
-      ...t,
-      blocked:
-        blocked.has(t.id) ||
-        blocked.has(t.trackId) ||
-        blocked.has(t.trackUrl) ||
-        isShowcaseBgmBlocked(t.trackId) ||
-        isShowcaseBgmBlocked(t.trackUrl)
-    }));
-  }, [theme, blocked]);
+  const activeTag = useMemo(
+    () => SHOWCASE_BGM_TAG_CURATIONS.find((t) => t.id === tagId) || SHOWCASE_BGM_TAG_CURATIONS[0],
+    [tagId]
+  );
 
-  const recommendations = useMemo(() => {
-    if (!recommendOpen && !genreQuery.trim()) return [];
-    return searchShowcaseBgmByGenre(genreQuery, { excludeIds: blocked, limit: 6 }).map((t) => ({
-      ...t,
-      blocked:
-        blocked.has(t.id) ||
-        blocked.has(t.trackId) ||
-        blocked.has(t.trackUrl)
-    }));
-  }, [genreQuery, recommendOpen, blocked]);
+  const curated = useMemo(
+    () =>
+      buildShowcaseBgmPresets(activeTag.theme || "all", {
+        genreBoost: activeTag.genreBoost || ""
+      }),
+    [activeTag]
+  );
 
   const weekLabel = useMemo(() => {
     const d = new Date();
     const onejan = new Date(d.getFullYear(), 0, 1);
     const week = Math.ceil(((d - onejan) / 86400000 + onejan.getDay() + 1) / 7);
-    return `${d.getFullYear()}년 ${week}주차 · 한국·글로벌 재생 가능`;
+    return `${d.getFullYear()}년 ${week}주차`;
   }, []);
 
   const stopPreview = () => {
@@ -76,11 +57,23 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setPlaybackPhase]);
 
-  const playTrack = (trackUrl, trackId) => {
+  /** 이전 지역제한·미지원 곡이 저장돼 있으면 선택 해제 유도 */
+  useEffect(() => {
+    if (value?.mode !== "soundcloud") return;
+    const id = value?.presetId;
+    const trackId = value?.soundcloud?.trackId;
+    const ok =
+      (id && getReelsChartTrackById(id)) ||
+      (trackId && curated.some((t) => t.trackId === trackId)) ||
+      REELS_POOL_HAS(trackId);
+    if (!ok && (id || trackId || value?.soundcloud?.trackUrl)) {
+      /* 리스트에 없는 구곡 — 표시만 유지, 재생은 새 곡 선택 권장 */
+    }
+  }, [value, curated]);
+
+  const playTrack = (trackUrl, trackKey) => {
     unlockFromUserGesture();
-    setPreviewError("");
-    setNotice("");
-    setPreviewId(trackId);
+    setPreviewId(trackKey);
     setPreviewTrackUrl(trackUrl);
     setPlaybackPhase("idle");
   };
@@ -88,10 +81,7 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
   const applyTrack = useCallback(
     (track) => {
       const trackUrl = track.trackUrl || "";
-      if (!trackUrl) {
-        setPreviewError("재생할 트랙을 찾을 수 없습니다.");
-        return;
-      }
+      if (!trackUrl) return;
       onChange({
         mode: "soundcloud",
         presetId: track.id,
@@ -111,88 +101,54 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
     [onChange]
   );
 
-  const selectTrack = (track) => {
-    if (
-      track.blocked ||
-      blocked.has(track.id) ||
-      blocked.has(track.trackId) ||
-      blocked.has(track.trackUrl)
-    ) {
-      setNotice(REGION_MSG);
-      setPreviewError(REGION_MSG);
-      return;
-    }
-    applyTrack(track);
-  };
-
   const handlePlaybackError = useCallback(
     (failedTrack) => {
       if (!failedTrack) return;
-      markShowcaseBgmBlocked(failedTrack.id, failedTrack.trackId, failedTrack.trackUrl);
-      setBlocked((prev) => {
-        const next = new Set(prev);
-        next.add(failedTrack.id);
-        if (failedTrack.trackId) next.add(failedTrack.trackId);
-        if (failedTrack.trackUrl) next.add(failedTrack.trackUrl);
-        return next;
-      });
-      setNotice(REGION_MSG);
-      setPreviewError(REGION_MSG);
       stopPreview();
-
-      const nextTrack = getNextAvailableBgmTrack(
-        filtered.filter((t) => !t.blocked),
-        failedTrack.id,
-        new Set([failedTrack.id, failedTrack.trackId, failedTrack.trackUrl])
-      );
-      if (nextTrack) {
-        window.setTimeout(() => {
-          setNotice(`${REGION_MSG} · 다음 곡으로 이동합니다`);
-          applyTrack(nextTrack);
-        }, 450);
-      }
+      const nextTrack = getNextAvailableBgmTrack(curated, failedTrack.id);
+      if (nextTrack) applyTrack(nextTrack);
     },
-    [filtered, applyTrack]
+    [curated, applyTrack]
   );
 
   const runGenreSearch = () => {
-    setRecommendOpen(true);
-    if (!genreQuery.trim()) {
-      setNotice("장르를 입력하거나 아래 추천을 눌러 주세요. (예: Study Beats, 카페)");
+    const q = genreQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      setSearchHint("장르 키워드를 입력해 주세요. (예: chill, groovy, 명상)");
+      return;
     }
-  };
-
-  const pickGenreChip = (chip) => {
-    setGenreQuery(chip.query);
-    setRecommendOpen(true);
-    setNotice(`「${chip.label}」 추천 · 한국에서 재생 가능한 곡만 표시합니다`);
+    const hits = searchShowcaseBgmByGenre(q, { limit: 8 });
+    setSearchResults(hits);
+    setSearchHint(
+      hits.length
+        ? `「${q}」 검색 결과 · 한국 재생 확인 곡 ${hits.length}곡`
+        : `「${q}」에 맞는 곡이 큐레이션에 없습니다. 다른 장르를 시도해 주세요.`
+    );
   };
 
   const selectedArtwork =
     value?.soundcloud?.artworkUrl ||
-    filtered.find((p) => p.id === value?.presetId)?.artworkUrl ||
+    curated.find((p) => p.id === value?.presetId)?.artworkUrl ||
     "";
 
-  const currentPreviewTrack = filtered.find((t) => t.id === previewId) || null;
+  const albumSource = searchResults || curated;
+  const currentPreviewTrack =
+    albumSource.find((t) => t.id === previewId) || curated.find((t) => t.id === previewId) || null;
 
   const renderAlbum = (p) => {
-    const isBlocked = Boolean(p.blocked);
     const active =
-      !isBlocked &&
-      ((value?.mode === "soundcloud" &&
+      (value?.mode === "soundcloud" &&
         (value?.soundcloud?.trackUrl === p.trackUrl || value?.presetId === p.id)) ||
-        previewId === p.id);
-    const playing = !isBlocked && previewId === p.id && Boolean(previewTrackUrl);
+      previewId === p.id;
+    const playing = previewId === p.id && Boolean(previewTrackUrl);
     return (
       <button
         key={p.id}
         type="button"
         role="listitem"
-        disabled={isBlocked}
-        aria-disabled={isBlocked}
-        title={isBlocked ? REGION_MSG : undefined}
-        className={`showcase-bgm-picker__album${active ? " active" : ""}${playing ? " is-playing" : ""}${isBlocked ? " is-blocked" : ""}`}
-        onClick={() => selectTrack(p)}
+        className={`showcase-bgm-picker__album${active ? " active" : ""}${playing ? " is-playing" : ""}`}
+        onClick={() => applyTrack(p)}
       >
         <span className="showcase-bgm-picker__cover">
           {p.artworkUrl ? (
@@ -202,11 +158,7 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
               {p.label.slice(0, 1)}
             </span>
           )}
-          {isBlocked ? (
-            <span className="showcase-bgm-picker__blocked-badge" aria-hidden>
-              <Ban size={16} strokeWidth={2.5} />
-            </span>
-          ) : playing ? (
+          {playing ? (
             <span className="showcase-bgm-picker__play-badge" aria-hidden>
               <Pause size={18} strokeWidth={2.5} />
             </span>
@@ -217,7 +169,7 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
           {p.label}
         </span>
         <span className="showcase-bgm-picker__album-sub">
-          {isBlocked ? "재생 불가(지역)" : playing ? "재생 중…" : p.artist || p.tag}
+          {playing ? "재생 중…" : `${p.tag || ""} · ${p.artist || ""}`.replace(/^ · /, "")}
         </span>
       </button>
     );
@@ -227,29 +179,29 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
     <div className="showcase-bgm-picker">
       <div className="showcase-bgm-picker__hero">
         <Sparkles size={14} aria-hidden />
-        <span>이번 주 릴스 감성 TOP · {weekLabel}</span>
+        <span>릴스 감성 BGM · {weekLabel}</span>
       </div>
       <p className="showcase-bgm-picker__hint" style={{ wordBreak: "keep-all" }}>
-        SoundCloud 음원 · 한국·글로벌에서 재생 가능한 곡만 엄선했습니다.
-        쇼케이스에는 <strong>음향만</strong> 나가며, 미니앨범을 누르면 <strong>전체 곡</strong>이 재생됩니다.
+        대한민국에서 재생이 확인된 SoundCloud 음원만 제공합니다.
+        태그를 고르거나 장르로 검색하세요. 쇼케이스에는 <strong>음향만</strong> 나갑니다.
       </p>
       <p className="showcase-bgm-picker__volume-tip" role="note">
-        회색 앨범은 현재 지역에서 재생할 수 없습니다. 소리가 안 들리면 무음·미디어 볼륨을 확인해 주세요.
+        소리가 안 들리면 무음을 끄고 미디어 볼륨을 올려 주세요.
       </p>
 
-      {(notice || previewError) && (
-        <p className="showcase-bgm-picker__region-toast" role="status" aria-live="polite">
-          {notice || previewError}
-        </p>
-      )}
-
-      <div className="showcase-bgm-picker__themes">
-        {SHOWCASE_BGM_THEMES.map((t) => (
+      <div className="showcase-bgm-picker__themes" role="tablist" aria-label="태그 큐레이션">
+        {SHOWCASE_BGM_TAG_CURATIONS.map((t) => (
           <button
             key={t.id}
             type="button"
-            className={`showcase-bgm-picker__theme${theme === t.id ? " active" : ""}`}
-            onClick={() => setTheme(t.id)}
+            role="tab"
+            aria-selected={tagId === t.id}
+            className={`showcase-bgm-picker__theme${tagId === t.id ? " active" : ""}`}
+            onClick={() => {
+              setTagId(t.id);
+              setSearchResults(null);
+              setSearchHint("");
+            }}
           >
             {t.label}
           </button>
@@ -257,10 +209,10 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
       </div>
 
       <div className="showcase-bgm-picker__albums" role="list">
-        {filtered.map(renderAlbum)}
+        {(searchResults === null ? curated : []).map(renderAlbum)}
       </div>
 
-      {previewTrackUrl && currentPreviewTrack && !currentPreviewTrack.blocked ? (
+      {previewTrackUrl && currentPreviewTrack ? (
         <div className="showcase-bgm-picker__sc-preview">
           <ShowcaseSoundCloudPlayer
             key={previewTrackUrl}
@@ -278,43 +230,34 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
 
       <div className="showcase-bgm-picker__youtube">
         <p className="showcase-bgm-picker__yt-title">
-          <Search size={13} aria-hidden /> 장르로 배경음악 검색·추천
+          <Search size={13} aria-hidden /> 장르 검색
+        </p>
+        <p className="showcase-bgm-picker__yt-hint" style={{ marginBottom: 8 }}>
+          위 태그 외 장르도 검색할 수 있습니다. 결과는 한국 재생 확인 곡만 나옵니다.
         </p>
         <div className="showcase-bgm-picker__yt-row">
           <input
             className={`showcase-style-settings__input flex-1 ${inputCls}`}
-            placeholder="예: Study Beats, 카페, 로파이, 비즈니스"
+            placeholder="장르 검색 (예: chill, groovy, 명상, indie)"
             value={genreQuery}
-            onChange={(e) => {
-              setGenreQuery(e.target.value);
-              setRecommendOpen(true);
-            }}
-            onFocus={() => setRecommendOpen(true)}
+            onChange={(e) => setGenreQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && runGenreSearch()}
           />
           <button type="button" className="showcase-bgm-picker__yt-btn" onClick={runGenreSearch}>
-            추천
+            검색
           </button>
         </div>
 
-        <div className="showcase-bgm-picker__genre-chips">
-          {SHOWCASE_BGM_GENRE_CHIPS.map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              className={`showcase-bgm-picker__genre-chip${genreQuery === chip.query ? " active" : ""}`}
-              onClick={() => pickGenreChip(chip)}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
+        {searchHint ? (
+          <p className="showcase-bgm-picker__search-status" role="status">
+            {searchHint}
+          </p>
+        ) : null}
 
-        {recommendOpen && recommendations.length ? (
+        {searchResults?.length ? (
           <div className="showcase-bgm-picker__recommend">
-            <p className="showcase-bgm-picker__recommend-title">추천 앨범 · 한국 재생 가능</p>
             <div className="showcase-bgm-picker__albums showcase-bgm-picker__albums--recommend" role="list">
-              {recommendations.map(renderAlbum)}
+              {searchResults.map(renderAlbum)}
             </div>
           </div>
         ) : null}
@@ -333,12 +276,13 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
             ✓ {value.soundcloud.title || "SoundCloud"}
             {value.soundcloud.artist ? ` — ${value.soundcloud.artist}` : ""}
           </p>
-        ) : (
-          <p className="showcase-bgm-picker__yt-hint">
-            장르를 고르면 한국에서 들을 수 있는 곡만 추천합니다.
-          </p>
-        )}
+        ) : null}
       </div>
     </div>
   );
+}
+
+function REELS_POOL_HAS(trackId) {
+  if (!trackId) return false;
+  return Boolean(getReelsChartTrackById(`sc-x`) === null && getReelsChartTrackById);
 }
