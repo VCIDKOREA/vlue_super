@@ -451,6 +451,12 @@ function ProfilePanel({
       if (r.error === "denied") {
         setSettingNotice("위치 권한이 필요합니다. 앱 설정 화면으로 이동합니다.");
         openNativeAppSettings();
+      } else if (r.error === "unavailable" || r.error === "timeout") {
+        setSettingNotice(
+          r.error === "timeout"
+            ? "위치 수신이 지연됩니다. 야외·GPS 켠 뒤 다시 탭해 주세요."
+            : "앱 위치 권한은 허용됐지만 GPS/위치 서비스가 꺼져 있거나 수신이 안 됩니다. 폰 설정에서 위치(GPS)를 켠 뒤 다시 탭해 주세요."
+        );
       }
     });
   }, []);

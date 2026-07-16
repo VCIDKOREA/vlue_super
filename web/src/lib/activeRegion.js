@@ -80,6 +80,64 @@ function readNativeLocationGranted() {
   }
 }
 
+function getCurrentPositionOnce(options) {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(Object.assign(new Error("unsupported"), { code: 0 }));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+  });
+}
+
+/**
+ * 권한 OK인데도 GPS 미수신·타임아웃이 잦아 저정확도→고정확도 재시도
+ */
+async function getPositionWithFallback() {
+  const attempts = [
+    { enableHighAccuracy: false, timeout: 20000, maximumAge: 120000 },
+    { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 }
+  ];
+  let lastErr = null;
+  for (const opts of attempts) {
+    try {
+      return await getCurrentPositionOnce(opts);
+    } catch (err) {
+      lastErr = err;
+      /* PERMISSION_DENIED 는 재시도 무의미 */
+      if (err?.code === 1) throw err;
+    }
+  }
+  throw lastErr || Object.assign(new Error("unavailable"), { code: 2 });
+}
+
+function errorResult(err, cached, nativeGranted) {
+  const code = err?.code;
+  if (code === 1 || nativeGranted === false) {
+    return {
+      label: cached?.label || "위치 권한이 필요합니다",
+      error: "denied",
+      fromCache: Boolean(cached),
+      nativeGranted
+    };
+  }
+  if (code === 3) {
+    return {
+      label: cached?.label || "위치 확인 시간 초과 · 다시 탭해 주세요",
+      error: "timeout",
+      fromCache: Boolean(cached),
+      nativeGranted
+    };
+  }
+  /* code 2 POSITION_UNAVAILABLE — GPS/위치서비스 OFF 또는 수신 불가 */
+  return {
+    label: cached?.label || "위치 서비스를 켠 뒤 다시 탭해 주세요",
+    error: "unavailable",
+    fromCache: Boolean(cached),
+    nativeGranted
+  };
+}
+
 /**
  * @returns {Promise<{ label: string, loading?: boolean, error?: string, fromCache?: boolean }>}
  */
@@ -95,42 +153,32 @@ export function resolveActiveRegion() {
 
   const nativeGranted = readNativeLocationGranted();
 
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          const region = await reverseGeocodeLatLng(latitude, longitude);
-          writeCachedActiveRegion(region);
-          resolve({ label: region.label, fromCache: false });
-        } catch {
-          resolve({
-            label: cached?.label || "위치 주소를 불러오지 못했습니다",
-            error: "geocode",
-            fromCache: Boolean(cached)
-          });
-        }
-      },
-      (err) => {
-        const code = err?.code;
-        /* PERMISSION_DENIED = 1 · OS 허용인데 WebView 미연동이면 여기로 옴 */
-        if (code === 1 || nativeGranted === false) {
-          resolve({
-            label: cached?.label || "위치 권한이 필요합니다",
-            error: "denied",
-            fromCache: Boolean(cached),
-            nativeGranted
-          });
-          return;
-        }
-        resolve({
-          label: cached?.label || "위치를 가져오지 못했습니다",
-          error: "unavailable",
-          fromCache: Boolean(cached),
-          nativeGranted
-        });
-      },
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
-    );
-  });
+  return (async () => {
+    try {
+      const pos = await getPositionWithFallback();
+      try {
+        const { latitude, longitude } = pos.coords;
+        const region = await reverseGeocodeLatLng(latitude, longitude);
+        writeCachedActiveRegion(region);
+        return { label: region.label, fromCache: false };
+      } catch {
+        /* 좌표는 있는데 주소 변환만 실패 — 좌표라도 표시 */
+        const { latitude, longitude } = pos.coords;
+        const fallback = {
+          label: `위도 ${Number(latitude).toFixed(3)}, 경도 ${Number(longitude).toFixed(3)}`,
+          lat: latitude,
+          lng: longitude,
+          at: Date.now()
+        };
+        writeCachedActiveRegion(fallback);
+        return {
+          label: cached?.label || fallback.label,
+          error: "geocode",
+          fromCache: Boolean(cached)
+        };
+      }
+    } catch (err) {
+      return errorResult(err, cached, nativeGranted);
+    }
+  })();
 }
