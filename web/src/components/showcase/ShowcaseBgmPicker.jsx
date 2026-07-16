@@ -6,9 +6,20 @@ import {
   searchShowcaseBgmByGenre,
   SHOWCASE_BGM_TAG_CURATIONS
 } from "../../lib/showcase/showcaseBgmPresets.js";
-import { getReelsChartTrackById } from "../../lib/showcase/showcaseBgmChart.js";
+import { getReelsChartTrackById, REELS_BGM_CHART_POOL } from "../../lib/showcase/showcaseBgmChart.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import ShowcaseSoundCloudPlayer from "./ShowcaseSoundCloudPlayer.jsx";
+
+function isKrCuratedSelection(value) {
+  if (value?.mode !== "soundcloud") return true;
+  const presetId = value?.presetId;
+  if (presetId && getReelsChartTrackById(presetId)) return true;
+  const trackId = String(value?.soundcloud?.trackId || "").trim();
+  if (trackId && REELS_BGM_CHART_POOL.some((t) => t.trackId === trackId && t.krVerified)) return true;
+  const trackUrl = String(value?.soundcloud?.trackUrl || "").trim();
+  if (trackUrl && REELS_BGM_CHART_POOL.some((t) => t.trackUrl === trackUrl && t.krVerified)) return true;
+  return !(presetId || trackId || trackUrl);
+}
 
 /**
  * SoundCloud 미니앨범 + 태그 큐레이션 + 장르 검색
@@ -56,20 +67,6 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setPlaybackPhase]);
-
-  /** 이전 지역제한·미지원 곡이 저장돼 있으면 선택 해제 유도 */
-  useEffect(() => {
-    if (value?.mode !== "soundcloud") return;
-    const id = value?.presetId;
-    const trackId = value?.soundcloud?.trackId;
-    const ok =
-      (id && getReelsChartTrackById(id)) ||
-      (trackId && curated.some((t) => t.trackId === trackId)) ||
-      REELS_POOL_HAS(trackId);
-    if (!ok && (id || trackId || value?.soundcloud?.trackUrl)) {
-      /* 리스트에 없는 구곡 — 표시만 유지, 재생은 새 곡 선택 권장 */
-    }
-  }, [value, curated]);
 
   const playTrack = (trackUrl, trackKey) => {
     unlockFromUserGesture();
@@ -122,19 +119,21 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
     setSearchResults(hits);
     setSearchHint(
       hits.length
-        ? `「${q}」 검색 결과 · 한국 재생 확인 곡 ${hits.length}곡`
-        : `「${q}」에 맞는 곡이 큐레이션에 없습니다. 다른 장르를 시도해 주세요.`
+        ? `「${q}」 검색 결과 · ${hits.length}곡`
+        : `「${q}」에 맞는 곡이 없습니다. 다른 장르를 시도해 주세요.`
     );
   };
 
+  const curatedOk = isKrCuratedSelection(value);
   const selectedArtwork =
-    value?.soundcloud?.artworkUrl ||
+    (curatedOk && value?.soundcloud?.artworkUrl) ||
     curated.find((p) => p.id === value?.presetId)?.artworkUrl ||
     "";
 
-  const albumSource = searchResults || curated;
   const currentPreviewTrack =
-    albumSource.find((t) => t.id === previewId) || curated.find((t) => t.id === previewId) || null;
+    curated.find((t) => t.id === previewId) ||
+    (searchResults || []).find((t) => t.id === previewId) ||
+    null;
 
   const renderAlbum = (p) => {
     const active =
@@ -208,9 +207,11 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
         ))}
       </div>
 
-      <div className="showcase-bgm-picker__albums" role="list">
-        {(searchResults === null ? curated : []).map(renderAlbum)}
-      </div>
+      {searchResults === null ? (
+        <div className="showcase-bgm-picker__albums" role="list">
+          {curated.map(renderAlbum)}
+        </div>
+      ) : null}
 
       {previewTrackUrl && currentPreviewTrack ? (
         <div className="showcase-bgm-picker__sc-preview">
@@ -233,7 +234,7 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
           <Search size={13} aria-hidden /> 장르 검색
         </p>
         <p className="showcase-bgm-picker__yt-hint" style={{ marginBottom: 8 }}>
-          위 태그 외 장르도 검색할 수 있습니다. 결과는 한국 재생 확인 곡만 나옵니다.
+          위 태그 외 장르도 검색할 수 있습니다. 한국 재생 확인 곡만 표시됩니다.
         </p>
         <div className="showcase-bgm-picker__yt-row">
           <input
@@ -262,7 +263,7 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
           </div>
         ) : null}
 
-        {value?.mode === "soundcloud" && (value?.soundcloud?.trackUrl || value?.soundcloud?.title) ? (
+        {value?.mode === "soundcloud" && curatedOk && (value?.soundcloud?.trackUrl || value?.soundcloud?.title) ? (
           <p className="showcase-bgm-picker__yt-selected">
             {selectedArtwork ? (
               <img
@@ -276,13 +277,12 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
             ✓ {value.soundcloud.title || "SoundCloud"}
             {value.soundcloud.artist ? ` — ${value.soundcloud.artist}` : ""}
           </p>
+        ) : value?.mode === "soundcloud" && !curatedOk ? (
+          <p className="showcase-bgm-picker__yt-hint">
+            이전 선택 곡은 목록에서 제외되었습니다. 위 앨범에서 새 곡을 골라 주세요.
+          </p>
         ) : null}
       </div>
     </div>
   );
-}
-
-function REELS_POOL_HAS(trackId) {
-  if (!trackId) return false;
-  return Boolean(getReelsChartTrackById(`sc-x`) === null && getReelsChartTrackById);
 }
