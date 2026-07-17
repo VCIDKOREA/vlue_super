@@ -1,66 +1,30 @@
 import { useEffect, useState } from "react";
 import VLUE_BRAND_LOGO from "../assets/vlue-shield-logo.svg?url";
-import { buildKakaoLoginDiagnosticsText } from "../lib/kakaoLoginDiagnostics.js";
-import { getKakaoOAuthRedirectUri } from "../lib/kakaoSocialLogin.js";
 import KakaoLoginButton from "./auth/KakaoLoginButton.jsx";
 import GoogleLoginButton from "./auth/GoogleLoginButton.jsx";
 import NaverLoginButton from "./auth/NaverLoginButton.jsx";
 import { VlueEyeMark } from "./VlueEyeMark.jsx";
-import { SOCIAL_LOGIN_POLICY_HINT } from "../lib/socialLoginPolicy.js";
 
 const SAVED_ID_KEY = "vlue_saved_login_id";
 const SAVED_PASSWORD_KEY = "vlue_saved_login_password";
 const REMEMBER_KEY = "vlue_remember_login";
 
-function SocialGoogle() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden>
-      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-    </svg>
-  );
-}
-
-function SocialApple() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden>
-      <rect width="24" height="24" rx="5" fill="#000000" />
-      <path
-        fill="#ffffff"
-        d="M16.36 12.55c-.02-2.7 2.2-4.01 2.25-4.04-1.23-1.8-3.12-2.04-3.8-2.06-1.62-.17-3.17.95-4 .95-.82 0-2.09-.93-3.44-.9-1.77.03-3.4 1.03-4.31 2.62-1.84 3.18-.47 7.9 1.32 10.5.87 1.26 1.9 2.67 3.26 2.62 1.3-.05 1.8-.84 3.38-.84s2.03.84 3.42.81c1.41-.03 2.3-1.28 3.16-2.53.99-1.45 1.4-2.85 1.42-2.92-.03-.01-2.72-1.04-2.75-4.11zM13.7 8.05c.9-1.09 1.51-2.6 1.34-4.11-1.29.05-2.85.86-3.78 1.95-.83.96-1.56 2.5-1.37 3.98 1.45.11 2.93-.73 3.81-1.82z"
-      />
-    </svg>
-  );
-}
-
-function SocialPass() {
-  return (
-    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-violet-700 text-[9px] font-black leading-tight tracking-tight text-white ring-1 ring-violet-900/15">
-      PASS
-    </div>
-  );
-}
-
 /**
  * 앱 최초 진입용 로그인 화면
- * - V1: 둘러보기(onDismiss) 없음 — 로그인·회원가입만
- * - 간편 로그인은 이미 가입·연동한 사용자용
+ * - 소셜 가입·로그인을 메인 진입 방식으로 제공
+ * - 일반 계정 로그인·회원가입은 사용자가 선택했을 때 표시
  * - 아이디·비밀번호 저장 체크 후 로그인 시 다음 접속에서 둘 다 불러옴
  */
 function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt }) {
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [rememberLogin, setRememberLogin] = useState(false);
-  const [socialOpen, setSocialOpen] = useState(false);
+  const [generalAuthOpen, setGeneralAuthOpen] = useState(false);
   const [hasRestoredLogin, setHasRestoredLogin] = useState(false);
-  const [kakaoDiagBusy, setKakaoDiagBusy] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [pwEyeBlinkSeq, setPwEyeBlinkSeq] = useState(0);
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState("");
-  const [socialHint, setSocialHint] = useState("");
 
   useEffect(() => {
     try {
@@ -104,22 +68,6 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
     }
   };
 
-  const social = (provider) => {
-    setSocialHint("");
-    const ret = onSocialLogin?.(provider);
-    if (ret != null && typeof ret.then === "function") {
-      ret
-        .then((ok) => {
-          if (ok !== false) setSocialOpen(false);
-        })
-        .catch((e) => {
-          setSocialHint(e instanceof Error ? e.message : "간편 로그인에 실패했습니다.");
-        });
-    } else {
-      setSocialOpen(false);
-    }
-  };
-
   return (
     <div className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden bg-[#fafbfc] antialiased">
       <div className="relative mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-5">
@@ -146,8 +94,31 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
             </p>
           </div>
 
-          <div className="mt-7 w-full max-w-[300px]">
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          {!generalAuthOpen ? (
+            <div className="mt-7 flex w-full max-w-[300px] flex-col items-center">
+              <p className="w-full text-center text-[12px] leading-relaxed text-slate-600 [word-break:keep-all]">
+                kakao · Google · NAVER 가입과 로그인이 가능합니다.
+              </p>
+              <div className="mt-4 flex w-full flex-col gap-2.5">
+                <KakaoLoginButton />
+                <GoogleLoginButton />
+                <NaverLoginButton />
+              </div>
+              <button
+                type="button"
+                onClick={() => setGeneralAuthOpen(true)}
+                className="mt-4 w-full rounded-xl border border-indigo-200 bg-indigo-50 py-2.5 text-[13px] font-semibold text-indigo-900 transition hover:bg-indigo-100 active:scale-[0.99]"
+              >
+                (일반) 로그인 · 회원가입
+              </button>
+              <p className="mt-3 w-full text-center text-[11px] leading-snug text-slate-500 [word-break:keep-all]">
+                VLUE 내부 기능 중 본인인증이 필요할 수 있습니다.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mt-7 w-full max-w-[300px]">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <input
                 type="text"
                 name="loginId"
@@ -191,91 +162,84 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
                   />
                 </button>
               </div>
-            </div>
-            {loginError ? (
-              <p className="mt-2 text-center text-[12px] font-medium leading-snug text-rose-600" role="alert">
-                {loginError}
-              </p>
-            ) : null}
+                </div>
+                {loginError ? (
+                  <p className="mt-2 text-center text-[12px] font-medium leading-snug text-rose-600" role="alert">
+                    {loginError}
+                  </p>
+                ) : null}
 
-            <label className="mt-3 flex cursor-pointer items-start gap-2 text-[12px] text-slate-600">
-              <input
-                type="checkbox"
-                checked={rememberLogin}
-                onChange={(e) => setRememberLogin(e.target.checked)}
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-blue-600"
-              />
-              <span className="min-w-0 leading-snug">아이디·비밀번호 저장</span>
-            </label>
-            {hasRestoredLogin && (
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginId("");
-                  setPassword("");
-                  setHasRestoredLogin(false);
-                  try {
-                    localStorage.removeItem(SAVED_ID_KEY);
-                    localStorage.removeItem(SAVED_PASSWORD_KEY);
-                    localStorage.removeItem(REMEMBER_KEY);
-                  } catch {
-                    /* ignore */
-                  }
-                  setRememberLogin(false);
-                }}
-                className="mt-1.5 text-left text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline"
-              >
-                다른 아이디로 로그인
-              </button>
-            )}
+                <label className="mt-3 flex cursor-pointer items-start gap-2 text-[12px] text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={rememberLogin}
+                    onChange={(e) => setRememberLogin(e.target.checked)}
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-blue-600"
+                  />
+                  <span className="min-w-0 leading-snug">아이디·비밀번호 저장</span>
+                </label>
+                {hasRestoredLogin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginId("");
+                      setPassword("");
+                      setHasRestoredLogin(false);
+                      try {
+                        localStorage.removeItem(SAVED_ID_KEY);
+                        localStorage.removeItem(SAVED_PASSWORD_KEY);
+                        localStorage.removeItem(REMEMBER_KEY);
+                      } catch {
+                        /* ignore */
+                      }
+                      setRememberLogin(false);
+                    }}
+                    className="mt-1.5 text-left text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline"
+                  >
+                    다른 아이디로 로그인
+                  </button>
+                )}
 
-            <div className="mt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => onSocialLogin?.("find_account")}
-                className="text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline"
-              >
-                아이디 / 비밀번호 찾기
-              </button>
-            </div>
-          </div>
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => onSocialLogin?.("find_account")}
+                    className="text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline"
+                  >
+                    아이디 / 비밀번호 찾기
+                  </button>
+                </div>
+              </div>
 
-          <div className="mt-4 w-full max-w-[300px]">
-            <button
-              type="button"
-              onClick={handleSubmitLogin}
-              disabled={loginBusy}
-              className="w-full rounded-lg bg-blue-600 py-2 text-[13px] font-semibold text-white transition active:scale-[0.99] active:bg-blue-700 disabled:cursor-wait disabled:opacity-70"
-            >
-              {loginBusy ? "로그인 중…" : "로그인"}
-            </button>
-            <button
-              type="button"
-              onClick={onSignup}
-              className="mt-1.5 w-full rounded-lg border border-indigo-600 bg-indigo-600 py-2 text-[13px] font-semibold text-white shadow-sm transition active:scale-[0.99] hover:bg-indigo-700"
-            >
-              회원가입
-            </button>
-            <p className="mt-1.5 text-center text-[9px] leading-snug text-slate-500 [word-break:keep-all]">
-              Portone 본인인증 · 약관 동의 · 아이디 설정
-            </p>
-          </div>
-
-          <div className="mt-6 flex w-full max-w-[300px] flex-col items-center">
-            <button
-              type="button"
-              onClick={() => {
-                setSocialHint("");
-                setSocialOpen(true);
-              }}
-              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.99]"
-            >
-              연동된 계정으로 간편 로그인
-            </button>
-            <p className="mt-2 w-full text-center text-[10px] leading-snug text-slate-500 [text-wrap:pretty] [word-break:keep-all] sm:text-[11px]">
-              {SOCIAL_LOGIN_POLICY_HINT}
-            </p>
-          </div>
+              <div className="mt-4 w-full max-w-[300px]">
+                <button
+                  type="button"
+                  onClick={handleSubmitLogin}
+                  disabled={loginBusy}
+                  className="w-full rounded-lg bg-blue-600 py-2 text-[13px] font-semibold text-white transition active:scale-[0.99] active:bg-blue-700 disabled:cursor-wait disabled:opacity-70"
+                >
+                  {loginBusy ? "로그인 중…" : "로그인"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onSignup}
+                  className="mt-1.5 w-full rounded-lg border border-indigo-600 bg-indigo-600 py-2 text-[13px] font-semibold text-white shadow-sm transition active:scale-[0.99] hover:bg-indigo-700"
+                >
+                  회원가입
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginError("");
+                    setGeneralAuthOpen(false);
+                  }}
+                  className="mt-3 w-full py-1 text-[12px] font-semibold text-slate-500 transition hover:text-slate-700"
+                >
+                  간편 로그인으로 돌아가기
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         <p className="shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-center text-[11px] font-medium leading-snug text-slate-400">
@@ -283,95 +247,6 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
         </p>
       </div>
 
-      {socialOpen && (
-        <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="social-login-title">
-          <button type="button" className="absolute inset-0 cursor-default" aria-label="닫기" onClick={() => setSocialOpen(false)} />
-          <div className="relative w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl">
-            <h2 id="social-login-title" className="text-center text-[15px] font-bold text-slate-900">
-              간편 로그인 · 가입
-            </h2>
-            <p className="mt-1 text-center text-[11px] leading-relaxed text-slate-500 [word-break:keep-all]">
-              카카오·Google·네이버로 바로 가입되고 로그인됩니다. 별도 연동이 필요하지 않습니다.
-            </p>
-            {socialHint ? (
-              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium leading-snug text-amber-900" role="alert">
-                {socialHint}
-              </p>
-            ) : null}
-            <div className="mt-4 flex w-full flex-col gap-2.5">
-              <KakaoLoginButton onBeforeNavigate={() => setSocialOpen(false)} />
-              <GoogleLoginButton onBeforeNavigate={() => setSocialOpen(false)} />
-              <NaverLoginButton onBeforeNavigate={() => setSocialOpen(false)} />
-            </div>
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                aria-label="Apple로 로그인"
-                onClick={() => social("apple")}
-                className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full ring-1 ring-slate-200 transition active:scale-95"
-              >
-                <SocialApple />
-              </button>
-              <button type="button" aria-label="PASS 인증" onClick={() => social("pass")} className="transition active:scale-95">
-                <SocialPass />
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setSocialOpen(false);
-                onSignup?.();
-              }}
-              className="mt-3 w-full rounded-xl border border-indigo-200 bg-indigo-50 py-2.5 text-[12px] font-semibold text-indigo-900"
-            >
-              일반 계정으로 가입
-            </button>
-            <p className="mt-3 text-center text-[11px] leading-snug text-slate-500">
-              쇼케이스·명함·결제 등 핵심 기능은 본인인증 후 이용할 수 있습니다.
-            </p>
-            <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-[10px] leading-snug text-slate-600 [word-break:keep-all]">
-              <summary className="cursor-pointer font-semibold text-slate-700">카카오 Redirect URI (서버 OAuth)</summary>
-              <p className="mt-2">
-                Vite 프록시 사용 시 예시 (포트에 맞게 수정):
-              </p>
-              <p className="mt-1 break-all font-mono text-[9px] text-slate-800">
-                {typeof window !== "undefined" ? `${window.location.origin}/api/v1/auth/kakao/callback` : "/api/v1/auth/kakao/callback"}
-              </p>
-              <p className="mt-2">SDK 팝업 방식(선택) Redirect:</p>
-              <p className="mt-1 break-all font-mono text-[9px] text-slate-800">{getKakaoOAuthRedirectUri()}</p>
-            </details>
-            <button
-              type="button"
-              disabled={kakaoDiagBusy}
-              onClick={async () => {
-                setKakaoDiagBusy(true);
-                try {
-                  const text = await buildKakaoLoginDiagnosticsText();
-                  console.info("[VLUE 카카오 점검]\n", text);
-                  try {
-                    await navigator.clipboard?.writeText?.(text);
-                  } catch {
-                    /* ignore */
-                  }
-                  window.alert(
-                    "점검 결과를 클립보드에 복사했습니다. 메모장에 붙여넣어 확인하세요.\n(복사가 안 되면 F12 → Console에 [VLUE 카카오 점검] 로그가 있습니다.)"
-                  );
-                } catch (e) {
-                  window.alert(e instanceof Error ? e.message : String(e));
-                } finally {
-                  setKakaoDiagBusy(false);
-                }
-              }}
-              className="mt-3 w-full rounded-xl border border-dashed border-slate-300 bg-white py-2 text-[12px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-            >
-              {kakaoDiagBusy ? "점검 중…" : "카카오 연동 점검 (결과 복사)"}
-            </button>
-            <button type="button" onClick={() => setSocialOpen(false)} className="mt-3 w-full rounded-xl border border-slate-200 py-2.5 text-[13px] font-semibold text-slate-600">
-              닫기
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
