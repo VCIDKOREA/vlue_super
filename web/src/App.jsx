@@ -154,7 +154,7 @@ import {
   getRefreshToken
 } from "./lib/vlueAuthHeaders.js";
 import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./lib/kakaoSocialLogin.js";
-import { consumeKakaoOAuthReturn } from "./lib/kakaoOAuthReturn.js";
+import { consumeSocialOAuthReturn } from "./lib/socialOAuthReturn.js";
 import { formatSocialLoginError } from "./lib/socialLoginPolicy.js";
 import { VLUE_MARKETING_SIGNUP_KEY, withdrawVlueAccount } from "./lib/vlueAuthApi.js";
 import LetteringNotificationPreviewPage from "./components/LetteringNotificationPreviewPage.jsx";
@@ -1852,16 +1852,24 @@ function App() {
   );
 
   useEffect(() => {
-    const result = consumeKakaoOAuthReturn();
+    const result = consumeSocialOAuthReturn();
     if (!result.handled) return;
     if (result.success && result.session) {
       persistAuthSessionAfterLogin(result.session);
       processTierChangeFromLoginData(result.session);
-      setBottomToast("카카오로 로그인되었습니다.");
+      const label =
+        result.provider === "google"
+          ? "Google"
+          : result.provider === "kakao"
+            ? "카카오"
+            : result.provider === "naver"
+              ? "네이버"
+              : "소셜";
+      setBottomToast(`${label}로 로그인되었습니다.`);
       const t = setTimeout(() => setBottomToast(""), 2200);
       return () => clearTimeout(t);
     }
-    setBottomToast(formatSocialLoginError(result.message) || "카카오 로그인에 실패했습니다. 다시 시도해 주세요.");
+    setBottomToast(formatSocialLoginError(result.message) || "소셜 로그인에 실패했습니다. 다시 시도해 주세요.");
     const t = setTimeout(() => setBottomToast(""), 3200);
     return () => clearTimeout(t);
   }, [persistAuthSessionAfterLogin, processTierChangeFromLoginData]);
@@ -1991,8 +1999,18 @@ function App() {
         pass: "PASS"
       };
 
+      if (provider === "google") {
+        window.location.assign(apiUrl("/api/v1/auth/google"));
+        return true;
+      }
+
+      if (provider === "naver") {
+        window.location.assign(apiUrl("/api/v1/auth/naver"));
+        return true;
+      }
+
       if (provider !== "kakao") {
-        const msg = `${labels[provider] || provider} 간편 로그인은 회원가입 후 마이페이지에서 연동해야 합니다. 현재 로그인 화면에서는 카카오(연동 계정)만 지원합니다.`;
+        const msg = `${labels[provider] || provider} 간편 로그인은 준비 중입니다. 카카오·Google·네이버 또는 아이디 로그인을 이용해 주세요.`;
         throw new Error(msg);
       }
 

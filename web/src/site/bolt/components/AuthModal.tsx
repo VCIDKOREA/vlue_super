@@ -147,6 +147,7 @@ export default function AuthModal({
         setError(result.error);
         return;
       }
+      if (result.redirect) return;
       onSuccess(result.user);
     } catch {
       setError('서버에 연결할 수 없습니다. API가 실행 중인지 확인해 주세요.');

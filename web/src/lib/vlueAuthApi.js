@@ -11,8 +11,6 @@ import {
   vlueAuthFetch,
   vlueAuthHeaders
 } from "./vlueAuthHeaders.js";
-import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./kakaoSocialLogin.js";
-import { formatSocialLoginError } from "./socialLoginPolicy.js";
 import { isValidMemberPassword, MEMBER_PASSWORD_INVALID_MESSAGE } from "./memberPasswordRules.js";
 import { normalizeMemberHandleSlug } from "./memberHandleRules.js";
 import { hydrateBizcardFromLoginPayload } from "./bizcardAccountSync.js";
@@ -172,46 +170,25 @@ export async function vlueLoginWithCredentials(input) {
  * @param {'kakao'|'naver'|'google'} provider
  */
 export async function vlueSocialLogin(provider) {
-  if (provider !== "kakao") {
-    return {
-      ok: false,
-      error:
-        provider === "google" || provider === "naver"
-          ? `${provider === "naver" ? "네이버" : "Google"} 간편 로그인은 VLUE 가입 후 마이페이지에서 연동할 수 있습니다. 카카오 또는 아이디 로그인을 이용해 주세요.`
-          : "지원하지 않는 간편 로그인입니다."
-    };
-  }
-
-  try {
-    const accessToken = await getKakaoAccessTokenWithLogin();
-    const me = await fetchKakaoUserMeClient(accessToken);
-    const res = await fetch(apiUrl("/api/auth/social-login"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...clientKindHeaders() },
-      body: JSON.stringify({
-        socialToken: accessToken,
-        provider: "kakao",
-        email: me.email || "",
-        nickname: me.nickname || ""
-      })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      return { ok: false, error: formatSocialLoginError(data?.error) };
+  if (provider === "google") {
+    if (typeof window !== "undefined") {
+      window.location.assign(apiUrl("/api/v1/auth/google"));
     }
-    try {
-      localStorage.setItem("vlue_social_login_provider", "kakao");
-    } catch {
-      /* ignore */
-    }
-    const user = persistVlueAuthSession(data);
-    return { ok: true, user };
-  } catch (e) {
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : "카카오 로그인에 실패했습니다."
-    };
+    return { ok: true, redirect: true };
   }
+  if (provider === "kakao") {
+    if (typeof window !== "undefined") {
+      window.location.assign(apiUrl("/api/v1/auth/kakao"));
+    }
+    return { ok: true, redirect: true };
+  }
+  if (provider === "naver") {
+    if (typeof window !== "undefined") {
+      window.location.assign(apiUrl("/api/v1/auth/naver"));
+    }
+    return { ok: true, redirect: true };
+  }
+  return { ok: false, error: "지원하지 않는 간편 로그인입니다." };
 }
 
 /** www 회원가입 시작 — 앱(/app) 리다이렉트 없이 동일 온보딩 플로우 */

@@ -3,6 +3,8 @@ import VLUE_BRAND_LOGO from "../assets/vlue-shield-logo.svg?url";
 import { buildKakaoLoginDiagnosticsText } from "../lib/kakaoLoginDiagnostics.js";
 import { getKakaoOAuthRedirectUri } from "../lib/kakaoSocialLogin.js";
 import KakaoLoginButton from "./auth/KakaoLoginButton.jsx";
+import GoogleLoginButton from "./auth/GoogleLoginButton.jsx";
+import NaverLoginButton from "./auth/NaverLoginButton.jsx";
 import { VlueEyeMark } from "./VlueEyeMark.jsx";
 import { SOCIAL_LOGIN_POLICY_HINT } from "../lib/socialLoginPolicy.js";
 
@@ -18,14 +20,6 @@ function SocialGoogle() {
       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
     </svg>
-  );
-}
-
-function SocialNaver() {
-  return (
-    <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#03C75A] text-[17px] font-black text-white" aria-hidden>
-      N
-    </span>
   );
 }
 
@@ -294,36 +288,22 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
           <button type="button" className="absolute inset-0 cursor-default" aria-label="닫기" onClick={() => setSocialOpen(false)} />
           <div className="relative w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl">
             <h2 id="social-login-title" className="text-center text-[15px] font-bold text-slate-900">
-              연동 계정 로그인
+              간편 로그인 · 가입
             </h2>
             <p className="mt-1 text-center text-[11px] leading-relaxed text-slate-500 [word-break:keep-all]">
-              VLUE 마스터 계정에 연결해 둔 소셜만 로그인할 수 있습니다. 미연동이면 먼저 회원가입 후 마이페이지에서 연동하세요.
+              카카오·Google·네이버로 바로 가입되고 로그인됩니다. 별도 연동이 필요하지 않습니다.
             </p>
             {socialHint ? (
               <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium leading-snug text-amber-900" role="alert">
                 {socialHint}
               </p>
             ) : null}
-            <div className="mt-4 w-full">
+            <div className="mt-4 flex w-full flex-col gap-2.5">
               <KakaoLoginButton onBeforeNavigate={() => setSocialOpen(false)} />
+              <GoogleLoginButton onBeforeNavigate={() => setSocialOpen(false)} />
+              <NaverLoginButton onBeforeNavigate={() => setSocialOpen(false)} />
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                aria-label="Google로 로그인"
-                onClick={() => social("google")}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-white ring-1 ring-slate-200 transition active:scale-95"
-              >
-                <SocialGoogle />
-              </button>
-              <button
-                type="button"
-                aria-label="네이버로 로그인"
-                onClick={() => social("naver")}
-                className="flex h-12 w-12 items-center justify-center rounded-full ring-1 ring-black/5 transition active:scale-95"
-              >
-                <SocialNaver />
-              </button>
               <button
                 type="button"
                 aria-label="Apple로 로그인"
@@ -344,10 +324,10 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
               }}
               className="mt-3 w-full rounded-xl border border-indigo-200 bg-indigo-50 py-2.5 text-[12px] font-semibold text-indigo-900"
             >
-              아직 계정이 없나요? 회원가입
+              일반 계정으로 가입
             </button>
             <p className="mt-3 text-center text-[11px] leading-snug text-slate-500">
-              카카오는 서버 OAuth로 로그인합니다. 연동은 가입 후 마이페이지에서 진행합니다.
+              쇼케이스·명함·결제 등 핵심 기능은 본인인증 후 이용할 수 있습니다.
             </p>
             <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-[10px] leading-snug text-slate-600 [word-break:keep-all]">
               <summary className="cursor-pointer font-semibold text-slate-700">카카오 Redirect URI (서버 OAuth)</summary>

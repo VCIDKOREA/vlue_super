@@ -1981,6 +1981,7 @@ model PersonalEnterpriseMailOtp {
 enum SocialLoginProvider {
   kakao
   naver
+  google
 }
 
 model UserSocialLoginLink {

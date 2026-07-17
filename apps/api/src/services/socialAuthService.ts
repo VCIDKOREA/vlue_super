@@ -1,6 +1,8 @@
 import type { AccountStatus, SocialLoginProvider } from "@prisma/client";
 import { prisma } from "../db/client.js";
 import { fetchKakaoUserFromAccessToken } from "../integrations/kakao/kakaoUserMe.js";
+import { fetchGoogleUserFromAccessToken } from "../integrations/google/googleOAuth.js";
+import { resolvePublicHandleForNewUser } from "../lib/publicHandle.js";
 import { issueTokenPair, type TokenPair } from "./authSessions.js";
 
 export type SocialLoginRequestBody = {
@@ -17,6 +19,7 @@ export type SocialLoginResponse = {
   accountStatus: AccountStatus;
   phoneE164: string | null;
   linkedProvider: SocialLoginProvider;
+  isNewUser?: boolean;
 } & TokenPair;
 
 type HonoLikeReq = { header: (name: string) => string | undefined };
@@ -25,13 +28,20 @@ type ResolvedSocialIdentity = {
   provider: SocialLoginProvider;
   providerUserId: string;
   providerEmail: string | null;
+  displayName: string | null;
+  emailVerified: boolean;
 };
 
 function normalizeProvider(raw: string): SocialLoginProvider | null {
   const p = raw.trim().toLowerCase();
   if (p === "kakao") return "kakao";
   if (p === "naver") return "naver";
+  if (p === "google") return "google";
   return null;
+}
+
+function signupMethodForProvider(provider: SocialLoginProvider): string {
+  return `social_${provider}`;
 }
 
 async function resolveSocialIdentity(
@@ -47,7 +57,9 @@ async function resolveSocialIdentity(
       providerEmail:
         k.email ||
         (typeof body.email === "string" && body.email.trim() ? body.email.trim() : null) ||
-        null
+        null,
+      displayName: k.nickname || (typeof body.nickname === "string" ? body.nickname.trim() : null) || null,
+      emailVerified: Boolean(k.emailVerified)
     };
   }
 
@@ -59,7 +71,7 @@ async function resolveSocialIdentity(
       throw new Error("네이버 토큰 검증에 실패했습니다.");
     }
     const json = (await res.json()) as {
-      response?: { id?: string; email?: string };
+      response?: { id?: string; email?: string; nickname?: string; name?: string };
     };
     const providerUserId = String(json.response?.id || "").trim();
     if (!providerUserId) {
@@ -68,7 +80,20 @@ async function resolveSocialIdentity(
     return {
       provider: "naver",
       providerUserId,
-      providerEmail: json.response?.email || null
+      providerEmail: json.response?.email || null,
+      displayName: json.response?.nickname || json.response?.name || null,
+      emailVerified: Boolean(json.response?.email)
+    };
+  }
+
+  if (provider === "google") {
+    const g = await fetchGoogleUserFromAccessToken(token);
+    return {
+      provider: "google",
+      providerUserId: g.id,
+      providerEmail: g.email,
+      displayName: g.name || (typeof body.nickname === "string" ? body.nickname.trim() : null) || null,
+      emailVerified: g.emailVerified
     };
   }
 
@@ -132,6 +157,53 @@ async function findUserBySocialMapping(identity: ResolvedSocialIdentity) {
   return { user: legacy, via: "legacy_migrated" as const };
 }
 
+async function createUserFromSocial(identity: ResolvedSocialIdentity) {
+  const publicHandle = await resolvePublicHandleForNewUser(prisma, null);
+  let email: string | null = identity.providerEmail;
+  if (email) {
+    const clash = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true }
+    });
+    if (clash) email = null;
+  }
+
+  const provisionalName = identity.displayName ? identity.displayName.slice(0, 120) : null;
+
+  const created = await prisma.user.create({
+    data: {
+      publicHandle,
+      email,
+      legalName: provisionalName,
+      identityVerified: false,
+      accountStatus: "pending_identity",
+      signupMethod: signupMethodForProvider(identity.provider),
+      socialProvider: identity.provider,
+      socialId: identity.providerUserId,
+      isVerified: Boolean(identity.emailVerified && identity.providerEmail),
+      status: "ACTIVE",
+      currentDiscountRate: 30,
+      socialLoginLinks: {
+        create: {
+          provider: identity.provider,
+          providerUserId: identity.providerUserId,
+          providerEmail: identity.providerEmail,
+          lastLoginAt: new Date()
+        }
+      }
+    },
+    select: {
+      id: true,
+      legalName: true,
+      publicHandle: true,
+      accountStatus: true,
+      phoneE164: true
+    }
+  });
+
+  return created;
+}
+
 async function loginMappedUser(
   user: {
     id: string;
@@ -141,7 +213,8 @@ async function loginMappedUser(
     phoneE164: string | null;
   },
   identity: ResolvedSocialIdentity,
-  req: HonoLikeReq
+  req: HonoLikeReq,
+  isNewUser = false
 ): Promise<SocialLoginResponse> {
   await prisma.userSocialLoginLink.updateMany({
     where: { userId: user.id, provider: identity.provider },
@@ -156,12 +229,13 @@ async function loginMappedUser(
     accountStatus: user.accountStatus,
     phoneE164: user.phoneE164,
     linkedProvider: identity.provider,
+    isNewUser,
     ...pair
   };
 }
 
 /**
- * 연동된 소셜 계정으로만 로그인 — 신규 User 생성 금지 (VLUE 순정 가입 정책).
+ * 소셜 로그인 upsert — 연동 계정이 없으면 pending_identity 유저를 즉시 생성한다.
  */
 export async function completeSocialLogin(
   body: SocialLoginRequestBody,
@@ -175,17 +249,16 @@ export async function completeSocialLogin(
 
   const identity = await resolveSocialIdentity(provider, token, body);
   const mapped = await findUserBySocialMapping(identity);
-  if (!mapped?.user) {
-    throw new Error(
-      "연동된 VLUE 계정이 없습니다. VLUE 순정 회원가입 후 [설정 > 소셜 연동]에서 카카오/네이버를 연결해 주세요."
-    );
+  if (mapped?.user) {
+    return loginMappedUser(mapped.user, identity, req, false);
   }
 
-  return loginMappedUser(mapped.user, identity, req);
+  const created = await createUserFromSocial(identity);
+  return loginMappedUser(created, identity, req, true);
 }
 
 /**
- * 로그인된 VLUE 마스터 계정에 소셜 1:1 연동.
+ * 로그인된 VLUE 계정에 소셜 1:1 연동 (추가 연결).
  */
 export async function linkSocialAccountToUser(
   userId: string,
@@ -203,9 +276,6 @@ export async function linkSocialAccountToUser(
     select: { id: true, signupMethod: true }
   });
   if (!user) throw new Error("사용자를 찾을 수 없습니다.");
-  if (user.signupMethod !== "vlue_native") {
-    throw new Error("VLUE 순정 가입 계정만 소셜 연동할 수 있습니다.");
-  }
 
   const identity = await resolveSocialIdentity(provider, token, body);
 
