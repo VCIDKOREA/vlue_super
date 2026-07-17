@@ -69,6 +69,7 @@ export default function Footer({ onNavigate }: FooterProps) {
               </div>
               <div className="mt-1 space-y-0.5 text-[0.625rem] sm:text-[0.6875rem] leading-relaxed text-gray-500">
                 <p>상호: 브이씨아이디코리아(VCID KOREA)</p>
+                <p>대표자: 이종근</p>
                 <p>사업자: 884-08-03191</p>
                 <p>통신판매업: 제 2026-경북구미-0551호</p>
               </div>
