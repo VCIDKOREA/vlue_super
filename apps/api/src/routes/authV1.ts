@@ -21,9 +21,10 @@ function isProduction(): boolean {
 }
 
 function frontendRedirect(query: Record<string, string>, hash?: Record<string, string>): string {
-  const base = getFrontendOrigin();
+  /* 토큰을 소비하는 SPA 셸은 루트(마케팅)가 아니라 /app 이다 */
+  const base = `${getFrontendOrigin()}/app`;
   const q = new URLSearchParams(query).toString();
-  const url = q ? `${base}/?${q}` : `${base}/`;
+  const url = q ? `${base}?${q}` : base;
   if (!hash || !Object.keys(hash).length) return url;
   const h = new URLSearchParams(hash).toString();
   return `${url}#${h}`;

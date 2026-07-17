@@ -13,7 +13,7 @@ export default function NaverLoginButton({ className = "", disabled = false, onB
       type="button"
       disabled={disabled}
       onClick={startNaverOAuth}
-      aria-label="네이버로 로그인"
+      aria-label="네이버 로그인 및 회원가입"
       className={[
         "flex w-full items-center justify-center gap-2 rounded-md bg-[#03C75A] py-3 text-[15px] font-semibold text-white transition",
         "hover:brightness-[0.98] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50",
@@ -28,7 +28,7 @@ export default function NaverLoginButton({ className = "", disabled = false, onB
       >
         N
       </span>
-      <span>네이버로 로그인</span>
+      <span>네이버 로그인 · 회원가입</span>
     </button>
   );
 }

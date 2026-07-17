@@ -107,9 +107,12 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
               <button
                 type="button"
                 onClick={() => setGeneralAuthOpen(true)}
-                className="mt-4 w-full rounded-xl border border-indigo-200 bg-indigo-50 py-2.5 text-[13px] font-semibold text-indigo-900 transition hover:bg-indigo-100 active:scale-[0.99]"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-[#2563EB] to-[#4F46E5] py-3 text-[15px] font-semibold text-white shadow-sm transition hover:brightness-105 active:scale-[0.99]"
               >
-                (일반) 로그인 · 회원가입
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white shadow-sm" aria-hidden>
+                  <img src={VLUE_BRAND_LOGO} alt="" className="h-5 w-5 rounded" />
+                </span>
+                <span>VLUE 로그인 · 회원가입</span>
               </button>
               <p className="mt-3 w-full text-center text-[11px] leading-snug text-slate-500 [word-break:keep-all]">
                 VLUE 내부 기능 중 본인인증이 필요할 수 있습니다.
