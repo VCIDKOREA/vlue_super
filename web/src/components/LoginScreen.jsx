@@ -3,6 +3,7 @@ import VLUE_BRAND_LOGO from "../assets/vlue-shield-logo.svg?url";
 import KakaoLoginButton from "./auth/KakaoLoginButton.jsx";
 import GoogleLoginButton from "./auth/GoogleLoginButton.jsx";
 import NaverLoginButton from "./auth/NaverLoginButton.jsx";
+import InstagramLoginButton from "./auth/InstagramLoginButton.jsx";
 import { VlueEyeMark } from "./VlueEyeMark.jsx";
 
 const SAVED_ID_KEY = "vlue_saved_login_id";
@@ -97,12 +98,13 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
           {!generalAuthOpen ? (
             <div className="mt-7 flex w-full max-w-[300px] flex-col items-center">
               <p className="w-full text-center text-[12px] leading-relaxed text-slate-600 [word-break:keep-all]">
-                kakao · Google · NAVER 가입과 로그인이 가능합니다.
+                카카오 · Google · 네이버 · Instagram · VLUE 가입과 로그인이 가능합니다.
               </p>
               <div className="mt-4 flex w-full flex-col gap-2.5">
                 <KakaoLoginButton />
                 <GoogleLoginButton />
                 <NaverLoginButton />
+                <InstagramLoginButton />
               </div>
               <button
                 type="button"

@@ -9,4 +9,4 @@ export function formatSocialLoginError(raw) {
 }
 
 export const SOCIAL_LOGIN_POLICY_HINT =
-  "카카오·Google·네이버로 바로 가입·로그인할 수 있습니다. 쇼케이스·명함·결제 등 핵심 기능은 본인인증 후 이용할 수 있습니다.";
+  "카카오·Google·네이버·Instagram으로 바로 가입·로그인할 수 있습니다. 쇼케이스·명함·결제 등 핵심 기능은 본인인증 후 이용할 수 있습니다.";

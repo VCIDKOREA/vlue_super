@@ -70,7 +70,7 @@ function ResultSortBar({ sort, onSortChange }) {
 
 function modeLabel(mode) {
   if (mode === "phone") return "전화번호";
-  if (mode === "name") return "실명·상호";
+  if (mode === "name") return "이름·상호";
   if (mode === "id") return "아이디·활동명";
   if (mode === "hashtag") return "해시태그";
   return "쇼케이스";
@@ -79,16 +79,22 @@ function modeLabel(mode) {
 function mapApiHitToBiz(hit, i, mode) {
   const displayName = hit.displayName || hit.name || "";
   const phone = hit.phoneVisible ? hit.phone || "" : "";
-  const nameOk = hit.nameVisible !== false && displayName && displayName !== "비공개 회원";
-  const org = String(hit.organization || "").trim();
-  const titleName = org || (nameOk ? displayName : displayName || "비공개 회원");
+  const nameOk = hit.nameVisible === true && displayName && displayName !== "비공개 회원";
+  const org = hit.orgVisible === true ? String(hit.organization || "").trim() : "";
+  const orgOk = Boolean(org);
   const handle = hit.publicHandle || "";
+  const titleParts = [];
+  if (orgOk) titleParts.push(org);
+  if (nameOk) titleParts.push(displayName);
+  if (!titleParts.length && handle) titleParts.push(`@${String(handle).replace(/^@/, "")}`);
+  if (!titleParts.length && phone) titleParts.push(phone);
+  const titleName = titleParts.join(" · ") || "비공개 회원";
   const card =
-    nameOk || phone || org
+    nameOk || phone || orgOk || handle
       ? {
           name: nameOk ? displayName : "",
           displayName: nameOk ? displayName : "",
-          organization: org,
+          organization: orgOk ? org : "",
           phone,
           title: hit.title || "",
           logoUrl: hit.logoUrl || "",
@@ -111,12 +117,16 @@ function mapApiHitToBiz(hit, i, mode) {
     roomId: null,
     phone,
     phoneVisible: Boolean(hit.phoneVisible),
+    nameVisible: nameOk,
+    orgVisible: orgOk,
     idInquiryEnabled: Boolean(hit.idInquiryEnabled),
     publicHandle: handle,
     address: "",
     intro:
       (hit.tags || []).join(" ") ||
-      [org, nameOk ? displayName : "", handle ? `@${handle}` : ""].filter(Boolean).join(" · ") ||
+      [orgOk ? org : "", nameOk ? displayName : "", handle ? `@${String(handle).replace(/^@/, "")}` : ""]
+        .filter(Boolean)
+        .join(" · ") ||
       "검색 공개된 쇼케이스",
     menu: [],
     showcaseTags: hit.tags || [],

@@ -33,6 +33,7 @@ import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../lib/letteringBizcardStorage.js";
+import { getMemberHandle } from "../lib/memberCardStorage.js";
 import "../styles/showcase-call-glass.css";
 import "../styles/incall-controls.css";
 
@@ -467,6 +468,15 @@ export default function LetteringIncomingNotification({
   const collapsedPhoneDisplay = receptionLines?.phone
     ? formatLetteringPhoneDisplay(receptionLines.phone)
     : freeTierSummary?.phoneDisplay || formatLetteringPhoneDisplay(incoming) || "";
+  const previewShowcaseId = useMemo(() => {
+    const fromCard = String(c.loginId || c.publicHandle || c.handle || "").trim().replace(/^@+/, "");
+    if (fromCard) return fromCard;
+    const handle = String(getMemberHandle() || "").trim().replace(/^@+/, "");
+    if (handle && handle !== "user") return handle;
+    const fromName = String(c.name || c.displayName || "").trim();
+    return fromName || "VLUE";
+  }, [c.loginId, c.publicHandle, c.handle, c.name, c.displayName]);
+
   const displayLabel = isUnverified
     ? null
     : showcaseOffPreview
@@ -614,6 +624,7 @@ export default function LetteringIncomingNotification({
   const useShowcaseCarousel = isGlassTent || previewMode;
   const carouselScrollEnabled = isPaidMember && (previewMode || onCall || isExpandedView);
   const showcasePhotos = c.showcaseStyle?.gallery?.photos || [];
+  const showcaseStyleConfig = c.showcaseStyle || null;
 
   const renderCircleAction = () => {
     if (showLiveEndCall) {
@@ -762,7 +773,9 @@ export default function LetteringIncomingNotification({
       >
         <div className="lettering-live-bar__left">
           <LetteringLiveIndicator />
-          <span className="lettering-live-bar__brand">{previewMode ? "내 쇼케이스" : "VLUE 작동중"}</span>
+          <span className="lettering-live-bar__brand">
+            {previewMode ? `${previewShowcaseId} Showcase` : "VLUE 작동중"}
+          </span>
         </div>
         {previewStatusLabel ? (
           <span className="lettering-live-bar__status">{previewStatusLabel}</span>
@@ -910,6 +923,7 @@ export default function LetteringIncomingNotification({
                       showOwnerSettings={Boolean(previewMode && showOwnerSettings)}
                       onOpenSlideSettings={openOwnerSettings}
                       onSlideTypeChange={setCarouselSlideType}
+                      showcaseStyle={showcaseStyleConfig}
                     />
                   ) : keypadOpen ? (
                     <InCallDtmfPad
@@ -971,6 +985,7 @@ export default function LetteringIncomingNotification({
                       showOwnerSettings={Boolean(previewMode && showOwnerSettings)}
                       onOpenSlideSettings={openOwnerSettings}
                       onSlideTypeChange={setCarouselSlideType}
+                      showcaseStyle={showcaseStyleConfig}
                     />
                   ) : (
                     <LetteringDigitalReception

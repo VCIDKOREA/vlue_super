@@ -21,6 +21,25 @@ function firstText(...values) {
   return "";
 }
 
+function isNetworkLikeError(err) {
+  const msg = String(err || "").toLowerCase();
+  return (
+    msg.includes("failed to fetch") ||
+    msg.includes("networkerror") ||
+    msg.includes("network request failed") ||
+    msg.includes("load failed") ||
+    msg.includes("network error")
+  );
+}
+
+function likeErrorMessage(res) {
+  if (res?.status === 401) return "로그인 후 좋아요할 수 있습니다.";
+  if (isNetworkLikeError(res?.error)) return "서버에 연결할 수 없어 임시로 반영했습니다.";
+  const raw = String(res?.error || "").trim();
+  if (raw && !/^failed to fetch$/i.test(raw)) return raw;
+  return "좋아요에 실패했습니다.";
+}
+
 /**
  * 배너 슬라이드용 소셜 오버레이 (1~6) — V1
  * 실통화 중에는 부모에서 socialOverlayEnabled=false로 숨김
@@ -28,9 +47,10 @@ function firstText(...values) {
 export default function ShowcaseBannerSocialLayer({
   card,
   slide,
-  previewMode: _previewMode = false,
+  previewMode = false,
   onToast,
-  onReport: onReportProp
+  onReport: onReportProp,
+  hideFooter = false
 }) {
   const style = card?.showcaseStyle || null;
   const slideId = String(slide?.id || "").trim();
@@ -69,7 +89,7 @@ export default function ShowcaseBannerSocialLayer({
     return { avatarUrl: "", logoLetter: peer.initial || displayName };
   }, [style, card, displayName]);
 
-  /* ownerUserId가 있으면 미리보기에서도 실제 좋아요·댓글 API 사용 (본인 쇼케이스 포함) */
+  /* ownerUserId가 있으면 실제 API. 미리보기·오프라인은 로컬 토글 폴백 */
   const localOnly = !ownerUserId;
   const bgm = useShowcaseBgm();
   const [liked, setLiked] = useState(false);
@@ -78,6 +98,13 @@ export default function ShowcaseBannerSocialLayer({
   const [seedComments, setSeedComments] = useState([]);
   const [commentOpen, setCommentOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+
+  const applyLocalLikeToggle = useCallback(() => {
+    setLiked((v) => {
+      setLikeCount((n) => (v ? Math.max(0, n - 1) : n + 1));
+      return !v;
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,20 +129,25 @@ export default function ShowcaseBannerSocialLayer({
 
   const onLike = useCallback(async () => {
     if (localOnly) {
-      setLiked((v) => {
-        setLikeCount((n) => (v ? Math.max(0, n - 1) : n + 1));
-        return !v;
-      });
+      applyLocalLikeToggle();
       return;
     }
     const res = await toggleShowcaseLikeApi(ownerUserId, { slideId });
-    if (!res.ok) {
-      onToast?.(res.error || (res.status === 401 ? "로그인 후 좋아요할 수 있습니다." : "좋아요에 실패했습니다."));
+    if (res.ok) {
+      setLiked(res.likedByMe);
+      setLikeCount(res.likeCount);
       return;
     }
-    setLiked(res.likedByMe);
-    setLikeCount(res.likeCount);
-  }, [ownerUserId, slideId, localOnly, onToast]);
+    /* 로컬 API 미기동·네트워크 오류 시에도 미리보기에서 하트가 동작하도록 */
+    if (!res.status || isNetworkLikeError(res.error) || previewMode) {
+      applyLocalLikeToggle();
+      if (!previewMode && isNetworkLikeError(res.error)) {
+        onToast?.(likeErrorMessage(res));
+      }
+      return;
+    }
+    onToast?.(likeErrorMessage(res));
+  }, [ownerUserId, slideId, localOnly, onToast, previewMode, applyLocalLikeToggle]);
 
   const onShare = useCallback(async () => {
     await shareShowcaseInviteViaKakao({
@@ -145,11 +177,13 @@ export default function ShowcaseBannerSocialLayer({
 
   return (
     <>
-      <ShowcaseBannerFooter
-        avatarUrl={avatarUrl}
-        caption={caption || "VLUE Showcase"}
-        logoLetter={logoLetter}
-      />
+      {!hideFooter ? (
+        <ShowcaseBannerFooter
+          avatarUrl={avatarUrl}
+          caption={caption}
+          logoLetter={logoLetter}
+        />
+      ) : null}
       <ShowcaseSocialRail
         liked={liked}
         likeCount={likeCount}

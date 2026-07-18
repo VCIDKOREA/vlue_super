@@ -5,7 +5,21 @@ import { buildKakaoAuthorizeUrl, exchangeKakaoCodeForAccessToken } from "../inte
 import { getFrontendOrigin } from "../integrations/kakao/kakaoEnv.js";
 import { buildGoogleAuthorizeUrl, exchangeGoogleCodeForAccessToken } from "../integrations/google/googleOAuth.js";
 import { buildNaverAuthorizeUrl, exchangeNaverCodeForAccessToken } from "../integrations/naver/naverOAuth.js";
+import {
+  buildInstagramAuthorizeUrl,
+  createInstagramLinkState,
+  exchangeInstagramCodeForShortLivedToken,
+  exchangeInstagramShortLivedForLongLived,
+  verifyInstagramLinkState
+} from "../integrations/instagram/instagramOAuth.js";
 import { completeSocialLogin, linkSocialAccountToUser } from "../services/socialAuthService.js";
+import {
+  completeInstagramLinkForUser,
+  disconnectInstagramLink,
+  getInstagramLinkStatus,
+  listLinkedInstagramMedia,
+  resolveLinkedInstagramMediaUrls
+} from "../services/instagramLinkService.js";
 import { requireUserHeader } from "../middleware/cardGate.js";
 import { prisma } from "../db/client.js";
 
@@ -14,6 +28,7 @@ export const authV1Routes = new Hono();
 const KAKAO_STATE_COOKIE = "vlue_kakao_oauth_state";
 const GOOGLE_STATE_COOKIE = "vlue_google_oauth_state";
 const NAVER_STATE_COOKIE = "vlue_naver_oauth_state";
+const INSTAGRAM_STATE_COOKIE = "vlue_instagram_oauth_state";
 const STATE_MAX_AGE = 600;
 
 function isProduction(): boolean {
@@ -30,7 +45,7 @@ function frontendRedirect(query: Record<string, string>, hash?: Record<string, s
   return `${url}#${h}`;
 }
 
-type OAuthProvider = "kakao" | "google" | "naver";
+type OAuthProvider = "kakao" | "google" | "naver" | "instagram";
 
 function redirectAuthError(provider: OAuthProvider, message: string): Response {
   const loc = frontendRedirect({
@@ -41,7 +56,9 @@ function redirectAuthError(provider: OAuthProvider, message: string): Response {
       ? { kakao_oauth: "error", kakao_error: message.slice(0, 240) }
       : provider === "google"
         ? { google_oauth: "error", google_error: message.slice(0, 240) }
-        : { naver_oauth: "error", naver_error: message.slice(0, 240) }),
+        : provider === "naver"
+          ? { naver_oauth: "error", naver_error: message.slice(0, 240) }
+          : { instagram_oauth: "error", instagram_error: message.slice(0, 240) }),
     oauth_error: message.slice(0, 240)
   });
   return Response.redirect(loc, 302);
@@ -66,7 +83,9 @@ function redirectAuthSuccess(
         ? { kakao_oauth: "success" }
         : provider === "google"
           ? { google_oauth: "success" }
-          : { naver_oauth: "success" })
+          : provider === "naver"
+            ? { naver_oauth: "success" }
+            : { instagram_oauth: "success" })
     },
     {
       accessToken: payload.accessToken,
@@ -256,6 +275,194 @@ authV1Routes.get("/naver/callback", async (c) => {
     const msg = e instanceof Error ? e.message : "네이버 로그인 처리에 실패했습니다.";
     return redirectAuthError("naver", msg);
   }
+});
+
+function redirectInstagramLink(query: Record<string, string>): Response {
+  const loc = frontendRedirect(query);
+  return Response.redirect(loc, 302);
+}
+
+/** Instagram 로그인·회원가입 (쇼케이스 연동과 동일 OAuth · state 쿠키) */
+authV1Routes.get("/instagram", (c) => {
+  try {
+    const state = randomBytes(24).toString("base64url");
+    setOAuthStateCookie(c, INSTAGRAM_STATE_COOKIE, state);
+    return c.redirect(buildInstagramAuthorizeUrl(state), 302);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Instagram 로그인을 시작할 수 없습니다.";
+    return redirectAuthError("instagram", msg);
+  }
+});
+
+/**
+ * Instagram 프로 계정 연동 시작 (쇼케이스 게시물 선택용).
+ * VLUE 로그인 필요 → authorize URL 반환 후 클라이언트가 리다이렉트.
+ */
+authV1Routes.post("/instagram/link/start", requireUserHeader, async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const state = createInstagramLinkState(userId);
+    const url = buildInstagramAuthorizeUrl(state);
+    return c.json({
+      url,
+      hint:
+        "Meta 앱 대시보드 → Instagram → Business login settings의 Instagram App ID·Redirect URI가 이 요청과 바이트 단위로 일치해야 합니다."
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Instagram 연동을 시작할 수 없습니다.";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+/**
+ * Instagram OAuth 콜백
+ * - signed link state → 쇼케이스 연동
+ * - cookie state → VLUE 로그인·회원가입
+ */
+authV1Routes.get("/instagram/callback", async (c) => {
+  const igErr = c.req.query("error");
+  const igErrDesc = c.req.query("error_description");
+  if (igErr) {
+    const msg =
+      (igErrDesc && String(igErrDesc).replace(/\+/g, " ").trim()) ||
+      (igErr === "access_denied"
+        ? "Instagram 인증이 취소되었습니다."
+        : `Instagram 인증 오류: ${igErr}`);
+    const cookieState = getCookie(c, INSTAGRAM_STATE_COOKIE) || "";
+    if (cookieState) return redirectAuthError("instagram", msg);
+    return redirectInstagramLink({
+      instagram_oauth: "error",
+      instagram_error: msg.slice(0, 240)
+    });
+  }
+
+  const state = c.req.query("state") || "";
+  const code = c.req.query("code");
+  if (!code) {
+    return redirectAuthError("instagram", "Instagram 인가 코드가 없습니다.");
+  }
+
+  const linkUserId = verifyInstagramLinkState(state);
+  if (linkUserId) {
+    try {
+      const link = await completeInstagramLinkForUser(linkUserId, code);
+      return redirectInstagramLink({
+        instagram_oauth: "success",
+        instagram_username: link.username
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Instagram 연동 처리에 실패했습니다.";
+      return redirectInstagramLink({
+        instagram_oauth: "error",
+        instagram_error: msg.slice(0, 240)
+      });
+    }
+  }
+
+  const cookieState = getCookie(c, INSTAGRAM_STATE_COOKIE) || "";
+  if (!state || !cookieState || state !== cookieState) {
+    return redirectAuthError(
+      "instagram",
+      "로그인 요청이 만료되었거나 위조되었습니다. 다시 시도해 주세요."
+    );
+  }
+
+  try {
+    const short = await exchangeInstagramCodeForShortLivedToken(code);
+    let accessToken = short.accessToken;
+    try {
+      const long = await exchangeInstagramShortLivedForLongLived(short.accessToken);
+      accessToken = long.accessToken;
+    } catch {
+      /* 단기 토큰으로 로그인 가능 */
+    }
+
+    const result = await completeSocialLogin(
+      { provider: "instagram", socialToken: accessToken },
+      { header: (n) => c.req.header(n) }
+    );
+
+    /* 로그인 성공 시 쇼케이스용 미디어 연동 토큰도 함께 저장 (코드는 이미 소비됨 → 토큰 upsert) */
+    try {
+      const { fetchInstagramProfile } = await import("../integrations/instagram/instagramOAuth.js");
+      const profile = await fetchInstagramProfile(accessToken);
+      await prisma.userInstagramLink.upsert({
+        where: { userId: result.userId },
+        create: {
+          userId: result.userId,
+          igUserId: profile.igUserId,
+          username: profile.username,
+          accessToken,
+          tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+          accountType: profile.accountType
+        },
+        update: {
+          igUserId: profile.igUserId,
+          username: profile.username,
+          accessToken,
+          tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+          accountType: profile.accountType
+        }
+      });
+    } catch (e2) {
+      console.warn("[instagram] login link upsert failed:", e2 instanceof Error ? e2.message : e2);
+    }
+
+    return redirectAuthSuccess("instagram", {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      userId: result.userId,
+      publicHandle: result.publicHandle,
+      legalName: result.legalName,
+      accountStatus: String(result.accountStatus)
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Instagram 로그인 처리에 실패했습니다.";
+    return redirectAuthError("instagram", msg);
+  }
+});
+
+/** Instagram 연동 상태 */
+authV1Routes.get("/instagram/status", requireUserHeader, async (c) => {
+  const userId = c.get("vlueUserId") as string;
+  const status = await getInstagramLinkStatus(userId);
+  return c.json(status);
+});
+
+/** 연동된 Instagram 미디어 목록 (permalink 선택용) */
+authV1Routes.get("/instagram/media", requireUserHeader, async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const limitRaw = Number(c.req.query("limit") || 40);
+    const result = await listLinkedInstagramMedia(userId, Number.isFinite(limitRaw) ? limitRaw : 40);
+    return c.json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "미디어를 불러오지 못했습니다.";
+    const status = (e as { status?: number })?.status;
+    return c.json({ error: msg }, status === 401 || status === 404 ? status : 400);
+  }
+});
+
+/** 선택 media id의 media_url 재조회 (만료 URL 갱신 · 파일 저장 없음) */
+authV1Routes.post("/instagram/media/resolve", requireUserHeader, async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const body = await c.req.json<{ ids?: string[] }>().catch(() => ({}));
+    const ids = Array.isArray(body?.ids) ? body.ids : [];
+    const result = await resolveLinkedInstagramMediaUrls(userId, ids);
+    return c.json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "미디어 URL을 갱신하지 못했습니다.";
+    const status = (e as { status?: number })?.status;
+    return c.json({ error: msg }, status === 401 || status === 404 ? status : 400);
+  }
+});
+
+/** Instagram 연동 해제 */
+authV1Routes.delete("/instagram/link", requireUserHeader, async (c) => {
+  const userId = c.get("vlueUserId") as string;
+  await disconnectInstagramLink(userId);
+  return c.json({ ok: true });
 });
 
 /** 연동된 소셜 계정 목록 */

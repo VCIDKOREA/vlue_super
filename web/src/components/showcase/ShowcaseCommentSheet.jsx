@@ -63,7 +63,14 @@ export default function ShowcaseCommentSheet({
     const res = await postShowcaseComment(ownerUserId, body, { slideId });
     setBusy(false);
     if (!res.ok) {
-      onToast?.(res.error || "댓글을 남기지 못했습니다.");
+      const msg = String(res.error || "");
+      if (/failed to fetch/i.test(msg) || res.status === 401) {
+        onToast?.(
+          res.status === 401 ? "로그인 후 댓글을 남길 수 있습니다." : "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
+        );
+      } else {
+        onToast?.(msg || "댓글을 남기지 못했습니다.");
+      }
       return;
     }
     const next = [res.comment, ...comments];

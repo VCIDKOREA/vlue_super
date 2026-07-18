@@ -1,7 +1,7 @@
-import { Heart, MessageCircle, Share2, MoreHorizontal } from "lucide-react";
+import { Heart, MessageCircle, Send, MoreHorizontal } from "lucide-react";
 
 /**
- * 쇼케이스 배너 우하단 액션 레일 — 1 좋아요 · 2 댓글 · 3 공유 · 4 더보기
+ * 쇼케이스 배너 우하단 액션 레일 — 좋아요 · 댓글 · 공유(비행기) · 더보기
  */
 export default function ShowcaseSocialRail({
   liked = false,
@@ -51,7 +51,7 @@ export default function ShowcaseSocialRail({
           onShare?.();
         }}
       >
-        <Share2 size={22} strokeWidth={2.2} aria-hidden />
+        <Send size={22} strokeWidth={2.2} aria-hidden />
       </button>
       <button
         type="button"

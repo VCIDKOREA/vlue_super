@@ -155,6 +155,7 @@ import {
 } from "./lib/vlueAuthHeaders.js";
 import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./lib/kakaoSocialLogin.js";
 import { consumeSocialOAuthReturn } from "./lib/socialOAuthReturn.js";
+import { consumeInstagramLinkReturn } from "./lib/instagramLinkApi.js";
 import { formatSocialLoginError } from "./lib/socialLoginPolicy.js";
 import { VLUE_MARKETING_SIGNUP_KEY, withdrawVlueAccount } from "./lib/vlueAuthApi.js";
 import LetteringNotificationPreviewPage from "./components/LetteringNotificationPreviewPage.jsx";
@@ -1852,6 +1853,18 @@ function App() {
   );
 
   useEffect(() => {
+    const ig = consumeInstagramLinkReturn();
+    if (ig.handled) {
+      if (ig.success) {
+        const name = ig.username ? `@${ig.username}` : "Instagram";
+        setBottomToast(`${name} 인증완료 · 게시물 사진을 선택할 수 있습니다.`);
+      } else {
+        setBottomToast(ig.message || "Instagram 연동에 실패했습니다.");
+      }
+      const t = setTimeout(() => setBottomToast(""), 3200);
+      return () => clearTimeout(t);
+    }
+
     const result = consumeSocialOAuthReturn();
     if (!result.handled) return;
     if (result.success && result.session) {
@@ -1864,7 +1877,9 @@ function App() {
             ? "카카오"
             : result.provider === "naver"
               ? "네이버"
-              : "소셜";
+              : result.provider === "instagram"
+                ? "Instagram"
+                : "소셜";
       setBottomToast(`${label}로 로그인되었습니다.`);
       const t = setTimeout(() => setBottomToast(""), 2200);
       return () => clearTimeout(t);
@@ -1995,6 +2010,7 @@ function App() {
         kakao: "카카오",
         google: "Google",
         naver: "네이버",
+        instagram: "Instagram",
         apple: "Apple",
         pass: "PASS"
       };
@@ -2009,8 +2025,13 @@ function App() {
         return true;
       }
 
+      if (provider === "instagram") {
+        window.location.assign(apiUrl("/api/v1/auth/instagram"));
+        return true;
+      }
+
       if (provider !== "kakao") {
-        const msg = `${labels[provider] || provider} 간편 로그인은 준비 중입니다. 카카오·Google·네이버 또는 아이디 로그인을 이용해 주세요.`;
+        const msg = `${labels[provider] || provider} 간편 로그인은 준비 중입니다. 카카오·Google·네이버·Instagram 또는 아이디 로그인을 이용해 주세요.`;
         throw new Error(msg);
       }
 

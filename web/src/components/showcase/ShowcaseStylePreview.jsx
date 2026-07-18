@@ -171,9 +171,14 @@ export default function ShowcaseStylePreview({
           </div>
         ) : null}
 
-        {isPaid && (styleConfig?.commercial?.products || []).length > 0 ? (
+        {isPaid &&
+        ((styleConfig?.commercial?.links || []).length > 0 ||
+          (styleConfig?.commercial?.products || []).length > 0) ? (
           <div className="showcase-style-preview__products">
-            {styleConfig.commercial.products.map((pr) => (
+            {(styleConfig.commercial.links?.length
+              ? styleConfig.commercial.links
+              : styleConfig.commercial.products
+            ).map((pr) => (
               <button key={pr.id} type="button" className="showcase-style-preview__product" onClick={() => openProduct(pr)}>
                 {pr.name}
                 <ExternalLink size={12} aria-hidden />

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import ShowcasePhotoTextOverlay from "./ShowcasePhotoTextOverlay.jsx";
 
 function useAutoSlide(enabled, onTick) {
   const onTickRef = useRef(onTick);
@@ -41,14 +42,7 @@ export default function ShowcasePhotoGallery({
     <div className={`showcase-photo-gallery ${className}`.trim()}>
       <div className="showcase-photo-gallery__frame">
         <img src={current.url} alt={current.caption || ""} className="showcase-photo-gallery__img" />
-        {current.overlayText ? (
-          <p
-            className="showcase-photo-gallery__overlay-text"
-            style={{ fontFamily: current.overlayFont || "inherit" }}
-          >
-            {current.overlayText}
-          </p>
-        ) : null}
+        <ShowcasePhotoTextOverlay key={`tx-${current.id || idx}`} photo={current} />
         {(current.emojiStickers || []).map((s) => (
           <span
             key={s.id}

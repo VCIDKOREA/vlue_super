@@ -1,102 +1,152 @@
 /**
- * Instagram 게시물/릴스 → 공식 embed URL
- * - 프로필 URL은 임베드 불가 (게시물 단위만)
- * - oEmbed HTML이 가리키는 실제 재생면과 동일: /p|reel|tv/{code}/embed/
+ * Instagram 게시물 → VLUE 쇼케이스용 미디어 메타데이터
+ * - 이미지 파일은 서버에 저장하지 않음
+ * - media_url 을 img src 에 직접 사용 (만료 시 resolve API로 갱신)
  */
 
 const POST_PATH_RE = /^\/(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i;
+const MAX_PHOTOS_PER_PAGE = 20;
 
 /**
  * @typedef {{
- *   ok: true,
- *   kind: "p" | "reel" | "tv",
- *   shortcode: string,
- *   permalink: string,
- *   embedUrl: string,
- *   embedCaptionedUrl: string
- * } | { ok: false, reason: string }} InstagramEmbedResolved
+ *   id: string,
+ *   mediaUrl?: string,
+ *   thumbnailUrl?: string,
+ *   permalink?: string,
+ *   caption?: string | null,
+ *   mediaType?: string,
+ *   timestamp?: string | null,
+ *   children?: Array<{ id: string, mediaUrl?: string, thumbnailUrl?: string, mediaType?: string }>
+ * }} InstagramShowcaseMedia
  */
 
-/**
- * @param {string} raw
- * @returns {boolean}
- */
 export function isInstagramPostOrReelUrl(raw) {
-  return resolveInstagramEmbed(raw).ok === true;
+  const url = String(raw || "").trim();
+  if (!url) return false;
+  try {
+    const parsed = new URL(url.startsWith("http") ? url : `https://${url}`);
+    const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    if (host !== "instagram.com" && host !== "instagr.am") return false;
+    return POST_PATH_RE.test(parsed.pathname);
+  } catch {
+    return false;
+  }
 }
 
-/**
- * @param {string} raw
- * @returns {InstagramEmbedResolved}
- */
-export function resolveInstagramEmbed(raw, { captioned = false } = {}) {
-  const url = String(raw || "").trim();
-  if (!url) return { ok: false, reason: "empty" };
-
-  let parsed;
-  try {
-    parsed = new URL(url.startsWith("http") ? url : `https://${url}`);
-  } catch {
-    return { ok: false, reason: "invalid_url" };
-  }
-
-  const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
-  if (host !== "instagram.com" && host !== "instagr.am") {
-    return { ok: false, reason: "not_instagram" };
-  }
-
-  const match = parsed.pathname.match(POST_PATH_RE);
-  if (!match) {
-    return { ok: false, reason: "not_post_or_reel" };
-  }
-
-  const kindRaw = match[1].toLowerCase();
-  const kind = kindRaw === "reels" ? "reel" : kindRaw;
-  const shortcode = match[2];
-  const pathKind = kind === "reel" ? "reel" : kind === "tv" ? "tv" : "p";
-  const permalink = `https://www.instagram.com/${pathKind}/${shortcode}/`;
-  const embedUrl = `https://www.instagram.com/${pathKind}/${shortcode}/embed/`;
-  const embedCaptionedUrl = `https://www.instagram.com/${pathKind}/${shortcode}/embed/captioned/`;
-
+function normalizeChild(row) {
+  if (!row || typeof row !== "object") return null;
+  const id = String(row.id || "").trim();
+  const mediaUrl = String(row.mediaUrl || row.media_url || "").trim();
+  const thumbnailUrl = String(row.thumbnailUrl || row.thumbnail_url || "").trim();
+  if (!id && !mediaUrl && !thumbnailUrl) return null;
   return {
-    ok: true,
-    kind: /** @type {"p"|"reel"|"tv"} */ (pathKind === "reel" ? "reel" : pathKind === "tv" ? "tv" : "p"),
-    shortcode,
-    permalink,
-    embedUrl: captioned ? embedCaptionedUrl : embedUrl,
-    embedCaptionedUrl
+    id: id || mediaUrl || thumbnailUrl,
+    mediaUrl: mediaUrl || thumbnailUrl,
+    thumbnailUrl: thumbnailUrl || mediaUrl,
+    mediaType: String(row.mediaType || row.media_type || "IMAGE")
   };
 }
 
 /**
- * 쇼케이스 설정에서 임베드 후보 URL 수집 (우선순위)
+ * 연동 후 선택한 Instagram 게시물 메타 (페이지 = 게시물 1개, 내부 사진 ≤ 20)
+ * pages[] 우선, 없으면 platformFeed.instagramMedia (레거시)
  * @param {object} [styleConfig]
- * @param {object} [slide]
- * @returns {string}
+ * @returns {InstagramShowcaseMedia[]}
  */
-export function pickInstagramEmbedSourceUrl(styleConfig, slide) {
-  const feed = styleConfig?.platformFeed || {};
-  const outlinks = styleConfig?.commercial?.outlinks || {};
-  const candidates = [
-    slide?.instagramPostUrl,
-    slide?.instagramUrl,
-    feed.instagramPostUrl,
-    outlinks.instagram,
-    feed.instagramProfileUrl
-  ];
-  for (const c of candidates) {
-    const s = String(c || "").trim();
-    if (!s) continue;
-    if (isInstagramPostOrReelUrl(s)) return s;
+export function listInstagramShowcaseMedia(styleConfig) {
+  const fromPages = [];
+  const seen = new Set();
+  const pages = Array.isArray(styleConfig?.pages) ? styleConfig.pages : [];
+  for (const page of pages) {
+    if (String(page?.type || "") !== "instagram") continue;
+    const row = page?.instagramMedia;
+    if (!row || typeof row !== "object") continue;
+    const id = String(row.id || "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    fromPages.push(normalizeMediaRow(row));
   }
+  if (fromPages.length) return fromPages;
+
+  const feed = styleConfig?.platformFeed || {};
+  const raw = Array.isArray(feed.instagramMedia) ? feed.instagramMedia : [];
+  const out = [];
+  for (const row of raw) {
+    const normalized = normalizeMediaRow(row);
+    if (!normalized || seen.has(normalized.id)) continue;
+    seen.add(normalized.id);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function normalizeMediaRow(row) {
+  if (!row || typeof row !== "object") return null;
+  const id = String(row.id || "").trim();
+  if (!id) return null;
+  const children = (Array.isArray(row.children) ? row.children : [])
+    .map(normalizeChild)
+    .filter(Boolean)
+    .slice(0, MAX_PHOTOS_PER_PAGE);
+  const mediaUrl = String(row.mediaUrl || row.thumbnailUrl || "").trim();
+  return {
+    id,
+    mediaUrl,
+    thumbnailUrl: String(row.thumbnailUrl || mediaUrl).trim(),
+    permalink: String(row.permalink || "").trim(),
+    caption: typeof row.caption === "string" ? row.caption : null,
+    mediaType: String(row.mediaType || "").trim() || "IMAGE",
+    timestamp: typeof row.timestamp === "string" ? row.timestamp : null,
+    children
+  };
+}
+
+/** 한 게시물 페이지에 표시할 사진 URL 목록 (캐러셀 children 우선) */
+export function photosForInstagramMediaItem(item) {
+  if (!item) return [];
+  const children = Array.isArray(item.children) ? item.children : [];
+  if (children.length) {
+    return children
+      .map((c) => ({
+        id: c.id,
+        url: String(c.mediaUrl || c.thumbnailUrl || "").trim(),
+        mediaUrl: c.mediaUrl
+      }))
+      .filter((p) => p.url)
+      .slice(0, MAX_PHOTOS_PER_PAGE);
+  }
+  const url = String(item.mediaUrl || item.thumbnailUrl || "").trim();
+  return url ? [{ id: item.id, url, mediaUrl: item.mediaUrl }] : [];
+}
+
+/** @deprecated */
+export function listInstagramEmbedUrls(styleConfig) {
+  return listInstagramShowcaseMedia(styleConfig)
+    .map((m) => m.permalink)
+    .filter((u) => isInstagramPostOrReelUrl(u));
+}
+
+/** @deprecated 임베드 폐기 — 항상 false */
+export function shouldUseInstagramEmbedMode() {
+  return false;
+}
+
+/** @deprecated 임베드 폐기 */
+export function pickInstagramEmbedSourceUrl() {
   return "";
 }
 
-/**
- * @param {object} [styleConfig]
- * @param {object} [slide]
- */
-export function shouldUseInstagramEmbedMode(styleConfig, slide) {
-  const src = pickInstagramEmbedSourceUrl(styleConfig, slide);
-  return Boolean(src && resolveInstagramEmbed(src).ok);
+/** @deprecated 임베드 폐기 — iframe 경로 없음 */
+export function resolveInstagramEmbed() {
+  return { ok: false, reason: "embed_removed" };
+}
+
+export function isInstagramVerified(styleConfig) {
+  return styleConfig?.platformFeed?.instagramVerified === true;
+}
+
+export function instagramVerifiedLabel(styleConfig) {
+  if (!isInstagramVerified(styleConfig)) return "";
+  const handle = String(styleConfig?.platformFeed?.instagramHandle || "").trim();
+  return handle ? `Instagram 인증완료✔ ${handle}` : "Instagram 인증완료✔";
 }

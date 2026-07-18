@@ -61,12 +61,19 @@ function instagramUrlFromHandle(handle) {
 function resolveSocialLinks(style, card) {
   const outlinks = style?.commercial?.outlinks || {};
   const feed = style?.platformFeed || {};
-  const kakao =
-    outlinks.kakao ||
-    feed.kakaoProfileUrl ||
-    card?.kakaoUrl ||
-    card?.kakaoProfileUrl ||
-    "";
+  const legacyKakao = String(outlinks.kakao || "").trim();
+  const kakaoOpenChat = String(
+    outlinks.kakaoOpenChat || (/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : "") || ""
+  ).trim();
+  const kakaoProfile = String(
+    outlinks.kakaoProfile ||
+      feed.kakaoProfileUrl ||
+      card?.kakaoUrl ||
+      card?.kakaoProfileUrl ||
+      (!/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : "") ||
+      ""
+  ).trim();
+  const kakao = kakaoOpenChat || kakaoProfile;
   const instagram =
     outlinks.instagram ||
     feed.instagramProfileUrl ||
@@ -77,8 +84,12 @@ function resolveSocialLinks(style, card) {
   const website = card?.website || outlinks.website || outlinks.youtube || "";
   return {
     kakao: String(kakao || "").trim(),
+    kakaoOpenChat,
+    kakaoProfile,
     instagram: String(instagram || "").trim(),
     website: String(website || "").trim(),
+    facebook: String(outlinks.facebook || "").trim(),
+    tiktok: String(outlinks.tiktok || "").trim(),
     attachments: style?.commercial?.attachments || []
   };
 }

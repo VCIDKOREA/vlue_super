@@ -23,8 +23,9 @@ export const SHOWCASE_STYLE_TYPES = {
   instagram: {
     id: "instagram",
     label: "인스타그램",
-    desc: "인스타 게시물 Native 임베드",
-    shortDesc: "게시물·릴스 URL을 쇼케이스 박스에 원본 표시",
+    desc: "Instagram 인증 후 게시물 사진",
+    shortDesc:
+      "Instagram 인증 필수. 세로 페이지 — 무료회원 1 · 유료회원 최대 10(명함 포함). 페이지당 사진 최대 20장.",
     emoji: "📷",
     accent: "#E1306C",
     bgmSource: "platform",
@@ -32,7 +33,7 @@ export const SHOWCASE_STYLE_TYPES = {
   },
   rich_custom: {
     id: "rich_custom",
-    label: "개인스타일",
+    label: "개인커스텀",
     desc: "폰트·사진·BGM 꾸미기",
     shortDesc: "사진·글꼴·음악을 직접 꾸미기",
     emoji: "✨",
@@ -52,7 +53,7 @@ export const SHOWCASE_STYLE_TYPES = {
   }
 };
 
-export const SHOWCASE_STYLE_LIST = Object.values(SHOWCASE_STYLE_TYPES);
+export const SHOWCASE_STYLE_LIST = Object.values(SHOWCASE_STYLE_TYPES).filter((s) => s.id !== "kakao");
 
 export const SHOWCASE_FONT_SETS = [
   { id: "pretendard", label: "프리텐다드", tier: "free", css: "'Pretendard Variable', Pretendard, sans-serif" },

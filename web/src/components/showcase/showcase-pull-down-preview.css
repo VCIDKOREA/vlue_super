@@ -1,0 +1,286 @@
+/**
+ * 블루 쇼케이스 설정 — 우측 사이드 탭 미리보기
+ * body 포털 + fixed → 부모 overflow에 잘리지 않고 화면 전체 덮음
+ */
+
+.showcase-side-preview {
+  pointer-events: none;
+}
+
+/* 우측 세로 탭 — 얇고 길게 + 반투명 + 테두리 푸른 아우라 */
+.showcase-side-preview__tab {
+  pointer-events: auto;
+  position: fixed;
+  top: 50%;
+  right: 0;
+  z-index: 160;
+  display: block;
+  width: 14px;
+  height: 210px;
+  min-height: 210px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(59, 130, 246, 0.55);
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.42) 0%,
+    rgba(239, 246, 255, 0.28) 100%
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: transparent;
+  font-size: 0;
+  cursor: pointer;
+  transform: translateY(-50%);
+  overflow: visible;
+  box-shadow:
+    -1px 0 4px rgba(59, 130, 246, 0.28),
+    -3px 0 10px rgba(37, 99, 235, 0.18),
+    inset 0 0 6px rgba(147, 197, 253, 0.15);
+  animation: showcase-side-border-aura 2.8s ease-in-out infinite;
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.showcase-side-preview__tab::before {
+  content: "";
+  position: absolute;
+  inset: -2px 0 -2px -2px;
+  border-radius: 12px 0 0 12px;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-right: 0;
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.35);
+  animation: showcase-side-border-outline 2.8s ease-in-out infinite;
+}
+
+.showcase-side-preview__tab:active {
+  transform: translateY(-50%) scale(0.97);
+}
+
+/* 방향키 — 탭 밖(왼쪽), 작게, 탭과 함께 탭 가능 */
+.showcase-side-preview__tab-chevron {
+  position: absolute;
+  left: -16px;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #2563eb;
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.35),
+    -1px 0 5px rgba(59, 130, 246, 0.22);
+  transform: translateY(-50%);
+  animation: showcase-side-chevron-nudge 1.8s ease-in-out infinite;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* 화살표 영역까지 히트박스만 확장 (화살표 자체는 작게) */
+.showcase-side-preview__tab::after {
+  content: "";
+  position: absolute;
+  left: -22px;
+  top: 0;
+  bottom: 0;
+  width: 22px;
+  pointer-events: auto;
+}
+
+.showcase-side-preview.is-open .showcase-side-preview__tab-chevron {
+  background: rgba(15, 23, 42, 0.9);
+  color: #7dd3fc;
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.5),
+    -2px 0 12px rgba(14, 165, 233, 0.45);
+  animation: none;
+}
+
+@keyframes showcase-side-chevron-nudge {
+  0%,
+  100% {
+    transform: translateY(-50%) translateX(0);
+  }
+  50% {
+    transform: translateY(-50%) translateX(-3px);
+  }
+}
+
+.showcase-side-preview.is-open .showcase-side-preview__tab {
+  border-color: rgba(56, 189, 248, 0.8);
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.55) 0%,
+    rgba(11, 18, 32, 0.4) 100%
+  );
+  animation-name: showcase-side-border-aura-open;
+}
+
+.showcase-side-preview.is-open .showcase-side-preview__tab::before {
+  border-color: rgba(125, 211, 252, 0.45);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
+}
+
+@keyframes showcase-side-border-aura {
+  0%,
+  100% {
+    box-shadow:
+      -1px 0 4px rgba(59, 130, 246, 0.22),
+      -3px 0 8px rgba(37, 99, 235, 0.14),
+      inset 0 0 5px rgba(147, 197, 253, 0.12);
+  }
+  50% {
+    box-shadow:
+      -2px 0 7px rgba(59, 130, 246, 0.4),
+      -4px 0 14px rgba(37, 99, 235, 0.26),
+      inset 0 0 8px rgba(147, 197, 253, 0.22);
+  }
+}
+
+@keyframes showcase-side-border-aura-open {
+  0%,
+  100% {
+    box-shadow:
+      -1px 0 5px rgba(56, 189, 248, 0.28),
+      -3px 0 10px rgba(14, 165, 233, 0.18),
+      inset 0 0 6px rgba(56, 189, 248, 0.1);
+  }
+  50% {
+    box-shadow:
+      -2px 0 8px rgba(56, 189, 248, 0.45),
+      -5px 0 14px rgba(14, 165, 233, 0.28),
+      inset 0 0 9px rgba(125, 211, 252, 0.16);
+  }
+}
+
+@keyframes showcase-side-border-outline {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+/* 배경 딤 — 페이드 인 */
+.showcase-side-preview__scrim {
+  pointer-events: auto;
+  position: fixed;
+  inset: 0;
+  z-index: 170;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+  opacity: 0;
+  animation: showcase-side-scrim-in 0.28s ease forwards;
+}
+
+.showcase-side-preview.is-entered .showcase-side-preview__scrim {
+  opacity: 1;
+}
+
+@keyframes showcase-side-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 전체 화면 패널 — 오른쪽에서 슬라이드 */
+.showcase-side-preview__panel {
+  pointer-events: auto;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 180;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #0b1220;
+  box-sizing: border-box;
+  transform: translate3d(100%, 0, 0);
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+
+.showcase-side-preview.is-entered .showcase-side-preview__panel {
+  transform: translate3d(0, 0, 0);
+}
+
+.showcase-side-preview__bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: max(10px, env(safe-area-inset-top, 0px)) 14px 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  background: #111827;
+}
+
+.showcase-side-preview__bar-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.showcase-side-preview__close {
+  margin: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.showcase-side-preview__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.showcase-side-preview__embed {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  border-radius: 16px;
+}
+
+.showcase-side-preview__embed .lettering-ongoing--home-glass {
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 0 !important;
+}
+
+/* 탭이 열린 패널보다 위에 남아 닫기 유도 */
+.showcase-side-preview.is-open .showcase-side-preview__tab {
+  z-index: 190;
+}

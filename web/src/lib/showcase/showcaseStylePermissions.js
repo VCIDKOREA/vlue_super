@@ -29,11 +29,11 @@ export function getShowcasePermissions(membershipTier = "free") {
     /** 인증 배지 · 명함형 */
     verifiedBadgeToggle: isPaid,
     certificateStyle: isPaid,
-    /** 무료: 인스타/카톡 피드만 (링크·메뉴 버튼 없음) */
+    /** 무료: 인스타 피드 등 (링크·메뉴 버튼 없음) */
     platformFeedOnly: !isPaid,
     allowedStyleIds: isPaid
-      ? Object.keys(SHOWCASE_STYLE_TYPES)
-      : ["default", "kakao", "instagram", "rich_custom"]
+      ? Object.keys(SHOWCASE_STYLE_TYPES).filter((id) => id !== "kakao")
+      : ["default", "instagram", "rich_custom"]
   };
 }
 

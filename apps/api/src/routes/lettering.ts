@@ -175,6 +175,7 @@ letteringRoutes.put("/showcase/search-privacy", requireUserHeader, async (c) => 
   const privacy = await updateSearchPrivacy(me, {
     isPhoneSearchAllowed: body?.isPhoneSearchAllowed,
     isNameSearchAllowed: body?.isNameSearchAllowed,
+    isOrgSearchAllowed: body?.isOrgSearchAllowed,
     isIdSearchAllowed: body?.isIdSearchAllowed
   });
   return c.json({ ok: true, privacy });

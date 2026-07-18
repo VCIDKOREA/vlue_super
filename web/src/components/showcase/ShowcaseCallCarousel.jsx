@@ -1,28 +1,50 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
 import ShowcaseIdentityCorner from "./ShowcaseIdentityCorner.jsx";
 import ShowcaseBannerSocialLayer from "./ShowcaseBannerSocialLayer.jsx";
-import ShowcaseInstagramEmbed from "./ShowcaseInstagramEmbed.jsx";
+import ShowcaseMediaPage from "./ShowcaseMediaPage.jsx";
 import InCallDtmfPad from "../call/InCallDtmfPad.jsx";
 import {
-  maxShowcasePhotosForTier,
+  maxInstagramEmbedsForTier,
+  maxShowcasePhotosPerPage,
   normalizeUserTier,
   USER_TIERS
 } from "../../lib/showcase/tentShowcaseTypes.js";
 import { resolvePaidShowcaseBanners } from "../../lib/showcase/demoShowcaseBanners.js";
 import {
-  pickInstagramEmbedSourceUrl,
-  shouldUseInstagramEmbedMode
+  listInstagramShowcaseMedia,
+  photosForInstagramMediaItem,
+  isInstagramVerified,
+  instagramVerifiedLabel
 } from "../../lib/showcase/instagramEmbed.js";
+import { resolveInstagramMediaUrls } from "../../lib/instagramLinkApi.js";
 import { v1AppShell } from "../../lib/v1ReleaseScope.js";
+import ShowcaseInstagramPost from "./ShowcaseInstagramPost.jsx";
+import ShowcaseSlideChrome from "./ShowcaseSlideChrome.jsx";
+
+/** 갤러리 사진 → 슬라이드용 (텍스트 오버레이 필드 유지) */
+function pickPhotoSlideFields(p = {}) {
+  return {
+    id: p.id,
+    url: p.url,
+    overlayText: p.overlayText,
+    overlayFont: p.overlayFont,
+    overlayFontSize: p.overlayFontSize,
+    overlayColor: p.overlayColor,
+    overlayX: p.overlayX,
+    overlayY: p.overlayY,
+    overlayAnim: p.overlayAnim,
+    overlayBorder: p.overlayBorder
+  };
+}
 
 /**
  * 통화 쇼케이스 시네마틱 캐러셀
- * - 유료+명함: 디지털 인증명함(1) + 쇼케이스 배너(최대 10)
- * - 유료·명함 미사용: 쇼케이스만 · 접힘 바(웹과 동일) + 필요 시 좌측 하단 식별
- * - 무료: 단독 1장 · 천막 프로필에 이름·번호 포함 (중복 코너 없음)
+ * - 상하 스와이프 / 마우스 휠: 페이지 이동 (디지털 인증명함 ↔ 쇼케이스)
+ * - Instagram: API media_url → VLUE 커스텀 카드 (embed/iframe 없음)
+ * - 일반 사진: 페이지 안 좌우 최대 20장
  */
 export default function ShowcaseCallCarousel({
   card,
@@ -52,37 +74,199 @@ export default function ShowcaseCallCarousel({
   onOpenSlideSettings,
   /** @param {"card"|"banner"|"empty-slot"|"paid-identity"|"free-profile"|"free-safe"|string} type */
   onSlideTypeChange,
-  /** 쇼케이스 스타일 — Instagram 게시물 URL 있으면 Native embed 자동 ON */
+  /** 쇼케이스 스타일 — Instagram 인증·선택 사진 */
   showcaseStyle = null
 }) {
   const styleConfig = showcaseStyle || card?.showcaseStyle || null;
   const [index, setIndex] = useState(0);
   const startX = useRef(0);
+  const startY = useRef(0);
   const dragging = useRef(false);
+  const swipeAxis = useRef(null);
+  const swipeStartTarget = useRef(null);
+  const wheelLockUntil = useRef(0);
+  const wheelAccum = useRef(0);
+  const viewportRef = useRef(null);
 
   const tier = normalizeUserTier(membershipTier || card?.membershipTier);
   const isPaid = tier === USER_TIERS.PAID;
-  const maxPhotos = maxShowcasePhotosForTier(tier);
-  const showDigitalCard = Boolean(includeDigitalCard);
+  const photosPerPage = maxShowcasePhotosPerPage();
+  const showDigitalCard = Boolean(includeDigitalCard) && isPaid;
+  const maxIgPages = maxInstagramEmbedsForTier(tier, { includeDigitalCard: showDigitalCard });
   const showCornerIdentity = !showDigitalCard;
-  const banners = useMemo(
-    () =>
-      isPaid
-        ? resolvePaidShowcaseBanners(photos, {
-            previewMode: previewMode && showDigitalCard,
-            max: maxPhotos
-          })
-        : [],
-    [isPaid, photos, previewMode, maxPhotos, showDigitalCard]
-  );
+  const igVerified = isInstagramVerified(styleConfig);
+  const igBadge = instagramVerifiedLabel(styleConfig);
+  const igUsername = String(styleConfig?.platformFeed?.instagramHandle || "")
+    .trim()
+    .replace(/^@+/, "");
+  const igProfilePictureUrl = String(
+    styleConfig?.platformFeed?.instagramProfilePictureUrl ||
+      styleConfig?.platformFeed?.profilePictureUrl ||
+      ""
+  ).trim();
+  const [igUrlMap, setIgUrlMap] = useState(() => new Map());
 
-  const igGlobalPostUrl = useMemo(
-    () => pickInstagramEmbedSourceUrl(styleConfig, null),
-    [styleConfig]
-  );
+  const galleryPagePhotos = useMemo(() => {
+    return (Array.isArray(photos) ? photos : [])
+      .filter((p) => p?.url)
+      .slice(0, photosPerPage)
+      .map((p) => pickPhotoSlideFields(p));
+  }, [photos, photosPerPage]);
+
+  const contentPages = useMemo(() => {
+    const raw = Array.isArray(styleConfig?.pages) ? styleConfig.pages : [];
+    return raw.slice(0, maxIgPages);
+  }, [styleConfig?.pages, maxIgPages]);
+
+  const hasRenderableContentPage = useMemo(() => {
+    return contentPages.some((page) => {
+      if (String(page?.type || "") === "instagram") {
+        return Boolean(page?.instagramMedia?.id);
+      }
+      return (Array.isArray(page?.gallery?.photos) ? page.gallery.photos : []).some((ph) => ph?.url);
+    });
+  }, [contentPages]);
+
+  const demoPagePhotos = useMemo(() => {
+    if (
+      !previewMode ||
+      hasRenderableContentPage ||
+      galleryPagePhotos.length ||
+      listInstagramShowcaseMedia(styleConfig).length
+    ) {
+      return [];
+    }
+    return resolvePaidShowcaseBanners([], { previewMode: true, max: Math.min(3, photosPerPage) }).map(
+      (p) => pickPhotoSlideFields(p)
+    );
+  }, [previewMode, hasRenderableContentPage, galleryPagePhotos.length, styleConfig, photosPerPage]);
+
+  const igPages = useMemo(() => {
+    return listInstagramShowcaseMedia(styleConfig)
+      .slice(0, maxIgPages)
+      .map((m, i) => {
+        const basePhotos = photosForInstagramMediaItem(m);
+        const refreshed = basePhotos.map((p) => {
+          const fresh = igUrlMap.get(p.id);
+          return fresh ? { ...p, url: fresh } : p;
+        });
+        return {
+          type: "instagram-post",
+          id: `ig-page-${m.id || i}`,
+          fromInstagram: true,
+          caption: m.caption || "",
+          photos: refreshed,
+          mediaId: m.id || "",
+          permalink: m.permalink || "",
+          username: igUsername,
+          profilePictureUrl: igProfilePictureUrl,
+          mediaIds: [m.id, ...(m.children || []).map((c) => c.id)].filter(Boolean)
+        };
+      });
+  }, [styleConfig, maxIgPages, igUrlMap, igUsername, igProfilePictureUrl]);
+
+  useEffect(() => {
+    const ids = igPages.flatMap((p) => p.mediaIds || []).filter(Boolean);
+    if (!ids.length) return undefined;
+    let cancelled = false;
+    resolveInstagramMediaUrls(ids)
+      .then((res) => {
+        if (cancelled) return;
+        const next = new Map();
+        for (const row of res.media || []) {
+          if (row?.id && row?.mediaUrl) next.set(String(row.id), String(row.mediaUrl));
+          for (const child of row.children || []) {
+            if (child?.id && child?.mediaUrl) next.set(String(child.id), String(child.mediaUrl));
+          }
+        }
+        if (next.size) setIgUrlMap(next);
+      })
+      .catch(() => {
+        /* 만료 시 저장된 mediaUrl 폴백 */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [igPages.map((p) => (p.mediaIds || []).join(",")).join("|")]);
 
   const slides = useMemo(() => {
+    const buildFromPages = (pages, limit) => {
+      const out = [];
+      for (const page of pages.slice(0, limit)) {
+        const pType = String(page?.type || "");
+        if (pType === "instagram") {
+          const m = page.instagramMedia;
+          const basePhotos = m?.id ? photosForInstagramMediaItem(m) : [];
+          const refreshed = basePhotos.map((p) => {
+            const fresh = igUrlMap.get(p.id);
+            return fresh ? { ...p, url: fresh } : p;
+          });
+          if (!m?.id || !refreshed.length) {
+            out.push({
+              type: "empty-slot",
+              id: page.id || `empty-ig-${out.length}`,
+              slot: out.length + 1,
+              max: photosPerPage,
+              pageType: "instagram"
+            });
+            continue;
+          }
+          out.push({
+            type: "instagram-post",
+            id: page.id || `ig-page-${m.id}`,
+            fromInstagram: true,
+            caption: m.caption || "",
+            photos: refreshed,
+            mediaId: m.id || "",
+            permalink: m.permalink || "",
+            username: igUsername,
+            profilePictureUrl: igProfilePictureUrl,
+            mediaIds: [m.id, ...(m.children || []).map((c) => c.id)].filter(Boolean)
+          });
+          continue;
+        }
+        const pagePhotos = (Array.isArray(page?.gallery?.photos) ? page.gallery.photos : [])
+          .filter((ph) => ph?.url)
+          .slice(0, String(page?.type || "") === "rich_custom" ? 1 : photosPerPage)
+          .map((ph) => pickPhotoSlideFields(ph));
+        if (pagePhotos.length) {
+          out.push({
+            type: "media-page",
+            id: page.id || `gallery-${out.length}`,
+            photos: pagePhotos,
+            caption: ""
+          });
+        } else {
+          out.push({
+            type: "empty-slot",
+            id: page.id || `empty-custom-${out.length}`,
+            slot: out.length + 1,
+            max: photosPerPage,
+            pageType: pType || "rich_custom"
+          });
+        }
+      }
+      return out;
+    };
+
     if (!isPaid) {
+      if (!showcaseOffPreview && contentPages.length > 0) {
+        const built = buildFromPages(contentPages, 1);
+        if (built.length) return built.slice(0, 1);
+      }
+      if (!showcaseOffPreview && igPages.length > 0) {
+        return igPages.slice(0, 1);
+      }
+      if (!showcaseOffPreview && galleryPagePhotos.length > 0) {
+        return [
+          {
+            type: "media-page",
+            id: "gallery-page",
+            photos: galleryPagePhotos,
+            caption: ""
+          }
+        ];
+      }
       return [
         {
           type: isKnownContact ? "free-profile" : "free-safe",
@@ -90,48 +274,77 @@ export default function ShowcaseCallCarousel({
         }
       ];
     }
-    let photoSlides = banners.map((p, i) => ({ type: "banner", id: p.id || `bn-${i}`, ...p }));
-    /** 사진 없이 Instagram 게시물 URL만 있으면 배너 1장으로 embed */
-    if (photoSlides.length === 0 && igGlobalPostUrl) {
-      photoSlides = [
+
+    let content = buildFromPages(contentPages, maxIgPages);
+
+    /* 레거시 폴백: pages 비어 있으면 기존 gallery + IG 병합 */
+    if (!content.length) {
+      if (galleryPagePhotos.length) {
+        content.push({
+          type: "media-page",
+          id: "gallery-page",
+          photos: galleryPagePhotos,
+          caption: ""
+        });
+      } else if (demoPagePhotos.length) {
+        content.push({
+          type: "media-page",
+          id: "demo-page",
+          photos: demoPagePhotos,
+          caption: ""
+        });
+      }
+      for (const page of igPages) {
+        if (content.length >= maxIgPages) break;
+        content.push(page);
+      }
+    } else if (!content.length && demoPagePhotos.length) {
+      content = [
         {
-          type: "banner",
-          id: "ig-embed-only",
-          url: "",
-          instagramPostUrl: igGlobalPostUrl
+          type: "media-page",
+          id: "demo-page",
+          photos: demoPagePhotos,
+          caption: ""
         }
       ];
     }
-    const emptyCount =
-      previewMode && showDigitalCard && photoSlides.length < Math.min(3, maxPhotos) && !igGlobalPostUrl
-        ? Math.min(3, maxPhotos) - photoSlides.length
-        : previewMode && !showDigitalCard && photoSlides.length < 1 && !igGlobalPostUrl
-          ? 1
-          : 0;
-    const empties = Array.from({ length: emptyCount }, (_, i) => ({
-      type: "empty-slot",
-      id: `empty-paid-${i}`,
-      slot: Math.max(1, photoSlides.length + i + 1),
-      max: maxPhotos
-    }));
-    const cardSlide = showDigitalCard ? [{ type: "card", id: "cert-card" }] : [];
-    const paidBody = [...photoSlides, ...empties];
-    if (!showDigitalCard && paidBody.length === 0) {
-      return [{ type: "paid-identity", id: "paid-identity-sheet" }];
+
+    const capped = content.slice(0, maxIgPages);
+
+    if (showDigitalCard) {
+      /* 명함만 있으면 다음 슬롯을 열어 세로 스와이프 가능하게 유지 */
+      if (capped.length === 0) {
+        return [
+          { type: "card", id: "digital-card" },
+          { type: "empty-slot", id: "empty-1", slot: 1, max: photosPerPage }
+        ];
+      }
+      return [{ type: "card", id: "digital-card" }, ...capped];
     }
-    return [...cardSlide, ...paidBody];
-  }, [isPaid, isKnownContact, banners, previewMode, maxPhotos, showDigitalCard, igGlobalPostUrl]);
+    if (capped.length === 0) {
+      return [{ type: "empty-slot", id: "empty-1", slot: 1, max: photosPerPage }];
+    }
+    return capped;
+  }, [
+    isPaid,
+    showcaseOffPreview,
+    contentPages,
+    igPages,
+    isKnownContact,
+    galleryPagePhotos,
+    demoPagePhotos,
+    showDigitalCard,
+    maxIgPages,
+    photosPerPage,
+    igUrlMap,
+    igUsername,
+    igProfilePictureUrl
+  ]);
 
   const count = slides.length;
-  const canScroll = isPaid && scrollEnabled && count > 1;
+  const canScroll = scrollEnabled && count > 1;
   const current = slides[index] || slides[0];
-  const currentIgEmbedUrl =
-    current?.type === "banner"
-      ? pickInstagramEmbedSourceUrl(styleConfig, current)
-      : "";
-  const currentIsIgEmbed = Boolean(currentIgEmbedUrl && shouldUseInstagramEmbedMode(styleConfig, current));
-  /** Instagram 내부 슬라이드와 바깥 캐러셀 제스처 충돌 방지 */
-  const outerNavEnabled = canScroll && !currentIsIgEmbed;
+  const outerNavEnabled = canScroll;
 
   useEffect(() => {
     setIndex(0);
@@ -160,56 +373,172 @@ export default function ShowcaseCallCarousel({
   );
 
   const interactiveSelector =
-    "a, button, input, textarea, select, label, iframe, .showcase-ig-embed, .showcase-call-carousel__nav, .showcase-call-carousel__slide-settings, .ldr-face-tab, .ldr-front-phone-link--btn, .ldr-contact-row-link, .showcase-social-rail, .showcase-banner-footer, .lettering-action";
+    "a, button, input, textarea, select, label, .showcase-call-carousel__dots, .showcase-call-carousel__slide-settings, .showcase-media-page__nav, .showcase-media-page__dots, .showcase-ig-post__nav, .showcase-ig-post__dots, .showcase-ig-post__action, .ldr-face-tab, .ldr-front-phone-link--btn, .ldr-contact-row-link, .showcase-social-rail, .showcase-banner-footer, .lettering-action";
+
+  /** 휠: deltaY>0 = 아래(다음 페이지) */
+  const canPanelConsumeWheel = (target, deltaY) => {
+    const scrollEl = target?.closest?.(".ldr-panel, .ldr-panel-stage");
+    if (!scrollEl) return false;
+    const maxScroll = scrollEl.scrollHeight - scrollEl.clientHeight;
+    if (maxScroll <= 8) return false;
+    const top = scrollEl.scrollTop;
+    if (deltaY < 0 && top > 2) return true;
+    if (deltaY > 0 && top < maxScroll - 2) return true;
+    return false;
+  };
+
+  /** 터치 스와이프: dy<0(위로 쓸기)=다음 페이지 — 패널이 그 방향으로 더 스크롤될 때만 양보 */
+  const canPanelConsumeSwipe = (target, swipeDy) => {
+    const scrollEl = target?.closest?.(".ldr-panel, .ldr-panel-stage");
+    if (!scrollEl) return false;
+    const maxScroll = scrollEl.scrollHeight - scrollEl.clientHeight;
+    if (maxScroll <= 8) return false;
+    const top = scrollEl.scrollTop;
+    if (swipeDy < 0 && top < maxScroll - 2) return true;
+    if (swipeDy > 0 && top > 2) return true;
+    return false;
+  };
+
+  /* PC/트랙패드 휠 — 상하 페이지 전환 (모바일 스와이프와 동일 축). passive:false 로 preventDefault 보장 */
+  const onWheel = useCallback(
+    (e) => {
+      if (keypadOpen || !outerNavEnabled) return;
+      if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      if (canPanelConsumeWheel(e.target, e.deltaY)) return;
+
+      const now = Date.now();
+      if (now < wheelLockUntil.current) {
+        e.preventDefault();
+        return;
+      }
+
+      wheelAccum.current += e.deltaY;
+      const threshold = 48;
+      if (Math.abs(wheelAccum.current) < threshold) {
+        e.preventDefault();
+        return;
+      }
+
+      const dir = wheelAccum.current > 0 ? 1 : -1;
+      wheelAccum.current = 0;
+      wheelLockUntil.current = now + 420;
+      e.preventDefault();
+      go(dir);
+    },
+    [keypadOpen, outerNavEnabled, go]
+  );
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return undefined;
+    const handler = (e) => onWheel(e);
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, [onWheel]);
 
   const finishSwipe = useCallback(
-    (clientX) => {
+    (clientX, clientY) => {
       if (!dragging.current) return;
       dragging.current = false;
+      const axis = swipeAxis.current;
+      const startTarget = swipeStartTarget.current;
+      swipeAxis.current = null;
+      swipeStartTarget.current = null;
+      if (axis === "x") return;
       const dx = clientX - startX.current;
-      if (Math.abs(dx) < 36) return;
-      go(dx < 0 ? 1 : -1);
+      const dy = clientY - startY.current;
+      if (Math.abs(dx) > Math.abs(dy)) return;
+      if (Math.abs(dy) < 36) return;
+      if (canPanelConsumeSwipe(startTarget, dy)) return;
+      go(dy < 0 ? 1 : -1);
     },
     [go]
   );
 
-  /* capture: 명함 패널 stopPropagation / overflow-y 스크롤이 bubble을 가로채도 스와이프 시작 */
+  const shouldIgnoreCarouselStart = (target) => {
+    return Boolean(target?.closest?.(interactiveSelector));
+  };
+
+  /* 축 잠금: 세로만 페이지 이동. 좌우는 ShowcaseMediaPage에 양보 (조기 capture 금지) */
   const onPointerDownCapture = (e) => {
     if (keypadOpen || !outerNavEnabled) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (e.target?.closest?.(interactiveSelector)) return;
+    if (shouldIgnoreCarouselStart(e.target)) return;
     dragging.current = true;
+    swipeAxis.current = null;
+    swipeStartTarget.current = e.target;
     startX.current = e.clientX;
-    try {
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-    } catch {
-      /* ignore */
+    startY.current = e.clientY;
+  };
+
+  const onPointerMoveCapture = (e) => {
+    if (!dragging.current || keypadOpen || !outerNavEnabled) return;
+    const dx = e.clientX - startX.current;
+    const dy = e.clientY - startY.current;
+    if (swipeAxis.current == null && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) {
+      swipeAxis.current = Math.abs(dy) >= Math.abs(dx) ? "y" : "x";
+      if (swipeAxis.current === "y") {
+        if (canPanelConsumeSwipe(swipeStartTarget.current, dy)) {
+          dragging.current = false;
+          swipeAxis.current = null;
+          swipeStartTarget.current = null;
+          return;
+        }
+        try {
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+      } else {
+        dragging.current = false;
+      }
     }
   };
 
   const onPointerUpCapture = (e) => {
-    if (!dragging.current) return;
+    if (!dragging.current && swipeAxis.current == null) return;
     try {
       e.currentTarget.releasePointerCapture?.(e.pointerId);
     } catch {
       /* ignore */
     }
-    finishSwipe(e.clientX);
+    finishSwipe(e.clientX, e.clientY);
   };
 
   const onTouchStartCapture = (e) => {
     if (keypadOpen || !outerNavEnabled) return;
-    if (e.target?.closest?.(interactiveSelector)) return;
+    if (shouldIgnoreCarouselStart(e.target)) return;
     const t = e.touches?.[0];
     if (!t) return;
     dragging.current = true;
+    swipeAxis.current = null;
+    swipeStartTarget.current = e.target;
     startX.current = t.clientX;
+    startY.current = t.clientY;
+  };
+
+  const onTouchMoveCapture = (e) => {
+    if (!dragging.current || keypadOpen || !outerNavEnabled) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    const dx = t.clientX - startX.current;
+    const dy = t.clientY - startY.current;
+    if (swipeAxis.current == null && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) {
+      swipeAxis.current = Math.abs(dy) >= Math.abs(dx) ? "y" : "x";
+      if (swipeAxis.current === "x") {
+        dragging.current = false;
+      } else if (canPanelConsumeSwipe(swipeStartTarget.current, dy)) {
+        dragging.current = false;
+        swipeAxis.current = null;
+        swipeStartTarget.current = null;
+      }
+    }
   };
 
   const onTouchEndCapture = (e) => {
-    if (!dragging.current) return;
+    if (!dragging.current && swipeAxis.current == null) return;
     const t = e.changedTouches?.[0];
-    finishSwipe(t?.clientX ?? startX.current);
+    finishSwipe(t?.clientX ?? startX.current, t?.clientY ?? startY.current);
   };
 
   const openSlideSettings = (kind) => (e) => {
@@ -223,7 +552,9 @@ export default function ShowcaseCallCarousel({
   const slideLabel =
     current?.type === "card"
       ? "디지털 인증명함"
-      : current?.type === "banner"
+      : current?.type === "instagram-post" ||
+          current?.type === "media-page" ||
+          current?.type === "banner"
         ? `쇼케이스 ${Math.max(1, index + 1 - photoIndexBase)}/${showcaseSlideTotal}`
         : current?.type === "empty-slot"
           ? `쇼케이스 ${current.slot}/${showcaseSlideTotal}`
@@ -241,9 +572,11 @@ export default function ShowcaseCallCarousel({
 
   return (
     <div
-      className={`showcase-call-carousel${canScroll ? "" : " showcase-call-carousel--locked"}${
+      className={`showcase-call-carousel showcase-call-carousel--vertical${canScroll ? "" : " showcase-call-carousel--locked"}${
         isPaid ? " showcase-call-carousel--paid" : " showcase-call-carousel--free"
-      }${showCornerIdentity ? " showcase-call-carousel--corner-id" : ""}`}
+      }${showCornerIdentity ? " showcase-call-carousel--corner-id" : ""}${
+        current?.fromInstagram ? " showcase-call-carousel--ig-active" : ""
+      }`}
       data-index={index}
       data-tier={tier}
       data-known={isKnownContact ? "1" : "0"}
@@ -261,16 +594,23 @@ export default function ShowcaseCallCarousel({
       ) : null}
 
       <div
+        ref={viewportRef}
         className={`showcase-call-carousel__viewport${keypadOpen ? " showcase-call-carousel__viewport--keypad" : ""}`}
         onPointerDownCapture={onPointerDownCapture}
+        onPointerMoveCapture={onPointerMoveCapture}
         onPointerUpCapture={onPointerUpCapture}
         onPointerCancel={() => {
           dragging.current = false;
+          swipeAxis.current = null;
+          swipeStartTarget.current = null;
         }}
         onTouchStartCapture={onTouchStartCapture}
+        onTouchMoveCapture={onTouchMoveCapture}
         onTouchEndCapture={onTouchEndCapture}
         onTouchCancel={() => {
           dragging.current = false;
+          swipeAxis.current = null;
+          swipeStartTarget.current = null;
         }}
       >
         <div
@@ -281,7 +621,7 @@ export default function ShowcaseCallCarousel({
         >
           <div
             className="showcase-call-carousel__track"
-            style={{ transform: `translate3d(-${index * 100}%, 0, 0)` }}
+            style={{ transform: `translate3d(0, -${index * 100}%, 0)` }}
           >
             {slides.map((slide) => (
               <article key={slide.id} className="showcase-call-carousel__slide">
@@ -318,18 +658,8 @@ export default function ShowcaseCallCarousel({
                   </div>
                 ) : null}
 
-                {slide.type === "banner" && isPaid ? (
-                  (() => {
-                    const igUrl = pickInstagramEmbedSourceUrl(styleConfig, slide);
-                    const useIgEmbed = Boolean(igUrl && shouldUseInstagramEmbedMode(styleConfig, slide));
-                    return (
-                  <div
-                    className={
-                      useIgEmbed
-                        ? "showcase-call-carousel__banner showcase-call-carousel__banner--ig-embed"
-                        : "showcase-call-carousel__banner"
-                    }
-                  >
+                {slide.type === "instagram-post" ? (
+                  <div className="showcase-call-carousel__banner showcase-call-carousel__banner--ig-post">
                     {showOwnerSettings && !keypadOpen ? (
                       <button
                         type="button"
@@ -343,28 +673,124 @@ export default function ShowcaseCallCarousel({
                         설정
                       </button>
                     ) : null}
-                    {useIgEmbed ? (
-                      <ShowcaseInstagramEmbed postUrl={igUrl} title="Instagram 쇼케이스" />
-                    ) : (
-                      <>
-                        <img src={slide.url} alt="" className="showcase-call-carousel__banner-img" draggable={false} />
-                        <div className="showcase-call-carousel__banner-veil" aria-hidden />
-                        {socialOverlayEnabled && v1AppShell.showcaseSocialOverlay && !keypadOpen ? (
-                          <ShowcaseBannerSocialLayer
-                            card={card}
-                            slide={slide}
-                            previewMode={previewMode}
-                            onToast={onKeypadToast}
-                            onReport={onReport}
-                          />
-                        ) : (slide.overlayText || slide.caption) ? (
-                          <p className="showcase-call-carousel__banner-caption">{slide.overlayText || slide.caption}</p>
-                        ) : null}
-                      </>
-                    )}
+                    <ShowcaseInstagramPost
+                      username={slide.username || igUsername}
+                      profilePictureUrl={slide.profilePictureUrl || igProfilePictureUrl}
+                      photos={slide.photos || []}
+                      caption={slide.caption || ""}
+                      mediaId={slide.mediaId || slide.id || ""}
+                      permalink={slide.permalink || ""}
+                      verified={igVerified}
+                      onLike={(_ctx, _state) => {
+                        /* TODO: VLUE 좋아요 API / Instagram Graph */
+                      }}
+                      onComment={(ctx) => {
+                        /* TODO: 댓글 시트 + VLUE comments API */
+                        onKeypadToast?.(`@${ctx.username || "instagram"} 댓글`);
+                      }}
+                      onShare={async (ctx) => {
+                        /* TODO: 공유 기록 + 카카오/시스템 공유 */
+                        try {
+                          if (navigator.share && ctx.permalink) {
+                            await navigator.share({
+                              title: "VLUE Showcase",
+                              url: ctx.permalink
+                            });
+                          } else if (ctx.permalink) {
+                            await navigator.clipboard?.writeText?.(ctx.permalink);
+                            onKeypadToast?.("링크를 복사했습니다.");
+                          } else {
+                            onKeypadToast?.("공유할 링크가 없습니다.");
+                          }
+                        } catch {
+                          /* ignore cancel */
+                        }
+                      }}
+                      onReport={(ctx) => {
+                        /* TODO: VLUE 신고/차단 */
+                        onReport?.({ card, phone: incomingNumber, mediaId: ctx.mediaId });
+                        onKeypadToast?.("신고는 VLUE 앱 신고 화면에서 처리할 수 있습니다.");
+                      }}
+                      onImageError={(broken) => {
+                        const id = broken?.id;
+                        if (!id) return;
+                        resolveInstagramMediaUrls([id])
+                          .then((res) => {
+                            const row = (res.media || []).find((m) => String(m.id) === String(id));
+                            const url = row?.mediaUrl || row?.children?.[0]?.mediaUrl;
+                            if (!url) return;
+                            setIgUrlMap((prev) => {
+                              const next = new Map(prev);
+                              next.set(String(id), String(url));
+                              return next;
+                            });
+                          })
+                          .catch(() => {});
+                      }}
+                    />
+                    {/* 인스타 게시물: 비즈니스 링크 숨김 · 소셜 로고 + VLUE 프로필만 */}
+                    {socialOverlayEnabled && !keypadOpen ? (
+                      <ShowcaseSlideChrome card={card} variant="instagram" hideBusinessLinks />
+                    ) : null}
                   </div>
-                    );
-                  })()
+                ) : null}
+
+                {slide.type === "media-page" || slide.type === "banner" ? (
+                  <div className="showcase-call-carousel__banner">
+                    {showOwnerSettings && !keypadOpen ? (
+                      <button
+                        type="button"
+                        className="showcase-call-carousel__slide-settings showcase-call-carousel__slide-settings--banner"
+                        aria-label="블루 쇼케이스 설정"
+                        title="쇼케이스 설정"
+                        onClick={openSlideSettings("showcase")}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+                        설정
+                      </button>
+                    ) : null}
+                    <ShowcaseMediaPage
+                      photos={
+                        slide.type === "media-page"
+                          ? slide.photos || []
+                          : slide.url
+                            ? [{ id: slide.id, url: slide.url }]
+                            : []
+                      }
+                      caption={slide.caption || slide.overlayText || ""}
+                      badge={igVerified && igBadge ? "Instagram 인증완료✔" : ""}
+                      onImageError={(broken) => {
+                        const id = broken?.id;
+                        if (!id) return;
+                        resolveInstagramMediaUrls([id])
+                          .then((res) => {
+                            const row = (res.media || []).find((m) => String(m.id) === String(id));
+                            const url = row?.mediaUrl || row?.children?.[0]?.mediaUrl;
+                            if (!url) return;
+                            setIgUrlMap((prev) => {
+                              const next = new Map(prev);
+                              next.set(String(id), String(url));
+                              return next;
+                            });
+                          })
+                          .catch(() => {});
+                      }}
+                    />
+                    {socialOverlayEnabled && v1AppShell.showcaseSocialOverlay && !keypadOpen ? (
+                      <>
+                        <ShowcaseSlideChrome card={card} variant="custom" />
+                        <ShowcaseBannerSocialLayer
+                          card={card}
+                          slide={slide}
+                          previewMode={previewMode}
+                          onToast={onKeypadToast}
+                          onReport={onReport}
+                          hideFooter
+                        />
+                      </>
+                    ) : null}
+                  </div>
                 ) : null}
 
                 {slide.type === "paid-identity" ? (
@@ -411,27 +837,25 @@ export default function ShowcaseCallCarousel({
             ))}
           </div>
 
-          {outerNavEnabled && !keypadOpen ? (
-            <>
-              <button
-                type="button"
-                className="showcase-call-carousel__nav showcase-call-carousel__nav--prev"
-                aria-label="이전 슬라이드"
-                disabled={index <= 0}
-                onClick={() => go(-1)}
-              >
-                <ChevronLeft size={22} strokeWidth={2.2} aria-hidden />
-              </button>
-              <button
-                type="button"
-                className="showcase-call-carousel__nav showcase-call-carousel__nav--next"
-                aria-label="다음 슬라이드"
-                disabled={index >= count - 1}
-                onClick={() => go(1)}
-              >
-                <ChevronRight size={22} strokeWidth={2.2} aria-hidden />
-              </button>
-            </>
+          {canScroll && !keypadOpen ? (
+            <div className="showcase-call-carousel__dots" role="tablist" aria-label="쇼케이스 슬라이드">
+              {slides.map((slide, i) => (
+                <button
+                  key={slide.id}
+                  type="button"
+                  className={`showcase-call-carousel__dot${i === index ? " is-active" : ""}`}
+                  aria-label={
+                    slide.type === "card"
+                      ? "디지털 명함"
+                      : slide.type === "empty-slot"
+                        ? `빈 슬롯 ${slide.slot}`
+                        : `쇼케이스 배너 ${i}`
+                  }
+                  aria-selected={i === index}
+                  onClick={() => setIndex(i)}
+                />
+              ))}
+            </div>
           ) : null}
 
           {showCornerIdentity && isPaid && !keypadOpen && !socialOverlayEnabled ? (
@@ -457,29 +881,6 @@ export default function ShowcaseCallCarousel({
           </div>
         ) : null}
       </div>
-
-      {canScroll && !keypadOpen ? (
-        <>
-          <div className="showcase-call-carousel__dots" role="tablist" aria-label="쇼케이스 슬라이드">
-            {slides.map((slide, i) => (
-              <button
-                key={slide.id}
-                type="button"
-                className={`showcase-call-carousel__dot${i === index ? " is-active" : ""}`}
-                aria-label={
-                  slide.type === "card"
-                    ? "디지털 명함"
-                    : slide.type === "empty-slot"
-                      ? `빈 슬롯 ${slide.slot}`
-                      : `쇼케이스 배너 ${i}`
-                }
-                aria-selected={i === index}
-                onClick={() => setIndex(i)}
-              />
-            ))}
-          </div>
-        </>
-      ) : null}
 
       {isPaid && !scrollEnabled && count > 1 ? (
         <p className="showcase-call-carousel__lock-hint">통화 연결 후 슬라이드할 수 있습니다</p>

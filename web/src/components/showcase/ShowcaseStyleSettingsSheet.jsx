@@ -4,7 +4,7 @@ import { VLUE_SHOWCASE } from "../../lib/vlueBrandSpaces.js";
 import ShowcaseStyleSettingsPanel from "./ShowcaseStyleSettingsPanel.jsx";
 import "./showcase-style-settings.css";
 
-/** V1 — 블루 쇼케이스 스타일 설정 (하단 바 유지 전체 화면) */
+/** V1 — 블루 쇼케이스 스타일 설정 (하단 바 유지) */
 export default function ShowcaseStyleSettingsSheet({
   open,
   onClose,
@@ -22,6 +22,7 @@ export default function ShowcaseStyleSettingsSheet({
       icon={Palette}
       isDarkMode={isDarkMode}
       reserveBottomNav
+      showFloatingClose
     >
       <ShowcaseStyleSettingsPanel
         fullscreen

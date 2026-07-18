@@ -2,6 +2,7 @@ import type { AccountStatus, SocialLoginProvider } from "@prisma/client";
 import { prisma } from "../db/client.js";
 import { fetchKakaoUserFromAccessToken } from "../integrations/kakao/kakaoUserMe.js";
 import { fetchGoogleUserFromAccessToken } from "../integrations/google/googleOAuth.js";
+import { fetchInstagramProfile } from "../integrations/instagram/instagramOAuth.js";
 import { resolvePublicHandleForNewUser } from "../lib/publicHandle.js";
 import { issueTokenPair, type TokenPair } from "./authSessions.js";
 
@@ -37,6 +38,7 @@ function normalizeProvider(raw: string): SocialLoginProvider | null {
   if (p === "kakao") return "kakao";
   if (p === "naver") return "naver";
   if (p === "google") return "google";
+  if (p === "instagram") return "instagram";
   return null;
 }
 
@@ -94,6 +96,17 @@ async function resolveSocialIdentity(
       providerEmail: g.email,
       displayName: g.name || (typeof body.nickname === "string" ? body.nickname.trim() : null) || null,
       emailVerified: g.emailVerified
+    };
+  }
+
+  if (provider === "instagram") {
+    const ig = await fetchInstagramProfile(token);
+    return {
+      provider: "instagram",
+      providerUserId: ig.igUserId || ig.appScopedUserId,
+      providerEmail: null,
+      displayName: ig.username || null,
+      emailVerified: false
     };
   }
 

@@ -14,6 +14,8 @@ export default function AppFullScreenView({
   reserveBottomNav = false,
   /** true면 하단 내비까지 덮는 진짜 전체화면 (쇼케이스 천막 등) */
   coverBottomNav = false,
+  /** reserveBottomNav일 때 CSS 변수 대신 쓸 실측 px (네비 높이) */
+  bottomInsetPx = null,
   /** true면 타이틀 헤더 숨김 */
   hideHeader = false,
   /** hideHeader일 때 우상단 플로팅 닫기 (자식이 자체 닫기를 쓰면 false) */
@@ -28,12 +30,19 @@ export default function AppFullScreenView({
       : "bg-white/95 text-slate-700 shadow-sm ring-1 ring-slate-200/80"
   }`;
 
+  let bottom = 0;
+  if (!coverBottomNav && reserveBottomNav) {
+    bottom =
+      bottomInsetPx != null && Number.isFinite(Number(bottomInsetPx))
+        ? Number(bottomInsetPx)
+        : "var(--vlue-bottom-nav-offset, 0px)";
+  }
+
   return (
     <div
       className={`fixed inset-x-0 top-0 flex flex-col ${zClass} ${isDarkMode ? "bg-[#111827] text-gray-100" : "bg-white text-slate-900"} ${className}`.trim()}
-      style={{
-        bottom: reserveBottomNav && !coverBottomNav ? "var(--vlue-bottom-nav-offset, 0px)" : 0
-      }}
+      style={{ bottom, margin: 0, padding: 0 }}
+      data-afv-bottom={typeof bottom === "number" ? String(bottom) : "css-var"}
       role="dialog"
       aria-modal="true"
       aria-label={title || "전체 화면"}

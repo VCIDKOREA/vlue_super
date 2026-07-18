@@ -22,6 +22,8 @@ function stripOAuthFromUrl() {
     "google_error",
     "naver_oauth",
     "naver_error",
+    "instagram_oauth",
+    "instagram_error",
     "social_oauth",
     "oauth_provider",
     "oauth_error"
@@ -68,6 +70,14 @@ function detectOAuthMode(search, hash) {
       error: search.get("naver_error") || hash.get("naver_error") || ""
     };
   }
+  const instagram = search.get("instagram_oauth") || hash.get("instagram_oauth");
+  if (instagram) {
+    return {
+      mode: instagram,
+      provider: "instagram",
+      error: search.get("instagram_error") || hash.get("instagram_error") || search.get("oauth_error") || ""
+    };
+  }
   return null;
 }
 
@@ -91,7 +101,9 @@ export function consumeSocialOAuthReturn() {
         ? "카카오"
         : provider === "naver"
           ? "네이버"
-          : provider;
+          : provider === "instagram"
+            ? "Instagram"
+            : provider;
 
   if (detected.mode === "error") {
     const message =
