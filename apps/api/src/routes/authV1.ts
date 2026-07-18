@@ -447,8 +447,8 @@ authV1Routes.get("/instagram/media", requireUserHeader, async (c) => {
 authV1Routes.post("/instagram/media/resolve", requireUserHeader, async (c) => {
   try {
     const userId = c.get("vlueUserId") as string;
-    const body = await c.req.json<{ ids?: string[] }>().catch(() => ({}));
-    const ids = Array.isArray(body?.ids) ? body.ids : [];
+    const body = (await c.req.json().catch(() => ({}))) as { ids?: unknown };
+    const ids = Array.isArray(body.ids) ? body.ids.map(String).filter(Boolean) : [];
     const result = await resolveLinkedInstagramMediaUrls(userId, ids);
     return c.json(result);
   } catch (e) {
