@@ -63,6 +63,33 @@ function isDownloadsRequest(pathname) {
   return pathname === "/downloads" || pathname === "/downloads/" || pathname.startsWith("/downloads/");
 }
 
+/** Meta 검수용 정적 약관 — SPA index.html 폴백보다 우선 */
+const LEGAL_STATIC_PAGES = new Map([
+  ["/privacy", "privacy/index.html"],
+  ["/privacy/", "privacy/index.html"],
+  ["/terms", "terms/index.html"],
+  ["/terms/", "terms/index.html"],
+  ["/data-deletion", "data-deletion/index.html"],
+  ["/data-deletion/", "data-deletion/index.html"],
+  ["/privacy/legal-article-6", "data-deletion/index.html"],
+  ["/privacy/legal-article-6/", "data-deletion/index.html"]
+]);
+
+function serveLegalStatic(response, pathname) {
+  const rel = LEGAL_STATIC_PAGES.get(pathname);
+  if (!rel) return false;
+  const filePath = join(dist, rel);
+  if (!existsSync(filePath)) return false;
+  const body = readFileSync(filePath);
+  response.writeHead(200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Content-Length": String(body.length),
+    "Cache-Control": "public, max-age=300"
+  });
+  response.end(body);
+  return true;
+}
+
 function serveDownload(request, response, pathname) {
   const filePath = resolveDownloadFile(pathname);
   if (!filePath) {
@@ -133,6 +160,10 @@ const server = createServer((request, response) => {
       return;
     }
     serveDownload(request, response, pathname);
+    return;
+  }
+
+  if (serveLegalStatic(response, pathname)) {
     return;
   }
 
