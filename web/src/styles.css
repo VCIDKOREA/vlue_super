@@ -1636,6 +1636,207 @@ body,
   background-color: rgb(255 255 255 / 6%) !important;
 }
 
+/* 홈 검색 — 공공 사업자 정보 카드 (검증 포탈 공공·국세청 탭과 동일 계열) */
+.home-public-biz-card {
+  margin-bottom: 0.5rem;
+  border-radius: 0.9rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 0.85rem 0.9rem 1rem;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 4%);
+}
+
+.home-public-biz-card__source {
+  margin: 0 0 0.55rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #64748b;
+}
+
+.home-public-biz-card__banner {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  margin-bottom: 0.7rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.55rem;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.home-public-biz-card__banner p {
+  margin: 0;
+}
+
+.home-public-biz-card__banner--ok {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.home-public-biz-card__banner--warn {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.home-public-biz-card__head h3 {
+  margin: 0 0 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.home-public-bizno-table {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.65rem;
+  overflow: hidden;
+  background: #fff;
+}
+
+.home-public-bizno-row {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 32%) 1fr;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.home-public-bizno-row:last-child {
+  border-bottom: 0;
+}
+
+.home-public-bizno-label {
+  padding: 0.65rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: #4b5563;
+  background: #f8fafc;
+  border-right: 1px solid #edf0f4;
+}
+
+.home-public-bizno-value {
+  padding: 0.65rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 550;
+  color: #111827;
+  line-height: 1.45;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.45rem;
+}
+
+.home-public-bizno-emphasis {
+  font-weight: 800;
+  color: #dc2626;
+}
+
+.home-public-bizno-note {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.home-public-bizno-divider {
+  height: 2px;
+  background: #e5e7eb;
+}
+
+.home-public-biz-card__call {
+  margin-top: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 0.65rem;
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.home-public-biz-candidates {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e8edf5;
+}
+
+.home-public-biz-candidates__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #334155;
+}
+
+.home-public-biz-candidates__title span {
+  color: #2563eb;
+}
+
+.home-public-biz-candidates__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.home-public-biz-candidates__item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.7rem;
+  background: #fff;
+  padding: 0.65rem 0.75rem;
+}
+
+.home-public-biz-candidates__item.is-active {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1px #bfdbfe;
+}
+
+.home-public-biz-candidates__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+}
+
+.home-public-biz-candidates__head strong {
+  font-size: 0.82rem;
+  font-weight: 850;
+  color: #0f172a;
+}
+
+.home-public-biz-candidates__head span {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.home-public-biz-candidates__item p {
+  margin: 0.25rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: #475569;
+}
+
+.home-public-biz-candidates__addr {
+  color: #64748b !important;
+  font-weight: 550 !important;
+}
+
+.home-public-biz-candidates__meta {
+  margin-top: 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
 .home-banner-slide {
   flex: 0 0 min(92%, calc(100% - 1.75rem));
   max-width: min(92%, calc(100% - 1.75rem));

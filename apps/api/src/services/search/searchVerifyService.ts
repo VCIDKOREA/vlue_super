@@ -95,7 +95,9 @@ export type SearchVerifyResponse =
   | { status: "error"; message: string };
 
 const FAIL_SAFE_UNMATCHED =
-  "국세청 원본과 일치하는 사업자번호는 조회가 지연되나, 카카오/네이버에 등록된 실존 기관임을 확인했습니다.";
+  "등록되지 않은 사업자입니다. 카카오/네이버 장소에는 있으나 공공·국세청 사업자 원본과 일치하지 않습니다.";
+
+const FAIL_SAFE_NO_PUBLIC = "등록되지 않은 사업자입니다";
 
 const PUBLIC_ORG_RE =
   /세무서|시청|구청|군청|도청|경찰서|소방서|우체국|법원|검찰|주민센터|보건소|관공서|국세청|행정복지센터|출장소/;
@@ -389,7 +391,7 @@ async function buildPublicSource(input: {
     matched: false,
     telephone: matchPhone,
     address: matchAddress,
-    fail_safe_message: hasExternalPlace ? FAIL_SAFE_UNMATCHED : "공공데이터에서 일치하는 사업자 정보를 찾지 못했습니다.",
+    fail_safe_message: hasExternalPlace ? FAIL_SAFE_UNMATCHED : FAIL_SAFE_NO_PUBLIC,
     candidates: []
   };
 }

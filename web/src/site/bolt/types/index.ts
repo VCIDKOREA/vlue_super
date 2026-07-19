@@ -19,7 +19,8 @@ export type View =
   | "mypage"
   | "bizcard"
   | "terms"
-  | "privacy";
+  | "privacy"
+  | "refund";
 
 export interface CertifiedOrg {
   id: string;

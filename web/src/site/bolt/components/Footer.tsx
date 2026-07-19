@@ -39,6 +39,7 @@ const FOOTER_SECTIONS: { label: string; links: FooterLink[] }[] = [
     links: [
       { text: '이용약관', view: 'terms' as View },
       { text: '개인정보처리방침', view: 'privacy' as View },
+      { text: '환불·청약철회 규정', view: 'refund' as View },
       { text: '만 14세 미만 정책', view: 'privacy' as View, anchor: 'legal-article-3' },
     ],
   },

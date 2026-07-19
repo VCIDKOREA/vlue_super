@@ -24,6 +24,7 @@ import {
 } from "./VlueSettingsUi.jsx";
 import VlueEmailSettingsSection from "./VlueEmailSettingsSection.jsx";
 import { v1AppShell } from "../../lib/v1ReleaseScope.js";
+import { APP_LEGAL_LINKS, marketingLegalUrl } from "../../lib/legalPageLinks.js";
 import {
   getAppLockStatus,
   hasNativeAppLockBridge,
@@ -720,6 +721,57 @@ export default function VlueSettingsPanel({
             label="글자 크기"
             value={settings.uiFontScale === "large" ? "크게" : settings.uiFontScale === "small" ? "작게" : "보통"}
             onClick={() => onSubView("uiFont")}
+            isDarkMode={isDarkMode}
+          />
+        </SettingsSection>
+
+        <SettingsSection title="약관 및 정책" isDarkMode={isDarkMode}>
+          {APP_LEGAL_LINKS.map((item, index) => (
+            <div key={item.id}>
+              {index > 0 ? <SettingsDivider isDarkMode={isDarkMode} /> : null}
+              <SettingsRowButton
+                label={item.label}
+                sublabel="공식 홈페이지에서 확인"
+                onClick={() => {
+                  const url = marketingLegalUrl(item.kind);
+                  try {
+                    const native = typeof window !== "undefined" ? window.VlueNative : null;
+                    if (native?.openExternalUrl) {
+                      native.openExternalUrl(url);
+                      return;
+                    }
+                  } catch {
+                    /* fall through */
+                  }
+                  window.open(url, "_blank", "noopener,noreferrer");
+                }}
+                isDarkMode={isDarkMode}
+              />
+            </div>
+          ))}
+          <SettingsDivider isDarkMode={isDarkMode} />
+          <SettingsRowButton
+            label="요금·멤버십 안내"
+            sublabel="가격표 · Premium"
+            onClick={() => {
+              const url =
+                typeof window !== "undefined" &&
+                ["www.vlue.kr", "vlue.kr", "localhost", "127.0.0.1"].includes(
+                  window.location.hostname.toLowerCase()
+                )
+                  ? `${window.location.origin}/#pricing`
+                  : "https://www.vlue.kr/#pricing";
+              try {
+                const native = typeof window !== "undefined" ? window.VlueNative : null;
+                if (native?.openExternalUrl) {
+                  native.openExternalUrl(url);
+                  return;
+                }
+              } catch {
+                /* fall through */
+              }
+              window.open(url, "_blank", "noopener,noreferrer");
+            }}
             isDarkMode={isDarkMode}
           />
         </SettingsSection>

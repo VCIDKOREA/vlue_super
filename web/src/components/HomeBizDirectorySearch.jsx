@@ -5,6 +5,7 @@ import {
   searchBusinessDirectory,
   suggestIndustries
 } from "../lib/homeBizDirectory.js";
+import { searchPublicBusiness } from "../lib/publicBusinessSearchApi.js";
 import {
   detectShowcaseSearchMode,
   searchShowcaseByTag
@@ -12,6 +13,7 @@ import {
 import LetteringBusinessCardPanel from "./LetteringBusinessCardPanel.jsx";
 import LetteringBizcardScaledPreview from "./LetteringBizcardScaledPreview.jsx";
 import LetteringBizcardSecureFrame from "./LetteringBizcardSecureFrame.jsx";
+import PublicBusinessInfoCard from "./PublicBusinessInfoCard.jsx";
 import { VlueBrandLogo } from "./VlueBrandLogo.jsx";
 
 function BizSearchBar({ query, onQueryChange, onSubmit, logoSize = 22 }) {
@@ -29,7 +31,7 @@ function BizSearchBar({ query, onQueryChange, onSubmit, logoSize = 22 }) {
               onSubmit?.();
             }
           }}
-          placeholder="업체명·쇼케이스·명함 검색"
+          placeholder="상호·업체명·쇼케이스 검색"
           className="home-biz-search__input"
           enterKeyHint="search"
           autoComplete="off"
@@ -159,7 +161,12 @@ export default function HomeBizDirectorySearch({
   const [apiMode, setApiMode] = useState(null);
   const [apiSearching, setApiSearching] = useState(false);
   const [apiError, setApiError] = useState("");
+  const [publicBiz, setPublicBiz] = useState(null);
+  const [publicBizLoading, setPublicBizLoading] = useState(false);
+  const [publicBizError, setPublicBizError] = useState("");
+  const [publicCandidateIndex, setPublicCandidateIndex] = useState(0);
   const stickySentinelRef = useRef(null);
+  const userCoordsRef = useRef(null);
 
   const localResults = useMemo(
     () => searchBusinessDirectory(query, { sort, categoryExposedPosts }),
@@ -184,6 +191,52 @@ export default function HomeBizDirectorySearch({
   useEffect(() => {
     if (!resultsOpen) setSelectedId("");
   }, [resultsOpen]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return undefined;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        userCoordsRef.current = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude
+        };
+      },
+      () => undefined,
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 120000 }
+    );
+  }, []);
+
+  /* 상호명 → 공공데이터 사업자 실시간 조회 */
+  useEffect(() => {
+    const q = query.trim();
+    if (!resultsOpen || q.length < 2) {
+      setPublicBiz(null);
+      setPublicBizError("");
+      setPublicBizLoading(false);
+      setPublicCandidateIndex(0);
+      return undefined;
+    }
+    let cancelled = false;
+    setPublicBizLoading(true);
+    setPublicBizError("");
+    const timer = setTimeout(() => {
+      searchPublicBusiness(q, userCoordsRef.current || undefined).then((res) => {
+        if (cancelled) return;
+        setPublicBizLoading(false);
+        if (res.status !== "success" || !res.data) {
+          setPublicBiz(null);
+          setPublicBizError(res.message || "사업자 조회에 실패했습니다.");
+          return;
+        }
+        setPublicBiz(res.data);
+        setPublicCandidateIndex(0);
+      });
+    }, 320);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, resultsOpen]);
 
   useEffect(() => {
     const q = query.trim();
@@ -260,12 +313,15 @@ export default function HomeBizDirectorySearch({
   };
 
   const emptyMessage = (() => {
-    if (apiSearching) return "검색 중…";
+    if (apiSearching || publicBizLoading) return "검색 중…";
     if (apiError) return apiError;
+    if (publicBiz && !publicBiz.matched && !results.length) {
+      return publicBiz.message || "등록되지 않은 사업자입니다";
+    }
     if (query.trim()) {
       return "검색 결과가 없습니다. 상대가 검색 공개를 허용했는지, 본인 쇼케이스가 활성화됐는지 확인해 보세요.";
     }
-    return "검색어를 입력하면 공개된 쇼케이스·명함이 표시됩니다.";
+    return "상호명을 입력하면 공공 사업자 정보와 공개 쇼케이스·명함이 표시됩니다.";
   })();
 
   return (
@@ -314,10 +370,10 @@ export default function HomeBizDirectorySearch({
               ) : (
                 <div className="flex items-center gap-2">
                   <p className="min-w-0 flex-1 text-[11px] font-black text-slate-700">
-                    {apiSearching
+                    {apiSearching || publicBizLoading
                       ? "검색 중…"
                       : query.trim()
-                        ? `검색 ${results.length}건`
+                        ? `쇼케이스 ${results.length}건${publicBiz?.matched ? ` · 사업자 ${publicBiz.candidates?.length || 1}건` : ""}`
                         : `노출 ${results.length}건`}
                   </p>
                   <ResultSortBar sort={sort} onSortChange={setSort} />
@@ -345,11 +401,24 @@ export default function HomeBizDirectorySearch({
                   </div>
                 )}
                 <div className="home-biz-search__sheet-body vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                  {results.length === 0 ? (
+                  {query.trim().length >= 2 ? (
+                    <div className="px-2 pt-2 pb-1">
+                      <PublicBusinessInfoCard
+                        loading={publicBizLoading}
+                        matched={Boolean(publicBiz?.matched)}
+                        message={publicBizError || publicBiz?.message}
+                        primary={publicBiz?.primary || null}
+                        candidates={publicBiz?.candidates || []}
+                        selectedIndex={publicCandidateIndex}
+                        onSelectCandidate={setPublicCandidateIndex}
+                      />
+                    </div>
+                  ) : null}
+                  {results.length === 0 && !(query.trim().length >= 2 && (publicBizLoading || publicBiz)) ? (
                     <div className="mx-2 mb-2 rounded-xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-[12px] font-semibold text-slate-500">
                       {emptyMessage}
                     </div>
-                  ) : (
+                  ) : results.length === 0 ? null : (
                     <ul className="px-2 pb-2">
                       {results.map((biz) => (
                         <li key={biz.id}>

@@ -230,12 +230,14 @@ async function run() {
   const partner = await runSearchVerify("다다오피스");
   assert(partner.status === "success", "partner search success");
   if (partner.status === "success") {
-    assert(partner.data.is_registered === true, "registered partner");
-    assert(partner.data.vlue_auth.safety_score >= 90, "premium safety score");
-    assert(partner.data.vlue_auth.cert_number.includes("VLUE"), "cert number");
-    assert(partner.data.public.matched === true, "dada public matched via hint");
-    assert(partner.data.public.business_number.includes("504"), "dada business number");
-    assert(partner.data.public.ceo_name === "박**", "dada ceo masked");
+    assert(partner.data.is_registered === false, "no demo VLUE partner registry");
+    assert(!partner.data.vlue_auth.cert_number, "no demo cert number");
+    assert(partner.data.vlue_auth.safety_score < 90, "unregistered safety score");
+    assert(partner.data.public.matched === false, "no demo public hint registry");
+    assert(
+      String(partner.data.public.fail_safe_message || "").includes("등록되지 않은 사업자"),
+      "unregistered public message"
+    );
   }
 
   globalThis.fetch = async (input: RequestInfo | URL) => {

@@ -353,6 +353,18 @@ function PublicPanel({ data }: { data: PublicSourceData }) {
 
   const ceoDisplay = display.ceo_name ? maskCeoName(display.ceo_name) : '미확인';
 
+  if (!data.matched && candidates.length === 0) {
+    return (
+      <div className="sv-cross-panel sv-cross-panel--enter">
+        <p className="sv-cross-source">출처: 소상공인 상가정보 · 금융위 기업기본정보 · 국세청</p>
+        <div className="sv-cross-failsafe">
+          <Info className="w-4 h-4 flex-shrink-0" />
+          <p>{data.fail_safe_message || '등록되지 않은 사업자입니다'}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="sv-cross-panel sv-cross-panel--enter">
       <p className="sv-cross-source">출처: 소상공인 상가정보 · 금융위 기업기본정보 · 국세청</p>

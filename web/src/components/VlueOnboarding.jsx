@@ -1265,6 +1265,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 <a href={marketingLegalUrl("privacy")} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 underline">
                   개인정보처리방침 전문
                 </a>
+                {" · "}
+                <a href={marketingLegalUrl("refund")} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 underline">
+                  환불·청약철회 규정
+                </a>
               </p>
               <div className="vlue-onb-terms-scroll mt-3 max-h-[min(42vh,360px)] overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-[12px] leading-relaxed text-slate-800">
                 {TERMS_ARTICLES.map((art) => (

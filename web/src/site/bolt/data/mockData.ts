@@ -11,56 +11,7 @@ import type {
 } from '../types';
 import { MARKETING_PRICING_TIERS } from './membershipPlansContent';
 
-export const certifiedOrgs: CertifiedOrg[] = [
-  {
-    id: 'vlue-001',
-    name: '명경채 요양병원',
-    category: '의료기관 / 요양병원',
-    address: '서울특별시 강남구 테헤란로 123, 명경채빌딩 3-5층',
-    phone: '02-1234-5678',
-    certifiedDate: '2024-03-15',
-    validUntil: '2026-03-14',
-    certNumber: 'VLUE-MED-2024-0031',
-    status: 'active',
-    description: '명경채 요양병원은 노인성 질환 및 재활치료를 전문으로 하는 의료기관입니다.',
-    representative: '김명경',
-    businessNumber: '123-45-67890',
-    tags: ['의료', '요양', '재활', '노인케어'],
-    lastVerified: '2026-04-17 09:32:15',
-  },
-  {
-    id: 'vlue-002',
-    name: '다다오피스',
-    category: '비즈니스 서비스 / 공유오피스',
-    address: '서울특별시 마포구 월드컵북로 56길 19, 다다타워 2층',
-    phone: '02-9876-5432',
-    certifiedDate: '2024-06-01',
-    validUntil: '2026-05-31',
-    certNumber: 'VLUE-BIZ-2024-0087',
-    status: 'active',
-    description: '다다오피스는 스타트업 및 소규모 기업을 위한 프리미엄 공유오피스 서비스를 제공합니다.',
-    representative: '박다다',
-    businessNumber: '234-56-78901',
-    tags: ['공유오피스', '스타트업', '비즈니스', '보안인증'],
-    lastVerified: '2026-04-17 10:15:42',
-  },
-  {
-    id: 'vlue-003',
-    name: '한국신뢰금융',
-    category: '금융기관 / 대출중개',
-    address: '서울특별시 중구 을지로 100, 한국신뢰빌딩 8층',
-    phone: '02-5555-7777',
-    certifiedDate: '2025-01-10',
-    validUntil: '2027-01-09',
-    certNumber: 'VLUE-FIN-2025-0012',
-    status: 'active',
-    description: '금융감독원 등록 대출중개업체로 VLUE 인증을 통한 합법적인 금융 서비스를 제공합니다.',
-    representative: '이신뢰',
-    businessNumber: '345-67-89012',
-    tags: ['금융', '대출', '합법기관', '인증'],
-    lastVerified: '2026-04-17 08:00:01',
-  },
-];
+export const certifiedOrgs: CertifiedOrg[] = [];
 
 export const publicDataResults: PublicDataResult[] = [
   {

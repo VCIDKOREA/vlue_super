@@ -27,6 +27,7 @@ import MyPage from './pages/MyPage';
 import BusinessCardPage from './pages/BusinessCardPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
+import RefundPage from './pages/RefundPage';
 import FamilyProtectionPage, { AFTER_LOGIN_KEY } from './pages/FamilyProtectionPage';
 import PremiumHeroSection from './components/PremiumHeroSection';
 import type { MarketingAuthUser } from './components/AuthModal';
@@ -40,7 +41,7 @@ import { coerceWebViewForV1, isWebViewV1Enabled, v1WebShell } from '../../lib/v1
 const VALID_VIEWS: View[] = [
   'home', 'search', 'shopping', 'auction', 'about', 'resources', 'pricing', 'safezone',
   'mail', 'mail-settings', 'download', 'news', 'events', 'jobs', 'support', 'exceleditor', 'family', 'mypage', 'bizcard',
-  'terms', 'privacy',
+  'terms', 'privacy', 'refund',
 ];
 
 function readViewFromHash(): { view: View; legalScrollId?: string } {
@@ -253,8 +254,13 @@ export default function App() {
         {view === 'privacy' && (
           <PrivacyPage onBack={() => handleNavigate('home')} scrollToId={legalScrollId} />
         )}
+        {view === 'refund' && (
+          <RefundPage onBack={() => handleNavigate('home')} scrollToId={legalScrollId} />
+        )}
 
-        {view !== 'mypage' && view !== 'terms' && view !== 'privacy' && <Footer onNavigate={handleNavigate} />}
+        {view !== 'mypage' && view !== 'terms' && view !== 'privacy' && view !== 'refund' && (
+          <Footer onNavigate={handleNavigate} />
+        )}
         </div>
       </div>
       {v1WebShell.marketingFabChat ? (

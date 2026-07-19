@@ -385,6 +385,21 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
             </p>
           </div>
         </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-center text-[11px] leading-relaxed text-slate-600">
+          <p className="font-semibold text-slate-800">유료 구독은 자동 갱신될 수 있으며, 해지·환불·청약철회는 아래 규정을 따릅니다.</p>
+          <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+            <a href="#terms" className="font-bold text-primary-600 underline-offset-2 hover:underline">
+              이용약관
+            </a>
+            <a href="#privacy" className="font-bold text-primary-600 underline-offset-2 hover:underline">
+              개인정보처리방침
+            </a>
+            <a href="#refund" className="font-bold text-primary-600 underline-offset-2 hover:underline">
+              환불·청약철회 규정
+            </a>
+          </p>
+        </div>
       </div>
     </main>
   );

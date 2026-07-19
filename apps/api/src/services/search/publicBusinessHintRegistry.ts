@@ -11,19 +11,8 @@ export type PublicBusinessHint = {
   biz_item: string;
 };
 
-/** sbdc/FSC 미신청 시 교차검증용 공개 사업자 힌트 (실제 공공·비즈노 조회값 기반) */
-const HINTS: PublicBusinessHint[] = [
-  {
-    store_name: "다다오피스 본점",
-    aliases: ["다다오피스", "다다오피스본점", "dadaoffice", "dada office"],
-    business_number: "504-24-34309",
-    ceo_name: "박지숙",
-    address: "대구광역시 북구 노원로 262",
-    telephone: "053-355-7011",
-    biz_type: "협회 및 단체, 수리 및 기타 개인 서비스업",
-    biz_item: "문구, 사무용품"
-  }
-];
+/** 데모 시드 없음 — 실데이터는 공공 API(FSC·SBDC·NTS)만 사용 */
+const HINTS: PublicBusinessHint[] = [];
 
 function normalize(raw: string): string {
   return String(raw || "")
