@@ -167,7 +167,7 @@ export async function vlueLoginWithCredentials(input) {
 }
 
 /**
- * @param {'kakao'|'naver'|'google'} provider
+ * @param {'kakao'|'naver'|'google'|'instagram'} provider
  */
 export async function vlueSocialLogin(provider) {
   if (provider === "google") {
@@ -185,6 +185,12 @@ export async function vlueSocialLogin(provider) {
   if (provider === "naver") {
     if (typeof window !== "undefined") {
       window.location.assign(apiUrl("/api/v1/auth/naver"));
+    }
+    return { ok: true, redirect: true };
+  }
+  if (provider === "instagram") {
+    if (typeof window !== "undefined") {
+      window.location.assign(apiUrl("/api/v1/auth/instagram"));
     }
     return { ok: true, redirect: true };
   }

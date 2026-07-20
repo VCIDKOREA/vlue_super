@@ -1,48 +1,32 @@
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import {
+  classifyEmailDomain,
+  extractEmailDomain,
+  isCompanyEmailDomain,
+  isPersonalEmailDomain,
+  isPlatformEmailDomain,
+  isValidEmailShape,
+  normalizeBusinessEmail,
+  suggestHandleBaseFromEmail
+} from "./emailDomainClassification.js";
+import {
   findMappingByFullVirtualEmail,
   upsertUserEmailMapping,
   type UserEmailMappingRow
 } from "./userEmailMappingsStore.js";
 
-const PUBLIC_EMAIL_DOMAINS = new Set([
-  "gmail.com",
-  "googlemail.com",
-  "naver.com",
-  "hanmail.net",
-  "daum.net",
-  "kakao.com",
-  "nate.com",
-  "hotmail.com",
-  "outlook.com",
-  "live.com",
-  "yahoo.com",
-  "yahoo.co.kr",
-  "icloud.com",
-  "me.com",
-  "msn.com"
-]);
-
 export type SignupTrack = "business_email" | "vlue_id_only";
 
-export function normalizeBusinessEmail(email: string): string {
-  return String(email || "").trim().toLowerCase();
-}
-
-export function isValidEmailShape(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeBusinessEmail(email));
-}
-
-export function extractEmailDomain(email: string): string {
-  return normalizeBusinessEmail(email).split("@")[1] || "";
-}
-
-export function isCompanyEmailDomain(email: string): boolean {
-  const domain = extractEmailDomain(email);
-  if (!domain) return false;
-  return !PUBLIC_EMAIL_DOMAINS.has(domain);
-}
+export {
+  classifyEmailDomain,
+  extractEmailDomain,
+  isCompanyEmailDomain,
+  isPersonalEmailDomain,
+  isPlatformEmailDomain,
+  isValidEmailShape,
+  normalizeBusinessEmail
+};
 
 export function deriveVirtualPrefixFromHandle(handle: string): string {
   return String(handle || "")
@@ -69,11 +53,6 @@ export async function deriveHandleFromBusinessEmail(
     throw new Error("유효한 이메일 주소를 입력해 주세요.");
   }
 
-  const [local, domain] = email.split("@");
-  if (!local || !domain) {
-    throw new Error("유효한 이메일 주소를 입력해 주세요.");
-  }
-
   const emailTaken = await db.user.findFirst({
     where: { email },
     select: { id: true }
@@ -82,10 +61,8 @@ export async function deriveHandleFromBusinessEmail(
     throw new Error("이미 가입된 이메일입니다. 로그인해 주세요.");
   }
 
-  let base = PUBLIC_EMAIL_DOMAINS.has(domain)
-    ? local.replace(/[^a-z0-9_]/g, "")
-    : `${local}_${domain.split(".")[0]}`.replace(/[^a-z0-9_]/g, "");
-
+  let base = suggestHandleBaseFromEmail(email) || "user";
+  base = deriveVirtualPrefixFromHandle(base) || "user";
   if (base.length < 3) base = `${base}vl`.slice(0, 20);
   base = base.slice(0, 20);
 

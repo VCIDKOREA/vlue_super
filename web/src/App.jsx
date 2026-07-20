@@ -309,6 +309,8 @@ function App() {
     return stored;
   });
   const [signupOnboardingOpen, setSignupOnboardingOpen] = useState(false);
+  const [signupIntent, setSignupIntent] = useState(/** @type {'general' | 'trust'} */ ("general"));
+
   const [pendingAuthAction, setPendingAuthAction] = useState(null);
   const [guestAuthOverlay, setGuestAuthOverlay] = useState(false);
 
@@ -1788,7 +1790,9 @@ function App() {
     setCardFieldsTick((n) => n + 1);
   }, []);
 
-  const handleSignup = useCallback(() => {
+  const handleSignup = useCallback((intent = "general") => {
+    const nextIntent = intent === "trust" ? "trust" : "general";
+    setSignupIntent(nextIntent);
     if (shouldOpenSignupInExternalBrowser()) {
       openElectronExternalSignup();
       setGuestAuthOverlay(false);
@@ -1802,6 +1806,11 @@ function App() {
       localStorage.removeItem(DIGITAL_CARD_ACTIVE_KEY);
       localStorage.removeItem("vlue_digital_card_id");
       localStorage.setItem(SESSION_KEY, "0");
+      if (nextIntent === "trust") {
+        sessionStorage.setItem("vlue_onboarding_prefer_trust", "1");
+      } else {
+        sessionStorage.removeItem("vlue_onboarding_prefer_trust");
+      }
     } catch {
       /* ignore */
     }
@@ -3437,7 +3446,15 @@ function App() {
       {showSplash && !showOnboardingFlow && <Splash onDone={() => setShowSplash(false)} />}
       {showOnboardingFlow && (
         <SignupErrorBoundary onCancel={() => setSignupOnboardingOpen(false)}>
-          <VlueOnboarding onComplete={finishOnboarding} onCancel={() => setSignupOnboardingOpen(false)} />
+          <VlueOnboarding
+            layout="app"
+            signupIntent={signupIntent}
+            onComplete={finishOnboarding}
+            onCancel={() => {
+              setSignupOnboardingOpen(false);
+              setSignupIntent("general");
+            }}
+          />
         </SignupErrorBoundary>
       )}
 
@@ -3497,7 +3514,7 @@ function App() {
         <div className="fixed inset-0 z-[220] bg-[#fafbfc]">
           <LoginScreen
             onLogin={async (payload) => handleLogin(payload)}
-            onSignup={() => handleSignup()}
+            onSignup={(intent) => handleSignup(intent)}
             onSocialLogin={handleSocialLogin}
           />
         </div>
@@ -3518,9 +3535,9 @@ function App() {
               }
               return result;
             }}
-            onSignup={() => {
+            onSignup={(intent) => {
               closeGuestAuthOverlay();
-              handleSignup();
+              handleSignup(intent);
             }}
             onSocialLogin={handleSocialLogin}
           />

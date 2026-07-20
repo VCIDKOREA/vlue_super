@@ -11,25 +11,8 @@ import {
   isValidEmailShape,
   normalizeBusinessEmail
 } from "./signupEmailProvision.js";
+import { suggestHandleBaseFromEmail } from "./emailDomainClassification.js";
 import { findMappingByFullVirtualEmail } from "./userEmailMappingsStore.js";
-
-const PUBLIC_EMAIL_DOMAINS = new Set([
-  "gmail.com",
-  "googlemail.com",
-  "naver.com",
-  "hanmail.net",
-  "daum.net",
-  "kakao.com",
-  "nate.com",
-  "hotmail.com",
-  "outlook.com",
-  "live.com",
-  "yahoo.com",
-  "yahoo.co.kr",
-  "icloud.com",
-  "me.com",
-  "msn.com"
-]);
 
 export type VirtualEmailIdCheckResult = {
   available: boolean;
@@ -42,19 +25,10 @@ export type VirtualEmailIdCheckResult = {
 };
 
 export function suggestPrefixFromBusinessEmail(emailRaw: string): string | null {
-  const email = normalizeBusinessEmail(emailRaw);
-  if (!isValidEmailShape(email)) return null;
-  const [local, domain] = email.split("@");
-  if (!local || !domain) return null;
-
-  const base = PUBLIC_EMAIL_DOMAINS.has(domain)
-    ? local.replace(/[^a-z0-9_]/g, "")
-    : `${local}_${domain.split(".")[0]}`.replace(/[^a-z0-9_]/g, "");
-
-  const trimmed = (base.length < 3 ? `${base}vl` : base).slice(0, 20);
-  return deriveVirtualPrefixFromHandle(trimmed) || null;
+  const base = suggestHandleBaseFromEmail(emailRaw);
+  if (!base) return null;
+  return deriveVirtualPrefixFromHandle(base) || null;
 }
-
 async function isVirtualIdTaken(normalized: string): Promise<boolean> {
   const full = buildFullVirtualEmail(normalized);
   const [handleClash, mappingClash] = await Promise.all([

@@ -206,7 +206,7 @@ export default function TwoTrackSignupFields({
               onBusinessEmailChange(e.target.value);
               onEmailVerifyChange({ status: "idle", message: "", token: "" });
             }}
-            placeholder="예: gildong@naver.com 또는 name@samsung.com"
+            placeholder="예: name@company.com 또는 name@vlue.kr"
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] outline-none focus:border-[#191f28]"
           />
           <div className="flex flex-wrap items-center gap-2">

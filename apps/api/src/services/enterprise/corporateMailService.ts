@@ -1,6 +1,7 @@
 import { createHash, randomInt } from "node:crypto";
 import { prisma } from "../../db/client.js";
 import { verifyPassword } from "../../lib/passwordHash.js";
+import { assertBusinessEmailEligible } from "../email/emailDomainClassification.js";
 import { isStandalonePersonalAccount } from "../membership/personalComboPricing.js";
 import { attachEnterpriseReferralAttribution } from "../membership/enterpriseReferralAttribution.js";
 
@@ -136,12 +137,7 @@ export async function sendCorporateMailOtp(userId: string, emailRaw: string) {
     throw new Error("회사 계정 인증(회사명·아이디·비밀번호)을 먼저 완료해 주세요.");
   }
 
-  const email = String(emailRaw || "")
-    .trim()
-    .toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new Error("올바른 회사 이메일 주소를 입력해 주세요.");
-  }
+  const email = assertBusinessEmailEligible(emailRaw);
 
   const recent = await prisma.personalEnterpriseMailOtp.findFirst({
     where: { userId, email },
@@ -179,11 +175,9 @@ export async function sendCorporateMailOtp(userId: string, emailRaw: string) {
 export async function verifyCorporateMailOtp(userId: string, emailRaw: string, otpRaw: string) {
   await assertStandalonePersonalUser(userId);
 
-  const email = String(emailRaw || "")
-    .trim()
-    .toLowerCase();
+  const email = assertBusinessEmailEligible(emailRaw);
   const otp = String(otpRaw || "").trim();
-  if (!email || otp.length !== 6) {
+  if (otp.length !== 6) {
     throw new Error("이메일과 6자리 인증번호를 입력해 주세요.");
   }
 
