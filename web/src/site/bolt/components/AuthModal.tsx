@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import { VlueBrandLogo } from '../../../components/VlueBrandLogo.jsx';
 import VLUE_BRAND_LOGO from '../../../assets/vlue-shield-logo.svg?url';
 import VlueOnboarding from '../../../components/VlueOnboarding.jsx';
 import SignupErrorBoundary from '../../../components/SignupErrorBoundary.jsx';
@@ -20,8 +19,6 @@ import {
 import { isBillableMembershipKind, normalizeMembershipKind } from '../../../lib/membershipBm.js';
 import { writePendingPayment } from '../../../lib/postSignupPayment.js';
 import { v1WebShell } from '../../../lib/v1ReleaseScope.js';
-import { SOCIAL_LOGIN_POLICY_HINT } from '../../../lib/socialLoginPolicy.js';
-
 export type MarketingAuthUser = {
   userId: string;
   loginId: string;
@@ -78,7 +75,6 @@ export default function AuthModal({
         setLoginId(saved);
         if (savedPw) setPassword(savedPw);
         setHasRestoredLogin(true);
-        setGeneralAuthOpen(true);
       }
     } catch {
       /* ignore */
@@ -227,23 +223,17 @@ export default function AuthModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[#191f28]/40" onClick={onClose} />
-      <div className="relative max-h-[min(92dvh,720px)] w-full max-w-[400px] overflow-y-auto overscroll-y-contain rounded-2xl border border-[#e5e8eb] bg-[#fafbfc] shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#f0f1f3] bg-[#fafbfc]/95 px-5 py-3 backdrop-blur-sm">
-          <div className="flex items-center gap-2">
-            <VlueBrandLogo size={28} className="rounded-lg" />
-            <span className="text-[15px] font-semibold tracking-tight text-[#191f28]">VLUE</span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-[#8b95a1] hover:bg-white hover:text-[#191f28]"
-            aria-label="닫기"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+      <div className="relative max-h-[min(92dvh,760px)] w-full max-w-md overflow-hidden rounded-[28px] border border-slate-200 bg-[#fafbfc] shadow-[0_18px_48px_rgba(15,23,42,0.18)]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 z-10 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-400 shadow-sm transition hover:text-slate-600 active:scale-95"
+          aria-label="닫기"
+        >
+          <X className="h-4 w-4" />
+        </button>
 
-        <div className="flex flex-col items-center px-5 pb-6 pt-5">
+        <div className="flex max-h-[min(92dvh,760px)] flex-col items-center overflow-y-auto overscroll-y-contain px-5 pb-6 pt-8 sm:pt-9">
           <img
             src={VLUE_BRAND_LOGO}
             alt=""
@@ -252,8 +242,8 @@ export default function AuthModal({
             className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-sm ring-1 ring-blue-900/10"
             draggable={false}
           />
-          <h2 className="mt-4 text-[22px] font-bold tracking-tight text-slate-900">VLUE</h2>
-          <p className="mt-2 w-full max-w-[300px] text-center text-[13px] font-normal leading-snug text-slate-600 [text-wrap:pretty] [word-break:keep-all]">
+          <h2 className="mt-4 text-[24px] font-bold tracking-tight text-slate-900">VLUE</h2>
+          <p className="mt-2 w-full max-w-[300px] text-center text-[13px] font-normal leading-snug text-slate-600 [text-wrap:pretty] [word-break:keep-all] sm:max-w-[320px] sm:text-[14px] sm:leading-relaxed">
             검증된 연결로 대화하고, 비즈니스를 이어갑니다.
           </p>
 
@@ -264,7 +254,7 @@ export default function AuthModal({
           ) : null}
 
           {!generalAuthOpen ? (
-            <div className="mt-6 flex w-full max-w-[300px] flex-col items-center">
+            <div className="mt-7 flex w-full max-w-[300px] flex-col items-center">
               <p className="w-full text-center text-[12px] leading-relaxed text-slate-600 [word-break:keep-all]">
                 카카오 · Google · 네이버 · Instagram · VLUE 가입과 로그인이 가능합니다.
               </p>
@@ -288,7 +278,7 @@ export default function AuthModal({
                 <span>VLUE 로그인 · 회원가입</span>
               </button>
               <p className="mt-3 w-full text-center text-[11px] leading-snug text-slate-500 [word-break:keep-all]">
-                {SOCIAL_LOGIN_POLICY_HINT}
+                VLUE 내부 기능 중 본인인증이 필요할 수 있습니다.
               </p>
             </div>
           ) : (
