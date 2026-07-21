@@ -9,6 +9,7 @@ import {
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
 import { SHOWCASE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
+import { hydrateLiveBroadcastFromServer } from "../lib/showcase/syncMycaseLiveBroadcast.js";
 import { LETTERING_BIZCARD_CHANGED_EVENT } from "../lib/letteringBizcardStorage.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import {
@@ -36,6 +37,18 @@ export default function CallBigPushPreviewSection({
   const paidTier = isPaidLetteringTier(membershipTier) ? membershipTier : "premium";
   const isOn = showcaseOn;
   const effectiveTier = isOn ? paidTier : "free";
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await hydrateLiveBroadcastFromServer();
+      if (cancelled || !res.applied) return;
+      setPreviewTick((n) => n + 1);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const bump = () => setPreviewTick((n) => n + 1);

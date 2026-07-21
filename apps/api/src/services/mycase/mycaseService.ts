@@ -407,6 +407,23 @@ export async function listMycaseMine(userId: string, limit = 24, cursor?: string
   };
 }
 
+/**
+ * 통화 송출용 메인 케이스 — slotIndex 오름차순 1순위 (+ 전체 목록)
+ */
+export async function getLiveMainBroadcast(userId: string) {
+  const rows = await prisma.showcaseCase.findMany({
+    where: { ownerUserId: userId, deletedAt: null, isMainBroadcast: true },
+    orderBy: [{ slotIndex: "asc" }, { updatedAt: "desc" }],
+    take: 20
+  });
+  const items = rows.map(serializeCase);
+  return {
+    item: items[0] || null,
+    items,
+    policy: await getBroadcastPolicy(userId)
+  };
+}
+
 /** 타인이 케이스함 열람 가능 여부 — 비공개 계정은 활성 팔로워만 */
 export async function canViewerOpenCaseArchive(
   viewerId: string | null,

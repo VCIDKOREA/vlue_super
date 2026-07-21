@@ -77,11 +77,20 @@ async function getActiveFollowRow(followerId: string, followingId: string) {
 }
 
 export async function getFollowCounts(userId: string) {
-  const [followers, following] = await Promise.all([
-    prisma.userFollow.count({ where: { followingId: userId, status: ACTIVE } }),
-    prisma.userFollow.count({ where: { followerId: userId, status: ACTIVE } })
-  ]);
-  return { followers, following };
+  try {
+    const [followers, following] = await Promise.all([
+      prisma.userFollow.count({ where: { followingId: userId, status: ACTIVE } }),
+      prisma.userFollow.count({ where: { followerId: userId, status: ACTIVE } })
+    ]);
+    return { followers, following };
+  } catch (e) {
+    /* 마이그레이션 전 로컬 DB 등 — 카운트만 0으로 폴백 */
+    const code = (e as { code?: string })?.code;
+    if (code === "P2021" || code === "P2022") {
+      return { followers: 0, following: 0 };
+    }
+    throw e;
+  }
 }
 
 export async function buildViewerAccessContext(

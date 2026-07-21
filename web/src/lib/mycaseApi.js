@@ -36,6 +36,18 @@ function errPayload(data, fallback) {
   };
 }
 
+function networkFail(e, fallback = "network") {
+  const raw = String(e?.message || "").trim();
+  const isFetchFail = /failed to fetch|networkerror|load failed|network/i.test(raw);
+  return {
+    ok: false,
+    error: "network",
+    message: isFetchFail
+      ? "서버에 연결하지 못했습니다. 로컬 API(8788) 실행 여부와 DB 마이그레이션을 확인해 주세요."
+      : raw || fallback
+  };
+}
+
 export async function fetchMycasePolicy() {
   try {
     const res = await vlueAuthFetch(apiUrl("/api/mycase/policy"));
@@ -43,7 +55,24 @@ export async function fetchMycasePolicy() {
     if (!res.ok) return errPayload(data, "policy_failed");
     return { ok: true, policy: data.policy };
   } catch (e) {
-    return { ok: false, error: "network", message: e?.message || "network" };
+    return networkFail(e);
+  }
+}
+
+/** 메인 송출 라이브 케이스 (통화·홈 미리보기 동기화) */
+export async function fetchMycaseLiveBroadcast() {
+  try {
+    const res = await vlueAuthFetch(apiUrl("/api/mycase/live"));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return errPayload(data, "live_failed");
+    return {
+      ok: true,
+      item: data.item || null,
+      items: data.items || [],
+      policy: data.policy || null
+    };
+  } catch (e) {
+    return networkFail(e);
   }
 }
 
@@ -63,7 +92,7 @@ export async function fetchMyMycaseList(opts = {}) {
       policy: data.policy
     };
   } catch (e) {
-    return { ok: false, error: "network", message: e?.message || "network" };
+    return networkFail(e);
   }
 }
 
@@ -80,7 +109,7 @@ export async function fetchUserMycase(userId, opts = {}) {
     if (!res.ok) return errPayload(data, "list_failed");
     return data;
   } catch (e) {
-    return { ok: false, error: "network", message: e?.message || "network" };
+    return networkFail(e);
   }
 }
 
@@ -92,7 +121,7 @@ export async function fetchMycaseDetail(caseId) {
     if (!res.ok) return errPayload(data, "detail_failed");
     return { ok: true, item: data.item, isOwner: data.isOwner };
   } catch (e) {
-    return { ok: false, error: "network", message: e?.message || "network" };
+    return networkFail(e);
   }
 }
 
@@ -111,7 +140,7 @@ export async function createMycase(body) {
     if (!res.ok) return errPayload(data, "create_failed");
     return { ok: true, item: data.item, policy: data.policy };
   } catch (e) {
-    return { ok: false, error: "network", message: e?.message || "network" };
+    return networkFail(e);
   }
 }
 
@@ -130,7 +159,7 @@ export async function archiveShowcaseToMycase(body) {
     if (!res.ok) return errPayload(data, "archive_failed");
     return { ok: true, item: data.item };
   } catch (e) {
-    return { ok: false, error: "network", message: e?.message || "network" };
+    return networkFail(e);
   }
 }
 
@@ -146,7 +175,7 @@ export async function setMycaseBroadcast(caseId, enabled) {
     if (!res.ok) return errPayload(data, "broadcast_failed");
     return { ok: true, item: data.item, policy: data.policy };
   } catch (e) {
-    return { ok: false, error: "network", message: e?.message || "network" };
+    return networkFail(e);
   }
 }
 
@@ -161,7 +190,7 @@ export async function deleteMycase(caseId) {
     if (!res.ok) return errPayload(data, "delete_failed");
     return { ok: true, policy: data.policy };
   } catch (e) {
-    return { ok: false, error: "network", message: e?.message || "network" };
+    return networkFail(e);
   }
 }
 

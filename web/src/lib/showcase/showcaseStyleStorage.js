@@ -243,8 +243,11 @@ export function readShowcaseStyle() {
   }
 }
 
-export function writeShowcaseStyle(next) {
-  const base = mergeDeep(readShowcaseStyle(), next);
+export function writeShowcaseStyle(next, opts = {}) {
+  const replace = Boolean(opts.replace);
+  const base = replace
+    ? mergeDeep(createDefaultShowcaseStyle(), next)
+    : mergeDeep(readShowcaseStyle(), next);
   const withPages = Array.isArray(next?.pages)
     ? { ...base, pages: next.pages.map(normalizeShowcasePage) }
     : base;

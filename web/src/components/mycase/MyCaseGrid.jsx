@@ -8,6 +8,7 @@ import {
   archiveShowcaseToMycase,
   deleteMycase,
   fetchMycaseDetail,
+  fetchMycaseLiveBroadcast,
   fetchMyMycaseList,
   fetchUserMycase,
   formatCooldownHint,
@@ -15,6 +16,7 @@ import {
 } from "../../lib/mycaseApi.js";
 import { fetchFollowCounts } from "../../lib/followApi.js";
 import { readShowcaseStyle, SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT } from "../../lib/showcase/showcaseStyleStorage.js";
+import { applyMycaseItemToLiveBroadcast } from "../../lib/showcase/syncMycaseLiveBroadcast.js";
 import {
   extractShowcaseArchiveTitle,
   extractShowcaseCoverUrl
@@ -91,14 +93,18 @@ export default function MyCaseGrid({
   const [busyId, setBusyId] = useState(null);
   const [manageMode, setManageMode] = useState(false);
   const sentinelRef = useRef(null);
+  const toastRef = useRef(onToast);
+  const initialLoadDoneRef = useRef(false);
 
-  const toast = useCallback(
-    (msg) => {
-      if (onToast) onToast(msg);
-      else if (typeof window !== "undefined") window.alert?.(msg);
-    },
-    [onToast]
-  );
+  useEffect(() => {
+    toastRef.current = onToast;
+  }, [onToast]);
+
+  const toast = useCallback((msg) => {
+    const fn = toastRef.current;
+    if (fn) fn(msg);
+    else if (typeof window !== "undefined") window.alert?.(msg);
+  }, []);
 
   const displayHandle = isMine
     ? self.handle
@@ -109,13 +115,14 @@ export default function MyCaseGrid({
   const avatarUrl = isMine ? self.avatarUrl : "";
 
   const loadFirst = useCallback(async () => {
-    setLoading(true);
+    const showFullLoading = !initialLoadDoneRef.current;
+    if (showFullLoading) setLoading(true);
     try {
       if (isMine) {
         const data = await fetchMyMycaseList({ limit: 30 });
         if (!data.ok) {
           toast(data.message || "마이케이스를 불러오지 못했습니다.");
-          setItems([]);
+          if (showFullLoading) setItems([]);
           return;
         }
         setItems(data.items || []);
@@ -127,6 +134,8 @@ export default function MyCaseGrid({
           const c = await fetchFollowCounts(self.userId);
           if (c.ok && c.counts) setFollowCounts(c.counts);
         }
+        const live = await fetchMycaseLiveBroadcast();
+        if (live.ok && live.item) applyMycaseItemToLiveBroadcast(live.item);
       } else {
         if (!ownerUserId) return;
         const data = await fetchUserMycase(ownerUserId, { limit: 30 });
@@ -147,13 +156,14 @@ export default function MyCaseGrid({
           if (c.ok && c.counts) setFollowCounts(c.counts);
         }
       }
+      initialLoadDoneRef.current = true;
     } finally {
-      setLoading(false);
+      if (showFullLoading) setLoading(false);
     }
   }, [isMine, ownerUserId, self.userId, toast]);
 
   useEffect(() => {
-    loadFirst();
+    void loadFirst();
   }, [loadFirst]);
 
   useEffect(() => {
@@ -226,8 +236,17 @@ export default function MyCaseGrid({
         if (next) return [...prev.filter((x) => x.id !== item.id), res.item];
         return prev.filter((x) => x.id !== item.id);
       });
+      if (next) {
+        const applied = applyMycaseItemToLiveBroadcast(res.item);
+        if (!applied) {
+          toast("송출은 켜졌지만 쇼케이스 내용이 비어 있습니다. 블루 쇼케이스에서 다시 저장해 주세요.");
+        } else {
+          toast("메인 송출 ON · 통화 미리보기에 반영됨");
+        }
+      } else {
+        toast("메인 송출 OFF");
+      }
       onBroadcastChanged?.(res.item, res.policy || null);
-      toast(next ? "메인 송출 ON" : "메인 송출 OFF");
     } finally {
       setBusyId(null);
     }
@@ -304,9 +323,20 @@ export default function MyCaseGrid({
           <ChevronLeft size={26} strokeWidth={2} />
         </button>
         <h1 className="ig-mycase__username">{displayHandle}</h1>
-        <button type="button" className="ig-mycase__icon-btn" aria-label="더보기">
-          <MoreHorizontal size={22} strokeWidth={2} />
-        </button>
+        {isMine ? (
+          <button
+            type="button"
+            className={`ig-mycase__icon-btn${manageMode ? " is-active" : ""}`}
+            aria-label={manageMode ? "송출 관리 종료" : "송출 관리"}
+            aria-pressed={manageMode}
+            title="송출 관리"
+            onClick={() => setManageMode((v) => !v)}
+          >
+            <MoreHorizontal size={22} strokeWidth={2} />
+          </button>
+        ) : (
+          <span className="ig-mycase__icon-btn ig-mycase__icon-btn--spacer" aria-hidden />
+        )}
       </header>
 
       <div className="ig-mycase__profile">
@@ -507,7 +537,7 @@ export default function MyCaseGrid({
                     disabled={busyId === item.id}
                     onClick={(e) => toggleBroadcast(item, e)}
                   >
-                    {item.isMainBroadcast ? "송출 ON" : "송출 OFF"}
+                    {item.isMainBroadcast ? "메인 송출 끄기" : "메인 송출 켜기"}
                   </button>
                   <button
                     type="button"

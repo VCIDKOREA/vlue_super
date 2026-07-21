@@ -49,9 +49,20 @@
   margin: 0;
   padding: 0;
   border: 0;
+  border-radius: 10px;
   background: transparent;
   color: var(--ig-text);
   cursor: pointer;
+}
+
+.ig-mycase__icon-btn.is-active {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.ig-mycase__icon-btn--spacer {
+  pointer-events: none;
+  visibility: hidden;
 }
 
 .ig-mycase__profile {

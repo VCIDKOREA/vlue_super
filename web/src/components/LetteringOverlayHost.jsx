@@ -6,6 +6,7 @@ import { readLetteringEnabled } from "../lib/letteringSettings.js";
 import { submitLetteringReport } from "../lib/letteringReport.js";
 import { blockLetteringPhoneOnly } from "../lib/letteringPhoneBlock.js";
 import { readShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
+import { hydrateLiveBroadcastFromServer } from "../lib/showcase/syncMycaseLiveBroadcast.js";
 import { CALL_STATES, normalizeCallState } from "../lib/showcase/tentShowcaseTypes.js";
 import { appendCallShowcaseHistory } from "../lib/callShowcaseHistory.js";
 import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
@@ -90,6 +91,8 @@ export default function LetteringOverlayHost() {
         setCard(null);
         setVerified(false);
       }
+      await hydrateLiveBroadcastFromServer();
+      if (cancelled) return;
       setShowcaseStyle(readShowcaseStyle());
       setLoading(false);
     })();

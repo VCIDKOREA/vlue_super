@@ -7,6 +7,7 @@ import {
   archiveShowcaseSnapshot,
   createMycase,
   getBroadcastPolicy,
+  getLiveMainBroadcast,
   getMycaseDetail,
   listMycaseForViewer,
   listMycaseMine,
@@ -38,6 +39,17 @@ mycaseRoutes.get("/policy", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId") as string;
   const policy = await getBroadcastPolicy(me);
   return c.json({ ok: true, policy });
+});
+
+/** 통화·홈 미리보기용 — 메인 송출 1순위(+목록) */
+mycaseRoutes.get("/live", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId") as string;
+  try {
+    const data = await getLiveMainBroadcast(me);
+    return c.json({ ok: true, ...data });
+  } catch (e) {
+    return handleMycaseError(c, e);
+  }
 });
 
 /** 내 마이케이스 그리드 (페이지네이션) */
