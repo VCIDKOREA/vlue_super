@@ -1,6 +1,12 @@
 import { openExternalHref, formatWebHref } from "../../lib/showcase/showcaseContactActions.js";
 import { resolveShowcasePeerAvatar } from "../../lib/showcase/resolveShowcasePeerAvatar.js";
 import { isVlueBrandAssetUrl } from "../../lib/vlueAvatar.js";
+import {
+  resolveFollowTargetUserId,
+  shouldShowShowcaseFollow
+} from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
+import FollowActionButton from "../follow/FollowActionButton.jsx";
+import "../follow/follow-action.css";
 import ShowcaseBgmMarquee from "./ShowcaseBgmMarquee.jsx";
 
 function firstText(...values) {
@@ -28,7 +34,11 @@ function openUrl(url) {
 export default function ShowcaseSlideChrome({
   card,
   variant = "custom",
-  hideBusinessLinks = false
+  hideBusinessLinks = false,
+  targetUserId: targetUserIdProp = null,
+  hideFollow = false,
+  fallbackToMe = true,
+  onToast
 }) {
   const style = card?.showcaseStyle || {};
   const outlinks = style?.commercial?.outlinks || {};
@@ -81,7 +91,6 @@ export default function ShowcaseSlideChrome({
   );
   const facebook = firstText(outlinks.facebook);
   const youtube = firstText(outlinks.youtube);
-  const tiktok = firstText(outlinks.tiktok);
 
   const socialItems = [
     ig ? { id: "instagram", label: "Instagram", url: ig, className: "is-ig" } : null,
@@ -92,11 +101,15 @@ export default function ShowcaseSlideChrome({
       ? { id: "kakao-profile", label: "카카오 프로필", url: kakaoProfile, className: "is-kakao", tag: "프로필" }
       : null,
     facebook ? { id: "facebook", label: "Facebook", url: facebook, className: "is-fb" } : null,
-    youtube ? { id: "youtube", label: "YouTube", url: youtube, className: "is-yt" } : null,
-    tiktok ? { id: "tiktok", label: "TikTok", url: tiktok, className: "is-tt" } : null
+    youtube ? { id: "youtube", label: "YouTube", url: youtube, className: "is-yt" } : null
   ].filter(Boolean);
 
   const showBizLinks = variant === "custom" && !hideBusinessLinks && links.some((l) => l?.url && l?.name);
+
+  const targetUserId = String(
+    targetUserIdProp || resolveFollowTargetUserId(card, { fallbackToMe }) || ""
+  ).trim();
+  const showFollow = shouldShowShowcaseFollow(targetUserId, { hideFollow });
 
   return (
     <div className="showcase-slide-chrome" data-variant={variant}>
@@ -156,6 +169,13 @@ export default function ShowcaseSlideChrome({
           <p className="showcase-slide-chrome__vlue-label">VLUE 프로필</p>
           <p className="showcase-slide-chrome__vlue-name">{activityName || "회원"}</p>
         </div>
+        {showFollow ? (
+          <FollowActionButton
+            targetUserId={targetUserId}
+            className="follow-action-btn--chrome"
+            onToast={onToast}
+          />
+        ) : null}
         <ShowcaseBgmMarquee
           styleConfig={style}
           compact
@@ -199,7 +219,7 @@ function SocialGlyph({ kind }) {
   }
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>
-      <path d="M16.5 3c.6 2.3 2.1 3.9 4.5 4.3v3.1c-1.6.1-3.1-.4-4.5-1.3v6.4c0 3.4-2.7 6.1-6.1 6.1S4.3 18.9 4.3 15.5 7 9.4 10.4 9.4c.4 0 .7 0 1.1.1v3.2c-.3-.1-.7-.2-1.1-.2-1.6 0-2.9 1.3-2.9 2.9s1.3 2.9 2.9 2.9 2.9-1.3 2.9-2.9V3h3.2z" />
+      <path d="M14 9h3V6h-3c-2.2 0-4 1.8-4 4v2H8v3h2v7h3v-7h2.6l.4-3H13v-2c0-.6.4-1 1-1z" />
     </svg>
   );
 }

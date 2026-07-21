@@ -1,93 +1,114 @@
-import { useEffect, useState } from "react";
-import { shareBizcardViaEmail, shareBizcardViaKakao, shareBizcardViaSms } from "../lib/letteringBizcardShare.js";
-import { ensureDigitalCardId, syncDigitalCardExportSnapshot } from "../lib/digitalCardApi.js";
+import { useEffect, useMemo, useState } from "react";
+import { copyShowcaseShareUrl } from "../lib/letteringBizcardShare.js";
+import { readLetteringFixedIdentity } from "../lib/letteringBizcardStorage.js";
+import { syncDigitalCardExportSnapshot, ensureDigitalCardId } from "../lib/digitalCardApi.js";
+import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import KakaoBizcardFeedPreview from "./KakaoBizcardFeedPreview.jsx";
+import HelpTip from "./HelpTip.jsx";
 
-/** 마이페이지 — 카카오 Feed 버튼 카드 · 문자/이메일 */
+const SHOWCASE_SHARE_HELP_PAID =
+  "쇼케이스 주소를 복사해 카카오톡 등에 붙여넣으세요. 상대가 열면 풀 쇼케이스가 펼쳐집니다.\n\n· 명함이 있으면 쇼케이스 안에 함께 표시됩니다.\n· 검색 목록 공개 여부는 「쇼케이스 검색」 설정에서 따로 관리합니다.";
+
+const SHOWCASE_SHARE_HELP_FREE =
+  "쇼케이스 주소를 복사해 카카오톡 등에 붙여넣으세요. 상대가 열면 풀 쇼케이스가 펼쳐집니다.\n\n· 무료 회원: 이름·VLUE ID·전화번호가 노출됩니다.\n· 검색 목록 공개 여부는 「쇼케이스 검색」 설정에서 따로 관리합니다.";
+
+function readVlueHandleDisplay() {
+  try {
+    const raw = String(localStorage.getItem("vlue_member_handle") || "").trim();
+    if (!raw) return "";
+    return raw.startsWith("@") ? raw : `@${raw}`;
+  } catch {
+    return "";
+  }
+}
+
+/** 마이페이지 — 쇼케이스 링크 미리보기 · 주소 복사 */
 export default function LetteringBizcardSharePanel({
   card,
+  membershipTier = "free",
   isDarkMode = false,
   embedded = true,
   onToast
 }) {
   const [busy, setBusy] = useState("");
-  const [cardId, setCardId] = useState("");
+  const [shareReady, setShareReady] = useState(false);
+  const isPaid = isPaidLetteringTier(membershipTier);
+
+  const sharePhone = useMemo(() => {
+    const fixed = readLetteringFixedIdentity();
+    return String(fixed.phone || card?.phone || "").trim();
+  }, [card?.phone]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await syncDigitalCardExportSnapshot(card);
-      const id = (await ensureDigitalCardId()) || "";
+      if (isPaid && card) {
+        await syncDigitalCardExportSnapshot(card);
+        await ensureDigitalCardId();
+      }
       if (cancelled) return;
-      setCardId(id);
+      setShareReady(Boolean(sharePhone));
     })();
     return () => {
       cancelled = true;
     };
-  }, [card?.name, card?.organization, card?.phone, card?.title, card?.department]);
+  }, [card?.name, card?.organization, card?.phone, card?.title, card?.department, isPaid, sharePhone]);
 
-  const run = async (key, fn) => {
+  const runCopy = async () => {
     if (busy) return;
-    setBusy(key);
+    setBusy("copy");
     try {
-      const r = await fn();
-      if (r.cancelled) return;
+      const r = await copyShowcaseShareUrl(card, { membershipTier });
       if (!r.ok && r.error) {
         onToast?.(r.error);
+        if (r.viewUrl) onToast?.(`주소: ${r.viewUrl}`);
         return;
       }
-      const msg =
-        key === "kakao"
-          ? "카카오톡에 VLUE 인증 명함 카드가 전송되었습니다. 탭하면 라이브 명함이 열립니다."
-          : key === "sms"
-            ? "문자 앱으로 이동합니다."
-            : key === "email"
-              ? "메일 앱으로 이동합니다."
-              : "완료";
-      onToast?.(msg);
+      onToast?.("쇼케이스 주소를 복사했습니다. 카카오톡 채팅방에 붙여넣기 하세요.");
     } catch (e) {
-      onToast?.(e?.message || "공유에 실패했습니다.");
+      onToast?.(e?.message || "주소 복사에 실패했습니다.");
     } finally {
       setBusy("");
     }
   };
 
-  const btnSecondary = isDarkMode
-    ? "rounded-lg border border-white/25 bg-white/5 px-2 py-2 text-[11px] font-bold text-gray-100 shadow-sm active:scale-[0.99] disabled:opacity-50"
-    : "rounded-lg border border-slate-200 bg-slate-100 px-2 py-2 text-[11px] font-bold text-slate-800 active:scale-[0.99] disabled:opacity-50";
-
-  const btnKakao =
-    "vlue-kakao-brand-btn col-span-2 rounded-lg bg-[#FEE500] px-2 py-3 text-[12px] font-black text-[rgba(0,0,0,0.85)] active:scale-[0.99] disabled:opacity-50";
+  const btnCopy =
+    "vlue-kakao-brand-btn w-full rounded-xl bg-[#FEE500] px-2 py-2.5 text-[12px] font-semibold text-[rgba(0,0,0,0.82)] active:scale-[0.99] disabled:opacity-50";
 
   const wrapCls = embedded
     ? `mt-2.5 border-t pt-2.5 ${isDarkMode ? "border-white/10" : "border-slate-200/90"}`
     : `mt-3 rounded-2xl border p-3 ${isDarkMode ? "border-cyan-500/20 bg-slate-900/50" : "border-slate-200 bg-white"}`;
 
+  const handleLabel = readVlueHandleDisplay();
+
   return (
     <div className={wrapCls}>
-      <p className={`text-[13px] font-black ${isDarkMode ? "text-gray-200" : "text-slate-800"}`}>보안 명함 공유</p>
-      <p className={`mt-0.5 text-[12px] leading-snug ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-        카카오는 <strong className={isDarkMode ? "text-[#FEE500]" : "text-[#b8860b]"}>개인화 명함 카드</strong>로 전송 · 탭 시
-        라이브 홀로그램 뷰어
+      <div className="flex items-center gap-1">
+        <p className={`text-[13px] font-semibold tracking-tight ${isDarkMode ? "text-gray-200" : "text-slate-800"}`}>
+          쇼케이스 공유란
+        </p>
+        <HelpTip text={isPaid ? SHOWCASE_SHARE_HELP_PAID : SHOWCASE_SHARE_HELP_FREE} isDarkMode={isDarkMode} />
+      </div>
+      <p className={`mt-1 text-[11px] font-normal leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
+        미리보기 확인 후{" "}
+        <span className={isDarkMode ? "text-cyan-200/90" : "text-slate-600"}>쇼케이스 주소 복사</span>를 누르세요.
       </p>
+      {!isPaid && handleLabel ? (
+        <p className={`mt-1 text-[10px] font-medium ${isDarkMode ? "text-cyan-300/80" : "text-blue-600/90"}`}>
+          공유 ID {handleLabel}
+        </p>
+      ) : null}
 
-      {/* 앱 미리보기는 React UI 고정 — 서버 PNG는 카카오 전송용(폰트 미탑재 시 □ 깨짐) */}
-      <KakaoBizcardFeedPreview card={card} isDarkMode={isDarkMode} onToast={onToast} />
+      <KakaoBizcardFeedPreview
+        card={card}
+        membershipTier={membershipTier}
+        isDarkMode={isDarkMode}
+        onToast={onToast}
+      />
 
-      <div className="mt-2 grid grid-cols-2 gap-1.5">
-        <button
-          type="button"
-          disabled={!!busy || !cardId}
-          className={btnKakao}
-          onClick={() => run("kakao", () => shareBizcardViaKakao(card))}
-        >
-          카카오톡 · 명함 카드 보내기
-        </button>
-        <button type="button" disabled={!!busy} className={btnSecondary} onClick={() => run("sms", async () => shareBizcardViaSms(card))}>
-          문자
-        </button>
-        <button type="button" disabled={!!busy} className={btnSecondary} onClick={() => run("email", async () => shareBizcardViaEmail(card))}>
-          이메일
+      <div className="mt-2">
+        <button type="button" disabled={!!busy || !shareReady} className={btnCopy} onClick={() => void runCopy()}>
+          {busy === "copy" ? "복사 중…" : "쇼케이스 주소 복사"}
         </button>
       </div>
     </div>

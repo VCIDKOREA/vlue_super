@@ -6,9 +6,12 @@ import {
 import {
   getVlueViralLinks,
   buildPublicCardViewUrl,
+  buildPublicShowcaseUrl,
   isLocalDevOrigin
 } from "./vlueViralLinks.js";
 import { ensureDigitalCardId, syncDigitalCardExportSnapshot } from "./digitalCardApi.js";
+import { readLetteringFixedIdentity } from "./letteringBizcardStorage.js";
+import { isPaidLetteringTier } from "./letteringMembership.js";
 
 function canShareFiles(file) {
   if (typeof navigator === "undefined" || !navigator.share) return false;
@@ -104,5 +107,60 @@ export async function shareBizcardViaEmail(card) {
   return { ok: true, channel: "email" };
 }
 
-/** 카카오톡 — Kakao.Share Feed 명함 이미지 카드만 (SVG·텍스트 링크 없음) */
+/**
+ * VLUE 쇼케이스 고유 주소 복사 — 명함 유무와 관계없이 전화번호 기준
+ */
+export async function copyShowcaseShareUrl(card, opts = {}) {
+  const fixed = readLetteringFixedIdentity();
+  const phone = String(fixed.phone || card?.phone || "").trim();
+  if (!phone) {
+    return { ok: false, error: "전화번호가 없습니다. 본인인증 후 다시 시도해 주세요." };
+  }
+
+  const isPaid = isPaidLetteringTier(card?.membershipTier || opts.membershipTier || "free");
+  if (isPaid && card) {
+    try {
+      await syncDigitalCardExportSnapshot(card);
+    } catch {
+      /* 쇼케이스 URL 복사는 스냅샷 실패와 무관 */
+    }
+  }
+
+  const viewUrl = buildPublicShowcaseUrl(phone);
+  if (!viewUrl) {
+    return { ok: false, error: "쇼케이스 주소를 만들지 못했습니다." };
+  }
+
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(viewUrl);
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = viewUrl;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    return { ok: true, channel: "copy_showcase_url", viewUrl };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "주소를 복사하지 못했습니다.",
+      viewUrl
+    };
+  }
+}
+
+/**
+ * @deprecated 쇼케이스 공유는 copyShowcaseShareUrl 사용
+ */
+export async function copyBizcardShareUrl(card) {
+  return copyShowcaseShareUrl(card);
+}
+
+/** @deprecated SDK Feed 공유 — 인증 오류로 copyBizcardShareUrl 권장 */
 export { shareBizcardViaKakaoFeed as shareBizcardViaKakao } from "./kakaoBizcardFeedShare.js";

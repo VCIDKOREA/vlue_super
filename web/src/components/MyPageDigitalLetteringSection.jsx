@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ChevronRight, CreditCard, Palette } from "lucide-react";
 import { LETTERING_BIZCARD_CHANGED_EVENT } from "../lib/letteringBizcardStorage.js";
 import { fetchDigitalCardMeta } from "../lib/digitalCardApi.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
@@ -9,7 +10,7 @@ import { SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT } from "../l
 import LetteringBizcardSharePanel from "./LetteringBizcardSharePanel.jsx";
 
 /**
- * 프로필 사이드바 — 디지털 인증명함 신청 / 승인 후 레터링 명함 미리보기
+ * 프로필 사이드바 — 디지털 인증명함 신청 / 쇼케이스 미리보기 · 공유
  */
 export default function MyPageDigitalLetteringSection({
   membershipTier = "free",
@@ -34,12 +35,12 @@ export default function MyPageDigitalLetteringSection({
   };
 
   const isApproved = Boolean(digitalCardActive) && digitalCardIssued !== false;
+  const tier = isPaidLetteringTier(membershipTier) ? membershipTier : "free";
 
   const previewCard = useMemo(() => {
-    const base = resolveVlueShowcaseCard({ membershipTier, previewExample: true });
-    const tier = isPaidLetteringTier(membershipTier) ? membershipTier : "free";
+    const base = resolveVlueShowcaseCard({ membershipTier: tier, previewExample: true });
     return applyShowcaseStyleToCard({ ...base, membershipTier: tier, issuedAt: cardIssuedAt }, tier);
-  }, [membershipTier, previewTick, cardIssuedAt]);
+  }, [membershipTier, tier, previewTick, cardIssuedAt]);
 
   useEffect(() => {
     const bump = () => setPreviewTick((n) => n + 1);
@@ -62,101 +63,81 @@ export default function MyPageDigitalLetteringSection({
     };
   }, [previewTick]);
 
-  if (!isApproved) {
-    return (
-      <div
-        className={`relative w-full overflow-hidden rounded-[26px] p-4 text-center ring-1 ring-inset ${
-          isDarkMode ? "bg-white/[0.03] ring-white/15" : "bg-slate-50/80 ring-slate-300"
-        }`}
-      >
-        <button
-          type="button"
-          onClick={() => onApplyDigitalCard?.()}
-          className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-4 text-[14px] font-black text-white shadow-lg shadow-blue-500/25 active:scale-[0.99] dark:shadow-blue-900/50"
-        >
-          디지털인증명함 신청
-        </button>
-        <p className={`mt-2 text-[10px] font-medium leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-          신청·승인 후 블루 케이스 미리보기와 통화 중 노출이 활성화됩니다.
-        </p>
-      </div>
-    );
-  }
-
-  const statusTone = isVCIDOn
-    ? isDarkMode
-      ? "text-blue-300"
-      : "text-blue-600"
-    : isDarkMode
-      ? "text-red-400"
-      : "text-red-600";
-
   return (
     <section className="w-full">
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={openSettings}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            openSettings();
-          }
-        }}
-        className={`relative mb-3 flex w-full cursor-pointer flex-col gap-3 rounded-[26px] border-2 p-4 text-left shadow-sm transition-all active:scale-[0.98] ${
-          isDarkMode
-            ? "border-blue-500/30 bg-gradient-to-br from-blue-500/10 to-indigo-500/10"
-            : "border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50"
-        }`}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className={`text-[15px] font-black leading-tight ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
-              {showcasePreviewLabel()}
-            </p>
-            <p className={`mt-1 text-[11px] font-semibold leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-600"}`}>
-              스타일 설정을 누르면 전체 화면에서 꾸밀 수 있습니다
-            </p>
-          </div>
-          <span className={`shrink-0 text-lg ${isDarkMode ? "text-gray-400" : "text-slate-400"}`} aria-hidden>
-            ›
-          </span>
+      {!isApproved ? (
+        <div className="mypage-showcase-card mypage-showcase-card--apply mb-3" data-theme={isDarkMode ? "dark" : "light"}>
+          <p className="mypage-showcase-card__apply-copy">
+            유료 회원은 명함이 쇼케이스에 함께 표시됩니다. 무료 회원도 이름·VLUE ID·전화번호로 공유할 수 있습니다.
+          </p>
+          <button type="button" className="mypage-showcase-card__apply-btn" onClick={() => onApplyDigitalCard?.()}>
+            디지털인증명함 신청
+          </button>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
+      ) : (
+        <div
+          role="button"
+          tabIndex={0}
+          className="mypage-showcase-card mb-3"
+          data-theme={isDarkMode ? "dark" : "light"}
+          onClick={openSettings}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
               openSettings();
-            }}
-            className={`rounded-full px-3 py-1.5 text-[11px] font-black ${
-              isDarkMode ? "bg-blue-500/20 text-blue-200" : "bg-white text-blue-700 ring-1 ring-blue-100"
-            }`}
-          >
-            스타일 설정
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEditLettering?.();
-            }}
-            className={`rounded-full px-3 py-1.5 text-[11px] font-black ${
-              isDarkMode ? "bg-white/10 text-cyan-200" : "bg-white text-cyan-800 ring-1 ring-cyan-100"
-            }`}
-          >
-            명함 수정
-          </button>
+            }
+          }}
+        >
+          <div className="mypage-showcase-card__head">
+            <div className="mypage-showcase-card__icon" aria-hidden>
+              <span className="mypage-showcase-card__icon-glow" />
+              <span className="mypage-showcase-card__icon-core">V</span>
+            </div>
+            <div className="mypage-showcase-card__copy">
+              <p className="mypage-showcase-card__eyebrow">VLUE Showcase</p>
+              <p className="mypage-showcase-card__title">{showcasePreviewLabel()}</p>
+              <p className="mypage-showcase-card__desc">전체 화면에서 스타일을 꾸미고 미리볼 수 있습니다</p>
+            </div>
+            <ChevronRight className="mypage-showcase-card__chev" size={18} strokeWidth={2} aria-hidden />
+          </div>
+
+          <div className="mypage-showcase-card__actions">
+            <button
+              type="button"
+              className="mypage-showcase-card__action"
+              onClick={(e) => {
+                e.stopPropagation();
+                openSettings();
+              }}
+            >
+              <Palette size={14} strokeWidth={2} aria-hidden />
+              스타일 설정
+            </button>
+            <button
+              type="button"
+              className="mypage-showcase-card__action"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditLettering?.();
+              }}
+            >
+              <CreditCard size={14} strokeWidth={2} aria-hidden />
+              명함 수정
+            </button>
+          </div>
+
+          <div className="mypage-showcase-card__foot">
+            <span className={`mypage-showcase-card__status${isVCIDOn ? " is-live" : ""}`}>
+              <span className="mypage-showcase-card__status-dot" aria-hidden />
+              {isVCIDOn ? `${VLUE_SHOWCASE.nameKo} 송출 중` : `${VLUE_SHOWCASE.nameKo} 꺼짐`}
+            </span>
+          </div>
         </div>
-        <p className={`text-[10px] font-bold ${statusTone}`}>
-          {isVCIDOn
-            ? `현재 ${VLUE_SHOWCASE.nameKo}가 송출중입니다.`
-            : `현재 ${VLUE_SHOWCASE.nameKo}가 꺼짐 상태입니다.`}
-        </p>
-      </div>
+      )}
 
       <LetteringBizcardSharePanel
         card={previewCard}
+        membershipTier={tier}
         isDarkMode={isDarkMode}
         embedded
         onToast={onToast}

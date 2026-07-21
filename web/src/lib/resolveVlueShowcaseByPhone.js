@@ -1,19 +1,24 @@
 import { normalizeLetteringCard } from "./letteringCardNormalize.js";
 import { formatLetteringPhoneDisplay, normalizePhoneDigits } from "./letteringPhoneMatch.js";
 import { isPaidLetteringTier } from "./letteringMembership.js";
+import { vlueAuthFetch } from "./vlueAuthHeaders.js";
 
 function mapLookupToCard(body, phoneDisplay) {
   const profile = body.profile && typeof body.profile === "object" ? body.profile : {};
+  const handle = String(body.publicHandle || profile.publicHandle || "").trim();
   return normalizeLetteringCard({
+    userId: String(body.userId || "").trim(),
     name: body.displayName || profile.name || "",
     title: body.jobTitle || profile.title || "",
     organization: body.companyName || profile.organization || "",
     department: profile.department || "",
     phone: phoneDisplay,
+    loginId: handle,
+    publicHandle: handle,
     photoUrl: body.image_url || profile.photoUrl || profile.image_url || "",
     website: profile.website || "",
     companyIntro: profile.companyIntro || profile.intro || "",
-    membershipTier: body.is_premium_line ? "premium" : "paid",
+    membershipTier: body.is_premium_line ? "premium" : body.digitalCardActive ? "paid" : "free",
     verificationItems: ["VLUE 인증 완료", "전화번호 일치 확인"]
   });
 }
@@ -21,7 +26,7 @@ function mapLookupToCard(body, phoneDisplay) {
 async function fetchCardFromApi(phoneRaw) {
   try {
     const q = encodeURIComponent(phoneRaw);
-    const res = await fetch(`/api/cards/lookup?number=${q}`, { credentials: "same-origin" });
+    const res = await vlueAuthFetch(`/api/cards/lookup?number=${q}`, { credentials: "same-origin" });
     if (!res.ok) return null;
     const body = await res.json();
     if (!body?.matched) return null;

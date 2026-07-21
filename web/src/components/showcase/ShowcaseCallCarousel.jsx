@@ -57,6 +57,8 @@ export default function ShowcaseCallCarousel({
   scrollEnabled = true,
   previewMode = false,
   includeDigitalCard = true,
+  /** true면 디지털인증명함 슬라이드만 (마이케이스 명함 버튼 등) */
+  digitalCardOnly = false,
   face = "front",
   onFaceChange,
   showcaseOffPreview = false,
@@ -311,6 +313,10 @@ export default function ShowcaseCallCarousel({
 
     const capped = content.slice(0, maxIgPages);
 
+    if (showDigitalCard && digitalCardOnly) {
+      return [{ type: "card", id: "digital-card" }];
+    }
+
     if (showDigitalCard) {
       /* 명함만 있으면 다음 슬롯을 열어 세로 스와이프 가능하게 유지 */
       if (capped.length === 0) {
@@ -334,6 +340,7 @@ export default function ShowcaseCallCarousel({
     galleryPagePhotos,
     demoPagePhotos,
     showDigitalCard,
+    digitalCardOnly,
     maxIgPages,
     photosPerPage,
     igUrlMap,
@@ -730,7 +737,12 @@ export default function ShowcaseCallCarousel({
                     />
                     {/* 인스타 게시물: 비즈니스 링크 숨김 · 소셜 로고 + VLUE 프로필만 */}
                     {socialOverlayEnabled && !keypadOpen ? (
-                      <ShowcaseSlideChrome card={card} variant="instagram" hideBusinessLinks />
+                      <ShowcaseSlideChrome
+                        card={card}
+                        variant="instagram"
+                        hideBusinessLinks
+                        onToast={onKeypadToast}
+                      />
                     ) : null}
                   </div>
                 ) : null}
@@ -779,7 +791,11 @@ export default function ShowcaseCallCarousel({
                     />
                     {socialOverlayEnabled && v1AppShell.showcaseSocialOverlay && !keypadOpen ? (
                       <>
-                        <ShowcaseSlideChrome card={card} variant="custom" />
+                        <ShowcaseSlideChrome
+                          card={card}
+                          variant="custom"
+                          onToast={onKeypadToast}
+                        />
                         <ShowcaseBannerSocialLayer
                           card={card}
                           slide={slide}

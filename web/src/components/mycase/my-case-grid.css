@@ -1,0 +1,449 @@
+/* 마이케이스 — Instagram profile layout, light mode default */
+
+.ig-mycase {
+  --ig-bg: #ffffff;
+  --ig-text: #262626;
+  --ig-muted: #8e8e8e;
+  --ig-border: #dbdbdb;
+  --ig-blue: #0095f6;
+  --ig-btn: #efefef;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--ig-bg);
+  color: var(--ig-text);
+}
+
+.ig-mycase__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 44px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--ig-border);
+  background: var(--ig-bg);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.ig-mycase__username {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ig-mycase__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ig-text);
+  cursor: pointer;
+}
+
+.ig-mycase__profile {
+  padding: 14px 16px 10px;
+}
+
+.ig-mycase__profile-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.ig-mycase__avatar-wrap {
+  flex-shrink: 0;
+}
+
+.ig-mycase__avatar {
+  display: block;
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--ig-border);
+  background: #fafafa;
+}
+
+.ig-mycase__avatar--ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--ig-muted);
+}
+
+.ig-mycase__stats {
+  flex: 1;
+  display: flex;
+  justify-content: space-around;
+  min-width: 0;
+}
+
+.ig-mycase__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ig-mycase__stat b {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ig-mycase__stat span {
+  font-size: 12px;
+  color: var(--ig-text);
+  font-weight: 400;
+}
+
+.ig-mycase__bio {
+  margin-top: 12px;
+}
+
+.ig-mycase__name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ig-mycase__bio-text {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ig-muted);
+  font-weight: 500;
+}
+
+.ig-mycase__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ig-mycase__btn {
+  flex: 1 1 calc(33.33% - 8px);
+  min-width: 0;
+  margin: 0;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ig-mycase__btn--card {
+  flex: 1 1 100%;
+  margin-top: 8px;
+  background: #e8f1ff;
+  color: #1d4ed8;
+}
+
+.ig-mycase__btn--primary {
+  background: var(--ig-blue);
+  color: #fff;
+}
+
+.ig-mycase__btn--secondary {
+  background: var(--ig-btn);
+  color: var(--ig-text);
+}
+
+.ig-mycase__btn--secondary.is-active {
+  background: #e7f3ff;
+  color: #00376b;
+}
+
+.ig-mycase__btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ig-mycase__follow-slot {
+  flex: 1;
+  display: flex;
+}
+
+.ig-mycase__follow-slot .follow-action-btn,
+.ig-mycase__follow-btn {
+  flex: 1;
+  width: 100%;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  padding: 7px 10px !important;
+  border: 0 !important;
+  background: #0095f6 !important;
+  color: #fff !important;
+}
+
+.ig-mycase__follow-slot .follow-action-btn--active,
+.ig-mycase__follow-slot .follow-action-btn--mutual {
+  background: #efefef !important;
+  color: #262626 !important;
+}
+
+.ig-mycase__highlights {
+  display: flex;
+  gap: 14px;
+  padding: 8px 16px 14px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.ig-mycase__highlights::-webkit-scrollbar {
+  display: none;
+}
+
+.ig-mycase__hl {
+  flex-shrink: 0;
+  width: 74px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: center;
+}
+
+.ig-mycase__hl-ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto;
+  padding: 2px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ig-border);
+  box-sizing: border-box;
+}
+
+.ig-mycase__hl-ring--dashed {
+  border-style: dashed;
+  border-color: #c7c7c7;
+}
+
+.ig-mycase__hl-ring img,
+.ig-mycase__hl-ph {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #f0f0f0;
+  display: block;
+}
+
+.ig-mycase__hl-plus {
+  font-size: 28px;
+  font-weight: 300;
+  color: var(--ig-text);
+  line-height: 1;
+}
+
+.ig-mycase__hl-label {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ig-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ig-mycase__hl-empty {
+  margin: 18px 0;
+  font-size: 12px;
+  color: var(--ig-muted);
+}
+
+.ig-mycase__tabs {
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid var(--ig-border);
+}
+
+.ig-mycase__tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid transparent;
+  background: transparent;
+  color: var(--ig-muted);
+  cursor: pointer;
+  margin-top: -1px;
+}
+
+.ig-mycase__tab.is-active {
+  color: var(--ig-text);
+  border-top-color: var(--ig-text);
+}
+
+.ig-mycase__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--ig-bg);
+}
+
+.ig-mycase__cell {
+  position: relative;
+  margin: 0;
+  background: #fafafa;
+}
+
+.ig-mycase__thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #efefef;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.ig-mycase__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ig-mycase__thumb-ph {
+  display: none;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #f0f0f0, #e6e6e6);
+}
+
+.ig-mycase__thumb-ph.is-visible {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+.ig-mycase__pin {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: #fff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+  pointer-events: none;
+}
+
+.ig-mycase__manage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
+.ig-mycase__manage-btn,
+.ig-mycase__manage-del {
+  pointer-events: auto;
+  margin: 0;
+  padding: 5px 4px;
+  border: 0;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ig-mycase__manage-btn {
+  background: rgba(255, 255, 255, 0.92);
+  color: #262626;
+}
+
+.ig-mycase__manage-btn.is-on {
+  background: var(--ig-blue);
+  color: #fff;
+}
+
+.ig-mycase__manage-del {
+  background: rgba(38, 38, 38, 0.85);
+  color: #fff;
+}
+
+.ig-mycase__locked,
+.ig-mycase__empty-block {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.ig-mycase__locked-title,
+.ig-mycase__empty-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.ig-mycase__locked-desc,
+.ig-mycase__empty-desc {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--ig-muted);
+  line-height: 1.45;
+}
+
+.ig-mycase__empty,
+.ig-mycase__sentinel {
+  margin: 20px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ig-muted);
+}
+
+.ig-mycase .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* legacy class hooks kept empty so old imports don't break */
+.my-case-grid {
+  display: contents;
+}

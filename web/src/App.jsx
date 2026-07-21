@@ -14,6 +14,7 @@ import AppRuntimePermissionsModal from "./components/AppRuntimePermissionsModal.
 import FeedManager from "./components/FeedManager";
 import Home from "./components/Home";
 import MyPage from "./components/MyPage";
+import MyCaseScreen from "./components/mycase/MyCaseScreen.jsx";
 import VlueCalendarScreen from "./components/calendar/VlueCalendarScreen.jsx";
 import PersonalMemoScreen from "./components/memo/PersonalMemoScreen.jsx";
 import MemoShareReceiveSheet from "./components/memo/MemoShareReceiveSheet.jsx";
@@ -3158,6 +3159,7 @@ function App() {
     if (page === "calendar") return "mypage";
     if (page === "memo") return "chat";
     if (page === "blueai") return "blueai";
+    if (page === "mycase") return "mycase";
     if (page === "mypage") return "mypage";
     if (page === "betaGuide") return "mypage";
     if (page === "subhub") return "shopping";
@@ -4341,6 +4343,15 @@ function App() {
           <BlueAIChat onGoMain={goBackStep} onAssistantReply={() => setBlueAiActivitySeq((n) => n + 1)} isDarkMode={isDarkMode} />
         </div>
       )}
+      {page === "mycase" && (
+        <MyCaseScreen
+          onGoMain={goBackStep}
+          onToast={(msg) => {
+            setBottomToast(msg);
+            setTimeout(() => setBottomToast(""), 2800);
+          }}
+        />
+      )}
       {page === "manage" && <FeedManager membershipTier={membershipTier} onGoMain={goBackStep} />}
       {page === "mypage" && (
         <MyPage
@@ -4371,6 +4382,7 @@ function App() {
             }
             navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
           }}
+          onOpenMycase={() => navigate({ nextPage: "mycase", nextTab: activeTab, nextRoomId: null })}
         />
       )}
       {page === "betaGuide" && <BetaLaunchGuide onGoMain={goBackStep} />}
@@ -4664,6 +4676,50 @@ function App() {
                   aria-label={`읽지 않은 알림 ${pushUnreadCount}건`}
                 />
               ) : null}
+            </button>
+            ) : null}
+
+            {v1AppShell.mycase ? (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHeaderEyeNavBlink();
+                setAppNotificationOpen(false);
+                setCallShowcaseSheetOpen(false);
+                setShowcaseStyleSheetOpen(false);
+                if (isBrowseGuest) {
+                  requireAuth(() => navigate({ nextPage: "mycase", nextTab: activeTab, nextRoomId: null }));
+                  return;
+                }
+                requireApp(() => navigate({ nextPage: "mycase", nextTab: activeTab, nextRoomId: null }));
+              }}
+              className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
+              aria-label="마이케이스"
+              title="마이케이스"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="21"
+                height="21"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`${
+                  activeBottomTab === "mycase"
+                    ? "text-blue-500"
+                    : isDarkMode
+                      ? "text-gray-400"
+                      : "text-gray-400"
+                }`}
+              >
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
             </button>
             ) : null}
 

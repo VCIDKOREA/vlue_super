@@ -4,6 +4,7 @@ import { normalizeDesiredPublicHandle } from "../lib/publicHandle.js";
 import { normalizeToE164KR } from "../lib/phoneE164.js";
 import { ssePublish } from "../realtime/sseHub.js";
 import { lookupCardByRawNumber } from "../services/cardLookup.js";
+import { resolveRequestUserId } from "../lib/authContext.js";
 import {
   requireUserHeader,
   requirePremiumTier,
@@ -18,8 +19,8 @@ import {
 
 export const cardsRoutes = new Hono();
 
-async function jsonLookup(raw: string) {
-  const result = await lookupCardByRawNumber(raw);
+async function jsonLookup(raw: string, viewerId?: string | null) {
+  const result = await lookupCardByRawNumber(raw, { viewerId });
   return result;
 }
 
@@ -27,7 +28,8 @@ async function jsonLookup(raw: string) {
 cardsRoutes.get("/lookup", async (c) => {
   try {
     const raw = String(c.req.query("number") ?? c.req.query("raw") ?? "").trim();
-    const result = await jsonLookup(raw);
+    const viewerId = await resolveRequestUserId(c);
+    const result = await jsonLookup(raw, viewerId);
     return c.json(result.body, result.status);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
@@ -39,7 +41,8 @@ cardsRoutes.get("/lookup", async (c) => {
 cardsRoutes.get("/by-number", async (c) => {
   try {
     const raw = String(c.req.query("number") ?? c.req.query("raw") ?? "").trim();
-    const result = await jsonLookup(raw);
+    const viewerId = await resolveRequestUserId(c);
+    const result = await jsonLookup(raw, viewerId);
     return c.json(result.body, result.status);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";

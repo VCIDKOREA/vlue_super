@@ -1,0 +1,135 @@
+import { useEffect, useMemo, useState } from "react";
+import MyCaseGrid from "./MyCaseGrid.jsx";
+import MyCaseDetailModal from "./MyCaseDetailModal.jsx";
+import AppFullScreenView from "../AppFullScreenView.jsx";
+import LetteringIncomingNotification from "../LetteringIncomingNotification.jsx";
+import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
+import { readDigitalCardActive, readMembershipTier } from "../../lib/bizcardAccountSync.js";
+import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
+import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
+import {
+  LETTERING_BIZCARD_CHANGED_EVENT
+} from "../../lib/letteringBizcardStorage.js";
+import "./my-case-detail.css";
+
+/**
+ * 하단바 마이케이스
+ * - 피드 탭 → 쇼케이스만
+ * - 디지털인증명함 버튼 → 홈/쇼케이스 「미리보기」와 동일한 수신 UI (명함 페이지만)
+ */
+export default function MyCaseScreen({ onGoMain, onToast }) {
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState(null);
+  const [detailPayload, setDetailPayload] = useState(null);
+  const [cardOpen, setCardOpen] = useState(false);
+  const [cardExpanded, setCardExpanded] = useState(true);
+  const [previewTick, setPreviewTick] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setPreviewTick((n) => n + 1);
+    window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
+    window.addEventListener("vlue-digital-card-changed", bump);
+    return () => {
+      window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
+      window.removeEventListener("vlue-digital-card-changed", bump);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (cardOpen) setCardExpanded(true);
+  }, [cardOpen]);
+
+  const membershipTier = useMemo(() => readMembershipTier(), [cardOpen, previewTick]);
+
+  /** 홈·블루쇼케이스 미리보기와 동일 파이프라인 */
+  const cardPreview = useMemo(() => {
+    const base = resolveVlueShowcaseCard({ membershipTier, previewExample: true });
+    return applyShowcaseStyleToCard(base, membershipTier, { digitalCardActive: true });
+  }, [membershipTier, previewTick]);
+
+  const closeCard = () => {
+    setCardOpen(false);
+    setCardExpanded(true);
+  };
+
+  return (
+    <section className="mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden bg-white">
+      <div className="min-h-0 flex-1 overflow-y-auto pb-[calc(52px+env(safe-area-inset-bottom,0px))]">
+        <MyCaseGrid
+          mode="mine"
+          onBack={onGoMain}
+          onToast={onToast}
+          onOpenDigitalCard={() => {
+            if (!readDigitalCardActive()) {
+              onToast?.("디지털인증명함이 없습니다.");
+              return;
+            }
+            if (!isPaidLetteringTier(membershipTier)) {
+              onToast?.("유료 디지털인증명함이 없습니다.");
+              return;
+            }
+            setCardOpen(true);
+          }}
+          onOpenDetail={(item, detail) => {
+            setDetailItem(item);
+            setDetailPayload(detail);
+            setDetailOpen(true);
+          }}
+        />
+      </div>
+
+      <MyCaseDetailModal
+        open={detailOpen}
+        item={detailItem}
+        detail={detailPayload}
+        isOwner
+        onClose={() => {
+          setDetailOpen(false);
+          setDetailItem(null);
+          setDetailPayload(null);
+        }}
+        onToast={onToast}
+      />
+
+      <AppFullScreenView
+        open={cardOpen}
+        onClose={closeCard}
+        title=""
+        hideHeader
+        showFloatingClose
+        coverBottomNav
+        className="my-case-detail my-case-detail--broadcast bg-[#0B101B]"
+      >
+        <div className="my-case-detail__broadcast-shell lettering-showcase-fs lettering-showcase-fs--history-embed">
+          <div className="lettering-showcase-fs__shell">
+            <LetteringIncomingNotification
+              className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--mycase-feed"
+              verified
+              previewMode
+              showOwnerSettings
+              hideUnverifiedFooter
+              callPhase="connected"
+              platform="android"
+              isRecording={false}
+              callDurationSec={0}
+              recordingDurationSec={0}
+              incomingNumber={cardPreview.phone || ""}
+              savedContactName={cardPreview.name || ""}
+              isKnownContact
+              card={cardPreview}
+              includeDigitalCard
+              digitalCardOnly
+              expanded={cardExpanded}
+              onExpandedChange={(next) => {
+                setCardExpanded(next);
+                if (!next) closeCard();
+              }}
+              onEndCall={closeCard}
+              onToast={onToast}
+            />
+          </div>
+        </div>
+      </AppFullScreenView>
+    </section>
+  );
+}

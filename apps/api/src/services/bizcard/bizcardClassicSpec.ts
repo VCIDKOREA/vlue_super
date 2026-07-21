@@ -10,6 +10,8 @@ export type BizcardClassicSnapshot = {
   address?: string;
   website?: string;
   logoUrl?: string;
+  /** 카카오 피드 카드 헤더 배경(커버) — http(s) 또는 data:image */
+  shareCoverUrl?: string;
   designTemplate?: string;
 };
 

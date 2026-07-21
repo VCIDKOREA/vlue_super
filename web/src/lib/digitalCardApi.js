@@ -69,6 +69,10 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
       force || !String(local.logoUrl || "").trim() ? String(snap.logoUrl || "").trim() : local.logoUrl,
     photoUrl:
       force || !String(local.photoUrl || "").trim() ? String(snap.photoUrl || "").trim() : local.photoUrl,
+    kakaoFeedBgDataUrl:
+      force || !String(local.kakaoFeedBgDataUrl || "").trim()
+        ? String(snap.shareCoverUrl || local.kakaoFeedBgDataUrl || "").trim()
+        : local.kakaoFeedBgDataUrl,
     designTemplate: normalizeLetteringBizcardTemplate(
       snap.designTemplate || local.designTemplate || "classic-light"
     ),
@@ -176,6 +180,7 @@ export async function syncDigitalCardExportSnapshot(card) {
           customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
           logoUrl: String(card?.logoUrl || ed.logoUrl || "").trim(),
           photoUrl: String(card?.photoUrl || ed.photoUrl || "").trim(),
+          shareCoverUrl: String(ed.kakaoFeedBgDataUrl || card?.shareCoverUrl || "").trim(),
           designTemplate: normalizeLetteringBizcardTemplate(card?.designTemplate || ed.designTemplate)
         }
       })

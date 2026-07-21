@@ -1,0 +1,65 @@
+.follow-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.follow-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.follow-action-btn--active {
+  background: rgba(148, 163, 184, 0.22);
+  border-color: rgba(148, 163, 184, 0.45);
+}
+
+.follow-action-btn--mutual {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(96, 165, 250, 0.55);
+  color: #dbeafe;
+}
+
+.follow-action-btn--seal {
+  min-width: 58px;
+  padding: 5px 10px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.follow-action-btn--chrome {
+  min-width: 54px;
+  padding: 5px 10px;
+  font-size: 11px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.follow-action-btn--self {
+  opacity: 0.72;
+  cursor: default;
+  background: rgba(148, 163, 184, 0.18);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #e2e8f0;
+}
+
+.follow-action-btn--tent {
+  min-width: 54px;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
+.showcase-slide-chrome__vlue .follow-action-btn--chrome {
+  margin-left: 0;
+}

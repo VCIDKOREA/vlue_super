@@ -44,6 +44,12 @@ import {
 import { shareShowcaseInviteViaKakao } from "../../lib/call/shareShowcaseInviteKakao.js";
 import TentFloatingMemo from "./TentFloatingMemo.jsx";
 import ShowcaseDialConfirmModal from "./ShowcaseDialConfirmModal.jsx";
+import FollowActionButton from "../follow/FollowActionButton.jsx";
+import {
+  resolveFollowTargetUserId,
+  shouldShowShowcaseFollow
+} from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
+import "../follow/follow-action.css";
 import "../../styles/tent-showcase.css";
 import "../../styles/incall-controls.css";
 
@@ -89,7 +95,6 @@ function resolveSocialLinks(style, card) {
     instagram: String(instagram || "").trim(),
     website: String(website || "").trim(),
     facebook: String(outlinks.facebook || "").trim(),
-    tiktok: String(outlinks.tiktok || "").trim(),
     attachments: style?.commercial?.attachments || []
   };
 }
@@ -221,6 +226,8 @@ export default function TentShowcaseOverlay({
   }, [previewMode, setCallState]);
 
   const phoneLabel = formatLetteringPhoneDisplay(peerPhone || card?.phone || "");
+  const followTargetUserId = resolveFollowTargetUserId(card, { fallbackToMe: false });
+  const showFollow = shouldShowShowcaseFollow(followTargetUserId);
   const hideBroadcastName = Boolean(
     card?.hideBroadcastName ||
       card?.showcaseStyle?.showBroadcastName === false ||
@@ -499,6 +506,13 @@ export default function TentShowcaseOverlay({
                 </button>
               ) : null}
             </div>
+            {showFollow ? (
+              <FollowActionButton
+                targetUserId={followTargetUserId}
+                className="follow-action-btn--tent"
+                onToast={showLinkToast}
+              />
+            ) : null}
           </div>
 
           {bodyCopy ? <p className="tent-vlue__body">{bodyCopy}</p> : null}

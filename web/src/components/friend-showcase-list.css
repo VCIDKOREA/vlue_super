@@ -1,4 +1,4 @@
-﻿/* 홈 — 친구 쇼케이스 목록 */
+﻿/* 홈 — 팔로우 쇼케이스 목록 (라이트 모드 기본 · VLUE 로고형 아바타) */
 .friend-showcase-list {
   margin: 0 auto;
   width: 100%;
@@ -128,12 +128,20 @@
   list-style: none;
 }
 
+.friend-showcase-list__section-empty {
+  margin: 0;
+  padding: 10px 16px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
 .friend-showcase-list__row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  padding: 11px 16px;
+  padding: 10px 14px;
   border: 0;
   border-bottom: 1px solid #f5f5f5;
   background: #fff;
@@ -142,27 +150,56 @@
   transition: background 0.15s;
 }
 
+.friend-showcase-list__row--ig {
+  cursor: default;
+}
+
+.friend-showcase-list__row-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
 .friend-showcase-list__row:hover,
 .friend-showcase-list__row--active {
   background: #f8fbff;
 }
 
+/* VLUE 로고형 스쿼클 — 인스타 원형 대신 */
 .friend-showcase-list__avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
+  width: 48px;
+  height: 48px;
+  border-radius: 22%;
   object-fit: cover;
   flex-shrink: 0;
+  background: #2b6ff0;
 }
 
-.friend-showcase-list__avatar--initial {
+.friend-showcase-list__avatar--initial,
+.friend-showcase-list__avatar--brand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #dbeafe, #e0e7ff);
-  color: #1d4ed8;
+  background: #2b6ff0;
+  color: #fff;
   font-size: 16px;
   font-weight: 900;
+  overflow: hidden;
+}
+
+.friend-showcase-list__avatar-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .friend-showcase-list__meta {
@@ -172,20 +209,187 @@
 
 .friend-showcase-list__name {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
   color: #191f28;
   letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .friend-showcase-list__subtitle {
-  margin: 3px 0 0;
+  margin: 2px 0 0;
   font-size: 12px;
   font-weight: 500;
   color: #8b95a1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.friend-showcase-list__toast {
+  position: sticky;
+  bottom: 8px;
+  margin: 0 16px 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.88);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  z-index: 2;
+}
+
+.follow-action-btn--list {
+  flex-shrink: 0;
+  min-width: 76px;
+  padding: 7px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+  background: #2b6ff0;
+  border-color: #2b6ff0;
+  color: #fff;
+}
+
+.follow-action-btn--list.follow-action-btn--active,
+.follow-action-btn--list.follow-action-btn--mutual {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.follow-action-btn--list-sm {
+  min-width: 64px;
+  padding: 5px 10px;
+  font-size: 11px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+.follow-action-btn--list-sm.follow-action-btn--active,
+.follow-action-btn--list-sm.follow-action-btn--mutual {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.friend-showcase-list__actions-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.friend-showcase-list__product-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.friend-showcase-list__product-btn {
+  margin: 0;
+  padding: 7px 11px;
+  border-radius: 8px;
+  border: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.friend-showcase-list__product-btn--showcase {
+  background: #2b6ff0;
+  color: #fff;
+}
+
+.friend-showcase-list__product-btn--card {
+  background: #e8f1ff;
+  color: #1d4ed8;
+}
+
+.friend-showcase-list__tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin: 0;
+  padding: 0 4px;
+  border-bottom: 1px solid #eceff3;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.friend-showcase-list__tab {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 12px 4px 11px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.friend-showcase-list__tab.is-active {
+  color: #191f28;
+  border-bottom-color: #191f28;
+  font-weight: 800;
+}
+
+.friend-showcase-list__hashtag-box {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 10px 16px 4px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.friend-showcase-list__hashtag-hash {
+  font-size: 15px;
+  font-weight: 900;
+  color: #2b6ff0;
+}
+
+.friend-showcase-list__hashtag-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 10px 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #191f28;
+  outline: none;
+}
+
+.friend-showcase-list__idcard-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.friend-showcase-list--light,
+.friend-showcase-list--light .friend-showcase-list__sheet-panel,
+.friend-showcase-list--light .friend-showcase-list__sheet-body {
+  background: #fff;
+  color: #191f28;
 }
 
 .friend-showcase-list__empty {
@@ -269,9 +473,10 @@
   color: #e2e8f0;
 }
 
-.dark-mode .friend-showcase-list__avatar--initial {
-  background: linear-gradient(135deg, #1e3a5f, #312e81);
-  color: #93c5fd;
+.dark-mode .friend-showcase-list__avatar--initial,
+.dark-mode .friend-showcase-list__avatar--brand {
+  background: #2b6ff0;
+  color: #fff;
 }
 
 /* 홈 하단 시트 — 탭에 딱 붙음 / 올리기=쇼케이스 / 드래그=검색창 아래 */

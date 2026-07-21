@@ -36,7 +36,17 @@ function buildTags(snap: BizcardClassicSnapshot): string[] {
 
 async function fetchRemoteImage(url: string): Promise<Buffer | null> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    const raw = String(url || "").trim();
+    if (!raw) return null;
+    if (raw.startsWith("data:image/")) {
+      const comma = raw.indexOf(",");
+      if (comma < 0) return null;
+      const b64 = raw.slice(comma + 1);
+      const buf = Buffer.from(b64, "base64");
+      return buf.length >= 32 ? buf : null;
+    }
+    if (!/^https?:\/\//i.test(raw)) return null;
+    const res = await fetch(raw, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return null;
     const buf = Buffer.from(await res.arrayBuffer());
     if (buf.length < 32) return null;
@@ -58,7 +68,7 @@ async function circleAvatarPng(source: Buffer, size: number): Promise<Buffer> {
     .toBuffer();
 }
 
-function buildFeedCardSvg(snap: BizcardClassicSnapshot, withAvatarSlot: boolean): string {
+function buildFeedCardSvg(snap: BizcardClassicSnapshot, withAvatarSlot: boolean, headerTransparent: boolean): string {
   const W = KAKAO_FEED_CARD_WIDTH;
   const H = KAKAO_FEED_CARD_HEIGHT;
   const name = trunc(snap.name || "회원", 14);
@@ -75,7 +85,7 @@ function buildFeedCardSvg(snap: BizcardClassicSnapshot, withAvatarSlot: boolean)
   for (const tag of tags) {
     const tw = Math.min(240, tag.length * 15 + 32);
     tagParts.push(`
-      <rect x="${tagX}" y="${tagY}" width="${tw}" height="34" rx="8" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.14)"/>
+      <rect x="${tagX}" y="${tagY}" width="${tw}" height="34" rx="8" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.2)"/>
       <text x="${tagX + tw / 2}" y="${tagY + 23}" text-anchor="middle" font-family="${FONT}" font-size="17" font-weight="700" fill="#e2e8f0">${esc(tag)}</text>
     `);
     tagX += tw + 10;
@@ -88,15 +98,19 @@ function buildFeedCardSvg(snap: BizcardClassicSnapshot, withAvatarSlot: boolean)
   <text x="84" y="98" text-anchor="middle" font-family="${FONT}" font-size="34" font-weight="900" fill="#f8fafc">${esc(initial)}</text>`;
 
   const orgY = roleLine ? 132 : 108;
+  const headerFill = headerTransparent ? "transparent" : NAVY;
+  const textShadow = headerTransparent
+    ? `filter="drop-shadow(0 1px 2px rgba(0,0,0,0.65))"`
+    : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <rect width="${W}" height="${H}" rx="24" fill="#ffffff"/>
-  <rect width="${W}" height="${HEADER_H}" fill="${NAVY}"/>
+  <rect width="${W}" height="${HEADER_H}" fill="${headerFill}"/>
   ${avatarPlaceholder}
-  <text x="152" y="74" font-family="${FONT}" font-size="34" font-weight="900" fill="#ffffff">${esc(name)}</text>
-  ${roleLine ? `<text x="152" y="108" font-family="${FONT}" font-size="18" font-weight="600" fill="#cbd5e1">${esc(roleLine)}</text>` : ""}
-  ${org ? `<text x="152" y="${orgY}" font-family="${FONT}" font-size="17" font-weight="500" fill="#94a3b8">${esc(org)}</text>` : ""}
+  <text x="152" y="74" font-family="${FONT}" font-size="34" font-weight="900" fill="#ffffff" ${textShadow}>${esc(name)}</text>
+  ${roleLine ? `<text x="152" y="108" font-family="${FONT}" font-size="18" font-weight="600" fill="#e2e8f0" ${textShadow}>${esc(roleLine)}</text>` : ""}
+  ${org ? `<text x="152" y="${orgY}" font-family="${FONT}" font-size="17" font-weight="500" fill="#cbd5e1" ${textShadow}>${esc(org)}</text>` : ""}
   ${tagParts.join("")}
   <rect y="${HEADER_H}" width="${W}" height="${H - HEADER_H}" fill="#ffffff"/>
   <text x="400" y="${HEADER_H + 46}" text-anchor="middle" font-family="${FONT}" font-size="22" font-weight="700" fill="#1e293b">
@@ -114,21 +128,54 @@ function buildFeedCardSvg(snap: BizcardClassicSnapshot, withAvatarSlot: boolean)
 /** 카카오 Feed — 개인화 명함 카드 PNG (미리보기·카카오 imageUrl 공용) */
 export async function renderKakaoFeedCardPng(snapshot: BizcardClassicSnapshot): Promise<Buffer> {
   const logoUrl = String(snapshot.logoUrl || "").trim();
-  let avatarBuf: Buffer | null = null;
-  if (logoUrl.startsWith("http")) {
-    avatarBuf = await fetchRemoteImage(logoUrl);
+  const coverUrl = String(snapshot.shareCoverUrl || "").trim();
+  const avatarBuf = logoUrl ? await fetchRemoteImage(logoUrl) : null;
+  const coverBuf = coverUrl ? await fetchRemoteImage(coverUrl) : null;
+
+  const svgBuf = await sharp(Buffer.from(buildFeedCardSvg(snapshot, Boolean(avatarBuf), Boolean(coverBuf))))
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+
+  const layers: sharp.OverlayOptions[] = [];
+
+  if (coverBuf) {
+    const cover = await sharp(coverBuf)
+      .resize(KAKAO_FEED_CARD_WIDTH, HEADER_H, { fit: "cover", position: "centre" })
+      .modulate({ brightness: 0.7 })
+      .png()
+      .toBuffer();
+    const dim = await sharp({
+      create: {
+        width: KAKAO_FEED_CARD_WIDTH,
+        height: HEADER_H,
+        channels: 4,
+        background: { r: 11, g: 26, b: 51, alpha: 0.38 }
+      }
+    })
+      .png()
+      .toBuffer();
+    const header = await sharp(cover)
+      .composite([{ input: dim, blend: "over" }])
+      .png()
+      .toBuffer();
+    layers.push({ input: header, left: 0, top: 0 });
   }
 
-  const svg = buildFeedCardSvg(snapshot, Boolean(avatarBuf));
-  let base = await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toBuffer();
+  layers.push({ input: svgBuf, left: 0, top: 0 });
 
   if (avatarBuf) {
-    const circle = await circleAvatarPng(avatarBuf, 88);
-    base = await sharp(base)
-      .composite([{ input: circle, left: 40, top: 42 }])
-      .png({ compressionLevel: 9 })
-      .toBuffer();
+    layers.push({ input: await circleAvatarPng(avatarBuf, 88), left: 40, top: 42 });
   }
 
-  return base;
+  return sharp({
+    create: {
+      width: KAKAO_FEED_CARD_WIDTH,
+      height: KAKAO_FEED_CARD_HEIGHT,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 }
+    }
+  })
+    .composite(layers)
+    .png({ compressionLevel: 9 })
+    .toBuffer();
 }

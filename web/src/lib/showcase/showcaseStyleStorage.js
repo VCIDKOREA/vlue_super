@@ -3,6 +3,7 @@ import { SHOWCASE_MAX_PHOTOS_PER_PAGE } from "./tentShowcaseTypes.js";
 import {
   migrateLegacyPages,
   normalizeShowcasePage,
+  stripInstagramContentPages,
   syncLegacyFieldsFromPages
 } from "./showcasePages.js";
 
@@ -88,6 +89,7 @@ export function createDefaultShowcaseStyle() {
       outlinks: {
         instagram: "",
         youtube: "",
+        /** @deprecated 전용 TikTok 칸 제거 — 자유 링크(commercial.links) 사용 */
         tiktok: "",
         facebook: "",
         /** @deprecated → kakaoOpenChat */
@@ -231,6 +233,8 @@ export function readShowcaseStyle() {
     /* pages 키가 없을 때만 레거시 이관 (빈 배열은 의도된 상태) */
     if (!Object.prototype.hasOwnProperty.call(parsed, "pages")) {
       merged.pages = migrateLegacyPages(merged);
+    } else if (Array.isArray(merged.pages)) {
+      merged.pages = stripInstagramContentPages(merged.pages);
     }
     merged = syncLegacyFieldsFromPages(merged);
     return merged;

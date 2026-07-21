@@ -117,6 +117,7 @@ function MyPage({
   onOpenUpdateStory,
   onOpenCalendar,
   onOpenFamilyProtection,
+  onOpenMycase,
   resetNonce = 0
 }) {
   const panelCls = isDarkMode
@@ -920,6 +921,29 @@ function MyPage({
           <p className={`mt-2 text-[11px] leading-relaxed ${subCls}`}>{intro}</p>
           {notice ? <p className="mt-1 text-[10px] font-semibold text-blue-700/90">{notice}</p> : null}
           {toast && <p className="mt-2 text-center text-[11px] font-bold text-blue-600">{toast}</p>}
+        </div>
+
+        <div className={`mt-4 ${panelCls}`}>
+          <div className="mb-2 flex items-center justify-between">
+            <p className={`text-[12px] font-black ${titleCls}`}>마이케이스</p>
+            <button
+              type="button"
+              className="text-[11px] font-bold text-blue-600"
+              onClick={() => onOpenMycase?.()}
+            >
+              모두 보기
+            </button>
+          </div>
+          <p className={`text-[11px] leading-relaxed ${subCls}`}>
+            인스타그램형 그리드로 쇼케이스 아카이브·메인 송출을 관리합니다.
+          </p>
+          <button
+            type="button"
+            onClick={() => onOpenMycase?.()}
+            className="mt-3 w-full rounded-xl bg-gray-900 py-2.5 text-[12px] font-black text-white active:scale-[0.99]"
+          >
+            마이케이스 열기
+          </button>
         </div>
 
         <div className={`mt-4 ${panelCls}`}>

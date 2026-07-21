@@ -258,7 +258,9 @@ function FrontPanel({
   verificationItems = [],
   embeddedInPush = false,
   enableContactLinks = true,
-  onRequestDial
+  onRequestDial,
+  hideFollow = false,
+  onToast
 }) {
   const phone = card.phone ? formatLetteringPhoneDisplay(card.phone) : "";
   const phoneRaw = String(card.phone || "").trim();
@@ -441,7 +443,12 @@ function FrontPanel({
       </div>
 
       {embeddedInPush && verified ? (
-        <VluePushAuthSeal className="ldr-front-intro ldr-front-intro--verified" />
+        <VluePushAuthSeal
+          className="ldr-front-intro ldr-front-intro--verified"
+          card={card}
+          hideFollow={hideFollow}
+          onToast={onToast}
+        />
       ) : null}
     </div>
   );
@@ -493,7 +500,8 @@ export default function LetteringDigitalReception({
   keypadOpen = false,
   onKeypadClose,
   keypadDemoMode = false,
-  onToast
+  onToast,
+  hideFollow = false
 }) {
   const card = useMemo(() => normalizeLetteringCard(cardRaw || {}), [cardRaw]);
   const items = verificationItems.length ? verificationItems : card.verificationItems;
@@ -522,6 +530,8 @@ export default function LetteringDigitalReception({
       embeddedInPush={embeddedInPush}
       enableContactLinks={enableContactLinks}
       onRequestDial={requestDial}
+      hideFollow={hideFollow}
+      onToast={onToast}
     />
   );
   const back = (

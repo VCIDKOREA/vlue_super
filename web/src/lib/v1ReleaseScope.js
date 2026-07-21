@@ -85,6 +85,8 @@ export const v1AppShell = {
   vaultTabsMinimal: true,
   contacts: true,
   notificationInbox: true,
+  /** V1 — 하단 바 마이케이스(아카이브 그리드) */
+  mycase: true,
   /** V1 — 홈 본문 알림 패널 대신 하단 바 아이콘 사용 */
   notificationBottomNavOnly: true,
   /** V1 — 지인·홍보 추천 프로그램 UI */

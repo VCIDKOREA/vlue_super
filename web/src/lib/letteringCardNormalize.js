@@ -27,6 +27,8 @@ export function normalizeLetteringCard(raw = {}) {
     companyIntro: String(raw.companyIntro || raw.intro || "").trim(),
     salesContent: String(raw.salesContent || raw.salesPitch || raw.pitch || "").trim(),
     feedId: String(raw.feedId || raw.userId || "").trim(),
+    userId: String(raw.userId || raw.ownerUserId || "").trim(),
+    ownerUserId: String(raw.ownerUserId || raw.userId || "").trim(),
     feedType: raw.feedType === "company" ? "company" : "personal",
     verificationItems: Array.isArray(raw.verificationItems) ? raw.verificationItems : [],
     membershipTier: String(raw.membershipTier || "free").toLowerCase(),

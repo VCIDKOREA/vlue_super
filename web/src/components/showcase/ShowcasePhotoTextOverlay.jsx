@@ -46,13 +46,31 @@ export function normalizePhotoOverlay(photo = {}) {
   };
 }
 
-/** 사진 위 Instagram 스타일 텍스트 오버레이 */
-export default function ShowcasePhotoTextOverlay({ photo, className = "" }) {
+/**
+ * 사진 위 Instagram 스타일 텍스트 오버레이
+ * @param {{ photo: object, className?: string, interactive?: boolean, dragging?: boolean, onPointerDown?: (e: PointerEvent) => void }} props
+ */
+export default function ShowcasePhotoTextOverlay({
+  photo,
+  className = "",
+  interactive = false,
+  dragging = false,
+  onPointerDown
+}) {
   const o = normalizePhotoOverlay(photo);
   if (!o.overlayText) return null;
   return (
     <p
-      className={`showcase-photo-text-overlay showcase-photo-text-overlay--border-${o.overlayBorder} showcase-photo-text-overlay--${o.overlayAnim} ${className}`.trim()}
+      className={[
+        "showcase-photo-text-overlay",
+        `showcase-photo-text-overlay--border-${o.overlayBorder}`,
+        `showcase-photo-text-overlay--${o.overlayAnim}`,
+        interactive ? "showcase-photo-text-overlay--interactive" : "",
+        dragging ? "is-dragging" : "",
+        className
+      ]
+        .filter(Boolean)
+        .join(" ")}
       style={{
         left: `${o.overlayX}%`,
         top: `${o.overlayY}%`,
@@ -60,6 +78,10 @@ export default function ShowcasePhotoTextOverlay({ photo, className = "" }) {
         color: o.overlayColor,
         fontFamily: o.overlayFontCss
       }}
+      onPointerDown={interactive ? onPointerDown : undefined}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={interactive ? "텍스트 위치 드래그" : undefined}
     >
       {o.overlayText}
     </p>

@@ -50,6 +50,13 @@ enum VouchRequestStatus {
   cancelled
 }
 
+enum UserFollowStatus {
+  pending
+  active
+  rejected
+  cancelled
+}
+
 /// 명함 유형: 휴대폰 / 내선 / 대표번호
 enum BusinessCardKind {
   mobile
@@ -169,6 +176,18 @@ model User {
   isOrgSearchAllowed   Boolean @default(false) @map("is_org_search_allowed")
   isIdSearchAllowed    Boolean @default(false) @map("is_id_search_allowed")
 
+  /// 팔로우 승인제 — true면 신청 pending, false면 즉시 active
+  isPrivateFollow Boolean @default(false) @map("is_private_follow")
+
+  /// 쇼케이스 비공개 — 비팔로워는 팔로워 전용 공개 범위 외 정보 마스킹
+  isShowcasePrivate Boolean @default(false) @map("is_showcase_private")
+
+  /// 팔로워에게만 공개 (검색 공개와 별도 옵트인)
+  isPhoneFollowersAllowed Boolean @default(true) @map("is_phone_followers_allowed")
+  isNameFollowersAllowed  Boolean @default(true) @map("is_name_followers_allowed")
+  isOrgFollowersAllowed   Boolean @default(true) @map("is_org_followers_allowed")
+  isIdFollowersAllowed    Boolean @default(true) @map("is_id_followers_allowed")
+
   /// 검색 어뷰징 카운터·잠금
   searchAbuseStrikeCount Int       @default(0) @map("search_abuse_strike_count")
   searchSuspendedAt      DateTime? @map("search_suspended_at") @db.Timestamptz(6)
@@ -180,6 +199,12 @@ model User {
   showcaseReactionsReceived ShowcaseReaction[] @relation("ShowcaseReactionOwner")
   showcaseCommentsAuthored  ShowcaseComment[]  @relation("ShowcaseCommentAuthor")
   showcaseCommentsReceived  ShowcaseComment[]  @relation("ShowcaseCommentOwner")
+
+  /// V1 마이케이스(아카이브) — 쇼케이스 게시물 누적
+  showcaseCases ShowcaseCase[]
+
+  /// 무료 회원 메인 송출 슬롯 변경 쿨다운 기준 시각
+  mainBroadcastChangedAt DateTime? @map("main_broadcast_changed_at") @db.Timestamptz(6)
 
   /// 로그인 비밀번호(scrypt 해시). null 이면 비밀번호 로그인 불가(관리자·레거시 등).
   passwordHash String? @map("password_hash") @db.VarChar(256)
@@ -241,6 +266,12 @@ model User {
 
   /// 이 사용자가 받은 친구 신청
   friendRequestsReceived FriendRequest[] @relation("FriendRequestTo")
+
+  /// 내가 팔로우하는 사용자
+  followsSent UserFollow[] @relation("UserFollowsSent")
+
+  /// 나를 팔로우하는 사용자
+  followsReceived UserFollow[] @relation("UserFollowsReceived")
 
   /// VLUE 디지털 명함 — 신규가입 시 신청한 경우에만 1:1 생성
   digitalCard DigitalCard?
@@ -596,6 +627,30 @@ model FriendRequest {
   @@index([fromUserId])
   @@index([fromUserId, toUserId])
   @@map("friend_requests")
+}
+
+// -----------------------------------------------------------------------------
+// UserFollow — 비대칭 팔로우 (승인제·즉시 팔로우)
+// -----------------------------------------------------------------------------
+
+model UserFollow {
+  id String @id @default(uuid()) @db.Uuid
+
+  followerId String @map("follower_id") @db.Uuid
+  follower   User   @relation("UserFollowsSent", fields: [followerId], references: [id], onDelete: Cascade)
+
+  followingId String @map("following_id") @db.Uuid
+  following   User   @relation("UserFollowsReceived", fields: [followingId], references: [id], onDelete: Cascade)
+
+  status UserFollowStatus @default(pending)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([followerId, followingId])
+  @@index([followingId, status])
+  @@index([followerId, status])
+  @@map("user_follows")
 }
 
 // -----------------------------------------------------------------------------
@@ -1438,6 +1493,41 @@ model SecuritySearchAlert {
   @@index([userId, createdAt(sort: Desc)])
   @@index([acknowledged, createdAt(sort: Desc)])
   @@map("security_search_alerts")
+}
+
+/// V1 마이케이스 — 쇼케이스 아카이브 게시물 (수정 시 덮어쓰지 않고 행 단위로 누적)
+model ShowcaseCase {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  owner       User   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  /// 그리드·목록 표시용 제목
+  title String @map("title") @db.VarChar(200)
+
+  /// 인스타그램 그리드용 대표 썸네일 URL (data URL 포함 — TEXT)
+  thumbnailUrl String? @map("thumbnail_url") @db.Text
+
+  /// 쇼케이스 전체 스냅샷(페이지·스타일·명함 플래그 등). 새 저장 = 새 행.
+  payloadJson Json @map("payload_json") @db.JsonB
+
+  /// 타인 케이스함 공개 여부
+  isPublic Boolean @default(true) @map("is_public")
+
+  /// 메인 송출(홈·프로필 대표 노출) 슬롯 포함
+  isMainBroadcast Boolean @default(false) @map("is_main_broadcast")
+
+  /// 메인 송출 슬롯 순서 (0-based). 송출 OFF면 null
+  slotIndex Int? @map("slot_index")
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, deletedAt, createdAt(sort: Desc)])
+  @@index([ownerUserId, isMainBroadcast, deletedAt])
+  @@index([ownerUserId, isPublic, deletedAt, createdAt(sort: Desc)])
+  @@map("showcase_cases")
 }
 
 /// V2 쇼케이스 소셜 — 좋아요 등 반응

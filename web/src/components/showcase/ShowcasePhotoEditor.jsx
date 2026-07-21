@@ -10,6 +10,22 @@ import ShowcasePhotoTextOverlay, {
   normalizePhotoOverlay
 } from "./ShowcasePhotoTextOverlay.jsx";
 
+function clampPercent(n) {
+  return Math.min(100, Math.max(0, n));
+}
+
+/** 픽셀 → % (소수 1자리 — 부드러운 드래그) */
+function pointerToPercent(clientX, clientY, el) {
+  const rect = el.getBoundingClientRect();
+  if (!rect.width || !rect.height) return { x: 50, y: 50 };
+  const x = ((clientX - rect.left) / rect.width) * 100;
+  const y = ((clientY - rect.top) / rect.height) * 100;
+  return {
+    x: clampPercent(Math.round(x * 10) / 10),
+    y: clampPercent(Math.round(y * 10) / 10)
+  };
+}
+
 /**
  * 쇼케이스 사진 편집
  * - limit=1(개인커스텀): 인스타 스토리형 스튜디오
@@ -24,16 +40,28 @@ export default function ShowcasePhotoEditor({
 }) {
   const fileRef = useRef(null);
   const replaceRef = useRef(null);
+  const studioCanvasRef = useRef(null);
+  const sheetCanvasRef = useRef(null);
+  const dragMovedRef = useRef(false);
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
   const [replaceId, setReplaceId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   /** @type {['text'|'font'|'color'|'size'|'pos'|'border'|'anim'|null, Function]} */
   const [tool, setTool] = useState("text");
+  /** 드래그 중 로컬 위치 — 부모 onChange 지연 없이 커서를 따라감 */
+  const [dragPos, setDragPos] = useState(null);
+  const [dragging, setDragging] = useState(false);
   const limit = Math.max(1, Number(maxPhotos) || maxShowcasePhotosForTier(membershipTier) || SHOWCASE_MAX_PHOTOS);
   const singleMode = limit === 1;
   const selected = photos.find((p) => p.id === selectedId) || (singleMode ? photos[0] || null : null);
   const canAdd = photos.length < limit;
   const cells = canAdd ? [...photos, null] : photos;
   const overlay = selected ? normalizePhotoOverlay(selected) : null;
+  const previewPhoto =
+    selected && dragPos
+      ? { ...selected, overlayX: dragPos.x, overlayY: dragPos.y }
+      : selected;
 
   useEffect(() => {
     if (!singleMode) return;
@@ -44,6 +72,79 @@ export default function ShowcasePhotoEditor({
   const patchSelected = (patch) => {
     if (!selected) return;
     onChange(photos.map((p) => (p.id === selected.id ? { ...p, ...patch } : p)));
+  };
+
+  const onOverlayPointerDown = (e, canvasRef) => {
+    if (!selected || !enableTextOverlay) return;
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const photoId = selected.id;
+    dragMovedRef.current = false;
+    const pointer = pointerToPercent(e.clientX, e.clientY, canvas);
+    const baseX = Number(selected.overlayX) || 50;
+    const baseY = Number(selected.overlayY) || 50;
+    const offsetX = baseX - pointer.x;
+    const offsetY = baseY - pointer.y;
+    setDragging(true);
+    setDragPos({ x: baseX, y: baseY });
+    const pointerId = e.pointerId;
+    try {
+      canvas.setPointerCapture(pointerId);
+    } catch {
+      /* ignore */
+    }
+
+    const onMove = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      dragMovedRef.current = true;
+      const p = pointerToPercent(ev.clientX, ev.clientY, canvas);
+      setDragPos({
+        x: clampPercent(Math.round((p.x + offsetX) * 10) / 10),
+        y: clampPercent(Math.round((p.y + offsetY) * 10) / 10)
+      });
+    };
+    const onUp = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      try {
+        canvas.releasePointerCapture(pointerId);
+      } catch {
+        /* ignore */
+      }
+      const p = pointerToPercent(ev.clientX, ev.clientY, canvas);
+      const finalPos = {
+        x: clampPercent(Math.round((p.x + offsetX) * 10) / 10),
+        y: clampPercent(Math.round((p.y + offsetY) * 10) / 10)
+      };
+      onChange(
+        photosRef.current.map((row) =>
+          row.id === photoId ? { ...row, overlayX: finalPos.x, overlayY: finalPos.y } : row
+        )
+      );
+      setDragging(false);
+      setDragPos(null);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
+
+  /** 빈 영역 탭 — 텍스트를 그 위치로 (드래그 직후 클릭은 무시) */
+  const onCanvasBackgroundPointerUp = (e) => {
+    if (!selected || !enableTextOverlay) return;
+    if (dragging || dragMovedRef.current) {
+      dragMovedRef.current = false;
+      return;
+    }
+    if (e.target?.closest?.(".showcase-photo-text-overlay")) return;
+    const el = e.currentTarget;
+    const pos = pointerToPercent(e.clientX, e.clientY, el);
+    patchSelected({ overlayX: pos.x, overlayY: pos.y });
   };
 
   const onFiles = async (fileList, { replacePhotoId } = {}) => {
@@ -92,19 +193,6 @@ export default function ShowcasePhotoEditor({
     if (selectedId === id) setSelectedId(null);
   };
 
-  const onPreviewPointer = (e) => {
-    if (!selected || !enableTextOverlay) return;
-    const el = e.currentTarget;
-    const rect = el.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
-    patchSelected({
-      overlayX: Math.min(100, Math.max(0, x)),
-      overlayY: Math.min(100, Math.max(0, y))
-    });
-  };
-
   const toggleTool = (id) => setTool((prev) => (prev === id ? null : id));
 
   return (
@@ -143,15 +231,23 @@ export default function ShowcasePhotoEditor({
         ) : (
           <div className="showcase-photo-studio">
             <div className="showcase-photo-studio__stage">
-              <button
-                type="button"
-                className="showcase-photo-studio__canvas"
-                onClick={onPreviewPointer}
-                aria-label="텍스트 위치 — 사진에서 탭"
+              <div
+                ref={studioCanvasRef}
+                role="img"
+                className={`showcase-photo-studio__canvas${dragging ? " is-dragging" : ""}`}
+                onPointerUp={onCanvasBackgroundPointerUp}
+                aria-label="텍스트를 드래그해 위치를 조정하세요"
               >
                 <img src={selected.url} alt="" draggable={false} />
-                {enableTextOverlay ? <ShowcasePhotoTextOverlay photo={selected} /> : null}
-              </button>
+                {enableTextOverlay && previewPhoto ? (
+                  <ShowcasePhotoTextOverlay
+                    photo={previewPhoto}
+                    interactive
+                    dragging={dragging}
+                    onPointerDown={(e) => onOverlayPointerDown(e, studioCanvasRef)}
+                  />
+                ) : null}
+              </div>
             </div>
 
             {enableTextOverlay && overlay ? (
@@ -240,7 +336,7 @@ export default function ShowcasePhotoEditor({
                       </button>
                     ))}
                     <p className="showcase-photo-studio__tip">
-                      위·아래 검정 여백을 탭해도 텍스트를 둘 수 있어요
+                      텍스트를 드래그해 옮기거나, 빈 곳을 탭해 위치를 지정하세요
                     </p>
                   </div>
                 ) : null}
@@ -408,18 +504,26 @@ export default function ShowcasePhotoEditor({
 
       {selected ? (
         <div className="showcase-photo-editor__sheet">
-              <button
-                type="button"
-                className="showcase-photo-editor__sheet-preview"
-                onClick={onPreviewPointer}
-                aria-label="텍스트 위치 — 사진에서 탭"
+              <div
+                ref={sheetCanvasRef}
+                role="img"
+                className={`showcase-photo-editor__sheet-preview${dragging ? " is-dragging" : ""}`}
+                onPointerUp={onCanvasBackgroundPointerUp}
+                aria-label="텍스트를 드래그해 위치를 조정하세요"
               >
                 <img src={selected.url} alt="" draggable={false} />
-                {enableTextOverlay ? <ShowcasePhotoTextOverlay photo={selected} /> : null}
-                {enableTextOverlay ? (
-                  <span className="showcase-photo-editor__pos-hint">위·아래 여백을 탭해 텍스트 위치 지정</span>
+                {enableTextOverlay && previewPhoto ? (
+                  <ShowcasePhotoTextOverlay
+                    photo={previewPhoto}
+                    interactive
+                    dragging={dragging}
+                    onPointerDown={(e) => onOverlayPointerDown(e, sheetCanvasRef)}
+                  />
                 ) : null}
-              </button>
+                {enableTextOverlay ? (
+                  <span className="showcase-photo-editor__pos-hint">텍스트를 드래그하거나 빈 곳을 탭해 위치 지정</span>
+                ) : null}
+              </div>
 
               {enableTextOverlay && overlay ? (
                 <div className="showcase-photo-editor__overlay-tools">

@@ -1,15 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ImagePlus, Trash2 } from "lucide-react";
 import { readProfileOrLogoAvatar, scrubBrandAvatarsFromStorage } from "../lib/vlueAvatar.js";
 import { withLetteringBizcardPreviewFallback } from "../lib/letteringBizcardProfile.js";
 import { scrubLetteringDemoPollution } from "../lib/letteringDemoPollution.js";
-import { ensureDigitalCardId } from "../lib/digitalCardApi.js";
-import { buildKakaoBizcardPublicUrls } from "../lib/kakaoBizcardFeedShare.js";
-import { buildPublicCardViewUrl } from "../lib/vlueViralLinks.js";
+import { syncDigitalCardExportSnapshot } from "../lib/digitalCardApi.js";
+import { buildPublicShowcaseUrl } from "../lib/vlueViralLinks.js";
+import { readLetteringFixedIdentity } from "../lib/letteringBizcardStorage.js";
+import { isPaidLetteringTier } from "../lib/letteringMembership.js";
+import {
+  readLetteringBizcardEditable,
+  writeLetteringBizcardEditable
+} from "../lib/letteringBizcardStorage.js";
+import { readShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
+import { CALL_STATES } from "../lib/showcase/tentShowcaseTypes.js";
+import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
 import UserProfileAvatar from "./UserProfileAvatar.jsx";
-import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
-import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
+import TentShowcaseOverlay from "./showcase/TentShowcaseOverlay.jsx";
 
 function buildTags(card) {
   const tags = [];
@@ -44,16 +52,56 @@ function openExternalSafely(url) {
   } catch {
     /* ignore */
   }
-  /* WebView location.href 로 이동하면 /app 셸이 깨져 재실행처럼 보임 — 절대 사용하지 않음 */
   return false;
 }
 
+async function compressCoverFile(file) {
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
+    reader.readAsDataURL(file);
+  });
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 960;
+      const scale = Math.min(1, maxW / Math.max(1, img.width));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.78));
+    };
+    img.onerror = () => reject(new Error("이미지 변환에 실패했습니다."));
+    img.src = dataUrl;
+  });
+}
+
+function readVlueHandleDisplay() {
+  try {
+    const raw = String(localStorage.getItem("vlue_member_handle") || "").trim();
+    if (!raw) return "";
+    return raw.startsWith("@") ? raw : `@${raw}`;
+  } catch {
+    return "";
+  }
+}
+
 /**
- * 카카오톡 Feed에 전송되는 「명함 카드」 UI 미리보기
+ * 카카오톡에 붙여넣을 때 보이는 「쇼케이스 카드」 UI 미리보기
  */
 export default function KakaoBizcardFeedPreview({
   card,
   className = "",
+  membershipTier = "free",
   isDarkMode = false,
   onToast
 }) {
@@ -61,22 +109,34 @@ export default function KakaoBizcardFeedPreview({
     () => scrubLetteringDemoPollution(withLetteringBizcardPreviewFallback(card || {})),
     [card]
   );
+  const [avatarTick, setAvatarTick] = useState(0);
+  const [coverTick, setCoverTick] = useState(0);
+  const fileRef = useRef(null);
   const name = String(snap.name || "").trim();
   const org = String(snap.organization || "").trim();
+  const isPaid = isPaidLetteringTier(membershipTier || snap.membershipTier || "free");
+  const vlueHandle = readVlueHandleDisplay();
   const title = String(snap.title || "").trim();
   const dept = String(snap.department || "").trim();
-  const roleLine = [dept, title].filter(Boolean).join(" | ");
+  const roleLine = isPaid
+    ? [dept, title].filter(Boolean).join(" | ")
+    : [vlueHandle, String(snap.phone || readLetteringFixedIdentity().phone || "").trim()]
+        .filter(Boolean)
+        .join(" · ");
   const tags = useMemo(() => buildTags(snap), [snap]);
-  const [avatarTick, setAvatarTick] = useState(0);
   const avatarUrl = useMemo(() => {
     scrubBrandAvatarsFromStorage();
     return readProfileOrLogoAvatar();
   }, [avatarTick, snap.name]);
+  const coverUrl = useMemo(() => {
+    const ed = readLetteringBizcardEditable();
+    return String(ed.kakaoFeedBgDataUrl || snap.shareCoverUrl || "").trim();
+  }, [coverTick, snap.shareCoverUrl]);
   const displayName = name || "명함 미설정";
   const hasProfile = Boolean(name || org || roleLine || tags.length);
   const [viewUrl, setViewUrl] = useState("");
   const [liveOpen, setLiveOpen] = useState(false);
-  const [face, setFace] = useState("front");
+  const showcaseStyle = useMemo(() => readShowcaseStyle(), [liveOpen]);
 
   useEffect(() => {
     const bump = () => setAvatarTick((n) => n + 1);
@@ -87,11 +147,11 @@ export default function KakaoBizcardFeedPreview({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const id = (await ensureDigitalCardId()) || "";
+      const fixed = readLetteringFixedIdentity();
+      const phone = String(fixed.phone || snap.phone || "").trim();
       if (cancelled) return;
-      if (id) {
-        const urls = buildKakaoBizcardPublicUrls(id, snap);
-        setViewUrl(urls.viewUrl || buildPublicCardViewUrl(id));
+      if (phone) {
+        setViewUrl(buildPublicShowcaseUrl(phone));
       } else {
         setViewUrl("");
       }
@@ -99,7 +159,7 @@ export default function KakaoBizcardFeedPreview({
     return () => {
       cancelled = true;
     };
-  }, [snap.name, snap.organization, snap.phone, snap.title, snap.department]);
+  }, [snap.name, snap.organization, snap.phone, snap.title, snap.department, coverUrl]);
 
   useEffect(() => {
     if (!liveOpen) return undefined;
@@ -109,11 +169,9 @@ export default function KakaoBizcardFeedPreview({
     });
   }, [liveOpen]);
 
-  const openCardView = (e) => {
+  const openFullShowcase = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    /* 앱 내 라이브 명함 — WebView를 외부 HTML로 바꾸지 않음(재실행처럼 보이는 버그 방지) */
-    setFace("front");
     setLiveOpen(true);
   };
 
@@ -121,12 +179,44 @@ export default function KakaoBizcardFeedPreview({
     e.preventDefault();
     e.stopPropagation();
     if (!viewUrl) {
-      onToast?.("명함을 저장한 뒤 공개 페이지를 열 수 있습니다.");
+      onToast?.("본인인증 전화번호가 없어 공개 페이지를 열 수 없습니다.");
       return;
     }
     const ok = openExternalSafely(viewUrl);
     if (!ok) onToast?.("외부 브라우저에서 명함 페이지를 열 수 없습니다.");
   };
+
+  const onPickCover = async (file) => {
+    if (!file) return;
+    if (!String(file.type || "").startsWith("image/")) {
+      onToast?.("이미지 파일만 선택할 수 있습니다.");
+      return;
+    }
+    try {
+      const dataUrl = await compressCoverFile(file);
+      writeLetteringBizcardEditable({ kakaoFeedBgDataUrl: dataUrl });
+      setCoverTick((n) => n + 1);
+      await syncDigitalCardExportSnapshot({ ...snap, shareCoverUrl: dataUrl });
+      onToast?.("카드 배경 썸네일을 적용했습니다.");
+    } catch (err) {
+      onToast?.(err instanceof Error ? err.message : "배경 설정에 실패했습니다.");
+    }
+  };
+
+  const clearCover = async () => {
+    writeLetteringBizcardEditable({ kakaoFeedBgDataUrl: "" });
+    setCoverTick((n) => n + 1);
+    await syncDigitalCardExportSnapshot({ ...snap, shareCoverUrl: "" });
+    onToast?.("배경 썸네일을 제거했습니다.");
+  };
+
+  const headerStyle = coverUrl
+    ? {
+        backgroundImage: `linear-gradient(180deg, rgba(11,26,51,0.35), rgba(11,26,51,0.55)), url(${coverUrl})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center"
+      }
+    : undefined;
 
   return (
     <div
@@ -134,7 +224,7 @@ export default function KakaoBizcardFeedPreview({
       data-theme={isDarkMode ? "dark" : "light"}
       aria-label="카카오 명함 카드 미리보기"
     >
-      <div className="vlue-kakao-feed-preview__header">
+      <div className="vlue-kakao-feed-preview__header" style={headerStyle}>
         <div className="vlue-kakao-feed-preview__row">
           <div className="vlue-kakao-feed-preview__avatar">
             <UserProfileAvatar src={avatarUrl} blankClassName="bg-[#c5cdd6] text-[#8b95a1]" />
@@ -162,12 +252,12 @@ export default function KakaoBizcardFeedPreview({
       <div className="vlue-kakao-feed-preview__body">
         <p className="vlue-kakao-feed-preview__cta-line">
           <span className="vlue-kakao-feed-preview__cta-name">{displayName}</span>
-          <span className="vlue-kakao-feed-preview__cta-rest">님의 명함을 확인하세요.</span>
+          <span className="vlue-kakao-feed-preview__cta-rest">님의 쇼케이스를 확인하세요.</span>
         </p>
-        <button type="button" className="vlue-kakao-feed-preview__cta-btn" onClick={openCardView}>
-          명함 확인
+        <button type="button" className="vlue-kakao-feed-preview__cta-btn" onClick={openFullShowcase}>
+          쇼케이스 보기
         </button>
-        <button type="button" className="vlue-kakao-feed-preview__footer" onClick={openCardView}>
+        <button type="button" className="vlue-kakao-feed-preview__footer" onClick={openFullShowcase}>
           <div className="vlue-kakao-feed-preview__brand">
             <img src={VLUE_SHIELD_LOGO} alt="" className="h-5 w-5 shrink-0 object-contain" />
             <span>VLUE</span>
@@ -178,50 +268,75 @@ export default function KakaoBizcardFeedPreview({
         </button>
       </div>
 
+      <div className="vlue-kakao-feed-preview__cover-tools">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            void onPickCover(f);
+          }}
+        />
+        <button
+          type="button"
+          className="vlue-kakao-feed-preview__cover-btn"
+          onClick={() => fileRef.current?.click()}
+        >
+          <ImagePlus size={14} aria-hidden />
+          배경 썸네일 설정
+        </button>
+        {coverUrl ? (
+          <button type="button" className="vlue-kakao-feed-preview__cover-btn is-muted" onClick={() => void clearCover()}>
+            <Trash2 size={14} aria-hidden />
+            배경 제거
+          </button>
+        ) : null}
+      </div>
+
       {liveOpen && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="fixed inset-0 z-[10000200] flex flex-col bg-black/70 p-3"
+              className="fixed inset-0 z-[10000200] flex flex-col bg-black"
               role="dialog"
               aria-modal="true"
-              aria-label="디지털 인증명함"
-              onClick={() => setLiveOpen(false)}
+              aria-label="VLUE 풀 쇼케이스"
             >
-              <div
-                className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col overflow-hidden rounded-2xl bg-slate-950 shadow-2xl"
-                onClick={(ev) => ev.stopPropagation()}
-              >
-                <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-                  <p className="text-[13px] font-black text-white">디지털 인증명함</p>
-                  <div className="flex items-center gap-2">
-                    {viewUrl ? (
-                      <button
-                        type="button"
-                        className="rounded-lg px-2 py-1 text-[11px] font-bold text-blue-300"
-                        onClick={openPublicPage}
-                      >
-                        공개 페이지
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="rounded-lg bg-white/10 px-2.5 py-1 text-[12px] font-bold text-white"
-                      onClick={() => setLiveOpen(false)}
-                    >
-                      닫기
+              <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-slate-950 px-3 py-2">
+                <p className="text-[13px] font-black text-white">풀 쇼케이스</p>
+                <div className="flex items-center gap-2">
+                  {viewUrl ? (
+                    <button type="button" className="rounded-lg px-2 py-1 text-[11px] font-bold text-blue-300" onClick={openPublicPage}>
+                      공개 페이지
                     </button>
-                  </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="rounded-lg bg-white/10 px-2.5 py-1 text-[12px] font-bold text-white"
+                    onClick={() => setLiveOpen(false)}
+                  >
+                    닫기
+                  </button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto p-2">
-                  <LetteringDigitalReception
-                    card={snap}
-                    verified
-                    embeddedInPush
-                    previewMode
-                    face={face}
-                    onFaceChange={setFace}
-                  />
-                </div>
+              </div>
+              <div className="min-h-0 flex-1">
+                <TentShowcaseOverlay
+                  previewMode
+                  forceInteractive
+                  callState={CALL_STATES.CONNECTED}
+                  verified
+                  membershipTier="premium"
+                  peerPhone={snap.phone || ""}
+                  displayName={displayName}
+                  organization={org}
+                  card={snap}
+                  showcaseStyle={showcaseStyle}
+                  privacyMode="public"
+                  className="tent-showcase--fill h-full"
+                  onClose={() => setLiveOpen(false)}
+                />
               </div>
             </div>,
             document.body

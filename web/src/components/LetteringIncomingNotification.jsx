@@ -195,6 +195,8 @@ export default function LetteringIncomingNotification({
   fromCallHistory = false,
   /** 홈 미리보기: 명함 신청자만 true — 미신청 시 쇼케이스만 */
   includeDigitalCard = true,
+  /** true면 디지털인증명함 페이지만 (마이케이스 명함 버튼) */
+  digitalCardOnly = false,
   /**
    * false면 펼침 화살표·외부 액션만 쓰고 디지털명함/쇼케이스 본문은 열지 않음
    * (개인케이스 명함저장 등 — 보여줄 송출 콘텐츠 없음)
@@ -974,6 +976,7 @@ export default function LetteringIncomingNotification({
                       scrollEnabled={carouselScrollEnabled}
                       previewMode={previewMode}
                       includeDigitalCard={includeDigitalCard}
+                      digitalCardOnly={digitalCardOnly}
                       face={receptionFace}
                       onFaceChange={handleFaceChange}
                       keypadOpen={keypadOpen}

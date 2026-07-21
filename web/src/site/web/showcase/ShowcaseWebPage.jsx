@@ -58,6 +58,8 @@ export default function ShowcaseWebPage({ phone }) {
   const photo = String(card.photoUrl || "").trim();
   const moodText = String(card.companyIntro || "").trim();
   const displayName = String(card.name || "").trim();
+  const vlueId = String(card.publicHandle || card.loginId || "").trim();
+  const vlueIdLabel = vlueId ? (vlueId.startsWith("@") ? vlueId : `@${vlueId}`) : "";
   const orgLine = isPaid
     ? [card.organization, card.title].filter(Boolean).join(" · ")
     : "";
@@ -80,9 +82,11 @@ export default function ShowcaseWebPage({ phone }) {
 
           {displayName ? <p className="showcase-web__name">{displayName}</p> : null}
 
+          {!isPaid && vlueIdLabel ? <p className="showcase-web__meta showcase-web__meta--id">{vlueIdLabel}</p> : null}
+
           {isPaid && orgLine ? <p className="showcase-web__meta">{orgLine}</p> : null}
 
-          {!isPaid && !displayName ? <p className="showcase-web__meta">VLUE 일상 프로필</p> : null}
+          {!isPaid && !displayName && !vlueIdLabel ? <p className="showcase-web__meta">VLUE 일상 프로필</p> : null}
 
           {moodText ? <p className="showcase-web__intro">{moodText}</p> : null}
 

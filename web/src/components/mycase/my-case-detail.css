@@ -1,0 +1,38 @@
+.my-case-detail--broadcast {
+  background: #0b101b;
+}
+
+.my-case-detail__broadcast-shell {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.my-case-detail__broadcast-shell .lettering-showcase-fs__shell {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+/* 마이케이스 피드 — 송출 캐러셀만 (상단 라이브바·프로필 요약 숨김) */
+.lettering-ongoing--mycase-feed .lettering-live-bar,
+.lettering-ongoing--mycase-feed .lettering-ongoing-summary {
+  display: none !important;
+}
+
+.lettering-ongoing--mycase-feed.lettering-ongoing--fullscreen-tent,
+.lettering-ongoing--mycase-feed .lettering-ongoing-body,
+.lettering-ongoing--mycase-feed .lettering-ongoing-expand-slot,
+.lettering-ongoing--mycase-feed .lettering-ongoing-expand-slot__inner,
+.lettering-ongoing--mycase-feed .lettering-ongoing-reception,
+.lettering-ongoing--mycase-feed .lettering-ongoing-scroll {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}
+
+.lettering-ongoing--mycase-feed .lettering-ongoing-expand-slot {
+  display: flex !important;
+}

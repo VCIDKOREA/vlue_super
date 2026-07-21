@@ -2126,6 +2126,20 @@
   max-width: 100%;
 }
 
+.showcase-profile-row__label-text--stack {
+  align-items: center;
+  gap: 6px;
+}
+
+.showcase-biz-social-title {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
 .showcase-help-tip {
   position: relative;
   display: inline-flex;
@@ -2567,8 +2581,14 @@
   border-radius: 16px;
   overflow: hidden;
   background: var(--studio-canvas);
-  cursor: crosshair;
+  cursor: default;
+  touch-action: none;
   box-shadow: var(--studio-shadow);
+  user-select: none;
+}
+
+.showcase-photo-studio__canvas.is-dragging {
+  cursor: grabbing;
 }
 
 .showcase-photo-studio__canvas img {
@@ -2845,7 +2865,13 @@
   overflow: hidden;
   aspect-ratio: 16 / 10;
   background: #e2e8f0;
-  cursor: crosshair;
+  cursor: default;
+  touch-action: none;
+  user-select: none;
+}
+
+.showcase-photo-editor__sheet-preview.is-dragging {
+  cursor: grabbing;
 }
 
 .showcase-photo-editor__sheet-preview img {
@@ -3209,8 +3235,13 @@
   background: #f8fafc;
   color: #334155;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
+}
+
+.showcase-page-add-btn--solo {
+  width: 100%;
+  margin-top: 4px;
 }
 
 .showcase-style-settings--dark .showcase-page-card {

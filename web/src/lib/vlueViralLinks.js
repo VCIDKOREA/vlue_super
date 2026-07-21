@@ -1,3 +1,5 @@
+import { showcaseWebPathForPhone } from "./showcaseWebRoute.js";
+
 export function getVlueViralLinks() {
   const landing =
     String(import.meta.env.VITE_VLUE_LANDING_URL || "").trim() || "https://www.vlue.kr";
@@ -55,13 +57,41 @@ export function resolvePublicCardApiBase(fallbackOrigin = "") {
   return landingBase;
 }
 
+/** 외부 공유용 웹 앱 오리진 (쇼케이스 `/site/web/showcase/…`) */
+export function resolvePublicWebOrigin(fallbackOrigin = "") {
+  const explicit = String(import.meta.env.VITE_SHOWCASE_WEB_BASE || "").trim().replace(/\/$/, "");
+  if (explicit.startsWith("http")) return explicit;
+
+  const { landing } = getVlueViralLinks();
+  const landingBase = landing.replace(/\/$/, "");
+
+  if (typeof window !== "undefined" && isLocalDevOrigin(window.location?.origin)) {
+    return landingBase;
+  }
+  const fb = String(fallbackOrigin || "").trim().replace(/\/$/, "");
+  if (fb.startsWith("http") && !isLocalDevOrigin(fb)) return fb;
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const origin = window.location.origin.replace(/\/$/, "");
+    if (!isLocalDevOrigin(origin)) return origin;
+  }
+  return landingBase;
+}
+
 export function buildHostedCardViewUrl(apiBase, cardId) {
   const base = String(apiBase || "").replace(/\/$/, "");
   if (!cardId) return "";
   return `${base}/api/v1/card/view/${encodeURIComponent(cardId)}`;
 }
 
-/** 카카오·문자 등 외부 공유용 — 항상 공개 HTTPS 링크 */
+/** 카카오·문자 등 외부 공유용 — VLUE 쇼케이스 웹뷰 링크 */
+export function buildPublicShowcaseUrl(phone, devOrigin = "") {
+  const origin = resolvePublicWebOrigin(devOrigin);
+  const path = showcaseWebPathForPhone(phone);
+  if (!path || path === "/site/web/showcase/") return "";
+  return `${origin}${path}`;
+}
+
+/** 카카오·문자 등 외부 공유용 — 레거시 명함 HTML 뷰 */
 export function buildPublicCardViewUrl(cardId, devApiBase = "") {
   const base = resolvePublicCardApiBase(devApiBase);
   return buildHostedCardViewUrl(base, cardId);

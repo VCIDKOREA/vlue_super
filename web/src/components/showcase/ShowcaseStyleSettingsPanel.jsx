@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, ChevronRight, ChevronUp, HelpCircle, Music2, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, HelpCircle, Music2, Plus, Trash2 } from "lucide-react";
 import BackButton from "../common/BackButton";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import { requiresPremium } from "../../lib/showcase/showcaseStylePermissions.js";
@@ -10,6 +10,11 @@ import {
   writeShowcaseStyle,
   parseShowcaseTagsInput
 } from "../../lib/showcase/showcaseStyleStorage.js";
+import { archiveShowcaseToMycase } from "../../lib/mycaseApi.js";
+import {
+  extractShowcaseArchiveTitle,
+  extractShowcaseCoverUrl
+} from "../../lib/showcase/showcaseCover.js";
 import { writeShowcasePrivacyMode } from "../../lib/showcase/showcasePrivacyMode.js";
 import { PRIVACY_MODES, maxShowcaseContentPagesForTier } from "../../lib/showcase/tentShowcaseTypes.js";
 import {
@@ -27,7 +32,6 @@ import {
   clearInstagramVerifiedLocal,
   disconnectInstagramLink,
   fetchInstagramLinkStatus,
-  fetchInstagramMedia,
   startInstagramLink
 } from "../../lib/instagramLinkApi.js";
 import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
@@ -41,7 +45,6 @@ import ShowcasePremiumGateModal from "./ShowcasePremiumGateModal.jsx";
 import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
 import ShowcasePhotoEditor from "./ShowcasePhotoEditor.jsx";
 import ShowcasePullDownPreview from "./ShowcasePullDownPreview.jsx";
-import { pushAndroidBackHandler } from "../../lib/androidBackStack.js";
 import "./showcase-style-settings.css";
 import "../../styles/showcase-call-glass.css";
 
@@ -201,8 +204,6 @@ export default function ShowcaseStyleSettingsPanel({
   const [expandedPageId, setExpandedPageId] = useState("");
   const [igLink, setIgLink] = useState({ linked: false });
   const [igLinkLoading, setIgLinkLoading] = useState(false);
-  /** @type {[{ pageId: string, mode: 'single'|'multi' }|null]} */
-  const [igPicker, setIgPicker] = useState(null);
   const pages = useMemo(
     () => (Array.isArray(config.pages) ? config.pages.map(normalizeShowcasePage) : []),
     [config.pages]
@@ -337,32 +338,9 @@ export default function ShowcaseStyleSettingsPanel({
     persistPages(pages.slice(0, maxContentPages));
   }, [maxContentPages, pages, persistPages]);
 
-  const ensureIgLinked = async () => {
-    if (igLink.linked && !igLink.expired) return true;
-    setIgLinkLoading(true);
-    try {
-      const url = await startInstagramLink();
-      window.location.assign(url);
-      return false;
-    } catch (e) {
-      onToast?.(e instanceof Error ? e.message : "Instagram 연동을 시작할 수 없습니다.");
-      setIgLinkLoading(false);
-      return false;
-    }
-  };
-
-  const addPage = async (type) => {
+  const addPage = () => {
     if (!canAddPage) {
       onToast?.(`콘텐츠 페이지는 최대 ${maxContentPages}장입니다.`);
-      return;
-    }
-    if (type === SHOWCASE_PAGE_TYPES.INSTAGRAM) {
-      const ok = await ensureIgLinked();
-      if (!ok) return;
-      const page = createShowcasePage(SHOWCASE_PAGE_TYPES.INSTAGRAM);
-      persistPages([...pages, page]);
-      setExpandedPageId(page.id);
-      setIgPicker({ pageId: page.id, mode: "single" });
       return;
     }
     const page = createShowcasePage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM);
@@ -445,7 +423,22 @@ export default function ShowcaseStyleSettingsPanel({
     if (isPaid) {
       void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));
     }
-    onToast?.("적용되었습니다.");
+    /* 마이케이스 아카이브 — 덮어쓰지 않고 새 게시물로 누적 */
+    try {
+      const cover = extractShowcaseCoverUrl(latest);
+      const title = extractShowcaseArchiveTitle(latest);
+      void archiveShowcaseToMycase({
+        title,
+        thumbnailUrl: cover || null,
+        payloadJson: { style: latest, source: "showcase_apply" },
+        isPublic: latest?.privacyMode !== "friend_only"
+      }).then((res) => {
+        if (res?.ok) onToast?.("적용 · 마이케이스에 저장되었습니다.");
+        else onToast?.("적용되었습니다.");
+      });
+    } catch {
+      onToast?.("적용되었습니다.");
+    }
   }, [isPaid, onToast, tagInput]);
 
   const headText = isDarkMode ? "text-gray-100" : "text-slate-900";
@@ -487,8 +480,8 @@ export default function ShowcaseStyleSettingsPanel({
               <HelpTip
                 text={[
                   "디지털인증명함을 쓰면 1페이지는 항상 명함입니다.",
-                  "2페이지부터 인스타그램·개인커스텀을 각각 설정할 수 있습니다.",
-                  `콘텐츠 페이지 최대 ${maxContentPages}장 · 인스타 페이지당 사진 최대 20장 · 개인커스텀은 사진 1장.`,
+                  "2페이지부터 개인커스텀 페이지를 추가할 수 있습니다.",
+                  `콘텐츠 페이지 최대 ${maxContentPages}장 · 개인커스텀은 사진 1장.`,
                   "오른쪽 사이드 탭(〈)을 누르면 통화 빅푸시 미리보기가 전체 화면으로 열립니다."
                 ].join(" ")}
               />
@@ -540,88 +533,20 @@ export default function ShowcaseStyleSettingsPanel({
 
                   {expanded ? (
                     <div className="showcase-page-card__body">
-                      <div className="showcase-page-type-row" role="group" aria-label="페이지 유형">
-                        {[
-                          { id: SHOWCASE_PAGE_TYPES.INSTAGRAM, label: "인스타그램" },
-                          { id: SHOWCASE_PAGE_TYPES.RICH_CUSTOM, label: "개인커스텀" }
-                        ].map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            className={`showcase-page-type-chip${page.type === opt.id ? " is-active" : ""}`}
-                            onClick={async () => {
-                              if (opt.id === SHOWCASE_PAGE_TYPES.INSTAGRAM) {
-                                const ok = await ensureIgLinked();
-                                if (!ok) return;
-                              }
-                              const patch = {
-                                type: opt.id,
-                                instagramMedia: opt.id === SHOWCASE_PAGE_TYPES.INSTAGRAM ? page.instagramMedia : null
-                              };
-                              if (opt.id === SHOWCASE_PAGE_TYPES.RICH_CUSTOM) {
-                                patch.gallery = {
-                                  photos: (page.gallery?.photos || []).slice(0, 1)
-                                };
-                              }
-                              updatePage(page.id, patch);
-                            }}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
+                      <div className="showcase-page-card__section">
+                        <ShowcasePhotoEditor
+                          photos={page.gallery?.photos || []}
+                          onChange={(photos) =>
+                            updatePage(page.id, { gallery: { photos: (photos || []).slice(0, 1) } })
+                          }
+                          membershipTier={membershipTier}
+                          maxPhotos={1}
+                          enableTextOverlay
+                        />
+                        <p className="showcase-page-card__hint">
+                          개인커스텀은 사진 1장 · 사진 위 텍스트(크기·위치·애니메이션) · 비즈니스 링크 중심입니다.
+                        </p>
                       </div>
-
-                      {page.type === SHOWCASE_PAGE_TYPES.INSTAGRAM ? (
-                        <div className="showcase-page-card__section">
-                          <ProfileRow
-                            label="인스타그램"
-                            help={
-                              igLink.linked && !igLink.expired
-                                ? `인증완료✔ @${igLink.username || ""} · 이 페이지에 게시물 1개`
-                                : "Instagram 인증 후 게시물을 고를 수 있습니다."
-                            }
-                            onClick={async () => {
-                              if (igLinkLoading) return;
-                              const ok = await ensureIgLinked();
-                              if (!ok) return;
-                              setIgPicker({ pageId: page.id, mode: "single" });
-                            }}
-                            trailing={
-                              <span className="showcase-profile-row__value">
-                                {igLinkLoading
-                                  ? "연결 중…"
-                                  : page.instagramMedia?.id
-                                    ? "게시물 변경"
-                                    : igLink.linked
-                                      ? "게시물 선택"
-                                      : "인증하기"}
-                              </span>
-                            }
-                          />
-                          {page.instagramMedia?.id ? (
-                            <p className="showcase-page-card__hint">
-                              선택됨 · {String(page.instagramMedia.caption || page.instagramMedia.id).slice(0, 48)}
-                            </p>
-                          ) : (
-                            <p className="showcase-page-card__hint">인증 후 게시물 사진을 선택하세요.</p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="showcase-page-card__section">
-                          <ShowcasePhotoEditor
-                            photos={page.gallery?.photos || []}
-                            onChange={(photos) =>
-                              updatePage(page.id, { gallery: { photos: (photos || []).slice(0, 1) } })
-                            }
-                            membershipTier={membershipTier}
-                            maxPhotos={1}
-                            enableTextOverlay
-                          />
-                          <p className="showcase-page-card__hint">
-                            개인커스텀은 사진 1장 · 사진 위 텍스트(크기·위치·애니메이션) · 비즈니스 링크 중심입니다.
-                          </p>
-                        </div>
-                      )}
 
                       <button
                         type="button"
@@ -638,16 +563,10 @@ export default function ShowcaseStyleSettingsPanel({
             })}
 
             {canAddPage ? (
-              <div className="showcase-page-add-row">
-                <button type="button" className="showcase-page-add-btn" onClick={() => addPage(SHOWCASE_PAGE_TYPES.INSTAGRAM)}>
-                  <Plus size={16} aria-hidden />
-                  인스타그램 페이지
-                </button>
-                <button type="button" className="showcase-page-add-btn" onClick={() => addPage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM)}>
-                  <Plus size={16} aria-hidden />
-                  개인커스텀 페이지
-                </button>
-              </div>
+              <button type="button" className="showcase-page-add-btn showcase-page-add-btn--solo" onClick={addPage}>
+                <Plus size={16} aria-hidden />
+                개인커스텀 페이지
+              </button>
             ) : (
               <p className={`text-[11px] ${subText}`}>콘텐츠 페이지 한도({maxContentPages})에 도달했습니다.</p>
             )}
@@ -658,16 +577,21 @@ export default function ShowcaseStyleSettingsPanel({
                 className="showcase-bgm-picker__yt-btn mt-2"
                 disabled={igLinkLoading}
                 onClick={async () => {
-                  if (!window.confirm("Instagram 인증을 해제할까요? 인스타 페이지의 게시물도 함께 지워집니다.")) return;
+                  if (!window.confirm("Instagram 인증을 해제할까요? 홍보 링크에 넣은 프로필 주소도 지워집니다.")) return;
                   setIgLinkLoading(true);
                   try {
                     await disconnectInstagramLink();
                     clearInstagramVerifiedLocal();
-                    persistPages(
-                      pages.map((p) =>
-                        p.type === SHOWCASE_PAGE_TYPES.INSTAGRAM ? { ...p, instagramMedia: null } : p
-                      )
-                    );
+                    persist({
+                      platformFeed: {
+                        instagramVerified: false,
+                        instagramHandle: "",
+                        instagramProfileUrl: ""
+                      },
+                      commercial: {
+                        outlinks: { ...config.commercial.outlinks, instagram: "" }
+                      }
+                    });
                     setConfig(readShowcaseStyle());
                     await refreshIgLink();
                     onToast?.("Instagram 인증이 해제되었습니다.");
@@ -831,9 +755,12 @@ export default function ShowcaseStyleSettingsPanel({
                   onClick={() => setOpenBiz((v) => !v)}
                 >
                   <span className="showcase-profile-row__label">
-                    <span className="showcase-profile-row__label-text">
-                      비즈니스 · 링크
-                      <HelpTip text="Instagram은 인증 시 자동 입력됩니다. 카카오는 오픈채팅·프로필을 따로 넣으세요. YouTube·TikTok·Facebook은 프로필 URL입니다." />
+                    <span className="showcase-profile-row__label-text showcase-profile-row__label-text--stack">
+                      <span className="showcase-biz-social-title">
+                        <span>비즈니스</span>
+                        <span>쇼셜링크</span>
+                      </span>
+                      <HelpTip text="Instagram은 로그인·회원가입·홍보 링크용입니다. 인증 시 프로필 URL이 자동 입력됩니다. 카카오는 오픈채팅·프로필을 따로 넣으세요." />
                     </span>
                   </span>
                   <span className="showcase-profile-row__trail">
@@ -885,18 +812,6 @@ export default function ShowcaseStyleSettingsPanel({
                       onChange={(v) =>
                         persist({
                           commercial: { outlinks: { ...config.commercial.outlinks, youtube: v } }
-                        })
-                      }
-                    />
-                    <BusinessOutlinkRow
-                      brand="tiktok"
-                      label="TikTok"
-                      placeholder="https://tiktok.com/@…"
-                      value={config.commercial.outlinks.tiktok || ""}
-                      inputCls={inputCls}
-                      onChange={(v) =>
-                        persist({
-                          commercial: { outlinks: { ...config.commercial.outlinks, tiktok: v } }
                         })
                       }
                     />
@@ -989,57 +904,6 @@ export default function ShowcaseStyleSettingsPanel({
             ) : null}
           </section>
 
-          {igPicker ? (
-            <InstagramMediaPickerModal
-              max={igPicker.mode === "single" ? 1 : Math.max(1, maxContentPages - pages.length + 1)}
-              selectedMedia={
-                igPicker.mode === "single"
-                  ? pages.find((p) => p.id === igPicker.pageId)?.instagramMedia
-                    ? [pages.find((p) => p.id === igPicker.pageId).instagramMedia]
-                    : []
-                  : []
-              }
-              isDarkMode={isDarkMode}
-              onClose={() => setIgPicker(null)}
-              onConfirm={(mediaItems) => {
-                const handle = igLink.username ? `@${igLink.username}` : config.platformFeed?.instagramHandle;
-                const id = handle ? String(handle).replace(/^@/, "") : "";
-                const profileUrl = id ? `https://instagram.com/${id}` : "";
-                if (igLink.username) applyInstagramVerifiedLocal(igLink.username);
-
-                if (igPicker.mode === "single" && igPicker.pageId) {
-                  updatePage(igPicker.pageId, { instagramMedia: mediaItems[0] || null });
-                } else {
-                  const room = Math.max(0, maxContentPages - pages.length);
-                  const extras = mediaItems.slice(0, room).map((m) =>
-                    createShowcasePage(SHOWCASE_PAGE_TYPES.INSTAGRAM, {
-                      id: `ig-${m.id}`,
-                      instagramMedia: m
-                    })
-                  );
-                  persistPages([...pages, ...extras]);
-                }
-
-                if (profileUrl) {
-                  persist({
-                    platformFeed: {
-                      instagramVerified: true,
-                      ...(handle ? { instagramHandle: handle, instagramProfileUrl: profileUrl } : {})
-                    },
-                    commercial: {
-                      outlinks: {
-                        ...config.commercial.outlinks,
-                        instagram: profileUrl
-                      }
-                    }
-                  });
-                }
-                setIgPicker(null);
-                onToast?.(mediaItems.length ? `게시물 ${mediaItems.length}개를 반영했습니다.` : "선택이 비었습니다.");
-              }}
-            />
-          ) : null}
-
           <p className={`text-center text-[11px] ${subText}`}>
             {includeDigitalCard ? "명함 1 · " : ""}
             콘텐츠 {pages.length}페이지 · 설정됨 {configuredCount}
@@ -1088,15 +952,6 @@ function BrandMark({ brand }) {
       </span>
     );
   }
-  if (brand === "tiktok") {
-    return (
-      <span className="showcase-brand-mark showcase-brand-mark--tt" aria-hidden>
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-          <path d="M16.5 3c.6 2.3 2.1 3.9 4.5 4.3v3.1c-1.6.1-3.1-.4-4.5-1.3v6.4c0 3.4-2.7 6.1-6.1 6.1S4.3 18.9 4.3 15.5 7 9.4 10.4 9.4c.4 0 .7 0 1.1.1v3.2c-.3-.1-.7-.2-1.1-.2-1.6 0-2.9 1.3-2.9 2.9s1.3 2.9 2.9 2.9 2.9-1.3 2.9-2.9V3h3.2z" />
-        </svg>
-      </span>
-    );
-  }
   if (brand === "kakao") {
     return (
       <span className="showcase-brand-mark showcase-brand-mark--kakao" aria-hidden>
@@ -1140,155 +995,6 @@ function BusinessOutlinkRow({ brand, label, placeholder, value, inputCls, onChan
           }
         }}
       />
-    </div>
-  );
-}
-
-function InstagramMediaPickerModal({ max = 1, selectedMedia = [], isDarkMode, onClose, onConfirm }) {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [media, setMedia] = useState([]);
-  const [picked, setPicked] = useState(() => {
-    const map = new Map();
-    for (const row of selectedMedia || []) {
-      if (row?.id) map.set(String(row.id), row);
-    }
-    return map;
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const result = await fetchInstagramMedia(40);
-        if (!cancelled) setMedia(result.media || []);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "게시물을 불러오지 못했습니다.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    return pushAndroidBackHandler(() => {
-      onClose?.();
-      return true;
-    });
-  }, [onClose]);
-
-  const toggle = (item) => {
-    const id = String(item?.id || "").trim();
-    const imageUrl = String(item?.mediaUrl || item?.thumbnailUrl || "").trim();
-    if (!id) return;
-    /* 캐러셀은 children URL, 단일은 mediaUrl — 파일 저장 없이 메타+URL만 보관 */
-    const children = (Array.isArray(item.children) ? item.children : [])
-      .map((c) => ({
-        id: String(c.id || "").trim(),
-        mediaUrl: String(c.mediaUrl || c.thumbnailUrl || "").trim(),
-        thumbnailUrl: String(c.thumbnailUrl || c.mediaUrl || "").trim(),
-        mediaType: String(c.mediaType || "IMAGE")
-      }))
-      .filter((c) => c.id && c.mediaUrl)
-      .slice(0, 20);
-    if (!imageUrl && !children.length) return;
-    setPicked((prev) => {
-      const next = new Map(prev);
-      if (next.has(id)) {
-        next.delete(id);
-        return next;
-      }
-      if (next.size >= max) {
-        window.alert(`세로 쇼케이스 페이지는 최대 ${max}장까지 선택할 수 있습니다.`);
-        return prev;
-      }
-      next.set(id, {
-        id,
-        mediaUrl: imageUrl || children[0]?.mediaUrl || "",
-        thumbnailUrl: String(item.thumbnailUrl || imageUrl || children[0]?.thumbnailUrl || "").trim(),
-        permalink: String(item.permalink || "").trim(),
-        caption: typeof item.caption === "string" ? item.caption : null,
-        mediaType: String(item.mediaType || "IMAGE"),
-        timestamp: typeof item.timestamp === "string" ? item.timestamp : null,
-        children
-      });
-      return next;
-    });
-  };
-
-  const panelCls = isDarkMode
-    ? "bg-slate-900 text-slate-100 border-slate-700"
-    : "bg-white text-slate-900 border-slate-200";
-
-  return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
-      <div className={`flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border sm:rounded-2xl ${panelCls}`}>
-        <div className="flex items-center justify-between border-b border-inherit px-4 py-3">
-          <div>
-            <p className="text-sm font-semibold">Instagram 게시물 선택</p>
-            <p className="text-[11px] opacity-70">
-              {picked.size}/{max}페이지 · 게시물당 사진 최대 20장 · VLUE 카드 표시
-            </p>
-          </div>
-          <button type="button" className="showcase-bgm-picker__yt-btn" onClick={onClose}>
-            닫기
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {loading ? (
-            <p className="py-8 text-center text-sm opacity-70">불러오는 중…</p>
-          ) : error ? (
-            <p className="py-8 text-center text-sm text-rose-500">{error}</p>
-          ) : media.length === 0 ? (
-            <p className="py-8 text-center text-sm opacity-70">표시할 게시물이 없습니다.</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {media.map((item) => {
-                const thumb = item.thumbnailUrl || item.mediaUrl || "";
-                const active = picked.has(String(item.id));
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`relative aspect-square overflow-hidden rounded-lg border-2 ${
-                      active ? "border-sky-500" : "border-transparent"
-                    }`}
-                    onClick={() => toggle(item)}
-                  >
-                    {thumb ? (
-                      <img src={thumb} alt="" className="h-full w-full object-cover" loading="lazy" />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center bg-slate-200 text-[10px] text-slate-600">
-                        {item.mediaType || "MEDIA"}
-                      </span>
-                    )}
-                    {active ? (
-                      <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-sky-500 text-white">
-                        <Check size={12} />
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <div className="border-t border-inherit p-3">
-          <button
-            type="button"
-            className="showcase-bgm-picker__yt-btn w-full"
-            disabled={loading || !!error}
-            onClick={() => onConfirm?.(Array.from(picked.values()).slice(0, max))}
-          >
-            선택 적용 ({picked.size})
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

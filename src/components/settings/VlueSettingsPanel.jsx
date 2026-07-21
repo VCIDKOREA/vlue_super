@@ -274,26 +274,14 @@ export default function VlueSettingsPanel({
 
   if (subView === "contactInfo") {
     return (
-      <SettingsSubpageShell title="전화번호 및 이메일" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
+      <SettingsSubpageShell title="전화번호" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
         <div className={`rounded-2xl border p-4 space-y-3 ${boxClass}`}>
           <div>
             <p className={`text-[11px] font-bold ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>휴대전화</p>
             <p className={`mt-1 text-[15px] font-bold ${headText}`}>{myPhone || "(등록된 번호 없음)"}</p>
           </div>
-          <SettingsDivider isDarkMode={isDarkMode} />
-          <div>
-            <p className={`text-[11px] font-bold ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>VLUE 가상 메일</p>
-            <p className={`mt-1 text-[15px] font-bold ${headText}`}>{myEmail}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => onSubView("vlueEmailSettings")}
-            className="mt-2 w-full rounded-xl bg-blue-600 py-2.5 text-[13px] font-black text-white"
-          >
-            VLUE 메일 설정
-          </button>
           <p className={`text-[11px] leading-relaxed ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-            가상 메일은 외부 메일로 즉시 포워딩됩니다. 휴대전화 번호 변경은 본인인증 후 고객센터를 통해 지원됩니다.
+            본인인증에 사용된 번호입니다. 번호 변경은 본인인증 후 고객센터를 통해 지원됩니다.
           </p>
         </div>
       </SettingsSubpageShell>
@@ -510,7 +498,7 @@ export default function VlueSettingsPanel({
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="VLUE ID 확인" value={getMemberHandle()} onClick={() => onSubView("vlueId")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
-          <SettingsRowButton label="전화번호 및 이메일" sublabel="VLUE 가상 메일 · 마스터 메일 연동" onClick={() => onSubView("contactInfo")} isDarkMode={isDarkMode} />
+          <SettingsRowButton label="전화번호" sublabel="본인인증 번호 · 변경 안내" onClick={() => onSubView("contactInfo")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton
             label="멤버십 등급 및 업그레이드"

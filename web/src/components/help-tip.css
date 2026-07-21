@@ -1,0 +1,53 @@
+.vlue-help-tip {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.vlue-help-tip__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: help;
+  line-height: 0;
+}
+
+.vlue-help-tip__btn:hover,
+.vlue-help-tip__btn:focus-visible {
+  color: #475569;
+  outline: none;
+}
+
+.vlue-help-tip[data-theme="dark"] .vlue-help-tip__btn {
+  color: #64748b;
+}
+
+.vlue-help-tip[data-theme="dark"] .vlue-help-tip__btn:hover,
+.vlue-help-tip[data-theme="dark"] .vlue-help-tip__btn:focus-visible {
+  color: #cbd5e1;
+}
+
+.vlue-help-tip__pop {
+  position: fixed;
+  z-index: 10050;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.02em;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
+  white-space: pre-line;
+}
