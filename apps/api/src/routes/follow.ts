@@ -164,6 +164,36 @@ followRoutes.put("/settings", requireUserHeader, async (c) => {
   return c.json({ ok: true, settings });
 });
 
+/** @handle → 유저 조회 (댓글 멘션) */
+followRoutes.get("/handle/:handle", async (c) => {
+  const raw = String(c.req.param("handle") || "")
+    .replace(/^@+/, "")
+    .trim();
+  if (!raw) return c.json({ ok: false, error: "handle required" }, 400);
+
+  const { prisma } = await import("../db/client.js");
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { publicHandle: raw },
+        { publicHandle: raw.toLowerCase() },
+        { publicHandle: { equals: raw, mode: "insensitive" } }
+      ],
+      status: "ACTIVE"
+    },
+    select: { id: true, publicHandle: true, legalName: true }
+  });
+  if (!user) return c.json({ ok: false, error: "user_not_found" }, 404);
+  return c.json({
+    ok: true,
+    user: {
+      id: user.id,
+      handle: user.publicHandle || "",
+      name: user.legalName || user.publicHandle || ""
+    }
+  });
+});
+
 /** 접근 제어가 적용된 프로필·쇼케이스 조회 */
 followRoutes.get("/profile/:userId", async (c) => {
   const viewerId = await resolveRequestUserId(c);

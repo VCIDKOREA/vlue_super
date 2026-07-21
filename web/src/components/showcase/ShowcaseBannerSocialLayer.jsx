@@ -53,6 +53,8 @@ export default function ShowcaseBannerSocialLayer({
   hideFooter = false
 }) {
   const style = card?.showcaseStyle || null;
+  const commentsEnabled = style?.commentsEnabled !== false;
+  const shareEnabled = style?.shareEnabled !== false;
   const slideId = String(slide?.id || "").trim();
   const rawOwner = firstText(card?.userId, card?.ownerUserId, String(card?.feedId || "").replace(/^user-/i, ""));
   const ownerUserId = OWNER_UUID_RE.test(rawOwner) ? rawOwner : "";
@@ -188,21 +190,27 @@ export default function ShowcaseBannerSocialLayer({
         liked={liked}
         likeCount={likeCount}
         commentCount={commentCount}
+        commentsEnabled={commentsEnabled}
+        shareEnabled={shareEnabled}
         onLike={() => void onLike()}
         onComment={() => setCommentOpen(true)}
         onShare={() => void onShare()}
         onMore={() => setMoreOpen(true)}
       />
-      <ShowcaseCommentSheet
-        open={commentOpen}
-        onClose={() => setCommentOpen(false)}
-        ownerUserId={ownerUserId}
-        slideId={slideId}
-        previewMode={localOnly}
-        seedComments={seedComments}
-        onCountChange={setCommentCount}
-        onToast={onToast}
-      />
+      {commentsEnabled ? (
+        <ShowcaseCommentSheet
+          open={commentOpen}
+          onClose={() => setCommentOpen(false)}
+          ownerUserId={ownerUserId}
+          slideId={slideId}
+          previewMode={localOnly}
+          seedComments={seedComments}
+          onCountChange={setCommentCount}
+          onToast={onToast}
+          onHashtag={() => setCommentOpen(false)}
+          onMention={() => setCommentOpen(false)}
+        />
+      ) : null}
       <ShowcaseMoreMenu
         open={moreOpen}
         onClose={() => setMoreOpen(false)}

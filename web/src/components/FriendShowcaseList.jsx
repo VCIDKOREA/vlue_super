@@ -202,6 +202,41 @@ export default function FriendShowcaseList({
     );
   }, []);
 
+  useEffect(() => {
+    const onHashtag = (e) => {
+      const tag = String(e?.detail?.tag || "")
+        .replace(/^#/, "")
+        .trim();
+      if (!tag) return;
+      setActiveTab("hashtag");
+      setHashtagQuery(tag);
+      setSheetLevel("full");
+    };
+    const onCaseUser = (e) => {
+      const userId = String(e?.detail?.userId || "").trim();
+      if (!userId) return;
+      setCaseArchiveUser(userId);
+      setSheetLevel("full");
+    };
+    try {
+      const pending = sessionStorage.getItem("vlue_pending_hashtag");
+      if (pending) {
+        sessionStorage.removeItem("vlue_pending_hashtag");
+        setActiveTab("hashtag");
+        setHashtagQuery(pending);
+        setSheetLevel("full");
+      }
+    } catch {
+      /* ignore */
+    }
+    window.addEventListener("vlue-open-hashtag-search", onHashtag);
+    window.addEventListener("vlue-open-case-user", onCaseUser);
+    return () => {
+      window.removeEventListener("vlue-open-hashtag-search", onHashtag);
+      window.removeEventListener("vlue-open-case-user", onCaseUser);
+    };
+  }, []);
+
   const reloadLists = useCallback(async () => {
     setListLoading(true);
     try {

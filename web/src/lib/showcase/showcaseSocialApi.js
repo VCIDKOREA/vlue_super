@@ -79,7 +79,11 @@ export async function postShowcaseComment(ownerUserId, body, opts = {}) {
       {
         method: "POST",
         headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ body, slideId: opts.slideId || "" })
+        body: JSON.stringify({
+          body,
+          slideId: opts.slideId || "",
+          parentId: opts.parentId || null
+        })
       }
     );
     const data = await res.json().catch(() => ({}));
@@ -89,6 +93,22 @@ export async function postShowcaseComment(ownerUserId, body, opts = {}) {
       error: data.error,
       status: res.status
     };
+  } catch (e) {
+    return { ok: false, error: e?.message };
+  }
+}
+
+/** @handle → userId 조회 (멘션) */
+export async function lookupUserByHandle(handle) {
+  const h = String(handle || "")
+    .replace(/^@+/, "")
+    .trim();
+  if (!h) return { ok: false };
+  try {
+    const res = await vlueAuthFetch(apiUrl(`/api/follow/handle/${encodeURIComponent(h)}`));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: data.error, status: res.status };
+    return { ok: true, user: data.user || null };
   } catch (e) {
     return { ok: false, error: e?.message };
   }

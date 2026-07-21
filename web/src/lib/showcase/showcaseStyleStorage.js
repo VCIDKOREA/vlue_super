@@ -125,6 +125,9 @@ export function createDefaultShowcaseStyle() {
     },
     /** 디지털인증명함 미사용 시 — 쇼케이스에 이름(상호) 송출 여부. 기본 켜짐 */
     showBroadcastName: true,
+    /** 소셜 레일 — 좋아요는 항상 활성, 댓글·공유만 끌 수 있음 */
+    commentsEnabled: true,
+    shareEnabled: true,
     /**
      * 세로 콘텐츠 페이지 (디지털인증명함 제외)
      * type: instagram | rich_custom | default
@@ -208,6 +211,8 @@ function mergeDeep(defaults, parsed) {
     tags: Array.isArray(parsed?.tags) ? parsed.tags : defaults.tags,
     privacyMode: parsed?.privacyMode === "public" ? "public" : defaults.privacyMode,
     showBroadcastName: parsed?.showBroadcastName === false ? false : true,
+    commentsEnabled: parsed?.commentsEnabled === false ? false : true,
+    shareEnabled: parsed?.shareEnabled === false ? false : true,
     pages: Array.isArray(parsed?.pages) ? parsed.pages.map(normalizeShowcasePage) : defaults.pages
   };
 }

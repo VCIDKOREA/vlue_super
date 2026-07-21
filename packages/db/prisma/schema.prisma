@@ -1563,6 +1563,11 @@ model ShowcaseComment {
   authorUserId String @map("author_user_id") @db.Uuid
   author       User   @relation("ShowcaseCommentAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
 
+  /// 답글 대상(루트 댓글). null = 최상위 댓글. 답글의 답글은 허용하지 않음(1단).
+  parentId String?          @map("parent_id") @db.Uuid
+  parent   ShowcaseComment? @relation("ShowcaseCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  ShowcaseComment[] @relation("ShowcaseCommentReplies")
+
   slideId String @default("") @map("slide_id") @db.VarChar(80)
   body    String  @map("body") @db.VarChar(1000)
 
@@ -1571,6 +1576,7 @@ model ShowcaseComment {
 
   @@index([ownerUserId, slideId, createdAt(sort: Desc)])
   @@index([authorUserId, createdAt(sort: Desc)])
+  @@index([parentId, createdAt(sort: Asc)])
   @@map("showcase_comments")
 }
 

@@ -103,10 +103,10 @@ export async function shareVlueContactInvite(opts = {}) {
 
   const copied = await copyInviteToClipboard(text);
   if (copied) {
-    window.alert("추천 문구가 복사되었습니다.\n카카오톡·문자 등 공유 앱에 붙여넣어 보내 주세요.");
+    window.alert("초대 링크가 복사되었습니다.\n원하는 곳에 붙여넣어 보내 주세요.");
     return { ok: true, channel: "clipboard" };
   }
 
-  window.prompt("아래 추천 문구를 복사해 카톡·문자로 보내 주세요.", text);
+  window.prompt("아래 초대 링크를 복사해 원하는 곳에 붙여넣어 주세요.", text);
   return { ok: true, channel: "prompt" };
 }

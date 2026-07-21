@@ -658,6 +658,37 @@ export default function ShowcaseStyleSettingsPanel({
               </label>
             ) : null}
 
+            <div className="showcase-profile-row showcase-profile-row--stack">
+              <span className="showcase-profile-row__label">
+                <span className="showcase-profile-row__label-text">
+                  반응 설정
+                  <HelpTip text="좋아요는 항상 켜집니다. 댓글·공유만 끌 수 있습니다." />
+                </span>
+              </span>
+              <label className="showcase-profile-row showcase-profile-row--toggle" style={{ padding: "8px 0 0" }}>
+                <span className="showcase-profile-row__label">좋아요</span>
+                <input type="checkbox" className="showcase-profile-switch" checked disabled readOnly aria-label="좋아요 항상 활성" />
+              </label>
+              <label className="showcase-profile-row showcase-profile-row--toggle" style={{ padding: "4px 0 0" }}>
+                <span className="showcase-profile-row__label">댓글</span>
+                <input
+                  type="checkbox"
+                  className="showcase-profile-switch"
+                  checked={config.commentsEnabled !== false}
+                  onChange={(e) => persist({ commentsEnabled: e.target.checked })}
+                />
+              </label>
+              <label className="showcase-profile-row showcase-profile-row--toggle" style={{ padding: "4px 0 0" }}>
+                <span className="showcase-profile-row__label">공유</span>
+                <input
+                  type="checkbox"
+                  className="showcase-profile-switch"
+                  checked={config.shareEnabled !== false}
+                  onChange={(e) => persist({ shareEnabled: e.target.checked })}
+                />
+              </label>
+            </div>
+
             <ProfileRow label="#해시태그" help={isPaid ? "검색용 · 공백으로 구분" : "유료회원만 해시태그를 등록할 수 있습니다."}>
               <input
                 className={`showcase-profile-input ${inputCls}`}

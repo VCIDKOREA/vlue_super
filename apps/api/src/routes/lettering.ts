@@ -248,7 +248,8 @@ letteringRoutes.post("/showcase/social/:ownerUserId/comments", requireUserHeader
     ownerUserId,
     authorUserId: me,
     body: body?.body,
-    slideId: body?.slideId
+    slideId: body?.slideId,
+    parentId: body?.parentId
   });
   if (!result.ok) return c.json({ ok: false, error: result.error }, result.status);
   return c.json({ ok: true, comment: result.comment });

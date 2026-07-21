@@ -2,11 +2,14 @@ import { Heart, MessageCircle, Send, MoreHorizontal } from "lucide-react";
 
 /**
  * 쇼케이스 배너 우하단 액션 레일 — 좋아요 · 댓글 · 공유(비행기) · 더보기
+ * 좋아요는 항상 노출. 댓글·공유는 등록 설정으로 숨길 수 있음.
  */
 export default function ShowcaseSocialRail({
   liked = false,
   likeCount = 0,
   commentCount = 0,
+  commentsEnabled = true,
+  shareEnabled = true,
   onLike,
   onComment,
   onShare,
@@ -30,29 +33,33 @@ export default function ShowcaseSocialRail({
         <Heart size={22} strokeWidth={2.2} fill={liked ? "currentColor" : "none"} aria-hidden />
         {likeLabel ? <span className="showcase-social-rail__count">{likeLabel}</span> : null}
       </button>
-      <button
-        type="button"
-        className="showcase-social-rail__btn"
-        aria-label="댓글"
-        onClick={(e) => {
-          e.stopPropagation();
-          onComment?.();
-        }}
-      >
-        <MessageCircle size={22} strokeWidth={2.2} aria-hidden />
-        {commentLabel ? <span className="showcase-social-rail__count">{commentLabel}</span> : null}
-      </button>
-      <button
-        type="button"
-        className="showcase-social-rail__btn"
-        aria-label="공유"
-        onClick={(e) => {
-          e.stopPropagation();
-          onShare?.();
-        }}
-      >
-        <Send size={22} strokeWidth={2.2} aria-hidden />
-      </button>
+      {commentsEnabled ? (
+        <button
+          type="button"
+          className="showcase-social-rail__btn"
+          aria-label="댓글"
+          onClick={(e) => {
+            e.stopPropagation();
+            onComment?.();
+          }}
+        >
+          <MessageCircle size={22} strokeWidth={2.2} aria-hidden />
+          {commentLabel ? <span className="showcase-social-rail__count">{commentLabel}</span> : null}
+        </button>
+      ) : null}
+      {shareEnabled ? (
+        <button
+          type="button"
+          className="showcase-social-rail__btn"
+          aria-label="공유"
+          onClick={(e) => {
+            e.stopPropagation();
+            onShare?.();
+          }}
+        >
+          <Send size={22} strokeWidth={2.2} aria-hidden />
+        </button>
+      ) : null}
       <button
         type="button"
         className="showcase-social-rail__btn"

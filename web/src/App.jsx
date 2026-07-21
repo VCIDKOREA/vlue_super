@@ -2819,6 +2819,57 @@ function App() {
     [activeTab, navigate]
   );
 
+  useEffect(() => {
+    const onHashtag = (e) => {
+      const tag = String(e?.detail?.tag || "")
+        .replace(/^#/, "")
+        .trim();
+      if (!tag) return;
+      try {
+        sessionStorage.setItem("vlue_pending_hashtag", tag);
+      } catch {
+        /* ignore */
+      }
+      setBottomToast(`#${tag} 검색`);
+      window.setTimeout(() => setBottomToast(""), 2200);
+      if (page !== "main") {
+        navigate({ nextPage: "main", nextTab: activeTab, nextRoomId: null });
+      }
+    };
+    const onMention = async (e) => {
+      const handle = String(e?.detail?.handle || "")
+        .replace(/^@+/, "")
+        .trim();
+      if (!handle) return;
+      try {
+        const { lookupUserByHandle } = await import("./lib/showcase/showcaseSocialApi.js");
+        const res = await lookupUserByHandle(handle);
+        if (!res.ok || !res.user?.id) {
+          setBottomToast(`@${handle} 회원을 찾지 못했습니다.`);
+          window.setTimeout(() => setBottomToast(""), 2400);
+          return;
+        }
+        window.dispatchEvent(
+          new CustomEvent("vlue-open-case-user", { detail: { userId: res.user.id, handle } })
+        );
+        setBottomToast(`@${handle}`);
+        window.setTimeout(() => setBottomToast(""), 1800);
+        if (page !== "main") {
+          navigate({ nextPage: "main", nextTab: activeTab, nextRoomId: null });
+        }
+      } catch {
+        setBottomToast("회원 조회에 실패했습니다.");
+        window.setTimeout(() => setBottomToast(""), 2400);
+      }
+    };
+    window.addEventListener("vlue-open-hashtag-search", onHashtag);
+    window.addEventListener("vlue-open-member-by-handle", onMention);
+    return () => {
+      window.removeEventListener("vlue-open-hashtag-search", onHashtag);
+      window.removeEventListener("vlue-open-member-by-handle", onMention);
+    };
+  }, [page, activeTab, navigate]);
+
   const shareMemoToChat = useCallback(
     (memo) => {
       if (!memo) return;

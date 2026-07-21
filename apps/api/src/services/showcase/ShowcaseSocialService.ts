@@ -75,6 +75,7 @@ export async function getShowcaseSocialSummary(opts: {
     comments: comments.map((c) => ({
       id: c.id,
       body: c.body,
+      parentId: c.parentId || null,
       createdAt: c.createdAt.toISOString(),
       author: {
         id: c.author.id,
@@ -133,6 +134,7 @@ export async function listShowcaseComments(opts: {
   return rows.map((c) => ({
     id: c.id,
     body: c.body,
+    parentId: c.parentId || null,
     createdAt: c.createdAt.toISOString(),
     author: {
       id: c.author.id,
@@ -147,6 +149,7 @@ export async function createShowcaseComment(opts: {
   authorUserId: string;
   body: string;
   slideId?: string | null;
+  parentId?: string | null;
 }) {
   const body = String(opts.body || "").trim().slice(0, COMMENT_MAX);
   if (!body) return { ok: false as const, error: "댓글 내용을 입력해 주세요.", status: 400 as const };
@@ -155,12 +158,37 @@ export async function createShowcaseComment(opts: {
   }
 
   const slideId = slideKey(opts.slideId);
+  const parentId = String(opts.parentId || "").trim() || null;
+
+  if (parentId) {
+    const parent = await prisma.showcaseComment.findFirst({
+      where: {
+        id: parentId,
+        ownerUserId: opts.ownerUserId,
+        slideId,
+        deletedAt: null
+      },
+      select: { id: true, parentId: true }
+    });
+    if (!parent) {
+      return { ok: false as const, error: "답글 대상 댓글을 찾을 수 없습니다.", status: 404 as const };
+    }
+    if (parent.parentId) {
+      return {
+        ok: false as const,
+        error: "답글에는 다시 답글을 달 수 없습니다. 원댓글에 답글해 주세요.",
+        status: 400 as const
+      };
+    }
+  }
+
   const row = await prisma.showcaseComment.create({
     data: {
       ownerUserId: opts.ownerUserId,
       authorUserId: opts.authorUserId,
       slideId,
-      body
+      body,
+      parentId
     },
     include: {
       author: { select: { id: true, publicHandle: true, legalName: true } }
@@ -172,6 +200,7 @@ export async function createShowcaseComment(opts: {
     comment: {
       id: row.id,
       body: row.body,
+      parentId: row.parentId || null,
       createdAt: row.createdAt.toISOString(),
       author: {
         id: row.author.id,

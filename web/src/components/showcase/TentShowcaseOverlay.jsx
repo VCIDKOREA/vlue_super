@@ -143,8 +143,14 @@ export default function TentShowcaseOverlay({
 
   const showLinkToast = useCallback(
     (msg) => {
-      onToast?.(msg);
-      setLinkToast(msg);
+      const text = String(msg || "").trim();
+      if (!text) return;
+      /* App onToast 가 있으면 그쪽만 — 로컬 linkToast와 이중 표시 방지 */
+      if (typeof onToast === "function") {
+        onToast(text);
+        return;
+      }
+      setLinkToast(text);
       window.setTimeout(() => setLinkToast(""), 2200);
     },
     [onToast]

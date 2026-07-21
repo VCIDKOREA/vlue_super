@@ -76,25 +76,28 @@ export default function VlueStoreShopSection({ isPaid = false, onManageProducts,
   const canPay = enterpriseRole === "NONE" || canEnterprisePurchase(enterpriseRole);
   const isStaff = enterpriseRole === "STAFF";
 
+  const notify = (text) => {
+    const msg = String(text || "").trim();
+    if (!msg) return;
+    if (typeof onToast === "function") {
+      onToast(msg);
+      return;
+    }
+    setCartMsg(msg);
+    setTimeout(() => setCartMsg(""), 5000);
+  };
+
   const onProductAction = async (p) => {
     if (enterpriseRole === "NONE") {
       setCheckoutProduct(p);
       return;
     }
     if (canPay) {
-      const ok = await addProductToEnterpriseCart(p, (m) => {
-        setCartMsg(m);
-        onToast?.(m);
-      });
-      if (ok) setTimeout(() => setCartMsg(""), 5000);
+      await addProductToEnterpriseCart(p, notify);
       return;
     }
     if (isStaff) {
-      const ok = await requestEnterprisePurchase(p, (m) => {
-        setCartMsg(m);
-        onToast?.(m);
-      });
-      if (ok) setTimeout(() => setCartMsg(""), 5000);
+      await requestEnterprisePurchase(p, notify);
     }
   };
 
@@ -103,10 +106,7 @@ export default function VlueStoreShopSection({ isPaid = false, onManageProducts,
   const onPaid = (p) => {
     const price = p.salePriceKrw != null ? p.salePriceKrw : p.priceKrw;
     const total = price + (p.shippingFeeKrw || 0);
-    const msg = `「${p.name}」 결제가 완료되었습니다. (${formatKrwDisplay(total)})`;
-    setCartMsg(msg);
-    onToast?.(msg);
-    setTimeout(() => setCartMsg(""), 6000);
+    notify(`「${p.name}」 결제가 완료되었습니다. (${formatKrwDisplay(total)})`);
     fetchShopProducts({ sellerUserId: getServerUserId(), status: "on_sale" })
       .then((rows) =>
         setProducts(
@@ -199,10 +199,7 @@ export default function VlueStoreShopSection({ isPaid = false, onManageProducts,
                         onClick={async () => {
                           try {
                             await addProductToCart(p, { sellerUserId: p.sellerUserId || getServerUserId() });
-                            const m = `「${p.name}」을(를) 장바구니에 담았습니다.`;
-                            setCartMsg(m);
-                            onToast?.(m);
-                            setTimeout(() => setCartMsg(""), 5000);
+                            notify(`「${p.name}」을(를) 장바구니에 담았습니다.`);
                           } catch (e) {
                             onToast?.(isVlueNetworkError(e) ? e.message : e?.message || "장바구니 담기 실패");
                           }

@@ -230,7 +230,11 @@ export default function LetteringIncomingNotification({
     (message) => {
       const msg = String(message || "").trim();
       if (!msg) return;
-      onToast?.(msg);
+      /* App onToast 가 있으면 그쪽만 — 로컬 guideToast와 이중 표시 방지 */
+      if (typeof onToast === "function") {
+        onToast(msg);
+        return;
+      }
       setGuideToast(msg);
     },
     [onToast]

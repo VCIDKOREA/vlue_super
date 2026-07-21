@@ -60,8 +60,13 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
     : "border-gray-200 bg-white text-gray-900";
 
   const toast = (text) => {
-    fp.setMsg(text);
-    onToast?.(text);
+    const msg = String(text || "").trim();
+    if (!msg) return;
+    if (typeof onToast === "function") {
+      onToast(msg);
+      return;
+    }
+    fp.setMsg(msg);
     setTimeout(() => fp.setMsg(""), 3200);
   };
 
