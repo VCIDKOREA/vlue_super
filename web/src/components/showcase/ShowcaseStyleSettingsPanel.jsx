@@ -35,6 +35,7 @@ import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../../lib/letteringBizcar
 import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
 import { syncShowcaseTagsToServer, fetchShowcaseSearchPrivacy, saveShowcaseSearchPrivacy } from "../../lib/showcase/showcaseTagsApi.js";
+import { checkShowcaseLinkUri, WEB_RISK_BLOCK_MESSAGE } from "../../lib/showcase/webRiskLinkCheck.js";
 import { VLUE_SHOWCASE } from "../../lib/vlueBrandSpaces.js";
 import ShowcasePremiumGateModal from "./ShowcasePremiumGateModal.jsx";
 import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
@@ -957,9 +958,11 @@ export default function ShowcaseStyleSettingsPanel({
                         })
                       }
                     />
-                    <p className="showcase-profile-block__sub mt-3">링크</p>
-                    <p className="px-1 pb-1 text-[11px] text-slate-500">
-                      링크 이름 · URL로 홍보할 수 있습니다. (상품·모임·자유 링크) 유해·불법 링크는 삭제됩니다.
+                    <p className="showcase-profile-block__sub mt-3">
+                      <span className="showcase-profile-row__label-text">
+                        링크
+                        <HelpTip text="링크 이름 · URL로 홍보할 수 있습니다. (상품·모임·자유 링크) 유해·불법 링크는 등록할 수 없으며, 등록 시 자동으로 차단됩니다." />
+                      </span>
                     </p>
                     <BizLinkEditor
                       links={
@@ -968,6 +971,8 @@ export default function ShowcaseStyleSettingsPanel({
                           : config.commercial.products || []
                       }
                       inputCls={inputCls}
+                      isDarkMode={isDarkMode}
+                      onToast={onToast}
                       onChange={(links) => persist({ commercial: { links, products: links } })}
                     />
                     <label className="showcase-style-settings__check mt-3">
@@ -1288,42 +1293,131 @@ function InstagramMediaPickerModal({ max = 1, selectedMedia = [], isDarkMode, on
   );
 }
 
-function BizLinkEditor({ links = [], inputCls, onChange }) {
+function stripUrlSchemeForInput(raw) {
+  return String(raw || "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^\/\//, "");
+}
+
+function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = false }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
-  const add = () => {
-    if (!name.trim() || !url.trim()) return;
-    onChange([...links, { id: `link-${Date.now()}`, name: name.trim(), url: url.trim() }]);
-    setName("");
-    setUrl("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const add = async () => {
+    const linkName = name.trim();
+    const hostPath = stripUrlSchemeForInput(url);
+    if (!linkName || !hostPath || busy) return;
+    const linkUrl = `https://${hostPath}`;
+    setError("");
+    setBusy(true);
+    try {
+      const check = await checkShowcaseLinkUri(linkUrl);
+      if (!check.ok || !check.safe) {
+        const msg = check.error || WEB_RISK_BLOCK_MESSAGE;
+        setError(msg);
+        onToast?.(msg);
+        return;
+      }
+      onChange([
+        ...links,
+        {
+          id: `link-${Date.now()}`,
+          name: linkName,
+          url: String(check.uri || linkUrl).trim()
+        }
+      ]);
+      setName("");
+      setUrl("");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "링크 검사에 실패했습니다.";
+      setError(msg);
+      onToast?.(msg);
+    } finally {
+      setBusy(false);
+    }
   };
+
   return (
-    <div>
-      <input
-        className={`showcase-style-settings__input w-full ${inputCls}`}
-        placeholder="링크 이름"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
-      <input
-        className={`showcase-style-settings__input mt-2 w-full ${inputCls}`}
-        placeholder="링크 URL"
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-      />
-      <button type="button" className="showcase-bgm-picker__yt-btn mt-2 w-full" onClick={add}>
-        링크 추가
+    <div className={`showcase-biz-link-editor${isDarkMode ? " showcase-biz-link-editor--dark" : ""}`}>
+      <div className="showcase-biz-link-editor__card">
+        <label className="showcase-biz-link-editor__field">
+          <span className="showcase-biz-link-editor__label">링크 이름</span>
+          <input
+            className={`showcase-biz-link-editor__input ${inputCls}`}
+            placeholder="예: 스마트스토어 · 모임 안내"
+            value={name}
+            disabled={busy}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (error) setError("");
+            }}
+          />
+        </label>
+        <div className="showcase-biz-link-editor__divider" aria-hidden />
+        <label className="showcase-biz-link-editor__field">
+          <span className="showcase-biz-link-editor__label">링크 URL</span>
+          <div className="showcase-biz-link-editor__url-row">
+            <span className="showcase-biz-link-editor__url-prefix" aria-hidden>
+              https://
+            </span>
+            <input
+              className={`showcase-biz-link-editor__input showcase-biz-link-editor__input--url ${inputCls}`}
+              placeholder="example.com/page"
+              value={url}
+              disabled={busy}
+              onChange={(e) => {
+                setUrl(stripUrlSchemeForInput(e.target.value));
+                if (error) setError("");
+              }}
+              onPaste={(e) => {
+                const pasted = e.clipboardData?.getData("text") || "";
+                if (!/^https?:\/\//i.test(pasted) && !/^\/\//.test(pasted.trim())) return;
+                e.preventDefault();
+                setUrl(stripUrlSchemeForInput(pasted));
+                if (error) setError("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void add();
+                }
+              }}
+            />
+          </div>
+        </label>
+      </div>
+      {error ? (
+        <p className="showcase-biz-link-editor__error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <button
+        type="button"
+        className="showcase-biz-link-editor__add"
+        disabled={busy || !name.trim() || !stripUrlSchemeForInput(url)}
+        onClick={() => void add()}
+      >
+        <Plus size={15} strokeWidth={2.4} aria-hidden />
+        {busy ? "안전성 검사 중…" : "링크 추가"}
       </button>
-      <ul className="showcase-biz-list">
-        {links.map((p) => (
-          <li key={p.id}>
-            {p.name}
-            <button type="button" onClick={() => onChange(links.filter((x) => x.id !== p.id))}>
-              ×
-            </button>
-          </li>
-        ))}
-      </ul>
+      {links.length ? (
+        <ul className="showcase-biz-list">
+          {links.map((p) => (
+            <li key={p.id}>
+              <span className="showcase-biz-list__meta">
+                <span className="showcase-biz-list__name">{p.name}</span>
+                {p.url ? <span className="showcase-biz-list__url">{p.url}</span> : null}
+              </span>
+              <button type="button" aria-label={`${p.name} 삭제`} onClick={() => onChange(links.filter((x) => x.id !== p.id))}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
