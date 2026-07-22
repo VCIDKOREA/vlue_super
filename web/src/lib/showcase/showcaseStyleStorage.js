@@ -9,6 +9,11 @@ import {
 
 export const SHOWCASE_STYLE_STORAGE_KEY = "vlue_showcase_style_v1";
 export const SHOWCASE_STYLE_CHANGED_EVENT = "vlue-showcase-style-changed";
+/** 메인 송출(통화·홈 미리보기) 전용 — 편집용 설정과 분리해 덮어쓰기 방지 */
+export const SHOWCASE_LIVE_STYLE_STORAGE_KEY = "vlue_showcase_live_style_v1";
+export const SHOWCASE_LIVE_STYLE_CHANGED_EVENT = "vlue-showcase-live-style-changed";
+/** editor | mycase — hydrate 가 설정 미리보기를 덮어쓰지 않게 */
+export const SHOWCASE_LIVE_SOURCE_STORAGE_KEY = "vlue_showcase_live_source_v1";
 /** 마이페이지·홈에서 쇼케이스 설정 패널 열기 */
 export const SHOWCASE_OPEN_SETTINGS_EVENT = "vlue-showcase-open-settings";
 /** 한 쇼케이스 페이지당 사진 한도 */
@@ -84,7 +89,7 @@ export function createDefaultShowcaseStyle() {
       menuItems: [],
       /** @deprecated products → links */
       products: [],
-      /** 홍보용 자유 링크 { id, name, url } */
+      /** 홍보용 자유 링크 { id, name, url, logoUrl? } */
       links: [],
       outlinks: {
         instagram: "",
@@ -169,7 +174,8 @@ function mergeDeep(defaults, parsed) {
             .map((row, i) => ({
               id: String(row.id || `link-${i}`),
               name: String(row.name || "").trim(),
-              url: String(row.url || "").trim()
+              url: String(row.url || "").trim(),
+              logoUrl: String(row.logoUrl || row.imageUrl || "").trim()
             }));
         }
         const legacy = Array.isArray(parsed?.commercial?.products) ? parsed.commercial.products : [];
@@ -178,7 +184,8 @@ function mergeDeep(defaults, parsed) {
           .map((row, i) => ({
             id: String(row.id || `link-${i}`),
             name: String(row.name || "").trim(),
-            url: String(row.url || "").trim()
+            url: String(row.url || "").trim(),
+            logoUrl: String(row.logoUrl || row.imageUrl || "").trim()
           }));
       })(),
       menuItems: parsed?.commercial?.menuItems || defaults.commercial.menuItems
@@ -221,28 +228,7 @@ export function readShowcaseStyle() {
   try {
     const raw = localStorage.getItem(SHOWCASE_STYLE_STORAGE_KEY);
     if (!raw) return createDefaultShowcaseStyle();
-    const parsed = JSON.parse(raw);
-    let merged = mergeDeep(createDefaultShowcaseStyle(), parsed);
-    if (merged.bgm.customUrl) {
-      merged.bgm.mode = merged.bgm.mode === "custom" ? "preset" : merged.bgm.mode;
-    }
-    /* 과거 데모 기본값 정리 */
-    const feed = merged.platformFeed || {};
-    if (feed.instagramHandle === "@vlue.official" && !feed.instagramProfileUrl) {
-      feed.instagramHandle = "";
-    }
-    if (feed.kakaoProfileTitle === "VLUE 프로필" && !feed.kakaoProfileUrl) {
-      feed.kakaoProfileTitle = "";
-    }
-    merged.platformFeed = feed;
-    /* pages 키가 없을 때만 레거시 이관 (빈 배열은 의도된 상태) */
-    if (!Object.prototype.hasOwnProperty.call(parsed, "pages")) {
-      merged.pages = migrateLegacyPages(merged);
-    } else if (Array.isArray(merged.pages)) {
-      merged.pages = stripInstagramContentPages(merged.pages);
-    }
-    merged = syncLegacyFieldsFromPages(merged);
-    return merged;
+    return normalizeStoredStyle(JSON.parse(raw));
   } catch {
     return createDefaultShowcaseStyle();
   }
@@ -257,9 +243,107 @@ export function writeShowcaseStyle(next, opts = {}) {
     ? { ...base, pages: next.pages.map(normalizeShowcasePage) }
     : base;
   const merged = syncLegacyFieldsFromPages(withPages);
-  localStorage.setItem(SHOWCASE_STYLE_STORAGE_KEY, JSON.stringify(merged));
+  try {
+    localStorage.setItem(SHOWCASE_STYLE_STORAGE_KEY, JSON.stringify(merged));
+  } catch (e) {
+    const quota =
+      e?.name === "QuotaExceededError" ||
+      e?.code === 22 ||
+      /quota/i.test(String(e?.message || ""));
+    console.warn("[showcase-style] localStorage write failed", e);
+    if (quota) {
+      throw new Error("저장 용량이 부족합니다. 사진·로고 용량을 줄인 뒤 다시 시도해 주세요.");
+    }
+    throw e instanceof Error ? e : new Error("쇼케이스 설정 저장에 실패했습니다.");
+  }
   window.dispatchEvent(new CustomEvent(SHOWCASE_STYLE_CHANGED_EVENT, { detail: merged }));
   return merged;
+}
+
+function normalizeStoredStyle(parsed) {
+  let merged = mergeDeep(createDefaultShowcaseStyle(), parsed);
+  if (merged.bgm.customUrl) {
+    merged.bgm.mode = merged.bgm.mode === "custom" ? "preset" : merged.bgm.mode;
+  }
+  const feed = merged.platformFeed || {};
+  if (feed.instagramHandle === "@vlue.official" && !feed.instagramProfileUrl) {
+    feed.instagramHandle = "";
+  }
+  if (feed.kakaoProfileTitle === "VLUE 프로필" && !feed.kakaoProfileUrl) {
+    feed.kakaoProfileTitle = "";
+  }
+  merged.platformFeed = feed;
+  if (!Object.prototype.hasOwnProperty.call(parsed, "pages")) {
+    merged.pages = migrateLegacyPages(merged);
+  } else if (Array.isArray(merged.pages)) {
+    merged.pages = stripInstagramContentPages(merged.pages);
+  }
+  return syncLegacyFieldsFromPages(merged);
+}
+
+/** 메인 송출 스타일만 읽기 (없으면 null) */
+export function readLiveShowcaseStyle() {
+  try {
+    const raw = localStorage.getItem(SHOWCASE_LIVE_STYLE_STORAGE_KEY);
+    if (!raw) return null;
+    return normalizeStoredStyle(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 통화·홈 빅푸시 미리보기용 — 메인 송출(라이브)만 사용.
+ * 편집 초안(editor)으로 폴백하지 않음: 마이케이스 삭제 후에도 송출이 남지 않게 한다.
+ */
+export function readActiveShowcaseStyle() {
+  return readLiveShowcaseStyle() || createDefaultShowcaseStyle();
+}
+
+/** @returns {{ source: 'editor'|'mycase', at: number }|null} */
+export function readLiveShowcaseSource() {
+  try {
+    const raw = localStorage.getItem(SHOWCASE_LIVE_SOURCE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || (parsed.source !== "editor" && parsed.source !== "mycase")) return null;
+    return { source: parsed.source, at: Number(parsed.at) || 0 };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 마이케이스 메인 송출 → 통화용 라이브 스타일만 갱신 (편집 설정 유지)
+ * @param {object} next
+ * @param {{ source?: 'editor'|'mycase' }} [opts]
+ */
+export function writeLiveShowcaseStyle(next, opts = {}) {
+  const merged = normalizeStoredStyle(next && typeof next === "object" ? next : {});
+  const source = opts.source === "mycase" ? "mycase" : "editor";
+  try {
+    localStorage.setItem(SHOWCASE_LIVE_STYLE_STORAGE_KEY, JSON.stringify(merged));
+    localStorage.setItem(
+      SHOWCASE_LIVE_SOURCE_STORAGE_KEY,
+      JSON.stringify({ source, at: Date.now() })
+    );
+  } catch (e) {
+    console.warn("[showcase-live-style] localStorage write failed", e);
+    return null;
+  }
+  /* 편집용 SHOWCASE_STYLE_CHANGED 는 쏘지 않음 — 마이케이스 목록 무한 리로드 방지 */
+  window.dispatchEvent(new CustomEvent(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, { detail: merged }));
+  return merged;
+}
+
+export function clearLiveShowcaseStyle() {
+  try {
+    localStorage.removeItem(SHOWCASE_LIVE_STYLE_STORAGE_KEY);
+    localStorage.removeItem(SHOWCASE_LIVE_SOURCE_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new CustomEvent(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, { detail: null }));
 }
 
 export function getStyleBgmMode(styleType) {

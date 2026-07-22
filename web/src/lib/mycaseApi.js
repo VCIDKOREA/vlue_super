@@ -146,7 +146,7 @@ export async function createMycase(body) {
 
 /**
  * 쇼케이스 수정/등록 시 기존 데이터 유실 없이 아카이브로 누적
- * @param {{ title: string, thumbnailUrl?: string|null, payloadJson?: object, isPublic?: boolean, supersedesCaseId?: string|null }} body
+ * @param {{ title: string, thumbnailUrl?: string|null, payloadJson?: object, isPublic?: boolean, supersedesCaseId?: string|null, promoteToMain?: boolean }} body
  */
 export async function archiveShowcaseToMycase(body) {
   try {
@@ -157,7 +157,7 @@ export async function archiveShowcaseToMycase(body) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return errPayload(data, "archive_failed");
-    return { ok: true, item: data.item };
+    return { ok: true, item: data.item, policy: data.policy || null };
   } catch (e) {
     return networkFail(e);
   }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight, ChevronUp, HelpCircle, Music2, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, HelpCircle, ImagePlus, Music2, Plus, Trash2, X } from "lucide-react";
 import BackButton from "../common/BackButton";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import { requiresPremium } from "../../lib/showcase/showcaseStylePermissions.js";
@@ -8,9 +8,11 @@ import {
   SHOWCASE_STYLE_CHANGED_EVENT,
   readShowcaseStyle,
   writeShowcaseStyle,
+  writeLiveShowcaseStyle,
   parseShowcaseTagsInput
 } from "../../lib/showcase/showcaseStyleStorage.js";
 import { archiveShowcaseToMycase } from "../../lib/mycaseApi.js";
+import { applyMycaseItemToLiveBroadcast } from "../../lib/showcase/syncMycaseLiveBroadcast.js";
 import {
   extractShowcaseArchiveTitle,
   extractShowcaseCoverUrl
@@ -40,6 +42,7 @@ import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
 import { syncShowcaseTagsToServer, fetchShowcaseSearchPrivacy, saveShowcaseSearchPrivacy } from "../../lib/showcase/showcaseTagsApi.js";
 import { checkShowcaseLinkUri, WEB_RISK_BLOCK_MESSAGE } from "../../lib/showcase/webRiskLinkCheck.js";
+import { readImageFileAsDataUrl } from "../../lib/readImageFile.js";
 import { VLUE_SHOWCASE } from "../../lib/vlueBrandSpaces.js";
 import ShowcasePremiumGateModal from "./ShowcasePremiumGateModal.jsx";
 import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
@@ -234,10 +237,23 @@ export default function ShowcaseStyleSettingsPanel({
     };
   }, []);
 
+  /* 설정 진입 시 편집본 → 홈/통화 미리보기 동기화 (삭제 후에도 데모·옛 송출이 남지 않게) */
+  useEffect(() => {
+    try {
+      writeLiveShowcaseStyle(readShowcaseStyle());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const card = useMemo(() => {
     const base = resolveVlueShowcaseCard({ membershipTier, previewExample: true });
-    return applyShowcaseStyleToCard({ ...base, showcaseStyle: config }, membershipTier);
-  }, [membershipTier, config]);
+    /* 설정 미리보기는 편집 초안(config)만 사용 — 라이브/마이케이스와 섞지 않음 */
+    return applyShowcaseStyleToCard(base, membershipTier, {
+      style: config,
+      digitalCardActive: includeDigitalCard
+    });
+  }, [membershipTier, config, includeDigitalCard]);
 
   const persist = useCallback((patch) => {
     setConfig((prev) => {
@@ -266,10 +282,17 @@ export default function ShowcaseStyleSettingsPanel({
       if (patch.tags) next.tags = patch.tags;
       if (Array.isArray(patch.pages)) next.pages = patch.pages.map(normalizeShowcasePage);
       next = clampShowcasePages(next, membershipTier, { includeDigitalCard });
-      writeShowcaseStyle(next);
+      try {
+        writeShowcaseStyle(next);
+        /* 편집 즉시 메인 미리보기 반영 (마이케이스 게시물 삭제는 아님) */
+        writeLiveShowcaseStyle(next);
+      } catch (e) {
+        onToast?.(e instanceof Error ? e.message : "쇼케이스 설정 저장에 실패했습니다.");
+        return prev;
+      }
       return next;
     });
-  }, [membershipTier, includeDigitalCard]);
+  }, [membershipTier, includeDigitalCard, onToast]);
 
   const persistPages = useCallback(
     (nextPages) => {
@@ -349,8 +372,10 @@ export default function ShowcaseStyleSettingsPanel({
   };
 
   const removePage = (pageId) => {
-    persistPages(pages.filter((p) => p.id !== pageId));
-    if (expandedPageId === pageId) setExpandedPageId("");
+    const nextPages = pages.filter((p) => p.id !== pageId);
+    persistPages(nextPages);
+    if (expandedPageId === pageId) setExpandedPageId(nextPages[0]?.id || "");
+    onToast?.("편집에서 페이지를 제거했습니다. 미리보기에 바로 반영됩니다. (마이케이스 게시물은 그대로입니다)");
   };
 
   const onTagsChange = (raw) => {
@@ -420,10 +445,12 @@ export default function ShowcaseStyleSettingsPanel({
   const commitApply = useCallback(() => {
     const latest = readShowcaseStyle();
     writeShowcaseStyle(latest);
+    /* 편집 초안과 별도로 — 홈/통화 미리보기에 즉시 송출 */
+    writeLiveShowcaseStyle(latest);
     if (isPaid) {
       void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));
     }
-    /* 마이케이스 아카이브 — 덮어쓰지 않고 새 게시물로 누적 */
+    /* 마이케이스에 새 게시물로 쌓고, 메인 송출로 자동 반영 (기존 게시물은 삭제하지 않음) */
     try {
       const cover = extractShowcaseCoverUrl(latest);
       const title = extractShowcaseArchiveTitle(latest);
@@ -431,10 +458,17 @@ export default function ShowcaseStyleSettingsPanel({
         title,
         thumbnailUrl: cover || null,
         payloadJson: { style: latest, source: "showcase_apply" },
-        isPublic: latest?.privacyMode !== "friend_only"
+        isPublic: latest?.privacyMode !== "friend_only",
+        promoteToMain: true
       }).then((res) => {
-        if (res?.ok) onToast?.("적용 · 마이케이스에 저장되었습니다.");
-        else onToast?.("적용되었습니다.");
+        if (res?.ok && res.item) {
+          applyMycaseItemToLiveBroadcast(res.item);
+          onToast?.("적용 · 마이케이스 저장 · 메인 송출 반영");
+        } else if (res?.ok) {
+          onToast?.("적용 · 마이케이스에 저장되었습니다.");
+        } else {
+          onToast?.(res?.message || "적용되었습니다. (마이케이스 저장 실패)");
+        }
       });
     } catch {
       onToast?.("적용되었습니다.");
@@ -456,7 +490,7 @@ export default function ShowcaseStyleSettingsPanel({
           <BackButton variant="inline" onBack={onBack} isDarkMode={isDarkMode} />
           <div className="min-w-0 flex-1">
             <p className={`text-[17px] font-black ${headText}`}>{VLUE_SHOWCASE.nameKo}</p>
-            <p className={`text-[11px] ${subText}`}>페이지마다 따로 · 공통은 음악·검색</p>
+            <p className={`text-[11px] ${subText}`}>적용 → 마이케이스 저장 · 자동 송출</p>
           </div>
           <button type="button" className="showcase-style-settings__done-btn" onClick={commitApply}>
             완료
@@ -545,6 +579,8 @@ export default function ShowcaseStyleSettingsPanel({
                         />
                         <p className="showcase-page-card__hint">
                           개인커스텀은 사진 1장 · 사진 위 텍스트(크기·위치·애니메이션) · 비즈니스 링크 중심입니다.
+                          「적용하기」하면 마이케이스에 새 게시물로 쌓이고 메인 송출에 반영됩니다. 여기서 페이지를
+                          지워도 이미 저장된 마이케이스 게시물은 그대로입니다.
                         </p>
                       </div>
 
@@ -554,7 +590,7 @@ export default function ShowcaseStyleSettingsPanel({
                         onClick={() => removePage(page.id)}
                       >
                         <Trash2 size={14} aria-hidden />
-                        이 페이지 삭제
+                        이 페이지 삭제 (편집만)
                       </button>
                     </div>
                   ) : null}
@@ -907,7 +943,7 @@ export default function ShowcaseStyleSettingsPanel({
                     <p className="showcase-profile-block__sub mt-3">
                       <span className="showcase-profile-row__label-text">
                         링크
-                        <HelpTip text="링크 이름 · URL로 홍보할 수 있습니다. (상품·모임·자유 링크) 유해·불법 링크는 등록할 수 없으며, 등록 시 자동으로 차단됩니다." />
+                        <HelpTip text="링크 이름 · URL · 선택 로고로 홍보할 수 있습니다. 로고가 없으면 기본 버튼으로 표시됩니다. 유해·불법 링크는 등록 시 자동 차단됩니다." />
                       </span>
                     </p>
                     <BizLinkEditor
@@ -1040,8 +1076,29 @@ function stripUrlSchemeForInput(raw) {
 function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = false }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const logoInputRef = useRef(null);
+
+  const clearDraft = () => {
+    setName("");
+    setUrl("");
+    setLogoUrl("");
+  };
+
+  const onPickLogo = async (file) => {
+    if (!file) return;
+    try {
+      const { dataUrl } = await readImageFileAsDataUrl(file);
+      setLogoUrl(dataUrl);
+      if (error) setError("");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "로고 이미지를 읽을 수 없습니다.";
+      setError(msg);
+      onToast?.(msg);
+    }
+  };
 
   const add = async () => {
     const linkName = name.trim();
@@ -1063,11 +1120,11 @@ function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = f
         {
           id: `link-${Date.now()}`,
           name: linkName,
-          url: String(check.uri || linkUrl).trim()
+          url: String(check.uri || linkUrl).trim(),
+          logoUrl: logoUrl || ""
         }
       ]);
-      setName("");
-      setUrl("");
+      clearDraft();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "링크 검사에 실패했습니다.";
       setError(msg);
@@ -1125,6 +1182,50 @@ function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = f
             />
           </div>
         </label>
+        <div className="showcase-biz-link-editor__divider" aria-hidden />
+        <div className="showcase-biz-link-editor__logo-row">
+          <span className="showcase-biz-link-editor__label">링크 로고 (선택)</span>
+          <div className="showcase-biz-link-editor__logo-actions">
+            <button
+              type="button"
+              className="showcase-biz-link-editor__logo-pick"
+              disabled={busy}
+              onClick={() => logoInputRef.current?.click()}
+            >
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="showcase-biz-link-editor__logo-preview" />
+              ) : (
+                <>
+                  <ImagePlus size={16} strokeWidth={2.2} aria-hidden />
+                  <span>사진 선택</span>
+                </>
+              )}
+            </button>
+            {logoUrl ? (
+              <button
+                type="button"
+                className="showcase-biz-link-editor__logo-clear"
+                disabled={busy}
+                aria-label="로고 제거"
+                onClick={() => setLogoUrl("")}
+              >
+                <X size={14} strokeWidth={2.4} aria-hidden />
+              </button>
+            ) : null}
+          </div>
+          <p className="showcase-biz-link-editor__logo-hint">없으면 기본 버튼으로 표시됩니다.</p>
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              void onPickLogo(file);
+            }}
+          />
+        </div>
       </div>
       {error ? (
         <p className="showcase-biz-link-editor__error" role="alert">
@@ -1148,6 +1249,13 @@ function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = f
                 <span className="showcase-biz-list__name">{p.name}</span>
                 {p.url ? <span className="showcase-biz-list__url">{p.url}</span> : null}
               </span>
+              {p.logoUrl ? (
+                <img src={p.logoUrl} alt="" className="showcase-biz-list__logo" />
+              ) : (
+                <span className="showcase-biz-list__btn-badge" aria-hidden>
+                  버튼
+                </span>
+              )}
               <button type="button" aria-label={`${p.name} 삭제`} onClick={() => onChange(links.filter((x) => x.id !== p.id))}>
                 ×
               </button>

@@ -33,7 +33,8 @@ export async function resolveRequestUserId(c: Context): Promise<string | null> {
   if (m?.[1]) {
     const uid = await verifyAccessToken(m[1].trim());
     if (uid) return uid;
-    return null;
+    /* 만료·무효 JWT — 엄격 모드가 아니면 레거시 헤더로 폴백 (개발·기기 세션) */
+    if (!allowLegacyUserHeader()) return null;
   }
   if (allowLegacyUserHeader()) {
     const id = c.req.header("X-VLUE-User-Id")?.trim();

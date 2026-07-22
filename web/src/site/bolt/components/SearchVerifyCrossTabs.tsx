@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Phone,
   MapPin,
@@ -122,10 +122,120 @@ const TABS: {
   { key: 'vlue', label: 'VLUE 인증', accent: 'sv-tab--vlue', Logo: VlueSourceLogo },
 ];
 
-function buildMapEmbed(lat: number, lng: number) {
-  const pad = 0.006;
-  const bbox = `${lng - pad},${lat - pad * 0.8},${lng + pad},${lat + pad * 0.8}`;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat}%2C${lng}`;
+function buildMapExternalUrl(lat: number, lng: number, placeName?: string) {
+  const name = encodeURIComponent(placeName || '위치');
+  return `https://map.kakao.com/link/map/${name},${lat},${lng}`;
+}
+
+type LeafletNs = {
+  map: (el: HTMLElement, opts?: object) => {
+    setView: (c: [number, number], z: number) => unknown;
+    remove: () => void;
+    invalidateSize: () => void;
+  };
+  tileLayer: (url: string, opts?: object) => { addTo: (map: unknown) => unknown };
+  marker: (c: [number, number]) => { addTo: (map: unknown) => unknown };
+  Icon: {
+    Default: {
+      prototype: { _getIconUrl?: unknown };
+      mergeOptions: (opts: Record<string, string>) => void;
+    };
+  };
+};
+
+let leafletLoader: Promise<LeafletNs> | null = null;
+
+function loadLeaflet(): Promise<LeafletNs> {
+  const w = window as Window & { L?: LeafletNs };
+  if (w.L) return Promise.resolve(w.L);
+  if (leafletLoader) return leafletLoader;
+  leafletLoader = new Promise((resolve, reject) => {
+    const cssId = 'vlue-leaflet-css';
+    if (!document.getElementById(cssId)) {
+      const link = document.createElement('link');
+      link.id = cssId;
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.async = true;
+    script.onload = () => {
+      if (!w.L) {
+        reject(new Error('Leaflet load failed'));
+        return;
+      }
+      delete w.L.Icon.Default.prototype._getIconUrl;
+      w.L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+      resolve(w.L);
+    };
+    script.onerror = () => reject(new Error('Leaflet load failed'));
+    document.head.appendChild(script);
+  });
+  return leafletLoader;
+}
+
+/** 교차검증 패널용 — 컨테이너를 꽉 채우는 대화형 지도 */
+function PlaceMapPreview({
+  lat,
+  lng,
+  href,
+  label,
+}: {
+  lat: number;
+  lng: number;
+  href: string;
+  label?: string;
+}) {
+  const hostRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let map: ReturnType<LeafletNs['map']> | null = null;
+    const host = hostRef.current;
+    if (!host) return undefined;
+
+    void loadLeaflet()
+      .then((L) => {
+        if (cancelled || !hostRef.current) return;
+        map = L.map(hostRef.current, {
+          zoomControl: true,
+          attributionControl: true,
+          scrollWheelZoom: false,
+        });
+        map.setView([lat, lng], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap',
+        }).addTo(map);
+        L.marker([lat, lng]).addTo(map);
+        requestAnimationFrame(() => map?.invalidateSize());
+        window.setTimeout(() => map?.invalidateSize(), 120);
+      })
+      .catch(() => {
+        /* 타일 로드 실패 시에도 링크 힌트는 유지 */
+      });
+
+    return () => {
+      cancelled = true;
+      map?.remove();
+      map = null;
+    };
+  }, [lat, lng]);
+
+  return (
+    <div className="sv-cross-map">
+      <div ref={hostRef} className="sv-cross-map-frame" role="img" aria-label={label || '위치 지도'} />
+      <a href={href} target="_blank" rel="noreferrer" className="sv-cross-map-hint">
+        지도 크게 보기
+      </a>
+    </div>
+  );
 }
 
 function telHref(phone: string) {
@@ -221,9 +331,12 @@ function KakaoPanel({ data }: { data: KakaoSourceData }) {
       <h3 className="sv-cross-title">{data.place_name}</h3>
       {data.category ? <p className="sv-cross-sub">{data.category}</p> : null}
       {coords ? (
-        <div className="sv-cross-map">
-          <iframe title="카카오 위치" src={buildMapEmbed(coords.lat, coords.lng)} className="sv-cross-map-frame" loading="lazy" />
-        </div>
+        <PlaceMapPreview
+          lat={coords.lat}
+          lng={coords.lng}
+          label={data.place_name}
+          href={buildMapExternalUrl(coords.lat, coords.lng, data.place_name)}
+        />
       ) : null}
       <div className="sv-cross-fields">
         <FieldRow icon={Phone} label="전화번호" value={phone || '미등록'} href={telHref(phone) || undefined} highlight={Boolean(phone)} />
@@ -263,9 +376,12 @@ function NaverPanel({ data }: { data: NaverSourceData }) {
       <h3 className="sv-cross-title">{data.title}</h3>
       {data.category ? <p className="sv-cross-sub">{data.category}</p> : null}
       {coords ? (
-        <div className="sv-cross-map">
-          <iframe title="네이버 위치" src={buildMapEmbed(coords.lat, coords.lng)} className="sv-cross-map-frame" loading="lazy" />
-        </div>
+        <PlaceMapPreview
+          lat={coords.lat}
+          lng={coords.lng}
+          label={data.title}
+          href={data.link || buildMapExternalUrl(coords.lat, coords.lng, data.title)}
+        />
       ) : null}
       <div className="sv-cross-fields">
         <FieldRow icon={MapPin} label="도로명 주소" value={data.road_address || data.address} />

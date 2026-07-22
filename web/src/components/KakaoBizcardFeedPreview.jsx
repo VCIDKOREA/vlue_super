@@ -12,7 +12,7 @@ import {
   readLetteringBizcardEditable,
   writeLetteringBizcardEditable
 } from "../lib/letteringBizcardStorage.js";
-import { readShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
+import { readActiveShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { CALL_STATES } from "../lib/showcase/tentShowcaseTypes.js";
 import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
@@ -136,7 +136,7 @@ export default function KakaoBizcardFeedPreview({
   const hasProfile = Boolean(name || org || roleLine || tags.length);
   const [viewUrl, setViewUrl] = useState("");
   const [liveOpen, setLiveOpen] = useState(false);
-  const showcaseStyle = useMemo(() => readShowcaseStyle(), [liveOpen]);
+  const showcaseStyle = useMemo(() => readActiveShowcaseStyle(), [liveOpen]);
 
   useEffect(() => {
     const bump = () => setAvatarTick((n) => n + 1);

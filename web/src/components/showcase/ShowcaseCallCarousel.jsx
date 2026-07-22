@@ -12,7 +12,6 @@ import {
   normalizeUserTier,
   USER_TIERS
 } from "../../lib/showcase/tentShowcaseTypes.js";
-import { resolvePaidShowcaseBanners } from "../../lib/showcase/demoShowcaseBanners.js";
 import {
   listInstagramShowcaseMedia,
   photosForInstagramMediaItem,
@@ -120,29 +119,6 @@ export default function ShowcaseCallCarousel({
     return raw.slice(0, maxIgPages);
   }, [styleConfig?.pages, maxIgPages]);
 
-  const hasRenderableContentPage = useMemo(() => {
-    return contentPages.some((page) => {
-      if (String(page?.type || "") === "instagram") {
-        return Boolean(page?.instagramMedia?.id);
-      }
-      return (Array.isArray(page?.gallery?.photos) ? page.gallery.photos : []).some((ph) => ph?.url);
-    });
-  }, [contentPages]);
-
-  const demoPagePhotos = useMemo(() => {
-    if (
-      !previewMode ||
-      hasRenderableContentPage ||
-      galleryPagePhotos.length ||
-      listInstagramShowcaseMedia(styleConfig).length
-    ) {
-      return [];
-    }
-    return resolvePaidShowcaseBanners([], { previewMode: true, max: Math.min(3, photosPerPage) }).map(
-      (p) => pickPhotoSlideFields(p)
-    );
-  }, [previewMode, hasRenderableContentPage, galleryPagePhotos.length, styleConfig, photosPerPage]);
-
   const igPages = useMemo(() => {
     return listInstagramShowcaseMedia(styleConfig)
       .slice(0, maxIgPages)
@@ -204,13 +180,7 @@ export default function ShowcaseCallCarousel({
             return fresh ? { ...p, url: fresh } : p;
           });
           if (!m?.id || !refreshed.length) {
-            out.push({
-              type: "empty-slot",
-              id: page.id || `empty-ig-${out.length}`,
-              slot: out.length + 1,
-              max: photosPerPage,
-              pageType: "instagram"
-            });
+            /* 미설정 인스타 페이지는 슬라이드 생략 */
             continue;
           }
           out.push({
@@ -238,15 +208,8 @@ export default function ShowcaseCallCarousel({
             photos: pagePhotos,
             caption: ""
           });
-        } else {
-          out.push({
-            type: "empty-slot",
-            id: page.id || `empty-custom-${out.length}`,
-            slot: out.length + 1,
-            max: photosPerPage,
-            pageType: pType || "rich_custom"
-          });
         }
+        /* 미설정(사진 없음) 개인커스텀 페이지는 슬라이드에 넣지 않음 */
       }
       return out;
     };
@@ -279,7 +242,7 @@ export default function ShowcaseCallCarousel({
 
     let content = buildFromPages(contentPages, maxIgPages);
 
-    /* 레거시 폴백: pages 비어 있으면 기존 gallery + IG 병합 */
+    /* 레거시 폴백: pages 비어 있으면 기존 gallery + IG 병합 (데모 사진은 넣지 않음) */
     if (!content.length) {
       if (galleryPagePhotos.length) {
         content.push({
@@ -288,27 +251,11 @@ export default function ShowcaseCallCarousel({
           photos: galleryPagePhotos,
           caption: ""
         });
-      } else if (demoPagePhotos.length) {
-        content.push({
-          type: "media-page",
-          id: "demo-page",
-          photos: demoPagePhotos,
-          caption: ""
-        });
       }
       for (const page of igPages) {
         if (content.length >= maxIgPages) break;
         content.push(page);
       }
-    } else if (!content.length && demoPagePhotos.length) {
-      content = [
-        {
-          type: "media-page",
-          id: "demo-page",
-          photos: demoPagePhotos,
-          caption: ""
-        }
-      ];
     }
 
     const capped = content.slice(0, maxIgPages);
@@ -318,12 +265,9 @@ export default function ShowcaseCallCarousel({
     }
 
     if (showDigitalCard) {
-      /* 명함만 있으면 다음 슬롯을 열어 세로 스와이프 가능하게 유지 */
+      /* 콘텐츠 페이지가 없으면 명함만 — 빈 슬롯(2/2)을 만들지 않음 */
       if (capped.length === 0) {
-        return [
-          { type: "card", id: "digital-card" },
-          { type: "empty-slot", id: "empty-1", slot: 1, max: photosPerPage }
-        ];
+        return [{ type: "card", id: "digital-card" }];
       }
       return [{ type: "card", id: "digital-card" }, ...capped];
     }
@@ -338,7 +282,6 @@ export default function ShowcaseCallCarousel({
     igPages,
     isKnownContact,
     galleryPagePhotos,
-    demoPagePhotos,
     showDigitalCard,
     digitalCardOnly,
     maxIgPages,

@@ -8,7 +8,6 @@ import {
   archiveShowcaseToMycase,
   deleteMycase,
   fetchMycaseDetail,
-  fetchMycaseLiveBroadcast,
   fetchMyMycaseList,
   fetchUserMycase,
   formatCooldownHint,
@@ -16,7 +15,12 @@ import {
 } from "../../lib/mycaseApi.js";
 import { fetchFollowCounts } from "../../lib/followApi.js";
 import { readShowcaseStyle, SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT } from "../../lib/showcase/showcaseStyleStorage.js";
-import { applyMycaseItemToLiveBroadcast } from "../../lib/showcase/syncMycaseLiveBroadcast.js";
+import {
+  applyMycaseItemToLiveBroadcast,
+  clearLiveBroadcastMeta,
+  hydrateLiveBroadcastFromServer,
+  readLiveBroadcastMeta
+} from "../../lib/showcase/syncMycaseLiveBroadcast.js";
 import {
   extractShowcaseArchiveTitle,
   extractShowcaseCoverUrl
@@ -134,8 +138,8 @@ export default function MyCaseGrid({
           const c = await fetchFollowCounts(self.userId);
           if (c.ok && c.counts) setFollowCounts(c.counts);
         }
-        const live = await fetchMycaseLiveBroadcast();
-        if (live.ok && live.item) applyMycaseItemToLiveBroadcast(live.item);
+        /* 라이브 스타일 동기화는 CallBigPush/오버레이 hydrate 에 맡김.
+           여기서 apply 하면 STYLE 이벤트로 목록이 재귀 갱신될 수 있음. */
       } else {
         if (!ownerUserId) return;
         const data = await fetchUserMycase(ownerUserId, { limit: 30 });
@@ -168,13 +172,18 @@ export default function MyCaseGrid({
 
   useEffect(() => {
     if (!isMine) return undefined;
+    let timer = 0;
     const onChanged = () => {
-      window.setTimeout(() => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
         void loadFirst();
-      }, 400);
+      }, 500);
     };
     window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onChanged);
-    return () => window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onChanged);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onChanged);
+    };
   }, [isMine, loadFirst]);
 
   const loadMore = useCallback(async () => {
@@ -184,13 +193,21 @@ export default function MyCaseGrid({
       if (isMine) {
         const data = await fetchMyMycaseList({ limit: 30, cursor: nextCursor });
         if (!data.ok) return;
-        setItems((prev) => [...prev, ...(data.items || [])]);
+        setItems((prev) => {
+          const seen = new Set(prev.map((x) => x.id));
+          const added = (data.items || []).filter((x) => x?.id && !seen.has(x.id));
+          return [...prev, ...added];
+        });
         setNextCursor(data.nextCursor || null);
         if (data.policy) setPolicy(data.policy);
       } else if (ownerUserId) {
         const data = await fetchUserMycase(ownerUserId, { limit: 30, cursor: nextCursor });
         if (!data.ok || data.accessDenied) return;
-        setItems((prev) => [...prev, ...(data.items || [])]);
+        setItems((prev) => {
+          const seen = new Set(prev.map((x) => x.id));
+          const added = (data.items || []).filter((x) => x?.id && !seen.has(x.id));
+          return [...prev, ...added];
+        });
         setNextCursor(data.nextCursor || null);
       }
     } finally {
@@ -213,28 +230,47 @@ export default function MyCaseGrid({
 
   const openItem = async (item) => {
     if (manageMode && isMine) return;
-    if (onOpenDetail) {
-      const detail = await fetchMycaseDetail(item.id);
-      onOpenDetail(item, detail.ok ? detail : null);
+    if (!onOpenDetail) return;
+    const caseId = String(item?.id || "").trim();
+    if (!caseId) {
+      toast("게시물 정보가 올바르지 않습니다.");
+      return;
     }
+    const detail = await fetchMycaseDetail(caseId);
+    if (!detail.ok) {
+      toast(detail.message || "마이케이스를 열 수 없습니다.");
+      if (detail.error === "not_found") void loadFirst();
+      return;
+    }
+    onOpenDetail(item, detail);
   };
 
   const toggleBroadcast = async (item, e) => {
     e?.stopPropagation?.();
     if (!isMine) return;
+    const caseId = String(item?.id || "").trim();
+    if (!caseId) {
+      toast("게시물 정보가 올바르지 않습니다.");
+      return;
+    }
     const next = !item.isMainBroadcast;
-    setBusyId(item.id);
+    setBusyId(caseId);
     try {
-      const res = await setMycaseBroadcast(item.id, next);
+      const res = await setMycaseBroadcast(caseId, next);
       if (!res.ok) {
+        if (res.error === "not_found") {
+          toast("게시물을 찾을 수 없습니다. 목록을 새로고침합니다.");
+          await loadFirst();
+          return;
+        }
         toast(res.message || "송출 설정을 변경할 수 없습니다.");
         return;
       }
       if (res.policy) setPolicy(res.policy);
-      setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, ...res.item } : x)));
+      setItems((prev) => prev.map((x) => (x.id === caseId ? { ...x, ...res.item } : x)));
       setMainBroadcast((prev) => {
-        if (next) return [...prev.filter((x) => x.id !== item.id), res.item];
-        return prev.filter((x) => x.id !== item.id);
+        if (next) return [...prev.filter((x) => x.id !== caseId), res.item];
+        return prev.filter((x) => x.id !== caseId);
       });
       if (next) {
         const applied = applyMycaseItemToLiveBroadcast(res.item);
@@ -244,6 +280,7 @@ export default function MyCaseGrid({
           toast("메인 송출 ON · 통화 미리보기에 반영됨");
         }
       } else {
+        clearLiveBroadcastMeta();
         toast("메인 송출 OFF");
       }
       onBroadcastChanged?.(res.item, res.policy || null);
@@ -255,17 +292,39 @@ export default function MyCaseGrid({
   const removeItem = async (item, e) => {
     e?.stopPropagation?.();
     if (!isMine) return;
-    if (!window.confirm(`「${item.title}」을(를) 삭제할까요?`)) return;
-    setBusyId(item.id);
+    if (!window.confirm("모든 기록이 삭제됩니다.")) return;
+    const caseId = String(item?.id || "").trim();
+    if (!caseId) {
+      toast("게시물 정보가 올바르지 않습니다.");
+      return;
+    }
+    const liveMeta = readLiveBroadcastMeta();
+    const touchingLive =
+      Boolean(item.isMainBroadcast) || String(liveMeta?.caseId || "") === caseId;
+    setBusyId(caseId);
     try {
-      const res = await deleteMycase(item.id);
+      const res = await deleteMycase(caseId);
       if (!res.ok) {
+        if (res.error === "not_found") {
+          toast("이미 삭제된 게시물입니다. 목록을 새로고침합니다.");
+          if (touchingLive) {
+            clearLiveBroadcastMeta();
+            await hydrateLiveBroadcastFromServer();
+          }
+          await loadFirst();
+          return;
+        }
         toast(res.message || "삭제에 실패했습니다.");
         return;
       }
       if (res.policy) setPolicy(res.policy);
-      setItems((prev) => prev.filter((x) => x.id !== item.id));
-      setMainBroadcast((prev) => prev.filter((x) => x.id !== item.id));
+      setItems((prev) => prev.filter((x) => x.id !== caseId));
+      setMainBroadcast((prev) => prev.filter((x) => x.id !== caseId));
+      /* 송출 중이던 게시물이면 홈·통화 미리보기에서도 즉시 제거 */
+      if (touchingLive) {
+        clearLiveBroadcastMeta();
+        await hydrateLiveBroadcastFromServer();
+      }
       toast("삭제되었습니다.");
     } finally {
       setBusyId(null);

@@ -119,7 +119,8 @@ mycaseRoutes.post("/", requireUserHeader, async (c) => {
 
 /**
  * 쇼케이스 저장 시 호출 — 기존 케이스를 덮지 않고 새 행으로 아카이브.
- * body: { title, thumbnailUrl, payloadJson, isPublic?, supersedesCaseId? }
+ * body: { title, thumbnailUrl, payloadJson, isPublic?, supersedesCaseId?, promoteToMain? }
+ * promoteToMain=true → 새 게시물을 메인 송출로 자동 반영 (블루 쇼케이스 적용)
  */
 mycaseRoutes.post("/archive", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId") as string;
@@ -129,6 +130,7 @@ mycaseRoutes.post("/archive", requireUserHeader, async (c) => {
     payloadJson?: unknown;
     isPublic?: boolean;
     supersedesCaseId?: string | null;
+    promoteToMain?: boolean;
   };
   try {
     body = await c.req.json();
@@ -142,9 +144,11 @@ mycaseRoutes.post("/archive", requireUserHeader, async (c) => {
       thumbnailUrl: body.thumbnailUrl,
       payloadJson: body.payloadJson ?? {},
       isPublic: body.isPublic,
-      supersedesCaseId: body.supersedesCaseId
+      supersedesCaseId: body.supersedesCaseId,
+      promoteToMain: body.promoteToMain === true
     });
-    return c.json({ ok: true, item }, 201);
+    const policy = await getBroadcastPolicy(me);
+    return c.json({ ok: true, item, policy }, 201);
   } catch (e) {
     return handleMycaseError(c, e);
   }

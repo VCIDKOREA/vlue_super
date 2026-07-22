@@ -5,7 +5,7 @@ import { checkLetteringPhoneBlocked } from "../lib/letteringApi.js";
 import { readLetteringEnabled } from "../lib/letteringSettings.js";
 import { submitLetteringReport } from "../lib/letteringReport.js";
 import { blockLetteringPhoneOnly } from "../lib/letteringPhoneBlock.js";
-import { readShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
+import { readActiveShowcaseStyle, SHOWCASE_LIVE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { hydrateLiveBroadcastFromServer } from "../lib/showcase/syncMycaseLiveBroadcast.js";
 import { CALL_STATES, normalizeCallState } from "../lib/showcase/tentShowcaseTypes.js";
 import { appendCallShowcaseHistory } from "../lib/callShowcaseHistory.js";
@@ -49,7 +49,7 @@ export default function LetteringOverlayHost() {
   const [callState, setCallState] = useState(() =>
     normalizeCallState(phase) === CALL_STATES.CONNECTED ? CALL_STATES.CONNECTED : CALL_STATES.RINGING
   );
-  const [showcaseStyle, setShowcaseStyle] = useState(() => readShowcaseStyle());
+  const [showcaseStyle, setShowcaseStyle] = useState(() => readActiveShowcaseStyle());
   const [expanded, setExpanded] = useState(() => normalizeCallState(phase) === CALL_STATES.CONNECTED);
 
   const showToast = useCallback((msg) => {
@@ -93,13 +93,19 @@ export default function LetteringOverlayHost() {
       }
       await hydrateLiveBroadcastFromServer();
       if (cancelled) return;
-      setShowcaseStyle(readShowcaseStyle());
+      setShowcaseStyle(readActiveShowcaseStyle());
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
   }, [incoming]);
+
+  useEffect(() => {
+    const onLive = () => setShowcaseStyle(readActiveShowcaseStyle());
+    window.addEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, onLive);
+    return () => window.removeEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, onLive);
+  }, []);
 
   useEffect(() => {
     const onNativeCall = (e) => {

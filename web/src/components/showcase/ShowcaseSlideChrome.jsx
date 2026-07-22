@@ -118,20 +118,33 @@ export default function ShowcaseSlideChrome({
           {links
             .filter((l) => l?.url && l?.name)
             .slice(0, 4)
-            .map((l) => (
-              <button
-                key={l.id || l.url}
-                type="button"
-                className="showcase-slide-chrome__biz-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openUrl(l.url);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                {l.name}
-              </button>
-            ))}
+            .map((l) => {
+              const hasLogo = Boolean(String(l.logoUrl || "").trim());
+              return (
+                <button
+                  key={l.id || l.url}
+                  type="button"
+                  className={
+                    hasLogo
+                      ? "showcase-slide-chrome__biz-btn showcase-slide-chrome__biz-btn--logo"
+                      : "showcase-slide-chrome__biz-btn"
+                  }
+                  aria-label={l.name}
+                  title={l.name}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openUrl(l.url);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {hasLogo ? (
+                    <img src={l.logoUrl} alt="" draggable={false} />
+                  ) : (
+                    l.name
+                  )}
+                </button>
+              );
+            })}
         </div>
       ) : null}
 

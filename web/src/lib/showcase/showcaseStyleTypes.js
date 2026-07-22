@@ -56,11 +56,36 @@ export const SHOWCASE_STYLE_TYPES = {
 export const SHOWCASE_STYLE_LIST = Object.values(SHOWCASE_STYLE_TYPES).filter((s) => s.id !== "kakao");
 
 export const SHOWCASE_FONT_SETS = [
-  { id: "pretendard", label: "프리텐다드", tier: "free", css: "'Pretendard Variable', Pretendard, sans-serif" },
-  { id: "maruburi", label: "마루부리", tier: "free", css: "'MaruBuri', 'Apple SD Gothic Neo', sans-serif" },
-  { id: "escoredream", label: "에스코어드림", tier: "free", css: "'S-CoreDream', 'Noto Sans KR', sans-serif" },
-  { id: "noto", label: "Noto Sans KR", tier: "free", css: "'Noto Sans KR', sans-serif" },
-  { id: "gothic", label: "Apple SD Gothic", tier: "free", css: "'Apple SD Gothic Neo', sans-serif" }
+  {
+    id: "pretendard",
+    label: "프리텐다드",
+    tier: "free",
+    css: "'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif"
+  },
+  {
+    id: "maruburi",
+    label: "마루부리",
+    tier: "free",
+    css: "MaruBuri, 'Apple Myungjo', Batang, serif"
+  },
+  {
+    id: "escoredream",
+    label: "에스코어드림",
+    tier: "free",
+    css: "'S-CoreDream', 'Noto Sans KR', sans-serif"
+  },
+  {
+    id: "noto",
+    label: "Noto Sans KR",
+    tier: "free",
+    css: "'Noto Sans KR', Pretendard, sans-serif"
+  },
+  {
+    id: "gothic",
+    label: "Apple SD Gothic",
+    tier: "free",
+    css: "'Apple SD Gothic Neo', 'Noto Sans KR', Malgun Gothic, sans-serif"
+  }
 ];
 
 export const SHOWCASE_CASE_FRAMES = [

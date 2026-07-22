@@ -9,7 +9,7 @@ import {
   X
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
-import { readShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
+import { readActiveShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 import { readShowcasePrivacyMode } from "../../lib/showcase/showcasePrivacyMode.js";
 import {
   areShowcaseLinksEnabled,
@@ -158,7 +158,7 @@ export default function TentShowcaseOverlay({
 
   const tier = normalizeUserTier(membershipTier || card?.membershipTier);
   const isPaid = tier === USER_TIERS.PAID;
-  const style = showcaseStyle || readShowcaseStyle();
+  const style = showcaseStyle || readActiveShowcaseStyle();
   const privacyMode = privacyModeProp || readShowcasePrivacyMode(tier);
 
   const [known, setKnown] = useState(() => resolveIsKnownContactSync(peerPhone));

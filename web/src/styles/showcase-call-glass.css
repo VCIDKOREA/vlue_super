@@ -2478,6 +2478,26 @@
   text-overflow: ellipsis;
 }
 
+.showcase-slide-chrome__biz-btn--logo {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.32);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.showcase-slide-chrome__biz-btn--logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .showcase-slide-chrome__social {
   position: absolute;
   left: 10px;

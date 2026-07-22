@@ -25,13 +25,12 @@ export const DEMO_SHOWCASE_BANNERS = Object.freeze([
 
 /**
  * 유료 캐러셀용 배너 목록
+ * 저장된 사진만 반환 — previewMode 여부와 무관하게 데모로 채우지 않음
+ * (빈 상태를 데모로 채우면 삭제 후에도 송출된 것처럼 보임)
  * @param {Array} photos
  * @param {{ previewMode?: boolean, max?: number }} [opts]
  */
 export function resolvePaidShowcaseBanners(photos, opts = {}) {
   const max = Math.max(1, Number(opts.max) || 10);
-  const saved = (Array.isArray(photos) ? photos : []).filter((p) => p?.url).slice(0, max);
-  if (saved.length) return saved;
-  if (opts.previewMode) return DEMO_SHOWCASE_BANNERS.slice(0, max);
-  return [];
+  return (Array.isArray(photos) ? photos : []).filter((p) => p?.url).slice(0, max);
 }

@@ -8,7 +8,7 @@ import {
 } from "../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
-import { SHOWCASE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
+import { SHOWCASE_STYLE_CHANGED_EVENT, SHOWCASE_LIVE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { hydrateLiveBroadcastFromServer } from "../lib/showcase/syncMycaseLiveBroadcast.js";
 import { LETTERING_BIZCARD_CHANGED_EVENT } from "../lib/letteringBizcardStorage.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
@@ -53,10 +53,12 @@ export default function CallBigPushPreviewSection({
   useEffect(() => {
     const bump = () => setPreviewTick((n) => n + 1);
     window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, bump);
+    window.addEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, bump);
     window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
     window.addEventListener("vlue-digital-card-changed", bump);
     return () => {
       window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, bump);
+      window.removeEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, bump);
       window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
       window.removeEventListener("vlue-digital-card-changed", bump);
     };

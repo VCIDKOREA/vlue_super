@@ -178,12 +178,26 @@ export default function ShowcaseStylePreview({
             {(styleConfig.commercial.links?.length
               ? styleConfig.commercial.links
               : styleConfig.commercial.products
-            ).map((pr) => (
-              <button key={pr.id} type="button" className="showcase-style-preview__product" onClick={() => openProduct(pr)}>
-                {pr.name}
-                <ExternalLink size={12} aria-hidden />
-              </button>
-            ))}
+            ).map((pr) => {
+              const hasLogo = Boolean(String(pr.logoUrl || "").trim());
+              return (
+                <button
+                  key={pr.id}
+                  type="button"
+                  className={
+                    hasLogo
+                      ? "showcase-style-preview__product showcase-style-preview__product--logo"
+                      : "showcase-style-preview__product"
+                  }
+                  onClick={() => openProduct(pr)}
+                  aria-label={pr.name}
+                  title={pr.name}
+                >
+                  {hasLogo ? <img src={pr.logoUrl} alt="" /> : pr.name}
+                  {!hasLogo ? <ExternalLink size={12} aria-hidden /> : null}
+                </button>
+              );
+            })}
           </div>
         ) : null}
 

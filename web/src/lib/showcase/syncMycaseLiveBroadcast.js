@@ -1,6 +1,8 @@
 import {
+  clearLiveShowcaseStyle,
   createDefaultShowcaseStyle,
-  writeShowcaseStyle
+  readLiveShowcaseSource,
+  writeLiveShowcaseStyle
 } from "./showcaseStyleStorage.js";
 import { fetchMycaseLiveBroadcast } from "../mycaseApi.js";
 
@@ -19,7 +21,8 @@ export function extractMycaseShowcaseStyle(payloadJson) {
 }
 
 /**
- * 메인 송출 케이스 → 로컬 라이브 쇼케이스(통화·홈 미리보기)에 반영
+ * 메인 송출 케이스 → 통화·홈 미리보기용 라이브 스타일에만 반영
+ * (블루 쇼케이스 편집 설정 vlue_showcase_style_v1 은 덮어쓰지 않음)
  * @param {object|null|undefined} item serializeCase 형태 (payloadJson 포함)
  * @returns {object|null} 적용된 style
  */
@@ -27,7 +30,8 @@ export function applyMycaseItemToLiveBroadcast(item) {
   const style = extractMycaseShowcaseStyle(item?.payloadJson);
   if (!style) return null;
 
-  const applied = writeShowcaseStyle(style, { replace: true });
+  const applied = writeLiveShowcaseStyle(style, { source: "mycase" });
+  if (!applied) return null;
   try {
     localStorage.setItem(
       LIVE_CASE_META_KEY,
@@ -45,7 +49,9 @@ export function applyMycaseItemToLiveBroadcast(item) {
 
 /**
  * 서버 메인 송출 → 로컬 라이브 동기화 (앱·홈·오버레이 진입 시)
- * @returns {Promise<{ ok: boolean, applied: boolean, item?: object|null, message?: string }>}
+ * 설정에서 미리보기를 갱신한 직후(source=editor)에는 덮어쓰지 않음.
+ * 마이케이스 메인이 없으면 라이브는 항상 비움.
+ * @returns {Promise<{ ok: boolean, applied: boolean, item?: object|null, message?: string, skippedEditorPreview?: boolean }>}
  */
 export async function hydrateLiveBroadcastFromServer() {
   const data = await fetchMycaseLiveBroadcast();
@@ -53,7 +59,22 @@ export async function hydrateLiveBroadcastFromServer() {
     return { ok: false, applied: false, message: data.message };
   }
   if (!data.item) {
+    clearLiveShowcaseStyle();
+    try {
+      localStorage.removeItem(LIVE_CASE_META_KEY);
+    } catch {
+      /* ignore */
+    }
     return { ok: true, applied: false, item: null };
+  }
+  const liveSource = readLiveShowcaseSource();
+  if (liveSource?.source === "editor") {
+    return {
+      ok: true,
+      applied: false,
+      item: data.item,
+      skippedEditorPreview: true
+    };
   }
   const applied = applyMycaseItemToLiveBroadcast(data.item);
   return { ok: true, applied: Boolean(applied), item: data.item };
@@ -76,6 +97,7 @@ export function clearLiveBroadcastMeta() {
   } catch {
     /* ignore */
   }
+  clearLiveShowcaseStyle();
 }
 
 export { createDefaultShowcaseStyle };

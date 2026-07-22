@@ -1,14 +1,14 @@
 import { readDigitalCardActive } from "../bizcardAccountSync.js";
 import { readLetteringFixedIdentity } from "../letteringBizcardStorage.js";
 import { scrubLetteringDemoPollution } from "../letteringDemoPollution.js";
-import { readShowcaseStyle } from "./showcaseStyleStorage.js";
+import { readActiveShowcaseStyle } from "./showcaseStyleStorage.js";
 
 /** 통화 송출·미리보기용 카드 + 스타일 설정 병합 */
 export function applyShowcaseStyleToCard(card, membershipTier = "free", opts = {}) {
   const style =
     opts.style ||
     (card?.showcaseStyle && typeof card.showcaseStyle === "object" ? card.showcaseStyle : null) ||
-    readShowcaseStyle();
+    readActiveShowcaseStyle();
   const merged = scrubLetteringDemoPollution({ ...card, showcaseStyle: style, membershipTier });
   const digitalActive = opts.digitalCardActive ?? readDigitalCardActive();
 

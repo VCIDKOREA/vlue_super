@@ -1624,6 +1624,27 @@
   color: #94a3b8;
 }
 
+.showcase-biz-list__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #e2e8f0;
+  border: 1px solid #e8edf3;
+}
+
+.showcase-biz-list__btn-badge {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
 .showcase-biz-list button {
   border: 0;
   background: transparent;
@@ -1744,6 +1765,87 @@
   opacity: 0.45;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+.showcase-biz-link-editor__logo-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px 12px;
+}
+
+.showcase-biz-link-editor__logo-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.showcase-biz-link-editor__logo-pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 88px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.showcase-biz-link-editor__logo-pick:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.showcase-biz-link-editor__logo-preview {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  display: block;
+}
+
+.showcase-biz-link-editor__logo-clear {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.showcase-biz-link-editor__logo-hint {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.showcase-biz-link-editor--dark .showcase-biz-link-editor__logo-pick,
+.showcase-style-settings--dark .showcase-biz-link-editor__logo-pick {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+}
+
+.showcase-biz-link-editor--dark .showcase-biz-link-editor__logo-clear,
+.showcase-style-settings--dark .showcase-biz-link-editor__logo-clear {
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.showcase-style-settings--dark .showcase-biz-list__btn-badge {
+  background: rgba(37, 99, 235, 0.22);
+  color: #93c5fd;
 }
 
 .showcase-biz-link-editor--dark .showcase-biz-link-editor__card,
@@ -1951,6 +2053,23 @@
   font-size: 10px;
   font-weight: 800;
   cursor: pointer;
+}
+
+.showcase-style-preview__product--logo {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+
+.showcase-style-preview__product--logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .showcase-style-settings--dark .showcase-style-settings__style-chip-title {
@@ -2649,9 +2768,12 @@
   border-radius: 10px;
   background: var(--studio-chip-bg);
   color: var(--studio-chip-text);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
+  /* 인라인 fontFamily 가 칩 라벨에 보이도록 유지 */
+  font-synthesis: none;
 }
 
 .showcase-photo-studio__chip.is-on {

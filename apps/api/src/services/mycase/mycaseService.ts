@@ -265,12 +265,19 @@ export async function updateMycase(userId: string, caseId: string, input: Update
 /**
  * 쇼케이스 편집본을 새 아카이브 게시물로 누적 저장.
  * (기존 행을 덮어쓰지 않음)
+ * promoteToMain=true 이면 새 게시물을 메인 송출로 올리고,
+ * 슬롯이 가득하면 기존 메인(가장 오래된 슬롯)을 내려 자리를 만든다.
+ * (블루 쇼케이스 「적용」용 — 쿨다운 없이 송출 내용만 교체)
  */
 export async function archiveShowcaseSnapshot(
   userId: string,
-  input: CreateMycaseInput & { supersedesCaseId?: string | null }
+  input: CreateMycaseInput & {
+    supersedesCaseId?: string | null;
+    promoteToMain?: boolean;
+  }
 ) {
-  return createMycase(userId, {
+  const promote = Boolean(input.promoteToMain);
+  const created = await createMycase(userId, {
     title: input.title,
     thumbnailUrl: input.thumbnailUrl,
     payloadJson: {
@@ -283,6 +290,34 @@ export async function archiveShowcaseSnapshot(
     isPublic: input.isPublic,
     isMainBroadcast: false
   });
+
+  if (!promote) return created;
+
+  const tier = await resolveMycaseTier(userId);
+  const maxSlots = maxMainSlotsForTier(tier);
+  const mains = await prisma.showcaseCase.findMany({
+    where: { ownerUserId: userId, deletedAt: null, isMainBroadcast: true },
+    orderBy: [{ slotIndex: "asc" }, { updatedAt: "asc" }],
+    select: { id: true, slotIndex: true }
+  });
+
+  if (mains.length >= maxSlots) {
+    const demoteIds = mains.slice(0, mains.length - maxSlots + 1).map((m) => m.id);
+    if (demoteIds.length) {
+      await prisma.showcaseCase.updateMany({
+        where: { id: { in: demoteIds }, ownerUserId: userId },
+        data: { isMainBroadcast: false, slotIndex: null }
+      });
+    }
+  }
+
+  const slotIndex = await nextSlotIndex(userId);
+  const row = await prisma.showcaseCase.update({
+    where: { id: created.id },
+    data: { isMainBroadcast: true, slotIndex }
+  });
+
+  return serializeCase(row);
 }
 
 export async function softDeleteMycase(userId: string, caseId: string) {
@@ -546,8 +581,14 @@ export async function listMycaseForViewer(
 }
 
 export async function getMycaseDetail(viewerId: string | null, caseId: string) {
+  const id = String(caseId || "").trim();
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(id)) {
+    throw new MycaseBroadcastError("not_found", "마이케이스를 찾을 수 없습니다.", 404);
+  }
+
   const row = await prisma.showcaseCase.findFirst({
-    where: { id: caseId, deletedAt: null }
+    where: { id, deletedAt: null }
   });
   if (!row) {
     throw new MycaseBroadcastError("not_found", "마이케이스를 찾을 수 없습니다.", 404);
