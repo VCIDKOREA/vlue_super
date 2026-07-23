@@ -844,11 +844,19 @@ function App() {
       .catch(() => {});
     const onFcmForeground = (e) => {
       const data = e.detail?.data || {};
+      const n = e.detail?.notification || {};
       if (data.type === "vlue-parental-consent-request" && data.wardUserId) {
         setParentalConsentRequest({
           wardUserId: data.wardUserId,
           wardLabel: data.wardLabel || "자녀"
         });
+      }
+      if (data.type === "vlue-payment-receipt") {
+        const title = String(n.title || data.title || "결제 완료");
+        const body = String(n.body || data.body || "결제가 완료되었습니다.");
+        addPushNotification({ category: "결제", title, body });
+        setBottomToast(body);
+        setTimeout(() => setBottomToast(""), 5200);
       }
     };
     window.addEventListener("vlue-fcm-foreground", onFcmForeground);
@@ -975,6 +983,13 @@ function App() {
           setBottomToast(msg);
           setTimeout(() => setBottomToast(""), 4200);
           addPushNotification({ category: "앱", title: "명함 문의", body: msg });
+        }
+        if (data?.type === "vlue-payment-receipt") {
+          const title = String(data.title || "결제 완료");
+          const body = String(data.body || "결제가 완료되었습니다.");
+          setBottomToast(body);
+          setTimeout(() => setBottomToast(""), 5200);
+          addPushNotification({ category: "결제", title, body });
         }
         if (data?.type === "vlue-family-protection-alert") {
           const title = String(data.title || "가족 보호");
@@ -1999,9 +2014,13 @@ function App() {
         processTierChangeFromLoginData(data);
         return { ok: true };
       } catch (e) {
-        const msg = e?.message || "네트워크 오류로 로그인할 수 없습니다. API 서버가 실행 중인지 확인해 주세요.";
+        const url = apiUrl("/api/auth/login");
+        const raw = e?.message || "Load failed";
+        const msg = /load failed|failed to fetch|networkerror/i.test(raw)
+          ? `네트워크 오류 (${url}) — PC·폰 같은 Wi‑Fi, Safari 로컬 네트워크 허용, 페이지 강력 새로고침을 확인해 주세요.`
+          : raw;
         setBottomToast(msg);
-        setTimeout(() => setBottomToast(""), 2800);
+        setTimeout(() => setBottomToast(""), 4500);
         return { ok: false, error: msg };
       }
     },

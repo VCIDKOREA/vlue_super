@@ -14,6 +14,7 @@ const CATEGORY_STYLE = {
   안심: "bg-emerald-50 text-emerald-700",
   앱: "bg-blue-50 text-blue-700",
   공지: "bg-indigo-50 text-indigo-700",
+  결제: "bg-sky-50 text-sky-800",
   기타: "bg-gray-100 text-gray-600"
 };
 

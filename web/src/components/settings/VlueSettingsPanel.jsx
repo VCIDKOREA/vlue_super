@@ -792,9 +792,19 @@ export default function VlueSettingsPanel({
                   customData: { source: "settings_pay_test" }
                 });
                 if (result.redirected) return;
+                try {
+                  const { addPushNotification } = await import("../../lib/pushNotificationInbox.js");
+                  addPushNotification({
+                    category: "결제",
+                    title: "결제 완료",
+                    body: `VLUE V2 테스트 · ${Number(result.complete?.amountTotal || 1000).toLocaleString("ko-KR")}원 결제가 완료되었습니다.`
+                  });
+                } catch {
+                  /* ignore */
+                }
                 showSettingNotice?.(
                   result.complete?.status === "PAID"
-                    ? "결제 승인 완료 (PAID)"
+                    ? "결제 승인 완료 (PAID) · 알림함·푸시를 확인하세요"
                     : `결제 처리됨 (${result.complete?.status || result.paymentId})`
                 );
               } catch (e) {

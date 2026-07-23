@@ -1,0 +1,208 @@
+/**
+ * 포트원 V2 결제 콜백 — 완료 / 취소 / 실패
+ */
+.portone-v2-cb {
+  --pv2-ink: #0f172a;
+  --pv2-muted: #64748b;
+  --pv2-line: rgba(15, 23, 42, 0.08);
+  --pv2-ok: #0f766e;
+  --pv2-ok-soft: #ccfbf1;
+  --pv2-warn: #b45309;
+  --pv2-warn-soft: #ffedd5;
+  --pv2-err: #be123c;
+  --pv2-err-soft: #ffe4e6;
+  --pv2-brand: #1d4ed8;
+  box-sizing: border-box;
+  min-height: 100dvh;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) 22px max(28px, env(safe-area-inset-bottom));
+  color: var(--pv2-ink);
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(37, 99, 235, 0.18), transparent 55%),
+    radial-gradient(90% 60% at 100% 100%, rgba(14, 165, 233, 0.1), transparent 50%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4ff 48%, #f7fafc 100%);
+  font-family: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  -webkit-font-smoothing: auto;
+}
+
+.portone-v2-cb *,
+.portone-v2-cb *::before,
+.portone-v2-cb *::after {
+  box-sizing: border-box;
+}
+
+.portone-v2-cb__stage {
+  width: min(100%, 360px);
+  text-align: center;
+  animation: pv2-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.portone-v2-cb__brand {
+  margin: 0 0 28px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--pv2-brand);
+}
+
+.portone-v2-cb__mark {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 22px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  animation: pv2-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.portone-v2-cb__mark--ok {
+  background: var(--pv2-ok-soft);
+  color: var(--pv2-ok);
+  box-shadow: 0 10px 28px rgba(15, 118, 110, 0.16);
+}
+
+.portone-v2-cb__mark--cancelled {
+  background: var(--pv2-warn-soft);
+  color: var(--pv2-warn);
+  box-shadow: 0 10px 28px rgba(180, 83, 9, 0.12);
+}
+
+.portone-v2-cb__mark--error {
+  background: var(--pv2-err-soft);
+  color: var(--pv2-err);
+  box-shadow: 0 10px 28px rgba(190, 18, 60, 0.12);
+}
+
+.portone-v2-cb__mark--processing {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--pv2-brand);
+}
+
+.portone-v2-cb__mark svg {
+  width: 34px;
+  height: 34px;
+}
+
+.portone-v2-cb__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(29, 78, 216, 0.2);
+  border-top-color: var(--pv2-brand);
+  border-radius: 50%;
+  animation: pv2-spin 0.75s linear infinite;
+}
+
+.portone-v2-cb__title {
+  margin: 0;
+  font-size: clamp(26px, 7vw, 32px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+  word-break: keep-all;
+}
+
+.portone-v2-cb__detail {
+  margin: 12px 0 0;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--pv2-muted);
+  word-break: keep-all;
+}
+
+.portone-v2-cb__id {
+  margin: 18px auto 0;
+  max-width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--pv2-line);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #94a3b8;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.portone-v2-cb__actions {
+  margin-top: 28px;
+  display: grid;
+  gap: 10px;
+  animation: pv2-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
+}
+
+.portone-v2-cb__btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  width: 100%;
+  padding: 15px 18px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.portone-v2-cb__btn:active {
+  transform: scale(0.98);
+}
+
+.portone-v2-cb__btn--primary {
+  background: var(--pv2-ink);
+  color: #fff;
+}
+
+.portone-v2-cb__btn--primary:hover {
+  background: #1e293b;
+}
+
+.portone-v2-cb__hint {
+  margin: 14px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+  word-break: keep-all;
+}
+
+@keyframes pv2-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pv2-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pv2-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portone-v2-cb__stage,
+  .portone-v2-cb__mark,
+  .portone-v2-cb__actions,
+  .portone-v2-cb__spinner {
+    animation: none !important;
+  }
+}
