@@ -867,21 +867,27 @@ function App() {
               "",
               `구매 상품: ${productName}`,
               `상품 설명: ${productDetail}`,
-              `결제 금액: ${amountTotal.toLocaleString("ko-KR")}원`
-            ].join("\n")
-        );
-        addPushNotification({
-          category: "결제",
-          kind: "payment",
-          title,
-          body,
-          productName,
-          productDetail,
-          amountKrw: amountTotal,
-          paymentId,
-          needsPurchaseConfirm: true
-        });
-        setBottomToast("결제 완료 · 알림함에서 구매확인해 주세요");
+              `결제 금액: ${amountTotal.toLocaleString("ko-KR")}원`,
+              paymentId ? `결제 번호: ${paymentId}` : "",
+              "",
+              "아래 [구매확인]을 눌러 주시면 구매가 확정됩니다.",
+              "환불이 필요하시면 [환불 문의]로 고객센터(support@vlue.kr)에 신청해 주세요."
+            ]
+              .filter(Boolean)
+              .join("\n")
+          );
+          addPushNotification({
+            category: "결제",
+            kind: "payment",
+            title,
+            body,
+            productName,
+            productDetail,
+            amountKrw: amountTotal,
+            paymentId,
+            needsPurchaseConfirm: true
+          });
+          setBottomToast("결제 완료 · 알림함에서 구매확인해 주세요");
         setTimeout(() => setBottomToast(""), 5200);
       }
     };
@@ -1029,7 +1035,8 @@ function App() {
               `결제 금액: ${amountTotal.toLocaleString("ko-KR")}원`,
               paymentId ? `결제 번호: ${paymentId}` : "",
               "",
-              "아래 [구매확인]을 눌러 주시면 구매가 확정됩니다."
+              "아래 [구매확인]을 눌러 주시면 구매가 확정됩니다.",
+              "환불이 필요하시면 [환불 문의]로 고객센터(support@vlue.kr)에 신청해 주세요."
             ]
               .filter(Boolean)
               .join("\n");

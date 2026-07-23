@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { confirmPushPurchase } from "../lib/pushNotificationInbox.js";
+import {
+  buildRefundInquiryMailto,
+  confirmPushPurchase
+} from "../lib/pushNotificationInbox.js";
+import { marketingLegalUrl } from "../lib/legalPageLinks.js";
 
 const CATEGORY_STYLE = {
   가족보호: "bg-emerald-50 text-emerald-700",
@@ -14,13 +18,14 @@ const CATEGORY_STYLE = {
 
 /**
  * 알림 상세 보기 팝업 (body 포털 — 전체화면 시트 위에서도 탭 가능)
- * 결제 알림은 구매확인(쇼핑 구매확정과 동일 결과) 버튼 제공
+ * 결제 알림은 구매확인 + 환불 문의(고객센터 메일) 제공
  */
 export default function PushNotificationDetailModal({
   open,
   item,
   displayTime = "",
   isDarkMode = false,
+  memberHandle = "",
   onClose,
   onUpdated
 }) {
@@ -39,6 +44,13 @@ export default function PushNotificationDetailModal({
   const isPayment =
     current.kind === "payment" || current.category === "결제" || current.needsPurchaseConfirm;
   const canConfirm = isPayment && current.needsPurchaseConfirm && !current.purchaseConfirmed;
+  const resolvedHandle =
+    String(memberHandle || "").replace(/^@/, "").trim() ||
+    String(
+      typeof localStorage !== "undefined" ? localStorage.getItem("vlue_member_handle") || "" : ""
+    )
+      .replace(/^@/, "")
+      .trim();
 
   const onConfirmPurchase = () => {
     if (confirmBusy || !canConfirm) return;
@@ -52,6 +64,20 @@ export default function PushNotificationDetailModal({
     } finally {
       setConfirmBusy(false);
     }
+  };
+
+  const onRefundInquiry = () => {
+    const href = buildRefundInquiryMailto({
+      productName: current.productName,
+      amountKrw: current.amountKrw,
+      paymentId: current.paymentId,
+      handle: resolvedHandle
+    });
+    window.location.href = href;
+  };
+
+  const onOpenRefundPolicy = () => {
+    window.open(marketingLegalUrl("refund"), "_blank", "noopener,noreferrer");
   };
 
   return createPortal(
@@ -152,6 +178,27 @@ export default function PushNotificationDetailModal({
               구매가 확정되었습니다. 이용해 주셔서 감사합니다.
             </p>
           ) : null}
+          {isPayment ? (
+            <div
+              className={`mt-4 rounded-xl border px-3.5 py-3 text-[12px] leading-relaxed ${
+                isDarkMode ? "border-white/10 bg-white/5 text-slate-300" : "border-amber-100 bg-amber-50/70 text-slate-700"
+              }`}
+            >
+              <p className="font-black text-amber-800">환불·청약철회</p>
+              <p className="mt-1.5 font-medium">
+                환불이 필요하시면 아래 <span className="font-black">환불 문의</span>로 고객센터에 신청해 주세요.
+                메일에는 결제 정보가 미리 채워집니다. 규정은{" "}
+                <button
+                  type="button"
+                  className="font-black text-sky-700 underline underline-offset-2"
+                  onClick={onOpenRefundPolicy}
+                >
+                  환불·청약철회 규정
+                </button>
+                을 확인해 주세요.
+              </p>
+            </div>
+          ) : null}
         </div>
         <div
           className={`shrink-0 space-y-2 border-t px-4 py-3 ${isDarkMode ? "border-white/10" : "border-slate-100"}`}
@@ -166,10 +213,23 @@ export default function PushNotificationDetailModal({
               {confirmBusy ? "처리 중…" : "구매확인"}
             </button>
           ) : null}
+          {isPayment ? (
+            <button
+              type="button"
+              className={`w-full rounded-xl py-3 text-[14px] font-black active:scale-[0.99] ${
+                isDarkMode
+                  ? "bg-amber-500/20 text-amber-100 ring-1 ring-amber-400/40"
+                  : "bg-amber-50 text-amber-900 ring-1 ring-amber-200"
+              }`}
+              onClick={onRefundInquiry}
+            >
+              환불 문의
+            </button>
+          ) : null}
           <button
             type="button"
             className={`w-full rounded-xl py-3 text-[14px] font-black active:scale-[0.99] ${
-              canConfirm
+              canConfirm || isPayment
                 ? isDarkMode
                   ? "bg-white/10 text-slate-100"
                   : "bg-slate-100 text-slate-700"
@@ -177,7 +237,7 @@ export default function PushNotificationDetailModal({
             }`}
             onClick={onClose}
           >
-            {canConfirm ? "닫기" : "확인"}
+            {canConfirm || isPayment ? "닫기" : "확인"}
           </button>
         </div>
       </div>

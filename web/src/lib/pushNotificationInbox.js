@@ -167,6 +167,37 @@ export function buildPaymentReceiptBody({
     `결제 금액: ${amount}원`
   ];
   if (paymentId) lines.push(`결제 번호: ${paymentId}`);
-  lines.push("", "아래 [구매확인]을 눌러 주시면 구매가 확정됩니다.");
+  lines.push(
+    "",
+    "아래 [구매확인]을 눌러 주시면 구매가 확정됩니다.",
+    "환불이 필요하시면 [환불 문의]로 고객센터(support@vlue.kr)에 신청해 주세요."
+  );
   return lines.join("\n");
+}
+
+/** 결제 알림 → 환불·청약철회 메일 문의 (사전 작성) */
+export function buildRefundInquiryMailto({
+  productName = "",
+  amountKrw = null,
+  paymentId = "",
+  handle = ""
+} = {}) {
+  const subject = encodeURIComponent("[VLUE] 환불·청약철회 문의");
+  const amountLabel =
+    amountKrw != null && Number.isFinite(Number(amountKrw))
+      ? `${Math.floor(Number(amountKrw)).toLocaleString("ko-KR")}원`
+      : "";
+  const lines = [
+    "안녕하세요. 환불·청약철회를 신청합니다.",
+    "",
+    `회원 ID: ${handle || "(작성해 주세요)"}`,
+    `구매 상품: ${String(productName || "").trim() || "(알 수 없음)"}`,
+    `결제 금액: ${amountLabel || "(작성해 주세요)"}`,
+    `결제 번호: ${String(paymentId || "").trim() || "(작성해 주세요)"}`,
+    "결제수단: (작성해 주세요)",
+    "사유: (작성해 주세요)",
+    "",
+    "※ 접수 후 영업일 3일 이내 회신 예정입니다."
+  ];
+  return `mailto:support@vlue.kr?subject=${subject}&body=${encodeURIComponent(lines.join("\n"))}`;
 }

@@ -53,7 +53,8 @@ function buildPaymentReceiptBody(orderName: string, amountKrw: number, paymentId
     `결제 금액: ${formatAmountKrw(amountKrw)}`,
     `결제 번호: ${paymentId}`,
     "",
-    "아래 [구매확인]을 눌러 주시면 구매가 확정됩니다."
+    "아래 [구매확인]을 눌러 주시면 구매가 확정됩니다.",
+    "환불이 필요하시면 [환불 문의]로 고객센터(support@vlue.kr)에 신청해 주세요."
   ].join("\n");
 }
 
