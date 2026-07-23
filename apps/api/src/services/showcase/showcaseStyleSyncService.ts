@@ -78,19 +78,19 @@ export async function putUserShowcaseStyleBundle(
 
   if (input.editor !== undefined) {
     const editor = asObjectOrNull(input.editor);
-    if (editor) data.showcaseStyleJson = editor;
+    if (editor) data.showcaseStyleJson = editor as Prisma.InputJsonValue;
   }
   if (input.live !== undefined) {
     if (input.live === null) {
       data.showcaseLiveStyleJson = Prisma.JsonNull;
     } else {
       const live = asObjectOrNull(input.live);
-      if (live) data.showcaseLiveStyleJson = live;
+      if (live) data.showcaseLiveStyleJson = live as Prisma.InputJsonValue;
     }
   }
   if (input.liveSource !== undefined) {
     const src = normalizeLiveSource(input.liveSource);
-    data.showcaseLiveSourceJson = src ?? Prisma.JsonNull;
+    data.showcaseLiveSourceJson = (src as Prisma.InputJsonValue | null) ?? Prisma.JsonNull;
   }
 
   await prisma.user.update({
