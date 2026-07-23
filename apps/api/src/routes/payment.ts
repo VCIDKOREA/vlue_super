@@ -1,10 +1,44 @@
 import { Hono } from "hono";
 import { requireUserHeader } from "../middleware/cardGate.js";
 import { completePortoneSubscribePayment } from "../services/payment/portoneSubscribeComplete.js";
+import { completePortoneV2Payment } from "../services/payment/portoneV2Complete.js";
 import { handlePortonePaymentWebhook } from "../services/payment/portoneWebhook.js";
 import { resolvePaymentProvider } from "../services/adapters/paymentProvider.js";
 
 export const paymentRoutes = new Hono();
+
+/**
+ * 포트원 V2 인증결제 완료 — 단건 조회·금액 검증
+ * Body: { paymentId, expectedAmount?, orderName?, customData? }
+ */
+paymentRoutes.post("/v2/complete", requireUserHeader, async (c) => {
+  try {
+    const uid = c.get("vlueUserId") as string;
+    const body = await c.req.json<{
+      paymentId?: string;
+      expectedAmount?: number;
+      orderName?: string;
+      customData?: unknown;
+    }>();
+
+    const result = await completePortoneV2Payment({
+      userId: uid,
+      paymentId: String(body?.paymentId || ""),
+      expectedAmount: body?.expectedAmount != null ? Number(body.expectedAmount) : undefined,
+      orderName: body?.orderName,
+      customData: body?.customData
+    });
+
+    return c.json({ ok: true, ...result });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    const status =
+      msg.includes("포트원") || msg.includes("조회") || msg.includes("금액")
+        ? 502
+        : 400;
+    return c.json({ error: msg, code: "PORTONE_V2_COMPLETE_FAILED" }, status);
+  }
+});
 
 /** 포트원 빌링키 발급(프론트) 후 첫 회차 실결제·구독 활성화 */
 paymentRoutes.post("/subscribe/complete", requireUserHeader, async (c) => {

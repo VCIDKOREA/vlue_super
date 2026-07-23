@@ -27,6 +27,10 @@ export default defineConfig(({ mode }) => {
     /** Electron 패키징 시 file:// 프로토콜 상대 경로 로딩 */
     base: process.env.VITE_ELECTRON_PACK === "1" ? "./" : "/",
     plugins: [react()],
+    optimizeDeps: {
+      /** 깨진/미설치 패키지가 optimize 스캔에 끌려 들어와 앱 부팅이 백지되는 것 방지 */
+      exclude: ["tesseract.js", "@portone/browser-sdk"]
+    },
     resolve: {
       alias: {
         "@vlue/shared": resolve(__dirname, "../packages/shared/src/index.ts"),

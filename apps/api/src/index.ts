@@ -37,10 +37,19 @@ const envOrigins =
 
 const origins = [...new Set([...envOrigins, ...LOCAL_DEV_ORIGINS, ...PLATFORM_ORIGINS])];
 
+function resolveCorsOrigin(origin: string): string | undefined {
+  if (!origin) return origins[0];
+  if (origins.includes(origin)) return origin;
+  // 폰·LAN 로컬 개발 (Vite 517x)
+  if (/^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:517\d$/.test(origin)) return origin;
+  if (/^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:517\d$/.test(origin)) return origin;
+  return undefined;
+}
+
 app.use(
   "*",
   cors({
-    origin: origins,
+    origin: resolveCorsOrigin,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: [
       "Content-Type",

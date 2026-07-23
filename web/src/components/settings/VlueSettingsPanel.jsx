@@ -32,6 +32,11 @@ import {
   setAppLockEnabled,
   APP_LOCK_STATUS
 } from "../../lib/appLockBridge.js";
+import {
+  defaultPortoneV2RedirectUrl,
+  requestPortoneV2Payment
+} from "../../lib/portoneV2Payment.js";
+import { getPortoneV2ChannelKey, getPortoneV2StoreId } from "../../lib/portoneV2Env.js";
 
 const BLOCKED_USER_DIRECTORY = [
   { id: "u-minsu", name: "민수", handle: "@minsu" },
@@ -759,6 +764,47 @@ export default function VlueSettingsPanel({
                 /* fall through */
               }
               window.open(url, "_blank", "noopener,noreferrer");
+            }}
+            isDarkMode={isDarkMode}
+          />
+        </SettingsSection>
+
+        <SettingsSection title="결제 테스트" isDarkMode={isDarkMode}>
+          <SettingsRowButton
+            label="KPN 테스트 결제 (1,000원)"
+            sublabel="포트원 V2 · 테스트 채널"
+            onClick={async () => {
+              if (!getPortoneV2StoreId() || !getPortoneV2ChannelKey()) {
+                showSettingNotice?.(
+                  "결제 설정(Store/Channel)이 없습니다. 웹 배포 환경변수를 확인해 주세요."
+                );
+                return;
+              }
+              showSettingNotice?.("결제창을 여는 중…");
+              try {
+                sessionStorage.setItem("vlue_v2_pay_amount", "1000");
+                sessionStorage.setItem("vlue_v2_pay_order_name", "VLUE V2 테스트");
+                const result = await requestPortoneV2Payment({
+                  orderName: "VLUE V2 테스트",
+                  totalAmount: 1000,
+                  payMethod: "CARD",
+                  redirectUrl: defaultPortoneV2RedirectUrl(),
+                  customData: { source: "settings_pay_test" }
+                });
+                if (result.redirected) return;
+                showSettingNotice?.(
+                  result.complete?.status === "PAID"
+                    ? "결제 승인 완료 (PAID)"
+                    : `결제 처리됨 (${result.complete?.status || result.paymentId})`
+                );
+              } catch (e) {
+                const msg = e?.message || "결제에 실패했습니다.";
+                if (/취소|9000|FAILURE/i.test(msg)) {
+                  showSettingNotice?.("결제를 취소했습니다.");
+                } else {
+                  showSettingNotice?.(msg);
+                }
+              }
             }}
             isDarkMode={isDarkMode}
           />
