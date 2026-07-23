@@ -206,7 +206,8 @@ export default function ShowcaseCallCarousel({
             type: "media-page",
             id: page.id || `gallery-${out.length}`,
             photos: pagePhotos,
-            caption: ""
+            caption: "",
+            businessLink: page.businessLink || null
           });
         }
         /* 미설정(사진 없음) 개인커스텀 페이지는 슬라이드에 넣지 않음 */
@@ -737,6 +738,7 @@ export default function ShowcaseCallCarousel({
                         <ShowcaseSlideChrome
                           card={card}
                           variant="custom"
+                          businessLink={slide.businessLink || null}
                           onToast={onKeypadToast}
                         />
                         <ShowcaseBannerSocialLayer

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { openExternalHref, formatWebHref } from "../../lib/showcase/showcaseContactActions.js";
 import { resolveShowcasePeerAvatar } from "../../lib/showcase/resolveShowcasePeerAvatar.js";
 import { isVlueBrandAssetUrl } from "../../lib/vlueAvatar.js";
@@ -5,6 +6,7 @@ import {
   resolveFollowTargetUserId,
   shouldShowShowcaseFollow
 } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
+import { normalizeBusinessLink } from "../../lib/showcase/showcasePages.js";
 import FollowActionButton from "../follow/FollowActionButton.jsx";
 import "../follow/follow-action.css";
 import ShowcaseBgmMarquee from "./ShowcaseBgmMarquee.jsx";
@@ -23,30 +25,39 @@ function openUrl(url) {
   openExternalHref(href);
 }
 
+function displayHost(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  try {
+    return new URL(formatWebHref(raw) || raw).href.replace(/^https?:\/\//i, "");
+  } catch {
+    return raw.replace(/^https?:\/\//i, "");
+  }
+}
+
 /**
  * 쇼케이스 슬라이드 공통 크롬
- * 1 하단: VLUE 프로필(사진 + 활동명)
- * 2 좌측: 소셜 로고만
- * 3 상단 좌측: 개인커스텀일 때 비즈니스 링크 버튼 / 인스타는 게시물 헤더가 담당
+ * 1 하단: VLUE 프로필 + 팔로우 + 쇼셜 토글
+ * 2 상단 좌측: 개인커스텀일 때 페이지 비즈니스 링크
+ * 3 쇼셜: 토글 시 VLUE 바 위에 표시
  *
  * @param {"instagram"|"custom"} variant
  */
 export default function ShowcaseSlideChrome({
   card,
   variant = "custom",
+  /** 현재 슬라이드(페이지)의 비즈니스 링크 — 페이지당 1개 */
+  businessLink = null,
   hideBusinessLinks = false,
   targetUserId: targetUserIdProp = null,
   hideFollow = false,
   fallbackToMe = true,
   onToast
 }) {
+  const [socialOpen, setSocialOpen] = useState(false);
   const style = card?.showcaseStyle || {};
   const outlinks = style?.commercial?.outlinks || {};
-  const links = Array.isArray(style?.commercial?.links)
-    ? style.commercial.links
-    : Array.isArray(style?.commercial?.products)
-      ? style.commercial.products
-      : [];
+  const pageLink = normalizeBusinessLink(businessLink);
 
   const activityName = firstText(
     card?.activityName,
@@ -94,17 +105,18 @@ export default function ShowcaseSlideChrome({
 
   const socialItems = [
     ig ? { id: "instagram", label: "Instagram", url: ig, className: "is-ig" } : null,
+    youtube ? { id: "youtube", label: "YouTube", url: youtube, className: "is-yt" } : null,
+    facebook ? { id: "facebook", label: "Facebook", url: facebook, className: "is-fb" } : null,
     kakaoOpen
-      ? { id: "kakao-open", label: "카카오 오픈채팅", url: kakaoOpen, className: "is-kakao", tag: "오픈채팅" }
+      ? { id: "kakao-open", label: "카카오 오픈채팅", url: kakaoOpen, className: "is-kakao" }
       : null,
     kakaoProfile
-      ? { id: "kakao-profile", label: "카카오 프로필", url: kakaoProfile, className: "is-kakao", tag: "프로필" }
-      : null,
-    facebook ? { id: "facebook", label: "Facebook", url: facebook, className: "is-fb" } : null,
-    youtube ? { id: "youtube", label: "YouTube", url: youtube, className: "is-yt" } : null
+      ? { id: "kakao-profile", label: "카카오 프로필", url: kakaoProfile, className: "is-kakao" }
+      : null
   ].filter(Boolean);
 
-  const showBizLinks = variant === "custom" && !hideBusinessLinks && links.some((l) => l?.url && l?.name);
+  const showBizLink = variant === "custom" && !hideBusinessLinks && Boolean(pageLink);
+  const hasSocial = socialItems.length > 0;
 
   const targetUserId = String(
     targetUserIdProp || resolveFollowTargetUserId(card, { fallbackToMe }) || ""
@@ -113,89 +125,127 @@ export default function ShowcaseSlideChrome({
 
   return (
     <div className="showcase-slide-chrome" data-variant={variant}>
-      {showBizLinks ? (
+      {showBizLink ? (
         <div className="showcase-slide-chrome__biz" aria-label="비즈니스 링크">
-          {links
-            .filter((l) => l?.url && l?.name)
-            .slice(0, 4)
-            .map((l) => {
-              const hasLogo = Boolean(String(l.logoUrl || "").trim());
-              return (
-                <button
-                  key={l.id || l.url}
-                  type="button"
-                  className={
-                    hasLogo
-                      ? "showcase-slide-chrome__biz-btn showcase-slide-chrome__biz-btn--logo"
-                      : "showcase-slide-chrome__biz-btn"
-                  }
-                  aria-label={l.name}
-                  title={l.name}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openUrl(l.url);
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  {hasLogo ? (
-                    <img src={l.logoUrl} alt="" draggable={false} />
-                  ) : (
-                    l.name
-                  )}
-                </button>
-              );
-            })}
+          <button
+            type="button"
+            className="showcase-slide-chrome__biz-card"
+            aria-label={`${pageLink.name} 열기`}
+            title={pageLink.name}
+            onClick={(e) => {
+              e.stopPropagation();
+              openUrl(pageLink.url);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {pageLink.logoUrl ? (
+              <img
+                src={pageLink.logoUrl}
+                alt=""
+                className="showcase-slide-chrome__biz-logo"
+                draggable={false}
+              />
+            ) : (
+              <span className="showcase-slide-chrome__biz-logo-fallback" aria-hidden>
+                링크
+              </span>
+            )}
+            <span className="showcase-slide-chrome__biz-meta">
+              <span className="showcase-slide-chrome__biz-name">{pageLink.name}</span>
+              <span className="showcase-slide-chrome__biz-url">{displayHost(pageLink.url)}</span>
+            </span>
+          </button>
         </div>
       ) : null}
 
-      {socialItems.length ? (
-        <div className="showcase-slide-chrome__social" aria-label="소셜 링크">
-          {socialItems.map((item) => (
+      <div className={`showcase-slide-chrome__dock${socialOpen && hasSocial ? " is-open" : ""}`}>
+        {hasSocial ? (
+          <div
+            className={`showcase-slide-chrome__social-dock${socialOpen ? " is-visible" : ""}`}
+            aria-label="비즈니스 쇼셜링크"
+            aria-hidden={!socialOpen}
+          >
+            {socialItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`showcase-slide-chrome__social-btn ${item.className}`}
+                title={item.label}
+                aria-label={item.label}
+                tabIndex={socialOpen ? 0 : -1}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openUrl(item.url);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <SocialGlyph kind={item.id} />
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="showcase-slide-chrome__vlue" aria-label="VLUE 프로필">
+          <div className="showcase-slide-chrome__vlue-avatar" aria-hidden>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" loading="lazy" draggable={false} />
+            ) : (
+              <span>{letter}</span>
+            )}
+          </div>
+          <div className="showcase-slide-chrome__vlue-meta">
+            <p className="showcase-slide-chrome__vlue-label">VLUE 프로필</p>
+            <p className="showcase-slide-chrome__vlue-name">{activityName || "회원"}</p>
+          </div>
+          {showFollow ? (
+            <FollowActionButton
+              targetUserId={targetUserId}
+              className="follow-action-btn--chrome"
+              onToast={onToast}
+            />
+          ) : null}
+          <ShowcaseBgmMarquee
+            styleConfig={style}
+            compact
+            className="showcase-slide-chrome__bgm"
+          />
+          {hasSocial ? (
             <button
-              key={item.id}
               type="button"
-              className={`showcase-slide-chrome__social-btn ${item.className}`}
-              title={item.tag ? `[카카오 ${item.tag}]` : item.label}
-              aria-label={item.tag ? `카카오 ${item.tag}` : item.label}
+              className={`showcase-slide-chrome__social-toggle${socialOpen ? " is-open" : ""}`}
+              aria-label={socialOpen ? "쇼셜 링크 닫기" : "쇼셜 링크 열기"}
+              aria-expanded={socialOpen}
+              title={socialOpen ? "쇼셜 닫기" : "쇼셜"}
               onClick={(e) => {
                 e.stopPropagation();
-                openUrl(item.url);
+                setSocialOpen((v) => !v);
               }}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              <SocialGlyph kind={item.id} />
-              {item.tag ? <span className="showcase-slide-chrome__social-tag">{item.tag}</span> : null}
+              <SocialToggleGlyph />
+              <span className="showcase-slide-chrome__social-toggle-label">쇼셜</span>
             </button>
-          ))}
+          ) : null}
         </div>
-      ) : null}
-
-      <div className="showcase-slide-chrome__vlue" aria-label="VLUE 프로필">
-        <div className="showcase-slide-chrome__vlue-avatar" aria-hidden>
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" loading="lazy" draggable={false} />
-          ) : (
-            <span>{letter}</span>
-          )}
-        </div>
-        <div className="showcase-slide-chrome__vlue-meta">
-          <p className="showcase-slide-chrome__vlue-label">VLUE 프로필</p>
-          <p className="showcase-slide-chrome__vlue-name">{activityName || "회원"}</p>
-        </div>
-        {showFollow ? (
-          <FollowActionButton
-            targetUserId={targetUserId}
-            className="follow-action-btn--chrome"
-            onToast={onToast}
-          />
-        ) : null}
-        <ShowcaseBgmMarquee
-          styleConfig={style}
-          compact
-          className="showcase-slide-chrome__bgm"
-        />
       </div>
     </div>
+  );
+}
+
+function SocialToggleGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden>
+      <circle cx="6" cy="12" r="2.2" fill="currentColor" />
+      <circle cx="12" cy="6.5" r="2.2" fill="currentColor" />
+      <circle cx="12" cy="17.5" r="2.2" fill="currentColor" />
+      <circle cx="18" cy="12" r="2.2" fill="currentColor" />
+      <path
+        d="M8 11.2 10.2 7.8M8 12.8l2.2 3.4M14 7.8 16 11.2M14 16.2 16 12.8"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 

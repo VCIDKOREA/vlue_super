@@ -24,6 +24,7 @@ import {
   contentPageDisplayNumber,
   createShowcasePage,
   isPageConfigured,
+  normalizeBusinessLink,
   normalizeShowcasePage,
   pageStatusSummary,
   pageTypeLabel,
@@ -310,6 +311,9 @@ export default function ShowcaseStyleSettingsPanel({
         if (patch.richCustom) merged.richCustom = { ...p.richCustom, ...patch.richCustom };
         if (patch.caseTheme) merged.caseTheme = { ...p.caseTheme, ...patch.caseTheme };
         if (patch.type) merged.type = patch.type;
+        if (Object.prototype.hasOwnProperty.call(patch, "businessLink")) {
+          merged.businessLink = normalizeBusinessLink(patch.businessLink);
+        }
         if (Object.prototype.hasOwnProperty.call(patch, "instagramMedia")) {
           merged.instagramMedia = patch.instagramMedia;
         }
@@ -577,11 +581,26 @@ export default function ShowcaseStyleSettingsPanel({
                           maxPhotos={1}
                           enableTextOverlay
                         />
-                        <p className="showcase-page-card__hint">
-                          개인커스텀은 사진 1장 · 사진 위 텍스트(크기·위치·애니메이션) · 비즈니스 링크 중심입니다.
-                          「적용하기」하면 마이케이스에 새 게시물로 쌓이고 메인 송출에 반영됩니다. 여기서 페이지를
-                          지워도 이미 저장된 마이케이스 게시물은 그대로입니다.
-                        </p>
+                        <div className="showcase-page-card__biz">
+                          <p className="showcase-profile-block__sub">
+                            <span className="showcase-profile-row__label-text">
+                              비즈니스 링크
+                              <HelpTip text="이 페이지에만 보이는 링크입니다. 페이지당 1개만 넣을 수 있습니다. 로고가 없으면 기본 버튼으로 표시됩니다." />
+                            </span>
+                          </p>
+                          <BizLinkEditor
+                            links={page.businessLink ? [page.businessLink] : []}
+                            maxCount={1}
+                            inputCls={inputCls}
+                            isDarkMode={isDarkMode}
+                            onToast={onToast}
+                            onChange={(links) =>
+                              updatePage(page.id, {
+                                businessLink: Array.isArray(links) && links[0] ? links[0] : null
+                              })
+                            }
+                          />
+                        </div>
                       </div>
 
                       <button
@@ -898,65 +917,47 @@ export default function ShowcaseStyleSettingsPanel({
                       brand="kakao"
                       label="카카오 오픈채팅"
                       placeholder="https://open.kakao.com/…"
-                      value={
-                        config.commercial.outlinks.kakaoOpenChat ||
-                        (/open\.kakao\.com/i.test(config.commercial.outlinks.kakao || "")
-                          ? config.commercial.outlinks.kakao
-                          : "")
-                      }
+                      value={config.commercial.outlinks.kakaoOpenChat || ""}
                       inputCls={inputCls}
-                      onChange={(v) =>
+                      onChange={(v) => {
+                        const kakaoOpenChat = String(v || "").trim();
+                        const kakaoProfile = String(config.commercial.outlinks.kakaoProfile || "").trim();
                         persist({
                           commercial: {
                             outlinks: {
                               ...config.commercial.outlinks,
-                              kakaoOpenChat: v,
-                              kakao: v || config.commercial.outlinks.kakaoProfile || ""
+                              kakaoOpenChat,
+                              /* 프로필 칸은 건드리지 않음 — 레거시 kakao만 요약용으로 유지 */
+                              kakao: kakaoOpenChat || kakaoProfile || ""
                             }
                           }
-                        })
-                      }
+                        });
+                      }}
                     />
                     <BusinessOutlinkRow
                       brand="kakao"
                       label="카카오 프로필"
                       placeholder="https://pf.kakao.com/… 또는 카톡 프로필 URL"
-                      value={
-                        config.commercial.outlinks.kakaoProfile ||
-                        (!/open\.kakao\.com/i.test(config.commercial.outlinks.kakao || "")
-                          ? config.commercial.outlinks.kakao || ""
-                          : "")
-                      }
+                      value={config.commercial.outlinks.kakaoProfile || ""}
                       inputCls={inputCls}
-                      onChange={(v) =>
+                      onChange={(v) => {
+                        const kakaoProfile = String(v || "").trim();
+                        const kakaoOpenChat = String(config.commercial.outlinks.kakaoOpenChat || "").trim();
                         persist({
                           commercial: {
                             outlinks: {
                               ...config.commercial.outlinks,
-                              kakaoProfile: v,
-                              kakao: config.commercial.outlinks.kakaoOpenChat || v || ""
+                              kakaoProfile,
+                              /* 오픈채팅 칸은 건드리지 않음 */
+                              kakao: kakaoOpenChat || kakaoProfile || ""
                             }
                           }
-                        })
-                      }
+                        });
+                      }}
                     />
-                    <p className="showcase-profile-block__sub mt-3">
-                      <span className="showcase-profile-row__label-text">
-                        링크
-                        <HelpTip text="링크 이름 · URL · 선택 로고로 홍보할 수 있습니다. 로고가 없으면 기본 버튼으로 표시됩니다. 유해·불법 링크는 등록 시 자동 차단됩니다." />
-                      </span>
+                    <p className="showcase-profile-block__sub mt-3 text-[11px] opacity-70">
+                      홍보용 비즈니스 링크는 각 개인커스텀 페이지에서 페이지당 1개씩 설정합니다.
                     </p>
-                    <BizLinkEditor
-                      links={
-                        Array.isArray(config.commercial.links) && config.commercial.links.length
-                          ? config.commercial.links
-                          : config.commercial.products || []
-                      }
-                      inputCls={inputCls}
-                      isDarkMode={isDarkMode}
-                      onToast={onToast}
-                      onChange={(links) => persist({ commercial: { links, products: links } })}
-                    />
                     <label className="showcase-style-settings__check mt-3">
                       <input
                         type="checkbox"
@@ -1073,13 +1074,16 @@ function stripUrlSchemeForInput(raw) {
     .replace(/^\/\//, "");
 }
 
-function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = false }) {
+function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = false, maxCount = 0 }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const logoInputRef = useRef(null);
+  const limit = Number(maxCount) > 0 ? Number(maxCount) : 0;
+  const singleMode = limit === 1;
+  const atLimit = limit > 0 && links.length >= limit;
 
   const clearDraft = () => {
     setName("");
@@ -1104,6 +1108,10 @@ function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = f
     const linkName = name.trim();
     const hostPath = stripUrlSchemeForInput(url);
     if (!linkName || !hostPath || busy) return;
+    if (atLimit && !singleMode) {
+      onToast?.(`링크는 최대 ${limit}개까지 넣을 수 있습니다.`);
+      return;
+    }
     const linkUrl = `https://${hostPath}`;
     setError("");
     setBusy(true);
@@ -1115,15 +1123,13 @@ function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = f
         onToast?.(msg);
         return;
       }
-      onChange([
-        ...links,
-        {
-          id: `link-${Date.now()}`,
-          name: linkName,
-          url: String(check.uri || linkUrl).trim(),
-          logoUrl: logoUrl || ""
-        }
-      ]);
+      const nextLink = {
+        id: singleMode && links[0]?.id ? links[0].id : `link-${Date.now()}`,
+        name: linkName,
+        url: String(check.uri || linkUrl).trim(),
+        logoUrl: logoUrl || ""
+      };
+      onChange(singleMode ? [nextLink] : [...links, nextLink]);
       clearDraft();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "링크 검사에 실패했습니다.";
@@ -1239,24 +1245,34 @@ function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = f
         onClick={() => void add()}
       >
         <Plus size={15} strokeWidth={2.4} aria-hidden />
-        {busy ? "안전성 검사 중…" : "링크 추가"}
+        {busy
+          ? "안전성 검사 중…"
+          : singleMode && links.length
+            ? "링크 교체"
+            : singleMode
+              ? "링크 적용"
+              : "링크 추가"}
       </button>
       {links.length ? (
         <ul className="showcase-biz-list">
           {links.map((p) => (
             <li key={p.id}>
-              <span className="showcase-biz-list__meta">
-                <span className="showcase-biz-list__name">{p.name}</span>
-                {p.url ? <span className="showcase-biz-list__url">{p.url}</span> : null}
-              </span>
               {p.logoUrl ? (
                 <img src={p.logoUrl} alt="" className="showcase-biz-list__logo" />
               ) : (
                 <span className="showcase-biz-list__btn-badge" aria-hidden>
-                  버튼
+                  링크
                 </span>
               )}
-              <button type="button" aria-label={`${p.name} 삭제`} onClick={() => onChange(links.filter((x) => x.id !== p.id))}>
+              <span className="showcase-biz-list__meta">
+                <span className="showcase-biz-list__name">{p.name}</span>
+                {p.url ? <span className="showcase-biz-list__url">{p.url}</span> : null}
+              </span>
+              <button
+                type="button"
+                aria-label={`${p.name} 삭제`}
+                onClick={() => onChange(links.filter((x) => x.id !== p.id))}
+              >
                 ×
               </button>
             </li>

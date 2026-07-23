@@ -23,6 +23,12 @@ export function getApiBase() {
   return "";
 }
 
+/** 개발용 — 폰 LAN 로그인 디버그 */
+if (typeof window !== "undefined" && import.meta.env.DEV) {
+  window.__VLUE_API_BASE__ = getApiBase();
+  window.__VLUE_API_URL_ENV__ = String(import.meta.env.VITE_API_URL ?? "");
+}
+
 /** 절대 또는 상대 API 경로 */
 export function apiUrl(path) {
   const p = path.startsWith("/") ? path : `/${path}`;

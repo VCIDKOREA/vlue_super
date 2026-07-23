@@ -21,8 +21,10 @@ body,
 body {
   font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   font-size: calc(1rem * var(--vlue-ui-font-scale, 1));
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* antialiased????? UI??? ????? ??? ??????? ?? ??Windows/??? ?? ?????????????? */
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+  text-rendering: optimizeLegibility;
   scrollbar-gutter: stable;
   /* ?? ??? ?? ??? ?? ??? ???? ?? ?? */
   word-break: keep-all;
@@ -132,7 +134,7 @@ body,
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: auto;
 }
 
 .vlue-fluid-subtitle {
@@ -142,7 +144,7 @@ body,
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: auto;
 }
 
 .vlue-fluid-chip-row {
@@ -163,7 +165,7 @@ body,
   font-size: clamp(12px, 3.2vw, 13px);
   padding: clamp(6px, 1.2vw, 8px) clamp(10px, 2.4vw, 14px);
   line-height: 1.25;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: auto;
   text-rendering: optimizeLegibility;
 }
 
@@ -184,7 +186,7 @@ body,
   font-size: 13px;
   line-height: 1.25;
   padding: 8px 14px;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: auto;
   text-rendering: optimizeLegibility;
 }
 
@@ -212,7 +214,7 @@ body,
   flex-shrink: 0;
   font-size: clamp(11px, 3vw, 12px);
   white-space: nowrap;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: auto;
 }
 
 .vlue-fluid-value {
@@ -222,7 +224,7 @@ body,
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: auto;
 }
 
 .vlue-profile-info-grid {
@@ -720,8 +722,8 @@ body,
 
 /* ?? ???? ? ?? ?? ??? */
 .shop-category-strip {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
   text-rendering: optimizeLegibility;
 }
 
@@ -743,7 +745,7 @@ body,
   color: #e5e7eb !important;
 }
 
-/* hex 라이트 배경 arbitrary — attribute selector는 부분일치 주의 */
+/* hex ??????? arbitrary ??attribute selector????????? */
 .dark-mode [class*="bg-[#F8"],
 .dark-mode [class*="bg-[#f8"],
 .dark-mode [class*="bg-[#f3"],
@@ -751,14 +753,14 @@ body,
   background-color: #111827 !important;
 }
 
-/* hex 다크텍스트 / Tailwind arbitrary — attribute selector는 부분일치 주의 */
+/* hex ????????/ Tailwind arbitrary ??attribute selector????????? */
 .dark-mode [class*="text-[#1A"],
 .dark-mode [class*="text-[#19"],
 .dark-mode [class*="text-[#191f28]"] {
   color: #e5e7eb !important;
 }
 
-/* 카카오 브랜드 버튼 — 노란 배경 + 검정 글씨 유지 (위 remap 예외) */
+/* ?????????? ?????? ?? + ?????????? (??remap ???) */
 .dark-mode [class*="bg-[#FEE500]"],
 .dark-mode [class*="bg-[#fee500]"] {
   color: rgba(0, 0, 0, 0.85) !important;
@@ -814,7 +816,7 @@ body,
   background-color: #374151 !important;
 }
 
-/* slate 톤: tint *-50만 — *-500 솔리드와 substring 충돌 방지 */
+/* slate ?? tint *-50????*-500 ??????? substring ?? ??? */
 .dark-mode [class*="bg-slate-50"]:not([class*="bg-slate-500"]) {
   background-color: #1e293b !important;
 }
@@ -827,7 +829,7 @@ body,
   background-color: #475569 !important;
 }
 
-/* tint *-50 배경만 변환 — bg-*-500 은 substring 매칭에서 제외 */
+/* tint *-50 ?????????bg-*-500 ?? substring ????? ??? */
 .dark-mode [class*="bg-blue-50"]:not([class*="bg-blue-500"]) {
   background-color: rgba(37, 99, 235, 0.22) !important;
 }
@@ -1637,7 +1639,7 @@ body,
   background-color: rgb(255 255 255 / 6%) !important;
 }
 
-/* 홈 검색 — 공공 사업자 정보 카드 (검증 포탈 공공·국세청 탭과 동일 계열) */
+/* ????????? ???????? ?? (?????? ????????????? ??? ??) */
 .home-public-biz-card {
   margin-bottom: 0.5rem;
   border-radius: 0.9rem;
@@ -2863,6 +2865,8 @@ body,
   border-bottom: 1.5px solid rgba(148, 163, 184, 0.35);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
   box-shadow:
     0 14px 36px rgba(15, 23, 42, 0.22),
     0 4px 12px rgba(37, 99, 235, 0.12),
@@ -3216,7 +3220,7 @@ body,
 /* ?? ?? ? line-height ???? ?? */
 .lettering-report-sheet-root {
   line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: auto;
 }
 
 .lettering-report-sheet {
@@ -6129,6 +6133,18 @@ body,
   flex-shrink: 0;
 }
 
+.ldr-reception--push .ldr-panel--front .ldr-auth-social-dock {
+  margin-top: 10px;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+.ldr-reception--push .ldr-panel--front .ldr-auth-social-dock .vlue-push-auth-seal,
+.ldr-reception--push .ldr-panel--front .ldr-auth-social-dock .ldr-front-intro {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 .ldr-reception--push .ldr-contact-list {
   gap: 0;
   margin: 4px 12px 0;
@@ -6166,7 +6182,102 @@ body,
   min-height: 0;
 }
 
-/* 키패드 — 탭·프로필·연락처·인증배지 포함 명함 프레임 전체 덮기 */
+.ldr-auth-social-dock {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.ldr-biz-logos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: auto;
+  padding: 10px 0 8px;
+  padding-left: var(--ldr-front-content-indent, 0);
+}
+
+.ldr-biz-logos--dock {
+  margin: 0 12px;
+  padding: 0 2px;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition:
+    max-height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.22s ease,
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.28s ease;
+}
+
+.ldr-biz-logos--dock.is-visible {
+  max-height: 56px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+  padding: 0 2px 8px;
+}
+
+.ldr-biz-logos__item {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  overflow: visible;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.55);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ldr-biz-logos__item svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ldr-biz-logos__item.is-ig {
+  background: linear-gradient(135deg, #f58529 0%, #dd2a7b 50%, #8134af 100%);
+}
+
+.ldr-biz-logos__item.is-yt {
+  background: #e11d48;
+}
+
+.ldr-biz-logos__item.is-fb {
+  background: #2563eb;
+}
+
+.ldr-biz-logos__item.is-kakao {
+  background: #facc15;
+  color: #111827;
+}
+
+.ldr-biz-logos__tag {
+  display: none;
+}
+
+.vlue-push-auth-seal--social-toggle {
+  cursor: default;
+}
+
+.vlue-push-auth-seal--social-toggle.is-social-open {
+  border-color: rgba(125, 211, 252, 0.55);
+}
+
+/* ??????????????????????? ??? ?? ???????? ???? */
 .ldr-reception--push.ldr-reception--keypad {
   position: relative;
   overflow: hidden;
@@ -7103,6 +7214,42 @@ body,
   animation: vlue-push-auth-live-blink 1.4s ease-in-out infinite;
 }
 
+.vlue-push-auth-seal__social-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 55%, #db2777 100%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  box-shadow:
+    0 2px 10px rgba(37, 99, 235, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.vlue-push-auth-seal__social-toggle.is-open {
+  background: linear-gradient(135deg, #06b6d4 0%, #2563eb 50%, #8b5cf6 100%);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #fff;
+  box-shadow:
+    0 0 0 1px rgba(125, 211, 252, 0.45),
+    0 4px 14px rgba(14, 165, 233, 0.55);
+}
+
+.vlue-push-auth-seal__social-toggle-icon {
+  width: 13px;
+  height: 13px;
+}
+
 @keyframes vlue-push-auth-seal-enter {
   from {
     opacity: 0;
@@ -7886,7 +8033,7 @@ body,
   color: #94a3b8 !important;
 }
 
-/* Showcase YouTube / SoundCloud BGM — audio-only host */
+/* Showcase YouTube / SoundCloud BGM ??audio-only host */
 .showcase-bgm-yt-host,
 .showcase-bgm-sc-host {
   position: fixed;
@@ -7909,7 +8056,7 @@ body,
   opacity: 1 !important;
 }
 
-/* 마이페이지 — 블루 쇼케이스 미리보기 카드 */
+/* ?????? ???? ??????? ???? ?? */
 .mypage-showcase-card {
   position: relative;
   overflow: hidden;

@@ -163,6 +163,16 @@ function mergeDeep(defaults, parsed) {
           if (/open\.kakao\.com/i.test(legacyKakao)) raw.kakaoOpenChat = legacyKakao;
           else raw.kakaoProfile = legacyKakao;
         }
+        /* 오픈채팅 URL이 프로필 칸에 잘못 들어간 경우 복구 */
+        const openChat = String(raw.kakaoOpenChat || "").trim();
+        const profile = String(raw.kakaoProfile || "").trim();
+        if (!openChat && /open\.kakao\.com/i.test(profile)) {
+          raw.kakaoOpenChat = profile;
+          raw.kakaoProfile = "";
+        } else if (openChat && profile && openChat === profile && /open\.kakao\.com/i.test(profile)) {
+          raw.kakaoProfile = "";
+        }
+        raw.kakao = String(raw.kakaoOpenChat || raw.kakaoProfile || legacyKakao || "").trim();
         return raw;
       })(),
       products: parsed?.commercial?.products || defaults.commercial.products,

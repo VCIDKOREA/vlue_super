@@ -172,32 +172,37 @@ export default function ShowcaseStylePreview({
         ) : null}
 
         {isPaid &&
-        ((styleConfig?.commercial?.links || []).length > 0 ||
-          (styleConfig?.commercial?.products || []).length > 0) ? (
+        (Array.isArray(styleConfig?.pages) ? styleConfig.pages : []).some(
+          (page) => page?.businessLink?.url && page?.businessLink?.name
+        ) ? (
           <div className="showcase-style-preview__products">
-            {(styleConfig.commercial.links?.length
-              ? styleConfig.commercial.links
-              : styleConfig.commercial.products
-            ).map((pr) => {
-              const hasLogo = Boolean(String(pr.logoUrl || "").trim());
-              return (
-                <button
-                  key={pr.id}
-                  type="button"
-                  className={
-                    hasLogo
-                      ? "showcase-style-preview__product showcase-style-preview__product--logo"
-                      : "showcase-style-preview__product"
-                  }
-                  onClick={() => openProduct(pr)}
-                  aria-label={pr.name}
-                  title={pr.name}
-                >
-                  {hasLogo ? <img src={pr.logoUrl} alt="" /> : pr.name}
-                  {!hasLogo ? <ExternalLink size={12} aria-hidden /> : null}
-                </button>
-              );
-            })}
+            {(Array.isArray(styleConfig?.pages) ? styleConfig.pages : [])
+              .map((page) => page?.businessLink)
+              .filter((link) => link?.url && link?.name)
+              .slice(0, 4)
+              .map((pr) => {
+                const hasLogo = Boolean(String(pr.logoUrl || "").trim());
+                return (
+                  <button
+                    key={pr.id || pr.url}
+                    type="button"
+                    className={
+                      hasLogo
+                        ? "showcase-style-preview__product showcase-style-preview__product--card"
+                        : "showcase-style-preview__product"
+                    }
+                    onClick={() => openProduct(pr)}
+                    aria-label={pr.name}
+                    title={pr.name}
+                  >
+                    {hasLogo ? <img src={pr.logoUrl} alt="" /> : <ExternalLink size={12} aria-hidden />}
+                    <span className="showcase-style-preview__product-meta">
+                      <span className="showcase-style-preview__product-name">{pr.name}</span>
+                      <span className="showcase-style-preview__product-url">{pr.url}</span>
+                    </span>
+                  </button>
+                );
+              })}
           </div>
         ) : null}
 

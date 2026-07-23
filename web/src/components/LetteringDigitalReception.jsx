@@ -28,12 +28,126 @@ import VluePushAuthSeal from "./VluePushAuthSeal.jsx";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
+import { openExternalHref, formatWebHref } from "../lib/showcase/showcaseContactActions.js";
 
 function formatWebsite(raw) {
   return String(raw || "")
     .trim()
     .replace(/^https?:\/\//i, "")
     .replace(/^www\./i, "");
+}
+
+function firstText(...values) {
+  for (const v of values) {
+    const s = String(v || "").trim();
+    if (s) return s;
+  }
+  return "";
+}
+
+/** 디지털 명함 — 비즈니스 쇼셜링크 (인스타·유튜브·페이스북·카카오채팅·카카오프로필) */
+function listCardSocialOutlinks(card) {
+  const style = card?.showcaseStyle && typeof card.showcaseStyle === "object" ? card.showcaseStyle : {};
+  const outlinks = style.commercial?.outlinks || {};
+  const feed = style.platformFeed || {};
+
+  const ig =
+    firstText(outlinks.instagram, feed.instagramProfileUrl) ||
+    (feed.instagramHandle
+      ? `https://instagram.com/${String(feed.instagramHandle).replace(/^@/, "")}`
+      : "");
+  const legacyKakao = firstText(outlinks.kakao);
+  const kakaoOpen = firstText(
+    outlinks.kakaoOpenChat,
+    /open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : ""
+  );
+  const kakaoProfile = firstText(
+    outlinks.kakaoProfile,
+    feed.kakaoProfileUrl,
+    legacyKakao && !/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : ""
+  );
+  const facebook = firstText(outlinks.facebook);
+  const youtube = firstText(outlinks.youtube);
+
+  return [
+    ig ? { id: "instagram", label: "Instagram", url: ig, className: "is-ig" } : null,
+    youtube ? { id: "youtube", label: "YouTube", url: youtube, className: "is-yt" } : null,
+    facebook ? { id: "facebook", label: "Facebook", url: facebook, className: "is-fb" } : null,
+    kakaoOpen
+      ? { id: "kakao-open", label: "카카오 오픈채팅", url: kakaoOpen, className: "is-kakao" }
+      : null,
+    kakaoProfile
+      ? { id: "kakao-profile", label: "카카오 프로필", url: kakaoProfile, className: "is-kakao" }
+      : null
+  ].filter(Boolean);
+}
+
+function SocialOutlinkGlyph({ kind }) {
+  if (kind === "instagram") {
+    return (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
+        <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="1.8" />
+        <circle cx="12" cy="12" r="4.2" stroke="currentColor" strokeWidth="1.8" />
+        <circle cx="17.2" cy="6.8" r="1.1" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (kind === "kakao-open" || kind === "kakao-profile") {
+    return (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden>
+        <path d="M12 4C7.03 4 3 7.13 3 10.98c0 2.45 1.62 4.6 4.06 5.84-.13.48-.47 1.73-.54 2-.09.32.12.32.25.23.11-.07 1.72-1.17 2.41-1.64.6.09 1.21.13 1.82.13 4.97 0 9-3.13 9-6.98C21 7.13 16.97 4 12 4z" />
+      </svg>
+    );
+  }
+  if (kind === "facebook") {
+    return (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden>
+        <path d="M14 9h3V6h-3c-2.2 0-4 1.8-4 4v2H8v3h2v7h3v-7h2.6l.4-3H13v-2c0-.6.4-1 1-1z" />
+      </svg>
+    );
+  }
+  if (kind === "youtube") {
+    return (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden>
+        <path d="M23.5 7.2a3 3 0 0 0-2.1-2.1C19.5 4.6 12 4.6 12 4.6s-7.5 0-9.4.5A3 3 0 0 0 .5 7.2 31.5 31.5 0 0 0 0 12a31.5 31.5 0 0 0 .5 4.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31.5 31.5 0 0 0 24 12a31.5 31.5 0 0 0-.5-4.8zM9.8 15.5v-7l6.3 3.5-6.3 3.5z" />
+      </svg>
+    );
+  }
+  return null;
+}
+
+function FrontSocialOutlinkButtons({ card, enableContactLinks = true, visible = false }) {
+  const items = listCardSocialOutlinks(card);
+  if (!items.length) return null;
+
+  return (
+    <div
+      className={`ldr-biz-logos ldr-biz-logos--dock${visible ? " is-visible" : ""}`}
+      aria-label="비즈니스 쇼셜링크"
+      aria-hidden={!visible}
+    >
+      {items.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          className={`ldr-biz-logos__item ${item.className}`}
+          title={item.label}
+          aria-label={`${item.label} 열기`}
+          tabIndex={visible ? 0 : -1}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!enableContactLinks) return;
+            const href = formatWebHref(item.url) || String(item.url || "").trim();
+            if (href) openExternalHref(href);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <SocialOutlinkGlyph kind={item.id} />
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function PhoneCertBadge({ className = "" }) {
@@ -262,6 +376,9 @@ function FrontPanel({
   hideFollow = false,
   onToast
 }) {
+  const [socialOpen, setSocialOpen] = useState(false);
+  const socialItems = listCardSocialOutlinks(card);
+  const hasSocial = socialItems.length > 0;
   const phone = card.phone ? formatLetteringPhoneDisplay(card.phone) : "";
   const phoneRaw = String(card.phone || "").trim();
   const faxRaw = String(card.fax || "").trim();
@@ -443,12 +560,24 @@ function FrontPanel({
       </div>
 
       {embeddedInPush && verified ? (
-        <VluePushAuthSeal
-          className="ldr-front-intro ldr-front-intro--verified"
-          card={card}
-          hideFollow={hideFollow}
-          onToast={onToast}
-        />
+        <div className={`ldr-auth-social-dock${socialOpen && hasSocial ? " is-open" : ""}`}>
+          {hasSocial ? (
+            <FrontSocialOutlinkButtons
+              card={card}
+              enableContactLinks={enableContactLinks}
+              visible={socialOpen}
+            />
+          ) : null}
+          <VluePushAuthSeal
+            className="ldr-front-intro ldr-front-intro--verified"
+            card={card}
+            hideFollow={hideFollow}
+            onToast={onToast}
+            socialToggle={hasSocial}
+            socialExpanded={socialOpen}
+            onActivate={hasSocial ? () => setSocialOpen((v) => !v) : undefined}
+          />
+        </div>
       ) : null}
     </div>
   );
