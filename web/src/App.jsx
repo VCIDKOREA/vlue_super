@@ -790,6 +790,20 @@ function App() {
   }, [isLoggedIn]);
 
   useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    let cancelled = false;
+    void import("./lib/showcase/showcaseStyleSync.js")
+      .then((m) => {
+        if (cancelled) return null;
+        return m.hydrateShowcaseStyleFromServer();
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
+
+  useEffect(() => {
     if (!isLoggedIn) {
       setParentalConsentRequest(null);
       return undefined;
@@ -2035,6 +2049,14 @@ function App() {
           } catch {
             /* ignore */
           }
+          try {
+            const { hydrateShowcaseStyleFromServer } = await import(
+              "./lib/showcase/showcaseStyleSync.js"
+            );
+            await hydrateShowcaseStyleFromServer();
+          } catch {
+            /* ignore */
+          }
           const tierFromApi = String(data.membershipTier || "").trim().toLowerCase();
           const handle = String(data.publicHandle || id || "")
             .trim()
@@ -2157,6 +2179,14 @@ function App() {
       }
       persistAuthSessionAfterLogin(data);
       processTierChangeFromLoginData(data);
+      try {
+        const { hydrateShowcaseStyleFromServer } = await import(
+          "./lib/showcase/showcaseStyleSync.js"
+        );
+        await hydrateShowcaseStyleFromServer();
+      } catch {
+        /* ignore */
+      }
       setBottomToast(`${labels.kakao}로 로그인되었습니다.`);
       setTimeout(() => setBottomToast(""), 2200);
       return true;

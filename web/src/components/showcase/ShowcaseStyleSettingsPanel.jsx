@@ -240,11 +240,29 @@ export default function ShowcaseStyleSettingsPanel({
 
   /* 설정 진입 시 편집본 → 홈/통화 미리보기 동기화 (삭제 후에도 데모·옛 송출이 남지 않게) */
   useEffect(() => {
-    try {
-      writeLiveShowcaseStyle(readShowcaseStyle());
-    } catch {
-      /* ignore */
-    }
+    let cancelled = false;
+    void import("../../lib/showcase/showcaseStyleSync.js")
+      .then(async (m) => {
+        await m.hydrateShowcaseStyleFromServer();
+        if (cancelled) return;
+        setConfig(readShowcaseStyle());
+        try {
+          writeLiveShowcaseStyle(readShowcaseStyle());
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        try {
+          writeLiveShowcaseStyle(readShowcaseStyle());
+        } catch {
+          /* ignore */
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const card = useMemo(() => {

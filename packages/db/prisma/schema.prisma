@@ -182,6 +182,14 @@ model User {
   /// 쇼케이스 비공개 — 비팔로워는 팔로워 전용 공개 범위 외 정보 마스킹
   isShowcasePrivate Boolean @default(false) @map("is_showcase_private")
 
+  /// 기기 간 동기화 — 쇼케이스 편집 초안(사진·쇼셜링크·페이지 등)
+  showcaseStyleJson Json? @map("showcase_style_json") @db.JsonB
+  /// 메인 송출(라이브) 스타일 — 통화·홈 미리보기
+  showcaseLiveStyleJson Json? @map("showcase_live_style_json") @db.JsonB
+  /// 라이브 출처 { source: editor|mycase, at }
+  showcaseLiveSourceJson Json? @map("showcase_live_source_json") @db.JsonB
+  showcaseStyleUpdatedAt DateTime? @map("showcase_style_updated_at") @db.Timestamptz(6)
+
   /// 팔로워에게만 공개 (검색 공개와 별도 옵트인)
   isPhoneFollowersAllowed Boolean @default(true) @map("is_phone_followers_allowed")
   isNameFollowersAllowed  Boolean @default(true) @map("is_name_followers_allowed")

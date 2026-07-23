@@ -246,6 +246,7 @@ export function readShowcaseStyle() {
 
 export function writeShowcaseStyle(next, opts = {}) {
   const replace = Boolean(opts.replace);
+  const skipSync = Boolean(opts.skipSync);
   const base = replace
     ? mergeDeep(createDefaultShowcaseStyle(), next)
     : mergeDeep(readShowcaseStyle(), next);
@@ -267,6 +268,18 @@ export function writeShowcaseStyle(next, opts = {}) {
     throw e instanceof Error ? e : new Error("쇼케이스 설정 저장에 실패했습니다.");
   }
   window.dispatchEvent(new CustomEvent(SHOWCASE_STYLE_CHANGED_EVENT, { detail: merged }));
+  if (!skipSync) {
+    try {
+      import("./showcaseStyleSync.js")
+        .then((m) => {
+          m.bumpLocalShowcaseStyleUpdatedAt();
+          m.scheduleShowcaseStylePush();
+        })
+        .catch(() => {});
+    } catch {
+      /* ignore */
+    }
+  }
   return merged;
 }
 
@@ -331,6 +344,7 @@ export function readLiveShowcaseSource() {
 export function writeLiveShowcaseStyle(next, opts = {}) {
   const merged = normalizeStoredStyle(next && typeof next === "object" ? next : {});
   const source = opts.source === "mycase" ? "mycase" : "editor";
+  const skipSync = Boolean(opts.skipSync);
   try {
     localStorage.setItem(SHOWCASE_LIVE_STYLE_STORAGE_KEY, JSON.stringify(merged));
     localStorage.setItem(
@@ -343,6 +357,18 @@ export function writeLiveShowcaseStyle(next, opts = {}) {
   }
   /* 편집용 SHOWCASE_STYLE_CHANGED 는 쏘지 않음 — 마이케이스 목록 무한 리로드 방지 */
   window.dispatchEvent(new CustomEvent(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, { detail: merged }));
+  if (!skipSync) {
+    try {
+      import("./showcaseStyleSync.js")
+        .then((m) => {
+          m.bumpLocalShowcaseStyleUpdatedAt();
+          m.scheduleShowcaseStylePush();
+        })
+        .catch(() => {});
+    } catch {
+      /* ignore */
+    }
+  }
   return merged;
 }
 

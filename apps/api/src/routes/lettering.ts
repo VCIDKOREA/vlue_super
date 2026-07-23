@@ -21,6 +21,10 @@ import {
   listShowcaseComments,
   toggleShowcaseLike
 } from "../services/showcase/ShowcaseSocialService.js";
+import {
+  getUserShowcaseStyleBundle,
+  putUserShowcaseStyleBundle
+} from "../services/showcase/showcaseStyleSyncService.js";
 
 export const letteringRoutes = new Hono();
 
@@ -179,6 +183,28 @@ letteringRoutes.put("/showcase/search-privacy", requireUserHeader, async (c) => 
     isIdSearchAllowed: body?.isIdSearchAllowed
   });
   return c.json({ ok: true, privacy });
+});
+
+/** 쇼케이스 편집·라이브 스타일 기기 간 동기화 */
+letteringRoutes.get("/showcase/style", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const bundle = await getUserShowcaseStyleBundle(me);
+  return c.json({ ok: true, ...bundle });
+});
+
+letteringRoutes.put("/showcase/style", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = await c.req.json().catch(() => ({}));
+  const result = await putUserShowcaseStyleBundle(me, {
+    editor: body?.editor,
+    live: body?.live,
+    liveSource: body?.liveSource,
+    clientUpdatedAt: body?.clientUpdatedAt ?? body?.updatedAt ?? null
+  });
+  if (!result.ok) {
+    return c.json({ ok: false, conflict: true, ...result.bundle }, 409);
+  }
+  return c.json({ ok: true, ...result.bundle });
 });
 
 /**
