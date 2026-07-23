@@ -852,10 +852,36 @@ function App() {
         });
       }
       if (data.type === "vlue-payment-receipt") {
-        const title = String(n.title || data.title || "결제 완료");
-        const body = String(n.body || data.body || "결제가 완료되었습니다.");
-        addPushNotification({ category: "결제", title, body });
-        setBottomToast(body);
+        const title = String(n.title || data.title || "결제 완료 · 구매확인 안내");
+        const productName = String(data.orderName || data.productName || "VLUE 상품");
+        const productDetail = String(
+          data.productDetail || `${productName} 결제가 정상 처리되었습니다.`
+        );
+        const amountTotal = Number(data.amountTotal || 0);
+        const paymentId = String(data.paymentId || "");
+        const body = String(
+          n.body ||
+            data.body ||
+            [
+              "구매해 주셔서 진심으로 감사합니다.",
+              "",
+              `구매 상품: ${productName}`,
+              `상품 설명: ${productDetail}`,
+              `결제 금액: ${amountTotal.toLocaleString("ko-KR")}원`
+            ].join("\n")
+        );
+        addPushNotification({
+          category: "결제",
+          kind: "payment",
+          title,
+          body,
+          productName,
+          productDetail,
+          amountKrw: amountTotal,
+          paymentId,
+          needsPurchaseConfirm: true
+        });
+        setBottomToast("결제 완료 · 알림함에서 구매확인해 주세요");
         setTimeout(() => setBottomToast(""), 5200);
       }
     };
@@ -985,11 +1011,41 @@ function App() {
           addPushNotification({ category: "앱", title: "명함 문의", body: msg });
         }
         if (data?.type === "vlue-payment-receipt") {
-          const title = String(data.title || "결제 완료");
-          const body = String(data.body || "결제가 완료되었습니다.");
-          setBottomToast(body);
+          const title = String(data.title || "결제 완료 · 구매확인 안내");
+          const productName = String(data.productName || data.orderName || "VLUE 상품");
+          const productDetail = String(
+            data.productDetail ||
+              `${productName} 결제가 정상 처리되었습니다. 결제 내역은 VLUE 계정에 보관됩니다.`
+          );
+          const amountTotal = Number(data.amountTotal || 0);
+          const paymentId = String(data.paymentId || "");
+          const body =
+            String(data.body || "").trim() ||
+            [
+              "구매해 주셔서 진심으로 감사합니다.",
+              "",
+              `구매 상품: ${productName}`,
+              `상품 설명: ${productDetail}`,
+              `결제 금액: ${amountTotal.toLocaleString("ko-KR")}원`,
+              paymentId ? `결제 번호: ${paymentId}` : "",
+              "",
+              "아래 [구매확인]을 눌러 주시면 구매가 확정됩니다."
+            ]
+              .filter(Boolean)
+              .join("\n");
+          setBottomToast("결제 완료 · 알림함에서 구매확인해 주세요");
           setTimeout(() => setBottomToast(""), 5200);
-          addPushNotification({ category: "결제", title, body });
+          addPushNotification({
+            category: "결제",
+            kind: "payment",
+            title,
+            body,
+            productName,
+            productDetail,
+            amountKrw: amountTotal,
+            paymentId,
+            needsPurchaseConfirm: true
+          });
         }
         if (data?.type === "vlue-family-protection-alert") {
           const title = String(data.title || "가족 보호");

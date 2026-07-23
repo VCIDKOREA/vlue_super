@@ -88,11 +88,29 @@ export default function PortoneV2PaymentCallback({
         setPaymentId(result.paymentId || qPaymentId);
         setDetail("결제가 정상적으로 승인되었습니다.");
         try {
-          const { addPushNotification } = await import("../lib/pushNotificationInbox.js");
+          const { addPushNotification, buildPaymentReceiptBody } = await import(
+            "../lib/pushNotificationInbox.js"
+          );
+          const productName = result.orderName || "VLUE 결제";
+          const productDetail =
+            /테스트/i.test(productName)
+              ? "포트원 V2(KPN) 결제 연동 테스트 상품입니다. 실제 서비스 이용 금액이 아니며, 결제 승인·알림·구매확인 흐름 검증용으로 제공됩니다."
+              : `${productName}에 대한 결제가 정상 처리되었습니다.`;
           addPushNotification({
             category: "결제",
-            title: "결제 완료",
-            body: `${result.orderName || "VLUE 결제"} · ${Number(result.amountTotal || 0).toLocaleString("ko-KR")}원 결제가 완료되었습니다.`
+            kind: "payment",
+            title: "결제 완료 · 구매확인 안내",
+            body: buildPaymentReceiptBody({
+              productName,
+              productDetail,
+              amountKrw: result.amountTotal,
+              paymentId: result.paymentId
+            }),
+            productName,
+            productDetail,
+            amountKrw: result.amountTotal,
+            paymentId: result.paymentId,
+            needsPurchaseConfirm: true
           });
         } catch {
           /* ignore */

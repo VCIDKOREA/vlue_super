@@ -70,19 +70,72 @@ export function countUnreadPush() {
   return readList().filter((n) => !n.read).length;
 }
 
-export function addPushNotification({ category = "기타", title = "", body = "", time, createdAt }) {
+/**
+ * @param {object} opts
+ * @param {string} [opts.category]
+ * @param {string} [opts.title]
+ * @param {string} [opts.body]
+ * @param {string} [opts.time]
+ * @param {string} [opts.createdAt]
+ * @param {"payment"|string} [opts.kind]
+ * @param {string} [opts.productName]
+ * @param {string} [opts.productDetail]
+ * @param {number} [opts.amountKrw]
+ * @param {string} [opts.paymentId]
+ * @param {boolean} [opts.needsPurchaseConfirm]
+ */
+export function addPushNotification({
+  category = "기타",
+  title = "",
+  body = "",
+  time,
+  createdAt,
+  kind,
+  productName,
+  productDetail,
+  amountKrw,
+  paymentId,
+  needsPurchaseConfirm
+} = {}) {
   const at = createdAt || new Date().toISOString();
+  const isPayment = kind === "payment" || category === "결제";
   const entry = {
     id: `push-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     category: String(category || "기타").slice(0, 12),
     title: String(title || "").slice(0, 80),
-    body: String(body || "").slice(0, 280),
+    body: String(body || "").slice(0, isPayment ? 1200 : 280),
     time: time || formatPushNotificationDateTime(at),
     read: false,
-    createdAt: at
+    createdAt: at,
+    kind: kind || null,
+    productName: productName ? String(productName).slice(0, 120) : null,
+    productDetail: productDetail ? String(productDetail).slice(0, 800) : null,
+    amountKrw: Number.isFinite(Number(amountKrw)) ? Math.floor(Number(amountKrw)) : null,
+    paymentId: paymentId ? String(paymentId).slice(0, 80) : null,
+    needsPurchaseConfirm: Boolean(needsPurchaseConfirm ?? isPayment),
+    purchaseConfirmed: false,
+    purchaseConfirmedAt: null
   };
   writeList([entry, ...readList()]);
   return entry;
+}
+
+/** 쇼핑 구매확정과 동일 — 알림에서 구매확인 완료 처리 */
+export function confirmPushPurchase(id) {
+  const at = new Date().toISOString();
+  let updated = null;
+  const list = readList().map((n) => {
+    if (n.id !== id) return n;
+    updated = {
+      ...n,
+      read: true,
+      purchaseConfirmed: true,
+      purchaseConfirmedAt: at
+    };
+    return updated;
+  });
+  writeList(list);
+  return updated;
 }
 
 export function markPushRead(id) {
@@ -92,4 +145,28 @@ export function markPushRead(id) {
 
 export function markAllPushRead() {
   writeList(readList().map((n) => ({ ...n, read: true })));
+}
+
+/** 결제 알림 본문 — 감사 인사로 시작 + 상품 상세 */
+export function buildPaymentReceiptBody({
+  productName = "VLUE 상품",
+  productDetail = "",
+  amountKrw = 0,
+  paymentId = ""
+} = {}) {
+  const name = String(productName || "VLUE 상품").trim();
+  const detail =
+    String(productDetail || "").trim() ||
+    `${name} 결제가 정상 처리되었습니다. 결제 내역은 VLUE 계정에 안전하게 보관됩니다.`;
+  const amount = Math.max(0, Math.floor(Number(amountKrw) || 0)).toLocaleString("ko-KR");
+  const lines = [
+    "구매해 주셔서 진심으로 감사합니다.",
+    "",
+    `구매 상품: ${name}`,
+    `상품 설명: ${detail}`,
+    `결제 금액: ${amount}원`
+  ];
+  if (paymentId) lines.push(`결제 번호: ${paymentId}`);
+  lines.push("", "아래 [구매확인]을 눌러 주시면 구매가 확정됩니다.");
+  return lines.join("\n");
 }

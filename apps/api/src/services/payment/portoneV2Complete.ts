@@ -29,6 +29,34 @@ function formatAmountKrw(n: number): string {
   return `${Math.max(0, Math.floor(n)).toLocaleString("ko-KR")}원`;
 }
 
+function resolveProductDetail(orderName: string, customData: unknown): string {
+  const name = String(orderName || "VLUE 상품").trim();
+  const fromCustom =
+    customData && typeof customData === "object" && !Array.isArray(customData)
+      ? String((customData as { productDetail?: string; description?: string }).productDetail ||
+          (customData as { description?: string }).description ||
+          "").trim()
+      : "";
+  if (fromCustom) return fromCustom;
+  if (/테스트/i.test(name)) {
+    return "포트원 V2(KPN) 결제 연동 테스트 상품입니다. 실제 서비스 이용 금액이 아니며, 결제 승인·알림·구매확인 흐름 검증용으로 제공됩니다.";
+  }
+  return `${name}에 대한 결제가 정상 처리되었습니다. 결제 내역은 VLUE 계정에 안전하게 보관되며, 구매확인 시 주문이 확정됩니다.`;
+}
+
+function buildPaymentReceiptBody(orderName: string, amountKrw: number, paymentId: string, productDetail: string): string {
+  return [
+    "구매해 주셔서 진심으로 감사합니다.",
+    "",
+    `구매 상품: ${orderName}`,
+    `상품 설명: ${productDetail}`,
+    `결제 금액: ${formatAmountKrw(amountKrw)}`,
+    `결제 번호: ${paymentId}`,
+    "",
+    "아래 [구매확인]을 눌러 주시면 구매가 확정됩니다."
+  ].join("\n");
+}
+
 /**
  * 브라우저 결제창 성공 후 서버에서 단건 조회 → 금액·상태 검증 → DB 저장 → 알림/푸시.
  * PAID / VIRTUAL_ACCOUNT_ISSUED 만 성공으로 간주.
@@ -99,8 +127,9 @@ export async function completePortoneV2Payment(
 
   let notified = false;
   if (status === "PAID" && !alreadyPaid) {
-    const title = "결제 완료";
-    const body = `${orderName} · ${formatAmountKrw(safeAmount)} 결제가 완료되었습니다.`;
+    const productDetail = resolveProductDetail(orderName, input.customData);
+    const title = "결제 완료 · 구매확인 안내";
+    const body = buildPaymentReceiptBody(orderName, safeAmount, paymentId, productDetail);
 
     try {
       await prisma.ownerNotification.create({
@@ -122,6 +151,9 @@ export async function completePortoneV2Payment(
         paymentId,
         amountTotal: safeAmount,
         orderName,
+        productName: orderName,
+        productDetail,
+        needsPurchaseConfirm: true,
         at: new Date().toISOString()
       });
     } catch (e) {
@@ -129,11 +161,12 @@ export async function completePortoneV2Payment(
     }
 
     try {
-      await sendOfficePushToUser(input.userId, title, body, {
+      await sendOfficePushToUser(input.userId, title, body.slice(0, 180), {
         type: "vlue-payment-receipt",
         paymentId,
         amountTotal: String(safeAmount),
-        orderName: String(orderName)
+        orderName: String(orderName),
+        productDetail: productDetail.slice(0, 120)
       });
       notified = true;
     } catch (e) {

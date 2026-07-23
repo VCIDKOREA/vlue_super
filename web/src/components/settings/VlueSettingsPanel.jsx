@@ -793,18 +793,36 @@ export default function VlueSettingsPanel({
                 });
                 if (result.redirected) return;
                 try {
-                  const { addPushNotification } = await import("../../lib/pushNotificationInbox.js");
+                  const { addPushNotification, buildPaymentReceiptBody } = await import(
+                    "../../lib/pushNotificationInbox.js"
+                  );
+                  const amount = Number(result.complete?.amountTotal || 1000);
+                  const paymentId = String(result.complete?.paymentId || result.paymentId || "");
+                  const productName = "VLUE V2 테스트";
+                  const productDetail =
+                    "포트원 V2(KPN) 결제 연동 테스트 상품입니다. 실제 서비스 이용 금액이 아니며, 결제 승인·알림·구매확인 흐름 검증용으로 제공됩니다.";
                   addPushNotification({
                     category: "결제",
-                    title: "결제 완료",
-                    body: `VLUE V2 테스트 · ${Number(result.complete?.amountTotal || 1000).toLocaleString("ko-KR")}원 결제가 완료되었습니다.`
+                    kind: "payment",
+                    title: "결제 완료 · 구매확인 안내",
+                    body: buildPaymentReceiptBody({
+                      productName,
+                      productDetail,
+                      amountKrw: amount,
+                      paymentId
+                    }),
+                    productName,
+                    productDetail,
+                    amountKrw: amount,
+                    paymentId,
+                    needsPurchaseConfirm: true
                   });
                 } catch {
                   /* ignore */
                 }
                 showSettingNotice?.(
                   result.complete?.status === "PAID"
-                    ? "결제 승인 완료 (PAID) · 알림함·푸시를 확인하세요"
+                    ? "결제 승인 완료 · 알림함에서 구매확인해 주세요"
                     : `결제 처리됨 (${result.complete?.status || result.paymentId})`
                 );
               } catch (e) {

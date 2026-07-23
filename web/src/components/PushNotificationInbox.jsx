@@ -111,10 +111,14 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
                   </span>
                   <span
                     className={`ml-auto text-[11px] font-bold ${
-                      n.read ? "text-slate-400" : "text-blue-600"
+                      n.purchaseConfirmed
+                        ? "text-emerald-600"
+                        : n.read
+                          ? "text-slate-400"
+                          : "text-blue-600"
                     }`}
                   >
-                    {n.read ? "확인" : "미확인"}
+                    {n.purchaseConfirmed ? "구매확정" : n.read ? "확인" : "미확인"}
                   </span>
                 </div>
                 <p className="text-[13px] font-bold text-gray-900">{n.title}</p>
@@ -131,6 +135,10 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
         displayTime={detail ? resolvePushDisplayTime(detail) : ""}
         isDarkMode={isDarkMode}
         onClose={() => setDetail(null)}
+        onUpdated={(next) => {
+          setDetail(next);
+          refresh();
+        }}
       />
     </div>
   );
