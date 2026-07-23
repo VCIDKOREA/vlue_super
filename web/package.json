@@ -13,7 +13,6 @@
     "typecheck": "echo \"(JSX) typecheck optional\""
   },
   "dependencies": {
-    "@portone/browser-sdk": "^0.1.9",
     "@supabase/supabase-js": "^2.105.1",
     "@vlue/shared": "*",
     "firebase": "^11.6.0",
