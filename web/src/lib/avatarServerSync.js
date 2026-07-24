@@ -1,4 +1,4 @@
-import { readAvatar, writeAvatar } from "./vlueAvatar.js";
+import { readAvatar, writeAvatar, writeProfilePhoto } from "./vlueAvatar.js";
 import {
   readLetteringBizcardEditable,
   writeLetteringBizcardEditable
@@ -37,9 +37,7 @@ export function hydrateAvatarsFromExportSnapshot(snap, opts = {}) {
   let logoApplied = false;
 
   if (shouldHydrateSlot(readAvatar("primary"), photo, force)) {
-    writeAvatar("primary", photo, { skipServerSync: true });
-    writeAvatar("feed", photo, { skipServerSync: true });
-    writeAvatar("chat", photo, { skipServerSync: true });
+    writeProfilePhoto(photo, { skipServerSync: true });
     photoApplied = true;
   }
   if (shouldHydrateSlot(readAvatar("card"), logo, force)) {

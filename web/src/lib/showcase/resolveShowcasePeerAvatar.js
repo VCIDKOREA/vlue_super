@@ -52,9 +52,9 @@ export function resolveShowcasePeerAvatar({
 
   if (!url) {
     url = firstNonEmpty(
-      feed.avatarUrl,
-      card?.avatarUrl,
       card?.photoUrl,
+      card?.avatarUrl,
+      feed.avatarUrl,
       card?.image_url,
       card?.profileImageUrl
     );

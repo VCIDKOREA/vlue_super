@@ -93,7 +93,7 @@ import {
 import { upsertKnownPhonesFromFriends } from "./lib/contacts/knownPhonesIndex.js";
 import { syncDeviceContactsFromNative } from "./lib/contacts/deviceContactsCache.js";
 import { effectiveCardJobTitle } from "./lib/jobTitleVerify.js";
-import { readAvatar } from "./lib/vlueAvatar.js";
+import { readAvatar, readProfilePhotoAvatar } from "./lib/vlueAvatar.js";
 import { fetchActiveMarketingPopup, fetchLatestNotice } from "./lib/vlueOfficeApi.js";
 import MarketingPopupModal, { shouldShowMarketingPopup } from "./components/marketing/MarketingPopupModal.jsx";
 import NoticeDetailSheet, { NoticeReleaseToast } from "./components/marketing/NoticeReleaseUI.jsx";
@@ -1667,7 +1667,7 @@ function App() {
       logoUrl: logoResolved
     };
   }, [membershipTier, digitalCardActive, cardFieldsTick, avatarTick]);
-  const headerProfileAvatar = useMemo(() => readAvatar("chat") || readAvatar("primary"), [avatarTick]);
+  const headerProfileAvatar = useMemo(() => readProfilePhotoAvatar(), [avatarTick]);
   const profileByRoomId = useMemo(() => {
     const out = {};
     Object.entries(roomCatalog).forEach(([tab, rooms]) => {

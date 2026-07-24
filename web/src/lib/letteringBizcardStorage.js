@@ -92,6 +92,26 @@ export const LETTERING_LOGO_RULES = {
   acceptLabel: "PNG, JPG, WEBP"
 };
 
+/** 프로필 사진 배경(히어로) 세로 초점 — object-position */
+export const PHOTO_FOCUS_OPTIONS = [
+  { id: "top", label: "상단", css: "center top" },
+  { id: "center", label: "중앙", css: "center center" },
+  { id: "bottom", label: "하단", css: "center bottom" }
+];
+
+export function normalizePhotoFocus(raw) {
+  const v = String(raw || "")
+    .trim()
+    .toLowerCase();
+  if (v === "center" || v === "bottom" || v === "top") return v;
+  return "top";
+}
+
+export function photoFocusToCss(raw) {
+  const id = normalizePhotoFocus(raw);
+  return PHOTO_FOCUS_OPTIONS.find((o) => o.id === id)?.css || "center top";
+}
+
 const DEFAULT_EDITABLE = {
   designTemplate: "classic-light",
   title: "",
@@ -108,6 +128,8 @@ const DEFAULT_EDITABLE = {
   logoFileName: "",
   photoDataUrl: "",
   photoFileName: "",
+  /** 히어로 배경 초점: top | center | bottom */
+  photoFocus: "top",
   noProfilePhoto: false,
   noCompanyLogo: false,
   noFax: false,
@@ -363,6 +385,7 @@ export function readLetteringBizcardEditable() {
     if (!coverSeparated && legacyCover.startsWith("data:")) writeBlobKey(LETTERING_BIZCARD_COVER_KEY, legacyCover);
     return {
       ...base,
+      photoFocus: normalizePhotoFocus(base.photoFocus),
       logoDataUrl: logoSeparated || legacyLogo,
       photoDataUrl: photoSeparated || legacyPhoto,
       kakaoFeedBgDataUrl: coverSeparated || legacyCover
@@ -387,6 +410,9 @@ export function writeLetteringBizcardEditable(patch = {}) {
       : {}),
     ...(Object.prototype.hasOwnProperty.call(patch, "email")
       ? { email: clampLetteringBizcardEmail(patch.email).trim() }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(patch, "photoFocus")
+      ? { photoFocus: normalizePhotoFocus(patch.photoFocus) }
       : {})
   };
 

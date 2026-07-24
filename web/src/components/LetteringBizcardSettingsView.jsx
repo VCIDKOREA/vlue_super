@@ -8,7 +8,8 @@ import {
   readLetteringBizcardAddressFields,
   readLetteringBizcardEditable,
   readLetteringFixedIdentity,
-  writeLetteringBizcardEditable
+  writeLetteringBizcardEditable,
+  normalizePhotoFocus
 } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringBizcardTemplate } from "../lib/letteringBizcardTemplates.js";
 import {
@@ -30,7 +31,7 @@ import {
   isVerifyDocIssuedWithinLimit,
   prepareLetteringVerifyDocFromFile
 } from "../lib/letteringBizcardVerification.js";
-import { writeAvatar } from "../lib/vlueAvatar.js";
+import { writeAvatar, writeProfilePhoto } from "../lib/vlueAvatar.js";
 import { DIGITAL_CARD_ACTIVE_KEY } from "../lib/bizcardAccountSync.js";
 
 export default function LetteringBizcardSettingsView({
@@ -63,6 +64,7 @@ export default function LetteringBizcardSettingsView({
   const [logoError, setLogoError] = useState("");
   const [photoError, setPhotoError] = useState("");
   const [noProfilePhoto, setNoProfilePhoto] = useState(false);
+  const [photoFocus, setPhotoFocus] = useState("top");
   const [noCompanyLogo, setNoCompanyLogo] = useState(false);
   const [noFax, setNoFax] = useState(false);
   const [noWebsite, setNoWebsite] = useState(false);
@@ -152,6 +154,7 @@ export default function LetteringBizcardSettingsView({
     setPhotoFileName(ed.photoFileName || "");
     setPhotoPreview(ed.photoDataUrl || "");
     setNoProfilePhoto(Boolean(ed.noProfilePhoto));
+    setPhotoFocus(normalizePhotoFocus(ed.photoFocus));
     setNoCompanyLogo(Boolean(ed.noCompanyLogo));
     setNoFax(Boolean(ed.noFax));
     setNoWebsite(Boolean(ed.noWebsite));
@@ -226,7 +229,8 @@ export default function LetteringBizcardSettingsView({
       noFax,
       noWebsite,
       logoUrl,
-      photoUrl
+      photoUrl,
+      photoFocus
     });
   }, [
     membershipTier,
@@ -241,6 +245,7 @@ export default function LetteringBizcardSettingsView({
     pendingLogo,
     photoPreview,
     pendingPhoto,
+    photoFocus,
     noProfilePhoto,
     noCompanyLogo,
     noFax,
@@ -380,6 +385,7 @@ export default function LetteringBizcardSettingsView({
       noCompanyLogo,
       noFax,
       noWebsite,
+      photoFocus: normalizePhotoFocus(photoFocus),
       logoDataUrl: noCompanyLogo ? "" : pendingLogo?.dataUrl || logoPreview || "",
       logoFileName: noCompanyLogo ? "" : pendingLogo?.fileName || logoFileName || "",
       photoDataUrl: noProfilePhoto ? "" : pendingPhoto?.dataUrl || photoPreview || "",
@@ -445,12 +451,16 @@ export default function LetteringBizcardSettingsView({
     setPendingPhoto(null);
 
     try {
-      /* primary = 프로필 사진, card = 회사 로고 — 슬롯 혼용 금지 */
+      /* primary/feed/chat = 프로필 사진, card = 회사 로고 — 슬롯 혼용 금지 */
       if (saved.photoDataUrl && !saved.noProfilePhoto) {
-        writeAvatar("primary", saved.photoDataUrl);
+        writeProfilePhoto(saved.photoDataUrl);
+      } else if (saved.noProfilePhoto) {
+        writeProfilePhoto("");
       }
       if (saved.logoDataUrl && !saved.noCompanyLogo) {
         writeAvatar("card", saved.logoDataUrl);
+      } else if (saved.noCompanyLogo) {
+        writeAvatar("card", "");
       }
     } catch {
       /* ignore */
@@ -553,6 +563,8 @@ export default function LetteringBizcardSettingsView({
           photoError={photoError}
           noProfilePhoto={noProfilePhoto}
           setNoProfilePhoto={handleNoProfilePhotoChange}
+          photoFocus={photoFocus}
+          setPhotoFocus={setPhotoFocus}
           noCompanyLogo={noCompanyLogo}
           setNoCompanyLogo={handleNoCompanyLogoChange}
           noFax={noFax}

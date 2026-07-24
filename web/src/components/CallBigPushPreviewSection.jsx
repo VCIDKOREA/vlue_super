@@ -55,11 +55,13 @@ export default function CallBigPushPreviewSection({
     window.addEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, bump);
     window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
     window.addEventListener("vlue-digital-card-changed", bump);
+    window.addEventListener("vlue-avatar-changed", bump);
     return () => {
       window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, bump);
       window.removeEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, bump);
       window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
       window.removeEventListener("vlue-digital-card-changed", bump);
+      window.removeEventListener("vlue-avatar-changed", bump);
     };
   }, []);
 

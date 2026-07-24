@@ -6,7 +6,8 @@ import {
   writeLetteringBizcardEditable,
   readLetteringBizcardAddressFields,
   combineLetteringBizcardAddress,
-  clampLetteringBizcardEmail
+  clampLetteringBizcardEmail,
+  normalizePhotoFocus
 } from "./letteringBizcardStorage.js";
 import { writeMembershipBillingMeta } from "./authValidityPeriod.js";
 import {
@@ -78,6 +79,10 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
       force || !String(local.photoDataUrl || local.photoUrl || "").trim()
         ? String(snap.photoUrl || "").trim()
         : String(local.photoDataUrl || local.photoUrl || "").trim(),
+    photoFocus:
+      force || !String(local.photoFocus || "").trim()
+        ? normalizePhotoFocus(snap.photoFocus || local.photoFocus)
+        : normalizePhotoFocus(local.photoFocus),
     noCompanyLogo: force && snap.noCompanyLogo != null ? Boolean(snap.noCompanyLogo) : Boolean(local.noCompanyLogo),
     noProfilePhoto: force && snap.noProfilePhoto != null ? Boolean(snap.noProfilePhoto) : Boolean(local.noProfilePhoto),
     noFax: force && snap.noFax != null ? Boolean(snap.noFax) : Boolean(local.noFax),
@@ -204,6 +209,7 @@ export async function syncDigitalCardExportSnapshot(card) {
           customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
           logoUrl: String(card?.logoUrl || ed.logoDataUrl || ed.logoUrl || "").trim(),
           photoUrl: String(card?.photoUrl || ed.photoDataUrl || ed.photoUrl || "").trim(),
+          photoFocus: normalizePhotoFocus(card?.photoFocus || ed.photoFocus),
           noCompanyLogo: Boolean(ed.noCompanyLogo),
           noProfilePhoto: Boolean(ed.noProfilePhoto),
           shareCoverUrl: String(ed.kakaoFeedBgDataUrl || card?.shareCoverUrl || "").trim(),

@@ -12,7 +12,10 @@ import {
   clampLetteringBizcardEmail,
   isLetteringBizcardEmailLong,
   prepareLetteringLogoFromFile,
-  prepareLetteringPhotoFromFile
+  prepareLetteringPhotoFromFile,
+  PHOTO_FOCUS_OPTIONS,
+  normalizePhotoFocus,
+  photoFocusToCss
 } from "../lib/letteringBizcardStorage.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 
@@ -75,7 +78,8 @@ function ImageUploadTile({
   disabled = false,
   omitChecked = false,
   onOmitChange,
-  omitLabel
+  omitLabel,
+  objectPosition
 }) {
   const inputRef = useRef(null);
   const scrollSnapshot = useRef({ top: 0, el: null });
@@ -143,7 +147,12 @@ function ImageUploadTile({
       <div className="flex items-center gap-3">
         <span className={tile}>
           {preview && !omitChecked ? (
-            <img src={preview} alt="" className="h-full w-full object-cover" />
+            <img
+              src={preview}
+              alt=""
+              className="h-full w-full object-cover"
+              style={objectPosition ? { objectPosition } : undefined}
+            />
           ) : (
             <ImagePlus className={`h-6 w-6 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
           )}
@@ -209,6 +218,8 @@ export default function LetteringBizcardQuickBuilder({
   photoError,
   noProfilePhoto,
   setNoProfilePhoto,
+  photoFocus = "top",
+  setPhotoFocus,
   noCompanyLogo,
   setNoCompanyLogo,
   noFax,
@@ -325,7 +336,42 @@ export default function LetteringBizcardQuickBuilder({
             omitChecked={noProfilePhoto}
             onOmitChange={setNoProfilePhoto}
             omitLabel="사진 업로드 없음"
+            objectPosition={photoFocusToCss(photoFocus)}
           />
+          {!noProfilePhoto && (pendingPhoto?.dataUrl || photoPreview) ? (
+            <div className="mt-2" role="tablist" aria-label="배경 사진 위치">
+              <p className={`mb-1.5 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                배경 사진 위치 · 얼굴이 잘리면 상단/하단으로 맞춰 주세요
+              </p>
+              <div
+                className={`grid grid-cols-3 gap-1 rounded-xl p-1 ${
+                  isDarkMode ? "bg-slate-900/80" : "bg-gray-100"
+                }`}
+              >
+                {PHOTO_FOCUS_OPTIONS.map((opt) => {
+                  const active = normalizePhotoFocus(photoFocus) === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      className={`rounded-lg px-2 py-2 text-[11px] font-bold transition ${
+                        active
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : isDarkMode
+                            ? "text-gray-300 active:bg-white/10"
+                            : "text-slate-600 active:bg-white"
+                      }`}
+                      onClick={() => setPhotoFocus?.(opt.id)}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           {photoFileName && !noProfilePhoto ? (
             <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
               {photoFileName}

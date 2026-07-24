@@ -179,6 +179,7 @@
   height: 48px;
   border-radius: 22%;
   object-fit: cover;
+  object-position: center top;
   flex-shrink: 0;
   background: #2b6ff0;
 }

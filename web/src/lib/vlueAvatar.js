@@ -10,6 +10,8 @@ const KEYS = {
   card: "vlue_avatar_card"
 };
 
+const PHOTO_SLOTS = ["primary", "feed", "chat"];
+
 /** VLUE 공식 마크 — 경로·data URL·인라인 SVG 지문까지 차단 */
 export function isVlueBrandAssetUrl(url) {
   const s = String(url || "").trim();
@@ -57,6 +59,77 @@ function sanitizeAvatarUrl(raw) {
   return s;
 }
 
+function readRawSlot(slot) {
+  try {
+    return sanitizeAvatarUrl(localStorage.getItem(KEYS[slot] || KEYS.primary));
+  } catch {
+    return "";
+  }
+}
+
+function writeRawSlot(slot, url) {
+  try {
+    const k = KEYS[slot] || KEYS.primary;
+    const v = sanitizeAvatarUrl(url);
+    if (v) localStorage.setItem(k, v);
+    else localStorage.removeItem(k);
+  } catch {
+    /* ignore */
+  }
+}
+
+function readLetteringPhotoUrl() {
+  try {
+    /* 동적 import 불가(동기 마이그레이션) — 명함 스토리지 키를 직접 읽음 */
+    const metaRaw = localStorage.getItem("vlue_lettering_bizcard_v1");
+    const photoBlob = localStorage.getItem("vlue_lettering_photo_data_v1");
+    let noProfilePhoto = false;
+    let metaPhoto = "";
+    if (metaRaw) {
+      const parsed = JSON.parse(metaRaw);
+      noProfilePhoto = Boolean(parsed?.noProfilePhoto);
+      metaPhoto = String(parsed?.photoDataUrl || parsed?.photoUrl || "").trim();
+    }
+    if (noProfilePhoto) return "";
+    return sanitizeAvatarUrl(photoBlob || metaPhoto);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * primary / feed / chat / 명함 photoDataUrl 을 한 장으로 맞춤.
+ * 우선순위: 명함 프로필 사진 → primary → feed → chat
+ */
+export function unifyProfilePhotoSlots() {
+  try {
+    const migrateKey = "vlue_avatar_unify_photo_v1";
+    const letteringPhoto = readLetteringPhotoUrl();
+    const primary = readRawSlot("primary");
+    const feed = readRawSlot("feed");
+    const chat = readRawSlot("chat");
+    const canonical = letteringPhoto || primary || feed || chat;
+    if (!canonical) {
+      if (!localStorage.getItem(migrateKey)) localStorage.setItem(migrateKey, "1");
+      return "";
+    }
+    const needsMirror =
+      primary !== canonical || feed !== canonical || chat !== canonical || !localStorage.getItem(migrateKey);
+    if (needsMirror) {
+      PHOTO_SLOTS.forEach((slot) => writeRawSlot(slot, canonical));
+      localStorage.setItem(migrateKey, "1");
+      try {
+        window.dispatchEvent(new Event("vlue-avatar-changed"));
+      } catch {
+        /* ignore */
+      }
+    }
+    return canonical;
+  } catch {
+    return "";
+  }
+}
+
 /** 예전에 박힌 VLUE 로고·오염 아바타 제거 */
 export function scrubBrandAvatarsFromStorage() {
   try {
@@ -75,6 +148,7 @@ export function scrubBrandAvatarsFromStorage() {
         /* ignore */
       }
     }
+    unifyProfilePhotoSlots();
   } catch {
     /* ignore */
   }
@@ -108,8 +182,34 @@ export function readProfilePhotoAvatar() {
   return readAvatar("primary") || readAvatar("feed") || readAvatar("chat") || "";
 }
 
+/**
+ * 사람 프로필 사진 — primary/feed/chat 동시 반영 (헤더·마이케이스·채팅 동기화)
+ * 회사 로고(card)는 절대 건드리지 않음.
+ */
+export function writeProfilePhoto(dataUrlOrUrl, opts = {}) {
+  const v = sanitizeAvatarUrl(dataUrlOrUrl);
+  PHOTO_SLOTS.forEach((slot) => writeRawSlot(slot, v));
+  try {
+    window.dispatchEvent(new Event("vlue-avatar-changed"));
+  } catch {
+    /* ignore */
+  }
+  if (!opts.skipServerSync) {
+    queueMicrotask(() => {
+      import("./avatarServerSync.js")
+        .then((m) => m.syncAvatarSlotToServer("primary", v))
+        .catch(() => {});
+    });
+  }
+}
+
 export function writeAvatar(slot, dataUrlOrUrl, opts = {}) {
   try {
+    /* 프로필 사진 슬롯은 항상 세 곳 동기화 — 헤더(chat)·피드·대표 불일치 방지 */
+    if ((slot === "primary" || slot === "feed" || slot === "chat") && !opts.skipMirror) {
+      writeProfilePhoto(dataUrlOrUrl, opts);
+      return;
+    }
     const k = KEYS[slot] || KEYS.primary;
     const v = sanitizeAvatarUrl(dataUrlOrUrl);
     if (v) localStorage.setItem(k, v);

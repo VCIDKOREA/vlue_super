@@ -1,5 +1,5 @@
 import { resolveLetteringDemoLogoUrl } from "./letteringDemoAssets.js";
-import { clampLetteringBizcardEmail } from "./letteringBizcardStorage.js";
+import { clampLetteringBizcardEmail, normalizePhotoFocus } from "./letteringBizcardStorage.js";
 
 /** Lettering·명함 카드 객체 정규화 — 빈 칸을 데모값으로 채우지 않음 */
 export function normalizeLetteringCard(raw = {}) {
@@ -23,6 +23,7 @@ export function normalizeLetteringCard(raw = {}) {
     email: clampLetteringBizcardEmail(String(raw.email || "").trim()),
     website: String(raw.website || raw.homepage || raw.url || raw.web || "").trim(),
     photoUrl,
+    photoFocus: normalizePhotoFocus(raw.photoFocus),
     logoUrl,
     companyIntro: String(raw.companyIntro || raw.intro || "").trim(),
     salesContent: String(raw.salesContent || raw.salesPitch || raw.pitch || "").trim(),

@@ -119,7 +119,7 @@ function LetteringProfileThumb({ card, verified, size = "sm" }) {
         <img
           src={photoUrl}
           alt=""
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover object-top"
           onError={() => setImgBroken(true)}
         />
       ) : (

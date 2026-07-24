@@ -1003,11 +1003,11 @@ function ProfilePanel({
           <div className={`mx-1 mt-4 rounded-2xl border p-3 ${isDarkMode ? "border-white/10 bg-white/5" : "border-gray-100 bg-gray-50/90"}`}>
             <p className={`text-[12px] font-black ${headText}`}>프로필 이미지</p>
             <p className={`mt-0.5 text-[10px] ${subText}`}>
-              대표 이미지가 기본값입니다. 쇼케이스 슬롯에 따로 넣으면 통화·쇼케이스에 우선 적용됩니다.
+              프로필 사진은 헤더·쇼케이스·마이케이스에 함께 반영됩니다. 회사 로고는 디지털인증명함 설정에서 바꿔 주세요.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <label className={`cursor-pointer rounded-lg border px-2 py-1.5 text-[10px] font-bold ${isDarkMode ? "border-white/20 text-gray-200" : "border-gray-200 text-gray-700"}`}>
-                대표
+                프로필 사진
                 <input
                   type="file"
                   accept="image/*"
@@ -1018,25 +1018,6 @@ function ProfilePanel({
                     try {
                       const u = await fileToFittedAvatarDataUrl(f);
                       writeAvatar("primary", u);
-                      setAvatarTick((n) => n + 1);
-                    } catch {
-                      /* ignore */
-                    }
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              <label className={`cursor-pointer rounded-lg border px-2 py-1.5 text-[10px] font-bold ${isDarkMode ? "border-white/20 text-gray-200" : "border-gray-200 text-gray-700"}`}>
-                쇼케이스
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    try {
-                      writeAvatar("card", await fileToFittedAvatarDataUrl(f, "logo"));
                       setAvatarTick((n) => n + 1);
                     } catch {
                       /* ignore */

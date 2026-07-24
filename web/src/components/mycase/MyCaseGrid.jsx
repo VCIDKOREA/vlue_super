@@ -25,7 +25,7 @@ import {
   extractShowcaseArchiveTitle,
   extractShowcaseCoverUrl
 } from "../../lib/showcase/showcaseCover.js";
-import { readAvatar } from "../../lib/vlueAvatar.js";
+import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
 import {
   isBroadcastStoryUnseen,
@@ -49,7 +49,7 @@ function readSelfProfile() {
   } catch {
     /* ignore */
   }
-  const avatarUrl = readAvatar("feed") || readAvatar("primary") || readAvatar("chat") || "";
+  const avatarUrl = readProfilePhotoAvatar();
   let userId = "";
   try {
     userId = String(localStorage.getItem("vlue_server_user_id") || "").trim();

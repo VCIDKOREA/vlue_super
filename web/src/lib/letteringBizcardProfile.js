@@ -6,7 +6,8 @@ import {
   formatLetteringContactEmailDisplay,
   combineLetteringBizcardAddress,
   readLetteringBizcardAddressFields,
-  writeLetteringBizcardEditable
+  writeLetteringBizcardEditable,
+  normalizePhotoFocus
 } from "./letteringBizcardStorage.js";
 import { normalizeLetteringBizcardTemplate } from "./letteringBizcardTemplates.js";
 import { resolveDisplayTitleDepartment } from "./letteringBizcardVerification.js";
@@ -191,6 +192,7 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       address: identity.address || "",
       logoUrl: ed.noCompanyLogo ? "" : String(ed.logoDataUrl || ed.logoUrl || "").trim(),
       photoUrl: ed.noProfilePhoto ? "" : String(ed.photoDataUrl || ed.photoUrl || "").trim(),
+      photoFocus: normalizePhotoFocus(ed.photoFocus),
       membershipTier,
       userId: userId || "",
       ownerUserId: userId || "",

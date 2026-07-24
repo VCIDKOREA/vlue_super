@@ -12,7 +12,7 @@ import {
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDisplay.js";
 import { resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
-import { formatLetteringContactEmailDisplay } from "../lib/letteringBizcardStorage.js";
+import { formatLetteringContactEmailDisplay, photoFocusToCss } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import {
   formatNameDeptTitleLine,
@@ -280,6 +280,7 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
   const src = variant === "logo" || variant === "avatar" ? logoUrl : photoUrl;
   const isLogo = variant === "logo" || variant === "avatar";
   const fallback = (card.organization || card.name || "V").slice(0, 1);
+  const focusCss = !isLogo ? photoFocusToCss(card.photoFocus) : undefined;
 
   if (!src && isLogo) return null;
 
@@ -290,7 +291,13 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
       }${className ? ` ${className}` : ""}`.trim()}
     >
       {src && !imgBroken ? (
-        <img src={src} alt="" className="ldr-profile-media__img" onError={() => setImgBroken(true)} />
+        <img
+          src={src}
+          alt=""
+          className="ldr-profile-media__img"
+          style={focusCss ? { objectPosition: focusCss } : undefined}
+          onError={() => setImgBroken(true)}
+        />
       ) : (
         <span className="ldr-profile-media__fallback" aria-hidden>
           {fallback}
@@ -318,6 +325,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
   const logoUrl = String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl(card);
   const hasPhoto = Boolean(photoUrl);
   const hasLogo = Boolean(logoUrl);
+  const photoObjectPosition = photoFocusToCss(card.photoFocus);
   const lines = formatLetteringReceptionLines(card, { incomingNumber });
   const orgLine = lines.expandedOrgLine;
   const personName = lines.organization && lines.name ? lines.name : "";
@@ -381,6 +389,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
             src={photoUrl}
             alt=""
             className="ldr-hero__photo"
+            style={{ objectPosition: photoObjectPosition }}
             onError={() => setImgBroken(true)}
           />
         ) : (

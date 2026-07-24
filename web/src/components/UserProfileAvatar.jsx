@@ -8,7 +8,7 @@ import KakaoBlankAvatar from "./KakaoBlankAvatar.jsx";
 export default function UserProfileAvatar({
   src = "",
   className = "",
-  imgClassName = "h-full w-full object-cover",
+  imgClassName = "h-full w-full object-cover object-top",
   blankClassName = "",
   alt = ""
 }) {
