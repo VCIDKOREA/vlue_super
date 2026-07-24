@@ -3526,6 +3526,43 @@
 .showcase-sound-register__ai label { font-size: 12px; font-weight: 700; display: flex; flex-direction: column; gap: 4px; }
 .showcase-sound-register__consent { display: flex; flex-direction: column; gap: 8px; }
 .showcase-sound-register__consent label { font-size: 11px; display: flex; gap: 8px; align-items: flex-start; }
+.showcase-sound-register__visibility {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+.showcase-sound-register__visibility-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+  flex-shrink: 0;
+}
+.showcase-sound-register__visibility-select {
+  margin-left: auto;
+  min-width: 148px;
+  max-width: 62%;
+  border-radius: 10px;
+  border: 2px solid #0f172a;
+  background: #0f172a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 9px 12px;
+  appearance: auto;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+}
+.showcase-sound-register__visibility-select.is-public {
+  border-color: #059669;
+  background: #059669;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+}
+.showcase-sound-register__visibility-select option {
+  color: #0f172a;
+  background: #fff;
+  font-weight: 700;
+}
 .showcase-sound-copyright { display: flex; flex-direction: column; gap: 8px; }
 .showcase-sound-copyright__hint { font-size: 11px; color: #64748b; }
 .showcase-sound-copyright__row { display: flex; flex-wrap: wrap; gap: 6px; }

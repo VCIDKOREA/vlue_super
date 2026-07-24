@@ -514,13 +514,20 @@ function UserSoundRegisterSheet({ inputCls, onClose, onRegistered }) {
         </div>
       )}
 
-      <label>
-        공개 범위
-        <select className={inputCls} value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+      <div className="showcase-sound-register__visibility">
+        <span className="showcase-sound-register__visibility-label">공개 범위</span>
+        <select
+          className={`showcase-sound-register__visibility-select${
+            visibility === "public" ? " is-public" : " is-private"
+          }`}
+          value={visibility}
+          onChange={(e) => setVisibility(e.target.value)}
+          aria-label="공개 범위"
+        >
           <option value="private">비공개</option>
-          <option value="public">공개 (타인 퍼가기 가능)</option>
+          <option value="public">공개 (퍼오기 가능)</option>
         </select>
-      </label>
+      </div>
 
       <div className="showcase-sound-register__consent">
         <p className="text-[11px] leading-relaxed text-slate-600">{RIGHTS_TEXT}</p>
