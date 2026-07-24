@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Loader2, Music2, Sparkles, Upload } from "lucide-react";
+import { Check, HelpCircle, Loader2, Music2, Sparkles, Upload } from "lucide-react";
 import CopyrightVerifySearch from "./CopyrightVerifySearch.jsx";
 import {
   borrowShowcaseSound,
@@ -24,6 +24,38 @@ const AI_SERVICES = ["Suno", "Udio", "기타"];
 const RIGHTS_TEXT =
   "본인은 등록하는 음원에 대해 VLUE에서 공개·재생할 수 있는 적법한 권리 또는 이용 권한을 보유하고 있음을 확인합니다. AI 음악 생성 서비스의 이용약관 및 라이선스 조건을 확인하였으며, 해당 음원을 VLUE에서 공개·재생하는 것이 허용되는지 확인했습니다. 타인의 저작물, 가사, 음성, 음원 등을 무단으로 사용하거나 권리를 침해한 콘텐츠를 등록하지 않습니다. 허위 등록 또는 권리 침해로 발생하는 모든 책임은 등록자에게 있습니다.";
 
+function resolveMemberHandle(propHandle = "") {
+  const fromProp = String(propHandle || "")
+    .replace(/^@/, "")
+    .trim();
+  if (fromProp) return fromProp;
+  try {
+    return String(localStorage.getItem("vlue_member_handle") || "")
+      .replace(/^@/, "")
+      .trim();
+  } catch {
+    return "";
+  }
+}
+
+function SoundHelp({ text }) {
+  return (
+    <button
+      type="button"
+      className="showcase-sound-help"
+      title={text}
+      aria-label={text}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.alert(text);
+      }}
+    >
+      <HelpCircle size={13} strokeWidth={2.4} aria-hidden />
+    </button>
+  );
+}
+
 function isAiType(t) {
   return t === "ai_assisted" || t === "ai_generated" || t === "remake_arrangement";
 }
@@ -31,7 +63,9 @@ function isAiType(t) {
 /**
  * A. VLUE Signature Sound / B. User Original Sound
  */
-export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
+export default function ShowcaseBgmPicker({ value, onChange, inputCls = "", memberHandle = "" }) {
+  const handle = resolveMemberHandle(memberHandle);
+  const originalTrackLabel = handle ? `@${handle} Original Track` : "Original Track";
   const [tab, setTab] = useState("signature");
   const [signatures, setSignatures] = useState([]);
   const [mine, setMine] = useState({ owned: [], borrowed: [] });
@@ -165,7 +199,6 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
 
       {tab === "user" && !loading ? (
         <div className="showcase-sound-list">
-          <p className="showcase-sound-list__lead">사용자가 직접 업로드한 음원 · 공개 음원 퍼가기</p>
           <button
             type="button"
             className="showcase-sound-btn showcase-sound-btn--primary"
@@ -178,7 +211,10 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
             <p className="text-[11px] text-amber-700">이번 달 무료 등록 한도를 모두 사용했습니다.</p>
           ) : null}
 
-          <h4 className="showcase-sound-list__h">내 음원</h4>
+          <h4 className="showcase-sound-list__h">
+            <span>{originalTrackLabel}</span>
+            <SoundHelp text="내가 VLUE에 등록·업로드한 내 음원입니다. 쇼케이스 배경음악으로 선택해 사용할 수 있습니다." />
+          </h4>
           {(mine.owned || []).map((s) => (
             <button
               key={s.id}
@@ -192,9 +228,14 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
               </span>
             </button>
           ))}
-          {!mine.owned?.length ? <p className="text-[12px] text-slate-500">등록한 음원이 없습니다.</p> : null}
+          {!mine.owned?.length ? (
+            <p className="text-[12px] text-slate-500">등록한 Original Track이 없습니다.</p>
+          ) : null}
 
-          <h4 className="showcase-sound-list__h">퍼간 음원</h4>
+          <h4 className="showcase-sound-list__h">
+            <span>VLUE Shared Track</span>
+            <SoundHelp text="공개된 다른 쇼케이스 음원을 가져와(퍼와) 내 쇼케이스에 연결한 음원입니다. 파일을 복사하지 않고 원본을 참조하며, 원본이 비공개·삭제되면 연결이 끊어질 수 있습니다." />
+          </h4>
           {(mine.borrowed || []).map((b) => (
             <button
               key={b.borrowId}
@@ -216,6 +257,9 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
               </span>
             </button>
           ))}
+          {!mine.borrowed?.length ? (
+            <p className="text-[12px] text-slate-500">퍼온 Shared Track이 없습니다.</p>
+          ) : null}
         </div>
       ) : null}
 

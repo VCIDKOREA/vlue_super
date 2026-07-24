@@ -829,7 +829,7 @@ export default function ShowcaseStyleSettingsPanel({
                 <span className="showcase-profile-row__label-text">
                   <Music2 size={14} className="inline mr-1" aria-hidden />
                   배경음악
-                  <HelpTip text="한 곡만 선택하면 디지털 인증명함·모든 쇼케이스 페이지에 함께 재생됩니다." />
+                  <HelpTip text="한 곡만 선택하면 디지털 인증명함·모든 쇼케이스 페이지에 함께 재생됩니다. Signature는 VLUE 제공곡, User Original은 내가 올린 Original Track과 퍼온 Shared Track을 씁니다." />
                 </span>
               </span>
               <span className="showcase-profile-row__trail">

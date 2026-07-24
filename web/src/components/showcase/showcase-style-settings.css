@@ -3476,7 +3476,28 @@
 .showcase-sound-picker__loading { font-size: 12px; color: #64748b; }
 .showcase-sound-list { display: flex; flex-direction: column; gap: 8px; }
 .showcase-sound-list__lead { font-size: 12px; color: #475569; }
-.showcase-sound-list__h { margin-top: 8px; font-size: 12px; font-weight: 900; color: #0f172a; }
+.showcase-sound-list__h {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.showcase-sound-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  padding: 0;
+  flex-shrink: 0;
+}
 .showcase-sound-list__item {
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   text-align: left; border-radius: 12px; border: 1px solid #e2e8f0; background: #fff;
