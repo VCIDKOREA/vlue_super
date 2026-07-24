@@ -15,6 +15,7 @@ export function ShowcaseBgmProvider({ children }) {
   const [proximityNear, setProximityNear] = useState(false);
 
   const bgmUrl = useMemo(() => resolveShowcaseBgmUrl(styleConfig), [styleConfig]);
+  /* 미리보기·리플레이·쇼케이스 열람 시 재생. 실통화(call_active)만 강제 무음 */
   const shouldPlayAudio = phase === "replay" || phase === "preview";
   const forceMuted = phase === "call_active" || proximityNear;
   const effectiveMuted = forceMuted || userMuted || !shouldPlayAudio || !bgmUrl;
@@ -28,23 +29,46 @@ export function ShowcaseBgmProvider({ children }) {
     if (!audioRef.current) {
       audioRef.current = new Audio();
       audioRef.current.loop = true;
-      audioRef.current.preload = "metadata";
+      audioRef.current.preload = "auto";
+      audioRef.current.crossOrigin = "anonymous";
     }
     const el = audioRef.current;
 
-    if (effectiveMuted || !bgmUrl) {
+    if (!bgmUrl) {
       el.pause();
-      if (!bgmUrl) el.removeAttribute("src");
+      el.removeAttribute("src");
+      try {
+        el.load();
+      } catch {
+        /* ignore */
+      }
       return undefined;
     }
 
-    if (el.src !== bgmUrl) {
+    const currentSrc = el.getAttribute("src") || "";
+    if (currentSrc !== bgmUrl) {
       el.src = bgmUrl;
-      el.load();
+      try {
+        el.load();
+      } catch {
+        /* ignore */
+      }
     }
 
-    el.play().catch(() => undefined);
-    return () => el.pause();
+    if (effectiveMuted) {
+      el.pause();
+      return undefined;
+    }
+
+    const tryPlay = () => {
+      el.play().catch(() => undefined);
+    };
+    tryPlay();
+    el.addEventListener("canplay", tryPlay, { once: true });
+    return () => {
+      el.removeEventListener("canplay", tryPlay);
+      el.pause();
+    };
   }, [bgmUrl, effectiveMuted]);
 
   const setPlaybackPhase = useCallback((next) => {
@@ -63,12 +87,43 @@ export function ShowcaseBgmProvider({ children }) {
   const unlockFromUserGesture = useCallback(() => {
     setTouchUnlocked(true);
     if (phase !== "call_active") setUserMuted(false);
-  }, [phase]);
+    const el = audioRef.current;
+    const url = resolveShowcaseBgmUrl(styleConfig);
+    if (el && url && phase !== "call_active") {
+      if ((el.getAttribute("src") || "") !== url) {
+        el.src = url;
+        el.load();
+      }
+      el.play().catch(() => undefined);
+    }
+  }, [phase, styleConfig]);
 
   const toggleUserMute = useCallback(() => {
-    setUserMuted((v) => !v);
+    setUserMuted((v) => {
+      const next = !v;
+      const el = audioRef.current;
+      if (el && !next) el.play().catch(() => undefined);
+      if (el && next) el.pause();
+      return next;
+    });
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    window.__vlueUnlockShowcaseBgm = () => {
+      setTouchUnlocked(true);
+      setUserMuted(false);
+      const el = audioRef.current;
+      if (el && bgmUrl) el.play().catch(() => undefined);
+    };
+    return () => {
+      try {
+        delete window.__vlueUnlockShowcaseBgm;
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [bgmUrl]);
   const value = useMemo(
     () => ({
       phase,

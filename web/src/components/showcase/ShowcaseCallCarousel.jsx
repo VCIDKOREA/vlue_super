@@ -22,6 +22,9 @@ import { resolveInstagramMediaUrls } from "../../lib/instagramLinkApi.js";
 import { v1AppShell } from "../../lib/v1ReleaseScope.js";
 import ShowcaseInstagramPost from "./ShowcaseInstagramPost.jsx";
 import ShowcaseSlideChrome from "./ShowcaseSlideChrome.jsx";
+import ShowcaseBgmTrackChip from "./ShowcaseBgmTrackChip.jsx";
+import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
+import { resolveShowcaseBgmUrl } from "../../lib/showcase/showcaseBgmPresets.js";
 
 /** 갤러리 사진 → 슬라이드용 (텍스트 오버레이 필드 유지) */
 function pickPhotoSlideFields(p = {}) {
@@ -79,6 +82,7 @@ export default function ShowcaseCallCarousel({
   showcaseStyle = null
 }) {
   const styleConfig = showcaseStyle || card?.showcaseStyle || null;
+  const { bindStyleConfig, setPlaybackPhase, unlockFromUserGesture } = useShowcaseBgm();
   const [index, setIndex] = useState(0);
   const startX = useRef(0);
   const startY = useRef(0);
@@ -106,6 +110,33 @@ export default function ShowcaseCallCarousel({
       ""
   ).trim();
   const [igUrlMap, setIgUrlMap] = useState(() => new Map());
+
+  /* 쇼케이스 캐러셀이 보이면 BGM 바인딩·재생 (실통화 스크롤 잠금만 무음) */
+  useEffect(() => {
+    bindStyleConfig(styleConfig);
+    const hasBgm = Boolean(resolveShowcaseBgmUrl(styleConfig));
+    if (!hasBgm) {
+      setPlaybackPhase("idle");
+      return () => {
+        setPlaybackPhase("idle");
+        bindStyleConfig(null);
+      };
+    }
+    const liveCallMuted = !previewMode && !scrollEnabled;
+    setPlaybackPhase(liveCallMuted ? "call_active" : previewMode ? "preview" : "replay");
+    return () => {
+      setPlaybackPhase("idle");
+      bindStyleConfig(null);
+    };
+  }, [styleConfig, previewMode, scrollEnabled, bindStyleConfig, setPlaybackPhase]);
+
+  useEffect(() => {
+    const onFirstPointer = () => unlockFromUserGesture?.();
+    const el = viewportRef.current;
+    if (!el) return undefined;
+    el.addEventListener("pointerdown", onFirstPointer, { once: true, passive: true });
+    return () => el.removeEventListener("pointerdown", onFirstPointer);
+  }, [unlockFromUserGesture]);
 
   const galleryPagePhotos = useMemo(() => {
     return (Array.isArray(photos) ? photos : [])
@@ -536,11 +567,18 @@ export default function ShowcaseCallCarousel({
       {showMeta ? (
         <div className="showcase-call-carousel__meta">
           <span className="showcase-call-carousel__meta-label">{slideLabel}</span>
-          {canScroll ? (
-            <span className="showcase-call-carousel__meta-count">
-              {index + 1} / {count}
-            </span>
-          ) : null}
+          <div className="showcase-call-carousel__meta-right">
+            <ShowcaseBgmTrackChip
+              styleConfig={styleConfig}
+              placement="top"
+              className="showcase-call-carousel__bgm"
+            />
+            {canScroll ? (
+              <span className="showcase-call-carousel__meta-count">
+                {index + 1} / {count}
+              </span>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

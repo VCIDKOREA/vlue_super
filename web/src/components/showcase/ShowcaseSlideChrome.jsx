@@ -9,7 +9,6 @@ import {
 import { normalizeBusinessLink } from "../../lib/showcase/showcasePages.js";
 import FollowActionButton from "../follow/FollowActionButton.jsx";
 import "../follow/follow-action.css";
-import ShowcaseBgmMarquee from "./ShowcaseBgmMarquee.jsx";
 
 function firstText(...values) {
   for (const v of values) {
@@ -38,7 +37,7 @@ function displayHost(url) {
 /**
  * 쇼케이스 슬라이드 공통 크롬
  * 1 하단: VLUE 프로필 + 팔로우 + 쇼셜 토글
- * 2 상단 좌측: 개인커스텀일 때 페이지 비즈니스 링크
+ * 2 상단: 음원 칩 (쇼셜과 분리) · 개인커스텀 비즈니스 링크
  * 3 쇼셜: 토글 시 VLUE 바 위에 표시
  *
  * @param {"instagram"|"custom"} variant
@@ -204,11 +203,6 @@ export default function ShowcaseSlideChrome({
               onToast={onToast}
             />
           ) : null}
-          <ShowcaseBgmMarquee
-            styleConfig={style}
-            compact
-            className="showcase-slide-chrome__bgm"
-          />
           {hasSocial ? (
             <button
               type="button"
