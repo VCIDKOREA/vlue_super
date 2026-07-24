@@ -146,27 +146,20 @@ export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
 
       {tab === "signature" && !loading ? (
         <div className="showcase-sound-list">
-          <p className="showcase-sound-list__lead">
-            VLUE가 직접 제작한 오리지널 AI 배경음악 (유료 AI 플랜 시그니처)
-          </p>
-          {!signatures.length ? (
-            <p className="text-[12px] text-slate-500">등록된 Signature Sound가 없습니다. 관리자 게시판에서 추가하세요.</p>
-          ) : (
-            signatures.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`showcase-sound-list__item${selectedId === s.id ? " is-selected" : ""}`}
-                onClick={() => applySound(s, "signature")}
-              >
-                <span className="font-bold">{s.title}</span>
-                <span className="text-[11px] text-slate-500">
-                  {s.artistName || "VLUE"} · {s.attributionLabel}
-                </span>
-                {selectedId === s.id ? <Check size={14} className="text-emerald-600" /> : null}
-              </button>
-            ))
-          )}
+          {signatures.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`showcase-sound-list__item${selectedId === s.id ? " is-selected" : ""}`}
+              onClick={() => applySound(s, "signature")}
+            >
+              <span className="font-bold">{s.title}</span>
+              <span className="text-[11px] text-slate-500">
+                {s.artistName || "VLUE"} · {s.attributionLabel}
+              </span>
+              {selectedId === s.id ? <Check size={14} className="text-emerald-600" /> : null}
+            </button>
+          ))}
         </div>
       ) : null}
 
