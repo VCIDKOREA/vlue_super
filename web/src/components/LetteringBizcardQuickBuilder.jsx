@@ -15,7 +15,6 @@ import {
   prepareLetteringPhotoFromFile
 } from "../lib/letteringBizcardStorage.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
-import { readShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 
 function Field({ label, hint, children, isDarkMode }) {
   const labelCls = isDarkMode ? "text-[11px] font-black text-gray-100" : "text-[11px] font-black text-gray-900";
@@ -234,13 +233,16 @@ export default function LetteringBizcardQuickBuilder({
   toast = ""
 }) {
   const [previewFace, setPreviewFace] = useState("front");
-  const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
+  const { setPlaybackPhase } = useShowcaseBgm();
 
+  /* 명함 설정은 수신 UI 미리보기만 — 쇼케이스 BGM은 재생하지 않음 */
   useEffect(() => {
-    bindStyleConfig(readShowcaseStyle());
-    setPlaybackPhase("preview");
-    return () => setPlaybackPhase("idle");
-  }, [bindStyleConfig, setPlaybackPhase]);
+    setPlaybackPhase("idle", { owner: "settings", steal: true });
+    return () => {
+      setPlaybackPhase("idle", { steal: true });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only
+  }, []);
 
   const inputBase = isDarkMode
     ? "mt-1.5 w-full rounded-xl border border-white/15 bg-slate-900/90 px-3 py-2.5 text-[13px] text-gray-100 outline-none focus:border-blue-400"
