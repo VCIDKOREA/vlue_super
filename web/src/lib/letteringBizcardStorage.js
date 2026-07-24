@@ -2,6 +2,7 @@
 
 import { formatPhoneE164ForKoreaDisplay } from "./phoneDisplay.js";
 import { fitImageFile } from "./fitImageFile.js";
+import { compressAndUploadBizcardImage } from "./bizcardImageUpload.js";
 
 export const LETTERING_BIZCARD_STORAGE_KEY = "vlue_lettering_bizcard_v1";
 /** 대용량 data URL — 본문 JSON과 분리해 QuotaExceeded 방지 */
@@ -74,16 +75,16 @@ export function readLetteringBizcardAddressFields(ed = {}) {
 
 export const LETTERING_PHOTO_RULES = {
   fileNamePrefix: "lettering-profile-photo",
-  maxBytes: 1024 * 1024,
-  maxWidth: 1200,
-  maxHeight: 1600,
+  maxBytes: 900 * 1024,
+  maxWidth: 1920,
+  maxHeight: 1920,
   accept: "image/png,image/jpeg,image/webp",
   acceptLabel: "PNG, JPG, WEBP"
 };
 
 export const LETTERING_LOGO_RULES = {
   fileNamePrefix: "lettering-company-logo",
-  maxBytes: 512 * 1024,
+  maxBytes: 400 * 1024,
   maxWidth: 512,
   maxHeight: 512,
   displayPx: 128,
@@ -483,20 +484,28 @@ async function prepareLetteringImageFromFile(file, rules, label = "이미지") {
   return { ok: true, dataUrl: result.dataUrl, fileName: `${rules.fileNamePrefix}.${result.fileName.split(".").pop()}` };
 }
 
-/** 로고 파일 검증 후 data URL 반환 */
+/** 로고 파일 — 압축 후 R2(가능 시) / data URL */
 export async function prepareLetteringLogoFromFile(file) {
-  return prepareLetteringImageFromFile(
-    file,
-    { ...LETTERING_LOGO_RULES, preferPng: true },
-    "로고"
-  );
+  const result = await compressAndUploadBizcardImage(file, "logo");
+  if (!result.ok) return { ok: false, error: result.error };
+  return {
+    ok: true,
+    dataUrl: result.url,
+    fileName: result.fileName,
+    via: result.via,
+    uploadWarning: result.uploadWarning
+  };
 }
 
-/** 프로필 사진 검증 후 data URL 반환 */
+/** 프로필 사진 — 압축 후 R2(가능 시) / data URL */
 export async function prepareLetteringPhotoFromFile(file) {
-  return prepareLetteringImageFromFile(
-    file,
-    { ...LETTERING_PHOTO_RULES, preferPng: false },
-    "프로필 사진"
-  );
+  const result = await compressAndUploadBizcardImage(file, "photo");
+  if (!result.ok) return { ok: false, error: result.error };
+  return {
+    ok: true,
+    dataUrl: result.url,
+    fileName: result.fileName,
+    via: result.via,
+    uploadWarning: result.uploadWarning
+  };
 }

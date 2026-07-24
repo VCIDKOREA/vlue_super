@@ -16,6 +16,14 @@ import {
   getTitleDeptStatusForUser,
   submitTitleDeptReview
 } from "../services/bizcard/titleDeptReviewService.js";
+import {
+  createBizcardImageUploadUrl,
+  isBizcardImageStorageConfigured
+} from "../services/bizcard/bizcardImageStorage.js";
+import {
+  createDirectImageUploadUrl,
+  isDirectImageStorageConfigured
+} from "../services/media/directImageStorage.js";
 
 export const cardsRoutes = new Hono();
 
@@ -331,7 +339,29 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
     issuedAt: row.issuedAt,
     designTemplate: row.designTemplateSnapshot,
     membershipTierSnapshot: row.membershipTierSnapshot,
-    exportSnapshot: snap
+    exportSnapshot: snap,
+    subscription: await (async () => {
+      const sub = await prisma.userSubscription.findFirst({
+        where: { userId: me, status: "active" },
+        orderBy: { cycleEndAt: "desc" },
+        select: {
+          cycleStartAt: true,
+          cycleEndAt: true,
+          nextChargeAt: true,
+          plan: true
+        }
+      });
+      if (!sub) return null;
+      const plan = String(sub.plan || "").toLowerCase();
+      const billingCycle = plan === "b2c_annual" ? "annual" : "monthly";
+      return {
+        cycleStartAt: sub.cycleStartAt,
+        cycleEndAt: sub.cycleEndAt,
+        nextChargeAt: sub.nextChargeAt,
+        plan: sub.plan,
+        billingCycle
+      };
+    })()
   });
 });
 
@@ -433,5 +463,41 @@ cardsRoutes.post("/title-dept/submit", requireUserHeader, async (c) => {
       DOC_REQUIRED: "확인 서류를 첨부해 주세요."
     };
     return c.json({ error: map[msg] || msg }, 400);
+  }
+});
+
+/** 명함·프로필 이미지 Presigned URL — 브라우저가 R2로 직행 업로드 (파일 본문 미수신) */
+cardsRoutes.post("/image-upload-url", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  if (!isDirectImageStorageConfigured() && !isBizcardImageStorageConfigured()) {
+    return c.json({ error: "이미지 스토리지(R2)가 설정되지 않았습니다.", configured: false }, 503);
+  }
+  const body = (await c.req.json().catch(() => ({}))) as {
+    kind?: string;
+    fileName?: string;
+    contentType?: string;
+    fileSize?: number;
+  };
+  try {
+    const kind = String(body.kind || "photo");
+    const signed = isDirectImageStorageConfigured()
+      ? await createDirectImageUploadUrl({
+          userId: me,
+          kind,
+          fileName: String(body.fileName || "image.jpg"),
+          contentType: String(body.contentType || "image/jpeg"),
+          fileSize: Number(body.fileSize) || 0
+        })
+      : await createBizcardImageUploadUrl({
+          userId: me,
+          kind: (kind as "photo" | "logo" | "avatar" | "cover") || "photo",
+          fileName: String(body.fileName || "image.jpg"),
+          contentType: String(body.contentType || "image/jpeg"),
+          fileSize: Number(body.fileSize) || 0
+        });
+    return c.json({ ok: true, ...signed });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "업로드 URL 발급 실패";
+    return c.json({ error: msg, configured: true }, 400);
   }
 });

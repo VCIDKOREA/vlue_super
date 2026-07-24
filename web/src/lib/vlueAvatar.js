@@ -1,7 +1,7 @@
 /** 대표·채팅·피드·명함 슬롯별 프로필 이미지 (Data URL 또는 https URL 권장 — blob: 은 세션 후 깨짐) */
 
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
-import { fitImageFileOrThrow, IMAGE_FIT_AVATAR } from "./fitImageFile.js";
+import { compressAndUploadMediaImageOrThrow } from "./mediaImageUpload.js";
 
 const KEYS = {
   primary: "vlue_avatar_primary",
@@ -127,8 +127,12 @@ export function fileToDataUrl(file) {
   });
 }
 
-/** 아바타용 — 픽셀·용량 자동 맞춤 */
-export async function fileToFittedAvatarDataUrl(file) {
-  const { dataUrl } = await fitImageFileOrThrow(file, IMAGE_FIT_AVATAR);
-  return dataUrl;
+/**
+ * 아바타용 — 클라이언트 압축 후 R2 Presigned 직행 업로드 (실패 시 data URL 폴백)
+ * @param {File} file
+ * @param {'avatar'|'logo'|'photo'} [kind='avatar']
+ */
+export async function fileToFittedAvatarDataUrl(file, kind = "avatar") {
+  const uploaded = await compressAndUploadMediaImageOrThrow(file, kind === "logo" ? "logo" : "avatar");
+  return uploaded.url;
 }

@@ -1,11 +1,12 @@
 /**
- * 멤버십 인증유효기간
- * - 월결제: 다음 결제(갱신)일 전날
- * - 연결제(1년): 결제일부터 1년
+ * 멤버십 만료일 (유료 결제 주기 종료일)
+ * - cycleEndAt(서버) 우선
+ * - 없으면 paidAt+주기 계산 (paidAt 없으면 표시 안 함 — 오늘 날짜로 갱신 금지)
  */
 
 const CYCLE_KEY = "vlue_paid_billing_cycle";
 const PAID_AT_KEY = "vlue_subscription_paid_at";
+const CYCLE_END_KEY = "vlue_subscription_cycle_end_at";
 
 function pad2(n) {
   return String(n).padStart(2, "0");
@@ -39,16 +40,38 @@ export function readMembershipPaidAt() {
   return null;
 }
 
-export function writeMembershipBillingMeta({ billingCycle, paidAt } = {}) {
+export function readMembershipCycleEndAt() {
   try {
-    if (billingCycle != null) {
-      const c = billingCycle === "annual" ? "annual" : "monthly";
+    const raw = String(localStorage.getItem(CYCLE_END_KEY) || "").trim();
+    if (raw) {
+      const d = new Date(raw);
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/**
+ * @param {{ billingCycle?: string, paidAt?: Date|string|null, cycleEndAt?: Date|string|null }} [meta]
+ */
+export function writeMembershipBillingMeta(meta = {}) {
+  try {
+    if (meta.billingCycle != null) {
+      const c = meta.billingCycle === "annual" ? "annual" : "monthly";
       localStorage.setItem(CYCLE_KEY, c);
     }
-    if (paidAt != null) {
-      const d = paidAt instanceof Date ? paidAt : new Date(paidAt);
+    if (meta.paidAt != null) {
+      const d = meta.paidAt instanceof Date ? meta.paidAt : new Date(meta.paidAt);
       if (!Number.isNaN(d.getTime())) {
         localStorage.setItem(PAID_AT_KEY, d.toISOString());
+      }
+    }
+    if (meta.cycleEndAt != null) {
+      const d = meta.cycleEndAt instanceof Date ? meta.cycleEndAt : new Date(meta.cycleEndAt);
+      if (!Number.isNaN(d.getTime())) {
+        localStorage.setItem(CYCLE_END_KEY, d.toISOString());
       }
     }
   } catch {
@@ -56,7 +79,6 @@ export function writeMembershipBillingMeta({ billingCycle, paidAt } = {}) {
   }
 }
 
-/** 같은 일자 기준 한 달 뒤 (말일 보정) */
 function addOneMonth(from) {
   const y = from.getFullYear();
   const m = from.getMonth();
@@ -79,41 +101,58 @@ function dayBefore(date) {
   return d;
 }
 
+function parseDate(value) {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (value == null || value === "") return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /**
- * @param {{ billingCycle?: 'monthly'|'annual', paidAt?: Date|string|null, now?: Date }} [opts]
- * @returns {{ cycle: 'monthly'|'annual', paidAt: Date, validUntil: Date, label: string, line: string }}
+ * @param {{
+ *   billingCycle?: 'monthly'|'annual',
+ *   paidAt?: Date|string|null,
+ *   cycleEndAt?: Date|string|null,
+ *   validUntil?: Date|string|null,
+ * }} [opts]
+ * @returns {{ cycle: string, paidAt: Date|null, validUntil: Date|null, label: string, line: string, display: string } | null}
  */
 export function resolveAuthValidityPeriod(opts = {}) {
   const cycle =
     opts.billingCycle === "annual" || opts.billingCycle === "monthly"
       ? opts.billingCycle
       : readMembershipBillingCycle();
+
+  const explicitUntil = parseDate(opts.validUntil) || parseDate(opts.cycleEndAt) || readMembershipCycleEndAt();
+
   let paidAt =
-    opts.paidAt instanceof Date
-      ? opts.paidAt
-      : opts.paidAt
-        ? new Date(opts.paidAt)
-        : readMembershipPaidAt();
-  if (!paidAt || Number.isNaN(paidAt.getTime())) {
-    paidAt = opts.now instanceof Date ? new Date(opts.now.getTime()) : new Date();
+    parseDate(opts.paidAt) || readMembershipPaidAt();
+
+  let validUntil = explicitUntil;
+  if (!validUntil && paidAt) {
+    /* 결제 앵커가 있을 때만 계산 — Date.now() 폴백으로 매일 갱신하지 않음 */
+    validUntil = cycle === "annual" ? addOneYear(paidAt) : dayBefore(addOneMonth(paidAt));
   }
 
-  const validUntil =
-    cycle === "annual" ? addOneYear(paidAt) : dayBefore(addOneMonth(paidAt));
+  if (!validUntil) {
+    return null;
+  }
 
   const dateStr = formatAuthValidityDate(validUntil);
+  /* 시작일 없이 종료일만 노출 → 만료일 */
   return {
     cycle,
     paidAt,
     validUntil,
-    label: "인증유효기간",
+    label: "만료일",
     line: dateStr,
-    display: `인증유효기간 : ${dateStr}`
+    display: `만료일 : ${dateStr}`
   };
 }
 
-/** 명함 verificationItems 대체용 */
+/** 명함 verificationItems 대체용 — 만료일 없으면 빈 배열 */
 export function buildAuthValidityVerificationItems(opts = {}) {
   const v = resolveAuthValidityPeriod(opts);
+  if (!v) return [];
   return [v.display];
 }

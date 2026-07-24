@@ -8,6 +8,7 @@ import {
   combineLetteringBizcardAddress,
   clampLetteringBizcardEmail
 } from "./letteringBizcardStorage.js";
+import { writeMembershipBillingMeta } from "./authValidityPeriod.js";
 
 const DIGITAL_CARD_ID_KEY = "vlue_digital_card_id";
 
@@ -114,12 +115,20 @@ export async function fetchDigitalCardMeta() {
     if (data?.exportSnapshot) {
       hydrateLetteringEditableFromSnapshot(data.exportSnapshot, { force: false });
     }
+    if (data?.subscription?.cycleEndAt) {
+      writeMembershipBillingMeta({
+        cycleEndAt: data.subscription.cycleEndAt,
+        billingCycle: data.subscription.billingCycle,
+        paidAt: data.subscription.cycleStartAt || undefined
+      });
+    }
     return {
       cardId: data?.cardId || cached || null,
       issuedAt: data?.issuedAt || null,
       designTemplate: data?.designTemplate || null,
       issued: Boolean(data?.issued),
-      exportSnapshot: data?.exportSnapshot || null
+      exportSnapshot: data?.exportSnapshot || null,
+      subscription: data?.subscription || null
     };
   } catch {
     return {

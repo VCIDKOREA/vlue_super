@@ -3,20 +3,10 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "node:crypto";
 
 const DEFAULT_BUCKET = "vlue-product-media";
-/** 쇼케이스 음원 — R2 Direct Upload (서버 디스크 미경유) */
-const MAX_AUDIO_BYTES = 80 * 1024 * 1024;
-const ALLOWED_TYPES = new Set([
-  "audio/mpeg",
-  "audio/mp3",
-  "audio/mp4",
-  "audio/x-m4a",
-  "audio/aac",
-  "audio/wav",
-  "audio/x-wav",
-  "audio/ogg",
-  "audio/webm"
-]);
-const PRESIGN_TTL_SEC = 60 * 60;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const PRESIGN_TTL_SEC = 60 * 30;
+const KINDS = new Set(["photo", "logo", "avatar", "cover"]);
 
 type R2Config = {
   accountId: string;
@@ -47,50 +37,53 @@ function getR2Client(config: R2Config) {
   });
 }
 
-export function isShowcaseSoundStorageConfigured() {
+export function isBizcardImageStorageConfigured() {
   return Boolean(readR2Config());
 }
 
 function extForContentType(contentType: string): string {
-  if (contentType.includes("wav")) return "wav";
-  if (contentType.includes("ogg")) return "ogg";
-  if (contentType.includes("webm")) return "webm";
-  if (contentType.includes("mp4") || contentType.includes("m4a") || contentType.includes("aac"))
-    return "m4a";
-  return "mp3";
+  if (contentType.includes("png")) return "png";
+  if (contentType.includes("webp")) return "webp";
+  return "jpg";
 }
 
-export async function createShowcaseSoundUploadUrl(input: {
+/**
+ * 명함·프로필 이미지 Presigned PUT — 서버는 파일 본문을 받지 않음
+ */
+export async function createBizcardImageUploadUrl(input: {
   userId: string;
+  kind: "photo" | "logo" | "avatar" | "cover";
   fileName: string;
   contentType: string;
   fileSize?: number;
-  /** signature 관리자 업로드 시 prefix */
-  prefix?: "user" | "signature";
 }) {
   const config = readR2Config();
   if (!config) {
     throw new Error(
-      "음원 스토리지(R2)가 설정되지 않았습니다. R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET_NAME / R2_PUBLIC_BASE_URL 을 확인해 주세요."
+      "이미지 스토리지(R2)가 설정되지 않았습니다. R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET_NAME / R2_PUBLIC_BASE_URL 을 확인해 주세요."
     );
   }
 
-  const contentType = String(input.contentType || "audio/mpeg").toLowerCase();
+  const kind = String(input.kind || "photo").toLowerCase();
+  if (!KINDS.has(kind)) {
+    throw new Error("지원하지 않는 이미지 종류입니다. (photo|logo|avatar|cover)");
+  }
+
+  const contentType = String(input.contentType || "image/jpeg").toLowerCase();
   if (!ALLOWED_TYPES.has(contentType)) {
-    throw new Error("mp3, m4a, wav, ogg, webm 음원만 업로드할 수 있습니다.");
+    throw new Error("JPEG, PNG, WEBP 이미지만 업로드할 수 있습니다.");
   }
 
   const fileSize = Number(input.fileSize) || 0;
-  if (fileSize > MAX_AUDIO_BYTES) {
-    throw new Error("음원은 80MB 이하만 업로드할 수 있습니다.");
+  if (fileSize > MAX_IMAGE_BYTES) {
+    throw new Error("이미지는 8MB 이하만 업로드할 수 있습니다. 클라이언트에서 압축 후 올려 주세요.");
   }
 
   const ext = extForContentType(contentType);
-  const safeName = String(input.fileName || `sound.${ext}`)
+  const safeName = String(input.fileName || `${kind}.${ext}`)
     .replace(/[^\w.\-가-힣]/g, "_")
     .slice(0, 80);
-  const folder = input.prefix === "signature" ? "showcase-bgm/signature" : `showcase-bgm/${input.userId}`;
-  const path = `${folder}/${randomUUID()}-${safeName || `sound.${ext}`}`;
+  const path = `bizcard/${input.userId}/${kind}/${randomUUID()}-${safeName || `${kind}.${ext}`}`;
 
   const client = getR2Client(config);
   const command = new PutObjectCommand({
@@ -108,8 +101,10 @@ export async function createShowcaseSoundUploadUrl(input: {
     path,
     uploadUrl,
     publicUrl,
-    maxBytes: MAX_AUDIO_BYTES,
+    maxBytes: MAX_IMAGE_BYTES,
     contentType,
-    provider: "cloudflare-r2" as const
+    kind,
+    provider: "cloudflare-r2" as const,
+    cacheControl: "public, max-age=31536000, immutable"
   };
 }

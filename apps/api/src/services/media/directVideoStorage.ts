@@ -82,7 +82,8 @@ export async function createDirectVideoUploadUrl(input: {
   const command = new PutObjectCommand({
     Bucket: config.bucket,
     Key: path,
-    ContentType: contentType
+    ContentType: contentType,
+    CacheControl: "public, max-age=31536000, immutable"
   });
 
   const uploadUrl = await getSignedUrl(client, command, { expiresIn: PRESIGN_TTL_SEC });

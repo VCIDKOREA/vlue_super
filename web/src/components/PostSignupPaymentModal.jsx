@@ -5,6 +5,7 @@ import { requestIamportBillingPay } from "../lib/iamportClient.js";
 import { getPortoneUserCode, isPortoneTestMode } from "../lib/portoneEnv.js";
 import { clearPendingPayment } from "../lib/postSignupPayment.js";
 import { requirePinForSensitiveAction } from "../lib/appLockBridge.js";
+import { resolveAuthValidityPeriod, writeMembershipBillingMeta } from "../lib/authValidityPeriod.js";
 
 /**
  * 가입·본인인증 완료 후 첫 구독 결제
@@ -77,10 +78,17 @@ export default function PostSignupPaymentModal({ open, pending, onComplete, onSk
       }
 
       try {
+        const paidAt = new Date();
+        const cycle = billingCycle === "annual" ? "annual" : "monthly";
         localStorage.setItem("vlue_subscription_paid", "1");
-        localStorage.setItem("vlue_paid_billing_cycle", billingCycle === "annual" ? "annual" : "monthly");
-        localStorage.setItem("vlue_subscription_paid_at", new Date().toISOString());
         localStorage.setItem("membershipTier", isB2b ? "b2b" : "paid");
+        /* 만료일 = 결제 앵커 기준 고정 (오늘 날짜로 매일 갱신하지 않음) */
+        const validity = resolveAuthValidityPeriod({ billingCycle: cycle, paidAt });
+        writeMembershipBillingMeta({
+          billingCycle: cycle,
+          paidAt,
+          cycleEndAt: validity?.validUntil || null
+        });
       } catch {
         /* ignore */
       }

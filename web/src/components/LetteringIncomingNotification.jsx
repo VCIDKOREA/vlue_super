@@ -16,7 +16,6 @@ import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDispl
 import { LETTERING_DEMO_COMPANY_LOGO } from "../lib/letteringDemoAssets.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAvatar.js";
-import { isVlueBrandAssetUrl } from "../lib/vlueAvatar.js";
 import { buildAuthValidityVerificationItems } from "../lib/authValidityPeriod.js";
 import { nativeEndCall, nativeEndCallKeepOverlay } from "../lib/call/nativeCallControl.js";
 import { resolveIsKnownContact } from "../lib/contacts/hybridKnownContact.js";
@@ -106,15 +105,11 @@ function LetteringProfileThumb({ card, verified, size = "sm" }) {
     displayName: card?.name || card?.displayName || "",
     exposeCustom: true
   });
-  const photoUrl = peer.type === "image" ? peer.url : "";
-  /** 등록 로고만 사용 — 데모/브랜드 로고로 프로필 자리를 채우지 않음 */
-  const rawLogo = !photoUrl && card.logoUrl ? String(card.logoUrl).trim() : "";
-  const logoUrl = rawLogo && !isVlueBrandAssetUrl(rawLogo) ? rawLogo : "";
-  const src = photoUrl || logoUrl;
-  const isLogoOnly = !photoUrl && Boolean(logoUrl);
+  /* 프로필 썸네일 = 프로필 사진만 (회사 로고로 대체하지 않음) */
+  const photoUrl = peer.type === "image" ? peer.url : String(card?.photoUrl || "").trim();
   const fallbackLabel =
     peer.type === "initial" ? peer.initial : (card.name || card.organization || "?").slice(0, 1);
-  const showImg = Boolean(src) && !imgBroken;
+  const showImg = Boolean(photoUrl) && !imgBroken;
 
   return (
     <span
@@ -122,9 +117,9 @@ function LetteringProfileThumb({ card, verified, size = "sm" }) {
     >
       {showImg ? (
         <img
-          src={src}
+          src={photoUrl}
           alt=""
-          className={`h-full w-full ${isLogoOnly ? "object-contain p-0.5" : "object-cover"}`}
+          className="h-full w-full object-cover"
           onError={() => setImgBroken(true)}
         />
       ) : (
@@ -366,14 +361,19 @@ export default function LetteringIncomingNotification({
       .map((line) => String(line || "").trim())
       .filter(Boolean)
       .filter((line) => !/PASS\s*본인인증|명함\s*승인|유료\s*명함\s*등급|사업자\s*정보|전화번호\s*일치/i.test(line));
-    const hasValidity = cleaned.some((line) => /인증유효기간/.test(line));
-    if (hasValidity) return cleaned.slice(0, 4);
+    const hasValidity = cleaned.some((line) => /만료일|인증유효기간/.test(line));
+    if (hasValidity) {
+      return cleaned
+        .map((line) => line.replace(/^인증유효기간/, "만료일"))
+        .slice(0, 4);
+    }
     if (showcaseOffPreview) return [];
     return buildAuthValidityVerificationItems({
-      paidAt: c.authPaidAt || c.issuedAt || null,
+      paidAt: c.authPaidAt || null,
+      cycleEndAt: c.authCycleEndAt || c.cycleEndAt || null,
       billingCycle: c.billingCycle || null
     });
-  }, [c.verificationItems, c.authPaidAt, c.issuedAt, c.billingCycle, showcaseOffPreview]);
+  }, [c.verificationItems, c.authPaidAt, c.authCycleEndAt, c.cycleEndAt, c.billingCycle, showcaseOffPreview]);
 
   const phoneMatched = useMemo(() => {
     if (!verified) return false;

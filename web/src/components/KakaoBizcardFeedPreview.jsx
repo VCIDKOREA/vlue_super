@@ -19,7 +19,7 @@ import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
 import UserProfileAvatar from "./UserProfileAvatar.jsx";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
-import { fitImageFileOrThrow, IMAGE_FIT_COVER } from "../lib/fitImageFile.js";
+import { compressAndUploadMediaImageOrThrow } from "../lib/mediaImageUpload.js";
 
 function buildTags(card) {
   const tags = [];
@@ -58,13 +58,8 @@ function openExternalSafely(url) {
 }
 
 async function compressCoverFile(file) {
-  const { dataUrl } = await fitImageFileOrThrow(file, {
-    ...IMAGE_FIT_COVER,
-    maxWidth: 1600,
-    maxHeight: 1600,
-    maxBytes: 900 * 1024
-  });
-  return dataUrl;
+  const uploaded = await compressAndUploadMediaImageOrThrow(file, "cover");
+  return uploaded.url;
 }
 
 function readVlueHandleDisplay() {

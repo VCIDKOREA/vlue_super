@@ -88,17 +88,17 @@ export function getStoreProduct(productId) {
   return readStoreProducts().find((p) => p.id === productId) || null;
 }
 
-/** 파일 → data URL (신청 서류·상품 이미지 — 이미지는 자동 맞춤) */
+/** 파일 → URL (신청 서류·상품 이미지 — 압축 후 R2 직행, 실패 시 data URL) */
 export async function readFileAsDataUrlLimited(file, maxBytes = 800 * 1024) {
   if (!file) throw new Error("파일이 없습니다.");
   const type = String(file.type || "").toLowerCase();
   if (type.startsWith("image/")) {
-    const { fitImageFileOrThrow, IMAGE_FIT_STORE } = await import("./fitImageFile.js");
-    const { dataUrl } = await fitImageFileOrThrow(file, {
-      ...IMAGE_FIT_STORE,
-      maxBytes
+    const { compressAndUploadMediaImageOrThrow } = await import("./mediaImageUpload.js");
+    const { IMAGE_FIT_STORE } = await import("./fitImageFile.js");
+    const uploaded = await compressAndUploadMediaImageOrThrow(file, "store", {
+      fitRules: { ...IMAGE_FIT_STORE, maxBytes }
     });
-    return dataUrl;
+    return uploaded.url;
   }
   if (file.size > maxBytes) {
     throw new Error(`파일은 ${Math.round(maxBytes / 1024)}KB 이하여야 합니다.`);

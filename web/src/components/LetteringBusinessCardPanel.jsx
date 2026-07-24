@@ -88,19 +88,17 @@ function BizcardFace({ className = "", children, overlay = null }) {
 
 function BizAvatar({ card }) {
   const [imgBroken, setImgBroken] = useState(false);
-  const photoUrl = card.photoUrl || "";
-  const logoUrl = card.logoUrl || resolveLetteringDemoLogoUrl(card);
-  const src = photoUrl || logoUrl;
-  const isLogoOnly = !photoUrl && Boolean(logoUrl);
+  /* 회사명 옆 = 회사 로고만 (프로필 사진과 혼용 금지) */
+  const logoUrl = String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl(card);
   const fallbackLabel = (card.organization || card.name || "?").slice(0, 1);
 
   return (
-    <span className="lettering-bizcard__avatar">
-      {src && !imgBroken ? (
+    <span className="lettering-bizcard__avatar" aria-label="회사 로고">
+      {logoUrl && !imgBroken ? (
         <img
-          src={src}
+          src={logoUrl}
           alt=""
-          className={`h-full w-full ${isLogoOnly ? "object-contain p-0.5" : "object-cover"}`}
+          className="h-full w-full object-contain p-0.5"
           onError={() => setImgBroken(true)}
         />
       ) : (

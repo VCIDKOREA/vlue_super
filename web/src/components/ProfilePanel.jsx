@@ -1036,7 +1036,7 @@ function ProfilePanel({
                     const f = e.target.files?.[0];
                     if (!f) return;
                     try {
-                      writeAvatar("card", await fileToFittedAvatarDataUrl(f));
+                      writeAvatar("card", await fileToFittedAvatarDataUrl(f, "logo"));
                       setAvatarTick((n) => n + 1);
                     } catch {
                       /* ignore */

@@ -9,7 +9,7 @@ import ShowcasePhotoTextOverlay, {
   SHOWCASE_TEXT_BORDERS,
   normalizePhotoOverlay
 } from "./ShowcasePhotoTextOverlay.jsx";
-import { fitImageFileOrThrow, IMAGE_FIT_GENERAL } from "../../lib/fitImageFile.js";
+import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
 
 function clampPercent(n) {
   return Math.min(100, Math.max(0, n));
@@ -156,8 +156,8 @@ export default function ShowcasePhotoEditor({
       const file = files[0];
       if (!file || !/^image\//i.test(file.type)) return;
       try {
-        const { dataUrl: url } = await fitImageFileOrThrow(file, IMAGE_FIT_GENERAL);
-        onChange(photos.map((p) => (p.id === replacePhotoId ? { ...p, url } : p)));
+        const uploaded = await compressAndUploadMediaImageOrThrow(file, "showcase");
+        onChange(photos.map((p) => (p.id === replacePhotoId ? { ...p, url: uploaded.url } : p)));
       } catch {
         /* ignore */
       }
@@ -169,12 +169,12 @@ export default function ShowcasePhotoEditor({
     for (const file of files.slice(0, limit - next.length)) {
       if (!/^image\//i.test(file.type)) continue;
       try {
-        const { dataUrl: url } = await fitImageFileOrThrow(file, IMAGE_FIT_GENERAL);
+        const uploaded = await compressAndUploadMediaImageOrThrow(file, "showcase");
         const id = `ph-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         lastId = id;
         next.push({
           id,
-          url,
+          url: uploaded.url,
           caption: "",
           overlayText: "",
           overlayFont: "pretendard",

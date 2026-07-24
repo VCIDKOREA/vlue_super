@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createMarketingPopup, fetchMarketingPopups } from "../../lib/adminV1Api.js";
 import AdminPhonePreview from "./AdminPhonePreview.jsx";
-import { fitImageFileOrThrow, IMAGE_FIT_COVER } from "../../lib/fitImageFile.js";
+import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
 
 function toLocalInputValue(iso) {
   if (!iso) return "";
@@ -64,8 +64,8 @@ export default function MarketingCenterTab({ onToast }) {
       return;
     }
     try {
-      const { dataUrl } = await fitImageFileOrThrow(f, IMAGE_FIT_COVER);
-      setImageDataUrl(dataUrl);
+      const uploaded = await compressAndUploadMediaImageOrThrow(f, "marketing");
+      setImageDataUrl(uploaded.url);
     } catch (err) {
       onToast?.(err instanceof Error ? err.message : "이미지를 처리하지 못했습니다.");
     }
@@ -81,6 +81,7 @@ export default function MarketingCenterTab({ onToast }) {
     try {
       const data = await createMarketingPopup({
         title,
+        imageUrl: imageDataUrl,
         imageDataUrl,
         linkUrl,
         linkType,

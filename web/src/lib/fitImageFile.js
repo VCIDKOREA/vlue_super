@@ -4,11 +4,11 @@
 
 export const IMAGE_FIT_READ_MAX_BYTES = 20 * 1024 * 1024;
 
-/** 프로필/명함 사진 */
+/** 프로필/명함 사진 — 클라이언트 압축 후 R2 */
 export const IMAGE_FIT_PHOTO = {
-  maxWidth: 1200,
-  maxHeight: 1600,
-  maxBytes: 1024 * 1024,
+  maxWidth: 1920,
+  maxHeight: 1920,
+  maxBytes: 900 * 1024,
   preferPng: false,
   fileNamePrefix: "photo"
 };
@@ -17,7 +17,7 @@ export const IMAGE_FIT_PHOTO = {
 export const IMAGE_FIT_LOGO = {
   maxWidth: 512,
   maxHeight: 512,
-  maxBytes: 512 * 1024,
+  maxBytes: 400 * 1024,
   preferPng: true,
   fileNamePrefix: "logo"
 };
@@ -26,7 +26,7 @@ export const IMAGE_FIT_LOGO = {
 export const IMAGE_FIT_AVATAR = {
   maxWidth: 1200,
   maxHeight: 1200,
-  maxBytes: 1024 * 1024,
+  maxBytes: 700 * 1024,
   preferPng: false,
   fileNamePrefix: "avatar"
 };
@@ -35,18 +35,27 @@ export const IMAGE_FIT_AVATAR = {
 export const IMAGE_FIT_COVER = {
   maxWidth: 1600,
   maxHeight: 1600,
-  maxBytes: 900 * 1024,
+  maxBytes: 800 * 1024,
   preferPng: false,
   fileNamePrefix: "cover"
 };
 
-/** 쇼케이스 갤러리·일반 첨부 사진 */
+/** 일반 첨부 (쇼케이스 제외) */
 export const IMAGE_FIT_GENERAL = {
-  maxWidth: 1600,
-  maxHeight: 1600,
-  maxBytes: 1024 * 1024,
+  maxWidth: 1920,
+  maxHeight: 1920,
+  maxBytes: 900 * 1024,
   preferPng: false,
   fileNamePrefix: "image"
+};
+
+/** 쇼케이스 갤러리 — 상대적으로 고화질 유지 */
+export const IMAGE_FIT_SHOWCASE = {
+  maxWidth: 1920,
+  maxHeight: 2560,
+  maxBytes: 1800 * 1024,
+  preferPng: false,
+  fileNamePrefix: "showcase"
 };
 
 /** 채팅 전송 이미지 */

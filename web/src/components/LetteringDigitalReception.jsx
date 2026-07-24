@@ -206,30 +206,43 @@ function ContactRow({ icon: Icon, label, value, onActivate, showCertBadge = fals
 
 function WatermarkBackdrop({ card }) {
   const [imgBroken, setImgBroken] = useState(false);
-  const photoUrl = card.photoUrl || "";
-  const logoUrl = card.logoUrl || resolveLetteringDemoLogoUrl(card);
-  const heroSrc = photoUrl || logoUrl;
-  if (!heroSrc || imgBroken) return null;
+  /* 회사 로고만 — 프로필 사진과 섞지 않음 */
+  const logoUrl = String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl(card);
+  if (!logoUrl || imgBroken) return null;
 
   return (
     <div className="ldr-watermark" aria-hidden>
-      <img src={heroSrc} alt="" className="ldr-watermark__img" onError={() => setImgBroken(true)} />
+      <img src={logoUrl} alt="" className="ldr-watermark__img" onError={() => setImgBroken(true)} />
     </div>
+  );
+}
+
+function CompanyLogoBadge({ card, className = "" }) {
+  const [imgBroken, setImgBroken] = useState(false);
+  const logoUrl = String(card.logoUrl || "").trim();
+  if (!logoUrl || imgBroken) return null;
+  return (
+    <span className={`ldr-company-logo-badge${className ? ` ${className}` : ""}`.trim()} aria-label="회사 로고">
+      <img src={logoUrl} alt="" className="ldr-company-logo-badge__img" onError={() => setImgBroken(true)} />
+    </span>
   );
 }
 
 function ProfileMedia({ card, className = "", variant = "avatar" }) {
   const [imgBroken, setImgBroken] = useState(false);
-  const photoUrl = card.photoUrl || "";
-  const logoUrl = card.logoUrl || resolveLetteringDemoLogoUrl(card);
-  const src = photoUrl || logoUrl;
-  const isLogoOnly = !photoUrl && Boolean(src);
-  const fallback = (card.name || card.organization || "V").slice(0, 1);
+  const photoUrl = String(card.photoUrl || "").trim();
+  const logoUrl = String(card.logoUrl || "").trim();
+  /* avatar = 회사 로고, hero = 프로필 사진 — 서로 대체하지 않음 */
+  const src = variant === "logo" || variant === "avatar" ? logoUrl : photoUrl;
+  const isLogo = variant === "logo" || variant === "avatar";
+  const fallback = (card.organization || card.name || "V").slice(0, 1);
+
+  if (!src && isLogo) return null;
 
   return (
     <div
       className={`ldr-profile-media ldr-profile-media--${variant}${
-        isLogoOnly ? " ldr-profile-media--logo" : ""
+        isLogo ? " ldr-profile-media--logo" : ""
       }${className ? ` ${className}` : ""}`.trim()}
     >
       {src && !imgBroken ? (
@@ -244,7 +257,7 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
 }
 
 function BackPanelHero({ card }) {
-  const photoUrl = card.photoUrl || "";
+  const photoUrl = String(card.photoUrl || "").trim();
   if (!photoUrl) return null;
 
   return (
@@ -257,25 +270,24 @@ function BackPanelHero({ card }) {
 
 function ProfileHero({ card, verified, incomingNumber = "" }) {
   const [imgBroken, setImgBroken] = useState(false);
-  const photoUrl = card.photoUrl || "";
-  const logoUrl = card.logoUrl || resolveLetteringDemoLogoUrl(card);
-  const heroSrc = photoUrl || logoUrl;
-  const isLogoOnly = !photoUrl && Boolean(heroSrc);
+  const photoUrl = String(card.photoUrl || "").trim();
+  const logoUrl = String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl(card);
+  const hasPhoto = Boolean(photoUrl);
+  const hasLogo = Boolean(logoUrl);
   const lines = formatLetteringReceptionLines(card, { incomingNumber });
   const orgLine = lines.expandedOrgLine;
   const personName = lines.organization && lines.name ? lines.name : "";
   const phoneDisplay = lines.phone ? formatLetteringPhoneDisplay(lines.phone) : "";
   const title = lines.title;
 
-  const heroCopy = (
-    <div className={`ldr-hero__copy${isLogoOnly ? " ldr-hero__copy--watermark" : ""}`}>
-      {verified ? (
-        <span className={`ldr-hero__badge${isLogoOnly ? " ldr-hero__badge--inline" : ""}`}>
-          <ShieldCheck className="h-3.5 w-3.5" />
-          VLUE 인증
-        </span>
+  const identityCopy = (
+    <>
+      {orgLine ? (
+        <p className="ldr-hero__brand ldr-hero__brand--with-logo">
+          {hasLogo ? <CompanyLogoBadge card={{ logoUrl }} className="ldr-company-logo-badge--inline" /> : null}
+          <span>{orgLine}</span>
+        </p>
       ) : null}
-      {orgLine ? <p className="ldr-hero__brand">{orgLine}</p> : null}
       {personName || phoneDisplay || title ? (
         <p className="ldr-hero__contact">
           {personName ? <span className="ldr-hero__person">{personName}</span> : null}
@@ -285,16 +297,17 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
           {title ? <span className="ldr-hero__title">{title}</span> : null}
         </p>
       ) : null}
-    </div>
+    </>
   );
 
-  if (isLogoOnly) {
+  /* 프로필 사진 없음 + 로고만 → 로고는 워터마크(브랜드), 프로필 자리와 혼동 방지 */
+  if (!hasPhoto && hasLogo) {
     return (
       <div className="ldr-hero ldr-hero--watermark">
         <div className="ldr-hero__watermark-stage" aria-hidden>
-          {heroSrc && !imgBroken ? (
+          {!imgBroken ? (
             <img
-              src={heroSrc}
+              src={logoUrl}
               alt=""
               className="ldr-hero__watermark-img"
               onError={() => setImgBroken(true)}
@@ -303,7 +316,15 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
             <span className="ldr-hero__watermark-fallback">{(orgLine || "V").slice(0, 1)}</span>
           )}
         </div>
-        {heroCopy}
+        <div className="ldr-hero__copy ldr-hero__copy--watermark">
+          {verified ? (
+            <span className="ldr-hero__badge ldr-hero__badge--inline">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              VLUE 인증
+            </span>
+          ) : null}
+          {identityCopy}
+        </div>
       </div>
     );
   }
@@ -311,9 +332,9 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
   return (
     <div className="ldr-hero">
       <div className="ldr-hero__visual">
-        {heroSrc && !imgBroken ? (
+        {hasPhoto && !imgBroken ? (
           <img
-            src={heroSrc}
+            src={photoUrl}
             alt=""
             className="ldr-hero__photo"
             onError={() => setImgBroken(true)}
@@ -324,6 +345,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
           </div>
         )}
         <div className="ldr-hero__shade" />
+        {hasLogo ? <CompanyLogoBadge card={{ logoUrl }} className="ldr-company-logo-badge--hero" /> : null}
         {verified ? (
           <span className="ldr-hero__badge">
             <ShieldCheck className="h-3.5 w-3.5" />
@@ -331,18 +353,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
           </span>
         ) : null}
       </div>
-      <div className="ldr-hero__copy ldr-hero__copy--overlay">
-        {orgLine ? <p className="ldr-hero__brand">{orgLine}</p> : null}
-        {personName || phoneDisplay || title ? (
-          <p className="ldr-hero__contact">
-            {personName ? <span className="ldr-hero__person">{personName}</span> : null}
-            {personName && (phoneDisplay || title) ? <span className="ldr-hero__contact-sep"> / </span> : null}
-            {phoneDisplay ? <span className="ldr-hero__phone">{phoneDisplay}</span> : null}
-            {phoneDisplay && title ? <span className="ldr-hero__contact-sep"> / </span> : null}
-            {title ? <span className="ldr-hero__title">{title}</span> : null}
-          </p>
-        ) : null}
-      </div>
+      <div className="ldr-hero__copy ldr-hero__copy--overlay">{identityCopy}</div>
     </div>
   );
 }
@@ -392,13 +403,17 @@ function FrontPanel({
   const intro = String(card.companyIntro || card.salesContent || "").trim();
   const validityFromItems = (verificationItems || [])
     .map((line) => String(line || "").trim())
-    .find((line) => /인증유효기간/.test(line));
+    .find((line) => /만료일|인증유효기간/.test(line));
+  const validityResolved = resolveAuthValidityPeriod({
+    paidAt: card.authPaidAt || null,
+    cycleEndAt: card.authCycleEndAt || card.cycleEndAt || null,
+    validUntil: card.authValidUntil || null,
+    billingCycle: card.billingCycle || null
+  });
+  const validityLabel = "만료일";
   const validityDisplay = validityFromItems
-    ? validityFromItems.replace(/^인증유효기간\s*[:：]?\s*/, "").trim()
-    : resolveAuthValidityPeriod({
-        paidAt: card.authPaidAt || card.issuedAt || null,
-        billingCycle: card.billingCycle || null
-      }).line;
+    ? validityFromItems.replace(/^(만료일|인증유효기간)\s*[:：]?\s*/, "").trim()
+    : validityResolved?.line || "";
 
   return (
     <div className={`ldr-panel ldr-panel--front${embeddedInPush ? " ldr-panel--push" : ""}`}>
@@ -409,9 +424,7 @@ function FrontPanel({
       )}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
       <div className={`ldr-back-head${card.photoUrl && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
-        {embeddedInPush && !card.photoUrl ? (
-          <ProfileMedia card={card} className="ldr-back-head__media" />
-        ) : null}
+        <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />
         <div className="ldr-back-head__copy">
           <p className="ldr-back-kicker">Digital ID · Profile</p>
           <div className="ldr-back-title-row">
@@ -553,7 +566,7 @@ function FrontPanel({
         ) : null}
 
         {validityDisplay ? (
-          <FrontInfoRow icon={ShieldCheck} label="인증유효기간" className="ldr-front-info-row--careers">
+          <FrontInfoRow icon={ShieldCheck} label={validityLabel} className="ldr-front-info-row--careers">
             <p className="ldr-front-info-row__text tabular-nums">{validityDisplay}</p>
           </FrontInfoRow>
         ) : null}

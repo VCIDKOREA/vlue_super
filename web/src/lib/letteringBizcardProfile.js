@@ -196,7 +196,17 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       ownerUserId: userId || "",
       feedId: userId ? `user-${userId}` : "",
       feedType: "personal",
-      verificationItems: identity.name ? buildAuthValidityVerificationItems() : []
+      verificationItems: identity.name
+        ? buildAuthValidityVerificationItems({
+            cycleEndAt: (() => {
+              try {
+                return localStorage.getItem("vlue_subscription_cycle_end_at") || null;
+              } catch {
+                return null;
+              }
+            })()
+          })
+        : []
     }),
     { isCeo }
   );

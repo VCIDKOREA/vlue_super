@@ -312,6 +312,7 @@ export default function LetteringBizcardSettingsView({
     setLogoPreview(result.dataUrl);
     setLogoFileName(result.fileName);
     setNoCompanyLogo(false);
+    if (result.uploadWarning) setToast(result.uploadWarning);
   };
 
   const handlePhotoPick = async (e) => {
@@ -328,6 +329,7 @@ export default function LetteringBizcardSettingsView({
     setPhotoPreview(result.dataUrl);
     setPhotoFileName(result.fileName);
     setNoProfilePhoto(false);
+    if (result.uploadWarning) setToast(result.uploadWarning);
   };
 
   const handleApply = async () => {
@@ -443,10 +445,11 @@ export default function LetteringBizcardSettingsView({
     setPendingPhoto(null);
 
     try {
+      /* primary = 프로필 사진, card = 회사 로고 — 슬롯 혼용 금지 */
       if (saved.photoDataUrl && !saved.noProfilePhoto) {
         writeAvatar("primary", saved.photoDataUrl);
-        writeAvatar("card", saved.photoDataUrl);
-      } else if (saved.logoDataUrl && !saved.noCompanyLogo) {
+      }
+      if (saved.logoDataUrl && !saved.noCompanyLogo) {
         writeAvatar("card", saved.logoDataUrl);
       }
     } catch {
