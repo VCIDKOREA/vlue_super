@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiUrl } from "../lib/apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "../lib/vlueAuthHeaders.js";
+import { fitImageFileOrThrow, IMAGE_FIT_GENERAL } from "../lib/fitImageFile.js";
 
 function isValidNaverBlogUrl(url) {
   return /^https?:\/\/(blog\.naver\.com|m\.blog\.naver\.com)\//i.test(String(url || "").trim());
@@ -68,16 +69,20 @@ export default function ReviewSubmissionForm({ match, onClose, onSubmitted }) {
     const next = [...photos];
     for (const file of list) {
       if (!file.type.startsWith("image/")) continue;
-      const url = URL.createObjectURL(file);
-      next.push({
-        url,
-        name: file.name,
-        size: file.size,
-        meta: {
-          mime: file.type,
-          lastModified: file.lastModified
-        }
-      });
+      try {
+        const { dataUrl: url } = await fitImageFileOrThrow(file, IMAGE_FIT_GENERAL);
+        next.push({
+          url,
+          name: file.name,
+          size: file.size,
+          meta: {
+            mime: file.type,
+            lastModified: file.lastModified
+          }
+        });
+      } catch {
+        /* skip */
+      }
     }
     setPhotos(next.slice(0, 20));
   };

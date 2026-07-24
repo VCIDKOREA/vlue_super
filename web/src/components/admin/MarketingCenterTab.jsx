@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createMarketingPopup, fetchMarketingPopups } from "../../lib/adminV1Api.js";
 import AdminPhonePreview from "./AdminPhonePreview.jsx";
+import { fitImageFileOrThrow, IMAGE_FIT_COVER } from "../../lib/fitImageFile.js";
 
 function toLocalInputValue(iso) {
   if (!iso) return "";
@@ -62,9 +63,12 @@ export default function MarketingCenterTab({ onToast }) {
       onToast?.("이미지 파일만 업로드할 수 있습니다.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => setImageDataUrl(String(reader.result || ""));
-    reader.readAsDataURL(f);
+    try {
+      const { dataUrl } = await fitImageFileOrThrow(f, IMAGE_FIT_COVER);
+      setImageDataUrl(dataUrl);
+    } catch (err) {
+      onToast?.(err instanceof Error ? err.message : "이미지를 처리하지 못했습니다.");
+    }
     e.target.value = "";
   };
 

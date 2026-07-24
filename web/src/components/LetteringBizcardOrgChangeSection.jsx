@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Building2, Upload } from "lucide-react";
+import { Building2, ChevronDown, Upload, X } from "lucide-react";
 import {
   ORG_CHANGE_APPROVAL,
   ORG_CHANGE_EVIDENCE_KINDS,
@@ -8,7 +8,7 @@ import {
 } from "../lib/letteringBizcardStorage.js";
 
 /**
- * 디지털 인증명함 — 상호 변경 신청 (성함 고정 · 상호만 승인 후 반영)
+ * 디지털 인증명함 — 상호 변경 신청 (버튼 → 입력폼 펼침)
  */
 export default function LetteringBizcardOrgChangeSection({
   isDarkMode = false,
@@ -19,12 +19,15 @@ export default function LetteringBizcardOrgChangeSection({
   onSubmitted,
   onToast
 }) {
+  const [formOpen, setFormOpen] = useState(false);
   const [desiredName, setDesiredName] = useState("");
   const [evidenceKind, setEvidenceKind] = useState("storefront");
   const [evidencePreview, setEvidencePreview] = useState("");
   const [evidenceName, setEvidenceName] = useState("");
   const [error, setError] = useState("");
   const inputRef = useRef(null);
+
+  const isPending = approvalStatus === ORG_CHANGE_APPROVAL.PENDING;
 
   const onPick = useCallback(async (e) => {
     const file = e.target.files?.[0];
@@ -40,6 +43,14 @@ export default function LetteringBizcardOrgChangeSection({
     setEvidenceName(result.fileName || file.name || "evidence.jpg");
   }, []);
 
+  const resetForm = () => {
+    setDesiredName("");
+    setEvidencePreview("");
+    setEvidenceName("");
+    setError("");
+    setEvidenceKind("storefront");
+  };
+
   const onSubmit = () => {
     setError("");
     const result = submitOrgChangeRequest({
@@ -52,9 +63,8 @@ export default function LetteringBizcardOrgChangeSection({
       setError(result.error || "신청에 실패했습니다.");
       return;
     }
-    setDesiredName("");
-    setEvidencePreview("");
-    setEvidenceName("");
+    resetForm();
+    setFormOpen(false);
     onSubmitted?.();
     onToast?.("상호 변경 신청이 접수되었습니다. 승인되면 자동 반영됩니다.");
   };
@@ -85,15 +95,14 @@ export default function LetteringBizcardOrgChangeSection({
         <Building2 className={`mt-0.5 h-4 w-4 shrink-0 ${isDarkMode ? "text-sky-400" : "text-sky-700"}`} />
         <div className="min-w-0 flex-1">
           <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
-            상호 변경 신청
+            상호 변경
           </p>
           <p className={`mt-0.5 text-[10px] font-medium leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-            성함은 수정할 수 없습니다. 상호는 가게 간판 또는 서비스 웹/앱 화면을 첨부해 신청하면, 승인 후 자동
-            변경됩니다.
+            성함은 수정할 수 없습니다. 상호 변경은 증빙 사진 심사 후 반영됩니다.
           </p>
           <p className={`mt-1 text-[11px] font-semibold ${statusCls}`}>
             현재 상호: {currentOrganization || "—"}
-            {approvalStatus === ORG_CHANGE_APPROVAL.PENDING
+            {isPending
               ? ` · 심사 중 (${pendingName || "—"})`
               : approvalStatus === ORG_CHANGE_APPROVAL.REJECTED
                 ? " · 최근 신청 반려"
@@ -102,12 +111,43 @@ export default function LetteringBizcardOrgChangeSection({
         </div>
       </div>
 
-      {approvalStatus === ORG_CHANGE_APPROVAL.PENDING ? (
+      {isPending ? (
         <p className={`text-[11px] font-bold ${isDarkMode ? "text-amber-200" : "text-amber-800"}`}>
           상호 변경 심사가 진행 중입니다. 승인되면 명함·쇼케이스에 바로 반영됩니다.
         </p>
+      ) : !formOpen ? (
+        <button
+          type="button"
+          onClick={() => setFormOpen(true)}
+          className={`flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-black active:scale-[0.99] ${
+            isDarkMode ? "bg-sky-600 text-white" : "bg-sky-600 text-white"
+          }`}
+        >
+          상호 변경 신청
+          <ChevronDown className="h-4 w-4" aria-hidden />
+        </button>
       ) : (
         <>
+          <div className="flex items-center justify-between gap-2">
+            <p className={`text-[11px] font-black ${isDarkMode ? "text-sky-200" : "text-sky-800"}`}>
+              신청 입력
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setFormOpen(false);
+                setError("");
+              }}
+              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold ${
+                isDarkMode ? "bg-white/10 text-gray-300" : "bg-white text-slate-600"
+              }`}
+              aria-label="신청 폼 닫기"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+              닫기
+            </button>
+          </div>
+
           <label className="block">
             <span className={`text-[11px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
               변경할 상호
@@ -173,7 +213,7 @@ export default function LetteringBizcardOrgChangeSection({
             onClick={onSubmit}
             className="w-full rounded-xl bg-sky-600 py-2.5 text-[13px] font-black text-white active:scale-[0.99]"
           >
-            상호 변경 신청
+            상호 변경 신청하기
           </button>
         </>
       )}

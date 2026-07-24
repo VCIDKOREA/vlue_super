@@ -13,7 +13,7 @@ import {
   writeDisplayNicknames,
   VLUE_NICKNAME_MAX
 } from "../../lib/memberCardStorage.js";
-import { fileToDataUrl, writeAvatar } from "../../lib/vlueAvatar.js";
+import { fileToFittedAvatarDataUrl, writeAvatar } from "../../lib/vlueAvatar.js";
 import {
   SettingsSection,
   SettingsDivider,
@@ -237,7 +237,7 @@ export default function VlueSettingsPanel({
               const f = e.target.files?.[0];
               if (!f) return;
               try {
-                writeAvatar("primary", await fileToDataUrl(f));
+                writeAvatar("primary", await fileToFittedAvatarDataUrl(f));
                 showSettingNotice?.("프로필 사진이 변경되었습니다.");
               } catch {
                 showSettingNotice?.("사진을 불러오지 못했습니다.");

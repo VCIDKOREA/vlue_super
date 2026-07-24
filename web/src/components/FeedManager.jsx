@@ -12,6 +12,7 @@ import { generatePostDescription } from "../lib/vmingApi.js";
 import VlueStoreApplicationPanel from "./VlueStoreApplicationPanel.jsx";
 import VlueStoreProductManager from "./VlueStoreProductManager.jsx";
 import ScreenBackHeader from "./common/ScreenBackHeader";
+import { fitImageFileOrThrow, IMAGE_FIT_AVATAR } from "../lib/fitImageFile.js";
 
 function FeedManager({ membershipTier = "free", onGoMain }) {
   const [feedName, setFeedName] = useState("");
@@ -52,25 +53,19 @@ function FeedManager({ membershipTier = "free", onGoMain }) {
     };
   }, []);
 
-  const onPickPageProfile = (file) => {
+  const onPickPageProfile = async (file) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setProfilePickInfo("이미지 파일만 선택할 수 있습니다.");
       return;
     }
-    if (file.size > 6 * 1024 * 1024) {
-      setProfilePickInfo("6MB 이하 이미지를 선택해 주세요.");
-      return;
+    try {
+      const { dataUrl } = await fitImageFileOrThrow(file, IMAGE_FIT_AVATAR);
+      setPageProfileImageDataUrl(dataUrl);
+      setProfilePickInfo("프로필 사진 선택됨. 저장하면 MY VLUE PAGE에 반영됩니다.");
+    } catch (e) {
+      setProfilePickInfo(e instanceof Error ? e.message : "이미지를 처리하지 못했습니다.");
     }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result;
-      if (typeof result === "string") {
-        setPageProfileImageDataUrl(result);
-        setProfilePickInfo("프로필 사진 선택됨. 저장하면 MY VLUE PAGE에 반영됩니다.");
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const saveConfig = (markCreated = false) => {

@@ -51,9 +51,7 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
   const patch = {
     email: force || !localEmail ? clampLetteringBizcardEmail(snap.email || "") : local.email,
     website: force || !localWebsite ? String(snap.website || "").trim() : local.website,
-    noWebsite: snap.noWebsite != null && (force || !localWebsite) ? Boolean(snap.noWebsite) : local.noWebsite,
     fax: force || !String(local.fax || "").trim() ? String(snap.fax || "").trim() : local.fax,
-    noFax: snap.noFax != null && (force || !String(local.fax || "").trim()) ? Boolean(snap.noFax) : local.noFax,
     addressRoad: force || !localRoad ? roadFromSnap || String(snap.address || "").trim() : localRoad,
     addressDetail: force || !localDetail ? detailFromSnap : localDetail,
     address: force || !localAddress ? addressCombined : local.address,
@@ -65,10 +63,19 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
       force || !String(local.customBackText || "").trim()
         ? String(snap.customBackText || "").trim()
         : local.customBackText,
-    logoUrl:
-      force || !String(local.logoUrl || "").trim() ? String(snap.logoUrl || "").trim() : local.logoUrl,
-    photoUrl:
-      force || !String(local.photoUrl || "").trim() ? String(snap.photoUrl || "").trim() : local.photoUrl,
+    /* 로컬 키는 logoDataUrl/photoDataUrl — 예전 hydrate가 logoUrl에 넣던 값도 흡수 */
+    logoDataUrl:
+      force || !String(local.logoDataUrl || local.logoUrl || "").trim()
+        ? String(snap.logoUrl || "").trim()
+        : String(local.logoDataUrl || local.logoUrl || "").trim(),
+    photoDataUrl:
+      force || !String(local.photoDataUrl || local.photoUrl || "").trim()
+        ? String(snap.photoUrl || "").trim()
+        : String(local.photoDataUrl || local.photoUrl || "").trim(),
+    noCompanyLogo: force && snap.noCompanyLogo != null ? Boolean(snap.noCompanyLogo) : Boolean(local.noCompanyLogo),
+    noProfilePhoto: force && snap.noProfilePhoto != null ? Boolean(snap.noProfilePhoto) : Boolean(local.noProfilePhoto),
+    noFax: force && snap.noFax != null ? Boolean(snap.noFax) : Boolean(local.noFax),
+    noWebsite: force && snap.noWebsite != null ? Boolean(snap.noWebsite) : Boolean(local.noWebsite),
     kakaoFeedBgDataUrl:
       force || !String(local.kakaoFeedBgDataUrl || "").trim()
         ? String(snap.shareCoverUrl || local.kakaoFeedBgDataUrl || "").trim()
@@ -83,7 +90,7 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
         : local.department
   };
 
-  return writeLetteringBizcardEditable(patch);
+  return writeLetteringBizcardEditable(patch)?.data ?? null;
 }
 
 /** 서버에서 디지털 명함 메타 (HTML 배포·검증·유효기간·편집 스냅샷) */
@@ -178,8 +185,10 @@ export async function syncDigitalCardExportSnapshot(card) {
           addressDetail: detail || String(ed.addressDetail || "").trim(),
           companyIntro: String(ed.companyIntro || card?.companyIntro || "").trim(),
           customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
-          logoUrl: String(card?.logoUrl || ed.logoUrl || "").trim(),
-          photoUrl: String(card?.photoUrl || ed.photoUrl || "").trim(),
+          logoUrl: String(card?.logoUrl || ed.logoDataUrl || ed.logoUrl || "").trim(),
+          photoUrl: String(card?.photoUrl || ed.photoDataUrl || ed.photoUrl || "").trim(),
+          noCompanyLogo: Boolean(ed.noCompanyLogo),
+          noProfilePhoto: Boolean(ed.noProfilePhoto),
           shareCoverUrl: String(ed.kakaoFeedBgDataUrl || card?.shareCoverUrl || "").trim(),
           designTemplate: normalizeLetteringBizcardTemplate(card?.designTemplate || ed.designTemplate)
         }

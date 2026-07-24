@@ -9,6 +9,7 @@ import ShowcasePhotoTextOverlay, {
   SHOWCASE_TEXT_BORDERS,
   normalizePhotoOverlay
 } from "./ShowcasePhotoTextOverlay.jsx";
+import { fitImageFileOrThrow, IMAGE_FIT_GENERAL } from "../../lib/fitImageFile.js";
 
 function clampPercent(n) {
   return Math.min(100, Math.max(0, n));
@@ -154,8 +155,12 @@ export default function ShowcasePhotoEditor({
     if (replacePhotoId) {
       const file = files[0];
       if (!file || !/^image\//i.test(file.type)) return;
-      const url = await readAsDataUrl(file);
-      onChange(photos.map((p) => (p.id === replacePhotoId ? { ...p, url } : p)));
+      try {
+        const { dataUrl: url } = await fitImageFileOrThrow(file, IMAGE_FIT_GENERAL);
+        onChange(photos.map((p) => (p.id === replacePhotoId ? { ...p, url } : p)));
+      } catch {
+        /* ignore */
+      }
       return;
     }
 
@@ -163,22 +168,27 @@ export default function ShowcasePhotoEditor({
     let lastId = "";
     for (const file of files.slice(0, limit - next.length)) {
       if (!/^image\//i.test(file.type)) continue;
-      const id = `ph-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      lastId = id;
-      next.push({
-        id,
-        url: await readAsDataUrl(file),
-        caption: "",
-        overlayText: "",
-        overlayFont: "pretendard",
-        overlayFontSize: 28,
-        overlayColor: "#ffffff",
-        overlayX: 50,
-        overlayY: 50,
-        overlayAnim: "fade",
-        overlayBorder: "none",
-        emojiStickers: []
-      });
+      try {
+        const { dataUrl: url } = await fitImageFileOrThrow(file, IMAGE_FIT_GENERAL);
+        const id = `ph-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        lastId = id;
+        next.push({
+          id,
+          url,
+          caption: "",
+          overlayText: "",
+          overlayFont: "pretendard",
+          overlayFontSize: 28,
+          overlayColor: "#ffffff",
+          overlayX: 50,
+          overlayY: 50,
+          overlayAnim: "fade",
+          overlayBorder: "none",
+          emojiStickers: []
+        });
+      } catch {
+        /* skip bad file */
+      }
       if (next.length >= limit) break;
     }
     onChange(next.slice(0, limit));
@@ -669,13 +679,4 @@ export default function ShowcasePhotoEditor({
       />
     </div>
   );
-}
-
-function readAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result || ""));
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
 }

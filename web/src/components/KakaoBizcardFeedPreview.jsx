@@ -12,12 +12,14 @@ import {
   readLetteringBizcardEditable,
   writeLetteringBizcardEditable
 } from "../lib/letteringBizcardStorage.js";
-import { readActiveShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
-import { CALL_STATES } from "../lib/showcase/tentShowcaseTypes.js";
+import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
+import { VLUE_SHOWCASE_DEMO_RECORDING_SEC } from "../lib/vlueShowcaseCard.js";
 import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
+import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
 import UserProfileAvatar from "./UserProfileAvatar.jsx";
-import TentShowcaseOverlay from "./showcase/TentShowcaseOverlay.jsx";
+import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
+import { fitImageFileOrThrow, IMAGE_FIT_COVER } from "../lib/fitImageFile.js";
 
 function buildTags(card) {
   const tags = [];
@@ -56,33 +58,13 @@ function openExternalSafely(url) {
 }
 
 async function compressCoverFile(file) {
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
-    reader.readAsDataURL(file);
+  const { dataUrl } = await fitImageFileOrThrow(file, {
+    ...IMAGE_FIT_COVER,
+    maxWidth: 1600,
+    maxHeight: 1600,
+    maxBytes: 900 * 1024
   });
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const maxW = 960;
-      const scale = Math.min(1, maxW / Math.max(1, img.width));
-      const w = Math.max(1, Math.round(img.width * scale));
-      const h = Math.max(1, Math.round(img.height * scale));
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        resolve(dataUrl);
-        return;
-      }
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL("image/jpeg", 0.78));
-    };
-    img.onerror = () => reject(new Error("이미지 변환에 실패했습니다."));
-    img.src = dataUrl;
-  });
+  return dataUrl;
 }
 
 function readVlueHandleDisplay() {
@@ -136,7 +118,16 @@ export default function KakaoBizcardFeedPreview({
   const hasProfile = Boolean(name || org || roleLine || tags.length);
   const [viewUrl, setViewUrl] = useState("");
   const [liveOpen, setLiveOpen] = useState(false);
-  const showcaseStyle = useMemo(() => readActiveShowcaseStyle(), [liveOpen]);
+  const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
+
+  const styledCard = useMemo(
+    () =>
+      applyShowcaseStyleToCard(
+        { ...snap, membershipTier: membershipTier || snap.membershipTier || "free" },
+        membershipTier || snap.membershipTier || "free"
+      ),
+    [snap, membershipTier]
+  );
 
   useEffect(() => {
     const bump = () => setAvatarTick((n) => n + 1);
@@ -168,6 +159,12 @@ export default function KakaoBizcardFeedPreview({
       return true;
     });
   }, [liveOpen]);
+
+  useEffect(() => {
+    bindStyleConfig(styledCard?.showcaseStyle);
+    setPlaybackPhase(liveOpen ? "preview" : "idle");
+    return () => setPlaybackPhase("idle");
+  }, [liveOpen, styledCard?.showcaseStyle, bindStyleConfig, setPlaybackPhase]);
 
   const openFullShowcase = (e) => {
     e.preventDefault();
@@ -217,6 +214,26 @@ export default function KakaoBizcardFeedPreview({
         backgroundPosition: "center"
       }
     : undefined;
+
+  const notificationProps = {
+    verified: true,
+    card: styledCard,
+    platform: "android",
+    callPhase: "connected",
+    isRecording: true,
+    callDurationSec: VLUE_SHOWCASE_DEMO_RECORDING_SEC,
+    recordingDurationSec: VLUE_SHOWCASE_DEMO_RECORDING_SEC,
+    incomingNumber: styledCard?.phone || snap.phone || "",
+    expanded: true,
+    onExpandedChange: (next) => {
+      if (!next) setLiveOpen(false);
+    },
+    hideUnverifiedFooter: true,
+    previewMode: true,
+    includeDigitalCard: true,
+    onEndCall: () => setLiveOpen(false),
+    onToast
+  };
 
   return (
     <div
@@ -299,13 +316,14 @@ export default function KakaoBizcardFeedPreview({
       {liveOpen && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="fixed inset-0 z-[10000200] flex flex-col bg-black"
+              className="lettering-showcase-fs"
               role="dialog"
               aria-modal="true"
-              aria-label="VLUE 풀 쇼케이스"
+              aria-label="디지털인증명함 쇼케이스"
+              style={{ zIndex: 10000200 }}
             >
-              <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-slate-950 px-3 py-2">
-                <p className="text-[13px] font-black text-white">풀 쇼케이스</p>
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-slate-950 px-3 py-2">
+                <p className="text-[13px] font-black text-white">디지털인증명함</p>
                 <div className="flex items-center gap-2">
                   {viewUrl ? (
                     <button type="button" className="rounded-lg px-2 py-1 text-[11px] font-bold text-blue-300" onClick={openPublicPage}>
@@ -321,21 +339,10 @@ export default function KakaoBizcardFeedPreview({
                   </button>
                 </div>
               </div>
-              <div className="min-h-0 flex-1">
-                <TentShowcaseOverlay
-                  previewMode
-                  forceInteractive
-                  callState={CALL_STATES.CONNECTED}
-                  verified
-                  membershipTier="premium"
-                  peerPhone={snap.phone || ""}
-                  displayName={displayName}
-                  organization={org}
-                  card={snap}
-                  showcaseStyle={showcaseStyle}
-                  privacyMode="public"
-                  className="tent-showcase--fill h-full"
-                  onClose={() => setLiveOpen(false)}
+              <div className="lettering-showcase-fs__shell" style={{ height: "auto", flex: "1 1 auto" }}>
+                <LetteringIncomingNotification
+                  {...notificationProps}
+                  className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent"
                 />
               </div>
             </div>,

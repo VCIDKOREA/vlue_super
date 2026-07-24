@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import {
-  LETTERING_BIZCARD_CHANGED_EVENT,
   clampLetteringBizcardEmail,
   combineLetteringBizcardAddress,
   prepareLetteringLogoFromFile,
@@ -31,6 +30,8 @@ import {
   isVerifyDocIssuedWithinLimit,
   prepareLetteringVerifyDocFromFile
 } from "../lib/letteringBizcardVerification.js";
+import { writeAvatar } from "../lib/vlueAvatar.js";
+import { DIGITAL_CARD_ACTIVE_KEY } from "../lib/bizcardAccountSync.js";
 
 export default function LetteringBizcardSettingsView({
   membershipTier = "free",
@@ -171,10 +172,17 @@ export default function LetteringBizcardSettingsView({
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     fetchDigitalCardMeta().then((meta) => {
+      if (cancelled) return;
       if (meta.cardId) setCardId(meta.cardId);
+      /* 서버 soft hydrate 후 이미지·필드 1회 반영 (편집 중 반복 reload 금지) */
+      reload();
     });
-  }, [previewTick]);
+    return () => {
+      cancelled = true;
+    };
+  }, [reload]);
 
   useEffect(() => {
     refreshMembership();
@@ -182,12 +190,6 @@ export default function LetteringBizcardSettingsView({
 
   useEffect(() => {
     reload();
-  }, [reload]);
-
-  useEffect(() => {
-    const onChange = () => reload();
-    window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onChange);
-    return () => window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onChange);
   }, [reload]);
 
   const titleDeptNeedsSubmit = useMemo(
@@ -247,14 +249,14 @@ export default function LetteringBizcardSettingsView({
   ]);
 
   const applyLabel = useMemo(() => {
-    if (titleDeptNeedsSubmit) return "신청하기";
-    if (isFirstApply) return "신청 · 적용";
-    return "적용";
+    if (titleDeptNeedsSubmit) return "신청 · 전체적용";
+    if (isFirstApply) return "신청 · 전체적용";
+    return "전체적용";
   }, [titleDeptNeedsSubmit, isFirstApply]);
 
   const showToast = (msg) => {
     setToast(msg);
-    window.setTimeout(() => setToast(""), 2400);
+    window.setTimeout(() => setToast(""), 4200);
   };
 
   const handleNoProfilePhotoChange = (checked) => {
@@ -382,6 +384,7 @@ export default function LetteringBizcardSettingsView({
       photoFileName: noProfilePhoto ? "" : pendingPhoto?.fileName || photoFileName || ""
     };
 
+    let writeResult;
     if (titleDeptNeedsSubmit) {
       try {
         await submitTitleDeptReview({
@@ -396,7 +399,7 @@ export default function LetteringBizcardSettingsView({
         setVerifyDocError(e?.message || "서류 제출에 실패했습니다.");
         return;
       }
-      writeLetteringBizcardEditable({
+      writeResult = writeLetteringBizcardEditable({
         ...basePatch,
         titleDeptApprovalStatus: TITLE_DEPT_APPROVAL.PENDING,
         titleDeptPendingTitle: trimmedTitle,
@@ -407,15 +410,23 @@ export default function LetteringBizcardSettingsView({
         titleDeptVerifyDocIssuedAt: verifyDocIssuedAt,
         titleDeptSubmittedAt: new Date().toISOString()
       });
+      if (!writeResult?.ok) {
+        showToast(writeResult?.error || "저장에 실패했습니다. 다시 시도해 주세요.");
+        return;
+      }
       setTitleDeptApprovalStatus(TITLE_DEPT_APPROVAL.PENDING);
     } else {
-      writeLetteringBizcardEditable({
+      writeResult = writeLetteringBizcardEditable({
         ...basePatch,
         approvedTitle: trimmedTitle,
         approvedDepartment: trimmedDept,
         titleDeptApprovalStatus:
           trimmedTitle || trimmedDept ? TITLE_DEPT_APPROVAL.APPROVED : titleDeptApprovalStatus
       });
+      if (!writeResult?.ok) {
+        showToast(writeResult?.error || "저장에 실패했습니다. 다시 시도해 주세요.");
+        return;
+      }
       if (trimmedTitle || trimmedDept) {
         setApprovedTitle(trimmedTitle);
         setApprovedDepartment(trimmedDept);
@@ -423,10 +434,45 @@ export default function LetteringBizcardSettingsView({
       }
     }
 
+    const saved = writeResult.data || readLetteringBizcardEditable();
+    setLogoPreview(saved.logoDataUrl || "");
+    setLogoFileName(saved.logoFileName || "");
+    setPhotoPreview(saved.photoDataUrl || "");
+    setPhotoFileName(saved.photoFileName || "");
+    setPendingLogo(null);
+    setPendingPhoto(null);
+
+    try {
+      if (saved.photoDataUrl && !saved.noProfilePhoto) {
+        writeAvatar("primary", saved.photoDataUrl);
+        writeAvatar("card", saved.photoDataUrl);
+      } else if (saved.logoDataUrl && !saved.noCompanyLogo) {
+        writeAvatar("card", saved.logoDataUrl);
+      }
+    } catch {
+      /* ignore */
+    }
+
+    try {
+      localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
+      window.dispatchEvent(new CustomEvent("vlue-digital-card-changed"));
+    } catch {
+      /* ignore */
+    }
+
+    const appliedCard = buildUserLetteringCard({ membershipTier });
     void syncDigitalCardDesignTemplate(tpl);
-    const syncResult = await syncDigitalCardExportSnapshot({ ...previewCard, designTemplate: tpl });
+    const syncResult = await syncDigitalCardExportSnapshot({
+      ...appliedCard,
+      designTemplate: tpl,
+      logoUrl: saved.noCompanyLogo ? "" : saved.logoDataUrl || appliedCard.logoUrl || "",
+      photoUrl: saved.noProfilePhoto ? "" : saved.photoDataUrl || appliedCard.photoUrl || ""
+    });
     if (!syncResult?.ok) {
-      showToast("기기에 저장되었습니다. 서버 동기화에 실패했습니다. 네트워크 확인 후 다시 적용해 주세요.");
+      showToast("기기에 저장되었습니다. 서버 동기화에 실패했습니다. 네트워크 확인 후 다시 전체적용해 주세요.");
+      setPreviewTick((n) => n + 1);
+      onApplied?.();
+      return;
     }
     if (isFirstApply) {
       try {
@@ -439,21 +485,17 @@ export default function LetteringBizcardSettingsView({
           localStorage.setItem("vlue_company_locked", identity.organization);
           localStorage.setItem("myCardOrganization", identity.organization);
         }
-        localStorage.setItem("vlue_digital_card_active", "1");
-        window.dispatchEvent(new CustomEvent("vlue-digital-card-changed"));
       } catch {
         /* ignore */
       }
     }
-    setPendingLogo(null);
-    setPendingPhoto(null);
     setPreviewTick((n) => n + 1);
     showToast(
       titleDeptNeedsSubmit
         ? "직책·부서 변경 신청이 접수되었습니다. 서류 확인 후 승인됩니다."
         : isFirstApply
-          ? "디지털인증명함 신청이 완료되었습니다. 통화 중 수신 화면에 반영됩니다."
-          : "디지털 인증 명함에 적용되었습니다."
+          ? "전체적용되었습니다. 디지털인증명함 신청이 완료되었고, 통화 수신 화면에 반영됩니다."
+          : "전체적용되었습니다. 입력하신 내용이 디지털인증명함·쇼케이스에 반영되었습니다."
     );
     onApplied?.();
   };

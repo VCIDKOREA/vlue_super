@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { fileToDataUrl, readAvatar, writeAvatar } from "../lib/vlueAvatar.js";
+import { fileToFittedAvatarDataUrl, readAvatar, writeAvatar } from "../lib/vlueAvatar.js";
 import {
   addMyPagePost,
   getPageDisplayProfile,
@@ -317,7 +317,7 @@ function MyPage({
     if (!file) return;
     if (!file.type.startsWith("image/")) return setToast("프로필은 이미지 파일만 가능합니다.");
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const dataUrl = await fileToFittedAvatarDataUrl(file);
       setProfileImageUrl(dataUrl);
       writeAvatar("primary", dataUrl);
       writeAvatar("feed", dataUrl);

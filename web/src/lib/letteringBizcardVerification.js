@@ -1,5 +1,7 @@
 /** 디지털 인증명함 — 직책·부서 확인 서류 */
 
+import { fitImageFile, IMAGE_FIT_DOC, IMAGE_FIT_READ_MAX_BYTES } from "./fitImageFile.js";
+
 export const LETTERING_VERIFY_DOC_MAX_BYTES = 5 * 1024 * 1024;
 export const LETTERING_VERIFY_DOC_ACCEPT = "application/pdf,image/png,image/jpeg,image/webp";
 export const LETTERING_VERIFY_DOC_ACCEPT_LABEL = "PDF, PNG, JPG, WEBP";
@@ -77,8 +79,21 @@ export async function prepareLetteringVerifyDocFromFile(file) {
   if (!allowed.includes(type)) {
     return { ok: false, error: `${LETTERING_VERIFY_DOC_ACCEPT_LABEL}만 첨부할 수 있습니다.` };
   }
+
+  if (type.startsWith("image/")) {
+    const result = await fitImageFile(file, {
+      ...IMAGE_FIT_DOC,
+      maxBytes: Math.min(IMAGE_FIT_DOC.maxBytes, LETTERING_VERIFY_DOC_MAX_BYTES)
+    });
+    if (!result.ok) return result;
+    return { ok: true, dataUrl: result.dataUrl, fileName: String(file.name || result.fileName || "verify-doc").trim() };
+  }
+
   if (file.size > LETTERING_VERIFY_DOC_MAX_BYTES) {
     return { ok: false, error: `파일 크기는 ${Math.round(LETTERING_VERIFY_DOC_MAX_BYTES / (1024 * 1024))}MB 이하여야 합니다.` };
+  }
+  if (file.size > IMAGE_FIT_READ_MAX_BYTES) {
+    return { ok: false, error: "파일이 너무 큽니다." };
   }
 
   const dataUrl = await new Promise((resolve, reject) => {

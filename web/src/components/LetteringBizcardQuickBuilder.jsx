@@ -20,29 +20,50 @@ import { readShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 function Field({ label, hint, children, isDarkMode }) {
   const labelCls = isDarkMode ? "text-[11px] font-black text-gray-100" : "text-[11px] font-black text-gray-900";
   const hintCls = isDarkMode ? "mt-0.5 text-[10px] text-gray-400" : "mt-0.5 text-[10px] text-gray-500";
+  /* div — 내부 체크박스 label 과 중첩되면 클릭이 먹통이 됨 */
   return (
-    <label className="block">
+    <div className="block">
       <span className={labelCls}>{label}</span>
       {hint ? <p className={hintCls}>{hint}</p> : null}
       {children}
-    </label>
+    </div>
   );
 }
 
 function OmitCheckbox({ checked, onChange, label, isDarkMode }) {
   const checkCls = isDarkMode
-    ? "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-gray-300"
-    : "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-slate-600";
+    ? "mt-2 flex w-full cursor-pointer items-center gap-2 text-left text-[11px] font-semibold text-gray-300"
+    : "mt-2 flex w-full cursor-pointer items-center gap-2 text-left text-[11px] font-semibold text-slate-600";
   return (
-    <label className={checkCls}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-      />
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      className={checkCls}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onChange(!checked);
+      }}
+    >
+      <span
+        aria-hidden
+        className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${
+          checked
+            ? "border-blue-600 bg-blue-600 text-white"
+            : isDarkMode
+              ? "border-gray-500 bg-transparent"
+              : "border-gray-300 bg-white"
+        }`}
+      >
+        {checked ? (
+          <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M2.5 6.2 4.8 8.5 9.5 3.5" />
+          </svg>
+        ) : null}
+      </span>
       {label}
-    </label>
+    </button>
   );
 }
 
@@ -84,6 +105,7 @@ function ImageUploadTile({
   const openPicker = useCallback(
     (e) => {
       e.preventDefault();
+      e.stopPropagation();
       if (disabled || omitChecked) return;
       captureScroll();
       const onWindowFocus = () => {
@@ -116,13 +138,10 @@ function ImageUploadTile({
     : `inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold ${
         isDarkMode ? "bg-blue-600 text-white" : "bg-blue-600 text-white"
       } active:scale-[0.99]`;
-  const checkCls = isDarkMode
-    ? "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-gray-300"
-    : "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-slate-600";
 
   return (
     <div>
-      <div className={`flex items-center gap-3${disabled || omitChecked ? " pointer-events-none" : ""}`}>
+      <div className="flex items-center gap-3">
         <span className={tile}>
           {preview && !omitChecked ? (
             <img src={preview} alt="" className="h-full w-full object-cover" />
@@ -148,15 +167,7 @@ function ImageUploadTile({
         </div>
       </div>
       {onOmitChange ? (
-        <label className={checkCls}>
-          <input
-            type="checkbox"
-            checked={omitChecked}
-            onChange={(e) => onOmitChange(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          {omitLabel}
-        </label>
+        <OmitCheckbox checked={omitChecked} onChange={onOmitChange} label={omitLabel} isDarkMode={isDarkMode} />
       ) : null}
     </div>
   );
@@ -219,7 +230,7 @@ export default function LetteringBizcardQuickBuilder({
   onOrgChangeSubmitted,
   onOrgChangeToast,
   onApply,
-  applyLabel = "적용",
+  applyLabel = "전체적용",
   toast = ""
 }) {
   const [previewFace, setPreviewFace] = useState("front");
@@ -298,7 +309,11 @@ export default function LetteringBizcardQuickBuilder({
 
       <div className={`${panel} space-y-4`}>
         <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>프로필 · 이미지</p>
-        <Field label="프로필 사진" hint={`${LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB`} isDarkMode={isDarkMode}>
+        <Field
+          label="프로필 사진"
+          hint={`${LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB · 초과 시 자동 맞춤`}
+          isDarkMode={isDarkMode}
+        >
           <ImageUploadTile
             preview={pendingPhoto?.dataUrl || photoPreview}
             placeholder="사진 업로드"
@@ -317,7 +332,11 @@ export default function LetteringBizcardQuickBuilder({
           ) : null}
           {photoError ? <p className="mt-1 text-[10px] font-bold text-red-500">{photoError}</p> : null}
         </Field>
-        <Field label="회사 로고" hint={`${LETTERING_LOGO_RULES.acceptLabel} · 512KB 이하`} isDarkMode={isDarkMode}>
+        <Field
+          label="회사 로고"
+          hint={`${LETTERING_LOGO_RULES.acceptLabel} · 512KB 이하 · 초과 시 자동 맞춤`}
+          isDarkMode={isDarkMode}
+        >
           <ImageUploadTile
             preview={pendingLogo?.dataUrl || logoPreview}
             placeholder="로고 업로드"
@@ -440,9 +459,18 @@ export default function LetteringBizcardQuickBuilder({
         {applyLabel}
       </button>
       {toast ? (
-        <p className={`text-center text-[11px] font-bold ${isDarkMode ? "text-cyan-300" : "text-blue-600"}`}>
-          {toast}
-        </p>
+        <div
+          className={`rounded-2xl border px-3 py-3 text-center ${
+            isDarkMode
+              ? "border-emerald-400/30 bg-emerald-950/40 text-emerald-200"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <p className="text-[12px] font-black">전체적용 완료</p>
+          <p className="mt-1 text-[11px] font-semibold leading-relaxed">{toast}</p>
+        </div>
       ) : null}
     </div>
   );

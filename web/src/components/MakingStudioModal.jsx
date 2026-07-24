@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { fitImageFileOrThrow, IMAGE_FIT_GENERAL } from "../lib/fitImageFile.js";
 
 const MAKING_STORAGE_KEY = "vlue_making_assets_v1";
 
@@ -173,7 +174,7 @@ export default function MakingStudioModal({
     setStudioTab("archive");
   };
 
-  const onPickFile = (file) => {
+  const onPickFile = async (file) => {
     if (!file) return;
     const meta = { name: file.name, type: file.type, size: file.size };
     setMakingFileMeta(meta);
@@ -181,16 +182,13 @@ export default function MakingStudioModal({
       showToast("이미지가 아닌 파일은 미리보기 없이 저장됩니다.");
       return;
     }
-    if (meta.size > 8 * 1024 * 1024) {
-      showToast("이미지는 8MB 이하만 가능합니다.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setMakingImageDataUrl(String(reader.result || ""));
+    try {
+      const { dataUrl } = await fitImageFileOrThrow(file, IMAGE_FIT_GENERAL);
+      setMakingImageDataUrl(dataUrl);
       showToast("이미지가 연결되었습니다.");
-    };
-    reader.readAsDataURL(file);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "이미지를 처리하지 못했습니다.");
+    }
   };
 
   const sendItem = async (item) => {

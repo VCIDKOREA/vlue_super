@@ -1,5 +1,6 @@
 import { apiUrl } from "./apiBase.js";
 import { vlueAuthHeaders, vlueAuthFetch } from "./vlueAuthHeaders.js";
+import { fitImageFileOrThrow, IMAGE_FIT_DOC } from "./fitImageFile.js";
 
 async function parseJson(res) {
   const data = await res.json().catch(() => ({}));
@@ -13,6 +14,20 @@ async function parseJson(res) {
     throw err;
   }
   return data;
+}
+
+async function fileToUploadDataUrl(file) {
+  if (!file) return undefined;
+  if (String(file.type || "").startsWith("image/")) {
+    const { dataUrl } = await fitImageFileOrThrow(file, IMAGE_FIT_DOC);
+    return dataUrl;
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 export async function fetchB2bEnterpriseMe() {
@@ -90,12 +105,7 @@ export async function fetchB2bEnrollmentStatus() {
 export async function uploadB2bEnrollmentDocument({ kind, fileName, file }) {
   let url;
   if (file && typeof FileReader !== "undefined") {
-    url = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
+    url = await fileToUploadDataUrl(file);
   }
   const res = await vlueAuthFetch(apiUrl("/api/b2b/enrollment/documents"), {
     method: "POST",
@@ -113,12 +123,7 @@ export async function uploadB2bEnrollmentDocument({ kind, fileName, file }) {
 export async function uploadB2bAttributionDocument({ requestId, kind, fileName, file }) {
   let url;
   if (file && typeof FileReader !== "undefined") {
-    url = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
+    url = await fileToUploadDataUrl(file);
   }
   const res = await vlueAuthFetch(apiUrl("/api/b2b/attribution/documents"), {
     method: "POST",

@@ -4,6 +4,7 @@ import WalletHubModal from "./WalletHubModal.jsx";
 import { buildMyCardChatPayload } from "../lib/shareMyCardToChat.js";
 import SpellingCorrectionField from "./spell/SpellingCorrectionField.jsx";
 import { useSpellingCheckMode } from "../hooks/useSpellingCheckMode.js";
+import { fitImageFileOrThrow, IMAGE_FIT_CHAT } from "../lib/fitImageFile.js";
 
 /** 위챗 스타일 8칸 + VLUE 기존 확장 */
 const PRIMARY_ACTIONS = [
@@ -298,13 +299,14 @@ const ChatInput = forwardRef(function ChatInput(
     if (action.text) onSend(action.text);
     setOpenPlus(false);
   };
-  const sendImageFile = (file) => {
+  const sendImageFile = async (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      onSend({ type: "me", imageUrl: String(reader.result || ""), text: "" });
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { dataUrl } = await fitImageFileOrThrow(file, IMAGE_FIT_CHAT);
+      onSend({ type: "me", imageUrl: dataUrl, text: "" });
+    } catch {
+      /* ignore */
+    }
   };
   const shareCardToChat = (profile) => {
     if (!profile) return;

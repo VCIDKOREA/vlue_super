@@ -1,8 +1,13 @@
 /** 레터링 명함 — 사용자 편집 필드 (회사명·성명·전화는 가입 고정) */
 
 import { formatPhoneE164ForKoreaDisplay } from "./phoneDisplay.js";
+import { fitImageFile } from "./fitImageFile.js";
 
 export const LETTERING_BIZCARD_STORAGE_KEY = "vlue_lettering_bizcard_v1";
+/** 대용량 data URL — 본문 JSON과 분리해 QuotaExceeded 방지 */
+export const LETTERING_BIZCARD_LOGO_KEY = "vlue_lettering_logo_data_v1";
+export const LETTERING_BIZCARD_PHOTO_KEY = "vlue_lettering_photo_data_v1";
+export const LETTERING_BIZCARD_COVER_KEY = "vlue_lettering_cover_data_v1";
 export const LETTERING_BIZCARD_CHANGED_EVENT = "vlue-lettering-bizcard-changed";
 /** 홈·미리보기에서 디지털 인증명함 설정(프로필 letteringBizcard) 열기 */
 export const LETTERING_OPEN_BIZCARD_SETTINGS_EVENT = "vlue-open-lettering-bizcard-settings";
@@ -294,17 +299,81 @@ function ensureCeoLetteringTitle() {
   }
 }
 
+function readBlobKey(key) {
+  try {
+    return String(localStorage.getItem(key) || "");
+  } catch {
+    return "";
+  }
+}
+
+function writeBlobKey(key, value) {
+  const v = String(value || "");
+  if (!v) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
+    return { ok: true };
+  }
+  try {
+    localStorage.setItem(key, v);
+    return { ok: true };
+  } catch (e) {
+    const quota =
+      e &&
+      (e.name === "QuotaExceededError" ||
+        e.code === 22 ||
+        e.code === 1014 ||
+        /quota/i.test(String(e.message || "")));
+    return {
+      ok: false,
+      error: quota
+        ? "저장 공간이 부족합니다. 사진·로고를 줄이거나 다른 이미지를 사용해 주세요."
+        : "이미지 저장에 실패했습니다."
+    };
+  }
+}
+
 export function readLetteringBizcardEditable() {
   try {
     const raw = localStorage.getItem(LETTERING_BIZCARD_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_EDITABLE };
+    if (!raw) {
+      return {
+        ...DEFAULT_EDITABLE,
+        logoDataUrl: readBlobKey(LETTERING_BIZCARD_LOGO_KEY),
+        photoDataUrl: readBlobKey(LETTERING_BIZCARD_PHOTO_KEY),
+        kakaoFeedBgDataUrl: readBlobKey(LETTERING_BIZCARD_COVER_KEY)
+      };
+    }
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_EDITABLE, ...(parsed && typeof parsed === "object" ? parsed : {}) };
+    const base = { ...DEFAULT_EDITABLE, ...(parsed && typeof parsed === "object" ? parsed : {}) };
+    /* 분리 키 우선 — 본문에 남아 있던 구버전 data URL도 흡수 */
+    const logoSeparated = readBlobKey(LETTERING_BIZCARD_LOGO_KEY);
+    const photoSeparated = readBlobKey(LETTERING_BIZCARD_PHOTO_KEY);
+    const coverSeparated = readBlobKey(LETTERING_BIZCARD_COVER_KEY);
+    const legacyLogo = String(base.logoDataUrl || base.logoUrl || "").trim();
+    const legacyPhoto = String(base.photoDataUrl || base.photoUrl || "").trim();
+    const legacyCover = String(base.kakaoFeedBgDataUrl || "").trim();
+    /* 구버전 본문 data URL → 분리 키로 이전 */
+    if (!logoSeparated && legacyLogo.startsWith("data:")) writeBlobKey(LETTERING_BIZCARD_LOGO_KEY, legacyLogo);
+    if (!photoSeparated && legacyPhoto.startsWith("data:")) writeBlobKey(LETTERING_BIZCARD_PHOTO_KEY, legacyPhoto);
+    if (!coverSeparated && legacyCover.startsWith("data:")) writeBlobKey(LETTERING_BIZCARD_COVER_KEY, legacyCover);
+    return {
+      ...base,
+      logoDataUrl: logoSeparated || legacyLogo,
+      photoDataUrl: photoSeparated || legacyPhoto,
+      kakaoFeedBgDataUrl: coverSeparated || legacyCover
+    };
   } catch {
     return { ...DEFAULT_EDITABLE };
   }
 }
 
+/**
+ * @returns {{ ok: boolean, data: object, error?: string }}
+ */
 export function writeLetteringBizcardEditable(patch = {}) {
   const prev = readLetteringBizcardEditable();
   const next = {
@@ -319,25 +388,79 @@ export function writeLetteringBizcardEditable(patch = {}) {
       ? { email: clampLetteringBizcardEmail(patch.email).trim() }
       : {})
   };
+
+  const logoDataUrl = String(next.logoDataUrl || "").trim();
+  const photoDataUrl = String(next.photoDataUrl || "").trim();
+  const coverDataUrl = String(next.kakaoFeedBgDataUrl || "").trim();
+
+  /* 본문 JSON에는 대용량 data URL을 넣지 않음 */
+  const meta = {
+    ...next,
+    logoDataUrl: "",
+    photoDataUrl: "",
+    kakaoFeedBgDataUrl: "",
+    logoUrl: undefined,
+    photoUrl: undefined
+  };
+  delete meta.logoUrl;
+  delete meta.photoUrl;
+
   try {
-    localStorage.setItem(LETTERING_BIZCARD_STORAGE_KEY, JSON.stringify(next));
+    const prevMetaRaw = localStorage.getItem(LETTERING_BIZCARD_STORAGE_KEY);
+    const nextMetaJson = JSON.stringify(meta);
+    const metaChanged = prevMetaRaw !== nextMetaJson;
+    if (metaChanged) {
+      localStorage.setItem(LETTERING_BIZCARD_STORAGE_KEY, nextMetaJson);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, "logoDataUrl") || logoDataUrl !== prev.logoDataUrl) {
+      const logoWrite = writeBlobKey(LETTERING_BIZCARD_LOGO_KEY, next.noCompanyLogo ? "" : logoDataUrl);
+      if (!logoWrite.ok) {
+        return { ok: false, data: prev, error: logoWrite.error };
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "photoDataUrl") || photoDataUrl !== prev.photoDataUrl) {
+      const photoWrite = writeBlobKey(LETTERING_BIZCARD_PHOTO_KEY, next.noProfilePhoto ? "" : photoDataUrl);
+      if (!photoWrite.ok) {
+        return { ok: false, data: prev, error: photoWrite.error };
+      }
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(patch, "kakaoFeedBgDataUrl") ||
+      coverDataUrl !== prev.kakaoFeedBgDataUrl
+    ) {
+      const coverWrite = writeBlobKey(LETTERING_BIZCARD_COVER_KEY, coverDataUrl);
+      if (!coverWrite.ok) {
+        return { ok: false, data: prev, error: coverWrite.error };
+      }
+    }
+
+    const merged = {
+      ...meta,
+      logoDataUrl: next.noCompanyLogo ? "" : logoDataUrl,
+      photoDataUrl: next.noProfilePhoto ? "" : photoDataUrl,
+      kakaoFeedBgDataUrl: coverDataUrl
+    };
     window.dispatchEvent(new Event(LETTERING_BIZCARD_CHANGED_EVENT));
-    return next;
-  } catch {
-    return prev;
+    return { ok: true, data: merged };
+  } catch (e) {
+    const quota =
+      e &&
+      (e.name === "QuotaExceededError" ||
+        e.code === 22 ||
+        e.code === 1014 ||
+        /quota/i.test(String(e.message || "")));
+    return {
+      ok: false,
+      data: prev,
+      error: quota
+        ? "저장 공간이 부족합니다. 사진·로고를 줄이거나 다시 시도해 주세요."
+        : "명함 저장에 실패했습니다."
+    };
   }
 }
 
-function readImageSize(dataUrl) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-    img.onerror = () => reject(new Error("이미지를 읽을 수 없습니다."));
-    img.src = dataUrl;
-  });
-}
-
-/** 로고·프로필 사진 파일 검증 후 data URL 반환 */
+/** 로고·프로필 사진 — 초과 시 자동 리사이즈·압축 후 data URL 반환 */
 async function prepareLetteringImageFromFile(file, rules, label = "이미지") {
   if (!file) return { ok: false, error: "파일을 선택해 주세요." };
 
@@ -345,45 +468,35 @@ async function prepareLetteringImageFromFile(file, rules, label = "이미지") {
   if (!rules.accept.split(",").includes(type)) {
     return { ok: false, error: `${rules.acceptLabel}만 업로드할 수 있습니다.` };
   }
-  if (file.size > rules.maxBytes) {
-    return { ok: false, error: `파일 크기는 ${Math.round(rules.maxBytes / 1024)}KB 이하여야 합니다.` };
+
+  const fitRules = {
+    maxWidth: rules.maxWidth,
+    maxHeight: rules.maxHeight,
+    maxBytes: rules.maxBytes,
+    preferPng: Boolean(rules.preferPng ?? rules === LETTERING_LOGO_RULES),
+    fileNamePrefix: rules.fileNamePrefix
+  };
+  const result = await fitImageFile(file, fitRules);
+  if (!result.ok) {
+    return { ok: false, error: result.error.replace(/^이미지/, label) };
   }
-
-  const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
-  const fileName = `${rules.fileNamePrefix}.${ext}`;
-
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("파일을 읽지 못했습니다."));
-    reader.readAsDataURL(file);
-  });
-
-  if (!dataUrl.startsWith("data:image/")) {
-    return { ok: false, error: "이미지 형식이 올바르지 않습니다." };
-  }
-
-  try {
-    const { width, height } = await readImageSize(dataUrl);
-    if (width > rules.maxWidth || height > rules.maxHeight) {
-      return {
-        ok: false,
-        error: `${label}은 가로·세로 각 ${rules.maxWidth}×${rules.maxHeight}px 이하여야 합니다. (현재 ${width}×${height})`
-      };
-    }
-  } catch (e) {
-    return { ok: false, error: e.message || "이미지 검증에 실패했습니다." };
-  }
-
-  return { ok: true, dataUrl, fileName };
+  return { ok: true, dataUrl: result.dataUrl, fileName: `${rules.fileNamePrefix}.${result.fileName.split(".").pop()}` };
 }
 
 /** 로고 파일 검증 후 data URL 반환 */
 export async function prepareLetteringLogoFromFile(file) {
-  return prepareLetteringImageFromFile(file, LETTERING_LOGO_RULES, "로고");
+  return prepareLetteringImageFromFile(
+    file,
+    { ...LETTERING_LOGO_RULES, preferPng: true },
+    "로고"
+  );
 }
 
 /** 프로필 사진 검증 후 data URL 반환 */
 export async function prepareLetteringPhotoFromFile(file) {
-  return prepareLetteringImageFromFile(file, LETTERING_PHOTO_RULES, "프로필 사진");
+  return prepareLetteringImageFromFile(
+    file,
+    { ...LETTERING_PHOTO_RULES, preferPng: false },
+    "프로필 사진"
+  );
 }

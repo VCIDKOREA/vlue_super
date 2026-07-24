@@ -65,39 +65,12 @@ export function sourcingHasVisualMedia(state) {
 }
 
 export async function compressImageFile(file, maxBytes = 1024 * 1024) {
-  const dataUrl = await fileToDataUrl(file);
-  if (dataUrl.length * 0.75 <= maxBytes) return dataUrl;
-
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      let { width, height } = img;
-      const maxSide = 1600;
-      if (width > maxSide || height > maxSide) {
-        const ratio = Math.min(maxSide / width, maxSide / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-      }
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        resolve(dataUrl);
-        return;
-      }
-      ctx.drawImage(img, 0, 0, width, height);
-      let quality = 0.88;
-      let out = canvas.toDataURL("image/jpeg", quality);
-      while (out.length * 0.75 > maxBytes && quality > 0.45) {
-        quality -= 0.08;
-        out = canvas.toDataURL("image/jpeg", quality);
-      }
-      resolve(out);
-    };
-    img.onerror = () => reject(new Error("이미지 압축에 실패했습니다."));
-    img.src = dataUrl;
+  const { fitImageFileOrThrow, IMAGE_FIT_GENERAL } = await import("./fitImageFile.js");
+  const { dataUrl } = await fitImageFileOrThrow(file, {
+    ...IMAGE_FIT_GENERAL,
+    maxBytes
   });
+  return dataUrl;
 }
 
 export function suggestProductNames(keywords, draftTitle) {

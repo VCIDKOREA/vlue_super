@@ -88,13 +88,22 @@ export function getStoreProduct(productId) {
   return readStoreProducts().find((p) => p.id === productId) || null;
 }
 
-/** 파일 → data URL (신청 서류, 최대 800KB) */
-export function readFileAsDataUrlLimited(file, maxBytes = 800 * 1024) {
+/** 파일 → data URL (신청 서류·상품 이미지 — 이미지는 자동 맞춤) */
+export async function readFileAsDataUrlLimited(file, maxBytes = 800 * 1024) {
+  if (!file) throw new Error("파일이 없습니다.");
+  const type = String(file.type || "").toLowerCase();
+  if (type.startsWith("image/")) {
+    const { fitImageFileOrThrow, IMAGE_FIT_STORE } = await import("./fitImageFile.js");
+    const { dataUrl } = await fitImageFileOrThrow(file, {
+      ...IMAGE_FIT_STORE,
+      maxBytes
+    });
+    return dataUrl;
+  }
+  if (file.size > maxBytes) {
+    throw new Error(`파일은 ${Math.round(maxBytes / 1024)}KB 이하여야 합니다.`);
+  }
   return new Promise((resolve, reject) => {
-    if (!file) return reject(new Error("파일이 없습니다."));
-    if (file.size > maxBytes) {
-      return reject(new Error(`파일은 ${Math.round(maxBytes / 1024)}KB 이하여야 합니다.`));
-    }
     const reader = new FileReader();
     reader.onloadend = () => {
       if (typeof reader.result === "string") resolve(reader.result);

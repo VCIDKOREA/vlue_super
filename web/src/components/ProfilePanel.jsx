@@ -18,7 +18,7 @@ import BackButton from "./common/BackButton";
 import { isBillableMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
 import { pricingNumbers } from "../lib/pricingConfig.js";
 import { probeEnterpriseSidebarAccess } from "../lib/enterpriseLineManageAccess.js";
-import { fileToDataUrl, readProfileOrLogoAvatar, writeAvatar, scrubBrandAvatarsFromStorage } from "../lib/vlueAvatar.js";
+import { fileToFittedAvatarDataUrl, readProfileOrLogoAvatar, writeAvatar, scrubBrandAvatarsFromStorage } from "../lib/vlueAvatar.js";
 import UserProfileAvatar from "./UserProfileAvatar.jsx";
 import { getMemberHandle, getProfileHeaderName } from "../lib/memberCardStorage.js";
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
@@ -1015,9 +1015,13 @@ function ProfilePanel({
                   onChange={async (e) => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    const u = await fileToDataUrl(f);
-                    writeAvatar("primary", u);
-                    setAvatarTick((n) => n + 1);
+                    try {
+                      const u = await fileToFittedAvatarDataUrl(f);
+                      writeAvatar("primary", u);
+                      setAvatarTick((n) => n + 1);
+                    } catch {
+                      /* ignore */
+                    }
                     e.target.value = "";
                   }}
                 />
@@ -1031,8 +1035,12 @@ function ProfilePanel({
                   onChange={async (e) => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    writeAvatar("card", await fileToDataUrl(f));
-                    setAvatarTick((n) => n + 1);
+                    try {
+                      writeAvatar("card", await fileToFittedAvatarDataUrl(f));
+                      setAvatarTick((n) => n + 1);
+                    } catch {
+                      /* ignore */
+                    }
                     e.target.value = "";
                   }}
                 />
