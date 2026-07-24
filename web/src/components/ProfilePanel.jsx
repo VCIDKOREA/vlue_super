@@ -18,7 +18,7 @@ import BackButton from "./common/BackButton";
 import { isBillableMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
 import { pricingNumbers } from "../lib/pricingConfig.js";
 import { probeEnterpriseSidebarAccess } from "../lib/enterpriseLineManageAccess.js";
-import { fileToFittedAvatarDataUrl, readProfileOrLogoAvatar, writeAvatar, scrubBrandAvatarsFromStorage } from "../lib/vlueAvatar.js";
+import { fileToFittedAvatarDataUrl, readProfilePhotoAvatar, writeAvatar, scrubBrandAvatarsFromStorage } from "../lib/vlueAvatar.js";
 import UserProfileAvatar from "./UserProfileAvatar.jsx";
 import { getMemberHandle, getProfileHeaderName } from "../lib/memberCardStorage.js";
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
@@ -369,10 +369,10 @@ function ProfilePanel({
       ? "text-blue-400"
       : "text-blue-600"
     : subText;
-  /** 사용자가 올린 프로필·로고만 — VLUE 브랜드 마크는 절대 폴백하지 않음 */
+  /** 사용자가 올린 프로필 사진만 — 회사 로고·VLUE 브랜드와 혼용하지 않음 */
   const primaryAva = useMemo(() => {
     scrubBrandAvatarsFromStorage();
-    return readProfileOrLogoAvatar();
+    return readProfilePhotoAvatar();
   }, [avatarTick, open]);
 
   const openLetteringBizcardHub = useCallback(() => {

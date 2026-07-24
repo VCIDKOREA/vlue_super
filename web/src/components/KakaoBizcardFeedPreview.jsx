@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ImagePlus, Trash2 } from "lucide-react";
-import { readProfileOrLogoAvatar, scrubBrandAvatarsFromStorage } from "../lib/vlueAvatar.js";
+import { readProfilePhotoAvatar, scrubBrandAvatarsFromStorage } from "../lib/vlueAvatar.js";
 import { withLetteringBizcardPreviewFallback } from "../lib/letteringBizcardProfile.js";
 import { scrubLetteringDemoPollution } from "../lib/letteringDemoPollution.js";
 import { syncDigitalCardExportSnapshot } from "../lib/digitalCardApi.js";
@@ -103,7 +103,8 @@ export default function KakaoBizcardFeedPreview({
   const tags = useMemo(() => buildTags(snap), [snap]);
   const avatarUrl = useMemo(() => {
     scrubBrandAvatarsFromStorage();
-    return readProfileOrLogoAvatar();
+    /* 사람 얼굴 = 프로필 사진. 회사 로고(card)와 섞지 않음 */
+    return readProfilePhotoAvatar();
   }, [avatarTick, snap.name]);
   const coverUrl = useMemo(() => {
     const ed = readLetteringBizcardEditable();

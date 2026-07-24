@@ -102,6 +102,12 @@ export function readProfileOrLogoAvatar() {
   return readAvatar("card") || readAvatar("primary") || "";
 }
 
+/** 사람 프로필 사진만 (회사 로고와 혼용하지 않음) — 헤더·마이페이지·카카오 미리보기 */
+export function readProfilePhotoAvatar() {
+  scrubBrandAvatarsFromStorage();
+  return readAvatar("primary") || readAvatar("feed") || readAvatar("chat") || "";
+}
+
 export function writeAvatar(slot, dataUrlOrUrl, opts = {}) {
   try {
     const k = KEYS[slot] || KEYS.primary;
