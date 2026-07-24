@@ -2,7 +2,7 @@ import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import { resolvePlaylistTracks } from "../../lib/showcase/showcaseBgmPresets.js";
 
 /**
- * BGM 전송 컨트롤 — 복수곡 ◀ ∥ ▶ / 단곡 ◁ ∥ ▷ (스킵 비활성)
+ * BGM 전송 컨트롤 — 복수곡 ◀◀ ∥ ▶▶ / 단곡 ◁◁ ∥ ▷▷ (스킵 비활성)
  * 가운데 = 일시정지/재생. 안 나오고 있으면 ▶ 탭 시 재생 강제.
  */
 export default function ShowcaseBgmTransport({ className = "", styleConfig = null }) {
@@ -27,8 +27,8 @@ export default function ShowcaseBgmTransport({ className = "", styleConfig = nul
 
   const skipEnabled = canSkipTracks || trackCount > 1;
   const paused = !isAudible;
-  const prevGlyph = skipEnabled ? "◀" : "◁";
-  const nextGlyph = skipEnabled ? "▶" : "▷";
+  const prevGlyph = skipEnabled ? "◀◀" : "◁◁";
+  const nextGlyph = skipEnabled ? "▶▶" : "▷▷";
   const midGlyph = paused ? "▶" : "∥";
 
   return (

@@ -6764,7 +6764,10 @@ body,
   aspect-ratio: 4 / 3;
   max-height: 200px;
   overflow: hidden;
-  background: #1e293b;
+  background: #0b101b;
+  border: 0;
+  box-shadow: none;
+  outline: none;
 }
 
 .ldr-hero--watermark {
@@ -6928,8 +6931,10 @@ body,
 .ldr-hero__shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 35%, rgba(11, 17, 32, 0.92) 100%);
+  z-index: 1;
   pointer-events: none;
+  /* 텍스트 가독성만 — 사진 본문은 가리지 않음 */
+  background: linear-gradient(180deg, transparent 55%, rgba(11, 17, 32, 0.55) 100%);
 }
 
 .ldr-hero__badge {
@@ -7495,8 +7500,12 @@ body,
 }
 
 .ldr-panel--push.ldr-panel--front .ldr-back-head--with-hero {
-  margin-top: -28px;
+  /* 신원 블록을 사진 위에 올려 중간 가로선이 로고/이름을 가르지 않게 */
+  margin-top: -52px;
   padding-top: 0;
+  border: 0 !important;
+  border-top: 0 !important;
+  box-shadow: none !important;
 }
 
 .ldr-panel--push.ldr-panel--back {
@@ -7527,11 +7536,33 @@ body,
 .ldr-profile-media--hero {
   width: 100%;
   aspect-ratio: 16 / 9;
-  max-height: 132px;
+  max-height: 160px;
   border-radius: 0;
-  border: 0;
-  border-bottom: 1px solid rgba(96, 165, 250, 0.2);
-  box-shadow: none;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  outline: none;
+  background: transparent;
+}
+
+.ldr-profile-media--hero .ldr-profile-media__img {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.ldr-back-hero {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 0 !important;
+  box-shadow: none !important;
+  /* 맨 아래 14px만 살짝 구분선 제거 — 얼굴/본문은 그대로 */
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 calc(100% - 14px), transparent 100%);
+}
+
+.ldr-back-hero__shade {
+  display: none;
 }
 
 .ldr-profile-media--logo .ldr-profile-media__img {
@@ -7557,19 +7588,6 @@ body,
   font-size: 22px;
   font-weight: 700;
   color: rgba(148, 163, 184, 0.75);
-}
-
-.ldr-back-hero {
-  position: relative;
-  z-index: 1;
-  overflow: hidden;
-}
-
-.ldr-back-hero__shade {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, transparent 45%, rgba(11, 17, 32, 0.88) 100%);
-  pointer-events: none;
 }
 
 .ldr-back-head {
