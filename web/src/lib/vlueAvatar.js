@@ -102,13 +102,20 @@ export function readProfileOrLogoAvatar() {
   return readAvatar("card") || readAvatar("primary") || "";
 }
 
-export function writeAvatar(slot, dataUrlOrUrl) {
+export function writeAvatar(slot, dataUrlOrUrl, opts = {}) {
   try {
     const k = KEYS[slot] || KEYS.primary;
     const v = sanitizeAvatarUrl(dataUrlOrUrl);
     if (v) localStorage.setItem(k, v);
     else localStorage.removeItem(k);
     window.dispatchEvent(new Event("vlue-avatar-changed"));
+    if (!opts.skipServerSync) {
+      queueMicrotask(() => {
+        import("./avatarServerSync.js")
+          .then((m) => m.syncAvatarSlotToServer(slot, v))
+          .catch(() => {});
+      });
+    }
   } catch {
     /* ignore */
   }

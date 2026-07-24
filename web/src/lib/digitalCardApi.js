@@ -9,6 +9,10 @@ import {
   clampLetteringBizcardEmail
 } from "./letteringBizcardStorage.js";
 import { writeMembershipBillingMeta } from "./authValidityPeriod.js";
+import {
+  hydrateAvatarsFromExportSnapshot,
+  pushLocalAvatarsIfServerMissing
+} from "./avatarServerSync.js";
 
 const DIGITAL_CARD_ID_KEY = "vlue_digital_card_id";
 
@@ -114,6 +118,8 @@ export async function fetchDigitalCardMeta() {
     if (data?.cardId) writeStoredDigitalCardId(data.cardId);
     if (data?.exportSnapshot) {
       hydrateLetteringEditableFromSnapshot(data.exportSnapshot, { force: false });
+      hydrateAvatarsFromExportSnapshot(data.exportSnapshot, { force: false });
+      pushLocalAvatarsIfServerMissing(data.exportSnapshot);
     }
     if (data?.subscription?.cycleEndAt) {
       writeMembershipBillingMeta({
