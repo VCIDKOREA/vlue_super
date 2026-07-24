@@ -11,11 +11,15 @@ export default function UserCaseArchiveView({
   userId,
   displayName = "",
   onClose,
-  onToast
+  onToast,
+  isDarkMode = false
 }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [detailPayload, setDetailPayload] = useState(null);
+  const [peerIdentity, setPeerIdentity] = useState(null);
+  const [feedItems, setFeedItems] = useState([]);
+  const [feedStartIndex, setFeedStartIndex] = useState(0);
 
   if (!open || !userId) return null;
 
@@ -27,18 +31,35 @@ export default function UserCaseArchiveView({
         hideHeader
         showFloatingClose={false}
         coverBottomNav
-        className="bg-white"
+        elevateAboveShowcase
+        isDarkMode={isDarkMode}
+        className={isDarkMode ? "bg-[#0b101b]" : "bg-white"}
         title={displayName || "케이스함"}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto bg-white">
+        <div className={`min-h-0 flex-1 overflow-y-auto ${isDarkMode ? "bg-[#0b101b]" : "bg-white"}`}>
           <MyCaseGrid
             mode="user"
             ownerUserId={userId}
             onBack={onClose}
             onToast={onToast}
-            onOpenDetail={(item, detail) => {
+            bgmEnabled
+            isDarkMode={isDarkMode}
+            onOpenDetail={(item, detail, meta) => {
+              setPeerIdentity(
+                meta || {
+                  userId,
+                  name: displayName || item?.title || "",
+                  handle: "",
+                  phone: "",
+                  organization: "",
+                  photoUrl: item?.thumbnailUrl || "",
+                  membershipTier: "premium"
+                }
+              );
               setDetailItem(item);
               setDetailPayload(detail);
+              setFeedItems(Array.isArray(meta?.feedItems) ? meta.feedItems : item ? [item] : []);
+              setFeedStartIndex(Number.isFinite(meta?.startIndex) ? meta.startIndex : 0);
               setDetailOpen(true);
             }}
           />
@@ -49,10 +70,17 @@ export default function UserCaseArchiveView({
         open={detailOpen}
         item={detailItem}
         detail={detailPayload}
+        feedItems={feedItems}
+        startIndex={feedStartIndex}
+        peerIdentity={peerIdentity}
+        suppressBgm
         onClose={() => {
           setDetailOpen(false);
           setDetailItem(null);
           setDetailPayload(null);
+          setPeerIdentity(null);
+          setFeedItems([]);
+          setFeedStartIndex(0);
         }}
         onToast={onToast}
       />

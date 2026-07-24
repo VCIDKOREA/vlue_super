@@ -25,6 +25,41 @@ function assertCommentRate(userId: string): boolean {
   return true;
 }
 
+function photoFromExportSnap(snap: unknown): string {
+  if (!snap || typeof snap !== "object") return "";
+  const o = snap as Record<string, unknown>;
+  return String(o.photoUrl || o.image_url || o.imageUrl || "").trim();
+}
+
+function activityNameFromExportSnap(snap: unknown): string {
+  if (!snap || typeof snap !== "object") return "";
+  const o = snap as Record<string, unknown>;
+  return String(o.activityName || o.activityDisplayName || o.nickname || "").trim();
+}
+
+const authorSelect = {
+  id: true,
+  publicHandle: true,
+  legalName: true,
+  digitalCard: { select: { exportSnapshotJson: true } }
+} as const;
+
+function serializeAuthor(author: {
+  id: string;
+  publicHandle: string | null;
+  legalName: string | null;
+  digitalCard?: { exportSnapshotJson: unknown } | null;
+}) {
+  const snap = author.digitalCard?.exportSnapshotJson;
+  const activity = activityNameFromExportSnap(snap);
+  return {
+    id: author.id,
+    handle: author.publicHandle || "",
+    name: activity || author.legalName || author.publicHandle || "회원",
+    avatarUrl: photoFromExportSnap(snap)
+  };
+}
+
 export async function getShowcaseSocialSummary(opts: {
   ownerUserId: string;
   actorUserId?: string | null;
@@ -57,15 +92,7 @@ export async function getShowcaseSocialSummary(opts: {
       },
       orderBy: { createdAt: "desc" },
       take: 50,
-      include: {
-        author: {
-          select: {
-            id: true,
-            publicHandle: true,
-            legalName: true
-          }
-        }
-      }
+      include: { author: { select: authorSelect } }
     })
   ]);
 
@@ -77,11 +104,7 @@ export async function getShowcaseSocialSummary(opts: {
       body: c.body,
       parentId: c.parentId || null,
       createdAt: c.createdAt.toISOString(),
-      author: {
-        id: c.author.id,
-        handle: c.author.publicHandle || "",
-        name: c.author.legalName || c.author.publicHandle || "회원"
-      }
+      author: serializeAuthor(c.author)
     }))
   };
 }
@@ -127,20 +150,14 @@ export async function listShowcaseComments(opts: {
     where: { ownerUserId: opts.ownerUserId, slideId, deletedAt: null },
     orderBy: { createdAt: "desc" },
     take: limit,
-    include: {
-      author: { select: { id: true, publicHandle: true, legalName: true } }
-    }
+    include: { author: { select: authorSelect } }
   });
   return rows.map((c) => ({
     id: c.id,
     body: c.body,
     parentId: c.parentId || null,
     createdAt: c.createdAt.toISOString(),
-    author: {
-      id: c.author.id,
-      handle: c.author.publicHandle || "",
-      name: c.author.legalName || c.author.publicHandle || "회원"
-    }
+    author: serializeAuthor(c.author)
   }));
 }
 
@@ -190,9 +207,7 @@ export async function createShowcaseComment(opts: {
       body,
       parentId
     },
-    include: {
-      author: { select: { id: true, publicHandle: true, legalName: true } }
-    }
+    include: { author: { select: authorSelect } }
   });
 
   return {
@@ -202,11 +217,7 @@ export async function createShowcaseComment(opts: {
       body: row.body,
       parentId: row.parentId || null,
       createdAt: row.createdAt.toISOString(),
-      author: {
-        id: row.author.id,
-        handle: row.author.publicHandle || "",
-        name: row.author.legalName || row.author.publicHandle || "회원"
-      }
+      author: serializeAuthor(row.author)
     }
   };
 }

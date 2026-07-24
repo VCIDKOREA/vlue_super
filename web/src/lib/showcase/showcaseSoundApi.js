@@ -77,6 +77,17 @@ export async function borrowShowcaseSound(soundId) {
   return data.sound;
 }
 
+/** 내 User Original Track 삭제 (소프트 삭제) */
+export async function deleteShowcaseSound(soundId) {
+  const res = await vlueAuthFetch(apiUrl(`/api/showcase-sounds/${encodeURIComponent(soundId)}`), {
+    method: "DELETE",
+    headers: vlueAuthHeaders()
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "삭제 실패");
+  return data.sound;
+}
+
 export async function notifyThemeBgmChange() {
   const res = await vlueAuthFetch(apiUrl("/api/showcase-sounds/theme-change"), {
     method: "POST",
@@ -85,6 +96,20 @@ export async function notifyThemeBgmChange() {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "주제곡 변경 제한");
   return data.quota;
+}
+
+/** GET /api/showcase-sounds/:soundId — 재생 URL 재조회 */
+export async function fetchShowcaseSoundById(soundId) {
+  const id = String(soundId || "").trim();
+  if (!id) return { ok: false, linkBroken: true, sound: null };
+  const res = await vlueAuthFetch(apiUrl(`/api/showcase-sounds/${encodeURIComponent(id)}`));
+  const data = await res.json().catch(() => ({}));
+  return {
+    ok: res.ok && data.ok !== false,
+    linkBroken: Boolean(data.linkBroken) || !res.ok,
+    sound: data.sound || null,
+    message: data.message || ""
+  };
 }
 
 /** 한국저작권위원회 등록정보 검색 */
@@ -98,8 +123,29 @@ export async function verifyCopyrightRegistration({ title, author, registrationN
   return { ok: res.ok && data.ok !== false, status: res.status, ...data };
 }
 
-export function soundToBgmPatch(sound, mode = "user") {
-  if (!sound) return { mode: "none", soundId: "", title: "", artistName: "", audioUrl: "", attributionLabel: "", linkBroken: false };
+export function soundToBgmPatch(sound, mode = "user", extras = {}) {
+  if (!sound) {
+    return {
+      mode: "none",
+      soundId: "",
+      title: "",
+      artistName: "",
+      audioUrl: "",
+      attributionLabel: "",
+      linkBroken: false,
+      ownerHandle: "",
+      sharedOwnerHandle: "",
+      createType: ""
+    };
+  }
+  const ownerHandle = String(extras.ownerHandle || sound.ownerHandle || "")
+    .replace(/^@/, "")
+    .trim();
+  const sharedOwnerHandle = String(
+    extras.sharedOwnerHandle || sound.sharedOwnerHandle || (mode === "borrowed" ? ownerHandle : "")
+  )
+    .replace(/^@/, "")
+    .trim();
   return {
     mode: sound.linkBroken ? "none" : mode,
     soundId: sound.id || "",
@@ -107,6 +153,24 @@ export function soundToBgmPatch(sound, mode = "user") {
     artistName: sound.artistName || "",
     audioUrl: sound.linkBroken ? "" : sound.audioUrl || "",
     attributionLabel: sound.attributionLabel || "",
-    linkBroken: Boolean(sound.linkBroken)
+    linkBroken: Boolean(sound.linkBroken),
+    ownerHandle: mode === "borrowed" ? "" : ownerHandle,
+    sharedOwnerHandle: mode === "borrowed" ? sharedOwnerHandle : "",
+    createType: sound.createType || extras.createType || ""
+  };
+}
+
+export function soundToPlaylistEntry(sound, mode = "user", extras = {}) {
+  const patch = soundToBgmPatch(sound, mode, extras);
+  return {
+    soundId: patch.soundId,
+    title: patch.title,
+    audioUrl: patch.audioUrl,
+    mode: patch.mode,
+    attributionLabel: patch.attributionLabel,
+    ownerHandle: patch.ownerHandle,
+    sharedOwnerHandle: patch.sharedOwnerHandle,
+    createType: patch.createType,
+    linkBroken: patch.linkBroken
   };
 }

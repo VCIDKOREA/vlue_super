@@ -13,6 +13,7 @@ import {
   hydrateAvatarsFromExportSnapshot,
   pushLocalAvatarsIfServerMissing
 } from "./avatarServerSync.js";
+import { hydrateFeedNicknameFromSnapshot, readFeedNickname } from "./memberCardStorage.js";
 
 const DIGITAL_CARD_ID_KEY = "vlue_digital_card_id";
 
@@ -119,6 +120,7 @@ export async function fetchDigitalCardMeta() {
     if (data?.exportSnapshot) {
       hydrateLetteringEditableFromSnapshot(data.exportSnapshot, { force: false });
       hydrateAvatarsFromExportSnapshot(data.exportSnapshot, { force: false });
+      hydrateFeedNicknameFromSnapshot(data.exportSnapshot, { force: false });
       pushLocalAvatarsIfServerMissing(data.exportSnapshot);
     }
     if (data?.subscription?.cycleEndAt) {
@@ -205,7 +207,8 @@ export async function syncDigitalCardExportSnapshot(card) {
           noCompanyLogo: Boolean(ed.noCompanyLogo),
           noProfilePhoto: Boolean(ed.noProfilePhoto),
           shareCoverUrl: String(ed.kakaoFeedBgDataUrl || card?.shareCoverUrl || "").trim(),
-          designTemplate: normalizeLetteringBizcardTemplate(card?.designTemplate || ed.designTemplate)
+          designTemplate: normalizeLetteringBizcardTemplate(card?.designTemplate || ed.designTemplate),
+          activityName: String(card?.activityName || readFeedNickname() || "").trim()
         }
       })
     });
@@ -213,6 +216,22 @@ export async function syncDigitalCardExportSnapshot(card) {
     const data = await res.json();
     if (data?.cardId) writeStoredDigitalCardId(data.cardId);
     return { ok: true, cardId: data.cardId, exportSnapshot: data.exportSnapshot || null };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** 활동 닉네임만 스냅샷에 병합 (댓글·콘텐츠 표시용) */
+export async function syncActivityNicknameToServer(activityName) {
+  const name = String(activityName || readFeedNickname() || "").trim();
+  try {
+    const res = await vlueAuthFetch(apiUrl("/api/cards/my-digital-card"), {
+      method: "PATCH",
+      headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ exportSnapshot: { activityName: name } })
+    });
+    if (!res.ok) return { ok: false };
+    return { ok: true };
   } catch {
     return { ok: false };
   }

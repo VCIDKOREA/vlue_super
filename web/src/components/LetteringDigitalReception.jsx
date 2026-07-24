@@ -15,7 +15,7 @@ import { resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
 import { formatLetteringContactEmailDisplay } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import {
-  formatTitleDeptLine,
+  formatNameDeptTitleLine,
   VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER,
   VLUE_PREVIEW_EMAIL_PLACEHOLDER
 } from "../lib/vlueShowcasePreviewIdentity.js";
@@ -202,6 +202,50 @@ function ContactRow({ icon: Icon, label, value, onActivate, showCertBadge = fals
     );
   }
   return inner;
+}
+
+function FaceTabs({ face, onFaceChange, hidden = false }) {
+  const isBack = face === "back";
+  return (
+    <div
+      className={`ldr-face-tabs${isBack ? " ldr-face-tabs--back" : ""}${
+        hidden ? " ldr-face-tabs--hidden" : ""
+      }`}
+      role="tablist"
+      aria-label="명함 면"
+      aria-hidden={hidden}
+    >
+      <div className="ldr-face-tabs__track">
+        <span className="ldr-face-tabs__thumb" aria-hidden />
+        <button
+          type="button"
+          role="tab"
+          aria-selected={!isBack}
+          className={`ldr-face-tab${!isBack ? " ldr-face-tab--active" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onFaceChange?.("front");
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          앞면
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={isBack}
+          className={`ldr-face-tab${isBack ? " ldr-face-tab--active" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onFaceChange?.("back");
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          뒷면
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function WatermarkBackdrop({ card }) {
@@ -435,25 +479,20 @@ function FrontPanel({
               <ShieldCheck className="ldr-name-shield" strokeWidth={2.35} aria-label="VLUE 인증됨" />
             ) : null}
           </div>
-          {String(card.organization || "").trim() && String(card.name || "").trim() ? (
-            <p className="ldr-back-person-name">{card.name}</p>
-          ) : null}
-          {card.previewTitleDeptPlaceholder ||
-          card.previewExampleBrand ||
-          card.title ||
-          card.department ? (
-            <p
-              className={`ldr-back-sub${
-                card.previewTitleDeptPlaceholder || card.previewExampleBrand
-                  ? " ldr-back-sub--placeholder"
-                  : ""
-              }`.trim()}
-            >
-              {card.previewTitleDeptPlaceholder || card.previewExampleBrand
-                ? VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER
-                : formatTitleDeptLine(card.title, card.department)}
-            </p>
-          ) : null}
+          {(() => {
+            const org = String(card.organization || "").trim();
+            const personName = org ? String(card.name || "").trim() : "";
+            if (card.previewTitleDeptPlaceholder || card.previewExampleBrand) {
+              return (
+                <p className="ldr-back-person-name ldr-back-person-name--row">
+                  {[personName, VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER].filter(Boolean).join(" ｜ ")}
+                </p>
+              );
+            }
+            const line = formatNameDeptTitleLine(personName || (!org ? card.name : ""), card.department, card.title);
+            if (!line) return null;
+            return <p className="ldr-back-person-name ldr-back-person-name--row">{line}</p>;
+          })()}
         </div>
       </div>
 
@@ -643,7 +682,9 @@ export default function LetteringDigitalReception({
   onKeypadClose,
   keypadDemoMode = false,
   onToast,
-  hideFollow = false
+  hideFollow = false,
+  /** 실통화 하단 통화옵션과 겹치지 않도록 토글 여백·크기 축소 */
+  callChromeSafe = false
 }) {
   const card = useMemo(() => normalizeLetteringCard(cardRaw || {}), [cardRaw]);
   const items = verificationItems.length ? verificationItems : card.verificationItems;
@@ -690,38 +731,11 @@ export default function LetteringDigitalReception({
     <div
       className={`ldr-reception${embeddedInPush ? " ldr-reception--push" : ""}${
         previewMode ? " ldr-reception--preview" : ""
-      }${keypadOpen ? " ldr-reception--keypad" : ""} ${className}`.trim()}
+      }${keypadOpen ? " ldr-reception--keypad" : ""}${
+        callChromeSafe ? " ldr-reception--call-chrome" : ""
+      } ${className}`.trim()}
       data-face={face}
     >
-      <div className="ldr-face-tabs" role="tablist" aria-label="명함 면" aria-hidden={keypadOpen}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={face === "front"}
-          className={`ldr-face-tab${face === "front" ? " ldr-face-tab--active" : ""}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onFaceChange?.("front");
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          앞면 · 프로필
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={face === "back"}
-          className={`ldr-face-tab${face === "back" ? " ldr-face-tab--active" : ""}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onFaceChange?.("back");
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          뒷면 · 연락
-        </button>
-      </div>
-
       <div className="ldr-panel-wrap" role="tabpanel" ref={panelWrapRef} aria-hidden={keypadOpen}>
         {useStackedPanels ? (
           <div className="ldr-panel-stage">
@@ -734,6 +748,8 @@ export default function LetteringDigitalReception({
           front
         )}
       </div>
+
+      <FaceTabs face={face} onFaceChange={onFaceChange} hidden={keypadOpen} />
 
       {keypadOpen ? (
         <div className="ldr-reception-keypad-layer">

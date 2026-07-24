@@ -21,6 +21,7 @@ import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage
 import { CALL_STATES } from "../lib/showcase/tentShowcaseTypes.js";
 import VLUE_BRAND_LOGO from "../assets/vlue-shield-eye-logo.svg?url";
 import UserCaseArchiveView from "./mycase/UserCaseArchiveView.jsx";
+import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
 import "./friend-showcase-list.css";
 import "../styles/tent-showcase.css";
 
@@ -200,41 +201,6 @@ export default function FriendShowcaseList({
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
     );
-  }, []);
-
-  useEffect(() => {
-    const onHashtag = (e) => {
-      const tag = String(e?.detail?.tag || "")
-        .replace(/^#/, "")
-        .trim();
-      if (!tag) return;
-      setActiveTab("hashtag");
-      setHashtagQuery(tag);
-      setSheetLevel("full");
-    };
-    const onCaseUser = (e) => {
-      const userId = String(e?.detail?.userId || "").trim();
-      if (!userId) return;
-      setCaseArchiveUser(userId);
-      setSheetLevel("full");
-    };
-    try {
-      const pending = sessionStorage.getItem("vlue_pending_hashtag");
-      if (pending) {
-        sessionStorage.removeItem("vlue_pending_hashtag");
-        setActiveTab("hashtag");
-        setHashtagQuery(pending);
-        setSheetLevel("full");
-      }
-    } catch {
-      /* ignore */
-    }
-    window.addEventListener("vlue-open-hashtag-search", onHashtag);
-    window.addEventListener("vlue-open-case-user", onCaseUser);
-    return () => {
-      window.removeEventListener("vlue-open-hashtag-search", onHashtag);
-      window.removeEventListener("vlue-open-case-user", onCaseUser);
-    };
   }, []);
 
   const reloadLists = useCallback(async () => {
@@ -488,6 +454,12 @@ export default function FriendShowcaseList({
     setPreviewCard(null);
     setPreviewKind("showcase");
   };
+
+  useEffect(() => {
+    const onCloseOverlays = () => closePreview();
+    window.addEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+    return () => window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+  }, []);
 
   const previewPaid = previewCard ? isPaidLetteringTier(previewCard.membershipTier) : false;
 

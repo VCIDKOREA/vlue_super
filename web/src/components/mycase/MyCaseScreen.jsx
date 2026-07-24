@@ -10,6 +10,7 @@ import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleT
 import {
   LETTERING_BIZCARD_CHANGED_EVENT
 } from "../../lib/letteringBizcardStorage.js";
+import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
 import "./my-case-detail.css";
 
 /**
@@ -17,13 +18,17 @@ import "./my-case-detail.css";
  * - 피드 탭 → 쇼케이스만
  * - 디지털인증명함 버튼 → 홈/쇼케이스 「미리보기」와 동일한 수신 UI (명함 페이지만)
  */
-export default function MyCaseScreen({ onGoMain, onToast }) {
+export default function MyCaseScreen({ onGoMain, onToast, isDarkMode = false }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [detailPayload, setDetailPayload] = useState(null);
+  const [feedItems, setFeedItems] = useState([]);
+  const [feedStartIndex, setFeedStartIndex] = useState(0);
   const [cardOpen, setCardOpen] = useState(false);
   const [cardExpanded, setCardExpanded] = useState(true);
   const [previewTick, setPreviewTick] = useState(0);
+
+  const caseBgmEnabled = !cardOpen;
 
   useEffect(() => {
     const bump = () => setPreviewTick((n) => n + 1);
@@ -38,6 +43,19 @@ export default function MyCaseScreen({ onGoMain, onToast }) {
   useEffect(() => {
     if (cardOpen) setCardExpanded(true);
   }, [cardOpen]);
+
+  useEffect(() => {
+    const onCloseOverlays = () => {
+      setDetailOpen(false);
+      setDetailItem(null);
+      setDetailPayload(null);
+      setFeedItems([]);
+      setFeedStartIndex(0);
+      setCardOpen(false);
+    };
+    window.addEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+    return () => window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+  }, []);
 
   const membershipTier = useMemo(() => readMembershipTier(), [cardOpen, previewTick]);
 
@@ -59,6 +77,8 @@ export default function MyCaseScreen({ onGoMain, onToast }) {
           mode="mine"
           onBack={onGoMain}
           onToast={onToast}
+          bgmEnabled={caseBgmEnabled}
+          isDarkMode={isDarkMode}
           onOpenDigitalCard={() => {
             if (!readDigitalCardActive()) {
               onToast?.("디지털인증명함이 없습니다.");
@@ -69,10 +89,16 @@ export default function MyCaseScreen({ onGoMain, onToast }) {
               return;
             }
             setCardOpen(true);
+            if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
+              window.__vlueUnlockShowcaseBgm();
+              window.setTimeout(() => window.__vlueUnlockShowcaseBgm?.(), 50);
+            }
           }}
-          onOpenDetail={(item, detail) => {
+          onOpenDetail={(item, detail, meta) => {
             setDetailItem(item);
             setDetailPayload(detail);
+            setFeedItems(Array.isArray(meta?.feedItems) ? meta.feedItems : item ? [item] : []);
+            setFeedStartIndex(Number.isFinite(meta?.startIndex) ? meta.startIndex : 0);
             setDetailOpen(true);
           }}
         />
@@ -82,11 +108,16 @@ export default function MyCaseScreen({ onGoMain, onToast }) {
         open={detailOpen}
         item={detailItem}
         detail={detailPayload}
+        feedItems={feedItems}
+        startIndex={feedStartIndex}
         isOwner
+        suppressBgm
         onClose={() => {
           setDetailOpen(false);
           setDetailItem(null);
           setDetailPayload(null);
+          setFeedItems([]);
+          setFeedStartIndex(0);
         }}
         onToast={onToast}
       />

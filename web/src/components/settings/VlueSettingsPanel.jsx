@@ -280,18 +280,36 @@ export default function VlueSettingsPanel({
               />
             </label>
           ) : null}
-          <label className={`mt-3 block text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-            활동 닉네임
+          <div className={`mt-3 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            <div className="flex items-center gap-1.5 text-[11px] font-bold">
+              <span>활동 닉네임</span>
+              <button
+                type="button"
+                className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-black ${
+                  isDarkMode ? "bg-white/15 text-gray-200" : "bg-gray-200 text-gray-700"
+                }`}
+                title="VLUE 콘텐츠 활동에 사용되는 명칭입니다."
+                aria-label="활동 닉네임 도움말"
+                onClick={() =>
+                  window.alert("VLUE 콘텐츠 활동에 사용되는 명칭입니다.")
+                }
+              >
+                ?
+              </button>
+            </div>
+            <p className={`mt-1 text-[10px] font-medium leading-snug ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+              VLUE 콘텐츠 활동에 사용되는 명칭입니다.
+            </p>
             <input
               type="text"
               maxLength={VLUE_NICKNAME_MAX}
               value={feedNickInput}
               onChange={(e) => setFeedNickInput(e.target.value)}
-              className={`mt-1 w-full rounded-lg border px-3 py-2 text-[13px] outline-none ${
+              className={`mt-1.5 w-full rounded-lg border px-3 py-2 text-[13px] font-bold outline-none ${
                 isDarkMode ? "border-white/15 bg-[#1f2937] text-gray-100" : "border-gray-200 bg-white text-gray-900"
               }`}
             />
-          </label>
+          </div>
           <button
             type="button"
             onClick={() => {

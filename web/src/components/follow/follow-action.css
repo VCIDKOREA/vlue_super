@@ -43,7 +43,6 @@
   padding: 5px 10px;
   font-size: 11px;
   flex-shrink: 0;
-  margin-left: auto;
 }
 
 .follow-action-btn--self {
@@ -58,8 +57,4 @@
   min-width: 54px;
   padding: 5px 10px;
   font-size: 11px;
-}
-
-.showcase-slide-chrome__vlue .follow-action-btn--chrome {
-  margin-left: 0;
 }

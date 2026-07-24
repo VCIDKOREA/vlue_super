@@ -1,12 +1,76 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Send } from "lucide-react";
+import { Smile, X, Send } from "lucide-react";
 import { fetchShowcaseComments, postShowcaseComment } from "../../lib/showcase/showcaseSocialApi.js";
-import { groupCommentsWithReplies } from "../../lib/showcase/commentRichText.js";
+import {
+  dispatchCommentAuthor,
+  dispatchCommentMention,
+  groupCommentsWithReplies
+} from "../../lib/showcase/commentRichText.js";
+import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
+import { getFeedDisplayName, getMemberHandle } from "../../lib/memberCardStorage.js";
 import ShowcaseCommentBody from "./ShowcaseCommentBody.jsx";
 
+const BASIC_EMOJIS = [
+  "😀",
+  "😂",
+  "😍",
+  "🥰",
+  "😊",
+  "👍",
+  "👏",
+  "🙏",
+  "❤️",
+  "🔥",
+  "✨",
+  "🎵",
+  "💯",
+  "🎉",
+  "😮",
+  "😢",
+  "💪",
+  "🙌"
+];
+
+function CommentAvatar({ author, onOpen }) {
+  const url = String(author?.avatarUrl || "").trim();
+  const letter = String(author?.name || author?.handle || "?").replace(/^@/, "").slice(0, 1) || "?";
+  const inner = url ? (
+    <div className="showcase-comment-sheet__avatar showcase-comment-sheet__avatar--photo" aria-hidden>
+      <img src={url} alt="" loading="lazy" draggable={false} />
+    </div>
+  ) : (
+    <div className="showcase-comment-sheet__avatar" aria-hidden>
+      {letter}
+    </div>
+  );
+  if (!onOpen) return inner;
+  return (
+    <button type="button" className="showcase-comment-sheet__avatar-btn" onClick={onOpen} aria-label="계정 케이스함">
+      {inner}
+    </button>
+  );
+}
+
+function resolveMyCommentAuthor() {
+  let handle = "";
+  try {
+    handle = String(getMemberHandle() || "")
+      .replace(/^@/, "")
+      .trim();
+  } catch {
+    /* ignore */
+  }
+  return {
+    id: "me",
+    handle,
+    name: getFeedDisplayName(handle || "나"),
+    avatarUrl: readProfilePhotoAvatar() || ""
+  };
+}
+
 /**
- * SAM/숏폼형 댓글 바텀시트 — 답글 · #해시태그 · @멘션
+ * SAM/숏폼형 댓글 바텀시트 — 답글 · #해시태그 · @멘션 · 이모티콘
  */
 export default function ShowcaseCommentSheet({
   open,
@@ -25,6 +89,8 @@ export default function ShowcaseCommentSheet({
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -32,6 +98,7 @@ export default function ShowcaseCommentSheet({
     setComments(seedComments || []);
     setReplyTo(null);
     setDraft("");
+    setEmojiOpen(false);
     if (!ownerUserId || previewMode) return undefined;
     setLoading(true);
     fetchShowcaseComments(ownerUserId, { slideId }).then((res) => {
@@ -60,6 +127,28 @@ export default function ShowcaseCommentSheet({
 
   const cancelReply = () => setReplyTo(null);
 
+  const insertEmoji = (emoji) => {
+    const el = inputRef.current;
+    const value = draft;
+    if (el && typeof el.selectionStart === "number") {
+      const start = el.selectionStart;
+      const end = el.selectionEnd ?? start;
+      const next = `${value.slice(0, start)}${emoji}${value.slice(end)}`.slice(0, 1000);
+      setDraft(next);
+      requestAnimationFrame(() => {
+        try {
+          el.focus();
+          const pos = start + emoji.length;
+          el.setSelectionRange(pos, pos);
+        } catch {
+          /* ignore */
+        }
+      });
+      return;
+    }
+    setDraft(`${value}${emoji}`.slice(0, 1000));
+  };
+
   const submit = async () => {
     const body = draft.trim();
     if (!body || busy) return;
@@ -71,12 +160,13 @@ export default function ShowcaseCommentSheet({
         body,
         parentId,
         createdAt: new Date().toISOString(),
-        author: { id: "me", handle: "", name: "나" }
+        author: resolveMyCommentAuthor()
       };
       const next = [local, ...comments];
       setComments(next);
       setDraft("");
       setReplyTo(null);
+      setEmojiOpen(false);
       onCountChange?.(next.length);
       onToast?.("미리보기 댓글입니다. 실제 통화·열람에서 저장됩니다.");
       return;
@@ -95,31 +185,73 @@ export default function ShowcaseCommentSheet({
       }
       return;
     }
-    const next = [res.comment, ...comments];
+    const comment = res.comment
+      ? {
+          ...res.comment,
+          author: {
+            ...(res.comment.author || {}),
+            name:
+              String(res.comment.author?.name || "").trim() ||
+              getFeedDisplayName(String(res.comment.author?.handle || "").trim() || "나"),
+            avatarUrl:
+              String(res.comment.author?.avatarUrl || "").trim() || readProfilePhotoAvatar() || ""
+          }
+        }
+      : null;
+    if (!comment) return;
+    const next = [comment, ...comments];
     setComments(next);
     setDraft("");
     setReplyTo(null);
+    setEmojiOpen(false);
     onCountChange?.(next.length);
   };
 
-  const renderItem = (c, { isReply = false } = {}) => (
+  const openAuthorCase = (author) => {
+    onMention?.(String(author?.handle || "").replace(/^@+/, ""));
+    dispatchCommentAuthor(author);
+  };
+
+  const renderItem = (c, { isReply = false } = {}) => {
+    let author = c.author || {};
+    try {
+      const myId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
+      if (myId && String(author.id || "") === myId) {
+        author = {
+          ...author,
+          name: getFeedDisplayName(author.name || author.handle || "나"),
+          avatarUrl: String(author.avatarUrl || "").trim() || readProfilePhotoAvatar() || ""
+        };
+      }
+    } catch {
+      /* ignore */
+    }
+    return (
     <article
       key={c.id}
       className={`showcase-comment-sheet__item${isReply ? " showcase-comment-sheet__item--reply" : ""}`}
     >
-      <div className="showcase-comment-sheet__avatar" aria-hidden>
-        {String(c.author?.name || "?").slice(0, 1)}
-      </div>
+      <CommentAvatar author={author} onOpen={() => openAuthorCase(author)} />
       <div className="showcase-comment-sheet__body">
         <div className="showcase-comment-sheet__meta">
-          <p className="showcase-comment-sheet__author">{c.author?.name || "회원"}</p>
-          {c.author?.handle ? (
+          <button
+            type="button"
+            className="showcase-comment-sheet__author"
+            onClick={() => openAuthorCase(author)}
+          >
+            {author?.name || "회원"}
+          </button>
+          {author?.handle ? (
             <button
               type="button"
               className="showcase-comment-sheet__author-handle"
-              onClick={() => onMention?.(String(c.author.handle).replace(/^@+/, ""))}
+              onClick={() => {
+                const handle = String(author.handle).replace(/^@+/, "");
+                onMention?.(handle);
+                dispatchCommentMention(handle);
+              }}
             >
-              @{String(c.author.handle).replace(/^@+/, "")}
+              @{String(author.handle).replace(/^@+/, "")}
             </button>
           ) : null}
         </div>
@@ -131,7 +263,8 @@ export default function ShowcaseCommentSheet({
         ) : null}
       </div>
     </article>
-  );
+    );
+  };
 
   return createPortal(
     <div className="showcase-comment-sheet-root" role="dialog" aria-modal="true" aria-label="댓글">
@@ -169,8 +302,33 @@ export default function ShowcaseCommentSheet({
               </button>
             </div>
           ) : null}
+          {emojiOpen ? (
+            <div className="showcase-comment-sheet__emoji" role="listbox" aria-label="이모티콘">
+              {BASIC_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  className="showcase-comment-sheet__emoji-btn"
+                  onClick={() => insertEmoji(emoji)}
+                  aria-label={`이모티콘 ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="showcase-comment-sheet__composer">
+            <button
+              type="button"
+              className={`showcase-comment-sheet__emoji-toggle${emojiOpen ? " is-open" : ""}`}
+              aria-label={emojiOpen ? "이모티콘 닫기" : "이모티콘"}
+              aria-expanded={emojiOpen}
+              onClick={() => setEmojiOpen((v) => !v)}
+            >
+              <Smile size={20} aria-hidden />
+            </button>
             <input
+              ref={inputRef}
               className="showcase-comment-sheet__input"
               placeholder={replyTo ? "답글 추가…" : "댓글 추가… #태그 @멘션"}
               value={draft}

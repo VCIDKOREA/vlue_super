@@ -205,6 +205,8 @@ export default function LetteringIncomingNotification({
   showOwnerSettings = false,
   /** 쇼케이스 꺼짐 미리보기 — 이름 숨김, 번호+VLUE 인증만 */
   showcaseOffPreview = false,
+  /** true면 캐러셀 BGM 비활성 (케이스함 BGM과 중복 방지) */
+  suppressBgm = false,
   /** 미리보기·액션 안내 토스트 */
   onToast,
   className = ""
@@ -281,7 +283,13 @@ export default function LetteringIncomingNotification({
           : "미리보기입니다. 실제 통화 화면에서 명함을 펼칠 수 있습니다."
       );
     }
-    setExpanded(!expanded);
+    const next = !expanded;
+    setExpanded(next);
+    if (next && typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
+      window.__vlueUnlockShowcaseBgm();
+      window.setTimeout(() => window.__vlueUnlockShowcaseBgm?.(), 80);
+      window.setTimeout(() => window.__vlueUnlockShowcaseBgm?.(), 280);
+    }
     if (expanded) {
       setReceptionFace("front");
       setKeypadOpen(false);
@@ -629,6 +637,8 @@ export default function LetteringIncomingNotification({
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;
   const carouselScrollEnabled = isPaidMember && (previewMode || onCall || isExpandedView);
+  const carouselSuppressBgm =
+    Boolean(suppressBgm) || Boolean(previewMode && !isExpandedView);
   const showcasePhotos = c.showcaseStyle?.gallery?.photos || [];
   const showcaseStyleConfig = c.showcaseStyle || null;
 
@@ -930,6 +940,7 @@ export default function LetteringIncomingNotification({
                       onOpenSlideSettings={openOwnerSettings}
                       onSlideTypeChange={setCarouselSlideType}
                       showcaseStyle={showcaseStyleConfig}
+                      suppressBgm={carouselSuppressBgm}
                     />
                   ) : keypadOpen ? (
                     <InCallDtmfPad
@@ -993,6 +1004,8 @@ export default function LetteringIncomingNotification({
                       onOpenSlideSettings={openOwnerSettings}
                       onSlideTypeChange={setCarouselSlideType}
                       showcaseStyle={showcaseStyleConfig}
+                      suppressBgm={carouselSuppressBgm}
+                      callChromeSafe={showInCallControls}
                     />
                   ) : (
                     <LetteringDigitalReception
@@ -1007,6 +1020,7 @@ export default function LetteringIncomingNotification({
                       onKeypadClose={() => setKeypadOpen(false)}
                       keypadDemoMode={inCallDemoMode}
                       onToast={showGuide}
+                      callChromeSafe={showInCallControls}
                     />
                   )}
                 </div>

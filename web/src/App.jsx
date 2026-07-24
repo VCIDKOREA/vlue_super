@@ -31,7 +31,11 @@ import Subscription from "./components/Subscription.jsx";
 import WalletHubModal from "./components/WalletHubModal.jsx";
 import AppNotificationSheet from "./components/AppNotificationSheet.jsx";
 import ShowcaseStyleSettingsSheet from "./components/showcase/ShowcaseStyleSettingsSheet.jsx";
+import HashtagSearchPopup from "./components/showcase/HashtagSearchPopup.jsx";
+import UserCaseArchiveView from "./components/mycase/UserCaseArchiveView.jsx";
 import CallShowcaseHistorySheet from "./components/CallShowcaseHistorySheet.jsx";
+import { getLocalVlueUserId } from "./lib/showcase/resolveShowcaseOwnerUserId.js";
+import { dispatchCloseShowcaseOverlays } from "./lib/showcase/closeShowcaseOverlays.js";
 import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
 import PersonalFeed from "./components/PersonalFeed";
 import ProfilePanel from "./components/ProfilePanel";
@@ -400,6 +404,8 @@ function App() {
   const [selectedFeedProfile, setSelectedFeedProfile] = useState(null);
   const [friendRequests, setFriendRequests] = useState([]);
   const [bottomToast, setBottomToast] = useState("");
+  const [hashtagSearchTag, setHashtagSearchTag] = useState("");
+  const [caseArchiveUser, setCaseArchiveUser] = useState(null);
   const [vmingUpgradePrompt, setVmingUpgradePrompt] = useState({
     open: false,
     message: "",
@@ -2932,27 +2938,68 @@ function App() {
   );
 
   useEffect(() => {
+    const readMyHandle = () => {
+      try {
+        return String(localStorage.getItem("vlue_member_handle") || "")
+          .replace(/^@+/, "")
+          .trim()
+          .toLowerCase();
+      } catch {
+        return "";
+      }
+    };
+
+    const openAccountCase = ({ userId = "", name = "", handle = "" } = {}) => {
+      const id = String(userId || "").trim();
+      const bareHandle = String(handle || "")
+        .replace(/^@+/, "")
+        .trim()
+        .toLowerCase();
+      const me = getLocalVlueUserId();
+      const myHandle = readMyHandle();
+      const isSelf =
+        (id && me && id === me) || (bareHandle && myHandle && bareHandle === myHandle);
+
+      dispatchCloseShowcaseOverlays();
+      setHashtagSearchTag("");
+
+      if (isSelf) {
+        setCaseArchiveUser(null);
+        navigate({ nextPage: "mycase", nextTab: activeTab, nextRoomId: null });
+        return;
+      }
+
+      if (!id) return;
+      setCaseArchiveUser({
+        userId: id,
+        name: String(name || handle || "").trim() || "케이스함"
+      });
+    };
+
     const onHashtag = (e) => {
       const tag = String(e?.detail?.tag || "")
         .replace(/^#/, "")
         .trim();
       if (!tag) return;
-      try {
-        sessionStorage.setItem("vlue_pending_hashtag", tag);
-      } catch {
-        /* ignore */
-      }
-      setBottomToast(`#${tag} 검색`);
-      window.setTimeout(() => setBottomToast(""), 2200);
-      if (page !== "main") {
-        navigate({ nextPage: "main", nextTab: activeTab, nextRoomId: null });
-      }
+      setHashtagSearchTag(tag);
+    };
+    const onCaseUser = (e) => {
+      openAccountCase({
+        userId: e?.detail?.userId,
+        name: e?.detail?.name,
+        handle: e?.detail?.handle
+      });
     };
     const onMention = async (e) => {
       const handle = String(e?.detail?.handle || "")
         .replace(/^@+/, "")
         .trim();
       if (!handle) return;
+      const myHandle = readMyHandle();
+      if (myHandle && handle.toLowerCase() === myHandle) {
+        openAccountCase({ handle, name: handle });
+        return;
+      }
       try {
         const { lookupUserByHandle } = await import("./lib/showcase/showcaseSocialApi.js");
         const res = await lookupUserByHandle(handle);
@@ -2961,14 +3008,11 @@ function App() {
           window.setTimeout(() => setBottomToast(""), 2400);
           return;
         }
-        window.dispatchEvent(
-          new CustomEvent("vlue-open-case-user", { detail: { userId: res.user.id, handle } })
-        );
-        setBottomToast(`@${handle}`);
-        window.setTimeout(() => setBottomToast(""), 1800);
-        if (page !== "main") {
-          navigate({ nextPage: "main", nextTab: activeTab, nextRoomId: null });
-        }
+        openAccountCase({
+          userId: res.user.id,
+          name: String(res.user.displayName || res.user.name || handle).trim() || handle,
+          handle
+        });
       } catch {
         setBottomToast("회원 조회에 실패했습니다.");
         window.setTimeout(() => setBottomToast(""), 2400);
@@ -2976,11 +3020,13 @@ function App() {
     };
     window.addEventListener("vlue-open-hashtag-search", onHashtag);
     window.addEventListener("vlue-open-member-by-handle", onMention);
+    window.addEventListener("vlue-open-case-user", onCaseUser);
     return () => {
       window.removeEventListener("vlue-open-hashtag-search", onHashtag);
       window.removeEventListener("vlue-open-member-by-handle", onMention);
+      window.removeEventListener("vlue-open-case-user", onCaseUser);
     };
-  }, [page, activeTab, navigate]);
+  }, [activeTab, navigate]);
 
   const shareMemoToChat = useCallback(
     (memo) => {
@@ -4509,6 +4555,7 @@ function App() {
       {page === "mycase" && (
         <MyCaseScreen
           onGoMain={goBackStep}
+          isDarkMode={isDarkMode}
           onToast={(msg) => {
             setBottomToast(msg);
             setTimeout(() => setBottomToast(""), 2800);
@@ -5102,6 +5149,35 @@ function App() {
       />
       <NoticeDetailSheet notice={activeNotice} open={noticeDetailOpen} onClose={() => setNoticeDetailOpen(false)} />
       <FamilyIosRestrictedDialog />
+      <HashtagSearchPopup
+        open={Boolean(hashtagSearchTag)}
+        tag={hashtagSearchTag}
+        onClose={() => setHashtagSearchTag("")}
+        onSelectResult={(row) => {
+          setHashtagSearchTag("");
+          if (!row?.userId) return;
+          window.dispatchEvent(
+            new CustomEvent("vlue-open-case-user", {
+              detail: {
+                userId: row.userId,
+                handle: row.publicHandle || "",
+                name: row.name || row.publicHandle || "케이스함"
+              }
+            })
+          );
+        }}
+      />
+      <UserCaseArchiveView
+        open={Boolean(caseArchiveUser?.userId)}
+        userId={caseArchiveUser?.userId || null}
+        displayName={caseArchiveUser?.name || ""}
+        onClose={() => setCaseArchiveUser(null)}
+        onToast={(msg) => {
+          setBottomToast(String(msg || ""));
+          window.setTimeout(() => setBottomToast(""), 2800);
+        }}
+        isDarkMode={isDarkMode}
+      />
       <VluePillToast
         message={bottomToast}
         bottomClassName={

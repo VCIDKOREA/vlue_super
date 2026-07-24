@@ -60,6 +60,15 @@ export function formatTitleDeptLine(title = "", department = "", opts = {}) {
   return t || d;
 }
 
+/**
+ * 디지털 인증명함 — 이름 / 부서 / 직책 가로 한 줄
+ * 예: 이종근 ｜ 영업팀 ｜ CEO  /  이종근 ｜ CEO
+ */
+export function formatNameDeptTitleLine(name = "", department = "", title = "") {
+  const parts = [name, department, title].map((v) => String(v ?? "").trim()).filter(Boolean);
+  return parts.join(" ｜ ");
+}
+
 export function readPlatformCeoHandle() {
   try {
     return (

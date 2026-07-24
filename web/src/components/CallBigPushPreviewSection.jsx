@@ -15,8 +15,8 @@ import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import {
   readShowcasePreviewDigitalCardApplied
 } from "../lib/vlueShowcasePreviewIdentity.js";
-import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
+import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
 
 /**
  * VLUE Showcase — 홈 메인 통화 빅푸시(픽푸시) 미리보기
@@ -32,7 +32,6 @@ export default function CallBigPushPreviewSection({
   const [showcaseOn, setShowcaseOn] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [previewTick, setPreviewTick] = useState(0);
-  const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
 
   const paidTier = isPaidLetteringTier(membershipTier) ? membershipTier : "premium";
   const isOn = showcaseOn;
@@ -72,6 +71,12 @@ export default function CallBigPushPreviewSection({
     });
   }, [expanded]);
 
+  useEffect(() => {
+    const onCloseOverlays = () => setExpanded(false);
+    window.addEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+    return () => window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+  }, []);
+
   const card = useMemo(() => {
     const base = applyShowcaseStyleToCard(
       resolveVlueShowcaseCard({ membershipTier: effectiveTier, previewExample: true }),
@@ -88,13 +93,6 @@ export default function CallBigPushPreviewSection({
       }
     };
   }, [effectiveTier, isOn, previewTick]);
-
-  useEffect(() => {
-    bindStyleConfig(card?.showcaseStyle);
-    /* 접힘 상태에서는 BGM 정지 — 피커/설정 미리듣기와 충돌·잔향 방지 */
-    setPlaybackPhase(expanded && isOn ? "preview" : "idle");
-    return () => setPlaybackPhase("idle");
-  }, [card?.showcaseStyle, expanded, isOn, bindStyleConfig, setPlaybackPhase]);
 
   const digitalCardApplied = readShowcasePreviewDigitalCardApplied();
   const incomingNumber = card.phone || "";

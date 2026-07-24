@@ -208,6 +208,8 @@ export default function ShowcaseStyleSettingsPanel({
   const [expandedPageId, setExpandedPageId] = useState("");
   const [igLink, setIgLink] = useState({ linked: false });
   const [igLinkLoading, setIgLinkLoading] = useState(false);
+  /** 적용 시 마이케이스에 새 게시물로 올릴지 (기본 꺼짐 — 사진 수정마다 쌓이는 것 방지) */
+  const [alsoUploadToMycase, setAlsoUploadToMycase] = useState(false);
   const pages = useMemo(
     () => (Array.isArray(config.pages) ? config.pages.map(normalizeShowcasePage) : []),
     [config.pages]
@@ -470,7 +472,11 @@ export default function ShowcaseStyleSettingsPanel({
     if (isPaid) {
       void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));
     }
-    /* 마이케이스에 새 게시물로 쌓고, 메인 송출로 자동 반영 (기존 게시물은 삭제하지 않음) */
+    if (!alsoUploadToMycase) {
+      onToast?.("적용되었습니다. (마이케이스에는 올리지 않음)");
+      return;
+    }
+    /* 체크한 경우에만 마이케이스에 새 게시물로 쌓고 메인 송출 반영 */
     try {
       const cover = extractShowcaseCoverUrl(latest);
       const title = extractShowcaseArchiveTitle(latest);
@@ -493,7 +499,7 @@ export default function ShowcaseStyleSettingsPanel({
     } catch {
       onToast?.("적용되었습니다.");
     }
-  }, [isPaid, onToast, tagInput]);
+  }, [alsoUploadToMycase, isPaid, onToast, tagInput]);
 
   const headText = isDarkMode ? "text-gray-100" : "text-slate-900";
   const subText = isDarkMode ? "text-gray-400" : "text-slate-500";
@@ -510,7 +516,9 @@ export default function ShowcaseStyleSettingsPanel({
           <BackButton variant="inline" onBack={onBack} isDarkMode={isDarkMode} />
           <div className="min-w-0 flex-1">
             <p className={`text-[17px] font-black ${headText}`}>{VLUE_SHOWCASE.nameKo}</p>
-            <p className={`text-[11px] ${subText}`}>적용 → 마이케이스 저장 · 자동 송출</p>
+            <p className={`text-[11px] ${subText}`}>
+              {alsoUploadToMycase ? "적용 → 마이케이스 저장 · 자동 송출" : "적용 → 미리보기 반영 (마이케이스는 선택 시)"}
+            </p>
           </div>
           <button type="button" className="showcase-style-settings__done-btn" onClick={commitApply}>
             완료
@@ -760,6 +768,36 @@ export default function ShowcaseStyleSettingsPanel({
               </label>
             </div>
 
+            <button
+              type="button"
+              className="showcase-profile-row showcase-profile-row--btn"
+              onClick={() => setOpenMusic((v) => !v)}
+            >
+              <span className="showcase-profile-row__label">
+                <span className="showcase-profile-row__label-text">
+                  <Music2 size={14} className="inline mr-1" aria-hidden />
+                  배경음악
+                  <HelpTip text="쇼케이스 미리보기·상대 쇼케이스·마이케이스에서만 자동 재생됩니다. 설정에서는 「BGM 미리듣기」로만 확인합니다. Signature / User Original / Shared Track을 연결합니다." />
+                </span>
+              </span>
+              <span className="showcase-profile-row__trail">
+                <span className="showcase-profile-row__value">
+                  {config.bgm?.mode === "none" || !config.bgm?.mode ? "미설정" : "설정됨"}
+                </span>
+                {openMusic ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </span>
+            </button>
+            {openMusic ? (
+              <div className="showcase-profile-nested">
+                <ShowcaseBgmPicker
+                  value={config.bgm}
+                  inputCls={inputCls}
+                  onChange={(bgm) => persist({ bgm: { ...config.bgm, ...bgm } })}
+                  onToast={onToast}
+                />
+              </div>
+            ) : null}
+
             <ProfileRow label="#해시태그" help={isPaid ? "검색용 · 공백으로 구분" : "유료회원만 해시태그를 등록할 수 있습니다."}>
               <input
                 className={`showcase-profile-input ${inputCls}`}
@@ -817,35 +855,6 @@ export default function ShowcaseStyleSettingsPanel({
                   />
                   아이디·활동명 검색 허용
                 </label>
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              className="showcase-profile-row showcase-profile-row--btn"
-              onClick={() => setOpenMusic((v) => !v)}
-            >
-              <span className="showcase-profile-row__label">
-                <span className="showcase-profile-row__label-text">
-                  <Music2 size={14} className="inline mr-1" aria-hidden />
-                  배경음악
-                  <HelpTip text="한 곡만 선택하면 디지털 인증명함·모든 쇼케이스 페이지에 함께 재생됩니다. Signature는 VLUE 제공곡, User Original은 내가 올린 Original Track과 퍼온 Shared Track을 씁니다." />
-                </span>
-              </span>
-              <span className="showcase-profile-row__trail">
-                <span className="showcase-profile-row__value">
-                  {config.bgm?.mode === "none" || !config.bgm?.mode ? "없음" : "설정됨"}
-                </span>
-                {openMusic ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </span>
-            </button>
-            {openMusic ? (
-              <div className="showcase-profile-nested">
-                <ShowcaseBgmPicker
-                  value={config.bgm}
-                  inputCls={inputCls}
-                  onChange={(bgm) => persist({ bgm: { ...config.bgm, ...bgm } })}
-                />
               </div>
             ) : null}
 
@@ -992,6 +1001,18 @@ export default function ShowcaseStyleSettingsPanel({
             {includeDigitalCard ? "명함 1 · " : ""}
             콘텐츠 {pages.length}페이지 · 설정됨 {configuredCount}
           </p>
+
+          <label className={`showcase-mycase-upload-check ${isDarkMode ? "is-dark" : ""}`}>
+            <input
+              type="checkbox"
+              checked={alsoUploadToMycase}
+              onChange={(e) => setAlsoUploadToMycase(e.target.checked)}
+            />
+            <span>
+              <b>[마이케이스]</b> 함께 올리기
+              <em>체크한 경우에만 마이케이스에 새 게시물로 저장됩니다</em>
+            </span>
+          </label>
 
           <button
             type="button"

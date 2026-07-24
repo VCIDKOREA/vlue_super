@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import { VLUE_SHOWCASE_DEMO_RECORDING_SEC } from "../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
-import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
+import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
 
 /**
  * 마이페이지 — 실제 빅푸시와 동일하게 ▼/▲ 로 접힘·펼침
@@ -19,14 +19,7 @@ export default function LetteringMypagePushInteractivePreview({
 }) {
   const [expanded, setExpanded] = useState(false);
   const rootRef = useRef(null);
-  const { setPlaybackPhase, bindStyleConfig } = useShowcaseBgm();
   const styledCard = applyShowcaseStyleToCard(card, card?.membershipTier || "free");
-
-  useEffect(() => {
-    bindStyleConfig(styledCard?.showcaseStyle);
-    setPlaybackPhase(expanded ? "preview" : "idle");
-    return () => setPlaybackPhase("idle");
-  }, [expanded, styledCard?.showcaseStyle, bindStyleConfig, setPlaybackPhase]);
 
   useEffect(() => {
     if (!expanded || !rootRef.current) return;
@@ -35,6 +28,12 @@ export default function LetteringMypagePushInteractivePreview({
     });
     return () => cancelAnimationFrame(id);
   }, [expanded]);
+
+  useEffect(() => {
+    const onCloseOverlays = () => setExpanded(false);
+    window.addEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+    return () => window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+  }, []);
 
   const notificationProps = {
     verified: true,

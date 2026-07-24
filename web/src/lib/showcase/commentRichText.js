@@ -95,3 +95,22 @@ export function dispatchCommentMention(handle) {
   if (!bare || typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(COMMENT_MENTION_EVENT, { detail: { handle: bare } }));
 }
+
+const OWNER_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export const COMMENT_CASE_USER_EVENT = "vlue-open-case-user";
+
+/** 댓글 작성자 → 계정 케이스함 */
+export function dispatchCommentAuthor(author) {
+  if (typeof window === "undefined" || !author) return;
+  const userId = String(author.id || "").trim();
+  const handle = normalizeCommentMention(author.handle || "");
+  const name = String(author.name || handle || "").trim();
+  if (userId && userId !== "me" && OWNER_UUID_RE.test(userId)) {
+    window.dispatchEvent(
+      new CustomEvent(COMMENT_CASE_USER_EVENT, { detail: { userId, handle, name } })
+    );
+    return;
+  }
+  if (handle) dispatchCommentMention(handle);
+}

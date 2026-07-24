@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import LetteringIncomingNotification from "../LetteringIncomingNotification.jsx";
 import { readMembershipTier } from "../../lib/bizcardAccountSync.js";
@@ -7,6 +7,8 @@ import {
   readShowcaseStyle
 } from "../../lib/showcase/showcaseStyleStorage.js";
 import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
+import { fetchMycaseDetail } from "../../lib/mycaseApi.js";
+import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
 import "./my-case-detail.css";
 
 function readPreviewIdentity() {
@@ -27,89 +29,96 @@ function readPreviewIdentity() {
   return { name: name || handle || "VLUE", phone, handle, org };
 }
 
-/**
- * ????? ?? ? ? ???? ????? (?? ??? ??)
- */
-export default function MyCaseDetailModal({
-  open,
-  item,
-  detail,
-  isOwner = false,
-  onClose,
-  onToast
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const owner = Boolean(isOwner || detail?.isOwner);
-  const identity = useMemo(() => readPreviewIdentity(), [open]);
-  const membershipTier = useMemo(() => readMembershipTier(), [open]);
+function buildPreviewCard({ item, detail, owner, selfIdentity, peerIdentity, membershipTier }) {
+  let userId = "";
+  try {
+    userId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
+  } catch {
+    /* ignore */
+  }
 
-  const style = useMemo(() => {
-    const payload = detail?.item?.payloadJson || item?.payloadJson || {};
-    const fromStyle = payload?.style;
-    if (fromStyle && typeof fromStyle === "object") {
-      return { ...createDefaultShowcaseStyle(), ...fromStyle };
-    }
-    if (owner) {
-      try {
-        return readShowcaseStyle();
-      } catch {
-        /* ignore */
-      }
-    }
-    return createDefaultShowcaseStyle();
-  }, [detail, item, owner]);
-
-  const previewCard = useMemo(() => {
-    let userId = "";
+  const payload = detail?.item?.payloadJson || item?.payloadJson || {};
+  const fromStyle = payload?.style;
+  let style = createDefaultShowcaseStyle();
+  if (fromStyle && typeof fromStyle === "object") {
+    style = { ...style, ...fromStyle };
+  } else if (owner) {
     try {
-      userId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
+      style = readShowcaseStyle();
     } catch {
       /* ignore */
     }
-    const base = {
-      name: identity.name,
-      displayName: identity.name,
-      phone: identity.phone,
-      organization: identity.org,
-      membershipTier,
-      showcaseStyle: style,
-      photoUrl: "",
-      image_url: "",
-      logoUrl: "",
-      userId
-    };
-    /* ?? = ?????. ?? ???? ?? ?? */
-    return applyShowcaseStyleToCard(base, membershipTier, {
+  }
+
+  const identity = owner
+    ? selfIdentity
+    : {
+        name: String(peerIdentity?.name || item?.title || "VLUE").trim() || "VLUE",
+        phone: String(peerIdentity?.phone || "").trim(),
+        handle: String(peerIdentity?.handle || "").replace(/^@/, "").trim(),
+        org: String(peerIdentity?.organization || "").trim()
+      };
+  const photoUrl = String(peerIdentity?.photoUrl || item?.thumbnailUrl || "").trim();
+  const base = {
+    name: identity.name,
+    displayName: identity.name,
+    phone: identity.phone,
+    organization: identity.org,
+    membershipTier,
+    showcaseStyle: style,
+    photoUrl: owner ? "" : photoUrl,
+    image_url: owner ? "" : photoUrl,
+    logoUrl: "",
+    userId: owner ? userId : String(peerIdentity?.userId || item?.ownerUserId || "")
+  };
+  return {
+    card: applyShowcaseStyleToCard(base, membershipTier, {
       style,
       digitalCardActive: false
-    });
-  }, [identity, membershipTier, style]);
+    }),
+    identity
+  };
+}
 
-  useEffect(() => {
-    if (open) setExpanded(true);
-  }, [open, item?.id]);
+function FeedSlide({
+  item,
+  detail,
+  loading,
+  owner,
+  selfIdentity,
+  peerIdentity,
+  membershipTier,
+  suppressBgm,
+  onToast,
+  active
+}) {
+  const { card, identity } = useMemo(
+    () =>
+      buildPreviewCard({
+        item,
+        detail,
+        owner,
+        selfIdentity,
+        peerIdentity,
+        membershipTier
+      }),
+    [item, detail, owner, selfIdentity, peerIdentity, membershipTier]
+  );
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  if (!active) {
+    return <div className="my-case-feed__slide-inner my-case-feed__slide-inner--idle" aria-hidden />;
+  }
 
-  if (!open || !item) return null;
+  if (loading && !detail) {
+    return (
+      <div className="my-case-feed__slide-inner my-case-feed__slide-inner--loading">
+        <p>불러오는 중…</p>
+      </div>
+    );
+  }
 
   return (
-    <AppFullScreenView
-      open={open}
-      onClose={onClose}
-      title=""
-      hideHeader
-      showFloatingClose
-      coverBottomNav
-      className="my-case-detail my-case-detail--broadcast bg-[#0B101B]"
-    >
+    <div className="my-case-feed__slide-inner">
       <div className="my-case-detail__broadcast-shell lettering-showcase-fs lettering-showcase-fs--history-embed">
         <div className="lettering-showcase-fs__shell">
           <LetteringIncomingNotification
@@ -126,17 +135,210 @@ export default function MyCaseDetailModal({
             incomingNumber={identity.phone}
             savedContactName={identity.name}
             isKnownContact
-            card={previewCard}
+            card={card}
             includeDigitalCard={false}
-            expanded={expanded}
-            onExpandedChange={(next) => {
-              setExpanded(next);
-              if (!next) onClose?.();
-            }}
-            onEndCall={onClose}
+            suppressBgm={suppressBgm}
+            expanded
+            onExpandedChange={() => {}}
+            onEndCall={() => {}}
             onToast={onToast}
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 마이케이스 게시물 뷰어 — 인스타형 상·하 스와이프로 계정 게시물 연속 열람
+ * suppressBgm=true 이면 케이스함 BGM을 끊지 않음
+ */
+export default function MyCaseDetailModal({
+  open,
+  item,
+  detail,
+  feedItems = null,
+  startIndex = 0,
+  isOwner = false,
+  peerIdentity = null,
+  suppressBgm = false,
+  onClose,
+  onToast
+}) {
+  const feed = useMemo(() => {
+    const list = Array.isArray(feedItems) && feedItems.length ? feedItems : item ? [item] : [];
+    return list.filter((x) => x && x.id);
+  }, [feedItems, item]);
+
+  const initialIdx = useMemo(() => {
+    if (!item?.id) return Math.max(0, Math.min(startIndex, Math.max(0, feed.length - 1)));
+    const found = feed.findIndex((x) => x.id === item.id);
+    return found >= 0 ? found : Math.max(0, Math.min(startIndex, Math.max(0, feed.length - 1)));
+  }, [feed, item, startIndex]);
+
+  const [index, setIndex] = useState(initialIdx);
+  const [detailCache, setDetailCache] = useState(() => {
+    const id = item?.id;
+    if (id && detail) return { [id]: detail };
+    return {};
+  });
+  const [loadingIds, setLoadingIds] = useState({});
+  const scrollerRef = useRef(null);
+  const ignoreScrollRef = useRef(false);
+  const detailCacheRef = useRef(detailCache);
+  detailCacheRef.current = detailCache;
+  const fetchingRef = useRef(new Set());
+
+  const owner = Boolean(isOwner || detail?.isOwner);
+  const selfIdentity = useMemo(() => readPreviewIdentity(), [open]);
+  const membershipTier = useMemo(() => {
+    if (!owner && peerIdentity?.membershipTier) return peerIdentity.membershipTier;
+    return readMembershipTier();
+  }, [open, owner, peerIdentity]);
+
+  useEffect(() => {
+    if (!open) return;
+    setIndex(initialIdx);
+    setDetailCache((prev) => {
+      const id = item?.id;
+      if (id && detail) return { ...prev, [id]: detail };
+      return prev;
+    });
+    ignoreScrollRef.current = true;
+    requestAnimationFrame(() => {
+      const root = scrollerRef.current;
+      if (root) {
+        const h = root.clientHeight || 1;
+        root.scrollTop = initialIdx * h;
+      }
+      window.setTimeout(() => {
+        ignoreScrollRef.current = false;
+      }, 80);
+    });
+  }, [open, initialIdx, item?.id, detail]);
+
+  const ensureDetail = useCallback(async (feedItem) => {
+    const id = String(feedItem?.id || "").trim();
+    if (!id) return;
+    if (detailCacheRef.current[id] || fetchingRef.current.has(id)) return;
+    fetchingRef.current.add(id);
+    setLoadingIds((prev) => ({ ...prev, [id]: true }));
+    try {
+      const res = await fetchMycaseDetail(id);
+      if (res.ok) {
+        setDetailCache((prev) => ({ ...prev, [id]: res }));
+      }
+    } finally {
+      fetchingRef.current.delete(id);
+      setLoadingIds((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open || !feed.length) return;
+    const targets = [index - 1, index, index + 1]
+      .filter((i) => i >= 0 && i < feed.length)
+      .map((i) => feed[i]);
+    targets.forEach((it) => {
+      void ensureDetail(it);
+    });
+  }, [open, feed, index, ensureDetail]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+      if (e.key === "ArrowDown" || e.key === "PageDown") {
+        e.preventDefault();
+        setIndex((i) => Math.min(feed.length - 1, i + 1));
+      }
+      if (e.key === "ArrowUp" || e.key === "PageUp") {
+        e.preventDefault();
+        setIndex((i) => Math.max(0, i - 1));
+      }
+    };
+    const onCloseOverlays = () => onClose?.();
+    window.addEventListener("keydown", onKey);
+    window.addEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+    };
+  }, [open, onClose, feed.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const root = scrollerRef.current;
+    if (!root) return;
+    ignoreScrollRef.current = true;
+    const h = root.clientHeight || 1;
+    root.scrollTo({ top: index * h, behavior: "smooth" });
+    window.setTimeout(() => {
+      ignoreScrollRef.current = false;
+    }, 320);
+  }, [index, open]);
+
+  const onScroll = () => {
+    if (ignoreScrollRef.current) return;
+    const root = scrollerRef.current;
+    if (!root) return;
+    const h = root.clientHeight || 1;
+    const next = Math.round(root.scrollTop / h);
+    if (next !== index && next >= 0 && next < feed.length) setIndex(next);
+  };
+
+  if (!open || !feed.length) return null;
+
+  return (
+    <AppFullScreenView
+      open={open}
+      onClose={onClose}
+      title=""
+      hideHeader
+      showFloatingClose
+      coverBottomNav
+      className="my-case-detail my-case-detail--broadcast bg-[#0B101B]"
+    >
+      <div
+        ref={scrollerRef}
+        className="my-case-feed"
+        onScroll={onScroll}
+        role="feed"
+        aria-label="마이케이스 게시물"
+      >
+        {feed.map((feedItem, i) => {
+          const active = Math.abs(i - index) <= 1;
+          const cached = detailCache[feedItem.id] || null;
+          return (
+            <section
+              key={feedItem.id}
+              className="my-case-feed__slide"
+              aria-label={`${i + 1} / ${feed.length}`}
+            >
+              <FeedSlide
+                item={feedItem}
+                detail={cached}
+                loading={Boolean(loadingIds[feedItem.id])}
+                owner={owner || Boolean(cached?.isOwner)}
+                selfIdentity={selfIdentity}
+                peerIdentity={peerIdentity}
+                membershipTier={membershipTier}
+                suppressBgm={suppressBgm}
+                onToast={onToast}
+                active={active}
+              />
+              {feed.length > 1 ? (
+                <p className="my-case-feed__counter" aria-hidden>
+                  {i + 1}/{feed.length}
+                </p>
+              ) : null}
+            </section>
+          );
+        })}
       </div>
     </AppFullScreenView>
   );

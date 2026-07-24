@@ -14,7 +14,7 @@ import {
   setMycaseBroadcast
 } from "../../lib/mycaseApi.js";
 import { fetchFollowCounts } from "../../lib/followApi.js";
-import { readShowcaseStyle, SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT } from "../../lib/showcase/showcaseStyleStorage.js";
+import { readShowcaseStyle, SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT, createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 import {
   applyMycaseItemToLiveBroadcast,
   clearLiveBroadcastMeta,
@@ -27,7 +27,15 @@ import {
 } from "../../lib/showcase/showcaseCover.js";
 import { readAvatar } from "../../lib/vlueAvatar.js";
 import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
+import {
+  isBroadcastStoryUnseen,
+  markBroadcastStorySeen
+} from "../../lib/mycaseStoryRing.js";
 import FollowActionButton from "../follow/FollowActionButton.jsx";
+import ShowcaseBgmTrackChip from "../showcase/ShowcaseBgmTrackChip.jsx";
+import ShowcaseBgmTransport from "../showcase/ShowcaseBgmTransport.jsx";
+import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
+import { resolveShowcaseBgmUrl } from "../../lib/showcase/showcaseBgmPresets.js";
 import "./my-case-grid.css";
 
 function readSelfProfile() {
@@ -67,6 +75,8 @@ function formatCount(n) {
  *   onOpenDigitalCard?: () => void,
  *   onToast?: (msg: string) => void,
  *   onBroadcastChanged?: (item: object, policy: object|null) => void,
+ *   bgmEnabled?: boolean,
+ *   isDarkMode?: boolean,
  *   className?: string
  * }} props
  */
@@ -78,6 +88,8 @@ export default function MyCaseGrid({
   onOpenDigitalCard,
   onToast,
   onBroadcastChanged,
+  bgmEnabled = true,
+  isDarkMode = false,
   className = ""
 }) {
   const isMine = mode === "mine";
@@ -96,9 +108,12 @@ export default function MyCaseGrid({
   const [nextCursor, setNextCursor] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [manageMode, setManageMode] = useState(false);
+  const [storySeenTick, setStorySeenTick] = useState(0);
   const sentinelRef = useRef(null);
   const toastRef = useRef(onToast);
   const initialLoadDoneRef = useRef(false);
+  const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
+  const [styleTick, setStyleTick] = useState(0);
 
   useEffect(() => {
     toastRef.current = onToast;
@@ -116,7 +131,20 @@ export default function MyCaseGrid({
   const displayName = isMine
     ? self.name
     : remoteProfile?.profile?.displayName || displayHandle;
-  const avatarUrl = isMine ? self.avatarUrl : "";
+  const avatarUrl = isMine
+    ? self.avatarUrl
+    : String(
+        remoteProfile?.profile?.avatarUrl ||
+          remoteProfile?.profile?.photoUrl ||
+          mainBroadcast[0]?.thumbnailUrl ||
+          ""
+      ).trim();
+  const storyOwnerId = isMine ? self.userId : String(ownerUserId || "").trim();
+  const hasLiveBroadcast = !accessDenied && mainBroadcast.length > 0;
+  const storyUnseen = useMemo(() => {
+    void storySeenTick;
+    return hasLiveBroadcast && isBroadcastStoryUnseen(storyOwnerId, mainBroadcast);
+  }, [hasLiveBroadcast, storyOwnerId, mainBroadcast, storySeenTick]);
 
   const loadFirst = useCallback(async () => {
     const showFullLoading = !initialLoadDoneRef.current;
@@ -176,6 +204,7 @@ export default function MyCaseGrid({
     const onChanged = () => {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
+        setStyleTick((n) => n + 1);
         void loadFirst();
       }, 500);
     };
@@ -185,6 +214,54 @@ export default function MyCaseGrid({
       window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onChanged);
     };
   }, [isMine, loadFirst]);
+
+  const caseStyleConfig = useMemo(() => {
+    if (isMine) {
+      try {
+        return readShowcaseStyle();
+      } catch {
+        return createDefaultShowcaseStyle();
+      }
+    }
+    const src = mainBroadcast[0] || items[0];
+    const payload = src?.payloadJson && typeof src.payloadJson === "object" ? src.payloadJson : {};
+    const fromStyle = payload.style && typeof payload.style === "object" ? payload.style : null;
+    if (fromStyle) return { ...createDefaultShowcaseStyle(), ...fromStyle };
+    return null;
+  }, [isMine, mainBroadcast, items, styleTick]);
+
+  const caseHasBgm = Boolean(resolveShowcaseBgmUrl(caseStyleConfig));
+  const caseBgmFingerprint = useMemo(() => {
+    const b = caseStyleConfig?.bgm;
+    if (!b || b.mode === "none") return "";
+    const pl = Array.isArray(b.playlist) ? b.playlist.map((t) => t?.soundId || t?.audioUrl || "").join(",") : "";
+    return `${b.mode}|${b.soundId || ""}|${b.audioUrl || ""}|${b.playMode || ""}|${pl}`;
+  }, [caseStyleConfig]);
+
+  /* 케이스함 프로필 — 쇼케이스 BGM (게시물 상세는 suppress 로 중복 방지) */
+  useEffect(() => {
+    if (!bgmEnabled || !caseHasBgm || !caseStyleConfig) {
+      setPlaybackPhase("idle", { fade: true, owner: "casebox" });
+      return () => {
+        setPlaybackPhase("idle", { fade: true, owner: "casebox" });
+      };
+    }
+    setPlaybackPhase("preview", {
+      forceRestart: true,
+      owner: "casebox",
+      styleConfig: caseStyleConfig
+    });
+    return () => {
+      setPlaybackPhase("idle", { fade: true, owner: "casebox" });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- caseStyleConfig는 fingerprint로 추적
+  }, [bgmEnabled, caseHasBgm, caseBgmFingerprint, bindStyleConfig, setPlaybackPhase]);
+
+  useEffect(() => {
+    if (!bgmEnabled || !caseHasBgm) return undefined;
+    bindStyleConfig(caseStyleConfig);
+    return undefined;
+  }, [bgmEnabled, caseHasBgm, caseStyleConfig, bindStyleConfig]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -242,7 +319,32 @@ export default function MyCaseGrid({
       if (detail.error === "not_found") void loadFirst();
       return;
     }
-    onOpenDetail(item, detail);
+    onOpenDetail(item, detail, {
+      userId: storyOwnerId,
+      name: displayName,
+      handle: displayHandle,
+      phone: String(remoteProfile?.profile?.phoneE164 || "").trim(),
+      organization: String(remoteProfile?.profile?.companyName || "").trim(),
+      photoUrl: avatarUrl,
+      membershipTier: "premium",
+      feedItems: items,
+      startIndex: Math.max(
+        0,
+        items.findIndex((x) => String(x.id) === caseId)
+      )
+    });
+  };
+
+  const openLiveBroadcastStory = async () => {
+    if (!hasLiveBroadcast || manageMode) return;
+    const item = mainBroadcast[0];
+    if (!item) return;
+    if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
+      window.__vlueUnlockShowcaseBgm();
+    }
+    markBroadcastStorySeen(storyOwnerId, mainBroadcast);
+    setStorySeenTick((n) => n + 1);
+    await openItem(item);
   };
 
   const toggleBroadcast = async (item, e) => {
@@ -376,117 +478,174 @@ export default function MyCaseGrid({
   const highlightItems = mainBroadcast;
 
   return (
-    <section className={`ig-mycase ${className}`.trim()} aria-label="마이케이스">
-      <header className="ig-mycase__topbar">
-        <button type="button" className="ig-mycase__icon-btn" onClick={onBack} aria-label="뒤로">
-          <ChevronLeft size={26} strokeWidth={2} />
-        </button>
-        <h1 className="ig-mycase__username">{displayHandle}</h1>
-        {isMine ? (
-          <button
-            type="button"
-            className={`ig-mycase__icon-btn${manageMode ? " is-active" : ""}`}
-            aria-label={manageMode ? "송출 관리 종료" : "송출 관리"}
-            aria-pressed={manageMode}
-            title="송출 관리"
-            onClick={() => setManageMode((v) => !v)}
-          >
-            <MoreHorizontal size={22} strokeWidth={2} />
+    <section
+      className={`ig-mycase${isDarkMode ? " ig-mycase--dark" : " ig-mycase--light"} ${className}`.trim()}
+      aria-label="마이케이스"
+      data-theme={isDarkMode ? "dark" : "light"}
+    >
+      <div className="ig-mycase__hero">
+        {avatarUrl ? (
+          <>
+            <div className="ig-mycase__hero-bg" aria-hidden>
+              <img src={avatarUrl} alt="" />
+            </div>
+            <div className="ig-mycase__hero-fade" aria-hidden />
+          </>
+        ) : null}
+        <header className="ig-mycase__topbar">
+          <button type="button" className="ig-mycase__icon-btn" onClick={onBack} aria-label="뒤로">
+            <ChevronLeft size={26} strokeWidth={2} />
           </button>
-        ) : (
-          <span className="ig-mycase__icon-btn ig-mycase__icon-btn--spacer" aria-hidden />
-        )}
-      </header>
-
-      <div className="ig-mycase__profile">
-        <div className="ig-mycase__profile-row">
-          <div className="ig-mycase__avatar-wrap">
-            {avatarUrl ? (
-              <img className="ig-mycase__avatar" src={avatarUrl} alt="" />
-            ) : (
-              <span className="ig-mycase__avatar ig-mycase__avatar--ph">
-                {(displayName || "?").slice(0, 1)}
-              </span>
-            )}
-          </div>
-          <div className="ig-mycase__stats" role="group" aria-label="통계">
-            <div className="ig-mycase__stat">
-              <b>{formatCount(postsCount)}</b>
-              <span>게시물</span>
-            </div>
-            <div className="ig-mycase__stat">
-              <b>{formatCount(followCounts.followers)}</b>
-              <span>팔로워</span>
-            </div>
-            <div className="ig-mycase__stat">
-              <b>{formatCount(followCounts.following)}</b>
-              <span>팔로잉</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="ig-mycase__bio">
-          <p className="ig-mycase__name">{displayName}</p>
+          <h1 className="ig-mycase__username">{displayHandle}</h1>
           {isMine ? (
-            <p className="ig-mycase__bio-text">
-              {policy
-                ? `${policy.tier === "pro" ? "Pro" : "Free"} · 메인 송출 ${policy.usedMainSlots}/${policy.maxMainSlots}`
-                : "쇼케이스 아카이브"}
-              {policyLine && !policy?.canChangeBroadcast ? ` · ${policyLine.replace(/^메인 송출 \d+\/\d+ · /, "")}` : ""}
-            </p>
-          ) : remoteProfile?.profile?.companyName ? (
-            <p className="ig-mycase__bio-text">{remoteProfile.profile.companyName}</p>
+            <button
+              type="button"
+              className={`ig-mycase__icon-btn${manageMode ? " is-active" : ""}`}
+              aria-label={manageMode ? "송출 관리 종료" : "송출 관리"}
+              aria-pressed={manageMode}
+              title="송출 관리"
+              onClick={() => setManageMode((v) => !v)}
+            >
+              <MoreHorizontal size={22} strokeWidth={2} />
+            </button>
           ) : (
-            <p className="ig-mycase__bio-text">공개 케이스함</p>
+            <span className="ig-mycase__icon-btn ig-mycase__icon-btn--spacer" aria-hidden />
           )}
-        </div>
+        </header>
 
-        <div className="ig-mycase__actions">
-          {isMine ? (
-            <>
-              <button
-                type="button"
-                className="ig-mycase__btn ig-mycase__btn--secondary"
-                onClick={goCreateOrEditShowcase}
-              >
-                쇼케이스 만들기
-              </button>
-              <button
-                type="button"
-                className="ig-mycase__btn ig-mycase__btn--secondary"
-                disabled={busyId === "archive"}
-                onClick={saveCurrentToArchive}
-              >
-                아카이브 저장
-              </button>
-              <button
-                type="button"
-                className={`ig-mycase__btn ig-mycase__btn--secondary${manageMode ? " is-active" : ""}`}
-                onClick={() => setManageMode((v) => !v)}
-              >
-                {manageMode ? "완료" : "송출 관리"}
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="ig-mycase__follow-slot">
-                <FollowActionButton targetUserId={ownerUserId} className="ig-mycase__follow-btn" />
+        <div className="ig-mycase__profile">
+          <div className="ig-mycase__profile-row">
+            <div
+              className={`ig-mycase__avatar-wrap${
+                hasLiveBroadcast ? (storyUnseen ? " is-story-unseen" : " is-story-seen") : ""
+              }`}
+            >
+              {hasLiveBroadcast ? (
+                <button
+                  type="button"
+                  className="ig-mycase__avatar-btn"
+                  onClick={() => void openLiveBroadcastStory()}
+                  aria-label={
+                    storyUnseen ? "송출 중인 쇼케이스 보기 (새 업데이트)" : "송출 중인 쇼케이스 보기"
+                  }
+                >
+                  {avatarUrl ? (
+                    <img className="ig-mycase__avatar" src={avatarUrl} alt="" />
+                  ) : (
+                    <span className="ig-mycase__avatar ig-mycase__avatar--ph">
+                      {(displayName || "?").slice(0, 1)}
+                    </span>
+                  )}
+                </button>
+              ) : avatarUrl ? (
+                <img className="ig-mycase__avatar" src={avatarUrl} alt="" />
+              ) : (
+                <span className="ig-mycase__avatar ig-mycase__avatar--ph">
+                  {(displayName || "?").slice(0, 1)}
+                </span>
+              )}
+            </div>
+            <div className="ig-mycase__stats" role="group" aria-label="통계">
+              <div className="ig-mycase__stat">
+                <b>{formatCount(postsCount)}</b>
+                <span>게시물</span>
               </div>
+              <div className="ig-mycase__stat">
+                <b>{formatCount(followCounts.followers)}</b>
+                <span>팔로워</span>
+              </div>
+              <div className="ig-mycase__stat">
+                <b>{formatCount(followCounts.following)}</b>
+                <span>팔로잉</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="ig-mycase__bio">
+            <div className="ig-mycase__bio-head">
+              <p className="ig-mycase__name">{displayName}</p>
+              {!isMine ? (
+                <div className="ig-mycase__bio-actions">
+                  <FollowActionButton targetUserId={ownerUserId} className="ig-mycase__follow-btn" />
+                </div>
+              ) : null}
+            </div>
+            <div className="ig-mycase__bio-meta">
+              {isMine ? (
+                <p className="ig-mycase__bio-text">
+                  {policy
+                    ? `${policy.tier === "pro" ? "Pro" : "Free"} · 송출중 ${
+                        (policy.usedMainSlots || 0) +
+                        (hasDigitalCard &&
+                        policy.tier === "pro" &&
+                        (policy.usedMainSlots || 0) <= mainBroadcast.length
+                          ? 1
+                          : 0)
+                      }/${policy.maxMainSlots}`
+                    : "쇼케이스 아카이브"}
+                  {policyLine && !policy?.canChangeBroadcast
+                    ? ` · ${policyLine
+                        .replace(/^메인 송출 \d+\/\d+ · /, "")
+                        .replace(/^송출중 \d+\/\d+ · /, "")}`
+                    : ""}
+                </p>
+              ) : remoteProfile?.profile?.companyName ? (
+                <p className="ig-mycase__bio-text">{remoteProfile.profile.companyName}</p>
+              ) : (
+                <p className="ig-mycase__bio-text">공개 케이스함</p>
+              )}
+              {hasDigitalCard ? (
+                <button
+                  type="button"
+                  className="ig-mycase__btn ig-mycase__btn--card"
+                  onClick={() => onOpenDigitalCard?.()}
+                >
+                  디지털인증명함
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {bgmEnabled && caseHasBgm ? (
+            <div className="ig-mycase__bgm" aria-label="쇼케이스 배경음악">
+              <ShowcaseBgmTrackChip
+                styleConfig={caseStyleConfig}
+                placement="inline"
+                className="ig-mycase__bgm-chip"
+              />
+              <ShowcaseBgmTransport
+                className="ig-mycase__bgm-transport"
+                styleConfig={caseStyleConfig}
+              />
+            </div>
+          ) : null}
+
+          <div className="ig-mycase__actions">
+            {isMine ? (
+              <>
+                <button
+                  type="button"
+                  className="ig-mycase__btn ig-mycase__btn--secondary"
+                  disabled={busyId === "archive"}
+                  onClick={saveCurrentToArchive}
+                >
+                  아카이브 저장
+                </button>
+                <button
+                  type="button"
+                  className={`ig-mycase__btn ig-mycase__btn--secondary${manageMode ? " is-active" : ""}`}
+                  onClick={() => setManageMode((v) => !v)}
+                >
+                  {manageMode ? "완료" : "송출 관리"}
+                </button>
+              </>
+            ) : (
               <button type="button" className="ig-mycase__btn ig-mycase__btn--secondary" disabled>
                 메시지
               </button>
-            </>
-          )}
+            )}
+          </div>
         </div>
-        {hasDigitalCard ? (
-          <button
-            type="button"
-            className="ig-mycase__btn ig-mycase__btn--card"
-            onClick={() => onOpenDigitalCard?.()}
-          >
-            디지털인증명함
-          </button>
-        ) : null}
       </div>
 
       {!accessDenied ? (

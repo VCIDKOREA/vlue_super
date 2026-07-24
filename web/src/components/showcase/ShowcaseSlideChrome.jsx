@@ -37,7 +37,7 @@ function displayHost(url) {
 /**
  * 쇼케이스 슬라이드 공통 크롬
  * 1 하단: VLUE 프로필 + 팔로우 + 쇼셜 토글
- * 2 상단: 음원 칩 (쇼셜과 분리) · 개인커스텀 비즈니스 링크
+ * 2 상단 좌측: 개인커스텀일 때 페이지 비즈니스 링크 (음원 칩은 캐러셀 메타 상단)
  * 3 쇼셜: 토글 시 VLUE 바 위에 표시
  *
  * @param {"instagram"|"custom"} variant
@@ -196,29 +196,33 @@ export default function ShowcaseSlideChrome({
             <p className="showcase-slide-chrome__vlue-label">VLUE 프로필</p>
             <p className="showcase-slide-chrome__vlue-name">{activityName || "회원"}</p>
           </div>
-          {showFollow ? (
-            <FollowActionButton
-              targetUserId={targetUserId}
-              className="follow-action-btn--chrome"
-              onToast={onToast}
-            />
-          ) : null}
-          {hasSocial ? (
-            <button
-              type="button"
-              className={`showcase-slide-chrome__social-toggle${socialOpen ? " is-open" : ""}`}
-              aria-label={socialOpen ? "쇼셜 링크 닫기" : "쇼셜 링크 열기"}
-              aria-expanded={socialOpen}
-              title={socialOpen ? "쇼셜 닫기" : "쇼셜"}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSocialOpen((v) => !v);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              <SocialToggleGlyph />
-              <span className="showcase-slide-chrome__social-toggle-label">쇼셜</span>
-            </button>
+          {(showFollow || hasSocial) ? (
+            <div className="showcase-slide-chrome__vlue-actions">
+              {showFollow ? (
+                <FollowActionButton
+                  targetUserId={targetUserId}
+                  className="follow-action-btn--chrome"
+                  onToast={onToast}
+                />
+              ) : null}
+              {hasSocial ? (
+                <button
+                  type="button"
+                  className={`showcase-slide-chrome__social-toggle${socialOpen ? " is-open" : ""}`}
+                  aria-label={socialOpen ? "쇼셜 링크 닫기" : "쇼셜 링크 열기"}
+                  aria-expanded={socialOpen}
+                  title={socialOpen ? "쇼셜 닫기" : "쇼셜"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSocialOpen((v) => !v);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <SocialToggleGlyph />
+                  <span className="showcase-slide-chrome__social-toggle-label">쇼셜</span>
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>

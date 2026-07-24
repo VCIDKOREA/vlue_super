@@ -13,6 +13,7 @@ import {
   getSoundQuotaStatus,
   listMySounds,
   listSignatureSounds,
+  softDeleteUserOriginalSound,
   SOUND_RIGHTS_DISCLAIMER
 } from "../services/showcase/showcaseSoundService.js";
 
@@ -120,6 +121,17 @@ showcaseSoundRoutes.post("/:soundId/borrow", requireUserHeader, async (c) => {
     return c.json({ ok: true, sound });
   } catch (e) {
     return c.json({ ok: false, error: e instanceof Error ? e.message : "borrow_failed" }, 400);
+  }
+});
+
+showcaseSoundRoutes.delete("/:soundId", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const soundId = String(c.req.param("soundId") || "").trim();
+  try {
+    const sound = await softDeleteUserOriginalSound(me, soundId);
+    return c.json({ ok: true, sound });
+  } catch (e) {
+    return c.json({ ok: false, error: e instanceof Error ? e.message : "delete_failed" }, 400);
   }
 });
 

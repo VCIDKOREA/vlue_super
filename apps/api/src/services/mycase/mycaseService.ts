@@ -124,7 +124,7 @@ function serializeGridItem(row: {
 }
 
 export async function getBroadcastPolicy(userId: string): Promise<BroadcastPolicySnapshot> {
-  const [tier, user, usedMainSlots] = await Promise.all([
+  const [tier, user, caseMainSlots, digitalCard] = await Promise.all([
     resolveMycaseTier(userId),
     prisma.user.findUnique({
       where: { id: userId },
@@ -132,10 +132,17 @@ export async function getBroadcastPolicy(userId: string): Promise<BroadcastPolic
     }),
     prisma.showcaseCase.count({
       where: { ownerUserId: userId, deletedAt: null, isMainBroadcast: true }
+    }),
+    prisma.digitalCard.findUnique({
+      where: { userId },
+      select: { id: true }
     })
   ]);
 
   const maxMainSlots = maxMainSlotsForTier(tier);
+  /** Pro 10슬롯 = 디지털인증명함(있으면 1) + 메인 송출 쇼케이스 */
+  const digitalSlot = tier === "pro" && digitalCard ? 1 : 0;
+  const usedMainSlots = caseMainSlots + digitalSlot;
   const cooldown = computeCooldown(tier, user?.mainBroadcastChangedAt ?? null);
 
   return {
@@ -179,7 +186,7 @@ async function assertCanTurnBroadcastOn(
       "slot_limit_exceeded",
       tier === "free"
         ? "무료 회원은 메인 송출 쇼케이스를 1개만 선택할 수 있습니다. 유료 회원으로 업그레이드하거나 기존 송출을 해제해주세요."
-        : `유료 회원은 메인 송출을 최대 ${policy.maxMainSlots}개까지 선택할 수 있습니다. 기존 송출을 해제해주세요.`,
+        : `유료 회원은 디지털인증명함 포함 메인 송출을 최대 ${policy.maxMainSlots}개까지 선택할 수 있습니다. 기존 송출을 해제해주세요.`,
       403,
       {
         maxMainSlots: policy.maxMainSlots,
@@ -295,14 +302,21 @@ export async function archiveShowcaseSnapshot(
 
   const tier = await resolveMycaseTier(userId);
   const maxSlots = maxMainSlotsForTier(tier);
+  const digitalCard =
+    tier === "pro"
+      ? await prisma.digitalCard.findUnique({ where: { userId }, select: { id: true } })
+      : null;
+  const digitalSlot = digitalCard ? 1 : 0;
   const mains = await prisma.showcaseCase.findMany({
     where: { ownerUserId: userId, deletedAt: null, isMainBroadcast: true },
     orderBy: [{ slotIndex: "asc" }, { updatedAt: "asc" }],
     select: { id: true, slotIndex: true }
   });
 
-  if (mains.length >= maxSlots) {
-    const demoteIds = mains.slice(0, mains.length - maxSlots + 1).map((m) => m.id);
+  /** 명함 슬롯을 제외한 쇼케이스 메인 한도 */
+  const maxCaseSlots = Math.max(0, maxSlots - digitalSlot);
+  if (mains.length >= maxCaseSlots) {
+    const demoteIds = mains.slice(0, mains.length - maxCaseSlots + 1).map((m) => m.id);
     if (demoteIds.length) {
       await prisma.showcaseCase.updateMany({
         where: { id: { in: demoteIds }, ownerUserId: userId },

@@ -5,8 +5,27 @@ import { isPaidMember } from "../membership/paidMemberGate.js";
 export const SOUND_RIGHTS_DISCLAIMER =
   "VLUE는 음원을 직접 판매하거나 저작권을 최종 인증하는 플랫폼이 아닙니다. 이용자가 적법한 권리 또는 이용 권한을 보유한 음원을 쇼케이스에서 소개·재생할 수 있도록 연결합니다.";
 
-const FREE_MONTHLY_REGISTER_LIMIT = 1;
+const FREE_MONTHLY_REGISTER_LIMIT = 0; /* 무료는 업로드 불가 — 퍼오기만 */
 const FREE_WEEKLY_THEME_CHANGE_LIMIT = 1;
+const PAID_DAILY_REGISTER_LIMIT = 3;
+const PAID_LIBRARY_LIMIT = 10;
+const PAID_PLAYLIST_SELECT_LIMIT = 5;
+
+function koreaDayKey(d = new Date()) {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  return fmt.format(d);
+}
+
+function startOfKoreaDayUtc(d = new Date()) {
+  const key = koreaDayKey(d);
+  /* Asia/Seoul midnight ≈ UTC-9h previous calendar for ISO; use approximate local parse */
+  return new Date(`${key}T00:00:00+09:00`);
+}
 
 function yearMonthNow(d = new Date()) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -97,28 +116,60 @@ export async function getSoundQuotaStatus(userId: string) {
   const paid = await isPaidMember(userId);
   const yearMonth = yearMonthNow();
   const weekKey = isoWeekKey();
+  const dayStart = startOfKoreaDayUtc();
   const row = await prisma.showcaseSoundQuotaMonth.findUnique({
     where: { userId_yearMonth: { userId, yearMonth } }
   });
   const registerCount = row?.registerCount ?? 0;
   const themeWeek = row?.themeChangeWeekKey === weekKey ? row.themeChangeCount : 0;
+
+  const [ownedCount, todayRegisterCount] = await Promise.all([
+    prisma.showcaseSound.count({
+      where: { ownerUserId: userId, kind: "user_original", deletedAt: null }
+    }),
+    prisma.showcaseSound.count({
+      where: {
+        ownerUserId: userId,
+        kind: "user_original",
+        deletedAt: null,
+        createdAt: { gte: dayStart }
+      }
+    })
+  ]);
+
+  const canRegister = paid
+    ? todayRegisterCount < PAID_DAILY_REGISTER_LIMIT && ownedCount < PAID_LIBRARY_LIMIT
+    : false;
+
   return {
     paid,
     yearMonth,
     weekKey,
-    registerCount,
-    registerLimit: paid ? null : FREE_MONTHLY_REGISTER_LIMIT,
-    canRegister: paid || registerCount < FREE_MONTHLY_REGISTER_LIMIT,
+    dayKey: koreaDayKey(),
+    registerCount: paid ? todayRegisterCount : registerCount,
+    registerLimit: paid ? PAID_DAILY_REGISTER_LIMIT : FREE_MONTHLY_REGISTER_LIMIT,
+    canRegister,
+    ownedCount,
+    libraryLimit: paid ? PAID_LIBRARY_LIMIT : 0,
+    playlistSelectLimit: paid ? PAID_PLAYLIST_SELECT_LIMIT : 1,
     themeChangeCount: themeWeek,
     themeChangeLimit: paid ? null : FREE_WEEKLY_THEME_CHANGE_LIMIT,
-    canChangeTheme: paid || themeWeek < FREE_WEEKLY_THEME_CHANGE_LIMIT
+    canChangeTheme: paid || themeWeek < FREE_WEEKLY_THEME_CHANGE_LIMIT,
+    canAddToLibrary: paid,
+    canUpload: paid
   };
 }
 
 export async function assertCanRegisterSound(userId: string) {
   const q = await getSoundQuotaStatus(userId);
+  if (!q.paid) {
+    throw new Error("무료 회원은 음원을 업로드할 수 없습니다. Signature 선택 또는 퍼오기만 가능합니다.");
+  }
+  if (q.ownedCount >= PAID_LIBRARY_LIMIT) {
+    throw new Error(`개인 음원은 최대 ${PAID_LIBRARY_LIMIT}곡까지 보관할 수 있습니다.`);
+  }
   if (!q.canRegister) {
-    throw new Error("무료 회원은 월 1회만 음원을 등록할 수 있습니다. 유료 플랜에서 상시 등록이 가능합니다.");
+    throw new Error(`유료 회원 음원 업로드는 하루 ${PAID_DAILY_REGISTER_LIMIT}곡까지입니다.`);
   }
   return q;
 }
@@ -348,6 +399,26 @@ export async function borrowShowcaseSound(borrowerUserId: string, soundId: strin
     update: {}
   });
   return serializeShowcaseSound(sound);
+}
+
+/** 내 User Original Track 소프트 삭제 (중복 등록 정리 등) */
+export async function softDeleteUserOriginalSound(userId: string, soundId: string) {
+  const sound = await prisma.showcaseSound.findFirst({
+    where: {
+      id: soundId,
+      ownerUserId: userId,
+      kind: "user_original",
+      deletedAt: null
+    }
+  });
+  if (!sound) {
+    throw new Error("삭제할 음원을 찾을 수 없습니다.");
+  }
+  const row = await prisma.showcaseSound.update({
+    where: { id: soundId },
+    data: { deletedAt: new Date() }
+  });
+  return serializeShowcaseSound(row);
 }
 
 export async function getSoundForPlayback(soundId: string, viewerUserId?: string | null) {

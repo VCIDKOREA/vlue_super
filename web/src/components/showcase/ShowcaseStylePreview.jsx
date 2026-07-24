@@ -30,14 +30,13 @@ export default function ShowcaseStylePreview({
   const {
     bindStyleConfig,
     setPlaybackPhase,
-    proximityNear,
-    unlockFromUserGesture
+    proximityNear
   } = useShowcaseBgm();
 
   useEffect(() => {
     bindStyleConfig(styleConfig);
-    setPlaybackPhase(phase);
-    return () => setPlaybackPhase("idle");
+    setPlaybackPhase(phase, { forceRestart: true, owner: "style-preview" });
+    return () => setPlaybackPhase("idle", { fade: true, owner: "style-preview" });
   }, [styleConfig, phase, bindStyleConfig, setPlaybackPhase]);
 
   useEffect(() => {
@@ -52,8 +51,6 @@ export default function ShowcaseStylePreview({
   const isCallActive = phase === "call_active";
   const sleepMode = proximityNear && isCallActive;
 
-  const onTapUnlock = () => unlockFromUserGesture();
-
   const openProduct = (product) => {
     if (!perms.productLinkout && !isPaid) return;
     if (onProductClick) onProductClick(product);
@@ -66,8 +63,6 @@ export default function ShowcaseStylePreview({
       <div
         className={`showcase-style-preview showcase-style-preview--certificate ${className}`.trim()}
         data-phase={phase}
-        onClick={onTapUnlock}
-        onTouchStart={onTapUnlock}
         role="presentation"
       >
         <div className="showcase-style-preview__cert-shell">
@@ -105,8 +100,6 @@ export default function ShowcaseStylePreview({
     <div
       className={`showcase-style-preview ${className}`.trim()}
       data-phase={phase}
-      onClick={onTapUnlock}
-      onTouchStart={onTapUnlock}
       role="presentation"
     >
       <div

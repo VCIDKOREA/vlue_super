@@ -14,6 +14,8 @@ export default function AppFullScreenView({
   reserveBottomNav = false,
   /** true면 하단 내비까지 덮는 진짜 전체화면 (쇼케이스 천막 등) */
   coverBottomNav = false,
+  /** coverBottomNav보다 위에 올려 쇼케이스 포털 위에 표시 */
+  elevateAboveShowcase = false,
   /** reserveBottomNav일 때 CSS 변수 대신 쓸 실측 px (네비 높이) */
   bottomInsetPx = null,
   /** true면 타이틀 헤더 숨김 */
@@ -23,7 +25,7 @@ export default function AppFullScreenView({
 }) {
   if (!open) return null;
 
-  const zClass = coverBottomNav ? "z-[220]" : "z-[140]";
+  const zClass = elevateAboveShowcase ? "z-[320]" : coverBottomNav ? "z-[220]" : "z-[140]";
   const closeBtnClass = `inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
     isDarkMode
       ? "bg-black/55 text-gray-100 ring-1 ring-white/20 backdrop-blur-md"

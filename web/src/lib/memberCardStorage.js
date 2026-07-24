@@ -133,8 +133,33 @@ export function writeDisplayNicknames({ chat, feed } = {}) {
       else localStorage.removeItem(VLUE_NICKNAME_FEED_KEY);
     }
     window.dispatchEvent(new Event("vlue-nicknames-changed"));
+    /* 댓글·쇼케이스 등 서버 표시용 — 활동 닉네임을 명함 스냅샷에 동기화 */
+    queueMicrotask(() => {
+      import("./digitalCardApi.js")
+        .then((m) => m.syncActivityNicknameToServer?.(readFeedNickname()))
+        .catch(() => {});
+    });
   } catch {
     /* ignore */
+  }
+}
+
+/** 서버 스냅샷 → 로컬 활동 닉 복원 (비어 있을 때만) */
+export function hydrateFeedNicknameFromSnapshot(snap, opts = {}) {
+  if (!snap || typeof snap !== "object") return false;
+  const force = Boolean(opts.force);
+  const fromSnap = scrubBrandDisplayName(
+    String(snap.activityName || snap.activityDisplayName || snap.nickname || "").trim()
+  );
+  if (!fromSnap) return false;
+  const local = readFeedNickname();
+  if (!force && local) return false;
+  try {
+    localStorage.setItem(VLUE_NICKNAME_FEED_KEY, fromSnap.slice(0, VLUE_NICKNAME_MAX));
+    window.dispatchEvent(new Event("vlue-nicknames-changed"));
+    return true;
+  } catch {
+    return false;
   }
 }
 

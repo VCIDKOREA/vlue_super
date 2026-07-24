@@ -198,8 +198,8 @@ export async function deleteMycase(caseId) {
 export function formatCooldownHint(policy) {
   if (!policy || policy.tier !== "free") return "";
   if (policy.canChangeBroadcast) {
-    return `메인 송출 ${policy.usedMainSlots}/${policy.maxMainSlots} · 변경 가능`;
+    return `송출중 ${policy.usedMainSlots}/${policy.maxMainSlots} · 변경 가능`;
   }
   const days = Math.max(1, Math.ceil((policy.cooldownRemainingMs || 0) / (24 * 60 * 60 * 1000)));
-  return `메인 송출 ${policy.usedMainSlots}/${policy.maxMainSlots} · ${days}일 후 변경 가능`;
+  return `송출중 ${policy.usedMainSlots}/${policy.maxMainSlots} · ${days}일 후 변경 가능`;
 }

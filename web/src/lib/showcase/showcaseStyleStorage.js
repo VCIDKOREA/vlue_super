@@ -60,6 +60,12 @@ export function createDefaultShowcaseStyle() {
       audioUrl: "",
       attributionLabel: "",
       linkBroken: false,
+      ownerHandle: "",
+      sharedOwnerHandle: "",
+      createType: "",
+      volumeLevel: "medium",
+      playMode: "single",
+      playlist: [],
       /** @deprecated SoundCloud 제거 — 마이그레이션 호환 */
       presetId: "",
       youtube: { videoId: "", title: "", artist: "", query: "" },

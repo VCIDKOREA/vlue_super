@@ -13,6 +13,7 @@ import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import AppFullScreenView from "./AppFullScreenView.jsx";
 import { readShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
+import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
 import {
   resolveCallPeerMatrix,
   resolveCallPeerMatrixSync
@@ -188,6 +189,12 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     setPreviewCard(null);
     setExpanded(true);
   };
+
+  useEffect(() => {
+    const onCloseOverlays = () => closeDetail();
+    window.addEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+    return () => window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+  }, []);
 
   const selectedKnown = useMemo(() => {
     if (!selected) return { isKnownContact: false, matchedName: "", sources: [] };

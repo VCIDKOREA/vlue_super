@@ -23,6 +23,7 @@ import { v1AppShell } from "../../lib/v1ReleaseScope.js";
 import ShowcaseInstagramPost from "./ShowcaseInstagramPost.jsx";
 import ShowcaseSlideChrome from "./ShowcaseSlideChrome.jsx";
 import ShowcaseBgmTrackChip from "./ShowcaseBgmTrackChip.jsx";
+import ShowcaseBgmTransport from "./ShowcaseBgmTransport.jsx";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import { resolveShowcaseBgmUrl } from "../../lib/showcase/showcaseBgmPresets.js";
 
@@ -79,10 +80,14 @@ export default function ShowcaseCallCarousel({
   /** @param {"card"|"banner"|"empty-slot"|"paid-identity"|"free-profile"|"free-safe"|string} type */
   onSlideTypeChange,
   /** 쇼케이스 스타일 — Instagram 인증·선택 사진 */
-  showcaseStyle = null
+  showcaseStyle = null,
+  /** true면 BGM을 건드리지 않음 (케이스함 BGM 유지·중복 방지) */
+  suppressBgm = false,
+  /** 실통화 하단 통화옵션과 겹치지 않게 */
+  callChromeSafe = false
 }) {
   const styleConfig = showcaseStyle || card?.showcaseStyle || null;
-  const { bindStyleConfig, setPlaybackPhase, unlockFromUserGesture } = useShowcaseBgm();
+  const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
   const [index, setIndex] = useState(0);
   const startX = useRef(0);
   const startY = useRef(0);
@@ -111,32 +116,51 @@ export default function ShowcaseCallCarousel({
   ).trim();
   const [igUrlMap, setIgUrlMap] = useState(() => new Map());
 
-  /* 쇼케이스 캐러셀이 보이면 BGM 바인딩·재생 (실통화 스크롤 잠금만 무음) */
+  const bgmFingerprint = useMemo(() => {
+    const b = styleConfig?.bgm;
+    if (!b || b.mode === "none") return "";
+    const pl = Array.isArray(b.playlist) ? b.playlist.map((t) => t?.soundId || t?.audioUrl || "").join(",") : "";
+    return `${b.mode}|${b.soundId || ""}|${b.audioUrl || ""}|${b.playMode || ""}|${pl}`;
+  }, [styleConfig]);
+
+  /* 쇼케이스 캐러셀이 보이면 BGM 바인딩·재생 (실통화 스크롤 잠금만 무음) · 입장마다 처음부터
+   * styleConfig 객체 참조 변경으로 effect가 반복 재실행되면 재생이 끊기므로 fingerprint만 의존 */
   useEffect(() => {
-    bindStyleConfig(styleConfig);
+    if (suppressBgm) {
+      setPlaybackPhase("idle", { fade: true, owner: "carousel" });
+      return undefined;
+    }
     const hasBgm = Boolean(resolveShowcaseBgmUrl(styleConfig));
     if (!hasBgm) {
-      setPlaybackPhase("idle");
+      setPlaybackPhase("idle", { fade: true, owner: "carousel", styleConfig });
       return () => {
-        setPlaybackPhase("idle");
-        bindStyleConfig(null);
+        setPlaybackPhase("idle", { fade: true, owner: "carousel" });
       };
     }
     const liveCallMuted = !previewMode && !scrollEnabled;
-    setPlaybackPhase(liveCallMuted ? "call_active" : previewMode ? "preview" : "replay");
+    setPlaybackPhase(liveCallMuted ? "call_active" : previewMode ? "preview" : "replay", {
+      forceRestart: true,
+      owner: "carousel",
+      styleConfig
+    });
     return () => {
-      setPlaybackPhase("idle");
-      bindStyleConfig(null);
+      setPlaybackPhase("idle", { fade: true, owner: "carousel" });
     };
-  }, [styleConfig, previewMode, scrollEnabled, bindStyleConfig, setPlaybackPhase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- styleConfig는 bgmFingerprint로 추적
+  }, [
+    bgmFingerprint,
+    previewMode,
+    scrollEnabled,
+    suppressBgm,
+    setPlaybackPhase
+  ]);
 
+  /* 스타일 객체만 바뀌고 음원이 같으면 바인딩만 갱신 (재생 재시작 없음) */
   useEffect(() => {
-    const onFirstPointer = () => unlockFromUserGesture?.();
-    const el = viewportRef.current;
-    if (!el) return undefined;
-    el.addEventListener("pointerdown", onFirstPointer, { once: true, passive: true });
-    return () => el.removeEventListener("pointerdown", onFirstPointer);
-  }, [unlockFromUserGesture]);
+    if (suppressBgm) return undefined;
+    bindStyleConfig(styleConfig);
+    return undefined;
+  }, [styleConfig, suppressBgm, bindStyleConfig]);
 
   const galleryPagePhotos = useMemo(() => {
     return (Array.isArray(photos) ? photos : [])
@@ -355,7 +379,7 @@ export default function ShowcaseCallCarousel({
   );
 
   const interactiveSelector =
-    "a, button, input, textarea, select, label, .showcase-call-carousel__dots, .showcase-call-carousel__slide-settings, .showcase-media-page__nav, .showcase-media-page__dots, .showcase-ig-post__nav, .showcase-ig-post__dots, .showcase-ig-post__action, .ldr-face-tab, .ldr-front-phone-link--btn, .ldr-contact-row-link, .showcase-social-rail, .showcase-banner-footer, .lettering-action";
+    "a, button, input, textarea, select, label, .showcase-call-carousel__dots, .showcase-call-carousel__slide-settings, .showcase-media-page__nav, .showcase-media-page__dots, .showcase-ig-post__nav, .showcase-ig-post__dots, .showcase-ig-post__action, .ldr-face-tabs, .ldr-face-tab, .ldr-front-phone-link--btn, .ldr-contact-row-link, .showcase-social-rail, .showcase-banner-footer, .lettering-action";
 
   /** 휠: deltaY>0 = 아래(다음 페이지) */
   const canPanelConsumeWheel = (target, deltaY) => {
@@ -568,15 +592,19 @@ export default function ShowcaseCallCarousel({
         <div className="showcase-call-carousel__meta">
           <span className="showcase-call-carousel__meta-label">{slideLabel}</span>
           <div className="showcase-call-carousel__meta-right">
-            <ShowcaseBgmTrackChip
-              styleConfig={styleConfig}
-              placement="top"
-              className="showcase-call-carousel__bgm"
-            />
-            {canScroll ? (
-              <span className="showcase-call-carousel__meta-count">
-                {index + 1} / {count}
-              </span>
+            {!suppressBgm ? (
+              <div className="showcase-call-carousel__bgm-bar" aria-label="쇼케이스 배경음악">
+                <ShowcaseBgmTrackChip
+                  styleConfig={styleConfig}
+                  placement="top"
+                  className="showcase-call-carousel__bgm"
+                  visible
+                />
+                <ShowcaseBgmTransport
+                  className="showcase-call-carousel__bgm-transport"
+                  styleConfig={styleConfig}
+                />
+              </div>
             ) : null}
           </div>
         </div>
@@ -643,6 +671,7 @@ export default function ShowcaseCallCarousel({
                       onKeypadClose={onKeypadClose}
                       keypadDemoMode={keypadDemoMode}
                       onToast={onKeypadToast}
+                      callChromeSafe={callChromeSafe}
                     />
                   </div>
                 ) : null}

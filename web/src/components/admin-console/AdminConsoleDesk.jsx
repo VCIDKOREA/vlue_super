@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createAdminNotice,
   createAdminPopup,
@@ -563,11 +563,42 @@ export default function AdminConsoleDesk({ user, onLogout }) {
   );
 }
 
+function titleFromFileName(name) {
+  const base = String(name || "")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  return base || "Untitled";
+}
+
+function guessAudioContentType(file) {
+  const t = String(file?.type || "").trim();
+  if (t && t !== "application/octet-stream") return t;
+  const n = String(file?.name || "").toLowerCase();
+  if (n.endsWith(".wav")) return "audio/wav";
+  if (n.endsWith(".m4a") || n.endsWith(".aac")) return "audio/mp4";
+  if (n.endsWith(".ogg")) return "audio/ogg";
+  if (n.endsWith(".webm")) return "audio/webm";
+  return "audio/mpeg";
+}
+
+function isLikelyAudioFile(file) {
+  if (!file) return false;
+  if (/^audio\//i.test(file.type || "")) return true;
+  if (/\.(mp3|m4a|wav|ogg|aac|webm|flac|aiff|aif)$/i.test(file.name || "")) return true;
+  /* USB 등 확장자 없는 음원 — 선택 목록에 올렸으면 통과 */
+  if (!/\.[a-z0-9]{1,5}$/i.test(file.name || "")) return true;
+  return false;
+}
+
 function SignatureSoundTab({ onToast }) {
   const [items, setItems] = useState([]);
-  const [title, setTitle] = useState("");
   const [artistName, setArtistName] = useState("VLUE");
+  const [queue, setQueue] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState("");
+  const filesInputRef = useRef(null);
+  const folderInputRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -582,44 +613,120 @@ function SignatureSoundTab({ onToast }) {
     load();
   }, [load]);
 
-  const onUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!title.trim()) {
-      onToast?.("제목을 먼저 입력하세요");
+  const enqueueFiles = (fileList) => {
+    const raw = Array.from(fileList || []);
+    const files = raw.filter(isLikelyAudioFile);
+    if (!files.length) {
+      onToast?.(raw.length ? "오디오로 인식된 파일이 없습니다" : "파일을 선택해 주세요");
       return;
     }
-    setBusy(true);
-    try {
-      const signed = await createAdminSignatureSoundUploadUrl({
-        fileName: file.name,
-        contentType: file.type || "audio/mpeg",
-        fileSize: file.size
+    setQueue((prev) => {
+      const seen = new Set(prev.map((p) => `${p.file.name}|${p.file.size}|${p.file.lastModified}`));
+      const next = [];
+      files.forEach((file, i) => {
+        const key = `${file.name}|${file.size}|${file.lastModified}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        next.push({
+          id: `${Date.now()}-${i}-${key}`,
+          file,
+          title: titleFromFileName(file.name),
+          status: "ready"
+        });
       });
-      const put = await fetch(signed.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": signed.contentType || file.type || "audio/mpeg" },
-        body: file
-      });
-      if (!put.ok) throw new Error("업로드 실패");
-      await createAdminSignatureSound({
-        title: title.trim(),
-        artistName: artistName.trim() || "VLUE",
-        audioUrl: signed.publicUrl,
-        objectKey: signed.path,
-        contentType: signed.contentType,
-        fileSize: file.size,
-        isPublished: true
-      });
-      setTitle("");
-      onToast?.("Signature Sound 등록됨");
-      await load();
-    } catch (err) {
-      onToast?.(err?.message || "등록 실패");
-    } finally {
-      setBusy(false);
-      e.target.value = "";
+      return [...prev, ...next];
+    });
+    if (files.length < raw.length) {
+      onToast?.(`${files.length}개 추가 · ${raw.length - files.length}개 건너뜀`);
+    } else {
+      onToast?.(`${files.length}개 대기열에 추가됨`);
     }
+  };
+
+  const onPickFiles = (e) => {
+    enqueueFiles(e.target.files);
+    e.target.value = "";
+  };
+
+  const updateQueueTitle = (id, title) => {
+    setQueue((prev) => prev.map((row) => (row.id === id ? { ...row, title } : row)));
+  };
+
+  const removeQueueItem = (id) => {
+    setQueue((prev) => prev.filter((row) => row.id !== id));
+  };
+
+  const clearQueue = () => setQueue([]);
+
+  const uploadOne = async (row, artist) => {
+    const file = row.file;
+    const contentType = guessAudioContentType(file);
+    const signed = await createAdminSignatureSoundUploadUrl({
+      fileName: /\.[a-z0-9]+$/i.test(file.name) ? file.name : `${file.name}.mp3`,
+      contentType,
+      fileSize: file.size
+    });
+    const put = await fetch(signed.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": signed.contentType || contentType },
+      body: file
+    });
+    if (!put.ok) throw new Error("업로드 실패");
+    await createAdminSignatureSound({
+      title: String(row.title || "").trim() || titleFromFileName(file.name),
+      artistName: artist,
+      audioUrl: signed.publicUrl,
+      objectKey: signed.path,
+      contentType: signed.contentType || contentType,
+      fileSize: file.size,
+      isPublished: true
+    });
+  };
+
+  const onBatchUpload = async () => {
+    const pending = queue.filter((q) => q.status === "ready" || q.status === "error");
+    if (!pending.length) {
+      onToast?.("업로드할 파일을 추가해 주세요");
+      return;
+    }
+    const blank = pending.find((q) => !String(q.title || "").trim());
+    if (blank) {
+      onToast?.("제목이 비어 있는 항목이 있습니다");
+      return;
+    }
+
+    setBusy(true);
+    const artist = artistName.trim() || "VLUE";
+    let okCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < pending.length; i += 1) {
+      const row = pending[i];
+      setProgress(`${i + 1}/${pending.length} · ${row.file.name}`);
+      setQueue((prev) => prev.map((q) => (q.id === row.id ? { ...q, status: "uploading" } : q)));
+      try {
+        await uploadOne(row, artist);
+        okCount += 1;
+        setQueue((prev) => prev.map((q) => (q.id === row.id ? { ...q, status: "done" } : q)));
+      } catch (err) {
+        failCount += 1;
+        setQueue((prev) =>
+          prev.map((q) =>
+            q.id === row.id ? { ...q, status: "error", error: err?.message || "실패" } : q
+          )
+        );
+      }
+    }
+
+    setProgress("");
+    setBusy(false);
+    setQueue((prev) => prev.filter((q) => q.status !== "done"));
+    onToast?.(
+      failCount
+        ? `완료 ${okCount}곡 · 실패 ${failCount}곡`
+        : `Signature Sound ${okCount}곡 등록됨`
+    );
+    await load();
   };
 
   return (
@@ -627,26 +734,124 @@ function SignatureSoundTab({ onToast }) {
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-[14px] font-black text-slate-900">VLUE Signature Sound</h2>
         <p className="mt-1 text-[12px] text-slate-500">
-          코디 없이 관리자가 오리지널 AI 배경음악을 업로드·게시합니다. (R2 Presigned)
+          여러 파일을 선택하거나 폴더 전체를 추가한 뒤 「일괄 업로드」를 누르세요. 제목은 파일명으로
+          자동 입력됩니다. (R2 Presigned)
         </p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <p className="mt-1 text-[11px] text-slate-400">
+          파일 선택 창에서 Ctrl+클릭 / Shift+클릭 / Ctrl+A 로 여러 개를 고르거나, 「폴더 추가」를 사용하세요.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <input
             className="rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
-            placeholder="곡 제목"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <input
-            className="rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
-            placeholder="아티스트"
+            placeholder="아티스트 (일괄 적용)"
             value={artistName}
             onChange={(e) => setArtistName(e.target.value)}
+            disabled={busy}
           />
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-bold text-white">
-            {busy ? "업로드 중…" : "음원 업로드"}
-            <input type="file" accept="audio/*,.mp3,.m4a,.wav" className="hidden" disabled={busy} onChange={onUpload} />
-          </label>
+          <button
+            type="button"
+            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-bold text-slate-800 disabled:opacity-50"
+            disabled={busy}
+            onClick={() => filesInputRef.current?.click()}
+          >
+            여러 파일 추가
+          </button>
+          <button
+            type="button"
+            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-bold text-slate-800 disabled:opacity-50"
+            disabled={busy}
+            onClick={() => folderInputRef.current?.click()}
+          >
+            폴더 추가
+          </button>
+          <input
+            ref={filesInputRef}
+            type="file"
+            className="hidden"
+            multiple
+            disabled={busy}
+            onChange={onPickFiles}
+          />
+          <input
+            ref={folderInputRef}
+            type="file"
+            className="hidden"
+            multiple
+            disabled={busy}
+            onChange={onPickFiles}
+            {...{ webkitdirectory: "", directory: "" }}
+          />
+          <button
+            type="button"
+            className="rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
+            disabled={busy || !queue.length}
+            onClick={onBatchUpload}
+          >
+            {busy ? progress || "업로드 중…" : `일괄 업로드${queue.length ? ` (${queue.length})` : ""}`}
+          </button>
+          {queue.length ? (
+            <button
+              type="button"
+              className="rounded-lg px-2 py-2 text-[12px] font-bold text-slate-500"
+              disabled={busy}
+              onClick={clearQueue}
+            >
+              대기열 비우기
+            </button>
+          ) : null}
         </div>
+
+        {queue.length ? (
+          <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto rounded-lg border border-slate-100 bg-slate-50/80 p-2">
+            {queue.map((row) => (
+              <li
+                key={row.id}
+                className="flex flex-wrap items-center gap-2 rounded-md bg-white px-2 py-1.5 text-[12px]"
+              >
+                <input
+                  className="min-w-[140px] flex-1 rounded border border-slate-200 px-2 py-1"
+                  value={row.title}
+                  disabled={busy || row.status === "uploading"}
+                  onChange={(e) => updateQueueTitle(row.id, e.target.value)}
+                />
+                <span className="max-w-[160px] truncate text-slate-400" title={row.file.name}>
+                  {row.file.name}
+                </span>
+                <span
+                  className={
+                    row.status === "error"
+                      ? "font-bold text-rose-600"
+                      : row.status === "uploading"
+                        ? "font-bold text-blue-600"
+                        : row.status === "done"
+                          ? "font-bold text-emerald-600"
+                          : "text-slate-400"
+                  }
+                >
+                  {row.status === "error"
+                    ? row.error || "실패"
+                    : row.status === "uploading"
+                      ? "업로드 중"
+                      : row.status === "done"
+                        ? "완료"
+                        : "대기"}
+                </span>
+                <button
+                  type="button"
+                  className="font-bold text-slate-400 hover:text-rose-600"
+                  disabled={busy}
+                  onClick={() => removeQueueItem(row.id)}
+                >
+                  제거
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-[12px] text-slate-400">
+            MUSIC 폴더처럼 확장자 없는 파일도 「폴더 추가」로 한 번에 넣을 수 있습니다.
+          </p>
+        )}
       </div>
       <Table
         columns={[
