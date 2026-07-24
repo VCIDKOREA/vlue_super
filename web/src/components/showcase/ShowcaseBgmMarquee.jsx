@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { resolveShowcaseBgmLabel } from "../../lib/showcase/showcaseYoutube.js";
+import { resolveShowcaseBgmLabel } from "../../lib/showcase/showcaseBgmPresets.js";
 
 /** 통화·미리보기 BGM 제목 마키 */
 export default function ShowcaseBgmMarquee({

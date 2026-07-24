@@ -219,3 +219,36 @@ export async function fetchAdminPricingRevenueStats({ planSku, from, to } = {}) 
   const res = await fetch(apiUrl(`/api/pricing/revenue-stats?${qs}`), { headers: adminHeaders() });
   return parseJson(res);
 }
+
+/** VLUE Signature Sound 게시판 */
+export async function fetchAdminSignatureSounds() {
+  const res = await fetch(apiUrl("/api/admin/console/signature-sounds"), { headers: adminHeaders() });
+  return parseJson(res);
+}
+
+export async function createAdminSignatureSoundUploadUrl(body) {
+  const res = await fetch(apiUrl("/api/admin/console/signature-sounds/upload-url"), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(body)
+  });
+  return parseJson(res);
+}
+
+export async function createAdminSignatureSound(body) {
+  const res = await fetch(apiUrl("/api/admin/console/signature-sounds"), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(body)
+  });
+  return parseJson(res);
+}
+
+export async function patchAdminSignatureSound(id, body) {
+  const res = await fetch(apiUrl(`/api/admin/console/signature-sounds/${encodeURIComponent(id)}`), {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify(body)
+  });
+  return parseJson(res);
+}

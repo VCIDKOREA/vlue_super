@@ -1,362 +1,522 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pause, Search, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Check, Loader2, Music2, Sparkles, Upload } from "lucide-react";
+import CopyrightVerifySearch from "./CopyrightVerifySearch.jsx";
 import {
-  fetchSoundCloudCuration,
-  fetchSoundCloudSearchPopular,
-  SOUNDCLOUD_GENRE_CURATIONS,
-  SOUNDCLOUD_CURATION_LIMIT,
-  SOUNDCLOUD_SEARCH_LIMIT
-} from "../../lib/showcase/showcaseSoundCloudSearch.js";
-import {
-  markShowcaseBgmBlocked,
-  readShowcaseBgmBlockedSet
-} from "../../lib/showcase/showcaseBgmBlocked.js";
+  borrowShowcaseSound,
+  fetchMyShowcaseSounds,
+  fetchShowcaseSoundQuota,
+  fetchSignatureSounds,
+  notifyThemeBgmChange,
+  registerShowcaseSound,
+  soundToBgmPatch,
+  uploadShowcaseSoundFile
+} from "../../lib/showcase/showcaseSoundApi.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
-import ShowcaseSoundCloudPlayer from "./ShowcaseSoundCloudPlayer.jsx";
+
+const CREATE_TYPES = [
+  { id: "human_created", label: "직접 창작한 음원" },
+  { id: "ai_assisted", label: "AI를 활용해 제작한 음원" },
+  { id: "ai_generated", label: "AI 생성 음원" },
+  { id: "remake_arrangement", label: "리메이크·편곡 음원" }
+];
+
+const AI_SERVICES = ["Suno", "Udio", "기타"];
+const RIGHTS_TEXT =
+  "본인은 등록하는 음원에 대해 VLUE에서 공개·재생할 수 있는 적법한 권리 또는 이용 권한을 보유하고 있음을 확인합니다. AI 음악 생성 서비스의 이용약관 및 라이선스 조건을 확인하였으며, 해당 음원을 VLUE에서 공개·재생하는 것이 허용되는지 확인했습니다. 타인의 저작물, 가사, 음성, 음원 등을 무단으로 사용하거나 권리를 침해한 콘텐츠를 등록하지 않습니다. 허위 등록 또는 권리 침해로 발생하는 모든 책임은 등록자에게 있습니다.";
+
+function isAiType(t) {
+  return t === "ai_assisted" || t === "ai_generated" || t === "remake_arrangement";
+}
 
 /**
- * SoundCloud 장르 고정 큐레이션(6곡) + 인기순 장르/키워드 검색
+ * A. VLUE Signature Sound / B. User Original Sound
  */
 export default function ShowcaseBgmPicker({ value, onChange, inputCls = "" }) {
-  const [genreId, setGenreId] = useState(SOUNDCLOUD_GENRE_CURATIONS[0]?.id || "kpop");
-  const [curatedTracks, setCuratedTracks] = useState([]);
-  const [curationLoading, setCurationLoading] = useState(false);
-  const [curationError, setCurationError] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchTracks, setSearchTracks] = useState(null);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchHint, setSearchHint] = useState("");
-  const [blocked, setBlocked] = useState(() => readShowcaseBgmBlockedSet());
-  const [previewId, setPreviewId] = useState("");
-  const [previewTrackUrl, setPreviewTrackUrl] = useState("");
+  const [tab, setTab] = useState("signature");
+  const [signatures, setSignatures] = useState([]);
+  const [mine, setMine] = useState({ owned: [], borrowed: [] });
+  const [quota, setQuota] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [registerOpen, setRegisterOpen] = useState(false);
   const { setPlaybackPhase, unlockFromUserGesture } = useShowcaseBgm();
-  const curationToken = useRef(0);
 
-  const activeGenre = useMemo(
-    () => SOUNDCLOUD_GENRE_CURATIONS.find((g) => g.id === genreId) || SOUNDCLOUD_GENRE_CURATIONS[0],
-    [genreId]
-  );
-
-  const visibleCurated = useMemo(
-    () =>
-      curatedTracks.filter(
-        (t) => !blocked.has(t.id) && !blocked.has(t.trackId) && !blocked.has(t.trackUrl)
-      ),
-    [curatedTracks, blocked]
-  );
-
-  const visibleSearch = useMemo(() => {
-    if (!searchTracks) return null;
-    return searchTracks.filter(
-      (t) => !blocked.has(t.id) && !blocked.has(t.trackId) && !blocked.has(t.trackUrl)
-    );
-  }, [searchTracks, blocked]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [sig, my, q] = await Promise.all([
+        fetchSignatureSounds(),
+        fetchMyShowcaseSounds(),
+        fetchShowcaseSoundQuota()
+      ]);
+      setSignatures(sig.items || []);
+      setMine({ owned: my.owned || [], borrowed: my.borrowed || [] });
+      setQuota(q.quota);
+    } catch (e) {
+      setError(e?.message || "음원 목록을 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
+    load();
     setPlaybackPhase("idle");
-    return () => {
-      setPreviewTrackUrl("");
-      setPreviewId("");
-      setPlaybackPhase("idle");
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setPlaybackPhase]);
+    return () => setPlaybackPhase("idle");
+  }, [load, setPlaybackPhase]);
 
-  useEffect(() => {
-    const token = ++curationToken.current;
-    setCurationLoading(true);
-    setCurationError("");
-    setSearchTracks(null);
-    setSearchHint("");
-    fetchSoundCloudCuration(genreId)
-      .then((res) => {
-        if (curationToken.current !== token) return;
-        setCuratedTracks(res.tracks || []);
-        if (!(res.tracks || []).length) {
-          setCurationError("이 장르에서 불러올 곡이 없습니다. 잠시 후 다시 시도해 주세요.");
-        }
-      })
-      .catch((e) => {
-        if (curationToken.current !== token) return;
-        setCuratedTracks([]);
-        setCurationError(e?.message || "큐레이션을 불러오지 못했습니다.");
-      })
-      .finally(() => {
-        if (curationToken.current === token) setCurationLoading(false);
-      });
-  }, [genreId]);
-
-  const stopPreview = () => {
-    setPreviewTrackUrl("");
-    setPreviewId("");
-  };
-
-  const playTrack = (trackUrl, trackKey) => {
-    unlockFromUserGesture();
-    setPreviewId(trackKey);
-    setPreviewTrackUrl(trackUrl);
-    setPlaybackPhase("idle");
-  };
-
-  const applyTrack = useCallback(
-    (track) => {
-      const trackUrl = track.trackUrl || "";
-      if (!trackUrl) return;
-      onChange({
-        mode: "soundcloud",
-        presetId: track.id,
-        soundcloud: {
-          trackUrl,
-          trackId: track.trackId || "",
-          title: track.label || track.title || "",
-          artist: track.artist || "",
-          artworkUrl: track.artworkUrl || "",
-          query: track.label || track.title || "",
-          license: track.license || "",
-          licenseLabel: track.licenseLabel || "",
-          attribution: track.attribution || "",
-          sourceVerified: true,
-          commercialCcOnly: true,
-          verifiedAt: track.verifiedAt || new Date().toISOString()
-        },
-        youtube: { videoId: "", title: "", artist: "", query: "" }
-      });
-      playTrack(trackUrl, track.id);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onChange]
-  );
-
-  const handlePlaybackError = useCallback(
-    (failedTrack) => {
-      if (!failedTrack) return;
-      markShowcaseBgmBlocked(failedTrack.id, failedTrack.trackId, failedTrack.trackUrl);
-      setBlocked((prev) => {
-        const next = new Set(prev);
-        next.add(failedTrack.id);
-        if (failedTrack.trackId) next.add(failedTrack.trackId);
-        if (failedTrack.trackUrl) next.add(failedTrack.trackUrl);
-        return next;
-      });
-      stopPreview();
-
-      const pool = (visibleSearch?.length ? visibleSearch : visibleCurated).filter(
-        (t) => t.id !== failedTrack.id && t.trackId !== failedTrack.trackId
-      );
-      const nextTrack = pool[0] || null;
-      if (nextTrack) {
-        window.setTimeout(() => applyTrack(nextTrack), 200);
+  const applySound = async (sound, mode) => {
+    try {
+      if (value?.soundId && value.soundId !== sound.id) {
+        await notifyThemeBgmChange();
       }
-    },
-    [visibleCurated, visibleSearch, applyTrack]
-  );
-
-  const runSearch = async () => {
-    const q = searchQuery.trim();
-    if (!q) {
-      setSearchTracks([]);
-      setSearchHint("장르나 키워드를 입력해 주세요.");
+    } catch (e) {
+      setError(e?.message || "주제곡 변경 제한");
       return;
     }
-    setSearchLoading(true);
-    setSearchHint("");
-    try {
-      const res = await fetchSoundCloudSearchPopular(q, { limit: SOUNDCLOUD_SEARCH_LIMIT });
-      setSearchTracks(res.tracks || []);
-      setSearchHint(
-        (res.tracks || []).length
-          ? `「${q}」 인기순 ${res.tracks.length}곡`
-          : `「${q}」 검색 결과가 없습니다.`
-      );
-    } catch (e) {
-      setSearchTracks([]);
-      setSearchHint(e?.message || "검색에 실패했습니다.");
-    } finally {
-      setSearchLoading(false);
-    }
+    unlockFromUserGesture();
+    onChange?.(soundToBgmPatch(sound, mode));
+    setPlaybackPhase("preview");
   };
 
-  const selectedArtwork = value?.soundcloud?.artworkUrl || "";
-  const currentPreviewTrack =
-    visibleCurated.find((t) => t.id === previewId) ||
-    (visibleSearch || []).find((t) => t.id === previewId) ||
-    null;
-
-  const renderAlbum = (p, compact = false) => {
-    const active =
-      (value?.mode === "soundcloud" &&
-        (value?.soundcloud?.trackUrl === p.trackUrl || value?.presetId === p.id)) ||
-      previewId === p.id;
-    const playing = previewId === p.id && Boolean(previewTrackUrl);
-    return (
-      <button
-        key={p.id}
-        type="button"
-        role="listitem"
-        className={`showcase-bgm-picker__album${compact ? " showcase-bgm-picker__album--row" : ""}${active ? " active" : ""}${playing ? " is-playing" : ""}`}
-        onClick={() => applyTrack(p)}
-      >
-        <span className="showcase-bgm-picker__cover">
-          {p.artworkUrl ? (
-            <img src={p.artworkUrl} alt="" loading="lazy" decoding="async" />
-          ) : (
-            <span className="showcase-bgm-picker__cover-fallback" aria-hidden>
-              {(p.label || p.title || "?").slice(0, 1)}
-            </span>
-          )}
-          {playing ? (
-            <span className="showcase-bgm-picker__play-badge" aria-hidden>
-              <Pause size={18} strokeWidth={2.5} />
-            </span>
-          ) : null}
-        </span>
-        <span className="showcase-bgm-picker__album-meta">
-          <span className="showcase-bgm-picker__album-title">
-            {p.rank ? `${p.rank}. ` : ""}
-            {p.label || p.title}
-          </span>
-          <span className="showcase-bgm-picker__album-sub">
-            {playing
-              ? "재생 중…"
-              : [p.artist || "SoundCloud", p.licenseLabel || p.license, p.playbackCount ? formatPlays(p.playbackCount) : ""]
-                  .filter(Boolean)
-                  .join(" · ")}
-          </span>
-        </span>
-      </button>
-    );
+  const clearBgm = () => {
+    onChange?.({
+      mode: "none",
+      soundId: "",
+      title: "",
+      artistName: "",
+      audioUrl: "",
+      attributionLabel: "",
+      linkBroken: false
+    });
   };
+
+  const selectedId = value?.soundId || "";
 
   return (
-    <div className="showcase-bgm-picker">
-      <div className="showcase-bgm-picker__hero">
-        <Sparkles size={14} aria-hidden />
-        <span>SoundCloud 큐레이션 · 장르별 {SOUNDCLOUD_CURATION_LIMIT}곡</span>
-      </div>
-      <p className="showcase-bgm-picker__hint" style={{ wordBreak: "keep-all" }}>
-        <strong>상업용 Creative Commons</strong> 음원만 검색합니다 (CC BY / BY-SA / BY-ND / CC0).
-        NC·무단배포 금지 곡은 결과에 포함되지 않습니다. 쇼케이스에는 <strong>음향만</strong> 나갑니다.
-      </p>
-      <p className="showcase-bgm-picker__volume-tip" role="note">
-        음원 출처가 확인된 곡만 표시합니다. 지역 제한 곡은 자동 제외됩니다.
+    <div className="showcase-sound-picker">
+      <p className="showcase-sound-picker__policy">
+        VLUE는 음원을 판매하거나 저작권을 최종 인증하지 않습니다. 적법한 권리·이용 권한이 있는 음원을
+        쇼케이스에 연결합니다.
       </p>
 
-      <div className="showcase-bgm-picker__themes" role="tablist" aria-label="장르 큐레이션">
-        {SOUNDCLOUD_GENRE_CURATIONS.map((g) => (
-          <button
-            key={g.id}
-            type="button"
-            role="tab"
-            aria-selected={genreId === g.id}
-            className={`showcase-bgm-picker__theme${genreId === g.id ? " active" : ""}`}
-            onClick={() => setGenreId(g.id)}
-          >
-            {g.label}
-          </button>
-        ))}
+      <div className="showcase-sound-picker__tabs">
+        <button
+          type="button"
+          className={tab === "signature" ? "is-on" : ""}
+          onClick={() => setTab("signature")}
+        >
+          <Sparkles size={14} /> VLUE Signature Sound
+        </button>
+        <button type="button" className={tab === "user" ? "is-on" : ""} onClick={() => setTab("user")}>
+          <Upload size={14} /> User Original Sound
+        </button>
       </div>
 
-      {searchTracks === null ? (
-        <>
-          <p className="showcase-bgm-picker__section-title">
-            {activeGenre?.label || "장르"} · 고정 {SOUNDCLOUD_CURATION_LIMIT}곡
-          </p>
-          {curationLoading ? (
-            <p className="showcase-bgm-picker__search-status">불러오는 중…</p>
-          ) : curationError ? (
-            <p className="showcase-bgm-picker__preview-error">{curationError}</p>
-          ) : (
-            <div className="showcase-bgm-picker__albums" role="list">
-              {visibleCurated.map((t) => renderAlbum(t))}
-            </div>
-          )}
-        </>
-      ) : null}
-
-      {previewTrackUrl && currentPreviewTrack ? (
-        <div className="showcase-bgm-picker__sc-preview">
-          <ShowcaseSoundCloudPlayer
-            key={previewTrackUrl}
-            trackUrl={previewTrackUrl}
-            muted={false}
-            visual
-            hideUi={false}
-            className="showcase-bgm-picker__sc-iframe"
-            title="BGM preview"
-            onError={() => handlePlaybackError(currentPreviewTrack)}
-          />
-          <p className="showcase-bgm-picker__yt-caption">전체 재생 · 실제 쇼케이스에는 소리만 나갑니다</p>
-        </div>
-      ) : null}
-
-      <div className="showcase-bgm-picker__youtube">
-        <p className="showcase-bgm-picker__yt-title">
-          <Search size={13} aria-hidden /> 검색 (인기순)
-        </p>
-        <p className="showcase-bgm-picker__yt-hint" style={{ marginBottom: 8 }}>
-          장르·키워드 검색 시 SoundCloud 인기순으로 {SOUNDCLOUD_SEARCH_LIMIT}곡 이상 표시합니다.
-        </p>
-        <div className="showcase-bgm-picker__yt-row">
-          <input
-            className={`showcase-style-settings__input flex-1 ${inputCls}`}
-            placeholder="장르 또는 키워드 검색"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && runSearch()}
-          />
-          <button type="button" className="showcase-bgm-picker__yt-btn" onClick={runSearch} disabled={searchLoading}>
-            {searchLoading ? "…" : "검색"}
-          </button>
-        </div>
-
-        {searchHint ? (
-          <p className="showcase-bgm-picker__search-status" role="status">
-            {searchHint}
-          </p>
-        ) : null}
-
-        {visibleSearch?.length ? (
-          <div className="showcase-bgm-picker__search-list" role="list">
-            {visibleSearch.map((t) => renderAlbum(t, true))}
+      {value?.mode && value.mode !== "none" ? (
+        <div className="showcase-sound-picker__current">
+          <Music2 size={14} />
+          <div>
+            <p className="font-bold">{value.title || "선택됨"}</p>
+            <p className="text-[11px] text-slate-500">
+              {value.artistName || "—"} · {value.attributionLabel || value.mode}
+              {value.linkBroken ? " · 연결 끊김" : ""}
+            </p>
           </div>
-        ) : null}
+          <button type="button" className="showcase-sound-btn showcase-sound-btn--ghost" onClick={clearBgm}>
+            없음
+          </button>
+        </div>
+      ) : null}
 
-        {searchTracks !== null ? (
+      {quota && !quota.paid ? (
+        <p className="showcase-sound-picker__quota">
+          무료: 월 등록 {quota.registerCount}/{quota.registerLimit} · 주제곡 변경 주{" "}
+          {quota.themeChangeCount}/{quota.themeChangeLimit}
+        </p>
+      ) : null}
+
+      {error ? <p className="showcase-sound-picker__err">{error}</p> : null}
+      {loading ? (
+        <p className="showcase-sound-picker__loading">
+          <Loader2 className="inline animate-spin" size={14} /> 불러오는 중…
+        </p>
+      ) : null}
+
+      {tab === "signature" && !loading ? (
+        <div className="showcase-sound-list">
+          <p className="showcase-sound-list__lead">
+            VLUE가 직접 제작한 오리지널 AI 배경음악 (유료 AI 플랜 시그니처)
+          </p>
+          {!signatures.length ? (
+            <p className="text-[12px] text-slate-500">등록된 Signature Sound가 없습니다. 관리자 게시판에서 추가하세요.</p>
+          ) : (
+            signatures.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`showcase-sound-list__item${selectedId === s.id ? " is-selected" : ""}`}
+                onClick={() => applySound(s, "signature")}
+              >
+                <span className="font-bold">{s.title}</span>
+                <span className="text-[11px] text-slate-500">
+                  {s.artistName || "VLUE"} · {s.attributionLabel}
+                </span>
+                {selectedId === s.id ? <Check size={14} className="text-emerald-600" /> : null}
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
+
+      {tab === "user" && !loading ? (
+        <div className="showcase-sound-list">
+          <p className="showcase-sound-list__lead">사용자가 직접 업로드한 음원 · 공개 음원 퍼가기</p>
           <button
             type="button"
-            className="showcase-bgm-picker__back-curation"
-            onClick={() => {
-              setSearchTracks(null);
-              setSearchHint("");
-            }}
+            className="showcase-sound-btn showcase-sound-btn--primary"
+            onClick={() => setRegisterOpen(true)}
+            disabled={quota && !quota.canRegister}
           >
-            ← 장르 큐레이션으로 돌아가기
+            <Upload size={14} /> 음원 등록
           </button>
-        ) : null}
+          {quota && !quota.canRegister ? (
+            <p className="text-[11px] text-amber-700">이번 달 무료 등록 한도를 모두 사용했습니다.</p>
+          ) : null}
 
-        {value?.mode === "soundcloud" && (value?.soundcloud?.trackUrl || value?.soundcloud?.title) ? (
-          <p className="showcase-bgm-picker__yt-selected">
-            {selectedArtwork ? (
-              <img
-                className="showcase-bgm-picker__selected-thumb"
-                src={selectedArtwork}
-                alt=""
-                width={28}
-                height={28}
-              />
-            ) : null}
-            ✓ {value.soundcloud.title || "SoundCloud"}
-            {value.soundcloud.artist ? ` — ${value.soundcloud.artist}` : ""}
-          </p>
-        ) : null}
-      </div>
+          <h4 className="showcase-sound-list__h">내 음원</h4>
+          {(mine.owned || []).map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`showcase-sound-list__item${selectedId === s.id ? " is-selected" : ""}`}
+              onClick={() => applySound(s, "user")}
+            >
+              <span className="font-bold">{s.title}</span>
+              <span className="text-[11px] text-slate-500">
+                {s.attributionLabel} · {s.visibility === "public" ? "공개" : "비공개"}
+              </span>
+            </button>
+          ))}
+          {!mine.owned?.length ? <p className="text-[12px] text-slate-500">등록한 음원이 없습니다.</p> : null}
+
+          <h4 className="showcase-sound-list__h">퍼간 음원</h4>
+          {(mine.borrowed || []).map((b) => (
+            <button
+              key={b.borrowId}
+              type="button"
+              className={`showcase-sound-list__item${selectedId === b.sound?.id ? " is-selected" : ""}${
+                b.sound?.linkBroken ? " is-broken" : ""
+              }`}
+              onClick={() => {
+                if (b.sound?.linkBroken) {
+                  setError("원본 음원이 비공개·삭제되어 연결이 끊어졌습니다.");
+                  return;
+                }
+                applySound(b.sound, "borrowed");
+              }}
+            >
+              <span className="font-bold">{b.sound?.title || "연결 끊김"}</span>
+              <span className="text-[11px] text-slate-500">
+                {b.sound?.linkBroken ? "연결 끊김" : b.sound?.attributionLabel}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {registerOpen ? (
+        <UserSoundRegisterSheet
+          inputCls={inputCls}
+          onClose={() => setRegisterOpen(false)}
+          onRegistered={async (sound) => {
+            setRegisterOpen(false);
+            await load();
+            await applySound(sound, "user");
+          }}
+        />
+      ) : null}
     </div>
   );
 }
 
-function formatPlays(n) {
-  const v = Number(n) || 0;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M plays`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K plays`;
-  return `${v} plays`;
+function UserSoundRegisterSheet({ inputCls, onClose, onRegistered }) {
+  const [createType, setCreateType] = useState("human_created");
+  const [title, setTitle] = useState("");
+  const [artistName, setArtistName] = useState("");
+  const [visibility, setVisibility] = useState("private");
+  const [fileMeta, setFileMeta] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [copyrightVerify, setCopyrightVerify] = useState(null);
+  const [consent, setConsent] = useState(false);
+  const [consentRights, setConsentRights] = useState(false);
+  const [consentThird, setConsentThird] = useState(false);
+  const [consentAi, setConsentAi] = useState(false);
+  const [commercialUse, setCommercialUse] = useState(false);
+  const [aiMeta, setAiMeta] = useState({
+    service: "Suno",
+    serviceOther: "",
+    generatedAt: "",
+    plan: "paid",
+    lyrics: "self",
+    melody: "ai",
+    vocalAi: false,
+    finalEdit: "edited"
+  });
+
+  const ai = isAiType(createType);
+
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const meta = await uploadShowcaseSoundFile(file);
+      setFileMeta(meta);
+    } catch (err) {
+      setError(err?.message || "업로드 실패");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const submit = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      if (!consent || !consentRights || !consentThird || (ai && !consentAi)) {
+        throw new Error("필수 동의 항목에 모두 체크해 주세요.");
+      }
+      if (!fileMeta?.audioUrl) throw new Error("음원 파일을 업로드해 주세요.");
+      if (ai && !commercialUse) throw new Error("상업적 이용 권한 보유에 동의해 주세요.");
+
+      const sound = await registerShowcaseSound({
+        title,
+        artistName,
+        createType,
+        audioUrl: fileMeta.audioUrl,
+        objectKey: fileMeta.objectKey,
+        contentType: fileMeta.contentType,
+        fileSize: fileMeta.fileSize,
+        visibility,
+        aiMeta: ai
+          ? {
+              ...aiMeta,
+              service:
+                aiMeta.service === "기타"
+                  ? String(aiMeta.serviceOther || "기타").trim() || "기타"
+                  : aiMeta.service,
+              finalEdited: aiMeta.finalEdit === "edited"
+            }
+          : null,
+        copyrightVerify,
+        commercialUseClaimed: ai ? commercialUse : true,
+        rightsConsent: true
+      });
+      onRegistered?.(sound);
+    } catch (err) {
+      setError(err?.message || "등록 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="showcase-sound-register">
+      <div className="showcase-sound-register__head">
+        <h3>User Original Sound 등록</h3>
+        <button type="button" onClick={onClose}>
+          닫기
+        </button>
+      </div>
+
+      <p className="showcase-sound-register__ban">
+        등록 제한: 특정 가수 목소리 무단 복제, 기존 곡 무단 변형, 상업적 이용 금지 요금제 곡, 타인 가사
+        무단 입력
+      </p>
+
+      <fieldset className="showcase-sound-register__types">
+        <legend>음원 유형</legend>
+        {CREATE_TYPES.map((t) => (
+          <label key={t.id}>
+            <input
+              type="radio"
+              name="createType"
+              checked={createType === t.id}
+              onChange={() => setCreateType(t.id)}
+            />
+            {t.label}
+          </label>
+        ))}
+      </fieldset>
+
+      <input className={inputCls} placeholder="음원 제목" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <input
+        className={inputCls}
+        placeholder="저작자·아티스트명"
+        value={artistName}
+        onChange={(e) => setArtistName(e.target.value)}
+      />
+
+      <label className="showcase-sound-register__file">
+        <Upload size={14} /> 음원 파일 (mp3/m4a/wav · R2 Direct Upload)
+        <input type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg" onChange={onFile} disabled={uploading} />
+      </label>
+      {uploading ? <p>업로드 중…</p> : null}
+      {fileMeta ? <p className="text-[11px] text-emerald-700">업로드 완료</p> : null}
+
+      {!ai ? (
+        <CopyrightVerifySearch
+          defaultTitle={title}
+          defaultAuthor={artistName}
+          inputCls={inputCls}
+          onSelect={(item) =>
+            setCopyrightVerify({
+              selected: item,
+              verifiedAt: new Date().toISOString(),
+              note: "등록정보 참고 선택"
+            })
+          }
+        />
+      ) : (
+        <div className="showcase-sound-register__ai">
+          <p className="font-bold text-[12px]">AI 음원 상세</p>
+          <label>
+            AI 서비스
+            <select
+              className={inputCls}
+              value={aiMeta.service}
+              onChange={(e) => setAiMeta((p) => ({ ...p, service: e.target.value }))}
+            >
+              {AI_SERVICES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          {aiMeta.service === "기타" ? (
+            <input
+              className={inputCls}
+              placeholder="서비스명"
+              value={aiMeta.serviceOther}
+              onChange={(e) => setAiMeta((p) => ({ ...p, serviceOther: e.target.value }))}
+            />
+          ) : null}
+          <label>
+            AI 생성 시점
+            <input
+              type="date"
+              className={inputCls}
+              value={aiMeta.generatedAt}
+              onChange={(e) => setAiMeta((p) => ({ ...p, generatedAt: e.target.value }))}
+            />
+          </label>
+          <label>
+            이용 요금제
+            <select
+              className={inputCls}
+              value={aiMeta.plan}
+              onChange={(e) => setAiMeta((p) => ({ ...p, plan: e.target.value }))}
+            >
+              <option value="free">무료</option>
+              <option value="paid">유료</option>
+            </select>
+          </label>
+          <label>
+            가사
+            <select
+              className={inputCls}
+              value={aiMeta.lyrics}
+              onChange={(e) => setAiMeta((p) => ({ ...p, lyrics: e.target.value }))}
+            >
+              <option value="self">직접 작성</option>
+              <option value="ai">AI 생성</option>
+              <option value="collab">공동 작성</option>
+            </select>
+          </label>
+          <label>
+            멜로디·작곡
+            <select
+              className={inputCls}
+              value={aiMeta.melody}
+              onChange={(e) => setAiMeta((p) => ({ ...p, melody: e.target.value }))}
+            >
+              <option value="self">직접 창작</option>
+              <option value="ai">AI 생성</option>
+              <option value="collab">공동 작업</option>
+            </select>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={aiMeta.vocalAi}
+              onChange={(e) => setAiMeta((p) => ({ ...p, vocalAi: e.target.checked }))}
+            />
+            보컬 AI 생성 포함
+          </label>
+          <label>
+            최종 편집
+            <select
+              className={inputCls}
+              value={aiMeta.finalEdit}
+              onChange={(e) => setAiMeta((p) => ({ ...p, finalEdit: e.target.value }))}
+            >
+              <option value="edited">직접 편집함</option>
+              <option value="none">하지 않음</option>
+            </select>
+          </label>
+          <label>
+            <input type="checkbox" checked={commercialUse} onChange={(e) => setCommercialUse(e.target.checked)} />
+            상업적 이용 권한 보유 (예)
+          </label>
+        </div>
+      )}
+
+      <label>
+        공개 범위
+        <select className={inputCls} value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+          <option value="private">비공개</option>
+          <option value="public">공개 (타인 퍼가기 가능)</option>
+        </select>
+      </label>
+
+      <div className="showcase-sound-register__consent">
+        <p className="text-[11px] leading-relaxed text-slate-600">{RIGHTS_TEXT}</p>
+        <label>
+          <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+          위 권리·책임 확인에 동의합니다.
+        </label>
+        <label>
+          <input type="checkbox" checked={consentRights} onChange={(e) => setConsentRights(e.target.checked)} />
+          본인은 이 음원을 VLUE에 업로드하고 재생할 권리를 보유하고 있습니다.
+        </label>
+        <label>
+          <input type="checkbox" checked={consentThird} onChange={(e) => setConsentThird(e.target.checked)} />
+          타인의 저작물·음원·보컬·샘플·가사를 무단 사용하지 않았습니다.
+        </label>
+        {ai ? (
+          <label>
+            <input type="checkbox" checked={consentAi} onChange={(e) => setConsentAi(e.target.checked)} />
+            AI 서비스 이용약관을 준수했습니다.
+          </label>
+        ) : null}
+      </div>
+
+      {error ? <p className="showcase-sound-picker__err">{error}</p> : null}
+
+      <button type="button" className="showcase-sound-btn showcase-sound-btn--primary" disabled={busy} onClick={submit}>
+        {busy ? "등록 중…" : "등록"}
+      </button>
+    </div>
+  );
+}
+
+/** 공개 Signature/타인 음원 퍼가기 헬퍼 (쇼케이스 보기에서 호출) */
+export async function borrowPublicShowcaseSound(soundId) {
+  return borrowShowcaseSound(soundId);
 }

@@ -280,9 +280,7 @@ export default function ShowcaseStyleSettingsPanel({
       if (patch.bgm) {
         next.bgm = {
           ...prev.bgm,
-          ...patch.bgm,
-          youtube: { ...(prev.bgm?.youtube || {}), ...(patch.bgm?.youtube || {}) },
-          soundcloud: { ...(prev.bgm?.soundcloud || {}), ...(patch.bgm?.soundcloud || {}) }
+          ...patch.bgm
         };
       }
       if (patch.richCustom) next.richCustom = { ...prev.richCustom, ...patch.richCustom };

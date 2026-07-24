@@ -211,6 +211,11 @@ model User {
   /// V1 마이케이스(아카이브) — 쇼케이스 게시물 누적
   showcaseCases ShowcaseCase[]
 
+  /// 쇼케이스 음원(User Original) · 퍼가기
+  showcaseSoundsOwned   ShowcaseSound[]       @relation("ShowcaseSoundOwner")
+  showcaseSoundBorrows  ShowcaseSoundBorrow[]
+  showcaseSoundQuotas   ShowcaseSoundQuotaMonth[]
+
   /// 무료 회원 메인 송출 슬롯 변경 쿨다운 기준 시각
   mainBroadcastChangedAt DateTime? @map("main_broadcast_changed_at") @db.Timestamptz(6)
 
@@ -1536,6 +1541,109 @@ model ShowcaseCase {
   @@index([ownerUserId, isMainBroadcast, deletedAt])
   @@index([ownerUserId, isPublic, deletedAt, createdAt(sort: Desc)])
   @@map("showcase_cases")
+}
+
+/// 쇼케이스 음원 — VLUE Signature / User Original (참조·퍼가기 기반)
+enum ShowcaseSoundKind {
+  signature
+  user_original
+}
+
+/// 등록 유형 (직접 창작 / AI 활용 / AI 생성 / 리메이크·편곡)
+enum ShowcaseSoundCreateType {
+  human_created
+  ai_assisted
+  ai_generated
+  remake_arrangement
+}
+
+enum ShowcaseSoundVisibility {
+  public
+  private
+}
+
+model ShowcaseSound {
+  id String @id @default(uuid()) @db.Uuid
+
+  kind ShowcaseSoundKind @map("kind")
+
+  /// User Original 소유자. Signature 는 null(플랫폼 카탈로그)
+  ownerUserId String? @map("owner_user_id") @db.Uuid
+  owner       User?   @relation("ShowcaseSoundOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  createType ShowcaseSoundCreateType @map("create_type")
+  title      String                  @map("title") @db.VarChar(200)
+  artistName String?                 @map("artist_name") @db.VarChar(120)
+
+  audioUrl    String  @map("audio_url") @db.Text
+  objectKey   String? @map("object_key") @db.VarChar(512)
+  contentType String? @map("content_type") @db.VarChar(80)
+  fileSize    Int?    @map("file_size")
+
+  visibility ShowcaseSoundVisibility @default(private) @map("visibility")
+
+  /// Human Created / AI Assisted / AI Generated / Human Edited / VLUE Signature
+  attributionLabel String @default("Human Created") @map("attribution_label") @db.VarChar(40)
+
+  /// AI 메타 · 저작권 검색 스냅샷 · 동의 시각 등
+  aiMetaJson           Json?     @map("ai_meta_json") @db.JsonB
+  copyrightVerifyJson  Json?     @map("copyright_verify_json") @db.JsonB
+  rightsConsentAt      DateTime? @map("rights_consent_at") @db.Timestamptz(6)
+  commercialUseClaimed Boolean   @default(false) @map("commercial_use_claimed")
+
+  /// Signature 게시판용 정렬·게시
+  isPublished Boolean @default(true) @map("is_published")
+  sortOrder   Int     @default(0) @map("sort_order")
+  adminNote   String? @map("admin_note") @db.VarChar(500)
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  borrows ShowcaseSoundBorrow[]
+
+  @@index([kind, isPublished, deletedAt, sortOrder])
+  @@index([ownerUserId, deletedAt, createdAt(sort: Desc)])
+  @@index([visibility, deletedAt, createdAt(sort: Desc)])
+  @@map("showcase_sounds")
+}
+
+/// 퍼가기 — 원본 복사 없이 참조
+model ShowcaseSoundBorrow {
+  id String @id @default(uuid()) @db.Uuid
+
+  borrowerUserId String @map("borrower_user_id") @db.Uuid
+  borrower       User   @relation(fields: [borrowerUserId], references: [id], onDelete: Cascade)
+
+  soundId String        @map("sound_id") @db.Uuid
+  sound   ShowcaseSound @relation(fields: [soundId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([borrowerUserId, soundId])
+  @@index([soundId])
+  @@map("showcase_sound_borrows")
+}
+
+/// 월간 등록 쿼터 (무료: 월 1회)
+model ShowcaseSoundQuotaMonth {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// YYYY-MM
+  yearMonth     String @map("year_month") @db.VarChar(7)
+  registerCount Int    @default(0) @map("register_count")
+
+  /// 주제곡(쇼케이스 BGM) 변경 — 무료 주 1회용 주차 키 YYYY-Www
+  themeChangeWeekKey String? @map("theme_change_week_key") @db.VarChar(10)
+  themeChangeCount   Int     @default(0) @map("theme_change_count")
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([userId, yearMonth])
+  @@map("showcase_sound_quota_months")
 }
 
 /// V2 쇼케이스 소셜 — 좋아요 등 반응

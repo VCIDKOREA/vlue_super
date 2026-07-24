@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   createAdminNotice,
   createAdminPopup,
+  createAdminSignatureSound,
+  createAdminSignatureSoundUploadUrl,
   deleteAdminFeedPost,
   deleteAdminNotice,
   deleteAdminPopup,
@@ -9,7 +11,9 @@ import {
   fetchAdminManualReview,
   fetchAdminOnboardingStats,
   fetchAdminPosts,
+  fetchAdminSignatureSounds,
   fetchAdminUsers,
+  patchAdminSignatureSound,
   patchAdminUser,
   resolveAdminManualReview,
   testAdminNotification,
@@ -22,6 +26,7 @@ import PricingManagerPanel from "./PricingManagerPanel.jsx";
 const TABS = [
   { id: "health", label: "상태 점검" },
   { id: "pricing", label: "요금제 관리" },
+  { id: "signature", label: "Signature Sound" },
   { id: "users", label: "회원 관리" },
   { id: "posts", label: "게시물 관리" },
   { id: "onboarding", label: "가입 승인" }
@@ -543,6 +548,7 @@ export default function AdminConsoleDesk({ user, onLogout }) {
       <main className="mx-auto max-w-6xl px-4 py-5">
         {tab === "health" ? <HealthTab onToast={showToast} /> : null}
         {tab === "pricing" ? <PricingManagerPanel onToast={showToast} /> : null}
+        {tab === "signature" ? <SignatureSoundTab onToast={showToast} /> : null}
         {tab === "users" ? <UsersTab onToast={showToast} /> : null}
         {tab === "posts" ? <PostsTab onToast={showToast} /> : null}
         {tab === "onboarding" ? <OnboardingTab onToast={showToast} /> : null}
@@ -553,6 +559,137 @@ export default function AdminConsoleDesk({ user, onLogout }) {
           {toast}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function SignatureSoundTab({ onToast }) {
+  const [items, setItems] = useState([]);
+  const [title, setTitle] = useState("");
+  const [artistName, setArtistName] = useState("VLUE");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await fetchAdminSignatureSounds();
+      setItems(data.items || []);
+    } catch (e) {
+      onToast?.(e?.message || "목록 실패");
+    }
+  }, [onToast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!title.trim()) {
+      onToast?.("제목을 먼저 입력하세요");
+      return;
+    }
+    setBusy(true);
+    try {
+      const signed = await createAdminSignatureSoundUploadUrl({
+        fileName: file.name,
+        contentType: file.type || "audio/mpeg",
+        fileSize: file.size
+      });
+      const put = await fetch(signed.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": signed.contentType || file.type || "audio/mpeg" },
+        body: file
+      });
+      if (!put.ok) throw new Error("업로드 실패");
+      await createAdminSignatureSound({
+        title: title.trim(),
+        artistName: artistName.trim() || "VLUE",
+        audioUrl: signed.publicUrl,
+        objectKey: signed.path,
+        contentType: signed.contentType,
+        fileSize: file.size,
+        isPublished: true
+      });
+      setTitle("");
+      onToast?.("Signature Sound 등록됨");
+      await load();
+    } catch (err) {
+      onToast?.(err?.message || "등록 실패");
+    } finally {
+      setBusy(false);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="text-[14px] font-black text-slate-900">VLUE Signature Sound</h2>
+        <p className="mt-1 text-[12px] text-slate-500">
+          코디 없이 관리자가 오리지널 AI 배경음악을 업로드·게시합니다. (R2 Presigned)
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            className="rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
+            placeholder="곡 제목"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <input
+            className="rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
+            placeholder="아티스트"
+            value={artistName}
+            onChange={(e) => setArtistName(e.target.value)}
+          />
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-bold text-white">
+            {busy ? "업로드 중…" : "음원 업로드"}
+            <input type="file" accept="audio/*,.mp3,.m4a,.wav" className="hidden" disabled={busy} onChange={onUpload} />
+          </label>
+        </div>
+      </div>
+      <Table
+        columns={[
+          { key: "title", label: "제목" },
+          { key: "artistName", label: "아티스트" },
+          {
+            key: "isPublished",
+            label: "게시",
+            render: (row) => (row.isPublished ? "ON" : "OFF")
+          },
+          {
+            key: "actions",
+            label: "관리",
+            render: (row) => (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="text-[11px] font-bold text-blue-600"
+                  onClick={async () => {
+                    await patchAdminSignatureSound(row.id, { isPublished: !row.isPublished });
+                    load();
+                  }}
+                >
+                  {row.isPublished ? "숨김" : "게시"}
+                </button>
+                <button
+                  type="button"
+                  className="text-[11px] font-bold text-rose-600"
+                  onClick={async () => {
+                    if (!window.confirm("삭제할까요?")) return;
+                    await patchAdminSignatureSound(row.id, { deleted: true });
+                    load();
+                  }}
+                >
+                  삭제
+                </button>
+              </div>
+            )
+          }
+        ]}
+        rows={items.map((r) => ({ ...r, _key: r.id }))}
+        emptyLabel="등록된 Signature Sound 없음"
+      />
     </div>
   );
 }

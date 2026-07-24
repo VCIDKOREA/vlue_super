@@ -291,5 +291,72 @@ authed.post("/security-search-alerts/:id/ack", async (c) => {
   return c.json({ ok: true });
 });
 
+/** VLUE Signature Sound 관리 게시판 */
+authed.get("/signature-sounds", async (c) => {
+  const { listAdminSignatureSounds } = await import("../services/showcase/showcaseSoundService.js");
+  const items = await listAdminSignatureSounds();
+  return c.json({ ok: true, items });
+});
+
+authed.post("/signature-sounds/upload-url", async (c) => {
+  const admin = c.get("adminConsoleUser");
+  const body = await c.req.json().catch(() => ({}));
+  try {
+    const { createShowcaseSoundUploadUrl } = await import(
+      "../services/showcase/showcaseSoundStorage.js"
+    );
+    const result = await createShowcaseSoundUploadUrl({
+      userId: admin.id,
+      fileName: String(body.fileName || "signature.mp3"),
+      contentType: String(body.contentType || "audio/mpeg"),
+      fileSize: body.fileSize,
+      prefix: "signature"
+    });
+    return c.json({ ok: true, ...result });
+  } catch (e) {
+    return c.json({ ok: false, error: e instanceof Error ? e.message : "upload_url_failed" }, 400);
+  }
+});
+
+authed.post("/signature-sounds", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  try {
+    const { createSignatureSound } = await import("../services/showcase/showcaseSoundService.js");
+    const sound = await createSignatureSound({
+      title: String(body.title || ""),
+      artistName: body.artistName,
+      audioUrl: String(body.audioUrl || ""),
+      objectKey: body.objectKey,
+      contentType: body.contentType,
+      fileSize: body.fileSize,
+      sortOrder: body.sortOrder,
+      adminNote: body.adminNote,
+      isPublished: body.isPublished !== false
+    });
+    return c.json({ ok: true, sound });
+  } catch (e) {
+    return c.json({ ok: false, error: e instanceof Error ? e.message : "create_failed" }, 400);
+  }
+});
+
+authed.patch("/signature-sounds/:id", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  try {
+    const { updateSignatureSound } = await import("../services/showcase/showcaseSoundService.js");
+    const sound = await updateSignatureSound(id, {
+      title: body.title,
+      artistName: body.artistName,
+      sortOrder: body.sortOrder,
+      adminNote: body.adminNote,
+      isPublished: body.isPublished,
+      deleted: body.deleted === true
+    });
+    return c.json({ ok: true, sound });
+  } catch (e) {
+    return c.json({ ok: false, error: e instanceof Error ? e.message : "update_failed" }, 400);
+  }
+});
+
 authed.route("/pricing-config", adminPricingConfigRoutes);
 adminConsoleRoutes.route("/", authed);

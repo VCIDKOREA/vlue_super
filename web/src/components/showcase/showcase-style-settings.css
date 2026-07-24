@@ -3456,3 +3456,61 @@
   border-color: rgba(255, 255, 255, 0.18);
   color: #e2e8f0;
 }
+
+/* ?? Showcase Sound (Signature / User Original) ?? */
+.showcase-sound-picker { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 8px; }
+.showcase-sound-picker__policy { font-size: 11px; line-height: 1.45; color: #64748b; }
+.showcase-sound-picker__tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.showcase-sound-picker__tabs button {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 999px; border: 1px solid #e2e8f0; background: #fff;
+  padding: 7px 12px; font-size: 12px; font-weight: 800; color: #334155;
+}
+.showcase-sound-picker__tabs button.is-on { background: #0f172a; color: #fff; border-color: #0f172a; }
+.showcase-sound-picker__current {
+  display: flex; align-items: center; gap: 10px;
+  border-radius: 12px; border: 1px solid #e2e8f0; background: #f8fafc; padding: 10px 12px;
+}
+.showcase-sound-picker__quota { font-size: 11px; color: #b45309; font-weight: 700; }
+.showcase-sound-picker__err { font-size: 12px; color: #be123c; font-weight: 700; }
+.showcase-sound-picker__loading { font-size: 12px; color: #64748b; }
+.showcase-sound-list { display: flex; flex-direction: column; gap: 8px; }
+.showcase-sound-list__lead { font-size: 12px; color: #475569; }
+.showcase-sound-list__h { margin-top: 8px; font-size: 12px; font-weight: 900; color: #0f172a; }
+.showcase-sound-list__item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  text-align: left; border-radius: 12px; border: 1px solid #e2e8f0; background: #fff;
+  padding: 10px 12px; position: relative;
+}
+.showcase-sound-list__item.is-selected { border-color: #059669; background: #ecfdf5; }
+.showcase-sound-list__item.is-broken { opacity: 0.55; }
+.showcase-sound-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 10px; border: 1px solid #cbd5e1; background: #fff;
+  padding: 8px 12px; font-size: 12px; font-weight: 800; color: #0f172a;
+}
+.showcase-sound-btn--primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+.showcase-sound-btn--ghost { border: 0; background: #e2e8f0; }
+.showcase-sound-register {
+  margin-top: 8px; border-radius: 14px; border: 1px solid #e2e8f0; background: #fff; padding: 12px;
+  display: flex; flex-direction: column; gap: 10px; max-height: 70vh; overflow: auto;
+}
+.showcase-sound-register__head { display: flex; justify-content: space-between; align-items: center; }
+.showcase-sound-register__head h3 { font-size: 14px; font-weight: 900; }
+.showcase-sound-register__ban { font-size: 11px; color: #9f1239; background: #fff1f2; border-radius: 8px; padding: 8px; }
+.showcase-sound-register__types { display: flex; flex-direction: column; gap: 6px; border: 0; padding: 0; }
+.showcase-sound-register__types label { font-size: 12px; font-weight: 700; display: flex; gap: 8px; align-items: center; }
+.showcase-sound-register__file { font-size: 12px; font-weight: 800; display: flex; flex-direction: column; gap: 6px; }
+.showcase-sound-register__ai { display: flex; flex-direction: column; gap: 8px; border-radius: 10px; background: #f8fafc; padding: 10px; }
+.showcase-sound-register__ai label { font-size: 12px; font-weight: 700; display: flex; flex-direction: column; gap: 4px; }
+.showcase-sound-register__consent { display: flex; flex-direction: column; gap: 8px; }
+.showcase-sound-register__consent label { font-size: 11px; display: flex; gap: 8px; align-items: flex-start; }
+.showcase-sound-copyright { display: flex; flex-direction: column; gap: 8px; }
+.showcase-sound-copyright__hint { font-size: 11px; color: #64748b; }
+.showcase-sound-copyright__row { display: flex; flex-wrap: wrap; gap: 6px; }
+.showcase-sound-copyright__err { font-size: 11px; color: #be123c; }
+.showcase-sound-copyright__list { display: flex; flex-direction: column; gap: 6px; }
+.showcase-sound-copyright__item {
+  display: flex; flex-direction: column; gap: 2px; text-align: left;
+  border-radius: 10px; border: 1px solid #e2e8f0; padding: 8px 10px; background: #fff;
+}

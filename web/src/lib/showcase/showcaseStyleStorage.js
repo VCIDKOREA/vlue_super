@@ -54,6 +54,13 @@ export function createDefaultShowcaseStyle() {
     tags: [],
     bgm: {
       mode: "none",
+      soundId: "",
+      title: "",
+      artistName: "",
+      audioUrl: "",
+      attributionLabel: "",
+      linkBroken: false,
+      /** @deprecated SoundCloud 제거 — 마이그레이션 호환 */
       presetId: "",
       youtube: { videoId: "", title: "", artist: "", query: "" },
       soundcloud: {

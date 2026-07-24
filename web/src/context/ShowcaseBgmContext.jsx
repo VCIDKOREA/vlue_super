@@ -1,14 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import {
-  resolveShowcaseBgmUrl,
-  isSoundCloudBgmMode,
-  isYoutubeBgmMode,
-  resolveShowcaseSoundCloudTrackUrl,
-  resolveShowcaseYoutubeVideoId
-} from "../lib/showcase/showcaseBgmPresets.js";
+import { resolveShowcaseBgmUrl } from "../lib/showcase/showcaseBgmPresets.js";
 import { installShowcaseProximityBridge, subscribeShowcaseProximity } from "../lib/showcase/showcaseProximityBridge.js";
-import ShowcaseSoundCloudPlayer from "../components/showcase/ShowcaseSoundCloudPlayer.jsx";
-import ShowcaseYoutubePlayer from "../components/showcase/ShowcaseYoutubePlayer.jsx";
 
 /** @typedef {'call_active' | 'replay' | 'preview' | 'idle'} ShowcasePlaybackPhase */
 
@@ -23,16 +15,9 @@ export function ShowcaseBgmProvider({ children }) {
   const [proximityNear, setProximityNear] = useState(false);
 
   const bgmUrl = useMemo(() => resolveShowcaseBgmUrl(styleConfig), [styleConfig]);
-  const soundcloudMode = useMemo(() => isSoundCloudBgmMode(styleConfig), [styleConfig]);
-  const soundcloudTrackUrl = useMemo(() => resolveShowcaseSoundCloudTrackUrl(styleConfig), [styleConfig]);
-  const youtubeMode = useMemo(() => isYoutubeBgmMode(styleConfig), [styleConfig]);
-  const youtubeVideoId = useMemo(() => resolveShowcaseYoutubeVideoId(styleConfig), [styleConfig]);
-
-  const hasStreamBgm = soundcloudMode || youtubeMode;
   const shouldPlayAudio = phase === "replay" || phase === "preview";
   const forceMuted = phase === "call_active" || proximityNear;
-  const effectiveMuted = forceMuted || userMuted || !shouldPlayAudio || (!bgmUrl && !hasStreamBgm);
-  const streamMuted = forceMuted || userMuted || !shouldPlayAudio || !touchUnlocked;
+  const effectiveMuted = forceMuted || userMuted || !shouldPlayAudio || !bgmUrl;
 
   useEffect(() => {
     installShowcaseProximityBridge();
@@ -47,7 +32,7 @@ export function ShowcaseBgmProvider({ children }) {
     }
     const el = audioRef.current;
 
-    if (hasStreamBgm || effectiveMuted || !bgmUrl) {
+    if (effectiveMuted || !bgmUrl) {
       el.pause();
       if (!bgmUrl) el.removeAttribute("src");
       return undefined;
@@ -60,7 +45,7 @@ export function ShowcaseBgmProvider({ children }) {
 
     el.play().catch(() => undefined);
     return () => el.pause();
-  }, [bgmUrl, effectiveMuted, hasStreamBgm]);
+  }, [bgmUrl, effectiveMuted]);
 
   const setPlaybackPhase = useCallback((next) => {
     setPhase(next);
@@ -80,116 +65,47 @@ export function ShowcaseBgmProvider({ children }) {
     if (phase !== "call_active") setUserMuted(false);
   }, [phase]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-    window.__vlueUnlockShowcaseBgm = unlockFromUserGesture;
-    return () => {
-      delete window.__vlueUnlockShowcaseBgm;
-    };
-  }, [unlockFromUserGesture]);
-
-  const toggleMute = useCallback(() => {
-    if (phase === "call_active" || proximityNear) return;
-    setUserMuted((m) => !m);
-  }, [phase, proximityNear]);
+  const toggleUserMute = useCallback(() => {
+    setUserMuted((v) => !v);
+  }, []);
 
   const value = useMemo(
     () => ({
       phase,
+      styleConfig,
+      bgmUrl,
+      userMuted,
+      touchUnlocked,
+      proximityNear,
+      effectiveMuted,
       setPlaybackPhase,
       bindStyleConfig,
-      userMuted,
-      toggleMute,
-      effectiveMuted,
-      forceMuted,
-      bgmUrl,
-      soundcloudMode,
-      soundcloudTrackUrl,
-      youtubeMode,
-      youtubeVideoId,
-      youtubeMuted: streamMuted,
-      soundcloudMuted: streamMuted,
-      touchUnlocked,
       unlockFromUserGesture,
-      proximityNear,
-      canToggleMute: shouldPlayAudio && Boolean(bgmUrl || hasStreamBgm) && !proximityNear
+      toggleUserMute,
+      setUserMuted
     }),
     [
       phase,
+      styleConfig,
+      bgmUrl,
+      userMuted,
+      touchUnlocked,
+      proximityNear,
+      effectiveMuted,
       setPlaybackPhase,
       bindStyleConfig,
-      userMuted,
-      toggleMute,
-      effectiveMuted,
-      forceMuted,
-      bgmUrl,
-      soundcloudMode,
-      soundcloudTrackUrl,
-      youtubeMode,
-      youtubeVideoId,
-      streamMuted,
-      touchUnlocked,
       unlockFromUserGesture,
-      proximityNear,
-      shouldPlayAudio,
-      hasStreamBgm
+      toggleUserMute
     ]
   );
 
-  return (
-    <ShowcaseBgmContext.Provider value={value}>
-      {children}
-      {soundcloudMode && soundcloudTrackUrl ? (
-        <div className="showcase-bgm-sc-host" aria-hidden>
-          <ShowcaseSoundCloudPlayer
-            key={soundcloudTrackUrl}
-            trackUrl={soundcloudTrackUrl}
-            muted={streamMuted}
-            visual={false}
-            hideUi
-            className="showcase-bgm-sc-host__player"
-            title="Showcase BGM audio"
-          />
-        </div>
-      ) : null}
-      {/* YouTube 레거시 설정 호환 */}
-      {!soundcloudMode && youtubeMode && youtubeVideoId ? (
-        <div className="showcase-bgm-yt-host" aria-hidden>
-          <ShowcaseYoutubePlayer
-            videoId={youtubeVideoId}
-            muted={streamMuted}
-            className="showcase-bgm-yt-host__player"
-            title="Showcase BGM audio"
-          />
-        </div>
-      ) : null}
-    </ShowcaseBgmContext.Provider>
-  );
+  return <ShowcaseBgmContext.Provider value={value}>{children}</ShowcaseBgmContext.Provider>;
 }
 
 export function useShowcaseBgm() {
   const ctx = useContext(ShowcaseBgmContext);
   if (!ctx) {
-    return {
-      phase: "idle",
-      setPlaybackPhase: () => {},
-      bindStyleConfig: () => {},
-      userMuted: true,
-      toggleMute: () => {},
-      effectiveMuted: true,
-      forceMuted: true,
-      bgmUrl: null,
-      soundcloudMode: false,
-      soundcloudTrackUrl: "",
-      youtubeMode: false,
-      youtubeVideoId: "",
-      youtubeMuted: true,
-      soundcloudMuted: true,
-      touchUnlocked: false,
-      unlockFromUserGesture: () => {},
-      proximityNear: false,
-      canToggleMute: false
-    };
+    throw new Error("useShowcaseBgm must be used within ShowcaseBgmProvider");
   }
   return ctx;
 }
