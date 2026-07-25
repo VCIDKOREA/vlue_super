@@ -51,11 +51,10 @@ function fireFollowNotify(
   };
   try {
     ssePublish(targetUserId, {
-      type: payload.type,
+      ...data,
       title: payload.title,
       message: payload.body,
-      body: payload.body,
-      ...data
+      body: payload.body
     });
   } catch (err) {
     console.warn("[follow] sse_notify_failed", { targetUserId, err });
