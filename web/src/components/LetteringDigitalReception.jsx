@@ -12,7 +12,6 @@ import {
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDisplay.js";
 import { formatLetteringContactEmailDisplay, photoFocusToCss } from "../lib/letteringBizcardStorage.js";
-import { nukkiLogoWhiteBackground } from "../lib/nukkiLogoWhiteBackground.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import {
   formatNameDeptTitleLine,
@@ -263,38 +262,16 @@ function resolveCardLogoUrl(card) {
   return logo;
 }
 
-/** 흰 사각 누끼 처리된 로고 URL */
-function useNukkiLogoUrl(rawUrl) {
-  const src = String(rawUrl || "").trim();
-  const [nukki, setNukki] = useState(src);
-  useEffect(() => {
-    let cancelled = false;
-    if (!src) {
-      setNukki("");
-      return undefined;
-    }
-    setNukki(src);
-    void nukkiLogoWhiteBackground(src).then((out) => {
-      if (!cancelled && out) setNukki(out);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [src]);
-  return nukki || src;
-}
-
-/** 회사 로고 누끼 워터마크 — 로고 있을 때만 (없으면 배경 비움) */
+/** 회사 로고 워터마크 — 로고 있을 때만 (없으면 배경 비움). 투명 PNG 그대로 표시 */
 function CompanyLogoWatermark({ card }) {
   const [imgBroken, setImgBroken] = useState(false);
   const logoUrl = resolveCardLogoUrl(card);
-  const nukkiSrc = useNukkiLogoUrl(logoUrl);
   if (!logoUrl || imgBroken) return null;
 
   return (
     <div className="ldr-watermark ldr-watermark--nukki" aria-hidden>
       <img
-        src={nukkiSrc}
+        src={logoUrl}
         alt=""
         className="ldr-watermark__img"
         onError={() => setImgBroken(true)}
@@ -306,11 +283,10 @@ function CompanyLogoWatermark({ card }) {
 function CompanyLogoBadge({ card, className = "" }) {
   const [imgBroken, setImgBroken] = useState(false);
   const logoUrl = resolveCardLogoUrl(card);
-  const nukkiSrc = useNukkiLogoUrl(logoUrl);
   if (!logoUrl || imgBroken) return null;
   return (
     <span className={`ldr-company-logo-badge${className ? ` ${className}` : ""}`.trim()} aria-label="회사 로고">
-      <img src={nukkiSrc} alt="" className="ldr-company-logo-badge__img" onError={() => setImgBroken(true)} />
+      <img src={logoUrl} alt="" className="ldr-company-logo-badge__img" onError={() => setImgBroken(true)} />
     </span>
   );
 }
@@ -319,10 +295,9 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
   const [imgBroken, setImgBroken] = useState(false);
   const photoUrl = String(card.photoUrl || "").trim();
   const logoUrl = resolveCardLogoUrl(card);
-  const nukkiLogo = useNukkiLogoUrl(logoUrl);
   /* avatar = 회사 로고, hero = 프로필 사진 — 서로 대체하지 않음 */
   const isLogo = variant === "logo" || variant === "avatar";
-  const src = isLogo ? nukkiLogo : photoUrl;
+  const src = isLogo ? logoUrl : photoUrl;
   const focusCss = !isLogo ? photoFocusToCss(card.photoFocus) : undefined;
 
   /* 로고 없음 → 무지(슬롯 비움). 이니셜/데모 로고 표시 안 함 */
