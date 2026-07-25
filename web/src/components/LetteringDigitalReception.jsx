@@ -250,7 +250,31 @@ function FaceTabs({ face, onFaceChange, hidden = false }) {
 
 function resolveCardLogoUrl(card) {
   if (card?.noCompanyLogo) return "";
-  return String(card?.logoUrl || card?.logo_url || "").trim();
+  const logo = String(card?.logoUrl || card?.logo_url || "").trim();
+  if (!logo) return "";
+  /* VLUE/데모 실드·아이콘은 회사 로고로 취급하지 않음 → 무지 */
+  if (/vlue-shield-logo|lettering-demo|icons8|data:image\/svg\+xml.*2563eb/i.test(logo)) {
+    return "";
+  }
+  return logo;
+}
+
+/** 회사 로고 누끼 워터마크 — 로고 있을 때만 (없으면 배경 비움) */
+function CompanyLogoWatermark({ card }) {
+  const [imgBroken, setImgBroken] = useState(false);
+  const logoUrl = resolveCardLogoUrl(card);
+  if (!logoUrl || imgBroken) return null;
+
+  return (
+    <div className="ldr-watermark ldr-watermark--nukki" aria-hidden>
+      <img
+        src={logoUrl}
+        alt=""
+        className="ldr-watermark__img"
+        onError={() => setImgBroken(true)}
+      />
+    </div>
+  );
 }
 
 function CompanyLogoBadge({ card, className = "" }) {
@@ -481,6 +505,7 @@ function FrontPanel({
 
   return (
     <div className={`ldr-panel ldr-panel--front${embeddedInPush ? " ldr-panel--push" : ""}`}>
+      {embeddedInPush ? <CompanyLogoWatermark card={card} /> : null}
       {embeddedInPush ? null : <ProfileHero card={card} verified={verified} />}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
       <div className={`ldr-back-head${card.photoUrl && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
@@ -696,6 +721,7 @@ function BackPanel({
 
   return (
     <div className={`ldr-panel ldr-panel--back${embeddedInPush ? " ldr-panel--push" : ""}`}>
+      {embeddedInPush ? <CompanyLogoWatermark card={card} /> : null}
       <div className="ldr-contact-extra ldr-contact-extra--back-only">
         <p className="ldr-contact-extra__label">추가 설명</p>
         <p

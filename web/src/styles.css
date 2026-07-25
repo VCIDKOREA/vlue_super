@@ -6018,14 +6018,22 @@ body,
   justify-content: center;
   pointer-events: none;
   overflow: hidden;
+  background: transparent;
 }
 
 .ldr-watermark__img {
-  width: min(62%, 180px);
-  max-height: 75%;
+  width: min(70%, 220px);
+  max-height: 78%;
   object-fit: contain;
-  opacity: 0.09;
-  filter: saturate(0.7);
+  background: transparent;
+  /* 누끼 로고 — 흰 사각 없이 은은하게 */
+  opacity: 0.16;
+  filter: drop-shadow(0 0 1px rgba(15, 23, 42, 0.15));
+}
+
+.ldr-watermark--nukki .ldr-watermark__img {
+  mix-blend-mode: normal;
+  opacity: 0.18;
 }
 
 .ldr-panel--push .ldr-contact-list,
@@ -6608,10 +6616,15 @@ body,
 }
 
 .ldr-reception--push .ldr-watermark__img {
-  width: min(68%, 200px);
-  opacity: 0.14;
-  filter: saturate(0.62) blur(0.25px);
+  width: min(72%, 240px);
+  opacity: 0.2;
+  filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.25));
   animation: ldr-watermark-drift 14s ease-in-out infinite;
+}
+
+.ldr-reception--push .ldr-watermark--nukki .ldr-watermark__img {
+  mix-blend-mode: normal;
+  opacity: 0.2;
 }
 
 @keyframes ldr-watermark-drift {
