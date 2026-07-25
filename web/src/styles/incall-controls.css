@@ -586,10 +586,28 @@
   color: #1e3a8a;
 }
 
-.lettering-ongoing-actions-secondary__row--controls {
+.lettering-ongoing-actions-secondary__row--controls,
+.lettering-ongoing-actions-secondary--call .lettering-ongoing-actions-secondary__row.lettering-ongoing-actions-secondary__row--controls {
   display: block;
   width: 100%;
+  max-width: none;
+  margin: 0;
   padding: 0;
+  grid-template-columns: none;
+  align-self: stretch;
+}
+
+.lettering-ongoing-actions-secondary__row--controls .incall-control-bar {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.lettering-ongoing-actions-secondary__row--controls .incall-control-bar__row {
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .lettering-ongoing-actions-secondary__row--dial {

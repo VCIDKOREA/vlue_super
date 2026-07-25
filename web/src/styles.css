@@ -4802,13 +4802,19 @@ body,
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: center;
+  align-items: stretch;
   padding: 8px 12px max(12px, env(safe-area-inset-bottom, 0px));
 }
 
 .lettering-ongoing-actions-secondary--call .lettering-caution--reception-footer {
   margin: 0;
   width: 100%;
+}
+
+.lettering-ongoing-actions-secondary--call .lettering-ongoing-actions-secondary__row--controls {
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
 }
 
 .lettering-ongoing-actions-secondary__row {

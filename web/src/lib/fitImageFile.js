@@ -58,6 +58,21 @@ export const IMAGE_FIT_SHOWCASE = {
   fileNamePrefix: "showcase"
 };
 
+/**
+ * 통화 화면 미리보기용 권장 픽셀 (세로 풀스크린 · 하단 통화버튼 가림 고려)
+ * 업로드 상한은 IMAGE_FIT_SHOWCASE 와 동일
+ */
+export const SHOWCASE_CALL_IMAGE_GUIDE = {
+  recommendWidthPx: 1080,
+  recommendHeightPx: 1920,
+  maxWidthPx: IMAGE_FIT_SHOWCASE.maxWidth,
+  maxHeightPx: IMAGE_FIT_SHOWCASE.maxHeight,
+  aspectLabel: "9:16",
+  safeZoneHint:
+    "하단은 키패드·음소거·스피커·통화종료 버튼에 가려질 수 있어요. 상품·문구는 위쪽 ⅔에 두세요.",
+  sizeHint: "권장 1080×1920px (9:16) · 최대 1920×2560px"
+};
+
 /** 채팅 전송 이미지 */
 export const IMAGE_FIT_CHAT = {
   maxWidth: 1600,

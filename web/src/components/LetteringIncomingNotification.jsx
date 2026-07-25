@@ -204,6 +204,12 @@ export default function LetteringIncomingNotification({
   isKnownContact: isKnownContactProp,
   /** 홈 본인 미리보기 전용 — 통화 중 상대방 오버레이에는 절대 true 금지 */
   showOwnerSettings = false,
+  /**
+   * 홈 미리보기에서 실제 통화와 동일한 하단 제어바(키패드·음소거·스피커·종료)를 보여 줌
+   * — 쇼케이스 사진이 통화옵션에 가리는지 확인할 때 사용
+   */
+  inCallChromePreview = false,
+  onInCallChromePreviewChange,
   /** 상대 열람 — 설정 자리에 닫기 */
   showPeerClose = false,
   onPeerClose,
@@ -533,9 +539,31 @@ export default function LetteringIncomingNotification({
   const showCollapsedPhoneSubline =
     !showcaseOffPreview && Boolean(collapsedPhoneDisplay) && !phoneSameAsPrimary;
 
-  const previewStatusLabel = previewMode
-    ? ""
-    : statusLabel;
+  const isInCallChromePreview = Boolean(previewMode && inCallChromePreview);
+  const previewStatusLabel = previewMode ? "" : statusLabel;
+
+  const openInCallChromePreview = useCallback(() => {
+    if (!previewMode) return;
+    onInCallChromePreviewChange?.(true);
+    if (!isExpandedView) setExpanded(true);
+  }, [previewMode, onInCallChromePreviewChange, isExpandedView, setExpanded]);
+
+  const closeInCallChromePreview = useCallback(() => {
+    onInCallChromePreviewChange?.(false);
+  }, [onInCallChromePreviewChange]);
+
+  const toggleInCallChromePreview = useCallback(
+    (e) => {
+      e?.stopPropagation?.();
+      if (isInCallChromePreview) {
+        closeInCallChromePreview();
+        if (isExpandedView) setExpanded(false);
+      } else {
+        openInCallChromePreview();
+      }
+    },
+    [isInCallChromePreview, closeInCallChromePreview, isExpandedView, setExpanded, openInCallChromePreview]
+  );
 
   const handleOpenFeed = () => {
     if (previewMode) {
@@ -557,7 +585,12 @@ export default function LetteringIncomingNotification({
 
   const handleEndCall = () => {
     if (previewMode) {
-      showGuide("미리보기를 종료합니다.");
+      if (isInCallChromePreview) {
+        closeInCallChromePreview();
+        showGuide("통화 화면 미리보기를 종료합니다.");
+      } else {
+        showGuide("미리보기를 종료합니다.");
+      }
       window.setTimeout(() => {
         if (onEndCall) onEndCall();
         else nativeEndCall();
@@ -647,12 +680,18 @@ export default function LetteringIncomingNotification({
   /** 통화 중: 종료 / 다시보기·미리보기: 전화걸기 */
   const showLiveEndCall = onCall && !previewMode;
   const showReplayDial = Boolean(fromCallHistory);
-  const showCallEndBar = showLiveEndCall || showReplayDial || Boolean(onEndCall && onCall && !previewMode);
+  /** 홈「통화화면」미리보기 — 펼친 상태에서만 실통화와 같은 하단 제어바 */
+  const showChromePreviewControls = Boolean(isInCallChromePreview && isExpandedView);
+  const showCallEndBar =
+    showLiveEndCall ||
+    showReplayDial ||
+    Boolean(onEndCall && onCall && !previewMode) ||
+    showChromePreviewControls;
   const isGlassTent = /\blettering-ongoing--fullscreen-tent\b/.test(String(className || ""));
   /** 통화목록 다시보기에서만 저장 CTA — 홈 미리보기·실통화 풀케이스에는 미노출 */
   const showCallLogSaveCta = Boolean(fromCallHistory && peerMatrix.showCallLogAction);
-  /** 실통화만 키패드·음소거·스피커 — 홈/설정 미리보기에서는 미노출 */
-  const showInCallControls = Boolean(showLiveEndCall);
+  /** 실통화 + 홈 통화화면 미리보기에서 키패드·음소거·스피커 */
+  const showInCallControls = Boolean(showLiveEndCall || showChromePreviewControls);
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;
   const carouselScrollEnabled = isPaidMember && (previewMode || onCall || isExpandedView);
@@ -687,8 +726,8 @@ export default function LetteringIncomingNotification({
   };
 
   const renderExpandedFooter = () => {
-    /* 홈·설정 쇼케이스 미리보기 — 하단 통화키 바 없이 캐러셀만 */
-    if (previewMode && !fromCallHistory) return null;
+    /* 홈·설정 쇼케이스 미리보기 — 통화화면 미리보기일 때만 하단 제어바 */
+    if (previewMode && !fromCallHistory && !showChromePreviewControls) return null;
 
     return (
     <div
@@ -742,7 +781,7 @@ export default function LetteringIncomingNotification({
                 onEnd={handleEndCall}
                 showEndButton
                 endLabel="통화종료"
-                demoMode={false}
+                demoMode={Boolean(previewMode)}
                 keypadOpen={keypadOpen}
                 onKeypadOpenChange={setKeypadOpen}
               />
@@ -812,7 +851,21 @@ export default function LetteringIncomingNotification({
             {previewMode ? `${previewShowcaseId} Showcase` : "VLUE 작동중"}
           </span>
         </div>
-        {previewStatusLabel ? (
+        {previewMode && showOwnerSettings ? (
+          <button
+            type="button"
+            onClick={toggleInCallChromePreview}
+            className="lettering-incall-preview-btn lettering-live-bar__call-preview"
+            aria-pressed={isInCallChromePreview}
+            aria-label={
+              isInCallChromePreview ? "통화 화면 미리보기 종료" : "통화화면 보기 (실제 통화 옵션 포함)"
+            }
+            title={isInCallChromePreview ? "미리보기 종료" : "통화화면 보기"}
+          >
+            <Phone className="h-3 w-3" strokeWidth={2.5} aria-hidden />
+            {isInCallChromePreview ? "미리보기 종료" : "통화화면 보기"}
+          </button>
+        ) : previewStatusLabel ? (
           <span className="lettering-live-bar__status">{previewStatusLabel}</span>
         ) : (
           <span className="lettering-live-bar__status lettering-live-bar__status--empty" aria-hidden />

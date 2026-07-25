@@ -20,6 +20,7 @@ import {
 } from "../../lib/showcase/showcaseCover.js";
 import { writeShowcasePrivacyMode } from "../../lib/showcase/showcasePrivacyMode.js";
 import { PRIVACY_MODES, maxShowcaseContentPagesForTier } from "../../lib/showcase/tentShowcaseTypes.js";
+import { SHOWCASE_CALL_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
 import {
   clampShowcasePages,
   contentPageDisplayNumber,
@@ -553,6 +554,17 @@ export default function ShowcaseStyleSettingsPanel({
                   "오른쪽 사이드 탭(〈)을 누르면 통화 빅푸시 미리보기가 전체 화면으로 열립니다."
                 ].join(" ")}
               />
+            </p>
+            <p
+              className={`mb-3 rounded-xl px-3 py-2 text-[11px] font-semibold leading-snug ${
+                isDarkMode
+                  ? "border border-blue-400/25 bg-blue-500/10 text-blue-100"
+                  : "border border-blue-100 bg-blue-50 text-blue-900"
+              }`}
+              style={{ wordBreak: "keep-all" }}
+            >
+              사진 {SHOWCASE_CALL_IMAGE_GUIDE.sizeHint}. {SHOWCASE_CALL_IMAGE_GUIDE.safeZoneHint} 홈
+              쇼케이스 상단 「통화화면 보기」로 실제 통화 옵션이 가리는 영역을 확인할 수 있습니다.
             </p>
 
             {includeDigitalCard ? (

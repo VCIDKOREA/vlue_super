@@ -21,6 +21,7 @@ import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOver
 /**
  * VLUE Showcase — 홈 메인 통화 빅푸시(픽푸시) 미리보기
  * 켜짐/꺼짐 모두 접힘→전체화면 펼침. 꺼짐은 내용만 번호+VLUE 인증.
+ * 「통화화면」으로 실통화와 같은 하단 제어바 미리보기 가능.
  */
 export default function CallBigPushPreviewSection({
   membershipTier = "free",
@@ -31,6 +32,7 @@ export default function CallBigPushPreviewSection({
   const showTierTabs = v1AppShell.callBigPushTierTabs;
   const [showcaseOn, setShowcaseOn] = useState(true);
   const [expanded, setExpanded] = useState(false);
+  const [callChromePreview, setCallChromePreview] = useState(false);
   const [previewTick, setPreviewTick] = useState(0);
 
   const paidTier = isPaidLetteringTier(membershipTier) ? membershipTier : "premium";
@@ -69,12 +71,16 @@ export default function CallBigPushPreviewSection({
     if (!expanded) return undefined;
     return pushAndroidBackHandler(() => {
       setExpanded(false);
+      setCallChromePreview(false);
       return true;
     });
   }, [expanded]);
 
   useEffect(() => {
-    const onCloseOverlays = () => setExpanded(false);
+    const onCloseOverlays = () => {
+      setExpanded(false);
+      setCallChromePreview(false);
+    };
     window.addEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
     return () => window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
   }, []);
@@ -100,6 +106,11 @@ export default function CallBigPushPreviewSection({
   const incomingNumber = card.phone || "";
   const useFullscreenPortal = expanded;
 
+  const handleExpandedChange = (next) => {
+    setExpanded(next);
+    if (!next) setCallChromePreview(false);
+  };
+
   const notificationProps = {
     verified: true,
     previewMode: true,
@@ -116,8 +127,13 @@ export default function CallBigPushPreviewSection({
     isKnownContact: isOn,
     card,
     expanded,
-    onExpandedChange: setExpanded,
-    onEndCall: () => setExpanded(false),
+    onExpandedChange: handleExpandedChange,
+    inCallChromePreview: callChromePreview,
+    onInCallChromePreviewChange: setCallChromePreview,
+    onEndCall: () => {
+      setCallChromePreview(false);
+      setExpanded(false);
+    },
     onToast
   };
 
@@ -151,6 +167,7 @@ export default function CallBigPushPreviewSection({
               onClick={() => {
                 setShowcaseOn(true);
                 setExpanded(false);
+                setCallChromePreview(false);
               }}
             >
               쇼케이스 켜짐
@@ -169,6 +186,7 @@ export default function CallBigPushPreviewSection({
               onClick={() => {
                 setShowcaseOn(false);
                 setExpanded(false);
+                setCallChromePreview(false);
               }}
             >
               쇼케이스 꺼짐
