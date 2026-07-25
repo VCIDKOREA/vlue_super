@@ -30,9 +30,13 @@ export function isLocalDevOrigin(origin = "") {
 
 /**
  * 외부 공유·OG용 API 베이스 — 로컬 개발 시 localhost 대신 공개 URL 사용.
- * VITE_CARD_PUBLIC_API_BASE 또는 VITE_VLUE_LANDING_URL(기본 www.vlue.kr)
+ * www.vlue.kr 는 SPA 라 /api HTML 이 index.html 로 떨어져 카톡 OG 가 깨지므로
+ * api.vlue.kr(VITE_API_URL) 를 우선한다.
  */
 export function resolvePublicCardApiBase(fallbackOrigin = "") {
+  const apiUrl = String(import.meta.env.VITE_API_URL || "")
+    .trim()
+    .replace(/\/$/, "");
   const explicit = String(
     import.meta.env.VITE_CARD_PUBLIC_API_BASE ||
       import.meta.env.VITE_PUBLIC_API_URL ||
@@ -40,21 +44,54 @@ export function resolvePublicCardApiBase(fallbackOrigin = "") {
   )
     .trim()
     .replace(/\/$/, "");
-  if (explicit.startsWith("http")) return explicit;
+
+  const pickApiHost = () => {
+    if (apiUrl.startsWith("http") && !isLocalDevOrigin(apiUrl)) return apiUrl;
+    return "https://api.vlue.kr";
+  };
+
+  if (explicit.startsWith("http")) {
+    try {
+      const host = new URL(explicit).hostname.toLowerCase();
+      /* www·루트 도메인은 Cloudflare SPA — OG 스크래퍼에 API 호스트 필요 */
+      if (host === "www.vlue.kr" || host === "vlue.kr") return pickApiHost();
+    } catch {
+      /* ignore */
+    }
+    if (!isLocalDevOrigin(explicit)) return explicit;
+  }
+
+  if (apiUrl.startsWith("http") && !isLocalDevOrigin(apiUrl)) return apiUrl;
 
   const { landing } = getVlueViralLinks();
   const landingBase = landing.replace(/\/$/, "");
 
   if (typeof window !== "undefined" && isLocalDevOrigin(window.location?.origin)) {
-    return landingBase;
+    return pickApiHost();
   }
   const fb = String(fallbackOrigin || "").trim().replace(/\/$/, "");
-  if (fb.startsWith("http") && !isLocalDevOrigin(fb)) return fb;
+  if (fb.startsWith("http") && !isLocalDevOrigin(fb)) {
+    try {
+      const host = new URL(fb).hostname.toLowerCase();
+      if (host === "www.vlue.kr" || host === "vlue.kr") return pickApiHost();
+    } catch {
+      /* ignore */
+    }
+    return fb;
+  }
   if (typeof window !== "undefined" && window.location?.origin) {
     const origin = window.location.origin.replace(/\/$/, "");
-    if (!isLocalDevOrigin(origin)) return origin;
+    if (!isLocalDevOrigin(origin)) {
+      try {
+        const host = new URL(origin).hostname.toLowerCase();
+        if (host === "www.vlue.kr" || host === "vlue.kr") return pickApiHost();
+      } catch {
+        /* ignore */
+      }
+      return origin;
+    }
   }
-  return landingBase;
+  return pickApiHost() || landingBase;
 }
 
 /** 외부 공유용 웹 앱 오리진 (쇼케이스 `/site/web/showcase/…`) */

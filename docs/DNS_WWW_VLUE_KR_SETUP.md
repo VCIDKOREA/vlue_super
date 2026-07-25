@@ -32,7 +32,7 @@ npm run verify:www-domain
 | `VITE_API_URL` | `https://api.vlue.kr` | ✅ |
 | `VITE_SUPABASE_URL` | `https://ywhjhdpecwvaujiagaln.supabase.co` | DM 사용 시 |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon 키 | DM 사용 시 |
-| `VITE_CARD_PUBLIC_API_BASE` | `https://www.vlue.kr` | 카카오 명함 |
+| `VITE_CARD_PUBLIC_API_BASE` | `https://api.vlue.kr` | 카카오 OG·명함 HTML (www SPA는 /api를 index.html로 떨어뜨림) |
 | `VITE_VLUE_LANDING_URL` | `https://www.vlue.kr` | |
 | `VITE_VLUE_CREATE_CARD_URL` | `https://www.vlue.kr/membership` | |
 | `VITE_VLUE_PC_WINDOWS_URL` | `https://www.vlue.kr/downloads/VLUE-Setup-1.0.0.exe` | PC 설치 파일 (빌드 후 `npm run web:sync-pc-installer`) |
