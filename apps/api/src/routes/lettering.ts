@@ -219,9 +219,11 @@ letteringRoutes.get("/showcase/style/:userId", async (c) => {
     return c.json({ ok: false, error: "not_found" }, 404);
   }
   const bundle = await getUserShowcaseStyleBundle(userId);
+  /* 라이브가 비면 편집 적용본으로 폴백 — 카톡 공개 링크에서 풀 쇼케이스·BGM 노출 */
+  const live = bundle.live ?? bundle.editor ?? null;
   return c.json({
     ok: true,
-    live: bundle.live,
+    live,
     liveSource: bundle.liveSource,
     updatedAt: bundle.updatedAt
   });

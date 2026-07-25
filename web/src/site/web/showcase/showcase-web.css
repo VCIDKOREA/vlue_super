@@ -313,3 +313,58 @@
   font-weight: 500;
   color: var(--showcase-muted);
 }
+
+/* 카톡 공개 — DCC+ 풀 쇼케이스 */
+.showcase-web-app-root {
+  min-height: 100dvh;
+  background: #0b101b;
+}
+
+.showcase-web--full-fs {
+  position: relative;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #0b101b;
+  overflow: hidden;
+}
+
+.showcase-web--full-fs .peer-showcase-preview {
+  flex: 1;
+  min-height: 0;
+}
+
+.showcase-web__fs-cta {
+  position: absolute;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 40;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.showcase-web__open-full {
+  display: block;
+  width: 100%;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: var(--showcase-radius-sm);
+  background: #0b101b;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+}
