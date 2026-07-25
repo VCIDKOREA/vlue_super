@@ -6913,7 +6913,8 @@ body,
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center top;
+  /* 인라인 objectPosition(photoFocus)이 우선. 기본은 중앙 */
+  object-position: center center;
 }
 
 .ldr-hero__fallback {
@@ -7576,7 +7577,7 @@ body,
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center top;
+  object-position: center center;
 }
 
 .ldr-profile-media__fallback {

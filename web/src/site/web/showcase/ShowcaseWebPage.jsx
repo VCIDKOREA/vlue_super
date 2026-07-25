@@ -36,6 +36,7 @@ function styleHasPublicShowcase(style) {
 export default function ShowcaseWebPage({ phone }) {
   const [payload, setPayload] = useState(null);
   const [showFull, setShowFull] = useState(true);
+  const [bgmPromptOpen, setBgmPromptOpen] = useState(false);
   const { unlockFromUserGesture } = useShowcaseBgm();
 
   useEffect(() => {
@@ -47,16 +48,6 @@ export default function ShowcaseWebPage({ phone }) {
       cancelled = true;
     };
   }, [phone]);
-
-  useEffect(() => {
-    const unlock = () => unlockFromUserGesture?.();
-    window.addEventListener("pointerdown", unlock, { once: true, capture: true });
-    window.addEventListener("touchstart", unlock, { once: true, capture: true });
-    return () => {
-      window.removeEventListener("pointerdown", unlock, true);
-      window.removeEventListener("touchstart", unlock, true);
-    };
-  }, [unlockFromUserGesture]);
 
   const links = getVlueDownloadLinks();
 
@@ -80,6 +71,30 @@ export default function ShowcaseWebPage({ phone }) {
     return false;
   }, [payload]);
 
+  const hasBgm = useMemo(
+    () =>
+      hasShowcaseBgmConfigured(payload?.card?.showcaseStyle || payload?.showcaseStyle),
+    [payload]
+  );
+
+  useEffect(() => {
+    if (!canShowFull || !showFull || !hasBgm) {
+      setBgmPromptOpen(false);
+      return undefined;
+    }
+    setBgmPromptOpen(true);
+    return undefined;
+  }, [canShowFull, showFull, hasBgm]);
+
+  const acceptBgm = () => {
+    setBgmPromptOpen(false);
+    unlockFromUserGesture?.();
+  };
+
+  const declineBgm = () => {
+    setBgmPromptOpen(false);
+  };
+
   if (!payload) {
     return (
       <div className="showcase-web">
@@ -91,16 +106,40 @@ export default function ShowcaseWebPage({ phone }) {
   if (canShowFull && showFull) {
     return (
       <div className="showcase-web showcase-web--full-fs" data-vlue-public-showcase="1">
-        <PeerShowcasePreview
-          card={payload.card}
-          includeDigitalCard={Boolean(payload.isPaid)}
-          digitalCardOnly={false}
-          onClose={() => setShowFull(false)}
-          onToast={() => {}}
-        />
-        <button type="button" className="showcase-web__fs-cta" onClick={handleAppDownload}>
-          VLUE 앱에서 열기
-        </button>
+        <div className="showcase-web__fs-topbar">
+          <button type="button" className="showcase-web__fs-open-app" onClick={handleAppDownload}>
+            VLUE 앱에서 열기
+          </button>
+        </div>
+        <div className="showcase-web__fs-stage">
+          <PeerShowcasePreview
+            card={payload.card}
+            includeDigitalCard={Boolean(payload.isPaid)}
+            digitalCardOnly={false}
+            onClose={() => setShowFull(false)}
+            onToast={() => {}}
+          />
+        </div>
+
+        {bgmPromptOpen ? (
+          <div className="showcase-web__bgm-modal" role="dialog" aria-modal="true" aria-labelledby="showcase-bgm-title">
+            <div className="showcase-web__bgm-card">
+              <p id="showcase-bgm-title" className="showcase-web__bgm-title">
+                해당 디지털인증명함엔 BGM이 있습니다.
+                <br />
+                재생하시겠습니까?
+              </p>
+              <div className="showcase-web__bgm-actions">
+                <button type="button" className="showcase-web__bgm-btn showcase-web__bgm-btn--ghost" onClick={declineBgm}>
+                  나중에
+                </button>
+                <button type="button" className="showcase-web__bgm-btn showcase-web__bgm-btn--primary" onClick={acceptBgm}>
+                  재생
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   }

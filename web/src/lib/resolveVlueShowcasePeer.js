@@ -49,6 +49,7 @@ export async function resolveVlueShowcasePeer(input = {}) {
   let address = "";
   let publicHandle = handle;
   let logoUrl = "";
+  let photoFocus = "center";
   let activityName = "";
   let authCycleEndAt = null;
   let authPaidAt = null;
@@ -82,6 +83,7 @@ export async function resolveVlueShowcasePeer(input = {}) {
         .replace(/^@/, "")
         .trim();
       logoUrl = String(exp?.logoUrl || "").trim();
+      photoFocus = String(exp?.photoFocus || "center").trim() || "center";
       activityName = String(exp?.activityName || "").trim();
       /* photo ≠ logo — 로고를 프로필 사진으로 쓰지 않음 */
       photoUrl =
@@ -113,6 +115,7 @@ export async function resolveVlueShowcasePeer(input = {}) {
       handle: publicHandle,
       activityName: activityName || name,
       photoUrl,
+      photoFocus,
       logoUrl,
       membershipTier: tier,
       authCycleEndAt,
@@ -132,6 +135,8 @@ export async function resolveVlueShowcasePeer(input = {}) {
         userId,
         ownerUserId: userId,
         showcaseStyle,
+        photoFocus: card.photoFocus,
+        logoUrl: card.logoUrl,
         authCycleEndAt,
         authPaidAt,
         cycleEndAt: authCycleEndAt

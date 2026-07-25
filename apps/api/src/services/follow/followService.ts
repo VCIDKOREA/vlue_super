@@ -588,6 +588,7 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
       : null;
   const photoUrl = String(snap?.photoUrl || snap?.image_url || snap?.imageUrl || "").trim();
   const logoUrl = String(snap?.logoUrl || "").trim();
+  const photoFocus = String(snap?.photoFocus || "").trim();
   const sub = user.subscriptions?.[0] || null;
 
   /** 디지털 인증명함 송출 스냅샷 — 쇼케이스·명함 열람용 (검색 마스킹과 별도) */
@@ -603,7 +604,8 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
         address: String(snap.address || "").trim(),
         activityName: String(snap.activityName || "").trim(),
         photoUrl,
-        logoUrl
+        logoUrl,
+        photoFocus
       }
     : null;
 

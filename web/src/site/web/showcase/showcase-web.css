@@ -330,27 +330,99 @@
   overflow: hidden;
 }
 
-.showcase-web--full-fs .peer-showcase-preview {
+.showcase-web__fs-topbar {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px calc(6px + env(safe-area-inset-top, 0px));
+  padding-top: max(10px, env(safe-area-inset-top, 0px));
+  z-index: 30;
+  background: linear-gradient(180deg, rgba(11, 16, 27, 0.92), rgba(11, 16, 27, 0.35) 70%, transparent);
+}
+
+.showcase-web__fs-open-app {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: rgba(37, 99, 235, 0.95);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.showcase-web__fs-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.showcase-web__fs-stage .peer-showcase-preview {
   flex: 1;
   min-height: 0;
 }
 
-.showcase-web__fs-cta {
+.showcase-web__bgm-modal {
   position: absolute;
-  left: 50%;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  z-index: 40;
-  padding: 10px 16px;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.82);
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.showcase-web__bgm-card {
+  width: min(100%, 320px);
+  border-radius: 16px;
+  padding: 20px 18px 16px;
+  background: #111827;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.showcase-web__bgm-title {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.55;
+  letter-spacing: -0.02em;
   color: #e2e8f0;
-  font-size: 12px;
+}
+
+.showcase-web__bgm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.showcase-web__bgm-btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 10px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  backdrop-filter: blur(8px);
   cursor: pointer;
+}
+
+.showcase-web__bgm-btn--ghost {
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+}
+
+.showcase-web__bgm-btn--primary {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  color: #fff;
 }
 
 .showcase-web__open-full {
