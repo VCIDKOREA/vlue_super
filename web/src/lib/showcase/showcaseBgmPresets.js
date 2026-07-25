@@ -143,16 +143,21 @@ export function resolveShowcaseBgmLabel(styleConfig) {
  * - 재생목록 2곡 이상 → 항상 목록 큐 (단독 모드로 남아 있어도 스킵·연속재생 가능)
  * - order / shuffle_selected → 재생목록(없으면 주제곡)
  * - single + 목록 0~1곡 → 주제곡만
+ * - audioUrl 이 비고 soundId 만 있어도 큐에 포함 (재생 직전 서명 URL 재조회)
  */
 export function resolvePlaylistTracks(bgm) {
   if (!bgm || bgm.mode === "none") return [];
   const mode = String(bgm.playMode || "single");
   const list = Array.isArray(bgm.playlist)
-    ? bgm.playlist.filter((t) => t?.audioUrl && !t.linkBroken)
+    ? bgm.playlist.filter((t) => {
+        if (t?.linkBroken) return false;
+        return Boolean(String(t?.audioUrl || "").trim() || String(t?.soundId || "").trim());
+      })
     : [];
   const themeTrack = () => {
     const url = String(bgm.audioUrl || "").trim();
-    if (!url || bgm.linkBroken) return [];
+    const sid = String(bgm.soundId || "").trim();
+    if ((!url && !sid) || bgm.linkBroken) return [];
     return [
       {
         soundId: bgm.soundId,

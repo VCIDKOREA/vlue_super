@@ -605,6 +605,10 @@ export function ShowcaseBgmProvider({ children }) {
       if (list.length <= 1) return;
       cancelFade();
       const mode = String(bgm?.playMode || "single");
+      /* 셔플 큐가 트랙 수와 어긋나면 재생성 (입장 후 목록만 바뀐 경우) */
+      if (mode === "shuffle_selected" && playOrderRef.current.length !== list.length) {
+        syncPlayOrder(bgm, visitKeyRef.current || `shuffle-${Date.now()}`);
+      }
       let nextTrackIdx = safeIndexRef.current;
       if (mode === "shuffle_selected" && playOrderRef.current.length > 1) {
         const len = playOrderRef.current.length;
@@ -622,20 +626,39 @@ export function ShowcaseBgmProvider({ children }) {
         nextTrackIdx = (safeIndexRef.current + delta + list.length) % list.length;
         playOrderPosRef.current = nextTrackIdx;
       }
+      /* refreshUrlIfNeeded 가 읽는 인덱스를 즉시 맞춤 (setState 반영 전) */
+      safeIndexRef.current = nextTrackIdx;
       setTrackIndex(nextTrackIdx);
       setUserMuted(false);
       setTouchUnlocked(true);
       bumpPlayEpoch();
       const key = visitKeyRef.current || "live";
-      const url = resolveUrlFromConfig(styleConfigRef.current, key, nextTrackIdx);
-      if (url) {
-        const el = ensureAudioEl();
-        el.loop = !isPlaylistAdvanceMode(bgm);
+      const el = ensureAudioEl();
+      el.loop = !isPlaylistAdvanceMode(bgm);
+      const startUrl = (url) => {
+        if (!url) return;
         el.dataset.vluePlayToken = `${playEpochRef.current}|${key}|${nextTrackIdx}|${url}`;
         void tryPlayNow(url, resolveBgmVolumeGain(styleConfigRef.current));
+      };
+      const url = resolveUrlFromConfig(styleConfigRef.current, key, nextTrackIdx);
+      if (url) {
+        startUrl(url);
+        return;
       }
+      /* 서명 URL 만료·미포함 — soundId 로 재조회 후 재생 */
+      void refreshUrlIfNeeded(styleConfigRef.current).then(({ url: fresh }) => {
+        startUrl(fresh);
+      });
     },
-    [bumpPlayEpoch, cancelFade, ensureAudioEl, resolveUrlFromConfig, tryPlayNow]
+    [
+      bumpPlayEpoch,
+      cancelFade,
+      ensureAudioEl,
+      refreshUrlIfNeeded,
+      resolveUrlFromConfig,
+      syncPlayOrder,
+      tryPlayNow
+    ]
   );
 
   const skipPrev = useCallback(() => skipTrack(-1), [skipTrack]);
@@ -645,6 +668,7 @@ export function ShowcaseBgmProvider({ children }) {
     const bgm = styleConfigRef.current?.bgm;
     if (!isPlaylistAdvanceMode(bgm)) return;
     const p = phaseRef.current;
+    /* 프로필·케이스함·실통화 미리보기 — 곡이 끝나면 다음 곡 */
     if (p !== "preview" && p !== "replay" && p !== "settings_preview") return;
     skipTrack(1);
   };

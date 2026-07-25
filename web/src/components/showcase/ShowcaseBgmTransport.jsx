@@ -25,7 +25,8 @@ export default function ShowcaseBgmTransport({ className = "", styleConfig = nul
 
   if (!hasBgm) return null;
 
-  const skipEnabled = canSkipTracks || trackCount > 1;
+  /* 컨텍스트 큐와 UI 표시를 맞춤 — 버튼만 켜지고 skip 이 무시되던 불일치 방지 */
+  const skipEnabled = Boolean(canSkipTracks) && trackCount > 1;
   const paused = !isAudible;
   const prevGlyph = skipEnabled ? "◀◀" : "◁◁";
   const nextGlyph = skipEnabled ? "▶▶" : "▷▷";
