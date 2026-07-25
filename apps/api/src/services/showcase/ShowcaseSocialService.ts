@@ -1,11 +1,13 @@
 /**
- * V2 쇼케이스 소셜 — 좋아요·댓글
+ * V2 쇼케이스 소셜 — 좋아요·댓글 (+ FCM 푸시)
  */
 import { prisma } from "../../db/client.js";
+import { sendShowcaseSocialPushToUser } from "../fcmNotificationService.js";
 
 const COMMENT_MAX = 1000;
 const COMMENT_RATE_WINDOW_MS = 60_000;
 const COMMENT_RATE_LIMIT = 8;
+const PUSH_BODY_MAX = 120;
 
 const commentBuckets = new Map<string, number[]>();
 
@@ -58,6 +60,38 @@ function serializeAuthor(author: {
     name: activity || author.legalName || author.publicHandle || "회원",
     avatarUrl: photoFromExportSnap(snap)
   };
+}
+
+async function resolveActorLabel(userId: string): Promise<string> {
+  try {
+    const u = await prisma.user.findUnique({
+      where: { id: userId },
+      select: authorSelect
+    });
+    if (!u) return "회원";
+    return serializeAuthor(u).name;
+  } catch {
+    return "회원";
+  }
+}
+
+function clipPushBody(text: string): string {
+  const s = String(text || "").replace(/\s+/g, " ").trim();
+  if (s.length <= PUSH_BODY_MAX) return s;
+  return `${s.slice(0, PUSH_BODY_MAX - 1)}…`;
+}
+
+/** 실패해도 좋아요/댓글 API에 영향 없음 */
+function fireShowcasePush(
+  userId: string,
+  title: string,
+  body: string,
+  data: Record<string, unknown>
+): void {
+  if (!userId) return;
+  void sendShowcaseSocialPushToUser(userId, title, clipPushBody(body), data).catch((err) => {
+    console.warn("[showcase-social] fcm_push_failed", { userId, err });
+  });
 }
 
 export async function getShowcaseSocialSummary(opts: {
@@ -132,11 +166,25 @@ export async function toggleShowcaseLike(opts: {
     await prisma.showcaseReaction.create({ data: key });
   }
 
+  const likedByMe = !existing;
   const likeCount = await prisma.showcaseReaction.count({
     where: { ownerUserId: opts.ownerUserId, type: "like", slideId }
   });
 
-  return { likedByMe: !existing, likeCount };
+  /* 좋아요 시에만 푸시 — 취소·본인 좋아요는 제외 */
+  if (likedByMe && opts.ownerUserId !== opts.actorUserId) {
+    void resolveActorLabel(opts.actorUserId).then((actorName) => {
+      fireShowcasePush(opts.ownerUserId, "새 좋아요", `${actorName}님이 회원님의 쇼케이스를 좋아합니다.`, {
+        type: "vlue-showcase-like",
+        ownerUserId: opts.ownerUserId,
+        actorUserId: opts.actorUserId,
+        slideId,
+        likeCount: String(likeCount)
+      });
+    });
+  }
+
+  return { likedByMe, likeCount };
 }
 
 export async function listShowcaseComments(opts: {
@@ -176,6 +224,7 @@ export async function createShowcaseComment(opts: {
 
   const slideId = slideKey(opts.slideId);
   const parentId = String(opts.parentId || "").trim() || null;
+  let parentAuthorUserId: string | null = null;
 
   if (parentId) {
     const parent = await prisma.showcaseComment.findFirst({
@@ -185,7 +234,7 @@ export async function createShowcaseComment(opts: {
         slideId,
         deletedAt: null
       },
-      select: { id: true, parentId: true }
+      select: { id: true, parentId: true, authorUserId: true }
     });
     if (!parent) {
       return { ok: false as const, error: "답글 대상 댓글을 찾을 수 없습니다.", status: 404 as const };
@@ -197,6 +246,7 @@ export async function createShowcaseComment(opts: {
         status: 400 as const
       };
     }
+    parentAuthorUserId = parent.authorUserId;
   }
 
   const row = await prisma.showcaseComment.create({
@@ -210,6 +260,43 @@ export async function createShowcaseComment(opts: {
     include: { author: { select: authorSelect } }
   });
 
+  const author = serializeAuthor(row.author);
+  const preview = clipPushBody(body);
+  const pushBase = {
+    type: parentId ? "vlue-showcase-comment-reply" : "vlue-showcase-comment",
+    ownerUserId: opts.ownerUserId,
+    actorUserId: opts.authorUserId,
+    slideId,
+    commentId: row.id,
+    parentId: parentId || ""
+  };
+
+  /* 쇼케이스 주인에게 알림 (본인 댓글 제외) */
+  if (opts.ownerUserId !== opts.authorUserId) {
+    fireShowcasePush(
+      opts.ownerUserId,
+      parentId ? "새 답글" : "새 댓글",
+      parentId
+        ? `${author.name}님이 회원님의 쇼케이스에 답글을 남겼습니다. ${preview}`
+        : `${author.name}님이 댓글을 남겼습니다. ${preview}`,
+      pushBase
+    );
+  }
+
+  /* 원댓글 작성자에게 답글 알림 (본인·이미 주인으로 보낸 경우 제외) */
+  if (
+    parentAuthorUserId &&
+    parentAuthorUserId !== opts.authorUserId &&
+    parentAuthorUserId !== opts.ownerUserId
+  ) {
+    fireShowcasePush(
+      parentAuthorUserId,
+      "새 답글",
+      `${author.name}님이 회원님의 댓글에 답글을 남겼습니다. ${preview}`,
+      { ...pushBase, type: "vlue-showcase-comment-reply" }
+    );
+  }
+
   return {
     ok: true as const,
     comment: {
@@ -217,7 +304,7 @@ export async function createShowcaseComment(opts: {
       body: row.body,
       parentId: row.parentId || null,
       createdAt: row.createdAt.toISOString(),
-      author: serializeAuthor(row.author)
+      author
     }
   };
 }

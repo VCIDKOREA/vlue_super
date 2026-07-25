@@ -202,25 +202,34 @@ export function ShowcaseBgmProvider({ children }) {
             return false;
           });
       };
+      /* 버퍼 완료(canplay)를 기다리지 않고 바로 play — 체감 지연·missed canplay(최대 8s) 방지 */
       if (!needLoad && el.readyState >= 2) return run();
-      if (el.readyState >= 3) return run();
-      return new Promise((resolve) => {
-        let settled = false;
-        const finish = (ok) => {
-          if (settled) return;
-          settled = true;
-          resolve(ok);
-        };
-        const onReady = () => {
-          el.removeEventListener("canplay", onReady);
-          window.clearTimeout(timer);
-          void run().then(finish);
-        };
-        el.addEventListener("canplay", onReady, { once: true });
-        const timer = window.setTimeout(() => {
-          el.removeEventListener("canplay", onReady);
-          void run().then(finish);
-        }, 8000);
+      return run().then((ok) => {
+        if (ok) return true;
+        if (el.readyState >= 2) return run();
+        return new Promise((resolve) => {
+          let settled = false;
+          const finish = (v) => {
+            if (settled) return;
+            settled = true;
+            resolve(v);
+          };
+          const onReady = () => {
+            el.removeEventListener("canplay", onReady);
+            window.clearTimeout(timer);
+            void run().then(finish);
+          };
+          el.addEventListener("canplay", onReady, { once: true });
+          /* load() 직후 동기 canplay / 캐시 hit — 리스너 등록 전에 끝난 경우 보정 */
+          if (el.readyState >= 2) {
+            onReady();
+            return;
+          }
+          const timer = window.setTimeout(() => {
+            el.removeEventListener("canplay", onReady);
+            void run().then(finish);
+          }, 8000);
+        });
       });
     },
     [ensureAudioEl]
@@ -261,6 +270,10 @@ export function ShowcaseBgmProvider({ children }) {
     el.volume = Math.max(0, Math.min(1, volumeGain));
 
     if (!bgmUrl) {
+      /* URL 이 잠깐 비어도 이미 재생 중이면 끊지 않음 (삭제·스타일 스왑 중 공백) */
+      if (!el.paused && (el.getAttribute("src") || el.src)) {
+        return undefined;
+      }
       el.pause();
       return undefined;
     }
@@ -298,6 +311,12 @@ export function ShowcaseBgmProvider({ children }) {
     }
 
     if (alreadyPlaying) return undefined;
+
+    /* settings_preview 는 setPlaybackPhase→tryPlayNow 가 제스처 안에서 이미 play 함.
+       여기서 load/play 를 한 번 더 하면 버퍼가 리셋되어 반응이 느려짐 */
+    if (phase === "settings_preview" && sameSrc) {
+      return undefined;
+    }
 
     const tryPlay = () => {
       el.volume = Math.max(0, Math.min(1, volumeGain));
@@ -380,11 +399,37 @@ export function ShowcaseBgmProvider({ children }) {
 
       let playKey = visitKeyRef.current;
       let playIndex = safeIndexRef.current;
-      const needsRestart =
+      const cfgEarly = styleConfigRef.current;
+      const urlEarly = resolveUrlFromConfig(
+        cfgEarly,
+        playKey || "live",
+        playIndex
+      );
+      const elEarly = audioRef.current;
+      const alreadyPlayingSame =
+        Boolean(elEarly) &&
+        !elEarly.paused &&
+        !elEarly.ended &&
+        Boolean(urlEarly) &&
+        (elEarly.getAttribute("src") === urlEarly || elEarly.src === urlEarly);
+
+      let needsRestart =
         forceRestart ||
         phaseRef.current === "idle" ||
         phaseRef.current === "call_active" ||
         !visitKeyRef.current;
+
+      /* 같은 곡이 이미 재생 중이면 idle 잔상·콜백 재진입으로 재시작하지 않음 (autoplay 차단 방지) */
+      if (needsRestart && !forceRestart && alreadyPlayingSame) {
+        needsRestart = false;
+        if (phaseRef.current === "idle") {
+          setPhase(next);
+          setTouchUnlocked(true);
+          setUserMuted(false);
+          setAudioPlaying(true);
+          return;
+        }
+      }
 
       if ((next === "preview" || next === "replay" || next === "settings_preview") && needsRestart) {
         playKey = newVisitKey();
@@ -395,18 +440,32 @@ export function ShowcaseBgmProvider({ children }) {
         bumpPlayEpoch();
       }
 
-      setPhase(next);
-      if (next === "call_active") setUserMuted(true);
+    setPhase(next);
+    if (next === "call_active") setUserMuted(true);
       if (next === "replay" || next === "preview" || next === "settings_preview") {
         setTouchUnlocked(true);
         setUserMuted(false);
-        const url = resolveUrlFromConfig(styleConfigRef.current, playKey || "live", playIndex);
+        const cfg = styleConfigRef.current;
+        const url = resolveUrlFromConfig(cfg, playKey || "live", playIndex);
         if (url) {
           const el = ensureAudioEl();
-          const advance = isPlaylistAdvanceMode(styleConfigRef.current?.bgm);
+          const advance = isPlaylistAdvanceMode(cfg?.bgm);
           el.loop = !advance;
           el.dataset.vluePlayToken = `${playEpochRef.current}|${playKey}|${playIndex}|${url}`;
-          void tryPlayNow(url, resolveBgmVolumeGain(styleConfigRef.current));
+          void tryPlayNow(url, resolveBgmVolumeGain(cfg));
+        } else {
+          /* 케이스함·피어: soundId만 있고 서명 URL이 비어 있으면 서버에서 재조회 */
+          void refreshUrlIfNeeded(cfg).then(({ url: fresh, config: nextCfg }) => {
+            if (!fresh) return;
+            if (phaseRef.current !== next && phaseRef.current !== "preview" && phaseRef.current !== "replay") {
+              return;
+            }
+            const el = ensureAudioEl();
+            const advance = isPlaylistAdvanceMode(nextCfg?.bgm || cfg?.bgm);
+            el.loop = !advance;
+            el.dataset.vluePlayToken = `${playEpochRef.current}|${playKey}|${playIndex}|${fresh}`;
+            void tryPlayNow(fresh, resolveBgmVolumeGain(nextCfg || cfg));
+          });
         }
       }
     },
@@ -418,7 +477,8 @@ export function ShowcaseBgmProvider({ children }) {
       tryPlayNow,
       ensureAudioEl,
       resolveUrlFromConfig,
-      syncPlayOrder
+      syncPlayOrder,
+      refreshUrlIfNeeded
     ]
   );
 
@@ -463,6 +523,21 @@ export function ShowcaseBgmProvider({ children }) {
     /* fade 쓰면 다음 미리듣기와 레이스 — 설정에서는 즉시 정지 */
     setPlaybackPhase("idle", { owner: "settings", steal: true });
   }, [setPlaybackPhase]);
+
+  /** 설정 목록 미리듣기용 — 상태 폭주 없이 메인 Audio 만 즉시 멈춤 */
+  const hushMainAudio = useCallback(() => {
+    cancelFade();
+    const el = audioRef.current;
+    if (el) {
+      el.pause();
+      setAudioPlaying(false);
+    }
+    if (phaseRef.current !== "idle" && phaseRef.current !== "call_active") {
+      phaseRef.current = "idle";
+      setPhase("idle");
+    }
+    ownerRef.current = "settings";
+  }, [cancelFade]);
 
   /**
    * 가운데 버튼 — 실제로 안 나오면 재생, 나오면 일시정지.
@@ -587,7 +662,7 @@ export function ShowcaseBgmProvider({ children }) {
     };
     return () => {
       try {
-        delete window.__vlueUnlockShowcaseBgm;
+      delete window.__vlueUnlockShowcaseBgm;
       } catch {
         /* ignore */
       }
@@ -615,6 +690,7 @@ export function ShowcaseBgmProvider({ children }) {
       unlockFromUserGesture,
       previewInSettings,
       stopSettingsPreview,
+      hushMainAudio,
       toggleUserMute,
       setUserMuted,
       skipPrev,
@@ -641,6 +717,7 @@ export function ShowcaseBgmProvider({ children }) {
       unlockFromUserGesture,
       previewInSettings,
       stopSettingsPreview,
+      hushMainAudio,
       toggleUserMute,
       skipPrev,
       skipNext,

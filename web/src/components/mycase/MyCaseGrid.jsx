@@ -14,7 +14,8 @@ import {
   setMycaseBroadcast
 } from "../../lib/mycaseApi.js";
 import { fetchFollowCounts } from "../../lib/followApi.js";
-import { readShowcaseStyle, SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT, createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
+import { fetchPeerShowcaseStyleBundle } from "../../lib/showcase/showcaseStyleApi.js";
+import { readShowcaseStyle, readLiveShowcaseStyle, writeShowcaseStyle, SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT, createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 import {
   applyMycaseItemToLiveBroadcast,
   clearLiveBroadcastMeta,
@@ -35,7 +36,11 @@ import FollowActionButton from "../follow/FollowActionButton.jsx";
 import ShowcaseBgmTrackChip from "../showcase/ShowcaseBgmTrackChip.jsx";
 import ShowcaseBgmTransport from "../showcase/ShowcaseBgmTransport.jsx";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
-import { resolveShowcaseBgmUrl } from "../../lib/showcase/showcaseBgmPresets.js";
+import {
+  createEmptyShowcaseBgm,
+  hasPlayableShowcaseBgm,
+  hasShowcaseBgmConfigured
+} from "../../lib/showcase/showcaseBgmPresets.js";
 import "./my-case-grid.css";
 
 function readSelfProfile() {
@@ -94,12 +99,12 @@ export default function MyCaseGrid({
 }) {
   const isMine = mode === "mine";
   const self = useMemo(() => readSelfProfile(), []);
-  const hasDigitalCard = isMine && readDigitalCardActive();
 
   const [items, setItems] = useState([]);
   const [mainBroadcast, setMainBroadcast] = useState([]);
   const [policy, setPolicy] = useState(null);
   const [remoteProfile, setRemoteProfile] = useState(null);
+  const [peerLiveStyle, setPeerLiveStyle] = useState(null);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [accessDenied, setAccessDenied] = useState(false);
   const [denyReason, setDenyReason] = useState(null);
@@ -114,6 +119,9 @@ export default function MyCaseGrid({
   const initialLoadDoneRef = useRef(false);
   const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
   const [styleTick, setStyleTick] = useState(0);
+  const hasDigitalCard = isMine
+    ? readDigitalCardActive()
+    : Boolean(remoteProfile?.digitalCardIssued);
 
   useEffect(() => {
     toastRef.current = onToast;
@@ -130,21 +138,24 @@ export default function MyCaseGrid({
     : String(remoteProfile?.profile?.publicHandle || "").replace(/^@/, "") || "member";
   const displayName = isMine
     ? self.name
-    : remoteProfile?.profile?.displayName || displayHandle;
+    : String(
+        remoteProfile?.cardExport?.name ||
+          remoteProfile?.profile?.displayName ||
+          remoteProfile?.profile?.legalName ||
+          ""
+      ).trim() || displayHandle;
   const avatarUrl = isMine
     ? self.avatarUrl
     : String(
         remoteProfile?.profile?.avatarUrl ||
           remoteProfile?.profile?.photoUrl ||
+          remoteProfile?.photoUrl ||
+          remoteProfile?.cardExport?.photoUrl ||
           mainBroadcast[0]?.thumbnailUrl ||
           ""
       ).trim();
   const storyOwnerId = isMine ? self.userId : String(ownerUserId || "").trim();
   const hasLiveBroadcast = !accessDenied && mainBroadcast.length > 0;
-  const storyUnseen = useMemo(() => {
-    void storySeenTick;
-    return hasLiveBroadcast && isBroadcastStoryUnseen(storyOwnerId, mainBroadcast);
-  }, [hasLiveBroadcast, storyOwnerId, mainBroadcast, storySeenTick]);
 
   const loadFirst = useCallback(async () => {
     const showFullLoading = !initialLoadDoneRef.current;
@@ -178,8 +189,36 @@ export default function MyCaseGrid({
         setRemoteProfile(data.profile || null);
         setAccessDenied(Boolean(data.accessDenied));
         setDenyReason(data.reason || null);
-        setMainBroadcast(data.mainBroadcast || []);
-        setItems(data.items || []);
+        let mains = data.mainBroadcast || [];
+        let list = data.items || [];
+        let liveStyle = null;
+        const styleRes = await fetchPeerShowcaseStyleBundle(ownerUserId);
+        if (styleRes.ok && styleRes.live && typeof styleRes.live === "object") {
+          liveStyle = styleRes.live;
+        }
+        setPeerLiveStyle(liveStyle);
+        /* 아카이브가 비어도 라이브 송출 스타일이 있으면 본인 마이케이스와 같이 보이게 */
+        if (!data.accessDenied && mains.length === 0 && list.length === 0 && liveStyle) {
+          const cover = extractShowcaseCoverUrl(liveStyle);
+          const title = extractShowcaseArchiveTitle(liveStyle);
+          const synthetic = {
+            id: `live-style-${ownerUserId}`,
+            ownerUserId,
+            title: title || "쇼케이스",
+            thumbnailUrl: cover || "",
+            payloadJson: { style: liveStyle },
+            isPublic: true,
+            isMainBroadcast: true,
+            isLiveStyle: true,
+            slotIndex: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          mains = [synthetic];
+          list = [synthetic];
+        }
+        setMainBroadcast(mains);
+        setItems(list);
         setNextCursor(data.nextCursor || null);
         const counts = data.profile?.follow?.counts;
         if (counts) setFollowCounts(counts);
@@ -218,7 +257,18 @@ export default function MyCaseGrid({
   const caseStyleConfig = useMemo(() => {
     if (isMine) {
       try {
-        return readShowcaseStyle();
+        const editor = readShowcaseStyle();
+        const live = readLiveShowcaseStyle();
+        /* 재생 URL 우선 — 제목만 있는 편집 설정보다 라이브 audioUrl 을 씀 */
+        if (hasPlayableShowcaseBgm(editor)) return editor;
+        if (live && hasPlayableShowcaseBgm(live)) {
+          return { ...editor, bgm: live.bgm };
+        }
+        if (hasShowcaseBgmConfigured(editor)) return editor;
+        if (live && hasShowcaseBgmConfigured(live)) {
+          return { ...editor, bgm: live.bgm };
+        }
+        return editor;
       } catch {
         return createDefaultShowcaseStyle();
       }
@@ -226,11 +276,37 @@ export default function MyCaseGrid({
     const src = mainBroadcast[0] || items[0];
     const payload = src?.payloadJson && typeof src.payloadJson === "object" ? src.payloadJson : {};
     const fromStyle = payload.style && typeof payload.style === "object" ? payload.style : null;
-    if (fromStyle) return { ...createDefaultShowcaseStyle(), ...fromStyle };
-    return null;
-  }, [isMine, mainBroadcast, items, styleTick]);
+    const base = fromStyle
+      ? { ...createDefaultShowcaseStyle(), ...fromStyle }
+      : peerLiveStyle
+        ? { ...createDefaultShowcaseStyle(), ...peerLiveStyle }
+        : null;
+    if (!base) return null;
+    /* 아카이브에 BGM 메타가 비면 라이브 송출 BGM 사용 */
+    const caseBgm = base.bgm;
+    const liveBgm = peerLiveStyle?.bgm;
+    const caseConfigured = hasShowcaseBgmConfigured({ bgm: caseBgm });
+    if (!caseConfigured && liveBgm && hasShowcaseBgmConfigured({ bgm: liveBgm })) {
+      return { ...base, bgm: liveBgm };
+    }
+    return base;
+  }, [isMine, mainBroadcast, items, styleTick, peerLiveStyle]);
 
-  const caseHasBgm = Boolean(resolveShowcaseBgmUrl(caseStyleConfig));
+  const caseHasBgm = hasShowcaseBgmConfigured(caseStyleConfig);
+  const hasLiveStyleContent = useMemo(() => {
+    const style = caseStyleConfig;
+    if (!style) return false;
+    if (extractShowcaseCoverUrl(style)) return true;
+    if (Array.isArray(style.pages) && style.pages.length > 0) return true;
+    return hasShowcaseBgmConfigured(style);
+  }, [caseStyleConfig]);
+  /** 아카이브 송출 슬롯 또는(본인) 현재 라이브 쇼케이스 */
+  const canOpenLiveStory =
+    !accessDenied && (hasLiveBroadcast || (isMine && hasLiveStyleContent));
+  const storyUnseen = useMemo(() => {
+    void storySeenTick;
+    return canOpenLiveStory && isBroadcastStoryUnseen(storyOwnerId, mainBroadcast);
+  }, [canOpenLiveStory, storyOwnerId, mainBroadcast, storySeenTick]);
   const caseBgmFingerprint = useMemo(() => {
     const b = caseStyleConfig?.bgm;
     if (!b || b.mode === "none") return "";
@@ -238,30 +314,44 @@ export default function MyCaseGrid({
     return `${b.mode}|${b.soundId || ""}|${b.audioUrl || ""}|${b.playMode || ""}|${pl}`;
   }, [caseStyleConfig]);
 
-  /* 케이스함 프로필 — 쇼케이스 BGM (게시물 상세는 suppress 로 중복 방지) */
+  const caseBgmFpRef = useRef("");
+  const setPlaybackPhaseRef = useRef(setPlaybackPhase);
+  const bindStyleConfigRef = useRef(bindStyleConfig);
+  setPlaybackPhaseRef.current = setPlaybackPhase;
+  bindStyleConfigRef.current = bindStyleConfig;
+
+  /* 케이스함 프로필 BGM — 게시물 열람/삭제와 독립. fingerprint 변경 시에만 재시작.
+     setPlaybackPhase 를 deps 에 넣지 않음 — 콜백 신원 변경 시 idle cleanup 으로 음악이 끊기던 주원인 */
   useEffect(() => {
     if (!bgmEnabled || !caseHasBgm || !caseStyleConfig) {
-      setPlaybackPhase("idle", { fade: true, owner: "casebox" });
-      return () => {
-        setPlaybackPhase("idle", { fade: true, owner: "casebox" });
-      };
+      setPlaybackPhaseRef.current("idle", { fade: true, owner: "casebox" });
+      caseBgmFpRef.current = "";
+      return undefined;
     }
-    setPlaybackPhase("preview", {
-      forceRestart: true,
+    const fp = caseBgmFingerprint;
+    const changed = caseBgmFpRef.current !== fp;
+    caseBgmFpRef.current = fp;
+    setPlaybackPhaseRef.current("preview", {
+      forceRestart: changed,
       owner: "casebox",
       styleConfig: caseStyleConfig
     });
-    return () => {
-      setPlaybackPhase("idle", { fade: true, owner: "casebox" });
-    };
+    return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- caseStyleConfig는 fingerprint로 추적
-  }, [bgmEnabled, caseHasBgm, caseBgmFingerprint, bindStyleConfig, setPlaybackPhase]);
+  }, [bgmEnabled, caseHasBgm, caseBgmFingerprint]);
+
+  /* 케이스함 화면을 떠날 때만 idle — setPlaybackPhase deps 금지 */
+  useEffect(() => {
+    return () => {
+      setPlaybackPhaseRef.current("idle", { fade: true, owner: "casebox" });
+    };
+  }, []);
 
   useEffect(() => {
     if (!bgmEnabled || !caseHasBgm) return undefined;
-    bindStyleConfig(caseStyleConfig);
+    bindStyleConfigRef.current(caseStyleConfig, { owner: "casebox" });
     return undefined;
-  }, [bgmEnabled, caseHasBgm, caseStyleConfig, bindStyleConfig]);
+  }, [bgmEnabled, caseHasBgm, caseStyleConfig]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -313,6 +403,31 @@ export default function MyCaseGrid({
       toast("게시물 정보가 올바르지 않습니다.");
       return;
     }
+    /* 라이브 스타일 합성 항목 — API detail 없이 바로 열기 */
+    if (item?.isLiveStyle || caseId.startsWith("live-style-")) {
+      const peerMeta = {
+        userId: String(ownerUserId || item.ownerUserId || "").trim(),
+        name: displayName,
+        handle: displayHandle,
+        phone: String(remoteProfile?.profile?.phoneE164 || "").trim(),
+        organization: String(
+          remoteProfile?.profile?.companyName || remoteProfile?.cardExport?.organization || ""
+        ).trim(),
+        photoUrl: avatarUrl,
+        logoUrl: String(remoteProfile?.cardExport?.logoUrl || "").trim(),
+        membershipTier: String(
+          remoteProfile?.membershipTier || remoteProfile?.profile?.membershipTier || "premium"
+        ),
+        digitalCardIssued: Boolean(remoteProfile?.digitalCardIssued),
+        feedItems: items,
+        startIndex: Math.max(
+          0,
+          items.findIndex((x) => x.id === item.id)
+        )
+      };
+      onOpenDetail(item, { item, ok: true, isOwner: false }, peerMeta);
+      return;
+    }
     const detail = await fetchMycaseDetail(caseId);
     if (!detail.ok) {
       toast(detail.message || "마이케이스를 열 수 없습니다.");
@@ -324,9 +439,15 @@ export default function MyCaseGrid({
       name: displayName,
       handle: displayHandle,
       phone: String(remoteProfile?.profile?.phoneE164 || "").trim(),
-      organization: String(remoteProfile?.profile?.companyName || "").trim(),
+      organization: String(
+        remoteProfile?.profile?.companyName || remoteProfile?.cardExport?.organization || ""
+      ).trim(),
       photoUrl: avatarUrl,
-      membershipTier: "premium",
+      logoUrl: String(remoteProfile?.cardExport?.logoUrl || "").trim(),
+      membershipTier: String(
+        remoteProfile?.membershipTier || remoteProfile?.profile?.membershipTier || "premium"
+      ),
+      digitalCardIssued: Boolean(remoteProfile?.digitalCardIssued),
       feedItems: items,
       startIndex: Math.max(
         0,
@@ -336,12 +457,61 @@ export default function MyCaseGrid({
   };
 
   const openLiveBroadcastStory = async () => {
-    if (!hasLiveBroadcast || manageMode) return;
-    const item = mainBroadcast[0];
-    if (!item) return;
+    if (manageMode) return;
     if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
       window.__vlueUnlockShowcaseBgm();
     }
+
+    /* 본인: 현재 송출 중인 라이브 쇼케이스(+DDC)를 우선 표시 */
+    if (isMine) {
+      let style = null;
+      try {
+        style = readShowcaseStyle();
+      } catch {
+        style = null;
+      }
+      const cover = style ? extractShowcaseCoverUrl(style) : "";
+      const title = style ? extractShowcaseArchiveTitle(style) : "";
+      const archived = mainBroadcast[0] || null;
+      if (!style && !archived) {
+        toast("송출 중인 쇼케이스가 없습니다.");
+        return;
+      }
+      if (
+        style &&
+        !cover &&
+        !(Array.isArray(style.pages) && style.pages.length > 0) &&
+        !hasShowcaseBgmConfigured(style) &&
+        !archived
+      ) {
+        toast("송출 중인 쇼케이스가 없습니다. 블루 쇼케이스에서 먼저 꾸며 주세요.");
+        return;
+      }
+      const liveItem = {
+        id: archived?.id || `live-style-${self.userId || "me"}`,
+        ownerUserId: self.userId || "",
+        title: title || archived?.title || "쇼케이스",
+        thumbnailUrl: cover || archived?.thumbnailUrl || "",
+        payloadJson: style
+          ? { style, source: "live_avatar" }
+          : archived?.payloadJson || {},
+        isPublic: true,
+        isMainBroadcast: true,
+        /* 라이브 스타일을 실었으면 API detail 대신 payload 사용 */
+        isLiveStyle: Boolean(style) || !archived || Boolean(archived.isLiveStyle),
+        slotIndex: archived?.slotIndex ?? 0,
+        createdAt: archived?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      markBroadcastStorySeen(storyOwnerId, mainBroadcast.length ? mainBroadcast : [liveItem]);
+      setStorySeenTick((n) => n + 1);
+      await openItem(liveItem);
+      return;
+    }
+
+    if (!hasLiveBroadcast) return;
+    const item = mainBroadcast[0];
+    if (!item) return;
     markBroadcastStorySeen(storyOwnerId, mainBroadcast);
     setStorySeenTick((n) => n + 1);
     await openItem(item);
@@ -382,12 +552,27 @@ export default function MyCaseGrid({
           toast("메인 송출 ON · 통화 미리보기에 반영됨");
         }
       } else {
+        preserveCaseboxBgmBeforeClearLive();
         clearLiveBroadcastMeta();
         toast("메인 송출 OFF");
       }
       onBroadcastChanged?.(res.item, res.policy || null);
     } finally {
       setBusyId(null);
+    }
+  };
+
+  /** 통화용 라이브 비우기 직전 — 재생 URL이 라이브에만 있으면 편집 설정으로 보존 */
+  const preserveCaseboxBgmBeforeClearLive = () => {
+    try {
+      const editor = readShowcaseStyle();
+      if (hasPlayableShowcaseBgm(editor)) return;
+      const live = readLiveShowcaseStyle();
+      if (live && hasPlayableShowcaseBgm(live)) {
+        writeShowcaseStyle({ ...editor, bgm: live.bgm }, { skipSync: true, silent: true });
+      }
+    } catch {
+      /* ignore */
     }
   };
 
@@ -410,6 +595,7 @@ export default function MyCaseGrid({
         if (res.error === "not_found") {
           toast("이미 삭제된 게시물입니다. 목록을 새로고침합니다.");
           if (touchingLive) {
+            preserveCaseboxBgmBeforeClearLive();
             clearLiveBroadcastMeta();
             await hydrateLiveBroadcastFromServer();
           }
@@ -422,8 +608,9 @@ export default function MyCaseGrid({
       if (res.policy) setPolicy(res.policy);
       setItems((prev) => prev.filter((x) => x.id !== caseId));
       setMainBroadcast((prev) => prev.filter((x) => x.id !== caseId));
-      /* 송출 중이던 게시물이면 홈·통화 미리보기에서도 즉시 제거 */
+      /* 송출 게시물 삭제 → 통화 미리보기만 비움. 케이스함 BGM(편집 설정)은 유지 */
       if (touchingLive) {
+        preserveCaseboxBgmBeforeClearLive();
         clearLiveBroadcastMeta();
         await hydrateLiveBroadcastFromServer();
       }
@@ -443,7 +630,8 @@ export default function MyCaseGrid({
     openShowcaseSettings();
   };
 
-  /** 현재 로컬 쇼케이스를 바로 아카이브에 남김 (설정 적용과 동일) */
+  /** 현재 로컬 쇼케이스를 바로 아카이브에 남김 (설정 적용과 동일)
+   * 게시물에는 음원을 넣지 않음 — 케이스함 BGM과 분리 */
   const saveCurrentToArchive = async () => {
     if (!isMine) return;
     const style = readShowcaseStyle();
@@ -456,10 +644,14 @@ export default function MyCaseGrid({
     }
     setBusyId("archive");
     try {
+      const archiveStyle = {
+        ...style,
+        bgm: createEmptyShowcaseBgm()
+      };
       const res = await archiveShowcaseToMycase({
         title,
         thumbnailUrl: cover || null,
-        payloadJson: { style, source: "mycase_save" },
+        payloadJson: { style: archiveStyle, source: "mycase_save" },
         isPublic: style?.privacyMode !== "friend_only"
       });
       if (!res.ok) {
@@ -517,16 +709,18 @@ export default function MyCaseGrid({
           <div className="ig-mycase__profile-row">
             <div
               className={`ig-mycase__avatar-wrap${
-                hasLiveBroadcast ? (storyUnseen ? " is-story-unseen" : " is-story-seen") : ""
+                canOpenLiveStory ? (storyUnseen ? " is-story-unseen" : " is-story-seen") : ""
               }`}
             >
-              {hasLiveBroadcast ? (
+              {canOpenLiveStory ? (
                 <button
                   type="button"
                   className="ig-mycase__avatar-btn"
                   onClick={() => void openLiveBroadcastStory()}
                   aria-label={
-                    storyUnseen ? "송출 중인 쇼케이스 보기 (새 업데이트)" : "송출 중인 쇼케이스 보기"
+                    storyUnseen
+                      ? "현재 송출 쇼케이스 보기 (새 업데이트)"
+                      : "현재 송출 쇼케이스 보기"
                   }
                 >
                   {avatarUrl ? (
@@ -589,8 +783,10 @@ export default function MyCaseGrid({
                         .replace(/^송출중 \d+\/\d+ · /, "")}`
                     : ""}
                 </p>
-              ) : remoteProfile?.profile?.companyName ? (
-                <p className="ig-mycase__bio-text">{remoteProfile.profile.companyName}</p>
+              ) : remoteProfile?.profile?.companyName || remoteProfile?.cardExport?.organization ? (
+                <p className="ig-mycase__bio-text">
+                  {remoteProfile?.profile?.companyName || remoteProfile?.cardExport?.organization}
+                </p>
               ) : (
                 <p className="ig-mycase__bio-text">공개 케이스함</p>
               )}
@@ -620,31 +816,25 @@ export default function MyCaseGrid({
             </div>
           ) : null}
 
-          <div className="ig-mycase__actions">
-            {isMine ? (
-              <>
-                <button
-                  type="button"
-                  className="ig-mycase__btn ig-mycase__btn--secondary"
-                  disabled={busyId === "archive"}
-                  onClick={saveCurrentToArchive}
-                >
-                  아카이브 저장
-                </button>
-                <button
-                  type="button"
-                  className={`ig-mycase__btn ig-mycase__btn--secondary${manageMode ? " is-active" : ""}`}
-                  onClick={() => setManageMode((v) => !v)}
-                >
-                  {manageMode ? "완료" : "송출 관리"}
-                </button>
-              </>
-            ) : (
-              <button type="button" className="ig-mycase__btn ig-mycase__btn--secondary" disabled>
-                메시지
+          {isMine ? (
+            <div className="ig-mycase__actions">
+              <button
+                type="button"
+                className="ig-mycase__btn ig-mycase__btn--secondary"
+                disabled={busyId === "archive"}
+                onClick={saveCurrentToArchive}
+              >
+                아카이브 저장
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                className={`ig-mycase__btn ig-mycase__btn--secondary${manageMode ? " is-active" : ""}`}
+                onClick={() => setManageMode((v) => !v)}
+              >
+                {manageMode ? "완료" : "송출 관리"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 

@@ -17,6 +17,7 @@ import { LETTERING_DEMO_COMPANY_LOGO } from "../lib/letteringDemoAssets.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAvatar.js";
 import { buildAuthValidityVerificationItems } from "../lib/authValidityPeriod.js";
+import { getLocalVlueUserId } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { nativeEndCall, nativeEndCallKeepOverlay } from "../lib/call/nativeCallControl.js";
 import { resolveIsKnownContact } from "../lib/contacts/hybridKnownContact.js";
 import {
@@ -203,6 +204,9 @@ export default function LetteringIncomingNotification({
   isKnownContact: isKnownContactProp,
   /** 홈 본인 미리보기 전용 — 통화 중 상대방 오버레이에는 절대 true 금지 */
   showOwnerSettings = false,
+  /** 상대 열람 — 설정 자리에 닫기 */
+  showPeerClose = false,
+  onPeerClose,
   /** 쇼케이스 꺼짐 미리보기 — 이름 숨김, 번호+VLUE 인증만 */
   showcaseOffPreview = false,
   /** true면 캐러셀 BGM 비활성 (케이스함 BGM과 중복 방지) */
@@ -376,12 +380,16 @@ export default function LetteringIncomingNotification({
         .slice(0, 4);
     }
     if (showcaseOffPreview) return [];
+    const peerId = String(c.userId || c.ownerUserId || "").trim();
+    const me = getLocalVlueUserId();
+    const isPeer = Boolean(peerId && me && peerId !== me);
     return buildAuthValidityVerificationItems({
       paidAt: c.authPaidAt || null,
       cycleEndAt: c.authCycleEndAt || c.cycleEndAt || null,
-      billingCycle: c.billingCycle || null
+      billingCycle: c.billingCycle || null,
+      useLocalFallback: !isPeer
     });
-  }, [c.verificationItems, c.authPaidAt, c.authCycleEndAt, c.cycleEndAt, c.billingCycle, showcaseOffPreview]);
+  }, [c.verificationItems, c.authPaidAt, c.authCycleEndAt, c.cycleEndAt, c.billingCycle, c.userId, c.ownerUserId, showcaseOffPreview]);
 
   const phoneMatched = useMemo(() => {
     if (!verified) return false;
@@ -485,11 +493,22 @@ export default function LetteringIncomingNotification({
   const previewShowcaseId = useMemo(() => {
     const fromCard = String(c.loginId || c.publicHandle || c.handle || "").trim().replace(/^@+/, "");
     if (fromCard) return fromCard;
-    const handle = String(getMemberHandle() || "").trim().replace(/^@+/, "");
-    if (handle && handle !== "user") return handle;
+    const peerId = String(c.userId || c.ownerUserId || "").trim();
+    let meId = "";
+    try {
+      meId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
+    } catch {
+      /* ignore */
+    }
+    const isPeer = Boolean(peerId && meId && peerId !== meId);
+    /* 상대 카드면 내 로컬 핸들로 채우지 않음 (ceo Showcase 오염 방지) */
+    if (!isPeer) {
+      const handle = String(getMemberHandle() || "").trim().replace(/^@+/, "");
+      if (handle && handle !== "user") return handle;
+    }
     const fromName = String(c.name || c.displayName || "").trim();
     return fromName || "VLUE";
-  }, [c.loginId, c.publicHandle, c.handle, c.name, c.displayName]);
+  }, [c.loginId, c.publicHandle, c.handle, c.name, c.displayName, c.userId, c.ownerUserId]);
 
   const displayLabel = isUnverified
     ? null
@@ -938,6 +957,8 @@ export default function LetteringIncomingNotification({
                       onReport={handleReport}
                       showOwnerSettings={Boolean(previewMode && showOwnerSettings)}
                       onOpenSlideSettings={openOwnerSettings}
+                      showPeerClose={Boolean(previewMode && showPeerClose)}
+                      onPeerClose={onPeerClose}
                       onSlideTypeChange={setCarouselSlideType}
                       showcaseStyle={showcaseStyleConfig}
                       suppressBgm={carouselSuppressBgm}
@@ -1002,6 +1023,8 @@ export default function LetteringIncomingNotification({
                       onReport={handleReport}
                       showOwnerSettings={Boolean(previewMode && showOwnerSettings)}
                       onOpenSlideSettings={openOwnerSettings}
+                      showPeerClose={Boolean(previewMode && showPeerClose)}
+                      onPeerClose={onPeerClose}
                       onSlideTypeChange={setCarouselSlideType}
                       showcaseStyle={showcaseStyleConfig}
                       suppressBgm={carouselSuppressBgm}

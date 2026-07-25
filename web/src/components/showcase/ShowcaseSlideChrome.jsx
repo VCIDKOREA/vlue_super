@@ -50,8 +50,9 @@ export default function ShowcaseSlideChrome({
   hideBusinessLinks = false,
   targetUserId: targetUserIdProp = null,
   hideFollow = false,
-  fallbackToMe = true,
-  onToast
+  fallbackToMe = false,
+  onToast,
+  onOpenCaseArchive
 }) {
   const [socialOpen, setSocialOpen] = useState(false);
   const style = card?.showcaseStyle || {};
@@ -60,10 +61,12 @@ export default function ShowcaseSlideChrome({
 
   const activityName = firstText(
     card?.activityName,
+    card?.name,
+    card?.displayName,
+    card?.publicHandle,
+    card?.loginId,
     card?.handle,
     card?.memberId,
-    card?.displayName,
-    card?.name,
     card?.organization
   );
 
@@ -121,6 +124,23 @@ export default function ShowcaseSlideChrome({
     targetUserIdProp || resolveFollowTargetUserId(card, { fallbackToMe }) || ""
   ).trim();
   const showFollow = shouldShowShowcaseFollow(targetUserId, { hideFollow });
+
+  const openCaseArchive = () => {
+    if (typeof onOpenCaseArchive === "function") {
+      onOpenCaseArchive({ userId: targetUserId, name: activityName, card });
+      return;
+    }
+    if (!targetUserId) return;
+    window.dispatchEvent(
+      new CustomEvent("vlue-open-case-user", {
+        detail: {
+          userId: targetUserId,
+          name: activityName,
+          handle: firstText(card?.publicHandle, card?.loginId, card?.handle)
+        }
+      })
+    );
+  };
 
   return (
     <div className="showcase-slide-chrome" data-variant={variant}>
@@ -185,17 +205,29 @@ export default function ShowcaseSlideChrome({
         ) : null}
 
         <div className="showcase-slide-chrome__vlue" aria-label="VLUE 프로필">
-          <div className="showcase-slide-chrome__vlue-avatar" aria-hidden>
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" loading="lazy" draggable={false} />
-            ) : (
-              <span>{letter}</span>
-            )}
-          </div>
-          <div className="showcase-slide-chrome__vlue-meta">
-            <p className="showcase-slide-chrome__vlue-label">VLUE 프로필</p>
-            <p className="showcase-slide-chrome__vlue-name">{activityName || "회원"}</p>
-          </div>
+          <button
+            type="button"
+            className="showcase-slide-chrome__vlue-profile"
+            aria-label={`${activityName || "회원"} 케이스함 열기`}
+            disabled={!targetUserId}
+            onClick={(e) => {
+              e.stopPropagation();
+              openCaseArchive();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <span className="showcase-slide-chrome__vlue-avatar" aria-hidden>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" loading="lazy" draggable={false} />
+              ) : (
+                <span>{letter}</span>
+              )}
+            </span>
+            <span className="showcase-slide-chrome__vlue-meta">
+              <span className="showcase-slide-chrome__vlue-label">VLUE 프로필</span>
+              <span className="showcase-slide-chrome__vlue-name">{activityName || "회원"}</span>
+            </span>
+          </button>
           {(showFollow || hasSocial) ? (
             <div className="showcase-slide-chrome__vlue-actions">
               {showFollow ? (

@@ -79,6 +79,21 @@ export function mapTitleDeptStatusRow(row: Awaited<ReturnType<typeof getLatestTi
 }
 
 export async function getTitleDeptStatusForUser(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { publicHandle: true }
+  });
+  const { isPlatformCeoHandle } = await import("../admin/platformAccountRoles.js");
+  if (isPlatformCeoHandle(user?.publicHandle)) {
+    return {
+      reviewStatus: "approved",
+      approvedTitle: "CEO",
+      approvedDepartment: "",
+      pendingTitle: "",
+      pendingDepartment: "",
+      submittedAt: null as string | null
+    };
+  }
   const row = await getLatestTitleDeptReviewForUser(userId);
   return mapTitleDeptStatusRow(row);
 }

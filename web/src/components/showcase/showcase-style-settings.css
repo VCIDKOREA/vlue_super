@@ -2839,6 +2839,14 @@
   font-size: 15px;
   font-weight: 650;
   outline: none;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.35;
+}
+
+.showcase-photo-studio__input--multiline {
+  min-height: 72px;
+  white-space: pre-wrap;
 }
 
 .showcase-photo-studio__input:focus {
@@ -2848,6 +2856,67 @@
 
 .showcase-photo-studio__input::placeholder {
   color: var(--studio-soft);
+}
+
+.showcase-photo-studio__text-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.showcase-photo-studio__mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+  background: var(--studio-chip-bg, rgba(248, 250, 252, 0.9));
+  color: var(--studio-text);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.showcase-photo-studio__mini-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.showcase-photo-studio__mini-btn--danger {
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #b91c1c;
+}
+
+.showcase-photo-studio__layers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.showcase-photo-studio__layer-chip {
+  max-width: 100%;
+  margin: 0;
+  padding: 5px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--studio-soft);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.showcase-photo-studio__layer-chip.is-on {
+  border-color: rgba(43, 111, 240, 0.85);
+  background: var(--studio-accent-soft);
+  color: var(--studio-accent);
 }
 
 .showcase-photo-studio__sheet {
@@ -3582,11 +3651,24 @@
   border: 1px solid #e2e8f0;
   background: #f8fafc;
   color: #334155;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .showcase-sound-btn--preview.is-on {
   background: #0f172a;
   border-color: #0f172a;
   color: #fff;
+}
+.showcase-sound-btn--preview.is-loading {
+  pointer-events: auto;
+}
+.showcase-sound-btn__spin {
+  animation: showcase-sound-spin 0.7s linear infinite;
+}
+@keyframes showcase-sound-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .showcase-sound-playlist {
   display: flex;

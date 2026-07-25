@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Settings } from "lucide-react";
+import { Settings, X } from "lucide-react";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
 import ShowcaseIdentityCorner from "./ShowcaseIdentityCorner.jsx";
@@ -25,7 +25,7 @@ import ShowcaseSlideChrome from "./ShowcaseSlideChrome.jsx";
 import ShowcaseBgmTrackChip from "./ShowcaseBgmTrackChip.jsx";
 import ShowcaseBgmTransport from "./ShowcaseBgmTransport.jsx";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
-import { resolveShowcaseBgmUrl } from "../../lib/showcase/showcaseBgmPresets.js";
+import { resolveShowcaseBgmUrl, hasShowcaseBgmConfigured } from "../../lib/showcase/showcaseBgmPresets.js";
 
 /** 갤러리 사진 → 슬라이드용 (텍스트 오버레이 필드 유지) */
 function pickPhotoSlideFields(p = {}) {
@@ -39,7 +39,8 @@ function pickPhotoSlideFields(p = {}) {
     overlayX: p.overlayX,
     overlayY: p.overlayY,
     overlayAnim: p.overlayAnim,
-    overlayBorder: p.overlayBorder
+    overlayBorder: p.overlayBorder,
+    textOverlays: Array.isArray(p.textOverlays) ? p.textOverlays : undefined
   };
 }
 
@@ -77,6 +78,9 @@ export default function ShowcaseCallCarousel({
   showOwnerSettings = false,
   /** @param {"card"|"showcase"} kind */
   onOpenSlideSettings,
+  /** 상대 열람 — 설정 버튼 자리에 닫기 */
+  showPeerClose = false,
+  onPeerClose,
   /** @param {"card"|"banner"|"empty-slot"|"paid-identity"|"free-profile"|"free-safe"|string} type */
   onSlideTypeChange,
   /** 쇼케이스 스타일 — Instagram 인증·선택 사진 */
@@ -87,7 +91,7 @@ export default function ShowcaseCallCarousel({
   callChromeSafe = false
 }) {
   const styleConfig = showcaseStyle || card?.showcaseStyle || null;
-  const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
+  const { bindStyleConfig, setPlaybackPhase, styleConfig: playingStyleConfig } = useShowcaseBgm();
   const [index, setIndex] = useState(0);
   const startX = useRef(0);
   const startY = useRef(0);
@@ -103,6 +107,11 @@ export default function ShowcaseCallCarousel({
   const photosPerPage = maxShowcasePhotosPerPage();
   const showDigitalCard = Boolean(includeDigitalCard) && isPaid;
   const maxIgPages = maxInstagramEmbedsForTier(tier, { includeDigitalCard: showDigitalCard });
+  /** 게시물 열람(suppressBgm) 시에도 재생 중인 케이스함 음원 메타를 칩에 표시 */
+  const bgmChipStyle =
+    suppressBgm && !hasShowcaseBgmConfigured(styleConfig) && hasShowcaseBgmConfigured(playingStyleConfig)
+      ? playingStyleConfig
+      : styleConfig;
   const showCornerIdentity = !showDigitalCard;
   const igVerified = isInstagramVerified(styleConfig);
   const igBadge = instagramVerifiedLabel(styleConfig);
@@ -124,12 +133,11 @@ export default function ShowcaseCallCarousel({
   }, [styleConfig]);
 
   /* 쇼케이스 캐러셀이 보이면 BGM 바인딩·재생 (실통화 스크롤 잠금만 무음) · 입장마다 처음부터
-   * styleConfig 객체 참조 변경으로 effect가 반복 재실행되면 재생이 끊기므로 fingerprint만 의존 */
+   * styleConfig 객체 참조 변경으로 effect가 반복 재실행되면 재생이 끊기므로 fingerprint만 의존
+   * suppressBgm=true: 케이스함 등 상위 BGM을 끊지 않음 (재생 제어 완전 스킵, 칩 표시는 유지)
+   * setPlaybackPhase 는 deps 금지 — 콜백 신원 변경 시 cleanup idle 로 끊김 방지 */
   useEffect(() => {
-    if (suppressBgm) {
-      setPlaybackPhase("idle", { fade: true, owner: "carousel" });
-      return undefined;
-    }
+    if (suppressBgm) return undefined;
     const hasBgm = Boolean(resolveShowcaseBgmUrl(styleConfig));
     if (!hasBgm) {
       setPlaybackPhase("idle", { fade: true, owner: "carousel", styleConfig });
@@ -147,13 +155,7 @@ export default function ShowcaseCallCarousel({
       setPlaybackPhase("idle", { fade: true, owner: "carousel" });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- styleConfig는 bgmFingerprint로 추적
-  }, [
-    bgmFingerprint,
-    previewMode,
-    scrollEnabled,
-    suppressBgm,
-    setPlaybackPhase
-  ]);
+  }, [bgmFingerprint, previewMode, scrollEnabled, suppressBgm]);
 
   /* 스타일 객체만 바뀌고 음원이 같으면 바인딩만 갱신 (재생 재시작 없음) */
   useEffect(() => {
@@ -553,6 +555,45 @@ export default function ShowcaseCallCarousel({
     onOpenSlideSettings?.(kind);
   };
 
+  const handlePeerClose = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onPeerClose?.();
+  };
+
+  const renderSlideCornerAction = (kind, banner = false) => {
+    if (keypadOpen) return null;
+    if (showPeerClose) {
+      return (
+        <button
+          type="button"
+          className={`showcase-call-carousel__slide-settings${banner ? " showcase-call-carousel__slide-settings--banner" : ""}`}
+          aria-label="닫기"
+          title="닫기"
+          onClick={handlePeerClose}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <X className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+          닫기
+        </button>
+      );
+    }
+    if (!showOwnerSettings) return null;
+    return (
+      <button
+        type="button"
+        className={`showcase-call-carousel__slide-settings${banner ? " showcase-call-carousel__slide-settings--banner" : ""}`}
+        aria-label={kind === "card" ? "디지털 인증명함 설정" : "블루 쇼케이스 설정"}
+        title={kind === "card" ? "명함 설정" : "쇼케이스 설정"}
+        onClick={openSlideSettings(kind)}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+        설정
+      </button>
+    );
+  };
+
   const photoIndexBase = showDigitalCard ? 1 : 0;
   const showcaseSlideTotal = Math.max(1, count - photoIndexBase);
   const slideLabel =
@@ -592,17 +633,18 @@ export default function ShowcaseCallCarousel({
         <div className="showcase-call-carousel__meta">
           <span className="showcase-call-carousel__meta-label">{slideLabel}</span>
           <div className="showcase-call-carousel__meta-right">
-            {!suppressBgm ? (
+            {/* suppressBgm 이어도 음원 칩·컨트롤은 표시 — 실제 재생은 케이스함 등 상위 owner 유지 */}
+            {hasShowcaseBgmConfigured(bgmChipStyle) || !suppressBgm ? (
               <div className="showcase-call-carousel__bgm-bar" aria-label="쇼케이스 배경음악">
                 <ShowcaseBgmTrackChip
-                  styleConfig={styleConfig}
+                  styleConfig={bgmChipStyle}
                   placement="top"
                   className="showcase-call-carousel__bgm"
                   visible
                 />
                 <ShowcaseBgmTransport
                   className="showcase-call-carousel__bgm-transport"
-                  styleConfig={styleConfig}
+                  styleConfig={bgmChipStyle}
                 />
               </div>
             ) : null}
@@ -644,19 +686,7 @@ export default function ShowcaseCallCarousel({
               <article key={slide.id} className="showcase-call-carousel__slide">
                 {slide.type === "card" && isPaid ? (
                   <div className="showcase-call-carousel__card">
-                    {showOwnerSettings && !keypadOpen ? (
-                      <button
-                        type="button"
-                        className="showcase-call-carousel__slide-settings"
-                        aria-label="디지털 인증명함 설정"
-                        title="명함 설정"
-                        onClick={openSlideSettings("card")}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
-                        설정
-                      </button>
-                    ) : null}
+                    {renderSlideCornerAction("card")}
                     <LetteringDigitalReception
                       card={card}
                       verified={verified}
@@ -678,19 +708,7 @@ export default function ShowcaseCallCarousel({
 
                 {slide.type === "instagram-post" ? (
                   <div className="showcase-call-carousel__banner showcase-call-carousel__banner--ig-post">
-                    {showOwnerSettings && !keypadOpen ? (
-                      <button
-                        type="button"
-                        className="showcase-call-carousel__slide-settings showcase-call-carousel__slide-settings--banner"
-                        aria-label="블루 쇼케이스 설정"
-                        title="쇼케이스 설정"
-                        onClick={openSlideSettings("showcase")}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
-                        설정
-                      </button>
-                    ) : null}
+                    {renderSlideCornerAction("showcase", true)}
                     <ShowcaseInstagramPost
                       username={slide.username || igUsername}
                       profilePictureUrl={slide.profilePictureUrl || igProfilePictureUrl}
@@ -752,6 +770,7 @@ export default function ShowcaseCallCarousel({
                         card={card}
                         variant="instagram"
                         hideBusinessLinks
+                        fallbackToMe={false}
                         onToast={onKeypadToast}
                       />
                     ) : null}
@@ -760,19 +779,7 @@ export default function ShowcaseCallCarousel({
 
                 {slide.type === "media-page" || slide.type === "banner" ? (
                   <div className="showcase-call-carousel__banner">
-                    {showOwnerSettings && !keypadOpen ? (
-                      <button
-                        type="button"
-                        className="showcase-call-carousel__slide-settings showcase-call-carousel__slide-settings--banner"
-                        aria-label="블루 쇼케이스 설정"
-                        title="쇼케이스 설정"
-                        onClick={openSlideSettings("showcase")}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
-                        설정
-                      </button>
-                    ) : null}
+                    {renderSlideCornerAction("showcase", true)}
                     <ShowcaseMediaPage
                       photos={
                         slide.type === "media-page"
@@ -806,6 +813,7 @@ export default function ShowcaseCallCarousel({
                           card={card}
                           variant="custom"
                           businessLink={slide.businessLink || null}
+                          fallbackToMe={false}
                           onToast={onKeypadToast}
                         />
                         <ShowcaseBannerSocialLayer
@@ -841,19 +849,7 @@ export default function ShowcaseCallCarousel({
 
                 {slide.type === "empty-slot" ? (
                   <div className="showcase-call-carousel__banner showcase-call-carousel__banner--empty">
-                    {showOwnerSettings && !keypadOpen ? (
-                      <button
-                        type="button"
-                        className="showcase-call-carousel__slide-settings showcase-call-carousel__slide-settings--banner"
-                        aria-label="블루 쇼케이스 설정"
-                        title="쇼케이스 설정"
-                        onClick={openSlideSettings("showcase")}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
-                        설정
-                      </button>
-                    ) : null}
+                    {renderSlideCornerAction("showcase", true)}
                     <div className="showcase-call-carousel__paid-sheet-stage" aria-hidden />
                     <div className="showcase-call-carousel__banner-veil" aria-hidden />
                     <p className="showcase-call-carousel__banner-caption showcase-call-carousel__banner-caption--empty">

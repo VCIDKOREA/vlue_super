@@ -114,19 +114,25 @@ function parseDate(value) {
  *   paidAt?: Date|string|null,
  *   cycleEndAt?: Date|string|null,
  *   validUntil?: Date|string|null,
+ *   useLocalFallback?: boolean,
  * }} [opts]
  * @returns {{ cycle: string, paidAt: Date|null, validUntil: Date|null, label: string, line: string, display: string } | null}
  */
 export function resolveAuthValidityPeriod(opts = {}) {
+  const useLocal = opts.useLocalFallback !== false;
   const cycle =
     opts.billingCycle === "annual" || opts.billingCycle === "monthly"
       ? opts.billingCycle
-      : readMembershipBillingCycle();
+      : useLocal
+        ? readMembershipBillingCycle()
+        : "monthly";
 
-  const explicitUntil = parseDate(opts.validUntil) || parseDate(opts.cycleEndAt) || readMembershipCycleEndAt();
+  const explicitUntil =
+    parseDate(opts.validUntil) ||
+    parseDate(opts.cycleEndAt) ||
+    (useLocal ? readMembershipCycleEndAt() : null);
 
-  let paidAt =
-    parseDate(opts.paidAt) || readMembershipPaidAt();
+  let paidAt = parseDate(opts.paidAt) || (useLocal ? readMembershipPaidAt() : null);
 
   let validUntil = explicitUntil;
   if (!validUntil && paidAt) {

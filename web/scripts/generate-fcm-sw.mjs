@@ -1,19 +1,33 @@
 /**
  * 빌드 시 Firebase Messaging service worker 생성.
  * VITE_FIREBASE_* / VITE_WEB_PUSH_VAPID_PUBLIC_KEY 가 없으면 no-op SW.
+ *
+ * Vite 기동 전에 단독 실행되므로 process.env 만으로는 web/.env 가 안 보임 → loadEnv 로 병합.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadEnv } from "vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const outPath = path.join(__dirname, "../public/firebase-messaging-sw.js");
+const webRoot = path.join(__dirname, "..");
+const monorepoRoot = path.join(webRoot, "..");
+const outPath = path.join(webRoot, "public/firebase-messaging-sw.js");
 
-const apiKey = String(process.env.VITE_FIREBASE_API_KEY ?? "").trim();
-const authDomain = String(process.env.VITE_FIREBASE_AUTH_DOMAIN ?? "").trim();
-const projectId = String(process.env.VITE_FIREBASE_PROJECT_ID ?? "").trim();
-const messagingSenderId = String(process.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? "").trim();
-const appId = String(process.env.VITE_FIREBASE_APP_ID ?? "").trim();
+const mode = process.env.NODE_ENV === "production" ? "production" : "development";
+const fromFiles = {
+  ...loadEnv(mode, monorepoRoot, "VITE_"),
+  ...loadEnv(mode, webRoot, "VITE_")
+};
+function env(key) {
+  return String(process.env[key] ?? fromFiles[key] ?? "").trim();
+}
+
+const apiKey = env("VITE_FIREBASE_API_KEY");
+const authDomain = env("VITE_FIREBASE_AUTH_DOMAIN");
+const projectId = env("VITE_FIREBASE_PROJECT_ID");
+const messagingSenderId = env("VITE_FIREBASE_MESSAGING_SENDER_ID");
+const appId = env("VITE_FIREBASE_APP_ID");
 
 const configured = apiKey && projectId && messagingSenderId && appId;
 

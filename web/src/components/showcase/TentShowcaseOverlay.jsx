@@ -9,7 +9,7 @@ import {
   X
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
-import { readActiveShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
+import { readActiveShowcaseStyle, createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 import { readShowcasePrivacyMode } from "../../lib/showcase/showcasePrivacyMode.js";
 import {
   areShowcaseLinksEnabled,
@@ -158,7 +158,11 @@ export default function TentShowcaseOverlay({
 
   const tier = normalizeUserTier(membershipTier || card?.membershipTier);
   const isPaid = tier === USER_TIERS.PAID;
-  const style = showcaseStyle || readActiveShowcaseStyle();
+  /* 미리보기·피어는 내 로컬 라이브 스타일로 폴백하지 않음 (계정 잔여 오염 방지) */
+  const style =
+    showcaseStyle ||
+    card?.showcaseStyle ||
+    (previewMode ? createDefaultShowcaseStyle() : readActiveShowcaseStyle());
   const privacyMode = privacyModeProp || readShowcasePrivacyMode(tier);
 
   const [known, setKnown] = useState(() => resolveIsKnownContactSync(peerPhone));

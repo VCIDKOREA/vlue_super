@@ -11,14 +11,13 @@ import {
   mapHashtagSearchHits
 } from "../lib/followShowcaseEntries.js";
 import { searchShowcaseByTag } from "../lib/showcase/showcaseTagsApi.js";
-import { resolveVlueShowcaseByPhone } from "../lib/resolveVlueShowcaseByPhone.js";
+import { resolveVlueShowcasePeer } from "../lib/resolveVlueShowcasePeer.js";
 import { VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
-import TentShowcaseOverlay from "./showcase/TentShowcaseOverlay.jsx";
+import PeerShowcasePreview from "./showcase/PeerShowcasePreview.jsx";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
 import AppFullScreenView from "./AppFullScreenView.jsx";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
-import { CALL_STATES } from "../lib/showcase/tentShowcaseTypes.js";
 import VLUE_BRAND_LOGO from "../assets/vlue-shield-eye-logo.svg?url";
 import UserCaseArchiveView from "./mycase/UserCaseArchiveView.jsx";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
@@ -421,28 +420,43 @@ export default function FriendShowcaseList({
     setPreviewCard(null);
     markFriendShowcaseSeen(row.id, row.updatedAt || Date.now());
     setActivityTick((n) => n + 1);
-    const phone = row.phone || row.phoneDisplay;
-    if (!phone) {
+    const uid = OWNER_UUID_RE.test(String(row.userId || "")) ? String(row.userId).trim() : "";
+    const handle = String(row.publicHandle || "").replace(/^@/, "").trim();
+    const phone = row.phone || row.phoneDisplay || "";
+    if (!uid && !handle && !phone) {
       setPreviewLoading(false);
       return;
     }
     setPreviewLoading(true);
     try {
-      const payload = await resolveVlueShowcaseByPhone(phone);
+      const payload = await resolveVlueShowcasePeer({
+        userId: uid,
+        handle,
+        phone,
+        displayName: row.name || "",
+        membershipTier: row.membershipTier || "free",
+        avatarUrl: row.avatarUrl || ""
+      });
       const tier = payload.card?.membershipTier || row.membershipTier || "free";
+      const peerUid = String(
+        payload.card?.userId || (OWNER_UUID_RE.test(String(row.userId || "")) ? row.userId : "")
+      ).trim();
       setPreviewCard({
         ...payload.card,
-        userId: payload.card?.userId || (OWNER_UUID_RE.test(String(row.userId || "")) ? row.userId : ""),
-        ownerUserId:
-          payload.card?.ownerUserId ||
-          payload.card?.userId ||
-          (OWNER_UUID_RE.test(String(row.userId || "")) ? row.userId : ""),
+        userId: peerUid,
+        ownerUserId: payload.card?.ownerUserId || peerUid,
         name: payload.card?.name || row.name,
-        phone: payload.phone || row.phoneDisplay || row.phone,
+        phone: payload.phone || row.phoneDisplay || row.phone || "",
         membershipTier: tier,
         photoUrl: payload.card?.photoUrl || row.avatarUrl || "",
         avatarUrl: payload.card?.avatarUrl || row.avatarUrl || "",
-        showcaseStyle: payload.card?.showcaseStyle || createDefaultShowcaseStyle()
+        email: payload.card?.email || "",
+        organization: payload.card?.organization || "",
+        website: payload.card?.website || "",
+        authCycleEndAt: payload.card?.authCycleEndAt || payload.card?.cycleEndAt || null,
+        authPaidAt: payload.card?.authPaidAt || null,
+        cycleEndAt: payload.card?.authCycleEndAt || payload.card?.cycleEndAt || null,
+        showcaseStyle: payload.showcaseStyle || payload.card?.showcaseStyle || createDefaultShowcaseStyle()
       });
     } finally {
       setPreviewLoading(false);
@@ -662,11 +676,11 @@ export default function FriendShowcaseList({
             : ""
         }
         subtitle={previewKind === "idcard" ? "디지털 인증명함" : "팔로우 쇼케이스"}
-        isDarkMode={false}
+        isDarkMode={previewKind !== "idcard"}
         coverBottomNav
         hideHeader
-        showFloatingClose={false}
-        className="bg-white"
+        showFloatingClose={previewKind === "idcard"}
+        className={previewKind === "idcard" ? "bg-white" : "bg-[#0B101B]"}
       >
         <div className="flex min-h-0 flex-1 flex-col">
           {previewLoading ? (
@@ -689,23 +703,14 @@ export default function FriendShowcaseList({
               </p>
             )
           ) : previewCard ? (
-            <TentShowcaseOverlay
-              previewMode
-              forceInteractive
-              callState={CALL_STATES.CONNECTED}
-              verified
-              membershipTier={previewPaid ? "paid" : "free"}
-              peerPhone={previewCard.phone || selected?.phoneDisplay}
-              displayName={previewCard.name || selected?.name}
-              organization={previewCard.organization || ""}
+            <PeerShowcasePreview
               card={previewCard}
-              showcaseStyle={previewCard.showcaseStyle || createDefaultShowcaseStyle()}
               onClose={closePreview}
-              className="tent-showcase--fill"
+              includeDigitalCard={previewPaid}
             />
           ) : (
             <p className="py-16 text-center text-[13px] font-semibold text-slate-500">
-              전화번호가 등록되지 않아 미리보기를 표시할 수 없습니다.
+              미리보기를 표시할 수 없습니다. 아이디·쇼케이스 공개 설정을 확인해 주세요.
             </p>
           )}
         </div>

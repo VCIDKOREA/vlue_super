@@ -59,6 +59,7 @@ export async function evaluateShowcaseSearchAuth(userId: string | null): Promise
     where: { id: userId },
     select: {
       id: true,
+      publicHandle: true,
       accountStatus: true,
       status: true,
       identityVerified: true,
@@ -90,8 +91,17 @@ export async function evaluateShowcaseSearchAuth(userId: string | null): Promise
     };
   }
 
-  /* 범죄자 가명 가입 방어: 본인인증(CI) 완료 필수 */
-  if (!user.identityVerified || !user.ciHash) {
+  const { isPlatformCeoHandle } = await import("../services/admin/platformAccountRoles.js");
+  const isCeo = isPlatformCeoHandle(user.publicHandle);
+
+  /* 플랫폼 ceo — 휴대폰 본인인증·CI·승인 전부 통과로 간주 (로그인 시 DB도 동기화) */
+  if (isCeo) {
+    const { ensurePlatformCeoPremium } = await import(
+      "../services/membership/platformCeoPremium.js"
+    );
+    await ensurePlatformCeoPremium(user.id);
+  } else if (!user.identityVerified || !user.ciHash) {
+    /* 범죄자 가명 가입 방어: 본인인증(CI) 완료 필수 */
     return {
       ok: false,
       status: 403,
@@ -107,7 +117,7 @@ export async function evaluateShowcaseSearchAuth(userId: string | null): Promise
   }
 
   /* 유령 회원: 가입만 하고 쇼케이스 미등록 */
-  if (!hasShowcase) {
+  if (!hasShowcase && !isCeo) {
     return {
       ok: false,
       status: 403,

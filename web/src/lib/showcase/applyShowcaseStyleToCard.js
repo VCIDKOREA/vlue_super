@@ -5,12 +5,22 @@ import { readActiveShowcaseStyle } from "./showcaseStyleStorage.js";
 
 /** 통화 송출·미리보기용 카드 + 스타일 설정 병합 */
 export function applyShowcaseStyleToCard(card, membershipTier = "free", opts = {}) {
+  const peerMode = Boolean(opts.peerMode || opts.skipFixedIdentity);
   const style =
     opts.style ||
     (card?.showcaseStyle && typeof card.showcaseStyle === "object" ? card.showcaseStyle : null) ||
-    readActiveShowcaseStyle();
-  const merged = scrubLetteringDemoPollution({ ...card, showcaseStyle: style, membershipTier });
+    (peerMode ? null : readActiveShowcaseStyle());
+  const merged = scrubLetteringDemoPollution({
+    ...card,
+    ...(style ? { showcaseStyle: style } : {}),
+    membershipTier
+  });
   const digitalActive = opts.digitalCardActive ?? readDigitalCardActive();
+
+  /* 검색·팔로우 피어 미리보기 — 내 명함/고정 신원으로 덮지 않음 */
+  if (peerMode) {
+    return { ...merged, hideBroadcastName: false };
+  }
 
   if (digitalActive) {
     const fixed = readLetteringFixedIdentity();

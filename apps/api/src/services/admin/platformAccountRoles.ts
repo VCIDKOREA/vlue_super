@@ -22,6 +22,11 @@ export const PLATFORM_CEO_MEMBER = Object.freeze({
   membershipTier: "paid",
   label: "대표경영자(개인)",
   accountKind: "ceo_premium_member",
+  /**
+   * 플랫폼 고정 승인 — 휴대폰 본인인증·CI·계정 active·직책/부서·발신번호·유료 구독 전부
+   * 로그인 시 ensurePlatformCeoPremium 으로 DB에 강제 동기화
+   */
+  fullyApproved: true,
   /** 가족보호 기본 최대(본인+3) — FAMILY_BASE_MAX_MEMBERS 와 정합 */
   familyProtectionMaxMembers: 4
 });

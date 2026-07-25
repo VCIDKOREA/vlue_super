@@ -10,7 +10,7 @@
  *   VLUE_CEO_PASSWORD   (기본은 시드 스크립트 상수 — 운영에서는 env 권장)
  */
 import { PrismaClient } from "@prisma/client";
-import { randomBytes, scrypt } from "node:crypto";
+import { createHash, randomBytes, scrypt } from "node:crypto";
 import { promisify } from "node:util";
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -18,6 +18,12 @@ import { fileURLToPath } from "node:url";
 
 const scryptAsync = promisify(scrypt);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+const PLATFORM_CEO_CI_UNIQUE_KEY = "platform:ceo:seed_ceo_premium_v1";
+
+function ceoCiHashBytes() {
+  return createHash("sha256").update(PLATFORM_CEO_CI_UNIQUE_KEY, "utf8").digest();
+}
 
 for (const rel of [".env", "packages/db/.env"]) {
   const f = resolve(root, rel);
@@ -135,12 +141,17 @@ async function upsertCeo(passwordHash) {
     identityVerifiedAt: now,
     accountStatus: "active",
     portoneIdentityId: CEO.portoneIdentityId,
+    ciHash: ceoCiHashBytes(),
+    isVerified: true,
+    isCompanyVerified: true,
+    companyVerifiedAt: now,
     birthDate: "19700101",
     gender: "M",
     nickFeed: CEO.nick,
     termsVersionAccepted: "platform-seed-ceo",
     termsAcceptedAt: now,
     status: "ACTIVE",
+    hasActiveShowcase: true,
     enterpriseRole: "NONE",
     lineType: "NONE"
   };

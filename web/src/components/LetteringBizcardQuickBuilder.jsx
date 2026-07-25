@@ -79,7 +79,8 @@ function ImageUploadTile({
   omitChecked = false,
   onOmitChange,
   omitLabel,
-  objectPosition
+  objectPosition,
+  objectFit = "cover"
 }) {
   const inputRef = useRef(null);
   const scrollSnapshot = useRef({ top: 0, el: null });
@@ -150,7 +151,7 @@ function ImageUploadTile({
             <img
               src={preview}
               alt=""
-              className="h-full w-full object-cover"
+              className={`h-full w-full ${objectFit === "contain" ? "object-contain" : "object-cover"}`}
               style={objectPosition ? { objectPosition } : undefined}
             />
           ) : (
@@ -328,7 +329,7 @@ export default function LetteringBizcardQuickBuilder({
           isDarkMode={isDarkMode}
         >
           <ImageUploadTile
-            preview={pendingPhoto?.dataUrl || photoPreview}
+            preview={pendingPhoto?.previewUrl || pendingPhoto?.dataUrl || photoPreview}
             placeholder="사진 업로드"
             onPick={onPhotoPick}
             acceptLabel={LETTERING_PHOTO_RULES.accept}
@@ -338,7 +339,7 @@ export default function LetteringBizcardQuickBuilder({
             omitLabel="사진 업로드 없음"
             objectPosition={photoFocusToCss(photoFocus)}
           />
-          {!noProfilePhoto && (pendingPhoto?.dataUrl || photoPreview) ? (
+          {!noProfilePhoto && (pendingPhoto?.previewUrl || pendingPhoto?.dataUrl || photoPreview) ? (
             <div className="mt-2" role="tablist" aria-label="배경 사진 위치">
               <p className={`mb-1.5 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                 배경 사진 위치 · 얼굴이 잘리면 상단/하단으로 맞춰 주세요
@@ -386,7 +387,7 @@ export default function LetteringBizcardQuickBuilder({
           isDarkMode={isDarkMode}
         >
           <ImageUploadTile
-            preview={pendingLogo?.dataUrl || logoPreview}
+            preview={pendingLogo?.previewUrl || pendingLogo?.dataUrl || logoPreview}
             placeholder="로고 업로드"
             onPick={onLogoPick}
             acceptLabel={LETTERING_LOGO_RULES.accept}
@@ -394,6 +395,7 @@ export default function LetteringBizcardQuickBuilder({
             omitChecked={noCompanyLogo}
             onOmitChange={setNoCompanyLogo}
             omitLabel="회사 로고 없음"
+            objectFit="contain"
           />
           {logoFileName && !noCompanyLogo ? (
             <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>

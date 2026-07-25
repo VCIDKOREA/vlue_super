@@ -416,9 +416,22 @@ export function writeLetteringBizcardEditable(patch = {}) {
       : {})
   };
 
-  const logoDataUrl = String(next.logoDataUrl || "").trim();
-  const photoDataUrl = String(next.photoDataUrl || "").trim();
+  let logoDataUrl = String(next.logoDataUrl || "").trim();
+  let photoDataUrl = String(next.photoDataUrl || "").trim();
   const coverDataUrl = String(next.kakaoFeedBgDataUrl || "").trim();
+
+  /* 로고·프로필 사진이 같은 값이면 혼용으로 보고 분리 */
+  if (logoDataUrl && photoDataUrl && logoDataUrl === photoDataUrl) {
+    if (Object.prototype.hasOwnProperty.call(patch, "logoDataUrl")) {
+      photoDataUrl = "";
+    } else if (Object.prototype.hasOwnProperty.call(patch, "photoDataUrl")) {
+      logoDataUrl = "";
+    } else {
+      logoDataUrl = "";
+    }
+  }
+  next.logoDataUrl = logoDataUrl;
+  next.photoDataUrl = photoDataUrl;
 
   /* 본문 JSON에는 대용량 data URL을 넣지 않음 */
   const meta = {
@@ -432,34 +445,56 @@ export function writeLetteringBizcardEditable(patch = {}) {
   delete meta.logoUrl;
   delete meta.photoUrl;
 
-  try {
-    const prevMetaRaw = localStorage.getItem(LETTERING_BIZCARD_STORAGE_KEY);
-    const nextMetaJson = JSON.stringify(meta);
-    const metaChanged = prevMetaRaw !== nextMetaJson;
-    if (metaChanged) {
-      localStorage.setItem(LETTERING_BIZCARD_STORAGE_KEY, nextMetaJson);
-    }
+  const prevMetaRaw = localStorage.getItem(LETTERING_BIZCARD_STORAGE_KEY);
 
-    if (Object.prototype.hasOwnProperty.call(patch, "logoDataUrl") || logoDataUrl !== prev.logoDataUrl) {
+  try {
+    const logoChanging =
+      Object.prototype.hasOwnProperty.call(patch, "logoDataUrl") || logoDataUrl !== prev.logoDataUrl;
+    const photoChanging =
+      Object.prototype.hasOwnProperty.call(patch, "photoDataUrl") ||
+      photoDataUrl !== prev.photoDataUrl;
+    const coverChanging =
+      Object.prototype.hasOwnProperty.call(patch, "kakaoFeedBgDataUrl") ||
+      coverDataUrl !== prev.kakaoFeedBgDataUrl;
+
+    /* 이미지 blob 먼저 저장 — 실패 시 파일명만 바뀌는 불일치 방지 */
+    if (logoChanging) {
       const logoWrite = writeBlobKey(LETTERING_BIZCARD_LOGO_KEY, next.noCompanyLogo ? "" : logoDataUrl);
       if (!logoWrite.ok) {
         return { ok: false, data: prev, error: logoWrite.error };
       }
     }
-    if (Object.prototype.hasOwnProperty.call(patch, "photoDataUrl") || photoDataUrl !== prev.photoDataUrl) {
-      const photoWrite = writeBlobKey(LETTERING_BIZCARD_PHOTO_KEY, next.noProfilePhoto ? "" : photoDataUrl);
+    if (photoChanging) {
+      const photoWrite = writeBlobKey(
+        LETTERING_BIZCARD_PHOTO_KEY,
+        next.noProfilePhoto ? "" : photoDataUrl
+      );
       if (!photoWrite.ok) {
+        if (logoChanging) {
+          writeBlobKey(LETTERING_BIZCARD_LOGO_KEY, prev.noCompanyLogo ? "" : prev.logoDataUrl || "");
+        }
         return { ok: false, data: prev, error: photoWrite.error };
       }
     }
-    if (
-      Object.prototype.hasOwnProperty.call(patch, "kakaoFeedBgDataUrl") ||
-      coverDataUrl !== prev.kakaoFeedBgDataUrl
-    ) {
+    if (coverChanging) {
       const coverWrite = writeBlobKey(LETTERING_BIZCARD_COVER_KEY, coverDataUrl);
       if (!coverWrite.ok) {
+        if (logoChanging) {
+          writeBlobKey(LETTERING_BIZCARD_LOGO_KEY, prev.noCompanyLogo ? "" : prev.logoDataUrl || "");
+        }
+        if (photoChanging) {
+          writeBlobKey(
+            LETTERING_BIZCARD_PHOTO_KEY,
+            prev.noProfilePhoto ? "" : prev.photoDataUrl || ""
+          );
+        }
         return { ok: false, data: prev, error: coverWrite.error };
       }
+    }
+
+    const nextMetaJson = JSON.stringify(meta);
+    if (prevMetaRaw !== nextMetaJson) {
+      localStorage.setItem(LETTERING_BIZCARD_STORAGE_KEY, nextMetaJson);
     }
 
     const merged = {
@@ -471,6 +506,12 @@ export function writeLetteringBizcardEditable(patch = {}) {
     window.dispatchEvent(new Event(LETTERING_BIZCARD_CHANGED_EVENT));
     return { ok: true, data: merged };
   } catch (e) {
+    try {
+      if (prevMetaRaw != null) localStorage.setItem(LETTERING_BIZCARD_STORAGE_KEY, prevMetaRaw);
+      else localStorage.removeItem(LETTERING_BIZCARD_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
     const quota =
       e &&
       (e.name === "QuotaExceededError" ||
@@ -514,9 +555,16 @@ async function prepareLetteringImageFromFile(file, rules, label = "이미지") {
 export async function prepareLetteringLogoFromFile(file) {
   const result = await compressAndUploadBizcardImage(file, "logo");
   if (!result.ok) return { ok: false, error: result.error };
+  /* 미리보기·저장: 로컬 dataUrl 우선 (R2 publicUrl 이 비거나 지연되면 예전 프로필 사진이 남는 문제 방지) */
+  const localDataUrl = String(result.dataUrl || "").trim();
+  const remoteUrl = String(result.url || "").trim();
+  const previewUrl = localDataUrl || remoteUrl;
+  if (!previewUrl) return { ok: false, error: "로고 이미지를 읽지 못했습니다." };
   return {
     ok: true,
-    dataUrl: result.url,
+    dataUrl: previewUrl,
+    /** 서버·스냅샷용 — https 우선 */
+    persistUrl: remoteUrl.startsWith("http") ? remoteUrl : previewUrl,
     fileName: result.fileName,
     via: result.via,
     uploadWarning: result.uploadWarning
@@ -527,9 +575,14 @@ export async function prepareLetteringLogoFromFile(file) {
 export async function prepareLetteringPhotoFromFile(file) {
   const result = await compressAndUploadBizcardImage(file, "photo");
   if (!result.ok) return { ok: false, error: result.error };
+  const localDataUrl = String(result.dataUrl || "").trim();
+  const remoteUrl = String(result.url || "").trim();
+  const previewUrl = localDataUrl || remoteUrl;
+  if (!previewUrl) return { ok: false, error: "사진을 읽지 못했습니다." };
   return {
     ok: true,
-    dataUrl: result.url,
+    dataUrl: previewUrl,
+    persistUrl: remoteUrl.startsWith("http") ? remoteUrl : previewUrl,
     fileName: result.fileName,
     via: result.via,
     uploadWarning: result.uploadWarning

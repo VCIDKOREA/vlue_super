@@ -70,15 +70,19 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
       force || !String(local.customBackText || "").trim()
         ? String(snap.customBackText || "").trim()
         : local.customBackText,
-    /* 로컬 키는 logoDataUrl/photoDataUrl — 예전 hydrate가 logoUrl에 넣던 값도 흡수 */
-    logoDataUrl:
-      force || !String(local.logoDataUrl || local.logoUrl || "").trim()
-        ? String(snap.logoUrl || "").trim()
-        : String(local.logoDataUrl || local.logoUrl || "").trim(),
-    photoDataUrl:
-      force || !String(local.photoDataUrl || local.photoUrl || "").trim()
-        ? String(snap.photoUrl || "").trim()
-        : String(local.photoDataUrl || local.photoUrl || "").trim(),
+    logoDataUrl: (() => {
+      const fromSnap = String(snap.logoUrl || "").trim();
+      const localLogo = String(local.logoDataUrl || local.logoUrl || "").trim();
+      if (force) return fromSnap || localLogo;
+      return localLogo ? localLogo : fromSnap;
+    })(),
+    photoDataUrl: (() => {
+      const fromSnap = String(snap.photoUrl || "").trim();
+      const localPhoto = String(local.photoDataUrl || local.photoUrl || "").trim();
+      /* force여도 서버에 사진이 없으면 빈 값으로 덮어 지우지 않음 */
+      if (force) return fromSnap || localPhoto;
+      return localPhoto ? localPhoto : fromSnap;
+    })(),
     photoFocus:
       force || !String(local.photoFocus || "").trim()
         ? normalizePhotoFocus(snap.photoFocus || local.photoFocus)
@@ -104,9 +108,13 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
   return writeLetteringBizcardEditable(patch)?.data ?? null;
 }
 
-/** 서버에서 디지털 명함 메타 (HTML 배포·검증·유효기간·편집 스냅샷) */
-export async function fetchDigitalCardMeta() {
-  const cached = readStoredDigitalCardId();
+/**
+ * 서버에서 디지털 명함 메타 (HTML 배포·검증·유효기간·편집 스냅샷)
+ * @param {{ force?: boolean }} [opts] force=true 계정 전환 직후 — 서버본 덮어쓰기, 로컬 avatar push 금지
+ */
+export async function fetchDigitalCardMeta(opts = {}) {
+  const force = Boolean(opts.force);
+  const cached = force ? null : readStoredDigitalCardId();
   try {
     const res = await vlueAuthFetch(apiUrl("/api/cards/my-digital-card"), {
       headers: vlueAuthHeaders()
@@ -122,10 +130,18 @@ export async function fetchDigitalCardMeta() {
     }
     const data = await res.json();
     if (data?.cardId) writeStoredDigitalCardId(data.cardId);
-    if (data?.exportSnapshot) {
-      hydrateLetteringEditableFromSnapshot(data.exportSnapshot, { force: false });
-      hydrateAvatarsFromExportSnapshot(data.exportSnapshot, { force: false });
-      hydrateFeedNicknameFromSnapshot(data.exportSnapshot, { force: false });
+    else if (force) {
+      try {
+        localStorage.removeItem(DIGITAL_CARD_ID_KEY);
+      } catch {
+        /* ignore */
+      }
+    }
+  if (data?.exportSnapshot) {
+      hydrateLetteringEditableFromSnapshot(data.exportSnapshot, { force });
+      hydrateAvatarsFromExportSnapshot(data.exportSnapshot, { force });
+      hydrateFeedNicknameFromSnapshot(data.exportSnapshot, { force });
+      /* 계정 전환 직후에도 로컬(세션 복원분)·서버 중 사진이 있으면 스냅에 반영 */
       pushLocalAvatarsIfServerMissing(data.exportSnapshot);
     }
     if (data?.subscription?.cycleEndAt) {

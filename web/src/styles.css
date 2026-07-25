@@ -7628,6 +7628,23 @@ body,
   line-height: 1.25;
 }
 
+button.ldr-back-title--link,
+button.ldr-back-person-name--link {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.ldr-back-title--link:active,
+button.ldr-back-person-name--link:active {
+  opacity: 0.85;
+}
+
 .ldr-name-shield {
   flex-shrink: 0;
   width: 1.15rem;

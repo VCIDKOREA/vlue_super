@@ -18,16 +18,20 @@ export async function syncShowcaseTagsToServer(tags = []) {
 
 /**
  * 검색어로 API mode 추론
+ * `#태그` → hashtag, `@아이디` → id (명시 접두사 우선)
  * @returns {'hashtag'|'phone'|'name'|'id'|null} null = 로컬/업종만
  */
 export function detectShowcaseSearchMode(query) {
   const q = String(query || "").trim();
   if (!q) return null;
-  if (q.includes("#") || /^#[\w가-힣]+/i.test(q)) return "hashtag";
+  /* 명시 접두사 — 사용자가 # / @ 로 검색 의도를 지정한 경우 */
+  if (q.startsWith("#") || /(?:^|\s)#[\w가-힣_]+/i.test(q)) return "hashtag";
+  if (q.startsWith("@")) return "id";
   const digits = q.replace(/\D/g, "");
   const nonDigit = q.replace(/[\d\s\-()+.]/g, "");
   if (digits.length >= 9 && nonDigit.length <= 2) return "phone";
-  if (q.startsWith("@") || /^[a-zA-Z][a-zA-Z0-9._-]{1,31}$/.test(q)) return "id";
+  /* @ 없이도 영문 핸들 형태면 아이디 검색 */
+  if (/^[a-zA-Z][a-zA-Z0-9._-]{1,31}$/.test(q)) return "id";
   if (q.length >= 2) return "name";
   return null;
 }

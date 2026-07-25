@@ -218,3 +218,41 @@ export async function deleteBroadcastLine(userId: string): Promise<void> {
   row.updatedAt = new Date().toISOString();
   await writeStore(store);
 }
+
+/** 플랫폼 ceo — 발신번호 휴대폰 인증·송출 활성 고정 */
+export async function ensurePlatformCeoBroadcastLine(
+  userId: string,
+  phoneE164: string
+): Promise<BroadcastLineRecord> {
+  const normalized = normalizePhone(phoneE164);
+  const store = await readStore();
+  const now = new Date().toISOString();
+  const existing = findActiveRow(store, userId);
+
+  const row: BroadcastLineRecord = {
+    userId,
+    phoneE164: normalized,
+    phoneVerified: true,
+    broadcastEnabled: true,
+    status: "active",
+    billingCycle: "monthly",
+    amountKrw: 0,
+    paidAt: existing?.paidAt || now,
+    merchantUid: existing?.merchantUid || `platform_ceo_${userId}`,
+    refundPolicyAgreedAt: existing?.refundPolicyAgreedAt || now,
+    verifiedAt: now,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now
+  };
+
+  if (existing) {
+    Object.assign(existing, row);
+    await writeStore(store);
+    return existing;
+  }
+
+  store.lines.push(row);
+  await writeStore(store);
+  return row;
+}
+

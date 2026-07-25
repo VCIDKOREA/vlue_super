@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve, dirname } from "node:path";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -18,6 +19,35 @@ function mergeViteEnv(mode) {
   }
 }
 
+/** SW가 fetch 하는 공개 Firebase 웹 설정 (apiKey 등은 클라이언트 공개 값) */
+function writeFirebaseWebConfigPlugin() {
+  const write = () => {
+    const apiKey = String(process.env.VITE_FIREBASE_API_KEY || "").trim();
+    const projectId = String(process.env.VITE_FIREBASE_PROJECT_ID || "").trim();
+    const messagingSenderId = String(process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "").trim();
+    const appId = String(process.env.VITE_FIREBASE_APP_ID || "").trim();
+    const authDomain = String(process.env.VITE_FIREBASE_AUTH_DOMAIN || "").trim();
+    const outDir = resolve(__dirname, "public");
+    mkdirSync(outDir, { recursive: true });
+    const payload =
+      apiKey && projectId && messagingSenderId && appId
+        ? {
+            apiKey,
+            authDomain: authDomain || `${projectId}.firebaseapp.com`,
+            projectId,
+            messagingSenderId,
+            appId
+          }
+        : { disabled: true };
+    writeFileSync(resolve(outDir, "firebase-web-config.json"), `${JSON.stringify(payload, null, 2)}\n`);
+  };
+  return {
+    name: "vlue-firebase-web-config",
+    configResolved: write,
+    buildStart: write
+  };
+}
+
 export default defineConfig(({ mode }) => {
   mergeViteEnv(mode);
 
@@ -26,7 +56,7 @@ export default defineConfig(({ mode }) => {
     envDir: __dirname,
     /** Electron 패키징 시 file:// 프로토콜 상대 경로 로딩 */
     base: process.env.VITE_ELECTRON_PACK === "1" ? "./" : "/",
-    plugins: [react()],
+    plugins: [react(), writeFirebaseWebConfigPlugin()],
     optimizeDeps: {
       /** 깨진/미설치 패키지가 optimize 스캔에 끌려 들어와 앱 부팅이 백지되는 것 방지 */
       exclude: ["tesseract.js", "@portone/browser-sdk"]

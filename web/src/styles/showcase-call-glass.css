@@ -1155,6 +1155,18 @@
   animation: none !important;
 }
 
+.showcase-photo-text-overlay.is-selected {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 4px;
+}
+
+.showcase-photo-text-overlay.is-empty {
+  opacity: 0.55;
+  border: 1px dashed rgba(255, 255, 255, 0.55);
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+
 .showcase-photo-text-overlay--pill {
   padding: 6px 14px;
   border-radius: 999px;
@@ -3066,6 +3078,30 @@
   pointer-events: auto;
 }
 
+.showcase-slide-chrome__vlue-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.showcase-slide-chrome__vlue-profile:disabled {
+  cursor: default;
+}
+
+.showcase-slide-chrome__vlue-profile:not(:disabled):active {
+  opacity: 0.88;
+}
+
 .showcase-slide-chrome__social-toggle {
   display: inline-flex;
   align-items: center;
@@ -3125,6 +3161,10 @@
 }
 
 .showcase-slide-chrome__vlue-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -3138,6 +3178,7 @@
 }
 
 .showcase-slide-chrome__vlue-label {
+  display: block;
   margin: 0;
   font-size: 11px;
   font-weight: 800;
@@ -3147,6 +3188,7 @@
 }
 
 .showcase-slide-chrome__vlue-name {
+  display: block;
   margin: 2px 0 0;
   font-size: 15px;
   font-weight: 800;
@@ -3155,6 +3197,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85);
 }
 

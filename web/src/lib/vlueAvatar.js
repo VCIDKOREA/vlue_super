@@ -70,7 +70,9 @@ function readRawSlot(slot) {
 function writeRawSlot(slot, url) {
   try {
     const k = KEYS[slot] || KEYS.primary;
-    const v = sanitizeAvatarUrl(url);
+    /* card = 회사 로고 — VLUE 실드도 회사 로고로 허용. 프로필 슬롯만 브랜드 마크 차단 */
+    const v =
+      slot === "card" ? String(url || "").trim().replace(/^blob:.*/, "") || "" : sanitizeAvatarUrl(url);
     if (v) localStorage.setItem(k, v);
     else localStorage.removeItem(k);
   } catch {
@@ -137,10 +139,16 @@ export function scrubBrandAvatarsFromStorage() {
       const v = localStorage.getItem(k);
       if (v && isVlueBrandAssetUrl(v)) localStorage.removeItem(k);
     });
-    /* 한 번만: 과거 기본 브랜드 로고가 슬롯에 남아 있던 경우를 전부 비움 */
-    const migrateKey = "vlue_avatar_scrub_brand_v4";
+    /*
+     * 기기 단위 1회 마이그레이션 — 계정 전환 시 clearAccountScoped 로 키가 지워지면
+     * 방금 hydrate 한 프로필 사진까지 통째로 날아가므로 KEEP_DEVICE 키 사용.
+     */
+    const migrateKey = "vlue_device_avatar_scrub_brand_v5";
     if (!localStorage.getItem(migrateKey)) {
-      Object.values(KEYS).forEach((k) => localStorage.removeItem(k));
+      Object.values(KEYS).forEach((k) => {
+        const v = localStorage.getItem(k);
+        if (v && isVlueBrandAssetUrl(v)) localStorage.removeItem(k);
+      });
       localStorage.setItem(migrateKey, "1");
       try {
         window.dispatchEvent(new Event("vlue-avatar-changed"));
@@ -158,9 +166,13 @@ scrubBrandAvatarsFromStorage();
 
 export function readAvatar(slot = "primary") {
   try {
-    const direct = sanitizeAvatarUrl(localStorage.getItem(KEYS[slot] || KEYS.primary));
+    const raw = localStorage.getItem(KEYS[slot] || KEYS.primary);
+    const direct =
+      slot === "card"
+        ? String(raw || "").trim().replace(/^blob:.*/, "") || ""
+        : sanitizeAvatarUrl(raw);
     if (direct) return direct;
-    if (slot !== "primary") {
+    if (slot !== "primary" && slot !== "card") {
       const fallback = sanitizeAvatarUrl(localStorage.getItem(KEYS.primary));
       if (fallback) return fallback;
     }

@@ -18,9 +18,9 @@
       "securityHealth": "ok",
       "openThreatCount": 0,
       "devicePlatform": "android",
-      "logHash": "e497dd8ef9d9421b1adf06626a68502c6e8c5ca646df4c13ba5f72292b8f7b63",
-      "prevLogHash": "d4f4cf2a2405b3147a5064f4b96649c013a1dbaea6defcfd101d8b6050fcaceb",
-      "updatedAt": "2026-07-23T15:23:19.584Z"
+      "logHash": "2588a4924d7613a130bbd2649ab835cd324f1e72025da5a23b82c26208e16cf8",
+      "prevLogHash": "82792c3e7e3022861179ba5deea009416e6dbae16fad8dc2eaaf0bfdff6f414f",
+      "updatedAt": "2026-07-25T06:16:30.489Z"
     },
     {
       "userId": "a2a75098-af47-4bc1-8298-6673660c6c0e",
@@ -51,9 +51,9 @@
       "securityHealth": "ok",
       "openThreatCount": 0,
       "devicePlatform": "android",
-      "logHash": "9de8343f73b7a89a5c71f040ba59ce10e2e8bbe7ec4f14cfe3b52571fb7edc6e",
-      "prevLogHash": "6458a7dbd62682834ef86faf692eb85784f9d5e18af0dc774e9d51bfaf7b3222",
-      "updatedAt": "2026-07-23T17:33:43.891Z"
+      "logHash": "73b706549cf15adab78fb918989d3104e03b1f4318179a25aab095bf60e3dc06",
+      "prevLogHash": "c4f0e780fa606834bb3c869a7fae575e44a49c6f35e1c9a423a5d9954b083dd8",
+      "updatedAt": "2026-07-25T08:53:38.754Z"
     }
   ]
 }

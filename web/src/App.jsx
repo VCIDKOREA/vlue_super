@@ -173,6 +173,7 @@ import { ShowcaseBgmProvider } from "./context/ShowcaseBgmContext.jsx";
 import { runAndroidBackHandlers } from "./lib/androidBackStack.js";
 import { normalizeMembershipKind, isBillableMembershipKind } from "./lib/membershipBm.js";
 import { writePendingPayment, readPendingPayment } from "./lib/postSignupPayment.js";
+import { clearAccountScopedLocalStorage } from "./lib/clearAccountScopedLocalStorage.js";
 
 const ONBOARDING_DONE_KEY = "vlue_onboarding_complete_v1";
 /** "1" 발급·활성, "0" 가입 시 미신청, 미설정은 기존 사용자용(온보딩 완료면 명함 있음으로 간주) */
@@ -910,6 +911,28 @@ function App() {
           setBottomToast("결제 완료 · 알림함에서 구매확인해 주세요");
         setTimeout(() => setBottomToast(""), 5200);
       }
+      if (
+        data.type === "vlue-follow" ||
+        data.type === "vlue-follow-request" ||
+        data.type === "vlue-follow-accepted"
+      ) {
+        const title = String(n.title || data.title || "팔로우 알림");
+        const body = String(n.body || data.body || data.message || "새 팔로우 알림이 있습니다.");
+        addPushNotification({ category: "팔로우", title, body });
+        setBottomToast(body);
+        setTimeout(() => setBottomToast(""), 4200);
+      }
+      if (
+        data.type === "vlue-showcase-like" ||
+        data.type === "vlue-showcase-comment" ||
+        data.type === "vlue-showcase-comment-reply"
+      ) {
+        const title = String(n.title || data.title || "쇼케이스 알림");
+        const body = String(n.body || data.body || data.message || "쇼케이스에 새 활동이 있습니다.");
+        addPushNotification({ category: "쇼케이스", title, body });
+        setBottomToast(body);
+        setTimeout(() => setBottomToast(""), 4200);
+      }
     };
     window.addEventListener("vlue-fcm-foreground", onFcmForeground);
     return () => {
@@ -1035,6 +1058,17 @@ function App() {
           setBottomToast(msg);
           setTimeout(() => setBottomToast(""), 4200);
           addPushNotification({ category: "앱", title: "명함 문의", body: msg });
+        }
+        if (
+          data?.type === "vlue-follow" ||
+          data?.type === "vlue-follow-request" ||
+          data?.type === "vlue-follow-accepted"
+        ) {
+          const title = String(data.title || "팔로우 알림");
+          const body = String(data.body || data.message || "새 팔로우 알림이 있습니다.");
+          setBottomToast(body);
+          setTimeout(() => setBottomToast(""), 4200);
+          addPushNotification({ category: "팔로우", title, body });
         }
         if (data?.type === "vlue-payment-receipt") {
           const title = String(data.title || "결제 완료 · 구매확인 안내");
@@ -1976,8 +2010,42 @@ function App() {
     const result = consumeSocialOAuthReturn();
     if (!result.handled) return;
     if (result.success && result.session) {
+      clearAccountScopedLocalStorage({ keepRememberLogin: false, keepOnboarding: true });
       persistAuthSessionAfterLogin(result.session);
       processTierChangeFromLoginData(result.session);
+      void (async () => {
+        try {
+          const { hydrateBizcardFromLoginPayload, syncBizcardAccountFromApi } = await import(
+            "./lib/bizcardAccountSync.js"
+          );
+          hydrateBizcardFromLoginPayload(result.session);
+          await syncBizcardAccountFromApi({ force: true });
+        } catch {
+          /* ignore */
+        }
+        try {
+          const { hydrateShowcaseStyleFromServer } = await import(
+            "./lib/showcase/showcaseStyleSync.js"
+          );
+          await hydrateShowcaseStyleFromServer({ forceServer: true });
+        } catch {
+          /* ignore */
+        }
+        try {
+          const { fetchDigitalCardMeta } = await import("./lib/digitalCardApi.js");
+          const meta = await fetchDigitalCardMeta({ force: true });
+          if (meta?.issued) {
+            localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
+            setDigitalCardActive(true);
+          } else {
+            localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "0");
+            setDigitalCardActive(false);
+          }
+        } catch {
+          /* ignore */
+        }
+        setCardFieldsTick((n) => n + 1);
+      })();
       const label =
         result.provider === "google"
           ? "Google"
@@ -2044,6 +2112,8 @@ function App() {
         } catch {
           /* ignore */
         }
+        /* 이전 계정 로컬 잔여 제거 후 서버 세션·hydrate */
+        clearAccountScopedLocalStorage({ keepRememberLogin: true, keepOnboarding: true });
         persistAuthSessionAfterLogin(data);
         if (data.deviceToken) saveDeviceToken(data.deviceToken);
         try {
@@ -2051,7 +2121,7 @@ function App() {
           hydrateBizcardFromLoginPayload(data);
           try {
             const { syncBizcardAccountFromApi } = await import("./lib/bizcardAccountSync.js");
-            await syncBizcardAccountFromApi();
+            await syncBizcardAccountFromApi({ force: true });
           } catch {
             /* ignore */
           }
@@ -2059,7 +2129,7 @@ function App() {
             const { hydrateShowcaseStyleFromServer } = await import(
               "./lib/showcase/showcaseStyleSync.js"
             );
-            await hydrateShowcaseStyleFromServer();
+            await hydrateShowcaseStyleFromServer({ forceServer: true });
           } catch {
             /* ignore */
           }
@@ -2084,9 +2154,22 @@ function App() {
             const { readLetteringFixedIdentity } = await import("./lib/letteringBizcardStorage.js");
             readLetteringFixedIdentity();
           }
-          if (handle === "ceo" || tierFromApi === "paid" || tierFromApi === "premium" || tierFromApi === "b2b") {
-            localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
-            setDigitalCardActive(true);
+          /* 디지털 명함 활성은 서버 발급(issued) 기준 — 유료만으로 CEO 잔여처럼 켜지 않음 */
+          try {
+            const { fetchDigitalCardMeta } = await import("./lib/digitalCardApi.js");
+            const meta = await fetchDigitalCardMeta({ force: true });
+            if (meta?.issued || handle === "ceo") {
+              localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
+              setDigitalCardActive(true);
+            } else {
+              localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "0");
+              setDigitalCardActive(false);
+            }
+          } catch {
+            if (handle === "ceo") {
+              localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
+              setDigitalCardActive(true);
+            }
           }
           if (data.enterpriseRole) {
             localStorage.setItem("vlue_enterprise_role", data.enterpriseRole);
@@ -2178,6 +2261,7 @@ function App() {
       } catch {
         /* ignore */
       }
+      clearAccountScopedLocalStorage({ keepRememberLogin: false, keepOnboarding: true });
       try {
         localStorage.setItem("vlue_social_login_provider", "kakao");
       } catch {
@@ -2186,10 +2270,32 @@ function App() {
       persistAuthSessionAfterLogin(data);
       processTierChangeFromLoginData(data);
       try {
+        const { hydrateBizcardFromLoginPayload, syncBizcardAccountFromApi } = await import(
+          "./lib/bizcardAccountSync.js"
+        );
+        hydrateBizcardFromLoginPayload(data);
+        await syncBizcardAccountFromApi({ force: true });
+      } catch {
+        /* ignore */
+      }
+      try {
         const { hydrateShowcaseStyleFromServer } = await import(
           "./lib/showcase/showcaseStyleSync.js"
         );
-        await hydrateShowcaseStyleFromServer();
+        await hydrateShowcaseStyleFromServer({ forceServer: true });
+      } catch {
+        /* ignore */
+      }
+      try {
+        const { fetchDigitalCardMeta } = await import("./lib/digitalCardApi.js");
+        const meta = await fetchDigitalCardMeta({ force: true });
+        if (meta?.issued) {
+          localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
+          setDigitalCardActive(true);
+        } else {
+          localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "0");
+          setDigitalCardActive(false);
+        }
       } catch {
         /* ignore */
       }
@@ -2239,8 +2345,10 @@ function App() {
       /* ignore */
     }
     clearVlueSessionTokens();
+    clearAccountScopedLocalStorage({ keepRememberLogin: true, keepOnboarding: true });
     localStorage.setItem(SESSION_KEY, "0");
     clearBiometricSessionOnly();
+    setDigitalCardActive(false);
     setIsLoggedIn(false);
     setProfileOpen(false);
     setPage("main");

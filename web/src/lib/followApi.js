@@ -143,7 +143,19 @@ export async function fetchFollowProfile(userId) {
     const res = await vlueAuthFetch(apiUrl(`/api/follow/profile/${encodeURIComponent(userId)}`));
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, error: data.error || "profile_failed" };
-    return { ok: true, profile: data.profile, follow: data.follow, userId: data.userId };
+    return {
+      ok: true,
+      profile: data.profile,
+      follow: data.follow,
+      userId: data.userId,
+      photoUrl: data.photoUrl || data.profile?.photoUrl || "",
+      membershipTier: data.membershipTier || data.profile?.membershipTier || "",
+      digitalCardIssued: Boolean(data.digitalCardIssued),
+      cardExport: data.cardExport || null,
+      authCycleEndAt: data.authCycleEndAt || null,
+      authPaidAt: data.authPaidAt || null,
+      cardIssuedAt: data.cardIssuedAt || null
+    };
   } catch (e) {
     return { ok: false, error: e?.message || "network" };
   }

@@ -40,6 +40,7 @@ export {
  * @property {number} [overlayY]
  * @property {string} [overlayAnim]
  * @property {string} [overlayBorder]
+ * @property {Array<{id:string,text?:string,font?:string,fontSize?:number,color?:string,x?:number,y?:number,anim?:string,border?:string}>} [textOverlays]
  * @property {Array<{ id: string, emoji: string, x: number, y: number }>} [emojiStickers]
  */
 
@@ -260,6 +261,7 @@ export function readShowcaseStyle() {
 export function writeShowcaseStyle(next, opts = {}) {
   const replace = Boolean(opts.replace);
   const skipSync = Boolean(opts.skipSync);
+  const silent = Boolean(opts.silent);
   const base = replace
     ? mergeDeep(createDefaultShowcaseStyle(), next)
     : mergeDeep(readShowcaseStyle(), next);
@@ -280,7 +282,10 @@ export function writeShowcaseStyle(next, opts = {}) {
     }
     throw e instanceof Error ? e : new Error("쇼케이스 설정 저장에 실패했습니다.");
   }
-  window.dispatchEvent(new CustomEvent(SHOWCASE_STYLE_CHANGED_EVENT, { detail: merged }));
+  /* silent: BGM 보존 등 — STYLE_CHANGED 로 목록/재생 재시작 연쇄를 막음 */
+  if (!silent) {
+    window.dispatchEvent(new CustomEvent(SHOWCASE_STYLE_CHANGED_EVENT, { detail: merged }));
+  }
   if (!skipSync) {
     try {
       import("./showcaseStyleSync.js")

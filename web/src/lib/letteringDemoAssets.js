@@ -1,3 +1,5 @@
+import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
+
 /** Lettering big-push / bizcard preview demo logo (inline, encoding-safe) */
 const SAMSUNG_LIFE_LOGO_SVG = [
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">',
@@ -39,6 +41,15 @@ export function resolveLetteringDemoLogoUrl(card = {}) {
   const logo = String(card.logoUrl || card.logo_url || "").trim();
   if (logo) return logo;
   const org = String(card.organization || card.companyName || "").trim();
+  const orgUp = org.toUpperCase();
+  /* VCID / VLUE — 본인 명함과 동일하게 브랜드 로고 */
+  if (
+    orgUp.includes("VCID") ||
+    orgUp.includes("VLUE") ||
+    org.includes("\uBE14\uB8E8") /* 블루 */
+  ) {
+    return VLUE_SHIELD_LOGO;
+  }
   if (org.includes("\uC0BC\uC131\uC0DD\uBA85")) return LETTERING_DEMO_COMPANY_LOGO;
   if (org.includes("\uACBD\uCC30\uCCAD")) return LETTERING_DEMO_POLICE_LOGO;
   if (org.includes("\uAE08\uC735\uAC10\uB3C5\uC6D0")) return LETTERING_DEMO_FSS_LOGO;

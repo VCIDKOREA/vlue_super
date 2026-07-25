@@ -2,9 +2,12 @@ import { useState } from "react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import MyCaseGrid from "./MyCaseGrid.jsx";
 import MyCaseDetailModal from "./MyCaseDetailModal.jsx";
+import PeerShowcasePreview from "../showcase/PeerShowcasePreview.jsx";
+import { resolveVlueShowcasePeer } from "../../lib/resolveVlueShowcasePeer.js";
+import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 
 /**
- * 타 유저 퍼블릭 프로필 + 케이스함 (인스타 형식 · 라이트)
+ * 타 유저 퍼블릭 프로필 + 케이스함 (인스타 형식 · 본인 마이케이스와 동일 셸)
  */
 export default function UserCaseArchiveView({
   open,
@@ -20,8 +23,36 @@ export default function UserCaseArchiveView({
   const [peerIdentity, setPeerIdentity] = useState(null);
   const [feedItems, setFeedItems] = useState([]);
   const [feedStartIndex, setFeedStartIndex] = useState(0);
+  const [cardOpen, setCardOpen] = useState(false);
+  const [peerCard, setPeerCard] = useState(null);
+  const [cardLoading, setCardLoading] = useState(false);
 
   if (!open || !userId) return null;
+
+  const openPeerDigitalCard = async () => {
+    if (cardLoading) return;
+    setCardLoading(true);
+    try {
+      const resolved = await resolveVlueShowcasePeer({
+        userId,
+        displayName
+      });
+      if (!resolved?.card) {
+        onToast?.("디지털인증명함을 불러오지 못했습니다.");
+        return;
+      }
+      if (!resolved.verified || !isPaidLetteringTier(resolved.card.membershipTier)) {
+        onToast?.("디지털인증명함이 없습니다.");
+        return;
+      }
+      setPeerCard(resolved.card);
+      setCardOpen(true);
+    } catch {
+      onToast?.("디지털인증명함을 불러오지 못했습니다.");
+    } finally {
+      setCardLoading(false);
+    }
+  };
 
   return (
     <>
@@ -42,8 +73,11 @@ export default function UserCaseArchiveView({
             ownerUserId={userId}
             onBack={onClose}
             onToast={onToast}
-            bgmEnabled
+            bgmEnabled={!cardOpen}
             isDarkMode={isDarkMode}
+            onOpenDigitalCard={() => {
+              void openPeerDigitalCard();
+            }}
             onOpenDetail={(item, detail, meta) => {
               setPeerIdentity(
                 meta || {
@@ -53,7 +87,9 @@ export default function UserCaseArchiveView({
                   phone: "",
                   organization: "",
                   photoUrl: item?.thumbnailUrl || "",
-                  membershipTier: "premium"
+                  logoUrl: "",
+                  membershipTier: "premium",
+                  digitalCardIssued: true
                 }
               );
               setDetailItem(item);
@@ -84,6 +120,33 @@ export default function UserCaseArchiveView({
         }}
         onToast={onToast}
       />
+
+      <AppFullScreenView
+        open={cardOpen && Boolean(peerCard)}
+        onClose={() => {
+          setCardOpen(false);
+          setPeerCard(null);
+        }}
+        hideHeader
+        showFloatingClose={false}
+        coverBottomNav
+        elevateAboveShowcase
+        className="my-case-detail my-case-detail--broadcast bg-[#0B101B]"
+        title="디지털 인증명함"
+      >
+        {peerCard ? (
+          <PeerShowcasePreview
+            card={peerCard}
+            includeDigitalCard
+            digitalCardOnly
+            onClose={() => {
+              setCardOpen(false);
+              setPeerCard(null);
+            }}
+            onToast={onToast}
+          />
+        ) : null}
+      </AppFullScreenView>
     </>
   );
 }

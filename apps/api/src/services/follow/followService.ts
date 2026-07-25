@@ -1,5 +1,7 @@
 import type { UserFollowStatus } from "@prisma/client";
 import { prisma } from "../../db/client.js";
+import { ssePublish } from "../../realtime/sseHub.js";
+import { sendShowcaseSocialPushToUser } from "../fcmNotificationService.js";
 import {
   maskProfileForViewer,
   privacySelect,
@@ -7,6 +9,61 @@ import {
   type UserPrivacyRow,
   type ViewerAccessContext
 } from "./profileAccessControl.js";
+
+async function resolveFollowActorLabel(userId: string): Promise<string> {
+  try {
+    const u = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { legalName: true, publicHandle: true, email: true }
+    });
+    if (!u) return "회원";
+    return (
+      String(u.legalName || "").trim() ||
+      String(u.publicHandle || "")
+        .replace(/^@/, "")
+        .trim() ||
+      String(u.email || "")
+        .split("@")[0]
+        .trim() ||
+      "회원"
+    );
+  } catch {
+    return "회원";
+  }
+}
+
+/** 팔로우·팔로우 요청 알림 (FCM + SSE). 실패해도 API 결과에 영향 없음 */
+function fireFollowNotify(
+  targetUserId: string,
+  payload: {
+    type: "vlue-follow" | "vlue-follow-request" | "vlue-follow-accepted";
+    title: string;
+    body: string;
+    actorUserId: string;
+    followId?: string | null;
+  }
+): void {
+  if (!targetUserId || targetUserId === payload.actorUserId) return;
+  const data = {
+    type: payload.type,
+    actorUserId: payload.actorUserId,
+    followId: payload.followId || ""
+  };
+  try {
+    ssePublish(targetUserId, {
+      type: payload.type,
+      title: payload.title,
+      message: payload.body,
+      body: payload.body,
+      ...data
+    });
+  } catch (err) {
+    console.warn("[follow] sse_notify_failed", { targetUserId, err });
+  }
+  void sendShowcaseSocialPushToUser(targetUserId, payload.title, payload.body, data).catch((err) => {
+    console.warn("[follow] fcm_notify_failed", { targetUserId, err });
+  });
+}
 
 export type FollowRelation =
   | "none"
@@ -216,6 +273,25 @@ export async function toggleFollow(followerId: string, followingId: string) {
         data: { status: nextStatus }
       });
       const state = await getFollowState(followerId, followingId);
+      void resolveFollowActorLabel(followerId).then((actorName) => {
+        if (nextStatus === ACTIVE) {
+          fireFollowNotify(followingId, {
+            type: "vlue-follow",
+            title: "새 팔로워",
+            body: `${actorName}님이 회원님을 팔로우하기 시작했습니다.`,
+            actorUserId: followerId,
+            followId: updated.id
+          });
+        } else {
+          fireFollowNotify(followingId, {
+            type: "vlue-follow-request",
+            title: "팔로우 요청",
+            body: `${actorName}님이 팔로우를 요청했습니다.`,
+            actorUserId: followerId,
+            followId: updated.id
+          });
+        }
+      });
       return {
         ok: true as const,
         action: nextStatus === ACTIVE ? ("followed" as const) : ("requested" as const),
@@ -234,6 +310,25 @@ export async function toggleFollow(followerId: string, followingId: string) {
     }
   });
   const state = await getFollowState(followerId, followingId);
+  void resolveFollowActorLabel(followerId).then((actorName) => {
+    if (nextStatus === ACTIVE) {
+      fireFollowNotify(followingId, {
+        type: "vlue-follow",
+        title: "새 팔로워",
+        body: `${actorName}님이 회원님을 팔로우하기 시작했습니다.`,
+        actorUserId: followerId,
+        followId: created.id
+      });
+    } else {
+      fireFollowNotify(followingId, {
+        type: "vlue-follow-request",
+        title: "팔로우 요청",
+        body: `${actorName}님이 팔로우를 요청했습니다.`,
+        actorUserId: followerId,
+        followId: created.id
+      });
+    }
+  });
   return {
     ok: true as const,
     action: nextStatus === ACTIVE ? ("followed" as const) : ("requested" as const),
@@ -259,6 +354,15 @@ export async function acceptFollowRequest(userId: string, followId: string) {
     data: { status: ACTIVE }
   });
   const state = await getFollowState(userId, row.followerId);
+  void resolveFollowActorLabel(userId).then((accepterName) => {
+    fireFollowNotify(row.followerId, {
+      type: "vlue-follow-accepted",
+      title: "팔로우 수락",
+      body: `${accepterName}님이 팔로우 요청을 수락했습니다.`,
+      actorUserId: userId,
+      followId: updated.id
+    });
+  });
   return { ok: true as const, follow: updated, state };
 }
 
@@ -452,7 +556,16 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
       phoneE164: true,
       publicHandle: true,
       status: true,
-      businessProfile: { select: { companyName: true, jobTitle: true } }
+      businessProfile: { select: { companyName: true, jobTitle: true } },
+      digitalCard: {
+        select: { membershipTierSnapshot: true, exportSnapshotJson: true, issuedAt: true }
+      },
+      subscriptions: {
+        where: { status: "active" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { cycleEndAt: true, cycleStartAt: true, plan: true }
+      }
     }
   });
   if (!user || user.status !== "ACTIVE") return null;
@@ -470,9 +583,45 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
   const masked = maskProfileForViewer(user as UserPrivacyRow, raw, ctx);
   const followState = await getFollowState(viewerId, targetUserId);
 
+  const snap =
+    user.digitalCard?.exportSnapshotJson && typeof user.digitalCard.exportSnapshotJson === "object"
+      ? (user.digitalCard.exportSnapshotJson as Record<string, unknown>)
+      : null;
+  const photoUrl = String(snap?.photoUrl || snap?.image_url || snap?.imageUrl || "").trim();
+  const logoUrl = String(snap?.logoUrl || "").trim();
+  const sub = user.subscriptions?.[0] || null;
+
+  /** 디지털 인증명함 송출 스냅샷 — 쇼케이스·명함 열람용 (검색 마스킹과 별도) */
+  const cardExport = snap
+    ? {
+        name: String(snap.name || snap.displayName || "").trim(),
+        organization: String(snap.organization || snap.companyName || "").trim(),
+        title: String(snap.title || "").trim(),
+        department: String(snap.department || "").trim(),
+        email: String(snap.email || "").trim(),
+        website: String(snap.website || "").trim(),
+        fax: String(snap.fax || "").trim(),
+        address: String(snap.address || "").trim(),
+        activityName: String(snap.activityName || "").trim(),
+        photoUrl,
+        logoUrl
+      }
+    : null;
+
   return {
     userId: targetUserId,
-    profile: masked,
-    follow: followState
+    profile: {
+      ...masked,
+      photoUrl: photoUrl || undefined,
+      membershipTier: user.digitalCard?.membershipTierSnapshot || undefined
+    },
+    follow: followState,
+    digitalCardIssued: Boolean(user.digitalCard),
+    membershipTier: user.digitalCard?.membershipTierSnapshot || "free",
+    photoUrl,
+    cardExport,
+    authCycleEndAt: sub?.cycleEndAt ? sub.cycleEndAt.toISOString() : null,
+    authPaidAt: sub?.cycleStartAt ? sub.cycleStartAt.toISOString() : null,
+    cardIssuedAt: user.digitalCard?.issuedAt ? user.digitalCard.issuedAt.toISOString() : null
   };
 }

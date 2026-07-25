@@ -1,5 +1,6 @@
 import { normalizeLetteringCard } from "./letteringCardNormalize.js";
 import { resolveLetteringDemoLogoUrl } from "./letteringDemoAssets.js";
+import { readProfilePhotoAvatar } from "./vlueAvatar.js";
 import {
   readLetteringBizcardEditable,
   readLetteringFixedIdentity,
@@ -191,7 +192,9 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       customBackText: identity.customBackText || "",
       address: identity.address || "",
       logoUrl: ed.noCompanyLogo ? "" : String(ed.logoDataUrl || ed.logoUrl || "").trim(),
-      photoUrl: ed.noProfilePhoto ? "" : String(ed.photoDataUrl || ed.photoUrl || "").trim(),
+      photoUrl: ed.noProfilePhoto
+        ? ""
+        : String(ed.photoDataUrl || ed.photoUrl || readProfilePhotoAvatar() || "").trim(),
       photoFocus: normalizePhotoFocus(ed.photoFocus),
       membershipTier,
       userId: userId || "",

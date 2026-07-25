@@ -328,7 +328,7 @@ export async function archiveShowcaseSnapshot(
   const slotIndex = await nextSlotIndex(userId);
   const row = await prisma.showcaseCase.update({
     where: { id: created.id },
-    data: { isMainBroadcast: true, slotIndex }
+    data: { isMainBroadcast: true, isPublic: true, slotIndex }
   });
 
   return serializeCase(row);
@@ -383,7 +383,7 @@ export async function setMainBroadcast(userId: string, caseId: string, enabled: 
     const slotIndex = await nextSlotIndex(userId);
     const row = await prisma.showcaseCase.update({
       where: { id: caseId },
-      data: { isMainBroadcast: true, slotIndex }
+      data: { isMainBroadcast: true, isPublic: true, slotIndex }
     });
     await touchMainBroadcastChangedAt(userId, tier);
     return { item: serializeCase(row), policy: await getBroadcastPolicy(userId) };
@@ -521,8 +521,8 @@ export async function listMycaseForViewer(
         where: {
           ownerUserId,
           deletedAt: null,
-          isMainBroadcast: true,
-          isPublic: true
+          isMainBroadcast: true
+          /* 메인 송출은 공개 여부와 무관하게 열람 (송출 = 공개) */
         },
         orderBy: [{ slotIndex: "asc" }, { createdAt: "desc" }],
         take: 20,
@@ -559,7 +559,7 @@ export async function listMycaseForViewer(
     where: {
       ownerUserId,
       deletedAt: null,
-      isPublic: true,
+      OR: [{ isPublic: true }, { isMainBroadcast: true }],
       ...(cursor ? { createdAt: { lt: new Date(cursor) } } : {})
     },
     orderBy: [{ isMainBroadcast: "desc" }, { createdAt: "desc" }],
@@ -613,7 +613,8 @@ export async function getMycaseDetail(viewerId: string | null, caseId: string) {
     return { item: serializeCase(row), isOwner: true };
   }
 
-  if (!row.isPublic) {
+  /* 메인 송출은 비공개 플래그와 무관하게 열람 가능 */
+  if (!row.isPublic && !row.isMainBroadcast) {
     throw new MycaseBroadcastError("forbidden", "비공개 마이케이스입니다.", 403);
   }
 

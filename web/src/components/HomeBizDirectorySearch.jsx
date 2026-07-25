@@ -7,15 +7,15 @@ import {
   searchShowcaseByTag
 } from "../lib/showcase/showcaseTagsApi.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
-import { resolveVlueShowcaseByPhone } from "../lib/resolveVlueShowcaseByPhone.js";
+import { resolveVlueShowcasePeer } from "../lib/resolveVlueShowcasePeer.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
-import { CALL_STATES } from "../lib/showcase/tentShowcaseTypes.js";
 import { VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
-import TentShowcaseOverlay from "./showcase/TentShowcaseOverlay.jsx";
+import PeerShowcasePreview from "./showcase/PeerShowcasePreview.jsx";
 import AppFullScreenView from "./AppFullScreenView.jsx";
 import { VlueBrandLogo } from "./VlueBrandLogo.jsx";
 import VLUE_BRAND_LOGO from "../assets/vlue-shield-eye-logo.svg?url";
+import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
 import "./friend-showcase-list.css";
 
 /**
@@ -38,10 +38,11 @@ function BizSearchBar({ query, onQueryChange, onSubmit, logoSize = 22 }) {
               onSubmit?.();
             }
           }}
-          placeholder="해시태그·상호·쇼케이스 검색"
+          placeholder="#해시태그 · @아이디 · 상호 검색"
           className="home-biz-search__input"
           enterKeyHint="search"
           autoComplete="off"
+          aria-label="#해시태그, @아이디, 상호 검색"
         />
         {query ? (
           <button
@@ -77,16 +78,31 @@ function ResultSortBar({ sort, onSortChange }) {
   );
 }
 
-/** 앱: 전화·아이디 외 키워드는 #해시태그 쇼케이스 검색 */
+/**
+ * 앱 홈 검색 — #해시태그 / @아이디 / 전화 / 상호(이름) 분기
+ * @returns {{ q: string, mode: 'hashtag'|'phone'|'name'|'id', tagLabel: string, idLabel: string } | null}
+ */
 function resolveAppShowcaseSearch(query) {
   const q = String(query || "").trim();
   if (!q) return null;
   const detected = detectShowcaseSearchMode(q);
-  if (detected === "phone") return { q, mode: "phone", tagLabel: "" };
-  if (detected === "id") return { q, mode: "id", tagLabel: "" };
+  if (!detected) return null;
+  if (detected === "phone") {
+    return { q, mode: "phone", tagLabel: "", idLabel: "" };
+  }
+  if (detected === "id") {
+    const idLabel = q.replace(/^@+/, "").trim();
+    if (!idLabel) return null;
+    return { q: `@${idLabel}`, mode: "id", tagLabel: "", idLabel };
+  }
+  if (detected === "name") {
+    if (q.length < 2) return null;
+    return { q, mode: "name", tagLabel: "", idLabel: "" };
+  }
+  /* hashtag */
   const bare = q.replace(/^#/, "").trim();
   if (!bare) return null;
-  return { q: `#${bare}`, mode: "hashtag", tagLabel: bare };
+  return { q: `#${bare}`, mode: "hashtag", tagLabel: bare, idLabel: "" };
 }
 
 function popularScore(hit) {
@@ -97,7 +113,7 @@ function popularScore(hit) {
   return 40 + Math.min(20, tags * 4);
 }
 
-function mapHitToRow(hit, i, tagLabel) {
+function mapHitToRow(hit, i, tagLabel, idLabel = "") {
   const userId = String(hit.userId || "").trim();
   const displayName = hit.displayName || "";
   const nameOk = hit.nameVisible === true && displayName && displayName !== "비공개 회원";
@@ -116,11 +132,15 @@ function mapHitToRow(hit, i, tagLabel) {
     name,
     subtitle: tagLabel
       ? `#${tagLabel}`
-      : tags[0]
-        ? String(tags[0])
-        : handle
-          ? `@${handle}`
-          : "쇼케이스",
+      : idLabel && handle
+        ? `@${handle}`
+        : idLabel
+          ? `@${idLabel}`
+          : tags[0]
+            ? String(tags[0])
+            : handle
+              ? `@${handle}`
+              : "쇼케이스",
     phone: hit.phoneVisible ? hit.phone || "" : "",
     phoneDisplay: hit.phoneVisible ? hit.phone || "" : "",
     avatarUrl: String(hit.logoUrl || "").trim(),
@@ -158,6 +178,8 @@ export default function HomeBizDirectorySearch({
   const [stuck, setStuck] = useState(false);
   const [apiHits, setApiHits] = useState([]);
   const [tagLabel, setTagLabel] = useState("");
+  const [idLabel, setIdLabel] = useState("");
+  const [searchMode, setSearchMode] = useState(/** @type {''|'hashtag'|'phone'|'name'|'id'} */ (""));
   const [apiSearching, setApiSearching] = useState(false);
   const [apiError, setApiError] = useState("");
   const [previewRow, setPreviewRow] = useState(null);
@@ -167,7 +189,7 @@ export default function HomeBizDirectorySearch({
   const stickySentinelRef = useRef(null);
 
   const rows = useMemo(() => {
-    const mapped = apiHits.map((hit, i) => mapHitToRow(hit, i, tagLabel));
+    const mapped = apiHits.map((hit, i) => mapHitToRow(hit, i, tagLabel, idLabel));
     const list = [...mapped];
     if (sort === "distance") {
       list.sort((a, b) => a.distance - b.distance || b.popular - a.popular);
@@ -175,7 +197,7 @@ export default function HomeBizDirectorySearch({
       list.sort((a, b) => b.popular - a.popular || a.name.localeCompare(b.name, "ko"));
     }
     return list;
-  }, [apiHits, tagLabel, sort]);
+  }, [apiHits, tagLabel, idLabel, sort]);
 
   const suggestions = useMemo(() => suggestIndustries(query), [query]);
 
@@ -184,6 +206,8 @@ export default function HomeBizDirectorySearch({
     if (!resultsOpen || !resolved) {
       setApiHits([]);
       setTagLabel("");
+      setIdLabel("");
+      setSearchMode("");
       setApiError("");
       setApiSearching(false);
       return undefined;
@@ -197,6 +221,8 @@ export default function HomeBizDirectorySearch({
         if (!res.ok) {
           setApiHits([]);
           setTagLabel(resolved.tagLabel || "");
+          setIdLabel(resolved.idLabel || "");
+          setSearchMode(resolved.mode);
           setApiError(res.error || "검색에 실패했습니다.");
           if (typeof window !== "undefined") {
             window.dispatchEvent(
@@ -214,6 +240,8 @@ export default function HomeBizDirectorySearch({
         }
         setApiError("");
         setTagLabel(resolved.tagLabel || "");
+        setIdLabel(resolved.idLabel || "");
+        setSearchMode(resolved.mode);
         setApiHits(res.items || []);
       });
     }, 280);
@@ -247,23 +275,39 @@ export default function HomeBizDirectorySearch({
     setPreviewRow(row);
     setPreviewKind(kind);
     setPreviewCard(null);
-    if (!row.phone && !row.phoneDisplay) {
+    const uid = String(row.userId || "").trim();
+    const handle = String(row.publicHandle || "").replace(/^@/, "").trim();
+    if (!uid && !handle && !row.phone && !row.phoneDisplay) {
       setPreviewLoading(false);
       return;
     }
     setPreviewLoading(true);
     try {
-      const payload = await resolveVlueShowcaseByPhone(row.phone || row.phoneDisplay);
+      const payload = await resolveVlueShowcasePeer({
+        userId: uid,
+        handle,
+        phone: row.phone || row.phoneDisplay || "",
+        displayName: row.name || "",
+        membershipTier: row.membershipTier || "free",
+        avatarUrl: row.avatarUrl || ""
+      });
       const tier = payload.card?.membershipTier || row.membershipTier || "free";
+      const peerUid = String(payload.card?.userId || uid || "").trim();
       setPreviewCard({
         ...payload.card,
-        userId: payload.card?.userId || row.userId || "",
-        ownerUserId: payload.card?.ownerUserId || payload.card?.userId || row.userId || "",
+        userId: peerUid,
+        ownerUserId: payload.card?.ownerUserId || peerUid,
         name: payload.card?.name || row.name,
-        phone: payload.phone || row.phoneDisplay || row.phone,
+        phone: payload.phone || row.phoneDisplay || row.phone || "",
         membershipTier: tier,
         photoUrl: payload.card?.photoUrl || row.avatarUrl || "",
-        showcaseStyle: payload.card?.showcaseStyle || createDefaultShowcaseStyle()
+        email: payload.card?.email || "",
+        organization: payload.card?.organization || "",
+        website: payload.card?.website || "",
+        authCycleEndAt: payload.card?.authCycleEndAt || payload.card?.cycleEndAt || null,
+        authPaidAt: payload.card?.authPaidAt || null,
+        cycleEndAt: payload.card?.authCycleEndAt || payload.card?.cycleEndAt || null,
+        showcaseStyle: payload.showcaseStyle || payload.card?.showcaseStyle || createDefaultShowcaseStyle()
       });
     } finally {
       setPreviewLoading(false);
@@ -276,18 +320,39 @@ export default function HomeBizDirectorySearch({
     setPreviewKind("showcase");
   };
 
+  useEffect(() => {
+    const onCloseOverlays = () => closePreview();
+    window.addEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+    return () => window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
+  }, []);
+
   const previewPaid = previewCard ? isPaidLetteringTier(previewCard.membershipTier) : false;
-  const activeTag = tagLabel || query.replace(/^#/, "").trim();
+
+  const resultTitle = (() => {
+    if (apiSearching) return "검색 중…";
+    if (searchMode === "hashtag" && tagLabel) return `#${tagLabel} · 쇼케이스 ${rows.length}건`;
+    if (searchMode === "id" && idLabel) return `@${idLabel} · 쇼케이스 ${rows.length}건`;
+    if (searchMode === "name") return `상호·이름 · 쇼케이스 ${rows.length}건`;
+    if (searchMode === "phone") return `전화 · 쇼케이스 ${rows.length}건`;
+    return `쇼케이스 ${rows.length}건`;
+  })();
 
   const emptyMessage = (() => {
     if (apiSearching) return "검색 중…";
     if (apiError) return apiError;
     if (query.trim()) {
-      return activeTag
-        ? `#${activeTag} 태그를 쓴 공개 쇼케이스가 없습니다.`
-        : "검색 결과가 없습니다.";
+      if (searchMode === "id" && idLabel) {
+        return `@${idLabel} 아이디로 공개된 쇼케이스가 없습니다. (상대가 아이디 검색 허용·유료·쇼케이스 활성인지 확인해 주세요)`;
+      }
+      if (searchMode === "hashtag" && tagLabel) {
+        return `#${tagLabel} 태그를 쓴 공개 쇼케이스가 없습니다.`;
+      }
+      if (searchMode === "name") {
+        return `"${query.trim()}" 상호·이름 검색 결과가 없습니다.`;
+      }
+      return "검색 결과가 없습니다.";
     }
-    return "검색어를 입력하면 #해시태그 쇼케이스 프로필이 표시됩니다.";
+    return "#해시태그 또는 @아이디로 검색해 보세요.";
   })();
 
   return (
@@ -305,7 +370,7 @@ export default function HomeBizDirectorySearch({
 
       <section
         className={`home-biz-search home-biz-search--sticky ${stuck || resultsOpen ? "home-biz-search--stuck" : ""} ${resultsOpen ? "home-biz-search--active" : ""}`}
-        aria-label="쇼케이스 해시태그 검색"
+        aria-label="쇼케이스 #해시태그 · @아이디 검색"
       >
         <BizSearchBar query={query} onQueryChange={setQuery} onSubmit={openResults} />
 
@@ -313,13 +378,7 @@ export default function HomeBizDirectorySearch({
           <div className="home-biz-search__sheet" role="dialog" aria-modal="true" aria-label="쇼케이스 검색 결과">
             <div className="home-biz-search__sheet-head shrink-0">
               <div className="flex items-center gap-2">
-                <p className="min-w-0 flex-1 text-[11px] font-black text-slate-700">
-                  {apiSearching
-                    ? "검색 중…"
-                    : activeTag
-                      ? `#${activeTag} · 쇼케이스 ${rows.length}건`
-                      : `쇼케이스 ${rows.length}건`}
-                </p>
+                <p className="min-w-0 flex-1 text-[11px] font-black text-slate-700">{resultTitle}</p>
                 <ResultSortBar sort={sort} onSortChange={setSort} />
                 <button type="button" onClick={closeResults} className="shrink-0 text-[12px] font-black text-blue-600">
                   닫기
@@ -327,7 +386,7 @@ export default function HomeBizDirectorySearch({
               </div>
             </div>
 
-            {suggestions.length > 0 ? (
+            {suggestions.length > 0 && searchMode !== "id" && searchMode !== "phone" ? (
               <div className="home-biz-search__sheet-tags shrink-0">
                 {suggestions.map((s) => (
                   <button
@@ -405,11 +464,11 @@ export default function HomeBizDirectorySearch({
             : ""
         }
         subtitle={previewKind === "idcard" ? "디지털 인증명함" : "쇼케이스"}
-        isDarkMode={false}
+        isDarkMode={previewKind !== "idcard"}
         coverBottomNav
         hideHeader
-        showFloatingClose={false}
-        className="bg-white"
+        showFloatingClose={previewKind === "idcard"}
+        className={previewKind === "idcard" ? "bg-white" : "bg-[#0B101B]"}
       >
         <div className="flex min-h-0 flex-1 flex-col">
           {previewLoading ? (
@@ -432,23 +491,14 @@ export default function HomeBizDirectorySearch({
               </p>
             )
           ) : previewCard ? (
-            <TentShowcaseOverlay
-              previewMode
-              forceInteractive
-              callState={CALL_STATES.CONNECTED}
-              verified
-              membershipTier={previewPaid ? "paid" : "free"}
-              peerPhone={previewCard.phone || previewRow?.phoneDisplay}
-              displayName={previewCard.name || previewRow?.name}
-              organization={previewCard.organization || ""}
+            <PeerShowcasePreview
               card={previewCard}
-              showcaseStyle={previewCard.showcaseStyle || createDefaultShowcaseStyle()}
               onClose={closePreview}
-              className="tent-showcase--fill"
+              includeDigitalCard={previewPaid}
             />
           ) : (
             <p className="py-16 text-center text-[13px] font-semibold text-slate-500">
-              전화번호가 공개되지 않아 미리보기를 열 수 없습니다. 쇼케이스 안에서 팔로우할 수 있습니다.
+              미리보기를 열 수 없습니다. 아이디·쇼케이스 공개 설정을 확인해 주세요.
             </p>
           )}
         </div>

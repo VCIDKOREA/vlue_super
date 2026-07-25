@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import {
   MasterCapability,
+  PLATFORM_CEO_MEMBER,
   denyAdminAccessReasonForUser,
   hasMasterCapability,
   isMasterSystemAdmin,
@@ -39,6 +40,7 @@ function run() {
 
   assert.equal(isPlatformCeoHandle("ceo"), true);
   assert.equal(isPlatformCeoHandle("@CEO"), true);
+  assert.equal(PLATFORM_CEO_MEMBER.fullyApproved, true);
   assert.equal(isMasterSystemAdmin(admin), true);
   assert.equal(isMasterSystemAdmin(ceo), false);
   assert.equal(isSuperAdminUser(admin), true);

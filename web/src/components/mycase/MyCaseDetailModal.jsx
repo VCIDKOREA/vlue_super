@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import LetteringIncomingNotification from "../LetteringIncomingNotification.jsx";
-import { readMembershipTier } from "../../lib/bizcardAccountSync.js";
+import { readDigitalCardActive, readMembershipTier } from "../../lib/bizcardAccountSync.js";
+import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import {
   createDefaultShowcaseStyle,
   readShowcaseStyle
@@ -29,7 +30,7 @@ function readPreviewIdentity() {
   return { name: name || handle || "VLUE", phone, handle, org };
 }
 
-function buildPreviewCard({ item, detail, owner, selfIdentity, peerIdentity, membershipTier }) {
+function buildPreviewCard({ item, detail, owner, selfIdentity, peerIdentity, membershipTier, includeDigitalCard }) {
   let userId = "";
   try {
     userId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
@@ -59,6 +60,7 @@ function buildPreviewCard({ item, detail, owner, selfIdentity, peerIdentity, mem
         org: String(peerIdentity?.organization || "").trim()
       };
   const photoUrl = String(peerIdentity?.photoUrl || item?.thumbnailUrl || "").trim();
+  const logoUrl = String(peerIdentity?.logoUrl || "").trim();
   const base = {
     name: identity.name,
     displayName: identity.name,
@@ -68,13 +70,18 @@ function buildPreviewCard({ item, detail, owner, selfIdentity, peerIdentity, mem
     showcaseStyle: style,
     photoUrl: owner ? "" : photoUrl,
     image_url: owner ? "" : photoUrl,
-    logoUrl: "",
-    userId: owner ? userId : String(peerIdentity?.userId || item?.ownerUserId || "")
+    logoUrl: owner ? "" : logoUrl,
+    publicHandle: identity.handle,
+    loginId: identity.handle,
+    activityName: identity.name,
+    userId: owner ? userId : String(peerIdentity?.userId || item?.ownerUserId || ""),
+    ownerUserId: owner ? userId : String(peerIdentity?.userId || item?.ownerUserId || "")
   };
   return {
     card: applyShowcaseStyleToCard(base, membershipTier, {
       style,
-      digitalCardActive: false
+      digitalCardActive: Boolean(includeDigitalCard),
+      peerMode: !owner
     }),
     identity
   };
@@ -88,6 +95,7 @@ function FeedSlide({
   selfIdentity,
   peerIdentity,
   membershipTier,
+  includeDigitalCard,
   suppressBgm,
   onToast,
   active
@@ -100,9 +108,10 @@ function FeedSlide({
         owner,
         selfIdentity,
         peerIdentity,
-        membershipTier
+        membershipTier,
+        includeDigitalCard
       }),
-    [item, detail, owner, selfIdentity, peerIdentity, membershipTier]
+    [item, detail, owner, selfIdentity, peerIdentity, membershipTier, includeDigitalCard]
   );
 
   if (!active) {
@@ -136,7 +145,7 @@ function FeedSlide({
             savedContactName={identity.name}
             isKnownContact
             card={card}
-            includeDigitalCard={false}
+            includeDigitalCard={Boolean(includeDigitalCard)}
             suppressBgm={suppressBgm}
             expanded
             onExpandedChange={() => {}}
@@ -196,6 +205,12 @@ export default function MyCaseDetailModal({
     return readMembershipTier();
   }, [open, owner, peerIdentity]);
 
+  const includeDigitalCard = useMemo(() => {
+    if (!isPaidLetteringTier(membershipTier)) return false;
+    if (owner) return readDigitalCardActive();
+    return Boolean(peerIdentity?.digitalCardIssued);
+  }, [owner, membershipTier, peerIdentity, open]);
+
   useEffect(() => {
     if (!open) return;
     setIndex(initialIdx);
@@ -220,6 +235,14 @@ export default function MyCaseDetailModal({
   const ensureDetail = useCallback(async (feedItem) => {
     const id = String(feedItem?.id || "").trim();
     if (!id) return;
+    /* 라이브 스타일 합성 항목 — API detail 불필요 */
+    if (feedItem?.isLiveStyle || id.startsWith("live-style-")) {
+      setDetailCache((prev) => ({
+        ...prev,
+        [id]: prev[id] || { ok: true, item: feedItem, isOwner: Boolean(isOwner) }
+      }));
+      return;
+    }
     if (detailCacheRef.current[id] || fetchingRef.current.has(id)) return;
     fetchingRef.current.add(id);
     setLoadingIds((prev) => ({ ...prev, [id]: true }));
@@ -236,7 +259,7 @@ export default function MyCaseDetailModal({
         return next;
       });
     }
-  }, []);
+  }, [isOwner]);
 
   useEffect(() => {
     if (!open || !feed.length) return;
@@ -327,6 +350,7 @@ export default function MyCaseDetailModal({
                 selfIdentity={selfIdentity}
                 peerIdentity={peerIdentity}
                 membershipTier={membershipTier}
+                includeDigitalCard={includeDigitalCard}
                 suppressBgm={suppressBgm}
                 onToast={onToast}
                 active={active}

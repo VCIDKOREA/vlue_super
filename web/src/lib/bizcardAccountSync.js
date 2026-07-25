@@ -85,10 +85,11 @@ export function hydrateBizcardFromLoginPayload(data) {
 }
 
 /** 웹 명함 설정 진입 시 서버 프로필·기업·명함 메타 동기화 */
-export async function syncBizcardAccountFromApi() {
+export async function syncBizcardAccountFromApi(opts = {}) {
+  const force = Boolean(opts.force);
   const [ctx, meta] = await Promise.all([
     fetchB2bMembershipUiContext().catch(() => null),
-    fetchDigitalCardMeta().catch(() => ({ issued: false, cardId: null }))
+    fetchDigitalCardMeta({ force }).catch(() => ({ issued: false, cardId: null }))
   ]);
 
   if (ctx?.company?.company_name) {
@@ -128,9 +129,13 @@ export async function syncBizcardAccountFromApi() {
 
   if (meta?.issued && meta?.cardId) {
     try {
-      if (localStorage.getItem(DIGITAL_CARD_ACTIVE_KEY) == null) {
-        localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
-      }
+      localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  } else if (force) {
+    try {
+      localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "0");
     } catch {
       /* ignore */
     }

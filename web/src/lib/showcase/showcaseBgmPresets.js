@@ -103,6 +103,28 @@ export function resolveShowcaseBgmUrl(styleConfig, visitSessionKey = "", trackIn
   return "";
 }
 
+/** 재생 URL이 없어도 soundId·메타가 있으면 BGM 슬롯 표시 (케이스함·피어 열람) */
+export function hasShowcaseBgmConfigured(styleConfig) {
+  const bgm = styleConfig?.bgm;
+  if (!bgm || bgm.mode === "none" || bgm.linkBroken) return false;
+  if (String(bgm.audioUrl || "").trim()) return true;
+  if (String(bgm.soundId || "").trim()) return true;
+  if (Array.isArray(bgm.playlist) && bgm.playlist.some((t) => t?.soundId || t?.audioUrl)) return true;
+  if (String(bgm.title || "").trim()) return true;
+  return false;
+}
+
+/** 실제로 재생 가능한 audioUrl 이 있는지 (제목만 있는 설정은 false) */
+export function hasPlayableShowcaseBgm(styleConfig) {
+  const bgm = styleConfig?.bgm;
+  if (!bgm || bgm.mode === "none" || bgm.linkBroken) return false;
+  if (String(bgm.audioUrl || "").trim()) return true;
+  if (Array.isArray(bgm.playlist) && bgm.playlist.some((t) => String(t?.audioUrl || "").trim())) {
+    return true;
+  }
+  return false;
+}
+
 /** @param {import('./showcaseStyleStorage.js').ShowcaseStyleConfig | null | undefined} styleConfig */
 export function resolveShowcaseBgmLabel(styleConfig) {
   const line = resolveShowcaseBgmMarqueeText(styleConfig);
@@ -118,12 +140,16 @@ export function resolveShowcaseBgmLabel(styleConfig) {
 
 /**
  * 재생에 쓸 트랙 목록
- * - single: 현재 주제곡만
- * - order / shuffle_selected: 재생목록(없으면 주제곡)
+ * - 재생목록 2곡 이상 → 항상 목록 큐 (단독 모드로 남아 있어도 스킵·연속재생 가능)
+ * - order / shuffle_selected → 재생목록(없으면 주제곡)
+ * - single + 목록 0~1곡 → 주제곡만
  */
 export function resolvePlaylistTracks(bgm) {
   if (!bgm || bgm.mode === "none") return [];
   const mode = String(bgm.playMode || "single");
+  const list = Array.isArray(bgm.playlist)
+    ? bgm.playlist.filter((t) => t?.audioUrl && !t.linkBroken)
+    : [];
   const themeTrack = () => {
     const url = String(bgm.audioUrl || "").trim();
     if (!url || bgm.linkBroken) return [];
@@ -140,12 +166,9 @@ export function resolvePlaylistTracks(bgm) {
       }
     ];
   };
-  if (mode === "order" || mode === "shuffle_selected") {
-    const list = Array.isArray(bgm.playlist)
-      ? bgm.playlist.filter((t) => t?.audioUrl && !t.linkBroken)
-      : [];
-    if (list.length) return list;
-  }
+  /* 선곡 2곡 이상이면 모드와 무관하게 재생목록 사용 — ◀▶ 활성 */
+  if (list.length > 1) return list;
+  if ((mode === "order" || mode === "shuffle_selected") && list.length) return list;
   return themeTrack();
 }
 
@@ -154,12 +177,12 @@ export function resolveActivePlaylistTrack(bgm, sessionKey = "", trackIndex = 0)
   const list = resolvePlaylistTracks(bgm);
   if (!list.length) return null;
   if (list.length <= 1) return list[0];
-  const mode = String(bgm.playMode || "single");
-  if (mode === "single") return list[0];
+  /* 스킵·연속재생으로 갱신된 trackIndex 우선 */
   if (typeof trackIndex === "number" && trackIndex >= 0 && trackIndex < list.length) {
     return list[trackIndex];
   }
-  if (mode === "order") return list[0];
+  const mode = String(bgm.playMode || "single");
+  if (mode === "order" || mode === "single") return list[0];
   /* shuffle — trackIndex 없을 때만 세션 해시로 시작 곡 */
   const seed = String(sessionKey || Date.now());
   let hash = 0;
@@ -202,9 +225,12 @@ export function initialPlaylistIndex(bgm, sessionKey = "") {
  * 여러 곡을 이어서 재생하는 모드인지 (loop 끄고 ended 시 다음 곡)
  */
 export function isPlaylistAdvanceMode(bgm) {
+  const tracks = resolvePlaylistTracks(bgm);
+  if (tracks.length <= 1) return false;
   const mode = String(bgm?.playMode || "single");
-  if (mode !== "order" && mode !== "shuffle_selected") return false;
-  return resolvePlaylistTracks(bgm).length > 1;
+  /* 재생목록이 여러 곡이면 단독으로 남아 있어도 끝나면 다음 곡 */
+  if (tracks.length > 1) return true;
+  return mode === "order" || mode === "shuffle_selected";
 }
 
 export function isDirectAudioBgmMode(styleConfig) {

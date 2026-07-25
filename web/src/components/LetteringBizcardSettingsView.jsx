@@ -214,8 +214,12 @@ export default function LetteringBizcardSettingsView({
   const previewCard = useMemo(() => {
     const draft = buildUserLetteringCard({ membershipTier });
     const address = combineLetteringBizcardAddress(addressRoad, addressDetail);
-    const photoUrl = noProfilePhoto ? "" : pendingPhoto?.dataUrl || photoPreview || "";
-    const logoUrl = noCompanyLogo ? "" : pendingLogo?.dataUrl || logoPreview || "";
+    const photoUrl = noProfilePhoto
+      ? ""
+      : pendingPhoto?.previewUrl || pendingPhoto?.dataUrl || photoPreview || "";
+    const logoUrl = noCompanyLogo
+      ? ""
+      : pendingLogo?.previewUrl || pendingLogo?.dataUrl || logoPreview || "";
     return withLetteringBizcardPreviewFallback({
       ...draft,
       fax: noFax ? "" : fax,
@@ -313,8 +317,14 @@ export default function LetteringBizcardSettingsView({
       setLogoError(result.error);
       return;
     }
-    setPendingLogo({ dataUrl: result.dataUrl, fileName: result.fileName });
-    setLogoPreview(result.dataUrl);
+    const preview = String(result.dataUrl || "").trim();
+    const persist = String(result.persistUrl || result.dataUrl || "").trim();
+    if (!preview) {
+      setLogoError("로고 이미지를 읽지 못했습니다.");
+      return;
+    }
+    setPendingLogo({ dataUrl: persist || preview, fileName: result.fileName, previewUrl: preview });
+    setLogoPreview(preview);
     setLogoFileName(result.fileName);
     setNoCompanyLogo(false);
     if (result.uploadWarning) setToast(result.uploadWarning);
@@ -330,8 +340,14 @@ export default function LetteringBizcardSettingsView({
       setPhotoError(result.error);
       return;
     }
-    setPendingPhoto({ dataUrl: result.dataUrl, fileName: result.fileName });
-    setPhotoPreview(result.dataUrl);
+    const preview = String(result.dataUrl || "").trim();
+    const persist = String(result.persistUrl || result.dataUrl || "").trim();
+    if (!preview) {
+      setPhotoError("사진을 읽지 못했습니다.");
+      return;
+    }
+    setPendingPhoto({ dataUrl: persist || preview, fileName: result.fileName, previewUrl: preview });
+    setPhotoPreview(preview);
     setPhotoFileName(result.fileName);
     setNoProfilePhoto(false);
     if (result.uploadWarning) setToast(result.uploadWarning);

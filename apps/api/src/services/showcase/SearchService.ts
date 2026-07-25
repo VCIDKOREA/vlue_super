@@ -381,7 +381,7 @@ export async function searchByPublicId(rawId: string, limit = 12): Promise<Maske
     where: {
       ...baseTargetWhere(),
       isIdSearchAllowed: true,
-      publicHandle: handle
+      publicHandle: { equals: handle, mode: "insensitive" }
     },
     select: searchSelect,
     take: limit

@@ -207,6 +207,26 @@ letteringRoutes.put("/showcase/style", requireUserHeader, async (c) => {
   return c.json({ ok: true, ...result.bundle });
 });
 
+/** 상대 공개 라이브 쇼케이스 스타일 (편집본 editor는 미노출) */
+letteringRoutes.get("/showcase/style/:userId", async (c) => {
+  const userId = String(c.req.param("userId") || "").trim();
+  if (!userId) return c.json({ ok: false, error: "user required" }, 400);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, status: true, hasActiveShowcase: true }
+  });
+  if (!user || user.status !== "ACTIVE") {
+    return c.json({ ok: false, error: "not_found" }, 404);
+  }
+  const bundle = await getUserShowcaseStyleBundle(userId);
+  return c.json({
+    ok: true,
+    live: bundle.live,
+    liveSource: bundle.liveSource,
+    updatedAt: bundle.updatedAt
+  });
+});
+
 /**
  * V1 — 쇼케이스 검색 (상호주의·레이트리밋·마스킹)
  * query: q | tag, mode=hashtag|phone|name|id

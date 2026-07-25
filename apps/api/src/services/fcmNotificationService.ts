@@ -198,3 +198,20 @@ export async function sendOfficePushToUser(
     "office_calendar"
   );
 }
+
+/** 쇼케이스 좋아요·댓글 등 소셜 FCM */
+export async function sendShowcaseSocialPushToUser(
+  userId: string,
+  title: string,
+  body: string,
+  dataPayload?: Record<string, unknown>
+): Promise<FamilyProtectionPushResult> {
+  return sendMulticastPush(
+    userId,
+    title,
+    body,
+    dataPayload,
+    "vlue-showcase-social",
+    "showcase_social"
+  );
+}

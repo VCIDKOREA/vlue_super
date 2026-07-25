@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, HelpCircle, ListMusic, Loader2, Music2, Plus, Search, Sparkles, Trash2, Upload, Volume2, VolumeX } from "lucide-react";
 import CopyrightVerifySearch from "./CopyrightVerifySearch.jsx";
 import {
@@ -16,7 +16,8 @@ import {
 import {
   BGM_PLAY_MODES,
   BGM_VOLUME_LEVELS,
-  normalizeBgmVolumeLevel
+  normalizeBgmVolumeLevel,
+  resolveBgmVolumeGain
 } from "../../lib/showcase/showcaseBgmPresets.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 
@@ -75,6 +76,34 @@ function isAiType(t) {
   return t === "ai_assisted" || t === "ai_generated" || t === "remake_arrangement";
 }
 
+/** 목록 스피커 — 부모 렌더마다 타입 재생성되지 않도록 모듈 스코프에 둠 */
+function PreviewSpeakerBtn({ soundId, active, playing, disabled, onPreview }) {
+  const loading = active && !playing;
+  return (
+    <button
+      type="button"
+      className={`showcase-sound-btn showcase-sound-btn--preview${active ? " is-on" : ""}${loading ? " is-loading" : ""}`}
+      aria-label={active ? (loading ? "불러오는 중" : "미리듣기 중지") : "미리듣기"}
+      title={active ? (loading ? "불러오는 중…" : "미리듣기 중지") : "미리듣기"}
+      disabled={disabled}
+      onPointerDown={(e) => {
+        if (e.button != null && e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onPreview?.(soundId);
+      }}
+    >
+      {loading ? (
+        <Loader2 size={16} strokeWidth={2.4} aria-hidden className="showcase-sound-btn__spin" />
+      ) : active ? (
+        <VolumeX size={16} strokeWidth={2.4} aria-hidden />
+      ) : (
+        <Volume2 size={16} strokeWidth={2.4} aria-hidden />
+      )}
+    </button>
+  );
+}
+
 /**
  * A. VLUE Signature Sound / B. User Original Sound
  * 설정 화면에서는 자동재생 없음 — 「BGM 미리듣기」만 재생
@@ -99,8 +128,11 @@ export default function ShowcaseBgmPicker({
   const [registerOpen, setRegisterOpen] = useState(false);
   const [addMenuFor, setAddMenuFor] = useState(null);
   const [previewingId, setPreviewingId] = useState("");
-  const { setPlaybackPhase, previewInSettings, stopSettingsPreview, phase, bindStyleConfig } =
-    useShowcaseBgm();
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const previewAudioRef = useRef(null);
+  const previewingIdRef = useRef("");
+  const soundByIdRef = useRef(new Map());
+  const { setPlaybackPhase, stopSettingsPreview, hushMainAudio, bindStyleConfig } = useShowcaseBgm();
 
   const paid = Boolean(quota?.paid);
   const playlist = Array.isArray(value?.playlist) ? value.playlist : [];
@@ -108,7 +140,6 @@ export default function ShowcaseBgmPicker({
   const volumeLevel = normalizeBgmVolumeLevel(value?.volumeLevel);
   const playMode = value?.playMode || "single";
   const selectedId = value?.soundId || "";
-  const isPreviewing = phase === "settings_preview";
 
   /** 하단 토스트 한 번 — 인라인에 남기지 않음 */
   const notify = (msg) => {
@@ -145,9 +176,117 @@ export default function ShowcaseBgmPicker({
     if (tab === "signature") setSignaturePage(0);
   }, [tab]);
 
+  /* 목록 미리듣기용 음원 인덱스 (pointerdown 핸들러가 최신 URL을 쓰도록) */
   useEffect(() => {
-    if (!isPreviewing) setPreviewingId("");
-  }, [isPreviewing]);
+    const map = new Map();
+    for (const s of signatures) {
+      if (s?.id) map.set(String(s.id), s);
+    }
+    for (const s of mine.owned || []) {
+      if (s?.id) map.set(String(s.id), s);
+    }
+    for (const s of mine.borrowed || []) {
+      if (s?.id) map.set(String(s.id), s);
+    }
+    soundByIdRef.current = map;
+  }, [signatures, mine]);
+
+  const stopLocalPreview = useCallback(() => {
+    const el = previewAudioRef.current;
+    if (el) {
+      el.pause();
+      try {
+        el.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+    }
+    previewingIdRef.current = "";
+    setPreviewingId("");
+    setPreviewPlaying(false);
+  }, []);
+
+  const ensurePreviewAudio = useCallback(() => {
+    if (previewAudioRef.current) return previewAudioRef.current;
+    const el = new Audio();
+    el.preload = "auto";
+    el.addEventListener("playing", () => setPreviewPlaying(true));
+    el.addEventListener("pause", () => setPreviewPlaying(false));
+    el.addEventListener("ended", () => {
+      previewingIdRef.current = "";
+      setPreviewingId("");
+      setPreviewPlaying(false);
+    });
+    previewAudioRef.current = el;
+    return el;
+  }, []);
+
+  /** Context 상태머신 우회 — 제스처 안에서 Audio.play() 만 호출 (즉각 반응) */
+  const previewListSoundById = useCallback(
+    (soundId) => {
+      const id = String(soundId || "").trim();
+      const sound = soundByIdRef.current.get(id);
+      const url = String(sound?.audioUrl || "").trim();
+      if (!id || !url || sound?.linkBroken) {
+        const text = "미리들을 수 없는 음원입니다.";
+        setError("");
+        if (typeof onToast === "function") onToast(text);
+        else window.alert(text);
+        return;
+      }
+
+      if (previewingIdRef.current === id) {
+        stopLocalPreview();
+        return;
+      }
+
+      previewingIdRef.current = id;
+      setPreviewingId(id);
+      setPreviewPlaying(false);
+
+      hushMainAudio?.();
+
+      const el = ensurePreviewAudio();
+      el.volume = resolveBgmVolumeGain({ bgm: { volumeLevel } });
+      if (el.dataset.vlueUrl !== url) {
+        el.dataset.vlueUrl = url;
+        el.src = url;
+      } else {
+        try {
+          el.currentTime = 0;
+        } catch {
+          /* ignore */
+        }
+      }
+      void el.play().catch(() => {
+        void el.play().catch(() => {
+          const text = "이 기기에서 미리듣기를 재생할 수 없습니다.";
+          setError("");
+          if (typeof onToast === "function") onToast(text);
+          else window.alert(text);
+          stopLocalPreview();
+        });
+      });
+    },
+    [ensurePreviewAudio, hushMainAudio, onToast, stopLocalPreview, volumeLevel]
+  );
+
+  useEffect(() => {
+    const el = previewAudioRef.current;
+    if (!el) return;
+    el.volume = resolveBgmVolumeGain({ bgm: { volumeLevel } });
+  }, [volumeLevel]);
+
+  useEffect(
+    () => () => {
+      const el = previewAudioRef.current;
+      if (el) {
+        el.pause();
+        previewAudioRef.current = null;
+      }
+    },
+    []
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -173,9 +312,9 @@ export default function ShowcaseBgmPicker({
     /* 설정 진입 시 다른 면 BGM 즉시 중지·소유권 확보.
        setPlaybackPhase 를 deps 에 넣으면 미리듣기 시 cleanup 이 재생을 끊음 */
     setPlaybackPhase("idle", { owner: "settings", steal: true });
-    /* 예전에 인라인에 남는 안내 문구 제거 */
     setError("");
     return () => {
+      stopLocalPreview();
       stopSettingsPreview?.();
       setPlaybackPhase("idle", { steal: true });
     };
@@ -183,10 +322,10 @@ export default function ShowcaseBgmPicker({
   }, [load]);
 
   useEffect(() => {
-    /* 미리듣기 중에는 선택값 바인딩으로 style/URL 을 덮어쓰지 않음 (재생 중단 방지) */
-    if (isPreviewing) return;
+    /* 목록 미리듣기 중에는 선택값 바인딩으로 URL 덮어쓰지 않음 */
+    if (previewingId) return;
     bindStyleConfig?.({ bgm: value || { mode: "none" } }, { owner: "settings" });
-  }, [value, bindStyleConfig, isPreviewing]);
+  }, [value, bindStyleConfig, previewingId]);
 
   const patchBgm = (partial) => {
     onChange?.({ ...(value || {}), ...partial });
@@ -206,22 +345,45 @@ export default function ShowcaseBgmPicker({
       sharedOwnerHandle: mode === "borrowed" ? extras.sharedOwnerHandle || sound.ownerHandle : "",
       createType: sound.createType
     });
+    const entry = soundToPlaylistEntry(sound, mode, {
+      ownerHandle: handle,
+      sharedOwnerHandle: extras.sharedOwnerHandle
+    });
+    let nextPlaylist;
+    if (!paid) {
+      nextPlaylist = entry.audioUrl ? [entry] : [];
+    } else if (playlist.length) {
+      nextPlaylist = playlist.some((p) => p.soundId === entry.soundId)
+        ? playlist
+        : entry.audioUrl
+          ? [entry, ...playlist].slice(0, playlistLimit)
+          : playlist;
+    } else {
+      nextPlaylist = entry.audioUrl ? [entry] : [];
+    }
+    const nextPlayMode =
+      !paid || nextPlaylist.length <= 1
+        ? paid
+          ? playMode
+          : "single"
+        : playMode === "single"
+          ? "order"
+          : playMode;
     /* 설정 화면 자동재생 금지 */
     setPlaybackPhase("idle", { owner: "settings" });
+    stopLocalPreview();
     stopSettingsPreview?.();
     onChange?.({
       ...(value || {}),
       ...patch,
       volumeLevel,
-      playMode: paid ? playMode : "single",
-      playlist:
-        paid && playlist.length
-          ? playlist
-          : [soundToPlaylistEntry(sound, mode, { ownerHandle: handle, sharedOwnerHandle: extras.sharedOwnerHandle })]
+      playMode: nextPlayMode,
+      playlist: nextPlaylist
     });
   };
 
   const clearBgm = () => {
+    stopLocalPreview();
     stopSettingsPreview?.();
     setPlaybackPhase("idle", { owner: "settings", steal: true });
     onChange?.({
@@ -284,8 +446,15 @@ export default function ShowcaseBgmPicker({
       return;
     }
     setError("");
-    patchBgm({ playlist: [...playlist, entry] });
-    notify(`재생목록에 추가했습니다. (${playlist.length + 1}/${playlistLimit})`);
+    const nextPlaylist = [...playlist, entry];
+    const patch = { playlist: nextPlaylist };
+    if (nextPlaylist.length >= 2 && playMode === "single") {
+      patch.playMode = "order";
+      notify(`재생목록 ${nextPlaylist.length}/${playlistLimit}곡 · 순서재생으로 전환되었습니다.`);
+    } else {
+      notify(`재생목록에 추가했습니다. (${nextPlaylist.length}/${playlistLimit})`);
+    }
+    patchBgm(patch);
   };
 
   /** 보관·선택 중인 주제곡을 재생목록에 넣기 */
@@ -337,64 +506,6 @@ export default function ShowcaseBgmPicker({
     }
   };
 
-  /** 목록에서 스피커로 바로 미리듣기 (선택과 무관) */
-  const previewListSound = (sound, mode, extras = {}) => {
-    if (!sound?.audioUrl || sound.linkBroken) {
-      notify("미리들을 수 없는 음원입니다.");
-      return;
-    }
-    const id = String(sound.id || "").trim();
-    if (isPreviewing && previewingId === id) {
-      stopSettingsPreview?.();
-      setPreviewingId("");
-      return;
-    }
-    const patch = soundToBgmPatch(sound, mode, {
-      ownerHandle: mode === "user" ? handle : extras.ownerHandle,
-      sharedOwnerHandle: mode === "borrowed" ? extras.sharedOwnerHandle || sound.ownerHandle : "",
-      createType: sound.createType
-    });
-    if (!patch.audioUrl) {
-      notify("미리들을 수 없는 음원입니다.");
-      return;
-    }
-    setError("");
-    setPreviewingId(id);
-    /* 제스처 안에서 즉시 재생 요청 */
-    previewInSettings?.({
-      bgm: {
-        ...patch,
-        volumeLevel,
-        playMode: "single",
-        playlist: []
-      }
-    });
-  };
-
-  const PreviewSpeakerBtn = ({ sound, mode, extras = {} }) => {
-    const id = String(sound?.id || "");
-    const active = isPreviewing && previewingId === id;
-    return (
-      <button
-        type="button"
-        className={`showcase-sound-btn showcase-sound-btn--preview${active ? " is-on" : ""}`}
-        aria-label={active ? "미리듣기 중지" : "미리듣기"}
-        title={active ? "미리듣기 중지" : "미리듣기"}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          previewListSound(sound, mode, extras);
-        }}
-      >
-        {active ? (
-          <VolumeX size={16} strokeWidth={2.4} aria-hidden />
-        ) : (
-          <Volume2 size={16} strokeWidth={2.4} aria-hidden />
-        )}
-      </button>
-    );
-  };
-
   return (
     <div className="showcase-sound-picker">
       <p className="showcase-sound-picker__policy">
@@ -436,7 +547,11 @@ export default function ShowcaseBgmPicker({
             ))}
           </div>
           <p className="text-[10px] text-slate-500 mt-1">
-            순서재생: 재생목록을 처음부터 이어서 재생. 셔플: 재생목록을 섞어 이어서 재생합니다.
+            재생목록 2곡 이상이면 ◀▶ 로 넘길 수 있습니다. 순서재생: 목록을 이어서 재생 · 셔플: 섞어
+            재생합니다.
+            {playlist.length > 1 && playMode === "single"
+              ? " (지금은 단독이어도 목록 기준으로 재생됩니다)"
+              : ""}
           </p>
         </div>
       ) : (
@@ -487,7 +602,7 @@ export default function ShowcaseBgmPicker({
           >
             <Trash2 size={14} /> 삭제
           </button>
-        </div>
+      </div>
       ) : (
         <p className="text-[11px] text-slate-500 mb-2">아래에서 곡을 선택하세요. 목록의 스피커로 미리들을 수 있습니다.</p>
       )}
@@ -518,12 +633,15 @@ export default function ShowcaseBgmPicker({
           <p className="showcase-sound-genre-search__help">
             장르는 <b>영문</b>으로 검색하세요. 예: Jazz, Lo-fi, Hiphop, Ambient
           </p>
-        </div>
+            </div>
       ) : null}
 
       {playlist.length > 0 && paid ? (
         <div className="showcase-sound-playlist">
-          <p className="showcase-sound-list__h">선택 재생목록</p>
+          <p className="showcase-sound-list__h">
+            선택 재생목록 ({playlist.length}/{playlistLimit})
+            {playlist.length > 1 ? " · 연속재생" : ""}
+          </p>
           {playlist.map((t) => (
             <div key={t.soundId} className="showcase-sound-playlist__row">
               <span className="truncate">{t.title}</span>
@@ -560,7 +678,12 @@ export default function ShowcaseBgmPicker({
                 </span>
                 {selectedId === s.id ? <Check size={14} className="text-emerald-600" aria-hidden /> : null}
               </button>
-              <PreviewSpeakerBtn sound={s} mode="signature" />
+              <PreviewSpeakerBtn
+                soundId={s.id}
+                active={previewingId === s.id}
+                playing={previewingId === s.id && previewPlaying}
+                onPreview={previewListSoundById}
+              />
               {paid ? (
                 <button
                   type="button"
@@ -602,7 +725,7 @@ export default function ShowcaseBgmPicker({
                 onClick={() => setSignaturePage((p) => Math.min(signaturePageCount - 1, p + 1))}
               >
                 <ChevronRight size={16} strokeWidth={2.4} aria-hidden />
-              </button>
+          </button>
             </div>
           ) : null}
         </div>
@@ -626,7 +749,7 @@ export default function ShowcaseBgmPicker({
           )}
           {quota && paid && !quota.canRegister ? (
             <p className="text-[11px] text-amber-700">오늘 업로드 한도 또는 보관 한도에 도달했습니다.</p>
-          ) : null}
+        ) : null}
 
           <h4 className="showcase-sound-list__h">
             <span>{originalTrackLabel}</span>
@@ -644,7 +767,12 @@ export default function ShowcaseBgmPicker({
                 </span>
                 {selectedId === s.id ? <Check size={14} className="text-emerald-600" aria-hidden /> : null}
               </button>
-              <PreviewSpeakerBtn sound={s} mode="user" />
+              <PreviewSpeakerBtn
+                soundId={s.id}
+                active={previewingId === s.id}
+                playing={previewingId === s.id && previewPlaying}
+                onPreview={previewListSoundById}
+              />
               {paid ? (
                 <button
                   type="button"
@@ -675,11 +803,11 @@ export default function ShowcaseBgmPicker({
                   <Plus size={14} />
                 </button>
               ) : null}
-            </div>
+          </div>
           ))}
           {!mine.owned?.length ? (
             <p className="text-[12px] text-slate-500">등록한 Original Track이 없습니다.</p>
-          ) : null}
+        ) : null}
 
           <h4 className="showcase-sound-list__h">
             <span>VLUE Shared Track</span>
@@ -690,10 +818,10 @@ export default function ShowcaseBgmPicker({
               key={b.borrowId}
               className={`showcase-sound-list__item-row${selectedId === b.sound?.id ? " is-selected" : ""}`}
             >
-              <button
-                type="button"
+          <button
+            type="button"
                 className={`showcase-sound-list__item${b.sound?.linkBroken ? " is-broken" : ""}`}
-                onClick={() => {
+            onClick={() => {
                   if (b.sound?.linkBroken) {
                     notify("원본 음원이 비공개·삭제되어 연결이 끊어졌습니다.");
                     return;
@@ -711,9 +839,10 @@ export default function ShowcaseBgmPicker({
               </button>
               {!b.sound?.linkBroken ? (
                 <PreviewSpeakerBtn
-                  sound={b.sound}
-                  mode="borrowed"
-                  extras={{ sharedOwnerHandle: b.sound?.ownerHandle }}
+                  soundId={b.sound?.id}
+                  active={previewingId === b.sound?.id}
+                  playing={previewingId === b.sound?.id && previewPlaying}
+                  onPreview={previewListSoundById}
                 />
               ) : null}
               {paid && !b.sound?.linkBroken ? (
@@ -730,7 +859,7 @@ export default function ShowcaseBgmPicker({
                   }
                 >
                   <Plus size={14} />
-                </button>
+          </button>
               ) : null}
             </div>
           ))}
@@ -738,7 +867,7 @@ export default function ShowcaseBgmPicker({
             <p className="text-[12px] text-slate-500">퍼온 Shared Track이 없습니다.</p>
           ) : null}
         </div>
-      ) : null}
+        ) : null}
 
       {addMenuFor ? (
         <div className="showcase-sound-add-sheet" role="dialog" aria-label="담기">
@@ -790,7 +919,7 @@ export default function ShowcaseBgmPicker({
             await applySound(sound, "user");
           }}
         />
-      ) : null}
+        ) : null}
     </div>
   );
 }

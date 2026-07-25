@@ -24,7 +24,8 @@ export default function ShowcaseMediaPage({
       overlayX: p?.overlayX,
       overlayY: p?.overlayY,
       overlayAnim: p?.overlayAnim,
-      overlayBorder: p?.overlayBorder
+      overlayBorder: p?.overlayBorder,
+      textOverlays: Array.isArray(p?.textOverlays) ? p.textOverlays : undefined
     }))
     .filter((p) => p.url)
     .slice(0, 20);

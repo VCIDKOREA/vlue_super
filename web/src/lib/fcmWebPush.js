@@ -1,5 +1,5 @@
 /**
- * 웹 FCM 토큰 등록 — 가족보호·부모 승인 백그라운드 푸시
+ * 웹 FCM 토큰 등록 — 백그라운드 푸시(팔로우·쇼케이스 소셜 등)
  * @see POST /api/auth/devices/fcm-token
  */
 import { initializeApp, getApps } from "firebase/app";
@@ -30,6 +30,14 @@ function readFirebaseWebConfig() {
   };
 }
 
+function readLocalUserId() {
+  try {
+    return String(localStorage.getItem("vlue_server_user_id") || "").trim();
+  } catch {
+    return "";
+  }
+}
+
 /** Railway Variables / .env 에 Firebase web 설정이 있는지 */
 export function isFcmWebPushConfigured() {
   return readFirebaseWebConfig() != null;
@@ -41,10 +49,18 @@ async function ensureFirebaseApp(config) {
   return initializeApp(config);
 }
 
-/** 로그인·승인된 기기에서 FCM 토큰을 API에 등록 */
+/**
+ * 로그인·승인된 기기에서 FCM 토큰을 API에 등록.
+ * 계정 전환 시 userId별로 다시 등록해야 해당 계정 기기로 백그라운드 푸시가 갑니다.
+ */
 export async function registerFcmWebPushToken() {
   const cfg = readFirebaseWebConfig();
-  if (!cfg) return { ok: false, skipped: true, reason: "not_configured" };
+  if (!cfg) {
+    console.warn(
+      "[fcm] not_configured — web/.env 에 VITE_FIREBASE_* + VITE_WEB_PUSH_VAPID_PUBLIC_KEY 를 넣으세요"
+    );
+    return { ok: false, skipped: true, reason: "not_configured" };
+  }
   if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
     return { ok: false, skipped: true, reason: "unsupported" };
   }
@@ -61,6 +77,7 @@ export async function registerFcmWebPushToken() {
 
   const app = await ensureFirebaseApp(cfg.firebase);
   const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+  await navigator.serviceWorker.ready;
   const messaging = getMessaging(app);
   const fcmToken = await getToken(messaging, {
     vapidKey: cfg.vapidKey,
@@ -69,9 +86,11 @@ export async function registerFcmWebPushToken() {
 
   if (!fcmToken) return { ok: false, error: "empty_fcm_token" };
 
+  const userId = readLocalUserId();
+  const cacheKey = userId ? `${userId}:${fcmToken}` : fcmToken;
   try {
     const cached = localStorage.getItem(FCM_REGISTERED_KEY);
-    if (cached === fcmToken) return { ok: true, cached: true };
+    if (cached === cacheKey) return { ok: true, cached: true };
   } catch {
     /* ignore */
   }
@@ -86,7 +105,7 @@ export async function registerFcmWebPushToken() {
   }
 
   try {
-    localStorage.setItem(FCM_REGISTERED_KEY, fcmToken);
+    localStorage.setItem(FCM_REGISTERED_KEY, cacheKey);
   } catch {
     /* ignore */
   }

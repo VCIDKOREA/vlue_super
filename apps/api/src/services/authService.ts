@@ -63,13 +63,22 @@ async function issueLoginOk(
   });
   const handle = full?.publicHandle || user.publicHandle || loginId;
   const membershipTier = await resolveLoginMembershipTier(user.id, handle);
+  const refreshed = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: {
+      accountStatus: true,
+      phoneE164: true,
+      legalName: true,
+      identityVerified: true
+    }
+  });
   return {
     status: "ok",
     userId: user.id,
-    legalName: user.legalName || "",
+    legalName: refreshed?.legalName || user.legalName || "",
     publicHandle: handle,
-    accountStatus: user.accountStatus,
-    phoneE164: user.phoneE164,
+    accountStatus: refreshed?.accountStatus || user.accountStatus,
+    phoneE164: refreshed?.phoneE164 ?? user.phoneE164,
     membershipTier,
     accessToken: pair.accessToken,
     refreshToken: pair.refreshToken,
@@ -185,8 +194,21 @@ export async function loginWithCredentials(
     return issueLoginOk(user, loginId, first.deviceToken, c);
   }
 
+  /**
+   * 같은 브라우저·기기(deviceToken)가 이미 다른 계정에서 승인된 경우
+   * → 계정 전환 로그인 허용 (기기 승인 재요청하지 않음)
+   */
+  const sameDeviceTrustedElsewhere = await prisma.userDevice.findFirst({
+    where: {
+      deviceToken,
+      isVerified: true,
+      NOT: { userId: user.id }
+    },
+    select: { id: true }
+  });
+
   /** 시드 테스트·플랫폼(admin/ceo) 계정은 QA/운영 부트스트랩용으로 신규 기기 즉시 승인 */
-  if (isDeviceAutoApproveHandle(loginId)) {
+  if (isDeviceAutoApproveHandle(loginId) || sameDeviceTrustedElsewhere) {
     const approved = await prisma.userDevice.upsert({
       where: { userId_deviceToken: { userId: user.id, deviceToken } },
       create: {
@@ -197,13 +219,24 @@ export async function loginWithCredentials(
         userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
         lastIp: c.req.header("x-forwarded-for")?.split(",")[0]?.trim()?.slice(0, 45) || null,
         clientKind,
-        label: clientKind === "mobile" ? "휴대폰 (부트스트랩)" : "PC (부트스트랩)"
+        label: sameDeviceTrustedElsewhere
+          ? clientKind === "mobile"
+            ? "휴대폰 (계정전환)"
+            : "PC (계정전환)"
+          : clientKind === "mobile"
+            ? "휴대폰 (부트스트랩)"
+            : "PC (부트스트랩)"
       },
       update: {
         isVerified: true,
         verifiedAt: new Date(),
         userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
-        clientKind
+        clientKind,
+        label: sameDeviceTrustedElsewhere
+          ? clientKind === "mobile"
+            ? "휴대폰 (계정전환)"
+            : "PC (계정전환)"
+          : undefined
       }
     });
     return issueLoginOk(user, loginId, approved.deviceToken, c);

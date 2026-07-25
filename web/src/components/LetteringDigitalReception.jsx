@@ -29,6 +29,7 @@ import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
 import { openExternalHref, formatWebHref } from "../lib/showcase/showcaseContactActions.js";
+import { getLocalVlueUserId } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
 
 function formatWebsite(raw) {
   return String(raw || "")
@@ -263,7 +264,7 @@ function WatermarkBackdrop({ card }) {
 
 function CompanyLogoBadge({ card, className = "" }) {
   const [imgBroken, setImgBroken] = useState(false);
-  const logoUrl = String(card.logoUrl || "").trim();
+  const logoUrl = String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl(card);
   if (!logoUrl || imgBroken) return null;
   return (
     <span className={`ldr-company-logo-badge${className ? ` ${className}` : ""}`.trim()} aria-label="회사 로고">
@@ -275,7 +276,7 @@ function CompanyLogoBadge({ card, className = "" }) {
 function ProfileMedia({ card, className = "", variant = "avatar" }) {
   const [imgBroken, setImgBroken] = useState(false);
   const photoUrl = String(card.photoUrl || "").trim();
-  const logoUrl = String(card.logoUrl || "").trim();
+  const logoUrl = String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl(card);
   /* avatar = 회사 로고, hero = 프로필 사진 — 서로 대체하지 않음 */
   const src = variant === "logo" || variant === "avatar" ? logoUrl : photoUrl;
   const isLogo = variant === "logo" || variant === "avatar";
@@ -457,16 +458,33 @@ function FrontPanel({
   const validityFromItems = (verificationItems || [])
     .map((line) => String(line || "").trim())
     .find((line) => /만료일|인증유효기간/.test(line));
+  const peerUserId = String(card.userId || card.ownerUserId || "").trim();
+  const meId = getLocalVlueUserId();
+  const isPeerCard = Boolean(peerUserId && meId && peerUserId !== meId);
   const validityResolved = resolveAuthValidityPeriod({
     paidAt: card.authPaidAt || null,
     cycleEndAt: card.authCycleEndAt || card.cycleEndAt || null,
     validUntil: card.authValidUntil || null,
-    billingCycle: card.billingCycle || null
+    billingCycle: card.billingCycle || null,
+    useLocalFallback: !isPeerCard
   });
   const validityLabel = "만료일";
   const validityDisplay = validityFromItems
     ? validityFromItems.replace(/^(만료일|인증유효기간)\s*[:：]?\s*/, "").trim()
     : validityResolved?.line || "";
+
+  const openPeerCaseArchive = () => {
+    if (!peerUserId) return;
+    window.dispatchEvent(
+      new CustomEvent("vlue-open-case-user", {
+        detail: {
+          userId: peerUserId,
+          name: String(card.name || card.organization || "").trim(),
+          handle: String(card.publicHandle || card.loginId || "").replace(/^@/, "")
+        }
+      })
+    );
+  };
 
   return (
     <div className={`ldr-panel ldr-panel--front${embeddedInPush ? " ldr-panel--push" : ""}`}>
@@ -481,9 +499,25 @@ function FrontPanel({
         <div className="ldr-back-head__copy">
           <p className="ldr-back-kicker">Digital ID · Profile</p>
           <div className="ldr-back-title-row">
-            <h3 className="ldr-back-title">
-              {String(card.organization || "").trim() || card.name}
-            </h3>
+            {peerUserId ? (
+              <button
+                type="button"
+                className="ldr-back-title ldr-back-title--link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openPeerCaseArchive();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                aria-label="케이스함 열기"
+              >
+                {String(card.organization || "").trim() || card.name}
+              </button>
+            ) : (
+              <h3 className="ldr-back-title">
+                {String(card.organization || "").trim() || card.name}
+              </h3>
+            )}
             {verified ? (
               <ShieldCheck className="ldr-name-shield" strokeWidth={2.35} aria-label="VLUE 인증됨" />
             ) : null}
@@ -500,6 +534,22 @@ function FrontPanel({
             }
             const line = formatNameDeptTitleLine(personName || (!org ? card.name : ""), card.department, card.title);
             if (!line) return null;
+            if (peerUserId && personName) {
+              return (
+                <button
+                  type="button"
+                  className="ldr-back-person-name ldr-back-person-name--row ldr-back-person-name--link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openPeerCaseArchive();
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {line}
+                </button>
+              );
+            }
             return <p className="ldr-back-person-name ldr-back-person-name--row">{line}</p>;
           })()}
         </div>
@@ -633,6 +683,7 @@ function FrontPanel({
             className="ldr-front-intro ldr-front-intro--verified"
             card={card}
             hideFollow={hideFollow}
+            fallbackToMe={!isPeerCard}
             onToast={onToast}
             socialToggle={hasSocial}
             socialExpanded={socialOpen}
