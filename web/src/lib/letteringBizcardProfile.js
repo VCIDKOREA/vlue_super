@@ -189,6 +189,7 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       customBackText: identity.customBackText || "",
       address: identity.address || "",
       logoUrl: ed.noCompanyLogo ? "" : String(ed.logoDataUrl || ed.logoUrl || "").trim(),
+      logoFileName: ed.noCompanyLogo ? "" : String(ed.logoFileName || "").trim(),
       photoUrl: ed.noProfilePhoto
         ? ""
         : String(ed.photoDataUrl || ed.photoUrl || readProfilePhotoAvatar() || "").trim(),
@@ -196,6 +197,15 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       membershipTier,
       userId: userId || "",
       ownerUserId: userId || "",
+      loginId: (() => {
+        try {
+          return String(localStorage.getItem("vlue_member_handle") || "")
+            .trim()
+            .replace(/^@/, "");
+        } catch {
+          return "";
+        }
+      })(),
       feedId: userId ? `user-${userId}` : "",
       feedType: "personal",
       verificationItems: identity.name

@@ -29,6 +29,7 @@ import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
 import { openExternalHref, formatWebHref } from "../lib/showcase/showcaseContactActions.js";
 import { getLocalVlueUserId } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
+import VLUE_WATERMARK_LOGO from "../assets/vlue-shield-logo.svg?url";
 
 function formatWebsite(raw) {
   return String(raw || "")
@@ -248,28 +249,77 @@ function FaceTabs({ face, onFaceChange, hidden = false }) {
   );
 }
 
+/** CEO(@ceo / ceo@vlue.kr) 소유 명함 — 이 계정만 ‘로고 없음’과 동일 처리 */
+function isCeoOwnerCard(card) {
+  const handle = String(
+    card?.loginId || card?.publicHandle || card?.handle || card?.memberHandle || ""
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/^@/, "");
+  if (handle === "ceo") return true;
+
+  const email = String(card?.email || "").trim().toLowerCase();
+  if (email === "ceo@vlue.kr") return true;
+
+  try {
+    const me = String(localStorage.getItem("vlue_member_handle") || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^@/, "");
+    if (me !== "ceo") return false;
+    const owner = String(card?.userId || card?.ownerUserId || "").trim();
+    const meId = getLocalVlueUserId();
+    if (!owner || owner === "me") return true;
+    if (meId && owner === meId) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 등록한 회사 로고 URL
+ * - CEO: 1번 캡처 VLUE 공식 로고 (업로드 PNG 대신)
+ * - 그 외: 업로드 로고 (프로필·워터마크 동일 소스)
+ */
 function resolveCardLogoUrl(card) {
+  if (isCeoOwnerCard(card)) return VLUE_WATERMARK_LOGO;
   if (card?.noCompanyLogo) return "";
   const logo = String(card?.logoUrl || card?.logo_url || "").trim();
   if (!logo) return "";
-  /* VLUE/데모 실드·아이콘은 회사 로고로 취급하지 않음 → 무지 */
-  if (
-    /vlue-shield|vlue-eye|lettering-demo|icons8|\/assets\/vlue/i.test(logo) ||
-    /data:image\/svg\+xml.*2563eb/i.test(logo)
-  ) {
-    return "";
-  }
+  if (/lettering-demo|icons8\.com/i.test(logo)) return "";
+  if (/data:image\/svg\+xml/i.test(logo) && /2563eb/i.test(logo)) return "";
+  if (/\/assets\/vlue-shield-logo\.svg/i.test(logo)) return "";
   return logo;
 }
 
-/** 회사 로고 워터마크 — 로고 있을 때만 (없으면 배경 비움). 투명 PNG 그대로 표시 */
+/**
+ * 뒷배경 워터마크 (크기·명도는 전 유저 동일)
+ * - CEO: VLUE 공식 로고
+ * - 그 외: 프로필 로고와 동일 / 없으면 없음
+ */
 function CompanyLogoWatermark({ card }) {
   const [imgBroken, setImgBroken] = useState(false);
-  const logoUrl = resolveCardLogoUrl(card);
+  const ceo = isCeoOwnerCard(card);
+  const company = resolveCardLogoUrl(card);
+
+  let logoUrl = "";
+  let variant = "nukki";
+  if (ceo) {
+    logoUrl = VLUE_WATERMARK_LOGO;
+    variant = "ceo";
+  } else if (company) {
+    logoUrl = company;
+    variant = "nukki";
+  } else {
+    return null;
+  }
+
   if (!logoUrl || imgBroken) return null;
 
   return (
-    <div className="ldr-watermark ldr-watermark--nukki" aria-hidden>
+    <div className={`ldr-watermark ldr-watermark--${variant}`} aria-hidden>
       <img
         src={logoUrl}
         alt=""
@@ -285,7 +335,10 @@ function CompanyLogoBadge({ card, className = "" }) {
   const logoUrl = resolveCardLogoUrl(card);
   if (!logoUrl || imgBroken) return null;
   return (
-    <span className={`ldr-company-logo-badge${className ? ` ${className}` : ""}`.trim()} aria-label="회사 로고">
+    <span
+      className={`ldr-company-logo-badge ldr-company-logo-badge--link${className ? ` ${className}` : ""}`.trim()}
+      aria-label="회사 로고"
+    >
       <img src={logoUrl} alt="" className="ldr-company-logo-badge__img" onError={() => setImgBroken(true)} />
     </span>
   );
@@ -300,8 +353,7 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
   const src = isLogo ? logoUrl : photoUrl;
   const focusCss = !isLogo ? photoFocusToCss(card.photoFocus) : undefined;
 
-  /* 로고 없음 → 무지(슬롯 비움). 이니셜/데모 로고 표시 안 함 */
-  if (!src && isLogo) return null;
+  /* 로고 없음 → 무지(슬롯 비움) */
   if (isLogo && !logoUrl) return null;
 
   const fallback = (card.organization || card.name || "?").slice(0, 1);
@@ -309,7 +361,7 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
   return (
     <div
       className={`ldr-profile-media ldr-profile-media--${variant}${
-        isLogo ? " ldr-profile-media--logo" : ""
+        isLogo ? " ldr-profile-media--logo ldr-profile-media--link-logo" : ""
       }${className ? ` ${className}` : ""}`.trim()}
     >
       {src && !imgBroken ? (
@@ -358,7 +410,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
     <>
       {orgLine ? (
         <p className={`ldr-hero__brand${hasLogo ? " ldr-hero__brand--with-logo" : ""}`}>
-          {hasLogo ? <CompanyLogoBadge card={{ logoUrl }} className="ldr-company-logo-badge--inline" /> : null}
+          {hasLogo ? <CompanyLogoBadge card={card} className="ldr-company-logo-badge--inline" /> : null}
           <span>{orgLine}</span>
         </p>
       ) : null}
@@ -420,7 +472,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
           </div>
         )}
         <div className="ldr-hero__shade" />
-        {hasLogo ? <CompanyLogoBadge card={{ logoUrl }} className="ldr-company-logo-badge--hero" /> : null}
+        {hasLogo ? <CompanyLogoBadge card={card} className="ldr-company-logo-badge--hero" /> : null}
         {verified ? (
           <span className="ldr-hero__badge">
             <ShieldCheck className="h-3.5 w-3.5" />

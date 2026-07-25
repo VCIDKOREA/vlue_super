@@ -6022,22 +6022,24 @@ body,
 }
 
 .ldr-watermark__img {
-  width: min(70%, 220px);
-  max-height: 78%;
+  width: min(40%, 128px);
+  max-height: 40%;
   object-fit: contain;
   background: transparent;
-  /* 누끼 로고 — 흰 사각 없이 은은하게 */
-  opacity: 0.16;
-  filter: drop-shadow(0 0 1px rgba(15, 23, 42, 0.15));
+  opacity: 0.15;
+  filter: none;
+  mix-blend-mode: normal;
 }
 
-.ldr-watermark--nukki .ldr-watermark__img {
-  mix-blend-mode: normal;
-  opacity: 0.2;
+.ldr-watermark--brand .ldr-watermark__img,
+.ldr-watermark--nukki .ldr-watermark__img,
+.ldr-watermark--ceo .ldr-watermark__img {
+  width: min(40%, 128px);
+  max-height: 40%;
+  opacity: 0.15;
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
-  /* 렌더 박스에 흰 면이 생기지 않게 */
   -webkit-mask-image: none;
   mask-image: none;
 }
@@ -6621,16 +6623,16 @@ body,
   letter-spacing: -0.01em;
 }
 
-.ldr-reception--push .ldr-watermark__img {
-  width: min(72%, 240px);
-  opacity: 0.2;
-  filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.25));
-  animation: ldr-watermark-drift 14s ease-in-out infinite;
-}
-
-.ldr-reception--push .ldr-watermark--nukki .ldr-watermark__img {
+.ldr-reception--push .ldr-watermark__img,
+.ldr-reception--push .ldr-watermark--brand .ldr-watermark__img,
+.ldr-reception--push .ldr-watermark--nukki .ldr-watermark__img,
+.ldr-reception--push .ldr-watermark--ceo .ldr-watermark__img {
+  width: min(40%, 128px);
+  max-height: 40%;
+  opacity: 0.15;
+  filter: none;
   mix-blend-mode: normal;
-  opacity: 0.2;
+  animation: ldr-watermark-drift 14s ease-in-out infinite;
 }
 
 @keyframes ldr-watermark-drift {
@@ -6858,32 +6860,44 @@ body,
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 0;
   background: transparent;
   box-shadow: none;
 }
 
+/* 쇼케이스 링크-로고와 동일 — 흰 테두리 */
+.ldr-company-logo-badge--link {
+  background: #1d4ed8;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
 .ldr-company-logo-badge__img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
   padding: 0;
   background: transparent;
+  display: block;
 }
 
 .ldr-company-logo-badge--inline {
   width: 28px;
   height: 28px;
   flex-shrink: 0;
+  border-radius: 8px;
 }
 
 .ldr-company-logo-badge--hero {
   position: absolute;
   left: 12px;
   top: 12px;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   z-index: 3;
 }
 
@@ -7552,6 +7566,27 @@ body,
   width: 56px;
   height: 56px;
   border-radius: 14px;
+}
+
+/* DCC 회사 로고 = 쇼케이스 링크-로고와 동일 (흰 테두리) */
+.ldr-profile-media--avatar.ldr-profile-media--link-logo,
+.ldr-reception--push .ldr-profile-media--avatar.ldr-profile-media--link-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  background: #1d4ed8;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.ldr-profile-media--avatar.ldr-profile-media--link-logo .ldr-profile-media__img {
+  object-fit: cover;
+  object-position: center;
+  padding: 0;
+  background: transparent;
 }
 
 .ldr-profile-media--hero {
