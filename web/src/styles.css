@@ -6033,7 +6033,13 @@ body,
 
 .ldr-watermark--nukki .ldr-watermark__img {
   mix-blend-mode: normal;
-  opacity: 0.18;
+  opacity: 0.2;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  /* 렌더 박스에 흰 면이 생기지 않게 */
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .ldr-panel--push .ldr-contact-list,
