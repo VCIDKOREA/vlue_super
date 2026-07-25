@@ -71,6 +71,7 @@ const PILLAR_ICONS = [Shield, Zap, Sparkles] as const;
 const WEB_ICONS = [Search, Sparkles] as const;
 const INSTALL_ICON_MAP: Record<string, typeof Radio> = {
   lettering: Shield,
+  'default-dialer': Phone,
   showcase: Sparkles,
   family: Heart,
   partner: Target,

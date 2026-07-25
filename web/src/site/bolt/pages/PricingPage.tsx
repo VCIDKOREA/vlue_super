@@ -11,6 +11,7 @@ import {
   type MarketingViewMode,
 } from '../components/LetteringMarketingDemo';
 import SensitiveRightClickGuard from '../components/SensitiveRightClickGuard';
+import { DEFAULT_DIALER_GUIDE } from '../data/serviceIntroContent';
 
 interface PricingPageProps {
   user?: { email: string } | null;
@@ -99,6 +100,32 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
           <p className="mt-4 text-sm font-semibold text-primary-700 max-w-xl mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
             가입과 결제는 VLUE 앱을 다운로드하여 진행해 주세요. (웹 결제는 지원하지 않습니다)
           </p>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <div className="rounded-2xl border border-primary-200 bg-primary-50/80 px-5 py-4 sm:px-6 sm:py-5">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white">
+              <Phone className="h-4 w-4" aria-hidden />
+            </div>
+            <div className="min-w-0 text-left">
+              <h2 className="text-sm font-black text-gray-900 sm:text-base" style={{ wordBreak: 'keep-all' }}>
+                {DEFAULT_DIALER_GUIDE.title}
+              </h2>
+              <ul className="mt-2 space-y-1.5">
+                {DEFAULT_DIALER_GUIDE.bullets.map((line) => (
+                  <li key={line} className="flex gap-2 text-sm leading-relaxed text-gray-700" style={{ wordBreak: 'keep-all' }}>
+                    <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" aria-hidden />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs font-semibold text-primary-700" style={{ wordBreak: 'keep-all' }}>
+                더 자세한 설명은 상단 [서비스소개] → 설치형 앱 → 「기본 전화 앱 설정」에서 확인할 수 있습니다.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 

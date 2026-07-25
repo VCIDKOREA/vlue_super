@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import BoltMarketingApp from "./bolt/App";
+import { ShowcaseBgmProvider } from "../context/ShowcaseBgmContext.jsx";
 import "./bolt/index.css";
 
 /** web2 bolt.new 마케팅 앱 전체 (소스맵에서 복원한 `site/bolt/`) */
@@ -31,7 +32,9 @@ export default function VlueMarketingApp() {
 
   return (
     <div data-vlue-site="marketing">
-      <BoltMarketingApp />
+      <ShowcaseBgmProvider>
+        <BoltMarketingApp />
+      </ShowcaseBgmProvider>
     </div>
   );
 }
