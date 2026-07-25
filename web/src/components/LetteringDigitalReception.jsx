@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDisplay.js";
-import { resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
 import { formatLetteringContactEmailDisplay, photoFocusToCss } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import {
@@ -249,22 +248,14 @@ function FaceTabs({ face, onFaceChange, hidden = false }) {
   );
 }
 
-function WatermarkBackdrop({ card }) {
-  const [imgBroken, setImgBroken] = useState(false);
-  /* 회사 로고만 — 프로필 사진과 섞지 않음 */
-  const logoUrl = String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl(card);
-  if (!logoUrl || imgBroken) return null;
-
-  return (
-    <div className="ldr-watermark" aria-hidden>
-      <img src={logoUrl} alt="" className="ldr-watermark__img" onError={() => setImgBroken(true)} />
-    </div>
-  );
+function resolveCardLogoUrl(card) {
+  if (card?.noCompanyLogo) return "";
+  return String(card?.logoUrl || card?.logo_url || "").trim();
 }
 
 function CompanyLogoBadge({ card, className = "" }) {
   const [imgBroken, setImgBroken] = useState(false);
-  const logoUrl = String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl(card);
+  const logoUrl = resolveCardLogoUrl(card);
   if (!logoUrl || imgBroken) return null;
   return (
     <span className={`ldr-company-logo-badge${className ? ` ${className}` : ""}`.trim()} aria-label="회사 로고">
@@ -276,14 +267,16 @@ function CompanyLogoBadge({ card, className = "" }) {
 function ProfileMedia({ card, className = "", variant = "avatar" }) {
   const [imgBroken, setImgBroken] = useState(false);
   const photoUrl = String(card.photoUrl || "").trim();
-  const logoUrl = String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl(card);
+  const logoUrl = resolveCardLogoUrl(card);
   /* avatar = 회사 로고, hero = 프로필 사진 — 서로 대체하지 않음 */
   const src = variant === "logo" || variant === "avatar" ? logoUrl : photoUrl;
   const isLogo = variant === "logo" || variant === "avatar";
-  const fallback = (card.organization || card.name || "V").slice(0, 1);
   const focusCss = !isLogo ? photoFocusToCss(card.photoFocus) : undefined;
 
+  /* 로고 없음 → 무지(슬롯 비움). 이니셜/데모 로고 표시 안 함 */
   if (!src && isLogo) return null;
+
+  const fallback = (card.organization || card.name || "?").slice(0, 1);
 
   return (
     <div
@@ -323,7 +316,7 @@ function BackPanelHero({ card }) {
 function ProfileHero({ card, verified, incomingNumber = "" }) {
   const [imgBroken, setImgBroken] = useState(false);
   const photoUrl = String(card.photoUrl || "").trim();
-  const logoUrl = String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl(card);
+  const logoUrl = resolveCardLogoUrl(card);
   const hasPhoto = Boolean(photoUrl);
   const hasLogo = Boolean(logoUrl);
   const photoObjectPosition = photoFocusToCss(card.photoFocus);
@@ -336,7 +329,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
   const identityCopy = (
     <>
       {orgLine ? (
-        <p className="ldr-hero__brand ldr-hero__brand--with-logo">
+        <p className={`ldr-hero__brand${hasLogo ? " ldr-hero__brand--with-logo" : ""}`}>
           {hasLogo ? <CompanyLogoBadge card={{ logoUrl }} className="ldr-company-logo-badge--inline" /> : null}
           <span>{orgLine}</span>
         </p>
@@ -488,11 +481,7 @@ function FrontPanel({
 
   return (
     <div className={`ldr-panel ldr-panel--front${embeddedInPush ? " ldr-panel--push" : ""}`}>
-      {embeddedInPush ? (
-        <WatermarkBackdrop card={card} />
-      ) : (
-        <ProfileHero card={card} verified={verified} />
-      )}
+      {embeddedInPush ? null : <ProfileHero card={card} verified={verified} />}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
       <div className={`ldr-back-head${card.photoUrl && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
         <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />
@@ -707,7 +696,6 @@ function BackPanel({
 
   return (
     <div className={`ldr-panel ldr-panel--back${embeddedInPush ? " ldr-panel--push" : ""}`}>
-      {embeddedInPush ? <WatermarkBackdrop card={card} /> : null}
       <div className="ldr-contact-extra ldr-contact-extra--back-only">
         <p className="ldr-contact-extra__label">추가 설명</p>
         <p

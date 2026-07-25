@@ -1,4 +1,3 @@
-import { resolveLetteringDemoLogoUrl } from "./letteringDemoAssets.js";
 import { clampLetteringBizcardEmail, normalizePhotoFocus } from "./letteringBizcardStorage.js";
 
 /** Lettering·명함 카드 객체 정규화 — 빈 칸을 데모값으로 채우지 않음 */
@@ -6,8 +5,8 @@ export function normalizeLetteringCard(raw = {}) {
   const photoUrl = String(raw.photoUrl || raw.image_url || raw.imageUrl || "").trim();
   const name = String(raw.name || raw.displayName || "").trim();
   const merged = { ...raw, name };
-  const explicitLogo = String(raw.logoUrl || "").trim();
-  const logoUrl = explicitLogo || resolveLetteringDemoLogoUrl(merged);
+  /* 회사 로고 없으면 비움(카카오 무지 스타일). VLUE 데모 로고로 채우지 않음 */
+  const logoUrl = String(raw.logoUrl || "").trim();
 
   return {
     ...merged,
@@ -25,6 +24,7 @@ export function normalizeLetteringCard(raw = {}) {
     photoUrl,
     photoFocus: normalizePhotoFocus(raw.photoFocus),
     logoUrl,
+    noCompanyLogo: Boolean(raw.noCompanyLogo) || !logoUrl,
     companyIntro: String(raw.companyIntro || raw.intro || "").trim(),
     salesContent: String(raw.salesContent || raw.salesPitch || raw.pitch || "").trim(),
     feedId: String(raw.feedId || raw.userId || "").trim(),

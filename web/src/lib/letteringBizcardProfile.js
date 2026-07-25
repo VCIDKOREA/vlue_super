@@ -1,5 +1,4 @@
 import { normalizeLetteringCard } from "./letteringCardNormalize.js";
-import { resolveLetteringDemoLogoUrl } from "./letteringDemoAssets.js";
 import { readProfilePhotoAvatar } from "./vlueAvatar.js";
 import {
   readLetteringBizcardEditable,
@@ -68,9 +67,7 @@ export function withLetteringBizcardPreviewFallback(card = {}, opts = {}) {
         formatLetteringContactEmailDisplay(cleanField(card?.email)) ||
         demo.email,
       website: pick("website"),
-      logoUrl: card.noCompanyLogo
-        ? ""
-        : String(card.logoUrl || "").trim() || resolveLetteringDemoLogoUrl({ organization }),
+      logoUrl: card.noCompanyLogo ? "" : String(card.logoUrl || "").trim(),
       photoUrl: card.noProfilePhoto ? "" : String(card.photoUrl || "").trim()
     };
   }
