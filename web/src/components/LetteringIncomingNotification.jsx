@@ -225,6 +225,7 @@ export default function LetteringIncomingNotification({
   const [receptionFace, setReceptionFace] = useState("front");
   const [guideToast, setGuideToast] = useState("");
   const [dialOpen, setDialOpen] = useState(false);
+  const [keypadOpen, setKeypadOpen] = useState(false);
   const [carouselSlideType, setCarouselSlideType] = useState(includeDigitalCard ? "card" : "banner");
   const [knownContact, setKnownContact] = useState(() => ({
     isKnownContact: Boolean(savedContactName),
@@ -549,6 +550,7 @@ export default function LetteringIncomingNotification({
   }, [previewMode, onInCallChromePreviewChange, isExpandedView, setExpanded]);
 
   const closeInCallChromePreview = useCallback(() => {
+    setKeypadOpen(false);
     onInCallChromePreviewChange?.(false);
   }, [onInCallChromePreviewChange]);
 
@@ -556,13 +558,13 @@ export default function LetteringIncomingNotification({
     (e) => {
       e?.stopPropagation?.();
       if (isInCallChromePreview) {
+        /* 쇼케이스 펼침은 유지 — 통화 옵션만 끄고 일반 미리보기로 복귀 */
         closeInCallChromePreview();
-        if (isExpandedView) setExpanded(false);
       } else {
         openInCallChromePreview();
       }
     },
-    [isInCallChromePreview, closeInCallChromePreview, isExpandedView, setExpanded, openInCallChromePreview]
+    [isInCallChromePreview, closeInCallChromePreview, openInCallChromePreview]
   );
 
   const handleOpenFeed = () => {
@@ -586,11 +588,11 @@ export default function LetteringIncomingNotification({
   const handleEndCall = () => {
     if (previewMode) {
       if (isInCallChromePreview) {
+        /* 하단 통화종료도 창 닫기가 아니라 일반 쇼케이스 미리보기로 복귀 */
         closeInCallChromePreview();
-        showGuide("통화 화면 미리보기를 종료합니다.");
-      } else {
-        showGuide("미리보기를 종료합니다.");
+        return;
       }
+      showGuide("미리보기를 종료합니다.");
       window.setTimeout(() => {
         if (onEndCall) onEndCall();
         else nativeEndCall();
@@ -630,7 +632,6 @@ export default function LetteringIncomingNotification({
   );
   const inCallKakao = resolveInCallKakaoSlot(peerMatrix);
   const [matrixBusy, setMatrixBusy] = useState(false);
-  const [keypadOpen, setKeypadOpen] = useState(false);
   const inCallDemoMode = Boolean(previewMode);
   /** 실통화 중에는 소셜 레일 숨김 — 미리보기·다시보기·열람만 노출 */
   const socialOverlayEnabled = Boolean(previewMode || fromCallHistory || !onCall);
@@ -857,13 +858,11 @@ export default function LetteringIncomingNotification({
             onClick={toggleInCallChromePreview}
             className="lettering-incall-preview-btn lettering-live-bar__call-preview"
             aria-pressed={isInCallChromePreview}
-            aria-label={
-              isInCallChromePreview ? "통화 화면 미리보기 종료" : "통화화면 보기 (실제 통화 옵션 포함)"
-            }
-            title={isInCallChromePreview ? "미리보기 종료" : "통화화면 보기"}
+            aria-label={isInCallChromePreview ? "통화화면 닫기" : "통화화면 보기 (실제 통화 옵션 포함)"}
+            title={isInCallChromePreview ? "통화화면 닫기" : "통화화면 보기"}
           >
             <Phone className="h-3 w-3" strokeWidth={2.5} aria-hidden />
-            {isInCallChromePreview ? "미리보기 종료" : "통화화면 보기"}
+            {isInCallChromePreview ? "통화화면 닫기" : "통화화면 보기"}
           </button>
         ) : previewStatusLabel ? (
           <span className="lettering-live-bar__status">{previewStatusLabel}</span>
