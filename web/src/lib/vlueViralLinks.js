@@ -83,8 +83,17 @@ export function buildHostedCardViewUrl(apiBase, cardId) {
   return `${base}/api/v1/card/view/${encodeURIComponent(cardId)}`;
 }
 
-/** 카카오·문자 등 외부 공유용 — VLUE 쇼케이스 웹뷰 링크 */
+/** 카카오·문자 등 외부 공유용 — OG 메타가 있는 서버 랜딩 → SPA 쇼케이스 */
 export function buildPublicShowcaseUrl(phone, devOrigin = "") {
+  const apiBase = resolvePublicCardApiBase(devOrigin);
+  const digits = String(phone || "").replace(/\D/g, "");
+  const local = digits.startsWith("82") ? `0${digits.slice(2)}` : digits;
+  if (!local) return "";
+  return `${apiBase}/api/v1/showcase/view/${encodeURIComponent(local)}`;
+}
+
+/** SPA 쇼케이스 직접 경로 (알림톡 버튼·앱 웹뷰용 — OG 불필요) */
+export function buildPublicShowcaseSpaUrl(phone, devOrigin = "") {
   const origin = resolvePublicWebOrigin(devOrigin);
   const path = showcaseWebPathForPhone(phone);
   if (!path || path === "/site/web/showcase/") return "";

@@ -68,6 +68,7 @@ import { mycaseRoutes } from "./mycase.js";
 import { notificationRoutes } from "./notification.js";
 import { publicBgmRoutes } from "./publicBgm.js";
 import { webRiskRoutes } from "./webRisk.js";
+import { showcasePublicRoutes } from "./showcasePublic.js";
 
 /** `/api` 아래에 마운트되는 라우트 묶음 */
 export const apiRoutes = new Hono();
@@ -87,6 +88,7 @@ apiRoutes.route("/home", homeLayoutRoutes);
 apiRoutes.route("/v1/admin", adminV1Routes);
 apiRoutes.route("/cards", cardsRoutes);
 apiRoutes.route("/v1/card", cardV1Routes);
+apiRoutes.route("/v1/showcase", showcasePublicRoutes);
 apiRoutes.route("/feed", feedRoutes);
 apiRoutes.route("/realtime", realtimeRoutes);
 apiRoutes.route("/campaign", campaignRoutes);
