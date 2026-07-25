@@ -7,6 +7,7 @@ import { requiresPremium } from "../../lib/showcase/showcaseStylePermissions.js"
 import {
   SHOWCASE_STYLE_CHANGED_EVENT,
   readShowcaseStyle,
+  readLiveShowcaseStyle,
   writeShowcaseStyle,
   writeLiveShowcaseStyle,
   parseShowcaseTagsInput
@@ -489,6 +490,11 @@ export default function ShowcaseStyleSettingsPanel({
       }).then((res) => {
         if (res?.ok && res.item) {
           applyMycaseItemToLiveBroadcast(res.item);
+          /* 게시물 hydrate 후에도 편집 BGM·source=editor 유지 — 새로고침 시 음원 보존 */
+          writeLiveShowcaseStyle(
+            { ...(readLiveShowcaseStyle() || latest), bgm: latest.bgm },
+            { source: "editor" }
+          );
           onToast?.("적용 · 마이케이스 저장 · 메인 송출 반영");
         } else if (res?.ok) {
           onToast?.("적용 · 마이케이스에 저장되었습니다.");

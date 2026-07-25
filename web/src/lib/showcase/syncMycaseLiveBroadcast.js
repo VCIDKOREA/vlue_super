@@ -2,8 +2,11 @@ import {
   clearLiveShowcaseStyle,
   createDefaultShowcaseStyle,
   readLiveShowcaseSource,
+  readLiveShowcaseStyle,
+  readShowcaseStyle,
   writeLiveShowcaseStyle
 } from "./showcaseStyleStorage.js";
+import { hasPlayableShowcaseBgm, hasShowcaseBgmConfigured } from "./showcaseBgmPresets.js";
 import { fetchMycaseLiveBroadcast } from "../mycaseApi.js";
 
 const LIVE_CASE_META_KEY = "vlue_mycase_live_broadcast_v1";
@@ -21,6 +24,30 @@ export function extractMycaseShowcaseStyle(payloadJson) {
 }
 
 /**
+ * 게시물 스타일에 재생 가능한 BGM이 없으면 편집/라이브 음원을 유지
+ * (아카이브는 음원 없이 저장하는 경우가 많음 — 케이스함·통화 BGM과 분리)
+ * @param {object} style
+ */
+function mergePreservedBgm(style) {
+  if (hasPlayableShowcaseBgm(style) || hasShowcaseBgmConfigured(style)) {
+    return style;
+  }
+  try {
+    const live = readLiveShowcaseStyle();
+    if (live && (hasPlayableShowcaseBgm(live) || hasShowcaseBgmConfigured(live))) {
+      return { ...style, bgm: live.bgm };
+    }
+    const editor = readShowcaseStyle();
+    if (editor && (hasPlayableShowcaseBgm(editor) || hasShowcaseBgmConfigured(editor))) {
+      return { ...style, bgm: editor.bgm };
+    }
+  } catch {
+    /* ignore */
+  }
+  return style;
+}
+
+/**
  * 메인 송출 케이스 → 통화·홈 미리보기용 라이브 스타일에만 반영
  * (블루 쇼케이스 편집 설정 vlue_showcase_style_v1 은 덮어쓰지 않음)
  * @param {object|null|undefined} item serializeCase 형태 (payloadJson 포함)
@@ -30,7 +57,7 @@ export function applyMycaseItemToLiveBroadcast(item) {
   const style = extractMycaseShowcaseStyle(item?.payloadJson);
   if (!style) return null;
 
-  const applied = writeLiveShowcaseStyle(style, { source: "mycase" });
+  const applied = writeLiveShowcaseStyle(mergePreservedBgm(style), { source: "mycase" });
   if (!applied) return null;
   try {
     localStorage.setItem(
@@ -50,8 +77,8 @@ export function applyMycaseItemToLiveBroadcast(item) {
 /**
  * 서버 메인 송출 → 로컬 라이브 동기화 (앱·홈·오버레이 진입 시)
  * 설정에서 미리보기를 갱신한 직후(source=editor)에는 덮어쓰지 않음.
- * 마이케이스 메인이 없으면 라이브는 항상 비움.
- * @returns {Promise<{ ok: boolean, applied: boolean, item?: object|null, message?: string, skippedEditorPreview?: boolean }>}
+ * 메인이 없어도 편집에서 적용한 라이브(음원 포함)는 지우지 않음 — 새로고침 시 음원 소실 방지.
+ * @returns {Promise<{ ok: boolean, applied: boolean, item?: object|null, message?: string, skippedEditorPreview?: boolean, keptEditorLive?: boolean, restoredFromEditor?: boolean }>}
  */
 export async function hydrateLiveBroadcastFromServer() {
   const data = await fetchMycaseLiveBroadcast();
@@ -59,13 +86,25 @@ export async function hydrateLiveBroadcastFromServer() {
     return { ok: false, applied: false, message: data.message };
   }
   if (!data.item) {
-    clearLiveShowcaseStyle();
     try {
       localStorage.removeItem(LIVE_CASE_META_KEY);
     } catch {
       /* ignore */
     }
-    return { ok: true, applied: false, item: null };
+    const liveSource = readLiveShowcaseSource();
+    /* 설정 적용본(editor)은 메인 게시물이 없어도 유지 */
+    if (liveSource?.source === "editor") {
+      return { ok: true, applied: false, item: null, keptEditorLive: true };
+    }
+    /* mycase 메인이 사라짐 → 편집 설정으로 라이브 복구 (음원·스타일 유지) */
+    try {
+      const editor = readShowcaseStyle();
+      writeLiveShowcaseStyle(editor, { source: "editor", skipSync: true });
+      return { ok: true, applied: true, item: null, restoredFromEditor: true };
+    } catch {
+      clearLiveShowcaseStyle();
+      return { ok: true, applied: false, item: null };
+    }
   }
   const liveSource = readLiveShowcaseSource();
   if (liveSource?.source === "editor") {
@@ -90,14 +129,19 @@ export function readLiveBroadcastMeta() {
   }
 }
 
-/** 테스트·리셋용 */
+/** 메인 송출 메타 제거 — 통화용 라이브는 편집 설정으로 되돌림(음원 유지) */
 export function clearLiveBroadcastMeta() {
   try {
     localStorage.removeItem(LIVE_CASE_META_KEY);
   } catch {
     /* ignore */
   }
-  clearLiveShowcaseStyle();
+  try {
+    const editor = readShowcaseStyle();
+    writeLiveShowcaseStyle(editor, { source: "editor", skipSync: true });
+  } catch {
+    clearLiveShowcaseStyle();
+  }
 }
 
 export { createDefaultShowcaseStyle };

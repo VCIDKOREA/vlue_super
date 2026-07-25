@@ -6,6 +6,7 @@ import {
   stripInstagramContentPages,
   syncLegacyFieldsFromPages
 } from "./showcasePages.js";
+import { hasPlayableShowcaseBgm, hasShowcaseBgmConfigured } from "./showcaseBgmPresets.js";
 
 export const SHOWCASE_STYLE_STORAGE_KEY = "vlue_showcase_style_v1";
 export const SHOWCASE_STYLE_CHANGED_EVENT = "vlue-showcase-style-changed";
@@ -334,11 +335,22 @@ export function readLiveShowcaseStyle() {
 }
 
 /**
- * 통화·홈 빅푸시 미리보기용 — 메인 송출(라이브)만 사용.
- * 편집 초안(editor)으로 폴백하지 않음: 마이케이스 삭제 후에도 송출이 남지 않게 한다.
+ * 통화·홈 빅푸시 미리보기용 — 메인 송출(라이브) 우선.
+ * 라이브에 음원이 없으면 편집 설정의 BGM을 합친다 (새로고침 후 재적용 불필요).
  */
 export function readActiveShowcaseStyle() {
-  return readLiveShowcaseStyle() || createDefaultShowcaseStyle();
+  const live = readLiveShowcaseStyle();
+  const base = live || createDefaultShowcaseStyle();
+  if (hasPlayableShowcaseBgm(base) || hasShowcaseBgmConfigured(base)) return base;
+  try {
+    const editor = readShowcaseStyle();
+    if (editor && (hasPlayableShowcaseBgm(editor) || hasShowcaseBgmConfigured(editor))) {
+      return { ...base, bgm: editor.bgm };
+    }
+  } catch {
+    /* ignore */
+  }
+  return base;
 }
 
 /** @returns {{ source: 'editor'|'mycase', at: number }|null} */
