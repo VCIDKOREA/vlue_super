@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
+import { stripDataUrlsFromJson } from "../../lib/mediaUrlGuard.js";
 
 export type ShowcaseLiveSource = { source: "editor" | "mycase"; at: number };
 
@@ -78,14 +79,18 @@ export async function putUserShowcaseStyleBundle(
 
   if (input.editor !== undefined) {
     const editor = asObjectOrNull(input.editor);
-    if (editor) data.showcaseStyleJson = editor as Prisma.InputJsonValue;
+    if (editor) {
+      data.showcaseStyleJson = stripDataUrlsFromJson(editor) as Prisma.InputJsonValue;
+    }
   }
   if (input.live !== undefined) {
     if (input.live === null) {
       data.showcaseLiveStyleJson = Prisma.JsonNull;
     } else {
       const live = asObjectOrNull(input.live);
-      if (live) data.showcaseLiveStyleJson = live as Prisma.InputJsonValue;
+      if (live) {
+        data.showcaseLiveStyleJson = stripDataUrlsFromJson(live) as Prisma.InputJsonValue;
+      }
     }
   }
   if (input.liveSource !== undefined) {

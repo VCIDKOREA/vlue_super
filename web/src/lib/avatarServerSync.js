@@ -106,7 +106,8 @@ export function syncAvatarSlotToServer(slot, url) {
 }
 
 /**
- * 서버에 사진이 없고 로컬(아바타·명함)에만 있으면 서버로 밀어 넣음
+ * 서버에 사진이 없고 로컬(아바타·명함)에만 있으면 서버로 밀어 넣음.
+ * data:/blob: 는 절대 PATCH 하지 않음 — 서버가 거절해도 매 hydrate 마다 재시도되어 egress 폭증.
  */
 export function pushLocalAvatarsIfServerMissing(snap) {
   const ed = readLetteringBizcardEditable();
@@ -115,12 +116,13 @@ export function pushLocalAvatarsIfServerMissing(snap) {
   const localPhoto =
     readAvatar("primary") || String(ed.photoDataUrl || ed.photoUrl || "").trim();
   const localLogo = readAvatar("card") || String(ed.logoDataUrl || ed.logoUrl || "").trim();
+  const isHttp = (u) => /^https?:\/\//i.test(String(u || "").trim());
   const patch = {};
 
-  if (!serverPhoto && localPhoto && !localPhoto.startsWith("blob:")) {
+  if (!serverPhoto && isHttp(localPhoto)) {
     patch.photoUrl = localPhoto;
   }
-  if (!serverLogo && localLogo && !localLogo.startsWith("blob:")) {
+  if (!serverLogo && isHttp(localLogo)) {
     patch.logoUrl = localLogo;
   }
   if (!Object.keys(patch).length) return;

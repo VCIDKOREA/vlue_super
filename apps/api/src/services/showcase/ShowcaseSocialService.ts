@@ -2,6 +2,7 @@
  * V2 쇼케이스 소셜 — 좋아요·댓글 (+ FCM 푸시)
  */
 import { prisma } from "../../db/client.js";
+import { Prisma } from "@prisma/client";
 import { sendShowcaseSocialPushToUser } from "../fcmNotificationService.js";
 
 const COMMENT_MAX = 1000;
@@ -27,38 +28,50 @@ function assertCommentRate(userId: string): boolean {
   return true;
 }
 
-function photoFromExportSnap(snap: unknown): string {
-  if (!snap || typeof snap !== "object") return "";
-  const o = snap as Record<string, unknown>;
-  return String(o.photoUrl || o.image_url || o.imageUrl || "").trim();
-}
-
-function activityNameFromExportSnap(snap: unknown): string {
-  if (!snap || typeof snap !== "object") return "";
-  const o = snap as Record<string, unknown>;
-  return String(o.activityName || o.activityDisplayName || o.nickname || "").trim();
-}
-
 const authorSelect = {
   id: true,
   publicHandle: true,
-  legalName: true,
-  digitalCard: { select: { exportSnapshotJson: true } }
+  legalName: true
 } as const;
 
-function serializeAuthor(author: {
-  id: string;
-  publicHandle: string | null;
-  legalName: string | null;
-  digitalCard?: { exportSnapshotJson: unknown } | null;
-}) {
-  const snap = author.digitalCard?.exportSnapshotJson;
-  const activity = activityNameFromExportSnap(snap);
+async function loadAuthorLite(userIds: string[]): Promise<Map<string, { activityName: string; avatarUrl: string }>> {
+  const map = new Map<string, { activityName: string; avatarUrl: string }>();
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (!ids.length) return map;
+  const rows = await prisma.$queryRaw<
+    Array<{ user_id: string; activity_name: string | null; photo_url: string | null }>
+  >`
+    SELECT
+      user_id,
+      NULLIF(TRIM(export_snapshot_json->>'activityName'), '') AS activity_name,
+      NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url
+    FROM digital_cards
+    WHERE user_id IN (${Prisma.join(ids)})
+  `;
+  for (const r of rows) {
+    const photo = String(r.photo_url || "").trim();
+    map.set(r.user_id, {
+      activityName: String(r.activity_name || "").trim(),
+      avatarUrl: photo && !photo.startsWith("data:") && !photo.startsWith("blob:") ? photo : ""
+    });
+  }
+  return map;
+}
+
+function serializeAuthor(
+  author: {
+    id: string;
+    publicHandle: string | null;
+    legalName: string | null;
+  },
+  lite?: { activityName: string; avatarUrl: string } | null
+) {
+  const activity = lite?.activityName || "";
   return {
     id: author.id,
     handle: author.publicHandle || "",
     name: activity || author.legalName || author.publicHandle || "회원",
-    avatarUrl: photoFromExportSnap(snap)
+    avatarUrl: lite?.avatarUrl || ""
   };
 }
 
@@ -69,7 +82,8 @@ async function resolveActorLabel(userId: string): Promise<string> {
       select: authorSelect
     });
     if (!u) return "회원";
-    return serializeAuthor(u).name;
+    const lite = await loadAuthorLite([userId]);
+    return serializeAuthor(u, lite.get(userId)).name;
   } catch {
     return "회원";
   }
@@ -130,6 +144,8 @@ export async function getShowcaseSocialSummary(opts: {
     })
   ]);
 
+  const authorLites = await loadAuthorLite(comments.map((c) => c.author.id));
+
   return {
     likeCount,
     likedByMe,
@@ -138,7 +154,7 @@ export async function getShowcaseSocialSummary(opts: {
       body: c.body,
       parentId: c.parentId || null,
       createdAt: c.createdAt.toISOString(),
-      author: serializeAuthor(c.author)
+      author: serializeAuthor(c.author, authorLites.get(c.author.id))
     }))
   };
 }
@@ -200,12 +216,13 @@ export async function listShowcaseComments(opts: {
     take: limit,
     include: { author: { select: authorSelect } }
   });
+  const authorLites = await loadAuthorLite(rows.map((c) => c.author.id));
   return rows.map((c) => ({
     id: c.id,
     body: c.body,
     parentId: c.parentId || null,
     createdAt: c.createdAt.toISOString(),
-    author: serializeAuthor(c.author)
+    author: serializeAuthor(c.author, authorLites.get(c.author.id))
   }));
 }
 
@@ -260,7 +277,8 @@ export async function createShowcaseComment(opts: {
     include: { author: { select: authorSelect } }
   });
 
-  const author = serializeAuthor(row.author);
+  const authorLite = await loadAuthorLite([row.author.id]);
+  const author = serializeAuthor(row.author, authorLite.get(row.author.id));
   const preview = clipPushBody(body);
   const pushBase = {
     type: parentId ? "vlue-showcase-comment-reply" : "vlue-showcase-comment",

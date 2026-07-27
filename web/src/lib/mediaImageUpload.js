@@ -76,7 +76,7 @@ export async function requestMediaImageUploadUrl({ kind, fileName, contentType, 
  * @returns {Promise<{ ok:true, url:string, fileName:string, mime:string, via:'r2'|'dataUrl', dataUrl?:string, uploadWarning?:string } | { ok:false, error:string }>}
  */
 export async function compressAndUploadMediaImage(file, kind = "general", opts = {}) {
-  const allowDataUrlFallback = opts.allowDataUrlFallback !== false;
+  const allowDataUrlFallback = opts.allowDataUrlFallback === true;
   const rules = opts.fitRules || fitRulesForKind(kind);
 
   const fitted = await fitImageFile(file, {

@@ -102,6 +102,50 @@ export default function ShowcaseCallCarousel({
   const wheelLockUntil = useRef(0);
   const wheelAccum = useRef(0);
   const viewportRef = useRef(null);
+  const igResolvingRef = useRef(new Set());
+  const igFailCountRef = useRef(new Map());
+
+  const resolveIgMediaSafe = useCallback((ids) => {
+    const want = [...new Set((ids || []).map(String).filter(Boolean))].filter((id) => {
+      if (igResolvingRef.current.has(id)) return false;
+      if ((igFailCountRef.current.get(id) || 0) >= 2) return false;
+      return true;
+    });
+    if (!want.length) return Promise.resolve(null);
+    want.forEach((id) => igResolvingRef.current.add(id));
+    return resolveInstagramMediaUrls(want)
+      .then((res) => {
+        const next = new Map();
+        for (const row of res.media || []) {
+          if (row?.id && row?.mediaUrl) next.set(String(row.id), String(row.mediaUrl));
+          for (const child of row.children || []) {
+            if (child?.id && child?.mediaUrl) next.set(String(child.id), String(child.mediaUrl));
+          }
+        }
+        for (const id of want) {
+          if (!next.has(id)) {
+            igFailCountRef.current.set(id, (igFailCountRef.current.get(id) || 0) + 1);
+          }
+        }
+        if (next.size) {
+          setIgUrlMap((prev) => {
+            const merged = new Map(prev);
+            next.forEach((url, id) => merged.set(id, url));
+            return merged;
+          });
+        }
+        return res;
+      })
+      .catch(() => {
+        for (const id of want) {
+          igFailCountRef.current.set(id, (igFailCountRef.current.get(id) || 0) + 1);
+        }
+        return null;
+      })
+      .finally(() => {
+        want.forEach((id) => igResolvingRef.current.delete(id));
+      });
+  }, []);
 
   const tier = normalizeUserTier(membershipTier || card?.membershipTier);
   const isPaid = tier === USER_TIERS.PAID;
@@ -231,25 +275,13 @@ export default function ShowcaseCallCarousel({
     const ids = igPages.flatMap((p) => p.mediaIds || []).filter(Boolean);
     if (!ids.length) return undefined;
     let cancelled = false;
-    resolveInstagramMediaUrls(ids)
-      .then((res) => {
-        if (cancelled) return;
-        const next = new Map();
-        for (const row of res.media || []) {
-          if (row?.id && row?.mediaUrl) next.set(String(row.id), String(row.mediaUrl));
-          for (const child of row.children || []) {
-            if (child?.id && child?.mediaUrl) next.set(String(child.id), String(child.mediaUrl));
-          }
-        }
-        if (next.size) setIgUrlMap(next);
-      })
-      .catch(() => {
-        /* 만료 시 저장된 mediaUrl 폴백 */
-      });
+    resolveIgMediaSafe(ids).then(() => {
+      if (cancelled) return;
+    });
     return () => {
       cancelled = true;
     };
-  }, [igPages.map((p) => (p.mediaIds || []).join(",")).join("|")]);
+  }, [igPages.map((p) => (p.mediaIds || []).join(",")).join("|"), resolveIgMediaSafe]);
 
   const slides = useMemo(() => {
     const buildFromPages = (pages, limit) => {
@@ -709,9 +741,12 @@ export default function ShowcaseCallCarousel({
             className="showcase-call-carousel__track"
             style={{ transform: `translate3d(0, -${index * 100}%, 0)` }}
           >
-            {slides.map((slide) => (
+            {slides.map((slide, slideIdx) => {
+              const near = Math.abs(slideIdx - index) <= 1;
+              return (
               <article key={slide.id} className="showcase-call-carousel__slide">
-                {slide.type === "card" && isPaid ? (
+                {!near ? <div className="showcase-call-carousel__slide-placeholder" aria-hidden /> : null}
+                {near && slide.type === "card" && isPaid ? (
                   <div className="showcase-call-carousel__card">
                     {renderSlideCornerAction("card")}
                     <LetteringDigitalReception
@@ -733,7 +768,7 @@ export default function ShowcaseCallCarousel({
                   </div>
                 ) : null}
 
-                {slide.type === "instagram-post" ? (
+                {near && slide.type === "instagram-post" ? (
                   <div className="showcase-call-carousel__banner showcase-call-carousel__banner--ig-post">
                     {renderSlideCornerAction("showcase", true)}
                     <ShowcaseInstagramPost
@@ -777,18 +812,7 @@ export default function ShowcaseCallCarousel({
                       onImageError={(broken) => {
                         const id = broken?.id;
                         if (!id) return;
-                        resolveInstagramMediaUrls([id])
-                          .then((res) => {
-                            const row = (res.media || []).find((m) => String(m.id) === String(id));
-                            const url = row?.mediaUrl || row?.children?.[0]?.mediaUrl;
-                            if (!url) return;
-                            setIgUrlMap((prev) => {
-                              const next = new Map(prev);
-                              next.set(String(id), String(url));
-                              return next;
-                            });
-                          })
-                          .catch(() => {});
+                        void resolveIgMediaSafe([id]);
                       }}
                     />
                     {/* 인스타 게시물: 비즈니스 링크 숨김 · 소셜 로고 + VLUE 프로필만 */}
@@ -804,7 +828,7 @@ export default function ShowcaseCallCarousel({
                   </div>
                 ) : null}
 
-                {slide.type === "media-page" || slide.type === "banner" ? (
+                {near && (slide.type === "media-page" || slide.type === "banner") ? (
                   <div className="showcase-call-carousel__banner">
                     {renderSlideCornerAction("showcase", true)}
                     <ShowcaseMediaPage
@@ -820,18 +844,7 @@ export default function ShowcaseCallCarousel({
                       onImageError={(broken) => {
                         const id = broken?.id;
                         if (!id) return;
-                        resolveInstagramMediaUrls([id])
-                          .then((res) => {
-                            const row = (res.media || []).find((m) => String(m.id) === String(id));
-                            const url = row?.mediaUrl || row?.children?.[0]?.mediaUrl;
-                            if (!url) return;
-                            setIgUrlMap((prev) => {
-                              const next = new Map(prev);
-                              next.set(String(id), String(url));
-                              return next;
-                            });
-                          })
-                          .catch(() => {});
+                        void resolveIgMediaSafe([id]);
                       }}
                     />
                     {socialOverlayEnabled && v1AppShell.showcaseSocialOverlay && !keypadOpen ? (
@@ -856,13 +869,13 @@ export default function ShowcaseCallCarousel({
                   </div>
                 ) : null}
 
-                {slide.type === "paid-identity" ? (
+                {near && slide.type === "paid-identity" ? (
                   <div className="showcase-call-carousel__paid-sheet">
                     <div className="showcase-call-carousel__paid-sheet-stage" aria-hidden />
                   </div>
                 ) : null}
 
-                {slide.type === "free-profile" || slide.type === "free-safe" ? (
+                {near && (slide.type === "free-profile" || slide.type === "free-safe") ? (
                   <div className="showcase-call-carousel__free">
                     <FreeTierCallShowcase
                       isKnownContact={slide.type === "free-profile" && !showcaseOffPreview}
@@ -874,7 +887,7 @@ export default function ShowcaseCallCarousel({
                   </div>
                 ) : null}
 
-                {slide.type === "empty-slot" ? (
+                {near && slide.type === "empty-slot" ? (
                   <div className="showcase-call-carousel__banner showcase-call-carousel__banner--empty">
                     {renderSlideCornerAction("showcase", true)}
                     <div className="showcase-call-carousel__paid-sheet-stage" aria-hidden />
@@ -885,7 +898,8 @@ export default function ShowcaseCallCarousel({
                   </div>
                 ) : null}
               </article>
-            ))}
+              );
+            })}
           </div>
 
           {canScroll && !keypadOpen ? (

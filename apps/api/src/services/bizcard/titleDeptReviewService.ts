@@ -162,7 +162,9 @@ export async function listTitleDeptPendingForAdmin() {
     approvedDepartment: r.approved_department || "",
     docKind: r.doc_kind || "",
     docUrl: r.doc_url || "",
-    docDataUrl: r.doc_data_url || "",
+    /* 목록에서는 base64 본문 미전송 — 폴링 egress 방지. 미리보기는 docUrl 또는 상세 API */
+    docDataUrl: "",
+    hasDocData: r.doc_data_url === "stored" || Boolean(r.doc_url),
     docFileName: r.doc_file_name || "",
     docIssuedAt: r.doc_issued_at ? String(r.doc_issued_at).slice(0, 10) : "",
     reviewStatus: r.review_status,

@@ -25,6 +25,7 @@ import {
   isDirectImageStorageConfigured
 } from "../services/media/directImageStorage.js";
 import { enterpriseDccRoutes } from "./enterpriseDcc.js";
+import { mergeExportSnapshotMedia, isDataUrl } from "../lib/mediaUrlGuard.js";
 
 export const cardsRoutes = new Hono();
 
@@ -403,9 +404,21 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
       cardRow.exportSnapshotJson && typeof cardRow.exportSnapshotJson === "object"
         ? (cardRow.exportSnapshotJson as Record<string, unknown>)
         : {};
+    /* data URL 사진/로고가 스냅샷에 쌓이면 검색·프로필 조회마다 Supabase egress 폭증 */
+    const mediaFields = ["photoUrl", "logoUrl", "shareCoverUrl", "imageUrl", "image_url", "kakaoFeedBgUrl"];
+    for (const key of mediaFields) {
+      if (key in body.exportSnapshot && isDataUrl(body.exportSnapshot[key])) {
+        return c.json(
+          {
+            error:
+              "이미지는 R2(https) URL만 저장할 수 있습니다. data URL은 DB 대역폭을 폭증시키므로 거부됩니다."
+          },
+          400
+        );
+      }
+    }
     data.exportSnapshotJson = {
-      ...prev,
-      ...body.exportSnapshot,
+      ...mergeExportSnapshotMedia(prev, body.exportSnapshot),
       ...(tpl ? { designTemplate: tpl } : {})
     };
   }

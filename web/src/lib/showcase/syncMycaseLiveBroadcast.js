@@ -57,7 +57,11 @@ export function applyMycaseItemToLiveBroadcast(item) {
   const style = extractMycaseShowcaseStyle(item?.payloadJson);
   if (!style) return null;
 
-  const applied = writeLiveShowcaseStyle(mergePreservedBgm(style), { source: "mycase" });
+  const applied = writeLiveShowcaseStyle(mergePreservedBgm(style), {
+    source: "mycase",
+    /* hydrate/apply 는 서버→로컬만 — 매 마운트마다 PUT 스케줄 금지 */
+    skipSync: true
+  });
   if (!applied) return null;
   try {
     localStorage.setItem(

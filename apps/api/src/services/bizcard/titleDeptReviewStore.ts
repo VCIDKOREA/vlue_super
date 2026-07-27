@@ -141,7 +141,11 @@ export async function listPendingTitleDeptReviews(limit = 100) {
   >(
     `
       SELECT r.id, r.user_id, r.source, r.pending_title, r.pending_department,
-             r.approved_title, r.approved_department, r.doc_kind, r.doc_url, r.doc_data_url,
+             r.approved_title, r.approved_department, r.doc_kind, r.doc_url,
+             CASE
+               WHEN r.doc_data_url IS NULL OR r.doc_data_url = '' THEN NULL
+               ELSE 'stored'
+             END AS doc_data_url,
              r.doc_file_name, r.doc_issued_at, r.review_status, r.created_at,
              u.legal_name, u.public_handle
       FROM title_dept_verification_reviews r

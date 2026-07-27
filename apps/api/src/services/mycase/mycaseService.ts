@@ -1,4 +1,5 @@
 import { prisma } from "../../db/client.js";
+import { stripDataUrlsFromJson } from "../../lib/mediaUrlGuard.js";
 import {
   buildViewerAccessContext,
   getProfileForViewer
@@ -39,8 +40,8 @@ function clampTitle(raw: string): string {
 function clampThumb(raw: string | null | undefined): string | null {
   const s = String(raw || "").trim();
   if (!s || s.startsWith("blob:")) return null;
-  /* VARCHAR(2048) 시절 잘린 data URL */
-  if (s.startsWith("data:") && s.length < 3000) return null;
+  /* data URL 썸네일은 DB·목록 egress 폭증 원인 — 저장·반환 금지 */
+  if (s.startsWith("data:")) return null;
   return s;
 }
 
@@ -215,7 +216,7 @@ async function touchMainBroadcastChangedAt(userId: string, tier: MycaseTier) {
 
 export async function createMycase(userId: string, input: CreateMycaseInput) {
   const title = clampTitle(input.title);
-  const payloadJson = input.payloadJson ?? {};
+  const payloadJson = stripDataUrlsFromJson(input.payloadJson ?? {}) ?? {};
   const wantMain = Boolean(input.isMainBroadcast);
   const tier = await resolveMycaseTier(userId);
 
@@ -257,7 +258,9 @@ export async function updateMycase(userId: string, caseId: string, input: Update
   if (input.thumbnailUrl !== undefined) {
     data.thumbnailUrl = clampThumb(input.thumbnailUrl);
   }
-  if (input.payloadJson !== undefined) data.payloadJson = input.payloadJson as object;
+  if (input.payloadJson !== undefined) {
+    data.payloadJson = stripDataUrlsFromJson(input.payloadJson) as object;
+  }
   if (input.isPublic !== undefined) data.isPublic = Boolean(input.isPublic);
 
   /** 내용 수정은 덮어쓰기 대신 새 아카이브로 남기려면 createMycase 사용.
@@ -436,7 +439,6 @@ export async function listMycaseMine(userId: string, limit = 24, cursor?: string
       ownerUserId: true,
       title: true,
       thumbnailUrl: true,
-      payloadJson: true,
       isPublic: true,
       isMainBroadcast: true,
       slotIndex: true,
@@ -531,7 +533,6 @@ export async function listMycaseForViewer(
           ownerUserId: true,
           title: true,
           thumbnailUrl: true,
-          payloadJson: true,
           isPublic: true,
           isMainBroadcast: true,
           slotIndex: true,
@@ -569,7 +570,6 @@ export async function listMycaseForViewer(
       ownerUserId: true,
       title: true,
       thumbnailUrl: true,
-      payloadJson: true,
       isPublic: true,
       isMainBroadcast: true,
       slotIndex: true,

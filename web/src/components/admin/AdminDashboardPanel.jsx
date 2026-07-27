@@ -116,7 +116,7 @@ function OnboardingHomeTab({ onToast }) {
 
     load();
 
-    const t = window.setInterval(load, 8000);
+    const t = window.setInterval(load, 60000);
 
     return () => window.clearInterval(t);
 
@@ -344,7 +344,7 @@ function TitleDeptReviewTab({ onToast }) {
 
     load();
 
-    const t = window.setInterval(load, 8000);
+    const t = window.setInterval(load, 60000);
 
     return () => window.clearInterval(t);
 

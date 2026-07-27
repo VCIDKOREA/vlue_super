@@ -52,6 +52,7 @@ export default function VlueDmChat() {
   const [vouchToast, setVouchToast] = useState("");
   const seenIds = useRef(new Set());
   const subRef = useRef(null);
+  const openSeqRef = useRef(0);
 
   const supabaseOk = useMemo(() => isSupabaseConfigured(), []);
 
@@ -62,6 +63,13 @@ export default function VlueDmChat() {
       if (prev.some((m) => m.id === row.id)) return prev;
       return [...prev, row].sort((a, b) => String(a.at).localeCompare(String(b.at)));
     });
+  }, []);
+
+  const tearDownChannel = useCallback(() => {
+    if (subRef.current) {
+      getSupabase()?.removeChannel(subRef.current);
+      subRef.current = null;
+    }
   }, []);
 
   const loadPeers = useCallback(async () => {
@@ -87,14 +95,7 @@ export default function VlueDmChat() {
     loadPeers();
   }, [loadPeers]);
 
-  useEffect(() => {
-    return () => {
-      if (subRef.current) {
-        getSupabase()?.removeChannel(subRef.current);
-        subRef.current = null;
-      }
-    };
-  }, []);
+  useEffect(() => () => tearDownChannel(), [tearDownChannel]);
 
   const sendVouchRequest = useCallback(
     async (e, u) => {
@@ -127,17 +128,19 @@ export default function VlueDmChat() {
 
   const openThread = useCallback(
     async (p) => {
+      const seq = ++openSeqRef.current;
       setLoadError("");
       setLastSaved(null);
       setMessages([]);
       seenIds.current = new Set();
       setPeer(p);
+      tearDownChannel();
       if (!myId) return;
 
       const access = await requirePrimaryForFeature("chat", {
         onBlocked: (msg) => setLoadError(msg)
       });
-      if (!access.ok) return;
+      if (!access.ok || seq !== openSeqRef.current) return;
 
       let rid;
       try {
@@ -152,8 +155,10 @@ export default function VlueDmChat() {
         }
         const data = await res.json();
         rid = data.roomId;
+        if (seq !== openSeqRef.current) return;
         setRoomId(rid);
       } catch (e) {
+        if (seq !== openSeqRef.current) return;
         setLoadError(e.message || "채팅방을 열 수 없습니다.");
         return;
       }
@@ -165,6 +170,7 @@ export default function VlueDmChat() {
           throw new Error(j.error || res.statusText);
         }
         const data = await res.json();
+        if (seq !== openSeqRef.current) return;
         const list = (data.messages || []).map((m) => mapApiMessage(m, myId));
         list.forEach((m) => seenIds.current.add(m.id));
         setMessages(list);
@@ -177,14 +183,13 @@ export default function VlueDmChat() {
           }).catch(() => {});
         }
       } catch (e) {
+        if (seq !== openSeqRef.current) return;
         setLoadError(e.message || "메시지를 불러오지 못했습니다.");
       }
 
+      if (seq !== openSeqRef.current) return;
       const supabase = getSupabase();
-      if (subRef.current) {
-        supabase?.removeChannel(subRef.current);
-        subRef.current = null;
-      }
+      tearDownChannel();
       if (!supabase) return;
 
       const channel = supabase
@@ -199,16 +204,18 @@ export default function VlueDmChat() {
           }
         )
         .subscribe();
+      if (seq !== openSeqRef.current) {
+        supabase.removeChannel(channel);
+        return;
+      }
       subRef.current = channel;
     },
-    [myId, appendUnique]
+    [myId, appendUnique, tearDownChannel]
   );
 
   const closeThread = useCallback(() => {
-    if (subRef.current) {
-      getSupabase()?.removeChannel(subRef.current);
-      subRef.current = null;
-    }
+    openSeqRef.current += 1;
+    tearDownChannel();
     setPeer(null);
     setRoomId(null);
     setMessages([]);
@@ -216,7 +223,7 @@ export default function VlueDmChat() {
     setLoadError("");
     setLastSaved(null);
     seenIds.current = new Set();
-  }, []);
+  }, [tearDownChannel]);
 
   const send = useCallback(async () => {
     const t = text.trim();

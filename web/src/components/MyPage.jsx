@@ -967,7 +967,17 @@ function MyPage({
               return (
                 <div key={`${p.id || src}-${idx}`} className="relative aspect-square overflow-hidden rounded-md bg-gray-100">
                   {isVideo && src ? (
-                    <video src={p.videoUrl || src} muted playsInline className="h-full w-full object-cover" />
+                    <>
+                      <img
+                        src={p.thumbUrl || src}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                      <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25 text-[11px] font-bold text-white">
+                        ▶
+                      </span>
+                    </>
                   ) : (
                     <img
                       src={src}

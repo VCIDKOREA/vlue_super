@@ -111,7 +111,7 @@ export default function HybridMediaPlayer({
           playsInline
           autoPlay={embed.isLive || autoplayMuted}
           muted={embed.isLive || autoplayMuted}
-          loop={autoplayMuted}
+          loop={Boolean(embed.isLive)}
           preload="metadata"
           className="absolute inset-0 h-full w-full object-contain"
         />

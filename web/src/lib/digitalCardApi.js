@@ -223,12 +223,25 @@ export async function syncDigitalCardExportSnapshot(card) {
           addressDetail: detail || String(ed.addressDetail || "").trim(),
           companyIntro: String(ed.companyIntro || card?.companyIntro || "").trim(),
           customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
-          logoUrl: String(card?.logoUrl || ed.logoDataUrl || ed.logoUrl || "").trim(),
-          photoUrl: String(card?.photoUrl || ed.photoDataUrl || ed.photoUrl || "").trim(),
+          logoUrl: (() => {
+            const u = String(card?.logoUrl || ed.logoUrl || "").trim();
+            /* data URL 은 서버 거부 — R2 https 만 동기화 (로컬 dataUrl 은 기기에만) */
+            if (!u || u.startsWith("data:") || u.startsWith("blob:")) return "";
+            return u;
+          })(),
+          photoUrl: (() => {
+            const u = String(card?.photoUrl || ed.photoUrl || "").trim();
+            if (!u || u.startsWith("data:") || u.startsWith("blob:")) return "";
+            return u;
+          })(),
           photoFocus: normalizePhotoFocus(card?.photoFocus || ed.photoFocus),
           noCompanyLogo: Boolean(ed.noCompanyLogo),
           noProfilePhoto: Boolean(ed.noProfilePhoto),
-          shareCoverUrl: String(ed.kakaoFeedBgDataUrl || card?.shareCoverUrl || "").trim(),
+          shareCoverUrl: (() => {
+            const u = String(card?.shareCoverUrl || ed.kakaoFeedBgUrl || "").trim();
+            if (!u || u.startsWith("data:") || u.startsWith("blob:")) return "";
+            return u;
+          })(),
           designTemplate: normalizeLetteringBizcardTemplate(card?.designTemplate || ed.designTemplate),
           activityName: String(card?.activityName || readFeedNickname() || "").trim()
         }

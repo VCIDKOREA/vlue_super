@@ -3,7 +3,9 @@
  * PII는 허용 플래그가 true일 때만 응답에 포함 (DB에서 꺼낼 때부터 가공)
  * 이름(실명)과 상호는 별도 옵트인
  */
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
+import { isDataUrl, isHttpMediaUrl } from "../../lib/mediaUrlGuard.js";
 import { normalizeToE164KR } from "../../lib/phoneE164.js";
 import { isPaidMember } from "../membership/paidMemberGate.js";
 import { normalizeShowcaseTag } from "./showcaseTagsService.js";
@@ -54,8 +56,24 @@ type UserSearchRow = {
   businessProfile: { companyName: string | null; jobTitle: string | null } | null;
   digitalCard: {
     membershipTierSnapshot: string | null;
-    exportSnapshotJson: unknown;
   } | null;
+  /** JSON path 로만 추출한 경량 스냅샷 (전체 exportSnapshotJson 금지 — egress) */
+  searchSnap?: SearchSnapLite | null;
+};
+
+type SearchSnapLite = {
+  logoUrl: string;
+  name: string;
+  displayName: string;
+  phone: string;
+  phoneE164: string;
+  organization: string;
+  companyName: string;
+  title: string;
+  activityName: string;
+  activityDisplayName: string;
+  nickname: string;
+  handle: string;
 };
 
 /**
@@ -108,8 +126,90 @@ export async function markShowcaseActiveIfEligible(userId: string): Promise<bool
 }
 
 function snapOf(u: UserSearchRow): Record<string, unknown> {
-  const raw = u.digitalCard?.exportSnapshotJson;
-  return raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const lite = u.searchSnap;
+  if (!lite) return {};
+  return {
+    logoUrl: lite.logoUrl,
+    name: lite.name,
+    displayName: lite.displayName,
+    phone: lite.phone,
+    phoneE164: lite.phoneE164,
+    organization: lite.organization,
+    companyName: lite.companyName,
+    title: lite.title,
+    activityName: lite.activityName,
+    activityDisplayName: lite.activityDisplayName,
+    nickname: lite.nickname,
+    handle: lite.handle
+  };
+}
+
+/**
+ * digital_cards.export_snapshot_json 전체 SELECT 금지.
+ * 필요한 짧은 문자열만 JSON path 로 읽어 Postgres egress 를 급감시킨다.
+ */
+async function attachSearchSnapLites(rows: UserSearchRow[]): Promise<UserSearchRow[]> {
+  const ids = [...new Set(rows.map((r) => r.id).filter(Boolean))];
+  if (!ids.length) return rows;
+
+  const liteRows = await prisma.$queryRaw<
+    Array<{
+      user_id: string;
+      logo_url: string | null;
+      name: string | null;
+      display_name: string | null;
+      phone: string | null;
+      phone_e164: string | null;
+      organization: string | null;
+      company_name: string | null;
+      title: string | null;
+      activity_name: string | null;
+      activity_display_name: string | null;
+      nickname: string | null;
+      handle: string | null;
+    }>
+  >`
+    SELECT
+      user_id,
+      NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
+      NULLIF(TRIM(export_snapshot_json->>'name'), '') AS name,
+      NULLIF(TRIM(export_snapshot_json->>'displayName'), '') AS display_name,
+      NULLIF(TRIM(export_snapshot_json->>'phone'), '') AS phone,
+      NULLIF(TRIM(export_snapshot_json->>'phoneE164'), '') AS phone_e164,
+      NULLIF(TRIM(export_snapshot_json->>'organization'), '') AS organization,
+      NULLIF(TRIM(export_snapshot_json->>'companyName'), '') AS company_name,
+      NULLIF(TRIM(export_snapshot_json->>'title'), '') AS title,
+      NULLIF(TRIM(export_snapshot_json->>'activityName'), '') AS activity_name,
+      NULLIF(TRIM(export_snapshot_json->>'activityDisplayName'), '') AS activity_display_name,
+      NULLIF(TRIM(export_snapshot_json->>'nickname'), '') AS nickname,
+      NULLIF(TRIM(export_snapshot_json->>'handle'), '') AS handle
+    FROM digital_cards
+    WHERE user_id IN (${Prisma.join(ids)})
+  `;
+
+  const byUser = new Map<string, SearchSnapLite>();
+  for (const r of liteRows) {
+    const logoRaw = String(r.logo_url || "").trim();
+    byUser.set(r.user_id, {
+      logoUrl: isHttpMediaUrl(logoRaw) && !isDataUrl(logoRaw) ? logoRaw : "",
+      name: String(r.name || "").trim(),
+      displayName: String(r.display_name || "").trim(),
+      phone: String(r.phone || "").trim(),
+      phoneE164: String(r.phone_e164 || "").trim(),
+      organization: String(r.organization || "").trim(),
+      companyName: String(r.company_name || "").trim(),
+      title: String(r.title || "").trim(),
+      activityName: String(r.activity_name || "").trim(),
+      activityDisplayName: String(r.activity_display_name || "").trim(),
+      nickname: String(r.nickname || "").trim(),
+      handle: String(r.handle || "").trim()
+    });
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    searchSnap: byUser.get(row.id) || null
+  }));
 }
 
 function digitsOnly(v: unknown): string {
@@ -200,7 +300,10 @@ export function maskShowcaseHit(u: UserSearchRow): MaskedShowcaseHit {
     organization: orgAllowed ? org : "",
     orgVisible: orgAllowed && Boolean(org),
     title: String(u.businessProfile?.jobTitle || snap.title || ""),
-    logoUrl: String(snap.logoUrl || ""),
+    logoUrl: (() => {
+      const logo = String(snap.logoUrl || "").trim();
+      return isHttpMediaUrl(logo) && !isDataUrl(logo) ? logo : "";
+    })(),
     displayName: nameAllowed && rawName ? rawName : MASKED_NAME,
     nameVisible: nameAllowed && Boolean(rawName),
     phone: phoneAllowed ? rawPhone : "",
@@ -231,7 +334,8 @@ const searchSelect = {
   isOrgSearchAllowed: true,
   isIdSearchAllowed: true,
   businessProfile: { select: { companyName: true, jobTitle: true } },
-  digitalCard: { select: { membershipTierSnapshot: true, exportSnapshotJson: true } }
+  /* exportSnapshotJson 전체 SELECT 금지 — base64 사진이 있으면 검색 1회에 수십~수백 MB egress */
+  digitalCard: { select: { membershipTierSnapshot: true } }
 } as const;
 
 function baseTargetWhere() {
@@ -277,7 +381,9 @@ export async function searchByHashtag(query: string, limit = 24): Promise<Masked
   );
 
   const paid = await filterPaidTargets(matched);
-  return paid.slice(0, limit).map(maskShowcaseHit);
+  const limited = paid.slice(0, limit);
+  const withSnap = await attachSearchSnapLites(limited);
+  return withSnap.map(maskShowcaseHit);
 }
 
 /**
@@ -310,7 +416,10 @@ export async function searchByPhone(rawPhone: string, limit = 12): Promise<Maske
       select: searchSelect,
       take: 200
     })) as UserSearchRow[];
-    users = candidates.filter((u) => phoneMatchesQuery(u, queryDigits)).slice(0, limit);
+    const withSnap = await attachSearchSnapLites(candidates);
+    users = withSnap.filter((u) => phoneMatchesQuery(u, queryDigits)).slice(0, limit);
+  } else if (users.length) {
+    users = await attachSearchSnapLites(users);
   }
 
   const paid = await filterPaidTargets(users);
@@ -343,7 +452,7 @@ export async function searchByName(rawName: string, limit = 24): Promise<MaskedS
     take: 80
   })) as UserSearchRow[];
 
-  /* 스냅샷 성명/상호만 있는 경우 — 각 허용 플래그 대상 중 추가 매칭 */
+  /* 스냅샷 성명/상호만 있는 경우 — 경량 JSON path 스냅으로 추가 매칭 */
   const extraPool = (await prisma.user.findMany({
     where: {
       ...baseTargetWhere(),
@@ -354,8 +463,9 @@ export async function searchByName(rawName: string, limit = 24): Promise<MaskedS
     take: 120
   })) as UserSearchRow[];
 
+  const extraWithSnap = await attachSearchSnapLites(extraPool);
   const seen = new Set(users.map((u) => u.id));
-  for (const u of extraPool) {
+  for (const u of extraWithSnap) {
     if (seen.has(u.id)) continue;
     if (nameOrOrgMatches(u, name)) {
       users.push(u);
@@ -364,7 +474,9 @@ export async function searchByName(rawName: string, limit = 24): Promise<MaskedS
   }
 
   const paid = await filterPaidTargets(users);
-  return paid.slice(0, limit).map(maskShowcaseHit);
+  const limited = paid.slice(0, limit);
+  const withSnap = await attachSearchSnapLites(limited);
+  return withSnap.map(maskShowcaseHit);
 }
 
 /**
@@ -396,9 +508,10 @@ export async function searchByPublicId(rawId: string, limit = 12): Promise<Maske
     take: 120
   })) as UserSearchRow[];
 
+  const candidatesWithSnap = await attachSearchSnapLites(candidates);
   const seen = new Set(exact.map((u) => u.id));
   const merged = [...exact];
-  for (const u of candidates) {
+  for (const u of candidatesWithSnap) {
     if (seen.has(u.id)) continue;
     if (idOrActivityMatches(u, handle)) {
       merged.push(u);
@@ -407,7 +520,9 @@ export async function searchByPublicId(rawId: string, limit = 12): Promise<Maske
   }
 
   const paid = await filterPaidTargets(merged);
-  return paid.slice(0, limit).map(maskShowcaseHit);
+  const limited = paid.slice(0, limit);
+  const withSnap = await attachSearchSnapLites(limited);
+  return withSnap.map(maskShowcaseHit);
 }
 
 export type PrivacyPatch = {

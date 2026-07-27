@@ -38,7 +38,11 @@ export default function OfficeRemotePanel({
 
   useEffect(() => {
     refresh();
-    const t = window.setInterval(refresh, 5000);
+    const tick = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      refresh();
+    };
+    const t = window.setInterval(tick, 20000);
     return () => window.clearInterval(t);
   }, [refresh]);
 

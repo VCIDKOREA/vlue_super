@@ -49,7 +49,11 @@ export default function FamilySecurityDashboard({ isDarkMode = false, onToast })
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 30000);
+    const tick = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      load();
+    };
+    const t = setInterval(tick, 60000);
     return () => clearInterval(t);
   }, [load]);
 

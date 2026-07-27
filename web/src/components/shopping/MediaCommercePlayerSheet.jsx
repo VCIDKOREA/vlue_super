@@ -87,7 +87,11 @@ export default function MediaCommercePlayerSheet({
 
   useEffect(() => {
     if (!open || !campaignId) return undefined;
-    const id = window.setInterval(refreshTick, 1500);
+    const tick = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      refreshTick();
+    };
+    const id = window.setInterval(tick, 12000);
     return () => window.clearInterval(id);
   }, [open, campaignId, refreshTick]);
 

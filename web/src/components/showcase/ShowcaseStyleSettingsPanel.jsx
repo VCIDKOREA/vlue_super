@@ -263,7 +263,7 @@ export default function ShowcaseStyleSettingsPanel({
         if (cancelled) return;
         setConfig(readShowcaseStyle());
         try {
-          writeLiveShowcaseStyle(readShowcaseStyle());
+          writeLiveShowcaseStyle(readShowcaseStyle(), { skipSync: true });
         } catch {
           /* ignore */
         }
@@ -271,7 +271,7 @@ export default function ShowcaseStyleSettingsPanel({
       .catch(() => {
         if (cancelled) return;
         try {
-          writeLiveShowcaseStyle(readShowcaseStyle());
+          writeLiveShowcaseStyle(readShowcaseStyle(), { skipSync: true });
         } catch {
           /* ignore */
         }

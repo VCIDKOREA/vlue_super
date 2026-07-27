@@ -557,7 +557,7 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
       status: true,
       businessProfile: { select: { companyName: true, jobTitle: true } },
       digitalCard: {
-        select: { membershipTierSnapshot: true, exportSnapshotJson: true, issuedAt: true }
+        select: { membershipTierSnapshot: true, issuedAt: true }
       },
       subscriptions: {
         where: { status: "active" },
@@ -582,27 +582,69 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
   const masked = maskProfileForViewer(user as UserPrivacyRow, raw, ctx);
   const followState = await getFollowState(viewerId, targetUserId);
 
-  const snap =
-    user.digitalCard?.exportSnapshotJson && typeof user.digitalCard.exportSnapshotJson === "object"
-      ? (user.digitalCard.exportSnapshotJson as Record<string, unknown>)
-      : null;
-  const photoUrl = String(snap?.photoUrl || snap?.image_url || snap?.imageUrl || "").trim();
-  const logoUrl = String(snap?.logoUrl || "").trim();
-  const photoFocus = String(snap?.photoFocus || "").trim();
+  /* 전체 exportSnapshotJson SELECT 금지 — 필요한 짧은 필드만 JSON path */
+  const snapRows = user.digitalCard
+    ? await prisma.$queryRaw<
+        Array<{
+          name: string | null;
+          display_name: string | null;
+          organization: string | null;
+          company_name: string | null;
+          title: string | null;
+          department: string | null;
+          email: string | null;
+          website: string | null;
+          fax: string | null;
+          address: string | null;
+          activity_name: string | null;
+          photo_url: string | null;
+          logo_url: string | null;
+          photo_focus: string | null;
+        }>
+      >`
+        SELECT
+          NULLIF(TRIM(export_snapshot_json->>'name'), '') AS name,
+          NULLIF(TRIM(export_snapshot_json->>'displayName'), '') AS display_name,
+          NULLIF(TRIM(export_snapshot_json->>'organization'), '') AS organization,
+          NULLIF(TRIM(export_snapshot_json->>'companyName'), '') AS company_name,
+          NULLIF(TRIM(export_snapshot_json->>'title'), '') AS title,
+          NULLIF(TRIM(export_snapshot_json->>'department'), '') AS department,
+          NULLIF(TRIM(export_snapshot_json->>'email'), '') AS email,
+          NULLIF(TRIM(export_snapshot_json->>'website'), '') AS website,
+          NULLIF(TRIM(export_snapshot_json->>'fax'), '') AS fax,
+          NULLIF(TRIM(export_snapshot_json->>'address'), '') AS address,
+          NULLIF(TRIM(export_snapshot_json->>'activityName'), '') AS activity_name,
+          NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url,
+          NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
+          NULLIF(TRIM(export_snapshot_json->>'photoFocus'), '') AS photo_focus
+        FROM digital_cards
+        WHERE user_id = ${targetUserId}
+        LIMIT 1
+      `
+    : [];
+  const s = snapRows[0];
+  const httpOnly = (v: string | null | undefined) => {
+    const t = String(v || "").trim();
+    if (!t || t.startsWith("data:") || t.startsWith("blob:")) return "";
+    return t;
+  };
+  const photoUrl = httpOnly(s?.photo_url);
+  const logoUrl = httpOnly(s?.logo_url);
+  const photoFocus = String(s?.photo_focus || "").trim();
   const sub = user.subscriptions?.[0] || null;
 
   /** 디지털 인증명함 송출 스냅샷 — 쇼케이스·명함 열람용 (검색 마스킹과 별도) */
-  const cardExport = snap
+  const cardExport = s
     ? {
-        name: String(snap.name || snap.displayName || "").trim(),
-        organization: String(snap.organization || snap.companyName || "").trim(),
-        title: String(snap.title || "").trim(),
-        department: String(snap.department || "").trim(),
-        email: String(snap.email || "").trim(),
-        website: String(snap.website || "").trim(),
-        fax: String(snap.fax || "").trim(),
-        address: String(snap.address || "").trim(),
-        activityName: String(snap.activityName || "").trim(),
+        name: String(s.name || s.display_name || "").trim(),
+        organization: String(s.organization || s.company_name || "").trim(),
+        title: String(s.title || "").trim(),
+        department: String(s.department || "").trim(),
+        email: String(s.email || "").trim(),
+        website: String(s.website || "").trim(),
+        fax: String(s.fax || "").trim(),
+        address: String(s.address || "").trim(),
+        activityName: String(s.activity_name || "").trim(),
         photoUrl,
         logoUrl,
         photoFocus
