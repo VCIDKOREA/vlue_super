@@ -41,10 +41,22 @@ import { coerceWebViewForV1, isWebViewV1Enabled, v1WebShell } from '../../lib/v1
 const VALID_VIEWS: View[] = [
   'home', 'search', 'shopping', 'auction', 'about', 'resources', 'pricing', 'safezone',
   'mail', 'mail-settings', 'download', 'news', 'events', 'jobs', 'support', 'exceleditor', 'family', 'mypage', 'bizcard',
+  'showcase', 'biz',
   'terms', 'privacy', 'refund',
 ];
 
+/** /showcase · /biz 경로 → 해시 라우트로 정규화 (www.vlue.kr/showcase) */
+function normalizeShowcaseManagePathname() {
+  if (typeof window === 'undefined') return;
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  if (path !== '/showcase' && path !== '/biz') return;
+  const view = path.slice(1);
+  const search = window.location.search || '';
+  window.history.replaceState(null, '', `/${search}#${view}`);
+}
+
 function readViewFromHash(): { view: View; legalScrollId?: string } {
+  normalizeShowcaseManagePathname();
   const raw = (typeof window !== 'undefined' ? window.location.hash : '').replace(/^#/, '');
   const [viewPart, anchor] = raw.split('/');
   if (viewPart === 'email-settings' || viewPart === 'email') {
@@ -141,18 +153,44 @@ export default function App() {
     setShowAuth(false);
     setShowLoginRequired(false);
     try {
-      if (sessionStorage.getItem(AFTER_LOGIN_KEY) === 'family') {
+      const after = sessionStorage.getItem(AFTER_LOGIN_KEY);
+      if (after === 'family') {
         sessionStorage.removeItem(AFTER_LOGIN_KEY);
         setRoute({ view: 'family' });
         window.location.hash = 'family';
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (after === 'showcase' || after === 'biz') {
+        sessionStorage.removeItem(AFTER_LOGIN_KEY);
+        setRoute({ view: after as View });
+        window.location.hash = after;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
       }
     } catch {
       /* ignore */
     }
+    /* 로그인 요청이 쇼케이스/비즈 화면에서 열렸다면 그 화면 유지 */
+    const current = readViewFromHash().view;
+    if (current === 'showcase' || current === 'biz') {
+      setRoute({ view: current });
+    }
   };
 
-  const handleLoginRequired = () => { if (!user) setShowLoginRequired(true); };
+  const handleLoginRequired = () => {
+    if (!user) {
+      try {
+        const current = readViewFromHash().view;
+        if (current === 'showcase' || current === 'biz' || current === 'family') {
+          sessionStorage.setItem(AFTER_LOGIN_KEY, current);
+        }
+      } catch {
+        /* ignore */
+      }
+      setShowLoginRequired(true);
+    }
+  };
 
   const handleStartFamilyProtection = () => {
     if (!user) {
@@ -246,6 +284,14 @@ export default function App() {
         {view === 'bizcard' && (
           <BusinessCardPage
             user={user}
+            onLoginClick={handleLoginRequired}
+            onBack={() => handleNavigate('home')}
+          />
+        )}
+        {(view === 'showcase' || view === 'biz') && (
+          <BusinessCardPage
+            user={user}
+            mode="showcase"
             onLoginClick={handleLoginRequired}
             onBack={() => handleNavigate('home')}
           />

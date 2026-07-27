@@ -14,6 +14,7 @@ import MyPageDigitalLetteringSection from "./MyPageDigitalLetteringSection.jsx";
 import EnterpriseLineManagePanel from "./EnterpriseLineManagePanel.jsx";
 import ShoppingCartHubPanel from "./ShoppingCartHubPanel.jsx";
 import BroadcastLineSetupPanel from "./BroadcastLineSetupPanel.jsx";
+import EnterpriseDccApplyWizard from "./EnterpriseDccApplyWizard.jsx";
 import BackButton from "./common/BackButton";
 import { isBillableMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
 import { pricingNumbers } from "../lib/pricingConfig.js";
@@ -593,6 +594,16 @@ function ProfilePanel({
             onBack={() => setPanelView("main")}
             onToast={showSettingNotice}
           />
+        ) : panelView === "enterpriseDcc" ? (
+          <EnterpriseDccApplyWizard
+            isDarkMode={isDarkMode}
+            onBack={() => setPanelView("main")}
+            onToast={showSettingNotice}
+            onRequestPayment={() => {
+              setUpgradeOpen(true);
+              showSettingNotice("승인 완료 · 유료 결제 후 디지털 인증명함이 활성화됩니다.");
+            }}
+          />
         ) : panelView === "broadcastSetup" ? (
           <div className={`flex min-h-0 flex-1 flex-col ${isDarkMode ? "text-gray-100" : ""}`}>
             <div
@@ -753,6 +764,26 @@ function ProfilePanel({
               </span>
             </button>
           ) : null}
+
+          <button
+            type="button"
+            onClick={() => setPanelView("enterpriseDcc")}
+            className={`relative mb-4 flex w-full items-center justify-between gap-3 rounded-[26px] border-2 p-4 text-left shadow-sm transition-all active:scale-[0.98] ${
+              isDarkMode
+                ? "border-blue-500/40 bg-blue-500/15"
+                : "border-blue-200 bg-gradient-to-br from-blue-50 to-sky-50"
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <p className={`text-[15px] font-black leading-tight ${headText}`}>기업·대표번호 인증명함</p>
+              <p className={`mt-0.5 text-[11px] font-semibold ${subText}`}>
+                사업자 검증 · 관계자 인증 · 승인 후 발급·결제
+              </p>
+            </div>
+            <span className={`shrink-0 text-lg ${subText}`} aria-hidden>
+              ›
+            </span>
+          </button>
 
           <button
             type="button"

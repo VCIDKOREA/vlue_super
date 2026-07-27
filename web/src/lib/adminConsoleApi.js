@@ -252,3 +252,32 @@ export async function patchAdminSignatureSound(id, body) {
   });
   return parseJson(res);
 }
+
+/** 관리자 DB 지표 차트 */
+export async function fetchAdminProductMetrics({ from = "", to = "" } = {}) {
+  const qs = new URLSearchParams();
+  if (from) qs.set("from", from);
+  if (to) qs.set("to", to);
+  const q = qs.toString();
+  const res = await fetch(apiUrl(`/api/admin/console/metrics${q ? `?${q}` : ""}`), {
+    headers: adminHeaders()
+  });
+  return parseJson(res);
+}
+
+/** 기업 DCC 승인 대기 */
+export async function fetchAdminEnterpriseDccPending() {
+  const res = await fetch(apiUrl("/api/admin/console/enterprise-dcc/pending"), {
+    headers: adminHeaders()
+  });
+  return parseJson(res);
+}
+
+export async function reviewAdminEnterpriseDcc(id, action, adminNote = "") {
+  const res = await fetch(apiUrl(`/api/admin/console/enterprise-dcc/${encodeURIComponent(id)}/review`), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify({ action, adminNote })
+  });
+  return parseJson(res);
+}

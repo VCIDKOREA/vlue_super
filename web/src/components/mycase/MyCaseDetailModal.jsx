@@ -10,6 +10,7 @@ import {
 import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
 import { fetchMycaseDetail } from "../../lib/mycaseApi.js";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
+import { trackShowcaseView } from "../../lib/productMetrics.js";
 import "./my-case-detail.css";
 
 function readPreviewIdentity() {
@@ -273,6 +274,8 @@ export default function MyCaseDetailModal({
 
   useEffect(() => {
     if (!open) return undefined;
+    const ownerId = String(item?.ownerUserId || peerIdentity?.userId || "").trim();
+    trackShowcaseView(isOwner ? "mycase_detail" : "peer_case_detail", ownerId);
     const onKey = (e) => {
       if (e.key === "Escape") onClose?.();
       if (e.key === "ArrowDown" || e.key === "PageDown") {
@@ -291,7 +294,7 @@ export default function MyCaseDetailModal({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
     };
-  }, [open, onClose, feed.length]);
+  }, [open, onClose, feed.length, item?.ownerUserId, peerIdentity?.userId, isOwner]);
 
   useEffect(() => {
     if (!open) return;

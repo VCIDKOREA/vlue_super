@@ -32,6 +32,7 @@ node scripts/extract-web2-sources.mjs
 | safezone | `pages/SafeZonePage.tsx` |
 | mypage | `pages/MyPage.tsx` |
 | bizcard | `pages/BusinessCardPage.tsx` |
+| showcase / biz | `pages/BusinessCardPage.tsx` (mode=`showcase`) — 웹 쇼케이스 관리 |
 
 ## 통합 시 최소 수정
 

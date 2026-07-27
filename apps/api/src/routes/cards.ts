@@ -24,8 +24,11 @@ import {
   createDirectImageUploadUrl,
   isDirectImageStorageConfigured
 } from "../services/media/directImageStorage.js";
+import { enterpriseDccRoutes } from "./enterpriseDcc.js";
 
 export const cardsRoutes = new Hono();
+
+cardsRoutes.route("/enterprise-dcc", enterpriseDccRoutes);
 
 async function jsonLookup(raw: string, viewerId?: string | null) {
   const result = await lookupCardByRawNumber(raw, { viewerId });

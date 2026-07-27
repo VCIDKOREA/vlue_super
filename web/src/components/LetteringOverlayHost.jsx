@@ -15,6 +15,7 @@ import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import LetteringReportSheet from "./LetteringReportSheet.jsx";
 import LetteringCertModal from "./LetteringCertModal.jsx";
+import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
 import "../styles/tent-showcase.css";
 import "../styles/showcase-call-glass.css";
 
@@ -61,6 +62,11 @@ export default function LetteringOverlayHost() {
     const onHash = () => setParams(parseOverlayParams());
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  useEffect(() => {
+    trackCallInterfaceUse("live_call");
+    trackShowcaseView("live_call");
   }, []);
 
   useEffect(() => {

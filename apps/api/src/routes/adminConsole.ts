@@ -13,6 +13,10 @@ import {
 } from "../services/admin/platformAccountRoles.js";
 import { issueTokenPair } from "../services/authSessions.js";
 import { adminPricingConfigRoutes } from "./pricingConfig.js";
+import { enterpriseDccAdminRoutes } from "./enterpriseDcc.js";
+import {
+  getAdminProductMetrics
+} from "../services/admin/adminProductMetrics.js";
 import {
   createMarketingPopup,
   deleteAdminFeedPost,
@@ -212,6 +216,19 @@ authed.get("/onboarding/stats", async (c) => {
   return c.json({ ok: true, stats });
 });
 
+/** GET /api/admin/console/metrics — DB 지표 차트용 시계열 */
+authed.get("/metrics", async (c) => {
+  const from = c.req.query("from") || undefined;
+  const to = c.req.query("to") || undefined;
+  try {
+    const data = await getAdminProductMetrics({ from, to });
+    return c.json(data);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "metrics_failed";
+    return c.json({ error: msg }, 500);
+  }
+});
+
 authed.get("/onboarding/manual-review", async (c) => {
   const rows = await listManualReviewQueue(100);
   return c.json({ ok: true, requests: mapManualReviewRows(rows) });
@@ -359,4 +376,5 @@ authed.patch("/signature-sounds/:id", async (c) => {
 });
 
 authed.route("/pricing-config", adminPricingConfigRoutes);
+authed.route("/enterprise-dcc", enterpriseDccAdminRoutes);
 adminConsoleRoutes.route("/", authed);

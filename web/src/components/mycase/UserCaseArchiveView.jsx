@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import MyCaseGrid from "./MyCaseGrid.jsx";
 import MyCaseDetailModal from "./MyCaseDetailModal.jsx";
 import PeerShowcasePreview from "../showcase/PeerShowcasePreview.jsx";
 import { resolveVlueShowcasePeer } from "../../lib/resolveVlueShowcasePeer.js";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
+import { trackShowcaseView } from "../../lib/productMetrics.js";
 
 /**
  * 타 유저 퍼블릭 프로필 + 케이스함 (인스타 형식 · 본인 마이케이스와 동일 셸)
@@ -26,6 +27,11 @@ export default function UserCaseArchiveView({
   const [cardOpen, setCardOpen] = useState(false);
   const [peerCard, setPeerCard] = useState(null);
   const [cardLoading, setCardLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !userId) return;
+    trackShowcaseView("peer_case_archive", String(userId));
+  }, [open, userId]);
 
   if (!open || !userId) return null;
 

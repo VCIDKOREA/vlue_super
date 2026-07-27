@@ -1,0 +1,302 @@
+/* www 쇼케이스 관리 — 1열 미리보기 / 2열 설정 = 듀얼 화면 */
+
+.showcase-web-desk {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.showcase-web-desk__tip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+}
+
+.showcase-web-desk__tip-text {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: #1e3a8a;
+  word-break: keep-all;
+}
+
+.showcase-web-desk__tip-cta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.showcase-web-desk__body {
+  display: grid;
+  grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  overflow: visible;
+}
+
+.showcase-web-desk__preview-col .max-w-md {
+  max-width: 22rem;
+}
+
+.showcase-web-desk__preview-col,
+.showcase-web-desk__settings-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  max-height: none;
+  padding: 12px 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+  overflow: visible;
+}
+
+.showcase-web-desk__preview-col {
+  background: #f8fafc;
+}
+
+.showcase-web-desk__preview-label,
+.showcase-web-desk__settings-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.showcase-web-desk__settings-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+
+.showcase-web-desk__settings-scroll .showcase-profile-block,
+.showcase-web-desk__settings-scroll .showcase-profile-group {
+  margin-top: 0;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+}
+
+.showcase-web-desk .showcase-style-settings__save-btn {
+  max-width: 240px;
+  margin: 8px auto 4px;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline {
+  width: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-summary {
+  align-items: center !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-profile-thumb {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.25;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-name {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-subline,
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-phone-em {
+  font-size: 12px !important;
+  line-height: 1.3 !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-subline {
+  margin-top: 2px !important;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing--home-glass.lettering-ongoing--expanded {
+  --lettering-push-expanded-max: none;
+  --lettering-push-expanded-max-fb: none;
+  max-height: none !important;
+  height: auto !important;
+  overflow: hidden;
+}
+
+/*
+ * 부드러운 펼침·접힘 (웹 부분영역):
+ * 콘텐츠 높이는 고정, grid 0fr↔1fr 로만 가림/드러냄.
+ * min-height·opacity·flex:1 동시 변경하면 뚝뚝 끊김.
+ */
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot {
+  display: grid !important;
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 1 !important;
+  pointer-events: none;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.5s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot[data-open="true"] {
+  grid-template-rows: 1fr !important;
+  pointer-events: auto;
+}
+
+/* fullscreen-tent 의 flex:1 / 1fr !important 가 접힘 트랜지션을 깨지 않게 */
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-expand-slot,
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-expand-slot[data-open="true"] {
+  display: grid !important;
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 1 !important;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-expand-slot {
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.5s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-expand-slot[data-open="true"] {
+  grid-template-rows: 1fr !important;
+  pointer-events: auto;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner,
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-expand-slot__inner {
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  display: block !important;
+  flex: none !important;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner > .lettering-ongoing-reception {
+  display: flex;
+  flex-direction: column;
+  height: 560px;
+  max-height: 560px;
+  min-height: 560px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--carousel,
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--reception {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
+  overflow: hidden;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .showcase-call-carousel,
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .showcase-call-carousel__viewport,
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .showcase-call-carousel__stage,
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .showcase-call-carousel__slide,
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .showcase-call-carousel__card,
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .ldr-reception--push {
+  height: 100%;
+  min-height: 0;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .ldr-panel-wrap {
+  flex: 1 1 auto;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .ldr-auth-social-dock,
+.showcase-web-desk .lettering-home-push-embed--web-inline .vlue-push-auth-seal,
+.showcase-web-desk .lettering-home-push-embed--web-inline .ldr-face-tabs {
+  flex-shrink: 0;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-actions-secondary--call {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 3;
+  animation: showcase-web-desk-call-chrome-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes showcase-web-desk-call-chrome-in {
+  from {
+    opacity: 0.35;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-actions-secondary--call {
+    animation: none;
+  }
+
+  .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot,
+  .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-expand-slot {
+    transition: none !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .showcase-web-desk__body {
+    grid-template-columns: 1fr;
+  }
+
+  .showcase-web-desk__preview-col .max-w-md {
+    max-width: 22rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}

@@ -6,6 +6,8 @@ import MyPageDigitalLetteringSection from '../../../components/MyPageDigitalLett
 import LetteringBizcardSettingsView from '../../../components/LetteringBizcardSettingsView.jsx';
 import LetteringSettingsSection from '../../../components/LetteringSettingsSection.jsx';
 import EnterpriseLineManagePanel from '../../../components/EnterpriseLineManagePanel.jsx';
+import ShowcaseStyleSettingsSheet from '../../../components/showcase/ShowcaseStyleSettingsSheet.jsx';
+import ShowcaseStyleSettingsPanel from '../../../components/showcase/ShowcaseStyleSettingsPanel.jsx';
 import WebUserLetteringPreview from './WebUserLetteringPreview';
 import {
   readDigitalCardActive,
@@ -14,7 +16,11 @@ import {
   syncBizcardAccountFromApi,
   writeVcidBroadcastOn,
 } from '../../../lib/bizcardAccountSync.js';
-import { readLetteringFixedIdentity, LETTERING_BIZCARD_CHANGED_EVENT } from '../../../lib/letteringBizcardStorage.js';
+import {
+  readLetteringFixedIdentity,
+  LETTERING_BIZCARD_CHANGED_EVENT,
+  LETTERING_OPEN_BIZCARD_SETTINGS_EVENT,
+} from '../../../lib/letteringBizcardStorage.js';
 import { fetchDigitalCardMeta } from '../../../lib/digitalCardApi.js';
 import { probeEnterpriseSidebarAccess } from '../../../lib/enterpriseLineManageAccess.js';
 import { formatPhoneE164ForKoreaDisplay } from '../../../lib/phoneDisplay.js';
@@ -122,9 +128,16 @@ function AccountSummaryCard({
   );
 }
 
-function WebBizcardHubInner({ user }: { user: MarketingAuthUser }) {
+function WebBizcardHubInner({
+  user,
+  autoOpenShowcase = false,
+}: {
+  user: MarketingAuthUser;
+  autoOpenShowcase?: boolean;
+}) {
   const [activeTab, setActiveTab] = useState<TabKey>('card');
   const [cardSubview, setCardSubview] = useState<CardSubview>('hub');
+  const [showcaseSheetOpen, setShowcaseSheetOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
   const [syncTick, setSyncTick] = useState(0);
@@ -178,15 +191,21 @@ function WebBizcardHubInner({ user }: { user: MarketingAuthUser }) {
       setSyncTick((n) => n + 1);
     };
     const onBizcard = () => setSyncTick((n) => n + 1);
+    const onOpenBizcardSettings = () => {
+      setCardSubview('edit');
+      showToast('디지털인증명함 설정으로 이동합니다. 프로필 사진·연락처는 여기서 저장해야 미리보기에 반영됩니다.');
+    };
     window.addEventListener('vlue-vcid-changed', onVcid);
     window.addEventListener('vlue-digital-card-changed', onCard);
     window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onBizcard);
+    window.addEventListener(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT, onOpenBizcardSettings);
     return () => {
       window.removeEventListener('vlue-vcid-changed', onVcid);
       window.removeEventListener('vlue-digital-card-changed', onCard);
       window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onBizcard);
+      window.removeEventListener(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT, onOpenBizcardSettings);
     };
-  }, []);
+  }, [showToast]);
 
   const hasDigitalCertCard = useMemo(
     () => Boolean(digitalCardActive) && digitalCardIssued !== false,
@@ -249,6 +268,27 @@ function WebBizcardHubInner({ user }: { user: MarketingAuthUser }) {
     );
   }
 
+  /* www #showcase — 미리보기|설정 2열. 명함 설정(edit)은 위에서 처리 */
+  if (autoOpenShowcase) {
+    return (
+      <div className="space-y-4">
+        {toast ? (
+          <div className="rounded-xl bg-slate-900 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg">
+            {toast}
+          </div>
+        ) : null}
+        <ShowcaseStyleSettingsPanel
+          layout="webDesk"
+          membershipTier={membershipTier}
+          isDarkMode={false}
+          hideHeader
+          onOpenUpgrade={() => window.location.assign('/pricing')}
+          onToast={showToast}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       {toast ? (
@@ -302,6 +342,7 @@ function WebBizcardHubInner({ user }: { user: MarketingAuthUser }) {
               isDarkMode={false}
               onApplyDigitalCard={handleApplyDigitalCard}
               onEditLettering={() => setCardSubview('edit')}
+              onOpenShowcaseStyle={() => setShowcaseSheetOpen(true)}
               onToast={showToast}
             />
           </div>
@@ -338,14 +379,32 @@ function WebBizcardHubInner({ user }: { user: MarketingAuthUser }) {
           />
         </div>
       )}
+
+      <ShowcaseStyleSettingsSheet
+        open={showcaseSheetOpen}
+        onClose={() => setShowcaseSheetOpen(false)}
+        membershipTier={membershipTier}
+        isDarkMode={false}
+        onOpenUpgrade={() => {
+          setShowcaseSheetOpen(false);
+          window.location.assign('/pricing');
+        }}
+        onToast={showToast}
+      />
     </div>
   );
 }
 
-export default function WebBizcardHub({ user }: { user: MarketingAuthUser }) {
+export default function WebBizcardHub({
+  user,
+  autoOpenShowcase = false,
+}: {
+  user: MarketingAuthUser;
+  autoOpenShowcase?: boolean;
+}) {
   return (
     <B2bMembershipProvider enabled>
-      <WebBizcardHubInner user={user} />
+      <WebBizcardHubInner user={user} autoOpenShowcase={autoOpenShowcase} />
     </B2bMembershipProvider>
   );
 }

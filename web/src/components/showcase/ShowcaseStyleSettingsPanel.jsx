@@ -40,7 +40,10 @@ import {
   startInstagramLink
 } from "../../lib/instagramLinkApi.js";
 import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
-import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../../lib/letteringBizcardStorage.js";
+import {
+  LETTERING_BIZCARD_CHANGED_EVENT,
+  LETTERING_OPEN_BIZCARD_SETTINGS_EVENT
+} from "../../lib/letteringBizcardStorage.js";
 import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
 import { syncShowcaseTagsToServer, fetchShowcaseSearchPrivacy, saveShowcaseSearchPrivacy } from "../../lib/showcase/showcaseTagsApi.js";
@@ -51,7 +54,9 @@ import ShowcasePremiumGateModal from "./ShowcasePremiumGateModal.jsx";
 import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
 import ShowcasePhotoEditor from "./ShowcasePhotoEditor.jsx";
 import ShowcasePullDownPreview from "./ShowcasePullDownPreview.jsx";
+import CallBigPushPreviewSection from "../CallBigPushPreviewSection.jsx";
 import "./showcase-style-settings.css";
+import "./showcase-web-desk.css";
 import "../../styles/showcase-call-glass.css";
 
 function gatePremium(feature, tier, setGate) {
@@ -191,12 +196,16 @@ export default function ShowcaseStyleSettingsPanel({
   onOpenUpgrade,
   onToast,
   hideHeader = false,
-  fullscreen = false
+  fullscreen = false,
+  /** sheet(기본·앱) | webDesk(www 미리보기|설정 2열) */
+  layout = "sheet"
 }) {
+  const isWebDesk = layout === "webDesk";
   const isPaid = isPaidLetteringTier(membershipTier);
   const includeDigitalCard = isPaid && readDigitalCardActive();
   const maxContentPages = maxShowcaseContentPagesForTier(membershipTier, { includeDigitalCard });
   const [config, setConfig] = useState(() => readShowcaseStyle());
+  const [identityTick, setIdentityTick] = useState(0);
   const [gateOpen, setGateOpen] = useState(false);
   const [tagInput, setTagInput] = useState(() => (config.tags || []).join(" "));
   const [searchPrivacy, setSearchPrivacy] = useState({
@@ -207,7 +216,10 @@ export default function ShowcaseStyleSettingsPanel({
   });
   const [openMusic, setOpenMusic] = useState(false);
   const [openBiz, setOpenBiz] = useState(false);
+  const [openReactions, setOpenReactions] = useState(() => layout !== "webDesk");
+  const [openSearch, setOpenSearch] = useState(false);
   const [expandedPageId, setExpandedPageId] = useState("");
+  const settingsScrollRef = useRef(null);
   const [igLink, setIgLink] = useState({ linked: false });
   const [igLinkLoading, setIgLinkLoading] = useState(false);
   /** 적용 시 마이케이스에 새 게시물로 올릴지 (기본 꺼짐 — 사진 수정마다 쌓이는 것 방지) */
@@ -269,6 +281,19 @@ export default function ShowcaseStyleSettingsPanel({
     };
   }, []);
 
+  /* 명함 사진·신원 변경 시 미리보기 즉시 반영 */
+  useEffect(() => {
+    const bump = () => setIdentityTick((n) => n + 1);
+    window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
+    window.addEventListener("vlue-digital-card-changed", bump);
+    window.addEventListener("vlue-avatar-changed", bump);
+    return () => {
+      window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
+      window.removeEventListener("vlue-digital-card-changed", bump);
+      window.removeEventListener("vlue-avatar-changed", bump);
+    };
+  }, []);
+
   const card = useMemo(() => {
     const base = resolveVlueShowcaseCard({ membershipTier, previewExample: true });
     /* 설정 미리보기는 편집 초안(config)만 사용 — 라이브/마이케이스와 섞지 않음 */
@@ -276,7 +301,7 @@ export default function ShowcaseStyleSettingsPanel({
       style: config,
       digitalCardActive: includeDigitalCard
     });
-  }, [membershipTier, config, includeDigitalCard]);
+  }, [membershipTier, config, includeDigitalCard, identityTick]);
 
   const persist = useCallback((patch) => {
     setConfig((prev) => {
@@ -474,6 +499,16 @@ export default function ShowcaseStyleSettingsPanel({
     if (isPaid) {
       void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));
     }
+
+    const previewCard = resolveVlueShowcaseCard({ membershipTier, previewExample: true });
+    const hasProfilePhoto = Boolean(String(previewCard?.photoUrl || "").trim());
+    if (includeDigitalCard && !hasProfilePhoto) {
+      onToast?.(
+        "쇼케이스 설정은 저장됐습니다. 프로필 사진은 「1페이지 · 디지털인증명함 → 설정하러가기」에서 등록·저장해야 미리보기에 나옵니다."
+      );
+      if (!alsoUploadToMycase) return;
+    }
+
     if (!alsoUploadToMycase) {
       onToast?.("적용되었습니다. (마이케이스에는 올리지 않음)");
       return;
@@ -496,7 +531,11 @@ export default function ShowcaseStyleSettingsPanel({
             { ...(readLiveShowcaseStyle() || latest), bgm: latest.bgm },
             { source: "editor" }
           );
-          onToast?.("적용 · 마이케이스 저장 · 메인 송출 반영");
+          onToast?.(
+            hasProfilePhoto
+              ? "적용 · 마이케이스 저장 · 메인 송출 반영"
+              : "적용 · 마이케이스 저장. 프로필 사진은 디지털인증명함 설정에서 등록해 주세요."
+          );
         } else if (res?.ok) {
           onToast?.("적용 · 마이케이스에 저장되었습니다.");
         } else {
@@ -506,13 +545,643 @@ export default function ShowcaseStyleSettingsPanel({
     } catch {
       onToast?.("적용되었습니다.");
     }
-  }, [alsoUploadToMycase, isPaid, onToast, tagInput]);
+  }, [alsoUploadToMycase, includeDigitalCard, isPaid, membershipTier, onToast, tagInput]);
 
   const headText = isDarkMode ? "text-gray-100" : "text-slate-900";
   const subText = isDarkMode ? "text-gray-400" : "text-slate-500";
   const inputCls = isDarkMode ? "border-white/10 bg-white/5 text-gray-100" : "border-slate-200 bg-white text-slate-900";
   const configuredCount = pages.filter(isPageConfigured).length;
   const digitalCardReady = includeDigitalCard;
+  const hasDigitalCardPhoto = Boolean(
+    includeDigitalCard && String(card?.photoUrl || "").trim()
+  );
+
+  const pagesSection = (
+    <section className="showcase-profile-block">
+      <p className="showcase-profile-block__title">
+        쇼케이스 페이지
+        <HelpTip
+          text={[
+            "디지털인증명함을 쓰면 1페이지는 항상 명함입니다.",
+            "2페이지부터 메인커스텀 페이지를 추가할 수 있습니다.",
+            `콘텐츠 페이지 최대 ${maxContentPages}장 · 커스텀은 사진 1장.`,
+            "추천 1080×1920(9:16) · 하단 1/3은 통화 UI에 가릴 수 있음 · 「통화화면 보기」로 확인",
+            isWebDesk
+              ? "왼쪽 미리보기에서 실시간으로 확인하세요."
+              : "오른쪽 사이드 탭(〈)을 누르면 통화 빅푸시 미리보기가 전체 화면으로 열립니다."
+          ].join(" ")}
+        />
+      </p>
+      {!isWebDesk ? (
+        <p
+          className={`mb-3 rounded-xl px-3 py-2 text-[11px] font-semibold leading-snug ${
+            isDarkMode
+              ? "border border-blue-400/25 bg-blue-500/10 text-blue-100"
+              : "border border-blue-100 bg-blue-50 text-blue-900"
+          }`}
+          style={{ wordBreak: "keep-all" }}
+        >
+          사진 {SHOWCASE_CALL_IMAGE_GUIDE.sizeHint}. {SHOWCASE_CALL_IMAGE_GUIDE.safeZoneHint} 「통화화면 보기」로
+          실제 통화 옵션이 가리는 영역을 확인할 수 있습니다.
+        </p>
+      ) : null}
+
+      {includeDigitalCard ? (
+        <div className="showcase-page-card showcase-page-card--digital">
+          <div className="showcase-page-card__head">
+            <div className="min-w-0 flex-1">
+              <p className="showcase-page-card__title">1페이지 · 디지털인증명함</p>
+              <p className={`showcase-page-card__status ${digitalCardReady && hasDigitalCardPhoto ? "is-ready" : ""}`}>
+                {!digitalCardReady
+                  ? "미설정"
+                  : hasDigitalCardPhoto
+                    ? "설정완료 ✔"
+                    : "프로필 사진 미등록"}
+              </p>
+            </div>
+            <button type="button" className="showcase-page-card__cta" onClick={openBizcardSettings}>
+              설정하러가기
+              <ChevronRight size={16} aria-hidden />
+            </button>
+          </div>
+          <p className="showcase-page-card__hint">
+            명함 디자인·상호·연락처·프로필 사진은 디지털인증명함 설정에서 편집·저장해야 미리보기에 반영됩니다.
+            쇼케이스 「적용하기」만으로는 프로필 사진이 바뀌지 않습니다.
+          </p>
+        </div>
+      ) : null}
+
+      {pages.map((page, idx) => {
+        const pageNum = contentPageDisplayNumber(idx, includeDigitalCard);
+        const expanded = expandedPageId === page.id;
+        const label = pageTypeLabel(page.type);
+        return (
+          <div key={page.id} className={`showcase-page-card${expanded ? " is-open" : ""}`}>
+            <button
+              type="button"
+              className="showcase-page-card__head showcase-page-card__head--btn"
+              onClick={() => setExpandedPageId(expanded ? "" : page.id)}
+            >
+              <div className="min-w-0 flex-1 text-left">
+                <p className="showcase-page-card__title">
+                  {pageNum}페이지 · {label}
+                </p>
+                <p className={`showcase-page-card__status ${isPageConfigured(page) ? "is-ready" : ""}`}>
+                  {isPageConfigured(page)
+                    ? `${pageStatusSummary(page)} · 설정완료 ✔`
+                    : pageStatusSummary(page)}
+                </p>
+              </div>
+              <span className="showcase-page-card__trail">
+                {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </span>
+            </button>
+
+            {expanded ? (
+              <div className="showcase-page-card__body">
+                <div className="showcase-page-card__section">
+                  <ShowcasePhotoEditor
+                    photos={page.gallery?.photos || []}
+                    onChange={(photos) =>
+                      updatePage(page.id, { gallery: { photos: (photos || []).slice(0, 1) } })
+                    }
+                    membershipTier={membershipTier}
+                    maxPhotos={1}
+                    enableTextOverlay
+                  />
+                  <div className="showcase-page-card__biz">
+                    <p className="showcase-profile-block__sub">
+                      <span className="showcase-profile-row__label-text">
+                        비즈니스 링크
+                        <HelpTip text="이 페이지에만 보이는 링크입니다. 페이지당 1개만 넣을 수 있습니다. 로고가 없으면 기본 버튼으로 표시됩니다." />
+                      </span>
+                    </p>
+                    <BizLinkEditor
+                      links={page.businessLink ? [page.businessLink] : []}
+                      maxCount={1}
+                      inputCls={inputCls}
+                      isDarkMode={isDarkMode}
+                      onToast={onToast}
+                      onChange={(links) =>
+                        updatePage(page.id, {
+                          businessLink: Array.isArray(links) && links[0] ? links[0] : null
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="showcase-page-card__remove"
+                  onClick={() => removePage(page.id)}
+                >
+                  <Trash2 size={14} aria-hidden />
+                  이 페이지 삭제 (편집만)
+                </button>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+
+      {canAddPage ? (
+        <button type="button" className="showcase-page-add-btn showcase-page-add-btn--solo" onClick={addPage}>
+          <Plus size={16} aria-hidden />
+          {isWebDesk ? "메인커스텀 페이지" : "개인커스텀 페이지"}
+        </button>
+      ) : (
+        <p className={`text-[11px] ${subText}`}>콘텐츠 페이지 한도({maxContentPages})에 도달했습니다.</p>
+      )}
+
+      {igLink.linked && !igLink.expired ? (
+        <button
+          type="button"
+          className="showcase-bgm-picker__yt-btn mt-2"
+          disabled={igLinkLoading}
+          onClick={async () => {
+            if (!window.confirm("Instagram 인증을 해제할까요? 홍보 링크에 넣은 프로필 주소도 지워집니다.")) return;
+            setIgLinkLoading(true);
+            try {
+              await disconnectInstagramLink();
+              clearInstagramVerifiedLocal();
+              persist({
+                platformFeed: {
+                  instagramVerified: false,
+                  instagramHandle: "",
+                  instagramProfileUrl: ""
+                },
+                commercial: {
+                  outlinks: { ...config.commercial.outlinks, instagram: "" }
+                }
+              });
+              setConfig(readShowcaseStyle());
+              await refreshIgLink();
+              onToast?.("Instagram 인증이 해제되었습니다.");
+            } catch (e) {
+              onToast?.(e instanceof Error ? e.message : "연동 해제에 실패했습니다.");
+            } finally {
+              setIgLinkLoading(false);
+            }
+          }}
+        >
+          Instagram 인증 해제
+        </button>
+      ) : null}
+    </section>
+  );
+
+  const commonSection = (
+    <section className="showcase-profile-group">
+      <p className="showcase-profile-block__title" style={{ padding: "12px 14px 0" }}>
+        공통 설정
+        <HelpTip text="배경음악·검색 공개는 모든 페이지(명함 포함)에 공통으로 적용됩니다." />
+      </p>
+
+      {isWebDesk ? (
+        <button
+          type="button"
+          className="showcase-profile-row showcase-profile-row--btn"
+          onClick={() => {
+            if (pages[0]) {
+              setExpandedPageId(pages[0].id);
+              onToast?.("위에서 커스텀 페이지를 펼친 뒤 글꼴·텍스트를 편집하세요.");
+              return;
+            }
+            if (canAddPage) {
+              addPage();
+              onToast?.("메인커스텀 페이지를 추가했습니다. 사진·글꼴을 편집하세요.");
+              return;
+            }
+            onToast?.("편집할 페이지가 없습니다.");
+          }}
+        >
+          <span className="showcase-profile-row__label">
+            <span className="showcase-profile-row__label-text">
+              글꼴 설정
+              <HelpTip text="커스텀 페이지 사진 위 텍스트·글꼴에서 설정합니다." />
+            </span>
+          </span>
+          <span className="showcase-profile-row__trail">
+            <ChevronRight size={16} />
+          </span>
+        </button>
+      ) : null}
+
+      {!isPaid ? (
+        <div className="showcase-profile-row showcase-profile-row--stack">
+          <span className="showcase-profile-row__label">공유 범위</span>
+          <div className="showcase-style-settings__phase-toggle">
+            <button
+              type="button"
+              className={(config.privacyMode || PRIVACY_MODES.FRIEND_ONLY) === PRIVACY_MODES.FRIEND_ONLY ? "active" : ""}
+              onClick={() => {
+                writeShowcasePrivacyMode(PRIVACY_MODES.FRIEND_ONLY, membershipTier);
+                persist({ privacyMode: PRIVACY_MODES.FRIEND_ONLY });
+              }}
+            >
+              친구만
+            </button>
+            <button
+              type="button"
+              className={config.privacyMode === PRIVACY_MODES.PUBLIC ? "active" : ""}
+              onClick={() => {
+                writeShowcasePrivacyMode(PRIVACY_MODES.PUBLIC, membershipTier);
+                persist({ privacyMode: PRIVACY_MODES.PUBLIC });
+              }}
+            >
+              전체
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!includeDigitalCard ? (
+        <label className="showcase-profile-row showcase-profile-row--toggle">
+          <span className="showcase-profile-row__label">
+            <span className="showcase-profile-row__label-text">
+              이름 보이기
+              <HelpTip text="끄면 사진·번호만 표시되며, 상대 전화부 이름을 사용합니다." />
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            className="showcase-profile-switch"
+            checked={config.showBroadcastName !== false}
+            onChange={(e) => persist({ showBroadcastName: e.target.checked })}
+          />
+        </label>
+      ) : null}
+
+      <button
+        type="button"
+        className="showcase-profile-row showcase-profile-row--btn"
+        onClick={() => setOpenReactions((v) => !v)}
+      >
+        <span className="showcase-profile-row__label">
+          <span className="showcase-profile-row__label-text">
+            반응 설정
+            <HelpTip text="좋아요는 항상 켜집니다. 댓글·공유만 끌 수 있습니다." />
+          </span>
+        </span>
+        <span className="showcase-profile-row__trail">
+          {openReactions ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </span>
+      </button>
+      {openReactions ? (
+        <div className="showcase-profile-nested">
+          <label className="showcase-profile-row showcase-profile-row--toggle">
+            <span className="showcase-profile-row__label">좋아요</span>
+            <input type="checkbox" className="showcase-profile-switch" checked disabled readOnly aria-label="좋아요 항상 활성" />
+          </label>
+          <label className="showcase-profile-row showcase-profile-row--toggle">
+            <span className="showcase-profile-row__label">댓글</span>
+            <input
+              type="checkbox"
+              className="showcase-profile-switch"
+              checked={config.commentsEnabled !== false}
+              onChange={(e) => persist({ commentsEnabled: e.target.checked })}
+            />
+          </label>
+          <label className="showcase-profile-row showcase-profile-row--toggle">
+            <span className="showcase-profile-row__label">공유</span>
+            <input
+              type="checkbox"
+              className="showcase-profile-switch"
+              checked={config.shareEnabled !== false}
+              onChange={(e) => persist({ shareEnabled: e.target.checked })}
+            />
+          </label>
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        className="showcase-profile-row showcase-profile-row--btn"
+        onClick={() => setOpenMusic((v) => !v)}
+      >
+        <span className="showcase-profile-row__label">
+          <span className="showcase-profile-row__label-text">
+            <Music2 size={14} className="inline mr-1" aria-hidden />
+            배경음악
+            <HelpTip text="쇼케이스 미리보기·상대 쇼케이스·마이케이스에서만 자동 재생됩니다. 설정에서는 「BGM 미리듣기」로만 확인합니다. Signature / User Original / Shared Track을 연결합니다." />
+          </span>
+        </span>
+        <span className="showcase-profile-row__trail">
+          <span className="showcase-profile-row__value">
+            {config.bgm?.mode === "none" || !config.bgm?.mode ? "미설정" : "설정됨"}
+          </span>
+          {openMusic ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </span>
+      </button>
+      {openMusic ? (
+        <div className="showcase-profile-nested">
+          <ShowcaseBgmPicker
+            value={config.bgm}
+            inputCls={inputCls}
+            onChange={(bgm) => persist({ bgm: { ...config.bgm, ...bgm } })}
+            onToast={onToast}
+          />
+        </div>
+      ) : null}
+
+      <ProfileRow label="#해시태그" help={isPaid ? "검색용 · 공백으로 구분" : "유료회원만 해시태그를 등록할 수 있습니다."}>
+        <input
+          className={`showcase-profile-input ${inputCls}`}
+          placeholder={isPaid ? "예: #상호명 #지역" : "유료회원만 등록"}
+          value={tagInput}
+          readOnly={!isPaid}
+          onFocus={() => {
+            if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
+          }}
+          onChange={(e) => onTagsChange(e.target.value)}
+        />
+      </ProfileRow>
+
+      {isPaid ? (
+        <>
+          <button
+            type="button"
+            className="showcase-profile-row showcase-profile-row--btn"
+            onClick={() => setOpenSearch((v) => !v)}
+          >
+            <span className="showcase-profile-row__label">
+              <span className="showcase-profile-row__label-text">
+                검색 공개 설정
+                <HelpTip text="비공개가 기본입니다. 이름·상호·전화·아이디는 각각 허용한 항목만 검색·결과에 노출됩니다." />
+              </span>
+            </span>
+            <span className="showcase-profile-row__trail">
+              {openSearch ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </span>
+          </button>
+          {openSearch ? (
+            <div className="showcase-profile-nested">
+              <label className="showcase-privacy-check">
+                <input type="checkbox" checked={isSearchPrivate} onChange={(e) => onSearchPrivateToggle(e.target.checked)} />
+                비공개
+              </label>
+              <label className="showcase-privacy-check">
+                <input
+                  type="checkbox"
+                  checked={searchPrivacy.isPhoneSearchAllowed}
+                  onChange={(e) => onSearchPrivacyToggle("isPhoneSearchAllowed", e.target.checked)}
+                />
+                전화번호 검색 허용
+              </label>
+              <label className="showcase-privacy-check">
+                <input
+                  type="checkbox"
+                  checked={searchPrivacy.isNameSearchAllowed}
+                  onChange={(e) => onSearchPrivacyToggle("isNameSearchAllowed", e.target.checked)}
+                />
+                이름 검색 허용
+              </label>
+              <label className="showcase-privacy-check">
+                <input
+                  type="checkbox"
+                  checked={searchPrivacy.isOrgSearchAllowed}
+                  onChange={(e) => onSearchPrivacyToggle("isOrgSearchAllowed", e.target.checked)}
+                />
+                상호 검색 허용
+              </label>
+              <label className="showcase-privacy-check">
+                <input
+                  type="checkbox"
+                  checked={searchPrivacy.isIdSearchAllowed}
+                  onChange={(e) => onSearchPrivacyToggle("isIdSearchAllowed", e.target.checked)}
+                />
+                아이디·활동명 검색 허용
+              </label>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {isPaid ? (
+        <>
+          <button
+            type="button"
+            className="showcase-profile-row showcase-profile-row--btn"
+            onClick={() => setOpenBiz((v) => !v)}
+          >
+            <span className="showcase-profile-row__label">
+              <span className="showcase-profile-row__label-text showcase-profile-row__label-text--stack">
+                <span className="showcase-biz-social-title">
+                  <span>비즈니스</span>
+                  <span>쇼셜링크</span>
+                </span>
+                <HelpTip text="Instagram은 로그인·회원가입·홍보 링크용입니다. 인증 시 프로필 URL이 자동 입력됩니다. 카카오는 오픈채팅·프로필을 따로 넣으세요." />
+              </span>
+            </span>
+            <span className="showcase-profile-row__trail">
+              {openBiz ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </span>
+          </button>
+          {openBiz ? (
+            <div className="showcase-profile-nested">
+              <BusinessOutlinkRow
+                brand="instagram"
+                label="Instagram"
+                placeholder="프로필 URL 또는 연동"
+                value={
+                  config.commercial.outlinks.instagram ||
+                  (igLink.linked && igLink.username ? `https://instagram.com/${igLink.username}` : "")
+                }
+                inputCls={inputCls}
+                onChange={(v) =>
+                  persist({
+                    commercial: { outlinks: { ...config.commercial.outlinks, instagram: v } }
+                  })
+                }
+                onBrandTap={async () => {
+                  if (igLinkLoading) return;
+                  if (igLink.linked && !igLink.expired) {
+                    const url = `https://instagram.com/${igLink.username}`;
+                    persist({
+                      commercial: { outlinks: { ...config.commercial.outlinks, instagram: url } }
+                    });
+                    onToast?.(`@${igLink.username} 프로필 링크를 넣었습니다.`);
+                    return;
+                  }
+                  setIgLinkLoading(true);
+                  try {
+                    const url = await startInstagramLink();
+                    window.location.assign(url);
+                  } catch (e) {
+                    onToast?.(e instanceof Error ? e.message : "Instagram 연동을 시작할 수 없습니다.");
+                    setIgLinkLoading(false);
+                  }
+                }}
+              />
+              <BusinessOutlinkRow
+                brand="youtube"
+                label="YouTube"
+                placeholder="https://youtube.com/…"
+                value={config.commercial.outlinks.youtube || ""}
+                inputCls={inputCls}
+                onChange={(v) =>
+                  persist({
+                    commercial: { outlinks: { ...config.commercial.outlinks, youtube: v } }
+                  })
+                }
+              />
+              <BusinessOutlinkRow
+                brand="facebook"
+                label="Facebook"
+                placeholder="https://facebook.com/…"
+                value={config.commercial.outlinks.facebook || ""}
+                inputCls={inputCls}
+                onChange={(v) =>
+                  persist({
+                    commercial: { outlinks: { ...config.commercial.outlinks, facebook: v } }
+                  })
+                }
+              />
+              <BusinessOutlinkRow
+                brand="kakao"
+                label="카카오 오픈채팅"
+                placeholder="https://open.kakao.com/…"
+                value={config.commercial.outlinks.kakaoOpenChat || ""}
+                inputCls={inputCls}
+                onChange={(v) => {
+                  const kakaoOpenChat = String(v || "").trim();
+                  const kakaoProfile = String(config.commercial.outlinks.kakaoProfile || "").trim();
+                  persist({
+                    commercial: {
+                      outlinks: {
+                        ...config.commercial.outlinks,
+                        kakaoOpenChat,
+                        kakao: kakaoOpenChat || kakaoProfile || ""
+                      }
+                    }
+                  });
+                }}
+              />
+              <BusinessOutlinkRow
+                brand="kakao"
+                label="카카오 프로필"
+                placeholder="https://pf.kakao.com/… 또는 카톡 프로필 URL"
+                value={config.commercial.outlinks.kakaoProfile || ""}
+                inputCls={inputCls}
+                onChange={(v) => {
+                  const kakaoProfile = String(v || "").trim();
+                  const kakaoOpenChat = String(config.commercial.outlinks.kakaoOpenChat || "").trim();
+                  persist({
+                    commercial: {
+                      outlinks: {
+                        ...config.commercial.outlinks,
+                        kakaoProfile,
+                        kakao: kakaoOpenChat || kakaoProfile || ""
+                      }
+                    }
+                  });
+                }}
+              />
+              <p className="showcase-profile-block__sub mt-3 text-[11px] opacity-70">
+                홍보용 비즈니스 링크는 각 메인커스텀 페이지에서 페이지당 1개씩 설정합니다.
+              </p>
+              <label className="showcase-style-settings__check mt-3">
+                <input
+                  type="checkbox"
+                  checked={config.verifiedBadgeOn}
+                  onChange={(e) => persist({ verifiedBadgeOn: e.target.checked })}
+                />
+                VLUE 인증 마크 표시
+              </label>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  );
+
+  const applyFooter = (
+    <>
+      <p className={`text-center text-[11px] ${subText}`}>
+        {includeDigitalCard ? "명함 1 · " : ""}
+        콘텐츠 {pages.length}페이지 · 설정됨 {configuredCount}
+      </p>
+
+      <label className={`showcase-mycase-upload-check ${isDarkMode ? "is-dark" : ""}`}>
+        <input
+          type="checkbox"
+          checked={alsoUploadToMycase}
+          onChange={(e) => setAlsoUploadToMycase(e.target.checked)}
+        />
+        <span>
+          <b>[마이케이스]</b> 함께 올리기
+          <em>체크한 경우에만 마이케이스에 새 게시물로 저장됩니다</em>
+        </span>
+      </label>
+
+      <button
+        type="button"
+        className={`showcase-style-settings__save-btn${fullscreen && !isWebDesk ? " showcase-style-settings__save-btn--compact" : ""}`}
+        onClick={commitApply}
+      >
+        적용하기
+      </button>
+    </>
+  );
+
+  const gateModal = (
+    <ShowcasePremiumGateModal
+      open={gateOpen}
+      onClose={() => setGateOpen(false)}
+      isDarkMode={isDarkMode}
+      onOpenUpgrade={() => {
+        setGateOpen(false);
+        onOpenUpgrade?.();
+      }}
+    />
+  );
+
+  if (isWebDesk) {
+    return (
+      <div
+        className={`showcase-web-desk showcase-style-settings showcase-style-settings--profile ${
+          isDarkMode ? "showcase-style-settings--dark" : ""
+        }`}
+      >
+        <div className="showcase-web-desk__tip">
+          <p className="showcase-web-desk__tip-text">
+            1열 미리보기 · 2열 설정 (듀얼 화면) · 페이지 전체가 아래로 스크롤됩니다
+          </p>
+          {includeDigitalCard ? (
+            <button type="button" className="showcase-web-desk__tip-cta" onClick={openBizcardSettings}>
+              설정하러가기
+              <ChevronRight size={14} aria-hidden />
+            </button>
+          ) : null}
+        </div>
+
+        <div className="showcase-web-desk__body">
+          <aside className="showcase-web-desk__preview-col" aria-label="미리보기">
+            <p className="showcase-web-desk__preview-label">미리보기</p>
+            <CallBigPushPreviewSection
+              membershipTier={membershipTier}
+              isDarkMode={isDarkMode}
+              onToast={onToast}
+              expandMode="inline"
+              defaultExpanded
+            />
+          </aside>
+
+          <section className="showcase-web-desk__settings-col" aria-label="설정">
+            <p className="showcase-web-desk__settings-label">설정</p>
+            <div className="showcase-web-desk__settings-scroll" ref={settingsScrollRef}>
+              {pagesSection}
+              {commonSection}
+              {applyFooter}
+            </div>
+          </section>
+        </div>
+
+        {gateModal}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -543,514 +1212,13 @@ export default function ShowcaseStyleSettingsPanel({
 
       <div className={`showcase-style-settings__split${fullscreen ? " showcase-style-settings__split--fullscreen" : " min-h-0 flex-1 overflow-hidden"}`}>
         <div className={`showcase-style-settings__form overflow-y-auto px-4 py-3 ${fullscreen ? "min-h-0 flex-1" : "vlue-scroll-pad-profile-panel"}`}>
-          <section className="showcase-profile-block">
-            <p className="showcase-profile-block__title">
-              쇼케이스 페이지
-              <HelpTip
-                text={[
-                  "디지털인증명함을 쓰면 1페이지는 항상 명함입니다.",
-                  "2페이지부터 개인커스텀 페이지를 추가할 수 있습니다.",
-                  `콘텐츠 페이지 최대 ${maxContentPages}장 · 개인커스텀은 사진 1장.`,
-                  "오른쪽 사이드 탭(〈)을 누르면 통화 빅푸시 미리보기가 전체 화면으로 열립니다."
-                ].join(" ")}
-              />
-            </p>
-            <p
-              className={`mb-3 rounded-xl px-3 py-2 text-[11px] font-semibold leading-snug ${
-                isDarkMode
-                  ? "border border-blue-400/25 bg-blue-500/10 text-blue-100"
-                  : "border border-blue-100 bg-blue-50 text-blue-900"
-              }`}
-              style={{ wordBreak: "keep-all" }}
-            >
-              사진 {SHOWCASE_CALL_IMAGE_GUIDE.sizeHint}. {SHOWCASE_CALL_IMAGE_GUIDE.safeZoneHint} 홈
-              쇼케이스 상단 「통화화면 보기」로 실제 통화 옵션이 가리는 영역을 확인할 수 있습니다.
-            </p>
-
-            {includeDigitalCard ? (
-              <div className="showcase-page-card showcase-page-card--digital">
-                <div className="showcase-page-card__head">
-                  <div className="min-w-0 flex-1">
-                    <p className="showcase-page-card__title">1페이지 · 디지털인증명함</p>
-                    <p className={`showcase-page-card__status ${digitalCardReady ? "is-ready" : ""}`}>
-                      {digitalCardReady ? "설정완료 ✔" : "미설정"}
-                    </p>
-                  </div>
-                  <button type="button" className="showcase-page-card__cta" onClick={openBizcardSettings}>
-                    설정하러가기
-                    <ChevronRight size={16} aria-hidden />
-                  </button>
-                </div>
-                <p className="showcase-page-card__hint">명함 디자인·상호·연락처는 디지털인증명함 설정에서 편집합니다.</p>
-              </div>
-            ) : null}
-
-            {pages.map((page, idx) => {
-              const pageNum = contentPageDisplayNumber(idx, includeDigitalCard);
-              const expanded = expandedPageId === page.id;
-              const label = pageTypeLabel(page.type);
-              return (
-                <div key={page.id} className={`showcase-page-card${expanded ? " is-open" : ""}`}>
-                  <button
-                    type="button"
-                    className="showcase-page-card__head showcase-page-card__head--btn"
-                    onClick={() => setExpandedPageId(expanded ? "" : page.id)}
-                  >
-                    <div className="min-w-0 flex-1 text-left">
-                      <p className="showcase-page-card__title">
-                        {pageNum}페이지 · {label}
-                      </p>
-                      <p className={`showcase-page-card__status ${isPageConfigured(page) ? "is-ready" : ""}`}>
-                        {isPageConfigured(page)
-                          ? `${pageStatusSummary(page)} · 설정완료 ✔`
-                          : pageStatusSummary(page)}
-                      </p>
-                    </div>
-                    <span className="showcase-page-card__trail">
-                      {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </span>
-                  </button>
-
-                  {expanded ? (
-                    <div className="showcase-page-card__body">
-                      <div className="showcase-page-card__section">
-                        <ShowcasePhotoEditor
-                          photos={page.gallery?.photos || []}
-                          onChange={(photos) =>
-                            updatePage(page.id, { gallery: { photos: (photos || []).slice(0, 1) } })
-                          }
-                          membershipTier={membershipTier}
-                          maxPhotos={1}
-                          enableTextOverlay
-                        />
-                        <div className="showcase-page-card__biz">
-                          <p className="showcase-profile-block__sub">
-                            <span className="showcase-profile-row__label-text">
-                              비즈니스 링크
-                              <HelpTip text="이 페이지에만 보이는 링크입니다. 페이지당 1개만 넣을 수 있습니다. 로고가 없으면 기본 버튼으로 표시됩니다." />
-                            </span>
-                          </p>
-                          <BizLinkEditor
-                            links={page.businessLink ? [page.businessLink] : []}
-                            maxCount={1}
-                            inputCls={inputCls}
-                            isDarkMode={isDarkMode}
-                            onToast={onToast}
-                            onChange={(links) =>
-                              updatePage(page.id, {
-                                businessLink: Array.isArray(links) && links[0] ? links[0] : null
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="showcase-page-card__remove"
-                        onClick={() => removePage(page.id)}
-                      >
-                        <Trash2 size={14} aria-hidden />
-                        이 페이지 삭제 (편집만)
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-
-            {canAddPage ? (
-              <button type="button" className="showcase-page-add-btn showcase-page-add-btn--solo" onClick={addPage}>
-                <Plus size={16} aria-hidden />
-                개인커스텀 페이지
-              </button>
-            ) : (
-              <p className={`text-[11px] ${subText}`}>콘텐츠 페이지 한도({maxContentPages})에 도달했습니다.</p>
-            )}
-
-            {igLink.linked && !igLink.expired ? (
-              <button
-                type="button"
-                className="showcase-bgm-picker__yt-btn mt-2"
-                disabled={igLinkLoading}
-                onClick={async () => {
-                  if (!window.confirm("Instagram 인증을 해제할까요? 홍보 링크에 넣은 프로필 주소도 지워집니다.")) return;
-                  setIgLinkLoading(true);
-                  try {
-                    await disconnectInstagramLink();
-                    clearInstagramVerifiedLocal();
-                    persist({
-                      platformFeed: {
-                        instagramVerified: false,
-                        instagramHandle: "",
-                        instagramProfileUrl: ""
-                      },
-                      commercial: {
-                        outlinks: { ...config.commercial.outlinks, instagram: "" }
-                      }
-                    });
-                    setConfig(readShowcaseStyle());
-                    await refreshIgLink();
-                    onToast?.("Instagram 인증이 해제되었습니다.");
-                  } catch (e) {
-                    onToast?.(e instanceof Error ? e.message : "연동 해제에 실패했습니다.");
-                  } finally {
-                    setIgLinkLoading(false);
-                  }
-                }}
-              >
-                Instagram 인증 해제
-              </button>
-            ) : null}
-          </section>
-
-          <section className="showcase-profile-group">
-            <p className="showcase-profile-block__title" style={{ padding: "12px 14px 0" }}>
-              공통 설정
-              <HelpTip text="배경음악·검색 공개는 모든 페이지(명함 포함)에 공통으로 적용됩니다." />
-            </p>
-
-            {!isPaid ? (
-              <div className="showcase-profile-row showcase-profile-row--stack">
-                <span className="showcase-profile-row__label">공유 범위</span>
-                <div className="showcase-style-settings__phase-toggle">
-                  <button
-                    type="button"
-                    className={(config.privacyMode || PRIVACY_MODES.FRIEND_ONLY) === PRIVACY_MODES.FRIEND_ONLY ? "active" : ""}
-                    onClick={() => {
-                      writeShowcasePrivacyMode(PRIVACY_MODES.FRIEND_ONLY, membershipTier);
-                      persist({ privacyMode: PRIVACY_MODES.FRIEND_ONLY });
-                    }}
-                  >
-                    친구만
-                  </button>
-                  <button
-                    type="button"
-                    className={config.privacyMode === PRIVACY_MODES.PUBLIC ? "active" : ""}
-                    onClick={() => {
-                      writeShowcasePrivacyMode(PRIVACY_MODES.PUBLIC, membershipTier);
-                      persist({ privacyMode: PRIVACY_MODES.PUBLIC });
-                    }}
-                  >
-                    전체
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            {!includeDigitalCard ? (
-              <label className="showcase-profile-row showcase-profile-row--toggle">
-                <span className="showcase-profile-row__label">
-                  <span className="showcase-profile-row__label-text">
-                    이름 보이기
-                    <HelpTip text="끄면 사진·번호만 표시되며, 상대 전화부 이름을 사용합니다." />
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  className="showcase-profile-switch"
-                  checked={config.showBroadcastName !== false}
-                  onChange={(e) => persist({ showBroadcastName: e.target.checked })}
-                />
-              </label>
-            ) : null}
-
-            <div className="showcase-profile-row showcase-profile-row--stack">
-              <span className="showcase-profile-row__label">
-                <span className="showcase-profile-row__label-text">
-                  반응 설정
-                  <HelpTip text="좋아요는 항상 켜집니다. 댓글·공유만 끌 수 있습니다." />
-                </span>
-              </span>
-              <label className="showcase-profile-row showcase-profile-row--toggle" style={{ padding: "8px 0 0" }}>
-                <span className="showcase-profile-row__label">좋아요</span>
-                <input type="checkbox" className="showcase-profile-switch" checked disabled readOnly aria-label="좋아요 항상 활성" />
-              </label>
-              <label className="showcase-profile-row showcase-profile-row--toggle" style={{ padding: "4px 0 0" }}>
-                <span className="showcase-profile-row__label">댓글</span>
-                <input
-                  type="checkbox"
-                  className="showcase-profile-switch"
-                  checked={config.commentsEnabled !== false}
-                  onChange={(e) => persist({ commentsEnabled: e.target.checked })}
-                />
-              </label>
-              <label className="showcase-profile-row showcase-profile-row--toggle" style={{ padding: "4px 0 0" }}>
-                <span className="showcase-profile-row__label">공유</span>
-                <input
-                  type="checkbox"
-                  className="showcase-profile-switch"
-                  checked={config.shareEnabled !== false}
-                  onChange={(e) => persist({ shareEnabled: e.target.checked })}
-                />
-              </label>
-            </div>
-
-            <button
-              type="button"
-              className="showcase-profile-row showcase-profile-row--btn"
-              onClick={() => setOpenMusic((v) => !v)}
-            >
-              <span className="showcase-profile-row__label">
-                <span className="showcase-profile-row__label-text">
-                  <Music2 size={14} className="inline mr-1" aria-hidden />
-                  배경음악
-                  <HelpTip text="쇼케이스 미리보기·상대 쇼케이스·마이케이스에서만 자동 재생됩니다. 설정에서는 「BGM 미리듣기」로만 확인합니다. Signature / User Original / Shared Track을 연결합니다." />
-                </span>
-              </span>
-              <span className="showcase-profile-row__trail">
-                <span className="showcase-profile-row__value">
-                  {config.bgm?.mode === "none" || !config.bgm?.mode ? "미설정" : "설정됨"}
-                </span>
-                {openMusic ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </span>
-            </button>
-            {openMusic ? (
-              <div className="showcase-profile-nested">
-                <ShowcaseBgmPicker
-                  value={config.bgm}
-                  inputCls={inputCls}
-                  onChange={(bgm) => persist({ bgm: { ...config.bgm, ...bgm } })}
-                  onToast={onToast}
-                />
-              </div>
-            ) : null}
-
-            <ProfileRow label="#해시태그" help={isPaid ? "검색용 · 공백으로 구분" : "유료회원만 해시태그를 등록할 수 있습니다."}>
-              <input
-                className={`showcase-profile-input ${inputCls}`}
-                placeholder={isPaid ? "예: #상호명 #지역" : "유료회원만 등록"}
-                value={tagInput}
-                readOnly={!isPaid}
-                onFocus={() => {
-                  if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
-                }}
-                onChange={(e) => onTagsChange(e.target.value)}
-              />
-            </ProfileRow>
-
-            {isPaid ? (
-              <div className="showcase-profile-row showcase-profile-row--stack">
-                <span className="showcase-profile-row__label">
-                  <span className="showcase-profile-row__label-text">
-                    검색 공개 설정
-                    <HelpTip text="비공개가 기본입니다. 이름·상호·전화·아이디는 각각 허용한 항목만 검색·결과에 노출됩니다." />
-                  </span>
-                </span>
-                <label className="showcase-privacy-check">
-                  <input type="checkbox" checked={isSearchPrivate} onChange={(e) => onSearchPrivateToggle(e.target.checked)} />
-                  비공개
-                </label>
-                <label className="showcase-privacy-check">
-                  <input
-                    type="checkbox"
-                    checked={searchPrivacy.isPhoneSearchAllowed}
-                    onChange={(e) => onSearchPrivacyToggle("isPhoneSearchAllowed", e.target.checked)}
-                  />
-                  전화번호 검색 허용
-                </label>
-                <label className="showcase-privacy-check">
-                  <input
-                    type="checkbox"
-                    checked={searchPrivacy.isNameSearchAllowed}
-                    onChange={(e) => onSearchPrivacyToggle("isNameSearchAllowed", e.target.checked)}
-                  />
-                  이름 검색 허용
-                </label>
-                <label className="showcase-privacy-check">
-                  <input
-                    type="checkbox"
-                    checked={searchPrivacy.isOrgSearchAllowed}
-                    onChange={(e) => onSearchPrivacyToggle("isOrgSearchAllowed", e.target.checked)}
-                  />
-                  상호 검색 허용
-                </label>
-                <label className="showcase-privacy-check">
-                  <input
-                    type="checkbox"
-                    checked={searchPrivacy.isIdSearchAllowed}
-                    onChange={(e) => onSearchPrivacyToggle("isIdSearchAllowed", e.target.checked)}
-                  />
-                  아이디·활동명 검색 허용
-                </label>
-              </div>
-            ) : null}
-
-            {isPaid ? (
-              <>
-                <button
-                  type="button"
-                  className="showcase-profile-row showcase-profile-row--btn"
-                  onClick={() => setOpenBiz((v) => !v)}
-                >
-                  <span className="showcase-profile-row__label">
-                    <span className="showcase-profile-row__label-text showcase-profile-row__label-text--stack">
-                      <span className="showcase-biz-social-title">
-                        <span>비즈니스</span>
-                        <span>쇼셜링크</span>
-                      </span>
-                      <HelpTip text="Instagram은 로그인·회원가입·홍보 링크용입니다. 인증 시 프로필 URL이 자동 입력됩니다. 카카오는 오픈채팅·프로필을 따로 넣으세요." />
-                    </span>
-                  </span>
-                  <span className="showcase-profile-row__trail">
-                    {openBiz ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </span>
-                </button>
-                {openBiz ? (
-                  <div className="showcase-profile-nested">
-                    <BusinessOutlinkRow
-                      brand="instagram"
-                      label="Instagram"
-                      placeholder="프로필 URL 또는 연동"
-                      value={
-                        config.commercial.outlinks.instagram ||
-                        (igLink.linked && igLink.username ? `https://instagram.com/${igLink.username}` : "")
-                      }
-                      inputCls={inputCls}
-                      onChange={(v) =>
-                        persist({
-                          commercial: { outlinks: { ...config.commercial.outlinks, instagram: v } }
-                        })
-                      }
-                      onBrandTap={async () => {
-                        if (igLinkLoading) return;
-                        if (igLink.linked && !igLink.expired) {
-                          const url = `https://instagram.com/${igLink.username}`;
-                          persist({
-                            commercial: { outlinks: { ...config.commercial.outlinks, instagram: url } }
-                          });
-                          onToast?.(`@${igLink.username} 프로필 링크를 넣었습니다.`);
-                          return;
-                        }
-                        setIgLinkLoading(true);
-                        try {
-                          const url = await startInstagramLink();
-                          window.location.assign(url);
-                        } catch (e) {
-                          onToast?.(e instanceof Error ? e.message : "Instagram 연동을 시작할 수 없습니다.");
-                          setIgLinkLoading(false);
-                        }
-                      }}
-                    />
-                    <BusinessOutlinkRow
-                      brand="youtube"
-                      label="YouTube"
-                      placeholder="https://youtube.com/…"
-                      value={config.commercial.outlinks.youtube || ""}
-                      inputCls={inputCls}
-                      onChange={(v) =>
-                        persist({
-                          commercial: { outlinks: { ...config.commercial.outlinks, youtube: v } }
-                        })
-                      }
-                    />
-                    <BusinessOutlinkRow
-                      brand="facebook"
-                      label="Facebook"
-                      placeholder="https://facebook.com/…"
-                      value={config.commercial.outlinks.facebook || ""}
-                      inputCls={inputCls}
-                      onChange={(v) =>
-                        persist({
-                          commercial: { outlinks: { ...config.commercial.outlinks, facebook: v } }
-                        })
-                      }
-                    />
-                    <BusinessOutlinkRow
-                      brand="kakao"
-                      label="카카오 오픈채팅"
-                      placeholder="https://open.kakao.com/…"
-                      value={config.commercial.outlinks.kakaoOpenChat || ""}
-                      inputCls={inputCls}
-                      onChange={(v) => {
-                        const kakaoOpenChat = String(v || "").trim();
-                        const kakaoProfile = String(config.commercial.outlinks.kakaoProfile || "").trim();
-                        persist({
-                          commercial: {
-                            outlinks: {
-                              ...config.commercial.outlinks,
-                              kakaoOpenChat,
-                              /* 프로필 칸은 건드리지 않음 — 레거시 kakao만 요약용으로 유지 */
-                              kakao: kakaoOpenChat || kakaoProfile || ""
-                            }
-                          }
-                        });
-                      }}
-                    />
-                    <BusinessOutlinkRow
-                      brand="kakao"
-                      label="카카오 프로필"
-                      placeholder="https://pf.kakao.com/… 또는 카톡 프로필 URL"
-                      value={config.commercial.outlinks.kakaoProfile || ""}
-                      inputCls={inputCls}
-                      onChange={(v) => {
-                        const kakaoProfile = String(v || "").trim();
-                        const kakaoOpenChat = String(config.commercial.outlinks.kakaoOpenChat || "").trim();
-                        persist({
-                          commercial: {
-                            outlinks: {
-                              ...config.commercial.outlinks,
-                              kakaoProfile,
-                              /* 오픈채팅 칸은 건드리지 않음 */
-                              kakao: kakaoOpenChat || kakaoProfile || ""
-                            }
-                          }
-                        });
-                      }}
-                    />
-                    <p className="showcase-profile-block__sub mt-3 text-[11px] opacity-70">
-                      홍보용 비즈니스 링크는 각 개인커스텀 페이지에서 페이지당 1개씩 설정합니다.
-                    </p>
-                    <label className="showcase-style-settings__check mt-3">
-                      <input
-                        type="checkbox"
-                        checked={config.verifiedBadgeOn}
-                        onChange={(e) => persist({ verifiedBadgeOn: e.target.checked })}
-                      />
-                      VLUE 인증 마크 표시
-                    </label>
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-          </section>
-
-          <p className={`text-center text-[11px] ${subText}`}>
-            {includeDigitalCard ? "명함 1 · " : ""}
-            콘텐츠 {pages.length}페이지 · 설정됨 {configuredCount}
-          </p>
-
-          <label className={`showcase-mycase-upload-check ${isDarkMode ? "is-dark" : ""}`}>
-            <input
-              type="checkbox"
-              checked={alsoUploadToMycase}
-              onChange={(e) => setAlsoUploadToMycase(e.target.checked)}
-            />
-            <span>
-              <b>[마이케이스]</b> 함께 올리기
-              <em>체크한 경우에만 마이케이스에 새 게시물로 저장됩니다</em>
-            </span>
-          </label>
-
-          <button
-            type="button"
-            className={`showcase-style-settings__save-btn${fullscreen ? " showcase-style-settings__save-btn--compact" : ""}`}
-            onClick={commitApply}
-          >
-            적용하기
-          </button>
+          {pagesSection}
+          {commonSection}
+          {applyFooter}
         </div>
       </div>
 
-      <ShowcasePremiumGateModal
-        open={gateOpen}
-        onClose={() => setGateOpen(false)}
-        isDarkMode={isDarkMode}
-        onOpenUpgrade={() => {
-          setGateOpen(false);
-          onOpenUpgrade?.();
-        }}
-      />
+      {gateModal}
     </div>
   );
 }

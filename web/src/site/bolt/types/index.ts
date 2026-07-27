@@ -18,6 +18,8 @@ export type View =
   | "family"
   | "mypage"
   | "bizcard"
+  | "showcase"
+  | "biz"
   | "terms"
   | "privacy"
   | "refund";

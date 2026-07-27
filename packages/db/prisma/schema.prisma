@@ -3083,3 +3083,24 @@ model AlimtalkOptOut {
 
   @@map("alimtalk_opt_outs")
 }
+
+/// 제품 지표 이벤트 — 관리자 DB 차트 (통화 UI · 쇼케이스 조회 등)
+/// eventType: call_interface | showcase_view
+model ProductMetricEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  eventType String  @map("event_type") @db.VarChar(40)
+  userId    String? @map("user_id") @db.Uuid
+  /// 조회 대상 쇼케이스 소유자 등 (선택)
+  targetUserId String? @map("target_user_id") @db.Uuid
+  /// preview | live_call | peer_case | mycase | public_view 등
+  source String? @map("source") @db.VarChar(40)
+  metaJson Json? @map("meta_json") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([eventType, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, eventType, createdAt(sort: Desc)])
+  @@map("product_metric_events")
+}

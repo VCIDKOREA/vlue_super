@@ -25,7 +25,8 @@ import ShowcaseSlideChrome from "./ShowcaseSlideChrome.jsx";
 import ShowcaseBgmTrackChip from "./ShowcaseBgmTrackChip.jsx";
 import ShowcaseBgmTransport from "./ShowcaseBgmTransport.jsx";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
-import { resolveShowcaseBgmUrl, hasShowcaseBgmConfigured } from "../../lib/showcase/showcaseBgmPresets.js";
+import { resolveShowcaseBgmUrl, hasShowcaseBgmConfigured, showcaseBgmIdentityKey } from "../../lib/showcase/showcaseBgmPresets.js";
+import { SHOWCASE_BGM_OWNER_RELEASED_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
 
 /** 갤러리 사진 → 슬라이드용 (텍스트 오버레이 필드 유지) */
 function pickPhotoSlideFields(p = {}) {
@@ -125,33 +126,41 @@ export default function ShowcaseCallCarousel({
   ).trim();
   const [igUrlMap, setIgUrlMap] = useState(() => new Map());
 
-  const bgmFingerprint = useMemo(() => {
-    const b = styleConfig?.bgm;
-    if (!b || b.mode === "none") return "";
-    const pl = Array.isArray(b.playlist) ? b.playlist.map((t) => t?.soundId || t?.audioUrl || "").join(",") : "";
-    return `${b.mode}|${b.soundId || ""}|${b.audioUrl || ""}|${b.playMode || ""}|${pl}`;
-  }, [styleConfig]);
+  const bgmFingerprint = useMemo(
+    () => showcaseBgmIdentityKey(styleConfig?.bgm),
+    [styleConfig]
+  );
+  const suppressBgmRef = useRef(suppressBgm);
+  suppressBgmRef.current = suppressBgm;
+  const bgmFpRef = useRef("");
 
-  /* 쇼케이스 캐러셀이 보이면 BGM 바인딩·재생 (실통화 스크롤 잠금만 무음) · 입장마다 처음부터
-   * styleConfig 객체 참조 변경으로 effect가 반복 재실행되면 재생이 끊기므로 fingerprint만 의존
-   * suppressBgm=true: 케이스함 등 상위 BGM을 끊지 않음 (재생 제어 완전 스킵, 칩 표시는 유지)
+  /* 쇼케이스 캐러셀이 보이면 BGM 바인딩·재생 (실통화 스크롤 잠금만 무음)
+   * styleConfig 객체 참조·서명 URL 변경으로 effect가 반복 재실행되면 재생이 끊기므로 identity fingerprint만 의존
+   * suppressBgm=true: 케이스함 등 상위 BGM을 끊지 않음 (접힘 전환 시 idle 스킵으로 핸드오프)
    * setPlaybackPhase 는 deps 금지 — 콜백 신원 변경 시 cleanup idle 로 끊김 방지 */
   useEffect(() => {
     if (suppressBgm) return undefined;
-    const hasBgm = Boolean(resolveShowcaseBgmUrl(styleConfig));
+    const hasBgm =
+      Boolean(resolveShowcaseBgmUrl(styleConfig)) || hasShowcaseBgmConfigured(styleConfig);
     if (!hasBgm) {
       setPlaybackPhase("idle", { fade: true, owner: "carousel", styleConfig });
+      bgmFpRef.current = "";
       return () => {
+        if (suppressBgmRef.current) return;
         setPlaybackPhase("idle", { fade: true, owner: "carousel" });
       };
     }
+    const changed = bgmFpRef.current !== bgmFingerprint;
+    bgmFpRef.current = bgmFingerprint;
     const liveCallMuted = !previewMode && !scrollEnabled;
     setPlaybackPhase(liveCallMuted ? "call_active" : previewMode ? "preview" : "replay", {
-      forceRestart: true,
+      forceRestart: changed,
       owner: "carousel",
       styleConfig
     });
     return () => {
+      /* 접힘·게시물 suppress 로 넘길 때는 끊지 않음 — 언마운트/실제 이탈만 idle */
+      if (suppressBgmRef.current) return;
       setPlaybackPhase("idle", { fade: true, owner: "carousel" });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- styleConfig는 bgmFingerprint로 추적
@@ -163,6 +172,24 @@ export default function ShowcaseCallCarousel({
     bindStyleConfig(styleConfig);
     return undefined;
   }, [styleConfig, suppressBgm, bindStyleConfig]);
+
+  /* 설정 시트 종료 후 캐러셀 BGM 재개 (접힘 suppress 가 아닐 때만) */
+  useEffect(() => {
+    if (suppressBgm) return undefined;
+    const onReleased = () => {
+      const hasBgm =
+        Boolean(resolveShowcaseBgmUrl(styleConfig)) || hasShowcaseBgmConfigured(styleConfig);
+      if (!hasBgm) return;
+      const liveCallMuted = !previewMode && !scrollEnabled;
+      setPlaybackPhase(liveCallMuted ? "call_active" : previewMode ? "preview" : "replay", {
+        forceRestart: false,
+        owner: "carousel",
+        styleConfig
+      });
+    };
+    window.addEventListener(SHOWCASE_BGM_OWNER_RELEASED_EVENT, onReleased);
+    return () => window.removeEventListener(SHOWCASE_BGM_OWNER_RELEASED_EVENT, onReleased);
+  }, [suppressBgm, styleConfig, previewMode, scrollEnabled, setPlaybackPhase]);
 
   const galleryPagePhotos = useMemo(() => {
     return (Array.isArray(photos) ? photos : [])

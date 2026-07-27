@@ -372,15 +372,21 @@ export default function LetteringBizcardSettingsView({
 
     if (titleDeptNeedsSubmit) {
       if (!verifyDocKind) {
-        setVerifyDocError("서류 종류를 선택해 주세요.");
+        const msg = "서류 종류를 선택해 주세요.";
+        setVerifyDocError(msg);
+        showToast(msg);
         return;
       }
       if (!verifyDocDataUrl || !verifyDocName) {
-        setVerifyDocError("직책·부서 확인 서류를 첨부해 주세요.");
+        const msg = "직책·부서 확인 서류를 첨부해 주세요. 첨부 없이는 명함 변경이 저장되지 않습니다.";
+        setVerifyDocError(msg);
+        showToast(msg);
         return;
       }
       if (!verifyDocIssuedAt || !isVerifyDocIssuedWithinLimit(verifyDocIssuedAt)) {
-        setVerifyDocError("발급일 기준 1개월 이내 서류만 제출할 수 있습니다.");
+        const msg = "발급일 기준 1개월 이내 서류만 제출할 수 있습니다.";
+        setVerifyDocError(msg);
+        showToast(msg);
         return;
       }
     }

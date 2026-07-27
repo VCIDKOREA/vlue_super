@@ -93,3 +93,42 @@ export function buildCallEndAlimtalkPayload(peerPhoneE164: string): AlimtalkCall
     optOutKey: `optout:${peerPhoneE164}`
   };
 }
+
+const WWW_BASE =
+  process.env.VLUE_WWW_ORIGIN || process.env.VLUE_APP_WEB_ORIGIN || "https://www.vlue.kr";
+
+/**
+ * 기업 DCC 승인 안내 알림톡/문자 본문
+ * 「YYYY년MM월DD일 신청하신 … www.vlue.kr 로그인 … 쇼케이스 꾸며보세요」
+ */
+export function buildEnterpriseDccApprovalAlimtalk(input: {
+  recipientPhoneE164: string;
+  appliedAt: Date | string;
+  manageLoginId: string;
+}): AlimtalkCallEndPayload {
+  const applied = input.appliedAt instanceof Date ? input.appliedAt : new Date(input.appliedAt);
+  const y = applied.getFullYear();
+  const m = String(applied.getMonth() + 1).padStart(2, "0");
+  const d = String(applied.getDate()).padStart(2, "0");
+  const loginUrl = `${String(WWW_BASE).replace(/\/$/, "")}/#showcase`;
+  const body =
+    `${y}년${m}월${d}일 신청하신 비즈니스 디지털 인증명함이 승인되었습니다. ` +
+    `웹 (www.vlue.kr)에서 등록하신 아이디와 비밀번호로 로그인하여, ` +
+    `기업 이미지에 맞게 쇼케이스를 멋지게 꾸며보세요! ` +
+    `(관리 아이디: ${input.manageLoginId})`;
+
+  return {
+    templateId: process.env.KAKAO_ALIMTALK_ENTERPRISE_DCC_TEMPLATE_ID || "VLUE_ENTERPRISE_DCC_APPROVED_V1",
+    recipientPhoneE164: input.recipientPhoneE164,
+    body,
+    buttons: [
+      {
+        name: "쇼케이스 관리하기",
+        type: "WL",
+        url_mobile: loginUrl,
+        url_pc: loginUrl
+      }
+    ],
+    optOutKey: `enterprise-dcc:${input.recipientPhoneE164}`
+  };
+}

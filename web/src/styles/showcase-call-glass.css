@@ -221,6 +221,10 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
+.lettering-ongoing--fullscreen-tent .lettering-profile-thumb__initial {
+  color: #e2e8f0 !important;
+}
+
 .lettering-ongoing--fullscreen-tent .lettering-expand-btn {
   background: rgba(30, 41, 59, 0.75);
   border: 1px solid rgba(226, 232, 240, 0.18);

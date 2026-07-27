@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { X } from "lucide-react";
+import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
 
 /** 하단 바에서 열리는 전체 화면 패널 — 닫기/뒤로가기는 우측 고정 */
 export default function AppFullScreenView({
@@ -21,8 +23,18 @@ export default function AppFullScreenView({
   /** true면 타이틀 헤더 숨김 */
   hideHeader = false,
   /** hideHeader일 때 우상단 플로팅 닫기 (자식이 자체 닫기를 쓰면 false) */
-  showFloatingClose = true
+  showFloatingClose = true,
+  /** false면 기기 뒤로가기를 등록하지 않음 (부모가 처리) */
+  captureAndroidBack = true
 }) {
+  useEffect(() => {
+    if (!open || !captureAndroidBack || typeof onClose !== "function") return undefined;
+    return pushAndroidBackHandler(() => {
+      onClose();
+      return true;
+    });
+  }, [open, onClose, captureAndroidBack]);
+
   if (!open) return null;
 
   const zClass = elevateAboveShowcase ? "z-[320]" : coverBottomNav ? "z-[220]" : "z-[140]";

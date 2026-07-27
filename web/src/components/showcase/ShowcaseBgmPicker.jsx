@@ -20,6 +20,7 @@ import {
   resolveBgmVolumeGain
 } from "../../lib/showcase/showcaseBgmPresets.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
+import { dispatchShowcaseBgmOwnerReleased } from "../../lib/showcase/closeShowcaseOverlays.js";
 
 const SIGNATURE_PAGE_SIZE = 10;
 
@@ -316,7 +317,9 @@ export default function ShowcaseBgmPicker({
     return () => {
       stopLocalPreview();
       stopSettingsPreview?.();
-      setPlaybackPhase("idle", { steal: true });
+      setPlaybackPhase("idle", { owner: "settings", steal: true });
+      /* 케이스함·홈 캐러셀이 재생을 이어가도록 */
+      dispatchShowcaseBgmOwnerReleased();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only
   }, [load]);

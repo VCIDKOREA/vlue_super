@@ -39,8 +39,10 @@ import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import {
   createEmptyShowcaseBgm,
   hasPlayableShowcaseBgm,
-  hasShowcaseBgmConfigured
+  hasShowcaseBgmConfigured,
+  showcaseBgmIdentityKey
 } from "../../lib/showcase/showcaseBgmPresets.js";
+import { SHOWCASE_BGM_OWNER_RELEASED_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
 import "./my-case-grid.css";
 
 function readSelfProfile() {
@@ -309,12 +311,10 @@ export default function MyCaseGrid({
     void storySeenTick;
     return canOpenLiveStory && isBroadcastStoryUnseen(storyOwnerId, mainBroadcast);
   }, [canOpenLiveStory, storyOwnerId, mainBroadcast, storySeenTick]);
-  const caseBgmFingerprint = useMemo(() => {
-    const b = caseStyleConfig?.bgm;
-    if (!b || b.mode === "none") return "";
-    const pl = Array.isArray(b.playlist) ? b.playlist.map((t) => t?.soundId || t?.audioUrl || "").join(",") : "";
-    return `${b.mode}|${b.soundId || ""}|${b.audioUrl || ""}|${b.playMode || ""}|${pl}`;
-  }, [caseStyleConfig]);
+  const caseBgmFingerprint = useMemo(
+    () => showcaseBgmIdentityKey(caseStyleConfig?.bgm),
+    [caseStyleConfig]
+  );
 
   const caseBgmFpRef = useRef("");
   const setPlaybackPhaseRef = useRef(setPlaybackPhase);
@@ -348,6 +348,20 @@ export default function MyCaseGrid({
       setPlaybackPhaseRef.current("idle", { fade: true, owner: "casebox" });
     };
   }, []);
+
+  /* 설정 시트 종료 후 케이스함 BGM 재개 */
+  useEffect(() => {
+    const onReleased = () => {
+      if (!bgmEnabled || !caseHasBgm || !caseStyleConfig) return;
+      setPlaybackPhaseRef.current("preview", {
+        forceRestart: false,
+        owner: "casebox",
+        styleConfig: caseStyleConfig
+      });
+    };
+    window.addEventListener(SHOWCASE_BGM_OWNER_RELEASED_EVENT, onReleased);
+    return () => window.removeEventListener(SHOWCASE_BGM_OWNER_RELEASED_EVENT, onReleased);
+  }, [bgmEnabled, caseHasBgm, caseStyleConfig]);
 
   useEffect(() => {
     if (!bgmEnabled || !caseHasBgm) return undefined;

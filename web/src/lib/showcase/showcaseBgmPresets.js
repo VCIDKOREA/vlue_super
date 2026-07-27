@@ -103,6 +103,19 @@ export function resolveShowcaseBgmUrl(styleConfig, visitSessionKey = "", trackIn
   return "";
 }
 
+/**
+ * BGM 정체성 키 — 서명 URL(audioUrl)은 제외.
+ * URL 갱신·hydrate 때마다 fingerprint 가 바뀌면 재생이 끊기던 주원인.
+ * @param {object|null|undefined} bgm
+ */
+export function showcaseBgmIdentityKey(bgm) {
+  if (!bgm || bgm.mode === "none") return "";
+  const pl = Array.isArray(bgm.playlist)
+    ? bgm.playlist.map((t) => String(t?.soundId || "").trim()).filter(Boolean).join(",")
+    : "";
+  return `${bgm.mode}|${String(bgm.soundId || "").trim()}|${bgm.playMode || ""}|${pl}`;
+}
+
 /** 재생 URL이 없어도 soundId·메타가 있으면 BGM 슬롯 표시 (케이스함·피어 열람) */
 export function hasShowcaseBgmConfigured(styleConfig) {
   const bgm = styleConfig?.bgm;

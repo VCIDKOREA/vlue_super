@@ -3,8 +3,10 @@ import { isWebPcDownloadEnabled } from '../../../lib/v1ReleaseScope.js';
 
 const cta = () => (isWebPcDownloadEnabled() ? '모바일·PC 버전을 설치하세요.' : '모바일 앱을 설치하세요.');
 
+const showcaseManageCopy = `쇼케이스(명함·사진·음원)는 www에서 꾸미고 앱과 즉시 동기화됩니다. 통화 중 송출은 모바일 앱에서 — ${cta()}`;
+
 /** 상단 설치 바 — 메뉴(뷰)별 핵심 포인트 → 설치 CTA */
-const DOWNLOAD_BAR_TOP_PC: Record<View, string> = {
+const DOWNLOAD_BAR_TOP_PC: Partial<Record<View, string>> = {
   home: `기관 검색은 웹에서, 통화 중 실시간 경보·가족 보호는 모바일 앱에서, 오피스·복합기 제어는 PC 프로그램에서 — ${cta()}`,
   search: `조회한 기관을 저장하고 수신 전화 위험 알림을 받으려면 VLUE 앱이 필요합니다 — ${cta()}`,
   about: `서비스 구조는 웹에서 확인했으면, 블루 쇼케이스·디지털 인증명함·가족보호는 설치형 앱에서 이어가세요 — ${cta()}`,
@@ -21,10 +23,12 @@ const DOWNLOAD_BAR_TOP_PC: Record<View, string> = {
   safezone: `안심영역·위치 기반 보호 설정은 모바일 앱에서 — ${cta()}`,
   news: `보이스피싱 경보·VLUE 공지 푸시는 앱에서 — ${cta()}`,
   mypage: `내 인증·결제·알림 설정은 웹·앱이 동기화됩니다 — ${cta()}`,
-  bizcard: `통화 화면 디지털 명함·레터링은 모바일 앱 전용 기능입니다 — ${cta()}`,
+  bizcard: `디지털 인증명함·쇼케이스는 웹·앱이 동일 계정으로 연동됩니다. 통화 중 실시간 표시는 모바일 앱에서 — ${cta()}`,
+  showcase: showcaseManageCopy,
+  biz: `기업·대표번호 쇼케이스는 웹에서 관리하고 앱과 동기화됩니다. 통화 중 송출은 모바일 앱에서 — ${cta()}`,
 };
 
-const DOWNLOAD_BAR_TOP_MOBILE: Record<View, string> = {
+const DOWNLOAD_BAR_TOP_MOBILE: Partial<Record<View, string>> = {
   home: `기관 검색은 웹에서, 통화 중 실시간 경보·가족 보호는 모바일 앱에서 — ${cta()}`,
   search: `조회한 기관을 저장하고 수신 전화 위험 알림을 받으려면 VLUE 모바일 앱이 필요합니다 — ${cta()}`,
   about: `서비스 구조는 웹에서 확인했으면, 블루 쇼케이스·디지털 인증명함·가족보호는 모바일 앱에서 이어가세요 — ${cta()}`,
@@ -41,7 +45,9 @@ const DOWNLOAD_BAR_TOP_MOBILE: Record<View, string> = {
   safezone: `안심영역·위치 기반 보호 설정은 모바일 앱에서 — ${cta()}`,
   news: `보이스피싱 경보·VLUE 공지 푸시는 앱에서 — ${cta()}`,
   mypage: `내 인증·결제·알림 설정은 웹·앱이 동기화됩니다 — ${cta()}`,
-  bizcard: `통화 화면 디지털 명함·레터링은 모바일 앱 전용 기능입니다 — ${cta()}`,
+  bizcard: `디지털 인증명함·쇼케이스는 웹·앱이 동일 계정으로 연동됩니다. 통화 중 실시간 표시는 모바일 앱에서 — ${cta()}`,
+  showcase: showcaseManageCopy,
+  biz: `기업·대표번호 쇼케이스는 웹에서 관리하고 앱과 동기화됩니다. 통화 중 송출은 모바일 앱에서 — ${cta()}`,
 };
 
 export const DOWNLOAD_BAR_BOTTOM = isWebPcDownloadEnabled()
@@ -50,5 +56,5 @@ export const DOWNLOAD_BAR_BOTTOM = isWebPcDownloadEnabled()
 
 export function getTopDownloadBarMessage(view: View): string {
   const map = isWebPcDownloadEnabled() ? DOWNLOAD_BAR_TOP_PC : DOWNLOAD_BAR_TOP_MOBILE;
-  return map[view] ?? map.home;
+  return map[view] ?? map.home ?? '';
 }

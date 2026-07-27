@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import PricingManagerPanel from "./PricingManagerPanel.jsx";
+import AdminMetricsPanel from "./AdminMetricsPanel.jsx";
 import {
   createAdminNotice,
   createAdminPopup,
@@ -7,6 +9,7 @@ import {
   deleteAdminFeedPost,
   deleteAdminNotice,
   deleteAdminPopup,
+  fetchAdminEnterpriseDccPending,
   fetchAdminHealth,
   fetchAdminManualReview,
   fetchAdminOnboardingStats,
@@ -16,14 +19,16 @@ import {
   patchAdminSignatureSound,
   patchAdminUser,
   resolveAdminManualReview,
+  reviewAdminEnterpriseDcc,
   testAdminNotification,
   testAdminScanner,
   updateAdminNotice,
   updateAdminPopup
 } from "../../lib/adminConsoleApi.js";
-import PricingManagerPanel from "./PricingManagerPanel.jsx";
 
 const TABS = [
+  { id: "metrics", label: "DB 지표" },
+  { id: "enterpriseDcc", label: "기업명함 승인" },
   { id: "health", label: "상태 점검" },
   { id: "pricing", label: "요금제 관리" },
   { id: "signature", label: "Signature Sound" },
@@ -136,6 +141,99 @@ function HealthTab({ onToast }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function EnterpriseDccAdminTab({ onToast }) {
+  const [items, setItems] = useState([]);
+  const [busyId, setBusyId] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const data = await fetchAdminEnterpriseDccPending();
+      setItems(data.items || []);
+    } catch (e) {
+      onToast?.(e?.message || "목록 조회 실패");
+    }
+  }, [onToast]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const review = async (id, action) => {
+    setBusyId(id);
+    try {
+      await reviewAdminEnterpriseDcc(id, action);
+      onToast?.(action === "approve" ? "승인 · 결제 단계 오픈" : "반려 처리");
+      await load();
+    } catch (e) {
+      onToast?.(e?.message || "처리 실패");
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[13px] font-black text-slate-800">기업·대표번호 인증명함 승인 대기</p>
+        <button type="button" onClick={() => void load()} className="rounded-lg bg-slate-100 px-3 py-1.5 text-[12px] font-bold">
+          새로고침
+        </button>
+      </div>
+      <Table
+        columns={[
+          {
+            key: "company",
+            label: "상호·사업자",
+            render: (row) => (
+              <div>
+                <p className="font-bold">{row.companyNameLocked || "—"}</p>
+                <p className="text-[10px] text-slate-500">{row.businessRegistrationNo}</p>
+              </div>
+            )
+          },
+          {
+            key: "detail",
+            label: "부서·담당·DCC",
+            render: (row) => (
+              <div className="text-[11px]">
+                <p>{row.department || "—"}</p>
+                <p>{row.contactName || "—"}</p>
+                <p>{row.dccOutboundPhone || "—"}</p>
+              </div>
+            )
+          },
+          {
+            key: "actions",
+            label: "처리",
+            render: (row) => (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={busyId === row.id}
+                  onClick={() => void review(row.id, "approve")}
+                  className="rounded border border-emerald-300 px-2 py-1 text-[10px] font-bold text-emerald-700"
+                >
+                  승인
+                </button>
+                <button
+                  type="button"
+                  disabled={busyId === row.id}
+                  onClick={() => void review(row.id, "reject")}
+                  className="rounded border border-rose-300 px-2 py-1 text-[10px] font-bold text-rose-600"
+                >
+                  반려
+                </button>
+              </div>
+            )
+          }
+        ]}
+        rows={items.map((r) => ({ ...r, _key: r.id }))}
+        emptyLabel="승인 대기 신청 없음"
+      />
     </div>
   );
 }
@@ -509,7 +607,7 @@ function OnboardingTab({ onToast }) {
 }
 
 export default function AdminConsoleDesk({ user, onLogout }) {
-  const [tab, setTab] = useState("health");
+  const [tab, setTab] = useState("metrics");
   const [toast, setToast] = useState("");
 
   const showToast = useCallback((msg) => {
@@ -546,6 +644,8 @@ export default function AdminConsoleDesk({ user, onLogout }) {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-5">
+        {tab === "metrics" ? <AdminMetricsPanel onToast={showToast} /> : null}
+        {tab === "enterpriseDcc" ? <EnterpriseDccAdminTab onToast={showToast} /> : null}
         {tab === "health" ? <HealthTab onToast={showToast} /> : null}
         {tab === "pricing" ? <PricingManagerPanel onToast={showToast} /> : null}
         {tab === "signature" ? <SignatureSoundTab onToast={showToast} /> : null}

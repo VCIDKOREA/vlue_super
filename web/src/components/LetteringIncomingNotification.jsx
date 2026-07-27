@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getLetteringCallStatusLabel } from "../lib/letteringCallStatus.js";
 import { compareLetteringPhones, formatLetteringPhoneDisplay, normalizePhoneDigits } from "../lib/letteringPhoneMatch.js";
 import { openLetteringCertInVlueApp } from "../lib/letteringOpenVlueApp.js";
@@ -114,7 +114,7 @@ function LetteringProfileThumb({ card, verified, size = "sm" }) {
 
   return (
     <span
-      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden border border-[#c5d4e8] bg-white shadow-sm ${dim}`}
+      className={`lettering-profile-thumb relative inline-flex shrink-0 items-center justify-center overflow-hidden border border-[#c5d4e8] bg-white shadow-sm ${dim}`}
     >
       {showImg ? (
         <img
@@ -124,7 +124,7 @@ function LetteringProfileThumb({ card, verified, size = "sm" }) {
           onError={() => setImgBroken(true)}
         />
       ) : (
-        <span className="font-black text-slate-700">{fallbackLabel}</span>
+        <span className="lettering-profile-thumb__initial font-black text-slate-700">{fallbackLabel}</span>
       )}
     </span>
   );
@@ -233,6 +233,9 @@ export default function LetteringIncomingNotification({
     sources: savedContactName ? ["prop"] : []
   }));
   const expanded = expandedProp !== undefined ? expandedProp : expandedInternal;
+  /** 접힘 애니메이션 끝날 때까지 --expanded 레이아웃 유지 (뚝뚝 끊김 방지) */
+  const [keepExpandedLayout, setKeepExpandedLayout] = useState(false);
+  const expandSlotRef = useRef(null);
 
   const showGuide = useCallback(
     (message) => {
@@ -455,6 +458,48 @@ export default function LetteringIncomingNotification({
   }, [isUnverified, incoming, reportHistory, reportTick]);
 
   const isExpandedView = expanded && canExpand && expandContent !== false;
+  const showExpandedLayout = isExpandedView || keepExpandedLayout;
+  const prevExpandedViewRef = useRef(isExpandedView);
+
+  useLayoutEffect(() => {
+    const wasExpanded = prevExpandedViewRef.current;
+    prevExpandedViewRef.current = isExpandedView;
+
+    if (isExpandedView) {
+      setKeepExpandedLayout(false);
+      return undefined;
+    }
+
+    if (!wasExpanded) {
+      setKeepExpandedLayout(false);
+      return undefined;
+    }
+
+    const slot = expandSlotRef.current;
+    if (!slot) {
+      setKeepExpandedLayout(false);
+      return undefined;
+    }
+
+    setKeepExpandedLayout(true);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      setKeepExpandedLayout(false);
+    };
+    const onEnd = (e) => {
+      if (e.target !== slot) return;
+      if (e.propertyName && e.propertyName !== "grid-template-rows") return;
+      finish();
+    };
+    slot.addEventListener("transitionend", onEnd);
+    const t = window.setTimeout(finish, 560);
+    return () => {
+      slot.removeEventListener("transitionend", onEnd);
+      window.clearTimeout(t);
+    };
+  }, [isExpandedView]);
 
   const shellTone = !verified
     ? "lettering-ongoing--unverified"
@@ -462,7 +507,7 @@ export default function LetteringIncomingNotification({
       ? "lettering-ongoing--verified lettering-ongoing--paid"
       : "lettering-ongoing--verified lettering-ongoing--free-tier";
   const platformClass = platform === "ios" ? "lettering-ongoing--ios" : "lettering-ongoing--android";
-  const heightClass = isExpandedView
+  const heightClass = showExpandedLayout
     ? previewMode
       ? "lettering-ongoing--expanded lettering-ongoing--showcase-preview"
       : "lettering-ongoing--expanded lettering-ongoing--expanded-layer"
@@ -696,6 +741,7 @@ export default function LetteringIncomingNotification({
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;
   const carouselScrollEnabled = isPaidMember && (previewMode || onCall || isExpandedView);
+  /** 홈 미리보기 접힘: 신규 재생은 막되, 펼침 중 재생분은 캐러셀 cleanup 핸드오프로 유지 */
   const carouselSuppressBgm =
     Boolean(suppressBgm) || Boolean(previewMode && !isExpandedView);
   const showcasePhotos = c.showcaseStyle?.gallery?.photos || [];
@@ -874,10 +920,10 @@ export default function LetteringIncomingNotification({
       <div className="lettering-ongoing-body relative flex min-h-0 flex-col">
         <div
           className={`lettering-ongoing-summary relative z-[2] flex gap-2.5 px-3 py-2.5 ${
-            isExpandedView ? "items-center" : "items-start"
+            showExpandedLayout || previewMode ? "items-center" : "items-start"
           } ${isFreeMember ? "lettering-ongoing-summary--free" : ""} ${
             isUnverified ? "lettering-ongoing-summary--unverified" : ""
-          } ${!isExpandedView && (isPaidMember || isFreeMember) ? "pb-3" : ""}`}
+          } ${!showExpandedLayout && (isPaidMember || isFreeMember) ? "pb-3" : ""}`}
         >
           {verified && !showcaseOffPreview ? <LetteringProfileThumb card={c} verified={verified} size="sm" /> : null}
           {verified && showcaseOffPreview ? (
@@ -899,7 +945,7 @@ export default function LetteringIncomingNotification({
             ) : (
               <>
                 <p className="lettering-ongoing-name-row flex min-w-0 items-center gap-1.5">
-                  <span className="lettering-ongoing-name min-w-0 truncate text-[15px] font-semibold leading-snug">
+                  <span className="lettering-ongoing-name min-w-0 text-[15px] font-semibold leading-snug">
                     {displayLabel}
                   </span>
                   {verified ? (
@@ -917,7 +963,7 @@ export default function LetteringIncomingNotification({
                   ) : null}
                 </p>
                 {showCollapsedPhoneSubline ? (
-                  <p className="lettering-ongoing-subline mt-0.5 min-w-0 truncate text-[11px] leading-snug">
+                  <p className="lettering-ongoing-subline mt-0.5 min-w-0 text-[12px] leading-snug">
                     {showCollapsedOrg ? (
                       <>
                         <span className="font-medium text-slate-600">{receptionLines.organization}</span>
@@ -976,6 +1022,7 @@ export default function LetteringIncomingNotification({
 
         {canExpand && isFreeMember ? (
           <div
+            ref={expandSlotRef}
             className="lettering-ongoing-expand-slot lettering-ongoing-expand-slot--emotional"
             data-open={isExpandedView ? "true" : "false"}
             aria-hidden={!isExpandedView}
@@ -1039,6 +1086,7 @@ export default function LetteringIncomingNotification({
 
         {canExpand && isPaidMember ? (
           <div
+            ref={expandSlotRef}
             className="lettering-ongoing-expand-slot lettering-ongoing-expand-slot--reception"
             data-open={isExpandedView ? "true" : "false"}
             aria-hidden={!isExpandedView}
@@ -1107,6 +1155,7 @@ export default function LetteringIncomingNotification({
 
         {canExpand && isUnverified ? (
           <div
+            ref={expandSlotRef}
             className="lettering-ongoing-expand-slot lettering-ongoing-expand-slot--unverified"
             data-open={isExpandedView ? "true" : "false"}
             aria-hidden={!isExpandedView}

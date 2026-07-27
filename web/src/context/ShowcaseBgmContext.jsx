@@ -489,8 +489,21 @@ export function ShowcaseBgmProvider({ children }) {
       return;
     }
     if (owner === "settings") ownerRef.current = "settings";
-    styleConfigRef.current = config;
-    setStyleConfig(config);
+    /* 같은 곡인데 저장본 audioUrl 이 비어 있으면 이미 갱신된 재생 URL 을 유지 */
+    let next = config;
+    const prevBgm = styleConfigRef.current?.bgm;
+    const nextBgm = config?.bgm;
+    if (prevBgm && nextBgm && String(prevBgm.mode) === String(nextBgm.mode)) {
+      const sameSound =
+        String(prevBgm.soundId || "").trim() === String(nextBgm.soundId || "").trim();
+      const prevUrl = String(prevBgm.audioUrl || "").trim();
+      const nextUrl = String(nextBgm.audioUrl || "").trim();
+      if (sameSound && prevUrl && !nextUrl) {
+        next = { ...config, bgm: { ...nextBgm, audioUrl: prevUrl } };
+      }
+    }
+    styleConfigRef.current = next;
+    setStyleConfig(next);
   }, []);
 
   const unlockFromUserGesture = useCallback(() => {

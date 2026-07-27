@@ -19,6 +19,18 @@ import { applyAppSettingsToDocument } from "./lib/vlueAppSettings.js";
 import { logProductionEnvBinding } from "./config.js";
 import { ensurePricingConfigLoaded } from "./lib/pricingConfig.js";
 
+/** www.vlue.kr/showcase · /biz → /#showcase · /#biz (해시 라우팅) */
+function normalizeWwwShowcaseManagePath() {
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (path !== "/showcase" && path !== "/biz") return;
+  const view = path.slice(1);
+  const search = window.location.search || "";
+  window.history.replaceState(null, "", `/${search}#${view}`);
+}
+
+normalizeWwwShowcaseManagePath();
+
 applyAppSettingsToDocument();
 logProductionEnvBinding();
 ensurePricingConfigLoaded().catch(() => undefined);

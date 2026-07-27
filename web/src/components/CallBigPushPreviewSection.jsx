@@ -17,21 +17,29 @@ import {
 } from "../lib/vlueShowcasePreviewIdentity.js";
 import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
+import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
 
 /**
  * VLUE Showcase — 홈 메인 통화 빅푸시(픽푸시) 미리보기
  * 켜짐/꺼짐 모두 접힘→전체화면 펼침. 꺼짐은 내용만 번호+VLUE 인증.
  * 「통화화면」으로 실통화와 같은 하단 제어바 미리보기 가능.
+ *
+ * @param {"portal"|"inline"} [expandMode]
+ *   portal = 앱 홈(document 전체화면)
+ *   inline = www 쇼케이스 관리 — 빅푸시 아래(빨간박스)에 동일 전체화면 UI
  */
 export default function CallBigPushPreviewSection({
   membershipTier = "free",
   className = "",
   onToast,
-  isDarkMode = false
+  isDarkMode = false,
+  expandMode = "portal",
+  defaultExpanded = false
 }) {
   const showTierTabs = v1AppShell.callBigPushTierTabs;
+  const inlineExpand = expandMode === "inline";
   const [showcaseOn, setShowcaseOn] = useState(true);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(Boolean(defaultExpanded));
   const [callChromePreview, setCallChromePreview] = useState(false);
   const [previewTick, setPreviewTick] = useState(0);
 
@@ -69,12 +77,14 @@ export default function CallBigPushPreviewSection({
 
   useEffect(() => {
     if (!expanded) return undefined;
+    trackCallInterfaceUse(callChromePreview ? "preview_incall" : "preview");
+    trackShowcaseView("home_preview");
     return pushAndroidBackHandler(() => {
       setExpanded(false);
       setCallChromePreview(false);
       return true;
     });
-  }, [expanded]);
+  }, [expanded, callChromePreview]);
 
   useEffect(() => {
     const onCloseOverlays = () => {
@@ -104,12 +114,17 @@ export default function CallBigPushPreviewSection({
 
   const digitalCardApplied = readShowcasePreviewDigitalCardApplied();
   const incomingNumber = card.phone || "";
-  const useFullscreenPortal = expanded;
+  const useFullscreenPortal = expanded && !inlineExpand;
 
   const handleExpandedChange = (next) => {
     setExpanded(next);
-    if (!next) setCallChromePreview(false);
   };
+
+  useEffect(() => {
+    if (expanded) return undefined;
+    const t = window.setTimeout(() => setCallChromePreview(false), 520);
+    return () => window.clearTimeout(t);
+  }, [expanded]);
 
   const notificationProps = {
     verified: true,
@@ -144,6 +159,19 @@ export default function CallBigPushPreviewSection({
   const statusOffCls = isDarkMode
     ? "border border-slate-600 bg-slate-800 text-slate-200"
     : "border border-slate-200 bg-slate-50 text-slate-700";
+
+  const embedClass = [
+    "lettering-home-push-embed",
+    inlineExpand ? "lettering-home-push-embed--web-inline" : "",
+    inlineExpand && expanded ? "is-expanded" : "",
+    inlineExpand && expanded && callChromePreview ? "is-call-chrome" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  /* 접힘·펼침 동일 크롬(home-glass) — 클래스 교체로 흔들림 방지 */
+  const pushClassName =
+    "lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass";
 
   return (
     <section
@@ -202,11 +230,8 @@ export default function CallBigPushPreviewSection({
       ) : null}
 
       {!useFullscreenPortal ? (
-        <div className="lettering-home-push-embed">
-          <LetteringIncomingNotification
-            {...notificationProps}
-            className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass"
-          />
+        <div className={embedClass}>
+          <LetteringIncomingNotification {...notificationProps} className={pushClassName} />
         </div>
       ) : (
         <div className="lettering-home-push-embed lettering-home-push-embed--placeholder" aria-hidden>
