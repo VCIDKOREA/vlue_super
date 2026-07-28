@@ -618,7 +618,7 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
           NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
           NULLIF(TRIM(export_snapshot_json->>'photoFocus'), '') AS photo_focus
         FROM digital_cards
-        WHERE user_id = ${targetUserId}
+        WHERE user_id = ${targetUserId}::uuid
         LIMIT 1
       `
     : [];

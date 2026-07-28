@@ -184,7 +184,7 @@ async function attachSearchSnapLites(rows: UserSearchRow[]): Promise<UserSearchR
       NULLIF(TRIM(export_snapshot_json->>'nickname'), '') AS nickname,
       NULLIF(TRIM(export_snapshot_json->>'handle'), '') AS handle
     FROM digital_cards
-    WHERE user_id IN (${Prisma.join(ids)})
+    WHERE user_id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})
   `;
 
   const byUser = new Map<string, SearchSnapLite>();

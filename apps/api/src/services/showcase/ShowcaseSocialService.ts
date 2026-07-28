@@ -46,7 +46,7 @@ async function loadAuthorLite(userIds: string[]): Promise<Map<string, { activity
       NULLIF(TRIM(export_snapshot_json->>'activityName'), '') AS activity_name,
       NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url
     FROM digital_cards
-    WHERE user_id IN (${Prisma.join(ids)})
+    WHERE user_id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})
   `;
   for (const r of rows) {
     const photo = String(r.photo_url || "").trim();

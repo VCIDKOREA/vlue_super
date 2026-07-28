@@ -241,13 +241,25 @@ letteringRoutes.get("/showcase/tags/search", SearchAuthInterceptor, async (c) =>
 
   if (!q) return c.json({ ok: true, mode, tag: null, items: [] });
 
-  const { items } = await runShowcaseSearch({ mode, query: q, limit: 24 });
-  return c.json({
-    ok: true,
-    mode,
-    tag: mode === "hashtag" ? normalizeShowcaseTag(q) : null,
-    items
-  });
+  try {
+    const { items } = await runShowcaseSearch({ mode, query: q, limit: 24 });
+    return c.json({
+      ok: true,
+      mode,
+      tag: mode === "hashtag" ? normalizeShowcaseTag(q) : null,
+      items
+    });
+  } catch (e) {
+    console.error("[showcase/tags/search]", e);
+    return c.json(
+      {
+        ok: false,
+        error: "검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        code: "SEARCH_INTERNAL"
+      },
+      500
+    );
+  }
 });
 
 /** V2 — 쇼케이스 소셜 요약 (좋아요·최근 댓글) */
