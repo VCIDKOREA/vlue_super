@@ -18,7 +18,7 @@ import {
   extractShowcaseArchiveTitle,
   extractShowcaseCoverUrl
 } from "../../lib/showcase/showcaseCover.js";
-import { slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
+import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { PRIVACY_MODES, maxShowcaseContentPagesForTier } from "../../lib/showcase/tentShowcaseTypes.js";
 import { SHOWCASE_CALL_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
 import {

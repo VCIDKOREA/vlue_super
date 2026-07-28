@@ -186,30 +186,57 @@ letteringRoutes.put("/showcase/search-privacy", requireUserHeader, async (c) => 
   return c.json({ ok: true, privacy });
 });
 
-/** 쇼케이스 편집·라이브 스타일 기기 간 동기화 */
+/** 쇼케이스 편집·라이브 스타일 기기 간 동기화 (slim v2 · 조건부 hydrate) */
 letteringRoutes.get("/showcase/style", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
-  const bundle = await getUserShowcaseStyleBundle(me);
-  return c.json({ ok: true, ...bundle });
+  const rawIfNone =
+    c.req.header("If-None-Match") ||
+    c.req.query("ifNoneMatch") ||
+    c.req.query("sinceUpdatedAt") ||
+    null;
+  const ifNoneMatch = String(rawIfNone || "")
+    .trim()
+    .replace(/^W\//i, "")
+    .replace(/^"|"$/g, "");
+  const bundle = await getUserShowcaseStyleBundle(me, { ifNoneMatch });
+  if (bundle.unchanged) {
+    return c.json(
+      { ok: true, v: 2, unchanged: true, updatedAt: bundle.updatedAt },
+      200,
+      bundle.updatedAt ? { ETag: `"${bundle.updatedAt}"` } : undefined
+    );
+  }
+  return c.json(
+    { ok: true, ...bundle },
+    200,
+    bundle.updatedAt ? { ETag: `"${bundle.updatedAt}"` } : undefined
+  );
 });
 
 letteringRoutes.put("/showcase/style", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
   const body = await c.req.json().catch(() => ({}));
-  const result = await putUserShowcaseStyleBundle(me, {
-    editor: body?.editor,
-    live: body?.live,
-    liveSource: body?.liveSource,
-    clientUpdatedAt: body?.clientUpdatedAt ?? body?.updatedAt ?? null
-  });
-  if (!result.ok) {
-    return c.json({ ok: false, conflict: true, ...result.bundle }, 409);
+  try {
+    const result = await putUserShowcaseStyleBundle(me, {
+      editor: body?.editor,
+      live: body?.live,
+      liveSource: body?.liveSource,
+      clientUpdatedAt: body?.clientUpdatedAt ?? body?.updatedAt ?? null
+    });
+    if (!result.ok) {
+      return c.json({ ok: false, conflict: true, ...result.bundle }, 409);
+    }
+    return c.json({ ok: true, v: 2, updatedAt: result.updatedAt });
+  } catch (e) {
+    const err = e as Error & { code?: string; status?: number };
+    if (err.code === "STYLE_TOO_LARGE" || err.status === 400) {
+      return c.json({ ok: false, error: err.message, code: err.code }, 400);
+    }
+    throw e;
   }
-  /* 성공 시 전체 editor/live 에코 금지 — 클라이언트가 로컬본을 이미 보유 */
-  return c.json({ ok: true, updatedAt: result.updatedAt });
 });
 
-/** 상대 공개 라이브 쇼케이스 스타일 (편집본 editor는 미노출) */
+/** 상대 공개 라이브 쇼케이스 스타일 (편집본 editor는 미노출 · public slim) */
 letteringRoutes.get("/showcase/style/:userId", async (c) => {
   const userId = String(c.req.param("userId") || "").trim();
   if (!userId) return c.json({ ok: false, error: "user required" }, 400);
@@ -220,13 +247,38 @@ letteringRoutes.get("/showcase/style/:userId", async (c) => {
   if (!user || user.status !== "ACTIVE") {
     return c.json({ ok: false, error: "not_found" }, 404);
   }
-  const pub = await getUserShowcasePublicLive(userId);
-  return c.json({
-    ok: true,
-    live: pub.live,
-    liveSource: pub.liveSource,
-    updatedAt: pub.updatedAt
-  });
+  const rawIfNone =
+    c.req.header("If-None-Match") ||
+    c.req.query("ifNoneMatch") ||
+    c.req.query("sinceUpdatedAt") ||
+    null;
+  const ifNoneMatch = String(rawIfNone || "")
+    .trim()
+    .replace(/^W\//i, "")
+    .replace(/^"|"$/g, "");
+  const pub = await getUserShowcasePublicLive(userId, { ifNoneMatch });
+  if (pub.unchanged) {
+    return c.json(
+      { ok: true, v: 2, unchanged: true, updatedAt: pub.updatedAt },
+      200,
+      pub.updatedAt
+        ? { ETag: `"${pub.updatedAt}"`, "Cache-Control": "private, max-age=60" }
+        : { "Cache-Control": "private, max-age=60" }
+    );
+  }
+  return c.json(
+    {
+      ok: true,
+      v: 2,
+      live: pub.live,
+      liveSource: pub.liveSource,
+      updatedAt: pub.updatedAt
+    },
+    200,
+    pub.updatedAt
+      ? { ETag: `"${pub.updatedAt}"`, "Cache-Control": "private, max-age=60" }
+      : { "Cache-Control": "private, max-age=60" }
+  );
 });
 
 /**

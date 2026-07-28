@@ -26,6 +26,8 @@ import {
 } from "../services/media/directImageStorage.js";
 import { enterpriseDccRoutes } from "./enterpriseDcc.js";
 import { mergeExportSnapshotMedia, isDataUrl } from "../lib/mediaUrlGuard.js";
+import { slimExportSnapshot, extractDigitalCardSlimMeta } from "../lib/digitalCardSlim.js";
+import { Prisma } from "@prisma/client";
 
 export const cardsRoutes = new Hono();
 
@@ -318,70 +320,154 @@ const ALLOWED_DESIGN_TEMPLATES = new Set([
 ]);
 
 /** 내 디지털 인증명함 ID · 템플릿 · 편집 스냅샷 (HTML 배포·검증 연동)
- *  ?lite=1 — exportSnapshotJson 생략 (허브·동기화용 · Shared Pooler egress 절감)
+ *  ?lite=1 — 스냅샷 생략
+ *  기본 — exportSnapshotJson 통째 SELECT 금지, JSON-path 슬림만
  */
 cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
   const lite = String(c.req.query("lite") || "") === "1" || String(c.req.query("lite") || "") === "true";
-  const row = await prisma.digitalCard.findUnique({
-    where: { userId: me },
-    select: lite
-      ? {
-          id: true,
-          issuedAt: true,
-          designTemplateSnapshot: true,
-          membershipTierSnapshot: true
-        }
-      : {
-          id: true,
-          issuedAt: true,
-          designTemplateSnapshot: true,
-          membershipTierSnapshot: true,
-          exportSnapshotJson: true
-        }
-  });
-  if (!row) {
-    return c.json({ issued: false, cardId: null, designTemplate: null, exportSnapshot: null, lite });
+
+  if (lite) {
+    const row = await prisma.digitalCard.findUnique({
+      where: { userId: me },
+      select: {
+        id: true,
+        issuedAt: true,
+        designTemplateSnapshot: true,
+        membershipTierSnapshot: true
+      }
+    });
+    if (!row) {
+      return c.json({ issued: false, cardId: null, designTemplate: null, exportSnapshot: null, lite: true });
+    }
+    return c.json({
+      issued: true,
+      cardId: row.id,
+      issuedAt: row.issuedAt,
+      designTemplate: row.designTemplateSnapshot,
+      membershipTierSnapshot: row.membershipTierSnapshot,
+      exportSnapshot: null,
+      lite: true,
+      subscription: await digitalCardSubscription(me)
+    });
   }
-  const snap =
-    !lite &&
-    "exportSnapshotJson" in row &&
-    row.exportSnapshotJson &&
-    typeof row.exportSnapshotJson === "object"
-      ? (row.exportSnapshotJson as Record<string, unknown>)
-      : null;
+
+  const slimRows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      issued_at: Date;
+      design_template_snapshot: string | null;
+      membership_tier_snapshot: string | null;
+      photo_url: string | null;
+      logo_url: string | null;
+      name: string | null;
+      display_name: string | null;
+      organization: string | null;
+      company_name: string | null;
+      title: string | null;
+      department: string | null;
+      phone: string | null;
+      email: string | null;
+      website: string | null;
+      address: string | null;
+      activity_name: string | null;
+      design_template: string | null;
+      photo_focus: unknown;
+      no_profile_photo: boolean | null;
+      no_company_logo: boolean | null;
+    }>
+  >(Prisma.sql`
+    SELECT
+      id,
+      issued_at,
+      design_template_snapshot,
+      membership_tier_snapshot,
+      NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url,
+      NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
+      NULLIF(TRIM(export_snapshot_json->>'name'), '') AS name,
+      NULLIF(TRIM(export_snapshot_json->>'displayName'), '') AS display_name,
+      NULLIF(TRIM(export_snapshot_json->>'organization'), '') AS organization,
+      NULLIF(TRIM(export_snapshot_json->>'companyName'), '') AS company_name,
+      NULLIF(TRIM(export_snapshot_json->>'title'), '') AS title,
+      NULLIF(TRIM(export_snapshot_json->>'department'), '') AS department,
+      NULLIF(TRIM(export_snapshot_json->>'phone'), '') AS phone,
+      NULLIF(TRIM(export_snapshot_json->>'email'), '') AS email,
+      NULLIF(TRIM(export_snapshot_json->>'website'), '') AS website,
+      NULLIF(TRIM(export_snapshot_json->>'address'), '') AS address,
+      NULLIF(TRIM(export_snapshot_json->>'activityName'), '') AS activity_name,
+      NULLIF(TRIM(export_snapshot_json->>'designTemplate'), '') AS design_template,
+      export_snapshot_json->'photoFocus' AS photo_focus,
+      CASE
+        WHEN export_snapshot_json ? 'noProfilePhoto'
+          THEN (export_snapshot_json->>'noProfilePhoto')::boolean
+        ELSE NULL
+      END AS no_profile_photo,
+      CASE
+        WHEN export_snapshot_json ? 'noCompanyLogo'
+          THEN (export_snapshot_json->>'noCompanyLogo')::boolean
+        ELSE NULL
+      END AS no_company_logo
+    FROM digital_cards
+    WHERE user_id = ${me}::uuid
+    LIMIT 1
+  `);
+  const row = slimRows[0];
+  if (!row) {
+    return c.json({ issued: false, cardId: null, designTemplate: null, exportSnapshot: null, lite: false });
+  }
+  const exportSnapshot = slimExportSnapshot({
+    photoUrl: row.photo_url,
+    logoUrl: row.logo_url,
+    name: row.name || row.display_name,
+    displayName: row.display_name || row.name,
+    organization: row.organization,
+    companyName: row.company_name || row.organization,
+    title: row.title,
+    department: row.department,
+    phone: row.phone,
+    email: row.email,
+    website: row.website,
+    address: row.address,
+    activityName: row.activity_name,
+    designTemplate: row.design_template || row.design_template_snapshot,
+    photoFocus: row.photo_focus,
+    noProfilePhoto: row.no_profile_photo,
+    noCompanyLogo: row.no_company_logo
+  });
   return c.json({
     issued: true,
     cardId: row.id,
-    issuedAt: row.issuedAt,
-    designTemplate: row.designTemplateSnapshot,
-    membershipTierSnapshot: row.membershipTierSnapshot,
-    exportSnapshot: snap,
-    lite,
-    subscription: await (async () => {
-      const sub = await prisma.userSubscription.findFirst({
-        where: { userId: me, status: "active" },
-        orderBy: { cycleEndAt: "desc" },
-        select: {
-          cycleStartAt: true,
-          cycleEndAt: true,
-          nextChargeAt: true,
-          plan: true
-        }
-      });
-      if (!sub) return null;
-      const plan = String(sub.plan || "").toLowerCase();
-      const billingCycle = plan === "b2c_annual" ? "annual" : "monthly";
-      return {
-        cycleStartAt: sub.cycleStartAt,
-        cycleEndAt: sub.cycleEndAt,
-        nextChargeAt: sub.nextChargeAt,
-        plan: sub.plan,
-        billingCycle
-      };
-    })()
+    issuedAt: row.issued_at,
+    designTemplate: row.design_template_snapshot,
+    membershipTierSnapshot: row.membership_tier_snapshot,
+    exportSnapshot,
+    lite: false,
+    subscription: await digitalCardSubscription(me)
   });
 });
+
+async function digitalCardSubscription(userId: string) {
+  const sub = await prisma.userSubscription.findFirst({
+    where: { userId, status: "active" },
+    orderBy: { cycleEndAt: "desc" },
+    select: {
+      cycleStartAt: true,
+      cycleEndAt: true,
+      nextChargeAt: true,
+      plan: true
+    }
+  });
+  if (!sub) return null;
+  const plan = String(sub.plan || "").toLowerCase();
+  const billingCycle = plan === "b2c_annual" ? "annual" : "monthly";
+  return {
+    cycleStartAt: sub.cycleStartAt,
+    cycleEndAt: sub.cycleEndAt,
+    nextChargeAt: sub.nextChargeAt,
+    plan: sub.plan,
+    billingCycle
+  };
+}
 
 cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
@@ -418,8 +504,12 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
     });
   }
 
-  const data: { designTemplateSnapshot?: string; exportSnapshotJson?: object } = {};
+  const data: {
+    designTemplateSnapshot?: string;
+    exportSnapshotJson?: object;
+  } = {};
   if (tpl) data.designTemplateSnapshot = tpl;
+  let slimMeta: ReturnType<typeof extractDigitalCardSlimMeta> | null = null;
   if (wantsSnapshot && body.exportSnapshot) {
     const prevSnap =
       "exportSnapshotJson" in cardRow &&
@@ -440,10 +530,14 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
         );
       }
     }
-    data.exportSnapshotJson = {
+    const merged = {
       ...mergeExportSnapshotMedia(prevSnap, body.exportSnapshot),
       ...(tpl ? { designTemplate: tpl } : {})
     };
+    /* 서버에는 슬림 스냅만 유지 (전체 블롭 금지) */
+    const slim = slimExportSnapshot(merged) || {};
+    data.exportSnapshotJson = slim;
+    slimMeta = extractDigitalCardSlimMeta(slim);
   }
 
   const updated = await prisma.digitalCard.update({
@@ -452,7 +546,24 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
     select: { id: true, designTemplateSnapshot: true }
   });
 
-  /* exportSnapshotJson 에코 금지 — PATCH 응답 egress 절감 (클라이언트 로컬본 유지) */
+  if (slimMeta) {
+    try {
+      await prisma.$executeRaw`
+        UPDATE digital_cards SET
+          photo_url = ${slimMeta.photoUrl},
+          logo_url = ${slimMeta.logoUrl},
+          display_name = ${slimMeta.displayName},
+          organization = ${slimMeta.organization},
+          title_snapshot = ${slimMeta.title},
+          department_snapshot = ${slimMeta.department},
+          activity_name = ${slimMeta.activityName}
+        WHERE user_id = ${me}::uuid
+      `;
+    } catch {
+      /* 마이그레이션 전 컬럼 없음 — JSON slim 만으로 충분 */
+    }
+  }
+
   return c.json({
     ok: true,
     cardId: updated.id,

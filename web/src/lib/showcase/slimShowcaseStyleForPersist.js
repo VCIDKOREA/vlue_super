@@ -48,3 +48,12 @@ export function slimShowcaseStyleForPersist(value, depth = 0) {
   }
   return value;
 }
+
+/** @param {unknown} value */
+export function slimShowcaseStyleForPersistWithVersion(value) {
+  const slim = slimShowcaseStyleForPersist(value);
+  if (slim && typeof slim === "object" && !Array.isArray(slim)) {
+    return { ...slim, v: 2 };
+  }
+  return slim;
+}

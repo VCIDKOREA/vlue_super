@@ -2,6 +2,11 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import { stripDataUrlsFromJson } from "../../lib/mediaUrlGuard.js";
 import {
+  assertShowcaseStyleWithinLimit,
+  slimShowcaseStyleForPersist
+} from "../../lib/slimShowcaseStyle.js";
+import { uploadShowcaseStyleJsonToR2 } from "../media/showcaseStyleCdn.js";
+import {
   buildViewerAccessContext,
   getProfileForViewer
 } from "../follow/followService.js";
@@ -16,6 +21,42 @@ import {
 } from "./mycasePolicy.js";
 
 const TITLE_MAX = 200;
+
+/** mutation·정책용 — payloadJson 미조회 */
+const MYCASE_META_SELECT = {
+  id: true,
+  ownerUserId: true,
+  title: true,
+  thumbnailUrl: true,
+  isPublic: true,
+  isMainBroadcast: true,
+  slotIndex: true,
+  createdAt: true,
+  updatedAt: true
+} as const;
+
+function slimMycasePayload(input: unknown): object {
+  const raw =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? (input as Record<string, unknown>)
+      : {};
+  const stripped = stripDataUrlsFromJson(raw) as Record<string, unknown>;
+  const styleRaw = stripped.style;
+  const style = styleRaw
+    ? (slimShowcaseStyleForPersist(styleRaw) as Record<string, unknown>)
+    : undefined;
+  if (style) {
+    style.v = 2;
+    assertShowcaseStyleWithinLimit(style, "mycase style");
+  }
+  const out: Record<string, unknown> = {
+    ...stripped,
+    ...(style ? { style } : {}),
+    v: 2
+  };
+  assertShowcaseStyleWithinLimit(out, "mycase payload");
+  return out;
+}
 
 export type CreateMycaseInput = {
   title: string;
@@ -79,7 +120,34 @@ function serializeCase(row: {
   ownerUserId: string;
   title: string;
   thumbnailUrl: string | null;
-  payloadJson: unknown;
+  payloadJson?: unknown;
+  isPublic: boolean;
+  isMainBroadcast: boolean;
+  slotIndex: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  const payload =
+    row.payloadJson != null ? slimMycasePayload(row.payloadJson) : { v: 2 };
+  return {
+    id: row.id,
+    ownerUserId: row.ownerUserId,
+    title: row.title,
+    thumbnailUrl: resolveThumbnail(row.thumbnailUrl, payload),
+    payloadJson: payload,
+    isPublic: row.isPublic,
+    isMainBroadcast: row.isMainBroadcast,
+    slotIndex: row.slotIndex,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
+  };
+}
+
+function serializeCaseMeta(row: {
+  id: string;
+  ownerUserId: string;
+  title: string;
+  thumbnailUrl: string | null;
   isPublic: boolean;
   isMainBroadcast: boolean;
   slotIndex: number | null;
@@ -90,8 +158,8 @@ function serializeCase(row: {
     id: row.id,
     ownerUserId: row.ownerUserId,
     title: row.title,
-    thumbnailUrl: resolveThumbnail(row.thumbnailUrl, row.payloadJson),
-    payloadJson: row.payloadJson,
+    thumbnailUrl: clampThumb(row.thumbnailUrl),
+    payloadJson: { v: 2 },
     isPublic: row.isPublic,
     isMainBroadcast: row.isMainBroadcast,
     slotIndex: row.slotIndex,
@@ -217,7 +285,7 @@ async function touchMainBroadcastChangedAt(userId: string, tier: MycaseTier) {
 
 export async function createMycase(userId: string, input: CreateMycaseInput) {
   const title = clampTitle(input.title);
-  const payloadJson = stripDataUrlsFromJson(input.payloadJson ?? {}) ?? {};
+  const payloadJson = slimMycasePayload(input.payloadJson ?? {}) as Record<string, unknown>;
   const wantMain = Boolean(input.isMainBroadcast);
   const tier = await resolveMycaseTier(userId);
 
@@ -239,16 +307,46 @@ export async function createMycase(userId: string, input: CreateMycaseInput) {
     }
   });
 
+  /* CDN 미러 — 실패해도 DB slim 으로 동작 */
+  const style = (payloadJson as { style?: unknown }).style;
+  let nextPayload = payloadJson;
+  if (style) {
+    const styleUrl = await uploadShowcaseStyleJsonToR2({
+      userId,
+      caseId: row.id,
+      style
+    });
+    if (styleUrl) {
+      nextPayload = { ...payloadJson, styleUrl };
+      try {
+        await prisma.showcaseCase.update({
+          where: { id: row.id },
+          data: { payloadJson: nextPayload as object }
+        });
+      } catch {
+        /* ignore */
+      }
+      try {
+        await prisma.$executeRaw`
+          UPDATE showcase_cases SET style_url = ${styleUrl} WHERE id = ${row.id}::uuid
+        `;
+      } catch {
+        /* 마이그레이션 전 */
+      }
+    }
+  }
+
   if (wantMain) {
     await touchMainBroadcastChangedAt(userId, tier);
   }
 
-  return serializeCase(row);
+  return serializeCase({ ...row, payloadJson: nextPayload });
 }
 
 export async function updateMycase(userId: string, caseId: string, input: UpdateMycaseInput) {
   const existing = await prisma.showcaseCase.findFirst({
-    where: { id: caseId, ownerUserId: userId, deletedAt: null }
+    where: { id: caseId, ownerUserId: userId, deletedAt: null },
+    select: MYCASE_META_SELECT
   });
   if (!existing) {
     throw new MycaseBroadcastError("not_found", "마이케이스를 찾을 수 없습니다.", 404);
@@ -260,17 +358,21 @@ export async function updateMycase(userId: string, caseId: string, input: Update
     data.thumbnailUrl = clampThumb(input.thumbnailUrl);
   }
   if (input.payloadJson !== undefined) {
-    data.payloadJson = stripDataUrlsFromJson(input.payloadJson) as object;
+    data.payloadJson = slimMycasePayload(input.payloadJson);
   }
   if (input.isPublic !== undefined) data.isPublic = Boolean(input.isPublic);
 
-  /** 내용 수정은 덮어쓰기 대신 새 아카이브로 남기려면 createMycase 사용.
-   *  메타/공개여부/썸네일만 PATCH. payloadJson 전달 시 해당 행만 갱신(실수 방지용). */
+  /** 메타/공개여부/썸네일만 PATCH. payloadJson 전달 시 slim 강제 */
   const row = await prisma.showcaseCase.update({
     where: { id: caseId },
-    data
+    data,
+    select: input.payloadJson !== undefined
+      ? { ...MYCASE_META_SELECT, payloadJson: true }
+      : MYCASE_META_SELECT
   });
-  return serializeCase(row);
+  return input.payloadJson !== undefined
+    ? serializeCase(row as typeof row & { payloadJson: unknown })
+    : serializeCaseMeta(row);
 }
 
 /**
@@ -340,7 +442,8 @@ export async function archiveShowcaseSnapshot(
 
 export async function softDeleteMycase(userId: string, caseId: string) {
   const existing = await prisma.showcaseCase.findFirst({
-    where: { id: caseId, ownerUserId: userId, deletedAt: null }
+    where: { id: caseId, ownerUserId: userId, deletedAt: null },
+    select: { id: true, isMainBroadcast: true }
   });
   if (!existing) {
     throw new MycaseBroadcastError("not_found", "마이케이스를 찾을 수 없습니다.", 404);
@@ -367,7 +470,8 @@ export async function softDeleteMycase(userId: string, caseId: string) {
 
 export async function setMainBroadcast(userId: string, caseId: string, enabled: boolean) {
   const existing = await prisma.showcaseCase.findFirst({
-    where: { id: caseId, ownerUserId: userId, deletedAt: null }
+    where: { id: caseId, ownerUserId: userId, deletedAt: null },
+    select: MYCASE_META_SELECT
   });
   if (!existing) {
     throw new MycaseBroadcastError("not_found", "마이케이스를 찾을 수 없습니다.", 404);
@@ -375,7 +479,7 @@ export async function setMainBroadcast(userId: string, caseId: string, enabled: 
 
   if (Boolean(existing.isMainBroadcast) === Boolean(enabled)) {
     return {
-      item: serializeCase(existing),
+      item: serializeCaseMeta(existing),
       policy: await getBroadcastPolicy(userId)
     };
   }
@@ -387,10 +491,11 @@ export async function setMainBroadcast(userId: string, caseId: string, enabled: 
     const slotIndex = await nextSlotIndex(userId);
     const row = await prisma.showcaseCase.update({
       where: { id: caseId },
-      data: { isMainBroadcast: true, isPublic: true, slotIndex }
+      data: { isMainBroadcast: true, isPublic: true, slotIndex },
+      select: MYCASE_META_SELECT
     });
     await touchMainBroadcastChangedAt(userId, tier);
-    return { item: serializeCase(row), policy: await getBroadcastPolicy(userId) };
+    return { item: serializeCaseMeta(row), policy: await getBroadcastPolicy(userId) };
   }
 
   // OFF — 무료도 쿨다운 적용 (변경으로 간주)
@@ -419,10 +524,11 @@ export async function setMainBroadcast(userId: string, caseId: string, enabled: 
 
   const row = await prisma.showcaseCase.update({
     where: { id: caseId },
-    data: { isMainBroadcast: false, slotIndex: null }
+    data: { isMainBroadcast: false, slotIndex: null },
+    select: MYCASE_META_SELECT
   });
   await touchMainBroadcastChangedAt(userId, tier);
-  return { item: serializeCase(row), policy: await getBroadcastPolicy(userId) };
+  return { item: serializeCaseMeta(row), policy: await getBroadcastPolicy(userId) };
 }
 
 export async function listMycaseMine(userId: string, limit = 24, cursor?: string) {
@@ -652,24 +758,73 @@ export async function getMycaseDetail(viewerId: string | null, caseId: string) {
     throw new MycaseBroadcastError("not_found", "마이케이스를 찾을 수 없습니다.", 404);
   }
 
-  const row = await prisma.showcaseCase.findFirst({
-    where: { id, deletedAt: null }
-  });
+  /* payload_json 전체 대신 style 키만 추출 (Pooler egress) */
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      owner_user_id: string;
+      title: string;
+      thumbnail_url: string | null;
+      payload_json: unknown;
+      is_public: boolean;
+      is_main_broadcast: boolean;
+      slot_index: number | null;
+      created_at: Date;
+      updated_at: Date;
+    }>
+  >(Prisma.sql`
+    SELECT
+      id,
+      owner_user_id,
+      title,
+      thumbnail_url,
+      CASE
+        WHEN payload_json ? 'style' THEN jsonb_build_object(
+          'style', payload_json->'style',
+          'v', COALESCE(payload_json->'v', '2'::jsonb),
+          'source', payload_json->'source'
+        )
+        ELSE COALESCE(payload_json, '{}'::jsonb)
+      END AS payload_json,
+      is_public,
+      is_main_broadcast,
+      slot_index,
+      created_at,
+      updated_at
+    FROM showcase_cases
+    WHERE id = ${id}::uuid
+      AND deleted_at IS NULL
+    LIMIT 1
+  `);
+  const row = rows[0];
   if (!row) {
     throw new MycaseBroadcastError("not_found", "마이케이스를 찾을 수 없습니다.", 404);
   }
 
-  const ctx = await buildViewerAccessContext(viewerId, row.ownerUserId);
+  const mapped = {
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    title: row.title,
+    thumbnailUrl: row.thumbnail_url,
+    payloadJson: row.payload_json,
+    isPublic: row.is_public,
+    isMainBroadcast: row.is_main_broadcast,
+    slotIndex: row.slot_index,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+
+  const ctx = await buildViewerAccessContext(viewerId, mapped.ownerUserId);
   if (ctx.isOwner) {
-    return { item: serializeCase(row), isOwner: true };
+    return { item: serializeCase(mapped), isOwner: true };
   }
 
   /* 메인 송출은 비공개 플래그와 무관하게 열람 가능 */
-  if (!row.isPublic && !row.isMainBroadcast) {
+  if (!mapped.isPublic && !mapped.isMainBroadcast) {
     throw new MycaseBroadcastError("forbidden", "비공개 마이케이스입니다.", 403);
   }
 
-  const access = await canViewerOpenCaseArchive(viewerId, row.ownerUserId);
+  const access = await canViewerOpenCaseArchive(viewerId, mapped.ownerUserId);
   if (!access.allowed) {
     throw new MycaseBroadcastError(
       "forbidden",
@@ -679,5 +834,5 @@ export async function getMycaseDetail(viewerId: string | null, caseId: string) {
     );
   }
 
-  return { item: serializeCase(row), isOwner: false };
+  return { item: serializeCase(mapped), isOwner: false };
 }

@@ -89,8 +89,8 @@ export async function syncBizcardAccountFromApi(opts = {}) {
   const force = Boolean(opts.force);
   const [ctx, meta] = await Promise.all([
     fetchB2bMembershipUiContext().catch(() => null),
-    /* 허브·계정 동기화는 스냅샷 불필요 — lite 로 Pooler egress 절감 */
-    fetchDigitalCardMeta({ force, lite: !force }).catch(() => ({ issued: false, cardId: null }))
+    /* force 여부와 무관하게 lite — full snapshot 은 로그인 후 1회만 (App) */
+    fetchDigitalCardMeta({ force, lite: true }).catch(() => ({ issued: false, cardId: null }))
   ]);
 
   if (ctx?.company?.company_name) {

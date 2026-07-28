@@ -578,8 +578,17 @@ model DigitalCard {
   membershipTierSnapshot String? @map("membership_tier_snapshot") @db.VarChar(20)
   /// 외부 HTML 명함 배포용 디자인 템플릿 (modern-dark | professional-gold | creative-gradient)
   designTemplateSnapshot String? @map("design_template_snapshot") @db.VarChar(40)
-  /// 카카오 OG·썸네일용 명함 스냅샷 (프론트 동기화)
+  /// 카카오 OG·썸네일용 명함 스냅샷 (슬림 https URL·텍스트만 — data URL 금지)
   exportSnapshotJson Json? @map("export_snapshot_json")
+
+  /// 정규화 메타 컬럼 — 목록·lite·검색용 (JSONB 통째 SELECT 대체)
+  photoUrl             String? @map("photo_url") @db.Text
+  logoUrl              String? @map("logo_url") @db.Text
+  displayName          String? @map("display_name") @db.VarChar(120)
+  organization         String? @map("organization") @db.VarChar(200)
+  titleSnapshot        String? @map("title_snapshot") @db.VarChar(120)
+  departmentSnapshot   String? @map("department_snapshot") @db.VarChar(120)
+  activityName         String? @map("activity_name") @db.VarChar(80)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1521,8 +1530,11 @@ model ShowcaseCase {
   /// 인스타그램 그리드용 대표 썸네일 URL (https only — data URL 금지)
   thumbnailUrl String? @map("thumbnail_url") @db.Text
 
-  /// 쇼케이스 전체 스냅샷(페이지·스타일·명함 플래그 등). 새 저장 = 새 행.
+  /// 쇼케이스 전체 스냅샷(슬림 style https URL만). 새 저장 = 새 행.
   payloadJson Json @map("payload_json") @db.JsonB
+
+  /// 선택: 스타일 JSON 을 R2에 두고 DB에는 URL만 (CDN 읽기 · Pooler 우회)
+  styleUrl String? @map("style_url") @db.Text
 
   /// 타인 케이스함 공개 여부
   isPublic Boolean @default(true) @map("is_public")

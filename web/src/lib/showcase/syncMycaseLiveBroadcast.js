@@ -88,7 +88,11 @@ export function applyMycaseItemToLiveBroadcast(item) {
  */
 let liveHydrateInFlight = null;
 let lastLiveHydrateOkAt = 0;
-const LIVE_HYDRATE_COOLDOWN_MS = 45_000;
+  const LIVE_HYDRATE_COOLDOWN_MS =
+    typeof import.meta !== "undefined" &&
+    Boolean(import.meta.env?.DEV || import.meta.env?.MODE === "development")
+      ? 180_000
+      : 45_000;
 
 export async function hydrateLiveBroadcastFromServer(opts = {}) {
   const force = Boolean(opts.force);

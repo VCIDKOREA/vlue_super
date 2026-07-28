@@ -1,14 +1,21 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import { stripDataUrlsFromJson } from "../../lib/mediaUrlGuard.js";
+import {
+  assertShowcaseStyleWithinLimit,
+  slimShowcaseStyleForPersist,
+  slimShowcaseStyleForPublic
+} from "../../lib/slimShowcaseStyle.js";
 
 export type ShowcaseLiveSource = { source: "editor" | "mycase"; at: number };
 
 export type ShowcaseStyleBundle = {
+  v: 2;
   editor: unknown | null;
   live: unknown | null;
   liveSource: ShowcaseLiveSource | null;
   updatedAt: string | null;
+  unchanged?: boolean;
 };
 
 function asObjectOrNull(value: unknown): Record<string, unknown> | null {
@@ -25,7 +32,43 @@ function normalizeLiveSource(raw: unknown): ShowcaseLiveSource | null {
   return { source, at: Number.isFinite(at) ? at : Date.now() };
 }
 
-export async function getUserShowcaseStyleBundle(userId: string): Promise<ShowcaseStyleBundle> {
+function prepareStyleForDb(raw: unknown): Record<string, unknown> | null {
+  const obj = asObjectOrNull(raw);
+  if (!obj) return null;
+  const slim = slimShowcaseStyleForPersist(stripDataUrlsFromJson(obj)) as Record<string, unknown>;
+  slim.v = 2;
+  assertShowcaseStyleWithinLimit(slim, "showcase style");
+  return slim;
+}
+
+/** updatedAt 만 — JSONB 본문 SELECT 없음 */
+export async function getUserShowcaseStyleUpdatedAt(userId: string): Promise<string | null> {
+  const row = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { showcaseStyleUpdatedAt: true }
+  });
+  return row?.showcaseStyleUpdatedAt ? row.showcaseStyleUpdatedAt.toISOString() : null;
+}
+
+export async function getUserShowcaseStyleBundle(
+  userId: string,
+  opts: { ifNoneMatch?: string | null } = {}
+): Promise<ShowcaseStyleBundle> {
+  const ifNone = String(opts.ifNoneMatch || "").trim();
+  if (ifNone) {
+    const serverAt = await getUserShowcaseStyleUpdatedAt(userId);
+    if (serverAt && serverAt === ifNone) {
+      return {
+        v: 2,
+        editor: null,
+        live: null,
+        liveSource: null,
+        updatedAt: serverAt,
+        unchanged: true
+      };
+    }
+  }
+
   const row = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -35,23 +78,42 @@ export async function getUserShowcaseStyleBundle(userId: string): Promise<Showca
       showcaseStyleUpdatedAt: true
     }
   });
+  const updatedAt = row?.showcaseStyleUpdatedAt ? row.showcaseStyleUpdatedAt.toISOString() : null;
   return {
-    editor: row?.showcaseStyleJson ?? null,
-    live: row?.showcaseLiveStyleJson ?? null,
+    v: 2,
+    editor: row?.showcaseStyleJson
+      ? slimShowcaseStyleForPersist(row.showcaseStyleJson)
+      : null,
+    live: row?.showcaseLiveStyleJson
+      ? slimShowcaseStyleForPersist(row.showcaseLiveStyleJson)
+      : null,
     liveSource: normalizeLiveSource(row?.showcaseLiveSourceJson),
-    updatedAt: row?.showcaseStyleUpdatedAt ? row.showcaseStyleUpdatedAt.toISOString() : null
+    updatedAt
   };
 }
 
 /**
  * 타인 공개용 — 라이브 우선, 없으면 편집본 폴백.
- * 라이브가 있으면 editor JSONB 는 SELECT 하지 않음 (Pooler egress 절감).
+ * 응답은 public slim. ifNoneMatch 시 본문 생략.
  */
-export async function getUserShowcasePublicLive(userId: string): Promise<{
+export async function getUserShowcasePublicLive(
+  userId: string,
+  opts: { ifNoneMatch?: string | null } = {}
+): Promise<{
+  v: 2;
   live: unknown | null;
   liveSource: ShowcaseLiveSource | null;
   updatedAt: string | null;
+  unchanged?: boolean;
 }> {
+  const ifNone = String(opts.ifNoneMatch || "").trim();
+  if (ifNone) {
+    const serverAt = await getUserShowcaseStyleUpdatedAt(userId);
+    if (serverAt && serverAt === ifNone) {
+      return { v: 2, live: null, liveSource: null, updatedAt: serverAt, unchanged: true };
+    }
+  }
+
   const row = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -63,24 +125,29 @@ export async function getUserShowcasePublicLive(userId: string): Promise<{
   const liveSource = normalizeLiveSource(row?.showcaseLiveSourceJson);
   const updatedAt = row?.showcaseStyleUpdatedAt ? row.showcaseStyleUpdatedAt.toISOString() : null;
   if (row?.showcaseLiveStyleJson != null) {
-    return { live: row.showcaseLiveStyleJson, liveSource, updatedAt };
+    return {
+      v: 2,
+      live: slimShowcaseStyleForPublic(row.showcaseLiveStyleJson),
+      liveSource,
+      updatedAt
+    };
   }
   const editorRow = await prisma.user.findUnique({
     where: { id: userId },
     select: { showcaseStyleJson: true }
   });
   return {
-    live: editorRow?.showcaseStyleJson ?? null,
+    v: 2,
+    live: editorRow?.showcaseStyleJson
+      ? slimShowcaseStyleForPublic(editorRow.showcaseStyleJson)
+      : null,
     liveSource,
     updatedAt
   };
 }
 
 /**
- * LWW: clientUpdatedAt 가 서버보다 오래되면 거부하고 서버본 반환.
- * clientUpdatedAt 없으면 항상 저장(서버 now).
- * 성공 시 전체 JSON 재조회 없이 updatedAt 만 반환 (응답 egress 절감).
- * 충돌 판정용 메타는 JSONB 본문 없이 IS NOT NULL 만 조회.
+ * LWW + slim-only write. 성공 시 updatedAt 만 반환.
  */
 export async function putUserShowcaseStyleBundle(
   userId: string,
@@ -135,18 +202,18 @@ export async function putUserShowcaseStyleBundle(
   };
 
   if (input.editor !== undefined) {
-    const editor = asObjectOrNull(input.editor);
+    const editor = prepareStyleForDb(input.editor);
     if (editor) {
-      data.showcaseStyleJson = stripDataUrlsFromJson(editor) as Prisma.InputJsonValue;
+      data.showcaseStyleJson = editor as Prisma.InputJsonValue;
     }
   }
   if (input.live !== undefined) {
     if (input.live === null) {
       data.showcaseLiveStyleJson = Prisma.JsonNull;
     } else {
-      const live = asObjectOrNull(input.live);
+      const live = prepareStyleForDb(input.live);
       if (live) {
-        data.showcaseLiveStyleJson = stripDataUrlsFromJson(live) as Prisma.InputJsonValue;
+        data.showcaseLiveStyleJson = live as Prisma.InputJsonValue;
       }
     }
   }

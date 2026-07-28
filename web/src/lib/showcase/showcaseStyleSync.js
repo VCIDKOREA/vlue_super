@@ -1,5 +1,5 @@
 import { fetchShowcaseStyleBundle, putShowcaseStyleBundle } from "./showcaseStyleApi.js";
-import { slimShowcaseStyleForPersist } from "./slimShowcaseStyleForPersist.js";
+import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "./slimShowcaseStyleForPersist.js";
 import {
   readLiveShowcaseSource,
   readLiveShowcaseStyle,
@@ -17,7 +17,14 @@ let pushTimer = null;
 let hydrateInFlight = null;
 /** 앱 로그인 hydrate 직후 설정 시트가 재요청하지 않도록 */
 let lastHydrateOkAt = 0;
-const HYDRATE_COOLDOWN_MS = 60_000;
+let poolerCallCount = 0;
+
+const isDev =
+  typeof import.meta !== "undefined" &&
+  Boolean(import.meta.env?.DEV || import.meta.env?.MODE === "development");
+
+/** 개발: 5분 / 운영: 60초 — 원격 Pooler 낭비 방지 */
+const HYDRATE_COOLDOWN_MS = isDev ? 300_000 : 60_000;
 
 export function readLocalShowcaseStyleUpdatedAt() {
   try {
@@ -43,6 +50,13 @@ export function writeLocalShowcaseStyleUpdatedAt(iso) {
 
 export function bumpLocalShowcaseStyleUpdatedAt() {
   return writeLocalShowcaseStyleUpdatedAt(new Date().toISOString());
+}
+
+function notePoolerCall(kind) {
+  poolerCallCount += 1;
+  if (isDev && typeof console !== "undefined") {
+    console.info(`[egress] showcase-style ${kind} (#${poolerCallCount})`);
+  }
 }
 
 /** 사진·쇼셜링크·본문 등 실질 편집 여부 */
@@ -92,6 +106,7 @@ export async function pushShowcaseStyleBundle() {
   const liveSource = readLiveShowcaseSource();
   const clientUpdatedAt = readLocalShowcaseStyleUpdatedAt() || bumpLocalShowcaseStyleUpdatedAt();
 
+  notePoolerCall("PUT");
   const result = await putShowcaseStyleBundle({
     editor,
     live,
@@ -120,22 +135,29 @@ export function scheduleShowcaseStylePush(delayMs = 900) {
 }
 
 /**
- * 로그인·앱 기동 시 — 서버 ↔ 로컬 동기화
+ * 로그인·앱 기동 시 — 서버 ↔ 로컬 동기화 (조건부 GET + 로컬 우선)
  * @param {{ forceServer?: boolean }} [opts]
- * - forceServer: 계정 전환 직후 — 서버본만 적용, 로컬 잔여 push 금지
- * - 그 외: 서버만 있으면 끌어옴 / 로컬만 있으면 올림 / 둘 다 있으면 LWW
  */
 export async function hydrateShowcaseStyleFromServer(opts = {}) {
   const forceServer = Boolean(opts.forceServer);
   if (hydrateInFlight && !forceServer) return hydrateInFlight;
-  /* 최근 성공 hydrate 있으면 재요청 생략 — 설정 패널·홈 중복 진입 절감 */
   if (!forceServer && lastHydrateOkAt && Date.now() - lastHydrateOkAt < HYDRATE_COOLDOWN_MS) {
     return { ok: true, applied: false, skipped: true, recent: true };
   }
   const run = (async () => {
-    const remote = await fetchShowcaseStyleBundle();
+    notePoolerCall(forceServer ? "GET-force" : "GET");
+    const remote = await fetchShowcaseStyleBundle({
+      force: forceServer,
+      ifNoneMatch: forceServer ? "" : readLocalShowcaseStyleUpdatedAt()
+    });
     if (!remote.ok) {
       return { ok: false, error: remote.error };
+    }
+
+    if (remote.unchanged) {
+      lastHydrateOkAt = Date.now();
+      if (remote.updatedAt) writeLocalShowcaseStyleUpdatedAt(remote.updatedAt);
+      return { ok: true, applied: false, unchanged: true, pushed: false };
     }
 
     if (forceServer) {

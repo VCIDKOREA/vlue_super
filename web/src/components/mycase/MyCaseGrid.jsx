@@ -26,7 +26,7 @@ import {
   extractShowcaseArchiveTitle,
   extractShowcaseCoverUrl
 } from "../../lib/showcase/showcaseCover.js";
-import { slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
+import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
 import {
