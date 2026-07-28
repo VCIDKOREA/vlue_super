@@ -180,6 +180,8 @@ export default function CallBigPushPreviewSection({
       className={`mx-auto w-full max-w-md px-0 pb-0 pt-0 ${className}`.trim()}
       aria-label={VLUE_SHOWCASE.nameEn}
       onPointerDownCapture={() => {
+        /* 펼친 미리보기에서만 autoplay 잠금 해제 — 접힌 상태 클릭으로 재생 재개 금지 */
+        if (!expanded) return;
         try {
           unlockFromUserGesture?.();
         } catch {

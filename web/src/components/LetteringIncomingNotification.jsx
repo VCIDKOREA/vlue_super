@@ -741,7 +741,7 @@ export default function LetteringIncomingNotification({
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;
   const carouselScrollEnabled = isPaidMember && (previewMode || onCall || isExpandedView);
-  /** 홈 미리보기 접힘: 신규 재생은 막되, 펼침 중 재생분은 캐러셀 cleanup 핸드오프로 유지 */
+  /** 홈 미리보기 접힘: BGM 재생 중지 */
   const carouselSuppressBgm =
     Boolean(suppressBgm) || Boolean(previewMode && !isExpandedView);
   const showcasePhotos = c.showcaseStyle?.gallery?.photos || [];

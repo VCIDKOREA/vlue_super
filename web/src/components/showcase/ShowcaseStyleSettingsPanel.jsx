@@ -261,12 +261,9 @@ export default function ShowcaseStyleSettingsPanel({
       .then(async (m) => {
         await m.hydrateShowcaseStyleFromServer();
         if (cancelled) return;
-        const healed = readShowcaseStyle();
-        setConfig(healed);
+        setConfig(readShowcaseStyle());
         try {
-          /* 재생목록만 있고 mode=none 인 상태도 normalize 로 복구돼 앱·미리보기에 반영 */
-          writeShowcaseStyle(healed, { skipSync: true, silent: true });
-          writeLiveShowcaseStyle(healed, { source: "editor" });
+          writeLiveShowcaseStyle(readShowcaseStyle(), { skipSync: true });
         } catch {
           /* ignore */
         }
@@ -274,10 +271,7 @@ export default function ShowcaseStyleSettingsPanel({
       .catch(() => {
         if (cancelled) return;
         try {
-          const healed = readShowcaseStyle();
-          setConfig(healed);
-          writeShowcaseStyle(healed, { skipSync: true, silent: true });
-          writeLiveShowcaseStyle(healed, { source: "editor" });
+          writeLiveShowcaseStyle(readShowcaseStyle(), { skipSync: true });
         } catch {
           /* ignore */
         }
@@ -875,11 +869,7 @@ export default function ShowcaseStyleSettingsPanel({
         </span>
         <span className="showcase-profile-row__trail">
           <span className="showcase-profile-row__value">
-            {config.bgm?.mode && config.bgm.mode !== "none"
-              ? "설정됨"
-              : Array.isArray(config.bgm?.playlist) && config.bgm.playlist.length > 0
-                ? `재생목록 ${config.bgm.playlist.length}곡`
-                : "미설정"}
+            {config.bgm?.mode === "none" || !config.bgm?.mode ? "미설정" : "설정됨"}
           </span>
           {openMusic ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </span>

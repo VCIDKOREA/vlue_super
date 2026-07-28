@@ -495,28 +495,7 @@ export default function ShowcaseBgmPicker({
     } else {
       notify(`재생목록에 추가했습니다. (${nextPlaylist.length}/${playlistLimit})`);
     }
-    /* 주제곡 미선택 + 재생목록만 있으면 미리보기·앱에 곡이 안 나옴 → 첫 곡을 쇼케이스 음원으로 연결 */
-    if (!value?.mode || value.mode === "none" || !String(value?.soundId || "").trim()) {
-      Object.assign(patch, {
-        mode: entry.mode,
-        soundId: entry.soundId,
-        title: entry.title,
-        artistName: entry.artistName || "",
-        audioUrl: entry.audioUrl,
-        attributionLabel: entry.attributionLabel || "",
-        linkBroken: Boolean(entry.linkBroken),
-        ownerHandle: entry.ownerHandle || "",
-        sharedOwnerHandle: entry.sharedOwnerHandle || "",
-        createType: entry.createType || ""
-      });
-    }
     patchBgm(patch);
-    if (coexistWithPreview) {
-      window.setTimeout(() => {
-        setPlaybackPhase("idle", { release: true });
-        dispatchShowcaseBgmOwnerReleased();
-      }, 40);
-    }
   };
 
   /** 보관·선택 중인 주제곡을 재생목록에 넣기 */

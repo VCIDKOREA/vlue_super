@@ -177,14 +177,26 @@ export default function ShowcaseCallCarousel({
   );
   const suppressBgmRef = useRef(suppressBgm);
   suppressBgmRef.current = suppressBgm;
+  const prevSuppressBgmRef = useRef(suppressBgm);
   const bgmFpRef = useRef("");
 
   /* 쇼케이스 캐러셀이 보이면 BGM 바인딩·재생 (실통화 스크롤 잠금만 무음)
    * styleConfig 객체 참조·서명 URL 변경으로 effect가 반복 재실행되면 재생이 끊기므로 identity fingerprint만 의존
-   * suppressBgm=true: 케이스함 등 상위 BGM을 끊지 않음 (접힘 전환 시 idle 스킵으로 핸드오프)
+   * suppressBgm=true: 케이스함 게시물 등 처음부터 억제면 상위 BGM 유지 / 접힘으로 전환되면 재생 중지
    * setPlaybackPhase 는 deps 금지 — 콜백 신원 변경 시 cleanup idle 로 끊김 방지 */
   useEffect(() => {
-    if (suppressBgm) return undefined;
+    const wasSuppressed = prevSuppressBgmRef.current;
+    prevSuppressBgmRef.current = suppressBgm;
+
+    if (suppressBgm) {
+      /* 홈 미리보기 접힘 등 — 재생 중이던 캐러셀 BGM 은 끈다.
+         처음부터 suppress 로 마운트된 케이스함 게시물은 wasSuppressed=true 라 상위 음원을 건드리지 않음 */
+      if (!wasSuppressed) {
+        setPlaybackPhase("idle", { fade: true, owner: "carousel", steal: true });
+        bgmFpRef.current = "";
+      }
+      return undefined;
+    }
     const hasBgm =
       Boolean(resolveShowcaseBgmUrl(styleConfig)) || hasShowcaseBgmConfigured(styleConfig);
     if (!hasBgm) {
@@ -204,7 +216,7 @@ export default function ShowcaseCallCarousel({
       styleConfig
     });
     return () => {
-      /* 접힘·게시물 suppress 로 넘길 때는 끊지 않음 — 언마운트/실제 이탈만 idle */
+      /* 접힘·게시물 suppress 로 넘길 때는 위에서 이미 처리 — 언마운트/실제 이탈만 idle */
       if (suppressBgmRef.current) return;
       setPlaybackPhase("idle", { fade: true, owner: "carousel" });
     };
