@@ -1,3 +1,4 @@
+import { useCallback, useRef } from 'react';
 import { ArrowLeft, LogIn, Sparkles } from 'lucide-react';
 import SensitiveRightClickGuard from '../components/SensitiveRightClickGuard';
 import WebBizcardHub from '../components/WebBizcardHub';
@@ -18,6 +19,14 @@ export default function BusinessCardPage({
   mode = 'bizcard',
 }: BusinessCardPageProps) {
   const isShowcase = mode === 'showcase';
+  const leaveGuardRef = useRef<(() => void) | null>(null);
+  const handleBack = useCallback(() => {
+    if (typeof leaveGuardRef.current === 'function') {
+      leaveGuardRef.current();
+      return;
+    }
+    onBack();
+  }, [onBack]);
 
   return (
     <div className="min-h-screen pt-16 bg-gray-50">
@@ -25,7 +34,7 @@ export default function BusinessCardPage({
         className={`mx-auto px-3 sm:px-4 ${isShowcase ? 'max-w-[1280px] py-4' : 'max-w-3xl py-8'}`}
       >
         <button
-          onClick={onBack}
+          onClick={handleBack}
           className={`flex items-center gap-2 text-sm text-gray-500 hover:text-primary-600 transition-colors ${
             isShowcase ? 'mb-3' : 'mb-6'
           }`}
@@ -85,7 +94,14 @@ export default function BusinessCardPage({
             </button>
           </div>
         ) : (
-          <WebBizcardHub user={user} autoOpenShowcase={isShowcase} />
+          <WebBizcardHub
+            user={user}
+            autoOpenShowcase={isShowcase}
+            onLeave={onBack}
+            onBindLeaveGuard={(fn) => {
+              leaveGuardRef.current = fn;
+            }}
+          />
         )}
       </SensitiveRightClickGuard>
     </div>

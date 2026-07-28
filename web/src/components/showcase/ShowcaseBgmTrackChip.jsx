@@ -137,13 +137,16 @@ export default function ShowcaseBgmTrackChip({
         throw new Error(`재생목록은 최대 ${limit}곡까지입니다.`);
       }
       const entry = bgmToPlaylistEntry(bgm);
-      writeShowcaseStyle({
-        bgm: {
-          ...style.bgm,
-          playlist: [...playlist, entry]
-        }
-      });
-      toast("재생목록에 추가했습니다.");
+      writeShowcaseStyle(
+        {
+          bgm: {
+            ...style.bgm,
+            playlist: [...playlist, entry]
+          }
+        },
+        { skipSync: true }
+      );
+      toast("재생목록에 추가했습니다. 「적용하기」를 눌러 저장하세요.");
     } catch (err) {
       toast(err?.message || "재생목록 추가에 실패했습니다.");
     } finally {

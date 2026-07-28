@@ -92,7 +92,7 @@ export function applyInstagramVerifiedLocal(username, opts = {}) {
         instagram: profileUrl
       }
     }
-  });
+  }, { skipSync: true });
 }
 
 /** 연동 해제 시 인증·선택 미디어 정리 */
@@ -117,7 +117,7 @@ export function clearInstagramVerifiedLocal() {
         instagram: ""
       }
     }
-  });
+  }, { skipSync: true });
 }
 
 /**

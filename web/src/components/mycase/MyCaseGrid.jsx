@@ -26,6 +26,7 @@ import {
   extractShowcaseArchiveTitle,
   extractShowcaseCoverUrl
 } from "../../lib/showcase/showcaseCover.js";
+import { slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
 import {
@@ -241,21 +242,16 @@ export default function MyCaseGrid({
 
   useEffect(() => {
     if (!isMine) return undefined;
-    let timer = 0;
     const onChanged = () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        setStyleTick((n) => n + 1);
-        void loadFirst();
-      }, 500);
+      /* STYLE_CHANGED 시 목록 재 GET 금지 — 로컬 BGM/하이라이트만 갱신.
+         아카이브·삭제·메인변경은 각 핸들러가 loadFirst 호출 */
+      setStyleTick((n) => n + 1);
     };
-    /* LIVE 는 미리보기용 — 목록 재조회는 STYLE(적용) 만 */
     window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onChanged);
     return () => {
-      window.clearTimeout(timer);
       window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onChanged);
     };
-  }, [isMine, loadFirst]);
+  }, [isMine]);
 
   const caseStyleConfig = useMemo(() => {
     if (isMine) {
@@ -659,10 +655,10 @@ export default function MyCaseGrid({
     }
     setBusyId("archive");
     try {
-      const archiveStyle = {
+      const archiveStyle = slimShowcaseStyleForPersist({
         ...style,
         bgm: createEmptyShowcaseBgm()
-      };
+      });
       const res = await archiveShowcaseToMycase({
         title,
         thumbnailUrl: cover || null,

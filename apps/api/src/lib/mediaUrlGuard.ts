@@ -10,6 +10,10 @@ const HTTP_URL_RE = /^\s*https?:\/\//i;
 const MEDIA_KEY_RE =
   /^(url|src|href|photoUrl|logoUrl|imageUrl|image_url|shareCoverUrl|thumbnailUrl|coverUrl|avatarUrl|kakaoFeedBgUrl|audioUrl|videoUrl|docUrl|docDataUrl|bgUrl|backgroundUrl)$/i;
 
+/** 클라이언트 편집 전용 — DB JSON에 남기지 않음 */
+const DROP_LOCAL_KEY_RE =
+  /^(photoDataUrl|logoDataUrl|docDataUrl|kakaoFeedBgDataUrl|dataUrl|previewUrl|localPreviewUrl|blobUrl)$/i;
+
 export function isDataUrl(value: unknown): boolean {
   return typeof value === "string" && DATA_URL_RE.test(value);
 }
@@ -59,6 +63,7 @@ export function stripDataUrlsFromJson(value: unknown, depth = 0): unknown {
   if (typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (DROP_LOCAL_KEY_RE.test(k)) continue;
       if (MEDIA_KEY_RE.test(k) && (isDataUrl(v) || isBlobUrl(v))) {
         out[k] = null;
         continue;

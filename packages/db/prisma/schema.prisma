@@ -1518,7 +1518,7 @@ model ShowcaseCase {
   /// 그리드·목록 표시용 제목
   title String @map("title") @db.VarChar(200)
 
-  /// 인스타그램 그리드용 대표 썸네일 URL (data URL 포함 — TEXT)
+  /// 인스타그램 그리드용 대표 썸네일 URL (https only — data URL 금지)
   thumbnailUrl String? @map("thumbnail_url") @db.Text
 
   /// 쇼케이스 전체 스냅샷(페이지·스타일·명함 플래그 등). 새 저장 = 새 행.

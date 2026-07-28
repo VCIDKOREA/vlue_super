@@ -394,9 +394,14 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
     return c.json({ error: "지원하지 않는 디자인 템플릿입니다." }, 400);
   }
 
+  const wantsSnapshot =
+    body.exportSnapshot != null && typeof body.exportSnapshot === "object";
+
   let cardRow = await prisma.digitalCard.findUnique({
     where: { userId: me },
-    select: { id: true, exportSnapshotJson: true }
+    select: wantsSnapshot
+      ? { id: true, exportSnapshotJson: true }
+      : { id: true }
   });
   if (!cardRow) {
     const sub = await prisma.userSubscription.findFirst({
@@ -407,15 +412,19 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
     const tier = sub ? "paid" : "free";
     cardRow = await prisma.digitalCard.create({
       data: { userId: me, membershipTierSnapshot: tier },
-      select: { id: true, exportSnapshotJson: true }
+      select: wantsSnapshot
+        ? { id: true, exportSnapshotJson: true }
+        : { id: true }
     });
   }
 
   const data: { designTemplateSnapshot?: string; exportSnapshotJson?: object } = {};
   if (tpl) data.designTemplateSnapshot = tpl;
-  if (body.exportSnapshot && typeof body.exportSnapshot === "object") {
-    const prev =
-      cardRow.exportSnapshotJson && typeof cardRow.exportSnapshotJson === "object"
+  if (wantsSnapshot && body.exportSnapshot) {
+    const prevSnap =
+      "exportSnapshotJson" in cardRow &&
+      cardRow.exportSnapshotJson &&
+      typeof cardRow.exportSnapshotJson === "object"
         ? (cardRow.exportSnapshotJson as Record<string, unknown>)
         : {};
     /* data URL 사진/로고가 스냅샷에 쌓이면 검색·프로필 조회마다 Supabase egress 폭증 */
@@ -432,7 +441,7 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
       }
     }
     data.exportSnapshotJson = {
-      ...mergeExportSnapshotMedia(prev, body.exportSnapshot),
+      ...mergeExportSnapshotMedia(prevSnap, body.exportSnapshot),
       ...(tpl ? { designTemplate: tpl } : {})
     };
   }
@@ -440,17 +449,14 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
   const updated = await prisma.digitalCard.update({
     where: { userId: me },
     data,
-    select: { id: true, designTemplateSnapshot: true, exportSnapshotJson: true }
+    select: { id: true, designTemplateSnapshot: true }
   });
 
+  /* exportSnapshotJson 에코 금지 — PATCH 응답 egress 절감 (클라이언트 로컬본 유지) */
   return c.json({
     ok: true,
     cardId: updated.id,
-    designTemplate: updated.designTemplateSnapshot,
-    exportSnapshot:
-      updated.exportSnapshotJson && typeof updated.exportSnapshotJson === "object"
-        ? updated.exportSnapshotJson
-        : null
+    designTemplate: updated.designTemplateSnapshot
   });
 });
 

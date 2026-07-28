@@ -264,12 +264,9 @@ export default function MyCaseDetailModal({
 
   useEffect(() => {
     if (!open || !feed.length) return;
-    const targets = [index - 1, index, index + 1]
-      .filter((i) => i >= 0 && i < feed.length)
-      .map((i) => feed[i]);
-    targets.forEach((it) => {
-      void ensureDetail(it);
-    });
+    /* 이웃 ±1 prefetch 금지 — 현재 아이템만 detail GET (Pooler egress) */
+    const current = feed[index];
+    if (current) void ensureDetail(current);
   }, [open, feed, index, ensureDetail]);
 
   useEffect(() => {

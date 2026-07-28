@@ -55,9 +55,6 @@ export async function putShowcaseStyleBundle({
     }
     return {
       ok: true,
-      editor: data.editor ?? null,
-      live: data.live ?? null,
-      liveSource: data.liveSource ?? null,
       updatedAt: data.updatedAt ?? null
     };
   } catch (e) {

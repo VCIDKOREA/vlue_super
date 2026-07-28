@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import { stripDataUrlsFromJson } from "../../lib/mediaUrlGuard.js";
 import {
@@ -459,35 +460,46 @@ export async function listMycaseMine(userId: string, limit = 24, cursor?: string
 }
 
 /**
- * hydrate용 — payloadJson 전체 대신 style만 반환 (Shared Pooler egress 절감)
- */
-function litePayloadStyleOnly(payloadJson: unknown): { style?: unknown } {
-  if (!payloadJson || typeof payloadJson !== "object") return {};
-  const style = (payloadJson as { style?: unknown }).style;
-  if (!style || typeof style !== "object") return {};
-  return { style };
-}
-
-/**
- * 통화 송출용 메인 케이스 — 1순위 1건만, payload는 style만 (목록 take:20 + 전체 JSON 금지)
+ * 통화 송출용 메인 케이스 — 1순위 1건만.
+ * DB에서도 payload_json 전체 대신 style 키만 추출 (Shared Pooler egress 절감).
  */
 export async function getLiveMainBroadcast(userId: string) {
-  const row = await prisma.showcaseCase.findFirst({
-    where: { ownerUserId: userId, deletedAt: null, isMainBroadcast: true },
-    orderBy: [{ slotIndex: "asc" }, { updatedAt: "desc" }],
-    select: {
-      id: true,
-      ownerUserId: true,
-      title: true,
-      thumbnailUrl: true,
-      payloadJson: true,
-      isPublic: true,
-      isMainBroadcast: true,
-      slotIndex: true,
-      createdAt: true,
-      updatedAt: true
-    }
-  });
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      owner_user_id: string;
+      title: string;
+      thumbnail_url: string | null;
+      payload_json: unknown;
+      is_public: boolean;
+      is_main_broadcast: boolean;
+      slot_index: number | null;
+      created_at: Date;
+      updated_at: Date;
+    }>
+  >(Prisma.sql`
+    SELECT
+      id,
+      owner_user_id,
+      title,
+      thumbnail_url,
+      CASE
+        WHEN payload_json ? 'style' THEN jsonb_build_object('style', payload_json->'style')
+        ELSE '{}'::jsonb
+      END AS payload_json,
+      is_public,
+      is_main_broadcast,
+      slot_index,
+      created_at,
+      updated_at
+    FROM showcase_cases
+    WHERE owner_user_id = ${userId}::uuid
+      AND deleted_at IS NULL
+      AND is_main_broadcast = true
+    ORDER BY slot_index ASC NULLS LAST, updated_at DESC
+    LIMIT 1
+  `);
+  const row = rows[0];
   if (!row) {
     return {
       item: null,
@@ -496,8 +508,16 @@ export async function getLiveMainBroadcast(userId: string) {
     };
   }
   const item = serializeCase({
-    ...row,
-    payloadJson: litePayloadStyleOnly(row.payloadJson)
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    title: row.title,
+    thumbnailUrl: row.thumbnail_url,
+    payloadJson: row.payload_json,
+    isPublic: row.is_public,
+    isMainBroadcast: row.is_main_broadcast,
+    slotIndex: row.slot_index,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   });
   return {
     item,

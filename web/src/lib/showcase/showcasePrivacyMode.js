@@ -31,7 +31,7 @@ export function writeShowcasePrivacyMode(mode, membershipTier = "free") {
         ? PRIVACY_MODES.PUBLIC
         : PRIVACY_MODES.FRIEND_ONLY;
   const style = readShowcaseStyle();
-  writeShowcaseStyle({ ...style, privacyMode: next });
+  writeShowcaseStyle({ ...style, privacyMode: next }, { skipSync: true });
   try {
     window.dispatchEvent(new CustomEvent(SHOWCASE_PRIVACY_CHANGED, { detail: { privacyMode: next } }));
   } catch {

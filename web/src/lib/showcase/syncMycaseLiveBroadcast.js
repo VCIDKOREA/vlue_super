@@ -82,45 +82,72 @@ export function applyMycaseItemToLiveBroadcast(item) {
  * 서버 메인 송출 → 로컬 라이브 동기화 (앱·홈·오버레이 진입 시)
  * 설정에서 미리보기를 갱신한 직후(source=editor)에는 덮어쓰지 않음.
  * 메인이 없어도 편집에서 적용한 라이브(음원 포함)는 지우지 않음 — 새로고침 시 음원 소실 방지.
- * @returns {Promise<{ ok: boolean, applied: boolean, item?: object|null, message?: string, skippedEditorPreview?: boolean, keptEditorLive?: boolean, restoredFromEditor?: boolean }>}
+ * 동일 세션 중복 GET 차단: in-flight 공유 + 쿨다운.
+ * @param {{ force?: boolean }} [opts]
+ * @returns {Promise<{ ok: boolean, applied: boolean, item?: object|null, message?: string, skippedEditorPreview?: boolean, keptEditorLive?: boolean, restoredFromEditor?: boolean, skipped?: boolean, recent?: boolean }>}
  */
-export async function hydrateLiveBroadcastFromServer() {
-  const data = await fetchMycaseLiveBroadcast();
-  if (!data.ok) {
-    return { ok: false, applied: false, message: data.message };
+let liveHydrateInFlight = null;
+let lastLiveHydrateOkAt = 0;
+const LIVE_HYDRATE_COOLDOWN_MS = 45_000;
+
+export async function hydrateLiveBroadcastFromServer(opts = {}) {
+  const force = Boolean(opts.force);
+  if (liveHydrateInFlight && !force) return liveHydrateInFlight;
+  if (!force && lastLiveHydrateOkAt && Date.now() - lastLiveHydrateOkAt < LIVE_HYDRATE_COOLDOWN_MS) {
+    return { ok: true, applied: false, skipped: true, recent: true };
   }
-  if (!data.item) {
-    try {
-      localStorage.removeItem(LIVE_CASE_META_KEY);
-    } catch {
-      /* ignore */
+
+  const run = (async () => {
+    const data = await fetchMycaseLiveBroadcast();
+    if (!data.ok) {
+      return { ok: false, applied: false, message: data.message };
+    }
+    if (!data.item) {
+      try {
+        localStorage.removeItem(LIVE_CASE_META_KEY);
+      } catch {
+        /* ignore */
+      }
+      const liveSource = readLiveShowcaseSource();
+      /* 설정 적용본(editor)은 메인 게시물이 없어도 유지 */
+      if (liveSource?.source === "editor") {
+        lastLiveHydrateOkAt = Date.now();
+        return { ok: true, applied: false, item: null, keptEditorLive: true };
+      }
+      /* mycase 메인이 사라짐 → 편집 설정으로 라이브 복구 (음원·스타일 유지) */
+      try {
+        const editor = readShowcaseStyle();
+        writeLiveShowcaseStyle(editor, { source: "editor", skipSync: true });
+        lastLiveHydrateOkAt = Date.now();
+        return { ok: true, applied: true, item: null, restoredFromEditor: true };
+      } catch {
+        clearLiveShowcaseStyle();
+        lastLiveHydrateOkAt = Date.now();
+        return { ok: true, applied: false, item: null };
+      }
     }
     const liveSource = readLiveShowcaseSource();
-    /* 설정 적용본(editor)은 메인 게시물이 없어도 유지 */
     if (liveSource?.source === "editor") {
-      return { ok: true, applied: false, item: null, keptEditorLive: true };
+      lastLiveHydrateOkAt = Date.now();
+      return {
+        ok: true,
+        applied: false,
+        item: data.item,
+        skippedEditorPreview: true
+      };
     }
-    /* mycase 메인이 사라짐 → 편집 설정으로 라이브 복구 (음원·스타일 유지) */
-    try {
-      const editor = readShowcaseStyle();
-      writeLiveShowcaseStyle(editor, { source: "editor", skipSync: true });
-      return { ok: true, applied: true, item: null, restoredFromEditor: true };
-    } catch {
-      clearLiveShowcaseStyle();
-      return { ok: true, applied: false, item: null };
-    }
+    const applied = applyMycaseItemToLiveBroadcast(data.item);
+    lastLiveHydrateOkAt = Date.now();
+    return { ok: true, applied: Boolean(applied), item: data.item };
+  })();
+
+  if (!force) {
+    liveHydrateInFlight = run.finally(() => {
+      liveHydrateInFlight = null;
+    });
+    return liveHydrateInFlight;
   }
-  const liveSource = readLiveShowcaseSource();
-  if (liveSource?.source === "editor") {
-    return {
-      ok: true,
-      applied: false,
-      item: data.item,
-      skippedEditorPreview: true
-    };
-  }
-  const applied = applyMycaseItemToLiveBroadcast(data.item);
-  return { ok: true, applied: Boolean(applied), item: data.item };
+  return run;
 }
 
 export function readLiveBroadcastMeta() {

@@ -18,7 +18,7 @@ import {
   extractShowcaseArchiveTitle,
   extractShowcaseCoverUrl
 } from "../../lib/showcase/showcaseCover.js";
-import { writeShowcasePrivacyMode } from "../../lib/showcase/showcasePrivacyMode.js";
+import { slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { PRIVACY_MODES, maxShowcaseContentPagesForTier } from "../../lib/showcase/tentShowcaseTypes.js";
 import { SHOWCASE_CALL_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
 import {
@@ -33,8 +33,6 @@ import {
   SHOWCASE_PAGE_TYPES
 } from "../../lib/showcase/showcasePages.js";
 import {
-  applyInstagramVerifiedLocal,
-  clearInstagramVerifiedLocal,
   disconnectInstagramLink,
   fetchInstagramLinkStatus,
   startInstagramLink
@@ -189,6 +187,23 @@ function ProfileRow({ label, help, children, onClick, trailing }) {
   );
 }
 
+/** 적용 전후 dirty 비교용 */
+function styleFingerprint(style) {
+  try {
+    return JSON.stringify(style && typeof style === "object" ? style : {});
+  } catch {
+    return "";
+  }
+}
+
+function pageFingerprint(page) {
+  try {
+    return JSON.stringify(normalizeShowcasePage(page || {}));
+  } catch {
+    return "";
+  }
+}
+
 export default function ShowcaseStyleSettingsPanel({
   membershipTier = "free",
   isDarkMode = false,
@@ -198,13 +213,17 @@ export default function ShowcaseStyleSettingsPanel({
   hideHeader = false,
   fullscreen = false,
   /** sheet(기본·앱) | webDesk(www 미리보기|설정 2열) */
-  layout = "sheet"
+  layout = "sheet",
+  /** 부모가 X/돌아가기 시 호출할 가드 등록 (미적용 확인) */
+  onBindCloseGuard
 }) {
   const isWebDesk = layout === "webDesk";
   const isPaid = isPaidLetteringTier(membershipTier);
   const includeDigitalCard = isPaid && readDigitalCardActive();
   const maxContentPages = maxShowcaseContentPagesForTier(membershipTier, { includeDigitalCard });
   const [config, setConfig] = useState(() => readShowcaseStyle());
+  const [appliedFp, setAppliedFp] = useState(() => styleFingerprint(readShowcaseStyle()));
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const [identityTick, setIdentityTick] = useState(0);
   const [gateOpen, setGateOpen] = useState(false);
   const [tagInput, setTagInput] = useState(() => (config.tags || []).join(" "));
@@ -254,17 +273,15 @@ export default function ShowcaseStyleSettingsPanel({
     };
   }, []);
 
-  /* 설정 진입 시 로컬→미리보기. 서버 hydrate 는 App 로그인·www(webDesk) 만 — 중복 GET 절감 */
+  /* 설정 진입 시 서버/로컬 → 초안. 편집 중에는 storage·서버에 쓰지 않음 */
   useEffect(() => {
     let cancelled = false;
     const applyLocal = () => {
       if (cancelled) return;
-      setConfig(readShowcaseStyle());
-      try {
-        writeLiveShowcaseStyle(readShowcaseStyle(), { skipSync: true });
-      } catch {
-        /* ignore */
-      }
+      const latest = readShowcaseStyle();
+      setConfig(latest);
+      setAppliedFp(styleFingerprint(latest));
+      setTagInput((latest.tags || []).join(" "));
     };
     if (!isWebDesk) {
       applyLocal();
@@ -332,17 +349,10 @@ export default function ShowcaseStyleSettingsPanel({
       if (patch.tags) next.tags = patch.tags;
       if (Array.isArray(patch.pages)) next.pages = patch.pages.map(normalizeShowcasePage);
       next = clampShowcasePages(next, membershipTier, { includeDigitalCard });
-      try {
-        /* 편집 중: 로컬+미리보기만. 서버 PUT 은 「적용」에서 — Pooler egress 절감 */
-        writeShowcaseStyle(next, { skipSync: true, silent: true });
-        writeLiveShowcaseStyle(next, { source: "editor", skipSync: true });
-      } catch (e) {
-        onToast?.(e instanceof Error ? e.message : "쇼케이스 설정 저장에 실패했습니다.");
-        return prev;
-      }
+      /* 편집 중: React 초안만 — 로컬/서버 저장·PUT 없음 (적용하기에서만) */
       return next;
     });
-  }, [membershipTier, includeDigitalCard, onToast]);
+  }, [membershipTier, includeDigitalCard]);
 
   const persistPages = useCallback(
     (nextPages) => {
@@ -387,15 +397,31 @@ export default function ShowcaseStyleSettingsPanel({
     ) {
       return;
     }
-    applyInstagramVerifiedLocal(igLink.username);
-    setConfig(readShowcaseStyle());
+    /* storage write 금지 — 초안에만 반영 */
+    const profileUrl = `https://instagram.com/${String(igLink.username).replace(/^@/, "")}`;
+    persist({
+      platformFeed: {
+        ...(config.platformFeed || {}),
+        instagramHandle: handle,
+        instagramProfileUrl: profileUrl,
+        instagramVerified: true
+      },
+      commercial: {
+        ...(config.commercial || {}),
+        outlinks: {
+          ...(config.commercial?.outlinks || {}),
+          instagram: profileUrl
+        }
+      }
+    });
   }, [
     igLink.linked,
     igLink.username,
     igLink.expired,
     config.platformFeed?.instagramVerified,
     config.platformFeed?.instagramHandle,
-    config.commercial?.outlinks?.instagram
+    config.commercial?.outlinks?.instagram,
+    persist
   ]);
 
   useEffect(() => {
@@ -428,7 +454,7 @@ export default function ShowcaseStyleSettingsPanel({
     const nextPages = pages.filter((p) => p.id !== pageId);
     persistPages(nextPages);
     if (expandedPageId === pageId) setExpandedPageId(nextPages[0]?.id || "");
-    onToast?.("편집에서 페이지를 제거했습니다. 미리보기에 바로 반영됩니다. (마이케이스 게시물은 그대로입니다)");
+    onToast?.("편집에서 페이지를 제거했습니다. 「적용하기」를 눌러 저장하세요.");
   };
 
   const onTagsChange = (raw) => {
@@ -486,22 +512,85 @@ export default function ShowcaseStyleSettingsPanel({
     void saveShowcaseSearchPrivacy(next);
   };
 
+  const dirty = useMemo(() => {
+    const draft = { ...config, tags: parseShowcaseTagsInput(tagInput) };
+    return styleFingerprint(draft) !== appliedFp;
+  }, [config, tagInput, appliedFp]);
+
+  const appliedPagesById = useMemo(() => {
+    try {
+      const applied = JSON.parse(appliedFp || "{}");
+      const list = Array.isArray(applied?.pages) ? applied.pages : [];
+      return new Map(list.map((p) => [p.id, normalizeShowcasePage(p)]));
+    } catch {
+      return new Map();
+    }
+  }, [appliedFp]);
+
+  const pageStatusLine = useCallback(
+    (page) => {
+      const summary = pageStatusSummary(page);
+      const applied = appliedPagesById.get(page.id);
+      const sameAsApplied = Boolean(applied) && pageFingerprint(page) === pageFingerprint(applied);
+      if (sameAsApplied && isPageConfigured(applied)) {
+        return { text: `${summary} · 설정완료 ✔`, ready: true };
+      }
+      if (isPageConfigured(page)) {
+        return { text: `${summary} · 미적용`, ready: false };
+      }
+      return { text: summary, ready: false };
+    },
+    [appliedPagesById]
+  );
+
+  const discardAndLeave = useCallback(() => {
+    setLeaveOpen(false);
+    try {
+      const baseline = JSON.parse(appliedFp || "{}");
+      if (baseline && typeof baseline === "object") {
+        setConfig(baseline);
+        setTagInput((baseline.tags || []).join(" "));
+      }
+    } catch {
+      /* ignore */
+    }
+    onBack?.();
+  }, [appliedFp, onBack]);
+
+  const requestClose = useCallback(() => {
+    if (!dirty) {
+      onBack?.();
+      return;
+    }
+    setLeaveOpen(true);
+  }, [dirty, onBack]);
+
   useEffect(() => {
-    if (!isPaid) return undefined;
-    const tags = parseShowcaseTagsInput(tagInput);
-    const timer = setTimeout(() => {
-      void syncShowcaseTagsToServer(tags);
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [tagInput, isPaid]);
+    if (typeof onBindCloseGuard !== "function") return undefined;
+    onBindCloseGuard(requestClose);
+    return () => onBindCloseGuard(null);
+  }, [onBindCloseGuard, requestClose]);
 
   const commitApply = useCallback(() => {
-    const latest = readShowcaseStyle();
-    /* 적용 시에만 서버 동기화 (편집 중 skipSync 분 일괄 push) */
-    writeShowcaseStyle(latest, { skipSync: true });
-    writeLiveShowcaseStyle(latest, { source: "editor" });
+    const withTags = {
+      ...config,
+      tags: isPaid ? parseShowcaseTagsInput(tagInput) : config.tags || []
+    };
+    const latest = slimShowcaseStyleForPersist(
+      clampShowcasePages(withTags, membershipTier, { includeDigitalCard })
+    );
+    try {
+      writeShowcaseStyle(latest, { replace: true, skipSync: true });
+      writeLiveShowcaseStyle(latest, { source: "editor" });
+    } catch (e) {
+      onToast?.(e instanceof Error ? e.message : "쇼케이스 적용에 실패했습니다.");
+      return;
+    }
+    setConfig(latest);
+    setAppliedFp(styleFingerprint(latest));
+    setTagInput((latest.tags || []).join(" "));
     if (isPaid) {
-      void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));
+      void syncShowcaseTagsToServer(latest.tags || []);
     }
 
     const previewCard = resolveVlueShowcaseCard({ membershipTier, previewExample: true });
@@ -549,7 +638,15 @@ export default function ShowcaseStyleSettingsPanel({
     } catch {
       onToast?.("적용되었습니다.");
     }
-  }, [alsoUploadToMycase, includeDigitalCard, isPaid, membershipTier, onToast, tagInput]);
+  }, [
+    alsoUploadToMycase,
+    config,
+    includeDigitalCard,
+    isPaid,
+    membershipTier,
+    onToast,
+    tagInput
+  ]);
 
   const headText = isDarkMode ? "text-gray-100" : "text-slate-900";
   const subText = isDarkMode ? "text-gray-400" : "text-slate-500";
@@ -630,10 +727,8 @@ export default function ShowcaseStyleSettingsPanel({
                 <p className="showcase-page-card__title">
                   {pageNum}페이지 · {label}
                 </p>
-                <p className={`showcase-page-card__status ${isPageConfigured(page) ? "is-ready" : ""}`}>
-                  {isPageConfigured(page)
-                    ? `${pageStatusSummary(page)} · 설정완료 ✔`
-                    : pageStatusSummary(page)}
+                <p className={`showcase-page-card__status ${pageStatusLine(page).ready ? "is-ready" : ""}`}>
+                  {pageStatusLine(page).text}
                 </p>
               </div>
               <span className="showcase-page-card__trail">
@@ -708,20 +803,21 @@ export default function ShowcaseStyleSettingsPanel({
             setIgLinkLoading(true);
             try {
               await disconnectInstagramLink();
-              clearInstagramVerifiedLocal();
               persist({
                 platformFeed: {
+                  ...(config.platformFeed || {}),
                   instagramVerified: false,
                   instagramHandle: "",
-                  instagramProfileUrl: ""
+                  instagramProfileUrl: "",
+                  instagramProfilePictureUrl: ""
                 },
                 commercial: {
-                  outlinks: { ...config.commercial.outlinks, instagram: "" }
+                  ...(config.commercial || {}),
+                  outlinks: { ...(config.commercial?.outlinks || {}), instagram: "" }
                 }
               });
-              setConfig(readShowcaseStyle());
               await refreshIgLink();
-              onToast?.("Instagram 인증이 해제되었습니다.");
+              onToast?.("Instagram 인증이 해제되었습니다. 「적용하기」를 눌러 저장하세요.");
             } catch (e) {
               onToast?.(e instanceof Error ? e.message : "연동 해제에 실패했습니다.");
             } finally {
@@ -780,7 +876,6 @@ export default function ShowcaseStyleSettingsPanel({
               type="button"
               className={(config.privacyMode || PRIVACY_MODES.FRIEND_ONLY) === PRIVACY_MODES.FRIEND_ONLY ? "active" : ""}
               onClick={() => {
-                writeShowcasePrivacyMode(PRIVACY_MODES.FRIEND_ONLY, membershipTier);
                 persist({ privacyMode: PRIVACY_MODES.FRIEND_ONLY });
               }}
             >
@@ -790,7 +885,6 @@ export default function ShowcaseStyleSettingsPanel({
               type="button"
               className={config.privacyMode === PRIVACY_MODES.PUBLIC ? "active" : ""}
               onClick={() => {
-                writeShowcasePrivacyMode(PRIVACY_MODES.PUBLIC, membershipTier);
                 persist({ privacyMode: PRIVACY_MODES.PUBLIC });
               }}
             >
@@ -1106,6 +1200,7 @@ export default function ShowcaseStyleSettingsPanel({
       <p className={`text-center text-[11px] ${subText}`}>
         {includeDigitalCard ? "명함 1 · " : ""}
         콘텐츠 {pages.length}페이지 · 설정됨 {configuredCount}
+        {dirty ? " · 미적용 변경 있음" : ""}
       </p>
 
       <label className={`showcase-mycase-upload-check ${isDarkMode ? "is-dark" : ""}`}>
@@ -1141,6 +1236,35 @@ export default function ShowcaseStyleSettingsPanel({
       }}
     />
   );
+
+  const leaveModal =
+    leaveOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div className="showcase-leave-confirm" role="dialog" aria-modal="true" aria-labelledby="showcase-leave-title">
+            <button
+              type="button"
+              className="showcase-leave-confirm__backdrop"
+              aria-label="닫기"
+              onClick={() => setLeaveOpen(false)}
+            />
+            <div className={`showcase-leave-confirm__panel ${isDarkMode ? "is-dark" : ""}`}>
+              <h2 id="showcase-leave-title" className="showcase-leave-confirm__title">
+                적용되지 않았습니다. 뒤로 가시겠습니까?
+              </h2>
+              <p className="showcase-leave-confirm__hint">저장하지 않은 변경 내용은 사라집니다.</p>
+              <div className="showcase-leave-confirm__actions">
+                <button type="button" className="showcase-leave-confirm__btn showcase-leave-confirm__btn--ghost" onClick={() => setLeaveOpen(false)}>
+                  취소
+                </button>
+                <button type="button" className="showcase-leave-confirm__btn showcase-leave-confirm__btn--ok" onClick={discardAndLeave}>
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
 
   if (isWebDesk) {
     return (
@@ -1185,6 +1309,7 @@ export default function ShowcaseStyleSettingsPanel({
         </div>
 
         {gateModal}
+        {leaveModal}
       </div>
     );
   }
@@ -1195,7 +1320,7 @@ export default function ShowcaseStyleSettingsPanel({
     >
       {!hideHeader ? (
         <div className={`flex shrink-0 items-center gap-2 border-b px-3 py-2.5 ${isDarkMode ? "border-white/10" : "border-slate-100"}`}>
-          <BackButton variant="inline" onBack={onBack} isDarkMode={isDarkMode} />
+          <BackButton variant="inline" onBack={requestClose} isDarkMode={isDarkMode} />
           <div className="min-w-0 flex-1">
             <p className={`text-[17px] font-black ${headText}`}>{VLUE_SHOWCASE.nameKo}</p>
             <p className={`text-[11px] ${subText}`}>
@@ -1225,6 +1350,7 @@ export default function ShowcaseStyleSettingsPanel({
       </div>
 
       {gateModal}
+      {leaveModal}
     </div>
   );
 }

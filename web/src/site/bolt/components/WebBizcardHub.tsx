@@ -131,9 +131,13 @@ function AccountSummaryCard({
 function WebBizcardHubInner({
   user,
   autoOpenShowcase = false,
+  onBindLeaveGuard,
+  onLeave,
 }: {
   user: MarketingAuthUser;
   autoOpenShowcase?: boolean;
+  onBindLeaveGuard?: (fn: (() => void) | null) => void;
+  onLeave?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>('card');
   const [cardSubview, setCardSubview] = useState<CardSubview>('hub');
@@ -289,6 +293,8 @@ function WebBizcardHubInner({
           membershipTier={membershipTier}
           isDarkMode={false}
           hideHeader
+          onBack={onLeave || (() => window.history.back())}
+          onBindCloseGuard={onBindLeaveGuard}
           onOpenUpgrade={() => window.location.assign('/pricing')}
           onToast={showToast}
         />
@@ -401,13 +407,22 @@ function WebBizcardHubInner({
 export default function WebBizcardHub({
   user,
   autoOpenShowcase = false,
+  onBindLeaveGuard,
+  onLeave,
 }: {
   user: MarketingAuthUser;
   autoOpenShowcase?: boolean;
+  onBindLeaveGuard?: (fn: (() => void) | null) => void;
+  onLeave?: () => void;
 }) {
   return (
     <B2bMembershipProvider enabled>
-      <WebBizcardHubInner user={user} autoOpenShowcase={autoOpenShowcase} />
+      <WebBizcardHubInner
+        user={user}
+        autoOpenShowcase={autoOpenShowcase}
+        onBindLeaveGuard={onBindLeaveGuard}
+        onLeave={onLeave}
+      />
     </B2bMembershipProvider>
   );
 }

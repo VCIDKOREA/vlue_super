@@ -10,6 +10,7 @@ export function extractShowcaseCoverUrl(style) {
     const s = String(u || "").trim();
     if (!s) return "";
     if (s.startsWith("blob:")) return ""; // 휘발성 — 저장 불가
+    if (s.startsWith("data:")) return ""; // DB·archive body egress 폭증 방지
     return s;
   };
 

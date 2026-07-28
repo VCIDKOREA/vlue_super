@@ -22,6 +22,7 @@ import {
   toggleShowcaseLike
 } from "../services/showcase/ShowcaseSocialService.js";
 import {
+  getUserShowcasePublicLive,
   getUserShowcaseStyleBundle,
   putUserShowcaseStyleBundle
 } from "../services/showcase/showcaseStyleSyncService.js";
@@ -204,7 +205,8 @@ letteringRoutes.put("/showcase/style", requireUserHeader, async (c) => {
   if (!result.ok) {
     return c.json({ ok: false, conflict: true, ...result.bundle }, 409);
   }
-  return c.json({ ok: true, ...result.bundle });
+  /* 성공 시 전체 editor/live 에코 금지 — 클라이언트가 로컬본을 이미 보유 */
+  return c.json({ ok: true, updatedAt: result.updatedAt });
 });
 
 /** 상대 공개 라이브 쇼케이스 스타일 (편집본 editor는 미노출) */
@@ -218,14 +220,12 @@ letteringRoutes.get("/showcase/style/:userId", async (c) => {
   if (!user || user.status !== "ACTIVE") {
     return c.json({ ok: false, error: "not_found" }, 404);
   }
-  const bundle = await getUserShowcaseStyleBundle(userId);
-  /* 라이브가 비면 편집 적용본으로 폴백 — 카톡 공개 링크에서 풀 쇼케이스·BGM 노출 */
-  const live = bundle.live ?? bundle.editor ?? null;
+  const pub = await getUserShowcasePublicLive(userId);
   return c.json({
     ok: true,
-    live,
-    liveSource: bundle.liveSource,
-    updatedAt: bundle.updatedAt
+    live: pub.live,
+    liveSource: pub.liveSource,
+    updatedAt: pub.updatedAt
   });
 });
 

@@ -18,6 +18,16 @@ import { hydrateFeedNicknameFromSnapshot, readFeedNickname } from "./memberCardS
 
 const DIGITAL_CARD_ID_KEY = "vlue_digital_card_id";
 
+/** 메모리 캐시 — 동일 세션 중복 GET 차단 */
+let digitalCardMetaCache = {
+  at: 0,
+  lite: null,
+  full: null,
+  inFlightLite: null,
+  inFlightFull: null
+};
+const DIGITAL_CARD_META_TTL_MS = 60_000;
+
 export function readStoredDigitalCardId() {
   try {
     return String(localStorage.getItem(DIGITAL_CARD_ID_KEY) || "").trim();
@@ -118,12 +128,72 @@ export async function fetchDigitalCardMeta(opts = {}) {
   const force = Boolean(opts.force);
   const lite = Boolean(opts.lite);
   const cached = force ? null : readStoredDigitalCardId();
-  try {
-    const q = lite ? "?lite=1" : "";
-    const res = await vlueAuthFetch(apiUrl(`/api/cards/my-digital-card${q}`), {
-      headers: vlueAuthHeaders()
-    });
-    if (!res.ok) {
+  const now = Date.now();
+  if (force) {
+    digitalCardMetaCache.at = 0;
+    digitalCardMetaCache.lite = null;
+    digitalCardMetaCache.full = null;
+  }
+  if (!force) {
+    const slot = lite ? digitalCardMetaCache.lite : digitalCardMetaCache.full;
+    if (slot && now - digitalCardMetaCache.at < DIGITAL_CARD_META_TTL_MS) {
+      return slot;
+    }
+    const inflight = lite ? digitalCardMetaCache.inFlightLite : digitalCardMetaCache.inFlightFull;
+    if (inflight) return inflight;
+  }
+
+  const run = (async () => {
+    try {
+      const q = lite ? "?lite=1" : "";
+      const res = await vlueAuthFetch(apiUrl(`/api/cards/my-digital-card${q}`), {
+        headers: vlueAuthHeaders()
+      });
+      if (!res.ok) {
+        return {
+          cardId: cached || null,
+          issuedAt: null,
+          designTemplate: null,
+          issued: false,
+          exportSnapshot: null
+        };
+      }
+      const data = await res.json();
+      if (data?.cardId) writeStoredDigitalCardId(data.cardId);
+      else if (force) {
+        try {
+          localStorage.removeItem(DIGITAL_CARD_ID_KEY);
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!lite && data?.exportSnapshot) {
+        hydrateLetteringEditableFromSnapshot(data.exportSnapshot, { force });
+        hydrateAvatarsFromExportSnapshot(data.exportSnapshot, { force });
+        hydrateFeedNicknameFromSnapshot(data.exportSnapshot, { force });
+        /* 계정 전환 직후에도 로컬(세션 복원분)·서버 중 사진이 있으면 스냅에 반영 */
+        pushLocalAvatarsIfServerMissing(data.exportSnapshot);
+      }
+      if (data?.subscription?.cycleEndAt) {
+        writeMembershipBillingMeta({
+          cycleEndAt: data.subscription.cycleEndAt,
+          billingCycle: data.subscription.billingCycle,
+          paidAt: data.subscription.cycleStartAt || undefined
+        });
+      }
+      const result = {
+        cardId: data?.cardId || cached || null,
+        issuedAt: data?.issuedAt || null,
+        designTemplate: data?.designTemplate || null,
+        issued: Boolean(data?.issued),
+        exportSnapshot: lite ? null : data?.exportSnapshot || null,
+        subscription: data?.subscription || null
+      };
+      digitalCardMetaCache.at = Date.now();
+      if (lite) digitalCardMetaCache.lite = result;
+      else digitalCardMetaCache.full = result;
+      return result;
+    } catch {
       return {
         cardId: cached || null,
         issuedAt: null,
@@ -132,51 +202,26 @@ export async function fetchDigitalCardMeta(opts = {}) {
         exportSnapshot: null
       };
     }
-    const data = await res.json();
-    if (data?.cardId) writeStoredDigitalCardId(data.cardId);
-    else if (force) {
-      try {
-        localStorage.removeItem(DIGITAL_CARD_ID_KEY);
-      } catch {
-        /* ignore */
-      }
-    }
-    if (!lite && data?.exportSnapshot) {
-      hydrateLetteringEditableFromSnapshot(data.exportSnapshot, { force });
-      hydrateAvatarsFromExportSnapshot(data.exportSnapshot, { force });
-      hydrateFeedNicknameFromSnapshot(data.exportSnapshot, { force });
-      /* 계정 전환 직후에도 로컬(세션 복원분)·서버 중 사진이 있으면 스냅에 반영 */
-      pushLocalAvatarsIfServerMissing(data.exportSnapshot);
-    }
-    if (data?.subscription?.cycleEndAt) {
-      writeMembershipBillingMeta({
-        cycleEndAt: data.subscription.cycleEndAt,
-        billingCycle: data.subscription.billingCycle,
-        paidAt: data.subscription.cycleStartAt || undefined
+  })();
+
+  if (!force) {
+    if (lite) {
+      digitalCardMetaCache.inFlightLite = run.finally(() => {
+        digitalCardMetaCache.inFlightLite = null;
       });
+      return digitalCardMetaCache.inFlightLite;
     }
-    return {
-      cardId: data?.cardId || cached || null,
-      issuedAt: data?.issuedAt || null,
-      designTemplate: data?.designTemplate || null,
-      issued: Boolean(data?.issued),
-      exportSnapshot: lite ? null : data?.exportSnapshot || null,
-      subscription: data?.subscription || null
-    };
-  } catch {
-    return {
-      cardId: cached || null,
-      issuedAt: null,
-      designTemplate: null,
-      issued: false,
-      exportSnapshot: null
-    };
+    digitalCardMetaCache.inFlightFull = run.finally(() => {
+      digitalCardMetaCache.inFlightFull = null;
+    });
+    return digitalCardMetaCache.inFlightFull;
   }
+  return run;
 }
 
 /** 서버에서 디지털 명함 ID 확보 (HTML 배포·검증용) */
 export async function ensureDigitalCardId() {
-  const meta = await fetchDigitalCardMeta();
+  const meta = await fetchDigitalCardMeta({ lite: true });
   return meta.cardId || null;
 }
 
@@ -254,7 +299,11 @@ export async function syncDigitalCardExportSnapshot(card) {
     if (!res.ok) return { ok: false };
     const data = await res.json();
     if (data?.cardId) writeStoredDigitalCardId(data.cardId);
-    return { ok: true, cardId: data.cardId, exportSnapshot: data.exportSnapshot || null };
+    /* 서버는 exportSnapshot 에코하지 않음 — 로컬본 유지 */
+    digitalCardMetaCache.at = 0;
+    digitalCardMetaCache.lite = null;
+    digitalCardMetaCache.full = null;
+    return { ok: true, cardId: data.cardId, exportSnapshot: null };
   } catch {
     return { ok: false };
   }

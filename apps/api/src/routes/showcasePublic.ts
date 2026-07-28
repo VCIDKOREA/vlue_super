@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { lookupCardByRawNumber } from "../services/cardLookup.js";
-import { getUserShowcaseStyleBundle } from "../services/showcase/showcaseStyleSyncService.js";
+import { getUserShowcasePublicLive } from "../services/showcase/showcaseStyleSyncService.js";
 import { buildShowcaseOgLandingPage } from "../services/showcase/showcaseOgLandingPage.js";
 import {
   getVlueCreateUrl,
@@ -130,8 +130,8 @@ showcasePublicRoutes.get("/view/:phone", async (c) => {
 
       if (b.userId) {
         try {
-          const bundle = await getUserShowcaseStyleBundle(b.userId);
-          cover = extractStyleCover(bundle.live) || extractStyleCover(bundle.editor);
+          const pub = await getUserShowcasePublicLive(b.userId);
+          cover = extractStyleCover(pub.live);
         } catch {
           /* ignore */
         }

@@ -1,4 +1,5 @@
 import { fetchShowcaseStyleBundle, putShowcaseStyleBundle } from "./showcaseStyleApi.js";
+import { slimShowcaseStyleForPersist } from "./slimShowcaseStyleForPersist.js";
 import {
   readLiveShowcaseSource,
   readLiveShowcaseStyle,
@@ -85,8 +86,9 @@ function applyServerBundle(bundle, { reason = "hydrate", clearMissing = false } 
 }
 
 export async function pushShowcaseStyleBundle() {
-  const editor = readShowcaseStyle();
-  const live = readLiveShowcaseStyle();
+  const editor = slimShowcaseStyleForPersist(readShowcaseStyle());
+  const liveRaw = readLiveShowcaseStyle();
+  const live = liveRaw ? slimShowcaseStyleForPersist(liveRaw) : liveRaw;
   const liveSource = readLiveShowcaseSource();
   const clientUpdatedAt = readLocalShowcaseStyleUpdatedAt() || bumpLocalShowcaseStyleUpdatedAt();
 

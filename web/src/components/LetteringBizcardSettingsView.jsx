@@ -91,8 +91,8 @@ export default function LetteringBizcardSettingsView({
       .replace(/^@/, "");
     const isCeo = handle === "ceo";
     try {
-      /* 서버 스냅샷 → 로컬 복원 (이메일·웹·주소 등) */
-      await fetchDigitalCardMeta();
+      /* 로그인 hydrate 캐시 우선 — 설정 진입마다 full snapshot GET 금지 */
+      await fetchDigitalCardMeta({ lite: true });
     } catch {
       /* ignore */
     }
@@ -176,10 +176,10 @@ export default function LetteringBizcardSettingsView({
 
   useEffect(() => {
     let cancelled = false;
-    fetchDigitalCardMeta().then((meta) => {
+    /* 로그인 시 full hydrate 된 로컬본 사용 — 설정 진입마다 full snapshot GET 금지 */
+    fetchDigitalCardMeta({ lite: true }).then((meta) => {
       if (cancelled) return;
       if (meta.cardId) setCardId(meta.cardId);
-      /* 서버 soft hydrate 후 이미지·필드 1회 반영 (편집 중 반복 reload 금지) */
       reload();
     });
     return () => {
