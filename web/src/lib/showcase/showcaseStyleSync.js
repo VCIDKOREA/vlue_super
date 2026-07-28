@@ -14,6 +14,9 @@ export const SHOWCASE_STYLE_META_KEY = "vlue_showcase_style_meta_v1";
 
 let pushTimer = null;
 let hydrateInFlight = null;
+/** 앱 로그인 hydrate 직후 설정 시트가 재요청하지 않도록 */
+let lastHydrateOkAt = 0;
+const HYDRATE_COOLDOWN_MS = 60_000;
 
 export function readLocalShowcaseStyleUpdatedAt() {
   try {
@@ -123,6 +126,10 @@ export function scheduleShowcaseStylePush(delayMs = 900) {
 export async function hydrateShowcaseStyleFromServer(opts = {}) {
   const forceServer = Boolean(opts.forceServer);
   if (hydrateInFlight && !forceServer) return hydrateInFlight;
+  /* 최근 성공 hydrate 있으면 재요청 생략 — 설정 패널·홈 중복 진입 절감 */
+  if (!forceServer && lastHydrateOkAt && Date.now() - lastHydrateOkAt < HYDRATE_COOLDOWN_MS) {
+    return { ok: true, applied: false, skipped: true, recent: true };
+  }
   const run = (async () => {
     const remote = await fetchShowcaseStyleBundle();
     if (!remote.ok) {
@@ -131,6 +138,7 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
 
     if (forceServer) {
       applyServerBundle(remote, { reason: "forceServer", clearMissing: true });
+      lastHydrateOkAt = Date.now();
       return { ok: true, applied: true, pushed: false, forceServer: true };
     }
 
@@ -147,19 +155,23 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
 
     if (!remoteHas && localHas) {
       const pushed = await pushShowcaseStyleBundle();
+      lastHydrateOkAt = Date.now();
       return { ok: true, applied: false, pushed: Boolean(pushed.ok) };
     }
 
     if (remoteHas && (!localHas || serverMs > localMs + 500)) {
       applyServerBundle(remote, { reason: "hydrate" });
+      lastHydrateOkAt = Date.now();
       return { ok: true, applied: true, pushed: false };
     }
 
     if (localHas && localMs > serverMs + 500) {
       const pushed = await pushShowcaseStyleBundle();
+      lastHydrateOkAt = Date.now();
       return { ok: true, applied: false, pushed: Boolean(pushed.ok) };
     }
 
+    lastHydrateOkAt = Date.now();
     return { ok: true, applied: false, pushed: false, inSync: true };
   })();
 

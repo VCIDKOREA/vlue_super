@@ -459,18 +459,49 @@ export async function listMycaseMine(userId: string, limit = 24, cursor?: string
 }
 
 /**
- * 통화 송출용 메인 케이스 — slotIndex 오름차순 1순위 (+ 전체 목록)
+ * hydrate용 — payloadJson 전체 대신 style만 반환 (Shared Pooler egress 절감)
+ */
+function litePayloadStyleOnly(payloadJson: unknown): { style?: unknown } {
+  if (!payloadJson || typeof payloadJson !== "object") return {};
+  const style = (payloadJson as { style?: unknown }).style;
+  if (!style || typeof style !== "object") return {};
+  return { style };
+}
+
+/**
+ * 통화 송출용 메인 케이스 — 1순위 1건만, payload는 style만 (목록 take:20 + 전체 JSON 금지)
  */
 export async function getLiveMainBroadcast(userId: string) {
-  const rows = await prisma.showcaseCase.findMany({
+  const row = await prisma.showcaseCase.findFirst({
     where: { ownerUserId: userId, deletedAt: null, isMainBroadcast: true },
     orderBy: [{ slotIndex: "asc" }, { updatedAt: "desc" }],
-    take: 20
+    select: {
+      id: true,
+      ownerUserId: true,
+      title: true,
+      thumbnailUrl: true,
+      payloadJson: true,
+      isPublic: true,
+      isMainBroadcast: true,
+      slotIndex: true,
+      createdAt: true,
+      updatedAt: true
+    }
   });
-  const items = rows.map(serializeCase);
+  if (!row) {
+    return {
+      item: null,
+      items: [] as ReturnType<typeof serializeCase>[],
+      policy: await getBroadcastPolicy(userId)
+    };
+  }
+  const item = serializeCase({
+    ...row,
+    payloadJson: litePayloadStyleOnly(row.payloadJson)
+  });
   return {
-    item: items[0] || null,
-    items,
+    item,
+    items: [item],
     policy: await getBroadcastPolicy(userId)
   };
 }

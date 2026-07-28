@@ -54,7 +54,7 @@ export default function MyPageDigitalLetteringSection({
 
   useEffect(() => {
     let cancelled = false;
-    fetchDigitalCardMeta().then((meta) => {
+    fetchDigitalCardMeta({ lite: true }).then((meta) => {
       if (cancelled) return;
       setCardIssuedAt(meta.issuedAt || null);
     });

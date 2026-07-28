@@ -198,7 +198,7 @@ function WebBizcardHubInner({
     const onVcid = () => setIsVCIDOn(readVcidBroadcastOn());
     const onCard = () => {
       setDigitalCardActive(readDigitalCardActive());
-      void fetchDigitalCardMeta().then((meta) => setDigitalCardIssued(meta.issued !== false));
+      void fetchDigitalCardMeta({ lite: true }).then((meta) => setDigitalCardIssued(meta.issued !== false));
       setSyncTick((n) => n + 1);
     };
     const onBizcard = () => setSyncTick((n) => n + 1);

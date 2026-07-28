@@ -254,32 +254,36 @@ export default function ShowcaseStyleSettingsPanel({
     };
   }, []);
 
-  /* 설정 진입 시 편집본 → 홈/통화 미리보기 동기화 (삭제 후에도 데모·옛 송출이 남지 않게) */
+  /* 설정 진입 시 로컬→미리보기. 서버 hydrate 는 App 로그인·www(webDesk) 만 — 중복 GET 절감 */
   useEffect(() => {
     let cancelled = false;
+    const applyLocal = () => {
+      if (cancelled) return;
+      setConfig(readShowcaseStyle());
+      try {
+        writeLiveShowcaseStyle(readShowcaseStyle(), { skipSync: true });
+      } catch {
+        /* ignore */
+      }
+    };
+    if (!isWebDesk) {
+      applyLocal();
+      return () => {
+        cancelled = true;
+      };
+    }
     void import("../../lib/showcase/showcaseStyleSync.js")
       .then(async (m) => {
         await m.hydrateShowcaseStyleFromServer();
-        if (cancelled) return;
-        setConfig(readShowcaseStyle());
-        try {
-          writeLiveShowcaseStyle(readShowcaseStyle(), { skipSync: true });
-        } catch {
-          /* ignore */
-        }
+        applyLocal();
       })
       .catch(() => {
-        if (cancelled) return;
-        try {
-          writeLiveShowcaseStyle(readShowcaseStyle(), { skipSync: true });
-        } catch {
-          /* ignore */
-        }
+        applyLocal();
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isWebDesk]);
 
   /* 명함 사진·신원 변경 시 미리보기 즉시 반영 */
   useEffect(() => {
@@ -329,9 +333,9 @@ export default function ShowcaseStyleSettingsPanel({
       if (Array.isArray(patch.pages)) next.pages = patch.pages.map(normalizeShowcasePage);
       next = clampShowcasePages(next, membershipTier, { includeDigitalCard });
       try {
-        writeShowcaseStyle(next);
-        /* 편집·라이브 동시 반영 → 앱 홈/통화와 100% 동일 송출 (BGM 포함) */
-        writeLiveShowcaseStyle(next, { source: "editor" });
+        /* 편집 중: 로컬+미리보기만. 서버 PUT 은 「적용」에서 — Pooler egress 절감 */
+        writeShowcaseStyle(next, { skipSync: true, silent: true });
+        writeLiveShowcaseStyle(next, { source: "editor", skipSync: true });
       } catch (e) {
         onToast?.(e instanceof Error ? e.message : "쇼케이스 설정 저장에 실패했습니다.");
         return prev;
@@ -493,8 +497,8 @@ export default function ShowcaseStyleSettingsPanel({
 
   const commitApply = useCallback(() => {
     const latest = readShowcaseStyle();
-    writeShowcaseStyle(latest);
-    /* 편집 = 라이브 송출 — 앱 홈·통화 미리보기와 웹이 동일 BGM·스타일 */
+    /* 적용 시에만 서버 동기화 (편집 중 skipSync 분 일괄 push) */
+    writeShowcaseStyle(latest, { skipSync: true });
     writeLiveShowcaseStyle(latest, { source: "editor" });
     if (isPaid) {
       void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));

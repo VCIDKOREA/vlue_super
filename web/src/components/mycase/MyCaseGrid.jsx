@@ -15,7 +15,7 @@ import {
 } from "../../lib/mycaseApi.js";
 import { fetchFollowCounts } from "../../lib/followApi.js";
 import { fetchPeerShowcaseStyleBundle } from "../../lib/showcase/showcaseStyleApi.js";
-import { readShowcaseStyle, readLiveShowcaseStyle, writeShowcaseStyle, SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT, SHOWCASE_LIVE_STYLE_CHANGED_EVENT, createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
+import { readShowcaseStyle, readLiveShowcaseStyle, writeShowcaseStyle, SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT, createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 import {
   applyMycaseItemToLiveBroadcast,
   clearLiveBroadcastMeta,
@@ -249,12 +249,11 @@ export default function MyCaseGrid({
         void loadFirst();
       }, 500);
     };
+    /* LIVE 는 미리보기용 — 목록 재조회는 STYLE(적용) 만 */
     window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onChanged);
-    window.addEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, onChanged);
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onChanged);
-      window.removeEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, onChanged);
     };
   }, [isMine, loadFirst]);
 

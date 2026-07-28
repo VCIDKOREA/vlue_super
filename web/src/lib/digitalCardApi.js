@@ -110,13 +110,17 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
 
 /**
  * 서버에서 디지털 명함 메타 (HTML 배포·검증·유효기간·편집 스냅샷)
- * @param {{ force?: boolean }} [opts] force=true 계정 전환 직후 — 서버본 덮어쓰기, 로컬 avatar push 금지
+ * @param {{ force?: boolean, lite?: boolean }} [opts]
+ *  - force=true: 계정 전환 직후 — 서버본 덮어쓰기
+ *  - lite=true: exportSnapshot 생략 (허브·계정 동기화 · egress 절감)
  */
 export async function fetchDigitalCardMeta(opts = {}) {
   const force = Boolean(opts.force);
+  const lite = Boolean(opts.lite);
   const cached = force ? null : readStoredDigitalCardId();
   try {
-    const res = await vlueAuthFetch(apiUrl("/api/cards/my-digital-card"), {
+    const q = lite ? "?lite=1" : "";
+    const res = await vlueAuthFetch(apiUrl(`/api/cards/my-digital-card${q}`), {
       headers: vlueAuthHeaders()
     });
     if (!res.ok) {
@@ -137,7 +141,7 @@ export async function fetchDigitalCardMeta(opts = {}) {
         /* ignore */
       }
     }
-  if (data?.exportSnapshot) {
+    if (!lite && data?.exportSnapshot) {
       hydrateLetteringEditableFromSnapshot(data.exportSnapshot, { force });
       hydrateAvatarsFromExportSnapshot(data.exportSnapshot, { force });
       hydrateFeedNicknameFromSnapshot(data.exportSnapshot, { force });
@@ -156,7 +160,7 @@ export async function fetchDigitalCardMeta(opts = {}) {
       issuedAt: data?.issuedAt || null,
       designTemplate: data?.designTemplate || null,
       issued: Boolean(data?.issued),
-      exportSnapshot: data?.exportSnapshot || null,
+      exportSnapshot: lite ? null : data?.exportSnapshot || null,
       subscription: data?.subscription || null
     };
   } catch {

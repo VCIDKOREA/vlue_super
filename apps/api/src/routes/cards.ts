@@ -317,24 +317,37 @@ const ALLOWED_DESIGN_TEMPLATES = new Set([
   "creative-gradient"
 ]);
 
-/** 내 디지털 인증명함 ID · 템플릿 · 편집 스냅샷 (HTML 배포·검증 연동) */
+/** 내 디지털 인증명함 ID · 템플릿 · 편집 스냅샷 (HTML 배포·검증 연동)
+ *  ?lite=1 — exportSnapshotJson 생략 (허브·동기화용 · Shared Pooler egress 절감)
+ */
 cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
+  const lite = String(c.req.query("lite") || "") === "1" || String(c.req.query("lite") || "") === "true";
   const row = await prisma.digitalCard.findUnique({
     where: { userId: me },
-    select: {
-      id: true,
-      issuedAt: true,
-      designTemplateSnapshot: true,
-      membershipTierSnapshot: true,
-      exportSnapshotJson: true
-    }
+    select: lite
+      ? {
+          id: true,
+          issuedAt: true,
+          designTemplateSnapshot: true,
+          membershipTierSnapshot: true
+        }
+      : {
+          id: true,
+          issuedAt: true,
+          designTemplateSnapshot: true,
+          membershipTierSnapshot: true,
+          exportSnapshotJson: true
+        }
   });
   if (!row) {
-    return c.json({ issued: false, cardId: null, designTemplate: null, exportSnapshot: null });
+    return c.json({ issued: false, cardId: null, designTemplate: null, exportSnapshot: null, lite });
   }
   const snap =
-    row.exportSnapshotJson && typeof row.exportSnapshotJson === "object"
+    !lite &&
+    "exportSnapshotJson" in row &&
+    row.exportSnapshotJson &&
+    typeof row.exportSnapshotJson === "object"
       ? (row.exportSnapshotJson as Record<string, unknown>)
       : null;
   return c.json({
@@ -344,6 +357,7 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
     designTemplate: row.designTemplateSnapshot,
     membershipTierSnapshot: row.membershipTierSnapshot,
     exportSnapshot: snap,
+    lite,
     subscription: await (async () => {
       const sub = await prisma.userSubscription.findFirst({
         where: { userId: me, status: "active" },
