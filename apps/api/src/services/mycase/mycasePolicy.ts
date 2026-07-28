@@ -2,8 +2,8 @@ import { isPaidMember } from "../membership/paidMemberGate.js";
 
 /** 무료: 메인 송출 슬롯 1개 */
 export const MYCASE_FREE_MAX_MAIN_SLOTS = 1;
-/** 유료(Pro): 메인 송출 슬롯 10개 (디지털인증명함 포함) */
-export const MYCASE_PRO_MAX_MAIN_SLOTS = 10;
+/** 유료(Pro): 메인 송출 슬롯 6개 = 쇼케이스 5 + 디지털인증명함(있으면 1) */
+export const MYCASE_PRO_MAX_MAIN_SLOTS = 6;
 /** 무료: 메인 송출 변경 쿨다운 (7일) */
 export const MYCASE_FREE_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 

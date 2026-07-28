@@ -25,7 +25,7 @@ export const SHOWCASE_STYLE_TYPES = {
     label: "인스타그램",
     desc: "Instagram 인증 후 게시물 사진",
     shortDesc:
-      "Instagram 인증 필수. 세로 페이지 — 무료회원 1 · 유료회원 최대 10(명함 포함). 페이지당 사진 최대 20장.",
+      "Instagram 인증 필수. 세로 페이지 — 무료회원 1 · 유료회원 최대 5(+디지털인증명함). 페이지당 사진 최대 20장.",
     emoji: "📷",
     accent: "#E1306C",
     bgmSource: "platform",

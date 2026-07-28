@@ -1166,6 +1166,7 @@ export default function ShowcaseStyleSettingsPanel({
               onToast={onToast}
               expandMode="inline"
               defaultExpanded
+              suppressExpandGuide
             />
           </aside>
 

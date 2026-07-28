@@ -28,6 +28,7 @@ import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
  * @param {"portal"|"inline"} [expandMode]
  *   portal = 앱 홈(document 전체화면)
  *   inline = www 쇼케이스 관리 — 빅푸시 아래(빨간박스)에 동일 전체화면 UI
+ * @param {boolean} [suppressExpandGuide] www 데스크 — 접기/펼치기 안내 토스트 생략(레이아웃 밀림 방지)
  */
 export default function CallBigPushPreviewSection({
   membershipTier = "free",
@@ -35,7 +36,8 @@ export default function CallBigPushPreviewSection({
   onToast,
   isDarkMode = false,
   expandMode = "portal",
-  defaultExpanded = false
+  defaultExpanded = false,
+  suppressExpandGuide = false
 }) {
   const showTierTabs = v1AppShell.callBigPushTierTabs;
   const inlineExpand = expandMode === "inline";
@@ -151,7 +153,8 @@ export default function CallBigPushPreviewSection({
       setCallChromePreview(false);
       setExpanded(false);
     },
-    onToast
+    onToast,
+    suppressExpandGuide: Boolean(suppressExpandGuide || inlineExpand)
   };
 
   const tabTrackCls = isDarkMode ? "flex gap-1 rounded-full bg-slate-800 p-1" : "flex gap-1 rounded-full bg-slate-100 p-1";

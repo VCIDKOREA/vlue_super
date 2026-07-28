@@ -3,7 +3,7 @@
  * UserTier / PrivacyMode / CallState
  *
  * 용어:
- * - 페이지(page): 위·아래 스와이프 장수 (무료 1 · 유료 최대 10, 명함 포함)
+ * - 페이지(page): 위·아래 스와이프 장수 (무료 1 · 유료 콘텐츠 5 + 디지털인증명함)
  * - 장당 사진: 한 페이지 안 사진 수 (최대 20 — Instagram 캐러셀과 동일)
  */
 
@@ -33,9 +33,9 @@ export const TENT_THEME = Object.freeze({
   answer: "#22C55E"
 });
 
-/** 위·아래 스와이프 페이지 한도 */
+/** 위·아래 스와이프 페이지 한도 (콘텐츠 — 디지털인증명함 별도) */
 export const SHOWCASE_MAX_PAGES_FREE = 1;
-export const SHOWCASE_MAX_PAGES_PAID = 10;
+export const SHOWCASE_MAX_PAGES_PAID = 5;
 
 /** 한 페이지(한 장)에 넣을 수 있는 사진 수 — Instagram 게시물 캐러셀과 동일 */
 export const SHOWCASE_MAX_PHOTOS_PER_PAGE = 20;
@@ -47,7 +47,7 @@ export const SHOWCASE_MAX_PHOTOS_PAID = SHOWCASE_MAX_PHOTOS_PER_PAGE;
 
 /** Instagram 게시물(=세로 페이지) 선택 한도 — 페이지 한도와 동일 규칙 */
 export const SHOWCASE_MAX_IG_PAGES_FREE = 1;
-export const SHOWCASE_MAX_IG_PAGES_PAID = 10;
+export const SHOWCASE_MAX_IG_PAGES_PAID = 5;
 
 /**
  * @param {string} [tier]
@@ -92,15 +92,14 @@ export function maxShowcasePhotosForTier(_tier) {
 /**
  * 위·아래 스와이프 가능한 콘텐츠 페이지 수 (디지털 인증명함 제외)
  * - 무료회원: 1
- * - 유료회원 + 명함: 9 (명함 포함 총 10)
- * - 유료회원 + 명함 미사용: 10
+ * - 유료회원: 5 (디지털인증명함은 별도 추가)
  * @param {UserTier|string} tier
- * @param {{ includeDigitalCard?: boolean }} [opts]
+ * @param {{ includeDigitalCard?: boolean }} [_opts] 호환용 — 명함은 한도에 차감하지 않음
  * @returns {number}
  */
-export function maxShowcaseContentPagesForTier(tier, opts = {}) {
+export function maxShowcaseContentPagesForTier(tier, _opts = {}) {
   if (normalizeUserTier(tier) !== USER_TIERS.PAID) return SHOWCASE_MAX_PAGES_FREE;
-  return opts.includeDigitalCard ? SHOWCASE_MAX_PAGES_PAID - 1 : SHOWCASE_MAX_PAGES_PAID;
+  return SHOWCASE_MAX_PAGES_PAID;
 }
 
 /**

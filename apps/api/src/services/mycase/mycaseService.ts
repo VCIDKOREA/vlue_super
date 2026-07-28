@@ -141,7 +141,7 @@ export async function getBroadcastPolicy(userId: string): Promise<BroadcastPolic
   ]);
 
   const maxMainSlots = maxMainSlotsForTier(tier);
-  /** Pro 10슬롯 = 디지털인증명함(있으면 1) + 메인 송출 쇼케이스 */
+  /** Pro 슬롯 = 디지털인증명함(있으면 1) + 메인 송출 쇼케이스(최대 5) */
   const digitalSlot = tier === "pro" && digitalCard ? 1 : 0;
   const usedMainSlots = caseMainSlots + digitalSlot;
   const cooldown = computeCooldown(tier, user?.mainBroadcastChangedAt ?? null);

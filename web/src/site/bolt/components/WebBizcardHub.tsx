@@ -157,6 +157,17 @@ function WebBizcardHubInner({
     window.setTimeout(() => setToast(''), 2800);
   }, []);
 
+  const floatingToast =
+    toast ? (
+      <div
+        className="pointer-events-none fixed left-1/2 top-[max(1rem,env(safe-area-inset-top))] z-[400] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl bg-slate-900/95 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg"
+        role="status"
+        aria-live="polite"
+      >
+        {toast}
+      </div>
+    ) : null;
+
   const refreshAccount = useCallback(async () => {
     setLoading(true);
     try {
@@ -272,11 +283,7 @@ function WebBizcardHubInner({
   if (autoOpenShowcase) {
     return (
       <div className="space-y-4">
-        {toast ? (
-          <div className="rounded-xl bg-slate-900 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg">
-            {toast}
-          </div>
-        ) : null}
+        {floatingToast}
         <ShowcaseStyleSettingsPanel
           layout="webDesk"
           membershipTier={membershipTier}
@@ -291,11 +298,7 @@ function WebBizcardHubInner({
 
   return (
     <div className="space-y-5">
-      {toast ? (
-        <div className="rounded-xl bg-slate-900 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
+      {floatingToast}
 
       <div className="mkt-pill-row--wrap flex flex-wrap border-b border-gray-200">
         {tabs.map(({ key, label }) => (

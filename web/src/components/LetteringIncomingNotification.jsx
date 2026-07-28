@@ -217,6 +217,8 @@ export default function LetteringIncomingNotification({
   showcaseOffPreview = false,
   /** true면 캐러셀 BGM 비활성 (케이스함 BGM과 중복 방지) */
   suppressBgm = false,
+  /** www 데스크 — 접기/펼치기 「미리보기입니다…」 안내 생략 */
+  suppressExpandGuide = false,
   /** 미리보기·액션 안내 토스트 */
   onToast,
   className = ""
@@ -290,7 +292,7 @@ export default function LetteringIncomingNotification({
   );
 
   const toggle = () => {
-    if (previewMode) {
+    if (previewMode && !suppressExpandGuide) {
       showGuide(
         expanded
           ? "미리보기입니다. 실제 통화 화면에서 명함을 접을 수 있습니다."

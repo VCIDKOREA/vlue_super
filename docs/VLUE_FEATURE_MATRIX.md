@@ -161,7 +161,7 @@
 |------|------|
 | 기능명 | 블루 쇼케이스 편집·송출 |
 | 사용자 문제 | 전화로 포트폴리오·사진·소개를 보여 주기 어렵다 |
-| 기능 설명 | 다페이지 쇼케이스(무료 1 / 유료 ≤10), 갤러리·스타일·프라이버시. 홈 빅푸시 켜짐/꺼짐 |
+| 기능 설명 | 다페이지 쇼케이스(무료 1 / 유료 ≤5 + DCC), 갤러리·스타일·프라이버시. 홈 빅푸시 켜짐/꺼짐 |
 | 실제 구현 파일/모듈 | `ShowcaseStyleSettingsPanel.jsx`, `ShowcaseCallCarousel.jsx`, `CallBigPushPreviewSection.jsx`, `tentShowcaseTypes.js`, `syncMycaseLiveBroadcast.js` |
 | 현재 구현 상태 | `[완료]` |
 | V1/V2 구분 | **V1** |
