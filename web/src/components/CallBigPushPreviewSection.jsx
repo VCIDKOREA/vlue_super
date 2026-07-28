@@ -18,6 +18,7 @@ import {
 import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
+import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 
 /**
  * VLUE Showcase — 홈 메인 통화 빅푸시(픽푸시) 미리보기
@@ -42,6 +43,7 @@ export default function CallBigPushPreviewSection({
   const [expanded, setExpanded] = useState(Boolean(defaultExpanded));
   const [callChromePreview, setCallChromePreview] = useState(false);
   const [previewTick, setPreviewTick] = useState(0);
+  const { unlockFromUserGesture } = useShowcaseBgm();
 
   const paidTier = isPaidLetteringTier(membershipTier) ? membershipTier : "premium";
   const isOn = showcaseOn;
@@ -177,6 +179,13 @@ export default function CallBigPushPreviewSection({
     <section
       className={`mx-auto w-full max-w-md px-0 pb-0 pt-0 ${className}`.trim()}
       aria-label={VLUE_SHOWCASE.nameEn}
+      onPointerDownCapture={() => {
+        try {
+          unlockFromUserGesture?.();
+        } catch {
+          /* ignore */
+        }
+      }}
     >
       {showTierTabs ? (
         <div className="mb-1.5 space-y-1.5">

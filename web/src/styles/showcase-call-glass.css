@@ -2192,7 +2192,7 @@
 .showcase-social-rail {
   position: absolute;
   right: 10px;
-  bottom: 18px;
+  bottom: max(22px, env(safe-area-inset-bottom, 0px));
   z-index: 6;
   display: flex;
   flex-direction: column;
@@ -3032,13 +3032,23 @@
   position: absolute;
   left: 12px;
   right: 58px;
-  bottom: 12px;
+  /* 하단 라운드·overflow 에 프로필 바가 잘리지 않게 */
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0;
   pointer-events: none;
   z-index: 6;
+}
+
+/* 통화 UI 미리보기 시 하단 제어바에 가리지 않음 */
+.lettering-home-push-embed.is-call-chrome .showcase-slide-chrome__dock {
+  bottom: max(108px, calc(96px + env(safe-area-inset-bottom, 0px)));
+}
+
+.lettering-home-push-embed.is-call-chrome .showcase-social-rail {
+  bottom: max(112px, calc(100px + env(safe-area-inset-bottom, 0px)));
 }
 
 .showcase-slide-chrome__social-dock {

@@ -222,11 +222,28 @@
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner > .lettering-ongoing-reception {
   display: flex;
   flex-direction: column;
-  height: 560px;
-  max-height: 560px;
-  min-height: 560px;
+  height: 620px;
+  max-height: 620px;
+  min-height: 620px;
   box-sizing: border-box;
   overflow: hidden;
+}
+
+/* www 미리보기 — VLUE 프로필 바가 배너 하단에 잘리지 않게 */
+.showcase-web-desk .lettering-home-push-embed--web-inline .showcase-slide-chrome__dock {
+  bottom: 22px;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline .showcase-social-rail {
+  bottom: 26px;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-slide-chrome__dock {
+  bottom: max(96px, calc(88px + env(safe-area-inset-bottom, 0px)));
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-social-rail {
+  bottom: max(100px, calc(92px + env(safe-area-inset-bottom, 0px)));
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--carousel,

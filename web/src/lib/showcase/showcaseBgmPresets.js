@@ -61,7 +61,7 @@ function readLocalHandle() {
  * - Shared: (제목)(@sharedId) Original Sound · Shared Track
  */
 export function resolveShowcaseBgmMarqueeText(styleConfig, visitSessionKey = "", trackIndex = 0) {
-  const bgm = styleConfig?.bgm;
+  const bgm = ensureActiveBgmFromPlaylist(styleConfig?.bgm);
   if (!bgm || bgm.mode === "none") return "";
   if (bgm.linkBroken) return "연결이 끊긴 음원";
 
@@ -95,7 +95,7 @@ export function resolveShowcaseBgmMarqueeText(styleConfig, visitSessionKey = "",
  * @param {number} [trackIndex]
  */
 export function resolveShowcaseBgmUrl(styleConfig, visitSessionKey = "", trackIndex = 0) {
-  const bgm = styleConfig?.bgm;
+  const bgm = ensureActiveBgmFromPlaylist(styleConfig?.bgm);
   if (!bgm || bgm.mode === "none" || bgm.linkBroken) return "";
   const active = resolveActivePlaylistTrack(bgm, visitSessionKey, trackIndex);
   const url = String(active?.audioUrl || bgm.audioUrl || "").trim();
@@ -109,16 +109,67 @@ export function resolveShowcaseBgmUrl(styleConfig, visitSessionKey = "", trackIn
  * @param {object|null|undefined} bgm
  */
 export function showcaseBgmIdentityKey(bgm) {
-  if (!bgm || bgm.mode === "none") return "";
-  const pl = Array.isArray(bgm.playlist)
-    ? bgm.playlist.map((t) => String(t?.soundId || "").trim()).filter(Boolean).join(",")
+  const active = ensureActiveBgmFromPlaylist(bgm);
+  if (!active || active.mode === "none") return "";
+  const pl = Array.isArray(active.playlist)
+    ? active.playlist.map((t) => String(t?.soundId || "").trim()).filter(Boolean).join(",")
     : "";
-  return `${bgm.mode}|${String(bgm.soundId || "").trim()}|${bgm.playMode || ""}|${pl}`;
+  return `${active.mode}|${String(active.soundId || "").trim()}|${active.playMode || ""}|${pl}`;
+}
+
+/**
+ * 「재생목록에 추가」만 하고 「쇼케이스에 사용」을 안 한 경우 mode=none + playlist 만 남는 상태 복구.
+ * 첫 곡을 주제곡으로 올려 미리보기·앱 송출이 바로 재생되게 한다.
+ * @param {object|null|undefined} bgm
+ */
+export function ensureActiveBgmFromPlaylist(bgm) {
+  if (!bgm || typeof bgm !== "object") return bgm;
+  const list = Array.isArray(bgm.playlist)
+    ? bgm.playlist.filter((t) => {
+        if (!t || t.linkBroken) return false;
+        return Boolean(String(t.audioUrl || "").trim() || String(t.soundId || "").trim());
+      })
+    : [];
+  if (!list.length) return bgm;
+
+  const hasTheme =
+    bgm.mode &&
+    bgm.mode !== "none" &&
+    (String(bgm.soundId || "").trim() || String(bgm.audioUrl || "").trim());
+  if (hasTheme) {
+    /* 재생목록 2곡+ 인데 단독모드면 연속재생으로 */
+    if (list.length > 1 && String(bgm.playMode || "single") === "single") {
+      return { ...bgm, playMode: "order" };
+    }
+    return bgm;
+  }
+
+  const first = list[0];
+  const mode = first.mode && first.mode !== "none" ? first.mode : "signature";
+  return {
+    ...bgm,
+    mode,
+    soundId: String(first.soundId || "").trim(),
+    title: String(first.title || "").trim(),
+    artistName: String(first.artistName || bgm.artistName || "").trim(),
+    audioUrl: String(first.audioUrl || "").trim(),
+    attributionLabel: String(first.attributionLabel || "").trim(),
+    linkBroken: Boolean(first.linkBroken),
+    ownerHandle: String(first.ownerHandle || "").replace(/^@/, "").trim(),
+    sharedOwnerHandle: String(first.sharedOwnerHandle || "").replace(/^@/, "").trim(),
+    createType: first.createType || "",
+    playMode:
+      list.length > 1
+        ? String(bgm.playMode || "single") === "single"
+          ? "order"
+          : bgm.playMode || "order"
+        : bgm.playMode || "single"
+  };
 }
 
 /** 재생 URL이 없어도 soundId·메타가 있으면 BGM 슬롯 표시 (케이스함·피어 열람) */
 export function hasShowcaseBgmConfigured(styleConfig) {
-  const bgm = styleConfig?.bgm;
+  const bgm = ensureActiveBgmFromPlaylist(styleConfig?.bgm);
   if (!bgm || bgm.mode === "none" || bgm.linkBroken) return false;
   if (String(bgm.audioUrl || "").trim()) return true;
   if (String(bgm.soundId || "").trim()) return true;
@@ -129,7 +180,7 @@ export function hasShowcaseBgmConfigured(styleConfig) {
 
 /** 실제로 재생 가능한 audioUrl 이 있는지 (제목만 있는 설정은 false) */
 export function hasPlayableShowcaseBgm(styleConfig) {
-  const bgm = styleConfig?.bgm;
+  const bgm = ensureActiveBgmFromPlaylist(styleConfig?.bgm);
   if (!bgm || bgm.mode === "none" || bgm.linkBroken) return false;
   if (String(bgm.audioUrl || "").trim()) return true;
   if (Array.isArray(bgm.playlist) && bgm.playlist.some((t) => String(t?.audioUrl || "").trim())) {
@@ -159,28 +210,29 @@ export function resolveShowcaseBgmLabel(styleConfig) {
  * - audioUrl 이 비고 soundId 만 있어도 큐에 포함 (재생 직전 서명 URL 재조회)
  */
 export function resolvePlaylistTracks(bgm) {
-  if (!bgm || bgm.mode === "none") return [];
-  const mode = String(bgm.playMode || "single");
-  const list = Array.isArray(bgm.playlist)
-    ? bgm.playlist.filter((t) => {
+  const active = ensureActiveBgmFromPlaylist(bgm);
+  if (!active || active.mode === "none") return [];
+  const mode = String(active.playMode || "single");
+  const list = Array.isArray(active.playlist)
+    ? active.playlist.filter((t) => {
         if (t?.linkBroken) return false;
         return Boolean(String(t?.audioUrl || "").trim() || String(t?.soundId || "").trim());
       })
     : [];
   const themeTrack = () => {
-    const url = String(bgm.audioUrl || "").trim();
-    const sid = String(bgm.soundId || "").trim();
-    if ((!url && !sid) || bgm.linkBroken) return [];
+    const url = String(active.audioUrl || "").trim();
+    const sid = String(active.soundId || "").trim();
+    if ((!url && !sid) || active.linkBroken) return [];
     return [
       {
-        soundId: bgm.soundId,
-        title: bgm.title,
+        soundId: active.soundId,
+        title: active.title,
         audioUrl: url,
-        mode: bgm.mode,
-        attributionLabel: bgm.attributionLabel,
-        ownerHandle: bgm.ownerHandle,
-        sharedOwnerHandle: bgm.sharedOwnerHandle,
-        createType: bgm.createType
+        mode: active.mode,
+        attributionLabel: active.attributionLabel,
+        ownerHandle: active.ownerHandle,
+        sharedOwnerHandle: active.sharedOwnerHandle,
+        createType: active.createType
       }
     ];
   };
@@ -191,15 +243,16 @@ export function resolvePlaylistTracks(bgm) {
 }
 
 export function resolveActivePlaylistTrack(bgm, sessionKey = "", trackIndex = 0) {
-  if (!bgm || bgm.mode === "none") return null;
-  const list = resolvePlaylistTracks(bgm);
+  const active = ensureActiveBgmFromPlaylist(bgm);
+  if (!active || active.mode === "none") return null;
+  const list = resolvePlaylistTracks(active);
   if (!list.length) return null;
   if (list.length <= 1) return list[0];
   /* 스킵·연속재생으로 갱신된 trackIndex 우선 */
   if (typeof trackIndex === "number" && trackIndex >= 0 && trackIndex < list.length) {
     return list[trackIndex];
   }
-  const mode = String(bgm.playMode || "single");
+  const mode = String(active.playMode || "single");
   if (mode === "order" || mode === "single") return list[0];
   /* shuffle — trackIndex 없을 때만 세션 해시로 시작 곡 */
   const seed = String(sessionKey || Date.now());

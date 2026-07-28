@@ -6,7 +6,7 @@ import {
   stripInstagramContentPages,
   syncLegacyFieldsFromPages
 } from "./showcasePages.js";
-import { hasPlayableShowcaseBgm, hasShowcaseBgmConfigured } from "./showcaseBgmPresets.js";
+import { hasPlayableShowcaseBgm, hasShowcaseBgmConfigured, ensureActiveBgmFromPlaylist } from "./showcaseBgmPresets.js";
 
 export const SHOWCASE_STYLE_STORAGE_KEY = "vlue_showcase_style_v1";
 export const SHOWCASE_STYLE_CHANGED_EVENT = "vlue-showcase-style-changed";
@@ -307,6 +307,7 @@ function normalizeStoredStyle(parsed) {
   if (merged.bgm.customUrl) {
     merged.bgm.mode = merged.bgm.mode === "custom" ? "preset" : merged.bgm.mode;
   }
+  merged.bgm = ensureActiveBgmFromPlaylist(merged.bgm) || merged.bgm;
   const feed = merged.platformFeed || {};
   if (feed.instagramHandle === "@vlue.official" && !feed.instagramProfileUrl) {
     feed.instagramHandle = "";

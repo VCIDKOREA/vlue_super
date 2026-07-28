@@ -7,6 +7,7 @@ import {
   resolveShowcaseBgmUrl
 } from "../lib/showcase/showcaseBgmPresets.js";
 import { fetchShowcaseSoundById } from "../lib/showcase/showcaseSoundApi.js";
+import { readActiveShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import {
   getProximityState,
   installShowcaseProximityBridge,
@@ -372,6 +373,12 @@ export function ShowcaseBgmProvider({ children }) {
       }
 
       if (next === "idle") {
+        /* release:true — 소유권을 완전히 내려놓고 다른 면(캐러셀)이 이어받을 수 있게 */
+        if (opts.release) {
+          cancelFade();
+          applyIdleHard();
+          return;
+        }
         if (owner && ownerRef.current && ownerRef.current !== owner && !steal) {
           return;
         }
@@ -508,13 +515,38 @@ export function ShowcaseBgmProvider({ children }) {
 
   const unlockFromUserGesture = useCallback(() => {
     setTouchUnlocked(true);
-    const p = phaseRef.current;
-    if (p !== "preview" && p !== "replay" && p !== "settings_preview") return;
     if (userMutedRef.current) return;
+    const p = phaseRef.current;
     const idx = safeIndexRef.current;
-    const url = resolveUrlFromConfig(styleConfigRef.current, visitKeyRef.current || "gesture", idx);
-    if (url) void tryPlayNow(url, resolveBgmVolumeGain(styleConfigRef.current));
-  }, [tryPlayNow, resolveUrlFromConfig]);
+    let url = resolveUrlFromConfig(styleConfigRef.current, visitKeyRef.current || "gesture", idx);
+    if (!url) {
+      try {
+        const live = readActiveShowcaseStyle();
+        if (live) {
+          styleConfigRef.current = live;
+          setStyleConfig(live);
+          url = resolveUrlFromConfig(live, visitKeyRef.current || "gesture", idx);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!url) return;
+    /* 이미 preview/replay 중이면 제스처로 autoplay 재시도 */
+    if (p === "preview" || p === "replay" || p === "settings_preview") {
+      void tryPlayNow(url, resolveBgmVolumeGain(styleConfigRef.current));
+      return;
+    }
+    /* idle 등 — www 데스크 첫 클릭에서 미리보기 재생 시작 */
+    if (p === "idle" || !p) {
+      setPlaybackPhase("preview", {
+        forceRestart: true,
+        steal: true,
+        owner: "carousel",
+        styleConfig: styleConfigRef.current
+      });
+    }
+  }, [tryPlayNow, resolveUrlFromConfig, setPlaybackPhase]);
 
   const previewInSettings = useCallback(
     (configOverride = null) => {
@@ -538,7 +570,7 @@ export function ShowcaseBgmProvider({ children }) {
   }, [setPlaybackPhase]);
 
   /** 설정 목록 미리듣기용 — 상태 폭주 없이 메인 Audio 만 즉시 멈춤 */
-  const hushMainAudio = useCallback(() => {
+  const hushMainAudio = useCallback((opts = {}) => {
     cancelFade();
     const el = audioRef.current;
     if (el) {
@@ -549,7 +581,10 @@ export function ShowcaseBgmProvider({ children }) {
       phaseRef.current = "idle";
       setPhase("idle");
     }
-    ownerRef.current = "settings";
+    /* www 데스크: 미리듣기 중에도 settings 소유권 잠금 금지 — 미리보기가 이어받을 수 있어야 함 */
+    if (opts.lockSettings !== false) {
+      ownerRef.current = "settings";
+    }
   }, [cancelFade]);
 
   /**

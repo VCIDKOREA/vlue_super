@@ -261,9 +261,12 @@ export default function ShowcaseStyleSettingsPanel({
       .then(async (m) => {
         await m.hydrateShowcaseStyleFromServer();
         if (cancelled) return;
-        setConfig(readShowcaseStyle());
+        const healed = readShowcaseStyle();
+        setConfig(healed);
         try {
-          writeLiveShowcaseStyle(readShowcaseStyle(), { skipSync: true });
+          /* 재생목록만 있고 mode=none 인 상태도 normalize 로 복구돼 앱·미리보기에 반영 */
+          writeShowcaseStyle(healed, { skipSync: true, silent: true });
+          writeLiveShowcaseStyle(healed, { source: "editor" });
         } catch {
           /* ignore */
         }
@@ -271,7 +274,10 @@ export default function ShowcaseStyleSettingsPanel({
       .catch(() => {
         if (cancelled) return;
         try {
-          writeLiveShowcaseStyle(readShowcaseStyle(), { skipSync: true });
+          const healed = readShowcaseStyle();
+          setConfig(healed);
+          writeShowcaseStyle(healed, { skipSync: true, silent: true });
+          writeLiveShowcaseStyle(healed, { source: "editor" });
         } catch {
           /* ignore */
         }
@@ -330,8 +336,8 @@ export default function ShowcaseStyleSettingsPanel({
       next = clampShowcasePages(next, membershipTier, { includeDigitalCard });
       try {
         writeShowcaseStyle(next);
-        /* 편집 즉시 메인 미리보기 반영 (마이케이스 게시물 삭제는 아님) */
-        writeLiveShowcaseStyle(next);
+        /* 편집·라이브 동시 반영 → 앱 홈/통화와 100% 동일 송출 (BGM 포함) */
+        writeLiveShowcaseStyle(next, { source: "editor" });
       } catch (e) {
         onToast?.(e instanceof Error ? e.message : "쇼케이스 설정 저장에 실패했습니다.");
         return prev;
@@ -494,8 +500,8 @@ export default function ShowcaseStyleSettingsPanel({
   const commitApply = useCallback(() => {
     const latest = readShowcaseStyle();
     writeShowcaseStyle(latest);
-    /* 편집 초안과 별도로 — 홈/통화 미리보기에 즉시 송출 */
-    writeLiveShowcaseStyle(latest);
+    /* 편집 = 라이브 송출 — 앱 홈·통화 미리보기와 웹이 동일 BGM·스타일 */
+    writeLiveShowcaseStyle(latest, { source: "editor" });
     if (isPaid) {
       void syncShowcaseTagsToServer(parseShowcaseTagsInput(tagInput));
     }
@@ -869,7 +875,11 @@ export default function ShowcaseStyleSettingsPanel({
         </span>
         <span className="showcase-profile-row__trail">
           <span className="showcase-profile-row__value">
-            {config.bgm?.mode === "none" || !config.bgm?.mode ? "미설정" : "설정됨"}
+            {config.bgm?.mode && config.bgm.mode !== "none"
+              ? "설정됨"
+              : Array.isArray(config.bgm?.playlist) && config.bgm.playlist.length > 0
+                ? `재생목록 ${config.bgm.playlist.length}곡`
+                : "미설정"}
           </span>
           {openMusic ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </span>
@@ -881,6 +891,7 @@ export default function ShowcaseStyleSettingsPanel({
             inputCls={inputCls}
             onChange={(bgm) => persist({ bgm: { ...config.bgm, ...bgm } })}
             onToast={onToast}
+            coexistWithPreview={isWebDesk}
           />
         </div>
       ) : null}

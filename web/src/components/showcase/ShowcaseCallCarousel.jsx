@@ -27,6 +27,7 @@ import ShowcaseBgmTransport from "./ShowcaseBgmTransport.jsx";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import { resolveShowcaseBgmUrl, hasShowcaseBgmConfigured, showcaseBgmIdentityKey } from "../../lib/showcase/showcaseBgmPresets.js";
 import { SHOWCASE_BGM_OWNER_RELEASED_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
+import { readActiveShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 
 /** 갤러리 사진 → 슬라이드용 (텍스트 오버레이 필드 유지) */
 function pickPhotoSlideFields(p = {}) {
@@ -221,14 +222,23 @@ export default function ShowcaseCallCarousel({
   useEffect(() => {
     if (suppressBgm) return undefined;
     const onReleased = () => {
+      /* persist 직후 React 클로저가 한 박자 늦을 수 있어 라이브 스토리지 우선 */
+      let cfg = styleConfig;
+      try {
+        const live = readActiveShowcaseStyle();
+        if (live?.bgm) cfg = { ...(styleConfig || {}), bgm: live.bgm };
+      } catch {
+        /* ignore */
+      }
       const hasBgm =
-        Boolean(resolveShowcaseBgmUrl(styleConfig)) || hasShowcaseBgmConfigured(styleConfig);
+        Boolean(resolveShowcaseBgmUrl(cfg)) || hasShowcaseBgmConfigured(cfg);
       if (!hasBgm) return;
       const liveCallMuted = !previewMode && !scrollEnabled;
       setPlaybackPhase(liveCallMuted ? "call_active" : previewMode ? "preview" : "replay", {
-        forceRestart: false,
+        forceRestart: true,
+        steal: true,
         owner: "carousel",
-        styleConfig
+        styleConfig: cfg
       });
     };
     window.addEventListener(SHOWCASE_BGM_OWNER_RELEASED_EVENT, onReleased);

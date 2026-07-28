@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
-import { resolveShowcaseBgmMarqueeText } from "../../lib/showcase/showcaseBgmPresets.js";
+import { resolveShowcaseBgmMarqueeText, ensureActiveBgmFromPlaylist } from "../../lib/showcase/showcaseBgmPresets.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import {
   borrowShowcaseSound,
@@ -46,8 +46,8 @@ export default function ShowcaseBgmTrackChip({
   const [busy, setBusy] = useState("");
   const [actionMsg, setActionMsg] = useState("");
   const { visitSessionKey, trackIndex, effectiveMuted, bgmUrl } = useShowcaseBgm();
-  const bgm = styleConfig?.bgm || null;
-  const marquee = resolveShowcaseBgmMarqueeText(styleConfig, visitSessionKey, trackIndex);
+  const bgm = ensureActiveBgmFromPlaylist(styleConfig?.bgm) || null;
+  const marquee = resolveShowcaseBgmMarqueeText({ bgm }, visitSessionKey, trackIndex);
 
   const details = useMemo(() => {
     if (!bgm || bgm.mode === "none") return null;

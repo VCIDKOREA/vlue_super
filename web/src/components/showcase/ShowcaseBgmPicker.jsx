@@ -108,13 +108,15 @@ function PreviewSpeakerBtn({ soundId, active, playing, disabled, onPreview }) {
 /**
  * A. VLUE Signature Sound / B. User Original Sound
  * 설정 화면에서는 자동재생 없음 — 「BGM 미리듣기」만 재생
+ * @param {boolean} [coexistWithPreview] www 쇼케이스 데스크 — 미리보기와 동시 마운트 시 소유권 양보
  */
 export default function ShowcaseBgmPicker({
   value,
   onChange,
   inputCls = "",
   memberHandle = "",
-  onToast
+  onToast,
+  coexistWithPreview = false
 }) {
   const handle = resolveMemberHandle(memberHandle);
   const originalTrackLabel = handle ? `@${handle} Original Track` : "Original Track";
@@ -133,6 +135,8 @@ export default function ShowcaseBgmPicker({
   const previewAudioRef = useRef(null);
   const previewingIdRef = useRef("");
   const soundByIdRef = useRef(new Map());
+  const coexistWithPreviewRef = useRef(coexistWithPreview);
+  coexistWithPreviewRef.current = coexistWithPreview;
   const { setPlaybackPhase, stopSettingsPreview, hushMainAudio, bindStyleConfig } = useShowcaseBgm();
 
   const paid = Boolean(quota?.paid);
@@ -207,6 +211,13 @@ export default function ShowcaseBgmPicker({
     setPreviewPlaying(false);
   }, []);
 
+  const stopLocalPreviewAndResumeCarousel = useCallback(() => {
+    stopLocalPreview();
+    if (!coexistWithPreview) return;
+    setPlaybackPhase("idle", { release: true });
+    dispatchShowcaseBgmOwnerReleased();
+  }, [coexistWithPreview, setPlaybackPhase, stopLocalPreview]);
+
   const ensurePreviewAudio = useCallback(() => {
     if (previewAudioRef.current) return previewAudioRef.current;
     const el = new Audio();
@@ -217,10 +228,14 @@ export default function ShowcaseBgmPicker({
       previewingIdRef.current = "";
       setPreviewingId("");
       setPreviewPlaying(false);
+      if (coexistWithPreviewRef.current) {
+        setPlaybackPhase("idle", { release: true });
+        dispatchShowcaseBgmOwnerReleased();
+      }
     });
     previewAudioRef.current = el;
     return el;
-  }, []);
+  }, [setPlaybackPhase]);
 
   /** Context 상태머신 우회 — 제스처 안에서 Audio.play() 만 호출 (즉각 반응) */
   const previewListSoundById = useCallback(
@@ -237,7 +252,7 @@ export default function ShowcaseBgmPicker({
       }
 
       if (previewingIdRef.current === id) {
-        stopLocalPreview();
+        stopLocalPreviewAndResumeCarousel();
         return;
       }
 
@@ -245,7 +260,7 @@ export default function ShowcaseBgmPicker({
       setPreviewingId(id);
       setPreviewPlaying(false);
 
-      hushMainAudio?.();
+      hushMainAudio?.(coexistWithPreviewRef.current ? { lockSettings: false } : undefined);
 
       const el = ensurePreviewAudio();
       el.volume = resolveBgmVolumeGain({ bgm: { volumeLevel } });
@@ -265,11 +280,17 @@ export default function ShowcaseBgmPicker({
           setError("");
           if (typeof onToast === "function") onToast(text);
           else window.alert(text);
-          stopLocalPreview();
+          stopLocalPreviewAndResumeCarousel();
         });
       });
     },
-    [ensurePreviewAudio, hushMainAudio, onToast, stopLocalPreview, volumeLevel]
+    [
+      ensurePreviewAudio,
+      hushMainAudio,
+      onToast,
+      stopLocalPreviewAndResumeCarousel,
+      volumeLevel
+    ]
   );
 
   useEffect(() => {
@@ -310,25 +331,28 @@ export default function ShowcaseBgmPicker({
 
   useEffect(() => {
     load();
-    /* 설정 진입 시 다른 면 BGM 즉시 중지·소유권 확보.
-       setPlaybackPhase 를 deps 에 넣으면 미리듣기 시 cleanup 이 재생을 끊음 */
-    setPlaybackPhase("idle", { owner: "settings", steal: true });
+    /* 앱 설정 시트: 다른 면 BGM 중지·소유권 확보.
+       www 데스크(미리보기 동시): 소유권을 붙잡지 않아 왼쪽 미리보기가 계속 재생 */
+    if (!coexistWithPreview) {
+      setPlaybackPhase("idle", { owner: "settings", steal: true });
+    }
     setError("");
     return () => {
       stopLocalPreview();
       stopSettingsPreview?.();
-      setPlaybackPhase("idle", { owner: "settings", steal: true });
-      /* 케이스함·홈 캐러셀이 재생을 이어가도록 */
+      /* 소유권을 완전히 내려놓아야 캐러셀이 RELEASED 이벤트에서 재개 가능 */
+      setPlaybackPhase("idle", { release: true });
       dispatchShowcaseBgmOwnerReleased();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only
-  }, [load]);
+  }, [load, coexistWithPreview]);
 
   useEffect(() => {
     /* 목록 미리듣기 중에는 선택값 바인딩으로 URL 덮어쓰지 않음 */
     if (previewingId) return;
-    bindStyleConfig?.({ bgm: value || { mode: "none" } }, { owner: "settings" });
-  }, [value, bindStyleConfig, previewingId]);
+    /* www 데스크: settings 잠금 없이 바인딩만 — 미리보기 캐러셀이 새 곡을 받음 */
+    bindStyleConfig?.({ bgm: value || { mode: "none" } }, coexistWithPreview ? {} : { owner: "settings" });
+  }, [value, bindStyleConfig, previewingId, coexistWithPreview]);
 
   const patchBgm = (partial) => {
     onChange?.({ ...(value || {}), ...partial });
@@ -372,10 +396,16 @@ export default function ShowcaseBgmPicker({
         : playMode === "single"
           ? "order"
           : playMode;
-    /* 설정 화면 자동재생 금지 */
-    setPlaybackPhase("idle", { owner: "settings" });
-    stopLocalPreview();
-    stopSettingsPreview?.();
+    /* 설정 화면 자동재생 금지 — www 데스크는 미리보기로 넘김 */
+    if (coexistWithPreview) {
+      stopLocalPreview();
+      stopSettingsPreview?.();
+      setPlaybackPhase("idle", { release: true });
+    } else {
+      setPlaybackPhase("idle", { owner: "settings" });
+      stopLocalPreview();
+      stopSettingsPreview?.();
+    }
     onChange?.({
       ...(value || {}),
       ...patch,
@@ -383,12 +413,20 @@ export default function ShowcaseBgmPicker({
       playMode: nextPlayMode,
       playlist: nextPlaylist
     });
+    if (coexistWithPreview) {
+      window.setTimeout(() => dispatchShowcaseBgmOwnerReleased(), 40);
+    }
   };
 
   const clearBgm = () => {
     stopLocalPreview();
     stopSettingsPreview?.();
-    setPlaybackPhase("idle", { owner: "settings", steal: true });
+    if (coexistWithPreview) {
+      setPlaybackPhase("idle", { release: true });
+      dispatchShowcaseBgmOwnerReleased();
+    } else {
+      setPlaybackPhase("idle", { owner: "settings", steal: true });
+    }
     onChange?.({
       mode: "none",
       soundId: "",
@@ -457,7 +495,28 @@ export default function ShowcaseBgmPicker({
     } else {
       notify(`재생목록에 추가했습니다. (${nextPlaylist.length}/${playlistLimit})`);
     }
+    /* 주제곡 미선택 + 재생목록만 있으면 미리보기·앱에 곡이 안 나옴 → 첫 곡을 쇼케이스 음원으로 연결 */
+    if (!value?.mode || value.mode === "none" || !String(value?.soundId || "").trim()) {
+      Object.assign(patch, {
+        mode: entry.mode,
+        soundId: entry.soundId,
+        title: entry.title,
+        artistName: entry.artistName || "",
+        audioUrl: entry.audioUrl,
+        attributionLabel: entry.attributionLabel || "",
+        linkBroken: Boolean(entry.linkBroken),
+        ownerHandle: entry.ownerHandle || "",
+        sharedOwnerHandle: entry.sharedOwnerHandle || "",
+        createType: entry.createType || ""
+      });
+    }
     patchBgm(patch);
+    if (coexistWithPreview) {
+      window.setTimeout(() => {
+        setPlaybackPhase("idle", { release: true });
+        dispatchShowcaseBgmOwnerReleased();
+      }, 40);
+    }
   };
 
   /** 보관·선택 중인 주제곡을 재생목록에 넣기 */
