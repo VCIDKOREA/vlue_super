@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, ExternalLink, Paperclip } from "lucide-react";
-import { resolveVlueShowcasePeer } from "../../../lib/resolveVlueShowcasePeer.js";
+import { resolvePublicShowcaseByPhone } from "../../../lib/resolvePublicShowcaseByPhone.js";
 import { getVlueDownloadLinks } from "../../../lib/vlueClientAccess.js";
 import { openVlueDownload } from "../../../lib/vlueDownloadActions.js";
 import { hasShowcaseBgmConfigured } from "../../../lib/showcase/showcaseBgmPresets.js";
@@ -42,7 +42,7 @@ export default function ShowcaseWebPage({ phone }) {
 
   useEffect(() => {
     let cancelled = false;
-    resolveVlueShowcasePeer({ phone, forceStyle: true }).then((data) => {
+    resolvePublicShowcaseByPhone(phone).then((data) => {
       if (!cancelled) setPayload(data);
     });
     return () => {
