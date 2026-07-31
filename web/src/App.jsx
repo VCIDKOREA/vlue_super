@@ -2055,8 +2055,8 @@ function App() {
           /* ignore */
         }
         try {
-          const { fetchDigitalCardMeta } = await import("./lib/digitalCardApi.js");
-          const meta = await fetchDigitalCardMeta({ force: true, lite: true });
+          const { restoreDigitalCardFromServer } = await import("./lib/digitalCardApi.js");
+          const meta = await restoreDigitalCardFromServer({ force: true });
           if (meta?.issued) {
             localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
             setDigitalCardActive(true);
@@ -2177,10 +2177,10 @@ function App() {
             const { readLetteringFixedIdentity } = await import("./lib/letteringBizcardStorage.js");
             readLetteringFixedIdentity();
           }
-          /* 디지털 명함 활성은 서버 발급(issued) 기준 — 유료만으로 CEO 잔여처럼 켜지 않음 */
+          /* 디지털 명함 — 재설치 대비 서버 스냅샷 전체 복원 */
           try {
-            const { fetchDigitalCardMeta } = await import("./lib/digitalCardApi.js");
-            const meta = await fetchDigitalCardMeta({ force: true, lite: true });
+            const { restoreDigitalCardFromServer } = await import("./lib/digitalCardApi.js");
+            const meta = await restoreDigitalCardFromServer({ force: true });
             if (meta?.issued || handle === "ceo") {
               localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
               setDigitalCardActive(true);
@@ -2310,8 +2310,8 @@ function App() {
         /* ignore */
       }
       try {
-        const { fetchDigitalCardMeta } = await import("./lib/digitalCardApi.js");
-        const meta = await fetchDigitalCardMeta({ force: true, lite: true });
+        const { restoreDigitalCardFromServer } = await import("./lib/digitalCardApi.js");
+        const meta = await restoreDigitalCardFromServer({ force: true });
         if (meta?.issued) {
           localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
           setDigitalCardActive(true);
@@ -2746,6 +2746,28 @@ function App() {
       }
       writeLetteringEnabled(readLetteringEnabled());
     })();
+  }, []);
+
+  /* 재설치 후 세션만 남은 경우 — 빈 로컬 명함을 서버 스냅샷으로 복원 */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const uid = String(localStorage.getItem("vlue_server_user_id") || "").trim();
+        if (!uid) return;
+        const { needsDigitalCardLocalRestore, restoreDigitalCardFromServer } = await import(
+          "./lib/digitalCardApi.js"
+        );
+        if (!needsDigitalCardLocalRestore()) return;
+        await restoreDigitalCardFromServer({ force: true });
+        if (!cancelled) setCardFieldsTick((n) => n + 1);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {

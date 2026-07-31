@@ -118,6 +118,61 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
   return writeLetteringBizcardEditable(patch)?.data ?? null;
 }
 
+/** 로컬 명함 편집값이 비어 재설치·캐시 유실로 보이는지 */
+export function needsDigitalCardLocalRestore() {
+  try {
+    const ed = readLetteringBizcardEditable();
+    const email = String(ed.email || "").trim();
+    const photo = String(ed.photoDataUrl || ed.photoUrl || "").trim();
+    const website = String(ed.website || "").trim();
+    const address = String(ed.address || ed.addressRoad || "").trim();
+    return !email && !photo && !website && !address;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * 재설치·로그인 후 서버 exportSnapshot 전체 복원 (lite 금지)
+ * @param {{ force?: boolean }} [opts]
+ */
+export async function restoreDigitalCardFromServer(opts = {}) {
+  const force = opts.force !== false;
+  const meta = await fetchDigitalCardMeta({ force: true, lite: false });
+  if (meta?.exportSnapshot) {
+    hydrateLetteringEditableFromSnapshot(meta.exportSnapshot, { force });
+    hydrateAvatarsFromExportSnapshot(meta.exportSnapshot, { force });
+    hydrateFeedNicknameFromSnapshot(meta.exportSnapshot, { force });
+    try {
+      const name = String(
+        meta.exportSnapshot.name || meta.exportSnapshot.displayName || ""
+      ).trim();
+      if (name) {
+        localStorage.setItem("myCardDisplayName", name);
+        if (!localStorage.getItem("vlue_legal_name")) {
+          localStorage.setItem("vlue_legal_name", name);
+        }
+      }
+      const org = String(
+        meta.exportSnapshot.organization || meta.exportSnapshot.companyName || ""
+      ).trim();
+      if (org) localStorage.setItem("myCardOrganization", org);
+      const phone = String(meta.exportSnapshot.phone || "").trim();
+      if (phone) localStorage.setItem("myCardPhone", phone);
+    } catch {
+      /* ignore */
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("vlue-digital-card-changed"));
+      window.dispatchEvent(new CustomEvent("vlue-lettering-bizcard-changed"));
+      window.dispatchEvent(new Event("vlue-vcid-changed"));
+    } catch {
+      /* ignore */
+    }
+  }
+  return meta;
+}
+
 /**
  * 서버에서 디지털 명함 메타 (HTML 배포·검증·유효기간·편집 스냅샷)
  * @param {{ force?: boolean, lite?: boolean }} [opts]

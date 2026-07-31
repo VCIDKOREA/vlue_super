@@ -1,5 +1,9 @@
 import { fetchB2bMembershipUiContext } from "./b2bEnterpriseApi.js";
-import { fetchDigitalCardMeta } from "./digitalCardApi.js";
+import {
+  fetchDigitalCardMeta,
+  needsDigitalCardLocalRestore,
+  restoreDigitalCardFromServer
+} from "./digitalCardApi.js";
 import { formatPhoneE164ForKoreaDisplay } from "./phoneDisplay.js";
 import { normalizeMembershipKind } from "./membershipBm.js";
 
@@ -87,10 +91,14 @@ export function hydrateBizcardFromLoginPayload(data) {
 /** 웹 명함 설정 진입 시 서버 프로필·기업·명함 메타 동기화 */
 export async function syncBizcardAccountFromApi(opts = {}) {
   const force = Boolean(opts.force);
+  /* 재설치·빈 로컬이면 반드시 full snapshot 복원 (lite 는 사진·이메일 생략) */
+  const restoreNeeded = force || needsDigitalCardLocalRestore();
+
   const [ctx, meta] = await Promise.all([
     fetchB2bMembershipUiContext().catch(() => null),
-    /* force 여부와 무관하게 lite — full snapshot 은 로그인 후 1회만 (App) */
-    fetchDigitalCardMeta({ force, lite: true }).catch(() => ({ issued: false, cardId: null }))
+    restoreNeeded
+      ? restoreDigitalCardFromServer({ force: true }).catch(() => ({ issued: false, cardId: null }))
+      : fetchDigitalCardMeta({ force, lite: true }).catch(() => ({ issued: false, cardId: null }))
   ]);
 
   if (ctx?.company?.company_name) {

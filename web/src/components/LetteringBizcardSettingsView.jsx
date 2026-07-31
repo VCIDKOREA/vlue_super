@@ -22,7 +22,9 @@ import { useB2bMembership } from "../context/B2bMembershipContext.jsx";
 import {
   syncDigitalCardDesignTemplate,
   syncDigitalCardExportSnapshot,
-  fetchDigitalCardMeta
+  fetchDigitalCardMeta,
+  needsDigitalCardLocalRestore,
+  restoreDigitalCardFromServer
 } from "../lib/digitalCardApi.js";
 import { fetchTitleDeptStatus, submitTitleDeptReview } from "../lib/titleDeptReviewApi.js";
 import {
@@ -91,8 +93,12 @@ export default function LetteringBizcardSettingsView({
       .replace(/^@/, "");
     const isCeo = handle === "ceo";
     try {
-      /* 로그인 hydrate 캐시 우선 — 설정 진입마다 full snapshot GET 금지 */
-      await fetchDigitalCardMeta({ lite: true });
+      /* 로컬이 비어 있으면 full snapshot 복원 (재설치·캐시 유실) */
+      if (needsDigitalCardLocalRestore()) {
+        await restoreDigitalCardFromServer({ force: true });
+      } else {
+        await fetchDigitalCardMeta({ lite: true });
+      }
     } catch {
       /* ignore */
     }

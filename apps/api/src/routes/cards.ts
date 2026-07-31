@@ -369,12 +369,20 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
       phone: string | null;
       email: string | null;
       website: string | null;
+      fax: string | null;
       address: string | null;
+      address_road: string | null;
+      address_detail: string | null;
+      company_intro: string | null;
+      custom_back_text: string | null;
+      share_cover_url: string | null;
       activity_name: string | null;
       design_template: string | null;
       photo_focus: unknown;
       no_profile_photo: boolean | null;
       no_company_logo: boolean | null;
+      no_fax: boolean | null;
+      no_website: boolean | null;
     }>
   >(Prisma.sql`
     SELECT
@@ -393,7 +401,13 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
       NULLIF(TRIM(export_snapshot_json->>'phone'), '') AS phone,
       NULLIF(TRIM(export_snapshot_json->>'email'), '') AS email,
       NULLIF(TRIM(export_snapshot_json->>'website'), '') AS website,
+      NULLIF(TRIM(export_snapshot_json->>'fax'), '') AS fax,
       NULLIF(TRIM(export_snapshot_json->>'address'), '') AS address,
+      NULLIF(TRIM(export_snapshot_json->>'addressRoad'), '') AS address_road,
+      NULLIF(TRIM(export_snapshot_json->>'addressDetail'), '') AS address_detail,
+      NULLIF(TRIM(export_snapshot_json->>'companyIntro'), '') AS company_intro,
+      NULLIF(TRIM(export_snapshot_json->>'customBackText'), '') AS custom_back_text,
+      NULLIF(TRIM(export_snapshot_json->>'shareCoverUrl'), '') AS share_cover_url,
       NULLIF(TRIM(export_snapshot_json->>'activityName'), '') AS activity_name,
       NULLIF(TRIM(export_snapshot_json->>'designTemplate'), '') AS design_template,
       export_snapshot_json->'photoFocus' AS photo_focus,
@@ -406,7 +420,17 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
         WHEN export_snapshot_json ? 'noCompanyLogo'
           THEN (export_snapshot_json->>'noCompanyLogo')::boolean
         ELSE NULL
-      END AS no_company_logo
+      END AS no_company_logo,
+      CASE
+        WHEN export_snapshot_json ? 'noFax'
+          THEN (export_snapshot_json->>'noFax')::boolean
+        ELSE NULL
+      END AS no_fax,
+      CASE
+        WHEN export_snapshot_json ? 'noWebsite'
+          THEN (export_snapshot_json->>'noWebsite')::boolean
+        ELSE NULL
+      END AS no_website
     FROM digital_cards
     WHERE user_id = ${me}::uuid
     LIMIT 1
@@ -427,12 +451,20 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
     phone: row.phone,
     email: row.email,
     website: row.website,
+    fax: row.fax,
     address: row.address,
+    addressRoad: row.address_road,
+    addressDetail: row.address_detail,
+    companyIntro: row.company_intro,
+    customBackText: row.custom_back_text,
+    shareCoverUrl: row.share_cover_url,
     activityName: row.activity_name,
     designTemplate: row.design_template || row.design_template_snapshot,
     photoFocus: row.photo_focus,
     noProfilePhoto: row.no_profile_photo,
-    noCompanyLogo: row.no_company_logo
+    noCompanyLogo: row.no_company_logo,
+    noFax: row.no_fax,
+    noWebsite: row.no_website
   });
   return c.json({
     issued: true,
