@@ -4,6 +4,7 @@ import {
   requestLetteringPermissions,
   writeLetteringEnabled
 } from "../lib/letteringSettings.js";
+import { nativeRequestDefaultDialerRole } from "../lib/call/nativeCallControl.js";
 
 /** 메인 앱 설정 — VLUE 레터링 켜기/끄기 + 권한 유도 */
 export default function LetteringSettingsSection({
@@ -36,7 +37,7 @@ export default function LetteringSettingsSection({
       setBusy(false);
       if (perm.ok) {
         onNotice?.(
-          "레터링이 켜졌습니다. 「다른 앱 위에 표시」와 전화·통화기록 권한을 허용한 뒤 실제 통화로 확인해 주세요."
+          "레터링이 켜졌습니다. 전화·통화기록·「다른 앱 위에 표시」를 허용한 뒤, 「기본 전화 앱으로 설정」도 확인해 주세요."
         );
       } else {
         onNotice?.(
@@ -46,6 +47,17 @@ export default function LetteringSettingsSection({
     },
     [onNotice]
   );
+
+  const handleDefaultDialer = useCallback(() => {
+    try {
+      nativeRequestDefaultDialerRole();
+      onNotice?.(
+        "「VLUE를 기본 전화 앱으로 사용할까요?」안내가 열립니다. 일반 전화는 그대로이며, 통화 화면 쇼케이스용입니다."
+      );
+    } catch {
+      onNotice?.("기본 전화 앱 설정은 VLUE Android 앱에서만 가능합니다.");
+    }
+  }, [onNotice]);
 
   const border = isDarkMode ? "border-white/10 bg-white/5" : "border-gray-100 bg-white";
   const label = isDarkMode ? "text-gray-200" : "text-gray-700";
@@ -59,7 +71,8 @@ export default function LetteringSettingsSection({
       <p className={`mb-3 text-[11px] leading-snug ${hint}`}>
         통화 수·발신 시 VLUE 인증 명함·쇼케이스를 표시합니다. 꺼두면 백그라운드 감시가 중지됩니다.
         <br />
-        ※ 브라우저가 아니라 VLUE 앱(APK)에서, 「다른 앱 위에 표시」·전화 권한을 허용해야 실제 통화에 반응합니다.
+        ※ 「다른 앱 위에 표시」는 필수입니다. 「기본 전화 앱」은 일반 전화를 막지 않으며, 통화 화면·키패드를
+        VLUE가 보여 주기 위한 설정입니다.
       </p>
       <label className={`flex items-center justify-between text-[12px] font-semibold ${label}`}>
         레터링 기능 켜기
@@ -71,15 +84,26 @@ export default function LetteringSettingsSection({
         />
       </label>
       {enabled ? (
-        <button
-          type="button"
-          className={`mt-3 w-full rounded-lg border py-2 text-[11px] font-bold ${
-            isDarkMode ? "border-blue-400/40 text-blue-300" : "border-blue-200 text-blue-700"
-          }`}
-          onClick={() => requestLetteringPermissions()}
-        >
-          통화·오버레이 권한 다시 확인
-        </button>
+        <div className="mt-3 space-y-2">
+          <button
+            type="button"
+            className={`w-full rounded-lg border py-2 text-[11px] font-bold ${
+              isDarkMode ? "border-blue-400/40 text-blue-300" : "border-blue-200 text-blue-700"
+            }`}
+            onClick={() => requestLetteringPermissions()}
+          >
+            통화·오버레이 권한 다시 확인
+          </button>
+          <button
+            type="button"
+            className={`w-full rounded-lg border py-2 text-[11px] font-bold ${
+              isDarkMode ? "border-cyan-400/40 text-cyan-200" : "border-cyan-200 text-cyan-800"
+            }`}
+            onClick={handleDefaultDialer}
+          >
+            기본 전화 앱으로 설정 (권장)
+          </button>
+        </div>
       ) : null}
       <p className={`mt-3 text-[10px] leading-snug ${hint}`}>
         {variant === "web"
