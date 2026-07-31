@@ -1,12 +1,27 @@
 /** 쇼케이스 명함 — 전화·메일·웹 링크 액션 */
 
+import { toKoreaNationalDigits } from "../letteringPhoneMatch.js";
+
 export function digitsForTel(raw) {
   return String(raw || "").replace(/[^\d+]/g, "");
 }
 
+/** 일반전화용 E.164 (+8210…) — 82… / 010… 혼용 통일 */
+export function toTelE164(raw) {
+  const national = toKoreaNationalDigits(raw);
+  if (national && national.startsWith("0") && national.length >= 9) {
+    return `+82${national.slice(1)}`;
+  }
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("82")) return `+${digits}`;
+  if (digits.startsWith("0")) return `+82${digits.slice(1)}`;
+  return digits.startsWith("+") ? String(raw).replace(/[^\d+]/g, "") : `+${digits}`;
+}
+
 export function formatTelHref(raw) {
-  const d = digitsForTel(raw);
-  return d ? `tel:${d}` : "";
+  const e164 = toTelE164(raw);
+  return e164 ? `tel:${e164}` : "";
 }
 
 export function formatMailtoHref(raw) {

@@ -3,20 +3,44 @@ export function normalizePhoneDigits(raw) {
   return String(raw || "").replace(/\D/g, "");
 }
 
-/** 화면 표시용 포맷 */
+/**
+ * 한국 번호 표시용 국내 자릿수 (010… / 02…)
+ * +82·82·010 혼용을 0으로 시작하는 국내형으로 통일
+ */
+export function toKoreaNationalDigits(raw) {
+  let d = normalizePhoneDigits(raw);
+  if (!d) return "";
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.startsWith("82") && d.length >= 10) {
+    d = `0${d.slice(2)}`;
+  }
+  return d;
+}
+
+/**
+ * 화면 표시용 — 010-0000-0000 / 02-XXXX-XXXX 통일
+ * (82… 원시 숫자열·E.164 모두 동일 포맷)
+ */
 export function formatLetteringPhoneDisplay(raw) {
-  const digits = normalizePhoneDigits(raw);
-  if (digits.length === 11 && digits.startsWith("010")) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  const d = toKoreaNationalDigits(raw);
+  if (!d) return String(raw || "—").trim() || "—";
+
+  if (d.length === 11 && d.startsWith("01")) {
+    return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
   }
-  if (digits.length === 9 && digits.startsWith("02")) {
-    return `02-${digits.slice(2, 5)}-${digits.slice(5)}`;
+  if (d.length === 10 && d.startsWith("02")) {
+    return `02-${d.slice(2, 6)}-${d.slice(6)}`;
   }
-  if (digits.length === 10 && digits.startsWith("02")) {
-    return `02-${digits.slice(2, 6)}-${digits.slice(6)}`;
+  if (d.length === 9 && d.startsWith("02")) {
+    return `02-${d.slice(2, 5)}-${d.slice(5)}`;
   }
-  if (digits.length >= 8) return digits;
-  return String(raw || "—").trim() || "—";
+  if (d.length === 10 && d.startsWith("0")) {
+    return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+  }
+  if (d.length === 11 && d.startsWith("0")) {
+    return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+  }
+  return d.length >= 8 ? d : String(raw || "—").trim() || "—";
 }
 
 /**
@@ -25,8 +49,8 @@ export function formatLetteringPhoneDisplay(raw) {
  * @returns {{ matched: boolean, status: "match"|"unknown", incomingDisplay: string, registeredDisplay: string, summary: string } | null}
  */
 export function compareLetteringPhones(incomingRaw, registeredRaw) {
-  const incoming = normalizePhoneDigits(incomingRaw);
-  const registered = normalizePhoneDigits(registeredRaw);
+  const incoming = toKoreaNationalDigits(incomingRaw) || normalizePhoneDigits(incomingRaw);
+  const registered = toKoreaNationalDigits(registeredRaw) || normalizePhoneDigits(registeredRaw);
   const incomingDisplay = formatLetteringPhoneDisplay(incomingRaw);
   const registeredDisplay = formatLetteringPhoneDisplay(registeredRaw);
 

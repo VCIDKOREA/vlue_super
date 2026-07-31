@@ -840,9 +840,12 @@ export default function LetteringDigitalReception({
     });
   }, [activeFace]);
 
-  const requestDial = (phone, displayName) => {
+  const requestDial = (phone, _displayName) => {
     if (!enableContactLinks) return;
-    setDialTarget({ phone, displayName });
+    /* 이메일·웹과 동일 — 확인 팝업 없이 즉시 일반전화(tel:) 연결 */
+    if (!openPhoneDial(phone)) {
+      setDialTarget({ phone, displayName: _displayName });
+    }
   };
 
   const front = (
