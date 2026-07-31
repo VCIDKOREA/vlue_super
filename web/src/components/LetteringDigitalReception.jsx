@@ -821,6 +821,16 @@ export default function LetteringDigitalReception({
   const panelWrapRef = useRef(null);
   const useStackedPanels = embeddedInPush && !previewMode;
   const [dialTarget, setDialTarget] = useState(null);
+  /* 부모가 onFaceChange 를 안 넘기면 탭이 먹통이 되므로 내부 상태로 폴백 */
+  const [internalFace, setInternalFace] = useState(() => (face === "back" ? "back" : "front"));
+  const faceControlled = typeof onFaceChange === "function";
+  const activeFace = faceControlled ? (face === "back" ? "back" : "front") : internalFace;
+  const setActiveFace = faceControlled ? onFaceChange : setInternalFace;
+
+  useEffect(() => {
+    if (!faceControlled) return;
+    setInternalFace(face === "back" ? "back" : "front");
+  }, [face, faceControlled]);
 
   useEffect(() => {
     const root = panelWrapRef.current;
@@ -828,7 +838,7 @@ export default function LetteringDigitalReception({
     root.querySelectorAll(".ldr-panel").forEach((panel) => {
       panel.scrollTop = 0;
     });
-  }, [face]);
+  }, [activeFace]);
 
   const requestDial = (phone, displayName) => {
     if (!enableContactLinks) return;
@@ -864,7 +874,7 @@ export default function LetteringDigitalReception({
       }${keypadOpen ? " ldr-reception--keypad" : ""}${
         callChromeSafe ? " ldr-reception--call-chrome" : ""
       } ${className}`.trim()}
-      data-face={face}
+      data-face={activeFace}
     >
       <div className="ldr-panel-wrap" role="tabpanel" ref={panelWrapRef} aria-hidden={keypadOpen}>
         {useStackedPanels ? (
@@ -872,14 +882,14 @@ export default function LetteringDigitalReception({
             {front}
             {back}
           </div>
-        ) : face === "back" ? (
+        ) : activeFace === "back" ? (
           back
         ) : (
           front
         )}
       </div>
 
-      <FaceTabs face={face} onFaceChange={onFaceChange} hidden={keypadOpen} />
+      <FaceTabs face={activeFace} onFaceChange={setActiveFace} hidden={keypadOpen} />
 
       {keypadOpen ? (
         <div className="ldr-reception-keypad-layer">

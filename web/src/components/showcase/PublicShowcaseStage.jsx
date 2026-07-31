@@ -118,6 +118,8 @@ export default function PublicShowcaseStage({ card, onToast, onClose }) {
           onKeypadToast={onToast}
           showcaseStyle={style}
           suppressBgm={false}
+          face={face}
+          onFaceChange={setFace}
         />
       </div>
     );
