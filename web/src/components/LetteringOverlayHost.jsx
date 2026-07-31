@@ -5,13 +5,15 @@ import { checkLetteringPhoneBlocked } from "../lib/letteringApi.js";
 import { readLetteringEnabled } from "../lib/letteringSettings.js";
 import { submitLetteringReport } from "../lib/letteringReport.js";
 import { blockLetteringPhoneOnly } from "../lib/letteringPhoneBlock.js";
-import { readActiveShowcaseStyle, SHOWCASE_LIVE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
-import { hydrateLiveBroadcastFromServer } from "../lib/showcase/syncMycaseLiveBroadcast.js";
+import { SHOWCASE_LIVE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { CALL_STATES, normalizeCallState } from "../lib/showcase/tentShowcaseTypes.js";
 import { appendCallShowcaseHistory } from "../lib/callShowcaseHistory.js";
 import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
+import { fetchPeerShowcaseStyleBundle } from "../lib/showcase/showcaseStyleApi.js";
+import { apiUrl } from "../lib/apiBase.js";
+import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import LetteringReportSheet from "./LetteringReportSheet.jsx";
 import LetteringCertModal from "./LetteringCertModal.jsx";
@@ -38,7 +40,7 @@ function parseOverlayParams() {
  * 웹 홈·마케팅과 동일 — LetteringIncomingNotification 쇼케이스 바 → 풀 쇼케이스
  */
 export default function LetteringOverlayHost() {
-  const [{ incoming, platform, direction, phase }, setParams] = useState(parseOverlayParams);
+  const [{ incoming, platform, direction, native, phase }, setParams] = useState(parseOverlayParams);
   const [card, setCard] = useState(null);
   const [verified, setVerified] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,7 +52,7 @@ export default function LetteringOverlayHost() {
   const [callState, setCallState] = useState(() =>
     normalizeCallState(phase) === CALL_STATES.CONNECTED ? CALL_STATES.CONNECTED : CALL_STATES.RINGING
   );
-  const [showcaseStyle, setShowcaseStyle] = useState(() => readActiveShowcaseStyle());
+  const [showcaseStyle, setShowcaseStyle] = useState(() => createDefaultShowcaseStyle());
   const [expanded, setExpanded] = useState(() => normalizeCallState(phase) === CALL_STATES.CONNECTED);
 
   const showToast = useCallback((msg) => {
@@ -76,7 +78,11 @@ export default function LetteringOverlayHost() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!readLetteringEnabled()) {
+      /*
+       * 네이티브 오버레이는 이미 SharedPreferences lettering_enabled 로 게이트됨.
+       * 별도 WebView localStorage 가 비어 있으면 UI 를 통째로 숨기지 않는다.
+       */
+      if (!native && !readLetteringEnabled()) {
         setBlocked(true);
         setLoading(false);
         return;
@@ -90,28 +96,95 @@ export default function LetteringOverlayHost() {
       }
       const lookup = await getBusinessCardByNumber(incoming);
       if (cancelled) return;
+      let nextCard = null;
+      let nextVerified = false;
       if (lookup?.ok && lookup.matched) {
-        setCard(mapLookupToLetteringCard(lookup, incoming));
-        setVerified(true);
+        nextCard = mapLookupToLetteringCard(lookup, incoming);
+        nextVerified = true;
+      }
+
+      /* 상대(발신/수신 번호 소유자) 라이브 쇼케이스 — 본인 hydrateLive 금지 */
+      let peerStyle = createDefaultShowcaseStyle();
+      const peerUserId = String(nextCard?.userId || nextCard?.ownerUserId || "").trim();
+      if (peerUserId) {
+        try {
+          /* 오버레이 WebView 는 로그인 쿠키가 없을 수 있어 공개 GET 사용 */
+          const styleUrl = apiUrl(`/api/lettering/showcase/style/${encodeURIComponent(peerUserId)}`);
+          const styleRes = await fetch(styleUrl, {
+            method: "GET",
+            headers: { Accept: "application/json" },
+            credentials: "omit",
+            cache: "no-store"
+          });
+          const styleData = await styleRes.json().catch(() => ({}));
+          if (styleRes.ok && styleData?.live && typeof styleData.live === "object") {
+            peerStyle = styleData.live;
+          } else {
+            const authStyle = await fetchPeerShowcaseStyleBundle(peerUserId, { force: true });
+            if (authStyle.ok && authStyle.live && typeof authStyle.live === "object") {
+              peerStyle = authStyle.live;
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+        /* 명함 사진·이메일이 lookup 에 없으면 공개 프로필 스냅샷 보강 */
+        if (!String(nextCard?.photoUrl || "").trim()) {
+          try {
+            const res = await fetch(apiUrl(`/api/follow/profile/${encodeURIComponent(peerUserId)}`), {
+              method: "GET",
+              headers: { Accept: "application/json" },
+              credentials: "omit",
+              cache: "no-store"
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data?.ok) {
+              const exp = data.cardExport && typeof data.cardExport === "object" ? data.cardExport : null;
+              const photo =
+                String(exp?.photoUrl || data.photoUrl || data.profile?.photoUrl || "").trim();
+              nextCard = {
+                ...nextCard,
+                photoUrl: photo || nextCard.photoUrl || "",
+                email: String(exp?.email || nextCard.email || "").trim(),
+                website: String(exp?.website || nextCard.website || "").trim(),
+                organization: String(exp?.organization || nextCard.organization || "").trim(),
+                title: String(exp?.title || nextCard.title || "").trim(),
+                logoUrl: String(exp?.logoUrl || nextCard.logoUrl || "").trim(),
+                membershipTier:
+                  data.membershipTier || nextCard.membershipTier || "paid"
+              };
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      if (cancelled) return;
+      if (nextCard) {
+        setCard({ ...nextCard, showcaseStyle: peerStyle });
+        setVerified(nextVerified);
       } else {
         setCard(null);
         setVerified(false);
       }
-      await hydrateLiveBroadcastFromServer();
-      if (cancelled) return;
-      setShowcaseStyle(readActiveShowcaseStyle());
+      setShowcaseStyle(peerStyle);
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [incoming]);
+  }, [incoming, native]);
 
   useEffect(() => {
-    const onLive = () => setShowcaseStyle(readActiveShowcaseStyle());
+    /* 라이브 이벤트는 본인 편집용 — 통화 오버레이에서는 상대 스타일을 덮어쓰지 않음 */
+    if (native) return undefined;
+    const onLive = () => {
+      /* no-op for non-native host paths that still mount this */
+    };
     window.addEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, onLive);
     return () => window.removeEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, onLive);
-  }, []);
+  }, [native]);
 
   useEffect(() => {
     const onNativeCall = (e) => {
@@ -236,7 +309,7 @@ export default function LetteringOverlayHost() {
     }
   }, [incoming, card, showToast]);
 
-  if (blocked || !readLetteringEnabled()) {
+  if (blocked || (!native && !readLetteringEnabled())) {
     return null;
   }
 

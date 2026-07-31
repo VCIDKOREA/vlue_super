@@ -32,9 +32,14 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
     address: profile.address || profile.businessAddress || profile.companyAddress || "",
     roadAddress: profile.roadAddress || profile.companyAddressRoad || "",
     addressDetail: profile.addressDetail || "",
+    userId: feedId,
+    ownerUserId: feedId,
     feedId: feedId || (phone ? `phone-${phone.replace(/\D/g, "")}` : ""),
     feedType: body.kind === "company" ? "company" : "personal",
-    membershipTier: profile.membershipTier || body.membershipTier || "free",
+    membershipTier:
+      profile.membershipTier ||
+      body.membershipTier ||
+      (body.is_premium_line || body.digitalCardActive ? "paid" : "free"),
     verificationItems: Array.isArray(profile.verificationItems)
       ? profile.verificationItems
       : body.is_verified

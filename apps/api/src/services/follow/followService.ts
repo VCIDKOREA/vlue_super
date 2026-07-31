@@ -385,6 +385,7 @@ type FollowListUser = {
   userId: string;
   displayName: string;
   publicHandle: string | null;
+  photoUrl: string | null;
   followId: string;
   followedAt: string;
   relation: FollowRelation;
@@ -398,7 +399,7 @@ async function mapFollowListUser(
 ): Promise<FollowListUser> {
   const user = await prisma.user.findUnique({
     where: { id: peerId },
-    select: { id: true, legalName: true, publicHandle: true, email: true }
+    select: { id: true, legalName: true, publicHandle: true, email: true, digitalCard: { select: { id: true } } }
   });
   const state = viewerId ? await getFollowState(viewerId, peerId) : null;
   const displayName =
@@ -407,10 +408,23 @@ async function mapFollowListUser(
     user?.email?.split("@")[0] ||
     "VLUE 회원";
 
+  let photoUrl: string | null = null;
+  if (user?.digitalCard) {
+    const snapRows = await prisma.$queryRaw<Array<{ photo_url: string | null }>>`
+      SELECT NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url
+      FROM digital_cards
+      WHERE user_id = ${peerId}::uuid
+      LIMIT 1
+    `;
+    const raw = String(snapRows[0]?.photo_url || "").trim();
+    if (raw.startsWith("http://") || raw.startsWith("https://")) photoUrl = raw;
+  }
+
   return {
     userId: peerId,
     displayName,
     publicHandle: user?.publicHandle ?? null,
+    photoUrl,
     followId: edge.id,
     followedAt: edge.createdAt.toISOString(),
     relation: state?.relation ?? "none",

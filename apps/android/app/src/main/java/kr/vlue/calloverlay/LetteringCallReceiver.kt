@@ -31,8 +31,9 @@ class LetteringCallReceiver : BroadcastReceiver() {
 
             when (state) {
                 TelephonyManager.EXTRA_STATE_RINGING -> {
-                    if (VlueInCallController.isDefaultDialerBound()) {
-                        Log.d(TAG, "skip RINGING: InCallService bound")
+                    /* InCall 이 실제 통화를 잡은 경우에만 PHONE_STATE RINGING 스킵 */
+                    if (VlueInCallController.hasActiveCall()) {
+                        Log.d(TAG, "skip RINGING: InCall has active call")
                         return
                     }
                     LetteringCallCoordinator.onRinging(context, number, outgoing = false)

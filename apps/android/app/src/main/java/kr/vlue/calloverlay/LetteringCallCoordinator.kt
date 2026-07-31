@@ -28,21 +28,19 @@ object LetteringCallCoordinator {
             /* 번호 비어 있어도 오버레이는 띄움 (Samsung 등에서 EXTRA_INCOMING_NUMBER null 빈번) */
             val raw = number?.trim().orEmpty().ifEmpty { "unknown" }
 
+            /* 네트워크 조회 전에 즉시 FGS 기동 — 조회 지연으로 프로세스가 죽거나 OFFHOOK을 놓치는 것 방지 */
+            showOverlay(app, raw, verified = false, cardJson = null, outgoing)
+
+            if (raw == "unknown") return
+
             scope.launch {
                 try {
-                    if (raw == "unknown") {
-                        showOverlay(app, raw, verified = false, cardJson = null, outgoing)
-                        return@launch
-                    }
                     val lookup = CardLookupRepository.lookup(app, raw)
-                    if (lookup == null || !lookup.matched) {
-                        showOverlay(app, raw, verified = false, cardJson = null, outgoing)
-                        return@launch
-                    }
+                    if (lookup == null || !lookup.matched) return@launch
+                    /* 검증·카드 JSON 갱신 (WebView 는 자체 lookup 도 수행) */
                     showOverlay(app, raw, verified = lookup.verified, cardJson = lookup.rawJson, outgoing)
                 } catch (e: Exception) {
-                    Log.e(TAG, "lookup failed — showing unverified overlay", e)
-                    showOverlay(app, raw, verified = false, cardJson = null, outgoing)
+                    Log.e(TAG, "lookup failed after overlay start", e)
                 }
             }
         } catch (e: Exception) {

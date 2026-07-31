@@ -213,7 +213,8 @@ export default function ShowcaseCallCarousel({
     bgmFpRef.current = bgmFingerprint;
     const liveCallMuted = !previewMode && !scrollEnabled;
     setPlaybackPhase(liveCallMuted ? "call_active" : previewMode ? "preview" : "replay", {
-      forceRestart: changed,
+      forceRestart: changed || previewMode,
+      steal: Boolean(previewMode),
       owner: "carousel",
       styleConfig
     });

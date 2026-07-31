@@ -48,10 +48,14 @@ function mapFollowingApiItem(item) {
       id: `following:${userId}`,
       userId,
       name: String(item.displayName || handle || "VLUE 회원").trim(),
-      subtitle: handle ? `@${handle}` : "팔로잉 중",
+      subtitle: handle
+        ? `@${handle}` === String(item.displayName || "").trim() || handle === String(item.displayName || "").trim()
+          ? "팔로잉 중"
+          : `@${handle}`
+        : "팔로잉 중",
       phone: "",
       phoneDisplay: "",
-      avatarUrl: "",
+      avatarUrl: String(item.photoUrl || "").trim(),
       publicHandle: handle,
       bucket: "following",
       relation: item.relation || "following",
@@ -81,7 +85,7 @@ function mapSearchHit(hit, bucket) {
             : hit.organization || "쇼케이스",
       phone: String(hit.phone || "").trim(),
       phoneDisplay: hit.phone ? formatLetteringPhoneDisplay(hit.phone) : "",
-      avatarUrl: String(hit.logoUrl || "").trim(),
+      avatarUrl: String(hit.photoUrl || hit.avatarUrl || "").trim(),
       publicHandle: handle,
       bucket,
       tags

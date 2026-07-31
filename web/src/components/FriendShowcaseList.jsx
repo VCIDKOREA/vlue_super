@@ -173,6 +173,7 @@ export default function FriendShowcaseList({
   const [caseArchiveUser, setCaseArchiveUser] = useState(null);
   const [previewKind, setPreviewKind] = useState(/** @type {PreviewKind} */ ("showcase"));
   const [previewCard, setPreviewCard] = useState(null);
+  const [previewSessionKey, setPreviewSessionKey] = useState(0);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -415,6 +416,7 @@ export default function FriendShowcaseList({
   }, [refreshAnchors, sheetTopPx, goFull, goMid, goCollapsed]);
 
   const openPreview = async (row, kind) => {
+    setPreviewSessionKey((k) => k + 1);
     setSelected(row);
     setPreviewKind(kind);
     setPreviewCard(null);
@@ -435,7 +437,8 @@ export default function FriendShowcaseList({
         phone,
         displayName: row.name || "",
         membershipTier: row.membershipTier || "free",
-        avatarUrl: row.avatarUrl || ""
+        avatarUrl: row.avatarUrl || "",
+        forceStyle: true
       });
       const tier = payload.card?.membershipTier || row.membershipTier || "free";
       const peerUid = String(
@@ -704,6 +707,7 @@ export default function FriendShowcaseList({
             )
           ) : previewCard ? (
             <PeerShowcasePreview
+              key={`peer-${previewCard.userId || "x"}-${previewSessionKey}`}
               card={previewCard}
               onClose={closePreview}
               includeDigitalCard={previewPaid}
