@@ -141,8 +141,7 @@ export default function ShowcaseWebPage({ phone }) {
             publicLinkMode
             preferContentSlide
             onClose={() => {
-              /* 공개 링크: 접지 않고 유지 — 재진입 시 쇼케이스/BGM 소실 방지 */
-              showToast("위로 스와이프하면 쇼케이스·음악을 볼 수 있습니다.");
+              showToast("아래로 스와이프하면 디지털 인증명함을 볼 수 있습니다.");
             }}
             onToast={showToast}
           />

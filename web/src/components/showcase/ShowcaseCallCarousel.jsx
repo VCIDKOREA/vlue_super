@@ -405,12 +405,18 @@ export default function ShowcaseCallCarousel({
       return [{ type: "card", id: "digital-card" }];
     }
 
+    const cardSlide = { type: "card", id: "digital-card" };
+
     if (showDigitalCard) {
       /* 콘텐츠 페이지가 없으면 명함만 — 빈 슬롯(2/2)을 만들지 않음 */
       if (capped.length === 0) {
-        return [{ type: "card", id: "digital-card" }];
+        return [cardSlide];
       }
-      return [{ type: "card", id: "digital-card" }, ...capped];
+      /* 공개 링크: 명함을 뒤로 — 첫 화면이 쇼케이스·BGM이 되도록 */
+      if (preferContentSlide) {
+        return [...capped, cardSlide];
+      }
+      return [cardSlide, ...capped];
     }
     if (capped.length === 0) {
       return [{ type: "empty-slot", id: "empty-1", slot: 1, max: photosPerPage }];
@@ -425,6 +431,7 @@ export default function ShowcaseCallCarousel({
     galleryPagePhotos,
     showDigitalCard,
     digitalCardOnly,
+    preferContentSlide,
     maxIgPages,
     photosPerPage,
     igUrlMap,
@@ -438,11 +445,6 @@ export default function ShowcaseCallCarousel({
   const outerNavEnabled = canScroll;
 
   useEffect(() => {
-    if (preferContentSlide && showDigitalCard && count > 1) {
-      /* 슬라이드 0 = 디지털 명함, 1+ = 쇼케이스 콘텐츠 */
-      setIndex(1);
-      return;
-    }
     setIndex(0);
   }, [card?.phone, count, isPaid, isKnownContact, preferContentSlide, showDigitalCard]);
 
@@ -682,15 +684,22 @@ export default function ShowcaseCallCarousel({
     );
   };
 
-  const photoIndexBase = showDigitalCard ? 1 : 0;
-  const showcaseSlideTotal = Math.max(1, count - photoIndexBase);
+  const cardAtEnd = Boolean(showDigitalCard && preferContentSlide);
+  const photoIndexBase = showDigitalCard && !preferContentSlide ? 1 : 0;
+  const showcaseSlideTotal = Math.max(1, count - (showDigitalCard ? 1 : 0));
+  const contentOrdinal =
+    current?.type === "card"
+      ? 0
+      : cardAtEnd
+        ? index + 1
+        : Math.max(1, index + 1 - photoIndexBase);
   const slideLabel =
     current?.type === "card"
       ? "디지털 인증명함"
       : current?.type === "instagram-post" ||
           current?.type === "media-page" ||
           current?.type === "banner"
-        ? `쇼케이스 ${Math.max(1, index + 1 - photoIndexBase)}/${showcaseSlideTotal}`
+        ? `쇼케이스 ${contentOrdinal}/${showcaseSlideTotal}`
         : current?.type === "empty-slot"
           ? `쇼케이스 ${current.slot}/${showcaseSlideTotal}`
           : current?.type === "paid-identity"

@@ -32,7 +32,7 @@ export default function PeerShowcasePreview({
 
   const handleCollapse = () => {
     if (publicLinkMode) {
-      onToast?.("위로 스와이프하면 쇼케이스·음악을 볼 수 있습니다.");
+      onToast?.("아래로 스와이프하면 디지털 인증명함을 볼 수 있습니다.");
       return;
     }
     onClose?.();
