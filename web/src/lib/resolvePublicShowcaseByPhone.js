@@ -1,4 +1,4 @@
-import { apiUrl } from "../apiBase.js";
+import { apiUrl } from "./apiBase.js";
 import { formatLetteringPhoneDisplay, normalizePhoneDigits } from "./letteringPhoneMatch.js";
 import { normalizeLetteringCard } from "./letteringCardNormalize.js";
 import { isPaidLetteringTier } from "./letteringMembership.js";
