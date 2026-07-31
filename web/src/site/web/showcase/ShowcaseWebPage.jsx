@@ -36,6 +36,7 @@ function styleHasPublicShowcase(style) {
 export default function ShowcaseWebPage({ phone }) {
   const [payload, setPayload] = useState(null);
   const [showFull, setShowFull] = useState(true);
+  const [stageKey, setStageKey] = useState(0);
   const [bgmPromptOpen, setBgmPromptOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const { unlockFromUserGesture, setPlaybackPhase, bindStyleConfig } = useShowcaseBgm();
@@ -58,14 +59,20 @@ export default function ShowcaseWebPage({ phone }) {
     return undefined;
   }, [payload, bindStyleConfig]);
 
+  const reopenFullShowcase = () => {
+    setStageKey((k) => k + 1);
+    setShowFull(true);
+  };
+
   /* 카톡 WebView bfcache — 접힌 상태로 복원되면 풀 쇼케이스 다시 연다 */
   useEffect(() => {
-    setShowFull(true);
+    reopenFullShowcase();
     const onPageShow = (e) => {
-      if (e?.persisted) setShowFull(true);
+      if (e?.persisted) reopenFullShowcase();
     };
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- phone 변경 시에만 재바인딩
   }, [phone]);
 
   useEffect(() => {
@@ -89,6 +96,12 @@ export default function ShowcaseWebPage({ phone }) {
     window.location.assign(links.downloadPage);
   };
 
+  const handleCloseFull = () => {
+    setPlaybackPhase?.("idle", { fade: true, steal: true, owner: "public-showcase" });
+    setBgmPromptOpen(false);
+    setShowFull(false);
+  };
+
   const canShowFull = useMemo(() => {
     if (!payload?.card) return false;
     if (styleHasPublicShowcase(payload.card.showcaseStyle || payload.showcaseStyle)) return true;
@@ -109,7 +122,7 @@ export default function ShowcaseWebPage({ phone }) {
     }
     setBgmPromptOpen(true);
     return undefined;
-  }, [canShowFull, showFull, hasBgm]);
+  }, [canShowFull, showFull, hasBgm, stageKey]);
 
   const acceptBgm = () => {
     setBgmPromptOpen(false);
@@ -152,7 +165,12 @@ export default function ShowcaseWebPage({ phone }) {
           </button>
         </div>
         <div className="showcase-web__fs-stage">
-          <PublicShowcaseStage card={payload.card} onToast={showToast} />
+          <PublicShowcaseStage
+            key={stageKey}
+            card={payload.card}
+            onToast={showToast}
+            onClose={handleCloseFull}
+          />
         </div>
 
         {bgmPromptOpen ? (
@@ -225,7 +243,7 @@ export default function ShowcaseWebPage({ phone }) {
           {photo ? <img className="showcase-web__photo" src={photo} alt="" /> : null}
 
           {canShowFull ? (
-            <button type="button" className="showcase-web__open-full" onClick={() => setShowFull(true)}>
+            <button type="button" className="showcase-web__open-full" onClick={reopenFullShowcase}>
               풀 쇼케이스 보기 (음악 포함)
             </button>
           ) : null}

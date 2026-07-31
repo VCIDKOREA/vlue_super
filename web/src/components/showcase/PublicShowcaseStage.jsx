@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import ShowcaseCallCarousel from "./ShowcaseCallCarousel.jsx";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import { createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
@@ -26,8 +27,9 @@ function styleHasMedia(style) {
 
 /**
  * 카톡·공개 링크 전용 — 유료면 디지털인증명함 1페이지 + 쇼케이스, 없으면 명함만
+ * onClose: X 닫기 → 가입 유도(간단 프로필)로. 링크 재진입 시 부모가 풀뷰를 다시 연다.
  */
-export default function PublicShowcaseStage({ card, onToast }) {
+export default function PublicShowcaseStage({ card, onToast, onClose }) {
   const userId = String(card?.userId || card?.ownerUserId || "").trim();
   const [style, setStyle] = useState(() =>
     card?.showcaseStyle && typeof card.showcaseStyle === "object"
@@ -86,6 +88,7 @@ export default function PublicShowcaseStage({ card, onToast }) {
   );
 
   const hasMedia = styleHasMedia(style);
+  const canClose = typeof onClose === "function";
 
   if (loadingStyle) {
     return (
@@ -110,6 +113,8 @@ export default function PublicShowcaseStage({ card, onToast }) {
           digitalCardOnly={false}
           preferContentSlide={false}
           socialOverlayEnabled
+          showPeerClose={canClose}
+          onPeerClose={canClose ? onClose : undefined}
           onKeypadToast={onToast}
           showcaseStyle={style}
           suppressBgm={false}
@@ -121,6 +126,18 @@ export default function PublicShowcaseStage({ card, onToast }) {
   /* 사진·BGM 이 아직 없어도 공개 링크는 디지털 인증명함만이라도 노출 */
   return (
     <div className="public-showcase-stage relative flex h-full min-h-0 flex-1 flex-col bg-[#0B101B] p-3">
+      {canClose ? (
+        <button
+          type="button"
+          className="showcase-call-carousel__slide-settings absolute right-3 top-3 z-20"
+          aria-label="닫기"
+          title="닫기"
+          onClick={onClose}
+        >
+          <X className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+          닫기
+        </button>
+      ) : null}
       <LetteringDigitalReception
         card={previewCard}
         verified
