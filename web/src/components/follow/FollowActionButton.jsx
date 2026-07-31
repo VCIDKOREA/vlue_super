@@ -1,5 +1,9 @@
 import { useFollowState } from "../../hooks/useFollowState.js";
 import { isFollowTargetSelf } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
+import {
+  hasVlueLoggedInSession,
+  VLUE_MEMBERSHIP_REQUIRED_MSG
+} from "../../lib/vlueGuestAuthGate.js";
 
 /**
  * 팔로우 액션 버튼
@@ -35,6 +39,10 @@ export default function FollowActionButton({ targetUserId, className = "", disab
   const handleClick = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!hasVlueLoggedInSession()) {
+      onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
+      return;
+    }
     const res = await toggle();
     if (res.ok) {
       if (res.action === "followed") onToast?.("팔로우했습니다.");

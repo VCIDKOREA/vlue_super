@@ -65,6 +65,8 @@ export default function ShowcaseCallCarousel({
   includeDigitalCard = true,
   /** true면 디지털인증명함 슬라이드만 (마이케이스 명함 버튼 등) */
   digitalCardOnly = false,
+  /** 공개 링크 — 콘텐츠 슬라이드부터 시작 */
+  preferContentSlide = false,
   face = "front",
   onFaceChange,
   showcaseOffPreview = false,
@@ -436,8 +438,13 @@ export default function ShowcaseCallCarousel({
   const outerNavEnabled = canScroll;
 
   useEffect(() => {
+    if (preferContentSlide && showDigitalCard && count > 1) {
+      /* 슬라이드 0 = 디지털 명함, 1+ = 쇼케이스 콘텐츠 */
+      setIndex(1);
+      return;
+    }
     setIndex(0);
-  }, [card?.phone, count, isPaid, isKnownContact]);
+  }, [card?.phone, count, isPaid, isKnownContact, preferContentSlide, showDigitalCard]);
 
   useEffect(() => {
     if (!canScroll && index !== 0) setIndex(0);

@@ -5,6 +5,10 @@ import {
   isFollowActiveState,
   toggleFollow
 } from "../lib/followApi.js";
+import {
+  hasVlueLoggedInSession,
+  VLUE_MEMBERSHIP_REQUIRED_MSG
+} from "../lib/vlueGuestAuthGate.js";
 
 /**
  * 팔로우 상태 조회 + 낙관적 토글
@@ -94,6 +98,10 @@ export function useFollowState(targetUserId, opts = {}) {
 
   const toggle = useCallback(async () => {
     if (!targetUserId || busy) return { ok: false };
+    if (!hasVlueLoggedInSession()) {
+      onErrorRef.current?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
+      return { ok: false, error: VLUE_MEMBERSHIP_REQUIRED_MSG, needsAuth: true };
+    }
     rollbackRef.current = state;
     setBusy(true);
     setState((prev) => applyOptimistic(prev));
@@ -107,8 +115,12 @@ export function useFollowState(targetUserId, opts = {}) {
     }
 
     setState(rollbackRef.current);
-    onErrorRef.current?.(res.error || "팔로우 처리에 실패했습니다.");
-    return { ok: false, error: res.error };
+    const errMsg =
+      res.status === 401 || /unauth|login|회원|로그인/i.test(String(res.error || ""))
+        ? VLUE_MEMBERSHIP_REQUIRED_MSG
+        : res.error || "팔로우 처리에 실패했습니다.";
+    onErrorRef.current?.(errMsg);
+    return { ok: false, error: errMsg };
   }, [targetUserId, busy, state, applyOptimistic]);
 
   const label = state?.label || followButtonLabel(state?.relation || "none");

@@ -37,17 +37,34 @@ export default function ShowcaseWebPage({ phone }) {
   const [payload, setPayload] = useState(null);
   const [showFull, setShowFull] = useState(true);
   const [bgmPromptOpen, setBgmPromptOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState("");
   const { unlockFromUserGesture } = useShowcaseBgm();
 
   useEffect(() => {
     let cancelled = false;
-    resolveVlueShowcasePeer({ phone }).then((data) => {
+    resolveVlueShowcasePeer({ phone, forceStyle: true }).then((data) => {
       if (!cancelled) setPayload(data);
     });
     return () => {
       cancelled = true;
     };
   }, [phone]);
+
+  /* 카톡 WebView bfcache — 접힌 상태로 복원되면 풀 쇼케이스 다시 연다 */
+  useEffect(() => {
+    setShowFull(true);
+    const onPageShow = (e) => {
+      if (e?.persisted) setShowFull(true);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [phone]);
+
+  useEffect(() => {
+    if (!toastMsg) return undefined;
+    const t = window.setTimeout(() => setToastMsg(""), 3200);
+    return () => window.clearTimeout(t);
+  }, [toastMsg]);
 
   const links = getVlueDownloadLinks();
 
@@ -95,6 +112,11 @@ export default function ShowcaseWebPage({ phone }) {
     setBgmPromptOpen(false);
   };
 
+  const showToast = (msg) => {
+    const text = String(msg || "").trim();
+    if (text) setToastMsg(text);
+  };
+
   if (!payload) {
     return (
       <div className="showcase-web">
@@ -116,8 +138,13 @@ export default function ShowcaseWebPage({ phone }) {
             card={payload.card}
             includeDigitalCard={Boolean(payload.isPaid)}
             digitalCardOnly={false}
-            onClose={() => setShowFull(false)}
-            onToast={() => {}}
+            publicLinkMode
+            preferContentSlide
+            onClose={() => {
+              /* 공개 링크: 접지 않고 유지 — 재진입 시 쇼케이스/BGM 소실 방지 */
+              showToast("위로 스와이프하면 쇼케이스·음악을 볼 수 있습니다.");
+            }}
+            onToast={showToast}
           />
         </div>
 
@@ -138,6 +165,12 @@ export default function ShowcaseWebPage({ phone }) {
                 </button>
               </div>
             </div>
+          </div>
+        ) : null}
+
+        {toastMsg ? (
+          <div className="showcase-web__toast" role="status">
+            {toastMsg}
           </div>
         ) : null}
       </div>
@@ -249,6 +282,12 @@ export default function ShowcaseWebPage({ phone }) {
           1초 만에 내 번호도 안심 보호하기 (무료)
         </button>
       </div>
+
+      {toastMsg ? (
+        <div className="showcase-web__toast" role="status">
+          {toastMsg}
+        </div>
+      ) : null}
     </div>
   );
 }

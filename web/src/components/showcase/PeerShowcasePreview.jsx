@@ -10,7 +10,11 @@ export default function PeerShowcasePreview({
   onClose,
   onToast,
   includeDigitalCard = true,
-  digitalCardOnly = false
+  digitalCardOnly = false,
+  /** 카톡 공개 링크 — 접기/종료로 풀뷰를 죽이지 않음 */
+  publicLinkMode = false,
+  /** 명함 다음 콘텐츠 슬라이드부터 시작 (공개 링크) */
+  preferContentSlide = false
 }) {
   const style =
     (card?.showcaseStyle && typeof card.showcaseStyle === "object"
@@ -26,6 +30,14 @@ export default function PeerShowcasePreview({
     cycleEndAt: card?.authCycleEndAt || card?.cycleEndAt || null
   };
 
+  const handleCollapse = () => {
+    if (publicLinkMode) {
+      onToast?.("위로 스와이프하면 쇼케이스·음악을 볼 수 있습니다.");
+      return;
+    }
+    onClose?.();
+  };
+
   return (
     <div className="peer-showcase-preview my-case-detail__broadcast-shell lettering-showcase-fs lettering-showcase-fs--history-embed relative flex min-h-0 flex-1 flex-col bg-[#0B101B]">
       <div className="lettering-showcase-fs__shell flex min-h-0 flex-1 flex-col">
@@ -34,8 +46,8 @@ export default function PeerShowcasePreview({
           verified
           previewMode
           showOwnerSettings={false}
-          showPeerClose
-          onPeerClose={onClose}
+          showPeerClose={!publicLinkMode}
+          onPeerClose={publicLinkMode ? undefined : onClose}
           hideUnverifiedFooter
           callPhase="connected"
           platform="android"
@@ -48,11 +60,12 @@ export default function PeerShowcasePreview({
           card={previewCard}
           includeDigitalCard={Boolean(includeDigitalCard)}
           digitalCardOnly={Boolean(digitalCardOnly)}
+          preferContentSlide={Boolean(preferContentSlide)}
           expanded
           onExpandedChange={(next) => {
-            if (!next) onClose?.();
+            if (!next) handleCollapse();
           }}
-          onEndCall={onClose}
+          onEndCall={publicLinkMode ? undefined : onClose}
           onToast={onToast}
         />
       </div>

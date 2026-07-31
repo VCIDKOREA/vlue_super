@@ -41,7 +41,14 @@ export async function toggleFollow(targetUserId) {
       body: JSON.stringify({ targetUserId })
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: data.error || "toggle_failed", state: data.state || null };
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: data.error || "toggle_failed",
+        state: data.state || null,
+        status: res.status
+      };
+    }
     return { ok: true, action: data.action, state: data.state, follow: data.follow };
   } catch (e) {
     return { ok: false, error: e?.message || "network", state: null };

@@ -10,6 +10,10 @@ import {
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { getFeedDisplayName, getMemberHandle } from "../../lib/memberCardStorage.js";
 import ShowcaseCommentBody from "./ShowcaseCommentBody.jsx";
+import {
+  hasVlueLoggedInSession,
+  VLUE_MEMBERSHIP_REQUIRED_MSG
+} from "../../lib/vlueGuestAuthGate.js";
 
 const BASIC_EMOJIS = [
   "😀",
@@ -171,6 +175,10 @@ export default function ShowcaseCommentSheet({
       onToast?.("미리보기 댓글입니다. 실제 통화·열람에서 저장됩니다.");
       return;
     }
+    if (!hasVlueLoggedInSession()) {
+      onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
+      return;
+    }
     setBusy(true);
     const res = await postShowcaseComment(ownerUserId, body, { slideId, parentId });
     setBusy(false);
@@ -178,7 +186,7 @@ export default function ShowcaseCommentSheet({
       const msg = String(res.error || "");
       if (/failed to fetch/i.test(msg) || res.status === 401) {
         onToast?.(
-          res.status === 401 ? "로그인 후 댓글을 남길 수 있습니다." : "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
+          res.status === 401 ? VLUE_MEMBERSHIP_REQUIRED_MSG : "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
         );
       } else {
         onToast?.(msg || "댓글을 남기지 못했습니다.");

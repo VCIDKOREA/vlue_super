@@ -10,6 +10,10 @@ import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import { resolveShowcasePeerAvatar } from "../../lib/showcase/resolveShowcasePeerAvatar.js";
 import { isVlueBrandAssetUrl } from "../../lib/vlueAvatar.js";
 import { readStatusMessage } from "../../lib/vlueAppSettings.js";
+import {
+  hasVlueLoggedInSession,
+  VLUE_MEMBERSHIP_REQUIRED_MSG
+} from "../../lib/vlueGuestAuthGate.js";
 
 const OWNER_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -33,7 +37,7 @@ function isNetworkLikeError(err) {
 }
 
 function likeErrorMessage(res) {
-  if (res?.status === 401) return "로그인 후 좋아요할 수 있습니다.";
+  if (res?.status === 401 || res?.needsAuth) return VLUE_MEMBERSHIP_REQUIRED_MSG;
   if (isNetworkLikeError(res?.error)) return "서버에 연결할 수 없어 임시로 반영했습니다.";
   const raw = String(res?.error || "").trim();
   if (raw && !/^failed to fetch$/i.test(raw)) return raw;
@@ -134,22 +138,38 @@ export default function ShowcaseBannerSocialLayer({
       applyLocalLikeToggle();
       return;
     }
+    if (!hasVlueLoggedInSession()) {
+      onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
+      return;
+    }
     const res = await toggleShowcaseLikeApi(ownerUserId, { slideId });
     if (res.ok) {
       setLiked(res.likedByMe);
       setLikeCount(res.likeCount);
       return;
     }
+    if (res.status === 401) {
+      onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
+      return;
+    }
     /* 로컬 API 미기동·네트워크 오류 시에도 미리보기에서 하트가 동작하도록 */
-    if (!res.status || isNetworkLikeError(res.error) || previewMode) {
+    if (!res.status || isNetworkLikeError(res.error)) {
       applyLocalLikeToggle();
-      if (!previewMode && isNetworkLikeError(res.error)) {
+      if (isNetworkLikeError(res.error)) {
         onToast?.(likeErrorMessage(res));
       }
       return;
     }
     onToast?.(likeErrorMessage(res));
-  }, [ownerUserId, slideId, localOnly, onToast, previewMode, applyLocalLikeToggle]);
+  }, [ownerUserId, slideId, localOnly, onToast, applyLocalLikeToggle]);
+
+  const onComment = useCallback(() => {
+    if (!localOnly && !hasVlueLoggedInSession()) {
+      onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
+      return;
+    }
+    setCommentOpen(true);
+  }, [localOnly, onToast]);
 
   const onShare = useCallback(async () => {
     await shareShowcaseInviteViaKakao({
@@ -193,7 +213,7 @@ export default function ShowcaseBannerSocialLayer({
         commentsEnabled={commentsEnabled}
         shareEnabled={shareEnabled}
         onLike={() => void onLike()}
-        onComment={() => setCommentOpen(true)}
+        onComment={onComment}
         onShare={() => void onShare()}
         onMore={() => setMoreOpen(true)}
       />

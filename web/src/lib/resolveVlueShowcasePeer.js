@@ -57,7 +57,7 @@ export async function resolveVlueShowcasePeer(input = {}) {
   if (UUID_RE.test(userId)) {
     const [profRes, styleRes] = await Promise.all([
       fetchFollowProfile(userId),
-      fetchPeerShowcaseStyleBundle(userId)
+      fetchPeerShowcaseStyleBundle(userId, { force: Boolean(input.forceStyle) })
     ]);
 
     if (profRes.ok) {
@@ -95,7 +95,8 @@ export async function resolveVlueShowcasePeer(input = {}) {
       authPaidAt = profRes.authPaidAt || null;
     }
 
-    const live = styleRes.ok && styleRes.live && typeof styleRes.live === "object" ? styleRes.live : null;
+    const live =
+      styleRes.ok && styleRes.live && typeof styleRes.live === "object" ? styleRes.live : null;
     const showcaseStyle = live || createDefaultShowcaseStyle();
 
     const card = normalizeLetteringCard({

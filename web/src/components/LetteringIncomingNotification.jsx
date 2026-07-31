@@ -193,6 +193,8 @@ export default function LetteringIncomingNotification({
   includeDigitalCard = true,
   /** true면 디지털인증명함 페이지만 (마이케이스 명함 버튼) */
   digitalCardOnly = false,
+  /** 공개 링크 — 명함 다음 콘텐츠 슬라이드부터 */
+  preferContentSlide = false,
   /**
    * false면 펼침 화살표·외부 액션만 쓰고 디지털명함/쇼케이스 본문은 열지 않음
    * (개인케이스 명함저장 등 — 보여줄 송출 콘텐츠 없음)
@@ -1115,6 +1117,7 @@ export default function LetteringIncomingNotification({
                       previewMode={previewMode}
                       includeDigitalCard={includeDigitalCard}
                       digitalCardOnly={digitalCardOnly}
+                      preferContentSlide={preferContentSlide}
                       face={receptionFace}
                       onFaceChange={handleFaceChange}
                       keypadOpen={keypadOpen}

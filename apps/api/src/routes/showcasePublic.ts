@@ -165,7 +165,12 @@ showcasePublicRoutes.get("/view/:phone", async (c) => {
       forScraper
     });
 
-    c.header("Cache-Control", forScraper ? "public, max-age=300" : "public, max-age=60");
+    /* 스크래퍼 HTML(리다이렉트 없음)과 사람용 HTML을 CDN이 섞지 않도록 */
+    c.header("Vary", "User-Agent");
+    c.header(
+      "Cache-Control",
+      forScraper ? "public, max-age=120" : "private, no-store"
+    );
     c.header("Content-Type", "text/html; charset=utf-8");
     return c.html(html);
   } catch (err) {
