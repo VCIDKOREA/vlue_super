@@ -4,6 +4,14 @@
         <item name="colorPrimary">#2563EB</item>
     </style>
 
+    <style name="Theme.VlueLetteringRinging" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowBackground">#0B101B</item>
+        <item name="android:statusBarColor">#0B101B</item>
+        <item name="android:navigationBarColor">#0B101B</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:windowIsTranslucent">false</item>
+    </style>
+
     <style name="PinKeyButton">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">64dp</item>

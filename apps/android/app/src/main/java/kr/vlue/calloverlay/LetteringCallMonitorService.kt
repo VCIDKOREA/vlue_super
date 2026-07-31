@@ -24,6 +24,8 @@ import java.util.concurrent.Executor
 class LetteringCallMonitorService : Service() {
     private var telephonyManager: TelephonyManager? = null
     private var callback: TelephonyCallback? = null
+    @Suppress("DEPRECATION")
+    private var legacyListener: android.telephony.PhoneStateListener? = null
     private var lastState: Int = TelephonyManager.CALL_STATE_IDLE
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -31,7 +33,7 @@ class LetteringCallMonitorService : Service() {
     override fun onCreate() {
         super.onCreate()
         createChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        VlueForegroundHelper.start(this, NOTIFICATION_ID, buildNotification())
         registerCallCallback()
         Log.i(TAG, "monitor started lettering=${LetteringPrefs.isLetteringEnabled(this)}")
     }
@@ -51,43 +53,59 @@ class LetteringCallMonitorService : Service() {
     }
 
     private fun registerCallCallback() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            Log.w(TAG, "TelephonyCallback requires API 31+; rely on PHONE_STATE receiver")
-            return
-        }
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_PHONE_STATE)
             != PackageManager.PERMISSION_GRANTED
         ) {
             Log.w(TAG, "READ_PHONE_STATE missing — monitor idle")
+            LetteringPrefs.setLastOverlayError(this, "READ_PHONE_STATE missing")
             return
         }
         try {
             val tm = getSystemService(TelephonyManager::class.java) ?: return
             telephonyManager = tm
-            val executor: Executor = mainExecutor
-            val cb = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
-                override fun onCallStateChanged(state: Int) {
-                    handleState(state)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val executor: Executor = mainExecutor
+                val cb = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
+                    override fun onCallStateChanged(state: Int) {
+                        handleState(state)
+                    }
                 }
+                callback = cb
+                tm.registerTelephonyCallback(executor, cb)
+                Log.i(TAG, "TelephonyCallback registered")
+            } else {
+                @Suppress("DEPRECATION")
+                val listener = object : android.telephony.PhoneStateListener() {
+                    @Deprecated("Deprecated in Java")
+                    override fun onCallStateChanged(state: Int, phoneNumber: String?) {
+                        handleState(state)
+                    }
+                }
+                legacyListener = listener
+                @Suppress("DEPRECATION")
+                tm.listen(listener, android.telephony.PhoneStateListener.LISTEN_CALL_STATE)
+                Log.i(TAG, "PhoneStateListener registered")
             }
-            callback = cb
-            tm.registerTelephonyCallback(executor, cb)
-            Log.i(TAG, "TelephonyCallback registered")
         } catch (e: Exception) {
-            Log.e(TAG, "register TelephonyCallback failed", e)
+            Log.e(TAG, "register call listener failed", e)
+            LetteringPrefs.setLastOverlayError(this, "register:${e.message}")
         }
     }
 
     private fun unregisterCallCallback() {
         try {
             val tm = telephonyManager
-            val cb = callback
-            if (tm != null && cb != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                tm.unregisterTelephonyCallback(cb)
+            if (tm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val cb = callback
+                if (cb != null) tm.unregisterTelephonyCallback(cb)
+            } else if (tm != null && legacyListener != null) {
+                @Suppress("DEPRECATION")
+                tm.listen(legacyListener, android.telephony.PhoneStateListener.LISTEN_NONE)
             }
         } catch (_: Exception) {
         }
         callback = null
+        legacyListener = null
         telephonyManager = null
     }
 
@@ -147,15 +165,15 @@ class LetteringCallMonitorService : Service() {
             val app = context.applicationContext
             val intent = Intent(app, LetteringCallMonitorService::class.java)
             try {
-                if (LetteringPrefs.isLetteringEnabled(app) &&
-                    LetteringPermissionHelper.canDrawOverlays(app)
-                ) {
+                /* 오버레이 없어도 통화 감지는 돌린다 — 알림/액티비티 폴백용 */
+                if (LetteringPrefs.isLetteringEnabled(app)) {
                     ContextCompat.startForegroundService(app, intent)
                 } else {
                     app.stopService(intent)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "syncWithPrefs failed", e)
+                LetteringPrefs.setLastOverlayError(app, "monitor:${e.message}")
             }
         }
     }

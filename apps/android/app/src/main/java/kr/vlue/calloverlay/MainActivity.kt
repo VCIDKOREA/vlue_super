@@ -857,6 +857,21 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             return LetteringPermissionHelper.statusJson(activity)
         }
 
+        /** QA — 수신 없이 빅푸시 경로 강제 기동 */
+        @android.webkit.JavascriptInterface
+        fun testLetteringBigPush(phone: String?) {
+            activity.runOnUiThread {
+                val number = phone?.trim().orEmpty().ifBlank { "01000000000" }
+                LetteringPrefs.setLetteringEnabled(activity, true)
+                LetteringCallCoordinator.onRinging(activity, number, outgoing = false)
+                android.widget.Toast.makeText(
+                    activity,
+                    "빅푸시 테스트 기동 ($number)",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
         @android.webkit.JavascriptInterface
         fun getDeviceContactsJson(): String {
             return DeviceContactsReader.readAsJson(activity)

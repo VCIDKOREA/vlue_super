@@ -43,7 +43,7 @@ class CallOverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        VlueForegroundHelper.start(this, NOTIFICATION_ID, buildNotification())
         activeInstance = this
     }
 
@@ -156,19 +156,30 @@ class CallOverlayService : Service() {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             y = 0
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
         }
 
         container.alpha = 0f
         container.translationY = -120f
         try {
             windowManager?.addView(container, params)
+            LetteringPrefs.setLastCallEvent(this, "overlay_shown:$phone")
         } catch (e: Exception) {
             android.util.Log.e("CallOverlay", "addView failed — overlay permission?", e)
+            LetteringPrefs.setLastOverlayError(this, "addView:${e.message}")
+            LetteringIncomingNotifier.post(this, phone, outgoing)
+            LetteringRingingActivity.launch(this, phone, outgoing)
             stopSelf()
             return
         }

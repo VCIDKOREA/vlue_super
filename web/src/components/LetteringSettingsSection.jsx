@@ -97,6 +97,26 @@ export default function LetteringSettingsSection({
           <button
             type="button"
             className={`w-full rounded-lg border py-2 text-[11px] font-bold ${
+              isDarkMode ? "border-amber-400/40 text-amber-200" : "border-amber-200 text-amber-800"
+            }`}
+            onClick={() => {
+              try {
+                if (typeof window.Android?.testLetteringBigPush === "function") {
+                  window.Android.testLetteringBigPush("01012345678");
+                  onNotice?.("빅푸시 테스트 기동 — 배너·알림·화면이 뜨는지 확인하세요.");
+                  return;
+                }
+              } catch {
+                /* ignore */
+              }
+              onNotice?.("빅푸시 테스트는 VLUE Android 앱에서만 가능합니다.");
+            }}
+          >
+            빅푸시 테스트 (통화 없이)
+          </button>
+          <button
+            type="button"
+            className={`w-full rounded-lg border py-2 text-[11px] font-bold ${
               isDarkMode ? "border-cyan-400/40 text-cyan-200" : "border-cyan-200 text-cyan-800"
             }`}
             onClick={handleDefaultDialer}

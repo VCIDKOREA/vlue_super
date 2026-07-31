@@ -8,6 +8,8 @@ object LetteringPrefs {
     private const val KEY_ENABLED = "lettering_enabled"
     private const val KEY_USER_ID = "vlue_user_id"
     private const val KEY_ACCESS_TOKEN = "vlue_access_token"
+    private const val KEY_LAST_CALL = "last_call_event"
+    private const val KEY_LAST_ERR = "last_overlay_error"
 
     fun isLetteringEnabled(context: Context): Boolean {
         return context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
@@ -35,4 +37,24 @@ object LetteringPrefs {
             .putString(KEY_ACCESS_TOKEN, accessToken)
             .apply()
     }
+
+    fun setLastCallEvent(context: Context, event: String) {
+        context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_LAST_CALL, "${System.currentTimeMillis()}|$event")
+            .apply()
+    }
+
+    fun getLastCallEvent(context: Context): String =
+        context.getSharedPreferences(NAME, Context.MODE_PRIVATE).getString(KEY_LAST_CALL, "") ?: ""
+
+    fun setLastOverlayError(context: Context, error: String) {
+        context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_LAST_ERR, "${System.currentTimeMillis()}|$error")
+            .apply()
+    }
+
+    fun getLastOverlayError(context: Context): String =
+        context.getSharedPreferences(NAME, Context.MODE_PRIVATE).getString(KEY_LAST_ERR, "") ?: ""
 }

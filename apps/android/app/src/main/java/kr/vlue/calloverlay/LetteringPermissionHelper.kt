@@ -24,6 +24,9 @@ object LetteringPermissionHelper {
                 base.add(Manifest.permission.ANSWER_PHONE_CALLS)
                 base.add(Manifest.permission.CALL_PHONE)
             }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                base.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
             return base.toTypedArray()
         }
 
@@ -96,6 +99,12 @@ object LetteringPermissionHelper {
         o.put("letteringEnabled", LetteringPrefs.isLetteringEnabled(context))
         o.put("defaultDialer", kr.vlue.calloverlay.incall.DialerRoleHelper.isDefaultDialer(context))
         o.put("inCallBound", kr.vlue.calloverlay.incall.VlueInCallController.isDefaultDialerBound())
+        o.put("lastCallEvent", LetteringPrefs.getLastCallEvent(context))
+        o.put("lastOverlayError", LetteringPrefs.getLastOverlayError(context))
+        o.put("readPhoneState", hasPermission(context, Manifest.permission.READ_PHONE_STATE))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            o.put("postNotifications", hasPermission(context, Manifest.permission.POST_NOTIFICATIONS))
+        }
         return o.toString()
     }
 
