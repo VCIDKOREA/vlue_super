@@ -32,6 +32,8 @@ object VlueLetteringConfig {
         val enc = java.net.URLEncoder.encode(phone, "UTF-8")
         val dir = if (outgoing) "outgoing" else "incoming"
         val ver = if (verified) "1" else "0"
-        return appUrl("lettering-overlay?incoming=$enc&platform=android&direction=$dir&verified=$ver&native=1")
+        return appUrl(
+            "lettering-overlay?incoming=$enc&platform=android&direction=$dir&verified=$ver&native=1&forceLettering=1"
+        )
     }
 }

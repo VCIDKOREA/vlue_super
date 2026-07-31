@@ -19,6 +19,7 @@ object LetteringPrefs {
             .edit()
             .putBoolean(KEY_ENABLED, enabled)
             .apply()
+        LetteringCallMonitorService.syncWithPrefs(context)
     }
 
     fun getUserId(context: Context): String? =

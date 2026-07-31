@@ -2727,7 +2727,25 @@ function App() {
 
   useEffect(() => {
     if (typeof window !== "undefined") window.VLUE_APP_MAIN = true;
-    writeLetteringEnabled(readLetteringEnabled());
+    /* 네이티브가 이미 ON 이면 웹이 false 로 덮어쓰지 않음 (권한 다이얼로그만 켠 경우) */
+    (async () => {
+      try {
+        const { readLetteringPermissionStatus } = await import("./lib/letteringSettings.js");
+        const st = readLetteringPermissionStatus();
+        if (st?.letteringEnabled && !readLetteringEnabled()) {
+          writeLetteringEnabled(true);
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+      const hash = window.location.hash || "";
+      if (hash.includes("forceLettering=1") || hash.includes("native=1")) {
+        writeLetteringEnabled(true);
+        return;
+      }
+      writeLetteringEnabled(readLetteringEnabled());
+    })();
   }, []);
 
   useEffect(() => {

@@ -113,6 +113,11 @@
             android:exported="false"
             android:foregroundServiceType="phoneCall" />
 
+        <service
+            android:name=".LetteringCallMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall" />
+
         <!-- VLUE 전면 통화 UI (기본 전화앱일 때 DTMF·disconnect) -->
         <service
             android:name=".incall.VlueInCallService"

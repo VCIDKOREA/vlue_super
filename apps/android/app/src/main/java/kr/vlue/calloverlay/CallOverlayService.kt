@@ -6,23 +6,29 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import kr.vlue.calloverlay.showcase.ShowcaseProximitySensor
 
 /**
  * SYSTEM_ALERT_WINDOW + WebView 천막 쇼케이스
- * 링잉: 상단 컴팩트 → 연결 후: MATCH_PARENT 전체화면
+ * 링잉: 상단 네이티브 빅푸시 배너 + 웹 오버레이
  */
 class CallOverlayService : Service() {
     private var windowManager: WindowManager? = null
@@ -69,18 +75,66 @@ class CallOverlayService : Service() {
         removeOverlayImmediate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val container = FrameLayout(this)
+
+        /* 네이티브 빅푸시 — 웹이 비어도 항상 보이도록 (진단·폴백) */
+        val banner = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#E60B101B"))
+            setPadding(dp(20), dp(28), dp(20), dp(20))
+            elevation = dp(8).toFloat()
+        }
+        val title = TextView(this).apply {
+            text = if (outgoing) "VLUE 발신 레터링" else "VLUE 수신 빅푸시"
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        val phoneTv = TextView(this).apply {
+            text = if (phone.isBlank() || phone == "unknown") "번호 확인 중…" else phone
+            setTextColor(Color.parseColor("#E2E8F0"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, dp(6), 0, 0)
+        }
+        val hint = TextView(this).apply {
+            text = if (verified) "VLUE 인증 · 쇼케이스 불러오는 중" else "쇼케이스 불러오는 중…"
+            setTextColor(Color.parseColor("#94A3B8"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setPadding(0, dp(4), 0, 0)
+        }
+        banner.addView(title)
+        banner.addView(phoneTv)
+        banner.addView(hint)
+        container.addView(
+            banner,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP
+            )
+        )
+
         val wv = WebView(this)
         LetteringJavascriptBridge.attach(wv, this)
         wv.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            cacheMode = WebSettings.LOAD_NO_CACHE
+            cacheMode = WebSettings.LOAD_DEFAULT
             val ua = userAgentString.orEmpty()
             if (!ua.contains(VlueLetteringConfig.ANDROID_APP_UA_TOKEN)) {
                 userAgentString = "$ua ${VlueLetteringConfig.ANDROID_APP_UA_TOKEN}"
             }
         }
-        wv.setBackgroundColor(0x00000000)
+        wv.setBackgroundColor(Color.TRANSPARENT)
+        wv.webViewClient = object : WebViewClient() {
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                injectLetteringFlag(view)
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                injectLetteringFlag(view)
+            }
+        }
         container.addView(
             wv,
             FrameLayout.LayoutParams(
@@ -111,7 +165,13 @@ class CallOverlayService : Service() {
 
         container.alpha = 0f
         container.translationY = -120f
-        windowManager?.addView(container, params)
+        try {
+            windowManager?.addView(container, params)
+        } catch (e: Exception) {
+            android.util.Log.e("CallOverlay", "addView failed — overlay permission?", e)
+            stopSelf()
+            return
+        }
         rootContainer = container
         webView = wv
         layoutParams = params
@@ -126,6 +186,18 @@ class CallOverlayService : Service() {
             .setInterpolator(DecelerateInterpolator())
             .start()
     }
+
+    private fun injectLetteringFlag(view: WebView?) {
+        view?.evaluateJavascript(
+            "try{localStorage.setItem('vlue_lettering_enabled','1');" +
+                "window.dispatchEvent(new CustomEvent('vlue-lettering-settings-changed',{detail:{enabled:true}}));" +
+                "}catch(e){}",
+            null
+        )
+    }
+
+    private fun dp(v: Int): Int =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
 
     fun setOverlayFullscreen(fullscreen: Boolean) {
         mainHandler.post {

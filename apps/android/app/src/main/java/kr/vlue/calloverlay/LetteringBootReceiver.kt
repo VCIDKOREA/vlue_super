@@ -8,6 +8,6 @@ import android.content.Intent
 class LetteringBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
-        // LetteringCallReceiver는 manifest에 등록되어 OS가 재등록함
+        LetteringCallMonitorService.syncWithPrefs(context)
     }
 }

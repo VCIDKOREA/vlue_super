@@ -14,6 +14,7 @@ object LetteringIntegration {
     fun onApplicationCreate(app: Application) {
         try {
             Log.i(TAG, "lettering module ready api=${VlueLetteringConfig.apiBaseUrl} web=${VlueLetteringConfig.webBaseUrl}")
+            LetteringCallMonitorService.syncWithPrefs(app)
         } catch (e: Exception) {
             Log.e(TAG, "onApplicationCreate failed", e)
         }
@@ -26,6 +27,7 @@ object LetteringIntegration {
             ) {
                 Log.w(TAG, "lettering enabled but permissions missing")
             }
+            LetteringCallMonitorService.syncWithPrefs(activity)
         } catch (e: Exception) {
             Log.e(TAG, "onMainActivityReady failed", e)
         }

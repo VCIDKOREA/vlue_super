@@ -31,6 +31,7 @@ function parseOverlayParams() {
     platform: params.get("platform") === "ios" ? "ios" : "android",
     direction: params.get("direction") === "outgoing" ? "outgoing" : "incoming",
     native: params.get("native") === "1",
+    forceLettering: params.get("forceLettering") === "1",
     phase: params.get("phase") || ""
   };
 }
@@ -40,7 +41,7 @@ function parseOverlayParams() {
  * 웹 홈·마케팅과 동일 — LetteringIncomingNotification 쇼케이스 바 → 풀 쇼케이스
  */
 export default function LetteringOverlayHost() {
-  const [{ incoming, platform, direction, native, phase }, setParams] = useState(parseOverlayParams);
+  const [{ incoming, platform, direction, native, forceLettering, phase }, setParams] = useState(parseOverlayParams);
   const [card, setCard] = useState(null);
   const [verified, setVerified] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -79,10 +80,16 @@ export default function LetteringOverlayHost() {
     let cancelled = false;
     (async () => {
       /*
-       * 네이티브 오버레이는 이미 SharedPreferences lettering_enabled 로 게이트됨.
-       * 별도 WebView localStorage 가 비어 있으면 UI 를 통째로 숨기지 않는다.
+       * 네이티브 오버레이는 SharedPreferences 로 이미 게이트됨.
+       * forceLettering / native 이면 웹 localStorage 가 비어도 UI 를 숨기지 않는다.
        */
-      if (!native && !readLetteringEnabled()) {
+      if (forceLettering || native) {
+        try {
+          localStorage.setItem("vlue_lettering_enabled", "1");
+        } catch {
+          /* ignore */
+        }
+      } else if (!readLetteringEnabled()) {
         setBlocked(true);
         setLoading(false);
         return;
@@ -174,17 +181,17 @@ export default function LetteringOverlayHost() {
     return () => {
       cancelled = true;
     };
-  }, [incoming, native]);
+  }, [incoming, native, forceLettering]);
 
   useEffect(() => {
     /* 라이브 이벤트는 본인 편집용 — 통화 오버레이에서는 상대 스타일을 덮어쓰지 않음 */
-    if (native) return undefined;
+    if (native || forceLettering) return undefined;
     const onLive = () => {
       /* no-op for non-native host paths that still mount this */
     };
     window.addEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, onLive);
     return () => window.removeEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, onLive);
-  }, [native]);
+  }, [native, forceLettering]);
 
   useEffect(() => {
     const onNativeCall = (e) => {
@@ -309,7 +316,7 @@ export default function LetteringOverlayHost() {
     }
   }, [incoming, card, showToast]);
 
-  if (blocked || (!native && !readLetteringEnabled())) {
+  if (blocked || (!native && !forceLettering && !readLetteringEnabled())) {
     return null;
   }
 
