@@ -823,8 +823,12 @@ function App() {
     if (!isLoggedIn) return undefined;
     let cancelled = false;
     void import("./lib/showcase/showcaseStyleSync.js")
-      .then((m) => {
+      .then(async (m) => {
         if (cancelled) return null;
+        /* 재설치 후 로컬이 비면 무조건 서버에서 강제 복원 */
+        if (m.needsShowcaseStyleLocalRestore()) {
+          return m.restoreShowcaseStyleFromServer();
+        }
         return m.hydrateShowcaseStyleFromServer();
       })
       .catch(() => {});
@@ -2047,10 +2051,13 @@ function App() {
           /* ignore */
         }
         try {
-          const { hydrateShowcaseStyleFromServer } = await import(
-            "./lib/showcase/showcaseStyleSync.js"
-          );
-          await hydrateShowcaseStyleFromServer({ forceServer: true });
+          const { hydrateShowcaseStyleFromServer, restoreShowcaseStyleFromServer, needsShowcaseStyleLocalRestore } =
+            await import("./lib/showcase/showcaseStyleSync.js");
+          if (needsShowcaseStyleLocalRestore()) {
+            await restoreShowcaseStyleFromServer();
+          } else {
+            await hydrateShowcaseStyleFromServer({ forceServer: true });
+          }
         } catch {
           /* ignore */
         }
@@ -2149,10 +2156,16 @@ function App() {
             /* ignore */
           }
           try {
-            const { hydrateShowcaseStyleFromServer } = await import(
-              "./lib/showcase/showcaseStyleSync.js"
-            );
-            await hydrateShowcaseStyleFromServer({ forceServer: true });
+            const {
+              hydrateShowcaseStyleFromServer,
+              restoreShowcaseStyleFromServer,
+              needsShowcaseStyleLocalRestore
+            } = await import("./lib/showcase/showcaseStyleSync.js");
+            if (needsShowcaseStyleLocalRestore()) {
+              await restoreShowcaseStyleFromServer();
+            } else {
+              await hydrateShowcaseStyleFromServer({ forceServer: true });
+            }
           } catch {
             /* ignore */
           }
@@ -2302,10 +2315,13 @@ function App() {
         /* ignore */
       }
       try {
-        const { hydrateShowcaseStyleFromServer } = await import(
-          "./lib/showcase/showcaseStyleSync.js"
-        );
-        await hydrateShowcaseStyleFromServer({ forceServer: true });
+        const { hydrateShowcaseStyleFromServer, restoreShowcaseStyleFromServer, needsShowcaseStyleLocalRestore } =
+          await import("./lib/showcase/showcaseStyleSync.js");
+        if (needsShowcaseStyleLocalRestore()) {
+          await restoreShowcaseStyleFromServer();
+        } else {
+          await hydrateShowcaseStyleFromServer({ forceServer: true });
+        }
       } catch {
         /* ignore */
       }
@@ -2748,7 +2764,7 @@ function App() {
     })();
   }, []);
 
-  /* 재설치 후 세션만 남은 경우 — 빈 로컬 명함을 서버 스냅샷으로 복원 */
+  /* 재설치 후 세션만 남은 경우 — 빈 로컬 명함·쇼케이스를 서버에서 복원 */
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -2758,8 +2774,13 @@ function App() {
         const { needsDigitalCardLocalRestore, restoreDigitalCardFromServer } = await import(
           "./lib/digitalCardApi.js"
         );
-        if (!needsDigitalCardLocalRestore()) return;
-        await restoreDigitalCardFromServer({ force: true });
+        if (needsDigitalCardLocalRestore()) {
+          await restoreDigitalCardFromServer({ force: true });
+        }
+        const showcase = await import("./lib/showcase/showcaseStyleSync.js");
+        if (showcase.needsShowcaseStyleLocalRestore()) {
+          await showcase.restoreShowcaseStyleFromServer();
+        }
         if (!cancelled) setCardFieldsTick((n) => n + 1);
       } catch {
         /* ignore */

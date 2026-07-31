@@ -283,15 +283,13 @@ export default function ShowcaseStyleSettingsPanel({
       setAppliedFp(styleFingerprint(latest));
       setTagInput((latest.tags || []).join(" "));
     };
-    if (!isWebDesk) {
-      applyLocal();
-      return () => {
-        cancelled = true;
-      };
-    }
     void import("../../lib/showcase/showcaseStyleSync.js")
       .then(async (m) => {
-        await m.hydrateShowcaseStyleFromServer();
+        if (m.needsShowcaseStyleLocalRestore()) {
+          await m.restoreShowcaseStyleFromServer();
+        } else if (isWebDesk) {
+          await m.hydrateShowcaseStyleFromServer();
+        }
         applyLocal();
       })
       .catch(() => {
