@@ -220,8 +220,8 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const [signupPwConfirmEyeBlink, setSignupPwConfirmEyeBlink] = useState(0);
   /** idle | checking | ok | taken | invalid */
   const [idCheck, setIdCheck] = useState({ status: "idle", message: "" });
-  /** business_email | vlue_id_only */
-  const [signupTrack, setSignupTrack] = useState("business_email");
+  /** business_email | vlue_id_only — QA·일반은 아이디만(이메일 OTP 불필요) */
+  const [signupTrack, setSignupTrack] = useState("vlue_id_only");
   const [businessEmail, setBusinessEmail] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
   const [emailVerify, setEmailVerify] = useState({ status: "idle", message: "", token: "" });
@@ -402,6 +402,12 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
           setAuthMode("recommend");
           setRecPhase(1);
           setStep("recommend_detail");
+        } else if (
+          !isBillableMembershipKind(draft.membershipKind) &&
+          draft.signupTrack === "vlue_id_only"
+        ) {
+          setAuthMode("direct");
+          setStep("complete");
         } else {
           setAuthMode("direct");
           setStep("direct_detail");
@@ -839,10 +845,17 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         setAuthMode("recommend");
         setRecPhase(1);
         setStep("recommend_detail");
-      } else {
-        setAuthMode("direct");
-        setStep("direct_detail");
+        return;
       }
+      /* 무료 + 아이디만 가입: 주소/직군 단계 생략 → 바로 완료 (이메일·Daum 주소 없이 QA 가능) */
+      if (!isBillableMembershipKind(membershipKind) && signupTrack === "vlue_id_only") {
+        setAuthMode("direct");
+        setVerifyZone({ ok: true, text: "본인인증이 완료되었습니다. 가입을 마무리해 주세요." });
+        setStep("complete");
+        return;
+      }
+      setAuthMode("direct");
+      setStep("direct_detail");
     } catch (e) {
       setVerifyZone({ ok: false, text: e?.message || String(e) });
     } finally {
@@ -2051,6 +2064,18 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
               >
                 검증 신청 완료로
               </button>
+              {!isBillableMembershipKind(membershipKind) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerifyZone({ ok: true, text: "주소는 나중에 입력할 수 있습니다." });
+                    setStep("complete");
+                  }}
+                  className="w-full rounded-2xl border border-slate-200 bg-white py-3 text-[13px] font-bold text-slate-700"
+                >
+                  주소 나중에 · 가입 완료
+                </button>
+              ) : null}
               {isBillableMembershipKind(membershipKind) && (
                 <p className="text-[10px] font-semibold text-amber-950/90">
                   구독({paidBillingCycle === "annual" ? "1년" : "월"}) 결제는 가입 완료 후 진행됩니다. 단순 변심 환불은 제한될 수 있습니다.
