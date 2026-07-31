@@ -1,22 +1,24 @@
 import { ensureKakaoSdk } from "./kakaoSocialLogin.js";
 import { ensureDigitalCardId, syncDigitalCardExportSnapshot } from "./digitalCardApi.js";
 import { apiUrl } from "./apiBase.js";
-import { getVlueViralLinks } from "./vlueViralLinks.js";
+import {
+  buildPublicShowcaseUrl,
+  getVlueViralLinks,
+  resolvePublicCardApiBase
+} from "./vlueViralLinks.js";
 import { withLetteringBizcardPreviewFallback } from "./letteringBizcardProfile.js";
 import { scrubLetteringDemoPollution } from "./letteringDemoPollution.js";
+import { readLetteringFixedIdentity } from "./letteringBizcardStorage.js";
 
 const KAKAO_PUBLIC_ORIGIN = "https://www.vlue.kr";
 export const KAKAO_FEED_IMAGE_WIDTH = 800;
 export const KAKAO_FEED_IMAGE_HEIGHT = 520;
 
-/** 카카오·OG가 접근할 공개 API 베이스 (실기기 공유용) */
+/** 카카오·OG가 접근할 공개 API 베이스 (실기기 공유용) — www SPA 금지 */
 export function getCardPublicApiBase() {
-  const fromEnv = String(import.meta.env.VITE_CARD_PUBLIC_API_BASE ?? "").trim().replace(/\/$/, "");
-  if (fromEnv.startsWith("http")) return fromEnv;
-  if (typeof window !== "undefined" && import.meta.env.DEV) {
-    return window.location.origin.replace(/\/$/, "");
-  }
-  return KAKAO_PUBLIC_ORIGIN;
+  return resolvePublicCardApiBase(
+    typeof window !== "undefined" ? window.location?.origin || "" : ""
+  );
 }
 
 /** 카카오 Feed 이미지 — 공용 버튼 (cardId 없을 때 폴백) */
@@ -45,20 +47,25 @@ export function getKakaoFeedCardPublicImageUrl(cardId) {
 
 export function buildKakaoBizcardPublicUrls(cardId, card) {
   const id = encodeURIComponent(String(cardId || "").trim());
-  const origin = KAKAO_PUBLIC_ORIGIN;
+  const apiBase = getCardPublicApiBase();
   const viral = getVlueViralLinks();
   const createUrl =
     String(viral.createUrl || "").startsWith("http") && viral.createUrl.includes("vlue")
       ? viral.createUrl
-      : `${origin}/membership`;
+      : `${KAKAO_PUBLIC_ORIGIN}/membership`;
   const snap = scrubLetteringDemoPollution(withLetteringBizcardPreviewFallback(card || {}));
   const feedImageUrl = cardId ? getKakaoFeedCardPublicImageUrl(cardId) : getKakaoShareButtonImageUrl();
+  const phone = String(
+    readLetteringFixedIdentity()?.phone || snap.phone || card?.phone || ""
+  ).trim();
+  const showcaseUrl = phone ? buildPublicShowcaseUrl(phone) : "";
+  const viewUrl = showcaseUrl || `${apiBase}/api/v1/card/view/${id}`;
   return {
     buttonImageUrl: feedImageUrl,
     buttonPreviewUrl: cardId ? getKakaoFeedCardPreviewUrl(cardId) : getKakaoShareButtonImageUrl(),
-    viewUrl: `${origin}/api/v1/card/view/${id}`,
+    viewUrl,
     createUrl,
-    feedTitle: `${String(snap.name || "회원").trim()}님의 VLUE 인증명함`,
+    feedTitle: `${String(snap.name || "회원").trim()}님의 VLUE 쇼케이스`,
     feedDescription: [snap.organization, snap.title, snap.department].filter(Boolean).join(" · ").slice(0, 80)
   };
 }
@@ -104,8 +111,8 @@ export async function shareBizcardViaKakaoFeed(card) {
       link: viewLink
     },
     buttons: [
-      { title: "명함 확인", link: viewLink },
-      { title: "나도 명함 만들기", link: createLink }
+      { title: "쇼케이스 열기", link: viewLink },
+      { title: "나도 VLUE 만들기", link: createLink }
     ]
   };
 

@@ -1,8 +1,42 @@
 import { escapeHtml } from "../bizcard/bizcardHtmlUtil.js";
 
 /**
+ * 카카오·페이스북 등 OG 스크래퍼.
+ * 인앱 브라우저(KAKAOTALK)까지 매칭하면 사람이 열 때도 리다이렉트가 안 되므로
+ * scrap / facebookexternalhit 등만 잡는다.
+ */
+export function isOgScraperUserAgent(uaRaw: string): boolean {
+  const ua = String(uaRaw || "").toLowerCase();
+  if (!ua) return false;
+  return (
+    ua.includes("kakaotalk-scrap") ||
+    ua.includes("kakao-scrap") ||
+    ua.includes("kakaotalk share") ||
+    ua.includes("facebookexternalhit") ||
+    ua.includes("facebot") ||
+    ua.includes("twitterbot") ||
+    ua.includes("slackbot") ||
+    ua.includes("linkedinbot") ||
+    ua.includes("discordbot") ||
+    ua.includes("telegrambot") ||
+    ua.includes("linespider") ||
+    ua.includes("yeti/") ||
+    ua.includes("bingbot") ||
+    ua.includes("googlebot") ||
+    ua.includes("embedly") ||
+    ua.includes("quora link preview") ||
+    ua.includes("showyoubot") ||
+    ua.includes("outbrain") ||
+    ua.includes("pinterest") ||
+    ua.includes("applebot") ||
+    ua.includes("whatsapp")
+  );
+}
+
+/**
  * 카카오·메신저 OG 미리보기용 — 서버 렌더 HTML.
  * (SPA /site/web/showcase 는 JS 이후에만 메타가 생겨 크롤러가 VLUE 기본 타이틀만 봄)
+ * @param opts.forScraper true 이면 즉시 redirect 없음 (OG 파싱용)
  */
 export function buildShowcaseOgLandingPage(opts: {
   name: string;
@@ -14,8 +48,8 @@ export function buildShowcaseOgLandingPage(opts: {
   shareUrl: string;
   spaUrl: string;
   createUrl: string;
+  forScraper?: boolean;
 }) {
-  const name = escapeHtml(opts.name || "VLUE");
   const org = escapeHtml(opts.org || "");
   const role = escapeHtml(opts.role || "");
   const handle = escapeHtml(opts.handle || "");
@@ -24,6 +58,7 @@ export function buildShowcaseOgLandingPage(opts: {
   const shareUrl = escapeHtml(opts.shareUrl);
   const spaUrl = escapeHtml(opts.spaUrl);
   const createUrl = escapeHtml(opts.createUrl);
+  const forScraper = Boolean(opts.forScraper);
 
   const titlePlain = opts.name?.trim()
     ? `${opts.name.trim()}님의 VLUE 쇼케이스`
@@ -39,6 +74,13 @@ export function buildShowcaseOgLandingPage(opts: {
   ].filter(Boolean);
   const description = escapeHtml(descParts.slice(0, 3).join(" · ") || "VLUE 디지털 쇼케이스");
 
+  const redirectHead = forScraper
+    ? ""
+    : `<meta http-equiv="refresh" content="1;url=${spaUrl}"/>`;
+  const redirectScript = forScraper
+    ? ""
+    : `<script>setTimeout(function(){location.replace(${JSON.stringify(opts.spaUrl)});},400);</script>`;
+
   return `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -48,9 +90,11 @@ export function buildShowcaseOgLandingPage(opts: {
 <meta name="description" content="${description}"/>
 <meta property="og:type" content="website"/>
 <meta property="og:site_name" content="VLUE"/>
+<meta property="og:locale" content="ko_KR"/>
 <meta property="og:title" content="${title}"/>
 <meta property="og:description" content="${description}"/>
 <meta property="og:image" content="${ogImage}"/>
+<meta property="og:image:secure_url" content="${ogImage}"/>
 <meta property="og:image:width" content="800"/>
 <meta property="og:image:height" content="800"/>
 <meta property="og:url" content="${shareUrl}"/>
@@ -58,7 +102,7 @@ export function buildShowcaseOgLandingPage(opts: {
 <meta name="twitter:title" content="${title}"/>
 <meta name="twitter:description" content="${description}"/>
 <meta name="twitter:image" content="${ogImage}"/>
-<meta http-equiv="refresh" content="0;url=${spaUrl}"/>
+${redirectHead}
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
@@ -89,7 +133,7 @@ font-weight:800;font-size:14px;color:#fff;background:linear-gradient(135deg,#1d4
     <p class="sub"><a href="${createUrl}">나도 VLUE 만들기</a></p>
   </div>
 </div>
-<script>location.replace(${JSON.stringify(opts.spaUrl)});</script>
+${redirectScript}
 </body>
 </html>`;
 }

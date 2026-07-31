@@ -1,7 +1,10 @@
 import { Hono } from "hono";
 import { lookupCardByRawNumber } from "../services/cardLookup.js";
 import { getUserShowcasePublicLive } from "../services/showcase/showcaseStyleSyncService.js";
-import { buildShowcaseOgLandingPage } from "../services/showcase/showcaseOgLandingPage.js";
+import {
+  buildShowcaseOgLandingPage,
+  isOgScraperUserAgent
+} from "../services/showcase/showcaseOgLandingPage.js";
 import {
   getVlueCreateUrl,
   getVluePublicOrigin,
@@ -147,6 +150,8 @@ showcasePublicRoutes.get("/view/:phone", async (c) => {
 
     if (!name) name = handle ? `@${handle}` : phoneDisplay;
 
+    const forScraper = isOgScraperUserAgent(c.req.header("user-agent") || "");
+
     const html = buildShowcaseOgLandingPage({
       name,
       org,
@@ -156,10 +161,12 @@ showcasePublicRoutes.get("/view/:phone", async (c) => {
       ogImage,
       shareUrl,
       spaUrl,
-      createUrl: getVlueCreateUrl()
+      createUrl: getVlueCreateUrl(),
+      forScraper
     });
 
-    c.header("Cache-Control", "public, max-age=120");
+    c.header("Cache-Control", forScraper ? "public, max-age=300" : "public, max-age=60");
+    c.header("Content-Type", "text/html; charset=utf-8");
     return c.html(html);
   } catch (err) {
     console.warn("[showcase-og-view] failed", err);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { copyShowcaseShareUrl } from "../lib/letteringBizcardShare.js";
+import { copyShowcaseShareUrl, shareBizcardViaKakao } from "../lib/letteringBizcardShare.js";
 import { readLetteringFixedIdentity } from "../lib/letteringBizcardStorage.js";
 import { syncDigitalCardExportSnapshot, ensureDigitalCardId } from "../lib/digitalCardApi.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
@@ -7,10 +7,10 @@ import KakaoBizcardFeedPreview from "./KakaoBizcardFeedPreview.jsx";
 import HelpTip from "./HelpTip.jsx";
 
 const SHOWCASE_SHARE_HELP_PAID =
-  "쇼케이스 주소를 복사해 카카오톡 등에 붙여넣으세요. 상대가 열면 풀 쇼케이스가 펼쳐집니다.\n\n· 명함이 있으면 쇼케이스 안에 함께 표시됩니다.\n· 검색 목록 공개 여부는 「쇼케이스 검색」 설정에서 따로 관리합니다.";
+  "「카카오톡으로 보내기」는 카드 미리보기와 함께 전달됩니다.\n「주소 복사」는 채팅방에 붙여넣기용이며, 카카오가 링크 미리보기를 만들 때까지 수 초~수 분 걸릴 수 있습니다.\n\n· 명함이 있으면 쇼케이스 안에 함께 표시됩니다.\n· 검색 목록 공개 여부는 「쇼케이스 검색」 설정에서 따로 관리합니다.";
 
 const SHOWCASE_SHARE_HELP_FREE =
-  "쇼케이스 주소를 복사해 카카오톡 등에 붙여넣으세요. 상대가 열면 풀 쇼케이스가 펼쳐집니다.\n\n· 무료 회원: 이름·VLUE ID·전화번호가 노출됩니다.\n· 검색 목록 공개 여부는 「쇼케이스 검색」 설정에서 따로 관리합니다.";
+  "「카카오톡으로 보내기」를 권장합니다. 주소만 붙여넣으면 미리보기가 안 뜨거나 늦게 뜰 수 있습니다.\n\n· 무료 회원: 이름·VLUE ID·전화번호가 노출됩니다.\n· 검색 목록 공개 여부는 「쇼케이스 검색」 설정에서 따로 관리합니다.";
 
 function readVlueHandleDisplay() {
   try {
@@ -64,7 +64,7 @@ export default function LetteringBizcardSharePanel({
         if (r.viewUrl) onToast?.(`주소: ${r.viewUrl}`);
         return;
       }
-      onToast?.("쇼케이스 주소를 복사했습니다. 카카오톡 채팅방에 붙여넣기 하세요.");
+      onToast?.("주소를 복사했습니다. 채팅방에 붙여넣으면 잠시 후 미리보기가 생길 수 있습니다.");
     } catch (e) {
       onToast?.(e?.message || "주소 복사에 실패했습니다.");
     } finally {
@@ -72,8 +72,32 @@ export default function LetteringBizcardSharePanel({
     }
   };
 
+  const runKakao = async () => {
+    if (busy) return;
+    if (!isPaid) {
+      onToast?.("카카오톡 카드 공유는 유료(인증명함) 회원만 사용할 수 있습니다. 주소 복사를 이용해 주세요.");
+      return;
+    }
+    setBusy("kakao");
+    try {
+      const r = await shareBizcardViaKakao(card);
+      if (r.cancelled) return;
+      if (!r.ok && r.error) {
+        onToast?.(r.error);
+        return;
+      }
+      onToast?.("카카오톡 공유 창을 열었습니다.");
+    } catch (e) {
+      onToast?.(e?.message || "카카오톡 공유에 실패했습니다.");
+    } finally {
+      setBusy("");
+    }
+  };
+
   const btnCopy =
     "vlue-kakao-brand-btn w-full rounded-xl bg-[#FEE500] px-2 py-2.5 text-[12px] font-semibold text-[rgba(0,0,0,0.82)] active:scale-[0.99] disabled:opacity-50";
+  const btnSecondary =
+    "w-full rounded-xl border border-slate-200 bg-white px-2 py-2.5 text-[12px] font-semibold text-slate-700 active:scale-[0.99] disabled:opacity-50";
 
   const wrapCls = embedded
     ? `mt-2.5 border-t pt-2.5 ${isDarkMode ? "border-white/10" : "border-slate-200/90"}`
@@ -91,7 +115,10 @@ export default function LetteringBizcardSharePanel({
       </div>
       <p className={`mt-1 text-[11px] font-normal leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
         미리보기 확인 후{" "}
-        <span className={isDarkMode ? "text-cyan-200/90" : "text-slate-600"}>쇼케이스 주소 복사</span>를 누르세요.
+        <span className={isDarkMode ? "text-cyan-200/90" : "text-slate-600"}>
+          {isPaid ? "카카오톡으로 보내기" : "쇼케이스 주소 복사"}
+        </span>
+        를 누르세요.
       </p>
       {!isPaid && handleLabel ? (
         <p className={`mt-1 text-[10px] font-medium ${isDarkMode ? "text-cyan-300/80" : "text-blue-600/90"}`}>
@@ -106,8 +133,18 @@ export default function LetteringBizcardSharePanel({
         onToast={onToast}
       />
 
-      <div className="mt-2">
-        <button type="button" disabled={!!busy || !shareReady} className={btnCopy} onClick={() => void runCopy()}>
+      <div className="mt-2 space-y-2">
+        {isPaid ? (
+          <button type="button" disabled={!!busy || !shareReady} className={btnCopy} onClick={() => void runKakao()}>
+            {busy === "kakao" ? "여는 중…" : "카카오톡으로 보내기"}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          disabled={!!busy || !shareReady}
+          className={isPaid ? btnSecondary : btnCopy}
+          onClick={() => void runCopy()}
+        >
           {busy === "copy" ? "복사 중…" : "쇼케이스 주소 복사"}
         </button>
       </div>
