@@ -10,6 +10,7 @@ import { seedDemoCompanyLine } from "./services/office/companyLinesService.js";
 import type { Server } from "node:http";
 import { loadPricingConfig } from "./services/pricing/pricingConfigService.js";
 import { startExternalMailSyncScheduler } from "./services/email/externalMailSyncQueue.js";
+import { egressLogMiddleware, startEgressSummaryTimer } from "./lib/egressLog.js";
 
 assertProductionEnvLocked();
 await loadPricingConfig();
@@ -70,6 +71,8 @@ app.get("/", (c) =>
   )
 );
 
+app.use("/api/*", egressLogMiddleware());
+
 app.route("/api", apiRoutes);
 
 const port = Number(process.env.PORT) || 8788;
@@ -83,6 +86,7 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
   }
   console.log(`VLUE API (Hono) listening on http://localhost:${info.port}`);
   console.log(`PC Agent WebSocket: ws://localhost:${info.port}/api/office/ws/agent`);
+  startEgressSummaryTimer();
 
   const vmingConsentCronMs = Number(process.env.VMING_CONSENT_CRON_MS) || 24 * 60 * 60 * 1000;
   setInterval(() => {

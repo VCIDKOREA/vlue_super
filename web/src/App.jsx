@@ -314,7 +314,16 @@ function App() {
     for (const id of getDemoFamilyRoomIds()) stored.add(id);
     return stored;
   });
-  const [signupOnboardingOpen, setSignupOnboardingOpen] = useState(false);
+  const [signupOnboardingOpen, setSignupOnboardingOpen] = useState(() => {
+    try {
+      if (sessionStorage.getItem("vlue_pass_cert_draft_v1")) return true;
+      const q = new URLSearchParams(window.location.search || "");
+      if (q.get("imp_uid") || q.get("impUid")) return true;
+    } catch {
+      /* ignore */
+    }
+    return false;
+  });
   const [signupIntent, setSignupIntent] = useState(/** @type {'general' | 'trust'} */ ("general"));
 
   const [pendingAuthAction, setPendingAuthAction] = useState(null);
@@ -337,6 +346,20 @@ function App() {
       setIsLoggedIn(false);
       setShowSplash(false);
       setOnboardingComplete(false);
+      setSignupOnboardingOpen(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  /** PASS 본인인증 redirect 복귀 시 온보딩 재오픈 */
+  useEffect(() => {
+    try {
+      const hasDraft = Boolean(sessionStorage.getItem("vlue_pass_cert_draft_v1"));
+      const q = new URLSearchParams(window.location.search || "");
+      const hasCertReturn = Boolean(q.get("imp_uid") || q.get("impUid") || q.get("success"));
+      if (!hasDraft && !hasCertReturn) return;
+      setShowSplash(false);
       setSignupOnboardingOpen(true);
     } catch {
       /* ignore */
@@ -2033,7 +2056,7 @@ function App() {
         }
         try {
           const { fetchDigitalCardMeta } = await import("./lib/digitalCardApi.js");
-          const meta = await fetchDigitalCardMeta({ force: true });
+          const meta = await fetchDigitalCardMeta({ force: true, lite: true });
           if (meta?.issued) {
             localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
             setDigitalCardActive(true);
@@ -2157,7 +2180,7 @@ function App() {
           /* 디지털 명함 활성은 서버 발급(issued) 기준 — 유료만으로 CEO 잔여처럼 켜지 않음 */
           try {
             const { fetchDigitalCardMeta } = await import("./lib/digitalCardApi.js");
-            const meta = await fetchDigitalCardMeta({ force: true });
+            const meta = await fetchDigitalCardMeta({ force: true, lite: true });
             if (meta?.issued || handle === "ceo") {
               localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
               setDigitalCardActive(true);
@@ -2288,7 +2311,7 @@ function App() {
       }
       try {
         const { fetchDigitalCardMeta } = await import("./lib/digitalCardApi.js");
-        const meta = await fetchDigitalCardMeta({ force: true });
+        const meta = await fetchDigitalCardMeta({ force: true, lite: true });
         if (meta?.issued) {
           localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
           setDigitalCardActive(true);

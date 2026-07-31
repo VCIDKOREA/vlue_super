@@ -1,12 +1,11 @@
 /**
- * Supabase public 스키마 RLS 잠금 SQL 적용
+ * Supabase public 스키마 RLS 잠금 적용 (Prisma · DO 블록 단위)
  * 사용: npm run db:supabase-rls-lockdown
- * 필요: packages/db/.env 의 DIRECT_URL 또는 DATABASE_URL
  */
-import { readFileSync, existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "url";
-import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -27,27 +26,78 @@ for (const rel of [".env", "packages/db/.env", "apps/api/.env"]) {
   }
 }
 
-const dbUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
-if (!dbUrl) {
-  console.error("DIRECT_URL 또는 DATABASE_URL 이 없습니다. packages/db/.env 를 확인하세요.");
+/** Pooler(6543)보다 DIRECT(5432) 우선 — multi-statement/DO 안정 */
+if (process.env.DIRECT_URL) {
+  process.env.DATABASE_URL = process.env.DIRECT_URL;
+}
+
+if (!process.env.DATABASE_URL) {
+  console.error("DIRECT_URL 또는 DATABASE_URL 이 없습니다.");
   process.exit(1);
 }
 
-const sqlPath = resolve(root, "supabase/migrations/20260608120000_lockdown_public_rls.sql");
-const sql = readFileSync(sqlPath, "utf8");
+const statements = [
+  `DROP POLICY IF EXISTS "chat_messages_select_all_for_dev" ON public.chat_messages`,
+  `DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN
+    SELECT c.relname AS tablename
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'r'
+      AND NOT c.relispartition
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', r.tablename);
+  END LOOP;
+END $$`,
+  `DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'documents'
+  ) THEN
+    DROP POLICY IF EXISTS "documents_public_read_active" ON public.documents;
+    CREATE POLICY "documents_public_read_active" ON public.documents
+      FOR SELECT
+      TO anon, authenticated
+      USING (COALESCE(is_active, false) = true);
+  END IF;
+END $$`,
+  `DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'terms_agreement_log'
+  ) THEN
+    ALTER TABLE public.terms_agreement_log ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "terms_agreement_log_no_anon" ON public.terms_agreement_log;
+    CREATE POLICY "terms_agreement_log_no_anon"
+      ON public.terms_agreement_log
+      FOR ALL
+      TO anon, authenticated
+      USING (false)
+      WITH CHECK (false);
+  END IF;
+END $$`
+];
 
-console.log("Applying Supabase RLS lockdown:", sqlPath);
+const require = createRequire(resolve(root, "packages/db/package.json"));
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
 
-const r = spawnSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-f", sqlPath], {
-  stdio: "inherit",
-  shell: true,
-  env: process.env
-});
-
-if (r.status !== 0) {
-  console.error("\npsql 실행 실패. Supabase Dashboard → SQL Editor 에서 아래 파일을 직접 실행하세요:");
-  console.error(sqlPath);
-  process.exit(r.status ?? 1);
+console.log("Applying Supabase RLS lockdown via Prisma…");
+let ok = 0;
+try {
+  for (const stmt of statements) {
+    await prisma.$executeRawUnsafe(stmt);
+    ok += 1;
+    console.log(`OK ${ok}/${statements.length}`);
+  }
+  console.log("RLS lockdown applied. Advisors → Security 에서 이슈 해소 여부 확인하세요.");
+} catch (e) {
+  console.error(`Failed after ${ok} statements:`, e?.message || e);
+  process.exitCode = 1;
+} finally {
+  await prisma.$disconnect();
 }
-
-console.log("\nRLS lockdown applied. Supabase Security Advisor에서 이슈가 해소되는지 확인하세요.");

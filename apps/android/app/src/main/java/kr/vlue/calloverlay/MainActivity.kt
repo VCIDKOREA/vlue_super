@@ -40,6 +40,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var pendingWebPermissionRequest: android.webkit.PermissionRequest? = null
     private var pendingWebGrantResources: Array<String>? = null
+    /** PASS/포트원 본인인증 window.open 팝업 */
+    private var certPopupDialog: AlertDialog? = null
+    private var certPopupWebView: WebView? = null
 
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -100,6 +103,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         webView.settings.allowContentAccess = true
         webView.settings.mediaPlaybackRequiresUserGesture = false
         webView.settings.setGeolocationEnabled(true)
+        /* PASS·포트원 IMP.certification 이 window.open 사용 — 미설정 시 흰 화면 */
+        webView.settings.javaScriptCanOpenWindowsAutomatically = true
+        webView.settings.setSupportMultipleWindows(true)
         val defaultUa = webView.settings.userAgentString.orEmpty()
         if (!defaultUa.contains(VlueLetteringConfig.ANDROID_APP_UA_TOKEN)) {
             webView.settings.userAgentString = "$defaultUa ${VlueLetteringConfig.ANDROID_APP_UA_TOKEN}"
@@ -141,6 +147,19 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
 
         webView.webChromeClient = object : WebChromeClient() {
+            override fun onCreateWindow(
+                view: WebView?,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: android.os.Message?
+            ): Boolean {
+                return openCertPopupWindow(resultMsg)
+            }
+
+            override fun onCloseWindow(window: WebView?) {
+                dismissCertPopup()
+            }
+
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String?,
                 callback: android.webkit.GeolocationPermissions.Callback?
@@ -329,7 +348,113 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         super.onStop()
     }
 
-    /** intent:// · kakaolink · tel 등 커스텀 스킴 → 외부 앱 */
+    /**
+     * 포트원/이니시스/PASS 본인인증용 window.open → 다이얼로그 WebView.
+     * 미구현이면 about:blank 흰 화면만 남음.
+     */
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun openCertPopupWindow(resultMsg: android.os.Message?): Boolean {
+        if (resultMsg == null) return false
+        dismissCertPopup()
+        val popup = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.javaScriptCanOpenWindowsAutomatically = true
+            settings.setSupportMultipleWindows(true)
+            settings.userAgentString = webView.settings.userAgentString
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(
+                    view: WebView?,
+                    request: android.webkit.WebResourceRequest?
+                ): Boolean {
+                    val url = request?.url?.toString().orEmpty()
+                    if (isAppShellReturnUrl(url)) {
+                        webView.loadUrl(url)
+                        dismissCertPopup()
+                        return true
+                    }
+                    return handleSpecialUrl(url)
+                }
+
+                @Deprecated("Deprecated in Java")
+                override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                    val u = url.orEmpty()
+                    if (isAppShellReturnUrl(u)) {
+                        webView.loadUrl(u)
+                        dismissCertPopup()
+                        return true
+                    }
+                    return handleSpecialUrl(u)
+                }
+            }
+            webChromeClient = object : WebChromeClient() {
+                override fun onCloseWindow(window: WebView?) {
+                    dismissCertPopup()
+                }
+            }
+        }
+        certPopupWebView = popup
+        val container = FrameLayout(this).apply {
+            addView(
+                popup,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            )
+        }
+        certPopupDialog = AlertDialog.Builder(this)
+            .setView(container)
+            .setNegativeButton("닫기") { _, _ -> dismissCertPopup() }
+            .setOnDismissListener { cleanupCertPopupViews() }
+            .create()
+            .also { dialog ->
+                dialog.setCanceledOnTouchOutside(false)
+                dialog.show()
+                dialog.window?.setLayout(
+                    (resources.displayMetrics.widthPixels * 0.96f).toInt(),
+                    (resources.displayMetrics.heightPixels * 0.88f).toInt()
+                )
+            }
+        val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+        transport.webView = popup
+        resultMsg.sendToTarget()
+        return true
+    }
+
+    private fun isAppShellReturnUrl(url: String): Boolean {
+        if (url.isBlank()) return false
+        return try {
+            val uri = Uri.parse(url)
+            val host = uri.host?.lowercase().orEmpty()
+            val path = uri.path.orEmpty()
+            val isVlue =
+                host == "www.vlue.kr" || host == "vlue.kr" || host.endsWith(".vlue.kr") ||
+                    host == "localhost" || host == "127.0.0.1"
+            isVlue && (path == "/app" || path.startsWith("/app/"))
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun dismissCertPopup() {
+        try {
+            certPopupDialog?.dismiss()
+        } catch (_: Exception) {
+        }
+        cleanupCertPopupViews()
+    }
+
+    private fun cleanupCertPopupViews() {
+        try {
+            certPopupWebView?.destroy()
+        } catch (_: Exception) {
+        }
+        certPopupWebView = null
+        certPopupDialog = null
+    }
+
+    /** intent:// · PASS · kakaolink · tel 등 커스텀 스킴 → 외부 앱 */
     private fun handleSpecialUrl(url: String): Boolean {
         if (url.isBlank()) return false
         val lower = url.lowercase()
@@ -348,7 +473,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                         val fallback = intent.getStringExtra("browser_fallback_url")
                         val pkg = intent.`package`
                         when {
-                            !fallback.isNullOrBlank() -> webView.loadUrl(fallback)
+                            !fallback.isNullOrBlank() -> {
+                                (certPopupWebView ?: webView).loadUrl(fallback)
+                            }
                             !pkg.isNullOrBlank() -> {
                                 startActivity(
                                     Intent(
@@ -364,7 +491,12 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 }
                 lower.startsWith("kakaolink:") || lower.startsWith("kakao") ||
                     lower.startsWith("tel:") || lower.startsWith("sms:") ||
-                    lower.startsWith("mailto:") || lower.startsWith("market:") -> {
+                    lower.startsWith("mailto:") || lower.startsWith("market:") ||
+                    lower.startsWith("ispmobile:") || lower.startsWith("tauthlink:") ||
+                    lower.startsWith("kftc-bankpay:") || lower.startsWith("supertoss:") ||
+                    lower.startsWith("cloudpay:") || lower.startsWith("nhappocardcert:") ||
+                    lower.startsWith("lid:") || lower.startsWith("niceiphonecert:") ||
+                    lower.startsWith("samsungpass:") || lower.startsWith("mbmobilebank:") -> {
                     startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                     true
                 }

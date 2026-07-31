@@ -1,6 +1,73 @@
 import { getPortoneUserCode } from "./portoneEnv.js";
+import { hasVlueNativeAppUserAgent, VLUE_ANDROID_APP_UA_TOKEN } from "./vlueClientAccess.js";
 
 const SCRIPT_SRC = "https://cdn.iamport.kr/v1/iamport.js";
+const CERT_REDIRECT_FLAG_KEY = "vlue_iamport_cert_redirect_v1";
+
+/**
+ * Android/iOS WebView·인앱 브라우저 — window.open 팝업이 흰 화면이 되므로 redirect 권장
+ */
+export function shouldUseIamportCertRedirect() {
+  if (typeof window === "undefined") return false;
+  if (hasVlueNativeAppUserAgent()) return true;
+  if (window.VlueFamilyBridgeNative || window.VlueFamilyBridge?.__androidShell) return true;
+  const ua = String(navigator.userAgent || "");
+  if (ua.includes(VLUE_ANDROID_APP_UA_TOKEN)) return true;
+  /* 일반 모바일 브라우저도 팝업 차단이 잦음 */
+  if (/Android|iPhone|iPad|iPod/i.test(ua) && !window.IMP_FORCE_POPUP) return true;
+  return false;
+}
+
+/**
+ * redirect 본인인증 복귀 URL (?imp_uid=&success=) 파싱 후 쿼리 정리
+ * @returns {{ imp_uid: string, success: boolean, error_msg?: string } | null}
+ */
+export function consumeIamportCertRedirectResult() {
+  if (typeof window === "undefined") return null;
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    const impUid = String(params.get("imp_uid") || params.get("impUid") || "").trim();
+    const successRaw = String(params.get("success") || "").toLowerCase();
+    const errorMsg = String(params.get("error_msg") || params.get("errorMsg") || "").trim();
+    if (!impUid && successRaw !== "false" && successRaw !== "true" && !errorMsg) {
+      return null;
+    }
+    const success = successRaw === "true" || successRaw === "1" || (Boolean(impUid) && successRaw !== "false");
+    /* URL 정리 — 해시(#) 온보딩 상태 유지 */
+    const url = new URL(window.location.href);
+    ["imp_uid", "impUid", "success", "error_msg", "merchant_uid", "imp_success"].forEach((k) =>
+      url.searchParams.delete(k)
+    );
+    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    try {
+      sessionStorage.removeItem(CERT_REDIRECT_FLAG_KEY);
+    } catch {
+      /* ignore */
+    }
+    if (!success || !impUid) {
+      return { imp_uid: "", success: false, error_msg: errorMsg || "본인인증이 완료되지 않았습니다." };
+    }
+    return { imp_uid: impUid, success: true };
+  } catch {
+    return null;
+  }
+}
+
+export function markIamportCertRedirectPending() {
+  try {
+    sessionStorage.setItem(CERT_REDIRECT_FLAG_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+export function wasIamportCertRedirectPending() {
+  try {
+    return sessionStorage.getItem(CERT_REDIRECT_FLAG_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * 아임포트(포트원) v1 스크립트 로드 후 `window.IMP` 반환
@@ -93,10 +160,15 @@ export async function requestIamportCertification(userCode = getPortoneUserCode(
   const company =
     typeof window !== "undefined" && window.location?.origin ? window.location.origin : "VLUE";
 
-  const usePopup =
-    envTrim(typeof import.meta !== "undefined" ? import.meta.env?.VITE_IAMPORT_CERT_POPUP : "") !== "false";
+  const envPopup =
+    envTrim(typeof import.meta !== "undefined" ? import.meta.env?.VITE_IAMPORT_CERT_POPUP : "");
+  const useRedirect = shouldUseIamportCertRedirect() || envPopup === "false";
+  const usePopup = !useRedirect && envPopup !== "false";
 
-  const returnUrl = typeof window !== "undefined" ? window.location.href.split("#")[0] : "";
+  const returnUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}${window.location.pathname || "/app"}`
+      : "";
 
   const payload = {
     merchant_uid: merchantUid,
@@ -108,37 +180,43 @@ export async function requestIamportCertification(userCode = getPortoneUserCode(
     payload.m_redirect_url = returnUrl;
   }
 
+  if (useRedirect) {
+    markIamportCertRedirectPending();
+  }
+
   if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
     console.info("[VLUE 본인인증 요청]", {
       pg,
       popup: usePopup,
+      redirect: useRedirect,
       company,
       m_redirect_url: payload.m_redirect_url,
       impUserCode: `${String(userCode).slice(0, 6)}…`
     });
   } else if (typeof console !== "undefined" && console.info) {
     /* 운영에서도 pg만 남겨 이니시스 일반 오류 원인 추적 (MID·키 전체는 미출력) */
-    console.info("[VLUE 본인인증 요청]", { pg, company: String(company).slice(0, 64) });
+    console.info("[VLUE 본인인증 요청]", {
+      pg,
+      popup: usePopup,
+      company: String(company).slice(0, 64)
+    });
   }
 
   return new Promise((resolve, reject) => {
-    IMP.certification(
-      payload,
-      (rsp) => {
-        if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
-          console.info("[VLUE 본인인증 응답]", rsp);
-        }
-        if (rsp?.success) {
-          resolve(rsp);
-        } else {
-          const pgHint =
-            typeof import.meta !== "undefined" && import.meta.env?.DEV
-              ? " 이니시스(sa.inicis.com) 일반 오류면 포트원 콘솔에서 통합본인인증 채널·MID·http://localhost:5173 허용을 확인하거나, 개발 시 「PASS 우회(개발)」를 사용하세요."
-              : "";
-          reject(new Error((rsp?.error_msg || "본인인증이 완료되지 않았습니다.") + pgHint));
-        }
+    IMP.certification(payload, (rsp) => {
+      if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
+        console.info("[VLUE 본인인증 응답]", rsp);
       }
-    );
+      if (rsp?.success) {
+        resolve(rsp);
+      } else {
+        const pgHint =
+          typeof import.meta !== "undefined" && import.meta.env?.DEV
+            ? " 이니시스(sa.inicis.com) 일반 오류면 포트원 콘솔에서 통합본인인증 채널·MID·http://localhost:5173 허용을 확인하거나, 개발 시 「PASS 우회(개발)」를 사용하세요."
+            : "";
+        reject(new Error((rsp?.error_msg || "본인인증이 완료되지 않았습니다.") + pgHint));
+      }
+    });
   });
 }
 

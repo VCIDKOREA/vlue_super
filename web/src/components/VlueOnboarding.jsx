@@ -8,7 +8,7 @@ import { logTermsAgreement } from "../lib/termsLog.js";
 import { apiUrl, getApiBase } from "../lib/apiBase.js";
 import { makeDevLocalImpUid, postPortoneIdentityComplete } from "../lib/identityCompleteApi.js";
 import { approveParentalConsentWithPass, requestParentalConsentToGuardian } from "../lib/parentalConsentApi.js";
-import { requestIamportCertification } from "../lib/iamportClient.js";
+import { requestIamportCertification, consumeIamportCertRedirectResult, shouldUseIamportCertRedirect } from "../lib/iamportClient.js";
 import { getPortoneUserCode } from "../lib/portoneEnv.js";
 import { DEV_SAMPLE_ROAD_ADDRESS, openDaumPostcode } from "../lib/daumPostcode.js";
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
@@ -43,6 +43,41 @@ import {
   syncDraftToPlannedLineCount,
   GROUP_SIGNUP_MIN_LINES
 } from "../lib/groupSignupBm.js";
+
+const PASS_CERT_DRAFT_KEY = "vlue_pass_cert_draft_v1";
+
+function savePassCertDraft(draft) {
+  try {
+    sessionStorage.setItem(PASS_CERT_DRAFT_KEY, JSON.stringify({ ...draft, at: Date.now() }));
+  } catch {
+    /* ignore */
+  }
+}
+
+function readPassCertDraft() {
+  try {
+    const raw = sessionStorage.getItem(PASS_CERT_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    /* 30분 초과 초안 폐기 */
+    if (parsed.at && Date.now() - Number(parsed.at) > 30 * 60 * 1000) {
+      sessionStorage.removeItem(PASS_CERT_DRAFT_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearPassCertDraft() {
+  try {
+    sessionStorage.removeItem(PASS_CERT_DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 /** 좌측 라벨 + 우측 필드 — 모바일은 세로 스택 */
 function FormRow({ icon, label, children, className = "" }) {
@@ -267,6 +302,121 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         fullVirtualEmail: ""
       });
     }
+  }, []);
+
+  useEffect(() => {
+    /** PASS redirect 복귀 — WebView에서 popup 대신 m_redirect_url 로 돌아옴 */
+    const redirect = consumeIamportCertRedirectResult();
+    if (!redirect) return undefined;
+    const draft = readPassCertDraft();
+    if (!redirect.success || !redirect.imp_uid) {
+      setStep("pass");
+      setVerifyZone({
+        ok: false,
+        text: redirect.error_msg || "본인인증이 완료되지 않았습니다. 다시 시도해 주세요."
+      });
+      return undefined;
+    }
+    if (!draft?.password) {
+      setStep("pass");
+      setVerifyZone({
+        ok: false,
+        text: "본인인증은 완료됐으나 가입 정보가 유실되었습니다. 계정 단계에서 다시 진행해 주세요."
+      });
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      setBusy(true);
+      setStep("pass");
+      setVerifyZone({ ok: true, text: "본인인증 확인 중…" });
+      try {
+        const trackA = Boolean(draft.trackA);
+        const allowBizCardOpts = Boolean(draft.allowBizCardOpts);
+        const data = await postPortoneIdentityComplete({
+          impUid: redirect.imp_uid,
+          isBusinessMember: allowBizCardOpts && draft.passBusinessMember,
+          requestDigitalCard: allowBizCardOpts && draft.requestDigitalCard,
+          digitalCardDoc:
+            allowBizCardOpts && draft.requestDigitalCard && draft.digitalCardDocDataUrl
+              ? {
+                  kind: draft.digitalCardDocKind,
+                  fileName: draft.digitalCardDocName,
+                  issuedAt: draft.digitalCardDocIssuedAt,
+                  dataUrl: draft.digitalCardDocDataUrl
+                }
+              : null,
+          membershipKind: draft.membershipKind,
+          billingCycle: draft.paidBillingCycle,
+          referralCode: draft.referralCodeForApi || null,
+          termsVersion: TERMS_VERSION,
+          desiredPublicHandle: trackA ? null : draft.slug,
+          signupTrack: draft.signupTrack,
+          businessEmail: trackA ? draft.businessEmail : null,
+          emailVerificationToken: trackA ? draft.emailVerificationToken : null,
+          virtualEmailPrefix: trackA ? draft.virtualEmailPrefix : null,
+          password: draft.password,
+          groupSignup: draft.isB2b ? draft.groupSignup : null,
+          ...(allowBizCardOpts && draft.passBusinessMember
+            ? {
+                businessRegistrationNo: draft.passBusinessRegNo,
+                businessJobTitle: draft.passBusinessNoJobTitle ? "" : draft.passBusinessJobTitle,
+                businessDeclaresNoJobTitle: Boolean(draft.passBusinessNoJobTitle)
+              }
+            : {}),
+          ...(draft.adminDeviceKey ? { adminDeviceKey: draft.adminDeviceKey } : {})
+        });
+        if (cancelled) return;
+        clearPassCertDraft();
+        try {
+          localStorage.setItem("vlue_server_user_id", data.userId);
+          if (data.accessToken || data.refreshToken) {
+            setVlueSessionTokens({
+              accessToken: data.accessToken,
+              refreshToken: data.refreshToken
+            });
+          }
+          if (data.publicHandle) {
+            localStorage.setItem("vlue_member_handle", `@${String(data.publicHandle)}`);
+          }
+          if (data.legalName) localStorage.setItem("vlue_legal_name", data.legalName);
+          if (data.phoneE164) {
+            localStorage.setItem("vlue_phone_e164", String(data.phoneE164));
+            localStorage.setItem("myCardPhone", formatPhoneE164ForKoreaDisplay(data.phoneE164));
+          }
+          localStorage.setItem(
+            "vlue_digital_card_active",
+            data.digitalCard?.issued ? "1" : "0"
+          );
+        } catch {
+          /* ignore */
+        }
+        setPassOk(true);
+        setVerifyZone(null);
+        const needsParent = Boolean(data.requiresParentalConsent) && !data.parentalConsentAt;
+        setRequiresParentalConsent(needsParent);
+        setParentalConsentDone(!needsParent);
+        if (needsParent) {
+          setStep("parent_consent");
+        } else if (draft.signupIntent === "trust") {
+          setAuthMode("recommend");
+          setRecPhase(1);
+          setStep("recommend_detail");
+        } else {
+          setAuthMode("direct");
+          setStep("direct_detail");
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setVerifyZone({ ok: false, text: e?.message || String(e) });
+        }
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -528,11 +678,44 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             : slug;
         impUid = makeDevLocalImpUid(devSlug);
       } else {
+        const allowBizCardOptsPre = isBillableMembershipKind(membershipKind);
+        const adminDeviceKeyPreSave =
+          typeof sessionStorage !== "undefined" && sessionStorage.getItem("vlue-admin-entry") === "1"
+            ? localStorage.getItem("vlue-admin-device-key")
+            : null;
+        if (shouldUseIamportCertRedirect()) {
+          savePassCertDraft({
+            trackA,
+            slug,
+            password: pw,
+            passBusinessMember,
+            requestDigitalCard,
+            digitalCardDocKind,
+            digitalCardDocName,
+            digitalCardDocDataUrl,
+            digitalCardDocIssuedAt,
+            membershipKind,
+            paidBillingCycle,
+            referralCodeForApi: referralMeta.codeForApi || null,
+            signupTrack,
+            businessEmail: trackA ? String(businessEmail || "").trim() : null,
+            emailVerificationToken: trackA ? emailVerify.token : null,
+            virtualEmailPrefix: trackA ? virtualIdCheck.normalized : null,
+            isB2b,
+            groupSignup: isB2b ? serializeGroupSignupForApi(groupSignupDraft) : null,
+            passBusinessRegNo: String(passBusinessRegNo || "").replace(/\D/g, "").slice(0, 10),
+            passBusinessJobTitle: passBusinessNoJobTitle ? "" : String(passBusinessJobTitle || "").trim(),
+            passBusinessNoJobTitle,
+            allowBizCardOpts: allowBizCardOptsPre,
+            adminDeviceKey: adminDeviceKeyPreSave,
+            signupIntent
+          });
+        }
         const userCode = getPortoneUserCode();
         const rsp = await requestIamportCertification(userCode);
         impUid = rsp?.imp_uid;
         if (!impUid) {
-          throw new Error("imp_uid가 없습니다. 본인인증 팝업이 완료됐는지 확인해 주세요.");
+          throw new Error("imp_uid가 없습니다. 본인인증이 완료됐는지 확인해 주세요.");
         }
       }
       const adminDeviceKey =
@@ -643,6 +826,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       }
       setVerifyZone(null);
       setPassOk(true);
+      clearPassCertDraft();
       const needsParent =
         Boolean(data.requiresParentalConsent) && !data.parentalConsentAt;
       setRequiresParentalConsent(needsParent);
