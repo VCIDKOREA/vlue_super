@@ -21,12 +21,11 @@ export function saveDeviceToken(token) {
   }
 }
 
-/** 모바일 WebView·좁은 화면 감지 */
+/** 모바일 WebView·앱 감지 (서버 detectClientKind 와 동일 — 폭 조건 없음) */
 export function detectClientKind() {
   if (typeof window === "undefined") return "desktop";
-  const w = window.innerWidth || 1024;
   const ua = navigator.userAgent || "";
-  if (/iphone|ipad|android|mobile/i.test(ua) && w < 900) return "mobile";
+  if (/iphone|ipad|ipod|android|mobile/i.test(ua)) return "mobile";
   return "desktop";
 }
 

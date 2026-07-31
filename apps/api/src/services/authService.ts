@@ -207,8 +207,19 @@ export async function loginWithCredentials(
     select: { id: true }
   });
 
-  /** 시드 테스트·플랫폼(admin/ceo) 계정은 QA/운영 부트스트랩용으로 신규 기기 즉시 승인 */
-  if (isDeviceAutoApproveHandle(loginId) || sameDeviceTrustedElsewhere) {
+  /**
+   * 휴대폰은 본인 기기로 즉시 승인 (앱 재설치·WebView 토큰 초기화 포함).
+   * PC/데스크톱만 이미 로그인된 기기에서 [기기 승인]이 필요하다.
+   * 시드·플랫폼(admin/ceo) 계정은 QA 부트스트랩용으로 PC도 즉시 승인.
+   */
+  if (clientKind === "mobile" || isDeviceAutoApproveHandle(loginId) || sameDeviceTrustedElsewhere) {
+    const label = sameDeviceTrustedElsewhere
+      ? clientKind === "mobile"
+        ? "휴대폰 (계정전환)"
+        : "PC (계정전환)"
+      : clientKind === "mobile"
+        ? "휴대폰"
+        : "PC (부트스트랩)";
     const approved = await prisma.userDevice.upsert({
       where: { userId_deviceToken: { userId: user.id, deviceToken } },
       create: {
@@ -219,24 +230,14 @@ export async function loginWithCredentials(
         userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
         lastIp: c.req.header("x-forwarded-for")?.split(",")[0]?.trim()?.slice(0, 45) || null,
         clientKind,
-        label: sameDeviceTrustedElsewhere
-          ? clientKind === "mobile"
-            ? "휴대폰 (계정전환)"
-            : "PC (계정전환)"
-          : clientKind === "mobile"
-            ? "휴대폰 (부트스트랩)"
-            : "PC (부트스트랩)"
+        label
       },
       update: {
         isVerified: true,
         verifiedAt: new Date(),
         userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
         clientKind,
-        label: sameDeviceTrustedElsewhere
-          ? clientKind === "mobile"
-            ? "휴대폰 (계정전환)"
-            : "PC (계정전환)"
-          : undefined
+        label
       }
     });
     return issueLoginOk(user, loginId, approved.deviceToken, c);
