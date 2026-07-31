@@ -20,6 +20,51 @@ async function publicGetJson(path) {
   return { ok: res.ok, status: res.status, data };
 }
 
+function httpMediaUrl(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (s.startsWith("data:") || s.startsWith("blob:")) return "";
+  if (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("/")) return s;
+  return "";
+}
+
+/**
+ * /api/follow/profile — 게스트도 디지털 인증명함 송출 스냅샷(cardExport) 포함
+ * @param {string} userId
+ */
+async function fetchPublicCardExport(userId) {
+  const id = String(userId || "").trim();
+  if (!id) return null;
+  const res = await publicGetJson(`/api/follow/profile/${encodeURIComponent(id)}`);
+  if (!res.ok || !res.data?.ok) return null;
+  const exp =
+    res.data.cardExport && typeof res.data.cardExport === "object" ? res.data.cardExport : null;
+  const photoUrl =
+    httpMediaUrl(exp?.photoUrl) ||
+    httpMediaUrl(res.data.photoUrl) ||
+    httpMediaUrl(res.data.profile?.photoUrl);
+  return {
+    photoUrl,
+    logoUrl: httpMediaUrl(exp?.logoUrl),
+    name: String(exp?.name || res.data.profile?.displayName || "").trim(),
+    organization: String(exp?.organization || res.data.profile?.companyName || "").trim(),
+    title: String(exp?.title || res.data.profile?.jobTitle || "").trim(),
+    department: String(exp?.department || "").trim(),
+    email: String(exp?.email || "").trim(),
+    website: String(exp?.website || "").trim(),
+    fax: String(exp?.fax || "").trim(),
+    address: String(exp?.address || "").trim(),
+    activityName: String(exp?.activityName || "").trim(),
+    photoFocus: exp?.photoFocus || "center",
+    membershipTier: String(
+      res.data.membershipTier || res.data.profile?.membershipTier || ""
+    ).toLowerCase(),
+    digitalCardIssued: Boolean(res.data.digitalCardIssued),
+    authCycleEndAt: res.data.authCycleEndAt || null,
+    authPaidAt: res.data.authPaidAt || null
+  };
+}
+
 /**
  * 전화번호 → 공개 쇼케이스 페이로드 (게스트 열람)
  * @param {string} phoneRaw
@@ -59,7 +104,13 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
   }
 
   const userId = String(body.userId).trim();
-  let styleRes = await publicGetJson(`/api/lettering/showcase/style/${encodeURIComponent(userId)}`);
+
+  const [styleResFirst, exportSnap] = await Promise.all([
+    publicGetJson(`/api/lettering/showcase/style/${encodeURIComponent(userId)}`),
+    fetchPublicCardExport(userId)
+  ]);
+
+  let styleRes = styleResFirst;
   if (!styleRes.ok || !styleRes.data?.live) {
     await new Promise((r) => setTimeout(r, 400));
     styleRes = await publicGetJson(`/api/lettering/showcase/style/${encodeURIComponent(userId)}`);
@@ -71,25 +122,37 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
       : null;
   const showcaseStyle = live || createDefaultShowcaseStyle();
 
-  const tier = body.is_premium_line
+  const tierFromLookup = body.is_premium_line
     ? "premium"
-    : body.digitalCardActive
+    : body.digitalCardActive || exportSnap?.digitalCardIssued
       ? "paid"
       : "free";
+  const tier = exportSnap?.membershipTier || tierFromLookup;
   const handle = String(body.publicHandle || "").trim().replace(/^@/, "");
 
   const card = normalizeLetteringCard({
     userId,
     ownerUserId: userId,
-    name: body.displayName || "",
-    title: body.jobTitle || "",
-    organization: body.companyName || "",
+    name: exportSnap?.name || body.displayName || "",
+    title: exportSnap?.title || body.jobTitle || "",
+    department: exportSnap?.department || "",
+    organization: exportSnap?.organization || body.companyName || "",
     phone: phoneDisplay,
+    email: exportSnap?.email || "",
+    website: exportSnap?.website || "",
+    fax: exportSnap?.fax || "",
+    address: exportSnap?.address || "",
+    activityName: exportSnap?.activityName || "",
     publicHandle: handle,
     loginId: handle,
     handle,
-    photoUrl: body.image_url || "",
+    photoUrl: exportSnap?.photoUrl || body.image_url || "",
+    photoFocus: exportSnap?.photoFocus || "center",
+    logoUrl: exportSnap?.logoUrl || "",
     membershipTier: tier,
+    authCycleEndAt: exportSnap?.authCycleEndAt || null,
+    authPaidAt: exportSnap?.authPaidAt || null,
+    cycleEndAt: exportSnap?.authCycleEndAt || null,
     verificationItems: ["VLUE 인증"],
     showcaseStyle
   });
@@ -107,6 +170,7 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
       showcaseStyle
     },
     styleLoaded: Boolean(live),
+    cardExportLoaded: Boolean(exportSnap?.photoUrl || exportSnap?.email || exportSnap?.name),
     error: live ? null : "style_empty"
   };
 }
