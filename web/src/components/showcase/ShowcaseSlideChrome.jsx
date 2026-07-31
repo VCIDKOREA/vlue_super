@@ -59,10 +59,17 @@ export default function ShowcaseSlideChrome({
   const outlinks = style?.commercial?.outlinks || {};
   const pageLink = normalizeBusinessLink(businessLink);
 
-  const activityName = firstText(
-    card?.activityName,
+  /*
+   * VLUE 프로필 바 — 디지털 인증명함 성명 우선.
+   * activityName(피드 닉)을 앞에 두면 공유 링크에 "VCID" 등 활동명이 뜨고
+   * 앱 미리보기(성명)와 어긋난다.
+   */
+  const profileName = firstText(
     card?.name,
     card?.displayName,
+    card?.legalName,
+    card?.personName,
+    card?.activityName,
     card?.publicHandle,
     card?.loginId,
     card?.handle,
@@ -74,17 +81,17 @@ export default function ShowcaseSlideChrome({
     const peer = resolveShowcasePeerAvatar({
       style,
       card,
-      displayName: activityName,
+      displayName: profileName,
       exposeCustom: true
     });
     if (peer.type === "image" && peer.url && !isVlueBrandAssetUrl(peer.url)) {
-      return { avatarUrl: peer.url, letter: activityName };
+      return { avatarUrl: peer.url, letter: profileName };
     }
     const logo = firstText(card?.photoUrl, card?.logoUrl, style?.platformFeed?.avatarUrl);
     if (logo && !isVlueBrandAssetUrl(logo)) {
-      return { avatarUrl: logo, letter: activityName };
+      return { avatarUrl: logo, letter: profileName };
     }
-    return { avatarUrl: "", letter: (activityName || "V").slice(0, 1).toUpperCase() };
+    return { avatarUrl: "", letter: (profileName || "V").slice(0, 1).toUpperCase() };
   })();
 
   const ig =
@@ -127,7 +134,7 @@ export default function ShowcaseSlideChrome({
 
   const openCaseArchive = () => {
     if (typeof onOpenCaseArchive === "function") {
-      onOpenCaseArchive({ userId: targetUserId, name: activityName, card });
+      onOpenCaseArchive({ userId: targetUserId, name: profileName, card });
       return;
     }
     if (!targetUserId) return;
@@ -135,7 +142,7 @@ export default function ShowcaseSlideChrome({
       new CustomEvent("vlue-open-case-user", {
         detail: {
           userId: targetUserId,
-          name: activityName,
+          name: profileName,
           handle: firstText(card?.publicHandle, card?.loginId, card?.handle)
         }
       })
@@ -208,7 +215,7 @@ export default function ShowcaseSlideChrome({
           <button
             type="button"
             className="showcase-slide-chrome__vlue-profile"
-            aria-label={`${activityName || "회원"} 케이스함 열기`}
+            aria-label={`${profileName || "회원"} 케이스함 열기`}
             disabled={!targetUserId}
             onClick={(e) => {
               e.stopPropagation();
@@ -225,7 +232,7 @@ export default function ShowcaseSlideChrome({
             </span>
             <span className="showcase-slide-chrome__vlue-meta">
               <span className="showcase-slide-chrome__vlue-label">VLUE 프로필</span>
-              <span className="showcase-slide-chrome__vlue-name">{activityName || "회원"}</span>
+              <span className="showcase-slide-chrome__vlue-name">{profileName || "회원"}</span>
             </span>
           </button>
           {(showFollow || hasSocial) ? (

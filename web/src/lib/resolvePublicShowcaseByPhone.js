@@ -46,7 +46,9 @@ async function fetchPublicCardExport(userId) {
   return {
     photoUrl,
     logoUrl: httpMediaUrl(exp?.logoUrl),
-    name: String(exp?.name || res.data.profile?.displayName || "").trim(),
+    name: String(
+      exp?.name || res.data.profile?.displayName || res.data.profile?.legalName || ""
+    ).trim(),
     organization: String(exp?.organization || res.data.profile?.companyName || "").trim(),
     title: String(exp?.title || res.data.profile?.jobTitle || "").trim(),
     department: String(exp?.department || "").trim(),
@@ -61,7 +63,8 @@ async function fetchPublicCardExport(userId) {
     ).toLowerCase(),
     digitalCardIssued: Boolean(res.data.digitalCardIssued),
     authCycleEndAt: res.data.authCycleEndAt || null,
-    authPaidAt: res.data.authPaidAt || null
+    authPaidAt: res.data.authPaidAt || null,
+    publicHandle: String(res.data.profile?.publicHandle || "").trim().replace(/^@/, "")
   };
 }
 
@@ -128,12 +131,20 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
       ? "paid"
       : "free";
   const tier = exportSnap?.membershipTier || tierFromLookup;
-  const handle = String(body.publicHandle || "").trim().replace(/^@/, "");
+  const handle = String(
+    exportSnap?.publicHandle || body.publicHandle || ""
+  )
+    .trim()
+    .replace(/^@/, "");
+  const personName = String(
+    exportSnap?.name || body.displayName || body.legalName || ""
+  ).trim();
 
   const card = normalizeLetteringCard({
     userId,
     ownerUserId: userId,
-    name: exportSnap?.name || body.displayName || "",
+    name: personName,
+    displayName: personName,
     title: exportSnap?.title || body.jobTitle || "",
     department: exportSnap?.department || "",
     organization: exportSnap?.organization || body.companyName || "",
@@ -142,7 +153,8 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
     website: exportSnap?.website || "",
     fax: exportSnap?.fax || "",
     address: exportSnap?.address || "",
-    activityName: exportSnap?.activityName || "",
+    /* 피드 닉은 유지하되, 비어 있으면 성명으로 — 크롬은 name 우선 */
+    activityName: exportSnap?.activityName || personName,
     publicHandle: handle,
     loginId: handle,
     handle,
