@@ -243,6 +243,7 @@ export async function loginWithCredentials(
     return issueLoginOk(user, loginId, approved.deviceToken, c);
   }
 
+  /* 여기까지 오면 PC/데스크톱만 — 휴대폰은 위에서 즉시 승인됨 */
   const pending = await prisma.userDevice.upsert({
     where: { userId_deviceToken: { userId: user.id, deviceToken } },
     create: {
@@ -251,12 +252,12 @@ export async function loginWithCredentials(
       isVerified: false,
       userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
       lastIp: c.req.header("x-forwarded-for")?.split(",")[0]?.trim()?.slice(0, 45) || null,
-      clientKind,
-      label: `${clientKind === "mobile" ? "모바일" : "PC"} (승인 대기)`
+      clientKind: "desktop",
+      label: "PC (승인 대기)"
     },
     update: {
       userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
-      clientKind
+      clientKind: "desktop"
     }
   });
 
