@@ -510,10 +510,24 @@ export default function LetteringBizcardSettingsView({
       photoUrl: saved.noProfilePhoto ? "" : saved.photoDataUrl || appliedCard.photoUrl || ""
     });
     if (!syncResult?.ok) {
-      showToast("기기에 저장되었습니다. 서버 동기화에 실패했습니다. 네트워크 확인 후 다시 전체적용해 주세요.");
+      showToast(
+        syncResult?.error
+          ? `기기에 저장되었습니다. 서버 동기화 실패: ${syncResult.error}`
+          : "기기에 저장되었습니다. 서버 동기화에 실패했습니다. 네트워크 확인 후 다시 전체적용해 주세요."
+      );
       setPreviewTick((n) => n + 1);
       onApplied?.();
       return;
+    }
+    if (syncResult?.mediaError) {
+      showToast(`명함은 저장됐지만 사진 클라우드 업로드에 문제가 있었습니다: ${syncResult.mediaError}`);
+    }
+    /* 업로드된 https 로 미리보기 갱신 */
+    if (syncResult?.photoUrl) {
+      setPhotoPreview(syncResult.photoUrl);
+    }
+    if (syncResult?.logoUrl) {
+      setLogoPreview(syncResult.logoUrl);
     }
     if (isFirstApply) {
       try {

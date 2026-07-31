@@ -56,32 +56,43 @@ function flushAvatarServerSync() {
   syncTimer = null;
   if (!patch) return;
 
-  try {
-    const edPatch = {};
-    if (Object.prototype.hasOwnProperty.call(patch, "photoUrl")) {
-      edPatch.photoDataUrl = patch.photoUrl || "";
-      edPatch.noProfilePhoto = !patch.photoUrl;
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "logoUrl")) {
-      edPatch.logoDataUrl = patch.logoUrl || "";
-      edPatch.noCompanyLogo = !patch.logoUrl;
-    }
-    if (Object.keys(edPatch).length) {
-      writeLetteringBizcardEditable(edPatch);
-    }
-  } catch {
-    /* ignore */
-  }
+  void (async () => {
+    try {
+      const { ensureHttpMediaUrl } = await import("./mediaImageUpload.js");
+      const next = { ...patch };
+      if (Object.prototype.hasOwnProperty.call(next, "photoUrl") && next.photoUrl) {
+        next.photoUrl = await ensureHttpMediaUrl(next.photoUrl, "photo");
+      }
+      if (Object.prototype.hasOwnProperty.call(next, "logoUrl") && next.logoUrl) {
+        next.logoUrl = await ensureHttpMediaUrl(next.logoUrl, "logo");
+      }
 
-  const ed = readLetteringBizcardEditable();
-  void patchExportSnapshot({
-    photoUrl: Object.prototype.hasOwnProperty.call(patch, "photoUrl")
-      ? patch.photoUrl
-      : ed.photoDataUrl || "",
-    logoUrl: Object.prototype.hasOwnProperty.call(patch, "logoUrl")
-      ? patch.logoUrl
-      : ed.logoDataUrl || ""
-  });
+      const edPatch = {};
+      if (Object.prototype.hasOwnProperty.call(next, "photoUrl")) {
+        edPatch.photoDataUrl = next.photoUrl || "";
+        edPatch.noProfilePhoto = !next.photoUrl;
+      }
+      if (Object.prototype.hasOwnProperty.call(next, "logoUrl")) {
+        edPatch.logoDataUrl = next.logoUrl || "";
+        edPatch.noCompanyLogo = !next.logoUrl;
+      }
+      if (Object.keys(edPatch).length) {
+        writeLetteringBizcardEditable(edPatch);
+      }
+
+      const ed = readLetteringBizcardEditable();
+      await patchExportSnapshot({
+        photoUrl: Object.prototype.hasOwnProperty.call(next, "photoUrl")
+          ? next.photoUrl
+          : ed.photoDataUrl || "",
+        logoUrl: Object.prototype.hasOwnProperty.call(next, "logoUrl")
+          ? next.logoUrl
+          : ed.logoDataUrl || ""
+      });
+    } catch (e) {
+      console.warn("[avatarSync] upload/sync failed", e);
+    }
+  })();
 }
 
 /**
@@ -90,7 +101,7 @@ function flushAvatarServerSync() {
  */
 export function syncAvatarSlotToServer(slot, url) {
   const v = String(url || "").trim();
-  /* blob 은 동기화 불가 · 빈 값은 삭제 동기화 허용 */
+  /* blob 은 동기화 불가 · data URL 은 flush 시 R2 업로드 · 빈 값은 삭제 동기화 허용 */
   if (v.startsWith("blob:")) return;
 
   if (slot === "card") {
@@ -117,25 +128,18 @@ export function pushLocalAvatarsIfServerMissing(snap) {
     readAvatar("primary") || String(ed.photoDataUrl || ed.photoUrl || "").trim();
   const localLogo = readAvatar("card") || String(ed.logoDataUrl || ed.logoUrl || "").trim();
   const isHttp = (u) => /^https?:\/\//i.test(String(u || "").trim());
-  const patch = {};
+  const isData = (u) => String(u || "").trim().startsWith("data:");
 
-  if (!serverPhoto && isHttp(localPhoto)) {
-    patch.photoUrl = localPhoto;
-  }
-  if (!serverLogo && isHttp(localLogo)) {
-    patch.logoUrl = localLogo;
-  }
-  if (!Object.keys(patch).length) return;
-
-  try {
-    if (patch.photoUrl) {
-      writeLetteringBizcardEditable({ photoDataUrl: patch.photoUrl, noProfilePhoto: false });
+  /* 서버에 없고 로컬에 http 또는 data 가 있으면 업로드·동기화 */
+  if ((!serverPhoto && (isHttp(localPhoto) || isData(localPhoto))) ||
+      (!serverLogo && (isHttp(localLogo) || isData(localLogo)))) {
+    if (!serverPhoto && (isHttp(localPhoto) || isData(localPhoto))) {
+      pendingPatch = { ...(pendingPatch || {}), photoUrl: localPhoto };
     }
-    if (patch.logoUrl) {
-      writeLetteringBizcardEditable({ logoDataUrl: patch.logoUrl, noCompanyLogo: false });
+    if (!serverLogo && (isHttp(localLogo) || isData(localLogo))) {
+      pendingPatch = { ...(pendingPatch || {}), logoUrl: localLogo };
     }
-  } catch {
-    /* ignore */
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(flushAvatarServerSync, 200);
   }
-  void patchExportSnapshot(patch);
 }

@@ -70,6 +70,49 @@ export async function requestMediaImageUploadUrl({ kind, fileName, contentType, 
 }
 
 /**
+ * data URL / File → R2 https URL
+ * 재설치 복원용 — 로컬에만 있던 사진을 서버에 올린다.
+ */
+export async function uploadDataUrlToMediaCdn(dataUrl, kind = "photo") {
+  const raw = String(dataUrl || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith("blob:")) {
+    throw new Error("blob URL은 업로드할 수 없습니다. 파일을 다시 선택해 주세요.");
+  }
+  if (!raw.startsWith("data:")) {
+    throw new Error("지원하지 않는 이미지 형식입니다.");
+  }
+  const blob = dataUrlToBlob(raw);
+  const mime = blob.type || "image/jpeg";
+  const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
+  const signed = await requestMediaImageUploadUrl({
+    kind,
+    fileName: `${kind}.${ext}`,
+    contentType: mime,
+    fileSize: blob.size
+  });
+  const put = await fetch(signed.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": signed.contentType || mime },
+    body: blob
+  });
+  if (!put.ok) {
+    throw new Error(`R2 업로드 실패 (${put.status})`);
+  }
+  return String(signed.publicUrl || "").trim();
+}
+
+/** http면 그대로, data면 R2 업로드, 그 외 빈 문자열 */
+export async function ensureHttpMediaUrl(url, kind = "photo") {
+  const u = String(url || "").trim();
+  if (!u) return "";
+  if (/^https?:\/\//i.test(u)) return u;
+  if (u.startsWith("data:")) return uploadDataUrlToMediaCdn(u, kind);
+  return "";
+}
+
+/**
  * @param {File|Blob} file
  * @param {string} [kind='general']
  * @param {{ allowDataUrlFallback?: boolean, fitRules?: object }} [opts]

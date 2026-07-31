@@ -305,6 +305,60 @@ export async function syncDigitalCardExportSnapshot(card) {
     combineLetteringBizcardAddress(road, detail) ||
     String(ed.address || "").trim();
 
+  const { ensureHttpMediaUrl } = await import("./mediaImageUpload.js");
+
+  let photoUrl = "";
+  let logoUrl = "";
+  let shareCoverUrl = "";
+  let mediaError = "";
+  try {
+    photoUrl = await ensureHttpMediaUrl(
+      card?.photoUrl || ed.photoDataUrl || ed.photoUrl || "",
+      "photo"
+    );
+    logoUrl = await ensureHttpMediaUrl(
+      card?.logoUrl || ed.logoDataUrl || ed.logoUrl || "",
+      "logo"
+    );
+    shareCoverUrl = await ensureHttpMediaUrl(
+      card?.shareCoverUrl || ed.kakaoFeedBgDataUrl || ed.kakaoFeedBgUrl || "",
+      "cover"
+    );
+  } catch (e) {
+    mediaError = e instanceof Error ? e.message : "이미지 업로드 실패";
+    /* https 후보만이라도 남긴다 */
+    const pickHttp = (...vals) => {
+      for (const v of vals) {
+        const s = String(v || "").trim();
+        if (/^https?:\/\//i.test(s)) return s;
+      }
+      return "";
+    };
+    photoUrl =
+      photoUrl ||
+      pickHttp(card?.photoUrl, ed.photoDataUrl, ed.photoUrl);
+    logoUrl = logoUrl || pickHttp(card?.logoUrl, ed.logoDataUrl, ed.logoUrl);
+    shareCoverUrl =
+      shareCoverUrl ||
+      pickHttp(card?.shareCoverUrl, ed.kakaoFeedBgDataUrl, ed.kakaoFeedBgUrl);
+  }
+
+  /* 업로드 성공한 https 는 로컬에도 반영 — 재설치 복원·재업로드 루프 방지 */
+  try {
+    const patch = {};
+    if (photoUrl && photoUrl !== String(ed.photoDataUrl || "").trim()) {
+      patch.photoDataUrl = photoUrl;
+      patch.noProfilePhoto = false;
+    }
+    if (logoUrl && logoUrl !== String(ed.logoDataUrl || "").trim()) {
+      patch.logoDataUrl = logoUrl;
+      patch.noCompanyLogo = false;
+    }
+    if (Object.keys(patch).length) writeLetteringBizcardEditable(patch);
+  } catch {
+    /* ignore */
+  }
+
   try {
     const res = await vlueAuthFetch(apiUrl("/api/cards/my-digital-card"), {
       method: "PATCH",
@@ -327,40 +381,39 @@ export async function syncDigitalCardExportSnapshot(card) {
           addressDetail: detail || String(ed.addressDetail || "").trim(),
           companyIntro: String(ed.companyIntro || card?.companyIntro || "").trim(),
           customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
-          logoUrl: (() => {
-            const u = String(card?.logoUrl || ed.logoUrl || "").trim();
-            /* data URL 은 서버 거부 — R2 https 만 동기화 (로컬 dataUrl 은 기기에만) */
-            if (!u || u.startsWith("data:") || u.startsWith("blob:")) return "";
-            return u;
-          })(),
-          photoUrl: (() => {
-            const u = String(card?.photoUrl || ed.photoUrl || "").trim();
-            if (!u || u.startsWith("data:") || u.startsWith("blob:")) return "";
-            return u;
-          })(),
+          logoUrl: ed.noCompanyLogo ? "" : logoUrl,
+          photoUrl: ed.noProfilePhoto ? "" : photoUrl,
           photoFocus: normalizePhotoFocus(card?.photoFocus || ed.photoFocus),
           noCompanyLogo: Boolean(ed.noCompanyLogo),
           noProfilePhoto: Boolean(ed.noProfilePhoto),
-          shareCoverUrl: (() => {
-            const u = String(card?.shareCoverUrl || ed.kakaoFeedBgUrl || "").trim();
-            if (!u || u.startsWith("data:") || u.startsWith("blob:")) return "";
-            return u;
-          })(),
+          shareCoverUrl,
           designTemplate: normalizeLetteringBizcardTemplate(card?.designTemplate || ed.designTemplate),
           activityName: String(card?.activityName || readFeedNickname() || "").trim()
         }
       })
     });
-    if (!res.ok) return { ok: false };
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      return {
+        ok: false,
+        error: errBody?.error || mediaError || "서버 동기화 실패"
+      };
+    }
     const data = await res.json();
     if (data?.cardId) writeStoredDigitalCardId(data.cardId);
-    /* 서버는 exportSnapshot 에코하지 않음 — 로컬본 유지 */
     digitalCardMetaCache.at = 0;
     digitalCardMetaCache.lite = null;
     digitalCardMetaCache.full = null;
-    return { ok: true, cardId: data.cardId, exportSnapshot: null };
+    return {
+      ok: true,
+      cardId: data.cardId,
+      exportSnapshot: null,
+      photoUrl,
+      logoUrl,
+      mediaError: mediaError || null
+    };
   } catch {
-    return { ok: false };
+    return { ok: false, error: mediaError || "서버 동기화 실패" };
   }
 }
 
