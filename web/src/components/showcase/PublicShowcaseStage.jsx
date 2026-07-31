@@ -25,7 +25,7 @@ function styleHasMedia(style) {
 }
 
 /**
- * 카톡·공개 링크 전용 — 미가입자도 쇼케이스(또는 명함)를 바로 본다
+ * 카톡·공개 링크 전용 — 유료면 디지털인증명함 1페이지 + 쇼케이스, 없으면 명함만
  */
 export default function PublicShowcaseStage({ card, onToast }) {
   const userId = String(card?.userId || card?.ownerUserId || "").trim();
@@ -106,8 +106,9 @@ export default function PublicShowcaseStage({ card, onToast }) {
           isKnownContact
           scrollEnabled
           previewMode
-          includeDigitalCard={false}
+          includeDigitalCard
           digitalCardOnly={false}
+          preferContentSlide={false}
           socialOverlayEnabled
           onKeypadToast={onToast}
           showcaseStyle={style}

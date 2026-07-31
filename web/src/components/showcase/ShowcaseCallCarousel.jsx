@@ -412,10 +412,11 @@ export default function ShowcaseCallCarousel({
       if (capped.length === 0) {
         return [cardSlide];
       }
-      /* 공개 링크: 명함을 뒤로 — 첫 화면이 쇼케이스·BGM이 되도록 */
+      /* preferContentSlide: 콘텐츠 먼저, 명함은 맨 뒤 (앱 내 일부 미리보기용) */
       if (preferContentSlide) {
         return [...capped, cardSlide];
       }
+      /* 기본·카톡 공개 링크: 디지털인증명함이 1페이지 */
       return [cardSlide, ...capped];
     }
     if (capped.length === 0) {
