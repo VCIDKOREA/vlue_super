@@ -207,14 +207,11 @@ export async function putUserShowcaseStyleBundle(
       data.showcaseStyleJson = editor as Prisma.InputJsonValue;
     }
   }
-  if (input.live !== undefined) {
-    if (input.live === null) {
-      data.showcaseLiveStyleJson = Prisma.JsonNull;
-    } else {
-      const live = prepareStyleForDb(input.live);
-      if (live) {
-        data.showcaseLiveStyleJson = live as Prisma.InputJsonValue;
-      }
+  if (input.live !== undefined && input.live !== null) {
+    /* live: null 로 서버 송출본을 지우지 않음 — 재설치 직후 빈 로컬 푸시 레이스 방지 */
+    const live = prepareStyleForDb(input.live);
+    if (live) {
+      data.showcaseLiveStyleJson = live as Prisma.InputJsonValue;
     }
   }
   if (input.liveSource !== undefined) {

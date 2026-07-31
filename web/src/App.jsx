@@ -829,6 +829,7 @@ function App() {
         if (m.needsShowcaseStyleLocalRestore()) {
           return m.restoreShowcaseStyleFromServer();
         }
+        m.seedEditorFromLocalLiveIfEmpty?.();
         return m.hydrateShowcaseStyleFromServer();
       })
       .catch(() => {});

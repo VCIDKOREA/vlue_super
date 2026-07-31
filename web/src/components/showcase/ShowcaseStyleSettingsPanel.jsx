@@ -287,8 +287,9 @@ export default function ShowcaseStyleSettingsPanel({
       .then(async (m) => {
         if (m.needsShowcaseStyleLocalRestore()) {
           await m.restoreShowcaseStyleFromServer();
-        } else if (isWebDesk) {
-          await m.hydrateShowcaseStyleFromServer();
+        } else {
+          m.seedEditorFromLocalLiveIfEmpty?.();
+          if (isWebDesk) await m.hydrateShowcaseStyleFromServer();
         }
         applyLocal();
       })
@@ -579,7 +580,7 @@ export default function ShowcaseStyleSettingsPanel({
     );
     try {
       writeShowcaseStyle(latest, { replace: true, skipSync: true });
-      writeLiveShowcaseStyle(latest, { source: "editor" });
+      writeLiveShowcaseStyle(latest, { source: "editor", skipSync: true });
     } catch (e) {
       onToast?.(e instanceof Error ? e.message : "쇼케이스 적용에 실패했습니다.");
       return;
@@ -593,6 +594,20 @@ export default function ShowcaseStyleSettingsPanel({
 
     const previewCard = resolveVlueShowcaseCard({ membershipTier, previewExample: true });
     const hasProfilePhoto = Boolean(String(previewCard?.photoUrl || "").trim());
+
+    /* 적용 즉시 서버에 확정 — 재설치·재로그인 복원의 기준본 */
+    void import("../../lib/showcase/showcaseStyleSync.js")
+      .then(async (m) => {
+        m.bumpLocalShowcaseStyleUpdatedAt?.();
+        const pushed = await m.pushShowcaseStyleBundle({ force: true });
+        if (!pushed?.ok && !pushed?.skipped) {
+          onToast?.(
+            "기기에 저장됐습니다. 서버 동기화에 실패했습니다. 네트워크 확인 후 다시 적용해 주세요."
+          );
+        }
+      })
+      .catch(() => {});
+
     if (includeDigitalCard && !hasProfilePhoto) {
       onToast?.(
         "쇼케이스 설정은 저장됐습니다. 프로필 사진은 「1페이지 · 디지털인증명함 → 설정하러가기」에서 등록·저장해야 미리보기에 나옵니다."

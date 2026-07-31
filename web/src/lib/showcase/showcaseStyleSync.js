@@ -110,23 +110,25 @@ function applyServerBundle(bundle, { reason = "hydrate", clearMissing = false } 
     bundle.editor && typeof bundle.editor === "object" ? bundle.editor : null;
   const live = bundle.live && typeof bundle.live === "object" ? bundle.live : null;
   const liveSource = bundle.liveSource?.source === "mycase" ? "mycase" : "editor";
+  const editorHas = showcaseStyleHasContent(editor);
+  const liveHas = showcaseStyleHasContent(live);
 
   /*
-   * 재설치 복원: 서버에 live 만 있고 editor 가 null 이면
-   * clearMissing 이 빈 초안으로 덮어 설정 화면이 텅 비어 보였다.
-   * live ↔ editor 상호 시딩으로 설정·송출 둘 다 채운다.
+   * 재설치 복원: 서버 editor 가 빈 객체(또는 null)이고 live 만 채워져 있으면
+   * 예전 코드가 빈 editor 를 그대로 써서 설정 화면이 텅 비어 보였다.
+   * 내용 있는 쪽을 우선해 설정·송출 둘 다 채운다.
    */
-  if (editor) {
+  if (editorHas) {
     writeShowcaseStyle(editor, { replace: true, skipSync: true });
-  } else if (live) {
+  } else if (liveHas) {
     writeShowcaseStyle(live, { replace: true, skipSync: true });
   } else if (clearMissing) {
     writeShowcaseStyle(createDefaultShowcaseStyle(), { replace: true, skipSync: true });
   }
 
-  if (live) {
+  if (liveHas) {
     writeLiveShowcaseStyle(live, { source: liveSource, skipSync: true });
-  } else if (editor) {
+  } else if (editorHas) {
     writeLiveShowcaseStyle(editor, { source: "editor", skipSync: true });
   } else if (clearMissing) {
     try {
@@ -140,22 +142,39 @@ function applyServerBundle(bundle, { reason = "hydrate", clearMissing = false } 
   if (bundle.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.updatedAt);
   else if (clearMissing) writeLocalShowcaseStyleUpdatedAt(new Date(0).toISOString());
   void reason;
+  return { editorHas, liveHas, seededEditorFromLive: !editorHas && liveHas };
 }
 
-export async function pushShowcaseStyleBundle() {
-  const editor = slimShowcaseStyleForPersist(readShowcaseStyle());
+export async function pushShowcaseStyleBundle(opts = {}) {
+  const force = Boolean(opts.force);
+  const editorRaw = readShowcaseStyle();
   const liveRaw = readLiveShowcaseStyle();
-  const live = liveRaw ? slimShowcaseStyleForPersist(liveRaw) : liveRaw;
-  const liveSource = readLiveShowcaseSource();
+  const editorHas = showcaseStyleHasContent(editorRaw);
+  const liveHas = showcaseStyleHasContent(liveRaw);
+
+  /* 재설치 직후 빈 로컬이 서버 라이브본을 덮어쓰지 않도록 차단 (적용 버튼은 force) */
+  if (!force && !editorHas && !liveHas) {
+    return { ok: true, skipped: true, reason: "empty_local" };
+  }
+
+  const editor = slimShowcaseStyleForPersist(editorRaw);
+  const liveSlim = liveRaw ? slimShowcaseStyleForPersist(liveRaw) : null;
+  const liveSource = readLiveShowcaseSource() || { source: "editor", at: Date.now() };
   const clientUpdatedAt = readLocalShowcaseStyleUpdatedAt() || bumpLocalShowcaseStyleUpdatedAt();
 
   notePoolerCall("PUT");
-  const result = await putShowcaseStyleBundle({
-    editor,
-    live,
+  const payload = {
+    editor: editorHas || force ? editor : liveSlim,
     liveSource,
     clientUpdatedAt
-  });
+  };
+  /* live 키 없음 = 서버 송출본 유지. null 은 보내지 않음 */
+  if (liveSlim) {
+    payload.live = liveSlim;
+  } else if (force && payload.editor) {
+    payload.live = payload.editor;
+  }
+  const result = await putShowcaseStyleBundle(payload);
 
   if (result.conflict) {
     applyServerBundle(result, { reason: "conflict" });
@@ -204,7 +223,13 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
     }
 
     if (forceServer) {
-      applyServerBundle(remote, { reason: "forceServer", clearMissing: true });
+      const applied = applyServerBundle(remote, { reason: "forceServer", clearMissing: true });
+      let pushed = false;
+      /* live → editor 시딩 후 서버 editor 컬럼도 채워 재설치 복원이 안정되게 */
+      if (applied?.seededEditorFromLive || showcaseStyleHasContent(readShowcaseStyle())) {
+        const push = await pushShowcaseStyleBundle({ force: true });
+        pushed = Boolean(push?.ok && !push?.skipped);
+      }
       lastHydrateOkAt = Date.now();
       try {
         window.dispatchEvent(new CustomEvent("vlue-showcase-style-changed"));
@@ -212,7 +237,7 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
       } catch {
         /* ignore */
       }
-      return { ok: true, applied: true, pushed: false, forceServer: true };
+      return { ok: true, applied: true, pushed, forceServer: true };
     }
 
     const localEditor = readShowcaseStyle();
@@ -261,6 +286,20 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
     return hydrateInFlight;
   }
   return run;
+}
+
+/** 로컬 편집본이 비었고 라이브만 있으면 설정 화면에 시딩 */
+export function seedEditorFromLocalLiveIfEmpty() {
+  if (showcaseStyleHasContent(readShowcaseStyle())) return false;
+  const live = readLiveShowcaseStyle();
+  if (!showcaseStyleHasContent(live)) return false;
+  writeShowcaseStyle(live, { replace: true, skipSync: true });
+  try {
+    window.dispatchEvent(new CustomEvent("vlue-showcase-style-changed"));
+  } catch {
+    /* ignore */
+  }
+  return true;
 }
 
 /** 재설치·빈 로컬 전용 — 서버본을 강제로 가져와 편집/라이브에 채운다 */
