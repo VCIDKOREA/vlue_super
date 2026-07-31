@@ -95,6 +95,21 @@ export default function AuthModal({
     setOnboardingOpen(true);
   }, [autoStartSignup, initialMode]);
 
+  /** PASS redirect 복귀 — AuthModal만 열린 상태에서도 온보딩을 강제 오픈 */
+  useEffect(() => {
+    try {
+      const hasDraft = Boolean(sessionStorage.getItem('vlue_pass_cert_draft_v1'));
+      const q = new URLSearchParams(window.location.search || '');
+      const hasCertReturn = Boolean(q.get('imp_uid') || q.get('impUid') || q.get('success'));
+      if (!hasDraft && !hasCertReturn) return;
+      beginWebSignup('signup');
+      setMode('signup');
+      setOnboardingOpen(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const finishPostSignupPayment = () => {
     setPostSignupPaymentOpen(false);
     setPostSignupPending(null);

@@ -1404,7 +1404,19 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
               </button>
               {bioRegistered ? (
                 <p className="mt-2 text-[11px] font-semibold text-emerald-700">앱 PIN이 등록되었습니다. 아래에서 다음 단계로 진행하세요.</p>
-              ) : null}
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setBioRegistered(true);
+                    setBioNote("PIN은 가입 후 앱 설정에서 등록할 수 있습니다. 지금은 가입을 계속합니다.");
+                  }}
+                  className="mt-2 w-full rounded-2xl py-2.5 text-[12px] font-bold text-blue-700 underline-offset-2 hover:underline"
+                >
+                  PIN 나중에 · 가입 계속하기
+                </button>
+              )}
               {bioNote && <p className="mt-2 text-[11px] text-slate-600">{bioNote}</p>}
 
               <button

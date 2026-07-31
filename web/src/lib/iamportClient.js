@@ -167,7 +167,15 @@ export async function requestIamportCertification(userCode = getPortoneUserCode(
 
   const returnUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}${window.location.pathname || "/app"}`
+      ? (() => {
+          const origin = window.location.origin;
+          const path = window.location.pathname || "/";
+          /* www 마케팅 가입: redirect 복귀 시 AuthModal이 다시 열리도록 딥링크 유지 */
+          if (!path.includes("/app")) {
+            return `${origin}${path === "/" ? "/" : path}?auth=signup&start=1`;
+          }
+          return `${origin}${path}`;
+        })()
       : "";
 
   const payload = {

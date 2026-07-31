@@ -110,6 +110,27 @@ export default function App() {
     window.history.replaceState(null, '', next);
   }, []);
 
+  /**
+   * PASS 본인인증 redirect 복귀 — www 마케팅에서 온보딩이 닫힌 채면
+   * 계정이 절대 생성되지 않음. AuthModal+온보딩을 강제로 다시 연다.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const hasDraft = Boolean(sessionStorage.getItem('vlue_pass_cert_draft_v1'));
+      const params = new URLSearchParams(window.location.search || '');
+      const hasCertReturn = Boolean(
+        params.get('imp_uid') || params.get('impUid') || params.get('success')
+      );
+      if (!hasDraft && !hasCertReturn) return;
+      setAuthInitialMode('signup');
+      setAuthAutoStartSignup(true);
+      setShowAuth(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
