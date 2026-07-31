@@ -6,12 +6,12 @@ import android.content.Intent
 import android.telephony.TelephonyManager
 import android.util.Log
 import kr.vlue.calloverlay.family.FamilyCallTracker
-import kr.vlue.calloverlay.incall.DialerRoleHelper
 import kr.vlue.calloverlay.incall.VlueInCallController
 
 /**
  * PHONE_STATE — 기본 전화앱이 아니면 RINGING 오버레이.
- * 기본 다이얼러(InCallService)일 때는 RINGING 중복을 건너뛰고 IDLE/OFFHOOK만 보조.
+ * InCallService 가 실제로 bound 된 경우에만 RINGING 중복을 건너뛴다.
+ * (ROLE_DIALER 만 잡고 InCall 미기동인 반쪽 상태에서 무반응 방지)
  */
 class LetteringCallReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -24,14 +24,17 @@ class LetteringCallReceiver : BroadcastReceiver() {
 
             FamilyCallTracker.onPhoneStateChanged(context, state, number)
 
-            if (!LetteringPrefs.isLetteringEnabled(context)) return
-
-            val dialerOwnsUi =
-                DialerRoleHelper.isDefaultDialer(context) || VlueInCallController.isDefaultDialerBound()
+            if (!LetteringPrefs.isLetteringEnabled(context)) {
+                Log.d(TAG, "skip: lettering_enabled=false state=$state")
+                return
+            }
 
             when (state) {
                 TelephonyManager.EXTRA_STATE_RINGING -> {
-                    if (dialerOwnsUi) return
+                    if (VlueInCallController.isDefaultDialerBound()) {
+                        Log.d(TAG, "skip RINGING: InCallService bound")
+                        return
+                    }
                     LetteringCallCoordinator.onRinging(context, number, outgoing = false)
                 }
                 TelephonyManager.EXTRA_STATE_IDLE -> {

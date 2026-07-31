@@ -35,10 +35,12 @@ export default function LetteringSettingsSection({
       setEnabled(true);
       setBusy(false);
       if (perm.ok) {
-        onNotice?.("레터링이 켜졌습니다. 통화 시 VLUE 명함이 표시됩니다.");
+        onNotice?.(
+          "레터링이 켜졌습니다. 「다른 앱 위에 표시」와 전화·통화기록 권한을 허용한 뒤 실제 통화로 확인해 주세요."
+        );
       } else {
         onNotice?.(
-          "레터링이 켜졌습니다. 다른 앱 위에 표시·통화 상태 권한을 설정에서 허용해 주세요."
+          "레터링이 켜졌습니다. VLUE 앱에서 전화·통화기록·다른 앱 위에 표시 권한을 허용해 주세요."
         );
       }
     },
@@ -55,7 +57,9 @@ export default function LetteringSettingsSection({
         VLUE 레터링
       </p>
       <p className={`mb-3 text-[11px] leading-snug ${hint}`}>
-        통화 수·발신 시 VLUE 인증 명함을 화면 상단에 표시합니다. 꺼두면 백그라운드 감시가 중지됩니다.
+        통화 수·발신 시 VLUE 인증 명함·쇼케이스를 표시합니다. 꺼두면 백그라운드 감시가 중지됩니다.
+        <br />
+        ※ 브라우저가 아니라 VLUE 앱(APK)에서, 「다른 앱 위에 표시」·전화 권한을 허용해야 실제 통화에 반응합니다.
       </p>
       <label className={`flex items-center justify-between text-[12px] font-semibold ${label}`}>
         레터링 기능 켜기

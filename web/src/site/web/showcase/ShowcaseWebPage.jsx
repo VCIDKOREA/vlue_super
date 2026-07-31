@@ -6,7 +6,7 @@ import { openVlueDownload } from "../../../lib/vlueDownloadActions.js";
 import { hasShowcaseBgmConfigured } from "../../../lib/showcase/showcaseBgmPresets.js";
 import { extractShowcaseCoverUrl } from "../../../lib/showcase/showcaseCover.js";
 import { useShowcaseBgm } from "../../../context/ShowcaseBgmContext.jsx";
-import PeerShowcasePreview from "../../../components/showcase/PeerShowcasePreview.jsx";
+import PublicShowcaseStage from "../../../components/showcase/PublicShowcaseStage.jsx";
 import "./showcase-web.css";
 
 function downloadAttachment(file) {
@@ -38,7 +38,7 @@ export default function ShowcaseWebPage({ phone }) {
   const [showFull, setShowFull] = useState(true);
   const [bgmPromptOpen, setBgmPromptOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
-  const { unlockFromUserGesture } = useShowcaseBgm();
+  const { unlockFromUserGesture, setPlaybackPhase, bindStyleConfig } = useShowcaseBgm();
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +49,14 @@ export default function ShowcaseWebPage({ phone }) {
       cancelled = true;
     };
   }, [phone]);
+
+  /* 스타일·BGM을 컨텍스트에 미리 바인딩 — 재생 수락 시 바로 들리게 */
+  useEffect(() => {
+    const style = payload?.card?.showcaseStyle || payload?.showcaseStyle;
+    if (!style) return undefined;
+    bindStyleConfig?.(style);
+    return undefined;
+  }, [payload, bindStyleConfig]);
 
   /* 카톡 WebView bfcache — 접힌 상태로 복원되면 풀 쇼케이스 다시 연다 */
   useEffect(() => {
@@ -105,7 +113,17 @@ export default function ShowcaseWebPage({ phone }) {
 
   const acceptBgm = () => {
     setBgmPromptOpen(false);
+    const style = payload?.card?.showcaseStyle || payload?.showcaseStyle;
     unlockFromUserGesture?.();
+    if (style) {
+      bindStyleConfig?.(style);
+      setPlaybackPhase?.("preview", {
+        forceRestart: true,
+        steal: true,
+        owner: "public-showcase",
+        styleConfig: style
+      });
+    }
   };
 
   const declineBgm = () => {
@@ -134,24 +152,14 @@ export default function ShowcaseWebPage({ phone }) {
           </button>
         </div>
         <div className="showcase-web__fs-stage">
-          <PeerShowcasePreview
-            card={payload.card}
-            includeDigitalCard={Boolean(payload.isPaid)}
-            digitalCardOnly={false}
-            publicLinkMode
-            preferContentSlide
-            onClose={() => {
-              showToast("아래로 스와이프하면 디지털 인증명함을 볼 수 있습니다.");
-            }}
-            onToast={showToast}
-          />
+          <PublicShowcaseStage card={payload.card} onToast={showToast} />
         </div>
 
         {bgmPromptOpen ? (
           <div className="showcase-web__bgm-modal" role="dialog" aria-modal="true" aria-labelledby="showcase-bgm-title">
             <div className="showcase-web__bgm-card">
               <p id="showcase-bgm-title" className="showcase-web__bgm-title">
-                해당 디지털인증명함엔 BGM이 있습니다.
+                이 쇼케이스에는 BGM이 있습니다.
                 <br />
                 재생하시겠습니까?
               </p>

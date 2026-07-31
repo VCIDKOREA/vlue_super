@@ -367,6 +367,18 @@
   min-height: 0;
 }
 
+.showcase-web__fs-stage .public-showcase-stage {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.showcase-web__fs-stage .public-showcase-stage .showcase-call-carousel {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
 .showcase-web__bgm-modal {
   position: absolute;
   inset: 0;

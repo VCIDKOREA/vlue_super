@@ -12,12 +12,25 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 object LetteringPermissionHelper {
-    val REQUIRED: Array<String>
+    /** 통화 빅푸시·쇼케이스에 필수 (카메라·위치와 분리) */
+    val CALL_DETECT: Array<String>
         get() {
             val base = mutableListOf(
                 Manifest.permission.READ_PHONE_STATE,
                 Manifest.permission.READ_CALL_LOG,
-                Manifest.permission.READ_CONTACTS,
+                Manifest.permission.READ_CONTACTS
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                base.add(Manifest.permission.ANSWER_PHONE_CALLS)
+                base.add(Manifest.permission.CALL_PHONE)
+            }
+            return base.toTypedArray()
+        }
+
+    /** 명함·쇼케이스·검색용 — 통화 오버레이 게이트에 쓰지 않음 */
+    val MEDIA_OPTIONAL: Array<String>
+        get() {
+            val base = mutableListOf(
                 Manifest.permission.CAMERA,
                 Manifest.permission.ACCESS_COARSE_LOCATION,
                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -27,24 +40,30 @@ object LetteringPermissionHelper {
             } else {
                 base.add(Manifest.permission.READ_EXTERNAL_STORAGE)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                base.add(Manifest.permission.ANSWER_PHONE_CALLS)
-                base.add(Manifest.permission.CALL_PHONE)
-            }
             return base.toTypedArray()
         }
+
+    /** 권한 요청 다이얼로그용 — 통화 필수 + 선택 미디어 */
+    val REQUIRED: Array<String>
+        get() = (CALL_DETECT.toList() + MEDIA_OPTIONAL.toList()).distinct().toTypedArray()
 
     fun hasPermission(context: Context, permission: String): Boolean =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
-    fun hasPhonePermissions(context: Context): Boolean =
-        REQUIRED.all { hasPermission(context, it) }
+    fun hasCallDetectPermissions(context: Context): Boolean =
+        CALL_DETECT.all { hasPermission(context, it) }
+
+    /** @deprecated 이름 호환 — 통화 감지 권한만 검사 */
+    fun hasPhonePermissions(context: Context): Boolean = hasCallDetectPermissions(context)
 
     fun canDrawOverlays(context: Context): Boolean =
         Settings.canDrawOverlays(context)
 
-    fun allGranted(context: Context): Boolean =
-        hasPhonePermissions(context) && canDrawOverlays(context)
+    /** 실제 통화 오버레이 동작 가능 여부 */
+    fun hasCallOverlayReady(context: Context): Boolean =
+        hasCallDetectPermissions(context) && canDrawOverlays(context)
+
+    fun allGranted(context: Context): Boolean = hasCallOverlayReady(context)
 
     fun hasContacts(context: Context): Boolean =
         hasPermission(context, Manifest.permission.READ_CONTACTS)
@@ -71,13 +90,20 @@ object LetteringPermissionHelper {
         o.put("photos", hasPhotos(context))
         o.put("location", hasLocation(context))
         o.put("overlay", canDrawOverlays(context))
-        o.put("allRuntime", hasPhonePermissions(context))
+        o.put("callDetect", hasCallDetectPermissions(context))
+        o.put("callOverlayReady", hasCallOverlayReady(context))
+        o.put("allRuntime", hasCallDetectPermissions(context))
+        o.put("letteringEnabled", LetteringPrefs.isLetteringEnabled(context))
         o.put("defaultDialer", kr.vlue.calloverlay.incall.DialerRoleHelper.isDefaultDialer(context))
         o.put("inCallBound", kr.vlue.calloverlay.incall.VlueInCallController.isDefaultDialerBound())
         return o.toString()
     }
 
     fun requestPhonePermissions(activity: Activity, requestCode: Int) {
+        ActivityCompat.requestPermissions(activity, CALL_DETECT, requestCode)
+    }
+
+    fun requestAllPermissions(activity: Activity, requestCode: Int) {
         ActivityCompat.requestPermissions(activity, REQUIRED, requestCode)
     }
 

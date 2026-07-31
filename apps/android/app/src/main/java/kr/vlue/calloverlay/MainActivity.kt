@@ -710,7 +710,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     }
 
     fun promptLetteringPermissions() {
-        if (LetteringPermissionHelper.allGranted(this)) {
+        if (LetteringPermissionHelper.hasCallOverlayReady(this)) {
             LetteringPrefs.setLetteringEnabled(this, true)
             Toast.makeText(this, "VLUE 레터링 권한이 준비되었습니다.", Toast.LENGTH_SHORT).show()
             return
@@ -718,12 +718,10 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         AlertDialog.Builder(this)
             .setTitle("VLUE 레터링 권한")
             .setMessage(
-                "VLUE 이용을 위해 다음 권한이 필요합니다.\n" +
-                    "· 다른 앱 위에 표시 (통화 쇼케이스)\n" +
-                    "· 전화 상태·통화 제어\n" +
-                    "· 주소록 (지인 찾기·추천)\n" +
-                    "· 카메라·사진 (명함·쇼케이스)\n" +
-                    "· 위치 (기관·업체 검색)"
+                "통화 중 쇼케이스를 위해 다음이 필요합니다.\n" +
+                    "· 다른 앱 위에 표시 (필수)\n" +
+                    "· 전화 상태·통화 기록·연락처 (필수)\n" +
+                    "카메라·위치는 나중에 허용해도 통화 쇼케이스는 동작합니다."
             )
             .setPositiveButton("권한 설정") { _, _ ->
                 requestLetteringOsPermissionsDirect()
@@ -734,7 +732,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
     /** 웹「허용하고 계속」— 시스템 권한 다이얼로그를 즉시 요청 */
     fun requestLetteringOsPermissionsDirect() {
-        if (!LetteringPermissionHelper.hasPhonePermissions(this)) {
+        if (!LetteringPermissionHelper.hasCallDetectPermissions(this)) {
             LetteringPermissionHelper.requestPhonePermissions(this, REQ_PHONE)
             return
         }
@@ -756,14 +754,14 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQ_PHONE) {
-            if (LetteringPermissionHelper.hasPhonePermissions(this)) {
+            if (LetteringPermissionHelper.hasCallDetectPermissions(this)) {
                 LetteringPrefs.setLetteringEnabled(this, true)
-                Toast.makeText(this, "필수 권한이 허용되었습니다.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "통화 권한이 허용되었습니다. 레터링이 켜집니다.", Toast.LENGTH_SHORT).show()
                 if (!LetteringPermissionHelper.canDrawOverlays(this)) {
                     LetteringPermissionHelper.openOverlaySettings(this)
                 }
             } else {
-                Toast.makeText(this, "일부 권한이 거부되었습니다. 설정에서 허용해 주세요.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "전화·통화기록 권한이 필요합니다. 설정에서 허용해 주세요.", Toast.LENGTH_LONG).show()
             }
             notifyWebPermissionStatus()
         }
@@ -792,10 +790,14 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         fun setLetteringEnabled(value: String) {
             activity.runOnUiThread {
                 val on = value == "1" || value == "true"
-                if (on && !LetteringPermissionHelper.allGranted(activity)) {
-                    activity.promptLetteringPermissions()
+                if (on) {
+                    /* 웹 토글 ON → 네이티브도 먼저 켠다. 권한 부족 시 안내만 추가 */
+                    LetteringPrefs.setLetteringEnabled(activity, true)
+                    if (!LetteringPermissionHelper.hasCallOverlayReady(activity)) {
+                        activity.promptLetteringPermissions()
+                    }
                 } else {
-                    LetteringPrefs.setLetteringEnabled(activity, on)
+                    LetteringPrefs.setLetteringEnabled(activity, false)
                 }
             }
         }
