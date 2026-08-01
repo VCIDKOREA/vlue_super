@@ -85,7 +85,7 @@ function mapSearchHit(hit, bucket) {
             : hit.organization || "쇼케이스",
       phone: String(hit.phone || "").trim(),
       phoneDisplay: hit.phone ? formatLetteringPhoneDisplay(hit.phone) : "",
-      avatarUrl: String(hit.photoUrl || hit.avatarUrl || "").trim(),
+      avatarUrl: String(hit.photoUrl || hit.avatarUrl || hit.logoUrl || "").trim(),
       publicHandle: handle,
       bucket,
       tags

@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import { isDataUrl, isHttpMediaUrl } from "../../lib/mediaUrlGuard.js";
 import { normalizeToE164KR } from "../../lib/phoneE164.js";
-import { isPaidMember } from "../membership/paidMemberGate.js";
+import { isPlatformCeoHandle } from "../admin/platformAccountRoles.js";
 import { normalizeShowcaseTag } from "./showcaseTagsService.js";
 
 export type ShowcaseSearchMode = "hashtag" | "phone" | "name" | "id";
@@ -19,7 +19,10 @@ export type MaskedShowcaseHit = {
   organization: string;
   orgVisible: boolean;
   title: string;
+  /** 회사 로고 — 배지용 (사람 아바타로 쓰지 말 것) */
   logoUrl: string;
+  /** 프로필 얼굴 사진 — 검색 아바타용 */
+  photoUrl: string;
   /** 마스킹된 표시명 — 비허용 시 "비공개 회원" */
   displayName: string;
   nameVisible: boolean;
@@ -63,6 +66,7 @@ type UserSearchRow = {
 
 type SearchSnapLite = {
   logoUrl: string;
+  photoUrl: string;
   name: string;
   displayName: string;
   phone: string;
@@ -146,7 +150,7 @@ function snapOf(u: UserSearchRow): Record<string, unknown> {
 
 /**
  * digital_cards.export_snapshot_json 전체 SELECT 금지.
- * 필요한 짧은 문자열만 JSON path 로 읽어 Postgres egress 를 급감시킨다.
+ * 컬럼 + JSON path 짧은 문자열만 읽어 Postgres egress 를 급감시킨다.
  */
 async function attachSearchSnapLites(rows: UserSearchRow[]): Promise<UserSearchRow[]> {
   const ids = [...new Set(rows.map((r) => r.id).filter(Boolean))];
@@ -156,6 +160,7 @@ async function attachSearchSnapLites(rows: UserSearchRow[]): Promise<UserSearchR
     Array<{
       user_id: string;
       logo_url: string | null;
+      photo_url: string | null;
       name: string | null;
       display_name: string | null;
       phone: string | null;
@@ -171,15 +176,31 @@ async function attachSearchSnapLites(rows: UserSearchRow[]): Promise<UserSearchR
   >`
     SELECT
       user_id,
-      NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
+      COALESCE(
+        NULLIF(TRIM(logo_url), ''),
+        NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '')
+      ) AS logo_url,
+      COALESCE(
+        NULLIF(TRIM(photo_url), ''),
+        NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '')
+      ) AS photo_url,
       NULLIF(TRIM(export_snapshot_json->>'name'), '') AS name,
-      NULLIF(TRIM(export_snapshot_json->>'displayName'), '') AS display_name,
+      COALESCE(
+        NULLIF(TRIM(display_name), ''),
+        NULLIF(TRIM(export_snapshot_json->>'displayName'), '')
+      ) AS display_name,
       NULLIF(TRIM(export_snapshot_json->>'phone'), '') AS phone,
       NULLIF(TRIM(export_snapshot_json->>'phoneE164'), '') AS phone_e164,
-      NULLIF(TRIM(export_snapshot_json->>'organization'), '') AS organization,
+      COALESCE(
+        NULLIF(TRIM(organization), ''),
+        NULLIF(TRIM(export_snapshot_json->>'organization'), '')
+      ) AS organization,
       NULLIF(TRIM(export_snapshot_json->>'companyName'), '') AS company_name,
       NULLIF(TRIM(export_snapshot_json->>'title'), '') AS title,
-      NULLIF(TRIM(export_snapshot_json->>'activityName'), '') AS activity_name,
+      COALESCE(
+        NULLIF(TRIM(activity_name), ''),
+        NULLIF(TRIM(export_snapshot_json->>'activityName'), '')
+      ) AS activity_name,
       NULLIF(TRIM(export_snapshot_json->>'activityDisplayName'), '') AS activity_display_name,
       NULLIF(TRIM(export_snapshot_json->>'nickname'), '') AS nickname,
       NULLIF(TRIM(export_snapshot_json->>'handle'), '') AS handle
@@ -190,8 +211,10 @@ async function attachSearchSnapLites(rows: UserSearchRow[]): Promise<UserSearchR
   const byUser = new Map<string, SearchSnapLite>();
   for (const r of liteRows) {
     const logoRaw = String(r.logo_url || "").trim();
+    const photoRaw = String(r.photo_url || "").trim();
     byUser.set(r.user_id, {
       logoUrl: isHttpMediaUrl(logoRaw) && !isDataUrl(logoRaw) ? logoRaw : "",
+      photoUrl: isHttpMediaUrl(photoRaw) && !isDataUrl(photoRaw) ? photoRaw : "",
       name: String(r.name || "").trim(),
       displayName: String(r.display_name || "").trim(),
       phone: String(r.phone || "").trim(),
@@ -304,6 +327,10 @@ export function maskShowcaseHit(u: UserSearchRow): MaskedShowcaseHit {
       const logo = String(snap.logoUrl || "").trim();
       return isHttpMediaUrl(logo) && !isDataUrl(logo) ? logo : "";
     })(),
+    photoUrl: (() => {
+      const photo = String(snap.photoUrl || "").trim();
+      return isHttpMediaUrl(photo) && !isDataUrl(photo) ? photo : "";
+    })(),
     displayName: nameAllowed && rawName ? rawName : MASKED_NAME,
     nameVisible: nameAllowed && Boolean(rawName),
     phone: phoneAllowed ? rawPhone : "",
@@ -347,13 +374,46 @@ function baseTargetWhere() {
   };
 }
 
+/**
+ * 유료 대상 필터 — 행마다 isPaidMember N+1 금지 (구독·B2B 배치 + 스냅샷)
+ * egress·레이턴시 재발 방지용
+ */
 async function filterPaidTargets(rows: UserSearchRow[]): Promise<UserSearchRow[]> {
-  const out: UserSearchRow[] = [];
+  if (!rows.length) return [];
+  const paidIds = new Set<string>();
   for (const u of rows) {
-    const paid = await isPaidMember(u.id);
-    if (paid.ok) out.push(u);
+    if (isPlatformCeoHandle(u.publicHandle)) {
+      paidIds.add(u.id);
+      continue;
+    }
+    const t = u.digitalCard?.membershipTierSnapshot;
+    if (t === "paid" || t === "standard" || t === "premium" || t === "b2b") {
+      paidIds.add(u.id);
+    }
   }
-  return out;
+  const remaining = rows.filter((r) => !paidIds.has(r.id)).map((r) => r.id);
+  if (remaining.length) {
+    const [subs, ents] = await Promise.all([
+      prisma.userSubscription.findMany({
+        where: {
+          userId: { in: remaining },
+          status: "active",
+          cycleEndAt: { gt: new Date() }
+        },
+        select: { userId: true }
+      }),
+      prisma.b2BEnterpriseAccount.findMany({
+        where: {
+          adminUserId: { in: remaining },
+          status: { in: ["draft", "active"] }
+        },
+        select: { adminUserId: true }
+      })
+    ]);
+    for (const s of subs) paidIds.add(s.userId);
+    for (const e of ents) paidIds.add(e.adminUserId);
+  }
+  return rows.filter((r) => paidIds.has(r.id));
 }
 
 /**

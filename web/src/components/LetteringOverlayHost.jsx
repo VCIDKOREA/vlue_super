@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getBusinessCardByNumber } from "../lib/getBusinessCardByNumber.js";
 import { mapLookupToLetteringCard } from "../lib/letteringCardMapper.js";
 import { checkLetteringPhoneBlocked } from "../lib/letteringApi.js";
@@ -193,13 +193,25 @@ export default function LetteringOverlayHost() {
     return () => window.removeEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, onLive);
   }, [native, forceLettering]);
 
+  const cacheHistoryRef = useRef(null);
+
   useEffect(() => {
     const onNativeCall = (e) => {
-      const next = normalizeCallState(e?.detail?.state || e?.detail?.callState || "");
-      if (!next) return;
-      setCallState(next);
-      if (next === CALL_STATES.CONNECTED) setExpanded(true);
-      if (next === CALL_STATES.RINGING) setExpanded(false);
+      const rawState = String(e?.detail?.state || e?.detail?.callState || "");
+      const next = normalizeCallState(rawState);
+      if (next) {
+        setCallState(next);
+        if (next === CALL_STATES.CONNECTED) setExpanded(true);
+        if (next === CALL_STATES.RINGING) setExpanded(false);
+      }
+      /* 시스템 전화 종료 — End 버튼 없이도 통화목록에 기록 */
+      const ended =
+        next === CALL_STATES.ENDED ||
+        next === CALL_STATES.IDLE ||
+        /ended|idle|dismiss/i.test(rawState);
+      if (ended) {
+        cacheHistoryRef.current?.(CALL_STATES.ENDED);
+      }
     };
     window.addEventListener("vlue-native-call-state", onNativeCall);
     return () => window.removeEventListener("vlue-native-call-state", onNativeCall);
@@ -254,6 +266,10 @@ export default function LetteringOverlayHost() {
     },
     [incoming, card, direction, verified, showcaseStyle, membershipTier]
   );
+
+  useEffect(() => {
+    cacheHistoryRef.current = cacheHistory;
+  }, [cacheHistory]);
 
   const handleEnd = useCallback(() => {
     cacheHistory(CALL_STATES.ENDED);

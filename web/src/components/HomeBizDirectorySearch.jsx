@@ -143,7 +143,7 @@ function mapHitToRow(hit, i, tagLabel, idLabel = "") {
               : "쇼케이스",
     phone: hit.phoneVisible ? hit.phone || "" : "",
     phoneDisplay: hit.phoneVisible ? hit.phone || "" : "",
-    avatarUrl: String(hit.logoUrl || "").trim(),
+    avatarUrl: String(hit.photoUrl || hit.avatarUrl || hit.logoUrl || "").trim(),
     publicHandle: handle,
     membershipTier: tier,
     hasShowcase: true,
