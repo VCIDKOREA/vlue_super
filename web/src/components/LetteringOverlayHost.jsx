@@ -194,6 +194,7 @@ export default function LetteringOverlayHost() {
   }, [native, forceLettering]);
 
   const cacheHistoryRef = useRef(null);
+  const lastHistoryAtRef = useRef(0);
 
   useEffect(() => {
     const onNativeCall = (e) => {
@@ -210,6 +211,9 @@ export default function LetteringOverlayHost() {
         next === CALL_STATES.IDLE ||
         /ended|idle|dismiss/i.test(rawState);
       if (ended) {
+        const now = Date.now();
+        if (now - lastHistoryAtRef.current < 2500) return;
+        lastHistoryAtRef.current = now;
         cacheHistoryRef.current?.(CALL_STATES.ENDED);
       }
     };
