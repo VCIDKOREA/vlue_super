@@ -19,6 +19,7 @@ import {
   extractShowcaseCoverUrl
 } from "../../lib/showcase/showcaseCover.js";
 import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
+import { hasShowcaseBgmConfigured } from "../../lib/showcase/showcaseBgmPresets.js";
 import { PRIVACY_MODES, maxShowcaseContentPagesForTier } from "../../lib/showcase/tentShowcaseTypes.js";
 import { SHOWCASE_CALL_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
 import {
@@ -980,7 +981,11 @@ export default function ShowcaseStyleSettingsPanel({
         </span>
         <span className="showcase-profile-row__trail">
           <span className="showcase-profile-row__value">
-            {config.bgm?.mode === "none" || !config.bgm?.mode ? "미설정" : "설정됨"}
+            {hasShowcaseBgmConfigured({ bgm: config.bgm })
+              ? Array.isArray(config.bgm?.playlist) && config.bgm.playlist.length > 1
+                ? `설정됨 · ${config.bgm.playlist.length}곡`
+                : "설정됨"
+              : "미설정"}
           </span>
           {openMusic ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </span>

@@ -354,6 +354,30 @@ export default function ShowcaseBgmPicker({
     bindStyleConfig?.({ bgm: value || { mode: "none" } }, coexistWithPreview ? {} : { owner: "settings" });
   }, [value, bindStyleConfig, previewingId, coexistWithPreview]);
 
+  /* 기존 데이터: 재생목록만 있고 mode=none → 첫 곡을 주제곡으로 복구 */
+  useEffect(() => {
+    if (!value || value.linkBroken) return;
+    const list = Array.isArray(value.playlist) ? value.playlist : [];
+    const first = list.find(
+      (t) => !t?.linkBroken && (String(t?.audioUrl || "").trim() || String(t?.soundId || "").trim())
+    );
+    if (!first) return;
+    if (value.mode && value.mode !== "none" && String(value.audioUrl || value.soundId || "").trim()) return;
+    onChange?.({
+      ...value,
+      mode: first.mode || "signature",
+      soundId: first.soundId || "",
+      title: first.title || "",
+      audioUrl: first.audioUrl || "",
+      attributionLabel: first.attributionLabel || "",
+      createType: first.createType || "",
+      ownerHandle: first.ownerHandle || "",
+      sharedOwnerHandle: first.sharedOwnerHandle || "",
+      linkBroken: false,
+      artistName: value.artistName || "VLUE"
+    });
+  }, [value?.playlist?.length, value?.mode, value?.soundId, value?.audioUrl, onChange]);
+
   const patchBgm = (partial) => {
     onChange?.({ ...(value || {}), ...partial });
   };
@@ -489,6 +513,19 @@ export default function ShowcaseBgmPicker({
     setError("");
     const nextPlaylist = [...playlist, entry];
     const patch = { playlist: nextPlaylist };
+    /* 주제곡(mode)이 비어 있으면 첫 추가곡을 주제곡으로 승격 — 「미설정」 오표시·재생 불가 방지 */
+    if (!value?.mode || value.mode === "none" || !String(value?.audioUrl || value?.soundId || "").trim()) {
+      patch.mode = entry.mode || mode;
+      patch.soundId = entry.soundId;
+      patch.title = entry.title;
+      patch.audioUrl = entry.audioUrl;
+      patch.attributionLabel = entry.attributionLabel || "";
+      patch.createType = entry.createType || "";
+      patch.ownerHandle = entry.ownerHandle || "";
+      patch.sharedOwnerHandle = entry.sharedOwnerHandle || "";
+      patch.linkBroken = false;
+      patch.artistName = value?.artistName || "VLUE";
+    }
     if (nextPlaylist.length >= 2 && playMode === "single") {
       patch.playMode = "order";
       notify(`재생목록 ${nextPlaylist.length}/${playlistLimit}곡 · 순서재생으로 전환되었습니다.`);
