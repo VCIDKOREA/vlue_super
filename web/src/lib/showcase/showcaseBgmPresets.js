@@ -62,13 +62,14 @@ function readLocalHandle() {
  */
 export function resolveShowcaseBgmMarqueeText(styleConfig, visitSessionKey = "", trackIndex = 0) {
   const bgm = styleConfig?.bgm;
-  if (!bgm || bgm.mode === "none") return "";
-  if (bgm.linkBroken) return "연결이 끊긴 음원";
+  if (!bgm || bgm.linkBroken) return "";
+  /* mode=none 이어도 재생목록이 있으면 제목 표시 (재생목록만 채운 설정) */
+  if ((bgm.mode === "none" || !bgm.mode) && !showcaseBgmPlaylistHasTracks(bgm)) return "";
 
   const active = resolveActivePlaylistTrack(bgm, visitSessionKey, trackIndex) || bgm;
   const title = String(active.title || bgm.title || "").trim() || "제목 없음";
   const attr = String(active.attributionLabel || bgm.attributionLabel || "").trim();
-  const mode = active.mode || bgm.mode;
+  const mode = active.mode || bgm.mode || "signature";
   const own =
     String(active.ownerHandle || bgm.ownerHandle || "")
       .replace(/^@/, "")
@@ -96,7 +97,8 @@ export function resolveShowcaseBgmMarqueeText(styleConfig, visitSessionKey = "",
  */
 export function resolveShowcaseBgmUrl(styleConfig, visitSessionKey = "", trackIndex = 0) {
   const bgm = styleConfig?.bgm;
-  if (!bgm || bgm.mode === "none" || bgm.linkBroken) return "";
+  if (!bgm || bgm.linkBroken) return "";
+  if ((bgm.mode === "none" || !bgm.mode) && !showcaseBgmPlaylistHasTracks(bgm)) return "";
   const active = resolveActivePlaylistTrack(bgm, visitSessionKey, trackIndex);
   const url = String(active?.audioUrl || bgm.audioUrl || "").trim();
   if (url) return url;
@@ -109,11 +111,13 @@ export function resolveShowcaseBgmUrl(styleConfig, visitSessionKey = "", trackIn
  * @param {object|null|undefined} bgm
  */
 export function showcaseBgmIdentityKey(bgm) {
-  if (!bgm || bgm.mode === "none") return "";
+  if (!bgm) return "";
   const pl = Array.isArray(bgm.playlist)
     ? bgm.playlist.map((t) => String(t?.soundId || "").trim()).filter(Boolean).join(",")
     : "";
-  return `${bgm.mode}|${String(bgm.soundId || "").trim()}|${bgm.playMode || ""}|${pl}`;
+  if ((bgm.mode === "none" || !bgm.mode) && !pl) return "";
+  const mode = bgm.mode && bgm.mode !== "none" ? bgm.mode : "playlist";
+  return `${mode}|${String(bgm.soundId || "").trim()}|${bgm.playMode || ""}|${pl}`;
 }
 
 /** 재생목록에 유효한 트랙이 있는지 */

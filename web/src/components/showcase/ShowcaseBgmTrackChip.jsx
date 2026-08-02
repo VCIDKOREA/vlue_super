@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
-import { resolveShowcaseBgmMarqueeText } from "../../lib/showcase/showcaseBgmPresets.js";
+import {
+  resolveShowcaseBgmMarqueeText,
+  resolveActivePlaylistTrack,
+  showcaseBgmPlaylistHasTracks
+} from "../../lib/showcase/showcaseBgmPresets.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import {
   borrowShowcaseSound,
@@ -50,20 +54,24 @@ export default function ShowcaseBgmTrackChip({
   const marquee = resolveShowcaseBgmMarqueeText(styleConfig, visitSessionKey, trackIndex);
 
   const details = useMemo(() => {
-    if (!bgm || bgm.mode === "none") return null;
+    if (!bgm || bgm.linkBroken) return null;
+    const active = resolveActivePlaylistTrack(bgm, visitSessionKey, trackIndex) || bgm;
+    const mode = active.mode || bgm.mode;
+    if ((mode === "none" || !mode) && !showcaseBgmPlaylistHasTracks(bgm)) return null;
+    const resolvedMode = mode && mode !== "none" ? mode : active.mode || "signature";
     return {
-      title: String(bgm.title || "").trim() || "제목 없음",
+      title: String(active.title || bgm.title || "").trim() || "제목 없음",
       artist: String(bgm.artistName || "").trim() || "—",
-      attribution: String(bgm.attributionLabel || "").trim() || "—",
-      mode: MODE_LABEL[bgm.mode] || bgm.mode || "—",
-      ownerHandle: String(bgm.ownerHandle || "").trim(),
-      sharedOwnerHandle: String(bgm.sharedOwnerHandle || "").trim(),
+      attribution: String(active.attributionLabel || bgm.attributionLabel || "").trim() || "—",
+      mode: MODE_LABEL[resolvedMode] || resolvedMode || "—",
+      ownerHandle: String(active.ownerHandle || bgm.ownerHandle || "").trim(),
+      sharedOwnerHandle: String(active.sharedOwnerHandle || bgm.sharedOwnerHandle || "").trim(),
       linkBroken: Boolean(bgm.linkBroken),
-      hasAudio: Boolean(String(bgm.audioUrl || "").trim()),
-      soundId: String(bgm.soundId || "").trim(),
+      hasAudio: Boolean(String(active.audioUrl || bgm.audioUrl || "").trim()),
+      soundId: String(active.soundId || bgm.soundId || "").trim(),
       volumeLevel: bgm.volumeLevel || "medium"
     };
-  }, [bgm]);
+  }, [bgm, visitSessionKey, trackIndex]);
 
   useEffect(() => {
     if (!visible) setOpen(false);
