@@ -530,6 +530,12 @@
   font-weight: 800;
   letter-spacing: 0.02em;
   color: #ffffff;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 38%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .showcase-call-carousel__meta-right {
@@ -555,16 +561,17 @@
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   justify-content: flex-end;
 }
 
 .showcase-call-carousel__bgm.showcase-bgm-chip,
 .showcase-call-carousel__bgm {
   position: static;
-  max-width: min(34vw, 132px);
+  /* 곡 제목이 잘리지 않도록 — 예전 132px는 너무 짧았음 */
+  max-width: min(62vw, 248px);
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: min(42vw, 160px);
 }
 
 .showcase-call-carousel__bgm-transport.showcase-bgm-transport {
