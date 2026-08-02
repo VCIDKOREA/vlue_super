@@ -530,11 +530,7 @@
   font-weight: 800;
   letter-spacing: 0.02em;
   color: #ffffff;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 38%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 0 0 auto;
   white-space: nowrap;
 }
 
@@ -568,10 +564,10 @@
 .showcase-call-carousel__bgm.showcase-bgm-chip,
 .showcase-call-carousel__bgm {
   position: static;
-  /* 곡 제목이 잘리지 않도록 — 예전 132px는 너무 짧았음 */
-  max-width: min(62vw, 248px);
+  /* 「디지털인증명함」 전체 표기 우선 — 곡정보는 마키로 스크롤 */
+  max-width: min(42vw, 168px);
   flex: 1 1 auto;
-  min-width: min(42vw, 160px);
+  min-width: 0;
 }
 
 .showcase-call-carousel__bgm-transport.showcase-bgm-transport {
