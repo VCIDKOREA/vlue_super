@@ -25,6 +25,7 @@ function parseSnapshotJson(raw: unknown): BizcardClassicSnapshot | null {
     address: String(o.address || "").trim(),
     website: String(o.website || "").trim(),
     logoUrl: String(o.logoUrl || "").trim(),
+    photoUrl: String(o.photoUrl || "").trim(),
     shareCoverUrl: String(o.shareCoverUrl || o.kakaoFeedBgUrl || "").trim(),
     designTemplate: normalizeBizcardTemplate(String(o.designTemplate || ""))
   };

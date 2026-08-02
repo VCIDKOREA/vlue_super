@@ -128,8 +128,14 @@ function buildFeedCardSvg(snap: BizcardClassicSnapshot, withAvatarSlot: boolean,
 /** 카카오 Feed — 개인화 명함 카드 PNG (미리보기·카카오 imageUrl 공용) */
 export async function renderKakaoFeedCardPng(snapshot: BizcardClassicSnapshot): Promise<Buffer> {
   const logoUrl = String(snapshot.logoUrl || "").trim();
+  const photoUrl = String(snapshot.photoUrl || "").trim();
   const coverUrl = String(snapshot.shareCoverUrl || "").trim();
-  const avatarBuf = logoUrl ? await fetchRemoteImage(logoUrl) : null;
+  /* 아바타 = 프로필 사진 우선, 없으면 회사 로고 */
+  const avatarBuf = photoUrl
+    ? await fetchRemoteImage(photoUrl)
+    : logoUrl
+      ? await fetchRemoteImage(logoUrl)
+      : null;
   const coverBuf = coverUrl ? await fetchRemoteImage(coverUrl) : null;
 
   const svgBuf = await sharp(Buffer.from(buildFeedCardSvg(snapshot, Boolean(avatarBuf), Boolean(coverBuf))))

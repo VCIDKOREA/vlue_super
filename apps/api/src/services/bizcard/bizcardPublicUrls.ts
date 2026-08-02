@@ -33,10 +33,14 @@ export function cardViewUrl(origin: string, cardId: string) {
 }
 
 /** 카카오 Feed — 개인화 명함 카드 PNG */
-export function kakaoFeedCardImageUrl(origin: string, cardId: string) {
+export function kakaoFeedCardImageUrl(origin: string, cardId: string, cacheKey = "") {
   const base = origin.replace(/\/$/, "");
   const id = encodeURIComponent(String(cardId || "").trim());
-  return `${base}/api/v1/card/kakao-feed/${id}.png`;
+  const url = `${base}/api/v1/card/kakao-feed/${id}.png`;
+  const v = String(cacheKey || "")
+    .replace(/[^\w.-]/g, "")
+    .slice(-40);
+  return v ? `${url}?v=${encodeURIComponent(v)}` : url;
 }
 
 export function cardVerifyPageUrl(origin: string, cardId: string) {

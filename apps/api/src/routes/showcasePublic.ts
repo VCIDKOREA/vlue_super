@@ -12,6 +12,7 @@ import {
   kakaoFeedCardImageUrl
 } from "../services/bizcard/bizcardPublicUrls.js";
 import { formatPhoneDisplayKR } from "../lib/phoneDisplay.js";
+import { prisma } from "../db/client.js";
 
 /** 공개 쇼케이스 — 카카오 OG 랜딩 */
 export const showcasePublicRoutes = new Hono();
@@ -112,6 +113,7 @@ showcasePublicRoutes.get("/view/:phone", async (c) => {
     let cardId = "";
     let photo = "";
     let cover = "";
+    let shareCover = "";
 
     if (matched && body) {
       const b = body as {
@@ -133,6 +135,20 @@ showcasePublicRoutes.get("/view/:phone", async (c) => {
 
       if (b.userId) {
         try {
+          const dc = await prisma.digitalCard.findUnique({
+            where: { userId: String(b.userId) },
+            select: { id: true, exportSnapshotJson: true }
+          });
+          if (dc?.id && !cardId) cardId = dc.id;
+          const snap =
+            dc?.exportSnapshotJson && typeof dc.exportSnapshotJson === "object"
+              ? (dc.exportSnapshotJson as Record<string, unknown>)
+              : null;
+          shareCover = pickHttpUrl(snap?.shareCoverUrl, snap?.kakaoFeedBgUrl);
+        } catch {
+          /* ignore */
+        }
+        try {
           const pub = await getUserShowcasePublicLive(b.userId);
           cover = extractStyleCover(pub.live);
         } catch {
@@ -142,8 +158,11 @@ showcasePublicRoutes.get("/view/:phone", async (c) => {
     }
 
     const phoneDisplay = formatPhoneDisplayKR(digits) || digits;
+    /* 사용자가 지정한 배경 썸네일(shareCover)이 쇼케이스 첫 장보다 우선 */
+    const feedCache = shareCover.replace(/[^\w]/g, "").slice(-32);
     const ogImage =
-      (cardId ? kakaoFeedCardImageUrl(apiBase, cardId) : "") ||
+      shareCover ||
+      (cardId ? kakaoFeedCardImageUrl(apiBase, cardId, feedCache) : "") ||
       cover ||
       photo ||
       getKakaoShareButtonImageUrl(webOrigin);

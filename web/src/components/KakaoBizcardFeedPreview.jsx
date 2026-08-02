@@ -189,8 +189,16 @@ export default function KakaoBizcardFeedPreview({
       const dataUrl = await compressCoverFile(file);
       writeLetteringBizcardEditable({ kakaoFeedBgDataUrl: dataUrl });
       setCoverTick((n) => n + 1);
-      await syncDigitalCardExportSnapshot({ ...snap, shareCoverUrl: dataUrl });
-      onToast?.("카드 배경 썸네일을 적용했습니다.");
+      const sync = await syncDigitalCardExportSnapshot({ ...snap, shareCoverUrl: dataUrl });
+      if (sync?.ok === false) {
+        onToast?.(sync.error || "배경은 기기에 저장됐지만 서버 동기화에 실패했습니다. 다시 시도해 주세요.");
+        return;
+      }
+      if (sync?.shareCoverUrl) {
+        writeLetteringBizcardEditable({ kakaoFeedBgDataUrl: sync.shareCoverUrl });
+        setCoverTick((n) => n + 1);
+      }
+      onToast?.("카드 배경 썸네일을 적용했습니다. 카카오 공유 시 반영됩니다.");
     } catch (err) {
       onToast?.(err instanceof Error ? err.message : "배경 설정에 실패했습니다.");
     }

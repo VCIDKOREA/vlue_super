@@ -8,7 +8,7 @@ import {
 } from "./vlueViralLinks.js";
 import { withLetteringBizcardPreviewFallback } from "./letteringBizcardProfile.js";
 import { scrubLetteringDemoPollution } from "./letteringDemoPollution.js";
-import { readLetteringFixedIdentity } from "./letteringBizcardStorage.js";
+import { readLetteringFixedIdentity, readLetteringBizcardEditable } from "./letteringBizcardStorage.js";
 
 const KAKAO_PUBLIC_ORIGIN = "https://www.vlue.kr";
 export const KAKAO_FEED_IMAGE_WIDTH = 800;
@@ -38,11 +38,15 @@ export function getKakaoFeedCardPreviewUrl(cardId) {
   return apiUrl(`/api/v1/card/kakao-feed/${id}.png`);
 }
 
-/** 카카오 SDK가 불러올 공개 PNG URL */
-export function getKakaoFeedCardPublicImageUrl(cardId) {
+/** 카카오 SDK가 불러올 공개 PNG URL — v 로 캐시 무효화(배경 썸네일 변경 반영) */
+export function getKakaoFeedCardPublicImageUrl(cardId, cacheKey = "") {
   const id = encodeURIComponent(String(cardId || "").trim());
   if (!id) return getKakaoShareButtonImageUrl();
-  return `${getCardPublicApiBase()}/api/v1/card/kakao-feed/${id}.png`;
+  const base = `${getCardPublicApiBase()}/api/v1/card/kakao-feed/${id}.png`;
+  const v = String(cacheKey || "")
+    .replace(/[^\w.-]/g, "")
+    .slice(-40);
+  return v ? `${base}?v=${encodeURIComponent(v)}` : base;
 }
 
 export function buildKakaoBizcardPublicUrls(cardId, card) {
@@ -54,7 +58,14 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
       ? viral.createUrl
       : `${KAKAO_PUBLIC_ORIGIN}/membership`;
   const snap = scrubLetteringDemoPollution(withLetteringBizcardPreviewFallback(card || {}));
-  const feedImageUrl = cardId ? getKakaoFeedCardPublicImageUrl(cardId) : getKakaoShareButtonImageUrl();
+  const ed = readLetteringBizcardEditable();
+  const coverHint = String(
+    snap.shareCoverUrl || card?.shareCoverUrl || ed.kakaoFeedBgDataUrl || ed.kakaoFeedBgUrl || ""
+  ).trim();
+  const coverKey = coverHint
+    ? coverHint.replace(/[^\w]/g, "").slice(-32)
+    : String(Date.now());
+  const feedImageUrl = cardId ? getKakaoFeedCardPublicImageUrl(cardId, coverKey) : getKakaoShareButtonImageUrl();
   const phone = String(
     readLetteringFixedIdentity()?.phone || snap.phone || card?.phone || ""
   ).trim();
@@ -62,7 +73,7 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
   const viewUrl = showcaseUrl || `${apiBase}/api/v1/card/view/${id}`;
   return {
     buttonImageUrl: feedImageUrl,
-    buttonPreviewUrl: cardId ? getKakaoFeedCardPreviewUrl(cardId) : getKakaoShareButtonImageUrl(),
+    buttonPreviewUrl: cardId ? `${getKakaoFeedCardPreviewUrl(cardId)}${coverKey ? `?v=${encodeURIComponent(coverKey)}` : ""}` : getKakaoShareButtonImageUrl(),
     viewUrl,
     createUrl,
     feedTitle: `${String(snap.name || "회원").trim()}님의 VLUE 쇼케이스`,

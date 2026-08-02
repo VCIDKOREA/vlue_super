@@ -354,6 +354,9 @@ export async function syncDigitalCardExportSnapshot(card) {
       patch.logoDataUrl = logoUrl;
       patch.noCompanyLogo = false;
     }
+    if (shareCoverUrl && shareCoverUrl !== String(ed.kakaoFeedBgDataUrl || "").trim()) {
+      patch.kakaoFeedBgDataUrl = shareCoverUrl;
+    }
     if (Object.keys(patch).length) writeLetteringBizcardEditable(patch);
   } catch {
     /* ignore */
@@ -410,6 +413,7 @@ export async function syncDigitalCardExportSnapshot(card) {
       exportSnapshot: null,
       photoUrl,
       logoUrl,
+      shareCoverUrl,
       mediaError: mediaError || null
     };
   } catch {
