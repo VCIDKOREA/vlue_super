@@ -416,8 +416,17 @@ export async function syncDigitalCardExportSnapshot(card) {
       shareCoverUrl,
       mediaError: mediaError || null
     };
-  } catch {
-    return { ok: false, error: mediaError || "서버 동기화 실패" };
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : "";
+    const net = /Failed to fetch|NetworkError|Load failed/i.test(raw);
+    return {
+      ok: false,
+      error:
+        mediaError ||
+        (net
+          ? "서버에 연결하지 못했습니다. (API 미기동·네트워크). 잠시 후 다시 시도해 주세요."
+          : raw || "서버 동기화 실패")
+    };
   }
 }
 

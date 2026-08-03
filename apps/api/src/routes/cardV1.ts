@@ -191,7 +191,7 @@ cardV1Routes.get("/kakao-feed/:cardId", async (c) => {
     const png = await renderKakaoFeedCardPng(snapshot);
     return pngResponse(png, {
       "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=300"
+      "Cache-Control": "public, max-age=60, must-revalidate"
     });
   } catch (err) {
     console.warn("[card-kakao-feed] failed", err);

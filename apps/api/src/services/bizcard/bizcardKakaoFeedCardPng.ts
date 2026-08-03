@@ -5,7 +5,9 @@ import type { BizcardClassicSnapshot } from "./bizcardClassicSpec.js";
 export const KAKAO_FEED_CARD_WIDTH = 800;
 export const KAKAO_FEED_CARD_HEIGHT = 520;
 
-const FONT = "NanumGothic, Nanum Gothic, Noto Sans CJK KR, Pretendard, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
+/** Debian fonts-nanum 패키지 실제 패밀리명 (Railway/Nixpacks) */
+const FONT =
+  "NanumGothic, Nanum Gothic, Noto Sans CJK KR, Noto Sans KR, Pretendard, Apple SD Gothic Neo, Malgun Gothic, sans-serif";
 const NAVY = "#0b1a33";
 const HEADER_H = 268;
 
@@ -68,7 +70,30 @@ async function circleAvatarPng(source: Buffer, size: number): Promise<Buffer> {
     .toBuffer();
 }
 
-function buildFeedCardSvg(snap: BizcardClassicSnapshot, withAvatarSlot: boolean, headerTransparent: boolean): string {
+/** 배경/사진이 있을 때: 한글 SVG 없이 풀블리드 썸네일 (폰 카카오 □□□ 토후 방지) */
+function buildCoverBadgeSvg(): string {
+  const W = KAKAO_FEED_CARD_WIDTH;
+  const H = KAKAO_FEED_CARD_HEIGHT;
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="55%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(8,15,28,0.72)"/>
+    </linearGradient>
+  </defs>
+  <rect width="${W}" height="${H}" fill="url(#g)"/>
+  <rect x="28" y="${H - 52}" width="22" height="22" rx="6" fill="#2563eb"/>
+  <text x="58" y="${H - 34}" font-family="${FONT}" font-size="18" font-weight="900" fill="#f8fafc">VLUE</text>
+</svg>`;
+}
+
+function buildFeedCardSvg(
+  snap: BizcardClassicSnapshot,
+  withAvatarSlot: boolean,
+  headerTransparent: boolean
+): string {
   const W = KAKAO_FEED_CARD_WIDTH;
   const H = KAKAO_FEED_CARD_HEIGHT;
   const name = trunc(snap.name || "회원", 14);
@@ -130,44 +155,40 @@ export async function renderKakaoFeedCardPng(snapshot: BizcardClassicSnapshot): 
   const logoUrl = String(snapshot.logoUrl || "").trim();
   const photoUrl = String(snapshot.photoUrl || "").trim();
   const coverUrl = String(snapshot.shareCoverUrl || "").trim();
-  /* 아바타 = 프로필 사진 우선, 없으면 회사 로고 */
+
+  const coverBuf = coverUrl ? await fetchRemoteImage(coverUrl) : null;
+  const photoBuf = !coverBuf && photoUrl ? await fetchRemoteImage(photoUrl) : null;
+  const heroBuf = coverBuf || photoBuf;
+
+  /* 배경·사진이 있으면 풀블리드 — 한글 SVG 렌더(서버 폰트 누락 → □□□)를 피함 */
+  if (heroBuf) {
+    const base = await sharp(heroBuf)
+      .resize(KAKAO_FEED_CARD_WIDTH, KAKAO_FEED_CARD_HEIGHT, {
+        fit: "cover",
+        position: "centre"
+      })
+      .png()
+      .toBuffer();
+    const badge = await sharp(Buffer.from(buildCoverBadgeSvg())).png().toBuffer();
+    return sharp(base)
+      .composite([{ input: badge, left: 0, top: 0 }])
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+  }
+
   const avatarBuf = photoUrl
     ? await fetchRemoteImage(photoUrl)
     : logoUrl
       ? await fetchRemoteImage(logoUrl)
       : null;
-  const coverBuf = coverUrl ? await fetchRemoteImage(coverUrl) : null;
 
-  const svgBuf = await sharp(Buffer.from(buildFeedCardSvg(snapshot, Boolean(avatarBuf), Boolean(coverBuf))))
+  const svgBuf = await sharp(
+    Buffer.from(buildFeedCardSvg(snapshot, Boolean(avatarBuf), false))
+  )
     .png({ compressionLevel: 9 })
     .toBuffer();
 
-  const layers: sharp.OverlayOptions[] = [];
-
-  if (coverBuf) {
-    const cover = await sharp(coverBuf)
-      .resize(KAKAO_FEED_CARD_WIDTH, HEADER_H, { fit: "cover", position: "centre" })
-      .modulate({ brightness: 0.7 })
-      .png()
-      .toBuffer();
-    const dim = await sharp({
-      create: {
-        width: KAKAO_FEED_CARD_WIDTH,
-        height: HEADER_H,
-        channels: 4,
-        background: { r: 11, g: 26, b: 51, alpha: 0.38 }
-      }
-    })
-      .png()
-      .toBuffer();
-    const header = await sharp(cover)
-      .composite([{ input: dim, blend: "over" }])
-      .png()
-      .toBuffer();
-    layers.push({ input: header, left: 0, top: 0 });
-  }
-
-  layers.push({ input: svgBuf, left: 0, top: 0 });
+  const layers: sharp.OverlayOptions[] = [{ input: svgBuf, left: 0, top: 0 }];
 
   if (avatarBuf) {
     layers.push({ input: await circleAvatarPng(avatarBuf, 88), left: 40, top: 42 });

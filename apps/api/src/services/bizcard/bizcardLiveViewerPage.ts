@@ -34,7 +34,9 @@ export function buildBizcardLiveViewerPage(opts: {
   const validateUrl = cardValidateApiUrl(base, cardId);
   const galleryUrl = `${base}/api/v1/card/gallery-png/${encodeURIComponent(cardId)}`;
   const vcfUrl = `${base}/api/v1/card/vcf/${encodeURIComponent(cardId)}`;
-  const feedImage = `${base}/api/v1/card/kakao-feed/${encodeURIComponent(cardId)}.png`;
+  const coverHttp = cover.startsWith("http") ? cover : "";
+  const feedImage =
+    coverHttp || `${base}/api/v1/card/kakao-feed/${encodeURIComponent(cardId)}.png`;
 
   return `<!DOCTYPE html>
 <html lang="ko">

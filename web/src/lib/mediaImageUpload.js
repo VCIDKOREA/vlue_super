@@ -103,11 +103,28 @@ export async function uploadDataUrlToMediaCdn(dataUrl, kind = "photo") {
   return String(signed.publicUrl || "").trim();
 }
 
-/** http면 그대로, data면 R2 업로드, 그 외 빈 문자열 */
+function isLocalOrPrivateHttpUrl(url) {
+  try {
+    const u = new URL(String(url || "").trim());
+    if (u.protocol !== "http:" && u.protocol !== "https:") return true;
+    const h = u.hostname.toLowerCase();
+    if (h === "localhost" || h === "127.0.0.1" || h === "[::1]") return true;
+    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(h)) return true;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/** 공개 https면 그대로, data·로컬 http면 R2 업로드, 그 외 빈 문자열 */
 export async function ensureHttpMediaUrl(url, kind = "photo") {
   const u = String(url || "").trim();
   if (!u) return "";
-  if (/^https?:\/\//i.test(u)) return u;
+  if (/^https:\/\//i.test(u) && !isLocalOrPrivateHttpUrl(u)) return u;
+  if (/^https?:\/\//i.test(u) && isLocalOrPrivateHttpUrl(u)) {
+    /* 로컬 API 주소는 카카오·다른 기기가 못 봄 → 재업로드 불가(이미 http). 버림 */
+    return "";
+  }
   if (u.startsWith("data:")) return uploadDataUrlToMediaCdn(u, kind);
   return "";
 }

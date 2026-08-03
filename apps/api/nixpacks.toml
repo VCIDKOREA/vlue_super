@@ -3,6 +3,7 @@
 
 [phases.setup]
 aptPkgs = ["fonts-nanum", "fontconfig"]
+cmds = ["fc-cache -f"]
 
 [variables]
 NIXPACKS_NODE_INSTALL_DEV_DEPS = "true"

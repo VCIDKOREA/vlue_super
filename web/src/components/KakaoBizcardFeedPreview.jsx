@@ -200,7 +200,11 @@ export default function KakaoBizcardFeedPreview({
       }
       onToast?.("카드 배경 썸네일을 적용했습니다. 카카오 공유 시 반영됩니다.");
     } catch (err) {
-      onToast?.(err instanceof Error ? err.message : "배경 설정에 실패했습니다.");
+      const raw = err instanceof Error ? err.message : String(err || "");
+      const friendly = /Failed to fetch|NetworkError|Load failed|network/i.test(raw)
+        ? "서버에 연결하지 못했습니다. API 주소·네트워크를 확인한 뒤 다시 시도해 주세요."
+        : raw || "배경 설정에 실패했습니다.";
+      onToast?.(friendly);
     }
   };
 
