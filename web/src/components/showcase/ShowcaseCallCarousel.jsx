@@ -726,6 +726,7 @@ export default function ShowcaseCallCarousel({
       data-index={index}
       data-tier={tier}
       data-known={isKnownContact ? "1" : "0"}
+      data-slide-kind={current?.type || ""}
       aria-roledescription={canScroll ? "carousel" : "region"}
     >
       {showMeta ? (

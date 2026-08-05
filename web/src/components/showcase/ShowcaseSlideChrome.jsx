@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { openExternalHref, formatWebHref } from "../../lib/showcase/showcaseContactActions.js";
 import { resolveShowcasePeerAvatar } from "../../lib/showcase/resolveShowcasePeerAvatar.js";
 import { isVlueBrandAssetUrl } from "../../lib/vlueAvatar.js";
@@ -55,9 +55,16 @@ export default function ShowcaseSlideChrome({
   onOpenCaseArchive
 }) {
   const [socialOpen, setSocialOpen] = useState(false);
+  const [logoBroken, setLogoBroken] = useState(false);
   const style = card?.showcaseStyle || {};
   const outlinks = style?.commercial?.outlinks || {};
   const pageLink = normalizeBusinessLink(businessLink);
+  const logoSrc = !logoBroken && pageLink?.logoUrl ? pageLink.logoUrl : "";
+  const logoInitial = String(pageLink?.name || "링").trim().slice(0, 1) || "링";
+
+  useEffect(() => {
+    setLogoBroken(false);
+  }, [pageLink?.logoUrl, pageLink?.id]);
 
   /*
    * VLUE 프로필 바 — 디지털 인증명함 성명 우선.
@@ -164,16 +171,17 @@ export default function ShowcaseSlideChrome({
             }}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            {pageLink.logoUrl ? (
+            {logoSrc ? (
               <img
-                src={pageLink.logoUrl}
+                src={logoSrc}
                 alt=""
                 className="showcase-slide-chrome__biz-logo"
                 draggable={false}
+                onError={() => setLogoBroken(true)}
               />
             ) : (
               <span className="showcase-slide-chrome__biz-logo-fallback" aria-hidden>
-                링크
+                {logoInitial}
               </span>
             )}
             <span className="showcase-slide-chrome__biz-meta">

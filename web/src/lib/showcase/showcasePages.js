@@ -52,11 +52,16 @@ export function normalizeBusinessLink(raw) {
   const name = String(raw.name || "").trim();
   const url = String(raw.url || "").trim();
   if (!name || !url) return null;
+  let logoUrl = String(raw.logoUrl || raw.imageUrl || "").trim();
+  /* data:/blob: 는 서버 동기화에서 탈락 — 미리보기에도 「링크」 폴백만 보이므로 비움 */
+  if (logoUrl.startsWith("data:") || logoUrl.startsWith("blob:")) {
+    logoUrl = "";
+  }
   return {
     id: String(raw.id || `link-${Date.now().toString(36)}`).trim(),
     name,
     url,
-    logoUrl: String(raw.logoUrl || raw.imageUrl || "").trim()
+    logoUrl
   };
 }
 

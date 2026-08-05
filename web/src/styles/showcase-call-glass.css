@@ -564,9 +564,16 @@
 .showcase-call-carousel__bgm.showcase-bgm-chip,
 .showcase-call-carousel__bgm {
   position: static;
-  /* ???????????????? ??? ??? ?????? ?????????*/
-  max-width: min(42vw, 168px);
+  /* ???? ??? ???: ? ??? ???? ?? */
+  max-width: min(56vw, 220px);
   flex: 1 1 auto;
+  min-width: min(28vw, 120px);
+}
+
+/* ??????? ???: ?? ?? ?? ?? ? ?? ??? ??? ??? */
+.showcase-call-carousel[data-slide-kind="card"] .showcase-call-carousel__bgm.showcase-bgm-chip,
+.showcase-call-carousel[data-slide-kind="card"] .showcase-call-carousel__bgm {
+  max-width: min(42vw, 168px);
   min-width: 0;
 }
 
@@ -3308,8 +3315,9 @@
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  mask-image: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 8px), transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 8px), transparent);
+  /* ??? ?? ?? ???? 'Si' ?? ?? 'gnature'?? ?? ? ?? ??? */
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 10px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 10px), transparent);
 }
 
 .showcase-bgm-chip__marquee-track {
