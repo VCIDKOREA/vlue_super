@@ -17,6 +17,8 @@ import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import LetteringReportSheet from "./LetteringReportSheet.jsx";
 import LetteringCertModal from "./LetteringCertModal.jsx";
+import { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
+import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
 import "../styles/tent-showcase.css";
 import "../styles/showcase-call-glass.css";
@@ -202,7 +204,18 @@ export default function LetteringOverlayHost() {
       const next = normalizeCallState(rawState);
       if (next) {
         setCallState(next);
-        if (next === CALL_STATES.CONNECTED) setExpanded(true);
+        if (next === CALL_STATES.CONNECTED) {
+          /* Companion: 연결 순간 BigPush 종료 → Showcase 전체화면 */
+          setExpanded(true);
+          try {
+            window.VlueLettering?.restoreShowcaseOverlay?.();
+            window.Android?.restoreShowcaseOverlay?.();
+            window.VlueLettering?.setOverlayFullscreen?.("1");
+            window.Android?.setOverlayFullscreen?.("1");
+          } catch {
+            /* ignore */
+          }
+        }
         if (next === CALL_STATES.RINGING) setExpanded(false);
       }
       /* 시스템 전화 종료 — End 버튼 없이도 통화목록에 기록 */
@@ -211,6 +224,17 @@ export default function LetteringOverlayHost() {
         next === CALL_STATES.IDLE ||
         /ended|idle|dismiss/i.test(rawState);
       if (ended) {
+        /* Mini Case 세션 좌표 초기화 — 다음 통화는 기본 위치. 앱은 종료하지 않음 */
+        resetCompanionMiniCaseSessionPos();
+        if (COMPANION_MVP_DELEGATE_CALL_UI) {
+          try {
+            /* Companion: 통화 UI만 닫기 (네이티브 onCallEnded 와 이중 호출돼도 dismiss 가드) */
+            window.VlueLettering?.dismissOverlay?.();
+            window.Android?.dismissOverlay?.();
+          } catch {
+            /* ignore */
+          }
+        }
         const now = Date.now();
         if (now - lastHistoryAtRef.current < 2500) return;
         lastHistoryAtRef.current = now;

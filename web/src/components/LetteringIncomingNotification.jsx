@@ -18,7 +18,7 @@ import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAvatar.js";
 import { buildAuthValidityVerificationItems } from "../lib/authValidityPeriod.js";
 import { getLocalVlueUserId } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
-import { nativeEndCall, nativeEndCallKeepOverlay } from "../lib/call/nativeCallControl.js";
+import { nativeEndCall, nativeEndCallKeepOverlay, nativeRevealSystemCallUi, nativeRestoreShowcaseOverlay, nativeSetOverlayFullscreen } from "../lib/call/nativeCallControl.js";
 import { resolveIsKnownContact } from "../lib/contacts/hybridKnownContact.js";
 import {
   resolveCallPeerMatrixSync,
@@ -29,6 +29,9 @@ import { shareShowcaseInviteViaKakao } from "../lib/call/shareShowcaseInviteKaka
 import InCallKakaoShareSlot from "./call/InCallKakaoShareSlot.jsx";
 import InCallControlBar from "./call/InCallControlBar.jsx";
 import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
+import CompanionMiniCase, { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
+import CompanionSamsungCallCta from "./call/CompanionSamsungCallCta.jsx";
+import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
@@ -303,6 +306,21 @@ export default function LetteringIncomingNotification({
     }
     const next = !expanded;
     setExpanded(next);
+    /* Companion: 통화 중 접기=Mini Case+삼성 UI, 펼치기=Showcase 복귀 (BigPush로 복귀하지 않음) */
+    const liveOnCall = callPhase === "active" || callPhase === "connected";
+    if (COMPANION_MVP_DELEGATE_CALL_UI && liveOnCall && !previewMode && !fromCallHistory) {
+      try {
+        if (next) {
+          nativeRestoreShowcaseOverlay();
+          nativeSetOverlayFullscreen(true);
+        } else {
+          nativeSetOverlayFullscreen(false);
+          nativeRevealSystemCallUi();
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     if (next && typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
       window.__vlueUnlockShowcaseBgm();
       window.setTimeout(() => window.__vlueUnlockShowcaseBgm?.(), 80);
@@ -339,6 +357,35 @@ export default function LetteringIncomingNotification({
           }
   );
   const onCall = callPhase === "active" || callPhase === "connected";
+  const useCompanionDelegate =
+    COMPANION_MVP_DELEGATE_CALL_UI && onCall && !previewMode && !fromCallHistory;
+  const [callTick, setCallTick] = useState(0);
+  const callStartedAtRef = useRef(null);
+  useEffect(() => {
+    if (!useCompanionDelegate) {
+      callStartedAtRef.current = null;
+      resetCompanionMiniCaseSessionPos();
+      return undefined;
+    }
+    if (!callStartedAtRef.current) callStartedAtRef.current = Date.now();
+    const id = window.setInterval(() => setCallTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [useCompanionDelegate]);
+  const companionDurationLabel = useMemo(() => {
+    void callTick;
+    if (callDurationSec > 0) {
+      const n = Math.floor(Number(callDurationSec) || 0);
+      const m = Math.floor(n / 60);
+      const s = n % 60;
+      return `${m}:${String(s).padStart(2, "0")}`;
+    }
+    const started = callStartedAtRef.current;
+    if (!started) return "0:00";
+    const sec = Math.max(0, Math.floor((Date.now() - started) / 1000));
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }, [callTick, callDurationSec, useCompanionDelegate]);
   const statusLabel = getLetteringCallStatusLabel({
     callActive: onCall,
     isRecording,
@@ -740,8 +787,45 @@ export default function LetteringIncomingNotification({
   const isGlassTent = /\blettering-ongoing--fullscreen-tent\b/.test(String(className || ""));
   /** 통화목록 다시보기에서만 저장 CTA — 홈 미리보기·실통화 풀케이스에는 미노출 */
   const showCallLogSaveCta = Boolean(fromCallHistory && peerMatrix.showCallLogAction);
-  /** 실통화 + 홈 통화화면 미리보기에서 키패드·음소거·스피커 */
-  const showInCallControls = Boolean(showLiveEndCall || showChromePreviewControls);
+  /** Companion MVP: 실통화·「통화화면」미리보기 모두 4버튼 숨김 → 삼성 CTA */
+  const showLegacyInCallControls = Boolean(
+    !COMPANION_MVP_DELEGATE_CALL_UI && showChromePreviewControls
+  );
+  const showCompanionSamsungCta = Boolean(
+    COMPANION_MVP_DELEGATE_CALL_UI &&
+      isExpandedView &&
+      !fromCallHistory &&
+      (useCompanionDelegate || showChromePreviewControls)
+  );
+  const showInCallControls = Boolean(showLegacyInCallControls || showCompanionSamsungCta);
+
+  const openSamsungCallOptions = useCallback(() => {
+    if (previewMode) {
+      onToast?.("미리보기입니다. 실제 통화에서는 삼성 전화앱으로 이동합니다.");
+      /* 미리보기에서도 Mini Case 전환 체감 */
+      setExpanded(false);
+      return;
+    }
+    setExpanded(false);
+    try {
+      nativeSetOverlayFullscreen(false);
+      nativeRevealSystemCallUi();
+    } catch {
+      /* ignore */
+    }
+    onToast?.("삼성 전화앱에서 키패드·음소거·스피커·종료를 사용하세요.");
+  }, [setExpanded, onToast, previewMode]);
+
+  const expandShowcaseFromMiniCase = useCallback(() => {
+    setExpanded(true);
+    try {
+      nativeRestoreShowcaseOverlay();
+      nativeSetOverlayFullscreen(true);
+    } catch {
+      /* ignore */
+    }
+  }, [setExpanded]);
+
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;
   const carouselScrollEnabled = isPaidMember && (previewMode || onCall || isExpandedView);
@@ -752,6 +836,10 @@ export default function LetteringIncomingNotification({
   const showcaseStyleConfig = c.showcaseStyle || null;
 
   const renderCircleAction = () => {
+    /* Companion MVP — 원형 종료 버튼도 숨김 (삼성 전화앱 위임) */
+    if (useCompanionDelegate) {
+      return null;
+    }
     if (showLiveEndCall) {
       return (
         <button
@@ -825,7 +913,9 @@ export default function LetteringIncomingNotification({
                 <Phone size={22} strokeWidth={2.2} aria-hidden />
               </button>
             </div>
-          ) : showInCallControls ? (
+          ) : showCompanionSamsungCta ? (
+            <CompanionSamsungCallCta onOpen={openSamsungCallOptions} />
+          ) : showLegacyInCallControls ? (
             <div className="lettering-ongoing-actions-secondary__row lettering-ongoing-actions-secondary__row--controls">
               <InCallControlBar
                 platform={platform}
@@ -882,11 +972,40 @@ export default function LetteringIncomingNotification({
     );
   };
 
+  /* Companion MVP — 통화 중 접기 = Mini Case (Floating Controller, BigPush 아님) */
+  if (useCompanionDelegate && !isExpandedView) {
+    const phoneDisp =
+      formatLetteringPhoneDisplay(incoming) ||
+      unverifiedCollapsedPhone ||
+      incoming ||
+      "—";
+    const nameDisp = isUnverified
+      ? phoneDisp
+      : String(displayLabel || "").trim() || phoneDisp;
+    return (
+      <div
+        className={`companion-mini-case-layer ${className || ""}`.trim()}
+        data-companion-surface="mini-case"
+        data-platform={platform}
+      >
+        <CompanionMiniCase
+          displayName={nameDisp}
+          phoneLabel={phoneDisp}
+          statusLabel={isUnverified ? "미인증" : verified ? "인증" : "미인증"}
+          durationLabel={companionDurationLabel}
+          verified={Boolean(verified && !isUnverified)}
+          onExpand={expandShowcaseFromMiniCase}
+        />
+      </div>
+    );
+  }
+
   return (
     <article
       className={`${shellBase} ${shellTone} ${platformClass} ${heightClass} ${shellPreviewClass} ${className}`.trim()}
       data-platform={platform}
       data-expanded={isExpandedView ? "true" : "false"}
+      data-companion-surface={useCompanionDelegate ? "showcase" : undefined}
       data-tier={isPaidMember ? "paid" : isFreeMember ? "free" : isUnverified ? "unverified" : "none"}
       aria-live="polite"
     >

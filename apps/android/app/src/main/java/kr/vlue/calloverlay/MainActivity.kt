@@ -713,7 +713,6 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         if (LetteringPermissionHelper.hasCallOverlayReady(this)) {
             LetteringPrefs.setLetteringEnabled(this, true)
             Toast.makeText(this, "통화·오버레이 권한이 준비되었습니다.", Toast.LENGTH_SHORT).show()
-            promptDefaultDialerIfNeeded()
             return
         }
         AlertDialog.Builder(this)
@@ -742,46 +741,14 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             return
         }
         LetteringPrefs.setLetteringEnabled(this, true)
-        promptDefaultDialerIfNeeded()
     }
 
     /**
-     * Android 「기본 전화 앱」안내.
-     * 일반 전화(걸기·받기·요금)는 그대로이고, 통화 화면에 쇼케이스·키패드를 붙이기 위한 설정.
-     * 이미 VLUE가 기본이면 / Role 불가 기기면 조용히 스킵.
+     * 기본 전화 앱(ROLE_DIALER) 안내는 사용하지 않음.
+     * Companion MVP: VLUE는 전화 앱이 아니며 삼성 전화 앱 위 오버레이로 쇼케이스만 표시.
      */
     fun promptDefaultDialerIfNeeded() {
-        val helper = kr.vlue.calloverlay.incall.DialerRoleHelper
-        if (helper.isDefaultDialer(this)) {
-            Toast.makeText(this, "VLUE가 이미 기본 전화 앱입니다.", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (!helper.isDialerRoleAvailable(this)) {
-            Toast.makeText(
-                this,
-                "이 기기에서는 기본 전화 앱 변경이 제한됩니다. 「다른 앱 위에 표시」로 쇼케이스를 띄웁니다.",
-                Toast.LENGTH_LONG
-            ).show()
-            return
-        }
-        AlertDialog.Builder(this)
-            .setTitle("VLUE를 기본 전화 앱으로 사용할까요?")
-            .setMessage(
-                "통신사 일반 전화(걸기·받기·요금)는 그대로입니다.\n\n" +
-                    "기본 전화 앱으로 지정하면 통화 연결 시 VLUE가 통화 화면(디지털 인증명함·쇼케이스)을 보여 주고, 키패드·종료를 안정적으로 제어합니다.\n\n" +
-                    "나중에 휴대폰 설정 → 기본 앱 → 전화 앱에서 바꿀 수 있습니다."
-            )
-            .setPositiveButton("VLUE로 설정") { _, _ ->
-                helper.requestDefaultDialer(this)
-            }
-            .setNegativeButton("나중에") { _, _ ->
-                Toast.makeText(
-                    this,
-                    "나중에 설정 → VLUE 레터링 → 「기본 전화 앱으로 설정」에서 다시 안내할 수 있습니다.",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-            .show()
+        /* no-op */
     }
 
     override fun onRequestPermissionsResult(
@@ -796,8 +763,6 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 Toast.makeText(this, "통화 권한이 허용되었습니다. 레터링이 켜집니다.", Toast.LENGTH_SHORT).show()
                 if (!LetteringPermissionHelper.canDrawOverlays(this)) {
                     LetteringPermissionHelper.openOverlaySettings(this)
-                } else {
-                    promptDefaultDialerIfNeeded()
                 }
             } else {
                 Toast.makeText(this, "전화·통화기록 권한이 필요합니다. 설정에서 허용해 주세요.", Toast.LENGTH_LONG).show()

@@ -37,7 +37,7 @@ class LetteringJavascriptBridge(
         endCallKeepOverlay()
     }
 
-    /** 통화 종료 + 오버레이 닫기 */
+    /** 통화 종료 + 오버레이 닫기. MainActivity·모니터는 종료하지 않음. */
     @JavascriptInterface
     fun endCall() {
         try {
@@ -87,6 +87,59 @@ class LetteringJavascriptBridge(
     fun setOverlayFullscreen(value: String) {
         val on = value == "1" || value.equals("true", ignoreCase = true)
         service.setOverlayFullscreen(on)
+    }
+
+    /**
+     * Companion MVP — Showcase를 Mini Case로 접고 삼성(시스템) 전화 UI가 보이도록 오버레이를 축소한다.
+     * ROLE_DIALER 없이 SYSTEM_ALERT_WINDOW 오버레이만 조정.
+     */
+    @JavascriptInterface
+    fun revealSystemCallUi() {
+        try {
+            service.setOverlayFullscreen(false)
+            service.notifyWebCallState("reveal_system_call_ui")
+        } catch (e: Exception) {
+            Log.e(TAG, "revealSystemCallUi failed", e)
+        }
+    }
+
+    /** Companion MVP — Mini Case에서 Showcase 전체화면 복귀 */
+    @JavascriptInterface
+    fun restoreShowcaseOverlay() {
+        try {
+            service.setOverlayFullscreen(true)
+            service.notifyWebCallState("restore_showcase")
+        } catch (e: Exception) {
+            Log.e(TAG, "restoreShowcaseOverlay failed", e)
+        }
+    }
+
+    /**
+     * Companion Mini Case — 드래그 위치·크기를 네이티브 플로팅 윈도우에 반영.
+     * React 논리 좌표(CSS px × density)와 WindowManager x/y/w/h 를 동일하게 유지.
+     * 자동 가장자리 정렬 없음. 통화 중 사용자가 놓은 위치 유지.
+     */
+    @JavascriptInterface
+    fun updateMiniOverlayFrame(x: String, y: String, w: String, h: String) {
+        try {
+            val xi = x.toFloatOrNull()?.toInt() ?: return
+            val yi = y.toFloatOrNull()?.toInt() ?: return
+            val wi = w.toFloatOrNull()?.toInt() ?: return
+            val hi = h.toFloatOrNull()?.toInt() ?: return
+            service.updateMiniOverlayFrame(xi, yi, wi, hi)
+        } catch (e: Exception) {
+            Log.e(TAG, "updateMiniOverlayFrame failed", e)
+        }
+    }
+
+    @JavascriptInterface
+    fun getScreenSizeJson(): String {
+        return try {
+            service.getScreenSizeJson()
+        } catch (e: Exception) {
+            Log.e(TAG, "getScreenSizeJson failed", e)
+            """{"w":360,"h":640,"d":1}"""
+        }
     }
 
     @JavascriptInterface
@@ -213,6 +266,10 @@ class LetteringJavascriptBridge(
                 window.VlueLettering.endCallOnly = function(){ Android.endCallOnly(); };
                 window.VlueLettering.answerCall = function(){ Android.answerCall(); };
                 window.VlueLettering.setOverlayFullscreen = function(v){ Android.setOverlayFullscreen(String(v)); };
+                window.VlueLettering.revealSystemCallUi = function(){ Android.revealSystemCallUi(); };
+                window.VlueLettering.restoreShowcaseOverlay = function(){ Android.restoreShowcaseOverlay(); };
+                window.VlueLettering.updateMiniOverlayFrame = function(x,y,w,h){ Android.updateMiniOverlayFrame(String(x),String(y),String(w),String(h)); };
+                window.VlueLettering.getScreenSizeJson = function(){ return Android.getScreenSizeJson(); };
                 window.VlueLettering.setMicrophoneMute = function(v){ return Android.setMicrophoneMute(String(v)); };
                 window.VlueLettering.isMicrophoneMute = function(){ return Android.isMicrophoneMute(); };
                 window.VlueLettering.setSpeakerphoneOn = function(v){ return Android.setSpeakerphoneOn(String(v)); };

@@ -88,18 +88,35 @@ object LetteringCallCoordinator {
             LetteringPrefs.setLastCallEvent(app, "idle")
             LetteringIncomingNotifier.cancel(app)
             LetteringRingingActivity.requestFinish(app)
+
+            /*
+             * 통화 종료 = 통화 UI(CallOverlay / Showcase / Mini Case)만 제거.
+             * MainActivity·LetteringCallMonitorService 는 중지하지 않음 — 카톡형 상시 대기.
+             */
+            if (CompanionMvpConfig.DELEGATE_CALL_UI) {
+                VlueInCallController.keepOverlayAfterHangup = false
+                dismissCallOverlayOnly(app)
+                return
+            }
+
+            /* Advanced: 통화 종료 후 쇼케이스 사후 감상 유지 옵션 */
             if (VlueInCallController.keepOverlayAfterHangup) {
                 VlueInCallController.keepOverlayAfterHangup = false
                 CallOverlayService.notifyKeepAfterEnd(app)
                 return
             }
-            val intent = Intent(app, CallOverlayService::class.java).apply {
-                action = CallOverlayService.ACTION_DISMISS
-            }
-            app.startService(intent)
+            dismissCallOverlayOnly(app)
         } catch (e: Exception) {
             Log.e(TAG, "onCallEnded failed", e)
         }
+    }
+
+    /** CallOverlayService 만 stop — 앱 프로세스·통화 모니터 FGS 는 유지 */
+    private fun dismissCallOverlayOnly(app: Context) {
+        val intent = Intent(app, CallOverlayService::class.java).apply {
+            action = CallOverlayService.ACTION_DISMISS
+        }
+        app.startService(intent)
     }
 
     private fun startOverlayService(

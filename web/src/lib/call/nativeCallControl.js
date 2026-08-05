@@ -113,6 +113,42 @@ export function nativeRestoreShowcaseOverlay() {
   return callBridge("restoreShowcaseOverlay") !== false;
 }
 
+/**
+ * Companion Mini Case — 네이티브 플로팅 오버레이 위치·크기 (CSS px → 네이티브에서 density 적용 전 가정: 호출측에서 물리 px 전달)
+ * @param {number} x
+ * @param {number} y
+ * @param {number} w
+ * @param {number} h
+ */
+export function nativeUpdateMiniOverlayFrame(x, y, w, h) {
+  return callBridge("updateMiniOverlayFrame", String(Math.round(x)), String(Math.round(y)), String(Math.round(w)), String(Math.round(h))) !== false;
+}
+
+/** @returns {{ w: number, h: number, d: number } | null} */
+export function nativeGetScreenSize() {
+  try {
+    const raw =
+      window.VlueLettering?.getScreenSizeJson?.() ||
+      window.Android?.getScreenSizeJson?.();
+    if (!raw) return null;
+    const o = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const w = Number(o?.w) || 0;
+    const h = Number(o?.h) || 0;
+    const d = Number(o?.d) || 1;
+    if (w < 1 || h < 1) return null;
+    return { w, h, d };
+  } catch {
+    return null;
+  }
+}
+
+export function hasNativeMiniOverlay() {
+  return Boolean(
+    window.VlueLettering?.updateMiniOverlayFrame ||
+      window.Android?.updateMiniOverlayFrame
+  );
+}
+
 export function hasNativeCallControl() {
   return Boolean(
     window.VlueLettering?.endCall ||

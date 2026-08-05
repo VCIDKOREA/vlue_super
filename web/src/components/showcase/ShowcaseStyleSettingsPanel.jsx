@@ -47,7 +47,7 @@ import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
 import { syncShowcaseTagsToServer, fetchShowcaseSearchPrivacy, saveShowcaseSearchPrivacy } from "../../lib/showcase/showcaseTagsApi.js";
 import { checkShowcaseLinkUri, WEB_RISK_BLOCK_MESSAGE } from "../../lib/showcase/webRiskLinkCheck.js";
-import { readImageFileAsDataUrl } from "../../lib/readImageFile.js";
+import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
 import { VLUE_SHOWCASE } from "../../lib/vlueBrandSpaces.js";
 import ShowcasePremiumGateModal from "./ShowcasePremiumGateModal.jsx";
 import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
@@ -1466,14 +1466,27 @@ function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = f
 
   const onPickLogo = async (file) => {
     if (!file) return;
-    try {
-      const { dataUrl } = await readImageFileAsDataUrl(file);
-      setLogoUrl(dataUrl);
-      if (error) setError("");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "로고 이미지를 읽을 수 없습니다.";
+    if (!/^image\//i.test(file.type || "")) {
+      const msg = "이미지 파일만 선택할 수 있습니다.";
       setError(msg);
       onToast?.(msg);
+      return;
+    }
+    setBusy(true);
+    try {
+      /* data URL 로컬 저장은 동기화·서버 저장 시 유실됨 → R2 https URL 사용 */
+      const uploaded = await compressAndUploadMediaImageOrThrow(file, "logo");
+      const nextUrl = String(uploaded?.url || "").trim();
+      if (!nextUrl) throw new Error("로고 업로드 URL이 비어 있습니다.");
+      setLogoUrl(nextUrl);
+      if (error) setError("");
+      onToast?.("링크 로고를 올렸습니다. 적용을 눌러 저장하세요.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "로고 이미지를 올릴 수 없습니다.";
+      setError(msg);
+      onToast?.(msg);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -1496,11 +1509,19 @@ function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = f
         onToast?.(msg);
         return;
       }
+      let resolvedLogo = String(logoUrl || "").trim();
+      /* 예전 data: 로고가 남아 있으면 표시 불가 — 재업로드 유도 */
+      if (resolvedLogo.startsWith("data:")) {
+        const msg = "링크 로고를 다시 선택해 주세요. (클라우드 저장용으로 변경됨)";
+        setError(msg);
+        onToast?.(msg);
+        return;
+      }
       const nextLink = {
         id: singleMode && links[0]?.id ? links[0].id : `link-${Date.now()}`,
         name: linkName,
         url: String(check.uri || linkUrl).trim(),
-        logoUrl: logoUrl || ""
+        logoUrl: resolvedLogo
       };
       onChange(singleMode ? [nextLink] : [...links, nextLink]);
       clearDraft();
@@ -1592,7 +1613,9 @@ function BizLinkEditor({ links = [], inputCls, onChange, onToast, isDarkMode = f
               </button>
             ) : null}
           </div>
-          <p className="showcase-biz-link-editor__logo-hint">없으면 기본 버튼으로 표시됩니다.</p>
+          <p className="showcase-biz-link-editor__logo-hint">
+            없으면 「링크」 기본 버튼으로 표시됩니다. 사진은 업로드 후 「적용」을 눌러야 저장됩니다.
+          </p>
           <input
             ref={logoInputRef}
             type="file"

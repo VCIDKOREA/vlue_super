@@ -28,6 +28,7 @@ import {
   nativeAnswerCall,
   nativeEndCallKeepOverlay,
   nativeRejectCall,
+  nativeRevealSystemCallUi,
   nativeSetOverlayFullscreen
 } from "../../lib/call/nativeCallControl.js";
 import { openExternalHref, formatWebHref } from "../../lib/showcase/showcaseContactActions.js";
@@ -37,6 +38,8 @@ import TentCallActionBar from "./TentCallActionBar.jsx";
 import InCallControlBar from "../call/InCallControlBar.jsx";
 import InCallKakaoShareSlot from "../call/InCallKakaoShareSlot.jsx";
 import InCallDtmfPad from "../call/InCallDtmfPad.jsx";
+import CompanionSamsungCallCta from "../call/CompanionSamsungCallCta.jsx";
+import { COMPANION_MVP_DELEGATE_CALL_UI } from "../../lib/call/companionMvpFlags.js";
 import {
   resolveCallPeerMatrixSync,
   resolveInCallKakaoSlot
@@ -587,14 +590,28 @@ export default function TentShowcaseOverlay({
 
       {!previewMode ? (
         isConnected || callState === CALL_STATES.ENDED ? (
-          <InCallControlBar
-            platform="android"
-            onEnd={handleEnd}
-            showEndButton
-            endLabel="통화종료"
-            keypadOpen={keypadOpen}
-            onKeypadOpenChange={setKeypadOpen}
-          />
+          COMPANION_MVP_DELEGATE_CALL_UI ? (
+            <CompanionSamsungCallCta
+              onOpen={() => {
+                try {
+                  nativeSetOverlayFullscreen(false);
+                  nativeRevealSystemCallUi();
+                } catch {
+                  /* ignore */
+                }
+                onToast?.("삼성 전화앱에서 키패드·음소거·스피커·종료를 사용하세요.");
+              }}
+            />
+          ) : (
+            <InCallControlBar
+              platform="android"
+              onEnd={handleEnd}
+              showEndButton
+              endLabel="통화종료"
+              keypadOpen={keypadOpen}
+              onKeypadOpenChange={setKeypadOpen}
+            />
+          )
         ) : (
           <TentCallActionBar
             callState={callState}

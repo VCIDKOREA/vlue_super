@@ -33,9 +33,11 @@ import kr.vlue.calloverlay.showcase.ShowcaseProximitySensor
 class CallOverlayService : Service() {
     private var windowManager: WindowManager? = null
     private var rootContainer: FrameLayout? = null
+    private var nativeBanner: LinearLayout? = null
     private var webView: WebView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private var dismissing = false
+    private var miniMode = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -105,6 +107,7 @@ class CallOverlayService : Service() {
         banner.addView(title)
         banner.addView(phoneTv)
         banner.addView(hint)
+        nativeBanner = banner
         container.addView(
             banner,
             FrameLayout.LayoutParams(
@@ -210,28 +213,85 @@ class CallOverlayService : Service() {
     private fun dp(v: Int): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
 
+    private fun screenSizePx(): Pair<Int, Int> {
+        val dm = resources.displayMetrics
+        return Pair(dm.widthPixels, dm.heightPixels)
+    }
+
+    /**
+     * Companion Mini Case — 작은 플로팅 윈도우.
+     * 자동 가장자리 스냅 없음. JS가 드래그한 x/y를 그대로 반영. 화면 밖 완전 이탈은 JS에서 clamp.
+     */
+    fun updateMiniOverlayFrame(xPx: Int, yPx: Int, wPx: Int, hPx: Int) {
+        mainHandler.post {
+            val wm = windowManager ?: return@post
+            val view = rootContainer ?: return@post
+            val params = layoutParams ?: return@post
+            val (sw, sh) = screenSizePx()
+            val keep = dp(28)
+            val w = wPx.coerceIn(keep, sw)
+            val h = hPx.coerceIn(keep, sh)
+            val minX = keep - w
+            val maxX = sw - keep
+            val minY = keep - h
+            val maxY = sh - keep
+            params.width = w
+            params.height = h
+            params.x = xPx.coerceIn(minX, maxX)
+            params.y = yPx.coerceIn(minY, maxY)
+            params.gravity = Gravity.TOP or Gravity.START
+            miniMode = true
+            nativeBanner?.visibility = android.view.View.GONE
+            try {
+                wm.updateViewLayout(view, params)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     fun setOverlayFullscreen(fullscreen: Boolean) {
         mainHandler.post {
             val wm = windowManager ?: return@post
             val view = rootContainer ?: return@post
             val params = layoutParams ?: return@post
             if (fullscreen) {
+                miniMode = false
                 params.height = WindowManager.LayoutParams.MATCH_PARENT
                 params.width = WindowManager.LayoutParams.MATCH_PARENT
+                params.x = 0
                 params.y = 0
                 params.gravity = Gravity.TOP or Gravity.START
                 params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                /* 연결 후 Showcase — 네이티브 폴백 배너는 웹 UI에 맡김 */
+                nativeBanner?.visibility = android.view.View.GONE
             } else {
-                params.height = WindowManager.LayoutParams.WRAP_CONTENT
-                params.width = WindowManager.LayoutParams.MATCH_PARENT
-                params.y = 48
-                params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                /* Companion Mini Case — 기본 프레임은 최초 진입 시에만. JS session 위치가 곧 이어짐 */
+                if (!miniMode) {
+                    val (sw, _) = screenSizePx()
+                    val w = (sw * 0.78f).toInt().coerceIn(dp(200), sw - dp(24))
+                    val h = dp(110)
+                    val x = ((sw - w) / 2).coerceAtLeast(dp(12))
+                    val y = dp(56)
+                    params.width = w
+                    params.height = h
+                    params.x = x
+                    params.y = y
+                }
+                miniMode = true
+                nativeBanner?.visibility = android.view.View.GONE
+                params.gravity = Gravity.TOP or Gravity.START
             }
             try {
                 wm.updateViewLayout(view, params)
             } catch (_: Exception) {
             }
         }
+    }
+
+    /** CSS px 클램프용 — WebView가 Mini Case로 줄어든 뒤에도 전체 화면 크기 제공 */
+    fun getScreenSizeJson(): String {
+        val dm = resources.displayMetrics
+        return """{"w":${dm.widthPixels},"h":${dm.heightPixels},"d":${dm.density}}"""
     }
 
     fun notifyWebCallState(state: String) {
@@ -243,6 +303,10 @@ class CallOverlayService : Service() {
         }
     }
 
+    /**
+     * 통화 오버레이(WebView)만 닫고 이 서비스만 stopSelf.
+     * MainActivity·LetteringCallMonitorService·앱 프로세스는 종료하지 않는다.
+     */
     fun dismissOverlay() {
         if (dismissing) return
         dismissing = true
@@ -273,6 +337,9 @@ class CallOverlayService : Service() {
         }
         rootContainer = null
         layoutParams = null
+        nativeBanner = null
+        webView = null
+        miniMode = false
         dismissing = false
     }
 
