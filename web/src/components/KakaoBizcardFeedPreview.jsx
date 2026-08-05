@@ -120,7 +120,11 @@ export default function KakaoBizcardFeedPreview({
       const phone = String(fixed.phone || snap.phone || "").trim();
       if (cancelled) return;
       if (phone) {
-        setViewUrl(buildPublicShowcaseUrl(phone));
+        setViewUrl(
+          buildPublicShowcaseUrl(phone, "", {
+            cacheKey: `og3${String(snap.name || "").replace(/\s+/g, "").slice(0, 12) || "share"}`
+          })
+        );
       } else {
         setViewUrl("");
       }

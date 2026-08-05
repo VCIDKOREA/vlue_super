@@ -120,13 +120,22 @@ export function buildHostedCardViewUrl(apiBase, cardId) {
   return `${base}/api/v1/card/view/${encodeURIComponent(cardId)}`;
 }
 
-/** 카카오·문자 등 외부 공유용 — OG 메타가 있는 서버 랜딩 → SPA 쇼케이스 */
-export function buildPublicShowcaseUrl(phone, devOrigin = "") {
+/**
+ * 카카오·문자 등 외부 공유용 — OG 메타가 있는 서버 랜딩 → SPA 쇼케이스
+ * @param {string} phone
+ * @param {string} [devOrigin]
+ * @param {{ cacheKey?: string }} [opts] — 카카오 OG 서버 캐시 무효화용 (?v=). 폰 앱 캐시 삭제와 무관.
+ */
+export function buildPublicShowcaseUrl(phone, devOrigin = "", opts = {}) {
   const apiBase = resolvePublicCardApiBase(devOrigin);
   const digits = String(phone || "").replace(/\D/g, "");
   const local = digits.startsWith("82") ? `0${digits.slice(2)}` : digits;
   if (!local) return "";
-  return `${apiBase}/api/v1/showcase/view/${encodeURIComponent(local)}`;
+  const base = `${apiBase}/api/v1/showcase/view/${encodeURIComponent(local)}`;
+  const rawKey = String(opts?.cacheKey || "").trim();
+  if (!rawKey) return base;
+  const v = rawKey.replace(/[^\w.-]/g, "").slice(0, 40);
+  return v ? `${base}?v=${encodeURIComponent(v)}` : base;
 }
 
 /** SPA 쇼케이스 직접 경로 (알림톡 버튼·앱 웹뷰용 — OG 불필요) */
