@@ -7,10 +7,10 @@ import KakaoBizcardFeedPreview from "./KakaoBizcardFeedPreview.jsx";
 import HelpTip from "./HelpTip.jsx";
 
 const SHOWCASE_SHARE_HELP_PAID =
-  "「카카오톡으로 보내기」는 카드 미리보기와 함께 전달됩니다.\n「주소 복사」는 채팅방에 붙여넣기용이며, 카카오가 링크 미리보기를 만들 때까지 수 초~수 분 걸릴 수 있습니다.\n\n· 명함이 있으면 쇼케이스 안에 함께 표시됩니다.\n· 검색 목록 공개 여부는 「쇼케이스 검색」 설정에서 따로 관리합니다.";
+  "카카오에 보이는 카드와 같은 형태로 미리보기를 보여 줍니다.\n\n· 「카카오톡으로 보내기」: 카드(제목·썸네일)가 바로 전달됩니다.\n· 「주소 복사」 후 채팅에 붙여넣기: 카카오가 링크를 읽어 미리보기를 만듭니다(수 초~수 분, 예전 「비공개」 캐시가 남을 수 있음).\n\n· 배경 썸네일은 카카오 카드 상단 이미지입니다.\n· 검색 목록 공개는 「쇼케이스 검색」 설정에서 따로 관리합니다.";
 
 const SHOWCASE_SHARE_HELP_FREE =
-  "「카카오톡으로 보내기」를 권장합니다. 주소만 붙여넣으면 미리보기가 안 뜨거나 늦게 뜰 수 있습니다.\n\n· 무료 회원: 이름·VLUE ID·전화번호가 노출됩니다.\n· 검색 목록 공개 여부는 「쇼케이스 검색」 설정에서 따로 관리합니다.";
+  "「쇼케이스 주소 복사」 후 채팅에 붙여넣으면, 아래 미리보기와 비슷한 카카오 링크 카드가 뜹니다(수 초~수 분 걸릴 수 있음).\n\n· 무료 회원: 이름·VLUE ID·전화번호가 노출될 수 있습니다.\n· 검색 목록 공개는 「쇼케이스 검색」 설정에서 따로 관리합니다.";
 
 function readVlueHandleDisplay() {
   try {
@@ -114,7 +114,8 @@ export default function LetteringBizcardSharePanel({
         <HelpTip text={isPaid ? SHOWCASE_SHARE_HELP_PAID : SHOWCASE_SHARE_HELP_FREE} isDarkMode={isDarkMode} />
       </div>
       <p className={`mt-1 text-[11px] font-normal leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-        미리보기 확인 후{" "}
+        아래는 <span className={isDarkMode ? "text-cyan-200/90" : "text-slate-600"}>카카오톡에 뜨는 링크 카드</span>와
+        같은 미리보기입니다. 확인 후{" "}
         <span className={isDarkMode ? "text-cyan-200/90" : "text-slate-600"}>
           {isPaid ? "카카오톡으로 보내기" : "쇼케이스 주소 복사"}
         </span>

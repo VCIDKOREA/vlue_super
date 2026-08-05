@@ -102,7 +102,7 @@ showcasePublicRoutes.get("/view/:phone", async (c) => {
     const spaUrl = `${webOrigin}/site/web/showcase/${encodeURIComponent(digits)}`;
     const shareUrl = `${apiBase}/api/v1/showcase/view/${encodeURIComponent(digits)}`;
 
-    const lookup = await lookupCardByRawNumber(digits);
+    const lookup = await lookupCardByRawNumber(digits, { forPublicOgShare: true });
     const body = lookup.status === 200 ? lookup.body : null;
     const matched = Boolean(body && (body as { matched?: boolean }).matched);
 

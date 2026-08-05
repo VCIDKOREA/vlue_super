@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ImagePlus, Trash2 } from "lucide-react";
-import { readProfilePhotoAvatar, scrubBrandAvatarsFromStorage } from "../lib/vlueAvatar.js";
 import { withLetteringBizcardPreviewFallback } from "../lib/letteringBizcardProfile.js";
 import { scrubLetteringDemoPollution } from "../lib/letteringDemoPollution.js";
 import { syncDigitalCardExportSnapshot } from "../lib/digitalCardApi.js";
@@ -16,19 +15,8 @@ import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCa
 import { VLUE_SHOWCASE_DEMO_RECORDING_SEC } from "../lib/vlueShowcaseCard.js";
 import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
-import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
-import UserProfileAvatar from "./UserProfileAvatar.jsx";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import { compressAndUploadMediaImageOrThrow } from "../lib/mediaImageUpload.js";
-
-function buildTags(card) {
-  const tags = [];
-  const title = String(card.title || "").trim();
-  const dept = String(card.department || "").trim();
-  if (dept) tags.push(dept);
-  if (title && title !== dept) tags.push(title);
-  return tags.slice(0, 3);
-}
 
 function openExternalSafely(url) {
   if (!url) return false;
@@ -72,8 +60,20 @@ function readVlueHandleDisplay() {
   }
 }
 
+/** 서버 OG description 과 동일 순서 (showcaseOgLandingPage) */
+function buildOgDescription({ org, role, handle, phone }) {
+  const parts = [
+    String(org || "").trim(),
+    String(role || "").trim(),
+    String(handle || "").trim(),
+    String(phone || "").trim(),
+    "VLUE 인증 · 안심 통신 프로필"
+  ].filter(Boolean);
+  return parts.slice(0, 3).join(" · ") || "VLUE 디지털 쇼케이스";
+}
+
 /**
- * 카카오톡에 붙여넣을 때 보이는 「쇼케이스 카드」 UI 미리보기
+ * 카카오톡에 링크가 붙을 때 보이는 OG/피드 카드와 동일한 미리보기
  */
 export default function KakaoBizcardFeedPreview({
   card,
@@ -86,7 +86,6 @@ export default function KakaoBizcardFeedPreview({
     () => scrubLetteringDemoPollution(withLetteringBizcardPreviewFallback(card || {})),
     [card]
   );
-  const [avatarTick, setAvatarTick] = useState(0);
   const [coverTick, setCoverTick] = useState(0);
   const fileRef = useRef(null);
   const name = String(snap.name || "").trim();
@@ -95,23 +94,12 @@ export default function KakaoBizcardFeedPreview({
   const vlueHandle = readVlueHandleDisplay();
   const title = String(snap.title || "").trim();
   const dept = String(snap.department || "").trim();
-  const roleLine = isPaid
-    ? [dept, title].filter(Boolean).join(" | ")
-    : [vlueHandle, String(snap.phone || readLetteringFixedIdentity().phone || "").trim()]
-        .filter(Boolean)
-        .join(" · ");
-  const tags = useMemo(() => buildTags(snap), [snap]);
-  const avatarUrl = useMemo(() => {
-    scrubBrandAvatarsFromStorage();
-    /* 사람 얼굴 = 프로필 사진. 회사 로고(card)와 섞지 않음 */
-    return readProfilePhotoAvatar();
-  }, [avatarTick, snap.name]);
+  const role = isPaid ? [title, dept].filter(Boolean).join(" · ") : title;
   const coverUrl = useMemo(() => {
     const ed = readLetteringBizcardEditable();
     return String(ed.kakaoFeedBgDataUrl || snap.shareCoverUrl || "").trim();
   }, [coverTick, snap.shareCoverUrl]);
   const displayName = name || "명함 미설정";
-  const hasProfile = Boolean(name || org || roleLine || tags.length);
   const [viewUrl, setViewUrl] = useState("");
   const [liveOpen, setLiveOpen] = useState(false);
   const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
@@ -124,12 +112,6 @@ export default function KakaoBizcardFeedPreview({
       ),
     [snap, membershipTier]
   );
-
-  useEffect(() => {
-    const bump = () => setAvatarTick((n) => n + 1);
-    window.addEventListener("vlue-avatar-changed", bump);
-    return () => window.removeEventListener("vlue-avatar-changed", bump);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -215,9 +197,26 @@ export default function KakaoBizcardFeedPreview({
     onToast?.("배경 썸네일을 제거했습니다.");
   };
 
+  const phoneLine = String(snap.phone || readLetteringFixedIdentity().phone || "").trim();
+  const ogTitle = `${displayName}님의 VLUE 쇼케이스`;
+  const ogDescription = buildOgDescription({
+    org,
+    role,
+    handle: vlueHandle,
+    phone: phoneLine
+  });
+  const ogHost = (() => {
+    try {
+      if (viewUrl) return new URL(viewUrl).hostname;
+    } catch {
+      /* ignore */
+    }
+    return "api.vlue.kr";
+  })();
+
   const headerStyle = coverUrl
     ? {
-        backgroundImage: `linear-gradient(180deg, rgba(11,26,51,0.35), rgba(11,26,51,0.55)), url(${coverUrl})`,
+        backgroundImage: `url(${coverUrl})`,
         backgroundSize: "cover",
         backgroundPosition: "center"
       }
@@ -247,51 +246,30 @@ export default function KakaoBizcardFeedPreview({
     <div
       className={`vlue-kakao-feed-preview mt-2 overflow-hidden rounded-2xl ${className}`}
       data-theme={isDarkMode ? "dark" : "light"}
-      aria-label="카카오 명함 카드 미리보기"
+      aria-label="카카오톡 링크 카드 미리보기"
     >
-      <div className="vlue-kakao-feed-preview__header" style={headerStyle}>
-        <div className="vlue-kakao-feed-preview__row">
-          <div className="vlue-kakao-feed-preview__avatar">
-            <UserProfileAvatar src={avatarUrl} blankClassName="bg-[#c5cdd6] text-[#8b95a1]" />
-          </div>
-          <div className="vlue-kakao-feed-preview__meta">
-            <p className="vlue-kakao-feed-preview__name">{displayName}</p>
-            {roleLine ? <p className="vlue-kakao-feed-preview__role">{roleLine}</p> : null}
-            {org ? <p className="vlue-kakao-feed-preview__org">{org}</p> : null}
-            {!hasProfile ? (
-              <p className="vlue-kakao-feed-preview__role">명함 수정에서 회사·직책 정보를 입력하세요.</p>
-            ) : null}
-          </div>
+      {/* 카카오 채팅 링크 미리보기와 동일: 상단 이미지 + 제목 + 설명 + 도메인 */}
+      <button
+        type="button"
+        className="vlue-kakao-og-card"
+        onClick={openFullShowcase}
+        aria-label="쇼케이스 미리보기 열기"
+      >
+        <div
+          className={`vlue-kakao-og-card__cover${coverUrl ? "" : " is-empty"}`}
+          style={headerStyle}
+          aria-hidden
+        >
+          {!coverUrl ? (
+            <span className="vlue-kakao-og-card__cover-placeholder">배경 썸네일을 설정하세요</span>
+          ) : null}
         </div>
-        {tags.length > 0 ? (
-          <div className="vlue-kakao-feed-preview__tags">
-            {tags.map((tag) => (
-              <span key={tag} className="vlue-kakao-feed-preview__tag">
-                {tag}
-              </span>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="vlue-kakao-feed-preview__body">
-        <p className="vlue-kakao-feed-preview__cta-line">
-          <span className="vlue-kakao-feed-preview__cta-name">{displayName}</span>
-          <span className="vlue-kakao-feed-preview__cta-rest">님의 쇼케이스를 확인하세요.</span>
-        </p>
-        <button type="button" className="vlue-kakao-feed-preview__cta-btn" onClick={openFullShowcase}>
-          쇼케이스 보기
-        </button>
-        <button type="button" className="vlue-kakao-feed-preview__footer" onClick={openFullShowcase}>
-          <div className="vlue-kakao-feed-preview__brand">
-            <img src={VLUE_SHIELD_LOGO} alt="" className="h-5 w-5 shrink-0 object-contain" />
-            <span>VLUE</span>
-          </div>
-          <span className="vlue-kakao-feed-preview__chev" aria-hidden>
-            ›
-          </span>
-        </button>
-      </div>
+        <div className="vlue-kakao-og-card__text">
+          <p className="vlue-kakao-og-card__title">{ogTitle}</p>
+          <p className="vlue-kakao-og-card__desc">{ogDescription}</p>
+          <p className="vlue-kakao-og-card__host">{ogHost}</p>
+        </div>
+      </button>
 
       <div className="vlue-kakao-feed-preview__cover-tools">
         <input

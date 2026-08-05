@@ -88,6 +88,22 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
   ).trim();
   const showcaseUrl = phone ? buildPublicShowcaseUrl(phone) : "";
   const viewUrl = showcaseUrl || `${apiBase}/api/v1/card/view/${id}`;
+  /* OG 랜딩(showcaseOgLandingPage)과 동일: org · role · handle · phone · 태그라인 중 최대 3 */
+  const role = [snap.title, snap.department].filter(Boolean).join(" · ");
+  let handle = "";
+  try {
+    const raw = String(localStorage.getItem("vlue_member_handle") || "").trim();
+    if (raw) handle = raw.startsWith("@") ? raw : `@${raw}`;
+  } catch {
+    /* ignore */
+  }
+  const feedDescParts = [
+    String(snap.organization || "").trim(),
+    role,
+    handle,
+    phone,
+    "VLUE 인증 · 안심 통신 프로필"
+  ].filter(Boolean);
   return {
     buttonImageUrl: feedImageUrl,
     buttonPreviewUrl: cardId
@@ -96,7 +112,7 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
     viewUrl,
     createUrl,
     feedTitle: `${String(snap.name || "회원").trim()}님의 VLUE 쇼케이스`,
-    feedDescription: [snap.organization, snap.title, snap.department].filter(Boolean).join(" · ").slice(0, 80),
+    feedDescription: feedDescParts.slice(0, 3).join(" · ").slice(0, 100) || "VLUE 디지털 쇼케이스",
     shareCoverUrl: coverHttp
   };
 }
