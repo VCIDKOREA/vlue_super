@@ -86,11 +86,7 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
   const phone = String(
     readLetteringFixedIdentity()?.phone || snap.phone || card?.phone || ""
   ).trim();
-  const showcaseUrl = phone
-    ? buildPublicShowcaseUrl(phone, "", {
-        cacheKey: `og3${String(snap.name || "").replace(/\s+/g, "").slice(0, 12) || "share"}`
-      })
-    : "";
+  const showcaseUrl = phone ? buildPublicShowcaseUrl(phone) : "";
   const viewUrl = showcaseUrl || `${apiBase}/api/v1/card/view/${id}`;
   /* OG 랜딩(showcaseOgLandingPage)과 동일: org · role · handle · phone · 태그라인 중 최대 3 */
   const role = [snap.title, snap.department].filter(Boolean).join(" · ");

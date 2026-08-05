@@ -126,11 +126,7 @@ export async function copyShowcaseShareUrl(card, opts = {}) {
     }
   }
 
-  /* 카카오 OG 서버 캐시: URL이 같으면 예전 「비공개 회원」이 오래 남음 → v 로 새 스크랩 유도 */
-  const nameHint = String(card?.name || "").replace(/\s+/g, "").slice(0, 12);
-  const viewUrl = buildPublicShowcaseUrl(phone, "", {
-    cacheKey: `og3${nameHint || "share"}`
-  });
+  const viewUrl = buildPublicShowcaseUrl(phone);
   if (!viewUrl) {
     return { ok: false, error: "쇼케이스 주소를 만들지 못했습니다." };
   }
