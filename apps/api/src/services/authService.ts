@@ -4,10 +4,6 @@ import { prisma } from "../db/client.js";
 import { verifyPassword } from "../lib/passwordHash.js";
 import { issueTokenPair } from "./authSessions.js";
 import { assertLineTypeAllowsClient, detectClientKind, type ClientKind } from "../middleware/enterpriseAccess.js";
-import {
-  isMinorForParentalConsent,
-  PARENTAL_CONSENT_PENDING_LOGIN_MESSAGE
-} from "@vlue/shared/policy/minor-signup";
 import { isDeviceAutoApproveHandle, isVlueSeedTestHandle } from "../lib/testAccounts.js";
 import { upsertEnterpriseDraft } from "./b2b/cartEngine.js";
 import { resolveLoginMembershipTier } from "./membership/platformCeoPremium.js";
@@ -113,45 +109,37 @@ export async function loginWithCredentials(
   if (user.status === "DELETED") {
     throw new Error("탈퇴한 계정입니다. 재가입하려면 본인인증부터 다시 진행해 주세요.");
   }
+  /**
+   * 부모 승인 로그인 게이트 폐지.
+   * 과거 정책으로 requiresParentalConsent 만 켜진 계정은 로그인 시 해제.
+   */
   const consentGate = await prisma.user.findUnique({
     where: { id: user.id },
     select: {
       requiresParentalConsent: true,
       parentalConsentAt: true,
-      birthDate: true,
       accountStatus: true,
       businessProfile: { select: { isBusiness: true, businessRegistrationNo: true } }
     }
   });
   if (consentGate?.requiresParentalConsent && !consentGate.parentalConsentAt) {
-    /**
-     * 생년월일 누락·성인인데 부모승인 플래그만 켜진 오탐 계정 자동 해제
-     * (포트원 테스트 MID 등에서 birth 없이 가입된 경우)
-     */
-    const minorFlag = isMinorForParentalConsent(consentGate.birthDate);
-    if (minorFlag !== true) {
-      const isBizPending = Boolean(
-        consentGate.businessProfile?.isBusiness ||
-          String(consentGate.businessProfile?.businessRegistrationNo || "").trim()
-      );
-      const healData: {
-        requiresParentalConsent: boolean;
-        accountStatus?: "active";
-        pendingApprovalAt?: null;
-      } = { requiresParentalConsent: false };
-      if (consentGate.accountStatus === "pending_approval" && !isBizPending) {
-        healData.accountStatus = "active";
-        healData.pendingApprovalAt = null;
-      }
-      await prisma.user.update({ where: { id: user.id }, data: healData });
-      console.warn("[auth] cleared false parental-consent gate", {
-        userId: user.id,
-        birthDate: consentGate.birthDate,
-        minorFlag
-      });
-    } else {
-      throw new Error(PARENTAL_CONSENT_PENDING_LOGIN_MESSAGE);
+    const isBizPending = Boolean(
+      consentGate.businessProfile?.isBusiness ||
+        String(consentGate.businessProfile?.businessRegistrationNo || "").trim()
+    );
+    const healData: {
+      requiresParentalConsent: boolean;
+      accountStatus?: "active";
+      pendingApprovalAt?: null;
+    } = { requiresParentalConsent: false };
+    if (consentGate.accountStatus === "pending_approval" && !isBizPending) {
+      healData.accountStatus = "active";
+      healData.pendingApprovalAt = null;
     }
+    await prisma.user.update({ where: { id: user.id }, data: healData });
+    console.warn("[auth] cleared legacy parental-consent gate (minors may login)", {
+      userId: user.id
+    });
   }
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) {

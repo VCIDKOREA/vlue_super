@@ -393,12 +393,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         }
         setPassOk(true);
         setVerifyZone(null);
-        const needsParent = Boolean(data.requiresParentalConsent) && !data.parentalConsentAt;
-        setRequiresParentalConsent(needsParent);
-        setParentalConsentDone(!needsParent);
-        if (needsParent) {
-          setStep("parent_consent");
-        } else if (draft.signupIntent === "trust") {
+        /* 미성년도 본인 휴대폰이면 즉시 이용 — 부모승인 단계 생략 */
+        setRequiresParentalConsent(false);
+        setParentalConsentDone(true);
+        if (draft.signupIntent === "trust") {
           setAuthMode("recommend");
           setRecPhase(1);
           setStep("recommend_detail");
@@ -833,14 +831,9 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       setVerifyZone(null);
       setPassOk(true);
       clearPassCertDraft();
-      const needsParent =
-        Boolean(data.requiresParentalConsent) && !data.parentalConsentAt;
-      setRequiresParentalConsent(needsParent);
-      setParentalConsentDone(!needsParent);
-      if (needsParent) {
-        setStep("parent_consent");
-        return;
-      }
+      /* 미성년도 본인 휴대폰이면 즉시 이용 — 부모승인 단계 생략 */
+      setRequiresParentalConsent(false);
+      setParentalConsentDone(true);
       if (signupIntent === "trust") {
         setAuthMode("recommend");
         setRecPhase(1);
@@ -939,11 +932,6 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const finishRecommendMinimal = () => {
     if (!recName.trim() || !roadAddress.trim()) {
       setVerifyZone({ ok: false, text: "이름과 등본상 주소를 입력해 주세요." });
-      return;
-    }
-    if (requiresParentalConsent && !parentalConsentDone) {
-      setVerifyZone({ ok: false, text: "법정대리인(부모) VLUE 본인인증 승인을 먼저 완료해 주세요." });
-      setStep("parent_consent");
       return;
     }
     setStep("complete");
@@ -1884,18 +1872,18 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
 
           {step === "parent_consent" && (
             <section className="space-y-4">
-              <h2 className="text-[16px] font-black text-slate-900 sm:text-xl">법정대리인(부모) 동의</h2>
+              <h2 className="text-[16px] font-black text-slate-900 sm:text-xl">가족보호 연동 (선택)</h2>
               <p className="text-[12px] leading-relaxed text-slate-600 sm:text-sm">
-                만 14세 미만은 <strong>개인정보보호법</strong>에 따라 법정대리인 동의가 필요합니다.
-                가족보호(자녀) 기능을 쓰려면 <strong>부모님 VLUE 계정</strong>으로 PASS 본인인증 승인을 받아야 합니다.{" "}
+                만 14세 미만도 <strong>본인 휴대폰 본인인증</strong>으로 가입·이용할 수 있습니다 (쇼케이스 등).
+                사업자·디지털인증명함은 이용할 수 없습니다. 부모님과 <strong>가족보호</strong>를 쓰려면 아래에서 연동할 수 있습니다.{" "}
                 <a href={marketingMinorPolicyUrl()} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 underline">
                   만 14세 미만 정책 보기
                 </a>
               </p>
               <ul className="list-disc space-y-1 pl-4 text-[11px] text-slate-600 sm:text-xs">
                 <li>부모님이 이미 VLUE 회원이어야 합니다 (만 14세 이상).</li>
-                <li>부모 VLUE 아이디로 <strong>승인 요청 푸시</strong>를 보내거나, 이 기기에서 부모님 PASS로 승인할 수 있습니다.</li>
-                <li>승인 완료 시 가족보호 「내 자녀」 연동이 자동으로 시작됩니다.</li>
+                <li>부모 VLUE 아이디로 <strong>승인 요청 푸시</strong>를 보내거나, 이 기기에서 부모님 PASS로 연동할 수 있습니다.</li>
+                <li>연동은 선택이며, 하지 않아도 가입·로그인이 가능합니다.</li>
               </ul>
               <label className="mt-2 block text-[11px] font-bold text-slate-700">부모 VLUE 아이디</label>
               <input
@@ -2056,11 +2044,6 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
               <button
                 type="button"
                 onClick={() => {
-                  if (requiresParentalConsent && !parentalConsentDone) {
-                    setVerifyZone({ ok: false, text: "법정대리인(부모) 승인을 먼저 완료해 주세요." });
-                    setStep("parent_consent");
-                    return;
-                  }
                   if (!roadAddress.trim()) {
                     setVerifyZone({ ok: false, text: "「우편번호 · 주소 찾기」로 등본 주소를 선택해 주세요." });
                     return;

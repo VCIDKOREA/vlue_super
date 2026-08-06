@@ -1,17 +1,25 @@
-/** 만 14세 미만 — 법정대리인(부모) 동의 후 가입 (가족보호 자녀 계정) */
+/** 만 14세 미만 — 본인 휴대폰 PASS로 가입 가능 (쇼케이스 등). 사업자·디지털인증명함만 제한 */
 
 export const MIN_SIGNUP_AGE_YEARS = 14;
 
+/** @deprecated 부모 승인 필수 정책은 폐지. 호환용으로만 유지 */
 export const PARENTAL_CONSENT_REQUIRED_MESSAGE =
-  "만 14세 미만은 법정대리인(부모) VLUE 본인인증 승인 후 가입이 완료됩니다.";
+  "만 14세 미만도 본인 휴대폰 본인인증으로 가입할 수 있습니다. 사업자·디지털인증명함은 이용할 수 없습니다.";
 
+/** @deprecated 로그인 차단 폐지 — 호환용 */
 export const PARENTAL_CONSENT_PENDING_LOGIN_MESSAGE =
   "부모 승인이 완료되지 않았습니다. 가입 화면에서 법정대리인 본인인증을 진행해 주세요.";
 
 export const BIRTH_DATE_MISSING_FROM_CERT_MESSAGE =
   "본인인증에서 생년월일을 확인할 수 없습니다. 다시 본인인증을 진행해 주세요.";
 
-/** @deprecated 차단 메시지 — 승인 플로우로 대체 */
+export const MINOR_BUSINESS_SIGNUP_BLOCKED_MESSAGE =
+  "만 14세 미만은 사업자 가입이 불가합니다. 일반 가입(쇼케이스)만 가능합니다.";
+
+export const MINOR_DIGITAL_CARD_BLOCKED_MESSAGE =
+  "만 14세 미만은 디지털인증명함을 신청할 수 없습니다. 쇼케이스는 이용할 수 있습니다.";
+
+/** @deprecated */
 export const UNDERAGE_SIGNUP_MESSAGE = PARENTAL_CONSENT_REQUIRED_MESSAGE;
 
 export function parseBirthDateYmd(raw: string | null | undefined): string | null {
@@ -38,7 +46,7 @@ export function computeAgeFromBirthYmd(birthYmd: string, asOf: Date = new Date()
 
 /**
  * 생년월일이 유효할 때만 미성년 여부를 판정.
- * 생년월일 없음/형식 오류 → null (보수적으로 "미성년"으로 단정하지 않음 — 호출부에서 거부 또는 재인증).
+ * 생년월일 없음/형식 오류 → null (호출부에서 거부 또는 재인증).
  */
 export function isMinorForParentalConsent(
   birthYmd: string | null | undefined,
@@ -58,7 +66,7 @@ export function isMinorForParentalConsentOrUnknown(
   return v !== false;
 }
 
-/** 만 14세 이상 — 부모 승인 없이 가입 가능 (생년월일 없으면 false) */
+/** 만 14세 이상 (생년월일 없으면 false) */
 export function isAdultSignupAge(
   birthYmd: string | null | undefined,
   asOf: Date = new Date()

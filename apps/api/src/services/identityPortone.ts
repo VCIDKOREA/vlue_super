@@ -26,9 +26,9 @@ import { runAutomatedBusinessOnboarding } from "./onboarding/automatedOnboarding
 import {
   BIRTH_DATE_MISSING_FROM_CERT_MESSAGE,
   isMinorForParentalConsent,
-  PARENTAL_CONSENT_REQUIRED_MESSAGE
+  MINOR_BUSINESS_SIGNUP_BLOCKED_MESSAGE,
+  MINOR_DIGITAL_CARD_BLOCKED_MESSAGE
 } from "@vlue/shared/policy/minor-signup";
-import { syncParentalConsentFromPendingChildInvites } from "./auth/parentalConsentService.js";
 import { recordOnboardingDigitalCardDoc } from "./bizcard/titleDeptReviewService.js";
 import {
   applySignupEmailBundle,
@@ -278,8 +278,9 @@ export async function completePortoneIdentity(params: {
   });
 
   /**
+   * 만 14세 미만: 본인 휴대폰 PASS로 일반 가입·로그인 가능 (쇼케이스).
+   * 사업자·디지털인증명함만 차단. 부모 승인(로그인 게이트)은 요구하지 않음.
    * 생년월일 없음 → 미성년으로 단정하지 않음.
-   * (KG이니시스 테스트 등에서 birth 누락 시 성인에게 부모승인 문구가 뜨던 오탐 방지)
    */
   let minorSignup = false;
   if (!existing && !adminBypass) {
@@ -288,7 +289,7 @@ export async function completePortoneIdentity(params: {
       if (!isPortoneTestMode()) {
         throw new Error(BIRTH_DATE_MISSING_FROM_CERT_MESSAGE);
       }
-      console.warn("[identityPortone] PORTONE_TEST_MODE: birth missing → skip parental consent", {
+      console.warn("[identityPortone] PORTONE_TEST_MODE: birth missing → treat as adult path", {
         birthDate
       });
       minorSignup = false;
@@ -297,7 +298,10 @@ export async function completePortoneIdentity(params: {
     }
   }
   if (minorSignup && params.isBusinessMember) {
-    throw new Error("만 14세 미만은 사업자 가입이 불가합니다. 일반(자녀) 가입만 가능합니다.");
+    throw new Error(MINOR_BUSINESS_SIGNUP_BLOCKED_MESSAGE);
+  }
+  if (minorSignup && params.requestDigitalCard) {
+    throw new Error(MINOR_DIGITAL_CARD_BLOCKED_MESSAGE);
   }
 
   const desiredSlug = normalizeDesiredPublicHandle(params.desiredPublicHandle);
@@ -373,18 +377,14 @@ export async function completePortoneIdentity(params: {
     }
     const passwordHash =
       !adminBypass && params.passwordPlain ? await hashPassword(String(params.passwordPlain)) : null;
-    const status = params.isBusinessMember
-      ? "pending_approval"
-      : minorSignup
-        ? "pending_approval"
-        : "active";
+    const status = params.isBusinessMember ? "pending_approval" : "active";
     const now = new Date();
     const initial = buildInitialLegalNameData({
       legalName,
       portoneIdentityId: params.impUid,
       identityVerifiedAt: now,
       accountStatus: status,
-      pendingApprovalAt: params.isBusinessMember || minorSignup ? now : null
+      pendingApprovalAt: params.isBusinessMember ? now : null
     });
 
     const created = await prisma.user.create({
@@ -409,8 +409,8 @@ export async function completePortoneIdentity(params: {
         referrerCode: String(params.referralCode || "")
           .trim()
           .toUpperCase() || null,
-        requiresParentalConsent: minorSignup,
-        ...(minorSignup ? { pendingApprovalAt: now } : {})
+        /** 부모 승인 게이트 폐지 — 미성년도 즉시 이용 (가족보호 연동은 별도 옵트인) */
+        requiresParentalConsent: false
       }
     });
     userId = created.id;
@@ -418,16 +418,14 @@ export async function completePortoneIdentity(params: {
       await prisma.verificationLog.create({
         data: {
           userId,
-          action: "parental_consent_pending",
-          detail: { birthDate, message: PARENTAL_CONSENT_REQUIRED_MESSAGE },
-          outcome: "pending"
+          action: "minor_signup_active",
+          detail: {
+            birthDate,
+            note: "under_14_own_phone_ok_showcase_only"
+          },
+          outcome: "ok"
         }
       });
-      try {
-        await syncParentalConsentFromPendingChildInvites(userId);
-      } catch (err) {
-        console.warn("[parental-consent] sync_pending_invites_failed", { userId, err });
-      }
     }
     base = {
       userId,
