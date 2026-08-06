@@ -3,10 +3,18 @@
  * @see https://developers.portone.io (레거시 엔드포인트 api.iamport.kr 사용)
  *
  * 환경변수: PORTONE_API_KEY → imp_key, PORTONE_API_SECRET → imp_secret
+ *
+ * KG이니시스 테스트 MID(MIIasTest) 는 CI(unique_key)를 주지 않음.
+ * PORTONE_TEST_MODE=true 일 때만 DI(unique_in_site) 또는 전화+실명 합성키로 통과.
  */
 import { createHash } from "node:crypto";
 
 const IAMPORT_HOST = "https://api.iamport.kr";
+
+export function isPortoneTestMode(): boolean {
+  const raw = String(process.env.PORTONE_TEST_MODE || "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
 
 export async function getIamportAccessToken(impKey: string, impSecret: string): Promise<string> {
   const res = await fetch(`${IAMPORT_HOST}/users/getToken`, {
@@ -46,16 +54,18 @@ export interface IamportCertificationPayload {
   certified?: boolean;
   /** 연계정보(CI) — 서버에 평문 저장하지 말고 해시만 저장 */
   unique_key?: string;
+  /** 사이트별 DI — 테스트 MID에서 CI 대신 올 수 있음 */
+  unique_in_site?: string;
   name?: string;
   phone?: string;
-  birth?: string;
+  birth?: string | number;
   gender?: string;
   certified_at?: number;
 }
 
 /** YYYYMMDD (8자리) */
-export function parseBirthDateYmd(birth: string | undefined | null): string | null {
-  if (!birth) return null;
+export function parseBirthDateYmd(birth: string | number | undefined | null): string | null {
+  if (birth == null || birth === "") return null;
   const d = String(birth).replace(/\D/g, "");
   if (d.length === 8) return d;
   if (d.length === 6) {
@@ -81,24 +91,72 @@ export type ParsedIamportIdentity = {
   phoneE164: string | undefined;
   birthDate: string | null;
   gender: string | null;
-  /** CI 원문 — DB 저장 금지, 해시만 */
+  /** CI 원문(또는 테스트 폴백 키) — DB 저장 금지, 해시만 */
   ciUniqueKey: string;
   certified: boolean;
+  /** true면 CI 대신 DI/합성키 사용 (테스트 전용) */
+  usedTestIdentityFallback?: boolean;
 };
+
+/**
+ * CI가 없을 때 테스트 전용 식별키.
+ * 접두사로 실 CI 해시와 충돌하지 않게 함.
+ */
+export function resolveTestIdentityFallbackKey(payload: IamportCertificationPayload, impUid: string): string | null {
+  const di = String(payload.unique_in_site || "").trim();
+  if (di) return `portone_di:${di}`;
+
+  const legalName = String(payload.name || "").trim();
+  const phoneE164 = normalizeKrPhone(payload.phone);
+  if (legalName && phoneE164) {
+    return `portone_test:${phoneE164}:${legalName}`;
+  }
+
+  const uid = String(impUid || payload.imp_uid || "").trim();
+  if (uid && legalName) {
+    return `portone_test_imp:${uid}:${legalName}`;
+  }
+  return null;
+}
 
 /** 포트원 V1 인증 조회 응답 → 앱·DB용 필드 */
 export function parseIamportCertification(
   impUid: string,
-  payload: IamportCertificationPayload
+  payload: IamportCertificationPayload,
+  opts: { allowTestCiFallback?: boolean } = {}
 ): ParsedIamportIdentity {
   if (!payload.certified) {
     throw new Error("본인인증이 완료되지 않은 건입니다.");
   }
-  const ciUniqueKey = payload.unique_key?.trim();
-  const legalName = payload.name?.trim();
-  if (!ciUniqueKey || !legalName) {
-    throw new Error("인증 응답에 CI(unique_key) 또는 실명(name)이 없습니다.");
+  const legalName = String(payload.name || "").trim();
+  if (!legalName) {
+    throw new Error("인증 응답에 실명(name)이 없습니다.");
   }
+
+  let ciUniqueKey = String(payload.unique_key || "").trim();
+  let usedTestIdentityFallback = false;
+
+  if (!ciUniqueKey) {
+    const allowFallback = opts.allowTestCiFallback ?? isPortoneTestMode();
+    if (!allowFallback) {
+      throw new Error(
+        "인증 응답에 CI(unique_key)가 없습니다. KG이니시스 테스트 MID는 CI를 제공하지 않습니다. 실연동 채널 또는 PORTONE_TEST_MODE=true(테스트 폴백)가 필요합니다."
+      );
+    }
+    const fallback = resolveTestIdentityFallbackKey(payload, impUid);
+    if (!fallback) {
+      throw new Error(
+        "테스트 모드인데 CI·DI·전화번호가 모두 없어 본인인증을 완료할 수 없습니다."
+      );
+    }
+    ciUniqueKey = fallback;
+    usedTestIdentityFallback = true;
+    console.warn("[iamportCert] PORTONE_TEST_MODE: CI 없음 → 테스트 폴백 키 사용", {
+      impUid,
+      fallbackKind: fallback.startsWith("portone_di:") ? "di" : "synthetic"
+    });
+  }
+
   return {
     impUid,
     legalName,
@@ -106,7 +164,8 @@ export function parseIamportCertification(
     birthDate: parseBirthDateYmd(payload.birth),
     gender: parseGenderCode(payload.gender),
     ciUniqueKey,
-    certified: true
+    certified: true,
+    usedTestIdentityFallback
   };
 }
 
@@ -118,7 +177,7 @@ export async function fetchAndParseIamportCertification(
 ): Promise<ParsedIamportIdentity> {
   const token = await getIamportAccessToken(impKey, impSecret);
   const raw = await getIamportCertification(impUid, token);
-  return parseIamportCertification(impUid, raw);
+  return parseIamportCertification(impUid, raw, { allowTestCiFallback: isPortoneTestMode() });
 }
 
 /** Prisma `Bytes` 필드 저장용 (SHA-256) */
