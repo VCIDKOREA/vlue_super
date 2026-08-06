@@ -175,12 +175,19 @@ function WebBizcardHubInner({
   const refreshAccount = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await syncBizcardAccountFromApi();
+      /* 웹 PC: 앱에서 고친 서버본을 우선 — 브라우저 localStorage 예전 값에 막히지 않게 force */
+      const result = await syncBizcardAccountFromApi({ force: true });
       setMembershipTier(result.membershipTier || readMembershipTier());
       setBusinessCards(result.businessCards || []);
       const meta = result.digitalMeta;
       setDigitalCardIssued(meta?.issued !== false);
       if (meta?.issued) setDigitalCardActive(readDigitalCardActive());
+      try {
+        const sync = await import('../../../lib/showcase/showcaseStyleSync.js');
+        await sync.hydrateShowcaseStyleFromServer({ forceServer: true });
+      } catch {
+        /* ignore */
+      }
       const access = await probeEnterpriseSidebarAccess(result.membershipTier);
       setEnterpriseAccess({
         canManage: Boolean(access?.canManage),

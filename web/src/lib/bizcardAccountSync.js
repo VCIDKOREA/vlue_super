@@ -128,7 +128,7 @@ export async function syncBizcardAccountFromApi(opts = {}) {
   if (primary?.display_name) {
     try {
       const name = String(primary.display_name).trim();
-      if (name && !localStorage.getItem("vlue_legal_name")) {
+      if (name && (force || !localStorage.getItem("vlue_legal_name"))) {
         localStorage.setItem("vlue_legal_name", name);
       }
     } catch {

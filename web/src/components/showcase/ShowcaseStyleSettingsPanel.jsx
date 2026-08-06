@@ -290,7 +290,8 @@ export default function ShowcaseStyleSettingsPanel({
           await m.restoreShowcaseStyleFromServer();
         } else {
           m.seedEditorFromLocalLiveIfEmpty?.();
-          if (isWebDesk) await m.hydrateShowcaseStyleFromServer();
+          /* 웹 PC는 앱과 같은 서버본을 강제 적용 (브라우저에 남은 예전 localStorage 우선 방지) */
+          await m.hydrateShowcaseStyleFromServer({ forceServer: Boolean(isWebDesk) });
         }
         applyLocal();
       })
