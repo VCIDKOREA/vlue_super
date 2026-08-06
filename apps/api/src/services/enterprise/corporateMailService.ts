@@ -215,11 +215,28 @@ export async function verifyCorporateMailOtp(userId: string, emailRaw: string, o
     })
   ]);
 
+  /** 개인 유료 → 회사 인증 후에도 동일하게 임직원 콤보(5,100) 적용 */
+  let comboConvert: { converted: boolean; nextAmountKrw: number | null } = {
+    converted: false,
+    nextAmountKrw: null
+  };
+  try {
+    const { applyPersonalComboPricingToActiveSubscription } = await import(
+      "../membership/personalComboMembershipService.js"
+    );
+    const r = await applyPersonalComboPricingToActiveSubscription(userId);
+    comboConvert = { converted: r.converted, nextAmountKrw: r.nextAmountKrw };
+  } catch (e) {
+    console.warn("[corp-mail] personal combo convert after verify failed", userId, e);
+  }
+
   return {
     ok: true as const,
     isEnterpriseVerified: true,
     enterpriseVerifiedEmail: email,
-    nextReverifyAt: nextCheck.toISOString()
+    nextReverifyAt: nextCheck.toISOString(),
+    personalComboConverted: comboConvert.converted,
+    personalComboNextAmountKrw: comboConvert.nextAmountKrw
   };
 }
 

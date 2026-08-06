@@ -1,13 +1,73 @@
 import { prisma } from "../../db/client.js";
 import type { PaidBillingCycle } from "./membershipBmConstants.js";
+import { personalComboAddonAmountKrw } from "./membershipBmConstants.js";
 import { referralDb } from "../../db/referralDb.js";
-import { resolveMembershipCheckoutAmountKrw } from "./personalComboPricing.js";
+import {
+  canUsePersonalComboPricing,
+  resolveMembershipCheckoutAmountKrw
+} from "./personalComboPricing.js";
 import { getEnterpriseReferralSummaryForUser } from "./enterpriseReferralAttribution.js";
+import { billingCycleFromPlan } from "./subscriptionBilling.js";
 
 function addMonthsLocal(d: Date, months: number) {
   const x = new Date(d);
   x.setMonth(x.getMonth() + months);
   return x;
+}
+
+/**
+ * 이미 유료 개인 구독 중인 사용자가 회사 인증을 마치면
+ * 재결제 없이 임직원 콤보(5,100)로 플래그·다음 청구액만 전환.
+ */
+export async function applyPersonalComboPricingToActiveSubscription(userId: string): Promise<{
+  converted: boolean;
+  subscriptionId: string | null;
+  nextAmountKrw: number | null;
+}> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      enterpriseRole: true,
+      enterpriseGroupId: true,
+      isEnterpriseVerified: true
+    }
+  });
+  if (!user || !canUsePersonalComboPricing(user)) {
+    return { converted: false, subscriptionId: null, nextAmountKrw: null };
+  }
+
+  const active = await prisma.userSubscription.findFirst({
+    where: { userId, status: "active", cycleEndAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" }
+  });
+  if (!active) {
+    return { converted: false, subscriptionId: null, nextAmountKrw: null };
+  }
+
+  const cycle = billingCycleFromPlan(active.plan);
+  const addon = personalComboAddonAmountKrw(cycle);
+  if (active.isPersonalCombo && active.amountKrw === addon) {
+    return { converted: false, subscriptionId: active.id, nextAmountKrw: addon };
+  }
+
+  await prisma.userSubscription.update({
+    where: { id: active.id },
+    data: {
+      isPersonalCombo: true,
+      amountKrw: addon,
+      isDiscounted: false,
+      isDiscountedNextCycle: false
+    }
+  });
+
+  console.warn("[personal-combo] converted active paid → combo pricing", {
+    userId,
+    subscriptionId: active.id,
+    fromAmount: active.amountKrw,
+    toAmount: addon
+  });
+
+  return { converted: true, subscriptionId: active.id, nextAmountKrw: addon };
 }
 
 export async function getPersonalComboStatus(userId: string) {
@@ -36,17 +96,17 @@ export async function getPersonalComboStatus(userId: string) {
   let pendingSub = null;
   try {
     activeSub = await prisma.userSubscription.findFirst({
-    where: { userId, status: "active", cycleEndAt: { gt: new Date() } },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      plan: true,
-      amountKrw: true,
-      isPersonalCombo: true,
-      cycleEndAt: true,
-      nextChargeAt: true
-    }
-  });
+      where: { userId, status: "active", cycleEndAt: { gt: new Date() } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        plan: true,
+        amountKrw: true,
+        isPersonalCombo: true,
+        cycleEndAt: true,
+        nextChargeAt: true
+      }
+    });
 
     pendingSub = await prisma.userSubscription.findFirst({
       where: { userId, status: "pending_payment" },
@@ -76,6 +136,12 @@ export async function getPersonalComboStatus(userId: string) {
     console.warn("[personal-combo] enterpriseReferral skipped", e);
   }
 
+  const eligibleForComboConvert =
+    user.isEnterpriseVerified &&
+    !isCorporateLine &&
+    Boolean(activeSub) &&
+    !activeSub?.isPersonalCombo;
+
   return {
     isCorporateLine,
     isEnterpriseVerified: user.isEnterpriseVerified,
@@ -85,8 +151,9 @@ export async function getPersonalComboStatus(userId: string) {
     activeSubscription: activeSub,
     pendingSubscription: pendingSub,
     comboMonthlyAmountKrw: monthlyQuote?.amountKrw ?? null,
+    eligibleForComboConvert,
     comboPricingNote:
-      "회사 부담 14,700원 + 개인 부담 5,100원 = 유료 회원 19,800원과 동일한 VLUER 혜택",
+      "회사 회선(정가 14,700원) + 개인 임직원 콤보(5,100원) = 19,800원. 순서는 무관하며, 개인 유료 이용 중 회사 인증 시에도 다음 청구부터 5,100원으로 전환됩니다.",
     enterpriseReferralLocked: enterpriseReferral.locked,
     enterpriseReferralSponsor: enterpriseReferral.sponsor,
     referralPolicyNote:
@@ -108,6 +175,17 @@ export async function createPersonalComboSubscription(userId: string, billingCyc
   }
 
   const quote = await resolveMembershipCheckoutAmountKrw(userId, billingCycle);
+
+  /** 이미 유료 구독 중이면 재결제 없이 콤보 전환 */
+  const converted = await applyPersonalComboPricingToActiveSubscription(userId);
+  if (converted.subscriptionId) {
+    const active = await prisma.userSubscription.findUnique({
+      where: { id: converted.subscriptionId }
+    });
+    if (active?.status === "active" && active.isPersonalCombo) {
+      return Object.assign(active, { convertedWithoutPayment: true as const });
+    }
+  }
 
   const existingPending = await prisma.userSubscription.findFirst({
     where: { userId, status: "pending_payment" }

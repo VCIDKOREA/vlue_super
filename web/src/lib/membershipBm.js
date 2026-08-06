@@ -19,7 +19,7 @@ export function personalComboPricingNote() {
 }
 
 export const PERSONAL_COMBO_PRICING_NOTE =
-  "회사 부담 직원 회선 + 개인 부담 콤보(V2 예정). V1에서는 개인 유료·B2B 회선만 안내합니다.";
+  "회사 회선(정가 14,700원) + 개인 임직원 콤보(5,100원) = 19,800원. 개인 유료를 먼저 쓰다 회사 인증해도 다음 청구부터 5,100원으로 전환됩니다.";
 
 export const ENTERPRISE_REFERRAL_POLICY_NOTE =
   "V1에서는 추천인 프로그램을 운영하지 않습니다.";

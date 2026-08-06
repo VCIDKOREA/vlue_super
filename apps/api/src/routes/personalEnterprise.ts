@@ -98,13 +98,17 @@ personalEnterpriseRoutes.post("/personal-combo/subscribe", requireUserHeader, as
     const cycle: PaidBillingCycle =
       String(body?.billingCycle || "monthly").toLowerCase() === "annual" ? "annual" : "monthly";
     const sub = await createPersonalComboSubscription(uid, cycle);
+    const convertedWithoutPayment = Boolean(
+      (sub as { convertedWithoutPayment?: boolean }).convertedWithoutPayment
+    );
     return c.json({
       ok: true,
       subscriptionId: sub.id,
       amountKrw: sub.amountKrw,
       isPersonalCombo: sub.isPersonalCombo,
       billingCycle: cycle,
-      status: sub.status
+      status: sub.status,
+      convertedWithoutPayment
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";

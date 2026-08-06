@@ -110,8 +110,11 @@ export function resolveSubscriptionChargeFromRecord(
 ): MembershipCheckoutResolution {
   const cycle = billingCycleFromPlan(sub.plan);
 
-  if (sub.isPersonalCombo) {
-    if (!canUsePersonalComboPricing(user)) {
+  /**
+   * 순서 무관: 회사 인증된 개인 계정이면 활성 유료(비콤보)도 다음 청구는 임직원 콤보(5,100)로.
+   */
+  if (canUsePersonalComboPricing(user) || sub.isPersonalCombo) {
+    if (!canUsePersonalComboPricing(user) && sub.isPersonalCombo) {
       return {
         cycle,
         amountKrw: paidListAmountKrw(cycle),

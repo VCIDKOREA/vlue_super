@@ -87,16 +87,13 @@ export default function PersonalComboPanel({ membershipTier = "free", onToast })
     );
   }
 
-  if (membershipTier !== "free" && !hasActiveCombo) {
-    return null;
-  }
-
   if (hasActiveCombo && status?.activeSubscription) {
     return (
       <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-        <p className="text-[13px] font-black text-emerald-950">복수 계정 콤보 이용 중</p>
+        <p className="text-[13px] font-black text-emerald-950">임직원 콤보 적용 중</p>
         <p className="mt-1 text-[11px] text-emerald-900/90">
-          월 {formatKrw(status.activeSubscription.amountKrw)} · 유료 회원과 동일한 VLUER 혜택
+          다음 청구 {formatKrw(status.activeSubscription.amountKrw)} · 유료 회원과 동일한 VLUER 혜택
+          (회사 회선 14,700 + 개인 5,100 = 19,800)
         </p>
       </div>
     );
@@ -140,8 +137,14 @@ export default function PersonalComboPanel({ membershipTier = "free", onToast })
   async function handleVerifyOtp() {
     setBusy(true);
     try {
-      await postVerifyCorporateMailOtp(corpEmail, otp);
-      onToast?.("회사 이메일 인증이 완료되었습니다.");
+      const res = await postVerifyCorporateMailOtp(corpEmail, otp);
+      if (res?.personalComboConverted) {
+        onToast?.(
+          `회사 이메일 인증 완료. 기존 유료 구독이 임직원 콤보(다음 청구 ${formatKrw(res.personalComboNextAmountKrw || 5100)})로 전환되었습니다.`
+        );
+      } else {
+        onToast?.("회사 이메일 인증이 완료되었습니다.");
+      }
       await refresh();
       setStep("pay");
     } catch (e) {
@@ -167,6 +170,13 @@ export default function PersonalComboPanel({ membershipTier = "free", onToast })
     setBusy(true);
     try {
       const sub = await postPersonalComboSubscribe(billingCycle);
+      if (sub.convertedWithoutPayment || sub.status === "active") {
+        onToast?.(
+          `임직원 콤보가 적용되었습니다. 다음 청구부터 ${formatKrw(sub.amountKrw)}입니다.`
+        );
+        await refresh();
+        return;
+      }
       const amount = sub.amountKrw;
       const merchantUid = `billing_combo_${userId.slice(0, 8)}_${Date.now()}`;
 

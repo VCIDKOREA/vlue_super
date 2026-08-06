@@ -1,4 +1,8 @@
-import type { UserSubscription } from "@prisma/client";
+import type { PersonalAccountFlags } from "./personalComboPricing.js";
+import {
+  canUsePersonalComboPricing,
+  resolveSubscriptionChargeFromRecord
+} from "./personalComboPricing.js";
 import {
   type PaidBillingCycle,
   paidChargeAmountKrw,
@@ -8,8 +12,7 @@ import {
   hadPromoEligibility,
   resolveBenefitAwareChargeKrw
 } from "./memberReferralBenefitService.js";
-import { resolveSubscriptionChargeFromRecord } from "./personalComboPricing.js";
-import type { PersonalAccountFlags } from "./personalComboPricing.js";
+import type { UserSubscription } from "@prisma/client";
 
 export function addMonths(d: Date, months: number): Date {
   const out = new Date(d);
@@ -69,7 +72,7 @@ export async function resolveSubscriptionChargeAmount(
   >,
   user?: PersonalAccountFlags
 ): Promise<ChargeAmountResolution> {
-  if (user && sub.isPersonalCombo) {
+  if (user && (sub.isPersonalCombo || canUsePersonalComboPricing(user))) {
     const resolved = resolveSubscriptionChargeFromRecord(sub, user);
     return {
       cycle: resolved.cycle,
@@ -81,9 +84,7 @@ export async function resolveSubscriptionChargeAmount(
           ? "personal_combo_addon"
           : resolved.reason === "paid_referral_discount"
             ? "active_discount"
-            : resolved.reason === "paid_list"
-              ? "list_price"
-              : "list_price"
+            : "list_price"
     };
   }
 
