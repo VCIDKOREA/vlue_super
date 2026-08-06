@@ -1042,11 +1042,11 @@ export default function LetteringIncomingNotification({
 
       <div className="lettering-ongoing-body relative flex min-h-0 flex-col">
         <div
-          className={`lettering-ongoing-summary relative z-[2] flex gap-2.5 px-3 py-2.5 ${
-            showExpandedLayout || previewMode ? "items-center" : "items-start"
-          } ${isFreeMember ? "lettering-ongoing-summary--free" : ""} ${
-            isUnverified ? "lettering-ongoing-summary--unverified" : ""
-          } ${!showExpandedLayout && (isPaidMember || isFreeMember) ? "pb-3" : ""}`}
+          className={`lettering-ongoing-summary relative z-[2] flex gap-2.5 px-3 py-2.5 items-center ${
+            isFreeMember ? "lettering-ongoing-summary--free" : ""
+          } ${isUnverified ? "lettering-ongoing-summary--unverified" : ""} ${
+            !showExpandedLayout && (isPaidMember || isFreeMember) ? "pb-3" : ""
+          }`}
         >
           {verified && !showcaseOffPreview ? <LetteringProfileThumb card={c} verified={verified} size="sm" /> : null}
           {verified && showcaseOffPreview ? (
@@ -1058,7 +1058,7 @@ export default function LetteringIncomingNotification({
               <ShieldCheck className="h-5 w-5 text-blue-200" strokeWidth={2.4} aria-hidden />
             </span>
           ) : null}
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 overflow-hidden">
             {isUnverified ? (
               <p className="lettering-ongoing-name-row min-w-0">
                 <span className="lettering-unverified-collapsed-phone">
@@ -1067,8 +1067,8 @@ export default function LetteringIncomingNotification({
               </p>
             ) : (
               <>
-                <p className="lettering-ongoing-name-row flex min-w-0 items-center gap-1.5">
-                  <span className="lettering-ongoing-name min-w-0 text-[15px] font-semibold leading-snug">
+                <p className="lettering-ongoing-name-row flex min-w-0 items-center gap-1.5 overflow-hidden">
+                  <span className="lettering-ongoing-name min-w-0 font-semibold">
                     {displayLabel}
                   </span>
                   {verified ? (
@@ -1086,7 +1086,7 @@ export default function LetteringIncomingNotification({
                   ) : null}
                 </p>
                 {showCollapsedPhoneSubline ? (
-                  <p className="lettering-ongoing-subline mt-0.5 min-w-0 text-[12px] leading-snug">
+                  <p className="lettering-ongoing-subline mt-0.5 min-w-0">
                     {showCollapsedOrg ? (
                       <>
                         <span className="font-medium text-slate-600">{receptionLines.organization}</span>

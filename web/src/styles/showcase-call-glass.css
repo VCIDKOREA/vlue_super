@@ -175,6 +175,77 @@
   color: #f8fafc !important;
 }
 
+/*
+ * ?? ?: ??·??? ????? ???? ?? ??? ??.
+ * (? ????·?? ??? ?? ??)
+ */
+.lettering-ongoing--fullscreen-tent .lettering-ongoing-summary > .min-w-0.flex-1 {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.lettering-ongoing--fullscreen-tent .lettering-ongoing-name-row {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: nowrap !important;
+}
+
+.lettering-ongoing--fullscreen-tent .lettering-ongoing-name {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(11px, 3.8vw, 15px) !important;
+  line-height: 1.25 !important;
+}
+
+.lettering-ongoing--fullscreen-tent .lettering-ongoing-subline,
+.lettering-ongoing--fullscreen-tent .lettering-ongoing-subtitle {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(10px, 3.2vw, 12px) !important;
+  line-height: 1.3 !important;
+}
+
+.lettering-ongoing--fullscreen-tent .lettering-ongoing-subline .lettering-ongoing-phone-em,
+.lettering-ongoing--fullscreen-tent .lettering-ongoing-subline .font-medium {
+  white-space: nowrap;
+}
+
+.lettering-ongoing--fullscreen-tent > .lettering-live-bar {
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lettering-ongoing--fullscreen-tent .lettering-live-bar__left {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.lettering-ongoing--fullscreen-tent .lettering-live-bar__brand {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(10px, 3vw, 12px) !important;
+}
+
+.lettering-ongoing--fullscreen-tent .lettering-live-bar__call-preview,
+.lettering-ongoing--fullscreen-tent .lettering-incall-preview-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: clamp(9px, 2.6vw, 11px) !important;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
 .lettering-ongoing--fullscreen-tent .lettering-unverified-collapsed-phone,
 .lettering-showcase-fs .lettering-unverified-collapsed-phone,
 .lettering-ongoing--fullscreen-tent .lettering-ongoing-summary--unverified .lettering-unverified-collapsed-phone {

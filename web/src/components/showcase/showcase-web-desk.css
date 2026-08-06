@@ -140,19 +140,20 @@
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-name {
-  font-size: 15px !important;
+  font-size: clamp(11px, 1.35vw + 10px, 15px) !important;
   font-weight: 600 !important;
   line-height: 1.25 !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-subline,
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-phone-em {
-  font-size: 12px !important;
+  font-size: clamp(10px, 1.1vw + 9px, 12px) !important;
   line-height: 1.3 !important;
-  overflow: visible !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
 
