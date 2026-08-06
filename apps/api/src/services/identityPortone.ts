@@ -4,7 +4,8 @@ import { buildInitialLegalNameData } from "@vlue/db";
 import { prisma } from "../db/client.js";
 import {
   fetchAndParseIamportCertification,
-  hashCiUniqueKey
+  hashCiUniqueKey,
+  isPortoneTestMode
 } from "../integrations/portone/iamportCert.js";
 import {
   ensurePublicHandleForExistingUser,
@@ -23,6 +24,7 @@ import { applyAbuseProtectionOnNewSignup } from "./auth/abusingProtectionService
 import { isB2bMembershipKind, normalizeMembershipKind } from "./membership/membershipBmConstants.js";
 import { runAutomatedBusinessOnboarding } from "./onboarding/automatedOnboardingService.js";
 import {
+  BIRTH_DATE_MISSING_FROM_CERT_MESSAGE,
   isMinorForParentalConsent,
   PARENTAL_CONSENT_REQUIRED_MESSAGE
 } from "@vlue/shared/policy/minor-signup";
@@ -275,7 +277,25 @@ export async function completePortoneIdentity(params: {
     }
   });
 
-  const minorSignup = !existing && !adminBypass && isMinorForParentalConsent(birthDate);
+  /**
+   * 생년월일 없음 → 미성년으로 단정하지 않음.
+   * (KG이니시스 테스트 등에서 birth 누락 시 성인에게 부모승인 문구가 뜨던 오탐 방지)
+   */
+  let minorSignup = false;
+  if (!existing && !adminBypass) {
+    const minorFlag = isMinorForParentalConsent(birthDate);
+    if (minorFlag === null) {
+      if (!isPortoneTestMode()) {
+        throw new Error(BIRTH_DATE_MISSING_FROM_CERT_MESSAGE);
+      }
+      console.warn("[identityPortone] PORTONE_TEST_MODE: birth missing → skip parental consent", {
+        birthDate
+      });
+      minorSignup = false;
+    } else {
+      minorSignup = minorFlag;
+    }
+  }
   if (minorSignup && params.isBusinessMember) {
     throw new Error("만 14세 미만은 사업자 가입이 불가합니다. 일반(자녀) 가입만 가능합니다.");
   }

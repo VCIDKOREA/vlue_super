@@ -22,8 +22,9 @@ describe("minorSignupPolicy", () => {
     assert.equal(computeAgeFromBirthYmd("20120602", asOf), 14);
   });
 
-  it("treats invalid birth as minor (conservative)", () => {
-    assert.equal(isMinorForParentalConsent("", asOf), true);
-    assert.equal(isMinorForParentalConsent("1990", asOf), true);
+  it("returns null for invalid birth (caller decides — do not mark as minor)", () => {
+    assert.equal(isMinorForParentalConsent("", asOf), null);
+    assert.equal(isMinorForParentalConsent("1990", asOf), null);
+    assert.equal(isAdultSignupAge("", asOf), false);
   });
 });

@@ -8,6 +8,9 @@ export const PARENTAL_CONSENT_REQUIRED_MESSAGE =
 export const PARENTAL_CONSENT_PENDING_LOGIN_MESSAGE =
   "부모 승인이 완료되지 않았습니다. 가입 화면에서 법정대리인 본인인증을 진행해 주세요.";
 
+export const BIRTH_DATE_MISSING_FROM_CERT_MESSAGE =
+  "본인인증에서 생년월일을 확인할 수 없습니다. 다시 본인인증을 진행해 주세요.";
+
 /** @deprecated 차단 메시지 — 승인 플로우로 대체 */
 export const UNDERAGE_SIGNUP_MESSAGE = PARENTAL_CONSENT_REQUIRED_MESSAGE;
 
@@ -33,21 +36,34 @@ export function computeAgeFromBirthYmd(birthYmd: string, asOf: Date = new Date()
   return age;
 }
 
+/**
+ * 생년월일이 유효할 때만 미성년 여부를 판정.
+ * 생년월일 없음/형식 오류 → null (보수적으로 "미성년"으로 단정하지 않음 — 호출부에서 거부 또는 재인증).
+ */
 export function isMinorForParentalConsent(
   birthYmd: string | null | undefined,
   asOf: Date = new Date()
-): boolean {
+): boolean | null {
   const age = computeAgeFromBirthYmd(String(birthYmd ?? ""), asOf);
-  if (age === null) return true;
+  if (age === null) return null;
   return age < MIN_SIGNUP_AGE_YEARS;
 }
 
-/** 만 14세 이상 — 부모 승인 없이 가입 가능 */
+/** @deprecated 호환용 — 생년월일 없으면 true(보수). 신규 코드는 isMinorForParentalConsent + null 분기 사용 */
+export function isMinorForParentalConsentOrUnknown(
+  birthYmd: string | null | undefined,
+  asOf: Date = new Date()
+): boolean {
+  const v = isMinorForParentalConsent(birthYmd, asOf);
+  return v !== false;
+}
+
+/** 만 14세 이상 — 부모 승인 없이 가입 가능 (생년월일 없으면 false) */
 export function isAdultSignupAge(
   birthYmd: string | null | undefined,
   asOf: Date = new Date()
 ): boolean {
-  return !isMinorForParentalConsent(birthYmd, asOf);
+  return isMinorForParentalConsent(birthYmd, asOf) === false;
 }
 
 /** @deprecated — isAdultSignupAge 사용 */
