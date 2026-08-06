@@ -65,15 +65,24 @@ class CallOverlayService : Service() {
                 notifyWebCallState("ended_keep_overlay")
                 return START_NOT_STICKY
             }
+            ACTION_UPDATE_CALL_INFO -> {
+                val phone = intent.getStringExtra(EXTRA_PHONE).orEmpty()
+                val verified = intent.getBooleanExtra(EXTRA_VERIFIED, false)
+                val outgoing = intent.getBooleanExtra(EXTRA_OUTGOING, false)
+                val cardJson = intent.getStringExtra(EXTRA_CARD_JSON)
+                applyCallInfoUpdate(phone, verified, outgoing, cardJson)
+                return START_NOT_STICKY
+            }
         }
         val phone = intent?.getStringExtra(EXTRA_PHONE).orEmpty()
         val verified = intent?.getBooleanExtra(EXTRA_VERIFIED, false) ?: false
         val outgoing = intent?.getBooleanExtra(EXTRA_OUTGOING, false) ?: false
-        showOverlay(phone, verified, outgoing)
+        val cardJson = intent?.getStringExtra(EXTRA_CARD_JSON)
+        showOverlay(phone, verified, outgoing, cardJson)
         return START_NOT_STICKY
     }
 
-    private fun showOverlay(phone: String, verified: Boolean, outgoing: Boolean) {
+    private fun showOverlay(phone: String, verified: Boolean, outgoing: Boolean, cardJson: String? = null) {
         removeOverlayImmediate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val container = FrameLayout(this)
@@ -90,19 +99,22 @@ class CallOverlayService : Service() {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             typeface = Typeface.DEFAULT_BOLD
+            tag = "banner_title"
         }
         val phoneTv = TextView(this).apply {
-            text = if (phone.isBlank() || phone == "unknown") "번호 확인 중…" else phone
+            text = bannerPrimaryText(phone, cardJson)
             setTextColor(Color.parseColor("#E2E8F0"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
             typeface = Typeface.DEFAULT_BOLD
             setPadding(0, dp(6), 0, 0)
+            tag = "banner_phone"
         }
         val hint = TextView(this).apply {
-            text = if (verified) "VLUE 인증 · 쇼케이스 불러오는 중" else "쇼케이스 불러오는 중…"
+            text = bannerHintText(phone, verified, cardJson)
             setTextColor(Color.parseColor("#94A3B8"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(0, dp(4), 0, 0)
+            tag = "banner_hint"
         }
         banner.addView(title)
         banner.addView(phoneTv)
@@ -191,7 +203,13 @@ class CallOverlayService : Service() {
         layoutParams = params
         ShowcaseProximitySensor.attach(this, wv)
 
+        currentPhone = phone
+        currentOutgoing = outgoing
+        pendingCardJson = cardJson
         wv.loadUrl(VlueLetteringConfig.overlayUrl(phone, verified, outgoing))
+        if (!cardJson.isNullOrBlank()) {
+            injectCardLookupJson(wv, cardJson)
+        }
 
         container.animate()
             .alpha(1f)
@@ -201,6 +219,82 @@ class CallOverlayService : Service() {
             .start()
     }
 
+    private var pendingCardJson: String? = null
+    private var currentPhone: String = ""
+    private var currentOutgoing: Boolean = false
+
+    private fun bannerPrimaryText(phone: String, cardJson: String?): String {
+        parseDisplayName(cardJson)?.let { return it }
+        return if (phone.isBlank() || phone == "unknown") "번호 확인 중…" else phone
+    }
+
+    private fun bannerHintText(phone: String, verified: Boolean, cardJson: String?): String {
+        val name = parseDisplayName(cardJson)
+        return when {
+            name != null && phone.isNotBlank() && phone != "unknown" -> phone
+            verified -> "VLUE 인증 · 쇼케이스 불러오는 중"
+            phone.isBlank() || phone == "unknown" -> "상대 번호를 확인하는 중…"
+            else -> "쇼케이스 불러오는 중…"
+        }
+    }
+
+    private fun parseDisplayName(cardJson: String?): String? {
+        if (cardJson.isNullOrBlank()) return null
+        return try {
+            val json = org.json.JSONObject(cardJson)
+            json.optString("displayName").ifBlank {
+                json.optJSONObject("card")?.optString("displayName").orEmpty()
+            }.ifBlank { null }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun applyCallInfoUpdate(
+        phone: String,
+        verified: Boolean,
+        outgoing: Boolean,
+        cardJson: String?
+    ) {
+        mainHandler.post {
+            if (IncomingNumberResolver.isUnknown(phone) && cardJson.isNullOrBlank()) return@post
+            currentPhone = phone
+            currentOutgoing = outgoing
+            pendingCardJson = cardJson
+            val banner = nativeBanner
+            if (banner != null) {
+                (banner.findViewWithTag<TextView>("banner_phone"))?.text =
+                    bannerPrimaryText(phone, cardJson)
+                (banner.findViewWithTag<TextView>("banner_hint"))?.text =
+                    bannerHintText(phone, verified, cardJson)
+                (banner.findViewWithTag<TextView>("banner_title"))?.text =
+                    if (outgoing) "VLUE 발신 레터링" else "VLUE 수신 빅푸시"
+            }
+            val wv = webView
+            if (wv != null && !IncomingNumberResolver.isUnknown(phone)) {
+                wv.loadUrl(VlueLetteringConfig.overlayUrl(phone, verified, outgoing))
+                if (!cardJson.isNullOrBlank()) {
+                    injectCardLookupJson(wv, cardJson)
+                }
+                /* 이미 통화 연결 중이면 쇼케이스 확장을 다시 알림 */
+                notifyWebCallState("connected")
+            } else if (rootContainer == null) {
+                showOverlay(phone, verified, outgoing, cardJson)
+            }
+            LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
+        }
+    }
+
+    private fun injectCardLookupJson(view: WebView?, cardJson: String) {
+        val escaped = org.json.JSONObject.quote(cardJson)
+        view?.evaluateJavascript(
+            "try{window.__VLUE_CARD_LOOKUP__=JSON.parse($escaped);" +
+                "window.dispatchEvent(new CustomEvent('vlue-card-lookup',{detail:window.__VLUE_CARD_LOOKUP__}));" +
+                "}catch(e){}",
+            null
+        )
+    }
+
     private fun injectLetteringFlag(view: WebView?) {
         view?.evaluateJavascript(
             "try{localStorage.setItem('vlue_lettering_enabled','1');" +
@@ -208,6 +302,7 @@ class CallOverlayService : Service() {
                 "}catch(e){}",
             null
         )
+        pendingCardJson?.let { injectCardLookupJson(view, it) }
     }
 
     private fun dp(v: Int): Int =
@@ -384,11 +479,44 @@ class CallOverlayService : Service() {
         const val ACTION_DISMISS = "kr.vlue.calloverlay.DISMISS"
         const val ACTION_CONNECTED = "kr.vlue.calloverlay.CONNECTED"
         const val ACTION_ENDED_KEEP = "kr.vlue.calloverlay.ENDED_KEEP"
+        const val ACTION_UPDATE_CALL_INFO = "kr.vlue.calloverlay.UPDATE_CALL_INFO"
         private const val CHANNEL_ID = "vlue_lettering_overlay"
         private const val NOTIFICATION_ID = 41001
 
         @Volatile
         private var activeInstance: CallOverlayService? = null
+
+        fun updateCallInfo(
+            context: android.content.Context,
+            phone: String,
+            verified: Boolean,
+            cardJson: String?,
+            outgoing: Boolean
+        ) {
+            try {
+                val intent = Intent(context, CallOverlayService::class.java).apply {
+                    action = ACTION_UPDATE_CALL_INFO
+                    putExtra(EXTRA_PHONE, phone)
+                    putExtra(EXTRA_VERIFIED, verified)
+                    putExtra(EXTRA_OUTGOING, outgoing)
+                    putExtra(EXTRA_CARD_JSON, cardJson)
+                }
+                if (activeInstance != null) {
+                    context.startService(intent)
+                } else {
+                    context.startForegroundService(
+                        Intent(context, CallOverlayService::class.java).apply {
+                            putExtra(EXTRA_PHONE, phone)
+                            putExtra(EXTRA_VERIFIED, verified)
+                            putExtra(EXTRA_OUTGOING, outgoing)
+                            putExtra(EXTRA_CARD_JSON, cardJson)
+                        }
+                    )
+                }
+            } catch (e: Exception) {
+                activeInstance?.applyCallInfoUpdate(phone, verified, outgoing, cardJson)
+            }
+        }
 
         fun notifyConnected(context: android.content.Context) {
             try {

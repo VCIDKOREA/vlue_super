@@ -79,6 +79,26 @@ export default function LetteringOverlayHost() {
   }, []);
 
   useEffect(() => {
+    const onNativeCard = (ev) => {
+      try {
+        const detail = ev?.detail || window.__VLUE_CARD_LOOKUP__;
+        if (!detail || detail.matched === false) return;
+        const mapped = mapLookupToLetteringCard(detail, incoming || detail.phoneE164 || "");
+        if (mapped) {
+          setCard((prev) => ({ ...(prev || {}), ...mapped }));
+          setVerified(true);
+          setLoading(false);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("vlue-card-lookup", onNativeCard);
+    if (window.__VLUE_CARD_LOOKUP__) onNativeCard({ detail: window.__VLUE_CARD_LOOKUP__ });
+    return () => window.removeEventListener("vlue-card-lookup", onNativeCard);
+  }, [incoming]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       /*
@@ -100,6 +120,10 @@ export default function LetteringOverlayHost() {
       if (cancelled) return;
       if (blockCheck.blocked) {
         setBlocked(true);
+        setLoading(false);
+        return;
+      }
+      if (!String(incoming || "").trim() || String(incoming).toLowerCase() === "unknown") {
         setLoading(false);
         return;
       }

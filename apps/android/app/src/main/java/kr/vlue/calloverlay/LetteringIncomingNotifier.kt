@@ -35,12 +35,16 @@ object LetteringIncomingNotifier {
         nm.createNotificationChannel(channel)
     }
 
-    fun post(context: Context, phone: String, outgoing: Boolean) {
+    fun post(context: Context, phone: String, outgoing: Boolean, displayName: String? = null) {
         try {
             val app = context.applicationContext
             ensureChannel(app)
             val title = if (outgoing) "VLUE 발신 레터링" else "VLUE 수신 빅푸시"
-            val body = if (phone.isBlank() || phone == "unknown") "번호 확인 중…" else phone
+            val body = when {
+                !displayName.isNullOrBlank() -> displayName
+                phone.isBlank() || phone == "unknown" -> "번호 확인 중…"
+                else -> phone
+            }
 
             val activityIntent = LetteringRingingActivity.intent(app, phone, outgoing)
             val fullScreen = PendingIntent.getActivity(
@@ -56,11 +60,21 @@ object LetteringIncomingNotifier {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
+            val bigText = buildString {
+                append(title)
+                append('\n')
+                append(body)
+                if (!displayName.isNullOrBlank() && phone.isNotBlank() && phone != "unknown") {
+                    append('\n')
+                    append(phone)
+                }
+            }
+
             val builder = NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(title)
                 .setContentText(body)
-                .setStyle(NotificationCompat.BigTextStyle().bigText("$title\n$body"))
+                .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -71,7 +85,7 @@ object LetteringIncomingNotifier {
                 .setTimeoutAfter(90_000L)
 
             NotificationManagerCompat.from(app).notify(NOTIFICATION_ID, builder.build())
-            Log.i(TAG, "posted incoming notif phone=$phone outgoing=$outgoing")
+            Log.i(TAG, "posted incoming notif phone=$phone name=$displayName outgoing=$outgoing")
         } catch (e: Exception) {
             Log.e(TAG, "post failed", e)
             LetteringPrefs.setLastOverlayError(context, "notif:${e.message}")

@@ -6,6 +6,7 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kr.vlue.calloverlay.incall.VlueInCallController
 
@@ -17,6 +18,12 @@ object LetteringCallCoordinator {
     @Volatile
     private var lastRingAt = 0L
 
+    @Volatile
+    private var lastRingNumber: String = ""
+
+    @Volatile
+    private var lastOutgoing: Boolean = false
+
     fun onRinging(context: Context, number: String?, outgoing: Boolean = false) {
         try {
             val app = context.applicationContext
@@ -26,14 +33,31 @@ object LetteringCallCoordinator {
                 return
             }
 
+            var resolved = number?.trim().orEmpty()
+            if (IncomingNumberResolver.isUnknown(resolved)) {
+                IncomingNumberResolver.resolveRecentNumber(app, outgoing)?.let { resolved = it }
+            }
+
             val now = System.currentTimeMillis()
-            if (now - lastRingAt < 800L) {
-                Log.d(TAG, "skip ringing: debounce")
+            val prevUnknown = IncomingNumberResolver.isUnknown(lastRingNumber)
+            val nextUnknown = IncomingNumberResolver.isUnknown(resolved)
+            val isUpgrade = prevUnknown && !nextUnknown && now - lastRingAt < 3_000L
+            val isDuplicate =
+                !isUpgrade &&
+                    now - lastRingAt < 800L &&
+                    lastOutgoing == outgoing &&
+                    (resolved == lastRingNumber || (nextUnknown && prevUnknown))
+
+            if (isDuplicate) {
+                Log.d(TAG, "skip ringing: debounce last=$lastRingNumber next=$resolved")
                 return
             }
-            lastRingAt = now
 
-            val raw = number?.trim().orEmpty().ifEmpty { "unknown" }
+            lastRingAt = now
+            lastRingNumber = if (nextUnknown) "unknown" else resolved
+            lastOutgoing = outgoing
+
+            val raw = if (nextUnknown) "unknown" else resolved
             LetteringPrefs.setLastCallEvent(app, "ringing:$raw:out=$outgoing")
 
             /* 1) FGS 오버레이 — SYSTEM_ALERT_WINDOW 있을 때 */
@@ -50,27 +74,68 @@ object LetteringCallCoordinator {
             /* 3) 액티비티 직접 기동 (백그라운드 제한 시 실패할 수 있음) */
             LetteringRingingActivity.launch(app, raw, outgoing)
 
-            if (raw == "unknown") return
+            if (raw == "unknown") {
+                /* CallLog 가 늦게 쌓이는 OEM — 짧게 재시도 후 번호 업그레이드 */
+                scope.launch {
+                    retryResolveUnknown(app, outgoing)
+                }
+                return
+            }
 
             scope.launch {
-                try {
-                    val lookup = CardLookupRepository.lookup(app, raw)
-                    if (lookup == null || !lookup.matched) {
-                        Log.w(TAG, "lookup unmatched for $raw")
-                        LetteringPrefs.setLastOverlayError(app, "lookup_unmatched:$raw")
-                        return@launch
-                    }
-                    if (LetteringPermissionHelper.canDrawOverlays(app)) {
-                        startOverlayService(app, raw, verified = lookup.verified, cardJson = lookup.rawJson, outgoing)
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "lookup failed after overlay start", e)
-                    LetteringPrefs.setLastOverlayError(app, "lookup_error:${e.message}")
-                }
+                enrichWithLookup(app, raw, outgoing)
             }
         } catch (e: Exception) {
             Log.e(TAG, "onRinging failed", e)
             LetteringPrefs.setLastOverlayError(context, "onRinging:${e.message}")
+        }
+    }
+
+    private suspend fun retryResolveUnknown(app: Context, outgoing: Boolean) {
+        repeat(4) { attempt ->
+            delay(350L + attempt * 200L)
+            val n = IncomingNumberResolver.resolveRecentNumber(app, outgoing) ?: return@repeat
+            if (IncomingNumberResolver.isUnknown(n)) return@repeat
+            Log.i(TAG, "upgrade unknown → $n (attempt=$attempt)")
+            lastRingNumber = n
+            lastRingAt = System.currentTimeMillis()
+            LetteringPrefs.setLastCallEvent(app, "ringing_upgrade:$n:out=$outgoing")
+            if (LetteringPermissionHelper.canDrawOverlays(app)) {
+                CallOverlayService.updateCallInfo(app, n, verified = false, cardJson = null, outgoing)
+            }
+            LetteringIncomingNotifier.post(app, n, outgoing)
+            enrichWithLookup(app, n, outgoing)
+            return
+        }
+        Log.w(TAG, "number still unknown after CallLog retries")
+        LetteringPrefs.setLastOverlayError(app, "number_unknown_after_retry")
+    }
+
+    private suspend fun enrichWithLookup(app: Context, raw: String, outgoing: Boolean) {
+        try {
+            val lookup = CardLookupRepository.lookup(app, raw)
+            if (lookup == null || !lookup.matched) {
+                Log.w(TAG, "lookup unmatched for $raw")
+                LetteringPrefs.setLastOverlayError(app, "lookup_unmatched:$raw")
+                LetteringIncomingNotifier.post(app, raw, outgoing, displayName = null)
+                return
+            }
+            val label = lookup.displayName.ifBlank { raw }
+            LetteringIncomingNotifier.post(app, raw, outgoing, displayName = label)
+            if (LetteringPermissionHelper.canDrawOverlays(app)) {
+                CallOverlayService.updateCallInfo(
+                    app,
+                    raw,
+                    verified = lookup.verified,
+                    cardJson = lookup.rawJson,
+                    outgoing = outgoing
+                )
+            } else {
+                startOverlayService(app, raw, verified = lookup.verified, cardJson = lookup.rawJson, outgoing)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "lookup failed after overlay start", e)
+            LetteringPrefs.setLastOverlayError(app, "lookup_error:${e.message}")
         }
     }
 
@@ -86,6 +151,7 @@ object LetteringCallCoordinator {
         try {
             val app = context.applicationContext
             LetteringPrefs.setLastCallEvent(app, "idle")
+            lastRingNumber = ""
             LetteringIncomingNotifier.cancel(app)
             LetteringRingingActivity.requestFinish(app)
 
