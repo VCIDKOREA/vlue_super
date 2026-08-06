@@ -229,7 +229,7 @@ export default function LetteringOverlayHost() {
       if (next) {
         setCallState(next);
         if (next === CALL_STATES.CONNECTED) {
-          /* Companion: 연결 순간 BigPush 종료 → Showcase 전체화면 */
+          /* 수화 = BigPush(바) 종료 → 전체 쇼케이스 오버레이 */
           setExpanded(true);
           try {
             window.VlueLettering?.restoreShowcaseOverlay?.();
@@ -240,7 +240,15 @@ export default function LetteringOverlayHost() {
             /* ignore */
           }
         }
-        if (next === CALL_STATES.RINGING) setExpanded(false);
+        if (next === CALL_STATES.RINGING) {
+          setExpanded(false);
+          try {
+            window.VlueLettering?.setOverlayFullscreen?.("0");
+            window.Android?.setOverlayFullscreen?.("0");
+          } catch {
+            /* ignore */
+          }
+        }
       }
       /* 시스템 전화 종료 — End 버튼 없이도 통화목록에 기록 */
       const ended =
@@ -402,10 +410,18 @@ export default function LetteringOverlayHost() {
   const callPhase = onCall ? "connected" : direction === "outgoing" ? "outgoing" : "ringing";
 
   return (
-    <div className="lettering-overlay-host lettering-overlay-host--tent">
+    <div
+      className={`lettering-overlay-host lettering-overlay-host--tent ${
+        onCall ? "lettering-overlay-host--connected" : "lettering-overlay-host--ringing"
+      }`}
+      data-call-phase={callPhase}
+      data-expanded={expanded ? "true" : "false"}
+    >
       <div className="lettering-overlay-host__tent-shell">
         <LetteringIncomingNotification
-          className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent"
+          className={`lettering-ongoing--on-call lettering-ongoing--fullscreen-tent ${
+            onCall ? "lettering-ongoing--phase-connected" : "lettering-ongoing--phase-ringing"
+          }`}
           verified={verified}
           previewMode={false}
           callPhase={callPhase}

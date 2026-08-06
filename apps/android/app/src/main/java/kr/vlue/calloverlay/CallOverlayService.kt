@@ -38,7 +38,13 @@ class CallOverlayService : Service() {
     private var layoutParams: WindowManager.LayoutParams? = null
     private var dismissing = false
     private var miniMode = false
+    /** ringing = 상단 빅푸시만 / connected = 전체 쇼케이스 */
+    private var callPhaseCompact = true
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var pendingConnectedNotify = false
+    private var pendingCardJson: String? = null
+    private var currentPhone: String = ""
+    private var currentOutgoing: Boolean = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -56,8 +62,10 @@ class CallOverlayService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_CONNECTED -> {
+                callPhaseCompact = false
                 setOverlayFullscreen(true)
                 notifyWebCallState("connected")
+                pendingConnectedNotify = true
                 return START_NOT_STICKY
             }
             ACTION_ENDED_KEEP -> {
@@ -87,12 +95,14 @@ class CallOverlayService : Service() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val container = FrameLayout(this)
 
-        /* 네이티브 빅푸시 — 웹이 비어도 항상 보이도록 (진단·폴백) */
+        /* 네이티브 폴백 배너 — 웹 빅푸시가 뜨면 가림. 수신 중엔 상단만 */
         val banner = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#E60B101B"))
             setPadding(dp(20), dp(28), dp(20), dp(20))
             elevation = dp(8).toFloat()
+            /* 웹 UI가 로드되면 GONE — 이중 표시 방지 */
+            visibility = android.view.View.VISIBLE
         }
         val title = TextView(this).apply {
             text = if (outgoing) "VLUE 발신 레터링" else "VLUE 수신 빅푸시"
@@ -148,6 +158,16 @@ class CallOverlayService : Service() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 injectLetteringFlag(view)
+                /* 웹 빅푸시 준비되면 네이티브 폴백 숨김 */
+                nativeBanner?.visibility = android.view.View.GONE
+                if (pendingConnectedNotify || !callPhaseCompact) {
+                    pendingConnectedNotify = false
+                    callPhaseCompact = false
+                    setOverlayFullscreen(true)
+                    notifyWebCallState("connected")
+                } else {
+                    applyCompactRingingWindow()
+                }
             }
         }
         container.addView(
@@ -166,7 +186,8 @@ class CallOverlayService : Service() {
         }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            /* 수신 중: 상단 빅푸시 높이만 — 시스템 전화 UI로 받을 수 있게 */
+            dp(300),
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -184,6 +205,8 @@ class CallOverlayService : Service() {
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
+        callPhaseCompact = true
+        miniMode = false
 
         container.alpha = 0f
         container.translationY = -120f
@@ -218,10 +241,6 @@ class CallOverlayService : Service() {
             .setInterpolator(DecelerateInterpolator())
             .start()
     }
-
-    private var pendingCardJson: String? = null
-    private var currentPhone: String = ""
-    private var currentOutgoing: Boolean = false
 
     private fun bannerPrimaryText(phone: String, cardJson: String?): String {
         parseDisplayName(cardJson)?.let { return it }
@@ -276,8 +295,10 @@ class CallOverlayService : Service() {
                 if (!cardJson.isNullOrBlank()) {
                     injectCardLookupJson(wv, cardJson)
                 }
-                /* 이미 통화 연결 중이면 쇼케이스 확장을 다시 알림 */
-                notifyWebCallState("connected")
+                /* 이미 수화(연결) 상태일 때만 전체 쇼케이스 재알림 */
+                if (!callPhaseCompact) {
+                    notifyWebCallState("connected")
+                }
             } else if (rootContainer == null) {
                 showOverlay(phone, verified, outgoing, cardJson)
             }
@@ -350,6 +371,7 @@ class CallOverlayService : Service() {
             val view = rootContainer ?: return@post
             val params = layoutParams ?: return@post
             if (fullscreen) {
+                callPhaseCompact = false
                 miniMode = false
                 params.height = WindowManager.LayoutParams.MATCH_PARENT
                 params.width = WindowManager.LayoutParams.MATCH_PARENT
@@ -357,10 +379,11 @@ class CallOverlayService : Service() {
                 params.y = 0
                 params.gravity = Gravity.TOP or Gravity.START
                 params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-                /* 연결 후 Showcase — 네이티브 폴백 배너는 웹 UI에 맡김 */
                 nativeBanner?.visibility = android.view.View.GONE
+            } else if (callPhaseCompact) {
+                applyCompactRingingWindowLocked(params)
             } else {
-                /* Companion Mini Case — 기본 프레임은 최초 진입 시에만. JS session 위치가 곧 이어짐 */
+                /* Companion Mini Case — 통화 중 사용자가 접을 때 */
                 if (!miniMode) {
                     val (sw, _) = screenSizePx()
                     val w = (sw * 0.78f).toInt().coerceIn(dp(200), sw - dp(24))
@@ -381,6 +404,31 @@ class CallOverlayService : Service() {
             } catch (_: Exception) {
             }
         }
+    }
+
+    /** 수신 링잉 — 상단 빅푸시 바만 (전화 받기 UI는 아래 시스템 화면) */
+    private fun applyCompactRingingWindow() {
+        mainHandler.post {
+            val wm = windowManager ?: return@post
+            val view = rootContainer ?: return@post
+            val params = layoutParams ?: return@post
+            applyCompactRingingWindowLocked(params)
+            try {
+                wm.updateViewLayout(view, params)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun applyCompactRingingWindowLocked(params: WindowManager.LayoutParams) {
+        callPhaseCompact = true
+        miniMode = false
+        params.width = WindowManager.LayoutParams.MATCH_PARENT
+        params.height = dp(300)
+        params.x = 0
+        params.y = 0
+        params.gravity = Gravity.TOP or Gravity.START
+        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
     }
 
     /** CSS px 클램프용 — WebView가 Mini Case로 줄어든 뒤에도 전체 화면 크기 제공 */

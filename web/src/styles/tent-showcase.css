@@ -739,6 +739,42 @@
   max-width: none;
 }
 
+/* 수신 링잉: 상단 빅푸시(쇼케이스 바)만 — 아래 시스템 전화 UI로 받기 */
+.lettering-overlay-host--tent.lettering-overlay-host--ringing {
+  align-items: flex-start;
+  background: transparent !important;
+}
+
+.lettering-overlay-host--tent.lettering-overlay-host--ringing > .lettering-overlay-host__tent-shell {
+  height: auto;
+  max-height: min(42vh, 320px);
+  overflow: hidden;
+}
+
+.lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing--phase-ringing,
+.lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing--fullscreen-tent[data-expanded="false"] {
+  background: transparent !important;
+  min-height: 0 !important;
+  height: auto !important;
+  box-shadow: none !important;
+}
+
+.lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing--phase-ringing > .lettering-live-bar,
+.lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing--phase-ringing .lettering-ongoing-summary {
+  pointer-events: auto;
+}
+
+/* 수화 후: 전체 오버레이 쇼케이스 */
+.lettering-overlay-host--tent.lettering-overlay-host--connected {
+  align-items: stretch;
+  background: #070b14;
+}
+
+.lettering-overlay-host--tent.lettering-overlay-host--connected > .lettering-overlay-host__tent-shell {
+  height: 100%;
+  max-height: none;
+}
+
 /* 앱 내 미리보기 — 부모(전체화면)를 100% 채움, 하단 내비 위까지 덮음 */
 .tent-showcase--fill.tent-showcase--fullscreen,
 .tent-showcase.tent-showcase--fill {
