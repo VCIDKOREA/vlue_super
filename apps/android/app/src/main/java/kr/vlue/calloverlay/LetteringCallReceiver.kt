@@ -24,7 +24,17 @@ class LetteringCallReceiver : BroadcastReceiver() {
 
             FamilyCallTracker.onPhoneStateChanged(context, state, number)
 
+            if (state == TelephonyManager.EXTRA_STATE_RINGING) {
+                VlueBigPushTrace.step(
+                    "1. Incoming Call Detected",
+                    "source=LetteringCallReceiver number=${number ?: "null"}"
+                )
+            }
+
             if (!LetteringPrefs.isLetteringEnabled(context)) {
+                if (state == TelephonyManager.EXTRA_STATE_RINGING) {
+                    VlueBigPushTrace.skip("1. Incoming Call Detected", "lettering_enabled=false")
+                }
                 Log.d(TAG, "skip: lettering_enabled=false state=$state")
                 return
             }
@@ -33,6 +43,7 @@ class LetteringCallReceiver : BroadcastReceiver() {
                 TelephonyManager.EXTRA_STATE_RINGING -> {
                     /* InCall 이 실제 통화를 잡은 경우에만 PHONE_STATE RINGING 스킵 */
                     if (VlueInCallController.hasActiveCall()) {
+                        VlueBigPushTrace.skip("1. Incoming Call Detected", "InCall has active call")
                         Log.d(TAG, "skip RINGING: InCall has active call")
                         return
                     }

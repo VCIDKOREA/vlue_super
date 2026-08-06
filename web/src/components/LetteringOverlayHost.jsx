@@ -64,6 +64,45 @@ export default function LetteringOverlayHost() {
   }, []);
 
   useEffect(() => {
+    console.log("[VlueBigPushTrace] 6. Showcase mounted (React)", {
+      incoming,
+      native,
+      forceLettering,
+      phase
+    });
+    try {
+      window.Android?.logBigPushTrace?.("6. Showcase mounted (React)", `incoming=${incoming}`);
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      console.log("[VlueBigPushTrace] Showcase unmounted (React)");
+    };
+  }, []);
+
+  useEffect(() => {
+    if (loading || blocked) return undefined;
+    const t = window.setTimeout(() => {
+      console.log("[VlueBigPushTrace] 7. Showcase visible", {
+        incoming,
+        hasCard: Boolean(card),
+        verified,
+        expanded,
+        callState
+      });
+      try {
+        window.Android?.logBigPushTrace?.(
+          "7. Showcase visible",
+          `incoming=${incoming} hasCard=${Boolean(card)} expanded=${expanded}`
+        );
+      } catch {
+        /* ignore */
+      }
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, [loading, blocked, card, verified, expanded, callState, incoming]);
+
+  useEffect(() => {
     const onHash = () => setParams(parseOverlayParams());
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);

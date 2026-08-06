@@ -50,6 +50,7 @@ class CallOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        VlueBigPushTrace.step("4. Showcase overlay create()", "CallOverlayService.onCreate")
         createNotificationChannel()
         VlueForegroundHelper.start(this, NOTIFICATION_ID, buildNotification())
         activeInstance = this
@@ -86,6 +87,10 @@ class CallOverlayService : Service() {
         val verified = intent?.getBooleanExtra(EXTRA_VERIFIED, false) ?: false
         val outgoing = intent?.getBooleanExtra(EXTRA_OUTGOING, false) ?: false
         val cardJson = intent?.getStringExtra(EXTRA_CARD_JSON)
+        VlueBigPushTrace.step(
+            "4. Showcase overlay create()",
+            "onStartCommand→showOverlay phone=$phone verified=$verified outgoing=$outgoing (note: no showShowcase(); real method=showOverlay)"
+        )
         showOverlay(phone, verified, outgoing, cardJson)
         return START_NOT_STICKY
     }
@@ -151,6 +156,15 @@ class CallOverlayService : Service() {
             }
         }
         wv.setBackgroundColor(Color.TRANSPARENT)
+        wv.webChromeClient = object : android.webkit.WebChromeClient() {
+            override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                val msg = consoleMessage?.message().orEmpty()
+                if (msg.contains("VlueBigPushTrace") || msg.contains("Showcase")) {
+                    VlueBigPushTrace.step("JS", msg)
+                }
+                return super.onConsoleMessage(consoleMessage)
+            }
+        }
         wv.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 injectLetteringFlag(view)
@@ -211,9 +225,15 @@ class CallOverlayService : Service() {
         container.alpha = 0f
         container.translationY = -120f
         try {
+            VlueBigPushTrace.step(
+                "5. WindowManager.addView()",
+                "before addView phone=$phone compact=$callPhaseCompact canDrawOverlays=${LetteringPermissionHelper.canDrawOverlays(this)}"
+            )
             windowManager?.addView(container, params)
+            VlueBigPushTrace.step("5. WindowManager.addView()", "SUCCESS phone=$phone")
             LetteringPrefs.setLastCallEvent(this, "overlay_shown:$phone")
         } catch (e: Exception) {
+            VlueBigPushTrace.skip("5. WindowManager.addView()", "FAILED: ${e.message}")
             android.util.Log.e("CallOverlay", "addView failed — overlay permission?", e)
             LetteringPrefs.setLastOverlayError(this, "addView:${e.message}")
             LetteringIncomingNotifier.post(this, phone, outgoing)

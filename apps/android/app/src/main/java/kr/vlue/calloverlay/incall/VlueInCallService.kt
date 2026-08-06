@@ -8,6 +8,7 @@ import android.util.Log
 import kr.vlue.calloverlay.CallOverlayService
 import kr.vlue.calloverlay.LetteringCallCoordinator
 import kr.vlue.calloverlay.LetteringPrefs
+import kr.vlue.calloverlay.VlueBigPushTrace
 
 /**
  * 기본 전화앱 UI — 순정 다이얼러 대신 VLUE 쇼케이스 오버레이를 전면 노출.
@@ -45,6 +46,10 @@ class VlueInCallService : InCallService() {
         val outgoing = VlueInCallController.isOutgoing(call)
         when (call.state) {
             Call.STATE_RINGING -> {
+                VlueBigPushTrace.step(
+                    "1. Incoming Call Detected",
+                    "source=VlueInCallService phone=$phone outgoing=$outgoing"
+                )
                 LetteringCallCoordinator.onRinging(this, phone.ifBlank { null }, outgoing = false)
             }
             Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_ACTIVE -> {

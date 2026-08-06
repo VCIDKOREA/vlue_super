@@ -21,6 +21,11 @@ class LetteringJavascriptBridge(
         service.dismissOverlay()
     }
 
+    @JavascriptInterface
+    fun logBigPushTrace(step: String?, detail: String?) {
+        VlueBigPushTrace.step(step ?: "JS", detail.orEmpty())
+    }
+
     /** 통화만 종료 — 쇼케이스 오버레이 유지 */
     @JavascriptInterface
     fun endCallKeepOverlay() {
@@ -261,6 +266,9 @@ class LetteringJavascriptBridge(
             val bridgeJs = """
                 window.VlueLettering = window.VlueLettering || {};
                 window.VlueLettering.dismissOverlay = function(){ Android.dismissOverlay(); };
+                window.VlueLettering.logBigPushTrace = function(s,d){ try{ Android.logBigPushTrace(String(s||''), String(d||'')); }catch(e){} };
+                window.Android = window.Android || Android;
+                window.Android.logBigPushTrace = window.VlueLettering.logBigPushTrace;
                 window.VlueLettering.endCall = function(){ Android.endCall(); };
                 window.VlueLettering.endCallKeepOverlay = function(){ Android.endCallKeepOverlay(); };
                 window.VlueLettering.endCallOnly = function(){ Android.endCallOnly(); };

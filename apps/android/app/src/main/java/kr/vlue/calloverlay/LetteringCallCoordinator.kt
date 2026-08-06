@@ -28,6 +28,7 @@ object LetteringCallCoordinator {
         try {
             val app = context.applicationContext
             if (!LetteringPrefs.isLetteringEnabled(app)) {
+                VlueBigPushTrace.skip("1→3", "lettering_enabled=false (coordinator)")
                 Log.w(TAG, "skip ringing: lettering_enabled=false")
                 LetteringPrefs.setLastOverlayError(app, "lettering_enabled=false")
                 return
@@ -49,6 +50,10 @@ object LetteringCallCoordinator {
                     (resolved == lastRingNumber || (nextUnknown && prevUnknown))
 
             if (isDuplicate) {
+                VlueBigPushTrace.skip(
+                    "1→3",
+                    "debounce last=$lastRingNumber next=$resolved out=$outgoing"
+                )
                 Log.d(TAG, "skip ringing: debounce last=$lastRingNumber next=$resolved")
                 return
             }
@@ -64,6 +69,7 @@ object LetteringCallCoordinator {
             if (LetteringPermissionHelper.canDrawOverlays(app)) {
                 startOverlayService(app, raw, verified = false, cardJson = null, outgoing)
             } else {
+                VlueBigPushTrace.skip("3. CallOverlayService requested", "SYSTEM_ALERT_WINDOW missing")
                 Log.w(TAG, "overlay permission missing — notif/activity fallback")
                 LetteringPrefs.setLastOverlayError(app, "SYSTEM_ALERT_WINDOW missing")
             }
@@ -193,6 +199,10 @@ object LetteringCallCoordinator {
         outgoing: Boolean
     ) {
         try {
+            VlueBigPushTrace.step(
+                "3. CallOverlayService requested",
+                "via=LetteringCallCoordinator.startOverlayService number=$number verified=$verified outgoing=$outgoing hasCard=${!cardJson.isNullOrBlank()}"
+            )
             Log.i(TAG, "showOverlay number=$number verified=$verified outgoing=$outgoing")
             val intent = Intent(context, CallOverlayService::class.java).apply {
                 putExtra(CallOverlayService.EXTRA_PHONE, number)
@@ -202,6 +212,7 @@ object LetteringCallCoordinator {
             }
             context.startForegroundService(intent)
         } catch (e: Exception) {
+            VlueBigPushTrace.skip("3. CallOverlayService requested", "startForegroundService failed: ${e.message}")
             Log.e(TAG, "showOverlay failed", e)
             LetteringPrefs.setLastOverlayError(context, "fgs:${e.message}")
         }
