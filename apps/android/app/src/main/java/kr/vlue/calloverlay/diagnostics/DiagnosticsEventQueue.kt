@@ -1,12 +1,14 @@
 package kr.vlue.calloverlay.diagnostics
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Local durable queue for diagnostics upload.
@@ -16,12 +18,17 @@ object DiagnosticsEventQueue {
     private const val TAG = "DiagnosticsQueue"
     private const val QUEUE_FILE = "vlue_diagnostics_queue.jsonl"
     private val executor = Executors.newSingleThreadExecutor()
+    private val lastEventElapsedRealtime = AtomicLong(-1L)
 
     @Volatile
     private var appContext: Context? = null
 
     fun bind(context: Context) {
         appContext = context.applicationContext
+    }
+
+    fun resetTiming() {
+        lastEventElapsedRealtime.set(-1L)
     }
 
     fun enqueueSession(
@@ -69,21 +76,44 @@ object DiagnosticsEventQueue {
         failStepOverride: Int? = null,
         failReasonOverride: String? = null
     ) {
-        val now = System.currentTimeMillis()
+        val wallNow = System.currentTimeMillis()
+        val ert = SystemClock.elapsedRealtime()
+        val sinceStart = session.elapsedRealtimeSinceStart(ert)
+        val prev = lastEventElapsedRealtime.getAndSet(ert)
+        val deltaFromPrev = if (prev < 0L) 0 else (ert - prev).toInt().coerceAtLeast(0)
+
+        val timingPayload = JSONObject().apply {
+            put("elapsedRealtimeMs", ert)
+            put("elapsedMs", sinceStart)
+            put("deltaFromPrevMs", deltaFromPrev)
+            put("startedElapsedRealtimeMs", session.startedElapsedRealtimeMs)
+        }
+        val mergedPayload = JSONObject().apply {
+            payloadJson?.keys()?.forEach { k -> put(k, payloadJson.get(k)) }
+            timingPayload.keys().forEach { k -> put(k, timingPayload.get(k)) }
+        }
+
+        val labelWithTime = if (label.contains("${sinceStart}ms")) {
+            label
+        } else {
+            "$label  ${sinceStart}ms"
+        }
+
         val event = JSONObject().apply {
             put("sessionId", session.id)
             put("seq", seq)
             put("code", code)
-            put("label", label)
+            put("label", labelWithTime)
             if (ok != null) put("ok", ok)
-            put("timestamp", now)
-            put("elapsedMs", session.elapsedMs(now))
+            put("timestamp", wallNow)
+            /* 타임라인 +elapsedMs 표시 — elapsedRealtime 세션 상대 */
+            put("elapsedMs", sinceStart)
             if (!reason.isNullOrBlank()) put("reason", reason)
             if (!exceptionMessage.isNullOrBlank()) put("exceptionMessage", exceptionMessage)
             if (!exceptionStack.isNullOrBlank()) put("exceptionStack", exceptionStack)
             if (!exceptionFn.isNullOrBlank()) put("exceptionFn", exceptionFn)
             if (exceptionLine != null) put("exceptionLine", exceptionLine)
-            if (payloadJson != null) put("payloadJson", payloadJson)
+            put("payloadJson", mergedPayload)
             put("terminalFailure", terminalFailure)
         }
         val sessionStatus = when {
@@ -103,7 +133,13 @@ object DiagnosticsEventQueue {
                         val fr = failReasonOverride ?: reason
                         if (!fr.isNullOrBlank()) put("failReason", fr)
                     }
-                    if (overlayState != null) put("overlayStateJson", overlayState)
+                    if (overlayState != null) {
+                        val mergedOverlay = JSONObject().apply {
+                            overlayState.keys().forEach { k -> put(k, overlayState.get(k)) }
+                            timingPayload.keys().forEach { k -> put(k, timingPayload.get(k)) }
+                        }
+                        put("overlayStateJson", mergedOverlay)
+                    }
                     if (statusHint == "OK" && !terminalFailure) {
                         put("status", "OK")
                     }
@@ -113,6 +149,7 @@ object DiagnosticsEventQueue {
         }
         append(context, wrapper)
         flushAsync(context)
+        Log.i(TAG, "$labelWithTime | ert=$ert deltaPrev=${deltaFromPrev}ms")
     }
 
     fun flushAsync(context: Context) {

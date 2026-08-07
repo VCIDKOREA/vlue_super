@@ -2,6 +2,7 @@ package kr.vlue.calloverlay.diagnostics
 
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import android.provider.Settings
 import kr.vlue.calloverlay.BuildConfig
 import kr.vlue.calloverlay.LetteringPrefs
@@ -18,6 +19,8 @@ data class ActiveDiagnosticSession(
     val feature: String,
     val sessionKey: String,
     val startedAtMs: Long,
+    /** SystemClock.elapsedRealtime() at session create — 이벤트 간 시간차 기준 */
+    val startedElapsedRealtimeMs: Long,
     val deviceModel: String,
     val androidVersion: String,
     val appVersion: String,
@@ -25,6 +28,11 @@ data class ActiveDiagnosticSession(
     val userId: String?,
     val phoneMasked: String?
 ) {
+    /** 세션 시작 대비 monotonic 경과(ms) — 타임라인 표시용 */
+    fun elapsedRealtimeSinceStart(nowEr: Long = SystemClock.elapsedRealtime()): Int =
+        (nowEr - startedElapsedRealtimeMs).coerceAtLeast(0).toInt()
+
+    @Deprecated("use elapsedRealtimeSinceStart", ReplaceWith("elapsedRealtimeSinceStart()"))
     fun elapsedMs(now: Long = System.currentTimeMillis()): Int =
         (now - startedAtMs).coerceAtLeast(0).toInt()
 
@@ -35,6 +43,7 @@ data class ActiveDiagnosticSession(
             put("sessionKey", sessionKey)
             put("status", status)
             put("startedAt", startedAtMs)
+            put("startedElapsedRealtimeMs", startedElapsedRealtimeMs)
             put("deviceModel", deviceModel)
             put("androidVersion", androidVersion)
             put("appVersion", appVersion)
@@ -113,6 +122,7 @@ object DiagnosticsSessionStore {
             feature = feature,
             sessionKey = key,
             startedAtMs = now,
+            startedElapsedRealtimeMs = SystemClock.elapsedRealtime(),
             deviceModel = Build.MODEL ?: "unknown",
             androidVersion = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
             appVersion = BuildConfig.VERSION_NAME,
@@ -122,6 +132,7 @@ object DiagnosticsSessionStore {
         )
         return if (active.compareAndSet(null, session)) {
             OverlayDiagTracker.resetForNewCallSession()
+            DiagnosticsEventQueue.resetTiming()
             OverlayDiagTracker.noteSessionBind(source, session.id, created = true)
             DiagnosticsEventQueue.enqueueSession(app, session)
             DiagnosticsEventQueue.enqueueEvent(
