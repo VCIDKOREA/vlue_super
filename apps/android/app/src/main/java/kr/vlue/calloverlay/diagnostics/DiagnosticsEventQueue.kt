@@ -64,7 +64,10 @@ object DiagnosticsEventQueue {
         exceptionLine: Int? = null,
         payloadJson: JSONObject? = null,
         overlayState: JSONObject? = null,
-        statusHint: String? = null
+        statusHint: String? = null,
+        terminalFailure: Boolean = false,
+        failStepOverride: Int? = null,
+        failReasonOverride: String? = null
     ) {
         val now = System.currentTimeMillis()
         val event = JSONObject().apply {
@@ -81,19 +84,29 @@ object DiagnosticsEventQueue {
             if (!exceptionFn.isNullOrBlank()) put("exceptionFn", exceptionFn)
             if (exceptionLine != null) put("exceptionLine", exceptionLine)
             if (payloadJson != null) put("payloadJson", payloadJson)
+            put("terminalFailure", terminalFailure)
+        }
+        val sessionStatus = when {
+            terminalFailure && statusHint == "SKIPPED" -> "SKIPPED"
+            terminalFailure -> "FAILED"
+            statusHint == "OK" -> "OK"
+            else -> "RUNNING"
         }
         val wrapper = JSONObject().apply {
             put("kind", "events")
             put("id", UUID.randomUUID().toString())
             put(
                 "session",
-                session.toSessionJson(statusHint ?: "RUNNING", seq).apply {
-                    if (ok == false || statusHint == "FAILED" || statusHint == "SKIPPED") {
-                        put("failStep", seq)
-                        if (!reason.isNullOrBlank()) put("failReason", reason)
-                        put("status", statusHint ?: if (code == "SKIP") "SKIPPED" else "FAILED")
+                session.toSessionJson(sessionStatus, seq).apply {
+                    if (terminalFailure) {
+                        put("failStep", failStepOverride ?: seq)
+                        val fr = failReasonOverride ?: reason
+                        if (!fr.isNullOrBlank()) put("failReason", fr)
                     }
                     if (overlayState != null) put("overlayStateJson", overlayState)
+                    if (statusHint == "OK" && !terminalFailure) {
+                        put("status", "OK")
+                    }
                 }
             )
             put("events", JSONArray().put(event))

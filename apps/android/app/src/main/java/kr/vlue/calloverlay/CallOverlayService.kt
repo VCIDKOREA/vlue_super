@@ -239,7 +239,7 @@ class CallOverlayService : Service() {
                     "canDrawOverlays=${LetteringPermissionHelper.canDrawOverlays(this)}"
             )
             windowManager?.addView(container, params)
-            VlueBigPushTrace.addViewSuccess("phone=$phone")
+            VlueBigPushTrace.addViewSuccess(container, params, "phone=$phone")
             /* addView 직후: 애니메이션 전 alpha=0 이라 안 보일 수 있음 — 덤프는 애니메이션 후에도 남김 */
             VlueBigPushTrace.dumpOverlayVisibility(
                 container,
@@ -248,7 +248,7 @@ class CallOverlayService : Service() {
             )
             LetteringPrefs.setLastCallEvent(this, "overlay_shown:$phone")
         } catch (e: Exception) {
-            VlueBigPushTrace.addViewFail(e)
+            VlueBigPushTrace.addViewException(e)
             android.util.Log.e("CallOverlay", "addView failed — overlay permission?", e)
             LetteringPrefs.setLastOverlayError(this, "addView:${e.message}")
             LetteringIncomingNotifier.post(this, phone, outgoing)

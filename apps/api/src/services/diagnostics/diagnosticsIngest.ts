@@ -167,12 +167,19 @@ export type IngestEventInput = {
   exceptionFn?: string | null;
   exceptionLine?: number | null;
   payloadJson?: unknown;
+  terminalFailure?: boolean;
 };
 
 export type IngestEventsBody = {
   session?: UpsertSessionInput;
   events?: IngestEventInput[];
 };
+
+/** 세션 FAILED 로 올릴 실제 단말 실패 코드만 */
+const TERMINAL_FAIL_CODES = new Set([
+  "ADD_VIEW_FAIL",
+  "ADD_VIEW_EXCEPTION"
+]);
 
 export async function ingestDiagnosticEvents(
   body: IngestEventsBody,
@@ -200,6 +207,7 @@ export async function ingestDiagnosticEvents(
   let nextStatus: string | null = null;
   let overlayState: Prisma.InputJsonValue | undefined;
   let endedAt: Date | null = null;
+  let sawAddViewSuccess = false;
 
   for (const ev of events) {
     const seq = asInt(ev.seq);
@@ -211,6 +219,14 @@ export async function ingestDiagnosticEvents(
     const reason = asStr(ev.reason, 4000);
     const ok = asBool(ev.ok);
     const payload = asJson(ev.payloadJson);
+    const terminalFailure =
+      ev.terminalFailure === true ||
+      TERMINAL_FAIL_CODES.has(code) ||
+      (code === "SKIP" &&
+        payload &&
+        typeof payload === "object" &&
+        !Array.isArray(payload) &&
+        (payload as Record<string, unknown>).terminal === true);
 
     try {
       await prisma.diagnosticEvent.upsert({
@@ -252,18 +268,22 @@ export async function ingestDiagnosticEvents(
 
     maxStep = Math.max(maxStep, seq);
 
-    const isSkip = code === "SKIP" || code.includes("SKIP");
-    const isFail = ok === false || code.includes("FAIL") || isSkip;
+    if (code === "ADD_VIEW_SUCCESS") {
+      sawAddViewSuccess = true;
+    }
 
-    if (isFail && failStep == null) {
+    /* SKIP / CALL_END ok=false 는 세션 FAIL 로 쓰지 않음 — terminalFailure 또는 EXCEPTION/FAIL 만 */
+    if (terminalFailure) {
       failStep = seq;
       failReason = reason || asStr(ev.exceptionMessage, 4000) || code;
-      nextStatus = isSkip ? "SKIPPED" : "FAILED";
+      nextStatus = code === "SKIP" ? "SKIPPED" : "FAILED";
     }
 
     if (code === "CALL_END" || seq === 11) {
       endedAt = timestamp;
-      if (!nextStatus) nextStatus = failStep != null ? "FAILED" : "OK";
+      if (!nextStatus) {
+        nextStatus = "OK";
+      }
     }
 
     if (payload && typeof payload === "object" && !Array.isArray(payload)) {
@@ -272,26 +292,46 @@ export async function ingestDiagnosticEvents(
         p.type != null ||
         p.layoutParams != null ||
         p.overlayPermission != null ||
-        p.width != null
+        p.width != null ||
+        p.result != null
       ) {
         overlayState = payload;
       }
     }
   }
 
+  /* session blob 의 failReason 은 terminal 일 때만 신뢰 — SUCCESS 후 이전 SKIP reason 제거 */
   const existing = await prisma.diagnosticSession.findUnique({ where: { id: sessionId } });
   if (existing) {
+    const sessionStatus = asStr(sessionInput.status, 16)?.toUpperCase();
+    const sessionClaimsTerminal =
+      sessionStatus === "FAILED" || sessionStatus === "SKIPPED";
+
     let status = existing.status;
-    if (nextStatus) {
-      if (existing.status === "RUNNING") status = nextStatus;
-      else if (nextStatus === "FAILED" || nextStatus === "SKIPPED") status = nextStatus;
+    if (failStep != null) {
+      status = nextStatus || "FAILED";
+    } else if (sawAddViewSuccess) {
+      status = nextStatus === "OK" || nextStatus == null || existing.status === "FAILED" || existing.status === "SKIPPED"
+        ? (nextStatus === "FAILED" ? "FAILED" : "OK")
+        : status;
+      if (existing.status === "FAILED" || existing.status === "SKIPPED") status = "OK";
+      if (nextStatus === "OK") status = "OK";
+    } else if (nextStatus === "OK") {
+      status = "OK";
+    } else if (nextStatus && existing.status === "RUNNING") {
+      status = nextStatus;
     }
+
     await prisma.diagnosticSession.update({
       where: { id: sessionId },
       data: {
         lastStep: Math.max(existing.lastStep, maxStep),
-        failStep: existing.failStep ?? failStep ?? undefined,
-        failReason: existing.failReason ?? failReason ?? undefined,
+        failStep: sawAddViewSuccess && !failStep
+          ? null
+          : failStep ?? (sessionClaimsTerminal ? asInt(sessionInput.failStep) : null) ?? undefined,
+        failReason: sawAddViewSuccess && !failReason
+          ? null
+          : failReason ?? (sessionClaimsTerminal ? asStr(sessionInput.failReason, 4000) : null) ?? undefined,
         status,
         endedAt: existing.endedAt ?? endedAt ?? undefined,
         overlayStateJson: overlayState ?? undefined

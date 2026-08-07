@@ -23,7 +23,7 @@ const BIG_PUSH_STEPS = [
   { seq: 5, short: "onStartCommand" },
   { seq: 6, short: "showOverlay" },
   { seq: 7, short: "addView() CALL" },
-  { seq: 8, short: "addView() result" },
+  { seq: 8, short: "addView() SUCCESS/FAIL/EXCEPTION" },
   { seq: 9, short: "React Root" },
   { seq: 10, short: "Showcase Visible" },
   { seq: 11, short: "Call End" }
@@ -45,10 +45,28 @@ function statusBadge(status) {
 function markForStep(events, seq) {
   const related = (events || []).filter((e) => e.seq === seq);
   if (!related.length) return { mark: "·", failed: false, event: null };
-  const fail = related.find((e) => e.ok === false || String(e.code).includes("FAIL") || e.code === "SKIP");
-  if (fail) return { mark: "✖", failed: true, event: fail };
-  const ok = related.find((e) => e.ok === true) || related[related.length - 1];
-  return { mark: "✔", failed: false, event: ok };
+  /* SUCCESS가 있으면 SKIP 잔여와 무관하게 성공 표시 */
+  const success = related.find(
+    (e) =>
+      e.ok === true &&
+      e.code !== "SKIP" &&
+      !String(e.code).includes("FAIL") &&
+      !String(e.code).includes("EXCEPTION")
+  );
+  const hardFail = related.find(
+    (e) =>
+      e.code === "ADD_VIEW_EXCEPTION" ||
+      e.code === "ADD_VIEW_FAIL" ||
+      (e.ok === false && e.code !== "SKIP" && e.code !== "CALL_END")
+  );
+  if (hardFail && !success) return { mark: "✖", failed: true, event: hardFail };
+  if (success) return { mark: "✔", failed: false, event: success };
+  const skipOnly = related.find((e) => e.code === "SKIP");
+  if (skipOnly && related.length === 1) {
+    return { mark: "○", failed: false, event: skipOnly };
+  }
+  const last = related[related.length - 1];
+  return { mark: last.ok === false ? "✖" : "✔", failed: last.ok === false, event: last };
 }
 
 export default function AdminDiagnosticsPanel({ onToast }) {
@@ -208,11 +226,13 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                 </ul>
               </div>
 
-              {session.failReason || events.some((e) => e.reason) ? (
+              {session.failReason || events.some((e) => e.reason && (e.code === "ADD_VIEW_EXCEPTION" || e.code === "ADD_VIEW_FAIL" || (e.payloadJson && e.payloadJson.terminal))) ? (
                 <div className="rounded-lg bg-rose-50 px-3 py-2 text-[12px] text-rose-900">
                   <p className="font-black">Reason</p>
                   <p className="mt-1 whitespace-pre-wrap">
-                    {session.failReason || events.find((e) => e.reason)?.reason}
+                    {session.failReason ||
+                      events.find((e) => e.code === "ADD_VIEW_EXCEPTION" || e.code === "ADD_VIEW_FAIL")?.reason ||
+                      events.find((e) => e.reason)?.reason}
                   </p>
                   {session.failStep != null ? (
                     <p className="mt-1 text-[11px] text-rose-700">failStep = {session.failStep}</p>
@@ -271,6 +291,22 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                     "alpha",
                     "visibility",
                     "attachedToWindow",
+                    "windowToken",
+                    "rootViewHashCode",
+                    "parent",
+                    "isAttachedToWindow",
+                    "attachedToWindow",
+                    "isShown",
+                    "visibility",
+                    "measuredWidth",
+                    "measuredHeight",
+                    "actualWidth",
+                    "actualHeight",
+                    "windowVisibility",
+                    "displayId",
+                    "currentActivity",
+                    "topPackage",
+                    "layoutParamsToken",
                     "overlayPermission",
                     "notificationPermission",
                     "foregroundServiceState"
