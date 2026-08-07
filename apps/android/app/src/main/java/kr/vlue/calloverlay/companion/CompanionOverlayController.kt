@@ -6,6 +6,8 @@ data class CompanionOverlaySnapshot(
     val state: OverlayState,
     val context: OverlayContext,
     val position: OverlayPosition,
+    val screenState: ScreenState,
+    val miniCaseVisibility: MiniCaseVisibility,
     val lastTransition: String?,
     val rejectedTransition: String?
 ) {
@@ -13,14 +15,18 @@ data class CompanionOverlaySnapshot(
         put("overlayState", state.name)
         put("overlayContext", context.name)
         put("overlayPosition", position.name)
+        put("screenState", screenState.name)
+        put("miniCaseVisibility", miniCaseVisibility.name)
         if (!lastTransition.isNullOrBlank()) put("lastTransition", lastTransition)
         if (!rejectedTransition.isNullOrBlank()) put("rejectedTransition", rejectedTransition)
     }
 }
 
 /**
- * Companion Overlay 허용 전이만 수행.
- * CallOverlayService는 이 Controller의 state/position을 따른다.
+ * Companion Overlay 허용 전이만 수행 (Event Driven).
+ *
+ * Answer Event는 BigPush attach / animation / timeout과 독립이다.
+ * Window 적용(단일 TYPE_APPLICATION_OVERLAY + updateViewLayout)은 CallOverlayService 책임.
  */
 class CompanionOverlayController {
     @Volatile
@@ -30,7 +36,13 @@ class CompanionOverlayController {
     var context: OverlayContext = OverlayContext.HOME_SCREEN
         private set
     @Volatile
+    var screenState: ScreenState = ScreenState.SCREEN_ON
+        private set
+    @Volatile
     var position: OverlayPosition = OverlayPosition.HIDDEN
+        private set
+    @Volatile
+    var miniCaseVisibility: MiniCaseVisibility = MiniCaseVisibility.VISIBLE
         private set
     @Volatile
     var lastTransition: String? = null
@@ -43,7 +55,6 @@ class CompanionOverlayController {
     fun onIncoming(detectedContext: OverlayContext = OverlayContext.HOME_SCREEN) {
         context = detectedContext
         if (state == OverlayState.IDLE || state == OverlayState.BIG_PUSH) {
-            /* Incoming 은 내부 phase — state는 BigPush 요청 시 확정 */
             refreshPosition()
             lastTransition = "onIncoming context=${context.name}"
             rejectedTransition = null
@@ -51,15 +62,14 @@ class CompanionOverlayController {
     }
 
     /**
-     * BigPush 표시 요청.
-     * @return true면 BigPush 생성 허용, false면 스킵(이미 Answer 등)
+     * BigPush 표시 요청 (optional).
+     * @return true면 BigPush 레이아웃 적용 허용, false면 스킵(이미 Answer / SCREEN_OFF 등)
      */
     fun requestBigPush(detectedContext: OverlayContext, callAlreadyAnswered: Boolean): Boolean {
         context = detectedContext
         if (callAlreadyAnswered || state == OverlayState.SHOWCASE || state == OverlayState.MINI_CASE) {
             rejectedTransition = "requestBigPush rejected: answeredOrShowcase state=$state"
             if (callAlreadyAnswered && state == OverlayState.IDLE) {
-                /* Answer-before-BigPush → Showcase로 바로 갈 준비 */
                 lastTransition = "answerBeforeBigPush"
             }
             refreshPosition()
@@ -72,7 +82,8 @@ class CompanionOverlayController {
         state = OverlayState.BIG_PUSH
         refreshPosition()
         if (position == OverlayPosition.HIDDEN) {
-            rejectedTransition = "requestBigPush: position HIDDEN for context=$context"
+            rejectedTransition =
+                "requestBigPush: position HIDDEN context=$context screen=${screenState.name}"
             state = OverlayState.IDLE
             return false
         }
@@ -81,24 +92,18 @@ class CompanionOverlayController {
         return true
     }
 
-    /** Answer — BigPush 제거 후 Showcase */
+    /**
+     * Call Answer Event → 즉시 SHOWCASE (FULLSCREEN).
+     * BigPush lifecycle(attach / animation / timeout)을 기다리지 않는다.
+     */
     fun onAnswer(detectedContext: OverlayContext = OverlayContext.IN_CALL) {
+        val from = state
         context = detectedContext
-        when (state) {
-            OverlayState.BIG_PUSH,
-            OverlayState.IDLE,
-            OverlayState.SHOWCASE -> {
-                state = OverlayState.SHOWCASE
-                lastTransition = "onAnswer → SHOWCASE (from was cleared)"
-                rejectedTransition = null
-            }
-            OverlayState.MINI_CASE -> {
-                /* Answer 중 Mini 유지 가능하나 정책상 통화 직후는 Showcase 우선 */
-                state = OverlayState.SHOWCASE
-                lastTransition = "onAnswer MiniCase→SHOWCASE"
-                rejectedTransition = null
-            }
-        }
+        state = OverlayState.SHOWCASE
+        miniCaseVisibility = MiniCaseVisibility.VISIBLE
+        lastTransition =
+            "onAnswer → SHOWCASE from=$from (event-driven, independent of BigPush)"
+        rejectedTransition = null
         refreshPosition()
     }
 
@@ -109,6 +114,7 @@ class CompanionOverlayController {
         }
         context = detectedContext
         state = OverlayState.MINI_CASE
+        miniCaseVisibility = MiniCaseVisibility.VISIBLE
         lastTransition = "onMinimize → MINI_CASE"
         rejectedTransition = null
         refreshPosition()
@@ -121,9 +127,36 @@ class CompanionOverlayController {
         }
         context = detectedContext
         state = OverlayState.SHOWCASE
+        miniCaseVisibility = MiniCaseVisibility.VISIBLE
         lastTransition = "onRestoreShowcase → SHOWCASE"
         rejectedTransition = null
         refreshPosition()
+    }
+
+    /** Drag End — edge peek. EDGE_HIDDEN은 종료가 아님. */
+    fun onMiniEdgeHidden() {
+        onMiniVisibilityChanged(MiniCaseVisibility.EDGE_HIDDEN)
+    }
+
+    /** Edge peek Tap → VISIBLE (여전히 MINI_CASE). Showcase 복원은 별도 restore 요청. */
+    fun onMiniEdgeReveal() {
+        onMiniVisibilityChanged(MiniCaseVisibility.VISIBLE)
+    }
+
+    /**
+     * MINI_CASE Visibility만 변경. OverlayState / Position은 유지.
+     * 좌표(updateMiniOverlayFrame)와 분리된 Event.
+     */
+    fun onMiniVisibilityChanged(visibility: MiniCaseVisibility) {
+        if (state != OverlayState.MINI_CASE) {
+            rejectedTransition =
+                "onMiniVisibilityChanged rejected: state=$state want=${visibility.name}"
+            return
+        }
+        val from = miniCaseVisibility
+        miniCaseVisibility = visibility
+        lastTransition = "onMiniVisibilityChanged $from→${visibility.name} (state=MINI_CASE)"
+        rejectedTransition = null
     }
 
     fun onKeypad(open: Boolean) {
@@ -137,6 +170,7 @@ class CompanionOverlayController {
         if (state == OverlayState.SHOWCASE || state == OverlayState.MINI_CASE) {
             context = OverlayContext.KEYPAD
             state = OverlayState.MINI_CASE
+            miniCaseVisibility = MiniCaseVisibility.VISIBLE
             lastTransition = "onKeypad → MINI_CASE"
             rejectedTransition = null
             refreshPosition()
@@ -149,13 +183,32 @@ class CompanionOverlayController {
         state = OverlayState.IDLE
         context = OverlayContext.HOME_SCREEN
         position = OverlayPosition.HIDDEN
+        miniCaseVisibility = MiniCaseVisibility.VISIBLE
         lastTransition = "onCallEnd → IDLE"
         rejectedTransition = null
     }
 
+    /**
+     * Screen On/Off/AOD — Position Context만 갱신.
+     * OverlayState를 바꾸지 않는다 (IDLE/제거/통화종료 금지).
+     * @return previous ScreenState
+     */
+    fun onScreenStateChanged(next: ScreenState): ScreenState {
+        val previous = screenState
+        if (previous == next) {
+            refreshPosition()
+            return previous
+        }
+        screenState = next
+        refreshPosition()
+        lastTransition =
+            "onScreenStateChanged $previous→$next state=${state.name} pos=${position.name}"
+        rejectedTransition = null
+        return previous
+    }
+
     fun updateContext(detectedContext: OverlayContext) {
         context = detectedContext
-        /* Showcase가 HOME/OTHER로 바뀌면 Mini로 유도 */
         if (state == OverlayState.SHOWCASE &&
             (detectedContext == OverlayContext.HOME_SCREEN ||
                 detectedContext == OverlayContext.OTHER_APP ||
@@ -163,22 +216,30 @@ class CompanionOverlayController {
                 detectedContext == OverlayContext.MINIMIZED)
         ) {
             state = OverlayState.MINI_CASE
+            miniCaseVisibility = MiniCaseVisibility.VISIBLE
             lastTransition = "context→MINI_CASE ($detectedContext)"
         }
-        if (state == OverlayState.BIG_PUSH &&
-            (detectedContext == OverlayContext.IN_CALL)
-        ) {
-            /* Answer race: context만 IN_CALL이 된 경우 BigPush 금지 */
+        if (state == OverlayState.BIG_PUSH && detectedContext == OverlayContext.IN_CALL) {
+            /* Answer race: context만 IN_CALL — BigPush 대기 없이 Showcase */
             state = OverlayState.SHOWCASE
-            lastTransition = "context IN_CALL while BIG_PUSH → SHOWCASE"
+            miniCaseVisibility = MiniCaseVisibility.VISIBLE
+            lastTransition = "context IN_CALL while BIG_PUSH → SHOWCASE (no BigPush wait)"
         }
         refreshPosition()
     }
 
     fun snapshot(): CompanionOverlaySnapshot =
-        CompanionOverlaySnapshot(state, context, position, lastTransition, rejectedTransition)
+        CompanionOverlaySnapshot(
+            state = state,
+            context = context,
+            position = position,
+            screenState = screenState,
+            miniCaseVisibility = miniCaseVisibility,
+            lastTransition = lastTransition,
+            rejectedTransition = rejectedTransition
+        )
 
     private fun refreshPosition() {
-        position = OverlayPositionManager.resolve(context, state)
+        position = OverlayPositionManager.resolve(context, state, screenState)
     }
 }

@@ -85,7 +85,7 @@ object LetteringIncomingNotifier {
                 .setTimeoutAfter(90_000L)
 
             NotificationManagerCompat.from(app).notify(NOTIFICATION_ID, builder.build())
-            Log.i(TAG, "posted incoming notif phone=$phone name=$displayName outgoing=$outgoing")
+            Log.i(TAG, "posted incoming notif phone=${kr.vlue.calloverlay.diagnostics.ReleaseDebugGate.maskPhoneForLog(phone)} name=$displayName outgoing=$outgoing")
         } catch (e: Exception) {
             Log.e(TAG, "post failed", e)
             LetteringPrefs.setLastOverlayError(context, "notif:${e.message}")

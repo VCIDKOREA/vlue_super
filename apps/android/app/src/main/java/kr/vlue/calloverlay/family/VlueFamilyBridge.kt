@@ -14,6 +14,7 @@ import kr.vlue.calloverlay.family.ledger.VlueLocalStore
 import kr.vlue.calloverlay.family.ocr.PosBillMlKitOcr
 import kr.vlue.calloverlay.family.translate.MlKitTranslate
 import kotlinx.coroutines.runBlocking
+import kr.vlue.calloverlay.diagnostics.ReleaseDebugGate
 import org.json.JSONObject
 import java.lang.ref.WeakReference
 
@@ -181,7 +182,7 @@ object VlueFamilyBridge {
     private fun runOnWebView(webView: WebView, script: String) {
         mainHandler.post {
             try {
-                webView.evaluateJavascript(script) { Log.d(TAG, "js: $it") }
+                webView.evaluateJavascript(script) { ReleaseDebugGate.d(TAG, "js: $it") }
             } catch (e: Exception) {
                 Log.e(TAG, "evaluateJavascript failed", e)
             }

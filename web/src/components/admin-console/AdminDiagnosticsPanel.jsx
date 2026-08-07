@@ -500,15 +500,945 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                   Companion Overlay
                 </p>
                 <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[11px] text-slate-700 sm:grid-cols-3">
-                  {["overlayState", "overlayContext", "overlayPosition", "lastTransition", "rejectedTransition"].map(
-                    (k) => (
-                      <div key={k}>
-                        <span className="text-slate-400">{k}:</span>{" "}
-                        <span className="font-bold">{String(overlay[k] ?? "—")}</span>
-                      </div>
-                    )
-                  )}
+                  {[
+                    "overlayState",
+                    "overlayPosition",
+                    "screenState",
+                    "miniCaseVisibility",
+                    "overlayContext",
+                    "lastTransition",
+                    "rejectedTransition"
+                  ].map((k) => (
+                    <div key={k}>
+                      <span className="text-slate-400">{k}:</span>{" "}
+                      <span className="font-bold">{String(overlay[k] ?? "—")}</span>
+                    </div>
+                  ))}
                 </div>
+                {(() => {
+                  const sec = overlay.securityAuditReport;
+                  if (!sec || typeof sec !== "object") return null;
+                  const summary = sec.summary || {};
+                  const section = (title, key) => {
+                    const rows = Array.isArray(sec[key]) ? sec[key] : [];
+                    if (!rows.length) return null;
+                    return (
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-[10px] font-bold text-slate-800">
+                          {title} ({rows.length})
+                        </summary>
+                        <ul className="mt-1 max-h-36 space-y-0.5 overflow-auto text-[10px] text-slate-600">
+                          {rows.map((f, i) => (
+                            <li
+                              key={`${key}-${f?.id ?? i}`}
+                              className={
+                                f?.severity === "RISK"
+                                  ? "text-rose-800"
+                                  : f?.severity === "REVIEW"
+                                    ? "text-amber-800"
+                                    : f?.severity === "OK"
+                                      ? "text-emerald-800"
+                                      : ""
+                              }
+                            >
+                              [{String(f?.severity ?? "?")}] {String(f?.title ?? f?.id ?? "?")}
+                              {f?.detail ? ` — ${String(f.detail)}` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    );
+                  };
+                  return (
+                    <div className="mt-3 rounded border border-slate-300 bg-white px-2 py-2 font-mono text-[11px] text-slate-700">
+                      <p className="text-[10px] font-black uppercase text-slate-800">
+                        Security Audit Report
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        total={String(summary.total ?? "—")} · risk=
+                        <span className="font-bold text-rose-800">{String(summary.risk ?? 0)}</span> ·
+                        review=
+                        <span className="font-bold text-amber-800">{String(summary.review ?? 0)}</span> ·
+                        ok={String(summary.ok ?? 0)}
+                      </p>
+                      {section("Manifest Risks", "manifestRisks")}
+                      {section("Intent Security", "intentSecurity")}
+                      {section("Overlay Security", "overlaySecurity")}
+                      <p className="mt-2 text-[10px] font-black uppercase text-slate-800">
+                        Privacy Report
+                      </p>
+                      {section("Privacy", "privacyReport")}
+                      <p className="mt-2 text-[10px] font-black uppercase text-slate-800">
+                        Release Checklist
+                      </p>
+                      {section("Release", "releaseChecklist")}
+                      {section("Store Readiness", "storeReadiness")}
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const dash = overlay.recoveryDashboard;
+                  if (!dash || typeof dash !== "object") return null;
+                  const timeline = Array.isArray(dash.recoveryTimeline) ? dash.recoveryTimeline : [];
+                  const cases = Array.isArray(dash.recoveryCaseResults) ? dash.recoveryCaseResults : [];
+                  const memCb = Array.isArray(dash.memoryCallbackHistory)
+                    ? dash.memoryCallbackHistory
+                    : [];
+                  const life = Array.isArray(dash.serviceLifecycle) ? dash.serviceLifecycle : [];
+                  const last = dash.lastRecoveryCase;
+                  const rate =
+                    dash.recoverySuccessRate != null
+                      ? `${(Number(dash.recoverySuccessRate) * 100).toFixed(0)}%`
+                      : "—";
+                  return (
+                    <div className="mt-3 rounded border border-orange-100 bg-orange-50/50 px-2 py-2 font-mono text-[11px] text-slate-700">
+                      <p className="text-[10px] font-black uppercase text-orange-900">
+                        Recovery Panel
+                      </p>
+                      <p className="mt-1">
+                        Success Rate: <span className="font-bold">{rate}</span> · attempts=
+                        {String(dash.recoveryAttemptCount ?? 0)} · success=
+                        {String(dash.recoverySuccessCount ?? 0)}
+                        {last && typeof last === "object" ? (
+                          <span className="ml-2">
+                            Last:{" "}
+                            <span
+                              className={
+                                last.passed === true || last.verdict === "PASS"
+                                  ? "font-bold text-emerald-800"
+                                  : "font-bold text-rose-800"
+                              }
+                            >
+                              {String(last.verdict ?? "—")} {String(last.caseName ?? last.caseId ?? "")}
+                            </span>
+                          </span>
+                        ) : null}
+                      </p>
+                      {timeline.length ? (
+                        <div className="mt-2 max-h-40 overflow-auto rounded border border-orange-100 bg-white px-2 py-2">
+                          <p className="text-[10px] font-black uppercase text-slate-500">
+                            Recovery Timeline ({timeline.length})
+                          </p>
+                          <ul className="mt-1 space-y-1 text-[10px] text-slate-600">
+                            {[...timeline].slice(-20).reverse().map((ev, i) => (
+                              <li
+                                key={`rec-${ev?.timestamp ?? i}-${i}`}
+                                className={
+                                  ev?.recoverySuccess === false ? "text-rose-800" : ""
+                                }
+                              >
+                                {String(ev?.recoveryEvent ?? "?")} · expected=
+                                {String(ev?.expectedState ?? "—")} · recovered=
+                                {String(ev?.recoveredState ?? "—")} ·{" "}
+                                {ev?.recoveryTimeMs != null ? `${ev.recoveryTimeMs}ms` : "—"} ·{" "}
+                                {ev?.recoverySuccess === true
+                                  ? "OK"
+                                  : ev?.recoverySuccess === false
+                                    ? "FAIL"
+                                    : "—"}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {memCb.length ? (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-[10px] font-bold text-orange-900">
+                            Memory Callback History ({memCb.length})
+                          </summary>
+                          <ul className="mt-1 max-h-28 space-y-0.5 overflow-auto text-[10px] text-slate-600">
+                            {[...memCb].reverse().map((ev, i) => (
+                              <li key={`mcb-${i}`}>
+                                {String(ev?.kind ?? "?")}
+                                {ev?.levelName ? ` · ${String(ev.levelName)}` : ""}
+                                {ev?.level != null ? ` (${ev.level})` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                      {life.length ? (
+                        <details className="mt-1">
+                          <summary className="cursor-pointer text-[10px] font-bold text-orange-900">
+                            Service Lifecycle ({life.length})
+                          </summary>
+                          <ul className="mt-1 max-h-28 space-y-0.5 overflow-auto text-[10px] text-slate-600">
+                            {[...life].reverse().map((ev, i) => (
+                              <li key={`sl-${i}`}>
+                                {String(ev?.event ?? "?")}
+                                {ev?.detail ? ` · ${String(ev.detail)}` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                      {cases.length > 1 ? (
+                        <details className="mt-1">
+                          <summary className="cursor-pointer text-[10px] font-bold text-orange-900">
+                            All recovery cases ({cases.length})
+                          </summary>
+                          <ul className="mt-1 space-y-0.5 text-[10px]">
+                            {[...cases].reverse().map((c, i) => (
+                              <li key={`rc-${c?.caseId ?? i}`}>
+                                {String(c?.verdict ?? "?")} · {String(c?.caseName ?? c?.caseId)}
+                                {c?.stateLeak ? " · stateLeak" : ""}
+                                {c?.windowLeak ? " · windowLeak" : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const dash = overlay.performanceDashboard;
+                  if (!dash || typeof dash !== "object") return null;
+                  const perf = dash.performance || {};
+                  const mem = dash.memory || {};
+                  const cpu = dash.cpu || {};
+                  const bat = dash.battery || {};
+                  const render = dash.rendering || {};
+                  const pass = dash.pass || {};
+                  const cpuEvents = ["INCOMING", "ANSWER", "MINI", "RESTORE", "CALL_END"];
+                  return (
+                    <div className="mt-3 rounded border border-emerald-100 bg-emerald-50/40 px-2 py-2 font-mono text-[11px] text-slate-700">
+                      <p className="text-[10px] font-black uppercase text-emerald-900">
+                        Performance Dashboard
+                      </p>
+                      <p className="mt-1">
+                        Verdict:{" "}
+                        <span
+                          className={
+                            pass.passed === true || pass.verdict === "PASS"
+                              ? "font-bold text-emerald-800"
+                              : "font-bold text-rose-800"
+                          }
+                        >
+                          {String(pass.verdict ?? "—")}
+                        </span>
+                        <span className="ml-2 text-slate-500">
+                          attach&lt;{String(pass.kpiOverlayAttachMs ?? 200)}ms · answer→showcase&lt;
+                          {String(pass.kpiAnswerToShowcaseMs ?? 500)}ms · window≤1 · no leak
+                        </span>
+                      </p>
+                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-3">
+                        <div>
+                          <span className="text-slate-400">Attach:</span>{" "}
+                          <span className="font-bold">{fmtMs(perf.overlayAttachMs)}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Layout Commit:</span>{" "}
+                          <span className="font-bold">{fmtMs(perf.layoutCommitMs)}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">WebView Ready:</span>{" "}
+                          <span className="font-bold">{fmtMs(perf.webViewReadyMs)}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">JS Bridge:</span>{" "}
+                          <span className="font-bold">{fmtMs(perf.jsBridgeCallMs)}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Controller:</span>{" "}
+                          <span className="font-bold">{fmtMs(perf.controllerProcessingMs)}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">updateViewLayout:</span>{" "}
+                          <span className="font-bold">{fmtMs(perf.updateViewLayoutMs)}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Frame Commit:</span>{" "}
+                          <span className="font-bold">{fmtMs(perf.frameCommitMs)}</span>
+                        </div>
+                      </div>
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-[10px] font-bold text-emerald-900">
+                          Memory
+                        </summary>
+                        <ul className="mt-1 space-y-0.5 text-[10px] text-slate-600">
+                          <li>Overlay Memory: {String(mem.overlayMemoryBytes ?? "—")} B</li>
+                          <li>WebView Memory: {String(mem.webViewMemoryBytes ?? "—")} B</li>
+                          <li>Bitmap: {String(mem.bitmapBytes ?? "—")} B</li>
+                          <li>View Count: {String(mem.viewCount ?? "—")}</li>
+                          <li>Window Count: {String(mem.windowCount ?? "—")}</li>
+                          <li>GC: {String(mem.gcCount ?? "—")}</li>
+                          <li>
+                            Leak:{" "}
+                            <span className={mem.leakDetected ? "text-rose-800" : "text-emerald-800"}>
+                              {String(mem.leakDetected ?? "—")}
+                            </span>
+                          </li>
+                        </ul>
+                      </details>
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-[10px] font-bold text-emerald-900">
+                          CPU
+                        </summary>
+                        <ul className="mt-1 space-y-0.5 text-[10px] text-slate-600">
+                          {cpuEvents.map((ev) => {
+                            const row = cpu[ev];
+                            if (!row || typeof row !== "object") {
+                              return (
+                                <li key={ev}>
+                                  {ev}: —
+                                </li>
+                              );
+                            }
+                            return (
+                              <li key={ev}>
+                                {ev}: last={fmtMs(row.lastMs)} · avg={fmtMs(row.avgMs)} · n=
+                                {String(row.count ?? 0)}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </details>
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-[10px] font-bold text-emerald-900">
+                          Battery
+                        </summary>
+                        <ul className="mt-1 space-y-0.5 text-[10px] text-slate-600">
+                          <li>FGS duration: {fmtMs(bat.foregroundServiceDurationMs)}</li>
+                          <li>WakeLock: {String(bat.wakeLockHeld ?? "—")}</li>
+                          <li>Screen ON: {String(bat.screenOn ?? "—")}</li>
+                          <li>Overlay alive: {fmtMs(bat.overlayAliveDurationMs)}</li>
+                          <li>Cost score: {String(bat.estimatedBatteryCostScore ?? "—")}</li>
+                        </ul>
+                      </details>
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-[10px] font-bold text-emerald-900">
+                          Rendering
+                        </summary>
+                        <ul className="mt-1 space-y-0.5 text-[10px] text-slate-600">
+                          <li>Dropped Frame: {String(render.droppedFrames ?? "—")}</li>
+                          <li>Jank: {String(render.jankCount ?? "—")}</li>
+                          <li>Skipped Frame: {String(render.skippedFrames ?? "—")}</li>
+                          <li>Animation Time: {fmtMs(render.animationTimeMs)}</li>
+                          <li>Layout Pass: {String(render.layoutPassCount ?? "—")}</li>
+                          <li>Measure: {String(render.measureCount ?? "—")}</li>
+                        </ul>
+                      </details>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const oem = overlay.oemDeviceInfo;
+                  const compat = overlay.deviceCompatibility;
+                  const samsung = overlay.samsungCompatibilityAudit;
+                  const oneUi = overlay.oneUiCallFlowResult;
+                  if (!oem && !compat && !samsung) return null;
+                  const source = compat && typeof compat === "object" ? compat : oem;
+                  const restrictions = Array.isArray(source?.knownRestrictions)
+                    ? source.knownRestrictions
+                    : Array.isArray(oem?.knownRestrictions)
+                      ? oem.knownRestrictions
+                      : [];
+                  const checklist = Array.isArray(samsung?.checklist) ? samsung.checklist : [];
+                  const attach = samsung?.attachAudit;
+                  const layout = samsung?.layoutAudit;
+                  return (
+                    <div className="mt-3 rounded border border-sky-100 bg-sky-50/50 px-2 py-2 font-mono text-[11px] text-slate-700">
+                      <p className="text-[10px] font-black uppercase text-sky-900">
+                        Device Compatibility
+                      </p>
+                      <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-3">
+                        <div>
+                          <span className="text-slate-400">Manufacturer:</span>{" "}
+                          <span className="font-bold">
+                            {String(source?.manufacturer ?? oem?.manufacturer ?? "—")}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Brand:</span>{" "}
+                          <span className="font-bold">
+                            {String(source?.brand ?? oem?.brand ?? "—")}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">SDK:</span>{" "}
+                          <span className="font-bold">
+                            {String(source?.sdkInt ?? oem?.sdkInt ?? "—")}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">OEM Family:</span>{" "}
+                          <span className="font-bold">
+                            {String(source?.oemFamily ?? oem?.oemFamily ?? "—")}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Overlay Permission:</span>{" "}
+                          <span className="font-bold">
+                            {String(
+                              source?.overlayPermission ?? oem?.overlayPermission ?? "—"
+                            )}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Battery Optimization:</span>{" "}
+                          <span className="font-bold">
+                            {String(
+                              source?.batteryOptimizationIgnored ??
+                                oem?.batteryOptimizationIgnored ??
+                                "—"
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      {restrictions.length ? (
+                        <div className="mt-2">
+                          <p className="text-[10px] font-black uppercase text-slate-500">
+                            Known Restriction
+                          </p>
+                          <ul className="mt-1 max-h-36 space-y-1 overflow-auto text-[10px] text-slate-600">
+                            {restrictions.map((r, i) => (
+                              <li key={r?.id ?? i}>
+                                <span className="font-bold">{String(r?.title ?? r?.id ?? "?")}</span>
+                                {r?.detail ? ` — ${String(r.detail)}` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {checklist.length ? (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-[10px] font-bold text-sky-900">
+                            Samsung Compatibility Checklist ({checklist.length})
+                          </summary>
+                          <ul className="mt-1 max-h-40 space-y-0.5 overflow-auto text-[10px]">
+                            {checklist.map((c, i) => (
+                              <li key={c?.id ?? i}>
+                                [{String(c?.status ?? "?")}] {String(c?.id ?? "?")} —{" "}
+                                {String(c?.detail ?? "")}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                      {attach && typeof attach === "object" ? (
+                        <p className="mt-2 text-[10px] text-slate-600">
+                          Attach Audit · successRate=
+                          {attach.attachSuccessRate != null
+                            ? String(attach.attachSuccessRate)
+                            : "—"}{" "}
+                          · failRate=
+                          {attach.attachFailRate != null ? String(attach.attachFailRate) : "—"} ·
+                          badToken={String(attach.badTokenCount ?? 0)} · oemReject=
+                          {String(attach.oemRejectCount ?? 0)} · permissionReject=
+                          {String(attach.permissionRejectCount ?? 0)}
+                        </p>
+                      ) : null}
+                      {layout && typeof layout === "object" ? (
+                        <p className="mt-1 text-[10px] text-slate-600">
+                          Layout Audit · applied={String(layout.layoutAppliedCount ?? 0)} · failed=
+                          {String(layout.layoutFailedCount ?? 0)} · allOk=
+                          {String(layout.allLayoutsObservedOk ?? "—")}
+                        </p>
+                      ) : null}
+                      {oneUi && typeof oneUi === "object" ? (
+                        <p className="mt-1 text-[10px]">
+                          OneUI Call Flow:{" "}
+                          <span
+                            className={
+                              oneUi.passed === true || oneUi.verdict === "PASS"
+                                ? "font-bold text-emerald-800"
+                                : "font-bold text-rose-800"
+                            }
+                          >
+                            {String(oneUi.verdict ?? "—")}
+                          </span>
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const oem = overlay.oemDeviceInfo;
+                  if (!oem || typeof oem !== "object") return null;
+                  return (
+                    <div className="mt-3 rounded border border-slate-100 bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700">
+                      <p className="text-[10px] font-black uppercase text-slate-500">Device Info</p>
+                      <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-3">
+                        {[
+                          ["manufacturer", "Manufacturer"],
+                          ["brand", "Brand"],
+                          ["model", "Model"],
+                          ["sdkInt", "SDK_INT"],
+                          ["overlayPermission", "Overlay Permission"],
+                          ["batteryOptimizationIgnored", "Battery Optimization Ignored"],
+                          ["roleDialer", "ROLE_DIALER"]
+                        ].map(([k, label]) => (
+                          <div key={k}>
+                            <span className="text-slate-400">{label}:</span>{" "}
+                            <span className="font-bold">{String(oem[k] ?? "—")}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const rel = overlay.overlayReliability;
+                  const lastFail = overlay.lastOverlayFailure;
+                  return (
+                    <div className="mt-3 rounded border border-rose-100 bg-rose-50/60 px-2 py-2 font-mono text-[11px] text-slate-700">
+                      <p className="text-[10px] font-black uppercase text-rose-700">Failure / Rates</p>
+                      <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-3">
+                        <div>
+                          <span className="text-slate-400">Failure Count:</span>{" "}
+                          <span className="font-bold">
+                            {rel?.failureCount != null ? String(rel.failureCount) : "0"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Attach Success Rate:</span>{" "}
+                          <span className="font-bold">
+                            {rel?.attachSuccessRate != null
+                              ? `${(Number(rel.attachSuccessRate) * 100).toFixed(0)}%`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Layout Success Rate:</span>{" "}
+                          <span className="font-bold">
+                            {rel?.layoutSuccessRate != null
+                              ? `${(Number(rel.layoutSuccessRate) * 100).toFixed(0)}%`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Overlay Success Rate:</span>{" "}
+                          <span className="font-bold">
+                            {rel?.overlaySuccessRate != null
+                              ? `${(Number(rel.overlaySuccessRate) * 100).toFixed(0)}%`
+                              : "—"}
+                          </span>
+                        </div>
+                      </div>
+                      {lastFail && typeof lastFail === "object" ? (
+                        <p className="mt-2 text-rose-900">
+                          <span className="text-slate-400">Last Failure:</span>{" "}
+                          <span className="font-bold">{String(lastFail.failureReason ?? "—")}</span>
+                          {" · "}
+                          phase={String(lastFail.phase ?? "—")}
+                          {lastFail.detail ? ` · ${String(lastFail.detail)}` : ""}
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-slate-500">Last Failure: —</p>
+                      )}
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const last = overlay.lastOverlayTransition;
+                  if (!last || typeof last !== "object") return null;
+                  return (
+                    <div className="mt-3 rounded border border-slate-100 bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700">
+                      <p className="text-[10px] font-black uppercase text-slate-500">Last Transition</p>
+                      <p className="mt-1">
+                        <span className="font-bold">
+                          {String(last.previousState ?? "—")} → {String(last.nextState ?? "—")}
+                        </span>
+                      </p>
+                      <p className="text-slate-500">
+                        trigger={String(last.triggerEvent ?? "—")} · elapsedMs=
+                        {last.elapsedMs != null ? String(last.elapsedMs) : "—"} · userAction=
+                        {String(last.userAction ?? false)}
+                      </p>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const kpi = overlay.companionKpi;
+                  if (!kpi || typeof kpi !== "object") return null;
+                  return (
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[11px] text-slate-700 sm:grid-cols-3">
+                      {[
+                        "answerToShowcaseMs",
+                        "incomingToBigPushMs",
+                        "bigPushToShowcaseMs",
+                        "kpiAnswerToShowcaseMs",
+                        "kpiAnswerToShowcasePass"
+                      ].map((k) =>
+                        kpi[k] == null ? null : (
+                          <div key={k}>
+                            <span className="text-slate-400">{k}:</span>{" "}
+                            <span className="font-bold">{String(kpi[k])}</span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  );
+                })()}
+                {Array.isArray(overlay.overlayTransitions) && overlay.overlayTransitions.length > 0 ? (
+                  <div className="mt-3 max-h-48 overflow-auto rounded border border-slate-100 bg-white px-2 py-2">
+                    <p className="text-[10px] font-black uppercase text-slate-500">
+                      Recent Timeline ({overlay.overlayTransitions.length})
+                    </p>
+                    <ul className="mt-1 space-y-1 font-mono text-[10px] text-slate-600">
+                      {[...overlay.overlayTransitions].reverse().map((ev, i) => (
+                        <li key={`${ev?.timestamp ?? i}-${i}`}>
+                          {String(ev?.previousState ?? "?")}→{String(ev?.nextState ?? "?")} ·{" "}
+                          {String(ev?.triggerEvent ?? "—")} · {String(ev?.elapsedMs ?? "—")}ms · pos=
+                          {String(ev?.overlayPosition ?? "—")}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {Array.isArray(overlay.overlayFailures) && overlay.overlayFailures.length > 0 ? (
+                  <div className="mt-3 max-h-48 overflow-auto rounded border border-rose-100 bg-white px-2 py-2">
+                    <p className="text-[10px] font-black uppercase text-rose-700">
+                      Recent Failure Timeline ({overlay.overlayFailures.length})
+                    </p>
+                    <ul className="mt-1 space-y-1 font-mono text-[10px] text-rose-900">
+                      {[...overlay.overlayFailures].reverse().map((ev, i) => (
+                        <li key={`fail-${ev?.timestamp ?? i}-${i}`}>
+                          {String(ev?.failureReason ?? "?")} · {String(ev?.phase ?? "—")}
+                          {ev?.detail ? ` · ${String(ev.detail)}` : ""}
+                          {ev?.overlayState ? ` · state=${String(ev.overlayState)}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {Array.isArray(overlay.attachTimeline) && overlay.attachTimeline.length > 0 ? (
+                  <div className="mt-3 max-h-40 overflow-auto rounded border border-slate-100 bg-white px-2 py-2">
+                    <p className="text-[10px] font-black uppercase text-slate-500">
+                      Attach Timeline ({overlay.attachTimeline.length})
+                    </p>
+                    <ul className="mt-1 space-y-1 font-mono text-[10px] text-slate-600">
+                      {[...overlay.attachTimeline].reverse().map((ev, i) => (
+                        <li key={`att-${ev?.timestamp ?? i}-${i}`}>
+                          {String(ev?.step ?? "?")}
+                          {ev?.failureReason ? ` · ${String(ev.failureReason)}` : ""}
+                          {ev?.elapsedMs != null ? ` · ${String(ev.elapsedMs)}ms` : ""}
+                          {ev?.phase ? ` · ${String(ev.phase)}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {Array.isArray(overlay.layoutTimeline) && overlay.layoutTimeline.length > 0 ? (
+                  <div className="mt-3 max-h-40 overflow-auto rounded border border-slate-100 bg-white px-2 py-2">
+                    <p className="text-[10px] font-black uppercase text-slate-500">
+                      Layout Timeline ({overlay.layoutTimeline.length})
+                    </p>
+                    <ul className="mt-1 space-y-1 font-mono text-[10px] text-slate-600">
+                      {[...overlay.layoutTimeline].reverse().map((ev, i) => (
+                        <li key={`lay-${ev?.timestamp ?? i}-${i}`}>
+                          {String(ev?.step ?? "?")}
+                          {ev?.result ? ` → ${String(ev.result)}` : ""}
+                          {ev?.failureReason ? ` · ${String(ev.failureReason)}` : ""}
+                          {ev?.position ? ` · pos=${String(ev.position)}` : ""}
+                          {ev?.elapsedMs != null ? ` · ${String(ev.elapsedMs)}ms` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {(() => {
+                  const scenarios = Array.isArray(overlay.scenarioResults)
+                    ? overlay.scenarioResults
+                    : [];
+                  const lastSc = overlay.lastScenarioResult;
+                  if (!lastSc && !scenarios.length) return null;
+                  const shown = lastSc && typeof lastSc === "object" ? lastSc : scenarios[scenarios.length - 1];
+                  if (!shown || typeof shown !== "object") return null;
+                  const timeline = Array.isArray(shown.timeline) ? shown.timeline : [];
+                  const stateFlow = Array.isArray(shown.stateFlow) ? shown.stateFlow : [];
+                  const kpi = shown.kpi && typeof shown.kpi === "object" ? shown.kpi : {};
+                  const pass = shown.passed === true || shown.verdict === "PASS";
+                  return (
+                    <div className="mt-3 rounded border border-indigo-100 bg-indigo-50/50 px-2 py-2 font-mono text-[11px] text-slate-700">
+                      <p className="text-[10px] font-black uppercase text-indigo-800">
+                        Scenario Viewer
+                      </p>
+                      <p className="mt-1">
+                        <span className="text-slate-400">Scenario Name:</span>{" "}
+                        <span className="font-bold">{String(shown.scenarioName ?? shown.scenarioId ?? "—")}</span>
+                        <span
+                          className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-black ${
+                            pass ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                          }`}
+                        >
+                          {String(shown.verdict ?? (pass ? "PASS" : "FAIL"))}
+                        </span>
+                      </p>
+                      <p className="text-slate-500">
+                        unexpectedState={String(shown.unexpectedStateCount ?? "—")} · failureCount=
+                        {String(shown.failureCount ?? "—")} · totalElapsedMs=
+                        {shown.totalElapsedMs != null ? String(shown.totalElapsedMs) : "—"}
+                      </p>
+                      {shown.missingTransitionHint ? (
+                        <p className="mt-1 text-rose-800">
+                          Missing/Unexpected: {String(shown.missingTransitionHint)}
+                        </p>
+                      ) : null}
+                      {stateFlow.length ? (
+                        <div className="mt-2">
+                          <p className="text-[10px] font-black uppercase text-slate-500">State Flow</p>
+                          <p className="mt-0.5 break-all text-[10px] text-slate-600">
+                            {stateFlow.map(String).join(" → ")}
+                          </p>
+                        </div>
+                      ) : null}
+                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-4">
+                        <div>
+                          <span className="text-slate-400">KPI steps:</span>{" "}
+                          <span className="font-bold">{String(kpi.stepCount ?? "—")}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">pass:</span>{" "}
+                          <span className="font-bold">{String(kpi.passCount ?? "—")}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">fail:</span>{" "}
+                          <span className="font-bold">{String(kpi.failCount ?? "—")}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">elapsed:</span>{" "}
+                          <span className="font-bold">
+                            {kpi.totalElapsedMs != null ? `${kpi.totalElapsedMs}ms` : "—"}
+                          </span>
+                        </div>
+                      </div>
+                      {timeline.length ? (
+                        <div className="mt-2 max-h-48 overflow-auto rounded border border-indigo-100 bg-white px-2 py-2">
+                          <p className="text-[10px] font-black uppercase text-slate-500">
+                            Timeline ({timeline.length})
+                          </p>
+                          <ul className="mt-1 space-y-1 font-mono text-[10px] text-slate-600">
+                            {timeline.map((st, i) => {
+                              const stepFail = st?.verdict === "FAIL";
+                              return (
+                                <li
+                                  key={`sc-${st?.index ?? i}`}
+                                  className={stepFail ? "text-rose-800" : ""}
+                                >
+                                  [{String(st?.verdict ?? "?")}] {String(st?.event ?? "?")} · state=
+                                  {String(st?.actual?.overlayState ?? "—")} · pos=
+                                  {String(st?.actual?.overlayPosition ?? "—")} · mini=
+                                  {String(st?.actual?.miniCaseVisibility ?? "—")} · screen=
+                                  {String(st?.actual?.screenState ?? "—")} · failReason=
+                                  {String(st?.actual?.failureReason ?? "—")} ·{" "}
+                                  {st?.elapsedMs != null ? `${st.elapsedMs}ms` : "—"}
+                                  {Array.isArray(st?.failReasons) && st.failReasons.length
+                                    ? ` · ${st.failReasons.join("; ")}`
+                                    : ""}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {scenarios.length > 1 ? (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-[10px] font-bold text-indigo-800">
+                            All scenario runs ({scenarios.length})
+                          </summary>
+                          <ul className="mt-1 space-y-0.5 text-[10px] text-slate-600">
+                            {[...scenarios].reverse().map((s, i) => (
+                              <li key={`all-sc-${s?.scenarioId ?? i}-${i}`}>
+                                {String(s?.verdict ?? "?")} · {String(s?.scenarioName ?? s?.scenarioId ?? "—")}
+                                {s?.unexpectedStateCount
+                                  ? ` · unexpected=${s.unexpectedStateCount}`
+                                  : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const lastEx = overlay.lastExceptionCase;
+                  const exCases = Array.isArray(overlay.exceptionCaseResults)
+                    ? overlay.exceptionCaseResults
+                    : [];
+                  const exTimeline = Array.isArray(overlay.exceptionTimeline)
+                    ? overlay.exceptionTimeline
+                    : [];
+                  const stress = overlay.lastStressResult;
+                  const stressTl = Array.isArray(overlay.stressTimeline)
+                    ? overlay.stressTimeline
+                    : [];
+                  const mem = overlay.memorySummary;
+                  const matrix = overlay.failureMatrix;
+                  if (!lastEx && !exCases.length && !stress && !mem && !matrix) return null;
+                  return (
+                    <div className="mt-3 space-y-3">
+                      {(lastEx || exCases.length > 0) && (
+                        <div className="rounded border border-amber-100 bg-amber-50/60 px-2 py-2 font-mono text-[11px] text-slate-700">
+                          <p className="text-[10px] font-black uppercase text-amber-900">
+                            Exception Timeline
+                          </p>
+                          {lastEx && typeof lastEx === "object" ? (
+                            <p className="mt-1">
+                              <span className="font-bold">
+                                {String(lastEx.caseName ?? lastEx.caseId ?? "—")}
+                              </span>
+                              <span
+                                className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-black ${
+                                  lastEx.passed === true || lastEx.verdict === "PASS"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-rose-100 text-rose-800"
+                                }`}
+                              >
+                                {String(lastEx.verdict ?? "—")}
+                              </span>
+                              {lastEx.hint ? (
+                                <span className="ml-2 text-rose-800">{String(lastEx.hint)}</span>
+                              ) : null}
+                            </p>
+                          ) : null}
+                          {exTimeline.length ? (
+                            <ul className="mt-2 max-h-40 space-y-1 overflow-auto text-[10px] text-slate-600">
+                              {[...exTimeline].slice(-16).reverse().map((ev, i) => (
+                                <li key={`ex-${ev?.index ?? i}-${i}`}>
+                                  {String(ev?.event ?? ev?.eventType ?? "?")} ·{" "}
+                                  {String(ev?.verdict ?? ev?.overlayState ?? "—")}
+                                  {ev?.actual?.failureReason
+                                    ? ` · ${String(ev.actual.failureReason)}`
+                                    : ""}
+                                  {ev?.elapsedMs != null ? ` · ${ev.elapsedMs}ms` : ""}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                          {exCases.length > 1 ? (
+                            <details className="mt-2">
+                              <summary className="cursor-pointer text-[10px] font-bold text-amber-900">
+                                All exception cases ({exCases.length})
+                              </summary>
+                              <ul className="mt-1 space-y-0.5 text-[10px]">
+                                {[...exCases].reverse().map((c, i) => (
+                                  <li key={`exc-${c?.caseId ?? i}`}>
+                                    {String(c?.verdict ?? "?")} · {String(c?.caseName ?? c?.caseId)}
+                                    {c?.stateLeak ? " · stateLeak" : ""}
+                                    {c?.overlayLeak ? " · overlayLeak" : ""}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          ) : null}
+                        </div>
+                      )}
+                      {stress && typeof stress === "object" ? (
+                        <div className="rounded border border-teal-100 bg-teal-50/60 px-2 py-2 font-mono text-[11px] text-slate-700">
+                          <p className="text-[10px] font-black uppercase text-teal-900">
+                            Stress Timeline
+                          </p>
+                          <p className="mt-1">
+                            cycles={String(stress.completedCycles ?? stress.cycles ?? "—")} ·{" "}
+                            <span
+                              className={
+                                stress.passed === true || stress.verdict === "PASS"
+                                  ? "font-bold text-emerald-800"
+                                  : "font-bold text-rose-800"
+                              }
+                            >
+                              {String(stress.verdict ?? "—")}
+                            </span>
+                            {" · "}attach={String(stress.attachCount ?? "—")} remove=
+                            {String(stress.removeCount ?? "—")} · final=
+                            {String(stress.finalState ?? "—")}
+                          </p>
+                          <p className="text-slate-500">
+                            stateLeak={String(stress.stateLeak ?? false)} · overlayLeak=
+                            {String(stress.overlayLeak ?? false)} · windowDuplicate=
+                            {String(stress.windowDuplicate ?? false)} · unexpected=
+                            {String(stress.unexpectedTransitionCount ?? 0)}
+                          </p>
+                          {stressTl.length ? (
+                            <details className="mt-1">
+                              <summary className="cursor-pointer text-[10px] font-bold text-teal-900">
+                                Cycles ({stressTl.length})
+                              </summary>
+                              <ul className="mt-1 max-h-32 space-y-0.5 overflow-auto text-[10px]">
+                                {stressTl.slice(-20).map((c, i) => (
+                                  <li key={`st-${c?.cycle ?? i}`}>
+                                    #{String(c?.cycle ?? i)} state={String(c?.state ?? "—")} ·
+                                    attached={String(c?.attached ?? "—")} ·{" "}
+                                    {c?.elapsedMs != null ? `${c.elapsedMs}ms` : ""}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {mem && typeof mem === "object" ? (
+                        <div className="rounded border border-slate-200 bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700">
+                          <p className="text-[10px] font-black uppercase text-slate-500">
+                            Memory Summary
+                          </p>
+                          <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-3">
+                            <div>
+                              Attach Count:{" "}
+                              <span className="font-bold">
+                                {String(mem.overlayAttachCount ?? "—")}
+                              </span>
+                            </div>
+                            <div>
+                              Remove Count:{" "}
+                              <span className="font-bold">
+                                {String(mem.overlayRemoveCount ?? "—")}
+                              </span>
+                            </div>
+                            <div>
+                              Window Attached Count:{" "}
+                              <span className="font-bold">
+                                {String(mem.windowAttachedCount ?? "—")}
+                              </span>
+                            </div>
+                            <div>
+                              Attached Now:{" "}
+                              <span className="font-bold">
+                                {String(mem.windowAttachedNow ?? "—")}
+                              </span>
+                            </div>
+                            <div>
+                              Leak:{" "}
+                              <span
+                                className={
+                                  mem.leak ? "font-bold text-rose-800" : "font-bold text-emerald-800"
+                                }
+                              >
+                                {String(mem.leak ?? "—")}
+                              </span>
+                            </div>
+                            <div>
+                              Verdict:{" "}
+                              <span className="font-bold">{String(mem.verdict ?? "—")}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                      {matrix && typeof matrix === "object" ? (
+                        <div className="rounded border border-rose-100 bg-rose-50/50 px-2 py-2 font-mono text-[11px] text-slate-700">
+                          <p className="text-[10px] font-black uppercase text-rose-800">
+                            Failure Matrix
+                          </p>
+                          <p className="mt-1">
+                            totalFailures={String(matrix.totalFailures ?? 0)}
+                          </p>
+                          <ul className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] sm:grid-cols-3">
+                            {Object.keys(matrix)
+                              .filter((k) => k !== "totalFailures")
+                              .map((k) => (
+                                <li key={k}>
+                                  {k}: <span className="font-bold">{String(matrix[k])}</span>
+                                </li>
+                              ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="rounded-lg border border-slate-200 px-3 py-2">
@@ -590,6 +1520,13 @@ function formatVal(v) {
   if (v === undefined || v === null || v === "") return "—";
   if (typeof v === "boolean") return v ? "true" : "false";
   return String(v);
+}
+
+function fmtMs(v) {
+  if (v === undefined || v === null || v === "") return "—";
+  const n = Number(v);
+  if (Number.isNaN(n)) return "—";
+  return `${Math.round(n * 100) / 100}ms`;
 }
 
 function uniqueSeqs(events) {

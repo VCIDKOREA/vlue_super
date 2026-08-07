@@ -8,6 +8,7 @@ import android.hardware.SensorManager
 import android.util.Log
 import android.webkit.WebView
 import java.lang.ref.WeakReference
+import kr.vlue.calloverlay.diagnostics.ReleaseDebugGate
 
 /**
  * 통화 중 근접 센서 — 귀에 대면 쇼케이스 sleep, 떼면 복구
@@ -26,7 +27,7 @@ object ShowcaseProximitySensor : SensorEventListener {
         proximity = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
         proximity?.let {
             sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
-            Log.d(TAG, "proximity sensor registered")
+            ReleaseDebugGate.d(TAG, "proximity sensor registered")
         } ?: Log.w(TAG, "no proximity sensor")
     }
 

@@ -28,8 +28,7 @@ import {
   nativeAnswerCall,
   nativeEndCallKeepOverlay,
   nativeRejectCall,
-  nativeRevealSystemCallUi,
-  nativeSetOverlayFullscreen
+  nativeRevealSystemCallUi
 } from "../../lib/call/nativeCallControl.js";
 import { openExternalHref, formatWebHref } from "../../lib/showcase/showcaseContactActions.js";
 import { resolveShowcasePeerAvatar } from "../../lib/showcase/resolveShowcasePeerAvatar.js";
@@ -208,13 +207,6 @@ export default function TentShowcaseOverlay({
   /** 실통화만 fixed 전체화면 — 앱 내 다시보기(fill)는 부모 안에 유지해 닫기 버튼이 가려지지 않음 */
   const useFixedFullscreen = !previewMode && !isFillEmbed && (isConnected || isRinging);
   const tentExpanded = useFixedFullscreen || isFillEmbed || (previewMode && (isConnected || forceInteractive));
-
-  useEffect(() => {
-    if (previewMode) return undefined;
-    /* 링잉부터 네이티브 오버레이 MATCH_PARENT */
-    nativeSetOverlayFullscreen(true);
-    return undefined;
-  }, [previewMode]);
 
   /** 네이티브 OFFHOOK → 연결 상태 동기화 */
   useEffect(() => {
@@ -594,7 +586,6 @@ export default function TentShowcaseOverlay({
             <CompanionSamsungCallCta
               onOpen={() => {
                 try {
-                  nativeSetOverlayFullscreen(false);
                   nativeRevealSystemCallUi();
                 } catch {
                   /* ignore */

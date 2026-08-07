@@ -9,6 +9,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
+import kr.vlue.calloverlay.diagnostics.OverlayDiagTracker
+import kr.vlue.calloverlay.diagnostics.OverlayFailureReason
+import kr.vlue.calloverlay.diagnostics.ReleaseDebugGate
 import kr.vlue.calloverlay.incall.VlueInCallController
 
 /** 통화 이벤트 → API 조회 → 오버레이·알림·액티비티 폴백 */
@@ -55,7 +58,7 @@ object LetteringCallCoordinator {
                     3,
                     "debounce — last=$lastRingNumber next=$resolved out=$outgoing within 800ms"
                 )
-                Log.d(TAG, "skip ringing: debounce last=$lastRingNumber next=$resolved")
+                ReleaseDebugGate.d(TAG, "skip ringing: debounce last=$lastRingNumber next=$resolved")
                 return
             }
 
@@ -71,6 +74,11 @@ object LetteringCallCoordinator {
             if (LetteringPermissionHelper.canDrawOverlays(app)) {
                 startOverlayService(app, raw, verified = false, cardJson = null, outgoing)
             } else {
+                OverlayDiagTracker.recordOverlayFailure(
+                    OverlayFailureReason.PERMISSION_DENIED,
+                    phase = "BIG_PUSH",
+                    detail = "SYSTEM_ALERT_WINDOW missing"
+                )
                 VlueBigPushTrace.skip(3, "Overlay permission denied (SYSTEM_ALERT_WINDOW missing)")
                 Log.w(TAG, "overlay permission missing — notif/activity fallback")
                 LetteringPrefs.setLastOverlayError(app, "SYSTEM_ALERT_WINDOW missing")
@@ -151,7 +159,14 @@ object LetteringCallCoordinator {
     fun ensureOverlayOnly(context: Context, number: String, outgoing: Boolean) {
         val app = context.applicationContext
         if (!LetteringPrefs.isLetteringEnabled(app)) return
-        if (!LetteringPermissionHelper.canDrawOverlays(app)) return
+        if (!LetteringPermissionHelper.canDrawOverlays(app)) {
+            OverlayDiagTracker.recordOverlayFailure(
+                OverlayFailureReason.PERMISSION_DENIED,
+                phase = "ENSURE_OVERLAY",
+                detail = "SYSTEM_ALERT_WINDOW missing"
+            )
+            return
+        }
         startOverlayService(app, number.ifBlank { "unknown" }, verified = false, cardJson = null, outgoing)
     }
 

@@ -18,7 +18,7 @@ import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAvatar.js";
 import { buildAuthValidityVerificationItems } from "../lib/authValidityPeriod.js";
 import { getLocalVlueUserId } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
-import { nativeEndCall, nativeEndCallKeepOverlay, nativeRevealSystemCallUi, nativeRestoreShowcaseOverlay, nativeSetOverlayFullscreen } from "../lib/call/nativeCallControl.js";
+import { nativeEndCall, nativeEndCallKeepOverlay, nativeRevealSystemCallUi, nativeRestoreShowcaseOverlay } from "../lib/call/nativeCallControl.js";
 import { resolveIsKnownContact } from "../lib/contacts/hybridKnownContact.js";
 import {
   resolveCallPeerMatrixSync,
@@ -312,9 +312,7 @@ export default function LetteringIncomingNotification({
       try {
         if (next) {
           nativeRestoreShowcaseOverlay();
-          nativeSetOverlayFullscreen(true);
         } else {
-          nativeSetOverlayFullscreen(false);
           nativeRevealSystemCallUi();
         }
       } catch {
@@ -808,7 +806,6 @@ export default function LetteringIncomingNotification({
     }
     setExpanded(false);
     try {
-      nativeSetOverlayFullscreen(false);
       nativeRevealSystemCallUi();
     } catch {
       /* ignore */
@@ -820,7 +817,6 @@ export default function LetteringIncomingNotification({
     setExpanded(true);
     try {
       nativeRestoreShowcaseOverlay();
-      nativeSetOverlayFullscreen(true);
     } catch {
       /* ignore */
     }

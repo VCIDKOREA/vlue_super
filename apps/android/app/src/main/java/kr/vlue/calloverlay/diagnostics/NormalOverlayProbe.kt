@@ -69,6 +69,10 @@ object NormalOverlayProbe {
      */
     fun scheduleIfEligible(context: Context) {
         val app = context.applicationContext
+        if (!ReleaseDebugGate.allowDiagProbe()) {
+            Log.i(TAG, "skip: release build — NORMAL_OVERLAY_PROBE disabled")
+            return
+        }
         if (scheduledThisProcess) return
         if (!LetteringPermissionHelper.canDrawOverlays(app)) {
             Log.i(TAG, "skip: canDrawOverlays=false")

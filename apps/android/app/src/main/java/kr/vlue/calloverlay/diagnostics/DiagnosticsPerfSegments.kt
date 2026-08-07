@@ -9,7 +9,9 @@ import org.json.JSONObject
  */
 object DiagnosticsPerfSegments {
     const val KPI_BIG_PUSH_VISIBLE_MS = 300
+    /** React Showcase Visible (콘텐츠) — layout commit KPI는 OverlayDiagTracker 500ms */
     const val KPI_SHOWCASE_VISIBLE_MS = 1000
+    const val KPI_ANSWER_TO_SHOWCASE_LAYOUT_MS = OverlayDiagTracker.KPI_ANSWER_TO_SHOWCASE_LAYOUT_MS
 
     /** 마일스톤 코드 → 타임라인 표시명 */
     val MILESTONE_LABELS = linkedMapOf(
@@ -19,6 +21,7 @@ object DiagnosticsPerfSegments {
         "ANSWER_DETECTED" to "Answer Detected",
         "SHOWCASE_REQUESTED" to "Showcase Requested",
         "OVERLAY_ATTACHED" to "Overlay Attached",
+        "SCREEN_CHANGED" to "Screen Changed",
         "REACT_ROOT_READY" to "React Root Ready",
         "DCC_BOUND" to "DCC Bound",
         "SHOWCASE_VISIBLE" to "Showcase Visible",

@@ -1,5 +1,8 @@
 /**
- * 네이티브 통화 제어 브릿지 — 응답 / 종료 / 음소거 / 스피커 / DTMF / 오버레이
+ * 네이티브 통화 제어 브릿지 — 응답 / 종료 / 음소거 / 스피커 / DTMF / 오버레이 Request
+ *
+ * OverlayState · Layout 은 Native Controller/Service 단일 흐름.
+ * JS는 Request/Event 전달만 한다 (fullscreen boolean으로 상태 강제 금지).
  */
 
 function callBridge(method, ...args) {
@@ -22,7 +25,7 @@ function callBridge(method, ...args) {
   return undefined;
 }
 
-/** 수신 중 전화 받기 (Telecom acceptRingingCall) */
+/** 수신 중 전화 받기 → Native Answer Request (telecom + Controller) */
 export function nativeAnswerCall() {
   const r = callBridge("answerCall");
   return r !== false;
@@ -55,10 +58,6 @@ export function nativeEndCall() {
 /** 거절 — 종료와 동일 경로 (링잉 중 endCall) */
 export function nativeRejectCall() {
   return nativeEndCall();
-}
-
-export function nativeSetOverlayFullscreen(fullscreen) {
-  callBridge("setOverlayFullscreen", fullscreen ? "1" : "0");
 }
 
 export function nativeDismissOverlay() {
@@ -103,25 +102,54 @@ export function nativeStopDtmf() {
   callBridge("stopDtmfTone");
 }
 
-/** iOS: 쇼케이스 가림 → 순정 통화 UI 노출 (스와이프 업) */
+/** Minimize Request — Controller → MINI_CASE */
 export function nativeRevealSystemCallUi() {
   return callBridge("revealSystemCallUi") !== false;
 }
 
-/** iOS: 쇼케이스 복귀 */
+/** Restore Request — Controller → SHOWCASE/FULLSCREEN */
 export function nativeRestoreShowcaseOverlay() {
   return callBridge("restoreShowcaseOverlay") !== false;
 }
 
 /**
- * Companion Mini Case — 네이티브 플로팅 오버레이 위치·크기 (CSS px → 네이티브에서 density 적용 전 가정: 호출측에서 물리 px 전달)
+ * Mini Visibility Request — VISIBLE | EDGE_HIDDEN (OverlayState 변경 없음)
+ * @param {"VISIBLE"|"EDGE_HIDDEN"} visibility
+ */
+export function nativeSetMiniCaseVisibility(visibility) {
+  const v =
+    visibility === "EDGE_HIDDEN" || visibility === 1 || visibility === "1"
+      ? "EDGE_HIDDEN"
+      : "VISIBLE";
+  return callBridge("setMiniCaseVisibility", v) !== false;
+}
+
+/**
+ * @deprecated Layout/state 강제 API 제거. true→restore, false→minimize Request로 매핑.
+ * 신규 코드는 nativeRestoreShowcaseOverlay / nativeRevealSystemCallUi 사용.
+ */
+export function nativeSetOverlayFullscreen(fullscreen) {
+  if (fullscreen) return nativeRestoreShowcaseOverlay();
+  return nativeRevealSystemCallUi();
+}
+
+/**
+ * Companion Mini Case — 좌표만 (Native가 MINI_CASE일 때만 적용)
  * @param {number} x
  * @param {number} y
  * @param {number} w
  * @param {number} h
  */
 export function nativeUpdateMiniOverlayFrame(x, y, w, h) {
-  return callBridge("updateMiniOverlayFrame", String(Math.round(x)), String(Math.round(y)), String(Math.round(w)), String(Math.round(h))) !== false;
+  return (
+    callBridge(
+      "updateMiniOverlayFrame",
+      String(Math.round(x)),
+      String(Math.round(y)),
+      String(Math.round(w)),
+      String(Math.round(h))
+    ) !== false
+  );
 }
 
 /** @returns {{ w: number, h: number, d: number } | null} */

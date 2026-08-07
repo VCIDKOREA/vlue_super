@@ -8,7 +8,11 @@ class OverlayPositionManagerTest {
     fun bigPush_home_isBottom() {
         assertEquals(
             OverlayPosition.BOTTOM,
-            OverlayPositionManager.resolve(OverlayContext.HOME_SCREEN, OverlayState.BIG_PUSH)
+            OverlayPositionManager.resolve(
+                OverlayContext.HOME_SCREEN,
+                OverlayState.BIG_PUSH,
+                ScreenState.SCREEN_ON
+            )
         )
     }
 
@@ -16,7 +20,11 @@ class OverlayPositionManagerTest {
     fun bigPush_otherApp_isBottom() {
         assertEquals(
             OverlayPosition.BOTTOM,
-            OverlayPositionManager.resolve(OverlayContext.OTHER_APP, OverlayState.BIG_PUSH)
+            OverlayPositionManager.resolve(
+                OverlayContext.OTHER_APP,
+                OverlayState.BIG_PUSH,
+                ScreenState.SCREEN_ON
+            )
         )
     }
 
@@ -24,7 +32,11 @@ class OverlayPositionManagerTest {
     fun bigPush_incomingCallUi_isTop() {
         assertEquals(
             OverlayPosition.TOP,
-            OverlayPositionManager.resolve(OverlayContext.INCOMING_CALL_UI, OverlayState.BIG_PUSH)
+            OverlayPositionManager.resolve(
+                OverlayContext.INCOMING_CALL_UI,
+                OverlayState.BIG_PUSH,
+                ScreenState.SCREEN_ON
+            )
         )
     }
 
@@ -32,15 +44,47 @@ class OverlayPositionManagerTest {
     fun bigPush_inCall_isHidden() {
         assertEquals(
             OverlayPosition.HIDDEN,
-            OverlayPositionManager.resolve(OverlayContext.IN_CALL, OverlayState.BIG_PUSH)
+            OverlayPositionManager.resolve(
+                OverlayContext.IN_CALL,
+                OverlayState.BIG_PUSH,
+                ScreenState.SCREEN_ON
+            )
         )
     }
 
     @Test
-    fun showcase_inCall_isTop() {
+    fun bigPush_screenOff_isHidden() {
         assertEquals(
-            OverlayPosition.TOP,
-            OverlayPositionManager.resolve(OverlayContext.IN_CALL, OverlayState.SHOWCASE)
+            OverlayPosition.HIDDEN,
+            OverlayPositionManager.resolve(
+                OverlayContext.HOME_SCREEN,
+                OverlayState.BIG_PUSH,
+                ScreenState.SCREEN_OFF
+            )
+        )
+    }
+
+    @Test
+    fun bigPush_aod_isHidden() {
+        assertEquals(
+            OverlayPosition.HIDDEN,
+            OverlayPositionManager.resolve(
+                OverlayContext.INCOMING_CALL_UI,
+                OverlayState.BIG_PUSH,
+                ScreenState.AOD
+            )
+        )
+    }
+
+    @Test
+    fun showcase_inCall_isFullscreen() {
+        assertEquals(
+            OverlayPosition.FULLSCREEN,
+            OverlayPositionManager.resolve(
+                OverlayContext.IN_CALL,
+                OverlayState.SHOWCASE,
+                ScreenState.SCREEN_ON
+            )
         )
     }
 
@@ -48,7 +92,11 @@ class OverlayPositionManagerTest {
     fun showcase_home_suggestsMini() {
         assertEquals(
             OverlayPosition.MINI_CASE,
-            OverlayPositionManager.resolve(OverlayContext.HOME_SCREEN, OverlayState.SHOWCASE)
+            OverlayPositionManager.resolve(
+                OverlayContext.HOME_SCREEN,
+                OverlayState.SHOWCASE,
+                ScreenState.SCREEN_ON
+            )
         )
     }
 
@@ -56,7 +104,11 @@ class OverlayPositionManagerTest {
     fun miniCase_alwaysMini() {
         assertEquals(
             OverlayPosition.MINI_CASE,
-            OverlayPositionManager.resolve(OverlayContext.IN_CALL, OverlayState.MINI_CASE)
+            OverlayPositionManager.resolve(
+                OverlayContext.IN_CALL,
+                OverlayState.MINI_CASE,
+                ScreenState.SCREEN_ON
+            )
         )
     }
 
@@ -64,7 +116,11 @@ class OverlayPositionManagerTest {
     fun idle_isHidden() {
         assertEquals(
             OverlayPosition.HIDDEN,
-            OverlayPositionManager.resolve(OverlayContext.HOME_SCREEN, OverlayState.IDLE)
+            OverlayPositionManager.resolve(
+                OverlayContext.HOME_SCREEN,
+                OverlayState.IDLE,
+                ScreenState.SCREEN_ON
+            )
         )
     }
 }

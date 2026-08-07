@@ -1,13 +1,16 @@
 package kr.vlue.calloverlay.companion
 
 /**
- * Window 배치 결과.
+ * Single Companion Window 내부 배치 결과.
  * BigPush: TOP | BOTTOM | HIDDEN
- * Showcase fullscreen은 TOP(전체)로 표기, Mini는 MINI_CASE.
+ * Showcase: FULLSCREEN (TOP/BOTTOM 아님)
+ * Mini: MINI_CASE
+ * 기준: docs/architecture/companion-overlay.md
  */
 enum class OverlayPosition {
     TOP,
     BOTTOM,
+    FULLSCREEN,
     MINI_CASE,
     HIDDEN
 }

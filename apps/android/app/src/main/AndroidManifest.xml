@@ -29,10 +29,26 @@
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- 가족보호 — 원격제어 앱(TeamViewer 등) 설치 목록 조회 -->
-    <uses-permission
-        android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Family Care: QUERY_ALL_PACKAGES 제거(RC-2). 알려진 remote 앱만 <queries>로 조회 -->
+
+    <queries>
+        <package android:name="com.teamviewer.teamviewer.market.mobile" />
+        <package android:name="com.teamviewer.quicksupport.market" />
+        <package android:name="com.teamviewer.host.market" />
+        <package android:name="com.anydesk.anydeskandroid" />
+        <package android:name="com.anydesk.adcontrol.ad1" />
+        <package android:name="com.carriez.flutter_hbb" />
+        <package android:name="com.google.chromeremotedesktop" />
+        <package android:name="com.splashtop.remote.pad.v2" />
+        <package android:name="com.splashtop.streamer.csrs" />
+        <package android:name="com.ultraviewer" />
+        <package android:name="eu.sisik.hackendx.supremo" />
+        <package android:name="com.LogMeIn.Ignition" />
+        <package android:name="com.parsec.app" />
+        <package android:name="com.sand.airdroid" />
+        <package android:name="com.microsoft.rdc.androidx" />
+        <package android:name="com.microsoft.rdc.android" />
+    </queries>
 
     <application
         android:name=".VlueCallOverlayApp"
@@ -43,7 +59,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.VlueCallOverlay"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
 
         <activity
             android:name=".MainActivity"

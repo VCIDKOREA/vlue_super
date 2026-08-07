@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.telephony.TelephonyManager
 import android.util.Log
+import kr.vlue.calloverlay.diagnostics.ReleaseDebugGate
 import kr.vlue.calloverlay.family.FamilyCallTracker
 import kr.vlue.calloverlay.incall.VlueInCallController
 
@@ -28,7 +29,7 @@ class LetteringCallReceiver : BroadcastReceiver() {
                 VlueBigPushTrace.step(
                     1,
                     "Incoming Call Detected",
-                    "source=LetteringCallReceiver number=${number ?: "null"}"
+                    "source=LetteringCallReceiver number=${ReleaseDebugGate.maskPhoneForLog(number)}"
                 )
             }
 
@@ -36,7 +37,7 @@ class LetteringCallReceiver : BroadcastReceiver() {
                 if (state == TelephonyManager.EXTRA_STATE_RINGING) {
                     VlueBigPushTrace.skip(1, "lettering_enabled=false")
                 }
-                Log.d(TAG, "skip: lettering_enabled=false state=$state")
+                ReleaseDebugGate.d(TAG, "skip: lettering_enabled=false state=$state")
                 return
             }
 
@@ -44,7 +45,7 @@ class LetteringCallReceiver : BroadcastReceiver() {
                 TelephonyManager.EXTRA_STATE_RINGING -> {
                     if (VlueInCallController.hasActiveCall()) {
                         VlueBigPushTrace.skip(1, "InCall has active call — PHONE_STATE RINGING skipped")
-                        Log.d(TAG, "skip RINGING: InCall has active call")
+                        ReleaseDebugGate.d(TAG, "skip RINGING: InCall has active call")
                         return
                     }
                     LetteringCallCoordinator.onRinging(context, number, outgoing = false)

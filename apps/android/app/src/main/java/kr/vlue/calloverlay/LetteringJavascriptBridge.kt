@@ -9,10 +9,15 @@ import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.core.content.ContextCompat
+import kr.vlue.calloverlay.companion.MiniCaseVisibility
+import kr.vlue.calloverlay.diagnostics.perf.CompanionPerfTracker
 import kr.vlue.calloverlay.incall.DialerRoleHelper
 import kr.vlue.calloverlay.incall.VlueInCallController
 
-/** window.Android — 웹 TentShowcase / LetteringIncoming ↔ 네이티브 */
+/**
+ * window.Android — Web ↔ Native Request/Event 전달만 수행.
+ * OverlayState / OverlayPosition / updateViewLayout 은 CallOverlayService + Controller 책임.
+ */
 class LetteringJavascriptBridge(
     private val service: CallOverlayService
 ) {
@@ -82,64 +87,82 @@ class LetteringJavascriptBridge(
         }
     }
 
+    /**
+     * Answer Request — telecom accept + Native Answer Event 하나만 전달.
+     * Layout / OverlayState는 Service → Controller 경로에서만 변경.
+     */
     @JavascriptInterface
     fun answerCall() {
-        try {
-            if (!LetteringCallAudioHelper.answerCall()) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    val telecom = service.getSystemService(TelecomManager::class.java)
-                    val granted = ContextCompat.checkSelfPermission(
-                        service,
-                        Manifest.permission.ANSWER_PHONE_CALLS
-                    ) == PackageManager.PERMISSION_GRANTED
-                    if (granted && telecom != null) {
-                        telecom.acceptRingingCall()
+        CompanionPerfTracker.measureJsBridge("answerCall") {
+            try {
+                if (!LetteringCallAudioHelper.answerCall()) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        val telecom = service.getSystemService(TelecomManager::class.java)
+                        val granted = ContextCompat.checkSelfPermission(
+                            service,
+                            Manifest.permission.ANSWER_PHONE_CALLS
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (granted && telecom != null) {
+                            telecom.acceptRingingCall()
+                        }
                     }
                 }
+                service.onAnswerRequestedFromWeb()
+            } catch (e: Exception) {
+                Log.e(TAG, "answerCall failed", e)
             }
-            service.setOverlayFullscreen(true)
-            service.notifyWebCallState("connected")
-            service.notifyCompanionAnswerFromJs()
-        } catch (e: Exception) {
-            Log.e(TAG, "answerCall failed", e)
         }
     }
 
-    @JavascriptInterface
-    fun setOverlayFullscreen(value: String) {
-        val on = value == "1" || value.equals("true", ignoreCase = true)
-        service.setOverlayFullscreen(on)
-    }
-
     /**
-     * Companion MVP — Showcase를 Mini Case로 접고 삼성(시스템) 전화 UI가 보이도록 오버레이를 축소한다.
-     * ROLE_DIALER 없이 SYSTEM_ALERT_WINDOW 오버레이만 조정.
+     * Minimize Request — Showcase → MINI_CASE (시스템 전화 UI 노출).
+     * fullscreen boolean으로 상태를 강제하지 않는다.
      */
     @JavascriptInterface
     fun revealSystemCallUi() {
-        try {
-            service.setOverlayFullscreen(false)
-            service.notifyWebCallState("reveal_system_call_ui")
-        } catch (e: Exception) {
-            Log.e(TAG, "revealSystemCallUi failed", e)
+        CompanionPerfTracker.measureJsBridge("revealSystemCallUi") {
+            try {
+                service.onMinimizeRequestedFromWeb(source = "js.revealSystemCallUi")
+            } catch (e: Exception) {
+                Log.e(TAG, "revealSystemCallUi failed", e)
+            }
         }
     }
 
-    /** Companion MVP — Mini Case에서 Showcase 전체화면 복귀 */
+    /** Restore Request — MINI_CASE → SHOWCASE/FULLSCREEN (Controller 판단) */
     @JavascriptInterface
     fun restoreShowcaseOverlay() {
-        try {
-            service.setOverlayFullscreen(true)
-            service.notifyWebCallState("restore_showcase")
-        } catch (e: Exception) {
-            Log.e(TAG, "restoreShowcaseOverlay failed", e)
+        CompanionPerfTracker.measureJsBridge("restoreShowcaseOverlay") {
+            try {
+                service.onRestoreShowcaseRequestedFromWeb(source = "js.restoreShowcase")
+            } catch (e: Exception) {
+                Log.e(TAG, "restoreShowcaseOverlay failed", e)
+            }
         }
     }
 
     /**
-     * Companion Mini Case — 드래그 위치·크기를 네이티브 플로팅 윈도우에 반영.
-     * React 논리 좌표(CSS px × density)와 WindowManager x/y/w/h 를 동일하게 유지.
-     * 자동 가장자리 정렬 없음. 통화 중 사용자가 놓은 위치 유지.
+     * Mini Visibility Request — VISIBLE | EDGE_HIDDEN.
+     * OverlayState는 바꾸지 않는다. 좌표는 updateMiniOverlayFrame 담당.
+     */
+    @JavascriptInterface
+    fun setMiniCaseVisibility(value: String) {
+        try {
+            val vis = when {
+                value.equals("EDGE_HIDDEN", ignoreCase = true) ||
+                    value == "1" ||
+                    value.equals("edge", ignoreCase = true) ->
+                    MiniCaseVisibility.EDGE_HIDDEN
+                else -> MiniCaseVisibility.VISIBLE
+            }
+            service.onMiniVisibilityRequestedFromWeb(vis, source = "js.setMiniCaseVisibility")
+        } catch (e: Exception) {
+            Log.e(TAG, "setMiniCaseVisibility failed", e)
+        }
+    }
+
+    /**
+     * Mini Case 좌표만. OverlayState / MiniCaseVisibility 변경 없음.
      */
     @JavascriptInterface
     fun updateMiniOverlayFrame(x: String, y: String, w: String, h: String) {
@@ -290,9 +313,9 @@ class LetteringJavascriptBridge(
                 window.VlueLettering.endCallKeepOverlay = function(){ Android.endCallKeepOverlay(); };
                 window.VlueLettering.endCallOnly = function(){ Android.endCallOnly(); };
                 window.VlueLettering.answerCall = function(){ Android.answerCall(); };
-                window.VlueLettering.setOverlayFullscreen = function(v){ Android.setOverlayFullscreen(String(v)); };
                 window.VlueLettering.revealSystemCallUi = function(){ Android.revealSystemCallUi(); };
                 window.VlueLettering.restoreShowcaseOverlay = function(){ Android.restoreShowcaseOverlay(); };
+                window.VlueLettering.setMiniCaseVisibility = function(v){ Android.setMiniCaseVisibility(String(v||'VISIBLE')); };
                 window.VlueLettering.updateMiniOverlayFrame = function(x,y,w,h){ Android.updateMiniOverlayFrame(String(x),String(y),String(w),String(h)); };
                 window.VlueLettering.getScreenSizeJson = function(){ return Android.getScreenSizeJson(); };
                 window.VlueLettering.setMicrophoneMute = function(v){ return Android.setMicrophoneMute(String(v)); };
@@ -310,6 +333,7 @@ class LetteringJavascriptBridge(
                 window.VlueLettering.getLetteringPermissionStatusJson = function(){ return Android.getLetteringPermissionStatusJson(); };
                 window.VlueLettering.openCertInfo = function(msg){ Android.openVlueCertInfo(JSON.stringify(msg||{})); };
                 window.VlueLettering.onNativeCallState = window.VlueLettering.onNativeCallState || function(){};
+                try { delete window.VlueLettering.setOverlayFullscreen; } catch (e) {}
             """.trimIndent()
             webView.evaluateJavascript(bridgeJs, null)
         }

@@ -283,25 +283,16 @@ export default function LetteringOverlayHost() {
       if (next) {
         setCallState(next);
         if (next === CALL_STATES.CONNECTED) {
-          /* 수화 = BigPush(바) 종료 → 전체 쇼케이스 오버레이 */
+          /*
+           * CONNECTED = Web Content Ready / UI sync only.
+           * OverlayState(SHOWCASE)는 Native ANSWER/OFFHOOK/ACTIVE → Controller.onAnswer 단일 책임.
+           * restoreShowcaseOverlay는 사용자 Mini→Showcase 명시 요청에서만 호출.
+           */
           setExpanded(true);
-          try {
-            window.VlueLettering?.restoreShowcaseOverlay?.();
-            window.Android?.restoreShowcaseOverlay?.();
-            window.VlueLettering?.setOverlayFullscreen?.("1");
-            window.Android?.setOverlayFullscreen?.("1");
-          } catch {
-            /* ignore */
-          }
         }
         if (next === CALL_STATES.RINGING) {
+          /* BigPush layout은 Native Controller 책임 — JS가 compact 강제하지 않음 */
           setExpanded(false);
-          try {
-            window.VlueLettering?.setOverlayFullscreen?.("0");
-            window.Android?.setOverlayFullscreen?.("0");
-          } catch {
-            /* ignore */
-          }
         }
       }
       /* 시스템 전화 종료 — End 버튼 없이도 통화목록에 기록 */

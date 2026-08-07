@@ -6,7 +6,8 @@ import android.os.Build
 import android.util.Log
 
 /**
- * PackageManager 기반 위험 권한 앱 스캔 (카메라·마이크·접근성·오버레이 등)
+ * 위험 권한 스캔 — QUERY_ALL_PACKAGES 없이 알려진 원격제어 앱 package만 검사.
+ * 전체 기기 스캔은 Store 정책상 제거됨 (RC-2).
  */
 object FamilyDangerousPermissionScanner {
     private const val TAG = "FamilyDangerousScan"
@@ -17,48 +18,39 @@ object FamilyDangerousPermissionScanner {
         val threatKind: String
     )
 
-    private val DANGEROUS_PERMS = listOf(
-        android.Manifest.permission.CAMERA,
-        android.Manifest.permission.RECORD_AUDIO,
-        android.Manifest.permission.SYSTEM_ALERT_WINDOW
-    )
-
     fun scanInstalled(context: Context): List<ThreatHit> {
         val pm = context.packageManager
         val self = context.packageName
         val hits = mutableListOf<ThreatHit>()
-        try {
-            val packages = if (Build.VERSION.SDK_INT >= 33) {
-                pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong()))
-            } else {
-                @Suppress("DEPRECATION")
-                pm.getInstalledPackages(PackageManager.GET_PERMISSIONS)
-            }
-            for (pkg in packages) {
-                val name = pkg.packageName.orEmpty()
-                if (name.isEmpty() || name == self) continue
-                // 삼성 플로우·Smart Switch 등 원격 미러링 — V1 오탐 제외
-                if (isAllowlistedRemoteTool(name)) continue
+        for (name in FamilyRemoteAppPackages.KNOWN_PACKAGES) {
+            if (name == self || isAllowlistedRemoteTool(name)) continue
+            try {
+                val pkg = if (Build.VERSION.SDK_INT >= 33) {
+                    pm.getPackageInfo(
+                        name,
+                        PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong())
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    pm.getPackageInfo(name, PackageManager.GET_PERMISSIONS)
+                }
                 val perms = pkg.requestedPermissions?.toList().orEmpty()
                 val hasCamera = perms.contains(android.Manifest.permission.CAMERA)
                 val hasMic = perms.contains(android.Manifest.permission.RECORD_AUDIO)
-                val hasAccessibility = perms.any { it.contains("BIND_ACCESSIBILITY", ignoreCase = true) }
+                val hasAccessibility =
+                    perms.any { it.contains("BIND_ACCESSIBILITY", ignoreCase = true) }
                 if (!hasCamera && !hasMic && !hasAccessibility) continue
-
                 val label = try {
                     pm.getApplicationLabel(pkg.applicationInfo!!).toString()
                 } catch (_: Exception) {
                     name
                 }
-                val kind = when {
-                    hasAccessibility -> "dangerous_permission_app"
-                    hasCamera && hasMic -> "dangerous_permission_app"
-                    else -> "dangerous_permission_app"
-                }
-                hits.add(ThreatHit(name, label, kind))
+                hits.add(ThreatHit(name, label, "dangerous_permission_app"))
+            } catch (_: PackageManager.NameNotFoundException) {
+                /* not installed */
+            } catch (e: Exception) {
+                Log.w(TAG, "scan $name failed", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "scan failed", e)
         }
         return hits
     }
@@ -67,10 +59,6 @@ object FamilyDangerousPermissionScanner {
         val p = packageName.lowercase()
         return p.contains("galaxycontinuity") ||
             p.contains("samsung.android.flow") ||
-            p == "com.samsung.android.galaxycontinuity" ||
-            p.contains("teamviewer") ||
-            p.contains("anydesk") ||
-            p.contains("chrome.remote") ||
-            p.contains("microsoft.rdc")
+            p == "com.samsung.android.galaxycontinuity"
     }
 }

@@ -9,6 +9,7 @@ import kr.vlue.calloverlay.CallOverlayService
 import kr.vlue.calloverlay.LetteringCallCoordinator
 import kr.vlue.calloverlay.LetteringPrefs
 import kr.vlue.calloverlay.VlueBigPushTrace
+import kr.vlue.calloverlay.diagnostics.ReleaseDebugGate
 
 /**
  * 기본 전화앱 UI — 순정 다이얼러 대신 VLUE 쇼케이스 오버레이를 전면 노출.
@@ -50,7 +51,7 @@ class VlueInCallService : InCallService() {
                 VlueBigPushTrace.step(
                     1,
                     "Incoming Call Detected",
-                    "source=VlueInCallService phone=$phone outgoing=$outgoing"
+                    "source=VlueInCallService phone=${ReleaseDebugGate.maskPhoneForLog(phone)} outgoing=$outgoing"
                 )
                 LetteringCallCoordinator.onRinging(this, phone.ifBlank { null }, outgoing = false)
             }

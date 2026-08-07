@@ -3,6 +3,7 @@ import { MINI_CASE_EDGE_KEEP_PX } from "../../lib/call/companionMvpFlags.js";
 import {
   hasNativeMiniOverlay,
   nativeGetScreenSize,
+  nativeSetMiniCaseVisibility,
   nativeUpdateMiniOverlayFrame
 } from "../../lib/call/nativeCallControl.js";
 
@@ -67,12 +68,23 @@ function peekFlags(pos, cardW, vw) {
   };
 }
 
+/** peek → 카드가 화면 안으로 들어오도록 좌표 보정 (Visibility VISIBLE용) */
+function revealPosFromPeek(pos, cardW, vw) {
+  const { peekLeft, peekRight } = peekFlags(pos, cardW, vw);
+  if (peekRight) {
+    return { x: Math.max(16, vw - cardW - 16), y: pos.y };
+  }
+  if (peekLeft) {
+    return { x: 16, y: pos.y };
+  }
+  return pos;
+}
+
 /**
  * Companion MVP — Mini Case Floating Controller
  *
- * 역할: 통화 중 정보 표시 + SHOWCASE 복귀만. 콘텐츠 비노출.
- * 위치: 드래그 유지 · 스냅 금지 · ~28px peek · Native updateMiniOverlayFrame 과 동기.
- * 통화 종료 시 제거(세션 좌표 reset). VLUE 앱·모니터는 유지.
+ * Position(MINI_CASE)과 Visibility(VISIBLE|EDGE_HIDDEN)는 분리.
+ * 좌표: updateMiniOverlayFrame / Visibility: setMiniCaseVisibility.
  */
 export default function CompanionMiniCase({
   displayName = "",
@@ -96,7 +108,7 @@ export default function CompanionMiniCase({
   const frameW = peekRight || peekLeft ? EDGE_KEEP_PX : cardSize.w;
   const frameH = peekRight || peekLeft ? 120 : cardSize.h;
 
-  const syncNative = useCallback(
+  const syncNativeFrame = useCallback(
     (nextPos, w, h) => {
       if (!nativeSync) return;
       const { density } = viewportRef.current;
@@ -106,8 +118,16 @@ export default function CompanionMiniCase({
     [nativeSync]
   );
 
+  const syncNativeVisibility = useCallback(
+    (isPeek) => {
+      if (!nativeSync) return;
+      nativeSetMiniCaseVisibility(isPeek ? "EDGE_HIDDEN" : "VISIBLE");
+    },
+    [nativeSync]
+  );
+
   const applyPos = useCallback(
-    (next) => {
+    (next, { commitVisibility = false } = {}) => {
       const { vw, vh } = viewportRef.current;
       const cw = cardSizeRef.current.w;
       const ch = cardSizeRef.current.h;
@@ -116,11 +136,15 @@ export default function CompanionMiniCase({
       sessionMiniCasePos = clamped;
       setPos(clamped);
       const peek = peekFlags(clamped, cw, vw);
-      const w = peek.peekRight || peek.peekLeft ? EDGE_KEEP_PX : cw;
-      const h = peek.peekRight || peek.peekLeft ? 120 : ch;
-      syncNative(clamped, w, h);
+      const isPeek = peek.peekRight || peek.peekLeft;
+      const w = isPeek ? EDGE_KEEP_PX : cw;
+      const h = isPeek ? 120 : ch;
+      syncNativeFrame(clamped, w, h);
+      if (commitVisibility) {
+        syncNativeVisibility(isPeek);
+      }
     },
-    [syncNative]
+    [syncNativeFrame, syncNativeVisibility]
   );
 
   useLayoutEffect(() => {
@@ -131,7 +155,6 @@ export default function CompanionMiniCase({
     const measureCard = () => {
       viewportRef.current = readViewport();
       const { vw, vh } = viewportRef.current;
-      /* peek 레일이 아닐 때만 카드 실측 → peek에 갇히지 않음 */
       if (
         !el.classList.contains("is-peek-right") &&
         !el.classList.contains("is-peek-left")
@@ -151,9 +174,11 @@ export default function CompanionMiniCase({
       sessionMiniCasePos = clamped;
       setPos(clamped);
       const peek = peekFlags(clamped, cw, vw);
-      const fw = peek.peekRight || peek.peekLeft ? EDGE_KEEP_PX : cw;
-      const fh = peek.peekRight || peek.peekLeft ? 120 : ch;
-      syncNative(clamped, fw, fh);
+      const isPeek = peek.peekRight || peek.peekLeft;
+      const fw = isPeek ? EDGE_KEEP_PX : cw;
+      const fh = isPeek ? 120 : ch;
+      syncNativeFrame(clamped, fw, fh);
+      syncNativeVisibility(isPeek);
     };
 
     measureCard();
@@ -161,19 +186,19 @@ export default function CompanionMiniCase({
     ro?.observe(el);
     const onResize = () => {
       viewportRef.current = readViewport();
-      applyPos(posRef.current);
+      applyPos(posRef.current, { commitVisibility: true });
     };
     window.addEventListener("resize", onResize);
     return () => {
       ro?.disconnect();
       window.removeEventListener("resize", onResize);
     };
-  }, [applyPos, nativeSync, syncNative]);
+  }, [applyPos, nativeSync, syncNativeFrame, syncNativeVisibility]);
 
   useEffect(() => {
     if (!nativeSync) return;
-    syncNative(posRef.current, frameW, frameH);
-  }, [nativeSync, frameW, frameH, syncNative]);
+    syncNativeFrame(posRef.current, frameW, frameH);
+  }, [nativeSync, frameW, frameH, syncNativeFrame]);
 
   const onPointerDown = useCallback((e) => {
     if (e.button != null && e.button !== 0) return;
@@ -204,7 +229,8 @@ export default function CompanionMiniCase({
       d.moved = Math.max(d.moved, Math.hypot(dx, dy));
       const next = { x: d.origX + dx, y: d.origY + dy };
       d.last = next;
-      applyPos(next);
+      /* 드래그 중: 좌표만 — Visibility는 Drag End에서 commit */
+      applyPos(next, { commitVisibility: false });
     },
     [applyPos]
   );
@@ -222,12 +248,29 @@ export default function CompanionMiniCase({
       } catch {
         /* ignore */
       }
-      applyPos(final);
+
+      const { vw } = viewportRef.current;
+      const cw = cardSizeRef.current.w;
+      const peekBefore = peekFlags(final, cw, vw);
+      const wasPeek = peekBefore.peekLeft || peekBefore.peekRight;
+
       if (moved <= DRAG_CLICK_MAX_PX) {
-        onExpand?.();
+        if (wasPeek) {
+          /* EDGE_HIDDEN Tap → VISIBLE (Showcase 복원은 카드 Tap / onExpand) */
+          const revealed = revealPosFromPeek(final, cw, vw);
+          applyPos(revealed, { commitVisibility: true });
+          syncNativeVisibility(false);
+        } else {
+          /* VISIBLE Tap → Showcase 복원 Request */
+          onExpand?.();
+        }
+        return;
       }
+
+      /* Drag End → peek이면 EDGE_HIDDEN, 아니면 VISIBLE */
+      applyPos(final, { commitVisibility: true });
     },
-    [applyPos, onExpand]
+    [applyPos, onExpand, syncNativeVisibility]
   );
 
   const style = nativeSync
@@ -264,7 +307,13 @@ export default function CompanionMiniCase({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onExpand?.();
+          if (peekRight || peekLeft) {
+            const revealed = revealPosFromPeek(posRef.current, cardSizeRef.current.w, viewportRef.current.vw);
+            applyPos(revealed, { commitVisibility: true });
+            syncNativeVisibility(false);
+          } else {
+            onExpand?.();
+          }
         }
       }}
     >
