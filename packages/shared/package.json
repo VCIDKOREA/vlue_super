@@ -54,6 +54,7 @@
       "default": "./dist/excel/workbookSchema.js"
     },
     "./policy/minor-signup": {
+      "types": "./dist/policy/minorSignupPolicy.d.ts",
       "import": "./dist/policy/minorSignupPolicy.js",
       "default": "./dist/policy/minorSignupPolicy.js"
     }

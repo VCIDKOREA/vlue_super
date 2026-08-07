@@ -214,22 +214,40 @@ function computePerfFromEvents(
     { id: "total_showcase", label: "Total Showcase", from: "ANSWER_DETECTED", to: "SHOWCASE_VISIBLE", kpiMs: 1000 }
   ];
 
-  const segments = [];
+  const segments: {
+    id: string;
+    label: string;
+    fromCode: string;
+    toCode: string;
+    elapsedMs: number;
+    kpiMs?: number;
+    kpiPass?: boolean;
+  }[] = [];
   for (const d of defs) {
     const from = milestones[d.from];
     const to = milestones[d.to];
     if (from == null || to == null) continue;
     const elapsedMs = Math.max(0, to - from);
-    segments.push({
+    const row: {
+      id: string;
+      label: string;
+      fromCode: string;
+      toCode: string;
+      elapsedMs: number;
+      kpiMs?: number;
+      kpiPass?: boolean;
+    } = {
       id: d.id,
       label: d.label,
       fromCode: d.from,
       toCode: d.to,
-      elapsedMs,
-      ...(d.kpiMs != null
-        ? { kpiMs: d.kpiMs, kpiPass: elapsedMs <= d.kpiMs }
-        : {})
-    });
+      elapsedMs
+    };
+    if (d.kpiMs != null) {
+      row.kpiMs = d.kpiMs;
+      row.kpiPass = elapsedMs <= d.kpiMs;
+    }
+    segments.push(row);
   }
 
   const pick = (id: string) => segments.find((s) => s.id === id)?.elapsedMs ?? null;
