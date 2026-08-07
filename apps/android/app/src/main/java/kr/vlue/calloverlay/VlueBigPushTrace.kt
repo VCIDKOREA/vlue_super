@@ -15,6 +15,7 @@ import kr.vlue.calloverlay.diagnostics.DiagnosticsFeature
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
 import kr.vlue.calloverlay.diagnostics.NormalOverlayProbe
 import kr.vlue.calloverlay.diagnostics.OverlayDiagTracker
+import kr.vlue.calloverlay.diagnostics.OverlayProbeEvidence
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
@@ -372,17 +373,26 @@ object VlueBigPushTrace {
             false
         }
         val normalPrior = NormalOverlayProbe.lastResultJson(app)
-        val priorResult = normalPrior.optString("result", "")
-        val samsungCallPolicyLikely =
-            probeKind == "CALL_OVERLAY_PROBE" &&
-                result == "EXCEPTION" &&
-                priorResult.equals("SUCCESS", ignoreCase = true)
-        val permissionOrContextLikely =
-            probeKind == "CALL_OVERLAY_PROBE" &&
-                result != "SUCCESS" &&
-                priorResult.isNotBlank() &&
-                !priorResult.equals("SUCCESS", ignoreCase = true) &&
-                !priorResult.equals("null", ignoreCase = true)
+        val priorResult = normalPrior.optString("result", "").takeIf {
+            it.isNotBlank() && !it.equals("null", true)
+        }
+        /* NORMAL 기록 직후에는 prior가 아직 없음 — 자기 결과는 result 사용 */
+        val priorForEvidence =
+            if (probeKind == "NORMAL_OVERLAY_PROBE") result else priorResult
+        val built = OverlayProbeEvidence.build(
+            context = context,
+            probeKind = probeKind,
+            result = result,
+            params = params,
+            canDrawOverlays = canDraw,
+            priorNormalResult = if (probeKind == "CALL_OVERLAY_PROBE") priorResult else priorForEvidence,
+            errorMessage = error?.message,
+            errorClass = error?.javaClass?.name
+        )
+        val installer = OverlayProbeEvidence.resolveInstaller(context)
+        val samsungCallPolicyLikely = built.conclusion == "SamsungCallPolicyLikely"
+        val permissionOrContextLikely = built.conclusion == "PermissionOrContextLikely"
+        val evidenceText = built.evidenceLines.joinToString("\n")
         val payload = JSONObject().apply {
             put("probeKind", probeKind)
             put("result", result)
@@ -416,22 +426,27 @@ object VlueBigPushTrace {
             }
             put("manufacturer", Build.MANUFACTURER ?: "")
             put("model", Build.MODEL ?: "")
+            put("installerPackage", installer ?: JSONObject.NULL)
             put("priorNormalOverlayProbe", normalPrior)
             put("samsungCallPolicyLikely", samsungCallPolicyLikely)
             put("permissionOrContextLikely", permissionOrContextLikely)
+            put("analysisHint", built.analysisHint)
+            put("analysis", built.analysisJson)
+            put("evidence", built.evidence)
+            put("evidenceScore", built.confidence)
+            put("confidence", built.confidence)
+            put("confidenceLabel", "${built.confidence}%")
+            put("evidenceText", evidenceText)
             put(
-                "analysisHint",
-                when {
-                    samsungCallPolicyLikely ->
-                        "NORMAL_OVERLAY_PROBE=SUCCESS but CALL_OVERLAY_PROBE=$result — Samsung call-time overlay restrict likely"
-                    permissionOrContextLikely ->
-                        "Both normal and call probes failed — permission or Context issue more likely than call-only OEM policy"
-                    probeKind == "NORMAL_OVERLAY_PROBE" && result == "SUCCESS" ->
-                        "Idle addView OK with same TYPE_APPLICATION_OVERLAY — await CALL_OVERLAY_PROBE comparison"
-                    probeKind == "NORMAL_OVERLAY_PROBE" && result != "SUCCESS" ->
-                        "Idle addView failed — not call-specific; check SYSTEM_ALERT_WINDOW / installer / Context"
-                    else -> "Recorded $probeKind=$result"
-                }
+                "analysisReport",
+                buildString {
+                    appendLine("Analysis")
+                    appendLine(built.conclusion)
+                    appendLine("Confidence : ${built.confidence}%")
+                    appendLine()
+                    appendLine("Evidence")
+                    built.evidenceLines.forEach { appendLine(it) }
+                }.trim()
             )
             if (error != null) {
                 put("errorClass", error.javaClass.name)
@@ -442,6 +457,7 @@ object VlueBigPushTrace {
         val msg = "==== $probeKind $result ====\n${payload.toString(2)}"
         Log.i(TAG, msg)
         persist(msg)
+        persist(payload.optString("analysisReport"))
 
         if (probeKind == "NORMAL_OVERLAY_PROBE") {
             val sid = DiagnosticsSessionStore.currentOrRecent()?.id
@@ -455,7 +471,7 @@ object VlueBigPushTrace {
             session,
             seq = if (probeKind == "NORMAL_OVERLAY_PROBE") 0 else 8,
             code = probeKind,
-            label = "$probeKind $result",
+            label = "$probeKind $result | ${built.conclusion} ${built.confidence}%",
             ok = ok,
             reason = if (!ok) (error?.message ?: result) else null,
             exceptionMessage = error?.message,

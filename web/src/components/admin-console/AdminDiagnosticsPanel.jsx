@@ -233,35 +233,68 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                 if (!probes.length) return null;
                 const normal = [...probes].reverse().find((e) => e.code === "NORMAL_OVERLAY_PROBE");
                 const call = [...probes].reverse().find((e) => e.code === "CALL_OVERLAY_PROBE");
-                const hint =
-                  call?.payloadJson?.analysisHint ||
-                  normal?.payloadJson?.analysisHint ||
-                  null;
+                const best = call?.payloadJson?.analysis ? call : normal;
+                const p = best?.payloadJson || {};
+                const analysis = p.analysis || {};
+                const conclusion = analysis.conclusion || p.analysisHint || null;
+                const confidence = analysis.confidence ?? p.confidence ?? p.evidenceScore;
+                const evidence = Array.isArray(p.evidence)
+                  ? p.evidence
+                  : String(p.evidenceText || "")
+                      .split("\n")
+                      .filter(Boolean)
+                      .map((line) => ({
+                        ok: line.startsWith("✔"),
+                        label: line.replace(/^[✔✘]\s*/, "")
+                      }));
                 return (
                   <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-950">
                     <p className="font-black">Overlay Probe Compare</p>
                     <p className="mt-1 font-mono text-[11px]">
-                      NORMAL_OVERLAY_PROBE:{" "}
+                      NORMAL:{" "}
                       <span className="font-black">
                         {normal?.payloadJson?.result || normal?.label || "—"}
                       </span>
                       {" · "}
-                      CALL_OVERLAY_PROBE:{" "}
+                      CALL:{" "}
                       <span className="font-black">
                         {call?.payloadJson?.result || call?.label || "—"}
                       </span>
                     </p>
-                    {call?.payloadJson?.samsungCallPolicyLikely ? (
-                      <p className="mt-1 text-[11px] font-bold text-amber-800">
-                        samsungCallPolicyLikely=true (idle SUCCESS + call EXCEPTION)
-                      </p>
+                    {conclusion ? (
+                      <div className="mt-2 rounded border border-sky-100 bg-white/70 px-2 py-1.5">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-sky-700">
+                          Analysis
+                        </p>
+                        <p className="mt-0.5 font-black text-sky-950">{conclusion}</p>
+                        {confidence != null ? (
+                          <p className="mt-0.5 font-mono text-[11px] text-sky-800">
+                            Confidence : {confidence}%
+                          </p>
+                        ) : null}
+                      </div>
                     ) : null}
-                    {call?.payloadJson?.permissionOrContextLikely ? (
-                      <p className="mt-1 text-[11px] font-bold text-rose-800">
-                        permissionOrContextLikely=true (both failed)
-                      </p>
+                    {evidence.length ? (
+                      <div className="mt-2">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-sky-700">
+                          Evidence
+                        </p>
+                        <ul className="mt-1 space-y-0.5 font-mono text-[11px]">
+                          {evidence.map((ev, i) => (
+                            <li
+                              key={ev.key || i}
+                              className={ev.ok === false ? "text-rose-700" : "text-emerald-800"}
+                            >
+                              {ev.mark || (ev.ok === false ? "✘" : "✔")} {ev.label}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : p.analysisReport ? (
+                      <pre className="mt-2 whitespace-pre-wrap font-mono text-[11px] text-sky-900">
+                        {p.analysisReport}
+                      </pre>
                     ) : null}
-                    {hint ? <p className="mt-1 text-[11px] text-sky-900">{hint}</p> : null}
                   </div>
                 );
               })()}
