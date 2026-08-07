@@ -24,6 +24,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
+import kr.vlue.calloverlay.diagnostics.OverlayDiagTracker
 import kr.vlue.calloverlay.showcase.ShowcaseProximitySensor
 
 /**
@@ -51,7 +52,13 @@ class CallOverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         VlueBigPushTrace.bind(this)
-        VlueBigPushTrace.step(4, "CallOverlayService.onCreate()")
+        val instanceId = OverlayDiagTracker.onServiceCreated()
+        OverlayDiagTracker.onForegroundStarted()
+        VlueBigPushTrace.step(
+            4,
+            "CallOverlayService.onCreate()",
+            "overlayInstanceId=$instanceId fgsStartAt=${OverlayDiagTracker.foregroundStartedAtMs}"
+        )
         createNotificationChannel()
         VlueForegroundHelper.start(this, NOTIFICATION_ID, buildNotification())
         activeInstance = this
@@ -91,17 +98,21 @@ class CallOverlayService : Service() {
         VlueBigPushTrace.step(
             5,
             "CallOverlayService.onStartCommand()",
-            "phone=$phone verified=$verified outgoing=$outgoing action=${intent?.action}"
+            "phone=$phone verified=$verified outgoing=$outgoing action=${intent?.action} " +
+                "alreadyAttached=${rootContainer?.isAttachedToWindow == true}"
         )
         showOverlay(phone, verified, outgoing, cardJson)
         return START_NOT_STICKY
     }
 
     private fun showOverlay(phone: String, verified: Boolean, outgoing: Boolean, cardJson: String? = null) {
+        val alreadyAttached = rootContainer?.isAttachedToWindow == true
+        OverlayDiagTracker.onShowOverlay()
         VlueBigPushTrace.step(
             6,
             "showOverlay()",
-            "file=CallOverlayService.kt phone=$phone verified=$verified outgoing=$outgoing — this function DOES call WindowManager.addView()"
+            "file=CallOverlayService.kt phone=$phone verified=$verified outgoing=$outgoing " +
+                "alreadyAttached=$alreadyAttached ${OverlayDiagTracker.detailSuffix()}"
         )
         removeOverlayImmediate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
@@ -236,8 +247,10 @@ class CallOverlayService : Service() {
         try {
             VlueBigPushTrace.addViewCall(
                 "phone=$phone type=${params.type} w=${params.width} h=${params.height} " +
-                    "canDrawOverlays=${LetteringPermissionHelper.canDrawOverlays(this)}"
+                    "canDrawOverlays=${LetteringPermissionHelper.canDrawOverlays(this)} " +
+                    OverlayDiagTracker.detailSuffix()
             )
+            OverlayDiagTracker.onAddView()
             windowManager?.addView(container, params)
             VlueBigPushTrace.addViewSuccess(container, params, "phone=$phone")
             /* addView 직후: 애니메이션 전 alpha=0 이라 안 보일 수 있음 — 덤프는 애니메이션 후에도 남김 */
@@ -253,7 +266,7 @@ class CallOverlayService : Service() {
             LetteringPrefs.setLastOverlayError(this, "addView:${e.message}")
             LetteringIncomingNotifier.post(this, phone, outgoing)
             LetteringRingingActivity.launch(this, phone, outgoing)
-            stopSelf()
+            stopSelfTraced("addViewException")
             return
         }
         rootContainer = container
@@ -496,7 +509,7 @@ class CallOverlayService : Service() {
         if (dismissing) return
         dismissing = true
         val container = rootContainer ?: run {
-            stopSelf()
+            stopSelfTraced("dismissOverlay_noContainer")
             return
         }
         container.animate()
@@ -505,7 +518,7 @@ class CallOverlayService : Service() {
             .setDuration(260)
             .withEndAction {
                 removeOverlayImmediate()
-                stopSelf()
+                stopSelfTraced("dismissOverlay_animateEnd")
             }
             .start()
     }
@@ -516,8 +529,17 @@ class CallOverlayService : Service() {
         webView = null
         rootContainer?.let { v ->
             try {
+                OverlayDiagTracker.onRemoveView()
                 windowManager?.removeView(v)
-            } catch (_: Exception) {
+                VlueBigPushTrace.lifecycle(
+                    "REMOVE_VIEW",
+                    "attachedWas=${v.isAttachedToWindow} ${OverlayDiagTracker.detailSuffix()}"
+                )
+            } catch (e: Exception) {
+                VlueBigPushTrace.lifecycle(
+                    "REMOVE_VIEW_EXCEPTION",
+                    "${e.javaClass.simpleName}: ${e.message}"
+                )
             }
         }
         rootContainer = null
@@ -529,9 +551,20 @@ class CallOverlayService : Service() {
     }
 
     override fun onDestroy() {
+        OverlayDiagTracker.onDestroy()
+        VlueBigPushTrace.lifecycle(
+            "ON_DESTROY",
+            "fgsEndedAt=${OverlayDiagTracker.foregroundEndedAtMs} ${OverlayDiagTracker.detailSuffix()}"
+        )
         if (activeInstance === this) activeInstance = null
         removeOverlayImmediate()
         super.onDestroy()
+    }
+
+    private fun stopSelfTraced(reason: String) {
+        OverlayDiagTracker.onStopSelf()
+        VlueBigPushTrace.lifecycle("STOP_SELF", reason)
+        stopSelf()
     }
 
     private fun createNotificationChannel() {

@@ -293,9 +293,15 @@ export async function ingestDiagnosticEvents(
         p.layoutParams != null ||
         p.overlayPermission != null ||
         p.width != null ||
-        p.result != null
+        p.result != null ||
+        p.overlayInstanceId != null ||
+        p.overlayDiag != null
       ) {
-        overlayState = payload;
+        const merged: Record<string, unknown> = { ...p };
+        if (p.overlayDiag && typeof p.overlayDiag === "object" && !Array.isArray(p.overlayDiag)) {
+          Object.assign(merged, p.overlayDiag as Record<string, unknown>);
+        }
+        overlayState = merged as Prisma.InputJsonValue;
       }
     }
   }

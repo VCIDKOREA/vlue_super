@@ -42,20 +42,63 @@ data class ActiveDiagnosticSession(
             if (!userId.isNullOrBlank()) put("userId", userId)
             if (!phoneMasked.isNullOrBlank()) put("phoneMasked", phoneMasked)
             put("lastStep", lastStep)
+            put("metaJson", JSONObject().put("overlayDiag", OverlayDiagTracker.snapshotJson()))
         }
 }
 
+/**
+ * 한 통화 = 하나의 sessionId.
+ * Call End 직후에도 잠시 recent 를 유지해 늦은 이벤트가 새 세션을 만들지 않게 한다.
+ */
 object DiagnosticsSessionStore {
+    private const val RECENT_GRACE_MS = 20_000L
+
     private val active = AtomicReference<ActiveDiagnosticSession?>(null)
+    @Volatile
+    private var recentEnded: ActiveDiagnosticSession? = null
+    @Volatile
+    private var recentEndedAtMs: Long = 0L
 
     fun current(): ActiveDiagnosticSession? = active.get()
 
+    /** active 또는 Call End 직후 grace 구간의 세션 */
+    fun currentOrRecent(): ActiveDiagnosticSession? {
+        active.get()?.let { return it }
+        val ended = recentEnded ?: return null
+        if (System.currentTimeMillis() - recentEndedAtMs <= RECENT_GRACE_MS) return ended
+        return null
+    }
+
+    /**
+     * @return Pair(session, createdNew)
+     */
     fun ensureSession(
         context: Context,
         feature: String = DiagnosticsFeature.BIG_PUSH,
-        phoneRaw: String? = null
-    ): ActiveDiagnosticSession {
-        active.get()?.let { return it }
+        phoneRaw: String? = null,
+        source: String = "unknown"
+    ): Pair<ActiveDiagnosticSession, Boolean> {
+        active.get()?.let { existing ->
+            OverlayDiagTracker.noteSessionBind(source, existing.id, created = false)
+            return existing to false
+        }
+        /* grace 중이면 재사용 — 한 통화 다중 세션 방지 */
+        val ended = recentEnded
+        if (ended != null &&
+            ended.feature == feature &&
+            System.currentTimeMillis() - recentEndedAtMs <= RECENT_GRACE_MS
+        ) {
+            if (active.compareAndSet(null, ended)) {
+                recentEnded = null
+                OverlayDiagTracker.noteSessionBind(source, ended.id, created = false)
+                return ended to false
+            }
+            active.get()?.let {
+                OverlayDiagTracker.noteSessionBind(source, it.id, created = false)
+                return it to false
+            }
+        }
+
         val app = context.applicationContext
         val now = System.currentTimeMillis()
         val key = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date(now)) +
@@ -77,10 +120,50 @@ object DiagnosticsSessionStore {
             userId = LetteringPrefs.getUserId(app),
             phoneMasked = maskPhone(phoneRaw)
         )
-        if (active.compareAndSet(null, session)) {
+        return if (active.compareAndSet(null, session)) {
+            OverlayDiagTracker.resetForNewCallSession()
+            OverlayDiagTracker.noteSessionBind(source, session.id, created = true)
             DiagnosticsEventQueue.enqueueSession(app, session)
+            DiagnosticsEventQueue.enqueueEvent(
+                app,
+                session,
+                seq = 0,
+                code = "SESSION_CREATED",
+                label = "Session created by $source",
+                ok = true,
+                payloadJson = JSONObject().apply {
+                    put("source", source)
+                    put("sessionId", session.id)
+                    put("sessionKey", session.sessionKey)
+                    put("created", true)
+                },
+                overlayState = OverlayDiagTracker.snapshotJson()
+            )
+            session to true
+        } else {
+            val cur = active.get()!!
+            OverlayDiagTracker.noteSessionBind(source, cur.id, created = false)
+            cur to false
         }
-        return active.get() ?: session
+    }
+
+    fun noteSource(context: Context, source: String) {
+        val s = currentOrRecent() ?: return
+        OverlayDiagTracker.noteSessionBind(source, s.id, created = false)
+        DiagnosticsEventQueue.enqueueEvent(
+            context.applicationContext,
+            s,
+            seq = 0,
+            code = "SESSION_BIND",
+            label = "Session bind by $source",
+            ok = true,
+            payloadJson = JSONObject().apply {
+                put("source", source)
+                put("sessionId", s.id)
+                put("created", false)
+            },
+            overlayState = OverlayDiagTracker.snapshotJson()
+        )
     }
 
     fun updatePhoneMasked(phoneRaw: String?) {
@@ -91,6 +174,8 @@ object DiagnosticsSessionStore {
 
     fun endSession(context: Context, status: String = "OK") {
         val cur = active.getAndSet(null) ?: return
+        recentEnded = cur
+        recentEndedAtMs = System.currentTimeMillis()
         DiagnosticsEventQueue.enqueueSession(
             context.applicationContext,
             cur,

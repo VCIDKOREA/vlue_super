@@ -9,6 +9,7 @@ import android.view.WindowManager
 import kr.vlue.calloverlay.diagnostics.DiagnosticsEventQueue
 import kr.vlue.calloverlay.diagnostics.DiagnosticsFeature
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
+import kr.vlue.calloverlay.diagnostics.OverlayDiagTracker
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
@@ -62,29 +63,33 @@ object VlueBigPushTrace {
         DiagnosticsEventQueue.flushAsync(app)
     }
 
-    fun beginIncoming(context: Context, phoneRaw: String? = null) {
+    fun beginIncoming(context: Context, phoneRaw: String? = null, source: String = "unknown") {
         bind(context)
-        DiagnosticsSessionStore.ensureSession(
+        val (session, created) = DiagnosticsSessionStore.ensureSession(
             context.applicationContext,
             DiagnosticsFeature.BIG_PUSH,
-            phoneRaw
+            phoneRaw,
+            source = source
         )
+        Log.i(TAG, "beginIncoming source=$source sessionId=${session.id} created=$created")
+        persist("beginIncoming source=$source sessionId=${session.id} created=$created")
     }
 
     fun step(n: Int, label: String, detail: String = "") {
         if (n > 0) lastStepReached = maxOf(lastStepReached, n)
-        val msg = if (detail.isBlank()) "[$n] $label" else "[$n] $label | $detail"
+        val diag = OverlayDiagTracker.detailSuffix()
+        val msg = buildString {
+            append("[$n] $label")
+            if (detail.isNotBlank()) append(" | $detail")
+            append(" | $diag")
+        }
         Log.i(TAG, msg)
         persist(msg)
 
         val ctx = appContext ?: return
         if (n <= 0) return
-        val session = if (n == 11) {
-            DiagnosticsSessionStore.current() ?: return
-        } else {
-            DiagnosticsSessionStore.current()
-                ?: DiagnosticsSessionStore.ensureSession(ctx, DiagnosticsFeature.BIG_PUSH)
-        }
+        /* 새 세션 생성 금지 — beginIncoming 만 생성. 늦은 이벤트는 recent grace 사용 */
+        val session = DiagnosticsSessionStore.currentOrRecent() ?: return
         val code = when (n) {
             1 -> "INCOMING_CALL"
             2 -> "MONITOR_RECEIVED"
@@ -99,7 +104,6 @@ object VlueBigPushTrace {
             11 -> "CALL_END"
             else -> "STEP_$n"
         }
-        /* Call End: 실제 terminal 실패(addView EXCEPTION 등)가 있을 때만 FAILED */
         val endStatus = when {
             n != 11 -> null
             terminalFailReason != null ||
@@ -108,6 +112,11 @@ object VlueBigPushTrace {
             lastAddViewResult == "SUCCESS" || lastStepReached >= 8 -> "OK"
             else -> "OK"
         }
+        val payload = JSONObject().apply {
+            if (detail.isNotBlank()) put("detail", detail)
+            put("sessionId", session.id)
+            put("overlayDiag", OverlayDiagTracker.snapshotJson())
+        }
         DiagnosticsEventQueue.enqueueEvent(
             ctx,
             session,
@@ -115,11 +124,14 @@ object VlueBigPushTrace {
             code = code,
             label = "[$n] $label",
             ok = true,
-            payloadJson = if (detail.isNotBlank()) JSONObject().put("detail", detail) else null,
+            payloadJson = payload,
             statusHint = endStatus ?: "RUNNING",
             terminalFailure = endStatus == "FAILED",
             failStepOverride = if (endStatus == "FAILED") terminalFailStep else null,
-            failReasonOverride = if (endStatus == "FAILED") terminalFailReason else null
+            failReasonOverride = if (endStatus == "FAILED") terminalFailReason else null,
+            overlayState = OverlayDiagTracker.snapshotJson().apply {
+                /* merge view fields if last overlay state exists elsewhere — keep diag counts visible */
+            }
         )
         if (n == 11 && endStatus != null) {
             DiagnosticsSessionStore.endSession(ctx, status = endStatus)
@@ -138,8 +150,8 @@ object VlueBigPushTrace {
         persist(msg)
 
         val ctx = appContext ?: return
-        val session = DiagnosticsSessionStore.current()
-            ?: DiagnosticsSessionStore.ensureSession(ctx, DiagnosticsFeature.BIG_PUSH)
+        val session = DiagnosticsSessionStore.currentOrRecent()
+            ?: DiagnosticsSessionStore.ensureSession(ctx, DiagnosticsFeature.BIG_PUSH, source = "skip").first
         if (terminal) {
             terminalFailReason = reason
             terminalFailStep = afterStep
@@ -154,7 +166,12 @@ object VlueBigPushTrace {
             reason = reason,
             statusHint = if (terminal) "SKIPPED" else "RUNNING",
             terminalFailure = terminal,
-            payloadJson = JSONObject().put("terminal", terminal)
+            payloadJson = JSONObject().apply {
+                put("terminal", terminal)
+                put("sessionId", session.id)
+                put("overlayDiag", OverlayDiagTracker.snapshotJson())
+            },
+            overlayState = OverlayDiagTracker.snapshotJson()
         )
     }
 
@@ -166,8 +183,7 @@ object VlueBigPushTrace {
         persist(msg)
 
         val ctx = appContext ?: return
-        val session = DiagnosticsSessionStore.current()
-            ?: DiagnosticsSessionStore.ensureSession(ctx)
+        val session = DiagnosticsSessionStore.currentOrRecent() ?: return
         DiagnosticsEventQueue.enqueueEvent(
             ctx,
             session,
@@ -175,7 +191,11 @@ object VlueBigPushTrace {
             code = "ADD_VIEW_CALL",
             label = "[7] WindowManager.addView() CALL",
             ok = true,
-            payloadJson = if (detail.isNotBlank()) JSONObject().put("detail", detail) else null
+            payloadJson = JSONObject().apply {
+                if (detail.isNotBlank()) put("detail", detail)
+                put("overlayDiag", OverlayDiagTracker.snapshotJson())
+            },
+            overlayState = OverlayDiagTracker.snapshotJson()
         )
     }
 
@@ -196,11 +216,9 @@ object VlueBigPushTrace {
         persist("[8] WindowManager.addView() SUCCESS")
 
         val ctx = appContext ?: return
-        val session = DiagnosticsSessionStore.current()
-            ?: DiagnosticsSessionStore.ensureSession(ctx)
+        val session = DiagnosticsSessionStore.currentOrRecent() ?: return
         val payload = collectAddViewSuccessSnapshot(ctx, view, params, detail)
         val overlayState = buildOverlayStateJson(ctx, view, params, "addView SUCCESS")
-        /* snapshot 필드를 overlayState에도 병합해 관리자 Overlay 패널에 보이게 */
         payload.keys().forEach { key ->
             if (!overlayState.has(key)) overlayState.put(key, payload.get(key))
         }
@@ -217,7 +235,7 @@ object VlueBigPushTrace {
         /* 레이아웃 직후 measured/actual 이 0일 수 있어 다음 프레임에 한 번 더 기록 */
         view?.post {
             val app = appContext ?: return@post
-            val s = DiagnosticsSessionStore.current() ?: return@post
+            val s = DiagnosticsSessionStore.currentOrRecent() ?: return@post
             val late = collectAddViewSuccessSnapshot(app, view, params, "$detail|postLayout")
             DiagnosticsEventQueue.enqueueEvent(
                 app,
@@ -242,8 +260,7 @@ object VlueBigPushTrace {
         persist("[8] WindowManager.addView() FAIL | $reason")
 
         val ctx = appContext ?: return
-        val session = DiagnosticsSessionStore.current()
-            ?: DiagnosticsSessionStore.ensureSession(ctx)
+        val session = DiagnosticsSessionStore.currentOrRecent() ?: return
         DiagnosticsEventQueue.enqueueEvent(
             ctx,
             session,
@@ -252,9 +269,10 @@ object VlueBigPushTrace {
             label = "[8] WindowManager.addView() FAIL",
             ok = false,
             reason = reason,
-            payloadJson = JSONObject().put("result", "FAIL"),
+            payloadJson = JSONObject().put("result", "FAIL").put("overlayDiag", OverlayDiagTracker.snapshotJson()),
             statusHint = "FAILED",
-            terminalFailure = true
+            terminalFailure = true,
+            overlayState = OverlayDiagTracker.snapshotJson()
         )
     }
 
@@ -272,8 +290,7 @@ object VlueBigPushTrace {
         persist("EXCEPTION:\n$lastException")
 
         val ctx = appContext ?: return
-        val session = DiagnosticsSessionStore.current()
-            ?: DiagnosticsSessionStore.ensureSession(ctx)
+        val session = DiagnosticsSessionStore.currentOrRecent() ?: return
         val top = e.stackTrace.firstOrNull()
         DiagnosticsEventQueue.enqueueEvent(
             ctx,
@@ -287,9 +304,10 @@ object VlueBigPushTrace {
             exceptionStack = lastException,
             exceptionFn = top?.let { "${it.className}.${it.methodName}" },
             exceptionLine = top?.lineNumber,
-            payloadJson = JSONObject().put("result", "EXCEPTION"),
+            payloadJson = JSONObject().put("result", "EXCEPTION").put("overlayDiag", OverlayDiagTracker.snapshotJson()),
             statusHint = "FAILED",
-            terminalFailure = true
+            terminalFailure = true,
+            overlayState = OverlayDiagTracker.snapshotJson()
         )
     }
 
@@ -354,7 +372,7 @@ object VlueBigPushTrace {
         persist(dump)
 
         val ctx = appContext ?: return
-        val session = DiagnosticsSessionStore.current() ?: return
+        val session = DiagnosticsSessionStore.currentOrRecent() ?: return
         val overlayState = buildOverlayStateJson(ctx, view, params, reactHint)
         DiagnosticsEventQueue.enqueueEvent(
             ctx,
@@ -454,6 +472,8 @@ object VlueBigPushTrace {
         target.put("displayId", resolveDisplayId(context, view))
         target.put("currentActivity", VlueCallOverlayApp.currentActivityName ?: "(none)")
         target.put("topPackage", resolveTopPackage(context))
+        val diag = OverlayDiagTracker.snapshotJson()
+        diag.keys().forEach { k -> target.put(k, diag.get(k)) }
     }
 
     private fun resolveDisplayId(context: Context, view: View?): Int {
@@ -498,6 +518,28 @@ object VlueBigPushTrace {
             /* GET_TASKS 제한 */
         }
         return context.packageName
+    }
+
+    fun lifecycle(code: String, detail: String = "") {
+        val ctx = appContext ?: return
+        val session = DiagnosticsSessionStore.currentOrRecent() ?: return
+        val msg = "[lifecycle] $code | $detail | ${OverlayDiagTracker.detailSuffix()}"
+        Log.i(TAG, msg)
+        persist(msg)
+        DiagnosticsEventQueue.enqueueEvent(
+            ctx,
+            session,
+            seq = 0,
+            code = code,
+            label = code,
+            ok = true,
+            payloadJson = JSONObject().apply {
+                put("detail", detail)
+                put("sessionId", session.id)
+                put("overlayDiag", OverlayDiagTracker.snapshotJson())
+            },
+            overlayState = OverlayDiagTracker.snapshotJson()
+        )
     }
 
     fun summaryForReport(): String = buildString {

@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
 import kr.vlue.calloverlay.incall.VlueInCallController
 
 /** 통화 이벤트 → API 조회 → 오버레이·알림·액티비티 폴백 */
@@ -206,6 +207,7 @@ object LetteringCallCoordinator {
                 "LetteringCallCoordinator.startOverlayService()",
                 "number=$number verified=$verified outgoing=$outgoing hasCard=${!cardJson.isNullOrBlank()}"
             )
+            DiagnosticsSessionStore.noteSource(context, "LetteringCallCoordinator")
             Log.i(TAG, "showOverlay number=$number verified=$verified outgoing=$outgoing")
             val intent = Intent(context, CallOverlayService::class.java).apply {
                 putExtra(CallOverlayService.EXTRA_PHONE, number)

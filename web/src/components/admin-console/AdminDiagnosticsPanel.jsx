@@ -278,6 +278,16 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                 <p className="text-[11px] font-black uppercase text-slate-500">Overlay / LayoutParams</p>
                 <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[11px] text-slate-700 sm:grid-cols-3">
                   {[
+                    "overlayInstanceId",
+                    "showOverlayCount",
+                    "addViewCount",
+                    "removeViewCount",
+                    "overlayCreateCountInSession",
+                    "overlayAlreadyAttached",
+                    "foregroundStartedAtMs",
+                    "foregroundEndedAtMs",
+                    "lastStopSelfAtMs",
+                    "lastOnDestroyAtMs",
                     "type",
                     "flags",
                     "flagsHex",
@@ -295,9 +305,7 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                     "rootViewHashCode",
                     "parent",
                     "isAttachedToWindow",
-                    "attachedToWindow",
                     "isShown",
-                    "visibility",
                     "measuredWidth",
                     "measuredHeight",
                     "actualWidth",
