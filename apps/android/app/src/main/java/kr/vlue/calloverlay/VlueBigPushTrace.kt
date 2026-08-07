@@ -10,8 +10,11 @@ import android.util.Log
 import android.view.View
 import android.view.ViewParent
 import android.view.WindowManager
+import kr.vlue.calloverlay.diagnostics.ActiveDiagnosticSession
 import kr.vlue.calloverlay.diagnostics.DiagnosticsEventQueue
 import kr.vlue.calloverlay.diagnostics.DiagnosticsFeature
+import kr.vlue.calloverlay.diagnostics.DiagnosticsMilestoneClock
+import kr.vlue.calloverlay.diagnostics.DiagnosticsPerfSegments
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
 import kr.vlue.calloverlay.diagnostics.NormalOverlayProbe
 import kr.vlue.calloverlay.diagnostics.OverlayDiagTracker
@@ -78,8 +81,67 @@ object VlueBigPushTrace {
             phoneRaw,
             source = source
         )
+        if (created) {
+            resetSessionLocals()
+            DiagnosticsMilestoneClock.clear(session.id)
+        }
         Log.i(TAG, "beginIncoming source=$source sessionId=${session.id} created=$created")
         persist("beginIncoming source=$source sessionId=${session.id} created=$created")
+    }
+
+    /**
+     * 성능 Timeline 마일스톤 — 발생 즉시 1회 기록 (동일 code 중복 무시).
+     * SystemClock.elapsedRealtimeNanos 기준 elapsed/delta 는 enqueueEvent 가 붙인다.
+     */
+    fun milestone(code: String, label: String, seq: Int, detail: String = "") {
+        val ctx = appContext ?: return
+        val session = DiagnosticsSessionStore.currentOrRecent() ?: return
+        val nowNanos = android.os.SystemClock.elapsedRealtimeNanos()
+        val elapsed = session.elapsedMsFromNanos(nowNanos)
+        if (!DiagnosticsMilestoneClock.note(session.id, code, elapsed)) return
+
+        val payload = JSONObject().apply {
+            if (detail.isNotBlank()) put("detail", detail)
+            put("milestone", true)
+            put("perfCode", code)
+            put("overlayDiag", OverlayDiagTracker.snapshotJson())
+        }
+        DiagnosticsEventQueue.enqueueEvent(
+            ctx,
+            session,
+            seq = seq,
+            code = code,
+            label = label,
+            ok = true,
+            payloadJson = payload,
+            overlayState = OverlayDiagTracker.snapshotJson()
+        )
+    }
+
+    private fun emitPerfSummary(session: ActiveDiagnosticSession, ctx: Context, force: Boolean = false) {
+        val pairs = DiagnosticsMilestoneClock.snapshot(session.id)
+        if (pairs.isEmpty()) return
+        /* 요약은 주요 마일스톤에서만 — 매 이벤트 upsert 폭주 방지 */
+        if (!force) return
+        val perf = DiagnosticsPerfSegments.compute(pairs)
+        DiagnosticsEventQueue.enqueueEvent(
+            ctx,
+            session,
+            seq = 0,
+            code = "PERF_SUMMARY",
+            label = "Performance Summary",
+            ok = true,
+            payloadJson = JSONObject().apply {
+                put("perf", perf)
+                put("summary", perf.optJSONObject("summary") ?: JSONObject())
+            }
+        )
+    }
+
+    fun emitPerfSummaryNow() {
+        val ctx = appContext ?: return
+        val session = DiagnosticsSessionStore.currentOrRecent() ?: return
+        emitPerfSummary(session, ctx, force = true)
     }
 
     fun step(n: Int, label: String, detail: String = "") {
@@ -106,7 +168,7 @@ object VlueBigPushTrace {
             6 -> "SHOW_OVERLAY"
             7 -> "ADD_VIEW_CALL"
             8 -> "ADD_VIEW_SUCCESS"
-            9 -> "REACT_ROOT_MOUNTED"
+            9 -> "REACT_ROOT_READY"
             10 -> "SHOWCASE_VISIBLE"
             11 -> "CALL_END"
             else -> "STEP_$n"
@@ -140,8 +202,14 @@ object VlueBigPushTrace {
                 /* merge view fields if last overlay state exists elsewhere — keep diag counts visible */
             }
         )
+        DiagnosticsMilestoneClock.note(session.id, code, session.elapsedMsFromNanos())
+        when (n) {
+            3 -> milestone("BIG_PUSH_REQUESTED", "BigPush Requested", 3, detail)
+            10, 11 -> emitPerfSummaryNow()
+        }
         if (n == 11 && endStatus != null) {
             DiagnosticsSessionStore.endSession(ctx, status = endStatus)
+            DiagnosticsMilestoneClock.clear(session.id)
             resetSessionLocals()
         }
     }

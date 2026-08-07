@@ -7,18 +7,21 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Local durable queue for diagnostics upload.
- * Failed HTTPS posts stay on disk and retry on next flush.
+ * 이벤트는 발생 즉시 기록 (일괄 지연 기록 없음).
+ * 시각: SystemClock.elapsedRealtimeNanos() 기준 baseTime 상대.
  */
 object DiagnosticsEventQueue {
     private const val TAG = "DiagnosticsQueue"
     private const val QUEUE_FILE = "vlue_diagnostics_queue.jsonl"
     private val executor = Executors.newSingleThreadExecutor()
-    private val lastEventElapsedRealtime = AtomicLong(-1L)
+    /** sessionId → last event elapsedRealtimeNanos (세션별 Δ 계산) */
+    private val lastEventNanosBySession = ConcurrentHashMap<String, AtomicLong>()
 
     @Volatile
     private var appContext: Context? = null
@@ -27,8 +30,12 @@ object DiagnosticsEventQueue {
         appContext = context.applicationContext
     }
 
-    fun resetTiming() {
-        lastEventElapsedRealtime.set(-1L)
+    fun resetTiming(sessionId: String? = null) {
+        if (sessionId != null) {
+            lastEventNanosBySession.remove(sessionId)
+        } else {
+            lastEventNanosBySession.clear()
+        }
     }
 
     fun enqueueSession(
@@ -76,27 +83,40 @@ object DiagnosticsEventQueue {
         failStepOverride: Int? = null,
         failReasonOverride: String? = null
     ) {
+        /* 발생 즉시 샘플 — enqueue 지연 전에 시각 고정 */
         val wallNow = System.currentTimeMillis()
-        val ert = SystemClock.elapsedRealtime()
-        val sinceStart = session.elapsedRealtimeSinceStart(ert)
-        val prev = lastEventElapsedRealtime.getAndSet(ert)
-        val deltaFromPrev = if (prev < 0L) 0 else (ert - prev).toInt().coerceAtLeast(0)
+        val nowNanos = SystemClock.elapsedRealtimeNanos()
+        val ertMs = SystemClock.elapsedRealtime()
+        val sinceStart = session.elapsedMsFromNanos(nowNanos)
+        val lastHolder = lastEventNanosBySession.getOrPut(session.id) { AtomicLong(-1L) }
+        val prevNanos = lastHolder.getAndSet(nowNanos)
+        val deltaFromPrev = if (prevNanos < 0L) {
+            0
+        } else {
+            ((nowNanos - prevNanos) / 1_000_000L).coerceAtLeast(0L).toInt()
+        }
 
         val timingPayload = JSONObject().apply {
-            put("elapsedRealtimeMs", ert)
+            put("timestamp", wallNow)
+            put("elapsedRealtimeNanos", nowNanos)
+            put("elapsedRealtimeMs", ertMs)
+            put("baseTimeNanos", session.startedElapsedRealtimeNanos)
+            put("startedElapsedRealtimeNanos", session.startedElapsedRealtimeNanos)
+            put("startedElapsedRealtimeMs", session.startedElapsedRealtimeMs)
             put("elapsedMs", sinceStart)
             put("deltaFromPrevMs", deltaFromPrev)
-            put("startedElapsedRealtimeMs", session.startedElapsedRealtimeMs)
+            put("t", sinceStart)
+            put("delta", deltaFromPrev)
         }
         val mergedPayload = JSONObject().apply {
             payloadJson?.keys()?.forEach { k -> put(k, payloadJson.get(k)) }
             timingPayload.keys().forEach { k -> put(k, timingPayload.get(k)) }
         }
 
-        val labelWithTime = if (label.contains("${sinceStart}ms")) {
-            label
-        } else {
-            "$label  ${sinceStart}ms"
+        val labelWithTime = when {
+            label.contains("t=") || label.contains("+") && label.contains("ms") && label.contains("Δ") -> label
+            sinceStart == 0 && deltaFromPrev == 0 -> "$label  t=0ms"
+            else -> "$label  t=+${sinceStart}ms  Δ${deltaFromPrev}ms"
         }
 
         val event = JSONObject().apply {
@@ -106,8 +126,10 @@ object DiagnosticsEventQueue {
             put("label", labelWithTime)
             if (ok != null) put("ok", ok)
             put("timestamp", wallNow)
-            /* 타임라인 +elapsedMs 표시 — elapsedRealtime 세션 상대 */
             put("elapsedMs", sinceStart)
+            put("deltaFromPrevMs", deltaFromPrev)
+            put("elapsedRealtimeNanos", nowNanos)
+            put("baseTimeNanos", session.startedElapsedRealtimeNanos)
             if (!reason.isNullOrBlank()) put("reason", reason)
             if (!exceptionMessage.isNullOrBlank()) put("exceptionMessage", exceptionMessage)
             if (!exceptionStack.isNullOrBlank()) put("exceptionStack", exceptionStack)
@@ -149,7 +171,7 @@ object DiagnosticsEventQueue {
         }
         append(context, wrapper)
         flushAsync(context)
-        Log.i(TAG, "$labelWithTime | ert=$ert deltaPrev=${deltaFromPrev}ms")
+        Log.i(TAG, "$labelWithTime | code=$code nanos=$nowNanos deltaPrev=${deltaFromPrev}ms")
     }
 
     fun flushAsync(context: Context) {

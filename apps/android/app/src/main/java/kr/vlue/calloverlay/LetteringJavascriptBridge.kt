@@ -34,6 +34,10 @@ class LetteringJavascriptBridge(
             s.contains("[9]") -> VlueBigPushTrace.step(9, "React Root Mounted", d)
             s.contains("[10]") -> VlueBigPushTrace.step(10, "Showcase Visible", d)
             s.contains("[11]") -> VlueBigPushTrace.step(11, "Call End", d)
+            s.contains("[DCC]", ignoreCase = true) ||
+                s.contains("DCC_BOUND", ignoreCase = true) ||
+                d.contains("DCC_BOUND", ignoreCase = true) ->
+                VlueBigPushTrace.milestone("DCC_BOUND", "DCC Bound", seq = 9, detail = d.ifBlank { s })
             else -> VlueBigPushTrace.step(0, s.ifBlank { "JS" }, d)
         }
     }

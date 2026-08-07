@@ -79,6 +79,18 @@ class CallOverlayService : Service() {
             }
             ACTION_CONNECTED -> {
                 callPhaseCompact = false
+                VlueBigPushTrace.milestone(
+                    "ANSWER_DETECTED",
+                    "Answer Detected",
+                    seq = 8,
+                    detail = "ACTION_CONNECTED"
+                )
+                VlueBigPushTrace.milestone(
+                    "SHOWCASE_REQUESTED",
+                    "Showcase Requested",
+                    seq = 8,
+                    detail = "fullscreen after answer"
+                )
                 setOverlayFullscreen(true)
                 notifyWebCallState("connected")
                 pendingConnectedNotify = true
@@ -222,6 +234,12 @@ class CallOverlayService : Service() {
         callPhaseCompact = true
         miniMode = false
 
+        VlueBigPushTrace.milestone(
+            "BIG_PUSH_REQUESTED",
+            "BigPush Requested",
+            seq = 6,
+            detail = "showOverlay()"
+        )
         VlueBigPushTrace.dumpOverlayPermissionProbe(
             context = this,
             params = params,
@@ -242,6 +260,12 @@ class CallOverlayService : Service() {
             OverlayDiagTracker.onAddView()
             windowManager?.addView(container, params)
             VlueBigPushTrace.addViewSuccess(container, params, "phone=$phone")
+            VlueBigPushTrace.milestone(
+                "BIG_PUSH_VISIBLE",
+                "BigPush Visible",
+                seq = 8,
+                detail = "addView SUCCESS"
+            )
             VlueBigPushTrace.recordOverlayAddViewProbe(
                 context = this,
                 probeKind = "CALL_OVERLAY_PROBE",
@@ -467,6 +491,14 @@ class CallOverlayService : Service() {
             }
             try {
                 wm.updateViewLayout(view, params)
+                if (fullscreen) {
+                    VlueBigPushTrace.milestone(
+                        "OVERLAY_ATTACHED",
+                        "Overlay Attached",
+                        seq = 8,
+                        detail = "setOverlayFullscreen(true)"
+                    )
+                }
             } catch (_: Exception) {
             }
         }

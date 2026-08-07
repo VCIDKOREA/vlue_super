@@ -19,8 +19,10 @@ data class ActiveDiagnosticSession(
     val feature: String,
     val sessionKey: String,
     val startedAtMs: Long,
-    /** SystemClock.elapsedRealtime() at session create — 이벤트 간 시간차 기준 */
+    /** SystemClock.elapsedRealtime() at session create (ms) */
     val startedElapsedRealtimeMs: Long,
+    /** SystemClock.elapsedRealtimeNanos() at session create — Timeline baseTime */
+    val startedElapsedRealtimeNanos: Long,
     val deviceModel: String,
     val androidVersion: String,
     val appVersion: String,
@@ -31,6 +33,9 @@ data class ActiveDiagnosticSession(
     /** 세션 시작 대비 monotonic 경과(ms) — 타임라인 표시용 */
     fun elapsedRealtimeSinceStart(nowEr: Long = SystemClock.elapsedRealtime()): Int =
         (nowEr - startedElapsedRealtimeMs).coerceAtLeast(0).toInt()
+
+    fun elapsedMsFromNanos(nowNanos: Long = SystemClock.elapsedRealtimeNanos()): Int =
+        ((nowNanos - startedElapsedRealtimeNanos) / 1_000_000L).coerceAtLeast(0L).toInt()
 
     @Deprecated("use elapsedRealtimeSinceStart", ReplaceWith("elapsedRealtimeSinceStart()"))
     fun elapsedMs(now: Long = System.currentTimeMillis()): Int =
@@ -44,6 +49,8 @@ data class ActiveDiagnosticSession(
             put("status", status)
             put("startedAt", startedAtMs)
             put("startedElapsedRealtimeMs", startedElapsedRealtimeMs)
+            put("baseTimeNanos", startedElapsedRealtimeNanos)
+            put("startedElapsedRealtimeNanos", startedElapsedRealtimeNanos)
             put("deviceModel", deviceModel)
             put("androidVersion", androidVersion)
             put("appVersion", appVersion)
@@ -91,25 +98,16 @@ object DiagnosticsSessionStore {
             OverlayDiagTracker.noteSessionBind(source, existing.id, created = false)
             return existing to false
         }
-        /* grace 중이면 재사용 — 한 통화 다중 세션 방지 */
-        val ended = recentEnded
-        if (ended != null &&
-            ended.feature == feature &&
-            System.currentTimeMillis() - recentEndedAtMs <= RECENT_GRACE_MS
-        ) {
-            if (active.compareAndSet(null, ended)) {
-                recentEnded = null
-                OverlayDiagTracker.noteSessionBind(source, ended.id, created = false)
-                return ended to false
-            }
-            active.get()?.let {
-                OverlayDiagTracker.noteSessionBind(source, it.id, created = false)
-                return it to false
-            }
-        }
+        /*
+         * 종료된 세션을 active 로 되살리지 않음.
+         * 이전 통화 baseTime 을 새 Incoming 에 물리면 +45000ms 등 왜곡이 발생한다.
+         * Call End 이후 늦은 이벤트만 currentOrRecent() grace 로 붙인다.
+         */
 
         val app = context.applicationContext
         val now = System.currentTimeMillis()
+        val baseNanos = SystemClock.elapsedRealtimeNanos()
+        val baseMs = SystemClock.elapsedRealtime()
         val key = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date(now)) +
             "-" + UUID.randomUUID().toString().take(6)
         val deviceId = try {
@@ -122,7 +120,8 @@ object DiagnosticsSessionStore {
             feature = feature,
             sessionKey = key,
             startedAtMs = now,
-            startedElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+            startedElapsedRealtimeMs = baseMs,
+            startedElapsedRealtimeNanos = baseNanos,
             deviceModel = Build.MODEL ?: "unknown",
             androidVersion = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
             appVersion = BuildConfig.VERSION_NAME,
@@ -132,7 +131,7 @@ object DiagnosticsSessionStore {
         )
         return if (active.compareAndSet(null, session)) {
             OverlayDiagTracker.resetForNewCallSession()
-            DiagnosticsEventQueue.resetTiming()
+            DiagnosticsEventQueue.resetTiming(session.id)
             OverlayDiagTracker.noteSessionBind(source, session.id, created = true)
             DiagnosticsEventQueue.enqueueSession(app, session)
             DiagnosticsEventQueue.enqueueEvent(

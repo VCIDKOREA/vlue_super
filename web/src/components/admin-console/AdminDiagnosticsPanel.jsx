@@ -29,6 +29,39 @@ const BIG_PUSH_STEPS = [
   { seq: 11, short: "Call End" }
 ];
 
+const PERF_MILESTONE_LABELS = {
+  INCOMING_CALL: "Incoming",
+  BIG_PUSH_REQUESTED: "BigPush Requested",
+  BIG_PUSH_VISIBLE: "BigPush Visible",
+  ANSWER_DETECTED: "Answer Detected",
+  SHOWCASE_REQUESTED: "Showcase Requested",
+  OVERLAY_ATTACHED: "Overlay Attached",
+  REACT_ROOT_READY: "React Root Ready",
+  REACT_ROOT_MOUNTED: "React Root Ready",
+  DCC_BOUND: "DCC Bound",
+  SHOWCASE_VISIBLE: "Showcase Visible",
+  CALL_END: "Call End",
+  PERF_SUMMARY: "Performance Summary"
+};
+
+const TIMELINE_SKIP_CODES = new Set([
+  "SESSION_CREATED",
+  "SESSION_BIND",
+  "PERF_SUMMARY",
+  "OVERLAY_PERMISSION_PROBE"
+]);
+
+function chronoEvents(events) {
+  return [...(events || [])]
+    .filter((e) => !TIMELINE_SKIP_CODES.has(String(e.code || "").toUpperCase()))
+    .sort((a, b) => {
+      const ta = a.elapsedMs ?? 0;
+      const tb = b.elapsedMs ?? 0;
+      if (ta !== tb) return ta - tb;
+      return (a.seq ?? 0) - (b.seq ?? 0);
+    });
+}
+
 function statusBadge(status) {
   const s = String(status || "").toUpperCase();
   const cls =
@@ -206,24 +239,139 @@ export default function AdminDiagnosticsPanel({ onToast }) {
 
               <hr className="border-slate-100" />
 
+              {(() => {
+                const perf = session.perf || {};
+                const summary = perf.summary || {};
+                const segments = Array.isArray(perf.segments) ? perf.segments : [];
+                const kpiBp = session.kpi?.bigPushVisibleMaxMs ?? 300;
+                const kpiSc = session.kpi?.showcaseVisibleMaxMs ?? 1000;
+                const rows = [
+                  { label: "Incoming → BigPush", ms: summary.incomingToBigPushMs, kpi: kpiBp },
+                  { label: "Answer → Showcase", ms: summary.answerToShowcaseMs, kpi: kpiSc },
+                  { label: "React Init", ms: summary.reactInitMs },
+                  { label: "DCC Bind", ms: summary.dccBindMs },
+                  { label: "Total Showcase", ms: summary.totalShowcaseMs, kpi: kpiSc }
+                ].filter((r) => r.ms != null);
+                return (
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[12px] text-violet-950">
+                      <p className="font-black">Performance</p>
+                      <p className="mt-1 text-[10px] text-violet-700">
+                        KPI · BigPush Visible ≤ {kpiBp}ms · Showcase Visible ≤ {kpiSc}ms
+                      </p>
+                      {rows.length ? (
+                        <ul className="mt-2 space-y-1 font-mono text-[11px]">
+                          {rows.map((r) => {
+                            const pass = r.kpi != null ? r.ms <= r.kpi : null;
+                            return (
+                              <li
+                                key={r.label}
+                                className={
+                                  pass === false
+                                    ? "text-rose-700"
+                                    : pass === true
+                                      ? "text-emerald-800"
+                                      : "text-violet-900"
+                                }
+                              >
+                                {r.label} : <span className="font-black">{r.ms}ms</span>
+                                {r.kpi != null ? (
+                                  <span className="ml-1 text-[10px] opacity-70">
+                                    (KPI {r.kpi}ms {pass ? "✔" : "✖"})
+                                  </span>
+                                ) : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <p className="mt-2 text-[11px] text-violet-700">
+                          구간 데이터 대기 — 새 APK로 통화 후 마일스톤이 쌓이면 표시됩니다.
+                        </p>
+                      )}
+                      {segments.length ? (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-[10px] font-bold text-violet-800">
+                            All segments
+                          </summary>
+                          <ul className="mt-1 space-y-0.5 font-mono text-[10px] text-violet-900">
+                            {segments.map((s) => (
+                              <li key={s.id}>
+                                {s.label}: {s.elapsedMs}ms
+                                {s.kpiMs != null
+                                  ? ` · KPI ${s.kpiMs}ms ${s.kpiPass ? "✔" : "✖"}`
+                                  : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div>
-                <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-slate-500">Timeline</p>
+                <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                  Timeline (발생 시점 순)
+                </p>
                 <ul className="space-y-1.5 font-mono text-[12px]">
-                  {(feature === "BIG_PUSH" ? BIG_PUSH_STEPS : uniqueSeqs(events)).map((step) => {
-                    const seq = step.seq;
-                    const short = step.short || step.label || `Step ${seq}`;
-                    const { mark, failed, event } = markForStep(events, seq);
+                  {chronoEvents(events).map((event) => {
+                    const failed =
+                      event.ok === false ||
+                      String(event.code || "").includes("EXCEPTION") ||
+                      String(event.code || "").includes("FAIL");
+                    const mark = failed ? "✖" : event.ok === false ? "✖" : "✔";
+                    const name =
+                      PERF_MILESTONE_LABELS[event.code] ||
+                      event.label?.replace(/\s+t=\+?\d+ms.*$/, "") ||
+                      event.code;
+                    const t = event.elapsedMs ?? 0;
+                    const delta =
+                      event.deltaFromPrevMs ??
+                      event.payloadJson?.deltaFromPrevMs ??
+                      event.payloadJson?.delta;
                     return (
-                      <li key={seq} className={failed ? "text-rose-700" : mark === "✔" ? "text-emerald-700" : "text-slate-400"}>
+                      <li
+                        key={event.id}
+                        className={failed ? "text-rose-700" : "text-emerald-800"}
+                      >
                         <span className="inline-block w-5 font-black">{mark}</span>
-                        [{seq}] {short}
-                        {event?.elapsedMs != null ? (
-                          <span className="ml-2 text-[10px] text-slate-400">+{event.elapsedMs}ms</span>
-                        ) : null}
+                        {name}
+                        <span className="ml-2 text-[10px] text-slate-500">
+                          {t === 0 ? "t=0ms" : `t=+${t}ms`}
+                          {delta != null ? ` · Δ${delta}ms` : ""}
+                        </span>
                       </li>
                     );
                   })}
                 </ul>
+                {feature === "BIG_PUSH" ? (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-[10px] font-bold text-slate-500">
+                      Pipeline steps (seq)
+                    </summary>
+                    <ul className="mt-1.5 space-y-1 font-mono text-[11px] text-slate-600">
+                      {BIG_PUSH_STEPS.map((step) => {
+                        const { mark, failed, event } = markForStep(events, step.seq);
+                        return (
+                          <li
+                            key={step.seq}
+                            className={failed ? "text-rose-700" : mark === "✔" ? "text-slate-700" : "text-slate-400"}
+                          >
+                            <span className="inline-block w-5 font-black">{mark}</span>
+                            [{step.seq}] {step.short}
+                            {event?.elapsedMs != null ? (
+                              <span className="ml-2 text-[10px] text-slate-400">
+                                t=+{event.elapsedMs}ms
+                              </span>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </details>
+                ) : null}
               </div>
 
               {(() => {
