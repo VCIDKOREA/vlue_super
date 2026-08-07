@@ -496,9 +496,28 @@ export default function AdminDiagnosticsPanel({ onToast }) {
               ) : null}
 
               <div className="rounded-lg border border-slate-200 px-3 py-2">
+                <p className="text-[11px] font-black uppercase text-slate-500">
+                  Companion Overlay
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[11px] text-slate-700 sm:grid-cols-3">
+                  {["overlayState", "overlayContext", "overlayPosition", "lastTransition", "rejectedTransition"].map(
+                    (k) => (
+                      <div key={k}>
+                        <span className="text-slate-400">{k}:</span>{" "}
+                        <span className="font-bold">{String(overlay[k] ?? "—")}</span>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 px-3 py-2">
                 <p className="text-[11px] font-black uppercase text-slate-500">Overlay / LayoutParams</p>
                 <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[11px] text-slate-700 sm:grid-cols-3">
                   {[
+                    "overlayState",
+                    "overlayContext",
+                    "overlayPosition",
                     "overlayInstanceId",
                     "showOverlayCount",
                     "addViewCount",

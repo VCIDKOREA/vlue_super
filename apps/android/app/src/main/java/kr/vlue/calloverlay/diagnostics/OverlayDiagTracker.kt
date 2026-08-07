@@ -17,6 +17,7 @@ object OverlayDiagTracker {
     private val removeViewCount = AtomicInteger(0)
     private val overlayCreateCountInSession = AtomicInteger(0)
     private val sessionBindLog = AtomicReference(JSONArray())
+    private val companionSnapshot = AtomicReference<JSONObject?>(null)
 
     @Volatile
     var foregroundStartedAtMs: Long? = null
@@ -33,6 +34,10 @@ object OverlayDiagTracker {
     @Volatile
     var overlayAttached: Boolean = false
         private set
+
+    fun setCompanionSnapshot(snapshot: kr.vlue.calloverlay.companion.CompanionOverlaySnapshot) {
+        companionSnapshot.set(snapshot.toJson())
+    }
 
     fun onServiceCreated(): String {
         val id = UUID.randomUUID().toString()
@@ -116,6 +121,9 @@ object OverlayDiagTracker {
             put("lastStopSelfAtMs", lastStopSelfAtMs ?: JSONObject.NULL)
             put("lastOnDestroyAtMs", lastOnDestroyAtMs ?: JSONObject.NULL)
             put("sessionBindLog", sessionBindLog.get() ?: JSONArray())
+            companionSnapshot.get()?.let { snap ->
+                snap.keys().forEach { k -> put(k, snap.get(k)) }
+            }
         }
 
     fun detailSuffix(): String {
@@ -125,6 +133,9 @@ object OverlayDiagTracker {
             "addViewCount=${s.optInt("addViewCount")} " +
             "removeViewCount=${s.optInt("removeViewCount")} " +
             "overlayCreateCountInSession=${s.optInt("overlayCreateCountInSession")} " +
-            "overlayAlreadyAttached=${s.optBoolean("overlayAlreadyAttached")}"
+            "overlayAlreadyAttached=${s.optBoolean("overlayAlreadyAttached")} " +
+            "overlayState=${s.optString("overlayState", "—")} " +
+            "overlayContext=${s.optString("overlayContext", "—")} " +
+            "overlayPosition=${s.optString("overlayPosition", "—")}"
     }
 }

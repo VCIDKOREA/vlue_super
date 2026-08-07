@@ -99,6 +99,7 @@ class LetteringJavascriptBridge(
             }
             service.setOverlayFullscreen(true)
             service.notifyWebCallState("connected")
+            service.notifyCompanionAnswerFromJs()
         } catch (e: Exception) {
             Log.e(TAG, "answerCall failed", e)
         }
