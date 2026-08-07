@@ -13,6 +13,7 @@ import android.view.WindowManager
 import kr.vlue.calloverlay.diagnostics.DiagnosticsEventQueue
 import kr.vlue.calloverlay.diagnostics.DiagnosticsFeature
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
+import kr.vlue.calloverlay.diagnostics.NormalOverlayProbe
 import kr.vlue.calloverlay.diagnostics.OverlayDiagTracker
 import org.json.JSONObject
 import java.io.File
@@ -349,6 +350,127 @@ object VlueBigPushTrace {
             terminalFailure = true,
             overlayState = OverlayDiagTracker.snapshotJson()
         )
+    }
+
+    /**
+     * NORMAL_OVERLAY_PROBE | CALL_OVERLAY_PROBE
+     * result: SUCCESS | FAIL | EXCEPTION
+     * 동일 type/LayoutParams/Context 로 통화 중 vs 유휴 addView 비교.
+     */
+    fun recordOverlayAddViewProbe(
+        context: Context,
+        probeKind: String,
+        result: String,
+        params: WindowManager.LayoutParams?,
+        error: Throwable? = null,
+        extra: JSONObject? = null
+    ) {
+        val app = context.applicationContext
+        val canDraw = try {
+            Settings.canDrawOverlays(context)
+        } catch (_: Exception) {
+            false
+        }
+        val normalPrior = NormalOverlayProbe.lastResultJson(app)
+        val priorResult = normalPrior.optString("result", "")
+        val samsungCallPolicyLikely =
+            probeKind == "CALL_OVERLAY_PROBE" &&
+                result == "EXCEPTION" &&
+                priorResult.equals("SUCCESS", ignoreCase = true)
+        val permissionOrContextLikely =
+            probeKind == "CALL_OVERLAY_PROBE" &&
+                result != "SUCCESS" &&
+                priorResult.isNotBlank() &&
+                !priorResult.equals("SUCCESS", ignoreCase = true) &&
+                !priorResult.equals("null", ignoreCase = true)
+        val payload = JSONObject().apply {
+            put("probeKind", probeKind)
+            put("result", result)
+            put("canDrawOverlays", canDraw)
+            put("contextClass", context.javaClass.name)
+            put("contextIsService", context is android.app.Service)
+            put("sdkInt", Build.VERSION.SDK_INT)
+            put("targetSdkVersion", try {
+                context.applicationInfo.targetSdkVersion
+            } catch (_: Exception) {
+                -1
+            })
+            put("layoutParamsType", params?.type ?: -1)
+            put(
+                "layoutParamsTypeName",
+                if (params?.type == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY) {
+                    "TYPE_APPLICATION_OVERLAY(2038)"
+                } else {
+                    "type=${params?.type}"
+                }
+            )
+            if (params != null) {
+                put("flags", params.flags)
+                put("flagsHex", "0x${Integer.toHexString(params.flags)}")
+                put("gravity", params.gravity)
+                put("width", params.width)
+                put("height", params.height)
+                put("format", params.format)
+                put("x", params.x)
+                put("y", params.y)
+            }
+            put("manufacturer", Build.MANUFACTURER ?: "")
+            put("model", Build.MODEL ?: "")
+            put("priorNormalOverlayProbe", normalPrior)
+            put("samsungCallPolicyLikely", samsungCallPolicyLikely)
+            put("permissionOrContextLikely", permissionOrContextLikely)
+            put(
+                "analysisHint",
+                when {
+                    samsungCallPolicyLikely ->
+                        "NORMAL_OVERLAY_PROBE=SUCCESS but CALL_OVERLAY_PROBE=$result — Samsung call-time overlay restrict likely"
+                    permissionOrContextLikely ->
+                        "Both normal and call probes failed — permission or Context issue more likely than call-only OEM policy"
+                    probeKind == "NORMAL_OVERLAY_PROBE" && result == "SUCCESS" ->
+                        "Idle addView OK with same TYPE_APPLICATION_OVERLAY — await CALL_OVERLAY_PROBE comparison"
+                    probeKind == "NORMAL_OVERLAY_PROBE" && result != "SUCCESS" ->
+                        "Idle addView failed — not call-specific; check SYSTEM_ALERT_WINDOW / installer / Context"
+                    else -> "Recorded $probeKind=$result"
+                }
+            )
+            if (error != null) {
+                put("errorClass", error.javaClass.name)
+                put("errorMessage", error.message ?: "")
+            }
+            extra?.keys()?.forEach { k -> put(k, extra.get(k)) }
+        }
+        val msg = "==== $probeKind $result ====\n${payload.toString(2)}"
+        Log.i(TAG, msg)
+        persist(msg)
+
+        if (probeKind == "NORMAL_OVERLAY_PROBE") {
+            val sid = DiagnosticsSessionStore.currentOrRecent()?.id
+            NormalOverlayProbe.rememberResult(app, result, error?.message ?: result, sid)
+        }
+
+        val session = DiagnosticsSessionStore.currentOrRecent() ?: return
+        val ok = result == "SUCCESS"
+        DiagnosticsEventQueue.enqueueEvent(
+            app,
+            session,
+            seq = if (probeKind == "NORMAL_OVERLAY_PROBE") 0 else 8,
+            code = probeKind,
+            label = "$probeKind $result",
+            ok = ok,
+            reason = if (!ok) (error?.message ?: result) else null,
+            exceptionMessage = error?.message,
+            exceptionStack = error?.let { Log.getStackTraceString(it) },
+            payloadJson = payload,
+            overlayState = payload,
+            statusHint = when {
+                probeKind == "NORMAL_OVERLAY_PROBE" && !ok -> "FAILED"
+                probeKind == "CALL_OVERLAY_PROBE" && !ok -> "FAILED"
+                else -> null
+            },
+            /* CALL 실패는 기존 ADD_VIEW_EXCEPTION 이 terminal 처리. NORMAL 은 OVERLAY 세션만 실패 */
+            terminalFailure = probeKind == "NORMAL_OVERLAY_PROBE" && !ok
+        )
+        DiagnosticsEventQueue.flushAsync(app)
     }
 
     /**

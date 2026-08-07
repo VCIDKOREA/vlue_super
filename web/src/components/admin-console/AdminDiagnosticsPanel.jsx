@@ -226,6 +226,46 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                 </ul>
               </div>
 
+              {(() => {
+                const probes = (events || []).filter(
+                  (e) => e.code === "NORMAL_OVERLAY_PROBE" || e.code === "CALL_OVERLAY_PROBE"
+                );
+                if (!probes.length) return null;
+                const normal = [...probes].reverse().find((e) => e.code === "NORMAL_OVERLAY_PROBE");
+                const call = [...probes].reverse().find((e) => e.code === "CALL_OVERLAY_PROBE");
+                const hint =
+                  call?.payloadJson?.analysisHint ||
+                  normal?.payloadJson?.analysisHint ||
+                  null;
+                return (
+                  <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-950">
+                    <p className="font-black">Overlay Probe Compare</p>
+                    <p className="mt-1 font-mono text-[11px]">
+                      NORMAL_OVERLAY_PROBE:{" "}
+                      <span className="font-black">
+                        {normal?.payloadJson?.result || normal?.label || "—"}
+                      </span>
+                      {" · "}
+                      CALL_OVERLAY_PROBE:{" "}
+                      <span className="font-black">
+                        {call?.payloadJson?.result || call?.label || "—"}
+                      </span>
+                    </p>
+                    {call?.payloadJson?.samsungCallPolicyLikely ? (
+                      <p className="mt-1 text-[11px] font-bold text-amber-800">
+                        samsungCallPolicyLikely=true (idle SUCCESS + call EXCEPTION)
+                      </p>
+                    ) : null}
+                    {call?.payloadJson?.permissionOrContextLikely ? (
+                      <p className="mt-1 text-[11px] font-bold text-rose-800">
+                        permissionOrContextLikely=true (both failed)
+                      </p>
+                    ) : null}
+                    {hint ? <p className="mt-1 text-[11px] text-sky-900">{hint}</p> : null}
+                  </div>
+                );
+              })()}
+
               {session.failReason || events.some((e) => e.reason && (e.code === "ADD_VIEW_EXCEPTION" || e.code === "ADD_VIEW_FAIL" || (e.payloadJson && e.payloadJson.terminal))) ? (
                 <div className="rounded-lg bg-rose-50 px-3 py-2 text-[12px] text-rose-900">
                   <p className="font-black">Reason</p>

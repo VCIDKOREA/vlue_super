@@ -24,6 +24,9 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
+import kr.vlue.calloverlay.diagnostics.DiagnosticsFeature
+import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
+import kr.vlue.calloverlay.diagnostics.NormalOverlayProbe
 import kr.vlue.calloverlay.diagnostics.OverlayDiagTracker
 import kr.vlue.calloverlay.showcase.ShowcaseProximitySensor
 
@@ -66,6 +69,10 @@ class CallOverlayService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
+            ACTION_NORMAL_OVERLAY_PROBE -> {
+                runNormalOverlayProbe()
+                return START_NOT_STICKY
+            }
             ACTION_DISMISS -> {
                 dismissOverlay()
                 return START_NOT_STICKY
@@ -210,33 +217,8 @@ class CallOverlayService : Service() {
             )
         )
 
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            /* 수신 중: 상단 빅푸시 높이만 — 시스템 전화 UI로 받을 수 있게 */
-            dp(300),
-            type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            y = 0
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                layoutInDisplayCutoutMode =
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-            }
-        }
+        /* 수신 중: 상단 빅푸시 높이만 — NORMAL_OVERLAY_PROBE 와 동일 LayoutParams */
+        val params = buildStandardOverlayLayoutParams()
         callPhaseCompact = true
         miniMode = false
 
@@ -260,6 +242,13 @@ class CallOverlayService : Service() {
             OverlayDiagTracker.onAddView()
             windowManager?.addView(container, params)
             VlueBigPushTrace.addViewSuccess(container, params, "phone=$phone")
+            VlueBigPushTrace.recordOverlayAddViewProbe(
+                context = this,
+                probeKind = "CALL_OVERLAY_PROBE",
+                result = "SUCCESS",
+                params = params,
+                extra = org.json.JSONObject().put("phone", phone).put("phase", "in-call")
+            )
             /* addView 직후: 애니메이션 전 alpha=0 이라 안 보일 수 있음 — 덤프는 애니메이션 후에도 남김 */
             VlueBigPushTrace.dumpOverlayVisibility(
                 container,
@@ -276,6 +265,14 @@ class CallOverlayService : Service() {
             )
             VlueBigPushTrace.dumpLayoutParams(params, "LayoutParams AFTER addView FAIL")
             VlueBigPushTrace.addViewException(e)
+            VlueBigPushTrace.recordOverlayAddViewProbe(
+                context = this,
+                probeKind = "CALL_OVERLAY_PROBE",
+                result = "EXCEPTION",
+                params = params,
+                error = e,
+                extra = org.json.JSONObject().put("phone", phone).put("phase", "in-call")
+            )
             android.util.Log.e("CallOverlay", "addView failed — overlay permission?", e)
             LetteringPrefs.setLastOverlayError(this, "addView:${e.message}")
             LetteringIncomingNotifier.post(this, phone, outgoing)
@@ -581,6 +578,122 @@ class CallOverlayService : Service() {
         stopSelf()
     }
 
+    /**
+     * 통화 중 showOverlay 와 동일 type / flags / size / gravity.
+     * NORMAL_OVERLAY_PROBE 비교 실험용 단일 소스.
+     */
+    private fun buildStandardOverlayLayoutParams(): WindowManager.LayoutParams {
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            dp(300),
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            y = 0
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+    }
+
+    /**
+     * 통화 중이 아닐 때 동일 Context(CallOverlayService) + LayoutParams 로 addView.
+     * 뷰는 비가시(alpha=0)이며 즉시 remove — 제품 UI 미표시.
+     */
+    private fun runNormalOverlayProbe() {
+        VlueBigPushTrace.bind(this)
+        if (!NormalOverlayProbe.isPhoneIdle(this)) {
+            VlueBigPushTrace.recordOverlayAddViewProbe(
+                context = this,
+                probeKind = "NORMAL_OVERLAY_PROBE",
+                result = "FAIL",
+                params = null,
+                extra = org.json.JSONObject().put("phase", "skipped").put("reason", "phone_not_idle")
+            )
+            DiagnosticsSessionStore.endSessionIfFeature(this, DiagnosticsFeature.OVERLAY, "SKIPPED")
+            if (rootContainer == null) stopSelfTraced("normalProbeSkippedNotIdle")
+            return
+        }
+        if (rootContainer?.isAttachedToWindow == true) {
+            VlueBigPushTrace.recordOverlayAddViewProbe(
+                context = this,
+                probeKind = "NORMAL_OVERLAY_PROBE",
+                result = "FAIL",
+                params = layoutParams,
+                extra = org.json.JSONObject().put("phase", "skipped").put("reason", "overlay_already_attached")
+            )
+            DiagnosticsSessionStore.endSessionIfFeature(this, DiagnosticsFeature.OVERLAY, "SKIPPED")
+            return
+        }
+
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        val params = buildStandardOverlayLayoutParams()
+        val probeView = FrameLayout(this).apply {
+            alpha = 0f
+            importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+
+        VlueBigPushTrace.dumpOverlayPermissionProbe(
+            context = this,
+            params = params,
+            phase = "NORMAL_OVERLAY_PROBE pre-addView"
+        )
+        VlueBigPushTrace.dumpLayoutParams(params, "NORMAL_OVERLAY_PROBE LayoutParams")
+
+        var status = "OK"
+        try {
+            windowManager?.addView(probeView, params)
+            VlueBigPushTrace.recordOverlayAddViewProbe(
+                context = this,
+                probeKind = "NORMAL_OVERLAY_PROBE",
+                result = "SUCCESS",
+                params = params,
+                extra = org.json.JSONObject()
+                    .put("phase", "idle")
+                    .put("callState", "IDLE")
+                    .put("viewClass", probeView.javaClass.name)
+            )
+            try {
+                windowManager?.removeViewImmediate(probeView)
+            } catch (_: Exception) {
+                try {
+                    windowManager?.removeView(probeView)
+                } catch (_: Exception) {
+                }
+            }
+        } catch (e: Exception) {
+            status = "FAILED"
+            VlueBigPushTrace.recordOverlayAddViewProbe(
+                context = this,
+                probeKind = "NORMAL_OVERLAY_PROBE",
+                result = "EXCEPTION",
+                params = params,
+                error = e,
+                extra = org.json.JSONObject().put("phase", "idle").put("callState", "IDLE")
+            )
+        }
+
+        DiagnosticsSessionStore.endSessionIfFeature(this, DiagnosticsFeature.OVERLAY, status)
+        if (rootContainer == null) {
+            stopSelfTraced("normalOverlayProbeDone")
+        }
+    }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
@@ -617,6 +730,8 @@ class CallOverlayService : Service() {
         const val ACTION_CONNECTED = "kr.vlue.calloverlay.CONNECTED"
         const val ACTION_ENDED_KEEP = "kr.vlue.calloverlay.ENDED_KEEP"
         const val ACTION_UPDATE_CALL_INFO = "kr.vlue.calloverlay.UPDATE_CALL_INFO"
+        /** 유휴 상태 동일 LayoutParams addView 실험 — 제품 UI 없음 */
+        const val ACTION_NORMAL_OVERLAY_PROBE = "kr.vlue.calloverlay.NORMAL_OVERLAY_PROBE"
         private const val CHANNEL_ID = "vlue_lettering_overlay"
         private const val NOTIFICATION_ID = 41001
 

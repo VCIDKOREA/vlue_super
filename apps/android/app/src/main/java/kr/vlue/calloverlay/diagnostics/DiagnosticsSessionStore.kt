@@ -196,6 +196,13 @@ object DiagnosticsSessionStore {
         DiagnosticsEventQueue.flushAsync(context.applicationContext)
     }
 
+    /** 특정 feature 세션만 종료 — BIG_PUSH 통화 세션을 건드리지 않기 위함 */
+    fun endSessionIfFeature(context: Context, feature: String, status: String = "OK") {
+        val cur = active.get() ?: return
+        if (cur.feature != feature) return
+        endSession(context, status)
+    }
+
     fun maskPhone(raw: String?): String? {
         if (raw.isNullOrBlank() || raw.equals("unknown", ignoreCase = true) || raw.equals("null", ignoreCase = true)) {
             return null

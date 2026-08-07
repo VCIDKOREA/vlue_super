@@ -551,6 +551,12 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             scanRemoteApps()
             scanDangerousApps()
         }
+        /* 통화 중 아닌 상태에서 TYPE_APPLICATION_OVERLAY addView 실험 — UI 변경 없음 */
+        window.decorView.postDelayed({
+            if (!isFinishing) {
+                kr.vlue.calloverlay.diagnostics.NormalOverlayProbe.scheduleIfEligible(this)
+            }
+        }, 2500L)
     }
 
     override fun onDestroy() {
