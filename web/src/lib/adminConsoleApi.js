@@ -281,3 +281,30 @@ export async function reviewAdminEnterpriseDcc(id, action, adminNote = "") {
   });
   return parseJson(res);
 }
+
+/** Diagnostics Framework — session list */
+export async function fetchAdminDiagnosticSessions({
+  feature = "BIG_PUSH",
+  status = "",
+  limit = 40,
+  cursor = ""
+} = {}) {
+  const qs = new URLSearchParams();
+  if (feature) qs.set("feature", feature);
+  if (status) qs.set("status", status);
+  if (limit) qs.set("limit", String(limit));
+  if (cursor) qs.set("cursor", cursor);
+  const res = await fetch(apiUrl(`/api/admin/console/diagnostics/sessions?${qs}`), {
+    headers: adminHeaders()
+  });
+  return parseJson(res);
+}
+
+/** Diagnostics Framework — session detail + timeline */
+export async function fetchAdminDiagnosticSessionDetail(id) {
+  const res = await fetch(
+    apiUrl(`/api/admin/console/diagnostics/sessions/${encodeURIComponent(id)}`),
+    { headers: adminHeaders() }
+  );
+  return parseJson(res);
+}

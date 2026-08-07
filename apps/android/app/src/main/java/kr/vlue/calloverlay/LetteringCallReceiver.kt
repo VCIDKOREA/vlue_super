@@ -11,7 +11,6 @@ import kr.vlue.calloverlay.incall.VlueInCallController
 /**
  * PHONE_STATE — 기본 전화앱이 아니면 RINGING 오버레이.
  * InCallService 가 실제로 bound 된 경우에만 RINGING 중복을 건너뛴다.
- * (ROLE_DIALER 만 잡고 InCall 미기동인 반쪽 상태에서 무반응 방지)
  */
 class LetteringCallReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -25,15 +24,17 @@ class LetteringCallReceiver : BroadcastReceiver() {
             FamilyCallTracker.onPhoneStateChanged(context, state, number)
 
             if (state == TelephonyManager.EXTRA_STATE_RINGING) {
+                VlueBigPushTrace.beginIncoming(context, number)
                 VlueBigPushTrace.step(
-                    "1. Incoming Call Detected",
+                    1,
+                    "Incoming Call Detected",
                     "source=LetteringCallReceiver number=${number ?: "null"}"
                 )
             }
 
             if (!LetteringPrefs.isLetteringEnabled(context)) {
                 if (state == TelephonyManager.EXTRA_STATE_RINGING) {
-                    VlueBigPushTrace.skip("1. Incoming Call Detected", "lettering_enabled=false")
+                    VlueBigPushTrace.skip(1, "lettering_enabled=false")
                 }
                 Log.d(TAG, "skip: lettering_enabled=false state=$state")
                 return
@@ -41,9 +42,8 @@ class LetteringCallReceiver : BroadcastReceiver() {
 
             when (state) {
                 TelephonyManager.EXTRA_STATE_RINGING -> {
-                    /* InCall 이 실제 통화를 잡은 경우에만 PHONE_STATE RINGING 스킵 */
                     if (VlueInCallController.hasActiveCall()) {
-                        VlueBigPushTrace.skip("1. Incoming Call Detected", "InCall has active call")
+                        VlueBigPushTrace.skip(1, "InCall has active call — PHONE_STATE RINGING skipped")
                         Log.d(TAG, "skip RINGING: InCall has active call")
                         return
                     }
@@ -58,6 +58,7 @@ class LetteringCallReceiver : BroadcastReceiver() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "onReceive failed", e)
+            VlueBigPushTrace.skip(1, "LetteringCallReceiver exception: ${e.javaClass.name}: ${e.message}")
         }
     }
 

@@ -23,7 +23,19 @@ class LetteringJavascriptBridge(
 
     @JavascriptInterface
     fun logBigPushTrace(step: String?, detail: String?) {
-        VlueBigPushTrace.step(step ?: "JS", detail.orEmpty())
+        val s = step.orEmpty()
+        val d = detail.orEmpty()
+        when {
+            s.startsWith("SKIP after") -> {
+                val after = Regex("""\[(\d+)\]""").find(s)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+                val reason = d.removePrefix("reason = ").ifBlank { d.ifBlank { s } }
+                VlueBigPushTrace.skip(after, reason)
+            }
+            s.contains("[9]") -> VlueBigPushTrace.step(9, "React Root Mounted", d)
+            s.contains("[10]") -> VlueBigPushTrace.step(10, "Showcase Visible", d)
+            s.contains("[11]") -> VlueBigPushTrace.step(11, "Call End", d)
+            else -> VlueBigPushTrace.step(0, s.ifBlank { "JS" }, d)
+        }
     }
 
     /** 통화만 종료 — 쇼케이스 오버레이 유지 */

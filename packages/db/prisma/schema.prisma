@@ -3116,3 +3116,72 @@ model ProductMetricEvent {
   @@index([userId, eventType, createdAt(sort: Desc)])
   @@map("product_metric_events")
 }
+
+/// 원격 진단 세션 — Big Push / Showcase / Mini Case 등 feature별 확장
+/// feature: BIG_PUSH | SHOWCASE | MINI_CASE | OVERLAY | FOREGROUND_SERVICE | API | VERIFICATION | PUSH
+/// status: RUNNING | OK | FAILED | SKIPPED
+model DiagnosticSession {
+  id String @id @default(uuid()) @db.Uuid
+
+  feature    String @db.VarChar(40)
+  sessionKey String @map("session_key") @db.VarChar(48)
+  status     String @default("RUNNING") @db.VarChar(16)
+
+  startedAt DateTime  @map("started_at") @db.Timestamptz(6)
+  endedAt   DateTime? @map("ended_at") @db.Timestamptz(6)
+
+  deviceModel    String? @map("device_model") @db.VarChar(80)
+  androidVersion String? @map("android_version") @db.VarChar(24)
+  appVersion     String? @map("app_version") @db.VarChar(32)
+  deviceId       String? @map("device_id") @db.VarChar(80)
+
+  userId      String? @map("user_id") @db.Uuid
+  phoneMasked String? @map("phone_masked") @db.VarChar(24)
+
+  lastStep   Int     @default(0) @map("last_step")
+  failStep   Int?    @map("fail_step")
+  failReason String? @map("fail_reason") @db.Text
+
+  overlayStateJson Json? @map("overlay_state_json")
+  metaJson         Json? @map("meta_json")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  events DiagnosticEvent[]
+
+  @@index([feature, startedAt(sort: Desc)])
+  @@index([userId, startedAt(sort: Desc)])
+  @@index([status, startedAt(sort: Desc)])
+  @@index([deviceId, startedAt(sort: Desc)])
+  @@map("diagnostic_sessions")
+}
+
+model DiagnosticEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  sessionId String @map("session_id") @db.Uuid
+  session   DiagnosticSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  seq   Int
+  code  String  @db.VarChar(64)
+  label String  @db.VarChar(160)
+  ok    Boolean?
+
+  timestamp DateTime @db.Timestamptz(6)
+  elapsedMs Int      @map("elapsed_ms")
+
+  reason            String? @db.Text
+  exceptionMessage  String? @map("exception_message") @db.Text
+  exceptionStack    String? @map("exception_stack") @db.Text
+  exceptionFn       String? @map("exception_fn") @db.VarChar(160)
+  exceptionLine     Int?    @map("exception_line")
+
+  payloadJson Json? @map("payload_json")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([sessionId, seq, code])
+  @@index([sessionId, seq])
+  @@map("diagnostic_events")
+}

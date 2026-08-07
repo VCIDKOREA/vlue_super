@@ -64,26 +64,41 @@ export default function LetteringOverlayHost() {
   }, []);
 
   useEffect(() => {
-    console.log("[VlueBigPushTrace] 6. Showcase mounted (React)", {
+    console.log("[VlueBigPushTrace] [9] React Root Mounted", {
       incoming,
       native,
       forceLettering,
       phase
     });
     try {
-      window.Android?.logBigPushTrace?.("6. Showcase mounted (React)", `incoming=${incoming}`);
+      window.Android?.logBigPushTrace?.(
+        "[9] React Root Mounted",
+        `incoming=${incoming} native=${native}`
+      );
     } catch {
       /* ignore */
     }
     return () => {
-      console.log("[VlueBigPushTrace] Showcase unmounted (React)");
+      console.log("[VlueBigPushTrace] React Root Unmounted");
     };
   }, []);
 
   useEffect(() => {
-    if (loading || blocked) return undefined;
+    if (loading || blocked) {
+      if (blocked) {
+        try {
+          window.Android?.logBigPushTrace?.(
+            "SKIP after [9]",
+            "reason = blocked or lettering disabled in WebView"
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+      return undefined;
+    }
     const t = window.setTimeout(() => {
-      console.log("[VlueBigPushTrace] 7. Showcase visible", {
+      console.log("[VlueBigPushTrace] [10] Showcase Visible", {
         incoming,
         hasCard: Boolean(card),
         verified,
@@ -92,8 +107,8 @@ export default function LetteringOverlayHost() {
       });
       try {
         window.Android?.logBigPushTrace?.(
-          "7. Showcase visible",
-          `incoming=${incoming} hasCard=${Boolean(card)} expanded=${expanded}`
+          "[10] Showcase Visible",
+          `incoming=${incoming} hasCard=${Boolean(card)} expanded=${expanded} verified=${verified}`
         );
       } catch {
         /* ignore */

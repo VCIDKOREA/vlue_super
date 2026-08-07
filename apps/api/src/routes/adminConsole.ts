@@ -18,6 +18,10 @@ import {
   getAdminProductMetrics
 } from "../services/admin/adminProductMetrics.js";
 import {
+  getDiagnosticSessionDetail,
+  listDiagnosticSessions
+} from "../services/diagnostics/diagnosticsAdmin.js";
+import {
   createMarketingPopup,
   deleteAdminFeedPost,
   deleteMarketingPopup,
@@ -226,6 +230,34 @@ authed.get("/metrics", async (c) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "metrics_failed";
     return c.json({ error: msg }, 500);
+  }
+});
+
+/** GET /api/admin/console/diagnostics/sessions */
+authed.get("/diagnostics/sessions", async (c) => {
+  try {
+    const data = await listDiagnosticSessions({
+      feature: c.req.query("feature") || undefined,
+      status: c.req.query("status") || undefined,
+      limit: Number(c.req.query("limit") || 40) || 40,
+      cursor: c.req.query("cursor") || undefined
+    });
+    return c.json({ ok: true, ...data });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "diagnostics_list_failed";
+    return c.json({ ok: false, error: msg }, 500);
+  }
+});
+
+/** GET /api/admin/console/diagnostics/sessions/:id */
+authed.get("/diagnostics/sessions/:id", async (c) => {
+  try {
+    const detail = await getDiagnosticSessionDetail(c.req.param("id"));
+    if (!detail) return c.json({ ok: false, error: "NOT_FOUND" }, 404);
+    return c.json({ ok: true, ...detail });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "diagnostics_detail_failed";
+    return c.json({ ok: false, error: msg }, 500);
   }
 });
 

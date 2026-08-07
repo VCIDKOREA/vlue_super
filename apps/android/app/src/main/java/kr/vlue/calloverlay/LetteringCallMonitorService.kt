@@ -32,6 +32,7 @@ class LetteringCallMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        VlueBigPushTrace.bind(this)
         createChannel()
         VlueForegroundHelper.start(this, NOTIFICATION_ID, buildNotification())
         registerCallCallback()
@@ -112,26 +113,28 @@ class LetteringCallMonitorService : Service() {
     private fun handleState(state: Int) {
         if (!LetteringPrefs.isLetteringEnabled(this)) {
             if (state == TelephonyManager.CALL_STATE_RINGING) {
-                VlueBigPushTrace.skip("2. LetteringCallMonitorService received", "lettering_enabled=false")
+                VlueBigPushTrace.skip(2, "lettering_enabled=false")
             }
             return
         }
         Log.i(TAG, "callState=$state prev=$lastState")
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
+                VlueBigPushTrace.beginIncoming(this, null)
                 VlueBigPushTrace.step(
-                    "2. LetteringCallMonitorService received",
-                    "state=RINGING prev=$lastState number=null(TelephonyCallback)"
+                    2,
+                    "LetteringCallMonitorService received",
+                    "state=RINGING prev=$lastState number=null(TelephonyCallback has no number)"
                 )
                 LetteringCallCoordinator.onRinging(this, null, outgoing = false)
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
                 VlueBigPushTrace.step(
-                    "2. LetteringCallMonitorService received",
+                    2,
+                    "LetteringCallMonitorService received",
                     "state=OFFHOOK prev=$lastState"
                 )
                 if (lastState != TelephonyManager.CALL_STATE_RINGING) {
-                    /* 발신 등 — RINGING 없이 OFFHOOK */
                     LetteringCallCoordinator.onRinging(this, null, outgoing = true)
                 }
                 CallOverlayService.notifyConnected(applicationContext)

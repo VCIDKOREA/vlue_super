@@ -46,8 +46,10 @@ class VlueInCallService : InCallService() {
         val outgoing = VlueInCallController.isOutgoing(call)
         when (call.state) {
             Call.STATE_RINGING -> {
+                VlueBigPushTrace.beginIncoming(this, phone)
                 VlueBigPushTrace.step(
-                    "1. Incoming Call Detected",
+                    1,
+                    "Incoming Call Detected",
                     "source=VlueInCallService phone=$phone outgoing=$outgoing"
                 )
                 LetteringCallCoordinator.onRinging(this, phone.ifBlank { null }, outgoing = false)

@@ -93,6 +93,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        VlueBigPushTrace.bind(this)
         AppLockStore.init(this)
         setContentView(R.layout.activity_main)
         mainRoot = findViewById(R.id.main_root)

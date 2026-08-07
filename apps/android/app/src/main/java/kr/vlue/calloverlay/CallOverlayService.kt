@@ -50,7 +50,8 @@ class CallOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        VlueBigPushTrace.step("4. Showcase overlay create()", "CallOverlayService.onCreate")
+        VlueBigPushTrace.bind(this)
+        VlueBigPushTrace.step(4, "CallOverlayService.onCreate()")
         createNotificationChannel()
         VlueForegroundHelper.start(this, NOTIFICATION_ID, buildNotification())
         activeInstance = this
@@ -88,14 +89,20 @@ class CallOverlayService : Service() {
         val outgoing = intent?.getBooleanExtra(EXTRA_OUTGOING, false) ?: false
         val cardJson = intent?.getStringExtra(EXTRA_CARD_JSON)
         VlueBigPushTrace.step(
-            "4. Showcase overlay create()",
-            "onStartCommand→showOverlay phone=$phone verified=$verified outgoing=$outgoing (note: no showShowcase(); real method=showOverlay)"
+            5,
+            "CallOverlayService.onStartCommand()",
+            "phone=$phone verified=$verified outgoing=$outgoing action=${intent?.action}"
         )
         showOverlay(phone, verified, outgoing, cardJson)
         return START_NOT_STICKY
     }
 
     private fun showOverlay(phone: String, verified: Boolean, outgoing: Boolean, cardJson: String? = null) {
+        VlueBigPushTrace.step(
+            6,
+            "showOverlay()",
+            "file=CallOverlayService.kt phone=$phone verified=$verified outgoing=$outgoing — this function DOES call WindowManager.addView()"
+        )
         removeOverlayImmediate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val container = FrameLayout(this)
@@ -160,7 +167,7 @@ class CallOverlayService : Service() {
             override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
                 val msg = consoleMessage?.message().orEmpty()
                 if (msg.contains("VlueBigPushTrace") || msg.contains("Showcase")) {
-                    VlueBigPushTrace.step("JS", msg)
+                    VlueBigPushTrace.step(0, "JS", msg)
                 }
                 return super.onConsoleMessage(consoleMessage)
             }
@@ -222,18 +229,26 @@ class CallOverlayService : Service() {
         callPhaseCompact = true
         miniMode = false
 
+        VlueBigPushTrace.dumpLayoutParams(params, "showOverlay() WindowManager.LayoutParams (pre-addView)")
+
         container.alpha = 0f
         container.translationY = -120f
         try {
-            VlueBigPushTrace.step(
-                "5. WindowManager.addView()",
-                "before addView phone=$phone compact=$callPhaseCompact canDrawOverlays=${LetteringPermissionHelper.canDrawOverlays(this)}"
+            VlueBigPushTrace.addViewCall(
+                "phone=$phone type=${params.type} w=${params.width} h=${params.height} " +
+                    "canDrawOverlays=${LetteringPermissionHelper.canDrawOverlays(this)}"
             )
             windowManager?.addView(container, params)
-            VlueBigPushTrace.step("5. WindowManager.addView()", "SUCCESS phone=$phone")
+            VlueBigPushTrace.addViewSuccess("phone=$phone")
+            /* addView 직후: 애니메이션 전 alpha=0 이라 안 보일 수 있음 — 덤프는 애니메이션 후에도 남김 */
+            VlueBigPushTrace.dumpOverlayVisibility(
+                container,
+                params,
+                reactHint="WebView not loaded yet (pre-loadUrl)"
+            )
             LetteringPrefs.setLastCallEvent(this, "overlay_shown:$phone")
         } catch (e: Exception) {
-            VlueBigPushTrace.skip("5. WindowManager.addView()", "FAILED: ${e.message}")
+            VlueBigPushTrace.addViewFail(e)
             android.util.Log.e("CallOverlay", "addView failed — overlay permission?", e)
             LetteringPrefs.setLastOverlayError(this, "addView:${e.message}")
             LetteringIncomingNotifier.post(this, phone, outgoing)
@@ -259,6 +274,13 @@ class CallOverlayService : Service() {
             .translationY(0f)
             .setDuration(320)
             .setInterpolator(DecelerateInterpolator())
+            .withEndAction {
+                VlueBigPushTrace.dumpOverlayVisibility(
+                    rootContainer,
+                    layoutParams,
+                    reactHint="post-animate alpha=${rootContainer?.alpha} webView=${webView != null}"
+                )
+            }
             .start()
     }
 
@@ -553,6 +575,8 @@ class CallOverlayService : Service() {
 
         @Volatile
         private var activeInstance: CallOverlayService? = null
+
+        fun isRunning(): Boolean = activeInstance != null
 
         fun updateCallInfo(
             context: android.content.Context,
