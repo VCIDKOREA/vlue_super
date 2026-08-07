@@ -240,6 +240,11 @@ class CallOverlayService : Service() {
         callPhaseCompact = true
         miniMode = false
 
+        VlueBigPushTrace.dumpOverlayPermissionProbe(
+            context = this,
+            params = params,
+            phase = "pre-addView"
+        )
         VlueBigPushTrace.dumpLayoutParams(params, "showOverlay() WindowManager.LayoutParams (pre-addView)")
 
         container.alpha = 0f
@@ -248,6 +253,8 @@ class CallOverlayService : Service() {
             VlueBigPushTrace.addViewCall(
                 "phone=$phone type=${params.type} w=${params.width} h=${params.height} " +
                     "canDrawOverlays=${LetteringPermissionHelper.canDrawOverlays(this)} " +
+                    "ctx=${this.javaClass.name} sdk=${Build.VERSION.SDK_INT} " +
+                    "targetSdk=${applicationInfo.targetSdkVersion} " +
                     OverlayDiagTracker.detailSuffix()
             )
             OverlayDiagTracker.onAddView()
@@ -261,6 +268,13 @@ class CallOverlayService : Service() {
             )
             LetteringPrefs.setLastCallEvent(this, "overlay_shown:$phone")
         } catch (e: Exception) {
+            VlueBigPushTrace.dumpOverlayPermissionProbe(
+                context = this,
+                params = params,
+                phase = "BadTokenException-or-addView-fail",
+                error = e
+            )
+            VlueBigPushTrace.dumpLayoutParams(params, "LayoutParams AFTER addView FAIL")
             VlueBigPushTrace.addViewException(e)
             android.util.Log.e("CallOverlay", "addView failed — overlay permission?", e)
             LetteringPrefs.setLastOverlayError(this, "addView:${e.message}")

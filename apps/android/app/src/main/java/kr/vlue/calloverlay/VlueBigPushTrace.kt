@@ -1,9 +1,11 @@
 package kr.vlue.calloverlay
 
+import android.Manifest
 import android.content.Context
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.view.ViewParent
@@ -346,6 +348,132 @@ object VlueBigPushTrace {
             statusHint = "FAILED",
             terminalFailure = true,
             overlayState = OverlayDiagTracker.snapshotJson()
+        )
+    }
+
+    /**
+     * TYPE_APPLICATION_OVERLAY 거부 원인 진단용.
+     * canDrawOverlays / Context / type / SDK / targetSdk / Manifest 선언 여부를 서버로 전송.
+     */
+    fun dumpOverlayPermissionProbe(
+        context: Context,
+        params: WindowManager.LayoutParams?,
+        phase: String,
+        error: Throwable? = null
+    ) {
+        val app = context.applicationContext
+        val canDraw = try {
+            Settings.canDrawOverlays(context)
+        } catch (e: Exception) {
+            false
+        }
+        val canDrawAppCtx = try {
+            Settings.canDrawOverlays(app)
+        } catch (_: Exception) {
+            false
+        }
+        val targetSdk = try {
+            context.applicationInfo.targetSdkVersion
+        } catch (_: Exception) {
+            -1
+        }
+        val manifestHasSaw = try {
+            val pi = context.packageManager.getPackageInfo(
+                context.packageName,
+                android.content.pm.PackageManager.GET_PERMISSIONS
+            )
+            pi.requestedPermissions?.any { it == Manifest.permission.SYSTEM_ALERT_WINDOW } == true
+        } catch (_: Exception) {
+            false
+        }
+        val installer = try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getInstallerPackageName(context.packageName)
+            }
+        } catch (_: Exception) {
+            null
+        }
+        val typeName = when (params?.type) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY -> "TYPE_APPLICATION_OVERLAY(2038)"
+            else -> "type=${params?.type}"
+        }
+        val probe = JSONObject().apply {
+            put("phase", phase)
+            put("canDrawOverlays_thisContext", canDraw)
+            put("canDrawOverlays_applicationContext", canDrawAppCtx)
+            put("contextClass", context.javaClass.name)
+            put("contextIsService", context is android.app.Service)
+            put("contextIsActivity", context is android.app.Activity)
+            put("contextIsApplication", context is android.app.Application)
+            put("windowManagerFrom", "Context.WINDOW_SERVICE via Service")
+            put("layoutParamsType", params?.type ?: -1)
+            put("layoutParamsTypeName", typeName)
+            put("sdkInt", Build.VERSION.SDK_INT)
+            put("release", Build.VERSION.RELEASE ?: "")
+            put("targetSdkVersion", targetSdk)
+            put("typeChangedForTargetSdk34Plus", false)
+            put("typeSelectionRule", "SDK_INT>=O → TYPE_APPLICATION_OVERLAY else TYPE_PHONE (no targetSdk branch)")
+            put("manifestSystemAlertWindow", manifestHasSaw)
+            put("installerPackage", installer ?: "(null=sideload/unknown)")
+            put("manufacturer", Build.MANUFACTURER ?: "")
+            put("brand", Build.BRAND ?: "")
+            put("model", Build.MODEL ?: "")
+            if (params != null) {
+                put("flags", params.flags)
+                put("flagsHex", "0x${Integer.toHexString(params.flags)}")
+                put("gravity", params.gravity)
+                put("x", params.x)
+                put("y", params.y)
+                put("width", params.width)
+                put("height", params.height)
+                put("format", params.format)
+                put("packageName", params.packageName ?: JSONObject.NULL)
+                put("token", params.token?.toString() ?: "null")
+            }
+            if (error != null) {
+                put("errorClass", error.javaClass.name)
+                put("errorMessage", error.message ?: "")
+            }
+            put(
+                "analysisHint",
+                if (!canDraw) {
+                    "canDrawOverlays=false — user must grant Draw over other apps"
+                } else if (
+                    (Build.MANUFACTURER.equals("samsung", true) ||
+                        Build.BRAND.equals("samsung", true)) &&
+                    (error?.message?.contains("2038") == true ||
+                        error?.message?.contains("permission denied") == true)
+                ) {
+                    "Samsung may block TYPE_APPLICATION_OVERLAY during calls for non-store/non-ADB installs (SamsungRestrictOverlayProcessor) even when canDrawOverlays==true"
+                } else {
+                    "canDrawOverlays=true — if still denied, OEM runtime restrict or wrong window type"
+                }
+            )
+        }
+        val msg = buildString {
+            appendLine("==== OVERLAY_PERMISSION_PROBE ($phase) ====")
+            appendLine(probe.toString(2))
+        }
+        Log.i(TAG, msg)
+        persist(msg)
+
+        val session = DiagnosticsSessionStore.currentOrRecent() ?: return
+        val ctx = appContext ?: context.applicationContext
+        DiagnosticsEventQueue.enqueueEvent(
+            ctx,
+            session,
+            seq = 8,
+            code = "OVERLAY_PERMISSION_PROBE",
+            label = "[8+] Overlay permission probe ($phase)",
+            ok = canDraw && error == null,
+            reason = error?.message,
+            exceptionMessage = error?.message,
+            exceptionStack = error?.let { Log.getStackTraceString(it) },
+            payloadJson = probe,
+            overlayState = probe
         )
     }
 
