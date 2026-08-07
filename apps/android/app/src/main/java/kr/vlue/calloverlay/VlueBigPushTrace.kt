@@ -2,6 +2,8 @@ package kr.vlue.calloverlay
 
 import android.content.Context
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.ViewParent
@@ -32,6 +34,7 @@ object VlueBigPushTrace {
     const val FILE_NAME = "vlue_bigpush_trace.log"
 
     private val ringBuffer = CopyOnWriteArrayList<String>()
+    private val mainHandler = Handler(Looper.getMainLooper())
     @Volatile
     private var appContext: Context? = null
     @Volatile
@@ -232,22 +235,57 @@ object VlueBigPushTrace {
             payloadJson = payload,
             overlayState = overlayState
         )
-        /* 레이아웃 직후 measured/actual 이 0일 수 있어 다음 프레임에 한 번 더 기록 */
+        /* 레이아웃 직후 + 300ms/1000ms attach 재확인 (중간에 removeView 되는지) */
         view?.post {
-            val app = appContext ?: return@post
-            val s = DiagnosticsSessionStore.currentOrRecent() ?: return@post
-            val late = collectAddViewSuccessSnapshot(app, view, params, "$detail|postLayout")
+            scheduleAttachRecheck(view, params, detail, delayMs = 0L, code = "ADD_VIEW_SUCCESS_LAYOUT")
+            scheduleAttachRecheck(view, params, detail, delayMs = 300L, code = "ADD_VIEW_ATTACH_300MS")
+            scheduleAttachRecheck(view, params, detail, delayMs = 1000L, code = "ADD_VIEW_ATTACH_1000MS")
+        }
+    }
+
+    private fun scheduleAttachRecheck(
+        view: View,
+        params: WindowManager.LayoutParams?,
+        detail: String,
+        delayMs: Long,
+        code: String
+    ) {
+        mainHandler.postDelayed({
+            val app = appContext ?: return@postDelayed
+            val s = DiagnosticsSessionStore.currentOrRecent() ?: return@postDelayed
+            val snap = collectAddViewSuccessSnapshot(
+                app,
+                view,
+                params,
+                "$detail|$code"
+            )
+            val attached = view.isAttachedToWindow
+            snap.put("recheckDelayMs", delayMs)
+            snap.put("isAttachedToWindow", attached)
+            snap.put("attachedToWindow", attached)
+            if (!attached && delayMs > 0) {
+                snap.put(
+                    "attachLostHint",
+                    "isAttachedToWindow=false after ${delayMs}ms — removeView() may have been called"
+                )
+                Log.w(TAG, "[$code] attach lost after ${delayMs}ms ${OverlayDiagTracker.detailSuffix()}")
+            }
             DiagnosticsEventQueue.enqueueEvent(
                 app,
                 s,
                 seq = 8,
-                code = "ADD_VIEW_SUCCESS_LAYOUT",
-                label = "[8+] addView SUCCESS layout snapshot",
+                code = code,
+                label = "[8+] $code attached=$attached",
                 ok = true,
-                payloadJson = late,
-                overlayState = late
+                reason = if (!attached && delayMs > 0) {
+                    "isAttachedToWindow=false after ${delayMs}ms — possible removeView()"
+                } else {
+                    null
+                },
+                payloadJson = snap,
+                overlayState = snap
             )
-        }
+        }, delayMs)
     }
 
     /** Soft fail — 예외 없이 addView 미호출/거부된 경우 (현재 경로에선 거의 미사용) */
@@ -446,7 +484,14 @@ object VlueBigPushTrace {
         putAllViewWindowFields(this, context, view)
         if (params != null) {
             put("type", params.type)
+            put("layoutParamsType", params.type)
             put("flags", params.flags)
+            put("layoutParamsFlags", params.flags)
+            put("flagsHex", "0x${Integer.toHexString(params.flags)}")
+            put("x", params.x)
+            put("y", params.y)
+            put("layoutParamsX", params.x)
+            put("layoutParamsY", params.y)
             put("width", params.width)
             put("height", params.height)
         }
@@ -454,26 +499,149 @@ object VlueBigPushTrace {
 
     private fun putAllViewWindowFields(target: JSONObject, context: Context, view: View?) {
         val root = view?.rootView
-        target.put("windowToken", view?.windowToken?.toString() ?: "null")
+        val parent = view?.parent
+        val wmCount = windowManagerGlobalViewCount()
+        val loc = IntArray(2)
+        if (view != null) {
+            try {
+                view.getLocationOnScreen(loc)
+            } catch (_: Exception) {
+                loc[0] = Int.MIN_VALUE
+                loc[1] = Int.MIN_VALUE
+            }
+        }
+        val vw = view?.width ?: -1
+        val vh = view?.height ?: -1
+        val screenW = try {
+            context.resources.displayMetrics.widthPixels
+        } catch (_: Exception) {
+            -1
+        }
+        val screenH = try {
+            context.resources.displayMetrics.heightPixels
+        } catch (_: Exception) {
+            -1
+        }
+        val offScreen = when {
+            view == null || loc[0] == Int.MIN_VALUE -> null
+            vw <= 0 || vh <= 0 -> true
+            loc[0] + vw <= 0 || loc[1] + vh <= 0 -> true
+            loc[0] >= screenW || loc[1] >= screenH -> true
+            else -> false
+        }
+
+        target.put("windowManagerGlobalViewCount", wmCount)
+        target.put("overlayViewHashCode", view?.hashCode() ?: -1)
         target.put("rootViewHashCode", root?.hashCode() ?: -1)
-        target.put("parent", describeParent(view?.parent))
+        target.put("rootViewParentHashCode", parent?.hashCode() ?: -1)
+        target.put("parent", describeParent(parent))
+        target.put("windowToken", view?.windowToken?.toString() ?: "null")
         target.put("isAttachedToWindow", view?.isAttachedToWindow ?: false)
         target.put("attachedToWindow", view?.isAttachedToWindow ?: false)
         target.put("isShown", view?.isShown ?: false)
         target.put("visibility", view?.let { visibilityName(it.visibility) } ?: "null")
-        target.put("measuredWidth", view?.measuredWidth ?: -1)
-        target.put("measuredHeight", view?.measuredHeight ?: -1)
-        target.put("actualWidth", view?.width ?: -1)
-        target.put("actualHeight", view?.height ?: -1)
         target.put(
             "windowVisibility",
             view?.let { visibilityName(it.windowVisibility) } ?: "null"
         )
+        target.put("alpha", (view?.alpha ?: -1f).toDouble())
+        target.put("measuredWidth", view?.measuredWidth ?: -1)
+        target.put("measuredHeight", view?.measuredHeight ?: -1)
+        target.put("actualWidth", vw)
+        target.put("actualHeight", vh)
+        target.put("viewWidth", vw)
+        target.put("viewHeight", vh)
+        target.put("locationOnScreenX", if (loc[0] == Int.MIN_VALUE) JSONObject.NULL else loc[0])
+        target.put("locationOnScreenY", if (loc[1] == Int.MIN_VALUE) JSONObject.NULL else loc[1])
+        target.put("offScreen", offScreen ?: JSONObject.NULL)
         target.put("displayId", resolveDisplayId(context, view))
-        target.put("currentActivity", VlueCallOverlayApp.currentActivityName ?: "(none)")
-        target.put("topPackage", resolveTopPackage(context))
+        val topPkg = resolveTopPackage(context)
+        val topActivity = resolveTopActivityComponent(context)
+        val currentAct = VlueCallOverlayApp.currentActivityName ?: "(none)"
+        target.put("topPackage", topPkg)
+        target.put("currentActivity", currentAct)
+        target.put("topActivityComponent", topActivity ?: "(unknown)")
+        target.put("topUiKind", classifyTopUi(topPkg, topActivity, currentAct, context.packageName))
+        val inWm = view != null && isViewInWindowManagerGlobal(view)
+        target.put("overlayListedInWindowManagerGlobal", inWm)
         val diag = OverlayDiagTracker.snapshotJson()
         diag.keys().forEach { k -> target.put(k, diag.get(k)) }
+    }
+
+    /** WindowManagerGlobal.mViews size — 실제 WM 등록 View 개수 */
+    private fun windowManagerGlobalViewCount(): Int {
+        return try {
+            val clz = Class.forName("android.view.WindowManagerGlobal")
+            val inst = clz.getMethod("getInstance").invoke(null)
+            val field = clz.getDeclaredField("mViews")
+            field.isAccessible = true
+            val views = field.get(inst)
+            when (views) {
+                is java.util.List<*> -> views.size
+                is Array<*> -> views.size
+                else -> -1
+            }
+        } catch (_: Exception) {
+            -1
+        }
+    }
+
+    private fun isViewInWindowManagerGlobal(view: View): Boolean {
+        return try {
+            val clz = Class.forName("android.view.WindowManagerGlobal")
+            val inst = clz.getMethod("getInstance").invoke(null)
+            val field = clz.getDeclaredField("mViews")
+            field.isAccessible = true
+            val views = field.get(inst)
+            when (views) {
+                is java.util.List<*> -> views.any { it === view || it === view.rootView }
+                is Array<*> -> views.any { it === view || it === view.rootView }
+                else -> false
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun resolveTopActivityComponent(context: Context): String? {
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            @Suppress("DEPRECATION")
+            val top = am?.getRunningTasks(1)?.firstOrNull()?.topActivity
+            if (top != null) return top.flattenToShortString()
+        } catch (_: Exception) {
+            /* ignore */
+        }
+        return null
+    }
+
+    /**
+     * Samsung InCallUI / Launcher / MainActivity / Other
+     */
+    private fun classifyTopUi(
+        topPackage: String,
+        topActivity: String?,
+        currentActivity: String,
+        ourPackage: String
+    ): String {
+        val blob = listOf(topPackage, topActivity.orEmpty(), currentActivity)
+            .joinToString(" ")
+            .lowercase()
+        return when {
+            blob.contains("incall") ||
+                blob.contains("dialer") ||
+                blob.contains("com.samsung.android.incallui") ||
+                blob.contains("com.android.server.telecom") ||
+                (blob.contains("phone") && blob.contains("samsung")) -> "SamsungInCallUI"
+            blob.contains("launcher") ||
+                blob.contains("net.oneplus.launcher") ||
+                blob.contains("com.sec.android.app.launcher") ||
+                blob.contains("com.google.android.apps.nexuslauncher") -> "Launcher"
+            blob.contains("mainactivity") ||
+                blob.contains("$ourPackage") && blob.contains("main") -> "MainActivity"
+            topPackage == ourPackage -> "VlueApp"
+            else -> "Other"
+        }
     }
 
     private fun resolveDisplayId(context: Context, view: View?): Int {
