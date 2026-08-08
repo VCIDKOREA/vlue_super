@@ -84,14 +84,22 @@ object LetteringCallCoordinator {
             if (canDraw) {
                 startOverlayService(app, raw, verified = false, cardJson = null, outgoing)
             } else {
+                val restrictHint =
+                    if (LetteringPermissionHelper.isLikelySamsungCallOverlayRestricted(app)) {
+                        "SAMSUNG_SIDELOAD_CALL_RESTRICT installer=${LetteringPermissionHelper.installerPackage(app)} " +
+                            "appOps=${LetteringPermissionHelper.overlayAppOpsModeName(app)} — " +
+                            "My Files APK 가 아닌 adb install / Play·Galaxy Store 설치 필요"
+                    } else {
+                        "SYSTEM_ALERT_WINDOW missing appOps=${LetteringPermissionHelper.overlayAppOpsModeName(app)}"
+                    }
                 OverlayDiagTracker.recordOverlayFailure(
                     OverlayFailureReason.PERMISSION_DENIED,
                     phase = "BIG_PUSH",
-                    detail = "SYSTEM_ALERT_WINDOW missing"
+                    detail = restrictHint
                 )
-                VlueBigPushTrace.skip(3, "Overlay permission denied (SYSTEM_ALERT_WINDOW missing)")
-                Log.w(TAG, "overlay permission missing — notif/activity fallback")
-                LetteringPrefs.setLastOverlayError(app, "SYSTEM_ALERT_WINDOW missing")
+                VlueBigPushTrace.skip(3, "Overlay permission denied ($restrictHint)")
+                Log.w(TAG, "overlay permission missing — $restrictHint")
+                LetteringPrefs.setLastOverlayError(app, restrictHint)
                 LetteringRingingActivity.launch(app, raw, outgoing)
             }
 

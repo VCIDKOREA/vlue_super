@@ -370,17 +370,41 @@ class CallOverlayService : Service() {
         cardJson: String?,
         asBigPush: Boolean
     ) {
-        if (asBigPush) {
-            val canDrawAttach = LetteringPermissionHelper.canDrawOverlays(this)
-            CompanionBigPushDiag.noteOverlayPermissionCheck(
-                context = this,
-                source = CompanionBigPushDiag.SOURCE_ATTACH_GATE,
-                canDrawOverlays = canDrawAttach,
-                callPhase = "RINGING",
-                screenState = companion.screenState.name,
-                overlayState = companion.state.name,
-                requestedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        val canDrawAttach = LetteringPermissionHelper.canDrawOverlays(this)
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            context = this,
+            source = CompanionBigPushDiag.SOURCE_ATTACH_GATE,
+            canDrawOverlays = canDrawAttach,
+            callPhase = if (asBigPush) "RINGING" else "OFFHOOK",
+            screenState = companion.screenState.name,
+            overlayState = companion.state.name,
+            requestedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        )
+        /*
+         * Phase 6-I: Permission false 인데 addView 를 호출하면
+         * BadToken/PERMISSION_DENIED 가 나고 Diagnostics 가 ATTACH 와 PERMISSION 을 혼동한다.
+         * Samsung 사이드로드는 통화 중 canDraw=false — 무리한 addView 금지.
+         */
+        if (!LetteringPermissionHelper.mayAttachOverlay(this)) {
+            val detail =
+                if (LetteringPermissionHelper.isLikelySamsungCallOverlayRestricted(this)) {
+                    "SAMSUNG_SIDELOAD_CALL_RESTRICT installer=${LetteringPermissionHelper.installerPackage(this)} " +
+                        "appOps=${LetteringPermissionHelper.overlayAppOpsModeName(this)}"
+                } else {
+                    "NO_OVERLAY_PERMISSION appOps=${LetteringPermissionHelper.overlayAppOpsModeName(this)}"
+                }
+            OverlayDiagTracker.recordOverlayFailure(
+                OverlayFailureReason.PERMISSION_DENIED,
+                phase = if (asBigPush) "BIG_PUSH" else "SHOWCASE",
+                detail = detail
             )
+            LetteringPrefs.setLastOverlayError(this, detail)
+            VlueBigPushTrace.skip(7, "ATTACH blocked: $detail")
+            LetteringIncomingNotifier.post(this, phone, outgoing)
+            /* addView 미호출 — onCallEnd 금지 */
+            return
+        }
+        if (asBigPush) {
             CompanionBigPushDiag.noteAttachRequest(
                 companion.snapshot(),
                 attached = rootContainer?.isAttachedToWindow == true
@@ -1222,15 +1246,8 @@ class CallOverlayService : Service() {
         params.flags = (
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
             )
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) {
-            @Suppress("DEPRECATION")
-            params.flags = params.flags or
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-        }
     }
 
     /** 수신 링잉 — BigPush TOP/BOTTOM (PositionManager) */
@@ -1525,17 +1542,18 @@ class CallOverlayService : Service() {
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
         }
+        /*
+         * Phase 6-I: FLAG_TURN_SCREEN_ON / KEEP_SCREEN_ON / SHOW_WHEN_LOCKED 는
+         * Overlay 에 불필요하고 OEM 정책 트리거가 될 수 있어 제거.
+         * Companion Overlay 는 NOT_FOCUSABLE + NOT_TOUCH_MODAL 로 하위 앱 터치 통과.
+         */
         return WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             dp(300),
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = when (position) {
