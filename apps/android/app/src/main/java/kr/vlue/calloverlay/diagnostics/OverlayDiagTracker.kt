@@ -341,6 +341,7 @@ object OverlayDiagTracker {
         lastEventAtElapsedMs = null
         lastStopSelfAtMs = null
         lastOnDestroyAtMs = null
+        CompanionBigPushDiag.reset()
     }
 
     fun setOemDeviceInfo(info: JSONObject) {
@@ -661,6 +662,7 @@ object OverlayDiagTracker {
                 "securityAuditReport",
                 securityAuditReport.get() ?: CompanionSecurityAudit.builtInReleaseCandidateReport()
             )
+            put("companionBigPushDiagnosis", CompanionBigPushDiag.diagnosisJson())
         }
 
     private fun answerToShowcaseMsOrNull(): Long? {
@@ -708,5 +710,6 @@ object OverlayDiagTracker {
         foregroundEndedAtMs = null
         CompanionPerfTracker.resetAllForTest()
         CompanionRecoveryTracker.resetAllForTest()
+        CompanionBigPushDiag.reset()
     }
 }

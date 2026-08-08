@@ -9,6 +9,8 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
+import kr.vlue.calloverlay.diagnostics.ReleaseDebugGate
 
 /**
  * 오버레이가 수신 전화 UI 아래에 깔릴 때 대비 — 풀스크린 인텐트 + 헤드업 알림.
@@ -85,7 +87,8 @@ object LetteringIncomingNotifier {
                 .setTimeoutAfter(90_000L)
 
             NotificationManagerCompat.from(app).notify(NOTIFICATION_ID, builder.build())
-            Log.i(TAG, "posted incoming notif phone=${kr.vlue.calloverlay.diagnostics.ReleaseDebugGate.maskPhoneForLog(phone)} name=$displayName outgoing=$outgoing")
+            CompanionBigPushDiag.noteSystemHunPosted(source = if (outgoing) "outgoing" else "incoming")
+            Log.i(TAG, "posted incoming notif phone=${ReleaseDebugGate.maskPhoneForLog(phone)} name=$displayName outgoing=$outgoing")
         } catch (e: Exception) {
             Log.e(TAG, "post failed", e)
             LetteringPrefs.setLastOverlayError(context, "notif:${e.message}")

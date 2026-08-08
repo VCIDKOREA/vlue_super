@@ -34,6 +34,7 @@ import kr.vlue.calloverlay.companion.OverlayState
 import kr.vlue.calloverlay.companion.OverlayTriggerEvent
 import kr.vlue.calloverlay.companion.ScreenState
 import kr.vlue.calloverlay.companion.ScreenStateDetector
+import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
 import kr.vlue.calloverlay.diagnostics.DiagnosticsFeature
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
 import kr.vlue.calloverlay.diagnostics.NormalOverlayProbe
@@ -180,8 +181,16 @@ class CallOverlayService : Service() {
     private fun showOverlay(phone: String, verified: Boolean, outgoing: Boolean, cardJson: String? = null) {
         val alreadyAttached = rootContainer?.isAttachedToWindow == true
         val answered = isCallAlreadyAnswered()
+        val canDraw = LetteringPermissionHelper.canDrawOverlays(this)
         val ctx = detectOverlayContext(forceRinging = !answered)
         companion.onIncoming(ctx)
+        CompanionBigPushDiag.noteOnIncoming(companion.snapshot())
+        CompanionBigPushDiag.noteShowOverlayEnter(
+            answered = answered,
+            canDrawOverlays = canDraw,
+            attached = alreadyAttached,
+            snap = companion.snapshot()
+        )
         OverlayDiagTracker.onShowOverlay()
         publishCompanion(OverlayTriggerEvent.INCOMING)
         VlueBigPushTrace.step(
@@ -195,6 +204,12 @@ class CallOverlayService : Service() {
 
         /* Answer-before-BigPush: BigPush 생성 금지 → SHOWCASE/FULLSCREEN 즉시 */
         if (answered) {
+            CompanionBigPushDiag.noteShowOverlayEarlyExit(
+                reason = "ALREADY_ANSWERED",
+                snap = companion.snapshot(),
+                attached = alreadyAttached
+            )
+            CompanionBigPushDiag.noteBigPushSkipped("ALREADY_ANSWERED", companion.snapshot())
             VlueBigPushTrace.milestone(
                 "ANSWER_DETECTED",
                 "Answer Detected",
@@ -226,7 +241,29 @@ class CallOverlayService : Service() {
             return
         }
 
+        if (!canDraw) {
+            CompanionBigPushDiag.noteShowOverlayEarlyExit(
+                reason = "NO_OVERLAY_PERMISSION",
+                snap = companion.snapshot(),
+                attached = alreadyAttached
+            )
+            OverlayDiagTracker.recordOverlayFailure(
+                OverlayFailureReason.PERMISSION_DENIED,
+                phase = "BIG_PUSH",
+                detail = "SYSTEM_ALERT_WINDOW missing at showOverlay"
+            )
+            VlueBigPushTrace.skip(6, "NO_OVERLAY_PERMISSION at showOverlay")
+            stopSelfTraced("noOverlayPermission")
+            return
+        }
+
+        CompanionBigPushDiag.noteBigPushRequestBegin(companion.snapshot())
         val allowBigPush = companion.requestBigPush(ctx, callAlreadyAnswered = false)
+        CompanionBigPushDiag.noteBigPushRequestResult(
+            accepted = allowBigPush,
+            snap = companion.snapshot(),
+            rejectReason = companion.rejectedTransition
+        )
         publishCompanion(OverlayTriggerEvent.INCOMING)
         if (!allowBigPush) {
             val screenOff =
@@ -235,6 +272,11 @@ class CallOverlayService : Service() {
             val reason =
                 if (screenOff) OverlayFailureReason.SCREEN_OFF_POLICY
                 else OverlayFailureReason.UNKNOWN
+            CompanionBigPushDiag.noteShowOverlayEarlyExit(
+                reason = "BIG_PUSH_REJECTED",
+                snap = companion.snapshot(),
+                attached = alreadyAttached
+            )
             OverlayDiagTracker.recordOverlayFailure(
                 reason = reason,
                 phase = "BIG_PUSH",
@@ -271,6 +313,12 @@ class CallOverlayService : Service() {
         cardJson: String?,
         asBigPush: Boolean
     ) {
+        if (asBigPush) {
+            CompanionBigPushDiag.noteAttachRequest(
+                companion.snapshot(),
+                attached = rootContainer?.isAttachedToWindow == true
+            )
+        }
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val container = FrameLayout(this)
         val bannerGravity =
@@ -400,11 +448,22 @@ class CallOverlayService : Service() {
                     OverlayDiagTracker.detailSuffix()
             )
             OverlayDiagTracker.markAddViewBegin()
+            if (asBigPush) {
+                CompanionBigPushDiag.noteAddViewBegin(
+                    snap = companion.snapshot(),
+                    windowType = params.type,
+                    flags = params.flags,
+                    canDrawOverlays = LetteringPermissionHelper.canDrawOverlays(this)
+                )
+            }
             windowManager?.addView(container, params)
             OverlayDiagTracker.onAddView()
             OverlayDiagTracker.markAddViewSuccess()
             VlueBigPushTrace.addViewSuccess(container, params, "phone=${ReleaseDebugGate.maskPhoneForLog(phone)}")
             if (asBigPush) {
+                CompanionBigPushDiag.noteAddViewSuccess(companion.snapshot())
+                CompanionBigPushDiag.noteLayoutRequest(companion.snapshot(), source = "addView_initialParams")
+                CompanionBigPushDiag.noteLayoutApplied(companion.snapshot(), source = "addView_initialParams")
                 VlueBigPushTrace.milestone(
                     "BIG_PUSH_VISIBLE",
                     "BigPush Visible",
@@ -435,6 +494,17 @@ class CallOverlayService : Service() {
             val canDraw = LetteringPermissionHelper.canDrawOverlays(this)
             val reason = OemDeviceProbe.classifyFailure(e, canDrawOverlays = canDraw)
             OverlayDiagTracker.markAddViewFailed(reason, e, phase = attachPhase)
+            if (asBigPush) {
+                CompanionBigPushDiag.noteAddViewFailed(
+                    snap = companion.snapshot(),
+                    reason = reason,
+                    error = e,
+                    windowType = params.type,
+                    layoutFlags = params.flags,
+                    canDrawOverlays = canDraw,
+                    oemInfo = OverlayDiagTracker.snapshotJson().optJSONObject("oemDeviceInfo")
+                )
+            }
             VlueBigPushTrace.dumpOverlayPermissionProbe(
                 context = this,
                 params = params,
@@ -491,6 +561,12 @@ class CallOverlayService : Service() {
                 CompanionPerfTracker.recordAnimationMs(
                     (android.os.SystemClock.elapsedRealtime() - animStart).coerceAtLeast(0L)
                 )
+                if (asBigPush && companion.state == OverlayState.BIG_PUSH) {
+                    CompanionBigPushDiag.noteBigPushVisible(
+                        companion.snapshot(),
+                        source = "post-animate"
+                    )
+                }
                 VlueBigPushTrace.dumpOverlayVisibility(
                     rootContainer,
                     layoutParams,
@@ -963,7 +1039,21 @@ class CallOverlayService : Service() {
                     companion.position.name,
                     null
                 )
+                if (companion.state == OverlayState.BIG_PUSH) {
+                    CompanionBigPushDiag.noteLayoutFailed(
+                        companion.snapshot(),
+                        OverlayFailureReason.UNKNOWN,
+                        null,
+                        source = "applyCompactRingingWindow_null"
+                    )
+                }
                 return@post
+            }
+            if (companion.state == OverlayState.BIG_PUSH) {
+                CompanionBigPushDiag.noteLayoutRequest(
+                    companion.snapshot(),
+                    source = "applyCompactRingingWindow"
+                )
             }
             applyCompactRingingWindowLocked(params)
             view.visibility = android.view.View.VISIBLE
@@ -973,19 +1063,28 @@ class CallOverlayService : Service() {
                 }
                 if (companion.state == OverlayState.BIG_PUSH) {
                     OverlayDiagTracker.markBigPushVisibleCommit()
+                    CompanionBigPushDiag.noteLayoutApplied(
+                        companion.snapshot(),
+                        source = "applyCompactRingingWindow"
+                    )
                 }
                 val result =
                     if (companion.position == OverlayPosition.BOTTOM) "BOTTOM" else "TOP"
                 OverlayDiagTracker.markLayoutApplied(result, companion.position.name)
             } catch (e: Exception) {
-                OverlayDiagTracker.markLayoutFailed(
-                    OemDeviceProbe.classifyFailure(
-                        e,
-                        LetteringPermissionHelper.canDrawOverlays(this@CallOverlayService)
-                    ),
-                    companion.position.name,
-                    e
+                val reason = OemDeviceProbe.classifyFailure(
+                    e,
+                    LetteringPermissionHelper.canDrawOverlays(this@CallOverlayService)
                 )
+                OverlayDiagTracker.markLayoutFailed(reason, companion.position.name, e)
+                if (companion.state == OverlayState.BIG_PUSH) {
+                    CompanionBigPushDiag.noteLayoutFailed(
+                        companion.snapshot(),
+                        reason,
+                        e,
+                        source = "applyCompactRingingWindow"
+                    )
+                }
             }
         }
     }

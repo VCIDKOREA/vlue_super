@@ -495,6 +495,101 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                 </div>
               ) : null}
 
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-[11px] font-black uppercase text-amber-900">
+                  Companion BIG_PUSH Diagnosis
+                </p>
+                <p className="mt-1 text-[10px] text-amber-800">
+                  HUN ≠ Companion BIG_PUSH · step(3) Service start ≠ BIG_PUSH 성립
+                </p>
+                {(() => {
+                  const diag = overlay.companionBigPushDiagnosis;
+                  if (!diag || typeof diag !== "object") {
+                    return (
+                      <p className="mt-2 text-[11px] text-slate-500">진단 스냅샷 없음 (세션 overlayStateJson)</p>
+                    );
+                  }
+                  const checklist = diag.checklist || {};
+                  const rows = [
+                    ["Incoming Received", checklist.incomingReceived],
+                    ["showOverlay Enter", checklist.showOverlayEnter],
+                    ["BigPush Request", checklist.bigPushRequest],
+                    ["BigPush Accepted", checklist.bigPushAccepted],
+                    ["Attach Request", checklist.attachRequest],
+                    ["AddView Begin", checklist.addViewBegin],
+                    ["AddView Success", checklist.addViewSuccess],
+                    ["Layout Applied", checklist.layoutApplied],
+                    ["BigPush Visible", checklist.bigPushVisible],
+                    ["System HUN Posted", checklist.systemHunPosted]
+                  ];
+                  return (
+                    <div className="mt-2 space-y-2 font-mono text-[11px] text-slate-800">
+                      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                        {rows.map(([label, status]) => (
+                          <div key={label}>
+                            <span className="text-slate-500">{label}:</span>{" "}
+                            <span
+                              className={
+                                status === "PASS"
+                                  ? "font-black text-emerald-800"
+                                  : "font-black text-rose-800"
+                              }
+                            >
+                              {String(status ?? "FAIL")}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="rounded border border-amber-200 bg-white px-2 py-2">
+                        <p className="text-[10px] font-black uppercase text-slate-600">
+                          Exact Breakpoint
+                        </p>
+                        <p className="mt-1 font-black text-rose-900">
+                          {String(diag.exactBreakpoint ?? "—")}
+                        </p>
+                        <p className="mt-1 text-[10px] text-slate-600">
+                          failureReason={String(diag.failureReason ?? "—")} · rejectReason=
+                          {String(diag.rejectReason ?? "—")}
+                        </p>
+                      </div>
+                      {diag.samsungEvidence ? (
+                        <details className="rounded border border-slate-200 bg-white px-2 py-1">
+                          <summary className="cursor-pointer text-[10px] font-bold text-slate-700">
+                            Samsung / addView Evidence
+                          </summary>
+                          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-[10px] text-slate-600">
+                            {JSON.stringify(diag.samsungEvidence, null, 2)}
+                          </pre>
+                        </details>
+                      ) : null}
+                      {Array.isArray(diag.events) && diag.events.length > 0 ? (
+                        <details className="rounded border border-slate-200 bg-white px-2 py-1">
+                          <summary className="cursor-pointer text-[10px] font-bold text-slate-700">
+                            BIG_PUSH Event Log ({diag.events.length})
+                          </summary>
+                          <ul className="mt-1 max-h-48 space-y-0.5 overflow-auto text-[10px] text-slate-600">
+                            {[...diag.events].reverse().map((ev, i) => (
+                              <li key={`bp-${ev?.timestamp ?? i}-${i}`}>
+                                {String(ev?.code ?? "?")}
+                                {ev?.elapsedMs != null ? ` · +${ev.elapsedMs}ms` : ""}
+                                {ev?.state ? ` · ${ev.state}` : ""}
+                                {ev?.position ? `/${ev.position}` : ""}
+                                {ev?.failureReason ? ` · ${ev.failureReason}` : ""}
+                                {ev?.accepted === true
+                                  ? " · accepted"
+                                  : ev?.accepted === false
+                                    ? " · rejected"
+                                    : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+              </div>
+
               <div className="rounded-lg border border-slate-200 px-3 py-2">
                 <p className="text-[11px] font-black uppercase text-slate-500">
                   Companion Overlay

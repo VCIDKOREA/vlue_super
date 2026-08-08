@@ -204,7 +204,7 @@ object VlueBigPushTrace {
         )
         DiagnosticsMilestoneClock.note(session.id, code, session.elapsedMsFromNanos())
         when (n) {
-            3 -> milestone("BIG_PUSH_REQUESTED", "BigPush Requested", 3, detail)
+            /* Phase 6-D: step(3) startOverlayService ≠ BIG_PUSH 성립 — 가짜 BIG_PUSH_REQUESTED 제거 */
             10, 11 -> emitPerfSummaryNow()
         }
         if (n == 11 && endStatus != null) {

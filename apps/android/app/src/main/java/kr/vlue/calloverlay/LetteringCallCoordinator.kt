@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
 import kr.vlue.calloverlay.diagnostics.OverlayDiagTracker
 import kr.vlue.calloverlay.diagnostics.OverlayFailureReason
@@ -69,11 +70,18 @@ object LetteringCallCoordinator {
             val raw = if (nextUnknown) "unknown" else resolved
             LetteringPrefs.setLastCallEvent(app, "ringing:$raw:out=$outgoing")
             kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore.updatePhoneMasked(raw)
+            CompanionBigPushDiag.noteIncomingReceived(
+                source = if (outgoing) "onRinging_outgoing" else "onRinging_incoming"
+            )
 
             /* 1) FGS 오버레이 — SYSTEM_ALERT_WINDOW 있을 때 */
             if (LetteringPermissionHelper.canDrawOverlays(app)) {
                 startOverlayService(app, raw, verified = false, cardJson = null, outgoing)
             } else {
+                CompanionBigPushDiag.noteShowOverlayEarlyExit(
+                    reason = "NO_OVERLAY_PERMISSION",
+                    source = "LetteringCallCoordinator"
+                )
                 OverlayDiagTracker.recordOverlayFailure(
                     OverlayFailureReason.PERMISSION_DENIED,
                     phase = "BIG_PUSH",
