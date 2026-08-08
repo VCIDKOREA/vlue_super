@@ -342,6 +342,7 @@ object OverlayDiagTracker {
         lastStopSelfAtMs = null
         lastOnDestroyAtMs = null
         CompanionBigPushDiag.reset()
+        CompanionRuntimeStabilityDiag.reset()
     }
 
     fun setOemDeviceInfo(info: JSONObject) {
@@ -663,6 +664,25 @@ object OverlayDiagTracker {
                 securityAuditReport.get() ?: CompanionSecurityAudit.builtInReleaseCandidateReport()
             )
             put("companionBigPushDiagnosis", CompanionBigPushDiag.diagnosisJson())
+            put(
+                "companionRuntimeStability",
+                CompanionRuntimeStabilityDiag.snapshotJson().apply {
+                    companionKpiJson().let { kpi ->
+                        val lat = optJSONObject("latency") ?: JSONObject()
+                        lat.put(
+                            "incomingToBigPushMs",
+                            if (kpi.isNull("incomingToBigPushMs")) JSONObject.NULL
+                            else kpi.opt("incomingToBigPushMs")
+                        )
+                        lat.put(
+                            "answerToShowcaseMs",
+                            if (kpi.isNull("answerToShowcaseMs")) JSONObject.NULL
+                            else kpi.opt("answerToShowcaseMs")
+                        )
+                        put("latency", lat)
+                    }
+                }
+            )
         }
 
     private fun answerToShowcaseMsOrNull(): Long? {
@@ -711,5 +731,6 @@ object OverlayDiagTracker {
         CompanionPerfTracker.resetAllForTest()
         CompanionRecoveryTracker.resetAllForTest()
         CompanionBigPushDiag.reset()
+        CompanionRuntimeStabilityDiag.reset()
     }
 }

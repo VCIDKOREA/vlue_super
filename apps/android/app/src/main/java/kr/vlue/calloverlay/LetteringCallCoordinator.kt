@@ -9,11 +9,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
+import kr.vlue.calloverlay.diagnostics.CompanionRuntimeStabilityDiag
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
 import kr.vlue.calloverlay.diagnostics.OverlayDiagTracker
 import kr.vlue.calloverlay.diagnostics.OverlayFailureReason
 import kr.vlue.calloverlay.diagnostics.ReleaseDebugGate
 import kr.vlue.calloverlay.incall.VlueInCallController
+import android.os.SystemClock
 
 /** 통화 이벤트 → API 조회 → 오버레이·알림·액티비티 폴백 */
 object LetteringCallCoordinator {
@@ -47,12 +49,14 @@ object LetteringCallCoordinator {
             val now = System.currentTimeMillis()
             val prevUnknown = IncomingNumberResolver.isUnknown(lastRingNumber)
             val nextUnknown = IncomingNumberResolver.isUnknown(resolved)
+            val sameNumber =
+                IncomingNumberResolver.sameCanonicalNumber(resolved, lastRingNumber)
             val isUpgrade = prevUnknown && !nextUnknown && now - lastRingAt < 3_000L
             val isDuplicate =
                 !isUpgrade &&
                     now - lastRingAt < 800L &&
                     lastOutgoing == outgoing &&
-                    (resolved == lastRingNumber || (nextUnknown && prevUnknown))
+                    (sameNumber || (nextUnknown && prevUnknown))
 
             if (isDuplicate) {
                 VlueBigPushTrace.skip(
@@ -73,15 +77,32 @@ object LetteringCallCoordinator {
             CompanionBigPushDiag.noteIncomingReceived(
                 source = if (outgoing) "onRinging_outgoing" else "onRinging_incoming"
             )
+            if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+                CompanionRuntimeStabilityDiag.beginCallSession(
+                    if (outgoing) "onRinging_outgoing" else "onRinging_incoming"
+                )
+            }
+            CompanionRuntimeStabilityDiag.mark(
+                "INCOMING_RECEIVED",
+                if (outgoing) "onRinging_outgoing" else "onRinging_incoming"
+            )
+            CompanionRuntimeStabilityDiag.mark(
+                "SERVICE_START_REQUEST",
+                "LetteringCallCoordinator.startOverlayService"
+            )
 
             /* 1) FGS 오버레이 — SYSTEM_ALERT_WINDOW 있을 때 */
-            if (LetteringPermissionHelper.canDrawOverlays(app)) {
+            val canDraw = LetteringPermissionHelper.canDrawOverlays(app)
+            CompanionBigPushDiag.noteOverlayPermissionCheck(
+                context = app,
+                source = CompanionBigPushDiag.SOURCE_INCOMING_GATE,
+                canDrawOverlays = canDraw,
+                callPhase = if (outgoing) "OUTGOING" else "RINGING",
+                requestedWindowType = android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            )
+            if (canDraw) {
                 startOverlayService(app, raw, verified = false, cardJson = null, outgoing)
             } else {
-                CompanionBigPushDiag.noteShowOverlayEarlyExit(
-                    reason = "NO_OVERLAY_PERMISSION",
-                    source = "LetteringCallCoordinator"
-                )
                 OverlayDiagTracker.recordOverlayFailure(
                     OverlayFailureReason.PERMISSION_DENIED,
                     phase = "BIG_PUSH",
@@ -92,13 +113,15 @@ object LetteringCallCoordinator {
                 LetteringPrefs.setLastOverlayError(app, "SYSTEM_ALERT_WINDOW missing")
             }
 
-            /* 2) 헤드업 + 풀스크린 인텐트 — 전화 UI 아래 깔림 대비 */
+            /* 2) 헤드업 — 전화 UI 아래 깔림 대비 (HUN ≠ Companion Overlay) */
             LetteringIncomingNotifier.post(app, raw, outgoing)
 
-            /* 3) 액티비티 직접 기동 (백그라운드 제한 시 실패할 수 있음) */
-            LetteringRingingActivity.launch(app, raw, outgoing)
+            /* 3) Overlay 권한이 없을 때만 Activity 폴백 — 권한 있으면 Single Window 와 중복 금지 */
+            if (!canDraw) {
+                LetteringRingingActivity.launch(app, raw, outgoing)
+            }
 
-            if (raw == "unknown") {
+            if (IncomingNumberResolver.isUnknown(raw)) {
                 /* CallLog 가 늦게 쌓이는 OEM — 짧게 재시도 후 번호 업그레이드 */
                 scope.launch {
                     retryResolveUnknown(app, outgoing)
@@ -136,12 +159,66 @@ object LetteringCallCoordinator {
     }
 
     private suspend fun enrichWithLookup(app: Context, raw: String, outgoing: Boolean) {
+        val masked = ReleaseDebugGate.maskPhoneForLog(raw)
+        val started = SystemClock.elapsedRealtime()
+        CompanionRuntimeStabilityDiag.noteMemberLookup(
+            phase = "PHONE_RECEIVED",
+            maskedPhone = masked,
+            dataSource = "coordinator"
+        )
+        val normalized = CardLookupBridge.normalizeKr(raw)
+        CompanionRuntimeStabilityDiag.noteMemberLookup(
+            phase = "PHONE_NORMALIZED",
+            maskedPhone = masked,
+            normalizedOk = normalized != null,
+            dataSource = "CardLookupBridge.normalizeKr"
+        )
+        CompanionRuntimeStabilityDiag.noteMemberLookup(
+            phase = "LOOKUP_STARTED",
+            maskedPhone = masked,
+            dataSource = "CardLookupRepository"
+        )
         try {
             val lookup = CardLookupRepository.lookup(app, raw)
+            val elapsed = (SystemClock.elapsedRealtime() - started).coerceAtLeast(0L)
             if (lookup == null || !lookup.matched) {
-                Log.w(TAG, "lookup unmatched for $raw")
-                LetteringPrefs.setLastOverlayError(app, "lookup_unmatched:$raw")
+                CompanionRuntimeStabilityDiag.noteMemberLookup(
+                    phase = "LOOKUP_COMPLETED",
+                    maskedPhone = masked,
+                    lookupElapsedMs = elapsed,
+                    matched = false,
+                    dataSource = "api",
+                    normalizedOk = normalized != null
+                )
+                Log.w(TAG, "lookup unmatched for $masked")
+                LetteringPrefs.setLastOverlayError(app, "lookup_unmatched:$masked")
                 LetteringIncomingNotifier.post(app, raw, outgoing, displayName = null)
+                return
+            }
+            CompanionRuntimeStabilityDiag.noteMemberLookup(
+                phase = "LOOKUP_MATCHED",
+                maskedPhone = masked,
+                lookupElapsedMs = elapsed,
+                matched = true,
+                dataSource = "api",
+                normalizedOk = normalized != null
+            )
+            CompanionRuntimeStabilityDiag.noteMemberLookup(
+                phase = "CARD_DATA_READY",
+                maskedPhone = masked,
+                lookupElapsedMs = elapsed,
+                matched = true,
+                dataSource = "api"
+            )
+            /* Call End 이후 late lookup 이 FGS/Showcase 를 다시 열지 않도록 */
+            if (!CompanionRuntimeStabilityDiag.isCallSessionActive() &&
+                CompanionRuntimeStabilityDiag.shouldIgnorePostEndOverlayStart()
+            ) {
+                CompanionRuntimeStabilityDiag.noteStaleEvent(
+                    "LOOKUP_UPDATE_AFTER_CALL_END",
+                    "enrichWithLookup",
+                    detail = "matched=true but session ended"
+                )
                 return
             }
             val label = lookup.displayName.ifBlank { raw }
@@ -160,6 +237,13 @@ object LetteringCallCoordinator {
         } catch (e: Exception) {
             Log.e(TAG, "lookup failed after overlay start", e)
             LetteringPrefs.setLastOverlayError(app, "lookup_error:${e.message}")
+            CompanionRuntimeStabilityDiag.noteMemberLookup(
+                phase = "LOOKUP_COMPLETED",
+                maskedPhone = masked,
+                lookupElapsedMs = (SystemClock.elapsedRealtime() - started).coerceAtLeast(0L),
+                matched = false,
+                dataSource = "error:${e.javaClass.simpleName}"
+            )
         }
     }
 
@@ -181,6 +265,7 @@ object LetteringCallCoordinator {
     fun onCallEnded(context: Context) {
         try {
             val app = context.applicationContext
+            CompanionRuntimeStabilityDiag.endCallSession("LetteringCallCoordinator.onCallEnded")
             VlueBigPushTrace.step(11, "Call End", "source=LetteringCallCoordinator.onCallEnded")
             LetteringPrefs.setLastCallEvent(app, "idle")
             lastRingNumber = ""

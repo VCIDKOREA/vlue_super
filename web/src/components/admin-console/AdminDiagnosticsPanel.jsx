@@ -500,7 +500,7 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                   Companion BIG_PUSH Diagnosis
                 </p>
                 <p className="mt-1 text-[10px] text-amber-800">
-                  HUN ≠ Companion BIG_PUSH · step(3) Service start ≠ BIG_PUSH 성립
+                  HUN ≠ Companion BIG_PUSH · Probe Permission ≠ Incoming Gate Permission
                 </p>
                 {(() => {
                   const diag = overlay.companionBigPushDiagnosis;
@@ -510,6 +510,12 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                     );
                   }
                   const checklist = diag.checklist || {};
+                  const gates = diag.gates || {};
+                  const pg = diag.permissionGate || {};
+                  const current = pg.current && typeof pg.current === "object" ? pg.current : null;
+                  const incomingGate = pg.incomingGate || {};
+                  const showOverlayGate = pg.showOverlay || {};
+                  const history = diag.permissionHistory || {};
                   const rows = [
                     ["Incoming Received", checklist.incomingReceived],
                     ["showOverlay Enter", checklist.showOverlayEnter],
@@ -522,8 +528,68 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                     ["BigPush Visible", checklist.bigPushVisible],
                     ["System HUN Posted", checklist.systemHunPosted]
                   ];
+                  const gateRows = [
+                    ["Permission Gate", gates.permissionGate],
+                    ["ShowOverlay Gate", gates.showOverlayGate],
+                    ["BigPush Gate", gates.bigPushGate],
+                    ["Attach Gate", gates.attachGate],
+                    ["Visible", gates.visible]
+                  ];
                   return (
                     <div className="mt-2 space-y-2 font-mono text-[11px] text-slate-800">
+                      <div className="rounded border border-amber-300 bg-white px-2 py-2">
+                        <p className="text-[10px] font-black uppercase text-slate-700">Permission Gate</p>
+                        {current ? (
+                          <div className="mt-1 grid grid-cols-2 gap-1 text-[10px]">
+                            <div>
+                              canDrawOverlays:{" "}
+                              <span className="font-black">
+                                {String(current.canDrawOverlays ?? "—")}
+                              </span>
+                            </div>
+                            <div>package: {String(current.packageName ?? "—")}</div>
+                            <div>SDK: {String(current.sdkInt ?? "—")}</div>
+                            <div>manufacturer: {String(current.manufacturer ?? "—")}</div>
+                            <div>model: {String(current.model ?? "—")}</div>
+                            <div>source: {String(current.source ?? "—")}</div>
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-[10px] text-slate-500">Permission check 없음</p>
+                        )}
+                        <div className="mt-2 grid grid-cols-1 gap-1 text-[10px] sm:grid-cols-2">
+                          <div>
+                            Incoming Gate:{" "}
+                            <span className="font-black">{String(incomingGate.status ?? "—")}</span>
+                            {incomingGate.timestamp != null ? (
+                              <span className="text-slate-500">
+                                {" "}
+                                · {new Date(Number(incomingGate.timestamp)).toISOString()}
+                              </span>
+                            ) : null}
+                            {incomingGate.reason ? (
+                              <span className="text-rose-700"> · {String(incomingGate.reason)}</span>
+                            ) : null}
+                          </div>
+                          <div>
+                            ShowOverlay:{" "}
+                            <span className="font-black">{String(showOverlayGate.status ?? "—")}</span>
+                            {showOverlayGate.reason && showOverlayGate.reason !== null ? (
+                              <span className="text-rose-700"> · {String(showOverlayGate.reason)}</span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="rounded border border-slate-200 bg-white px-2 py-2">
+                        <p className="text-[10px] font-black uppercase text-slate-600">Gates Summary</p>
+                        <div className="mt-1 grid grid-cols-1 gap-1 sm:grid-cols-2">
+                          {gateRows.map(([label, status]) => (
+                            <div key={label}>
+                              <span className="text-slate-500">{label}:</span>{" "}
+                              <span className="font-black">{String(status ?? "—")}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                       <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                         {rows.map(([label, status]) => (
                           <div key={label}>
@@ -552,6 +618,36 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                           {String(diag.rejectReason ?? "—")}
                         </p>
                       </div>
+                      <details className="rounded border border-slate-200 bg-white px-2 py-1">
+                        <summary className="cursor-pointer text-[10px] font-bold text-slate-700">
+                          Permission History (Probe ≠ Incoming)
+                        </summary>
+                        <ul className="mt-1 max-h-40 space-y-1 overflow-auto text-[10px] text-slate-600">
+                          {["INCOMING_GATE", "SHOW_OVERLAY_GATE", "ATTACH_GATE", "DIAGNOSTIC_PROBE"].map(
+                            (src) => {
+                              const row = history[src];
+                              if (!row || typeof row !== "object") {
+                                return (
+                                  <li key={src}>
+                                    {src}: <span className="text-slate-400">—</span>
+                                  </li>
+                                );
+                              }
+                              return (
+                                <li key={src}>
+                                  {src}: canDraw=
+                                  <span className="font-black">{String(row.canDrawOverlays)}</span>
+                                  {" · "}
+                                  {row.timestamp != null
+                                    ? new Date(Number(row.timestamp)).toISOString()
+                                    : "—"}
+                                  {row.result ? ` · ${row.result}` : ""}
+                                </li>
+                              );
+                            }
+                          )}
+                        </ul>
+                      </details>
                       {diag.samsungEvidence ? (
                         <details className="rounded border border-slate-200 bg-white px-2 py-1">
                           <summary className="cursor-pointer text-[10px] font-bold text-slate-700">
@@ -571,7 +667,11 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                             {[...diag.events].reverse().map((ev, i) => (
                               <li key={`bp-${ev?.timestamp ?? i}-${i}`}>
                                 {String(ev?.code ?? "?")}
+                                {ev?.source ? ` · ${ev.source}` : ""}
                                 {ev?.elapsedMs != null ? ` · +${ev.elapsedMs}ms` : ""}
+                                {ev?.canDrawOverlays != null
+                                  ? ` · canDraw=${ev.canDrawOverlays}`
+                                  : ""}
                                 {ev?.state ? ` · ${ev.state}` : ""}
                                 {ev?.position ? `/${ev.position}` : ""}
                                 {ev?.failureReason ? ` · ${ev.failureReason}` : ""}
@@ -580,6 +680,135 @@ export default function AdminDiagnosticsPanel({ onToast }) {
                                   : ev?.accepted === false
                                     ? " · rejected"
                                     : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">
+                <p className="text-[11px] font-black uppercase text-cyan-900">
+                  Companion Runtime Stability
+                </p>
+                <p className="mt-1 text-[10px] text-cyan-800">
+                  Phase 6-G · Latency / CallSession / Stale / UI Divergence (Native OverlayState SoT)
+                </p>
+                {(() => {
+                  const rs = overlay.companionRuntimeStability;
+                  if (!rs || typeof rs !== "object") {
+                    return (
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        런타임 안정성 스냅샷 없음 (세션 overlayStateJson)
+                      </p>
+                    );
+                  }
+                  const lat = rs.latency || {};
+                  const life = rs.lifecycle || {};
+                  const stale = rs.staleEvents || {};
+                  const div = rs.uiDivergence || {};
+                  const member = rs.memberLookup || {};
+                  const top = Array.isArray(rs.topSlowSegments) ? rs.topSlowSegments : [];
+                  const pg = overlay.companionBigPushDiagnosis?.permissionGate || {};
+                  const hist = overlay.companionBigPushDiagnosis?.permissionHistory || {};
+                  const gateVal = (src) => {
+                    const row = hist[src];
+                    if (!row || typeof row !== "object") return "—";
+                    return String(row.canDrawOverlays);
+                  };
+                  return (
+                    <div className="mt-2 space-y-2">
+                      <div className="grid grid-cols-2 gap-2 font-mono text-[11px] sm:grid-cols-4">
+                        {[
+                          ["Incoming→BigPush", lat.incomingToBigPushMs],
+                          ["Answer→Showcase", lat.answerToShowcaseMs],
+                          ["CallEnd→Gone", lat.callEndToOverlayGoneMs],
+                          ["CallEnd→WebIdle", "—"]
+                        ].map(([label, v]) => (
+                          <div key={label} className="rounded border border-cyan-200 bg-white px-2 py-1">
+                            <p className="text-[10px] text-slate-500">{label}</p>
+                            <p className="font-black text-slate-900">
+                              {v == null || v === "—" ? "—" : `${v}ms`}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="rounded border border-cyan-200 bg-white px-2 py-2 font-mono text-[11px] text-slate-700">
+                        <p>
+                          CallSession:{" "}
+                          <span className="font-black">{String(life.callSessionId ?? rs.callSessionId ?? "—")}</span>
+                          {" · active="}
+                          <span className="font-black">{String(life.active ?? rs.callSessionActive)}</span>
+                        </p>
+                        <p className="mt-1">
+                          OverlayState: <span className="font-black">{String(overlay.overlayState ?? "—")}</span>
+                          {" · Position: "}
+                          <span className="font-black">{String(overlay.overlayPosition ?? "—")}</span>
+                          {" · Attached: "}
+                          <span className="font-black">{String(overlay.overlayAlreadyAttached ?? "—")}</span>
+                        </p>
+                        <p className="mt-1">
+                          STALE: <span className="font-black">{String(stale.count ?? 0)}</span>
+                          {" · UI_DIVERGENCE: "}
+                          <span className="font-black">{String(div.count ?? 0)}</span>
+                          {" · WINDOW: "}
+                          <span className="font-black">
+                            {overlay.overlayAlreadyAttached ? "1" : "0"}/1
+                          </span>
+                        </p>
+                        <p className="mt-1">
+                          MEMBER:{" "}
+                          <span className="font-black">
+                            {member.matched === true
+                              ? "MATCH"
+                              : member.matched === false
+                                ? "MISS"
+                                : String(member.phase ?? "—")}
+                          </span>
+                          {member.lookupElapsedMs != null ? ` · ${member.lookupElapsedMs}ms` : ""}
+                          {member.maskedPhone ? ` · ${member.maskedPhone}` : ""}
+                        </p>
+                        <p className="mt-1">
+                          PERMISSION: INCOMING={gateVal("INCOMING_GATE")} / SHOW=
+                          {gateVal("SHOW_OVERLAY_GATE")} / ATTACH={gateVal("ATTACH_GATE")} / PROBE=
+                          {gateVal("DIAGNOSTIC_PROBE")}
+                          {pg.current?.canDrawOverlays != null
+                            ? ` · current=${pg.current.canDrawOverlays}`
+                            : ""}
+                        </p>
+                      </div>
+                      {top.length > 0 ? (
+                        <details className="rounded border border-cyan-200 bg-white px-2 py-1">
+                          <summary className="cursor-pointer text-[10px] font-bold text-slate-700">
+                            Top Slow Segments ({top.length})
+                          </summary>
+                          <ul className="mt-1 max-h-40 space-y-0.5 overflow-auto text-[10px] text-slate-600">
+                            {top.map((s, i) => (
+                              <li key={`slow-${i}`}>
+                                {String(s.from ?? "?")} → {String(s.to ?? "?")}:{" "}
+                                <span className="font-black">{String(s.deltaMs)}ms</span>
+                                {s.severity ? ` · ${s.severity}` : ""}
+                                {s.threadName ? ` · ${s.threadName}` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                      {Array.isArray(stale.recent) && stale.recent.length > 0 ? (
+                        <details className="rounded border border-cyan-200 bg-white px-2 py-1">
+                          <summary className="cursor-pointer text-[10px] font-bold text-slate-700">
+                            Recent Stale Events ({stale.recent.length})
+                          </summary>
+                          <ul className="mt-1 max-h-40 space-y-0.5 overflow-auto text-[10px] text-slate-600">
+                            {[...stale.recent].reverse().map((ev, i) => (
+                              <li key={`stale-${i}`}>
+                                {String(ev.event ?? "?")} · {String(ev.source ?? "")}
+                                {ev.elapsedSinceCallEndMs != null
+                                  ? ` · +${ev.elapsedSinceCallEndMs}ms after end`
+                                  : ""}
                               </li>
                             ))}
                           </ul>

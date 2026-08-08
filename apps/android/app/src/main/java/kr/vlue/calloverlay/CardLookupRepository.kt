@@ -22,7 +22,28 @@ object CardLookupRepository {
             if (BlockedPhoneCache.isBlocked(context, e164)) return@withContext null
 
             val base = BuildConfig.API_BASE_URL.trimEnd('/')
-            val q = URLEncoder.encode(rawNumber, "UTF-8")
+            /* API 에는 정규화된 E.164 를 우선 전달 — raw 하이픈/공백 불일치로 MISS 나지 않게 */
+            val candidates = LinkedHashSet<String>()
+            candidates.add(e164)
+            val canon = IncomingNumberResolver.canonicalDigits(rawNumber)
+            if (canon.isNotEmpty()) candidates.add("+$canon")
+            val digitsOnly = rawNumber.filter { it.isDigit() }
+            if (digitsOnly.isNotEmpty()) candidates.add(digitsOnly)
+            val trimmed = rawNumber.trim()
+            if (trimmed.isNotEmpty()) candidates.add(trimmed)
+
+            var lastUnmatched: CardLookupResult? = null
+            for (candidate in candidates) {
+                val result = lookupOnce(context, base, candidate) ?: continue
+                if (result.matched) return@withContext result
+                lastUnmatched = result
+            }
+            lastUnmatched ?: lookupOnce(context, base, e164)
+        }
+
+    private fun lookupOnce(context: Context, base: String, numberParam: String): CardLookupResult? {
+        return try {
+            val q = URLEncoder.encode(numberParam, "UTF-8")
             val url = URL("$base/api/cards/by-number?number=$q")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
@@ -39,6 +60,7 @@ object CardLookupRepository {
                 val code = conn.responseCode
                 val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
                     .bufferedReader().use { it.readText() }
+                if (code !in 200..299) return null
                 val json = JSONObject(body)
                 val matched = json.optBoolean("matched", false)
                 CardLookupResult(
@@ -47,12 +69,13 @@ object CardLookupRepository {
                     displayName = json.optString("displayName", ""),
                     rawJson = body
                 )
-            } catch (_: Exception) {
-                null
             } finally {
                 conn.disconnect()
             }
+        } catch (_: Exception) {
+            null
         }
+    }
 }
 
 /** 로컬·서버 차단 번호 캐시 (오버레이 미표시) */

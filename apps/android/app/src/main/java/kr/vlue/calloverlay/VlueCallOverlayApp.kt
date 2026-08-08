@@ -19,16 +19,20 @@ class VlueCallOverlayApp : Application() {
                 if (currentActivityName == activity.javaClass.name) {
                     setCurrentActivity("${activity.javaClass.name}(paused)")
                 }
+                CallOverlayService.notifyForegroundContextChanged("onActivityPaused")
             }
 
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
             override fun onActivityStarted(activity: Activity) {}
-            override fun onActivityStopped(activity: Activity) {}
+            override fun onActivityStopped(activity: Activity) {
+                CallOverlayService.notifyForegroundContextChanged("onActivityStopped")
+            }
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
             override fun onActivityDestroyed(activity: Activity) {
                 if (currentActivityName?.startsWith(activity.javaClass.name) == true) {
                     setCurrentActivity(null)
                 }
+                CallOverlayService.notifyForegroundContextChanged("onActivityDestroyed")
             }
         })
         try {

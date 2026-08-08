@@ -178,7 +178,8 @@ export default function LetteringOverlayHost() {
         return;
       }
       if (!String(incoming || "").trim() || String(incoming).toLowerCase() === "unknown") {
-        setLoading(false);
+        /* 번호 업그레이드(Native loadUrl / card-lookup) 대기 — unknown 으로 확정하지 않음 */
+        setLoading(true);
         return;
       }
       const lookup = await getBusinessCardByNumber(incoming);

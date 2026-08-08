@@ -35,6 +35,7 @@ import kr.vlue.calloverlay.companion.OverlayTriggerEvent
 import kr.vlue.calloverlay.companion.ScreenState
 import kr.vlue.calloverlay.companion.ScreenStateDetector
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
+import kr.vlue.calloverlay.diagnostics.CompanionRuntimeStabilityDiag
 import kr.vlue.calloverlay.diagnostics.DiagnosticsFeature
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
 import kr.vlue.calloverlay.diagnostics.NormalOverlayProbe
@@ -99,6 +100,7 @@ class CallOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        CompanionRuntimeStabilityDiag.mark("SERVICE_ON_CREATE", "CallOverlayService.onCreate")
         CompanionRecoveryTracker.recordServiceLifecycle("ON_CREATE")
         VlueBigPushTrace.bind(this)
         val instanceId = OverlayDiagTracker.onServiceCreated()
@@ -179,12 +181,55 @@ class CallOverlayService : Service() {
     }
 
     private fun showOverlay(phone: String, verified: Boolean, outgoing: Boolean, cardJson: String? = null) {
+        if (dismissing) {
+            CompanionRuntimeStabilityDiag.noteStaleEvent("SHOW_OVERLAY", "showOverlay", detail = "dismissing")
+            return
+        }
         val alreadyAttached = rootContainer?.isAttachedToWindow == true
         val answered = isCallAlreadyAnswered()
+        val callState = telephonyCallState()
+        /*
+         * Phase 6-G: Call End 이후 enrichWithLookup / queued FGS 가 IDLE 에서 showOverlay 를
+         * 다시 열면 Showcase 재등장이 난다. 세션이 이미 끝났고 IDLE 이면 무시.
+         */
+        if (callState == TelephonyManager.CALL_STATE_IDLE &&
+            !answered &&
+            CompanionRuntimeStabilityDiag.shouldIgnorePostEndOverlayStart()
+        ) {
+            CompanionRuntimeStabilityDiag.noteStaleEvent(
+                "SHOW_OVERLAY_WHILE_IDLE",
+                "showOverlay",
+                detail = "alreadyAttached=$alreadyAttached"
+            )
+            if (!alreadyAttached) {
+                stopSelfTraced("staleShowOverlayAfterCallEnd")
+            }
+            return
+        }
+        if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+            CompanionRuntimeStabilityDiag.beginCallSession(
+                if (answered) "showOverlay_answered" else "showOverlay_ringing"
+            )
+        }
+        CompanionRuntimeStabilityDiag.mark("SHOW_OVERLAY_ENTER", "showOverlay")
         val canDraw = LetteringPermissionHelper.canDrawOverlays(this)
+        CompanionRuntimeStabilityDiag.mark(
+            "PERMISSION_GATE",
+            "SHOW_OVERLAY_GATE",
+            org.json.JSONObject().put("canDrawOverlays", canDraw)
+        )
         val ctx = detectOverlayContext(forceRinging = !answered)
         companion.onIncoming(ctx)
         CompanionBigPushDiag.noteOnIncoming(companion.snapshot())
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            context = this,
+            source = CompanionBigPushDiag.SOURCE_SHOW_OVERLAY_GATE,
+            canDrawOverlays = canDraw,
+            callPhase = if (answered) "OFFHOOK" else "RINGING",
+            screenState = companion.screenState.name,
+            overlayState = companion.state.name,
+            requestedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        )
         CompanionBigPushDiag.noteShowOverlayEnter(
             answered = answered,
             canDrawOverlays = canDraw,
@@ -258,12 +303,16 @@ class CallOverlayService : Service() {
         }
 
         CompanionBigPushDiag.noteBigPushRequestBegin(companion.snapshot())
+        CompanionRuntimeStabilityDiag.mark("BIG_PUSH_REQUEST_BEGIN", "showOverlay")
         val allowBigPush = companion.requestBigPush(ctx, callAlreadyAnswered = false)
         CompanionBigPushDiag.noteBigPushRequestResult(
             accepted = allowBigPush,
             snap = companion.snapshot(),
             rejectReason = companion.rejectedTransition
         )
+        if (allowBigPush) {
+            CompanionRuntimeStabilityDiag.mark("BIG_PUSH_ACCEPTED", "showOverlay")
+        }
         publishCompanion(OverlayTriggerEvent.INCOMING)
         if (!allowBigPush) {
             val screenOff =
@@ -314,6 +363,16 @@ class CallOverlayService : Service() {
         asBigPush: Boolean
     ) {
         if (asBigPush) {
+            val canDrawAttach = LetteringPermissionHelper.canDrawOverlays(this)
+            CompanionBigPushDiag.noteOverlayPermissionCheck(
+                context = this,
+                source = CompanionBigPushDiag.SOURCE_ATTACH_GATE,
+                canDrawOverlays = canDrawAttach,
+                callPhase = "RINGING",
+                screenState = companion.screenState.name,
+                overlayState = companion.state.name,
+                requestedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            )
             CompanionBigPushDiag.noteAttachRequest(
                 companion.snapshot(),
                 attached = rootContainer?.isAttachedToWindow == true
@@ -395,7 +454,17 @@ class CallOverlayService : Service() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 CompanionPerfTracker.noteWebViewReady()
                 injectLetteringFlag(view)
-                nativeBanner?.visibility = android.view.View.GONE
+                if (dismissing || companion.state == OverlayState.IDLE ||
+                    !CompanionRuntimeStabilityDiag.isCallSessionActive()
+                ) {
+                    CompanionRuntimeStabilityDiag.noteStaleEvent(
+                        "WEB_PAGE_FINISHED",
+                        "onPageFinished",
+                        detail = "state=${companion.state.name}"
+                    )
+                    return
+                }
+                syncOverlayChromeForState(source = "onPageFinished")
                 /*
                  * Showcase 레이아웃은 Answer Event에서 이미 commit됨.
                  * onPageFinished는 Web 알림·레이아웃 재확인만 — Showcase 표시를 지연시키지 않는다.
@@ -456,9 +525,11 @@ class CallOverlayService : Service() {
                     canDrawOverlays = LetteringPermissionHelper.canDrawOverlays(this)
                 )
             }
+            CompanionRuntimeStabilityDiag.mark("ADD_VIEW_BEGIN", if (asBigPush) "bigPush" else "showcase")
             windowManager?.addView(container, params)
             OverlayDiagTracker.onAddView()
             OverlayDiagTracker.markAddViewSuccess()
+            CompanionRuntimeStabilityDiag.mark("ADD_VIEW_SUCCESS", if (asBigPush) "bigPush" else "showcase")
             VlueBigPushTrace.addViewSuccess(container, params, "phone=${ReleaseDebugGate.maskPhoneForLog(phone)}")
             if (asBigPush) {
                 CompanionBigPushDiag.noteAddViewSuccess(companion.snapshot())
@@ -471,6 +542,7 @@ class CallOverlayService : Service() {
                     detail = "addView SUCCESS pos=${companion.position.name}"
                 )
                 OverlayDiagTracker.markBigPushVisibleCommit()
+                CompanionRuntimeStabilityDiag.mark("BIG_PUSH_VISIBLE", "addView_success")
             }
             VlueBigPushTrace.recordOverlayAddViewProbe(
                 context = this,
@@ -490,6 +562,10 @@ class CallOverlayService : Service() {
                 reactHint = "WebView not loaded yet (pre-loadUrl)"
             )
             LetteringPrefs.setLastCallEvent(this, "overlay_shown:$phone")
+            if (asBigPush) {
+                LetteringRingingActivity.requestFinish(this)
+            }
+            syncOverlayChromeForState(source = if (asBigPush) "attach_bigPush" else "attach_showcase")
         } catch (e: Exception) {
             val canDraw = LetteringPermissionHelper.canDrawOverlays(this)
             val reason = OemDeviceProbe.classifyFailure(e, canDrawOverlays = canDraw)
@@ -581,6 +657,16 @@ class CallOverlayService : Service() {
      * 이후 notifyWebCallState("connected")는 Web Content Ready 알림만 (상태 전이 아님).
      */
     private fun enterShowcaseFromAnswer(source: String) {
+        if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+            CompanionRuntimeStabilityDiag.noteStaleEvent(
+                "CONNECTED",
+                source,
+                detail = "enterShowcaseFromAnswer ignored dismissing=$dismissing sessionActive=${CompanionRuntimeStabilityDiag.isCallSessionActive()}"
+            )
+            return
+        }
+        CompanionRuntimeStabilityDiag.mark("ANSWER_DETECTED", source)
+        CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_ANSWER", source)
         VlueBigPushTrace.milestone(
             "ANSWER_DETECTED",
             "Answer Detected",
@@ -593,6 +679,10 @@ class CallOverlayService : Service() {
             seq = 8,
             detail = "event-driven ($source), independent of BigPush"
         )
+        CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_BEGIN", source)
+        /* BigPush native banner 즉시 제거 — Web Showcase 와 겹침 방지 */
+        rootContainer?.animate()?.cancel()
+        nativeBanner?.visibility = android.view.View.GONE
         companion.onAnswer(OverlayContext.IN_CALL)
         publishCompanion(OverlayTriggerEvent.ANSWER)
         userMinimized = false
@@ -609,7 +699,37 @@ class CallOverlayService : Service() {
             )
             enterShowcaseLayout(source = source)
         }
+        syncOverlayChromeForState(source = source)
+        CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_APPLIED", source)
+        CompanionRuntimeStabilityDiag.mark("SHOWCASE_VISIBLE", source)
         notifyWebCallState("connected")
+        LetteringRingingActivity.requestFinish(this)
+    }
+
+    /**
+     * Single Window 내부 UI 스왑 — 한 시점에 BIG_PUSH banner / SHOWCASE / MINI 중 하나만.
+     * Window 추가 금지.
+     */
+    private fun syncOverlayChromeForState(source: String) {
+        when (companion.state) {
+            OverlayState.BIG_PUSH -> {
+                nativeBanner?.visibility = android.view.View.VISIBLE
+                webView?.visibility = android.view.View.VISIBLE
+            }
+            OverlayState.SHOWCASE, OverlayState.MINI_CASE -> {
+                nativeBanner?.visibility = android.view.View.GONE
+                webView?.visibility = android.view.View.VISIBLE
+            }
+            OverlayState.IDLE -> {
+                nativeBanner?.visibility = android.view.View.GONE
+                webView?.visibility = android.view.View.GONE
+            }
+        }
+        VlueBigPushTrace.lifecycle(
+            "UI_MODE_SYNC",
+            "source=$source state=${companion.state.name} pos=${companion.position.name} " +
+                "banner=${nativeBanner?.visibility} web=${webView?.visibility}"
+        )
     }
 
     /** Controller position FULLSCREEN을 단일 Window에 updateViewLayout으로 반영 */
@@ -650,6 +770,8 @@ class CallOverlayService : Service() {
             params.x = 0
             params.y = 0
             params.gravity = Gravity.TOP or Gravity.START
+            applyPassThroughTouchFlags(params)
+            /* Showcase 터치 필요 — NOT_FOCUSABLE 유지하되 창은 full; HOME 시 MINI 로 축소 */
             params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
             nativeBanner?.visibility = android.view.View.GONE
             try {
@@ -695,17 +817,20 @@ class CallOverlayService : Service() {
             }
         }
         val activity = VlueCallOverlayApp.currentActivityName.orEmpty()
-        val ourApp = activity.contains("kr.vlue", ignoreCase = true)
-        /* Activity name만으로는 패키지 확정 불가 — InCall 추정은 링잉+비홈 휴리스틱 */
-        val launcher = activity.contains("Launcher", ignoreCase = true) ||
-            activity.contains("launcher", ignoreCase = true)
-        val inCallUi = phase == OverlayContextDetector.CallPhase.RINGING && !ourApp && !launcher
+        val pausedOrGone = activity.isBlank() || activity.contains("(paused)", ignoreCase = true)
+        /* paused 는 전면이 아님 — HOME/OTHER 로 내려가 MINI 로 축소되어야 함 */
+        val ourApp = activity.contains("kr.vlue", ignoreCase = true) && !pausedOrGone
+        val launcher =
+            OverlayContextDetector.isLikelyLauncherPackage(activity) ||
+                activity.contains("Launcher", ignoreCase = true) ||
+                (pausedOrGone && phase == OverlayContextDetector.CallPhase.OFFHOOK)
+        val inCallUi =
+            OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone
         return OverlayContextDetector.detect(
             callPhase = phase,
             foregroundIsOurApp = ourApp,
-            foregroundIsLauncher = launcher || (!ourApp && phase == OverlayContextDetector.CallPhase.RINGING && activity.isBlank()),
-            foregroundIsInCallUi = inCallUi ||
-                (phase == OverlayContextDetector.CallPhase.OFFHOOK && !userMinimized),
+            foregroundIsLauncher = launcher,
+            foregroundIsInCallUi = inCallUi,
             userMinimized = userMinimized,
             keypadOpen = keypadOpen
         )
@@ -759,6 +884,14 @@ class CallOverlayService : Service() {
         cardJson: String?
     ) {
         mainHandler.post {
+            if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+                CompanionRuntimeStabilityDiag.noteStaleEvent(
+                    "CALL_INFO_UPDATE",
+                    "applyCallInfoUpdate",
+                    detail = "dismissing=$dismissing"
+                )
+                return@post
+            }
             if (IncomingNumberResolver.isUnknown(phone) && cardJson.isNullOrBlank()) return@post
             currentPhone = phone
             currentOutgoing = outgoing
@@ -779,6 +912,12 @@ class CallOverlayService : Service() {
                 if (!cardJson.isNullOrBlank()) {
                     injectCardLookupJson(wv, cardJson)
                 }
+                CompanionRuntimeStabilityDiag.noteMemberLookup(
+                    phase = "WEB_CARD_RENDERED",
+                    maskedPhone = ReleaseDebugGate.maskPhoneForLog(phone),
+                    matched = !cardJson.isNullOrBlank(),
+                    dataSource = "applyCallInfoUpdate"
+                )
                 /* 이미 수화(SHOWCASE/MINI)일 때만 전체 쇼케이스 재알림 */
                 if (isInCallOverlayState()) {
                     notifyWebCallState("connected")
@@ -831,6 +970,10 @@ class CallOverlayService : Service() {
      * Controller → MINI_CASE → layout.
      */
     fun onMinimizeRequestedFromWeb(source: String = "js.revealSystemCallUi") {
+        if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+            CompanionRuntimeStabilityDiag.noteStaleEvent("MINI", source)
+            return
+        }
         companion.onMinimize(
             if (keypadOpen) OverlayContext.KEYPAD else OverlayContext.MINIMIZED
         )
@@ -845,6 +988,10 @@ class CallOverlayService : Service() {
      * Controller → SHOWCASE/FULLSCREEN → layout.
      */
     fun onRestoreShowcaseRequestedFromWeb(source: String = "js.restoreShowcase") {
+        if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+            CompanionRuntimeStabilityDiag.noteStaleEvent("RESTORE", source)
+            return
+        }
         companion.onRestoreShowcase(OverlayContext.IN_CALL)
         if (companion.rejectedTransition != null && companion.state != OverlayState.SHOWCASE) {
             OverlayDiagTracker.recordOverlayFailure(
@@ -924,11 +1071,28 @@ class CallOverlayService : Service() {
      * Bridge/boolean fullscreen API가 상태를 밀어 넣지 않는다.
      */
     private fun applyLayoutFromController(source: String) {
+        if (dismissing || companion.state == OverlayState.IDLE) {
+            if (companion.state == OverlayState.IDLE && !dismissing) {
+                CompanionRuntimeStabilityDiag.noteStaleEvent("LAYOUT", source, detail = "state=IDLE")
+            }
+            return
+        }
         val pos = companion.position
+        CompanionRuntimeStabilityDiag.noteLayoutCommit(
+            state = companion.state.name,
+            position = pos.name,
+            source = source,
+            miniVisibility = companion.miniCaseVisibility.name
+        )
+        syncOverlayChromeForState(source = source)
         OverlayDiagTracker.beginLayout(pos.name, source = source)
         when (pos) {
             OverlayPosition.FULLSCREEN -> commitFullscreenLayout(source = source)
-            OverlayPosition.MINI_CASE -> commitMiniCaseLayout(source = source)
+            OverlayPosition.MINI_CASE -> {
+                CompanionRuntimeStabilityDiag.mark("MINI_REQUEST", source)
+                commitMiniCaseLayout(source = source)
+                CompanionRuntimeStabilityDiag.mark("MINI_VISIBLE", source)
+            }
             OverlayPosition.TOP, OverlayPosition.BOTTOM -> applyCompactRingingWindow()
             OverlayPosition.HIDDEN -> commitHiddenLayout(source = source)
         }
@@ -998,6 +1162,8 @@ class CallOverlayService : Service() {
             }
             params.gravity = Gravity.TOP or Gravity.START
             nativeBanner?.visibility = android.view.View.GONE
+            /* HOME/다른 앱 터치 통과 — 전체화면 플래그 잔존 제거 후 Mini flags 고정 */
+            applyPassThroughTouchFlags(params)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
                     wm.updateViewLayout(view, params)
@@ -1024,6 +1190,22 @@ class CallOverlayService : Service() {
             apply.run()
         } else {
             mainHandler.post(apply)
+        }
+    }
+
+    /** Mini/compact: 포커스·모달 점유 없이 창 밖 터치가 하위 앱으로 전달 */
+    private fun applyPassThroughTouchFlags(params: WindowManager.LayoutParams) {
+        params.flags = (
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+            )
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) {
+            @Suppress("DEPRECATION")
+            params.flags = params.flags or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
         }
     }
 
@@ -1099,7 +1281,7 @@ class CallOverlayService : Service() {
             OverlayPosition.BOTTOM -> Gravity.BOTTOM or Gravity.START
             else -> Gravity.TOP or Gravity.START
         }
-        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+        applyPassThroughTouchFlags(params)
     }
 
     /** CSS px 클램프용 — WebView가 Mini Case로 줄어든 뒤에도 전체 화면 크기 제공 */
@@ -1124,25 +1306,24 @@ class CallOverlayService : Service() {
     /**
      * 통화 오버레이(WebView)만 닫고 이 서비스만 stopSelf.
      * MainActivity·LetteringCallMonitorService·앱 프로세스는 종료하지 않는다.
+     * Phase 6-G FINAL: 애니 대기 없이 즉시 remove — CallEnd→Gone &lt; 300ms.
      */
     fun dismissOverlay() {
         if (dismissing) return
         dismissing = true
+        CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_CALL_END", "dismissOverlay")
+        CompanionRuntimeStabilityDiag.endCallSession("dismissOverlay")
         companion.onCallEnd()
         publishCompanion(OverlayTriggerEvent.CALL_END)
-        val container = rootContainer ?: run {
-            stopSelfTraced("dismissOverlay_noContainer")
-            return
-        }
-        container.animate()
-            .alpha(0f)
-            .translationY(-100f)
-            .setDuration(260)
-            .withEndAction {
-                removeOverlayImmediate()
-                stopSelfTraced("dismissOverlay_animateEnd")
-            }
-            .start()
+        /* 애니/큐보다 먼저 Web idle — stale connected 가 UI 를 되살리지 않게 */
+        notifyWebCallState("idle")
+        CompanionRuntimeStabilityDiag.mark("WEB_CALL_STATE_IDLE", "dismissOverlay")
+        CompanionRuntimeStabilityDiag.mark("OVERLAY_HIDE_BEGIN", "dismissOverlay")
+        rootContainer?.animate()?.cancel()
+        removeOverlayImmediate()
+        CompanionRuntimeStabilityDiag.mark("OVERLAY_HIDE_COMPLETE", "dismissOverlay_immediate")
+        LetteringRingingActivity.requestFinish(this)
+        stopSelfTraced("dismissOverlay_immediate")
     }
 
     private fun removeOverlayImmediate() {
@@ -1268,6 +1449,35 @@ class CallOverlayService : Service() {
             detail = detail
         )
         applyLayoutFromController(source = "screen:$previous→$next")
+    }
+
+    /**
+     * HOME / 다른 앱 전환 시 Activity lifecycle 에서 호출.
+     * SHOWCASE FULLSCREEN 이 화면을 점유하지 않도록 Context→MINI 로 축소.
+     */
+    private fun reevaluateForegroundContext(source: String) {
+        if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
+        if (companion.state != OverlayState.SHOWCASE && companion.state != OverlayState.MINI_CASE) return
+        val prevState = companion.state
+        val prevPos = companion.position
+        val ctx = detectOverlayContext(forceRinging = false)
+        companion.updateContext(ctx)
+        if (companion.state != prevState || companion.position != prevPos) {
+            publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
+            applyLayoutFromController(source = "reeval:$source")
+            if (companion.state == OverlayState.MINI_CASE) {
+                userMinimized = true
+                notifyWebCallState("reveal_system_call_ui")
+            }
+            CompanionRuntimeStabilityDiag.mark(
+                "HOME_CONTEXT_REEVAL",
+                source,
+                org.json.JSONObject()
+                    .put("context", ctx.name)
+                    .put("state", companion.state.name)
+                    .put("position", companion.position.name)
+            )
+        }
     }
 
     private fun stopSelfTraced(reason: String) {
@@ -1468,6 +1678,12 @@ class CallOverlayService : Service() {
 
         fun isRunning(): Boolean = activeInstance != null
 
+        /** Activity pause/stop → HOME 점유 해제용 Context 재평가 */
+        fun notifyForegroundContextChanged(source: String = "activityLifecycle") {
+            val svc = activeInstance ?: return
+            svc.mainHandler.post { svc.reevaluateForegroundContext(source) }
+        }
+
         fun updateCallInfo(
             context: android.content.Context,
             phone: String,
@@ -1502,6 +1718,14 @@ class CallOverlayService : Service() {
 
         fun notifyConnected(context: android.content.Context) {
             /* Native Call Event (OFFHOOK/ACTIVE) → Controller.onAnswer — Web "connected" 알림과 역할 분리 */
+            if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+                CompanionRuntimeStabilityDiag.noteStaleEvent(
+                    "CONNECTED",
+                    "notifyConnected",
+                    detail = "session inactive — skip startService"
+                )
+                return
+            }
             try {
                 val intent = Intent(context, CallOverlayService::class.java).apply {
                     action = ACTION_CONNECTED

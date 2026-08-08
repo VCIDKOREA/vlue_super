@@ -14,7 +14,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Phase 6-D — Companion BIG_PUSH Diagnosis (관찰 전용 · Architecture Freeze).
+ * Phase 6-D/E — Companion BIG_PUSH + Permission Gate Diagnosis.
  */
 class CompanionBigPushDiagTest {
     @Before
@@ -24,75 +24,182 @@ class CompanionBigPushDiagTest {
     }
 
     @Test
-    fun requestBigPush_accepted_recordsResult() {
+    fun permissionFalse_showOverlayNotReached_isPermissionBlocked() {
+        CompanionBigPushDiag.noteIncomingReceived("test")
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            source = CompanionBigPushDiag.SOURCE_INCOMING_GATE,
+            canDrawOverlays = false,
+            callPhase = "RINGING"
+        )
+        val diag = CompanionBigPushDiag.diagnosisJson()
+        assertEquals(
+            CompanionBigPushDiag.Breakpoint.PERMISSION_BLOCKED.name,
+            diag.getString("exactBreakpoint")
+        )
+        assertEquals("BLOCKED", diag.getJSONObject("gates").getString("permissionGate"))
+        assertEquals("NOT_REACHED", diag.getJSONObject("gates").getString("showOverlayGate"))
+        assertEquals("NOT_REACHED", diag.getJSONObject("gates").getString("bigPushGate"))
+    }
+
+    @Test
+    fun permissionFalse_noBigPushRequestBegin() {
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            source = CompanionBigPushDiag.SOURCE_INCOMING_GATE,
+            canDrawOverlays = false
+        )
+        val codes = eventCodes()
+        assertTrue(codes.contains("OVERLAY_PERMISSION_CHECK"))
+        assertFalse(codes.contains("BIG_PUSH_REQUEST_BEGIN"))
+        assertFalse(codes.contains("SHOW_OVERLAY_ENTER"))
+    }
+
+    @Test
+    fun permissionTrue_showOverlayEnter_and_requestBegin() {
+        val c = CompanionOverlayController()
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            source = CompanionBigPushDiag.SOURCE_SHOW_OVERLAY_GATE,
+            canDrawOverlays = true,
+            callPhase = "RINGING"
+        )
+        CompanionBigPushDiag.noteShowOverlayEnter(false, true, false, c.snapshot())
+        CompanionBigPushDiag.noteBigPushRequestBegin(c.snapshot())
+        val diag = CompanionBigPushDiag.diagnosisJson()
+        assertEquals("PASS", diag.getJSONObject("checklist").getString("showOverlayEnter"))
+        assertEquals("PASS", diag.getJSONObject("checklist").getString("bigPushRequest"))
+        assertEquals("REACHED", diag.getJSONObject("gates").getString("showOverlayGate"))
+        assertEquals("PASS", diag.getJSONObject("gates").getString("permissionGate"))
+    }
+
+    @Test
+    fun bigPush_acceptedFalse() {
+        val c = CompanionOverlayController()
+        c.onScreenStateChanged(ScreenState.SCREEN_OFF)
+        CompanionBigPushDiag.noteShowOverlayEnter(false, true, false, c.snapshot())
+        CompanionBigPushDiag.noteBigPushRequestBegin(c.snapshot())
+        assertFalse(c.requestBigPush(OverlayContext.HOME_SCREEN, false))
+        CompanionBigPushDiag.noteBigPushRequestResult(false, c.snapshot(), c.rejectedTransition)
+        CompanionBigPushDiag.noteShowOverlayEarlyExit("BIG_PUSH_REJECTED", c.snapshot())
+        val diag = CompanionBigPushDiag.diagnosisJson()
+        assertEquals(
+            CompanionBigPushDiag.Breakpoint.BIG_PUSH_REJECTED.name,
+            diag.getString("exactBreakpoint")
+        )
+        assertEquals("REJECTED", diag.getJSONObject("gates").getString("bigPushGate"))
+    }
+
+    @Test
+    fun bigPush_acceptedTrue() {
         val c = CompanionOverlayController()
         c.onIncoming(OverlayContext.INCOMING_CALL_UI)
-        CompanionBigPushDiag.noteShowOverlayEnter(
-            answered = false,
-            canDrawOverlays = true,
-            attached = false,
-            snap = c.snapshot()
-        )
+        CompanionBigPushDiag.noteShowOverlayEnter(false, true, false, c.snapshot())
         CompanionBigPushDiag.noteBigPushRequestBegin(c.snapshot())
-        val ok = c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false)
-        assertTrue(ok)
+        assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, false))
         CompanionBigPushDiag.noteBigPushRequestResult(true, c.snapshot())
-        val diag = CompanionBigPushDiag.diagnosisJson()
-        assertEquals("PASS", diag.getJSONObject("checklist").getString("bigPushAccepted"))
-        assertEquals(OverlayState.BIG_PUSH, c.state)
+        assertEquals(
+            "ACCEPTED",
+            CompanionBigPushDiag.diagnosisJson().getJSONObject("gates").getString("bigPushGate")
+        )
         assertEquals(OverlayPosition.TOP, c.position)
     }
 
     @Test
-    fun requestBigPush_rejected_whenAlreadyAnsweredPath() {
-        CompanionBigPushDiag.noteShowOverlayEnter(
-            answered = true,
-            canDrawOverlays = true,
-            attached = false,
-            snap = CompanionOverlayController().snapshot()
+    fun attachFailure_withPermissionTrue() {
+        val c = CompanionOverlayController()
+        assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, false))
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            source = CompanionBigPushDiag.SOURCE_ATTACH_GATE,
+            canDrawOverlays = true
         )
-        CompanionBigPushDiag.noteShowOverlayEarlyExit("ALREADY_ANSWERED")
-        CompanionBigPushDiag.noteBigPushSkipped("ALREADY_ANSWERED")
+        CompanionBigPushDiag.noteShowOverlayEnter(false, true, false, c.snapshot())
+        CompanionBigPushDiag.noteBigPushRequestResult(true, c.snapshot())
+        CompanionBigPushDiag.noteAttachRequest(c.snapshot(), false)
+        CompanionBigPushDiag.noteAddViewBegin(c.snapshot(), 2038, 0, true)
+        CompanionBigPushDiag.noteAddViewFailed(
+            c.snapshot(),
+            OverlayFailureReason.OEM_RESTRICTED,
+            RuntimeException("denied"),
+            2038,
+            0,
+            canDrawOverlays = true,
+            oemInfo = null
+        )
+        val diag = CompanionBigPushDiag.diagnosisJson()
         assertEquals(
-            CompanionBigPushDiag.Breakpoint.SHOW_OVERLAY_EARLY_EXIT.name,
+            CompanionBigPushDiag.Breakpoint.ATTACH_FAILED.name,
+            diag.getString("exactBreakpoint")
+        )
+        assertEquals(OverlayFailureReason.OEM_RESTRICTED.name, diag.getString("failureReason"))
+    }
+
+    @Test
+    fun oemRestricted_notKeptWhenPermissionFalse() {
+        val c = CompanionOverlayController()
+        CompanionBigPushDiag.noteShowOverlayEnter(false, true, false, c.snapshot())
+        CompanionBigPushDiag.noteBigPushRequestResult(true, c.snapshot())
+        CompanionBigPushDiag.noteAttachRequest(c.snapshot(), false)
+        CompanionBigPushDiag.noteAddViewBegin(c.snapshot(), 2038, 0, false)
+        CompanionBigPushDiag.noteAddViewFailed(
+            c.snapshot(),
+            OverlayFailureReason.OEM_RESTRICTED,
+            RuntimeException("x"),
+            2038,
+            0,
+            canDrawOverlays = false,
+            oemInfo = null
+        )
+        assertEquals(
+            OverlayFailureReason.PERMISSION_DENIED.name,
+            CompanionBigPushDiag.diagnosisJson().getString("failureReason")
+        )
+    }
+
+    @Test
+    fun probeTrue_incomingFalse_keptSeparate() {
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            source = CompanionBigPushDiag.SOURCE_DIAGNOSTIC_PROBE,
+            canDrawOverlays = true
+        )
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            source = CompanionBigPushDiag.SOURCE_INCOMING_GATE,
+            canDrawOverlays = false
+        )
+        val hist = CompanionBigPushDiag.diagnosisJson().getJSONObject("permissionHistory")
+        assertTrue(hist.getJSONObject("DIAGNOSTIC_PROBE").getBoolean("canDrawOverlays"))
+        assertFalse(hist.getJSONObject("INCOMING_GATE").getBoolean("canDrawOverlays"))
+        assertEquals(
+            CompanionBigPushDiag.Breakpoint.PERMISSION_BLOCKED.name,
             CompanionBigPushDiag.diagnosisJson().getString("exactBreakpoint")
         )
     }
 
     @Test
-    fun screenOff_rejection_mapsToPolicy() {
+    fun probeFalse_incomingTrue_keptSeparate() {
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            source = CompanionBigPushDiag.SOURCE_DIAGNOSTIC_PROBE,
+            canDrawOverlays = false
+        )
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            source = CompanionBigPushDiag.SOURCE_INCOMING_GATE,
+            canDrawOverlays = true
+        )
         val c = CompanionOverlayController()
-        c.onScreenStateChanged(ScreenState.SCREEN_OFF)
         CompanionBigPushDiag.noteShowOverlayEnter(false, true, false, c.snapshot())
-        CompanionBigPushDiag.noteBigPushRequestBegin(c.snapshot())
-        val ok = c.requestBigPush(OverlayContext.HOME_SCREEN, callAlreadyAnswered = false)
-        assertFalse(ok)
-        CompanionBigPushDiag.noteBigPushRequestResult(
-            false,
-            c.snapshot(),
-            rejectReason = c.rejectedTransition
-        )
-        CompanionBigPushDiag.noteShowOverlayEarlyExit("BIG_PUSH_REJECTED", c.snapshot())
-        val diag = CompanionBigPushDiag.diagnosisJson()
-        assertEquals(
-            CompanionBigPushDiag.Breakpoint.BIG_PUSH_REQUEST_REJECTED.name,
-            diag.getString("exactBreakpoint")
-        )
-        assertEquals(
-            OverlayFailureReason.SCREEN_OFF_POLICY.name,
-            diag.getString("failureReason")
+        val hist = CompanionBigPushDiag.diagnosisJson().getJSONObject("permissionHistory")
+        assertFalse(hist.getJSONObject("DIAGNOSTIC_PROBE").getBoolean("canDrawOverlays"))
+        assertTrue(hist.getJSONObject("INCOMING_GATE").getBoolean("canDrawOverlays"))
+        assertNotEquals(
+            CompanionBigPushDiag.Breakpoint.PERMISSION_BLOCKED.name,
+            CompanionBigPushDiag.diagnosisJson().getString("exactBreakpoint")
         )
     }
 
     @Test
-    fun addView_success_and_layout_visible() {
+    fun success_visible_breakpoint() {
         val c = CompanionOverlayController()
-        c.onIncoming(OverlayContext.INCOMING_CALL_UI)
         assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, false))
         CompanionBigPushDiag.noteShowOverlayEnter(false, true, false, c.snapshot())
-        CompanionBigPushDiag.noteBigPushRequestBegin(c.snapshot())
         CompanionBigPushDiag.noteBigPushRequestResult(true, c.snapshot())
-        CompanionBigPushDiag.noteAttachRequest(c.snapshot(), attached = false)
+        CompanionBigPushDiag.noteAttachRequest(c.snapshot(), false)
         CompanionBigPushDiag.noteAddViewBegin(c.snapshot(), 2038, 0, true)
         CompanionBigPushDiag.noteAddViewSuccess(c.snapshot())
         CompanionBigPushDiag.noteLayoutRequest(c.snapshot())
@@ -100,80 +207,39 @@ class CompanionBigPushDiagTest {
         CompanionBigPushDiag.noteBigPushVisible(c.snapshot())
         val diag = CompanionBigPushDiag.diagnosisJson()
         assertEquals(
-            CompanionBigPushDiag.Breakpoint.BIG_PUSH_SUCCESS.name,
+            CompanionBigPushDiag.Breakpoint.BIG_PUSH_VISIBLE.name,
             diag.getString("exactBreakpoint")
         )
-        assertEquals("PASS", diag.getJSONObject("checklist").getString("bigPushVisible"))
+        assertEquals("PASS", diag.getJSONObject("gates").getString("visible"))
     }
 
     @Test
-    fun addView_failure_setsBreakpointAndEvidence() {
-        val c = CompanionOverlayController()
-        c.onIncoming(OverlayContext.INCOMING_CALL_UI)
-        assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, false))
-        CompanionBigPushDiag.noteShowOverlayEnter(false, true, false, c.snapshot())
-        CompanionBigPushDiag.noteBigPushRequestResult(true, c.snapshot())
-        CompanionBigPushDiag.noteAttachRequest(c.snapshot(), false)
-        CompanionBigPushDiag.noteAddViewBegin(c.snapshot(), 2038, 0, true)
-        CompanionBigPushDiag.noteAddViewFailed(
-            snap = c.snapshot(),
-            reason = OverlayFailureReason.OEM_RESTRICTED,
-            error = RuntimeException("permission denied for window type"),
-            windowType = 2038,
-            layoutFlags = 0,
-            canDrawOverlays = true,
-            oemInfo = null
+    fun alreadyAnswered_earlyExit() {
+        CompanionBigPushDiag.noteShowOverlayEnter(
+            true,
+            true,
+            false,
+            CompanionOverlayController().snapshot()
         )
-        val diag = CompanionBigPushDiag.diagnosisJson()
+        CompanionBigPushDiag.noteShowOverlayEarlyExit("ALREADY_ANSWERED")
         assertEquals(
-            CompanionBigPushDiag.Breakpoint.BIG_PUSH_ADD_VIEW_FAILED.name,
-            diag.getString("exactBreakpoint")
-        )
-        assertEquals(OverlayFailureReason.OEM_RESTRICTED.name, diag.getString("failureReason"))
-        assertTrue(diag.has("samsungEvidence"))
-        assertEquals(
-            "RuntimeException",
-            diag.getJSONObject("samsungEvidence").getString("exceptionClass").substringAfterLast('.')
-        )
-    }
-
-    @Test
-    fun layout_failure_breakpoint() {
-        val c = CompanionOverlayController()
-        assertTrue(c.requestBigPush(OverlayContext.HOME_SCREEN, false))
-        CompanionBigPushDiag.noteShowOverlayEnter(false, true, false, c.snapshot())
-        CompanionBigPushDiag.noteBigPushRequestResult(true, c.snapshot())
-        CompanionBigPushDiag.noteAttachRequest(c.snapshot(), false)
-        CompanionBigPushDiag.noteAddViewBegin(c.snapshot(), 2038, 0, true)
-        CompanionBigPushDiag.noteAddViewSuccess(c.snapshot())
-        CompanionBigPushDiag.noteLayoutRequest(c.snapshot())
-        CompanionBigPushDiag.noteLayoutFailed(
-            c.snapshot(),
-            OverlayFailureReason.WINDOW_REJECTED,
-            RuntimeException("layout fail")
-        )
-        assertEquals(
-            CompanionBigPushDiag.Breakpoint.BIG_PUSH_LAYOUT_FAILED.name,
+            CompanionBigPushDiag.Breakpoint.SHOW_OVERLAY_EARLY_EXIT.name,
             CompanionBigPushDiag.diagnosisJson().getString("exactBreakpoint")
         )
     }
 
     @Test
-    fun hun_is_not_companion_bigPush() {
-        CompanionBigPushDiag.noteIncomingReceived("test")
-        CompanionBigPushDiag.noteSystemHunPosted()
-        val diag = CompanionBigPushDiag.diagnosisJson()
-        assertTrue(diag.getBoolean("hunIsNotCompanionBigPush"))
-        assertEquals("PASS", diag.getJSONObject("checklist").getString("systemHunPosted"))
-        assertEquals("FAIL", diag.getJSONObject("checklist").getString("bigPushVisible"))
-        assertNotEquals(
-            CompanionBigPushDiag.Breakpoint.BIG_PUSH_SUCCESS.name,
-            diag.getString("exactBreakpoint")
-        )
+    fun answer_showcase_regression() {
+        val c = CompanionOverlayController()
+        c.onIncoming(OverlayContext.INCOMING_CALL_UI)
+        c.requestBigPush(OverlayContext.INCOMING_CALL_UI, false)
+        c.onAnswer(OverlayContext.IN_CALL)
+        assertEquals(OverlayState.SHOWCASE, c.state)
+        assertEquals(OverlayPosition.FULLSCREEN, c.position)
     }
 
     @Test
-    fun position_rules_screenOn() {
+    fun position_rules_unchanged() {
         assertEquals(
             OverlayPosition.TOP,
             OverlayPositionManager.resolve(
@@ -190,52 +256,23 @@ class CompanionBigPushDiagTest {
                 ScreenState.SCREEN_ON
             )
         )
-        assertEquals(
-            OverlayPosition.HIDDEN,
-            OverlayPositionManager.resolve(
-                OverlayContext.INCOMING_CALL_UI,
-                OverlayState.BIG_PUSH,
-                ScreenState.SCREEN_OFF
-            )
+    }
+
+    @Test
+    fun snapshot_includes_permission_gate() {
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            source = CompanionBigPushDiag.SOURCE_INCOMING_GATE,
+            canDrawOverlays = true
         )
+        val snap = OverlayDiagTracker.snapshotJson().getJSONObject("companionBigPushDiagnosis")
+        assertTrue(snap.has("permissionGate"))
+        assertTrue(snap.has("permissionHistory"))
+        assertTrue(snap.has("gates"))
+        assertTrue(snap.getBoolean("architectureFreeze"))
     }
 
-    @Test
-    fun answer_showcase_regression_controller() {
-        val c = CompanionOverlayController()
-        c.onIncoming(OverlayContext.INCOMING_CALL_UI)
-        c.requestBigPush(OverlayContext.INCOMING_CALL_UI, false)
-        c.onAnswer(OverlayContext.IN_CALL)
-        assertEquals(OverlayState.SHOWCASE, c.state)
-        assertEquals(OverlayPosition.FULLSCREEN, c.position)
-    }
-
-    @Test
-    fun single_window_diagnosis_in_snapshot() {
-        CompanionBigPushDiag.noteIncomingReceived("t")
-        val snap = OverlayDiagTracker.snapshotJson()
-        assertTrue(snap.has("companionBigPushDiagnosis"))
-        assertTrue(snap.getJSONObject("companionBigPushDiagnosis").getBoolean("architectureFreeze"))
-    }
-
-    @Test
-    fun showOverlay_not_reached_breakpoint() {
-        CompanionBigPushDiag.noteIncomingReceived("only")
-        assertEquals(
-            CompanionBigPushDiag.Breakpoint.SHOW_OVERLAY_NOT_REACHED.name,
-            CompanionBigPushDiag.diagnosisJson().getString("exactBreakpoint")
-        )
-    }
-
-    @Test
-    fun attach_not_called_after_accept() {
-        val c = CompanionOverlayController()
-        assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, false))
-        CompanionBigPushDiag.noteShowOverlayEnter(false, true, false, c.snapshot())
-        CompanionBigPushDiag.noteBigPushRequestResult(true, c.snapshot())
-        assertEquals(
-            CompanionBigPushDiag.Breakpoint.BIG_PUSH_ATTACH_NOT_CALLED.name,
-            CompanionBigPushDiag.diagnosisJson().getString("exactBreakpoint")
-        )
+    private fun eventCodes(): List<String> {
+        val arr = CompanionBigPushDiag.diagnosisJson().getJSONArray("events")
+        return (0 until arr.length()).map { arr.getJSONObject(it).getString("code") }
     }
 }

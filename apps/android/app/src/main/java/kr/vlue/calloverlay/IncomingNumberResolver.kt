@@ -65,6 +65,30 @@ object IncomingNumberResolver {
 
     fun isUnknown(number: String?): Boolean {
         val n = number?.trim().orEmpty()
-        return n.isEmpty() || n.equals("unknown", ignoreCase = true)
+        if (n.isEmpty()) return true
+        if (n.equals("unknown", ignoreCase = true)) return true
+        if (n.equals("null", ignoreCase = true)) return true
+        if (n == "-" || n == "—") return true
+        return false
+    }
+
+    /**
+     * 010-8014-4666 / 01080144666 / +821080144666 를 동일 번호로 취급.
+     * Debounce·lookup 타이밍 레이스에서 서로 다른 문자열로 오인하지 않게 한다.
+     */
+    fun canonicalDigits(number: String?): String {
+        val d = number?.filter { it.isDigit() }.orEmpty()
+        if (d.isEmpty()) return ""
+        return when {
+            d.startsWith("82") -> d
+            d.startsWith("0") -> "82${d.drop(1)}"
+            else -> d
+        }
+    }
+
+    fun sameCanonicalNumber(a: String?, b: String?): Boolean {
+        val ca = canonicalDigits(a)
+        val cb = canonicalDigits(b)
+        return ca.isNotEmpty() && ca == cb
     }
 }

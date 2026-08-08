@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewParent
 import android.view.WindowManager
 import kr.vlue.calloverlay.diagnostics.ActiveDiagnosticSession
+import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
 import kr.vlue.calloverlay.diagnostics.DiagnosticsEventQueue
 import kr.vlue.calloverlay.diagnostics.DiagnosticsFeature
 import kr.vlue.calloverlay.diagnostics.DiagnosticsMilestoneClock
@@ -440,6 +441,15 @@ object VlueBigPushTrace {
         } catch (_: Exception) {
             false
         }
+        CompanionBigPushDiag.noteOverlayPermissionCheck(
+            context = context,
+            source = CompanionBigPushDiag.SOURCE_DIAGNOSTIC_PROBE,
+            canDrawOverlays = canDraw,
+            callPhase = "PROBE",
+            requestedWindowType = params?.type
+                ?: WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            result = if (canDraw) "ALLOW" else "BLOCK"
+        )
         val normalPrior = NormalOverlayProbe.lastResultJson(app)
         val priorResult = normalPrior.optString("result", "").takeIf {
             it.isNotBlank() && !it.equals("null", true)

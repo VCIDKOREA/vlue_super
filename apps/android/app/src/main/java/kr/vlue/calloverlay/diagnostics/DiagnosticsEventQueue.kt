@@ -15,6 +15,9 @@ import java.util.concurrent.atomic.AtomicLong
  * Local durable queue for diagnostics upload.
  * 이벤트는 발생 즉시 기록 (일괄 지연 기록 없음).
  * 시각: SystemClock.elapsedRealtimeNanos() 기준 baseTime 상대.
+ *
+ * Phase 6-G: file queue lock 과 HTTP upload 분리 —
+ * flush 중 @Synchronized 로 append 가 막히면 Timeline Δ 가 수 초로 부풀었다.
  */
 object DiagnosticsEventQueue {
     private const val TAG = "DiagnosticsQueue"
@@ -22,6 +25,7 @@ object DiagnosticsEventQueue {
     private val executor = Executors.newSingleThreadExecutor()
     /** sessionId → last event elapsedRealtimeNanos (세션별 Δ 계산) */
     private val lastEventNanosBySession = ConcurrentHashMap<String, AtomicLong>()
+    private val fileLock = Any()
 
     @Volatile
     private var appContext: Context? = null
@@ -107,6 +111,7 @@ object DiagnosticsEventQueue {
             put("deltaFromPrevMs", deltaFromPrev)
             put("t", sinceStart)
             put("delta", deltaFromPrev)
+            put("threadName", Thread.currentThread().name)
         }
         val mergedPayload = JSONObject().apply {
             payloadJson?.keys()?.forEach { k -> put(k, payloadJson.get(k)) }
@@ -130,6 +135,7 @@ object DiagnosticsEventQueue {
             put("deltaFromPrevMs", deltaFromPrev)
             put("elapsedRealtimeNanos", nowNanos)
             put("baseTimeNanos", session.startedElapsedRealtimeNanos)
+            put("threadName", Thread.currentThread().name)
             if (!reason.isNullOrBlank()) put("reason", reason)
             if (!exceptionMessage.isNullOrBlank()) put("exceptionMessage", exceptionMessage)
             if (!exceptionStack.isNullOrBlank()) put("exceptionStack", exceptionStack)
@@ -171,7 +177,7 @@ object DiagnosticsEventQueue {
         }
         append(context, wrapper)
         flushAsync(context)
-        Log.i(TAG, "$labelWithTime | code=$code nanos=$nowNanos deltaPrev=${deltaFromPrev}ms")
+        Log.i(TAG, "$labelWithTime | code=$code thread=${Thread.currentThread().name} deltaPrev=${deltaFromPrev}ms")
     }
 
     fun flushAsync(context: Context) {
@@ -183,26 +189,39 @@ object DiagnosticsEventQueue {
     private fun queueFile(context: Context): File =
         File(context.filesDir, QUEUE_FILE)
 
-    @Synchronized
     private fun append(context: Context, obj: JSONObject) {
-        try {
-            queueFile(context).appendText(obj.toString() + "\n")
-        } catch (e: Exception) {
-            Log.w(TAG, "append failed: ${e.message}")
+        synchronized(fileLock) {
+            try {
+                queueFile(context).appendText(obj.toString() + "\n")
+            } catch (e: Exception) {
+                Log.w(TAG, "append failed: ${e.message}")
+            }
         }
     }
 
-    @Synchronized
+    /**
+     * HTTP 는 fileLock 밖에서 수행한다.
+     * (이전: @Synchronized flush 가 upload 동안 append 를 막아 Timeline Δ 가 RTT 만큼 부풀음)
+     */
     private fun flushSync(context: Context) {
-        val file = queueFile(context)
-        if (!file.exists()) return
-        val lines = try {
-            file.readLines().filter { it.isNotBlank() }
-        } catch (e: Exception) {
-            Log.w(TAG, "read queue failed: ${e.message}")
-            return
+        val lines: List<String>
+        synchronized(fileLock) {
+            val file = queueFile(context)
+            if (!file.exists()) return
+            lines = try {
+                file.readLines().filter { it.isNotBlank() }
+            } catch (e: Exception) {
+                Log.w(TAG, "read queue failed: ${e.message}")
+                return
+            }
+            if (lines.isEmpty()) return
+            try {
+                file.writeText("")
+            } catch (e: Exception) {
+                Log.w(TAG, "clear queue failed: ${e.message}")
+                return
+            }
         }
-        if (lines.isEmpty()) return
 
         val remaining = mutableListOf<String>()
         for (line in lines) {
@@ -223,14 +242,14 @@ object DiagnosticsEventQueue {
                 remaining.add(line)
             }
         }
-        try {
-            if (remaining.isEmpty()) {
-                file.writeText("")
-            } else {
-                file.writeText(remaining.joinToString("\n", postfix = "\n"))
+        if (remaining.isEmpty()) return
+        synchronized(fileLock) {
+            try {
+                val file = queueFile(context)
+                file.appendText(remaining.joinToString("\n", postfix = "\n"))
+            } catch (e: Exception) {
+                Log.w(TAG, "rewrite queue failed: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "rewrite queue failed: ${e.message}")
         }
     }
 }
