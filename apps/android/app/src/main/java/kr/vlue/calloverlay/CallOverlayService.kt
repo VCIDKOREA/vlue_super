@@ -269,6 +269,8 @@ class CallOverlayService : Service() {
             )
             companion.onAnswer(OverlayContext.IN_CALL)
             publishCompanion(OverlayTriggerEvent.ANSWER)
+            LetteringIncomingNotifier.cancel(this)
+            LetteringRingingActivity.requestFinish(this)
             if (alreadyAttached) {
                 /* 기존 Single Window morph — remove/add 금지 */
                 enterShowcaseLayout(source = "answerBeforeBigPush_reuseWindow")
@@ -282,6 +284,7 @@ class CallOverlayService : Service() {
                 )
                 enterShowcaseLayout(source = "answerBeforeBigPush_attach")
             }
+            syncOverlayChromeForState(source = "answerBeforeBigPush")
             notifyWebCallState("connected")
             return
         }
@@ -342,14 +345,19 @@ class CallOverlayService : Service() {
             seq = 6,
             detail = "pos=${companion.position.name} context=${companion.context.name}"
         )
-        removeOverlayImmediate()
-        attachOverlayWindow(
-            phone = phone,
-            verified = verified,
-            outgoing = outgoing,
-            cardJson = cardJson,
-            asBigPush = true
-        )
+        /* 기존 Window 재사용 — remove+add 는 BadToken/흰화면 유발 */
+        if (alreadyAttached) {
+            applyCompactRingingWindow()
+            syncOverlayChromeForState(source = "bigPush_reuseWindow")
+        } else {
+            attachOverlayWindow(
+                phone = phone,
+                verified = verified,
+                outgoing = outgoing,
+                cardJson = cardJson,
+                asBigPush = true
+            )
+        }
     }
 
     /**
@@ -379,7 +387,10 @@ class CallOverlayService : Service() {
             )
         }
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        val container = FrameLayout(this)
+        val container = FrameLayout(this).apply {
+            /* WebView 기본 흰 배경이 FULLSCREEN 을 채우지 않도록 컨테이너는 다크 */
+            setBackgroundColor(Color.parseColor("#0B101B"))
+        }
         val bannerGravity =
             if (asBigPush && companion.position == OverlayPosition.BOTTOM) Gravity.BOTTOM else Gravity.TOP
 
@@ -437,6 +448,10 @@ class CallOverlayService : Service() {
             }
         }
         wv.setBackgroundColor(Color.TRANSPARENT)
+        /* BIG_PUSH: Native banner 만 노출 — WebView 흰 로딩이 화면을 덮지 않음 */
+        if (asBigPush) {
+            wv.visibility = android.view.View.GONE
+        }
         wv.webChromeClient = object : android.webkit.WebChromeClient() {
             override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
                 val msg = consoleMessage?.message().orEmpty()
@@ -601,13 +616,19 @@ class CallOverlayService : Service() {
                     .put("overlayPosition", companion.position.name)
                     .put("failureReason", reason.name)
             )
-            android.util.Log.e("CallOverlay", "addView failed — overlay permission?", e)
-            LetteringPrefs.setLastOverlayError(this, "addView:${e.message}")
+            android.util.Log.e("CallOverlay", "addView failed", e)
+            LetteringPrefs.setLastOverlayError(
+                this,
+                "addView:${e.javaClass.simpleName}:${e.message}"
+            )
+            /*
+             * Phase 6-H: addView 실패 시 onCallEnd/stopSelf 로 Showcase 를 죽이지 않는다.
+             * 세션·Controller 유지. HUN 폴백만 (Companion Window 추가 금지).
+             */
             LetteringIncomingNotifier.post(this, phone, outgoing)
-            LetteringRingingActivity.launch(this, phone, outgoing)
-            companion.onCallEnd()
-            publishCompanion(OverlayTriggerEvent.CALL_END)
-            stopSelfTraced("addViewException")
+            if (!LetteringPermissionHelper.canDrawOverlays(this)) {
+                LetteringRingingActivity.launch(this, phone, outgoing)
+            }
             return
         }
         rootContainer = container
@@ -680,9 +701,12 @@ class CallOverlayService : Service() {
             detail = "event-driven ($source), independent of BigPush"
         )
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_BEGIN", source)
-        /* BigPush native banner 즉시 제거 — Web Showcase 와 겹침 방지 */
+        /* Answer: HUN(가짜 빅푸시) 제거 + Native banner 제거 → Showcase */
+        LetteringIncomingNotifier.cancel(this)
+        LetteringRingingActivity.requestFinish(this)
         rootContainer?.animate()?.cancel()
         nativeBanner?.visibility = android.view.View.GONE
+        webView?.visibility = android.view.View.VISIBLE
         companion.onAnswer(OverlayContext.IN_CALL)
         publishCompanion(OverlayTriggerEvent.ANSWER)
         userMinimized = false
@@ -703,7 +727,6 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_APPLIED", source)
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_VISIBLE", source)
         notifyWebCallState("connected")
-        LetteringRingingActivity.requestFinish(this)
     }
 
     /**
@@ -714,7 +737,8 @@ class CallOverlayService : Service() {
         when (companion.state) {
             OverlayState.BIG_PUSH -> {
                 nativeBanner?.visibility = android.view.View.VISIBLE
-                webView?.visibility = android.view.View.VISIBLE
+                /* Web 로딩 흰 화면이 BigPush 를 덮지 않음 */
+                webView?.visibility = android.view.View.GONE
             }
             OverlayState.SHOWCASE, OverlayState.MINI_CASE -> {
                 nativeBanner?.visibility = android.view.View.GONE

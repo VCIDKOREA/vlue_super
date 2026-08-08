@@ -443,9 +443,13 @@ export default function LetteringOverlayHost() {
   }
 
   if (loading) {
+    /* FULLSCREEN 흰 바탕 점유 금지 — 투명 호스트 + 작은 상태 칩만 */
     return (
-      <div className="lettering-overlay-host lettering-overlay-host--tent fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
-        <p className="rounded-full bg-[#0F172A]/90 px-4 py-2 text-[11px] font-semibold tracking-wide text-[#E2E8F0]">
+      <div
+        className="lettering-overlay-host lettering-overlay-host--tent lettering-overlay-host--loading fixed inset-0 z-[200] flex items-start justify-center pointer-events-none bg-transparent"
+        style={{ background: "transparent" }}
+      >
+        <p className="mt-16 rounded-full bg-[#0F172A]/90 px-4 py-2 text-[11px] font-semibold tracking-wide text-[#E2E8F0]">
           VLUE 신원 확인 중…
         </p>
       </div>

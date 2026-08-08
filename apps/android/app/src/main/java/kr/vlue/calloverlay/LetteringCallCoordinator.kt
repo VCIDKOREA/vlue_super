@@ -2,22 +2,25 @@ package kr.vlue.calloverlay
 
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
 import kr.vlue.calloverlay.diagnostics.CompanionRuntimeStabilityDiag
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
 import kr.vlue.calloverlay.diagnostics.OverlayDiagTracker
 import kr.vlue.calloverlay.diagnostics.OverlayFailureReason
 import kr.vlue.calloverlay.diagnostics.ReleaseDebugGate
-import kr.vlue.calloverlay.incall.VlueInCallController
-import android.os.SystemClock
 
-/** 통화 이벤트 → API 조회 → 오버레이·알림·액티비티 폴백 */
+/**
+ * 통화 이벤트 → Overlay 즉시 기동 → (이후) 번호/회원 enrich.
+ * Phase 6-H: CallLog/lookup 이 startOverlayService 를 블로킹하지 않는다.
+ */
 object LetteringCallCoordinator {
     private const val TAG = "LetteringCoordinator"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -41,14 +44,16 @@ object LetteringCallCoordinator {
                 return
             }
 
-            var resolved = number?.trim().orEmpty()
-            if (IncomingNumberResolver.isUnknown(resolved)) {
-                IncomingNumberResolver.resolveRecentNumber(app, outgoing)?.let { resolved = it }
-            }
+            /*
+             * Phase 6-H: CallLog ContentResolver 동기 조회를 여기서 하지 않는다.
+             * (Samsung 수신 직후 CallLog 가 수 초 블로킹 → Incoming→startOverlay ~3s)
+             * 번호는 extras 만 즉시 사용하고, 미지정이면 unknown 으로 Overlay 먼저 띄운다.
+             */
+            val resolved = number?.trim().orEmpty()
+            val nextUnknown = IncomingNumberResolver.isUnknown(resolved)
 
             val now = System.currentTimeMillis()
             val prevUnknown = IncomingNumberResolver.isUnknown(lastRingNumber)
-            val nextUnknown = IncomingNumberResolver.isUnknown(resolved)
             val sameNumber =
                 IncomingNumberResolver.sameCanonicalNumber(resolved, lastRingNumber)
             val isUpgrade = prevUnknown && !nextUnknown && now - lastRingAt < 3_000L
@@ -73,7 +78,25 @@ object LetteringCallCoordinator {
 
             val raw = if (nextUnknown) "unknown" else resolved
             LetteringPrefs.setLastCallEvent(app, "ringing:$raw:out=$outgoing")
-            kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore.updatePhoneMasked(raw)
+
+            /* 1) Permission → Overlay 즉시 (diag/lookup 보다 먼저) */
+            val canDraw = LetteringPermissionHelper.canDrawOverlays(app)
+            if (canDraw) {
+                startOverlayService(app, raw, verified = false, cardJson = null, outgoing)
+            } else {
+                OverlayDiagTracker.recordOverlayFailure(
+                    OverlayFailureReason.PERMISSION_DENIED,
+                    phase = "BIG_PUSH",
+                    detail = "SYSTEM_ALERT_WINDOW missing"
+                )
+                VlueBigPushTrace.skip(3, "Overlay permission denied (SYSTEM_ALERT_WINDOW missing)")
+                Log.w(TAG, "overlay permission missing — notif/activity fallback")
+                LetteringPrefs.setLastOverlayError(app, "SYSTEM_ALERT_WINDOW missing")
+                LetteringRingingActivity.launch(app, raw, outgoing)
+            }
+
+            /* 2) 세션/게이트 기록 — Overlay 시작 이후 (임계 경로 밖) */
+            DiagnosticsSessionStore.updatePhoneMasked(raw)
             CompanionBigPushDiag.noteIncomingReceived(
                 source = if (outgoing) "onRinging_outgoing" else "onRinging_incoming"
             )
@@ -86,13 +109,6 @@ object LetteringCallCoordinator {
                 "INCOMING_RECEIVED",
                 if (outgoing) "onRinging_outgoing" else "onRinging_incoming"
             )
-            CompanionRuntimeStabilityDiag.mark(
-                "SERVICE_START_REQUEST",
-                "LetteringCallCoordinator.startOverlayService"
-            )
-
-            /* 1) FGS 오버레이 — SYSTEM_ALERT_WINDOW 있을 때 */
-            val canDraw = LetteringPermissionHelper.canDrawOverlays(app)
             CompanionBigPushDiag.noteOverlayPermissionCheck(
                 context = app,
                 source = CompanionBigPushDiag.SOURCE_INCOMING_GATE,
@@ -100,37 +116,19 @@ object LetteringCallCoordinator {
                 callPhase = if (outgoing) "OUTGOING" else "RINGING",
                 requestedWindowType = android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             )
-            if (canDraw) {
-                startOverlayService(app, raw, verified = false, cardJson = null, outgoing)
-            } else {
-                OverlayDiagTracker.recordOverlayFailure(
-                    OverlayFailureReason.PERMISSION_DENIED,
-                    phase = "BIG_PUSH",
-                    detail = "SYSTEM_ALERT_WINDOW missing"
-                )
-                VlueBigPushTrace.skip(3, "Overlay permission denied (SYSTEM_ALERT_WINDOW missing)")
-                Log.w(TAG, "overlay permission missing — notif/activity fallback")
-                LetteringPrefs.setLastOverlayError(app, "SYSTEM_ALERT_WINDOW missing")
-            }
 
-            /* 2) 헤드업 — 전화 UI 아래 깔림 대비 (HUN ≠ Companion Overlay) */
+            /* 3) HUN — Companion Overlay 가 아님. 폴백용만 */
             LetteringIncomingNotifier.post(app, raw, outgoing)
 
-            /* 3) Overlay 권한이 없을 때만 Activity 폴백 — 권한 있으면 Single Window 와 중복 금지 */
-            if (!canDraw) {
-                LetteringRingingActivity.launch(app, raw, outgoing)
-            }
-
-            if (IncomingNumberResolver.isUnknown(raw)) {
-                /* CallLog 가 늦게 쌓이는 OEM — 짧게 재시도 후 번호 업그레이드 */
+            /* 4) 번호/회원 enrich — Overlay 이후 IO */
+            if (nextUnknown) {
                 scope.launch {
-                    retryResolveUnknown(app, outgoing)
+                    upgradeNumberAfterOverlay(app, outgoing)
                 }
-                return
-            }
-
-            scope.launch {
-                enrichWithLookup(app, raw, outgoing)
+            } else {
+                scope.launch {
+                    enrichWithLookup(app, raw, outgoing)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "onRinging failed", e)
@@ -138,12 +136,35 @@ object LetteringCallCoordinator {
         }
     }
 
+    /** CallLog 조회는 IO — Overlay 시작을 막지 않는다 */
+    private suspend fun upgradeNumberAfterOverlay(app: Context, outgoing: Boolean) {
+        val fromLog = withContext(Dispatchers.IO) {
+            IncomingNumberResolver.resolveRecentNumber(app, outgoing)
+        }
+        if (!IncomingNumberResolver.isUnknown(fromLog)) {
+            val n = fromLog!!
+            Log.i(TAG, "upgrade unknown → ${ReleaseDebugGate.maskPhoneForLog(n)} (immediate CallLog)")
+            lastRingNumber = n
+            lastRingAt = System.currentTimeMillis()
+            LetteringPrefs.setLastCallEvent(app, "ringing_upgrade:$n:out=$outgoing")
+            if (LetteringPermissionHelper.canDrawOverlays(app)) {
+                CallOverlayService.updateCallInfo(app, n, verified = false, cardJson = null, outgoing)
+            }
+            LetteringIncomingNotifier.post(app, n, outgoing)
+            enrichWithLookup(app, n, outgoing)
+            return
+        }
+        retryResolveUnknown(app, outgoing)
+    }
+
     private suspend fun retryResolveUnknown(app: Context, outgoing: Boolean) {
         repeat(4) { attempt ->
             delay(350L + attempt * 200L)
-            val n = IncomingNumberResolver.resolveRecentNumber(app, outgoing) ?: return@repeat
+            val n = withContext(Dispatchers.IO) {
+                IncomingNumberResolver.resolveRecentNumber(app, outgoing)
+            } ?: return@repeat
             if (IncomingNumberResolver.isUnknown(n)) return@repeat
-            Log.i(TAG, "upgrade unknown → $n (attempt=$attempt)")
+            Log.i(TAG, "upgrade unknown → ${ReleaseDebugGate.maskPhoneForLog(n)} (attempt=$attempt)")
             lastRingNumber = n
             lastRingAt = System.currentTimeMillis()
             LetteringPrefs.setLastCallEvent(app, "ringing_upgrade:$n:out=$outgoing")
@@ -210,7 +231,6 @@ object LetteringCallCoordinator {
                 matched = true,
                 dataSource = "api"
             )
-            /* Call End 이후 late lookup 이 FGS/Showcase 를 다시 열지 않도록 */
             if (!CompanionRuntimeStabilityDiag.isCallSessionActive() &&
                 CompanionRuntimeStabilityDiag.shouldIgnorePostEndOverlayStart()
             ) {
@@ -231,8 +251,6 @@ object LetteringCallCoordinator {
                     cardJson = lookup.rawJson,
                     outgoing = outgoing
                 )
-            } else {
-                startOverlayService(app, raw, verified = lookup.verified, cardJson = lookup.rawJson, outgoing)
             }
         } catch (e: Exception) {
             Log.e(TAG, "lookup failed after overlay start", e)
@@ -247,7 +265,6 @@ object LetteringCallCoordinator {
         }
     }
 
-    /** RingingActivity 가 이미 떠 있을 때 — 오버레이만 재시도 (알림/액티비티 재기동 없음) */
     fun ensureOverlayOnly(context: Context, number: String, outgoing: Boolean) {
         val app = context.applicationContext
         if (!LetteringPrefs.isLetteringEnabled(app)) return
@@ -272,19 +289,14 @@ object LetteringCallCoordinator {
             LetteringIncomingNotifier.cancel(app)
             LetteringRingingActivity.requestFinish(app)
 
-            /*
-             * 통화 종료 = 통화 UI(CallOverlay / Showcase / Mini Case)만 제거.
-             * MainActivity·LetteringCallMonitorService 는 중지하지 않음 — 카톡형 상시 대기.
-             */
             if (CompanionMvpConfig.DELEGATE_CALL_UI) {
-                VlueInCallController.keepOverlayAfterHangup = false
+                kr.vlue.calloverlay.incall.VlueInCallController.keepOverlayAfterHangup = false
                 dismissCallOverlayOnly(app)
                 return
             }
 
-            /* Advanced: 통화 종료 후 쇼케이스 사후 감상 유지 옵션 */
-            if (VlueInCallController.keepOverlayAfterHangup) {
-                VlueInCallController.keepOverlayAfterHangup = false
+            if (kr.vlue.calloverlay.incall.VlueInCallController.keepOverlayAfterHangup) {
+                kr.vlue.calloverlay.incall.VlueInCallController.keepOverlayAfterHangup = false
                 CallOverlayService.notifyKeepAfterEnd(app)
                 return
             }
@@ -294,7 +306,6 @@ object LetteringCallCoordinator {
         }
     }
 
-    /** CallOverlayService 만 stop — 앱 프로세스·통화 모니터 FGS 는 유지 */
     private fun dismissCallOverlayOnly(app: Context) {
         val intent = Intent(app, CallOverlayService::class.java).apply {
             action = CallOverlayService.ACTION_DISMISS
@@ -310,13 +321,7 @@ object LetteringCallCoordinator {
         outgoing: Boolean
     ) {
         try {
-            VlueBigPushTrace.step(
-                3,
-                "LetteringCallCoordinator.startOverlayService()",
-                "number=$number verified=$verified outgoing=$outgoing hasCard=${!cardJson.isNullOrBlank()}"
-            )
-            DiagnosticsSessionStore.noteSource(context, "LetteringCallCoordinator")
-            Log.i(TAG, "showOverlay number=$number verified=$verified outgoing=$outgoing")
+            /* FGS 를 diag/step 보다 먼저 — Incoming→BigPush 임계 경로 */
             val intent = Intent(context, CallOverlayService::class.java).apply {
                 putExtra(CallOverlayService.EXTRA_PHONE, number)
                 putExtra(CallOverlayService.EXTRA_VERIFIED, verified)
@@ -324,6 +329,17 @@ object LetteringCallCoordinator {
                 putExtra(CallOverlayService.EXTRA_CARD_JSON, cardJson)
             }
             context.startForegroundService(intent)
+            CompanionRuntimeStabilityDiag.mark(
+                "SERVICE_START_REQUEST",
+                "LetteringCallCoordinator.startOverlayService"
+            )
+            VlueBigPushTrace.step(
+                3,
+                "LetteringCallCoordinator.startOverlayService()",
+                "number=${ReleaseDebugGate.maskPhoneForLog(number)} verified=$verified outgoing=$outgoing hasCard=${!cardJson.isNullOrBlank()}"
+            )
+            DiagnosticsSessionStore.noteSource(context, "LetteringCallCoordinator")
+            Log.i(TAG, "showOverlay number=${ReleaseDebugGate.maskPhoneForLog(number)} verified=$verified outgoing=$outgoing")
         } catch (e: Exception) {
             VlueBigPushTrace.skip(
                 3,

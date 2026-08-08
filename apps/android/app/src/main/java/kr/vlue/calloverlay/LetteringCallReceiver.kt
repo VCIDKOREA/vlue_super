@@ -43,9 +43,13 @@ class LetteringCallReceiver : BroadcastReceiver() {
 
             when (state) {
                 TelephonyManager.EXTRA_STATE_RINGING -> {
-                    if (VlueInCallController.hasActiveCall()) {
-                        VlueBigPushTrace.skip(1, "InCall has active call — PHONE_STATE RINGING skipped")
-                        ReleaseDebugGate.d(TAG, "skip RINGING: InCall has active call")
+                    /*
+                     * Phase 6-H: InCall hasActiveCall 이어도 Overlay 가 아직 없으면 onRinging 유지.
+                     * (이전: skip → InCall onCallAdded 대기 ~3초 → startOverlay 지연)
+                     */
+                    if (VlueInCallController.hasActiveCall() && CallOverlayService.isRunning()) {
+                        VlueBigPushTrace.skip(1, "InCall+Overlay already running — PHONE_STATE RINGING skipped")
+                        ReleaseDebugGate.d(TAG, "skip RINGING: InCall+Overlay active")
                         return
                     }
                     LetteringCallCoordinator.onRinging(context, number, outgoing = false)
