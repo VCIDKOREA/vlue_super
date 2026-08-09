@@ -1290,7 +1290,10 @@ class CallOverlayService : Service() {
             val params = layoutParams ?: return@post
             val (sw, sh) = screenSizePx()
             val keep = dp(28)
-            val w = wPx.coerceIn(keep, sw)
+            /* peek(~32dp) 은 좁게, 일반 MiniCase 는 가로형 최소폭 유지 — 정사각 붕괴 방지 */
+            val peekLikely = wPx <= dp(48)
+            val minW = if (peekLikely) keep else (sw * 0.72f).toInt().coerceIn(dp(260), sw - dp(16))
+            val w = wPx.coerceIn(minW, sw)
             val h = hPx.coerceIn(keep, sh)
             val minX = keep - w
             val maxX = sw - keep
@@ -1398,10 +1401,10 @@ class CallOverlayService : Service() {
             view.visibility = android.view.View.VISIBLE
             userMinimized = true
             val (sw, _) = screenSizePx()
-            val w = (sw * 0.92f).toInt().coerceIn(dp(280), sw - dp(12))
-            /* CSS 둥근 사각 — native capsule clip 은 가위질 느낌 */
-            val h = dp(132)
-            val x = ((sw - w) / 2).coerceAtLeast(dp(6))
+            /* 가로형 기본 창 — JS updateMiniOverlayFrame 이 이어서 정밀 맞춤 */
+            val w = (sw * 0.86f).toInt().coerceIn(dp(280), sw - dp(16))
+            val h = dp(140)
+            val x = ((sw - w) / 2).coerceAtLeast(dp(8))
             val y = (statusBarHeightPx() + dp(48)).coerceAtLeast(dp(72))
             params.width = w
             params.height = h
@@ -1414,6 +1417,7 @@ class CallOverlayService : Service() {
             view.setBackgroundColor(Color.TRANSPARENT)
             webView?.setBackgroundColor(Color.TRANSPARENT)
             applyPassThroughTouchFlags(params)
+            /* 캡슐 clip 금지 — 모서리 가위질·테두리 잘림 */
             applyCapsuleClip(view, enabled = false)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {

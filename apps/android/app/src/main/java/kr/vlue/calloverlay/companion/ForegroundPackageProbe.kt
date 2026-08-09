@@ -11,6 +11,10 @@ import android.os.Build
  * RINGING BigPush 위치 (서로 독립):
  * - 전체 InCallUI (InCall 액티비티 FOREGROUND) → TOP
  * - 홈 / 다른 앱 / HUN (타 앱이 FOREGROUND) → BOTTOM
+ *
+ * 주의: Samsung 전체 수신 UI 에서도 getRunningTasks(1) 이 직전 앱(카톡/런처)을
+ * 반환하는 경우가 많다. tasks 의 "타앱"을 InCall FOREGROUND 보다 먼저 보면
+ * 전체 UI 가 항상 BOTTOM 으로 고정된다.
  */
 object ForegroundPackageProbe {
     enum class RingingSurface {
@@ -34,12 +38,13 @@ object ForegroundPackageProbe {
     /**
      * Pure — 단위 테스트용.
      *
-     * 우선순위:
-     * 1) Tasks 가 홈/타앱 → BOTTOM
+     * 우선순위 (증거: getRunningTasks 는 InCallUI 전체화면에서 stale 가능):
+     * 1) InCall importance ≤ FOREGROUND → TOP (전체 수신 UI; stale tasks 무시)
      * 2) Tasks 가 InCallUI → TOP
-     * 3) InCallUI importance ≤ FOREGROUND → TOP (전체 수신 UI)
-     * 4) 다른 앱이 FOREGROUND → BOTTOM (HUN/백그라운드 수신)
-     * 5) 그 외 → BOTTOM
+     * 3) 다른 앱이 FOREGROUND → BOTTOM (HUN / 백그라운드 수신)
+     * 4) InCall ≤ VISIBLE 이고 타 앱 FOREGROUND 없음 → TOP (stale tasks 보정)
+     * 5) Tasks 가 홈/타앱 → BOTTOM
+     * 6) 그 외 → BOTTOM
      */
     fun classifyRingingSurface(
         tasksPkg: String?,
@@ -48,32 +53,37 @@ object ForegroundPackageProbe {
         ourApp: Boolean = false
     ): RingingSurface {
         if (ourApp) return RingingSurface.HOME_OR_OTHER
-        if (OverlayContextDetector.isLikelyLauncherPackage(tasksPkg)) {
-            return RingingSurface.HOME_OR_OTHER
-        }
-        if (isKnownOtherAppPackage(tasksPkg)) return RingingSurface.HOME_OR_OTHER
-        if (OverlayContextDetector.isLikelyInCallUiPackage(tasksPkg)) {
-            return RingingSurface.FULL_INCALL
-        }
 
-        /* 전체 수신 UI: InCall 액티비티가 전면 — 직전 앱 usage 와 무관 */
+        /* 전체 수신 UI: InCall 액티비티가 전면 — stale tasks(직전 카톡/런처)와 무관 */
         if (inCallImportance != null &&
             inCallImportance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
         ) {
             return RingingSurface.FULL_INCALL
         }
 
-        /* HUN/다른앱: 타 앱이 전면 */
+        if (OverlayContextDetector.isLikelyInCallUiPackage(tasksPkg)) {
+            return RingingSurface.FULL_INCALL
+        }
+
+        /* HUN/다른앱: 타 앱이 진짜 FOREGROUND — InCall 은 보통 FGS 만 */
         if (otherForegroundPackages.isNotEmpty()) {
             return RingingSurface.HOME_OR_OTHER
         }
 
-        /* InCall 이 보이기만 하고 타 앱 전면이 없으면 전체 UI 쪽으로 */
+        /*
+         * InCall 이 VISIBLE/FGS 이고 타 앱 FOREGROUND 가 없으면 전체 UI.
+         * (tasks 가 직전 앱을 가리켜도 otherFg 비어 있으면 stale 로 본다)
+         */
         if (inCallImportance != null &&
             inCallImportance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
         ) {
             return RingingSurface.FULL_INCALL
         }
+
+        if (OverlayContextDetector.isLikelyLauncherPackage(tasksPkg)) {
+            return RingingSurface.HOME_OR_OTHER
+        }
+        if (isKnownOtherAppPackage(tasksPkg)) return RingingSurface.HOME_OR_OTHER
 
         return RingingSurface.HOME_OR_OTHER
     }
@@ -109,7 +119,8 @@ object ForegroundPackageProbe {
                         blob.contains("com.samsung.android.incallui")
                 if (isInCall) {
                     val imp = proc.importance
-                    if (inCallImp == null || imp < inCallImp!!) inCallImp = imp
+                    val prev = inCallImp
+                    if (prev == null || imp < prev) inCallImp = imp
                     continue
                 }
                 if (proc.importance > ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {

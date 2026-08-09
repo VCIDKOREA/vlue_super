@@ -16,10 +16,19 @@ export function resetCompanionMiniCaseSessionPos() {
 
 const EDGE_KEEP_PX = MINI_CASE_EDGE_KEEP_PX;
 const DRAG_CLICK_MAX_PX = 10;
-const DEFAULT_CARD_W = 320;
-const DEFAULT_CARD_H = 120;
+/** 화면 기준 가로형 — WebView 100vw 에 의존하지 않음 */
+const DEFAULT_CARD_W = 312;
+const DEFAULT_CARD_H = 118;
 const PEEK_W = 32;
 const PEEK_H = 112;
+const FRAME_PAD_PX = 4;
+
+function resolveCardWidthCss(vw) {
+  const side = 24;
+  const ideal = 312;
+  const max = Math.max(240, Math.round(vw - side));
+  return Math.min(ideal, max);
+}
 
 function readViewport() {
   const native = nativeGetScreenSize();
@@ -99,10 +108,11 @@ export default function CompanionMiniCase({
   const rootRef = useRef(null);
   const dragRef = useRef(null);
   const viewportRef = useRef(readViewport());
-  const cardSizeRef = useRef({ w: DEFAULT_CARD_W, h: DEFAULT_CARD_H });
+  const initialW = resolveCardWidthCss(viewportRef.current.vw);
+  const cardSizeRef = useRef({ w: initialW, h: DEFAULT_CARD_H });
   const posRef = useRef(sessionMiniCasePos || { x: 16, y: 56 });
   const [pos, setPos] = useState(() => sessionMiniCasePos || { x: 16, y: 56 });
-  const [cardSize, setCardSize] = useState({ w: DEFAULT_CARD_W, h: DEFAULT_CARD_H });
+  const [cardSize, setCardSize] = useState({ w: initialW, h: DEFAULT_CARD_H });
   const [dragging, setDragging] = useState(false);
   const [nativeSync] = useState(() => hasNativeMiniOverlay());
 
@@ -161,14 +171,13 @@ export default function CompanionMiniCase({
         !el.classList.contains("is-peek-right") &&
         !el.classList.contains("is-peek-left")
       ) {
-        /*
-         * 외곽 .companion-mini-case(패딩 포함)를 측정.
-         * 예전: __card 만 측정 → 네이티브 창이 더 좁아 우측 잘림·사각 잔상.
-         */
-        const w = Math.max(160, Math.round(el.offsetWidth || DEFAULT_CARD_W));
-        const h = Math.max(72, Math.round(el.offsetHeight || DEFAULT_CARD_H));
-        /* 1px AA / clip 여유 */
-        const pad = 2;
+        /* 화면 폭 기준 가로 — overlay WebView 의 offsetWidth(창 크기)에 묶지 않음 */
+        const w = resolveCardWidthCss(vw);
+        const h = Math.max(
+          96,
+          Math.round(el.offsetHeight || DEFAULT_CARD_H)
+        );
+        const pad = FRAME_PAD_PX;
         cardSizeRef.current = { w: w + pad, h: h + pad };
         setCardSize((prev) =>
           prev.w === w + pad && prev.h === h + pad ? prev : { w: w + pad, h: h + pad }
@@ -282,6 +291,7 @@ export default function CompanionMiniCase({
     [applyPos, onExpand, syncNativeVisibility]
   );
 
+  const cssCardW = peekRight || peekLeft ? PEEK_W : resolveCardWidthCss(viewportRef.current.vw);
   const style = nativeSync
     ? {
         position: "relative",
@@ -289,14 +299,19 @@ export default function CompanionMiniCase({
         top: 0,
         zIndex: 240,
         touchAction: "none",
-        width: "max-content"
+        width: cssCardW,
+        maxWidth: cssCardW,
+        boxSizing: "border-box"
       }
     : {
         position: "fixed",
         left: pos.x,
         top: pos.y,
         zIndex: 240,
-        touchAction: "none"
+        touchAction: "none",
+        width: cssCardW,
+        maxWidth: cssCardW,
+        boxSizing: "border-box"
       };
 
   return (

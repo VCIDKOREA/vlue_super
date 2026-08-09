@@ -22,9 +22,13 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun tasksKakao_isBottom_evenIfInCallForeground() {
+    fun staleTasksKakao_inCallForeground_isTop() {
+        /*
+         * 전체 수신 UI: InCall FOREGROUND.
+         * getRunningTasks 가 직전 카톡을 반환해도 TOP 유지 (기존 버그 회귀 방지).
+         */
         assertEquals(
-            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
             ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = "com.kakao.talk",
                 inCallImportance = fg,
@@ -34,12 +38,50 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun tasksLauncher_isBottom() {
+    fun staleTasksLauncher_inCallForeground_isTop() {
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.sec.android.app.launcher",
+                inCallImportance = fg,
+                otherForegroundPackages = emptyList()
+            )
+        )
+    }
+
+    @Test
+    fun hun_otherAppForeground_inCallServiceOnly_isBottom() {
+        /* HUN: 카톡 FOREGROUND, InCall 은 FGS — tasks 유무와 무관하게 BOTTOM */
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.kakao.talk",
+                inCallImportance = fgs,
+                otherForegroundPackages = listOf("com.kakao.talk")
+            )
+        )
+    }
+
+    @Test
+    fun home_launcherForeground_inCallServiceOnly_isBottom() {
         assertEquals(
             ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
             ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = "com.sec.android.app.launcher",
                 inCallImportance = fgs,
+                otherForegroundPackages = listOf("com.sec.android.app.launcher")
+            )
+        )
+    }
+
+    @Test
+    fun staleTasksKakao_inCallVisible_noOtherFg_isTop() {
+        /* 타 앱이 더 이상 FOREGROUND 가 아닌데 tasks 만 stale */
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.kakao.talk",
+                inCallImportance = visible,
                 otherForegroundPackages = emptyList()
             )
         )
@@ -47,7 +89,6 @@ class ForegroundPackageProbeTest {
 
     @Test
     fun noTasks_inCallForeground_isTop_ignoresRecentOtherApp() {
-        /* 전체 UI: InCall FOREGROUND — 직전 카톡이 있어도 TOP */
         assertEquals(
             ForegroundPackageProbe.RingingSurface.FULL_INCALL,
             ForegroundPackageProbe.classifyRingingSurface(
@@ -60,7 +101,6 @@ class ForegroundPackageProbeTest {
 
     @Test
     fun noTasks_otherAppForeground_inCallServiceOnly_isBottom() {
-        /* HUN: 카톡 FOREGROUND, InCall 은 FGS */
         assertEquals(
             ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
             ForegroundPackageProbe.classifyRingingSurface(
