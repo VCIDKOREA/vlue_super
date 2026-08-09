@@ -322,6 +322,15 @@ function LetteringOverlayHostInner() {
           /* BigPush layout은 Native Controller 책임 — JS가 compact 강제하지 않음 */
           setExpanded(false);
         }
+        if (
+          rawState === "minimize_showcase" ||
+          rawState === "reveal_system_call_ui"
+        ) {
+          setExpanded(false);
+        }
+        if (rawState === "restore_showcase") {
+          setExpanded(true);
+        }
       }
       /* 시스템 전화 종료 — End 버튼 없이도 통화목록에 기록 */
       const ended =

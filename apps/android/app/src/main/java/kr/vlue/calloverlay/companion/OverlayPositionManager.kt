@@ -16,14 +16,7 @@ object OverlayPositionManager {
         return when (state) {
             OverlayState.IDLE -> OverlayPosition.HIDDEN
             OverlayState.BIG_PUSH -> resolveBigPush(context, screenState)
-            OverlayState.SHOWCASE -> when (context) {
-                OverlayContext.IN_CALL -> OverlayPosition.FULLSCREEN
-                OverlayContext.KEYPAD,
-                OverlayContext.MINIMIZED,
-                OverlayContext.HOME_SCREEN,
-                OverlayContext.OTHER_APP,
-                OverlayContext.INCOMING_CALL_UI -> OverlayPosition.MINI_CASE
-            }
+            OverlayState.SHOWCASE -> OverlayPosition.FULLSCREEN
             OverlayState.MINI_CASE -> OverlayPosition.MINI_CASE
         }
     }

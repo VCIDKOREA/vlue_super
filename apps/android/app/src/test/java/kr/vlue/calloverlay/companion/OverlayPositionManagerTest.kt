@@ -89,9 +89,10 @@ class OverlayPositionManagerTest {
     }
 
     @Test
-    fun showcase_home_suggestsMini() {
+    fun showcase_staysFullscreen_evenIfHomeContext() {
+        /* Position 은 State 따름 — HOME 컨텍스트만으로 창을 줄이지 않음 */
         assertEquals(
-            OverlayPosition.MINI_CASE,
+            OverlayPosition.FULLSCREEN,
             OverlayPositionManager.resolve(
                 OverlayContext.HOME_SCREEN,
                 OverlayState.SHOWCASE,

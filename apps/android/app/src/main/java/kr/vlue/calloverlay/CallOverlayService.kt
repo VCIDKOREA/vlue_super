@@ -810,6 +810,9 @@ class CallOverlayService : Service() {
             params.x = 0
             params.y = 0
             params.gravity = Gravity.TOP or Gravity.START
+            view.clipToOutline = false
+            view.outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+            view.setBackgroundColor(Color.parseColor("#0B101B"))
             applyPassThroughTouchFlags(params)
             /* Showcase 터치 필요 — NOT_FOCUSABLE 유지하되 창은 full; HOME 시 MINI 로 축소 */
             params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
@@ -846,31 +849,10 @@ class CallOverlayService : Service() {
         }
     }
 
-    /** 링잉 BigPush 바 ▾ — Web 쇼케이스 패널 확장 (Answer 전) */
+    /** 링잉 BigPush ▾ 펼침 — 금지 (하단 깨짐). Answer 후 Showcase 만 전체 표시 */
     private fun expandBigPushPanelFromBar() {
-        if (companion.state != OverlayState.BIG_PUSH) return
-        val wm = windowManager ?: return
-        val view = rootContainer ?: return
-        val params = layoutParams ?: return
-        nativeBanner?.visibility = android.view.View.GONE
-        webView?.visibility = android.view.View.VISIBLE
-        rootContainer?.setBackgroundColor(Color.parseColor("#E60F172A"))
-        val h = (resources.displayMetrics.heightPixels * 0.52f).toInt().coerceAtLeast(dp(320))
-        params.height = h
-        params.width = WindowManager.LayoutParams.MATCH_PARENT
-        try {
-            wm.updateViewLayout(view, params)
-        } catch (_: Exception) {
-            /* ignore */
-        }
-        webView?.evaluateJavascript(
-            "try{window.dispatchEvent(new CustomEvent('vlue-native-expand-showcase'," +
-                "{detail:{expanded:true}}));" +
-                "window.VlueLettering&&window.VlueLettering.setExpanded&&window.VlueLettering.setExpanded(true);" +
-                "}catch(e){}",
-            null
-        )
-        CompanionRuntimeStabilityDiag.mark("BIG_PUSH_EXPAND_TAP", "nativeBanner")
+        CompanionRuntimeStabilityDiag.mark("BIG_PUSH_EXPAND_BLOCKED", "nativeBanner")
+        VlueBigPushTrace.lifecycle("BIG_PUSH_EXPAND_BLOCKED", "ringing expand disabled")
     }
 
     private fun detectOverlayContext(forceRinging: Boolean): OverlayContext {
@@ -890,24 +872,29 @@ class CallOverlayService : Service() {
             ForegroundPackageProbe.topPackage(this)
                 ?: ForegroundPackageProbe.topPackageFromProcesses(this)
         val fgHint = listOf(activity, sysFg.orEmpty()).joinToString(" ")
-        /* paused 는 전면이 아님 — HOME/OTHER 로 내려가 MINI 로 축소되어야 함 */
+        /* paused 는 전면이 아님 — 단, sysFg null 을 HOME 으로 추정하면 Answer 직후 쇼케이스가 깨짐 */
         val ourApp = activity.contains("kr.vlue", ignoreCase = true) && !pausedOrGone
         val launcher =
             OverlayContextDetector.isLikelyLauncherPackage(sysFg) ||
-                OverlayContextDetector.isLikelyLauncherPackage(activity) ||
-                activity.contains("Launcher", ignoreCase = true) ||
-                (pausedOrGone && phase == OverlayContextDetector.CallPhase.OFFHOOK && sysFg == null)
+                (!sysFg.isNullOrBlank() &&
+                    OverlayContextDetector.isLikelyLauncherPackage(activity)) ||
+                (!pausedOrGone && activity.contains("Launcher", ignoreCase = true))
         val inCallUi =
             OverlayContextDetector.isLikelyInCallUiPackage(sysFg) ||
                 (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone) ||
                 OverlayContextDetector.isLikelyInCallUiPackage(fgHint) ||
                 (phase == OverlayContextDetector.CallPhase.RINGING &&
-                    ForegroundPackageProbe.isInCallUiProcessRunning(this))
+                    ForegroundPackageProbe.isInCallUiProcessRunning(this)) ||
+                (phase == OverlayContextDetector.CallPhase.OFFHOOK &&
+                    ForegroundPackageProbe.isInCallUiProcessRunning(this) &&
+                    sysFg.isNullOrBlank())
         val knownOther =
             !sysFg.isNullOrBlank() &&
                 !OverlayContextDetector.isLikelyInCallUiPackage(sysFg) &&
                 !OverlayContextDetector.isLikelyLauncherPackage(sysFg) &&
-                !sysFg.contains("kr.vlue", ignoreCase = true)
+                !sysFg.contains("kr.vlue", ignoreCase = true) &&
+                !sysFg.contains("systemui", ignoreCase = true) &&
+                !sysFg.contains("android.permissioncontroller", ignoreCase = true)
         return OverlayContextDetector.detect(
             callPhase = phase,
             foregroundIsOurApp = ourApp,
@@ -1058,7 +1045,7 @@ class CallOverlayService : Service() {
         publishCompanion(OverlayTriggerEvent.HOME_CHANGED, userAction = true)
         userMinimized = true
         applyLayoutFromController(source = source)
-        notifyWebCallState("reveal_system_call_ui")
+        notifyWebCallState("minimize_showcase")
     }
 
     /**
@@ -1082,6 +1069,11 @@ class CallOverlayService : Service() {
         userMinimized = false
         applyLayoutFromController(source = source)
         notifyWebCallState("restore_showcase")
+        webView?.evaluateJavascript(
+            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&window.VlueLettering.setExpanded(true);" +
+                "window.dispatchEvent(new CustomEvent('vlue-native-expand-showcase',{detail:{expanded:true}}));}catch(e){}",
+            null
+        )
     }
 
     /**
@@ -1224,23 +1216,29 @@ class CallOverlayService : Service() {
             view.translationY = 0f
             view.visibility = android.view.View.VISIBLE
             userMinimized = true
-            if (params.height == WindowManager.LayoutParams.MATCH_PARENT ||
-                params.width == WindowManager.LayoutParams.MATCH_PARENT ||
-                params.height > dp(200)
-            ) {
-                val (sw, _) = screenSizePx()
-                val w = (sw * 0.78f).toInt().coerceIn(dp(200), sw - dp(24))
-                val h = dp(110)
-                val x = ((sw - w) / 2).coerceAtLeast(dp(12))
-                val y = dp(56)
-                params.width = w
-                params.height = h
-                params.x = x
-                params.y = y
-            }
+            val (sw, _) = screenSizePx()
+            val w = (sw * 0.82f).toInt().coerceIn(dp(220), sw - dp(20))
+            /* 카드(타원)+여유 — 110dp 는 하단이 잘려 '캡처 버그'처럼 보임 */
+            val h = dp(132)
+            val x = ((sw - w) / 2).coerceAtLeast(dp(10))
+            val y = dp(72)
+            params.width = w
+            params.height = h
+            params.x = x
+            params.y = y
             params.gravity = Gravity.TOP or Gravity.START
             nativeBanner?.visibility = android.view.View.GONE
-            /* HOME/다른 앱 터치 통과 — 전체화면 플래그 잔존 제거 후 Mini flags 고정 */
+            webView?.visibility = android.view.View.VISIBLE
+            view.setBackgroundColor(Color.TRANSPARENT)
+            /* 네이티브 창 모서리 클리핑 — WebView 사각 번짐 완화 */
+            val density = resources.displayMetrics.density
+            val radius = 28f * density
+            view.clipToOutline = true
+            view.outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(v: android.view.View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, v.width, v.height, radius)
+                }
+            }
             applyPassThroughTouchFlags(params)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
@@ -1538,7 +1536,7 @@ class CallOverlayService : Service() {
 
     /**
      * HOME / 다른 앱 전환 시 Activity lifecycle 또는 ContextWatch 에서 호출.
-     * SHOWCASE → MINI, BIG_PUSH → TOP/BOTTOM 재배치.
+     * SHOWCASE → MINI 는 런처·타 앱 패키지가 확정될 때만 (창만 줄여 깨짐 금지).
      */
     private fun reevaluateForegroundContext(source: String) {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
@@ -1555,23 +1553,34 @@ class CallOverlayService : Service() {
         val holdActive =
             companion.state == OverlayState.SHOWCASE &&
                 android.os.SystemClock.elapsedRealtime() < showcaseHoldUntilElapsed
-        if (holdActive &&
-            (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN)
-        ) {
-            /* Answer 직후 전체 Showcase 유지 */
-            ctx = OverlayContext.IN_CALL
-        }
-        /* 타 앱 확정 시에만 SHOWCASE→MINI (유예 후) */
-        if (companion.state == OverlayState.SHOWCASE &&
-            ctx == OverlayContext.OTHER_APP &&
-            !holdActive
-        ) {
-            companion.minimizeForOtherApp()
-            publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
-            applyLayoutFromController(source = "reeval:$source:otherApp")
-            userMinimized = true
-            notifyWebCallState("reveal_system_call_ui")
-            return
+        if (companion.state == OverlayState.SHOWCASE) {
+            if (holdActive &&
+                (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN)
+            ) {
+                ctx = OverlayContext.IN_CALL
+            }
+            /* 확정 HOME → 명시적 MINI */
+            if (!holdActive && ctx == OverlayContext.HOME_SCREEN) {
+                companion.onMinimize(OverlayContext.HOME_SCREEN)
+                publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
+                applyLayoutFromController(source = "reeval:$source:home")
+                userMinimized = true
+                notifyWebCallState("minimize_showcase")
+                return
+            }
+            /* 확정 타 앱 → 명시적 MINI */
+            if (!holdActive && ctx == OverlayContext.OTHER_APP) {
+                companion.minimizeForOtherApp()
+                publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
+                applyLayoutFromController(source = "reeval:$source:otherApp")
+                userMinimized = true
+                notifyWebCallState("minimize_showcase")
+                return
+            }
+            /* 통화 화면 유지 — context 만 갱신, Position 은 SHOWCASE=FULLSCREEN 고정 */
+            if (ctx != OverlayContext.IN_CALL && ctx != OverlayContext.KEYPAD) {
+                ctx = OverlayContext.IN_CALL
+            }
         }
         companion.updateContext(ctx)
         if (companion.state != prevState || companion.position != prevPos) {
@@ -1579,7 +1588,12 @@ class CallOverlayService : Service() {
             applyLayoutFromController(source = "reeval:$source")
             if (companion.state == OverlayState.MINI_CASE) {
                 userMinimized = true
-                notifyWebCallState("reveal_system_call_ui")
+                notifyWebCallState("minimize_showcase")
+            } else if (companion.state == OverlayState.SHOWCASE &&
+                companion.position == OverlayPosition.FULLSCREEN
+            ) {
+                /* 풀스크린 재확인 — 잘린 창 복구 */
+                commitFullscreenLayout(source = "reeval:$source:keepFull")
             }
             CompanionRuntimeStabilityDiag.mark(
                 "HOME_CONTEXT_REEVAL",
@@ -1591,6 +1605,14 @@ class CallOverlayService : Service() {
             )
         } else if (companion.state == OverlayState.BIG_PUSH) {
             applyCompactRingingWindow()
+        } else if (companion.state == OverlayState.SHOWCASE &&
+            companion.position == OverlayPosition.FULLSCREEN
+        ) {
+            /* 레이아웃 드리프트 방지 */
+            val h = layoutParams?.height ?: 0
+            if (h > 0 && h < dp(400)) {
+                commitFullscreenLayout(source = "reeval:$source:repairFull")
+            }
         }
     }
 
