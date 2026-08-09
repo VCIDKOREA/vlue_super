@@ -505,11 +505,12 @@ function LetteringOverlayHostInner() {
     >
       <div className="lettering-overlay-host__tent-shell">
         <LetteringIncomingNotification
-          className={`lettering-ongoing--on-call lettering-ongoing--fullscreen-tent ${
+          className={`lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass ${
             onCall ? "lettering-ongoing--phase-connected" : "lettering-ongoing--phase-ringing"
           }`}
           verified={verified}
           previewMode={false}
+          showOwnerSettings={false}
           callPhase={callPhase}
           platform={platform}
           incomingNumber={incoming}

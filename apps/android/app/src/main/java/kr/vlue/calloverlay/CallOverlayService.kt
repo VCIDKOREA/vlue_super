@@ -1217,11 +1217,11 @@ class CallOverlayService : Service() {
             view.visibility = android.view.View.VISIBLE
             userMinimized = true
             val (sw, _) = screenSizePx()
-            val w = (sw * 0.82f).toInt().coerceIn(dp(220), sw - dp(20))
-            /* 카드(타원)+여유 — 110dp 는 하단이 잘려 '캡처 버그'처럼 보임 */
-            val h = dp(132)
-            val x = ((sw - w) / 2).coerceAtLeast(dp(10))
-            val y = dp(72)
+            val w = (sw * 0.86f).toInt().coerceIn(dp(240), sw - dp(16))
+            /* 타원 카드 + 외부 안내문구 여유 — 네이티브 clip 없이 CSS 타원만 */
+            val h = dp(168)
+            val x = ((sw - w) / 2).coerceAtLeast(dp(8))
+            val y = dp(64)
             params.width = w
             params.height = h
             params.x = x
@@ -1230,15 +1230,8 @@ class CallOverlayService : Service() {
             nativeBanner?.visibility = android.view.View.GONE
             webView?.visibility = android.view.View.VISIBLE
             view.setBackgroundColor(Color.TRANSPARENT)
-            /* 네이티브 창 모서리 클리핑 — WebView 사각 번짐 완화 */
-            val density = resources.displayMetrics.density
-            val radius = 28f * density
-            view.clipToOutline = true
-            view.outlineProvider = object : android.view.ViewOutlineProvider() {
-                override fun getOutline(v: android.view.View, outline: android.graphics.Outline) {
-                    outline.setRoundRect(0, 0, v.width, v.height, radius)
-                }
-            }
+            view.clipToOutline = false
+            view.outlineProvider = null
             applyPassThroughTouchFlags(params)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
@@ -1550,37 +1543,17 @@ class CallOverlayService : Service() {
         val prevPos = companion.position
         val forceRinging = companion.state == OverlayState.BIG_PUSH
         var ctx = detectOverlayContext(forceRinging = forceRinging)
-        val holdActive =
-            companion.state == OverlayState.SHOWCASE &&
-                android.os.SystemClock.elapsedRealtime() < showcaseHoldUntilElapsed
         if (companion.state == OverlayState.SHOWCASE) {
-            if (holdActive &&
-                (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN)
-            ) {
-                ctx = OverlayContext.IN_CALL
+            /*
+             * 자동 HOME/OTHER→MINI 금지 — InCallUI 오판으로 풀쇼케이스가 1초 뒤 깨짐.
+             * 미니는 사용자 「통화 옵션/접기」 또는 키패드만.
+             */
+            companion.updateContext(OverlayContext.IN_CALL)
+            val h = layoutParams?.height ?: 0
+            if (h > 0 && h < dp(400)) {
+                commitFullscreenLayout(source = "reeval:$source:pinFull")
             }
-            /* 확정 HOME → 명시적 MINI */
-            if (!holdActive && ctx == OverlayContext.HOME_SCREEN) {
-                companion.onMinimize(OverlayContext.HOME_SCREEN)
-                publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
-                applyLayoutFromController(source = "reeval:$source:home")
-                userMinimized = true
-                notifyWebCallState("minimize_showcase")
-                return
-            }
-            /* 확정 타 앱 → 명시적 MINI */
-            if (!holdActive && ctx == OverlayContext.OTHER_APP) {
-                companion.minimizeForOtherApp()
-                publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
-                applyLayoutFromController(source = "reeval:$source:otherApp")
-                userMinimized = true
-                notifyWebCallState("minimize_showcase")
-                return
-            }
-            /* 통화 화면 유지 — context 만 갱신, Position 은 SHOWCASE=FULLSCREEN 고정 */
-            if (ctx != OverlayContext.IN_CALL && ctx != OverlayContext.KEYPAD) {
-                ctx = OverlayContext.IN_CALL
-            }
+            return
         }
         companion.updateContext(ctx)
         if (companion.state != prevState || companion.position != prevPos) {
@@ -1589,11 +1562,6 @@ class CallOverlayService : Service() {
             if (companion.state == OverlayState.MINI_CASE) {
                 userMinimized = true
                 notifyWebCallState("minimize_showcase")
-            } else if (companion.state == OverlayState.SHOWCASE &&
-                companion.position == OverlayPosition.FULLSCREEN
-            ) {
-                /* 풀스크린 재확인 — 잘린 창 복구 */
-                commitFullscreenLayout(source = "reeval:$source:keepFull")
             }
             CompanionRuntimeStabilityDiag.mark(
                 "HOME_CONTEXT_REEVAL",
@@ -1605,14 +1573,6 @@ class CallOverlayService : Service() {
             )
         } else if (companion.state == OverlayState.BIG_PUSH) {
             applyCompactRingingWindow()
-        } else if (companion.state == OverlayState.SHOWCASE &&
-            companion.position == OverlayPosition.FULLSCREEN
-        ) {
-            /* 레이아웃 드리프트 방지 */
-            val h = layoutParams?.height ?: 0
-            if (h > 0 && h < dp(400)) {
-                commitFullscreenLayout(source = "reeval:$source:repairFull")
-            }
         }
     }
 

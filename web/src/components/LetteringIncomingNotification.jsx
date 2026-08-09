@@ -806,7 +806,6 @@ export default function LetteringIncomingNotification({
   const openSamsungCallOptions = useCallback(() => {
     if (previewMode) {
       onToast?.("미리보기입니다. 실제 통화에서는 삼성 전화앱으로 이동합니다.");
-      /* 미리보기에서도 Mini Case 전환 체감 */
       setExpanded(false);
       return;
     }
@@ -816,7 +815,7 @@ export default function LetteringIncomingNotification({
     } catch {
       /* ignore */
     }
-    onToast?.("삼성 전화앱에서 키패드·음소거·스피커·종료를 사용하세요.");
+    /* 미니케이스와 겹치는 안내 토스트는 내지 않음 — 힌트는 MiniCase 하단 버튼으로 */
   }, [setExpanded, onToast, previewMode]);
 
   const expandShowcaseFromMiniCase = useCallback(() => {

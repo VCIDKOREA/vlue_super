@@ -161,7 +161,8 @@ export default function CompanionMiniCase({
       ) {
         const cardEl = el.querySelector(".companion-mini-case__card") || el;
         const w = Math.max(160, Math.round(cardEl.offsetWidth || DEFAULT_CARD_W));
-        const h = Math.max(72, Math.round(cardEl.offsetHeight || DEFAULT_CARD_H));
+        /* 카드 + 외부 SHOWCASE 열기 힌트까지 네이티브 창 높이 */
+        const h = Math.max(96, Math.round(el.offsetHeight || DEFAULT_CARD_H));
         cardSizeRef.current = { w, h };
         setCardSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
       }
@@ -339,8 +340,17 @@ export default function CompanionMiniCase({
               {statusLabel || (verified ? "인증" : "미인증")}
             </span>
           </p>
-          <p className="companion-mini-case__expand-hint">▼ SHOWCASE 열기</p>
         </div>
+        <button
+          type="button"
+          className="companion-mini-case__expand-hint"
+          onClick={(e) => {
+            e.stopPropagation();
+            onExpand?.();
+          }}
+        >
+          ▼ SHOWCASE 열기
+        </button>
       )}
     </div>
   );

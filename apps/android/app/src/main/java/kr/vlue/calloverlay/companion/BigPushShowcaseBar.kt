@@ -155,27 +155,32 @@ object BigPushShowcaseBar {
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             tag = TAG_ROOT
+            /* 7번 쇼케이스 바: 진한 네이비 + 얇은 테두리 + 큰 라운드 (통화화면/설정 없음) */
             background = roundedBg(
-                fill = Color.parseColor("#F20F172A"),
-                stroke = Color.parseColor("#55E2E8F0"),
-                radiusDp = 20f,
+                fill = Color.parseColor("#F20B1220"),
+                stroke = Color.parseColor("#66E2E8F0"),
+                radiusDp = 22f,
                 density = density
             )
-            setPadding(dp(12), dp(10), dp(12), dp(12))
-            elevation = dp(12).toFloat()
+            setPadding(dp(14), dp(10), dp(12), dp(12))
+            elevation = dp(10).toFloat()
+            clipToOutline = true
+            outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
         }
 
-        /* Row 1: brand only — 수신자에게 통화화면/설정 버튼 금지 */
+        /* Row 1: live + brand only */
         val top = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
         top.addView(
             TextView(context).apply {
-                text = "〰"
+                text = "▎▎▎"
                 setTextColor(Color.parseColor("#00D2FF"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                setPadding(0, 0, dp(4), 0)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f)
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(0, 0, dp(6), 0)
+                letterSpacing = -0.12f
             }
         )
         top.addView(
@@ -198,13 +203,13 @@ object BigPushShowcaseBar {
 
         val avatar = ImageView(context).apply {
             tag = TAG_AVATAR
-            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44)).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
                 marginEnd = dp(10)
             }
             scaleType = ImageView.ScaleType.CENTER_CROP
             background = roundedBg(
-                fill = Color.parseColor("#334155"),
-                stroke = Color.parseColor("#55E2E8F0"),
+                fill = Color.parseColor("#1E293B"),
+                stroke = Color.parseColor("#44E2E8F0"),
                 radiusDp = 12f,
                 density = density
             )
@@ -271,30 +276,35 @@ object BigPushShowcaseBar {
         )
         body.addView(textCol)
 
-        /* 링잉 BigPush: ▾ 숨김 (WebView 펼침 버그). Answer 후 Showcase 에서만 확장 */
-        if (onExpand != null) {
-            body.addView(
-                TextView(context).apply {
-                    text = "▾"
-                    setTextColor(Color.WHITE)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                    gravity = Gravity.CENTER
-                    setPadding(dp(10), dp(6), dp(10), dp(6))
-                    background = roundedBg(
-                        fill = Color.parseColor("#E61E293B"),
-                        stroke = Color.parseColor("#38E2E8F0"),
-                        radiusDp = 999f,
-                        density = density
-                    )
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply { marginStart = dp(6) }
-                    isClickable = true
+        /*
+         * 7번 UI: ▾ 은 시각적으로 유지. 링잉 중 onExpand=null 이면 탭 무반응
+         * (WebView 펼침 깨짐 방지). 통화화면 보기·설정은 넣지 않음.
+         */
+        body.addView(
+            TextView(context).apply {
+                text = "▾"
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                gravity = Gravity.CENTER
+                setPadding(dp(11), dp(7), dp(11), dp(7))
+                background = roundedBg(
+                    fill = Color.parseColor("#E61E293B"),
+                    stroke = Color.parseColor("#38E2E8F0"),
+                    radiusDp = 999f,
+                    density = density
+                )
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginStart = dp(8) }
+                isClickable = onExpand != null
+                isFocusable = onExpand != null
+                alpha = if (onExpand != null) 1f else 0.55f
+                if (onExpand != null) {
                     setOnClickListener { onExpand.invoke() }
                 }
-            )
-        }
+            }
+        )
         root.addView(body)
         return root
     }
