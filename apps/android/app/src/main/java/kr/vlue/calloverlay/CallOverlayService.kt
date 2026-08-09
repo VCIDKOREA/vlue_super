@@ -453,7 +453,7 @@ class CallOverlayService : Service() {
             )
             LetteringPrefs.setLastOverlayError(this, detail)
             VlueBigPushTrace.skip(7, "ATTACH blocked: $detail")
-            LetteringIncomingNotifier.post(this, phone, outgoing)
+            LetteringIncomingNotifier.post(this, phone, outgoing, forceFallback = true)
             /* addView 미호출 — onCallEnd 금지 */
             return
         }
@@ -711,7 +711,7 @@ class CallOverlayService : Service() {
              * Phase 6-H: addView 실패 시 onCallEnd/stopSelf 로 Showcase 를 죽이지 않는다.
              * 세션·Controller 유지. HUN 폴백만 (Companion Window 추가 금지).
              */
-            LetteringIncomingNotifier.post(this, phone, outgoing)
+            LetteringIncomingNotifier.post(this, phone, outgoing, forceFallback = true)
             /* Activity 폴백 금지 — 홈/뒤로가기 가로챔 */
             return
         }
@@ -2321,6 +2321,19 @@ class CallOverlayService : Service() {
         private var activeInstance: CallOverlayService? = null
 
         fun isRunning(): Boolean = activeInstance != null
+
+        /** BigPush/Showcase/Mini 가 화면에 있으면 HUN 폴백 금지 */
+        fun isCompanionSurfaceVisible(): Boolean {
+            val svc = activeInstance ?: return false
+            if (svc.dismissing) return false
+            if (svc.rootContainer == null) return false
+            return when (svc.companion.state) {
+                OverlayState.BIG_PUSH,
+                OverlayState.SHOWCASE,
+                OverlayState.MINI_CASE -> true
+                else -> false
+            }
+        }
 
         /**
          * PHONE_STATE OFFHOOK 시 Showcase 진입 여부.

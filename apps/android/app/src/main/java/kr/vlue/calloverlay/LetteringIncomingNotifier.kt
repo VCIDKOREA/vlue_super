@@ -13,7 +13,8 @@ import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
 import kr.vlue.calloverlay.diagnostics.ReleaseDebugGate
 
 /**
- * 오버레이가 수신 전화 UI 아래에 깔릴 때 대비 — 풀스크린 인텐트 + 헤드업 알림.
+ * 오버레이가 수신 전화 UI 아래에 깔릴 때 대비 — 헤드업 알림 폴백.
+ * Companion BigPush/Showcase 가 이미 보이면 게시하지 않는다 (BigPush 를 가림).
  */
 object LetteringIncomingNotifier {
     private const val TAG = "LetteringIncomingNotif"
@@ -37,9 +38,23 @@ object LetteringIncomingNotifier {
         nm.createNotificationChannel(channel)
     }
 
-    fun post(context: Context, phone: String, outgoing: Boolean, displayName: String? = null) {
+    /**
+     * @param forceFallback addView/권한 실패 폴백 — 오버레이 유무와 무관하게 게시
+     */
+    fun post(
+        context: Context,
+        phone: String,
+        outgoing: Boolean,
+        displayName: String? = null,
+        forceFallback: Boolean = false
+    ) {
         try {
             val app = context.applicationContext
+            if (!forceFallback && CallOverlayService.isCompanionSurfaceVisible()) {
+                cancel(app)
+                Log.i(TAG, "skip HUN — companion overlay visible (background-only policy)")
+                return
+            }
             /* 재게시 전 취소 — HUN 깜빡임(보이다 사라졌다 다시 보임) 완화 */
             cancel(app)
             ensureChannel(app)
@@ -85,7 +100,7 @@ object LetteringIncomingNotifier {
 
             NotificationManagerCompat.from(app).notify(NOTIFICATION_ID, builder.build())
             CompanionBigPushDiag.noteSystemHunPosted(source = if (outgoing) "outgoing" else "incoming")
-            Log.i(TAG, "posted incoming notif phone=${ReleaseDebugGate.maskPhoneForLog(phone)} name=$displayName outgoing=$outgoing")
+            Log.i(TAG, "posted incoming notif phone=${ReleaseDebugGate.maskPhoneForLog(phone)} name=$displayName outgoing=$outgoing force=$forceFallback")
         } catch (e: Exception) {
             Log.e(TAG, "post failed", e)
             LetteringPrefs.setLastOverlayError(context, "notif:${e.message}")

@@ -125,8 +125,12 @@ object LetteringCallCoordinator {
                 requestedWindowType = android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             )
 
-            /* 3) HUN — Companion Overlay 가 아님. 폴백용만 */
-            LetteringIncomingNotifier.post(app, raw, outgoing)
+            /* 3) HUN — 오버레이 불가할 때만. BigPush 보이면 가리지 않음 */
+            if (canDraw) {
+                LetteringIncomingNotifier.cancel(app)
+            } else {
+                LetteringIncomingNotifier.post(app, raw, outgoing, forceFallback = true)
+            }
 
             /* 4) 번호/회원 enrich — Overlay 이후 IO */
             if (nextUnknown) {
@@ -157,8 +161,10 @@ object LetteringCallCoordinator {
             LetteringPrefs.setLastCallEvent(app, "ringing_upgrade:$n:out=$outgoing")
             if (LetteringPermissionHelper.canDrawOverlays(app)) {
                 CallOverlayService.updateCallInfo(app, n, verified = false, cardJson = null, outgoing)
+                LetteringIncomingNotifier.cancel(app)
+            } else {
+                LetteringIncomingNotifier.post(app, n, outgoing, forceFallback = true)
             }
-            LetteringIncomingNotifier.post(app, n, outgoing)
             enrichWithLookup(app, n, outgoing)
             return
         }
@@ -178,8 +184,10 @@ object LetteringCallCoordinator {
             LetteringPrefs.setLastCallEvent(app, "ringing_upgrade:$n:out=$outgoing")
             if (LetteringPermissionHelper.canDrawOverlays(app)) {
                 CallOverlayService.updateCallInfo(app, n, verified = false, cardJson = null, outgoing)
+                LetteringIncomingNotifier.cancel(app)
+            } else {
+                LetteringIncomingNotifier.post(app, n, outgoing, forceFallback = true)
             }
-            LetteringIncomingNotifier.post(app, n, outgoing)
             enrichWithLookup(app, n, outgoing)
             return
         }
@@ -221,6 +229,7 @@ object LetteringCallCoordinator {
                 )
                 Log.w(TAG, "lookup unmatched for $masked")
                 LetteringPrefs.setLastOverlayError(app, "lookup_unmatched:$masked")
+                /* 오버레이 보이면 HUN 재게시 금지 — post() 가 자체 스킵 */
                 LetteringIncomingNotifier.post(app, raw, outgoing, displayName = null)
                 return
             }
@@ -250,7 +259,6 @@ object LetteringCallCoordinator {
                 return
             }
             val label = lookup.displayName.ifBlank { raw }
-            LetteringIncomingNotifier.post(app, raw, outgoing, displayName = label)
             if (LetteringPermissionHelper.canDrawOverlays(app)) {
                 CallOverlayService.updateCallInfo(
                     app,
@@ -258,6 +266,15 @@ object LetteringCallCoordinator {
                     verified = lookup.verified,
                     cardJson = lookup.rawJson,
                     outgoing = outgoing
+                )
+                LetteringIncomingNotifier.cancel(app)
+            } else {
+                LetteringIncomingNotifier.post(
+                    app,
+                    raw,
+                    outgoing,
+                    displayName = label,
+                    forceFallback = true
                 )
             }
         } catch (e: Exception) {
