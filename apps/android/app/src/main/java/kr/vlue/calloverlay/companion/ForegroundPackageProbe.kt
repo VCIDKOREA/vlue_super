@@ -26,23 +26,23 @@ object ForegroundPackageProbe {
         if (!tasksPkg.isNullOrBlank()) {
             val tasksInCall = OverlayContextDetector.isLikelyInCallUiPackage(tasksPkg)
             val usageInCall = OverlayContextDetector.isLikelyInCallUiPackage(usagePkg)
-            /* HUN: Tasks=launcher/other, Usage=InCallUI → Tasks 유지 */
+            /* HUN: Tasks=launcher/other, Usage=InCallUI → Tasks 유지 → BOTTOM */
             if (!tasksInCall && (usageInCall || usagePkg.isNullOrBlank())) {
                 return tasksPkg
             }
             if (!tasksInCall) return tasksPkg
-            /* Tasks 도 InCallUI → 전체 전화 UI */
+            /* Tasks 도 InCallUI → 전체 전화 UI → TOP */
             return tasksPkg
         }
         /*
-         * Tasks 불명 + Usage=InCallUI 만: 삼성 홈 HUN 과 전체 InCallUI 구분 불가.
-         * TOP(상단 숨김) 오판 방지 → null → Detector OTHER_APP → BOTTOM.
+         * Tasks 불명: Usage/procs 가 InCallUI 이면 전체 전화 UI로 본다 (TOP).
+         * (홈 HUN 은 위에서 Tasks=launcher 로 이미 걸러짐)
          */
         if (OverlayContextDetector.isLikelyInCallUiPackage(usagePkg)) {
-            return null
+            return usagePkg
         }
         if (OverlayContextDetector.isLikelyInCallUiPackage(procsPkg)) {
-            return null
+            return procsPkg
         }
         return usagePkg?.takeIf { it.isNotBlank() } ?: procsPkg?.takeIf { it.isNotBlank() }
     }

@@ -17,7 +17,9 @@ export function resetCompanionMiniCaseSessionPos() {
 const EDGE_KEEP_PX = MINI_CASE_EDGE_KEEP_PX;
 const DRAG_CLICK_MAX_PX = 10;
 const DEFAULT_CARD_W = 280;
-const DEFAULT_CARD_H = 88;
+const DEFAULT_CARD_H = 108;
+const PEEK_W = 32;
+const PEEK_H = 112;
 
 function readViewport() {
   const native = nativeGetScreenSize();
@@ -105,8 +107,8 @@ export default function CompanionMiniCase({
   const [nativeSync] = useState(() => hasNativeMiniOverlay());
 
   const { peekRight, peekLeft } = peekFlags(pos, cardSize.w, viewportRef.current.vw);
-  const frameW = peekRight || peekLeft ? EDGE_KEEP_PX : cardSize.w;
-  const frameH = peekRight || peekLeft ? 120 : cardSize.h;
+  const frameW = peekRight || peekLeft ? PEEK_W : cardSize.w;
+  const frameH = peekRight || peekLeft ? PEEK_H : cardSize.h;
 
   const syncNativeFrame = useCallback(
     (nextPos, w, h) => {
@@ -137,8 +139,8 @@ export default function CompanionMiniCase({
       setPos(clamped);
       const peek = peekFlags(clamped, cw, vw);
       const isPeek = peek.peekRight || peek.peekLeft;
-      const w = isPeek ? EDGE_KEEP_PX : cw;
-      const h = isPeek ? 120 : ch;
+      const w = isPeek ? PEEK_W : cw;
+      const h = isPeek ? PEEK_H : ch;
       syncNativeFrame(clamped, w, h);
       if (commitVisibility) {
         syncNativeVisibility(isPeek);
@@ -182,8 +184,8 @@ export default function CompanionMiniCase({
       setPos(clamped);
       const peek = peekFlags(clamped, cw, vw);
       const isPeek = peek.peekRight || peek.peekLeft;
-      const fw = isPeek ? EDGE_KEEP_PX : cw;
-      const fh = isPeek ? 120 : ch;
+      const fw = isPeek ? PEEK_W : cw;
+      const fh = isPeek ? PEEK_H : ch;
       syncNativeFrame(clamped, fw, fh);
       syncNativeVisibility(isPeek);
     };
@@ -305,7 +307,7 @@ export default function CompanionMiniCase({
       }${peekLeft ? " is-peek-left" : ""}`}
       role="button"
       tabIndex={0}
-      aria-label="Mini Case · SHOWCASE 열기 · 드래그로 위치 이동"
+      aria-label="Mini Case · 쇼케이스로 돌아가기 · 드래그로 위치 이동"
       style={style}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -326,11 +328,19 @@ export default function CompanionMiniCase({
     >
       {peekRight || peekLeft ? (
         <div className="companion-mini-case__peek" aria-hidden>
-          <span className="companion-mini-case__peek-rail" />
-          <span className="companion-mini-case__peek-knob">{peekRight ? "<" : ">"}</span>
+          <span className="companion-mini-case__peek-shell">
+            <span className="companion-mini-case__peek-rail" />
+            <span className="companion-mini-case__peek-knob">
+              {peekRight ? "‹" : "›"}
+            </span>
+          </span>
         </div>
       ) : (
         <>
+          <div className="companion-mini-case__brand" aria-hidden>
+            <span className="companion-mini-case__brand-mark" />
+            <span className="companion-mini-case__brand-text">VLUE LIVE</span>
+          </div>
           <div className="companion-mini-case__card">
             <p className="companion-mini-case__line1">
               <span className="companion-mini-case__name">{displayName || "—"}</span>
@@ -340,7 +350,7 @@ export default function CompanionMiniCase({
                 {statusLabel || (verified ? "인증" : "미인증")}
               </span>
               <span className="companion-mini-case__live" aria-hidden>
-                🟢
+                <span className="companion-mini-case__live-dot" />
               </span>
               <span className="companion-mini-case__duration">{durationLabel}</span>
             </p>
@@ -348,6 +358,17 @@ export default function CompanionMiniCase({
               <span className="companion-mini-case__phone">{phoneLabel || "—"}</span>
             </p>
           </div>
+          <button
+            type="button"
+            className="companion-mini-case__expand"
+            onClick={(e) => {
+              e.stopPropagation();
+              onExpand?.();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            쇼케이스로 돌아가기 <span aria-hidden>&lt;&lt;</span>
+          </button>
         </>
       )}
     </div>

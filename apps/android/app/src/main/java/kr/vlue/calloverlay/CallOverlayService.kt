@@ -82,6 +82,9 @@ class CallOverlayService : Service() {
     private var remoteConnected: Boolean = false
     /** BigPush 가장자리 피크 (MiniCase 패리티) — OverlayState 는 BIG_PUSH 유지 */
     private var bigPushPeeking: Boolean = false
+    /** 피크 시 WebView 대신 동일한 좌/우 엣지 탭 */
+    private var bigPushPeekTab: FrameLayout? = null
+    private var bigPushPeekOnRight: Boolean = false
     /** Phase 5-C — Memory callback 관찰만 (동작 변경 없음) */
     private var memoryCallbacks: ComponentCallbacks2? = null
 
@@ -550,6 +553,19 @@ class CallOverlayService : Service() {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
         )
+        val peekTab = buildBigPushPeekTab()
+        peekTab.visibility = android.view.View.GONE
+        container.addView(
+            peekTab,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        bigPushPeekTab = peekTab
+        if (asBigPush) {
+            attachBigPushDragGestures(peekTab)
+        }
 
         val params = if (asBigPush) {
             buildBigPushLayoutParams(companion.position)
@@ -794,23 +810,34 @@ class CallOverlayService : Service() {
                  * Native BigPushShowcaseBar 는 사용하지 않음 (임의 UI 금지).
                  */
                 nativeBanner?.visibility = android.view.View.GONE
-                webView?.visibility = android.view.View.VISIBLE
                 rootContainer?.setBackgroundColor(Color.TRANSPARENT)
                 webView?.setBackgroundColor(Color.TRANSPARENT)
                 applyCapsuleClip(rootContainer, enabled = false)
-                notifyWebCallState("big_push_bar")
+                if (bigPushPeeking) {
+                    applyBigPushPeekChrome(onRight = bigPushPeekOnRight)
+                } else {
+                    bigPushPeekTab?.visibility = android.view.View.GONE
+                    webView?.visibility = android.view.View.VISIBLE
+                    notifyWebCallState("big_push_bar")
+                }
             }
             OverlayState.SHOWCASE -> {
+                bigPushPeeking = false
+                bigPushPeekTab?.visibility = android.view.View.GONE
                 nativeBanner?.visibility = android.view.View.GONE
                 webView?.visibility = android.view.View.VISIBLE
             }
             OverlayState.MINI_CASE -> {
+                bigPushPeeking = false
+                bigPushPeekTab?.visibility = android.view.View.GONE
                 nativeBanner?.visibility = android.view.View.GONE
                 webView?.visibility = android.view.View.VISIBLE
                 rootContainer?.setBackgroundColor(Color.TRANSPARENT)
                 webView?.setBackgroundColor(Color.TRANSPARENT)
             }
             OverlayState.IDLE -> {
+                bigPushPeeking = false
+                bigPushPeekTab?.visibility = android.view.View.GONE
                 nativeBanner?.visibility = android.view.View.GONE
                 webView?.visibility = android.view.View.GONE
             }
@@ -927,9 +954,7 @@ class CallOverlayService : Service() {
         val activity = VlueCallOverlayApp.currentActivityName.orEmpty()
         val pausedOrGone = activity.isBlank() || activity.contains("(paused)", ignoreCase = true)
         /* VLUE Activity lifecycle 만으로는 삼성 InCallUI 를 알 수 없음 — 시스템 전면 패키지 병행 */
-        val sysFg =
-            ForegroundPackageProbe.topPackage(this)
-                ?: ForegroundPackageProbe.topPackageFromProcesses(this)
+        val sysFg = ForegroundPackageProbe.topPackage(this)
         val fgHint = listOf(activity, sysFg.orEmpty()).joinToString(" ")
         /* paused 는 전면이 아님 — 단, sysFg null 을 HOME 으로 추정하면 Answer 직후 쇼케이스가 깨짐 */
         val ourApp = activity.contains("kr.vlue", ignoreCase = true) && !pausedOrGone
@@ -1322,7 +1347,7 @@ class CallOverlayService : Service() {
             val (sw, _) = screenSizePx()
             val w = (sw * 0.86f).toInt().coerceIn(dp(240), sw - dp(16))
             /* 타원 MiniCase 전체(힌트 포함) — WebView 투명, 형태는 CSS */
-            val h = dp(96)
+            val h = dp(120)
             val x = ((sw - w) / 2).coerceAtLeast(dp(8))
             val y = (statusBarHeightPx() + dp(48)).coerceAtLeast(dp(72))
             params.width = w
@@ -1471,27 +1496,35 @@ class CallOverlayService : Service() {
 
     private fun applyCompactRingingWindowLocked(params: WindowManager.LayoutParams) {
         val pos = companion.position
-        val (_, sh) = screenSizePx()
-        val keep = dp(28)
+        val (sw, sh) = screenSizePx()
         val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
         val topY = topBigPushOffsetY()
         /* TOP|START 고정 — 드래그/피크가 BOTTOM gravity 와 충돌하지 않게 */
         params.gravity = Gravity.TOP or Gravity.START
-        params.height = barH
         if (bigPushPeeking) {
+            val keep = dp(32)
+            val peekH = dp(112)
             params.width = keep
+            params.height = peekH
+            params.x = if (bigPushPeekOnRight) (sw - keep).coerceAtLeast(0) else 0
             if (params.y < topY) {
                 params.y = when (pos) {
-                    OverlayPosition.BOTTOM -> (sh - barH - dp(8)).coerceAtLeast(0)
+                    OverlayPosition.BOTTOM -> (sh - peekH - dp(8)).coerceAtLeast(0)
                     else -> topY
                 }
             }
+            applyBigPushPeekChrome(onRight = bigPushPeekOnRight)
         } else {
-                params.width = WindowManager.LayoutParams.MATCH_PARENT
+            params.width = WindowManager.LayoutParams.MATCH_PARENT
+            params.height = barH
             params.x = 0
             params.y = when (pos) {
                 OverlayPosition.BOTTOM -> (sh - barH - dp(8)).coerceAtLeast(0)
                 else -> topY
+            }
+            bigPushPeekTab?.visibility = android.view.View.GONE
+            if (companion.state == OverlayState.BIG_PUSH) {
+                webView?.visibility = android.view.View.VISIBLE
             }
         }
         applyPassThroughTouchFlags(params)
@@ -1500,9 +1533,65 @@ class CallOverlayService : Service() {
         webView?.setBackgroundColor(Color.TRANSPARENT)
         VlueBigPushTrace.lifecycle(
             "COMPACT_RINGING_LAYOUT",
-            "pos=${pos.name} y=${params.y} h=$barH sh=$sh " +
+            "pos=${pos.name} y=${params.y} h=${params.height} peek=$bigPushPeeking " +
                 "ctx=${companion.context.name} state=${companion.state.name}"
         )
+    }
+
+    /** 좌/우 동일 크롬 — 화면 밖 VLUE 탭 */
+    private fun buildBigPushPeekTab(): FrameLayout {
+        val tab = FrameLayout(this).apply {
+            setBackgroundColor(Color.TRANSPARENT)
+            isClickable = true
+            isFocusable = true
+        }
+        val shell = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#0B1220"))
+            clipToOutline = true
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(v: View, outline: Outline) {
+                    outline.setRoundRect(0, 0, v.width.coerceAtLeast(1), v.height.coerceAtLeast(1), dp(16).toFloat())
+                }
+            }
+        }
+        val rail = View(this).apply {
+            setBackgroundColor(Color.parseColor("#38BDF8"))
+        }
+        val chevron = TextView(this).apply {
+            text = "‹"
+            setTextColor(Color.parseColor("#E0F2FE"))
+            textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#0F172A"))
+        }
+        shell.addView(
+            rail,
+            FrameLayout.LayoutParams(dp(4), FrameLayout.LayoutParams.MATCH_PARENT, Gravity.CENTER).apply {
+                topMargin = dp(14)
+                bottomMargin = dp(14)
+            }
+        )
+        shell.addView(
+            chevron,
+            FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER)
+        )
+        tab.addView(
+            shell,
+            FrameLayout.LayoutParams(dp(32), dp(112), Gravity.CENTER)
+        )
+        tab.tag = chevron
+        return tab
+    }
+
+    private fun applyBigPushPeekChrome(onRight: Boolean) {
+        bigPushPeekOnRight = onRight
+        val tab = bigPushPeekTab ?: return
+        webView?.visibility = android.view.View.GONE
+        nativeBanner?.visibility = android.view.View.GONE
+        tab.visibility = android.view.View.VISIBLE
+        (tab.tag as? TextView)?.text = if (onRight) "‹" else "›"
+        tab.invalidateOutline()
     }
 
     /**
@@ -1595,7 +1684,10 @@ class CallOverlayService : Service() {
 
     private fun expandBigPushFromPeekForDrag(params: WindowManager.LayoutParams) {
         bigPushPeeking = false
+        bigPushPeekTab?.visibility = android.view.View.GONE
+        webView?.visibility = android.view.View.VISIBLE
         params.width = WindowManager.LayoutParams.MATCH_PARENT
+        params.height = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
         params.x = 0
         try {
             windowManager?.updateViewLayout(rootContainer ?: return, params)
@@ -1607,8 +1699,9 @@ class CallOverlayService : Service() {
         val wm = windowManager ?: return
         val view = rootContainer ?: return
         val (sw, sh) = screenSizePx()
-        val keep = dp(28)
-        val h = if (params.height > 0) params.height else dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
+        val keep = dp(32)
+        val peekH = dp(112)
+        val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
         val w = when {
             params.width > 0 && params.width != WindowManager.LayoutParams.MATCH_PARENT -> params.width
             else -> sw
@@ -1617,21 +1710,30 @@ class CallOverlayService : Service() {
         when {
             mid < keep * 3 || params.x < keep - w / 2 -> {
                 bigPushPeeking = true
+                bigPushPeekOnRight = false
                 params.width = keep
+                params.height = peekH
                 params.x = 0
-                params.y = params.y.coerceIn(keep - h, sh - keep)
+                params.y = params.y.coerceIn(keep - peekH, sh - keep)
+                applyBigPushPeekChrome(onRight = false)
             }
             mid > sw - keep * 3 || params.x + w > sw - keep + w / 2 -> {
                 bigPushPeeking = true
+                bigPushPeekOnRight = true
                 params.width = keep
+                params.height = peekH
                 params.x = sw - keep
-                params.y = params.y.coerceIn(keep - h, sh - keep)
+                params.y = params.y.coerceIn(keep - peekH, sh - keep)
+                applyBigPushPeekChrome(onRight = true)
             }
             else -> {
                 bigPushPeeking = false
+                bigPushPeekTab?.visibility = android.view.View.GONE
+                webView?.visibility = android.view.View.VISIBLE
                 params.width = WindowManager.LayoutParams.MATCH_PARENT
+                params.height = barH
                 params.x = 0
-                params.y = params.y.coerceIn(0, sh - h)
+                params.y = params.y.coerceIn(0, sh - barH)
             }
         }
         params.gravity = Gravity.TOP or Gravity.START
@@ -1642,17 +1744,20 @@ class CallOverlayService : Service() {
         }
         VlueBigPushTrace.lifecycle(
             "BIG_PUSH_DRAG",
-            "peek=$bigPushPeeking x=${params.x} y=${params.y} w=${params.width}"
+            "peek=$bigPushPeeking right=$bigPushPeekOnRight x=${params.x} y=${params.y} w=${params.width}"
         )
     }
 
     private fun restoreBigPushFromPeek() {
         bigPushPeeking = false
+        bigPushPeekTab?.visibility = android.view.View.GONE
+        webView?.visibility = android.view.View.VISIBLE
         val params = layoutParams ?: return
-        val (sw, sh) = screenSizePx()
+        val (_, sh) = screenSizePx()
         val h = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
-        val wasRight = params.x > sw / 2
+        val wasRight = bigPushPeekOnRight
         params.width = WindowManager.LayoutParams.MATCH_PARENT
+        params.height = h
         params.x = 0
         params.y = params.y.coerceIn(0, sh - h)
         params.gravity = Gravity.TOP or Gravity.START
@@ -1731,6 +1836,8 @@ class CallOverlayService : Service() {
         rootContainer = null
         layoutParams = null
         nativeBanner = null
+        bigPushPeekTab = null
+        bigPushPeeking = false
         webView = null
         dismissing = false
     }

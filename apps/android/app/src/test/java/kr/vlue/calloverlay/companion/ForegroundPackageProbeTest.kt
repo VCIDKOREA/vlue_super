@@ -38,9 +38,9 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun noTasks_usageInCallUi_returnsNull_forBottomDefault() {
+    fun noTasks_usageInCallUi_keepsInCallForFullUiTop() {
         assertEquals(
-            null,
+            "com.samsung.android.incallui",
             ForegroundPackageProbe.preferForegroundForOverlay(
                 usagePkg = "com.samsung.android.incallui",
                 tasksPkg = null
@@ -72,9 +72,9 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun noTasks_procsInCallUi_returnsNull() {
+    fun noTasks_procsInCallUi_keepsInCall() {
         assertEquals(
-            null,
+            "com.samsung.android.incallui",
             ForegroundPackageProbe.preferForegroundForOverlay(
                 usagePkg = null,
                 tasksPkg = null,
