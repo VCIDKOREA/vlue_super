@@ -70,6 +70,8 @@ class CallOverlayService : Service() {
     private var keypadOpen = false
     private var userMinimized = false
     private var screenStateDetector: ScreenStateDetector? = null
+    /** Answer 직후 ContextWatch 가 OTHER_APP 로 쇼케이스를 깨지 않게 */
+    private var showcaseHoldUntilElapsed: Long = 0L
     /** Phase 5-C — Memory callback 관찰만 (동작 변경 없음) */
     private var memoryCallbacks: ComponentCallbacks2? = null
 
@@ -431,7 +433,8 @@ class CallOverlayService : Service() {
             phone = phone,
             verified = verified,
             outgoing = outgoing,
-            cardJson = cardJson
+            cardJson = cardJson,
+            onExpand = { mainHandler.post { expandBigPushPanelFromBar() } }
         )
         nativeBanner = banner
         val bannerLp = FrameLayout.LayoutParams(
@@ -717,9 +720,12 @@ class CallOverlayService : Service() {
         rootContainer?.animate()?.cancel()
         nativeBanner?.visibility = android.view.View.GONE
         webView?.visibility = android.view.View.VISIBLE
+        rootContainer?.setBackgroundColor(Color.parseColor("#0B101B"))
         companion.onAnswer(OverlayContext.IN_CALL)
         publishCompanion(OverlayTriggerEvent.ANSWER)
         userMinimized = false
+        /* Answer 후 3초간 ContextWatch OTHER_APP→MINI 금지 — 전체 Showcase 유지 */
+        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 3000L
         if (rootContainer?.isAttachedToWindow == true) {
             enterShowcaseLayout(source = source)
         } else {
@@ -840,6 +846,33 @@ class CallOverlayService : Service() {
         }
     }
 
+    /** 링잉 BigPush 바 ▾ — Web 쇼케이스 패널 확장 (Answer 전) */
+    private fun expandBigPushPanelFromBar() {
+        if (companion.state != OverlayState.BIG_PUSH) return
+        val wm = windowManager ?: return
+        val view = rootContainer ?: return
+        val params = layoutParams ?: return
+        nativeBanner?.visibility = android.view.View.GONE
+        webView?.visibility = android.view.View.VISIBLE
+        rootContainer?.setBackgroundColor(Color.parseColor("#E60F172A"))
+        val h = (resources.displayMetrics.heightPixels * 0.52f).toInt().coerceAtLeast(dp(320))
+        params.height = h
+        params.width = WindowManager.LayoutParams.MATCH_PARENT
+        try {
+            wm.updateViewLayout(view, params)
+        } catch (_: Exception) {
+            /* ignore */
+        }
+        webView?.evaluateJavascript(
+            "try{window.dispatchEvent(new CustomEvent('vlue-native-expand-showcase'," +
+                "{detail:{expanded:true}}));" +
+                "window.VlueLettering&&window.VlueLettering.setExpanded&&window.VlueLettering.setExpanded(true);" +
+                "}catch(e){}",
+            null
+        )
+        CompanionRuntimeStabilityDiag.mark("BIG_PUSH_EXPAND_TAP", "nativeBanner")
+    }
+
     private fun detectOverlayContext(forceRinging: Boolean): OverlayContext {
         val phase = when {
             forceRinging && !isCallAlreadyAnswered() -> OverlayContextDetector.CallPhase.RINGING
@@ -867,18 +900,20 @@ class CallOverlayService : Service() {
         val inCallUi =
             OverlayContextDetector.isLikelyInCallUiPackage(sysFg) ||
                 (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone) ||
-                OverlayContextDetector.isLikelyInCallUiPackage(fgHint)
+                OverlayContextDetector.isLikelyInCallUiPackage(fgHint) ||
+                (phase == OverlayContextDetector.CallPhase.RINGING &&
+                    ForegroundPackageProbe.isInCallUiProcessRunning(this))
         val knownOther =
             !sysFg.isNullOrBlank() &&
-                !inCallUi &&
+                !OverlayContextDetector.isLikelyInCallUiPackage(sysFg) &&
                 !OverlayContextDetector.isLikelyLauncherPackage(sysFg) &&
                 !sysFg.contains("kr.vlue", ignoreCase = true)
         return OverlayContextDetector.detect(
             callPhase = phase,
             foregroundIsOurApp = ourApp,
             foregroundIsLauncher = launcher,
-            foregroundIsInCallUi = inCallUi,
-            foregroundIsKnownOtherApp = knownOther,
+            foregroundIsInCallUi = inCallUi && !knownOther,
+            foregroundIsKnownOtherApp = knownOther && !inCallUi,
             userMinimized = userMinimized,
             keypadOpen = keypadOpen
         )
@@ -1516,7 +1551,27 @@ class CallOverlayService : Service() {
         val prevState = companion.state
         val prevPos = companion.position
         val forceRinging = companion.state == OverlayState.BIG_PUSH
-        val ctx = detectOverlayContext(forceRinging = forceRinging)
+        var ctx = detectOverlayContext(forceRinging = forceRinging)
+        val holdActive =
+            companion.state == OverlayState.SHOWCASE &&
+                android.os.SystemClock.elapsedRealtime() < showcaseHoldUntilElapsed
+        if (holdActive &&
+            (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN)
+        ) {
+            /* Answer 직후 전체 Showcase 유지 */
+            ctx = OverlayContext.IN_CALL
+        }
+        if (companion.state == OverlayState.SHOWCASE &&
+            ctx == OverlayContext.OTHER_APP &&
+            !holdActive
+        ) {
+            companion.minimizeForOtherApp()
+            publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
+            applyLayoutFromController(source = "reeval:$source:otherApp")
+            userMinimized = true
+            notifyWebCallState("reveal_system_call_ui")
+            return
+        }
         companion.updateContext(ctx)
         if (companion.state != prevState || companion.position != prevPos) {
             publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
@@ -1534,7 +1589,6 @@ class CallOverlayService : Service() {
                     .put("position", companion.position.name)
             )
         } else if (companion.state == OverlayState.BIG_PUSH) {
-            /* 동일 Context 라도 gravity 재적용 (다른 앱 HUN 뒤로 남는 경우) */
             applyCompactRingingWindow()
         }
     }

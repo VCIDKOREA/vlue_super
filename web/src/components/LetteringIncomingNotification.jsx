@@ -1014,7 +1014,11 @@ export default function LetteringIncomingNotification({
         <div className="lettering-live-bar__left">
           <LetteringLiveIndicator />
           <span className="lettering-live-bar__brand">
-            {previewMode ? `${previewShowcaseId} Showcase` : "VLUE 작동중"}
+            {previewMode
+              ? `${previewShowcaseId} Showcase`
+              : previewShowcaseId
+                ? `${previewShowcaseId} Showcase`
+                : "VLUE Showcase"}
           </span>
         </div>
         {previewMode && showOwnerSettings ? (

@@ -5,9 +5,9 @@ import org.junit.Test
 
 class OverlayContextDetectorTest {
     @Test
-    fun ringing_unknownForeground_defaultsToOtherAppBottom() {
+    fun ringing_unknownForeground_defaultsToIncomingCallUiTop() {
         assertEquals(
-            OverlayContext.OTHER_APP,
+            OverlayContext.INCOMING_CALL_UI,
             OverlayContextDetector.detect(
                 callPhase = OverlayContextDetector.CallPhase.RINGING
             )

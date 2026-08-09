@@ -3684,7 +3684,7 @@
   min-width: 200px;
   max-width: min(300px, calc(100vw - 24px));
   padding: 12px 14px 11px;
-  border-radius: 16px;
+  border-radius: 28px;
   background: linear-gradient(
     155deg,
     rgba(17, 28, 48, 0.94) 0%,

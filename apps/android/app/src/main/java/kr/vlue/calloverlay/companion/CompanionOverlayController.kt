@@ -209,9 +209,13 @@ class CompanionOverlayController {
 
     fun updateContext(detectedContext: OverlayContext) {
         context = detectedContext
+        /*
+         * SHOWCASE→MINI: HOME / 사용자 최소화 / 키패드만.
+         * OTHER_APP 로 즉시 MINI 하면 Answer 직후 프로브 오판으로 쇼케이스가 깨진다.
+         * 다른 앱 사용 중 MINI 는 CallOverlayService 가 HOME 확정 또는 유예 후 요청.
+         */
         if (state == OverlayState.SHOWCASE &&
             (detectedContext == OverlayContext.HOME_SCREEN ||
-                detectedContext == OverlayContext.OTHER_APP ||
                 detectedContext == OverlayContext.KEYPAD ||
                 detectedContext == OverlayContext.MINIMIZED)
         ) {
@@ -220,11 +224,20 @@ class CompanionOverlayController {
             lastTransition = "context→MINI_CASE ($detectedContext)"
         }
         if (state == OverlayState.BIG_PUSH && detectedContext == OverlayContext.IN_CALL) {
-            /* Answer race: context만 IN_CALL — BigPush 대기 없이 Showcase */
             state = OverlayState.SHOWCASE
             miniCaseVisibility = MiniCaseVisibility.VISIBLE
             lastTransition = "context IN_CALL while BIG_PUSH → SHOWCASE (no BigPush wait)"
         }
+        refreshPosition()
+    }
+
+    /** 통화 중 다른 앱으로 나간 것이 확실할 때만 MINI (유예 후 Service에서 호출) */
+    fun minimizeForOtherApp() {
+        if (state != OverlayState.SHOWCASE) return
+        context = OverlayContext.OTHER_APP
+        state = OverlayState.MINI_CASE
+        miniCaseVisibility = MiniCaseVisibility.VISIBLE
+        lastTransition = "minimizeForOtherApp → MINI_CASE"
         refreshPosition()
     }
 

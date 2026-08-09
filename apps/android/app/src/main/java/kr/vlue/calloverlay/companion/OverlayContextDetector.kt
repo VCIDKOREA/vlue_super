@@ -38,14 +38,15 @@ object OverlayContextDetector {
             }
             /*
              * RINGING:
-             * - 삼성 전체 InCallUI 확정 → TOP
-             * - 그 외(다른 앱/홈 팝업/미확인) → BOTTOM (상단 HUN 뒤에 숨지 않게)
+             * - InCallUI(전체 전화) → TOP
+             * - 다른 앱 확정 → BOTTOM
+             * - 미확인: InCallUI 프로세스 여부는 Service에서 inCallUi 플래그로 보정
              */
             CallPhase.RINGING -> when {
                 foregroundIsInCallUi -> OverlayContext.INCOMING_CALL_UI
                 foregroundIsKnownOtherApp -> OverlayContext.OTHER_APP
                 foregroundIsLauncher || foregroundIsOurApp -> OverlayContext.HOME_SCREEN
-                else -> OverlayContext.OTHER_APP
+                else -> OverlayContext.INCOMING_CALL_UI
             }
             CallPhase.OFFHOOK -> when {
                 foregroundIsInCallUi && !userMinimized -> OverlayContext.IN_CALL

@@ -287,6 +287,24 @@ function LetteringOverlayHostInner() {
   const lastHistoryAtRef = useRef(0);
 
   useEffect(() => {
+    const onExpand = (e) => {
+      const ex = e?.detail?.expanded;
+      if (ex === false) setExpanded(false);
+      else setExpanded(true);
+    };
+    window.addEventListener("vlue-native-expand-showcase", onExpand);
+    try {
+      window.VlueLettering = window.VlueLettering || {};
+      window.VlueLettering.setExpanded = (v) => setExpanded(Boolean(v));
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      window.removeEventListener("vlue-native-expand-showcase", onExpand);
+    };
+  }, []);
+
+  useEffect(() => {
     const onNativeCall = (e) => {
       const rawState = String(e?.detail?.state || e?.detail?.callState || "");
       const next = normalizeCallState(rawState);

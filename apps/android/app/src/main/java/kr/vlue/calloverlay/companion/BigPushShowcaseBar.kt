@@ -70,13 +70,6 @@ object BigPushShowcaseBar {
             profile?.optString("companyName"),
             profile?.optString("organization")
         )
-        val jobTitle = firstNonBlank(
-            card?.optString("jobTitle"),
-            json?.optString("jobTitle"),
-            card?.optString("title"),
-            json?.optString("title"),
-            profile?.optString("jobTitle")
-        )
         val handle = firstNonBlank(
             card?.optString("publicHandle"),
             json?.optString("publicHandle"),
@@ -99,27 +92,19 @@ object BigPushShowcaseBar {
             firstNonBlank(json?.optString("phoneE164"), card?.optString("phoneE164"), phone).orEmpty()
         )
         val brand = if (!handle.isNullOrBlank()) "$handle Showcase" else "VLUE Showcase"
-        val namePart = when {
-            !displayName.isNullOrBlank() && !jobTitle.isNullOrBlank() -> "$displayName · $jobTitle"
-            !displayName.isNullOrBlank() -> displayName
-            else -> null
-        }
+        /* 앱 미리보기와 동일: 1행 = 회사 · 이름 (직함 제외), 2행 = 회사 / 번호 */
         val primary = when {
-            !org.isNullOrBlank() && !namePart.isNullOrBlank() -> "$org · $namePart"
             !org.isNullOrBlank() && !displayName.isNullOrBlank() -> "$org · $displayName"
             !displayName.isNullOrBlank() -> displayName
             else -> phoneDisp.ifBlank { "번호 확인 중…" }
         }
         val secondary = when {
-            !org.isNullOrBlank() && phoneDisp.isNotBlank() -> {
-                val jobBit = if (!jobTitle.isNullOrBlank()) " · $jobTitle" else ""
-                "$org$jobBit / $phoneDisp"
-            }
-            !jobTitle.isNullOrBlank() && phoneDisp.isNotBlank() -> "$jobTitle / $phoneDisp"
+            !org.isNullOrBlank() && phoneDisp.isNotBlank() -> "$org / $phoneDisp"
             phoneDisp.isNotBlank() -> phoneDisp
             verified -> "VLUE 인증 · 쇼케이스"
             else -> "상대 번호 확인 중…"
         }
+        /* jobTitle 은 펼침 쇼케이스 본문에만 사용 — 바에는 넣지 않음 */
         return Model(
             brandLabel = brand,
             primaryLine = primary,
@@ -137,7 +122,8 @@ object BigPushShowcaseBar {
         phone: String,
         verified: Boolean,
         outgoing: Boolean,
-        cardJson: String?
+        cardJson: String?,
+        onExpand: (() -> Unit)? = null
     ): LinearLayout {
         val model = parseModel(phone, verified, cardJson)
         val density = context.resources.displayMetrics.density
@@ -264,7 +250,7 @@ object BigPushShowcaseBar {
         )
         body.addView(textCol)
 
-        /* 수신자: 펼침 힌트만 (설정/통화화면 보기 없음) */
+        /* 수신자: 펼침 탭 — 링잉 중 쇼케이스 패널 확장 */
         body.addView(
             TextView(context).apply {
                 text = "▾"
@@ -282,8 +268,8 @@ object BigPushShowcaseBar {
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { marginStart = dp(6) }
-                /* 링잉 중 펼침은 Answer→Showcase — 탭은 no-op */
-                isClickable = false
+                isClickable = true
+                setOnClickListener { onExpand?.invoke() }
             }
         )
         root.addView(body)

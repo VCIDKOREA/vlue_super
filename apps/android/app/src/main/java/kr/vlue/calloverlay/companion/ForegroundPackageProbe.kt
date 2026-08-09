@@ -64,4 +64,23 @@ object ForegroundPackageProbe {
             null
         }
     }
+
+    /** 삼성/시스템 InCallUI 프로세스가 떠 있으면 전체 수신 UI로 간주 */
+    fun isInCallUiProcessRunning(context: Context): Boolean {
+        return try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                ?: return false
+            val procs = am.runningAppProcesses ?: return false
+            procs.any { proc ->
+                val name = proc.processName.orEmpty().lowercase()
+                val pkgs = proc.pkgList?.joinToString(" ").orEmpty().lowercase()
+                val blob = "$name $pkgs"
+                OverlayContextDetector.isLikelyInCallUiPackage(blob) ||
+                    blob.contains("incallui") ||
+                    blob.contains("com.samsung.android.incallui")
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
 }

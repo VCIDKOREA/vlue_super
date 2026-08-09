@@ -11,9 +11,8 @@ class BigPushShowcaseBarTest {
             """{"matched":true,"is_verified":true,"displayName":"이종근","companyName":"VCID KOREA","jobTitle":"대표","publicHandle":"ceo","image_url":"https://example.com/a.jpg","phoneE164":"+821080144666"}"""
         val m = BigPushShowcaseBar.parseModel("+821080144666", verified = true, cardJson = json)
         assertEquals("ceo Showcase", m.brandLabel)
-        assertTrue(m.primaryLine.contains("VCID KOREA"))
-        assertTrue(m.primaryLine.contains("이종근"))
-        assertTrue(m.secondaryLine.contains("VCID KOREA"))
+        assertEquals("VCID KOREA · 이종근", m.primaryLine)
+        assertTrue(m.secondaryLine.startsWith("VCID KOREA /"))
         assertTrue(m.verified)
         assertEquals("https://example.com/a.jpg", m.avatarUrl)
     }
