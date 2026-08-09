@@ -100,7 +100,7 @@ object LetteringCallCoordinator {
                 VlueBigPushTrace.skip(3, "Overlay permission denied ($restrictHint)")
                 Log.w(TAG, "overlay permission missing — $restrictHint")
                 LetteringPrefs.setLastOverlayError(app, restrictHint)
-                LetteringRingingActivity.launch(app, raw, outgoing)
+                /* Activity 폴백은 홈/뒤로가기를 가로챔 — 아래 HUN 만 사용 */
             }
 
             /* 2) 세션/게이트 기록 — Overlay 시작 이후 (임계 경로 밖) */

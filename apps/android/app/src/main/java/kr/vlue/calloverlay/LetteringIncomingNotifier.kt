@@ -48,17 +48,12 @@ object LetteringIncomingNotifier {
                 else -> phone
             }
 
-            val activityIntent = LetteringRingingActivity.intent(app, phone, outgoing)
-            val fullScreen = PendingIntent.getActivity(
-                app,
-                1,
-                activityIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            val content = PendingIntent.getActivity(
+            val openApp = PendingIntent.getActivity(
                 app,
                 2,
-                activityIntent,
+                Intent(app, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
@@ -82,8 +77,8 @@ object LetteringIncomingNotifier {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setOngoing(true)
                 .setAutoCancel(false)
-                .setContentIntent(content)
-                .setFullScreenIntent(fullScreen, true)
+                .setContentIntent(openApp)
+                /* FullScreenIntent→RingingActivity 는 홈/뒤로가기 가로챔 — 사용 금지 */
                 .setTimeoutAfter(90_000L)
 
             NotificationManagerCompat.from(app).notify(NOTIFICATION_ID, builder.build())

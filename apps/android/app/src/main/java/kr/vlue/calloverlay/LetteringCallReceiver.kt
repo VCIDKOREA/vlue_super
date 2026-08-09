@@ -50,15 +50,29 @@ class LetteringCallReceiver : BroadcastReceiver() {
                     if (VlueInCallController.hasActiveCall() && CallOverlayService.isRunning()) {
                         VlueBigPushTrace.skip(1, "InCall+Overlay already running — PHONE_STATE RINGING skipped")
                         ReleaseDebugGate.d(TAG, "skip RINGING: InCall+Overlay active")
+                        lastExtraState = state
                         return
                     }
                     LetteringCallCoordinator.onRinging(context, number, outgoing = false)
+                    lastExtraState = state
                 }
                 TelephonyManager.EXTRA_STATE_IDLE -> {
                     LetteringCallCoordinator.onCallEnded(context)
+                    lastExtraState = state
                 }
                 TelephonyManager.EXTRA_STATE_OFFHOOK -> {
-                    CallOverlayService.notifyConnected(context.applicationContext)
+                    /*
+                     * 수신 다이얼 OFFHOOK ≠ 연결. 수신 RINGING→OFFHOOK 만 Showcase.
+                     * (이전: 모든 OFFHOOK → notifyConnected → 발신 백지 FULLSCREEN)
+                     */
+                    if (lastExtraState == TelephonyManager.EXTRA_STATE_RINGING) {
+                        CallOverlayService.notifyConnected(context.applicationContext)
+                    } else if (CallOverlayService.shouldConnectOnOffhook()) {
+                        CallOverlayService.notifyConnected(context.applicationContext)
+                    } else {
+                        LetteringCallCoordinator.onRinging(context, number, outgoing = true)
+                    }
+                    lastExtraState = state
                 }
             }
         } catch (e: Exception) {
@@ -69,5 +83,7 @@ class LetteringCallReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "LetteringCallReceiver"
+        @Volatile
+        private var lastExtraState: String? = null
     }
 }

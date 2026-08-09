@@ -16,8 +16,11 @@ import android.os.Looper
 import android.util.TypedValue
 import android.telephony.TelephonyManager
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
+import kotlin.math.abs
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -28,6 +31,7 @@ import androidx.core.app.NotificationCompat
 import kr.vlue.calloverlay.companion.CompanionOverlayController
 import kr.vlue.calloverlay.companion.MiniCaseVisibility
 import kr.vlue.calloverlay.companion.BigPushShowcaseBar
+import kr.vlue.calloverlay.companion.OutgoingShowcaseGate
 import kr.vlue.calloverlay.companion.ForegroundPackageProbe
 import kr.vlue.calloverlay.companion.OverlayContext
 import kr.vlue.calloverlay.companion.OverlayContextDetector
@@ -72,12 +76,28 @@ class CallOverlayService : Service() {
     private var screenStateDetector: ScreenStateDetector? = null
     /** Answer 직후 ContextWatch 가 OTHER_APP 로 쇼케이스를 깨지 않게 */
     private var showcaseHoldUntilElapsed: Long = 0L
+    /** 발신: 상대 응답(STATE_ACTIVE / notifyConnected) 후에만 true — 다이얼 OFFHOOK 만으로는 Showcase 금지 */
+    private var remoteConnected: Boolean = false
+    /** BigPush 가장자리 피크 (MiniCase 패리티) — OverlayState 는 BIG_PUSH 유지 */
+    private var bigPushPeeking: Boolean = false
     /** Phase 5-C — Memory callback 관찰만 (동작 변경 없음) */
     private var memoryCallbacks: ComponentCallbacks2? = null
 
     /** Derived — OverlayState SoT. 저장 flag 아님. */
     private fun isInCallOverlayState(): Boolean =
         companion.state == OverlayState.SHOWCASE || companion.state == OverlayState.MINI_CASE
+
+    /**
+     * Showcase 즉시 진입 여부.
+     * 발신 다이얼(OFFHOOK)은 false → BigPush. 수신 Answer(OFFHOOK) 또는 remoteConnected 만 true.
+     */
+    private fun shouldEnterShowcaseNow(outgoing: Boolean): Boolean =
+        OutgoingShowcaseGate.shouldEnterShowcaseNow(
+            outgoing = outgoing,
+            remoteConnected = remoteConnected,
+            inCallOverlayState = isInCallOverlayState(),
+            telephonyOffhook = telephonyCallState() == TelephonyManager.CALL_STATE_OFFHOOK
+        )
 
     /** Diagnostics 관찰만 — Controller 상태는 이미 반영된 snapshot을 기록 */
     private fun publishCompanion(
@@ -191,8 +211,9 @@ class CallOverlayService : Service() {
             return
         }
         val alreadyAttached = rootContainer?.isAttachedToWindow == true
-        val answered = isCallAlreadyAnswered()
+        val answered = shouldEnterShowcaseNow(outgoing)
         val callState = telephonyCallState()
+        currentOutgoing = outgoing
         /*
          * Phase 6-G: Call End 이후 enrichWithLookup / queued FGS 가 IDLE 에서 showOverlay 를
          * 다시 열면 Showcase 재등장이 난다. 세션이 이미 끝났고 IDLE 이면 무시.
@@ -252,7 +273,7 @@ class CallOverlayService : Service() {
                 OverlayDiagTracker.detailSuffix()
         )
 
-        /* Answer-before-BigPush: BigPush 생성 금지 → SHOWCASE/FULLSCREEN 즉시 */
+        /* Answer-before-BigPush: 수신 Answer 또는 발신 상대응답 후에만 SHOWCASE */
         if (answered) {
             CompanionBigPushDiag.noteShowOverlayEarlyExit(
                 reason = "ALREADY_ANSWERED",
@@ -264,7 +285,7 @@ class CallOverlayService : Service() {
                 "ANSWER_DETECTED",
                 "Answer Detected",
                 seq = 6,
-                detail = "answerBeforeBigPush"
+                detail = "answerBeforeBigPush outgoing=$outgoing remoteConnected=$remoteConnected"
             )
             VlueBigPushTrace.milestone(
                 "SHOWCASE_REQUESTED",
@@ -272,6 +293,7 @@ class CallOverlayService : Service() {
                 seq = 6,
                 detail = "answerBeforeBigPush skip BigPush"
             )
+            remoteConnected = true
             companion.onAnswer(OverlayContext.IN_CALL)
             publishCompanion(OverlayTriggerEvent.ANSWER)
             LetteringIncomingNotifier.cancel(this)
@@ -425,8 +447,7 @@ class CallOverlayService : Service() {
                 if (asBigPush) Color.TRANSPARENT else Color.parseColor("#0B101B")
             )
         }
-        val bannerGravity =
-            if (asBigPush && companion.position == OverlayPosition.BOTTOM) Gravity.BOTTOM else Gravity.TOP
+        val bannerGravity = Gravity.TOP
 
         val banner = BigPushShowcaseBar.create(
             context = this,
@@ -437,6 +458,9 @@ class CallOverlayService : Service() {
             onExpand = null /* 링잉 중 ▾ 펼침은 WebView 깨짐 — Answer 후 Showcase 에서만 펼침 */
         )
         nativeBanner = banner
+        if (asBigPush) {
+            attachBigPushDragGestures(banner)
+        }
         val bannerLp = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -444,8 +468,8 @@ class CallOverlayService : Service() {
         ).apply {
             marginStart = dp(10)
             marginEnd = dp(10)
-            topMargin = if (asBigPush && companion.position != OverlayPosition.BOTTOM) dp(8) else 0
-            bottomMargin = if (asBigPush && companion.position == OverlayPosition.BOTTOM) dp(12) else 0
+            topMargin = dp(8)
+            bottomMargin = 0
         }
         container.addView(banner, bannerLp)
 
@@ -639,9 +663,7 @@ class CallOverlayService : Service() {
              * 세션·Controller 유지. HUN 폴백만 (Companion Window 추가 금지).
              */
             LetteringIncomingNotifier.post(this, phone, outgoing)
-            if (!LetteringPermissionHelper.canDrawOverlays(this)) {
-                LetteringRingingActivity.launch(this, phone, outgoing)
-            }
+            /* Activity 폴백 금지 — 홈/뒤로가기 가로챔 */
             return
         }
         rootContainer = container
@@ -714,6 +736,8 @@ class CallOverlayService : Service() {
             detail = "event-driven ($source), independent of BigPush"
         )
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_BEGIN", source)
+        remoteConnected = true
+        bigPushPeeking = false
         /* Answer: HUN(가짜 빅푸시) 제거 + Native banner 제거 → Showcase */
         LetteringIncomingNotifier.cancel(this)
         LetteringRingingActivity.requestFinish(this)
@@ -916,7 +940,9 @@ class CallOverlayService : Service() {
     }
 
     private fun isCallAlreadyAnswered(): Boolean {
-        if (isInCallOverlayState()) return true
+        if (isInCallOverlayState() || remoteConnected) return true
+        /* 발신 다이얼 OFFHOOK 는 미연결 — Showcase/Answered 로 취급하지 않음 */
+        if (currentOutgoing) return false
         return telephonyCallState() == TelephonyManager.CALL_STATE_OFFHOOK
     }
 
@@ -1335,27 +1361,195 @@ class CallOverlayService : Service() {
 
     private fun applyCompactRingingWindowLocked(params: WindowManager.LayoutParams) {
         val pos = companion.position
-        params.width = WindowManager.LayoutParams.MATCH_PARENT
-        /* 컴팩트 쇼케이스 바만 — 300dp 가림막 제거 */
-        params.height = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
-        params.x = 0
-        params.y = when (pos) {
-            OverlayPosition.BOTTOM -> dp(8)
-            else -> dp(4)
-        }
-        params.gravity = when (pos) {
-            OverlayPosition.BOTTOM -> Gravity.BOTTOM or Gravity.START
-            else -> Gravity.TOP or Gravity.START
+        val (_, sh) = screenSizePx()
+        val keep = dp(28)
+        val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
+        /* TOP|START 고정 — 드래그/피크가 BOTTOM gravity 와 충돌하지 않게 */
+        params.gravity = Gravity.TOP or Gravity.START
+        params.height = barH
+        if (bigPushPeeking) {
+            params.width = keep
+            /* x 는 드래그/스냅이 유지. y 만 TOP/BOTTOM 컨텍스트에 맞춤 가능 */
+            if (params.y <= 0) {
+                params.y = when (pos) {
+                    OverlayPosition.BOTTOM -> (sh - barH - dp(8)).coerceAtLeast(0)
+                    else -> dp(4)
+                }
+            }
+        } else {
+            params.width = WindowManager.LayoutParams.MATCH_PARENT
+            params.x = 0
+            params.y = when (pos) {
+                OverlayPosition.BOTTOM -> (sh - barH - dp(8)).coerceAtLeast(0)
+                else -> dp(4)
+            }
         }
         applyPassThroughTouchFlags(params)
-        /* 바 카드가 하단에 보이도록 배너 gravity 동기화 */
+        /* 바 카드 — 컨테이너 안에서 TOP (윈도우 y 가 이미 하단 위치) */
         (nativeBanner?.layoutParams as? FrameLayout.LayoutParams)?.let { lp ->
-            lp.gravity = if (pos == OverlayPosition.BOTTOM) Gravity.BOTTOM else Gravity.TOP
-            lp.bottomMargin = if (pos == OverlayPosition.BOTTOM) dp(12) else 0
-            lp.topMargin = if (pos != OverlayPosition.BOTTOM) dp(8) else 0
+            lp.gravity = Gravity.TOP
+            lp.bottomMargin = 0
+            lp.topMargin = dp(8)
             nativeBanner?.layoutParams = lp
         }
         rootContainer?.setBackgroundColor(Color.TRANSPARENT)
+    }
+
+    /**
+     * BigPush MiniCase 패리티: 드래그 + 좌/우 가장자리 피크.
+     * OverlayState 는 BIG_PUSH 유지. ▾ 펼침은 계속 금지.
+     */
+    private fun attachBigPushDragGestures(banner: View) {
+        var downRawX = 0f
+        var downRawY = 0f
+        var startX = 0
+        var startY = 0
+        var dragging = false
+        var moved = false
+        banner.setOnTouchListener { _, ev ->
+            if (companion.state != OverlayState.BIG_PUSH) return@setOnTouchListener false
+            val wm = windowManager ?: return@setOnTouchListener false
+            val view = rootContainer ?: return@setOnTouchListener false
+            val params = layoutParams ?: return@setOnTouchListener false
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downRawX = ev.rawX
+                    downRawY = ev.rawY
+                    ensureBigPushTopStartGravity(params)
+                    startX = params.x
+                    startY = params.y
+                    dragging = true
+                    moved = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (!dragging) return@setOnTouchListener false
+                    val dx = (ev.rawX - downRawX).toInt()
+                    val dy = (ev.rawY - downRawY).toInt()
+                    if (abs(dx) > 10 || abs(dy) > 10) moved = true
+                    if (bigPushPeeking && moved) {
+                        expandBigPushFromPeekForDrag(params)
+                        startX = params.x
+                        startY = params.y
+                        downRawX = ev.rawX
+                        downRawY = ev.rawY
+                    }
+                    val (sw, sh) = screenSizePx()
+                    val keep = dp(28)
+                    val w = if (params.width > 0) params.width else sw
+                    val h = if (params.height > 0) params.height else dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
+                    params.x = (startX + dx).coerceIn(keep - w, sw - keep)
+                    params.y = (startY + dy).coerceIn(keep - h, sh - keep)
+                    try {
+                        wm.updateViewLayout(view, params)
+                    } catch (_: Exception) {
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (!dragging) return@setOnTouchListener false
+                    dragging = false
+                    if (!moved) {
+                        if (bigPushPeeking) {
+                            restoreBigPushFromPeek()
+                        }
+                        return@setOnTouchListener true
+                    }
+                    snapBigPushEdgePeek(params)
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun ensureBigPushTopStartGravity(params: WindowManager.LayoutParams) {
+        if (params.gravity == (Gravity.TOP or Gravity.START)) return
+        val (sw, sh) = screenSizePx()
+        val h = if (params.height > 0) params.height else dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
+        val yAbs = when {
+            params.gravity and Gravity.BOTTOM == Gravity.BOTTOM ->
+                (sh - h - params.y).coerceAtLeast(0)
+            else -> params.y
+        }
+        params.gravity = Gravity.TOP or Gravity.START
+        params.y = yAbs
+        if (params.width <= 0) params.width = sw
+        try {
+            windowManager?.updateViewLayout(rootContainer ?: return, params)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun expandBigPushFromPeekForDrag(params: WindowManager.LayoutParams) {
+        bigPushPeeking = false
+        params.width = WindowManager.LayoutParams.MATCH_PARENT
+        params.x = 0
+        try {
+            windowManager?.updateViewLayout(rootContainer ?: return, params)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun snapBigPushEdgePeek(params: WindowManager.LayoutParams) {
+        val wm = windowManager ?: return
+        val view = rootContainer ?: return
+        val (sw, sh) = screenSizePx()
+        val keep = dp(28)
+        val h = if (params.height > 0) params.height else dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
+        val w = when {
+            params.width > 0 && params.width != WindowManager.LayoutParams.MATCH_PARENT -> params.width
+            else -> sw
+        }
+        val mid = params.x + w / 2
+        when {
+            mid < keep * 3 || params.x < keep - w / 2 -> {
+                bigPushPeeking = true
+                params.width = keep
+                params.x = 0
+                params.y = params.y.coerceIn(keep - h, sh - keep)
+            }
+            mid > sw - keep * 3 || params.x + w > sw - keep + w / 2 -> {
+                bigPushPeeking = true
+                params.width = keep
+                params.x = sw - keep
+                params.y = params.y.coerceIn(keep - h, sh - keep)
+            }
+            else -> {
+                bigPushPeeking = false
+                params.width = WindowManager.LayoutParams.MATCH_PARENT
+                params.x = 0
+                params.y = params.y.coerceIn(0, sh - h)
+            }
+        }
+        params.gravity = Gravity.TOP or Gravity.START
+        applyPassThroughTouchFlags(params)
+        try {
+            wm.updateViewLayout(view, params)
+        } catch (_: Exception) {
+        }
+        VlueBigPushTrace.lifecycle(
+            "BIG_PUSH_DRAG",
+            "peek=$bigPushPeeking x=${params.x} y=${params.y} w=${params.width}"
+        )
+    }
+
+    private fun restoreBigPushFromPeek() {
+        bigPushPeeking = false
+        val params = layoutParams ?: return
+        val (sw, sh) = screenSizePx()
+        val h = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
+        val wasRight = params.x > sw / 2
+        params.width = WindowManager.LayoutParams.MATCH_PARENT
+        params.x = 0
+        params.y = params.y.coerceIn(0, sh - h)
+        params.gravity = Gravity.TOP or Gravity.START
+        applyPassThroughTouchFlags(params)
+        try {
+            windowManager?.updateViewLayout(rootContainer ?: return, params)
+        } catch (_: Exception) {
+        }
+        VlueBigPushTrace.lifecycle("BIG_PUSH_PEEK_RESTORE", "wasRight=$wasRight y=${params.y}")
     }
 
     /** CSS px 클램프용 — WebView가 Mini Case로 줄어든 뒤에도 전체 화면 크기 제공 */
@@ -1389,6 +1583,8 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_CALL_END", "dismissOverlay")
         CompanionRuntimeStabilityDiag.endCallSession("dismissOverlay")
         companion.onCallEnd()
+        remoteConnected = false
+        bigPushPeeking = false
         publishCompanion(OverlayTriggerEvent.CALL_END)
         /* 애니/큐보다 먼저 Web idle — stale connected 가 UI 를 되살리지 않게 */
         notifyWebCallState("idle")
@@ -1798,6 +1994,18 @@ class CallOverlayService : Service() {
         private var activeInstance: CallOverlayService? = null
 
         fun isRunning(): Boolean = activeInstance != null
+
+        /**
+         * PHONE_STATE OFFHOOK 시 Showcase 진입 여부.
+         * 발신 다이얼 중(currentOutgoing && !remoteConnected) 은 false.
+         */
+        fun shouldConnectOnOffhook(): Boolean {
+            val svc = activeInstance ?: return false
+            if (svc.remoteConnected) return true
+            if (svc.currentOutgoing) return false
+            return svc.companion.state == OverlayState.BIG_PUSH ||
+                svc.isInCallOverlayState()
+        }
 
         /** Activity pause/stop → HOME 점유 해제용 Context 재평가 */
         fun notifyForegroundContextChanged(source: String = "activityLifecycle") {

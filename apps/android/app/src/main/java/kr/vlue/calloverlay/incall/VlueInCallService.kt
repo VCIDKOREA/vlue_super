@@ -55,13 +55,16 @@ class VlueInCallService : InCallService() {
                 )
                 LetteringCallCoordinator.onRinging(this, phone.ifBlank { null }, outgoing = false)
             }
-            Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_ACTIVE -> {
+            Call.STATE_DIALING, Call.STATE_CONNECTING -> {
                 if (phone.isNotBlank()) {
                     LetteringCallCoordinator.onRinging(this, phone, outgoing = outgoing)
                 }
-                if (call.state == Call.STATE_ACTIVE) {
-                    CallOverlayService.notifyConnected(applicationContext)
+            }
+            Call.STATE_ACTIVE -> {
+                if (phone.isNotBlank()) {
+                    LetteringCallCoordinator.onRinging(this, phone, outgoing = outgoing)
                 }
+                CallOverlayService.notifyConnected(applicationContext)
             }
         }
     }

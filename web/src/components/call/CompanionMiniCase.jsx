@@ -324,33 +324,35 @@ export default function CompanionMiniCase({
           <span className="companion-mini-case__peek-knob">{peekRight ? "‹" : "›"}</span>
         </div>
       ) : (
-        <div className="companion-mini-case__card">
-          <p className="companion-mini-case__line1">
-            <span className="companion-mini-case__name">{displayName || "—"}</span>
-            <span className="companion-mini-case__live" aria-hidden>
-              🟢
-            </span>
-            <span className="companion-mini-case__duration">{durationLabel}</span>
-          </p>
-          <p className="companion-mini-case__line2">
-            <span className="companion-mini-case__phone">{phoneLabel || "—"}</span>
-            <span
-              className={`companion-mini-case__badge${verified ? " is-verified" : " is-unverified"}`}
-            >
-              {statusLabel || (verified ? "인증" : "미인증")}
-            </span>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="companion-mini-case__expand-hint"
-          onClick={(e) => {
-            e.stopPropagation();
-            onExpand?.();
-          }}
-        >
-          ▼ SHOWCASE 열기
-        </button>
+        <>
+          <div className="companion-mini-case__card">
+            <p className="companion-mini-case__line1">
+              <span className="companion-mini-case__name">{displayName || "—"}</span>
+              <span className="companion-mini-case__live" aria-hidden>
+                🟢
+              </span>
+              <span className="companion-mini-case__duration">{durationLabel}</span>
+            </p>
+            <p className="companion-mini-case__line2">
+              <span className="companion-mini-case__phone">{phoneLabel || "—"}</span>
+              <span
+                className={`companion-mini-case__badge${verified ? " is-verified" : " is-unverified"}`}
+              >
+                {statusLabel || (verified ? "인증" : "미인증")}
+              </span>
+            </p>
+          </div>
+          <button
+            type="button"
+            className="companion-mini-case__expand-hint"
+            onClick={(e) => {
+              e.stopPropagation();
+              onExpand?.();
+            }}
+          >
+            ▼ SHOWCASE 열기
+          </button>
+        </>
       )}
     </div>
   );

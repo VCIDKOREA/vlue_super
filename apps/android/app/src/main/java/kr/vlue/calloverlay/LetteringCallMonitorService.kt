@@ -134,10 +134,13 @@ class LetteringCallMonitorService : Service() {
                     "LetteringCallMonitorService received",
                     "state=OFFHOOK prev=$lastState"
                 )
-                if (lastState != TelephonyManager.CALL_STATE_RINGING) {
+                if (lastState == TelephonyManager.CALL_STATE_RINGING) {
+                    /* 수신 Answer → Showcase */
+                    CallOverlayService.notifyConnected(applicationContext)
+                } else {
+                    /* 발신 다이얼 중(OFFHOOK) — BigPush 유지. Showcase 는 STATE_ACTIVE/notifyConnected 만 */
                     LetteringCallCoordinator.onRinging(this, null, outgoing = true)
                 }
-                CallOverlayService.notifyConnected(applicationContext)
             }
             TelephonyManager.CALL_STATE_IDLE -> {
                 LetteringCallCoordinator.onCallEnded(this)
