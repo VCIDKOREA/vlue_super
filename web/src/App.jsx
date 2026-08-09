@@ -3818,7 +3818,11 @@ function App() {
   }
 
   if (letteringOverlayOpen) {
-    return <LetteringOverlayHost />;
+    return (
+      <ShowcaseBgmProvider>
+        <LetteringOverlayHost />
+      </ShowcaseBgmProvider>
+    );
   }
 
   if (isElectronRoomWindowMode && electronRoomBoot?.roomType === "MAIL_TALK") {

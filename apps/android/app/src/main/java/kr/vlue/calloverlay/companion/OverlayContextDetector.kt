@@ -16,6 +16,7 @@ object OverlayContextDetector {
      * @param foregroundIsOurApp VLUE MainActivity 등이 전면
      * @param foregroundIsLauncher 런처/홈이 전면으로 추정
      * @param foregroundIsInCallUi 시스템 전화(InCallUI) 패키지가 전면으로 추정
+     * @param foregroundIsKnownOtherApp 전면 패키지를 알 수 있고 전화/런처/자사가 아님
      * @param userMinimized 사용자/브리지가 Mini 요청
      * @param keypadOpen 키패드 열림
      */
@@ -24,6 +25,7 @@ object OverlayContextDetector {
         foregroundIsOurApp: Boolean = false,
         foregroundIsLauncher: Boolean = false,
         foregroundIsInCallUi: Boolean = false,
+        foregroundIsKnownOtherApp: Boolean = false,
         userMinimized: Boolean = false,
         keypadOpen: Boolean = false
     ): OverlayContext {
@@ -34,8 +36,14 @@ object OverlayContextDetector {
                 foregroundIsLauncher || foregroundIsOurApp -> OverlayContext.HOME_SCREEN
                 else -> OverlayContext.OTHER_APP
             }
+            /*
+             * RINGING:
+             * - 삼성 전체 InCallUI 확정 → TOP
+             * - 그 외(다른 앱/홈 팝업/미확인) → BOTTOM (상단 HUN 뒤에 숨지 않게)
+             */
             CallPhase.RINGING -> when {
                 foregroundIsInCallUi -> OverlayContext.INCOMING_CALL_UI
+                foregroundIsKnownOtherApp -> OverlayContext.OTHER_APP
                 foregroundIsLauncher || foregroundIsOurApp -> OverlayContext.HOME_SCREEN
                 else -> OverlayContext.OTHER_APP
             }
@@ -61,11 +69,15 @@ object OverlayContextDetector {
     fun isLikelyInCallUiPackage(pkg: String?): Boolean {
         if (pkg.isNullOrBlank()) return false
         val p = pkg.lowercase()
-        return p.contains("incall") ||
+        return p.contains("incallui") ||
+            p.contains("incall") ||
             p.contains("dialer") ||
             p.contains("telecom") ||
+            p.contains("telephonyui") ||
             p == "com.samsung.android.incallui" ||
+            p == "com.samsung.android.dialer" ||
             p == "com.google.android.dialer" ||
-            p == "com.android.phone"
+            p == "com.android.phone" ||
+            p == "com.android.server.telecom"
     }
 }

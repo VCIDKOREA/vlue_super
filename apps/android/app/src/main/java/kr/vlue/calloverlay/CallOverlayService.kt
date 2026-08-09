@@ -27,6 +27,8 @@ import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import kr.vlue.calloverlay.companion.CompanionOverlayController
 import kr.vlue.calloverlay.companion.MiniCaseVisibility
+import kr.vlue.calloverlay.companion.BigPushShowcaseBar
+import kr.vlue.calloverlay.companion.ForegroundPackageProbe
 import kr.vlue.calloverlay.companion.OverlayContext
 import kr.vlue.calloverlay.companion.OverlayContextDetector
 import kr.vlue.calloverlay.companion.OverlayPosition
@@ -116,6 +118,7 @@ class CallOverlayService : Service() {
         OverlayDiagTracker.setOemDeviceInfo(OemDeviceProbe.collect(this))
         OverlayDiagTracker.refreshSecurityAuditReport()
         startScreenStateDetector()
+        startContextWatch()
         registerMemoryCallbackObserver()
     }
 
@@ -412,53 +415,36 @@ class CallOverlayService : Service() {
         }
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val container = FrameLayout(this).apply {
-            /* WebView 기본 흰 배경이 FULLSCREEN 을 채우지 않도록 컨테이너는 다크 */
-            setBackgroundColor(Color.parseColor("#0B101B"))
+            /*
+             * BIG_PUSH: 투명 — 40% 가림막(#0B101B) 금지.
+             * SHOWCASE/FULLSCREEN: 다크 베이스(WebView 흰 깜빡임 방지).
+             */
+            setBackgroundColor(
+                if (asBigPush) Color.TRANSPARENT else Color.parseColor("#0B101B")
+            )
         }
         val bannerGravity =
             if (asBigPush && companion.position == OverlayPosition.BOTTOM) Gravity.BOTTOM else Gravity.TOP
 
-        val banner = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#E60B101B"))
-            setPadding(dp(20), dp(28), dp(20), dp(20))
-            elevation = dp(8).toFloat()
-            visibility = android.view.View.VISIBLE
-        }
-        val title = TextView(this).apply {
-            text = if (outgoing) "VLUE 발신 레터링" else "VLUE 수신 빅푸시"
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            typeface = Typeface.DEFAULT_BOLD
-            tag = "banner_title"
-        }
-        val phoneTv = TextView(this).apply {
-            text = bannerPrimaryText(phone, cardJson)
-            setTextColor(Color.parseColor("#E2E8F0"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, dp(6), 0, 0)
-            tag = "banner_phone"
-        }
-        val hint = TextView(this).apply {
-            text = bannerHintText(phone, verified, cardJson)
-            setTextColor(Color.parseColor("#94A3B8"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setPadding(0, dp(4), 0, 0)
-            tag = "banner_hint"
-        }
-        banner.addView(title)
-        banner.addView(phoneTv)
-        banner.addView(hint)
-        nativeBanner = banner
-        container.addView(
-            banner,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                bannerGravity
-            )
+        val banner = BigPushShowcaseBar.create(
+            context = this,
+            phone = phone,
+            verified = verified,
+            outgoing = outgoing,
+            cardJson = cardJson
         )
+        nativeBanner = banner
+        val bannerLp = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            bannerGravity
+        ).apply {
+            marginStart = dp(10)
+            marginEnd = dp(10)
+            topMargin = if (asBigPush && companion.position != OverlayPosition.BOTTOM) dp(8) else 0
+            bottomMargin = if (asBigPush && companion.position == OverlayPosition.BOTTOM) dp(12) else 0
+        }
+        container.addView(banner, bannerLp)
 
         val wv = WebView(this)
         LetteringJavascriptBridge.attach(wv, this)
@@ -866,19 +852,33 @@ class CallOverlayService : Service() {
         }
         val activity = VlueCallOverlayApp.currentActivityName.orEmpty()
         val pausedOrGone = activity.isBlank() || activity.contains("(paused)", ignoreCase = true)
+        /* VLUE Activity lifecycle 만으로는 삼성 InCallUI 를 알 수 없음 — 시스템 전면 패키지 병행 */
+        val sysFg =
+            ForegroundPackageProbe.topPackage(this)
+                ?: ForegroundPackageProbe.topPackageFromProcesses(this)
+        val fgHint = listOf(activity, sysFg.orEmpty()).joinToString(" ")
         /* paused 는 전면이 아님 — HOME/OTHER 로 내려가 MINI 로 축소되어야 함 */
         val ourApp = activity.contains("kr.vlue", ignoreCase = true) && !pausedOrGone
         val launcher =
-            OverlayContextDetector.isLikelyLauncherPackage(activity) ||
+            OverlayContextDetector.isLikelyLauncherPackage(sysFg) ||
+                OverlayContextDetector.isLikelyLauncherPackage(activity) ||
                 activity.contains("Launcher", ignoreCase = true) ||
-                (pausedOrGone && phase == OverlayContextDetector.CallPhase.OFFHOOK)
+                (pausedOrGone && phase == OverlayContextDetector.CallPhase.OFFHOOK && sysFg == null)
         val inCallUi =
-            OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone
+            OverlayContextDetector.isLikelyInCallUiPackage(sysFg) ||
+                (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone) ||
+                OverlayContextDetector.isLikelyInCallUiPackage(fgHint)
+        val knownOther =
+            !sysFg.isNullOrBlank() &&
+                !inCallUi &&
+                !OverlayContextDetector.isLikelyLauncherPackage(sysFg) &&
+                !sysFg.contains("kr.vlue", ignoreCase = true)
         return OverlayContextDetector.detect(
             callPhase = phase,
             foregroundIsOurApp = ourApp,
             foregroundIsLauncher = launcher,
             foregroundIsInCallUi = inCallUi,
+            foregroundIsKnownOtherApp = knownOther,
             userMinimized = userMinimized,
             keypadOpen = keypadOpen
         )
@@ -946,12 +946,7 @@ class CallOverlayService : Service() {
             pendingCardJson = cardJson
             val banner = nativeBanner
             if (banner != null) {
-                (banner.findViewWithTag<TextView>("banner_phone"))?.text =
-                    bannerPrimaryText(phone, cardJson)
-                (banner.findViewWithTag<TextView>("banner_hint"))?.text =
-                    bannerHintText(phone, verified, cardJson)
-                (banner.findViewWithTag<TextView>("banner_title"))?.text =
-                    if (outgoing) "VLUE 발신 레터링" else "VLUE 수신 빅푸시"
+                BigPushShowcaseBar.bind(banner, phone, verified, outgoing, cardJson)
             }
             val wv = webView
             if (wv != null && !IncomingNumberResolver.isUnknown(phone)) {
@@ -1315,14 +1310,26 @@ class CallOverlayService : Service() {
     private fun applyCompactRingingWindowLocked(params: WindowManager.LayoutParams) {
         val pos = companion.position
         params.width = WindowManager.LayoutParams.MATCH_PARENT
-        params.height = dp(300)
+        /* 컴팩트 쇼케이스 바만 — 300dp 가림막 제거 */
+        params.height = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
         params.x = 0
-        params.y = 0
+        params.y = when (pos) {
+            OverlayPosition.BOTTOM -> dp(8)
+            else -> dp(4)
+        }
         params.gravity = when (pos) {
             OverlayPosition.BOTTOM -> Gravity.BOTTOM or Gravity.START
             else -> Gravity.TOP or Gravity.START
         }
         applyPassThroughTouchFlags(params)
+        /* 바 카드가 하단에 보이도록 배너 gravity 동기화 */
+        (nativeBanner?.layoutParams as? FrameLayout.LayoutParams)?.let { lp ->
+            lp.gravity = if (pos == OverlayPosition.BOTTOM) Gravity.BOTTOM else Gravity.TOP
+            lp.bottomMargin = if (pos == OverlayPosition.BOTTOM) dp(12) else 0
+            lp.topMargin = if (pos != OverlayPosition.BOTTOM) dp(8) else 0
+            nativeBanner?.layoutParams = lp
+        }
+        rootContainer?.setBackgroundColor(Color.TRANSPARENT)
     }
 
     /** CSS px 클램프용 — WebView가 Mini Case로 줄어든 뒤에도 전체 화면 크기 제공 */
@@ -1352,6 +1359,7 @@ class CallOverlayService : Service() {
     fun dismissOverlay() {
         if (dismissing) return
         dismissing = true
+        stopContextWatch()
         CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_CALL_END", "dismissOverlay")
         CompanionRuntimeStabilityDiag.endCallSession("dismissOverlay")
         companion.onCallEnd()
@@ -1409,6 +1417,7 @@ class CallOverlayService : Service() {
     override fun onDestroy() {
         CompanionRecoveryTracker.recordServiceLifecycle("ON_DESTROY")
         unregisterMemoryCallbackObserver()
+        stopContextWatch()
         stopScreenStateDetector()
         OverlayDiagTracker.onDestroy()
         VlueBigPushTrace.lifecycle(
@@ -1493,15 +1502,21 @@ class CallOverlayService : Service() {
     }
 
     /**
-     * HOME / 다른 앱 전환 시 Activity lifecycle 에서 호출.
-     * SHOWCASE FULLSCREEN 이 화면을 점유하지 않도록 Context→MINI 로 축소.
+     * HOME / 다른 앱 전환 시 Activity lifecycle 또는 ContextWatch 에서 호출.
+     * SHOWCASE → MINI, BIG_PUSH → TOP/BOTTOM 재배치.
      */
     private fun reevaluateForegroundContext(source: String) {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
-        if (companion.state != OverlayState.SHOWCASE && companion.state != OverlayState.MINI_CASE) return
+        if (companion.state != OverlayState.SHOWCASE &&
+            companion.state != OverlayState.MINI_CASE &&
+            companion.state != OverlayState.BIG_PUSH
+        ) {
+            return
+        }
         val prevState = companion.state
         val prevPos = companion.position
-        val ctx = detectOverlayContext(forceRinging = false)
+        val forceRinging = companion.state == OverlayState.BIG_PUSH
+        val ctx = detectOverlayContext(forceRinging = forceRinging)
         companion.updateContext(ctx)
         if (companion.state != prevState || companion.position != prevPos) {
             publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
@@ -1518,7 +1533,32 @@ class CallOverlayService : Service() {
                     .put("state", companion.state.name)
                     .put("position", companion.position.name)
             )
+        } else if (companion.state == OverlayState.BIG_PUSH) {
+            /* 동일 Context 라도 gravity 재적용 (다른 앱 HUN 뒤로 남는 경우) */
+            applyCompactRingingWindow()
         }
+    }
+
+    private val contextWatchRunnable = object : Runnable {
+        override fun run() {
+            if (dismissing) return
+            when (companion.state) {
+                OverlayState.BIG_PUSH, OverlayState.SHOWCASE, OverlayState.MINI_CASE -> {
+                    reevaluateForegroundContext("contextWatch")
+                    mainHandler.postDelayed(this, 450L)
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    private fun startContextWatch() {
+        mainHandler.removeCallbacks(contextWatchRunnable)
+        mainHandler.postDelayed(contextWatchRunnable, 450L)
+    }
+
+    private fun stopContextWatch() {
+        mainHandler.removeCallbacks(contextWatchRunnable)
     }
 
     private fun stopSelfTraced(reason: String) {
@@ -1543,13 +1583,12 @@ class CallOverlayService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
         /*
-         * Phase 6-I: FLAG_TURN_SCREEN_ON / KEEP_SCREEN_ON / SHOW_WHEN_LOCKED 는
-         * Overlay 에 불필요하고 OEM 정책 트리거가 될 수 있어 제거.
+         * Phase 6-I + Showcase Bar: 컴팩트 높이만.
          * Companion Overlay 는 NOT_FOCUSABLE + NOT_TOUCH_MODAL 로 하위 앱 터치 통과.
          */
         return WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            dp(300),
+            dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP),
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -1560,7 +1599,10 @@ class CallOverlayService : Service() {
                 OverlayPosition.BOTTOM -> Gravity.BOTTOM or Gravity.START
                 else -> Gravity.TOP or Gravity.START
             }
-            y = 0
+            y = when (position) {
+                OverlayPosition.BOTTOM -> dp(8)
+                else -> dp(4)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES

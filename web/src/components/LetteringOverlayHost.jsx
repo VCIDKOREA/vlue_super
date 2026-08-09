@@ -20,6 +20,7 @@ import LetteringCertModal from "./LetteringCertModal.jsx";
 import { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
+import { ShowcaseBgmProvider } from "../context/ShowcaseBgmContext.jsx";
 import "../styles/tent-showcase.css";
 import "../styles/showcase-call-glass.css";
 
@@ -43,6 +44,14 @@ function parseOverlayParams() {
  * 웹 홈·마케팅과 동일 — LetteringIncomingNotification 쇼케이스 바 → 풀 쇼케이스
  */
 export default function LetteringOverlayHost() {
+  return (
+    <ShowcaseBgmProvider>
+      <LetteringOverlayHostInner />
+    </ShowcaseBgmProvider>
+  );
+}
+
+function LetteringOverlayHostInner() {
   const [{ incoming, platform, direction, native, forceLettering, phase }, setParams] = useState(parseOverlayParams);
   const [card, setCard] = useState(null);
   const [verified, setVerified] = useState(false);

@@ -44,7 +44,7 @@ object CardLookupRepository {
     private fun lookupOnce(context: Context, base: String, numberParam: String): CardLookupResult? {
         return try {
             val q = URLEncoder.encode(numberParam, "UTF-8")
-            val url = URL("$base/api/cards/by-number?number=$q")
+            val url = URL("$base/api/cards/by-number?number=$q&purpose=call_overlay")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 8000

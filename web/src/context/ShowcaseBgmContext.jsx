@@ -803,7 +803,27 @@ export function ShowcaseBgmProvider({ children }) {
 export function useShowcaseBgm() {
   const ctx = useContext(ShowcaseBgmContext);
   if (!ctx) {
-    throw new Error("useShowcaseBgm must be used within ShowcaseBgmProvider");
+    /* Overlay WebView 가 Provider 밖에 떠도 Showcase가 크래시하지 않게 no-op */
+    return {
+      visitSessionKey: "",
+      trackIndex: 0,
+      playEpoch: 0,
+      phase: "idle",
+      styleConfig: null,
+      bindStyleConfig: () => {},
+      setPlaybackPhase: () => {},
+      unlockFromUserGesture: () => {},
+      effectiveMuted: true,
+      canToggleMute: false,
+      toggleMute: () => {},
+      bgmUrl: null,
+      stopSettingsPreview: () => {},
+      hushMainAudio: () => {},
+      audioPlaying: false,
+      isAudible: false,
+      canSkipTracks: false,
+      skipTrack: () => {}
+    };
   }
   return ctx;
 }
