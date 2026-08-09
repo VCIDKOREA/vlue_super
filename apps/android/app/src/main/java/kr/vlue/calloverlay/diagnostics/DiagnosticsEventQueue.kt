@@ -32,6 +32,10 @@ object DiagnosticsEventQueue {
 
     fun bind(context: Context) {
         appContext = context.applicationContext
+        if (!DiagnosticsRemoteGate.ENABLED) {
+            clearQueueFile(context.applicationContext)
+            Log.i(TAG, "remote diagnostics DISABLED — queue cleared, upload skipped")
+        }
     }
 
     fun resetTiming(sessionId: String? = null) {
@@ -52,6 +56,7 @@ object DiagnosticsEventQueue {
         failReason: String? = null,
         overlayState: JSONObject? = null
     ) {
+        if (!DiagnosticsRemoteGate.ENABLED) return
         val payload = JSONObject().apply {
             put("kind", "session")
             put("id", UUID.randomUUID().toString())
@@ -87,6 +92,7 @@ object DiagnosticsEventQueue {
         failStepOverride: Int? = null,
         failReasonOverride: String? = null
     ) {
+        if (!DiagnosticsRemoteGate.ENABLED) return
         /* 발생 즉시 샘플 — enqueue 지연 전에 시각 고정 */
         val wallNow = System.currentTimeMillis()
         val nowNanos = SystemClock.elapsedRealtimeNanos()
@@ -181,9 +187,24 @@ object DiagnosticsEventQueue {
     }
 
     fun flushAsync(context: Context) {
+        if (!DiagnosticsRemoteGate.ENABLED) {
+            clearQueueFile(context.applicationContext)
+            return
+        }
         val app = context.applicationContext
         appContext = app
         executor.execute { flushSync(app) }
+    }
+
+    private fun clearQueueFile(context: Context) {
+        synchronized(fileLock) {
+            try {
+                val f = queueFile(context)
+                if (f.exists()) f.writeText("")
+            } catch (_: Exception) {
+            }
+        }
+        lastEventNanosBySession.clear()
     }
 
     private fun queueFile(context: Context): File =

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { resolveRequestUserId } from "../lib/authContext.js";
+import { isDiagnosticsRemoteEnabled } from "../services/diagnostics/diagnosticsFeatureFlags.js";
 import {
   ingestDiagnosticEvents,
   upsertDiagnosticSession,
@@ -11,6 +12,8 @@ import {
  * POST /api/diagnostics/sessions — 세션 upsert
  * POST /api/diagnostics/events — 이벤트 배치 (+ 선택 session)
  * 수집 실패여도 UX를 깨지 않도록 가급적 200.
+ *
+ * VLUE_DIAGNOSTICS_ENABLED 기본 OFF — DB/pooler 쓰기 0.
  */
 export const diagnosticsRoutes = new Hono();
 
@@ -30,6 +33,9 @@ function rateLimit(key: string, max = 120, windowMs = 60_000): boolean {
 
 diagnosticsRoutes.post("/sessions", async (c) => {
   try {
+    if (!isDiagnosticsRemoteEnabled()) {
+      return c.json({ ok: true, disabled: true });
+    }
     const deviceId = c.req.header("X-VLUE-Device-Id") || "anon";
     if (!rateLimit(`s:${deviceId}`)) {
       return c.json({ ok: true, throttled: true });
@@ -48,6 +54,10 @@ diagnosticsRoutes.post("/sessions", async (c) => {
 
 diagnosticsRoutes.post("/events", async (c) => {
   try {
+    if (!isDiagnosticsRemoteEnabled()) {
+      /* body 파싱·DB 없이 즉시 응답 — Shared Pooler 0 */
+      return c.json({ ok: true, disabled: true, accepted: 0 });
+    }
     const deviceId = c.req.header("X-VLUE-Device-Id") || "anon";
     if (!rateLimit(`e:${deviceId}`)) {
       return c.json({ ok: true, throttled: true, accepted: 0 });

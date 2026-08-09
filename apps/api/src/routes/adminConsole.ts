@@ -21,6 +21,7 @@ import {
   getDiagnosticSessionDetail,
   listDiagnosticSessions
 } from "../services/diagnostics/diagnosticsAdmin.js";
+import { isDiagnosticsRemoteEnabled } from "../services/diagnostics/diagnosticsFeatureFlags.js";
 import {
   createMarketingPopup,
   deleteAdminFeedPost,
@@ -236,6 +237,15 @@ authed.get("/metrics", async (c) => {
 /** GET /api/admin/console/diagnostics/sessions */
 authed.get("/diagnostics/sessions", async (c) => {
   try {
+    if (!isDiagnosticsRemoteEnabled()) {
+      return c.json({
+        ok: true,
+        disabled: true,
+        sessions: [],
+        nextCursor: null,
+        message: "Diagnostics disabled. Set VLUE_DIAGNOSTICS_ENABLED=true to re-enable."
+      });
+    }
     const data = await listDiagnosticSessions({
       feature: c.req.query("feature") || undefined,
       status: c.req.query("status") || undefined,
@@ -252,6 +262,13 @@ authed.get("/diagnostics/sessions", async (c) => {
 /** GET /api/admin/console/diagnostics/sessions/:id */
 authed.get("/diagnostics/sessions/:id", async (c) => {
   try {
+    if (!isDiagnosticsRemoteEnabled()) {
+      return c.json({
+        ok: false,
+        disabled: true,
+        error: "DIAGNOSTICS_DISABLED"
+      }, 503);
+    }
     const detail = await getDiagnosticSessionDetail(c.req.param("id"));
     if (!detail) return c.json({ ok: false, error: "NOT_FOUND" }, 404);
     return c.json({ ok: true, ...detail });

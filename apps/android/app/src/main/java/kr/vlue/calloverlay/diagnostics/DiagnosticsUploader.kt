@@ -25,6 +25,7 @@ object DiagnosticsUploader {
     }
 
     private fun postJson(context: Context, path: String, body: JSONObject): Boolean {
+        if (!DiagnosticsRemoteGate.ENABLED) return true
         val base = BuildConfig.API_BASE_URL.trimEnd('/')
         val url = URL("$base$path")
         var conn: HttpURLConnection? = null

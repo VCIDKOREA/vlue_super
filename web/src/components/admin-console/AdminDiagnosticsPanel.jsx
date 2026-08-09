@@ -3,6 +3,7 @@ import {
   fetchAdminDiagnosticSessionDetail,
   fetchAdminDiagnosticSessions
 } from "../../lib/adminConsoleApi.js";
+import { ADMIN_DIAGNOSTICS_UI_ENABLED } from "../../lib/adminDiagnosticsFlags.js";
 
 const FEATURES = [
   { id: "BIG_PUSH", label: "Big Push Trace" },
@@ -102,7 +103,25 @@ function markForStep(events, seq) {
   return { mark: last.ok === false ? "✖" : "✔", failed: last.ok === false, event: last };
 }
 
-export default function AdminDiagnosticsPanel({ onToast }) {
+export default function AdminDiagnosticsPanel(props) {
+  if (!ADMIN_DIAGNOSTICS_UI_ENABLED) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-[13px] text-slate-600">
+        <p className="font-black text-slate-900">Diagnostics 비활성화</p>
+        <p className="mt-2">
+          원격 트레이스가 꺼져 있습니다 (egress 0). 코드는 유지되어 있으며, 재사용 시{" "}
+          <code className="rounded bg-white px-1">adminDiagnosticsFlags.js</code> 와 API{" "}
+          <code className="rounded bg-white px-1">VLUE_DIAGNOSTICS_ENABLED=true</code>, Android{" "}
+          <code className="rounded bg-white px-1">DiagnosticsRemoteGate.ENABLED=true</code> 를 켜면
+          됩니다.
+        </p>
+      </div>
+    );
+  }
+  return <AdminDiagnosticsPanelActive {...props} />;
+}
+
+function AdminDiagnosticsPanelActive({ onToast }) {
   const [feature, setFeature] = useState("BIG_PUSH");
   const [sessions, setSessions] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -189,7 +208,7 @@ export default function AdminDiagnosticsPanel({ onToast }) {
         <div className="rounded-xl border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
             <p className="text-[12px] font-black text-slate-700">Session 목록</p>
-            <p className="text-[10px] text-slate-400">{busy ? "갱신 중…" : "4초 폴링"}</p>
+            <p className="text-[10px] text-slate-400">{busy ? "갱신 중…" : "30초 폴링"}</p>
           </div>
           <div className="max-h-[70vh] divide-y divide-slate-100 overflow-y-auto">
             {!sessions.length ? (

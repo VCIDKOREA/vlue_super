@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import PricingManagerPanel from "./PricingManagerPanel.jsx";
 import AdminMetricsPanel from "./AdminMetricsPanel.jsx";
 import AdminDiagnosticsPanel from "./AdminDiagnosticsPanel.jsx";
+import { ADMIN_DIAGNOSTICS_UI_ENABLED } from "../../lib/adminDiagnosticsFlags.js";
 import {
   createAdminNotice,
   createAdminPopup,
@@ -29,7 +30,9 @@ import {
 
 const TABS = [
   { id: "metrics", label: "DB 지표" },
-  { id: "diagnostics", label: "Diagnostics" },
+  ...(ADMIN_DIAGNOSTICS_UI_ENABLED
+    ? [{ id: "diagnostics", label: "Diagnostics" }]
+    : []),
   { id: "enterpriseDcc", label: "기업명함 승인" },
   { id: "health", label: "상태 점검" },
   { id: "pricing", label: "요금제 관리" },
@@ -647,7 +650,9 @@ export default function AdminConsoleDesk({ user, onLogout }) {
 
       <main className="mx-auto max-w-6xl px-4 py-5">
         {tab === "metrics" ? <AdminMetricsPanel onToast={showToast} /> : null}
-        {tab === "diagnostics" ? <AdminDiagnosticsPanel onToast={showToast} /> : null}
+        {tab === "diagnostics" && ADMIN_DIAGNOSTICS_UI_ENABLED ? (
+          <AdminDiagnosticsPanel onToast={showToast} />
+        ) : null}
         {tab === "enterpriseDcc" ? <EnterpriseDccAdminTab onToast={showToast} /> : null}
         {tab === "health" ? <HealthTab onToast={showToast} /> : null}
         {tab === "pricing" ? <PricingManagerPanel onToast={showToast} /> : null}
