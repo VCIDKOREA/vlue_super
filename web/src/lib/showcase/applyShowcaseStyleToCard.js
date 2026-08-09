@@ -16,9 +16,12 @@ export function applyShowcaseStyleToCard(card, membershipTier = "free", opts = {
    * scrub/고정신원 병합 금지 — ceo@vlue.kr·VCID KOREA 가 「데모 오염」으로 지워지는 사고 방지.
    */
   if (peerMode) {
+    const styleSafe = style
+      ? { ...style, showBroadcastName: style.showBroadcastName !== false }
+      : null;
     return {
       ...card,
-      ...(style ? { showcaseStyle: style } : {}),
+      ...(styleSafe ? { showcaseStyle: styleSafe } : {}),
       membershipTier,
       hideBroadcastName: false
     };

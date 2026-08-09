@@ -27,6 +27,8 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       nested.companyName ||
       body.organization ||
       nested.organization ||
+      profile.companyName ||
+      profile.organization ||
       "",
     publicHandle: handle,
     loginId: handle,
@@ -47,7 +49,13 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       nested.fax ||
       "",
     website:
-      profile.website || profile.homepage || profile.url || profile.web || nested.website || "",
+      body.website ||
+      nested.website ||
+      profile.website ||
+      profile.homepage ||
+      profile.url ||
+      profile.web ||
+      "",
     address:
       profile.address ||
       profile.businessAddress ||
@@ -85,6 +93,15 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       body.membershipTier ||
       nested.membershipTier ||
       (body.is_premium_line || body.digitalCardActive ? "paid" : "free"),
+    authPaidAt: body.authPaidAt || nested.authPaidAt || profile.authPaidAt || null,
+    authCycleEndAt:
+      body.authCycleEndAt ||
+      nested.authCycleEndAt ||
+      profile.authCycleEndAt ||
+      body.cycleEndAt ||
+      null,
+    authValidUntil: body.authValidUntil || nested.authValidUntil || profile.authValidUntil || null,
+    billingCycle: body.billingCycle || nested.billingCycle || profile.billingCycle || null,
     verificationItems: Array.isArray(profile.verificationItems)
       ? profile.verificationItems
       : body.is_verified

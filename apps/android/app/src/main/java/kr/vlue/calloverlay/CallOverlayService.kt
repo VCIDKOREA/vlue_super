@@ -477,7 +477,7 @@ class CallOverlayService : Service() {
         ).apply {
             marginStart = dp(10)
             marginEnd = dp(10)
-            topMargin = dp(4)
+            topMargin = dp(0)
             bottomMargin = dp(4)
         }
         if (asBigPush) {
@@ -689,6 +689,10 @@ class CallOverlayService : Service() {
         publishCompanion(
             if (asBigPush) OverlayTriggerEvent.INCOMING else OverlayTriggerEvent.ANSWER
         )
+        /* 오버레이 BigPush 가 보이면 HUN 중복(깜빡임) 제거 — 실패 시에만 Notifier 폴백 */
+        if (asBigPush) {
+            LetteringIncomingNotifier.cancel(this)
+        }
 
         currentPhone = phone
         currentOutgoing = outgoing
@@ -766,7 +770,7 @@ class CallOverlayService : Service() {
         publishCompanion(OverlayTriggerEvent.ANSWER)
         userMinimized = false
         /* Answer 후 3초간 ContextWatch OTHER_APP→MINI 금지 — 전체 Showcase 유지 */
-        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 8000L
+        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 3000L
         if (rootContainer?.isAttachedToWindow == true) {
             enterShowcaseLayout(source = source)
         } else {
@@ -937,15 +941,6 @@ class CallOverlayService : Service() {
                 (!sysFg.isNullOrBlank() &&
                     OverlayContextDetector.isLikelyLauncherPackage(activity)) ||
                 (!pausedOrGone && activity.contains("Launcher", ignoreCase = true))
-        val inCallUi =
-            OverlayContextDetector.isLikelyInCallUiPackage(sysFg) ||
-                (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone) ||
-                OverlayContextDetector.isLikelyInCallUiPackage(fgHint) ||
-                (phase == OverlayContextDetector.CallPhase.RINGING &&
-                    ForegroundPackageProbe.isInCallUiProcessRunning(this)) ||
-                (phase == OverlayContextDetector.CallPhase.OFFHOOK &&
-                    ForegroundPackageProbe.isInCallUiProcessRunning(this) &&
-                    sysFg.isNullOrBlank())
         val knownOther =
             !sysFg.isNullOrBlank() &&
                 !OverlayContextDetector.isLikelyInCallUiPackage(sysFg) &&
@@ -953,6 +948,21 @@ class CallOverlayService : Service() {
                 !sysFg.contains("kr.vlue", ignoreCase = true) &&
                 !sysFg.contains("systemui", ignoreCase = true) &&
                 !sysFg.contains("android.permissioncontroller", ignoreCase = true)
+        /*
+         * 홈+삼성 수신 HUN 만 떠 있을 때 InCallUI 프로세스가 살아 있어도 TOP 고정하지 않음.
+         * (그렇지 않으면 BigPush 가 팝업 아래에 가려짐 → 하단으로 내려야 함)
+         */
+        val inCallUi =
+            OverlayContextDetector.isLikelyInCallUiPackage(sysFg) ||
+                (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone) ||
+                OverlayContextDetector.isLikelyInCallUiPackage(fgHint) ||
+                (phase == OverlayContextDetector.CallPhase.RINGING &&
+                    ForegroundPackageProbe.isInCallUiProcessRunning(this) &&
+                    !launcher &&
+                    sysFg.isNullOrBlank()) ||
+                (phase == OverlayContextDetector.CallPhase.OFFHOOK &&
+                    ForegroundPackageProbe.isInCallUiProcessRunning(this) &&
+                    sysFg.isNullOrBlank())
         return OverlayContextDetector.detect(
             callPhase = phase,
             foregroundIsOurApp = ourApp,
@@ -1094,7 +1104,7 @@ class CallOverlayService : Service() {
         return dp(28)
     }
 
-    private fun topBigPushOffsetY(): Int = statusBarHeightPx() + dp(16)
+    private fun topBigPushOffsetY(): Int = statusBarHeightPx() + dp(4)
 
     /** MiniCase: WebView 사각 표면을 타원(캡슐)으로 잘라 모서리를 투명하게 */
     private fun applyCapsuleClip(view: android.view.View?, enabled: Boolean) {
@@ -1829,7 +1839,7 @@ class CallOverlayService : Service() {
 
     /**
      * HOME / 다른 앱 전환 시 Activity lifecycle 또는 ContextWatch 에서 호출.
-     * SHOWCASE → MINI 는 런처·타 앱 패키지가 확정될 때만 (창만 줄여 깨짐 금지).
+     * SHOWCASE → MINI: 확정된 OTHER_APP / HOME 만 (InCallUI 오판 유예 후).
      */
     private fun reevaluateForegroundContext(source: String) {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
@@ -1844,10 +1854,27 @@ class CallOverlayService : Service() {
         val forceRinging = companion.state == OverlayState.BIG_PUSH
         var ctx = detectOverlayContext(forceRinging = forceRinging)
         if (companion.state == OverlayState.SHOWCASE) {
-            /*
-             * 자동 HOME/OTHER→MINI 금지 — InCallUI 오판으로 풀쇼케이스가 1초 뒤 깨짐.
-             * 미니는 사용자 「통화 옵션/접기」 또는 키패드만.
-             */
+            val hold =
+                android.os.SystemClock.elapsedRealtime() < showcaseHoldUntilElapsed
+            if (!hold &&
+                (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN)
+            ) {
+                /* 다른 앱/홈 — 풀 쇼케이스가 InCallUI 에 겹치지 않게 Mini 로 */
+                companion.minimizeForOtherApp()
+                userMinimized = true
+                publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
+                applyLayoutFromController(source = "reeval:$source:otherAppMini")
+                notifyWebCallState("minimize_showcase")
+                CompanionRuntimeStabilityDiag.mark(
+                    "HOME_CONTEXT_REEVAL",
+                    source,
+                    org.json.JSONObject()
+                        .put("context", ctx.name)
+                        .put("state", companion.state.name)
+                        .put("position", companion.position.name)
+                )
+                return
+            }
             companion.updateContext(OverlayContext.IN_CALL)
             val h = layoutParams?.height ?: 0
             if (h > 0 && h < dp(400)) {

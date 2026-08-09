@@ -323,7 +323,7 @@ export default function CompanionMiniCase({
       {peekRight || peekLeft ? (
         <div className="companion-mini-case__peek" aria-hidden>
           <span className="companion-mini-case__peek-rail" />
-          <span className="companion-mini-case__peek-knob">{peekRight ? "‹" : "›"}</span>
+          <span className="companion-mini-case__peek-knob">{peekRight ? "<" : ">"}</span>
         </div>
       ) : (
         <>

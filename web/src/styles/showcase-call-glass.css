@@ -3676,7 +3676,7 @@
   margin: 0;
   padding: 16px 22px 14px;
   border-radius: 9999px;
-  overflow: visible;
+  overflow: hidden;
   isolation: isolate;
   background: #0b1220;
   border: 1.5px solid rgba(226, 232, 240, 0.65);
@@ -3691,7 +3691,6 @@
   opacity: 0.96;
 }
 
-/* ?? ?? ù ?? oval ? ??? */
 .companion-mini-case__card {
   min-width: 0;
   max-width: none;
@@ -3827,10 +3826,20 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ??????peek ???????????? ??????? (??? ??? ???, ??????????) */
+/* peek: ???? ?? ó ??/???/min-width ??(?? ??) ?? */
 .companion-mini-case.is-peek-right,
 .companion-mini-case.is-peek-left {
   width: 28px;
+  min-width: 0 !important;
+  max-width: 28px;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  border: none !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible;
 }
 
 .companion-mini-case__peek {

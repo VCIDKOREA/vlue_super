@@ -533,13 +533,13 @@ function FrontPanel({
     .find((line) => /만료일|인증유효기간/.test(line));
   const peerUserId = String(card.userId || card.ownerUserId || "").trim();
   const meId = getLocalVlueUserId();
-  const isPeerCard = Boolean(peerUserId && meId && peerUserId !== meId);
+  const isPeerCard = Boolean(peerUserId && (!meId || peerUserId !== meId));
   const validityResolved = resolveAuthValidityPeriod({
     paidAt: card.authPaidAt || null,
     cycleEndAt: card.authCycleEndAt || card.cycleEndAt || null,
     validUntil: card.authValidUntil || null,
     billingCycle: card.billingCycle || null,
-    useLocalFallback: !isPeerCard
+    useLocalFallback: !isPeerCard && !peerUserId
   });
   const validityLabel = "만료일";
   const validityDisplay = validityFromItems

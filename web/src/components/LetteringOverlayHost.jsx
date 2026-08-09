@@ -258,7 +258,9 @@ function LetteringOverlayHostInner() {
               address: String(nextCard?.address || "").trim() || String(exp?.address || "").trim(),
               organization:
                 String(nextCard?.organization || "").trim() ||
-                String(exp?.organization || "").trim(),
+                String(exp?.organization || "").trim() ||
+                String(exp?.companyName || "").trim() ||
+                String(data.profile?.companyName || data.profile?.organization || "").trim(),
               title: String(nextCard?.title || "").trim() || String(exp?.title || "").trim(),
               department:
                 String(nextCard?.department || "").trim() || String(exp?.department || "").trim(),
@@ -266,6 +268,9 @@ function LetteringOverlayHostInner() {
               publicHandle:
                 String(nextCard?.publicHandle || nextCard?.loginId || "").trim() ||
                 String(data.profile?.publicHandle || "").trim(),
+              authPaidAt: nextCard?.authPaidAt || data.authPaidAt || null,
+              authCycleEndAt: nextCard?.authCycleEndAt || data.authCycleEndAt || null,
+              authValidUntil: nextCard?.authValidUntil || data.authValidUntil || null,
               membershipTier: data.membershipTier || nextCard.membershipTier || "paid"
             };
           }

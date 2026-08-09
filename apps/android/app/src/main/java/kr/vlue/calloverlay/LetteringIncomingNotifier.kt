@@ -40,6 +40,8 @@ object LetteringIncomingNotifier {
     fun post(context: Context, phone: String, outgoing: Boolean, displayName: String? = null) {
         try {
             val app = context.applicationContext
+            /* 재게시 전 취소 — HUN 깜빡임(보이다 사라졌다 다시 보임) 완화 */
+            cancel(app)
             ensureChannel(app)
             val title = if (outgoing) "VLUE 발신 레터링" else "VLUE 수신 빅푸시"
             val body = when {

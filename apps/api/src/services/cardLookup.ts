@@ -140,6 +140,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           companyName: card.companyName || "",
           email,
           profile,
+          website: firstStr(profile.website),
           image_url:
             pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url", "photoUrl"]) ||
             firstStr(card.user.digitalCard?.photoUrl),
@@ -181,6 +182,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         companyName: masked.companyName,
         email,
         profile,
+        website: firstStr(profile.website),
         image_url:
           pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url", "photoUrl"]) ||
           firstStr(card.user.digitalCard?.photoUrl),
@@ -248,6 +250,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           companyName: user.businessProfile?.companyName || "",
           email,
           profile,
+          website: firstStr(profile.website),
           digitalCardActive: Boolean(user.digitalCard),
           is_premium_line: isPremiumLine,
           phoneE164: user.phoneE164,
@@ -288,6 +291,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         companyName: masked.companyName,
         email,
         profile,
+        website: firstStr(profile.website),
         digitalCardActive: Boolean(user.digitalCard),
         is_premium_line: isPremiumLine,
         phoneE164: masked.phoneE164,

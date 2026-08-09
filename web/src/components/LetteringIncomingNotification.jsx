@@ -445,14 +445,16 @@ export default function LetteringIncomingNotification({
     if (showcaseOffPreview) return [];
     const peerId = String(c.userId || c.ownerUserId || "").trim();
     const me = getLocalVlueUserId();
-    const isPeer = Boolean(peerId && me && peerId !== me);
+    /* 피어 카드(상대 userId 있음) — 로컬 멤버십 만료일로 대체하지 않음 */
+    const isPeer = Boolean(peerId && (!me || peerId !== me));
     return buildAuthValidityVerificationItems({
       paidAt: c.authPaidAt || null,
       cycleEndAt: c.authCycleEndAt || c.cycleEndAt || null,
+      validUntil: c.authValidUntil || null,
       billingCycle: c.billingCycle || null,
-      useLocalFallback: !isPeer
+      useLocalFallback: !isPeer && !peerId
     });
-  }, [c.verificationItems, c.authPaidAt, c.authCycleEndAt, c.cycleEndAt, c.billingCycle, c.userId, c.ownerUserId, showcaseOffPreview]);
+  }, [c.verificationItems, c.authPaidAt, c.authCycleEndAt, c.cycleEndAt, c.authValidUntil, c.billingCycle, c.userId, c.ownerUserId, showcaseOffPreview]);
 
   const phoneMatched = useMemo(() => {
     if (!verified) return false;
@@ -583,8 +585,14 @@ export default function LetteringIncomingNotification({
     return phoneDisplay && phoneDisplay !== "\u2014" ? phoneDisplay : "";
   }, [isUnverified, incoming]);
 
+  /* 통화 오버레이(피어): 상대 쇼케이스 스타일의 showBroadcastName=false 로 상호가 사라지지 않게 */
+  const peerOverlayLive = Boolean(
+    !previewMode && String(c.userId || c.ownerUserId || "").trim()
+  );
   const hideBroadcastName = Boolean(
-    showcaseOffPreview || c.hideBroadcastName || c.showcaseStyle?.showBroadcastName === false
+    showcaseOffPreview ||
+      c.hideBroadcastName ||
+      (!peerOverlayLive && c.showcaseStyle?.showBroadcastName === false)
   );
   const contactSavedName = String(savedContactName || knownContact.matchedName || "").trim();
 
@@ -982,7 +990,7 @@ export default function LetteringIncomingNotification({
       "—";
     const nameDisp = isUnverified
       ? phoneDisp
-      : String(receptionLines?.collapsedPrimary || displayLabel || "").trim() || phoneDisp;
+      : String(displayLabel || receptionLines?.collapsedPrimary || "").trim() || phoneDisp;
     const subPhone =
       receptionLines?.organization && phoneDisp
         ? `${receptionLines.organization} / ${phoneDisp}`
@@ -1111,19 +1119,7 @@ export default function LetteringIncomingNotification({
                   <span className="lettering-ongoing-name min-w-0 font-semibold">
                     {displayLabel}
                   </span>
-                  {verified ? (
-                    isGlassTent ? (
-                      <span
-                        className="lettering-vlue-verified-badge lettering-vlue-verified-badge--metal inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center"
-                        title="VLUE 인증"
-                        aria-label="VLUE 인증됨"
-                      >
-                        <ShieldCheck className="h-3 w-3" strokeWidth={2.6} aria-hidden />
-                      </span>
-                    ) : (
-                      <VlueVerifiedBadge />
-                    )
-                  ) : null}
+                  {verified ? <VlueVerifiedBadge /> : null}
                 </p>
                 {showCollapsedPhoneSubline ? (
                   <p className="lettering-ongoing-subline mt-0.5 min-w-0">
