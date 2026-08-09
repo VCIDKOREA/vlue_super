@@ -743,7 +743,7 @@
 .lettering-overlay-host--tent.lettering-overlay-host--ringing {
   align-items: flex-start;
   background: transparent !important;
-  padding: 8px 10px 0 !important;
+  padding: 0 10px !important;
 }
 
 .lettering-overlay-host--tent.lettering-overlay-host--ringing > .lettering-overlay-host__tent-shell {
@@ -757,6 +757,12 @@
   background:
     radial-gradient(120% 80% at 50% -10%, rgba(0, 210, 255, 0.08), transparent 55%),
     linear-gradient(180deg, #0f172a 0%, #0b1220 48%, #070b14 100%);
+}
+
+/* 윈도우가 이미 상태바 아래 — live-bar safe-area 추가 패딩 금지 */
+.lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-live-bar,
+.lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-live-bar--glass {
+  padding-top: 8px !important;
 }
 
 .lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing--phase-ringing,
@@ -789,6 +795,28 @@
 .lettering-overlay-host--tent.lettering-overlay-host--connected > .lettering-overlay-host__tent-shell {
   height: 100%;
   max-height: none;
+}
+
+/*
+ * MiniCase: 호스트 사각 검정(#070b14)이 타원 밖으로 비치면 안 됨.
+ * 각진 모서리는 완전 투명 — 육안상 타원만 보이게.
+ */
+.lettering-overlay-host--tent.lettering-overlay-host--mini,
+.lettering-overlay-host--tent.lettering-overlay-host--connected.lettering-overlay-host--mini {
+  background: transparent !important;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 0 !important;
+}
+
+.lettering-overlay-host--tent.lettering-overlay-host--mini > .lettering-overlay-host__tent-shell {
+  height: auto !important;
+  max-height: none !important;
+  width: 100%;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
 }
 
 /* 앱 내 미리보기 — 부모(전체화면)를 100% 채움, 하단 내비 위까지 덮음 */

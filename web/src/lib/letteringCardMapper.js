@@ -3,23 +3,44 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
   if (!body?.matched) return null;
 
   const profile = body.profile && typeof body.profile === "object" ? body.profile : {};
-  const feedId = String(body.userId || body.cardId || "").trim();
-  const phone = body.phoneE164 || incomingPhone || "";
+  const nested = body.card && typeof body.card === "object" ? body.card : {};
+  const feedId = String(body.userId || body.cardId || nested.userId || "").trim();
+  const phone = body.phoneE164 || nested.phoneE164 || incomingPhone || "";
+  const handle = String(
+    body.publicHandle ||
+      body.vlueId ||
+      body.loginId ||
+      nested.publicHandle ||
+      nested.vlueId ||
+      nested.loginId ||
+      ""
+  )
+    .trim()
+    .replace(/^@+/, "");
 
   return {
-    name: body.displayName || "\u2014",
-    displayName: body.displayName || "",
-    title: body.jobTitle || "",
-    organization: body.companyName || "",
+    name: body.displayName || nested.displayName || nested.name || "\u2014",
+    displayName: body.displayName || nested.displayName || nested.name || "",
+    title: body.jobTitle || nested.jobTitle || nested.title || "",
+    organization:
+      body.companyName ||
+      nested.companyName ||
+      body.organization ||
+      nested.organization ||
+      "",
+    publicHandle: handle,
+    loginId: handle,
+    vlueId: handle,
     department:
       profile.department || profile.dept || profile.team || profile.division || "",
     phone,
     fax: profile.fax || profile.officePhone || profile.faxNumber || profile.tel || profile.landline || "",
     email: profile.email || profile.contactEmail || "",
     website: profile.website || profile.homepage || profile.url || profile.web || "",
-    photoUrl: body.image_url || profile.image_url || profile.photoUrl || "",
+    photoUrl:
+      body.image_url || nested.image_url || nested.photoUrl || profile.image_url || profile.photoUrl || "",
     logoUrl: profile.logoUrl || profile.logo_url || "",
-    image_url: body.image_url || "",
+    image_url: body.image_url || nested.image_url || "",
     companyIntro: profile.intro || profile.companyIntro || "",
     salesContent: profile.salesPitch || profile.promo || profile.salesContent || "",
     customBackText:
@@ -39,6 +60,7 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
     membershipTier:
       profile.membershipTier ||
       body.membershipTier ||
+      nested.membershipTier ||
       (body.is_premium_line || body.digitalCardActive ? "paid" : "free"),
     verificationItems: Array.isArray(profile.verificationItems)
       ? profile.verificationItems

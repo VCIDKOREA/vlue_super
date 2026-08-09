@@ -35,7 +35,7 @@ object BigPushShowcaseBar {
     const val TAG_SECONDARY = "bar_secondary"
     const val TAG_AVATAR = "bar_avatar"
     const val TAG_VERIFIED = "bar_verified"
-    const val WINDOW_HEIGHT_DP = 148
+    const val WINDOW_HEIGHT_DP = 156
 
     enum class AvatarKind {
         PHOTO,

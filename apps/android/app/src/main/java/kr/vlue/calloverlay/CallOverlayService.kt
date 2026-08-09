@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Outline
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.os.Build
@@ -18,6 +19,7 @@ import android.telephony.TelephonyManager
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
 import kotlin.math.abs
@@ -453,8 +455,9 @@ class CallOverlayService : Service() {
         }
 
         /*
-         * BigPush UI SoT = 웹 LetteringIncomingNotification (홈 쇼케이스 바와 동일 컴포넌트).
-         * Native 재구성 배너는 폴백용으로만 두고 GONE — 눈 로고/각진 바 추측 UI 금지.
+         * BigPush SoT = 홈 쇼케이스 바와 동일 정보 구조 (BigPushShowcaseBar = LetteringIncomingNotification
+         * 수신자 크롬: ceo Showcase · VCID KOREA · 이름 · 번호 · ▾, 통화화면/설정 없음).
+         * Showcase FULLSCREEN 만 WebView LetteringOverlayHost.
          */
         val banner = BigPushShowcaseBar.create(
             context = this,
@@ -464,16 +467,24 @@ class CallOverlayService : Service() {
             cardJson = cardJson,
             onExpand = null
         )
-        banner.visibility = android.view.View.GONE
         nativeBanner = banner
-        container.addView(
-            banner,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP
-            )
-        )
+        val bannerLp = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP
+        ).apply {
+            marginStart = dp(10)
+            marginEnd = dp(10)
+            topMargin = dp(4)
+            bottomMargin = dp(4)
+        }
+        if (asBigPush) {
+            banner.visibility = android.view.View.VISIBLE
+            attachBigPushDragGestures(banner)
+        } else {
+            banner.visibility = android.view.View.GONE
+        }
+        container.addView(banner, bannerLp)
 
         val wv = WebView(this)
         LetteringJavascriptBridge.attach(wv, this)
@@ -488,10 +499,9 @@ class CallOverlayService : Service() {
         }
         wv.setBackgroundColor(Color.TRANSPARENT)
         wv.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-        /* BigPush도 웹 쇼케이스 바 표시 — 로딩 칩은 투명 호스트 */
-        wv.visibility = android.view.View.VISIBLE
+        wv.visibility = if (asBigPush) android.view.View.GONE else android.view.View.VISIBLE
         if (asBigPush) {
-            attachBigPushDragGestures(container)
+            /* drag already on banner */
         }
         wv.webChromeClient = object : android.webkit.WebChromeClient() {
             override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
@@ -781,11 +791,11 @@ class CallOverlayService : Service() {
     private fun syncOverlayChromeForState(source: String) {
         when (companion.state) {
             OverlayState.BIG_PUSH -> {
-                /* UI SoT = 웹 home-glass LetteringIncomingNotification */
-                nativeBanner?.visibility = android.view.View.GONE
-                webView?.visibility = android.view.View.VISIBLE
+                /* 홈 쇼케이스 바와 동일 Native 바 (수신자: 통화화면/설정 없음) */
+                nativeBanner?.visibility = android.view.View.VISIBLE
+                webView?.visibility = android.view.View.GONE
                 rootContainer?.setBackgroundColor(Color.TRANSPARENT)
-                webView?.setBackgroundColor(Color.TRANSPARENT)
+                applyCapsuleClip(rootContainer, enabled = false)
             }
             OverlayState.SHOWCASE -> {
                 nativeBanner?.visibility = android.view.View.GONE
@@ -849,7 +859,9 @@ class CallOverlayService : Service() {
             params.gravity = Gravity.TOP or Gravity.START
             view.clipToOutline = false
             view.outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+            applyCapsuleClip(view, enabled = false)
             view.setBackgroundColor(Color.parseColor("#0B101B"))
+            webView?.setBackgroundColor(Color.TRANSPARENT)
             applyPassThroughTouchFlags(params)
             /* Showcase 터치 필요 — NOT_FOCUSABLE 유지하되 창은 full; HOME 시 MINI 로 축소 */
             params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
@@ -1063,6 +1075,38 @@ class CallOverlayService : Service() {
         return Pair(dm.widthPixels, dm.heightPixels)
     }
 
+    /** 상태바(시간·통신사) 아래부터 BigPush 배치 */
+    private fun statusBarHeightPx(): Int {
+        val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+        if (id > 0) {
+            val h = resources.getDimensionPixelSize(id)
+            if (h > 0) return h
+        }
+        return dp(28)
+    }
+
+    private fun topBigPushOffsetY(): Int = statusBarHeightPx() + dp(10)
+
+    /** MiniCase: WebView 사각 표면을 타원(캡슐)으로 잘라 모서리를 투명하게 */
+    private fun applyCapsuleClip(view: android.view.View?, enabled: Boolean) {
+        if (view == null) return
+        if (!enabled) {
+            view.clipToOutline = false
+            view.outlineProvider = ViewOutlineProvider.BACKGROUND
+            return
+        }
+        view.outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(v: android.view.View, outline: Outline) {
+                val w = v.width.coerceAtLeast(1)
+                val h = v.height.coerceAtLeast(1)
+                val radius = (minOf(w, h) / 2f)
+                outline.setRoundRect(0, 0, w, h, radius)
+            }
+        }
+        view.clipToOutline = true
+        view.invalidateOutline()
+    }
+
     /**
      * Web Answer Request — telecom accept는 Bridge, Companion 전이는 여기.
      * JS는 layout/state를 직접 바꾸지 않는다.
@@ -1166,12 +1210,16 @@ class CallOverlayService : Service() {
             params.x = xPx.coerceIn(minX, maxX)
             params.y = yPx.coerceIn(minY, maxY)
             params.gravity = Gravity.TOP or Gravity.START
+            params.format = PixelFormat.TRANSLUCENT
             view.visibility = android.view.View.VISIBLE
             nativeBanner?.visibility = android.view.View.GONE
+            view.setBackgroundColor(Color.TRANSPARENT)
+            webView?.setBackgroundColor(Color.TRANSPARENT)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
                     wm.updateViewLayout(view, params)
                 }
+                view.post { applyCapsuleClip(view, enabled = true) }
             } catch (_: Exception) {
             }
         }
@@ -1262,22 +1310,24 @@ class CallOverlayService : Service() {
             /* 타원 MiniCase 전체(힌트 포함) — WebView 각진 배경 금지 */
             val h = dp(140)
             val x = ((sw - w) / 2).coerceAtLeast(dp(8))
-            val y = dp(64)
+            val y = (statusBarHeightPx() + dp(48)).coerceAtLeast(dp(72))
             params.width = w
             params.height = h
             params.x = x
             params.y = y
             params.gravity = Gravity.TOP or Gravity.START
+            params.format = PixelFormat.TRANSLUCENT
             nativeBanner?.visibility = android.view.View.GONE
             webView?.visibility = android.view.View.VISIBLE
             view.setBackgroundColor(Color.TRANSPARENT)
-            view.clipToOutline = false
-            view.outlineProvider = null
+            webView?.setBackgroundColor(Color.TRANSPARENT)
             applyPassThroughTouchFlags(params)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
                     wm.updateViewLayout(view, params)
                 }
+                /* 레이아웃 반영 후 캡슐 클립 — 사각 WebView 모서리 제거 */
+                view.post { applyCapsuleClip(view, enabled = true) }
                 OverlayDiagTracker.markLayoutApplied("MINI_CASE", OverlayPosition.MINI_CASE.name)
                 VlueBigPushTrace.milestone(
                     "OVERLAY_ATTACHED",
@@ -1410,16 +1460,16 @@ class CallOverlayService : Service() {
         val (_, sh) = screenSizePx()
         val keep = dp(28)
         val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
+        val topY = topBigPushOffsetY()
         /* TOP|START 고정 — 드래그/피크가 BOTTOM gravity 와 충돌하지 않게 */
         params.gravity = Gravity.TOP or Gravity.START
         params.height = barH
         if (bigPushPeeking) {
             params.width = keep
-            /* x 는 드래그/스냅이 유지. y 만 TOP/BOTTOM 컨텍스트에 맞춤 가능 */
-            if (params.y <= 0) {
+            if (params.y < topY) {
                 params.y = when (pos) {
                     OverlayPosition.BOTTOM -> (sh - barH - dp(8)).coerceAtLeast(0)
-                    else -> dp(4)
+                    else -> topY
                 }
             }
         } else {
@@ -1427,18 +1477,13 @@ class CallOverlayService : Service() {
             params.x = 0
             params.y = when (pos) {
                 OverlayPosition.BOTTOM -> (sh - barH - dp(8)).coerceAtLeast(0)
-                else -> dp(4)
+                else -> topY
             }
         }
         applyPassThroughTouchFlags(params)
-        /* 바 카드 — 컨테이너 안에서 TOP (윈도우 y 가 이미 하단 위치) */
-        (nativeBanner?.layoutParams as? FrameLayout.LayoutParams)?.let { lp ->
-            lp.gravity = Gravity.TOP
-            lp.bottomMargin = 0
-            lp.topMargin = dp(8)
-            nativeBanner?.layoutParams = lp
-        }
+        applyCapsuleClip(rootContainer, enabled = false)
         rootContainer?.setBackgroundColor(Color.TRANSPARENT)
+        webView?.setBackgroundColor(Color.TRANSPARENT)
     }
 
     /**
@@ -1880,7 +1925,7 @@ class CallOverlayService : Service() {
             }
             y = when (position) {
                 OverlayPosition.BOTTOM -> dp(8)
-                else -> dp(4)
+                else -> topBigPushOffsetY()
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =

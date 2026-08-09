@@ -494,14 +494,16 @@ function LetteringOverlayHostInner() {
 
   const onCall = callState === CALL_STATES.CONNECTED;
   const callPhase = onCall ? "connected" : direction === "outgoing" ? "outgoing" : "ringing";
+  const miniCollapsed = onCall && !expanded;
 
   return (
     <div
       className={`lettering-overlay-host lettering-overlay-host--tent ${
         onCall ? "lettering-overlay-host--connected" : "lettering-overlay-host--ringing"
-      }`}
+      }${miniCollapsed ? " lettering-overlay-host--mini" : ""}`}
       data-call-phase={callPhase}
       data-expanded={expanded ? "true" : "false"}
+      data-mini={miniCollapsed ? "true" : "false"}
     >
       <div className="lettering-overlay-host__tent-shell">
         <LetteringIncomingNotification

@@ -3660,13 +3660,6 @@
 }
 
 /* Companion MVP: Mini Case Floating Controller */
-.companion-mini-case-layer {
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  z-index: 240;
-}
-
 .companion-mini-case {
   pointer-events: auto;
   user-select: none;
@@ -3676,18 +3669,21 @@
   flex-direction: column;
   align-items: stretch;
   gap: 0;
-  /* ??=?? ??? ?? ù ?? WebView ?? ?? */
+  box-sizing: border-box;
   min-width: 200px;
   max-width: min(300px, calc(100vw - 24px));
   padding: 14px 20px 10px;
-  border-radius: 999px;
+  /* ?? ??(??) ó ?? ??? ?? */
+  border-radius: 9999px;
   overflow: hidden;
   isolation: isolate;
   background: #0b1220;
+  /* ??? = ?? ??? ?? */
   border: 1.5px solid rgba(226, 232, 240, 0.55);
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  -webkit-mask-image: none;
 }
 
 .companion-mini-case.is-dragging {
@@ -3695,19 +3691,30 @@
   opacity: 0.96;
 }
 
+/* ?? ??? ?? ??/??? ?? ó ?? ??? */
 .companion-mini-case__card {
   min-width: 0;
   max-width: none;
   padding: 0;
+  margin: 0;
   border-radius: 0;
   overflow: visible;
   isolation: auto;
   background: transparent;
-  border: none;
-  box-shadow: none;
+  border: none !important;
+  outline: none;
+  box-shadow: none !important;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   -webkit-mask-image: none;
+}
+
+.companion-mini-case-layer {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  background: transparent !important;
 }
 
 .companion-mini-case__line1 {

@@ -982,7 +982,11 @@ export default function LetteringIncomingNotification({
       "—";
     const nameDisp = isUnverified
       ? phoneDisp
-      : String(displayLabel || "").trim() || phoneDisp;
+      : String(receptionLines?.collapsedPrimary || displayLabel || "").trim() || phoneDisp;
+    const subPhone =
+      receptionLines?.organization && phoneDisp
+        ? `${receptionLines.organization} / ${phoneDisp}`
+        : phoneDisp;
     return (
       <div
         className={`companion-mini-case-layer ${className || ""}`.trim()}
@@ -991,7 +995,7 @@ export default function LetteringIncomingNotification({
       >
         <CompanionMiniCase
           displayName={nameDisp}
-          phoneLabel={phoneDisp}
+          phoneLabel={subPhone}
           statusLabel={isUnverified ? "미인증" : verified ? "인증" : "미인증"}
           durationLabel={companionDurationLabel}
           verified={Boolean(verified && !isUnverified)}
