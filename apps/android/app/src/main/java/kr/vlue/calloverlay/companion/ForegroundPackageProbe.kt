@@ -15,6 +15,10 @@ object ForegroundPackageProbe {
         return resolveForCompanionOverlay(app)
     }
 
+    /** RunningTasks 1순위 패키지 (권한/OS 제한 시 null) */
+    fun runningTaskPackage(context: Context): String? =
+        resolveViaRunningTasks(context.applicationContext)
+
     /**
      * 삼성 홈/다른앱 + 상단 HUN: UsageStats 는 InCallUI 를 lastUsed 로 올리는 경우가 많다.
      * RunningTasks 가 런처·타앱이면 그걸 우선 — 하단 쇼케이스바(BOTTOM) 판정용.
@@ -54,6 +58,27 @@ object ForegroundPackageProbe {
             tasksPkg = resolveViaRunningTasks(app),
             procsPkg = topPackageFromProcesses(app)
         )
+    }
+
+    /**
+     * 전체 InCallUI 여부 — 홈/타앱 Tasks 가 아닐 때 프로세스 생존으로 보정.
+     * (sysFg=SystemUI 오판으로 BOTTOM 가는 케이스 차단)
+     */
+    fun isFullInCallUiLikely(context: Context): Boolean {
+        val app = context.applicationContext
+        val tasks = resolveViaRunningTasks(app)
+        if (OverlayContextDetector.isLikelyLauncherPackage(tasks)) return false
+        if (!tasks.isNullOrBlank() &&
+            !OverlayContextDetector.isLikelyInCallUiPackage(tasks) &&
+            !tasks.contains("systemui", ignoreCase = true) &&
+            !tasks.contains("kr.vlue", ignoreCase = true) &&
+            !tasks.contains("permissioncontroller", ignoreCase = true)
+        ) {
+            return false
+        }
+        if (OverlayContextDetector.isLikelyInCallUiPackage(tasks)) return true
+        if (OverlayContextDetector.isLikelyInCallUiPackage(resolveViaUsageStats(app))) return true
+        return isInCallUiProcessRunning(app)
     }
 
     private fun resolveViaUsageStats(context: Context): String? {

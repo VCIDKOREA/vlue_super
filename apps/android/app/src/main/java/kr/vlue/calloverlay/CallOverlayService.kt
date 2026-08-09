@@ -953,42 +953,63 @@ class CallOverlayService : Service() {
         }
         val activity = VlueCallOverlayApp.currentActivityName.orEmpty()
         val pausedOrGone = activity.isBlank() || activity.contains("(paused)", ignoreCase = true)
-        /* VLUE Activity lifecycle 만으로는 삼성 InCallUI 를 알 수 없음 — 시스템 전면 패키지 병행 */
         val sysFg = ForegroundPackageProbe.topPackage(this)
-        val fgHint = listOf(activity, sysFg.orEmpty()).joinToString(" ")
-        /* paused 는 전면이 아님 — 단, sysFg null 을 HOME 으로 추정하면 Answer 직후 쇼케이스가 깨짐 */
+        val tasksPkg = ForegroundPackageProbe.runningTaskPackage(this)
         val ourApp = activity.contains("kr.vlue", ignoreCase = true) && !pausedOrGone
+        val tasksLauncher = OverlayContextDetector.isLikelyLauncherPackage(tasksPkg)
+        val tasksInCall = OverlayContextDetector.isLikelyInCallUiPackage(tasksPkg)
+        val tasksOther =
+            !tasksPkg.isNullOrBlank() &&
+                !tasksLauncher &&
+                !tasksInCall &&
+                !tasksPkg.contains("kr.vlue", ignoreCase = true) &&
+                !tasksPkg.contains("systemui", ignoreCase = true) &&
+                !tasksPkg.contains("permissioncontroller", ignoreCase = true)
         val launcher =
-            OverlayContextDetector.isLikelyLauncherPackage(sysFg) ||
-                (!sysFg.isNullOrBlank() &&
-                    OverlayContextDetector.isLikelyLauncherPackage(activity)) ||
+            tasksLauncher ||
+                OverlayContextDetector.isLikelyLauncherPackage(sysFg) ||
                 (!pausedOrGone && activity.contains("Launcher", ignoreCase = true))
         val knownOther =
-            !sysFg.isNullOrBlank() &&
-                !OverlayContextDetector.isLikelyInCallUiPackage(sysFg) &&
-                !OverlayContextDetector.isLikelyLauncherPackage(sysFg) &&
-                !sysFg.contains("kr.vlue", ignoreCase = true) &&
-                !sysFg.contains("systemui", ignoreCase = true) &&
-                !sysFg.contains("android.permissioncontroller", ignoreCase = true)
+            tasksOther ||
+                (!sysFg.isNullOrBlank() &&
+                    !OverlayContextDetector.isLikelyInCallUiPackage(sysFg) &&
+                    !OverlayContextDetector.isLikelyLauncherPackage(sysFg) &&
+                    !sysFg.contains("kr.vlue", ignoreCase = true) &&
+                    !sysFg.contains("systemui", ignoreCase = true) &&
+                    !sysFg.contains("android.permissioncontroller", ignoreCase = true))
         val systemUi =
             !sysFg.isNullOrBlank() && sysFg.contains("systemui", ignoreCase = true)
         /*
-         * InCallUI「프로세스만」살아 있어도 홈+HUN 을 TOP 으로 올리지 않음.
-         * top package 가 실제 InCallUI/다이얼러일 때만 TOP.
+         * 전체 InCallUI → TOP.
+         * sysFg=SystemUI/미확인이어도 InCallUI 프로세스가 살아 있고
+         * Tasks 가 홈·타앱이 아니면 TOP (이전 BOTTOM 오판 수정).
          */
+        val fullInCallLikely =
+            phase == OverlayContextDetector.CallPhase.RINGING &&
+                ForegroundPackageProbe.isFullInCallUiLikely(this) &&
+                !ourApp
         val inCallUi =
-            OverlayContextDetector.isLikelyInCallUiPackage(sysFg) ||
-                (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone)
-        val homeLike = launcher || (systemUi && !inCallUi)
-        return OverlayContextDetector.detect(
+            tasksInCall ||
+                OverlayContextDetector.isLikelyInCallUiPackage(sysFg) ||
+                (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone) ||
+                fullInCallLikely
+        /* SystemUI 를 HOME 으로 쓰지 않음 — full InCallUI 와 충돌 */
+        val homeLike = (launcher || (systemUi && !inCallUi)) && !inCallUi
+        val ctx = OverlayContextDetector.detect(
             callPhase = phase,
-            foregroundIsOurApp = ourApp,
-            foregroundIsLauncher = homeLike,
-            foregroundIsInCallUi = inCallUi && !knownOther,
+            foregroundIsOurApp = ourApp && !inCallUi,
+            foregroundIsLauncher = homeLike && !inCallUi,
+            foregroundIsInCallUi = inCallUi && !tasksOther,
             foregroundIsKnownOtherApp = knownOther && !inCallUi,
             userMinimized = userMinimized,
             keypadOpen = keypadOpen
         )
+        VlueBigPushTrace.lifecycle(
+            "OVERLAY_CONTEXT",
+            "phase=$phase ctx=${ctx.name} sysFg=$sysFg tasks=$tasksPkg " +
+                "inCall=$inCallUi fullLikely=$fullInCallLikely ourApp=$ourApp launcher=$launcher"
+        )
+        return ctx
     }
 
     private fun telephonyCallState(): Int {
@@ -2066,12 +2087,12 @@ class CallOverlayService : Service() {
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = when (position) {
-                OverlayPosition.BOTTOM -> Gravity.BOTTOM or Gravity.START
-                else -> Gravity.TOP or Gravity.START
-            }
+            /* 항상 TOP|START + y — BOTTOM gravity 와 드래그/피크 충돌 방지 */
+            gravity = Gravity.TOP or Gravity.START
+            val (_, sh) = screenSizePx()
+            val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
             y = when (position) {
-                OverlayPosition.BOTTOM -> dp(8)
+                OverlayPosition.BOTTOM -> (sh - barH - dp(8)).coerceAtLeast(0)
                 else -> topBigPushOffsetY()
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {

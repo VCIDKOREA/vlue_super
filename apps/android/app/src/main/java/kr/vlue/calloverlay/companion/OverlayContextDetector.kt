@@ -43,11 +43,11 @@ object OverlayContextDetector {
              * - 미확인: InCallUI 프로세스 여부는 Service에서 inCallUi 플래그로 보정
              */
             CallPhase.RINGING -> when {
-                /* 전체 InCallUI 전면만 TOP. 홈·다른앱·미확인(삼성 HUN)은 BOTTOM */
+                /* 전체 InCallUI → TOP. 홈·타앱 확정만 BOTTOM. 미확인도 TOP(전체 전화 기본). */
                 foregroundIsInCallUi -> OverlayContext.INCOMING_CALL_UI
                 foregroundIsKnownOtherApp -> OverlayContext.OTHER_APP
                 foregroundIsLauncher || foregroundIsOurApp -> OverlayContext.HOME_SCREEN
-                else -> OverlayContext.OTHER_APP
+                else -> OverlayContext.INCOMING_CALL_UI
             }
             CallPhase.OFFHOOK -> when {
                 foregroundIsInCallUi && !userMinimized -> OverlayContext.IN_CALL
