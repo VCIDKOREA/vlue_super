@@ -1018,6 +1018,21 @@ export default function LetteringIncomingNotification({
         className={`lettering-live-bar ${dragHandleProps ? "lettering-live-bar--draggable" : ""} ${
           isGlassTent ? "lettering-live-bar--glass" : ""
         }`.trim()}
+        role="button"
+        tabIndex={0}
+        aria-label={isExpandedView ? "쇼케이스 접기" : "쇼케이스 열기"}
+        onClick={(e) => {
+          /* ▽/△ 버튼 제거 — 바 탭으로 펼침/접힘 */
+          if (e.target?.closest?.("button,a,input")) return;
+          if (!canExpand) return;
+          toggle();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (canExpand) toggle();
+          }
+        }}
         {...(dragHandleProps || {})}
       >
         <div className="lettering-live-bar__left">
@@ -1056,6 +1071,20 @@ export default function LetteringIncomingNotification({
           } ${isUnverified ? "lettering-ongoing-summary--unverified" : ""} ${
             !showExpandedLayout && (isPaidMember || isFreeMember) ? "pb-3" : ""
           }`}
+          role="button"
+          tabIndex={0}
+          aria-label={isExpandedView ? "쇼케이스 접기" : "쇼케이스 열기"}
+          onClick={(e) => {
+            if (e.target?.closest?.("button,a,input")) return;
+            if (!canExpand) return;
+            toggle();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              if (canExpand) toggle();
+            }
+          }}
         >
           {verified && !showcaseOffPreview ? <LetteringProfileThumb card={c} verified={verified} size="sm" /> : null}
           {verified && showcaseOffPreview ? (
@@ -1142,13 +1171,6 @@ export default function LetteringIncomingNotification({
               <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
               설정
             </button>
-          ) : null}
-          {canExpand ? (
-            <LetteringExpandButton
-              expanded={expanded}
-              onClick={toggle}
-              mode={isUnverified ? "report" : "card"}
-            />
           ) : null}
         </div>
 

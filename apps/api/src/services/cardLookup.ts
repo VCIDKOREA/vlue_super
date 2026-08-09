@@ -20,12 +20,62 @@ function pickProfileString(profileJson: unknown, keys: string[]): string | null 
   return null;
 }
 
+function firstStr(...values: unknown[]): string {
+  for (const v of values) {
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+/** 쇼케이스 송출용 연락처 — User.email + digital_cards.export_snapshot_json + profileJson */
+function buildContactProfile(opts: {
+  userEmail?: string | null;
+  exportSnap?: Record<string, unknown> | null;
+  profileJson?: Record<string, unknown> | null;
+}): Record<string, unknown> {
+  const snap = opts.exportSnap || {};
+  const pj = opts.profileJson || {};
+  const email = firstStr(
+    snap.email,
+    opts.userEmail,
+    pj.email,
+    pj.contactEmail,
+    pj.mail
+  );
+  const website = firstStr(snap.website, pj.website, pj.homepage, pj.url, pj.web);
+  const fax = firstStr(snap.fax, pj.fax, pj.officePhone, pj.faxNumber, pj.tel, pj.landline);
+  const address = firstStr(
+    snap.address,
+    pj.address,
+    pj.businessAddress,
+    pj.companyAddress,
+    pj.roadAddress
+  );
+  const department = firstStr(snap.department, pj.department, pj.dept, pj.team);
+  const intro = firstStr(pj.intro, pj.companyIntro, snap.companyIntro);
+  const sales = firstStr(pj.salesPitch, pj.promo, pj.salesContent, snap.salesContent);
+  return {
+    ...pj,
+    email,
+    contactEmail: email,
+    website,
+    fax,
+    address,
+    department,
+    intro,
+    companyIntro: intro,
+    salesContent: sales,
+    photoUrl: firstStr(snap.photoUrl, pj.photoUrl, pj.image_url, pj.imageUrl) || undefined,
+    logoUrl: firstStr(snap.logoUrl, pj.logoUrl, pj.logo_url) || undefined
+  };
+}
+
 type LookupOptions = {
   viewerId?: string | null;
   /**
    * 공개 공유 링크(OG/카카오 스크래퍼)용.
    * 검색·팔로워 비공개 마스킹을 적용하지 않고 명함 표기명을 그대로 노출한다.
-   * (링크를 보낸 사람은 이미 초대 의 — 「비공개 회원」으로 가리면 안 됨)
+   * (링크를 보낸 사람은 이미 초대 전의 — 「비공개 회원」으로 가리면 안 됨)
    */
   forPublicOgShare?: boolean;
 };
@@ -45,15 +95,35 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         select: {
           ...privacySelect,
           legalName: true,
-          publicHandle: true
+          publicHandle: true,
+          email: true,
+          digitalCard: {
+            select: {
+              photoUrl: true,
+              logoUrl: true,
+              exportSnapshotJson: true,
+              membershipTierSnapshot: true
+            }
+          }
         }
       }
     }
   });
 
   if (card) {
-    const profile = (card.profileJson as Record<string, unknown> | null) ?? null;
+    const exportSnap =
+      card.user.digitalCard?.exportSnapshotJson &&
+      typeof card.user.digitalCard.exportSnapshotJson === "object"
+        ? (card.user.digitalCard.exportSnapshotJson as Record<string, unknown>)
+        : null;
+    const baseProfile = (card.profileJson as Record<string, unknown> | null) ?? null;
+    const profile = buildContactProfile({
+      userEmail: card.user.email,
+      exportSnap,
+      profileJson: baseProfile
+    });
     const rawDisplay = card.displayName || card.user.legalName || "";
+    const email = firstStr(profile.email, card.user.email);
 
     if (opts.forPublicOgShare) {
       return {
@@ -68,8 +138,11 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           displayName: rawDisplay,
           jobTitle: card.jobTitle || "",
           companyName: card.companyName || "",
+          email,
           profile,
-          image_url: pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url"]),
+          image_url:
+            pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url", "photoUrl"]) ||
+            firstStr(card.user.digitalCard?.photoUrl),
           voice_url: pickProfileString(profile, ["voice_url", "voiceUrl", "bluevoice_url"]),
           phoneE164: card.phoneE164,
           publicHandle: card.user.publicHandle || "",
@@ -106,8 +179,11 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         displayName: masked.displayName,
         jobTitle: masked.jobTitle,
         companyName: masked.companyName,
+        email,
         profile,
-        image_url: pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url"]),
+        image_url:
+          pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url", "photoUrl"]) ||
+          firstStr(card.user.digitalCard?.photoUrl),
         voice_url: pickProfileString(profile, ["voice_url", "voiceUrl", "bluevoice_url"]),
         phoneE164: masked.phoneE164,
         publicHandle: masked.publicHandle,
@@ -139,6 +215,12 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       dc?.exportSnapshotJson && typeof dc.exportSnapshotJson === "object"
         ? (dc.exportSnapshotJson as Record<string, unknown>)
         : null;
+    const profile = buildContactProfile({
+      userEmail: user.email,
+      exportSnap,
+      profileJson: null
+    });
+    const email = firstStr(profile.email, user.email);
     const photoOnly =
       (typeof dc?.photoUrl === "string" && dc.photoUrl.trim()) ||
       (typeof exportSnap?.photoUrl === "string" && String(exportSnap.photoUrl).trim()) ||
@@ -164,6 +246,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           publicHandle: user.publicHandle || "",
           jobTitle: user.businessProfile?.jobTitle || "",
           companyName: user.businessProfile?.companyName || "",
+          email,
+          profile,
           digitalCardActive: Boolean(user.digitalCard),
           is_premium_line: isPremiumLine,
           phoneE164: user.phoneE164,
@@ -202,6 +286,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         publicHandle: masked.publicHandle,
         jobTitle: masked.jobTitle,
         companyName: masked.companyName,
+        email,
+        profile,
         digitalCardActive: Boolean(user.digitalCard),
         is_premium_line: isPremiumLine,
         phoneE164: masked.phoneE164,

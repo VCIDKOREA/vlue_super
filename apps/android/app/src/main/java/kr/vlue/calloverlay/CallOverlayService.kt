@@ -459,13 +459,15 @@ class CallOverlayService : Service() {
          * 수신자 크롬: ceo Showcase · VCID KOREA · 이름 · 번호 · ▾, 통화화면/설정 없음).
          * Showcase FULLSCREEN 만 WebView LetteringOverlayHost.
          */
+        /*
+         * ▾ / △ 제거. 바 아무 곳 탭 → Showcase 오픈 (드래그와 구분).
+         */
         val banner = BigPushShowcaseBar.create(
             context = this,
             phone = phone,
             verified = verified,
             outgoing = outgoing,
-            cardJson = cardJson,
-            onExpand = null
+            cardJson = cardJson
         )
         nativeBanner = banner
         val bannerLp = FrameLayout.LayoutParams(
@@ -898,10 +900,17 @@ class CallOverlayService : Service() {
         }
     }
 
-    /** 링잉 BigPush ▾ 펼침 — 금지 (하단 깨짐). Answer 후 Showcase 만 전체 표시 */
+    /** 링잉 BigPush ▾ 펼침 — 삭제됨. 바 탭 → Showcase */
     private fun expandBigPushPanelFromBar() {
-        CompanionRuntimeStabilityDiag.mark("BIG_PUSH_EXPAND_BLOCKED", "nativeBanner")
-        VlueBigPushTrace.lifecycle("BIG_PUSH_EXPAND_BLOCKED", "ringing expand disabled")
+        openShowcaseFromBigPushTap()
+    }
+
+    /** BigPush 아무 곳 탭 → Showcase FULLSCREEN (텔레콤 Answer 와 무관, UI만) */
+    private fun openShowcaseFromBigPushTap() {
+        if (dismissing || companion.state == OverlayState.SHOWCASE) return
+        CompanionRuntimeStabilityDiag.mark("BIG_PUSH_BAR_TAP", "openShowcase")
+        VlueBigPushTrace.lifecycle("BIG_PUSH_BAR_TAP", "open Showcase from bar tap")
+        enterShowcaseFromAnswer(source = "bigPush_bar_tap")
     }
 
     private fun detectOverlayContext(forceRinging: Boolean): OverlayContext {
@@ -1085,7 +1094,7 @@ class CallOverlayService : Service() {
         return dp(28)
     }
 
-    private fun topBigPushOffsetY(): Int = statusBarHeightPx() + dp(10)
+    private fun topBigPushOffsetY(): Int = statusBarHeightPx() + dp(16)
 
     /** MiniCase: WebView 사각 표면을 타원(캡슐)으로 잘라 모서리를 투명하게 */
     private fun applyCapsuleClip(view: android.view.View?, enabled: Boolean) {
@@ -1099,8 +1108,10 @@ class CallOverlayService : Service() {
             override fun getOutline(v: android.view.View, outline: Outline) {
                 val w = v.width.coerceAtLeast(1)
                 val h = v.height.coerceAtLeast(1)
+                /* 1px inset — stroke/inset-shadow 가 clip 에 잘리지 않게 */
+                val inset = 1
                 val radius = (minOf(w, h) / 2f)
-                outline.setRoundRect(0, 0, w, h, radius)
+                outline.setRoundRect(inset, inset, w - inset, h - inset, radius)
             }
         }
         view.clipToOutline = true
@@ -1207,6 +1218,11 @@ class CallOverlayService : Service() {
             val maxY = sh - keep
             params.width = w
             params.height = h
+            /* JS 프레임보다 살짝 크게 — inset 테두리 clip 여유 */
+            if (wPx > 0 && hPx > 0) {
+                params.width = (w + dp(6)).coerceAtMost(sw)
+                params.height = (h + dp(6)).coerceAtMost(sh)
+            }
             params.x = xPx.coerceIn(minX, maxX)
             params.y = yPx.coerceIn(minY, maxY)
             params.gravity = Gravity.TOP or Gravity.START
@@ -1308,11 +1324,12 @@ class CallOverlayService : Service() {
             val (sw, _) = screenSizePx()
             val w = (sw * 0.86f).toInt().coerceIn(dp(240), sw - dp(16))
             /* 타원 MiniCase 전체(힌트 포함) — WebView 각진 배경 금지 */
-            val h = dp(140)
+            val h = dp(148)
             val x = ((sw - w) / 2).coerceAtLeast(dp(8))
             val y = (statusBarHeightPx() + dp(48)).coerceAtLeast(dp(72))
-            params.width = w
-            params.height = h
+            /* +6dp: inset 테두리·margin 이 clip 에 안 잘리게 */
+            params.width = w + dp(6)
+            params.height = h + dp(6)
             params.x = x
             params.y = y
             params.gravity = Gravity.TOP or Gravity.START
@@ -1543,6 +1560,8 @@ class CallOverlayService : Service() {
                     if (!moved) {
                         if (bigPushPeeking) {
                             restoreBigPushFromPeek()
+                        } else {
+                            openShowcaseFromBigPushTap()
                         }
                         return@setOnTouchListener true
                     }

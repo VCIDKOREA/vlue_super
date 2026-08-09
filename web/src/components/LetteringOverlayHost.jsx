@@ -225,35 +225,38 @@ function LetteringOverlayHostInner() {
         } catch {
           /* ignore */
         }
-        /* 명함 사진·이메일이 lookup 에 없으면 공개 프로필 스냅샷 보강 */
-        if (!String(nextCard?.photoUrl || "").trim()) {
-          try {
-            const res = await fetch(apiUrl(`/api/follow/profile/${encodeURIComponent(peerUserId)}`), {
-              method: "GET",
-              headers: { Accept: "application/json" },
-              credentials: "omit",
-              cache: "no-store"
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data?.ok) {
-              const exp = data.cardExport && typeof data.cardExport === "object" ? data.cardExport : null;
-              const photo =
-                String(exp?.photoUrl || data.photoUrl || data.profile?.photoUrl || "").trim();
-              nextCard = {
-                ...nextCard,
-                photoUrl: photo || nextCard.photoUrl || "",
-                email: String(exp?.email || nextCard.email || "").trim(),
-                website: String(exp?.website || nextCard.website || "").trim(),
-                organization: String(exp?.organization || nextCard.organization || "").trim(),
-                title: String(exp?.title || nextCard.title || "").trim(),
-                logoUrl: String(exp?.logoUrl || nextCard.logoUrl || "").trim(),
-                membershipTier:
-                  data.membershipTier || nextCard.membershipTier || "paid"
-              };
-            }
-          } catch {
-            /* ignore */
+        /* 명함 사진·이메일 등 DB 스냅샷 보강 (lookup 누락 대비) */
+        try {
+          const res = await fetch(apiUrl(`/api/follow/profile/${encodeURIComponent(peerUserId)}`), {
+            method: "GET",
+            headers: { Accept: "application/json" },
+            credentials: "omit",
+            cache: "no-store"
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data?.ok) {
+            const exp = data.cardExport && typeof data.cardExport === "object" ? data.cardExport : null;
+            const photo =
+              String(exp?.photoUrl || data.photoUrl || data.profile?.photoUrl || "").trim();
+            nextCard = {
+              ...nextCard,
+              photoUrl: String(nextCard?.photoUrl || "").trim() || photo || "",
+              email: String(nextCard?.email || "").trim() || String(exp?.email || "").trim(),
+              website: String(nextCard?.website || "").trim() || String(exp?.website || "").trim(),
+              fax: String(nextCard?.fax || "").trim() || String(exp?.fax || "").trim(),
+              address: String(nextCard?.address || "").trim() || String(exp?.address || "").trim(),
+              organization:
+                String(nextCard?.organization || "").trim() ||
+                String(exp?.organization || "").trim(),
+              title: String(nextCard?.title || "").trim() || String(exp?.title || "").trim(),
+              department:
+                String(nextCard?.department || "").trim() || String(exp?.department || "").trim(),
+              logoUrl: String(nextCard?.logoUrl || "").trim() || String(exp?.logoUrl || "").trim(),
+              membershipTier: data.membershipTier || nextCard.membershipTier || "paid"
+            };
           }
+        } catch {
+          /* ignore */
         }
       }
 
@@ -517,11 +520,18 @@ function LetteringOverlayHostInner() {
           platform={platform}
           incomingNumber={incoming}
           card={styledCard || undefined}
-          expanded={onCall ? expanded : false}
+          expanded={expanded}
           onExpandedChange={(next) => {
-            /* 링잉 BigPush: 웹 홈 접힘 바와만 — ▾ 펼침으로 UI 깨짐 방지 */
-            if (!onCall) return;
             setExpanded(next);
+            /* 링잉 BigPush 바 탭으로도 Showcase 펼침 허용 */
+            if (next) {
+              try {
+                window.VlueLettering?.restoreShowcaseOverlay?.();
+                window.Android?.restoreShowcaseOverlay?.();
+              } catch {
+                /* ignore */
+              }
+            }
           }}
           includeDigitalCard={Boolean(verified && isPaid)}
           isKnownContact={verified}

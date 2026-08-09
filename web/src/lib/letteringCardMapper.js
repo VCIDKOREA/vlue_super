@@ -31,17 +31,32 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
     publicHandle: handle,
     loginId: handle,
     vlueId: handle,
-    department:
-      profile.department || profile.dept || profile.team || profile.division || "",
     phone,
-    fax: profile.fax || profile.officePhone || profile.faxNumber || profile.tel || profile.landline || "",
-    email: profile.email || profile.contactEmail || "",
-    website: profile.website || profile.homepage || profile.url || profile.web || "",
-    photoUrl:
-      body.image_url || nested.image_url || nested.photoUrl || profile.image_url || profile.photoUrl || "",
-    logoUrl: profile.logoUrl || profile.logo_url || "",
-    image_url: body.image_url || nested.image_url || "",
-    companyIntro: profile.intro || profile.companyIntro || "",
+    email:
+      body.email ||
+      profile.email ||
+      profile.contactEmail ||
+      nested.email ||
+      "",
+    fax:
+      profile.fax ||
+      profile.officePhone ||
+      profile.faxNumber ||
+      profile.tel ||
+      profile.landline ||
+      nested.fax ||
+      "",
+    website:
+      profile.website || profile.homepage || profile.url || profile.web || nested.website || "",
+    address:
+      profile.address ||
+      profile.businessAddress ||
+      profile.companyAddress ||
+      nested.address ||
+      "",
+    roadAddress: profile.roadAddress || profile.companyAddressRoad || "",
+    addressDetail: profile.addressDetail || "",
+    companyIntro: profile.intro || profile.companyIntro || nested.companyIntro || "",
     salesContent: profile.salesPitch || profile.promo || profile.salesContent || "",
     customBackText:
       profile.customBackText ||
@@ -50,9 +65,17 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       profile.promo ||
       "",
     promo: profile.promo || "",
-    address: profile.address || profile.businessAddress || profile.companyAddress || "",
-    roadAddress: profile.roadAddress || profile.companyAddressRoad || "",
-    addressDetail: profile.addressDetail || "",
+    photoUrl:
+      body.image_url ||
+      nested.image_url ||
+      nested.photoUrl ||
+      profile.image_url ||
+      profile.photoUrl ||
+      "",
+    logoUrl: profile.logoUrl || profile.logo_url || body.logo_url || "",
+    image_url: body.image_url || nested.image_url || "",
+    department:
+      profile.department || profile.dept || profile.team || profile.division || nested.department || "",
     userId: feedId,
     ownerUserId: feedId,
     feedId: feedId || (phone ? `phone-${phone.replace(/\D/g, "")}` : ""),

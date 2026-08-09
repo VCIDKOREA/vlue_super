@@ -146,7 +146,7 @@ object BigPushShowcaseBar {
         verified: Boolean,
         outgoing: Boolean,
         cardJson: String?,
-        onExpand: (() -> Unit)? = null
+        onBarTap: (() -> Unit)? = null
     ): LinearLayout {
         val model = parseModel(phone, verified, cardJson)
         val density = context.resources.displayMetrics.density
@@ -155,7 +155,7 @@ object BigPushShowcaseBar {
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             tag = TAG_ROOT
-            /* 7번 쇼케이스 바: 진한 네이비 + 얇은 테두리 + 큰 라운드 (통화화면/설정 없음) */
+            /* 7번 쇼케이스 바: 진한 네이비 + 얇은 테두리 + 큰 라운드 (통화화면/설정/▾ 없음) */
             background = roundedBg(
                 fill = Color.parseColor("#F20B1220"),
                 stroke = Color.parseColor("#66E2E8F0"),
@@ -166,6 +166,11 @@ object BigPushShowcaseBar {
             elevation = dp(10).toFloat()
             clipToOutline = true
             outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+            isClickable = onBarTap != null
+            isFocusable = onBarTap != null
+            if (onBarTap != null) {
+                setOnClickListener { onBarTap.invoke() }
+            }
         }
 
         /* Row 1: live + brand only */
@@ -275,36 +280,7 @@ object BigPushShowcaseBar {
             }
         )
         body.addView(textCol)
-
-        /*
-         * 7번 UI: ▾ 은 시각적으로 유지. 링잉 중 onExpand=null 이면 탭 무반응
-         * (WebView 펼침 깨짐 방지). 통화화면 보기·설정은 넣지 않음.
-         */
-        body.addView(
-            TextView(context).apply {
-                text = "▾"
-                setTextColor(Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                gravity = Gravity.CENTER
-                setPadding(dp(11), dp(7), dp(11), dp(7))
-                background = roundedBg(
-                    fill = Color.parseColor("#E61E293B"),
-                    stroke = Color.parseColor("#38E2E8F0"),
-                    radiusDp = 999f,
-                    density = density
-                )
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { marginStart = dp(8) }
-                isClickable = onExpand != null
-                isFocusable = onExpand != null
-                alpha = if (onExpand != null) 1f else 0.55f
-                if (onExpand != null) {
-                    setOnClickListener { onExpand.invoke() }
-                }
-            }
-        )
+        /* ▾ / △ 삭제 — 바 전체 탭으로 Showcase 오픈 */
         root.addView(body)
         return root
     }
