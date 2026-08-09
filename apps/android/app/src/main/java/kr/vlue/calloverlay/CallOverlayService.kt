@@ -392,8 +392,8 @@ class CallOverlayService : Service() {
             )
         }
         /*
-         * InCallUI 액티비티 FOREGROUND 전환이 감지보다 늦을 수 있음.
-         * 짧은 재평가로 전체 UI→TOP / 다른앱→BOTTOM 을 분리 보정.
+         * InCallActivity ACTIVITY_RESUMED 가 FGS/알림보다 늦을 수 있음 (DUT usagestats).
+         * 재평가로 전체 UI→TOP / 다른앱→BOTTOM 분리 보정.
          */
         mainHandler.postDelayed({
             if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
@@ -405,6 +405,11 @@ class CallOverlayService : Service() {
                 reevaluateForegroundContext("bigPush_settle_1200")
             }
         }, 1_200L)
+        mainHandler.postDelayed({
+            if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
+                reevaluateForegroundContext("bigPush_settle_2500")
+            }
+        }, 2_500L)
     }
 
     /**
@@ -969,32 +974,38 @@ class CallOverlayService : Service() {
         val pausedOrGone = activity.isBlank() || activity.contains("(paused)", ignoreCase = true)
         val ourApp = activity.contains("kr.vlue", ignoreCase = true) && !pausedOrGone
 
-        /* RINGING: 전체 UI vs 홈·다른앱 분리를 classifyRingingSurface 에 위임 */
+        /* RINGING: 전체 UI vs 홈·다른앱 — UsageEvents ACTIVITY_RESUMED 1차 (DUT 증거) */
         if (phase == OverlayContextDetector.CallPhase.RINGING) {
             val hints = ForegroundPackageProbe.processImportanceHints(this)
             val tasksPkg = ForegroundPackageProbe.runningTaskPackage(this)
+            val resumedPkg = ForegroundPackageProbe.lastResumedPackage(this)
             val surface = ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = tasksPkg,
                 inCallImportance = hints.inCallImportance,
                 otherForegroundPackages = hints.otherForegroundPackages,
-                ourApp = ourApp
+                ourApp = ourApp,
+                lastResumedPkg = resumedPkg
             )
             val ctx = when (surface) {
                 ForegroundPackageProbe.RingingSurface.FULL_INCALL ->
                     OverlayContext.INCOMING_CALL_UI
                 ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER ->
-                    if (ourApp || OverlayContextDetector.isLikelyLauncherPackage(tasksPkg)) {
+                    if (ourApp ||
+                        OverlayContextDetector.isLikelyLauncherPackage(resumedPkg) ||
+                        OverlayContextDetector.isLikelyLauncherPackage(tasksPkg)
+                    ) {
                         OverlayContext.HOME_SCREEN
                     } else {
                         OverlayContext.OTHER_APP
                     }
             }
-            VlueBigPushTrace.lifecycle(
-                "OVERLAY_CONTEXT",
+            val detail =
                 "phase=RINGING surface=$surface ctx=${ctx.name} ourApp=$ourApp " +
-                    "tasks=$tasksPkg inCallImp=${hints.inCallImportance} " +
+                    "resumed=$resumedPkg tasks=$tasksPkg inCallImp=${hints.inCallImportance} " +
                     "otherFg=${hints.otherForegroundPackages.joinToString(",")}"
-            )
+            /* Diagnostics 세션 없어도 반드시 남김 — TOP/BOTTOM 원인 추적 */
+            android.util.Log.i("VlueOverlayCtx", detail)
+            VlueBigPushTrace.lifecycle("OVERLAY_CONTEXT", detail)
             return ctx
         }
 
@@ -1295,20 +1306,28 @@ class CallOverlayService : Service() {
             val minW = if (peekLikely) keep else (sw * 0.72f).toInt().coerceIn(dp(260), sw - dp(16))
             val w = wPx.coerceIn(minW, sw)
             val h = hPx.coerceIn(keep, sh)
+            /*
+             * 좌/우 테두리·라운드가 WebView 창 가장자리에서 잘리지 않게 inset.
+             * (증상: 왼쪽 모서리만 수직으로 잘린 것처럼 보임)
+             */
+            val edgePad = if (peekLikely) 0 else dp(4)
             val minX = keep - w
             val maxX = sw - keep
             val minY = keep - h
             val maxY = sh - keep
-            params.width = w
-            params.height = h
-            params.x = xPx.coerceIn(minX, maxX)
-            params.y = yPx.coerceIn(minY, maxY)
+            params.width = (w + edgePad * 2).coerceAtMost(sw)
+            params.height = (h + edgePad * 2).coerceAtMost(sh)
+            params.x = (xPx - edgePad).coerceIn(minX, maxX)
+            params.y = (yPx - edgePad).coerceIn(minY, maxY)
             params.gravity = Gravity.TOP or Gravity.START
             params.format = PixelFormat.TRANSLUCENT
             view.visibility = android.view.View.VISIBLE
             nativeBanner?.visibility = android.view.View.GONE
             view.setBackgroundColor(Color.TRANSPARENT)
             webView?.setBackgroundColor(Color.TRANSPARENT)
+            (view as? android.view.ViewGroup)?.clipChildren = false
+            (view as? android.view.ViewGroup)?.clipToPadding = false
+            webView?.clipToOutline = false
             applyCapsuleClip(view, enabled = false)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {

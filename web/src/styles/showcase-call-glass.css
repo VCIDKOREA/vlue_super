@@ -3681,7 +3681,8 @@
   margin: 0;
   padding: 10px 16px 12px;
   border-radius: 16px;
-  overflow: hidden;
+  /* overflow:hidden ?? WebView ? ?? ??? ??? ?? ?? */
+  overflow: visible;
   isolation: isolate;
   background: linear-gradient(165deg, #15233a 0%, #0d1524 55%, #0a1320 100%);
   border: 1.5px solid rgba(125, 211, 252, 0.55);

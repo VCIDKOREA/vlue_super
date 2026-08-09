@@ -21,7 +21,7 @@ const DEFAULT_CARD_W = 312;
 const DEFAULT_CARD_H = 118;
 const PEEK_W = 32;
 const PEEK_H = 112;
-const FRAME_PAD_PX = 4;
+const FRAME_PAD_PX = 8;
 
 function resolveCardWidthCss(vw) {
   const side = 24;
