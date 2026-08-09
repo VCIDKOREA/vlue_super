@@ -3659,7 +3659,7 @@
   }
 }
 
-/* Companion MVP: Mini Case ù VLUE live pill + identical L/R edge peek */
+/* Companion MVP: Mini Case soft rounded card with clear border */
 .companion-mini-case {
   pointer-events: auto;
   user-select: none;
@@ -3669,18 +3669,18 @@
   flex-direction: column;
   justify-content: center;
   align-items: stretch;
-  gap: 6px;
+  gap: 8px;
   box-sizing: border-box;
-  min-width: 220px;
+  min-width: min(300px, calc(100vw - 20px));
   width: max-content;
-  max-width: min(320px, calc(100vw - 32px));
+  max-width: min(360px, calc(100vw - 20px));
   margin: 0;
-  padding: 10px 16px 12px;
-  border-radius: 22px;
-  overflow: hidden;
+  padding: 12px 18px 14px;
+  border-radius: 14px;
+  overflow: visible;
   isolation: isolate;
-  background: linear-gradient(165deg, #122038 0%, #0b1220 55%, #0a1628 100%);
-  border: 1px solid rgba(56, 189, 248, 0.28) !important;
+  background: linear-gradient(165deg, #15233a 0%, #0d1524 55%, #0a1320 100%);
+  border: 1.5px solid rgba(125, 211, 252, 0.55) !important;
   outline: none !important;
   box-shadow: none !important;
   filter: none !important;
@@ -3763,10 +3763,11 @@
 
 .companion-mini-case__name {
   min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 46vw;
+  max-width: none;
 }
 
 .companion-mini-case__live {
@@ -3797,10 +3798,10 @@
 .companion-mini-case__expand {
   appearance: none;
   margin: 2px 0 0;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(125, 211, 252, 0.28);
-  background: rgba(14, 165, 233, 0.12);
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(125, 211, 252, 0.4);
+  background: rgba(14, 165, 233, 0.14);
   color: #e0f2fe;
   font-size: 11px;
   font-weight: 800;

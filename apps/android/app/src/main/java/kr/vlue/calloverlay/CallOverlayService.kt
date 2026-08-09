@@ -953,9 +953,34 @@ class CallOverlayService : Service() {
         }
         val activity = VlueCallOverlayApp.currentActivityName.orEmpty()
         val pausedOrGone = activity.isBlank() || activity.contains("(paused)", ignoreCase = true)
+        val ourApp = activity.contains("kr.vlue", ignoreCase = true) && !pausedOrGone
+
+        /* RINGING: 전체 UI vs 홈·다른앱 분리를 classifyRingingSurface 에 위임 */
+        if (phase == OverlayContextDetector.CallPhase.RINGING) {
+            val surface = ForegroundPackageProbe.classifyRingingSurface(this, ourApp)
+            val ctx = when (surface) {
+                ForegroundPackageProbe.RingingSurface.FULL_INCALL ->
+                    OverlayContext.INCOMING_CALL_UI
+                ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER ->
+                    if (ourApp || OverlayContextDetector.isLikelyLauncherPackage(
+                            ForegroundPackageProbe.runningTaskPackage(this)
+                        )
+                    ) {
+                        OverlayContext.HOME_SCREEN
+                    } else {
+                        OverlayContext.OTHER_APP
+                    }
+            }
+            VlueBigPushTrace.lifecycle(
+                "OVERLAY_CONTEXT",
+                "phase=RINGING surface=$surface ctx=${ctx.name} ourApp=$ourApp " +
+                    "tasks=${ForegroundPackageProbe.runningTaskPackage(this)}"
+            )
+            return ctx
+        }
+
         val sysFg = ForegroundPackageProbe.topPackage(this)
         val tasksPkg = ForegroundPackageProbe.runningTaskPackage(this)
-        val ourApp = activity.contains("kr.vlue", ignoreCase = true) && !pausedOrGone
         val tasksLauncher = OverlayContextDetector.isLikelyLauncherPackage(tasksPkg)
         val tasksInCall = OverlayContextDetector.isLikelyInCallUiPackage(tasksPkg)
         val tasksOther =
@@ -979,35 +1004,23 @@ class CallOverlayService : Service() {
                     !sysFg.contains("android.permissioncontroller", ignoreCase = true))
         val systemUi =
             !sysFg.isNullOrBlank() && sysFg.contains("systemui", ignoreCase = true)
-        /*
-         * 전체 InCallUI → TOP.
-         * sysFg=SystemUI/미확인이어도 InCallUI 프로세스가 살아 있고
-         * Tasks 가 홈·타앱이 아니면 TOP (이전 BOTTOM 오판 수정).
-         */
-        val fullInCallLikely =
-            phase == OverlayContextDetector.CallPhase.RINGING &&
-                ForegroundPackageProbe.isFullInCallUiLikely(this) &&
-                !ourApp
         val inCallUi =
             tasksInCall ||
                 OverlayContextDetector.isLikelyInCallUiPackage(sysFg) ||
-                (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone) ||
-                fullInCallLikely
-        /* SystemUI 를 HOME 으로 쓰지 않음 — full InCallUI 와 충돌 */
-        val homeLike = (launcher || (systemUi && !inCallUi)) && !inCallUi
+                (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone)
+        val homeLike = launcher || (systemUi && !inCallUi)
         val ctx = OverlayContextDetector.detect(
             callPhase = phase,
-            foregroundIsOurApp = ourApp && !inCallUi,
-            foregroundIsLauncher = homeLike && !inCallUi,
-            foregroundIsInCallUi = inCallUi && !tasksOther,
+            foregroundIsOurApp = ourApp,
+            foregroundIsLauncher = homeLike,
+            foregroundIsInCallUi = inCallUi && !knownOther,
             foregroundIsKnownOtherApp = knownOther && !inCallUi,
             userMinimized = userMinimized,
             keypadOpen = keypadOpen
         )
         VlueBigPushTrace.lifecycle(
             "OVERLAY_CONTEXT",
-            "phase=$phase ctx=${ctx.name} sysFg=$sysFg tasks=$tasksPkg " +
-                "inCall=$inCallUi fullLikely=$fullInCallLikely ourApp=$ourApp launcher=$launcher"
+            "phase=$phase ctx=${ctx.name} sysFg=$sysFg tasks=$tasksPkg inCall=$inCallUi ourApp=$ourApp"
         )
         return ctx
     }
@@ -1274,12 +1287,12 @@ class CallOverlayService : Service() {
             nativeBanner?.visibility = android.view.View.GONE
             view.setBackgroundColor(Color.TRANSPARENT)
             webView?.setBackgroundColor(Color.TRANSPARENT)
-            applyCapsuleClip(view, enabled = true)
+            applyCapsuleClip(view, enabled = false)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
                     wm.updateViewLayout(view, params)
                 }
-                view.post { applyCapsuleClip(view, enabled = true) }
+                view.post { applyCapsuleClip(view, enabled = false) }
             } catch (_: Exception) {
             }
         }
@@ -1366,10 +1379,10 @@ class CallOverlayService : Service() {
             view.visibility = android.view.View.VISIBLE
             userMinimized = true
             val (sw, _) = screenSizePx()
-            val w = (sw * 0.86f).toInt().coerceIn(dp(240), sw - dp(16))
-            /* 타원 MiniCase 전체(힌트 포함) — WebView 투명, 형태는 CSS */
-            val h = dp(120)
-            val x = ((sw - w) / 2).coerceAtLeast(dp(8))
+            val w = (sw * 0.92f).toInt().coerceIn(dp(280), sw - dp(12))
+            /* CSS 둥근 사각 — native capsule clip 은 가위질 느낌 */
+            val h = dp(132)
+            val x = ((sw - w) / 2).coerceAtLeast(dp(6))
             val y = (statusBarHeightPx() + dp(48)).coerceAtLeast(dp(72))
             params.width = w
             params.height = h
@@ -1382,12 +1395,12 @@ class CallOverlayService : Service() {
             view.setBackgroundColor(Color.TRANSPARENT)
             webView?.setBackgroundColor(Color.TRANSPARENT)
             applyPassThroughTouchFlags(params)
-            applyCapsuleClip(view, enabled = true)
+            applyCapsuleClip(view, enabled = false)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
                     wm.updateViewLayout(view, params)
                 }
-                view.post { applyCapsuleClip(view, enabled = true) }
+                view.post { applyCapsuleClip(view, enabled = false) }
                 OverlayDiagTracker.markLayoutApplied("MINI_CASE", OverlayPosition.MINI_CASE.name)
                 VlueBigPushTrace.milestone(
                     "OVERLAY_ATTACHED",

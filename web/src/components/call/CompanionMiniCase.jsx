@@ -16,8 +16,8 @@ export function resetCompanionMiniCaseSessionPos() {
 
 const EDGE_KEEP_PX = MINI_CASE_EDGE_KEEP_PX;
 const DRAG_CLICK_MAX_PX = 10;
-const DEFAULT_CARD_W = 280;
-const DEFAULT_CARD_H = 108;
+const DEFAULT_CARD_W = 320;
+const DEFAULT_CARD_H = 120;
 const PEEK_W = 32;
 const PEEK_H = 112;
 

@@ -38,47 +38,81 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun noTasks_usageInCallUi_keepsInCallForFullUiTop() {
+    fun classify_tasksInCall_isFullInCallTop() {
         assertEquals(
-            "com.samsung.android.incallui",
-            ForegroundPackageProbe.preferForegroundForOverlay(
-                usagePkg = "com.samsung.android.incallui",
-                tasksPkg = null
+            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.samsung.android.incallui",
+                recentUsage = emptyList()
             )
         )
     }
 
     @Test
-    fun noTasks_usageOtherApp_usesUsage() {
+    fun classify_tasksKakao_isHomeOrOtherBottom() {
         assertEquals(
-            "com.kakao.talk",
-            ForegroundPackageProbe.preferForegroundForOverlay(
-                usagePkg = "com.kakao.talk",
-                tasksPkg = null
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.kakao.talk",
+                recentUsage = listOf("com.samsung.android.incallui" to 1000L)
             )
         )
     }
 
     @Test
-    fun noTasksNoUsage_fallsBackToProcs() {
+    fun classify_tasksLauncher_isHomeOrOtherBottom() {
         assertEquals(
-            "com.sec.android.app.launcher",
-            ForegroundPackageProbe.preferForegroundForOverlay(
-                usagePkg = null,
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.sec.android.app.launcher",
+                recentUsage = listOf("com.samsung.android.incallui" to 2000L)
+            )
+        )
+    }
+
+    @Test
+    fun classify_usageInCallOnly_isFullInCallTop() {
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
+            ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = null,
-                procsPkg = "com.sec.android.app.launcher"
+                recentUsage = listOf("com.samsung.android.incallui" to 5_000L)
             )
         )
     }
 
     @Test
-    fun noTasks_procsInCallUi_keepsInCall() {
+    fun classify_usageInCallWithRecentKakao_isHunBottom() {
         assertEquals(
-            "com.samsung.android.incallui",
-            ForegroundPackageProbe.preferForegroundForOverlay(
-                usagePkg = null,
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = null,
-                procsPkg = "com.samsung.android.incallui"
+                recentUsage = listOf(
+                    "com.samsung.android.incallui" to 5_000L,
+                    "com.kakao.talk" to 3_500L
+                )
+            )
+        )
+    }
+
+    @Test
+    fun classify_ourApp_isHomeOrOtherBottom() {
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.samsung.android.incallui",
+                recentUsage = emptyList(),
+                ourApp = true
+            )
+        )
+    }
+
+    @Test
+    fun ringing_unknownForeground_defaultsToOtherAppBottom() {
+        assertEquals(
+            OverlayContext.OTHER_APP,
+            OverlayContextDetector.detect(
+                callPhase = OverlayContextDetector.CallPhase.RINGING
             )
         )
     }
