@@ -1004,8 +1004,6 @@ export default function LetteringIncomingNotification({
         <CompanionMiniCase
           displayName={nameDisp}
           phoneLabel={subPhone}
-          emailLabel={String(c.email || "").trim()}
-          websiteLabel={String(c.website || "").trim()}
           statusLabel={isUnverified ? "미인증" : verified ? "인증" : "미인증"}
           durationLabel={companionDurationLabel}
           verified={Boolean(verified && !isUnverified)}

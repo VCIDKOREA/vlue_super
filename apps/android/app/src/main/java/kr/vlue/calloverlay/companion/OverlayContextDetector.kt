@@ -45,6 +45,7 @@ object OverlayContextDetector {
             CallPhase.RINGING -> when {
                 foregroundIsInCallUi -> OverlayContext.INCOMING_CALL_UI
                 foregroundIsKnownOtherApp -> OverlayContext.OTHER_APP
+                /* 런처·자사·SystemUI(삼성 미니 HUN) → 하단 BigPush */
                 foregroundIsLauncher || foregroundIsOurApp -> OverlayContext.HOME_SCREEN
                 else -> OverlayContext.INCOMING_CALL_UI
             }

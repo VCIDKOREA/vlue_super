@@ -17,7 +17,7 @@ export function resetCompanionMiniCaseSessionPos() {
 const EDGE_KEEP_PX = MINI_CASE_EDGE_KEEP_PX;
 const DRAG_CLICK_MAX_PX = 10;
 const DEFAULT_CARD_W = 280;
-const DEFAULT_CARD_H = 118;
+const DEFAULT_CARD_H = 88;
 
 function readViewport() {
   const native = nativeGetScreenSize();
@@ -89,8 +89,6 @@ function revealPosFromPeek(pos, cardW, vw) {
 export default function CompanionMiniCase({
   displayName = "",
   phoneLabel = "",
-  emailLabel = "",
-  websiteLabel = "",
   statusLabel = "",
   durationLabel = "0:00",
   verified = false,
@@ -330,6 +328,11 @@ export default function CompanionMiniCase({
           <div className="companion-mini-case__card">
             <p className="companion-mini-case__line1">
               <span className="companion-mini-case__name">{displayName || "—"}</span>
+              <span
+                className={`companion-mini-case__badge${verified ? " is-verified" : " is-unverified"}`}
+              >
+                {statusLabel || (verified ? "인증" : "미인증")}
+              </span>
               <span className="companion-mini-case__live" aria-hidden>
                 🟢
               </span>
@@ -337,18 +340,7 @@ export default function CompanionMiniCase({
             </p>
             <p className="companion-mini-case__line2">
               <span className="companion-mini-case__phone">{phoneLabel || "—"}</span>
-              <span
-                className={`companion-mini-case__badge${verified ? " is-verified" : " is-unverified"}`}
-              >
-                {statusLabel || (verified ? "인증" : "미인증")}
-              </span>
             </p>
-            {emailLabel || websiteLabel ? (
-              <div className="companion-mini-case__line3">
-                {emailLabel ? <span className="companion-mini-case__meta">{emailLabel}</span> : null}
-                {websiteLabel ? <span className="companion-mini-case__meta">{websiteLabel}</span> : null}
-              </div>
-            ) : null}
           </div>
           <button
             type="button"

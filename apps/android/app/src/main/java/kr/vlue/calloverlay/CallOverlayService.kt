@@ -180,7 +180,7 @@ class CallOverlayService : Service() {
                     companion.onRestoreShowcase(OverlayContext.IN_CALL)
                     publishCompanion(OverlayTriggerEvent.USER_RESTORE)
                     applyLayoutFromController(source = "ACTION_ENDED_KEEP")
-                    notifyWebCallState("ended_keep_overlay")
+                notifyWebCallState("ended_keep_overlay")
                 }
                 return START_NOT_STICKY
             }
@@ -594,7 +594,7 @@ class CallOverlayService : Service() {
                 )
             }
             CompanionRuntimeStabilityDiag.mark("ADD_VIEW_BEGIN", if (asBigPush) "bigPush" else "showcase")
-            windowManager?.addView(container, params)
+        windowManager?.addView(container, params)
             OverlayDiagTracker.onAddView()
             OverlayDiagTracker.markAddViewSuccess()
             CompanionRuntimeStabilityDiag.mark("ADD_VIEW_SUCCESS", if (asBigPush) "bigPush" else "showcase")
@@ -858,11 +858,11 @@ class CallOverlayService : Service() {
             view.translationY = 0f
             view.visibility = android.view.View.VISIBLE
             userMinimized = false
-            params.height = WindowManager.LayoutParams.MATCH_PARENT
-            params.width = WindowManager.LayoutParams.MATCH_PARENT
+                params.height = WindowManager.LayoutParams.MATCH_PARENT
+                params.width = WindowManager.LayoutParams.MATCH_PARENT
             params.x = 0
-            params.y = 0
-            params.gravity = Gravity.TOP or Gravity.START
+                params.y = 0
+                params.gravity = Gravity.TOP or Gravity.START
             view.clipToOutline = false
             view.outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
             applyCapsuleClip(view, enabled = false)
@@ -870,7 +870,7 @@ class CallOverlayService : Service() {
             webView?.setBackgroundColor(Color.TRANSPARENT)
             applyPassThroughTouchFlags(params)
             /* Showcase 터치 필요 — NOT_FOCUSABLE 유지하되 창은 full; HOME 시 MINI 로 축소 */
-            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
             nativeBanner?.visibility = android.view.View.GONE
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
@@ -899,7 +899,7 @@ class CallOverlayService : Service() {
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
             apply.run()
-        } else {
+            } else {
             mainHandler.post(apply)
         }
     }
@@ -948,25 +948,29 @@ class CallOverlayService : Service() {
                 !sysFg.contains("kr.vlue", ignoreCase = true) &&
                 !sysFg.contains("systemui", ignoreCase = true) &&
                 !sysFg.contains("android.permissioncontroller", ignoreCase = true)
+        val systemUi =
+            !sysFg.isNullOrBlank() && sysFg.contains("systemui", ignoreCase = true)
         /*
-         * 홈+삼성 수신 HUN 만 떠 있을 때 InCallUI 프로세스가 살아 있어도 TOP 고정하지 않음.
-         * (그렇지 않으면 BigPush 가 팝업 아래에 가려짐 → 하단으로 내려야 함)
+         * 홈+삼성 수신 HUN: top package 가 SystemUI 인 경우가 많음 → 하단 BigPush.
+         * 전체 InCallUI 가 전면일 때만 TOP.
          */
         val inCallUi =
             OverlayContextDetector.isLikelyInCallUiPackage(sysFg) ||
                 (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone) ||
-                OverlayContextDetector.isLikelyInCallUiPackage(fgHint) ||
+                (OverlayContextDetector.isLikelyInCallUiPackage(fgHint) && !systemUi) ||
                 (phase == OverlayContextDetector.CallPhase.RINGING &&
                     ForegroundPackageProbe.isInCallUiProcessRunning(this) &&
                     !launcher &&
+                    !systemUi &&
                     sysFg.isNullOrBlank()) ||
                 (phase == OverlayContextDetector.CallPhase.OFFHOOK &&
                     ForegroundPackageProbe.isInCallUiProcessRunning(this) &&
                     sysFg.isNullOrBlank())
+        val homeLike = launcher || (systemUi && !inCallUi)
         return OverlayContextDetector.detect(
             callPhase = phase,
             foregroundIsOurApp = ourApp,
-            foregroundIsLauncher = launcher,
+            foregroundIsLauncher = homeLike,
             foregroundIsInCallUi = inCallUi && !knownOther,
             foregroundIsKnownOtherApp = knownOther && !inCallUi,
             userMinimized = userMinimized,
@@ -1330,7 +1334,7 @@ class CallOverlayService : Service() {
             val (sw, _) = screenSizePx()
             val w = (sw * 0.86f).toInt().coerceIn(dp(240), sw - dp(16))
             /* 타원 MiniCase 전체(힌트 포함) — WebView 투명, 형태는 CSS */
-            val h = dp(148)
+            val h = dp(96)
             val x = ((sw - w) / 2).coerceAtLeast(dp(8))
             val y = (statusBarHeightPx() + dp(48)).coerceAtLeast(dp(72))
             params.width = w
@@ -1494,7 +1498,7 @@ class CallOverlayService : Service() {
                 }
             }
         } else {
-            params.width = WindowManager.LayoutParams.MATCH_PARENT
+                params.width = WindowManager.LayoutParams.MATCH_PARENT
             params.x = 0
             params.y = when (pos) {
                 OverlayPosition.BOTTOM -> (sh - barH - dp(8)).coerceAtLeast(0)
@@ -1552,10 +1556,10 @@ class CallOverlayService : Service() {
                     val h = if (params.height > 0) params.height else dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
                     params.x = (startX + dx).coerceIn(keep - w, sw - keep)
                     params.y = (startY + dy).coerceIn(keep - h, sh - keep)
-                    try {
-                        wm.updateViewLayout(view, params)
-                    } catch (_: Exception) {
-                    }
+            try {
+                wm.updateViewLayout(view, params)
+            } catch (_: Exception) {
+            }
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -1705,7 +1709,7 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.mark("WEB_CALL_STATE_IDLE", "dismissOverlay")
         CompanionRuntimeStabilityDiag.mark("OVERLAY_HIDE_BEGIN", "dismissOverlay")
         rootContainer?.animate()?.cancel()
-        removeOverlayImmediate()
+                removeOverlayImmediate()
         CompanionRuntimeStabilityDiag.mark("OVERLAY_HIDE_COMPLETE", "dismissOverlay_immediate")
         LetteringRingingActivity.requestFinish(this)
         stopSelfTraced("dismissOverlay_immediate")
@@ -1851,19 +1855,20 @@ class CallOverlayService : Service() {
         }
         val prevState = companion.state
         val prevPos = companion.position
-        val forceRinging = companion.state == OverlayState.BIG_PUSH
+        val forceRinging = companion.state == OverlayState.BIG_PUSH && !isCallAlreadyAnswered()
         var ctx = detectOverlayContext(forceRinging = forceRinging)
-        if (companion.state == OverlayState.SHOWCASE) {
+        if (companion.state == OverlayState.SHOWCASE || companion.state == OverlayState.MINI_CASE) {
             val hold =
                 android.os.SystemClock.elapsedRealtime() < showcaseHoldUntilElapsed
             if (!hold &&
                 (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN)
             ) {
-                /* 다른 앱/홈 — 풀 쇼케이스가 InCallUI 에 겹치지 않게 Mini 로 */
-                companion.minimizeForOtherApp()
-                userMinimized = true
+                /* 다른 앱/홈/삼성 미니푸시 — 하단 쇼케이스 바 (MiniCase 아님) */
+                companion.collapseToBottomShowcaseBar(ctx)
+                userMinimized = false
                 publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
-                applyLayoutFromController(source = "reeval:$source:otherAppMini")
+                syncOverlayChromeForState(source = "reeval:$source:bottomBar")
+                applyLayoutFromController(source = "reeval:$source:bottomBar")
                 notifyWebCallState("minimize_showcase")
                 CompanionRuntimeStabilityDiag.mark(
                     "HOME_CONTEXT_REEVAL",
@@ -1875,21 +1880,19 @@ class CallOverlayService : Service() {
                 )
                 return
             }
-            companion.updateContext(OverlayContext.IN_CALL)
-            val h = layoutParams?.height ?: 0
-            if (h > 0 && h < dp(400)) {
-                commitFullscreenLayout(source = "reeval:$source:pinFull")
+            if (companion.state == OverlayState.SHOWCASE) {
+                companion.updateContext(OverlayContext.IN_CALL)
+                val h = layoutParams?.height ?: 0
+                if (h > 0 && h < dp(400)) {
+                    commitFullscreenLayout(source = "reeval:$source:pinFull")
+                }
+                return
             }
-            return
         }
         companion.updateContext(ctx)
         if (companion.state != prevState || companion.position != prevPos) {
             publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
             applyLayoutFromController(source = "reeval:$source")
-            if (companion.state == OverlayState.MINI_CASE) {
-                userMinimized = true
-                notifyWebCallState("minimize_showcase")
-            }
             CompanionRuntimeStabilityDiag.mark(
                 "HOME_CONTEXT_REEVAL",
                 source,

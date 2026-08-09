@@ -3659,7 +3659,7 @@
   }
 }
 
-/* Companion MVP: Mini Case Floating Controller */
+/* Companion MVP: Mini Case ù ??? ?(stadium), ??ù??ù??ù????? */
 .companion-mini-case {
   pointer-events: auto;
   user-select: none;
@@ -3669,18 +3669,20 @@
   flex-direction: column;
   justify-content: center;
   align-items: stretch;
-  gap: 5px;
+  gap: 2px;
   box-sizing: border-box;
-  min-width: 220px;
-  max-width: min(300px, calc(100vw - 24px));
+  min-width: 240px;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 24px));
   margin: 0;
-  padding: 16px 22px 14px;
-  border-radius: 9999px;
+  padding: 10px 22px 8px;
+  /* ??? ? ?: ??? ?? ?? ??? ? ?? ?? */
+  border-radius: 999px;
   overflow: hidden;
   isolation: isolate;
   background: #0b1220;
-  border: 1.5px solid rgba(226, 232, 240, 0.65);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   -webkit-mask-image: none;
@@ -3719,15 +3721,15 @@
 .companion-mini-case__line1 {
   margin: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   color: #f8fafc;
   letter-spacing: -0.02em;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .companion-mini-case__name {
@@ -3751,16 +3753,32 @@
 }
 
 .companion-mini-case__line2 {
-  margin: 2px 0 0;
+  margin: 1px 0 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 650;
   color: #cbd5e1;
-  line-height: 1.3;
+  line-height: 1.25;
+}
+
+.companion-mini-case__expand-hint {
+  margin: 2px 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #7dd3fc;
+  letter-spacing: -0.01em;
+  text-shadow: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .companion-mini-case__line3 {
@@ -3810,23 +3828,7 @@
   border: 1px solid rgba(251, 191, 36, 0.35);
 }
 
-.companion-mini-case__expand-hint {
-  margin: 4px 0 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  width: 100%;
-  text-align: center;
-  font-size: 11px;
-  font-weight: 800;
-  color: #7dd3fc;
-  letter-spacing: -0.01em;
-  text-shadow: none;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* peek: ???? ?? ó ??/???/min-width ??(?? ??) ?? */
+/* peek: ???? ?? */
 .companion-mini-case.is-peek-right,
 .companion-mini-case.is-peek-left {
   width: 28px;

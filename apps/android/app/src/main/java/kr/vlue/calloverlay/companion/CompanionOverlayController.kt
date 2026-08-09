@@ -224,25 +224,30 @@ class CompanionOverlayController {
     fun updateContext(detectedContext: OverlayContext) {
         context = detectedContext
         /*
-         * SHOWCASE→MINI 는 Service 가 onMinimize / onKeypad / minimizeForOtherApp 으로만.
-         * 여기서 HOME/OTHER 를 받으면 Position 만 MINI 로 줄어 풀 쇼케이스가 110dp 에 잘린다.
+         * BIG_PUSH→SHOWCASE 는 Service.enterShowcaseFromAnswer / onAnswer 단일 경로.
+         * 여기서 IN_CALL 로 올리면 통화 중 하단 쇼케이스 바가 다시 풀스크린으로 깨진다.
          */
-        if (state == OverlayState.BIG_PUSH && detectedContext == OverlayContext.IN_CALL) {
-            state = OverlayState.SHOWCASE
-            miniCaseVisibility = MiniCaseVisibility.VISIBLE
-            lastTransition = "context IN_CALL while BIG_PUSH → SHOWCASE (no BigPush wait)"
-        }
         refreshPosition()
     }
 
-    /** 통화 중 다른 앱으로 나간 것이 확실할 때만 MINI (유예 후 Service에서 호출) */
-    fun minimizeForOtherApp() {
-        if (state != OverlayState.SHOWCASE) return
-        context = OverlayContext.OTHER_APP
-        state = OverlayState.MINI_CASE
+    /**
+     * 다른 앱·홈·삼성 미니푸시 — 풀 쇼케이스 대신 하단 쇼케이스 바(BigPush chrome).
+     * MiniCase 타원이 아님.
+     */
+    fun collapseToBottomShowcaseBar(detected: OverlayContext = OverlayContext.OTHER_APP) {
+        if (state != OverlayState.SHOWCASE && state != OverlayState.MINI_CASE) return
+        context =
+            if (detected == OverlayContext.HOME_SCREEN) OverlayContext.HOME_SCREEN
+            else OverlayContext.OTHER_APP
+        state = OverlayState.BIG_PUSH
         miniCaseVisibility = MiniCaseVisibility.VISIBLE
-        lastTransition = "minimizeForOtherApp → MINI_CASE"
+        lastTransition = "collapseToBottomShowcaseBar → BIG_PUSH pos=BOTTOM"
         refreshPosition()
+    }
+
+    /** @deprecated 하단 바 경로 — collapseToBottomShowcaseBar 사용 */
+    fun minimizeForOtherApp() {
+        collapseToBottomShowcaseBar(OverlayContext.OTHER_APP)
     }
 
     fun snapshot(): CompanionOverlaySnapshot =
