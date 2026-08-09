@@ -213,6 +213,8 @@ export default function LetteringIncomingNotification({
   isKnownContact: isKnownContactProp,
   /** 홈 본인 미리보기 전용 — 통화 중 상대방 오버레이에는 절대 true 금지 */
   showOwnerSettings = false,
+  /** Native BIG_PUSH — MiniCase 대신 앱 쇼케이스바(접힘) 유지 */
+  forceShowcaseBar = false,
   /**
    * 홈 미리보기에서 실제 통화와 동일한 하단 제어바(키패드·음소거·스피커·종료)를 보여 줌
    * — 쇼케이스 사진이 통화옵션에 가리는지 확인할 때 사용
@@ -360,7 +362,11 @@ export default function LetteringIncomingNotification({
   );
   const onCall = callPhase === "active" || callPhase === "connected";
   const useCompanionDelegate =
-    COMPANION_MVP_DELEGATE_CALL_UI && onCall && !previewMode && !fromCallHistory;
+    COMPANION_MVP_DELEGATE_CALL_UI &&
+    onCall &&
+    !previewMode &&
+    !fromCallHistory &&
+    !forceShowcaseBar;
   const [callTick, setCallTick] = useState(0);
   const callStartedAtRef = useRef(null);
   useEffect(() => {

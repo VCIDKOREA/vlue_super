@@ -27,33 +27,132 @@ function firstStr(...values: unknown[]): string {
   return "";
 }
 
-/** 쇼케이스 송출용 연락처 — User.email + digital_cards.export_snapshot_json + profileJson */
+function httpOnlyUrl(v: unknown): string {
+  const t = String(v || "").trim();
+  if (!t || /^\s*data:/i.test(t) || /^\s*blob:/i.test(t)) return "";
+  return t;
+}
+
+type ExportSnapLite = {
+  email: string;
+  website: string;
+  fax: string;
+  address: string;
+  department: string;
+  companyIntro: string;
+  salesContent: string;
+  photoUrl: string;
+  logoUrl: string;
+};
+
+/**
+ * export_snapshot_json 전체 SELECT 금지 — Shared Pooler egress 폭주 방지.
+ * JSON path 로 짧은 텍스트 필드만 추출.
+ */
+async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null> {
+  const rows = await prisma.$queryRaw<
+    Array<{
+      email: string | null;
+      website: string | null;
+      fax: string | null;
+      address: string | null;
+      department: string | null;
+      company_intro: string | null;
+      sales_content: string | null;
+      photo_url: string | null;
+      logo_url: string | null;
+    }>
+  >`
+    SELECT
+      NULLIF(TRIM(export_snapshot_json->>'email'), '') AS email,
+      NULLIF(TRIM(export_snapshot_json->>'website'), '') AS website,
+      NULLIF(TRIM(export_snapshot_json->>'fax'), '') AS fax,
+      NULLIF(TRIM(export_snapshot_json->>'address'), '') AS address,
+      NULLIF(TRIM(export_snapshot_json->>'department'), '') AS department,
+      NULLIF(TRIM(export_snapshot_json->>'companyIntro'), '') AS company_intro,
+      NULLIF(TRIM(export_snapshot_json->>'salesContent'), '') AS sales_content,
+      NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url,
+      NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url
+    FROM digital_cards
+    WHERE user_id = ${userId}::uuid
+    LIMIT 1
+  `;
+  const s = rows[0];
+  if (!s) return null;
+  return {
+    email: firstStr(s.email),
+    website: firstStr(s.website),
+    fax: firstStr(s.fax),
+    address: firstStr(s.address),
+    department: firstStr(s.department),
+    companyIntro: firstStr(s.company_intro),
+    salesContent: firstStr(s.sales_content),
+    photoUrl: httpOnlyUrl(s.photo_url),
+    logoUrl: httpOnlyUrl(s.logo_url)
+  };
+}
+
+/** 쇼케이스 송출용 연락처 — User.email + snap lite + profileJson */
 function buildContactProfile(opts: {
   userEmail?: string | null;
-  exportSnap?: Record<string, unknown> | null;
+  exportSnap?: ExportSnapLite | Record<string, unknown> | null;
   profileJson?: Record<string, unknown> | null;
 }): Record<string, unknown> {
   const snap = opts.exportSnap || {};
   const pj = opts.profileJson || {};
   const email = firstStr(
-    snap.email,
+    (snap as ExportSnapLite).email,
+    (snap as Record<string, unknown>).email,
     opts.userEmail,
     pj.email,
     pj.contactEmail,
     pj.mail
   );
-  const website = firstStr(snap.website, pj.website, pj.homepage, pj.url, pj.web);
-  const fax = firstStr(snap.fax, pj.fax, pj.officePhone, pj.faxNumber, pj.tel, pj.landline);
+  const website = firstStr(
+    (snap as ExportSnapLite).website,
+    (snap as Record<string, unknown>).website,
+    pj.website,
+    pj.homepage,
+    pj.url,
+    pj.web
+  );
+  const fax = firstStr(
+    (snap as ExportSnapLite).fax,
+    (snap as Record<string, unknown>).fax,
+    pj.fax,
+    pj.officePhone,
+    pj.faxNumber,
+    pj.tel,
+    pj.landline
+  );
   const address = firstStr(
-    snap.address,
+    (snap as ExportSnapLite).address,
+    (snap as Record<string, unknown>).address,
     pj.address,
     pj.businessAddress,
     pj.companyAddress,
     pj.roadAddress
   );
-  const department = firstStr(snap.department, pj.department, pj.dept, pj.team);
-  const intro = firstStr(pj.intro, pj.companyIntro, snap.companyIntro);
-  const sales = firstStr(pj.salesPitch, pj.promo, pj.salesContent, snap.salesContent);
+  const department = firstStr(
+    (snap as ExportSnapLite).department,
+    (snap as Record<string, unknown>).department,
+    pj.department,
+    pj.dept,
+    pj.team
+  );
+  const intro = firstStr(
+    pj.intro,
+    pj.companyIntro,
+    (snap as ExportSnapLite).companyIntro,
+    (snap as Record<string, unknown>).companyIntro
+  );
+  const sales = firstStr(
+    pj.salesPitch,
+    pj.promo,
+    pj.salesContent,
+    (snap as ExportSnapLite).salesContent,
+    (snap as Record<string, unknown>).salesContent
+  );
   return {
     ...pj,
     email,
@@ -65,8 +164,21 @@ function buildContactProfile(opts: {
     intro,
     companyIntro: intro,
     salesContent: sales,
-    photoUrl: firstStr(snap.photoUrl, pj.photoUrl, pj.image_url, pj.imageUrl) || undefined,
-    logoUrl: firstStr(snap.logoUrl, pj.logoUrl, pj.logo_url) || undefined
+    photoUrl:
+      firstStr(
+        (snap as ExportSnapLite).photoUrl,
+        (snap as Record<string, unknown>).photoUrl,
+        pj.photoUrl,
+        pj.image_url,
+        pj.imageUrl
+      ) || undefined,
+    logoUrl:
+      firstStr(
+        (snap as ExportSnapLite).logoUrl,
+        (snap as Record<string, unknown>).logoUrl,
+        pj.logoUrl,
+        pj.logo_url
+      ) || undefined
   };
 }
 
@@ -101,7 +213,6 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
             select: {
               photoUrl: true,
               logoUrl: true,
-              exportSnapshotJson: true,
               membershipTierSnapshot: true
             }
           }
@@ -111,11 +222,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
   });
 
   if (card) {
-    const exportSnap =
-      card.user.digitalCard?.exportSnapshotJson &&
-      typeof card.user.digitalCard.exportSnapshotJson === "object"
-        ? (card.user.digitalCard.exportSnapshotJson as Record<string, unknown>)
-        : null;
+    const exportSnap = await loadExportSnapLite(card.user.id);
     const baseProfile = (card.profileJson as Record<string, unknown> | null) ?? null;
     const profile = buildContactProfile({
       userEmail: card.user.email,
@@ -200,23 +307,28 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       phoneE164: e164,
       OR: [{ identityVerified: true }, { digitalCard: { isNot: null } }]
     },
-    include: {
-      businessProfile: true,
-      digitalCard: true
+    select: {
+      ...privacySelect,
+      legalName: true,
+      publicHandle: true,
+      email: true,
+      phoneE164: true,
+      identityVerified: true,
+      businessProfile: { select: { companyName: true, jobTitle: true } },
+      digitalCard: {
+        select: {
+          photoUrl: true,
+          logoUrl: true,
+          membershipTierSnapshot: true
+        }
+      }
     }
   });
 
   if (user) {
     const tierSnap = String(user.digitalCard?.membershipTierSnapshot || "").toLowerCase();
     const isPremiumLine = ["paid", "premium", "b2b", "business"].includes(tierSnap);
-    const dc = user.digitalCard as
-      | { photoUrl?: string | null; logoUrl?: string | null; exportSnapshotJson?: unknown }
-      | null
-      | undefined;
-    const exportSnap =
-      dc?.exportSnapshotJson && typeof dc.exportSnapshotJson === "object"
-        ? (dc.exportSnapshotJson as Record<string, unknown>)
-        : null;
+    const exportSnap = user.digitalCard ? await loadExportSnapLite(user.id) : null;
     const profile = buildContactProfile({
       userEmail: user.email,
       exportSnap,
@@ -224,12 +336,12 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
     });
     const email = firstStr(profile.email, user.email);
     const photoOnly =
-      (typeof dc?.photoUrl === "string" && dc.photoUrl.trim()) ||
-      (typeof exportSnap?.photoUrl === "string" && String(exportSnap.photoUrl).trim()) ||
+      (typeof user.digitalCard?.photoUrl === "string" && user.digitalCard.photoUrl.trim()) ||
+      exportSnap?.photoUrl ||
       null;
     const logoOnly =
-      (typeof dc?.logoUrl === "string" && dc.logoUrl.trim()) ||
-      (typeof exportSnap?.logoUrl === "string" && String(exportSnap.logoUrl).trim()) ||
+      (typeof user.digitalCard?.logoUrl === "string" && user.digitalCard.logoUrl.trim()) ||
+      exportSnap?.logoUrl ||
       null;
     const isCeo = isPlatformCeoHandle(user.publicHandle);
     /* 프로필 사진만 image_url. CEO 로고 슬롯만 VLUE 기본. 타인 빈 사진 → null(실루엣) */

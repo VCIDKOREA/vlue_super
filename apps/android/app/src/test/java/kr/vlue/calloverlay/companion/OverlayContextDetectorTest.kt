@@ -5,9 +5,9 @@ import org.junit.Test
 
 class OverlayContextDetectorTest {
     @Test
-    fun ringing_unknownForeground_defaultsToIncomingCallUiTop() {
+    fun ringing_unknownForeground_defaultsToOtherAppBottom() {
         assertEquals(
-            OverlayContext.INCOMING_CALL_UI,
+            OverlayContext.OTHER_APP,
             OverlayContextDetector.detect(
                 callPhase = OverlayContextDetector.CallPhase.RINGING
             )
@@ -65,12 +65,23 @@ class OverlayContextDetectorTest {
     }
 
     @Test
-    fun offhook_knownOtherApp_isOtherApp() {
+    fun ringing_launcher_isHomeScreen() {
         assertEquals(
-            OverlayContext.OTHER_APP,
+            OverlayContext.HOME_SCREEN,
             OverlayContextDetector.detect(
-                callPhase = OverlayContextDetector.CallPhase.OFFHOOK,
-                foregroundIsKnownOtherApp = true
+                callPhase = OverlayContextDetector.CallPhase.RINGING,
+                foregroundIsLauncher = true
+            )
+        )
+    }
+
+    @Test
+    fun ringing_ourApp_isHomeScreen() {
+        assertEquals(
+            OverlayContext.HOME_SCREEN,
+            OverlayContextDetector.detect(
+                callPhase = OverlayContextDetector.CallPhase.RINGING,
+                foregroundIsOurApp = true
             )
         )
     }

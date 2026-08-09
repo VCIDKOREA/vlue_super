@@ -12,9 +12,48 @@ import android.os.Build
 object ForegroundPackageProbe {
     fun topPackage(context: Context): String? {
         val app = context.applicationContext
-        resolveViaUsageStats(app)?.let { return it }
-        resolveViaRunningTasks(app)?.let { return it }
-        return null
+        return resolveForCompanionOverlay(app)
+    }
+
+    /**
+     * 삼성 홈/다른앱 + 상단 HUN: UsageStats 는 InCallUI 를 lastUsed 로 올리는 경우가 많다.
+     * RunningTasks 가 런처·타앱이면 그걸 우선 — 하단 쇼케이스바(BOTTOM) 판정용.
+     * 전체 InCallUI 전면이면 Tasks/Usage 모두 InCallUI → TOP.
+     *
+     * Pure — 단위 테스트용. Service 는 resolveForCompanionOverlay 경유.
+     */
+    fun preferForegroundForOverlay(usagePkg: String?, tasksPkg: String?, procsPkg: String? = null): String? {
+        if (!tasksPkg.isNullOrBlank()) {
+            val tasksInCall = OverlayContextDetector.isLikelyInCallUiPackage(tasksPkg)
+            val usageInCall = OverlayContextDetector.isLikelyInCallUiPackage(usagePkg)
+            /* HUN: Tasks=launcher/other, Usage=InCallUI → Tasks 유지 */
+            if (!tasksInCall && (usageInCall || usagePkg.isNullOrBlank())) {
+                return tasksPkg
+            }
+            if (!tasksInCall) return tasksPkg
+            /* Tasks 도 InCallUI → 전체 전화 UI */
+            return tasksPkg
+        }
+        /*
+         * Tasks 불명 + Usage=InCallUI 만: 삼성 홈 HUN 과 전체 InCallUI 구분 불가.
+         * TOP(상단 숨김) 오판 방지 → null → Detector OTHER_APP → BOTTOM.
+         */
+        if (OverlayContextDetector.isLikelyInCallUiPackage(usagePkg)) {
+            return null
+        }
+        if (OverlayContextDetector.isLikelyInCallUiPackage(procsPkg)) {
+            return null
+        }
+        return usagePkg?.takeIf { it.isNotBlank() } ?: procsPkg?.takeIf { it.isNotBlank() }
+    }
+
+    fun resolveForCompanionOverlay(context: Context): String? {
+        val app = context.applicationContext
+        return preferForegroundForOverlay(
+            usagePkg = resolveViaUsageStats(app),
+            tasksPkg = resolveViaRunningTasks(app),
+            procsPkg = topPackageFromProcesses(app)
+        )
     }
 
     private fun resolveViaUsageStats(context: Context): String? {

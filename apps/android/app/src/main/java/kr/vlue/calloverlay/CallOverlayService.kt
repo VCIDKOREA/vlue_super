@@ -455,12 +455,8 @@ class CallOverlayService : Service() {
         }
 
         /*
-         * BigPush SoT = 홈 쇼케이스 바와 동일 정보 구조 (BigPushShowcaseBar = LetteringIncomingNotification
-         * 수신자 크롬: ceo Showcase · VCID KOREA · 이름 · 번호 · ▾, 통화화면/설정 없음).
-         * Showcase FULLSCREEN 만 WebView LetteringOverlayHost.
-         */
-        /*
-         * ▾ / △ 제거. 바 아무 곳 탭 → Showcase 오픈 (드래그와 구분).
+         * BigPush SoT = Web LetteringIncomingNotification(home-glass) — 앱 홈 쇼케이스바와 동일.
+         * Native BigPushShowcaseBar 는 생성만 하고 항상 GONE (임의 UI 송출 금지).
          */
         val banner = BigPushShowcaseBar.create(
             context = this,
@@ -480,12 +476,7 @@ class CallOverlayService : Service() {
             topMargin = dp(0)
             bottomMargin = dp(4)
         }
-        if (asBigPush) {
-            banner.visibility = android.view.View.VISIBLE
-            attachBigPushDragGestures(banner)
-        } else {
-            banner.visibility = android.view.View.GONE
-        }
+        banner.visibility = android.view.View.GONE
         container.addView(banner, bannerLp)
 
         val wv = WebView(this)
@@ -501,9 +492,10 @@ class CallOverlayService : Service() {
         }
         wv.setBackgroundColor(Color.TRANSPARENT)
         wv.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-        wv.visibility = if (asBigPush) android.view.View.GONE else android.view.View.VISIBLE
+        /* BigPush도 앱 쇼케이스바(Web) — Native 바 숨김 */
+        wv.visibility = android.view.View.VISIBLE
         if (asBigPush) {
-            /* drag already on banner */
+            attachBigPushDragGestures(wv)
         }
         wv.webChromeClient = object : android.webkit.WebChromeClient() {
             override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
@@ -797,11 +789,16 @@ class CallOverlayService : Service() {
     private fun syncOverlayChromeForState(source: String) {
         when (companion.state) {
             OverlayState.BIG_PUSH -> {
-                /* 홈 쇼케이스 바와 동일 Native 바 (수신자: 통화화면/설정 없음) */
-                nativeBanner?.visibility = android.view.View.VISIBLE
-                webView?.visibility = android.view.View.GONE
+                /*
+                 * 앱 홈 쇼케이스바와 동일 — WebView LetteringIncomingNotification(home-glass).
+                 * Native BigPushShowcaseBar 는 사용하지 않음 (임의 UI 금지).
+                 */
+                nativeBanner?.visibility = android.view.View.GONE
+                webView?.visibility = android.view.View.VISIBLE
                 rootContainer?.setBackgroundColor(Color.TRANSPARENT)
+                webView?.setBackgroundColor(Color.TRANSPARENT)
                 applyCapsuleClip(rootContainer, enabled = false)
+                notifyWebCallState("big_push_bar")
             }
             OverlayState.SHOWCASE -> {
                 nativeBanner?.visibility = android.view.View.GONE
@@ -951,21 +948,12 @@ class CallOverlayService : Service() {
         val systemUi =
             !sysFg.isNullOrBlank() && sysFg.contains("systemui", ignoreCase = true)
         /*
-         * 홈+삼성 수신 HUN: top package 가 SystemUI 인 경우가 많음 → 하단 BigPush.
-         * 전체 InCallUI 가 전면일 때만 TOP.
+         * InCallUI「프로세스만」살아 있어도 홈+HUN 을 TOP 으로 올리지 않음.
+         * top package 가 실제 InCallUI/다이얼러일 때만 TOP.
          */
         val inCallUi =
             OverlayContextDetector.isLikelyInCallUiPackage(sysFg) ||
-                (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone) ||
-                (OverlayContextDetector.isLikelyInCallUiPackage(fgHint) && !systemUi) ||
-                (phase == OverlayContextDetector.CallPhase.RINGING &&
-                    ForegroundPackageProbe.isInCallUiProcessRunning(this) &&
-                    !launcher &&
-                    !systemUi &&
-                    sysFg.isNullOrBlank()) ||
-                (phase == OverlayContextDetector.CallPhase.OFFHOOK &&
-                    ForegroundPackageProbe.isInCallUiProcessRunning(this) &&
-                    sysFg.isNullOrBlank())
+                (OverlayContextDetector.isLikelyInCallUiPackage(activity) && !pausedOrGone)
         val homeLike = launcher || (systemUi && !inCallUi)
         return OverlayContextDetector.detect(
             callPhase = phase,
@@ -1240,12 +1228,12 @@ class CallOverlayService : Service() {
             nativeBanner?.visibility = android.view.View.GONE
             view.setBackgroundColor(Color.TRANSPARENT)
             webView?.setBackgroundColor(Color.TRANSPARENT)
-            /* CSS 타원 테두리 — native capsule clip 은 테두리를 직선으로 자름 */
-            applyCapsuleClip(view, enabled = false)
+            applyCapsuleClip(view, enabled = true)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
                     wm.updateViewLayout(view, params)
                 }
+                view.post { applyCapsuleClip(view, enabled = true) }
             } catch (_: Exception) {
             }
         }
@@ -1347,12 +1335,13 @@ class CallOverlayService : Service() {
             webView?.visibility = android.view.View.VISIBLE
             view.setBackgroundColor(Color.TRANSPARENT)
             webView?.setBackgroundColor(Color.TRANSPARENT)
-            applyCapsuleClip(view, enabled = false)
             applyPassThroughTouchFlags(params)
+            applyCapsuleClip(view, enabled = true)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
                     wm.updateViewLayout(view, params)
                 }
+                view.post { applyCapsuleClip(view, enabled = true) }
                 OverlayDiagTracker.markLayoutApplied("MINI_CASE", OverlayPosition.MINI_CASE.name)
                 VlueBigPushTrace.milestone(
                     "OVERLAY_ATTACHED",
@@ -1509,6 +1498,11 @@ class CallOverlayService : Service() {
         applyCapsuleClip(rootContainer, enabled = false)
         rootContainer?.setBackgroundColor(Color.TRANSPARENT)
         webView?.setBackgroundColor(Color.TRANSPARENT)
+        VlueBigPushTrace.lifecycle(
+            "COMPACT_RINGING_LAYOUT",
+            "pos=${pos.name} y=${params.y} h=$barH sh=$sh " +
+                "ctx=${companion.context.name} state=${companion.state.name}"
+        )
     }
 
     /**
@@ -1869,7 +1863,7 @@ class CallOverlayService : Service() {
                 publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
                 syncOverlayChromeForState(source = "reeval:$source:bottomBar")
                 applyLayoutFromController(source = "reeval:$source:bottomBar")
-                notifyWebCallState("minimize_showcase")
+                notifyWebCallState("big_push_bar")
                 CompanionRuntimeStabilityDiag.mark(
                     "HOME_CONTEXT_REEVAL",
                     source,
@@ -1893,6 +1887,9 @@ class CallOverlayService : Service() {
         if (companion.state != prevState || companion.position != prevPos) {
             publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
             applyLayoutFromController(source = "reeval:$source")
+            if (companion.state == OverlayState.BIG_PUSH) {
+                notifyWebCallState("big_push_bar")
+            }
             CompanionRuntimeStabilityDiag.mark(
                 "HOME_CONTEXT_REEVAL",
                 source,

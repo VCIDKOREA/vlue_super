@@ -52,10 +52,19 @@ function asDate(v: unknown): Date | null {
   return null;
 }
 
-function asJson(v: unknown): Prisma.InputJsonValue | undefined {
+function asJson(v: unknown, maxChars = 4_000): Prisma.InputJsonValue | undefined {
   if (v == null) return undefined;
-  if (typeof v === "object") return v as Prisma.InputJsonValue;
-  return undefined;
+  if (typeof v !== "object") return undefined;
+  try {
+    const s = JSON.stringify(v);
+    if (s.length <= maxChars) return v as Prisma.InputJsonValue;
+    return {
+      _truncated: true,
+      preview: s.slice(0, maxChars)
+    } as Prisma.InputJsonValue;
+  } catch {
+    return undefined;
+  }
 }
 
 export type UpsertSessionInput = {
@@ -243,7 +252,7 @@ export async function ingestDiagnosticEvents(
           elapsedMs,
           reason: reason ?? undefined,
           exceptionMessage: asStr(ev.exceptionMessage, 4000) ?? undefined,
-          exceptionStack: asStr(ev.exceptionStack, 20000) ?? undefined,
+          exceptionStack: asStr(ev.exceptionStack, 800) ?? undefined,
           exceptionFn: asStr(ev.exceptionFn, 160) ?? undefined,
           exceptionLine: asInt(ev.exceptionLine) ?? undefined,
           payloadJson: payload
@@ -255,7 +264,7 @@ export async function ingestDiagnosticEvents(
           elapsedMs,
           reason: reason ?? undefined,
           exceptionMessage: asStr(ev.exceptionMessage, 4000) ?? undefined,
-          exceptionStack: asStr(ev.exceptionStack, 20000) ?? undefined,
+          exceptionStack: asStr(ev.exceptionStack, 800) ?? undefined,
           exceptionFn: asStr(ev.exceptionFn, 160) ?? undefined,
           exceptionLine: asInt(ev.exceptionLine) ?? undefined,
           payloadJson: payload

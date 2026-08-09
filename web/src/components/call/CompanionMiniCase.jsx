@@ -159,12 +159,18 @@ export default function CompanionMiniCase({
         !el.classList.contains("is-peek-right") &&
         !el.classList.contains("is-peek-left")
       ) {
-        const cardEl = el.querySelector(".companion-mini-case__card") || el;
-        const w = Math.max(160, Math.round(cardEl.offsetWidth || DEFAULT_CARD_W));
-        /* 카드 + 외부 SHOWCASE 열기 힌트까지 네이티브 창 높이 */
-        const h = Math.max(96, Math.round(el.offsetHeight || DEFAULT_CARD_H));
-        cardSizeRef.current = { w, h };
-        setCardSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+        /*
+         * 외곽 .companion-mini-case(패딩 포함)를 측정.
+         * 예전: __card 만 측정 → 네이티브 창이 더 좁아 우측 잘림·사각 잔상.
+         */
+        const w = Math.max(160, Math.round(el.offsetWidth || DEFAULT_CARD_W));
+        const h = Math.max(72, Math.round(el.offsetHeight || DEFAULT_CARD_H));
+        /* 1px AA / clip 여유 */
+        const pad = 2;
+        cardSizeRef.current = { w: w + pad, h: h + pad };
+        setCardSize((prev) =>
+          prev.w === w + pad && prev.h === h + pad ? prev : { w: w + pad, h: h + pad }
+        );
       }
       const base = sessionMiniCasePos || posRef.current;
       const cw = cardSizeRef.current.w;
@@ -342,16 +348,6 @@ export default function CompanionMiniCase({
               <span className="companion-mini-case__phone">{phoneLabel || "—"}</span>
             </p>
           </div>
-          <button
-            type="button"
-            className="companion-mini-case__expand-hint"
-            onClick={(e) => {
-              e.stopPropagation();
-              onExpand?.();
-            }}
-          >
-            ▼ SHOWCASE 열기
-          </button>
         </>
       )}
     </div>

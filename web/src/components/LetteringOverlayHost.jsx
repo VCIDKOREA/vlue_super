@@ -66,6 +66,8 @@ function LetteringOverlayHostInner() {
   );
   const [showcaseStyle, setShowcaseStyle] = useState(() => createDefaultShowcaseStyle());
   const [expanded, setExpanded] = useState(() => normalizeCallState(phase) === CALL_STATES.CONNECTED);
+  /* Native BIG_PUSH 창 — 앱 쇼케이스바(접힘) 강제. MiniCase 금지 */
+  const [forceShowcaseBar, setForceShowcaseBar] = useState(true);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -329,6 +331,23 @@ function LetteringOverlayHostInner() {
   useEffect(() => {
     const onNativeCall = (e) => {
       const rawState = String(e?.detail?.state || e?.detail?.callState || "");
+      /*
+       * big_push_bar / minimize / restore 는 CallState 가 아님.
+       * normalizeCallState("") → early-return 되면 하단 바가 풀쇼케이스/미니로 남음.
+       */
+      if (rawState === "big_push_bar") {
+        setForceShowcaseBar(true);
+        setExpanded(false);
+      } else if (
+        rawState === "minimize_showcase" ||
+        rawState === "reveal_system_call_ui"
+      ) {
+        setForceShowcaseBar(false);
+        setExpanded(false);
+      } else if (rawState === "restore_showcase") {
+        setForceShowcaseBar(false);
+        setExpanded(true);
+      }
       const next = normalizeCallState(rawState);
       if (next) {
         setCallState(next);
@@ -338,20 +357,13 @@ function LetteringOverlayHostInner() {
            * OverlayState(SHOWCASE)는 Native ANSWER/OFFHOOK/ACTIVE → Controller.onAnswer 단일 책임.
            * restoreShowcaseOverlay는 사용자 Mini→Showcase 명시 요청에서만 호출.
            */
+          setForceShowcaseBar(false);
           setExpanded(true);
         }
         if (next === CALL_STATES.RINGING) {
-          /* BigPush layout은 Native Controller 책임 — JS가 compact 강제하지 않음 */
+          /* BigPush = 앱 쇼케이스바 */
+          setForceShowcaseBar(true);
           setExpanded(false);
-        }
-        if (
-          rawState === "minimize_showcase" ||
-          rawState === "reveal_system_call_ui"
-        ) {
-          setExpanded(false);
-        }
-        if (rawState === "restore_showcase") {
-          setExpanded(true);
         }
       }
       /* 시스템 전화 종료 — End 버튼 없이도 통화목록에 기록 */
@@ -542,10 +554,11 @@ function LetteringOverlayHostInner() {
           incomingNumber={incoming}
           card={styledCard || undefined}
           expanded={expanded}
+          forceShowcaseBar={forceShowcaseBar}
           onExpandedChange={(next) => {
             setExpanded(next);
-            /* 링잉 BigPush 바 탭으로도 Showcase 펼침 허용 */
             if (next) {
+              setForceShowcaseBar(false);
               try {
                 window.VlueLettering?.restoreShowcaseOverlay?.();
                 window.Android?.restoreShowcaseOverlay?.();

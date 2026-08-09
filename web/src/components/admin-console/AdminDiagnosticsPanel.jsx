@@ -150,7 +150,7 @@ export default function AdminDiagnosticsPanel({ onToast }) {
     const t = window.setInterval(() => {
       void loadList();
       if (selectedId) void loadDetail(selectedId);
-    }, 4000);
+    }, 30000);
     return () => window.clearInterval(t);
   }, [loadList, loadDetail, selectedId]);
 

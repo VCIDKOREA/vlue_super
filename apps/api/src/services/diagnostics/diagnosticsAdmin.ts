@@ -1,6 +1,17 @@
 import { prisma } from "../../db/client.js";
 import { suggestedFixHint } from "./diagnosticsHints.js";
 
+function truncatePayload(raw: unknown): unknown {
+  if (raw == null) return null;
+  try {
+    const s = JSON.stringify(raw);
+    if (s.length <= 2_000) return raw;
+    return { _truncated: true, preview: s.slice(0, 2_000) };
+  } catch {
+    return null;
+  }
+}
+
 export async function listDiagnosticSessions(opts: {
   feature?: string;
   status?: string;
@@ -56,21 +67,92 @@ export async function listDiagnosticSessions(opts: {
 export async function getDiagnosticSessionDetail(id: string) {
   const session = await prisma.diagnosticSession.findUnique({
     where: { id },
-    include: {
-      events: { orderBy: [{ elapsedMs: "asc" }, { seq: "asc" }] }
+    select: {
+      id: true,
+      feature: true,
+      sessionKey: true,
+      status: true,
+      startedAt: true,
+      endedAt: true,
+      deviceModel: true,
+      androidVersion: true,
+      appVersion: true,
+      deviceId: true,
+      userId: true,
+      phoneMasked: true,
+      lastStep: true,
+      failStep: true,
+      failReason: true,
+      overlayStateJson: true,
+      metaJson: true
     }
   });
   if (!session) return null;
 
-  const lastOkStep = session.events
-    .filter((e) => e.ok === true)
-    .reduce((m, e) => Math.max(m, e.seq), 0);
+  /*
+   * payload/stack 전문 SELECT 금지 — Shared Pooler egress.
+   * DB에서 left() 로 잘라 읽는다 (Node slim 은 pooler 바이트를 줄이지 못함).
+   */
+  const rawEvents = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      seq: number;
+      code: string;
+      label: string;
+      ok: boolean | null;
+      timestamp: Date;
+      elapsed_ms: number;
+      reason: string | null;
+      exception_message: string | null;
+      exception_stack: string | null;
+      exception_fn: string | null;
+      exception_line: number | null;
+      payload_preview: string | null;
+    }>
+  >`
+    SELECT
+      id::text AS id,
+      seq,
+      code,
+      label,
+      ok,
+      timestamp,
+      elapsed_ms,
+      reason,
+      exception_message,
+      CASE
+        WHEN exception_stack IS NULL THEN NULL
+        ELSE left(exception_stack, 800)
+      END AS exception_stack,
+      exception_fn,
+      exception_line,
+      CASE
+        WHEN payload_json IS NULL THEN NULL
+        WHEN octet_length(payload_json::text) <= 2000 THEN payload_json::text
+        ELSE left(payload_json::text, 2000)
+      END AS payload_preview
+    FROM diagnostic_events
+    WHERE session_id = ${id}::uuid
+    ORDER BY elapsed_ms ASC, seq ASC
+  `;
 
-  const events = session.events.map((e) => {
-    const payload =
-      e.payloadJson && typeof e.payloadJson === "object" && !Array.isArray(e.payloadJson)
-        ? (e.payloadJson as Record<string, unknown>)
-        : {};
+  const events = rawEvents.map((e) => {
+    let payload: Record<string, unknown> = {};
+    let payloadJson: unknown = null;
+    if (e.payload_preview) {
+      try {
+        const parsed = JSON.parse(e.payload_preview);
+        payloadJson =
+          e.payload_preview.length >= 2000
+            ? { _truncated: true, preview: e.payload_preview }
+            : parsed;
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          payload = parsed as Record<string, unknown>;
+        }
+      } catch {
+        payloadJson = { _truncated: true, preview: e.payload_preview };
+      }
+    }
     return {
       id: e.id,
       seq: e.seq,
@@ -78,7 +160,7 @@ export async function getDiagnosticSessionDetail(id: string) {
       label: e.label,
       ok: e.ok,
       timestamp: e.timestamp.toISOString(),
-      elapsedMs: e.elapsedMs,
+      elapsedMs: e.elapsed_ms,
       deltaFromPrevMs:
         typeof payload.deltaFromPrevMs === "number"
           ? payload.deltaFromPrevMs
@@ -89,13 +171,17 @@ export async function getDiagnosticSessionDetail(id: string) {
       elapsedRealtimeNanos:
         typeof payload.elapsedRealtimeNanos === "number" ? payload.elapsedRealtimeNanos : null,
       reason: e.reason,
-      exceptionMessage: e.exceptionMessage,
-      exceptionStack: e.exceptionStack,
-      exceptionFn: e.exceptionFn,
-      exceptionLine: e.exceptionLine,
-      payloadJson: e.payloadJson
+      exceptionMessage: e.exception_message,
+      exceptionStack: e.exception_stack,
+      exceptionFn: e.exception_fn,
+      exceptionLine: e.exception_line,
+      payloadJson
     };
   });
+
+  const lastOkStep = events
+    .filter((e) => e.ok === true)
+    .reduce((m, e) => Math.max(m, e.seq), 0);
 
   /* 실제 발생 시각 기준 정렬 */
   events.sort((a, b) => {
@@ -130,8 +216,8 @@ export async function getDiagnosticSessionDetail(id: string) {
       lastStep: session.lastStep,
       failStep: session.failStep,
       failReason: session.failReason,
-      overlayStateJson: session.overlayStateJson,
-      metaJson: session.metaJson,
+      overlayStateJson: truncatePayload(session.overlayStateJson),
+      metaJson: truncatePayload(session.metaJson),
       lastOkStep,
       suggestedFixHint: suggestedFixHint(session.feature, session.failStep),
       perf,
