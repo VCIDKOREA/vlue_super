@@ -391,6 +391,20 @@ class CallOverlayService : Service() {
                 asBigPush = true
             )
         }
+        /*
+         * InCallUI 액티비티 FOREGROUND 전환이 감지보다 늦을 수 있음.
+         * 짧은 재평가로 전체 UI→TOP / 다른앱→BOTTOM 을 분리 보정.
+         */
+        mainHandler.postDelayed({
+            if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
+                reevaluateForegroundContext("bigPush_settle_400")
+            }
+        }, 400L)
+        mainHandler.postDelayed({
+            if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
+                reevaluateForegroundContext("bigPush_settle_1200")
+            }
+        }, 1_200L)
     }
 
     /**
@@ -957,15 +971,19 @@ class CallOverlayService : Service() {
 
         /* RINGING: 전체 UI vs 홈·다른앱 분리를 classifyRingingSurface 에 위임 */
         if (phase == OverlayContextDetector.CallPhase.RINGING) {
-            val surface = ForegroundPackageProbe.classifyRingingSurface(this, ourApp)
+            val hints = ForegroundPackageProbe.processImportanceHints(this)
+            val tasksPkg = ForegroundPackageProbe.runningTaskPackage(this)
+            val surface = ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = tasksPkg,
+                inCallImportance = hints.inCallImportance,
+                otherForegroundPackages = hints.otherForegroundPackages,
+                ourApp = ourApp
+            )
             val ctx = when (surface) {
                 ForegroundPackageProbe.RingingSurface.FULL_INCALL ->
                     OverlayContext.INCOMING_CALL_UI
                 ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER ->
-                    if (ourApp || OverlayContextDetector.isLikelyLauncherPackage(
-                            ForegroundPackageProbe.runningTaskPackage(this)
-                        )
-                    ) {
+                    if (ourApp || OverlayContextDetector.isLikelyLauncherPackage(tasksPkg)) {
                         OverlayContext.HOME_SCREEN
                     } else {
                         OverlayContext.OTHER_APP
@@ -974,7 +992,8 @@ class CallOverlayService : Service() {
             VlueBigPushTrace.lifecycle(
                 "OVERLAY_CONTEXT",
                 "phase=RINGING surface=$surface ctx=${ctx.name} ourApp=$ourApp " +
-                    "tasks=${ForegroundPackageProbe.runningTaskPackage(this)}"
+                    "tasks=$tasksPkg inCallImp=${hints.inCallImportance} " +
+                    "otherFg=${hints.otherForegroundPackages.joinToString(",")}"
             )
             return ctx
         }
