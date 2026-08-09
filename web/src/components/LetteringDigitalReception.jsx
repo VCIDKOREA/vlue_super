@@ -561,7 +561,7 @@ function FrontPanel({
 
   return (
     <div className={`ldr-panel ldr-panel--front${embeddedInPush ? " ldr-panel--push" : ""}`}>
-      {/* 대형 VLUE 눈 워터마크는 연락처(이메일·웹)를 가림 — 통화/푸시 송출에서는 생략 */}
+      {embeddedInPush ? <CompanyLogoWatermark card={card} /> : null}
       {embeddedInPush ? null : <ProfileHero card={card} verified={verified} />}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
       <div className={`ldr-back-head${card.photoUrl && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
@@ -777,6 +777,7 @@ function BackPanel({
 
   return (
     <div className={`ldr-panel ldr-panel--back${embeddedInPush ? " ldr-panel--push" : ""}`}>
+      {embeddedInPush ? <CompanyLogoWatermark card={card} /> : null}
       <div className="ldr-contact-extra ldr-contact-extra--back-only">
         <p className="ldr-contact-extra__label">추가 설명</p>
         <p
