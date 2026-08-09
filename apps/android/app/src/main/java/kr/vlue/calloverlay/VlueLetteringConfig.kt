@@ -32,8 +32,10 @@ object VlueLetteringConfig {
         val enc = java.net.URLEncoder.encode(phone, "UTF-8")
         val dir = if (outgoing) "outgoing" else "incoming"
         val ver = if (verified) "1" else "0"
+        /* 웹 배포 해시가 바뀌어도 WebView 가 옛 번들을 붙잡지 않게 */
+        val bust = BuildConfig.VERSION_CODE
         return appUrl(
-            "lettering-overlay?incoming=$enc&platform=android&direction=$dir&verified=$ver&native=1&forceLettering=1"
+            "lettering-overlay?incoming=$enc&platform=android&direction=$dir&verified=$ver&native=1&forceLettering=1&_ov=$bust"
         )
     }
 }

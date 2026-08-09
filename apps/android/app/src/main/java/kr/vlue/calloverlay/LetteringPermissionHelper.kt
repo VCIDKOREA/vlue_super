@@ -183,6 +183,10 @@ object LetteringPermissionHelper {
         o.put("overlaySamsungCallRestrictLikely", isLikelySamsungCallOverlayRestricted(context))
         o.put("callDetect", hasCallDetectPermissions(context))
         o.put("callOverlayReady", hasCallOverlayReady(context))
+        o.put(
+            "usageAccess",
+            kr.vlue.calloverlay.companion.UsageAccessHelper.hasAccess(context)
+        )
         o.put("allRuntime", hasCallDetectPermissions(context))
         o.put("letteringEnabled", LetteringPrefs.isLetteringEnabled(context))
         o.put("defaultDialer", kr.vlue.calloverlay.incall.DialerRoleHelper.isDefaultDialer(context))
@@ -210,6 +214,12 @@ object LetteringPermissionHelper {
             Uri.parse("package:${activity.packageName}")
         )
         activity.startActivity(intent)
+    }
+
+    fun openUsageAccessSettings(activity: Activity) {
+        activity.startActivity(
+            kr.vlue.calloverlay.companion.UsageAccessHelper.settingsIntent(activity)
+        )
     }
 
     fun openAppSettings(activity: Activity) {

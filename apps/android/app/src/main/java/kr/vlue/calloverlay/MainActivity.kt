@@ -747,6 +747,15 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             LetteringPermissionHelper.openOverlaySettings(this)
             return
         }
+        if (!kr.vlue.calloverlay.companion.UsageAccessHelper.hasAccess(this)) {
+            Toast.makeText(
+                this,
+                "전체 수신 UI 상단 배치를 위해「사용 정보 접근」허용이 필요합니다.",
+                Toast.LENGTH_LONG
+            ).show()
+            LetteringPermissionHelper.openUsageAccessSettings(this)
+            return
+        }
         LetteringPrefs.setLetteringEnabled(this, true)
     }
 
@@ -770,6 +779,13 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 Toast.makeText(this, "통화 권한이 허용되었습니다. 레터링이 켜집니다.", Toast.LENGTH_SHORT).show()
                 if (!LetteringPermissionHelper.canDrawOverlays(this)) {
                     LetteringPermissionHelper.openOverlaySettings(this)
+                } else if (!kr.vlue.calloverlay.companion.UsageAccessHelper.hasAccess(this)) {
+                    Toast.makeText(
+                        this,
+                        "전체 수신 UI 상단 배치를 위해「사용 정보 접근」허용이 필요합니다.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    LetteringPermissionHelper.openUsageAccessSettings(this)
                 }
             } else {
                 Toast.makeText(this, "전화·통화기록 권한이 필요합니다. 설정에서 허용해 주세요.", Toast.LENGTH_LONG).show()

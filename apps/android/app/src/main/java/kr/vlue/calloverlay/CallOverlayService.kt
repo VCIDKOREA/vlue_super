@@ -42,6 +42,7 @@ import kr.vlue.calloverlay.companion.OverlayState
 import kr.vlue.calloverlay.companion.OverlayTriggerEvent
 import kr.vlue.calloverlay.companion.ScreenState
 import kr.vlue.calloverlay.companion.ScreenStateDetector
+import kr.vlue.calloverlay.companion.UsageAccessHelper
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
 import kr.vlue.calloverlay.diagnostics.CompanionRuntimeStabilityDiag
 import kr.vlue.calloverlay.diagnostics.DiagnosticsFeature
@@ -506,14 +507,19 @@ class CallOverlayService : Service() {
         wv.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            cacheMode = WebSettings.LOAD_DEFAULT
+            /* 오버레이 CSS/JS 캐시로 미니케이스·바가 옛 스타일로 남는 것 방지 */
+            cacheMode = WebSettings.LOAD_NO_CACHE
             val ua = userAgentString.orEmpty()
             if (!ua.contains(VlueLetteringConfig.ANDROID_APP_UA_TOKEN)) {
                 userAgentString = "$ua ${VlueLetteringConfig.ANDROID_APP_UA_TOKEN}"
             }
         }
         wv.setBackgroundColor(Color.TRANSPARENT)
-        wv.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+        /*
+         * HARDWARE 레이어는 반투명 라운드 보더를 좌측에서 잘라 먹는 경우가 많음 (MiniCase 증상).
+         * NONE 이면 테두리 유지.
+         */
+        wv.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
         /* BigPush도 앱 쇼케이스바(Web) — Native 바 숨김 */
         wv.visibility = android.view.View.VISIBLE
         if (asBigPush) {
@@ -1002,9 +1008,16 @@ class CallOverlayService : Service() {
             val detail =
                 "phase=RINGING surface=$surface ctx=${ctx.name} ourApp=$ourApp " +
                     "resumed=$resumedPkg tasks=$tasksPkg inCallImp=${hints.inCallImportance} " +
-                    "otherFg=${hints.otherForegroundPackages.joinToString(",")}"
+                    "otherFg=${hints.otherForegroundPackages.joinToString(",")} " +
+                    "usageAccess=${UsageAccessHelper.hasAccess(this)}"
             /* Diagnostics 세션 없어도 반드시 남김 — TOP/BOTTOM 원인 추적 */
             android.util.Log.i("VlueOverlayCtx", detail)
+            if (!UsageAccessHelper.hasAccess(this)) {
+                android.util.Log.w(
+                    "VlueOverlayCtx",
+                    "PACKAGE_USAGE_STATS denied — cannot detect InCallActivity resume; BigPush stays BOTTOM"
+                )
+            }
             VlueBigPushTrace.lifecycle("OVERLAY_CONTEXT", detail)
             return ctx
         }
