@@ -238,10 +238,21 @@ function LetteringOverlayHostInner() {
             const exp = data.cardExport && typeof data.cardExport === "object" ? data.cardExport : null;
             const photo =
               String(exp?.photoUrl || data.photoUrl || data.profile?.photoUrl || "").trim();
+            const profileEmail = String(data.profile?.email || "").trim();
             nextCard = {
               ...nextCard,
+              name:
+                String(nextCard?.name || nextCard?.displayName || "").trim() ||
+                String(exp?.name || "").trim() ||
+                String(data.profile?.legalName || data.profile?.name || "").trim(),
+              displayName:
+                String(nextCard?.displayName || nextCard?.name || "").trim() ||
+                String(exp?.name || "").trim(),
               photoUrl: String(nextCard?.photoUrl || "").trim() || photo || "",
-              email: String(nextCard?.email || "").trim() || String(exp?.email || "").trim(),
+              email:
+                String(nextCard?.email || "").trim() ||
+                String(exp?.email || "").trim() ||
+                profileEmail,
               website: String(nextCard?.website || "").trim() || String(exp?.website || "").trim(),
               fax: String(nextCard?.fax || "").trim() || String(exp?.fax || "").trim(),
               address: String(nextCard?.address || "").trim() || String(exp?.address || "").trim(),
@@ -252,6 +263,9 @@ function LetteringOverlayHostInner() {
               department:
                 String(nextCard?.department || "").trim() || String(exp?.department || "").trim(),
               logoUrl: String(nextCard?.logoUrl || "").trim() || String(exp?.logoUrl || "").trim(),
+              publicHandle:
+                String(nextCard?.publicHandle || nextCard?.loginId || "").trim() ||
+                String(data.profile?.publicHandle || "").trim(),
               membershipTier: data.membershipTier || nextCard.membershipTier || "paid"
             };
           }
@@ -368,7 +382,9 @@ function LetteringOverlayHostInner() {
     if (!card) return null;
     return applyShowcaseStyleToCard(
       { ...card, showcaseStyle: card.showcaseStyle || showcaseStyle },
-      membershipTier
+      membershipTier,
+      /* 통화 오버레이 = 상대 명함 — scrub/내 고정신원으로 이메일·상호를 지우지 않음 */
+      { peerMode: true, skipFixedIdentity: true }
     );
   }, [card, showcaseStyle, membershipTier]);
 

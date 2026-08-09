@@ -568,6 +568,7 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
       legalName: true,
       phoneE164: true,
       publicHandle: true,
+      email: true,
       status: true,
       businessProfile: { select: { companyName: true, jobTitle: true } },
       digitalCard: {
@@ -654,7 +655,7 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
         organization: String(s.organization || s.company_name || "").trim(),
         title: String(s.title || "").trim(),
         department: String(s.department || "").trim(),
-        email: String(s.email || "").trim(),
+        email: String(s.email || user.email || "").trim(),
         website: String(s.website || "").trim(),
         fax: String(s.fax || "").trim(),
         address: String(s.address || "").trim(),
@@ -669,6 +670,7 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
     userId: targetUserId,
     profile: {
       ...masked,
+      email: String(s?.email || user.email || "").trim() || undefined,
       photoUrl: photoUrl || undefined,
       membershipTier: user.digitalCard?.membershipTierSnapshot || undefined
     },

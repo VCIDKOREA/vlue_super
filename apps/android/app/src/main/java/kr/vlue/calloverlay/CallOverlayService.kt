@@ -1218,11 +1218,6 @@ class CallOverlayService : Service() {
             val maxY = sh - keep
             params.width = w
             params.height = h
-            /* JS 프레임보다 살짝 크게 — inset 테두리 clip 여유 */
-            if (wPx > 0 && hPx > 0) {
-                params.width = (w + dp(6)).coerceAtMost(sw)
-                params.height = (h + dp(6)).coerceAtMost(sh)
-            }
             params.x = xPx.coerceIn(minX, maxX)
             params.y = yPx.coerceIn(minY, maxY)
             params.gravity = Gravity.TOP or Gravity.START
@@ -1231,11 +1226,12 @@ class CallOverlayService : Service() {
             nativeBanner?.visibility = android.view.View.GONE
             view.setBackgroundColor(Color.TRANSPARENT)
             webView?.setBackgroundColor(Color.TRANSPARENT)
+            /* CSS 타원 테두리 — native capsule clip 은 테두리를 직선으로 자름 */
+            applyCapsuleClip(view, enabled = false)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
                     wm.updateViewLayout(view, params)
                 }
-                view.post { applyCapsuleClip(view, enabled = true) }
             } catch (_: Exception) {
             }
         }
@@ -1323,13 +1319,12 @@ class CallOverlayService : Service() {
             userMinimized = true
             val (sw, _) = screenSizePx()
             val w = (sw * 0.86f).toInt().coerceIn(dp(240), sw - dp(16))
-            /* 타원 MiniCase 전체(힌트 포함) — WebView 각진 배경 금지 */
+            /* 타원 MiniCase 전체(힌트 포함) — WebView 투명, 형태는 CSS */
             val h = dp(148)
             val x = ((sw - w) / 2).coerceAtLeast(dp(8))
             val y = (statusBarHeightPx() + dp(48)).coerceAtLeast(dp(72))
-            /* +6dp: inset 테두리·margin 이 clip 에 안 잘리게 */
-            params.width = w + dp(6)
-            params.height = h + dp(6)
+            params.width = w
+            params.height = h
             params.x = x
             params.y = y
             params.gravity = Gravity.TOP or Gravity.START
@@ -1338,13 +1333,12 @@ class CallOverlayService : Service() {
             webView?.visibility = android.view.View.VISIBLE
             view.setBackgroundColor(Color.TRANSPARENT)
             webView?.setBackgroundColor(Color.TRANSPARENT)
+            applyCapsuleClip(view, enabled = false)
             applyPassThroughTouchFlags(params)
             try {
                 CompanionPerfTracker.measureUpdateViewLayout {
                     wm.updateViewLayout(view, params)
                 }
-                /* 레이아웃 반영 후 캡슐 클립 — 사각 WebView 모서리 제거 */
-                view.post { applyCapsuleClip(view, enabled = true) }
                 OverlayDiagTracker.markLayoutApplied("MINI_CASE", OverlayPosition.MINI_CASE.name)
                 VlueBigPushTrace.milestone(
                     "OVERLAY_ATTACHED",

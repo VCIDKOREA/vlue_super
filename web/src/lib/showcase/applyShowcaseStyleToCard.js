@@ -10,17 +10,26 @@ export function applyShowcaseStyleToCard(card, membershipTier = "free", opts = {
     opts.style ||
     (card?.showcaseStyle && typeof card.showcaseStyle === "object" ? card.showcaseStyle : null) ||
     (peerMode ? null : readActiveShowcaseStyle());
+
+  /*
+   * 통화 오버레이·피어 명함: 상대 DB 값을 그대로 송출.
+   * scrub/고정신원 병합 금지 — ceo@vlue.kr·VCID KOREA 가 「데모 오염」으로 지워지는 사고 방지.
+   */
+  if (peerMode) {
+    return {
+      ...card,
+      ...(style ? { showcaseStyle: style } : {}),
+      membershipTier,
+      hideBroadcastName: false
+    };
+  }
+
   const merged = scrubLetteringDemoPollution({
     ...card,
     ...(style ? { showcaseStyle: style } : {}),
     membershipTier
   });
   const digitalActive = opts.digitalCardActive ?? readDigitalCardActive();
-
-  /* 검색·팔로우 피어 미리보기 — 내 명함/고정 신원으로 덮지 않음 */
-  if (peerMode) {
-    return { ...merged, hideBroadcastName: false };
-  }
 
   if (digitalActive) {
     const fixed = readLetteringFixedIdentity();
@@ -34,7 +43,7 @@ export function applyShowcaseStyleToCard(card, membershipTier = "free", opts = {
   }
 
   /* 디지털인증명함 미사용 — VLUE 이름/상호 송출 OFF. 상대 전화부 저장 이름은 수신측에서 별도 표시 */
-  if (style.showBroadcastName === false) {
+  if (style?.showBroadcastName === false) {
     return {
       ...merged,
       hideBroadcastName: true,

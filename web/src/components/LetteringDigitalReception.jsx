@@ -524,8 +524,8 @@ function FrontPanel({
   const website = formatWebsite(card.website);
   const emailRaw = String(card.email || "").trim();
   const email = emailRaw ? formatLetteringContactEmailDisplay(emailRaw) : "";
-  /* 이메일만 필수 — 미입력 시 짧은 안내. 주소·웹·팩스는 값 있을 때만 표기 */
-  const emailValue = email || VLUE_PREVIEW_EMAIL_PLACEHOLDER;
+  /* 통화 송출(피어): 빈 이메일은 숨김. 미리보기 편집만 플레이스홀더 */
+  const emailValue = email || (embeddedInPush ? "" : VLUE_PREVIEW_EMAIL_PLACEHOLDER);
   const addressRaw = String(card.address || "").trim();
   const intro = String(card.companyIntro || card.salesContent || "").trim();
   const validityFromItems = (verificationItems || [])
@@ -561,7 +561,7 @@ function FrontPanel({
 
   return (
     <div className={`ldr-panel ldr-panel--front${embeddedInPush ? " ldr-panel--push" : ""}`}>
-      {embeddedInPush ? <CompanyLogoWatermark card={card} /> : null}
+      {/* 대형 VLUE 눈 워터마크는 연락처(이메일·웹)를 가림 — 통화/푸시 송출에서는 생략 */}
       {embeddedInPush ? null : <ProfileHero card={card} verified={verified} />}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
       <div className={`ldr-back-head${card.photoUrl && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
@@ -777,7 +777,6 @@ function BackPanel({
 
   return (
     <div className={`ldr-panel ldr-panel--back${embeddedInPush ? " ldr-panel--push" : ""}`}>
-      {embeddedInPush ? <CompanyLogoWatermark card={card} /> : null}
       <div className="ldr-contact-extra ldr-contact-extra--back-only">
         <p className="ldr-contact-extra__label">추가 설명</p>
         <p

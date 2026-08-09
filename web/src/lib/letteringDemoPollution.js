@@ -66,13 +66,28 @@ function isPollutedCopy(raw) {
   return POLLUTED_COPY_RE.some((re) => re.test(v));
 }
 
+function isCeoSubjectCard(card = {}) {
+  const handle = String(
+    card.publicHandle || card.loginId || card.handle || card.vlueId || card.memberHandle || ""
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/^@/, "");
+  if (handle === "ceo") return true;
+  const email = String(card.email || "").trim().toLowerCase();
+  if (email === "ceo@vlue.kr") return true;
+  const phone = String(card.phone || card.phoneE164 || "").replace(/\D/g, "");
+  return phone === "821080144666" || phone === "01080144666";
+}
+
 /**
- * ceo 외 계정 — 데모·플랫폼 예시로 채워진 필드를 빈 칸으로 되돌림
+ * ceo 외 계정 — 데모·플랫폼 예시로 채워진 필드를 빈 칸으로 되돌림.
+ * 카드 주체가 CEO 이면(상대 쇼케이스 송출) 절대 지우지 않음.
  * @param {Record<string, unknown>} card
  * @param {{ isCeo?: boolean }} [opts]
  */
 export function scrubLetteringDemoPollution(card = {}, opts = {}) {
-  const isCeo = opts.isCeo ?? isPlatformCeoHandle();
+  const isCeo = opts.isCeo ?? (isCeoSubjectCard(card) || isPlatformCeoHandle());
   if (isCeo) return { ...card };
 
   const next = { ...card };

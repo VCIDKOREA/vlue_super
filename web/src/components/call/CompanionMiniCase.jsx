@@ -89,6 +89,8 @@ function revealPosFromPeek(pos, cardW, vw) {
 export default function CompanionMiniCase({
   displayName = "",
   phoneLabel = "",
+  emailLabel = "",
+  websiteLabel = "",
   statusLabel = "",
   durationLabel = "0:00",
   verified = false,
@@ -341,6 +343,12 @@ export default function CompanionMiniCase({
                 {statusLabel || (verified ? "인증" : "미인증")}
               </span>
             </p>
+            {emailLabel || websiteLabel ? (
+              <div className="companion-mini-case__line3">
+                {emailLabel ? <span className="companion-mini-case__meta">{emailLabel}</span> : null}
+                {websiteLabel ? <span className="companion-mini-case__meta">{websiteLabel}</span> : null}
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
