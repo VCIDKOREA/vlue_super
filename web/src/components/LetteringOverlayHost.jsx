@@ -515,8 +515,12 @@ function LetteringOverlayHostInner() {
           platform={platform}
           incomingNumber={incoming}
           card={styledCard || undefined}
-          expanded={expanded}
-          onExpandedChange={setExpanded}
+          expanded={onCall ? expanded : false}
+          onExpandedChange={(next) => {
+            /* 링잉 BigPush: 웹 홈 접힘 바와만 — ▾ 펼침으로 UI 깨짐 방지 */
+            if (!onCall) return;
+            setExpanded(next);
+          }}
           includeDigitalCard={Boolean(verified && isPaid)}
           isKnownContact={verified}
           onEndCall={onCall ? handleEnd : handleReject}

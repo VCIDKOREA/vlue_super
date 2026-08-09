@@ -25,8 +25,12 @@ object OverlayPositionManager {
         context: OverlayContext,
         screenState: ScreenState
     ): OverlayPosition {
+        /*
+         * 화면 꺼짐/AOD/잠금에서도 시스템 전화처럼 BigPush 표시.
+         * (이전: HIDDEN → requestBigPush 거부 → 잠금 시 미표시)
+         */
         if (screenState == ScreenState.SCREEN_OFF || screenState == ScreenState.AOD) {
-            return OverlayPosition.HIDDEN
+            return OverlayPosition.TOP
         }
         return when (context) {
             OverlayContext.HOME_SCREEN,

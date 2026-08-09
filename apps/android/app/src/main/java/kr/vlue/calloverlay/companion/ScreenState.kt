@@ -1,9 +1,8 @@
 package kr.vlue.calloverlay.companion
 
 /**
- * 화면 전원/표시 상태. BigPush BOTTOM 정책 입력.
- * SCREEN_OFF / AOD에서는 Bottom Overlay 정책을 적용하지 않는다.
- * 기준: docs/architecture/companion-overlay.md §6
+ * 화면 전원/표시 상태. BigPush 위치 정책 입력.
+ * SCREEN_OFF / AOD 에서도 BigPush 는 TOP 으로 표시 (잠금화면 패리티).
  */
 enum class ScreenState {
     SCREEN_ON,

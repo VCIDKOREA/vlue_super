@@ -15,6 +15,7 @@ class BigPushShowcaseBarTest {
         assertTrue(m.secondaryLine.startsWith("VCID KOREA /"))
         assertTrue(m.verified)
         assertEquals("https://example.com/a.jpg", m.avatarUrl)
+        assertEquals(BigPushShowcaseBar.AvatarKind.PHOTO, m.avatarKind)
     }
 
     @Test

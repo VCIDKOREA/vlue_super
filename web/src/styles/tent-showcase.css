@@ -743,12 +743,20 @@
 .lettering-overlay-host--tent.lettering-overlay-host--ringing {
   align-items: flex-start;
   background: transparent !important;
+  padding: 8px 10px 0 !important;
 }
 
 .lettering-overlay-host--tent.lettering-overlay-host--ringing > .lettering-overlay-host__tent-shell {
   height: auto;
-  max-height: min(42vh, 320px);
+  max-height: none;
   overflow: hidden;
+  /* 홈 lettering-home-push-embed 와 동일 크롬 */
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.32);
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(0, 210, 255, 0.08), transparent 55%),
+    linear-gradient(180deg, #0f172a 0%, #0b1220 48%, #070b14 100%);
 }
 
 .lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing--phase-ringing,
@@ -757,11 +765,19 @@
   min-height: 0 !important;
   height: auto !important;
   box-shadow: none !important;
+  border-radius: 0 !important;
+  border: 0 !important;
 }
 
 .lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing--phase-ringing > .lettering-live-bar,
 .lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing--phase-ringing .lettering-ongoing-summary {
   pointer-events: auto;
+}
+
+/* 링잉 중 펼침 슬롯 숨김 — 홈 접힘 바와와 동일 */
+.lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing-expand-slot,
+.lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing-body > :not(.lettering-ongoing-summary) {
+  display: none !important;
 }
 
 /* 수화 후: 전체 오버레이 쇼케이스 */

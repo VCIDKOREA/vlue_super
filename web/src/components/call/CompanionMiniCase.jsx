@@ -17,7 +17,7 @@ export function resetCompanionMiniCaseSessionPos() {
 const EDGE_KEEP_PX = MINI_CASE_EDGE_KEEP_PX;
 const DRAG_CLICK_MAX_PX = 10;
 const DEFAULT_CARD_W = 280;
-const DEFAULT_CARD_H = 100;
+const DEFAULT_CARD_H = 118;
 
 function readViewport() {
   const native = nativeGetScreenSize();

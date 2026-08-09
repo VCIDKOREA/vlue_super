@@ -238,6 +238,7 @@ class CallOverlayService : Service() {
             )
         }
         CompanionRuntimeStabilityDiag.mark("SHOW_OVERLAY_ENTER", "showOverlay")
+        wakeScreenForCallOverlay()
         val canDraw = LetteringPermissionHelper.canDrawOverlays(this)
         CompanionRuntimeStabilityDiag.mark(
             "PERMISSION_GATE",
@@ -438,40 +439,41 @@ class CallOverlayService : Service() {
             )
         }
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        if (asBigPush) {
+            wakeScreenForCallOverlay()
+        }
         val container = FrameLayout(this).apply {
             /*
-             * BIG_PUSH: 투명 — 40% 가림막(#0B101B) 금지.
+             * BIG_PUSH: 투명 — 웹 LetteringIncomingNotification(home-glass) 바만 표시.
              * SHOWCASE/FULLSCREEN: 다크 베이스(WebView 흰 깜빡임 방지).
              */
             setBackgroundColor(
                 if (asBigPush) Color.TRANSPARENT else Color.parseColor("#0B101B")
             )
         }
-        val bannerGravity = Gravity.TOP
 
+        /*
+         * BigPush UI SoT = 웹 LetteringIncomingNotification (홈 쇼케이스 바와 동일 컴포넌트).
+         * Native 재구성 배너는 폴백용으로만 두고 GONE — 눈 로고/각진 바 추측 UI 금지.
+         */
         val banner = BigPushShowcaseBar.create(
             context = this,
             phone = phone,
             verified = verified,
             outgoing = outgoing,
             cardJson = cardJson,
-            onExpand = null /* 링잉 중 ▾ 펼침은 WebView 깨짐 — Answer 후 Showcase 에서만 펼침 */
+            onExpand = null
         )
+        banner.visibility = android.view.View.GONE
         nativeBanner = banner
-        if (asBigPush) {
-            attachBigPushDragGestures(banner)
-        }
-        val bannerLp = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            bannerGravity
-        ).apply {
-            marginStart = dp(10)
-            marginEnd = dp(10)
-            topMargin = dp(8)
-            bottomMargin = 0
-        }
-        container.addView(banner, bannerLp)
+        container.addView(
+            banner,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP
+            )
+        )
 
         val wv = WebView(this)
         LetteringJavascriptBridge.attach(wv, this)
@@ -485,9 +487,11 @@ class CallOverlayService : Service() {
             }
         }
         wv.setBackgroundColor(Color.TRANSPARENT)
-        /* BIG_PUSH: Native banner 만 노출 — WebView 흰 로딩이 화면을 덮지 않음 */
+        wv.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+        /* BigPush도 웹 쇼케이스 바 표시 — 로딩 칩은 투명 호스트 */
+        wv.visibility = android.view.View.VISIBLE
         if (asBigPush) {
-            wv.visibility = android.view.View.GONE
+            attachBigPushDragGestures(container)
         }
         wv.webChromeClient = object : android.webkit.WebChromeClient() {
             override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
@@ -738,6 +742,7 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_BEGIN", source)
         remoteConnected = true
         bigPushPeeking = false
+        wakeScreenForCallOverlay()
         /* Answer: HUN(가짜 빅푸시) 제거 + Native banner 제거 → Showcase */
         LetteringIncomingNotifier.cancel(this)
         LetteringRingingActivity.requestFinish(this)
@@ -776,13 +781,21 @@ class CallOverlayService : Service() {
     private fun syncOverlayChromeForState(source: String) {
         when (companion.state) {
             OverlayState.BIG_PUSH -> {
-                nativeBanner?.visibility = android.view.View.VISIBLE
-                /* Web 로딩 흰 화면이 BigPush 를 덮지 않음 */
-                webView?.visibility = android.view.View.GONE
-            }
-            OverlayState.SHOWCASE, OverlayState.MINI_CASE -> {
+                /* UI SoT = 웹 home-glass LetteringIncomingNotification */
                 nativeBanner?.visibility = android.view.View.GONE
                 webView?.visibility = android.view.View.VISIBLE
+                rootContainer?.setBackgroundColor(Color.TRANSPARENT)
+                webView?.setBackgroundColor(Color.TRANSPARENT)
+            }
+            OverlayState.SHOWCASE -> {
+                nativeBanner?.visibility = android.view.View.GONE
+                webView?.visibility = android.view.View.VISIBLE
+            }
+            OverlayState.MINI_CASE -> {
+                nativeBanner?.visibility = android.view.View.GONE
+                webView?.visibility = android.view.View.VISIBLE
+                rootContainer?.setBackgroundColor(Color.TRANSPARENT)
+                webView?.setBackgroundColor(Color.TRANSPARENT)
             }
             OverlayState.IDLE -> {
                 nativeBanner?.visibility = android.view.View.GONE
@@ -1034,6 +1047,8 @@ class CallOverlayService : Service() {
         view?.evaluateJavascript(
             "try{localStorage.setItem('vlue_lettering_enabled','1');" +
                 "window.dispatchEvent(new CustomEvent('vlue-lettering-settings-changed',{detail:{enabled:true}}));" +
+                "document.documentElement.style.background='transparent';" +
+                "if(document.body){document.body.style.background='transparent';}" +
                 "}catch(e){}",
             null
         )
@@ -1244,8 +1259,8 @@ class CallOverlayService : Service() {
             userMinimized = true
             val (sw, _) = screenSizePx()
             val w = (sw * 0.86f).toInt().coerceIn(dp(240), sw - dp(16))
-            /* 타원 카드 + 외부 안내문구 여유 — 네이티브 clip 없이 CSS 타원만 */
-            val h = dp(168)
+            /* 타원 MiniCase 전체(힌트 포함) — WebView 각진 배경 금지 */
+            val h = dp(140)
             val x = ((sw - w) / 2).coerceAtLeast(dp(8))
             val y = dp(64)
             params.width = w
@@ -1288,13 +1303,44 @@ class CallOverlayService : Service() {
         }
     }
 
-    /** Mini/compact: 포커스·모달 점유 없이 창 밖 터치가 하위 앱으로 전달 */
+    /** Mini/compact: 포커스·모달 점유 없이 창 밖 터치가 하위 앱으로 전달 + 잠금화면 위 표시 */
     private fun applyPassThroughTouchFlags(params: WindowManager.LayoutParams) {
+        @Suppress("DEPRECATION")
         params.flags = (
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
             )
+    }
+
+    /** 화면 꺼짐/잠금 수신 시 시스템 전화처럼 화면을 깨워 오버레이를 보이게 함 */
+    private fun wakeScreenForCallOverlay() {
+        try {
+            val pm = getSystemService(POWER_SERVICE) as? android.os.PowerManager ?: return
+            if (pm.isInteractive) return
+            @Suppress("DEPRECATION")
+            val wl = pm.newWakeLock(
+                android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                    android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                    android.os.PowerManager.ON_AFTER_RELEASE,
+                "vlue:call_overlay"
+            )
+            wl.setReferenceCounted(false)
+            wl.acquire(8_000L)
+            CompanionPerfTracker.noteWakeLock(true)
+            mainHandler.postDelayed({
+                try {
+                    if (wl.isHeld) wl.release()
+                } catch (_: Exception) {
+                }
+                CompanionPerfTracker.noteWakeLock(false)
+            }, 8_500L)
+        } catch (e: Exception) {
+            VlueBigPushTrace.lifecycle("WAKE_SCREEN_FAIL", e.message ?: e.javaClass.simpleName)
+        }
     }
 
     /** 수신 링잉 — BigPush TOP/BOTTOM (PositionManager) */

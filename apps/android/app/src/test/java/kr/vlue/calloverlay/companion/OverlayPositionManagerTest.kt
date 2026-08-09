@@ -53,9 +53,9 @@ class OverlayPositionManagerTest {
     }
 
     @Test
-    fun bigPush_screenOff_isHidden() {
+    fun bigPush_screenOff_isTop_likeIncoming() {
         assertEquals(
-            OverlayPosition.HIDDEN,
+            OverlayPosition.TOP,
             OverlayPositionManager.resolve(
                 OverlayContext.HOME_SCREEN,
                 OverlayState.BIG_PUSH,
@@ -65,9 +65,9 @@ class OverlayPositionManagerTest {
     }
 
     @Test
-    fun bigPush_aod_isHidden() {
+    fun bigPush_aod_isTop_likeIncoming() {
         assertEquals(
-            OverlayPosition.HIDDEN,
+            OverlayPosition.TOP,
             OverlayPositionManager.resolve(
                 OverlayContext.INCOMING_CALL_UI,
                 OverlayState.BIG_PUSH,

@@ -228,7 +228,7 @@ object CompanionScenarioCatalog {
                 "SCREEN_OFF",
                 CompanionScenarioExpectation(
                     state = OverlayState.BIG_PUSH,
-                    position = OverlayPosition.HIDDEN,
+                    position = OverlayPosition.TOP,
                     screenState = ScreenState.SCREEN_OFF
                 )
             ),

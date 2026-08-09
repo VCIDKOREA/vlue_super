@@ -35,7 +35,7 @@ object BigPushShowcaseBar {
     const val TAG_SECONDARY = "bar_secondary"
     const val TAG_AVATAR = "bar_avatar"
     const val TAG_VERIFIED = "bar_verified"
-    const val WINDOW_HEIGHT_DP = 118
+    const val WINDOW_HEIGHT_DP = 148
 
     enum class AvatarKind {
         PHOTO,
@@ -106,8 +106,8 @@ object BigPushShowcaseBar {
             profile?.optString("portrait_url")
         )
         val (avatarKind, avatar) = when {
-            isCeo -> AvatarKind.CEO_BRAND to photo
             !photo.isNullOrBlank() -> AvatarKind.PHOTO to photo
+            isCeo -> AvatarKind.CEO_BRAND to null
             else -> AvatarKind.SILHOUETTE to null
         }
         val phoneDisp = formatPhone(
@@ -342,10 +342,6 @@ object BigPushShowcaseBar {
 
     private fun loadAvatar(view: ImageView, kind: AvatarKind, url: String?) {
         applyDefaultAvatar(view, kind)
-        if (kind == AvatarKind.CEO_BRAND) {
-            /* CEO는 항상 VLUE 브랜드 마크 (업로드 사진이 있어도 로고 슬롯은 브랜드) */
-            return
-        }
         if (kind != AvatarKind.PHOTO || url.isNullOrBlank()) return
         if (url.startsWith("content:") || url.startsWith("file:")) {
             try {

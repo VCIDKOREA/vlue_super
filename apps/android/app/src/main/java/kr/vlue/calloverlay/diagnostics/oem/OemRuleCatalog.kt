@@ -77,7 +77,7 @@ object OemRuleCatalog {
         OemKnownRestriction(
             id = "SCREEN_OFF_AOD",
             title = "Screen OFF / AOD",
-            detail = "BigPush position HIDDEN while SCREEN_OFF/AOD — state kept",
+            detail = "BigPush TOP while SCREEN_OFF/AOD — lock-screen parity",
             relatedFailureReasons = listOf("SCREEN_OFF_POLICY")
         )
     )

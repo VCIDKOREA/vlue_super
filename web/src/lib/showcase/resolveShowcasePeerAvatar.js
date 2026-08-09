@@ -59,6 +59,16 @@ export function resolveShowcasePeerAvatar({
   }
 
   if (isCeoCard(card)) {
+    /* 홈 쇼케이스 바와 동일: 프로필 사진이 있으면 사진, 없으면 VLUE 브랜드 */
+    const photo = firstNonEmpty(
+      card?.photoUrl,
+      card?.avatarUrl,
+      card?.image_url,
+      card?.profileImageUrl,
+      style?.platformFeed?.avatarUrl,
+      card?.showcaseStyle?.platformFeed?.avatarUrl
+    );
+    if (photo) return { type: "image", url: photo };
     return { type: "brand", url: brandLogoUrl || CEO_BRAND_LOGO };
   }
 
