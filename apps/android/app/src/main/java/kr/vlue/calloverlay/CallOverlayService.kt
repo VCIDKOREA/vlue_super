@@ -434,7 +434,7 @@ class CallOverlayService : Service() {
             verified = verified,
             outgoing = outgoing,
             cardJson = cardJson,
-            onExpand = { mainHandler.post { expandBigPushPanelFromBar() } }
+            onExpand = null /* 링잉 중 ▾ 펼침은 WebView 깨짐 — Answer 후 Showcase 에서만 펼침 */
         )
         nativeBanner = banner
         val bannerLp = FrameLayout.LayoutParams(
@@ -725,7 +725,7 @@ class CallOverlayService : Service() {
         publishCompanion(OverlayTriggerEvent.ANSWER)
         userMinimized = false
         /* Answer 후 3초간 ContextWatch OTHER_APP→MINI 금지 — 전체 Showcase 유지 */
-        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 3000L
+        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 8000L
         if (rootContainer?.isAttachedToWindow == true) {
             enterShowcaseLayout(source = source)
         } else {
@@ -1561,6 +1561,7 @@ class CallOverlayService : Service() {
             /* Answer 직후 전체 Showcase 유지 */
             ctx = OverlayContext.IN_CALL
         }
+        /* 타 앱 확정 시에만 SHOWCASE→MINI (유예 후) */
         if (companion.state == OverlayState.SHOWCASE &&
             ctx == OverlayContext.OTHER_APP &&
             !holdActive

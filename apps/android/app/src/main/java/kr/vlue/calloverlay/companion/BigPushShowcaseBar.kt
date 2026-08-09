@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import kr.vlue.calloverlay.R
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -22,6 +23,9 @@ import java.util.concurrent.Executors
  * 수신자용 BigPush 쇼케이스 바 (상대에게 보이는 UI).
  * 앱 홈 미리보기와 동일 정보(회사·이름·직함·로고·인증)를 표시하되
  * 소유자 전용 「통화화면 보기」「설정」은 절대 노출하지 않는다.
+ *
+ * 아바타: CEO(@ceo) → VLUE 브랜드 마크 / 그 외 사진 없음 → 카톡형 실루엣
+ * (빈 로고에 VLUE 눈을 자동 넣지 않음)
  */
 object BigPushShowcaseBar {
 
@@ -33,6 +37,12 @@ object BigPushShowcaseBar {
     const val TAG_VERIFIED = "bar_verified"
     const val WINDOW_HEIGHT_DP = 118
 
+    enum class AvatarKind {
+        PHOTO,
+        CEO_BRAND,
+        SILHOUETTE
+    }
+
     private val io by lazy { Executors.newSingleThreadExecutor() }
     private val main by lazy { Handler(Looper.getMainLooper()) }
 
@@ -41,7 +51,8 @@ object BigPushShowcaseBar {
         val primaryLine: String,
         val secondaryLine: String,
         val verified: Boolean,
-        val avatarUrl: String?
+        val avatarUrl: String?,
+        val avatarKind: AvatarKind
     )
 
     fun parseModel(phone: String, verified: Boolean, cardJson: String?): Model {
@@ -75,19 +86,30 @@ object BigPushShowcaseBar {
             json?.optString("publicHandle"),
             card?.optString("vlueId"),
             json?.optString("vlueId")
-        )?.removePrefix("@")
-        val avatar = firstNonBlank(
+        )?.removePrefix("@")?.lowercase()
+        val isCeo = handle == "ceo" ||
+            firstNonBlank(json?.optString("phoneE164"), card?.optString("phoneE164"), phone)
+                ?.let { normalizeDigits(it) } == "821080144666"
+        /* 프로필 사진만 — 회사 로고·VLUE 눈을 빈 자리에 넣지 않음 */
+        val photo = firstNonBlank(
             json?.optString("image_url"),
             card?.optString("image_url"),
-            card?.optString("avatarUrl"),
             card?.optString("photoUrl"),
+            card?.optString("avatarUrl"),
             card?.optString("imageUrl"),
             json?.optString("avatarUrl"),
+            json?.optString("photoUrl"),
             profile?.optString("image_url"),
             profile?.optString("imageUrl"),
             profile?.optString("photo_url"),
+            profile?.optString("photoUrl"),
             profile?.optString("portrait_url")
         )
+        val (avatarKind, avatar) = when {
+            isCeo -> AvatarKind.CEO_BRAND to photo
+            !photo.isNullOrBlank() -> AvatarKind.PHOTO to photo
+            else -> AvatarKind.SILHOUETTE to null
+        }
         val phoneDisp = formatPhone(
             firstNonBlank(json?.optString("phoneE164"), card?.optString("phoneE164"), phone).orEmpty()
         )
@@ -113,7 +135,8 @@ object BigPushShowcaseBar {
                 json?.optBoolean("is_verified", false) == true ||
                 json?.optBoolean("verified", false) == true ||
                 card?.optBoolean("verified", false) == true,
-            avatarUrl = avatar
+            avatarUrl = avatar,
+            avatarKind = avatarKind
         )
     }
 
@@ -187,12 +210,10 @@ object BigPushShowcaseBar {
             )
             clipToOutline = true
             outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
-            setImageDrawable(
-                android.graphics.drawable.ColorDrawable(Color.parseColor("#475569"))
-            )
+            applyDefaultAvatar(this, model.avatarKind)
         }
         body.addView(avatar)
-        loadAvatar(avatar, model.avatarUrl)
+        loadAvatar(avatar, model.avatarKind, model.avatarUrl)
 
         val textCol = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -250,28 +271,30 @@ object BigPushShowcaseBar {
         )
         body.addView(textCol)
 
-        /* 수신자: 펼침 탭 — 링잉 중 쇼케이스 패널 확장 */
-        body.addView(
-            TextView(context).apply {
-                text = "▾"
-                setTextColor(Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                gravity = Gravity.CENTER
-                setPadding(dp(10), dp(6), dp(10), dp(6))
-                background = roundedBg(
-                    fill = Color.parseColor("#E61E293B"),
-                    stroke = Color.parseColor("#38E2E8F0"),
-                    radiusDp = 999f,
-                    density = density
-                )
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { marginStart = dp(6) }
-                isClickable = true
-                setOnClickListener { onExpand?.invoke() }
-            }
-        )
+        /* 링잉 BigPush: ▾ 숨김 (WebView 펼침 버그). Answer 후 Showcase 에서만 확장 */
+        if (onExpand != null) {
+            body.addView(
+                TextView(context).apply {
+                    text = "▾"
+                    setTextColor(Color.WHITE)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    gravity = Gravity.CENTER
+                    setPadding(dp(10), dp(6), dp(10), dp(6))
+                    background = roundedBg(
+                        fill = Color.parseColor("#E61E293B"),
+                        stroke = Color.parseColor("#38E2E8F0"),
+                        radiusDp = 999f,
+                        density = density
+                    )
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { marginStart = dp(6) }
+                    isClickable = true
+                    setOnClickListener { onExpand.invoke() }
+                }
+            )
+        }
         root.addView(body)
         return root
     }
@@ -285,17 +308,40 @@ object BigPushShowcaseBar {
         banner.findViewWithTag<TextView>(TAG_VERIFIED)?.visibility =
             if (model.verified) View.VISIBLE else View.GONE
         banner.findViewWithTag<ImageView>(TAG_AVATAR)?.let {
-            loadAvatar(it, model.avatarUrl)
+            loadAvatar(it, model.avatarKind, model.avatarUrl)
         }
     }
 
-    private fun loadAvatar(view: ImageView, url: String?) {
-        if (url.isNullOrBlank()) return
+    private fun applyDefaultAvatar(view: ImageView, kind: AvatarKind) {
+        when (kind) {
+            AvatarKind.CEO_BRAND -> {
+                view.scaleType = ImageView.ScaleType.FIT_CENTER
+                view.setImageResource(R.drawable.ic_vlue_brand_mark)
+                view.setPadding(0, 0, 0, 0)
+            }
+            AvatarKind.SILHOUETTE -> {
+                view.scaleType = ImageView.ScaleType.CENTER_CROP
+                view.setImageResource(R.drawable.ic_avatar_person_silhouette)
+            }
+            AvatarKind.PHOTO -> {
+                view.scaleType = ImageView.ScaleType.CENTER_CROP
+                view.setImageResource(R.drawable.ic_avatar_person_silhouette)
+            }
+        }
+    }
+
+    private fun loadAvatar(view: ImageView, kind: AvatarKind, url: String?) {
+        applyDefaultAvatar(view, kind)
+        if (kind == AvatarKind.CEO_BRAND) {
+            /* CEO는 항상 VLUE 브랜드 마크 (업로드 사진이 있어도 로고 슬롯은 브랜드) */
+            return
+        }
+        if (kind != AvatarKind.PHOTO || url.isNullOrBlank()) return
         if (url.startsWith("content:") || url.startsWith("file:")) {
             try {
                 view.setImageURI(android.net.Uri.parse(url))
             } catch (_: Exception) {
-                /* ignore */
+                applyDefaultAvatar(view, AvatarKind.SILHOUETTE)
             }
             return
         }
@@ -313,14 +359,24 @@ object BigPushShowcaseBar {
                     val bmp = BitmapFactory.decodeStream(stream) ?: return@execute
                     main.post {
                         if (view.getTag(TAG_AVATAR.hashCode()) == token) {
+                            view.scaleType = ImageView.ScaleType.CENTER_CROP
                             view.setImageBitmap(bmp)
                         }
                     }
                 }
                 conn.disconnect()
             } catch (_: Exception) {
-                /* keep placeholder */
+                main.post { applyDefaultAvatar(view, AvatarKind.SILHOUETTE) }
             }
+        }
+    }
+
+    private fun normalizeDigits(raw: String): String {
+        val d = raw.filter { it.isDigit() }
+        return when {
+            d.startsWith("82") -> d
+            d.startsWith("0") && d.length >= 10 -> "82" + d.drop(1)
+            else -> d
         }
     }
 

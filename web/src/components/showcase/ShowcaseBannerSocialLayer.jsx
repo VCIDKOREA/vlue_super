@@ -46,7 +46,7 @@ function likeErrorMessage(res) {
 
 /**
  * 배너 슬라이드용 소셜 오버레이 (1~6) — V1
- * 실통화 중에는 부모에서 socialOverlayEnabled=false로 숨김
+ * 펼친 쇼케이스에서는 실통화 중에도 노출 (부모 socialOverlayEnabled)
  */
 export default function ShowcaseBannerSocialLayer({
   card,

@@ -18,9 +18,18 @@ class BigPushShowcaseBarTest {
     }
 
     @Test
-    fun parseModel_unknownPhone_fallback() {
-        val m = BigPushShowcaseBar.parseModel("unknown", verified = false, cardJson = null)
-        assertEquals("VLUE Showcase", m.brandLabel)
-        assertEquals("번호 확인 중…", m.primaryLine)
+    fun parseModel_ceoWithoutPhoto_usesBrandKind() {
+        val json =
+            """{"matched":true,"is_verified":true,"displayName":"이종근","companyName":"VCID KOREA","publicHandle":"ceo","phoneE164":"+821080144666"}"""
+        val m = BigPushShowcaseBar.parseModel("+821080144666", verified = true, cardJson = json)
+        assertEquals(BigPushShowcaseBar.AvatarKind.CEO_BRAND, m.avatarKind)
+    }
+
+    @Test
+    fun parseModel_otherWithoutPhoto_usesSilhouette() {
+        val json =
+            """{"matched":true,"is_verified":true,"displayName":"전중희","companyName":"TEST","publicHandle":"jeonjunghee","phoneE164":"+821063358746"}"""
+        val m = BigPushShowcaseBar.parseModel("+821063358746", verified = true, cardJson = json)
+        assertEquals(BigPushShowcaseBar.AvatarKind.SILHOUETTE, m.avatarKind)
     }
 }

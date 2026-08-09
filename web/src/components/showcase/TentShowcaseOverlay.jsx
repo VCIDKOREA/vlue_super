@@ -356,7 +356,9 @@ export default function TentShowcaseOverlay({
   }, [peerAvatar.url, peerAvatar.type]);
 
   const showAvatarImage =
-    (peerAvatar.type === "image" || peerAvatar.type === "brand") &&
+    (peerAvatar.type === "image" ||
+      peerAvatar.type === "brand" ||
+      peerAvatar.type === "silhouette") &&
     Boolean(peerAvatar.url) &&
     !avatarBroken;
   const avatarInitial =

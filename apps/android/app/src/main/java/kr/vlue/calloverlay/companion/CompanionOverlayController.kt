@@ -67,6 +67,20 @@ class CompanionOverlayController {
      */
     fun requestBigPush(detectedContext: OverlayContext, callAlreadyAnswered: Boolean): Boolean {
         context = detectedContext
+        /*
+         * 이전 통화가 MINI/SHOWCASE 에 남아 있으면 수신 BigPush 가 스킵된다.
+         * 새 RINGING(미응답)이면 IDLE 로 리셋 후 BigPush 허용.
+         */
+        if (!callAlreadyAnswered &&
+            (state == OverlayState.SHOWCASE || state == OverlayState.MINI_CASE)
+        ) {
+            val prev = state
+            state = OverlayState.IDLE
+            context = detectedContext
+            miniCaseVisibility = MiniCaseVisibility.VISIBLE
+            lastTransition = "requestBigPush: stale ${prev.name}→IDLE for new ringing"
+            rejectedTransition = null
+        }
         if (callAlreadyAnswered || state == OverlayState.SHOWCASE || state == OverlayState.MINI_CASE) {
             rejectedTransition = "requestBigPush rejected: answeredOrShowcase state=$state"
             if (callAlreadyAnswered && state == OverlayState.IDLE) {

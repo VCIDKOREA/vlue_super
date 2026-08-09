@@ -52,7 +52,9 @@ object OverlayContextDetector {
                 foregroundIsInCallUi && !userMinimized -> OverlayContext.IN_CALL
                 foregroundIsLauncher -> OverlayContext.HOME_SCREEN
                 foregroundIsOurApp -> OverlayContext.IN_CALL
-                else -> OverlayContext.OTHER_APP
+                /* 확정된 타 앱만 OTHER → MINI. 미확인은 InCallUI 유지(오판으로 쇼케이스 축소 방지) */
+                foregroundIsKnownOtherApp -> OverlayContext.OTHER_APP
+                else -> OverlayContext.IN_CALL
             }
         }
     }

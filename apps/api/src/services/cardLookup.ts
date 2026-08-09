@@ -1,7 +1,14 @@
 import { prisma } from "../db/client.js";
 import { normalizeToE164KR } from "../lib/phoneE164.js";
+import { isPlatformCeoHandle } from "./admin/platformAccountRoles.js";
+import { getVluePublicOrigin } from "./bizcard/bizcardPublicUrls.js";
 import { buildViewerAccessContext } from "./follow/followService.js";
 import { maskProfileForViewer, privacySelect } from "./follow/profileAccessControl.js";
+
+/** CEO 기본 VLUE 브랜드 로고 (업로드 없을 때) */
+function ceoDefaultBrandLogoUrl(): string {
+  return `${getVluePublicOrigin()}/vlue-brand-logo.svg`;
+}
 
 function pickProfileString(profileJson: unknown, keys: string[]): string | null {
   if (!profileJson || typeof profileJson !== "object") return null;
@@ -124,6 +131,26 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
   if (user) {
     const tierSnap = String(user.digitalCard?.membershipTierSnapshot || "").toLowerCase();
     const isPremiumLine = ["paid", "premium", "b2b", "business"].includes(tierSnap);
+    const dc = user.digitalCard as
+      | { photoUrl?: string | null; logoUrl?: string | null; exportSnapshotJson?: unknown }
+      | null
+      | undefined;
+    const exportSnap =
+      dc?.exportSnapshotJson && typeof dc.exportSnapshotJson === "object"
+        ? (dc.exportSnapshotJson as Record<string, unknown>)
+        : null;
+    const photoOnly =
+      (typeof dc?.photoUrl === "string" && dc.photoUrl.trim()) ||
+      (typeof exportSnap?.photoUrl === "string" && String(exportSnap.photoUrl).trim()) ||
+      null;
+    const logoOnly =
+      (typeof dc?.logoUrl === "string" && dc.logoUrl.trim()) ||
+      (typeof exportSnap?.logoUrl === "string" && String(exportSnap.logoUrl).trim()) ||
+      null;
+    const isCeo = isPlatformCeoHandle(user.publicHandle);
+    /* 프로필 사진만 image_url. CEO 로고 슬롯만 VLUE 기본. 타인 빈 사진 → null(실루엣) */
+    const imageUrl = photoOnly || (isCeo ? ceoDefaultBrandLogoUrl() : null);
+    const logoUrl = logoOnly || (isCeo ? ceoDefaultBrandLogoUrl() : null);
 
     if (opts.forPublicOgShare) {
       return {
@@ -140,7 +167,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           digitalCardActive: Boolean(user.digitalCard),
           is_premium_line: isPremiumLine,
           phoneE164: user.phoneE164,
-          image_url: null as string | null,
+          image_url: imageUrl,
+          logo_url: logoUrl,
           voice_url: null as string | null,
           access: {
             isOwner: false,
@@ -177,7 +205,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         digitalCardActive: Boolean(user.digitalCard),
         is_premium_line: isPremiumLine,
         phoneE164: masked.phoneE164,
-        image_url: null as string | null,
+        image_url: imageUrl,
+        logo_url: logoUrl,
         voice_url: null as string | null,
         access: masked.access,
         visibility: masked.visibility

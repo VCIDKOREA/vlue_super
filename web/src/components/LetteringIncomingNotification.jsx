@@ -109,21 +109,25 @@ function LetteringProfileThumb({ card, verified, size = "sm" }) {
     displayName: card?.name || card?.displayName || "",
     exposeCustom: true
   });
-  /* 프로필 썸네일 = 프로필 사진만 (회사 로고로 대체하지 않음) */
-  const photoUrl = peer.type === "image" ? peer.url : String(card?.photoUrl || "").trim();
+  /* image | brand(CEO VLUE) | silhouette(카톡형) — 빈 자리에 VLUE 눈/회사로고 자동 삽입 금지 */
+  const imgUrl =
+    peer.type === "image" || peer.type === "brand" || peer.type === "silhouette"
+      ? peer.url
+      : "";
   const fallbackLabel =
     peer.type === "initial" ? peer.initial : (card.name || card.organization || "?").slice(0, 1);
-  const showImg = Boolean(photoUrl) && !imgBroken;
+  const showImg = Boolean(imgUrl) && !imgBroken;
+  const objectFit = peer.type === "brand" ? "object-contain" : "object-cover object-top";
 
   return (
     <span
-      className={`lettering-profile-thumb relative inline-flex shrink-0 items-center justify-center overflow-hidden border border-[#c5d4e8] bg-white shadow-sm ${dim}`}
+      className={`lettering-profile-thumb relative inline-flex shrink-0 items-center justify-center overflow-hidden border border-[#c5d4e8] bg-slate-200 shadow-sm ${dim}`}
     >
       {showImg ? (
         <img
-          src={photoUrl}
+          src={imgUrl}
           alt=""
-          className="h-full w-full object-cover object-top"
+          className={`h-full w-full ${objectFit}`}
           onError={() => setImgBroken(true)}
         />
       ) : (
@@ -727,8 +731,10 @@ export default function LetteringIncomingNotification({
   const inCallKakao = resolveInCallKakaoSlot(peerMatrix);
   const [matrixBusy, setMatrixBusy] = useState(false);
   const inCallDemoMode = Boolean(previewMode);
-  /** 실통화 중에는 소셜 레일 숨김 — 미리보기·다시보기·열람만 노출 */
-  const socialOverlayEnabled = Boolean(previewMode || fromCallHistory || !onCall);
+  /** 실통화 중에도 펼친 쇼케이스에서는 좋아요·댓글·공유·신고 노출 (Test 3.0) */
+  const socialOverlayEnabled = Boolean(
+    previewMode || fromCallHistory || !onCall || (onCall && isExpandedView)
+  );
 
   const handleMatrixAction = async () => {
     if (!peerMatrix.showCallLogAction || matrixBusy) return;

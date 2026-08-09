@@ -53,4 +53,25 @@ class OverlayContextDetectorTest {
         assertEquals(true, OverlayContextDetector.isLikelyInCallUiPackage("com.samsung.android.incallui"))
         assertEquals(true, OverlayContextDetector.isLikelyInCallUiPackage("com.samsung.android.dialer"))
     }
+
+    @Test
+    fun offhook_unknownForeground_staysInCall() {
+        assertEquals(
+            OverlayContext.IN_CALL,
+            OverlayContextDetector.detect(
+                callPhase = OverlayContextDetector.CallPhase.OFFHOOK
+            )
+        )
+    }
+
+    @Test
+    fun offhook_knownOtherApp_isOtherApp() {
+        assertEquals(
+            OverlayContext.OTHER_APP,
+            OverlayContextDetector.detect(
+                callPhase = OverlayContextDetector.CallPhase.OFFHOOK,
+                foregroundIsKnownOtherApp = true
+            )
+        )
+    }
 }

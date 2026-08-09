@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VLUE shield eye mark — CEO BigPush 기본 로고 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="128dp"
+    android:height="128dp"
+    android:viewportWidth="128"
+    android:viewportHeight="128">
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M0,0h128v128h-128z" />
+    <!-- eye white -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M64,71.7m-21.3,0a21.3,21.3 0,1 1,42.6 0a21.3,21.3 0,1 1,-42.6 0" />
+    <!-- simplified upper arc as filled crescent band -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,62 Q64,28 104,62 L98,68 Q64,40 30,68 Z" />
+</vector>

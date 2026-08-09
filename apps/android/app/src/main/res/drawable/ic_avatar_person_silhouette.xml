@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 카카오톡형 기본 프로필 — 사진 없을 때 무지 사람 실루엣 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <path
+        android:fillColor="#CBD5E1"
+        android:pathData="M0,0h96v96h-96z" />
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M48,46c9.4,0 17,-7.6 17,-17S57.4,12 48,12 31,19.6 31,29 38.6,46 48,46z" />
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M16,84c0,-17.7 14.3,-32 32,-32s32,14.3 32,32v4H16v-4z" />
+</vector>

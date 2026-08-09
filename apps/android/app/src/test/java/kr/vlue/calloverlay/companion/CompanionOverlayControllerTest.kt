@@ -208,4 +208,16 @@ class CompanionOverlayControllerTest {
         assertEquals(OverlayState.MINI_CASE, c.state)
         assertEquals(OverlayContext.KEYPAD, c.context)
     }
+
+    /** 이전 통화 MINI 잔존 → 새 RINGING 시 BigPush 허용 */
+    @Test
+    fun requestBigPush_resetsStaleMiniForNewRinging() {
+        val c = CompanionOverlayController()
+        c.onAnswer(OverlayContext.IN_CALL)
+        c.onMinimize(OverlayContext.MINIMIZED)
+        assertEquals(OverlayState.MINI_CASE, c.state)
+        assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))
+        assertEquals(OverlayState.BIG_PUSH, c.state)
+        assertEquals(OverlayPosition.TOP, c.position)
+    }
 }
