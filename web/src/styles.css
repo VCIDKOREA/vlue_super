@@ -7922,7 +7922,12 @@ button.ldr-back-person-name--link:active {
 }
 
 .lbq-preview-phone--compact .ldr-reception--preview .ldr-panel-wrap {
-  --ldr-preview-panel-h: 300px;
+  /* 만료일·뱃지·앞면/뒷면까지 잘리지 않게 */
+  --ldr-preview-panel-h: 360px;
+}
+
+.lbq-preview-scale .lettering-bizcard-preview-host__slot {
+  overflow: visible;
 }
 
 .lbq-preview-phone .ldr-reception {

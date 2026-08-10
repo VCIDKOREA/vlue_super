@@ -632,7 +632,7 @@ export default function LetteringBizcardSettingsView({
         </label>
       ) : null}
 
-      <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-4 py-4 no-scrollbar">
+      <div className="vlue-scroll-pad-profile-panel min-h-0 flex-1 overflow-y-auto px-4 py-4 no-scrollbar">
         <LetteringBizcardQuickBuilder
           fixed={fixed}
           previewCard={previewCard}

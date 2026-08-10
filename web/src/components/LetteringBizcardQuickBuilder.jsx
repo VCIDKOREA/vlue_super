@@ -273,8 +273,8 @@ export default function LetteringBizcardQuickBuilder({
         <p className={`mb-2 text-[12px] font-black ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
           수신 화면 미리보기
         </p>
-        <div className="lbq-preview-scale mx-auto w-full max-w-[210px]">
-          <LetteringBizcardScaledPreview isDarkMode={isDarkMode}>
+        <div className="lbq-preview-scale mx-auto w-full max-w-[240px]">
+          <LetteringBizcardScaledPreview isDarkMode={isDarkMode} designWidth={300}>
             <div className="lbq-preview-phone lbq-preview-phone--compact rounded-[22px] border border-slate-200/80 bg-slate-950 shadow-lg">
               <LetteringDigitalReception
                 card={previewCard}
