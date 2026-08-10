@@ -145,27 +145,48 @@ export async function fetchFollowRequestInbox() {
 }
 
 /** @param {string} userId */
+const followProfileCache = new Map();
+const FOLLOW_PROFILE_TTL_MS = 90_000;
+const followProfileInflight = new Map();
+
 export async function fetchFollowProfile(userId) {
-  try {
-    const res = await vlueAuthFetch(apiUrl(`/api/follow/profile/${encodeURIComponent(userId)}`));
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: data.error || "profile_failed" };
-    return {
-      ok: true,
-      profile: data.profile,
-      follow: data.follow,
-      userId: data.userId,
-      photoUrl: data.photoUrl || data.profile?.photoUrl || "",
-      membershipTier: data.membershipTier || data.profile?.membershipTier || "",
-      digitalCardIssued: Boolean(data.digitalCardIssued),
-      cardExport: data.cardExport || null,
-      authCycleEndAt: data.authCycleEndAt || null,
-      authPaidAt: data.authPaidAt || null,
-      cardIssuedAt: data.cardIssuedAt || null
-    };
-  } catch (e) {
-    return { ok: false, error: e?.message || "network" };
-  }
+  const id = String(userId || "").trim();
+  if (!id) return { ok: false, error: "user_required" };
+  const now = Date.now();
+  const cached = followProfileCache.get(id);
+  if (cached && now - cached.at < FOLLOW_PROFILE_TTL_MS) return cached.value;
+  const inflight = followProfileInflight.get(id);
+  if (inflight) return inflight;
+
+  const run = (async () => {
+    try {
+      const res = await vlueAuthFetch(apiUrl(`/api/follow/profile/${encodeURIComponent(id)}`));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: data.error || "profile_failed" };
+      const value = {
+        ok: true,
+        profile: data.profile,
+        follow: data.follow,
+        userId: data.userId,
+        photoUrl: data.photoUrl || data.profile?.photoUrl || "",
+        membershipTier: data.membershipTier || data.profile?.membershipTier || "",
+        digitalCardIssued: Boolean(data.digitalCardIssued),
+        cardExport: data.cardExport || null,
+        authCycleEndAt: data.authCycleEndAt || null,
+        authPaidAt: data.authPaidAt || null,
+        cardIssuedAt: data.cardIssuedAt || null
+      };
+      followProfileCache.set(id, { at: Date.now(), value });
+      return value;
+    } catch (e) {
+      return { ok: false, error: e?.message || "network" };
+    } finally {
+      followProfileInflight.delete(id);
+    }
+  })();
+
+  followProfileInflight.set(id, run);
+  return run;
 }
 
 export async function fetchFollowSettings() {

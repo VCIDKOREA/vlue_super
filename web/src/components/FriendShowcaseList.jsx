@@ -438,7 +438,7 @@ export default function FriendShowcaseList({
         displayName: row.name || "",
         membershipTier: row.membershipTier || "free",
         avatarUrl: row.avatarUrl || "",
-        forceStyle: true
+        forceStyle: false
       });
       const tier = payload.card?.membershipTier || row.membershipTier || "free";
       const peerUid = String(

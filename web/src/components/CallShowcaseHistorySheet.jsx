@@ -298,10 +298,12 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const hydrateCallFromNetwork = useCallback(async (call, gen, opts = {}) => {
     const background = Boolean(opts.background);
     const phone = call.phoneDisplay || call.phone;
+    const hasLocalPages = styleHasShowcaseContent(call.showcaseSnapshot);
+    /* 로컬에 페이지 스냅샷이 있으면 백그라운드 재조회 생략 — egress */
+    if (background && hasLocalPages) return;
     try {
       if (!background) setLoading(true);
       const uidHint = String(call.cardSnapshot?.userId || call.userId || "").trim();
-      const hasLocalPages = styleHasShowcaseContent(call.showcaseSnapshot);
       const payload = await resolveVlueShowcasePeer({
         phone,
         userId: uidHint,

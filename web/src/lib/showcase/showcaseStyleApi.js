@@ -84,17 +84,19 @@ const PEER_CACHE_TTL_MS = 120_000;
 /** 공개 GET(쿠키 없는 오버레이·통화목록)용 메모리 캐시 */
 const publicPeerLiveCache = new Map();
 const PUBLIC_PEER_LIVE_TTL_MS = 90_000;
+/** 동일 userId 동시 요청 합치기 — OverlayHost 네이티브+웹 레이스 egress 방어 */
+const publicPeerLiveInflight = new Map();
 
 function rememberPeerLive(id, live, liveSource, updatedAt) {
   if (!id || !live || typeof live !== "object") return;
   const at = Date.now();
   peerCache.set(id, { live, liveSource: liveSource ?? null, updatedAt: updatedAt ?? null, at });
-  publicPeerLiveCache.set(id, { live, at });
+  publicPeerLiveCache.set(id, { live, updatedAt: updatedAt ?? null, at });
 }
 
 /**
  * 공개 라이브 스타일 GET — 오버레이 WebView·통화목록 공통.
- * 짧은 메모리 캐시로 동일 상대 재진입·중복 fetch 를 줄인다.
+ * 메모리 캐시 + in-flight 합치기 + ETag 로 Shared Pooler egress 를 줄인다.
  */
 export async function fetchPeerLiveStylePublic(userId, opts = {}) {
   const id = String(userId || "").trim();
@@ -106,32 +108,61 @@ export async function fetchPeerLiveStylePublic(userId, opts = {}) {
     if (mem?.live && now - mem.at < PUBLIC_PEER_LIVE_TTL_MS) return mem.live;
     const authCached = peerCache.get(id);
     if (authCached?.live && now - authCached.at < PEER_CACHE_TTL_MS) return authCached.live;
+    const inflight = publicPeerLiveInflight.get(id);
+    if (inflight) return inflight;
   }
-  try {
-    const styleUrl = apiUrl(`/api/lettering/showcase/style/${encodeURIComponent(id)}`);
-    const styleRes = await fetch(styleUrl, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "omit",
-      cache: force ? "no-store" : "default"
-    });
-    const styleData = await styleRes.json().catch(() => ({}));
-    if (styleRes.ok && styleData?.live && typeof styleData.live === "object") {
-      rememberPeerLive(id, styleData.live, styleData.liveSource ?? null, styleData.updatedAt ?? null);
-      return styleData.live;
+
+  const run = (async () => {
+    try {
+      const headers = { Accept: "application/json" };
+      const cachedMeta = publicPeerLiveCache.get(id) || peerCache.get(id);
+      const etag = !force && cachedMeta?.updatedAt ? String(cachedMeta.updatedAt) : "";
+      if (etag) headers["If-None-Match"] = `"${etag}"`;
+      const q = etag ? `?sinceUpdatedAt=${encodeURIComponent(etag)}` : "";
+      const styleUrl = apiUrl(`/api/lettering/showcase/style/${encodeURIComponent(id)}${q}`);
+      const styleRes = await fetch(styleUrl, {
+        method: "GET",
+        headers,
+        credentials: "omit",
+        cache: force ? "no-store" : "default"
+      });
+      const styleData = await styleRes.json().catch(() => ({}));
+      if (styleRes.ok && styleData?.unchanged) {
+        const prev = publicPeerLiveCache.get(id) || peerCache.get(id);
+        if (prev?.live) {
+          rememberPeerLive(id, prev.live, prev.liveSource ?? null, styleData.updatedAt || prev.updatedAt);
+          return prev.live;
+        }
+      }
+      if (styleRes.ok && styleData?.live && typeof styleData.live === "object") {
+        rememberPeerLive(id, styleData.live, styleData.liveSource ?? null, styleData.updatedAt ?? null);
+        return styleData.live;
+      }
+      /* 404 등 — auth 폴백으로 두 번 치지 않음 (미존재·비공개) */
+      if (styleRes.status === 404 || styleRes.status === 403) return null;
+    } catch {
+      /* network — auth 폴백 */
     }
-  } catch {
-    /* fall through */
-  }
-  try {
-    const authStyle = await fetchPeerShowcaseStyleBundle(id, { force });
-    if (authStyle.ok && authStyle.live && typeof authStyle.live === "object") {
-      return authStyle.live;
+    try {
+      const authStyle = await fetchPeerShowcaseStyleBundle(id, { force: false });
+      if (authStyle.ok && authStyle.live && typeof authStyle.live === "object") {
+        return authStyle.live;
+      }
+    } catch {
+      /* ignore */
     }
-  } catch {
-    /* ignore */
+    return null;
+  })();
+
+  if (!force) {
+    publicPeerLiveInflight.set(id, run);
+    try {
+      return await run;
+    } finally {
+      if (publicPeerLiveInflight.get(id) === run) publicPeerLiveInflight.delete(id);
+    }
   }
-  return null;
+  return run;
 }
 
 /** GET /api/lettering/showcase/style/:userId — peer live slim + 로컬 캐시 */

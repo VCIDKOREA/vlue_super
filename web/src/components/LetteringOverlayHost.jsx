@@ -12,7 +12,7 @@ import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCach
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
-import { apiUrl } from "../lib/apiBase.js";
+import { fetchFollowProfile } from "../lib/followApi.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { normalizePhotoFocus } from "../lib/letteringBizcardStorage.js";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
@@ -25,56 +25,77 @@ import { ShowcaseBgmProvider } from "../context/ShowcaseBgmContext.jsx";
 import "../styles/tent-showcase.css";
 import "../styles/showcase-call-glass.css";
 
+/** 네이티브 card-lookup + 웹 useEffect 가 같은 peer 를 동시에 때리지 않도록 */
+const overlayPeerEnrichInflight = new Map();
+
 async function enrichPeerCardFromProfile(peerUserId, nextCard) {
-  try {
-    const res = await fetch(apiUrl(`/api/follow/profile/${encodeURIComponent(peerUserId)}`), {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "omit",
-      cache: "default"
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data?.ok) return nextCard;
-    const exp = data.cardExport && typeof data.cardExport === "object" ? data.cardExport : null;
-    const photo = String(exp?.photoUrl || data.photoUrl || data.profile?.photoUrl || "").trim();
-    const profileEmail = String(data.profile?.email || "").trim();
+  const data = await fetchFollowProfile(peerUserId);
+  if (!data?.ok) return nextCard;
+  const exp = data.cardExport && typeof data.cardExport === "object" ? data.cardExport : null;
+  const photo = String(exp?.photoUrl || data.photoUrl || data.profile?.photoUrl || "").trim();
+  const profileEmail = String(data.profile?.email || "").trim();
+  return {
+    ...nextCard,
+    name:
+      String(nextCard?.name || nextCard?.displayName || "").trim() ||
+      String(exp?.name || "").trim() ||
+      String(data.profile?.legalName || data.profile?.name || "").trim(),
+    displayName:
+      String(nextCard?.displayName || nextCard?.name || "").trim() ||
+      String(exp?.name || "").trim(),
+    photoUrl: String(nextCard?.photoUrl || "").trim() || photo || "",
+    email:
+      String(nextCard?.email || "").trim() ||
+      String(exp?.email || "").trim() ||
+      profileEmail,
+    website: String(nextCard?.website || "").trim() || String(exp?.website || "").trim(),
+    fax: String(nextCard?.fax || "").trim() || String(exp?.fax || "").trim(),
+    address: String(nextCard?.address || "").trim() || String(exp?.address || "").trim(),
+    organization:
+      String(nextCard?.organization || "").trim() ||
+      String(exp?.organization || "").trim() ||
+      String(exp?.companyName || "").trim() ||
+      String(data.profile?.companyName || data.profile?.organization || "").trim(),
+    title: String(nextCard?.title || "").trim() || String(exp?.title || "").trim(),
+    department:
+      String(nextCard?.department || "").trim() || String(exp?.department || "").trim(),
+    logoUrl: String(nextCard?.logoUrl || "").trim() || String(exp?.logoUrl || "").trim(),
+    photoFocus: normalizePhotoFocus(exp?.photoFocus || nextCard?.photoFocus || "center"),
+    publicHandle:
+      String(nextCard?.publicHandle || nextCard?.loginId || "").trim() ||
+      String(data.profile?.publicHandle || "").trim(),
+    authPaidAt: nextCard?.authPaidAt || data.authPaidAt || null,
+    authCycleEndAt: nextCard?.authCycleEndAt || data.authCycleEndAt || null,
+    authValidUntil: nextCard?.authValidUntil || data.authValidUntil || null,
+    membershipTier: data.membershipTier || nextCard.membershipTier || "paid"
+  };
+}
+
+async function enrichOverlayPeerBundle(peerUserId, nextCard) {
+  const id = String(peerUserId || "").trim();
+  if (!id) {
     return {
-      ...nextCard,
-      name:
-        String(nextCard?.name || nextCard?.displayName || "").trim() ||
-        String(exp?.name || "").trim() ||
-        String(data.profile?.legalName || data.profile?.name || "").trim(),
-      displayName:
-        String(nextCard?.displayName || nextCard?.name || "").trim() ||
-        String(exp?.name || "").trim(),
-      photoUrl: String(nextCard?.photoUrl || "").trim() || photo || "",
-      email:
-        String(nextCard?.email || "").trim() ||
-        String(exp?.email || "").trim() ||
-        profileEmail,
-      website: String(nextCard?.website || "").trim() || String(exp?.website || "").trim(),
-      fax: String(nextCard?.fax || "").trim() || String(exp?.fax || "").trim(),
-      address: String(nextCard?.address || "").trim() || String(exp?.address || "").trim(),
-      organization:
-        String(nextCard?.organization || "").trim() ||
-        String(exp?.organization || "").trim() ||
-        String(exp?.companyName || "").trim() ||
-        String(data.profile?.companyName || data.profile?.organization || "").trim(),
-      title: String(nextCard?.title || "").trim() || String(exp?.title || "").trim(),
-      department:
-        String(nextCard?.department || "").trim() || String(exp?.department || "").trim(),
-      logoUrl: String(nextCard?.logoUrl || "").trim() || String(exp?.logoUrl || "").trim(),
-      photoFocus: normalizePhotoFocus(exp?.photoFocus || nextCard?.photoFocus || "center"),
-      publicHandle:
-        String(nextCard?.publicHandle || nextCard?.loginId || "").trim() ||
-        String(data.profile?.publicHandle || "").trim(),
-      authPaidAt: nextCard?.authPaidAt || data.authPaidAt || null,
-      authCycleEndAt: nextCard?.authCycleEndAt || data.authCycleEndAt || null,
-      authValidUntil: nextCard?.authValidUntil || data.authValidUntil || null,
-      membershipTier: data.membershipTier || nextCard.membershipTier || "paid"
+      card: nextCard,
+      style: createDefaultShowcaseStyle()
     };
-  } catch {
-    return nextCard;
+  }
+  const existing = overlayPeerEnrichInflight.get(id);
+  if (existing) return existing;
+  const run = (async () => {
+    const [live, enriched] = await Promise.all([
+      fetchPeerLiveStylePublic(id, { force: false }),
+      enrichPeerCardFromProfile(id, nextCard)
+    ]);
+    return {
+      card: enriched,
+      style: live && typeof live === "object" ? live : createDefaultShowcaseStyle()
+    };
+  })();
+  overlayPeerEnrichInflight.set(id, run);
+  try {
+    return await run;
+  } finally {
+    if (overlayPeerEnrichInflight.get(id) === run) overlayPeerEnrichInflight.delete(id);
   }
 }
 
@@ -210,23 +231,16 @@ function LetteringOverlayHostInner() {
           setCard((prev) => ({ ...(prev || {}), ...mapped }));
           setVerified(true);
           setLoading(false);
-          /* DCC 즉시 표시 후 스타일·프로필은 백그라운드 병렬 보강 */
           const peerUserId = String(mapped.userId || mapped.ownerUserId || "").trim();
           if (peerUserId) {
-            void (async () => {
-              const [live, enriched] = await Promise.all([
-                fetchPeerLiveStylePublic(peerUserId, { force: false }),
-                enrichPeerCardFromProfile(peerUserId, mapped)
-              ]);
-              const peerStyle =
-                live && typeof live === "object" ? live : createDefaultShowcaseStyle();
+            void enrichOverlayPeerBundle(peerUserId, mapped).then(({ card, style }) => {
               setCard((prev) => ({
                 ...(prev || {}),
-                ...enriched,
-                showcaseStyle: peerStyle
+                ...card,
+                showcaseStyle: style
               }));
-              setShowcaseStyle(peerStyle);
-            })();
+              setShowcaseStyle(style);
+            });
           }
         }
       } catch {
@@ -268,6 +282,33 @@ function LetteringOverlayHostInner() {
         setLoading(true);
         return;
       }
+
+      /*
+       * 네이티브 card-lookup 이 이미 있으면 by-number 재조회 생략.
+       * 스타일·프로필 enrich 는 in-flight 맵으로 리스너와 합친다.
+       */
+      const nativeDetail =
+        native || forceLettering ? window.__VLUE_CARD_LOOKUP__ : null;
+      if (nativeDetail && nativeDetail.matched !== false) {
+        const mapped = mapLookupToLetteringCard(
+          nativeDetail,
+          incoming || nativeDetail.phoneE164 || ""
+        );
+        if (mapped) {
+          setCard((prev) => ({ ...(prev || {}), ...mapped }));
+          setVerified(true);
+          setLoading(false);
+          const peerUserId = String(mapped.userId || mapped.ownerUserId || "").trim();
+          if (peerUserId) {
+            const { card, style } = await enrichOverlayPeerBundle(peerUserId, mapped);
+            if (cancelled) return;
+            setCard((prev) => ({ ...(prev || {}), ...card, showcaseStyle: style }));
+            setShowcaseStyle(style);
+          }
+          return;
+        }
+      }
+
       const lookup = await getBusinessCardByNumber(incoming);
       if (cancelled) return;
       let nextCard = null;
@@ -289,13 +330,10 @@ function LetteringOverlayHostInner() {
       }
 
       if (peerUserId) {
-        const [live, enriched] = await Promise.all([
-          fetchPeerLiveStylePublic(peerUserId, { force: false }),
-          enrichPeerCardFromProfile(peerUserId, nextCard)
-        ]);
+        const { card, style } = await enrichOverlayPeerBundle(peerUserId, nextCard);
         if (cancelled) return;
-        if (live && typeof live === "object") peerStyle = live;
-        nextCard = enriched;
+        nextCard = card;
+        peerStyle = style;
       }
 
       if (cancelled) return;
