@@ -51,6 +51,7 @@ function FriendSearch({
   }, [tab, reloadFriendRequests]);
 
   const tabs = [
+    { id: "family", label: "가족 보호" },
     { id: "friends", label: "주소록 친구" },
     { id: "search", label: "검색" },
     { id: "inbox", label: `받은 요청 (${receivedRequests.length})` },
@@ -79,6 +80,12 @@ function FriendSearch({
         </div>
 
         {notice ? <p className="mt-2 text-center text-[11px] font-bold text-blue-600">{notice}</p> : null}
+
+        {tab === "family" ? (
+          <div className="mt-3">
+            <FamilyProtectionRegister isDarkMode={isDarkMode} onToast={onFamilyToast} />
+          </div>
+        ) : null}
 
         {tab === "friends" ? (
           <div className="mt-3">
@@ -144,10 +151,6 @@ function FriendSearch({
                   void reloadFriendRequests();
                 }}
               />
-            </div>
-
-            <div className="mt-3">
-              <FamilyProtectionRegister isDarkMode={isDarkMode} onToast={onFamilyToast} />
             </div>
           </>
         ) : null}
