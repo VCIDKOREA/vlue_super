@@ -4834,6 +4834,55 @@ body,
   width: 100%;
 }
 
+/* 통화목록 다시보기 — 저장(좌) + 전화(화면 정중앙). styles.css 1fr 1fr 덮어씀 */
+.lettering-ongoing-actions-secondary__row.lettering-ongoing-actions-secondary__row--save-end {
+  position: relative;
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-start;
+  grid-template-columns: none !important;
+  gap: 0;
+  width: 100%;
+  max-width: none;
+  min-height: 64px;
+  padding: 4px 12px;
+  box-sizing: border-box;
+}
+
+.lettering-ongoing-actions-secondary__row.lettering-ongoing-actions-secondary__row--save-end .lettering-action--save-inline {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 140px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.lettering-ongoing-actions-secondary__row.lettering-ongoing-actions-secondary__row--save-end .lettering-action--dial-call-circle,
+.lettering-ongoing-actions-secondary__row.lettering-ongoing-actions-secondary__row--save-end .lettering-action--end-call-circle {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  margin: 0 !important;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  border-radius: 28px;
+}
+
+.lettering-ongoing-actions-secondary__row.lettering-ongoing-actions-secondary__row--save-end .lettering-action--dial-call-circle:active,
+.lettering-ongoing-actions-secondary__row.lettering-ongoing-actions-secondary__row--save-end .lettering-action--end-call-circle:active {
+  transform: translate(-50%, -50%) scale(0.94);
+}
+
 .lettering-action--end-call {
   display: inline-flex;
   align-items: center;

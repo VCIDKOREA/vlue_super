@@ -25,6 +25,9 @@ import {
 import { runCallPeerMatrixAction } from "../lib/call/runCallPeerMatrixAction.js";
 import { resolveIsKnownContactSync } from "../lib/contacts/hybridKnownContact.js";
 import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
+import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
+import { apiUrl } from "../lib/apiBase.js";
+import { fetchPeerShowcaseStyleBundle } from "../lib/showcase/showcaseStyleApi.js";
 import "./friend-showcase-list.css";
 import "../styles/showcase-call-glass.css";
 import "../styles/incall-controls.css";
@@ -90,12 +93,42 @@ function styleHasShowcaseContent(style) {
   return false;
 }
 
+/** 통화목록용 — 공개 GET 우선 (오버레이와 동일, 캐시·ETag 우회) */
+async function fetchPeerLiveStyleForHistory(userId) {
+  const id = String(userId || "").trim();
+  if (!id) return null;
+  try {
+    const styleUrl = apiUrl(`/api/lettering/showcase/style/${encodeURIComponent(id)}`);
+    const styleRes = await fetch(styleUrl, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+      cache: "no-store"
+    });
+    const styleData = await styleRes.json().catch(() => ({}));
+    if (styleRes.ok && styleData?.live && typeof styleData.live === "object") {
+      return styleData.live;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    const authStyle = await fetchPeerShowcaseStyleBundle(id, { force: true });
+    if (authStyle.ok && authStyle.live && typeof authStyle.live === "object") {
+      return authStyle.live;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/** 로컬에 인증 회원 + 쇼케이스 콘텐츠(페이지) 스냅샷이 있을 때만 API 생략 */
 function hasUsableLocalSnapshot(call) {
   if (call?.verified !== true) return false;
   const snap = call?.cardSnapshot;
   const style = call?.showcaseSnapshot;
   if (!(style || snap?.photoUrl || snap?.name || snap?.userId)) return false;
-  /* DCC만 있는 스냅샷이면 라이브 스타일 재조회로 전체 쇼케이스 확보 */
   return styleHasShowcaseContent(style);
 }
 
@@ -170,6 +203,26 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const [busyId, setBusyId] = useState("");
   const [toast, setToast] = useState("");
   const openGenRef = useRef(0);
+  const { unlockFromUserGesture, setPlaybackPhase, bindStyleConfig } = useShowcaseBgm();
+
+  const startPeerBgm = useCallback(
+    (style) => {
+      if (!hasPlayableShowcaseBgm(style)) return;
+      try {
+        bindStyleConfig?.(style);
+        unlockFromUserGesture?.();
+        setPlaybackPhase?.("preview", {
+          forceRestart: true,
+          steal: true,
+          owner: "call-history",
+          styleConfig: style
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    [bindStyleConfig, unlockFromUserGesture, setPlaybackPhase]
+  );
 
   const showToast = useCallback((msg) => {
     setToast(String(msg || "").trim());
@@ -276,10 +329,10 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const phone = call.phoneDisplay || call.phone;
     try {
       setLoading(true);
-      const uid = String(call.cardSnapshot?.userId || call.userId || "").trim();
+      const uidHint = String(call.cardSnapshot?.userId || call.userId || "").trim();
       const payload = await resolveVlueShowcasePeer({
         phone,
-        userId: uid,
+        userId: uidHint,
         displayName: call.name || "",
         membershipTier: call.membershipTier || "free",
         avatarUrl: call.avatarUrl || "",
@@ -287,16 +340,27 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       });
       if (gen !== openGenRef.current) return;
 
-      /* userId 있으면 VLUE 회원 쇼케이스 — verified 플래그만으로 미인증 처리하지 않음 */
       const matched = Boolean(String(payload.card?.userId || "").trim());
-      const peerStyle =
+      const peerUserId = String(payload.card?.userId || uidHint || "").trim();
+      let peerStyle =
         matched && payload.showcaseStyle && typeof payload.showcaseStyle === "object"
           ? payload.showcaseStyle
           : silentShowcaseStyle();
 
-      if (matched && hasPlayableShowcaseBgm(peerStyle)) {
-        if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
-          window.__vlueUnlockShowcaseBgm();
+      /* 통화목록 — 항상 공개 라이브 스타일로 페이지·BGM 보강 (DCC-only 방지) */
+      if (matched && peerUserId) {
+        const live = await fetchPeerLiveStyleForHistory(peerUserId);
+        if (live && typeof live === "object") {
+          peerStyle = {
+            ...peerStyle,
+            ...live,
+            bgm: live.bgm || peerStyle.bgm,
+            pages:
+              Array.isArray(live.pages) && live.pages.length
+                ? live.pages
+                : peerStyle.pages,
+            gallery: live.gallery || peerStyle.gallery
+          };
         }
       }
 
@@ -323,6 +387,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
       setPreviewVerified(matched);
       setPreviewCard(card);
+      if (matched) startPeerBgm(peerStyle);
 
       if (matched && payload.card?.name) {
         setSelected((prev) =>
@@ -340,12 +405,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     } finally {
       if (gen === openGenRef.current) setLoading(false);
     }
-  }, []);
+  }, [startPeerBgm]);
 
   const openCall = (call) => {
     const gen = ++openGenRef.current;
 
-    /* 탭 즉시 로딩 — 미인증 패널을 먼저 그리지 않음 */
     flushSync(() => {
       setSelected(call);
       setExpanded(true);
@@ -357,17 +421,13 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const finishOpen = () => {
       if (gen !== openGenRef.current) return;
 
-      /* 인증 회원 스냅샷만 즉시 표시. 그 외(CEO 포함 미확인)는 hydrate 완료까지 로딩 */
       if (hasUsableLocalSnapshot(call)) {
         const optimistic = buildOptimisticHistoryCard(call);
         setPreviewVerified(true);
         setPreviewCard(optimistic.card);
-        if (hasPlayableShowcaseBgm(optimistic.peerStyle)) {
-          if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
-            window.__vlueUnlockShowcaseBgm();
-          }
-        }
+        startPeerBgm(optimistic.peerStyle);
         setLoading(false);
+        void hydrateCallFromNetwork(call, gen);
         return;
       }
 
@@ -381,6 +441,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
   const closeDetail = () => {
     openGenRef.current += 1;
+    try {
+      setPlaybackPhase?.("idle", { fade: true, steal: true, owner: "call-history" });
+    } catch {
+      /* ignore */
+    }
     setSelected(null);
     setPreviewCard(null);
     setPreviewVerified(false);

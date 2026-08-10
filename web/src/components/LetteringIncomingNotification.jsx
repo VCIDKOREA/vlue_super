@@ -844,9 +844,9 @@ export default function LetteringIncomingNotification({
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;
   const carouselScrollEnabled = isPaidMember && (previewMode || onCall || isExpandedView);
-  /** 홈 미리보기 접힘: BGM 재생 중지 */
+  /** 홈 미리보기 접힘: BGM 중지. 통화목록 다시보기는 항상 재생 허용 */
   const carouselSuppressBgm =
-    Boolean(suppressBgm) || Boolean(previewMode && !isExpandedView);
+    Boolean(suppressBgm) || Boolean(previewMode && !isExpandedView && !fromCallHistory);
   const showcasePhotos = c.showcaseStyle?.gallery?.photos || [];
   const showcaseStyleConfig = c.showcaseStyle || null;
 
