@@ -22,7 +22,7 @@ export function normalizeLetteringCard(raw = {}) {
     email: clampLetteringBizcardEmail(String(raw.email || "").trim()),
     website: String(raw.website || raw.homepage || raw.url || raw.web || "").trim(),
     photoUrl,
-    photoFocus: normalizePhotoFocus(raw.photoFocus),
+    photoFocus: normalizePhotoFocus(raw.photoFocus || "center"),
     logoUrl,
     noCompanyLogo: Boolean(raw.noCompanyLogo) || !logoUrl,
     companyIntro: String(raw.companyIntro || raw.intro || "").trim(),

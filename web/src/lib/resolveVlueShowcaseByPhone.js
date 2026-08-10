@@ -16,6 +16,7 @@ function mapLookupToCard(body, phoneDisplay) {
     loginId: handle,
     publicHandle: handle,
     photoUrl: body.image_url || profile.photoUrl || profile.image_url || "",
+    photoFocus: body.photoFocus || profile.photoFocus || "center",
     website: profile.website || "",
     companyIntro: profile.companyIntro || profile.intro || "",
     membershipTier: body.is_premium_line ? "premium" : body.digitalCardActive ? "paid" : "free",

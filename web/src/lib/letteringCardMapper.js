@@ -84,7 +84,7 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       "",
     /** 발신자 설정(상단/중앙/하단) — 수신 쇼케이스 object-position */
     photoFocus: normalizePhotoFocus(
-      body.photoFocus || nested.photoFocus || profile.photoFocus
+      body.photoFocus || nested.photoFocus || profile.photoFocus || "center"
     ),
     logoUrl: profile.logoUrl || profile.logo_url || body.logo_url || "",
     image_url: body.image_url || nested.image_url || "",

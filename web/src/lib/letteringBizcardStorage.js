@@ -110,8 +110,11 @@ export function normalizePhotoFocus(raw) {
 }
 
 export function photoFocusToCss(raw) {
-  const id = normalizePhotoFocus(raw);
-  return PHOTO_FOCUS_OPTIONS.find((o) => o.id === id)?.css || "center top";
+  const rawStr = String(raw ?? "").trim();
+  /* 미설정 시 상단 강제 금지 — 수신/통화 쇼케이스는 중앙이 안전한 기본 */
+  if (!rawStr) return "center center";
+  const id = normalizePhotoFocus(rawStr);
+  return PHOTO_FOCUS_OPTIONS.find((o) => o.id === id)?.css || "center center";
 }
 
 const DEFAULT_EDITABLE = {

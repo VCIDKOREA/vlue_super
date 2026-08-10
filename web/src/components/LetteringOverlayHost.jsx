@@ -269,7 +269,7 @@ function LetteringOverlayHostInner() {
                 String(nextCard?.department || "").trim() || String(exp?.department || "").trim(),
               logoUrl: String(nextCard?.logoUrl || "").trim() || String(exp?.logoUrl || "").trim(),
               photoFocus: normalizePhotoFocus(
-                exp?.photoFocus || nextCard?.photoFocus
+                exp?.photoFocus || nextCard?.photoFocus || "center"
               ),
               publicHandle:
                 String(nextCard?.publicHandle || nextCard?.loginId || "").trim() ||

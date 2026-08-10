@@ -82,15 +82,12 @@ function buildOptimisticHistoryCard(call) {
   return { card, verified: matchedHint, peerStyle };
 }
 
-/** 로컬 스냅샷만으로 충분하면 API/DB(Egress) 호출 생략 */
+/** 로컬에 인증 회원 스냅샷이 있을 때만 API 생략 — unverified/미확인은 반드시 재조회 */
 function hasUsableLocalSnapshot(call) {
-  if (call?.verified === false) return true;
+  if (call?.verified !== true) return false;
   const snap = call?.cardSnapshot;
   const style = call?.showcaseSnapshot;
-  if (call?.verified === true && (style || snap?.photoUrl || snap?.name || snap?.userId)) {
-    return true;
-  }
-  return Boolean(snap?.userId && (snap?.name || snap?.photoUrl || style));
+  return Boolean(style || snap?.photoUrl || snap?.name || snap?.userId);
 }
 
 function CallHistoryAvatar({ call }) {
@@ -277,11 +274,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         displayName: call.name || "",
         membershipTier: call.membershipTier || "free",
         avatarUrl: call.avatarUrl || ""
-        /* forceStyle 금지 — peer 스타일 캐시·ETag로 egress 절약 */
       });
       if (gen !== openGenRef.current) return;
 
-      const matched = Boolean(payload.verified && payload.card?.userId);
+      /* userId 있으면 VLUE 회원 쇼케이스 — verified 플래그만으로 미인증 처리하지 않음 */
+      const matched = Boolean(String(payload.card?.userId || "").trim());
       const peerStyle =
         matched && payload.showcaseStyle && typeof payload.showcaseStyle === "object"
           ? payload.showcaseStyle
@@ -293,7 +290,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         }
       }
 
-      const tier = payload.card?.membershipTier || call.membershipTier || "free";
+      const tier = payload.card?.membershipTier || call.membershipTier || (matched ? "paid" : "free");
       const card = applyShowcaseStyleToCard(
         {
           ...payload.card,
@@ -302,9 +299,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           membershipTier: tier,
           photoUrl: matched ? payload.card?.photoUrl || call.avatarUrl || "" : "",
           avatarUrl: matched ? payload.card?.avatarUrl || call.avatarUrl || "" : "",
+          photoFocus: payload.card?.photoFocus || call.cardSnapshot?.photoFocus || "center",
+          publicHandle: payload.card?.publicHandle || payload.card?.loginId || "",
           showcaseStyle: peerStyle
         },
-        isPaidLetteringTier(tier) ? tier : "free",
+        isPaidLetteringTier(tier) ? tier : matched ? "paid" : "free",
         { peerMode: true, style: peerStyle }
       );
 
@@ -332,7 +331,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const openCall = (call) => {
     const gen = ++openGenRef.current;
 
-    /* 무거운 카드 조립 전에 로딩 화면을 먼저 그려 탭 반응을 보장 */
+    /* 탭 즉시 로딩 — 미인증 패널을 먼저 그리지 않음 */
     flushSync(() => {
       setSelected(call);
       setExpanded(true);
@@ -343,20 +342,21 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
     const finishOpen = () => {
       if (gen !== openGenRef.current) return;
-      const optimistic = buildOptimisticHistoryCard(call);
-      setPreviewVerified(optimistic.verified);
-      setPreviewCard(optimistic.card);
 
-      if (optimistic.verified && hasPlayableShowcaseBgm(optimistic.peerStyle)) {
-        if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
-          window.__vlueUnlockShowcaseBgm();
-        }
-      }
-
+      /* 인증 회원 스냅샷만 즉시 표시. 그 외(CEO 포함 미확인)는 hydrate 완료까지 로딩 */
       if (hasUsableLocalSnapshot(call)) {
+        const optimistic = buildOptimisticHistoryCard(call);
+        setPreviewVerified(true);
+        setPreviewCard(optimistic.card);
+        if (hasPlayableShowcaseBgm(optimistic.peerStyle)) {
+          if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
+            window.__vlueUnlockShowcaseBgm();
+          }
+        }
         setLoading(false);
         return;
       }
+
       void hydrateCallFromNetwork(call, gen);
     };
 
