@@ -14,7 +14,6 @@ import { searchShowcaseByTag } from "../lib/showcase/showcaseTagsApi.js";
 import { resolveVlueShowcasePeer } from "../lib/resolveVlueShowcasePeer.js";
 import { VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
 import PeerShowcasePreview from "./showcase/PeerShowcasePreview.jsx";
-import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
 import AppFullScreenView from "./AppFullScreenView.jsx";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
@@ -498,7 +497,8 @@ export default function FriendShowcaseList({
         setFollowing(patch);
         setHashtagRows(patch);
       }
-      if (kind === "showcase") startPeerBgm(showcaseStyle);
+      /* 명함도 쇼케이스 DCC 슬라이드(사진3) — BGM 동일 */
+      startPeerBgm(showcaseStyle);
     } finally {
       setPreviewLoading(false);
     }
@@ -714,28 +714,26 @@ export default function FriendShowcaseList({
             : ""
         }
         subtitle={previewKind === "idcard" ? "디지털 인증명함" : "팔로우 쇼케이스"}
-        isDarkMode={previewKind !== "idcard"}
+        isDarkMode
         coverBottomNav
         hideHeader
-        showFloatingClose={previewKind === "idcard"}
-        className={previewKind === "idcard" ? "bg-white" : "bg-[#0B101B]"}
+        showFloatingClose={false}
+        className="bg-[#0B101B]"
       >
         <div className="flex min-h-0 flex-1 flex-col">
           {previewLoading ? (
-            <p className="py-16 text-center text-[13px] font-semibold text-slate-500">불러오는 중…</p>
+            <p className="py-16 text-center text-[13px] font-semibold text-slate-400">불러오는 중…</p>
           ) : previewCard && previewKind === "idcard" ? (
             previewPaid ? (
-              <div className="friend-showcase-list__idcard-wrap">
-                <LetteringDigitalReception
-                  card={previewCard}
-                  verified
-                  embeddedInPush
-                  enableContactLinks
-                  face="front"
-                />
-              </div>
+              <PeerShowcasePreview
+                key={`idcard-${previewCard.userId || "x"}-${previewSessionKey}`}
+                card={previewCard}
+                onClose={closePreview}
+                includeDigitalCard
+                digitalCardOnly
+              />
             ) : (
-              <p className="py-16 text-center text-[13px] font-semibold text-slate-500 px-6">
+              <p className="py-16 text-center text-[13px] font-semibold text-slate-400 px-6">
                 이 회원은 디지털 인증명함이 없습니다. 쇼케이스로 확인해 주세요.
               </p>
             )
@@ -749,7 +747,7 @@ export default function FriendShowcaseList({
               }
             />
           ) : (
-            <p className="py-16 text-center text-[13px] font-semibold text-slate-500">
+            <p className="py-16 text-center text-[13px] font-semibold text-slate-400">
               미리보기를 표시할 수 없습니다. 아이디·쇼케이스 공개 설정을 확인해 주세요.
             </p>
           )}

@@ -415,16 +415,12 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       return;
     }
 
+    /* 스냅샷 없을 때 미인증 셸을 깔면 로딩 블라인드 뒤로 흔적이 남음 — 가이드만 표시 */
     flushSync(() => {
       setSelected(call);
       setExpanded(true);
-      /* 스냅샷 없어도 목록 메타로 즉시 셸을 띄워 로딩 체감 단축 */
-      const optimistic = buildOptimisticHistoryCard({
-        ...call,
-        verified: call.verified === true || Boolean(call.userId || call.cardSnapshot?.userId)
-      });
-      setPreviewVerified(Boolean(optimistic.verified));
-      setPreviewCard(optimistic.card);
+      setPreviewCard(null);
+      setPreviewVerified(false);
       setLoading(true);
     });
     void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: true });
@@ -479,7 +475,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
               {toast}
             </p>
           ) : null}
-          {loading && !previewCard ? (
+          {loading && !(previewCard && isMember) ? (
             <CallHistoryLoadingGuide />
           ) : previewCard ? (
             <div className="lettering-showcase-fs lettering-showcase-fs--history-embed relative">
@@ -531,7 +527,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                 />
               </div>
               {loading ? (
-                <div className="call-history-loading-overlay">
+                <div className="call-history-loading-overlay" aria-hidden>
                   <CallHistoryLoadingGuide syncing />
                 </div>
               ) : null}
