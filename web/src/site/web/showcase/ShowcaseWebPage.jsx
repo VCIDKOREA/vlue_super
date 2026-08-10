@@ -130,8 +130,9 @@ export default function ShowcaseWebPage({ phone }) {
     unlockFromUserGesture?.();
     if (style) {
       bindStyleConfig?.(style);
+      /* 이미 재생 중이면 이어서 — 처음부터 다시 시작하지 않음 */
       setPlaybackPhase?.("preview", {
-        forceRestart: true,
+        forceRestart: false,
         steal: true,
         owner: "public-showcase",
         styleConfig: style
@@ -141,6 +142,7 @@ export default function ShowcaseWebPage({ phone }) {
 
   const declineBgm = () => {
     setBgmPromptOpen(false);
+    setPlaybackPhase?.("idle", { fade: true, steal: true, owner: "public-showcase" });
   };
 
   const showToast = (msg) => {
@@ -179,14 +181,14 @@ export default function ShowcaseWebPage({ phone }) {
               <p id="showcase-bgm-title" className="showcase-web__bgm-title">
                 이 쇼케이스의 BGM이 재생 중입니다.
                 <br />
-                계속 들으시겠습니까?
+                계속 재생합니다.
               </p>
               <div className="showcase-web__bgm-actions">
                 <button type="button" className="showcase-web__bgm-btn showcase-web__bgm-btn--ghost" onClick={declineBgm}>
-                  나중에
+                  취소
                 </button>
                 <button type="button" className="showcase-web__bgm-btn showcase-web__bgm-btn--primary" onClick={acceptBgm}>
-                  재생
+                  확인
                 </button>
               </div>
             </div>
