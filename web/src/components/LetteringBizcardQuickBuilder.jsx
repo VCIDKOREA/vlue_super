@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Upload } from "lucide-react";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
+import LetteringBizcardScaledPreview from "./LetteringBizcardScaledPreview.jsx";
 import LetteringBizcardAddressField from "./LetteringBizcardAddressField.jsx";
 import LetteringBizcardTitleDeptVerifySection from "./LetteringBizcardTitleDeptVerifySection.jsx";
 import LetteringBizcardOrgChangeSection from "./LetteringBizcardOrgChangeSection.jsx";
@@ -272,18 +273,22 @@ export default function LetteringBizcardQuickBuilder({
         <p className={`mb-2 text-[12px] font-black ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
           수신 화면 미리보기
         </p>
-        <div className="lbq-preview-phone mx-auto max-w-[320px] rounded-[22px] border border-slate-200/80 bg-slate-950 shadow-lg">
-          <LetteringDigitalReception
-            card={previewCard}
-            verified
-            embeddedInPush
-            previewMode
-            face={previewFace}
-            onFaceChange={setPreviewFace}
-          />
+        <div className="lbq-preview-scale mx-auto w-full max-w-[210px]">
+          <LetteringBizcardScaledPreview isDarkMode={isDarkMode}>
+            <div className="lbq-preview-phone lbq-preview-phone--compact rounded-[22px] border border-slate-200/80 bg-slate-950 shadow-lg">
+              <LetteringDigitalReception
+                card={previewCard}
+                verified
+                embeddedInPush
+                previewMode
+                face={previewFace}
+                onFaceChange={setPreviewFace}
+              />
+            </div>
+          </LetteringBizcardScaledPreview>
         </div>
         <p className={`mt-2 text-center text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-          통화 중 상대방에게 이렇게 표시됩니다 · 앞면/뒷면 탭으로 확인
+          통화 중 상대 표시 · 앞면/뒷면 탭
         </p>
       </div>
 

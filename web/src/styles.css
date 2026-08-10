@@ -5834,6 +5834,11 @@ body,
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
 }
 
+.vlue-broadcast-switch--on.vlue-broadcast-switch--on-blue {
+  background: #2b6ff0;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.35);
+}
+
 .vlue-broadcast-switch--disabled {
   opacity: 0.45;
   pointer-events: none;
@@ -7909,6 +7914,15 @@ button.ldr-back-person-name--link:active {
   display: flex;
   flex-direction: column;
   overflow: visible;
+}
+
+.lbq-preview-scale {
+  /* ScaledPreview 가 슬롯 높이를 잡음 — 2단 깨짐 방지 */
+  overflow: hidden;
+}
+
+.lbq-preview-phone--compact .ldr-reception--preview .ldr-panel-wrap {
+  --ldr-preview-panel-h: 300px;
 }
 
 .lbq-preview-phone .ldr-reception {

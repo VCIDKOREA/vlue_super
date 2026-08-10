@@ -605,9 +605,7 @@ export default function LetteringBizcardSettingsView({
                     : "text-gray-500"
               }`}
             >
-              {dccBroadcastOn
-                ? "켜짐 — 디지털인증명함이 쇼케이스 첫 페이지에 표시됩니다."
-                : "꺼짐 — 디지털인증명함만 숨기고 쇼케이스만 표시됩니다."}
+              {dccBroadcastOn ? "켜짐" : "꺼짐"}
             </p>
           </div>
           <input
@@ -624,7 +622,9 @@ export default function LetteringBizcardSettingsView({
             }}
           />
           <span
-            className={`vlue-broadcast-switch ${dccBroadcastOn ? "vlue-broadcast-switch--on" : ""}`}
+            className={`vlue-broadcast-switch ${
+              dccBroadcastOn ? "vlue-broadcast-switch--on vlue-broadcast-switch--on-blue" : ""
+            }`}
             aria-hidden
           >
             <span className="vlue-broadcast-switch__knob" />
