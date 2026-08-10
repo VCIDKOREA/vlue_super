@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Phone, PhoneIncoming, PhoneOutgoing, ShieldCheck } from "lucide-react";
 import { CALL_SHOWCASE_HISTORY_CHANGED } from "../lib/callShowcaseHistory.js";
 import {
@@ -138,6 +139,18 @@ function HistoryRowCta({ call, matrix, busy, onAction }) {
   );
 }
 
+function CallHistoryLoadingGuide({ syncing = false }) {
+  return (
+    <div className="call-history-loading" role="status" aria-live="polite">
+      <div className="call-history-loading__spinner" aria-hidden />
+      <p className="call-history-loading__title">
+        {syncing ? "최신 쇼케이스를 불러오는 중…" : "쇼케이스를 불러오는 중…"}
+      </p>
+      <p className="call-history-loading__hint">잠시만 기다려 주세요</p>
+    </div>
+  );
+}
+
 export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = false }) {
   const [items, setItems] = useState([]);
   const [loadError, setLoadError] = useState("");
@@ -201,6 +214,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       setPreviewCard(null);
       setPreviewVerified(false);
       setExpanded(true);
+      setLoading(false);
       return undefined;
     }
     let cancelled = false;
@@ -217,15 +231,18 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       }
       if (!cancelled) setRowMatrix(next);
     };
-    /* 캐시로 즉시 CTA — 주소록 sync 완료 후 한 번만 재계산 */
+    /* 캐시로 즉시 CTA — 네이티브 주소록 dump는 목록이 반응한 뒤 지연(탭 지연 방지) */
     buildMatrix();
-    void syncDeviceContactsFromNative()
-      .then(() => {
-        if (!cancelled) buildMatrix();
-      })
-      .catch(() => {});
+    const syncTimer = window.setTimeout(() => {
+      void syncDeviceContactsFromNative()
+        .then(() => {
+          if (!cancelled) buildMatrix();
+        })
+        .catch(() => {});
+    }, 1200);
     return () => {
       cancelled = true;
+      window.clearTimeout(syncTimer);
     };
   }, [open, items]);
 
@@ -314,36 +331,47 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
   const openCall = (call) => {
     const gen = ++openGenRef.current;
-    const optimistic = buildOptimisticHistoryCard(call);
 
-    /* 클릭 핸들러에서 동기 전환 — 네트워크 await 없음 */
-    setSelected(call);
-    setExpanded(true);
-    setPreviewVerified(optimistic.verified);
-    setPreviewCard(optimistic.card);
-    setLoading(false);
+    /* 무거운 카드 조립 전에 로딩 화면을 먼저 그려 탭 반응을 보장 */
+    flushSync(() => {
+      setSelected(call);
+      setExpanded(true);
+      setPreviewCard(null);
+      setPreviewVerified(false);
+      setLoading(true);
+    });
 
-    if (optimistic.verified && hasPlayableShowcaseBgm(optimistic.peerStyle)) {
-      if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
-        window.__vlueUnlockShowcaseBgm();
-      }
-    }
-
-    /* 로컬 스냅샷 충분 → Supabase/API 호출 생략 (Egress 절약) */
-    if (hasUsableLocalSnapshot(call)) return;
-
-    /* 스냅샷 없을 때만 페인트 이후 백그라운드 hydrate */
-    window.setTimeout(() => {
+    const finishOpen = () => {
       if (gen !== openGenRef.current) return;
+      const optimistic = buildOptimisticHistoryCard(call);
+      setPreviewVerified(optimistic.verified);
+      setPreviewCard(optimistic.card);
+
+      if (optimistic.verified && hasPlayableShowcaseBgm(optimistic.peerStyle)) {
+        if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
+          window.__vlueUnlockShowcaseBgm();
+        }
+      }
+
+      if (hasUsableLocalSnapshot(call)) {
+        setLoading(false);
+        return;
+      }
       void hydrateCallFromNetwork(call, gen);
-    }, 0);
+    };
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(finishOpen);
+    });
   };
 
   const closeDetail = () => {
+    openGenRef.current += 1;
     setSelected(null);
     setPreviewCard(null);
     setPreviewVerified(false);
     setExpanded(true);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -381,7 +409,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
               {toast}
             </p>
           ) : null}
-          {previewCard ? (
+          {loading && !previewCard ? (
+            <CallHistoryLoadingGuide />
+          ) : previewCard ? (
             <div className="lettering-showcase-fs lettering-showcase-fs--history-embed relative">
               <div className="lettering-showcase-fs__shell">
                 <LetteringIncomingNotification
@@ -428,14 +458,14 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                 />
               </div>
               {loading ? (
-                <p className="pointer-events-none absolute inset-x-0 top-2 z-10 text-center text-[11px] font-semibold text-slate-400/90">
-                  최신 쇼케이스 동기화 중…
-                </p>
+                <div className="call-history-loading-overlay">
+                  <CallHistoryLoadingGuide syncing />
+                </div>
               ) : null}
             </div>
-          ) : loading ? (
-            <p className="py-16 text-center text-[13px] font-semibold text-slate-400">쇼케이스 불러오는 중…</p>
-          ) : null}
+          ) : (
+            <CallHistoryLoadingGuide />
+          )}
         </div>
       </AppFullScreenView>
     );
