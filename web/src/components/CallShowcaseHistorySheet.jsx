@@ -517,6 +517,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                       ? previewCard.showcaseStyle
                       : silentShowcaseStyle()
                   }}
+                  includeDigitalCard={
+                    isMember && previewCard.showcaseStyle?.includeDigitalCard !== false
+                  }
                   expanded={expanded}
                   onExpandedChange={setExpanded}
                   onSaveCard={async ({ card, incomingNumber }) => {

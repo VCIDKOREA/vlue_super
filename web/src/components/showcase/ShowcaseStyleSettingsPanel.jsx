@@ -38,7 +38,7 @@ import {
   fetchInstagramLinkStatus,
   startInstagramLink
 } from "../../lib/instagramLinkApi.js";
-import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
+import { readDigitalCardActive, readDccBroadcastOn } from "../../lib/bizcardAccountSync.js";
 import {
   LETTERING_BIZCARD_CHANGED_EVENT,
   LETTERING_OPEN_BIZCARD_SETTINGS_EVENT
@@ -220,7 +220,7 @@ export default function ShowcaseStyleSettingsPanel({
 }) {
   const isWebDesk = layout === "webDesk";
   const isPaid = isPaidLetteringTier(membershipTier);
-  const includeDigitalCard = isPaid && readDigitalCardActive();
+  const includeDigitalCard = isPaid && readDigitalCardActive() && readDccBroadcastOn();
   const maxContentPages = maxShowcaseContentPagesForTier(membershipTier, { includeDigitalCard });
   const [config, setConfig] = useState(() => readShowcaseStyle());
   const [appliedFp, setAppliedFp] = useState(() => styleFingerprint(readShowcaseStyle()));
@@ -305,7 +305,14 @@ export default function ShowcaseStyleSettingsPanel({
 
   /* 명함 사진·신원 변경 시 미리보기 즉시 반영 */
   useEffect(() => {
-    const bump = () => setIdentityTick((n) => n + 1);
+    const bump = () => {
+      setIdentityTick((n) => n + 1);
+      setConfig((prev) => {
+        const on = readDccBroadcastOn();
+        if (prev.includeDigitalCard === on) return prev;
+        return { ...prev, includeDigitalCard: on };
+      });
+    };
     window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
     window.addEventListener("vlue-digital-card-changed", bump);
     window.addEventListener("vlue-avatar-changed", bump);
@@ -575,6 +582,7 @@ export default function ShowcaseStyleSettingsPanel({
   const commitApply = useCallback(() => {
     const withTags = {
       ...config,
+      includeDigitalCard,
       tags: isPaid ? parseShowcaseTagsInput(tagInput) : config.tags || []
     };
     const latest = slimShowcaseStyleForPersist(

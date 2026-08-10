@@ -8,6 +8,9 @@ import { formatPhoneE164ForKoreaDisplay } from "./phoneDisplay.js";
 import { normalizeMembershipKind } from "./membershipBm.js";
 
 export const DIGITAL_CARD_ACTIVE_KEY = "vlue_digital_card_active";
+/** 쇼케이스에 DCC(디지털인증명함) 송출 — 발급(active)과 별개 */
+export const DCC_BROADCAST_KEY = "vlue_dcc_broadcast_on";
+export const DCC_BROADCAST_CHANGED_EVENT = "vlue-dcc-broadcast-changed";
 export const ONBOARDING_DONE_KEY = "vlue_onboarding_complete_v1";
 
 export function readMembershipTier() {
@@ -37,6 +40,75 @@ export function writeDigitalCardActive(on) {
     localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, on ? "1" : "0");
     window.dispatchEvent(new Event("vlue-vcid-changed"));
     window.dispatchEvent(new CustomEvent("vlue-digital-card-changed"));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * 쇼케이스 DCC 송출 ON/OFF (명함 발급 여부와 독립).
+ * 미설정이면 발급된 경우 ON.
+ */
+export function readDccBroadcastOn() {
+  try {
+    const v = localStorage.getItem(DCC_BROADCAST_KEY);
+    if (v === "0") return false;
+    if (v === "1") return true;
+    return readDigitalCardActive();
+  } catch {
+    return true;
+  }
+}
+
+export function writeDccBroadcastOn(on) {
+  const next = Boolean(on);
+  try {
+    localStorage.setItem(DCC_BROADCAST_KEY, next ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  try {
+    import("./showcase/showcaseStyleStorage.js")
+      .then((m) => {
+        try {
+          m.writeShowcaseStyle({ includeDigitalCard: next });
+        } catch {
+          /* ignore */
+        }
+        try {
+          const live = m.readLiveShowcaseStyle();
+          if (live) {
+            m.writeLiveShowcaseStyle({ ...live, includeDigitalCard: next }, { source: "editor" });
+          } else {
+            m.writeLiveShowcaseStyle(
+              { ...m.readShowcaseStyle(), includeDigitalCard: next },
+              { source: "editor" }
+            );
+          }
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {});
+  } catch {
+    /* ignore */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(DCC_BROADCAST_CHANGED_EVENT, { detail: { on: next } }));
+    window.dispatchEvent(new Event("vlue-vcid-changed"));
+    window.dispatchEvent(new CustomEvent("vlue-digital-card-changed"));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 서버 hydrate 후 로컬 송출 키를 스타일과 맞춤 (이벤트·스타일 재기록 없음) */
+export function syncDccBroadcastKeyFromStyle(style) {
+  if (!style || typeof style !== "object") return;
+  try {
+    const next = style.includeDigitalCard === false ? "0" : "1";
+    if (localStorage.getItem(DCC_BROADCAST_KEY) === next) return;
+    localStorage.setItem(DCC_BROADCAST_KEY, next);
   } catch {
     /* ignore */
   }

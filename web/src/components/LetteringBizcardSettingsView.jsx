@@ -34,7 +34,12 @@ import {
   prepareLetteringVerifyDocFromFile
 } from "../lib/letteringBizcardVerification.js";
 import { writeAvatar, writeProfilePhoto } from "../lib/vlueAvatar.js";
-import { DIGITAL_CARD_ACTIVE_KEY } from "../lib/bizcardAccountSync.js";
+import {
+  DIGITAL_CARD_ACTIVE_KEY,
+  DCC_BROADCAST_CHANGED_EVENT,
+  readDccBroadcastOn,
+  writeDccBroadcastOn
+} from "../lib/bizcardAccountSync.js";
 
 export default function LetteringBizcardSettingsView({
   membershipTier = "free",
@@ -45,6 +50,7 @@ export default function LetteringBizcardSettingsView({
 }) {
   const [fixed, setFixed] = useState(() => readLetteringFixedIdentity());
   const isPaid = isPaidLetteringTier(membershipTier);
+  const [dccBroadcastOn, setDccBroadcastOn] = useState(() => readDccBroadcastOn());
 
   const [title, setTitle] = useState("");
   const [department, setDepartment] = useState("");
@@ -200,6 +206,16 @@ export default function LetteringBizcardSettingsView({
   useEffect(() => {
     reload();
   }, [reload]);
+
+  useEffect(() => {
+    const sync = () => setDccBroadcastOn(readDccBroadcastOn());
+    window.addEventListener(DCC_BROADCAST_CHANGED_EVENT, sync);
+    window.addEventListener("vlue-digital-card-changed", sync);
+    return () => {
+      window.removeEventListener(DCC_BROADCAST_CHANGED_EVENT, sync);
+      window.removeEventListener("vlue-digital-card-changed", sync);
+    };
+  }, []);
 
   const titleDeptNeedsSubmit = useMemo(
     () =>
@@ -568,6 +584,43 @@ export default function LetteringBizcardSettingsView({
             {!isPaid ? " · 유료 회원만 통화 중 상대에게 표시됩니다." : ""}
           </p>
         </div>
+        {isPaid && !isFirstApply ? (
+          <div className="ml-1 flex shrink-0 flex-col items-end gap-0.5 pr-0.5">
+            <span
+              className={`text-[10px] font-bold tracking-tight ${
+                dccBroadcastOn ? "text-[#2b6ff0]" : isDarkMode ? "text-gray-500" : "text-gray-400"
+              }`}
+            >
+              {dccBroadcastOn ? "송출 ON" : "송출 OFF"}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={dccBroadcastOn}
+              aria-label="디지털인증명함 쇼케이스 송출"
+              title="쇼케이스에 디지털인증명함 송출"
+              onClick={() => {
+                const next = !dccBroadcastOn;
+                writeDccBroadcastOn(next);
+                setDccBroadcastOn(next);
+                showToast(
+                  next
+                    ? "디지털인증명함이 쇼케이스 첫 페이지로 송출됩니다."
+                    : "디지털인증명함 송출을 껐습니다. 쇼케이스만 표시됩니다."
+                );
+              }}
+              className={`relative h-7 w-[46px] rounded-full transition-colors ${
+                dccBroadcastOn ? "bg-[#2b6ff0]" : isDarkMode ? "bg-white/20" : "bg-gray-300"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                  dccBroadcastOn ? "translate-x-[18px]" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-4 py-4 no-scrollbar">

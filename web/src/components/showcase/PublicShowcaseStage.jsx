@@ -89,6 +89,7 @@ export default function PublicShowcaseStage({ card, onToast, onClose }) {
 
   const hasMedia = styleHasMedia(style);
   const canClose = typeof onClose === "function";
+  const includeDigitalCard = style?.includeDigitalCard !== false;
 
   if (loadingStyle) {
     return (
@@ -109,7 +110,7 @@ export default function PublicShowcaseStage({ card, onToast, onClose }) {
           isKnownContact
           scrollEnabled
           previewMode
-          includeDigitalCard
+          includeDigitalCard={includeDigitalCard}
           digitalCardOnly={false}
           preferContentSlide={false}
           socialOverlayEnabled
@@ -125,7 +126,23 @@ export default function PublicShowcaseStage({ card, onToast, onClose }) {
     );
   }
 
-  /* 사진·BGM 이 아직 없어도 공개 링크는 디지털 인증명함만이라도 노출 */
+  /* 사진·BGM 이 아직 없어도 공개 링크는 디지털 인증명함만이라도 노출 (송출 OFF면 안내) */
+  if (!includeDigitalCard) {
+    return (
+      <div className="flex h-full min-h-[50vh] flex-col items-center justify-center gap-2 px-6 text-center text-[14px] font-semibold text-slate-300">
+        <p>쇼케이스 콘텐츠가 아직 없습니다.</p>
+        {canClose ? (
+          <button
+            type="button"
+            className="mt-2 rounded-full bg-white/10 px-4 py-2 text-[12px] font-bold text-white"
+            onClick={onClose}
+          >
+            닫기
+          </button>
+        ) : null}
+      </div>
+    );
+  }
   return (
     <div className="public-showcase-stage relative flex h-full min-h-0 flex-1 flex-col bg-[#0B101B] p-3">
       {canClose ? (

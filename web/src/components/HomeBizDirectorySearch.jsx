@@ -494,7 +494,9 @@ export default function HomeBizDirectorySearch({
             <PeerShowcasePreview
               card={previewCard}
               onClose={closePreview}
-              includeDigitalCard={previewPaid}
+              includeDigitalCard={
+                previewPaid && previewCard.showcaseStyle?.includeDigitalCard !== false
+              }
             />
           ) : (
             <p className="py-16 text-center text-[13px] font-semibold text-slate-500">

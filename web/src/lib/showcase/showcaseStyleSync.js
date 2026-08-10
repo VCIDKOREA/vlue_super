@@ -141,6 +141,16 @@ function applyServerBundle(bundle, { reason = "hydrate", clearMissing = false } 
 
   if (bundle.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.updatedAt);
   else if (clearMissing) writeLocalShowcaseStyleUpdatedAt(new Date(0).toISOString());
+  try {
+    const prefer = liveHas ? live : editorHas ? editor : null;
+    if (prefer) {
+      import("../bizcardAccountSync.js")
+        .then((m) => m.syncDccBroadcastKeyFromStyle?.(prefer))
+        .catch(() => {});
+    }
+  } catch {
+    /* ignore */
+  }
   void reason;
   return { editorHas, liveHas, seededEditorFromLive: !editorHas && liveHas };
 }

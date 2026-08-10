@@ -100,6 +100,8 @@ export function createDefaultShowcaseStyle() {
     },
     /** 디지털인증명함 「VLUE 인증」뱃지 표시 — 미등록 번호 UI와 무관 */
     verifiedBadgeOn: true,
+    /** 쇼케이스 1페이지 DCC 송출 — false 면 콘텐츠만 */
+    includeDigitalCard: true,
     commercial: {
       menuItems: [],
       /** @deprecated products → links */
@@ -243,6 +245,7 @@ function mergeDeep(defaults, parsed) {
     tags: Array.isArray(parsed?.tags) ? parsed.tags : defaults.tags,
     privacyMode: parsed?.privacyMode === "public" ? "public" : defaults.privacyMode,
     showBroadcastName: parsed?.showBroadcastName === false ? false : true,
+    includeDigitalCard: parsed?.includeDigitalCard === false ? false : true,
     commentsEnabled: parsed?.commentsEnabled === false ? false : true,
     shareEnabled: parsed?.shareEnabled === false ? false : true,
     pages: Array.isArray(parsed?.pages) ? parsed.pages.map(normalizeShowcasePage) : defaults.pages

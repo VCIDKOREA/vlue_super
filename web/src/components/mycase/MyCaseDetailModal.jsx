@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import LetteringIncomingNotification from "../LetteringIncomingNotification.jsx";
-import { readDigitalCardActive, readMembershipTier } from "../../lib/bizcardAccountSync.js";
+import { readDigitalCardActive, readDccBroadcastOn, readMembershipTier } from "../../lib/bizcardAccountSync.js";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import {
   createDefaultShowcaseStyle,
@@ -208,7 +208,7 @@ export default function MyCaseDetailModal({
 
   const includeDigitalCard = useMemo(() => {
     if (!isPaidLetteringTier(membershipTier)) return false;
-    if (owner) return readDigitalCardActive();
+    if (owner) return readDigitalCardActive() && readDccBroadcastOn();
     return Boolean(peerIdentity?.digitalCardIssued);
   }, [owner, membershipTier, peerIdentity, open]);
 

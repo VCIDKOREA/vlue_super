@@ -3,7 +3,7 @@ import {
   readLetteringBizcardEditable,
   readLetteringFixedIdentity
 } from "./letteringBizcardStorage.js";
-import { readDigitalCardActive } from "./bizcardAccountSync.js";
+import { readDigitalCardActive, readDccBroadcastOn } from "./bizcardAccountSync.js";
 import { scrubLetteringDemoPollution } from "./letteringDemoPollution.js";
 
 /** 홈 쇼케이스 미리보기 — 설정 전 예시 브랜드 */
@@ -210,5 +210,5 @@ export function applyShowcasePreviewExampleIdentity(card = {}) {
 }
 
 export function readShowcasePreviewDigitalCardApplied() {
-  return readDigitalCardActive();
+  return readDigitalCardActive() && readDccBroadcastOn();
 }

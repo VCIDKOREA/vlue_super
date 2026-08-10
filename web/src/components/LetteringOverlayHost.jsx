@@ -575,7 +575,9 @@ function LetteringOverlayHostInner() {
               }
             }
           }}
-          includeDigitalCard={Boolean(verified && isPaid)}
+          includeDigitalCard={Boolean(
+            verified && isPaid && styledCard?.showcaseStyle?.includeDigitalCard !== false
+          )}
           isKnownContact={verified}
           onEndCall={onCall ? handleEnd : handleReject}
           onToast={showToast}

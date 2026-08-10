@@ -360,7 +360,15 @@ export default function LetteringIncomingNotification({
             verificationItems: []
           }
   );
+  /** prop + 상대 쇼케이스 스타일(includeDigitalCard) 모두 허용할 때만 DCC 슬라이드 */
+  const showDigitalCard =
+    Boolean(includeDigitalCard) && c?.showcaseStyle?.includeDigitalCard !== false;
   const onCall = callPhase === "active" || callPhase === "connected";
+  useEffect(() => {
+    if (!showDigitalCard && carouselSlideType === "card") {
+      setCarouselSlideType("banner");
+    }
+  }, [showDigitalCard, carouselSlideType]);
   const useCompanionDelegate =
     COMPANION_MVP_DELEGATE_CALL_UI &&
     onCall &&
@@ -1267,7 +1275,7 @@ export default function LetteringIncomingNotification({
                       isKnownContact={isKnownContact}
                       scrollEnabled={carouselScrollEnabled}
                       previewMode={previewMode}
-                      includeDigitalCard={includeDigitalCard}
+                      includeDigitalCard={showDigitalCard}
                       digitalCardOnly={digitalCardOnly}
                       preferContentSlide={preferContentSlide}
                       face={receptionFace}
