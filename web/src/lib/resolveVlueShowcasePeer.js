@@ -7,12 +7,37 @@ import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
 import { isPaidLetteringTier } from "./letteringMembership.js";
 import { fetchFollowProfile } from "./followApi.js";
 import { lookupUserByHandle } from "./showcase/showcaseSocialApi.js";
-import { fetchPeerShowcaseStyleBundle } from "./showcase/showcaseStyleApi.js";
+import {
+  fetchPeerLiveStylePublic,
+  fetchPeerShowcaseStyleBundle
+} from "./showcase/showcaseStyleApi.js";
 import { createDefaultShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
 import { resolveVlueShowcaseByPhone } from "./resolveVlueShowcaseByPhone.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function styleHasShowcaseContent(style) {
+  if (!style || typeof style !== "object") return false;
+  if (Array.isArray(style.pages) && style.pages.some((p) => p && typeof p === "object")) return true;
+  if (Array.isArray(style.gallery?.photos) && style.gallery.photos.length > 0) return true;
+  return false;
+}
+
+function mergePeerLiveStyle(base, live) {
+  if (!live || typeof live !== "object") return base;
+  if (!base || typeof base !== "object") return live;
+  return {
+    ...base,
+    ...live,
+    bgm: live.bgm || base.bgm,
+    pages:
+      Array.isArray(live.pages) && live.pages.length
+        ? live.pages
+        : base.pages,
+    gallery: live.gallery || base.gallery
+  };
+}
 
 /**
  * @param {{
@@ -21,7 +46,8 @@ const UUID_RE =
  *   phone?: string,
  *   displayName?: string,
  *   membershipTier?: string,
- *   avatarUrl?: string
+ *   avatarUrl?: string,
+ *   forceStyle?: boolean
  * }} input
  */
 export async function resolveVlueShowcasePeer(input = {}) {
@@ -95,8 +121,17 @@ export async function resolveVlueShowcasePeer(input = {}) {
       authPaidAt = profRes.authPaidAt || null;
     }
 
-    const live =
+    let live =
       styleRes.ok && styleRes.live && typeof styleRes.live === "object" ? styleRes.live : null;
+    /* 캐시·auth 응답에 콘텐츠 페이지가 없으면 공개 라이브로 한 번 더 보강 */
+    if (!styleHasShowcaseContent(live)) {
+      const pub = await fetchPeerLiveStylePublic(userId, {
+        force: Boolean(input.forceStyle) || !live
+      });
+      if (pub && typeof pub === "object") {
+        live = mergePeerLiveStyle(live, pub);
+      }
+    }
     const showcaseStyle = live || createDefaultShowcaseStyle();
 
     const card = normalizeLetteringCard({

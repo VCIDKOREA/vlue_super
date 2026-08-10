@@ -299,19 +299,22 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const background = Boolean(opts.background);
     const phone = call.phoneDisplay || call.phone;
     const hasLocalPages = styleHasShowcaseContent(call.showcaseSnapshot);
-    /* 로컬에 페이지 스냅샷이 있으면 백그라운드 재조회 생략 — egress */
-    if (background && hasLocalPages) return;
+    const hasLocalBgm = hasPlayableShowcaseBgm(call.showcaseSnapshot);
+    /* 페이지·BGM이 모두 있는 스냅샷만 백그라운드 재조회 생략 — DCC만 있는 스냅샷은 반드시 라이브 보강 */
+    if (background && hasLocalPages && hasLocalBgm) return;
     try {
       if (!background) setLoading(true);
       const uidHint = String(call.cardSnapshot?.userId || call.userId || "").trim();
+      const needForce =
+        !hasLocalPages || !hasLocalBgm || Boolean(opts.forceStyle);
       const payload = await resolveVlueShowcasePeer({
         phone,
         userId: uidHint,
         displayName: call.name || "",
         membershipTier: call.membershipTier || "free",
         avatarUrl: call.avatarUrl || "",
-        /* 스냅샷·캐시가 있으면 강제 우회하지 않음 — 재탭 체감 속도 */
-        forceStyle: !background && !hasLocalPages && !uidHint
+        /* 콘텐츠/음악 없으면 캐시 우회해 최신 라이브 */
+        forceStyle: needForce
       });
       if (gen !== openGenRef.current) return;
 
@@ -324,7 +327,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
       /* resolve 결과에 페이지가 없을 때만 공개 라이브 보강 (중복 GET 제거) */
       if (matched && peerUserId && !styleHasShowcaseContent(peerStyle)) {
-        const live = await fetchPeerLiveStylePublic(peerUserId, { force: false });
+        const live = await fetchPeerLiveStylePublic(peerUserId, { force: true });
         if (live && typeof live === "object") {
           peerStyle = {
             ...peerStyle,
@@ -385,6 +388,15 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const openCall = (call) => {
     const gen = ++openGenRef.current;
 
+    try {
+      unlockFromUserGesture?.();
+    } catch {
+      /* ignore */
+    }
+
+    const hasPages = styleHasShowcaseContent(call.showcaseSnapshot);
+    const hasBgm = hasPlayableShowcaseBgm(call.showcaseSnapshot);
+
     if (hasUsableLocalSnapshot(call)) {
       const optimistic = buildOptimisticHistoryCard(call);
       flushSync(() => {
@@ -395,18 +407,27 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         setLoading(false);
       });
       startPeerBgm(optimistic.peerStyle);
-      void hydrateCallFromNetwork(call, gen, { background: true });
+      /* DCC-only / BGM 없는 스냅샷은 포그라운드에 가깝게 강제 보강 */
+      void hydrateCallFromNetwork(call, gen, {
+        background: Boolean(hasPages && hasBgm),
+        forceStyle: !hasPages || !hasBgm
+      });
       return;
     }
 
     flushSync(() => {
       setSelected(call);
       setExpanded(true);
-      setPreviewCard(null);
-      setPreviewVerified(false);
+      /* 스냅샷 없어도 목록 메타로 즉시 셸을 띄워 로딩 체감 단축 */
+      const optimistic = buildOptimisticHistoryCard({
+        ...call,
+        verified: call.verified === true || Boolean(call.userId || call.cardSnapshot?.userId)
+      });
+      setPreviewVerified(Boolean(optimistic.verified));
+      setPreviewCard(optimistic.card);
       setLoading(true);
     });
-    void hydrateCallFromNetwork(call, gen, { background: false });
+    void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: true });
   };
 
   const closeDetail = () => {

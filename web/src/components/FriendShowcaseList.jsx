@@ -18,8 +18,9 @@ import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
 import AppFullScreenView from "./AppFullScreenView.jsx";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
+import { hasPlayableShowcaseBgm } from "../lib/showcase/showcaseBgmPresets.js";
+import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import VLUE_BRAND_LOGO from "../assets/vlue-shield-eye-logo.svg?url";
-import UserCaseArchiveView from "./mycase/UserCaseArchiveView.jsx";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
 import "./friend-showcase-list.css";
 import "../styles/tent-showcase.css";
@@ -90,11 +91,11 @@ function measureSheetTops() {
 }
 
 /**
- * 인스타형 행 — 로고형 아바타 + 쇼케이스/명함 분리 버튼 + 팔로우
+ * 인스타형 행 — 로고형 아바타 + 쇼케이스/명함 분리 버튼
+ * 이름·아바타 탭도 현재 쇼케이스를 연다 (케이스함은 별도 진입점)
  */
-function FollowShowcaseRow({ row, selected, unread, onOpenShowcase, onOpenIdCard, onOpenCaseArchive }) {
+function FollowShowcaseRow({ row, selected, unread, onOpenShowcase, onOpenIdCard }) {
   const showCardBtn = Boolean(row.hasDigitalCard);
-  const canOpenArchive = Boolean(row.userId && OWNER_UUID_RE.test(String(row.userId)));
   return (
     <li>
       <div
@@ -103,11 +104,8 @@ function FollowShowcaseRow({ row, selected, unread, onOpenShowcase, onOpenIdCard
         <button
           type="button"
           className="friend-showcase-list__row-main friend-showcase-list__row-main--profile"
-          onClick={() => {
-            if (canOpenArchive && onOpenCaseArchive) onOpenCaseArchive(row);
-            else onOpenShowcase(row);
-          }}
-          aria-label={`${row.name} 케이스함 보기`}
+          onClick={() => onOpenShowcase(row)}
+          aria-label={`${row.name} 쇼케이스 보기`}
         >
           <VlueLogoAvatar avatarUrl={row.avatarUrl} unread={unread} />
           <div className="friend-showcase-list__meta">
@@ -170,7 +168,6 @@ export default function FriendShowcaseList({
   const [listLoading, setListLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(/** @type {FollowTabId} */ ("trending"));
   const [selected, setSelected] = useState(null);
-  const [caseArchiveUser, setCaseArchiveUser] = useState(null);
   const [previewKind, setPreviewKind] = useState(/** @type {PreviewKind} */ ("showcase"));
   const [previewCard, setPreviewCard] = useState(null);
   const [previewSessionKey, setPreviewSessionKey] = useState(0);
@@ -187,6 +184,26 @@ export default function FriendShowcaseList({
   const dragRef = useRef({ startY: 0, startTop: 0, dragging: false });
   const anchorsRef = useRef({ fullTop: 56, midTop: 320, nav: 56 });
   const geoRef = useRef(false);
+  const { unlockFromUserGesture, setPlaybackPhase, bindStyleConfig } = useShowcaseBgm();
+
+  const startPeerBgm = useCallback(
+    (style) => {
+      if (!hasPlayableShowcaseBgm(style)) return;
+      try {
+        bindStyleConfig?.(style);
+        unlockFromUserGesture?.();
+        setPlaybackPhase?.("preview", {
+          forceRestart: true,
+          steal: true,
+          owner: "follow-showcase",
+          styleConfig: style
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    [bindStyleConfig, unlockFromUserGesture, setPlaybackPhase]
+  );
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return undefined;
@@ -416,6 +433,12 @@ export default function FriendShowcaseList({
   }, [refreshAnchors, sheetTopPx, goFull, goMid, goCollapsed]);
 
   const openPreview = async (row, kind) => {
+    /* 탭 제스처 안에서 즉시 unlock — 비동기 이후엔 autoplay 차단됨 */
+    try {
+      unlockFromUserGesture?.();
+    } catch {
+      /* ignore */
+    }
     setPreviewSessionKey((k) => k + 1);
     setSelected(row);
     setPreviewKind(kind);
@@ -438,13 +461,16 @@ export default function FriendShowcaseList({
         displayName: row.name || "",
         membershipTier: row.membershipTier || "free",
         avatarUrl: row.avatarUrl || "",
-        forceStyle: false
+        /* 팔로우 목록 열람은 항상 최신 라이브 스타일 */
+        forceStyle: true
       });
       const tier = payload.card?.membershipTier || row.membershipTier || "free";
       const peerUid = String(
         payload.card?.userId || (OWNER_UUID_RE.test(String(row.userId || "")) ? row.userId : "")
       ).trim();
-      setPreviewCard({
+      const showcaseStyle =
+        payload.showcaseStyle || payload.card?.showcaseStyle || createDefaultShowcaseStyle();
+      const nextCard = {
         ...payload.card,
         userId: peerUid,
         ownerUserId: payload.card?.ownerUserId || peerUid,
@@ -459,14 +485,31 @@ export default function FriendShowcaseList({
         authCycleEndAt: payload.card?.authCycleEndAt || payload.card?.cycleEndAt || null,
         authPaidAt: payload.card?.authPaidAt || null,
         cycleEndAt: payload.card?.authCycleEndAt || payload.card?.cycleEndAt || null,
-        showcaseStyle: payload.showcaseStyle || payload.card?.showcaseStyle || createDefaultShowcaseStyle()
-      });
+        showcaseStyle
+      };
+      setPreviewCard(nextCard);
+      /* 목록 아바타도 즉시 반영 */
+      if (nextCard.photoUrl || nextCard.avatarUrl) {
+        const av = nextCard.photoUrl || nextCard.avatarUrl;
+        const patch = (list) =>
+          list.map((r) => (r.id === row.id || r.userId === row.userId ? { ...r, avatarUrl: av } : r));
+        setNearby(patch);
+        setTrending(patch);
+        setFollowing(patch);
+        setHashtagRows(patch);
+      }
+      if (kind === "showcase") startPeerBgm(showcaseStyle);
     } finally {
       setPreviewLoading(false);
     }
   };
 
   const closePreview = () => {
+    try {
+      setPlaybackPhase?.("idle", { fade: true, steal: true, owner: "follow-showcase" });
+    } catch {
+      /* ignore */
+    }
     setSelected(null);
     setPreviewCard(null);
     setPreviewKind("showcase");
@@ -496,15 +539,7 @@ export default function FriendShowcaseList({
 
   const rowHandlers = {
     onOpenShowcase: (row) => openPreview(row, "showcase"),
-    onOpenIdCard: (row) => openPreview(row, "idcard"),
-    onOpenCaseArchive: (row) => {
-      if (row?.userId && OWNER_UUID_RE.test(String(row.userId))) {
-        setCaseArchiveUser({
-          userId: row.userId,
-          name: row.name || row.publicHandle || "케이스함"
-        });
-      }
-    }
+    onOpenIdCard: (row) => openPreview(row, "idcard")
   };
 
   const listBody = (
@@ -695,7 +730,6 @@ export default function FriendShowcaseList({
                   card={previewCard}
                   verified
                   embeddedInPush
-                  previewMode
                   enableContactLinks
                   face="front"
                 />
@@ -721,13 +755,6 @@ export default function FriendShowcaseList({
           )}
         </div>
       </AppFullScreenView>
-
-      <UserCaseArchiveView
-        open={Boolean(caseArchiveUser?.userId)}
-        userId={caseArchiveUser?.userId || null}
-        displayName={caseArchiveUser?.name || ""}
-        onClose={() => setCaseArchiveUser(null)}
-      />
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
 import { getLocalVlueUserId } from "./showcase/resolveShowcaseOwnerUserId.js";
-import { fetchFollowing } from "./followApi.js";
+import { fetchFollowing, fetchFollowProfile } from "./followApi.js";
 import { searchShowcaseByTag } from "./showcase/showcaseTagsApi.js";
 import { isPaidLetteringTier } from "./letteringMembership.js";
 
@@ -118,7 +118,7 @@ export function buildBaseRecommendPool({
           subtitle: handle ? `@${handle}` : "주소록 · VLUE 회원",
           phone,
           phoneDisplay: phone ? formatLetteringPhoneDisplay(phone) : "",
-          avatarUrl: "",
+          avatarUrl: String(u.photoUrl || u.avatarUrl || u.profilePhotoUrl || "").trim(),
           publicHandle: handle,
           bucket: "nearby",
           tags: []
@@ -293,5 +293,56 @@ export async function loadFollowShowcaseLists({
   }
 
   const { trending, nearby } = splitRecommendBuckets(pool, trendingHits, { geoGranted });
-  return { following, trending, nearby, me };
+
+  /* 주변·인기·팔로잉 행에 프로필 사진이 비어 있으면 follow profile로 보강 */
+  const [followingHydrated, trendingHydrated, nearbyHydrated] = await Promise.all([
+    hydrateMissingAvatars(following, 24),
+    hydrateMissingAvatars(trending, 12),
+    hydrateMissingAvatars(nearby, 16)
+  ]);
+
+  return {
+    following: followingHydrated,
+    trending: trendingHydrated,
+    nearby: nearbyHydrated,
+    me
+  };
+}
+
+/** 목록 아바타 누락 행만 프로필 API로 채움 — 동시성 제한 */
+async function hydrateMissingAvatars(rows = [], limit = 12) {
+  const list = Array.isArray(rows) ? rows : [];
+  const needIdx = [];
+  for (let i = 0; i < list.length && needIdx.length < limit; i += 1) {
+    const row = list[i];
+    if (row?.userId && isUuid(row.userId) && !String(row.avatarUrl || "").trim()) {
+      needIdx.push(i);
+    }
+  }
+  if (!needIdx.length) return list;
+
+  const out = list.slice();
+  const CONCURRENCY = 4;
+  for (let i = 0; i < needIdx.length; i += CONCURRENCY) {
+    const chunk = needIdx.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      chunk.map(async (idx) => {
+        const row = out[idx];
+        try {
+          const prof = await fetchFollowProfile(row.userId);
+          if (!prof?.ok) return;
+          const url = String(
+            prof.photoUrl ||
+              prof.profile?.photoUrl ||
+              prof.cardExport?.photoUrl ||
+              ""
+          ).trim();
+          if (url) out[idx] = { ...row, avatarUrl: url };
+        } catch {
+          /* ignore */
+        }
+      })
+    );
+  }
+  return out;
 }

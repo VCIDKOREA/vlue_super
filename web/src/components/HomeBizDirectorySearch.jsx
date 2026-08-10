@@ -289,7 +289,8 @@ export default function HomeBizDirectorySearch({
         phone: row.phone || row.phoneDisplay || "",
         displayName: row.name || "",
         membershipTier: row.membershipTier || "free",
-        avatarUrl: row.avatarUrl || ""
+        avatarUrl: row.avatarUrl || "",
+        forceStyle: true
       });
       const tier = payload.card?.membershipTier || row.membershipTier || "free";
       const peerUid = String(payload.card?.userId || uid || "").trim();

@@ -387,7 +387,15 @@
   min-height: 0;
   overflow: auto;
   padding: 12px;
-  background: #f8fafc;
+  background: #0b101b;
+  display: flex;
+  flex-direction: column;
+}
+
+.friend-showcase-list__idcard-wrap .ldr-reception {
+  flex: 1;
+  min-height: min(72vh, 640px);
+  width: 100%;
 }
 
 .friend-showcase-list--light,
