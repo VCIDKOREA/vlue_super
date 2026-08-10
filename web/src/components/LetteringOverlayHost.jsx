@@ -432,13 +432,17 @@ function LetteringOverlayHostInner() {
         showcaseSnapshot: showcaseStyle,
         cardSnapshot: card
           ? {
+              userId: card.userId || card.ownerUserId || "",
               name: card.name,
               organization: card.organization,
+              title: card.title,
               phone: card.phone,
+              email: card.email,
               photoUrl: card.photoUrl,
               avatarUrl: card.avatarUrl || card.photoUrl || "",
               logoUrl: card.logoUrl,
               website: card.website,
+              photoFocus: card.photoFocus || "center",
               membershipTier: card.membershipTier,
               kakaoAvatarUrl: card.kakaoAvatarUrl || "",
               instagramAvatarUrl: card.instagramAvatarUrl || ""

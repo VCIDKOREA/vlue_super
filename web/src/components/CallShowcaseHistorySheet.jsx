@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Phone, PhoneIncoming, PhoneOutgoing, ShieldCheck } from "lucide-react";
 import { CALL_SHOWCASE_HISTORY_CHANGED } from "../lib/callShowcaseHistory.js";
 import {
@@ -40,6 +40,45 @@ function silentShowcaseStyle() {
       playlist: []
     }
   };
+}
+
+/** 탭 즉시 표시용 — 네트워크 완료 전 스냅샷/목록 메타로 카드 구성 */
+function buildOptimisticHistoryCard(call) {
+  const phone = call.phoneDisplay || call.phone || "";
+  const snap = call.cardSnapshot && typeof call.cardSnapshot === "object" ? call.cardSnapshot : {};
+  const snapStyle =
+    call.showcaseSnapshot && typeof call.showcaseSnapshot === "object"
+      ? call.showcaseSnapshot
+      : null;
+  const matchedHint = call.verified === true;
+  const tier = call.membershipTier || snap.membershipTier || "free";
+  const peerStyle =
+    matchedHint && snapStyle
+      ? snapStyle
+      : silentShowcaseStyle();
+  const card = applyShowcaseStyleToCard(
+    {
+      userId: String(snap.userId || call.userId || "").trim(),
+      ownerUserId: String(snap.userId || call.userId || "").trim(),
+      name: matchedHint ? String(snap.name || call.name || "").trim() : "",
+      phone,
+      organization: matchedHint ? String(snap.organization || "").trim() : "",
+      title: matchedHint ? String(snap.title || "").trim() : "",
+      email: matchedHint ? String(snap.email || "").trim() : "",
+      website: matchedHint ? String(snap.website || "").trim() : "",
+      logoUrl: matchedHint ? String(snap.logoUrl || "").trim() : "",
+      photoUrl: matchedHint ? String(snap.photoUrl || call.avatarUrl || "").trim() : "",
+      avatarUrl: matchedHint
+        ? String(snap.avatarUrl || snap.photoUrl || call.avatarUrl || "").trim()
+        : "",
+      photoFocus: String(snap.photoFocus || "center").trim() || "center",
+      membershipTier: tier,
+      showcaseStyle: peerStyle
+    },
+    isPaidLetteringTier(tier) ? tier : "free",
+    { peerMode: true, style: peerStyle }
+  );
+  return { card, verified: matchedHint, peerStyle };
 }
 
 function CallHistoryAvatar({ call }) {
@@ -100,6 +139,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const [rowMatrix, setRowMatrix] = useState({});
   const [busyId, setBusyId] = useState("");
   const [toast, setToast] = useState("");
+  const openGenRef = useRef(0);
 
   const showToast = useCallback((msg) => {
     setToast(String(msg || "").trim());
@@ -192,14 +232,34 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   };
 
   const openCall = async (call) => {
+    const gen = ++openGenRef.current;
+    const phone = call.phoneDisplay || call.phone;
+    const optimistic = buildOptimisticHistoryCard(call);
+
+    /* 네트워크 대기 없이 즉시 상세 화면 진입 */
     setSelected(call);
-    setPreviewCard(null);
-    setPreviewVerified(false);
     setExpanded(true);
+    setPreviewVerified(optimistic.verified);
+    setPreviewCard(optimistic.card);
     setLoading(true);
+
+    if (optimistic.verified && hasPlayableShowcaseBgm(optimistic.peerStyle)) {
+      if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
+        window.__vlueUnlockShowcaseBgm();
+      }
+    }
+
     try {
-      const phone = call.phoneDisplay || call.phone;
-      const payload = await resolveVlueShowcasePeer({ phone });
+      const uid = String(call.cardSnapshot?.userId || call.userId || "").trim();
+      const payload = await resolveVlueShowcasePeer({
+        phone,
+        userId: uid,
+        displayName: call.name || "",
+        membershipTier: call.membershipTier || "free",
+        avatarUrl: call.avatarUrl || ""
+      });
+      if (gen !== openGenRef.current) return;
+
       const matched = Boolean(payload.verified && payload.card?.userId);
       const peerStyle =
         matched && payload.showcaseStyle && typeof payload.showcaseStyle === "object"
@@ -216,9 +276,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       const card = applyShowcaseStyleToCard(
         {
           ...payload.card,
-          name: matched
-            ? payload.card?.name || call.name || phone
-            : "",
+          name: matched ? payload.card?.name || call.name || phone : "",
           phone: payload.phone || phone,
           membershipTier: tier,
           photoUrl: matched ? payload.card?.photoUrl || call.avatarUrl || "" : "",
@@ -232,7 +290,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       setPreviewVerified(matched);
       setPreviewCard(card);
 
-      /* 목록 표시명 enrich (회원명) */
       if (matched && payload.card?.name) {
         setSelected((prev) =>
           prev
@@ -247,7 +304,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         );
       }
     } finally {
-      setLoading(false);
+      if (gen === openGenRef.current) setLoading(false);
     }
   };
 
@@ -293,10 +350,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
               {toast}
             </p>
           ) : null}
-          {loading ? (
-            <p className="py-16 text-center text-[13px] font-semibold text-slate-400">쇼케이스 불러오는 중…</p>
-          ) : previewCard ? (
-            <div className="lettering-showcase-fs lettering-showcase-fs--history-embed">
+          {previewCard ? (
+            <div className="lettering-showcase-fs lettering-showcase-fs--history-embed relative">
               <div className="lettering-showcase-fs__shell">
                 <LetteringIncomingNotification
                   className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--history-replay"
@@ -341,7 +396,14 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                   onToast={showToast}
                 />
               </div>
+              {loading ? (
+                <p className="pointer-events-none absolute inset-x-0 top-2 z-10 text-center text-[11px] font-semibold text-slate-400/90">
+                  최신 쇼케이스 동기화 중…
+                </p>
+              ) : null}
             </div>
+          ) : loading ? (
+            <p className="py-16 text-center text-[13px] font-semibold text-slate-400">쇼케이스 불러오는 중…</p>
           ) : null}
         </div>
       </AppFullScreenView>
