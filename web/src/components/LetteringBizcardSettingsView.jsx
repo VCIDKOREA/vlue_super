@@ -584,44 +584,53 @@ export default function LetteringBizcardSettingsView({
             {!isPaid ? " · 유료 회원만 통화 중 상대에게 표시됩니다." : ""}
           </p>
         </div>
-        {isPaid && !isFirstApply ? (
-          <div className="ml-1 flex shrink-0 flex-col items-end gap-0.5 pr-0.5">
-            <span
-              className={`text-[10px] font-bold tracking-tight ${
-                dccBroadcastOn ? "text-[#2b6ff0]" : isDarkMode ? "text-gray-500" : "text-gray-400"
-              }`}
-            >
-              {dccBroadcastOn ? "송출 ON" : "송출 OFF"}
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={dccBroadcastOn}
-              aria-label="디지털인증명함 쇼케이스 송출"
-              title="쇼케이스에 디지털인증명함 송출"
-              onClick={() => {
-                const next = !dccBroadcastOn;
-                writeDccBroadcastOn(next);
-                setDccBroadcastOn(next);
-                showToast(
-                  next
-                    ? "디지털인증명함이 쇼케이스 첫 페이지로 송출됩니다."
-                    : "디지털인증명함 송출을 껐습니다. 쇼케이스만 표시됩니다."
-                );
-              }}
-              className={`relative h-7 w-[46px] rounded-full transition-colors ${
-                dccBroadcastOn ? "bg-[#2b6ff0]" : isDarkMode ? "bg-white/20" : "bg-gray-300"
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-                  dccBroadcastOn ? "translate-x-[18px]" : "translate-x-0.5"
-                }`}
-              />
-            </button>
-          </div>
-        ) : null}
       </div>
+
+      {isPaid && !isFirstApply ? (
+        <label
+          className={`flex shrink-0 cursor-pointer items-center justify-between gap-3 border-b px-4 py-3 ${
+            isDarkMode ? "border-white/10 bg-white/[0.03]" : "border-gray-100 bg-[#f8fafc]"
+          }`}
+        >
+          <div className="min-w-0">
+            <p className={`text-[13px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
+              쇼케이스 송출
+            </p>
+            <p
+              className={`mt-0.5 text-[11px] font-medium ${
+                dccBroadcastOn
+                  ? "text-[#2b6ff0]"
+                  : isDarkMode
+                    ? "text-gray-500"
+                    : "text-gray-500"
+              }`}
+            >
+              {dccBroadcastOn
+                ? "켜짐 — 디지털인증명함이 쇼케이스 첫 페이지에 표시됩니다."
+                : "꺼짐 — 디지털인증명함만 숨기고 쇼케이스만 표시됩니다."}
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            role="switch"
+            className="peer sr-only"
+            checked={dccBroadcastOn}
+            aria-checked={dccBroadcastOn}
+            aria-label="디지털인증명함 쇼케이스 송출"
+            onChange={(e) => {
+              const next = e.target.checked;
+              setDccBroadcastOn(next);
+              writeDccBroadcastOn(next);
+            }}
+          />
+          <span
+            className={`vlue-broadcast-switch ${dccBroadcastOn ? "vlue-broadcast-switch--on" : ""}`}
+            aria-hidden
+          >
+            <span className="vlue-broadcast-switch__knob" />
+          </span>
+        </label>
+      ) : null}
 
       <div className="vlue-scroll-pad-bottom-nav min-h-0 flex-1 overflow-y-auto px-4 py-4 no-scrollbar">
         <LetteringBizcardQuickBuilder
