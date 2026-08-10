@@ -917,7 +917,7 @@ export default function LetteringIncomingNotification({
                   isGlassTent ? "lettering-action--glass" : "lettering-action--primary"
                 }`}
               >
-                {matrixBusy ? "처리 중…" : peerMatrix.label}
+                {matrixBusy ? "처리 중…" : "쇼케이스 저장하기"}
               </button>
               <button
                 type="button"
@@ -971,7 +971,7 @@ export default function LetteringIncomingNotification({
               disabled={matrixBusy}
               className="lettering-action lettering-action--ghost"
             >
-              {peerMatrix.label}
+              {matrixBusy ? "처리 중…" : "쇼케이스 저장하기"}
             </button>
           ) : (
             <span className="lettering-action lettering-action--ghost opacity-0 pointer-events-none" aria-hidden>

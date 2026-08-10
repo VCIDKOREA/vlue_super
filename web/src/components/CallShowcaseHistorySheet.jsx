@@ -82,12 +82,21 @@ function buildOptimisticHistoryCard(call) {
   return { card, verified: matchedHint, peerStyle };
 }
 
-/** 로컬에 인증 회원 스냅샷이 있을 때만 API 생략 — unverified/미확인은 반드시 재조회 */
+/** 로컬에 인증 회원 + 쇼케이스 콘텐츠(페이지) 스냅샷이 있을 때만 API 생략 */
+function styleHasShowcaseContent(style) {
+  if (!style || typeof style !== "object") return false;
+  if (Array.isArray(style.pages) && style.pages.some((p) => p && typeof p === "object")) return true;
+  if (Array.isArray(style.gallery?.photos) && style.gallery.photos.length > 0) return true;
+  return false;
+}
+
 function hasUsableLocalSnapshot(call) {
   if (call?.verified !== true) return false;
   const snap = call?.cardSnapshot;
   const style = call?.showcaseSnapshot;
-  return Boolean(style || snap?.photoUrl || snap?.name || snap?.userId);
+  if (!(style || snap?.photoUrl || snap?.name || snap?.userId)) return false;
+  /* DCC만 있는 스냅샷이면 라이브 스타일 재조회로 전체 쇼케이스 확보 */
+  return styleHasShowcaseContent(style);
 }
 
 function CallHistoryAvatar({ call }) {
@@ -273,7 +282,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         userId: uid,
         displayName: call.name || "",
         membershipTier: call.membershipTier || "free",
-        avatarUrl: call.avatarUrl || ""
+        avatarUrl: call.avatarUrl || "",
+        forceStyle: true
       });
       if (gen !== openGenRef.current) return;
 
@@ -290,7 +300,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         }
       }
 
-      const tier = payload.card?.membershipTier || call.membershipTier || (matched ? "paid" : "free");
+      const tierRaw = payload.card?.membershipTier || call.membershipTier || "";
+      const tier =
+        isPaidLetteringTier(tierRaw) || !matched
+          ? tierRaw || (matched ? "paid" : "free")
+          : "paid";
       const card = applyShowcaseStyleToCard(
         {
           ...payload.card,
@@ -303,7 +317,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           publicHandle: payload.card?.publicHandle || payload.card?.loginId || "",
           showcaseStyle: peerStyle
         },
-        isPaidLetteringTier(tier) ? tier : matched ? "paid" : "free",
+        isPaidLetteringTier(tier) ? tier : "free",
         { peerMode: true, style: peerStyle }
       );
 
@@ -414,10 +428,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           ) : previewCard ? (
             <div className="lettering-showcase-fs lettering-showcase-fs--history-embed relative">
               <div className="lettering-showcase-fs__shell">
-                <LetteringIncomingNotification
+                  <LetteringIncomingNotification
                   className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--history-replay"
                   previewMode
                   fromCallHistory
+                  preferContentSlide
                   verified={isMember}
                   callPhase="connected"
                   platform="android"
