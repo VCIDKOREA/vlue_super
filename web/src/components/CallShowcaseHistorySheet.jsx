@@ -497,7 +497,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                   className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--history-replay"
                   previewMode
                   fromCallHistory
-                  preferContentSlide
                   verified={isMember}
                   callPhase="connected"
                   platform="android"
