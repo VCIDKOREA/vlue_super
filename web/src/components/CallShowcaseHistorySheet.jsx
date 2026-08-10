@@ -26,8 +26,7 @@ import { runCallPeerMatrixAction } from "../lib/call/runCallPeerMatrixAction.js"
 import { resolveIsKnownContactSync } from "../lib/contacts/hybridKnownContact.js";
 import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
-import { apiUrl } from "../lib/apiBase.js";
-import { fetchPeerShowcaseStyleBundle } from "../lib/showcase/showcaseStyleApi.js";
+import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
 import "./friend-showcase-list.css";
 import "../styles/showcase-call-glass.css";
 import "../styles/incall-controls.css";
@@ -85,7 +84,6 @@ function buildOptimisticHistoryCard(call) {
   return { card, verified: matchedHint, peerStyle };
 }
 
-/** 로컬에 인증 회원 + 쇼케이스 콘텐츠(페이지) 스냅샷이 있을 때만 API 생략 */
 function styleHasShowcaseContent(style) {
   if (!style || typeof style !== "object") return false;
   if (Array.isArray(style.pages) && style.pages.some((p) => p && typeof p === "object")) return true;
@@ -93,43 +91,15 @@ function styleHasShowcaseContent(style) {
   return false;
 }
 
-/** 통화목록용 — 공개 GET 우선 (오버레이와 동일, 캐시·ETag 우회) */
-async function fetchPeerLiveStyleForHistory(userId) {
-  const id = String(userId || "").trim();
-  if (!id) return null;
-  try {
-    const styleUrl = apiUrl(`/api/lettering/showcase/style/${encodeURIComponent(id)}`);
-    const styleRes = await fetch(styleUrl, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "omit",
-      cache: "no-store"
-    });
-    const styleData = await styleRes.json().catch(() => ({}));
-    if (styleRes.ok && styleData?.live && typeof styleData.live === "object") {
-      return styleData.live;
-    }
-  } catch {
-    /* fall through */
-  }
-  try {
-    const authStyle = await fetchPeerShowcaseStyleBundle(id, { force: true });
-    if (authStyle.ok && authStyle.live && typeof authStyle.live === "object") {
-      return authStyle.live;
-    }
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
-
-/** 로컬에 인증 회원 + 쇼케이스 콘텐츠(페이지) 스냅샷이 있을 때만 API 생략 */
+/**
+ * 인증 회원 + 로컬 스냅샷이 있으면 즉시 연다.
+ * 페이지가 없어도 DCC/메타로 먼저 띄우고 네트워크로 보강한다.
+ */
 function hasUsableLocalSnapshot(call) {
   if (call?.verified !== true) return false;
   const snap = call?.cardSnapshot;
   const style = call?.showcaseSnapshot;
-  if (!(style || snap?.photoUrl || snap?.name || snap?.userId)) return false;
-  return styleHasShowcaseContent(style);
+  return Boolean(style || snap?.photoUrl || snap?.name || snap?.userId || call?.userId);
 }
 
 function CallHistoryAvatar({ call }) {
@@ -325,18 +295,21 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     }
   };
 
-  const hydrateCallFromNetwork = useCallback(async (call, gen) => {
+  const hydrateCallFromNetwork = useCallback(async (call, gen, opts = {}) => {
+    const background = Boolean(opts.background);
     const phone = call.phoneDisplay || call.phone;
     try {
-      setLoading(true);
+      if (!background) setLoading(true);
       const uidHint = String(call.cardSnapshot?.userId || call.userId || "").trim();
+      const hasLocalPages = styleHasShowcaseContent(call.showcaseSnapshot);
       const payload = await resolveVlueShowcasePeer({
         phone,
         userId: uidHint,
         displayName: call.name || "",
         membershipTier: call.membershipTier || "free",
         avatarUrl: call.avatarUrl || "",
-        forceStyle: true
+        /* 스냅샷·캐시가 있으면 강제 우회하지 않음 — 재탭 체감 속도 */
+        forceStyle: !background && !hasLocalPages && !uidHint
       });
       if (gen !== openGenRef.current) return;
 
@@ -347,9 +320,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           ? payload.showcaseStyle
           : silentShowcaseStyle();
 
-      /* 통화목록 — 항상 공개 라이브 스타일로 페이지·BGM 보강 (DCC-only 방지) */
-      if (matched && peerUserId) {
-        const live = await fetchPeerLiveStyleForHistory(peerUserId);
+      /* resolve 결과에 페이지가 없을 때만 공개 라이브 보강 (중복 GET 제거) */
+      if (matched && peerUserId && !styleHasShowcaseContent(peerStyle)) {
+        const live = await fetchPeerLiveStylePublic(peerUserId, { force: false });
         if (live && typeof live === "object") {
           peerStyle = {
             ...peerStyle,
@@ -410,6 +383,20 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const openCall = (call) => {
     const gen = ++openGenRef.current;
 
+    if (hasUsableLocalSnapshot(call)) {
+      const optimistic = buildOptimisticHistoryCard(call);
+      flushSync(() => {
+        setSelected(call);
+        setExpanded(true);
+        setPreviewVerified(true);
+        setPreviewCard(optimistic.card);
+        setLoading(false);
+      });
+      startPeerBgm(optimistic.peerStyle);
+      void hydrateCallFromNetwork(call, gen, { background: true });
+      return;
+    }
+
     flushSync(() => {
       setSelected(call);
       setExpanded(true);
@@ -417,26 +404,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       setPreviewVerified(false);
       setLoading(true);
     });
-
-    const finishOpen = () => {
-      if (gen !== openGenRef.current) return;
-
-      if (hasUsableLocalSnapshot(call)) {
-        const optimistic = buildOptimisticHistoryCard(call);
-        setPreviewVerified(true);
-        setPreviewCard(optimistic.card);
-        startPeerBgm(optimistic.peerStyle);
-        setLoading(false);
-        void hydrateCallFromNetwork(call, gen);
-        return;
-      }
-
-      void hydrateCallFromNetwork(call, gen);
-    };
-
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(finishOpen);
-    });
+    void hydrateCallFromNetwork(call, gen, { background: false });
   };
 
   const closeDetail = () => {

@@ -11,7 +11,7 @@ import { appendCallShowcaseHistory } from "../lib/callShowcaseHistory.js";
 import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
-import { fetchPeerShowcaseStyleBundle } from "../lib/showcase/showcaseStyleApi.js";
+import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
 import { apiUrl } from "../lib/apiBase.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { normalizePhotoFocus } from "../lib/letteringBizcardStorage.js";
@@ -24,6 +24,59 @@ import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.
 import { ShowcaseBgmProvider } from "../context/ShowcaseBgmContext.jsx";
 import "../styles/tent-showcase.css";
 import "../styles/showcase-call-glass.css";
+
+async function enrichPeerCardFromProfile(peerUserId, nextCard) {
+  try {
+    const res = await fetch(apiUrl(`/api/follow/profile/${encodeURIComponent(peerUserId)}`), {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+      cache: "default"
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.ok) return nextCard;
+    const exp = data.cardExport && typeof data.cardExport === "object" ? data.cardExport : null;
+    const photo = String(exp?.photoUrl || data.photoUrl || data.profile?.photoUrl || "").trim();
+    const profileEmail = String(data.profile?.email || "").trim();
+    return {
+      ...nextCard,
+      name:
+        String(nextCard?.name || nextCard?.displayName || "").trim() ||
+        String(exp?.name || "").trim() ||
+        String(data.profile?.legalName || data.profile?.name || "").trim(),
+      displayName:
+        String(nextCard?.displayName || nextCard?.name || "").trim() ||
+        String(exp?.name || "").trim(),
+      photoUrl: String(nextCard?.photoUrl || "").trim() || photo || "",
+      email:
+        String(nextCard?.email || "").trim() ||
+        String(exp?.email || "").trim() ||
+        profileEmail,
+      website: String(nextCard?.website || "").trim() || String(exp?.website || "").trim(),
+      fax: String(nextCard?.fax || "").trim() || String(exp?.fax || "").trim(),
+      address: String(nextCard?.address || "").trim() || String(exp?.address || "").trim(),
+      organization:
+        String(nextCard?.organization || "").trim() ||
+        String(exp?.organization || "").trim() ||
+        String(exp?.companyName || "").trim() ||
+        String(data.profile?.companyName || data.profile?.organization || "").trim(),
+      title: String(nextCard?.title || "").trim() || String(exp?.title || "").trim(),
+      department:
+        String(nextCard?.department || "").trim() || String(exp?.department || "").trim(),
+      logoUrl: String(nextCard?.logoUrl || "").trim() || String(exp?.logoUrl || "").trim(),
+      photoFocus: normalizePhotoFocus(exp?.photoFocus || nextCard?.photoFocus || "center"),
+      publicHandle:
+        String(nextCard?.publicHandle || nextCard?.loginId || "").trim() ||
+        String(data.profile?.publicHandle || "").trim(),
+      authPaidAt: nextCard?.authPaidAt || data.authPaidAt || null,
+      authCycleEndAt: nextCard?.authCycleEndAt || data.authCycleEndAt || null,
+      authValidUntil: nextCard?.authValidUntil || data.authValidUntil || null,
+      membershipTier: data.membershipTier || nextCard.membershipTier || "paid"
+    };
+  } catch {
+    return nextCard;
+  }
+}
 
 function parseOverlayParams() {
   const hash = typeof window !== "undefined" ? window.location.hash || "" : "";
@@ -141,7 +194,10 @@ function LetteringOverlayHostInner() {
   }, []);
 
   useEffect(() => {
-    void syncDeviceContactsFromNative();
+    const t = window.setTimeout(() => {
+      void syncDeviceContactsFromNative();
+    }, 800);
+    return () => window.clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -154,6 +210,24 @@ function LetteringOverlayHostInner() {
           setCard((prev) => ({ ...(prev || {}), ...mapped }));
           setVerified(true);
           setLoading(false);
+          /* DCC 즉시 표시 후 스타일·프로필은 백그라운드 병렬 보강 */
+          const peerUserId = String(mapped.userId || mapped.ownerUserId || "").trim();
+          if (peerUserId) {
+            void (async () => {
+              const [live, enriched] = await Promise.all([
+                fetchPeerLiveStylePublic(peerUserId, { force: false }),
+                enrichPeerCardFromProfile(peerUserId, mapped)
+              ]);
+              const peerStyle =
+                live && typeof live === "object" ? live : createDefaultShowcaseStyle();
+              setCard((prev) => ({
+                ...(prev || {}),
+                ...enriched,
+                showcaseStyle: peerStyle
+              }));
+              setShowcaseStyle(peerStyle);
+            })();
+          }
         }
       } catch {
         /* ignore */
@@ -206,83 +280,22 @@ function LetteringOverlayHostInner() {
       /* 상대(발신/수신 번호 소유자) 라이브 쇼케이스 — 본인 hydrateLive 금지 */
       let peerStyle = createDefaultShowcaseStyle();
       const peerUserId = String(nextCard?.userId || nextCard?.ownerUserId || "").trim();
+
+      /* lookup 직후 DCC 먼저 표시 — 스타일·프로필은 병렬 */
+      if (nextCard) {
+        setCard({ ...nextCard, showcaseStyle: peerStyle });
+        setVerified(nextVerified);
+        setLoading(false);
+      }
+
       if (peerUserId) {
-        try {
-          /* 오버레이 WebView 는 로그인 쿠키가 없을 수 있어 공개 GET 사용 */
-          const styleUrl = apiUrl(`/api/lettering/showcase/style/${encodeURIComponent(peerUserId)}`);
-          const styleRes = await fetch(styleUrl, {
-            method: "GET",
-            headers: { Accept: "application/json" },
-            credentials: "omit",
-            cache: "no-store"
-          });
-          const styleData = await styleRes.json().catch(() => ({}));
-          if (styleRes.ok && styleData?.live && typeof styleData.live === "object") {
-            peerStyle = styleData.live;
-          } else {
-            const authStyle = await fetchPeerShowcaseStyleBundle(peerUserId, { force: true });
-            if (authStyle.ok && authStyle.live && typeof authStyle.live === "object") {
-              peerStyle = authStyle.live;
-            }
-          }
-        } catch {
-          /* ignore */
-        }
-        /* 명함 사진·이메일 등 DB 스냅샷 보강 (lookup 누락 대비) */
-        try {
-          const res = await fetch(apiUrl(`/api/follow/profile/${encodeURIComponent(peerUserId)}`), {
-            method: "GET",
-            headers: { Accept: "application/json" },
-            credentials: "omit",
-            cache: "no-store"
-          });
-          const data = await res.json().catch(() => ({}));
-          if (res.ok && data?.ok) {
-            const exp = data.cardExport && typeof data.cardExport === "object" ? data.cardExport : null;
-            const photo =
-              String(exp?.photoUrl || data.photoUrl || data.profile?.photoUrl || "").trim();
-            const profileEmail = String(data.profile?.email || "").trim();
-            nextCard = {
-              ...nextCard,
-              name:
-                String(nextCard?.name || nextCard?.displayName || "").trim() ||
-                String(exp?.name || "").trim() ||
-                String(data.profile?.legalName || data.profile?.name || "").trim(),
-              displayName:
-                String(nextCard?.displayName || nextCard?.name || "").trim() ||
-                String(exp?.name || "").trim(),
-              photoUrl: String(nextCard?.photoUrl || "").trim() || photo || "",
-              email:
-                String(nextCard?.email || "").trim() ||
-                String(exp?.email || "").trim() ||
-                profileEmail,
-              website: String(nextCard?.website || "").trim() || String(exp?.website || "").trim(),
-              fax: String(nextCard?.fax || "").trim() || String(exp?.fax || "").trim(),
-              address: String(nextCard?.address || "").trim() || String(exp?.address || "").trim(),
-              organization:
-                String(nextCard?.organization || "").trim() ||
-                String(exp?.organization || "").trim() ||
-                String(exp?.companyName || "").trim() ||
-                String(data.profile?.companyName || data.profile?.organization || "").trim(),
-              title: String(nextCard?.title || "").trim() || String(exp?.title || "").trim(),
-              department:
-                String(nextCard?.department || "").trim() || String(exp?.department || "").trim(),
-              logoUrl: String(nextCard?.logoUrl || "").trim() || String(exp?.logoUrl || "").trim(),
-              photoFocus: normalizePhotoFocus(
-                exp?.photoFocus || nextCard?.photoFocus || "center"
-              ),
-              publicHandle:
-                String(nextCard?.publicHandle || nextCard?.loginId || "").trim() ||
-                String(data.profile?.publicHandle || "").trim(),
-              authPaidAt: nextCard?.authPaidAt || data.authPaidAt || null,
-              authCycleEndAt: nextCard?.authCycleEndAt || data.authCycleEndAt || null,
-              authValidUntil: nextCard?.authValidUntil || data.authValidUntil || null,
-              membershipTier: data.membershipTier || nextCard.membershipTier || "paid"
-            };
-          }
-        } catch {
-          /* ignore */
-        }
+        const [live, enriched] = await Promise.all([
+          fetchPeerLiveStylePublic(peerUserId, { force: false }),
+          enrichPeerCardFromProfile(peerUserId, nextCard)
+        ]);
+        if (cancelled) return;
+        if (live && typeof live === "object") peerStyle = live;
+        nextCard = enriched;
       }
 
       if (cancelled) return;

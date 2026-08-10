@@ -81,6 +81,58 @@ export async function putShowcaseStyleBundle({
 
 const peerCache = new Map();
 const PEER_CACHE_TTL_MS = 120_000;
+/** 공개 GET(쿠키 없는 오버레이·통화목록)용 메모리 캐시 */
+const publicPeerLiveCache = new Map();
+const PUBLIC_PEER_LIVE_TTL_MS = 90_000;
+
+function rememberPeerLive(id, live, liveSource, updatedAt) {
+  if (!id || !live || typeof live !== "object") return;
+  const at = Date.now();
+  peerCache.set(id, { live, liveSource: liveSource ?? null, updatedAt: updatedAt ?? null, at });
+  publicPeerLiveCache.set(id, { live, at });
+}
+
+/**
+ * 공개 라이브 스타일 GET — 오버레이 WebView·통화목록 공통.
+ * 짧은 메모리 캐시로 동일 상대 재진입·중복 fetch 를 줄인다.
+ */
+export async function fetchPeerLiveStylePublic(userId, opts = {}) {
+  const id = String(userId || "").trim();
+  if (!id) return null;
+  const force = Boolean(opts.force);
+  const now = Date.now();
+  if (!force) {
+    const mem = publicPeerLiveCache.get(id);
+    if (mem?.live && now - mem.at < PUBLIC_PEER_LIVE_TTL_MS) return mem.live;
+    const authCached = peerCache.get(id);
+    if (authCached?.live && now - authCached.at < PEER_CACHE_TTL_MS) return authCached.live;
+  }
+  try {
+    const styleUrl = apiUrl(`/api/lettering/showcase/style/${encodeURIComponent(id)}`);
+    const styleRes = await fetch(styleUrl, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+      cache: force ? "no-store" : "default"
+    });
+    const styleData = await styleRes.json().catch(() => ({}));
+    if (styleRes.ok && styleData?.live && typeof styleData.live === "object") {
+      rememberPeerLive(id, styleData.live, styleData.liveSource ?? null, styleData.updatedAt ?? null);
+      return styleData.live;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    const authStyle = await fetchPeerShowcaseStyleBundle(id, { force });
+    if (authStyle.ok && authStyle.live && typeof authStyle.live === "object") {
+      return authStyle.live;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 
 /** GET /api/lettering/showcase/style/:userId — peer live slim + 로컬 캐시 */
 export async function fetchPeerShowcaseStyleBundle(userId, opts = {}) {
@@ -111,6 +163,7 @@ export async function fetchPeerShowcaseStyleBundle(userId, opts = {}) {
     }
     if (data.unchanged && cached) {
       peerCache.set(id, { ...cached, at: now });
+      publicPeerLiveCache.set(id, { live: cached.live, at: now });
       return {
         ok: true,
         unchanged: true,
@@ -124,6 +177,7 @@ export async function fetchPeerShowcaseStyleBundle(userId, opts = {}) {
     const liveSource = data.liveSource ?? null;
     const updatedAt = data.updatedAt ?? null;
     peerCache.set(id, { live, liveSource, updatedAt, at: now });
+    if (live) publicPeerLiveCache.set(id, { live, at: now });
     return { ok: true, v: 2, editor: null, live, liveSource, updatedAt };
   } catch (e) {
     return { ok: false, error: e?.message || "network" };
