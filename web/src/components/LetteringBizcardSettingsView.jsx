@@ -594,7 +594,7 @@ export default function LetteringBizcardSettingsView({
         >
           <div className="min-w-0">
             <p className={`text-[13px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
-              쇼케이스 송출
+              디지털인증 명함 송출
             </p>
             <p
               className={`mt-0.5 text-[11px] font-medium ${
