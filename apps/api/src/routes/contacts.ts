@@ -217,3 +217,59 @@ contactRoutes.post("/friend-request", async (c) => {
     createdAt: created.createdAt.toISOString()
   });
 });
+
+/** 보낸/받은 친구 신청 목록 (FriendRequest) */
+contactRoutes.get("/friend-requests", async (c) => {
+  const me = await resolveRequestUserId(c);
+  if (!me) return c.json({ error: "인증 필요" }, 401);
+
+  const rows = await prisma.friendRequest.findMany({
+    where: {
+      status: "pending",
+      OR: [{ fromUserId: me }, { toUserId: me }]
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    select: {
+      id: true,
+      fromUserId: true,
+      toUserId: true,
+      status: true,
+      purposeText: true,
+      applicantLegalNameSnapshot: true,
+      createdAt: true,
+      fromUser: {
+        select: { id: true, legalName: true, publicHandle: true, email: true, phoneE164: true }
+      },
+      toUser: {
+        select: { id: true, legalName: true, publicHandle: true, email: true, phoneE164: true }
+      }
+    }
+  });
+
+  const mapRow = (fr: (typeof rows)[number], direction: "sent" | "received") => {
+    const peer = direction === "sent" ? fr.toUser : fr.fromUser;
+    return {
+      id: fr.id,
+      status: fr.status,
+      direction,
+      fromUserId: fr.fromUserId,
+      toUserId: fr.toUserId,
+      fromName:
+        direction === "received"
+          ? fr.applicantLegalNameSnapshot || userDisplayName(peer)
+          : userDisplayName(fr.fromUser),
+      toUserName: userDisplayName(fr.toUser),
+      fromUserName: userDisplayName(fr.fromUser),
+      peerName: userDisplayName(peer),
+      peerHandle: peer.publicHandle,
+      message: fr.purposeText || "",
+      createdAt: fr.createdAt.toISOString()
+    };
+  };
+
+  const sent = rows.filter((r) => r.fromUserId === me).map((r) => mapRow(r, "sent"));
+  const received = rows.filter((r) => r.toUserId === me).map((r) => mapRow(r, "received"));
+
+  return c.json({ ok: true, sent, received });
+});

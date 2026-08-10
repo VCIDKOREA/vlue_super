@@ -30,10 +30,30 @@ export async function sendContactFriendRequest(toUserId, message) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    if (data.error === "already_friend" || data.error === "already_pending") {
+    /* 이미 대기 중이면 보낸요청에 보이도록 성공으로 취급 */
+    if (data.error === "already_pending") {
+      return { ok: true, alreadyPending: true, id: data.id, status: "pending" };
+    }
+    if (data.error === "already_friend") {
       return { ok: false, reason: data.error, id: data.id };
     }
     throw new Error(data.error || `친구 신청 실패 (${res.status})`);
   }
   return { ok: true, ...data };
+}
+
+/** 보낸/받은 친구 신청 (pending) */
+export async function fetchContactFriendRequests() {
+  try {
+    const res = await vlueAuthFetch(apiUrl("/api/contacts/friend-requests"));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, sent: [], received: [], error: data.error };
+    return {
+      ok: true,
+      sent: Array.isArray(data.sent) ? data.sent : [],
+      received: Array.isArray(data.received) ? data.received : []
+    };
+  } catch (e) {
+    return { ok: false, sent: [], received: [], error: e?.message || "network" };
+  }
 }
