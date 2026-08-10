@@ -151,7 +151,10 @@ export async function resolveCallPeerMatrix(input = {}) {
   let known = input.knownContact || null;
   if (phone && !known) {
     try {
-      known = await resolveIsKnownContact(phone, { refreshDevice: true });
+      /* 목록·CTA는 캐시 우선 — 행마다 refreshDevice 하면 주소록 전체 dump로 UI가 수 초씩 멈춤 */
+      known = await resolveIsKnownContact(phone, {
+        refreshDevice: input.refreshDevice === true
+      });
     } catch {
       known = resolveIsKnownContactSync(phone);
     }

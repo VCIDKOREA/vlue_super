@@ -66,7 +66,7 @@ function collectIndexPhones() {
 /**
  * 하이브리드 주소록 판별 — VLUE 친구 DB + 디바이스 주소록
  * @param {string} peerPhone
- * @param {{ refreshDevice?: boolean }} [opts]
+ * @param {{ refreshDevice?: boolean }} [opts] refreshDevice=true 일 때만 네이티브 주소록 재동기화
  * @returns {Promise<{ isKnownContact: boolean, matchedName: string, sources: string[] }>}
  */
 export async function resolveIsKnownContact(peerPhone, opts = {}) {
@@ -75,7 +75,7 @@ export async function resolveIsKnownContact(peerPhone, opts = {}) {
     return { isKnownContact: false, matchedName: "", sources: [] };
   }
 
-  if (opts.refreshDevice !== false) {
+  if (opts.refreshDevice === true) {
     try {
       await syncDeviceContactsFromNative();
     } catch {

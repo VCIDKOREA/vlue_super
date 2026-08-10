@@ -19,11 +19,11 @@ import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import AppFullScreenView from "./AppFullScreenView.jsx";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
 import {
-  resolveCallPeerMatrix,
   resolveCallPeerMatrixSync
 } from "../lib/call/callPeerMatrix.js";
 import { runCallPeerMatrixAction } from "../lib/call/runCallPeerMatrixAction.js";
 import { resolveIsKnownContactSync } from "../lib/contacts/hybridKnownContact.js";
+import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
 import "./friend-showcase-list.css";
 import "../styles/showcase-call-glass.css";
 import "../styles/incall-controls.css";
@@ -79,6 +79,17 @@ function buildOptimisticHistoryCard(call) {
     { peerMode: true, style: peerStyle }
   );
   return { card, verified: matchedHint, peerStyle };
+}
+
+/** 로컬 스냅샷만으로 충분하면 API/DB(Egress) 호출 생략 */
+function hasUsableLocalSnapshot(call) {
+  if (call?.verified === false) return true;
+  const snap = call?.cardSnapshot;
+  const style = call?.showcaseSnapshot;
+  if (call?.verified === true && (style || snap?.photoUrl || snap?.name || snap?.userId)) {
+    return true;
+  }
+  return Boolean(snap?.userId && (snap?.name || snap?.photoUrl || style));
 }
 
 function CallHistoryAvatar({ call }) {
@@ -190,22 +201,29 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       setPreviewCard(null);
       setPreviewVerified(false);
       setExpanded(true);
-      return;
+      return undefined;
     }
     let cancelled = false;
-    (async () => {
+    const buildMatrix = () => {
       const next = {};
       for (const call of items) {
         const phone = call.phoneDisplay || call.phone;
         const isVlueMember = call.verified === true;
-        next[call.id] = await resolveCallPeerMatrix({
+        next[call.id] = resolveCallPeerMatrixSync({
           phone,
           isVlueMember,
           verified: isVlueMember
         });
       }
       if (!cancelled) setRowMatrix(next);
-    })();
+    };
+    /* 캐시로 즉시 CTA — 주소록 sync 완료 후 한 번만 재계산 */
+    buildMatrix();
+    void syncDeviceContactsFromNative()
+      .then(() => {
+        if (!cancelled) buildMatrix();
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -231,25 +249,10 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     }
   };
 
-  const openCall = async (call) => {
-    const gen = ++openGenRef.current;
+  const hydrateCallFromNetwork = useCallback(async (call, gen) => {
     const phone = call.phoneDisplay || call.phone;
-    const optimistic = buildOptimisticHistoryCard(call);
-
-    /* 네트워크 대기 없이 즉시 상세 화면 진입 */
-    setSelected(call);
-    setExpanded(true);
-    setPreviewVerified(optimistic.verified);
-    setPreviewCard(optimistic.card);
-    setLoading(true);
-
-    if (optimistic.verified && hasPlayableShowcaseBgm(optimistic.peerStyle)) {
-      if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
-        window.__vlueUnlockShowcaseBgm();
-      }
-    }
-
     try {
+      setLoading(true);
       const uid = String(call.cardSnapshot?.userId || call.userId || "").trim();
       const payload = await resolveVlueShowcasePeer({
         phone,
@@ -257,6 +260,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         displayName: call.name || "",
         membershipTier: call.membershipTier || "free",
         avatarUrl: call.avatarUrl || ""
+        /* forceStyle 금지 — peer 스타일 캐시·ETag로 egress 절약 */
       });
       if (gen !== openGenRef.current) return;
 
@@ -306,6 +310,33 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     } finally {
       if (gen === openGenRef.current) setLoading(false);
     }
+  }, []);
+
+  const openCall = (call) => {
+    const gen = ++openGenRef.current;
+    const optimistic = buildOptimisticHistoryCard(call);
+
+    /* 클릭 핸들러에서 동기 전환 — 네트워크 await 없음 */
+    setSelected(call);
+    setExpanded(true);
+    setPreviewVerified(optimistic.verified);
+    setPreviewCard(optimistic.card);
+    setLoading(false);
+
+    if (optimistic.verified && hasPlayableShowcaseBgm(optimistic.peerStyle)) {
+      if (typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
+        window.__vlueUnlockShowcaseBgm();
+      }
+    }
+
+    /* 로컬 스냅샷 충분 → Supabase/API 호출 생략 (Egress 절약) */
+    if (hasUsableLocalSnapshot(call)) return;
+
+    /* 스냅샷 없을 때만 페인트 이후 백그라운드 hydrate */
+    window.setTimeout(() => {
+      if (gen !== openGenRef.current) return;
+      void hydrateCallFromNetwork(call, gen);
+    }, 0);
   };
 
   const closeDetail = () => {

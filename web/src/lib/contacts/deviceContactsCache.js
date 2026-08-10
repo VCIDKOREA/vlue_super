@@ -60,9 +60,20 @@ function parseNativeContactsJson(raw) {
 
 /**
  * Android/iOS 네이티브에서 주소록 JSON 동기화
+ * (짧은 간격 중복 호출은 캐시만 반환 — WebView 블로킹·트래픽 방지)
+ * @param {{ force?: boolean }} [opts]
  * @returns {Promise<{ name: string, phone: string }[]>}
  */
-export async function syncDeviceContactsFromNative() {
+let _deviceContactsSyncAt = 0;
+const DEVICE_CONTACTS_SYNC_MIN_MS = 60_000;
+
+export async function syncDeviceContactsFromNative(opts = {}) {
+  const force = Boolean(opts.force);
+  const now = Date.now();
+  if (!force && now - _deviceContactsSyncAt < DEVICE_CONTACTS_SYNC_MIN_MS) {
+    return readDeviceContactsCache().contacts;
+  }
+
   let raw = null;
   try {
     if (typeof window.VlueLettering?.getDeviceContactsJson === "function") {
@@ -82,6 +93,7 @@ export async function syncDeviceContactsFromNative() {
     }
   }
 
+  _deviceContactsSyncAt = Date.now();
   const contacts = parseNativeContactsJson(raw);
   if (contacts.length) {
     writeDeviceContactsCache(contacts);
