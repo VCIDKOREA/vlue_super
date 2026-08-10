@@ -950,6 +950,20 @@ function App() {
         setBottomToast(body);
         setTimeout(() => setBottomToast(""), 4200);
       }
+      if (data.type === "vlue-friend-request") {
+        const title = String(n.title || data.title || "친구 신청");
+        const body = String(
+          n.body || data.body || data.message || "새 친구 신청이 있습니다."
+        );
+        addPushNotification({
+          category: "친구",
+          title,
+          body,
+          kind: "friend_request"
+        });
+        setBottomToast(body);
+        setTimeout(() => setBottomToast(""), 4200);
+      }
       if (
         data.type === "vlue-showcase-like" ||
         data.type === "vlue-showcase-comment" ||
@@ -1097,6 +1111,18 @@ function App() {
           setBottomToast(body);
           setTimeout(() => setBottomToast(""), 4200);
           addPushNotification({ category: "팔로우", title, body });
+        }
+        if (data?.type === "vlue-friend-request") {
+          const title = String(data.title || "친구 신청");
+          const body = String(data.body || data.message || "새 친구 신청이 있습니다.");
+          setBottomToast(body);
+          setTimeout(() => setBottomToast(""), 4200);
+          addPushNotification({
+            category: "친구",
+            title,
+            body,
+            kind: "friend_request"
+          });
         }
         if (data?.type === "vlue-payment-receipt") {
           const title = String(data.title || "결제 완료 · 구매확인 안내");

@@ -15,6 +15,9 @@ const CATEGORY_STYLE = {
   앱: "bg-blue-50 text-blue-700",
   공지: "bg-indigo-50 text-indigo-700",
   결제: "bg-sky-50 text-sky-800",
+  친구: "bg-violet-50 text-violet-700",
+  팔로우: "bg-fuchsia-50 text-fuchsia-700",
+  쇼케이스: "bg-amber-50 text-amber-800",
   기타: "bg-gray-100 text-gray-600"
 };
 
@@ -45,7 +48,7 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
         <p className="text-sm font-bold text-gray-500">알림이 없습니다</p>
-        <p className="mt-1 text-xs text-gray-400">가족보호·앱 알림이 이곳에 쌓입니다.</p>
+        <p className="mt-1 text-xs text-gray-400">친구·가족보호·앱 알림이 이곳에 쌓입니다.</p>
       </div>
     );
   }

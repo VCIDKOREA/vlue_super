@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { prisma } from "../db/client.js";
 import { resolveRequestUserId } from "../lib/authContext.js";
 import { normalizeToE164KR } from "../lib/phoneE164.js";
+import { ssePublish } from "../realtime/sseHub.js";
+import { sendShowcaseSocialPushToUser } from "../services/fcmNotificationService.js";
 
 const MAX_CONTACTS = 500;
 
@@ -209,6 +211,44 @@ contactRoutes.post("/friend-request", async (c) => {
       purposeText: body.message?.trim() || "주소록에서 친구 신청",
       status: "pending"
     }
+  });
+
+  /* 수신자 알림함(SSE+FCM) + OwnerNotification — 실패해도 신청 결과는 유지 */
+  const title = "친구 신청";
+  const bodyText = `${snapshot}님이 친구 신청을 보냈습니다.`;
+  try {
+    await prisma.ownerNotification.create({
+      data: {
+        ownerUserId: toUserId,
+        actorUserId: me,
+        title,
+        body: bodyText
+      }
+    });
+  } catch (err) {
+    console.warn("[contacts] friend_request ownerNotification_failed", err);
+  }
+  try {
+    ssePublish(toUserId, {
+      type: "vlue-friend-request",
+      title,
+      body: bodyText,
+      message: bodyText,
+      actorUserId: me,
+      actorName: snapshot,
+      requestId: created.id,
+      at: new Date().toISOString()
+    });
+  } catch (err) {
+    console.warn("[contacts] friend_request sse_failed", err);
+  }
+  void sendShowcaseSocialPushToUser(toUserId, title, bodyText, {
+    type: "vlue-friend-request",
+    actorUserId: me,
+    actorName: snapshot,
+    requestId: created.id
+  }).catch((err) => {
+    console.warn("[contacts] friend_request fcm_failed", err);
   });
 
   return c.json({
