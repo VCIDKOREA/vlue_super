@@ -103,6 +103,8 @@ export function normalizePhotoFocus(raw) {
   const v = String(raw || "")
     .trim()
     .toLowerCase();
+  /* middle 별칭 → center (일부 클라이언트/스냅샷 호환) */
+  if (v === "middle") return "center";
   if (v === "center" || v === "bottom" || v === "top") return v;
   return "top";
 }

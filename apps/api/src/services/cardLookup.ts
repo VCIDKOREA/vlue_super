@@ -43,6 +43,8 @@ type ExportSnapLite = {
   salesContent: string;
   photoUrl: string;
   logoUrl: string;
+  /** 히어로 배경 초점: top | center | bottom */
+  photoFocus: string;
 };
 
 /**
@@ -61,6 +63,7 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
       sales_content: string | null;
       photo_url: string | null;
       logo_url: string | null;
+      photo_focus: string | null;
     }>
   >`
     SELECT
@@ -72,7 +75,8 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
       NULLIF(TRIM(export_snapshot_json->>'companyIntro'), '') AS company_intro,
       NULLIF(TRIM(export_snapshot_json->>'salesContent'), '') AS sales_content,
       NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url,
-      NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url
+      NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
+      NULLIF(TRIM(export_snapshot_json->>'photoFocus'), '') AS photo_focus
     FROM digital_cards
     WHERE user_id = ${userId}::uuid
     LIMIT 1
@@ -88,7 +92,8 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
     companyIntro: firstStr(s.company_intro),
     salesContent: firstStr(s.sales_content),
     photoUrl: httpOnlyUrl(s.photo_url),
-    logoUrl: httpOnlyUrl(s.logo_url)
+    logoUrl: httpOnlyUrl(s.logo_url),
+    photoFocus: firstStr(s.photo_focus)
   };
 }
 
@@ -178,6 +183,12 @@ function buildContactProfile(opts: {
         (snap as Record<string, unknown>).logoUrl,
         pj.logoUrl,
         pj.logo_url
+      ) || undefined,
+    photoFocus:
+      firstStr(
+        (snap as ExportSnapLite).photoFocus,
+        (snap as Record<string, unknown>).photoFocus,
+        pj.photoFocus
       ) || undefined
   };
 }
@@ -248,6 +259,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           email,
           profile,
           website: firstStr(profile.website),
+          photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
           image_url:
             pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url", "photoUrl"]) ||
             firstStr(card.user.digitalCard?.photoUrl),
@@ -290,6 +302,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         email,
         profile,
         website: firstStr(profile.website),
+        photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
         image_url:
           pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url", "photoUrl"]) ||
           firstStr(card.user.digitalCard?.photoUrl),
@@ -363,6 +376,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           email,
           profile,
           website: firstStr(profile.website),
+          photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
           digitalCardActive: Boolean(user.digitalCard),
           is_premium_line: isPremiumLine,
           phoneE164: user.phoneE164,
@@ -404,6 +418,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         email,
         profile,
         website: firstStr(profile.website),
+        photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
         digitalCardActive: Boolean(user.digitalCard),
         is_premium_line: isPremiumLine,
         phoneE164: masked.phoneE164,

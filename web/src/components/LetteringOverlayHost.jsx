@@ -14,6 +14,7 @@ import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { fetchPeerShowcaseStyleBundle } from "../lib/showcase/showcaseStyleApi.js";
 import { apiUrl } from "../lib/apiBase.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
+import { normalizePhotoFocus } from "../lib/letteringBizcardStorage.js";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import LetteringReportSheet from "./LetteringReportSheet.jsx";
 import LetteringCertModal from "./LetteringCertModal.jsx";
@@ -267,6 +268,9 @@ function LetteringOverlayHostInner() {
               department:
                 String(nextCard?.department || "").trim() || String(exp?.department || "").trim(),
               logoUrl: String(nextCard?.logoUrl || "").trim() || String(exp?.logoUrl || "").trim(),
+              photoFocus: normalizePhotoFocus(
+                exp?.photoFocus || nextCard?.photoFocus
+              ),
               publicHandle:
                 String(nextCard?.publicHandle || nextCard?.loginId || "").trim() ||
                 String(data.profile?.publicHandle || "").trim(),

@@ -177,9 +177,9 @@ export default function ShowcaseWebPage({ phone }) {
           <div className="showcase-web__bgm-modal" role="dialog" aria-modal="true" aria-labelledby="showcase-bgm-title">
             <div className="showcase-web__bgm-card">
               <p id="showcase-bgm-title" className="showcase-web__bgm-title">
-                이 쇼케이스에는 BGM이 있습니다.
+                이 쇼케이스의 BGM이 재생 중입니다.
                 <br />
-                재생하시겠습니까?
+                계속 들으시겠습니까?
               </p>
               <div className="showcase-web__bgm-actions">
                 <button type="button" className="showcase-web__bgm-btn showcase-web__bgm-btn--ghost" onClick={declineBgm}>

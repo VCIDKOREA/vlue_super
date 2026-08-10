@@ -1,3 +1,5 @@
+import { normalizePhotoFocus } from "./letteringBizcardStorage.js";
+
 /** GET /api/cards/by-number 응답 → LetteringIncomingNotification card */
 export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
   if (!body?.matched) return null;
@@ -80,6 +82,10 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       profile.image_url ||
       profile.photoUrl ||
       "",
+    /** 발신자 설정(상단/중앙/하단) — 수신 쇼케이스 object-position */
+    photoFocus: normalizePhotoFocus(
+      body.photoFocus || nested.photoFocus || profile.photoFocus
+    ),
     logoUrl: profile.logoUrl || profile.logo_url || body.logo_url || "",
     image_url: body.image_url || nested.image_url || "",
     department:
