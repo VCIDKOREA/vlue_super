@@ -673,6 +673,14 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                   try{return window.Android&&window.Android.getDeviceContactsJson?window.Android.getDeviceContactsJson():'[]';}
                   catch(e){return '[]';}
                 },
+                getDeviceCallLogJson:function(limit){
+                  try{
+                    if(window.Android&&window.Android.getDeviceCallLogJson){
+                      return window.Android.getDeviceCallLogJson(String(limit==null?200:limit));
+                    }
+                    return '[]';
+                  }catch(e){return '[]';}
+                },
                 getLetteringPermissionStatusJson:function(){
                   try{return window.Android&&window.Android.getLetteringPermissionStatusJson?window.Android.getLetteringPermissionStatusJson():null;}
                   catch(e){return null;}
@@ -863,6 +871,13 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         @android.webkit.JavascriptInterface
         fun getDeviceContactsJson(): String {
             return DeviceContactsReader.readAsJson(activity)
+        }
+
+        /** 앱「통화 목록」— 시스템 CallLog 최근 건 */
+        @android.webkit.JavascriptInterface
+        fun getDeviceCallLogJson(limit: String?): String {
+            val n = limit?.toIntOrNull() ?: 200
+            return DeviceCallLogReader.readAsJson(activity, n)
         }
 
         /** 종이 명함 스캔 → 시스템 연락처 추가 화면 (Insert Intent) */
