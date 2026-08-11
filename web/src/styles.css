@@ -7665,8 +7665,8 @@ body,
 
 .ldr-profile-media--hero {
   width: 100%;
-  aspect-ratio: 16 / 9;
-  max-height: 160px;
+  aspect-ratio: 4 / 3;
+  max-height: 220px;
   border-radius: 0;
   border: 0 !important;
   border-bottom: 0 !important;
