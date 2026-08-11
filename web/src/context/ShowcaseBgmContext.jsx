@@ -548,6 +548,11 @@ export function ShowcaseBgmProvider({ children }) {
     }
   }, [tryPlayNow, resolveUrlFromConfig, setPlaybackPhase]);
 
+  /** 탭 제스처만 기록 — 재생은 시작하지 않음 (로딩 중 선재생 방지) */
+  const unlockAudioGesture = useCallback(() => {
+    setTouchUnlocked(true);
+  }, []);
+
   const previewInSettings = useCallback(
     (configOverride = null) => {
       const nextConfig =
@@ -760,6 +765,7 @@ export function ShowcaseBgmProvider({ children }) {
       setPlaybackPhase,
       bindStyleConfig,
       unlockFromUserGesture,
+      unlockAudioGesture,
       previewInSettings,
       stopSettingsPreview,
       hushMainAudio,
@@ -787,6 +793,7 @@ export function ShowcaseBgmProvider({ children }) {
       setPlaybackPhase,
       bindStyleConfig,
       unlockFromUserGesture,
+      unlockAudioGesture,
       previewInSettings,
       stopSettingsPreview,
       hushMainAudio,
@@ -813,6 +820,7 @@ export function useShowcaseBgm() {
       bindStyleConfig: () => {},
       setPlaybackPhase: () => {},
       unlockFromUserGesture: () => {},
+      unlockAudioGesture: () => {},
       effectiveMuted: true,
       canToggleMute: false,
       toggleMute: () => {},

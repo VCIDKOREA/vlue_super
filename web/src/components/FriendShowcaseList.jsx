@@ -17,7 +17,6 @@ import PeerShowcasePreview from "./showcase/PeerShowcasePreview.jsx";
 import AppFullScreenView from "./AppFullScreenView.jsx";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
-import { hasPlayableShowcaseBgm } from "../lib/showcase/showcaseBgmPresets.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import VLUE_BRAND_LOGO from "../assets/vlue-shield-eye-logo.svg?url";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
@@ -183,26 +182,9 @@ export default function FriendShowcaseList({
   const dragRef = useRef({ startY: 0, startTop: 0, dragging: false });
   const anchorsRef = useRef({ fullTop: 56, midTop: 320, nav: 56 });
   const geoRef = useRef(false);
-  const { unlockFromUserGesture, setPlaybackPhase, bindStyleConfig } = useShowcaseBgm();
+  const { unlockAudioGesture, setPlaybackPhase } = useShowcaseBgm();
 
-  const startPeerBgm = useCallback(
-    (style) => {
-      if (!hasPlayableShowcaseBgm(style)) return;
-      try {
-        bindStyleConfig?.(style);
-        unlockFromUserGesture?.();
-        setPlaybackPhase?.("preview", {
-          forceRestart: true,
-          steal: true,
-          owner: "follow-showcase",
-          styleConfig: style
-        });
-      } catch {
-        /* ignore */
-      }
-    },
-    [bindStyleConfig, unlockFromUserGesture, setPlaybackPhase]
-  );
+  /* BGM은 PeerShowcasePreview→ShowcaseCallCarousel 마운트 시에만 시작 (로딩 중 선재생 금지) */
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return undefined;
@@ -432,9 +414,10 @@ export default function FriendShowcaseList({
   }, [refreshAnchors, sheetTopPx, goFull, goMid, goCollapsed]);
 
   const openPreview = async (row, kind) => {
-    /* 탭 제스처 안에서 즉시 unlock — 비동기 이후엔 autoplay 차단됨 */
+    /* 탭 제스처 unlock만 — 재생은 미리보기 마운트 후 캐러셀이 담당 */
     try {
-      unlockFromUserGesture?.();
+      unlockAudioGesture?.();
+      setPlaybackPhase?.("idle", { steal: true, owner: "follow-showcase" });
     } catch {
       /* ignore */
     }
@@ -497,8 +480,6 @@ export default function FriendShowcaseList({
         setFollowing(patch);
         setHashtagRows(patch);
       }
-      /* 명함도 쇼케이스 DCC 슬라이드(사진3) — BGM 동일 */
-      startPeerBgm(showcaseStyle);
     } finally {
       setPreviewLoading(false);
     }

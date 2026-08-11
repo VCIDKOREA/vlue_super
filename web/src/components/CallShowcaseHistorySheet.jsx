@@ -173,26 +173,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const [busyId, setBusyId] = useState("");
   const [toast, setToast] = useState("");
   const openGenRef = useRef(0);
-  const { unlockFromUserGesture, setPlaybackPhase, bindStyleConfig } = useShowcaseBgm();
-
-  const startPeerBgm = useCallback(
-    (style) => {
-      if (!hasPlayableShowcaseBgm(style)) return;
-      try {
-        bindStyleConfig?.(style);
-        unlockFromUserGesture?.();
-        setPlaybackPhase?.("preview", {
-          forceRestart: true,
-          steal: true,
-          owner: "call-history",
-          styleConfig: style
-        });
-      } catch {
-        /* ignore */
-      }
-    },
-    [bindStyleConfig, unlockFromUserGesture, setPlaybackPhase]
-  );
+  const { unlockAudioGesture, setPlaybackPhase } = useShowcaseBgm();
 
   const showToast = useCallback((msg) => {
     setToast(String(msg || "").trim());
@@ -365,7 +346,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
       setPreviewVerified(matched);
       setPreviewCard(card);
-      if (matched) startPeerBgm(peerStyle);
+      /* BGM은 LetteringIncomingNotification→ShowcaseCallCarousel 마운트 시에만 — 로딩 중 선재생 금지 */
 
       if (matched && payload.card?.name) {
         setSelected((prev) =>
@@ -383,13 +364,15 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     } finally {
       if (gen === openGenRef.current) setLoading(false);
     }
-  }, [startPeerBgm]);
+  }, []);
 
   const openCall = (call) => {
     const gen = ++openGenRef.current;
 
+    /* 제스처 unlock만 — 즉시 재생하지 않음. 기존 곡도 로딩 동안 정지 */
     try {
-      unlockFromUserGesture?.();
+      unlockAudioGesture?.();
+      setPlaybackPhase?.("idle", { steal: true, owner: "call-history" });
     } catch {
       /* ignore */
     }
@@ -397,7 +380,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const hasPages = styleHasShowcaseContent(call.showcaseSnapshot);
     const hasBgm = hasPlayableShowcaseBgm(call.showcaseSnapshot);
 
-    if (hasUsableLocalSnapshot(call)) {
+    /* 페이지+BGM 스냅샷이 완전할 때만 즉시 표시(캐러셀 마운트와 동시에 BGM). 불완전하면 로딩만 */
+    if (hasUsableLocalSnapshot(call) && hasPages && hasBgm) {
       const optimistic = buildOptimisticHistoryCard(call);
       flushSync(() => {
         setSelected(call);
@@ -406,16 +390,10 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         setPreviewCard(optimistic.card);
         setLoading(false);
       });
-      startPeerBgm(optimistic.peerStyle);
-      /* DCC-only / BGM 없는 스냅샷은 포그라운드에 가깝게 강제 보강 */
-      void hydrateCallFromNetwork(call, gen, {
-        background: Boolean(hasPages && hasBgm),
-        forceStyle: !hasPages || !hasBgm
-      });
+      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
       return;
     }
 
-    /* 스냅샷 없을 때 미인증 셸을 깔면 로딩 블라인드 뒤로 흔적이 남음 — 가이드만 표시 */
     flushSync(() => {
       setSelected(call);
       setExpanded(true);
@@ -475,9 +453,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
               {toast}
             </p>
           ) : null}
-          {loading && !(previewCard && isMember) ? (
+          {loading || !previewCard ? (
             <CallHistoryLoadingGuide />
-          ) : previewCard ? (
+          ) : (
             <div className="lettering-showcase-fs lettering-showcase-fs--history-embed relative">
               <div className="lettering-showcase-fs__shell">
                   <LetteringIncomingNotification
@@ -526,14 +504,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                   onToast={showToast}
                 />
               </div>
-              {loading ? (
-                <div className="call-history-loading-overlay" aria-hidden>
-                  <CallHistoryLoadingGuide syncing />
-                </div>
-              ) : null}
             </div>
-          ) : (
-            <CallHistoryLoadingGuide />
           )}
         </div>
       </AppFullScreenView>
