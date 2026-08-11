@@ -6420,15 +6420,15 @@ body,
   min-width: 0;
   padding-top: 1px;
   color: #64748b;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1.45;
 }
 
 .ldr-front-info-row__icon {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
   margin-top: 1px;
   color: #93c5fd;
@@ -6448,7 +6448,7 @@ body,
 .ldr-front-info-row__value {
   min-width: 0;
   color: #0f172a;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 650;
   line-height: 1.5;
   word-break: keep-all;
@@ -6688,7 +6688,7 @@ body,
 }
 
 .ldr-reception--push .ldr-contact-row__value {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -7136,7 +7136,7 @@ body,
 
 .ldr-contact-row__label {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: rgba(148, 163, 184, 0.9);
 }
@@ -7152,7 +7152,7 @@ body,
 .ldr-contact-row__value {
   display: block;
   min-width: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.35;
   color: #f1f5f9;
