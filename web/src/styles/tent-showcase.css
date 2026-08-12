@@ -750,10 +750,18 @@
   height: auto;
   max-height: none;
   overflow: hidden;
-  /* 홈 lettering-home-push-embed 와 동일 크롬 */
   border-radius: 20px;
+  /* 기존 — 통화 화면에 묻히던 회색 테두리
   border: 1px solid rgba(148, 163, 184, 0.2);
   box-shadow: 0 14px 40px rgba(15, 23, 42, 0.32);
+  */
+  /* 빅푸시 전용 — 블루 에메랄드 얇은 테두리 + 소프트 글로우 */
+  border: 1px solid rgba(45, 212, 191, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.22),
+    0 0 20px rgba(34, 211, 238, 0.32),
+    0 0 36px rgba(45, 212, 191, 0.18),
+    0 14px 40px rgba(15, 23, 42, 0.4);
   background:
     radial-gradient(120% 80% at 50% -10%, rgba(0, 210, 255, 0.08), transparent 55%),
     linear-gradient(180deg, #0f172a 0%, #0b1220 48%, #070b14 100%);

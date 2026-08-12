@@ -521,6 +521,13 @@ export default function MyCaseGrid({
     }
 
     if (!hasLiveBroadcast) return;
+    /* 상대 케이스함 프로필 탭 — 아카이브 스냅샷이 아니라 라이브 쇼케이스 전체 */
+    if (typeof onOpenDigitalCard === "function") {
+      markBroadcastStorySeen(storyOwnerId, mainBroadcast);
+      setStorySeenTick((n) => n + 1);
+      onOpenDigitalCard();
+      return;
+    }
     const item = mainBroadcast[0];
     if (!item) return;
     markBroadcastStorySeen(storyOwnerId, mainBroadcast);

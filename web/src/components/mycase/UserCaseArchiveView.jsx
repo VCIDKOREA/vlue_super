@@ -144,8 +144,10 @@ export default function UserCaseArchiveView({
         {peerCard ? (
           <PeerShowcasePreview
             card={peerCard}
-            includeDigitalCard
-            digitalCardOnly
+            includeDigitalCard={
+              isPaidLetteringTier(peerCard.membershipTier) &&
+              peerCard.showcaseStyle?.includeDigitalCard !== false
+            }
             onClose={() => {
               setCardOpen(false);
               setPeerCard(null);
