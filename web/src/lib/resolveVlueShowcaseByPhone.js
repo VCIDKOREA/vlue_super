@@ -1,70 +1,15 @@
 import { normalizeLetteringCard } from "./letteringCardNormalize.js";
 import { formatLetteringPhoneDisplay, normalizePhoneDigits } from "./letteringPhoneMatch.js";
 import { isPaidLetteringTier } from "./letteringMembership.js";
-import { vlueAuthFetch } from "./vlueAuthHeaders.js";
+import { getBusinessCardByNumber } from "./getBusinessCardByNumber.js";
+import { mapLookupToLetteringCard } from "./letteringCardMapper.js";
+import {
+  buildNationalAgencyDcpCard,
+  isNationalAgencyDcpCard,
+  matchNationalAgency
+} from "./nationalAgencyDcpClient.js";
 
-function mapLookupToCard(body, phoneDisplay) {
-  const profile = body.profile && typeof body.profile === "object" ? body.profile : {};
-  const handle = String(body.publicHandle || profile.publicHandle || "").trim();
-  return normalizeLetteringCard({
-    userId: String(body.userId || "").trim(),
-    name: body.displayName || profile.name || "",
-    title: body.jobTitle || profile.title || "",
-    organization: body.companyName || profile.organization || "",
-    department: profile.department || "",
-    phone: phoneDisplay,
-    loginId: handle,
-    publicHandle: handle,
-    photoUrl: body.image_url || profile.photoUrl || profile.image_url || "",
-    photoFocus: body.photoFocus || profile.photoFocus || "center",
-    website: profile.website || "",
-    companyIntro: profile.companyIntro || profile.intro || "",
-    membershipTier: body.is_premium_line ? "premium" : body.digitalCardActive ? "paid" : "free",
-    verificationItems: ["VLUE 인증 완료", "전화번호 일치 확인"]
-  });
-}
-
-async function fetchCardFromApi(phoneRaw) {
-  try {
-    const q = encodeURIComponent(phoneRaw);
-    const res = await vlueAuthFetch(`/api/cards/lookup?number=${q}`, { credentials: "same-origin" });
-    if (!res.ok) return null;
-    const body = await res.json();
-    if (!body?.matched) return null;
-    const phoneDisplay = formatLetteringPhoneDisplay(phoneRaw);
-    return {
-      card: mapLookupToCard(body, phoneDisplay),
-      verified: Boolean(body.is_verified),
-      source: "api"
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * :phone 파라미터 → VLUE Showcase 웹뷰 페이로드
- * API 매칭만 사용. 미매칭 시 데모/내 명함을 상대 카드로 넣지 않음.
- */
-export async function resolveVlueShowcaseByPhone(phoneRaw) {
-  const digits = normalizePhoneDigits(phoneRaw);
-  const phoneDisplay = formatLetteringPhoneDisplay(phoneRaw) || phoneRaw || "—";
-
-  const apiHit = await fetchCardFromApi(phoneRaw);
-  if (apiHit) {
-    const tier = apiHit.card.membershipTier || "paid";
-    return {
-      phone: phoneDisplay,
-      phoneDigits: digits,
-      verified: apiHit.verified,
-      source: apiHit.source,
-      isPaid: isPaidLetteringTier(tier),
-      card: { ...apiHit.card, phone: phoneDisplay, membershipTier: tier },
-      attachments: [],
-      outlinks: []
-    };
-  }
-
+function emptyUnmatched(phoneDisplay, digits) {
   return {
     phone: phoneDisplay,
     phoneDigits: digits,
@@ -79,4 +24,60 @@ export async function resolveVlueShowcaseByPhone(phoneRaw) {
     attachments: [],
     outlinks: []
   };
+}
+
+function dcpPayload(card, phoneDisplay, digits, source) {
+  return {
+    phone: card.phone || phoneDisplay,
+    phoneDigits: digits,
+    verified: true,
+    source,
+    isPaid: true,
+    card: normalizeLetteringCard(card),
+    attachments: [],
+    outlinks: []
+  };
+}
+
+/**
+ * :phone 파라미터 → VLUE Showcase 웹뷰 페이로드
+ * API 매칭만 사용. 미매칭 시 데모/내 명함을 상대 카드로 넣지 않음.
+ * 112 등 국가기관은 userId 없이도 DCP 쇼케이스.
+ */
+export async function resolveVlueShowcaseByPhone(phoneRaw) {
+  const digits = normalizePhoneDigits(phoneRaw);
+  const phoneDisplay = formatLetteringPhoneDisplay(phoneRaw) || phoneRaw || "—";
+
+  const lookup = await getBusinessCardByNumber(phoneRaw, { forCallOverlay: true });
+  if (lookup?.ok && lookup.matched) {
+    const mapped = mapLookupToLetteringCard(lookup, phoneRaw);
+    if (mapped) {
+      if (isNationalAgencyDcpCard(mapped)) {
+        return dcpPayload(mapped, phoneDisplay, digits, lookup.source || "national_agency_dcp");
+      }
+      const tier = mapped.membershipTier || "paid";
+      return {
+        phone: phoneDisplay,
+        phoneDigits: digits,
+        verified: Boolean(lookup.is_verified),
+        source: lookup.source || "api",
+        isPaid: isPaidLetteringTier(tier),
+        card: { ...mapped, phone: mapped.phone || phoneDisplay, membershipTier: tier },
+        attachments: [],
+        outlinks: []
+      };
+    }
+  }
+
+  const agency = matchNationalAgency(phoneRaw);
+  if (agency) {
+    return dcpPayload(
+      buildNationalAgencyDcpCard(agency),
+      phoneDisplay,
+      digits,
+      "national_agency_whitelist"
+    );
+  }
+
+  return emptyUnmatched(phoneDisplay, digits);
 }

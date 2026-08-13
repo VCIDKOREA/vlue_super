@@ -155,7 +155,7 @@ export default function ShowcaseCallCarousel({
   const isDcp = card?.profileKind === "dcp" || Boolean(card?.dcp);
   const isPaid = isDcp || tier === USER_TIERS.PAID;
   const photosPerPage = maxShowcasePhotosPerPage();
-  const showDigitalCard = Boolean(includeDigitalCard) && isPaid;
+  const showDigitalCard = isDcp || (Boolean(includeDigitalCard) && isPaid);
   const maxIgPages = maxInstagramEmbedsForTier(tier, { includeDigitalCard: showDigitalCard });
   /** 게시물 열람(suppressBgm) 시에도 재생 중인 케이스함 음원 메타를 칩에 표시 */
   const bgmChipStyle =

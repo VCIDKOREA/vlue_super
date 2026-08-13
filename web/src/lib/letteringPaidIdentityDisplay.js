@@ -1,4 +1,6 @@
 /** 유료 Lettering·명함 — 회사명 / 직책·성명 표시 */
+import { isUnknownPhoneToken } from "./letteringPhoneMatch.js";
+
 export function formatLetteringPaidIdentity(card = {}) {
   const organization = String(card.organization || card.companyName || "").trim();
   const title = String(card.title || card.jobTitle || "").trim();
@@ -26,7 +28,9 @@ export function formatLetteringReceptionLines(card = {}, { incomingNumber = "" }
   const org = identity.organization;
   const name = identity.name;
   const title = identity.title;
-  const phoneRaw = String(incomingNumber || card.phone || "").trim();
+  const liveIncoming = isUnknownPhoneToken(incomingNumber) ? "" : String(incomingNumber || "").trim();
+  const cardPhone = isUnknownPhoneToken(card.phone) ? "" : String(card.phone || "").trim();
+  const phoneRaw = liveIncoming || cardPhone;
   const phone = phoneRaw;
   /* 디지털 인증명함 — 상호·이름 동시 표현 (사업자 상호 우선) */
   const collapsedPrimary = identity.orgAndName || org || name || "\u2014";

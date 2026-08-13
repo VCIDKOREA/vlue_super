@@ -33,6 +33,8 @@ export function normalizeLetteringCard(raw = {}) {
     feedType: raw.feedType === "company" ? "company" : "personal",
     verificationItems: Array.isArray(raw.verificationItems) ? raw.verificationItems : [],
     membershipTier: String(raw.membershipTier || "free").toLowerCase(),
+    profileKind: String(raw.profileKind || "").trim(),
+    dcp: raw.dcp && typeof raw.dcp === "object" ? raw.dcp : null,
     customBackText: String(raw.customBackText || "").trim(),
     promo: String(raw.promo || "").trim(),
     address: String(

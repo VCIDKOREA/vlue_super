@@ -5,6 +5,7 @@ import {
   readCallShowcaseHistory,
   resolveCallHistoryAvatar
 } from "./callShowcaseHistory.js";
+import { matchNationalAgency } from "./nationalAgencyDcpClient.js";
 
 /**
  * 네이티브 시스템 CallLog JSON 로드.
@@ -89,15 +90,21 @@ export function enrichCallLogGroupsWithShowcaseHistory(groups) {
   }
   return groups.map((g) => {
     const meta = byKey.get(g.phoneKey);
+    const agency = matchNationalAgency(g.phoneDisplay || g.phone);
     const nameFromMeta = String(meta?.name || "").trim();
     const looksLikePhone =
       !nameFromMeta ||
       normalizePhoneDigits(nameFromMeta) === g.phoneKey ||
       nameFromMeta === g.phoneDisplay;
+    const displayName = !looksLikePhone
+      ? nameFromMeta
+      : agency
+        ? agency.agencyName
+        : g.phoneDisplay;
     return {
       ...g,
-      name: looksLikePhone ? g.phoneDisplay : nameFromMeta,
-      verified: meta ? meta.verified !== false : null,
+      name: displayName,
+      verified: agency ? true : meta ? meta.verified !== false : null,
       membershipTier: meta?.membershipTier || null,
       avatarUrl: resolveCallHistoryAvatar(meta || {}) || "",
       cardSnapshot: meta?.cardSnapshot || null,

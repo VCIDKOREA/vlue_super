@@ -27,6 +27,11 @@ import { resolveIsKnownContactSync } from "../lib/contacts/hybridKnownContact.js
 import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
+import {
+  buildNationalAgencyDcpCard,
+  isNationalAgencyDcpCard,
+  matchNationalAgency
+} from "../lib/nationalAgencyDcpClient.js";
 import "./friend-showcase-list.css";
 import "../styles/showcase-call-glass.css";
 import "../styles/incall-controls.css";
@@ -299,15 +304,16 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       });
       if (gen !== openGenRef.current) return;
 
-      const matched = Boolean(String(payload.card?.userId || "").trim());
-      const peerUserId = String(payload.card?.userId || uidHint || "").trim();
+      const isDcp = isNationalAgencyDcpCard(payload.card);
+      const matched = isDcp || Boolean(String(payload.card?.userId || "").trim());
+      const peerUserId = isDcp ? "" : String(payload.card?.userId || uidHint || "").trim();
       let peerStyle =
-        matched && payload.showcaseStyle && typeof payload.showcaseStyle === "object"
+        matched && !isDcp && payload.showcaseStyle && typeof payload.showcaseStyle === "object"
           ? payload.showcaseStyle
           : silentShowcaseStyle();
 
       /* resolve 결과에 페이지가 없을 때만 공개 라이브 보강 (중복 GET 제거) */
-      if (matched && peerUserId && !styleHasShowcaseContent(peerStyle)) {
+      if (matched && peerUserId && !isDcp && !styleHasShowcaseContent(peerStyle)) {
         const live = await fetchPeerLiveStylePublic(peerUserId, { force: true });
         if (live && typeof live === "object") {
           peerStyle = {
@@ -324,20 +330,25 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       }
 
       const tierRaw = payload.card?.membershipTier || call.membershipTier || "";
-      const tier =
-        isPaidLetteringTier(tierRaw) || !matched
+      const tier = isDcp
+        ? "paid"
+        : isPaidLetteringTier(tierRaw) || !matched
           ? tierRaw || (matched ? "paid" : "free")
           : "paid";
       const card = applyShowcaseStyleToCard(
         {
           ...payload.card,
           name: matched ? payload.card?.name || call.name || phone : "",
-          phone: payload.phone || phone,
+          phone: isDcp
+            ? payload.card?.dcp?.shortNumber || payload.card?.phone || phone
+            : payload.phone || phone,
           membershipTier: tier,
           photoUrl: matched ? payload.card?.photoUrl || call.avatarUrl || "" : "",
           avatarUrl: matched ? payload.card?.avatarUrl || call.avatarUrl || "" : "",
           photoFocus: payload.card?.photoFocus || call.cardSnapshot?.photoFocus || "center",
           publicHandle: payload.card?.publicHandle || payload.card?.loginId || "",
+          profileKind: isDcp ? "dcp" : payload.card?.profileKind || "",
+          dcp: isDcp ? payload.card?.dcp : payload.card?.dcp || null,
           showcaseStyle: peerStyle
         },
         isPaidLetteringTier(tier) ? tier : "free",
@@ -348,12 +359,12 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       setPreviewCard(card);
       /* BGM은 LetteringIncomingNotification→ShowcaseCallCarousel 마운트 시에만 — 로딩 중 선재생 금지 */
 
-      if (matched && payload.card?.name) {
+      if (matched && (payload.card?.name || isDcp)) {
         setSelected((prev) =>
           prev
             ? {
                 ...prev,
-                name: payload.card.name,
+                name: payload.card?.name || prev.name,
                 verified: true,
                 membershipTier: tier,
                 avatarUrl: card.photoUrl || card.avatarUrl || prev.avatarUrl
@@ -379,6 +390,32 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
     const hasPages = styleHasShowcaseContent(call.showcaseSnapshot);
     const hasBgm = hasPlayableShowcaseBgm(call.showcaseSnapshot);
+    const agency = matchNationalAgency(call.phoneDisplay || call.phone);
+
+    if (agency) {
+      const dcpCard = applyShowcaseStyleToCard(
+        {
+          ...buildNationalAgencyDcpCard(agency),
+          showcaseStyle: silentShowcaseStyle()
+        },
+        "paid",
+        { peerMode: true, style: silentShowcaseStyle() }
+      );
+      flushSync(() => {
+        setSelected({
+          ...call,
+          name: agency.agencyName,
+          verified: true,
+          membershipTier: "paid"
+        });
+        setExpanded(true);
+        setPreviewVerified(true);
+        setPreviewCard(dcpCard);
+        setLoading(false);
+      });
+      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
+      return;
+    }
 
     /* 페이지+BGM 스냅샷이 완전할 때만 즉시 표시(캐러셀 마운트와 동시에 BGM). 불완전하면 로딩만 */
     if (hasUsableLocalSnapshot(call) && hasPages && hasBgm) {
@@ -483,7 +520,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                       : silentShowcaseStyle()
                   }}
                   includeDigitalCard={
-                    isMember && previewCard.showcaseStyle?.includeDigitalCard !== false
+                    isNationalAgencyDcpCard(previewCard) ||
+                    (isMember && previewCard.showcaseStyle?.includeDigitalCard !== false)
                   }
                   expanded={expanded}
                   onExpandedChange={setExpanded}

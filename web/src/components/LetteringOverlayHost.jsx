@@ -263,6 +263,8 @@ function LetteringOverlayHostInner() {
 
   useEffect(() => {
     matchedRef.current = false;
+    setVerified(false);
+    setCard(isUnknownIncoming(incoming) ? null : buildUnverifiedOverlayCard(incoming));
   }, [incoming]);
 
   useEffect(() => {

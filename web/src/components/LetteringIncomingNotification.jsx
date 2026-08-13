@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getLetteringCallStatusLabel } from "../lib/letteringCallStatus.js";
-import { compareLetteringPhones, formatLetteringPhoneDisplay, normalizePhoneDigits } from "../lib/letteringPhoneMatch.js";
+import { compareLetteringPhones, formatLetteringPhoneDisplay, isUnknownPhoneToken, normalizePhoneDigits } from "../lib/letteringPhoneMatch.js";
 import { openLetteringCertInVlueApp } from "../lib/letteringOpenVlueApp.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { VLUE_CARD_CAUTION, VLUE_UNVERIFIED_REPORT_DISCLAIMER } from "../lib/vlueDigitalCardUi.js";
@@ -414,7 +414,9 @@ export default function LetteringIncomingNotification({
     platform
   });
 
-  const incoming = String(incomingNumber || (verified ? c.phone : "") || "").trim();
+  const liveIncoming = isUnknownPhoneToken(incomingNumber) ? "" : String(incomingNumber || "").trim();
+  const cardPhone = isUnknownPhoneToken(c.phone) ? "" : String(c.phone || "").trim();
+  const incoming = liveIncoming || (verified ? cardPhone : "") || "";
 
   useEffect(() => {
     if (typeof isKnownContactProp === "boolean") {
@@ -508,8 +510,8 @@ export default function LetteringIncomingNotification({
     "lettering-ongoing lettering-incoming-active relative flex w-full flex-col overflow-hidden";
   const isDcp = isDcpCard;
   const isPaidMember = isDcp || (verified && isPaidLetteringTier(c.membershipTier));
-  const isFreeMember = verified && !isPaidMember;
-  const isUnverified = !verified;
+  const isFreeMember = verified && !isPaidMember && !isDcp;
+  const isUnverified = !verified && !isDcp;
   const { setPlaybackPhase } = useShowcaseBgm();
   const canExpand = isPaidMember || isFreeMember || isUnverified;
   const [reportTick, setReportTick] = useState(0);

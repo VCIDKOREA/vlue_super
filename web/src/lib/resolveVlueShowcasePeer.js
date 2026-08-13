@@ -13,6 +13,7 @@ import {
 } from "./showcase/showcaseStyleApi.js";
 import { createDefaultShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
 import { resolveVlueShowcaseByPhone } from "./resolveVlueShowcaseByPhone.js";
+import { isNationalAgencyDcpCard } from "./nationalAgencyDcpClient.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -181,9 +182,23 @@ export async function resolveVlueShowcasePeer(input = {}) {
     };
   }
 
-  /* userId 없으면 전화 폴백 (검색 히트에 번호가 있을 때만) — 스타일은 로컬 미사용 */
+  /* userId 없으면 전화 폴백 — 112 등 DCP는 UUID 없이 쇼케이스 */
   if (phoneHint) {
     const byPhone = await resolveVlueShowcaseByPhone(phoneHint);
+    if (isNationalAgencyDcpCard(byPhone.card)) {
+      const emptyStyle = createDefaultShowcaseStyle();
+      return {
+        ...byPhone,
+        verified: true,
+        source: byPhone.source || "national_agency_dcp",
+        isPaid: true,
+        showcaseStyle: emptyStyle,
+        card: {
+          ...byPhone.card,
+          showcaseStyle: emptyStyle
+        }
+      };
+    }
     const uid = String(byPhone.card?.userId || "").trim();
     if (UUID_RE.test(uid)) {
       return resolveVlueShowcasePeer({
