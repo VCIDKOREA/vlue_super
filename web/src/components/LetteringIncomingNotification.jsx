@@ -8,6 +8,7 @@ import {
   resolveFreeTierSummary
 } from "../lib/letteringFreeTierDisplay.js";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
+import RenderErrorGuard from "./RenderErrorGuard.jsx";
 import AgencyRouteWarningOverlay from "./agency/AgencyRouteWarningOverlay.jsx";
 import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx";
 import ShowcaseCallCarousel from "./showcase/ShowcaseCallCarousel.jsx";
@@ -631,8 +632,14 @@ export default function LetteringIncomingNotification({
     ? formatLetteringPhoneDisplay(receptionLines.phone)
     : freeTierSummary?.phoneDisplay || formatLetteringPhoneDisplay(incoming) || "";
   const previewShowcaseId = useMemo(() => {
+    /* 미인증·실통화 오버레이는 수신자 로컬 핸들(ceo)을 붙이지 않음 */
+    if (isUnverified) return "";
     const fromCard = String(c.loginId || c.publicHandle || c.handle || "").trim().replace(/^@+/, "");
     if (fromCard) return fromCard;
+    if (!previewMode) {
+      const liveName = String(c.name || c.displayName || "").trim();
+      return liveName || "";
+    }
     const peerId = String(c.userId || c.ownerUserId || "").trim();
     let meId = "";
     try {
@@ -641,14 +648,23 @@ export default function LetteringIncomingNotification({
       /* ignore */
     }
     const isPeer = Boolean(peerId && meId && peerId !== meId);
-    /* 상대 카드면 내 로컬 핸들로 채우지 않음 (ceo Showcase 오염 방지) */
     if (!isPeer) {
       const handle = String(getMemberHandle() || "").trim().replace(/^@+/, "");
       if (handle && handle !== "user") return handle;
     }
     const fromName = String(c.name || c.displayName || "").trim();
     return fromName || "VLUE";
-  }, [c.loginId, c.publicHandle, c.handle, c.name, c.displayName, c.userId, c.ownerUserId]);
+  }, [
+    isUnverified,
+    previewMode,
+    c.loginId,
+    c.publicHandle,
+    c.handle,
+    c.name,
+    c.displayName,
+    c.userId,
+    c.ownerUserId
+  ]);
 
   const displayLabel = isUnverified
     ? null
@@ -1075,11 +1091,7 @@ export default function LetteringIncomingNotification({
         <div className="lettering-live-bar__left">
           <LetteringLiveIndicator />
           <span className="lettering-live-bar__brand">
-            {previewMode
-              ? `${previewShowcaseId} Showcase`
-              : previewShowcaseId
-                ? `${previewShowcaseId} Showcase`
-                : "VLUE Showcase"}
+            {previewShowcaseId ? `${previewShowcaseId} Showcase` : "VLUE Showcase"}
           </span>
         </div>
         {previewMode && showOwnerSettings ? (
@@ -1311,6 +1323,7 @@ export default function LetteringIncomingNotification({
                       callChromeSafe={showInCallControls}
                     />
                   ) : (
+                    <RenderErrorGuard fallback={null}>
                     <LetteringDigitalReception
                       card={c}
                       verified={verified}
@@ -1325,6 +1338,7 @@ export default function LetteringIncomingNotification({
                       onToast={showGuide}
                       callChromeSafe={showInCallControls}
                     />
+                    </RenderErrorGuard>
                   )}
                 </div>
                 {renderExpandedFooter()}

@@ -66,7 +66,7 @@ function isPollutedCopy(raw) {
   return POLLUTED_COPY_RE.some((re) => re.test(v));
 }
 
-function isCeoSubjectCard(card = {}) {
+export function isCeoSubjectCard(card = {}) {
   const handle = String(
     card.publicHandle || card.loginId || card.handle || card.vlueId || card.memberHandle || ""
   )

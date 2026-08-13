@@ -18,6 +18,7 @@ import { normalizePhotoFocus } from "../lib/letteringBizcardStorage.js";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import LetteringReportSheet from "./LetteringReportSheet.jsx";
 import LetteringCertModal from "./LetteringCertModal.jsx";
+import RenderErrorGuard from "./RenderErrorGuard.jsx";
 import { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
@@ -134,6 +135,17 @@ function buildUnverifiedOverlayCard(phone) {
   };
 }
 
+/** 조회 매칭이 끝난 카드 — 미인증 플레이스홀더로 덮지 않음 */
+function isResolvedOverlayCard(card) {
+  if (!card) return false;
+  if (card.profileKind === "dcp" || (card.dcp && typeof card.dcp === "object")) return true;
+  if (String(card.userId || card.ownerUserId || "").trim()) return true;
+  const handle = String(card.publicHandle || card.loginId || card.vlueId || "")
+    .trim()
+    .replace(/^@/, "");
+  return Boolean(handle);
+}
+
 /**
  * 네이티브 CallOverlay WebView / #lettering-overlay 진입점
  * 웹 홈·마케팅과 동일 — LetteringIncomingNotification 쇼케이스 바 → 풀 쇼케이스
@@ -167,6 +179,8 @@ function LetteringOverlayHostInner() {
   const [forceShowcaseBar, setForceShowcaseBar] = useState(true);
   /* Mini→풀 복원 직후 늦게 도착하는 big_push_bar 로 다시 접히는 레이스 방지 */
   const restoreHoldUntilRef = useRef(0);
+  /* 네이티브/웹 조회가 한 번 매칭되면 timeout·unmatched 로 되돌리지 않음 */
+  const matchedRef = useRef(false);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -248,19 +262,26 @@ function LetteringOverlayHostInner() {
   const { setPlaybackPhase } = useShowcaseBgm();
 
   useEffect(() => {
+    matchedRef.current = false;
+  }, [incoming]);
+
+  useEffect(() => {
     const onNativeCard = (ev) => {
       try {
         const detail = ev?.detail || window.__VLUE_CARD_LOOKUP__;
         if (!detail) return;
         if (detail.matched === false) {
+          if (matchedRef.current) return;
           const phone = incoming || detail.phoneE164 || "";
-          setCard(buildUnverifiedOverlayCard(phone));
-          setVerified(false);
+          setCard((prev) =>
+            isResolvedOverlayCard(prev) ? prev : buildUnverifiedOverlayCard(phone)
+          );
           setLoading(false);
           return;
         }
         const mapped = mapLookupToLetteringCard(detail, incoming || detail.phoneE164 || "");
         if (mapped) {
+          matchedRef.current = true;
           setCard((prev) => ({ ...(prev || {}), ...mapped }));
           setVerified(true);
           setLoading(false);
@@ -308,12 +329,11 @@ function LetteringOverlayHostInner() {
       const unknown = isUnknownIncoming(incoming);
       if (!unknown) {
         setCard((prev) => prev || buildUnverifiedOverlayCard(incoming));
-        setVerified(false);
-        setLoading(false);
+        if (!matchedRef.current) setLoading(false);
       } else {
         setLoading(true);
         unknownTimer = window.setTimeout(() => {
-          if (cancelled) return;
+          if (cancelled || matchedRef.current) return;
           setCard(buildUnverifiedOverlayCard(incoming));
           setVerified(false);
           setLoading(false);
@@ -333,25 +353,21 @@ function LetteringOverlayHostInner() {
         return;
       }
       if (unknown) return;
+      if (matchedRef.current) return;
 
       /*
        * 네이티브 card-lookup 이 이미 있으면 by-number 재조회 생략.
-       * 스타일·프로필 enrich 는 in-flight 맵으로 리스너와 합친다.
+       * matched:false 는 웹 조회를 건너뛰지 않음 — 네이티브 타임아웃/미매칭 후에도 CEO 등 회원 카드를 살린다.
        */
       const nativeDetail =
         native || forceLettering ? window.__VLUE_CARD_LOOKUP__ : null;
-      if (nativeDetail && nativeDetail.matched === false) {
-        setCard(buildUnverifiedOverlayCard(incoming || nativeDetail.phoneE164 || ""));
-        setVerified(false);
-        setLoading(false);
-        return;
-      }
       if (nativeDetail && nativeDetail.matched !== false) {
         const mapped = mapLookupToLetteringCard(
           nativeDetail,
           incoming || nativeDetail.phoneE164 || ""
         );
         if (mapped) {
+          matchedRef.current = true;
           setCard((prev) => ({ ...(prev || {}), ...mapped }));
           setVerified(true);
           setLoading(false);
@@ -374,13 +390,13 @@ function LetteringOverlayHostInner() {
           /* ignore */
         }
       }
-      const lookup = await Promise.race([
-        getBusinessCardByNumber(incoming, { dcpRoute: resolvedDcpRoute }),
-        new Promise((resolve) => {
-          window.setTimeout(() => resolve(null), 4000);
-        })
-      ]);
+      const lookup = await getBusinessCardByNumber(incoming, {
+        dcpRoute: resolvedDcpRoute,
+        forCallOverlay: true
+      });
       if (cancelled) return;
+      if (matchedRef.current) return;
+
       let nextCard = null;
       let nextVerified = false;
       if (lookup?.ok && lookup.matched) {
@@ -395,6 +411,7 @@ function LetteringOverlayHostInner() {
 
       /* lookup 직후 DCC 먼저 표시 — 스타일·프로필은 병렬 */
       if (nextCard) {
+        matchedRef.current = true;
         setCard({ ...nextCard, showcaseStyle: peerStyle });
         setVerified(nextVerified);
         setLoading(false);
@@ -408,14 +425,17 @@ function LetteringOverlayHostInner() {
       }
 
       if (cancelled) return;
+      if (matchedRef.current && !nextCard) return;
       if (nextCard) {
+        matchedRef.current = true;
         setCard({ ...nextCard, showcaseStyle: peerStyle });
         setVerified(nextVerified);
-      } else {
+        setShowcaseStyle(peerStyle);
+      } else if (!matchedRef.current) {
         setCard(buildUnverifiedOverlayCard(incoming));
         setVerified(false);
+        setShowcaseStyle(createDefaultShowcaseStyle());
       }
-      setShowcaseStyle(nextCard ? peerStyle : createDefaultShowcaseStyle());
       setLoading(false);
     })();
     return () => {
@@ -684,6 +704,14 @@ function LetteringOverlayHostInner() {
       data-mini={miniCollapsed ? "true" : "false"}
     >
       <div className="lettering-overlay-host__tent-shell">
+        <RenderErrorGuard
+          fallback={
+            <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 px-6 text-center">
+              <p className="text-[15px] font-black text-slate-100">쇼케이스를 표시하지 못했습니다</p>
+              <p className="text-[12px] text-slate-400">{incoming || "발신 번호"}</p>
+            </div>
+          }
+        >
         <LetteringIncomingNotification
           className={`lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass ${
             onCall ? "lettering-ongoing--phase-connected" : "lettering-ongoing--phase-ringing"
@@ -721,6 +749,7 @@ function LetteringOverlayHostInner() {
             setCertOpen(true);
           }}
         />
+        </RenderErrorGuard>
       </div>
 
       {toast ? (

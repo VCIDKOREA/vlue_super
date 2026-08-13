@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Settings, X } from "lucide-react";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
+import RenderErrorGuard from "../RenderErrorGuard.jsx";
 import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
 import ShowcaseIdentityCorner from "./ShowcaseIdentityCorner.jsx";
 import ShowcaseBannerSocialLayer from "./ShowcaseBannerSocialLayer.jsx";
@@ -791,6 +792,16 @@ export default function ShowcaseCallCarousel({
                 {near && slide.type === "card" && isPaid ? (
                   <div className="showcase-call-carousel__card">
                     {renderSlideCornerAction("card")}
+                    <RenderErrorGuard
+                      fallback={
+                        <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-1 px-6 text-center text-slate-100">
+                          <p className="text-[15px] font-black">{card?.organization || card?.name || "VLUE"}</p>
+                          {card?.name && card?.organization ? (
+                            <p className="text-[13px] text-slate-300">{card.name}</p>
+                          ) : null}
+                        </div>
+                      }
+                    >
                     <LetteringDigitalReception
                       card={card}
                       verified={verified}
@@ -807,6 +818,7 @@ export default function ShowcaseCallCarousel({
                       onToast={onKeypadToast}
                       callChromeSafe={callChromeSafe}
                     />
+                    </RenderErrorGuard>
                   </div>
                 ) : null}
 

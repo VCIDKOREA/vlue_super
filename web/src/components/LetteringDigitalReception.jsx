@@ -30,6 +30,11 @@ import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
 import { openExternalHref, formatWebHref } from "../lib/showcase/showcaseContactActions.js";
 import { getLocalVlueUserId } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
 import AgencyDcpCard from "./agency/AgencyDcpCard.jsx";
+import { isCeoSubjectCard } from "../lib/letteringDemoPollution.js";
+import VLUE_EYE_WATERMARK from "../assets/vlue-eye-watermark.svg?url";
+import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
+
+const CEO_WATERMARK_SRC = VLUE_EYE_WATERMARK || VLUE_SHIELD_LOGO || "";
 
 function formatWebsite(raw) {
   return String(raw || "")
@@ -251,17 +256,7 @@ function FaceTabs({ face, onFaceChange, hidden = false }) {
 
 /** CEO(@ceo / ceo@vlue.kr) 소유 명함 — 이 계정만 ‘로고 없음’과 동일 처리 */
 function isCeoOwnerCard(card) {
-  const handle = String(
-    card?.loginId || card?.publicHandle || card?.handle || card?.memberHandle || ""
-  )
-    .trim()
-    .toLowerCase()
-    .replace(/^@/, "");
-  if (handle === "ceo") return true;
-
-  const email = String(card?.email || "").trim().toLowerCase();
-  if (email === "ceo@vlue.kr") return true;
-
+  if (isCeoSubjectCard(card)) return true;
   try {
     const me = String(localStorage.getItem("vlue_member_handle") || "")
       .trim()
@@ -270,8 +265,8 @@ function isCeoOwnerCard(card) {
     if (me !== "ceo") return false;
     const owner = String(card?.userId || card?.ownerUserId || "").trim();
     const meId = getLocalVlueUserId();
-    if (!owner || owner === "me") return true;
-    if (meId && owner === meId) return true;
+    /* 빈 미인증 카드(owner 없음)를 수신자 계정만으로 CEO 쇼케이스로 치지 않음 */
+    if (meId && owner && owner === meId) return true;
     return false;
   } catch {
     return false;
@@ -284,7 +279,7 @@ function isCeoOwnerCard(card) {
  * - 그 외: 업로드 로고 (프로필·워터마크 동일 소스)
  */
 function resolveCardLogoUrl(card) {
-  if (isCeoOwnerCard(card)) return VLUE_WATERMARK_LOGO;
+  if (isCeoOwnerCard(card)) return CEO_WATERMARK_SRC;
   if (card?.noCompanyLogo) return "";
   const logo = String(card?.logoUrl || card?.logo_url || "").trim();
   if (!logo) return "";
@@ -307,7 +302,7 @@ function CompanyLogoWatermark({ card }) {
   let logoUrl = "";
   let variant = "nukki";
   if (ceo) {
-    logoUrl = VLUE_WATERMARK_LOGO;
+    logoUrl = CEO_WATERMARK_SRC;
     variant = "ceo";
   } else if (company) {
     logoUrl = company;

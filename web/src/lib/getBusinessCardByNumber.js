@@ -13,6 +13,7 @@ export async function getBusinessCardByNumber(raw, opts = {}) {
     const params = new URLSearchParams({ number });
     const route = String(opts.dcpRoute || "").trim();
     if (route) params.set("dcp_route", route);
+    if (opts.forCallOverlay) params.set("purpose", "call_overlay");
     const res = await vlueAuthFetch(apiUrl(`/api/cards/by-number?${params.toString()}`), {
       headers: vlueAuthHeaders()
     });
