@@ -322,7 +322,7 @@ export default function CompanionMiniCase({
       }${peekLeft ? " is-peek-left" : ""}`}
       role="button"
       tabIndex={0}
-      aria-label="Mini Case · 쇼케이스로 돌아가기 · 드래그로 위치 이동"
+      aria-label="Mini Case · 쇼케이스 돌아가기 · 드래그로 위치 이동"
       style={style}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -382,7 +382,7 @@ export default function CompanionMiniCase({
             }}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            쇼케이스로 돌아가기 <span aria-hidden>&lt;&lt;</span>
+            쇼케이스 돌아가기
           </button>
         </>
       )}
