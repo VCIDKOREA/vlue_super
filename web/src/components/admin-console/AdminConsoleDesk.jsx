@@ -19,6 +19,7 @@ import {
   fetchAdminPosts,
   fetchAdminSignatureSounds,
   fetchAdminUsers,
+  fetchAdminUser,
   patchAdminSignatureSound,
   patchAdminUser,
   resolveAdminManualReview,
@@ -245,12 +246,87 @@ function EnterpriseDccAdminTab({ onToast }) {
   );
 }
 
+function accountStatusLabel(status) {
+  const s = String(status || "");
+  if (s === "active") return "활성";
+  if (s === "suspended") return "정지";
+  if (s === "pending_identity") return "본인인증 대기";
+  if (s === "pending_approval") return "가입 승인 대기";
+  return s || "—";
+}
+
+function membershipLabel(tier) {
+  const t = String(tier || "free").toLowerCase();
+  if (t === "paid" || t === "standard" || t === "premium") return "유료";
+  if (t === "free") return "무료";
+  return t || "무료";
+}
+
+function formatAdminDate(iso) {
+  const s = String(iso || "");
+  if (!s) return "—";
+  return s.replace("T", " ").slice(0, 16);
+}
+
+function signupMethodLabel(method) {
+  const m = String(method || "");
+  if (m === "vlue_native") return "VLUE 앱";
+  if (m === "social_kakao") return "카카오";
+  if (m === "social_google") return "구글";
+  if (m === "social_naver") return "네이버";
+  if (m === "social_instagram") return "인스타그램";
+  return m || "—";
+}
+
+function MemberDetail({ user, onClose }) {
+  const rows = [
+    ["가입일시", formatAdminDate(user.createdAt)],
+    ["아이디", user.publicHandle ? `@${user.publicHandle}` : "—"],
+    ["실명", user.legalName || "—"],
+    ["전화번호", user.phoneDisplay || user.phoneE164 || "—"],
+    ["이메일", user.email || "—"],
+    ["생년월일", user.birthDisplay || "—"],
+    ["성별", user.genderDisplay || "—"],
+    ["본인인증", user.identityVerified ? `완료${user.identityVerifiedAt ? ` · ${formatAdminDate(user.identityVerifiedAt)}` : ""}` : "미완료"],
+    ["가입 경로", signupMethodLabel(user.signupMethod)],
+    ["멤버십", membershipLabel(user.membershipTier)],
+    ["디지털명함", user.digitalCardIssued ? "발급" : "미발급"],
+    ["상호", user.companyName || "—"],
+    ["직함", user.jobTitle || "—"],
+    ["사업자번호", user.businessRegistrationNo || "—"],
+    ["직장메일 인증", user.isCompanyVerified ? "완료" : "—"],
+    ["추천인 코드", user.referrerCode || "—"],
+    ["계정 상태", `${accountStatusLabel(user.accountStatus)} / ${user.status || "—"}`],
+    ["역할", user.role || "—"],
+    ["약관 동의", formatAdminDate(user.termsAcceptedAt)]
+  ];
+  return (
+    <div className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-[14px] font-black text-slate-900">가입 회원 정보</p>
+        <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-600">
+          닫기
+        </button>
+      </div>
+      <dl className="grid gap-2 sm:grid-cols-2">
+        {rows.map(([label, value]) => (
+          <div key={label} className="rounded-lg bg-slate-50 px-3 py-2">
+            <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</dt>
+            <dd className="mt-0.5 break-all text-[13px] font-semibold text-slate-900">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function UsersTab({ onToast }) {
   const [q, setQ] = useState("");
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState("");
+  const [selected, setSelected] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -268,6 +344,16 @@ function UsersTab({ onToast }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const openDetail = async (row) => {
+    setSelected(row);
+    try {
+      const data = await fetchAdminUser(row.id);
+      if (data?.user) setSelected(data.user);
+    } catch {
+      /* 목록 데이터로 표시 */
+    }
+  };
 
   const suspend = async (userId) => {
     setBusyId(userId);
@@ -301,26 +387,46 @@ function UsersTab({ onToast }) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="아이디·이름·이메일·전화 검색"
+          placeholder="아이디·이름·이메일·전화·상호 검색"
           className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
         />
         <button type="button" onClick={load} disabled={loading} className="rounded-lg bg-blue-600 px-4 py-2 text-[12px] font-bold text-white">
           검색
         </button>
       </div>
-      <p className="text-[11px] text-slate-500">총 {total}명</p>
+      <p className="text-[11px] text-slate-500">총 {total}명 · 최신 가입순 · 「상세」에서 가입 정보를 확인합니다</p>
+      {selected ? <MemberDetail user={selected} onClose={() => setSelected(null)} /> : null}
       <Table
         emptyLabel={loading ? "불러오는 중…" : "회원 없음"}
         columns={[
-          { key: "handle", label: "아이디", render: (r) => r.publicHandle || "—" },
-          { key: "name", label: "이름", render: (r) => r.legalName || "—" },
-          { key: "status", label: "상태", render: (r) => `${r.accountStatus} / ${r.status}` },
-          { key: "role", label: "역할" },
+          { key: "createdAt", label: "가입일", render: (r) => formatAdminDate(r.createdAt) },
+          { key: "handle", label: "아이디", render: (r) => (r.publicHandle ? `@${r.publicHandle}` : "—") },
+          { key: "name", label: "실명", render: (r) => r.legalName || "—" },
+          { key: "phone", label: "전화", render: (r) => r.phoneDisplay || r.phoneE164 || "—" },
+          { key: "email", label: "이메일", render: (r) => r.email || "—" },
+          {
+            key: "identity",
+            label: "본인인증",
+            render: (r) => (r.identityVerified ? "완료" : "미완료")
+          },
+          {
+            key: "membership",
+            label: "멤버십",
+            render: (r) => membershipLabel(r.membershipTier)
+          },
+          { key: "status", label: "상태", render: (r) => accountStatusLabel(r.accountStatus) },
           {
             key: "actions",
             label: "관리",
             render: (r) => (
-              <div className="flex gap-1">
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => openDetail(r)}
+                  className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-700"
+                >
+                  상세
+                </button>
                 <button
                   type="button"
                   disabled={busyId === r.id}

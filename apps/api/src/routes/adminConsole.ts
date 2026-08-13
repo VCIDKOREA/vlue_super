@@ -32,6 +32,7 @@ import {
   listAdminFeedPosts,
   listAdminMediaCampaigns,
   listAdminUsers,
+  getAdminUser,
   listManualReviewQueue,
   listMarketingPopups,
   listNotices,
@@ -122,6 +123,12 @@ authed.get("/users", async (c) => {
   const offset = Number(c.req.query("offset") || 0);
   const data = await listAdminUsers({ q, limit, offset });
   return c.json({ ok: true, ...data });
+});
+
+authed.get("/users/:userId", async (c) => {
+  const user = await getAdminUser(c.req.param("userId"));
+  if (!user) return c.json({ error: "회원을 찾을 수 없습니다." }, 404);
+  return c.json({ ok: true, user });
 });
 
 authed.patch("/users/:userId", async (c) => {

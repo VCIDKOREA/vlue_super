@@ -1,4 +1,5 @@
 import { prisma } from "../../db/client.js";
+import { formatPhoneDisplayKR } from "../../lib/phoneDisplay.js";
 import { sseConnectionStats, ssePublishAllConnected } from "../../realtime/sseHub.js";
 import {
   createMarketingPopup,
@@ -19,6 +20,118 @@ import {
   resolveManualReview
 } from "../onboarding/automatedOnboardingService.js";
 
+const ADMIN_MEMBER_SELECT = {
+  id: true,
+  publicHandle: true,
+  legalName: true,
+  email: true,
+  phoneE164: true,
+  birthDate: true,
+  gender: true,
+  identityVerified: true,
+  identityVerifiedAt: true,
+  signupMethod: true,
+  isCompanyVerified: true,
+  referrerCode: true,
+  role: true,
+  accountStatus: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+  termsAcceptedAt: true,
+  pendingApprovalAt: true,
+  businessProfile: {
+    select: {
+      isBusiness: true,
+      companyName: true,
+      jobTitle: true,
+      businessRegistrationNo: true
+    }
+  },
+  digitalCard: {
+    select: {
+      membershipTierSnapshot: true,
+      issuedAt: true
+    }
+  }
+} as const;
+
+function formatBirthDisplay(raw: string | null | undefined): string {
+  const d = String(raw || "").replace(/\D/g, "");
+  if (d.length !== 8) return "";
+  return `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}`;
+}
+
+function formatGenderDisplay(raw: string | null | undefined): string {
+  if (raw === "M") return "남";
+  if (raw === "F") return "여";
+  return "";
+}
+
+function serializeAdminMember(u: {
+  id: string;
+  publicHandle: string | null;
+  legalName: string | null;
+  email: string | null;
+  phoneE164: string | null;
+  birthDate: string | null;
+  gender: string | null;
+  identityVerified: boolean;
+  identityVerifiedAt: Date | null;
+  signupMethod: string;
+  isCompanyVerified: boolean;
+  referrerCode: string | null;
+  role: string;
+  accountStatus: string;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  termsAcceptedAt: Date | null;
+  pendingApprovalAt: Date | null;
+  businessProfile: {
+    isBusiness: boolean;
+    companyName: string | null;
+    jobTitle: string | null;
+    businessRegistrationNo: string | null;
+  } | null;
+  digitalCard: {
+    membershipTierSnapshot: string | null;
+    issuedAt: Date;
+  } | null;
+}) {
+  const phone = u.phoneE164 || "";
+  return {
+    id: u.id,
+    publicHandle: u.publicHandle || "",
+    legalName: u.legalName || "",
+    email: u.email || "",
+    phoneE164: phone,
+    phoneDisplay: phone ? formatPhoneDisplayKR(phone) : "",
+    birthDate: u.birthDate || "",
+    birthDisplay: formatBirthDisplay(u.birthDate),
+    gender: u.gender || "",
+    genderDisplay: formatGenderDisplay(u.gender),
+    identityVerified: Boolean(u.identityVerified),
+    identityVerifiedAt: u.identityVerifiedAt ? u.identityVerifiedAt.toISOString() : null,
+    signupMethod: u.signupMethod || "",
+    isCompanyVerified: Boolean(u.isCompanyVerified),
+    referrerCode: u.referrerCode || "",
+    role: u.role,
+    accountStatus: u.accountStatus,
+    status: u.status,
+    membershipTier: String(u.digitalCard?.membershipTierSnapshot || "free").toLowerCase(),
+    digitalCardIssued: Boolean(u.digitalCard),
+    companyName: u.businessProfile?.companyName || "",
+    jobTitle: u.businessProfile?.jobTitle || "",
+    businessRegistrationNo: u.businessProfile?.businessRegistrationNo || "",
+    isBusiness: Boolean(u.businessProfile?.isBusiness),
+    createdAt: u.createdAt.toISOString(),
+    updatedAt: u.updatedAt.toISOString(),
+    termsAcceptedAt: u.termsAcceptedAt ? u.termsAcceptedAt.toISOString() : null,
+    pendingApprovalAt: u.pendingApprovalAt ? u.pendingApprovalAt.toISOString() : null
+  };
+}
+
 export async function listAdminUsers(opts: { q?: string; limit?: number; offset?: number }) {
   const q = String(opts.q || "").trim();
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
@@ -30,7 +143,8 @@ export async function listAdminUsers(opts: { q?: string; limit?: number; offset?
           { publicHandle: { contains: q, mode: "insensitive" as const } },
           { legalName: { contains: q, mode: "insensitive" as const } },
           { email: { contains: q, mode: "insensitive" as const } },
-          { phoneE164: { contains: q } }
+          { phoneE164: { contains: q } },
+          { businessProfile: { companyName: { contains: q, mode: "insensitive" as const } } }
         ]
       }
     : {};
@@ -38,19 +152,7 @@ export async function listAdminUsers(opts: { q?: string; limit?: number; offset?
   const [users, total] = await Promise.all([
     prisma.user.findMany({
       where,
-      select: {
-        id: true,
-        publicHandle: true,
-        legalName: true,
-        email: true,
-        phoneE164: true,
-        role: true,
-        accountStatus: true,
-        status: true,
-        identityVerified: true,
-        createdAt: true,
-        updatedAt: true
-      },
+      select: ADMIN_MEMBER_SELECT,
       orderBy: { createdAt: "desc" },
       take: limit,
       skip: offset
@@ -59,15 +161,20 @@ export async function listAdminUsers(opts: { q?: string; limit?: number; offset?
   ]);
 
   return {
-    users: users.map((u) => ({
-      ...u,
-      createdAt: u.createdAt.toISOString(),
-      updatedAt: u.updatedAt.toISOString()
-    })),
+    users: users.map(serializeAdminMember),
     total,
     limit,
     offset
   };
+}
+
+export async function getAdminUser(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: ADMIN_MEMBER_SELECT
+  });
+  if (!user) return null;
+  return serializeAdminMember(user);
 }
 
 export async function patchAdminUser(

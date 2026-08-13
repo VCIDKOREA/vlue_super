@@ -82,6 +82,11 @@ export async function fetchAdminUsers({ q = "", limit = 50, offset = 0 } = {}) {
   return parseJson(res);
 }
 
+export async function fetchAdminUser(userId) {
+  const res = await fetch(apiUrl(`/api/admin/console/users/${userId}`), { headers: adminHeaders() });
+  return parseJson(res);
+}
+
 export async function patchAdminUser(userId, patch) {
   const res = await fetch(apiUrl(`/api/admin/console/users/${userId}`), {
     method: "PATCH",
