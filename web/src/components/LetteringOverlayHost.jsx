@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getBusinessCardByNumber } from "../lib/getBusinessCardByNumber.js";
 import { mapLookupToLetteringCard } from "../lib/letteringCardMapper.js";
+import { isUnknownPhoneToken } from "../lib/letteringPhoneMatch.js";
 import { checkLetteringPhoneBlocked } from "../lib/letteringApi.js";
 import { readLetteringEnabled } from "../lib/letteringSettings.js";
 import { submitLetteringReport } from "../lib/letteringReport.js";
@@ -117,8 +118,7 @@ function parseOverlayParams() {
 }
 
 function isUnknownIncoming(phone) {
-  const p = String(phone || "").trim().toLowerCase();
-  return !p || p === "unknown" || p === "null" || p === "-" || p === "—";
+  return isUnknownPhoneToken(phone);
 }
 
 function buildUnverifiedOverlayCard(phone) {

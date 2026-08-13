@@ -126,7 +126,12 @@ class LetteringCallMonitorService : Service() {
                     "LetteringCallMonitorService received",
                     "state=RINGING prev=$lastState number=null(TelephonyCallback has no number)"
                 )
-                LetteringCallCoordinator.onRinging(this, null, outgoing = false)
+                if (CallOverlayService.isRunning()) {
+                    /* PHONE_STATE 가 070 등 실번호를 이미 넣었으면 unknown 으로 덮지 않음 */
+                    Log.i(TAG, "RINGING — overlay running, skip unknown onRinging")
+                } else {
+                    LetteringCallCoordinator.onRinging(this, null, outgoing = false)
+                }
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
                 VlueBigPushTrace.step(
@@ -137,8 +142,10 @@ class LetteringCallMonitorService : Service() {
                 if (lastState == TelephonyManager.CALL_STATE_RINGING) {
                     /* 수신 Answer → Showcase */
                     CallOverlayService.notifyConnected(applicationContext)
+                } else if (CallOverlayService.isRunning()) {
+                    /* 발신 OFFHOOK — NEW_OUTGOING_CALL 로 이미 번호와 함께 기동됨. unknown 재기동 금지 */
+                    Log.i(TAG, "OFFHOOK outgoing — overlay running, skip unknown onRinging")
                 } else {
-                    /* 발신 다이얼 중(OFFHOOK) — BigPush 유지. Showcase 는 STATE_ACTIVE/notifyConnected 만 */
                     LetteringCallCoordinator.onRinging(this, null, outgoing = true)
                 }
             }

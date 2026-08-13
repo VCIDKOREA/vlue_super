@@ -3,6 +3,27 @@ export function normalizePhoneDigits(raw) {
   return String(raw || "").replace(/\D/g, "");
 }
 
+/** 오버레이 extras / CallLog 가 넣는 미지정 토큰 — 화면에 그대로 보여주지 않음 */
+export function isUnknownPhoneToken(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return true;
+  if (s === "-" || s === "—" || s === "-1") return true;
+  const compact = s.toLowerCase().replace(/\s+/g, "");
+  if (
+    compact === "unknown" ||
+    compact === "null" ||
+    compact === "anonymous" ||
+    compact === "private" ||
+    compact === "restricted" ||
+    compact === "withheld" ||
+    compact === "알수없음" ||
+    compact === "알수없음."
+  ) {
+    return true;
+  }
+  return !/\d/.test(s);
+}
+
 /**
  * 한국 번호 표시용 국내 자릿수 (010… / 02…)
  * +82·82·010 혼용을 0으로 시작하는 국내형으로 통일
@@ -22,8 +43,9 @@ export function toKoreaNationalDigits(raw) {
  * (82… 원시 숫자열·E.164 모두 동일 포맷)
  */
 export function formatLetteringPhoneDisplay(raw) {
+  if (isUnknownPhoneToken(raw)) return "";
   const d = toKoreaNationalDigits(raw);
-  if (!d) return String(raw || "—").trim() || "—";
+  if (!d) return "";
 
   if (d.length === 11 && d.startsWith("01")) {
     return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;

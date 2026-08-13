@@ -44,10 +44,14 @@ class LetteringCallReceiver : BroadcastReceiver() {
             when (state) {
                 TelephonyManager.EXTRA_STATE_RINGING -> {
                     /*
-                     * Phase 6-H: InCall hasActiveCall 이어도 Overlay 가 아직 없으면 onRinging 유지.
-                     * (이전: skip → InCall onCallAdded 대기 ~3초 → startOverlay 지연)
+                     * Overlay 가 이미 떠 있어도 실번호(070 등)가 뒤늦게 오면 업그레이드한다.
+                     * 번호 없는 RINGING 만 중복 skip.
                      */
-                    if (VlueInCallController.hasActiveCall() && CallOverlayService.isRunning()) {
+                    val hasNumber = !IncomingNumberResolver.isUnknown(number)
+                    if (!hasNumber &&
+                        VlueInCallController.hasActiveCall() &&
+                        CallOverlayService.isRunning()
+                    ) {
                         VlueBigPushTrace.skip(1, "InCall+Overlay already running — PHONE_STATE RINGING skipped")
                         ReleaseDebugGate.d(TAG, "skip RINGING: InCall+Overlay active")
                         lastExtraState = state

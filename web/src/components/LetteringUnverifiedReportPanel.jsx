@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
+import { formatLetteringPhoneDisplay, isUnknownPhoneToken } from "../lib/letteringPhoneMatch.js";
 import {
   formatLetteringReportDate,
   getLetteringReportsForPhone
@@ -36,6 +36,9 @@ export default function LetteringUnverifiedReportPanel({
   className = ""
 }) {
   const incoming = String(incomingNumber || "").trim();
+  const incomingDisplay = isUnknownPhoneToken(incoming)
+    ? "번호 확인 중"
+    : formatLetteringPhoneDisplay(incoming) || "번호 확인 중";
   const reports = useMemo(
     () => getLetteringReportsForPhone(incoming, { extra: reportHistory }),
     [incoming, reportHistory]
@@ -47,10 +50,10 @@ export default function LetteringUnverifiedReportPanel({
         {"등록되지 않은 발신 번호입니다. 커뮤니티·VLUE 신고·제보 이력을 확인할 수 있습니다."}
       </p>
 
-      {incoming ? (
+      {incomingDisplay ? (
         <p className="lettering-unverified-incoming">
           <span className="lettering-unverified-incoming__label">{"발신번호"}</span>
-          <span className="lettering-unverified-incoming__value">{formatLetteringPhoneDisplay(incoming)}</span>
+          <span className="lettering-unverified-incoming__value">{incomingDisplay}</span>
         </p>
       ) : null}
 

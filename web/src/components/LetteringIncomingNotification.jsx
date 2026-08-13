@@ -610,7 +610,8 @@ export default function LetteringIncomingNotification({
   const unverifiedCollapsedPhone = useMemo(() => {
     if (!isUnverified) return "";
     const phoneDisplay = formatLetteringPhoneDisplay(incoming);
-    return phoneDisplay && phoneDisplay !== "\u2014" ? phoneDisplay : "";
+    if (phoneDisplay) return phoneDisplay;
+    return "번호 확인 중";
   }, [isUnverified, incoming]);
 
   /* 통화 오버레이(피어): 상대 쇼케이스 스타일의 showBroadcastName=false 로 상호가 사라지지 않게 */
