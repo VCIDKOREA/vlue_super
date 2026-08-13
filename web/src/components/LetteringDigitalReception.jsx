@@ -29,7 +29,7 @@ import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
 import { openExternalHref, formatWebHref } from "../lib/showcase/showcaseContactActions.js";
 import { getLocalVlueUserId } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
-import VLUE_WATERMARK_LOGO from "../assets/vlue-shield-logo.svg?url";
+import AgencyDcpCard from "./agency/AgencyDcpCard.jsx";
 
 function formatWebsite(raw) {
   return String(raw || "")
@@ -817,6 +817,7 @@ export default function LetteringDigitalReception({
   callChromeSafe = false
 }) {
   const card = useMemo(() => normalizeLetteringCard(cardRaw || {}), [cardRaw]);
+  const isDcp = card?.profileKind === "dcp" || card?.dcp;
   const items = verificationItems.length ? verificationItems : card.verificationItems;
   const panelWrapRef = useRef(null);
   const useStackedPanels = embeddedInPush && !previewMode;
@@ -847,6 +848,18 @@ export default function LetteringDigitalReception({
       setDialTarget({ phone, displayName: _displayName });
     }
   };
+
+  if (isDcp) {
+    return (
+      <div
+        className={`ldr-reception ldr-reception--dcp${embeddedInPush ? " ldr-reception--push" : ""}${
+          previewMode ? " ldr-reception--preview" : ""
+        } ${className}`.trim()}
+      >
+        <AgencyDcpCard card={card} incomingNumber={incomingNumber} />
+      </div>
+    );
+  }
 
   const front = (
     <FrontPanel

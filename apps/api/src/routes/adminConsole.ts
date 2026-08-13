@@ -424,6 +424,57 @@ authed.patch("/signature-sounds/:id", async (c) => {
   }
 });
 
+/** 국가기관 DCP 화이트리스트 */
+authed.get("/agencies", async (c) => {
+  const { listNationalAgencies } = await import("../services/agency/nationalAgencyDcpService.js");
+  const items = await listNationalAgencies();
+  return c.json({ ok: true, items });
+});
+
+authed.post("/agencies", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { createNationalAgency } = await import("../services/agency/nationalAgencyDcpService.js");
+  const result = await createNationalAgency({
+    agencyName: body.agencyName,
+    shortNumber: body.shortNumber,
+    officialWebsite: body.officialWebsite,
+    logoResourceName: body.logoResourceName
+  });
+  if (!result.ok) return c.json({ ok: false, error: result.error }, result.status);
+  return c.json({ ok: true, agency: result.agency });
+});
+
+authed.patch("/agencies/:id", async (c) => {
+  const id = String(c.req.param("id") || "").trim();
+  const body = await c.req.json().catch(() => ({}));
+  const { updateNationalAgency } = await import("../services/agency/nationalAgencyDcpService.js");
+  const result = await updateNationalAgency(id, body);
+  if (!result.ok) return c.json({ ok: false, error: result.error }, result.status);
+  return c.json({ ok: true, agency: result.agency });
+});
+
+authed.post("/agencies/:id/logo-upload-url", async (c) => {
+  const id = String(c.req.param("id") || "").trim();
+  const body = await c.req.json().catch(() => ({}));
+  try {
+    const { createAgencyLogoUploadUrl, isBizcardImageStorageConfigured } = await import(
+      "../services/bizcard/bizcardImageStorage.js"
+    );
+    if (!isBizcardImageStorageConfigured()) {
+      return c.json({ ok: false, error: "이미지 스토리지가 설정되지 않았습니다. 로고 URL을 직접 입력해 주세요." }, 400);
+    }
+    const signed = await createAgencyLogoUploadUrl({
+      agencyId: id,
+      fileName: String(body.fileName || "logo.png"),
+      contentType: String(body.contentType || "image/png"),
+      fileSize: Number(body.fileSize) || 0
+    });
+    return c.json({ ok: true, ...signed });
+  } catch (e) {
+    return c.json({ ok: false, error: e instanceof Error ? e.message : "upload_url_failed" }, 400);
+  }
+});
+
 authed.route("/pricing-config", adminPricingConfigRoutes);
 authed.route("/enterprise-dcc", enterpriseDccAdminRoutes);
 adminConsoleRoutes.route("/", authed);

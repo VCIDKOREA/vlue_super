@@ -102,6 +102,46 @@ export default function LetteringSettingsSection({
           >
             빅푸시 테스트 (통화 없이)
           </button>
+          <button
+            type="button"
+            className={`w-full rounded-lg border py-2 text-[11px] font-bold ${
+              isDarkMode ? "border-emerald-400/40 text-emerald-200" : "border-emerald-200 text-emerald-800"
+            }`}
+            onClick={() => {
+              try {
+                if (typeof window.Android?.testDcpPathNormal === "function") {
+                  window.Android.testDcpPathNormal();
+                  onNotice?.("DCP 정상 경로 테스트 — 상단 디지털인증프로필을 확인하세요.");
+                  return;
+                }
+              } catch {
+                /* ignore */
+              }
+              onNotice?.("DCP 테스트는 VLUE Android 앱에서만 가능합니다. 홈 화면 버튼으로도 미리볼 수 있습니다.");
+            }}
+          >
+            DCP 정상 테스트
+          </button>
+          <button
+            type="button"
+            className={`w-full rounded-lg border py-2 text-[11px] font-bold ${
+              isDarkMode ? "border-rose-400/40 text-rose-200" : "border-rose-200 text-rose-800"
+            }`}
+            onClick={() => {
+              try {
+                if (typeof window.Android?.testDcpPathAbnormal === "function") {
+                  window.Android.testDcpPathAbnormal();
+                  onNotice?.("DCP 비정상 경로 테스트 — 경고 오버레이를 확인하세요.");
+                  return;
+                }
+              } catch {
+                /* ignore */
+              }
+              onNotice?.("DCP 테스트는 VLUE Android 앱에서만 가능합니다. 홈 화면 버튼으로도 미리볼 수 있습니다.");
+            }}
+          >
+            DCP 비정상 테스트
+          </button>
         </div>
       ) : null}
       <p className={`mt-3 text-[10px] leading-snug ${hint}`}>

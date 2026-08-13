@@ -108,3 +108,19 @@ export async function createBizcardImageUploadUrl(input: {
     cacheControl: "public, max-age=31536000, immutable"
   };
 }
+
+/** 국가기관 DCP 공식 로고 Presigned PUT */
+export async function createAgencyLogoUploadUrl(input: {
+  agencyId: string;
+  fileName: string;
+  contentType: string;
+  fileSize?: number;
+}) {
+  return createBizcardImageUploadUrl({
+    userId: `agency-${String(input.agencyId || "unknown").replace(/[^a-zA-Z0-9-]/g, "").slice(0, 40)}`,
+    kind: "logo",
+    fileName: input.fileName,
+    contentType: input.contentType,
+    fileSize: input.fileSize
+  });
+}

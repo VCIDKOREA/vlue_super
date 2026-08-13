@@ -8,6 +8,7 @@ import {
   resolveFreeTierSummary
 } from "../lib/letteringFreeTierDisplay.js";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
+import AgencyRouteWarningOverlay from "./agency/AgencyRouteWarningOverlay.jsx";
 import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx";
 import ShowcaseCallCarousel from "./showcase/ShowcaseCallCarousel.jsx";
 import FreeTierCallShowcase from "./showcase/FreeTierCallShowcase.jsx";
@@ -32,6 +33,7 @@ import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import CompanionMiniCase, { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
 import CompanionSamsungCallCta from "./call/CompanionSamsungCallCta.jsx";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
+import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
@@ -325,7 +327,7 @@ export default function LetteringIncomingNotification({
         /* ignore */
       }
     }
-    if (next && typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
+    if (next && verified && typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
       window.__vlueUnlockShowcaseBgm();
       window.setTimeout(() => window.__vlueUnlockShowcaseBgm?.(), 80);
       window.setTimeout(() => window.__vlueUnlockShowcaseBgm?.(), 280);
@@ -361,8 +363,9 @@ export default function LetteringIncomingNotification({
           }
   );
   /** prop + 상대 쇼케이스 스타일(includeDigitalCard) 모두 허용할 때만 DCC 슬라이드 */
+  const isDcpCard = c?.profileKind === "dcp" || Boolean(c?.dcp);
   const showDigitalCard =
-    Boolean(includeDigitalCard) && c?.showcaseStyle?.includeDigitalCard !== false;
+    isDcpCard || (Boolean(includeDigitalCard) && c?.showcaseStyle?.includeDigitalCard !== false);
   const onCall = callPhase === "active" || callPhase === "connected";
   useEffect(() => {
     if (!showDigitalCard && carouselSlideType === "card") {
@@ -502,9 +505,11 @@ export default function LetteringIncomingNotification({
 
   const shellBase =
     "lettering-ongoing lettering-incoming-active relative flex w-full flex-col overflow-hidden";
-  const isPaidMember = verified && isPaidLetteringTier(c.membershipTier);
+  const isDcp = isDcpCard;
+  const isPaidMember = isDcp || (verified && isPaidLetteringTier(c.membershipTier));
   const isFreeMember = verified && !isPaidMember;
   const isUnverified = !verified;
+  const { setPlaybackPhase } = useShowcaseBgm();
   const canExpand = isPaidMember || isFreeMember || isUnverified;
   const [reportTick, setReportTick] = useState(0);
   const [walletTick, setWalletTick] = useState(0);
@@ -520,6 +525,14 @@ export default function LetteringIncomingNotification({
       window.removeEventListener("vlue-card-wallet-changed", onWalletChanged);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isUnverified) return undefined;
+    setPlaybackPhase("idle", { steal: true, fade: true, owner: "unverified" });
+    return () => {
+      setPlaybackPhase("idle", { release: true, steal: true, owner: "unverified" });
+    };
+  }, [isUnverified, setPlaybackPhase]);
 
   const phoneReports = useMemo(() => {
     if (!isUnverified) return [];
@@ -821,7 +834,7 @@ export default function LetteringIncomingNotification({
     COMPANION_MVP_DELEGATE_CALL_UI &&
       isExpandedView &&
       !fromCallHistory &&
-      (useCompanionDelegate || showChromePreviewControls)
+      (useCompanionDelegate || showChromePreviewControls || isUnverified)
   );
   const showInCallControls = Boolean(showLegacyInCallControls || showCompanionSamsungCta);
 
@@ -854,7 +867,9 @@ export default function LetteringIncomingNotification({
   const carouselScrollEnabled = isPaidMember && (previewMode || onCall || isExpandedView);
   /** 홈 미리보기 접힘: BGM 중지. 통화목록 다시보기는 항상 재생 허용 */
   const carouselSuppressBgm =
-    Boolean(suppressBgm) || Boolean(previewMode && !isExpandedView && !fromCallHistory);
+    Boolean(suppressBgm) ||
+    isUnverified ||
+    Boolean(previewMode && !isExpandedView && !fromCallHistory);
   const showcasePhotos = c.showcaseStyle?.gallery?.photos || [];
   const showcaseStyleConfig = c.showcaseStyle || null;
 
@@ -1336,8 +1351,16 @@ export default function LetteringIncomingNotification({
                     <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger w-full">
                       {"\uC2E0\uACE0/\uCC28\uB2E8"}
                     </button>
+                    {showCompanionSamsungCta ? (
+                      <CompanionSamsungCallCta onOpen={openSamsungCallOptions} />
+                    ) : null}
                   </footer>
                 )}
+                {hideUnverifiedFooter && showCompanionSamsungCta ? (
+                  <footer className="lettering-unverified-expanded__footer">
+                    <CompanionSamsungCallCta onOpen={openSamsungCallOptions} />
+                  </footer>
+                ) : null}
               </div>
             </div>
           </div>
@@ -1355,6 +1378,12 @@ export default function LetteringIncomingNotification({
         phone={incoming}
         displayName={hideBroadcastName ? contactSavedName : c.name || contactSavedName || ""}
         onClose={() => setDialOpen(false)}
+      />
+      <AgencyRouteWarningOverlay
+        open={String(c?.dcp?.routeStatus || "") === "abnormal"}
+        warning={c?.dcp?.warning}
+        agencyName={c?.dcp?.agencyName || c?.organization}
+        officialWebsite={c?.dcp?.officialWebsite || c?.website}
       />
     </article>
   );

@@ -4,6 +4,10 @@ import { isPlatformCeoHandle } from "./admin/platformAccountRoles.js";
 import { getVluePublicOrigin } from "./bizcard/bizcardPublicUrls.js";
 import { buildViewerAccessContext } from "./follow/followService.js";
 import { maskProfileForViewer, privacySelect } from "./follow/profileAccessControl.js";
+import {
+  buildAgencyDcpLookupBody,
+  resolveAgencyCallRoute
+} from "./agency/nationalAgencyDcpService.js";
 
 /** CEO 기본 VLUE 브랜드 로고 (업로드 없을 때) */
 function ceoDefaultBrandLogoUrl(): string {
@@ -201,11 +205,54 @@ type LookupOptions = {
    * (링크를 보낸 사람은 이미 초대 전의 — 「비공개 회원」으로 가리면 안 됨)
    */
   forPublicOgShare?: boolean;
+  /** 테스트 시뮬레이터 — normal | abnormal */
+  dcpRoute?: string | null;
 };
 
 /** 번호 기준 조회 응답 본문 — GET /lookup · GET /by-number 공용 */
 export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {}) {
   const viewerId = opts.viewerId ?? null;
+  const agencyRoute = await resolveAgencyCallRoute({
+    number: raw,
+    forceRoute: opts.dcpRoute
+  });
+  if (agencyRoute.status === "abnormal") {
+    const agency = agencyRoute.agency;
+    const body = agency
+      ? buildAgencyDcpLookupBody(agency, "abnormal", agencyRoute.warning)
+      : {
+          matched: true,
+          is_verified: false,
+          source: "national_agency_dcp",
+          profileKind: "dcp",
+          displayName: "비정상 발신",
+          companyName: "",
+          phoneE164: String(raw || "").replace(/\D/g, ""),
+          website: "",
+          image_url: "",
+          logo_url: "",
+          membershipTier: "paid",
+          profile: {},
+          dcp: {
+            id: "",
+            agencyName: "",
+            shortNumber: String(raw || "").replace(/\D/g, ""),
+            officialWebsite: "",
+            logoUrl: "",
+            logoResourceName: "",
+            routeStatus: "abnormal",
+            warning: agencyRoute.warning
+          }
+        };
+    return { status: 200 as const, body };
+  }
+  if (agencyRoute.status === "normal") {
+    return {
+      status: 200 as const,
+      body: buildAgencyDcpLookupBody(agencyRoute.agency, "normal")
+    };
+  }
+
   const e164 = normalizeToE164KR(raw.trim());
   if (!e164) {
     return { status: 400 as const, body: { error: "유효한 번호 형식이 아닙니다.", matched: false } };

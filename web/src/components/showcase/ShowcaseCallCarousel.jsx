@@ -151,7 +151,8 @@ export default function ShowcaseCallCarousel({
   }, []);
 
   const tier = normalizeUserTier(membershipTier || card?.membershipTier);
-  const isPaid = tier === USER_TIERS.PAID;
+  const isDcp = card?.profileKind === "dcp" || Boolean(card?.dcp);
+  const isPaid = isDcp || tier === USER_TIERS.PAID;
   const photosPerPage = maxShowcasePhotosPerPage();
   const showDigitalCard = Boolean(includeDigitalCard) && isPaid;
   const maxIgPages = maxInstagramEmbedsForTier(tier, { includeDigitalCard: showDigitalCard });
@@ -882,6 +883,13 @@ export default function ShowcaseCallCarousel({
                       }
                       caption={slide.caption || slide.overlayText || ""}
                       badge={igVerified && igBadge ? "Instagram 인증완료✔" : ""}
+                      onDoubleTap={() => {
+                        window.dispatchEvent(
+                          new CustomEvent("vlue-showcase-double-tap-like", {
+                            detail: { slideId: String(slide.id || "") }
+                          })
+                        );
+                      }}
                       onImageError={(broken) => {
                         const id = broken?.id;
                         if (!id) return;

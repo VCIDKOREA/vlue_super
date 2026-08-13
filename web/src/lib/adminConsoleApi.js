@@ -308,3 +308,35 @@ export async function fetchAdminDiagnosticSessionDetail(id) {
   );
   return parseJson(res);
 }
+
+export async function fetchAdminAgencies() {
+  const res = await fetch(apiUrl("/api/admin/console/agencies"), { headers: adminHeaders() });
+  return parseJson(res);
+}
+
+export async function createAdminAgency(body) {
+  const res = await fetch(apiUrl("/api/admin/console/agencies"), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(body)
+  });
+  return parseJson(res);
+}
+
+export async function patchAdminAgency(id, body) {
+  const res = await fetch(apiUrl(`/api/admin/console/agencies/${encodeURIComponent(id)}`), {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify(body)
+  });
+  return parseJson(res);
+}
+
+export async function createAdminAgencyLogoUploadUrl(id, body) {
+  const res = await fetch(apiUrl(`/api/admin/console/agencies/${encodeURIComponent(id)}/logo-upload-url`), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(body)
+  });
+  return parseJson(res);
+}

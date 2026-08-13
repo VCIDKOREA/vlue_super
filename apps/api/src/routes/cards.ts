@@ -36,12 +36,13 @@ cardsRoutes.route("/enterprise-dcc", enterpriseDccRoutes);
 async function jsonLookup(
   raw: string,
   viewerId?: string | null,
-  opts?: { forCallOverlay?: boolean }
+  opts?: { forCallOverlay?: boolean; dcpRoute?: string | null }
 ) {
   const result = await lookupCardByRawNumber(raw, {
     viewerId,
     /* 통화 수신 오버레이 — 발신자 상호·회사·직함은 수신자에게 표시 (미리보기와 동일) */
-    forPublicOgShare: Boolean(opts?.forCallOverlay)
+    forPublicOgShare: Boolean(opts?.forCallOverlay),
+    dcpRoute: opts?.dcpRoute
   });
   return result;
 }
@@ -53,7 +54,8 @@ cardsRoutes.get("/lookup", async (c) => {
     const viewerId = await resolveRequestUserId(c);
     const forCallOverlay =
       c.req.query("purpose") === "call_overlay" || c.req.query("call_overlay") === "1";
-    const result = await jsonLookup(raw, viewerId, { forCallOverlay });
+    const dcpRoute = c.req.query("dcp_route") || c.req.query("dcpRoute") || null;
+    const result = await jsonLookup(raw, viewerId, { forCallOverlay, dcpRoute });
     return c.json(result.body, result.status);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
@@ -68,7 +70,8 @@ cardsRoutes.get("/by-number", async (c) => {
     const viewerId = await resolveRequestUserId(c);
     const forCallOverlay =
       c.req.query("purpose") === "call_overlay" || c.req.query("call_overlay") === "1";
-    const result = await jsonLookup(raw, viewerId, { forCallOverlay });
+    const dcpRoute = c.req.query("dcp_route") || c.req.query("dcpRoute") || null;
+    const result = await jsonLookup(raw, viewerId, { forCallOverlay, dcpRoute });
     return c.json(result.body, result.status);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";

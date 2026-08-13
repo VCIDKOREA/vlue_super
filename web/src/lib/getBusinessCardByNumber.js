@@ -6,11 +6,14 @@ import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
  * @param {string} raw 전화번호 임의 형식
  * @returns {Promise<object|null>}
  */
-export async function getBusinessCardByNumber(raw) {
-  const q = encodeURIComponent(String(raw || "").trim());
-  if (!q) return null;
+export async function getBusinessCardByNumber(raw, opts = {}) {
+  const number = String(raw || "").trim();
+  if (!number) return null;
   try {
-    const res = await vlueAuthFetch(apiUrl(`/api/cards/by-number?number=${q}`), {
+    const params = new URLSearchParams({ number });
+    const route = String(opts.dcpRoute || "").trim();
+    if (route) params.set("dcp_route", route);
+    const res = await vlueAuthFetch(apiUrl(`/api/cards/by-number?${params.toString()}`), {
       headers: vlueAuthHeaders()
     });
     const data = await res.json().catch(() => ({}));

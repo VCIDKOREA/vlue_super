@@ -3185,3 +3185,25 @@ model DiagnosticEvent {
   @@index([sessionId, seq])
   @@map("diagnostic_events")
 }
+
+/// 국가기관 디지털인증프로필(DCP) 화이트리스트
+model NationalAgencyProfile {
+  id               String   @id @default(uuid()) @db.Uuid
+  /// 공식 단축번호 (112, 1332 등)
+  shortNumber      String   @unique @map("short_number") @db.VarChar(16)
+  agencyName       String   @map("agency_name") @db.VarChar(160)
+  officialWebsite  String   @map("official_website") @db.VarChar(255)
+  /// 관리자가 업로드한 공식 로고 URL. 비어 있으면 로고 미등록.
+  logoUrl          String   @default("") @map("logo_url") @db.VarChar(1024)
+  /// 관리자 식별용 리소스 키 (dcp_logo_112)
+  logoResourceName String   @default("") @map("logo_resource_name") @db.VarChar(80)
+  enabled          Boolean  @default(true)
+  /// normal = 인증 DCP 노출 / abnormal = 비정상 발신 경고
+  routeStatus      String   @default("normal") @map("route_status") @db.VarChar(16)
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([enabled, sortOrder])
+  @@map("national_agency_profiles")
+}

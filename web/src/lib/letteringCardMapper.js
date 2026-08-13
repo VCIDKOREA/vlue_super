@@ -86,7 +86,7 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
     photoFocus: normalizePhotoFocus(
       body.photoFocus || nested.photoFocus || profile.photoFocus || "center"
     ),
-    logoUrl: profile.logoUrl || profile.logo_url || body.logo_url || "",
+    logoUrl: profile.logoUrl || profile.logo_url || body.logo_url || body.dcp?.logoUrl || "",
     image_url: body.image_url || nested.image_url || "",
     department:
       profile.department || profile.dept || profile.team || profile.division || nested.department || "",
@@ -108,6 +108,8 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       null,
     authValidUntil: body.authValidUntil || nested.authValidUntil || profile.authValidUntil || null,
     billingCycle: body.billingCycle || nested.billingCycle || profile.billingCycle || null,
+    profileKind: body.profileKind || nested.profileKind || "",
+    dcp: body.dcp && typeof body.dcp === "object" ? body.dcp : null,
     verificationItems: Array.isArray(profile.verificationItems)
       ? profile.verificationItems
       : body.is_verified

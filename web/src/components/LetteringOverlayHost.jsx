@@ -21,7 +21,7 @@ import LetteringCertModal from "./LetteringCertModal.jsx";
 import { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
-import { ShowcaseBgmProvider } from "../context/ShowcaseBgmContext.jsx";
+import { ShowcaseBgmProvider, useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import "../styles/tent-showcase.css";
 import "../styles/showcase-call-glass.css";
 
@@ -110,7 +110,27 @@ function parseOverlayParams() {
     direction: params.get("direction") === "outgoing" ? "outgoing" : "incoming",
     native: params.get("native") === "1",
     forceLettering: params.get("forceLettering") === "1",
-    phase: params.get("phase") || ""
+    phase: params.get("phase") || "",
+    dcpRoute: params.get("dcp_route") || params.get("dcpRoute") || ""
+  };
+}
+
+function isUnknownIncoming(phone) {
+  const p = String(phone || "").trim().toLowerCase();
+  return !p || p === "unknown" || p === "null" || p === "-" || p === "—";
+}
+
+function buildUnverifiedOverlayCard(phone) {
+  return {
+    name: "",
+    displayName: "",
+    organization: "",
+    title: "",
+    department: "",
+    phone: String(phone || "").trim(),
+    membershipTier: "free",
+    verificationItems: [],
+    profileKind: ""
   };
 }
 
@@ -127,10 +147,12 @@ export default function LetteringOverlayHost() {
 }
 
 function LetteringOverlayHostInner() {
-  const [{ incoming, platform, direction, native, forceLettering, phase }, setParams] = useState(parseOverlayParams);
-  const [card, setCard] = useState(null);
+  const [{ incoming, platform, direction, native, forceLettering, phase, dcpRoute }, setParams] = useState(parseOverlayParams);
+  const [card, setCard] = useState(() =>
+    isUnknownIncoming(incoming) ? null : buildUnverifiedOverlayCard(incoming)
+  );
   const [verified, setVerified] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => isUnknownIncoming(incoming));
   const [blocked, setBlocked] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
@@ -143,6 +165,8 @@ function LetteringOverlayHostInner() {
   const [expanded, setExpanded] = useState(() => normalizeCallState(phase) === CALL_STATES.CONNECTED);
   /* Native BIG_PUSH 창 — 앱 쇼케이스바(접힘) 강제. MiniCase 금지 */
   const [forceShowcaseBar, setForceShowcaseBar] = useState(true);
+  /* Mini→풀 복원 직후 늦게 도착하는 big_push_bar 로 다시 접히는 레이스 방지 */
+  const restoreHoldUntilRef = useRef(0);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -221,11 +245,20 @@ function LetteringOverlayHostInner() {
     return () => window.clearTimeout(t);
   }, []);
 
+  const { setPlaybackPhase } = useShowcaseBgm();
+
   useEffect(() => {
     const onNativeCard = (ev) => {
       try {
         const detail = ev?.detail || window.__VLUE_CARD_LOOKUP__;
-        if (!detail || detail.matched === false) return;
+        if (!detail) return;
+        if (detail.matched === false) {
+          const phone = incoming || detail.phoneE164 || "";
+          setCard(buildUnverifiedOverlayCard(phone));
+          setVerified(false);
+          setLoading(false);
+          return;
+        }
         const mapped = mapLookupToLetteringCard(detail, incoming || detail.phoneE164 || "");
         if (mapped) {
           setCard((prev) => ({ ...(prev || {}), ...mapped }));
@@ -254,6 +287,7 @@ function LetteringOverlayHostInner() {
 
   useEffect(() => {
     let cancelled = false;
+    let unknownTimer = 0;
     (async () => {
       /*
        * 네이티브 오버레이는 SharedPreferences 로 이미 게이트됨.
@@ -270,18 +304,35 @@ function LetteringOverlayHostInner() {
         setLoading(false);
         return;
       }
-      const blockCheck = await checkLetteringPhoneBlocked(incoming);
+
+      const unknown = isUnknownIncoming(incoming);
+      if (!unknown) {
+        setCard((prev) => prev || buildUnverifiedOverlayCard(incoming));
+        setVerified(false);
+        setLoading(false);
+      } else {
+        setLoading(true);
+        unknownTimer = window.setTimeout(() => {
+          if (cancelled) return;
+          setCard(buildUnverifiedOverlayCard(incoming));
+          setVerified(false);
+          setLoading(false);
+        }, 2800);
+      }
+
+      const blockCheck = await Promise.race([
+        checkLetteringPhoneBlocked(incoming),
+        new Promise((resolve) => {
+          window.setTimeout(() => resolve({ blocked: false }), 2000);
+        })
+      ]);
       if (cancelled) return;
       if (blockCheck.blocked) {
         setBlocked(true);
         setLoading(false);
         return;
       }
-      if (!String(incoming || "").trim() || String(incoming).toLowerCase() === "unknown") {
-        /* 번호 업그레이드(Native loadUrl / card-lookup) 대기 — unknown 으로 확정하지 않음 */
-        setLoading(true);
-        return;
-      }
+      if (unknown) return;
 
       /*
        * 네이티브 card-lookup 이 이미 있으면 by-number 재조회 생략.
@@ -289,6 +340,12 @@ function LetteringOverlayHostInner() {
        */
       const nativeDetail =
         native || forceLettering ? window.__VLUE_CARD_LOOKUP__ : null;
+      if (nativeDetail && nativeDetail.matched === false) {
+        setCard(buildUnverifiedOverlayCard(incoming || nativeDetail.phoneE164 || ""));
+        setVerified(false);
+        setLoading(false);
+        return;
+      }
       if (nativeDetail && nativeDetail.matched !== false) {
         const mapped = mapLookupToLetteringCard(
           nativeDetail,
@@ -309,7 +366,20 @@ function LetteringOverlayHostInner() {
         }
       }
 
-      const lookup = await getBusinessCardByNumber(incoming);
+      let resolvedDcpRoute = String(dcpRoute || "").trim();
+      if (!resolvedDcpRoute) {
+        try {
+          resolvedDcpRoute = String(sessionStorage.getItem("vlue_dcp_test_route") || "").trim();
+        } catch {
+          /* ignore */
+        }
+      }
+      const lookup = await Promise.race([
+        getBusinessCardByNumber(incoming, { dcpRoute: resolvedDcpRoute }),
+        new Promise((resolve) => {
+          window.setTimeout(() => resolve(null), 4000);
+        })
+      ]);
       if (cancelled) return;
       let nextCard = null;
       let nextVerified = false;
@@ -320,7 +390,8 @@ function LetteringOverlayHostInner() {
 
       /* 상대(발신/수신 번호 소유자) 라이브 쇼케이스 — 본인 hydrateLive 금지 */
       let peerStyle = createDefaultShowcaseStyle();
-      const peerUserId = String(nextCard?.userId || nextCard?.ownerUserId || "").trim();
+      const isDcp = nextCard?.profileKind === "dcp" || Boolean(nextCard?.dcp);
+      const peerUserId = isDcp ? "" : String(nextCard?.userId || nextCard?.ownerUserId || "").trim();
 
       /* lookup 직후 DCC 먼저 표시 — 스타일·프로필은 병렬 */
       if (nextCard) {
@@ -341,16 +412,25 @@ function LetteringOverlayHostInner() {
         setCard({ ...nextCard, showcaseStyle: peerStyle });
         setVerified(nextVerified);
       } else {
-        setCard(null);
+        setCard(buildUnverifiedOverlayCard(incoming));
         setVerified(false);
       }
-      setShowcaseStyle(peerStyle);
+      setShowcaseStyle(nextCard ? peerStyle : createDefaultShowcaseStyle());
       setLoading(false);
     })();
     return () => {
       cancelled = true;
+      if (unknownTimer) window.clearTimeout(unknownTimer);
     };
-  }, [incoming, native, forceLettering]);
+  }, [incoming, native, forceLettering, dcpRoute]);
+
+  useEffect(() => {
+    if (verified || loading) return undefined;
+    setPlaybackPhase("idle", { steal: true, fade: true, owner: "unverified" });
+    return () => {
+      setPlaybackPhase("idle", { release: true, steal: true, owner: "unverified" });
+    };
+  }, [verified, loading, setPlaybackPhase]);
 
   useEffect(() => {
     /* 라이브 이벤트는 본인 편집용 — 통화 오버레이에서는 상대 스타일을 덮어쓰지 않음 */
@@ -391,8 +471,10 @@ function LetteringOverlayHostInner() {
        * normalizeCallState("") → early-return 되면 하단 바가 풀쇼케이스/미니로 남음.
        */
       if (rawState === "big_push_bar") {
-        setForceShowcaseBar(true);
-        setExpanded(false);
+        if (Date.now() >= restoreHoldUntilRef.current) {
+          setForceShowcaseBar(true);
+          setExpanded(false);
+        }
       } else if (
         rawState === "minimize_showcase" ||
         rawState === "reveal_system_call_ui"
@@ -400,6 +482,7 @@ function LetteringOverlayHostInner() {
         setForceShowcaseBar(false);
         setExpanded(false);
       } else if (rawState === "restore_showcase") {
+        restoreHoldUntilRef.current = Date.now() + 3500;
         setForceShowcaseBar(false);
         setExpanded(true);
       }
