@@ -135,10 +135,36 @@ function buildUnverifiedOverlayCard(phone) {
   };
 }
 
-/** 조회 매칭이 끝난 카드 — 미인증 플레이스홀더로 덮지 않음 */
+function isDcpOverlayCard(card) {
+  if (!card || typeof card !== "object") return false;
+  return String(card.profileKind || "").trim() === "dcp" || Boolean(card.dcp && typeof card.dcp === "object");
+}
+
+function dcpLogoUrl(card) {
+  if (!card) return "";
+  return String(card.logoUrl || card.dcp?.logoUrl || card.photoUrl || "").trim();
+}
+
+function mergeDcpCard(prev, mapped) {
+  const next = { ...(prev || {}), ...mapped };
+  const keepLogo = dcpLogoUrl(prev);
+  if (isDcpOverlayCard(mapped) && !dcpLogoUrl(mapped) && keepLogo) {
+    return {
+      ...next,
+      logoUrl: keepLogo,
+      photoUrl: prev.photoUrl || next.photoUrl,
+      dcp: { ...(next.dcp || {}), logoUrl: keepLogo }
+    };
+  }
+  return next;
+}
+
+/**
+ * 조회 매칭이 끝난 카드 — 미인증 플레이스홀더로 덮지 않음
+ */
 function isResolvedOverlayCard(card) {
   if (!card) return false;
-  if (card.profileKind === "dcp" || (card.dcp && typeof card.dcp === "object")) return true;
+  if (isDcpOverlayCard(card)) return true;
   if (String(card.userId || card.ownerUserId || "").trim()) return true;
   const handle = String(card.publicHandle || card.loginId || card.vlueId || "")
     .trim()
@@ -283,8 +309,9 @@ function LetteringOverlayHostInner() {
         }
         const mapped = mapLookupToLetteringCard(detail, incoming || detail.phoneE164 || "");
         if (mapped) {
-          matchedRef.current = true;
-          setCard((prev) => ({ ...(prev || {}), ...mapped }));
+          const waitForLogo = isDcpOverlayCard(mapped);
+          matchedRef.current = !waitForLogo;
+          setCard((prev) => mergeDcpCard(prev, mapped));
           setVerified(true);
           setLoading(false);
           const peerUserId = String(mapped.userId || mapped.ownerUserId || "").trim();
@@ -369,18 +396,21 @@ function LetteringOverlayHostInner() {
           incoming || nativeDetail.phoneE164 || ""
         );
         if (mapped) {
-          matchedRef.current = true;
-          setCard((prev) => ({ ...(prev || {}), ...mapped }));
+          const isDcp = isDcpOverlayCard(mapped);
+          if (!isDcp) matchedRef.current = true;
+          setCard((prev) => mergeDcpCard(prev, mapped));
           setVerified(true);
           setLoading(false);
-          const peerUserId = String(mapped.userId || mapped.ownerUserId || "").trim();
+          const peerUserId = isDcp
+            ? ""
+            : String(mapped.userId || mapped.ownerUserId || "").trim();
           if (peerUserId) {
             const { card, style } = await enrichOverlayPeerBundle(peerUserId, mapped);
             if (cancelled) return;
             setCard((prev) => ({ ...(prev || {}), ...card, showcaseStyle: style }));
             setShowcaseStyle(style);
           }
-          return;
+          if (!isDcp) return;
         }
       }
 
@@ -414,7 +444,7 @@ function LetteringOverlayHostInner() {
       /* lookup 직후 DCC 먼저 표시 — 스타일·프로필은 병렬 */
       if (nextCard) {
         matchedRef.current = true;
-        setCard({ ...nextCard, showcaseStyle: peerStyle });
+        setCard((prev) => ({ ...mergeDcpCard(prev, nextCard), showcaseStyle: peerStyle }));
         setVerified(nextVerified);
         setLoading(false);
       }
@@ -430,7 +460,7 @@ function LetteringOverlayHostInner() {
       if (matchedRef.current && !nextCard) return;
       if (nextCard) {
         matchedRef.current = true;
-        setCard({ ...nextCard, showcaseStyle: peerStyle });
+        setCard((prev) => ({ ...mergeDcpCard(prev, nextCard), showcaseStyle: peerStyle }));
         setVerified(nextVerified);
         setShowcaseStyle(peerStyle);
       } else if (!matchedRef.current) {

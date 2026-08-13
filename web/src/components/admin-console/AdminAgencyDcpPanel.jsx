@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import AgencyDcpCard from "../agency/AgencyDcpCard.jsx";
-import AgencyRouteWarningOverlay from "../agency/AgencyRouteWarningOverlay.jsx";
+import AgencyDcpMiniPopup from "./agency/AgencyDcpMiniPopup.jsx";
 import {
   createAdminAgency,
   createAdminAgencyLogoUploadUrl,
@@ -313,22 +312,16 @@ export default function AdminAgencyDcpPanel({ onToast }) {
         </div>
       ) : null}
 
-      {preview?.route === "normal" ? (
-        <div className="overflow-hidden rounded-2xl bg-slate-950 p-4">
-          <AgencyDcpCard card={toCard(preview.agency)} incomingNumber={preview.agency.shortNumber} />
-          <button type="button" className="mt-3 text-[12px] font-bold text-slate-300" onClick={() => setPreview(null)}>
-            미리보기 닫기
-          </button>
-        </div>
+      {preview ? (
+        <AgencyDcpMiniPopup
+          open
+          card={toCard(preview.agency)}
+          incomingNumber={preview.agency.shortNumber}
+          abnormal={preview.route === "abnormal"}
+          warning={ABNORMAL}
+          onClose={() => setPreview(null)}
+        />
       ) : null}
-
-      <AgencyRouteWarningOverlay
-        open={preview?.route === "abnormal"}
-        warning={ABNORMAL}
-        agencyName={preview?.agency?.agencyName}
-        officialWebsite={preview?.agency?.officialWebsite}
-        onClose={() => setPreview(null)}
-      />
     </div>
   );
 }

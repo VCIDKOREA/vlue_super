@@ -9,7 +9,7 @@ import {
 } from "../lib/letteringFreeTierDisplay.js";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
 import RenderErrorGuard from "./RenderErrorGuard.jsx";
-import AgencyRouteWarningOverlay from "./agency/AgencyRouteWarningOverlay.jsx";
+import AgencyDcpMiniPopup from "./agency/AgencyDcpMiniPopup.jsx";
 import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx";
 import ShowcaseCallCarousel from "./showcase/ShowcaseCallCarousel.jsx";
 import FreeTierCallShowcase from "./showcase/FreeTierCallShowcase.jsx";
@@ -1030,6 +1030,18 @@ export default function LetteringIncomingNotification({
   };
 
   /* Companion MVP — 통화 중 접기 = Mini Case (Floating Controller, BigPush 아님) */
+  if (isDcp && !previewMode && !fromCallHistory) {
+    return (
+      <AgencyDcpMiniPopup
+        open
+        card={c}
+        incomingNumber={incoming}
+        abnormal={String(c?.dcp?.routeStatus || "") === "abnormal"}
+        warning={c?.dcp?.warning}
+      />
+    );
+  }
+
   if (useCompanionDelegate && !isExpandedView) {
     const phoneDisp =
       formatLetteringPhoneDisplay(incoming) ||
@@ -1395,12 +1407,6 @@ export default function LetteringIncomingNotification({
         phone={incoming}
         displayName={hideBroadcastName ? contactSavedName : c.name || contactSavedName || ""}
         onClose={() => setDialOpen(false)}
-      />
-      <AgencyRouteWarningOverlay
-        open={String(c?.dcp?.routeStatus || "") === "abnormal"}
-        warning={c?.dcp?.warning}
-        agencyName={c?.dcp?.agencyName || c?.organization}
-        officialWebsite={c?.dcp?.officialWebsite || c?.website}
       />
     </article>
   );

@@ -103,7 +103,10 @@ export default function CompanionMiniCase({
   statusLabel = "",
   durationLabel = "0:00",
   verified = false,
-  onExpand
+  onExpand,
+  customBody = null,
+  hideExpand = false,
+  brandText = "VLUE LIVE"
 }) {
   const rootRef = useRef(null);
   const dragRef = useRef(null);
@@ -278,7 +281,7 @@ export default function CompanionMiniCase({
           const revealed = revealPosFromPeek(final, cw, vw);
           applyPos(revealed, { commitVisibility: true });
           syncNativeVisibility(false);
-        } else {
+        } else if (!hideExpand) {
           /* VISIBLE Tap → Showcase 복원 Request */
           onExpand?.();
         }
@@ -288,7 +291,7 @@ export default function CompanionMiniCase({
       /* Drag End → peek이면 EDGE_HIDDEN, 아니면 VISIBLE */
       applyPos(final, { commitVisibility: true });
     },
-    [applyPos, onExpand, syncNativeVisibility]
+    [applyPos, onExpand, syncNativeVisibility, hideExpand]
   );
 
   const cssCardW = peekRight || peekLeft ? PEEK_W : resolveCardWidthCss(viewportRef.current.vw);
@@ -322,7 +325,7 @@ export default function CompanionMiniCase({
       }${peekLeft ? " is-peek-left" : ""}`}
       role="button"
       tabIndex={0}
-      aria-label="Mini Case · 쇼케이스 돌아가기 · 드래그로 위치 이동"
+      aria-label={hideExpand ? "VLUE 미니케이스 · 드래그로 위치 이동" : "Mini Case · 쇼케이스 돌아가기 · 드래그로 위치 이동"}
       style={style}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -335,7 +338,7 @@ export default function CompanionMiniCase({
             const revealed = revealPosFromPeek(posRef.current, cardSizeRef.current.w, viewportRef.current.vw);
             applyPos(revealed, { commitVisibility: true });
             syncNativeVisibility(false);
-          } else {
+          } else if (!hideExpand) {
             onExpand?.();
           }
         }
@@ -354,36 +357,42 @@ export default function CompanionMiniCase({
         <>
           <div className="companion-mini-case__brand" aria-hidden>
             <span className="companion-mini-case__brand-mark" />
-            <span className="companion-mini-case__brand-text">VLUE LIVE</span>
+            <span className="companion-mini-case__brand-text">{brandText}</span>
           </div>
-          <div className="companion-mini-case__card">
-            <p className="companion-mini-case__line1">
-              <span className="companion-mini-case__name">{displayName || "—"}</span>
-              <span
-                className={`companion-mini-case__badge${verified ? " is-verified" : " is-unverified"}`}
-              >
-                {statusLabel || (verified ? "인증" : "미인증")}
-              </span>
-              <span className="companion-mini-case__live" aria-hidden>
-                <span className="companion-mini-case__live-dot" />
-              </span>
-              <span className="companion-mini-case__duration">{durationLabel}</span>
-            </p>
-            <p className="companion-mini-case__line2">
-              <span className="companion-mini-case__phone">{phoneLabel || "—"}</span>
-            </p>
-          </div>
-          <button
-            type="button"
-            className="companion-mini-case__expand"
-            onClick={(e) => {
-              e.stopPropagation();
-              onExpand?.();
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            쇼케이스 돌아가기
-          </button>
+          {customBody ? (
+            <div className="companion-mini-case__card companion-mini-case__card--custom">{customBody}</div>
+          ) : (
+            <div className="companion-mini-case__card">
+              <p className="companion-mini-case__line1">
+                <span className="companion-mini-case__name">{displayName || "—"}</span>
+                <span
+                  className={`companion-mini-case__badge${verified ? " is-verified" : " is-unverified"}`}
+                >
+                  {statusLabel || (verified ? "인증" : "미인증")}
+                </span>
+                <span className="companion-mini-case__live" aria-hidden>
+                  <span className="companion-mini-case__live-dot" />
+                </span>
+                <span className="companion-mini-case__duration">{durationLabel}</span>
+              </p>
+              <p className="companion-mini-case__line2">
+                <span className="companion-mini-case__phone">{phoneLabel || "—"}</span>
+              </p>
+            </div>
+          )}
+          {hideExpand ? null : (
+            <button
+              type="button"
+              className="companion-mini-case__expand"
+              onClick={(e) => {
+                e.stopPropagation();
+                onExpand?.();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              쇼케이스 돌아가기
+            </button>
+          )}
         </>
       )}
     </div>

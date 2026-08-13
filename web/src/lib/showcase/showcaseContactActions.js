@@ -24,6 +24,14 @@ export function formatTelHref(raw) {
   return e164 ? `tel:${e164}` : "";
 }
 
+/** 112·119 등 국가기관 단축번호는 E.164로 바꾸지 않는다 */
+export function formatAgencyTelHref(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length <= 4) return `tel:${digits}`;
+  return formatTelHref(raw);
+}
+
 export function formatMailtoHref(raw) {
   const e = String(raw || "").trim();
   return e ? `mailto:${e}` : "";
