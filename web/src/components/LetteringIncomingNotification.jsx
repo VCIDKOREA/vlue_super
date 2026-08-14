@@ -9,6 +9,7 @@ import {
 } from "../lib/letteringFreeTierDisplay.js";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
 import RenderErrorGuard from "./RenderErrorGuard.jsx";
+import { dcpCardMatchesIncoming } from "../lib/nationalAgencyDcpClient.js";
 import AgencyDcpMiniPopup from "./agency/AgencyDcpMiniPopup.jsx";
 import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx";
 import ShowcaseCallCarousel from "./showcase/ShowcaseCallCarousel.jsx";
@@ -1030,7 +1031,7 @@ export default function LetteringIncomingNotification({
   };
 
   /* Companion MVP — 통화 중 접기 = Mini Case (Floating Controller, BigPush 아님) */
-  if (isDcp && !previewMode && !fromCallHistory) {
+  if (isDcp && !previewMode && !fromCallHistory && dcpCardMatchesIncoming(c, incoming)) {
     return (
       <AgencyDcpMiniPopup
         open

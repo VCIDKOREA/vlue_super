@@ -868,6 +868,32 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             }
         }
 
+        /** QA — 국가기관 DCP 정상 경로 오버레이 */
+        @android.webkit.JavascriptInterface
+        fun testDcpPathNormal() {
+            activity.runOnUiThread {
+                LetteringCallCoordinator.onDcpPathTest(activity, abnormal = false)
+                android.widget.Toast.makeText(
+                    activity,
+                    "DCP 정상 경로 테스트 (112)",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+        /** QA — 경로 검증 비정상 경고 오버레이 */
+        @android.webkit.JavascriptInterface
+        fun testDcpPathAbnormal() {
+            activity.runOnUiThread {
+                LetteringCallCoordinator.onDcpPathTest(activity, abnormal = true)
+                android.widget.Toast.makeText(
+                    activity,
+                    "DCP 비정상 경로 테스트",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
         @android.webkit.JavascriptInterface
         fun getDeviceContactsJson(): String {
             return DeviceContactsReader.readAsJson(activity)

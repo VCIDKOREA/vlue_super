@@ -49,8 +49,8 @@ android {
         applicationId = "kr.vlue.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.0.0-rc2"
+        versionCode = 5
+        versionName = "1.0.0-rc5"
         buildConfigField("String", "API_BASE_URL", "\"$vlueApiBase\"")
         buildConfigField("String", "WEB_BASE_URL", "\"$vlueWebBase\"")
     }

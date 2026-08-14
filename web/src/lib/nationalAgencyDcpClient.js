@@ -51,6 +51,23 @@ export function matchNationalAgency(raw) {
   return null;
 }
 
+/** 테스트/오버레이 dcp_route 는 해당 번호가 국가기관일 때만 유효 */
+export function dcpRouteForIncoming(incoming, requested) {
+  const route = String(requested || "").trim().toLowerCase();
+  if (route !== "normal" && route !== "abnormal") return "";
+  return matchNationalAgency(incoming) ? route : "";
+}
+
+/** 이번 수신 번호가 그 DCP 기관 번호일 때만 쇼케이스/경고를 연다 */
+export function dcpCardMatchesIncoming(card, incoming) {
+  const agency = matchNationalAgency(incoming);
+  if (!agency) return false;
+  const dcp = card?.dcp && typeof card.dcp === "object" ? card.dcp : {};
+  const short = String(dcp.shortNumber || card?.phone || "").replace(/\D/g, "");
+  if (!short) return true;
+  return agency.shortNumber === short || matchNationalAgency(short)?.shortNumber === agency.shortNumber;
+}
+
 export function isNationalAgencyDcpCard(card) {
   if (!card || typeof card !== "object") return false;
   if (String(card.profileKind || "").trim() === "dcp") return true;

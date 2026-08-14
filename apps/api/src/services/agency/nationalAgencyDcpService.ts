@@ -142,14 +142,12 @@ export async function resolveAgencyCallRoute(opts: {
   const force = String(opts.forceRoute || "").trim().toLowerCase();
   const agency = await matchNationalAgency(opts.number);
 
+  /* 테스트 force 는 화이트리스트 번호에만 적용. CEO 등 일반 번호에 abnormal 이 붙으면 안 된다. */
+  if (!agency) {
+    return { status: "none" };
+  }
   if (force === AGENCY_ROUTE_ABNORMAL) {
     return { status: "abnormal", agency, warning: AGENCY_ABNORMAL_WARNING };
-  }
-  if (!agency) {
-    if (force === AGENCY_ROUTE_NORMAL) {
-      return { status: "none" };
-    }
-    return { status: "none" };
   }
   if (force === AGENCY_ROUTE_NORMAL || agency.routeStatus === AGENCY_ROUTE_NORMAL) {
     return { status: "normal", agency };

@@ -3,6 +3,7 @@ package kr.vlue.calloverlay
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kr.vlue.calloverlay.dcp.NationalAgencyWhitelist
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -16,7 +17,11 @@ data class CardLookupResult(
 )
 
 object CardLookupRepository {
-    suspend fun lookup(context: Context, rawNumber: String): CardLookupResult? =
+    suspend fun lookup(
+        context: Context,
+        rawNumber: String,
+        dcpRoute: String? = null
+    ): CardLookupResult? =
         withContext(Dispatchers.IO) {
             val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: return@withContext null
             if (BlockedPhoneCache.isBlocked(context, e164)) return@withContext null
@@ -24,6 +29,8 @@ object CardLookupRepository {
             val base = BuildConfig.API_BASE_URL.trimEnd('/')
             /* API 에는 정규화된 E.164 를 우선 전달 — raw 하이픈/공백 불일치로 MISS 나지 않게 */
             val candidates = LinkedHashSet<String>()
+            val agency = NationalAgencyWhitelist.match(rawNumber)
+            if (agency != null) candidates.add(agency.shortNumber)
             candidates.add(e164)
             val canon = IncomingNumberResolver.canonicalDigits(rawNumber)
             if (canon.isNotEmpty()) candidates.add("+$canon")
@@ -34,17 +41,29 @@ object CardLookupRepository {
 
             var lastUnmatched: CardLookupResult? = null
             for (candidate in candidates) {
-                val result = lookupOnce(context, base, candidate) ?: continue
+                val result = lookupOnce(context, base, candidate, dcpRoute) ?: continue
                 if (result.matched) return@withContext result
                 lastUnmatched = result
             }
-            lastUnmatched ?: lookupOnce(context, base, e164)
+            lastUnmatched ?: lookupOnce(context, base, e164, dcpRoute)
         }
 
-    private fun lookupOnce(context: Context, base: String, numberParam: String): CardLookupResult? {
+    private fun lookupOnce(
+        context: Context,
+        base: String,
+        numberParam: String,
+        dcpRoute: String? = null
+    ): CardLookupResult? {
         return try {
             val q = URLEncoder.encode(numberParam, "UTF-8")
-            val url = URL("$base/api/cards/by-number?number=$q&purpose=call_overlay")
+            val route = dcpRoute?.trim().orEmpty().lowercase()
+            val routeQ =
+                if (route == "normal" || route == "abnormal") {
+                    "&dcp_route=${URLEncoder.encode(route, "UTF-8")}"
+                } else {
+                    ""
+                }
+            val url = URL("$base/api/cards/by-number?number=$q&purpose=call_overlay$routeQ")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 8000

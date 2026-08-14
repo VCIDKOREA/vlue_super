@@ -28,14 +28,24 @@ object VlueLetteringConfig {
         return "$appShellUrl$withHash"
     }
 
-    fun overlayUrl(phone: String, verified: Boolean, outgoing: Boolean): String {
+    fun overlayUrl(
+        phone: String,
+        verified: Boolean,
+        outgoing: Boolean,
+        dcpRoute: String = "",
+        navigationNonce: Long = 0L
+    ): String {
         val enc = java.net.URLEncoder.encode(phone, "UTF-8")
         val dir = if (outgoing) "outgoing" else "incoming"
         val ver = if (verified) "1" else "0"
         /* 웹 배포 해시가 바뀌어도 WebView 가 옛 번들을 붙잡지 않게 */
         val bust = BuildConfig.VERSION_CODE
+        val route = dcpRoute.trim().lowercase()
+        val dcp = if (route == "normal" || route == "abnormal") "&dcp_route=$route" else ""
+        /* 번호가 바뀌면 해시만 바꿔 loadUrl 해도 hashchange 가 안 나 이전 번호가 남는다 */
+        val nav = if (navigationNonce > 0L) "&_n=$navigationNonce" else ""
         return appUrl(
-            "lettering-overlay?incoming=$enc&platform=android&direction=$dir&verified=$ver&native=1&forceLettering=1&_ov=$bust"
+            "lettering-overlay?incoming=$enc&platform=android&direction=$dir&verified=$ver&native=1&forceLettering=1&_ov=$bust$dcp$nav"
         )
     }
 }

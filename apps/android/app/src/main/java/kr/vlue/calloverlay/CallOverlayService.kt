@@ -43,6 +43,8 @@ import kr.vlue.calloverlay.companion.OverlayTriggerEvent
 import kr.vlue.calloverlay.companion.ScreenState
 import kr.vlue.calloverlay.companion.ScreenStateDetector
 import kr.vlue.calloverlay.companion.UsageAccessHelper
+import kr.vlue.calloverlay.dcp.DcpAbnormalWarningView
+import kr.vlue.calloverlay.dcp.NationalAgencyWhitelist
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
 import kr.vlue.calloverlay.diagnostics.CompanionRuntimeStabilityDiag
 import kr.vlue.calloverlay.diagnostics.DiagnosticsFeature
@@ -74,6 +76,7 @@ class CallOverlayService : Service() {
     private var pendingCardJson: String? = null
     private var currentPhone: String = ""
     private var currentOutgoing: Boolean = false
+    private var currentDcpRoute: String = ""
     private var keypadOpen = false
     private var userMinimized = false
     private var screenStateDetector: ScreenStateDetector? = null
@@ -193,7 +196,8 @@ class CallOverlayService : Service() {
                 val verified = intent.getBooleanExtra(EXTRA_VERIFIED, false)
                 val outgoing = intent.getBooleanExtra(EXTRA_OUTGOING, false)
                 val cardJson = intent.getStringExtra(EXTRA_CARD_JSON)
-                applyCallInfoUpdate(phone, verified, outgoing, cardJson)
+                val dcpRoute = intent.getStringExtra(EXTRA_DCP_ROUTE).orEmpty()
+                applyCallInfoUpdate(phone, verified, outgoing, cardJson, dcpRoute)
                 return START_NOT_STICKY
             }
         }
@@ -201,17 +205,24 @@ class CallOverlayService : Service() {
         val verified = intent?.getBooleanExtra(EXTRA_VERIFIED, false) ?: false
         val outgoing = intent?.getBooleanExtra(EXTRA_OUTGOING, false) ?: false
         val cardJson = intent?.getStringExtra(EXTRA_CARD_JSON)
+        val dcpRoute = intent?.getStringExtra(EXTRA_DCP_ROUTE).orEmpty()
         VlueBigPushTrace.step(
             5,
             "CallOverlayService.onStartCommand()",
             "phone=${ReleaseDebugGate.maskPhoneForLog(phone)} verified=$verified outgoing=$outgoing action=${intent?.action} " +
-                "alreadyAttached=${rootContainer?.isAttachedToWindow == true}"
+                "alreadyAttached=${rootContainer?.isAttachedToWindow == true} dcpRoute=$dcpRoute"
         )
-        showOverlay(phone, verified, outgoing, cardJson)
+        showOverlay(phone, verified, outgoing, cardJson, dcpRoute)
         return START_NOT_STICKY
     }
 
-    private fun showOverlay(phone: String, verified: Boolean, outgoing: Boolean, cardJson: String? = null) {
+    private fun showOverlay(
+        phone: String,
+        verified: Boolean,
+        outgoing: Boolean,
+        cardJson: String? = null,
+        dcpRoute: String = ""
+    ) {
         if (dismissing) {
             CompanionRuntimeStabilityDiag.noteStaleEvent("SHOW_OVERLAY", "showOverlay", detail = "dismissing")
             return
@@ -220,6 +231,7 @@ class CallOverlayService : Service() {
         val answered = shouldEnterShowcaseNow(outgoing)
         val callState = telephonyCallState()
         currentOutgoing = outgoing
+        bindDcpRoute(phone, dcpRoute, cardJson)
         /*
          * Phase 6-G: Call End 이후 enrichWithLookup / queued FGS 가 IDLE 에서 showOverlay 를
          * 다시 열면 Showcase 재등장이 난다. 세션이 이미 끝났고 IDLE 이면 무시.
@@ -382,6 +394,14 @@ class CallOverlayService : Service() {
         /* 기존 Window 재사용 — remove+add 는 BadToken/흰화면 유발 */
         if (alreadyAttached) {
             applyCompactRingingWindow()
+            val phoneChanged = overlayPhoneChanged(phone)
+            currentPhone = phone
+            pendingCardJson = cardJson
+            val wv = webView
+            if (wv != null && !IncomingNumberResolver.isUnknown(phone)) {
+                loadOverlayDocument(wv, phone, verified, outgoing, cardJson, forceNewDocument = phoneChanged)
+            }
+            syncDcpAbnormalWarning(rootContainer, cardJson, currentDcpRoute)
             syncOverlayChromeForState(source = "bigPush_reuseWindow")
         } else {
             attachOverlayWindow(
@@ -553,6 +573,7 @@ class CallOverlayService : Service() {
                     return
                 }
                 syncOverlayChromeForState(source = "onPageFinished")
+                DcpAbnormalWarningView.detach(rootContainer)
                 /*
                  * Showcase 레이아웃은 Answer Event에서 이미 commit됨.
                  * onPageFinished는 Web 알림·레이아웃 재확인만 — Showcase 표시를 지연시키지 않는다.
@@ -730,11 +751,12 @@ class CallOverlayService : Service() {
         currentPhone = phone
         currentOutgoing = outgoing
         pendingCardJson = cardJson
-        wv.loadUrl(VlueLetteringConfig.overlayUrl(phone, verified, outgoing))
+        wv.loadUrl(VlueLetteringConfig.overlayUrl(phone, verified, outgoing, currentDcpRoute))
         CompanionPerfTracker.noteWebViewLoadStart()
         if (!cardJson.isNullOrBlank()) {
             injectCardLookupJson(wv, cardJson)
         }
+        syncDcpAbnormalWarning(container, cardJson, currentDcpRoute)
 
         val animStart = android.os.SystemClock.elapsedRealtime()
         container.animate()
@@ -982,6 +1004,21 @@ class CallOverlayService : Service() {
 
         /* RINGING: 전체 UI vs 홈·다른앱 — UsageEvents ACTIVITY_RESUMED 1차 (DUT 증거) */
         if (phase == OverlayContextDetector.CallPhase.RINGING) {
+            /*
+             * 삼성 통화 목록·다이얼러 발신은 항상 전체 InCallActivity.
+             * UsageStats 미허용·contacts last-resume 오판으로 BOTTOM 두면 종료 버튼을 가린다.
+             */
+            if (currentOutgoing) {
+                android.util.Log.i(
+                    "VlueOverlayCtx",
+                    "phase=RINGING outgoing dialing → TOP (Samsung InCallUI)"
+                )
+                VlueBigPushTrace.lifecycle(
+                    "OVERLAY_CONTEXT",
+                    "phase=RINGING outgoing=true ctx=INCOMING_CALL_UI"
+                )
+                return OverlayContext.INCOMING_CALL_UI
+            }
             val hints = ForegroundPackageProbe.processImportanceHints(this)
             val tasksPkg = ForegroundPackageProbe.runningTaskPackage(this)
             val resumedPkg = ForegroundPackageProbe.lastResumedPackage(this)
@@ -1115,7 +1152,8 @@ class CallOverlayService : Service() {
         phone: String,
         verified: Boolean,
         outgoing: Boolean,
-        cardJson: String?
+        cardJson: String?,
+        dcpRoute: String = ""
     ) {
         mainHandler.post {
             if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) {
@@ -1127,20 +1165,19 @@ class CallOverlayService : Service() {
                 return@post
             }
             if (IncomingNumberResolver.isUnknown(phone) && cardJson.isNullOrBlank()) return@post
+            val phoneChanged = overlayPhoneChanged(phone)
             currentPhone = phone
             currentOutgoing = outgoing
             pendingCardJson = cardJson
+            bindDcpRoute(phone, dcpRoute, cardJson)
             val banner = nativeBanner
             if (banner != null) {
                 BigPushShowcaseBar.bind(banner, phone, verified, outgoing, cardJson)
             }
             val wv = webView
             if (wv != null && !IncomingNumberResolver.isUnknown(phone)) {
-                wv.loadUrl(VlueLetteringConfig.overlayUrl(phone, verified, outgoing))
+                loadOverlayDocument(wv, phone, verified, outgoing, cardJson, forceNewDocument = phoneChanged)
                 CompanionPerfTracker.noteWebViewLoadStart()
-                if (!cardJson.isNullOrBlank()) {
-                    injectCardLookupJson(wv, cardJson)
-                }
                 CompanionRuntimeStabilityDiag.noteMemberLookup(
                     phase = "WEB_CARD_RENDERED",
                     maskedPhone = ReleaseDebugGate.maskPhoneForLog(phone),
@@ -1152,10 +1189,105 @@ class CallOverlayService : Service() {
                     notifyWebCallState("connected")
                 }
             } else if (rootContainer == null) {
-                showOverlay(phone, verified, outgoing, cardJson)
+                showOverlay(phone, verified, outgoing, cardJson, currentDcpRoute)
             }
+            syncDcpAbnormalWarning(rootContainer, cardJson, currentDcpRoute)
             LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
         }
+    }
+
+    private fun bindDcpRoute(phone: String, requested: String, cardJson: String?) {
+        currentDcpRoute = NationalAgencyWhitelist.routeForCall(phone, requested, parseDcpRoute(cardJson))
+    }
+
+    private fun syncDcpAbnormalWarning(container: FrameLayout?, cardJson: String?, dcpRoute: String) {
+        if (container == null) return
+        val route = NationalAgencyWhitelist.routeForCall(currentPhone, dcpRoute, parseDcpRoute(cardJson))
+        if (route == "abnormal") {
+            DcpAbnormalWarningView.attach(
+                container,
+                parseDcpAgencyName(cardJson),
+                parseDcpPhone(cardJson),
+                parseDcpWebsite(cardJson)
+            )
+        } else {
+            DcpAbnormalWarningView.detach(container)
+        }
+    }
+
+    private fun parseDcpRoute(cardJson: String?): String {
+        if (cardJson.isNullOrBlank()) return ""
+        return try {
+            val json = org.json.JSONObject(cardJson)
+            json.optJSONObject("dcp")?.optString("routeStatus").orEmpty()
+                .ifBlank { json.optString("dcp_route") }
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun parseDcpAgencyName(cardJson: String?): String {
+        if (cardJson.isNullOrBlank()) return ""
+        return try {
+            val json = org.json.JSONObject(cardJson)
+            json.optJSONObject("dcp")?.optString("agencyName").orEmpty()
+                .ifBlank { json.optString("displayName") }
+                .ifBlank { json.optString("companyName") }
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun parseDcpPhone(cardJson: String?): String {
+        if (cardJson.isNullOrBlank()) return ""
+        return try {
+            val json = org.json.JSONObject(cardJson)
+            json.optJSONObject("dcp")?.optString("shortNumber").orEmpty()
+                .ifBlank { json.optString("phoneE164") }
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun parseDcpWebsite(cardJson: String?): String {
+        if (cardJson.isNullOrBlank()) return ""
+        return try {
+            val json = org.json.JSONObject(cardJson)
+            json.optJSONObject("dcp")?.optString("officialWebsite").orEmpty()
+                .ifBlank { json.optString("website") }
+                .ifBlank { json.optJSONObject("profile")?.optString("website").orEmpty() }
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun overlayPhoneChanged(nextPhone: String): Boolean {
+        if (IncomingNumberResolver.isUnknown(currentPhone)) return true
+        return !IncomingNumberResolver.sameCanonicalNumber(currentPhone, nextPhone)
+    }
+
+    /**
+     * 번호가 바뀌면 `_n` 로 문서를 새로 연다. 해시만 바꾸면 이전 incoming(070)이 CEO 카드와 섞인다.
+     */
+    private fun loadOverlayDocument(
+        wv: WebView,
+        phone: String,
+        verified: Boolean,
+        outgoing: Boolean,
+        cardJson: String?,
+        forceNewDocument: Boolean
+    ) {
+        val nonce = if (forceNewDocument) System.currentTimeMillis() else 0L
+        if (forceNewDocument) {
+            wv.evaluateJavascript("try{window.__VLUE_CARD_LOOKUP__=null;}catch(e){}", null)
+        }
+        wv.loadUrl(
+            VlueLetteringConfig.overlayUrl(phone, verified, outgoing, currentDcpRoute, nonce)
+        )
+        if (!forceNewDocument && !cardJson.isNullOrBlank()) {
+            injectCardLookupJson(wv, cardJson)
+        }
+        /* forceNewDocument 이면 onPageStarted 의 injectLetteringFlag 가 pendingCardJson 주입 */
     }
 
     private fun injectCardLookupJson(view: WebView?, cardJson: String) {
@@ -1169,14 +1301,25 @@ class CallOverlayService : Service() {
     }
 
     private fun injectLetteringFlag(view: WebView?) {
-        view?.evaluateJavascript(
-            "try{localStorage.setItem('vlue_lettering_enabled','1');" +
-                "window.dispatchEvent(new CustomEvent('vlue-lettering-settings-changed',{detail:{enabled:true}}));" +
-                "document.documentElement.style.background='transparent';" +
-                "if(document.body){document.body.style.background='transparent';}" +
-                "}catch(e){}",
-            null
-        )
+        val route = currentDcpRoute.replace("'", "")
+        val js =
+            if (route == "normal" || route == "abnormal") {
+                "try{localStorage.setItem('vlue_lettering_enabled','1');" +
+                    "sessionStorage.setItem('vlue_dcp_test_route','$route');" +
+                    "window.dispatchEvent(new CustomEvent('vlue-lettering-settings-changed',{detail:{enabled:true}}));" +
+                    "document.documentElement.style.background='transparent';" +
+                    "if(document.body){document.body.style.background='transparent';}" +
+                    "}catch(e){}"
+            } else {
+                "try{localStorage.setItem('vlue_lettering_enabled','1');" +
+                    "sessionStorage.removeItem('vlue_dcp_test_route');" +
+                    "sessionStorage.removeItem('vlue_dcp_test_number');" +
+                    "window.dispatchEvent(new CustomEvent('vlue-lettering-settings-changed',{detail:{enabled:true}}));" +
+                    "document.documentElement.style.background='transparent';" +
+                    "if(document.body){document.body.style.background='transparent';}" +
+                    "}catch(e){}"
+            }
+        view?.evaluateJavascript(js, null)
         pendingCardJson?.let { injectCardLookupJson(view, it) }
     }
 
@@ -1257,6 +1400,13 @@ class CallOverlayService : Service() {
             CompanionRuntimeStabilityDiag.noteStaleEvent("RESTORE", source)
             return
         }
+        /*
+         * Mini→Showcase 직후 ContextWatch 가 OTHER_APP(삼성 인콜 UI)으로 오판하면
+         * collapseToBottomShowcaseBar → 156dp 컴팩트 창이 된다.
+         * 웹은 restore 로 expanded=true(전화 화면 보기 CTA 포함)인데 네이티브 창만
+         * 접혀 CTA·하단이 잘리는 버그가 난다. Answer 와 동일하게 홀드로 보호.
+         */
+        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 3500L
         companion.onRestoreShowcase(OverlayContext.IN_CALL)
         if (companion.rejectedTransition != null && companion.state != OverlayState.SHOWCASE) {
             OverlayDiagTracker.recordOverlayFailure(
@@ -1584,6 +1734,14 @@ class CallOverlayService : Service() {
     }
 
     private fun applyCompactRingingWindowLocked(params: WindowManager.LayoutParams) {
+        if (currentDcpRoute == "abnormal") {
+            params.gravity = Gravity.TOP or Gravity.START
+            params.width = WindowManager.LayoutParams.MATCH_PARENT
+            params.height = WindowManager.LayoutParams.MATCH_PARENT
+            params.x = 0
+            params.y = 0
+            return
+        }
         val pos = companion.position
         val (sw, sh) = screenSizePx()
         val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
@@ -1927,6 +2085,7 @@ class CallOverlayService : Service() {
         nativeBanner = null
         bigPushPeekTab = null
         bigPushPeeking = false
+        currentDcpRoute = ""
         webView = null
         dismissing = false
     }
@@ -2308,6 +2467,7 @@ class CallOverlayService : Service() {
         const val EXTRA_VERIFIED = "verified"
         const val EXTRA_OUTGOING = "outgoing"
         const val EXTRA_CARD_JSON = "card_json"
+        const val EXTRA_DCP_ROUTE = "dcp_route"
         const val ACTION_DISMISS = "kr.vlue.calloverlay.DISMISS"
         const val ACTION_CONNECTED = "kr.vlue.calloverlay.CONNECTED"
         const val ACTION_ENDED_KEEP = "kr.vlue.calloverlay.ENDED_KEEP"
@@ -2358,7 +2518,8 @@ class CallOverlayService : Service() {
             phone: String,
             verified: Boolean,
             cardJson: String?,
-            outgoing: Boolean
+            outgoing: Boolean,
+            dcpRoute: String = ""
         ) {
             try {
                 val intent = Intent(context, CallOverlayService::class.java).apply {
@@ -2367,6 +2528,7 @@ class CallOverlayService : Service() {
                     putExtra(EXTRA_VERIFIED, verified)
                     putExtra(EXTRA_OUTGOING, outgoing)
                     putExtra(EXTRA_CARD_JSON, cardJson)
+                    putExtra(EXTRA_DCP_ROUTE, dcpRoute)
                 }
                 if (activeInstance != null) {
                     context.startService(intent)
@@ -2377,11 +2539,12 @@ class CallOverlayService : Service() {
                             putExtra(EXTRA_VERIFIED, verified)
                             putExtra(EXTRA_OUTGOING, outgoing)
                             putExtra(EXTRA_CARD_JSON, cardJson)
+                            putExtra(EXTRA_DCP_ROUTE, dcpRoute)
                         }
                     )
                 }
             } catch (e: Exception) {
-                activeInstance?.applyCallInfoUpdate(phone, verified, outgoing, cardJson)
+                activeInstance?.applyCallInfoUpdate(phone, verified, outgoing, cardJson, dcpRoute)
             }
         }
 

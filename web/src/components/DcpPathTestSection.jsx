@@ -50,11 +50,25 @@ function callNativeDcpTest(abnormal) {
   return false;
 }
 
+function clearDcpTestStorage() {
+  try {
+    sessionStorage.removeItem("vlue_dcp_test_route");
+    sessionStorage.removeItem("vlue_dcp_test_number");
+  } catch {
+    /* ignore */
+  }
+}
+
 /** 홈 — 통화 경로 감지 엔진 정상/비정상 UI 즉시 확인 */
 export default function DcpPathTestSection({ isDarkMode = false }) {
   const [preview, setPreview] = useState(null);
   const [card, setCard] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const closePreview = useCallback(() => {
+    setPreview(null);
+    clearDcpTestStorage();
+  }, []);
 
   const prefetch = useCallback(async () => {
     const next = await loadPoliceDcpCard(false);
@@ -65,10 +79,36 @@ export default function DcpPathTestSection({ isDarkMode = false }) {
     void prefetch();
   }, [prefetch]);
 
+  useEffect(() => {
+    const onHide = () => closePreview();
+    const onCall = () => closePreview();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onHide);
+    window.addEventListener("vlue-call-session", onCall);
+    window.addEventListener("vlue-dcp-dismiss", onCall);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onHide);
+      window.removeEventListener("vlue-call-session", onCall);
+      window.removeEventListener("vlue-dcp-dismiss", onCall);
+    };
+  }, [closePreview]);
+
   const run = async (abnormal) => {
-    callNativeDcpTest(abnormal);
+    const native = callNativeDcpTest(abnormal);
+    if (native) {
+      /* 오버레이가 테스트 UI. 홈 팝업을 남기면 다음 실제 통화에 경찰청 경고가 겹친다. */
+      closePreview();
+      return;
+    }
     setLoading(true);
     setPreview(abnormal ? "abnormal" : "normal");
+    try {
+      sessionStorage.setItem("vlue_dcp_test_route", abnormal ? "abnormal" : "normal");
+      sessionStorage.setItem("vlue_dcp_test_number", "112");
+    } catch {
+      /* ignore */
+    }
     try {
       const next = await loadPoliceDcpCard(abnormal);
       if (next) setCard(next);
@@ -111,7 +151,7 @@ export default function DcpPathTestSection({ isDarkMode = false }) {
         incomingNumber="112"
         abnormal={preview === "abnormal"}
         warning={ABNORMAL_WARNING}
-        onClose={() => setPreview(null)}
+        onClose={closePreview}
       />
     </section>
   );

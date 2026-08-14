@@ -4,12 +4,17 @@ import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
 import android.util.Log
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kr.vlue.calloverlay.dcp.CallPathSession
+import kr.vlue.calloverlay.dcp.CallPathVerdict
+import kr.vlue.calloverlay.dcp.DcpLookupPayload
+import kr.vlue.calloverlay.dcp.NationalAgencyWhitelist
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
 import kr.vlue.calloverlay.diagnostics.CompanionRuntimeStabilityDiag
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
@@ -33,6 +38,22 @@ object LetteringCallCoordinator {
 
     @Volatile
     private var lastOutgoing: Boolean = false
+
+    /** CallLog 업그레이드·enrich 가 다음 통화를 덮지 못하게 세대 번호 */
+    private val callGen = AtomicLong(0L)
+
+    /** 홈 화면 정상/비정상 테스트 — 실제 통화 없이 경로 판정 UI를 기동 */
+    fun onDcpPathTest(context: Context, abnormal: Boolean) {
+        lastRingAt = 0L
+        lastRingNumber = ""
+        callGen.incrementAndGet()
+        CallPathSession.armMock(abnormal)
+        LetteringPrefs.setLetteringEnabled(context, true)
+        CompanionRuntimeStabilityDiag.beginCallSession(
+            if (abnormal) "dcp_path_test_abnormal" else "dcp_path_test_normal"
+        )
+        onRinging(context, "112", outgoing = false)
+    }
 
     fun onRinging(context: Context, number: String?, outgoing: Boolean = false) {
         try {
@@ -72,17 +93,65 @@ object LetteringCallCoordinator {
                 return
             }
 
+            /*
+             * TelephonyCallback / OFFHOOK 은 번호를 안 준다.
+             * 이미 아는 번호를 unknown 으로 덮으면 오버레이가 「신원 확인 중」에 멈춘다.
+             * 같은 발신/수신 방향의 같은 통화에만 유지 — 바로 다음 발신의 unknown OFFHOOK 이
+             * 직전 070 을 붙잡고 있으면 010 통화에 070 이 남는다.
+             */
+            if (nextUnknown && !prevUnknown && lastOutgoing == outgoing && now - lastRingAt < 30_000L) {
+                VlueBigPushTrace.skip(
+                    3,
+                    "keep known number — ignore unknown RINGING/OFFHOOK last=$lastRingNumber"
+                )
+                Log.i(TAG, "skip ringing: keep known ${ReleaseDebugGate.maskPhoneForLog(lastRingNumber)}")
+                val keepNumber = lastRingNumber
+                val keepStartedAt = lastRingAt
+                val keepOut = outgoing
+                scope.launch {
+                    detectSuccessorOutgoingNumber(app, keepNumber, keepStartedAt, keepOut)
+                }
+                return
+            }
+
+            if (!nextUnknown && !prevUnknown && !sameNumber) {
+                callGen.incrementAndGet()
+            }
+
             lastRingAt = now
             lastRingNumber = if (nextUnknown) "unknown" else resolved
             lastOutgoing = outgoing
+            val gen = callGen.get()
 
             val raw = if (nextUnknown) "unknown" else resolved
             LetteringPrefs.setLastCallEvent(app, "ringing:$raw:out=$outgoing")
 
+            val agency = if (nextUnknown) null else NationalAgencyWhitelist.match(raw)
+            if (agency == null) {
+                CallPathSession.clear()
+            }
+            val dcpVerdict = if (agency != null) CallPathSession.consumeOrVerify(app) else null
+            val dcpJson =
+                if (agency != null && dcpVerdict != null) DcpLookupPayload.toJson(agency, dcpVerdict) else null
+            val overlayNumber = agency?.shortNumber ?: raw
+            if (agency != null && dcpVerdict != null) {
+                Log.i(
+                    TAG,
+                    "path-verify ${agency.shortNumber} ${agency.agencyName} route=${dcpVerdict.routeQuery} mock=${dcpVerdict.fromMock}"
+                )
+            }
+
             /* 1) Permission → Overlay 즉시 (diag/lookup 보다 먼저) */
             val canDraw = LetteringPermissionHelper.canDrawOverlays(app)
             if (canDraw) {
-                startOverlayService(app, raw, verified = false, cardJson = null, outgoing)
+                startOverlayService(
+                    app,
+                    overlayNumber,
+                    verified = dcpJson != null,
+                    cardJson = dcpJson,
+                    outgoing = outgoing,
+                    dcpRoute = dcpVerdict?.routeQuery.orEmpty()
+                )
             } else {
                 val restrictHint =
                     if (LetteringPermissionHelper.isLikelySamsungCallOverlayRestricted(app)) {
@@ -132,10 +201,15 @@ object LetteringCallCoordinator {
                 LetteringIncomingNotifier.post(app, raw, outgoing, forceFallback = true)
             }
 
-            /* 4) 번호/회원 enrich — Overlay 이후 IO */
-            if (nextUnknown) {
+            /* 4) 번호/회원 enrich — Overlay 이후 IO. 화이트리스트는 DCP 경로만. */
+            if (agency != null && dcpVerdict != null) {
                 scope.launch {
-                    upgradeNumberAfterOverlay(app, outgoing)
+                    enrichDcpLookup(app, agency, dcpVerdict, outgoing)
+                }
+            } else if (nextUnknown) {
+                val startedAt = lastRingAt
+                scope.launch {
+                    upgradeNumberAfterOverlay(app, outgoing, gen, startedAt)
                 }
             } else {
                 scope.launch {
@@ -149,53 +223,120 @@ object LetteringCallCoordinator {
     }
 
     /** CallLog 조회는 IO — Overlay 시작을 막지 않는다 */
-    private suspend fun upgradeNumberAfterOverlay(app: Context, outgoing: Boolean) {
+    private suspend fun upgradeNumberAfterOverlay(
+        app: Context,
+        outgoing: Boolean,
+        gen: Long,
+        callStartedAt: Long
+    ) {
+        if (callGen.get() != gen) return
         val fromLog = withContext(Dispatchers.IO) {
-            IncomingNumberResolver.resolveRecentNumber(app, outgoing)
+            IncomingNumberResolver.resolveRecentNumber(
+                app,
+                outgoing,
+                minDateMs = callLogMinDate(callStartedAt)
+            )
         }
-        if (!IncomingNumberResolver.isUnknown(fromLog)) {
-            val n = fromLog!!
-            Log.i(TAG, "upgrade unknown → ${ReleaseDebugGate.maskPhoneForLog(n)} (immediate CallLog)")
-            lastRingNumber = n
-            lastRingAt = System.currentTimeMillis()
-            LetteringPrefs.setLastCallEvent(app, "ringing_upgrade:$n:out=$outgoing")
-            if (LetteringPermissionHelper.canDrawOverlays(app)) {
-                CallOverlayService.updateCallInfo(app, n, verified = false, cardJson = null, outgoing)
-                LetteringIncomingNotifier.cancel(app)
-            } else {
-                LetteringIncomingNotifier.post(app, n, outgoing, forceFallback = true)
-            }
-            enrichWithLookup(app, n, outgoing)
-            return
-        }
-        retryResolveUnknown(app, outgoing)
+        if (applyCallLogUpgradeIfCurrent(app, outgoing, gen, fromLog)) return
+        retryResolveUnknown(app, outgoing, gen, callStartedAt)
     }
 
-    private suspend fun retryResolveUnknown(app: Context, outgoing: Boolean) {
-        repeat(4) { attempt ->
-            delay(350L + attempt * 200L)
+    private suspend fun retryResolveUnknown(
+        app: Context,
+        outgoing: Boolean,
+        gen: Long,
+        callStartedAt: Long
+    ) {
+        repeat(8) { attempt ->
+            delay(400L + attempt * 350L)
+            if (callGen.get() != gen) return
             val n = withContext(Dispatchers.IO) {
-                IncomingNumberResolver.resolveRecentNumber(app, outgoing)
+                IncomingNumberResolver.resolveRecentNumber(
+                    app,
+                    outgoing,
+                    minDateMs = callLogMinDate(callStartedAt)
+                )
             } ?: return@repeat
-            if (IncomingNumberResolver.isUnknown(n)) return@repeat
-            Log.i(TAG, "upgrade unknown → ${ReleaseDebugGate.maskPhoneForLog(n)} (attempt=$attempt)")
-            lastRingNumber = n
-            lastRingAt = System.currentTimeMillis()
-            LetteringPrefs.setLastCallEvent(app, "ringing_upgrade:$n:out=$outgoing")
-            if (LetteringPermissionHelper.canDrawOverlays(app)) {
-                CallOverlayService.updateCallInfo(app, n, verified = false, cardJson = null, outgoing)
-                LetteringIncomingNotifier.cancel(app)
-            } else {
-                LetteringIncomingNotifier.post(app, n, outgoing, forceFallback = true)
-            }
-            enrichWithLookup(app, n, outgoing)
-            return
+            if (applyCallLogUpgradeIfCurrent(app, outgoing, gen, n)) return
         }
         Log.w(TAG, "number still unknown after CallLog retries")
         LetteringPrefs.setLastOverlayError(app, "number_unknown_after_retry")
     }
 
+    /**
+     * IDLE 누락 후 바로 다음 발신: unknown OFFHOOK 은 직전 번호를 유지한다.
+     * 그 사이 CallLog 에 다른 번호가 생기면 이번 통화로 교체한다.
+     */
+    private suspend fun detectSuccessorOutgoingNumber(
+        app: Context,
+        keptNumber: String,
+        keptStartedAt: Long,
+        outgoing: Boolean
+    ) {
+        repeat(6) { attempt ->
+            if (attempt > 0) delay(400L + attempt * 300L)
+            if (!IncomingNumberResolver.sameCanonicalNumber(lastRingNumber, keptNumber)) return
+            val n = withContext(Dispatchers.IO) {
+                IncomingNumberResolver.resolveRecentNumber(
+                    app,
+                    outgoing,
+                    minDateMs = keptStartedAt + 400L
+                )
+            } ?: return@repeat
+            if (IncomingNumberResolver.isUnknown(n)) return@repeat
+            if (IncomingNumberResolver.sameCanonicalNumber(n, keptNumber)) return@repeat
+            Log.i(
+                TAG,
+                "successor call ${ReleaseDebugGate.maskPhoneForLog(n)} replaces ${ReleaseDebugGate.maskPhoneForLog(keptNumber)}"
+            )
+            onRinging(app, n, outgoing)
+            return
+        }
+    }
+
+    /**
+     * unknown 오버레이만 CallLog 로 채운다.
+     * 이미 다른 실번호(010)가 있으면 직전 070 CallLog 로 덮지 않는다.
+     */
+    private suspend fun applyCallLogUpgradeIfCurrent(
+        app: Context,
+        outgoing: Boolean,
+        gen: Long,
+        fromLog: String?
+    ): Boolean {
+        if (callGen.get() != gen) return true
+        if (IncomingNumberResolver.isUnknown(fromLog)) return false
+        val n = fromLog!!
+        val current = lastRingNumber
+        if (!IncomingNumberResolver.isUnknown(current) &&
+            !IncomingNumberResolver.sameCanonicalNumber(current, n)
+        ) {
+            Log.i(
+                TAG,
+                "skip CallLog ${ReleaseDebugGate.maskPhoneForLog(n)} — overlay already ${ReleaseDebugGate.maskPhoneForLog(current)}"
+            )
+            return true
+        }
+        Log.i(TAG, "upgrade unknown → ${ReleaseDebugGate.maskPhoneForLog(n)} (CallLog)")
+        lastRingNumber = n
+        lastRingAt = System.currentTimeMillis()
+        LetteringPrefs.setLastCallEvent(app, "ringing_upgrade:$n:out=$outgoing")
+        if (applyWhitelistPathIfMatched(app, n, outgoing)) return true
+        if (LetteringPermissionHelper.canDrawOverlays(app)) {
+            CallOverlayService.updateCallInfo(app, n, verified = false, cardJson = null, outgoing)
+            LetteringIncomingNotifier.cancel(app)
+        } else {
+            LetteringIncomingNotifier.post(app, n, outgoing, forceFallback = true)
+        }
+        enrichWithLookup(app, n, outgoing)
+        return true
+    }
+
+    private fun callLogMinDate(callStartedAt: Long): Long =
+        (callStartedAt - 1_500L).coerceAtLeast(0L)
+
     private suspend fun enrichWithLookup(app: Context, raw: String, outgoing: Boolean) {
+        if (applyWhitelistPathIfMatched(app, raw, outgoing)) return
         val masked = ReleaseDebugGate.maskPhoneForLog(raw)
         val started = SystemClock.elapsedRealtime()
         CompanionRuntimeStabilityDiag.noteMemberLookup(
@@ -229,8 +370,18 @@ object LetteringCallCoordinator {
                 )
                 Log.w(TAG, "lookup unmatched for $masked")
                 LetteringPrefs.setLastOverlayError(app, "lookup_unmatched:$masked")
-                /* 오버레이 보이면 HUN 재게시 금지 — post() 가 자체 스킵 */
-                LetteringIncomingNotifier.post(app, raw, outgoing, displayName = null)
+                if (LetteringPermissionHelper.canDrawOverlays(app)) {
+                    CallOverlayService.updateCallInfo(
+                        app,
+                        raw,
+                        verified = false,
+                        cardJson = unmatchedLookupJson(raw),
+                        outgoing = outgoing
+                    )
+                    LetteringIncomingNotifier.cancel(app)
+                } else {
+                    LetteringIncomingNotifier.post(app, raw, outgoing, displayName = null)
+                }
                 return
             }
             CompanionRuntimeStabilityDiag.noteMemberLookup(
@@ -287,6 +438,87 @@ object LetteringCallCoordinator {
                 matched = false,
                 dataSource = "error:${e.javaClass.simpleName}"
             )
+            if (LetteringPermissionHelper.canDrawOverlays(app)) {
+                CallOverlayService.updateCallInfo(
+                    app,
+                    raw,
+                    verified = false,
+                    cardJson = unmatchedLookupJson(raw),
+                    outgoing = outgoing
+                )
+            }
+        }
+    }
+
+    private fun unmatchedLookupJson(raw: String): String =
+        org.json.JSONObject()
+            .put("matched", false)
+            .put("is_verified", false)
+            .put("phoneE164", raw)
+            .put("profileKind", "")
+            .toString()
+
+    private fun applyWhitelistPathIfMatched(app: Context, number: String, outgoing: Boolean): Boolean {
+        val agency = NationalAgencyWhitelist.match(number) ?: return false
+        val verdict = CallPathSession.consumeOrVerify(app)
+        val json = DcpLookupPayload.toJson(agency, verdict)
+        Log.i(
+            TAG,
+            "path-verify ${agency.shortNumber} ${agency.agencyName} route=${verdict.routeQuery} mock=${verdict.fromMock}"
+        )
+        if (LetteringPermissionHelper.canDrawOverlays(app)) {
+            CallOverlayService.updateCallInfo(
+                app,
+                agency.shortNumber,
+                verified = true,
+                cardJson = json,
+                outgoing = outgoing,
+                dcpRoute = verdict.routeQuery
+            )
+            LetteringIncomingNotifier.cancel(app)
+        } else {
+            LetteringIncomingNotifier.post(
+                app,
+                agency.shortNumber,
+                outgoing,
+                displayName = agency.agencyName,
+                forceFallback = true
+            )
+        }
+        scope.launch { enrichDcpLookup(app, agency, verdict, outgoing) }
+        return true
+    }
+
+    private suspend fun enrichDcpLookup(
+        app: Context,
+        agency: NationalAgencyWhitelist.Agency,
+        verdict: CallPathVerdict,
+        outgoing: Boolean
+    ) {
+        try {
+            val lookup = CardLookupRepository.lookup(
+                app,
+                agency.shortNumber,
+                dcpRoute = verdict.routeQuery
+            )
+            if (lookup == null || !lookup.matched) return
+            if (!CompanionRuntimeStabilityDiag.isCallSessionActive() &&
+                CompanionRuntimeStabilityDiag.shouldIgnorePostEndOverlayStart()
+            ) {
+                return
+            }
+            if (LetteringPermissionHelper.canDrawOverlays(app)) {
+                CallOverlayService.updateCallInfo(
+                    app,
+                    agency.shortNumber,
+                    verified = lookup.verified,
+                    cardJson = lookup.rawJson,
+                    outgoing = outgoing,
+                    dcpRoute = verdict.routeQuery
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "dcp lookup enrich failed", e)
         }
     }
 
@@ -306,11 +538,13 @@ object LetteringCallCoordinator {
 
     fun onCallEnded(context: Context) {
         try {
+            CallPathSession.clear()
             val app = context.applicationContext
             CompanionRuntimeStabilityDiag.endCallSession("LetteringCallCoordinator.onCallEnded")
             VlueBigPushTrace.step(11, "Call End", "source=LetteringCallCoordinator.onCallEnded")
             LetteringPrefs.setLastCallEvent(app, "idle")
             lastRingNumber = ""
+            callGen.incrementAndGet()
             LetteringIncomingNotifier.cancel(app)
             LetteringRingingActivity.requestFinish(app)
 
@@ -343,7 +577,8 @@ object LetteringCallCoordinator {
         number: String,
         verified: Boolean,
         cardJson: String?,
-        outgoing: Boolean
+        outgoing: Boolean,
+        dcpRoute: String = ""
     ) {
         try {
             /* FGS 를 diag/step 보다 먼저 — Incoming→BigPush 임계 경로 */
@@ -352,6 +587,7 @@ object LetteringCallCoordinator {
                 putExtra(CallOverlayService.EXTRA_VERIFIED, verified)
                 putExtra(CallOverlayService.EXTRA_OUTGOING, outgoing)
                 putExtra(CallOverlayService.EXTRA_CARD_JSON, cardJson)
+                putExtra(CallOverlayService.EXTRA_DCP_ROUTE, dcpRoute)
             }
             context.startForegroundService(intent)
             CompanionRuntimeStabilityDiag.mark(

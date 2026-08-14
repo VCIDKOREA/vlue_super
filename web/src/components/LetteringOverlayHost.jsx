@@ -24,6 +24,7 @@ import { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
 import { ShowcaseBgmProvider, useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
+import { dcpCardMatchesIncoming, dcpRouteForIncoming, matchNationalAgency } from "../lib/nationalAgencyDcpClient.js";
 import "../styles/tent-showcase.css";
 import "../styles/showcase-call-glass.css";
 
@@ -309,6 +310,9 @@ function LetteringOverlayHostInner() {
         }
         const mapped = mapLookupToLetteringCard(detail, incoming || detail.phoneE164 || "");
         if (mapped) {
+          if (isDcpOverlayCard(mapped) && incoming && !dcpCardMatchesIncoming(mapped, incoming)) {
+            return;
+          }
           const waitForLogo = isDcpOverlayCard(mapped);
           matchedRef.current = !waitForLogo;
           setCard((prev) => mergeDcpCard(prev, mapped));
@@ -397,27 +401,34 @@ function LetteringOverlayHostInner() {
         );
         if (mapped) {
           const isDcp = isDcpOverlayCard(mapped);
-          if (!isDcp) matchedRef.current = true;
-          setCard((prev) => mergeDcpCard(prev, mapped));
-          setVerified(true);
-          setLoading(false);
-          const peerUserId = isDcp
-            ? ""
-            : String(mapped.userId || mapped.ownerUserId || "").trim();
-          if (peerUserId) {
-            const { card, style } = await enrichOverlayPeerBundle(peerUserId, mapped);
-            if (cancelled) return;
-            setCard((prev) => ({ ...(prev || {}), ...card, showcaseStyle: style }));
-            setShowcaseStyle(style);
+          const staleDcp = isDcp && incoming && !dcpCardMatchesIncoming(mapped, incoming);
+          if (!staleDcp) {
+            if (!isDcp) matchedRef.current = true;
+            setCard((prev) => mergeDcpCard(prev, mapped));
+            setVerified(true);
+            setLoading(false);
+            const peerUserId = isDcp
+              ? ""
+              : String(mapped.userId || mapped.ownerUserId || "").trim();
+            if (peerUserId) {
+              const { card, style } = await enrichOverlayPeerBundle(peerUserId, mapped);
+              if (cancelled) return;
+              setCard((prev) => ({ ...(prev || {}), ...card, showcaseStyle: style }));
+              setShowcaseStyle(style);
+            }
+            if (!isDcp) return;
           }
-          if (!isDcp) return;
         }
       }
 
-      let resolvedDcpRoute = String(dcpRoute || "").trim();
+      let resolvedDcpRoute = dcpRouteForIncoming(incoming, dcpRoute);
       if (!resolvedDcpRoute) {
         try {
-          resolvedDcpRoute = String(sessionStorage.getItem("vlue_dcp_test_route") || "").trim();
+          const stored = String(sessionStorage.getItem("vlue_dcp_test_route") || "").trim();
+          const testNumber = String(sessionStorage.getItem("vlue_dcp_test_number") || "112").trim();
+          if (matchNationalAgency(incoming) && matchNationalAgency(testNumber)) {
+            resolvedDcpRoute = dcpRouteForIncoming(incoming, stored);
+          }
         } catch {
           /* ignore */
         }

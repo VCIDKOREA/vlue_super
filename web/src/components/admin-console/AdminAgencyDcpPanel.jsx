@@ -319,7 +319,15 @@ export default function AdminAgencyDcpPanel({ onToast }) {
           incomingNumber={preview.agency.shortNumber}
           abnormal={preview.route === "abnormal"}
           warning={ABNORMAL}
-          onClose={() => setPreview(null)}
+          onClose={() => {
+            setPreview(null);
+            try {
+              sessionStorage.removeItem("vlue_dcp_test_route");
+              sessionStorage.removeItem("vlue_dcp_test_number");
+            } catch {
+              /* ignore */
+            }
+          }}
         />
       ) : null}
     </div>
