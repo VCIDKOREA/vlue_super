@@ -392,7 +392,19 @@ export default function CompanionMiniCase({
               }}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              쇼케이스 돌아가기
+              <span className="companion-mini-case__expand-shine" aria-hidden="true" />
+              <span className="companion-mini-case__expand-icon" aria-hidden="true">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path
+                    d="M2.2 7.4L6 3.6l3.8 3.8"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+              <span className="companion-mini-case__expand-label">쇼케이스 돌아가기</span>
             </button>
           )}
         </>
