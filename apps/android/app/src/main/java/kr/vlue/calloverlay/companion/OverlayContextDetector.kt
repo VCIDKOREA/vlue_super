@@ -19,6 +19,7 @@ object OverlayContextDetector {
      * @param foregroundIsKnownOtherApp 전면 패키지를 알 수 있고 전화/런처/자사가 아님
      * @param userMinimized 사용자/브리지가 Mini 요청
      * @param keypadOpen 키패드 열림
+     * @param outgoingDialing 삼성 통화목록 등 발신 다이얼 — 항상 전체 InCallUI(TOP)
      */
     fun detect(
         callPhase: CallPhase,
@@ -27,7 +28,8 @@ object OverlayContextDetector {
         foregroundIsInCallUi: Boolean = false,
         foregroundIsKnownOtherApp: Boolean = false,
         userMinimized: Boolean = false,
-        keypadOpen: Boolean = false
+        keypadOpen: Boolean = false,
+        outgoingDialing: Boolean = false
     ): OverlayContext {
         if (keypadOpen) return OverlayContext.KEYPAD
         if (userMinimized) return OverlayContext.MINIMIZED
@@ -38,16 +40,19 @@ object OverlayContextDetector {
             }
             /*
              * RINGING:
+             * - 발신 다이얼 → 항상 TOP (삼성 전체 통화 UI. 하단이면 종료 버튼을 가림)
              * - InCallUI(전체 전화) → TOP
+             * - 런처 확정 → BOTTOM
              * - 다른 앱 확정 → BOTTOM
-             * - 미확인: InCallUI 프로세스 여부는 Service에서 inCallUi 플래그로 보정
+             * - VLUE 전면·미확인 → TOP (삼성 전체 UI가 VLUE 위에 떠도 응답/종료 가림 방지)
              */
             CallPhase.RINGING -> when {
-                /* 전체 InCallUI → TOP. 홈·타앱 확정 → BOTTOM. 미확인 → BOTTOM(다른앱 안전). */
+                outgoingDialing -> OverlayContext.INCOMING_CALL_UI
+                /* 전체 InCallUI → TOP. 홈·타앱 확정 → BOTTOM. 미확인·VLUE 전면 → TOP(버튼 가림 방지). */
                 foregroundIsInCallUi -> OverlayContext.INCOMING_CALL_UI
                 foregroundIsKnownOtherApp -> OverlayContext.OTHER_APP
-                foregroundIsLauncher || foregroundIsOurApp -> OverlayContext.HOME_SCREEN
-                else -> OverlayContext.OTHER_APP
+                foregroundIsLauncher -> OverlayContext.HOME_SCREEN
+                else -> OverlayContext.INCOMING_CALL_UI
             }
             CallPhase.OFFHOOK -> when {
                 foregroundIsInCallUi && !userMinimized -> OverlayContext.IN_CALL

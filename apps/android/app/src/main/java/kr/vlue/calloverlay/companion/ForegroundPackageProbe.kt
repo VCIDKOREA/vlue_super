@@ -51,8 +51,9 @@ object ForegroundPackageProbe {
      * 4) InCall FOREGROUND → TOP
      * 5) 타 앱 FOREGROUND → BOTTOM
      * 6) InCall ≤ VISIBLE + 타앱 FG 없음 → TOP
-     * 7) 그 외 → BOTTOM
+     * 7) 그 외(미확인·VLUE 전면) → TOP — 삼성 전체 UI 응답/종료 가림 방지
      */
+    @Suppress("UNUSED_PARAMETER")
     fun classifyRingingSurface(
         tasksPkg: String?,
         inCallImportance: Int?,
@@ -60,8 +61,10 @@ object ForegroundPackageProbe {
         ourApp: Boolean = false,
         lastResumedPkg: String? = null
     ): RingingSurface {
-        if (ourApp) return RingingSurface.HOME_OR_OTHER
-
+        /*
+         * VLUE가 열려 있어도 삼성 전체 InCallActivity 가 그 위에 뜬다.
+         * ourApp 을 먼저 BOTTOM 처리하면 응답/종료 버튼을 가린다.
+         */
         if (OverlayContextDetector.isLikelyInCallUiPackage(lastResumedPkg)) {
             return RingingSurface.FULL_INCALL
         }
@@ -97,7 +100,8 @@ object ForegroundPackageProbe {
             return RingingSurface.HOME_OR_OTHER
         }
 
-        return RingingSurface.HOME_OR_OTHER
+        /* 미확인(사용정보 접근 없음·VLUE 전면) → TOP. 하단이면 전체 UI 버튼을 가린다. */
+        return RingingSurface.FULL_INCALL
     }
 
     fun classifyRingingSurface(context: Context, ourApp: Boolean): RingingSurface {

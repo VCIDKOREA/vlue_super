@@ -187,11 +187,9 @@ export default function LetteringOverlayHost() {
 
 function LetteringOverlayHostInner() {
   const [{ incoming, platform, direction, native, forceLettering, phase, dcpRoute }, setParams] = useState(parseOverlayParams);
-  const [card, setCard] = useState(() =>
-    isUnknownIncoming(incoming) ? null : buildUnverifiedOverlayCard(incoming)
-  );
+  const [card, setCard] = useState(null);
   const [verified, setVerified] = useState(false);
-  const [loading, setLoading] = useState(() => isUnknownIncoming(incoming));
+  const [loading, setLoading] = useState(true);
   const [blocked, setBlocked] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
@@ -291,7 +289,8 @@ function LetteringOverlayHostInner() {
   useEffect(() => {
     matchedRef.current = false;
     setVerified(false);
-    setCard(isUnknownIncoming(incoming) ? null : buildUnverifiedOverlayCard(incoming));
+    setCard(null);
+    setLoading(true);
   }, [incoming]);
 
   useEffect(() => {
@@ -360,10 +359,7 @@ function LetteringOverlayHostInner() {
       }
 
       const unknown = isUnknownIncoming(incoming);
-      if (!unknown) {
-        setCard((prev) => prev || buildUnverifiedOverlayCard(incoming));
-        if (!matchedRef.current) setLoading(false);
-      } else {
+      if (unknown) {
         setLoading(true);
         unknownTimer = window.setTimeout(() => {
           if (cancelled || matchedRef.current) return;

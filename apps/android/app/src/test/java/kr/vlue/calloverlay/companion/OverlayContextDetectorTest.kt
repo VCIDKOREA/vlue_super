@@ -5,9 +5,32 @@ import org.junit.Test
 
 class OverlayContextDetectorTest {
     @Test
-    fun ringing_unknownForeground_defaultsToOtherAppBottom() {
+    fun ringing_outgoingDialing_isTopEvenIfUnknownForeground() {
         assertEquals(
-            OverlayContext.OTHER_APP,
+            OverlayContext.INCOMING_CALL_UI,
+            OverlayContextDetector.detect(
+                callPhase = OverlayContextDetector.CallPhase.RINGING,
+                outgoingDialing = true
+            )
+        )
+    }
+
+    @Test
+    fun ringing_outgoingDialing_beatsKnownOtherApp() {
+        assertEquals(
+            OverlayContext.INCOMING_CALL_UI,
+            OverlayContextDetector.detect(
+                callPhase = OverlayContextDetector.CallPhase.RINGING,
+                foregroundIsKnownOtherApp = true,
+                outgoingDialing = true
+            )
+        )
+    }
+
+    @Test
+    fun ringing_unknownForeground_defaultsToIncomingCallUiTop() {
+        assertEquals(
+            OverlayContext.INCOMING_CALL_UI,
             OverlayContextDetector.detect(
                 callPhase = OverlayContextDetector.CallPhase.RINGING
             )
@@ -76,9 +99,10 @@ class OverlayContextDetectorTest {
     }
 
     @Test
-    fun ringing_ourApp_isHomeScreen() {
+    fun ringing_ourApp_isIncomingCallUi() {
+        /* VLUE 전면 + 삼성 전체 전화 UI → TOP (하단이면 응답/종료를 가림) */
         assertEquals(
-            OverlayContext.HOME_SCREEN,
+            OverlayContext.INCOMING_CALL_UI,
             OverlayContextDetector.detect(
                 callPhase = OverlayContextDetector.CallPhase.RINGING,
                 foregroundIsOurApp = true

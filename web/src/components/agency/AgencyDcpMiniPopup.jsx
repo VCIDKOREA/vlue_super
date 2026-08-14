@@ -23,6 +23,7 @@ export default function AgencyDcpMiniPopup({
       <CompanionMiniCase
         brandText={abnormal ? "VLUE DCP · 비정상" : "VLUE DCP"}
         hideExpand
+        locked={abnormal}
         customBody={
           <AgencyDcpCard
             card={card}

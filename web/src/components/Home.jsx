@@ -26,7 +26,6 @@ import { fetchPublicHomeLayout } from "../lib/hqAdminApi.js";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
 import HomeBizDirectorySearch from "./HomeBizDirectorySearch.jsx";
 import CallBigPushPreviewSection from "./CallBigPushPreviewSection.jsx";
-import DcpPathTestSection from "./DcpPathTestSection.jsx";
 import FriendShowcaseList from "./FriendShowcaseList.jsx";
 import HomeNotificationPanel from "./HomeNotificationPanel.jsx";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
@@ -920,15 +919,8 @@ function Home({
       {v1AppShell.callBigPush ? (
       <div data-home-anchor="showcase" className="home-kakao-anchor home-kakao-anchor--showcase shrink-0 px-2.5">
         <CallBigPushPreviewSection membershipTier={membershipTier} isDarkMode={isDarkMode} />
-        <div className="mt-3">
-          <DcpPathTestSection isDarkMode={isDarkMode} />
-        </div>
       </div>
-      ) : (
-      <div className="shrink-0 px-2.5">
-        <DcpPathTestSection isDarkMode={isDarkMode} />
-      </div>
-      )}
+      ) : null}
       </div>
 
       {v1AppShell.friendShowcaseFeed ? (

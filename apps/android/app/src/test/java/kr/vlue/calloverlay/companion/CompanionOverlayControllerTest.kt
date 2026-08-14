@@ -40,26 +40,26 @@ class CompanionOverlayControllerTest {
         assertEquals(OverlayPosition.BOTTOM, c.position)
     }
 
-    /** SCREEN_OFF + INCOMING → BigPush HIDDEN (생성 거부, state IDLE) */
+    /** SCREEN_OFF + INCOMING → BigPush TOP (잠금화면 패리티) */
     @Test
-    fun screenOff_incoming_bigPushHidden() {
+    fun screenOff_incoming_bigPushTop() {
         val c = CompanionOverlayController()
         c.onScreenStateChanged(ScreenState.SCREEN_OFF)
         c.onIncoming(OverlayContext.HOME_SCREEN)
-        assertFalse(c.requestBigPush(OverlayContext.HOME_SCREEN, callAlreadyAnswered = false))
-        assertEquals(OverlayState.IDLE, c.state)
-        assertEquals(OverlayPosition.HIDDEN, c.position)
+        assertTrue(c.requestBigPush(OverlayContext.HOME_SCREEN, callAlreadyAnswered = false))
+        assertEquals(OverlayState.BIG_PUSH, c.state)
+        assertEquals(OverlayPosition.TOP, c.position)
         assertEquals(ScreenState.SCREEN_OFF, c.screenState)
     }
 
-    /** AOD + INCOMING → BigPush HIDDEN */
+    /** AOD + INCOMING → BigPush TOP */
     @Test
-    fun aod_incoming_bigPushHidden() {
+    fun aod_incoming_bigPushTop() {
         val c = CompanionOverlayController()
         c.onScreenStateChanged(ScreenState.AOD)
-        assertFalse(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))
-        assertEquals(OverlayPosition.HIDDEN, c.position)
-        assertEquals(OverlayState.IDLE, c.state)
+        assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))
+        assertEquals(OverlayPosition.TOP, c.position)
+        assertEquals(OverlayState.BIG_PUSH, c.state)
     }
 
     /** SCREEN_OFF + SHOWCASE → state 유지, FULLSCREEN position 유지 */
@@ -85,22 +85,22 @@ class CompanionOverlayControllerTest {
         assertEquals(OverlayPosition.MINI_CASE, c.position)
     }
 
-    /** 이미 BIG_PUSH 중 SCREEN_OFF → state 유지, position만 HIDDEN (IDLE 전이 금지) */
+    /** 이미 BIG_PUSH 중 SCREEN_OFF → state 유지, position TOP */
     @Test
-    fun screenOff_whileBigPush_keepsState_hidesPosition() {
+    fun screenOff_whileBigPush_keepsState_staysTop() {
         val c = CompanionOverlayController()
         assertTrue(c.requestBigPush(OverlayContext.HOME_SCREEN, false))
         c.onScreenStateChanged(ScreenState.AOD)
         assertEquals(OverlayState.BIG_PUSH, c.state)
-        assertEquals(OverlayPosition.HIDDEN, c.position)
+        assertEquals(OverlayPosition.TOP, c.position)
     }
 
     @Test
-    fun screenOn_afterHiddenBigPush_restoresBottom() {
+    fun screenOn_afterScreenOffBigPush_restoresBottomOnHome() {
         val c = CompanionOverlayController()
         assertTrue(c.requestBigPush(OverlayContext.HOME_SCREEN, false))
         c.onScreenStateChanged(ScreenState.SCREEN_OFF)
-        assertEquals(OverlayPosition.HIDDEN, c.position)
+        assertEquals(OverlayPosition.TOP, c.position)
         c.onScreenStateChanged(ScreenState.SCREEN_ON)
         assertEquals(OverlayState.BIG_PUSH, c.state)
         assertEquals(OverlayPosition.BOTTOM, c.position)

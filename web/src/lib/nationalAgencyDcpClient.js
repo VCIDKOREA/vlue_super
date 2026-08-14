@@ -30,6 +30,10 @@ export const NATIONAL_AGENCY_WHITELIST = [
 
 const BY_SHORT = new Map(NATIONAL_AGENCY_WHITELIST.map((a) => [a.shortNumber, a]));
 
+/** 비정상 경로 확인 → 경찰청 피싱안심SOS 공식 제보 */
+export const ABNORMAL_REPORT_URL =
+  "https://www.counterscam112.go.kr/report/reportGuide.do?type=itg";
+
 export function agencyShortNumberCandidates(raw) {
   const d = String(raw || "").replace(/\D/g, "");
   if (!d) return [];

@@ -73,10 +73,9 @@ class CompanionBigPushDiagTest {
     @Test
     fun bigPush_acceptedFalse() {
         val c = CompanionOverlayController()
-        c.onScreenStateChanged(ScreenState.SCREEN_OFF)
         CompanionBigPushDiag.noteShowOverlayEnter(false, true, false, c.snapshot())
         CompanionBigPushDiag.noteBigPushRequestBegin(c.snapshot())
-        assertFalse(c.requestBigPush(OverlayContext.HOME_SCREEN, false))
+        assertFalse(c.requestBigPush(OverlayContext.HOME_SCREEN, callAlreadyAnswered = true))
         CompanionBigPushDiag.noteBigPushRequestResult(false, c.snapshot(), c.rejectedTransition)
         CompanionBigPushDiag.noteShowOverlayEarlyExit("BIG_PUSH_REJECTED", c.snapshot())
         val diag = CompanionBigPushDiag.diagnosisJson()

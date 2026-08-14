@@ -8,28 +8,47 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import kotlin.math.hypot
 
-/** 비정상 경로 — WebView 로드 전에도 즉시 보이는 네이티브 경고 */
+/**
+ * 정상·비정상 공통 DCP 팝업.
+ * 비정상은 고정 + 확인=공식 제보 사이트. 정상은 미니케이스처럼 드래그·가장자리 피크.
+ */
 object DcpAbnormalWarningView {
-    const val TAG = "vlue_dcp_abnormal_warning"
+    const val TAG = "vlue_dcp_route_popup"
 
-    fun attach(
-        parent: FrameLayout,
-        agencyName: String = "",
-        shortNumber: String = "",
-        officialWebsite: String = ""
-    ) {
-        detach(parent)
-        val ctx = parent.context
+    const val NORMAL_MESSAGE =
+        "공식 국가기관 번호로 확인되었습니다. 디지털인증프로필을 확인하세요."
+
+    data class Spec(
+        val abnormal: Boolean,
+        val agencyName: String = "",
+        val shortNumber: String = "",
+        val officialWebsite: String = "",
+        val fromMock: Boolean = false
+    )
+
+    fun build(
+        context: Context,
+        spec: Spec,
+        onConfirm: () -> Unit
+    ): View {
+        val ctx = context
         val card = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             background = GradientDrawable().apply {
                 setColor(Color.parseColor("#1C1917"))
-                setStroke(dp(ctx, 1), Color.parseColor("#FB7185"))
+                setStroke(
+                    dp(ctx, 1),
+                    Color.parseColor(if (spec.abnormal) "#FB7185" else "#60A5FA")
+                )
                 cornerRadius = dp(ctx, 22).toFloat()
             }
             val pad = dp(ctx, 20)
@@ -37,8 +56,8 @@ object DcpAbnormalWarningView {
         }
         card.addView(
             TextView(ctx).apply {
-                text = "경로 검증 · 비정상"
-                setTextColor(Color.parseColor("#FDA4AF"))
+                text = if (spec.abnormal) "경로 검증 · 비정상" else "경로 검증 · 정상"
+                setTextColor(Color.parseColor(if (spec.abnormal) "#FDA4AF" else "#93C5FD"))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
@@ -46,7 +65,7 @@ object DcpAbnormalWarningView {
         )
         card.addView(
             TextView(ctx).apply {
-                text = NationalAgencyWhitelist.ABNORMAL_WARNING
+                text = if (spec.abnormal) NationalAgencyWhitelist.ABNORMAL_WARNING else NORMAL_MESSAGE
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
                 typeface = Typeface.DEFAULT_BOLD
@@ -54,10 +73,10 @@ object DcpAbnormalWarningView {
                 setPadding(0, dp(ctx, 10), 0, 0)
             }
         )
-        if (agencyName.isNotBlank()) {
+        if (spec.agencyName.isNotBlank()) {
             card.addView(
                 TextView(ctx).apply {
-                    text = agencyName
+                    text = spec.agencyName
                     setTextColor(Color.WHITE)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                     typeface = Typeface.DEFAULT_BOLD
@@ -66,23 +85,26 @@ object DcpAbnormalWarningView {
                 }
             )
         }
-        if (shortNumber.isNotBlank()) {
+        if (spec.shortNumber.isNotBlank()) {
             card.addView(
                 TextView(ctx).apply {
-                    text = shortNumber
+                    text = spec.shortNumber
                     setTextColor(Color.parseColor("#93C5FD"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
                     typeface = Typeface.DEFAULT_BOLD
                     gravity = Gravity.CENTER
                     paint.isUnderlineText = true
                     setPadding(0, dp(ctx, 6), 0, 0)
-                    setOnClickListener { openUri(ctx, "tel:$shortNumber") }
+                    setOnClickListener { openUri(ctx, "tel:${spec.shortNumber}") }
                 }
             )
         }
-        if (officialWebsite.isNotBlank()) {
-            val href = if (officialWebsite.startsWith("http")) officialWebsite else "https://$officialWebsite"
-            val label = officialWebsite.removePrefix("https://").removePrefix("http://").trimEnd('/')
+        val href = websiteHref(spec.officialWebsite)
+        if (href.isNotBlank()) {
+            val label = spec.officialWebsite
+                .removePrefix("https://")
+                .removePrefix("http://")
+                .trimEnd('/')
             card.addView(
                 TextView(ctx).apply {
                     text = "해당 공식 웹사이트\n$label"
@@ -96,33 +118,166 @@ object DcpAbnormalWarningView {
                 }
             )
         }
-        val wrap = FrameLayout(ctx).apply {
-            this.tag = TAG
-            setBackgroundColor(Color.parseColor("#00000000"))
-            val lp = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER
-            ).apply {
-                marginStart = dp(ctx, 24)
-                marginEnd = dp(ctx, 24)
+        val confirm = TextView(ctx).apply {
+            text = "확인"
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor(if (spec.abnormal) "#E11D48" else "#2563EB"))
+                cornerRadius = dp(ctx, 12).toFloat()
             }
-            addView(card, lp)
+            setPadding(dp(ctx, 12), dp(ctx, 12), dp(ctx, 12), dp(ctx, 12))
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(ctx, 14) }
+            layoutParams = lp
+            setOnClickListener {
+                if (spec.abnormal) {
+                    openUri(ctx, NationalAgencyWhitelist.ABNORMAL_REPORT_URL)
+                }
+                onConfirm()
+            }
         }
-        parent.addView(
-            wrap,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER
+        card.addView(confirm)
+
+        return FrameLayout(ctx).apply {
+            tag = TAG
+            addView(
+                card,
+                FrameLayout.LayoutParams(
+                    dp(ctx, 320),
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER
+                ).apply {
+                    marginStart = dp(ctx, 20)
+                    marginEnd = dp(ctx, 20)
+                }
             )
-        )
+        }
+    }
+
+    /**
+     * 정상 경로만 드래그·피크. 비정상은 터치해도 창이 움직이지 않음.
+     */
+    fun bindDrag(
+        host: View,
+        wm: WindowManager,
+        params: WindowManager.LayoutParams,
+        enabled: Boolean
+    ) {
+        if (!enabled) {
+            host.setOnTouchListener(null)
+            (host as? android.view.ViewGroup)?.getChildAt(0)?.setOnTouchListener(null)
+            return
+        }
+        val peekKeep = dp(host.context, 32)
+        var downRawX = 0f
+        var downRawY = 0f
+        var startX = 0
+        var startY = 0
+        var dragging = false
+        var moved = false
+        var peeking = false
+        val listener = View.OnTouchListener { v, ev ->
+            if (!dragging && touchOnConfirm(v, ev)) {
+                return@OnTouchListener false
+            }
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downRawX = ev.rawX
+                    downRawY = ev.rawY
+                    if (params.gravity != (Gravity.TOP or Gravity.START)) {
+                        val dm = host.resources.displayMetrics
+                        val w = host.width.coerceAtLeast(1)
+                        val h = host.height.coerceAtLeast(1)
+                        params.gravity = Gravity.TOP or Gravity.START
+                        params.x = ((dm.widthPixels - w) / 2 + params.x).coerceAtLeast(0)
+                        params.y = ((dm.heightPixels - h) / 2 + params.y).coerceAtLeast(0)
+                    }
+                    startX = params.x
+                    startY = params.y
+                    dragging = true
+                    moved = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (!dragging) return@OnTouchListener false
+                    val dx = (ev.rawX - downRawX).toInt()
+                    val dy = (ev.rawY - downRawY).toInt()
+                    if (hypot(dx.toDouble(), dy.toDouble()) > 10) moved = true
+                    val dm = host.resources.displayMetrics
+                    val sw = dm.widthPixels
+                    val sh = dm.heightPixels
+                    val w = host.width.coerceAtLeast(1)
+                    val h = host.height.coerceAtLeast(1)
+                    params.x = (startX + dx).coerceIn(peekKeep - w, sw - peekKeep)
+                    params.y = (startY + dy).coerceIn(peekKeep - h, sh - peekKeep)
+                    try {
+                        wm.updateViewLayout(host, params)
+                    } catch (_: Exception) {
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (!dragging) return@OnTouchListener false
+                    dragging = false
+                    val dm = host.resources.displayMetrics
+                    val sw = dm.widthPixels
+                    val w = host.width.coerceAtLeast(1)
+                    if (!moved) {
+                        if (peeking) {
+                            params.x = ((sw - w) / 2).coerceAtLeast(0)
+                            peeking = false
+                            try {
+                                wm.updateViewLayout(host, params)
+                            } catch (_: Exception) {
+                            }
+                        }
+                        return@OnTouchListener true
+                    }
+                    val visibleLeft = params.x.coerceAtLeast(0)
+                    val visibleRight = (params.x + w).coerceAtMost(sw)
+                    val visibleW = (visibleRight - visibleLeft).coerceAtLeast(0)
+                    if (visibleW <= peekKeep + dp(host.context, 8)) {
+                        peeking = true
+                        params.x = if (params.x > sw / 2) sw - peekKeep else peekKeep - w
+                        try {
+                            wm.updateViewLayout(host, params)
+                        } catch (_: Exception) {
+                        }
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+        host.setOnTouchListener(null)
+        (host as? android.view.ViewGroup)?.getChildAt(0)?.setOnTouchListener(listener)
+    }
+
+    private fun touchOnConfirm(card: View, ev: MotionEvent): Boolean {
+        val group = card as? android.view.ViewGroup ?: return false
+        val last = group.getChildAt(group.childCount - 1) ?: return false
+        val loc = IntArray(2)
+        last.getLocationOnScreen(loc)
+        val x = ev.rawX
+        val y = ev.rawY
+        return x >= loc[0] && x <= loc[0] + last.width && y >= loc[1] && y <= loc[1] + last.height
     }
 
     fun detach(parent: FrameLayout?) {
         if (parent == null) return
-        val existing = parent.findViewWithTag<android.view.View>(TAG) ?: return
+        val existing = parent.findViewWithTag<View>(TAG) ?: return
         parent.removeView(existing)
+    }
+
+    fun websiteHref(raw: String): String {
+        val site = raw.trim()
+        if (site.isEmpty()) return ""
+        return if (site.startsWith("http")) site else "https://$site"
     }
 
     private fun openUri(context: Context, uri: String) {

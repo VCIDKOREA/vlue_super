@@ -1030,8 +1030,14 @@ export default function LetteringIncomingNotification({
     );
   };
 
-  /* Companion MVP — 통화 중 접기 = Mini Case (Floating Controller, BigPush 아님) */
-  if (isDcp && !previewMode && !fromCallHistory && dcpCardMatchesIncoming(c, incoming)) {
+  /* Native BigPush 창에서는 네이티브 DCP 팝업 + 쇼케이스 바를 같이 띄운다 */
+  if (
+    isDcp &&
+    !previewMode &&
+    !fromCallHistory &&
+    !forceShowcaseBar &&
+    dcpCardMatchesIncoming(c, incoming)
+  ) {
     return (
       <AgencyDcpMiniPopup
         open
@@ -1039,6 +1045,14 @@ export default function LetteringIncomingNotification({
         incomingNumber={incoming}
         abnormal={String(c?.dcp?.routeStatus || "") === "abnormal"}
         warning={c?.dcp?.warning}
+        onClose={() => {
+          try {
+            window.Android?.dismissOverlay?.();
+            window.VlueLettering?.dismissOverlay?.();
+          } catch {
+            /* ignore */
+          }
+        }}
       />
     );
   }

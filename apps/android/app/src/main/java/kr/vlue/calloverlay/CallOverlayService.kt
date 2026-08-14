@@ -43,6 +43,7 @@ import kr.vlue.calloverlay.companion.OverlayTriggerEvent
 import kr.vlue.calloverlay.companion.ScreenState
 import kr.vlue.calloverlay.companion.ScreenStateDetector
 import kr.vlue.calloverlay.companion.UsageAccessHelper
+import kr.vlue.calloverlay.dcp.CallPathSession
 import kr.vlue.calloverlay.dcp.DcpAbnormalWarningView
 import kr.vlue.calloverlay.dcp.NationalAgencyWhitelist
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
@@ -89,6 +90,9 @@ class CallOverlayService : Service() {
     /** 피크 시 WebView 대신 동일한 좌/우 엣지 탭 */
     private var bigPushPeekTab: FrameLayout? = null
     private var bigPushPeekOnRight: Boolean = false
+    /** DCP 정상/비정상 팝업 — BigPush 창과 분리(WRAP_CONTENT) */
+    private var dcpPopupView: android.view.View? = null
+    private var dcpPopupParams: WindowManager.LayoutParams? = null
     /** Phase 5-C — Memory callback 관찰만 (동작 변경 없음) */
     private var memoryCallbacks: ComponentCallbacks2? = null
 
@@ -401,7 +405,7 @@ class CallOverlayService : Service() {
             if (wv != null && !IncomingNumberResolver.isUnknown(phone)) {
                 loadOverlayDocument(wv, phone, verified, outgoing, cardJson, forceNewDocument = phoneChanged)
             }
-            syncDcpAbnormalWarning(rootContainer, cardJson, currentDcpRoute)
+            syncDcpRoutePopup(cardJson, currentDcpRoute)
             syncOverlayChromeForState(source = "bigPush_reuseWindow")
         } else {
             attachOverlayWindow(
@@ -573,7 +577,7 @@ class CallOverlayService : Service() {
                     return
                 }
                 syncOverlayChromeForState(source = "onPageFinished")
-                DcpAbnormalWarningView.detach(rootContainer)
+                syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
                 /*
                  * Showcase 레이아웃은 Answer Event에서 이미 commit됨.
                  * onPageFinished는 Web 알림·레이아웃 재확인만 — Showcase 표시를 지연시키지 않는다.
@@ -756,7 +760,7 @@ class CallOverlayService : Service() {
         if (!cardJson.isNullOrBlank()) {
             injectCardLookupJson(wv, cardJson)
         }
-        syncDcpAbnormalWarning(container, cardJson, currentDcpRoute)
+        syncDcpRoutePopup(cardJson, currentDcpRoute)
 
         val animStart = android.os.SystemClock.elapsedRealtime()
         container.animate()
@@ -873,6 +877,7 @@ class CallOverlayService : Service() {
                 bigPushPeekTab?.visibility = android.view.View.GONE
                 nativeBanner?.visibility = android.view.View.GONE
                 webView?.visibility = android.view.View.VISIBLE
+                removeDcpPopupWindow()
             }
             OverlayState.MINI_CASE -> {
                 bigPushPeeking = false
@@ -881,12 +886,14 @@ class CallOverlayService : Service() {
                 webView?.visibility = android.view.View.VISIBLE
                 rootContainer?.setBackgroundColor(Color.TRANSPARENT)
                 webView?.setBackgroundColor(Color.TRANSPARENT)
+                removeDcpPopupWindow()
             }
             OverlayState.IDLE -> {
                 bigPushPeeking = false
                 bigPushPeekTab?.visibility = android.view.View.GONE
                 nativeBanner?.visibility = android.view.View.GONE
                 webView?.visibility = android.view.View.GONE
+                removeDcpPopupWindow()
             }
         }
         VlueBigPushTrace.lifecycle(
@@ -1033,8 +1040,7 @@ class CallOverlayService : Service() {
                 ForegroundPackageProbe.RingingSurface.FULL_INCALL ->
                     OverlayContext.INCOMING_CALL_UI
                 ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER ->
-                    if (ourApp ||
-                        OverlayContextDetector.isLikelyLauncherPackage(resumedPkg) ||
+                    if (OverlayContextDetector.isLikelyLauncherPackage(resumedPkg) ||
                         OverlayContextDetector.isLikelyLauncherPackage(tasksPkg)
                     ) {
                         OverlayContext.HOME_SCREEN
@@ -1052,7 +1058,7 @@ class CallOverlayService : Service() {
             if (!UsageAccessHelper.hasAccess(this)) {
                 android.util.Log.w(
                     "VlueOverlayCtx",
-                    "PACKAGE_USAGE_STATS denied — cannot detect InCallActivity resume; BigPush stays BOTTOM"
+                    "PACKAGE_USAGE_STATS denied — InCallActivity resume unknown; BigPush defaults TOP"
                 )
             }
             VlueBigPushTrace.lifecycle("OVERLAY_CONTEXT", detail)
@@ -1191,7 +1197,7 @@ class CallOverlayService : Service() {
             } else if (rootContainer == null) {
                 showOverlay(phone, verified, outgoing, cardJson, currentDcpRoute)
             }
-            syncDcpAbnormalWarning(rootContainer, cardJson, currentDcpRoute)
+            syncDcpRoutePopup(cardJson, currentDcpRoute)
             LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
         }
     }
@@ -1200,19 +1206,77 @@ class CallOverlayService : Service() {
         currentDcpRoute = NationalAgencyWhitelist.routeForCall(phone, requested, parseDcpRoute(cardJson))
     }
 
-    private fun syncDcpAbnormalWarning(container: FrameLayout?, cardJson: String?, dcpRoute: String) {
-        if (container == null) return
+    private fun syncDcpRoutePopup(cardJson: String?, dcpRoute: String) {
         val route = NationalAgencyWhitelist.routeForCall(currentPhone, dcpRoute, parseDcpRoute(cardJson))
-        if (route == "abnormal") {
-            DcpAbnormalWarningView.attach(
-                container,
-                parseDcpAgencyName(cardJson),
-                parseDcpPhone(cardJson),
-                parseDcpWebsite(cardJson)
-            )
-        } else {
-            DcpAbnormalWarningView.detach(container)
+        val show =
+            companion.state == OverlayState.BIG_PUSH &&
+                (route == "normal" || route == "abnormal") &&
+                !dismissing
+        if (!show) {
+            removeDcpPopupWindow()
+            return
         }
+        val spec = DcpAbnormalWarningView.Spec(
+            abnormal = route == "abnormal",
+            agencyName = parseDcpAgencyName(cardJson).ifBlank { "경찰청" },
+            shortNumber = parseDcpPhone(cardJson).ifBlank { "112" },
+            officialWebsite = parseDcpWebsite(cardJson).ifBlank { "https://www.police.go.kr" },
+            fromMock = CallPathSession.lastVerdict?.fromMock == true
+        )
+        attachDcpPopupWindow(spec)
+    }
+
+    private fun attachDcpPopupWindow(spec: DcpAbnormalWarningView.Spec) {
+        if (dcpPopupView?.isAttachedToWindow == true) return
+        val wm = windowManager ?: return
+        removeDcpPopupWindow()
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+        val params = WindowManager.LayoutParams(
+            dp(320),
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.CENTER
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        val view = DcpAbnormalWarningView.build(this, spec) {
+            if (spec.fromMock) {
+                dismissOverlay()
+            } else {
+                removeDcpPopupWindow()
+            }
+        }
+        DcpAbnormalWarningView.bindDrag(view, wm, params, enabled = !spec.abnormal)
+        try {
+            wm.addView(view, params)
+            dcpPopupView = view
+            dcpPopupParams = params
+        } catch (e: Exception) {
+            VlueBigPushTrace.lifecycle("DCP_POPUP_ADD_FAIL", e.message ?: e.javaClass.simpleName)
+        }
+    }
+
+    private fun removeDcpPopupWindow() {
+        val view = dcpPopupView ?: return
+        try {
+            windowManager?.removeView(view)
+        } catch (_: Exception) {
+        }
+        dcpPopupView = null
+        dcpPopupParams = null
+        DcpAbnormalWarningView.detach(rootContainer)
     }
 
     private fun parseDcpRoute(cardJson: String?): String {
@@ -1734,14 +1798,6 @@ class CallOverlayService : Service() {
     }
 
     private fun applyCompactRingingWindowLocked(params: WindowManager.LayoutParams) {
-        if (currentDcpRoute == "abnormal") {
-            params.gravity = Gravity.TOP or Gravity.START
-            params.width = WindowManager.LayoutParams.MATCH_PARENT
-            params.height = WindowManager.LayoutParams.MATCH_PARENT
-            params.x = 0
-            params.y = 0
-            return
-        }
         val pos = companion.position
         val (sw, sh) = screenSizePx()
         val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
@@ -2086,6 +2142,7 @@ class CallOverlayService : Service() {
         bigPushPeekTab = null
         bigPushPeeking = false
         currentDcpRoute = ""
+        removeDcpPopupWindow()
         webView = null
         dismissing = false
     }

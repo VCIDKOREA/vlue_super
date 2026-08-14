@@ -14,6 +14,10 @@ object NationalAgencyWhitelist {
     const val ABNORMAL_WARNING =
         "🚨 현재 번호는 비정상 발신 번호로 의심됩니다! 즉시 통화를 종료하고 공식 정보를 확인하세요!!"
 
+    /** 비정상 경로 확인 → 경찰청 피싱안심SOS 공식 제보 */
+    const val ABNORMAL_REPORT_URL =
+        "https://www.counterscam112.go.kr/report/reportGuide.do?type=itg"
+
     val AGENCIES: List<Agency> = listOf(
         Agency("112", "경찰청", "https://www.police.go.kr"),
         Agency("119", "소방청", "https://www.nfa.go.kr"),

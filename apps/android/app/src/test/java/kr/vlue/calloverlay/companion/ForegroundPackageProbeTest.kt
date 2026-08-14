@@ -102,14 +102,28 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun ourApp_isBottom() {
+    fun ourApp_withInCallUi_isTop() {
+        /* VLUE가 열려 있어도 삼성 전체 InCallActivity 가 그 위면 TOP */
         assertEquals(
-            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
             ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = "com.samsung.android.incallui",
                 inCallImportance = fg,
                 ourApp = true,
                 lastResumedPkg = "com.samsung.android.incallui"
+            )
+        )
+    }
+
+    @Test
+    fun unknown_defaultsToTop() {
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = null,
+                inCallImportance = null,
+                otherForegroundPackages = emptyList(),
+                lastResumedPkg = null
             )
         )
     }

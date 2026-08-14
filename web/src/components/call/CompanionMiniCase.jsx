@@ -106,6 +106,7 @@ export default function CompanionMiniCase({
   onExpand,
   customBody = null,
   hideExpand = false,
+  locked = false,
   brandText = "VLUE LIVE"
 }) {
   const rootRef = useRef(null);
@@ -222,6 +223,7 @@ export default function CompanionMiniCase({
   }, [nativeSync, frameW, frameH, syncNativeFrame]);
 
   const onPointerDown = useCallback((e) => {
+    if (locked) return;
     if (e.button != null && e.button !== 0) return;
     const el = rootRef.current;
     if (!el) return;
@@ -237,7 +239,7 @@ export default function CompanionMiniCase({
       last: cur
     };
     setDragging(true);
-  }, []);
+  }, [locked]);
 
   const onPointerMove = useCallback(
     (e) => {

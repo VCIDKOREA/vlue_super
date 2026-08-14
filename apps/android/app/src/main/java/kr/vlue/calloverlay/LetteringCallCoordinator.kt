@@ -133,6 +133,8 @@ object LetteringCallCoordinator {
             val dcpVerdict = if (agency != null) CallPathSession.consumeOrVerify(app) else null
             val dcpJson =
                 if (agency != null && dcpVerdict != null) DcpLookupPayload.toJson(agency, dcpVerdict) else null
+            val cachedMember =
+                if (agency == null && !nextUnknown) CardLookupRepository.peekCached(raw) else null
             val overlayNumber = agency?.shortNumber ?: raw
             if (agency != null && dcpVerdict != null) {
                 Log.i(
@@ -147,8 +149,8 @@ object LetteringCallCoordinator {
                 startOverlayService(
                     app,
                     overlayNumber,
-                    verified = dcpJson != null,
-                    cardJson = dcpJson,
+                    verified = dcpJson != null || cachedMember?.verified == true,
+                    cardJson = dcpJson ?: cachedMember?.rawJson,
                     outgoing = outgoing,
                     dcpRoute = dcpVerdict?.routeQuery.orEmpty()
                 )

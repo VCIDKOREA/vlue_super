@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import AgencyDcpMiniPopup from "./agency/AgencyDcpMiniPopup.jsx";
+import AgencyDcpMiniPopup from "../agency/AgencyDcpMiniPopup.jsx";
 import {
   createAdminAgency,
   createAdminAgencyLogoUploadUrl,

@@ -17,6 +17,34 @@ data class CardLookupResult(
 )
 
 object CardLookupRepository {
+    private const val CACHE_TTL_MS = 30L * 60L * 1000L
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, CachedLookup>()
+
+    private data class CachedLookup(
+        val result: CardLookupResult,
+        val atMs: Long
+    )
+
+    fun peekCached(rawNumber: String): CardLookupResult? {
+        val keys = cacheKeys(rawNumber)
+        val now = System.currentTimeMillis()
+        for (key in keys) {
+            val hit = cache[key] ?: continue
+            if (now - hit.atMs > CACHE_TTL_MS) {
+                cache.remove(key)
+                continue
+            }
+            if (hit.result.matched) return hit.result
+        }
+        return null
+    }
+
+    fun remember(rawNumber: String, result: CardLookupResult) {
+        if (!result.matched) return
+        for (key in cacheKeys(rawNumber)) {
+            cache[key] = CachedLookup(result, System.currentTimeMillis())
+        }
+    }
     suspend fun lookup(
         context: Context,
         rawNumber: String,
@@ -25,6 +53,8 @@ object CardLookupRepository {
         withContext(Dispatchers.IO) {
             val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: return@withContext null
             if (BlockedPhoneCache.isBlocked(context, e164)) return@withContext null
+
+            peekCached(rawNumber)?.let { return@withContext it }
 
             val base = BuildConfig.API_BASE_URL.trimEnd('/')
             /* API 에는 정규화된 E.164 를 우선 전달 — raw 하이픈/공백 불일치로 MISS 나지 않게 */
@@ -42,11 +72,26 @@ object CardLookupRepository {
             var lastUnmatched: CardLookupResult? = null
             for (candidate in candidates) {
                 val result = lookupOnce(context, base, candidate, dcpRoute) ?: continue
-                if (result.matched) return@withContext result
+                if (result.matched) {
+                    remember(rawNumber, result)
+                    return@withContext result
+                }
                 lastUnmatched = result
             }
             lastUnmatched ?: lookupOnce(context, base, e164, dcpRoute)
         }
+
+    private fun cacheKeys(rawNumber: String): List<String> {
+        val out = LinkedHashSet<String>()
+        val trimmed = rawNumber.trim()
+        if (trimmed.isNotEmpty()) out.add(trimmed)
+        CardLookupBridge.normalizeKr(rawNumber)?.let { out.add(it) }
+        val digits = rawNumber.filter { it.isDigit() }
+        if (digits.isNotEmpty()) out.add(digits)
+        val canon = IncomingNumberResolver.canonicalDigits(rawNumber)
+        if (canon.isNotEmpty()) out.add(canon)
+        return out.toList()
+    }
 
     private fun lookupOnce(
         context: Context,
