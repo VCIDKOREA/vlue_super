@@ -15,6 +15,7 @@ export type DccLineDto = {
   id: string;
   kind: DccLineKind;
   kindLabel: string;
+  isCertified: boolean;
   phoneE164: string;
   displayPhone: string;
   displayName: string;
@@ -32,8 +33,9 @@ function text(v: unknown, max: number): string {
   return String(v ?? "").trim().slice(0, max);
 }
 
-function kindLabel(kind: string): string {
-  if (kind === "mobile") return "휴대폰";
+function kindLabel(kind: string, isCertified: boolean): string {
+  if (isCertified) return "인증번호";
+  if (kind === "mobile") return "인증번호";
   if (kind === "extension") return "내선번호";
   if (kind === "rep_number") return "대표번호";
   return kind;
@@ -98,24 +100,29 @@ function httpPhoto(v: unknown): string | null {
   return null;
 }
 
-function toLineDto(row: {
-  id: string;
-  kind: string;
-  phoneE164: string;
-  displayName: string | null;
-  jobTitle: string | null;
-  dccSnapshotJson: unknown;
-  lineShowcaseLiveStyleJson: unknown;
-  lineShowcaseStyleJson: unknown;
-  activeDccAgentProfileId: string | null;
-  updatedAt: Date;
-  lineShowcaseUpdatedAt: Date | null;
-}): DccLineDto {
+function toLineDto(
+  row: {
+    id: string;
+    kind: string;
+    phoneE164: string;
+    displayName: string | null;
+    jobTitle: string | null;
+    dccSnapshotJson: unknown;
+    lineShowcaseLiveStyleJson: unknown;
+    lineShowcaseStyleJson: unknown;
+    activeDccAgentProfileId: string | null;
+    updatedAt: Date;
+    lineShowcaseUpdatedAt: Date | null;
+  },
+  certifiedPhone = ""
+): DccLineDto {
   const snap = snapObj(row.dccSnapshotJson);
+  const isCertified = Boolean(certifiedPhone) && row.phoneE164 === certifiedPhone;
   return {
     id: row.id,
     kind: row.kind === "rep_number" ? "rep_number" : row.kind === "mobile" ? "mobile" : "extension",
-    kindLabel: kindLabel(row.kind),
+    kindLabel: kindLabel(row.kind, isCertified),
+    isCertified,
     phoneE164: row.phoneE164,
     displayPhone: displayPhone(row.phoneE164),
     displayName: text(row.displayName || snap.name || snap.displayName, 120),
@@ -131,11 +138,12 @@ function toLineDto(row: {
 }
 
 async function requireOwnedLine(userId: string, cardId: string) {
+  const { phone } = await userCertifiedPhone(userId);
   const row = await prisma.businessCard.findFirst({
     where: {
       id: cardId,
       userId,
-      kind: { in: [...LINE_KINDS] }
+      OR: [{ kind: { in: [...LINE_KINDS] } }, ...(phone ? [{ phoneE164: phone }] : [])]
     }
   });
   if (!row) {
@@ -146,41 +154,69 @@ async function requireOwnedLine(userId: string, cardId: string) {
   return row;
 }
 
-async function ensureMobileLine(userId: string) {
+async function toOwnedLineDto(userId: string, row: Parameters<typeof toLineDto>[0]) {
+  const { phone } = await userCertifiedPhone(userId);
+  return toLineDto(row, phone);
+}
+
+async function userCertifiedPhone(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { phoneE164: true, legalName: true }
   });
-  const phone = String(user?.phoneE164 || "").trim();
-  if (!phone) return;
-  const existing = await prisma.businessCard.findFirst({
-    where: { OR: [{ userId, kind: "mobile" }, { phoneE164: phone }] },
-    select: { id: true, userId: true, kind: true }
+  return {
+    phone: String(user?.phoneE164 || "").trim(),
+    legalName: String(user?.legalName || "").trim()
+  };
+}
+
+/** 계정 본인인증 휴대폰(VLUE 인증번호)을 회선 목록에 항상 넣는다. */
+async function ensureCertifiedLine(userId: string) {
+  const { phone, legalName } = await userCertifiedPhone(userId);
+  if (!phone) return null;
+  const owned = await prisma.businessCard.findFirst({
+    where: { userId, phoneE164: phone }
   });
-  if (existing) return;
+  if (owned) return owned;
+  const taken = await prisma.businessCard.findFirst({
+    where: { phoneE164: phone },
+    select: { userId: true }
+  });
+  if (taken && taken.userId !== userId) return null;
   try {
-    await prisma.businessCard.create({
+    return await prisma.businessCard.create({
       data: {
         userId,
         kind: "mobile",
         phoneE164: phone,
-        displayName: user?.legalName || "",
+        displayName: legalName,
         isPremiumLine: false,
         verificationStatus: "approved"
       }
     });
   } catch {
-    /* 다른 계정이 이미 점유한 번호이거나 동시 생성 */
+    return prisma.businessCard.findFirst({ where: { userId, phoneE164: phone } });
   }
 }
 
 export async function listDccLines(userId: string): Promise<{ lines: DccLineDto[] }> {
-  await ensureMobileLine(userId);
+  const certified = await ensureCertifiedLine(userId);
+  const certifiedPhone = certified?.phoneE164 || (await userCertifiedPhone(userId)).phone;
   const rows = await prisma.businessCard.findMany({
-    where: { userId, kind: { in: [...LINE_KINDS] } }
+    where: {
+      userId,
+      OR: [{ kind: { in: [...LINE_KINDS] } }, ...(certifiedPhone ? [{ phoneE164: certifiedPhone }] : [])]
+    }
   });
-  rows.sort((a, b) => (KIND_RANK[a.kind] ?? 9) - (KIND_RANK[b.kind] ?? 9) || a.createdAt.getTime() - b.createdAt.getTime());
-  return { lines: rows.map(toLineDto) };
+  if (certified && !rows.some((row) => row.id === certified.id)) {
+    rows.unshift(certified);
+  }
+  rows.sort((a, b) => {
+    const aCert = certifiedPhone && a.phoneE164 === certifiedPhone ? 0 : 1;
+    const bCert = certifiedPhone && b.phoneE164 === certifiedPhone ? 0 : 1;
+    return aCert - bCert || (KIND_RANK[a.kind] ?? 9) - (KIND_RANK[b.kind] ?? 9) || a.createdAt.getTime() - b.createdAt.getTime();
+  });
+  return { lines: rows.map((row) => toLineDto(row, certifiedPhone)) };
 }
 
 export async function getDccLineBundle(userId: string, cardId: string) {
@@ -192,7 +228,7 @@ export async function getDccLineBundle(userId: string, cardId: string) {
     : null;
   const snap = snapObj(row.dccSnapshotJson);
   return {
-    line: toLineDto(row),
+    line: await toOwnedLineDto(userId, row),
     agent: agent ? agentDto(agent) : null,
     dcc: slimExportSnapshot(snap) || snap,
     showcase: {
@@ -237,7 +273,7 @@ export async function assignAgentToLine(userId: string, cardId: string, agentId:
     }
   });
   return {
-    line: toLineDto(updated),
+    line: await toOwnedLineDto(userId, updated),
     agent: agentDto(agent)
   };
 }
@@ -273,7 +309,7 @@ export async function putDccLineSnapshot(
       } as Prisma.InputJsonValue
     }
   });
-  return { line: toLineDto(updated), dcc: slim };
+  return { line: await toOwnedLineDto(userId, updated), dcc: slim };
 }
 
 export async function putDccLineShowcase(
@@ -318,7 +354,7 @@ export async function putDccLineShowcase(
   return {
     ok: true as const,
     updatedAt: now.toISOString(),
-    line: toLineDto(updated)
+    line: await toOwnedLineDto(userId, updated)
   };
 }
 

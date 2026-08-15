@@ -8,6 +8,7 @@ import {
   updateDccAgentProfile
 } from "../../lib/dccAgentProfilesApi.js";
 import { agentOptionLabel } from "../../lib/dccAgentProfileState.js";
+import { isCertifiedLine } from "../../lib/dccLineLabel.js";
 
 const EMPTY_FORM = {
   displayName: "",
@@ -162,6 +163,7 @@ export default function DccAgentManageModal({
                     >
                       <p className="dcc-agent-row__name">
                         {line.displayPhone}
+                        {isCertifiedLine(line) ? " (인증번호)" : ""}
                         {agentName ? ` ${agentName}` : ""}
                         {line.agentId || agentName ? <span className="dcc-agent-row__badge">사용 중</span> : null}
                       </p>
