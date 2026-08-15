@@ -14,8 +14,9 @@ async function parseJson(res) {
   return data;
 }
 
-export async function fetchDccAgentProfiles() {
-  const res = await vlueAuthFetch(apiUrl(DCC_AGENT_PROFILES_PATH), {
+export async function fetchDccAgentProfiles(cardId) {
+  const q = cardId ? `?cardId=${encodeURIComponent(cardId)}` : "";
+  const res = await vlueAuthFetch(apiUrl(`${DCC_AGENT_PROFILES_PATH}${q}`), {
     headers: vlueAuthHeaders()
   });
   return parseJson(res);
@@ -47,12 +48,13 @@ export async function deleteDccAgentProfile(id) {
   return parseJson(res);
 }
 
-export async function activateDccAgentProfile(id) {
+export async function activateDccAgentProfile(id, cardId) {
   const res = await vlueAuthFetch(
     apiUrl(`${DCC_AGENT_PROFILES_PATH}/${encodeURIComponent(id)}/activate`),
     {
       method: "PUT",
-      headers: vlueAuthHeaders()
+      headers: vlueAuthHeaders(),
+      body: JSON.stringify({ cardId: cardId || undefined })
     }
   );
   return parseJson(res);

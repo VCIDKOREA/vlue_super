@@ -5,12 +5,33 @@
   min-width: 0;
 }
 
-.dcc-agent-bar--card {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
+.dcc-line-grid {
+  display: grid;
   gap: 10px;
 }
+
+.dcc-line-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #475569;
+}
+
+.dcc-agent-bar--lines {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.showcase-web-desk__tip .dcc-agent-bar--lines {
+  flex: 1;
+  justify-content: flex-end;
+}
+
 
 .dcc-agent-bar__meta {
   min-width: 0;

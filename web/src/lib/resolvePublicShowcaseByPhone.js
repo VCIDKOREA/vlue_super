@@ -109,14 +109,18 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
   const userId = String(body.userId).trim();
 
   const [styleResFirst, exportSnap] = await Promise.all([
-    publicGetJson(`/api/lettering/showcase/style/${encodeURIComponent(userId)}`),
+    publicGetJson(
+      `/api/lettering/showcase/style/${encodeURIComponent(userId)}?number=${encodeURIComponent(lookupNumber)}`
+    ),
     fetchPublicCardExport(userId)
   ]);
 
   let styleRes = styleResFirst;
   if (!styleRes.ok || !styleRes.data?.live) {
     await new Promise((r) => setTimeout(r, 400));
-    styleRes = await publicGetJson(`/api/lettering/showcase/style/${encodeURIComponent(userId)}`);
+    styleRes = await publicGetJson(
+      `/api/lettering/showcase/style/${encodeURIComponent(userId)}?number=${encodeURIComponent(lookupNumber)}`
+    );
   }
 
   const live =

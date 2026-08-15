@@ -1,7 +1,5 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
-import { extractDigitalCardSlimMeta, slimExportSnapshot } from "../../lib/digitalCardSlim.js";
-import { isDataUrl, isHttpMediaUrl, mergeExportSnapshotMedia } from "../../lib/mediaUrlGuard.js";
+import { isDataUrl, isHttpMediaUrl } from "../../lib/mediaUrlGuard.js";
 
 export const DCC_AGENT_MAX_COUNT = 20;
 
@@ -78,7 +76,7 @@ export function normalizeDccAgentInput(body: DccAgentInput): {
   };
 }
 
-function toDto(row: {
+export function toDto(row: {
   id: string;
   label: string;
   displayName: string;
@@ -155,7 +153,10 @@ async function seedFromDigitalCard(userId: string) {
   return created;
 }
 
-export async function listDccAgentProfiles(userId: string): Promise<{
+export async function listDccAgentProfiles(
+  userId: string,
+  cardId?: string | null
+): Promise<{
   profiles: DccAgentDto[];
   activeId: string | null;
   maxCount: number;
@@ -169,10 +170,18 @@ export async function listDccAgentProfiles(userId: string): Promise<{
       const seeded = await seedFromDigitalCard(userId);
       if (seeded) rows = [seeded];
     }
-    const profiles = rows.map(toDto);
+    let activeId = rows.find((p) => p.isActive)?.id || rows[0]?.id || null;
+    if (cardId) {
+      const line = await prisma.businessCard.findFirst({
+        where: { id: cardId, userId },
+        select: { activeDccAgentProfileId: true }
+      });
+      if (line?.activeDccAgentProfileId) activeId = line.activeDccAgentProfileId;
+    }
+    const profiles = rows.map((row) => ({ ...toDto(row), isActive: row.id === activeId }));
     return {
       profiles,
-      activeId: profiles.find((p) => p.isActive)?.id || profiles[0]?.id || null,
+      activeId,
       maxCount: DCC_AGENT_MAX_COUNT
     };
   } catch (e) {
@@ -209,9 +218,6 @@ export async function createDccAgentProfile(userId: string, body: DccAgentInput)
       sortOrder: count
     }
   });
-  if (makeFirstActive) {
-    await applyAgentToLiveDcc(userId, created);
-  }
   return toDto(created);
 }
 
@@ -244,7 +250,8 @@ export async function updateDccAgentProfile(
     data: input
   });
   if (updated.isActive) {
-    await applyAgentToLiveDcc(userId, updated);
+    const { syncAssignedLinesForAgent } = await import("./dccLineService.js");
+    await syncAssignedLinesForAgent(userId, updated);
   }
   return toDto(updated);
 }
@@ -273,14 +280,17 @@ export async function deleteDccAgentProfile(userId: string, id: string): Promise
         where: { id: next.id },
         data: { isActive: true }
       });
-      await applyAgentToLiveDcc(userId, next);
       return { ok: true, activeId: next.id };
     }
   }
   return { ok: true, activeId: null };
 }
 
-export async function activateDccAgentProfile(userId: string, id: string): Promise<DccAgentDto> {
+export async function activateDccAgentProfile(
+  userId: string,
+  id: string,
+  cardId?: string | null
+): Promise<DccAgentDto> {
   const target = await prisma.userDccAgentProfile.findFirst({ where: { id, userId } });
   if (!target) {
     const err = new Error("담당자 프로필을 찾을 수 없습니다.");
@@ -297,92 +307,9 @@ export async function activateDccAgentProfile(userId: string, id: string): Promi
       data: { isActive: true }
     });
   });
-  const active = { ...target, isActive: true };
-  await applyAgentToLiveDcc(userId, active);
-  return toDto(active);
-}
-
-async function applyAgentToLiveDcc(
-  userId: string,
-  agent: {
-    displayName: string;
-    title: string;
-    department: string;
-    photoUrl: string | null;
-    photoFocus: string;
+  if (cardId) {
+    const { assignAgentToLine } = await import("./dccLineService.js");
+    await assignAgentToLine(userId, cardId, id);
   }
-) {
-  const card = await prisma.digitalCard.findUnique({
-    where: { userId },
-    select: { id: true, exportSnapshotJson: true }
-  });
-  const prevSnap =
-    card?.exportSnapshotJson && typeof card.exportSnapshotJson === "object"
-      ? (card.exportSnapshotJson as Record<string, unknown>)
-      : {};
-  const patch: Record<string, unknown> = {
-    name: agent.displayName,
-    displayName: agent.displayName,
-    title: agent.title,
-    department: agent.department,
-    photoUrl: agent.photoUrl || "",
-    photoFocus: agent.photoFocus,
-    noProfilePhoto: !agent.photoUrl
-  };
-  const merged = mergeExportSnapshotMedia(prevSnap, patch);
-  const slim = slimExportSnapshot(merged) || {};
-  const meta = extractDigitalCardSlimMeta(slim);
-
-  if (!card) {
-    const sub = await prisma.userSubscription.findFirst({
-      where: { userId, status: "active" },
-      orderBy: { createdAt: "desc" },
-      select: { id: true }
-    });
-    await prisma.digitalCard.create({
-      data: {
-        userId,
-        membershipTierSnapshot: sub ? "paid" : "free",
-        exportSnapshotJson: slim as Prisma.InputJsonValue,
-        displayName: meta.displayName,
-        titleSnapshot: meta.title,
-        departmentSnapshot: meta.department,
-        photoUrl: meta.photoUrl
-      }
-    });
-  } else {
-    await prisma.digitalCard.update({
-      where: { userId },
-      data: {
-        exportSnapshotJson: slim as Prisma.InputJsonValue,
-        displayName: meta.displayName,
-        titleSnapshot: meta.title,
-        departmentSnapshot: meta.department,
-        photoUrl: meta.photoUrl
-      }
-    });
-  }
-
-  const owned = await prisma.businessCard.findMany({
-    where: { userId },
-    select: { id: true, profileJson: true }
-  });
-  for (const row of owned) {
-    const prev = row.profileJson && typeof row.profileJson === "object" ? (row.profileJson as Record<string, unknown>) : {};
-    await prisma.businessCard.update({
-      where: { id: row.id },
-      data: {
-        displayName: agent.displayName,
-        jobTitle: agent.title || null,
-        profileJson: {
-          ...prev,
-          department: agent.department,
-          title: agent.title,
-          photoUrl: agent.photoUrl,
-          image_url: agent.photoUrl,
-          photoFocus: agent.photoFocus
-        } as Prisma.InputJsonValue
-      }
-    });
-  }
+  return toDto({ ...target, isActive: true });
 }

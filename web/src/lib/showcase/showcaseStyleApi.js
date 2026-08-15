@@ -1,8 +1,26 @@
 import { apiUrl } from "../apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "../vlueAuthHeaders.js";
+import { readSelectedDccLineId } from "../dccLineState.js";
+import { fetchDccLineShowcase, putDccLineShowcase } from "../dccLinesApi.js";
 
 /** GET /api/lettering/showcase/style — 조건부 hydrate (If-None-Match) */
 export async function fetchShowcaseStyleBundle(opts = {}) {
+  const lineId = String(opts.lineId || readSelectedDccLineId() || "").trim();
+  if (lineId) {
+    try {
+      const data = await fetchDccLineShowcase(lineId);
+      return {
+        ok: true,
+        v: data.v ?? 2,
+        editor: data.editor ?? null,
+        live: data.live ?? null,
+        liveSource: data.liveSource ?? null,
+        updatedAt: data.updatedAt ?? null
+      };
+    } catch (e) {
+      return { ok: false, error: e?.message || "fetch_failed" };
+    }
+  }
   const ifNone = String(opts.ifNoneMatch || "").trim();
   try {
     const headers = { ...vlueAuthHeaders() };
@@ -42,8 +60,18 @@ export async function putShowcaseStyleBundle({
   editor,
   live,
   liveSource,
-  clientUpdatedAt
+  clientUpdatedAt,
+  lineId: lineIdOpt
 } = {}) {
+  const lineId = String(lineIdOpt || readSelectedDccLineId() || "").trim();
+  if (lineId) {
+    try {
+      const data = await putDccLineShowcase(lineId, { editor, live, liveSource, clientUpdatedAt });
+      return { ok: true, updatedAt: data.updatedAt ?? null };
+    } catch (e) {
+      return { ok: false, error: e?.message || "save_failed" };
+    }
+  }
   try {
     const res = await vlueAuthFetch(apiUrl("/api/lettering/showcase/style"), {
       method: "PUT",

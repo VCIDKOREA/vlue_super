@@ -619,6 +619,8 @@ model UserDccAgentProfile {
   isActive    Boolean @default(false) @map("is_active")
   sortOrder   Int     @default(0) @map("sort_order")
 
+  assignedLines BusinessCard[]
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -747,6 +749,16 @@ model BusinessCard {
   companyName String? @map("company_name") @db.VarChar(200)
   profileJson Json?   @map("profile_json") @db.JsonB
 
+  /// 이 번호 전용 DCC (대표계정 DigitalCard와 분리)
+  dccSnapshotJson Json? @map("dcc_snapshot_json") @db.JsonB
+  /// 이 번호 전용 쇼케이스 (User.showcaseStyleJson과 분리)
+  lineShowcaseStyleJson Json? @map("line_showcase_style_json") @db.JsonB
+  lineShowcaseLiveStyleJson Json? @map("line_showcase_live_style_json") @db.JsonB
+  lineShowcaseLiveSourceJson Json? @map("line_showcase_live_source_json") @db.JsonB
+  lineShowcaseUpdatedAt DateTime? @map("line_showcase_updated_at") @db.Timestamptz(6)
+  activeDccAgentProfileId String? @map("active_dcc_agent_profile_id") @db.Uuid
+  activeDccAgentProfile UserDccAgentProfile? @relation(fields: [activeDccAgentProfileId], references: [id], onDelete: SetNull)
+
   verificationStatus CardVerificationStatus @default(approved) @map("verification_status")
   /// 내선/대표 등 유료 라인 — 승인된 경우에만 사업 피드 생성 허용
   isPremiumLine       Boolean @default(false) @map("is_premium_line")
@@ -767,6 +779,7 @@ model BusinessCard {
 
   @@index([userId])
   @@index([b2bEnterpriseId])
+  @@index([activeDccAgentProfileId])
   @@map("business_cards")
 }
 

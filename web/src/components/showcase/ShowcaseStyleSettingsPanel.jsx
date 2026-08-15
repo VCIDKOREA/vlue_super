@@ -54,7 +54,7 @@ import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
 import ShowcasePhotoEditor from "./ShowcasePhotoEditor.jsx";
 import ShowcasePullDownPreview from "./ShowcasePullDownPreview.jsx";
 import CallBigPushPreviewSection from "../CallBigPushPreviewSection.jsx";
-import DccAgentSwitcher from "../dcc/DccAgentSwitcher.jsx";
+import DccLineSwitcher from "../dcc/DccLineSwitcher.jsx";
 import "./showcase-style-settings.css";
 import "./showcase-web-desk.css";
 import "../../styles/showcase-call-glass.css";
@@ -686,7 +686,7 @@ export default function ShowcaseStyleSettingsPanel({
       {!isWebDesk ? (
         <div className="mb-3">
           <p className="showcase-profile-block__title">발·수신 담당자</p>
-          <DccAgentSwitcher compact onToast={onToast} />
+          <DccLineSwitcher compact onToast={onToast} />
         </div>
       ) : null}
       <p className="showcase-profile-block__title">
@@ -1311,7 +1311,7 @@ export default function ShowcaseStyleSettingsPanel({
           <p className="showcase-web-desk__tip-text">
             1열 미리보기 · 2열 설정 (듀얼 화면) · 담당자를 바꾸면 DCC·쇼케이스에 바로 반영됩니다
           </p>
-          <DccAgentSwitcher compact onToast={onToast} />
+          <DccLineSwitcher compact onToast={onToast} />
           {includeDigitalCard ? (
             <button type="button" className="showcase-web-desk__tip-cta" onClick={openBizcardSettings}>
               설정하러가기

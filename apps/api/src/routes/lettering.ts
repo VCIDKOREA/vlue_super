@@ -240,6 +240,25 @@ letteringRoutes.put("/showcase/style", requireUserHeader, async (c) => {
 letteringRoutes.get("/showcase/style/:userId", async (c) => {
   const userId = String(c.req.param("userId") || "").trim();
   if (!userId) return c.json({ ok: false, error: "user required" }, 400);
+  const numberQ = String(c.req.query("number") || c.req.query("phone") || "").trim();
+  if (numberQ) {
+    const { getLineShowcasePublicByPhone } = await import("../services/dcc/dccLineService.js");
+    const lineLive = await getLineShowcasePublicByPhone(numberQ);
+    if (lineLive) {
+      return c.json(
+        {
+          ok: true,
+          v: 2,
+          live: lineLive.live,
+          liveSource: lineLive.liveSource,
+          updatedAt: lineLive.updatedAt,
+          lineId: lineLive.cardId
+        },
+        200,
+        { "Cache-Control": "private, max-age=60" }
+      );
+    }
+  }
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, status: true, hasActiveShowcase: true }

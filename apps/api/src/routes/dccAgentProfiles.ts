@@ -24,7 +24,8 @@ function httpError(e: unknown) {
 /** GET /api/cards/dcc-agent-profiles */
 dccAgentProfileRoutes.get("/", async (c) => {
   try {
-    const data = await listDccAgentProfiles(c.get("vlueUserId"));
+    const cardId = String(c.req.query("cardId") || "").trim() || null;
+    const data = await listDccAgentProfiles(c.get("vlueUserId"), cardId);
     return c.json({ ok: true, ...data });
   } catch (e) {
     const { status, body } = httpError(e);
@@ -69,8 +70,13 @@ dccAgentProfileRoutes.delete("/:id", async (c) => {
 
 /** PUT /api/cards/dcc-agent-profiles/:id/activate */
 dccAgentProfileRoutes.put("/:id/activate", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { cardId?: string };
   try {
-    const profile = await activateDccAgentProfile(c.get("vlueUserId"), c.req.param("id"));
+    const profile = await activateDccAgentProfile(
+      c.get("vlueUserId"),
+      c.req.param("id"),
+      String(body.cardId || "").trim() || null
+    );
     return c.json({ ok: true, profile });
   } catch (e) {
     const { status, body } = httpError(e);

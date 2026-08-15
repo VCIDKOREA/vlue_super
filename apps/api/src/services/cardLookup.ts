@@ -300,7 +300,26 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
   });
 
   if (card) {
-    const exportSnap = await loadExportSnapLite(card.user.id);
+    const lineSnap =
+      card.dccSnapshotJson && typeof card.dccSnapshotJson === "object"
+        ? (card.dccSnapshotJson as Record<string, unknown>)
+        : null;
+    const exportSnap = lineSnap
+      ? {
+          name: firstStr(lineSnap.name, lineSnap.displayName),
+          title: firstStr(lineSnap.title),
+          email: firstStr(lineSnap.email),
+          website: firstStr(lineSnap.website),
+          fax: firstStr(lineSnap.fax),
+          address: firstStr(lineSnap.address),
+          department: firstStr(lineSnap.department),
+          companyIntro: firstStr(lineSnap.companyIntro),
+          salesContent: firstStr(lineSnap.salesContent),
+          photoUrl: httpOnlyUrl(lineSnap.photoUrl),
+          logoUrl: httpOnlyUrl(lineSnap.logoUrl),
+          photoFocus: firstStr(lineSnap.photoFocus)
+        }
+      : await loadExportSnapLite(card.user.id);
     const baseProfile = (card.profileJson as Record<string, unknown> | null) ?? null;
     const profile = buildContactProfile({
       userEmail: card.user.email,
@@ -308,12 +327,15 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       profileJson: baseProfile
     });
     const rawDisplay = firstStr(
+      lineSnap?.name,
+      lineSnap?.displayName,
       card.displayName,
       exportSnap?.name,
       card.user.digitalCard?.displayName,
       card.user.legalName
     );
     const rawTitle = firstStr(
+      lineSnap?.title,
       card.jobTitle,
       exportSnap?.title,
       card.user.digitalCard?.titleSnapshot

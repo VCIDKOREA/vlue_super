@@ -6,13 +6,14 @@ import { TITLE_DEPT_APPROVAL } from "./letteringBizcardVerification.js";
 
 export const DCC_AGENT_CHANGED_EVENT = "vlue-dcc-agent-changed";
 
-export function applyDccAgentToLocalCard(profile) {
+export function applyDccAgentToLocalCard(profile, opts = {}) {
   if (!profile || typeof profile !== "object") return null;
   const displayName = String(profile.displayName || profile.name || "").trim();
   const title = String(profile.title || "").trim();
   const department = String(profile.department || "").trim();
   const photoUrl = String(profile.photoUrl || "").trim();
   const photoFocus = String(profile.photoFocus || "center").trim() || "center";
+  const keepPhoto = Boolean(opts.keepPhoto);
 
   try {
     if (displayName) localStorage.setItem("myCardDisplayName", displayName);
@@ -20,7 +21,7 @@ export function applyDccAgentToLocalCard(profile) {
     /* ignore */
   }
 
-  const written = writeLetteringBizcardEditable({
+  const patch = {
     displayName,
     title,
     department,
@@ -28,12 +29,16 @@ export function applyDccAgentToLocalCard(profile) {
     approvedDepartment: department,
     titleDeptApprovalStatus: TITLE_DEPT_APPROVAL.APPROVED,
     titleDeptPendingTitle: "",
-    titleDeptPendingDepartment: "",
-    photoDataUrl: photoUrl,
-    photoUrl,
-    photoFocus,
-    noProfilePhoto: !photoUrl
-  });
+    titleDeptPendingDepartment: ""
+  };
+  if (!keepPhoto) {
+    patch.photoDataUrl = photoUrl;
+    patch.photoUrl = photoUrl;
+    patch.photoFocus = photoFocus;
+    patch.noProfilePhoto = !photoUrl;
+  }
+
+  const written = writeLetteringBizcardEditable(patch);
 
   try {
     window.dispatchEvent(new Event(LETTERING_BIZCARD_CHANGED_EVENT));
