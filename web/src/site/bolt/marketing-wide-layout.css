@@ -574,6 +574,27 @@
   box-shadow: 0 1px 0 rgb(255 255 255 / 80%), 0 4px 14px rgb(37 99 235 / 5%);
 }
 
+/* 적용/저장 안내 — 고정 네비 아래, 헤더보다 위 */
+[data-vlue-site="marketing"] .mkt-site-toast {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--mkt-chrome-active, 3.75rem) + 0.75rem);
+  transform: translateX(-50%);
+  z-index: 80;
+  width: min(92vw, 32rem);
+  padding: 0.8rem 1.1rem;
+  border-radius: 0.75rem;
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: center;
+  word-break: keep-all;
+  box-shadow: 0 12px 32px rgb(15 23 42 / 32%);
+  pointer-events: none;
+}
+
 [data-vlue-site="marketing"] .mkt-download-bar--top {
   background: rgb(255 255 255 / 72%);
   border-bottom: 1px solid rgb(226 232 240 / 80%);

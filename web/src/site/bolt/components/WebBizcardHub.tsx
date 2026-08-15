@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Loader2, Pencil, Phone, Building2, User } from 'lucide-react';
 import '../../../styles.css';
 import { B2bMembershipProvider } from '../../../context/B2bMembershipContext.jsx';
@@ -158,19 +159,18 @@ function WebBizcardHubInner({
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    window.setTimeout(() => setToast(''), 2800);
+    window.setTimeout(() => setToast(''), 5200);
   }, []);
 
   const floatingToast =
-    toast ? (
-      <div
-        className="pointer-events-none fixed left-1/2 top-[max(1rem,env(safe-area-inset-top))] z-[400] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl bg-slate-900/95 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg"
-        role="status"
-        aria-live="polite"
-      >
-        {toast}
-      </div>
-    ) : null;
+    toast && typeof document !== 'undefined'
+      ? createPortal(
+          <div className="mkt-site-toast" role="status" aria-live="polite">
+            {toast}
+          </div>,
+          document.body
+        )
+      : null;
 
   const refreshAccount = useCallback(async () => {
     setLoading(true);
