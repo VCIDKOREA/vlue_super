@@ -12,6 +12,7 @@ import { assignDccLineAgent, fetchDccLineBundle, fetchDccLines, putDccLineDcc } 
 import { fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
 import { agentOptionLabel, applyDccAgentToLocalCard } from "../../lib/dccAgentProfileState.js";
 import { readSelectedDccLineId, writeSelectedDccLineId } from "../../lib/dccLineState.js";
+import { dccLineOptionLabel } from "../../lib/dccLineLabel.js";
 import DccAgentManageModal from "./DccAgentManageModal.jsx";
 import "./dcc-agent-switcher.css";
 
@@ -115,20 +116,42 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
     void selectLine(nextId);
   };
 
-  const onChangeAgent = async (nextId) => {
-    if (!nextId || !lineId || nextId === agentId) return;
+  const onChangeAgentForLine = async (targetLineId, nextId) => {
+    if (!nextId || !targetLineId) return;
+    const current = lines.find((l) => l.id === targetLineId);
+    if (current?.agentId === nextId && targetLineId === lineId && nextId === agentId) return;
     setBusy(true);
     try {
-      const res = await assignDccLineAgent(lineId, nextId);
-      setAgentId(res.agent?.id || nextId);
-      setProfiles((prev) => prev.map((p) => ({ ...p, isActive: p.id === nextId })));
-      if (res.agent) applyDccAgentToLocalCard(res.agent, { keepPhoto: true });
-      onToast?.(`${agentOptionLabel(res.agent)}(으)로 이 번호 담당자를 바꿨습니다. 사진·쇼케이스는 이 번호 설정이 유지됩니다.`);
+      const res = await assignDccLineAgent(targetLineId, nextId);
+      const nextLine = res.line;
+      if (nextLine?.id) {
+        setLines((prev) => prev.map((l) => (l.id === nextLine.id ? { ...l, ...nextLine } : l)));
+      }
+      if (targetLineId === lineId) {
+        setAgentId(res.agent?.id || nextId);
+        setProfiles((prev) => prev.map((p) => ({ ...p, isActive: p.id === nextId })));
+        if (res.agent) applyDccAgentToLocalCard(res.agent, { keepPhoto: true });
+      }
+      onToast?.(
+        `${dccLineOptionLabel(nextLine || current)} — 담당자를 바꿨습니다. 사진·쇼케이스는 이 번호 설정이 유지됩니다.`
+      );
     } catch (e) {
       onToast?.(e instanceof Error ? e.message : "담당자 전환에 실패했습니다.");
     } finally {
       setBusy(false);
     }
+  };
+
+  const onChangeAgent = async (nextId) => {
+    if (!nextId || !lineId) return;
+    await onChangeAgentForLine(lineId, nextId);
+  };
+
+  const refreshAfterManage = async () => {
+    const data = await fetchDccLines();
+    const list = Array.isArray(data.lines) ? data.lines : [];
+    setLines(list);
+    if (lineId) await loadAgents(lineId);
   };
 
   const onPickPhoto = async (file) => {
@@ -156,14 +179,13 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
         className="dcc-agent-bar__select"
         value={lineId}
         disabled={loading || busy || lines.length === 0}
-        aria-label="내선·대표번호"
+        aria-label="번호"
         onChange={(e) => onChangeLine(e.target.value)}
       >
-        {lines.length === 0 ? <option value="">등록된 내선·대표번호 없음</option> : null}
+        {lines.length === 0 ? <option value="">등록된 번호 없음</option> : null}
         {lines.map((l) => (
           <option key={l.id} value={l.id}>
-            {l.kindLabel} {l.displayPhone}
-            {l.displayName ? ` · ${l.displayName}` : ""}
+            {dccLineOptionLabel(l)}
           </option>
         ))}
       </select>
@@ -202,10 +224,14 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
   const modal = (
     <DccAgentManageModal
       open={manageOpen}
+      lines={lines}
+      selectedLineId={lineId}
       profiles={profiles}
       maxCount={maxCount}
       onClose={() => setManageOpen(false)}
-      onChanged={() => void loadAgents(lineId)}
+      onSelectLine={(id) => void selectLine(id)}
+      onAssignAgent={(id, nextAgentId) => void onChangeAgentForLine(id, nextAgentId)}
+      onChanged={() => void refreshAfterManage()}
       onToast={onToast}
     />
   );
@@ -239,7 +265,7 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
         <div className="dcc-agent-bar__meta">
           <p className="dcc-agent-bar__label">번호 DCC + 쇼케이스</p>
           <p className="dcc-agent-bar__hint">
-            내선·대표번호마다 사진과 쇼케이스가 따로입니다. 번호를 바꾸면 그 번호 설정으로 전환되고, 담당자만 드롭다운으로 바꿉니다.
+            번호마다 사진과 쇼케이스가 따로입니다. 번호를 고르면 그 번호 설정으로 전환되고, 담당자만 드롭다운으로 바꿉니다.
           </p>
         </div>
         <div className="dcc-line-grid">

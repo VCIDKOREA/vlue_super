@@ -9,7 +9,7 @@ import {
 } from "../../lib/slimShowcaseStyle.js";
 import { defaultAgentLabel, normalizePhotoFocus } from "./dccAgentProfileService.js";
 
-export type DccLineKind = "extension" | "rep_number";
+export type DccLineKind = "mobile" | "extension" | "rep_number";
 
 export type DccLineDto = {
   id: string;
@@ -33,23 +33,33 @@ function text(v: unknown, max: number): string {
 }
 
 function kindLabel(kind: string): string {
+  if (kind === "mobile") return "휴대폰";
   if (kind === "extension") return "내선번호";
   if (kind === "rep_number") return "대표번호";
   return kind;
 }
 
 function displayPhone(e164: string): string {
-  const d = String(e164 || "").replace(/^\+82/, "0").replace(/\D/g, "");
-  if (d.startsWith("02") && d.length >= 9) {
-    return `02-${d.slice(2, d.length - 4)}-${d.slice(-4)}`;
+  const raw = String(e164 || "").trim();
+  const rest = raw.startsWith("+82") ? raw.slice(3) : raw.replace(/\D/g, "").replace(/^82/, "");
+  if (rest.startsWith("10") && rest.length === 10) {
+    return `0${rest.slice(0, 2)}-${rest.slice(2, 6)}-${rest.slice(6)}`;
   }
-  if (d.length === 8 && d.startsWith("15")) {
-    return `${d.slice(0, 4)}-${d.slice(4)}`;
+  if (rest.startsWith("2")) {
+    const d = `0${rest}`;
+    if (d.length >= 9) return `02-${d.slice(2, d.length - 4)}-${d.slice(-4)}`;
   }
+  if (/^1[5-8]/.test(rest) && rest.length >= 8) {
+    return `${rest.slice(0, 4)}-${rest.slice(4)}`;
+  }
+  const d = rest.startsWith("0") ? rest : `0${rest}`;
   if (d.length === 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
   if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
-  return e164;
+  return raw || e164;
 }
+
+const LINE_KINDS = ["mobile", "extension", "rep_number"] as const;
+const KIND_RANK: Record<string, number> = { mobile: 0, extension: 1, rep_number: 2 };
 
 function snapObj(raw: unknown): Record<string, unknown> {
   return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
@@ -104,7 +114,7 @@ function toLineDto(row: {
   const snap = snapObj(row.dccSnapshotJson);
   return {
     id: row.id,
-    kind: row.kind === "rep_number" ? "rep_number" : "extension",
+    kind: row.kind === "rep_number" ? "rep_number" : row.kind === "mobile" ? "mobile" : "extension",
     kindLabel: kindLabel(row.kind),
     phoneE164: row.phoneE164,
     displayPhone: displayPhone(row.phoneE164),
@@ -125,22 +135,51 @@ async function requireOwnedLine(userId: string, cardId: string) {
     where: {
       id: cardId,
       userId,
-      kind: { in: ["extension", "rep_number"] }
+      kind: { in: [...LINE_KINDS] }
     }
   });
   if (!row) {
-    const err = new Error("내선·대표번호를 찾을 수 없습니다.");
+    const err = new Error("번호를 찾을 수 없습니다.");
     (err as Error & { status?: number }).status = 404;
     throw err;
   }
   return row;
 }
 
-export async function listDccLines(userId: string): Promise<{ lines: DccLineDto[] }> {
-  const rows = await prisma.businessCard.findMany({
-    where: { userId, kind: { in: ["extension", "rep_number"] } },
-    orderBy: [{ kind: "asc" }, { createdAt: "asc" }]
+async function ensureMobileLine(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { phoneE164: true, legalName: true }
   });
+  const phone = String(user?.phoneE164 || "").trim();
+  if (!phone) return;
+  const existing = await prisma.businessCard.findFirst({
+    where: { OR: [{ userId, kind: "mobile" }, { phoneE164: phone }] },
+    select: { id: true, userId: true, kind: true }
+  });
+  if (existing) return;
+  try {
+    await prisma.businessCard.create({
+      data: {
+        userId,
+        kind: "mobile",
+        phoneE164: phone,
+        displayName: user?.legalName || "",
+        isPremiumLine: false,
+        verificationStatus: "approved"
+      }
+    });
+  } catch {
+    /* 다른 계정이 이미 점유한 번호이거나 동시 생성 */
+  }
+}
+
+export async function listDccLines(userId: string): Promise<{ lines: DccLineDto[] }> {
+  await ensureMobileLine(userId);
+  const rows = await prisma.businessCard.findMany({
+    where: { userId, kind: { in: [...LINE_KINDS] } }
+  });
+  rows.sort((a, b) => (KIND_RANK[a.kind] ?? 9) - (KIND_RANK[b.kind] ?? 9) || a.createdAt.getTime() - b.createdAt.getTime());
   return { lines: rows.map(toLineDto) };
 }
 
@@ -288,7 +327,7 @@ export async function getLineShowcasePublicByPhone(rawNumber: string) {
   const e164 = normalizeToE164KR(String(rawNumber || "").trim());
   if (!e164) return null;
   const card = await prisma.businessCard.findFirst({
-    where: { phoneE164: e164, kind: { in: ["extension", "rep_number"] } },
+    where: { phoneE164: e164, kind: { in: [...LINE_KINDS] } },
     select: {
       id: true,
       userId: true,

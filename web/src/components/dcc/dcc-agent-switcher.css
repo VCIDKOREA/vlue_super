@@ -70,7 +70,7 @@
   appearance: none;
   width: 100%;
   min-width: 11rem;
-  max-width: 22rem;
+  max-width: 28rem;
   padding: 8px 28px 8px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
@@ -129,7 +129,7 @@
 }
 
 .dcc-agent-modal__sheet {
-  width: min(32rem, 100%);
+  width: min(36rem, 100%);
   margin-top: 2.5rem;
   border-radius: 16px;
   background: #fff;
@@ -174,7 +174,58 @@
   padding: 12px 16px 16px;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+}
+
+.dcc-agent-section {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+}
+
+.dcc-agent-section__title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.dcc-line-row {
+  align-items: flex-start;
+}
+
+.dcc-line-row__pick {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.dcc-line-row__agent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+  width: 9.5rem;
+  font-size: 10px;
+  font-weight: 800;
+  color: #64748b;
+}
+
+.dcc-line-row__agent select {
+  appearance: auto;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .dcc-agent-row {
@@ -337,6 +388,16 @@
 
 .showcase-web-desk__tip .dcc-agent-bar__manage {
   padding: 6px 10px;
+}
+
+@media (max-width: 560px) {
+  .dcc-line-row {
+    flex-wrap: wrap;
+  }
+
+  .dcc-line-row__agent {
+    width: 100%;
+  }
 }
 
 @media (max-width: 720px) {
