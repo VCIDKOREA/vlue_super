@@ -1,12 +1,13 @@
 import { apiUrl } from "../apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "../vlueAuthHeaders.js";
-import { readSelectedDccLineId } from "../dccLineState.js";
+import { readDccLinePreview, readSelectedDccLineId } from "../dccLineState.js";
 import { fetchDccLineShowcase, putDccLineShowcase } from "../dccLinesApi.js";
 
 /** GET /api/lettering/showcase/style — 조건부 hydrate (If-None-Match) */
 export async function fetchShowcaseStyleBundle(opts = {}) {
   const lineId = String(opts.lineId || readSelectedDccLineId() || "").trim();
-  if (lineId) {
+  const certified = Boolean(readDccLinePreview()?.isCertified);
+  if (lineId && !certified) {
     try {
       const data = await fetchDccLineShowcase(lineId);
       return {
@@ -64,7 +65,8 @@ export async function putShowcaseStyleBundle({
   lineId: lineIdOpt
 } = {}) {
   const lineId = String(lineIdOpt || readSelectedDccLineId() || "").trim();
-  if (lineId) {
+  const certified = Boolean(readDccLinePreview()?.isCertified);
+  if (lineId && !certified) {
     try {
       const data = await putDccLineShowcase(lineId, { editor, live, liveSource, clientUpdatedAt });
       return { ok: true, updatedAt: data.updatedAt ?? null };

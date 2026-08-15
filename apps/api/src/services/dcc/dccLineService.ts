@@ -93,6 +93,19 @@ async function loadMasterExport(userId: string): Promise<Record<string, unknown>
   return snap;
 }
 
+async function isCertifiedRow(userId: string, phoneE164: string) {
+  const { phone } = await userCertifiedPhone(userId);
+  return Boolean(phone) && phoneE164 === phone;
+}
+
+async function lineDccBase(userId: string, row: { phoneE164: string; dccSnapshotJson: unknown }) {
+  const lineSnap = snapObj(row.dccSnapshotJson);
+  if (await isCertifiedRow(userId, row.phoneE164)) {
+    return mergeExportSnapshotMedia(await loadMasterExport(userId), lineSnap);
+  }
+  return lineSnap;
+}
+
 async function loadMasterShowcase(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
@@ -268,16 +281,24 @@ export async function getDccLineBundle(userId: string, cardId: string) {
         where: { id: row.activeDccAgentProfileId, userId }
       })
     : null;
-  const snap = mergeExportSnapshotMedia(await loadMasterExport(userId), snapObj(row.dccSnapshotJson));
+  const certified = await isCertifiedRow(userId, row.phoneE164);
+  const snap = await lineDccBase(userId, row);
   const lineEditor = row.lineShowcaseStyleJson;
   const lineLive = row.lineShowcaseLiveStyleJson;
   const lineHas = showcaseHasContent(lineEditor) || showcaseHasContent(lineLive);
-  const master = lineHas ? null : await loadMasterShowcase(userId);
-  const editor = lineHas ? lineEditor : master?.showcaseStyleJson || master?.showcaseLiveStyleJson || null;
-  const live = lineHas ? lineLive || lineEditor : master?.showcaseLiveStyleJson || master?.showcaseStyleJson || null;
-  const masterAt = master?.showcaseStyleUpdatedAt;
-  const lineAt = row.lineShowcaseUpdatedAt;
-  const updatedAt = lineHas ? lineAt : masterAt;
+  /* 인증번호만 대표계정 쇼케이스를 쓴다. 내선·대표번호는 비어 있으면 빈 쇼케이스. */
+  const master = !lineHas && certified ? await loadMasterShowcase(userId) : null;
+  const editor = lineHas
+    ? lineEditor
+    : certified
+      ? master?.showcaseStyleJson || master?.showcaseLiveStyleJson || null
+      : null;
+  const live = lineHas
+    ? lineLive || lineEditor
+    : certified
+      ? master?.showcaseLiveStyleJson || master?.showcaseStyleJson || null
+      : null;
+  const updatedAt = lineHas ? row.lineShowcaseUpdatedAt : certified ? master?.showcaseStyleUpdatedAt : null;
   return {
     line: await toOwnedLineDto(userId, row),
     agent: agent ? agentDto(agent) : null,
@@ -300,7 +321,7 @@ export async function assignAgentToLine(userId: string, cardId: string, agentId:
     (err as Error & { status?: number }).status = 404;
     throw err;
   }
-  const prev = mergeExportSnapshotMedia(await loadMasterExport(userId), snapObj(row.dccSnapshotJson));
+  const prev = await lineDccBase(userId, row);
   const merged = mergeExportSnapshotMedia(prev, {
     name: agent.displayName,
     displayName: agent.displayName,
@@ -335,7 +356,7 @@ export async function putDccLineSnapshot(
   patch: Record<string, unknown>
 ) {
   const row = await requireOwnedLine(userId, cardId);
-  const prev = mergeExportSnapshotMedia(await loadMasterExport(userId), snapObj(row.dccSnapshotJson));
+  const prev = await lineDccBase(userId, row);
   if (patch.photoUrl != null && isDataUrl(patch.photoUrl)) {
     const err = new Error("프로필 사진은 https URL만 저장할 수 있습니다.");
     (err as Error & { status?: number }).status = 400;
@@ -369,9 +390,7 @@ export async function putDccLineShowcase(
   input: { editor?: unknown; live?: unknown; liveSource?: unknown }
 ) {
   const row = await requireOwnedLine(userId, cardId);
-  const master = await loadMasterShowcase(userId);
-  const masterHas =
-    showcaseHasContent(master?.showcaseStyleJson) || showcaseHasContent(master?.showcaseLiveStyleJson);
+  const certified = await isCertifiedRow(userId, row.phoneE164);
   const existingHas =
     showcaseHasContent(row.lineShowcaseStyleJson) || showcaseHasContent(row.lineShowcaseLiveStyleJson);
   const now = new Date();
@@ -383,7 +402,7 @@ export async function putDccLineShowcase(
       slim.v = 2;
       assertShowcaseStyleWithinLimit(slim, "showcase style");
       data.lineShowcaseStyleJson = slim as Prisma.InputJsonValue;
-    } else if (!obj && !existingHas && !masterHas) {
+    } else if (!obj && !existingHas && !certified) {
       data.lineShowcaseStyleJson = Prisma.JsonNull;
     }
   }
@@ -394,7 +413,7 @@ export async function putDccLineShowcase(
       slim.v = 2;
       assertShowcaseStyleWithinLimit(slim, "showcase style");
       data.lineShowcaseLiveStyleJson = slim as Prisma.InputJsonValue;
-    } else if (!obj && !existingHas && !masterHas) {
+    } else if (!obj && !existingHas && !certified) {
       data.lineShowcaseLiveStyleJson = Prisma.JsonNull;
     }
   }
@@ -430,18 +449,33 @@ export async function getLineShowcasePublicByPhone(rawNumber: string) {
     select: {
       id: true,
       userId: true,
+      phoneE164: true,
       lineShowcaseLiveStyleJson: true,
       lineShowcaseStyleJson: true,
       lineShowcaseLiveSourceJson: true,
-      lineShowcaseUpdatedAt: true
+      lineShowcaseUpdatedAt: true,
+      user: { select: { phoneE164: true } }
     }
   });
   if (!card) return null;
+  const certified = Boolean(card.user?.phoneE164) && card.phoneE164 === card.user.phoneE164;
   const live = card.lineShowcaseLiveStyleJson || card.lineShowcaseStyleJson;
-  if (!showcaseHasContent(live)) return null;
+  if (certified && !showcaseHasContent(live)) return null;
+  if (!showcaseHasContent(live)) {
+    return {
+      cardId: card.id,
+      userId: card.userId,
+      isCertified: false,
+      v: 2 as const,
+      live: null,
+      liveSource: null,
+      updatedAt: null
+    };
+  }
   return {
     cardId: card.id,
     userId: card.userId,
+    isCertified: certified,
     v: 2 as const,
     live: slimShowcaseStyleForPublic(live),
     liveSource: card.lineShowcaseLiveSourceJson || null,

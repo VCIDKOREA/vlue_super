@@ -58,7 +58,7 @@ export function writeDccLinePreviewFromBundle(bundle) {
     title: String(line.jobTitle || agent.title || dcc.title || "").trim(),
     department: String(line.department || agent.department || dcc.department || "").trim(),
     photoUrl: String(
-      line.photoUrl || dcc.photoUrl || agent.photoUrl || (keepSameLine ? prev?.photoUrl : "") || ""
+      line.photoUrl || dcc.photoUrl || (keepSameLine ? prev?.photoUrl : "") || ""
     ).trim(),
     photoFocus: String(line.photoFocus || dcc.photoFocus || (keepSameLine ? prev?.photoFocus : "") || "center").trim() || "center",
     kindLabel: String(line.kindLabel || (keepSameLine ? prev?.kindLabel : "") || "").trim(),

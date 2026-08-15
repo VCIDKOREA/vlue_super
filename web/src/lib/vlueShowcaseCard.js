@@ -27,16 +27,37 @@ export function applyDccLinePreviewOverlay(card = {}) {
   const photo = String(line.photoUrl || "").trim();
   const title = String(line.title || "").trim();
   const department = String(line.department || "").trim();
+  if (line.isCertified) {
+    return {
+      ...card,
+      name: name || card.name,
+      displayName: name || card.displayName,
+      phone: phone || card.phone,
+      photoUrl: photo || card.photoUrl,
+      photoFocus: line.photoFocus || card.photoFocus,
+      title: title || card.title,
+      department: department || card.department,
+      previewShowcaseId: name || phone || card.previewShowcaseId || ""
+    };
+  }
   return {
     ...card,
     name: name || card.name,
     displayName: name || card.displayName,
     phone: phone || card.phone,
-    photoUrl: photo || card.photoUrl,
-    photoFocus: line.photoFocus || card.photoFocus,
-    title: title || card.title,
-    department: department || card.department,
-    previewShowcaseId: name || phone || card.previewShowcaseId || ""
+    photoUrl: photo,
+    photoFocus: line.photoFocus || "center",
+    title,
+    department,
+    email: "",
+    logoUrl: "",
+    organization: "",
+    address: "",
+    website: "",
+    fax: "",
+    companyIntro: "",
+    customBackText: "",
+    previewShowcaseId: name || phone || ""
   };
 }
 

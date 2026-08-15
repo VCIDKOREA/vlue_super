@@ -285,6 +285,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           legalName: true,
           publicHandle: true,
           email: true,
+          phoneE164: true,
           digitalCard: {
             select: {
               photoUrl: true,
@@ -304,24 +305,25 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       card.dccSnapshotJson && typeof card.dccSnapshotJson === "object"
         ? (card.dccSnapshotJson as Record<string, unknown>)
         : null;
-    const masterSnap = await loadExportSnapLite(card.user.id);
+    const certified = Boolean(card.user.phoneE164) && card.phoneE164 === card.user.phoneE164;
+    const masterSnap = certified ? await loadExportSnapLite(card.user.id) : null;
     const exportSnap = {
-      name: firstStr(lineSnap?.name, lineSnap?.displayName, masterSnap?.name),
-      title: firstStr(lineSnap?.title, masterSnap?.title),
-      email: firstStr(lineSnap?.email, masterSnap?.email),
-      website: firstStr(lineSnap?.website, masterSnap?.website),
-      fax: firstStr(lineSnap?.fax, masterSnap?.fax),
-      address: firstStr(lineSnap?.address, masterSnap?.address),
-      department: firstStr(lineSnap?.department, masterSnap?.department),
-      companyIntro: firstStr(lineSnap?.companyIntro, masterSnap?.companyIntro),
-      salesContent: firstStr(lineSnap?.salesContent, masterSnap?.salesContent),
-      photoUrl: httpOnlyUrl(lineSnap?.photoUrl) || masterSnap?.photoUrl || "",
-      logoUrl: httpOnlyUrl(lineSnap?.logoUrl) || masterSnap?.logoUrl || "",
-      photoFocus: firstStr(lineSnap?.photoFocus, masterSnap?.photoFocus)
+      name: firstStr(lineSnap?.name, lineSnap?.displayName, certified ? masterSnap?.name : ""),
+      title: firstStr(lineSnap?.title, certified ? masterSnap?.title : ""),
+      email: firstStr(lineSnap?.email, certified ? masterSnap?.email : ""),
+      website: firstStr(lineSnap?.website, certified ? masterSnap?.website : ""),
+      fax: firstStr(lineSnap?.fax, certified ? masterSnap?.fax : ""),
+      address: firstStr(lineSnap?.address, certified ? masterSnap?.address : ""),
+      department: firstStr(lineSnap?.department, certified ? masterSnap?.department : ""),
+      companyIntro: firstStr(lineSnap?.companyIntro, certified ? masterSnap?.companyIntro : ""),
+      salesContent: firstStr(lineSnap?.salesContent, certified ? masterSnap?.salesContent : ""),
+      photoUrl: httpOnlyUrl(lineSnap?.photoUrl) || (certified ? masterSnap?.photoUrl || "" : ""),
+      logoUrl: httpOnlyUrl(lineSnap?.logoUrl) || (certified ? masterSnap?.logoUrl || "" : ""),
+      photoFocus: firstStr(lineSnap?.photoFocus, certified ? masterSnap?.photoFocus : "")
     };
     const baseProfile = (card.profileJson as Record<string, unknown> | null) ?? null;
     const profile = buildContactProfile({
-      userEmail: card.user.email,
+      userEmail: certified ? card.user.email : null,
       exportSnap,
       profileJson: baseProfile
     });
@@ -330,16 +332,16 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       lineSnap?.displayName,
       card.displayName,
       exportSnap?.name,
-      card.user.digitalCard?.displayName,
-      card.user.legalName
+      certified ? card.user.digitalCard?.displayName : "",
+      certified ? card.user.legalName : ""
     );
     const rawTitle = firstStr(
       lineSnap?.title,
       card.jobTitle,
       exportSnap?.title,
-      card.user.digitalCard?.titleSnapshot
+      certified ? card.user.digitalCard?.titleSnapshot : ""
     );
-    const email = firstStr(profile.email, card.user.email);
+    const email = firstStr(profile.email, certified ? card.user.email : "");
 
     if (opts.forPublicOgShare) {
       return {

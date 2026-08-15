@@ -11,6 +11,7 @@ import {
   SHOWCASE_LIVE_STYLE_STORAGE_KEY,
   SHOWCASE_LIVE_SOURCE_STORAGE_KEY
 } from "./showcaseStyleStorage.js";
+import { readDccLinePreview, readSelectedDccLineId } from "../dccLineState.js";
 
 export const SHOWCASE_STYLE_META_KEY = "vlue_showcase_style_meta_v1";
 
@@ -58,6 +59,12 @@ function notePoolerCall(kind) {
   if (isDev && typeof console !== "undefined") {
     console.info(`[egress] showcase-style ${kind} (#${poolerCallCount})`);
   }
+}
+
+function isIndependentDccLine() {
+  const id = readSelectedDccLineId();
+  if (!id) return false;
+  return !readDccLinePreview()?.isCertified;
 }
 
 function pageHasPhotos(page) {
@@ -235,8 +242,10 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
     if (forceServer) {
       const applied = applyServerBundle(remote, { reason: "forceServer", clearMissing: true });
       let pushed = false;
-      /* live → editor 시딩 후 서버 editor 컬럼도 채워 재설치 복원이 안정되게 */
-      if (applied?.seededEditorFromLive || showcaseStyleHasContent(readShowcaseStyle())) {
+      if (
+        !isIndependentDccLine() &&
+        (applied?.seededEditorFromLive || showcaseStyleHasContent(readShowcaseStyle()))
+      ) {
         const push = await pushShowcaseStyleBundle({ force: true });
         pushed = Boolean(push?.ok && !push?.skipped);
       }
@@ -262,6 +271,11 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
     const serverMs = serverAt ? Date.parse(serverAt) : 0;
 
     if (!remoteHas && localHas) {
+      if (isIndependentDccLine()) {
+        applyServerBundle(remote, { reason: "empty-line", clearMissing: true });
+        lastHydrateOkAt = Date.now();
+        return { ok: true, applied: true, pushed: false };
+      }
       const pushed = await pushShowcaseStyleBundle();
       lastHydrateOkAt = Date.now();
       return { ok: true, applied: false, pushed: Boolean(pushed.ok) };
@@ -280,6 +294,11 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
     }
 
     if (localHas && localMs > serverMs + 500) {
+      if (isIndependentDccLine() && !remoteHas) {
+        applyServerBundle(remote, { reason: "empty-line", clearMissing: true });
+        lastHydrateOkAt = Date.now();
+        return { ok: true, applied: true, pushed: false };
+      }
       const pushed = await pushShowcaseStyleBundle();
       lastHydrateOkAt = Date.now();
       return { ok: true, applied: false, pushed: Boolean(pushed.ok) };

@@ -10,6 +10,7 @@ import {
   writeSelectedDccLineId
 } from "../../lib/dccLineState.js";
 import {
+  createDefaultShowcaseStyle,
   writeLiveShowcaseStyle,
   writeShowcaseStyle
 } from "../../lib/showcase/showcaseStyleStorage.js";
@@ -27,10 +28,15 @@ function applyLineToLocalPreview(bundle) {
   writeSelectedDccLineId(line.id);
   const editor = bundle.showcase?.editor || bundle.showcase?.live || null;
   const live = bundle.showcase?.live || editor;
-  if (showcaseStyleHasContent(editor) || showcaseStyleHasContent(live)) {
+  const has = showcaseStyleHasContent(editor) || showcaseStyleHasContent(live);
+  if (has) {
     writeShowcaseStyle(editor || live, { replace: true, skipSync: true });
     writeLiveShowcaseStyle(live || editor, { source: "editor", skipSync: true });
     if (bundle.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
+  } else {
+    const empty = createDefaultShowcaseStyle();
+    writeShowcaseStyle(empty, { replace: true, skipSync: true });
+    writeLiveShowcaseStyle(empty, { source: "editor", skipSync: true });
   }
   try {
     window.dispatchEvent(new Event("vlue-showcase-style-changed"));
