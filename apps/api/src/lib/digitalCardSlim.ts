@@ -87,7 +87,8 @@ export function slimExportSnapshot(snap: unknown): Record<string, unknown> | nul
   const tpl = text(s.designTemplate, 40);
   if (tpl) out.designTemplate = tpl;
   const focus = s.photoFocus;
-  if (focus && typeof focus === "object") out.photoFocus = focus;
+  if (typeof focus === "string" && focus.trim()) out.photoFocus = focus.trim();
+  else if (focus && typeof focus === "object") out.photoFocus = focus;
   if (typeof s.noProfilePhoto === "boolean") out.noProfilePhoto = s.noProfilePhoto;
   if (typeof s.noCompanyLogo === "boolean") out.noCompanyLogo = s.noCompanyLogo;
   if (typeof s.noFax === "boolean") out.noFax = s.noFax;

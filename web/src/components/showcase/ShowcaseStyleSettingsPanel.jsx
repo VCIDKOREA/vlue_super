@@ -54,6 +54,7 @@ import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
 import ShowcasePhotoEditor from "./ShowcasePhotoEditor.jsx";
 import ShowcasePullDownPreview from "./ShowcasePullDownPreview.jsx";
 import CallBigPushPreviewSection from "../CallBigPushPreviewSection.jsx";
+import DccAgentSwitcher from "../dcc/DccAgentSwitcher.jsx";
 import "./showcase-style-settings.css";
 import "./showcase-web-desk.css";
 import "../../styles/showcase-call-glass.css";
@@ -682,6 +683,12 @@ export default function ShowcaseStyleSettingsPanel({
 
   const pagesSection = (
     <section className="showcase-profile-block">
+      {!isWebDesk ? (
+        <div className="mb-3">
+          <p className="showcase-profile-block__title">발·수신 담당자</p>
+          <DccAgentSwitcher compact onToast={onToast} />
+        </div>
+      ) : null}
       <p className="showcase-profile-block__title">
         쇼케이스 페이지
         <HelpTip
@@ -730,7 +737,7 @@ export default function ShowcaseStyleSettingsPanel({
           </div>
           <p className="showcase-page-card__hint">
             명함 디자인·상호·연락처·프로필 사진은 디지털인증명함 설정에서 편집·저장해야 미리보기에 반영됩니다.
-            쇼케이스 「적용하기」만으로는 프로필 사진이 바뀌지 않습니다.
+            쇼케이스 「적용하기」만으로는 프로필 사진이 바뀌지 않습니다. 담당자만 바꿀 때는 상단 드롭다운을 사용하세요.
           </p>
         </div>
       ) : null}
@@ -1302,8 +1309,9 @@ export default function ShowcaseStyleSettingsPanel({
       >
         <div className="showcase-web-desk__tip">
           <p className="showcase-web-desk__tip-text">
-            1열 미리보기 · 2열 설정 (듀얼 화면) · 페이지 전체가 아래로 스크롤됩니다
+            1열 미리보기 · 2열 설정 (듀얼 화면) · 담당자를 바꾸면 DCC·쇼케이스에 바로 반영됩니다
           </p>
+          <DccAgentSwitcher compact onToast={onToast} />
           {includeDigitalCard ? (
             <button type="button" className="showcase-web-desk__tip-cta" onClick={openBizcardSettings}>
               설정하러가기

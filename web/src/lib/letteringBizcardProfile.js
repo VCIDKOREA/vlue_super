@@ -159,9 +159,10 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
   let address = combineLetteringBizcardAddress(road, detail) || String(ed.address || "").trim();
   const titleDept = resolveDisplayTitleDepartment(ed);
 
+  const agentName = isCeo ? "" : String(ed.displayName || "").trim();
   const identity = scrubLetteringDemoPollution(
     {
-      name: fixed.name || "",
+      name: agentName || fixed.name || "",
       organization: fixed.organization || "",
       email: ed.email,
       website: ed.website,

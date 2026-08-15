@@ -139,6 +139,8 @@ const DEFAULT_EDITABLE = {
   noCompanyLogo: false,
   noFax: false,
   noWebsite: false,
+  /** 담당자 스위칭용 표시명 — 없으면 가입 실명 */
+  displayName: "",
   /** 카카오 피드 카드 헤더 배경(커버) data URL */
   kakaoFeedBgDataUrl: "",
   approvedTitle: "",

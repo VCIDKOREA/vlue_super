@@ -9,6 +9,7 @@ import LetteringSettingsSection from '../../../components/LetteringSettingsSecti
 import EnterpriseLineManagePanel from '../../../components/EnterpriseLineManagePanel.jsx';
 import ShowcaseStyleSettingsSheet from '../../../components/showcase/ShowcaseStyleSettingsSheet.jsx';
 import ShowcaseStyleSettingsPanel from '../../../components/showcase/ShowcaseStyleSettingsPanel.jsx';
+import DccAgentSwitcher from '../../../components/dcc/DccAgentSwitcher.jsx';
 import WebUserLetteringPreview from './WebUserLetteringPreview';
 import {
   readDigitalCardActive,
@@ -330,6 +331,7 @@ function WebBizcardHubInner({
 
       {activeTab === 'card' && (
         <div className="space-y-4">
+          <DccAgentSwitcher variant="card" onToast={showToast} />
           <AccountSummaryCard user={user} membershipTier={membershipTier} businessCards={businessCards} />
 
           <BizcardBroadcastToggle

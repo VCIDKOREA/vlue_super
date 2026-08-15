@@ -38,6 +38,8 @@ function httpOnlyUrl(v: unknown): string {
 }
 
 type ExportSnapLite = {
+  name: string;
+  title: string;
   email: string;
   website: string;
   fax: string;
@@ -58,6 +60,9 @@ type ExportSnapLite = {
 async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null> {
   const rows = await prisma.$queryRaw<
     Array<{
+      name: string | null;
+      display_name: string | null;
+      title: string | null;
       email: string | null;
       website: string | null;
       fax: string | null;
@@ -71,6 +76,9 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
     }>
   >`
     SELECT
+      NULLIF(TRIM(export_snapshot_json->>'name'), '') AS name,
+      NULLIF(TRIM(export_snapshot_json->>'displayName'), '') AS display_name,
+      NULLIF(TRIM(export_snapshot_json->>'title'), '') AS title,
       NULLIF(TRIM(export_snapshot_json->>'email'), '') AS email,
       NULLIF(TRIM(export_snapshot_json->>'website'), '') AS website,
       NULLIF(TRIM(export_snapshot_json->>'fax'), '') AS fax,
@@ -88,6 +96,8 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
   const s = rows[0];
   if (!s) return null;
   return {
+    name: firstStr(s.name, s.display_name),
+    title: firstStr(s.title),
     email: firstStr(s.email),
     website: firstStr(s.website),
     fax: firstStr(s.fax),
@@ -149,6 +159,12 @@ function buildContactProfile(opts: {
     pj.dept,
     pj.team
   );
+  const title = firstStr(
+    (snap as ExportSnapLite).title,
+    (snap as Record<string, unknown>).title,
+    pj.title,
+    pj.jobTitle
+  );
   const intro = firstStr(
     pj.intro,
     pj.companyIntro,
@@ -170,6 +186,8 @@ function buildContactProfile(opts: {
     fax,
     address,
     department,
+    title,
+    jobTitle: title || firstStr(pj.jobTitle),
     intro,
     companyIntro: intro,
     salesContent: sales,
@@ -271,6 +289,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
             select: {
               photoUrl: true,
               logoUrl: true,
+              displayName: true,
+              titleSnapshot: true,
               membershipTierSnapshot: true
             }
           }
@@ -287,7 +307,17 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       exportSnap,
       profileJson: baseProfile
     });
-    const rawDisplay = card.displayName || card.user.legalName || "";
+    const rawDisplay = firstStr(
+      card.displayName,
+      exportSnap?.name,
+      card.user.digitalCard?.displayName,
+      card.user.legalName
+    );
+    const rawTitle = firstStr(
+      card.jobTitle,
+      exportSnap?.title,
+      card.user.digitalCard?.titleSnapshot
+    );
     const email = firstStr(profile.email, card.user.email);
 
     if (opts.forPublicOgShare) {
@@ -301,7 +331,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           cardId: card.id,
           kind: card.kind,
           displayName: rawDisplay,
-          jobTitle: card.jobTitle || "",
+          jobTitle: rawTitle,
           companyName: card.companyName || "",
           email,
           profile,
@@ -331,7 +361,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       phoneE164: card.phoneE164,
       publicHandle: card.user.publicHandle,
       companyName: card.companyName,
-      jobTitle: card.jobTitle
+      jobTitle: rawTitle
     }, ctx);
 
     return {
@@ -379,6 +409,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         select: {
           photoUrl: true,
           logoUrl: true,
+          displayName: true,
+          titleSnapshot: true,
           membershipTierSnapshot: true
         }
       }
@@ -394,6 +426,16 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       exportSnap,
       profileJson: null
     });
+    const liveDisplayName = firstStr(
+      exportSnap?.name,
+      user.digitalCard?.displayName,
+      user.legalName
+    );
+    const liveJobTitle = firstStr(
+      exportSnap?.title,
+      user.digitalCard?.titleSnapshot,
+      user.businessProfile?.jobTitle
+    );
     const email = firstStr(profile.email, user.email);
     const photoOnly =
       (typeof user.digitalCard?.photoUrl === "string" && user.digitalCard.photoUrl.trim()) ||
@@ -416,9 +458,9 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           is_verified: Boolean(user.identityVerified) || Boolean(user.digitalCard),
           source: "user_mobile",
           userId: user.id,
-          displayName: user.legalName || "",
+          displayName: liveDisplayName,
           publicHandle: user.publicHandle || "",
-          jobTitle: user.businessProfile?.jobTitle || "",
+          jobTitle: liveJobTitle,
           companyName: user.businessProfile?.companyName || "",
           email,
           profile,
@@ -443,12 +485,12 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
 
     const ctx = await buildViewerAccessContext(viewerId, user.id);
     const masked = maskProfileForViewer(user, {
-      displayName: user.legalName || "",
+      displayName: liveDisplayName,
       legalName: user.legalName,
       phoneE164: user.phoneE164,
       publicHandle: user.publicHandle,
       companyName: user.businessProfile?.companyName,
-      jobTitle: user.businessProfile?.jobTitle
+      jobTitle: liveJobTitle
     }, ctx);
 
     return {

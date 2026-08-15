@@ -289,6 +289,9 @@ model User {
   /// VLUE 디지털 명함 — 신규가입 시 신청한 경우에만 1:1 생성
   digitalCard DigitalCard?
 
+  /// 대표·유선 계정 — 발·수신 DCC에 노출할 담당자 프리셋 (1:N)
+  dccAgentProfiles UserDccAgentProfile[]
+
   /// 1:1 DM — participant_low 쪽
   chatRoomsAsLow ChatRoom[] @relation("ChatRoomParticipantLow")
   /// 1:1 DM — participant_high 쪽
@@ -594,6 +597,34 @@ model DigitalCard {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("digital_cards")
+}
+
+// -----------------------------------------------------------------------------
+// UserDccAgentProfile — 대표/유선 계정 1 : 담당자 프리셋 N
+// DigitalCard 는 「현재 활성 담당자」 스냅샷(통화 lookup 호환)
+// -----------------------------------------------------------------------------
+
+model UserDccAgentProfile {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 드롭다운 표시명. 비우면 displayName · title 로 조합
+  label       String @default("") @db.VarChar(80)
+  displayName String @map("display_name") @db.VarChar(120)
+  title       String @default("") @db.VarChar(120)
+  department  String @default("") @db.VarChar(120)
+  photoUrl    String? @map("photo_url") @db.Text
+  photoFocus  String  @default("center") @map("photo_focus") @db.VarChar(16)
+  isActive    Boolean @default(false) @map("is_active")
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([userId, isActive])
+  @@index([userId, sortOrder])
+  @@map("user_dcc_agent_profiles")
 }
 
 // -----------------------------------------------------------------------------

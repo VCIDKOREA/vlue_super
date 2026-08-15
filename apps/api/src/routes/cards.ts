@@ -25,6 +25,7 @@ import {
   isDirectImageStorageConfigured
 } from "../services/media/directImageStorage.js";
 import { enterpriseDccRoutes } from "./enterpriseDcc.js";
+import { dccAgentProfileRoutes } from "./dccAgentProfiles.js";
 import { mergeExportSnapshotMedia, isDataUrl } from "../lib/mediaUrlGuard.js";
 import { slimExportSnapshot, extractDigitalCardSlimMeta } from "../lib/digitalCardSlim.js";
 import { Prisma } from "@prisma/client";
@@ -32,6 +33,7 @@ import { Prisma } from "@prisma/client";
 export const cardsRoutes = new Hono();
 
 cardsRoutes.route("/enterprise-dcc", enterpriseDccRoutes);
+cardsRoutes.route("/dcc-agent-profiles", dccAgentProfileRoutes);
 
 async function jsonLookup(
   raw: string,

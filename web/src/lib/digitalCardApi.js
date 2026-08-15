@@ -112,7 +112,11 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
     department:
       force || !String(local.department || "").trim()
         ? String(snap.department || "").trim()
-        : local.department
+        : local.department,
+    displayName:
+      force || !String(local.displayName || "").trim()
+        ? String(snap.name || snap.displayName || "").trim()
+        : local.displayName
   };
 
   return writeLetteringBizcardEditable(patch)?.data ?? null;
