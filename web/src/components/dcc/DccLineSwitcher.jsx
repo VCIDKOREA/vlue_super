@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, Settings2 } from "lucide-react";
 import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
-import { writeLetteringBizcardEditable } from "../../lib/letteringBizcardStorage.js";
+import { agentOptionLabel } from "../../lib/dccAgentProfileState.js";
+import {
+  readDccLinePreview,
+  readSelectedDccLineId,
+  writeDccLinePreview,
+  writeDccLinePreviewFromBundle,
+  writeSelectedDccLineId
+} from "../../lib/dccLineState.js";
 import {
   writeLiveShowcaseStyle,
   writeShowcaseStyle
@@ -9,8 +16,6 @@ import {
 import { showcaseStyleHasContent, writeLocalShowcaseStyleUpdatedAt } from "../../lib/showcase/showcaseStyleSync.js";
 import { assignDccLineAgent, fetchDccLineBundle, fetchDccLines, putDccLineDcc } from "../../lib/dccLinesApi.js";
 import { fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
-import { agentOptionLabel, applyDccAgentToLocalCard } from "../../lib/dccAgentProfileState.js";
-import { readSelectedDccLineId, writeSelectedDccLineId } from "../../lib/dccLineState.js";
 import { dccLineOptionLabel } from "../../lib/dccLineLabel.js";
 import DccAgentManageModal from "./DccAgentManageModal.jsx";
 import "./dcc-agent-switcher.css";
@@ -18,6 +23,7 @@ import "./dcc-agent-switcher.css";
 function applyLineToLocalPreview(bundle) {
   const line = bundle?.line;
   if (!line?.id) return;
+  writeDccLinePreviewFromBundle(bundle);
   writeSelectedDccLineId(line.id);
   const editor = bundle.showcase?.editor || bundle.showcase?.live || null;
   const live = bundle.showcase?.live || editor;
@@ -25,15 +31,6 @@ function applyLineToLocalPreview(bundle) {
     writeShowcaseStyle(editor || live, { replace: true, skipSync: true });
     writeLiveShowcaseStyle(live || editor, { source: "editor", skipSync: true });
     if (bundle.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
-  }
-  const photo = String(line.photoUrl || bundle.dcc?.photoUrl || "").trim();
-  if (photo) {
-    writeLetteringBizcardEditable({
-      photoDataUrl: photo,
-      photoUrl: photo,
-      photoFocus: line.photoFocus || "center",
-      noProfilePhoto: false
-    });
   }
   try {
     window.dispatchEvent(new Event("vlue-showcase-style-changed"));
@@ -131,7 +128,7 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
       if (targetLineId === lineId) {
         setAgentId(res.agent?.id || nextId);
         setProfiles((prev) => prev.map((p) => ({ ...p, isActive: p.id === nextId })));
-        if (res.agent) applyDccAgentToLocalCard(res.agent, { keepPhoto: true });
+        writeDccLinePreviewFromBundle(res);
       }
       onToast?.(
         `${dccLineOptionLabel(nextLine || current)} — 담당자를 바꿨습니다. 사진·쇼케이스는 이 번호 설정이 유지됩니다.`
@@ -165,7 +162,7 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
       const res = await putDccLineDcc(lineId, { photoUrl: url, noProfilePhoto: false });
       const next = res.line?.photoUrl || url;
       setPhotoUrl(next);
-      writeLetteringBizcardEditable({ photoDataUrl: next, photoUrl: next, noProfilePhoto: false });
+      writeDccLinePreview({ ...(readDccLinePreview() || {}), id: lineId, photoUrl: next });
       onToast?.("이 번호의 프로필 사진을 저장했습니다.");
     } catch (e) {
       onToast?.(e instanceof Error ? e.message : "사진 저장에 실패했습니다.");

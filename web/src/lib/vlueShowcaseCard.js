@@ -1,6 +1,7 @@
 import { buildUserLetteringCard, withLetteringBizcardPreviewFallback } from "./letteringBizcardProfile.js";
 import { isPaidLetteringTier, normalizeMembershipKind } from "./letteringMembership.js";
 import { applyShowcasePreviewExampleIdentity } from "./vlueShowcasePreviewIdentity.js";
+import { readDccLinePreview } from "./dccLineState.js";
 
 /**
  * VLUE Showcase · VLUE Case — 동일 명함/프로필 데이터 소스
@@ -11,8 +12,32 @@ export function resolveVlueShowcaseCard({ membershipTier = "free", previewExampl
   const kind = normalizeMembershipKind(membershipTier);
   const tier = isPaidLetteringTier(kind) ? kind : "free";
   const base = withLetteringBizcardPreviewFallback(buildUserLetteringCard({ membershipTier: tier }));
-  if (!previewExample) return base;
-  return applyShowcasePreviewExampleIdentity({ ...base, membershipTier: tier });
+  const withExample = previewExample
+    ? applyShowcasePreviewExampleIdentity({ ...base, membershipTier: tier })
+    : base;
+  return applyDccLinePreviewOverlay(withExample);
+}
+
+/** 선택한 내선·대표·인증번호의 이름·번호·사진을 미리보기에 덮어쓴다. 대표 DigitalCard는 건드리지 않음. */
+export function applyDccLinePreviewOverlay(card = {}) {
+  const line = readDccLinePreview();
+  if (!line?.id) return card;
+  const name = String(line.displayName || "").trim();
+  const phone = String(line.displayPhone || "").trim();
+  const photo = String(line.photoUrl || "").trim();
+  const title = String(line.title || "").trim();
+  const department = String(line.department || "").trim();
+  return {
+    ...card,
+    name: name || card.name,
+    displayName: name || card.displayName,
+    phone: phone || card.phone,
+    photoUrl: photo || card.photoUrl,
+    photoFocus: line.photoFocus || card.photoFocus,
+    title: title || card.title,
+    department: department || card.department,
+    previewShowcaseId: name || phone || card.previewShowcaseId || ""
+  };
 }
 
 /** 유료 Showcase — 통화 중 송출 데모 상태 */

@@ -638,6 +638,8 @@ export default function LetteringIncomingNotification({
   const previewShowcaseId = useMemo(() => {
     /* 미인증·실통화 오버레이는 수신자 로컬 핸들(ceo)을 붙이지 않음 */
     if (isUnverified) return "";
+    const fromPreview = String(c.previewShowcaseId || "").trim().replace(/^@+/, "");
+    if (fromPreview) return fromPreview;
     const fromCard = String(c.loginId || c.publicHandle || c.handle || "").trim().replace(/^@+/, "");
     if (fromCard) return fromCard;
     if (!previewMode) {
@@ -661,6 +663,7 @@ export default function LetteringIncomingNotification({
   }, [
     isUnverified,
     previewMode,
+    c.previewShowcaseId,
     c.loginId,
     c.publicHandle,
     c.handle,
@@ -1030,12 +1033,11 @@ export default function LetteringIncomingNotification({
     );
   };
 
-  /* Native BigPush 창에서는 네이티브 DCP 팝업 + 쇼케이스 바를 같이 띄운다 */
+  /* 네이티브 오버레이는 DCP 팝업을 별도 창으로 띄움 — 웹 전체 레이어로 화면을 잠그지 않음 */
   if (
     isDcp &&
-    !previewMode &&
+    previewMode &&
     !fromCallHistory &&
-    !forceShowcaseBar &&
     dcpCardMatchesIncoming(c, incoming)
   ) {
     return (
