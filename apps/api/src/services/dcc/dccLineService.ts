@@ -63,6 +63,48 @@ function displayPhone(e164: string): string {
 const LINE_KINDS = ["mobile", "extension", "rep_number"] as const;
 const KIND_RANK: Record<string, number> = { mobile: 0, extension: 1, rep_number: 2 };
 
+function showcaseHasContent(raw: unknown): boolean {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
+  const s = raw as Record<string, unknown>;
+  const bgm = snapObj(s.bgm);
+  if (bgm.mode && bgm.mode !== "none") return true;
+  if (Array.isArray(bgm.playlist) && bgm.playlist.length > 0) return true;
+  if (Array.isArray(s.pages) && s.pages.length > 0) return true;
+  const gallery = snapObj(s.gallery);
+  if (Array.isArray(gallery.photos) && gallery.photos.length > 0) return true;
+  const commercial = snapObj(s.commercial);
+  const outlinks = snapObj(commercial.outlinks);
+  if (Object.values(outlinks).some((v) => String(v || "").trim())) return true;
+  if (Array.isArray(commercial.links) && commercial.links.length > 0) return true;
+  const rich = snapObj(s.richCustom);
+  if (String(rich.bodyText || "").trim()) return true;
+  if (Array.isArray(s.tags) && s.tags.length > 0) return true;
+  return false;
+}
+
+async function loadMasterExport(userId: string): Promise<Record<string, unknown>> {
+  const card = await prisma.digitalCard.findUnique({
+    where: { userId },
+    select: { exportSnapshotJson: true, photoUrl: true, logoUrl: true }
+  });
+  const snap = snapObj(card?.exportSnapshotJson);
+  if (card?.photoUrl && !httpPhoto(snap.photoUrl)) snap.photoUrl = card.photoUrl;
+  if (card?.logoUrl && !httpPhoto(snap.logoUrl)) snap.logoUrl = card.logoUrl;
+  return snap;
+}
+
+async function loadMasterShowcase(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      showcaseStyleJson: true,
+      showcaseLiveStyleJson: true,
+      showcaseLiveSourceJson: true,
+      showcaseStyleUpdatedAt: true
+    }
+  });
+}
+
 function snapObj(raw: unknown): Record<string, unknown> {
   return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
 }
@@ -226,17 +268,26 @@ export async function getDccLineBundle(userId: string, cardId: string) {
         where: { id: row.activeDccAgentProfileId, userId }
       })
     : null;
-  const snap = snapObj(row.dccSnapshotJson);
+  const snap = mergeExportSnapshotMedia(await loadMasterExport(userId), snapObj(row.dccSnapshotJson));
+  const lineEditor = row.lineShowcaseStyleJson;
+  const lineLive = row.lineShowcaseLiveStyleJson;
+  const lineHas = showcaseHasContent(lineEditor) || showcaseHasContent(lineLive);
+  const master = lineHas ? null : await loadMasterShowcase(userId);
+  const editor = lineHas ? lineEditor : master?.showcaseStyleJson || master?.showcaseLiveStyleJson || null;
+  const live = lineHas ? lineLive || lineEditor : master?.showcaseLiveStyleJson || master?.showcaseStyleJson || null;
+  const masterAt = master?.showcaseStyleUpdatedAt;
+  const lineAt = row.lineShowcaseUpdatedAt;
+  const updatedAt = lineHas ? lineAt : masterAt;
   return {
     line: await toOwnedLineDto(userId, row),
     agent: agent ? agentDto(agent) : null,
     dcc: slimExportSnapshot(snap) || snap,
     showcase: {
       v: 2 as const,
-      editor: row.lineShowcaseStyleJson || null,
-      live: row.lineShowcaseLiveStyleJson || null,
-      liveSource: row.lineShowcaseLiveSourceJson || null,
-      updatedAt: row.lineShowcaseUpdatedAt ? row.lineShowcaseUpdatedAt.toISOString() : null
+      editor: editor || null,
+      live: live || null,
+      liveSource: (lineHas ? row.lineShowcaseLiveSourceJson : master?.showcaseLiveSourceJson) || null,
+      updatedAt: updatedAt ? updatedAt.toISOString() : null
     }
   };
 }
@@ -249,7 +300,7 @@ export async function assignAgentToLine(userId: string, cardId: string, agentId:
     (err as Error & { status?: number }).status = 404;
     throw err;
   }
-  const prev = snapObj(row.dccSnapshotJson);
+  const prev = mergeExportSnapshotMedia(await loadMasterExport(userId), snapObj(row.dccSnapshotJson));
   const merged = mergeExportSnapshotMedia(prev, {
     name: agent.displayName,
     displayName: agent.displayName,
@@ -284,7 +335,7 @@ export async function putDccLineSnapshot(
   patch: Record<string, unknown>
 ) {
   const row = await requireOwnedLine(userId, cardId);
-  const prev = snapObj(row.dccSnapshotJson);
+  const prev = mergeExportSnapshotMedia(await loadMasterExport(userId), snapObj(row.dccSnapshotJson));
   if (patch.photoUrl != null && isDataUrl(patch.photoUrl)) {
     const err = new Error("프로필 사진은 https URL만 저장할 수 있습니다.");
     (err as Error & { status?: number }).status = 400;
@@ -318,35 +369,47 @@ export async function putDccLineShowcase(
   input: { editor?: unknown; live?: unknown; liveSource?: unknown }
 ) {
   const row = await requireOwnedLine(userId, cardId);
+  const master = await loadMasterShowcase(userId);
+  const masterHas =
+    showcaseHasContent(master?.showcaseStyleJson) || showcaseHasContent(master?.showcaseLiveStyleJson);
+  const existingHas =
+    showcaseHasContent(row.lineShowcaseStyleJson) || showcaseHasContent(row.lineShowcaseLiveStyleJson);
   const now = new Date();
-  const data: Prisma.BusinessCardUpdateInput = {
-    lineShowcaseUpdatedAt: now
-  };
+  const data: Prisma.BusinessCardUpdateInput = {};
   if (input.editor !== undefined) {
     const obj = input.editor && typeof input.editor === "object" ? (input.editor as Record<string, unknown>) : null;
-    if (obj) {
+    if (obj && showcaseHasContent(obj)) {
       const slim = slimShowcaseStyleForPersist(stripDataUrlsFromJson(obj)) as Record<string, unknown>;
       slim.v = 2;
       assertShowcaseStyleWithinLimit(slim, "showcase style");
       data.lineShowcaseStyleJson = slim as Prisma.InputJsonValue;
-    } else {
+    } else if (!obj && !existingHas && !masterHas) {
       data.lineShowcaseStyleJson = Prisma.JsonNull;
     }
   }
   if (input.live !== undefined) {
     const obj = input.live && typeof input.live === "object" ? (input.live as Record<string, unknown>) : null;
-    if (obj) {
+    if (obj && showcaseHasContent(obj)) {
       const slim = slimShowcaseStyleForPersist(stripDataUrlsFromJson(obj)) as Record<string, unknown>;
       slim.v = 2;
       assertShowcaseStyleWithinLimit(slim, "showcase style");
       data.lineShowcaseLiveStyleJson = slim as Prisma.InputJsonValue;
-    } else {
+    } else if (!obj && !existingHas && !masterHas) {
       data.lineShowcaseLiveStyleJson = Prisma.JsonNull;
     }
   }
   if (input.liveSource !== undefined && input.liveSource && typeof input.liveSource === "object") {
     data.lineShowcaseLiveSourceJson = input.liveSource as Prisma.InputJsonValue;
   }
+  if (Object.keys(data).length === 0) {
+    return {
+      ok: true as const,
+      updatedAt: row.lineShowcaseUpdatedAt ? row.lineShowcaseUpdatedAt.toISOString() : now.toISOString(),
+      line: await toOwnedLineDto(userId, row),
+      skippedEmpty: true as const
+    };
+  }
+  data.lineShowcaseUpdatedAt = now;
   const updated = await prisma.businessCard.update({
     where: { id: row.id },
     data
@@ -375,16 +438,7 @@ export async function getLineShowcasePublicByPhone(rawNumber: string) {
   });
   if (!card) return null;
   const live = card.lineShowcaseLiveStyleJson || card.lineShowcaseStyleJson;
-  if (!live) {
-    return {
-      cardId: card.id,
-      userId: card.userId,
-      v: 2 as const,
-      live: null,
-      liveSource: card.lineShowcaseLiveSourceJson || null,
-      updatedAt: card.lineShowcaseUpdatedAt ? card.lineShowcaseUpdatedAt.toISOString() : null
-    };
-  }
+  if (!showcaseHasContent(live)) return null;
   return {
     cardId: card.id,
     userId: card.userId,

@@ -304,22 +304,21 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       card.dccSnapshotJson && typeof card.dccSnapshotJson === "object"
         ? (card.dccSnapshotJson as Record<string, unknown>)
         : null;
-    const exportSnap = lineSnap
-      ? {
-          name: firstStr(lineSnap.name, lineSnap.displayName),
-          title: firstStr(lineSnap.title),
-          email: firstStr(lineSnap.email),
-          website: firstStr(lineSnap.website),
-          fax: firstStr(lineSnap.fax),
-          address: firstStr(lineSnap.address),
-          department: firstStr(lineSnap.department),
-          companyIntro: firstStr(lineSnap.companyIntro),
-          salesContent: firstStr(lineSnap.salesContent),
-          photoUrl: httpOnlyUrl(lineSnap.photoUrl),
-          logoUrl: httpOnlyUrl(lineSnap.logoUrl),
-          photoFocus: firstStr(lineSnap.photoFocus)
-        }
-      : await loadExportSnapLite(card.user.id);
+    const masterSnap = await loadExportSnapLite(card.user.id);
+    const exportSnap = {
+      name: firstStr(lineSnap?.name, lineSnap?.displayName, masterSnap?.name),
+      title: firstStr(lineSnap?.title, masterSnap?.title),
+      email: firstStr(lineSnap?.email, masterSnap?.email),
+      website: firstStr(lineSnap?.website, masterSnap?.website),
+      fax: firstStr(lineSnap?.fax, masterSnap?.fax),
+      address: firstStr(lineSnap?.address, masterSnap?.address),
+      department: firstStr(lineSnap?.department, masterSnap?.department),
+      companyIntro: firstStr(lineSnap?.companyIntro, masterSnap?.companyIntro),
+      salesContent: firstStr(lineSnap?.salesContent, masterSnap?.salesContent),
+      photoUrl: httpOnlyUrl(lineSnap?.photoUrl) || masterSnap?.photoUrl || "",
+      logoUrl: httpOnlyUrl(lineSnap?.logoUrl) || masterSnap?.logoUrl || "",
+      photoFocus: firstStr(lineSnap?.photoFocus, masterSnap?.photoFocus)
+    };
     const baseProfile = (card.profileJson as Record<string, unknown> | null) ?? null;
     const profile = buildContactProfile({
       userEmail: card.user.email,

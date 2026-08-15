@@ -3,11 +3,10 @@ import { ChevronDown, Settings2 } from "lucide-react";
 import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
 import { writeLetteringBizcardEditable } from "../../lib/letteringBizcardStorage.js";
 import {
-  createDefaultShowcaseStyle,
   writeLiveShowcaseStyle,
   writeShowcaseStyle
 } from "../../lib/showcase/showcaseStyleStorage.js";
-import { writeLocalShowcaseStyleUpdatedAt } from "../../lib/showcase/showcaseStyleSync.js";
+import { showcaseStyleHasContent, writeLocalShowcaseStyleUpdatedAt } from "../../lib/showcase/showcaseStyleSync.js";
 import { assignDccLineAgent, fetchDccLineBundle, fetchDccLines, putDccLineDcc } from "../../lib/dccLinesApi.js";
 import { fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
 import { agentOptionLabel, applyDccAgentToLocalCard } from "../../lib/dccAgentProfileState.js";
@@ -20,20 +19,22 @@ function applyLineToLocalPreview(bundle) {
   const line = bundle?.line;
   if (!line?.id) return;
   writeSelectedDccLineId(line.id);
-  const empty = createDefaultShowcaseStyle();
-  const editor = bundle.showcase?.editor || bundle.showcase?.live || empty;
-  const live = bundle.showcase?.live || editor || empty;
-  writeShowcaseStyle(editor, { replace: true, skipSync: true });
-  writeLiveShowcaseStyle(live, { source: "editor", skipSync: true });
-  if (bundle.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
+  const editor = bundle.showcase?.editor || bundle.showcase?.live || null;
+  const live = bundle.showcase?.live || editor;
+  if (showcaseStyleHasContent(editor) || showcaseStyleHasContent(live)) {
+    writeShowcaseStyle(editor || live, { replace: true, skipSync: true });
+    writeLiveShowcaseStyle(live || editor, { source: "editor", skipSync: true });
+    if (bundle.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
+  }
   const photo = String(line.photoUrl || bundle.dcc?.photoUrl || "").trim();
-  writeLetteringBizcardEditable({
-    photoDataUrl: photo,
-    photoUrl: photo,
-    photoFocus: line.photoFocus || "center",
-    noProfilePhoto: !photo
-  });
-  if (bundle.agent) applyDccAgentToLocalCard(bundle.agent, { keepPhoto: true });
+  if (photo) {
+    writeLetteringBizcardEditable({
+      photoDataUrl: photo,
+      photoUrl: photo,
+      photoFocus: line.photoFocus || "center",
+      noProfilePhoto: false
+    });
+  }
   try {
     window.dispatchEvent(new Event("vlue-showcase-style-changed"));
     window.dispatchEvent(new Event("vlue-showcase-live-style-changed"));
