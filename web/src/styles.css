@@ -6870,7 +6870,7 @@ body,
   aspect-ratio: 4 / 3;
   max-height: 200px;
   overflow: hidden;
-  background: #0b101b;
+  background: transparent;
   border: 0;
   box-shadow: none;
   outline: none;
@@ -7048,18 +7048,41 @@ body,
   background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
 }
 
+.ldr-hero__visual,
+.ldr-back-hero {
+  /* 웹·앱 DCC 동일 — 사진이 패널 배경(#070b14)으로 녹아들게 */
+  --ldr-photo-feather-mask: linear-gradient(
+    180deg,
+    #000 0%,
+    #000 36%,
+    rgba(0, 0, 0, 0.92) 50%,
+    rgba(0, 0, 0, 0.62) 66%,
+    rgba(0, 0, 0, 0.28) 82%,
+    rgba(0, 0, 0, 0.06) 93%,
+    transparent 100%
+  );
+  --ldr-photo-feather-shade: linear-gradient(
+    180deg,
+    transparent 28%,
+    rgba(7, 11, 20, 0.16) 48%,
+    rgba(7, 11, 20, 0.48) 68%,
+    rgba(7, 11, 20, 0.28) 86%,
+    transparent 100%
+  );
+  -webkit-mask-image: var(--ldr-photo-feather-mask);
+  mask-image: var(--ldr-photo-feather-mask);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
 .ldr-hero__shade {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  /* 하단 페더를 이름 높이까지 살짝 올려 흰 글자가 사진에 묻히지 않게 */
-  background: linear-gradient(
-    180deg,
-    transparent 40%,
-    rgba(11, 17, 32, 0.28) 68%,
-    rgba(11, 17, 32, 0.78) 100%
-  );
+  background: var(--ldr-photo-feather-shade);
 }
 
 .ldr-hero__badge {
@@ -7706,9 +7729,6 @@ body,
   overflow: hidden;
   border: 0 !important;
   box-shadow: none !important;
-  /* 하단 페더는 shade로 처리 — 사진이 투명으로 사라지지 않게 */
-  -webkit-mask-image: none;
-  mask-image: none;
 }
 
 .ldr-back-hero__shade {
@@ -7717,14 +7737,7 @@ body,
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  /* 이름·직함이 밝은 사진에 묻히지 않게 하단부터 중간까지 페더 */
-  background: linear-gradient(
-    180deg,
-    transparent 36%,
-    rgba(7, 11, 20, 0.28) 58%,
-    rgba(7, 11, 20, 0.72) 82%,
-    rgba(7, 11, 20, 0.9) 100%
-  );
+  background: var(--ldr-photo-feather-shade);
 }
 
 .ldr-profile-media--logo .ldr-profile-media__img {
