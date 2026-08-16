@@ -125,6 +125,15 @@ authed.get("/users", async (c) => {
   return c.json({ ok: true, ...data });
 });
 
+authed.get("/overdue-lines", async (c) => {
+  const q = c.req.query("q") || "";
+  const limit = Number(c.req.query("limit") || 50);
+  const offset = Number(c.req.query("offset") || 0);
+  const { listOverdueLinesForAdmin } = await import("../services/billing/lineBillingService.js");
+  const data = await listOverdueLinesForAdmin({ q, limit, offset });
+  return c.json({ ok: true, ...data });
+});
+
 authed.get("/users/:userId", async (c) => {
   const user = await getAdminUser(c.req.param("userId"));
   if (!user) return c.json({ error: "회원을 찾을 수 없습니다." }, 404);

@@ -7,6 +7,7 @@ import {
   readPushNotifications,
   resolvePushDisplayTime
 } from "../lib/pushNotificationInbox";
+import { syncOwnerInboxFromServer } from "../lib/ownerInboxSync.js";
 import PushNotificationDetailModal from "./PushNotificationDetailModal.jsx";
 
 const CATEGORY_STYLE = {
@@ -33,6 +34,7 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
 
   useEffect(() => {
     refresh();
+    void syncOwnerInboxFromServer().then(() => refresh());
     const onChange = () => refresh();
     window.addEventListener(PUSH_INBOX_CHANGED, onChange);
     return () => window.removeEventListener(PUSH_INBOX_CHANGED, onChange);
@@ -89,8 +91,12 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
           <li key={n.id}>
             <button
               type="button"
-              className={`relative flex w-full cursor-pointer gap-3 border-b border-gray-50 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 active:bg-gray-100 ${
-                n.read ? "opacity-70" : "bg-blue-50/40"
+              className={`relative flex w-full cursor-pointer gap-3 border-b px-4 py-3.5 text-left transition-colors hover:bg-slate-50 active:bg-gray-100 ${
+                n.pinned
+                  ? "border-amber-100 bg-amber-50/70"
+                  : n.read
+                    ? "border-gray-50 opacity-70"
+                    : "border-gray-50 bg-blue-50/40"
               }`}
               onClick={() => openDetail(n)}
             >
@@ -102,6 +108,16 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
               ) : null}
               <div className="min-w-0 flex-1 pl-2">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
+                  {n.pinned ? (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800">
+                      고정
+                    </span>
+                  ) : null}
+                  {!n.read ? (
+                    <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-black text-white">
+                      NEW
+                    </span>
+                  ) : null}
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                       CATEGORY_STYLE[n.category] || CATEGORY_STYLE.기타

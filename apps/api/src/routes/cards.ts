@@ -166,6 +166,18 @@ async function handleRegisterPremiumLine(c: import("hono").Context) {
     }
   });
 
+  try {
+    const { ensureLineSubscriptionForCard } = await import("../services/billing/lineBillingService.js");
+    await ensureLineSubscriptionForCard({
+      userId: me,
+      businessCardId: created.id,
+      amountKrw: 9900,
+      status: "pending_payment"
+    });
+  } catch (e) {
+    console.warn("[cards/register] line subscription", e);
+  }
+
   await prisma.verificationLog.create({
     data: {
       cardId: created.id,

@@ -18,6 +18,7 @@ import {
   fetchAdminOnboardingStats,
   fetchAdminPosts,
   fetchAdminSignatureSounds,
+  fetchAdminOverdueLines,
   fetchAdminUsers,
   fetchAdminUser,
   patchAdminSignatureSound,
@@ -41,6 +42,7 @@ const TABS = [
   { id: "pricing", label: "요금제 관리" },
   { id: "signature", label: "Signature Sound" },
   { id: "users", label: "회원 관리" },
+  { id: "overdue", label: "미납 회선" },
   { id: "posts", label: "게시물 관리" },
   { id: "onboarding", label: "가입 승인" }
 ];
@@ -316,6 +318,73 @@ function MemberDetail({ user, onClose }) {
           </div>
         ))}
       </dl>
+    </div>
+  );
+}
+
+function OverdueLinesTab({ onToast }) {
+  const [q, setQ] = useState("");
+  const [lines, setLines] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchAdminOverdueLines({ q });
+      setLines(data.lines || []);
+      setTotal(data.total || 0);
+    } catch (e) {
+      onToast?.(e?.message || "미납 회선 조회 실패");
+    } finally {
+      setLoading(false);
+    }
+  }, [q, onToast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const statusLabel = (status) => {
+    if (status === "grace") return "유예(미납)";
+    if (status === "lapsed") return "만료·삭제";
+    return status || "—";
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="이름·핸들·번호 검색"
+          className="rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
+        />
+        <button type="button" onClick={load} className="rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-bold text-white">
+          {loading ? "조회 중…" : "조회"}
+        </button>
+        <p className="text-[12px] text-slate-500">미납·유예·만료 회선 {total}건</p>
+      </div>
+      <Table
+        emptyLabel="미납 회선이 없습니다"
+        columns={[
+          { key: "legalName", label: "회원", render: (r) => `${r.legalName || "—"} (@${r.publicHandle || ""})` },
+          { key: "phoneDisplay", label: "회선 번호" },
+          { key: "kind", label: "종류" },
+          { key: "status", label: "상태", render: (r) => statusLabel(r.status) },
+          {
+            key: "graceEndsAt",
+            label: "유예 마감",
+            render: (r) =>
+              r.graceEndsAt
+                ? new Date(r.graceEndsAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })
+                : "—"
+          },
+          { key: "amountKrw", label: "금액", render: (r) => `${Number(r.amountKrw || 0).toLocaleString("ko-KR")}원` },
+          { key: "email", label: "이메일" }
+        ]}
+        rows={lines.map((row) => ({ ...row, _key: row.id }))}
+      />
     </div>
   );
 }
@@ -767,6 +836,7 @@ export default function AdminConsoleDesk({ user, onLogout }) {
         {tab === "pricing" ? <PricingManagerPanel onToast={showToast} /> : null}
         {tab === "signature" ? <SignatureSoundTab onToast={showToast} /> : null}
         {tab === "users" ? <UsersTab onToast={showToast} /> : null}
+        {tab === "overdue" ? <OverdueLinesTab onToast={showToast} /> : null}
         {tab === "posts" ? <PostsTab onToast={showToast} /> : null}
         {tab === "onboarding" ? <OnboardingTab onToast={showToast} /> : null}
       </main>

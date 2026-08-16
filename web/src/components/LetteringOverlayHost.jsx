@@ -141,6 +141,14 @@ function isDcpOverlayCard(card) {
   return String(card.profileKind || "").trim() === "dcp" || Boolean(card.dcp && typeof card.dcp === "object");
 }
 
+function isExpiredLineCard(card) {
+  if (!card || typeof card !== "object") return false;
+  return (
+    String(card.profileKind || "").trim() === "expired_line" ||
+    String(card.lineBillingStatus || "").trim() === "grace"
+  );
+}
+
 function dcpLogoUrl(card) {
   if (!card) return "";
   return String(card.logoUrl || card.dcp?.logoUrl || card.photoUrl || "").trim();
@@ -166,6 +174,7 @@ function mergeDcpCard(prev, mapped) {
 function isResolvedOverlayCard(card) {
   if (!card) return false;
   if (isDcpOverlayCard(card)) return true;
+  if (isExpiredLineCard(card)) return true;
   if (String(card.userId || card.ownerUserId || "").trim()) return true;
   const handle = String(card.publicHandle || card.loginId || card.vlueId || "")
     .trim()
@@ -403,9 +412,10 @@ function LetteringOverlayHostInner() {
             setCard((prev) => mergeDcpCard(prev, mapped));
             setVerified(true);
             setLoading(false);
-            const peerUserId = isDcp
-              ? ""
-              : String(mapped.userId || mapped.ownerUserId || "").trim();
+            const peerUserId =
+              isDcp || isExpiredLineCard(mapped)
+                ? ""
+                : String(mapped.userId || mapped.ownerUserId || "").trim();
             if (peerUserId) {
               const { card, style } = await enrichOverlayPeerBundle(peerUserId, mapped);
               if (cancelled) return;
@@ -445,8 +455,10 @@ function LetteringOverlayHostInner() {
 
       /* 상대(발신/수신 번호 소유자) 라이브 쇼케이스 — 본인 hydrateLive 금지 */
       let peerStyle = createDefaultShowcaseStyle();
-      const isDcp = nextCard?.profileKind === "dcp" || Boolean(nextCard?.dcp);
-      const peerUserId = isDcp ? "" : String(nextCard?.userId || nextCard?.ownerUserId || "").trim();
+      const isDcp = isDcpOverlayCard(nextCard);
+      const isExpiredLine = isExpiredLineCard(nextCard);
+      const peerUserId =
+        isDcp || isExpiredLine ? "" : String(nextCard?.userId || nextCard?.ownerUserId || "").trim();
 
       /* lookup 직후 DCC 먼저 표시 — 스타일·프로필은 병렬 */
       if (nextCard) {

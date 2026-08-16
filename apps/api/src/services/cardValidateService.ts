@@ -74,6 +74,25 @@ export async function validateDigitalCardForExport(cardIdOrHandle: string): Prom
     };
   }
 
+  try {
+    const { getOwnerLineBillingStatus } = await import("./billing/lineBillingService.js");
+    const billing = await getOwnerLineBillingStatus(row.userId);
+    const certified = billing.lines.find((l) => l.isCertified);
+    if (certified && certified.status !== "active" && certified.status !== "pending_payment") {
+      return {
+        valid: false,
+        cardId: id,
+        reason: "membership_expired",
+        message: "인증기간이 만료되어 명함 송출이 중단되었습니다.",
+        membershipActive: false,
+        designTemplate: row.designTemplateSnapshot,
+        checkedAt
+      };
+    }
+  } catch {
+    /* billing table 미적용 환경은 기존 paid 판정 유지 */
+  }
+
   return {
     valid: true,
     cardId: id,

@@ -8,6 +8,70 @@ import {
   buildAgencyDcpLookupBody,
   resolveAgencyCallRoute
 } from "./agency/nationalAgencyDcpService.js";
+import { formatPhoneDisplayKR } from "../lib/phoneDisplay.js";
+
+const EXPIRED_SUBTITLE = "인증기간이 만료된 번호입니다.";
+const EXPIRED_DETAIL = "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다.";
+
+function expiredLineLookupBody(opts: {
+  phoneE164: string;
+  cardId?: string;
+  userId?: string;
+  graceEndsAt?: Date | null;
+}) {
+  const phoneDisplay = formatPhoneDisplayKR(opts.phoneE164);
+  return {
+    matched: true,
+    is_verified: false,
+    source: "expired_line",
+    profileKind: "expired_line",
+    lineBillingStatus: "grace",
+    displayName: phoneDisplay,
+    jobTitle: "",
+    companyName: "",
+    email: "",
+    profile: {},
+    website: "",
+    photoFocus: "",
+    image_url: "",
+    logo_url: "",
+    voice_url: null as string | null,
+    phoneE164: opts.phoneE164,
+    cardId: opts.cardId || "",
+    userId: opts.userId || "",
+    membershipTier: "free",
+    expiredSubtitle: EXPIRED_SUBTITLE,
+    expiredDetail: EXPIRED_DETAIL,
+    graceEndsAt: opts.graceEndsAt ? opts.graceEndsAt.toISOString() : null,
+    access: {
+      isOwner: false,
+      isActiveFollower: false,
+      isMutualFollow: false,
+      isShowcasePrivate: true
+    },
+    visibility: { phone: true, name: false, org: false, id: false }
+  };
+}
+
+async function resolveLineBillingGate(e164: string) {
+  const card = await prisma.businessCard.findFirst({
+    where: { phoneE164: e164 },
+    select: {
+      id: true,
+      userId: true,
+      phoneE164: true,
+      lineSubscription: { select: { status: true, graceEndsAt: true } }
+    }
+  });
+  const status = card?.lineSubscription?.status || "";
+  if (status === "grace") {
+    return { gate: "expired" as const, card };
+  }
+  if (status === "lapsed" || status === "cancelled") {
+    return { gate: "unmatched" as const, card };
+  }
+  return { gate: "ok" as const, card };
+}
 
 /** CEO 기본 VLUE 브랜드 로고 (업로드 없을 때) */
 function ceoDefaultBrandLogoUrl(): string {
@@ -276,6 +340,21 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
     return { status: 400 as const, body: { error: "유효한 번호 형식이 아닙니다.", matched: false } };
   }
 
+  const billingGate = await resolveLineBillingGate(e164);
+  if (billingGate.gate === "expired" && billingGate.card) {
+    return {
+      status: 200 as const,
+      body: expiredLineLookupBody({
+        phoneE164: billingGate.card.phoneE164,
+        cardId: billingGate.card.id,
+        userId: billingGate.card.userId,
+        graceEndsAt: billingGate.card.lineSubscription?.graceEndsAt || null
+      })
+    };
+  }
+  if (billingGate.gate === "unmatched") {
+    /* 유예 경과·해지 회선은 일반 미인증으로 취급 — 아래 user/unmatched 분기로 */
+  } else {
   const card = await prisma.businessCard.findFirst({
     where: { phoneE164: e164, verificationStatus: "approved" },
     include: {
@@ -412,6 +491,14 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         access: masked.access,
         visibility: masked.visibility
       }
+    };
+  }
+  }
+
+  if (billingGate.gate === "unmatched") {
+    return {
+      status: 404 as const,
+      body: { matched: false, message: "등록된 명함이 없습니다." }
     };
   }
 

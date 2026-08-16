@@ -341,6 +341,7 @@ model User {
   penaltyEvents        PenaltyEvent[]
   notificationsOwned   OwnerNotification[] @relation("OwnerNotificationOwner")
   notificationsActor   OwnerNotification[] @relation("OwnerNotificationActor")
+  lineSubscriptions    LineSubscription[]
   boardEvents          ActiveBoardEvent[]
   letteringPhoneBlocks LetteringPhoneBlock[] @relation("LetteringBlocksOwned")
   letteringPhoneReports LetteringPhoneReport[] @relation("LetteringReportsFiled")
@@ -770,6 +771,7 @@ model BusinessCard {
   feedPosts         CardFeedPost[]
   verificationLogs  VerificationLog[]
   chatMessagesSent  ChatMessage[]
+  lineSubscription  LineSubscription?
 
   /// B2B 기업 귀속 회선 — 통화 오버레이 시 대표번호 마스킹용
   b2bEnterpriseId String? @map("b2b_enterprise_id") @db.Uuid
@@ -1069,9 +1071,15 @@ model OwnerNotification {
   title        String             @db.VarChar(120)
   body         String             @db.Text
   status       NotificationStatus @default(unread)
+  /// line_grace 등 — 알림함 상단 고정. 결제·해지 시 서버에서 삭제
+  pinKind      String?            @map("pin_kind") @db.VarChar(40)
+  pinKey       String?            @map("pin_key") @db.VarChar(80)
+  payloadJson  Json?              @map("payload_json") @db.JsonB
   createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  @@unique([ownerUserId, pinKey])
   @@index([ownerUserId, status])
+  @@index([ownerUserId, pinKind])
   @@map("owner_notifications")
 }
 
@@ -1434,6 +1442,15 @@ enum UserSubscriptionStatus {
   cancelled
 }
 
+/// 회선(BusinessCard) 단위 독립 구독 — 장바구니 일괄 신청 후에도 결제·상태는 회선별
+enum LineSubscriptionStatus {
+  pending_payment
+  active
+  grace
+  cancelled
+  lapsed
+}
+
 enum SubscriptionPaymentStatus {
   pending
   paid
@@ -1502,6 +1519,7 @@ model UserSubscription {
 
   refundQueues RefundQueue[]
   payments       SubscriptionPayment[]
+  lineSubscriptions LineSubscription[]
 
   @@index([userId, status])
   @@map("user_subscriptions")
@@ -1774,6 +1792,74 @@ model SubscriptionPayment {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("subscription_payments")
+}
+
+/// 회선 1:1 구독 — 대표번호·추가번호 각각 독립 결제·미납 추적
+model LineSubscription {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  businessCardId String       @unique @map("business_card_id") @db.Uuid
+  businessCard   BusinessCard @relation(fields: [businessCardId], references: [id], onDelete: Cascade)
+
+  /// 인증번호(대표 계정) 구독과 이중 기록. 추가 회선은 null — 독립 청구
+  userSubscriptionId String?           @map("user_subscription_id") @db.Uuid
+  userSubscription   UserSubscription? @relation(fields: [userSubscriptionId], references: [id], onDelete: SetNull)
+
+  plan   UserSubscriptionPlan   @map("plan")
+  status LineSubscriptionStatus @default(pending_payment) @map("status")
+  amountKrw Int @map("amount_krw")
+
+  cycleStartAt DateTime  @map("cycle_start_at") @db.Timestamptz(6)
+  cycleEndAt   DateTime  @map("cycle_end_at") @db.Timestamptz(6)
+  nextChargeAt DateTime? @map("next_charge_at") @db.Timestamptz(6)
+
+  graceStartedAt DateTime? @map("grace_started_at") @db.Timestamptz(6)
+  graceEndsAt    DateTime? @map("grace_ends_at") @db.Timestamptz(6)
+  lapsedAt       DateTime? @map("lapsed_at") @db.Timestamptz(6)
+  cancelledAt    DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelReason   String?   @map("cancel_reason") @db.VarChar(120)
+  showcasePurgedAt DateTime? @map("showcase_purged_at") @db.Timestamptz(6)
+
+  portoneCustomerUid String?   @map("portone_customer_uid") @db.VarChar(64)
+  lastPaymentAt      DateTime? @map("last_payment_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  payments LineSubscriptionPayment[]
+
+  @@index([userId, status])
+  @@index([status, graceEndsAt])
+  @@index([status, nextChargeAt])
+  @@map("line_subscriptions")
+}
+
+model LineSubscriptionPayment {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+
+  lineSubscriptionId String           @map("line_subscription_id") @db.Uuid
+  lineSubscription   LineSubscription @relation(fields: [lineSubscriptionId], references: [id], onDelete: Cascade)
+
+  merchantUid   String  @unique @map("merchant_uid") @db.VarChar(80)
+  impUid        String? @map("imp_uid") @db.VarChar(80)
+  customerUid   String  @map("customer_uid") @db.VarChar(64)
+  amountKrw     Int     @map("amount_krw")
+  status        SubscriptionPaymentStatus @default(pending) @map("status")
+  portoneStatus String? @map("portone_status") @db.VarChar(40)
+  paidAt        DateTime? @map("paid_at") @db.Timestamptz(6)
+  failureReason String? @map("failure_reason") @db.VarChar(240)
+  rawResponse   Json?   @map("raw_response") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([lineSubscriptionId, createdAt(sort: Desc)])
+  @@map("line_subscription_payments")
 }
 
 model EnterpriseBillingSchedule {

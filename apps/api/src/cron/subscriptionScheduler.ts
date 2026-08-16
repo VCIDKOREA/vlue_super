@@ -5,6 +5,11 @@ import {
   startOfKoreaDayUtc
 } from "../services/membership/subscriptionBilling.js";
 import { renewUserSubscription } from "../services/membership/subscriptionRenewal.js";
+import {
+  enterGraceForOverdueActiveLines,
+  lapseExpiredGraceLines,
+  runIndependentLineBillingBatch
+} from "../services/billing/lineBillingService.js";
 
 export type SubscriptionCronOptions = {
   /** 기준일 (기본: now). 테스트 시 YYYY-MM-DD */
@@ -22,6 +27,9 @@ export type SubscriptionCronSummary = {
   succeeded: number;
   failed: number;
   skippedDryRun: number;
+  independentLines?: Record<string, unknown>;
+  overdueGrace?: { scanned: number; entered: number };
+  graceLapse?: { scanned: number; lapsed: number };
   results: Array<Record<string, unknown>>;
 };
 
@@ -113,6 +121,24 @@ export async function runSubscriptionBillingBatch(
     succeeded: summary.succeeded,
     failed: summary.failed
   }));
+
+  if (!opts.dryRun) {
+    try {
+      summary.independentLines = await runIndependentLineBillingBatch(asOf, false);
+    } catch (e) {
+      console.error("[subscription-cron] independent lines", e);
+    }
+    try {
+      summary.overdueGrace = await enterGraceForOverdueActiveLines(asOf);
+    } catch (e) {
+      console.error("[subscription-cron] overdue grace", e);
+    }
+    try {
+      summary.graceLapse = await lapseExpiredGraceLines(asOf);
+    } catch (e) {
+      console.error("[subscription-cron] grace lapse", e);
+    }
+  }
 
   return summary;
 }

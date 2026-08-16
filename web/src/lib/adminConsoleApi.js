@@ -75,6 +75,13 @@ export async function fetchAdminConsoleMe() {
   return parseJson(res);
 }
 
+export async function fetchAdminOverdueLines({ q = "", limit = 50, offset = 0 } = {}) {
+  const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (q) qs.set("q", q);
+  const res = await fetch(apiUrl(`/api/admin/console/overdue-lines?${qs}`), { headers: adminHeaders() });
+  return parseJson(res);
+}
+
 export async function fetchAdminUsers({ q = "", limit = 50, offset = 0 } = {}) {
   const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (q) qs.set("q", q);

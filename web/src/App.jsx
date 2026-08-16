@@ -52,9 +52,11 @@ import {
   scheduleAutoRequestVming
 } from "./lib/chatRoomPrefsStorage.js";
 import { addPushNotification, countUnreadPush, PUSH_INBOX_CHANGED } from "./lib/pushNotificationInbox.js";
+import { syncOwnerInboxFromServer } from "./lib/ownerInboxSync.js";
 import Splash from "./components/Splash";
 import VlueOnboarding from "./components/VlueOnboarding";
 import PostSignupPaymentModal from "./components/PostSignupPaymentModal.jsx";
+import LineBillingGraceModal from "./components/LineBillingGraceModal.jsx";
 import ParentalConsentApproveModal from "./components/ParentalConsentApproveModal.jsx";
 import { fetchPendingParentalConsents } from "./lib/parentalConsentApi.js";
 import { bindFcmForegroundListener, registerFcmWebPushToken } from "./lib/fcmWebPush.js";
@@ -891,6 +893,7 @@ function App() {
         if (typeof off === "function") unsubscribe = off;
       })
       .catch(() => {});
+    void syncOwnerInboxFromServer();
     const onFcmForeground = (e) => {
       const data = e.detail?.data || {};
       const n = e.detail?.notification || {};
@@ -967,11 +970,17 @@ function App() {
       if (
         data.type === "vlue-showcase-like" ||
         data.type === "vlue-showcase-comment" ||
-        data.type === "vlue-showcase-comment-reply"
+        data.type === "vlue-showcase-comment-reply" ||
+        data.type === "vlue-showcase-share"
       ) {
         const title = String(n.title || data.title || "쇼케이스 알림");
         const body = String(n.body || data.body || data.message || "쇼케이스에 새 활동이 있습니다.");
-        addPushNotification({ category: "쇼케이스", title, body });
+        addPushNotification({
+          category: "쇼케이스",
+          title,
+          body,
+          serverId: data.notificationId
+        });
         setBottomToast(body);
         setTimeout(() => setBottomToast(""), 4200);
       }
@@ -1121,7 +1130,25 @@ function App() {
             category: "친구",
             title,
             body,
-            kind: "friend_request"
+            kind: "friend_request",
+            serverId: data.notificationId
+          });
+        }
+        if (
+          data?.type === "vlue-showcase-like" ||
+          data?.type === "vlue-showcase-comment" ||
+          data?.type === "vlue-showcase-comment-reply" ||
+          data?.type === "vlue-showcase-share"
+        ) {
+          const title = String(data.title || "쇼케이스 알림");
+          const body = String(data.body || data.message || "쇼케이스에 새 활동이 있습니다.");
+          setBottomToast(body);
+          setTimeout(() => setBottomToast(""), 4200);
+          addPushNotification({
+            category: "쇼케이스",
+            title,
+            body,
+            serverId: data.notificationId
           });
         }
         if (data?.type === "vlue-payment-receipt") {
@@ -3912,6 +3939,8 @@ function App() {
           setPostSignupPending(null);
         }}
       />
+
+      <LineBillingGraceModal enabled={isLoggedIn && showAppShell} />
 
       <AppRuntimePermissionsModal
         open={runtimePermsModalOpen && isLoggedIn && showAppShell}

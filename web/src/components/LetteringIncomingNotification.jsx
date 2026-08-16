@@ -252,6 +252,7 @@ export default function LetteringIncomingNotification({
   const expanded = expandedProp !== undefined ? expandedProp : expandedInternal;
   /** 접힘 애니메이션 끝날 때까지 --expanded 레이아웃 유지 (뚝뚝 끊김 방지) */
   const [keepExpandedLayout, setKeepExpandedLayout] = useState(false);
+  const [expiredPopupOpen, setExpiredPopupOpen] = useState(true);
   const expandSlotRef = useRef(null);
 
   const showGuide = useCallback(
@@ -307,6 +308,11 @@ export default function LetteringIncomingNotification({
   );
 
   const toggle = () => {
+    if (isExpiredLine) {
+      setExpiredPopupOpen(true);
+      setExpanded(true);
+      return;
+    }
     if (previewMode && !suppressExpandGuide) {
       showGuide(
         expanded
@@ -366,6 +372,13 @@ export default function LetteringIncomingNotification({
   );
   /** prop + 상대 쇼케이스 스타일(includeDigitalCard) 모두 허용할 때만 DCC 슬라이드 */
   const isDcpCard = c?.profileKind === "dcp" || Boolean(c?.dcp);
+  const isExpiredLine =
+    c?.profileKind === "expired_line" || String(c?.lineBillingStatus || "") === "grace";
+  const expiredSubtitle =
+    String(c?.expiredSubtitle || "").trim() || "인증기간이 만료된 번호입니다.";
+  const expiredDetail =
+    String(c?.expiredDetail || "").trim() ||
+    "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다.";
   const showDigitalCard =
     isDcpCard || (Boolean(includeDigitalCard) && c?.showcaseStyle?.includeDigitalCard !== false);
   const onCall = callPhase === "active" || callPhase === "connected";
@@ -510,11 +523,11 @@ export default function LetteringIncomingNotification({
   const shellBase =
     "lettering-ongoing lettering-incoming-active relative flex w-full flex-col overflow-hidden";
   const isDcp = isDcpCard;
-  const isPaidMember = isDcp || (verified && isPaidLetteringTier(c.membershipTier));
-  const isFreeMember = verified && !isPaidMember && !isDcp;
-  const isUnverified = !verified && !isDcp;
+  const isPaidMember = !isExpiredLine && (isDcp || (verified && isPaidLetteringTier(c.membershipTier)));
+  const isFreeMember = !isExpiredLine && verified && !isPaidMember && !isDcp;
+  const isUnverified = !isExpiredLine && !verified && !isDcp;
   const { setPlaybackPhase } = useShowcaseBgm();
-  const canExpand = isPaidMember || isFreeMember || isUnverified;
+  const canExpand = isPaidMember || isFreeMember || isUnverified || isExpiredLine;
   const [reportTick, setReportTick] = useState(0);
   const [walletTick, setWalletTick] = useState(0);
 
@@ -673,7 +686,9 @@ export default function LetteringIncomingNotification({
     c.ownerUserId
   ]);
 
-  const displayLabel = isUnverified
+  const displayLabel = isExpiredLine
+    ? formatLetteringPhoneDisplay(incoming) || unverifiedCollapsedPhone || incoming || "—"
+    : isUnverified
     ? null
     : showcaseOffPreview
       ? collapsedPhoneDisplay || formatLetteringPhoneDisplay(incoming) || "—"
@@ -892,6 +907,7 @@ export default function LetteringIncomingNotification({
   const carouselSuppressBgm =
     Boolean(suppressBgm) ||
     isUnverified ||
+    isExpiredLine ||
     Boolean(previewMode && !isExpandedView && !fromCallHistory);
   const showcasePhotos = c.showcaseStyle?.gallery?.photos || [];
   const showcaseStyleConfig = c.showcaseStyle || null;
@@ -1065,11 +1081,14 @@ export default function LetteringIncomingNotification({
       unverifiedCollapsedPhone ||
       incoming ||
       "—";
-    const nameDisp = isUnverified
+    const nameDisp = isExpiredLine
+      ? phoneDisp
+      : isUnverified
       ? phoneDisp
       : String(displayLabel || receptionLines?.collapsedPrimary || "").trim() || phoneDisp;
-    const subPhone =
-      receptionLines?.organization && phoneDisp
+    const subPhone = isExpiredLine
+      ? expiredSubtitle
+      : receptionLines?.organization && phoneDisp
         ? `${receptionLines.organization} / ${phoneDisp}`
         : phoneDisp;
     return (
@@ -1081,11 +1100,21 @@ export default function LetteringIncomingNotification({
         <CompanionMiniCase
           displayName={nameDisp}
           phoneLabel={subPhone}
-          statusLabel={isUnverified ? "미인증" : verified ? "인증" : "미인증"}
+          statusLabel={isExpiredLine ? "인증 만료" : isUnverified ? "미인증" : verified ? "인증" : "미인증"}
           durationLabel={companionDurationLabel}
-          verified={Boolean(verified && !isUnverified)}
+          verified={Boolean(verified && !isUnverified && !isExpiredLine)}
           onExpand={expandShowcaseFromMiniCase}
         />
+        {isExpiredLine ? (
+          <AgencyDcpMiniPopup
+            open={expiredPopupOpen}
+            card={{ ...c, expiredDetail, name: phoneDisp }}
+            incomingNumber={incoming}
+            expired
+            warning={expiredDetail}
+            onClose={() => setExpiredPopupOpen(false)}
+          />
+        ) : null}
       </div>
     );
   }
@@ -1096,7 +1125,17 @@ export default function LetteringIncomingNotification({
       data-platform={platform}
       data-expanded={isExpandedView ? "true" : "false"}
       data-companion-surface={useCompanionDelegate ? "showcase" : undefined}
-      data-tier={isPaidMember ? "paid" : isFreeMember ? "free" : isUnverified ? "unverified" : "none"}
+      data-tier={
+        isExpiredLine
+          ? "expired"
+          : isPaidMember
+            ? "paid"
+            : isFreeMember
+              ? "free"
+              : isUnverified
+                ? "unverified"
+                : "none"
+      }
       aria-live="polite"
     >
       <div
@@ -1178,7 +1217,18 @@ export default function LetteringIncomingNotification({
             </span>
           ) : null}
           <div className="min-w-0 flex-1 overflow-hidden">
-            {isUnverified ? (
+            {isExpiredLine ? (
+              <>
+                <p className="lettering-ongoing-name-row min-w-0">
+                  <span className="lettering-unverified-collapsed-phone">
+                    {formatLetteringPhoneDisplay(incoming) || unverifiedCollapsedPhone || "\u2014"}
+                  </span>
+                </p>
+                <p className="lettering-ongoing-unverified-hint mt-0.5 text-[10px] font-bold text-amber-800">
+                  {expiredSubtitle}
+                </p>
+              </>
+            ) : isUnverified ? (
               <p className="lettering-ongoing-name-row min-w-0">
                 <span className="lettering-unverified-collapsed-phone">
                   {unverifiedCollapsedPhone || "\u2014"}
@@ -1379,6 +1429,15 @@ export default function LetteringIncomingNotification({
           </div>
         ) : null}
 
+        {canExpand && isExpiredLine ? (
+          <div
+            ref={expandSlotRef}
+            className="lettering-ongoing-expand-slot"
+            data-open={isExpandedView ? "true" : "false"}
+            aria-hidden={!isExpandedView}
+          />
+        ) : null}
+
         {canExpand && isUnverified ? (
           <div
             ref={expandSlotRef}
@@ -1425,6 +1484,16 @@ export default function LetteringIncomingNotification({
         displayName={hideBroadcastName ? contactSavedName : c.name || contactSavedName || ""}
         onClose={() => setDialOpen(false)}
       />
+      {isExpiredLine ? (
+        <AgencyDcpMiniPopup
+          open={expiredPopupOpen}
+          card={{ ...c, expiredDetail }}
+          incomingNumber={incoming}
+          expired
+          warning={expiredDetail}
+          onClose={() => setExpiredPopupOpen(false)}
+        />
+      ) : null}
     </article>
   );
 }

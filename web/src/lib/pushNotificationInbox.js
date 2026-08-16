@@ -63,7 +63,11 @@ function writeList(list) {
 }
 
 export function readPushNotifications() {
-  return readList().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return readList().sort((a, b) => {
+    const pin = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned));
+    if (pin) return pin;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 }
 
 export function countUnreadPush() {
@@ -83,6 +87,7 @@ export function countUnreadPush() {
  * @param {number} [opts.amountKrw]
  * @param {string} [opts.paymentId]
  * @param {boolean} [opts.needsPurchaseConfirm]
+ * @param {string} [opts.serverId]
  */
 export function addPushNotification({
   category = "기타",
@@ -95,29 +100,86 @@ export function addPushNotification({
   productDetail,
   amountKrw,
   paymentId,
-  needsPurchaseConfirm
+  needsPurchaseConfirm,
+  serverId,
+  read = false,
+  pinned = false,
+  pinKind = null,
+  pinKey = null
 } = {}) {
   const at = createdAt || new Date().toISOString();
+  const sid = String(serverId || "").trim();
+  const key = String(pinKey || "").trim();
+  const list = readList();
+  if (sid) {
+    const idx = list.findIndex((n) => String(n.serverId || "") === sid);
+    if (idx >= 0) {
+      const next = {
+        ...list[idx],
+        title: String(title || list[idx].title || "").slice(0, 80),
+        body: String(body || list[idx].body || "").slice(0, 1200),
+        pinned: Boolean(pinned),
+        pinKind: pinKind || list[idx].pinKind || null,
+        pinKey: key || list[idx].pinKey || null,
+        read: Boolean(pinned) ? false : list[idx].read
+      };
+      const copy = [...list];
+      copy[idx] = next;
+      writeList(copy);
+      return next;
+    }
+  }
+  if (key) {
+    const idx = list.findIndex((n) => String(n.pinKey || "") === key);
+    if (idx >= 0) {
+      const next = {
+        ...list[idx],
+        title: String(title || list[idx].title || "").slice(0, 80),
+        body: String(body || list[idx].body || "").slice(0, 1200),
+        pinned: Boolean(pinned),
+        pinKind: pinKind || list[idx].pinKind || null,
+        serverId: sid || list[idx].serverId || null
+      };
+      const copy = [...list];
+      copy[idx] = next;
+      writeList(copy);
+      return next;
+    }
+  }
   const isPayment = kind === "payment" || category === "결제";
   const entry = {
-    id: `push-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: sid ? `push-srv-${sid}` : `push-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    serverId: sid || null,
     category: String(category || "기타").slice(0, 12),
     title: String(title || "").slice(0, 80),
-    body: String(body || "").slice(0, isPayment ? 1200 : 280),
+    body: String(body || "").slice(0, isPayment || pinned ? 1200 : 280),
     time: time || formatPushNotificationDateTime(at),
-    read: false,
+    read: Boolean(read) && !pinned,
     createdAt: at,
     kind: kind || null,
     productName: productName ? String(productName).slice(0, 120) : null,
     productDetail: productDetail ? String(productDetail).slice(0, 800) : null,
     amountKrw: Number.isFinite(Number(amountKrw)) ? Math.floor(Number(amountKrw)) : null,
     paymentId: paymentId ? String(paymentId).slice(0, 80) : null,
-    needsPurchaseConfirm: Boolean(needsPurchaseConfirm ?? isPayment),
+    needsPurchaseConfirm: Boolean(needsPurchaseConfirm ?? (isPayment && !pinned)),
     purchaseConfirmed: false,
-    purchaseConfirmedAt: null
+    purchaseConfirmedAt: null,
+    pinned: Boolean(pinned),
+    pinKind: pinKind || null,
+    pinKey: key || null
   };
-  writeList([entry, ...readList()]);
+  writeList([entry, ...list]);
   return entry;
+}
+
+export function prunePinnedPushNotIn(pinKeys = []) {
+  const keep = new Set((pinKeys || []).map((k) => String(k || "").trim()).filter(Boolean));
+  const list = readList();
+  const next = list.filter((n) => {
+    if (!n.pinned || !n.pinKey) return true;
+    return keep.has(String(n.pinKey));
+  });
+  if (next.length !== list.length) writeList(next);
 }
 
 /** 쇼핑 구매확정과 동일 — 알림에서 구매확인 완료 처리 */

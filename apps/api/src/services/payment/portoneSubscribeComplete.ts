@@ -271,6 +271,23 @@ export async function completePortoneSubscribePayment(input: CompleteSubscribeIn
     console.error("[subscription-referral-settlement]", input.userId, merchantUid, e);
   }
 
+  try {
+    const { syncCertifiedLineFromUserSubscription, restoreLineFromPayment } = await import(
+      "../billing/lineBillingService.js"
+    );
+    const lineId = await syncCertifiedLineFromUserSubscription(input.userId);
+    if (lineId) {
+      await restoreLineFromPayment(lineId, {
+        amountKrw: amount,
+        portoneCustomerUid: customerUid,
+        impUid,
+        merchantUid
+      });
+    }
+  } catch (e) {
+    console.error("[subscribe-complete] sync line", input.userId, e);
+  }
+
   return {
     subscriptionId: sub.id,
     status: "active" as const,

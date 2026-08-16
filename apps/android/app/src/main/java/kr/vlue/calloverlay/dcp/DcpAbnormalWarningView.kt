@@ -31,7 +31,9 @@ object DcpAbnormalWarningView {
         val agencyName: String = "",
         val shortNumber: String = "",
         val officialWebsite: String = "",
-        val fromMock: Boolean = false
+        val fromMock: Boolean = false,
+        val expired: Boolean = false,
+        val expiredMessage: String = "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다."
     )
 
     fun build(
@@ -47,17 +49,37 @@ object DcpAbnormalWarningView {
                 setColor(Color.parseColor("#1C1917"))
                 setStroke(
                     dp(ctx, 1),
-                    Color.parseColor(if (spec.abnormal) "#FB7185" else "#60A5FA")
+                    Color.parseColor(
+                        when {
+                            spec.expired -> "#FBBF24"
+                            spec.abnormal -> "#FB7185"
+                            else -> "#60A5FA"
+                        }
+                    )
                 )
                 cornerRadius = dp(ctx, 22).toFloat()
             }
             val pad = dp(ctx, 20)
             setPadding(pad, pad, pad, pad)
+            tag = TAG
+            layoutParams = LinearLayout.LayoutParams(dp(ctx, 320), LinearLayout.LayoutParams.WRAP_CONTENT)
         }
         card.addView(
             TextView(ctx).apply {
-                text = if (spec.abnormal) "경로 검증 · 비정상" else "경로 검증 · 정상"
-                setTextColor(Color.parseColor(if (spec.abnormal) "#FDA4AF" else "#93C5FD"))
+                text = when {
+                    spec.expired -> "인증기간 만료"
+                    spec.abnormal -> "경로 검증 · 비정상"
+                    else -> "경로 검증 · 정상"
+                }
+                setTextColor(
+                    Color.parseColor(
+                        when {
+                            spec.expired -> "#FDE68A"
+                            spec.abnormal -> "#FDA4AF"
+                            else -> "#93C5FD"
+                        }
+                    )
+                )
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
@@ -65,7 +87,11 @@ object DcpAbnormalWarningView {
         )
         card.addView(
             TextView(ctx).apply {
-                text = if (spec.abnormal) NationalAgencyWhitelist.ABNORMAL_WARNING else NORMAL_MESSAGE
+                text = when {
+                    spec.expired -> spec.expiredMessage
+                    spec.abnormal -> NationalAgencyWhitelist.ABNORMAL_WARNING
+                    else -> NORMAL_MESSAGE
+                }
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
                 typeface = Typeface.DEFAULT_BOLD
@@ -119,7 +145,7 @@ object DcpAbnormalWarningView {
             )
         }
         val confirm = TextView(ctx).apply {
-            text = "확인"
+            text = if (spec.expired) "닫기" else "확인"
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             typeface = Typeface.DEFAULT_BOLD
@@ -142,21 +168,7 @@ object DcpAbnormalWarningView {
             }
         }
         card.addView(confirm)
-
-        return FrameLayout(ctx).apply {
-            tag = TAG
-            addView(
-                card,
-                FrameLayout.LayoutParams(
-                    dp(ctx, 320),
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    Gravity.CENTER
-                ).apply {
-                    marginStart = dp(ctx, 20)
-                    marginEnd = dp(ctx, 20)
-                }
-            )
-        }
+        return card
     }
 
     /**
@@ -170,7 +182,6 @@ object DcpAbnormalWarningView {
     ) {
         if (!enabled) {
             host.setOnTouchListener(null)
-            (host as? android.view.ViewGroup)?.getChildAt(0)?.setOnTouchListener(null)
             return
         }
         val peekKeep = dp(host.context, 32)
@@ -254,8 +265,7 @@ object DcpAbnormalWarningView {
                 else -> false
             }
         }
-        host.setOnTouchListener(null)
-        (host as? android.view.ViewGroup)?.getChildAt(0)?.setOnTouchListener(listener)
+        host.setOnTouchListener(listener)
     }
 
     private fun touchOnConfirm(card: View, ev: MotionEvent): Boolean {

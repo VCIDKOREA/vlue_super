@@ -141,6 +141,12 @@ export async function renewUserSubscription(
         rawResponse: { error: msg }
       }
     });
+    try {
+      const { enterGraceForUserSubscription } = await import("../billing/lineBillingService.js");
+      await enterGraceForUserSubscription(sub.id, "payment_failed", asOf);
+    } catch (graceErr) {
+      console.error("[subscription-renewal] enter grace", sub.id, graceErr);
+    }
     return { ok: false, subscriptionId: sub.id, userId: sub.userId, error: msg, merchantUid };
   }
 
@@ -204,6 +210,24 @@ export async function renewUserSubscription(
     });
   } catch (e) {
     console.error("[subscription-referral-settlement]", sub.userId, merchantUid, e);
+  }
+
+  try {
+    const { syncCertifiedLineFromUserSubscription, restoreLineFromPayment } = await import(
+      "../billing/lineBillingService.js"
+    );
+    const lineId = await syncCertifiedLineFromUserSubscription(sub.userId);
+    if (lineId) {
+      await restoreLineFromPayment(lineId, {
+        amountKrw: charge.amountKrw,
+        cycleMonths,
+        portoneCustomerUid: sub.portoneCustomerUid,
+        impUid,
+        merchantUid
+      });
+    }
+  } catch (e) {
+    console.error("[subscription-renewal] restore line", sub.id, e);
   }
 
   return {

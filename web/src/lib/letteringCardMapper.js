@@ -109,6 +109,10 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
     authValidUntil: body.authValidUntil || nested.authValidUntil || profile.authValidUntil || null,
     billingCycle: body.billingCycle || nested.billingCycle || profile.billingCycle || null,
     profileKind: body.profileKind || nested.profileKind || "",
+    lineBillingStatus: body.lineBillingStatus || nested.lineBillingStatus || "",
+    expiredSubtitle:
+      body.expiredSubtitle || nested.expiredSubtitle || "",
+    expiredDetail: body.expiredDetail || nested.expiredDetail || "",
     dcp: body.dcp && typeof body.dcp === "object" ? body.dcp : null,
     verificationItems: Array.isArray(profile.verificationItems)
       ? profile.verificationItems

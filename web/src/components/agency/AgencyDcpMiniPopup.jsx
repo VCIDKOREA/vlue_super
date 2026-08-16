@@ -14,23 +14,25 @@ export default function AgencyDcpMiniPopup({
   card = {},
   incomingNumber = "",
   abnormal = false,
+  expired = false,
   warning = "",
   onClose
 }) {
   if (!open || typeof document === "undefined") return null;
+  const variant = expired ? "expired" : abnormal ? "abnormal" : "normal";
   return createPortal(
-    <div className="agency-dcp-mini-layer" data-dcp-popup={abnormal ? "abnormal" : "normal"}>
+    <div className="agency-dcp-mini-layer" data-dcp-popup={variant}>
       <CompanionMiniCase
-        brandText={abnormal ? "VLUE DCP · 비정상" : "VLUE DCP"}
+        brandText={expired ? "VLUE · 인증 만료" : abnormal ? "VLUE DCP · 비정상" : "VLUE DCP"}
         hideExpand
-        locked={abnormal}
+        locked={abnormal || expired}
         customBody={
           <AgencyDcpCard
             card={card}
             incomingNumber={incomingNumber}
             compact
-            variant={abnormal ? "abnormal" : "normal"}
-            warning={warning || DEFAULT_WARNING}
+            variant={variant}
+            warning={warning || (expired ? "" : DEFAULT_WARNING)}
             onClose={onClose}
           />
         }

@@ -110,9 +110,28 @@ object BigPushShowcaseBar {
             isCeo -> AvatarKind.CEO_BRAND to null
             else -> AvatarKind.SILHOUETTE to null
         }
+        val profileKind = firstNonBlank(
+            json?.optString("profileKind"),
+            card?.optString("profileKind")
+        )
+        val expired = profileKind == "expired_line" ||
+            firstNonBlank(json?.optString("lineBillingStatus"), card?.optString("lineBillingStatus")) == "grace"
         val phoneDisp = formatPhone(
             firstNonBlank(json?.optString("phoneE164"), card?.optString("phoneE164"), phone).orEmpty()
         )
+        if (expired) {
+            return Model(
+                brandLabel = "VLUE",
+                primaryLine = phoneDisp.ifBlank { "번호 확인 중…" },
+                secondaryLine = firstNonBlank(
+                    json?.optString("expiredSubtitle"),
+                    card?.optString("expiredSubtitle")
+                ) ?: "인증기간이 만료된 번호입니다.",
+                verified = false,
+                avatarUrl = null,
+                avatarKind = AvatarKind.SILHOUETTE
+            )
+        }
         val brand = if (!handle.isNullOrBlank()) "$handle Showcase" else "VLUE Showcase"
         /* 앱 미리보기와 동일: 1행 = 회사 · 이름 (직함 제외), 2행 = 회사 / 번호 */
         val primary = when {

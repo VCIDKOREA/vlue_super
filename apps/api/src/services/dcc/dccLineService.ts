@@ -27,6 +27,8 @@ export type DccLineDto = {
   hasShowcase: boolean;
   hasDcc: boolean;
   updatedAt: string;
+  billingStatus?: string;
+  graceEndsAt?: string | null;
 };
 
 function text(v: unknown, max: number): string {
@@ -188,7 +190,9 @@ function toLineDto(
     agentId: row.activeDccAgentProfileId,
     hasShowcase: Boolean(row.lineShowcaseLiveStyleJson || row.lineShowcaseStyleJson),
     hasDcc: Boolean(httpPhoto(snap.photoUrl) || snap.name || snap.title),
-    updatedAt: (row.lineShowcaseUpdatedAt || row.updatedAt).toISOString()
+    updatedAt: (row.lineShowcaseUpdatedAt || row.updatedAt).toISOString(),
+    billingStatus: "none",
+    graceEndsAt: null
   };
 }
 
@@ -271,7 +275,22 @@ export async function listDccLines(userId: string): Promise<{ lines: DccLineDto[
     const bCert = certifiedPhone && b.phoneE164 === certifiedPhone ? 0 : 1;
     return aCert - bCert || (KIND_RANK[a.kind] ?? 9) - (KIND_RANK[b.kind] ?? 9) || a.createdAt.getTime() - b.createdAt.getTime();
   });
-  return { lines: rows.map((row) => toLineDto(row, certifiedPhone)) };
+  const subs = await prisma.lineSubscription.findMany({
+    where: { userId, businessCardId: { in: rows.map((r) => r.id) } },
+    select: { businessCardId: true, status: true, graceEndsAt: true }
+  });
+  const subByCard = new Map(subs.map((s) => [s.businessCardId, s]));
+  return {
+    lines: rows.map((row) => {
+      const dto = toLineDto(row, certifiedPhone);
+      const sub = subByCard.get(row.id);
+      if (sub) {
+        dto.billingStatus = sub.status;
+        dto.graceEndsAt = sub.graceEndsAt?.toISOString() || null;
+      }
+      return dto;
+    })
+  };
 }
 
 export async function getDccLineBundle(userId: string, cardId: string) {
