@@ -7706,13 +7706,25 @@ body,
   overflow: hidden;
   border: 0 !important;
   box-shadow: none !important;
-  /* 맨 아래 14px만 살짝 구분선 제거 — 얼굴/본문은 그대로 */
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 calc(100% - 14px), transparent 100%);
-  mask-image: linear-gradient(180deg, #000 0%, #000 calc(100% - 14px), transparent 100%);
+  /* 하단 페더는 shade로 처리 — 사진이 투명으로 사라지지 않게 */
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .ldr-back-hero__shade {
-  display: none;
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  /* 이름·직함이 밝은 사진에 묻히지 않게 하단부터 중간까지 페더 */
+  background: linear-gradient(
+    180deg,
+    transparent 36%,
+    rgba(7, 11, 20, 0.28) 58%,
+    rgba(7, 11, 20, 0.72) 82%,
+    rgba(7, 11, 20, 0.9) 100%
+  );
 }
 
 .ldr-profile-media--logo .ldr-profile-media__img {
