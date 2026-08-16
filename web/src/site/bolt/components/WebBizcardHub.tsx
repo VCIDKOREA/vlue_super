@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, Pencil, Phone, Building2, User } from 'lucide-react';
 import '../../../styles.css';
@@ -158,10 +158,24 @@ function WebBizcardHubInner({
     isEnterprise: false,
   });
 
+  const toastTimer = useRef<number | null>(null);
   const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    window.setTimeout(() => setToast(''), 5200);
+    const text = String(msg || '').trim();
+    if (!text) return;
+    setToast(text);
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => {
+      setToast('');
+      toastTimer.current = null;
+    }, 5200);
   }, []);
+
+  useEffect(
+    () => () => {
+      if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    },
+    []
+  );
 
   const floatingToast =
     toast && typeof document !== 'undefined'

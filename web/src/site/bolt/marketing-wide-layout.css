@@ -574,13 +574,15 @@
   box-shadow: 0 1px 0 rgb(255 255 255 / 80%), 0 4px 14px rgb(37 99 235 / 5%);
 }
 
-/* 적용/저장 안내 — 고정 네비 아래, 헤더보다 위 */
-[data-vlue-site="marketing"] .mkt-site-toast {
+/* 적용/저장 안내 — body 포탈에도 적용. 상단 네비에 가리지 않게 화면 하단 */
+.mkt-site-toast {
   position: fixed;
   left: 50%;
-  top: calc(var(--mkt-chrome-active, 3.75rem) + 0.75rem);
+  right: auto;
+  top: auto;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
-  z-index: 80;
+  z-index: 400;
   width: min(92vw, 32rem);
   padding: 0.8rem 1.1rem;
   border-radius: 0.75rem;

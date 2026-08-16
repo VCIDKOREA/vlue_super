@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, Settings2 } from "lucide-react";
+import { ChevronDown, Loader2, Settings2 } from "lucide-react";
 import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
 import { agentOptionLabel } from "../../lib/dccAgentProfileState.js";
 import {
@@ -47,7 +47,12 @@ function applyLineToLocalPreview(bundle) {
   }
 }
 
-export default function DccLineSwitcher({ variant = "inline", onToast, compact = false }) {
+export default function DccLineSwitcher({
+  variant = "inline",
+  onToast,
+  compact = false,
+  onBusyChange
+}) {
   const [lines, setLines] = useState([]);
   const [lineId, setLineId] = useState(() => readSelectedDccLineId());
   const [profiles, setProfiles] = useState([]);
@@ -57,6 +62,11 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const switching = loading || busy;
+
+  useEffect(() => {
+    onBusyChange?.(switching);
+  }, [switching, onBusyChange]);
 
   const loadAgents = useCallback(async (cardId) => {
     const data = await fetchDccAgentProfiles(cardId);
@@ -182,7 +192,7 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
       <select
         className="dcc-agent-bar__select"
         value={lineId}
-        disabled={loading || busy || lines.length === 0}
+        disabled={switching || lines.length === 0}
         aria-label="번호"
         onChange={(e) => onChangeLine(e.target.value)}
       >
@@ -202,7 +212,7 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
       <select
         className="dcc-agent-bar__select"
         value={agentId}
-        disabled={loading || busy || !lineId || profiles.length === 0}
+        disabled={switching || !lineId || profiles.length === 0}
         aria-label="이 번호 담당자"
         onChange={(e) => void onChangeAgent(e.target.value)}
       >
@@ -219,11 +229,18 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
   );
 
   const manageBtn = (
-    <button type="button" className="dcc-agent-bar__manage" onClick={() => setManageOpen(true)}>
+    <button type="button" className="dcc-agent-bar__manage" disabled={switching} onClick={() => setManageOpen(true)}>
       <Settings2 size={13} />
       담당자 관리
     </button>
   );
+
+  const loadingChip = switching ? (
+    <span className="dcc-agent-bar__status" role="status" aria-live="polite">
+      <Loader2 size={14} className="dcc-agent-bar__status-spin" aria-hidden />
+      불러오는 중…
+    </span>
+  ) : null;
 
   const modal = (
     <DccAgentManageModal
@@ -281,6 +298,7 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
             담당자
             <div className="dcc-agent-bar__controls">
               {agentSelect}
+              {loadingChip}
               {manageBtn}
             </div>
           </label>
@@ -295,6 +313,7 @@ export default function DccLineSwitcher({ variant = "inline", onToast, compact =
     <div className={`dcc-agent-bar dcc-agent-bar--lines${compact ? " dcc-agent-bar--compact" : ""}`}>
       {lineSelect}
       {agentSelect}
+      {loadingChip}
       {manageBtn}
       {modal}
     </div>

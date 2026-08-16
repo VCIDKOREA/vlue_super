@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight, ChevronUp, HelpCircle, ImagePlus, Music2, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, HelpCircle, ImagePlus, Loader2, Music2, Plus, Trash2, X } from "lucide-react";
 import BackButton from "../common/BackButton";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import { requiresPremium } from "../../lib/showcase/showcaseStylePermissions.js";
@@ -245,11 +245,29 @@ export default function ShowcaseStyleSettingsPanel({
   const [igLinkLoading, setIgLinkLoading] = useState(false);
   /** 적용 시 마이케이스에 새 게시물로 올릴지 (기본 꺼짐 — 사진 수정마다 쌓이는 것 방지) */
   const [alsoUploadToMycase, setAlsoUploadToMycase] = useState(false);
+  const [lineBusy, setLineBusy] = useState(false);
+  const [deskNotice, setDeskNotice] = useState("");
   const pages = useMemo(
     () => (Array.isArray(config.pages) ? config.pages.map(normalizeShowcasePage) : []),
     [config.pages]
   );
   const canAddPage = pages.length < maxContentPages;
+
+  const notify = useCallback(
+    (msg) => {
+      const text = String(msg || "").trim();
+      if (!text) return;
+      onToast?.(text);
+      if (isWebDesk) setDeskNotice(text);
+    },
+    [isWebDesk, onToast]
+  );
+
+  useEffect(() => {
+    if (!deskNotice) return undefined;
+    const t = window.setTimeout(() => setDeskNotice(""), 5000);
+    return () => window.clearTimeout(t);
+  }, [deskNotice]);
 
   const refreshIgLink = useCallback(async () => {
     try {
@@ -595,7 +613,7 @@ export default function ShowcaseStyleSettingsPanel({
       writeShowcaseStyle(latest, { replace: true, skipSync: true });
       writeLiveShowcaseStyle(latest, { source: "editor", skipSync: true });
     } catch (e) {
-      onToast?.(e instanceof Error ? e.message : "쇼케이스 적용에 실패했습니다.");
+      notify(e instanceof Error ? e.message : "쇼케이스 적용에 실패했습니다.");
       return;
     }
     setConfig(latest);
@@ -614,7 +632,7 @@ export default function ShowcaseStyleSettingsPanel({
         m.bumpLocalShowcaseStyleUpdatedAt?.();
         const pushed = await m.pushShowcaseStyleBundle({ force: true });
         if (!pushed?.ok && !pushed?.skipped) {
-          onToast?.(
+          notify(
             "기기에 저장됐습니다. 서버 동기화에 실패했습니다. 네트워크 확인 후 다시 적용해 주세요."
           );
         }
@@ -622,14 +640,14 @@ export default function ShowcaseStyleSettingsPanel({
       .catch(() => {});
 
     if (includeDigitalCard && !hasProfilePhoto) {
-      onToast?.(
+      notify(
         "쇼케이스 설정은 저장됐습니다. 프로필 사진은 「1페이지 · 디지털인증명함 → 설정하러가기」에서 등록·저장해야 미리보기에 나옵니다."
       );
       if (!alsoUploadToMycase) return;
     }
 
     if (!alsoUploadToMycase) {
-      onToast?.("적용되었습니다. (마이케이스에는 올리지 않음)");
+      notify("적용되었습니다. (마이케이스에는 올리지 않음)");
       return;
     }
     /* 체크한 경우에만 마이케이스에 새 게시물로 쌓고 메인 송출 반영 */
@@ -650,19 +668,19 @@ export default function ShowcaseStyleSettingsPanel({
             { ...(readLiveShowcaseStyle() || latest), bgm: latest.bgm },
             { source: "editor" }
           );
-          onToast?.(
+          notify(
             hasProfilePhoto
               ? "적용 · 마이케이스 저장 · 메인 송출 반영"
               : "적용 · 마이케이스 저장. 프로필 사진은 디지털인증명함 설정에서 등록해 주세요."
           );
         } else if (res?.ok) {
-          onToast?.("적용 · 마이케이스에 저장되었습니다.");
+          notify("적용 · 마이케이스에 저장되었습니다.");
         } else {
-          onToast?.(res?.message || "적용되었습니다. (마이케이스 저장 실패)");
+          notify(res?.message || "적용되었습니다. (마이케이스 저장 실패)");
         }
       });
     } catch {
-      onToast?.("적용되었습니다.");
+      notify("적용되었습니다.");
     }
   }, [
     alsoUploadToMycase,
@@ -670,7 +688,7 @@ export default function ShowcaseStyleSettingsPanel({
     includeDigitalCard,
     isPaid,
     membershipTier,
-    onToast,
+    notify,
     tagInput
   ]);
 
@@ -688,7 +706,7 @@ export default function ShowcaseStyleSettingsPanel({
       {!isWebDesk ? (
         <div className="mb-3">
           <p className="showcase-profile-block__title">발·수신 담당자</p>
-          <DccLineSwitcher compact onToast={onToast} />
+          <DccLineSwitcher compact onToast={onToast} onBusyChange={setLineBusy} />
         </div>
       ) : null}
       <p className="showcase-profile-block__title">
@@ -1258,6 +1276,11 @@ export default function ShowcaseStyleSettingsPanel({
       >
         적용하기
       </button>
+      {isWebDesk && deskNotice ? (
+        <p className="showcase-web-desk__save-notice" role="status" aria-live="polite">
+          {deskNotice}
+        </p>
+      ) : null}
     </>
   );
 
@@ -1308,14 +1331,20 @@ export default function ShowcaseStyleSettingsPanel({
         className={`showcase-web-desk showcase-style-settings showcase-style-settings--profile ${
           isDarkMode ? "showcase-style-settings--dark" : ""
         }`}
+        aria-busy={lineBusy ? "true" : undefined}
       >
         <div className="showcase-web-desk__tip">
           <p className="showcase-web-desk__tip-text">
             1열 미리보기 · 2열 설정 (듀얼 화면) · 담당자를 바꾸면 DCC·쇼케이스에 바로 반영됩니다
           </p>
-          <DccLineSwitcher compact onToast={onToast} />
+          <DccLineSwitcher compact onToast={onToast} onBusyChange={setLineBusy} />
           {includeDigitalCard ? (
-            <button type="button" className="showcase-web-desk__tip-cta" onClick={openBizcardSettings}>
+            <button
+              type="button"
+              className="showcase-web-desk__tip-cta"
+              disabled={lineBusy}
+              onClick={openBizcardSettings}
+            >
               설정하러가기
               <ChevronRight size={14} aria-hidden />
             </button>
@@ -1345,6 +1374,12 @@ export default function ShowcaseStyleSettingsPanel({
           </section>
         </div>
 
+        {lineBusy ? (
+          <div className="showcase-web-desk__loading" role="status" aria-live="polite">
+            <Loader2 size={22} className="showcase-web-desk__loading-spin" aria-hidden />
+            번호를 불러오는 중…
+          </div>
+        ) : null}
         {gateModal}
         {leaveModal}
       </div>

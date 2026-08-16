@@ -116,6 +116,36 @@
   background: #dbeafe;
 }
 
+.dcc-agent-bar__manage:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.dcc-agent-bar__status {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #1e3a8a;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.dcc-agent-bar__status-spin {
+  animation: dcc-agent-spin 0.8s linear infinite;
+}
+
+@keyframes dcc-agent-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .dcc-agent-modal {
   position: fixed;
   inset: 0;
