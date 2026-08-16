@@ -2,7 +2,7 @@ import { ensureKakaoSdk } from "./kakaoSocialLogin.js";
 import { ensureDigitalCardId, syncDigitalCardExportSnapshot } from "./digitalCardApi.js";
 import { apiUrl } from "./apiBase.js";
 import {
-  buildPublicShowcaseUrl,
+  buildPublicShowcaseSpaUrl,
   getVlueViralLinks,
   isLocalDevHost,
   isLocalDevOrigin,
@@ -63,8 +63,6 @@ export function getKakaoFeedCardPublicImageUrl(cardId, cacheKey = "") {
 }
 
 export function buildKakaoBizcardPublicUrls(cardId, card) {
-  const id = encodeURIComponent(String(cardId || "").trim());
-  const apiBase = getCardPublicApiBase();
   const viral = getVlueViralLinks();
   const createUrl =
     String(viral.createUrl || "").startsWith("http") && viral.createUrl.includes("vlue")
@@ -86,8 +84,9 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
   const phone = String(
     readLetteringFixedIdentity()?.phone || snap.phone || card?.phone || ""
   ).trim();
-  const showcaseUrl = phone ? buildPublicShowcaseUrl(phone) : "";
-  const viewUrl = showcaseUrl || `${apiBase}/api/v1/card/view/${id}`;
+  /* 카카오 버튼은 www 도메인 공개 쇼케이스. api.vlue.kr 는 콘솔 미등록이라 홈으로 떨어짐 */
+  const showcaseUrl = phone ? buildPublicShowcaseSpaUrl(phone) : "";
+  const viewUrl = showcaseUrl || `${KAKAO_PUBLIC_ORIGIN}/site/web/showcase/`;
   /* OG 랜딩(showcaseOgLandingPage)과 동일: org · role · handle · phone · 태그라인 중 최대 3 */
   const role = [snap.title, snap.department].filter(Boolean).join(" · ");
   let handle = "";
