@@ -8,6 +8,7 @@ import ShowcaseBgmMuteButton from "./ShowcaseBgmMuteButton.jsx";
 import ShowcaseBgmMarquee from "./ShowcaseBgmMarquee.jsx";
 import ShowcasePhotoGallery from "./ShowcasePhotoGallery.jsx";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
+import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
 
 const FONT_MAP = Object.fromEntries(SHOWCASE_FONT_SETS.map((f) => [f.id, f.css]));
 
@@ -45,7 +46,7 @@ export default function ShowcaseStylePreview({
 
   const rc = styleConfig?.richCustom || {};
   const caseTheme = styleConfig?.caseTheme || {};
-  const phone = card?.phone || "010-0000-0000";
+  const phone = formatLetteringPhoneDisplay(card?.phone) || card?.phone || "010-0000-0000";
   const showName = perms.showNameOrg && card?.name;
   const photos = styleConfig?.gallery?.photos || [];
   const isCallActive = phase === "call_active";

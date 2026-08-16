@@ -12,6 +12,7 @@ import {
 import { ensureDigitalCardId, syncDigitalCardExportSnapshot } from "./digitalCardApi.js";
 import { readLetteringFixedIdentity } from "./letteringBizcardStorage.js";
 import { isPaidLetteringTier } from "./letteringMembership.js";
+import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
 
 function canShareFiles(file) {
   if (typeof navigator === "undefined" || !navigator.share) return false;
@@ -48,7 +49,7 @@ function shareTextSummary(card, viewUrl = "") {
   const viral = getVlueViralLinks();
   return [
     `[VLUE 인증명함] ${card.organization || ""} ${card.name || ""}`.trim(),
-    card.phone ? `Tel ${card.phone}` : "",
+    card.phone ? `Tel ${formatLetteringPhoneDisplay(card.phone) || card.phone}` : "",
     "",
     "VLUE 공식 기업 인증 보안 명함입니다. (SVG · 실시간 검증)",
     viewUrl ? `명함 보기: ${viewUrl}` : "",

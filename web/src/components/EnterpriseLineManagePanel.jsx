@@ -14,6 +14,7 @@ import {
   normalizeEnterpriseRole
 } from "../lib/enterpriseRoles.js";
 import BackButton from "./common/BackButton";
+import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 
 const EMPTY_FORM = {
   assigneeName: "",
@@ -304,7 +305,7 @@ export default function EnterpriseLineManagePanel({ onToast, onBack, isDarkMode 
                     </span>
                   </p>
                   <p className={`text-[11px] ${subText}`}>
-                    {m.lineKind === "mobile" ? "휴대" : "유선"} · {m.phoneE164}
+                    {m.lineKind === "mobile" ? "휴대" : "유선"} · {formatLetteringPhoneDisplay(m.phoneE164) || m.phoneE164}
                     {m.assigneeTitle ? ` · ${m.assigneeTitle}` : ""}
                   </p>
                   <p className={`text-[10px] ${subText}`}>

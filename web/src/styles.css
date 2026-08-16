@@ -7053,8 +7053,13 @@ body,
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  /* 텍스트 가독성만 — 사진 본문은 가리지 않음 */
-  background: linear-gradient(180deg, transparent 55%, rgba(11, 17, 32, 0.55) 100%);
+  /* 하단 페더를 이름 높이까지 살짝 올려 흰 글자가 사진에 묻히지 않게 */
+  background: linear-gradient(
+    180deg,
+    transparent 40%,
+    rgba(11, 17, 32, 0.28) 68%,
+    rgba(11, 17, 32, 0.78) 100%
+  );
 }
 
 .ldr-hero__badge {

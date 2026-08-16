@@ -1,5 +1,5 @@
 /** 유료 Lettering·명함 — 회사명 / 직책·성명 표시 */
-import { isUnknownPhoneToken } from "./letteringPhoneMatch.js";
+import { formatLetteringPhoneDisplay, isUnknownPhoneToken } from "./letteringPhoneMatch.js";
 
 export function formatLetteringPaidIdentity(card = {}) {
   const organization = String(card.organization || card.companyName || "").trim();
@@ -31,7 +31,7 @@ export function formatLetteringReceptionLines(card = {}, { incomingNumber = "" }
   const liveIncoming = isUnknownPhoneToken(incomingNumber) ? "" : String(incomingNumber || "").trim();
   const cardPhone = isUnknownPhoneToken(card.phone) ? "" : String(card.phone || "").trim();
   const phoneRaw = liveIncoming || cardPhone;
-  const phone = phoneRaw;
+  const phone = formatLetteringPhoneDisplay(phoneRaw) || phoneRaw;
   /* 디지털 인증명함 — 상호·이름 동시 표현 (사업자 상호 우선) */
   const collapsedPrimary = identity.orgAndName || org || name || "\u2014";
   const expandedOrgLine = org || name || "\u2014";

@@ -9,6 +9,9 @@ export function digitsForTel(raw) {
 /** 일반전화용 E.164 (+8210…) — 82… / 010… 혼용 통일 */
 export function toTelE164(raw) {
   const national = toKoreaNationalDigits(raw);
+  if (national && /^1[3-9]\d{6}$/.test(national)) {
+    return `+82${national}`;
+  }
   if (national && national.startsWith("0") && national.length >= 9) {
     return `+82${national.slice(1)}`;
   }

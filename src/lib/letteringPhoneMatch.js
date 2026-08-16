@@ -3,28 +3,40 @@ export function normalizePhoneDigits(raw) {
   return String(raw || "").replace(/\D/g, "");
 }
 
+/** 전국 대표번호 8자리 (1577·1588·1600·1800 등) — 010 휴대와 구분 */
+export function isNationwideRepresentativeDigits(d) {
+  return /^1[3-9]\d{6}$/.test(String(d || ""));
+}
+
 /**
- * 한국 번호 표시용 국내 자릿수 (010… / 02…)
- * +82·82·010 혼용을 0으로 시작하는 국내형으로 통일
+ * 한국 번호 표시용 국내 자릿수 (010… / 02… / 1577…)
+ * +82·82·010 혼용을 국내형으로 통일. 대표번호는 앞에 0을 붙이지 않는다.
  */
 export function toKoreaNationalDigits(raw) {
   let d = normalizePhoneDigits(raw);
   if (!d) return "";
   if (d.startsWith("00")) d = d.slice(2);
-  if (d.startsWith("82") && d.length >= 10) {
-    d = `0${d.slice(2)}`;
+  if (d.startsWith("82")) {
+    const rest = d.slice(2);
+    if (isNationwideRepresentativeDigits(rest)) return rest;
+    d = rest.startsWith("0") ? rest : `0${rest}`;
+  }
+  if (d.length === 9 && d.startsWith("0") && isNationwideRepresentativeDigits(d.slice(1))) {
+    return d.slice(1);
   }
   return d;
 }
 
 /**
- * 화면 표시용 — 010-0000-0000 / 02-XXXX-XXXX 통일
- * (82… 원시 숫자열·E.164 모두 동일 포맷)
+ * 화면 표시용 — 010-0000-0000 / 02-XXXX-XXXX / 1577-8746 통일
  */
 export function formatLetteringPhoneDisplay(raw) {
   const d = toKoreaNationalDigits(raw);
   if (!d) return String(raw || "—").trim() || "—";
 
+  if (isNationwideRepresentativeDigits(d)) {
+    return `${d.slice(0, 4)}-${d.slice(4)}`;
+  }
   if (d.length === 11 && d.startsWith("01")) {
     return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
   }

@@ -394,6 +394,17 @@ object BigPushShowcaseBar {
 
     private fun formatPhone(raw: String): String {
         val digits = raw.filter { it.isDigit() }
+        val national = when {
+            digits.startsWith("82") && digits.length >= 10 -> digits.removePrefix("82")
+            else -> digits
+        }.let { d ->
+            if (d.length == 9 && d.startsWith("0") && d.substring(1).matches(Regex("^1[3-9]\\d{6}$"))) {
+                d.substring(1)
+            } else d
+        }
+        if (national.matches(Regex("^1[3-9]\\d{6}$"))) {
+            return "${national.substring(0, 4)}-${national.substring(4)}"
+        }
         if (digits.length == 11 && digits.startsWith("010")) {
             return "${digits.substring(0, 3)}-${digits.substring(3, 7)}-${digits.substring(7)}"
         }

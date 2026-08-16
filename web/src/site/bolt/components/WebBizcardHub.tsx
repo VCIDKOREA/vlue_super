@@ -74,7 +74,7 @@ function AccountSummaryCard({
   const fixed = readLetteringFixedIdentity();
   const displayName = fixed.name || user.legalName || user.email;
   const org = fixed.organization || '—';
-  const phone = fixed.phone || '—';
+  const phone = formatPhoneE164ForKoreaDisplay(fixed.phone) || fixed.phone || '—';
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import GeneralLetteringCard from "./GeneralLetteringCard.jsx";
 import { VLUE_CARD_CAUTION, digitalCardBadgeText, digitalCardRoleLine } from "../lib/vlueDigitalCardUi.js";
+import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { VlueBrandMark } from "./VlueBrandLogo.jsx";
 
 const BackIcon = ({ type }) => {
@@ -55,14 +56,14 @@ export default function DigitalAuthCard({ membershipTier = "free", myCard = {}, 
   const titleRaw = String(myCard?.title || "").trim();
   /** 조직명과 동일하면 앞면 직책 줄 생략(스탠다드와 동일 규칙) */
   const title = titleRaw && titleRaw !== org ? titleRaw : "";
-  const phone = String(myCard?.phone || "").trim();
+  const phone = myCard?.phone ? formatLetteringPhoneDisplay(myCard.phone) || String(myCard.phone).trim() : "";
   const logoUrl = myCard?.logoUrl || "";
   const backText = String(myCard?.introBack || "프리미엄 인증 명함입니다.").trim();
   const backLines = [
     { icon: "✉", label: "e-mail", value: myCard?.email || "" },
     { icon: "📍", label: "주소", value: myCard?.address || "" },
-    { icon: "☎", label: "대표번호", value: myCard?.landline || "" },
-    { icon: "📠", label: "팩스번호", value: myCard?.fax || "" }
+    { icon: "☎", label: "대표번호", value: myCard?.landline ? formatLetteringPhoneDisplay(myCard.landline) || myCard.landline : "" },
+    { icon: "📠", label: "팩스번호", value: myCard?.fax ? formatLetteringPhoneDisplay(myCard.fax) || myCard.fax : "" }
   ].filter((line) => line.value);
   const backNote = String(myCard?.backNote || backText).trim();
 

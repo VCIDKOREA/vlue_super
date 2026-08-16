@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { SHOWCASE_STYLE_TYPES } from "../lib/showcase/showcaseStyleTypes.js";
+import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import ShowcaseStylePreview from "./showcase/ShowcaseStylePreview.jsx";
 import "./showcase/showcase-style-settings.css";
 
@@ -22,7 +23,7 @@ export default function VaultSavedShowcaseRow({ item, onRemove, isDarkMode = fal
   const org = String(snap.organization || "").trim();
   const name = String(snap.name || "").trim();
   const title = [snap.title, snap.department].filter(Boolean).join(" · ");
-  const phone = String(snap.phone || "").trim();
+  const phone = formatLetteringPhoneDisplay(snap.phone) || String(snap.phone || "").trim();
   const displayName = org || name || phone || "저장된 케이스";
   const savedLabel = formatSavedAt(item?.savedAt || styleConfig.scrapedAt);
 

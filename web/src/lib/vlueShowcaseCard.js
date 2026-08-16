@@ -2,6 +2,7 @@ import { buildUserLetteringCard, withLetteringBizcardPreviewFallback } from "./l
 import { isPaidLetteringTier, normalizeMembershipKind } from "./letteringMembership.js";
 import { applyShowcasePreviewExampleIdentity } from "./vlueShowcasePreviewIdentity.js";
 import { readDccLinePreview } from "./dccLineState.js";
+import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
 
 /**
  * VLUE Showcase · VLUE Case — 동일 명함/프로필 데이터 소스
@@ -23,7 +24,7 @@ export function applyDccLinePreviewOverlay(card = {}) {
   const line = readDccLinePreview();
   if (!line?.id) return card;
   const name = String(line.displayName || "").trim();
-  const phone = String(line.displayPhone || "").trim();
+  const phone = formatLetteringPhoneDisplay(line.displayPhone) || String(line.displayPhone || "").trim();
   const photo = String(line.photoUrl || "").trim();
   const title = String(line.title || "").trim();
   const department = String(line.department || "").trim();

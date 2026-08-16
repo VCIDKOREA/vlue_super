@@ -527,7 +527,7 @@ export default function WalletHubModal({
                           }`}
                         >
                           <span className={`font-bold ${isDarkMode ? "text-gray-200" : "text-slate-800"}`}>
-                            {c.kind} · {c.phoneE164}
+                            {c.kind} · {formatLetteringPhoneDisplay(c.phoneE164) || c.phoneE164}
                           </span>
                           {c.verificationStatus === "pending" ? (
                             <button

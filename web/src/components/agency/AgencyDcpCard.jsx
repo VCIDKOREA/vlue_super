@@ -1,5 +1,6 @@
 import { Globe, Phone } from "lucide-react";
 import { formatAgencyTelHref, formatWebHref } from "../../lib/showcase/showcaseContactActions.js";
+import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
 import { ABNORMAL_REPORT_URL } from "../../lib/nationalAgencyDcpClient.js";
 
 const DEFAULT_WARNING =
@@ -37,9 +38,10 @@ export default function AgencyDcpCard({
   const agencyName = expired
     ? String(card.displayName || card.name || incomingNumber || "").trim()
     : String(dcp.agencyName || card.organization || card.name || "").trim();
-  const phone = String(dcp.shortNumber || card.phone || incomingNumber || "").trim();
+  const phoneRaw = String(dcp.shortNumber || card.phone || incomingNumber || "").trim();
+  const phone = formatLetteringPhoneDisplay(phoneRaw) || phoneRaw;
   const website = expired ? "" : String(dcp.officialWebsite || card.website || "").trim();
-  const telHref = formatAgencyTelHref(phone);
+  const telHref = formatAgencyTelHref(phoneRaw);
   const webHref = formatWebHref(website);
   const abnormal = variant === "abnormal";
   const warnText = expired

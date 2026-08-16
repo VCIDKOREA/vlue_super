@@ -1,3 +1,5 @@
+import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
+
 export const DCC_LINE_ID_KEY = "vlue_dcc_line_id";
 export const DCC_LINE_PREVIEW_KEY = "vlue_dcc_line_preview";
 export const DCC_LINE_CHANGED_EVENT = "vlue-dcc-line-changed";
@@ -51,7 +53,9 @@ export function writeDccLinePreviewFromBundle(bundle) {
   const keepSameLine = prev?.id === line.id;
   return writeDccLinePreview({
     id: line.id,
-    displayPhone: String(line.displayPhone || (keepSameLine ? prev?.displayPhone : "") || "").trim(),
+    displayPhone:
+      formatLetteringPhoneDisplay(line.displayPhone || (keepSameLine ? prev?.displayPhone : "") || line.phoneE164) ||
+      String(line.displayPhone || (keepSameLine ? prev?.displayPhone : "") || "").trim(),
     displayName: String(
       line.displayName || agent.displayName || dcc.name || dcc.displayName || (keepSameLine ? prev?.displayName : "") || ""
     ).trim(),

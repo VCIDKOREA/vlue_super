@@ -4,6 +4,11 @@ export function formatPhoneE164ForKoreaDisplay(e164) {
   const digits = String(e164).replace(/\D/g, "");
   if (!digits) return String(e164).trim();
   let d = digits;
+  if (digits.startsWith("82")) d = digits.slice(2);
+  if (d.startsWith("0") && d.length === 9 && /^1[3-9]\d{6}$/.test(d.slice(1))) d = d.slice(1);
+  if (/^1[3-9]\d{6}$/.test(d)) {
+    return `${d.slice(0, 4)}-${d.slice(4)}`;
+  }
   if (digits.startsWith("82")) d = `0${digits.slice(2)}`;
   if (d.length === 11 && d.startsWith("010")) {
     return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;

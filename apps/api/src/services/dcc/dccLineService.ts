@@ -45,16 +45,19 @@ function kindLabel(kind: string, isCertified: boolean): string {
 
 function displayPhone(e164: string): string {
   const raw = String(e164 || "").trim();
-  const rest = raw.startsWith("+82") ? raw.slice(3) : raw.replace(/\D/g, "").replace(/^82/, "");
+  let rest = raw.startsWith("+82") ? raw.slice(3) : raw.replace(/\D/g, "").replace(/^82/, "");
+  if (rest.startsWith("0") && rest.length === 9 && /^1[3-9]\d{6}$/.test(rest.slice(1))) {
+    rest = rest.slice(1);
+  }
+  if (/^1[3-9]\d{6}$/.test(rest)) {
+    return `${rest.slice(0, 4)}-${rest.slice(4)}`;
+  }
   if (rest.startsWith("10") && rest.length === 10) {
     return `0${rest.slice(0, 2)}-${rest.slice(2, 6)}-${rest.slice(6)}`;
   }
   if (rest.startsWith("2")) {
     const d = `0${rest}`;
     if (d.length >= 9) return `02-${d.slice(2, d.length - 4)}-${d.slice(-4)}`;
-  }
-  if (/^1[5-8]/.test(rest) && rest.length >= 8) {
-    return `${rest.slice(0, 4)}-${rest.slice(4)}`;
   }
   const d = rest.startsWith("0") ? rest : `0${rest}`;
   if (d.length === 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;

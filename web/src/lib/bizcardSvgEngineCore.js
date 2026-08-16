@@ -2,6 +2,7 @@
  * 정통 90×50mm 비즈니스 명함 — 동적 SVG 코어 (프론트·API OG PNG 공통)
  */
 import { normalizeLetteringBizcardTemplate } from "./letteringBizcardTemplates.js";
+import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
 
 export const BIZCARD_ASPECT = 90 / 50;
 export const BIZCARD_CARD_W = 900;
@@ -76,7 +77,7 @@ export function cardToSvgSnapshot(card) {
     name: card?.name || card?.displayName || "",
     title: card?.title || "",
     department: card?.department || card?.dept || "",
-    phone: card?.phone || "",
+    phone: card?.phone ? formatLetteringPhoneDisplay(card.phone) || String(card.phone).trim() : "",
     email: card?.email || "",
     address:
       card?.address ||
