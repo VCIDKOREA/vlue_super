@@ -86,7 +86,11 @@ export default function LetteringBizcardSharePanel({
         onToast?.(r.error);
         return;
       }
-      onToast?.("카카오톡 공유 창을 열었습니다.");
+      onToast?.(
+        r.viewUrl
+          ? `카카오톡 공유 창을 열었습니다. 버튼 주소: ${r.viewUrl}`
+          : "카카오톡 공유 창을 열었습니다."
+      );
     } catch (e) {
       onToast?.(e?.message || "카카오톡 공유에 실패했습니다.");
     } finally {

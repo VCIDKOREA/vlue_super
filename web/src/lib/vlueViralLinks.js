@@ -133,7 +133,7 @@ export function buildPublicShowcaseUrl(phone, devOrigin = "") {
 export function buildPublicShowcaseSpaUrl(phone, devOrigin = "") {
   const origin = resolvePublicWebOrigin(devOrigin);
   const path = showcaseWebPathForPhone(phone);
-  if (!path || path === "/site/web/showcase/") return "";
+  if (!path || path === "/s/" || path === "/site/web/showcase/") return "";
   return `${origin}${path}`;
 }
 

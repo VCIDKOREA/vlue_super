@@ -75,6 +75,35 @@ const LEGAL_STATIC_PAGES = new Map([
   ["/privacy/legal-article-6/", "data-deletion/index.html"]
 ]);
 
+/** 카카오 버튼용 짧은 쇼케이스 `/s/010…` — SPA 번들 전에 바로 이동 */
+function matchPublicShowcaseShort(pathname) {
+  const m = String(pathname || "").match(/^\/s\/(\d{8,15})\/?$/);
+  return m ? m[1] : "";
+}
+
+function serveShowcaseShortBounce(response, phone) {
+  const spa = `/site/web/showcase/${encodeURIComponent(phone)}`;
+  const html = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>VLUE 쇼케이스</title>
+<meta http-equiv="refresh" content="0;url=${spa}"/>
+<script>location.replace(${JSON.stringify(spa)});</script>
+</head>
+<body style="margin:0;font-family:sans-serif;background:#0B101B;color:#e2e8f0;display:flex;min-height:100vh;align-items:center;justify-content:center">
+<a href="${spa}" style="color:#7dd3fc;font-weight:800;text-decoration:none">쇼케이스 열기</a>
+</body>
+</html>`;
+  response.writeHead(200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store"
+  });
+  response.end(html);
+  return true;
+}
+
 function serveLegalStatic(response, pathname) {
   const rel = LEGAL_STATIC_PAGES.get(pathname);
   if (!rel) return false;
@@ -160,6 +189,12 @@ const server = createServer((request, response) => {
       return;
     }
     serveDownload(request, response, pathname);
+    return;
+  }
+
+  const showcasePhone = matchPublicShowcaseShort(pathname);
+  if (showcasePhone) {
+    serveShowcaseShortBounce(response, showcasePhone);
     return;
   }
 

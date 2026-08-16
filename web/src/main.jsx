@@ -49,6 +49,8 @@ const showAdminGate = !showAdminConsole && !showHq && adminPath && isCurrentUrlA
 const siteShell = resolveSiteShell();
 const showPortoneV2Callback =
   typeof window !== "undefined" && isPortoneV2PaymentCallbackPath(window.location.pathname);
+const showcasePublic =
+  typeof window !== "undefined" && isShowcaseWebRoute(window.location.pathname);
 
 const rootEl = document.getElementById("root");
 if (!rootEl) {
@@ -60,12 +62,13 @@ if (!rootEl) {
   else if (showAdminConsole) Shell = AdminConsoleApp;
   else if (showHq) Shell = SuperAdminHqApp;
   else if (showAdminGate) Shell = AdminSecretApp;
-  else if (typeof window !== "undefined" && isShowcaseWebRoute(window.location.pathname)) Shell = ShowcaseWebApp;
+  else if (showcasePublic) Shell = ShowcaseWebApp;
   else if (siteShell === "blocked") Shell = BrowserAppBlockedPage;
   else if (siteShell === "marketing") Shell = VlueMarketingApp;
 
   const appBlocked = siteShell === "blocked";
-  const shellTree = appBlocked ? (
+  /* 공개 쇼케이스는 Coming Soon 잠금 없이 바로 연다 (카톡 인앱 브라우저) */
+  const shellTree = appBlocked || showcasePublic ? (
     <Shell />
   ) : (
     <WwwStagingLockGate>
