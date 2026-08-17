@@ -81,6 +81,8 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  const [idleNotice, setIdleNotice] = useState(false);
+
   useEffect(() => {
     const restored = restoreMarketingAuthUser();
     if (restored) setUser(restored);
@@ -91,6 +93,13 @@ export default function App() {
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (!user?.userId) return;
+    void import('../../lib/digitalCardApi.js')
+      .then((m) => m.fetchDigitalCardMeta({ lite: false }))
+      .catch(() => null);
+  }, [user?.userId]);
 
   /** PC 앱 등에서 ?auth=signup&start=1 로 회원가입 딥링크 */
   useEffect(() => {
@@ -169,6 +178,12 @@ export default function App() {
     setRoute({ view: 'home' });
   };
 
+  const handleIdleLogout = async () => {
+    await handleLogout();
+    setIdleNotice(true);
+    window.setTimeout(() => setIdleNotice(false), 4500);
+  };
+
   const handleAuthSuccess = (authUser: MarketingAuthUser) => {
     setUser(authUser);
     setShowAuth(false);
@@ -230,7 +245,12 @@ export default function App() {
     <div className="min-h-screen bg-blue-tint relative font-sans">
       <AnimatedBackground />
       <div className="relative z-10">
-        <Navbar currentView={view} onNavigate={handleNavigate} user={user} onLoginClick={() => { setAuthInitialMode('login'); setAuthAutoStartSignup(false); setShowAuth(true); }} onLogout={handleLogout} />
+        <Navbar currentView={view} onNavigate={handleNavigate} user={user} onLoginClick={() => { setAuthInitialMode('login'); setAuthAutoStartSignup(false); setShowAuth(true); }} onLogout={handleLogout} onIdleLogout={handleIdleLogout} />
+        {idleNotice ? (
+          <div className="mkt-site-toast" role="status">
+            30분 동안 사용이 없어 로그아웃되었습니다.
+          </div>
+        ) : null}
         {view === 'home' && (
           <div className="fixed left-0 right-0 z-40 mkt-download-bar-anchor">
             <AppDownloadBar variant="top" currentView={view} onNavigate={handleNavigate} />

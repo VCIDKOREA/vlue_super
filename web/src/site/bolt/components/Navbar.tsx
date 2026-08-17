@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Menu, X, User, ChevronDown, LogOut, MapPin, Lock, CreditCard, LayoutDashboard, Award, Sparkles } from 'lucide-react';
 import { VlueNavLogoMark, useVlueLogoBlink } from '../../../components/VlueNavLogoMark.jsx';
+import { readProfilePhotoAvatar } from '../../../lib/vlueAvatar.js';
+import { useWebIdleSession } from '../hooks/useWebIdleSession';
 import type { View } from '../types';
 import { isWebViewV1Enabled } from '../../../lib/v1ReleaseScope.js';
 
@@ -10,6 +12,7 @@ interface NavbarProps {
   user: { email: string } | null;
   onLoginClick: () => void;
   onLogout: () => void;
+  onIdleLogout?: () => void;
 }
 
 type NavItem = {
@@ -38,10 +41,52 @@ const USER_MENU_ITEMS: { label: string; view: View; icon: typeof LayoutDashboard
   { label: '안심영역 설정', view: 'safezone', icon: MapPin },
 ];
 
-export default function Navbar({ currentView, onNavigate, user, onLoginClick, onLogout }: NavbarProps) {
+function useHeaderProfilePhoto() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setTick((n) => n + 1);
+    window.addEventListener('vlue-avatar-changed', bump);
+    window.addEventListener('vlue-lettering-bizcard-changed', bump);
+    window.addEventListener('vlue-digital-card-changed', bump);
+    return () => {
+      window.removeEventListener('vlue-avatar-changed', bump);
+      window.removeEventListener('vlue-lettering-bizcard-changed', bump);
+      window.removeEventListener('vlue-digital-card-changed', bump);
+    };
+  }, []);
+  return useMemo(() => readProfilePhotoAvatar(), [tick]);
+}
+
+function HeaderProfileMark({ photoUrl, sizeClass = 'w-7 h-7' }: { photoUrl: string; sizeClass?: string }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => {
+    setBroken(false);
+  }, [photoUrl]);
+  if (photoUrl && !broken) {
+    return (
+      <div className={`${sizeClass} rounded-full overflow-hidden bg-slate-200 ring-1 ring-blue-100 flex-shrink-0`}>
+        <img
+          src={photoUrl}
+          alt=""
+          className="h-full w-full object-cover object-top"
+          onError={() => setBroken(true)}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className={`${sizeClass} rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0`}>
+      <User className="w-3.5 h-3.5 text-white" />
+    </div>
+  );
+}
+
+export default function Navbar({ currentView, onNavigate, user, onLoginClick, onLogout, onIdleLogout }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { blinkSeq: logoBlinkSeq, triggerBlink: triggerLogoBlink } = useVlueLogoBlink();
+  const photoUrl = useHeaderProfilePhoto();
+  const idle = useWebIdleSession({ enabled: Boolean(user), onTimeout: onIdleLogout || onLogout });
 
   const handleNav = (view?: View) => {
     if (view) onNavigate(view);
@@ -108,14 +153,27 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
 
           <div className="mkt-nav-actions hidden xl:flex items-center gap-2.5 ml-4 flex-shrink-0">
             {user ? (
-              <div className="relative">
+              <div className="relative flex items-center gap-1.5">
+                {idle.warning ? (
+                  <button
+                    type="button"
+                    className="mkt-idle-timer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      idle.bump();
+                    }}
+                    title="클릭하면 세션이 30분 연장됩니다"
+                    aria-label={`세션 남은 시간 ${idle.label}. 누르면 30분 연장`}
+                  >
+                    {idle.label}
+                  </button>
+                ) : null}
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
                 >
-                  <div className="w-7 h-7 rounded-full bg-primary-600 flex items-center justify-center">
-                    <User className="w-3.5 h-3.5 text-white" />
-                  </div>
+                  <HeaderProfileMark photoUrl={photoUrl} />
                   <span className="max-w-28 truncate">{user.email.split('@')[0]}</span>
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -182,6 +240,20 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
           </div>
 
           <div className="xl:hidden ml-auto flex items-center gap-1 flex-shrink-0 min-w-0">
+            {user && idle.warning ? (
+              <button
+                type="button"
+                className="mkt-idle-timer mkt-idle-timer--compact"
+                onClick={(e) => {
+                  e.preventDefault();
+                  idle.bump();
+                }}
+                aria-label={`세션 남은 시간 ${idle.label}. 누르면 30분 연장`}
+              >
+                {idle.label}
+              </button>
+            ) : null}
+            {user ? <HeaderProfileMark photoUrl={photoUrl} sizeClass="w-7 h-7" /> : null}
             {isWebViewV1Enabled('exceleditor') ? (
             <button
               type="button"

@@ -574,6 +574,31 @@
   box-shadow: 0 1px 0 rgb(255 255 255 / 80%), 0 4px 14px rgb(37 99 235 / 5%);
 }
 
+[data-vlue-site="marketing"] .mkt-idle-timer {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+[data-vlue-site="marketing"] .mkt-idle-timer:hover,
+[data-vlue-site="marketing"] .mkt-idle-timer:focus-visible {
+  background: #dbeafe;
+  outline: none;
+}
+
+[data-vlue-site="marketing"] .mkt-idle-timer--compact {
+  padding: 0.15rem 0.45rem;
+  font-size: 0.6875rem;
+}
+
 /* 적용/저장 안내 — body 포탈에도 적용. 상단 네비에 가리지 않게 화면 하단 */
 .mkt-site-toast {
   position: fixed;
