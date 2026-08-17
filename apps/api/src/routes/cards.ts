@@ -4,6 +4,10 @@ import { normalizeDesiredPublicHandle } from "../lib/publicHandle.js";
 import { normalizeToE164KR } from "../lib/phoneE164.js";
 import { ssePublish } from "../realtime/sseHub.js";
 import { lookupCardByRawNumber } from "../services/cardLookup.js";
+import {
+  lookupMemberNamesByNumbers,
+  recordOverlayLineCallEvent
+} from "../services/dcc/lineCallEventService.js";
 import { resolveRequestUserId } from "../lib/authContext.js";
 import {
   requireUserHeader,
@@ -60,6 +64,9 @@ cardsRoutes.get("/lookup", async (c) => {
       c.req.query("purpose") === "call_overlay" || c.req.query("call_overlay") === "1";
     const dcpRoute = c.req.query("dcp_route") || c.req.query("dcpRoute") || null;
     const result = await jsonLookup(raw, viewerId, { forCallOverlay, dcpRoute });
+    if (forCallOverlay && viewerId && result.body && (result.body as { matched?: boolean }).matched) {
+      void recordOverlayLineCallEvent({ viewerId, number: raw, direction: "in" }).catch(() => {});
+    }
     return c.json(result.body, result.status);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
@@ -76,10 +83,42 @@ cardsRoutes.get("/by-number", async (c) => {
       c.req.query("purpose") === "call_overlay" || c.req.query("call_overlay") === "1";
     const dcpRoute = c.req.query("dcp_route") || c.req.query("dcpRoute") || null;
     const result = await jsonLookup(raw, viewerId, { forCallOverlay, dcpRoute });
+    if (forCallOverlay && viewerId && result.body && (result.body as { matched?: boolean }).matched) {
+      void recordOverlayLineCallEvent({ viewerId, number: raw, direction: "in" }).catch(() => {});
+    }
     return c.json(result.body, result.status);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
     return c.json({ error: msg, matched: false }, 500);
+  }
+});
+
+/** 통화 오버레이 — 상대 회선 소유자 통화목록에 적재 (캐시 히트 대비 명시 보고) */
+cardsRoutes.post("/line-call-events", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = (await c.req.json().catch(() => ({}))) as { number?: string; direction?: string };
+  try {
+    const result = await recordOverlayLineCallEvent({
+      viewerId: me,
+      number: String(body.number || ""),
+      direction: body.direction
+    });
+    return c.json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    return c.json({ ok: false, error: msg }, 500);
+  }
+});
+
+/** 내 통화목록 표시용 — VLUE 회원 이름 일괄 조회 */
+cardsRoutes.post("/member-names", requireUserHeader, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { numbers?: unknown };
+  const numbers = Array.isArray(body.numbers) ? body.numbers.map((n) => String(n || "")) : [];
+  try {
+    return c.json({ ok: true, ...(await lookupMemberNamesByNumbers(numbers)) });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    return c.json({ ok: false, error: msg, members: [] }, 500);
   }
 });
 

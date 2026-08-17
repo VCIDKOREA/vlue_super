@@ -7,6 +7,7 @@ import {
   putDccLineShowcase,
   putDccLineSnapshot
 } from "../services/dcc/dccLineService.js";
+import { listOwnerLineCallEvents } from "../services/dcc/lineCallEventService.js";
 
 type Vars = { vlueUserId: string };
 
@@ -25,6 +26,24 @@ dccLineRoutes.get("/", async (c) => {
   try {
     const data = await listDccLines(c.get("vlueUserId"));
     return c.json({ ok: true, ...data });
+  } catch (e) {
+    const { status, body } = httpError(e);
+    return c.json(body, status);
+  }
+});
+
+/** GET /api/cards/dcc-lines/call-history?lineId= */
+dccLineRoutes.get("/call-history", async (c) => {
+  try {
+    const userId = c.get("vlueUserId");
+    const lineId = String(c.req.query("lineId") || "").trim();
+    let linePhone: string | null = null;
+    if (lineId && lineId !== "all") {
+      const bundle = await getDccLineBundle(userId, lineId);
+      linePhone = bundle.line.phoneE164;
+    }
+    const events = await listOwnerLineCallEvents(userId, linePhone);
+    return c.json({ ok: true, events });
   } catch (e) {
     const { status, body } = httpError(e);
     return c.json(body, status);

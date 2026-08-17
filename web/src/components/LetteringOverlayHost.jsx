@@ -9,6 +9,7 @@ import { blockLetteringPhoneOnly } from "../lib/letteringPhoneBlock.js";
 import { SHOWCASE_LIVE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { CALL_STATES, normalizeCallState } from "../lib/showcase/tentShowcaseTypes.js";
 import { appendCallShowcaseHistory } from "../lib/callShowcaseHistory.js";
+import { reportLineCallEvent } from "../lib/lineCallHistoryApi.js";
 import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
@@ -329,6 +330,12 @@ function LetteringOverlayHostInner() {
           setCard((prev) => mergeDcpCard(prev, mapped));
           setVerified(true);
           setLoading(false);
+          if (!isDcpOverlayCard(mapped)) {
+            void reportLineCallEvent(
+              incoming || detail.phoneE164 || mapped.phone || "",
+              direction === "outgoing" ? "out" : "in"
+            );
+          }
           const peerUserId = String(mapped.userId || mapped.ownerUserId || "").trim();
           if (peerUserId) {
             void enrichOverlayPeerBundle(peerUserId, mapped).then(({ card, style }) => {
@@ -348,7 +355,7 @@ function LetteringOverlayHostInner() {
     window.addEventListener("vlue-card-lookup", onNativeCard);
     if (window.__VLUE_CARD_LOOKUP__) onNativeCard({ detail: window.__VLUE_CARD_LOOKUP__ });
     return () => window.removeEventListener("vlue-card-lookup", onNativeCard);
-  }, [incoming]);
+  }, [incoming, direction]);
 
   useEffect(() => {
     let cancelled = false;
@@ -454,6 +461,9 @@ function LetteringOverlayHostInner() {
       if (lookup?.ok && lookup.matched) {
         nextCard = mapLookupToLetteringCard(lookup, incoming);
         nextVerified = true;
+        if (nextCard && !isDcpOverlayCard(nextCard)) {
+          void reportLineCallEvent(incoming, direction === "outgoing" ? "out" : "in");
+        }
       }
 
       /* 상대(발신/수신 번호 소유자) 라이브 쇼케이스 — 본인 hydrateLive 금지 */

@@ -3,14 +3,17 @@ import { flushSync } from "react-dom";
 import { Phone, PhoneIncoming, PhoneOutgoing, ShieldCheck } from "lucide-react";
 import { CALL_SHOWCASE_HISTORY_CHANGED } from "../lib/callShowcaseHistory.js";
 import {
-  enrichCallLogGroupsWithShowcaseHistory,
+  applyMemberDirectoryToCallGroups,
+  buildCallHistoryList,
   fetchDeviceCallLogEntries,
   formatCallDuration,
   formatCallGroupLabel,
   formatCallWhen,
-  groupConsecutiveCallLogEntries,
   resolveCallHistoryAvatar
 } from "../lib/callLogList.js";
+import { fetchDccLines } from "../lib/dccLinesApi.js";
+import { dccLineOptionLabel } from "../lib/dccLineLabel.js";
+import { fetchLineCallHistory, fetchMemberNamesByNumbers } from "../lib/lineCallHistoryApi.js";
 import { resolveVlueShowcasePeer } from "../lib/resolveVlueShowcasePeer.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
@@ -107,9 +110,28 @@ function hasUsableLocalSnapshot(call) {
   return Boolean(style || snap?.photoUrl || snap?.name || snap?.userId || call?.userId);
 }
 
+const CALL_HISTORY_LINE_KEY = "vlue_call_history_line_id";
+
+function readCallHistoryLineId() {
+  try {
+    return String(sessionStorage.getItem(CALL_HISTORY_LINE_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function writeCallHistoryLineId(id) {
+  try {
+    if (id) sessionStorage.setItem(CALL_HISTORY_LINE_KEY, String(id));
+    else sessionStorage.removeItem(CALL_HISTORY_LINE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 function CallHistoryAvatar({ call }) {
   const url = resolveCallHistoryAvatar(call);
-  const label = String(call?.name || "").trim();
+  const label = String(call?.memberName || call?.name || "").trim();
   const phoneDisp = String(call?.phoneDisplay || call?.phone || "").trim();
   const isPhoneLabel =
     !label ||
@@ -167,6 +189,8 @@ function CallHistoryLoadingGuide({ syncing = false }) {
 
 export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = false }) {
   const [items, setItems] = useState([]);
+  const [lines, setLines] = useState([]);
+  const [lineFilter, setLineFilter] = useState(() => readCallHistoryLineId() || "all");
   const [loadError, setLoadError] = useState("");
   const [selected, setSelected] = useState(null);
   const [previewCard, setPreviewCard] = useState(null);
@@ -189,27 +213,40 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     setListLoading(true);
     setLoadError("");
     try {
-      const raw = await fetchDeviceCallLogEntries(200);
-      if (!raw.length) {
-        /* 권한 없거나 기록 없음 — localStorage만으로는 채우지 않음(계획: CallLog SoT) */
-        setItems([]);
+      const [raw, lineRows, lineEvents] = await Promise.all([
+        fetchDeviceCallLogEntries(200),
+        fetchDccLines()
+          .then((d) => (Array.isArray(d.lines) ? d.lines : []))
+          .catch(() => []),
+        fetchLineCallHistory(lineFilter)
+      ]);
+      setLines(lineRows);
+      const selectedLine =
+        lineFilter && lineFilter !== "all" ? lineRows.find((l) => l.id === lineFilter) || null : "all";
+      const merged = buildCallHistoryList({
+        deviceEntries: raw,
+        lineEvents,
+        selectedLine,
+        lines: lineRows
+      });
+      const members = await fetchMemberNamesByNumbers(merged.map((c) => c.phoneDisplay || c.phone));
+      setItems(applyMemberDirectoryToCallGroups(merged, members));
+      if (!raw.length && !lineEvents.length) {
         setLoadError(
           typeof window !== "undefined" &&
-            !(window.Android?.getDeviceCallLogJson || window.VlueLettering?.getDeviceCallLogJson)
+            !(window.Android?.getDeviceCallLogJson || window.VlueLettering?.getDeviceCallLogJson) &&
+            lineFilter === "all"
             ? "이 환경에서는 시스템 통화기록을 읽을 수 없습니다."
             : ""
         );
-        return;
       }
-      const grouped = groupConsecutiveCallLogEntries(raw);
-      setItems(enrichCallLogGroupsWithShowcaseHistory(grouped));
     } catch {
       setItems([]);
       setLoadError("통화기록을 불러오지 못했습니다.");
     } finally {
       setListLoading(false);
     }
-  }, []);
+  }, [lineFilter]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -549,12 +586,49 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     );
   }
 
+  const emptyHint = (() => {
+    if (loadError) return loadError;
+    if (lineFilter !== "all") {
+      return "이 번호로 쌓인 통화가 없습니다. VLUE 앱에서 이 번호로 걸면 이 계정 목록에 표시됩니다.";
+    }
+    return "통화 기록이 없습니다. 전화·통화기록 권한을 확인해 주세요.";
+  })();
+
+  const lineFilterBar =
+    lines.length > 1 ? (
+      <div className="call-history-line-filter">
+        <label className="call-history-line-filter__label" htmlFor="call-history-line-select">
+          번호
+        </label>
+        <div className="call-history-line-filter__wrap">
+          <select
+            id="call-history-line-select"
+            className="call-history-line-filter__select"
+            value={lineFilter}
+            aria-label="통화목록 번호"
+            onChange={(e) => {
+              const next = e.target.value || "all";
+              writeCallHistoryLineId(next);
+              setLineFilter(next);
+            }}
+          >
+            <option value="all">전체 번호</option>
+            {lines.map((line) => (
+              <option key={line.id} value={line.id}>
+                {dccLineOptionLabel(line)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    ) : null;
+
   return (
     <AppFullScreenView
       open={open}
       onClose={onClose}
       title="통화 목록"
-      subtitle="시스템 통화기록 · 상대 쇼케이스"
+      subtitle="번호별 통화기록 · 상대 쇼케이스"
       icon={Phone}
       isDarkMode={isDarkMode}
       reserveBottomNav
@@ -564,18 +638,18 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           {toast}
         </p>
       ) : null}
+      {lineFilterBar}
       {listLoading ? (
         <p className="px-4 py-16 text-center text-[13px] font-semibold text-slate-500">
           통화기록 불러오는 중…
         </p>
       ) : items.length === 0 ? (
-        <p className="px-4 py-16 text-center text-[13px] font-semibold text-slate-500">
-          {loadError || "통화 기록이 없습니다. 전화·통화기록 권한을 확인해 주세요."}
-        </p>
+        <p className="px-4 py-16 text-center text-[13px] font-semibold text-slate-500">{emptyHint}</p>
       ) : (
-        <ul className="friend-showcase-list__rows m-0 list-none p-0">
+        <ul className="friend-showcase-list__rows m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
           {items.map((call) => {
             const matrix = rowMatrix[call.id];
+            const member = Boolean(call.memberName || call.verified);
             return (
               <li key={call.id}>
                 <div className="friend-showcase-list__row call-history-row">
@@ -584,7 +658,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                     <div className="friend-showcase-list__meta">
                       <p className="friend-showcase-list__name">
                         {formatCallGroupLabel(call)}
-                        {isPaidLetteringTier(call.membershipTier) ? (
+                        {member && isPaidLetteringTier(call.membershipTier) ? (
                           <ShieldCheck
                             size={15}
                             strokeWidth={2.4}
@@ -594,7 +668,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                         ) : null}
                       </p>
                       <p className="friend-showcase-list__subtitle">
-                        {call.phoneDisplay || call.phone} · {formatCallDuration(call.durationSec)}
+                        {formatCallDuration(call.durationSec)}
                       </p>
                     </div>
                     <span className="shrink-0 text-[11px] font-bold text-slate-400">

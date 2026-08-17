@@ -322,6 +322,8 @@ model User {
   cardMemberships    CardMember[]
   authoredCardPosts  CardFeedPost[]      @relation("CardFeedPostAuthor")
   verificationLogs   VerificationLog[]
+  lineCallEventsOwned LineCallEvent[]    @relation("LineCallEventOwner")
+  lineCallEventsAsPeer LineCallEvent[]   @relation("LineCallEventPeer")
 
   authRefreshSessions AuthRefreshSession[]
   passwordResetTokens PasswordResetToken[]
@@ -772,6 +774,7 @@ model BusinessCard {
   verificationLogs  VerificationLog[]
   chatMessagesSent  ChatMessage[]
   lineSubscription  LineSubscription?
+  lineCallEvents    LineCallEvent[]
 
   /// B2B 기업 귀속 회선 — 통화 오버레이 시 대표번호 마스킹용
   b2bEnterpriseId String? @map("b2b_enterprise_id") @db.Uuid
@@ -783,6 +786,36 @@ model BusinessCard {
   @@index([b2bEnterpriseId])
   @@index([activeDccAgentProfileId])
   @@map("business_cards")
+}
+
+/// 앱이 없는 회선(02·1577 등) 포함 — 상대 VLUE 앱 오버레이 조회 시 소유자 통화목록에 적재
+model LineCallEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  owner       User   @relation("LineCallEventOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  lineCardId String?       @map("line_card_id") @db.Uuid
+  lineCard   BusinessCard? @relation(fields: [lineCardId], references: [id], onDelete: SetNull)
+  linePhoneE164 String     @map("line_phone_e164") @db.VarChar(24)
+
+  peerUserId String? @map("peer_user_id") @db.Uuid
+  peer       User?   @relation("LineCallEventPeer", fields: [peerUserId], references: [id], onDelete: SetNull)
+  peerPhoneE164 String @map("peer_phone_e164") @db.VarChar(24)
+  peerDisplayName String @default("") @map("peer_display_name") @db.VarChar(120)
+  peerIsVlueMember Boolean @default(false) @map("peer_is_vlue_member")
+  peerMembershipTier String? @map("peer_membership_tier") @db.VarChar(24)
+
+  /// 소유자 기준 방향 — 상대가 이 회선으로 걸면 in
+  direction String @default("in") @db.VarChar(8)
+  durationSec Int @default(0) @map("duration_sec")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt])
+  @@index([ownerUserId, linePhoneE164, createdAt])
+  @@index([peerUserId, createdAt])
+  @@map("line_call_events")
 }
 
 model CardMember {

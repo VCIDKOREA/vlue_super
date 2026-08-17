@@ -27,7 +27,15 @@ object DeviceCallLogReader {
         }
         val limit = limitRaw.coerceIn(1, MAX_LIMIT)
         val resolver = context.contentResolver
-        val projection = arrayOf(
+        val projectionWithVia = arrayOf(
+            CallLog.Calls._ID,
+            CallLog.Calls.NUMBER,
+            CallLog.Calls.DURATION,
+            CallLog.Calls.TYPE,
+            CallLog.Calls.DATE,
+            CallLog.Calls.VIA_NUMBER
+        )
+        val projectionBase = arrayOf(
             CallLog.Calls._ID,
             CallLog.Calls.NUMBER,
             CallLog.Calls.DURATION,
@@ -37,13 +45,23 @@ object DeviceCallLogReader {
         var cursor: Cursor? = null
         val out = JSONArray()
         return try {
-            cursor = resolver.query(
-                CallLog.Calls.CONTENT_URI,
-                projection,
-                null,
-                null,
-                "${CallLog.Calls.DATE} DESC"
-            )
+            cursor = try {
+                resolver.query(
+                    CallLog.Calls.CONTENT_URI,
+                    projectionWithVia,
+                    null,
+                    null,
+                    "${CallLog.Calls.DATE} DESC"
+                )
+            } catch (_: Exception) {
+                resolver.query(
+                    CallLog.Calls.CONTENT_URI,
+                    projectionBase,
+                    null,
+                    null,
+                    "${CallLog.Calls.DATE} DESC"
+                )
+            }
             if (cursor == null) return out.toString()
             var n = 0
             while (cursor.moveToNext() && n < limit) {
@@ -53,6 +71,7 @@ object DeviceCallLogReader {
                 val durationSec = cursor.getLong(2).toInt().coerceAtLeast(0)
                 val type = cursor.getInt(3)
                 val dateMs = cursor.getLong(4)
+                val viaNumber = if (cursor.columnCount > 5) cursor.getString(5).orEmpty().trim() else ""
                 val direction = when (type) {
                     CallLog.Calls.OUTGOING_TYPE -> "out"
                     CallLog.Calls.INCOMING_TYPE -> "in"
@@ -65,6 +84,7 @@ object DeviceCallLogReader {
                     JSONObject()
                         .put("id", "clog-$id")
                         .put("phone", number)
+                        .put("viaNumber", viaNumber)
                         .put("durationSec", durationSec)
                         .put("direction", direction)
                         .put("type", type)

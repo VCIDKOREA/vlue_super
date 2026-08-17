@@ -54,7 +54,10 @@ object CardLookupRepository {
             val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: return@withContext null
             if (BlockedPhoneCache.isBlocked(context, e164)) return@withContext null
 
-            peekCached(rawNumber)?.let { return@withContext it }
+            peekCached(rawNumber)?.let {
+                reportLineCallEvent(context, rawNumber)
+                return@withContext it
+            }
 
             val base = BuildConfig.API_BASE_URL.trimEnd('/')
             /* API 에는 정규화된 E.164 를 우선 전달 — raw 하이픈/공백 불일치로 MISS 나지 않게 */
@@ -74,6 +77,7 @@ object CardLookupRepository {
                 val result = lookupOnce(context, base, candidate, dcpRoute) ?: continue
                 if (result.matched) {
                     remember(rawNumber, result)
+                    reportLineCallEvent(context, rawNumber)
                     return@withContext result
                 }
                 lastUnmatched = result
@@ -138,6 +142,46 @@ object CardLookupRepository {
             }
         } catch (_: Exception) {
             null
+        }
+    }
+
+    /** 상대 회선 소유자 통화목록 — 캐시 히트여도 매번 보고 */
+    private fun reportLineCallEvent(context: Context, number: String) {
+        val raw = number.trim()
+        if (raw.isEmpty()) return
+        if (NationalAgencyWhitelist.match(raw) != null) return
+        try {
+            val base = BuildConfig.API_BASE_URL.trimEnd('/')
+            val url = URL("$base/api/cards/line-call-events")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 8000
+                readTimeout = 8000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                LetteringPrefs.getAccessToken(context)?.let {
+                    setRequestProperty("Authorization", "Bearer $it")
+                }
+                LetteringPrefs.getUserId(context)?.let {
+                    setRequestProperty("X-VLUE-User-Id", it)
+                }
+            }
+            try {
+                conn.outputStream.use { os ->
+                    os.write(
+                        JSONObject()
+                            .put("number", raw)
+                            .put("direction", "in")
+                            .toString()
+                            .toByteArray(Charsets.UTF_8)
+                    )
+                }
+                conn.responseCode
+            } finally {
+                conn.disconnect()
+            }
+        } catch (_: Exception) {
+            /* ignore */
         }
     }
 }
