@@ -27,6 +27,7 @@ import {
 } from "../services/auth/accountWithdrawalService.js";
 import {
   approveParentalConsentByGuardianSession,
+  approveParentalConsentWithGuardianPass,
   listPendingParentalConsentsForGuardian,
   ParentalConsentError,
   requestParentalConsentToGuardian
