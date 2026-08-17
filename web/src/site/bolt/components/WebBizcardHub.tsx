@@ -197,13 +197,12 @@ function WebBizcardHubInner({
       const meta = result.digitalMeta;
       setDigitalCardIssued(meta?.issued !== false);
       if (meta?.issued) setDigitalCardActive(readDigitalCardActive());
-      try {
-        const sync = await import('../../../lib/showcase/showcaseStyleSync.js');
-        await sync.hydrateShowcaseStyleFromServer({ forceServer: true });
-      } catch {
-        /* ignore */
-      }
-      const access = await probeEnterpriseSidebarAccess(result.membershipTier);
+      const [access] = await Promise.all([
+        probeEnterpriseSidebarAccess(result.membershipTier),
+        import('../../../lib/showcase/showcaseStyleSync.js')
+          .then((sync) => sync.hydrateShowcaseStyleFromServer({ forceServer: true }))
+          .catch(() => null),
+      ]);
       setEnterpriseAccess({
         canManage: Boolean(access?.canManage),
         isEnterprise: Boolean(access?.isEnterpriseMember),

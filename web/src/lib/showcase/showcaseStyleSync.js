@@ -241,14 +241,6 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
 
     if (forceServer) {
       const applied = applyServerBundle(remote, { reason: "forceServer", clearMissing: true });
-      let pushed = false;
-      if (
-        !isIndependentDccLine() &&
-        (applied?.seededEditorFromLive || showcaseStyleHasContent(readShowcaseStyle()))
-      ) {
-        const push = await pushShowcaseStyleBundle({ force: true });
-        pushed = Boolean(push?.ok && !push?.skipped);
-      }
       lastHydrateOkAt = Date.now();
       try {
         window.dispatchEvent(new CustomEvent("vlue-showcase-style-changed"));
@@ -256,7 +248,14 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
       } catch {
         /* ignore */
       }
-      return { ok: true, applied: true, pushed, forceServer: true };
+      /* 화면은 GET 반영 즉시. 서버 재저장은 뒤에서 — 웹 진입이 PUT까지 기다리지 않게 */
+      if (
+        !isIndependentDccLine() &&
+        (applied?.seededEditorFromLive || showcaseStyleHasContent(readShowcaseStyle()))
+      ) {
+        void pushShowcaseStyleBundle({ force: true });
+      }
+      return { ok: true, applied: true, pushed: false, forceServer: true };
     }
 
     const localEditor = readShowcaseStyle();

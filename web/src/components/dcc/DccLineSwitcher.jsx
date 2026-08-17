@@ -11,6 +11,8 @@ import {
 } from "../../lib/dccLineState.js";
 import {
   createDefaultShowcaseStyle,
+  readLiveShowcaseStyle,
+  readShowcaseStyle,
   writeLiveShowcaseStyle,
   writeShowcaseStyle
 } from "../../lib/showcase/showcaseStyleStorage.js";
@@ -33,7 +35,12 @@ function applyLineToLocalPreview(bundle) {
     writeShowcaseStyle(editor || live, { replace: true, skipSync: true });
     writeLiveShowcaseStyle(live || editor, { source: "editor", skipSync: true });
     if (bundle.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
-  } else {
+  } else if (
+    line.isCertified &&
+    (showcaseStyleHasContent(readShowcaseStyle()) || showcaseStyleHasContent(readLiveShowcaseStyle()))
+  ) {
+    /* 인증번호 쇼케이스는 계정 서버본. 회선 번들이 비어도 로컬 BGM·사진을 지우지 않음 */
+  } else if (!line.isCertified) {
     const empty = createDefaultShowcaseStyle();
     writeShowcaseStyle(empty, { replace: true, skipSync: true });
     writeLiveShowcaseStyle(empty, { source: "editor", skipSync: true });
