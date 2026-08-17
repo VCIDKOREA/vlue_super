@@ -27,6 +27,37 @@
   min-width: 0;
 }
 
+.dcc-agent-bar--compact.dcc-agent-bar--lines {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.dcc-agent-bar--compact .dcc-line-field {
+  width: 100%;
+}
+
+.dcc-agent-bar--compact .dcc-agent-bar__controls {
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.dcc-agent-bar--compact .dcc-agent-bar__select-wrap {
+  flex: 1 1 12rem;
+  width: auto;
+}
+
+.dcc-agent-bar--compact .dcc-agent-bar__select {
+  min-width: 0;
+  max-width: none;
+}
+
 .showcase-web-desk__tip .dcc-agent-bar--lines {
   flex: 1;
   justify-content: flex-end;

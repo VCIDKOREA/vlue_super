@@ -318,10 +318,29 @@ export default function DccLineSwitcher({
 
   return (
     <div className={`dcc-agent-bar dcc-agent-bar--lines${compact ? " dcc-agent-bar--compact" : ""}`}>
-      {lineSelect}
-      {agentSelect}
-      {loadingChip}
-      {manageBtn}
+      {compact ? (
+        <>
+          <label className="dcc-line-field">
+            번호
+            {lineSelect}
+          </label>
+          <label className="dcc-line-field">
+            담당자
+            <div className="dcc-agent-bar__controls">
+              {agentSelect}
+              {loadingChip}
+              {manageBtn}
+            </div>
+          </label>
+        </>
+      ) : (
+        <>
+          {lineSelect}
+          {agentSelect}
+          {loadingChip}
+          {manageBtn}
+        </>
+      )}
       {modal}
     </div>
   );
