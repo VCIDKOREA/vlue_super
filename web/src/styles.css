@@ -6868,8 +6868,11 @@ body,
 
 .ldr-hero__visual {
   position: relative;
-  aspect-ratio: 4 / 3;
+  width: 100%;
+  height: 200px;
   max-height: 200px;
+  aspect-ratio: auto;
+  flex-shrink: 0;
   overflow: hidden;
   background: transparent;
   border: 0;
@@ -7709,8 +7712,10 @@ body,
 
 .ldr-profile-media--hero {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  height: 200px;
   max-height: 200px;
+  aspect-ratio: auto;
+  flex-shrink: 0;
   border-radius: 0;
   border: 0 !important;
   border-bottom: 0 !important;
@@ -7727,6 +7732,10 @@ body,
 .ldr-back-hero {
   position: relative;
   z-index: 1;
+  width: 100%;
+  height: 200px;
+  max-height: 200px;
+  flex-shrink: 0;
   overflow: hidden;
   border: 0 !important;
   box-shadow: none !important;
@@ -8037,6 +8046,7 @@ button.ldr-back-person-name--link:active {
 }
 
 .lbq-preview-phone .ldr-hero__visual {
+  height: 160px;
   max-height: 160px;
 }
 

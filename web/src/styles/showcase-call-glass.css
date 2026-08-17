@@ -656,9 +656,12 @@
 }
 
 .showcase-call-carousel__bgm-bar {
+  --showcase-bgm-bar-h: 22px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  height: var(--showcase-bgm-bar-h);
+  min-height: var(--showcase-bgm-bar-h);
   min-width: 0;
   max-width: 100%;
   flex: 1 1 auto;
@@ -668,10 +671,21 @@
 .showcase-call-carousel__bgm.showcase-bgm-chip,
 .showcase-call-carousel__bgm {
   position: static;
-  /* ???? ??? ???: ? ??? ???? ?? */
   max-width: min(56vw, 220px);
   flex: 1 1 auto;
   min-width: min(28vw, 120px);
+  align-self: center;
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  height: var(--showcase-bgm-bar-h, 22px);
+  min-height: var(--showcase-bgm-bar-h, 22px);
+  max-height: var(--showcase-bgm-bar-h, 22px);
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
+  font-size: 10px;
+  overflow: hidden;
 }
 
 /* ??????? ???: ?? ?? ?? ?? ? ?? ??? ??? ??? */
@@ -690,10 +704,13 @@
   align-items: center;
   gap: 1px;
   flex-shrink: 0;
+  align-self: center;
   box-sizing: border-box;
-  height: 22px;
-  min-height: 22px;
+  height: var(--showcase-bgm-bar-h, 22px);
+  min-height: var(--showcase-bgm-bar-h, 22px);
+  max-height: var(--showcase-bgm-bar-h, 22px);
   padding: 0 2px;
+  line-height: 1;
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -3447,6 +3464,8 @@
 
 /* ??? ??????? (??????? ??? ??) ? ??? ?? + ??? ?? */
 .showcase-bgm-chip {
+  appearance: none;
+  -webkit-appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -3455,7 +3474,11 @@
   box-sizing: border-box;
   height: 22px;
   min-height: 22px;
+  max-height: 22px;
   padding: 0 8px;
+  line-height: 1;
+  font-size: 10px;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.72);
@@ -3472,6 +3495,11 @@
 
 .showcase-bgm-chip__note {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
   font-size: 11px;
   line-height: 1;
 }
@@ -3493,7 +3521,7 @@
   font-size: 10px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 1.2;
+  line-height: 1;
   animation: showcase-bgm-marquee 14s linear infinite;
   animation-play-state: paused;
 }

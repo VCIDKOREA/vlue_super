@@ -378,7 +378,8 @@
 }
 
 .lettering-ongoing--on-call .ldr-hero__visual:not(.ldr-hero__visual--logo) {
-  max-height: 132px;
+  height: 200px;
+  max-height: 200px;
 }
 
 .lettering-call-screen--marketing-demo .lettering-ongoing--unverified.lettering-ongoing--expanded {
