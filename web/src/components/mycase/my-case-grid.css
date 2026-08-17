@@ -363,6 +363,15 @@
   font-weight: 700;
 }
 
+.ig-mycase__status {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 400;
+  color: var(--ig-text);
+  word-break: keep-all;
+}
+
 .ig-mycase__bio-text {
   margin: 0;
   font-size: 12px;

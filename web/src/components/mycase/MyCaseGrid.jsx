@@ -29,6 +29,7 @@ import {
 import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
+import { readStatusMessage } from "../../lib/vlueAppSettings.js";
 import {
   isBroadcastStoryUnseen,
   markBroadcastStorySeen
@@ -117,6 +118,7 @@ export default function MyCaseGrid({
   const [busyId, setBusyId] = useState(null);
   const [manageMode, setManageMode] = useState(false);
   const [storySeenTick, setStorySeenTick] = useState(0);
+  const [statusMessage, setStatusMessage] = useState(() => (isMine ? readStatusMessage() : ""));
   const sentinelRef = useRef(null);
   const toastRef = useRef(onToast);
   const initialLoadDoneRef = useRef(false);
@@ -129,6 +131,14 @@ export default function MyCaseGrid({
   useEffect(() => {
     toastRef.current = onToast;
   }, [onToast]);
+
+  useEffect(() => {
+    if (!isMine) return undefined;
+    const sync = () => setStatusMessage(readStatusMessage());
+    sync();
+    window.addEventListener("vlue-app-settings-changed", sync);
+    return () => window.removeEventListener("vlue-app-settings-changed", sync);
+  }, [isMine]);
 
   const toast = useCallback((msg) => {
     const fn = toastRef.current;
@@ -782,6 +792,9 @@ export default function MyCaseGrid({
                 </div>
               ) : null}
             </div>
+            {isMine && statusMessage ? (
+              <p className="ig-mycase__status">{statusMessage}</p>
+            ) : null}
             <div className="ig-mycase__bio-meta">
               {isMine ? (
                 <p className="ig-mycase__bio-text">

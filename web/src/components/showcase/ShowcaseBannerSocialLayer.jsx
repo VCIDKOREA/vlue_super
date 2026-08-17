@@ -9,7 +9,6 @@ import { shareShowcaseInviteViaKakao } from "../../lib/call/shareShowcaseInviteK
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import { resolveShowcasePeerAvatar } from "../../lib/showcase/resolveShowcasePeerAvatar.js";
 import { isVlueBrandAssetUrl } from "../../lib/vlueAvatar.js";
-import { readStatusMessage } from "../../lib/vlueAppSettings.js";
 import {
   hasVlueLoggedInSession,
   VLUE_MEMBERSHIP_REQUIRED_MSG
@@ -70,12 +69,9 @@ export default function ShowcaseBannerSocialLayer({
       firstText(
         slide?.overlayText,
         slide?.caption,
-        style?.richCustom?.bodyText,
-        card?.statusMessage,
-        card?.companyIntro,
-        typeof window !== "undefined" ? readStatusMessage() : ""
+        style?.richCustom?.bodyText
       ),
-    [slide?.overlayText, slide?.caption, style?.richCustom?.bodyText, card?.statusMessage, card?.companyIntro]
+    [slide?.overlayText, slide?.caption, style?.richCustom?.bodyText]
   );
 
   const { avatarUrl, logoLetter } = useMemo(() => {

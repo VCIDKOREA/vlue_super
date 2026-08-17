@@ -261,11 +261,14 @@ export default function VlueSettingsPanel({
               maxLength={80}
               value={statusInput}
               onChange={(e) => setStatusInput(e.target.value)}
-              placeholder="상태메시지를 입력해 주세요"
+              placeholder="마이케이스 이름 아래에 표시됩니다"
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-[13px] outline-none ${
                 isDarkMode ? "border-white/15 bg-[#1f2937] text-gray-100" : "border-gray-200 bg-white text-gray-900"
               }`}
             />
+            <p className={`mt-1 text-[10px] font-medium ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+              마이케이스에만 표시됩니다. 쇼케이스·DCC에는 나가지 않습니다.
+            </p>
           </label>
           {v1AppShell.chat ? (
             <label className={`mt-3 block text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
