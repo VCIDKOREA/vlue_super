@@ -63,6 +63,7 @@ import { bindFcmForegroundListener, registerFcmWebPushToken } from "./lib/fcmWeb
 import SignupErrorBoundary from "./components/SignupErrorBoundary.jsx";
 import LoginScreen from "./components/LoginScreen";
 import AppLockPinResetModal, { useAppLockResetListener } from "./components/AppLockPinResetModal.jsx";
+import { isPasswordChangeCertPending, readPasswordChangeResume } from "./lib/passwordChangeApi.js";
 import { GUEST_PROTECTED_SUBHUB_TABS, runWithGuestAuthGate } from "./lib/guestAuthGate.js";
 import { VlueNavLogoMark } from "./components/VlueNavLogoMark.jsx";
 import BackButton from "./components/common/BackButton";
@@ -357,12 +358,26 @@ function App() {
   /** PASS 본인인증 redirect 복귀 시 온보딩 재오픈 */
   useEffect(() => {
     try {
+      if (isPasswordChangeCertPending()) return;
       const hasDraft = Boolean(sessionStorage.getItem("vlue_pass_cert_draft_v1"));
       const q = new URLSearchParams(window.location.search || "");
       const hasCertReturn = Boolean(q.get("imp_uid") || q.get("impUid") || q.get("success"));
       if (!hasDraft && !hasCertReturn) return;
       setShowSplash(false);
       setSignupOnboardingOpen(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  /** 비밀번호 변경 PASS redirect 복귀 — 설정 화면으로 */
+  useEffect(() => {
+    try {
+      if (!isPasswordChangeCertPending()) return;
+      if (readPasswordChangeResume() !== "settings") return;
+      setShowSplash(false);
+      setProfileInitialView("passwordChange");
+      setProfileOpen(true);
     } catch {
       /* ignore */
     }

@@ -27,12 +27,15 @@ import {
 } from "../services/auth/accountWithdrawalService.js";
 import {
   approveParentalConsentByGuardianSession,
-  approveParentalConsentWithGuardianPass,
   listPendingParentalConsentsForGuardian,
   ParentalConsentError,
   requestParentalConsentToGuardian
 } from "../services/auth/parentalConsentService.js";
 import { PARENTAL_CONSENT_PENDING_LOGIN_MESSAGE } from "@vlue/shared/policy/minor-signup";
+import {
+  changePasswordWithIdentity,
+  PasswordIdentityError
+} from "../services/auth/passwordIdentityChangeService.js";
 import {
   sendSignupEmailOtp,
   verifySignupEmailOtp
@@ -468,6 +471,32 @@ authRoutes.post("/password/change", async (c) => {
     const pair = await issueTokenPair(uid, c.req);
     return c.json({ ok: true, ...pair });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+/** PASS 본인인증으로 비밀번호 변경 — 로그인(계정 일치) 또는 비로그인(CI·번호로 기존 회원 찾기) */
+authRoutes.post("/password/change-with-identity", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    const body = await c.req.json<{ impUid?: string; imp_uid?: string; newPassword?: string }>();
+    const impUid = String(body?.impUid || body?.imp_uid || "").trim();
+    const newPassword = String(body?.newPassword ?? "");
+    const result = await changePasswordWithIdentity({
+      impUid,
+      newPassword,
+      sessionUserId: uid
+    });
+    if (uid && uid === result.userId) {
+      const pair = await issueTokenPair(uid, c.req);
+      return c.json({ ok: true, ...pair });
+    }
+    return c.json({ ok: true });
+  } catch (e) {
+    if (e instanceof PasswordIdentityError) {
+      return c.json({ error: e.message }, e.status as 400 | 401 | 403 | 404);
+    }
     const msg = e instanceof Error ? e.message : "unknown error";
     return c.json({ error: msg }, 400);
   }

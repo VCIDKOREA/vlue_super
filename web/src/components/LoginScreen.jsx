@@ -5,6 +5,8 @@ import GoogleLoginButton from "./auth/GoogleLoginButton.jsx";
 import NaverLoginButton from "./auth/NaverLoginButton.jsx";
 import InstagramLoginButton from "./auth/InstagramLoginButton.jsx";
 import { VlueEyeMark } from "./VlueEyeMark.jsx";
+import PasswordChangeSection from "./settings/PasswordChangeSection.jsx";
+import { isPasswordChangeCertPending } from "../lib/passwordChangeApi.js";
 
 const SAVED_ID_KEY = "vlue_saved_login_id";
 const SAVED_PASSWORD_KEY = "vlue_saved_login_password";
@@ -26,6 +28,8 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
   const [pwEyeBlinkSeq, setPwEyeBlinkSeq] = useState(0);
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [recoveryOpen, setRecoveryOpen] = useState(() => isPasswordChangeCertPending());
+  const [recoveryDone, setRecoveryDone] = useState("");
 
   useEffect(() => {
     try {
@@ -173,6 +177,11 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
                     {loginError}
                   </p>
                 ) : null}
+                {recoveryDone ? (
+                  <p className="mt-2 text-center text-[12px] font-medium leading-snug text-emerald-600" role="status">
+                    {recoveryDone}
+                  </p>
+                ) : null}
 
                 <label className="mt-3 flex cursor-pointer items-start gap-2 text-[12px] text-slate-600">
                   <input
@@ -208,7 +217,7 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
                 <div className="mt-2 flex justify-end">
                   <button
                     type="button"
-                    onClick={() => onSocialLogin?.("find_account")}
+                    onClick={() => setRecoveryOpen(true)}
                     className="text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline"
                   >
                     아이디 / 비밀번호 찾기
@@ -251,6 +260,21 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
           © 2026 VLUE Inc. · VCID KOREA
         </p>
       </div>
+
+      {recoveryOpen ? (
+        <PasswordChangeSection
+          variant="overlay"
+          loggedIn={false}
+          handle={loginId}
+          onBack={() => setRecoveryOpen(false)}
+          onSuccess={(msg) => {
+            setRecoveryOpen(false);
+            setLoginError("");
+            setGeneralAuthOpen(true);
+            setRecoveryDone(msg || "비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.");
+          }}
+        />
+      ) : null}
 
     </div>
   );

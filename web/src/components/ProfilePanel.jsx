@@ -267,6 +267,13 @@ function ProfilePanel({
       setUpgradeOpen(false);
       return;
     }
+    if (initialView === "passwordChange") {
+      setPanelView("settings");
+      setSettingsSubView("passwordChange");
+      setDigitalCardMode("edit");
+      setUpgradeOpen(false);
+      return;
+    }
     if (initialView === "digitalCardApply" || initialView === "digitalCardEdit" || initialView === "letteringBizcard") {
       setPanelView("letteringBizcard");
       setUpgradeOpen(false);

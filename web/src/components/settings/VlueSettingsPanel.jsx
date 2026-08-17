@@ -22,6 +22,7 @@ import {
   SettingsSubpageShell,
   FontScalePicker
 } from "./VlueSettingsUi.jsx";
+import PasswordChangeSection from "./PasswordChangeSection.jsx";
 import VlueEmailSettingsSection from "./VlueEmailSettingsSection.jsx";
 import { v1AppShell } from "../../lib/v1ReleaseScope.js";
 import { APP_LEGAL_LINKS, marketingLegalUrl } from "../../lib/legalPageLinks.js";
@@ -375,6 +376,23 @@ export default function VlueSettingsPanel({
     );
   }
 
+  if (subView === "passwordChange") {
+    return (
+      <PasswordChangeSection
+        isDarkMode={isDarkMode}
+        loggedIn
+        handle={getMemberHandle()}
+        legalName={getLegalName()}
+        phone={myPhone}
+        onBack={() => onSubView(null)}
+        onSuccess={(msg) => {
+          showSettingNotice?.(msg || "비밀번호가 변경되었습니다.");
+          onSubView(null);
+        }}
+      />
+    );
+  }
+
   if (subView === "contactInfo") {
     return (
       <SettingsSubpageShell title="전화번호" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
@@ -613,6 +631,13 @@ export default function VlueSettingsPanel({
         </SettingsSection>
 
         <SettingsSection title="보안" isDarkMode={isDarkMode}>
+          <SettingsRowButton
+            label="비밀번호 변경"
+            sublabel="기존 비밀번호 · PASS 본인인증 · 고객센터"
+            onClick={() => onSubView("passwordChange")}
+            isDarkMode={isDarkMode}
+          />
+          <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton
             label="앱 잠금 (PIN)"
             sublabel="6자리 PIN 등록 · 앱 실행/중요 기능 보호"
