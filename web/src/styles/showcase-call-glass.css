@@ -619,8 +619,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 0 4px 6px;
+  gap: 8px;
+  padding: 0 4px 2px;
+  min-height: 0;
   flex-shrink: 0;
   position: relative;
   z-index: 20;
@@ -628,9 +629,10 @@
 }
 
 .showcase-call-carousel__meta-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.02em;
+  line-height: 1.15;
   color: #ffffff;
   flex: 0 0 auto;
   white-space: nowrap;
@@ -656,7 +658,7 @@
 .showcase-call-carousel__bgm-bar {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   max-width: 100%;
   flex: 1 1 auto;
@@ -686,9 +688,9 @@
 .showcase-bgm-transport {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
   flex-shrink: 0;
-  padding: 2px 4px;
+  padding: 0 2px;
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -699,14 +701,14 @@
 }
 
 .showcase-bgm-transport__btn {
-  min-width: 28px;
-  height: 26px;
-  padding: 0 3px;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 2px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   color: #f8fafc;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.22em;
@@ -715,8 +717,8 @@
 }
 
 .showcase-bgm-transport__btn--main {
-  min-width: 28px;
-  font-size: 13px;
+  min-width: 22px;
+  font-size: 12px;
   letter-spacing: normal;
   color: #7dd3fc;
 }
@@ -3444,10 +3446,11 @@
 .showcase-bgm-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   max-width: min(72vw, 240px);
   margin: 0;
-  padding: 7px 10px;
+  padding: 2px 8px;
+  min-height: 22px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.72);
@@ -3464,7 +3467,7 @@
 
 .showcase-bgm-chip__note {
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: 11px;
   line-height: 1;
 }
 
@@ -3482,9 +3485,10 @@
   align-items: center;
   gap: 0;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: -0.02em;
+  line-height: 1.2;
   animation: showcase-bgm-marquee 14s linear infinite;
   animation-play-state: paused;
 }
@@ -3534,9 +3538,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: -0.02em;
+  line-height: 1.2;
   text-align: left;
 }
 
