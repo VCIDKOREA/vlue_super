@@ -51,6 +51,20 @@ export async function changePasswordWithIdentity(impUid, newPassword, { anonymou
   return data;
 }
 
+export async function changePasswordWithEmailCode(token, newPassword, { anonymous = false } = {}) {
+  const init = {
+    method: "POST",
+    headers: anonymous ? { "Content-Type": "application/json" } : vlueAuthHeaders(),
+    body: JSON.stringify({ token, newPassword })
+  };
+  const res = anonymous
+    ? await fetch(apiUrl("/api/auth/password/change-with-email"), init)
+    : await vlueAuthFetch(apiUrl("/api/auth/password/change-with-email"), init);
+  const data = await parseJson(res);
+  if (!anonymous) persistTokensIfPresent(data);
+  return data;
+}
+
 export const PASSWORD_CHANGE_CERT_KEY = "vlue_password_change_cert_v1";
 export const PASSWORD_CHANGE_RESUME_KEY = "vlue_password_change_resume";
 

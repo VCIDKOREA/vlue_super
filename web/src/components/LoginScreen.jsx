@@ -7,6 +7,7 @@ import InstagramLoginButton from "./auth/InstagramLoginButton.jsx";
 import { VlueEyeMark } from "./VlueEyeMark.jsx";
 import PasswordChangeSection from "./settings/PasswordChangeSection.jsx";
 import { isPasswordChangeCertPending } from "../lib/passwordChangeApi.js";
+import { sendAuthCode, EMAIL_AUTH_SUPPORT } from "../lib/emailAuthApi.js";
 
 const SAVED_ID_KEY = "vlue_saved_login_id";
 const SAVED_PASSWORD_KEY = "vlue_saved_login_password";
@@ -30,6 +31,9 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
   const [loginError, setLoginError] = useState("");
   const [recoveryOpen, setRecoveryOpen] = useState(() => isPasswordChangeCertPending());
   const [recoveryDone, setRecoveryDone] = useState("");
+  const [deviceEmailGate, setDeviceEmailGate] = useState(null);
+  const [deviceEmailCode, setDeviceEmailCode] = useState("");
+  const [deviceEmailHint, setDeviceEmailHint] = useState("");
 
   useEffect(() => {
     try {
@@ -59,15 +63,59 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
       setLoginError("아이디와 비밀번호를 입력해 주세요.");
       return;
     }
+    if (deviceEmailGate && String(deviceEmailCode || "").trim().length !== 6) {
+      setLoginError("인증번호 6자리를 입력해 주세요.");
+      return;
+    }
     setLoginError("");
     setLoginBusy(true);
     try {
-      const result = await onLogin?.({ id, password: pw, rememberLogin });
+      const result = await onLogin?.({
+        id,
+        password: pw,
+        rememberLogin,
+        ...(deviceEmailGate
+          ? { deviceEmailTicket: deviceEmailGate.ticket, emailCode: deviceEmailCode }
+          : {})
+      });
+      if (result?.emailCodeRequired) {
+        setDeviceEmailGate({
+          ticket: result.ticket,
+          maskedEmail: result.maskedEmail,
+          message: result.message,
+          supportEmail: result.supportEmail
+        });
+        setDeviceEmailCode("");
+        setDeviceEmailHint(result.message || "");
+        setLoginError("");
+        return;
+      }
       if (result && result.ok === false) {
         setLoginError(result.error || "로그인에 실패했습니다.");
+      } else {
+        setDeviceEmailGate(null);
+        setDeviceEmailCode("");
       }
     } catch (e) {
       setLoginError(e instanceof Error ? e.message : "로그인할 수 없습니다.");
+    } finally {
+      setLoginBusy(false);
+    }
+  };
+
+  const resendDeviceEmailCode = async () => {
+    if (!deviceEmailGate?.ticket) return;
+    setLoginBusy(true);
+    setLoginError("");
+    try {
+      const data = await sendAuthCode({ purpose: "login_device", ticket: deviceEmailGate.ticket });
+      setDeviceEmailHint(
+        data.devCode
+          ? `개발 모드 인증번호: ${data.devCode}`
+          : `${data.maskedEmail || deviceEmailGate.maskedEmail} 로 인증번호를 다시 보냈습니다.`
+      );
+    } catch (e) {
+      setLoginError(e instanceof Error ? e.message : "인증번호를 다시 보내지 못했습니다.");
     } finally {
       setLoginBusy(false);
     }
@@ -172,6 +220,36 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
                 </button>
               </div>
                 </div>
+                {deviceEmailGate ? (
+                  <div className="mt-3 space-y-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-3">
+                    <p className="text-[12px] font-semibold leading-relaxed text-blue-900" style={{ wordBreak: "keep-all" }}>
+                      새 기기 확인 — {deviceEmailGate.maskedEmail} 로 보낸 6자리 인증번호를 입력해 주세요.
+                    </p>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      value={deviceEmailCode}
+                      onChange={(e) => setDeviceEmailCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="인증번호 6자리"
+                      className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-[14px] outline-none"
+                    />
+                    {deviceEmailHint ? (
+                      <p className="text-[11px] leading-snug text-blue-800">{deviceEmailHint}</p>
+                    ) : null}
+                    <p className="text-[11px] leading-snug text-slate-500" style={{ wordBreak: "keep-all" }}>
+                      {EMAIL_AUTH_SUPPORT}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={loginBusy}
+                      onClick={resendDeviceEmailCode}
+                      className="text-[11px] font-medium text-blue-700 underline-offset-2 hover:underline"
+                    >
+                      인증번호 다시 받기
+                    </button>
+                  </div>
+                ) : null}
                 {loginError ? (
                   <p className="mt-2 text-center text-[12px] font-medium leading-snug text-rose-600" role="alert">
                     {loginError}
@@ -232,7 +310,7 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
                   disabled={loginBusy}
                   className="w-full rounded-lg bg-blue-600 py-2 text-[13px] font-semibold text-white transition active:scale-[0.99] active:bg-blue-700 disabled:cursor-wait disabled:opacity-70"
                 >
-                  {loginBusy ? "로그인 중…" : "로그인"}
+                  {loginBusy ? "로그인 중…" : deviceEmailGate ? "인증 후 로그인" : "로그인"}
                 </button>
                 <button
                   type="button"

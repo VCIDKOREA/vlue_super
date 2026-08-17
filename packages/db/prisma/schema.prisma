@@ -473,8 +473,13 @@ model AuthRefreshSession {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   userAgent String?  @map("user_agent") @db.VarChar(512)
   lastIp    String?  @map("last_ip") @db.VarChar(45)
+  clientKind String? @map("client_kind") @db.VarChar(16)
+  deviceToken String? @map("device_token") @db.VarChar(128)
+  geoLabel  String?  @map("geo_label") @db.VarChar(64)
+  platform  String?  @map("platform") @db.VarChar(16)
 
   @@index([userId])
+  @@index([userId, platform, revokedAt])
   @@map("auth_refresh_sessions")
 }
 
@@ -2232,6 +2237,8 @@ model UserDevice {
   userAgent String? @map("user_agent") @db.VarChar(512)
   lastIp    String? @map("last_ip") @db.VarChar(45)
   clientKind String? @map("client_kind") @db.VarChar(16)
+  geoLabel  String? @map("geo_label") @db.VarChar(64)
+  platform  String? @map("platform") @db.VarChar(16)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)

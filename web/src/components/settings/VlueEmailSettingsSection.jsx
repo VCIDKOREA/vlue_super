@@ -11,6 +11,7 @@ import {
   slugifyCompanyName
 } from "../../lib/vlueEmailMappingsApi.js";
 import { getPricingConfigSync } from "../../lib/pricingConfig.js";
+import { sendAuthCode, verifyAuthCode, EMAIL_AUTH_SUPPORT } from "../../lib/emailAuthApi.js";
 import VluePromoCard, { VlueMailPreviewFloat } from "../ui/VluePromoCard.jsx";
 import { SettingsSubpageShell } from "./VlueSettingsUi.jsx";
 
@@ -94,6 +95,9 @@ export default function VlueEmailSettingsSection({
   const [configuredEmail, setConfiguredEmail] = useState(null);
   const [masterEmails, setMasterEmails] = useState([]);
   const [newMasterEmail, setNewMasterEmail] = useState("");
+  const [masterOtp, setMasterOtp] = useState("");
+  const [masterOtpHint, setMasterOtpHint] = useState("");
+  const [masterVerifyToken, setMasterVerifyToken] = useState("");
 
   const headText = isDarkMode ? "text-gray-100" : "text-[#191f28]";
   const inputCls = isDarkMode
@@ -161,7 +165,7 @@ export default function VlueEmailSettingsSection({
     }
   };
 
-  const handleAddMaster = async () => {
+  const handleSendMasterOtp = async () => {
     const email = newMasterEmail.trim();
     if (!email) {
       showSettingNotice?.("연동할 이메일을 입력해 주세요.");
@@ -169,9 +173,59 @@ export default function VlueEmailSettingsSection({
     }
     setAddingMaster(true);
     try {
-      const data = await addMasterEmail(email);
+      const data = await sendAuthCode({ purpose: "dcc_email", email }, { auth: true });
+      setMasterVerifyToken("");
+      setMasterOtpHint(
+        data.devCode
+          ? `개발 모드 인증번호: ${data.devCode}`
+          : `${data.maskedEmail || email} 로 인증번호를 보냈습니다. 5분 내에 입력해 주세요.`
+      );
+      showSettingNotice?.("인증번호를 발송했습니다.");
+    } catch (e) {
+      showSettingNotice?.(e.message || "인증번호 발송에 실패했습니다.");
+    } finally {
+      setAddingMaster(false);
+    }
+  };
+
+  const handleVerifyMasterOtp = async () => {
+    const email = newMasterEmail.trim();
+    const code = String(masterOtp || "").trim();
+    if (!email || code.length !== 6) {
+      showSettingNotice?.("이메일과 인증번호 6자리를 입력해 주세요.");
+      return;
+    }
+    setAddingMaster(true);
+    try {
+      const data = await verifyAuthCode({ purpose: "dcc_email", email, code }, { auth: true });
+      setMasterVerifyToken(data.token || "");
+      setMasterOtpHint("이메일 인증이 완료되었습니다. 추가를 눌러 등록해 주세요.");
+      showSettingNotice?.("이메일 인증이 완료되었습니다.");
+    } catch (e) {
+      showSettingNotice?.(e.message || "인증에 실패했습니다.");
+    } finally {
+      setAddingMaster(false);
+    }
+  };
+
+  const handleAddMaster = async () => {
+    const email = newMasterEmail.trim();
+    if (!email) {
+      showSettingNotice?.("연동할 이메일을 입력해 주세요.");
+      return;
+    }
+    if (!masterVerifyToken) {
+      showSettingNotice?.("먼저 이메일 인증번호를 확인해 주세요.");
+      return;
+    }
+    setAddingMaster(true);
+    try {
+      const data = await addMasterEmail(email, masterVerifyToken);
       setMasterEmails(data.mapping?.masterEmails || []);
       setNewMasterEmail("");
+      setMasterOtp("");
+      setMasterOtpHint("");
+      setMasterVerifyToken("");
       showSettingNotice?.("수신 메일이 등록되었습니다.");
     } catch (e) {
       showSettingNotice?.(e.message || "등록에 실패했습니다.");
@@ -349,22 +403,55 @@ export default function VlueEmailSettingsSection({
               </p>
             )}
 
-            <div className="mt-3 flex gap-2">
-              <input
-                type="email"
-                value={newMasterEmail}
-                onChange={(e) => setNewMasterEmail(e.target.value)}
-                placeholder="example@naver.com"
-                className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 vlue-type-body ${inputCls}`}
-              />
-              <button
-                type="button"
-                onClick={handleAddMaster}
-                disabled={addingMaster}
-                className="vlue-promo-card__cta shrink-0 !w-auto px-4 disabled:opacity-50"
-              >
-                {addingMaster ? "…" : "추가"}
-              </button>
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={newMasterEmail}
+                  onChange={(e) => {
+                    setNewMasterEmail(e.target.value);
+                    setMasterVerifyToken("");
+                  }}
+                  placeholder="example@naver.com"
+                  className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 vlue-type-body ${inputCls}`}
+                />
+                <button
+                  type="button"
+                  onClick={handleSendMasterOtp}
+                  disabled={addingMaster}
+                  className="vlue-promo-card__cta shrink-0 !w-auto px-3 disabled:opacity-50"
+                >
+                  {addingMaster ? "…" : "인증번호"}
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={masterOtp}
+                  onChange={(e) => setMasterOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="인증번호 6자리"
+                  className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 vlue-type-body ${inputCls}`}
+                />
+                <button
+                  type="button"
+                  onClick={handleVerifyMasterOtp}
+                  disabled={addingMaster}
+                  className="shrink-0 rounded-xl border border-[#e8eaed] px-3 py-2.5 text-[13px] font-bold disabled:opacity-50"
+                >
+                  확인
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddMaster}
+                  disabled={addingMaster}
+                  className="vlue-promo-card__cta shrink-0 !w-auto px-4 disabled:opacity-50"
+                >
+                  {addingMaster ? "…" : "추가"}
+                </button>
+              </div>
+              {masterOtpHint ? <p className="vlue-settings-card__hint">{masterOtpHint}</p> : null}
+              <p className="vlue-settings-card__hint">{EMAIL_AUTH_SUPPORT}</p>
             </div>
           </section>
 

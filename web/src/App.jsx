@@ -152,7 +152,7 @@ import {
 import { apiUrl } from "./lib/apiBase.js";
 import { readStoreFeedTab, writeStoreFeedTab, STORE_FEED_PREFS_CHANGED } from "./lib/storeFeedPrefs.js";
 import { v1AppShell, coerceAppPageForV1, isAppPageV1Enabled } from "./lib/v1ReleaseScope.js";
-import { getDeviceToken, saveDeviceToken, clientKindHeaders } from "./lib/deviceAuth.js";
+import { getDeviceToken, saveDeviceToken, clientKindHeaders, detectAuthPlatform } from "./lib/deviceAuth.js";
 import { runUnifiedSearch, tabForRoom } from "./lib/appUnifiedSearch.js";
 import {
   vlueAuthHeaders,
@@ -2176,15 +2176,51 @@ function App() {
         return { ok: false, error: msg };
       }
       try {
-        const url = apiUrl("/api/auth/login");
         const deviceToken = getDeviceToken();
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...clientKindHeaders() },
-          body: JSON.stringify({ loginId: id, password, deviceToken })
-        });
+        const headers = { "Content-Type": "application/json", ...clientKindHeaders() };
+        let res;
+        if (payload?.deviceEmailTicket && payload?.emailCode) {
+          res = await fetch(apiUrl("/api/auth/verify-code"), {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              purpose: "login_device",
+              ticket: payload.deviceEmailTicket,
+              code: payload.emailCode,
+              deviceToken
+            })
+          });
+        } else {
+          res = await fetch(apiUrl("/api/auth/login"), {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              loginId: id,
+              password,
+              deviceToken,
+              platform: detectAuthPlatform()
+            })
+          });
+        }
         const data = await res.json().catch(() => ({}));
-        if (data?.status === "device_pending" || (res.status === 403 && data?.deviceToken)) {
+        if (data?.status === "email_code_required") {
+          if (data.deviceToken) saveDeviceToken(data.deviceToken);
+          return {
+            ok: false,
+            emailCodeRequired: true,
+            ticket: data.ticket,
+            maskedEmail: data.maskedEmail,
+            message: data.message,
+            supportEmail: data.supportEmail || "support@vlue.kr"
+          };
+        }
+        if (data?.status === "email_unavailable") {
+          const msg = data?.message || data?.error || "가입 이메일이 없어 새 기기 확인을 할 수 없습니다.";
+          setBottomToast(msg);
+          setTimeout(() => setBottomToast(""), 4500);
+          return { ok: false, error: msg };
+        }
+        if (data?.status === "device_pending" || (res.status === 403 && data?.deviceToken && !data?.ticket)) {
           if (data.deviceToken) saveDeviceToken(data.deviceToken);
           const msg =
             data?.message || "이 PC는 기기 승인이 필요합니다. 승인된 기기에서 승인 후 다시 로그인해 주세요.";

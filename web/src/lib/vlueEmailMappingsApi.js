@@ -57,11 +57,11 @@ export async function saveVirtualEmailMapping(payload) {
   return data;
 }
 
-export async function addMasterEmail(email) {
+export async function addMasterEmail(email, token) {
   const res = await vlueAuthFetch(apiUrl("/api/email-forwarding/masters"), {
     method: "POST",
     headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({ email })
+    body: JSON.stringify({ email, token })
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

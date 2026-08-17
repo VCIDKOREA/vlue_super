@@ -2,11 +2,26 @@ import { randomBytes } from "node:crypto";
 import type { Context } from "hono";
 import { prisma } from "../db/client.js";
 import { verifyPassword } from "../lib/passwordHash.js";
-import { issueTokenPair } from "./authSessions.js";
+import { issueTokenPair, revokeOtherAndroidAppSessions } from "./authSessions.js";
 import { assertLineTypeAllowsClient, detectClientKind, type ClientKind } from "../middleware/enterpriseAccess.js";
 import { isDeviceAutoApproveHandle, isVlueSeedTestHandle } from "../lib/testAccounts.js";
 import { upsertEnterpriseDraft } from "./b2b/cartEngine.js";
 import { resolveLoginMembershipTier } from "./membership/platformCeoPremium.js";
+import {
+  detectAuthPlatform,
+  requestClientIp,
+  requestGeoLabel,
+  sessionClientKind,
+  type AuthPlatform
+} from "../lib/authPlatform.js";
+import {
+  EMAIL_AUTH_SUPPORT,
+  EMAIL_OTP_TTL_SEC,
+  maskEmail,
+  putLoginGateTicket,
+  resolveUserNotifyEmail,
+  sendEmailAuthCode
+} from "./email/emailAuthCodeService.js";
 
 export type { ClientKind };
 export { detectClientKind };
@@ -47,15 +62,39 @@ export type LoginResult =
       deviceToken: string;
       message: string;
       pendingDeviceId: string;
+    }
+  | {
+      status: "email_code_required";
+      ticket: string;
+      maskedEmail: string;
+      expiresInSec: number;
+      message: string;
+      supportEmail: string;
+      deviceToken: string;
+    }
+  | {
+      status: "email_unavailable";
+      message: string;
+      supportEmail: string;
     };
 
 async function issueLoginOk(
   user: LoginUserRow,
   loginId: string,
   deviceToken: string,
-  c: Context
+  c: Context,
+  platform: AuthPlatform
 ): Promise<Extract<LoginResult, { status: "ok" }>> {
-  const pair = await issueTokenPair(user.id, { header: (n) => c.req.header(n) });
+  const pair = await issueTokenPair(
+    user.id,
+    { header: (n) => c.req.header(n) },
+    {
+      platform,
+      deviceToken,
+      clientKind: sessionClientKind(platform, c),
+      geoLabel: requestGeoLabel({ header: (n) => c.req.header(n) })
+    }
+  );
   const full = await prisma.user.findUnique({
     where: { id: user.id },
     select: { enterpriseRole: true, lineType: true, publicHandle: true }
@@ -88,11 +127,69 @@ async function issueLoginOk(
   };
 }
 
+async function upsertTrackedDevice(opts: {
+  userId: string;
+  deviceToken: string;
+  c: Context;
+  platform: AuthPlatform;
+  verified: boolean;
+  label: string;
+}) {
+  const req = { header: (n: string) => opts.c.req.header(n) };
+  const clientKind = detectClientKind(opts.c);
+  return prisma.userDevice.upsert({
+    where: { userId_deviceToken: { userId: opts.userId, deviceToken: opts.deviceToken } },
+    create: {
+      userId: opts.userId,
+      deviceToken: opts.deviceToken,
+      isVerified: opts.verified,
+      verifiedAt: opts.verified ? new Date() : null,
+      userAgent: req.header("user-agent")?.slice(0, 512) || null,
+      lastIp: requestClientIp(req),
+      geoLabel: requestGeoLabel(req),
+      clientKind,
+      platform: opts.platform,
+      label: opts.label
+    },
+    update: {
+      isVerified: opts.verified,
+      verifiedAt: opts.verified ? new Date() : null,
+      userAgent: req.header("user-agent")?.slice(0, 512) || null,
+      lastIp: requestClientIp(req),
+      geoLabel: requestGeoLabel(req),
+      clientKind,
+      platform: opts.platform,
+      label: opts.label
+    }
+  });
+}
+
+export async function completeAppLoginFromGate(
+  userId: string,
+  loginId: string,
+  deviceToken: string,
+  c: Context
+): Promise<Extract<LoginResult, { status: "ok" }>> {
+  const user = (await prisma.user.findUnique({ where: { id: userId } })) as LoginUserRow | null;
+  if (!user) throw new Error("계정을 찾을 수 없습니다.");
+  await upsertTrackedDevice({
+    userId,
+    deviceToken,
+    c,
+    platform: "app",
+    verified: true,
+    label: "Android 앱"
+  });
+  await revokeOtherAndroidAppSessions(userId, deviceToken);
+  return issueLoginOk(user, loginId, deviceToken, c, "app");
+}
+
 export async function loginWithCredentials(
   loginId: string,
   password: string,
   deviceTokenInput: string | null | undefined,
-  c: Context
+  c: Context,
+  platformHint?: string | null
 ): Promise<LoginResult> {
   const loginIdNorm = String(loginId || "").trim().toLowerCase().replace(/^@/, "");
   const user = (await prisma.user.findFirst({
@@ -148,6 +245,7 @@ export async function loginWithCredentials(
 
   const clientKind = detectClientKind(c);
   assertLineTypeAllowsClient(user.lineType as "NONE" | "WIRED" | "MOBILE", clientKind);
+  const platform = detectAuthPlatform({ header: (n) => c.req.header(n) }, platformHint);
 
   /**
    * QA 시드 계정: test_b2b 는 "대표(MASTER)"로 테스트할 수 있게 서버에서 자동 승격
@@ -180,117 +278,83 @@ export async function loginWithCredentials(
     where: { userId_deviceToken: { userId: user.id, deviceToken } }
   });
 
-  if (existingDevice?.isVerified) {
-    await prisma.userDevice.update({
-      where: { id: existingDevice.id },
-      data: {
-        userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
-        lastIp: c.req.header("x-forwarded-for")?.split(",")[0]?.trim()?.slice(0, 45) || null,
-        clientKind
-      }
-    });
-    return issueLoginOk(user, loginId, deviceToken, c);
-  }
-
-  const verifiedCount = await prisma.userDevice.count({
-    where: { userId: user.id, isVerified: true }
-  });
-
-  if (verifiedCount === 0) {
-    const first = await prisma.userDevice.upsert({
-      where: { userId_deviceToken: { userId: user.id, deviceToken } },
-      create: {
-        userId: user.id,
-        deviceToken,
-        isVerified: true,
-        verifiedAt: new Date(),
-        userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
-        lastIp: c.req.header("x-forwarded-for")?.split(",")[0]?.trim()?.slice(0, 45) || null,
-        clientKind,
-        label: clientKind === "mobile" ? "휴대폰" : "PC"
-      },
-      update: {
-        isVerified: true,
-        verifiedAt: new Date(),
-        clientKind
-      }
-    });
-    return issueLoginOk(user, loginId, first.deviceToken, c);
-  }
-
-  /**
-   * 같은 브라우저·기기(deviceToken)가 이미 다른 계정에서 승인된 경우
-   * → 계정 전환 로그인 허용 (기기 승인 재요청하지 않음)
-   */
-  const sameDeviceTrustedElsewhere = await prisma.userDevice.findFirst({
-    where: {
-      deviceToken,
-      isVerified: true,
-      NOT: { userId: user.id }
-    },
-    select: { id: true }
-  });
-
-  /**
-   * 휴대폰은 본인 기기로 즉시 승인 (앱 재설치·WebView 토큰 초기화 포함).
-   * PC/데스크톱만 이미 로그인된 기기에서 [기기 승인]이 필요하다.
-   * 시드·플랫폼(admin/ceo) 계정은 QA 부트스트랩용으로 PC도 즉시 승인.
-   */
-  if (clientKind === "mobile" || isDeviceAutoApproveHandle(loginId) || sameDeviceTrustedElsewhere) {
-    const label = sameDeviceTrustedElsewhere
-      ? clientKind === "mobile"
-        ? "휴대폰 (계정전환)"
-        : "PC (계정전환)"
-      : clientKind === "mobile"
-        ? "휴대폰"
-        : "PC (부트스트랩)";
-    const approved = await prisma.userDevice.upsert({
-      where: { userId_deviceToken: { userId: user.id, deviceToken } },
-      create: {
-        userId: user.id,
-        deviceToken,
-        isVerified: true,
-        verifiedAt: new Date(),
-        userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
-        lastIp: c.req.header("x-forwarded-for")?.split(",")[0]?.trim()?.slice(0, 45) || null,
-        clientKind,
-        label
-      },
-      update: {
-        isVerified: true,
-        verifiedAt: new Date(),
-        userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
-        clientKind,
-        label
-      }
-    });
-    return issueLoginOk(user, loginId, approved.deviceToken, c);
-  }
-
-  /* 여기까지 오면 PC/데스크톱만 — 휴대폰은 위에서 즉시 승인됨 */
-  const pending = await prisma.userDevice.upsert({
-    where: { userId_deviceToken: { userId: user.id, deviceToken } },
-    create: {
+  /* 웹(www.vlue.kr) — 중복 로그인 허용, IP·위치·기기 기록만 */
+  if (platform === "web") {
+    await upsertTrackedDevice({
       userId: user.id,
       deviceToken,
-      isVerified: false,
-      userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
-      lastIp: c.req.header("x-forwarded-for")?.split(",")[0]?.trim()?.slice(0, 45) || null,
-      clientKind: "desktop",
-      label: "PC (승인 대기)"
-    },
-    update: {
-      userAgent: c.req.header("user-agent")?.slice(0, 512) || null,
-      clientKind: "desktop"
-    }
+      c,
+      platform: "web",
+      verified: true,
+      label: clientKind === "mobile" ? "웹(모바일)" : "웹(PC)"
+    });
+    return issueLoginOk(user, loginId, deviceToken, c, "web");
+  }
+
+  /* Android 앱 — 이미 이 기기면 기존 앱 세션만 끊고 로그인 */
+  if (existingDevice?.isVerified) {
+    await upsertTrackedDevice({
+      userId: user.id,
+      deviceToken,
+      c,
+      platform: "app",
+      verified: true,
+      label: existingDevice.label || "Android 앱"
+    });
+    await revokeOtherAndroidAppSessions(user.id, deviceToken);
+    return issueLoginOk(user, loginId, deviceToken, c, "app");
+  }
+
+  const firstAppDevice =
+    (await prisma.userDevice.count({
+      where: { userId: user.id, isVerified: true, platform: "app" }
+    })) === 0;
+
+  if (isDeviceAutoApproveHandle(loginId) || (firstAppDevice && !(await resolveUserNotifyEmail(user.id)))) {
+    await upsertTrackedDevice({
+      userId: user.id,
+      deviceToken,
+      c,
+      platform: "app",
+      verified: true,
+      label: "Android 앱"
+    });
+    await revokeOtherAndroidAppSessions(user.id, deviceToken);
+    return issueLoginOk(user, loginId, deviceToken, c, "app");
+  }
+
+  const notifyEmail = await resolveUserNotifyEmail(user.id);
+  if (!notifyEmail) {
+    return {
+      status: "email_unavailable",
+      supportEmail: "support@vlue.kr",
+      message: `새 기기 로그인을 확인하려면 가입 이메일이 필요합니다. ${EMAIL_AUTH_SUPPORT}`
+    };
+  }
+
+  const ticket = await putLoginGateTicket({
+    userId: user.id,
+    loginId: loginIdNorm,
+    deviceToken
+  });
+  await sendEmailAuthCode({ purpose: "login_device", emailRaw: notifyEmail });
+  await upsertTrackedDevice({
+    userId: user.id,
+    deviceToken,
+    c,
+    platform: "app",
+    verified: false,
+    label: "Android 앱 (인증 대기)"
   });
 
   return {
-    status: "device_pending",
-    deviceToken: pending.deviceToken,
-    pendingDeviceId: pending.id,
-    message:
-      "이 PC(기기)는 아직 승인되지 않았습니다. 이미 로그인된 휴대폰·PC에서 [기기 승인]을 완료한 뒤 다시 로그인해 주세요."
+    status: "email_code_required",
+    ticket,
+    deviceToken,
+    maskedEmail: maskEmail(notifyEmail),
+    expiresInSec: EMAIL_OTP_TTL_SEC,
+    supportEmail: "support@vlue.kr",
+    message: `새 기기에서 로그인하려면 ${maskEmail(notifyEmail)} 로 보낸 인증번호를 입력해 주세요. ${EMAIL_AUTH_SUPPORT}`
   };
 }
 

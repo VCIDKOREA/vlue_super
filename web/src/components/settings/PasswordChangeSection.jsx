@@ -6,10 +6,12 @@ import { isValidMemberPassword, MEMBER_PASSWORD_HINT, MEMBER_PASSWORD_INVALID_ME
 import {
   changePasswordWithCurrent,
   changePasswordWithIdentity,
+  changePasswordWithEmailCode,
   markPasswordChangeCertPending,
   clearPasswordChangeCertPending,
   buildPasswordChangeSupportMailto
 } from "../../lib/passwordChangeApi.js";
+import { sendAuthCode, verifyAuthCode, EMAIL_AUTH_SUPPORT } from "../../lib/emailAuthApi.js";
 
 function Field({ label, value, onChange, isDarkMode, autoComplete, placeholder }) {
   return (
@@ -46,6 +48,11 @@ export default function PasswordChangeSection({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [emailCode, setEmailCode] = useState("");
+  const [emailTicket, setEmailTicket] = useState("");
+  const [emailMasked, setEmailMasked] = useState("");
+  const [emailVerifiedToken, setEmailVerifiedToken] = useState("");
+  const [recoveryLoginId, setRecoveryLoginId] = useState(handle || "");
 
   useEffect(() => {
     const redirect = consumeIamportCertRedirectResult();
@@ -109,6 +116,77 @@ export default function PasswordChangeSection({
       setBusy(false);
     }
   }, []);
+
+  const sendPasswordEmailCode = async () => {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const data = await sendAuthCode(
+        { purpose: "password_change", loginId: recoveryLoginId || handle },
+        { auth: loggedIn }
+      );
+      setEmailTicket(data.ticket || "");
+      setEmailMasked(data.maskedEmail || "");
+      setEmailVerifiedToken("");
+      setNotice(
+        data.devCode
+          ? `개발 모드 인증번호: ${data.devCode}`
+          : `${data.maskedEmail || "가입 이메일"} 로 인증번호를 보냈습니다. 5분 내에 입력해 주세요.`
+      );
+    } catch (e) {
+      setError(e?.message || "인증번호를 보내지 못했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verifyPasswordEmailCode = async () => {
+    if (!emailTicket || String(emailCode || "").trim().length !== 6) {
+      setError("인증번호 6자리를 입력해 주세요.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const data = await verifyAuthCode(
+        { purpose: "password_change", ticket: emailTicket, code: emailCode },
+        { auth: loggedIn }
+      );
+      setEmailVerifiedToken(data.token || "");
+      setNotice("이메일 인증이 완료되었습니다. 새 비밀번호를 입력한 뒤 변경을 눌러 주세요.");
+    } catch (e) {
+      setError(e?.message || "인증번호가 올바르지 않습니다.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitWithEmail = async () => {
+    const invalid = validateNew();
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    if (!emailVerifiedToken) {
+      setError("먼저 이메일 인증을 완료해 주세요.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await changePasswordWithEmailCode(emailVerifiedToken, newPassword, { anonymous: !loggedIn });
+      onSuccess?.(
+        loggedIn
+          ? "이메일 인증으로 비밀번호가 변경되었습니다."
+          : "이메일 인증으로 비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요."
+      );
+    } catch (e) {
+      setError(e?.message || "비밀번호를 변경하지 못했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submitWithIdentity = async () => {
     const invalid = validateNew();
@@ -245,6 +323,74 @@ export default function PasswordChangeSection({
           </button>
         </div>
       ) : null}
+
+      <div className={`rounded-2xl border p-4 space-y-3 ${boxClass}`}>
+        <p className={`text-[13px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
+          가입 이메일 인증번호로 변경
+        </p>
+        <p className={`text-[12px] leading-relaxed ${isDarkMode ? "text-gray-400" : "text-gray-600"}`} style={{ wordBreak: "keep-all" }}>
+          가입 때 등록한 이메일로 6자리 인증번호를 보냅니다. {EMAIL_AUTH_SUPPORT}
+        </p>
+        {!loggedIn ? (
+          <label className={`block text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            회원 아이디
+            <input
+              type="text"
+              value={recoveryLoginId}
+              onChange={(e) => setRecoveryLoginId(e.target.value)}
+              placeholder="가입 시 설정한 아이디"
+              className={`mt-1 w-full rounded-lg border px-3 py-2.5 text-[13px] outline-none ${
+                isDarkMode ? "border-white/15 bg-[#1f2937] text-gray-100" : "border-gray-200 bg-white text-gray-900"
+              }`}
+            />
+          </label>
+        ) : null}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={emailCode}
+            onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            placeholder="인증번호 6자리"
+            className={`min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-[13px] outline-none ${
+              isDarkMode ? "border-white/15 bg-[#1f2937] text-gray-100" : "border-gray-200 bg-white text-gray-900"
+            }`}
+          />
+          <button
+            type="button"
+            disabled={busy}
+            onClick={sendPasswordEmailCode}
+            className={`shrink-0 rounded-xl border px-3 py-2 text-[12px] font-bold disabled:opacity-50 ${
+              isDarkMode ? "border-white/15 text-gray-100" : "border-gray-200 text-gray-800"
+            }`}
+          >
+            {emailTicket ? "다시 받기" : "인증번호"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={verifyPasswordEmailCode}
+            className="shrink-0 rounded-xl bg-slate-800 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
+          >
+            확인
+          </button>
+        </div>
+        {emailMasked ? (
+          <p className={`text-[11px] ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+            발송: {emailMasked}
+          </p>
+        ) : null}
+        {emailVerifiedToken ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={submitWithEmail}
+            className="w-full rounded-xl bg-blue-600 py-3 text-[13px] font-black text-white disabled:opacity-50"
+          >
+            {busy ? "처리 중…" : "이메일 인증으로 비밀번호 변경"}
+          </button>
+        ) : null}
+      </div>
 
       <div className={`rounded-2xl border p-4 space-y-2 ${boxClass}`}>
         <p className={`text-[13px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>

@@ -29,6 +29,16 @@ export function detectClientKind() {
   return "desktop";
 }
 
+export function detectAuthPlatform() {
+  if (typeof navigator === "undefined") return "web";
+  const ua = String(navigator.userAgent || "");
+  if (ua.includes("VLUE-Android-App")) return "app";
+  return "web";
+}
+
 export function clientKindHeaders() {
-  return { "X-VLUE-Client": detectClientKind() };
+  return {
+    "X-VLUE-Client": detectClientKind(),
+    "X-VLUE-Platform": detectAuthPlatform()
+  };
 }

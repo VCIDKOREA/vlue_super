@@ -1,6 +1,7 @@
 import { randomBytes, createHash, randomUUID } from "node:crypto";
 import { SignJWT } from "jose";
 import { prisma } from "../db/client.js";
+import { requestClientIp, requestGeoLabel } from "../lib/authPlatform.js";
 
 const ACCESS_TTL_SEC = 15 * 60;
 const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -18,10 +19,21 @@ export function hashOpaqueToken(raw: string): string {
   return createHash("sha256").update(raw, "utf8").digest("hex");
 }
 
-function clientMeta(req: { header: (n: string) => string | undefined }) {
+export type SessionIssueExtras = {
+  clientKind?: string | null;
+  deviceToken?: string | null;
+  geoLabel?: string | null;
+  platform?: string | null;
+};
+
+function clientMeta(req: { header: (n: string) => string | undefined }, extras?: SessionIssueExtras) {
   return {
     userAgent: req.header("user-agent")?.slice(0, 512) ?? null,
-    lastIp: req.header("x-forwarded-for")?.split(",")[0]?.trim()?.slice(0, 45) ?? null
+    lastIp: requestClientIp(req),
+    clientKind: extras?.clientKind ?? null,
+    deviceToken: extras?.deviceToken ?? null,
+    geoLabel: extras?.geoLabel ?? requestGeoLabel(req),
+    platform: extras?.platform ?? null
   };
 }
 
@@ -42,11 +54,12 @@ export type TokenPair = {
 
 export async function issueTokenPair(
   userId: string,
-  req: { header: (n: string) => string | undefined }
+  req: { header: (n: string) => string | undefined },
+  extras?: SessionIssueExtras
 ): Promise<TokenPair> {
   const rawRefresh = randomBytes(48).toString("base64url");
   const tokenHash = hashOpaqueToken(rawRefresh);
-  const { userAgent, lastIp } = clientMeta(req);
+  const meta = clientMeta(req, extras);
   const expiresAt = new Date(Date.now() + REFRESH_TTL_MS);
   await prisma.authRefreshSession.create({
     data: {
@@ -54,8 +67,7 @@ export async function issueTokenPair(
       userId,
       tokenHash,
       expiresAt,
-      userAgent,
-      lastIp
+      ...meta
     }
   });
   const accessToken = await signAccessToken(userId);
@@ -71,7 +83,12 @@ export async function refreshWithToken(
   const now = new Date();
   if (!row || row.revokedAt || row.expiresAt <= now) return null;
 
-  const { userAgent, lastIp } = clientMeta(req);
+  const extras: SessionIssueExtras = {
+    clientKind: row.clientKind,
+    deviceToken: row.deviceToken,
+    platform: row.platform,
+    geoLabel: requestGeoLabel(req) || row.geoLabel
+  };
   await prisma.authRefreshSession.update({
     where: { id: row.id },
     data: { revokedAt: now }
@@ -80,14 +97,14 @@ export async function refreshWithToken(
   const rawRefresh = randomBytes(48).toString("base64url");
   const nextHash = hashOpaqueToken(rawRefresh);
   const expiresAt = new Date(Date.now() + REFRESH_TTL_MS);
+  const meta = clientMeta(req, extras);
   await prisma.authRefreshSession.create({
     data: {
       id: randomUUID(),
       userId: row.userId,
       tokenHash: nextHash,
       expiresAt,
-      userAgent,
-      lastIp
+      ...meta
     }
   });
   const accessToken = await signAccessToken(row.userId);
@@ -109,6 +126,38 @@ export async function revokeAllRefreshForUser(userId: string): Promise<number> {
   const res = await prisma.authRefreshSession.updateMany({
     where: { userId, revokedAt: null },
     data: { revokedAt: new Date() }
+  });
+  return res.count;
+}
+
+/** Android 앱 단일 활성 기기 — 다른 앱 세션만 즉시 만료 */
+export async function revokeOtherAndroidAppSessions(
+  userId: string,
+  keepDeviceToken: string
+): Promise<number> {
+  const now = new Date();
+  const token = String(keepDeviceToken || "").trim();
+  const res = await prisma.authRefreshSession.updateMany({
+    where: {
+      userId,
+      revokedAt: null,
+      OR: [
+        { platform: "app" },
+        { clientKind: "android_app" },
+        { userAgent: { contains: "VLUE-Android-App" } }
+      ],
+      ...(token ? { NOT: { deviceToken: token } } : {})
+    },
+    data: { revokedAt: now }
+  });
+  await prisma.userDevice.updateMany({
+    where: {
+      userId,
+      platform: "app",
+      isVerified: true,
+      ...(token ? { NOT: { deviceToken: token } } : {})
+    },
+    data: { isVerified: false }
   });
   return res.count;
 }

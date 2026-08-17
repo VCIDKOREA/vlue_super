@@ -33,7 +33,7 @@ Railway는 `NODE_ENV=production` 이라 API 시작 시 **7개 필수 변수** �
 
 | Variable | 설명 |
 |----------|------|
-| `REDIS_URL` | Redis — Vming 토큰 캡 등 (없으면 인메모리 폴백) |
+| `REDIS_URL` | Redis — 이메일 OTP(5분 TTL)·Vming 등 (없으면 인메모리 폴백) |
 | `GEMINI_API_KEY` | Google AI — AI 기능 사용 시 필수 |
 | `PORTONE_API_KEY` | 포트원 imp_key |
 
@@ -62,25 +62,32 @@ PowerShell:
 | Variable | 설명 |
 |----------|------|
 | `PORTONE_API_KEY` | 포트원 imp_key |
+| `PORTONE_TEST_MODE` | `true`면 KG이니시스 테스트처럼 CI 없는 본인인증을 DI/합성키로 통과 (실연동 전용, 실서비스에서는 제거) |
 | `PORTONE_WEBHOOK_SECRET` | 웹훅 서명 |
 | `CORS_ORIGIN` | 웹 URL (예: `https://vlueweb-production.up.railway.app`) — 코드에 기본 포함되나 명시 권장 |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` / `PUBLIC_DATA_SERVICE_KEY` | `GET /api/v1/search/verify` 기관 검색 |
 | `DIRECT_URL` | Prisma direct URL (Supabase/Neon 사용 시) |
 
-## 가입 이메일 인증번호 (비즈니스 메일 트랙)
+## 이메일 인증번호 (AWS SES)
 
-`POST /api/auth/signup-email/send` 가 **실제 수신함**으로 메일을 보내려면 아래가 필요합니다.  
-미설정 시(기본 `SMTP_PROVIDER=mock`) API는 더 이상 “발송 성공”으로 위장하지 않고 오류를 반환합니다.
+가입 · 앱 새 기기 로그인 · 비밀번호 변경 · DCC 수신 메일 등록에 공통 사용합니다.
 
-| Variable | 값 예시 | 설명 |
-|----------|---------|------|
-| `SMTP_PROVIDER` | `resend` | `mock` 이면 실발송 없음 |
-| `RESEND_API_KEY` | `re_…` | [Resend](https://resend.com) API 키 |
-| `VLUE_SIGNUP_FROM_EMAIL` | `noreply@vlue.kr` | Resend에서 **도메인 인증**된 From |
+| Variable | 값 | 설명 |
+|----------|----|------|
+| `AWS_REGION` | `ap-northeast-2` | SES 리전 |
+| `AWS_ACCESS_KEY_ID` | IAM 액세스 키 | SES `ses:SendEmail` |
+| `AWS_SECRET_ACCESS_KEY` | IAM 시크릿 | **Railway에만 저장. Git 금지** |
+| `SENDER_EMAIL` | `support@vlue.kr` | SES에서 인증된 발신 주소 |
+| `REDIS_URL` | Redis URL | OTP 5분 TTL. 없으면 프로세스 메모리 폴백 |
 
-1. Resend에 `vlue.kr`(또는 사용할 발신 도메인) 인증  
-2. Railway Variables에 위 3개 설정 후 API 재배포  
-3. 스팸함도 확인 (네이버 등)
+엔드포인트: `POST /api/auth/send-code`, `POST /api/auth/verify-code` (`purpose`: `signup` / `login_device` / `password_change` / `dcc_email`).
+
+세션 정책:
+
+- **웹 (`www.vlue.kr`)** — 중복 로그인 허용. 접속 IP·위치(`CF-IPCountry` 등)·User-Agent를 `user_devices` / `auth_refresh_sessions`에 기록.
+- **Android 앱 (`VLUE-Android-App`)** — 단일 활성 기기. 새 기기 로그인 시 가입 이메일로 6자리 코드를 보내고, 확인 후 기존 앱 세션을 즉시 만료.
+
+`POST /api/auth/signup-email/send` 는 위 SES 경로를 사용합니다. Resend SMTP는 가입 OTP에 더 이상 필요하지 않습니다.
 
 임시 QA만 필요하면 가입에서 **「개인 아이디로 가입」** 트랙을 쓰면 이메일 OTP 없이 진행할 수 있습니다.
 

@@ -348,7 +348,7 @@ export async function completePortoneIdentity(params: {
       if (!businessEmailNorm) {
         throw new Error("비즈니스 메일 주소를 입력해 주세요.");
       }
-      consumeSignupEmailToken(businessEmailNorm, params.emailVerificationToken);
+      await consumeSignupEmailToken(businessEmailNorm, params.emailVerificationToken);
       const virtualPrefix = await assertVirtualEmailIdForSignup(
         String(params.virtualEmailPrefix || "")
       );

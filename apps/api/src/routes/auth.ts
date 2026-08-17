@@ -15,6 +15,7 @@ import {
 import { requireUserHeader } from "../middleware/cardGate.js";
 import {
   approvePendingDevice,
+  completeAppLoginFromGate,
   generateDeviceToken,
   listPendingDevicesForApprover,
   loginWithCredentials
@@ -41,6 +42,21 @@ import {
   sendSignupEmailOtp,
   verifySignupEmailOtp
 } from "../services/email/signupEmailVerifyService.js";
+import {
+  EMAIL_AUTH_SUPPORT,
+  consumeVerifiedEmailTicket,
+  dropLoginGateTicket,
+  isEmailAuthPurpose,
+  issueVerifiedEmailTicket,
+  maskEmail,
+  putPasswordGateTicket,
+  readLoginGateTicket,
+  readPasswordGateTicket,
+  resolveUserNotifyEmail,
+  sendEmailAuthCode,
+  verifyEmailAuthCode,
+  type EmailAuthPurpose
+} from "../services/email/emailAuthCodeService.js";
 import {
   checkVirtualEmailIdAvailability,
   previewBusinessVirtualEmail
@@ -127,7 +143,7 @@ authRoutes.post("/signup-email/send", async (c) => {
 authRoutes.post("/signup-email/verify", async (c) => {
   try {
     const body = await c.req.json<{ email?: string; code?: string }>();
-    const token = verifySignupEmailOtp(String(body?.email || ""), String(body?.code || ""));
+    const token = await verifySignupEmailOtp(String(body?.email || ""), String(body?.code || ""));
     return c.json({ ok: true, token });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
@@ -135,15 +151,233 @@ authRoutes.post("/signup-email/verify", async (c) => {
   }
 });
 
+function loginOkJson(result: Extract<Awaited<ReturnType<typeof loginWithCredentials>>, { status: "ok" }>) {
+  return {
+    status: "ok" as const,
+    userId: result.userId,
+    legalName: result.legalName,
+    publicHandle: result.publicHandle,
+    accountStatus: result.accountStatus,
+    phoneE164: result.phoneE164,
+    membershipTier: result.membershipTier,
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
+    accessExpiresInSec: result.accessExpiresInSec,
+    enterpriseRole: result.enterpriseRole,
+    lineType: result.lineType,
+    deviceToken: result.deviceToken
+  };
+}
+
+async function resolvePasswordChangeEmail(opts: {
+  uid: string | null;
+  loginId?: string;
+}): Promise<{ email: string; userId: string } | null> {
+  if (opts.uid) {
+    const email = await resolveUserNotifyEmail(opts.uid);
+    return email ? { email, userId: opts.uid } : null;
+  }
+  const loginId = normalizeLoginPublicHandle(opts.loginId);
+  if (!loginId) return null;
+  const user = await prisma.user.findFirst({
+    where: loginId.includes("@") ? { OR: [{ publicHandle: loginId }, { email: loginId }] } : { publicHandle: loginId },
+    select: { id: true }
+  });
+  if (!user) return null;
+  const email = await resolveUserNotifyEmail(user.id);
+  return email ? { email, userId: user.id } : null;
+}
+
+/** SES + Redis(5분) 6자리 인증번호 발송 — 가입 / 새기기 / 비밀번호 / DCC 메일 */
+authRoutes.post("/send-code", async (c) => {
+  try {
+    const body = await c.req.json<{
+      email?: string;
+      purpose?: string;
+      ticket?: string;
+      loginId?: string;
+    }>();
+    const purposeRaw = String(body?.purpose || "signup").trim();
+    if (!isEmailAuthPurpose(purposeRaw)) {
+      return c.json({ error: "purpose 값이 올바르지 않습니다." }, 400);
+    }
+    const purpose: EmailAuthPurpose = purposeRaw;
+    const uid = await resolveRequestUserId(c);
+
+    if (purpose === "login_device") {
+      const gate = await readLoginGateTicket(String(body?.ticket || ""));
+      if (!gate) {
+        return c.json({ error: "로그인 인증 요청이 만료되었습니다. 다시 로그인해 주세요." }, 400);
+      }
+      const email = await resolveUserNotifyEmail(gate.userId);
+      if (!email) {
+        return c.json(
+          { error: `가입 이메일이 없습니다. ${EMAIL_AUTH_SUPPORT}`, supportEmail: "support@vlue.kr" },
+          400
+        );
+      }
+      const sent = await sendEmailAuthCode({ purpose, emailRaw: email });
+      return c.json({
+        ok: true,
+        purpose,
+        maskedEmail: sent.maskedEmail,
+        expiresInSec: sent.expiresInSec,
+        supportEmail: "support@vlue.kr",
+        message: EMAIL_AUTH_SUPPORT,
+        ...(sent.devCode ? { devCode: sent.devCode } : {})
+      });
+    }
+
+    if (purpose === "password_change") {
+      const found = await resolvePasswordChangeEmail({ uid, loginId: body?.loginId });
+      if (!found) {
+        return c.json(
+          { error: `등록된 이메일이 없습니다. ${EMAIL_AUTH_SUPPORT}`, supportEmail: "support@vlue.kr" },
+          400
+        );
+      }
+      const sent = await sendEmailAuthCode({ purpose, emailRaw: found.email });
+      const ticket = await putPasswordGateTicket({ userId: found.userId, email: found.email });
+      return c.json({
+        ok: true,
+        purpose,
+        ticket,
+        maskedEmail: sent.maskedEmail,
+        expiresInSec: sent.expiresInSec,
+        supportEmail: "support@vlue.kr",
+        message: EMAIL_AUTH_SUPPORT,
+        ...(sent.devCode ? { devCode: sent.devCode } : {})
+      });
+    }
+
+    if (purpose === "dcc_email") {
+      if (!uid) return c.json({ error: "인증 필요" }, 401);
+      const sent = await sendEmailAuthCode({ purpose, emailRaw: String(body?.email || "") });
+      return c.json({
+        ok: true,
+        purpose,
+        maskedEmail: sent.maskedEmail,
+        expiresInSec: sent.expiresInSec,
+        supportEmail: "support@vlue.kr",
+        message: EMAIL_AUTH_SUPPORT,
+        ...(sent.devCode ? { devCode: sent.devCode } : {})
+      });
+    }
+
+    const sent = await sendEmailAuthCode({ purpose: "signup", emailRaw: String(body?.email || "") });
+    return c.json({
+      ok: true,
+      purpose: "signup",
+      maskedEmail: sent.maskedEmail,
+      expiresInSec: sent.expiresInSec,
+      supportEmail: "support@vlue.kr",
+      message: EMAIL_AUTH_SUPPORT,
+      ...(sent.devCode ? { devCode: sent.devCode } : {})
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg, supportEmail: "support@vlue.kr", message: EMAIL_AUTH_SUPPORT }, 400);
+  }
+});
+
+/** 인증번호 검증 — 목적별 완료 토큰 발급 (앱 새기기는 로그인 세션 발급) */
+authRoutes.post("/verify-code", async (c) => {
+  try {
+    const body = await c.req.json<{
+      email?: string;
+      code?: string;
+      purpose?: string;
+      ticket?: string;
+      deviceToken?: string;
+    }>();
+    const purposeRaw = String(body?.purpose || "signup").trim();
+    if (!isEmailAuthPurpose(purposeRaw)) {
+      return c.json({ error: "purpose 값이 올바르지 않습니다." }, 400);
+    }
+    const purpose: EmailAuthPurpose = purposeRaw;
+    const code = String(body?.code || "");
+    const uid = await resolveRequestUserId(c);
+
+    if (purpose === "login_device") {
+      const gate = await readLoginGateTicket(String(body?.ticket || ""));
+      if (!gate) {
+        return c.json({ error: "로그인 인증 요청이 만료되었습니다. 다시 로그인해 주세요." }, 400);
+      }
+      const email = await resolveUserNotifyEmail(gate.userId);
+      if (!email) {
+        return c.json({ error: `가입 이메일이 없습니다. ${EMAIL_AUTH_SUPPORT}` }, 400);
+      }
+      await verifyEmailAuthCode({ purpose, emailRaw: email, codeRaw: code });
+      await dropLoginGateTicket(String(body?.ticket || ""));
+      const result = await completeAppLoginFromGate(gate.userId, gate.loginId, gate.deviceToken, c);
+      return c.json(loginOkJson(result));
+    }
+
+    if (purpose === "password_change") {
+      const gate = await readPasswordGateTicket(String(body?.ticket || ""));
+      const found = gate
+        ? { email: gate.email, userId: gate.userId }
+        : await resolvePasswordChangeEmail({ uid, loginId: undefined });
+      if (!found) {
+        return c.json({ error: "이메일 인증 요청이 만료되었습니다. 인증번호를 다시 받아 주세요." }, 400);
+      }
+      const verifiedEmail = await verifyEmailAuthCode({
+        purpose,
+        emailRaw: found.email,
+        codeRaw: code
+      });
+      const token = await issueVerifiedEmailTicket({
+        purpose,
+        email: verifiedEmail,
+        userId: found.userId
+      });
+      return c.json({
+        ok: true,
+        verified: true,
+        token,
+        maskedEmail: maskEmail(verifiedEmail),
+        supportEmail: "support@vlue.kr"
+      });
+    }
+
+    if (purpose === "dcc_email") {
+      if (!uid) return c.json({ error: "인증 필요" }, 401);
+      const verifiedEmail = await verifyEmailAuthCode({
+        purpose,
+        emailRaw: String(body?.email || ""),
+        codeRaw: code
+      });
+      const token = await issueVerifiedEmailTicket({ purpose, email: verifiedEmail, userId: uid });
+      return c.json({
+        ok: true,
+        verified: true,
+        token,
+        maskedEmail: maskEmail(verifiedEmail)
+      });
+    }
+
+    const token = await verifySignupEmailOtp(String(body?.email || ""), code);
+    return c.json({ ok: true, verified: true, token });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg, supportEmail: "support@vlue.kr" }, 400);
+  }
+});
+
 authRoutes.post("/login", async (c) => {
   try {
-    const body = await c.req.json<{ loginId?: string; password?: string; deviceToken?: string }>();
+    const body = await c.req.json<{
+      loginId?: string;
+      password?: string;
+      deviceToken?: string;
+      platform?: string;
+    }>();
     const loginId = normalizeLoginPublicHandle(body?.loginId);
     const password = String(body?.password ?? "");
     if (!loginId || !password) {
       return c.json({ error: "아이디와 비밀번호를 입력해 주세요." }, 400);
     }
-    const result = await loginWithCredentials(loginId, password, body?.deviceToken, c);
+    const result = await loginWithCredentials(loginId, password, body?.deviceToken, c, body?.platform);
     if (result.status === "device_pending") {
       return c.json(
         {
@@ -155,21 +389,32 @@ authRoutes.post("/login", async (c) => {
         403
       );
     }
-    return c.json({
-      status: "ok",
-      userId: result.userId,
-      legalName: result.legalName,
-      publicHandle: result.publicHandle,
-      accountStatus: result.accountStatus,
-      phoneE164: result.phoneE164,
-      membershipTier: result.membershipTier,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      accessExpiresInSec: result.accessExpiresInSec,
-      enterpriseRole: result.enterpriseRole,
-      lineType: result.lineType,
-      deviceToken: (result as { deviceToken?: string }).deviceToken
-    });
+    if (result.status === "email_code_required") {
+      return c.json(
+        {
+          status: "email_code_required",
+          ticket: result.ticket,
+          deviceToken: result.deviceToken,
+          maskedEmail: result.maskedEmail,
+          expiresInSec: result.expiresInSec,
+          message: result.message,
+          supportEmail: result.supportEmail
+        },
+        403
+      );
+    }
+    if (result.status === "email_unavailable") {
+      return c.json(
+        {
+          status: "email_unavailable",
+          error: result.message,
+          message: result.message,
+          supportEmail: result.supportEmail
+        },
+        403
+      );
+    }
+    return c.json(loginOkJson(result));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
     const status = (e as Error & { statusCode?: number }).statusCode === 403 ? 403 : 400;
@@ -498,6 +743,43 @@ authRoutes.post("/password/change-with-identity", async (c) => {
     if (e instanceof PasswordIdentityError) {
       return c.json({ error: e.message }, e.status as 400 | 401 | 403 | 404);
     }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+/** 가입 이메일 인증번호로 비밀번호 변경 */
+authRoutes.post("/password/change-with-email", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    const body = await c.req.json<{ token?: string; ticket?: string; newPassword?: string }>();
+    const token = String(body?.token || body?.ticket || "").trim();
+    const newPassword = String(body?.newPassword ?? "");
+    if (!isValidMemberPassword(newPassword)) {
+      return c.json({ error: MEMBER_PASSWORD_INVALID_MESSAGE }, 400);
+    }
+    const verified = await consumeVerifiedEmailTicket(token, { purpose: "password_change" });
+    if (uid && verified.userId && uid !== verified.userId) {
+      return c.json({ error: "인증한 계정과 로그인 계정이 다릅니다." }, 403);
+    }
+    const userId = verified.userId;
+    if (!userId) return c.json({ error: "이메일 인증이 올바르지 않습니다." }, 400);
+
+    const passwordHash = await hashPassword(newPassword);
+    const now = new Date();
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+      prisma.authRefreshSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: now }
+      })
+    ]);
+    if (uid && uid === userId) {
+      const pair = await issueTokenPair(uid, c.req);
+      return c.json({ ok: true, ...pair });
+    }
+    return c.json({ ok: true });
+  } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
     return c.json({ error: msg }, 400);
   }

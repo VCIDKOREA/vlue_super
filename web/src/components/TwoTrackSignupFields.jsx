@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiUrl } from "../lib/apiBase.js";
+import { sendAuthCode, verifyAuthCode, EMAIL_AUTH_SUPPORT } from "../lib/emailAuthApi.js";
 import { isValidMemberHandleSlug, normalizeMemberHandleSlug } from "../lib/memberHandleRules.js";
 import { VIRTUAL_ID_CONFLICT_MESSAGE } from "../lib/vlueSignupMessages.js";
 
@@ -112,17 +113,11 @@ export default function TwoTrackSignupFields({
     setOtpSending(true);
     setOtpHint("");
     try {
-      const res = await fetch(apiUrl("/api/auth/signup-email/send"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "인증번호 발송에 실패했습니다.");
+      const data = await sendAuthCode({ email, purpose: "signup" });
       if (data.devCode) {
         setOtpHint(`개발 모드 인증번호: ${data.devCode}`);
       } else {
-        setOtpHint("인증번호를 메일함(또는 스팸함)에서 확인해 주세요. 수 분 내 미도착 시 「개인 아이디로 가입」을 이용해 주세요.");
+        setOtpHint(`인증번호를 메일함(또는 스팸함)에서 확인해 주세요. 5분 내에 입력해 주세요. ${EMAIL_AUTH_SUPPORT}`);
       }
     } catch (e) {
       setOtpHint("");
@@ -144,13 +139,7 @@ export default function TwoTrackSignupFields({
       return;
     }
     try {
-      const res = await fetch(apiUrl("/api/auth/signup-email/verify"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "인증에 실패했습니다.");
+      const data = await verifyAuthCode({ email, code, purpose: "signup" });
       onEmailVerifyChange({ status: "ok", message: "이메일 인증 완료", token: data.token || "" });
       await previewVirtualFromEmail(email);
     } catch (e) {
@@ -236,6 +225,9 @@ export default function TwoTrackSignupFields({
             </button>
           </div>
           {otpHint ? <p className="text-[10px] text-slate-500">{otpHint}</p> : null}
+          <p className="text-[10px] leading-snug text-slate-400" style={{ wordBreak: "keep-all" }}>
+            {EMAIL_AUTH_SUPPORT}
+          </p>
           {emailVerify.status === "ok" ? (
             <p className="text-[11px] font-medium text-emerald-700">{emailVerify.message}</p>
           ) : emailVerify.status === "error" ? (

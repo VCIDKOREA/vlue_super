@@ -22,6 +22,7 @@ import {
   listUserEmails
 } from "../services/email/userEmailsStore.js";
 import { sendUserOutboundEmail } from "../services/email/outboundEmailService.js";
+import { consumeVerifiedEmailTicket } from "../services/email/emailAuthCodeService.js";
 import {
   listExternalMailAccounts,
   runExternalMailSyncBatch,
@@ -119,11 +120,16 @@ emailForwardingRoutes.put("/mapping", async (c) => {
 emailForwardingRoutes.post("/masters", async (c) => {
   try {
     const userId = c.get("vlueUserId") as string;
-    const body = await c.req.json<{ email?: string }>();
+    const body = await c.req.json<{ email?: string; token?: string; ticket?: string }>();
     const email = String(body.email || "").trim();
     if (!email) {
       return c.json({ error: "email is required" }, 400);
     }
+    await consumeVerifiedEmailTicket(String(body.token || body.ticket || ""), {
+      purpose: "dcc_email",
+      email,
+      userId
+    });
     const mapping = await addUserMasterEmail(userId, email);
     return c.json({ ok: true, mapping });
   } catch (e) {
