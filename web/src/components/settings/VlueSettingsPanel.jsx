@@ -261,6 +261,7 @@ export default function VlueSettingsPanel({
               maxLength={80}
               value={statusInput}
               onChange={(e) => setStatusInput(e.target.value)}
+              placeholder="상태메시지를 입력해 주세요"
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-[13px] outline-none ${
                 isDarkMode ? "border-white/15 bg-[#1f2937] text-gray-100" : "border-gray-200 bg-white text-gray-900"
               }`}
@@ -317,7 +318,7 @@ export default function VlueSettingsPanel({
                 chat: v1AppShell.chat ? chatNickInput : readChatNickname(),
                 feed: feedNickInput
               });
-              patchSettings({ statusMessage: statusInput.trim() || readAppSettings().statusMessage });
+              patchSettings({ statusMessage: statusInput.trim() });
               showSettingNotice?.("프로필이 저장되었습니다.");
             }}
             className="mt-4 w-full rounded-xl bg-blue-600 py-2.5 text-[13px] font-black text-white"

@@ -1,4 +1,5 @@
 const STORAGE_KEY = "vlue_app_settings_v1";
+const LEGACY_STATUS_PLACEHOLDER = "인증 기반 커뮤니케이션 운영중";
 
 export const DEFAULT_APP_SETTINGS = {
   allowSearchByPhone: false,
@@ -15,8 +16,14 @@ export const DEFAULT_APP_SETTINGS = {
   familyProtectionAlerts: true,
   chatFontScale: "medium",
   uiFontScale: "medium",
-  statusMessage: "인증 기반 커뮤니케이션 운영중"
+  statusMessage: ""
 };
+
+function normalizeStatusMessage(raw) {
+  const s = String(raw || "").trim();
+  if (!s || s === LEGACY_STATUS_PLACEHOLDER) return "";
+  return s;
+}
 
 const FONT_SCALE_MAP = { small: "0.92", medium: "1", large: "1.08" };
 
@@ -25,7 +32,9 @@ export function readAppSettings() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULT_APP_SETTINGS };
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_APP_SETTINGS, ...parsed };
+    const merged = { ...DEFAULT_APP_SETTINGS, ...parsed };
+    merged.statusMessage = normalizeStatusMessage(merged.statusMessage);
+    return merged;
   } catch {
     return { ...DEFAULT_APP_SETTINGS };
   }
@@ -33,6 +42,7 @@ export function readAppSettings() {
 
 export function writeAppSettings(patch) {
   const next = { ...readAppSettings(), ...patch };
+  next.statusMessage = normalizeStatusMessage(next.statusMessage);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   try {
     window.dispatchEvent(new CustomEvent("vlue-app-settings-changed", { detail: next }));
@@ -62,5 +72,5 @@ export function applyAppSettingsToDocument(settings = readAppSettings()) {
 }
 
 export function readStatusMessage() {
-  return String(readAppSettings().statusMessage || "").trim();
+  return normalizeStatusMessage(readAppSettings().statusMessage);
 }
