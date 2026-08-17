@@ -67,11 +67,16 @@ export default function LetteringBizcardSettingsView({
   const [photoFileName, setPhotoFileName] = useState("");
   const [photoPreview, setPhotoPreview] = useState("");
   const [pendingPhoto, setPendingPhoto] = useState(null);
+  const [titlePhotoFileName, setTitlePhotoFileName] = useState("");
+  const [titlePhotoPreview, setTitlePhotoPreview] = useState("");
+  const [pendingTitlePhoto, setPendingTitlePhoto] = useState(null);
+  const [titlePhotoError, setTitlePhotoError] = useState("");
   const [previewTick, setPreviewTick] = useState(0);
   const [toast, setToast] = useState("");
   const [logoError, setLogoError] = useState("");
   const [photoError, setPhotoError] = useState("");
   const [noProfilePhoto, setNoProfilePhoto] = useState(false);
+  const [noTitlePhoto, setNoTitlePhoto] = useState(false);
   const [photoFocus, setPhotoFocus] = useState("top");
   const [noCompanyLogo, setNoCompanyLogo] = useState(false);
   const [noFax, setNoFax] = useState(false);
@@ -165,7 +170,10 @@ export default function LetteringBizcardSettingsView({
     setLogoPreview(ed.logoDataUrl);
     setPhotoFileName(ed.photoFileName || "");
     setPhotoPreview(ed.photoDataUrl || "");
+    setTitlePhotoFileName(ed.titlePhotoFileName || "");
+    setTitlePhotoPreview(ed.titlePhotoDataUrl || "");
     setNoProfilePhoto(Boolean(ed.noProfilePhoto));
+    setNoTitlePhoto(Boolean(ed.noTitlePhoto));
     setPhotoFocus(normalizePhotoFocus(ed.photoFocus));
     setNoCompanyLogo(Boolean(ed.noCompanyLogo));
     setNoFax(Boolean(ed.noFax));
@@ -239,6 +247,9 @@ export default function LetteringBizcardSettingsView({
     const photoUrl = noProfilePhoto
       ? ""
       : pendingPhoto?.previewUrl || pendingPhoto?.dataUrl || photoPreview || "";
+    const titlePhotoUrl = noTitlePhoto
+      ? ""
+      : pendingTitlePhoto?.previewUrl || pendingTitlePhoto?.dataUrl || titlePhotoPreview || "";
     const logoUrl = noCompanyLogo
       ? ""
       : pendingLogo?.previewUrl || pendingLogo?.dataUrl || logoPreview || "";
@@ -251,11 +262,13 @@ export default function LetteringBizcardSettingsView({
       customBackText,
       address,
       noProfilePhoto,
+      noTitlePhoto,
       noCompanyLogo,
       noFax,
       noWebsite,
       logoUrl,
       photoUrl,
+      titlePhotoUrl,
       photoFocus
     });
   }, [
@@ -271,8 +284,11 @@ export default function LetteringBizcardSettingsView({
     pendingLogo,
     photoPreview,
     pendingPhoto,
+    titlePhotoPreview,
+    pendingTitlePhoto,
     photoFocus,
     noProfilePhoto,
+    noTitlePhoto,
     noCompanyLogo,
     noFax,
     noWebsite,
@@ -295,6 +311,14 @@ export default function LetteringBizcardSettingsView({
     if (checked) {
       setPhotoError("");
       setPendingPhoto(null);
+    }
+  };
+
+  const handleNoTitlePhotoChange = (checked) => {
+    setNoTitlePhoto(checked);
+    if (checked) {
+      setTitlePhotoError("");
+      setPendingTitlePhoto(null);
     }
   };
 
@@ -375,6 +399,29 @@ export default function LetteringBizcardSettingsView({
     if (result.uploadWarning) setToast(result.uploadWarning);
   };
 
+  const handleTitlePhotoPick = async (e) => {
+    if (noTitlePhoto) return;
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setTitlePhotoError("");
+    const result = await prepareLetteringPhotoFromFile(file);
+    if (!result.ok) {
+      setTitlePhotoError(result.error);
+      return;
+    }
+    const preview = String(result.dataUrl || "").trim();
+    const persist = String(result.persistUrl || result.dataUrl || "").trim();
+    if (!preview) {
+      setTitlePhotoError("사진을 읽지 못했습니다.");
+      return;
+    }
+    setPendingTitlePhoto({ dataUrl: persist || preview, fileName: result.fileName, previewUrl: preview });
+    setTitlePhotoPreview(preview);
+    setTitlePhotoFileName(result.fileName);
+    setNoTitlePhoto(false);
+    if (result.uploadWarning) setToast(result.uploadWarning);
+  };
+
   const handleApply = async () => {
     const tpl = normalizeLetteringBizcardTemplate(designTemplate);
     const road = addressRoad.trim();
@@ -426,6 +473,7 @@ export default function LetteringBizcardSettingsView({
       addressDetail: detail,
       address: combineLetteringBizcardAddress(road, detail),
       noProfilePhoto,
+      noTitlePhoto,
       noCompanyLogo,
       noFax,
       noWebsite,
@@ -433,7 +481,9 @@ export default function LetteringBizcardSettingsView({
       logoDataUrl: noCompanyLogo ? "" : pendingLogo?.dataUrl || logoPreview || "",
       logoFileName: noCompanyLogo ? "" : pendingLogo?.fileName || logoFileName || "",
       photoDataUrl: noProfilePhoto ? "" : pendingPhoto?.dataUrl || photoPreview || "",
-      photoFileName: noProfilePhoto ? "" : pendingPhoto?.fileName || photoFileName || ""
+      photoFileName: noProfilePhoto ? "" : pendingPhoto?.fileName || photoFileName || "",
+      titlePhotoDataUrl: noTitlePhoto ? "" : pendingTitlePhoto?.dataUrl || titlePhotoPreview || "",
+      titlePhotoFileName: noTitlePhoto ? "" : pendingTitlePhoto?.fileName || titlePhotoFileName || ""
     };
 
     let writeResult;
@@ -491,8 +541,11 @@ export default function LetteringBizcardSettingsView({
     setLogoFileName(saved.logoFileName || "");
     setPhotoPreview(saved.photoDataUrl || "");
     setPhotoFileName(saved.photoFileName || "");
+    setTitlePhotoPreview(saved.titlePhotoDataUrl || "");
+    setTitlePhotoFileName(saved.titlePhotoFileName || "");
     setPendingLogo(null);
     setPendingPhoto(null);
+    setPendingTitlePhoto(null);
 
     try {
       /* primary/feed/chat = 프로필 사진, card = 회사 로고 — 슬롯 혼용 금지 */
@@ -523,7 +576,8 @@ export default function LetteringBizcardSettingsView({
       ...appliedCard,
       designTemplate: tpl,
       logoUrl: saved.noCompanyLogo ? "" : saved.logoDataUrl || appliedCard.logoUrl || "",
-      photoUrl: saved.noProfilePhoto ? "" : saved.photoDataUrl || appliedCard.photoUrl || ""
+      photoUrl: saved.noProfilePhoto ? "" : saved.photoDataUrl || appliedCard.photoUrl || "",
+      titlePhotoUrl: saved.noTitlePhoto ? "" : saved.titlePhotoDataUrl || appliedCard.titlePhotoUrl || ""
     });
     if (!syncResult?.ok) {
       showToast(
@@ -541,6 +595,9 @@ export default function LetteringBizcardSettingsView({
     /* 업로드된 https 로 미리보기 갱신 */
     if (syncResult?.photoUrl) {
       setPhotoPreview(syncResult.photoUrl);
+    }
+    if (syncResult?.titlePhotoUrl) {
+      setTitlePhotoPreview(syncResult.titlePhotoUrl);
     }
     if (syncResult?.logoUrl) {
       setLogoPreview(syncResult.logoUrl);
@@ -669,6 +726,13 @@ export default function LetteringBizcardSettingsView({
           setNoProfilePhoto={handleNoProfilePhotoChange}
           photoFocus={photoFocus}
           setPhotoFocus={setPhotoFocus}
+          titlePhotoPreview={titlePhotoPreview}
+          titlePhotoFileName={titlePhotoFileName}
+          pendingTitlePhoto={pendingTitlePhoto}
+          onTitlePhotoPick={handleTitlePhotoPick}
+          titlePhotoError={titlePhotoError}
+          noTitlePhoto={noTitlePhoto}
+          setNoTitlePhoto={handleNoTitlePhotoChange}
           noCompanyLogo={noCompanyLogo}
           setNoCompanyLogo={handleNoCompanyLogoChange}
           noFax={noFax}

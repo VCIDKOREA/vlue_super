@@ -82,6 +82,7 @@ export function mergeExportSnapshotMedia(
 ): Record<string, unknown> {
   const mediaKeys = [
     "photoUrl",
+    "titlePhotoUrl",
     "logoUrl",
     "shareCoverUrl",
     "imageUrl",

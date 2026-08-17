@@ -407,11 +407,13 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
       company_intro: string | null;
       custom_back_text: string | null;
       share_cover_url: string | null;
+      title_photo_url: string | null;
       activity_name: string | null;
       design_template: string | null;
       photo_focus: unknown;
       no_profile_photo: boolean | null;
       no_company_logo: boolean | null;
+      no_title_photo: boolean | null;
       no_fax: boolean | null;
       no_website: boolean | null;
     }>
@@ -439,6 +441,7 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
       NULLIF(TRIM(export_snapshot_json->>'companyIntro'), '') AS company_intro,
       NULLIF(TRIM(export_snapshot_json->>'customBackText'), '') AS custom_back_text,
       NULLIF(TRIM(export_snapshot_json->>'shareCoverUrl'), '') AS share_cover_url,
+      NULLIF(TRIM(export_snapshot_json->>'titlePhotoUrl'), '') AS title_photo_url,
       NULLIF(TRIM(export_snapshot_json->>'activityName'), '') AS activity_name,
       NULLIF(TRIM(export_snapshot_json->>'designTemplate'), '') AS design_template,
       export_snapshot_json->'photoFocus' AS photo_focus,
@@ -452,6 +455,11 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
           THEN (export_snapshot_json->>'noCompanyLogo')::boolean
         ELSE NULL
       END AS no_company_logo,
+      CASE
+        WHEN export_snapshot_json ? 'noTitlePhoto'
+          THEN (export_snapshot_json->>'noTitlePhoto')::boolean
+        ELSE NULL
+      END AS no_title_photo,
       CASE
         WHEN export_snapshot_json ? 'noFax'
           THEN (export_snapshot_json->>'noFax')::boolean
@@ -489,11 +497,13 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
     companyIntro: row.company_intro,
     customBackText: row.custom_back_text,
     shareCoverUrl: row.share_cover_url,
+    titlePhotoUrl: row.title_photo_url,
     activityName: row.activity_name,
     designTemplate: row.design_template || row.design_template_snapshot,
     photoFocus: row.photo_focus,
     noProfilePhoto: row.no_profile_photo,
     noCompanyLogo: row.no_company_logo,
+    noTitlePhoto: row.no_title_photo,
     noFax: row.no_fax,
     noWebsite: row.no_website
   });

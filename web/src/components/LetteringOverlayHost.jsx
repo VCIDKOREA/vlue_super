@@ -36,6 +36,7 @@ async function enrichPeerCardFromProfile(peerUserId, nextCard) {
   if (!data?.ok) return nextCard;
   const exp = data.cardExport && typeof data.cardExport === "object" ? data.cardExport : null;
   const photo = String(exp?.photoUrl || data.photoUrl || data.profile?.photoUrl || "").trim();
+  const titlePhoto = String(exp?.titlePhotoUrl || data.titlePhotoUrl || data.profile?.titlePhotoUrl || "").trim();
   const profileEmail = String(data.profile?.email || "").trim();
   return {
     ...nextCard,
@@ -47,6 +48,8 @@ async function enrichPeerCardFromProfile(peerUserId, nextCard) {
       String(nextCard?.displayName || nextCard?.name || "").trim() ||
       String(exp?.name || "").trim(),
     photoUrl: String(nextCard?.photoUrl || "").trim() || photo || "",
+    titlePhotoUrl: String(nextCard?.titlePhotoUrl || "").trim() || titlePhoto || "",
+    noTitlePhoto: Boolean(exp?.noTitlePhoto || nextCard?.noTitlePhoto),
     email:
       String(nextCard?.email || "").trim() ||
       String(exp?.email || "").trim() ||
@@ -644,6 +647,8 @@ function LetteringOverlayHostInner() {
               phone: card.phone,
               email: card.email,
               photoUrl: card.photoUrl,
+              titlePhotoUrl: card.titlePhotoUrl || "",
+              noTitlePhoto: Boolean(card.noTitlePhoto),
               avatarUrl: card.avatarUrl || card.photoUrl || "",
               logoUrl: card.logoUrl,
               website: card.website,

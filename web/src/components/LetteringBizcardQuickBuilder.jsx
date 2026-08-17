@@ -183,6 +183,43 @@ function ImageUploadTile({
   );
 }
 
+function PhotoFocusBar({ photoFocus, setPhotoFocus, isDarkMode }) {
+  return (
+    <div className="mt-2" role="tablist" aria-label="배경 사진 위치">
+      <p className={`mb-1.5 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+        배경 사진 위치 · 얼굴이 잘리면 상단/하단으로 맞춰 주세요
+      </p>
+      <div
+        className={`grid grid-cols-3 gap-1 rounded-xl p-1 ${
+          isDarkMode ? "bg-slate-900/80" : "bg-gray-100"
+        }`}
+      >
+        {PHOTO_FOCUS_OPTIONS.map((opt) => {
+          const active = normalizePhotoFocus(photoFocus) === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={`rounded-lg px-2 py-2 text-[11px] font-bold transition ${
+                active
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : isDarkMode
+                    ? "text-gray-300 active:bg-white/10"
+                    : "text-slate-600 active:bg-white"
+              }`}
+              onClick={() => setPhotoFocus?.(opt.id)}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * 디지털 인증명함 — 한 화면 입력 + 실시간 수신 UI 미리보기
  */
@@ -222,6 +259,13 @@ export default function LetteringBizcardQuickBuilder({
   setNoProfilePhoto,
   photoFocus = "top",
   setPhotoFocus,
+  titlePhotoPreview,
+  titlePhotoFileName,
+  pendingTitlePhoto,
+  onTitlePhotoPick,
+  titlePhotoError,
+  noTitlePhoto,
+  setNoTitlePhoto,
   noCompanyLogo,
   setNoCompanyLogo,
   noFax,
@@ -330,7 +374,7 @@ export default function LetteringBizcardQuickBuilder({
         <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>프로필 · 이미지</p>
         <Field
           label="프로필 사진"
-          hint={`${LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB · 초과 시 자동 맞춤`}
+          hint={`${LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB · 초과 시 자동 맞춤 · 번호 앞에 표시`}
           isDarkMode={isDarkMode}
         >
           <ImageUploadTile
@@ -342,42 +386,7 @@ export default function LetteringBizcardQuickBuilder({
             omitChecked={noProfilePhoto}
             onOmitChange={setNoProfilePhoto}
             omitLabel="사진 업로드 없음"
-            objectPosition={photoFocusToCss(photoFocus)}
           />
-          {!noProfilePhoto && (pendingPhoto?.previewUrl || pendingPhoto?.dataUrl || photoPreview) ? (
-            <div className="mt-2" role="tablist" aria-label="배경 사진 위치">
-              <p className={`mb-1.5 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                배경 사진 위치 · 얼굴이 잘리면 상단/하단으로 맞춰 주세요
-              </p>
-              <div
-                className={`grid grid-cols-3 gap-1 rounded-xl p-1 ${
-                  isDarkMode ? "bg-slate-900/80" : "bg-gray-100"
-                }`}
-              >
-                {PHOTO_FOCUS_OPTIONS.map((opt) => {
-                  const active = normalizePhotoFocus(photoFocus) === opt.id;
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      className={`rounded-lg px-2 py-2 text-[11px] font-bold transition ${
-                        active
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : isDarkMode
-                            ? "text-gray-300 active:bg-white/10"
-                            : "text-slate-600 active:bg-white"
-                      }`}
-                      onClick={() => setPhotoFocus?.(opt.id)}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
           {photoFileName && !noProfilePhoto ? (
             <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
               {photoFileName}
@@ -385,6 +394,39 @@ export default function LetteringBizcardQuickBuilder({
             </p>
           ) : null}
           {photoError ? <p className="mt-1 text-[10px] font-bold text-red-500">{photoError}</p> : null}
+        </Field>
+        <Field
+          label="DCC 타이틀 사진"
+          hint={`${LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB · 초과 시 자동 맞춤 · 번호 앞 사진과 따로 설정`}
+          isDarkMode={isDarkMode}
+        >
+          <ImageUploadTile
+            preview={pendingTitlePhoto?.previewUrl || pendingTitlePhoto?.dataUrl || titlePhotoPreview}
+            placeholder="타이틀 업로드"
+            onPick={onTitlePhotoPick}
+            acceptLabel={LETTERING_PHOTO_RULES.accept}
+            isDarkMode={isDarkMode}
+            omitChecked={noTitlePhoto}
+            onOmitChange={setNoTitlePhoto}
+            omitLabel="DCC 타이틀 사진 없음"
+            objectPosition={photoFocusToCss(photoFocus)}
+          />
+          {!noTitlePhoto ? (
+            <PhotoFocusBar photoFocus={photoFocus} setPhotoFocus={setPhotoFocus} isDarkMode={isDarkMode} />
+          ) : null}
+          {!noTitlePhoto &&
+          !(pendingTitlePhoto?.previewUrl || pendingTitlePhoto?.dataUrl || titlePhotoPreview) ? (
+            <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+              비워 두면 프로필 사진이 타이틀에 사용됩니다
+            </p>
+          ) : null}
+          {titlePhotoFileName && !noTitlePhoto ? (
+            <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              {titlePhotoFileName}
+              {pendingTitlePhoto ? " (미적용)" : ""}
+            </p>
+          ) : null}
+          {titlePhotoError ? <p className="mt-1 text-[10px] font-bold text-red-500">{titlePhotoError}</p> : null}
         </Field>
         <Field
           label="회사 로고"

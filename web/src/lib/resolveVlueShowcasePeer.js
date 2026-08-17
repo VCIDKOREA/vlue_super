@@ -67,6 +67,8 @@ export async function resolveVlueShowcasePeer(input = {}) {
   let tier = String(input.membershipTier || "free").toLowerCase();
   let name = String(input.displayName || "").trim();
   let photoUrl = String(input.avatarUrl || "").trim();
+  let titlePhotoUrl = "";
+  let noTitlePhoto = false;
   let organization = "";
   let title = "";
   let department = "";
@@ -115,6 +117,8 @@ export async function resolveVlueShowcasePeer(input = {}) {
       /* photo ≠ logo — 로고를 프로필 사진으로 쓰지 않음 */
       photoUrl =
         String(exp?.photoUrl || profile.photoUrl || photoUrl).trim() || photoUrl;
+      titlePhotoUrl = String(exp?.titlePhotoUrl || "").trim();
+      noTitlePhoto = Boolean(exp?.noTitlePhoto);
       if (profile.membershipTier || profRes.membershipTier) {
         tier = String(profile.membershipTier || profRes.membershipTier).toLowerCase();
       }
@@ -152,6 +156,8 @@ export async function resolveVlueShowcasePeer(input = {}) {
       handle: publicHandle,
       activityName: activityName || name,
       photoUrl,
+      titlePhotoUrl,
+      noTitlePhoto,
       photoFocus,
       logoUrl,
       membershipTier: tier,

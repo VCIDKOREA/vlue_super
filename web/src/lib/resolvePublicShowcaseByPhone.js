@@ -45,6 +45,8 @@ async function fetchPublicCardExport(userId) {
     httpMediaUrl(res.data.profile?.photoUrl);
   return {
     photoUrl,
+    titlePhotoUrl: httpMediaUrl(exp?.titlePhotoUrl),
+    noTitlePhoto: Boolean(exp?.noTitlePhoto),
     logoUrl: httpMediaUrl(exp?.logoUrl),
     name: String(
       exp?.name || res.data.profile?.displayName || res.data.profile?.legalName || ""
@@ -163,6 +165,8 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
     loginId: handle,
     handle,
     photoUrl: exportSnap?.photoUrl || body.image_url || "",
+    titlePhotoUrl: exportSnap?.titlePhotoUrl || body.titlePhotoUrl || "",
+    noTitlePhoto: Boolean(exportSnap?.noTitlePhoto || body.noTitlePhoto),
     photoFocus: exportSnap?.photoFocus || "center",
     logoUrl: exportSnap?.logoUrl || "",
     membershipTier: tier,

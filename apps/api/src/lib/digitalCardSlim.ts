@@ -84,6 +84,8 @@ export function slimExportSnapshot(snap: unknown): Record<string, unknown> | nul
   if (customBackText) out.customBackText = customBackText;
   const shareCover = httpOnly(s.shareCoverUrl);
   if (shareCover) out.shareCoverUrl = shareCover;
+  const titlePhoto = httpOnly(s.titlePhotoUrl);
+  if (titlePhoto) out.titlePhotoUrl = titlePhoto;
   const tpl = text(s.designTemplate, 40);
   if (tpl) out.designTemplate = tpl;
   const focus = s.photoFocus;
@@ -91,6 +93,7 @@ export function slimExportSnapshot(snap: unknown): Record<string, unknown> | nul
   else if (focus && typeof focus === "object") out.photoFocus = focus;
   if (typeof s.noProfilePhoto === "boolean") out.noProfilePhoto = s.noProfilePhoto;
   if (typeof s.noCompanyLogo === "boolean") out.noCompanyLogo = s.noCompanyLogo;
+  if (typeof s.noTitlePhoto === "boolean") out.noTitlePhoto = s.noTitlePhoto;
   if (typeof s.noFax === "boolean") out.noFax = s.noFax;
   if (typeof s.noWebsite === "boolean") out.noWebsite = s.noWebsite;
   return out;

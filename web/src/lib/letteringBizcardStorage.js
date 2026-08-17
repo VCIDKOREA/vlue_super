@@ -8,6 +8,7 @@ export const LETTERING_BIZCARD_STORAGE_KEY = "vlue_lettering_bizcard_v1";
 /** 대용량 data URL — 본문 JSON과 분리해 QuotaExceeded 방지 */
 export const LETTERING_BIZCARD_LOGO_KEY = "vlue_lettering_logo_data_v1";
 export const LETTERING_BIZCARD_PHOTO_KEY = "vlue_lettering_photo_data_v1";
+export const LETTERING_BIZCARD_TITLE_PHOTO_KEY = "vlue_lettering_title_photo_data_v1";
 export const LETTERING_BIZCARD_COVER_KEY = "vlue_lettering_cover_data_v1";
 export const LETTERING_BIZCARD_CHANGED_EVENT = "vlue-lettering-bizcard-changed";
 /** 홈·미리보기에서 디지털 인증명함 설정(프로필 letteringBizcard) 열기 */
@@ -133,6 +134,10 @@ const DEFAULT_EDITABLE = {
   logoFileName: "",
   photoDataUrl: "",
   photoFileName: "",
+  /** DCC 타이틀(큰 배경) — 번호 앞 프로필 사진과 분리 */
+  titlePhotoDataUrl: "",
+  titlePhotoFileName: "",
+  noTitlePhoto: false,
   /** 히어로 배경 초점: top | center | bottom */
   photoFocus: "top",
   noProfilePhoto: false,
@@ -374,6 +379,7 @@ export function readLetteringBizcardEditable() {
         ...DEFAULT_EDITABLE,
         logoDataUrl: readBlobKey(LETTERING_BIZCARD_LOGO_KEY),
         photoDataUrl: readBlobKey(LETTERING_BIZCARD_PHOTO_KEY),
+        titlePhotoDataUrl: readBlobKey(LETTERING_BIZCARD_TITLE_PHOTO_KEY),
         kakaoFeedBgDataUrl: readBlobKey(LETTERING_BIZCARD_COVER_KEY)
       };
     }
@@ -382,19 +388,26 @@ export function readLetteringBizcardEditable() {
     /* 분리 키 우선 — 본문에 남아 있던 구버전 data URL도 흡수 */
     const logoSeparated = readBlobKey(LETTERING_BIZCARD_LOGO_KEY);
     const photoSeparated = readBlobKey(LETTERING_BIZCARD_PHOTO_KEY);
+    const titleSeparated = readBlobKey(LETTERING_BIZCARD_TITLE_PHOTO_KEY);
     const coverSeparated = readBlobKey(LETTERING_BIZCARD_COVER_KEY);
     const legacyLogo = String(base.logoDataUrl || base.logoUrl || "").trim();
     const legacyPhoto = String(base.photoDataUrl || base.photoUrl || "").trim();
+    const legacyTitle = String(base.titlePhotoDataUrl || base.titlePhotoUrl || "").trim();
     const legacyCover = String(base.kakaoFeedBgDataUrl || "").trim();
     /* 구버전 본문 data URL → 분리 키로 이전 */
     if (!logoSeparated && legacyLogo.startsWith("data:")) writeBlobKey(LETTERING_BIZCARD_LOGO_KEY, legacyLogo);
     if (!photoSeparated && legacyPhoto.startsWith("data:")) writeBlobKey(LETTERING_BIZCARD_PHOTO_KEY, legacyPhoto);
+    if (!titleSeparated && legacyTitle.startsWith("data:")) {
+      writeBlobKey(LETTERING_BIZCARD_TITLE_PHOTO_KEY, legacyTitle);
+    }
     if (!coverSeparated && legacyCover.startsWith("data:")) writeBlobKey(LETTERING_BIZCARD_COVER_KEY, legacyCover);
     return {
       ...base,
       photoFocus: normalizePhotoFocus(base.photoFocus),
+      noTitlePhoto: Boolean(base.noTitlePhoto),
       logoDataUrl: logoSeparated || legacyLogo,
       photoDataUrl: photoSeparated || legacyPhoto,
+      titlePhotoDataUrl: titleSeparated || legacyTitle,
       kakaoFeedBgDataUrl: coverSeparated || legacyCover
     };
   } catch {
@@ -425,6 +438,7 @@ export function writeLetteringBizcardEditable(patch = {}) {
 
   let logoDataUrl = String(next.logoDataUrl || "").trim();
   let photoDataUrl = String(next.photoDataUrl || "").trim();
+  let titlePhotoDataUrl = String(next.titlePhotoDataUrl || "").trim();
   const coverDataUrl = String(next.kakaoFeedBgDataUrl || "").trim();
 
   /* 로고·프로필 사진이 같은 값이면 혼용으로 보고 분리 */
@@ -439,18 +453,22 @@ export function writeLetteringBizcardEditable(patch = {}) {
   }
   next.logoDataUrl = logoDataUrl;
   next.photoDataUrl = photoDataUrl;
+  next.titlePhotoDataUrl = titlePhotoDataUrl;
 
   /* 본문 JSON에는 대용량 data URL을 넣지 않음 */
   const meta = {
     ...next,
     logoDataUrl: "",
     photoDataUrl: "",
+    titlePhotoDataUrl: "",
     kakaoFeedBgDataUrl: "",
     logoUrl: undefined,
-    photoUrl: undefined
+    photoUrl: undefined,
+    titlePhotoUrl: undefined
   };
   delete meta.logoUrl;
   delete meta.photoUrl;
+  delete meta.titlePhotoUrl;
 
   const prevMetaRaw = localStorage.getItem(LETTERING_BIZCARD_STORAGE_KEY);
 
@@ -460,9 +478,28 @@ export function writeLetteringBizcardEditable(patch = {}) {
     const photoChanging =
       Object.prototype.hasOwnProperty.call(patch, "photoDataUrl") ||
       photoDataUrl !== prev.photoDataUrl;
+    const titleChanging =
+      Object.prototype.hasOwnProperty.call(patch, "titlePhotoDataUrl") ||
+      Object.prototype.hasOwnProperty.call(patch, "noTitlePhoto") ||
+      titlePhotoDataUrl !== prev.titlePhotoDataUrl;
     const coverChanging =
       Object.prototype.hasOwnProperty.call(patch, "kakaoFeedBgDataUrl") ||
       coverDataUrl !== prev.kakaoFeedBgDataUrl;
+
+    const restorePrevBlobs = ({ logo = false, photo = false, title = false } = {}) => {
+      if (logo) {
+        writeBlobKey(LETTERING_BIZCARD_LOGO_KEY, prev.noCompanyLogo ? "" : prev.logoDataUrl || "");
+      }
+      if (photo) {
+        writeBlobKey(LETTERING_BIZCARD_PHOTO_KEY, prev.noProfilePhoto ? "" : prev.photoDataUrl || "");
+      }
+      if (title) {
+        writeBlobKey(
+          LETTERING_BIZCARD_TITLE_PHOTO_KEY,
+          prev.noTitlePhoto ? "" : prev.titlePhotoDataUrl || ""
+        );
+      }
+    };
 
     /* 이미지 blob 먼저 저장 — 실패 시 파일명만 바뀌는 불일치 방지 */
     if (logoChanging) {
@@ -477,24 +514,24 @@ export function writeLetteringBizcardEditable(patch = {}) {
         next.noProfilePhoto ? "" : photoDataUrl
       );
       if (!photoWrite.ok) {
-        if (logoChanging) {
-          writeBlobKey(LETTERING_BIZCARD_LOGO_KEY, prev.noCompanyLogo ? "" : prev.logoDataUrl || "");
-        }
+        restorePrevBlobs({ logo: logoChanging });
         return { ok: false, data: prev, error: photoWrite.error };
+      }
+    }
+    if (titleChanging) {
+      const titleWrite = writeBlobKey(
+        LETTERING_BIZCARD_TITLE_PHOTO_KEY,
+        next.noTitlePhoto ? "" : titlePhotoDataUrl
+      );
+      if (!titleWrite.ok) {
+        restorePrevBlobs({ logo: logoChanging, photo: photoChanging });
+        return { ok: false, data: prev, error: titleWrite.error };
       }
     }
     if (coverChanging) {
       const coverWrite = writeBlobKey(LETTERING_BIZCARD_COVER_KEY, coverDataUrl);
       if (!coverWrite.ok) {
-        if (logoChanging) {
-          writeBlobKey(LETTERING_BIZCARD_LOGO_KEY, prev.noCompanyLogo ? "" : prev.logoDataUrl || "");
-        }
-        if (photoChanging) {
-          writeBlobKey(
-            LETTERING_BIZCARD_PHOTO_KEY,
-            prev.noProfilePhoto ? "" : prev.photoDataUrl || ""
-          );
-        }
+        restorePrevBlobs({ logo: logoChanging, photo: photoChanging, title: titleChanging });
         return { ok: false, data: prev, error: coverWrite.error };
       }
     }
@@ -508,6 +545,7 @@ export function writeLetteringBizcardEditable(patch = {}) {
       ...meta,
       logoDataUrl: next.noCompanyLogo ? "" : logoDataUrl,
       photoDataUrl: next.noProfilePhoto ? "" : photoDataUrl,
+      titlePhotoDataUrl: next.noTitlePhoto ? "" : titlePhotoDataUrl,
       kakaoFeedBgDataUrl: coverDataUrl
     };
     window.dispatchEvent(new Event(LETTERING_BIZCARD_CHANGED_EVENT));

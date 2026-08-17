@@ -613,8 +613,10 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
           address: string | null;
           activity_name: string | null;
           photo_url: string | null;
+          title_photo_url: string | null;
           logo_url: string | null;
           photo_focus: string | null;
+          no_title_photo: boolean | null;
         }>
       >`
         SELECT
@@ -630,8 +632,14 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
           NULLIF(TRIM(export_snapshot_json->>'address'), '') AS address,
           NULLIF(TRIM(export_snapshot_json->>'activityName'), '') AS activity_name,
           NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url,
+          NULLIF(TRIM(export_snapshot_json->>'titlePhotoUrl'), '') AS title_photo_url,
           NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
-          NULLIF(TRIM(export_snapshot_json->>'photoFocus'), '') AS photo_focus
+          NULLIF(TRIM(export_snapshot_json->>'photoFocus'), '') AS photo_focus,
+          CASE
+            WHEN export_snapshot_json ? 'noTitlePhoto'
+              THEN (export_snapshot_json->>'noTitlePhoto')::boolean
+            ELSE NULL
+          END AS no_title_photo
         FROM digital_cards
         WHERE user_id = ${targetUserId}::uuid
         LIMIT 1
@@ -644,8 +652,10 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
     return t;
   };
   const photoUrl = httpOnly(s?.photo_url);
+  const titlePhotoUrl = httpOnly(s?.title_photo_url);
   const logoUrl = httpOnly(s?.logo_url);
   const photoFocus = String(s?.photo_focus || "").trim();
+  const noTitlePhoto = Boolean(s?.no_title_photo);
   const sub = user.subscriptions?.[0] || null;
 
   /** 디지털 인증명함 송출 스냅샷 — 쇼케이스·명함 열람용 (검색 마스킹과 별도) */
@@ -661,6 +671,8 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
         address: String(s.address || "").trim(),
         activityName: String(s.activity_name || "").trim(),
         photoUrl,
+        titlePhotoUrl,
+        noTitlePhoto,
         logoUrl,
         photoFocus
       }

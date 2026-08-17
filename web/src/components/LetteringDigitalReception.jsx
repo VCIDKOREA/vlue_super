@@ -12,7 +12,7 @@ import {
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDisplay.js";
 import { formatLetteringContactEmailDisplay, photoFocusToCss } from "../lib/letteringBizcardStorage.js";
-import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
+import { normalizeLetteringCard, resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
 import {
   formatNameDeptTitleLine,
   VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER,
@@ -341,11 +341,11 @@ function CompanyLogoBadge({ card, className = "" }) {
 
 function ProfileMedia({ card, className = "", variant = "avatar" }) {
   const [imgBroken, setImgBroken] = useState(false);
-  const photoUrl = String(card.photoUrl || "").trim();
+  const titlePhotoUrl = resolveDccTitlePhotoUrl(card);
   const logoUrl = resolveCardLogoUrl(card);
-  /* avatar = 회사 로고, hero = 프로필 사진 — 서로 대체하지 않음 */
+  /* avatar = 회사 로고, hero = DCC 타이틀 사진 — 서로 대체하지 않음 */
   const isLogo = variant === "logo" || variant === "avatar";
-  const src = isLogo ? logoUrl : photoUrl;
+  const src = isLogo ? logoUrl : titlePhotoUrl;
   const focusCss = !isLogo ? photoFocusToCss(card.photoFocus) : undefined;
 
   /* 로고 없음 → 무지(슬롯 비움) */
@@ -377,7 +377,7 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
 }
 
 function BackPanelHero({ card }) {
-  const photoUrl = String(card.photoUrl || "").trim();
+  const photoUrl = resolveDccTitlePhotoUrl(card);
   if (!photoUrl) return null;
 
   return (
@@ -390,7 +390,7 @@ function BackPanelHero({ card }) {
 
 function ProfileHero({ card, verified, incomingNumber = "" }) {
   const [imgBroken, setImgBroken] = useState(false);
-  const photoUrl = String(card.photoUrl || "").trim();
+  const photoUrl = resolveDccTitlePhotoUrl(card);
   const logoUrl = resolveCardLogoUrl(card);
   const hasPhoto = Boolean(photoUrl);
   const hasLogo = Boolean(logoUrl);
@@ -559,7 +559,7 @@ function FrontPanel({
       {embeddedInPush ? <CompanyLogoWatermark card={card} /> : null}
       {embeddedInPush ? null : <ProfileHero card={card} verified={verified} />}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
-      <div className={`ldr-back-head${card.photoUrl && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
+      <div className={`ldr-back-head${resolveDccTitlePhotoUrl(card) && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
         <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />
         <div className="ldr-back-head__copy">
           <p className="ldr-back-kicker">Digital ID · Profile</p>

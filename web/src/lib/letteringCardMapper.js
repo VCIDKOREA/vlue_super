@@ -86,6 +86,13 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
     photoFocus: normalizePhotoFocus(
       body.photoFocus || nested.photoFocus || profile.photoFocus || "center"
     ),
+    titlePhotoUrl:
+      body.titlePhotoUrl ||
+      body.title_photo_url ||
+      nested.titlePhotoUrl ||
+      profile.titlePhotoUrl ||
+      "",
+    noTitlePhoto: Boolean(body.noTitlePhoto || nested.noTitlePhoto || profile.noTitlePhoto),
     logoUrl: profile.logoUrl || profile.logo_url || body.logo_url || body.dcp?.logoUrl || "",
     image_url: body.image_url || nested.image_url || "",
     department:

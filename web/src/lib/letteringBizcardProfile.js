@@ -68,7 +68,9 @@ export function withLetteringBizcardPreviewFallback(card = {}, opts = {}) {
         demo.email,
       website: pick("website"),
       logoUrl: card.noCompanyLogo ? "" : String(card.logoUrl || "").trim(),
-      photoUrl: card.noProfilePhoto ? "" : String(card.photoUrl || "").trim()
+      photoUrl: card.noProfilePhoto ? "" : String(card.photoUrl || "").trim(),
+      titlePhotoUrl: card.noTitlePhoto ? "" : String(card.titlePhotoUrl || "").trim(),
+      noTitlePhoto: Boolean(card.noTitlePhoto)
     };
   }
 
@@ -88,6 +90,8 @@ export function withLetteringBizcardPreviewFallback(card = {}, opts = {}) {
     website: cleanField(scrubbed?.website),
     logoUrl: scrubbed.noCompanyLogo ? "" : String(scrubbed.logoUrl || "").trim(),
     photoUrl: scrubbed.noProfilePhoto ? "" : String(scrubbed.photoUrl || "").trim(),
+    titlePhotoUrl: scrubbed.noTitlePhoto ? "" : String(scrubbed.titlePhotoUrl || "").trim(),
+    noTitlePhoto: Boolean(scrubbed.noTitlePhoto),
     customBackText: cleanField(scrubbed?.customBackText),
     companyIntro: cleanField(scrubbed?.companyIntro),
     address: cleanField(scrubbed?.address)
@@ -194,6 +198,8 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       photoUrl: ed.noProfilePhoto
         ? ""
         : String(ed.photoDataUrl || ed.photoUrl || readProfilePhotoAvatar() || "").trim(),
+      titlePhotoUrl: ed.noTitlePhoto ? "" : String(ed.titlePhotoDataUrl || ed.titlePhotoUrl || "").trim(),
+      noTitlePhoto: Boolean(ed.noTitlePhoto),
       photoFocus: normalizePhotoFocus(ed.photoFocus),
       membershipTier,
       userId: userId || "",

@@ -64,6 +64,13 @@ export function writeDccLinePreviewFromBundle(bundle) {
     photoUrl: String(
       line.photoUrl || dcc.photoUrl || (keepSameLine ? prev?.photoUrl : "") || ""
     ).trim(),
+    titlePhotoUrl: String(
+      dcc.titlePhotoUrl || (keepSameLine ? prev?.titlePhotoUrl : "") || ""
+    ).trim(),
+    noTitlePhoto:
+      dcc.noTitlePhoto != null
+        ? Boolean(dcc.noTitlePhoto)
+        : Boolean(keepSameLine ? prev?.noTitlePhoto : false),
     photoFocus: String(line.photoFocus || dcc.photoFocus || (keepSameLine ? prev?.photoFocus : "") || "center").trim() || "center",
     kindLabel: String(line.kindLabel || (keepSameLine ? prev?.kindLabel : "") || "").trim(),
     isCertified: Boolean(line.isCertified)

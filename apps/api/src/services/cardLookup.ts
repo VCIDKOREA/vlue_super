@@ -112,9 +112,11 @@ type ExportSnapLite = {
   companyIntro: string;
   salesContent: string;
   photoUrl: string;
+  titlePhotoUrl: string;
   logoUrl: string;
   /** 히어로 배경 초점: top | center | bottom */
   photoFocus: string;
+  noTitlePhoto: boolean;
 };
 
 /**
@@ -135,8 +137,10 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
       company_intro: string | null;
       sales_content: string | null;
       photo_url: string | null;
+      title_photo_url: string | null;
       logo_url: string | null;
       photo_focus: string | null;
+      no_title_photo: boolean | null;
     }>
   >`
     SELECT
@@ -151,8 +155,14 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
       NULLIF(TRIM(export_snapshot_json->>'companyIntro'), '') AS company_intro,
       NULLIF(TRIM(export_snapshot_json->>'salesContent'), '') AS sales_content,
       NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url,
+      NULLIF(TRIM(export_snapshot_json->>'titlePhotoUrl'), '') AS title_photo_url,
       NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
-      NULLIF(TRIM(export_snapshot_json->>'photoFocus'), '') AS photo_focus
+      NULLIF(TRIM(export_snapshot_json->>'photoFocus'), '') AS photo_focus,
+      CASE
+        WHEN export_snapshot_json ? 'noTitlePhoto'
+          THEN (export_snapshot_json->>'noTitlePhoto')::boolean
+        ELSE NULL
+      END AS no_title_photo
     FROM digital_cards
     WHERE user_id = ${userId}::uuid
     LIMIT 1
@@ -170,8 +180,10 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
     companyIntro: firstStr(s.company_intro),
     salesContent: firstStr(s.sales_content),
     photoUrl: httpOnlyUrl(s.photo_url),
+    titlePhotoUrl: httpOnlyUrl(s.title_photo_url),
     logoUrl: httpOnlyUrl(s.logo_url),
-    photoFocus: firstStr(s.photo_focus)
+    photoFocus: firstStr(s.photo_focus),
+    noTitlePhoto: Boolean(s.no_title_photo)
   };
 }
 
@@ -263,6 +275,17 @@ function buildContactProfile(opts: {
         pj.image_url,
         pj.imageUrl
       ) || undefined,
+    titlePhotoUrl:
+      firstStr(
+        (snap as ExportSnapLite).titlePhotoUrl,
+        (snap as Record<string, unknown>).titlePhotoUrl,
+        pj.titlePhotoUrl
+      ) || undefined,
+    noTitlePhoto: Boolean(
+      (snap as ExportSnapLite).noTitlePhoto ||
+        (snap as Record<string, unknown>).noTitlePhoto ||
+        pj.noTitlePhoto
+    ),
     logoUrl:
       firstStr(
         (snap as ExportSnapLite).logoUrl,
@@ -397,6 +420,11 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       companyIntro: firstStr(lineSnap?.companyIntro, certified ? masterSnap?.companyIntro : ""),
       salesContent: firstStr(lineSnap?.salesContent, certified ? masterSnap?.salesContent : ""),
       photoUrl: httpOnlyUrl(lineSnap?.photoUrl) || (certified ? masterSnap?.photoUrl || "" : ""),
+      titlePhotoUrl:
+        httpOnlyUrl(lineSnap?.titlePhotoUrl) || (certified ? masterSnap?.titlePhotoUrl || "" : ""),
+      noTitlePhoto: Boolean(
+        lineSnap?.noTitlePhoto ?? (certified ? masterSnap?.noTitlePhoto : false)
+      ),
       logoUrl: httpOnlyUrl(lineSnap?.logoUrl) || (certified ? masterSnap?.logoUrl || "" : ""),
       photoFocus: firstStr(lineSnap?.photoFocus, certified ? masterSnap?.photoFocus : "")
     };
@@ -439,6 +467,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           profile,
           website: firstStr(profile.website),
           photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
+          titlePhotoUrl: firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
+          noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
           image_url:
             pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url", "photoUrl"]) ||
             firstStr(card.user.digitalCard?.photoUrl),
@@ -482,6 +512,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         profile,
         website: firstStr(profile.website),
         photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
+        titlePhotoUrl: firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
+        noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
         image_url:
           pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url", "photoUrl"]) ||
           firstStr(card.user.digitalCard?.photoUrl),
@@ -576,6 +608,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           profile,
           website: firstStr(profile.website),
           photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
+          titlePhotoUrl: firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
+          noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
           digitalCardActive: Boolean(user.digitalCard),
           is_premium_line: isPremiumLine,
           phoneE164: user.phoneE164,
@@ -618,6 +652,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         profile,
         website: firstStr(profile.website),
         photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
+        titlePhotoUrl: firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
+        noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
         digitalCardActive: Boolean(user.digitalCard),
         is_premium_line: isPremiumLine,
         phoneE164: masked.phoneE164,

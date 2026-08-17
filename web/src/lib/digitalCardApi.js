@@ -93,12 +93,19 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
       if (force) return fromSnap || localPhoto;
       return localPhoto ? localPhoto : fromSnap;
     })(),
+    titlePhotoDataUrl: (() => {
+      const fromSnap = String(snap.titlePhotoUrl || "").trim();
+      const localTitle = String(local.titlePhotoDataUrl || local.titlePhotoUrl || "").trim();
+      if (force) return fromSnap || localTitle;
+      return localTitle ? localTitle : fromSnap;
+    })(),
     photoFocus:
       force || !String(local.photoFocus || "").trim()
         ? normalizePhotoFocus(snap.photoFocus || local.photoFocus)
         : normalizePhotoFocus(local.photoFocus),
     noCompanyLogo: force && snap.noCompanyLogo != null ? Boolean(snap.noCompanyLogo) : Boolean(local.noCompanyLogo),
     noProfilePhoto: force && snap.noProfilePhoto != null ? Boolean(snap.noProfilePhoto) : Boolean(local.noProfilePhoto),
+    noTitlePhoto: force && snap.noTitlePhoto != null ? Boolean(snap.noTitlePhoto) : Boolean(local.noTitlePhoto),
     noFax: force && snap.noFax != null ? Boolean(snap.noFax) : Boolean(local.noFax),
     noWebsite: force && snap.noWebsite != null ? Boolean(snap.noWebsite) : Boolean(local.noWebsite),
     kakaoFeedBgDataUrl:
@@ -312,12 +319,17 @@ export async function syncDigitalCardExportSnapshot(card) {
   const { ensureHttpMediaUrl } = await import("./mediaImageUpload.js");
 
   let photoUrl = "";
+  let titlePhotoUrl = "";
   let logoUrl = "";
   let shareCoverUrl = "";
   let mediaError = "";
   try {
     photoUrl = await ensureHttpMediaUrl(
       card?.photoUrl || ed.photoDataUrl || ed.photoUrl || "",
+      "photo"
+    );
+    titlePhotoUrl = await ensureHttpMediaUrl(
+      card?.titlePhotoUrl || ed.titlePhotoDataUrl || ed.titlePhotoUrl || "",
       "photo"
     );
     logoUrl = await ensureHttpMediaUrl(
@@ -341,6 +353,9 @@ export async function syncDigitalCardExportSnapshot(card) {
     photoUrl =
       photoUrl ||
       pickHttp(card?.photoUrl, ed.photoDataUrl, ed.photoUrl);
+    titlePhotoUrl =
+      titlePhotoUrl ||
+      pickHttp(card?.titlePhotoUrl, ed.titlePhotoDataUrl, ed.titlePhotoUrl);
     logoUrl = logoUrl || pickHttp(card?.logoUrl, ed.logoDataUrl, ed.logoUrl);
     shareCoverUrl =
       shareCoverUrl ||
@@ -353,6 +368,10 @@ export async function syncDigitalCardExportSnapshot(card) {
     if (photoUrl && photoUrl !== String(ed.photoDataUrl || "").trim()) {
       patch.photoDataUrl = photoUrl;
       patch.noProfilePhoto = false;
+    }
+    if (titlePhotoUrl && titlePhotoUrl !== String(ed.titlePhotoDataUrl || "").trim()) {
+      patch.titlePhotoDataUrl = titlePhotoUrl;
+      patch.noTitlePhoto = false;
     }
     if (logoUrl && logoUrl !== String(ed.logoDataUrl || "").trim()) {
       patch.logoDataUrl = logoUrl;
@@ -390,9 +409,11 @@ export async function syncDigitalCardExportSnapshot(card) {
           customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
           logoUrl: ed.noCompanyLogo ? "" : logoUrl,
           photoUrl: ed.noProfilePhoto ? "" : photoUrl,
+          titlePhotoUrl: ed.noTitlePhoto ? "" : titlePhotoUrl,
           photoFocus: normalizePhotoFocus(card?.photoFocus || ed.photoFocus),
           noCompanyLogo: Boolean(ed.noCompanyLogo),
           noProfilePhoto: Boolean(ed.noProfilePhoto),
+          noTitlePhoto: Boolean(ed.noTitlePhoto),
           shareCoverUrl,
           designTemplate: normalizeLetteringBizcardTemplate(card?.designTemplate || ed.designTemplate),
           activityName: String(card?.activityName || readFeedNickname() || "").trim()
@@ -416,6 +437,7 @@ export async function syncDigitalCardExportSnapshot(card) {
       cardId: data.cardId,
       exportSnapshot: null,
       photoUrl,
+      titlePhotoUrl,
       logoUrl,
       shareCoverUrl,
       mediaError: mediaError || null
