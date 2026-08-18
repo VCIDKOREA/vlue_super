@@ -58,7 +58,12 @@ export default function LetteringReportSheet({
       role="dialog"
       aria-modal="true"
       aria-labelledby="lettering-report-title"
-      onClick={() => onClose?.()}
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose?.();
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
     >
       <div className={sheetClass} onClick={(e) => e.stopPropagation()}>
         <header className="lettering-report-sheet__header">
@@ -129,7 +134,16 @@ export default function LetteringReportSheet({
           <button
             type="button"
             disabled={busy}
-            onClick={() => onClose?.()}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!busy) onClose?.();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose?.();
+            }}
             className="rounded-xl border border-slate-200 py-2.5 text-[12px] font-black text-slate-600 disabled:opacity-60"
           >
             {"\uCDE8\uC18C"}

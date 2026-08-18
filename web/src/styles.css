@@ -6097,22 +6097,22 @@ body,
 .ldr-watermark {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 1;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   pointer-events: none;
   overflow: hidden;
   background: transparent;
-  padding-bottom: 10px;
+  padding: 0;
 }
 
 .ldr-watermark__img {
-  width: min(26%, 84px);
-  max-height: 72px;
+  width: min(58%, 168px);
+  max-height: 168px;
   object-fit: contain;
   background: transparent;
-  opacity: 0.15;
+  opacity: 0.28;
   filter: none;
   mix-blend-mode: normal;
 }
@@ -6120,9 +6120,9 @@ body,
 .ldr-watermark--brand .ldr-watermark__img,
 .ldr-watermark--nukki .ldr-watermark__img,
 .ldr-watermark--ceo .ldr-watermark__img {
-  width: min(26%, 84px);
-  max-height: 72px;
-  opacity: 0.15;
+  width: min(58%, 168px);
+  max-height: 168px;
+  opacity: 0.28;
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -6135,7 +6135,7 @@ body,
 .ldr-panel--push .ldr-back-contact-stack,
 .ldr-panel--push .ldr-contact-extra {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .ldr-reception--push .ldr-face-tabs {
@@ -6713,12 +6713,12 @@ body,
 .ldr-reception--push .ldr-watermark--brand .ldr-watermark__img,
 .ldr-reception--push .ldr-watermark--nukki .ldr-watermark__img,
 .ldr-reception--push .ldr-watermark--ceo .ldr-watermark__img {
-  width: min(26%, 84px);
-  max-height: 72px;
-  opacity: 0.15;
+  width: min(58%, 168px);
+  max-height: 168px;
+  opacity: 0.28;
   filter: none;
   mix-blend-mode: normal;
-  animation: ldr-watermark-drift 14s ease-in-out infinite;
+  animation: none;
 }
 
 @keyframes ldr-watermark-drift {
@@ -6859,11 +6859,14 @@ body,
 }
 
 .ldr-panel {
+  position: relative;
+  overflow: hidden;
   padding: 0 0 12px;
 }
 
 .ldr-hero {
   position: relative;
+  z-index: 2;
 }
 
 .ldr-hero__visual {

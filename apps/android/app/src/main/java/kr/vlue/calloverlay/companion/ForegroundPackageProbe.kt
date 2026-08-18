@@ -12,10 +12,11 @@ import android.util.Log
  *
  * RINGING BigPush 위치 (서로 독립):
  * - 전체 InCallUI → TOP
- * - 홈 / 다른 앱 / HUN → BOTTOM
+ * - 미니 수신 팝업(전화 앱·카톡·홈·HUN 포함) → 팝업 바로 아래
  *
  * DUT(SM-A175N) usagestats 증거:
  * - 전체 UI: ACTIVITY_RESUMED com.samsung.android.incallui/.call.InCallActivity
+ * - 미니 수신(전화 앱 위): last resume / task = com.samsung.android.dialer
  * - HUN/다른앱: FOREGROUND_SERVICE + NOTIFICATION 만 (ACTIVITY_RESUMED 없음)
  *
  * getRunningTasks / process importance 만으로는 Samsung 에서 둘을 구분하지 못함.
@@ -25,6 +26,7 @@ object ForegroundPackageProbe {
 
     enum class RingingSurface {
         FULL_INCALL,
+        COMPACT_DIALER,
         HOME_OR_OTHER
     }
 
@@ -45,13 +47,16 @@ object ForegroundPackageProbe {
      * Pure — 단위 테스트용.
      *
      * 우선순위 (DUT usagestats):
-     * 1) 최근 ACTIVITY_RESUMED 가 InCallUI → TOP (전체 수신 UI)
-     * 2) 최근 ACTIVITY_RESUMED 가 홈/타앱 → BOTTOM (HUN·다른앱)
-     * 3) Tasks 가 InCallUI → TOP
-     * 4) InCall FOREGROUND → TOP
-     * 5) 타 앱 FOREGROUND → BOTTOM
-     * 6) InCall ≤ VISIBLE + 타앱 FG 없음 → TOP
-     * 7) 그 외(미확인·VLUE 전면) → TOP — 삼성 전체 UI 응답/종료 가림 방지
+     * 1) 최근 resume 이 전화 앱(dialer) → 미니 수신 (팝업 바로 아래)
+     * 2) 최근 resume 이 InCallUI + task 가 dialer → compact InCall (팝업 바로 아래)
+     * 3) 최근 resume 이 InCallUI → TOP (전체 수신 UI)
+     * 4) 최근 ACTIVITY_RESUMED 가 홈/타앱 → 미니 수신 (팝업 바로 아래)
+     * 5) Tasks 가 dialer → 미니 수신
+     * 6) Tasks 가 InCallUI → TOP
+     * 7) InCall FOREGROUND → TOP
+     * 8) 타 앱 FOREGROUND → 미니 수신 (팝업 바로 아래)
+     * 9) InCall ≤ VISIBLE + 타앱 FG 없음 → TOP
+     * 10) 그 외(미확인·VLUE 전면) → TOP — 삼성 전체 UI 응답/종료 가림 방지
      */
     @Suppress("UNUSED_PARAMETER")
     fun classifyRingingSurface(
@@ -61,22 +66,25 @@ object ForegroundPackageProbe {
         ourApp: Boolean = false,
         lastResumedPkg: String? = null
     ): RingingSurface {
-        /*
-         * VLUE가 열려 있어도 삼성 전체 InCallActivity 가 그 위에 뜬다.
-         * ourApp 을 먼저 BOTTOM 처리하면 응답/종료 버튼을 가린다.
-         */
-        if (OverlayContextDetector.isLikelyInCallUiPackage(lastResumedPkg)) {
-            return RingingSurface.FULL_INCALL
-        }
+        val resumedDialer = OverlayContextDetector.isLikelyDialerPackage(lastResumedPkg)
+        val resumedFull = OverlayContextDetector.isLikelyFullInCallUiPackage(lastResumedPkg)
+        val tasksDialer = OverlayContextDetector.isLikelyDialerPackage(tasksPkg)
+        val tasksFull = OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg)
+
+        if (resumedDialer) return RingingSurface.COMPACT_DIALER
+        /* 최근기록이 전면이면 미니 수신 — 이전 InCallActivity resume 가 남아도 TOP 금지 */
+        if (tasksDialer) return RingingSurface.COMPACT_DIALER
+        if (resumedFull && tasksDialer) return RingingSurface.COMPACT_DIALER
+        if (resumedFull) return RingingSurface.FULL_INCALL
+
         if (OverlayContextDetector.isLikelyLauncherPackage(lastResumedPkg) ||
             isKnownOtherAppPackage(lastResumedPkg)
         ) {
             return RingingSurface.HOME_OR_OTHER
         }
 
-        if (OverlayContextDetector.isLikelyInCallUiPackage(tasksPkg)) {
-            return RingingSurface.FULL_INCALL
-        }
+        if (tasksDialer) return RingingSurface.COMPACT_DIALER
+        if (tasksFull) return RingingSurface.FULL_INCALL
 
         if (inCallImportance != null &&
             inCallImportance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
@@ -175,7 +183,7 @@ object ForegroundPackageProbe {
                 if (pkgs.isEmpty()) continue
                 val blob = (proc.processName.orEmpty() + " " + pkgs.joinToString(" ")).lowercase()
                 val isInCall =
-                    OverlayContextDetector.isLikelyInCallUiPackage(blob) ||
+                    OverlayContextDetector.isLikelyFullInCallUiPackage(blob) ||
                         blob.contains("incallui") ||
                         blob.contains("com.samsung.android.incallui")
                 if (isInCall) {

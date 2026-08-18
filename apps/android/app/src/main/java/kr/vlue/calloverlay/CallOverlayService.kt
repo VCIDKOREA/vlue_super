@@ -35,6 +35,7 @@ import kr.vlue.calloverlay.companion.MiniCaseVisibility
 import kr.vlue.calloverlay.companion.BigPushShowcaseBar
 import kr.vlue.calloverlay.companion.OutgoingShowcaseGate
 import kr.vlue.calloverlay.companion.ForegroundPackageProbe
+import kr.vlue.calloverlay.companion.CompactIncomingMetrics
 import kr.vlue.calloverlay.companion.OverlayContext
 import kr.vlue.calloverlay.companion.OverlayContextDetector
 import kr.vlue.calloverlay.companion.OverlayPosition
@@ -45,6 +46,7 @@ import kr.vlue.calloverlay.companion.ScreenStateDetector
 import kr.vlue.calloverlay.companion.UsageAccessHelper
 import kr.vlue.calloverlay.dcp.CallPathSession
 import kr.vlue.calloverlay.dcp.DcpAbnormalWarningView
+import kr.vlue.calloverlay.dcp.DcpPopupPolicy
 import kr.vlue.calloverlay.dcp.NationalAgencyWhitelist
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
 import kr.vlue.calloverlay.diagnostics.CompanionRuntimeStabilityDiag
@@ -87,12 +89,15 @@ class CallOverlayService : Service() {
     private var remoteConnected: Boolean = false
     /** BigPush 가장자리 피크 (MiniCase 패리티) — OverlayState 는 BIG_PUSH 유지 */
     private var bigPushPeeking: Boolean = false
+    private var overlayModal: Boolean = false
     /** 피크 시 WebView 대신 동일한 좌/우 엣지 탭 */
     private var bigPushPeekTab: FrameLayout? = null
     private var bigPushPeekOnRight: Boolean = false
     /** DCP 정상/비정상 팝업 — BigPush 창과 분리(WRAP_CONTENT) */
     private var dcpPopupView: android.view.View? = null
     private var dcpPopupParams: WindowManager.LayoutParams? = null
+    /** 설정 DCP 테스트 — 전체 오버레이 없이 팝업만 */
+    private var dcpPopupOnly = false
     /** Phase 5-C — Memory callback 관찰만 (동작 변경 없음) */
     private var memoryCallbacks: ComponentCallbacks2? = null
 
@@ -204,6 +209,14 @@ class CallOverlayService : Service() {
                 applyCallInfoUpdate(phone, verified, outgoing, cardJson, dcpRoute)
                 return START_NOT_STICKY
             }
+            ACTION_DCP_TEST_POPUP -> {
+                showDcpTestPopupOnly(
+                    phone = intent.getStringExtra(EXTRA_PHONE).orEmpty().ifBlank { "112" },
+                    cardJson = intent.getStringExtra(EXTRA_CARD_JSON),
+                    dcpRoute = intent.getStringExtra(EXTRA_DCP_ROUTE).orEmpty()
+                )
+                return START_NOT_STICKY
+            }
         }
         val phone = intent?.getStringExtra(EXTRA_PHONE).orEmpty()
         val verified = intent?.getBooleanExtra(EXTRA_VERIFIED, false) ?: false
@@ -235,6 +248,7 @@ class CallOverlayService : Service() {
         val answered = shouldEnterShowcaseNow(outgoing)
         val callState = telephonyCallState()
         currentOutgoing = outgoing
+        dcpPopupOnly = false
         bindDcpRoute(phone, dcpRoute, cardJson)
         /*
          * Phase 6-G: Call End 이후 enrichWithLookup / queued FGS 가 IDLE 에서 showOverlay 를
@@ -844,6 +858,7 @@ class CallOverlayService : Service() {
             enterShowcaseLayout(source = source)
         }
         syncOverlayChromeForState(source = source)
+        syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_APPLIED", source)
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_VISIBLE", source)
         notifyWebCallState("connected")
@@ -877,7 +892,7 @@ class CallOverlayService : Service() {
                 bigPushPeekTab?.visibility = android.view.View.GONE
                 nativeBanner?.visibility = android.view.View.GONE
                 webView?.visibility = android.view.View.VISIBLE
-                removeDcpPopupWindow()
+                syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
             }
             OverlayState.MINI_CASE -> {
                 bigPushPeeking = false
@@ -1039,14 +1054,9 @@ class CallOverlayService : Service() {
             val ctx = when (surface) {
                 ForegroundPackageProbe.RingingSurface.FULL_INCALL ->
                     OverlayContext.INCOMING_CALL_UI
+                ForegroundPackageProbe.RingingSurface.COMPACT_DIALER,
                 ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER ->
-                    if (OverlayContextDetector.isLikelyLauncherPackage(resumedPkg) ||
-                        OverlayContextDetector.isLikelyLauncherPackage(tasksPkg)
-                    ) {
-                        OverlayContext.HOME_SCREEN
-                    } else {
-                        OverlayContext.OTHER_APP
-                    }
+                    OverlayContext.COMPACT_INCOMING
             }
             val detail =
                 "phase=RINGING surface=$surface ctx=${ctx.name} ourApp=$ourApp " +
@@ -1206,12 +1216,66 @@ class CallOverlayService : Service() {
         currentDcpRoute = NationalAgencyWhitelist.routeForCall(phone, requested, parseDcpRoute(cardJson))
     }
 
+    /**
+     * 설정 DCP 테스트 — 전체 먹색 오버레이 없이 팝업만.
+     * 홈·뒤로가기·다른 앱 터치를 가로채지 않는다.
+     */
+    private fun showDcpTestPopupOnly(phone: String, cardJson: String?, dcpRoute: String) {
+        dcpPopupOnly = true
+        currentPhone = phone
+        pendingCardJson = cardJson
+        bindDcpRoute(phone, dcpRoute, cardJson)
+        detachCompanionOverlayKeepingService()
+        if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+            CompanionRuntimeStabilityDiag.beginCallSession("dcp_popup_test")
+        }
+        syncDcpRoutePopup(cardJson, currentDcpRoute)
+    }
+
+    /** DCP 팝업 테스트 때 이전 전체 오버레이가 홈/뒤로가기를 먹지 않게 제거 */
+    private fun detachCompanionOverlayKeepingService() {
+        rootContainer?.animate()?.cancel()
+        webView?.destroy()
+        webView = null
+        rootContainer?.let { v ->
+            try {
+                windowManager?.removeView(v)
+            } catch (_: Exception) {
+            }
+        }
+        rootContainer = null
+        layoutParams = null
+        nativeBanner = null
+        bigPushPeekTab = null
+        bigPushPeeking = false
+        companion.onCallEnd()
+    }
+
     private fun syncDcpRoutePopup(cardJson: String?, dcpRoute: String) {
+        if (parseProfileKind(cardJson) == "expired_line") {
+            if (dismissing) {
+                removeDcpPopupWindow()
+                return
+            }
+            removeDcpPopupWindow()
+            val spec = DcpAbnormalWarningView.Spec(
+                abnormal = false,
+                expired = true,
+                agencyName = "",
+                shortNumber = currentPhone.ifBlank { parseDcpPhone(cardJson) },
+                officialWebsite = "",
+                expiredMessage = parseExpiredDetail(cardJson),
+                fromMock = false
+            )
+            attachDcpPopupWindow(spec)
+            return
+        }
         val route = NationalAgencyWhitelist.routeForCall(currentPhone, dcpRoute, parseDcpRoute(cardJson))
-        val show =
-            companion.state == OverlayState.BIG_PUSH &&
-                (route == "normal" || route == "abnormal") &&
-                !dismissing
+        val show = DcpPopupPolicy.shouldShow(
+            route = route,
+            overlayState = companion.state,
+            popupOnlyTest = dcpPopupOnly
+        ) && !dismissing
         if (!show) {
             removeDcpPopupWindow()
             return
@@ -1221,14 +1285,22 @@ class CallOverlayService : Service() {
             agencyName = parseDcpAgencyName(cardJson).ifBlank { "경찰청" },
             shortNumber = parseDcpPhone(cardJson).ifBlank { "112" },
             officialWebsite = parseDcpWebsite(cardJson).ifBlank { "https://www.police.go.kr" },
-            fromMock = CallPathSession.lastVerdict?.fromMock == true
+            fromMock = dcpPopupOnly || CallPathSession.lastVerdict?.fromMock == true
         )
         attachDcpPopupWindow(spec)
     }
 
+    private fun ensureWindowManager(): android.view.WindowManager? {
+        val existing = windowManager
+        if (existing != null) return existing
+        val wm = getSystemService(WINDOW_SERVICE) as? android.view.WindowManager ?: return null
+        windowManager = wm
+        return wm
+    }
+
     private fun attachDcpPopupWindow(spec: DcpAbnormalWarningView.Spec) {
         if (dcpPopupView?.isAttachedToWindow == true) return
-        val wm = windowManager ?: return
+        val wm = ensureWindowManager() ?: return
         removeDcpPopupWindow()
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -1246,23 +1318,38 @@ class CallOverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.CENTER
+            width = dp(320)
+            height = WindowManager.LayoutParams.WRAP_CONTENT
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
         val view = DcpAbnormalWarningView.build(this, spec) {
-            if (spec.fromMock) {
+            if (spec.fromMock || dcpPopupOnly) {
+                dcpPopupOnly = false
                 dismissOverlay()
             } else {
                 removeDcpPopupWindow()
             }
         }
-        DcpAbnormalWarningView.bindDrag(view, wm, params, enabled = !spec.abnormal)
+        DcpAbnormalWarningView.bindDrag(view, wm, params, enabled = !spec.abnormal && !spec.expired)
         try {
             wm.addView(view, params)
             dcpPopupView = view
             dcpPopupParams = params
+            view.post {
+                val h = view.height
+                val w = view.width.coerceAtLeast(dp(280))
+                if (h > 0 && (params.height != h || params.width != w)) {
+                    params.width = w
+                    params.height = h
+                    try {
+                        wm.updateViewLayout(view, params)
+                    } catch (_: Exception) {
+                    }
+                }
+            }
         } catch (e: Exception) {
             VlueBigPushTrace.lifecycle("DCP_POPUP_ADD_FAIL", e.message ?: e.javaClass.simpleName)
         }
@@ -1310,6 +1397,26 @@ class CallOverlayService : Service() {
                 .ifBlank { json.optString("phoneE164") }
         } catch (_: Exception) {
             ""
+        }
+    }
+
+    private fun parseProfileKind(cardJson: String?): String {
+        if (cardJson.isNullOrBlank()) return ""
+        return try {
+            org.json.JSONObject(cardJson).optString("profileKind").orEmpty()
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun parseExpiredDetail(cardJson: String?): String {
+        val fallback = "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다."
+        if (cardJson.isNullOrBlank()) return fallback
+        return try {
+            val json = org.json.JSONObject(cardJson)
+            json.optString("expiredDetail").ifBlank { fallback }
+        } catch (_: Exception) {
+            fallback
         }
     }
 
@@ -1406,6 +1513,19 @@ class CallOverlayService : Service() {
     }
 
     private fun topBigPushOffsetY(): Int = statusBarHeightPx() + dp(4)
+
+    /** 삼성 미니 수신 팝업 바로 아래 (사진 3 "여기") */
+    private fun compactIncomingBelowY(): Int =
+        statusBarHeightPx() +
+            dp(CompactIncomingMetrics.CARD_HEIGHT_DP) +
+            dp(CompactIncomingMetrics.GAP_DP)
+
+    private fun compactBarY(pos: OverlayPosition, barH: Int, screenH: Int): Int =
+        when (pos) {
+            OverlayPosition.BOTTOM -> (screenH - barH - dp(8)).coerceAtLeast(0)
+            OverlayPosition.BELOW_COMPACT_INCOMING -> compactIncomingBelowY()
+            else -> topBigPushOffsetY()
+        }
 
     /** MiniCase: WebView 사각 표면을 타원(캡슐)으로 잘라 모서리를 투명하게 */
     private fun applyCapsuleClip(view: android.view.View?, enabled: Boolean) {
@@ -1593,7 +1713,9 @@ class CallOverlayService : Service() {
                 commitMiniCaseLayout(source = source)
                 CompanionRuntimeStabilityDiag.mark("MINI_VISIBLE", source)
             }
-            OverlayPosition.TOP, OverlayPosition.BOTTOM -> applyCompactRingingWindow()
+            OverlayPosition.TOP,
+            OverlayPosition.BOTTOM,
+            OverlayPosition.BELOW_COMPACT_INCOMING -> applyCompactRingingWindow()
             OverlayPosition.HIDDEN -> commitHiddenLayout(source = source)
         }
         publishCompanion(OverlayTriggerEvent.INTERNAL)
@@ -1708,6 +1830,44 @@ class CallOverlayService : Service() {
             )
     }
 
+    /** 신고 시트 등 — 전체 창 + 터치 포커스 (취소 버튼이 compact 창 밖으로 나가 무반응이던 문제) */
+    fun setOverlayModal(open: Boolean) {
+        mainHandler.post {
+            overlayModal = open
+            if (open) {
+                applyOverlayModalWindow()
+            } else if (!dismissing) {
+                applyLayoutFromController(source = "setOverlayModal_close")
+            }
+        }
+    }
+
+    private fun applyOverlayModalWindow() {
+        val wm = windowManager ?: return
+        val view = rootContainer ?: return
+        val params = layoutParams ?: return
+        params.gravity = Gravity.TOP or Gravity.START
+        params.width = WindowManager.LayoutParams.MATCH_PARENT
+        params.height = WindowManager.LayoutParams.MATCH_PARENT
+        params.x = 0
+        params.y = 0
+        @Suppress("DEPRECATION")
+        params.flags = (
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            )
+        nativeBanner?.visibility = android.view.View.GONE
+        webView?.visibility = android.view.View.VISIBLE
+        view.visibility = android.view.View.VISIBLE
+        try {
+            wm.updateViewLayout(view, params)
+        } catch (_: Exception) {
+        }
+    }
+
     /** 화면 꺼짐/잠금 수신 시 시스템 전화처럼 화면을 깨워 오버레이를 보이게 함 */
     private fun wakeScreenForCallOverlay() {
         try {
@@ -1738,6 +1898,10 @@ class CallOverlayService : Service() {
     /** 수신 링잉 — BigPush TOP/BOTTOM (PositionManager) */
     private fun applyCompactRingingWindow() {
         mainHandler.post {
+            if (overlayModal) {
+                applyOverlayModalWindow()
+                return@post
+            }
             val wm = windowManager
             val view = rootContainer
             val params = layoutParams
@@ -1811,20 +1975,14 @@ class CallOverlayService : Service() {
             params.height = peekH
             params.x = if (bigPushPeekOnRight) (sw - keep).coerceAtLeast(0) else 0
             if (params.y < topY) {
-                params.y = when (pos) {
-                    OverlayPosition.BOTTOM -> (sh - peekH - dp(8)).coerceAtLeast(0)
-                    else -> topY
-                }
+                params.y = compactBarY(pos, peekH, sh)
             }
             applyBigPushPeekChrome(onRight = bigPushPeekOnRight)
         } else {
             params.width = WindowManager.LayoutParams.MATCH_PARENT
             params.height = barH
             params.x = 0
-            params.y = when (pos) {
-                OverlayPosition.BOTTOM -> (sh - barH - dp(8)).coerceAtLeast(0)
-                else -> topY
-            }
+            params.y = compactBarY(pos, barH, sh)
             bigPushPeekTab?.visibility = android.view.View.GONE
             if (companion.state == OverlayState.BIG_PUSH) {
                 webView?.visibility = android.view.View.VISIBLE
@@ -2105,6 +2263,8 @@ class CallOverlayService : Service() {
         companion.onCallEnd()
         remoteConnected = false
         bigPushPeeking = false
+        overlayModal = false
+        dcpPopupOnly = false
         publishCompanion(OverlayTriggerEvent.CALL_END)
         /* 애니/큐보다 먼저 Web idle — stale connected 가 UI 를 되살리지 않게 */
         notifyWebCallState("idle")
@@ -2375,10 +2535,7 @@ class CallOverlayService : Service() {
             gravity = Gravity.TOP or Gravity.START
             val (_, sh) = screenSizePx()
             val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
-            y = when (position) {
-                OverlayPosition.BOTTOM -> (sh - barH - dp(8)).coerceAtLeast(0)
-                else -> topBigPushOffsetY()
-            }
+            y = compactBarY(position, barH, sh)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -2529,6 +2686,8 @@ class CallOverlayService : Service() {
         const val ACTION_CONNECTED = "kr.vlue.calloverlay.CONNECTED"
         const val ACTION_ENDED_KEEP = "kr.vlue.calloverlay.ENDED_KEEP"
         const val ACTION_UPDATE_CALL_INFO = "kr.vlue.calloverlay.UPDATE_CALL_INFO"
+        /** 설정 DCP 테스트 — 팝업만 (전체 오버레이 없음) */
+        const val ACTION_DCP_TEST_POPUP = "kr.vlue.calloverlay.DCP_TEST_POPUP"
         /** 유휴 상태 동일 LayoutParams addView 실험 — 제품 UI 없음 */
         const val ACTION_NORMAL_OVERLAY_PROBE = "kr.vlue.calloverlay.NORMAL_OVERLAY_PROBE"
         private const val CHANNEL_ID = "vlue_lettering_overlay"

@@ -252,6 +252,12 @@ class LetteringJavascriptBridge(
     }
 
     @JavascriptInterface
+    fun setOverlayModal(value: String) {
+        val open = value == "1" || value.equals("true", ignoreCase = true)
+        service.setOverlayModal(open)
+    }
+
+    @JavascriptInterface
     fun setLetteringEnabled(value: String) {
         LetteringPrefs.setLetteringEnabled(service, value == "1" || value == "true")
     }

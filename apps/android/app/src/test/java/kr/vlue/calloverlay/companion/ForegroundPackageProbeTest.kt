@@ -38,6 +38,43 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
+    fun resumedDialer_isCompact_notFullInCall() {
+        /* 전화 앱 최근기록 위 미니 수신 팝업 — 전체 InCallUI 가 아님 */
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.COMPACT_DIALER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.samsung.android.dialer",
+                inCallImportance = fgs,
+                lastResumedPkg = "com.samsung.android.dialer"
+            )
+        )
+    }
+
+    @Test
+    fun staleInCallResume_withDialerTask_isCompact() {
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.COMPACT_DIALER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.samsung.android.dialer",
+                inCallImportance = fg,
+                lastResumedPkg = "com.samsung.android.incallui"
+            )
+        )
+    }
+
+    @Test
+    fun tasksDialer_noResume_isCompact() {
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.COMPACT_DIALER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.samsung.android.dialer",
+                inCallImportance = fgs,
+                lastResumedPkg = null
+            )
+        )
+    }
+
+    @Test
     fun resumedLauncher_isBottom() {
         assertEquals(
             ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,

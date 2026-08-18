@@ -8,6 +8,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.Executors
 
 data class CardLookupResult(
     val matched: Boolean,
@@ -19,6 +20,7 @@ data class CardLookupResult(
 object CardLookupRepository {
     private const val CACHE_TTL_MS = 30L * 60L * 1000L
     private val cache = java.util.concurrent.ConcurrentHashMap<String, CachedLookup>()
+    private val bg by lazy { Executors.newSingleThreadExecutor() }
 
     private data class CachedLookup(
         val result: CardLookupResult,
@@ -55,7 +57,7 @@ object CardLookupRepository {
             if (BlockedPhoneCache.isBlocked(context, e164)) return@withContext null
 
             peekCached(rawNumber)?.let {
-                reportLineCallEvent(context, rawNumber)
+                bg.execute { reportLineCallEvent(context, rawNumber) }
                 return@withContext it
             }
 
@@ -77,7 +79,7 @@ object CardLookupRepository {
                 val result = lookupOnce(context, base, candidate, dcpRoute) ?: continue
                 if (result.matched) {
                     remember(rawNumber, result)
-                    reportLineCallEvent(context, rawNumber)
+                    bg.execute { reportLineCallEvent(context, rawNumber) }
                     return@withContext result
                 }
                 lastUnmatched = result
@@ -115,8 +117,8 @@ object CardLookupRepository {
             val url = URL("$base/api/cards/by-number?number=$q&purpose=call_overlay$routeQ")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
-                connectTimeout = 8000
-                readTimeout = 8000
+                connectTimeout = 2500
+                readTimeout = 2500
                 LetteringPrefs.getAccessToken(context)?.let {
                     setRequestProperty("Authorization", "Bearer $it")
                 }

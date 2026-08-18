@@ -33,4 +33,12 @@ class BigPushShowcaseBarTest {
         val m = BigPushShowcaseBar.parseModel("+821063358746", verified = true, cardJson = json)
         assertEquals(BigPushShowcaseBar.AvatarKind.SILHOUETTE, m.avatarKind)
     }
+
+    @Test
+    fun parseModel_readsOrganizationFromExportSnapshot() {
+        val json =
+            """{"matched":true,"is_verified":true,"displayName":"이종근","publicHandle":"ceo","phoneE164":"+821080144666","exportSnapshot":{"organization":"VCID KOREA"}}"""
+        val m = BigPushShowcaseBar.parseModel("+821080144666", verified = true, cardJson = json)
+        assertEquals("VCID KOREA · 이종근", m.primaryLine)
+    }
 }

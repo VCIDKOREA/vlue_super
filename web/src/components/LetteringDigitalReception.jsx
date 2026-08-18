@@ -556,7 +556,7 @@ function FrontPanel({
 
   return (
     <div className={`ldr-panel ldr-panel--front${embeddedInPush ? " ldr-panel--push" : ""}`}>
-      {embeddedInPush ? <CompanyLogoWatermark card={card} /> : null}
+      <CompanyLogoWatermark card={card} />
       {embeddedInPush ? null : <ProfileHero card={card} verified={verified} />}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
       <div className={`ldr-back-head${resolveDccTitlePhotoUrl(card) && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
@@ -772,7 +772,7 @@ function BackPanel({
 
   return (
     <div className={`ldr-panel ldr-panel--back${embeddedInPush ? " ldr-panel--push" : ""}`}>
-      {embeddedInPush ? <CompanyLogoWatermark card={card} /> : null}
+      <CompanyLogoWatermark card={card} />
       <div className="ldr-contact-extra ldr-contact-extra--back-only">
         <p className="ldr-contact-extra__label">추가 설명</p>
         <p

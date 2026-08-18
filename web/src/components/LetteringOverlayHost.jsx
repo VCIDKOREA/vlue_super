@@ -226,6 +226,21 @@ function LetteringOverlayHostInner() {
   }, []);
 
   useEffect(() => {
+    try {
+      window.Android?.setOverlayModal?.(reportOpen ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      try {
+        window.Android?.setOverlayModal?.("0");
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [reportOpen]);
+
+  useEffect(() => {
     console.log("[VlueBigPushTrace] [9] React Root Mounted", {
       incoming,
       native,

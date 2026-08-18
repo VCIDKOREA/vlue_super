@@ -79,7 +79,11 @@ object BigPushShowcaseBar {
             card?.optString("organization"),
             json?.optString("organization"),
             profile?.optString("companyName"),
-            profile?.optString("organization")
+            profile?.optString("organization"),
+            card?.optJSONObject("exportSnapshot")?.optString("organization"),
+            card?.optJSONObject("exportSnapshot")?.optString("companyName"),
+            json?.optJSONObject("exportSnapshot")?.optString("organization"),
+            json?.optJSONObject("exportSnapshot")?.optString("companyName")
         )
         val handle = firstNonBlank(
             card?.optString("publicHandle"),
