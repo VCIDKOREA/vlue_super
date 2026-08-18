@@ -14,7 +14,7 @@ import {
  */
 export default function FollowActionButton({ targetUserId, className = "", disabled = false, onToast }) {
   const isSelf = isFollowTargetSelf(targetUserId);
-  const { label, isActive, isMutual, loading, busy, toggle } = useFollowState(targetUserId, {
+  const { label, isActive, isMutual, busy, toggle } = useFollowState(targetUserId, {
     enabled: Boolean(targetUserId) && !isSelf,
     onError: (msg) => onToast?.(msg)
   });
@@ -36,33 +36,33 @@ export default function FollowActionButton({ targetUserId, className = "", disab
     );
   }
 
-  const handleClick = async (e) => {
+  const handleClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (!hasVlueLoggedInSession()) {
       onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
       return;
     }
-    const res = await toggle();
-    if (res.ok) {
+    void toggle().then((res) => {
+      if (!res.ok || res.queued) return;
       if (res.action === "followed") onToast?.("팔로우했습니다.");
       else if (res.action === "requested") onToast?.("팔로우 요청을 보냈습니다.");
       else if (res.action === "unfollowed") onToast?.("팔로우를 취소했습니다.");
-    }
+    });
   };
 
   return (
     <button
       type="button"
       className={`follow-action-btn ${isActive ? "follow-action-btn--active" : ""} ${isMutual ? "follow-action-btn--mutual" : ""} ${className}`.trim()}
-      disabled={disabled || loading || busy}
+      disabled={disabled}
       aria-pressed={isActive}
       aria-busy={busy}
       data-follow-relation={isMutual ? "mutual" : isActive ? "active" : "none"}
       onClick={handleClick}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {loading ? "…" : label}
+      {label}
     </button>
   );
 }

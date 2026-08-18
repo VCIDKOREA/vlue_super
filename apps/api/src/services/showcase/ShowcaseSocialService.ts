@@ -1,16 +1,20 @@
 /**
- * V2 쇼케이스 소셜 — 좋아요·댓글 (+ FCM 푸시)
+ * V2 쇼케이스 소셜 — 좋아요·댓글 (+ FCM 푸시 · 알림함)
  */
 import { prisma } from "../../db/client.js";
 import { Prisma } from "@prisma/client";
+import { ssePublish } from "../../realtime/sseHub.js";
 import { sendShowcaseSocialPushToUser } from "../fcmNotificationService.js";
 
 const COMMENT_MAX = 1000;
 const COMMENT_RATE_WINDOW_MS = 60_000;
 const COMMENT_RATE_LIMIT = 8;
+const SHARE_RATE_WINDOW_MS = 60_000;
+const SHARE_RATE_LIMIT = 4;
 const PUSH_BODY_MAX = 120;
 
 const commentBuckets = new Map<string, number[]>();
+const shareBuckets = new Map<string, number[]>();
 
 function slideKey(slideId?: string | null) {
   return String(slideId || "").trim().slice(0, 80);
@@ -95,6 +99,19 @@ function clipPushBody(text: string): string {
   return `${s.slice(0, PUSH_BODY_MAX - 1)}…`;
 }
 
+function assertShareRate(userId: string, ownerUserId: string): boolean {
+  const key = `${userId}:${ownerUserId}`;
+  const now = Date.now();
+  const prev = (shareBuckets.get(key) || []).filter((t) => now - t < SHARE_RATE_WINDOW_MS);
+  if (prev.length >= SHARE_RATE_LIMIT) {
+    shareBuckets.set(key, prev);
+    return false;
+  }
+  prev.push(now);
+  shareBuckets.set(key, prev);
+  return true;
+}
+
 /** 실패해도 좋아요/댓글 API에 영향 없음 */
 function fireShowcasePush(
   userId: string,
@@ -103,9 +120,57 @@ function fireShowcasePush(
   data: Record<string, unknown>
 ): void {
   if (!userId) return;
-  void sendShowcaseSocialPushToUser(userId, title, clipPushBody(body), data).catch((err) => {
+  const clipped = clipPushBody(body);
+  void sendShowcaseSocialPushToUser(userId, title, clipped, {
+    ...data,
+    title,
+    body: clipped
+  }).catch((err) => {
     console.warn("[showcase-social] fcm_push_failed", { userId, err });
   });
+}
+
+/** OwnerNotification + SSE + FCM — 알림함에 쌓이도록 */
+function deliverShowcaseSocialNotice(opts: {
+  recipientUserId: string;
+  actorUserId?: string | null;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+}): void {
+  const recipientUserId = String(opts.recipientUserId || "").trim();
+  if (!recipientUserId) return;
+  const title = String(opts.title || "").slice(0, 120);
+  const body = clipPushBody(opts.body);
+  void (async () => {
+    let notificationId = "";
+    try {
+      const row = await prisma.ownerNotification.create({
+        data: {
+          ownerUserId: recipientUserId,
+          actorUserId: opts.actorUserId || null,
+          title,
+          body
+        }
+      });
+      notificationId = row.id;
+    } catch (err) {
+      console.warn("[showcase-social] inbox_persist_failed", { recipientUserId, err });
+    }
+    const payload = {
+      ...opts.data,
+      type: String(opts.data?.type || "vlue-showcase-social"),
+      title,
+      body,
+      notificationId
+    };
+    try {
+      ssePublish(recipientUserId, payload);
+    } catch (err) {
+      console.warn("[showcase-social] sse_failed", { recipientUserId, err });
+    }
+    fireShowcasePush(recipientUserId, title, body, payload);
+  })();
 }
 
 export async function getShowcaseSocialSummary(opts: {
@@ -154,6 +219,7 @@ export async function getShowcaseSocialSummary(opts: {
       body: c.body,
       parentId: c.parentId || null,
       createdAt: c.createdAt.toISOString(),
+      mine: Boolean(opts.actorUserId && c.authorUserId === opts.actorUserId),
       author: serializeAuthor(c.author, authorLites.get(c.author.id))
     }))
   };
@@ -163,6 +229,7 @@ export async function toggleShowcaseLike(opts: {
   ownerUserId: string;
   actorUserId: string;
   slideId?: string | null;
+  liked?: boolean | null;
 }) {
   const slideId = slideKey(opts.slideId);
   const key = {
@@ -176,26 +243,36 @@ export async function toggleShowcaseLike(opts: {
     where: { ownerUserId_actorUserId_type_slideId: key }
   });
 
-  if (existing) {
-    await prisma.showcaseReaction.delete({ where: { id: existing.id } });
-  } else {
+  const wantLiked = typeof opts.liked === "boolean" ? opts.liked : !existing;
+  let likedByMe = Boolean(existing);
+
+  if (wantLiked && !existing) {
     await prisma.showcaseReaction.create({ data: key });
+    likedByMe = true;
+  } else if (!wantLiked && existing) {
+    await prisma.showcaseReaction.delete({ where: { id: existing.id } });
+    likedByMe = false;
   }
 
-  const likedByMe = !existing;
   const likeCount = await prisma.showcaseReaction.count({
     where: { ownerUserId: opts.ownerUserId, type: "like", slideId }
   });
 
-  /* 좋아요 시에만 푸시 — 취소·본인 좋아요는 제외 */
-  if (likedByMe && opts.ownerUserId !== opts.actorUserId) {
+  /* 새로 좋아요 시에만 알림 — 취소·본인·이미 좋아요는 제외 */
+  if (likedByMe && !existing && opts.ownerUserId !== opts.actorUserId) {
     void resolveActorLabel(opts.actorUserId).then((actorName) => {
-      fireShowcasePush(opts.ownerUserId, "새 좋아요", `${actorName}님이 회원님의 쇼케이스를 좋아합니다.`, {
-        type: "vlue-showcase-like",
-        ownerUserId: opts.ownerUserId,
+      deliverShowcaseSocialNotice({
+        recipientUserId: opts.ownerUserId,
         actorUserId: opts.actorUserId,
-        slideId,
-        likeCount: String(likeCount)
+        title: "새 좋아요",
+        body: `${actorName}님이 회원님의 쇼케이스를 좋아합니다.`,
+        data: {
+          type: "vlue-showcase-like",
+          ownerUserId: opts.ownerUserId,
+          actorUserId: opts.actorUserId,
+          slideId,
+          likeCount: String(likeCount)
+        }
       });
     });
   }
@@ -205,6 +282,7 @@ export async function toggleShowcaseLike(opts: {
 
 export async function listShowcaseComments(opts: {
   ownerUserId: string;
+  actorUserId?: string | null;
   slideId?: string | null;
   limit?: number;
 }) {
@@ -222,6 +300,7 @@ export async function listShowcaseComments(opts: {
     body: c.body,
     parentId: c.parentId || null,
     createdAt: c.createdAt.toISOString(),
+    mine: Boolean(opts.actorUserId && c.authorUserId === opts.actorUserId),
     author: serializeAuthor(c.author, authorLites.get(c.author.id))
   }));
 }
@@ -291,14 +370,15 @@ export async function createShowcaseComment(opts: {
 
   /* 쇼케이스 주인에게 알림 (본인 댓글 제외) */
   if (opts.ownerUserId !== opts.authorUserId) {
-    fireShowcasePush(
-      opts.ownerUserId,
-      parentId ? "새 답글" : "새 댓글",
-      parentId
+    deliverShowcaseSocialNotice({
+      recipientUserId: opts.ownerUserId,
+      actorUserId: opts.authorUserId,
+      title: parentId ? "새 답글" : "새 댓글",
+      body: parentId
         ? `${author.name}님이 회원님의 쇼케이스에 답글을 남겼습니다. ${preview}`
         : `${author.name}님이 댓글을 남겼습니다. ${preview}`,
-      pushBase
-    );
+      data: pushBase
+    });
   }
 
   /* 원댓글 작성자에게 답글 알림 (본인·이미 주인으로 보낸 경우 제외) */
@@ -307,12 +387,13 @@ export async function createShowcaseComment(opts: {
     parentAuthorUserId !== opts.authorUserId &&
     parentAuthorUserId !== opts.ownerUserId
   ) {
-    fireShowcasePush(
-      parentAuthorUserId,
-      "새 답글",
-      `${author.name}님이 회원님의 댓글에 답글을 남겼습니다. ${preview}`,
-      { ...pushBase, type: "vlue-showcase-comment-reply" }
-    );
+    deliverShowcaseSocialNotice({
+      recipientUserId: parentAuthorUserId,
+      actorUserId: opts.authorUserId,
+      title: "새 답글",
+      body: `${author.name}님이 회원님의 댓글에 답글을 남겼습니다. ${preview}`,
+      data: { ...pushBase, type: "vlue-showcase-comment-reply" }
+    });
   }
 
   return {
@@ -322,7 +403,110 @@ export async function createShowcaseComment(opts: {
       body: row.body,
       parentId: row.parentId || null,
       createdAt: row.createdAt.toISOString(),
+      mine: true,
       author
     }
   };
+}
+
+export async function updateShowcaseComment(opts: {
+  ownerUserId: string;
+  authorUserId: string;
+  commentId: string;
+  body: string;
+}) {
+  const body = String(opts.body || "").trim().slice(0, COMMENT_MAX);
+  if (!body) return { ok: false as const, error: "댓글 내용을 입력해 주세요.", status: 400 as const };
+  const commentId = String(opts.commentId || "").trim();
+  if (!commentId) return { ok: false as const, error: "댓글을 찾을 수 없습니다.", status: 404 as const };
+
+  const existing = await prisma.showcaseComment.findFirst({
+    where: {
+      id: commentId,
+      ownerUserId: opts.ownerUserId,
+      authorUserId: opts.authorUserId,
+      deletedAt: null
+    },
+    include: { author: { select: authorSelect } }
+  });
+  if (!existing) {
+    return { ok: false as const, error: "본인 댓글만 수정할 수 있습니다.", status: 403 as const };
+  }
+
+  const row = await prisma.showcaseComment.update({
+    where: { id: existing.id },
+    data: { body },
+    include: { author: { select: authorSelect } }
+  });
+  const authorLite = await loadAuthorLite([row.author.id]);
+  return {
+    ok: true as const,
+    comment: {
+      id: row.id,
+      body: row.body,
+      parentId: row.parentId || null,
+      createdAt: row.createdAt.toISOString(),
+      mine: true,
+      author: serializeAuthor(row.author, authorLite.get(row.author.id))
+    }
+  };
+}
+
+export async function deleteShowcaseComment(opts: {
+  ownerUserId: string;
+  authorUserId: string;
+  commentId: string;
+}) {
+  const commentId = String(opts.commentId || "").trim();
+  if (!commentId) return { ok: false as const, error: "댓글을 찾을 수 없습니다.", status: 404 as const };
+
+  const existing = await prisma.showcaseComment.findFirst({
+    where: {
+      id: commentId,
+      ownerUserId: opts.ownerUserId,
+      authorUserId: opts.authorUserId,
+      deletedAt: null
+    },
+    select: { id: true }
+  });
+  if (!existing) {
+    return { ok: false as const, error: "본인 댓글만 삭제할 수 있습니다.", status: 403 as const };
+  }
+
+  const now = new Date();
+  await prisma.showcaseComment.updateMany({
+    where: {
+      OR: [{ id: existing.id }, { parentId: existing.id }],
+      deletedAt: null
+    },
+    data: { deletedAt: now }
+  });
+  return { ok: true as const };
+}
+
+export async function recordShowcaseShare(opts: {
+  ownerUserId: string;
+  actorUserId: string;
+  slideId?: string | null;
+}) {
+  if (opts.ownerUserId === opts.actorUserId) {
+    return { ok: true as const, notified: false };
+  }
+  if (!assertShareRate(opts.actorUserId, opts.ownerUserId)) {
+    return { ok: true as const, notified: false };
+  }
+  const actorName = await resolveActorLabel(opts.actorUserId);
+  deliverShowcaseSocialNotice({
+    recipientUserId: opts.ownerUserId,
+    actorUserId: opts.actorUserId,
+    title: "새 공유",
+    body: `${actorName}님이 회원님의 쇼케이스를 공유했습니다.`,
+    data: {
+      type: "vlue-showcase-share",
+      ownerUserId: opts.ownerUserId,
+      actorUserId: opts.actorUserId,
+      slideId: slideKey(opts.slideId)
+    }
+  });
+  return { ok: true as const, notified: true };
 }

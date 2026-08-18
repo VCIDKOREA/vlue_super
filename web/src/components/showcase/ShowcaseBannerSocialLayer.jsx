@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Heart } from "lucide-react";
 import ShowcaseSocialRail from "./ShowcaseSocialRail.jsx";
 import ShowcaseBannerFooter from "./ShowcaseBannerFooter.jsx";
 import ShowcaseCommentSheet from "./ShowcaseCommentSheet.jsx";
 import ShowcaseMoreMenu from "./ShowcaseMoreMenu.jsx";
-import { fetchShowcaseSocial, toggleShowcaseLikeApi } from "../../lib/showcase/showcaseSocialApi.js";
+import {
+  fetchShowcaseSocial,
+  recordShowcaseShareApi,
+  toggleShowcaseLikeApi
+} from "../../lib/showcase/showcaseSocialApi.js";
 import { scrapShowcaseToVault } from "../../lib/showcase/scrapShowcaseToVault.js";
 import { shareShowcaseInviteViaKakao } from "../../lib/call/shareShowcaseInviteKakao.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
@@ -94,70 +99,99 @@ export default function ShowcaseBannerSocialLayer({
   /* ownerUserId가 있으면 실제 API. 미리보기·오프라인은 로컬 토글 폴백 */
   const localOnly = !ownerUserId;
   const bgm = useShowcaseBgm();
+  const likedRef = useRef(false);
+  const likeCountRef = useRef(0);
+  const likeGenRef = useRef(0);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [commentCount, setCommentCount] = useState(0);
   const [seedComments, setSeedComments] = useState([]);
   const [commentOpen, setCommentOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [likeBurst, setLikeBurst] = useState(0);
 
-  const applyLocalLikeToggle = useCallback(() => {
-    setLiked((v) => {
-      setLikeCount((n) => (v ? Math.max(0, n - 1) : n + 1));
-      return !v;
-    });
+  const popLikeBurst = useCallback(() => {
+    setLikeBurst((n) => n + 1);
+  }, []);
+
+  const applyLike = useCallback((nextLiked, nextCount) => {
+    likedRef.current = nextLiked;
+    likeCountRef.current = nextCount;
+    setLiked(nextLiked);
+    setLikeCount(nextCount);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
+    likeGenRef.current = 0;
     if (!ownerUserId) {
-      setLiked(false);
-      setLikeCount(0);
+      applyLike(false, 0);
       setCommentCount(0);
       setSeedComments([]);
       return undefined;
     }
     fetchShowcaseSocial(ownerUserId, { slideId }).then((res) => {
-      if (cancelled || !res.ok) return;
-      setLiked(res.likedByMe);
-      setLikeCount(res.likeCount);
+      if (cancelled || !res.ok || likeGenRef.current > 0) return;
+      applyLike(res.likedByMe, res.likeCount);
       setCommentCount(res.comments.length);
       setSeedComments(res.comments);
     });
     return () => {
       cancelled = true;
     };
-  }, [ownerUserId, slideId]);
+  }, [ownerUserId, slideId, applyLike]);
 
-  const onLike = useCallback(async () => {
-    if (localOnly) {
-      applyLocalLikeToggle();
-      return;
-    }
-    if (!hasVlueLoggedInSession()) {
-      onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
-      return;
-    }
-    const res = await toggleShowcaseLikeApi(ownerUserId, { slideId });
-    if (res.ok) {
-      setLiked(res.likedByMe);
-      setLikeCount(res.likeCount);
-      return;
-    }
-    if (res.status === 401) {
-      onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
-      return;
-    }
-    /* 로컬 API 미기동·네트워크 오류 시에도 미리보기에서 하트가 동작하도록 */
-    if (!res.status || isNetworkLikeError(res.error)) {
-      applyLocalLikeToggle();
-      if (isNetworkLikeError(res.error)) {
-        onToast?.(likeErrorMessage(res));
+  const onLike = useCallback(
+    (opts = {}) => {
+      const forceLike = Boolean(opts.forceLike);
+      if (!localOnly && !hasVlueLoggedInSession()) {
+        onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
+        return;
       }
-      return;
-    }
-    onToast?.(likeErrorMessage(res));
-  }, [ownerUserId, slideId, localOnly, onToast, applyLocalLikeToggle]);
+      if (forceLike && likedRef.current) {
+        popLikeBurst();
+        return;
+      }
+      const prevLiked = likedRef.current;
+      const prevCount = likeCountRef.current;
+      const nextLiked = forceLike ? true : !prevLiked;
+      const nextCount = nextLiked === prevLiked ? prevCount : nextLiked ? prevCount + 1 : Math.max(0, prevCount - 1);
+      applyLike(nextLiked, nextCount);
+      if (nextLiked) popLikeBurst();
+      if (localOnly) return;
+
+      const gen = ++likeGenRef.current;
+      void toggleShowcaseLikeApi(ownerUserId, { slideId, liked: nextLiked }).then((res) => {
+        if (gen !== likeGenRef.current) return;
+        if (res.ok) {
+          applyLike(res.likedByMe, res.likeCount);
+          return;
+        }
+        if (res.status === 401) {
+          applyLike(prevLiked, prevCount);
+          onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
+          return;
+        }
+        if (!res.status || isNetworkLikeError(res.error)) {
+          if (isNetworkLikeError(res.error)) onToast?.(likeErrorMessage(res));
+          return;
+        }
+        applyLike(prevLiked, prevCount);
+        onToast?.(likeErrorMessage(res));
+      });
+    },
+    [ownerUserId, slideId, localOnly, onToast, applyLike, popLikeBurst]
+  );
+
+  useEffect(() => {
+    const onDoubleTap = (e) => {
+      const sid = String(e?.detail?.slideId || "");
+      if (sid && sid !== slideId) return;
+      void onLike({ forceLike: true });
+    };
+    window.addEventListener("vlue-showcase-double-tap-like", onDoubleTap);
+    return () => window.removeEventListener("vlue-showcase-double-tap-like", onDoubleTap);
+  }, [slideId, onLike]);
 
   const onComment = useCallback(() => {
     if (!localOnly && !hasVlueLoggedInSession()) {
@@ -173,7 +207,10 @@ export default function ShowcaseBannerSocialLayer({
       phone,
       onToast
     });
-  }, [displayName, phone, onToast]);
+    if (!localOnly && hasVlueLoggedInSession()) {
+      void recordShowcaseShareApi(ownerUserId, { slideId });
+    }
+  }, [displayName, phone, onToast, localOnly, ownerUserId, slideId]);
 
   const onSave = useCallback(() => {
     const r = scrapShowcaseToVault({
@@ -213,6 +250,11 @@ export default function ShowcaseBannerSocialLayer({
         onShare={() => void onShare()}
         onMore={() => setMoreOpen(true)}
       />
+      {likeBurst > 0 ? (
+        <div key={likeBurst} className="showcase-like-burst" aria-hidden>
+          <Heart size={88} strokeWidth={0} fill="currentColor" />
+        </div>
+      ) : null}
       {commentsEnabled ? (
         <ShowcaseCommentSheet
           open={commentOpen}

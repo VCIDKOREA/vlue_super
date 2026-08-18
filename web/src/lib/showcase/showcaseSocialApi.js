@@ -34,7 +34,10 @@ export async function toggleShowcaseLikeApi(ownerUserId, opts = {}) {
     const res = await vlueAuthFetch(apiUrl(`/api/lettering/showcase/social/${encodeURIComponent(id)}/like`), {
       method: "POST",
       headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ slideId: opts.slideId || "" })
+      body: JSON.stringify({
+        slideId: opts.slideId || "",
+        ...(typeof opts.liked === "boolean" ? { liked: opts.liked } : {})
+      })
     });
     const data = await res.json().catch(() => ({}));
     return {
@@ -44,6 +47,63 @@ export async function toggleShowcaseLikeApi(ownerUserId, opts = {}) {
       error: data.error,
       status: res.status
     };
+  } catch (e) {
+    return { ok: false, error: e?.message };
+  }
+}
+
+export async function patchShowcaseComment(ownerUserId, commentId, body) {
+  const id = String(ownerUserId || "").trim();
+  const cid = String(commentId || "").trim();
+  if (!id || !cid) return { ok: false };
+  try {
+    const res = await vlueAuthFetch(
+      apiUrl(`/api/lettering/showcase/social/${encodeURIComponent(id)}/comments/${encodeURIComponent(cid)}`),
+      {
+        method: "PATCH",
+        headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ body })
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    return {
+      ok: res.ok,
+      comment: data.comment || null,
+      error: data.error,
+      status: res.status
+    };
+  } catch (e) {
+    return { ok: false, error: e?.message };
+  }
+}
+
+export async function deleteShowcaseCommentApi(ownerUserId, commentId) {
+  const id = String(ownerUserId || "").trim();
+  const cid = String(commentId || "").trim();
+  if (!id || !cid) return { ok: false };
+  try {
+    const res = await vlueAuthFetch(
+      apiUrl(`/api/lettering/showcase/social/${encodeURIComponent(id)}/comments/${encodeURIComponent(cid)}`),
+      { method: "DELETE", headers: vlueAuthHeaders() }
+    );
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, error: data.error, status: res.status };
+  } catch (e) {
+    return { ok: false, error: e?.message };
+  }
+}
+
+export async function recordShowcaseShareApi(ownerUserId, opts = {}) {
+  const id = String(ownerUserId || "").trim();
+  if (!id) return { ok: false };
+  try {
+    const res = await vlueAuthFetch(apiUrl(`/api/lettering/showcase/social/${encodeURIComponent(id)}/share`), {
+      method: "POST",
+      headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ slideId: opts.slideId || "" })
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, error: data.error, status: res.status };
   } catch (e) {
     return { ok: false, error: e?.message };
   }

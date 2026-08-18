@@ -17,9 +17,12 @@ import {
 } from "../services/showcase/SearchService.js";
 import {
   createShowcaseComment,
+  deleteShowcaseComment,
   getShowcaseSocialSummary,
   listShowcaseComments,
-  toggleShowcaseLike
+  recordShowcaseShare,
+  toggleShowcaseLike,
+  updateShowcaseComment
 } from "../services/showcase/ShowcaseSocialService.js";
 import {
   getUserShowcasePublicLive,
@@ -352,7 +355,8 @@ letteringRoutes.post("/showcase/social/:ownerUserId/like", requireUserHeader, as
   const result = await toggleShowcaseLike({
     ownerUserId,
     actorUserId: me,
-    slideId: body?.slideId
+    slideId: body?.slideId,
+    liked: typeof body?.liked === "boolean" ? body.liked : undefined
   });
   return c.json({ ok: true, ...result });
 });
@@ -363,6 +367,7 @@ letteringRoutes.get("/showcase/social/:ownerUserId/comments", async (c) => {
   if (!ownerUserId) return c.json({ ok: false, error: "owner required" }, 400);
   const comments = await listShowcaseComments({
     ownerUserId,
+    actorUserId: String(c.req.header("x-vlue-user-id") || "").trim() || null,
     slideId: c.req.query("slideId"),
     limit: Number(c.req.query("limit") || 50)
   });
@@ -384,4 +389,50 @@ letteringRoutes.post("/showcase/social/:ownerUserId/comments", requireUserHeader
   });
   if (!result.ok) return c.json({ ok: false, error: result.error }, result.status);
   return c.json({ ok: true, comment: result.comment });
+});
+
+/** V2 — 본인 댓글 수정 */
+letteringRoutes.patch("/showcase/social/:ownerUserId/comments/:commentId", requireUserHeader, async (c) => {
+  const ownerUserId = String(c.req.param("ownerUserId") || "").trim();
+  const commentId = String(c.req.param("commentId") || "").trim();
+  const me = String(c.get("vlueUserId") || c.req.header("x-vlue-user-id") || "").trim();
+  if (!ownerUserId || !me) return c.json({ ok: false, error: "auth required" }, 401);
+  const body = await c.req.json().catch(() => ({}));
+  const result = await updateShowcaseComment({
+    ownerUserId,
+    authorUserId: me,
+    commentId,
+    body: body?.body
+  });
+  if (!result.ok) return c.json({ ok: false, error: result.error }, result.status);
+  return c.json({ ok: true, comment: result.comment });
+});
+
+/** V2 — 본인 댓글 삭제 */
+letteringRoutes.delete("/showcase/social/:ownerUserId/comments/:commentId", requireUserHeader, async (c) => {
+  const ownerUserId = String(c.req.param("ownerUserId") || "").trim();
+  const commentId = String(c.req.param("commentId") || "").trim();
+  const me = String(c.get("vlueUserId") || c.req.header("x-vlue-user-id") || "").trim();
+  if (!ownerUserId || !me) return c.json({ ok: false, error: "auth required" }, 401);
+  const result = await deleteShowcaseComment({
+    ownerUserId,
+    authorUserId: me,
+    commentId
+  });
+  if (!result.ok) return c.json({ ok: false, error: result.error }, result.status);
+  return c.json({ ok: true });
+});
+
+/** V2 — 쇼케이스 공유 알림 */
+letteringRoutes.post("/showcase/social/:ownerUserId/share", requireUserHeader, async (c) => {
+  const ownerUserId = String(c.req.param("ownerUserId") || "").trim();
+  const me = String(c.get("vlueUserId") || c.req.header("x-vlue-user-id") || "").trim();
+  if (!ownerUserId || !me) return c.json({ ok: false, error: "auth required" }, 401);
+  const body = await c.req.json().catch(() => ({}));
+  const result = await recordShowcaseShare({
+    ownerUserId,
+    actorUserId: me,
+    slideId: body?.slideId
+  });
+  return c.json({ ok: true, ...result });
 });
