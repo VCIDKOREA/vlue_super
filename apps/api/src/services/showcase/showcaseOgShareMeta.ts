@@ -141,3 +141,65 @@ export async function loadShowcaseOgShareMeta(digits: string): Promise<ShowcaseO
     shareCover: pickHttpUrl(row.share_cover, row.kakao_bg)
   };
 }
+
+const COVER_MAX_BYTES = 1_500_000;
+type CoverRow = { bytes: Buffer; contentType: string; freshUntil: number };
+const coverCache = new Map<string, CoverRow>();
+
+export function getCachedOgCover(phone: string): CoverRow | null {
+  const row = coverCache.get(phone);
+  if (!row) return null;
+  if (Date.now() >= row.freshUntil) {
+    coverCache.delete(phone);
+    return null;
+  }
+  return row;
+}
+
+export function setCachedOgCover(phone: string, bytes: Buffer, contentType: string) {
+  coverCache.set(phone, {
+    bytes,
+    contentType,
+    freshUntil: Date.now() + FRESH_MS
+  });
+}
+
+export function isAllowedOgImageHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === "m.vlue.kr" ||
+      host === "www.vlue.kr" ||
+      host === "vlue.kr" ||
+      host === "api.vlue.kr" ||
+      host.endsWith(".r2.dev") ||
+      host.endsWith(".up.railway.app") ||
+      host.endsWith(".r2.cloudflarestorage.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchOgCoverBytes(
+  url: string
+): Promise<{ bytes: Buffer; contentType: string } | null> {
+  const target = toAsciiOgImageUrl(url);
+  if (!target || !isAllowedOgImageHost(target)) return null;
+  try {
+    const res = await fetch(target, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(2500),
+      headers: { Accept: "image/jpeg,image/png,image/webp,image/*" }
+    });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (!buf.length || buf.length > COVER_MAX_BYTES) return null;
+    const type = String(res.headers.get("content-type") || "image/jpeg").split(";")[0];
+    if (!type.startsWith("image/")) return null;
+    return { bytes: buf, contentType: type };
+  } catch {
+    return null;
+  }
+}
+

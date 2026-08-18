@@ -20,9 +20,9 @@ object ShowcaseShareLinks {
     fun smsBody(ownerPhone: String?, origin: String = PUBLIC_ORIGIN): String {
         val url = publicShowcaseUrl(ownerPhone, origin)
         return """
-            [VLUE 쇼케이스]
-            안전한 통화를 위한 VLUE 디지털 쇼케이스입니다.
-            링크를 눌러 프로필을 확인해 주세요.
+            [VLUE]
+            인증 디지털 쇼케이스입니다.
+            공식 주소 m.vlue.kr
 
             $url
         """.trimIndent()

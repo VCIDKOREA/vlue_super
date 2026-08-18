@@ -1,6 +1,7 @@
 import {
   buildShowcaseOgLandingPage,
-  isOgScraperUserAgent
+  isOgScraperUserAgent,
+  isUserDocumentNavigation
 } from "../services/showcase/showcaseOgLandingPage.js";
 import { toAsciiOgImageUrl } from "../services/showcase/showcaseOgShareMeta.js";
 
@@ -35,6 +36,7 @@ function run() {
   assert(scraperHtml.includes('property="og:image"'), "og:image");
   assert(scraperHtml.includes('property="og:url"'), "og:url");
   assert(scraperHtml.includes(shareUrl), "canonical share host");
+  assert(scraperHtml.includes("<img src="), "visible img for Android parsers");
   assert(!scraperHtml.includes("location.replace"), "scraper HTML has no JS redirect");
   assert(!scraperHtml.includes("http-equiv=\"refresh\""), "no meta refresh");
   assert(!scraperHtml.includes("background-image:url"), "scraper HTML does not preload cover image");
@@ -42,15 +44,27 @@ function run() {
   const humanHtml = buildShowcaseOgLandingPage({
     name: "홍길동",
     phoneDisplay: "010-8014-4666",
-    ogImage: "https://m.vlue.kr/api/v1/card/kakao-feed/abc.png",
+    ogImage: "https://m.vlue.kr/showcase/01080144666/cover.jpg",
     shareUrl,
     spaUrl,
     createUrl: "https://www.vlue.kr/membership",
     forScraper: false
   });
   assert(humanHtml.includes('property="og:title"'), "human HTML still has OG tags");
-  assert(humanHtml.includes("location.replace"), "human HTML redirects to SPA");
+  assert(!humanHtml.includes("location.replace"), "no JS redirect for Chrome UA Android preview");
   assert(humanHtml.includes(spaUrl), "SPA url present");
+  assert(isUserDocumentNavigation({
+    userAgent: "Mozilla/5.0 (Linux; Android 14) Chrome/124.0.0.0 Mobile Safari/537.36",
+    secFetchUser: "?1",
+    secFetchMode: "navigate",
+    secFetchDest: "document"
+  }), "browser tap is user navigation");
+  assert(!isUserDocumentNavigation({
+    userAgent: "Mozilla/5.0 (Linux; Android 14) Chrome/124.0.0.0 Mobile Safari/537.36",
+    secFetchUser: "",
+    secFetchMode: "no-cors",
+    secFetchDest: "empty"
+  }), "Android preview fetch is not user navigation");
 
   const encoded = toAsciiOgImageUrl(
     "https://pub.example/covers/이종근/다운로드__2_.jpg"

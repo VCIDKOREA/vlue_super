@@ -81,6 +81,15 @@ app.get("/", (c) => {
   );
 });
 
+app.get("/robots.txt", (c) =>
+  c.text("User-agent: *\nAllow: /showcase\nAllow: /s/\nAllow: /api/v1/showcase/\n", 200, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "public, max-age=3600"
+  })
+);
+
+app.get("/favicon.ico", (c) => c.redirect("https://www.vlue.kr/favicon.ico", 302));
+
 app.route("/", showcaseSharePrettyRoutes);
 
 app.use("/api/*", egressLogMiddleware());

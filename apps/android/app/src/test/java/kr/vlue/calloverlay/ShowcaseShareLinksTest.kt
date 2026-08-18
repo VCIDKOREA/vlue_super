@@ -25,6 +25,8 @@ class ShowcaseShareLinksTest {
         assertTrue(!body.contains("api.vlue.kr"))
         assertTrue(!body.contains("www.vlue.kr"))
         assertTrue(!body.contains("/api/v1/showcase/view/"))
-        assertTrue(body.contains("[VLUE 쇼케이스]"))
+        assertTrue(body.contains("[VLUE]"))
+        assertTrue(body.contains("m.vlue.kr"))
+        assertTrue(!body.contains("링크를 눌러"))
     }
 }

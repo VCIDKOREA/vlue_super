@@ -39,8 +39,24 @@ export function isOgScraperUserAgent(uaRaw: string): boolean {
     ua.includes("bitlybot") ||
     ua.includes("redditbot") ||
     ua.includes("qwantify") ||
-    ua.includes("pinterestbot")
+    ua.includes("pinterestbot") ||
+    (ua.includes("samsung") && ua.includes("message")) ||
+    ua.includes("com.google.android.apps.messaging")
   );
+}
+
+/** 실제 브라우저 탭 이동. 문자 미리보기 수집기는 보통 이 헤더가 없다. */
+export function isUserDocumentNavigation(opts: {
+  userAgent?: string | null;
+  secFetchUser?: string | null;
+  secFetchMode?: string | null;
+  secFetchDest?: string | null;
+}): boolean {
+  if (isOgScraperUserAgent(opts.userAgent || "")) return false;
+  const user = String(opts.secFetchUser || "");
+  const mode = String(opts.secFetchMode || "").toLowerCase();
+  const dest = String(opts.secFetchDest || "").toLowerCase();
+  return user === "?1" && mode === "navigate" && (dest === "document" || dest === "");
 }
 
 /**
@@ -68,7 +84,7 @@ export function buildShowcaseOgLandingPage(opts: {
   const shareUrl = escapeHtml(opts.shareUrl);
   const spaUrl = escapeHtml(opts.spaUrl);
   const createUrl = escapeHtml(opts.createUrl);
-  const forScraper = Boolean(opts.forScraper);
+  void opts.forScraper;
 
   const titlePlain = opts.name?.trim()
     ? `${opts.name.trim()}님의 VLUE 쇼케이스`
@@ -83,11 +99,7 @@ export function buildShowcaseOgLandingPage(opts: {
     "VLUE 인증 · 안심 통신 프로필"
   ].filter(Boolean);
   const description = escapeHtml(descParts.slice(0, 3).join(" · ") || "VLUE 디지털 쇼케이스");
-
-  /* 스크래퍼는 JS를 실행하지 않음. 사람은 바로 쇼케이스로 이동 */
-  const redirectScript = forScraper
-    ? ""
-    : `<script>location.replace(${JSON.stringify(opts.spaUrl)});</script>`;
+  const imageType = ogImage.toLowerCase().includes(".png") ? "image/png" : "image/jpeg";
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -103,14 +115,16 @@ export function buildShowcaseOgLandingPage(opts: {
 <meta property="og:description" content="${description}"/>
 <meta property="og:image" content="${ogImage}"/>
 <meta property="og:image:secure_url" content="${ogImage}"/>
-<meta property="og:image:type" content="${ogImage.toLowerCase().includes(".png") ? "image/png" : "image/jpeg"}"/>
+<meta property="og:image:type" content="${imageType}"/>
 <meta property="og:image:width" content="800"/>
 <meta property="og:image:height" content="520"/>
 <meta property="og:image:alt" content="${title}"/>
 <meta property="og:url" content="${shareUrl}"/>
 <link rel="canonical" href="${shareUrl}"/>
+<link rel="image_src" href="${ogImage}"/>
 <meta itemprop="name" content="${title}"/>
 <meta itemprop="image" content="${ogImage}"/>
+<meta name="thumbnail" content="${ogImage}"/>
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:title" content="${title}"/>
 <meta name="twitter:description" content="${description}"/>
@@ -126,7 +140,7 @@ background:#111827;box-shadow:0 20px 50px rgba(0,0,0,.45)}
 .badge{display:inline-block;font-size:11px;font-weight:800;color:#7dd3fc;margin-bottom:8px}
 h1{font-size:1.25rem;font-weight:900;letter-spacing:-.02em;line-height:1.3}
 .meta{margin-top:8px;font-size:13px;font-weight:600;color:#94a3b8;line-height:1.45}
-a.btn{display:block;margin-top:16px;padding:13px;border-radius:12px;text-align:center;text-decoration:none;
+a.btn,.btn{display:block;margin-top:16px;padding:13px;border-radius:12px;text-align:center;text-decoration:none;
 font-weight:800;font-size:14px;color:#fff;background:linear-gradient(135deg,#1d4ed8,#2563eb)}
 .sub{margin-top:12px;text-align:center;font-size:12px;color:#64748b}
 .sub a{color:#7dd3fc;font-weight:700;text-decoration:none}
@@ -134,18 +148,22 @@ font-weight:800;font-size:14px;color:#fff;background:linear-gradient(135deg,#1d4
 </head>
 <body>
 <div class="card">
-  <div class="cover" role="img" aria-label="쇼케이스 미리보기"></div>
+  <a href="${spaUrl}" style="color:inherit;text-decoration:none">
+  <div class="cover">
+    <img src="${ogImage}" alt="${title}" width="800" height="520" style="width:100%;height:auto;display:block;object-fit:cover"/>
+  </div>
   <div class="body">
-    <p class="badge">VLUE Showcase</p>
+    <p class="badge">VLUE 인증 쇼케이스</p>
     <h1>${title}</h1>
     <p class="meta">
       ${org ? `${org}<br/>` : ""}${role ? `${role}<br/>` : ""}${handle ? `@${handle.replace(/^@/, "")}<br/>` : ""}${phone || ""}
     </p>
-    <a class="btn" href="${spaUrl}">쇼케이스 열기</a>
-    <p class="sub"><a href="${createUrl}">나도 VLUE 만들기</a></p>
+    <span class="btn">쇼케이스 열기</span>
+    <p class="sub">공식 주소 m.vlue.kr · VLUE 인증 프로필</p>
   </div>
+  </a>
+  <p class="sub" style="padding-bottom:16px"><a href="${createUrl}">나도 VLUE 만들기</a></p>
 </div>
-${redirectScript}
 </body>
 </html>`;
 }

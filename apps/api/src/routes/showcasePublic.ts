@@ -1,12 +1,15 @@
 import { Hono, type Context } from "hono";
 import {
   buildShowcaseOgLandingPage,
-  isOgScraperUserAgent
+  isUserDocumentNavigation
 } from "../services/showcase/showcaseOgLandingPage.js";
 import {
   coalesceOgHtmlBuild,
+  fetchOgCoverBytes,
+  getCachedOgCover,
   getCachedOgHtml,
   loadShowcaseOgShareMeta,
+  setCachedOgCover,
   setCachedOgHtml,
   toAsciiOgImageUrl
 } from "../services/showcase/showcaseOgShareMeta.js";
@@ -29,7 +32,7 @@ function apiBaseFromRequest(c: { req: { header: (n: string) => string | undefine
   return `${proto}://${host}`.replace(/\/$/, "");
 }
 
-function phoneDigitsForUrl(raw: string): string {
+export function phoneDigitsForUrl(raw: string): string {
   const digits = String(raw || "").replace(/\D/g, "");
   if (!digits) return "";
   if (digits.startsWith("82") && digits.length >= 10) return `0${digits.slice(2)}`;
@@ -49,8 +52,20 @@ function imageApiBaseFromRequest(c: { req: { header: (n: string) => string | und
   return getVluePublicApiOrigin();
 }
 
-function sendOgHtml(c: Context, html: string, forScraper: boolean) {
-  c.header("Vary", "Accept-Encoding");
+function spaUrlFor(digits: string) {
+  return `${getVluePublicOrigin()}/site/web/showcase/${encodeURIComponent(digits)}`;
+}
+
+function shareUrlFor(digits: string) {
+  return `${getVlueShareOrigin()}/showcase/${encodeURIComponent(digits)}`;
+}
+
+function coverUrlFor(digits: string) {
+  return `${getVlueShareOrigin()}/showcase/${encodeURIComponent(digits)}/cover.jpg`;
+}
+
+function sendOgHtml(c: Context, html: string) {
+  c.header("Vary", "Accept-Encoding, Sec-Fetch-Mode, Sec-Fetch-User");
   c.header(
     "Cache-Control",
     "public, max-age=120, s-maxage=600, stale-while-revalidate=86400"
@@ -62,44 +77,42 @@ function sendOgHtml(c: Context, html: string, forScraper: boolean) {
     c.header("Content-Length", String(Buffer.byteLength(html, "utf8")));
     return c.body(null);
   }
-  void forScraper;
   return c.html(html);
 }
 
-async function buildOgHtml(c: Context, digits: string, forScraper: boolean): Promise<string> {
-  const imageApiBase = imageApiBaseFromRequest(c);
-  const webOrigin = getVluePublicOrigin();
-  const shareOrigin = getVlueShareOrigin();
-  const spaUrl = `${webOrigin}/site/web/showcase/${encodeURIComponent(digits)}`;
-  const shareUrl = `${shareOrigin}/showcase/${encodeURIComponent(digits)}`;
-  const phoneDisplay = formatPhoneDisplayKR(digits) || digits;
-
+async function resolveUpstreamCoverUrl(c: Context, digits: string): Promise<string> {
   const meta = await loadShowcaseOgShareMeta(digits);
-  const ogImage =
+  const webOrigin = getVluePublicOrigin();
+  const imageApiBase = imageApiBaseFromRequest(c);
+  return (
     toAsciiOgImageUrl(meta.shareCover) ||
     (meta.cardId ? kakaoFeedCardImageUrl(imageApiBase, meta.cardId) : "") ||
     toAsciiOgImageUrl(meta.photo) ||
-    getKakaoShareButtonImageUrl(webOrigin);
+    getKakaoShareButtonImageUrl(webOrigin)
+  );
+}
 
+async function buildOgHtml(digits: string): Promise<string> {
+  const phoneDisplay = formatPhoneDisplayKR(digits) || digits;
+  const meta = await loadShowcaseOgShareMeta(digits);
   const name = meta.name || (meta.handle ? `@${meta.handle}` : phoneDisplay);
-
   return buildShowcaseOgLandingPage({
     name,
     org: meta.org,
     role: meta.role,
     handle: meta.handle,
     phoneDisplay,
-    ogImage,
-    shareUrl,
-    spaUrl,
+    ogImage: coverUrlFor(digits),
+    shareUrl: shareUrlFor(digits),
+    spaUrl: spaUrlFor(digits),
     createUrl: getVlueCreateUrl(),
-    forScraper
+    forScraper: true
   });
 }
 
 /**
  * GET /api/v1/showcase/view/:phone 및 GET /showcase/:phone
- * 카카오·문자 스크래퍼용 OG HTML → 사람은 www SPA 쇼케이스로 이동
+ * 문자·카카오 스크래퍼는 항상 OG HTML. 사람이 탭하면 SPA로 보낸다.
  */
 export async function respondShowcaseOgView(c: Context) {
   try {
@@ -107,24 +120,70 @@ export async function respondShowcaseOgView(c: Context) {
     const digits = phoneDigitsForUrl(rawPhone);
     if (!digits) return c.text("유효한 번호가 아닙니다.", 400);
 
-    const forScraper = isOgScraperUserAgent(c.req.header("user-agent") || "");
-    const cacheKey = `${digits}:${forScraper ? "s" : "h"}`;
-    const cached = getCachedOgHtml(cacheKey);
-    if (cached) {
-      if (cached.stale) {
-        void coalesceOgHtmlBuild(cacheKey, () => buildOgHtml(c, digits, forScraper))
-          .then((html) => setCachedOgHtml(cacheKey, html))
-          .catch(() => undefined);
-      }
-      return sendOgHtml(c, cached.html, forScraper);
+    if (
+      isUserDocumentNavigation({
+        userAgent: c.req.header("user-agent"),
+        secFetchUser: c.req.header("sec-fetch-user"),
+        secFetchMode: c.req.header("sec-fetch-mode"),
+        secFetchDest: c.req.header("sec-fetch-dest")
+      })
+    ) {
+      return c.redirect(spaUrlFor(digits), 302);
     }
 
-    const html = await coalesceOgHtmlBuild(cacheKey, () => buildOgHtml(c, digits, forScraper));
-    setCachedOgHtml(cacheKey, html);
-    return sendOgHtml(c, html, forScraper);
+    const cached = getCachedOgHtml(digits);
+    if (cached) {
+      if (cached.stale) {
+        void coalesceOgHtmlBuild(digits, () => buildOgHtml(digits))
+          .then((html) => setCachedOgHtml(digits, html))
+          .catch(() => undefined);
+      }
+      return sendOgHtml(c, cached.html);
+    }
+
+    const html = await coalesceOgHtmlBuild(digits, () => buildOgHtml(digits));
+    setCachedOgHtml(digits, html);
+    return sendOgHtml(c, html);
   } catch (err) {
     console.warn("[showcase-og-view] failed", err);
     return c.text("쇼케이스를 불러올 수 없습니다.", 500);
+  }
+}
+
+/** 안드로이드 OG는 같은 호스트의 짧은 이미지 경로를 더 잘 읽는다. */
+export async function respondShowcaseOgCover(c: Context) {
+  try {
+    const rawPhone = decodeURIComponent(String(c.req.param("phone") || "").trim());
+    const digits = phoneDigitsForUrl(rawPhone);
+    if (!digits) return c.text("not found", 404);
+
+    const hit = getCachedOgCover(digits);
+    if (hit) {
+      c.header("Cache-Control", "public, max-age=600");
+      c.header("Content-Type", hit.contentType);
+      if (c.req.method === "HEAD") {
+        c.header("Content-Length", String(hit.bytes.length));
+        return c.body(null);
+      }
+      return c.body(new Uint8Array(hit.bytes));
+    }
+
+    const target = await resolveUpstreamCoverUrl(c, digits);
+    const fetched = await fetchOgCoverBytes(target);
+    if (!fetched) {
+      return c.redirect(target || getKakaoShareButtonImageUrl(getVluePublicOrigin()), 302);
+    }
+    setCachedOgCover(digits, fetched.bytes, fetched.contentType);
+    c.header("Cache-Control", "public, max-age=600");
+    c.header("Content-Type", fetched.contentType);
+    if (c.req.method === "HEAD") {
+      c.header("Content-Length", String(fetched.bytes.length));
+      return c.body(null);
+    }
+    return c.body(new Uint8Array(fetched.bytes));
+  } catch (err) {
+    console.warn("[showcase-og-cover] failed", err);
+    return c.redirect(getKakaoShareButtonImageUrl(getVluePublicOrigin()), 302);
   }
 }
 
