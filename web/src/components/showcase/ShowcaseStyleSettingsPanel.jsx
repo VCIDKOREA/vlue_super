@@ -703,12 +703,10 @@ export default function ShowcaseStyleSettingsPanel({
 
   const pagesSection = (
     <section className="showcase-profile-block">
-      {!isWebDesk ? (
-        <div className="mb-2">
-          <p className="showcase-profile-block__title">발·수신 담당자</p>
-          <DccLineSwitcher compact onToast={onToast} onBusyChange={setLineBusy} />
-        </div>
-      ) : null}
+      <div className={isWebDesk ? "showcase-web-desk__line-bar" : "mb-2"}>
+        <p className="showcase-profile-block__title">발·수신 담당자</p>
+        <DccLineSwitcher compact onToast={onToast} onBusyChange={setLineBusy} />
+      </div>
       <p className="showcase-profile-block__title">
         쇼케이스 페이지
         <HelpTip
@@ -1333,24 +1331,6 @@ export default function ShowcaseStyleSettingsPanel({
         }`}
         aria-busy={lineBusy ? "true" : undefined}
       >
-        <div className="showcase-web-desk__tip">
-          <p className="showcase-web-desk__tip-text">
-            1열 미리보기 · 2열 설정 (듀얼 화면) · 담당자를 바꾸면 DCC·쇼케이스에 바로 반영됩니다
-          </p>
-          <DccLineSwitcher compact onToast={onToast} onBusyChange={setLineBusy} />
-          {includeDigitalCard ? (
-            <button
-              type="button"
-              className="showcase-web-desk__tip-cta"
-              disabled={lineBusy}
-              onClick={openBizcardSettings}
-            >
-              설정하러가기
-              <ChevronRight size={14} aria-hidden />
-            </button>
-          ) : null}
-        </div>
-
         <div className="showcase-web-desk__body">
           <aside className="showcase-web-desk__preview-col" aria-label="미리보기">
             <p className="showcase-web-desk__preview-label">미리보기</p>
