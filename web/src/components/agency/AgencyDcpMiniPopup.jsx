@@ -16,7 +16,9 @@ export default function AgencyDcpMiniPopup({
   abnormal = false,
   expired = false,
   warning = "",
-  onClose
+  contactSafeCare = false,
+  onClose,
+  onShareShowcase
 }) {
   if (!open || typeof document === "undefined") return null;
   const variant = expired ? "expired" : abnormal ? "abnormal" : "normal";
@@ -33,7 +35,9 @@ export default function AgencyDcpMiniPopup({
             compact
             variant={variant}
             warning={warning || (expired ? "" : DEFAULT_WARNING)}
+            contactSafeCare={contactSafeCare}
             onClose={onClose}
+            onShareShowcase={onShareShowcase}
           />
         }
       />

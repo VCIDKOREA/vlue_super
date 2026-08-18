@@ -2295,6 +2295,12 @@ function App() {
             const { readLetteringFixedIdentity } = await import("./lib/letteringBizcardStorage.js");
             readLetteringFixedIdentity();
           }
+          try {
+            const { syncMemberIdentityToNative } = await import("./lib/showcaseSmsShare.js");
+            syncMemberIdentityToNative();
+          } catch {
+            /* ignore */
+          }
           /* 디지털 명함 — 재설치 대비 서버 스냅샷 전체 복원 */
           try {
             const { restoreDigitalCardFromServer } = await import("./lib/digitalCardApi.js");

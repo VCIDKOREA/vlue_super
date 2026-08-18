@@ -36,6 +36,7 @@ export default function ShowcaseInstagramPost({
   const [likeCount, setLikeCount] = useState(Number(likeCountProp) || 0);
   const startX = useRef(0);
   const dragging = useRef(false);
+  const lastTapRef = useRef({ t: 0, x: 0 });
   const handle = String(username || "").trim().replace(/^@+/, "") || "instagram";
   const canSwipe = list.length > 1;
 
@@ -92,7 +93,7 @@ export default function ShowcaseInstagramPost({
   };
 
   const onPointerDown = (e) => {
-    if (!canSwipe || e.target?.closest?.("button, a")) return;
+    if (e.target?.closest?.("button, a")) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
     dragging.current = true;
     startX.current = e.clientX;
@@ -102,8 +103,19 @@ export default function ShowcaseInstagramPost({
     if (!dragging.current) return;
     dragging.current = false;
     const dx = e.clientX - startX.current;
-    if (Math.abs(dx) < 40) return;
-    go(dx < 0 ? 1 : -1);
+    if (canSwipe && Math.abs(dx) >= 40) {
+      go(dx < 0 ? 1 : -1);
+      lastTapRef.current = { t: 0, x: 0 };
+      return;
+    }
+    const now = Date.now();
+    const prev = lastTapRef.current;
+    if (now - prev.t < 320 && Math.abs(e.clientX - prev.x) < 36) {
+      lastTapRef.current = { t: 0, x: 0 };
+      if (!liked) handleLike();
+      return;
+    }
+    lastTapRef.current = { t: now, x: e.clientX };
   };
 
   if (!list.length) {

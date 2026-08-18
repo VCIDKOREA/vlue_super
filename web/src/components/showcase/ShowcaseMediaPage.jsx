@@ -11,7 +11,8 @@ export default function ShowcaseMediaPage({
   photos = [],
   caption = "",
   badge = "",
-  onImageError
+  onImageError,
+  onDoubleTap
 }) {
   const list = (Array.isArray(photos) ? photos : [])
     .map((p) => ({
@@ -35,11 +36,31 @@ export default function ShowcaseMediaPage({
   const startY = useRef(0);
   const dragging = useRef(false);
   const axis = useRef(null);
+  const movedRef = useRef(false);
+  const tapArmedRef = useRef(false);
+  const lastTapRef = useRef({ t: 0, x: 0, y: 0 });
   const canSwipe = list.length > 1;
 
   useEffect(() => {
     setIndex(0);
   }, [list.map((p) => p.id).join("|")]);
+
+  const noteTap = useCallback(
+    (clientX, clientY, moved) => {
+      if (moved) return;
+      const now = Date.now();
+      const prev = lastTapRef.current;
+      const dt = now - prev.t;
+      const dist = Math.hypot(clientX - prev.x, clientY - prev.y);
+      if (dt > 0 && dt < 320 && dist < 36) {
+        lastTapRef.current = { t: 0, x: 0, y: 0 };
+        onDoubleTap?.();
+        return;
+      }
+      lastTapRef.current = { t: now, x: clientX, y: clientY };
+    },
+    [onDoubleTap]
+  );
 
   const go = useCallback(
     (dir) => {
@@ -66,19 +87,22 @@ export default function ShowcaseMediaPage({
   );
 
   const onPointerDown = (e) => {
-    if (!canSwipe) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (e.target?.closest?.("button, a")) return;
-    dragging.current = true;
-    axis.current = null;
+    movedRef.current = false;
+    tapArmedRef.current = true;
     startX.current = e.clientX;
     startY.current = e.clientY;
+    if (!canSwipe) return;
+    dragging.current = true;
+    axis.current = null;
   };
 
   const onPointerMove = (e) => {
-    if (!dragging.current || !canSwipe) return;
     const dx = e.clientX - startX.current;
     const dy = e.clientY - startY.current;
+    if (Math.abs(dx) > 12 || Math.abs(dy) > 12) movedRef.current = true;
+    if (!dragging.current || !canSwipe) return;
     if (axis.current == null && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) {
       axis.current = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
       if (axis.current === "x") {
@@ -98,14 +122,16 @@ export default function ShowcaseMediaPage({
   };
 
   const onPointerUp = (e) => {
-    if (!dragging.current && axis.current == null) return;
     try {
       e.currentTarget.releasePointerCapture?.(e.pointerId);
     } catch {
       /* ignore */
     }
+    const moved = movedRef.current || axis.current === "x";
     if (axis.current === "x") e.stopPropagation();
     finishSwipe(e.clientX, e.clientY);
+    if (tapArmedRef.current) noteTap(e.clientX, e.clientY, moved);
+    tapArmedRef.current = false;
   };
 
   const onTouchStart = (e) => {

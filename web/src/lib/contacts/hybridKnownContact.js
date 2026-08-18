@@ -101,6 +101,23 @@ export async function resolveIsKnownContact(peerPhone, opts = {}) {
 }
 
 /**
+ * 기기 전화번호부에만 있는 이름 (VLUE 친구 DB 제외)
+ * @param {string} peerPhone
+ */
+export function findDeviceContactName(peerPhone) {
+  const target = String(peerPhone || "").trim();
+  if (!target) return "";
+  const device = readDeviceContactsCache();
+  for (const c of device?.contacts || []) {
+    if (!c?.phone) continue;
+    if (!phonesMatchLoose(target, c.phone)) continue;
+    const name = String(c.name || "").trim();
+    if (name) return name;
+  }
+  return "";
+}
+
+/**
  * 동기 판별 (캐시만 — 오버레이 첫 페인트용)
  * @param {string} peerPhone
  */

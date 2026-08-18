@@ -28,7 +28,7 @@ import {
   resolveInCallKakaoSlot
 } from "../lib/call/callPeerMatrix.js";
 import { runCallPeerMatrixAction } from "../lib/call/runCallPeerMatrixAction.js";
-import { shareShowcaseInviteViaKakao } from "../lib/call/shareShowcaseInviteKakao.js";
+import { openShowcaseSmsCompose } from "../lib/showcaseSmsShare.js";
 import InCallKakaoShareSlot from "./call/InCallKakaoShareSlot.jsx";
 import InCallControlBar from "./call/InCallControlBar.jsx";
 import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
@@ -371,7 +371,10 @@ export default function LetteringIncomingNotification({
           }
   );
   /** prop + 상대 쇼케이스 스타일(includeDigitalCard) 모두 허용할 때만 DCC 슬라이드 */
-  const isDcpCard = c?.profileKind === "dcp" || Boolean(c?.dcp);
+  const isContactSafeCareCardFlag =
+    String(c?.profileKind || "").trim() === "contact_safe_care" || Boolean(c?.dcp?.contactSafeCare);
+  const isDcpCard =
+    !isContactSafeCareCardFlag && (c?.profileKind === "dcp" || Boolean(c?.dcp));
   const isExpiredLine =
     c?.profileKind === "expired_line" || String(c?.lineBillingStatus || "") === "grace";
   const expiredSubtitle =
@@ -523,9 +526,10 @@ export default function LetteringIncomingNotification({
   const shellBase =
     "lettering-ongoing lettering-incoming-active relative flex w-full flex-col overflow-hidden";
   const isDcp = isDcpCard;
+  const isContactSafeCare = isContactSafeCareCardFlag;
   const isPaidMember = !isExpiredLine && (isDcp || (verified && isPaidLetteringTier(c.membershipTier)));
   const isFreeMember = !isExpiredLine && verified && !isPaidMember && !isDcp;
-  const isUnverified = !isExpiredLine && !verified && !isDcp;
+  const isUnverified = !isExpiredLine && !verified && !isDcp && !isContactSafeCare;
   const { setPlaybackPhase } = useShowcaseBgm();
   const canExpand = isPaidMember || isFreeMember || isUnverified || isExpiredLine;
   const [reportTick, setReportTick] = useState(0);
@@ -1071,6 +1075,36 @@ export default function LetteringIncomingNotification({
             /* ignore */
           }
         }}
+      />
+    );
+  }
+
+  if (isContactSafeCare) {
+    const contactName =
+      String(c.displayName || c.name || savedContactName || knownContact.matchedName || "").trim() ||
+      incoming;
+    return (
+      <AgencyDcpMiniPopup
+        open
+        card={{
+          ...c,
+          name: contactName,
+          displayName: contactName,
+          dcp: { ...(c.dcp || {}), contactSafeCare: true, contactName }
+        }}
+        incomingNumber={incoming}
+        abnormal={String(c?.dcp?.routeStatus || "") === "abnormal"}
+        contactSafeCare
+        warning={c?.dcp?.warning}
+        onClose={() => {
+          try {
+            window.Android?.dismissOverlay?.();
+            window.VlueLettering?.dismissOverlay?.();
+          } catch {
+            /* ignore */
+          }
+        }}
+        onShareShowcase={() => openShowcaseSmsCompose(incoming)}
       />
     );
   }

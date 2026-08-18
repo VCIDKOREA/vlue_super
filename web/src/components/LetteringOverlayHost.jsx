@@ -11,6 +11,8 @@ import { CALL_STATES, normalizeCallState } from "../lib/showcase/tentShowcaseTyp
 import { appendCallShowcaseHistory } from "../lib/callShowcaseHistory.js";
 import { reportLineCallEvent } from "../lib/lineCallHistoryApi.js";
 import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
+import { findDeviceContactName } from "../lib/contacts/hybridKnownContact.js";
+import { syncMemberIdentityToNative } from "../lib/showcaseSmsShare.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
@@ -142,6 +144,7 @@ function buildUnverifiedOverlayCard(phone) {
 
 function isDcpOverlayCard(card) {
   if (!card || typeof card !== "object") return false;
+  if (isContactSafeCareCard(card)) return false;
   return String(card.profileKind || "").trim() === "dcp" || Boolean(card.dcp && typeof card.dcp === "object");
 }
 
@@ -151,6 +154,29 @@ function isExpiredLineCard(card) {
     String(card.profileKind || "").trim() === "expired_line" ||
     String(card.lineBillingStatus || "").trim() === "grace"
   );
+}
+
+function isContactSafeCareCard(card) {
+  if (!card || typeof card !== "object") return false;
+  return (
+    String(card.profileKind || "").trim() === "contact_safe_care" ||
+    Boolean(card.dcp && card.dcp.contactSafeCare)
+  );
+}
+
+function buildContactSafeCareCard(phone, name, route = "normal") {
+  const display = String(name || "").trim();
+  return {
+    ...buildUnverifiedOverlayCard(phone),
+    name: display,
+    displayName: display,
+    profileKind: "contact_safe_care",
+    dcp: {
+      contactSafeCare: true,
+      contactName: display,
+      routeStatus: route === "abnormal" ? "abnormal" : "normal"
+    }
+  };
 }
 
 function dcpLogoUrl(card) {
@@ -179,6 +205,7 @@ function isResolvedOverlayCard(card) {
   if (!card) return false;
   if (isDcpOverlayCard(card)) return true;
   if (isExpiredLineCard(card)) return true;
+  if (isContactSafeCareCard(card)) return true;
   if (String(card.userId || card.ownerUserId || "").trim()) return true;
   const handle = String(card.publicHandle || card.loginId || card.vlueId || "")
     .trim()
@@ -306,6 +333,11 @@ function LetteringOverlayHostInner() {
   }, []);
 
   useEffect(() => {
+    try {
+      syncMemberIdentityToNative();
+    } catch {
+      /* ignore */
+    }
     const t = window.setTimeout(() => {
       void syncDeviceContactsFromNative();
     }, 800);
@@ -329,6 +361,27 @@ function LetteringOverlayHostInner() {
         if (detail.matched === false) {
           if (matchedRef.current) return;
           const phone = incoming || detail.phoneE164 || "";
+          if (String(detail.profileKind || "") === "contact_safe_care" || detail.dcp?.contactSafeCare) {
+            matchedRef.current = true;
+            setCard(
+              buildContactSafeCareCard(
+                phone,
+                detail.displayName || detail.contactName || findDeviceContactName(phone),
+                detail.dcp?.routeStatus || dcpRoute
+              )
+            );
+            setVerified(false);
+            setLoading(false);
+            return;
+          }
+          const deviceName = findDeviceContactName(phone);
+          if (deviceName) {
+            matchedRef.current = true;
+            setCard(buildContactSafeCareCard(phone, deviceName, dcpRoute));
+            setVerified(false);
+            setLoading(false);
+            return;
+          }
           setCard((prev) =>
             isResolvedOverlayCard(prev) ? prev : buildUnverifiedOverlayCard(phone)
           );
@@ -370,7 +423,7 @@ function LetteringOverlayHostInner() {
     window.addEventListener("vlue-card-lookup", onNativeCard);
     if (window.__VLUE_CARD_LOOKUP__) onNativeCard({ detail: window.__VLUE_CARD_LOOKUP__ });
     return () => window.removeEventListener("vlue-card-lookup", onNativeCard);
-  }, [incoming, direction]);
+  }, [incoming, direction, dcpRoute]);
 
   useEffect(() => {
     let cancelled = false;
@@ -397,11 +450,24 @@ function LetteringOverlayHostInner() {
         setLoading(true);
         unknownTimer = window.setTimeout(() => {
           if (cancelled || matchedRef.current) return;
-          setCard(buildUnverifiedOverlayCard(incoming));
+          const deviceName = findDeviceContactName(incoming);
+          if (deviceName) {
+            matchedRef.current = true;
+            setCard(buildContactSafeCareCard(incoming, deviceName, dcpRoute));
+          } else {
+            setCard(buildUnverifiedOverlayCard(incoming));
+          }
           setVerified(false);
           setLoading(false);
         }, 2800);
       }
+
+      try {
+        await syncDeviceContactsFromNative();
+      } catch {
+        /* cache only */
+      }
+      if (cancelled) return;
 
       const blockCheck = await Promise.race([
         checkLetteringPhoneBlocked(incoming),
@@ -511,8 +577,15 @@ function LetteringOverlayHostInner() {
         setVerified(nextVerified);
         setShowcaseStyle(peerStyle);
       } else if (!matchedRef.current) {
-        setCard(buildUnverifiedOverlayCard(incoming));
-        setVerified(false);
+        const deviceName = findDeviceContactName(incoming);
+        if (deviceName) {
+          matchedRef.current = true;
+          setCard(buildContactSafeCareCard(incoming, deviceName, resolvedDcpRoute || dcpRoute));
+          setVerified(false);
+        } else {
+          setCard(buildUnverifiedOverlayCard(incoming));
+          setVerified(false);
+        }
         setShowcaseStyle(createDefaultShowcaseStyle());
       }
       setLoading(false);
@@ -821,6 +894,11 @@ function LetteringOverlayHostInner() {
           includeDigitalCard={Boolean(
             verified && isPaid && styledCard?.showcaseStyle?.includeDigitalCard !== false
           )}
+          savedContactName={
+            String(styledCard?.profileKind || "") === "contact_safe_care"
+              ? String(styledCard?.displayName || styledCard?.name || "").trim()
+              : ""
+          }
           isKnownContact={verified}
           onEndCall={onCall ? handleEnd : handleReject}
           onToast={showToast}
