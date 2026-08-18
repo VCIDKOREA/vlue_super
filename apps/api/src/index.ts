@@ -57,6 +57,7 @@ app.use(
       "Authorization",
       "X-VLUE-User-Id",
       "X-VLUE-Client",
+      "X-VLUE-Platform",
       "X-Admin-Device-Id",
       "Last-Event-ID"
     ]
