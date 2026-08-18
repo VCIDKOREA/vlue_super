@@ -434,5 +434,5 @@ letteringRoutes.post("/showcase/social/:ownerUserId/share", requireUserHeader, a
     actorUserId: me,
     slideId: body?.slideId
   });
-  return c.json({ ok: true, ...result });
+  return c.json({ ok: true, notified: Boolean(result.notified) });
 });
