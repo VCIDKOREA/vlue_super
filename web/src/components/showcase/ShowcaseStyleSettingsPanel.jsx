@@ -704,7 +704,7 @@ export default function ShowcaseStyleSettingsPanel({
   const pagesSection = (
     <section className="showcase-profile-block">
       {!isWebDesk ? (
-        <div className="mb-3">
+        <div className="mb-2">
           <p className="showcase-profile-block__title">발·수신 담당자</p>
           <DccLineSwitcher compact onToast={onToast} onBusyChange={setLineBusy} />
         </div>
