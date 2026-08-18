@@ -21,10 +21,21 @@
 
 .showcase-web-desk__settings-scroll .dcc-agent-bar--compact.dcc-agent-bar--lines {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
-  align-items: end;
-  gap: 6px 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 12px;
   padding: 8px 10px;
+}
+
+.showcase-web-desk__settings-scroll .dcc-agent-bar--compact .dcc-agent-bar__controls {
+  flex-wrap: nowrap;
+  width: 100%;
+}
+
+.showcase-web-desk__settings-scroll .dcc-agent-bar--compact .dcc-agent-bar__select-wrap {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
 }
 
 .showcase-web-desk__settings-scroll .dcc-agent-bar__select {
@@ -35,6 +46,7 @@
 }
 
 .showcase-web-desk__settings-scroll .dcc-agent-bar__manage {
+  flex-shrink: 0;
   padding: 6px 10px;
 }
 
