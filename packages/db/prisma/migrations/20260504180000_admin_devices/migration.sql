@@ -21,3 +21,7 @@ CREATE UNIQUE INDEX "admin_devices_device_key_key" ON "admin_devices"("device_ke
 CREATE INDEX "admin_devices_auth_code_idx" ON "admin_devices"("auth_code");
 
 ALTER TABLE "admin_devices" ADD CONSTRAINT "admin_devices_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- 이전 feed 마이그레이션이 테이블 생성 전에 실행될 수 있어, 기본값 제거는 여기서 확정
+ALTER TABLE "admin_devices" ALTER COLUMN "id" DROP DEFAULT;
+ALTER TABLE "admin_devices" ALTER COLUMN "updated_at" DROP DEFAULT;

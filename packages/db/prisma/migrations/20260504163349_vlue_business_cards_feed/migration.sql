@@ -7,9 +7,14 @@ CREATE TYPE "CardVerificationStatus" AS ENUM ('pending', 'approved', 'rejected')
 -- CreateEnum
 CREATE TYPE "CardMemberRole" AS ENUM ('OWNER', 'MANAGER', 'STAFF');
 
--- AlterTable
-ALTER TABLE "admin_devices" ALTER COLUMN "id" DROP DEFAULT,
-ALTER COLUMN "updated_at" DROP DEFAULT;
+-- AlterTable (admin_devices 는 이후 20260504180000 에서 생성 — 빈 DB 순서 대비)
+DO $$
+BEGIN
+  IF to_regclass('public.admin_devices') IS NOT NULL THEN
+    ALTER TABLE "admin_devices" ALTER COLUMN "id" DROP DEFAULT,
+      ALTER COLUMN "updated_at" DROP DEFAULT;
+  END IF;
+END $$;
 
 -- AlterTable
 ALTER TABLE "chat_messages" ADD COLUMN     "sender_card_id" UUID;
