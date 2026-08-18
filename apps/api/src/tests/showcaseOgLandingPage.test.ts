@@ -1,0 +1,56 @@
+import {
+  buildShowcaseOgLandingPage,
+  isOgScraperUserAgent
+} from "../services/showcase/showcaseOgLandingPage.js";
+
+function assert(cond: boolean, message: string) {
+  if (!cond) throw new Error(message);
+}
+
+function run() {
+  const iMessageUa =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/601.2.4 (KHTML, like Gecko) Version/9.0.1 Safari/601.2.4 facebookexternalhit/1.1 Facebot Twitterbot/1.0";
+  assert(isOgScraperUserAgent(iMessageUa), "iMessage spoofed UA is a scraper");
+  assert(isOgScraperUserAgent("facebookexternalhit/1.1"), "facebookexternalhit");
+  assert(isOgScraperUserAgent("Google-PageRenderer"), "Android Messages renderer");
+  assert(isOgScraperUserAgent(""), "empty UA is treated as scraper");
+  assert(!isOgScraperUserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"), "Safari is not a scraper");
+  assert(!isOgScraperUserAgent("Mozilla/5.0 (Linux; Android 14; SM-S911N) AppleWebKit/537.36 Chrome/124.0.0.0 Mobile Safari/537.36"), "Chrome is not a scraper");
+
+  const shareUrl = "https://m.vlue.kr/showcase/01080144666";
+  const spaUrl = "https://www.vlue.kr/site/web/showcase/01080144666";
+  const scraperHtml = buildShowcaseOgLandingPage({
+    name: "홍길동",
+    org: "VLUE",
+    role: "대표",
+    phoneDisplay: "010-8014-4666",
+    ogImage: "https://m.vlue.kr/api/v1/card/kakao-feed/abc.png",
+    shareUrl,
+    spaUrl,
+    createUrl: "https://www.vlue.kr/membership",
+    forScraper: true
+  });
+  assert(scraperHtml.includes('property="og:title"'), "og:title");
+  assert(scraperHtml.includes('property="og:image"'), "og:image");
+  assert(scraperHtml.includes('property="og:url"'), "og:url");
+  assert(scraperHtml.includes(shareUrl), "canonical share host");
+  assert(!scraperHtml.includes("location.replace"), "scraper HTML has no JS redirect");
+  assert(!scraperHtml.includes("http-equiv=\"refresh\""), "no meta refresh");
+
+  const humanHtml = buildShowcaseOgLandingPage({
+    name: "홍길동",
+    phoneDisplay: "010-8014-4666",
+    ogImage: "https://m.vlue.kr/api/v1/card/kakao-feed/abc.png",
+    shareUrl,
+    spaUrl,
+    createUrl: "https://www.vlue.kr/membership",
+    forScraper: false
+  });
+  assert(humanHtml.includes('property="og:title"'), "human HTML still has OG tags");
+  assert(humanHtml.includes("location.replace"), "human HTML redirects to SPA");
+  assert(humanHtml.includes(spaUrl), "SPA url present");
+
+  console.log("[test] showcase OG landing page ok");
+}
+
+run();

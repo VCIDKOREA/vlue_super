@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { apiRoutes } from "./routes/api.js";
+import { showcaseSharePrettyRoutes } from "./routes/showcaseSharePretty.js";
 import { runElderProtectionChecks } from "./services/familyProtection/familyProtectionEngine.js";
 import { attachOfficeAgentWebSocket } from "./services/office/remoteControlHub.js";
 import { seedDemoCompanyLine } from "./services/office/companyLinesService.js";
@@ -28,7 +29,9 @@ const LOCAL_DEV_ORIGINS = [
 const PLATFORM_ORIGINS = [
   "https://vlueweb-production.up.railway.app",
   "https://www.vlue.kr",
-  "https://vlue.kr"
+  "https://vlue.kr",
+  "https://m.vlue.kr",
+  "https://api.vlue.kr"
 ];
 
 const envOrigins =
@@ -64,13 +67,21 @@ app.use(
   })
 );
 
-app.get("/", (c) =>
-  c.text(
+app.get("/", (c) => {
+  const host = String(c.req.header("x-forwarded-host") || c.req.header("host") || "")
+    .split(":")[0]
+    .toLowerCase();
+  if (host === "m.vlue.kr") {
+    return c.redirect("https://www.vlue.kr", 302);
+  }
+  return c.text(
     "VLUE API — 엔드포인트는 /api 아래입니다.\n예: GET /api/health\n",
     200,
     { "Content-Type": "text/plain; charset=utf-8" }
-  )
-);
+  );
+});
+
+app.route("/", showcaseSharePrettyRoutes);
 
 app.use("/api/*", egressLogMiddleware());
 

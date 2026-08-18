@@ -1,9 +1,27 @@
-/** 공개 명함·카카오·QR — 프로덕션 베이스 URL */
+/** 공개 명함·카카오·QR — 프로덕션 웹 베이스 URL */
 export function getVluePublicOrigin() {
   return (
     process.env.VLUE_PUBLIC_ORIGIN?.trim() ||
     process.env.VITE_VLUE_LANDING_URL?.trim()?.replace(/\/$/, "") ||
     "https://www.vlue.kr"
+  ).replace(/\/$/, "");
+}
+
+/** 문자·카카오 OG 공유 도메인 — Railway API에 붙은 m.vlue.kr */
+export function getVlueShareOrigin() {
+  return (
+    process.env.VLUE_SHARE_ORIGIN?.trim() ||
+    process.env.VITE_SHOWCASE_SHARE_ORIGIN?.trim() ||
+    "https://m.vlue.kr"
+  ).replace(/\/$/, "");
+}
+
+/** OG 이미지·레거시 API 호스트 */
+export function getVluePublicApiOrigin() {
+  return (
+    process.env.VLUE_PUBLIC_API_ORIGIN?.trim() ||
+    process.env.VITE_API_URL?.trim() ||
+    "https://api.vlue.kr"
   ).replace(/\/$/, "");
 }
 

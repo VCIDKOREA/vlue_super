@@ -7,7 +7,8 @@ import { escapeHtml } from "../bizcard/bizcardHtmlUtil.js";
  */
 export function isOgScraperUserAgent(uaRaw: string): boolean {
   const ua = String(uaRaw || "").toLowerCase();
-  if (!ua) return false;
+  /* 문자 앱 미리보기는 UA를 비우거나 게이트웨이로 오는 경우가 있다 */
+  if (!ua.trim()) return true;
   return (
     ua.includes("kakaotalk-scrap") ||
     ua.includes("kakao-scrap") ||
@@ -23,13 +24,22 @@ export function isOgScraperUserAgent(uaRaw: string): boolean {
     ua.includes("yeti/") ||
     ua.includes("bingbot") ||
     ua.includes("googlebot") ||
+    ua.includes("googleother") ||
     ua.includes("embedly") ||
     ua.includes("quora link preview") ||
     ua.includes("showyoubot") ||
     ua.includes("outbrain") ||
     ua.includes("pinterest") ||
     ua.includes("applebot") ||
-    ua.includes("whatsapp")
+    ua.includes("whatsapp") ||
+    ua.includes("google-pagerenderer") ||
+    ua.includes("google web preview") ||
+    ua.includes("iframely") ||
+    ua.includes("skypeuripreview") ||
+    ua.includes("bitlybot") ||
+    ua.includes("redditbot") ||
+    ua.includes("qwantify") ||
+    ua.includes("pinterestbot")
   );
 }
 
@@ -74,12 +84,10 @@ export function buildShowcaseOgLandingPage(opts: {
   ].filter(Boolean);
   const description = escapeHtml(descParts.slice(0, 3).join(" · ") || "VLUE 디지털 쇼케이스");
 
-  const redirectHead = forScraper
-    ? ""
-    : `<meta http-equiv="refresh" content="1;url=${spaUrl}"/>`;
+  /* meta refresh 는 일부 문자 미리보기가 따라가 www SPA(OG 없음)로 빠지므로 쓰지 않는다 */
   const redirectScript = forScraper
     ? ""
-    : `<script>setTimeout(function(){location.replace(${JSON.stringify(opts.spaUrl)});},400);</script>`;
+    : `<script>location.replace(${JSON.stringify(opts.spaUrl)});</script>`;
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -95,14 +103,18 @@ export function buildShowcaseOgLandingPage(opts: {
 <meta property="og:description" content="${description}"/>
 <meta property="og:image" content="${ogImage}"/>
 <meta property="og:image:secure_url" content="${ogImage}"/>
+<meta property="og:image:type" content="${ogImage.toLowerCase().includes(".png") ? "image/png" : "image/jpeg"}"/>
 <meta property="og:image:width" content="800"/>
-<meta property="og:image:height" content="800"/>
+<meta property="og:image:height" content="520"/>
+<meta property="og:image:alt" content="${title}"/>
 <meta property="og:url" content="${shareUrl}"/>
+<link rel="canonical" href="${shareUrl}"/>
+<meta itemprop="name" content="${title}"/>
+<meta itemprop="image" content="${ogImage}"/>
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:title" content="${title}"/>
 <meta name="twitter:description" content="${description}"/>
 <meta name="twitter:image" content="${ogImage}"/>
-${redirectHead}
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;

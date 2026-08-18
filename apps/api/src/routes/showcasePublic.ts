@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { lookupCardByRawNumber } from "../services/cardLookup.js";
 import { getUserShowcasePublicLive } from "../services/showcase/showcaseStyleSyncService.js";
 import {
@@ -8,6 +8,8 @@ import {
 import {
   getVlueCreateUrl,
   getVluePublicOrigin,
+  getVlueShareOrigin,
+  getVluePublicApiOrigin,
   getKakaoShareButtonImageUrl,
   kakaoFeedCardImageUrl
 } from "../services/bizcard/bizcardPublicUrls.js";
@@ -87,20 +89,34 @@ function pickProfileImage(profile: unknown): string {
   return pickHttpUrl(o.image_url, o.imageUrl, o.photo_url, o.photoUrl, o.portrait_url);
 }
 
+function imageApiBaseFromRequest(c: { req: { header: (n: string) => string | undefined } }) {
+  const fromReq = apiBaseFromRequest(c);
+  try {
+    const host = new URL(fromReq).hostname.toLowerCase();
+    if (host === "m.vlue.kr" || host === "api.vlue.kr" || host.endsWith(".up.railway.app")) {
+      return fromReq;
+    }
+  } catch {
+    /* ignore */
+  }
+  return getVluePublicApiOrigin();
+}
+
 /**
- * GET /api/v1/showcase/view/:phone
- * 카카오 스크래퍼용 OG HTML → 사람은 SPA 쇼케이스로 이동
+ * GET /api/v1/showcase/view/:phone 및 GET /showcase/:phone
+ * 카카오·문자 스크래퍼용 OG HTML → 사람은 www SPA 쇼케이스로 이동
  */
-showcasePublicRoutes.get("/view/:phone", async (c) => {
+export async function respondShowcaseOgView(c: Context) {
   try {
     const rawPhone = decodeURIComponent(String(c.req.param("phone") || "").trim());
     const digits = phoneDigitsForUrl(rawPhone);
     if (!digits) return c.text("유효한 번호가 아닙니다.", 400);
 
-    const apiBase = apiBaseFromRequest(c);
+    const imageApiBase = imageApiBaseFromRequest(c);
     const webOrigin = getVluePublicOrigin();
+    const shareOrigin = getVlueShareOrigin();
     const spaUrl = `${webOrigin}/site/web/showcase/${encodeURIComponent(digits)}`;
-    const shareUrl = `${apiBase}/api/v1/showcase/view/${encodeURIComponent(digits)}`;
+    const shareUrl = `${shareOrigin}/showcase/${encodeURIComponent(digits)}`;
 
     const lookup = await lookupCardByRawNumber(digits, { forPublicOgShare: true });
     const body = lookup.status === 200 ? lookup.body : null;
@@ -162,7 +178,7 @@ showcasePublicRoutes.get("/view/:phone", async (c) => {
     const feedCache = shareCover.replace(/[^\w]/g, "").slice(-32);
     const ogImage =
       shareCover ||
-      (cardId ? kakaoFeedCardImageUrl(apiBase, cardId, feedCache) : "") ||
+      (cardId ? kakaoFeedCardImageUrl(imageApiBase, cardId, feedCache) : "") ||
       cover ||
       photo ||
       getKakaoShareButtonImageUrl(webOrigin);
@@ -184,16 +200,21 @@ showcasePublicRoutes.get("/view/:phone", async (c) => {
       forScraper
     });
 
-    /* 스크래퍼 HTML(리다이렉트 없음)과 사람용 HTML을 CDN이 섞지 않도록 */
+    /* 스크래퍼 HTML과 사람용 HTML을 Cloudflare가 섞지 않도록 엣지 캐시 금지 */
     c.header("Vary", "User-Agent");
-    c.header(
-      "Cache-Control",
-      forScraper ? "public, max-age=120" : "private, no-store"
-    );
+    c.header("Cache-Control", forScraper ? "public, max-age=60" : "private, no-store");
+    c.header("CDN-Cache-Control", "no-store");
+    c.header("Cloudflare-CDN-Cache-Control", "no-store");
     c.header("Content-Type", "text/html; charset=utf-8");
+    if (c.req.method === "HEAD") {
+      c.header("Content-Length", String(Buffer.byteLength(html, "utf8")));
+      return c.body(null);
+    }
     return c.html(html);
   } catch (err) {
     console.warn("[showcase-og-view] failed", err);
     return c.text("쇼케이스를 불러올 수 없습니다.", 500);
   }
-});
+}
+
+showcasePublicRoutes.on(["GET", "HEAD"], "/view/:phone", (c) => respondShowcaseOgView(c));

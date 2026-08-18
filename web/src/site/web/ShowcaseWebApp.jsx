@@ -5,7 +5,7 @@ import ShowcaseWebPage from "./showcase/ShowcaseWebPage.jsx";
 import "../../styles/tent-showcase.css";
 import "../../styles/showcase-call-glass.css";
 
-/** 알림톡 · 카톡 공개 링크 — /s/:phone · /site/web/showcase/:phone */
+/** 알림톡 · 카톡 공개 링크 — /showcase/:phone · /s/:phone · /site/web/showcase/:phone */
 export default function ShowcaseWebApp() {
   const phone = useMemo(() => parseShowcasePhoneFromPath(window.location.pathname), []);
 

@@ -30,8 +30,8 @@ export function isLocalDevOrigin(origin = "") {
 
 /**
  * 외부 공유·OG용 API 베이스 — 로컬 개발 시 localhost 대신 공개 URL 사용.
- * www.vlue.kr 는 SPA 라 /api HTML 이 index.html 로 떨어져 카톡 OG 가 깨지므로
- * api.vlue.kr(VITE_API_URL) 를 우선한다.
+ * 문자 미리보기 카드는 m.vlue.kr/showcase/… (API OG HTML) 를 쓰고,
+ * 카카오 썸네일 PNG 등 API 호스트가 필요한 경우에만 이 베이스를 쓴다.
  */
 export function resolvePublicCardApiBase(fallbackOrigin = "") {
   const apiUrl = String(import.meta.env.VITE_API_URL || "")
@@ -120,20 +120,29 @@ export function buildHostedCardViewUrl(apiBase, cardId) {
   return `${base}/api/v1/card/view/${encodeURIComponent(cardId)}`;
 }
 
-/** 카카오·문자 등 외부 공유용 — OG 메타가 있는 서버 랜딩 → SPA 쇼케이스 */
-export function buildPublicShowcaseUrl(phone, devOrigin = "") {
-  const apiBase = resolvePublicCardApiBase(devOrigin);
+/** 문자·카카오 등 외부 공유용 — m.vlue.kr OG 랜딩 */
+export function resolvePublicShowcaseShareOrigin() {
+  const explicit = String(import.meta.env.VITE_SHOWCASE_SHARE_ORIGIN || "")
+    .trim()
+    .replace(/\/$/, "");
+  if (explicit.startsWith("http") && !isLocalDevOrigin(explicit)) return explicit;
+  return "https://m.vlue.kr";
+}
+
+/** 카카오·문자 등 외부 공유용 — m.vlue.kr/showcase/010… (API가 OG HTML 직접 서빙) */
+export function buildPublicShowcaseUrl(phone, _devOrigin = "") {
+  const origin = resolvePublicShowcaseShareOrigin();
   const digits = String(phone || "").replace(/\D/g, "");
   const local = digits.startsWith("82") ? `0${digits.slice(2)}` : digits;
   if (!local) return "";
-  return `${apiBase}/api/v1/showcase/view/${encodeURIComponent(local)}`;
+  return `${origin}/showcase/${encodeURIComponent(local)}`;
 }
 
 /** SPA 쇼케이스 직접 경로 (알림톡 버튼·앱 웹뷰용 — OG 불필요) */
 export function buildPublicShowcaseSpaUrl(phone, devOrigin = "") {
   const origin = resolvePublicWebOrigin(devOrigin);
   const path = showcaseWebPathForPhone(phone);
-  if (!path || path === "/s/" || path === "/site/web/showcase/") return "";
+  if (!path || path === "/s/" || path === "/site/web/showcase/" || path === "/showcase/") return "";
   return `${origin}${path}`;
 }
 

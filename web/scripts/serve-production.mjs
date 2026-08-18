@@ -75,9 +75,13 @@ const LEGAL_STATIC_PAGES = new Map([
   ["/privacy/legal-article-6/", "data-deletion/index.html"]
 ]);
 
-/** 카카오 버튼용 짧은 쇼케이스 `/s/010…` — SPA 번들 전에 바로 이동 */
-function matchPublicShowcaseShort(pathname) {
-  const m = String(pathname || "").match(/^\/s\/(\d{8,15})\/?$/);
+const VLUE_SHARE_ORIGIN = String(process.env.VLUE_SHARE_ORIGIN || "https://m.vlue.kr")
+  .trim()
+  .replace(/\/$/, "");
+
+/** `/showcase/010…` · `/s/010…` — 문자 OG 카드용. 관리 화면 `/showcase` 는 제외 */
+function matchPublicShowcaseShare(pathname) {
+  const m = String(pathname || "").match(/^\/(?:showcase|s)\/(\d{8,15})\/?$/);
   return m ? m[1] : "";
 }
 
@@ -102,6 +106,15 @@ function serveShowcaseShortBounce(response, phone) {
   });
   response.end(html);
   return true;
+}
+
+async function serveShowcaseOgShare(_request, response, phone) {
+  const dest = `${VLUE_SHARE_ORIGIN}/showcase/${encodeURIComponent(phone)}`;
+  response.writeHead(302, {
+    Location: dest,
+    "Cache-Control": "public, max-age=120"
+  });
+  response.end();
 }
 
 function serveLegalStatic(response, pathname) {
@@ -192,9 +205,9 @@ const server = createServer((request, response) => {
     return;
   }
 
-  const showcasePhone = matchPublicShowcaseShort(pathname);
+  const showcasePhone = matchPublicShowcaseShare(pathname);
   if (showcasePhone) {
-    serveShowcaseShortBounce(response, showcasePhone);
+    void serveShowcaseOgShare(request, response, showcasePhone);
     return;
   }
 
