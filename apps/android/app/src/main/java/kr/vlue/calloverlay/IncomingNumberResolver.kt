@@ -18,13 +18,22 @@ object IncomingNumberResolver {
     /**
      * 최근 [windowMs] 내 가장 최신 통화 번호.
      * RINGING 직후엔 duration=0 인입 기록이 잡히는 경우가 많음.
+     *
+     * @param minDateMs 이 시각 이전 CallLog 는 이전 통화로 보고 무시 (다음 발신이 070을 다시 집어오는 치명 버그 방지)
      */
-    fun resolveRecentNumber(context: Context, outgoing: Boolean, windowMs: Long = 45_000L): String? {
+    fun resolveRecentNumber(
+        context: Context,
+        outgoing: Boolean,
+        windowMs: Long = 45_000L,
+        minDateMs: Long = 0L
+    ): String? {
         if (!hasCallLogPermission(context)) {
             Log.w(TAG, "READ_CALL_LOG missing")
             return null
         }
-        val since = System.currentTimeMillis() - windowMs
+        val since = (System.currentTimeMillis() - windowMs).let { windowStart ->
+            if (minDateMs > 0L) maxOf(windowStart, minDateMs) else windowStart
+        }
         val preferredType =
             if (outgoing) CallLog.Calls.OUTGOING_TYPE else CallLog.Calls.INCOMING_TYPE
         return try {
@@ -42,6 +51,8 @@ object IncomingNumberResolver {
             )?.use { c ->
                 var fallback: String? = null
                 while (c.moveToNext()) {
+                    val dateMs = c.getLong(2)
+                    if (!isFreshCallLogDate(dateMs, minDateMs)) continue
                     val raw = pickUsableNumber(c.getString(0), c.getString(3))
                     if (raw == null) continue
                     val type = c.getInt(1)
@@ -108,5 +119,11 @@ object IncomingNumberResolver {
         val ca = canonicalDigits(a)
         val cb = canonicalDigits(b)
         return ca.isNotEmpty() && ca == cb
+    }
+
+    /** CallLog DATE 가 이번 통화 시작보다 이전이면 이전 통화 번호 */
+    fun isFreshCallLogDate(dateMs: Long, minDateMs: Long): Boolean {
+        if (minDateMs <= 0L) return true
+        return dateMs >= minDateMs
     }
 }

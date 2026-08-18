@@ -75,14 +75,20 @@ object NationalAgencyWhitelist {
 
     /**
      * 이번 통화에 붙일 DCP 경로.
-     * 화이트리스트가 아니면 빈 값 — 직전 112 테스트의 abnormal 이 CEO 통화에 남으면 안 된다.
+     * 국가기관 번호는 화이트리스트 규칙.
+     * 일반 번호는 경로 검증 비정상만 통과 — 설치만 된 원격앱은 해당 없음.
      */
     fun routeForCall(phone: String?, requested: String?, cardRoute: String? = ""): String {
-        if (match(phone) == null) return ""
         val req = requested?.trim()?.lowercase().orEmpty()
-        if (req == "normal" || req == "abnormal") return req
         val card = cardRoute?.trim()?.lowercase().orEmpty()
-        if (card == "normal" || card == "abnormal") return card
+        val raw = phone?.trim().orEmpty()
+        if (raw.isEmpty() || raw.equals("unknown", ignoreCase = true)) return ""
+        if (match(phone) != null) {
+            if (req == "normal" || req == "abnormal") return req
+            if (card == "normal" || card == "abnormal") return card
+            return ""
+        }
+        if (req == "abnormal" || card == "abnormal") return "abnormal"
         return ""
     }
 }

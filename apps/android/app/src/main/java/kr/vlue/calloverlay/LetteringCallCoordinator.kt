@@ -11,8 +11,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kr.vlue.calloverlay.dcp.CallPathLookupMerge
 import kr.vlue.calloverlay.dcp.CallPathSession
 import kr.vlue.calloverlay.dcp.CallPathVerdict
+import kr.vlue.calloverlay.dcp.ContactSafeCarePayload
 import kr.vlue.calloverlay.dcp.DcpLookupPayload
 import kr.vlue.calloverlay.dcp.NationalAgencyWhitelist
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
@@ -42,17 +44,29 @@ object LetteringCallCoordinator {
     /** CallLog 업그레이드·enrich 가 다음 통화를 덮지 못하게 세대 번호 */
     private val callGen = AtomicLong(0L)
 
-    /** 홈 화면 정상/비정상 테스트 — 실제 통화 없이 경로 판정 UI를 기동 */
+    /** 홈 화면 정상/비정상 테스트 — 실제 통화·전체 오버레이 없이 팝업만 */
     fun onDcpPathTest(context: Context, abnormal: Boolean) {
         lastRingAt = 0L
         lastRingNumber = ""
         callGen.incrementAndGet()
         CallPathSession.armMock(abnormal)
         LetteringPrefs.setLetteringEnabled(context, true)
-        CompanionRuntimeStabilityDiag.beginCallSession(
-            if (abnormal) "dcp_path_test_abnormal" else "dcp_path_test_normal"
-        )
-        onRinging(context, "112", outgoing = false)
+        val app = context.applicationContext
+        val agency = NationalAgencyWhitelist.match("112") ?: return
+        val verdict = CallPathSession.consumeOrVerify(app)
+        val json = DcpLookupPayload.toJson(agency, verdict)
+        if (!LetteringPermissionHelper.canDrawOverlays(app)) {
+            Log.w(TAG, "DCP popup test skipped — overlay permission missing")
+            return
+        }
+        val intent = Intent(app, CallOverlayService::class.java).apply {
+            action = CallOverlayService.ACTION_DCP_TEST_POPUP
+            putExtra(CallOverlayService.EXTRA_PHONE, agency.shortNumber)
+            putExtra(CallOverlayService.EXTRA_VERIFIED, true)
+            putExtra(CallOverlayService.EXTRA_CARD_JSON, json)
+            putExtra(CallOverlayService.EXTRA_DCP_ROUTE, verdict.routeQuery)
+        }
+        app.startForegroundService(intent)
     }
 
     fun onRinging(context: Context, number: String?, outgoing: Boolean = false) {
@@ -127,19 +141,42 @@ object LetteringCallCoordinator {
             LetteringPrefs.setLastCallEvent(app, "ringing:$raw:out=$outgoing")
 
             val agency = if (nextUnknown) null else NationalAgencyWhitelist.match(raw)
-            if (agency == null) {
-                CallPathSession.clear()
+            val dcpVerdict = if (nextUnknown) null else CallPathSession.consumeOrVerify(app)
+            if (dcpVerdict?.isAbnormal == true && outgoing) {
+                scope.launch(Dispatchers.IO) {
+                    CardLookupRepository.reportOutgoingCallPath(app, dcpVerdict.reasons)
+                }
             }
-            val dcpVerdict = if (agency != null) CallPathSession.consumeOrVerify(app) else null
-            val dcpJson =
-                if (agency != null && dcpVerdict != null) DcpLookupPayload.toJson(agency, dcpVerdict) else null
+            val pathJson =
+                when {
+                    agency != null && dcpVerdict != null -> DcpLookupPayload.toJson(agency, dcpVerdict)
+                    dcpVerdict?.isAbnormal == true ->
+                        CallPathLookupMerge.placeholderJson(raw, dcpVerdict, outgoing)
+                    else -> null
+                }
             val cachedMember =
                 if (agency == null && !nextUnknown) CardLookupRepository.peekCached(raw) else null
+            val overlayJson =
+                pathJson
+                    ?: cachedMember?.rawJson?.let { cached ->
+                        if (dcpVerdict != null) {
+                            CallPathLookupMerge.merge(cached, dcpVerdict, outgoing).json
+                        } else {
+                            cached
+                        }
+                    }
             val overlayNumber = agency?.shortNumber ?: raw
-            if (agency != null && dcpVerdict != null) {
+            val overlayRoute =
+                when {
+                    agency != null -> dcpVerdict?.routeQuery.orEmpty()
+                    dcpVerdict?.isAbnormal == true -> "abnormal"
+                    else -> ""
+                }
+            if (dcpVerdict != null && (agency != null || dcpVerdict.isAbnormal)) {
                 Log.i(
                     TAG,
-                    "path-verify ${agency.shortNumber} ${agency.agencyName} route=${dcpVerdict.routeQuery} mock=${dcpVerdict.fromMock}"
+                    "path-verify ${ReleaseDebugGate.maskPhoneForLog(overlayNumber)} " +
+                        "route=${dcpVerdict.routeQuery} reasons=${dcpVerdict.reasons} mock=${dcpVerdict.fromMock}"
                 )
             }
 
@@ -149,10 +186,10 @@ object LetteringCallCoordinator {
                 startOverlayService(
                     app,
                     overlayNumber,
-                    verified = dcpJson != null || cachedMember?.verified == true,
-                    cardJson = dcpJson ?: cachedMember?.rawJson,
+                    verified = agency != null || cachedMember?.verified == true,
+                    cardJson = overlayJson,
                     outgoing = outgoing,
-                    dcpRoute = dcpVerdict?.routeQuery.orEmpty()
+                    dcpRoute = overlayRoute
                 )
             } else {
                 val restrictHint =
@@ -359,9 +396,26 @@ object LetteringCallCoordinator {
             dataSource = "CardLookupRepository"
         )
         try {
-            val lookup = CardLookupRepository.lookup(app, raw)
+            var lookup = CardLookupRepository.lookup(app, raw)
+            if (lookup == null) {
+                delay(400L)
+                lookup = CardLookupRepository.lookup(app, raw)
+            }
             val elapsed = (SystemClock.elapsedRealtime() - started).coerceAtLeast(0L)
-            if (lookup == null || !lookup.matched) {
+            if (lookup == null) {
+                CompanionRuntimeStabilityDiag.noteMemberLookup(
+                    phase = "LOOKUP_COMPLETED",
+                    maskedPhone = masked,
+                    lookupElapsedMs = elapsed,
+                    matched = false,
+                    dataSource = "api_timeout",
+                    normalizedOk = normalized != null
+                )
+                Log.w(TAG, "lookup timeout for $masked — skip non-member popup")
+                LetteringPrefs.setLastOverlayError(app, "lookup_timeout:$masked")
+                return
+            }
+            if (!lookup.matched) {
                 CompanionRuntimeStabilityDiag.noteMemberLookup(
                     phase = "LOOKUP_COMPLETED",
                     maskedPhone = masked,
@@ -372,13 +426,20 @@ object LetteringCallCoordinator {
                 )
                 Log.w(TAG, "lookup unmatched for $masked")
                 LetteringPrefs.setLastOverlayError(app, "lookup_unmatched:$masked")
+                if (applyContactSafeCareIfSaved(app, raw, outgoing)) return
+                val merged = CallPathLookupMerge.merge(
+                    lookup.rawJson,
+                    CallPathSession.lastVerdict,
+                    outgoing
+                )
                 if (LetteringPermissionHelper.canDrawOverlays(app)) {
                     CallOverlayService.updateCallInfo(
                         app,
                         raw,
                         verified = false,
-                        cardJson = unmatchedLookupJson(raw),
-                        outgoing = outgoing
+                        cardJson = if (merged.route == "abnormal") merged.json else unmatchedLookupJson(raw),
+                        outgoing = outgoing,
+                        dcpRoute = merged.route
                     )
                     LetteringIncomingNotifier.cancel(app)
                 } else {
@@ -412,13 +473,19 @@ object LetteringCallCoordinator {
                 return
             }
             val label = lookup.displayName.ifBlank { raw }
+            val merged = CallPathLookupMerge.merge(
+                lookup.rawJson,
+                CallPathSession.lastVerdict,
+                outgoing
+            )
             if (LetteringPermissionHelper.canDrawOverlays(app)) {
                 CallOverlayService.updateCallInfo(
                     app,
                     raw,
                     verified = lookup.verified,
-                    cardJson = lookup.rawJson,
-                    outgoing = outgoing
+                    cardJson = merged.json,
+                    outgoing = outgoing,
+                    dcpRoute = merged.route
                 )
                 LetteringIncomingNotifier.cancel(app)
             } else {
@@ -440,6 +507,7 @@ object LetteringCallCoordinator {
                 matched = false,
                 dataSource = "error:${e.javaClass.simpleName}"
             )
+            if (applyContactSafeCareIfSaved(app, raw, outgoing)) return
             if (LetteringPermissionHelper.canDrawOverlays(app)) {
                 CallOverlayService.updateCallInfo(
                     app,
@@ -459,6 +527,31 @@ object LetteringCallCoordinator {
             .put("phoneE164", raw)
             .put("profileKind", "")
             .toString()
+
+    private fun applyContactSafeCareIfSaved(app: Context, raw: String, outgoing: Boolean): Boolean {
+        val contactName = DeviceContactsReader.findDisplayName(app, raw) ?: return false
+        if (contactName.isBlank()) return false
+        val verdict = CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(app)
+        val json = ContactSafeCarePayload.toJson(raw, contactName, verdict)
+        Log.i(
+            TAG,
+            "contact safe-care ${ReleaseDebugGate.maskPhoneForLog(raw)} name=$contactName route=${verdict.routeQuery}"
+        )
+        if (LetteringPermissionHelper.canDrawOverlays(app)) {
+            CallOverlayService.updateCallInfo(
+                app,
+                raw,
+                verified = false,
+                cardJson = json,
+                outgoing = outgoing,
+                dcpRoute = verdict.routeQuery
+            )
+            LetteringIncomingNotifier.cancel(app)
+        } else {
+            LetteringIncomingNotifier.post(app, raw, outgoing, displayName = contactName)
+        }
+        return true
+    }
 
     private fun applyWhitelistPathIfMatched(app: Context, number: String, outgoing: Boolean): Boolean {
         val agency = NationalAgencyWhitelist.match(number) ?: return false

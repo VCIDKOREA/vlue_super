@@ -26,6 +26,11 @@ object DcpAbnormalWarningView {
     const val NORMAL_MESSAGE =
         "공식 국가기관 번호로 확인되었습니다. 디지털인증프로필을 확인하세요."
 
+    const val CONTACT_NORMAL_MESSAGE =
+        "기기에 저장된 번호입니다. VLUE 비회원 · 안심케어 정상 경로입니다."
+
+    const val ACTION_TAG = "dcp_action"
+
     data class Spec(
         val abnormal: Boolean,
         val agencyName: String = "",
@@ -33,13 +38,19 @@ object DcpAbnormalWarningView {
         val officialWebsite: String = "",
         val fromMock: Boolean = false,
         val expired: Boolean = false,
-        val expiredMessage: String = "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다."
+        val expiredMessage: String = "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다.",
+        val contactSafeCare: Boolean = false,
+        val vlueNonMember: Boolean = false,
+        val showShareShowcase: Boolean = false,
+        val reasonLine: String = "",
+        val pathVerify: Boolean = false
     )
 
     fun build(
         context: Context,
         spec: Spec,
-        onConfirm: () -> Unit
+        onConfirm: () -> Unit,
+        onShareShowcase: (() -> Unit)? = null
     ): View {
         val ctx = context
         val card = LinearLayout(ctx).apply {
@@ -89,7 +100,11 @@ object DcpAbnormalWarningView {
             TextView(ctx).apply {
                 text = when {
                     spec.expired -> spec.expiredMessage
+                    spec.abnormal && spec.reasonLine.isNotBlank() -> spec.reasonLine
+                    spec.abnormal && spec.pathVerify ->
+                        "비정상 경로로 확인된 전화입니다."
                     spec.abnormal -> NationalAgencyWhitelist.ABNORMAL_WARNING
+                    spec.contactSafeCare -> CONTACT_NORMAL_MESSAGE
                     else -> NORMAL_MESSAGE
                 }
                 setTextColor(Color.WHITE)
@@ -122,6 +137,18 @@ object DcpAbnormalWarningView {
                     paint.isUnderlineText = true
                     setPadding(0, dp(ctx, 6), 0, 0)
                     setOnClickListener { openUri(ctx, "tel:${spec.shortNumber}") }
+                }
+            )
+        }
+        if (spec.vlueNonMember) {
+            card.addView(
+                TextView(ctx).apply {
+                    text = "VLUE 비회원"
+                    setTextColor(Color.parseColor("#FDE047"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(ctx, 8), 0, 0)
                 }
             )
         }
@@ -160,14 +187,38 @@ object DcpAbnormalWarningView {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(ctx, 14) }
             layoutParams = lp
+            tag = ACTION_TAG
             setOnClickListener {
-                if (spec.abnormal) {
+                if (spec.abnormal && !spec.pathVerify) {
                     openUri(ctx, NationalAgencyWhitelist.ABNORMAL_REPORT_URL)
                 }
                 onConfirm()
             }
         }
         card.addView(confirm)
+        if (spec.showShareShowcase && onShareShowcase != null) {
+            card.addView(
+                TextView(ctx).apply {
+                    text = "쇼케이스 전달하기"
+                    setTextColor(Color.parseColor("#E2E8F0"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor("#334155"))
+                        cornerRadius = dp(ctx, 12).toFloat()
+                    }
+                    setPadding(dp(ctx, 12), dp(ctx, 12), dp(ctx, 12), dp(ctx, 12))
+                    val lp = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = dp(ctx, 8) }
+                    layoutParams = lp
+                    tag = ACTION_TAG
+                    setOnClickListener { onShareShowcase() }
+                }
+            )
+        }
         return card
     }
 
@@ -193,7 +244,7 @@ object DcpAbnormalWarningView {
         var moved = false
         var peeking = false
         val listener = View.OnTouchListener { v, ev ->
-            if (!dragging && touchOnConfirm(v, ev)) {
+            if (!dragging && touchOnAction(v, ev)) {
                 return@OnTouchListener false
             }
             when (ev.actionMasked) {
@@ -268,14 +319,20 @@ object DcpAbnormalWarningView {
         host.setOnTouchListener(listener)
     }
 
-    private fun touchOnConfirm(card: View, ev: MotionEvent): Boolean {
+    private fun touchOnAction(card: View, ev: MotionEvent): Boolean {
         val group = card as? android.view.ViewGroup ?: return false
-        val last = group.getChildAt(group.childCount - 1) ?: return false
-        val loc = IntArray(2)
-        last.getLocationOnScreen(loc)
         val x = ev.rawX
         val y = ev.rawY
-        return x >= loc[0] && x <= loc[0] + last.width && y >= loc[1] && y <= loc[1] + last.height
+        for (i in 0 until group.childCount) {
+            val child = group.getChildAt(i) ?: continue
+            if (child.tag != ACTION_TAG) continue
+            val loc = IntArray(2)
+            child.getLocationOnScreen(loc)
+            if (x >= loc[0] && x <= loc[0] + child.width && y >= loc[1] && y <= loc[1] + child.height) {
+                return true
+            }
+        }
+        return false
     }
 
     fun detach(parent: FrameLayout?) {

@@ -245,6 +245,22 @@ class LetteringJavascriptBridge(
     }
 
     @JavascriptInterface
+    fun syncMemberPhone(phone: String?) {
+        LetteringPrefs.setMemberPhone(service, phone)
+    }
+
+    @JavascriptInterface
+    fun openShowcaseSms(toPhone: String?) {
+        val to = toPhone?.trim().orEmpty()
+        if (to.isEmpty()) return
+        ShowcaseSmsComposer.openPrefill(
+            service,
+            toPhone = to,
+            ownerPhone = LetteringPrefs.getMemberPhone(service)
+        )
+    }
+
+    @JavascriptInterface
     fun blockPhoneNumber(phone: String) {
         val e164 = CardLookupBridge.normalizeKr(phone) ?: return
         BlockedPhoneCache.add(service, e164)
@@ -333,6 +349,8 @@ class LetteringJavascriptBridge(
                 window.VlueLettering.getInCallCapabilityJson = function(){ return Android.getInCallCapabilityJson(); };
                 window.VlueLettering.requestDefaultDialerRole = function(){ Android.requestDefaultDialerRole(); };
                 window.VlueLettering.getDeviceContactsJson = function(){ return Android.getDeviceContactsJson(); };
+                window.VlueLettering.syncMemberPhone = function(p){ Android.syncMemberPhone(String(p||'')); };
+                window.VlueLettering.openShowcaseSms = function(p){ Android.openShowcaseSms(String(p||'')); };
                 window.VlueLettering.blockPhoneNumber = function(p){ Android.blockPhoneNumber(p); };
                 window.VlueLettering.setLetteringEnabled = function(v){ Android.setLetteringEnabled(v ? '1' : '0'); };
                 window.VlueLettering.requestLetteringPermissions = function(){ Android.requestLetteringPermissions(); };

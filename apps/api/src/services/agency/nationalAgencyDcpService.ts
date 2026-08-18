@@ -113,6 +113,8 @@ export async function matchNationalAgency(rawNumber: string): Promise<AgencyDcpP
 export function agencyShortNumberCandidates(rawNumber: string): string[] {
   const d = normalizeAgencyShortNumber(rawNumber);
   if (!d) return [];
+  /* 010 등 일반 번호는 기관 DB 시드/조회를 건너뛴다. 화이트리스트는 3~4자리. */
+  if (d.length >= 8) return [];
   const out = new Set<string>();
   out.add(d);
   if (d.startsWith("82") && d.length > 2) {

@@ -4,6 +4,7 @@ import { normalizeDesiredPublicHandle } from "../lib/publicHandle.js";
 import { normalizeToE164KR } from "../lib/phoneE164.js";
 import { ssePublish } from "../realtime/sseHub.js";
 import { lookupCardByRawNumber } from "../services/cardLookup.js";
+import { reportOutgoingCallPath } from "../services/callPathPeerSignal.js";
 import {
   lookupMemberNamesByNumbers,
   recordOverlayLineCallEvent
@@ -48,8 +49,8 @@ async function jsonLookup(
 ) {
   const result = await lookupCardByRawNumber(raw, {
     viewerId,
-    /* 통화 수신 오버레이 — 발신자 상호·회사·직함은 수신자에게 표시 (미리보기와 동일) */
     forPublicOgShare: Boolean(opts?.forCallOverlay),
+    forCallOverlay: Boolean(opts?.forCallOverlay),
     dcpRoute: opts?.dcpRoute
   });
   return result;
@@ -90,6 +91,20 @@ cardsRoutes.get("/by-number", async (c) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
     return c.json({ error: msg, matched: false }, 500);
+  }
+});
+
+/** 발신 폰 원격·악성앱 실행 중 — 수신 VLUE 회원 오버레이가 비정상으로 표시 */
+cardsRoutes.post("/call-path-report", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = (await c.req.json().catch(() => ({}))) as { reasons?: unknown };
+  const reasons = Array.isArray(body.reasons) ? body.reasons.map((r) => String(r || "")) : [];
+  try {
+    const result = await reportOutgoingCallPath({ userId: me, reasons });
+    return c.json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    return c.json({ ok: false, error: msg }, 500);
   }
 });
 

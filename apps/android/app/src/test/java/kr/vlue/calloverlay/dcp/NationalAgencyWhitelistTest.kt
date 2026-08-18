@@ -39,9 +39,10 @@ class NationalAgencyWhitelistTest {
     }
 
     @Test
-    fun dcp_route_does_not_stick_to_member_calls() {
-        assertEquals("", NationalAgencyWhitelist.routeForCall("01080144666", "abnormal"))
-        assertEquals("", NationalAgencyWhitelist.routeForCall("+821080144666", "abnormal", "abnormal"))
+    fun dcp_route_path_verify_applies_to_member_numbers() {
+        assertEquals("abnormal", NationalAgencyWhitelist.routeForCall("01080144666", "abnormal"))
+        assertEquals("abnormal", NationalAgencyWhitelist.routeForCall("+821080144666", "abnormal", "abnormal"))
+        assertEquals("", NationalAgencyWhitelist.routeForCall("01080144666", "normal"))
         assertEquals("abnormal", NationalAgencyWhitelist.routeForCall("112", "abnormal"))
         assertEquals("normal", NationalAgencyWhitelist.routeForCall("112", "normal"))
         assertEquals("abnormal", NationalAgencyWhitelist.routeForCall("112", "", "abnormal"))

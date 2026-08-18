@@ -673,6 +673,12 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                   try{return window.Android&&window.Android.getDeviceContactsJson?window.Android.getDeviceContactsJson():'[]';}
                   catch(e){return '[]';}
                 },
+                syncMemberPhone:function(p){
+                  try{if(window.Android&&window.Android.syncMemberPhone)window.Android.syncMemberPhone(String(p||''));}catch(e){}
+                },
+                openShowcaseSms:function(p){
+                  try{if(window.Android&&window.Android.openShowcaseSms)window.Android.openShowcaseSms(String(p||''));}catch(e){}
+                },
                 getDeviceCallLogJson:function(limit){
                   try{
                     if(window.Android&&window.Android.getDeviceCallLogJson){
@@ -897,6 +903,24 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         @android.webkit.JavascriptInterface
         fun getDeviceContactsJson(): String {
             return DeviceContactsReader.readAsJson(activity)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun syncMemberPhone(phone: String?) {
+            LetteringPrefs.setMemberPhone(activity, phone)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun openShowcaseSms(toPhone: String?) {
+            val to = toPhone?.trim().orEmpty()
+            if (to.isEmpty()) return
+            activity.runOnUiThread {
+                ShowcaseSmsComposer.openPrefill(
+                    activity,
+                    toPhone = to,
+                    ownerPhone = LetteringPrefs.getMemberPhone(activity)
+                )
+            }
         }
 
         /** 앱「통화 목록」— 시스템 CallLog 최근 건 */

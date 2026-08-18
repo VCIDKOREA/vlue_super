@@ -63,6 +63,33 @@ class CallPathVerificationEngineTest {
                 "kr.vlue.calloverlay"
             )
         )
+        assertFalse(
+            CallPathVerificationEngine.isSuspiciousAccessibilityPackage(
+                "com.lastpass.lpandroid",
+                "kr.vlue.app"
+            )
+        )
+        assertFalse(
+            CallPathVerificationEngine.isCallScreenOccluder(
+                "com.facebook.katana",
+                "kr.vlue.app"
+            )
+        )
+        assertFalse(
+            CallPathVerificationEngine.isCallScreenOccluder(
+                "com.kakao.talk",
+                "kr.vlue.app"
+            )
+        )
+        assertTrue(
+            CallPathVerificationEngine.isCallScreenOccluder(
+                "com.anydesk.anydeskandroid",
+                "kr.vlue.app"
+            )
+        )
+        assertTrue(
+            CallPathVerificationEngine.isVoiceModulatorOrFakeCallPackage("com.example.fakecall")
+        )
     }
 
     @Test

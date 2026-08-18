@@ -44,7 +44,10 @@ import kr.vlue.calloverlay.companion.OverlayTriggerEvent
 import kr.vlue.calloverlay.companion.ScreenState
 import kr.vlue.calloverlay.companion.ScreenStateDetector
 import kr.vlue.calloverlay.companion.UsageAccessHelper
+import kr.vlue.calloverlay.dcp.CallPathReasonCopy
 import kr.vlue.calloverlay.dcp.CallPathSession
+import kr.vlue.calloverlay.dcp.ContactSafeCarePayload
+import kr.vlue.calloverlay.dcp.ContactSafeCarePolicy
 import kr.vlue.calloverlay.dcp.DcpAbnormalWarningView
 import kr.vlue.calloverlay.dcp.DcpPopupPolicy
 import kr.vlue.calloverlay.dcp.NationalAgencyWhitelist
@@ -822,6 +825,13 @@ class CallOverlayService : Service() {
             seq = 8,
             detail = source
         )
+        if (isContactSafeCare(pendingCardJson)) {
+            remoteConnected = true
+            companion.onAnswer(OverlayContext.IN_CALL)
+            hideCompanionOverlayChrome()
+            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            return
+        }
         VlueBigPushTrace.milestone(
             "SHOWCASE_REQUESTED",
             "Showcase Requested",
@@ -891,17 +901,26 @@ class CallOverlayService : Service() {
                 bigPushPeeking = false
                 bigPushPeekTab?.visibility = android.view.View.GONE
                 nativeBanner?.visibility = android.view.View.GONE
-                webView?.visibility = android.view.View.VISIBLE
+                if (isContactSafeCare(pendingCardJson)) {
+                    hideCompanionOverlayChrome()
+                } else {
+                    webView?.visibility = android.view.View.VISIBLE
+                }
                 syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
             }
             OverlayState.MINI_CASE -> {
                 bigPushPeeking = false
                 bigPushPeekTab?.visibility = android.view.View.GONE
                 nativeBanner?.visibility = android.view.View.GONE
-                webView?.visibility = android.view.View.VISIBLE
-                rootContainer?.setBackgroundColor(Color.TRANSPARENT)
-                webView?.setBackgroundColor(Color.TRANSPARENT)
-                removeDcpPopupWindow()
+                if (isContactSafeCare(pendingCardJson)) {
+                    hideCompanionOverlayChrome()
+                    syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+                } else {
+                    webView?.visibility = android.view.View.VISIBLE
+                    rootContainer?.setBackgroundColor(Color.TRANSPARENT)
+                    webView?.setBackgroundColor(Color.TRANSPARENT)
+                    removeDcpPopupWindow()
+                }
             }
             OverlayState.IDLE -> {
                 bigPushPeeking = false
@@ -1186,6 +1205,12 @@ class CallOverlayService : Service() {
             currentOutgoing = outgoing
             pendingCardJson = cardJson
             bindDcpRoute(phone, dcpRoute, cardJson)
+            if (isContactSafeCare(cardJson)) {
+                hideCompanionOverlayChrome()
+                syncDcpRoutePopup(cardJson, currentDcpRoute)
+                LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
+                return@post
+            }
             val banner = nativeBanner
             if (banner != null) {
                 BigPushShowcaseBar.bind(banner, phone, verified, outgoing, cardJson)
@@ -1213,6 +1238,15 @@ class CallOverlayService : Service() {
     }
 
     private fun bindDcpRoute(phone: String, requested: String, cardJson: String?) {
+        if (isContactSafeCare(cardJson)) {
+            val fromCard = parseDcpRoute(cardJson)
+            currentDcpRoute = requested.trim().lowercase().ifBlank { fromCard }
+                .ifBlank { "normal" }
+            if (currentDcpRoute != "normal" && currentDcpRoute != "abnormal") {
+                currentDcpRoute = "normal"
+            }
+            return
+        }
         currentDcpRoute = NationalAgencyWhitelist.routeForCall(phone, requested, parseDcpRoute(cardJson))
     }
 
@@ -1270,23 +1304,81 @@ class CallOverlayService : Service() {
             attachDcpPopupWindow(spec)
             return
         }
+        if (isContactSafeCare(cardJson)) {
+            val route = currentDcpRoute.ifBlank { parseDcpRoute(cardJson) }.ifBlank { "normal" }
+            val show = ContactSafeCarePolicy.shouldShow(
+                profileKind = ContactSafeCarePayload.PROFILE_KIND,
+                overlayState = companion.state,
+                popupOnly = dcpPopupOnly
+            ) && !dismissing
+            if (!show) {
+                removeDcpPopupWindow()
+                return
+            }
+            val contactName = parseDcpAgencyName(cardJson).ifBlank { currentPhone }
+            val pathAbnormal = route == "abnormal"
+            val spec = DcpAbnormalWarningView.Spec(
+                abnormal = pathAbnormal,
+                agencyName = contactName,
+                shortNumber = parseDcpPhone(cardJson).ifBlank { currentPhone },
+                officialWebsite = "",
+                fromMock = dcpPopupOnly || CallPathSession.lastVerdict?.fromMock == true,
+                contactSafeCare = true,
+                vlueNonMember = true,
+                showShareShowcase = true,
+                pathVerify = pathAbnormal,
+                reasonLine = if (pathAbnormal) {
+                    parseDcpWarning(cardJson).ifBlank {
+                        CallPathReasonCopy.summary(
+                            CallPathSession.lastVerdict?.reasons.orEmpty(),
+                            currentOutgoing
+                        )
+                    }
+                } else {
+                    ""
+                }
+            )
+            attachDcpPopupWindow(spec)
+            return
+        }
         val route = NationalAgencyWhitelist.routeForCall(currentPhone, dcpRoute, parseDcpRoute(cardJson))
+        val pathVerify = parsePathVerify(cardJson) ||
+            (route == "abnormal" && NationalAgencyWhitelist.match(currentPhone) == null)
         val show = DcpPopupPolicy.shouldShow(
             route = route,
             overlayState = companion.state,
-            popupOnlyTest = dcpPopupOnly
+            popupOnlyTest = dcpPopupOnly,
+            pathVerifyAbnormal = pathVerify
         ) && !dismissing
         if (!show) {
             removeDcpPopupWindow()
             return
         }
-        val spec = DcpAbnormalWarningView.Spec(
-            abnormal = route == "abnormal",
-            agencyName = parseDcpAgencyName(cardJson).ifBlank { "경찰청" },
-            shortNumber = parseDcpPhone(cardJson).ifBlank { "112" },
-            officialWebsite = parseDcpWebsite(cardJson).ifBlank { "https://www.police.go.kr" },
-            fromMock = dcpPopupOnly || CallPathSession.lastVerdict?.fromMock == true
-        )
+        val reason = parseDcpWarning(cardJson).ifBlank {
+            CallPathReasonCopy.summary(
+                CallPathSession.lastVerdict?.reasons.orEmpty(),
+                currentOutgoing
+            )
+        }
+        val spec = if (pathVerify) {
+            DcpAbnormalWarningView.Spec(
+                abnormal = route == "abnormal",
+                agencyName = parseDcpAgencyName(cardJson),
+                shortNumber = parseDcpPhone(cardJson).ifBlank { currentPhone },
+                officialWebsite = "",
+                fromMock = dcpPopupOnly || CallPathSession.lastVerdict?.fromMock == true,
+                pathVerify = true,
+                reasonLine = reason
+            )
+        } else {
+            DcpAbnormalWarningView.Spec(
+                abnormal = route == "abnormal",
+                agencyName = parseDcpAgencyName(cardJson).ifBlank { "경찰청" },
+                shortNumber = parseDcpPhone(cardJson).ifBlank { "112" },
+                officialWebsite = parseDcpWebsite(cardJson).ifBlank { "https://www.police.go.kr" },
+                fromMock = dcpPopupOnly || CallPathSession.lastVerdict?.fromMock == true
+            )
+        }
         attachDcpPopupWindow(spec)
     }
 
@@ -1325,14 +1417,33 @@ class CallOverlayService : Service() {
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
-        val view = DcpAbnormalWarningView.build(this, spec) {
-            if (spec.fromMock || dcpPopupOnly) {
-                dcpPopupOnly = false
-                dismissOverlay()
+        val view = DcpAbnormalWarningView.build(
+            this,
+            spec,
+            onConfirm = {
+                if (spec.contactSafeCare) {
+                    removeDcpPopupWindow()
+                } else if (spec.fromMock || dcpPopupOnly) {
+                    dcpPopupOnly = false
+                    dismissOverlay()
+                } else {
+                    removeDcpPopupWindow()
+                }
+            },
+            onShareShowcase = if (spec.showShareShowcase) {
+                {
+                    hideCompanionOverlayChrome()
+                    removeDcpPopupWindow()
+                    ShowcaseSmsComposer.openPrefill(
+                        this,
+                        toPhone = spec.shortNumber.ifBlank { currentPhone },
+                        ownerPhone = LetteringPrefs.getMemberPhone(this)
+                    )
+                }
             } else {
-                removeDcpPopupWindow()
+                null
             }
-        }
+        )
         DcpAbnormalWarningView.bindDrag(view, wm, params, enabled = !spec.abnormal && !spec.expired)
         try {
             wm.addView(view, params)
@@ -1377,12 +1488,31 @@ class CallOverlayService : Service() {
         }
     }
 
+    private fun parseDcpWarning(cardJson: String?): String {
+        if (cardJson.isNullOrBlank()) return ""
+        return try {
+            org.json.JSONObject(cardJson).optJSONObject("dcp")?.optString("warning").orEmpty()
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun parsePathVerify(cardJson: String?): Boolean {
+        if (cardJson.isNullOrBlank()) return false
+        return try {
+            org.json.JSONObject(cardJson).optJSONObject("dcp")?.optBoolean("pathVerify", false) == true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun parseDcpAgencyName(cardJson: String?): String {
         if (cardJson.isNullOrBlank()) return ""
         return try {
             val json = org.json.JSONObject(cardJson)
             json.optJSONObject("dcp")?.optString("agencyName").orEmpty()
                 .ifBlank { json.optString("displayName") }
+                .ifBlank { json.optString("contactName") }
                 .ifBlank { json.optString("companyName") }
         } catch (_: Exception) {
             ""
@@ -1407,6 +1537,36 @@ class CallOverlayService : Service() {
         } catch (_: Exception) {
             ""
         }
+    }
+
+    private fun isContactSafeCare(cardJson: String?): Boolean =
+        parseProfileKind(cardJson) == ContactSafeCarePayload.PROFILE_KIND
+
+    /**
+     * 미인증 쇼케이스 대신 안심케어 팝업만 남긴다.
+     * 오버레이 창이 남아 있으면 문자 앱을 가린다.
+     */
+    private fun hideCompanionOverlayChrome() {
+        nativeBanner?.visibility = View.GONE
+        webView?.visibility = View.GONE
+        bigPushPeekTab?.visibility = View.GONE
+        val root = rootContainer
+        val wm = windowManager
+        if (root != null && wm != null && root.isAttachedToWindow) {
+            try {
+                wm.removeView(root)
+            } catch (_: Exception) {
+            }
+        }
+        rootContainer = null
+        layoutParams = null
+        try {
+            webView?.destroy()
+        } catch (_: Exception) {
+        }
+        webView = null
+        nativeBanner = null
+        bigPushPeekTab = null
     }
 
     private fun parseExpiredDetail(cardJson: String?): String {

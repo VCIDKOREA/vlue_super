@@ -8,6 +8,7 @@ object LetteringPrefs {
     private const val KEY_ENABLED = "lettering_enabled"
     private const val KEY_USER_ID = "vlue_user_id"
     private const val KEY_ACCESS_TOKEN = "vlue_access_token"
+    private const val KEY_MEMBER_PHONE = "vlue_member_phone"
     private const val KEY_LAST_CALL = "last_call_event"
     private const val KEY_LAST_ERR = "last_overlay_error"
 
@@ -35,6 +36,18 @@ object LetteringPrefs {
             .edit()
             .putString(KEY_USER_ID, userId)
             .putString(KEY_ACCESS_TOKEN, accessToken)
+            .apply()
+    }
+
+    fun getMemberPhone(context: Context): String =
+        context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+            .getString(KEY_MEMBER_PHONE, "")
+            .orEmpty()
+
+    fun setMemberPhone(context: Context, phone: String?) {
+        context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_MEMBER_PHONE, phone?.trim().orEmpty())
             .apply()
     }
 

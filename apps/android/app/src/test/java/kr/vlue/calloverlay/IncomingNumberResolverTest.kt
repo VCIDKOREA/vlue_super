@@ -43,4 +43,14 @@ class IncomingNumberResolverTest {
             IncomingNumberResolver.canonicalDigits("070-1234-5678")
         )
     }
+
+    @Test
+    fun callLog_beforeThisCall_isStale() {
+        val callStartedAt = 1_000_000L
+        val minDate = callStartedAt - 1_500L
+        assertFalse(IncomingNumberResolver.isFreshCallLogDate(callStartedAt - 8_000L, minDate))
+        assertTrue(IncomingNumberResolver.isFreshCallLogDate(callStartedAt, minDate))
+        assertTrue(IncomingNumberResolver.isFreshCallLogDate(callStartedAt + 2_000L, minDate))
+        assertTrue(IncomingNumberResolver.isFreshCallLogDate(50L, 0L))
+    }
 }

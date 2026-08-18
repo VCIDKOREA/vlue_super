@@ -10,6 +10,37 @@ import org.json.JSONObject
 
 /** 디바이스 주소록 → 웹 하이브리드 판별용 JSON */
 object DeviceContactsReader {
+    fun findDisplayName(context: Context, rawPhone: String): String? {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            return null
+        }
+        if (ContactPhoneKeys.keys(rawPhone).isEmpty()) return null
+        val projection = arrayOf(
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+            ContactsContract.CommonDataKinds.Phone.NUMBER
+        )
+        context.contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            projection,
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            val nameIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+            val phoneIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            while (cursor.moveToNext()) {
+                val phone = cursor.getString(phoneIdx)?.trim().orEmpty()
+                if (phone.isEmpty()) continue
+                if (!ContactPhoneKeys.matches(rawPhone, phone)) continue
+                val name = if (nameIdx >= 0) cursor.getString(nameIdx)?.trim().orEmpty() else ""
+                if (name.isNotBlank()) return name
+            }
+        }
+        return null
+    }
+
     fun readAsJson(context: Context): String {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS)
             != PackageManager.PERMISSION_GRANTED

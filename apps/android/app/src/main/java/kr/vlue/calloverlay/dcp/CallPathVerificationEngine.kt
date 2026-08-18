@@ -14,11 +14,22 @@ import kr.vlue.calloverlay.companion.OverlayContextDetector
 import kr.vlue.calloverlay.family.FamilyRemoteAppPackages
 
 /**
- * 화이트리스트 번호 통화의 경로 검증.
- * 다른 앱의 오버레이·접근성·InCallUI 가림을 **탐지**만 한다 (공격 절차 없음).
+ * 화이트리스트·안심케어 경로 검증.
+ * 변작기·원격제어·악성 오버레이만 비정상. 페이스북 등 일반 앱이 앞에 있는 것은 정상.
  */
 object CallPathVerificationEngine {
     private const val TAG = "CallPathVerify"
+
+    private val VOICE_MODULATOR_PATTERNS = listOf(
+        "voicechanger",
+        "voice.changer",
+        "voicechanger",
+        "fakecall",
+        "fake.call",
+        "calleridspoof",
+        "numberchanger",
+        "변작"
+    )
 
     fun evaluate(signals: CallPathSignals): CallPathVerdict {
         val reasons = mutableListOf<String>()
@@ -80,10 +91,28 @@ object CallPathVerificationEngine {
             p.contains("permissioncontroller")
     }
 
-    internal fun isSuspiciousAccessibilityPackage(packageName: String, selfPackage: String): Boolean {
+    internal fun isVoiceModulatorOrFakeCallPackage(packageName: String): Boolean {
+        val p = packageName.lowercase()
+        return VOICE_MODULATOR_PATTERNS.any { p.contains(it) }
+    }
+
+    internal fun isMaliciousCallPathPackage(packageName: String, selfPackage: String): Boolean {
         if (isTrustedSystemOrSelf(packageName, selfPackage)) return false
         if (FamilyRemoteAppPackages.matchesRemotePattern(packageName)) return true
-        return true
+        if (FamilyRemoteAppPackages.KNOWN_PACKAGES.contains(packageName)) return true
+        return isVoiceModulatorOrFakeCallPackage(packageName)
+    }
+
+    /** 접근성 — 원격제어·변작기만. LastPass 등 일반 접근성은 정상. */
+    internal fun isSuspiciousAccessibilityPackage(packageName: String, selfPackage: String): Boolean {
+        return isMaliciousCallPathPackage(packageName, selfPackage)
+    }
+
+    /** 통화 화면을 가리는 것으로 볼 앱 — 원격제어·변작기만. 페이스북·카카오는 해당 없음. */
+    internal fun isCallScreenOccluder(packageName: String, selfPackage: String): Boolean {
+        if (packageName.isBlank()) return false
+        if (OverlayContextDetector.isLikelyLauncherPackage(packageName)) return false
+        return isMaliciousCallPathPackage(packageName, selfPackage)
     }
 
     private fun overlayAppsCurrentlyInUse(context: Context): List<String> {
@@ -91,26 +120,34 @@ object CallPathVerificationEngine {
         val running = runningPackageImportance(context)
         val hits = linkedSetOf<String>()
         for (pkg in overlayCandidatePackages()) {
-            if (isTrustedSystemOrSelf(pkg, self)) continue
+            if (!isMaliciousCallPathPackage(pkg, self)) continue
             if (!hasSystemAlertWindowGranted(context, pkg)) continue
             val imp = running[pkg] ?: continue
-            val remote = FamilyRemoteAppPackages.matchesRemotePattern(pkg) ||
-                FamilyRemoteAppPackages.KNOWN_PACKAGES.contains(pkg)
-            val using =
-                if (remote) {
-                    imp <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE
-                } else {
-                    imp <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
-                }
-            if (using) hits.add(pkg)
+            if (imp <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE) {
+                hits.add(pkg)
+            }
         }
         return hits.toList()
     }
 
     private fun overlayCandidatePackages(): List<String> {
-        return (FamilyRemoteAppPackages.KNOWN_PACKAGES + listOf(
-            "com.kakao.talk"
-        )).distinct()
+        return FamilyRemoteAppPackages.KNOWN_PACKAGES.distinct()
+    }
+
+    /**
+     * 벨이 울릴 때 직전 앱(페이스북 등)이 아직 resumed 로 남는 것은 정상.
+     * 원격제어·변작기가 전면에 있을 때만 가림으로 본다.
+     */
+    private fun occludingNonSystemPackage(context: Context): String? {
+        val self = context.packageName
+        val last = ForegroundPackageProbe.lastResumedPackage(context)
+        if (!last.isNullOrBlank() && isCallScreenOccluder(last, self)) {
+            return last
+        }
+        val hints = ForegroundPackageProbe.processImportanceHints(context)
+        return hints.otherForegroundPackages.firstOrNull { pkg ->
+            isCallScreenOccluder(pkg, self)
+        }
     }
 
     private fun hasSystemAlertWindowGranted(context: Context, packageName: String): Boolean {
@@ -193,29 +230,7 @@ object CallPathVerificationEngine {
         }
         val running = runningPackageImportance(context)
         return enabled.filter { pkg ->
-            isSuspiciousAccessibilityPackage(pkg, self) &&
-                (running[pkg] != null || FamilyRemoteAppPackages.matchesRemotePattern(pkg))
+            isSuspiciousAccessibilityPackage(pkg, self) && running[pkg] != null
         }
-    }
-
-    /**
-     * 기본 InCallUI 가 아닌 타 앱이 전면에 있으면 통화 UI가 가려진 것으로 본다.
-     * 런처/홈/시스템 UI 는 정상(HUN)으로 취급.
-     */
-    private fun occludingNonSystemPackage(context: Context): String? {
-        val self = context.packageName
-        val last = ForegroundPackageProbe.lastResumedPackage(context)
-        if (!last.isNullOrBlank() &&
-            !isTrustedSystemOrSelf(last, self) &&
-            !OverlayContextDetector.isLikelyLauncherPackage(last)
-        ) {
-            return last
-        }
-        val hints = ForegroundPackageProbe.processImportanceHints(context)
-        val other = hints.otherForegroundPackages.firstOrNull { pkg ->
-            !isTrustedSystemOrSelf(pkg, self) &&
-                !OverlayContextDetector.isLikelyLauncherPackage(pkg)
-        }
-        return other
     }
 }

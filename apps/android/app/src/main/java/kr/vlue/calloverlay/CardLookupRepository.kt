@@ -58,33 +58,18 @@ object CardLookupRepository {
 
             peekCached(rawNumber)?.let {
                 bg.execute { reportLineCallEvent(context, rawNumber) }
-                return@withContext it
+                /* 캐시는 즉시 오버레이용. 조회는 매번 네트워크 — 상대 원격 실행 신호를 놓치지 않음 */
             }
 
             val base = BuildConfig.API_BASE_URL.trimEnd('/')
-            /* API 에는 정규화된 E.164 를 우선 전달 — raw 하이픈/공백 불일치로 MISS 나지 않게 */
-            val candidates = LinkedHashSet<String>()
             val agency = NationalAgencyWhitelist.match(rawNumber)
-            if (agency != null) candidates.add(agency.shortNumber)
-            candidates.add(e164)
-            val canon = IncomingNumberResolver.canonicalDigits(rawNumber)
-            if (canon.isNotEmpty()) candidates.add("+$canon")
-            val digitsOnly = rawNumber.filter { it.isDigit() }
-            if (digitsOnly.isNotEmpty()) candidates.add(digitsOnly)
-            val trimmed = rawNumber.trim()
-            if (trimmed.isNotEmpty()) candidates.add(trimmed)
-
-            var lastUnmatched: CardLookupResult? = null
-            for (candidate in candidates) {
-                val result = lookupOnce(context, base, candidate, dcpRoute) ?: continue
-                if (result.matched) {
-                    remember(rawNumber, result)
-                    bg.execute { reportLineCallEvent(context, rawNumber) }
-                    return@withContext result
-                }
-                lastUnmatched = result
+            val numberParam = agency?.shortNumber ?: e164
+            val result = lookupOnce(context, base, numberParam, dcpRoute)
+            if (result != null && result.matched) {
+                remember(rawNumber, result)
+                bg.execute { reportLineCallEvent(context, rawNumber) }
             }
-            lastUnmatched ?: lookupOnce(context, base, e164, dcpRoute)
+            return@withContext result
         }
 
     private fun cacheKeys(rawNumber: String): List<String> {
@@ -117,8 +102,9 @@ object CardLookupRepository {
             val url = URL("$base/api/cards/by-number?number=$q&purpose=call_overlay$routeQ")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
-                connectTimeout = 2500
-                readTimeout = 2500
+                /* 조회는 서버에서 짧게. 앱 대기는 넉넉히 — 2.5s 타임아웃으로 회원 미매칭 처리하지 않음 */
+                connectTimeout = 5000
+                readTimeout = 12000
                 LetteringPrefs.getAccessToken(context)?.let {
                     setRequestProperty("Authorization", "Bearer $it")
                 }
@@ -144,6 +130,42 @@ object CardLookupRepository {
             }
         } catch (_: Exception) {
             null
+        }
+    }
+
+    /** 발신 폰에서 원격·악성앱이 실행 중일 때 — 수신 VLUE 회원이 비정상을 볼 수 있게 보고 */
+    fun reportOutgoingCallPath(context: Context, reasons: List<String>) {
+        if (reasons.isEmpty()) return
+        val token = LetteringPrefs.getAccessToken(context)
+        val userId = LetteringPrefs.getUserId(context)
+        if (token.isNullOrBlank() && userId.isNullOrBlank()) return
+        try {
+            val base = BuildConfig.API_BASE_URL.trimEnd('/')
+            val url = URL("$base/api/cards/call-path-report")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 5000
+                readTimeout = 8000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                token?.let { setRequestProperty("Authorization", "Bearer $it") }
+                userId?.let { setRequestProperty("X-VLUE-User-Id", it) }
+            }
+            try {
+                conn.outputStream.use { os ->
+                    os.write(
+                        JSONObject()
+                            .put("reasons", org.json.JSONArray(reasons))
+                            .toString()
+                            .toByteArray(Charsets.UTF_8)
+                    )
+                }
+                conn.responseCode
+            } finally {
+                conn.disconnect()
+            }
+        } catch (_: Exception) {
+            /* ignore */
         }
     }
 

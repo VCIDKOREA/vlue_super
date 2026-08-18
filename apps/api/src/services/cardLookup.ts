@@ -9,6 +9,10 @@ import {
   resolveAgencyCallRoute
 } from "./agency/nationalAgencyDcpService.js";
 import { formatPhoneDisplayKR } from "../lib/phoneDisplay.js";
+import {
+  PEER_REMOTE_SUMMARY,
+  readOutgoingCallPathSignal
+} from "./callPathPeerSignal.js";
 
 const EXPIRED_SUBTITLE = "인증기간이 만료된 번호입니다.";
 const EXPIRED_DETAIL = "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다.";
@@ -310,12 +314,237 @@ type LookupOptions = {
    * (링크를 보낸 사람은 이미 초대 전의 — 「비공개 회원」으로 가리면 안 됨)
    */
   forPublicOgShare?: boolean;
+  /** 통화 오버레이 — 기관 DB·export 스냅샷을 건너뛰고 최소 필드로 조회 */
+  forCallOverlay?: boolean;
   /** 테스트 시뮬레이터 — normal | abnormal */
   dcpRoute?: string | null;
 };
 
+function attachPeerPath<T extends Record<string, unknown>>(
+  body: T,
+  peer: { reasons: string[] } | null
+): T {
+  if (!peer?.reasons?.length) return body;
+  const prev =
+    body.dcp && typeof body.dcp === "object" ? (body.dcp as Record<string, unknown>) : {};
+  return {
+    ...body,
+    dcp: {
+      ...prev,
+      routeStatus: "abnormal",
+      pathVerify: true,
+      warning: PEER_REMOTE_SUMMARY,
+      reasons: ["peer_remote_outgoing", ...peer.reasons]
+    }
+  };
+}
+
+async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length > 0 && digits.length < 8) {
+    const agencyRoute = await resolveAgencyCallRoute({
+      number: raw,
+      forceRoute: opts.dcpRoute
+    });
+    if (agencyRoute.status === "abnormal") {
+      const agency = agencyRoute.agency;
+      const body = agency
+        ? buildAgencyDcpLookupBody(agency, "abnormal", agencyRoute.warning)
+        : {
+            matched: true,
+            is_verified: false,
+            source: "national_agency_dcp",
+            profileKind: "dcp",
+            displayName: "비정상 발신",
+            dcp: { routeStatus: "abnormal", warning: agencyRoute.warning }
+          };
+      return { status: 200 as const, body };
+    }
+    if (agencyRoute.status === "normal") {
+      return {
+        status: 200 as const,
+        body: buildAgencyDcpLookupBody(agencyRoute.agency, "normal")
+      };
+    }
+  }
+
+  const e164 = normalizeToE164KR(String(raw || "").trim());
+  if (!e164) {
+    return { status: 400 as const, body: { error: "유효한 번호 형식이 아닙니다.", matched: false } };
+  }
+
+  const [peer, card] = await Promise.all([
+    readOutgoingCallPathSignal(e164),
+    prisma.businessCard.findFirst({
+    where: { phoneE164: e164 },
+    select: {
+      id: true,
+      userId: true,
+      phoneE164: true,
+      displayName: true,
+      jobTitle: true,
+      companyName: true,
+      verificationStatus: true,
+      kind: true,
+      lineSubscription: { select: { status: true, graceEndsAt: true } },
+      user: {
+        select: {
+          id: true,
+          publicHandle: true,
+          legalName: true,
+          identityVerified: true,
+          isShowcasePrivate: true,
+          digitalCard: {
+            select: {
+              photoUrl: true,
+              logoUrl: true,
+              displayName: true,
+              titleSnapshot: true
+            }
+          }
+        }
+      }
+    }
+  })
+  ]);
+
+  const sub = card?.lineSubscription?.status || "";
+  if (card && sub === "grace") {
+    return {
+      status: 200 as const,
+      body: attachPeerPath(
+        expiredLineLookupBody({
+          phoneE164: card.phoneE164,
+          cardId: card.id,
+          userId: card.userId,
+          graceEndsAt: card.lineSubscription?.graceEndsAt || null
+        }) as Record<string, unknown>,
+        peer
+      )
+    };
+  }
+  if (card && (sub === "lapsed" || sub === "cancelled")) {
+    return {
+      status: 200 as const,
+      body: attachPeerPath({ matched: false, phoneE164: e164, source: "lapsed_line" }, peer)
+    };
+  }
+
+  if (card && card.verificationStatus === "approved") {
+    const displayName = firstStr(
+      card.displayName,
+      card.user.digitalCard?.displayName,
+      card.user.legalName
+    );
+    const photo =
+      (typeof card.user.digitalCard?.photoUrl === "string" && card.user.digitalCard.photoUrl.trim()) ||
+      "";
+    const isCeo = isPlatformCeoHandle(card.user.publicHandle);
+    const imageUrl = photo || (isCeo ? ceoDefaultBrandLogoUrl() : "");
+    return {
+      status: 200 as const,
+      body: attachPeerPath(
+        {
+          matched: true,
+          is_verified: true,
+          source: "business_card",
+          userId: card.user.id,
+          cardId: card.id,
+          kind: card.kind,
+          displayName,
+          jobTitle: firstStr(card.jobTitle, card.user.digitalCard?.titleSnapshot),
+          companyName: card.companyName || "",
+          email: "",
+          profile: {},
+          website: "",
+          image_url: imageUrl,
+          logo_url: card.user.digitalCard?.logoUrl || (isCeo ? ceoDefaultBrandLogoUrl() : ""),
+          voice_url: null,
+          phoneE164: card.phoneE164,
+          publicHandle: card.user.publicHandle || "",
+          access: {
+            isOwner: false,
+            isActiveFollower: false,
+            isMutualFollow: false,
+            isShowcasePrivate: Boolean(card.user.isShowcasePrivate)
+          },
+          visibility: { phone: true, name: true, org: true, id: true }
+        },
+        peer
+      )
+    };
+  }
+
+  const user = await prisma.user.findFirst({
+    where: {
+      phoneE164: e164,
+      OR: [{ identityVerified: true }, { digitalCard: { isNot: null } }]
+    },
+    select: {
+      id: true,
+      publicHandle: true,
+      legalName: true,
+      identityVerified: true,
+      isShowcasePrivate: true,
+      phoneE164: true,
+      businessProfile: { select: { companyName: true, jobTitle: true } },
+      digitalCard: {
+        select: {
+          photoUrl: true,
+          logoUrl: true,
+          displayName: true,
+          titleSnapshot: true
+        }
+      }
+    }
+  });
+
+  if (user) {
+    const isCeo = isPlatformCeoHandle(user.publicHandle);
+    const photo =
+      (typeof user.digitalCard?.photoUrl === "string" && user.digitalCard.photoUrl.trim()) || "";
+    return {
+      status: 200 as const,
+      body: attachPeerPath(
+        {
+          matched: true,
+          is_verified: Boolean(user.identityVerified) || Boolean(user.digitalCard),
+          source: "user_mobile",
+          userId: user.id,
+          displayName: firstStr(user.digitalCard?.displayName, user.legalName),
+          publicHandle: user.publicHandle || "",
+          jobTitle: firstStr(user.digitalCard?.titleSnapshot, user.businessProfile?.jobTitle),
+          companyName: user.businessProfile?.companyName || "",
+          email: "",
+          profile: {},
+          image_url: photo || (isCeo ? ceoDefaultBrandLogoUrl() : null),
+          logo_url: user.digitalCard?.logoUrl || (isCeo ? ceoDefaultBrandLogoUrl() : null),
+          voice_url: null,
+          phoneE164: user.phoneE164,
+          access: {
+            isOwner: false,
+            isActiveFollower: false,
+            isMutualFollow: false,
+            isShowcasePrivate: Boolean(user.isShowcasePrivate)
+          },
+          visibility: { phone: true, name: true, org: true, id: true }
+        },
+        peer
+      )
+    };
+  }
+
+  return {
+    status: 200 as const,
+    body: attachPeerPath({ matched: false, phoneE164: e164, source: "unmatched" }, peer)
+  };
+}
+
 /** 번호 기준 조회 응답 본문 — GET /lookup · GET /by-number 공용 */
 export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {}) {
+  if (opts.forCallOverlay) {
+    return lookupCardForCallOverlay(raw, opts);
+  }
   const viewerId = opts.viewerId ?? null;
   const agencyRoute = await resolveAgencyCallRoute({
     number: raw,
