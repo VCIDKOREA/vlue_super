@@ -84,7 +84,7 @@ export function buildShowcaseOgLandingPage(opts: {
   ].filter(Boolean);
   const description = escapeHtml(descParts.slice(0, 3).join(" · ") || "VLUE 디지털 쇼케이스");
 
-  /* meta refresh 는 일부 문자 미리보기가 따라가 www SPA(OG 없음)로 빠지므로 쓰지 않는다 */
+  /* 스크래퍼는 JS를 실행하지 않음. 사람은 바로 쇼케이스로 이동 */
   const redirectScript = forScraper
     ? ""
     : `<script>location.replace(${JSON.stringify(opts.spaUrl)});</script>`;
@@ -121,7 +121,7 @@ body{min-height:100vh;display:flex;align-items:center;justify-content:center;pad
 background:#0b1220;color:#e2e8f0;font-family:Pretendard,Apple SD Gothic Neo,Malgun Gothic,sans-serif}
 .card{max-width:420px;width:100%;border-radius:20px;overflow:hidden;border:1px solid rgba(148,163,184,.2);
 background:#111827;box-shadow:0 20px 50px rgba(0,0,0,.45)}
-.cover{aspect-ratio:1.2;background:#0f172a center/cover no-repeat;background-image:url('${ogImage}')}
+.cover{aspect-ratio:1.6;background:linear-gradient(160deg,#0f172a,#1e3a5f)}
 .body{padding:18px 16px 20px}
 .badge{display:inline-block;font-size:11px;font-weight:800;color:#7dd3fc;margin-bottom:8px}
 h1{font-size:1.25rem;font-weight:900;letter-spacing:-.02em;line-height:1.3}

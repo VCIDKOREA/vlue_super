@@ -2,6 +2,7 @@ import {
   buildShowcaseOgLandingPage,
   isOgScraperUserAgent
 } from "../services/showcase/showcaseOgLandingPage.js";
+import { toAsciiOgImageUrl } from "../services/showcase/showcaseOgShareMeta.js";
 
 function assert(cond: boolean, message: string) {
   if (!cond) throw new Error(message);
@@ -36,6 +37,7 @@ function run() {
   assert(scraperHtml.includes(shareUrl), "canonical share host");
   assert(!scraperHtml.includes("location.replace"), "scraper HTML has no JS redirect");
   assert(!scraperHtml.includes("http-equiv=\"refresh\""), "no meta refresh");
+  assert(!scraperHtml.includes("background-image:url"), "scraper HTML does not preload cover image");
 
   const humanHtml = buildShowcaseOgLandingPage({
     name: "홍길동",
@@ -49,6 +51,12 @@ function run() {
   assert(humanHtml.includes('property="og:title"'), "human HTML still has OG tags");
   assert(humanHtml.includes("location.replace"), "human HTML redirects to SPA");
   assert(humanHtml.includes(spaUrl), "SPA url present");
+
+  const encoded = toAsciiOgImageUrl(
+    "https://pub.example/covers/이종근/다운로드__2_.jpg"
+  );
+  assert(encoded.includes("%"), "non-ascii image path is percent-encoded");
+  assert(!encoded.includes("다운로드"), "raw hangul is not left in og:image URL");
 
   console.log("[test] showcase OG landing page ok");
 }
