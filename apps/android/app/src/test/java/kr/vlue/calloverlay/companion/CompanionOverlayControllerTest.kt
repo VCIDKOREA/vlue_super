@@ -12,7 +12,7 @@ class CompanionOverlayControllerTest {
         c.onIncoming(OverlayContext.HOME_SCREEN)
         assertTrue(c.requestBigPush(OverlayContext.HOME_SCREEN, callAlreadyAnswered = false))
         assertEquals(OverlayState.BIG_PUSH, c.state)
-        assertEquals(OverlayPosition.BOTTOM, c.position)
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
     }
 
     @Test
@@ -20,6 +20,13 @@ class CompanionOverlayControllerTest {
         val c = CompanionOverlayController()
         assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))
         assertEquals(OverlayPosition.TOP, c.position)
+    }
+
+    @Test
+    fun requestBigPush_compactIncoming_belowMini() {
+        val c = CompanionOverlayController()
+        assertTrue(c.requestBigPush(OverlayContext.COMPACT_INCOMING, callAlreadyAnswered = false))
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
     }
 
     @Test
@@ -37,7 +44,7 @@ class CompanionOverlayControllerTest {
         c.onIncoming(OverlayContext.HOME_SCREEN)
         assertTrue(c.requestBigPush(OverlayContext.HOME_SCREEN, callAlreadyAnswered = false))
         assertEquals(OverlayState.BIG_PUSH, c.state)
-        assertEquals(OverlayPosition.BOTTOM, c.position)
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
     }
 
     /** SCREEN_OFF + INCOMING → BigPush TOP (잠금화면 패리티) */
@@ -96,14 +103,14 @@ class CompanionOverlayControllerTest {
     }
 
     @Test
-    fun screenOn_afterScreenOffBigPush_restoresBottomOnHome() {
+    fun screenOn_afterScreenOffBigPush_restoresBelowMiniOnHome() {
         val c = CompanionOverlayController()
         assertTrue(c.requestBigPush(OverlayContext.HOME_SCREEN, false))
         c.onScreenStateChanged(ScreenState.SCREEN_OFF)
         assertEquals(OverlayPosition.TOP, c.position)
         c.onScreenStateChanged(ScreenState.SCREEN_ON)
         assertEquals(OverlayState.BIG_PUSH, c.state)
-        assertEquals(OverlayPosition.BOTTOM, c.position)
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
     }
 
     @Test

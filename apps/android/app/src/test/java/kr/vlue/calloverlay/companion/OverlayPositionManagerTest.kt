@@ -5,9 +5,9 @@ import org.junit.Test
 
 class OverlayPositionManagerTest {
     @Test
-    fun bigPush_home_isBottom() {
+    fun bigPush_home_isBelowMiniPopup() {
         assertEquals(
-            OverlayPosition.BOTTOM,
+            OverlayPosition.BELOW_COMPACT_INCOMING,
             OverlayPositionManager.resolve(
                 OverlayContext.HOME_SCREEN,
                 OverlayState.BIG_PUSH,
@@ -17,9 +17,9 @@ class OverlayPositionManagerTest {
     }
 
     @Test
-    fun bigPush_otherApp_isBottom() {
+    fun bigPush_otherApp_isBelowMiniPopup() {
         assertEquals(
-            OverlayPosition.BOTTOM,
+            OverlayPosition.BELOW_COMPACT_INCOMING,
             OverlayPositionManager.resolve(
                 OverlayContext.OTHER_APP,
                 OverlayState.BIG_PUSH,
@@ -36,6 +36,30 @@ class OverlayPositionManagerTest {
                 OverlayContext.INCOMING_CALL_UI,
                 OverlayState.BIG_PUSH,
                 ScreenState.SCREEN_ON
+            )
+        )
+    }
+
+    @Test
+    fun bigPush_compactIncoming_isBelowMiniPopup() {
+        assertEquals(
+            OverlayPosition.BELOW_COMPACT_INCOMING,
+            OverlayPositionManager.resolve(
+                OverlayContext.COMPACT_INCOMING,
+                OverlayState.BIG_PUSH,
+                ScreenState.SCREEN_ON
+            )
+        )
+    }
+
+    @Test
+    fun bigPush_compactIncoming_screenOff_isTop() {
+        assertEquals(
+            OverlayPosition.TOP,
+            OverlayPositionManager.resolve(
+                OverlayContext.COMPACT_INCOMING,
+                OverlayState.BIG_PUSH,
+                ScreenState.SCREEN_OFF
             )
         )
     }

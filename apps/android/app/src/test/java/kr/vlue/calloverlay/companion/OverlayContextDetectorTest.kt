@@ -38,9 +38,9 @@ class OverlayContextDetectorTest {
     }
 
     @Test
-    fun ringing_knownOtherApp_isOtherApp() {
+    fun ringing_knownOtherApp_isCompactIncoming() {
         assertEquals(
-            OverlayContext.OTHER_APP,
+            OverlayContext.COMPACT_INCOMING,
             OverlayContextDetector.detect(
                 callPhase = OverlayContextDetector.CallPhase.RINGING,
                 foregroundIsKnownOtherApp = true
@@ -75,6 +75,10 @@ class OverlayContextDetectorTest {
     fun samsungIncallui_package_detected() {
         assertEquals(true, OverlayContextDetector.isLikelyInCallUiPackage("com.samsung.android.incallui"))
         assertEquals(true, OverlayContextDetector.isLikelyInCallUiPackage("com.samsung.android.dialer"))
+        assertEquals(true, OverlayContextDetector.isLikelyFullInCallUiPackage("com.samsung.android.incallui"))
+        assertEquals(false, OverlayContextDetector.isLikelyFullInCallUiPackage("com.samsung.android.dialer"))
+        assertEquals(true, OverlayContextDetector.isLikelyDialerPackage("com.samsung.android.dialer"))
+        assertEquals(false, OverlayContextDetector.isLikelyDialerPackage("com.samsung.android.incallui"))
     }
 
     @Test
@@ -88,12 +92,35 @@ class OverlayContextDetectorTest {
     }
 
     @Test
-    fun ringing_launcher_isHomeScreen() {
+    fun ringing_launcher_isCompactIncoming() {
         assertEquals(
-            OverlayContext.HOME_SCREEN,
+            OverlayContext.COMPACT_INCOMING,
             OverlayContextDetector.detect(
                 callPhase = OverlayContextDetector.CallPhase.RINGING,
                 foregroundIsLauncher = true
+            )
+        )
+    }
+
+    @Test
+    fun ringing_compactDialer_isCompactIncoming() {
+        assertEquals(
+            OverlayContext.COMPACT_INCOMING,
+            OverlayContextDetector.detect(
+                callPhase = OverlayContextDetector.CallPhase.RINGING,
+                foregroundIsCompactDialer = true
+            )
+        )
+    }
+
+    @Test
+    fun ringing_inCallUi_beatsCompactDialer() {
+        assertEquals(
+            OverlayContext.INCOMING_CALL_UI,
+            OverlayContextDetector.detect(
+                callPhase = OverlayContextDetector.CallPhase.RINGING,
+                foregroundIsInCallUi = true,
+                foregroundIsCompactDialer = true
             )
         )
     }

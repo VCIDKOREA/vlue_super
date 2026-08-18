@@ -34,7 +34,8 @@ object OverlayPositionManager {
         }
         return when (context) {
             OverlayContext.HOME_SCREEN,
-            OverlayContext.OTHER_APP -> OverlayPosition.BOTTOM
+            OverlayContext.OTHER_APP,
+            OverlayContext.COMPACT_INCOMING -> OverlayPosition.BELOW_COMPACT_INCOMING
             OverlayContext.INCOMING_CALL_UI -> OverlayPosition.TOP
             OverlayContext.IN_CALL,
             OverlayContext.KEYPAD,

@@ -80,7 +80,7 @@ object CompanionScenarioCatalog {
                 "BIG_PUSH",
                 CompanionScenarioExpectation(
                     state = OverlayState.BIG_PUSH,
-                    position = OverlayPosition.BOTTOM,
+                    position = OverlayPosition.BELOW_COMPACT_INCOMING,
                     screenState = ScreenState.SCREEN_ON
                 )
             ),
@@ -185,7 +185,7 @@ object CompanionScenarioCatalog {
                 "BIG_PUSH",
                 CompanionScenarioExpectation(
                     state = OverlayState.BIG_PUSH,
-                    position = OverlayPosition.BOTTOM
+                    position = OverlayPosition.BELOW_COMPACT_INCOMING
                 )
             ),
             CompanionScenarioStepDef(
@@ -220,7 +220,7 @@ object CompanionScenarioCatalog {
                 "BIG_PUSH",
                 CompanionScenarioExpectation(
                     state = OverlayState.BIG_PUSH,
-                    position = OverlayPosition.BOTTOM,
+                    position = OverlayPosition.BELOW_COMPACT_INCOMING,
                     screenState = ScreenState.SCREEN_ON
                 )
             ),
@@ -236,7 +236,7 @@ object CompanionScenarioCatalog {
                 "SCREEN_ON",
                 CompanionScenarioExpectation(
                     state = OverlayState.BIG_PUSH,
-                    position = OverlayPosition.BOTTOM,
+                    position = OverlayPosition.BELOW_COMPACT_INCOMING,
                     screenState = ScreenState.SCREEN_ON
                 )
             ),
@@ -244,7 +244,7 @@ object CompanionScenarioCatalog {
                 "BIG_PUSH_REEVAL",
                 CompanionScenarioExpectation(
                     state = OverlayState.BIG_PUSH,
-                    position = OverlayPosition.BOTTOM,
+                    position = OverlayPosition.BELOW_COMPACT_INCOMING,
                     screenState = ScreenState.SCREEN_ON
                 )
             )

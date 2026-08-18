@@ -248,7 +248,7 @@ class CompanionBigPushDiagTest {
             )
         )
         assertEquals(
-            OverlayPosition.BOTTOM,
+            OverlayPosition.BELOW_COMPACT_INCOMING,
             OverlayPositionManager.resolve(
                 OverlayContext.HOME_SCREEN,
                 OverlayState.BIG_PUSH,

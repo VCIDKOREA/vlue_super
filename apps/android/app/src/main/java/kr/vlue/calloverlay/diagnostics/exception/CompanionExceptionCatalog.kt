@@ -265,7 +265,7 @@ object CompanionExceptionCatalog {
                 "BIG_PUSH",
                 CompanionScenarioExpectation(
                     state = OverlayState.BIG_PUSH,
-                    position = OverlayPosition.BOTTOM,
+                    position = OverlayPosition.BELOW_COMPACT_INCOMING,
                     windowAttached = true
                 )
             ),
@@ -308,7 +308,7 @@ object CompanionExceptionCatalog {
                 "SINGLE_BIG_PUSH",
                 CompanionScenarioExpectation(
                     state = OverlayState.BIG_PUSH,
-                    position = OverlayPosition.BOTTOM,
+                    position = OverlayPosition.BELOW_COMPACT_INCOMING,
                     windowAttached = true,
                     screenState = ScreenState.SCREEN_ON
                 )
