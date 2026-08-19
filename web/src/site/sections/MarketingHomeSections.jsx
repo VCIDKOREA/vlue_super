@@ -101,7 +101,7 @@ export function DownloadSection() {
         <div className="flex-1">
           <h2 className="section-title">VLUE 앱으로 더 안전하게</h2>
           <p className="section-subtitle">
-            실시간 알림, 가족 보안 모니터링, 블루쇼핑까지 — 모바일 앱에서 이용하세요.
+            블루 쇼케이스, 디지털 인증명함, 가족 보호는 모바일 앱에서 이용하세요.
           </p>
         </div>
         <a href={appEntryUrl("download")} className="btn-primary shrink-0 no-underline">

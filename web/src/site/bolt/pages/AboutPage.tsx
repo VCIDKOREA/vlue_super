@@ -333,7 +333,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
   );
   const aboutHeroSubtitle = showPc
     ? ABOUT_HERO.subtitle
-    : 'www.vlue.kr에서 기관을 확인하고, 모바일 앱에서 실시간으로 보호받으세요. 하나의 계정으로 데이터가 연결됩니다.';
+    : 'www.vlue.kr에서 기관을 확인하고, 모바일 앱에서 블루 쇼케이스·디지털 인증명함·가족보호를 이용하세요. 하나의 계정으로 개인케이스가 연결됩니다.';
   const installSectionTitle = showPc ? 'PC·모바일 설치 프로그램' : '모바일 앱';
   const installCtaLabel = showPc ? 'PC·모바일 설치' : '모바일 앱 설치';
   const syncPrinciples = SYNC_PRINCIPLES.map((item) =>
@@ -704,7 +704,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
               </span>
             }
             title={installSectionTitle}
-            desc="블루 쇼케이스·디지털 인증명함·실시간 알림·가족보호는 모바일 앱 설치 후 이용합니다. 브라우저 웹앱(/app)은 제공하지 않습니다."
+            desc="블루 쇼케이스·디지털 인증명함·가족보호는 모바일 앱 설치 후 이용합니다. 브라우저 웹앱(/app)은 제공하지 않습니다."
           />
 
           <div className="flex flex-wrap gap-2 mb-6">

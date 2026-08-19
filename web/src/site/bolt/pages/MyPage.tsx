@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Shield, CheckCircle, Clock, Camera, Grid2x2 as Grid, Plus, Star, MapPin, Bell, ChevronRight, Award, Lock, Upload, Video, AlertTriangle, TrendingUp, Eye, Heart, MessageCircle, Bookmark, User, Settings, LogOut } from 'lucide-react';
 import { VlueBrandMark } from '../../../components/VlueBrandLogo.jsx';
+import { isWebViewV1Enabled } from '../../../lib/v1ReleaseScope.js';
 
 interface MyPageProps {
   user: { email: string; grade?: 'basic' | 'certified' };
@@ -463,6 +464,7 @@ export default function MyPage({ user, onNavigate, onLogout }: MyPageProps) {
               ))}
             </div>
 
+            {isWebViewV1Enabled('safezone') ? (
             <div className="card p-5">
               <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-primary-500" />
@@ -479,6 +481,7 @@ export default function MyPage({ user, onNavigate, onLogout }: MyPageProps) {
                 안심 구역 관리하기
               </button>
             </div>
+            ) : null}
           </div>
         )}
 

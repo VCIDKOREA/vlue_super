@@ -313,7 +313,9 @@ export default function App() {
           />
         )}
         {view === 'mail' && isWebViewV1Enabled('mail') && <SecureMailPage onBack={() => handleNavigate('home')} />}
-        {view === 'download' && <DownloadPage onBack={() => handleNavigate('home')} />}
+        {view === 'download' && (
+          <DownloadPage onBack={() => handleNavigate('home')} onNavigate={handleNavigate} />
+        )}
         {view === 'news' && <NewsPage onBack={() => handleNavigate('home')} />}
         {view === 'events' && isWebViewV1Enabled('events') && <EventsPage onBack={() => handleNavigate('home')} />}
         {view === 'jobs' && isWebViewV1Enabled('jobs') && <JobsPage user={user} onLoginClick={handleLoginRequired} onBack={() => handleNavigate('home')} />}

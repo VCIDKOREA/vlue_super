@@ -13,7 +13,9 @@ export const V1_WEB_EXCLUDED_VIEWS = new Set([
   "jobs",
   "mail-settings",
   "mail",
-  "exceleditor"
+  "exceleditor",
+  /** 위치 기반 안심영역 — V2 */
+  "safezone"
 ]);
 
 /** @type {ReadonlySet<string>} */

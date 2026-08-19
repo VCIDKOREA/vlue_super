@@ -39,7 +39,7 @@ const USER_MENU_ITEMS: { label: string; view: View; icon: typeof LayoutDashboard
   { label: '마이 쇼케이스', view: 'bizcard', icon: CreditCard },
   { label: '신뢰인증 신청', view: 'pricing', icon: Award },
   { label: '안심영역 설정', view: 'safezone', icon: MapPin },
-];
+].filter((item) => isWebViewV1Enabled(item.view));
 
 function useHeaderProfilePhoto() {
   const [tick, setTick] = useState(0);
@@ -204,6 +204,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
                       <Award className="w-4 h-4" />
                       신뢰인증 신청
                     </button>
+                    {isWebViewV1Enabled('safezone') ? (
                     <button
                       onClick={() => { handleNav('safezone'); }}
                       className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-colors"
@@ -211,6 +212,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
                       <MapPin className="w-4 h-4" />
                       안심영역 설정
                     </button>
+                    ) : null}
                     <button
                       onClick={() => { onLogout(); setUserMenuOpen(false); }}
                       className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"

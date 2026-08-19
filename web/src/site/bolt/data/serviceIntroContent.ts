@@ -18,7 +18,7 @@ export const ABOUT_HERO = {
     'VLUE(블루)는 보이스피싱·기관 사칭 피해를 줄이고, 검증된 기관과 사람이 안심하고 소통할 수 있도록 돕는 디지털 신뢰 플랫폼입니다. 공공데이터와 자체 인증을 결합해 “이 전화, 이 업체를 믿어도 될까?”에 답하고, 웹 검색과 설치형 앱의 통화 쇼케이스·인증명함·가족보호로 이어갑니다.',
   companyPoweredBy: 'Powered by VCID KOREA',
   subtitle:
-    'www.vlue.kr에서 기관을 확인하고, 모바일 앱에서 블루 쇼케이스·디지털 인증명함·가족보호로 실시간 보호받으세요. 하나의 계정으로 개인케이스가 연결됩니다.',
+    'www.vlue.kr에서 기관을 확인하고, 모바일 앱에서 블루 쇼케이스·디지털 인증명함·가족보호를 이용하세요. 하나의 계정으로 개인케이스가 연결됩니다.',
   searchHint: '아래에서 기관을 조회하거나, 궁금한 기능을 바로 찾아볼 수 있습니다.',
 };
 
@@ -62,7 +62,7 @@ export const PLATFORM_SPLIT = {
     color: 'indigo' as const,
     exclusive: [
       { id: 'showcase', title: '블루 쇼케이스', desc: '통화 중 프로필·SNS 연동' },
-      { id: 'alert', title: '실시간 알림', desc: '피싱·가족·공지 푸시' },
+      { id: 'alert', title: '통화 경로 안내', desc: '정상·비정상 경로 표시' },
       { id: 'hw', title: '기본 전화 앱·명함', desc: 'Android 통화 화면·인증명함 연동' },
     ],
     sharedLabel: '웹·앱 공통',
@@ -230,9 +230,9 @@ export const DEFAULT_DIALER_GUIDE = {
 } as const;
 
 export const INSTALL_HIGHLIGHTS = [
-  '수신 전화 실시간 위험 알림',
-  '위치 기반 안심영역',
-  '지문·Face ID 로그인',
+  '수신 전화 디지털 인증명함',
+  '블루 쇼케이스',
+  '가족 보호',
 ] as const;
 
 export const PRICING_TIER_FEATURES = MEMBERSHIP_PRICING_FEATURES;

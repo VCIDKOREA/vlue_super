@@ -2,9 +2,11 @@ import { Monitor, Smartphone, Download, CheckCircle, Apple, Chrome, ArrowLeft } 
 import { VlueBrandMark, VlueBrandLogo } from '../../../components/VlueBrandLogo.jsx';
 import { openVlueDownload, VLUE_APP_VERSION } from '../../../lib/vlueDownloadActions.js';
 import { isWebPcDownloadEnabled } from '../../../lib/v1ReleaseScope.js';
+import type { View } from '../types';
 
 interface DownloadPageProps {
   onBack: () => void;
+  onNavigate?: (view: View) => void;
 }
 
 const PC_FEATURES = [
@@ -17,11 +19,11 @@ const PC_FEATURES = [
 ];
 
 const MOBILE_FEATURES = [
-  '수신 전화 실시간 사기 위험 알림',
-  '위치 기반 안심영역 설정',
-  '음성 통화 중 즉시 기관 조회',
-  '지문·Face ID 간편 인증',
-  '오프라인 최근 검색 기록 보기',
+  '수신 전화 디지털 인증명함·블루 쇼케이스',
+  '의심 번호·공공기관 조회',
+  '통화 경로 정상·비정상 안내',
+  '가족 보호',
+  '개인케이스·명함 저장',
 ];
 
 const PC_SYSTEMS = [
@@ -34,7 +36,7 @@ const MOBILE_SYSTEMS = [
   { icon: Apple, label: 'iOS', sub: 'iOS 15 이상', badge: '' },
 ];
 
-export default function DownloadPage({ onBack }: DownloadPageProps) {
+export default function DownloadPage({ onBack, onNavigate }: DownloadPageProps) {
   const showPc = isWebPcDownloadEnabled();
 
   return (
@@ -63,8 +65,8 @@ export default function DownloadPage({ onBack }: DownloadPageProps) {
           </h1>
           <p className="text-gray-500 text-sm sm:text-base max-w-xl mx-auto" style={{ wordBreak: 'keep-all' }}>
             {showPc
-              ? <>PC와 모바일 모두에서 사기 피해를 예방하세요.<br />어떤 환경에서도 실시간으로 기관 신뢰도를 확인할 수 있습니다.</>
-              : <>모바일 앱으로 사기 피해를 예방하세요.<br />수신 전화·문자를 실시간으로 분석하고 기관 신뢰도를 확인할 수 있습니다.</>}
+              ? <>PC와 모바일에서 번호·기관을 확인하고, 앱에서는 수신 전화에 명함·쇼케이스를 띄울 수 있습니다.</>
+              : <>모바일 앱으로 수신 전화에 디지털 인증명함·쇼케이스를 띄우고, 웹에서는 번호·기관을 조회할 수 있습니다.</>}
           </p>
         </div>
 
@@ -209,12 +211,16 @@ export default function DownloadPage({ onBack }: DownloadPageProps) {
             <VlueBrandLogo size={48} />
           </div>
           <div className="flex-1">
-            <p className="font-bold text-gray-900 text-sm mb-0.5">모든 버전은 무료입니다</p>
+            <p className="font-bold text-gray-900 text-sm mb-0.5">앱 설치는 무료입니다</p>
             <p className="text-gray-500 text-xs" style={{ wordBreak: 'keep-all' }}>
-              VLUE 기본 검색 및 사기 탐지 기능은 회원가입 없이도 사용 가능합니다. 기업용 일괄 검증, 보안 메일 등 프리미엄 기능은 인증 플랜을 확인하세요.
+              가입·본인인증은 VLUE 앱에서 진행합니다. 디지털 인증명함·블루 쇼케이스·가족보호는 인증 플랜을 확인하세요.
             </p>
           </div>
-          <button className="btn-primary text-sm flex-shrink-0 whitespace-nowrap">
+          <button
+            type="button"
+            onClick={() => onNavigate?.('pricing')}
+            className="btn-primary text-sm flex-shrink-0 whitespace-nowrap"
+          >
             인증 플랜 보기
           </button>
         </div>

@@ -43,9 +43,9 @@ export const APP_PLATFORM = {
     },
     {
       id: 'alert',
-      title: '실시간 알림',
-      summary: 'SSE·푸시·경보',
-      detail: '보이스피싱 경보, 가족보호, 공지를 SSE·푸시로 즉시 전달합니다.',
+      title: '통화 경로 안내',
+      summary: '정상·비정상',
+      detail: '수신 전화의 통화 경로가 정상인지 비정상인지 앱에서 안내합니다.',
     },
     {
       id: 'hw',

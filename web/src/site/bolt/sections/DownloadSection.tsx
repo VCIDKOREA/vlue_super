@@ -4,7 +4,12 @@ import { openVlueDownload } from '../../../lib/vlueDownloadActions.js';
 import { isWebAiExcelEnabled, isWebPcDownloadEnabled } from '../../../lib/v1ReleaseScope.js';
 import type { View } from '../types';
 
-const FEATURES = ['실시간 보이스피싱 경보', 'VLUE 기관 인증 조회', '위치기반 안심영역 설정', '피해 즉시 신고 기능'];
+const FEATURES = [
+  '수신 전화 디지털 인증명함·쇼케이스',
+  'VLUE 기관·번호 조회',
+  '가족 보호',
+  '개인케이스',
+];
 
 interface DownloadSectionProps {
   onNavigate?: (view: View) => void;
@@ -30,11 +35,11 @@ export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
             <p className="text-white/70 text-base leading-relaxed mb-6">
               {showAiExcel
                 ? showPc
-                  ? '모바일·PC 앱으로 보이스피싱을 막고, 웹에서는 AI엑셀에디터로 업무 장부까지 한곳에서 이어가세요.'
-                  : '모바일 앱으로 보이스피싱을 막고, 웹에서는 AI엑셀에디터로 업무 장부까지 이어가세요.'
+                  ? '모바일·PC 앱으로 명함·쇼케이스를 띄우고, 웹에서는 AI엑셀에디터로 업무 장부까지 한곳에서 이어가세요.'
+                  : '모바일 앱으로 명함·쇼케이스를 띄우고, 웹에서는 AI엑셀에디터로 업무 장부까지 이어가세요.'
                 : showPc
-                  ? '모바일·PC 앱으로 보이스피싱을 막고, 웹에서는 기관 검색과 인증 서비스를 이용하세요.'
-                  : '모바일 앱으로 보이스피싱을 막고, 웹에서는 기관 검색과 인증 서비스를 이용하세요.'}
+                  ? '모바일·PC 앱으로 수신 전화에 명함·쇼케이스를 띄우고, 웹에서는 기관 검색과 인증 서비스를 이용하세요.'
+                  : '모바일 앱으로 수신 전화에 명함·쇼케이스를 띄우고, 웹에서는 기관 검색과 인증 서비스를 이용하세요.'}
             </p>
 
             <ul className="space-y-2 mb-8">
