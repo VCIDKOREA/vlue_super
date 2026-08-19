@@ -14,7 +14,6 @@ import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCach
 import { findDeviceContactName } from "../lib/contacts/hybridKnownContact.js";
 import { syncMemberIdentityToNative } from "../lib/showcaseSmsShare.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
-import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
 import { fetchFollowProfile } from "../lib/followApi.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
@@ -709,7 +708,6 @@ function LetteringOverlayHostInner() {
   }, []);
 
   const membershipTier = card?.membershipTier || "free";
-  const isPaid = isPaidLetteringTier(membershipTier);
   const styledCard = useMemo(() => {
     if (!card) return null;
     return applyShowcaseStyleToCard(
@@ -897,8 +895,9 @@ function LetteringOverlayHostInner() {
             }
           }}
           includeDigitalCard={Boolean(
-            verified && isPaid && styledCard?.showcaseStyle?.includeDigitalCard !== false
+            verified && styledCard?.showcaseStyle?.includeDigitalCard !== false
           )}
+          digitalCardOnly={onCall}
           savedContactName={
             String(styledCard?.profileKind || "") === "contact_safe_care"
               ? String(styledCard?.displayName || styledCard?.name || "").trim()

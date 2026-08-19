@@ -51,10 +51,14 @@ object OverlayCardOrgFill {
     }
 
     internal fun applyLocalDefaults(json: JSONObject) {
-        if (organizationOf(json).isNotBlank()) return
-        if (!isPlatformCeo(json)) return
-        json.put("companyName", "VCID KOREA")
-        json.put("organization", "VCID KOREA")
+        if (organizationOf(json).isBlank() && isPlatformCeo(json)) {
+            json.put("companyName", "VCID KOREA")
+            json.put("organization", "VCID KOREA")
+        }
+        val tier = json.optString("membershipTier").trim()
+        if (tier.isEmpty() && (json.optBoolean("is_verified", false) || isPlatformCeo(json))) {
+            json.put("membershipTier", "paid")
+        }
     }
 
     private fun isPlatformCeo(json: JSONObject): Boolean {

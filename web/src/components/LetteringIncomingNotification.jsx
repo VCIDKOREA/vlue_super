@@ -527,7 +527,13 @@ export default function LetteringIncomingNotification({
     "lettering-ongoing lettering-incoming-active relative flex w-full flex-col overflow-hidden";
   const isDcp = isDcpCard;
   const isContactSafeCare = isContactSafeCareCardFlag;
-  const isPaidMember = !isExpiredLine && (isDcp || (verified && isPaidLetteringTier(c.membershipTier)));
+  const isGlassTent = /\blettering-ongoing--fullscreen-tent\b/.test(String(className || ""));
+  const isPaidMember =
+    !isExpiredLine &&
+    (isDcp ||
+      (verified && isPaidLetteringTier(c.membershipTier)) ||
+      /* 실통화 오버레이 — 티어 오기 전 옛 천막 쇼케이스를 띄우지 않음 */
+      (verified && isGlassTent));
   const isFreeMember = !isExpiredLine && verified && !isPaidMember && !isDcp;
   const isUnverified = !isExpiredLine && !verified && !isDcp && !isContactSafeCare;
   const { setPlaybackPhase } = useShowcaseBgm();
@@ -865,7 +871,6 @@ export default function LetteringIncomingNotification({
     showReplayDial ||
     Boolean(onEndCall && onCall && !previewMode) ||
     showChromePreviewControls;
-  const isGlassTent = /\blettering-ongoing--fullscreen-tent\b/.test(String(className || ""));
   /** 통화목록 다시보기에서만 저장 CTA — 홈 미리보기·실통화 풀케이스에는 미노출 */
   const showCallLogSaveCta = Boolean(fromCallHistory && peerMatrix.showCallLogAction);
   /** Companion MVP: 실통화·「통화화면」미리보기 모두 4버튼 숨김 → 삼성 CTA */

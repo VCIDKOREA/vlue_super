@@ -6104,7 +6104,7 @@ body,
   pointer-events: none;
   overflow: hidden;
   background: transparent;
-  padding: 0;
+  padding: 18% 0 0;
 }
 
 .ldr-watermark__img {
@@ -6115,6 +6115,7 @@ body,
   opacity: 0.14;
   filter: none;
   mix-blend-mode: normal;
+  transform: translateY(18px);
 }
 
 .ldr-watermark--brand .ldr-watermark__img,
@@ -6719,6 +6720,7 @@ body,
   filter: none;
   mix-blend-mode: normal;
   animation: none;
+  transform: translateY(18px);
 }
 
 @keyframes ldr-watermark-drift {

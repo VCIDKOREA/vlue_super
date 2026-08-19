@@ -32,6 +32,14 @@ class OverlayCardOrgFillTest {
     }
 
     @Test
+    fun verifiedLookup_defaultsPaidTier() {
+        val raw = """{"matched":true,"is_verified":true,"displayName":"이종근","publicHandle":"ceo"}"""
+        val filled = OverlayCardOrgFill.applyLocalDefaults(raw)
+        assertEquals("paid", JSONObject(filled).optString("membershipTier"))
+        assertEquals("VCID KOREA", JSONObject(filled).optString("companyName"))
+    }
+
+    @Test
     fun otherMember_withoutOrg_staysEmpty() {
         val raw = """{"matched":true,"displayName":"홍길동","publicHandle":"hong","companyName":""}"""
         assertFalse(OverlayCardOrgFill.hasOrganization(OverlayCardOrgFill.applyLocalDefaults(raw)))

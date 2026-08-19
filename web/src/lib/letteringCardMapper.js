@@ -105,7 +105,7 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       profile.membershipTier ||
       body.membershipTier ||
       nested.membershipTier ||
-      (body.is_premium_line || body.digitalCardActive ? "paid" : "free"),
+      (body.is_premium_line || body.digitalCardActive || body.is_verified ? "paid" : "free"),
     authPaidAt: body.authPaidAt || nested.authPaidAt || profile.authPaidAt || null,
     authCycleEndAt:
       body.authCycleEndAt ||
