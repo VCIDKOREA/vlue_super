@@ -66,8 +66,10 @@ object CardLookupRepository {
             val numberParam = agency?.shortNumber ?: e164
             val result = lookupOnce(context, base, numberParam, dcpRoute)
             if (result != null && result.matched) {
-                remember(rawNumber, result)
+                val filled = result.copy(rawJson = OverlayCardOrgFill.fillIfMissing(context, result.rawJson))
+                remember(rawNumber, filled)
                 bg.execute { reportLineCallEvent(context, rawNumber) }
+                return@withContext filled
             }
             return@withContext result
         }

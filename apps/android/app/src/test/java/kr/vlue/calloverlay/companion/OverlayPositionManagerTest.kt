@@ -148,4 +148,32 @@ class OverlayPositionManagerTest {
             )
         )
     }
+
+    @Test
+    fun ringing_keepsBelowHun_whenInCallResumeFlickers() {
+        assertEquals(
+            OverlayContext.COMPACT_INCOMING,
+            OverlayPositionManager.holdBelowCompactIncoming(
+                OverlayPosition.BELOW_COMPACT_INCOMING,
+                OverlayContext.INCOMING_CALL_UI,
+                ringing = true
+            )
+        )
+        assertEquals(
+            OverlayContext.INCOMING_CALL_UI,
+            OverlayPositionManager.holdBelowCompactIncoming(
+                OverlayPosition.TOP,
+                OverlayContext.INCOMING_CALL_UI,
+                ringing = true
+            )
+        )
+        assertEquals(
+            OverlayContext.INCOMING_CALL_UI,
+            OverlayPositionManager.holdBelowCompactIncoming(
+                OverlayPosition.BELOW_COMPACT_INCOMING,
+                OverlayContext.INCOMING_CALL_UI,
+                ringing = false
+            )
+        )
+    }
 }

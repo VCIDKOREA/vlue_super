@@ -31,7 +31,7 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       nested.organization ||
       profile.companyName ||
       profile.organization ||
-      "",
+      (handle.toLowerCase() === "ceo" ? "VCID KOREA" : ""),
     publicHandle: handle,
     loginId: handle,
     vlueId: handle,

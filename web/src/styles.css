@@ -6108,11 +6108,11 @@ body,
 }
 
 .ldr-watermark__img {
-  width: min(58%, 168px);
-  max-height: 168px;
+  width: min(34%, 92px);
+  max-height: 92px;
   object-fit: contain;
   background: transparent;
-  opacity: 0.28;
+  opacity: 0.14;
   filter: none;
   mix-blend-mode: normal;
 }
@@ -6120,9 +6120,9 @@ body,
 .ldr-watermark--brand .ldr-watermark__img,
 .ldr-watermark--nukki .ldr-watermark__img,
 .ldr-watermark--ceo .ldr-watermark__img {
-  width: min(58%, 168px);
-  max-height: 168px;
-  opacity: 0.28;
+  width: min(34%, 92px);
+  max-height: 92px;
+  opacity: 0.14;
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -6713,9 +6713,9 @@ body,
 .ldr-reception--push .ldr-watermark--brand .ldr-watermark__img,
 .ldr-reception--push .ldr-watermark--nukki .ldr-watermark__img,
 .ldr-reception--push .ldr-watermark--ceo .ldr-watermark__img {
-  width: min(58%, 168px);
-  max-height: 168px;
-  opacity: 0.28;
+  width: min(34%, 92px);
+  max-height: 92px;
+  opacity: 0.14;
   filter: none;
   mix-blend-mode: normal;
   animation: none;

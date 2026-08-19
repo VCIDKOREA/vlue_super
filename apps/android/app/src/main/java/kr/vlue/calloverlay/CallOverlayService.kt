@@ -39,6 +39,7 @@ import kr.vlue.calloverlay.companion.CompactIncomingMetrics
 import kr.vlue.calloverlay.companion.OverlayContext
 import kr.vlue.calloverlay.companion.OverlayContextDetector
 import kr.vlue.calloverlay.companion.OverlayPosition
+import kr.vlue.calloverlay.companion.OverlayPositionManager
 import kr.vlue.calloverlay.companion.OverlayState
 import kr.vlue.calloverlay.companion.OverlayTriggerEvent
 import kr.vlue.calloverlay.companion.ScreenState
@@ -1622,7 +1623,8 @@ class CallOverlayService : Service() {
     }
 
     private fun injectCardLookupJson(view: WebView?, cardJson: String) {
-        val escaped = org.json.JSONObject.quote(cardJson)
+        val patched = OverlayCardOrgFill.applyLocalDefaults(cardJson)
+        val escaped = org.json.JSONObject.quote(patched)
         view?.evaluateJavascript(
             "try{window.__VLUE_CARD_LOOKUP__=JSON.parse($escaped);" +
                 "window.dispatchEvent(new CustomEvent('vlue-card-lookup',{detail:window.__VLUE_CARD_LOOKUP__}));" +
@@ -2582,7 +2584,18 @@ class CallOverlayService : Service() {
         val prevState = companion.state
         val prevPos = companion.position
         val forceRinging = companion.state == OverlayState.BIG_PUSH && !isCallAlreadyAnswered()
-        var ctx = detectOverlayContext(forceRinging = forceRinging)
+        val detected = detectOverlayContext(forceRinging = forceRinging)
+        val ctx = OverlayPositionManager.holdBelowCompactIncoming(
+            prevPos,
+            detected,
+            ringing = forceRinging
+        )
+        if (ctx != detected) {
+            android.util.Log.i(
+                "VlueOverlayCtx",
+                "holdBelowHun source=$source prevPos=$prevPos detected=${detected.name} held=${ctx.name}"
+            )
+        }
         if (companion.state == OverlayState.SHOWCASE || companion.state == OverlayState.MINI_CASE) {
             val hold =
                 android.os.SystemClock.elapsedRealtime() < showcaseHoldUntilElapsed

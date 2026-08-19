@@ -42,4 +42,19 @@ object OverlayPositionManager {
             OverlayContext.MINIMIZED -> OverlayPosition.HIDDEN
         }
     }
+
+    /**
+     * 링잉 빅푸시가 미니 수신 팝업 아래에 붙은 뒤에는 상단(TOP)으로 올리지 않는다.
+     * 조회가 끝나 상호가 채워질 때 InCallUI resume 오판으로 HUN 을 가리는 것을 막는다.
+     */
+    fun holdBelowCompactIncoming(
+        previous: OverlayPosition,
+        nextContext: OverlayContext,
+        ringing: Boolean
+    ): OverlayContext {
+        if (!ringing) return nextContext
+        if (previous != OverlayPosition.BELOW_COMPACT_INCOMING) return nextContext
+        if (nextContext != OverlayContext.INCOMING_CALL_UI) return nextContext
+        return OverlayContext.COMPACT_INCOMING
+    }
 }

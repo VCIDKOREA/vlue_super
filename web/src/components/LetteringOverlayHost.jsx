@@ -142,6 +142,11 @@ function buildUnverifiedOverlayCard(phone) {
   };
 }
 
+function overlayCardHasOrg(card) {
+  if (!card || typeof card !== "object") return false;
+  return Boolean(String(card.organization || card.companyName || "").trim());
+}
+
 function isDcpOverlayCard(card) {
   if (!card || typeof card !== "object") return false;
   if (isContactSafeCareCard(card)) return false;
@@ -394,7 +399,7 @@ function LetteringOverlayHostInner() {
             return;
           }
           const waitForLogo = isDcpOverlayCard(mapped);
-          matchedRef.current = !waitForLogo;
+          matchedRef.current = !waitForLogo && overlayCardHasOrg(mapped);
           setCard((prev) => mergeDcpCard(prev, mapped));
           setVerified(true);
           setLoading(false);
@@ -499,7 +504,7 @@ function LetteringOverlayHostInner() {
           const isDcp = isDcpOverlayCard(mapped);
           const staleDcp = isDcp && incoming && !dcpCardMatchesIncoming(mapped, incoming);
           if (!staleDcp) {
-            if (!isDcp) matchedRef.current = true;
+            if (!isDcp) matchedRef.current = overlayCardHasOrg(mapped);
             setCard((prev) => mergeDcpCard(prev, mapped));
             setVerified(true);
             setLoading(false);
@@ -513,7 +518,7 @@ function LetteringOverlayHostInner() {
               setCard((prev) => ({ ...(prev || {}), ...card, showcaseStyle: style }));
               setShowcaseStyle(style);
             }
-            if (!isDcp) return;
+            if (!isDcp && overlayCardHasOrg(mapped)) return;
           }
         }
       }

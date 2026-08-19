@@ -156,13 +156,17 @@ object LetteringCallCoordinator {
                 }
             val cachedMember =
                 if (agency == null && !nextUnknown) CardLookupRepository.peekCached(raw) else null
+            val cachedJson = cachedMember?.rawJson?.let { OverlayCardOrgFill.applyLocalDefaults(it) }
             val overlayJson =
                 pathJson
-                    ?: cachedMember?.rawJson?.let { cached ->
+                    ?: cachedJson?.let { cached ->
+                        val withOrg =
+                            if (OverlayCardOrgFill.hasOrganization(cached)) cached else null
+                        val body = withOrg ?: return@let null
                         if (dcpVerdict != null) {
-                            CallPathLookupMerge.merge(cached, dcpVerdict, outgoing).json
+                            CallPathLookupMerge.merge(body, dcpVerdict, outgoing).json
                         } else {
-                            cached
+                            body
                         }
                     }
             val overlayNumber = agency?.shortNumber ?: raw
@@ -178,6 +182,22 @@ object LetteringCallCoordinator {
                     "path-verify ${ReleaseDebugGate.maskPhoneForLog(overlayNumber)} " +
                         "route=${dcpVerdict.routeQuery} reasons=${dcpVerdict.reasons} mock=${dcpVerdict.fromMock}"
                 )
+            }
+
+            /* 조회는 창 부착과 동시에 — WebView 로딩 동안 상호를 채운다 */
+            if (agency != null && dcpVerdict != null) {
+                scope.launch {
+                    enrichDcpLookup(app, agency, dcpVerdict, outgoing)
+                }
+            } else if (nextUnknown) {
+                val startedAt = lastRingAt
+                scope.launch {
+                    upgradeNumberAfterOverlay(app, outgoing, gen, startedAt)
+                }
+            } else {
+                scope.launch {
+                    enrichWithLookup(app, raw, outgoing)
+                }
             }
 
             /* 1) Permission → Overlay 즉시 (diag/lookup 보다 먼저) */
@@ -240,21 +260,6 @@ object LetteringCallCoordinator {
                 LetteringIncomingNotifier.post(app, raw, outgoing, forceFallback = true)
             }
 
-            /* 4) 번호/회원 enrich — Overlay 이후 IO. 화이트리스트는 DCP 경로만. */
-            if (agency != null && dcpVerdict != null) {
-                scope.launch {
-                    enrichDcpLookup(app, agency, dcpVerdict, outgoing)
-                }
-            } else if (nextUnknown) {
-                val startedAt = lastRingAt
-                scope.launch {
-                    upgradeNumberAfterOverlay(app, outgoing, gen, startedAt)
-                }
-            } else {
-                scope.launch {
-                    enrichWithLookup(app, raw, outgoing)
-                }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "onRinging failed", e)
             LetteringPrefs.setLastOverlayError(context, "onRinging:${e.message}")

@@ -99,6 +99,35 @@ function firstStr(...values: unknown[]): string {
   return "";
 }
 
+/**
+ * 오버레이 슬림 조회 — export_snapshot_json 통째 SELECT 없이 상호만 JSON path.
+ * business_cards.company_name 이 비어 있는 CEO·개인명함(VCID KOREA 등) 보정.
+ */
+async function loadOverlayOrgByUserId(userId: string): Promise<string> {
+  const rows = await prisma.$queryRaw<Array<{ org: string | null }>>`
+    SELECT COALESCE(
+      NULLIF(TRIM(organization), ''),
+      NULLIF(TRIM(export_snapshot_json->>'organization'), ''),
+      NULLIF(TRIM(export_snapshot_json->>'companyName'), '')
+    ) AS org
+    FROM digital_cards
+    WHERE user_id = ${userId}::uuid
+    LIMIT 1
+  `;
+  return firstStr(rows[0]?.org);
+}
+
+async function resolveOverlayCompanyName(opts: {
+  lineCompany?: string | null;
+  digitalOrg?: string | null;
+  profileCompany?: string | null;
+  userId: string;
+}): Promise<string> {
+  const ready = firstStr(opts.lineCompany, opts.digitalOrg, opts.profileCompany);
+  if (ready) return ready;
+  return loadOverlayOrgByUserId(opts.userId);
+}
+
 function httpOnlyUrl(v: unknown): string {
   const t = String(v || "").trim();
   if (!t || /^\s*data:/i.test(t) || /^\s*blob:/i.test(t)) return "";
@@ -394,12 +423,14 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           legalName: true,
           identityVerified: true,
           isShowcasePrivate: true,
+          businessProfile: { select: { companyName: true } },
           digitalCard: {
             select: {
               photoUrl: true,
               logoUrl: true,
               displayName: true,
-              titleSnapshot: true
+              titleSnapshot: true,
+              organization: true
             }
           }
         }
@@ -441,6 +472,12 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       "";
     const isCeo = isPlatformCeoHandle(card.user.publicHandle);
     const imageUrl = photo || (isCeo ? ceoDefaultBrandLogoUrl() : "");
+    const companyName = await resolveOverlayCompanyName({
+      lineCompany: card.companyName,
+      digitalOrg: card.user.digitalCard?.organization,
+      profileCompany: card.user.businessProfile?.companyName,
+      userId: card.user.id
+    });
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -453,7 +490,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           kind: card.kind,
           displayName,
           jobTitle: firstStr(card.jobTitle, card.user.digitalCard?.titleSnapshot),
-          companyName: card.companyName || "",
+          companyName,
           email: "",
           profile: {},
           website: "",
@@ -493,7 +530,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           photoUrl: true,
           logoUrl: true,
           displayName: true,
-          titleSnapshot: true
+          titleSnapshot: true,
+          organization: true
         }
       }
     }
@@ -503,6 +541,11 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
     const isCeo = isPlatformCeoHandle(user.publicHandle);
     const photo =
       (typeof user.digitalCard?.photoUrl === "string" && user.digitalCard.photoUrl.trim()) || "";
+    const companyName = await resolveOverlayCompanyName({
+      digitalOrg: user.digitalCard?.organization,
+      profileCompany: user.businessProfile?.companyName,
+      userId: user.id
+    });
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -514,7 +557,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           displayName: firstStr(user.digitalCard?.displayName, user.legalName),
           publicHandle: user.publicHandle || "",
           jobTitle: firstStr(user.digitalCard?.titleSnapshot, user.businessProfile?.jobTitle),
-          companyName: user.businessProfile?.companyName || "",
+          companyName,
           email: "",
           profile: {},
           image_url: photo || (isCeo ? ceoDefaultBrandLogoUrl() : null),
