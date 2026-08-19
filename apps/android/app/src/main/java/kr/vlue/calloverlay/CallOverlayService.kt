@@ -1074,9 +1074,14 @@ class CallOverlayService : Service() {
             val ctx = when (surface) {
                 ForegroundPackageProbe.RingingSurface.FULL_INCALL ->
                     OverlayContext.INCOMING_CALL_UI
-                ForegroundPackageProbe.RingingSurface.COMPACT_DIALER,
-                ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER ->
+                ForegroundPackageProbe.RingingSurface.COMPACT_DIALER ->
                     OverlayContext.COMPACT_INCOMING
+                /*
+                 * "기본 전화앱 미니 수신 UI" 에서만 팝업 바로 아래.
+                 * 홈/타앱/HUN 추정은 모두 상단(TOP)으로 두어 겹침·출렁임을 막는다.
+                 */
+                ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER ->
+                    OverlayContext.INCOMING_CALL_UI
             }
             val detail =
                 "phase=RINGING surface=$surface ctx=${ctx.name} ourApp=$ourApp " +

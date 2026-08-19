@@ -351,7 +351,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
       /* resolve 결과에 페이지가 없을 때만 공개 라이브 보강 (중복 GET 제거) */
       if (matched && peerUserId && !isDcp && !styleHasShowcaseContent(peerStyle)) {
-        const live = await fetchPeerLiveStylePublic(peerUserId, { force: true });
+        const live = await fetchPeerLiveStylePublic(peerUserId, { force: true, number: phone });
         if (live && typeof live === "object") {
           peerStyle = {
             ...peerStyle,

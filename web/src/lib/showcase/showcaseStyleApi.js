@@ -2,6 +2,7 @@ import { apiUrl } from "../apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "../vlueAuthHeaders.js";
 import { readDccLinePreview, readSelectedDccLineId } from "../dccLineState.js";
 import { fetchDccLineShowcase, putDccLineShowcase } from "../dccLinesApi.js";
+import { normalizePhoneDigits } from "../letteringPhoneMatch.js";
 
 /** GET /api/lettering/showcase/style — 조건부 hydrate (If-None-Match) */
 export async function fetchShowcaseStyleBundle(opts = {}) {
@@ -117,11 +118,21 @@ const PUBLIC_PEER_LIVE_TTL_MS = 90_000;
 /** 동일 userId 동시 요청 합치기 — OverlayHost 네이티브+웹 레이스 egress 방어 */
 const publicPeerLiveInflight = new Map();
 
-function rememberPeerLive(id, live, liveSource, updatedAt) {
-  if (!id || !live || typeof live !== "object") return;
+function peerPublicCacheKey(userId, phoneRaw = "") {
+  const id = String(userId || "").trim();
+  const digits = normalizePhoneDigits(phoneRaw);
+  return digits ? `${id}:${digits}` : id;
+}
+
+function rememberPeerLive(cacheKey, live, liveSource, updatedAt, opts = {}) {
+  if (!cacheKey || !live || typeof live !== "object") return;
   const at = Date.now();
-  peerCache.set(id, { live, liveSource: liveSource ?? null, updatedAt: updatedAt ?? null, at });
-  publicPeerLiveCache.set(id, { live, updatedAt: updatedAt ?? null, at });
+  const mirrorAuth = opts.mirrorAuth !== false;
+  const userId = String(opts.userId || cacheKey).trim();
+  if (mirrorAuth && userId) {
+    peerCache.set(userId, { live, liveSource: liveSource ?? null, updatedAt: updatedAt ?? null, at });
+  }
+  publicPeerLiveCache.set(cacheKey, { live, liveSource: liveSource ?? null, updatedAt: updatedAt ?? null, at });
 }
 
 /**
@@ -132,23 +143,28 @@ export async function fetchPeerLiveStylePublic(userId, opts = {}) {
   const id = String(userId || "").trim();
   if (!id) return null;
   const force = Boolean(opts.force);
+  const number = String(opts.number || opts.phone || "").trim();
+  const cacheKey = peerPublicCacheKey(id, number);
   const now = Date.now();
   if (!force) {
-    const mem = publicPeerLiveCache.get(id);
+    const mem = publicPeerLiveCache.get(cacheKey);
     if (mem?.live && now - mem.at < PUBLIC_PEER_LIVE_TTL_MS) return mem.live;
-    const authCached = peerCache.get(id);
+    const authCached = !number ? peerCache.get(id) : null;
     if (authCached?.live && now - authCached.at < PEER_CACHE_TTL_MS) return authCached.live;
-    const inflight = publicPeerLiveInflight.get(id);
+    const inflight = publicPeerLiveInflight.get(cacheKey);
     if (inflight) return inflight;
   }
 
   const run = (async () => {
     try {
       const headers = { Accept: "application/json" };
-      const cachedMeta = publicPeerLiveCache.get(id) || peerCache.get(id);
+      const cachedMeta = publicPeerLiveCache.get(cacheKey) || (!number ? peerCache.get(id) : null);
       const etag = !force && cachedMeta?.updatedAt ? String(cachedMeta.updatedAt) : "";
       if (etag) headers["If-None-Match"] = `"${etag}"`;
-      const q = etag ? `?sinceUpdatedAt=${encodeURIComponent(etag)}` : "";
+      const params = new URLSearchParams();
+      if (etag) params.set("sinceUpdatedAt", etag);
+      if (number) params.set("number", number);
+      const q = params.toString() ? `?${params.toString()}` : "";
       const styleUrl = apiUrl(`/api/lettering/showcase/style/${encodeURIComponent(id)}${q}`);
       const styleRes = await fetch(styleUrl, {
         method: "GET",
@@ -158,14 +174,20 @@ export async function fetchPeerLiveStylePublic(userId, opts = {}) {
       });
       const styleData = await styleRes.json().catch(() => ({}));
       if (styleRes.ok && styleData?.unchanged) {
-        const prev = publicPeerLiveCache.get(id) || peerCache.get(id);
+        const prev = publicPeerLiveCache.get(cacheKey) || (!number ? peerCache.get(id) : null);
         if (prev?.live) {
-          rememberPeerLive(id, prev.live, prev.liveSource ?? null, styleData.updatedAt || prev.updatedAt);
+          rememberPeerLive(cacheKey, prev.live, prev.liveSource ?? null, styleData.updatedAt || prev.updatedAt, {
+            userId: id,
+            mirrorAuth: !number
+          });
           return prev.live;
         }
       }
       if (styleRes.ok && styleData?.live && typeof styleData.live === "object") {
-        rememberPeerLive(id, styleData.live, styleData.liveSource ?? null, styleData.updatedAt ?? null);
+        rememberPeerLive(cacheKey, styleData.live, styleData.liveSource ?? null, styleData.updatedAt ?? null, {
+          userId: id,
+          mirrorAuth: !number
+        });
         return styleData.live;
       }
       /* 404 등 — auth 폴백으로 두 번 치지 않음 (미존재·비공개) */
@@ -185,11 +207,11 @@ export async function fetchPeerLiveStylePublic(userId, opts = {}) {
   })();
 
   if (!force) {
-    publicPeerLiveInflight.set(id, run);
+    publicPeerLiveInflight.set(cacheKey, run);
     try {
       return await run;
     } finally {
-      if (publicPeerLiveInflight.get(id) === run) publicPeerLiveInflight.delete(id);
+      if (publicPeerLiveInflight.get(cacheKey) === run) publicPeerLiveInflight.delete(cacheKey);
     }
   }
   return run;

@@ -88,11 +88,14 @@ async function enrichOverlayPeerBundle(peerUserId, nextCard) {
       style: createDefaultShowcaseStyle()
     };
   }
-  const existing = overlayPeerEnrichInflight.get(id);
+  const peerNumber =
+    String(nextCard?.phone || nextCard?.registeredPhone || nextCard?.incomingNumber || "").trim();
+  const inflightKey = peerNumber ? `${id}:${peerNumber}` : id;
+  const existing = overlayPeerEnrichInflight.get(inflightKey);
   if (existing) return existing;
   const run = (async () => {
     const [live, enriched] = await Promise.all([
-      fetchPeerLiveStylePublic(id, { force: false }),
+      fetchPeerLiveStylePublic(id, { force: false, number: peerNumber }),
       enrichPeerCardFromProfile(id, nextCard)
     ]);
     return {
@@ -100,11 +103,13 @@ async function enrichOverlayPeerBundle(peerUserId, nextCard) {
       style: live && typeof live === "object" ? live : createDefaultShowcaseStyle()
     };
   })();
-  overlayPeerEnrichInflight.set(id, run);
+  overlayPeerEnrichInflight.set(inflightKey, run);
   try {
     return await run;
   } finally {
-    if (overlayPeerEnrichInflight.get(id) === run) overlayPeerEnrichInflight.delete(id);
+    if (overlayPeerEnrichInflight.get(inflightKey) === run) {
+      overlayPeerEnrichInflight.delete(inflightKey);
+    }
   }
 }
 

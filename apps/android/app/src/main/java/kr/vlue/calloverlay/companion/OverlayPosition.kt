@@ -23,5 +23,5 @@ enum class OverlayPosition {
  */
 object CompactIncomingMetrics {
     const val CARD_HEIGHT_DP = 168
-    const val GAP_DP = 6
+    const val GAP_DP = 12
 }
