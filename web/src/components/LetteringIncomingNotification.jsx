@@ -335,7 +335,8 @@ export default function LetteringIncomingNotification({
         /* ignore */
       }
     }
-    if (next && verified && typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
+    /* 실통화 펼침은 BGM 잠금 유지 — 미니→풀 복원 탭이 preview 재생을 열면 안 됨 */
+    if (next && verified && !liveOnCall && typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
       window.__vlueUnlockShowcaseBgm();
       window.setTimeout(() => window.__vlueUnlockShowcaseBgm?.(), 80);
       window.setTimeout(() => window.__vlueUnlockShowcaseBgm?.(), 280);
@@ -918,6 +919,8 @@ export default function LetteringIncomingNotification({
     isUnverified ||
     isExpiredLine ||
     Boolean(previewMode && !isExpandedView && !fromCallHistory);
+  /** 실통화 풀쇼케이스 — 미니↔풀 전환으로 BGM이 다시 켜지지 않게 */
+  const carouselMuteForLiveCall = Boolean(onCall && !previewMode && !fromCallHistory);
   const showcasePhotos = c.showcaseStyle?.gallery?.photos || [];
   const showcaseStyleConfig = c.showcaseStyle || null;
 
@@ -1373,6 +1376,7 @@ export default function LetteringIncomingNotification({
                       onSlideTypeChange={setCarouselSlideType}
                       showcaseStyle={showcaseStyleConfig}
                       suppressBgm={carouselSuppressBgm}
+                      muteForLiveCall={carouselMuteForLiveCall}
                     />
                   ) : keypadOpen ? (
                     <InCallDtmfPad
@@ -1441,6 +1445,7 @@ export default function LetteringIncomingNotification({
                       onSlideTypeChange={setCarouselSlideType}
                       showcaseStyle={showcaseStyleConfig}
                       suppressBgm={carouselSuppressBgm}
+                      muteForLiveCall={carouselMuteForLiveCall}
                       callChromeSafe={showInCallControls}
                     />
                   ) : (

@@ -124,6 +124,19 @@ function parseOverlayParams() {
   };
 }
 
+/** 웹 리스너 전에 도착한 네이티브 통화 상태 */
+function readQueuedNativeCallState() {
+  try {
+    if (typeof window === "undefined") return "";
+    return String(window.__VLUE_LAST_CALL_STATE__ || "");
+  } catch {
+    return "";
+  }
+}
+
+/** 빠른 수화 시 명함이 칩보다 먼저 뜨지 않게 */
+const OVERLAY_IDENTITY_CHIP_MIN_MS = 480;
+
 function isUnknownIncoming(phone) {
   return isUnknownPhoneToken(phone);
 }
@@ -240,15 +253,23 @@ function LetteringOverlayHostInner() {
   const [certOpen, setCertOpen] = useState(false);
   const [certPayload, setCertPayload] = useState(null);
   const [toast, setToast] = useState("");
-  const [callState, setCallState] = useState(() =>
-    normalizeCallState(phase) === CALL_STATES.CONNECTED ? CALL_STATES.CONNECTED : CALL_STATES.RINGING
-  );
+  const [callState, setCallState] = useState(() => {
+    const queued = normalizeCallState(readQueuedNativeCallState());
+    if (queued === CALL_STATES.CONNECTED) return CALL_STATES.CONNECTED;
+    return normalizeCallState(phase) === CALL_STATES.CONNECTED
+      ? CALL_STATES.CONNECTED
+      : CALL_STATES.RINGING;
+  });
   const [showcaseStyle, setShowcaseStyle] = useState(() => createDefaultShowcaseStyle());
-  const [expanded, setExpanded] = useState(() => normalizeCallState(phase) === CALL_STATES.CONNECTED);
+  /* 수화 직후 신원 칩이 끝나기 전에는 풀 DCC를 펼치지 않음 */
+  const [expanded, setExpanded] = useState(false);
   /* Native BIG_PUSH 창 — 앱 쇼케이스바(접힘) 강제. MiniCase 금지 */
   const [forceShowcaseBar, setForceShowcaseBar] = useState(true);
+  const [identityHold, setIdentityHold] = useState(true);
   /* Mini→풀 복원 직후 늦게 도착하는 big_push_bar 로 다시 접히는 레이스 방지 */
   const restoreHoldUntilRef = useRef(0);
+  const loadingStartedAtRef = useRef(Date.now());
+  const autoExpandedOnceRef = useRef(false);
   /* 네이티브/웹 조회가 한 번 매칭되면 timeout·unmatched 로 되돌리지 않음 */
   const matchedRef = useRef(false);
 
@@ -353,10 +374,38 @@ function LetteringOverlayHostInner() {
 
   useEffect(() => {
     matchedRef.current = false;
+    autoExpandedOnceRef.current = false;
     setVerified(false);
     setCard(null);
     setLoading(true);
+    setIdentityHold(true);
+    setExpanded(false);
+    setForceShowcaseBar(true);
+    loadingStartedAtRef.current = Date.now();
   }, [incoming]);
+
+  useEffect(() => {
+    if (loading) return undefined;
+    /* 링잉 중에는 칩을 붙잡지 않음 — 수화 전에 빅푸시 바가 바로 뜨게 */
+    if (callState !== CALL_STATES.CONNECTED) {
+      setIdentityHold(false);
+      return undefined;
+    }
+    const elapsed = Date.now() - loadingStartedAtRef.current;
+    const wait = Math.max(0, OVERLAY_IDENTITY_CHIP_MIN_MS - elapsed);
+    const t = window.setTimeout(() => setIdentityHold(false), wait);
+    return () => window.clearTimeout(t);
+  }, [loading, callState]);
+
+  const identityReady = !loading && !identityHold;
+
+  useEffect(() => {
+    if (callState !== CALL_STATES.CONNECTED || !identityReady) return;
+    if (autoExpandedOnceRef.current) return;
+    autoExpandedOnceRef.current = true;
+    setForceShowcaseBar(false);
+    setExpanded(true);
+  }, [callState, identityReady]);
 
   useEffect(() => {
     const onNativeCard = (ev) => {
@@ -660,6 +709,7 @@ function LetteringOverlayHostInner() {
         setExpanded(false);
       } else if (rawState === "restore_showcase") {
         restoreHoldUntilRef.current = Date.now() + 3500;
+        autoExpandedOnceRef.current = true;
         setForceShowcaseBar(false);
         setExpanded(true);
       }
@@ -669,14 +719,15 @@ function LetteringOverlayHostInner() {
         if (next === CALL_STATES.CONNECTED) {
           /*
            * CONNECTED = Web Content Ready / UI sync only.
+           * 풀 DCC 펼침은 신원 칩이 끝난 뒤 한 번만 (빠른 수화 레이스 방지).
            * OverlayState(SHOWCASE)는 Native ANSWER/OFFHOOK/ACTIVE → Controller.onAnswer 단일 책임.
            * restoreShowcaseOverlay는 사용자 Mini→Showcase 명시 요청에서만 호출.
            */
-          setForceShowcaseBar(false);
-          setExpanded(true);
+          restoreHoldUntilRef.current = Date.now() + 3500;
         }
         if (next === CALL_STATES.RINGING) {
           /* BigPush = 앱 쇼케이스바 */
+          autoExpandedOnceRef.current = false;
           setForceShowcaseBar(true);
           setExpanded(false);
         }
@@ -834,7 +885,7 @@ function LetteringOverlayHostInner() {
     return null;
   }
 
-  if (loading) {
+  if (loading || (identityHold && callState === CALL_STATES.CONNECTED && !expanded)) {
     /* FULLSCREEN 흰 바탕 점유 금지 — 투명 호스트 + 브랜드 확인 칩만 */
     return (
       <div

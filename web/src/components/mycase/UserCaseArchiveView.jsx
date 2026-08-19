@@ -42,7 +42,8 @@ export default function UserCaseArchiveView({
       const resolved = await resolveVlueShowcasePeer({
         userId,
         displayName,
-        forceStyle: true
+        forceStyle: true,
+        viewContext: "search"
       });
       if (!resolved?.card) {
         onToast?.("디지털인증명함을 불러오지 못했습니다.");

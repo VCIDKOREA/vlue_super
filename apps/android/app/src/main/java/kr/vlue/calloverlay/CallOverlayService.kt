@@ -2404,9 +2404,11 @@ class CallOverlayService : Service() {
          * OverlayState 전이는 하지 않는다 — ANSWER/OFFHOOK는 enterShowcaseFromAnswer → onAnswer.
          */
         mainHandler.post {
+            val safe = state.replace("'", "").replace("\\", "")
             val js =
-                "try{window.VlueLettering&&window.VlueLettering.onNativeCallState&&window.VlueLettering.onNativeCallState('${state}');" +
-                    "window.dispatchEvent(new CustomEvent('vlue-native-call-state',{detail:{callState:'${state}'}}));}catch(e){}"
+                "try{window.__VLUE_LAST_CALL_STATE__='$safe';" +
+                    "window.VlueLettering&&window.VlueLettering.onNativeCallState&&window.VlueLettering.onNativeCallState('$safe');" +
+                    "window.dispatchEvent(new CustomEvent('vlue-native-call-state',{detail:{callState:'$safe'}}));}catch(e){}"
             webView?.evaluateJavascript(js, null)
         }
     }

@@ -285,6 +285,7 @@ export default function LetteringBizcardQuickBuilder({
   orgChangePendingName = "",
   onOrgChangeSubmitted,
   onOrgChangeToast,
+  exposureSlot = null,
   onApply,
   applyLabel = "전체적용",
   toast = ""
@@ -369,6 +370,8 @@ export default function LetteringBizcardQuickBuilder({
           onToast={onOrgChangeToast}
         />
       ) : null}
+
+      {exposureSlot}
 
       <div className={`${panel} space-y-4`}>
         <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>프로필 · 이미지</p>

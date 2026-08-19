@@ -10,6 +10,7 @@ import {
   Check
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
+import { isMaskedPhoneDisplay } from "../lib/dccExposure.js";
 import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDisplay.js";
 import { formatLetteringContactEmailDisplay, photoFocusToCss } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard, resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
@@ -512,8 +513,11 @@ function FrontPanel({
   const [socialOpen, setSocialOpen] = useState(false);
   const socialItems = listCardSocialOutlinks(card);
   const hasSocial = socialItems.length > 0;
-  const phone = card.phone ? formatLetteringPhoneDisplay(card.phone) : "";
   const phoneRaw = String(card.phone || "").trim();
+  const phoneMasked = isMaskedPhoneDisplay(phoneRaw);
+  const phone = phoneMasked ? phoneRaw : card.phone ? formatLetteringPhoneDisplay(card.phone) : "";
+  const canDialPhone =
+    enableContactLinks && !phoneMasked && card.phoneDialEnabled !== false && Boolean(phoneRaw);
   const faxRaw = String(card.fax || "").trim();
   const fax = faxRaw ? formatLetteringPhoneDisplay(faxRaw) : "";
   const website = formatWebsite(card.website);
@@ -624,7 +628,7 @@ function FrontPanel({
         {phone ? (
           <FrontInfoRow icon={Phone} label="전화번호" className="ldr-front-info-row--phone">
             <span className="ldr-front-info-row__phone-line">
-              {enableContactLinks ? (
+              {canDialPhone ? (
                 <button
                   type="button"
                   className="ldr-front-phone-link ldr-front-phone-link--btn"
@@ -838,6 +842,7 @@ export default function LetteringDigitalReception({
 
   const requestDial = (phone, _displayName) => {
     if (!enableContactLinks) return;
+    if (isMaskedPhoneDisplay(phone)) return;
     /* 이메일·웹과 동일 — 확인 팝업 없이 즉시 일반전화(tel:) 연결 */
     if (!openPhoneDial(phone)) {
       setDialTarget({ phone, displayName: _displayName });

@@ -20,7 +20,7 @@ import "./friend-showcase-list.css";
 
 /**
  * 앱 홈 검색 — 키워드는 #해시태그 쇼케이스 프로필 목록 (웹 공공사업자 표는 미사용)
- * 인기순 / 거리순 정렬, 팔로우는 쇼케이스 안에서만
+ * 인기순 / 거리순. 거리순 = 검색 당시 기기 위치 → DCC 등록 주소. 검색자는 본인인증 로그인만 있으면 됨.
  */
 
 function BizSearchBar({ query, onQueryChange, onSubmit, logoSize = 22 }) {
@@ -76,6 +76,28 @@ function ResultSortBar({ sort, onSortChange }) {
       </button>
     </div>
   );
+}
+
+function requestSearchOrigin() {
+  return new Promise((resolve) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = Number(pos?.coords?.latitude);
+        const lng = Number(pos?.coords?.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+          resolve(null);
+          return;
+        }
+        resolve({ lat, lng });
+      },
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+    );
+  });
 }
 
 /**
@@ -141,8 +163,9 @@ function mapHitToRow(hit, i, tagLabel, idLabel = "") {
             : handle
               ? `@${handle}`
               : "쇼케이스",
-    phone: hit.phoneVisible ? hit.phone || "" : "",
-    phoneDisplay: hit.phoneVisible ? hit.phone || "" : "",
+    phone: hit.phoneVisible ? hit.phone || "" : hit.phone || "",
+    phoneDisplay: hit.phone || "",
+    phoneDialEnabled: hit.phoneDialEnabled !== false && hit.phoneVisible !== false,
     avatarUrl: String(hit.photoUrl || hit.avatarUrl || hit.logoUrl || "").trim(),
     publicHandle: handle,
     membershipTier: tier,
@@ -150,7 +173,8 @@ function mapHitToRow(hit, i, tagLabel, idLabel = "") {
     hasDigitalCard: isPaidLetteringTier(tier),
     tags,
     popular: popularScore(hit),
-    distance: typeof hit.distanceKm === "number" ? hit.distanceKm : Number(hit.distance) || 999 + i
+    distanceKm: typeof hit.distanceKm === "number" ? hit.distanceKm : null,
+    distanceRankEligible: hit.distanceRankEligible === true
   };
 }
 
@@ -182,6 +206,9 @@ export default function HomeBizDirectorySearch({
   const [searchMode, setSearchMode] = useState(/** @type {''|'hashtag'|'phone'|'name'|'id'} */ (""));
   const [apiSearching, setApiSearching] = useState(false);
   const [apiError, setApiError] = useState("");
+  const [origin, setOrigin] = useState(null);
+  const [originDenied, setOriginDenied] = useState(false);
+  const [originReady, setOriginReady] = useState(false);
   const [previewRow, setPreviewRow] = useState(null);
   const [previewKind, setPreviewKind] = useState(/** @type {'showcase'|'idcard'} */ ("showcase"));
   const [previewCard, setPreviewCard] = useState(null);
@@ -190,21 +217,38 @@ export default function HomeBizDirectorySearch({
 
   const rows = useMemo(() => {
     const mapped = apiHits.map((hit, i) => mapHitToRow(hit, i, tagLabel, idLabel));
-    const list = [...mapped];
     if (sort === "distance") {
-      list.sort((a, b) => a.distance - b.distance || b.popular - a.popular);
-    } else {
-      list.sort((a, b) => b.popular - a.popular || a.name.localeCompare(b.name, "ko"));
+      return mapped
+        .filter((row) => row.distanceRankEligible && typeof row.distanceKm === "number")
+        .sort((a, b) => a.distanceKm - b.distanceKm || b.popular - a.popular);
     }
-    return list;
+    return [...mapped].sort((a, b) => b.popular - a.popular || a.name.localeCompare(b.name, "ko"));
   }, [apiHits, tagLabel, idLabel, sort]);
 
   const suggestions = useMemo(() => suggestIndustries(query), [query]);
 
   useEffect(() => {
+    if (!resultsOpen || sort !== "distance" || origin) return undefined;
+    let cancelled = false;
+    requestSearchOrigin().then((point) => {
+      if (cancelled) return;
+      if (point) {
+        setOrigin(point);
+        setOriginDenied(false);
+      } else {
+        setOriginDenied(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [resultsOpen, sort, origin]);
+
+  useEffect(() => {
     const resolved = resolveAppShowcaseSearch(query);
     if (!resultsOpen || !resolved) {
       setApiHits([]);
+      setOriginReady(false);
       setTagLabel("");
       setIdLabel("");
       setSearchMode("");
@@ -212,14 +256,23 @@ export default function HomeBizDirectorySearch({
       setApiSearching(false);
       return undefined;
     }
+    if (sort === "distance" && !origin && !originDenied) {
+      setApiSearching(true);
+      return undefined;
+    }
     let cancelled = false;
     setApiSearching(true);
     const timer = setTimeout(() => {
-      searchShowcaseByTag(resolved.q, { mode: resolved.mode }).then((res) => {
+      searchShowcaseByTag(resolved.q, {
+        mode: resolved.mode,
+        lat: sort === "distance" ? origin?.lat : undefined,
+        lng: sort === "distance" ? origin?.lng : undefined
+      }).then((res) => {
         if (cancelled) return;
         setApiSearching(false);
         if (!res.ok) {
           setApiHits([]);
+          setOriginReady(false);
           setTagLabel(resolved.tagLabel || "");
           setIdLabel(resolved.idLabel || "");
           setSearchMode(resolved.mode);
@@ -243,13 +296,14 @@ export default function HomeBizDirectorySearch({
         setIdLabel(resolved.idLabel || "");
         setSearchMode(resolved.mode);
         setApiHits(res.items || []);
+        setOriginReady(Boolean(res.originReady));
       });
     }, 280);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, resultsOpen]);
+  }, [query, resultsOpen, sort, origin, originDenied]);
 
   useEffect(() => {
     const sentinel = stickySentinelRef.current;
@@ -290,7 +344,8 @@ export default function HomeBizDirectorySearch({
         displayName: row.name || "",
         membershipTier: row.membershipTier || "free",
         avatarUrl: row.avatarUrl || "",
-        forceStyle: true
+        forceStyle: true,
+        viewContext: "search"
       });
       const tier = payload.card?.membershipTier || row.membershipTier || "free";
       const peerUid = String(payload.card?.userId || uid || "").trim();
@@ -300,6 +355,7 @@ export default function HomeBizDirectorySearch({
         ownerUserId: payload.card?.ownerUserId || peerUid,
         name: payload.card?.name || row.name,
         phone: payload.phone || row.phoneDisplay || row.phone || "",
+        phoneDialEnabled: payload.card?.phoneDialEnabled !== false && row.phoneDialEnabled !== false,
         membershipTier: tier,
         photoUrl: payload.card?.photoUrl || row.avatarUrl || "",
         email: payload.card?.email || "",
@@ -341,6 +397,14 @@ export default function HomeBizDirectorySearch({
   const emptyMessage = (() => {
     if (apiSearching) return "검색 중…";
     if (apiError) return apiError;
+    if (sort === "distance") {
+      if (originDenied || !originReady) {
+        return "현재 위치를 허용하면 가까운 순으로 볼 수 있습니다. 상점 위치는 명함에 등록된 주소입니다.";
+      }
+      if (apiHits.length > 0) {
+        return "주소를 검색에 공개한 쇼케이스만 거리순에 포함됩니다.";
+      }
+    }
     if (query.trim()) {
       if (searchMode === "id" && idLabel) {
         return `@${idLabel} 아이디로 공개된 쇼케이스가 없습니다. (상대가 아이디 검색 허용·유료·쇼케이스 활성인지 확인해 주세요)`;
@@ -418,8 +482,8 @@ export default function HomeBizDirectorySearch({
                             <p className="friend-showcase-list__name">{row.name}</p>
                             <p className="friend-showcase-list__subtitle">
                               {row.subtitle}
-                              {sort === "distance" && row.distance < 900
-                                ? ` · ${row.distance.toFixed?.(1) ?? row.distance}km`
+                              {sort === "distance" && typeof row.distanceKm === "number"
+                                ? ` · ${row.distanceKm.toFixed(1)}km`
                                 : ""}
                             </p>
                           </div>

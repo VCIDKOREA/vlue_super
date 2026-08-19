@@ -9,6 +9,12 @@ import {
   type UserPrivacyRow,
   type ViewerAccessContext
 } from "./profileAccessControl.js";
+import {
+  directoryFieldAllowed,
+  resolveDirectoryAddress,
+  resolveDirectoryPhone,
+  type DccExposurePurpose
+} from "../dcc/dccExposure.js";
 
 async function resolveFollowActorLabel(userId: string): Promise<string> {
   try {
@@ -509,6 +515,7 @@ export type FollowSettingsPatch = {
   isNameFollowersAllowed?: boolean;
   isOrgFollowersAllowed?: boolean;
   isIdFollowersAllowed?: boolean;
+  isAddressFollowersAllowed?: boolean;
 };
 
 export async function getFollowSettings(userId: string) {
@@ -521,10 +528,13 @@ export async function getFollowSettings(userId: string) {
       isNameFollowersAllowed: true,
       isOrgFollowersAllowed: true,
       isIdFollowersAllowed: true,
+      isAddressFollowersAllowed: true,
       isPhoneSearchAllowed: true,
       isNameSearchAllowed: true,
       isOrgSearchAllowed: true,
-      isIdSearchAllowed: true
+      isIdSearchAllowed: true,
+      isAddressSearchAllowed: true,
+      dccExposureConfigured: true
     }
   });
 }
@@ -537,7 +547,8 @@ export async function updateFollowSettings(userId: string, patch: FollowSettings
     "isPhoneFollowersAllowed",
     "isNameFollowersAllowed",
     "isOrgFollowersAllowed",
-    "isIdFollowersAllowed"
+    "isIdFollowersAllowed",
+    "isAddressFollowersAllowed"
   ] as const) {
     if (typeof patch[key] === "boolean") data[key] = patch[key]!;
   }
@@ -552,15 +563,36 @@ export async function updateFollowSettings(userId: string, patch: FollowSettings
       isNameFollowersAllowed: true,
       isOrgFollowersAllowed: true,
       isIdFollowersAllowed: true,
+      isAddressFollowersAllowed: true,
       isPhoneSearchAllowed: true,
       isNameSearchAllowed: true,
       isOrgSearchAllowed: true,
-      isIdSearchAllowed: true
+      isIdSearchAllowed: true,
+      isAddressSearchAllowed: true,
+      dccExposureConfigured: true
     }
   });
 }
 
-export async function getProfileForViewer(viewerId: string | null, targetUserId: string) {
+async function isAcceptedFriend(viewerId: string, ownerId: string): Promise<boolean> {
+  const row = await prisma.friendRequest.findFirst({
+    where: {
+      status: "accepted",
+      OR: [
+        { fromUserId: viewerId, toUserId: ownerId },
+        { fromUserId: ownerId, toUserId: viewerId }
+      ]
+    },
+    select: { id: true }
+  });
+  return Boolean(row);
+}
+
+export async function getProfileForViewer(
+  viewerId: string | null,
+  targetUserId: string,
+  opts?: { purpose?: DccExposurePurpose }
+) {
   const user = await prisma.user.findUnique({
     where: { id: targetUserId },
     select: {
@@ -658,17 +690,58 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
   const noTitlePhoto = Boolean(s?.no_title_photo);
   const sub = user.subscriptions?.[0] || null;
 
-  /** 디지털 인증명함 송출 스냅샷 — 쇼케이스·명함 열람용 (검색 마스킹과 별도) */
+  const purpose: DccExposurePurpose = opts?.purpose === "search" || opts?.purpose === "follow" ? opts.purpose : "full";
+  const isFriend =
+    Boolean(viewerId) && !ctx.isOwner && (purpose === "search" || purpose === "follow")
+      ? await isAcceptedFriend(viewerId as string, targetUserId)
+      : false;
+  const fullAccess = ctx.isOwner || isFriend || purpose === "full";
+
+  let exportAddress = String(s?.address || "").trim();
+  let phoneDisplay = String(user.phoneE164 || "").trim();
+  let phoneVisible = Boolean(phoneDisplay);
+  let phoneDialEnabled = phoneVisible;
+  let addressVisible = Boolean(exportAddress);
+
+  if (!fullAccess && (purpose === "search" || purpose === "follow")) {
+    const flags = {
+      isPhoneSearchAllowed: Boolean((user as UserPrivacyRow).isPhoneSearchAllowed),
+      isAddressSearchAllowed: Boolean((user as UserPrivacyRow).isAddressSearchAllowed),
+      isPhoneFollowersAllowed: Boolean((user as UserPrivacyRow).isPhoneFollowersAllowed),
+      isAddressFollowersAllowed: Boolean((user as UserPrivacyRow).isAddressFollowersAllowed)
+    };
+    const phoneAllowed = directoryFieldAllowed(flags, "phone", purpose, ctx.isActiveFollower);
+    const addressAllowed = directoryFieldAllowed(flags, "address", purpose, ctx.isActiveFollower);
+    const phoneDir = resolveDirectoryPhone({
+      rawPhone: String(user.phoneE164 || "").trim(),
+      allowed: phoneAllowed,
+      fullAccess: false
+    });
+    const addrDir = resolveDirectoryAddress({
+      rawAddress: exportAddress,
+      allowed: addressAllowed,
+      fullAccess: false
+    });
+    phoneDisplay = phoneDir.phone;
+    phoneVisible = phoneDir.phoneVisible;
+    phoneDialEnabled = phoneDir.phoneDialEnabled;
+    exportAddress = addrDir.address;
+    addressVisible = addrDir.addressVisible;
+  }
+
+  const rawName = String(user.legalName || s?.name || s?.display_name || "").trim();
+
+  /** 디지털 인증명함 송출 스냅샷 — 검색/팔로우는 주소만 마스킹. 통화(full)는 원본 */
   const cardExport = s
     ? {
-        name: String(s.name || s.display_name || "").trim(),
+        name: String(s.name || s.display_name || rawName || "").trim(),
         organization: String(s.organization || s.company_name || "").trim(),
         title: String(s.title || "").trim(),
         department: String(s.department || "").trim(),
         email: String(s.email || user.email || "").trim(),
         website: String(s.website || "").trim(),
         fax: String(s.fax || "").trim(),
-        address: String(s.address || "").trim(),
+        address: exportAddress,
         activityName: String(s.activity_name || "").trim(),
         photoUrl,
         titlePhotoUrl,
@@ -682,6 +755,14 @@ export async function getProfileForViewer(viewerId: string | null, targetUserId:
     userId: targetUserId,
     profile: {
       ...masked,
+      displayName: purpose === "full" ? masked.displayName : rawName || masked.displayName,
+      nameVisible: purpose === "full" ? masked.nameVisible : Boolean(rawName),
+      phoneE164: phoneVisible ? phoneDisplay : "",
+      phoneDisplay,
+      phoneVisible,
+      phoneDialEnabled,
+      address: exportAddress,
+      addressVisible,
       email: String(s?.email || user.email || "").trim() || undefined,
       photoUrl: photoUrl || undefined,
       membershipTier: user.digitalCard?.membershipTierSnapshot || undefined

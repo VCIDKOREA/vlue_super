@@ -1,12 +1,11 @@
 /**
- * V1 쇼케이스 검색 — 상호주의 권한 가드
- * 로그인 → 본인인증(CI) → 활성 쇼케이스 보유자만 검색 엔진 진입
+ * V1 쇼케이스 검색 — 권한 가드
+ * 로그인 → 본인인증(CI). 검색자 DCC·유료 여부는 요구하지 않음.
  */
 import type { Context, Next } from "hono";
 import { prisma } from "../db/client.js";
 import { resolveRequestUserId } from "../lib/authContext.js";
 import { assertSearchRateLimit } from "../services/showcase/SearchRateLimiter.js";
-import { refreshHasActiveShowcase } from "../services/showcase/SearchService.js";
 
 export type SearchAuthCode =
   | "LOGIN_REQUIRED"
@@ -64,10 +63,7 @@ export async function evaluateShowcaseSearchAuth(userId: string | null): Promise
       status: true,
       identityVerified: true,
       ciHash: true,
-      hasActiveShowcase: true,
-      showcaseTags: true,
-      searchSuspendedAt: true,
-      digitalCard: { select: { id: true } }
+      searchSuspendedAt: true
     }
   });
 
@@ -108,25 +104,6 @@ export async function evaluateShowcaseSearchAuth(userId: string | null): Promise
       code: "IDENTITY_REQUIRED",
       error: "휴대폰 본인인증이 완료된 계정만 쇼케이스 검색을 이용할 수 있습니다.",
       meta: { redirect: "/onboarding/identity", popup: "identity" }
-    };
-  }
-
-  let hasShowcase = user.hasActiveShowcase;
-  if (!hasShowcase) {
-    hasShowcase = await refreshHasActiveShowcase(user.id);
-  }
-
-  /* 유령 회원: 가입만 하고 쇼케이스 미등록 */
-  if (!hasShowcase && !isCeo) {
-    return {
-      ok: false,
-      status: 403,
-      code: "SHOWCASE_REQUIRED",
-      error: "자신의 인증 쇼케이스를 등록·활성화한 회원만 검색할 수 있습니다.",
-      meta: {
-        redirect: "/showcase/onboarding",
-        popup: "showcase_onboarding"
-      }
     };
   }
 

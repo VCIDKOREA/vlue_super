@@ -577,10 +577,8 @@ function App() {
         d.error ||
         (d.code === "LOGIN_REQUIRED"
           ? "쇼케이스 검색은 로그인 후 이용할 수 있습니다."
-          : d.code === "SHOWCASE_REQUIRED"
-            ? "자신의 인증 쇼케이스를 먼저 등록해 주세요."
-            : d.code === "IDENTITY_REQUIRED"
-              ? "휴대폰 본인인증 후 검색할 수 있습니다."
+          : d.code === "IDENTITY_REQUIRED"
+            ? "휴대폰 본인인증 후 검색할 수 있습니다."
               : d.code === "RATE_LIMITED"
                 ? "검색 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
                 : "");

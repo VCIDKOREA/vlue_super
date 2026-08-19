@@ -12,9 +12,11 @@ import {
 import {
   getSearchPrivacy,
   runShowcaseSearch,
+  saveDccExposure,
   updateSearchPrivacy,
   type ShowcaseSearchMode
 } from "../services/showcase/SearchService.js";
+import { parseSearchOrigin } from "../services/dcc/dccAddressDistance.js";
 import {
   createShowcaseComment,
   deleteShowcaseComment,
@@ -184,9 +186,46 @@ letteringRoutes.put("/showcase/search-privacy", requireUserHeader, async (c) => 
     isPhoneSearchAllowed: body?.isPhoneSearchAllowed,
     isNameSearchAllowed: body?.isNameSearchAllowed,
     isOrgSearchAllowed: body?.isOrgSearchAllowed,
-    isIdSearchAllowed: body?.isIdSearchAllowed
+    isIdSearchAllowed: body?.isIdSearchAllowed,
+    isAddressSearchAllowed: body?.isAddressSearchAllowed
   });
   return c.json({ ok: true, privacy });
+});
+
+/** DCC 검색·팔로우 노출 4항목 — 전부 지정해야 저장 */
+letteringRoutes.get("/dcc-exposure", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const privacy = await getSearchPrivacy(me);
+  return c.json({
+    ok: true,
+    exposure: {
+      configured: Boolean(privacy?.dccExposureConfigured),
+      phoneSearch: privacy?.dccExposureConfigured ? Boolean(privacy.isPhoneSearchAllowed) : null,
+      addressSearch: privacy?.dccExposureConfigured ? Boolean(privacy.isAddressSearchAllowed) : null,
+      phoneFollow: privacy?.dccExposureConfigured ? Boolean(privacy.isPhoneFollowersAllowed) : null,
+      addressFollow: privacy?.dccExposureConfigured ? Boolean(privacy.isAddressFollowersAllowed) : null
+    },
+    privacy
+  });
+});
+
+letteringRoutes.put("/dcc-exposure", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = await c.req.json().catch(() => ({}));
+  try {
+    const privacy = await saveDccExposure(me, {
+      phoneSearch: body?.phoneSearch,
+      addressSearch: body?.addressSearch,
+      phoneFollow: body?.phoneFollow,
+      addressFollow: body?.addressFollow
+    });
+    return c.json({ ok: true, privacy });
+  } catch (e) {
+    if (e instanceof Error && e.name === "EXPOSURE_REQUIRED") {
+      return c.json({ ok: false, error: "EXPOSURE_REQUIRED", message: "검색·팔로우 노출 설정을 지정해야 저장됩니다." }, 400);
+    }
+    throw e;
+  }
 });
 
 /** 쇼케이스 편집·라이브 스타일 기기 간 동기화 (slim v2 · 조건부 hydrate) */
@@ -313,14 +352,22 @@ letteringRoutes.get("/showcase/tags/search", SearchAuthInterceptor, async (c) =>
   const mode: ShowcaseSearchMode =
     modeRaw === "phone" || modeRaw === "name" || modeRaw === "id" ? modeRaw : "hashtag";
 
-  if (!q) return c.json({ ok: true, mode, tag: null, items: [] });
+  if (!q) return c.json({ ok: true, mode, tag: null, items: [], originReady: false });
 
   try {
-    const { items } = await runShowcaseSearch({ mode, query: q, limit: 24 });
+    const origin = parseSearchOrigin(c.req.query("lat") ?? c.req.query("latitude"), c.req.query("lng") ?? c.req.query("longitude"));
+    const { items, originReady } = await runShowcaseSearch({
+      mode,
+      query: q,
+      limit: 24,
+      viewerId: c.get("vlueUserId") || null,
+      origin
+    });
     return c.json({
       ok: true,
       mode,
       tag: mode === "hashtag" ? normalizeShowcaseTag(q) : null,
+      originReady,
       items
     });
   } catch (e) {

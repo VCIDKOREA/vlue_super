@@ -48,8 +48,7 @@ function mergePeerLiveStyle(base, live) {
  *   displayName?: string,
  *   membershipTier?: string,
  *   avatarUrl?: string,
- *   forceStyle?: boolean
- * }} input
+ *   viewContext?: 'search'|'follow'|'full',
  */
 export async function resolveVlueShowcasePeer(input = {}) {
   let userId = String(input.userId || "").trim();
@@ -82,10 +81,13 @@ export async function resolveVlueShowcasePeer(input = {}) {
   let activityName = "";
   let authCycleEndAt = null;
   let authPaidAt = null;
+  let phoneDialEnabled = true;
 
   if (UUID_RE.test(userId)) {
+    const viewContext =
+      input.viewContext === "search" || input.viewContext === "follow" ? input.viewContext : "full";
     const [profRes, styleRes] = await Promise.all([
-      fetchFollowProfile(userId),
+      fetchFollowProfile(userId, { purpose: viewContext }),
       fetchPeerShowcaseStyleBundle(userId, { force: Boolean(input.forceStyle) })
     ]);
 
@@ -99,6 +101,13 @@ export async function resolveVlueShowcasePeer(input = {}) {
         name;
       if (profile.phoneE164) {
         phoneDisplay = formatLetteringPhoneDisplay(profile.phoneE164) || phoneDisplay;
+      } else if (profile.phoneDisplay) {
+        phoneDisplay = String(profile.phoneDisplay).trim() || phoneDisplay;
+      }
+      if (typeof profile.phoneDialEnabled === "boolean") {
+        phoneDialEnabled = profile.phoneDialEnabled;
+      } else if (profile.phoneVisible === false) {
+        phoneDialEnabled = false;
       }
       organization =
         String(exp?.organization || profile.companyName || "").trim() || organization;
@@ -107,7 +116,7 @@ export async function resolveVlueShowcasePeer(input = {}) {
       email = String(exp?.email || "").trim();
       website = String(exp?.website || "").trim();
       fax = String(exp?.fax || "").trim();
-      address = String(exp?.address || "").trim();
+      address = String(profile.address || exp?.address || "").trim() || address;
       publicHandle = String(profile.publicHandle || handle || "")
         .replace(/^@/, "")
         .trim();
@@ -147,6 +156,7 @@ export async function resolveVlueShowcasePeer(input = {}) {
       department,
       organization,
       phone: phoneDisplay,
+      phoneDialEnabled,
       email,
       website,
       fax,

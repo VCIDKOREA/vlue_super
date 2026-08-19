@@ -40,6 +40,9 @@ import {
   readDccBroadcastOn,
   writeDccBroadcastOn
 } from "../lib/bizcardAccountSync.js";
+import DccExposureSettingsPanel from "./dcc/DccExposureSettingsPanel.jsx";
+import { emptyDccExposureChoice, isDccExposureComplete } from "../lib/dccExposure.js";
+import { fetchDccExposure, saveDccExposure } from "../lib/dccExposureApi.js";
 
 export default function LetteringBizcardSettingsView({
   membershipTier = "free",
@@ -93,6 +96,7 @@ export default function LetteringBizcardSettingsView({
   const [cardId, setCardId] = useState("");
   const [orgChangeApprovalStatus, setOrgChangeApprovalStatus] = useState("");
   const [orgChangePendingName, setOrgChangePendingName] = useState("");
+  const [exposureChoice, setExposureChoice] = useState(() => emptyDccExposureChoice());
   const { refresh: refreshMembership } = useB2bMembership();
 
   const reload = useCallback(async () => {
@@ -210,6 +214,24 @@ export default function LetteringBizcardSettingsView({
   useEffect(() => {
     refreshMembership();
   }, [refreshMembership]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDccExposure().then((res) => {
+      if (cancelled || !res.ok || !res.exposure) return;
+      if (res.exposure.configured) {
+        setExposureChoice({
+          phoneSearch: Boolean(res.exposure.phoneSearch),
+          addressSearch: Boolean(res.exposure.addressSearch),
+          phoneFollow: Boolean(res.exposure.phoneFollow),
+          addressFollow: Boolean(res.exposure.addressFollow)
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     reload();
@@ -436,6 +458,17 @@ export default function LetteringBizcardSettingsView({
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       showToast("올바른 이메일 형식을 입력해 주세요.");
+      return;
+    }
+
+    if (!isDccExposureComplete(exposureChoice)) {
+      showToast("검색·팔로우 노출 설정을 모두 지정해야 저장됩니다.");
+      return;
+    }
+
+    const exposureSaved = await saveDccExposure(exposureChoice);
+    if (!exposureSaved.ok) {
+      showToast(exposureSaved.message || "노출 설정을 저장하지 못했습니다.");
       return;
     }
 
@@ -752,6 +785,13 @@ export default function LetteringBizcardSettingsView({
           orgChangePendingName={orgChangePendingName}
           onOrgChangeSubmitted={reload}
           onOrgChangeToast={showToast}
+          exposureSlot={
+            <DccExposureSettingsPanel
+              choice={exposureChoice}
+              onChange={setExposureChoice}
+              isDarkMode={isDarkMode}
+            />
+          }
           onApply={handleApply}
           applyLabel={applyLabel}
           toast={toast}

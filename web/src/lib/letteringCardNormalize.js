@@ -56,6 +56,7 @@ export function normalizeLetteringCard(raw = {}) {
       raw.address || raw.businessAddress || raw.companyAddress || raw.officeAddress || ""
     ).trim(),
     roadAddress: String(raw.roadAddress || raw.companyAddressRoad || "").trim(),
-    addressDetail: String(raw.addressDetail || "").trim()
+    addressDetail: String(raw.addressDetail || "").trim(),
+    phoneDialEnabled: raw.phoneDialEnabled !== false && raw.phoneVisible !== false
   };
 }

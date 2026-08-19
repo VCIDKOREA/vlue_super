@@ -329,7 +329,7 @@ async function hydrateMissingAvatars(rows = [], limit = 12) {
       chunk.map(async (idx) => {
         const row = out[idx];
         try {
-          const prof = await fetchFollowProfile(row.userId);
+          const prof = await fetchFollowProfile(row.userId, { purpose: "follow" });
           if (!prof?.ok) return;
           const url = String(
             prof.photoUrl ||

@@ -448,7 +448,14 @@ export function ShowcaseBgmProvider({ children }) {
       }
 
     setPhase(next);
-    if (next === "call_active") setUserMuted(true);
+    if (next === "call_active") {
+      setUserMuted(true);
+      const el = audioRef.current;
+      if (el) {
+        el.pause();
+        setAudioPlaying(false);
+      }
+    }
       if (next === "replay" || next === "preview" || next === "settings_preview") {
         setTouchUnlocked(true);
         setUserMuted(false);
@@ -532,6 +539,8 @@ export function ShowcaseBgmProvider({ children }) {
       }
     }
     if (!url) return;
+    /* 실통화 무음 유지 — 미니→풀 복원 제스처로 preview 를 열지 않음 */
+    if (p === "call_active") return;
     /* 이미 preview/replay 중이면 제스처로 autoplay 재시도 */
     if (p === "preview" || p === "replay" || p === "settings_preview") {
       void tryPlayNow(url, resolveBgmVolumeGain(styleConfigRef.current));

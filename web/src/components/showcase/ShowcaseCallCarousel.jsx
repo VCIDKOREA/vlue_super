@@ -26,7 +26,12 @@ import ShowcaseSlideChrome from "./ShowcaseSlideChrome.jsx";
 import ShowcaseBgmTrackChip from "./ShowcaseBgmTrackChip.jsx";
 import ShowcaseBgmTransport from "./ShowcaseBgmTransport.jsx";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
-import { resolveShowcaseBgmUrl, hasShowcaseBgmConfigured, showcaseBgmIdentityKey } from "../../lib/showcase/showcaseBgmPresets.js";
+import {
+  resolveShowcaseBgmUrl,
+  hasShowcaseBgmConfigured,
+  showcaseBgmIdentityKey,
+  resolveShowcaseCarouselPlaybackPhase
+} from "../../lib/showcase/showcaseBgmPresets.js";
 import { SHOWCASE_BGM_OWNER_RELEASED_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
 import { readActiveShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 
@@ -92,6 +97,8 @@ export default function ShowcaseCallCarousel({
   showcaseStyle = null,
   /** true면 BGM을 건드리지 않음 (케이스함 BGM 유지·중복 방지) */
   suppressBgm = false,
+  /** 실통화 — 미니↔풀 복원 시 BGM 재시작 금지 */
+  muteForLiveCall = false,
   /** 실통화 하단 통화옵션과 겹치지 않게 */
   callChromeSafe = false
 }) {
@@ -181,10 +188,22 @@ export default function ShowcaseCallCarousel({
   );
   const suppressBgmRef = useRef(suppressBgm);
   suppressBgmRef.current = suppressBgm;
+  const muteForLiveCallRef = useRef(muteForLiveCall);
+  muteForLiveCallRef.current = muteForLiveCall;
   const prevSuppressBgmRef = useRef(suppressBgm);
   const bgmFpRef = useRef("");
 
-  /* 쇼케이스 캐러셀이 보이면 BGM 바인딩·재생 (실통화 스크롤 잠금만 무음)
+  const leaveCarouselBgm = () => {
+    if (suppressBgmRef.current) return;
+    /* 실통화 미니케이스 — idle 로 내리면 복원 탭이 preview 재생을 연다 */
+    if (muteForLiveCallRef.current) {
+      setPlaybackPhase("call_active", { owner: "carousel" });
+      return;
+    }
+    setPlaybackPhase("idle", { fade: true, owner: "carousel" });
+  };
+
+  /* 쇼케이스 캐러셀이 보이면 BGM 바인딩·재생 (실통화는 스크롤과 무관하게 무음)
    * styleConfig 객체 참조·서명 URL 변경으로 effect가 반복 재실행되면 재생이 끊기므로 identity fingerprint만 의존
    * suppressBgm=true: 케이스함 게시물 등 처음부터 억제면 상위 BGM 유지 / 접힘으로 전환되면 재생 중지
    * setPlaybackPhase 는 deps 금지 — 콜백 신원 변경 시 cleanup idle 로 끊김 방지 */
@@ -207,26 +226,29 @@ export default function ShowcaseCallCarousel({
       setPlaybackPhase("idle", { fade: true, owner: "carousel", styleConfig });
       bgmFpRef.current = "";
       return () => {
-        if (suppressBgmRef.current) return;
-        setPlaybackPhase("idle", { fade: true, owner: "carousel" });
+        leaveCarouselBgm();
       };
     }
     const changed = bgmFpRef.current !== bgmFingerprint;
     bgmFpRef.current = bgmFingerprint;
-    const liveCallMuted = !previewMode && !scrollEnabled;
-    setPlaybackPhase(liveCallMuted ? "call_active" : previewMode ? "preview" : "replay", {
-      forceRestart: changed || previewMode,
+    const phase = resolveShowcaseCarouselPlaybackPhase({
+      previewMode,
+      scrollEnabled,
+      muteForLiveCall
+    });
+    const liveCallMuted = phase === "call_active";
+    setPlaybackPhase(phase, {
+      forceRestart: liveCallMuted ? false : changed || previewMode,
       steal: Boolean(previewMode),
       owner: "carousel",
       styleConfig
     });
     return () => {
       /* 접힘·게시물 suppress 로 넘길 때는 위에서 이미 처리 — 언마운트/실제 이탈만 idle */
-      if (suppressBgmRef.current) return;
-      setPlaybackPhase("idle", { fade: true, owner: "carousel" });
+      leaveCarouselBgm();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- styleConfig는 bgmFingerprint로 추적
-  }, [bgmFingerprint, previewMode, scrollEnabled, suppressBgm]);
+  }, [bgmFingerprint, previewMode, scrollEnabled, suppressBgm, muteForLiveCall]);
 
   /* 스타일 객체만 바뀌고 음원이 같으면 바인딩만 갱신 (재생 재시작 없음) */
   useEffect(() => {
@@ -250,9 +272,14 @@ export default function ShowcaseCallCarousel({
       const hasBgm =
         Boolean(resolveShowcaseBgmUrl(cfg)) || hasShowcaseBgmConfigured(cfg);
       if (!hasBgm) return;
-      const liveCallMuted = !previewMode && !scrollEnabled;
-      setPlaybackPhase(liveCallMuted ? "call_active" : previewMode ? "preview" : "replay", {
-        forceRestart: true,
+      const phase = resolveShowcaseCarouselPlaybackPhase({
+        previewMode,
+        scrollEnabled,
+        muteForLiveCall
+      });
+      const liveCallMuted = phase === "call_active";
+      setPlaybackPhase(phase, {
+        forceRestart: liveCallMuted ? false : true,
         steal: true,
         owner: "carousel",
         styleConfig: cfg
@@ -260,7 +287,7 @@ export default function ShowcaseCallCarousel({
     };
     window.addEventListener(SHOWCASE_BGM_OWNER_RELEASED_EVENT, onReleased);
     return () => window.removeEventListener(SHOWCASE_BGM_OWNER_RELEASED_EVENT, onReleased);
-  }, [suppressBgm, styleConfig, previewMode, scrollEnabled, setPlaybackPhase]);
+  }, [suppressBgm, styleConfig, previewMode, scrollEnabled, muteForLiveCall, setPlaybackPhase]);
 
   const galleryPagePhotos = useMemo(() => {
     return (Array.isArray(photos) ? photos : [])

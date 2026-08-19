@@ -149,18 +149,22 @@ const followProfileCache = new Map();
 const FOLLOW_PROFILE_TTL_MS = 90_000;
 const followProfileInflight = new Map();
 
-export async function fetchFollowProfile(userId) {
+/** @param {string} userId @param {{ purpose?: 'search'|'follow'|'full' }} [opts] */
+export async function fetchFollowProfile(userId, opts = {}) {
   const id = String(userId || "").trim();
   if (!id) return { ok: false, error: "user_required" };
+  const purpose = opts.purpose === "search" || opts.purpose === "follow" ? opts.purpose : "full";
+  const cacheKey = `${id}:${purpose}`;
   const now = Date.now();
-  const cached = followProfileCache.get(id);
+  const cached = followProfileCache.get(cacheKey);
   if (cached && now - cached.at < FOLLOW_PROFILE_TTL_MS) return cached.value;
-  const inflight = followProfileInflight.get(id);
+  const inflight = followProfileInflight.get(cacheKey);
   if (inflight) return inflight;
 
   const run = (async () => {
     try {
-      const res = await vlueAuthFetch(apiUrl(`/api/follow/profile/${encodeURIComponent(id)}`));
+      const qs = purpose !== "full" ? `?purpose=${encodeURIComponent(purpose)}` : "";
+      const res = await vlueAuthFetch(apiUrl(`/api/follow/profile/${encodeURIComponent(id)}${qs}`));
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, error: data.error || "profile_failed" };
       const value = {
@@ -176,16 +180,16 @@ export async function fetchFollowProfile(userId) {
         authPaidAt: data.authPaidAt || null,
         cardIssuedAt: data.cardIssuedAt || null
       };
-      followProfileCache.set(id, { at: Date.now(), value });
+      followProfileCache.set(cacheKey, { at: Date.now(), value });
       return value;
     } catch (e) {
       return { ok: false, error: e?.message || "network" };
     } finally {
-      followProfileInflight.delete(id);
+      followProfileInflight.delete(cacheKey);
     }
   })();
 
-  followProfileInflight.set(id, run);
+  followProfileInflight.set(cacheKey, run);
   return run;
 }
 

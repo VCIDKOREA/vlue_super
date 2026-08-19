@@ -158,7 +158,9 @@ followRoutes.put("/settings", requireUserHeader, async (c) => {
     isOrgFollowersAllowed:
       typeof body.isOrgFollowersAllowed === "boolean" ? body.isOrgFollowersAllowed : undefined,
     isIdFollowersAllowed:
-      typeof body.isIdFollowersAllowed === "boolean" ? body.isIdFollowersAllowed : undefined
+      typeof body.isIdFollowersAllowed === "boolean" ? body.isIdFollowersAllowed : undefined,
+    isAddressFollowersAllowed:
+      typeof body.isAddressFollowersAllowed === "boolean" ? body.isAddressFollowersAllowed : undefined
   });
 
   return c.json({ ok: true, settings });
@@ -198,7 +200,10 @@ followRoutes.get("/handle/:handle", async (c) => {
 followRoutes.get("/profile/:userId", async (c) => {
   const viewerId = await resolveRequestUserId(c);
   const targetUserId = String(c.req.param("userId") || "").trim();
-  const payload = await getProfileForViewer(viewerId, targetUserId);
+  const purposeRaw = String(c.req.query("purpose") || "").trim().toLowerCase();
+  const purpose =
+    purposeRaw === "search" || purposeRaw === "follow" || purposeRaw === "full" ? purposeRaw : "full";
+  const payload = await getProfileForViewer(viewerId, targetUserId, { purpose });
   if (!payload) return c.json({ error: "user_not_found" }, 404);
   return c.json({ ok: true, ...payload });
 });

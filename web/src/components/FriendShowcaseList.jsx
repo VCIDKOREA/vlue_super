@@ -444,7 +444,8 @@ export default function FriendShowcaseList({
         membershipTier: row.membershipTier || "free",
         avatarUrl: row.avatarUrl || "",
         /* 팔로우 목록 열람은 항상 최신 라이브 스타일 */
-        forceStyle: true
+        forceStyle: true,
+        viewContext: activeTab === "following" ? "follow" : "search"
       });
       const tier = payload.card?.membershipTier || row.membershipTier || "free";
       const peerUid = String(
@@ -458,6 +459,7 @@ export default function FriendShowcaseList({
         ownerUserId: payload.card?.ownerUserId || peerUid,
         name: payload.card?.name || row.name,
         phone: payload.phone || row.phoneDisplay || row.phone || "",
+        phoneDialEnabled: payload.card?.phoneDialEnabled !== false,
         membershipTier: tier,
         photoUrl: payload.card?.photoUrl || row.avatarUrl || "",
         avatarUrl: payload.card?.avatarUrl || row.avatarUrl || "",

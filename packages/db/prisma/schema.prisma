@@ -175,6 +175,8 @@ model User {
   /// 상호(회사명) 검색 허용 — 실명(isNameSearchAllowed)과 분리
   isOrgSearchAllowed   Boolean @default(false) @map("is_org_search_allowed")
   isIdSearchAllowed    Boolean @default(false) @map("is_id_search_allowed")
+  /// DCC 검색 주소 전체 공개 (끄면 시·군·구만)
+  isAddressSearchAllowed Boolean @default(false) @map("is_address_search_allowed")
 
   /// 팔로우 승인제 — true면 신청 pending, false면 즉시 active
   isPrivateFollow Boolean @default(false) @map("is_private_follow")
@@ -195,6 +197,10 @@ model User {
   isNameFollowersAllowed  Boolean @default(true) @map("is_name_followers_allowed")
   isOrgFollowersAllowed   Boolean @default(true) @map("is_org_followers_allowed")
   isIdFollowersAllowed    Boolean @default(true) @map("is_id_followers_allowed")
+  /// 팔로우하면 주소 전체 공개
+  isAddressFollowersAllowed Boolean @default(false) @map("is_address_followers_allowed")
+  /// DCC 노출 4항목을 사용자가 지정했는지 — 미지정 시 명함 저장 거부
+  dccExposureConfigured Boolean @default(false) @map("dcc_exposure_configured")
 
   /// 검색 어뷰징 카운터·잠금
   searchAbuseStrikeCount Int       @default(0) @map("search_abuse_strike_count")

@@ -39,7 +39,7 @@ export function detectShowcaseSearchMode(query) {
 /**
  * V1 — 쇼케이스 검색 (인증 필수 · 상호주의 · 마스킹)
  * @param {string} query
- * @param {{ mode?: 'hashtag'|'phone'|'name'|'id' }} [opts]
+ * @param {{ mode?: 'hashtag'|'phone'|'name'|'id', lat?: number, lng?: number }} [opts]
  */
 export async function searchShowcaseByTag(query, opts = {}) {
   const q = String(query || "").trim();
@@ -47,6 +47,10 @@ export async function searchShowcaseByTag(query, opts = {}) {
   const mode = opts.mode || detectShowcaseSearchMode(q) || "hashtag";
   try {
     const params = new URLSearchParams({ q, mode });
+    if (Number.isFinite(Number(opts.lat)) && Number.isFinite(Number(opts.lng))) {
+      params.set("lat", String(opts.lat));
+      params.set("lng", String(opts.lng));
+    }
     const res = await vlueAuthFetch(apiUrl(`/api/lettering/showcase/tags/search?${params}`));
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -59,7 +63,13 @@ export async function searchShowcaseByTag(query, opts = {}) {
         status: res.status
       };
     }
-    return { ok: true, items: data.items || [], tag: data.tag, mode: data.mode || mode };
+    return {
+      ok: true,
+      items: data.items || [],
+      tag: data.tag,
+      mode: data.mode || mode,
+      originReady: Boolean(data.originReady)
+    };
   } catch (e) {
     return { ok: false, items: [], error: e?.message || "network" };
   }

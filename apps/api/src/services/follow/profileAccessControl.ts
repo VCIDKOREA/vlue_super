@@ -14,6 +14,9 @@ export type UserPrivacyRow = {
   isNameFollowersAllowed: boolean;
   isOrgFollowersAllowed: boolean;
   isIdFollowersAllowed: boolean;
+  isAddressSearchAllowed?: boolean;
+  isAddressFollowersAllowed?: boolean;
+  dccExposureConfigured?: boolean;
 };
 
 export type ViewerAccessContext = {
@@ -36,7 +39,10 @@ export const privacySelect = {
   isPhoneFollowersAllowed: true,
   isNameFollowersAllowed: true,
   isOrgFollowersAllowed: true,
-  isIdFollowersAllowed: true
+  isIdFollowersAllowed: true,
+  isAddressSearchAllowed: true,
+  isAddressFollowersAllowed: true,
+  dccExposureConfigured: true
 } as const;
 
 function searchAllowed(owner: UserPrivacyRow, field: ProfileField): boolean {

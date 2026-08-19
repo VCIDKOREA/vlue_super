@@ -8,6 +8,9 @@ import { prisma } from "../../db/client.js";
 import { isDataUrl, isHttpMediaUrl } from "../../lib/mediaUrlGuard.js";
 import { normalizeToE164KR } from "../../lib/phoneE164.js";
 import { isPlatformCeoHandle } from "../admin/platformAccountRoles.js";
+import { isDccExposureComplete, resolveDirectoryAddress, resolveDirectoryPhone } from "../dcc/dccExposure.js";
+import { buildDistanceKmByUserId, type GeoPoint } from "../dcc/dccAddressDistance.js";
+import { geocodeDccAddress } from "../../integrations/kakao/kakaoAddressGeocode.js";
 import { normalizeShowcaseTag } from "./showcaseTagsService.js";
 
 export type ShowcaseSearchMode = "hashtag" | "phone" | "name" | "id";
@@ -23,12 +26,15 @@ export type MaskedShowcaseHit = {
   logoUrl: string;
   /** 프로필 얼굴 사진 — 검색 아바타용 */
   photoUrl: string;
-  /** 마스킹된 표시명 — 비허용 시 "비공개 회원" */
+  /** 검색된 명함은 이름을 항상 표시 */
   displayName: string;
   nameVisible: boolean;
-  /** 허용 시에만 실번호, 아니면 빈 문자열 */
+  /** 허용 시 실번호, 아니면 010-****-**** (전화연결 금지) */
   phone: string;
   phoneVisible: boolean;
+  phoneDialEnabled: boolean;
+  address: string;
+  addressVisible: boolean;
   /** ID 문의 버튼용 — 허용 시 publicHandle */
   publicHandle: string;
   idInquiryEnabled: boolean;
@@ -37,7 +43,11 @@ export type MaskedShowcaseHit = {
     isNameSearchAllowed: boolean;
     isOrgSearchAllowed: boolean;
     isIdSearchAllowed: boolean;
+    isAddressSearchAllowed: boolean;
   };
+  /** 검색자 현재 위치(GPS) ↔ DCC 등록 주소 km. 주소 비공개·없음은 순위 제외 */
+  distanceKm: number | null;
+  distanceRankEligible: boolean;
 };
 
 const MASKED_NAME = "비공개 회원";
@@ -56,6 +66,7 @@ type UserSearchRow = {
   isNameSearchAllowed: boolean;
   isOrgSearchAllowed: boolean;
   isIdSearchAllowed: boolean;
+  isAddressSearchAllowed: boolean;
   businessProfile: { companyName: string | null; jobTitle: string | null } | null;
   digitalCard: {
     membershipTierSnapshot: string | null;
@@ -78,6 +89,7 @@ type SearchSnapLite = {
   activityDisplayName: string;
   nickname: string;
   handle: string;
+  address: string;
 };
 
 /**
@@ -172,6 +184,7 @@ async function attachSearchSnapLites(rows: UserSearchRow[]): Promise<UserSearchR
       activity_display_name: string | null;
       nickname: string | null;
       handle: string | null;
+      address: string | null;
     }>
   >`
     SELECT
@@ -203,7 +216,8 @@ async function attachSearchSnapLites(rows: UserSearchRow[]): Promise<UserSearchR
       ) AS activity_name,
       NULLIF(TRIM(export_snapshot_json->>'activityDisplayName'), '') AS activity_display_name,
       NULLIF(TRIM(export_snapshot_json->>'nickname'), '') AS nickname,
-      NULLIF(TRIM(export_snapshot_json->>'handle'), '') AS handle
+      NULLIF(TRIM(export_snapshot_json->>'handle'), '') AS handle,
+      NULLIF(TRIM(export_snapshot_json->>'address'), '') AS address
     FROM digital_cards
     WHERE user_id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})
   `;
@@ -225,7 +239,8 @@ async function attachSearchSnapLites(rows: UserSearchRow[]): Promise<UserSearchR
       activityName: String(r.activity_name || "").trim(),
       activityDisplayName: String(r.activity_display_name || "").trim(),
       nickname: String(r.nickname || "").trim(),
-      handle: String(r.handle || "").trim()
+      handle: String(r.handle || "").trim(),
+      address: String(r.address || "").trim()
     });
   }
 
@@ -301,27 +316,40 @@ function idOrActivityMatches(u: UserSearchRow, needle: string): boolean {
 }
 
 /**
- * Case A/B 마스킹 — 허용되지 않은 PII는 응답에 절대 넣지 않음
- * 이름·상호는 각각 독립 마스킹
+ * 검색 결과 카드 — 이름은 항상 표시. 전화·주소만 검색 노출 설정 적용.
+ * 수락된 지인(fullAccess)은 전부 공개.
  */
-export function maskShowcaseHit(u: UserSearchRow): MaskedShowcaseHit {
+export function maskShowcaseHit(u: UserSearchRow, opts?: { fullAccess?: boolean }): MaskedShowcaseHit {
   const snap = snapOf(u);
+  const fullAccess = Boolean(opts?.fullAccess);
   const phoneAllowed = Boolean(u.isPhoneSearchAllowed);
   const nameAllowed = Boolean(u.isNameSearchAllowed);
   const orgAllowed = Boolean(u.isOrgSearchAllowed);
   const idAllowed = Boolean(u.isIdSearchAllowed);
+  const addressAllowed = Boolean(u.isAddressSearchAllowed);
 
   const rawName = String(u.legalName || snap.name || snap.displayName || "").trim();
   const rawPhone = String(u.phoneE164 || snap.phone || "").trim();
   const handle = String(u.publicHandle || snap.handle || "").trim();
   const org = String(u.businessProfile?.companyName || snap.organization || snap.companyName || "").trim();
+  const rawAddress = String(snap.address || "").trim();
+  const phoneDir = resolveDirectoryPhone({
+    rawPhone,
+    allowed: phoneAllowed,
+    fullAccess
+  });
+  const addrDir = resolveDirectoryAddress({
+    rawAddress,
+    allowed: addressAllowed,
+    fullAccess
+  });
 
   return {
     userId: u.id,
     tags: u.showcaseTags || [],
     membershipTier: u.digitalCard?.membershipTierSnapshot || "free",
-    organization: orgAllowed ? org : "",
-    orgVisible: orgAllowed && Boolean(org),
+    organization: orgAllowed || fullAccess ? org : "",
+    orgVisible: (orgAllowed || fullAccess) && Boolean(org),
     title: String(u.businessProfile?.jobTitle || snap.title || ""),
     logoUrl: (() => {
       const logo = String(snap.logoUrl || "").trim();
@@ -331,18 +359,24 @@ export function maskShowcaseHit(u: UserSearchRow): MaskedShowcaseHit {
       const photo = String(snap.photoUrl || "").trim();
       return isHttpMediaUrl(photo) && !isDataUrl(photo) ? photo : "";
     })(),
-    displayName: nameAllowed && rawName ? rawName : MASKED_NAME,
-    nameVisible: nameAllowed && Boolean(rawName),
-    phone: phoneAllowed ? rawPhone : "",
-    phoneVisible: phoneAllowed && Boolean(rawPhone),
-    publicHandle: idAllowed ? handle : "",
-    idInquiryEnabled: idAllowed && Boolean(handle),
+    displayName: rawName || (handle ? `@${handle}` : "") || MASKED_NAME,
+    nameVisible: Boolean(rawName || handle),
+    phone: phoneDir.phone,
+    phoneVisible: phoneDir.phoneVisible,
+    phoneDialEnabled: phoneDir.phoneDialEnabled,
+    address: addrDir.address,
+    addressVisible: addrDir.addressVisible,
+    publicHandle: idAllowed || fullAccess ? handle : "",
+    idInquiryEnabled: (idAllowed || fullAccess) && Boolean(handle),
     privacy: {
       isPhoneSearchAllowed: phoneAllowed,
       isNameSearchAllowed: nameAllowed,
       isOrgSearchAllowed: orgAllowed,
-      isIdSearchAllowed: idAllowed
-    }
+      isIdSearchAllowed: idAllowed,
+      isAddressSearchAllowed: addressAllowed
+    },
+    distanceKm: null,
+    distanceRankEligible: false
   };
 }
 
@@ -360,10 +394,60 @@ const searchSelect = {
   isNameSearchAllowed: true,
   isOrgSearchAllowed: true,
   isIdSearchAllowed: true,
+  isAddressSearchAllowed: true,
   businessProfile: { select: { companyName: true, jobTitle: true } },
   /* exportSnapshotJson 전체 SELECT 금지 — base64 사진이 있으면 검색 1회에 수십~수백 MB egress */
   digitalCard: { select: { membershipTierSnapshot: true } }
 } as const;
+
+async function acceptedFriendIds(viewerId: string, ownerIds: string[]): Promise<Set<string>> {
+  const ids = [...new Set(ownerIds.filter(Boolean))];
+  if (!viewerId || !ids.length) return new Set();
+  const rows = await prisma.friendRequest.findMany({
+    where: {
+      status: "accepted",
+      OR: [
+        { fromUserId: viewerId, toUserId: { in: ids } },
+        { toUserId: viewerId, fromUserId: { in: ids } }
+      ]
+    },
+    select: { fromUserId: true, toUserId: true }
+  });
+  const set = new Set<string>();
+  for (const r of rows) {
+    set.add(r.fromUserId === viewerId ? r.toUserId : r.fromUserId);
+  }
+  return set;
+}
+
+async function maskHitsForViewer(
+  rows: UserSearchRow[],
+  viewerId?: string | null,
+  origin?: GeoPoint | null
+): Promise<MaskedShowcaseHit[]> {
+  const friendIds = viewerId ? await acceptedFriendIds(viewerId, rows.map((r) => r.id)) : new Set<string>();
+  const masked = rows.map((u) =>
+    maskShowcaseHit(u, { fullAccess: Boolean(viewerId && (viewerId === u.id || friendIds.has(u.id))) })
+  );
+  const dist = await buildDistanceKmByUserId({
+    origin: origin || null,
+    hits: rows.map((u) => ({
+      userId: u.id,
+      rawAddress: String(snapOf(u).address || "").trim(),
+      isAddressSearchAllowed: Boolean(u.isAddressSearchAllowed)
+    })),
+    geocode: geocodeDccAddress
+  });
+  return masked.map((hit) => {
+    const km = dist.byUserId.get(hit.userId);
+    const eligible = typeof km === "number";
+    return {
+      ...hit,
+      distanceKm: eligible ? km : null,
+      distanceRankEligible: eligible
+    };
+  });
+}
 
 function baseTargetWhere() {
   return {
@@ -419,7 +503,12 @@ async function filterPaidTargets(rows: UserSearchRow[]): Promise<UserSearchRow[]
 /**
  * #해시태그 검색 — 리스트는 노출하되 카드 PII는 마스킹
  */
-export async function searchByHashtag(query: string, limit = 24): Promise<MaskedShowcaseHit[]> {
+export async function searchByHashtag(
+  query: string,
+  limit = 24,
+  viewerId?: string | null,
+  origin?: GeoPoint | null
+): Promise<MaskedShowcaseHit[]> {
   const tag = normalizeShowcaseTag(query);
   const bare = tag.replace(/^#/, "").toLowerCase();
   if (!bare) return [];
@@ -443,13 +532,18 @@ export async function searchByHashtag(query: string, limit = 24): Promise<Masked
   const paid = await filterPaidTargets(matched);
   const limited = paid.slice(0, limit);
   const withSnap = await attachSearchSnapLites(limited);
-  return withSnap.map(maskShowcaseHit);
+  return maskHitsForViewer(withSnap, viewerId, origin);
 }
 
 /**
  * 전화번호 다이렉트 검색 — isPhoneSearchAllowed=true 대상만
  */
-export async function searchByPhone(rawPhone: string, limit = 12): Promise<MaskedShowcaseHit[]> {
+export async function searchByPhone(
+  rawPhone: string,
+  limit = 12,
+  viewerId?: string | null,
+  origin?: GeoPoint | null
+): Promise<MaskedShowcaseHit[]> {
   const e164 = normalizeToE164KR(rawPhone);
   const queryDigits = digitsOnly(rawPhone);
   if (!e164 && queryDigits.length < 9) return [];
@@ -483,14 +577,19 @@ export async function searchByPhone(rawPhone: string, limit = 12): Promise<Maske
   }
 
   const paid = await filterPaidTargets(users);
-  return paid.map(maskShowcaseHit);
+  return maskHitsForViewer(paid, viewerId, origin);
 }
 
 /**
  * 이름·상호 검색 — 각각 isNameSearchAllowed / isOrgSearchAllowed 대상만 매칭
  * 결과 마스킹도 허용된 필드만 노출
  */
-export async function searchByName(rawName: string, limit = 24): Promise<MaskedShowcaseHit[]> {
+export async function searchByName(
+  rawName: string,
+  limit = 24,
+  viewerId?: string | null,
+  origin?: GeoPoint | null
+): Promise<MaskedShowcaseHit[]> {
   const name = String(rawName || "").trim();
   if (name.length < 2) return [];
 
@@ -536,13 +635,18 @@ export async function searchByName(rawName: string, limit = 24): Promise<MaskedS
   const paid = await filterPaidTargets(users);
   const limited = paid.slice(0, limit);
   const withSnap = await attachSearchSnapLites(limited);
-  return withSnap.map(maskShowcaseHit);
+  return maskHitsForViewer(withSnap, viewerId, origin);
 }
 
 /**
  * 아이디·활동명 검색 — isIdSearchAllowed=true 대상만
  */
-export async function searchByPublicId(rawId: string, limit = 12): Promise<MaskedShowcaseHit[]> {
+export async function searchByPublicId(
+  rawId: string,
+  limit = 12,
+  viewerId?: string | null,
+  origin?: GeoPoint | null
+): Promise<MaskedShowcaseHit[]> {
   const handle = String(rawId || "")
     .trim()
     .replace(/^@/, "")
@@ -582,7 +686,7 @@ export async function searchByPublicId(rawId: string, limit = 12): Promise<Maske
   const paid = await filterPaidTargets(merged);
   const limited = paid.slice(0, limit);
   const withSnap = await attachSearchSnapLites(limited);
-  return withSnap.map(maskShowcaseHit);
+  return maskHitsForViewer(withSnap, viewerId, origin);
 }
 
 export type PrivacyPatch = {
@@ -590,7 +694,20 @@ export type PrivacyPatch = {
   isNameSearchAllowed?: boolean;
   isOrgSearchAllowed?: boolean;
   isIdSearchAllowed?: boolean;
+  isAddressSearchAllowed?: boolean;
 };
+
+const privacySelectFields = {
+  isPhoneSearchAllowed: true,
+  isNameSearchAllowed: true,
+  isOrgSearchAllowed: true,
+  isIdSearchAllowed: true,
+  isAddressSearchAllowed: true,
+  isPhoneFollowersAllowed: true,
+  isAddressFollowersAllowed: true,
+  dccExposureConfigured: true,
+  hasActiveShowcase: true
+} as const;
 
 export async function updateSearchPrivacy(userId: string, patch: PrivacyPatch) {
   const data: Record<string, boolean> = {};
@@ -606,29 +723,19 @@ export async function updateSearchPrivacy(userId: string, patch: PrivacyPatch) {
   if (typeof patch.isIdSearchAllowed === "boolean") {
     data.isIdSearchAllowed = patch.isIdSearchAllowed;
   }
+  if (typeof patch.isAddressSearchAllowed === "boolean") {
+    data.isAddressSearchAllowed = patch.isAddressSearchAllowed;
+  }
   if (!Object.keys(data).length) {
-    const cur = await prisma.user.findUnique({
+    return prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        isPhoneSearchAllowed: true,
-        isNameSearchAllowed: true,
-        isOrgSearchAllowed: true,
-        isIdSearchAllowed: true,
-        hasActiveShowcase: true
-      }
+      select: privacySelectFields
     });
-    return cur;
   }
   const updated = await prisma.user.update({
     where: { id: userId },
     data,
-    select: {
-      isPhoneSearchAllowed: true,
-      isNameSearchAllowed: true,
-      isOrgSearchAllowed: true,
-      isIdSearchAllowed: true,
-      hasActiveShowcase: true
-    }
+    select: privacySelectFields
   });
   await markShowcaseActiveIfEligible(userId);
   return {
@@ -641,14 +748,48 @@ export async function getSearchPrivacy(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
     select: {
-      isPhoneSearchAllowed: true,
-      isNameSearchAllowed: true,
-      isOrgSearchAllowed: true,
-      isIdSearchAllowed: true,
-      hasActiveShowcase: true,
+      ...privacySelectFields,
       identityVerified: true
     }
   });
+}
+
+export type DccExposureSavePatch = {
+  phoneSearch: boolean;
+  addressSearch: boolean;
+  phoneFollow: boolean;
+  addressFollow: boolean;
+};
+
+/** DCC 설정 저장 — 4항목이 모두 boolean이어야 함 */
+export async function saveDccExposure(userId: string, patch: DccExposureSavePatch) {
+  const choice = {
+    phoneSearch: patch.phoneSearch,
+    addressSearch: patch.addressSearch,
+    phoneFollow: patch.phoneFollow,
+    addressFollow: patch.addressFollow
+  };
+  if (!isDccExposureComplete(choice)) {
+    const err = new Error("EXPOSURE_REQUIRED");
+    err.name = "EXPOSURE_REQUIRED";
+    throw err;
+  }
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      isPhoneSearchAllowed: patch.phoneSearch,
+      isAddressSearchAllowed: patch.addressSearch,
+      isPhoneFollowersAllowed: patch.phoneFollow,
+      isAddressFollowersAllowed: patch.addressFollow,
+      dccExposureConfigured: true
+    },
+    select: privacySelectFields
+  });
+  await markShowcaseActiveIfEligible(userId);
+  return {
+    ...updated,
+    hasActiveShowcase: await refreshHasActiveShowcase(userId)
+  };
 }
 
 /** 통합 진입 — mode에 따라 분기 */
@@ -656,18 +797,26 @@ export async function runShowcaseSearch(opts: {
   mode: ShowcaseSearchMode;
   query: string;
   limit?: number;
-}): Promise<{ mode: ShowcaseSearchMode; items: MaskedShowcaseHit[] }> {
+  viewerId?: string | null;
+  origin?: GeoPoint | null;
+}): Promise<{
+  mode: ShowcaseSearchMode;
+  items: MaskedShowcaseHit[];
+  originReady: boolean;
+}> {
   const limit = opts.limit ?? 24;
   const q = String(opts.query || "").trim();
-  switch (opts.mode) {
-    case "phone":
-      return { mode: "phone", items: await searchByPhone(q, limit) };
-    case "name":
-      return { mode: "name", items: await searchByName(q, limit) };
-    case "id":
-      return { mode: "id", items: await searchByPublicId(q, limit) };
-    case "hashtag":
-    default:
-      return { mode: "hashtag", items: await searchByHashtag(q, limit) };
-  }
+  const viewerId = opts.viewerId || null;
+  const origin = opts.origin || null;
+  const mode: ShowcaseSearchMode =
+    opts.mode === "phone" || opts.mode === "name" || opts.mode === "id" ? opts.mode : "hashtag";
+  const items =
+    mode === "phone"
+      ? await searchByPhone(q, limit, viewerId, origin)
+      : mode === "name"
+        ? await searchByName(q, limit, viewerId, origin)
+        : mode === "id"
+          ? await searchByPublicId(q, limit, viewerId, origin)
+          : await searchByHashtag(q, limit, viewerId, origin);
+  return { mode, items, originReady: Boolean(origin) };
 }

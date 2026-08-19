@@ -120,6 +120,20 @@ export function showcaseBgmIdentityKey(bgm) {
   return `${mode}|${String(bgm.soundId || "").trim()}|${bgm.playMode || ""}|${pl}`;
 }
 
+/**
+ * 캐러셀 BGM phase.
+ * 실통화(미니↔풀 복원 포함)는 스크롤 가능해도 재생하지 않는다.
+ * @param {{ previewMode?: boolean, scrollEnabled?: boolean, muteForLiveCall?: boolean }} opts
+ */
+export function resolveShowcaseCarouselPlaybackPhase(opts = {}) {
+  const previewMode = Boolean(opts.previewMode);
+  const scrollEnabled = opts.scrollEnabled !== false;
+  const muteForLiveCall = Boolean(opts.muteForLiveCall);
+  if (muteForLiveCall || (!previewMode && !scrollEnabled)) return "call_active";
+  if (previewMode) return "preview";
+  return "replay";
+}
+
 /** 재생목록에 유효한 트랙이 있는지 */
 export function showcaseBgmPlaylistHasTracks(bgm) {
   return (
