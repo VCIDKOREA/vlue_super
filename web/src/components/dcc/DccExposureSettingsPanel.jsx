@@ -1,4 +1,4 @@
-import { isDccExposureComplete } from "../lib/dccExposure.js";
+import { isDccExposureComplete } from "../../lib/dccExposure.js";
 
 function PublicPrivateRow({ label, hint, value, onChange, isDarkMode }) {
   const unset = typeof value !== "boolean";
