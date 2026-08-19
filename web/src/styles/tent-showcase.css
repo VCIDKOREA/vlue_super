@@ -732,6 +732,125 @@
   pointer-events: none;
 }
 
+/* 조회 중 — HD Voice 바로 아래, 번호는 가리지 않는 브랜드 칩 */
+.lettering-overlay-host--tent.lettering-overlay-host--loading {
+  align-items: flex-start !important;
+  justify-content: center !important;
+  background: transparent !important;
+  padding: 36px 16px 0 !important;
+}
+
+.lettering-overlay-verify-chip {
+  pointer-events: none;
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 8px);
+  padding: 7px 14px 7px 8px;
+  border-radius: 999px;
+  color: #f8fbff;
+  white-space: nowrap;
+  background:
+    linear-gradient(180deg, rgba(56, 189, 248, 0.38) 0%, rgba(8, 47, 73, 0.88) 48%, rgba(15, 23, 42, 0.92) 100%);
+  border: 1px solid rgba(125, 211, 252, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(45, 212, 191, 0.28),
+    0 0 16px rgba(34, 211, 238, 0.42),
+    0 8px 22px rgba(8, 15, 30, 0.5);
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  animation: lettering-overlay-verify-pulse 1.8s ease-in-out infinite;
+}
+
+.lettering-overlay-verify-chip__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
+}
+
+.lettering-overlay-verify-chip__copy {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lettering-overlay-verify-chip__brand {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #7dd3fc;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+}
+
+.lettering-overlay-verify-chip__label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #f8fbff;
+}
+
+.lettering-overlay-verify-chip__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 2px;
+}
+
+.lettering-overlay-verify-chip__dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #7dd3fc;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.9);
+  animation: lettering-overlay-verify-dot 1.05s ease-in-out infinite;
+}
+
+.lettering-overlay-verify-chip__dots i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.lettering-overlay-verify-chip__dots i:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes lettering-overlay-verify-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(45, 212, 191, 0.22),
+      0 0 14px rgba(34, 211, 238, 0.34),
+      0 8px 22px rgba(8, 15, 30, 0.48);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(56, 189, 248, 0.55),
+      0 0 22px rgba(34, 211, 238, 0.58),
+      0 10px 26px rgba(8, 15, 30, 0.55);
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes lettering-overlay-verify-dot {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.75);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .lettering-overlay-host--tent > .lettering-overlay-host__tent-shell {
   pointer-events: auto;
   width: 100%;

@@ -18,6 +18,7 @@ import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
 import { fetchFollowProfile } from "../lib/followApi.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { normalizePhotoFocus } from "../lib/letteringBizcardStorage.js";
+import { VlueBrandMark } from "./VlueBrandLogo.jsx";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import LetteringReportSheet from "./LetteringReportSheet.jsx";
 import LetteringCertModal from "./LetteringCertModal.jsx";
@@ -834,15 +835,26 @@ function LetteringOverlayHostInner() {
   }
 
   if (loading) {
-    /* FULLSCREEN 흰 바탕 점유 금지 — 투명 호스트 + 작은 상태 칩만 */
+    /* FULLSCREEN 흰 바탕 점유 금지 — 투명 호스트 + 브랜드 확인 칩만 */
     return (
       <div
-        className="lettering-overlay-host lettering-overlay-host--tent lettering-overlay-host--loading fixed inset-0 z-[200] flex items-start justify-center pointer-events-none bg-transparent"
+        className="lettering-overlay-host lettering-overlay-host--tent lettering-overlay-host--loading"
         style={{ background: "transparent" }}
       >
-        <p className="mt-16 rounded-full bg-[#0F172A]/90 px-4 py-2 text-[11px] font-semibold tracking-wide text-[#E2E8F0]">
-          VLUE 신원 확인 중…
-        </p>
+        <div className="lettering-overlay-verify-chip" role="status" aria-live="polite">
+          <span className="lettering-overlay-verify-chip__mark">
+            <VlueBrandMark size={18} />
+          </span>
+          <span className="lettering-overlay-verify-chip__copy">
+            <span className="lettering-overlay-verify-chip__brand">VLUE</span>
+            <span className="lettering-overlay-verify-chip__label">신원 확인 중</span>
+          </span>
+          <span className="lettering-overlay-verify-chip__dots" aria-hidden>
+            <i />
+            <i />
+            <i />
+          </span>
+        </div>
       </div>
     );
   }
