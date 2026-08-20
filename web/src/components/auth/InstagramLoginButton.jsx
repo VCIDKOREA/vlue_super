@@ -13,7 +13,7 @@ export default function InstagramLoginButton({ className = "", disabled = false,
       type="button"
       disabled={disabled}
       onClick={startInstagramOAuth}
-      aria-label="Instagram 로그인 및 회원가입"
+      aria-label="Instagram 간편 로그인"
       className={[
         "flex w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#8134AF] py-3 text-[15px] font-semibold text-white transition",
         "hover:brightness-[0.98] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50",
@@ -29,7 +29,7 @@ export default function InstagramLoginButton({ className = "", disabled = false,
           <circle cx="17.2" cy="6.8" r="1.1" fill="currentColor" />
         </svg>
       </span>
-      <span>Instagram 로그인 · 회원가입</span>
+      <span>Instagram 로그인</span>
     </button>
   );
 }

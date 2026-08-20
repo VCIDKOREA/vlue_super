@@ -164,7 +164,7 @@ import {
 import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./lib/kakaoSocialLogin.js";
 import { consumeSocialOAuthReturn } from "./lib/socialOAuthReturn.js";
 import { consumeInstagramLinkReturn } from "./lib/instagramLinkApi.js";
-import { formatSocialLoginError } from "./lib/socialLoginPolicy.js";
+import { formatSocialLoginError, isSnsUnlinkedError } from "./lib/socialLoginPolicy.js";
 import { VLUE_MARKETING_SIGNUP_KEY, withdrawVlueAccount } from "./lib/vlueAuthApi.js";
 import LetteringNotificationPreviewPage from "./components/LetteringNotificationPreviewPage.jsx";
 import LetteringOverlayHost from "./components/LetteringOverlayHost.jsx";
@@ -331,6 +331,7 @@ function App() {
 
   const [pendingAuthAction, setPendingAuthAction] = useState(null);
   const [guestAuthOverlay, setGuestAuthOverlay] = useState(false);
+  const [snsUnlinkedAlert, setSnsUnlinkedAlert] = useState("");
 
   /** 마케팅 웹(www) 회원가입 탭 → /app 동일 온보딩 (PC file:// 앱은 외부 브라우저) */
   useEffect(() => {
@@ -2157,7 +2158,12 @@ function App() {
       const t = setTimeout(() => setBottomToast(""), 2200);
       return () => clearTimeout(t);
     }
-    setBottomToast(formatSocialLoginError(result.message) || "소셜 로그인에 실패했습니다. 다시 시도해 주세요.");
+    const formatted = formatSocialLoginError(result.message);
+    if (isSnsUnlinkedError(result.message || formatted)) {
+      setSnsUnlinkedAlert(formatted);
+      return undefined;
+    }
+    setBottomToast(formatted || "소셜 로그인에 실패했습니다. 다시 시도해 주세요.");
     const t = setTimeout(() => setBottomToast(""), 3200);
     return () => clearTimeout(t);
   }, [persistAuthSessionAfterLogin, processTierChangeFromLoginData]);
@@ -2397,7 +2403,12 @@ function App() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(formatSocialLoginError(data?.error));
+        const formatted = formatSocialLoginError(data?.error);
+        if (isSnsUnlinkedError(data?.error || formatted)) {
+          setSnsUnlinkedAlert(formatted);
+          return false;
+        }
+        throw new Error(formatted);
       }
       try {
         localStorage.removeItem(SAVED_LOGIN_ID_KEY);
@@ -4034,6 +4045,8 @@ function App() {
             onLogin={async (payload) => handleLogin(payload)}
             onSignup={(intent) => handleSignup(intent)}
             onSocialLogin={handleSocialLogin}
+            snsUnlinkedAlert={snsUnlinkedAlert}
+            onDismissSnsAlert={() => setSnsUnlinkedAlert("")}
           />
         </div>
       ) : null}
@@ -4042,6 +4055,8 @@ function App() {
         <div className="fixed inset-0 z-[220] bg-[#fafbfc]">
           <LoginScreen
             browsePrompt="이 기능은 회원가입 후 이용할 수 있습니다. VLUE 인증을 시작해 주세요."
+            snsUnlinkedAlert={snsUnlinkedAlert}
+            onDismissSnsAlert={() => setSnsUnlinkedAlert("")}
             onDismiss={closeGuestAuthOverlay}
             onLogin={async (payload) => {
               const result = await handleLogin(payload);

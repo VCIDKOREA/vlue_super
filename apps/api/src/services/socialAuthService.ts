@@ -3,8 +3,22 @@ import { prisma } from "../db/client.js";
 import { fetchKakaoUserFromAccessToken } from "../integrations/kakao/kakaoUserMe.js";
 import { fetchGoogleUserFromAccessToken } from "../integrations/google/googleOAuth.js";
 import { fetchInstagramProfile } from "../integrations/instagram/instagramOAuth.js";
-import { resolvePublicHandleForNewUser } from "../lib/publicHandle.js";
 import { issueTokenPair, type TokenPair } from "./authSessions.js";
+
+/** SRT형 — SNS는 휴대폰 본인인증 가입 후 마이페이지 연동된 계정만 로그인 */
+export const SOCIAL_NOT_LINKED_MESSAGE =
+  "이 SNS 계정과 연동되어 있지 않습니다. 최초 1회 휴대폰 본인인증으로 가입한 뒤, [마이페이지 > 소셜 로그인 연동]에서 SNS 계정을 연결하면 간편 로그인할 수 있습니다.";
+
+export class SocialAuthError extends Error {
+  statusCode: number;
+  code: string;
+  constructor(message: string, statusCode = 403, code = "SOCIAL_NOT_LINKED") {
+    super(message);
+    this.name = "SocialAuthError";
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}
 
 export type SocialLoginRequestBody = {
   socialToken?: string;
@@ -40,10 +54,6 @@ function normalizeProvider(raw: string): SocialLoginProvider | null {
   if (p === "google") return "google";
   if (p === "instagram") return "instagram";
   return null;
-}
-
-function signupMethodForProvider(provider: SocialLoginProvider): string {
-  return `social_${provider}`;
 }
 
 async function resolveSocialIdentity(
@@ -170,53 +180,6 @@ async function findUserBySocialMapping(identity: ResolvedSocialIdentity) {
   return { user: legacy, via: "legacy_migrated" as const };
 }
 
-async function createUserFromSocial(identity: ResolvedSocialIdentity) {
-  const publicHandle = await resolvePublicHandleForNewUser(prisma, null);
-  let email: string | null = identity.providerEmail;
-  if (email) {
-    const clash = await prisma.user.findUnique({
-      where: { email },
-      select: { id: true }
-    });
-    if (clash) email = null;
-  }
-
-  const provisionalName = identity.displayName ? identity.displayName.slice(0, 120) : null;
-
-  const created = await prisma.user.create({
-    data: {
-      publicHandle,
-      email,
-      legalName: provisionalName,
-      identityVerified: false,
-      accountStatus: "pending_identity",
-      signupMethod: signupMethodForProvider(identity.provider),
-      socialProvider: identity.provider,
-      socialId: identity.providerUserId,
-      isVerified: Boolean(identity.emailVerified && identity.providerEmail),
-      status: "ACTIVE",
-      currentDiscountRate: 30,
-      socialLoginLinks: {
-        create: {
-          provider: identity.provider,
-          providerUserId: identity.providerUserId,
-          providerEmail: identity.providerEmail,
-          lastLoginAt: new Date()
-        }
-      }
-    },
-    select: {
-      id: true,
-      legalName: true,
-      publicHandle: true,
-      accountStatus: true,
-      phoneE164: true
-    }
-  });
-
-  return created;
-}
-
 async function loginMappedUser(
   user: {
     id: string;
@@ -248,7 +211,8 @@ async function loginMappedUser(
 }
 
 /**
- * 소셜 로그인 upsert — 연동 계정이 없으면 pending_identity 유저를 즉시 생성한다.
+ * 소셜 간편 로그인 — 마이페이지에서 연동된 계정만 통과.
+ * 연동 없으면 신규 가입하지 않는다 (휴대폰 본인인증 가입 필수).
  */
 export async function completeSocialLogin(
   body: SocialLoginRequestBody,
@@ -266,8 +230,7 @@ export async function completeSocialLogin(
     return loginMappedUser(mapped.user, identity, req, false);
   }
 
-  const created = await createUserFromSocial(identity);
-  return loginMappedUser(created, identity, req, true);
+  throw new SocialAuthError(SOCIAL_NOT_LINKED_MESSAGE);
 }
 
 /**
@@ -286,9 +249,16 @@ export async function linkSocialAccountToUser(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, signupMethod: true }
+    select: { id: true, signupMethod: true, identityVerified: true }
   });
   if (!user) throw new Error("사용자를 찾을 수 없습니다.");
+  if (!user.identityVerified) {
+    throw new SocialAuthError(
+      "휴대폰 본인인증으로 가입한 뒤에 SNS 계정을 연동할 수 있습니다.",
+      403,
+      "IDENTITY_REQUIRED"
+    );
+  }
 
   const identity = await resolveSocialIdentity(provider, token, body);
 

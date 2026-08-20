@@ -16,7 +16,7 @@ export default function KakaoLoginButton({ className = "", disabled = false, onB
       type="button"
       disabled={disabled}
       onClick={startKakaoOAuth}
-      aria-label="카카오 로그인 및 회원가입"
+      aria-label="카카오 간편 로그인"
       className={[
         "flex w-full items-center justify-center gap-2 rounded-md bg-[#FEE500] py-3 text-[15px] font-semibold text-[rgba(0,0,0,0.85)] transition",
         "hover:brightness-[0.98] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50",
@@ -31,7 +31,7 @@ export default function KakaoLoginButton({ className = "", disabled = false, onB
       >
         K
       </span>
-      <span>카카오 로그인 · 회원가입</span>
+      <span>카카오 로그인</span>
     </button>
   );
 }

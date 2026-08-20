@@ -15,11 +15,18 @@ const REMEMBER_KEY = "vlue_remember_login";
 
 /**
  * 앱 최초 진입용 로그인 화면
- * - 소셜 가입·로그인을 메인 진입 방식으로 제공
- * - 일반 계정 로그인·회원가입은 사용자가 선택했을 때 표시
- * - 아이디·비밀번호 저장 체크 후 로그인 시 다음 접속에서 둘 다 불러옴
+ * - 신규 가입은 휴대폰 본인인증(VLUE 회원가입)
+ * - SNS는 가입 후 마이페이지 연동된 계정만 간편 로그인
  */
-function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt }) {
+function LoginScreen({
+  onLogin,
+  onSignup,
+  onSocialLogin,
+  onDismiss,
+  browsePrompt,
+  snsUnlinkedAlert,
+  onDismissSnsAlert
+}) {
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [rememberLogin, setRememberLogin] = useState(false);
@@ -150,7 +157,7 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
           {!generalAuthOpen ? (
             <div className="mt-7 flex w-full max-w-[300px] flex-col items-center">
               <p className="w-full text-center text-[12px] leading-relaxed text-slate-600 [word-break:keep-all]">
-                카카오 · Google · 네이버 · Instagram · VLUE 가입과 로그인이 가능합니다.
+                간편 로그인은 휴대폰 본인인증 가입 후 마이페이지에서 SNS를 연동해야 사용할 수 있습니다.
               </p>
               <div className="mt-4 flex w-full flex-col gap-2.5">
                 <KakaoLoginButton />
@@ -169,7 +176,7 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
                 <span>VLUE 로그인 · 회원가입</span>
               </button>
               <p className="mt-3 w-full text-center text-[11px] leading-snug text-slate-500 [word-break:keep-all]">
-                VLUE 내부 기능 중 본인인증이 필요할 수 있습니다.
+                처음이라면 「VLUE 로그인 · 회원가입」에서 휴대폰 본인인증으로 가입해 주세요.
               </p>
             </div>
           ) : (
@@ -352,6 +359,26 @@ function LoginScreen({ onLogin, onSignup, onSocialLogin, onDismiss, browsePrompt
             setRecoveryDone(msg || "비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.");
           }}
         />
+      ) : null}
+
+      {snsUnlinkedAlert ? (
+        <div className="fixed inset-0 z-[30] flex items-center justify-center bg-black/40 px-6" role="alertdialog" aria-modal="true">
+          <div className="w-full max-w-[320px] rounded-2xl bg-white px-5 py-6 shadow-xl">
+            <p className="text-center text-[15px] font-bold leading-snug text-slate-900 [word-break:keep-all]">
+              이 SNS 계정과 연동되어 있지 않습니다.
+            </p>
+            <p className="mt-3 text-center text-[13px] leading-relaxed text-slate-600 [word-break:keep-all]">
+              최초 1회 휴대폰 본인인증으로 가입한 뒤, [마이페이지 &gt; 소셜 로그인 연동]에서 SNS 계정을 연결하면 간편 로그인할 수 있습니다.
+            </p>
+            <button
+              type="button"
+              onClick={() => onDismissSnsAlert?.()}
+              className="mt-5 w-full rounded-xl bg-slate-900 py-3 text-[15px] font-semibold text-white"
+            >
+              확인
+            </button>
+          </div>
+        </div>
       ) : null}
 
     </div>

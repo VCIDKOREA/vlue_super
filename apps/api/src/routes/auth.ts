@@ -434,14 +434,16 @@ authRoutes.post("/social-login", async (c) => {
     return c.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
+    const code = (e as Error & { code?: string }).code;
     const lower = msg.toLowerCase();
     const status =
-      lower.includes("토큰") || lower.includes("token") || lower.includes("만료") || lower.includes("유효하지")
+      (e as Error & { statusCode?: number }).statusCode ||
+      (lower.includes("토큰") || lower.includes("token") || lower.includes("만료") || lower.includes("유효하지")
         ? 401
         : lower.includes("지원하지") || lower.includes("provider")
           ? 400
-          : 400;
-    return c.json({ error: msg }, status);
+          : 400);
+    return c.json({ error: msg, ...(code ? { code } : {}) }, status as 400 | 401 | 403);
   }
 });
 

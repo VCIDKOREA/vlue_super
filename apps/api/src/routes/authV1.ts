@@ -178,7 +178,7 @@ authV1Routes.get("/google", (c) => {
   }
 });
 
-/** Google OAuth 콜백 — 즉시 가입/로그인 후 프론트로 리다이렉트 */
+/** Google OAuth 콜백 — 연동된 계정만 로그인 후 프론트로 리다이렉트 */
 authV1Routes.get("/google/callback", async (c) => {
   const googleErr = c.req.query("error");
   const googleErrDesc = c.req.query("error_description");
@@ -282,7 +282,7 @@ function redirectInstagramLink(query: Record<string, string>): Response {
   return Response.redirect(loc, 302);
 }
 
-/** Instagram 로그인·회원가입 (쇼케이스 연동과 동일 OAuth · state 쿠키) */
+/** Instagram 간편 로그인 (쇼케이스 연동과 동일 OAuth · state 쿠키). 미연동이면 가입하지 않음. */
 authV1Routes.get("/instagram", (c) => {
   try {
     const state = randomBytes(24).toString("base64url");
@@ -317,7 +317,7 @@ authV1Routes.post("/instagram/link/start", requireUserHeader, async (c) => {
 /**
  * Instagram OAuth 콜백
  * - signed link state → 쇼케이스 연동
- * - cookie state → VLUE 로그인·회원가입
+ * - cookie state → VLUE 간편 로그인 (미연동이면 가입 차단)
  */
 authV1Routes.get("/instagram/callback", async (c) => {
   const igErr = c.req.query("error");
@@ -497,6 +497,7 @@ authV1Routes.post("/social/link", requireUserHeader, async (c) => {
     return c.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "소셜 연동에 실패했습니다.";
-    return c.json({ error: msg }, 400);
+    const status = (e as Error & { statusCode?: number }).statusCode === 403 ? 403 : 400;
+    return c.json({ error: msg }, status);
   }
 });
