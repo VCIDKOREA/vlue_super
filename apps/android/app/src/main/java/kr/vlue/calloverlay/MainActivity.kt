@@ -828,6 +828,11 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
     class MainJsBridge(private val activity: MainActivity) {
         @android.webkit.JavascriptInterface
+        fun isCompanionOverlayActive(): String {
+            return if (CallOverlayService.isCompanionSurfaceVisible()) "1" else "0"
+        }
+
+        @android.webkit.JavascriptInterface
         fun setLetteringEnabled(value: String) {
             activity.runOnUiThread {
                 val on = value == "1" || value == "true"

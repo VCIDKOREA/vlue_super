@@ -1074,14 +1074,13 @@ class CallOverlayService : Service() {
             val ctx = when (surface) {
                 ForegroundPackageProbe.RingingSurface.FULL_INCALL ->
                     OverlayContext.INCOMING_CALL_UI
-                ForegroundPackageProbe.RingingSurface.COMPACT_DIALER ->
-                    OverlayContext.COMPACT_INCOMING
                 /*
-                 * "기본 전화앱 미니 수신 UI" 에서만 팝업 바로 아래.
-                 * 홈/타앱/HUN 추정은 모두 상단(TOP)으로 두어 겹침·출렁임을 막는다.
+                 * 미니 수신(다이얼러·HUN·VLUE/홈 위 팝업) → 팝업 바로 아래.
+                 * TOP 이면 삼성 미니 UI 뒤로 들어가 홈 미리보기만 보이므로 BELOW 고정.
                  */
+                ForegroundPackageProbe.RingingSurface.COMPACT_DIALER,
                 ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER ->
-                    OverlayContext.INCOMING_CALL_UI
+                    OverlayContext.COMPACT_INCOMING
             }
             val detail =
                 "phase=RINGING surface=$surface ctx=${ctx.name} ourApp=$ourApp " +

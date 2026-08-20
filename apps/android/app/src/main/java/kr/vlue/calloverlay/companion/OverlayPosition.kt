@@ -22,6 +22,7 @@ enum class OverlayPosition {
  * 상태바 아래부터 카드 하단까지. 빅푸시는 이 값 + GAP 만큼 내려 붙인다.
  */
 object CompactIncomingMetrics {
-    const val CARD_HEIGHT_DP = 200
-    const val GAP_DP = 16
+    /** SM-A175N HD Voice + 응답/종료 + 메시지 카드 실측 여유 */
+    const val CARD_HEIGHT_DP = 228
+    const val GAP_DP = 20
 }

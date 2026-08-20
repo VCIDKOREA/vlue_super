@@ -45,11 +45,38 @@ export default function CallBigPushPreviewSection({
   const [expanded, setExpanded] = useState(Boolean(defaultExpanded));
   const [callChromePreview, setCallChromePreview] = useState(false);
   const [previewTick, setPreviewTick] = useState(0);
+  const [liveCallOverlayActive, setLiveCallOverlayActive] = useState(false);
   const { unlockFromUserGesture } = useShowcaseBgm();
 
   const paidTier = isPaidLetteringTier(membershipTier) ? membershipTier : "premium";
   const isOn = showcaseOn;
   const effectiveTier = isOn ? paidTier : "free";
+
+  useEffect(() => {
+    const readActive = () => {
+      try {
+        const raw =
+          window.Android?.isCompanionOverlayActive?.() ||
+          window.VlueLettering?.isCompanionOverlayActive?.() ||
+          "";
+        setLiveCallOverlayActive(String(raw) === "1" || String(raw) === "true");
+      } catch {
+        setLiveCallOverlayActive(false);
+      }
+    };
+    readActive();
+    const t = window.setInterval(readActive, 700);
+    const onNative = () => readActive();
+    window.addEventListener("vlue-native-call-state", onNative);
+    window.addEventListener("focus", onNative);
+    window.addEventListener("visibilitychange", onNative);
+    return () => {
+      window.clearInterval(t);
+      window.removeEventListener("vlue-native-call-state", onNative);
+      window.removeEventListener("focus", onNative);
+      window.removeEventListener("visibilitychange", onNative);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,6 +206,11 @@ export default function CallBigPushPreviewSection({
   /* 접힘·펼침 동일 크롬(home-glass) — 클래스 교체로 흔들림 방지 */
   const pushClassName =
     "lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass";
+
+  /* 실통화 오버레이가 떠 있으면 홈 미리보기를 숨겨 미니 UI 뒤 본인 쇼케이스 겹침을 막는다 */
+  if (liveCallOverlayActive && !inlineExpand) {
+    return null;
+  }
 
   return (
     <section

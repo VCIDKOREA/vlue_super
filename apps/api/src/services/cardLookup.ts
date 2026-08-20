@@ -444,6 +444,12 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
               titleSnapshot: true,
               organization: true
             }
+          },
+          subscriptions: {
+            where: { status: "active" },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { cycleEndAt: true, cycleStartAt: true }
           }
         }
       }
@@ -532,6 +538,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       profileCompany: card.user.businessProfile?.companyName,
       userId: card.user.id
     });
+    const authSub = card.user.subscriptions?.[0];
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -552,6 +559,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
           titlePhotoUrl: firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
           noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
+          authCycleEndAt: authSub?.cycleEndAt ? authSub.cycleEndAt.toISOString() : null,
+          authPaidAt: authSub?.cycleStartAt ? authSub.cycleStartAt.toISOString() : null,
           image_url: imageUrl,
           logo_url:
             firstStr(
@@ -583,6 +592,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       id: true,
       publicHandle: true,
       legalName: true,
+      email: true,
       identityVerified: true,
       isShowcasePrivate: true,
       phoneE164: true,
@@ -595,6 +605,12 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           titleSnapshot: true,
           organization: true
         }
+      },
+      subscriptions: {
+        where: { status: "active" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { cycleEndAt: true, cycleStartAt: true }
       }
     }
   });
@@ -616,6 +632,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       profileCompany: user.businessProfile?.companyName,
       userId: user.id
     });
+    const sub = user.subscriptions?.[0];
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -639,6 +656,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
           titlePhotoUrl: firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
           noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
+          authCycleEndAt: sub?.cycleEndAt ? sub.cycleEndAt.toISOString() : null,
+          authPaidAt: sub?.cycleStartAt ? sub.cycleStartAt.toISOString() : null,
           image_url: photo || (isCeo ? ceoDefaultBrandLogoUrl() : null),
           logo_url:
             firstStr(
