@@ -56,7 +56,11 @@ object OverlayCardOrgFill {
             json.put("organization", "VCID KOREA")
         }
         val tier = json.optString("membershipTier").trim()
-        if (tier.isEmpty() && (json.optBoolean("is_verified", false) || isPlatformCeo(json))) {
+        if (tier.isEmpty() &&
+            (json.optBoolean("is_premium_line", false) ||
+                json.optBoolean("digitalCardActive", false) ||
+                isPlatformCeo(json))
+        ) {
             json.put("membershipTier", "paid")
         }
     }

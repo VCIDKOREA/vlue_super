@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "330913603576",
+    "project_id": "vlue-c6c0b",
+    "storage_bucket": "vlue-c6c0b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:330913603576:android:efad97b32b98719809c00d",
+        "android_client_info": {
+          "package_name": "kr.vlue.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChTn5Qsr7EKrC6yYzzNqqzBVYNu5JDZyI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -61,6 +61,11 @@ import LineBillingGraceModal from "./components/LineBillingGraceModal.jsx";
 import ParentalConsentApproveModal from "./components/ParentalConsentApproveModal.jsx";
 import { fetchPendingParentalConsents } from "./lib/parentalConsentApi.js";
 import { bindFcmForegroundListener, registerFcmWebPushToken } from "./lib/fcmWebPush.js";
+import {
+  bindNativeFcmTokenListener,
+  isNativeFcmAvailable,
+  registerNativeFcmPushToken
+} from "./lib/fcmNativeRegister.js";
 import SignupErrorBoundary from "./components/SignupErrorBoundary.jsx";
 import LoginScreen from "./components/LoginScreen";
 import AppLockPinResetModal, { useAppLockResetListener } from "./components/AppLockPinResetModal.jsx";
@@ -881,12 +886,20 @@ function App() {
     };
   }, [isLoggedIn]);
 
-  /** FCM 웹 토큰 — 부모 승인·가족보호 백그라운드 푸시 */
+  /** FCM — Android 앱은 네이티브 토큰, 웹은 Web Push */
   useEffect(() => {
     if (!isLoggedIn) return undefined;
     let cancelled = false;
+    const unbindNative = bindNativeFcmTokenListener();
     (async () => {
       try {
+        if (isNativeFcmAvailable()) {
+          const result = await registerNativeFcmPushToken();
+          if (!cancelled && !result.ok && !result.skipped) {
+            console.warn("[fcm] native_register_failed", result.error);
+          }
+          return;
+        }
         const result = await registerFcmWebPushToken();
         if (!cancelled && !result.ok && !result.skipped) {
           console.warn("[fcm] register_failed", result.error);
@@ -897,6 +910,7 @@ function App() {
     })();
     return () => {
       cancelled = true;
+      unbindNative();
     };
   }, [isLoggedIn]);
 

@@ -17,6 +17,19 @@ import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCa
 import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
 import { fetchFollowProfile } from "../lib/followApi.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
+
+/** 상대가 쇼케이스/DCC 를 송출 ON 으로 저장하지 않은 경우 — 인증 팝업만 */
+function createPeerAuthOnlyShowcaseStyle() {
+  return {
+    ...createDefaultShowcaseStyle(),
+    includeDigitalCard: false,
+    verifiedBadgeOn: true
+  };
+}
+
+function peerShowcaseBroadcastOn(style) {
+  return Boolean(style && typeof style === "object" && style.includeDigitalCard === true);
+}
 import { normalizePhotoFocus } from "../lib/letteringBizcardStorage.js";
 import { VlueBrandMark } from "./VlueBrandLogo.jsx";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
@@ -76,7 +89,11 @@ async function enrichPeerCardFromProfile(peerUserId, nextCard) {
     authPaidAt: nextCard?.authPaidAt || data.authPaidAt || null,
     authCycleEndAt: nextCard?.authCycleEndAt || data.authCycleEndAt || null,
     authValidUntil: nextCard?.authValidUntil || data.authValidUntil || null,
-    membershipTier: data.membershipTier || nextCard.membershipTier || "paid"
+    membershipTier: data.membershipTier || nextCard.membershipTier || "free",
+    digitalCardActive:
+      nextCard?.digitalCardActive === true ||
+      data.digitalCardActive === true ||
+      Boolean(data.cardId)
   };
 }
 
@@ -85,7 +102,8 @@ async function enrichOverlayPeerBundle(peerUserId, nextCard) {
   if (!id) {
     return {
       card: nextCard,
-      style: createDefaultShowcaseStyle()
+      style: createPeerAuthOnlyShowcaseStyle(),
+      broadcastOn: false
     };
   }
   const peerNumber =
@@ -98,9 +116,19 @@ async function enrichOverlayPeerBundle(peerUserId, nextCard) {
       fetchPeerLiveStylePublic(id, { force: false, number: peerNumber }),
       enrichPeerCardFromProfile(id, nextCard)
     ]);
+    /* live 없음 = 미설정 → 인증 팝업. live.includeDigitalCard===true 만 송출 ON */
+    const style =
+      live && typeof live === "object" ? live : createPeerAuthOnlyShowcaseStyle();
+    const broadcastOn = peerShowcaseBroadcastOn(style);
     return {
-      card: enriched,
-      style: live && typeof live === "object" ? live : createDefaultShowcaseStyle()
+      card: {
+        ...enriched,
+        membershipTier: broadcastOn
+          ? enriched.membershipTier || nextCard?.membershipTier || "free"
+          : "free"
+      },
+      style: broadcastOn ? style : { ...style, includeDigitalCard: false },
+      broadcastOn
     };
   })();
   overlayPeerEnrichInflight.set(inflightKey, run);
@@ -265,7 +293,7 @@ function LetteringOverlayHostInner() {
       ? CALL_STATES.CONNECTED
       : CALL_STATES.RINGING;
   });
-  const [showcaseStyle, setShowcaseStyle] = useState(() => createDefaultShowcaseStyle());
+  const [showcaseStyle, setShowcaseStyle] = useState(() => createPeerAuthOnlyShowcaseStyle());
   /* 수화 직후 신원 칩이 끝나기 전에는 풀 DCC를 펼치지 않음 */
   const [expanded, setExpanded] = useState(false);
   /* Native BIG_PUSH 창 — 앱 쇼케이스바(접힘) 강제. MiniCase 금지 */
@@ -966,8 +994,12 @@ function LetteringOverlayHostInner() {
             }
           }}
           includeDigitalCard={Boolean(
-            verified && styledCard?.showcaseStyle?.includeDigitalCard !== false
+            verified && peerShowcaseBroadcastOn(styledCard?.showcaseStyle || showcaseStyle)
           )}
+          showcaseOffPreview={
+            Boolean(verified) &&
+            !peerShowcaseBroadcastOn(styledCard?.showcaseStyle || showcaseStyle)
+          }
           digitalCardOnly={false}
           savedContactName={
             String(styledCard?.profileKind || "") === "contact_safe_care"

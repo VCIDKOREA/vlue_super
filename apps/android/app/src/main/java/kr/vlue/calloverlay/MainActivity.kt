@@ -118,6 +118,10 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             VlueFamilyBridge.INTERFACE_NAME
         )
         VlueFamilyBridge.attachWebView(webView)
+        kr.vlue.calloverlay.push.VlueFcmTokenStore.attachWebView(webView)
+        Thread {
+            kr.vlue.calloverlay.push.VlueFcmTokenStore.fetchTokenBlocking(this)
+        }.start()
 
         pinLock = PinLockController(
             activity = this,
@@ -846,6 +850,27 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                     tag
                 )
             }
+        }
+
+        /** 네이티브 FCM 등록 토큰 — 웹이 /api/auth/devices/fcm-token 에 전달 */
+        @android.webkit.JavascriptInterface
+        fun getFcmToken(): String {
+            return try {
+                kr.vlue.calloverlay.push.VlueFcmTokenStore.read(activity)
+            } catch (_: Exception) {
+                ""
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun refreshFcmToken() {
+            Thread {
+                val token =
+                    kr.vlue.calloverlay.push.VlueFcmTokenStore.fetchTokenBlocking(activity)
+                if (token.isNotBlank()) {
+                    kr.vlue.calloverlay.push.VlueFcmTokenStore.notifyWebToken(activity, token)
+                }
+            }.start()
         }
 
         @android.webkit.JavascriptInterface

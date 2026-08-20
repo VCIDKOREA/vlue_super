@@ -384,7 +384,7 @@ export default function LetteringIncomingNotification({
     String(c?.expiredDetail || "").trim() ||
     "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다.";
   const showDigitalCard =
-    isDcpCard || (Boolean(includeDigitalCard) && c?.showcaseStyle?.includeDigitalCard !== false);
+    isDcpCard || (Boolean(includeDigitalCard) && c?.showcaseStyle?.includeDigitalCard === true);
   const onCall = callPhase === "active" || callPhase === "connected";
   useEffect(() => {
     if (!showDigitalCard && carouselSlideType === "card") {
@@ -529,12 +529,17 @@ export default function LetteringIncomingNotification({
   const isDcp = isDcpCard;
   const isContactSafeCare = isContactSafeCareCardFlag;
   const isGlassTent = /\blettering-ongoing--fullscreen-tent\b/.test(String(className || ""));
+  /*
+   * 실통화: 상대가 쇼케이스/DCC 를 저장·ON 한 경우만 유료 쇼케이스.
+   * (이전: verified+glassTent → 항상 paid → 미설정 회원에게 DCC가 잘못 노출)
+   */
+  const peerBroadcastOn =
+    Boolean(includeDigitalCard) && c?.showcaseStyle?.includeDigitalCard === true;
   const isPaidMember =
     !isExpiredLine &&
     (isDcp ||
-      (verified && isPaidLetteringTier(c.membershipTier)) ||
-      /* 실통화 오버레이 — 티어 오기 전 옛 천막 쇼케이스를 띄우지 않음 */
-      (verified && isGlassTent));
+      (verified && isPaidLetteringTier(c.membershipTier) && peerBroadcastOn) ||
+      (verified && isGlassTent && peerBroadcastOn));
   const isFreeMember = !isExpiredLine && verified && !isPaidMember && !isDcp;
   const isUnverified = !isExpiredLine && !verified && !isDcp && !isContactSafeCare;
   const { setPlaybackPhase } = useShowcaseBgm();
