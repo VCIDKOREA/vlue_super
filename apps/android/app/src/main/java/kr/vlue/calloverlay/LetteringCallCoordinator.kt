@@ -467,6 +467,18 @@ object LetteringCallCoordinator {
                 matched = true,
                 dataSource = "api"
             )
+            if (!IncomingNumberResolver.sameCanonicalNumber(lastRingNumber, raw)) {
+                CompanionRuntimeStabilityDiag.noteStaleEvent(
+                    "LOOKUP_UPDATE_STALE_NUMBER",
+                    "enrichWithLookup",
+                    detail = "drop=${ReleaseDebugGate.maskPhoneForLog(raw)} current=${ReleaseDebugGate.maskPhoneForLog(lastRingNumber)}"
+                )
+                Log.i(
+                    TAG,
+                    "drop stale lookup ${ReleaseDebugGate.maskPhoneForLog(raw)} current=${ReleaseDebugGate.maskPhoneForLog(lastRingNumber)}"
+                )
+                return
+            }
             if (!CompanionRuntimeStabilityDiag.isCallSessionActive() &&
                 CompanionRuntimeStabilityDiag.shouldIgnorePostEndOverlayStart()
             ) {

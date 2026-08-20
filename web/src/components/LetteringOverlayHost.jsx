@@ -965,7 +965,7 @@ function LetteringOverlayHostInner() {
           includeDigitalCard={Boolean(
             verified && styledCard?.showcaseStyle?.includeDigitalCard !== false
           )}
-          digitalCardOnly={onCall}
+          digitalCardOnly={false}
           savedContactName={
             String(styledCard?.profileKind || "") === "contact_safe_care"
               ? String(styledCard?.displayName || styledCard?.name || "").trim()
