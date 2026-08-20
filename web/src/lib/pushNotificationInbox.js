@@ -126,7 +126,7 @@ export function addPushNotification({
       const copy = [...list];
       copy[idx] = next;
       writeList(copy);
-      return next;
+      return { ...next, isNew: false };
     }
   }
   if (key) {
@@ -143,7 +143,7 @@ export function addPushNotification({
       const copy = [...list];
       copy[idx] = next;
       writeList(copy);
-      return next;
+      return { ...next, isNew: false };
     }
   }
   const isPayment = kind === "payment" || category === "결제";
@@ -169,7 +169,7 @@ export function addPushNotification({
     pinKey: key || null
   };
   writeList([entry, ...list]);
-  return entry;
+  return { ...entry, isNew: true };
 }
 
 export function prunePinnedPushNotIn(pinKeys = []) {

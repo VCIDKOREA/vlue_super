@@ -408,8 +408,18 @@ export async function createProtectionLink(
       linkId: link.id,
       guardianUserId,
       familyRelation
+    }).then((push) => {
+      if (push.skipped || push.sent === 0) {
+        console.warn("[family-protection] invite_fcm_skipped", {
+          wardUserId: ward.id,
+          reason: push.reason || (push.sent === 0 ? "no_delivery" : "ok"),
+          sent: push.sent,
+          failed: push.failed
+        });
+      }
     });
-  } catch {
+  } catch (err) {
+    console.warn("[family-protection] invite_fcm_failed", err);
     /* FCM 실패는 초대 자체를 막지 않음 */
   }
 

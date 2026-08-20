@@ -95,6 +95,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         super.onCreate(savedInstanceState)
         VlueBigPushTrace.bind(this)
         AppLockStore.init(this)
+        VlueSystemNotifier.ensureChannel(this)
         setContentView(R.layout.activity_main)
         mainRoot = findViewById(R.id.main_root)
         webView = findViewById(R.id.main_webview)
@@ -832,6 +833,19 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             if (CallOverlayService.isCompanionSurfaceVisible()) return "1"
             if (LetteringCallCoordinator.isIncomingRingingActive()) return "1"
             return "0"
+        }
+
+        /** 웹 SSE·알림함 → OS 상태바 푸시 (FCM 미등록 기기 보완) */
+        @android.webkit.JavascriptInterface
+        fun showSystemNotification(title: String?, body: String?, tag: String?) {
+            activity.runOnUiThread {
+                VlueSystemNotifier.show(
+                    activity,
+                    title.orEmpty(),
+                    body.orEmpty(),
+                    tag
+                )
+            }
         }
 
         @android.webkit.JavascriptInterface

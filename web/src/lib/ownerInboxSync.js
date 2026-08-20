@@ -1,6 +1,7 @@
 import { apiUrl } from "./apiBase.js";
 import { vlueAuthFetch } from "./vlueAuthHeaders.js";
 import { addPushNotification, prunePinnedPushNotIn } from "./pushNotificationInbox.js";
+import { maybePostAndroidPushForInboxItem } from "./androidSystemNotification.js";
 
 /**
  * 서버 OwnerNotification → 로컬 알림함 병합 (좋아요·댓글·공유 포함)
@@ -25,7 +26,11 @@ export async function syncOwnerInboxFromServer() {
         pinKind: item.pinKind || null,
         pinKey: item.pinKey || null
       });
-      if (entry) added += 1;
+      if (entry?.isNew) {
+        added += 1;
+        /* 앱 재오픈 시 신규 가족 초대 등은 OS 상태바에도 표시 */
+        if (!item.read) maybePostAndroidPushForInboxItem(entry);
+      }
     }
     return { ok: true, added };
   } catch {
