@@ -83,13 +83,24 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
   const onAdd = async () => {
     setSlotHint("");
     try {
-      let guardianImpUid;
-      if (familyRelation === "child") {
-        guardianImpUid = await requestGuardianPassImpUid();
+      /*
+       * 1차: PASS 없이 초대 시도 (seed_ QA 보호자·부모(노부모) 등록).
+       * 2차: 실계정 자녀 초대만 GUARDIAN_PASS_REQUIRED → 보호자 PASS.
+       */
+      try {
+        const text = await fp.addLink(wardHandle, familyRelation, undefined);
+        setWardHandle("");
+        toast(text);
+        return;
+      } catch (first) {
+        if (familyRelation !== "child" || first?.code !== "GUARDIAN_PASS_REQUIRED") {
+          throw first;
+        }
+        const guardianImpUid = await requestGuardianPassImpUid();
+        const text = await fp.addLink(wardHandle, familyRelation, guardianImpUid);
+        setWardHandle("");
+        toast(text);
       }
-      const text = await fp.addLink(wardHandle, familyRelation, guardianImpUid);
-      setWardHandle("");
-      toast(text);
     } catch (e) {
       const msg = e?.message || "등록 실패";
       setSlotHint(msg);

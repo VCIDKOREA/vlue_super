@@ -155,14 +155,35 @@ class OverlayPositionManagerTest {
             OverlayContext.COMPACT_INCOMING,
             OverlayPositionManager.holdBelowCompactIncoming(
                 OverlayPosition.BELOW_COMPACT_INCOMING,
+                OverlayContext.COMPACT_INCOMING,
                 OverlayContext.INCOMING_CALL_UI,
                 ringing = true
+            )
+        )
+        assertEquals(
+            OverlayContext.COMPACT_INCOMING,
+            OverlayPositionManager.holdBelowCompactIncoming(
+                OverlayPosition.TOP,
+                OverlayContext.COMPACT_INCOMING,
+                OverlayContext.INCOMING_CALL_UI,
+                ringing = true
+            )
+        )
+        assertEquals(
+            OverlayContext.COMPACT_INCOMING,
+            OverlayPositionManager.holdBelowCompactIncoming(
+                OverlayPosition.HIDDEN,
+                OverlayContext.HOME_SCREEN,
+                OverlayContext.INCOMING_CALL_UI,
+                ringing = true,
+                ourAppForeground = true
             )
         )
         assertEquals(
             OverlayContext.INCOMING_CALL_UI,
             OverlayPositionManager.holdBelowCompactIncoming(
                 OverlayPosition.TOP,
+                OverlayContext.HOME_SCREEN,
                 OverlayContext.INCOMING_CALL_UI,
                 ringing = true
             )
@@ -171,6 +192,7 @@ class OverlayPositionManagerTest {
             OverlayContext.INCOMING_CALL_UI,
             OverlayPositionManager.holdBelowCompactIncoming(
                 OverlayPosition.BELOW_COMPACT_INCOMING,
+                OverlayContext.COMPACT_INCOMING,
                 OverlayContext.INCOMING_CALL_UI,
                 ringing = false
             )

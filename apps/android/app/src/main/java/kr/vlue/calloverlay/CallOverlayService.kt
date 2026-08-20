@@ -873,6 +873,12 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_APPLIED", source)
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_VISIBLE", source)
         notifyWebCallState("connected")
+        /* Mini Case 에서 수락해도 웹 expanded=true — 검정 FULLSCREEN + 미니 UI 불일치 방지 */
+        webView?.evaluateJavascript(
+            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&window.VlueLettering.setExpanded(true);" +
+                "window.dispatchEvent(new CustomEvent('vlue-native-expand-showcase',{detail:{expanded:true}}));}catch(e){}",
+            null
+        )
     }
 
     /**
@@ -1081,6 +1087,15 @@ class CallOverlayService : Service() {
                 ForegroundPackageProbe.RingingSurface.COMPACT_DIALER,
                 ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER ->
                     OverlayContext.COMPACT_INCOMING
+            }.let { resolved ->
+                if (ourApp &&
+                    resolved == OverlayContext.INCOMING_CALL_UI &&
+                    !OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg)
+                ) {
+                    OverlayContext.COMPACT_INCOMING
+                } else {
+                    resolved
+                }
             }
             val detail =
                 "phase=RINGING surface=$surface ctx=${ctx.name} ourApp=$ourApp " +
@@ -2589,12 +2604,20 @@ class CallOverlayService : Service() {
         }
         val prevState = companion.state
         val prevPos = companion.position
+        val prevCtx = companion.context
         val forceRinging = companion.state == OverlayState.BIG_PUSH && !isCallAlreadyAnswered()
+        val ourAppForeground =
+            VlueCallOverlayApp.currentActivityName.orEmpty().let { activity ->
+                activity.contains("kr.vlue", ignoreCase = true) &&
+                    !activity.contains("(paused)", ignoreCase = true)
+            }
         val detected = detectOverlayContext(forceRinging = forceRinging)
         val ctx = OverlayPositionManager.holdBelowCompactIncoming(
-            prevPos,
-            detected,
-            ringing = forceRinging
+            previous = prevPos,
+            previousContext = prevCtx,
+            nextContext = detected,
+            ringing = forceRinging,
+            ourAppForeground = ourAppForeground
         )
         if (ctx != detected) {
             android.util.Log.i(

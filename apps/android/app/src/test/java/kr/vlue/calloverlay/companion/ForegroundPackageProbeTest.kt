@@ -153,6 +153,47 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
+    fun ourApp_vlueForeground_inCallForeground_isBottom() {
+        /* 2번째 수신: VLUE 전면 + InCall 프로세스 FG + stale resume 없음 → 미니 팝업 아래 */
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = null,
+                inCallImportance = fg,
+                otherForegroundPackages = emptyList(),
+                ourApp = true,
+                lastResumedPkg = null
+            )
+        )
+    }
+
+    @Test
+    fun ourApp_staleInCallResume_vlueForeground_isBottom() {
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = null,
+                inCallImportance = fg,
+                ourApp = true,
+                lastResumedPkg = "com.samsung.android.incallui"
+            )
+        )
+    }
+
+    @Test
+    fun ourApp_staleInCallResume_withInCallTask_isTop() {
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.samsung.android.incallui",
+                inCallImportance = fg,
+                ourApp = true,
+                lastResumedPkg = "com.samsung.android.incallui"
+            )
+        )
+    }
+
+    @Test
     fun unknown_defaultsToTop() {
         assertEquals(
             ForegroundPackageProbe.RingingSurface.FULL_INCALL,

@@ -104,11 +104,16 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
     setBusy(true);
     setMsg('');
     try {
-      let guardianImpUid: string | undefined;
-      if (familyRelation === 'child') {
-        guardianImpUid = await requestGuardianPassImpUid();
+      try {
+        await createFamilyProtectionLink(handle, familyRelation, undefined);
+      } catch (first) {
+        const fe = first as Error & { code?: string };
+        if (familyRelation !== 'child' || fe?.code !== 'GUARDIAN_PASS_REQUIRED') {
+          throw first;
+        }
+        const guardianImpUid = await requestGuardianPassImpUid();
+        await createFamilyProtectionLink(handle, familyRelation, guardianImpUid);
       }
-      await createFamilyProtectionLink(handle, familyRelation, guardianImpUid);
       setWardHandle('');
       setMsg('초대를 보냈습니다. 상대가 앱에서 수락하면 보호가 시작됩니다.');
       await load();

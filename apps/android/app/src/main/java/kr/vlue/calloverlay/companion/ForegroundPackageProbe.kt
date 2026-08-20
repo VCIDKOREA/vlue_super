@@ -75,6 +75,11 @@ object ForegroundPackageProbe {
         /* 최근기록이 전면이면 미니 수신 — 이전 InCallActivity resume 가 남아도 TOP 금지 */
         if (tasksDialer) return RingingSurface.COMPACT_DIALER
         if (resumedFull && tasksDialer) return RingingSurface.COMPACT_DIALER
+        /*
+         * VLUE 전면 + 미니 수신 팝업: 직전 통화 InCallActivity resume 가 UsageEvents 에 남아
+         * resumedFull 로 오판 → 2번째 수신부터 TOP(겹침). task 가 전체 InCallUI 가 아니면 BELOW.
+         */
+        if (resumedFull && ourApp && !tasksFull) return RingingSurface.HOME_OR_OTHER
         if (resumedFull) return RingingSurface.FULL_INCALL
 
         if (OverlayContextDetector.isLikelyLauncherPackage(lastResumedPkg) ||
@@ -86,6 +91,12 @@ object ForegroundPackageProbe {
         if (tasksDialer) return RingingSurface.COMPACT_DIALER
         if (tasksFull) return RingingSurface.FULL_INCALL
 
+        /*
+         * InCall 프로세스만 FOREGROUND — VLUE/홈 위 미니 팝업. ourApp 미사용 시 카톡 등 타앱 전면.
+         */
+        if (ourApp && !resumedFull && !tasksFull) {
+            return RingingSurface.HOME_OR_OTHER
+        }
         if (inCallImportance != null &&
             inCallImportance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
         ) {
@@ -108,7 +119,9 @@ object ForegroundPackageProbe {
             return RingingSurface.HOME_OR_OTHER
         }
 
-        /* 미확인(사용정보 접근 없음·VLUE 전면) → TOP. 하단이면 전체 UI 버튼을 가린다. */
+        /* VLUE 전면 = 미니 팝업 위. 미확인(usage 없음)이어도 BELOW — TOP 이면 미니 UI 와 겹침 */
+        if (ourApp) return RingingSurface.HOME_OR_OTHER
+        /* 미확인 → TOP. 하단이면 Samsung 전체 수신 UI 버튼을 가린다. */
         return RingingSurface.FULL_INCALL
     }
 

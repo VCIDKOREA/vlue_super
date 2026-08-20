@@ -49,12 +49,19 @@ object OverlayPositionManager {
      */
     fun holdBelowCompactIncoming(
         previous: OverlayPosition,
+        previousContext: OverlayContext,
         nextContext: OverlayContext,
-        ringing: Boolean
+        ringing: Boolean,
+        ourAppForeground: Boolean = false
     ): OverlayContext {
         if (!ringing) return nextContext
-        if (previous != OverlayPosition.BELOW_COMPACT_INCOMING) return nextContext
         if (nextContext != OverlayContext.INCOMING_CALL_UI) return nextContext
-        return OverlayContext.COMPACT_INCOMING
+        if (previous == OverlayPosition.BELOW_COMPACT_INCOMING ||
+            previousContext == OverlayContext.COMPACT_INCOMING ||
+            ourAppForeground
+        ) {
+            return OverlayContext.COMPACT_INCOMING
+        }
+        return nextContext
     }
 }

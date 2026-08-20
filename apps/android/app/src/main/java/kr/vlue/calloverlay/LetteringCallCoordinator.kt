@@ -41,6 +41,12 @@ object LetteringCallCoordinator {
     @Volatile
     private var lastOutgoing: Boolean = false
 
+    /** onRinging ~ 오버레이 attach 전 홈 미리보기 숨김용 */
+    @Volatile
+    private var incomingRingingActive: Boolean = false
+
+    fun isIncomingRingingActive(): Boolean = incomingRingingActive
+
     /** CallLog 업그레이드·enrich 가 다음 통화를 덮지 못하게 세대 번호 */
     private val callGen = AtomicLong(0L)
 
@@ -135,6 +141,7 @@ object LetteringCallCoordinator {
             lastRingAt = now
             lastRingNumber = if (nextUnknown) "unknown" else resolved
             lastOutgoing = outgoing
+            incomingRingingActive = true
             val gen = callGen.get()
 
             val raw = if (nextUnknown) "unknown" else resolved
@@ -655,6 +662,7 @@ object LetteringCallCoordinator {
             CompanionRuntimeStabilityDiag.endCallSession("LetteringCallCoordinator.onCallEnded")
             VlueBigPushTrace.step(11, "Call End", "source=LetteringCallCoordinator.onCallEnded")
             LetteringPrefs.setLastCallEvent(app, "idle")
+            incomingRingingActive = false
             lastRingNumber = ""
             callGen.incrementAndGet()
             LetteringIncomingNotifier.cancel(app)

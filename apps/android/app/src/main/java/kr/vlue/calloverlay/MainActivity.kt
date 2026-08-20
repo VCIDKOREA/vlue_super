@@ -829,7 +829,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     class MainJsBridge(private val activity: MainActivity) {
         @android.webkit.JavascriptInterface
         fun isCompanionOverlayActive(): String {
-            return if (CallOverlayService.isCompanionSurfaceVisible()) "1" else "0"
+            if (CallOverlayService.isCompanionSurfaceVisible()) return "1"
+            if (LetteringCallCoordinator.isIncomingRingingActive()) return "1"
+            return "0"
         }
 
         @android.webkit.JavascriptInterface

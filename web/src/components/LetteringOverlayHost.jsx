@@ -723,12 +723,15 @@ function LetteringOverlayHostInner() {
         setCallState(next);
         if (next === CALL_STATES.CONNECTED) {
           /*
-           * CONNECTED = Web Content Ready / UI sync only.
-           * 풀 DCC 펼침은 신원 칩이 끝난 뒤 한 번만 (빠른 수화 레이스 방지).
-           * OverlayState(SHOWCASE)는 Native ANSWER/OFFHOOK/ACTIVE → Controller.onAnswer 단일 책임.
-           * restoreShowcaseOverlay는 사용자 Mini→Showcase 명시 요청에서만 호출.
+           * Answer = always full Showcase.
+           * 링잉 중 Mini Case로 접은 뒤 수락해도 expanded=false 로 남으면
+           * 네이티브 FULLSCREEN(검정) + 웹 미니 UI 가 겹친다.
+           * 통화 중 다시 접기는 minimize_showcase 로만 한다.
            */
           restoreHoldUntilRef.current = Date.now() + 3500;
+          autoExpandedOnceRef.current = true;
+          setForceShowcaseBar(false);
+          setExpanded(true);
         }
         if (next === CALL_STATES.RINGING) {
           /* BigPush = 앱 쇼케이스바 */
