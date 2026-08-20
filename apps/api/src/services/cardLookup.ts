@@ -141,9 +141,11 @@ type ExportSnapLite = {
   website: string;
   fax: string;
   address: string;
+  addressDetail: string;
   department: string;
   companyIntro: string;
   salesContent: string;
+  customBackText: string;
   photoUrl: string;
   titlePhotoUrl: string;
   logoUrl: string;
@@ -166,9 +168,11 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
       website: string | null;
       fax: string | null;
       address: string | null;
+      address_detail: string | null;
       department: string | null;
       company_intro: string | null;
       sales_content: string | null;
+      custom_back_text: string | null;
       photo_url: string | null;
       title_photo_url: string | null;
       logo_url: string | null;
@@ -184,9 +188,11 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
       NULLIF(TRIM(export_snapshot_json->>'website'), '') AS website,
       NULLIF(TRIM(export_snapshot_json->>'fax'), '') AS fax,
       NULLIF(TRIM(export_snapshot_json->>'address'), '') AS address,
+      NULLIF(TRIM(export_snapshot_json->>'addressDetail'), '') AS address_detail,
       NULLIF(TRIM(export_snapshot_json->>'department'), '') AS department,
       NULLIF(TRIM(export_snapshot_json->>'companyIntro'), '') AS company_intro,
       NULLIF(TRIM(export_snapshot_json->>'salesContent'), '') AS sales_content,
+      NULLIF(TRIM(export_snapshot_json->>'customBackText'), '') AS custom_back_text,
       NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url,
       NULLIF(TRIM(export_snapshot_json->>'titlePhotoUrl'), '') AS title_photo_url,
       NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
@@ -209,9 +215,11 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
     website: firstStr(s.website),
     fax: firstStr(s.fax),
     address: firstStr(s.address),
+    addressDetail: firstStr(s.address_detail),
     department: firstStr(s.department),
     companyIntro: firstStr(s.company_intro),
     salesContent: firstStr(s.sales_content),
+    customBackText: firstStr(s.custom_back_text),
     photoUrl: httpOnlyUrl(s.photo_url),
     titlePhotoUrl: httpOnlyUrl(s.title_photo_url),
     logoUrl: httpOnlyUrl(s.logo_url),
@@ -415,15 +423,19 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       companyName: true,
       verificationStatus: true,
       kind: true,
+      dccSnapshotJson: true,
+      profileJson: true,
       lineSubscription: { select: { status: true, graceEndsAt: true } },
       user: {
         select: {
           id: true,
           publicHandle: true,
           legalName: true,
+          email: true,
+          phoneE164: true,
           identityVerified: true,
           isShowcasePrivate: true,
-          businessProfile: { select: { companyName: true } },
+          businessProfile: { select: { companyName: true, jobTitle: true } },
           digitalCard: {
             select: {
               photoUrl: true,
@@ -462,12 +474,54 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
   }
 
   if (card && card.verificationStatus === "approved") {
+    const lineSnap =
+      card.dccSnapshotJson && typeof card.dccSnapshotJson === "object"
+        ? (card.dccSnapshotJson as Record<string, unknown>)
+        : null;
+    const certified = Boolean(card.user.phoneE164) && card.phoneE164 === card.user.phoneE164;
+    const masterSnap = certified ? await loadExportSnapLite(card.user.id) : null;
+    const exportSnap = {
+      name: firstStr(lineSnap?.name, lineSnap?.displayName, certified ? masterSnap?.name : ""),
+      title: firstStr(lineSnap?.title, certified ? masterSnap?.title : ""),
+      email: firstStr(lineSnap?.email, certified ? masterSnap?.email : ""),
+      website: firstStr(lineSnap?.website, certified ? masterSnap?.website : ""),
+      fax: firstStr(lineSnap?.fax, certified ? masterSnap?.fax : ""),
+      address: firstStr(lineSnap?.address, certified ? masterSnap?.address : ""),
+      department: firstStr(lineSnap?.department, certified ? masterSnap?.department : ""),
+      companyIntro: firstStr(lineSnap?.companyIntro, certified ? masterSnap?.companyIntro : ""),
+      salesContent: firstStr(lineSnap?.salesContent, certified ? masterSnap?.salesContent : ""),
+      photoUrl: httpOnlyUrl(lineSnap?.photoUrl) || (certified ? masterSnap?.photoUrl || "" : ""),
+      titlePhotoUrl:
+        httpOnlyUrl(lineSnap?.titlePhotoUrl) || (certified ? masterSnap?.titlePhotoUrl || "" : ""),
+      noTitlePhoto: Boolean(
+        lineSnap?.noTitlePhoto ?? (certified ? masterSnap?.noTitlePhoto : false)
+      ),
+      logoUrl: httpOnlyUrl(lineSnap?.logoUrl) || (certified ? masterSnap?.logoUrl || "" : ""),
+      photoFocus: firstStr(lineSnap?.photoFocus, certified ? masterSnap?.photoFocus : "")
+    };
+    const profile = buildContactProfile({
+      userEmail: certified ? card.user.email : null,
+      exportSnap,
+      profileJson: (card.profileJson as Record<string, unknown> | null) ?? null
+    });
+    const rawTitle = firstStr(
+      lineSnap?.title,
+      card.jobTitle,
+      exportSnap?.title,
+      certified ? card.user.digitalCard?.titleSnapshot : "",
+      card.user.businessProfile?.jobTitle
+    );
+    const email = firstStr(profile.email, certified ? card.user.email : "");
     const displayName = firstStr(
+      lineSnap?.name,
+      lineSnap?.displayName,
       card.displayName,
+      exportSnap?.name,
       card.user.digitalCard?.displayName,
       card.user.legalName
     );
     const photo =
+      pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url", "photoUrl"]) ||
       (typeof card.user.digitalCard?.photoUrl === "string" && card.user.digitalCard.photoUrl.trim()) ||
       "";
     const isCeo = isPlatformCeoHandle(card.user.publicHandle);
@@ -489,14 +543,21 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           cardId: card.id,
           kind: card.kind,
           displayName,
-          jobTitle: firstStr(card.jobTitle, card.user.digitalCard?.titleSnapshot),
+          jobTitle: rawTitle,
           companyName,
           membershipTier: "paid",
-          email: "",
-          profile: {},
-          website: "",
+          email,
+          profile,
+          website: firstStr(profile.website),
+          photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
+          titlePhotoUrl: firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
+          noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
           image_url: imageUrl,
-          logo_url: card.user.digitalCard?.logoUrl || (isCeo ? ceoDefaultBrandLogoUrl() : ""),
+          logo_url:
+            firstStr(
+              card.user.digitalCard?.logoUrl,
+              pickProfileString(profile, ["logoUrl", "logo_url"])
+            ) || (isCeo ? ceoDefaultBrandLogoUrl() : ""),
           voice_url: null,
           phoneE164: card.phoneE164,
           publicHandle: card.user.publicHandle || "",
@@ -539,9 +600,17 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
   });
 
   if (user) {
+    const exportSnap = user.digitalCard ? await loadExportSnapLite(user.id) : null;
+    const profile = buildContactProfile({
+      userEmail: user.email,
+      exportSnap,
+      profileJson: null
+    });
     const isCeo = isPlatformCeoHandle(user.publicHandle);
     const photo =
-      (typeof user.digitalCard?.photoUrl === "string" && user.digitalCard.photoUrl.trim()) || "";
+      pickProfileString(profile, ["image_url", "imageUrl", "photo_url", "portrait_url", "photoUrl"]) ||
+      (typeof user.digitalCard?.photoUrl === "string" && user.digitalCard.photoUrl.trim()) ||
+      "";
     const companyName = await resolveOverlayCompanyName({
       digitalOrg: user.digitalCard?.organization,
       profileCompany: user.businessProfile?.companyName,
@@ -555,15 +624,27 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           is_verified: Boolean(user.identityVerified) || Boolean(user.digitalCard),
           source: "user_mobile",
           userId: user.id,
-          displayName: firstStr(user.digitalCard?.displayName, user.legalName),
+          displayName: firstStr(exportSnap?.name, user.digitalCard?.displayName, user.legalName),
           publicHandle: user.publicHandle || "",
-          jobTitle: firstStr(user.digitalCard?.titleSnapshot, user.businessProfile?.jobTitle),
+          jobTitle: firstStr(
+            exportSnap?.title,
+            user.digitalCard?.titleSnapshot,
+            user.businessProfile?.jobTitle
+          ),
           companyName,
           membershipTier: "paid",
-          email: "",
-          profile: {},
+          email: firstStr(profile.email, user.email),
+          profile,
+          website: firstStr(profile.website),
+          photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
+          titlePhotoUrl: firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
+          noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
           image_url: photo || (isCeo ? ceoDefaultBrandLogoUrl() : null),
-          logo_url: user.digitalCard?.logoUrl || (isCeo ? ceoDefaultBrandLogoUrl() : null),
+          logo_url:
+            firstStr(
+              user.digitalCard?.logoUrl,
+              pickProfileString(profile, ["logoUrl", "logo_url"])
+            ) || (isCeo ? ceoDefaultBrandLogoUrl() : null),
           voice_url: null,
           phoneE164: user.phoneE164,
           access: {

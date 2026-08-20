@@ -22,6 +22,6 @@ enum class OverlayPosition {
  * 상태바 아래부터 카드 하단까지. 빅푸시는 이 값 + GAP 만큼 내려 붙인다.
  */
 object CompactIncomingMetrics {
-    const val CARD_HEIGHT_DP = 184
-    const val GAP_DP = 12
+    const val CARD_HEIGHT_DP = 200
+    const val GAP_DP = 16
 }
