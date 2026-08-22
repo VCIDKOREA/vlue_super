@@ -14,7 +14,12 @@ import {
 import { fetchDccLines } from "../lib/dccLinesApi.js";
 import { dccLineOptionLabel } from "../lib/dccLineLabel.js";
 import { fetchLineCallHistory, fetchMemberNamesByNumbers } from "../lib/lineCallHistoryApi.js";
-import { resolveVlueShowcasePeer } from "../lib/resolveVlueShowcasePeer.js";
+import { resolveCallHistoryShowcasePeer } from "../lib/resolveCallHistoryShowcasePeer.js";
+import {
+  prefetchCallHistoryPeer,
+  readCallHistoryPeerCache,
+  writeCallHistoryPeerCache
+} from "../lib/callHistoryPeerCache.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
@@ -28,7 +33,6 @@ import { runCallPeerMatrixAction } from "../lib/call/runCallPeerMatrixAction.js"
 import { resolveIsKnownContactSync } from "../lib/contacts/hybridKnownContact.js";
 import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
-import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
 import {
   buildNationalAgencyDcpCard,
   isNationalAgencyDcpCard,
@@ -108,13 +112,37 @@ function styleHasShowcaseContent(style) {
 
 /**
  * 인증 회원 + 로컬 스냅샷이 있으면 즉시 연다.
- * 페이지가 없어도 DCC/메타로 먼저 띄우고 네트워크로 보강한다.
  */
 function hasUsableLocalSnapshot(call) {
   if (call?.verified !== true) return false;
   const snap = call?.cardSnapshot;
   const style = call?.showcaseSnapshot;
   return Boolean(style || snap?.photoUrl || snap?.name || snap?.userId || call?.userId);
+}
+
+function snapshotIsCompleteEnough(call) {
+  if (!hasUsableLocalSnapshot(call)) return false;
+  const snap = call.cardSnapshot || {};
+  const tier = call.membershipTier || snap.membershipTier || "free";
+  if (!isPaidLetteringTier(tier)) {
+    return Boolean(snap.name || snap.photoUrl);
+  }
+  const hasMeta = Boolean(
+    String(snap.organization || "").trim() || String(snap.email || "").trim()
+  );
+  const hasHero = Boolean(String(snap.titlePhotoUrl || snap.photoUrl || "").trim());
+  const hasStyle = styleHasShowcaseContent(call.showcaseSnapshot);
+  return hasMeta && hasHero && hasStyle;
+}
+
+function peerPayloadFromResolve(payload) {
+  return {
+    card: payload.card,
+    showcaseStyle: payload.card?.showcaseStyle || payload.showcaseStyle,
+    verified: Boolean(payload.verified),
+    phone: payload.phone,
+    tier: payload.card?.membershipTier || "free"
+  };
 }
 
 const CALL_HISTORY_LINE_KEY = "vlue_call_history_line_id";
@@ -217,15 +245,29 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   }, []);
 
   const refresh = useCallback(async () => {
-    setListLoading(true);
     setLoadError("");
+    setListLoading(true);
     try {
-      const [raw, lineRows, lineEvents] = await Promise.all([
-        fetchDeviceCallLogEntries(200),
+      const raw = await fetchDeviceCallLogEntries(200);
+      const quickLine =
+        lineFilter && lineFilter !== "all"
+          ? lines.find((l) => l.id === lineFilter) || null
+          : "all";
+      setItems(
+        buildCallHistoryList({
+          deviceEntries: raw,
+          lineEvents: [],
+          selectedLine: quickLine,
+          lines
+        })
+      );
+      setListLoading(false);
+
+      const [lineRows, lineEvents] = await Promise.all([
         fetchDccLines()
           .then((d) => (Array.isArray(d.lines) ? d.lines : []))
           .catch(() => []),
-        fetchLineCallHistory(lineFilter)
+        fetchLineCallHistory(lineFilter).catch(() => [])
       ]);
       setLines(lineRows);
       const selectedLine =
@@ -236,7 +278,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         selectedLine,
         lines: lineRows
       });
-      const members = await fetchMemberNamesByNumbers(merged.map((c) => c.phoneDisplay || c.phone));
+      const members = await fetchMemberNamesByNumbers(merged.map((c) => c.phoneDisplay || c.phone)).catch(
+        () => []
+      );
       setItems(applyMemberDirectoryToCallGroups(merged, members));
       if (!raw.length && !lineEvents.length) {
         setLoadError(
@@ -250,7 +294,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     } catch {
       setItems([]);
       setLoadError("통화기록을 불러오지 못했습니다.");
-    } finally {
       setListLoading(false);
     }
   }, [lineFilter]);
@@ -305,12 +348,80 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     };
   }, [open, items]);
 
+  /* 목록에 보이는 VLUE 회원 쇼케이스 — 탭 전 미리 불러오기 */
+  useEffect(() => {
+    if (!open || !items.length) return undefined;
+    const tops = items.filter((c) => c.verified === true).slice(0, 12);
+    for (const call of tops) {
+      const phone = call.phoneDisplay || call.phone;
+      if (!phone || readCallHistoryPeerCache(phone)) continue;
+      prefetchCallHistoryPeer(phone, () =>
+        resolveCallHistoryShowcasePeer(phone, {
+          displayName: call.name || call.memberName || "",
+          avatarUrl: call.avatarUrl || ""
+        }).then((payload) => peerPayloadFromResolve(payload))
+      );
+    }
+    return undefined;
+  }, [open, items]);
+
+  const applyPeerPayload = useCallback((payload, call, gen) => {
+    if (gen !== openGenRef.current || !payload?.card) return;
+    const tier = payload.card.membershipTier || call.membershipTier || "free";
+    setPreviewVerified(Boolean(payload.verified));
+    setPreviewCard(payload.card);
+    setLoading(false);
+    if (payload.verified && payload.card?.name) {
+      setSelected((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: payload.card.name || prev.name,
+              verified: true,
+              membershipTier: tier,
+              avatarUrl: payload.card.photoUrl || payload.card.avatarUrl || prev.avatarUrl
+            }
+          : prev
+      );
+    }
+  }, []);
+
+  const loadPeerPayload = useCallback(async (call, opts = {}) => {
+    const phone = call.phoneDisplay || call.phone;
+    return resolveCallHistoryShowcasePeer(phone, {
+      force: Boolean(opts.force),
+      displayName: call.name || call.memberName || "",
+      avatarUrl: call.avatarUrl || ""
+    }).then((payload) => {
+      const packed = peerPayloadFromResolve(payload);
+      writeCallHistoryPeerCache(phone, packed);
+      return packed;
+    });
+  }, []);
+
+  const hydrateCallFromNetwork = useCallback(
+    async (call, gen, opts = {}) => {
+      const background = Boolean(opts.background);
+      const phone = call.phoneDisplay || call.phone;
+      try {
+        if (!background) setLoading(true);
+        const payload = await prefetchCallHistoryPeer(phone, () =>
+          loadPeerPayload(call, { force: Boolean(opts.forceStyle) })
+        );
+        applyPeerPayload(payload, call, gen);
+      } finally {
+        if (gen === openGenRef.current) setLoading(false);
+      }
+    },
+    [applyPeerPayload, loadPeerPayload]
+  );
+
   const runRowAction = async (call, matrix) => {
     setBusyId(call.id);
     try {
       let card = call.cardSnapshot || null;
       if (!card && matrix.cta !== "kakao_share") {
-        const payload = await resolveVlueShowcasePeer({ phone: call.phone });
+        const payload = await resolveCallHistoryShowcasePeer(call.phoneDisplay || call.phone);
         card = payload.card;
       }
       await runCallPeerMatrixAction({
@@ -325,97 +436,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     }
   };
 
-  const hydrateCallFromNetwork = useCallback(async (call, gen, opts = {}) => {
-    const background = Boolean(opts.background);
-    const phone = call.phoneDisplay || call.phone;
-    try {
-      if (!background) setLoading(true);
-      const needForce = Boolean(opts.forceStyle);
-      const payload = await resolveVlueShowcasePeer({
-        phone,
-        displayName: call.name || "",
-        membershipTier: call.membershipTier || "free",
-        avatarUrl: call.avatarUrl || "",
-        forceStyle: needForce
-      });
-      if (gen !== openGenRef.current) return;
-
-      const isDcp = isNationalAgencyDcpCard(payload.card);
-      const matched = isDcp || Boolean(String(payload.card?.userId || "").trim());
-      const peerUserId = isDcp ? "" : String(payload.card?.userId || uidHint || "").trim();
-      const tierRaw = payload.card?.membershipTier || call.membershipTier || "";
-      const tier = isDcp
-        ? "paid"
-        : isPaidLetteringTier(tierRaw) || !matched
-          ? tierRaw || (matched ? "paid" : "free")
-          : "paid";
-      let peerStyle =
-        matched && !isDcp && payload.showcaseStyle && typeof payload.showcaseStyle === "object"
-          ? payload.showcaseStyle
-          : silentShowcaseStyle();
-
-      /* resolve 결과에 페이지가 없을 때만 공개 라이브 보강 (중복 GET 제거) */
-      if (matched && peerUserId && !isDcp && !styleHasShowcaseContent(peerStyle)) {
-        const live = await fetchPeerLiveStylePublic(peerUserId, { force: true, number: phone });
-        if (live && typeof live === "object") {
-          peerStyle = {
-            ...peerStyle,
-            ...live,
-            bgm: live.bgm || peerStyle.bgm,
-            pages:
-              Array.isArray(live.pages) && live.pages.length
-                ? live.pages
-                : peerStyle.pages,
-            gallery: live.gallery || peerStyle.gallery
-          };
-        }
-      }
-      peerStyle = normalizeHistoryReplayStyle(peerStyle, tier);
-
-      const card = applyShowcaseStyleToCard(
-        {
-          ...payload.card,
-          name: matched ? payload.card?.name || call.name || phone : "",
-          phone: isDcp
-            ? payload.card?.dcp?.shortNumber || payload.card?.phone || phone
-            : payload.phone || phone,
-          membershipTier: tier,
-          photoUrl: matched ? payload.card?.photoUrl || call.avatarUrl || "" : "",
-          avatarUrl: matched ? payload.card?.avatarUrl || call.avatarUrl || "" : "",
-          photoFocus: payload.card?.photoFocus || call.cardSnapshot?.photoFocus || "center",
-          publicHandle: payload.card?.publicHandle || payload.card?.loginId || "",
-          profileKind: isDcp ? "dcp" : payload.card?.profileKind || "",
-          dcp: isDcp ? payload.card?.dcp : payload.card?.dcp || null,
-          showcaseStyle: peerStyle
-        },
-        isPaidLetteringTier(tier) ? tier : "free",
-        { peerMode: true, style: peerStyle }
-      );
-
-      setPreviewVerified(matched);
-      setPreviewCard(card);
-      /* BGM은 LetteringIncomingNotification→ShowcaseCallCarousel 마운트 시에만 — 로딩 중 선재생 금지 */
-
-      if (matched && (payload.card?.name || isDcp)) {
-        setSelected((prev) =>
-          prev
-            ? {
-                ...prev,
-                name: payload.card?.name || prev.name,
-                verified: true,
-                membershipTier: tier,
-                avatarUrl: card.photoUrl || card.avatarUrl || prev.avatarUrl
-              }
-            : prev
-        );
-      }
-    } finally {
-      if (gen === openGenRef.current) setLoading(false);
-    }
-  }, []);
-
   const openCall = (call) => {
     const gen = ++openGenRef.current;
+    const phone = call.phoneDisplay || call.phone;
 
     /* 제스처 unlock만 — 즉시 재생하지 않음. 기존 곡도 로딩 동안 정지 */
     try {
@@ -425,7 +448,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       /* ignore */
     }
 
-    const agency = matchNationalAgency(call.phoneDisplay || call.phone);
+    const agency = matchNationalAgency(phone);
 
     if (agency) {
       const dcpCard = applyShowcaseStyleToCard(
@@ -452,8 +475,21 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       return;
     }
 
-    /* 인증 회원 + 로컬 스냅샷이 있으면 즉시 연고 네트워크로 보강 */
-    if (hasUsableLocalSnapshot(call)) {
+    const cached = readCallHistoryPeerCache(phone);
+    if (cached?.card) {
+      flushSync(() => {
+        setSelected(call);
+        setExpanded(true);
+        setPreviewVerified(Boolean(cached.verified));
+        setPreviewCard(cached.card);
+        setLoading(false);
+      });
+      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
+      return;
+    }
+
+    /* 완전한 로컬 스냅샷만 즉시 표시 — 불완전 DCC 깜빡임 방지 */
+    if (snapshotIsCompleteEnough(call)) {
       const optimistic = buildOptimisticHistoryCard(call);
       flushSync(() => {
         setSelected(call);

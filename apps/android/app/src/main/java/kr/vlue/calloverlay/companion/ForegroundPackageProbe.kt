@@ -76,6 +76,16 @@ object ForegroundPackageProbe {
         if (tasksDialer) return RingingSurface.COMPACT_DIALER
         if (resumedFull && tasksDialer) return RingingSurface.COMPACT_DIALER
         /*
+         * 타앱(카톡·카카오내비 등) 위 미니 수신 팝업 — task 가 전체 InCallUI 가 아니면 BELOW.
+         * 직전 통화 InCallActivity resume(stale) 가 남아도 TOP 금지 → 2번째 수신 겹침 방지.
+         */
+        if (isKnownOtherAppPackage(tasksPkg) && !tasksFull) {
+            return RingingSurface.HOME_OR_OTHER
+        }
+        if (otherForegroundPackages.isNotEmpty() && !tasksFull) {
+            return RingingSurface.HOME_OR_OTHER
+        }
+        /*
          * VLUE 전면 + 미니 수신 팝업: 직전 통화 InCallActivity resume 가 UsageEvents 에 남아
          * resumedFull 로 오판 → 2번째 수신부터 TOP(겹침). task 가 전체 InCallUI 가 아니면 BELOW.
          */

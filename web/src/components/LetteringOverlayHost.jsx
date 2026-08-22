@@ -17,6 +17,11 @@ import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCa
 import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
 import { fetchFollowProfile } from "../lib/followApi.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
+import { resolveCallHistoryShowcasePeer } from "../lib/resolveCallHistoryShowcasePeer.js";
+import {
+  readCallHistoryPeerCache,
+  writeCallHistoryPeerCache
+} from "../lib/callHistoryPeerCache.js";
 
 /** 상대가 쇼케이스/DCC 를 송출 ON 으로 저장하지 않은 경우 — 인증 팝업만 */
 function createPeerAuthOnlyShowcaseStyle() {
@@ -166,8 +171,36 @@ function readQueuedNativeCallState() {
   }
 }
 
-/** 빠른 수화 시 명함이 칩보다 먼저 뜨지 않게 */
-const OVERLAY_IDENTITY_CHIP_MIN_MS = 480;
+/** 빠른 수화 시에도 빅푸시 바는 즉시 — 칩 홀드 최소화 */
+const OVERLAY_IDENTITY_CHIP_MIN_MS = 0;
+
+function applyOverlayPeerPack(pack, setters) {
+  if (!pack?.card) return;
+  setters.setCard(pack.card);
+  setters.setShowcaseStyle(pack.card.showcaseStyle || pack.showcaseStyle || createDefaultShowcaseStyle());
+  setters.setVerified(Boolean(pack.verified));
+  setters.setLoading(false);
+}
+
+function scheduleOverlayPeerEnrich(phone, seedCard, applyPack) {
+  const ph = String(phone || "").trim();
+  if (!ph) return;
+  void resolveCallHistoryShowcasePeer(ph, {
+    displayName: seedCard?.name || seedCard?.displayName || "",
+    avatarUrl: seedCard?.photoUrl || seedCard?.avatarUrl || ""
+  })
+    .then((payload) => {
+      const pack = {
+        card: payload.card,
+        showcaseStyle: payload.card?.showcaseStyle || payload.showcaseStyle,
+        verified: Boolean(payload.verified),
+        phone: payload.phone || ph
+      };
+      writeCallHistoryPeerCache(ph, pack);
+      applyPack(pack);
+    })
+    .catch(() => {});
+}
 
 function isUnknownIncoming(phone) {
   return isUnknownPhoneToken(phone);
@@ -408,13 +441,22 @@ function LetteringOverlayHostInner() {
     matchedRef.current = false;
     autoExpandedOnceRef.current = false;
     setVerified(false);
-    setCard(null);
     setShowcaseStyle(createPeerAuthOnlyShowcaseStyle());
     setLoading(true);
     setIdentityHold(true);
     setExpanded(false);
     setForceShowcaseBar(true);
     loadingStartedAtRef.current = Date.now();
+    const cached = readCallHistoryPeerCache(incoming);
+    if (cached?.card) {
+      matchedRef.current = true;
+      setCard(cached.card);
+      setShowcaseStyle(cached.card.showcaseStyle || createDefaultShowcaseStyle());
+      setVerified(Boolean(cached.verified));
+      setLoading(false);
+    } else {
+      setCard(null);
+    }
   }, [incoming]);
 
   useEffect(() => {
@@ -481,7 +523,7 @@ function LetteringOverlayHostInner() {
             return;
           }
           const waitForLogo = isDcpOverlayCard(mapped);
-          matchedRef.current = !waitForLogo && overlayCardHasOrg(mapped);
+          matchedRef.current = !waitForLogo || Boolean(mapped.userId || mapped.name);
           setCard((prev) => mergeDcpCard(prev, mapped));
           setVerified(true);
           setLoading(false);
@@ -491,17 +533,14 @@ function LetteringOverlayHostInner() {
               direction === "outgoing" ? "out" : "in"
             );
           }
-          const peerUserId = String(mapped.userId || mapped.ownerUserId || "").trim();
-          if (peerUserId) {
-            void enrichOverlayPeerBundle(peerUserId, mapped).then(({ card, style }) => {
-              setCard((prev) => ({
-                ...(prev || {}),
-                ...card,
-                showcaseStyle: style
-              }));
-              setShowcaseStyle(style);
-            });
-          }
+          scheduleOverlayPeerEnrich(incoming || detail.phoneE164 || mapped.phone, mapped, (pack) => {
+            setCard((prev) => ({
+              ...(prev || {}),
+              ...pack.card,
+              showcaseStyle: pack.showcaseStyle
+            }));
+            setShowcaseStyle(pack.showcaseStyle);
+          });
         }
       } catch {
         /* ignore */
@@ -534,7 +573,6 @@ function LetteringOverlayHostInner() {
 
       const unknown = isUnknownIncoming(incoming);
       if (unknown) {
-        setLoading(true);
         unknownTimer = window.setTimeout(() => {
           if (cancelled || matchedRef.current) return;
           const deviceName = findDeviceContactName(incoming);
@@ -546,29 +584,26 @@ function LetteringOverlayHostInner() {
           }
           setVerified(false);
           setLoading(false);
-        }, 2800);
+        }, 600);
       }
 
-      try {
-        await syncDeviceContactsFromNative();
-      } catch {
-        /* cache only */
-      }
-      if (cancelled) return;
+      void syncDeviceContactsFromNative().catch(() => {});
 
-      const blockCheck = await Promise.race([
+      const blockCheckPromise = Promise.race([
         checkLetteringPhoneBlocked(incoming),
         new Promise((resolve) => {
-          window.setTimeout(() => resolve({ blocked: false }), 2000);
+          window.setTimeout(() => resolve({ blocked: false }), 800);
         })
       ]);
+      if (cancelled) return;
+      const blockCheck = await blockCheckPromise;
       if (cancelled) return;
       if (blockCheck.blocked) {
         setBlocked(true);
         setLoading(false);
         return;
       }
-      if (unknown) return;
+      if (unknown && !matchedRef.current) return;
       if (matchedRef.current) return;
 
       /*
@@ -586,21 +621,18 @@ function LetteringOverlayHostInner() {
           const isDcp = isDcpOverlayCard(mapped);
           const staleDcp = isDcp && incoming && !dcpCardMatchesIncoming(mapped, incoming);
           if (!staleDcp) {
-            if (!isDcp) matchedRef.current = overlayCardHasOrg(mapped);
+            matchedRef.current = true;
             setCard((prev) => mergeDcpCard(prev, mapped));
             setVerified(true);
             setLoading(false);
-            const peerUserId =
-              isDcp || isExpiredLineCard(mapped)
-                ? ""
-                : String(mapped.userId || mapped.ownerUserId || "").trim();
-            if (peerUserId) {
-              const { card, style } = await enrichOverlayPeerBundle(peerUserId, mapped);
-              if (cancelled) return;
-              setCard((prev) => ({ ...(prev || {}), ...card, showcaseStyle: style }));
-              setShowcaseStyle(style);
+            if (!isDcp) {
+              scheduleOverlayPeerEnrich(incoming, mapped, (pack) => {
+                if (cancelled) return;
+                setCard((prev) => ({ ...(prev || {}), ...pack.card, showcaseStyle: pack.showcaseStyle }));
+                setShowcaseStyle(pack.showcaseStyle);
+              });
             }
-            if (!isDcp && overlayCardHasOrg(mapped)) return;
+            return;
           }
         }
       }
@@ -617,6 +649,21 @@ function LetteringOverlayHostInner() {
           /* ignore */
         }
       }
+      if (cancelled) return;
+      if (matchedRef.current) return;
+
+      scheduleOverlayPeerEnrich(incoming, null, (pack) => {
+        if (cancelled || matchedRef.current) return;
+        matchedRef.current = true;
+        setCard(pack.card);
+        setVerified(Boolean(pack.verified));
+        setShowcaseStyle(pack.showcaseStyle);
+        setLoading(false);
+        if (pack.verified && !isDcpOverlayCard(pack.card)) {
+          void reportLineCallEvent(incoming, direction === "outgoing" ? "out" : "in");
+        }
+      });
+
       const lookup = await getBusinessCardByNumber(incoming, {
         dcpRoute: resolvedDcpRoute,
         forCallOverlay: true
@@ -634,36 +681,25 @@ function LetteringOverlayHostInner() {
         }
       }
 
-      /* 상대(발신/수신 번호 소유자) 라이브 쇼케이스 — 본인 hydrateLive 금지 */
-      let peerStyle = createDefaultShowcaseStyle();
       const isDcp = isDcpOverlayCard(nextCard);
-      const isExpiredLine = isExpiredLineCard(nextCard);
-      const peerUserId =
-        isDcp || isExpiredLine ? "" : String(nextCard?.userId || nextCard?.ownerUserId || "").trim();
+      const peerStyle = createDefaultShowcaseStyle();
 
-      /* lookup 직후 DCC 먼저 표시 — 스타일·프로필은 병렬 */
       if (nextCard) {
         matchedRef.current = true;
         setCard((prev) => ({ ...mergeDcpCard(prev, nextCard), showcaseStyle: peerStyle }));
         setVerified(nextVerified);
         setLoading(false);
+        if (!isDcp && !isExpiredLineCard(nextCard)) {
+          scheduleOverlayPeerEnrich(incoming, nextCard, (pack) => {
+            if (cancelled) return;
+            setCard((prev) => ({ ...(prev || {}), ...pack.card, showcaseStyle: pack.showcaseStyle }));
+            setShowcaseStyle(pack.showcaseStyle);
+          });
+        }
+        return;
       }
 
-      if (peerUserId) {
-        const { card, style } = await enrichOverlayPeerBundle(peerUserId, nextCard);
-        if (cancelled) return;
-        nextCard = card;
-        peerStyle = style;
-      }
-
-      if (cancelled) return;
-      if (matchedRef.current && !nextCard) return;
-      if (nextCard) {
-        matchedRef.current = true;
-        setCard((prev) => ({ ...mergeDcpCard(prev, nextCard), showcaseStyle: peerStyle }));
-        setVerified(nextVerified);
-        setShowcaseStyle(peerStyle);
-      } else if (!matchedRef.current) {
+      if (!matchedRef.current) {
         const deviceName = findDeviceContactName(incoming);
         if (deviceName) {
           matchedRef.current = true;
@@ -924,7 +960,12 @@ function LetteringOverlayHostInner() {
     return null;
   }
 
-  if (loading || (identityHold && callState === CALL_STATES.CONNECTED && !expanded)) {
+  const showLoadingChip =
+    loading &&
+    !(forceShowcaseBar && (styledCard || card || incoming)) &&
+    !(identityHold && callState === CALL_STATES.CONNECTED && !expanded);
+
+  if (showLoadingChip) {
     /* FULLSCREEN 흰 바탕 점유 금지 — 투명 호스트 + 브랜드 확인 칩만 */
     return (
       <div

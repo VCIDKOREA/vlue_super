@@ -10,14 +10,27 @@ class ForegroundPackageProbeTest {
     private val visible = ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
 
     @Test
-    fun resumedInCall_isTop_evenIfKakaoStillForeground() {
-        /* DUT: 전체 UI = InCallActivity ACTIVITY_RESUMED */
+    fun resumedInCall_isBottom_whenOtherAppTaskOnTop() {
+        /* 미니 수신: 카톡/내비 위 팝업 — stale InCall resume 무시 */
         assertEquals(
-            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
             ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = "com.kakao.talk",
                 inCallImportance = fgs,
                 otherForegroundPackages = listOf("com.kakao.talk"),
+                lastResumedPkg = "com.samsung.android.incallui"
+            )
+        )
+    }
+
+    @Test
+    fun consecutiveCall_kakaonavi_staleInCallResume_isBottom() {
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.locnall.KimGiSa",
+                inCallImportance = fg,
+                otherForegroundPackages = listOf("com.locnall.KimGiSa"),
                 lastResumedPkg = "com.samsung.android.incallui"
             )
         )
@@ -100,9 +113,9 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun noResume_inCallForeground_isTop() {
+    fun noResume_inCallForeground_isBottomWhenOtherAppTask() {
         assertEquals(
-            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
             ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = "com.kakao.talk",
                 inCallImportance = fg,

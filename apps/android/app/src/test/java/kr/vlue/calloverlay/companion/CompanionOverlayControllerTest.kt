@@ -227,4 +227,17 @@ class CompanionOverlayControllerTest {
         assertEquals(OverlayState.BIG_PUSH, c.state)
         assertEquals(OverlayPosition.TOP, c.position)
     }
+
+    /** BELOW 로 붙은 뒤 context 재평가 TOP 오판 → 겹침 방지 */
+    @Test
+    fun bigPush_pinsBelowAfterFirstBelow_evenIfContextFlipsToTop() {
+        val c = CompanionOverlayController()
+        assertTrue(c.requestBigPush(OverlayContext.COMPACT_INCOMING, callAlreadyAnswered = false))
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
+        c.updateContext(OverlayContext.INCOMING_CALL_UI)
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
+        c.onCallEnd()
+        assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))
+        assertEquals(OverlayPosition.TOP, c.position)
+    }
 }

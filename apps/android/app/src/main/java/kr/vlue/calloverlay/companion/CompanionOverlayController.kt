@@ -51,6 +51,13 @@ class CompanionOverlayController {
     var rejectedTransition: String? = null
         private set
 
+    /**
+     * 링잉 BigPush 가 한 번 BELOW(미니 수신 UI 아래)로 붙으면,
+     * 재평가로 TOP(겹침)으로 올리지 않는다. 통화 종료 시 해제.
+     */
+    @Volatile
+    private var ringingBelowMiniPinned = false
+
     /** Incoming 감지 — 아직 BigPush 전 */
     fun onIncoming(detectedContext: OverlayContext = OverlayContext.HOME_SCREEN) {
         context = detectedContext
@@ -198,6 +205,7 @@ class CompanionOverlayController {
         context = OverlayContext.HOME_SCREEN
         position = OverlayPosition.HIDDEN
         miniCaseVisibility = MiniCaseVisibility.VISIBLE
+        ringingBelowMiniPinned = false
         lastTransition = "onCallEnd → IDLE"
         rejectedTransition = null
     }
@@ -262,6 +270,22 @@ class CompanionOverlayController {
         )
 
     private fun refreshPosition() {
-        position = OverlayPositionManager.resolve(context, state, screenState)
+        val resolved = OverlayPositionManager.resolve(context, state, screenState)
+        position =
+            if (ringingBelowMiniPinned &&
+                state == OverlayState.BIG_PUSH &&
+                resolved == OverlayPosition.TOP &&
+                screenState == ScreenState.SCREEN_ON
+            ) {
+                OverlayPosition.BELOW_COMPACT_INCOMING
+            } else {
+                if (resolved == OverlayPosition.BELOW_COMPACT_INCOMING &&
+                    state == OverlayState.BIG_PUSH &&
+                    screenState == ScreenState.SCREEN_ON
+                ) {
+                    ringingBelowMiniPinned = true
+                }
+                resolved
+            }
     }
 }
