@@ -5,6 +5,7 @@
  */
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
+import { privacySelectDccExposure } from "../follow/profileAccessControl.js";
 import { isDataUrl, isHttpMediaUrl } from "../../lib/mediaUrlGuard.js";
 import { normalizeToE164KR } from "../../lib/phoneE164.js";
 import { isPlatformCeoHandle } from "../admin/platformAccountRoles.js";
@@ -749,6 +750,42 @@ export async function getSearchPrivacy(userId: string) {
       identityVerified: true
     }
   });
+}
+
+/** DCC 노출 4항목 — 마이그레이션 미적용 DB는 false/null 폴백 */
+export type DccExposurePrivacyView = Awaited<ReturnType<typeof getSearchPrivacy>> & {
+  isAddressSearchAllowed: boolean;
+  isAddressFollowersAllowed: boolean;
+  dccExposureConfigured: boolean;
+};
+
+export async function getDccExposurePrivacy(userId: string): Promise<DccExposurePrivacyView | null> {
+  const baseSelect = {
+    ...privacySelectFields,
+    identityVerified: true
+  };
+  try {
+    const row = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { ...baseSelect, ...privacySelectDccExposure }
+    });
+    if (!row) return null;
+    return {
+      ...row,
+      isAddressSearchAllowed: Boolean(row.isAddressSearchAllowed),
+      isAddressFollowersAllowed: Boolean(row.isAddressFollowersAllowed),
+      dccExposureConfigured: Boolean(row.dccExposureConfigured)
+    };
+  } catch {
+    const row = await getSearchPrivacy(userId);
+    if (!row) return null;
+    return {
+      ...row,
+      isAddressSearchAllowed: false,
+      isAddressFollowersAllowed: false,
+      dccExposureConfigured: false
+    };
+  }
 }
 
 export type DccExposureSavePatch = {

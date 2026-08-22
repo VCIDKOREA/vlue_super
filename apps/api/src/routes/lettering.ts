@@ -11,6 +11,7 @@ import {
 } from "../services/showcase/showcaseTagsService.js";
 import {
   getSearchPrivacy,
+  getDccExposurePrivacy,
   runShowcaseSearch,
   saveDccExposure,
   updateSearchPrivacy,
@@ -195,7 +196,7 @@ letteringRoutes.put("/showcase/search-privacy", requireUserHeader, async (c) => 
 /** DCC 검색·팔로우 노출 4항목 — 전부 지정해야 저장 */
 letteringRoutes.get("/dcc-exposure", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
-  const privacy = await getSearchPrivacy(me);
+  const privacy = await getDccExposurePrivacy(me);
   return c.json({
     ok: true,
     exposure: {
