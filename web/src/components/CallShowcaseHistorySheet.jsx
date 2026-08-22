@@ -121,18 +121,29 @@ function hasUsableLocalSnapshot(call) {
 }
 
 function snapshotIsCompleteEnough(call) {
+  if (call?.verified === true) {
+    const snap = call.cardSnapshot || {};
+    const hasName = Boolean(
+      String(snap.name || call.name || call.memberName || "").trim()
+    );
+    const hasOrg = Boolean(String(snap.organization || snap.companyName || "").trim());
+    const hasStyle = styleHasShowcaseContent(call.showcaseSnapshot);
+    /* 유료 상호·이름만 있어도 즉시 연다 — 페이지는 백그라운드 보강 */
+    if (hasOrg || hasStyle || (hasName && isPaidLetteringTier(call.membershipTier || snap.membershipTier))) {
+      return true;
+    }
+  }
   if (!hasUsableLocalSnapshot(call)) return false;
   const snap = call.cardSnapshot || {};
   const tier = call.membershipTier || snap.membershipTier || "free";
   if (!isPaidLetteringTier(tier)) {
     return Boolean(snap.name || snap.photoUrl);
   }
-  const hasMeta = Boolean(
-    String(snap.organization || "").trim() || String(snap.email || "").trim()
+  return Boolean(
+    String(snap.organization || "").trim() ||
+      String(snap.name || "").trim() ||
+      styleHasShowcaseContent(call.showcaseSnapshot)
   );
-  const hasHero = Boolean(String(snap.titlePhotoUrl || snap.photoUrl || "").trim());
-  const hasStyle = styleHasShowcaseContent(call.showcaseSnapshot);
-  return hasMeta && hasHero && hasStyle;
 }
 
 function peerPayloadFromResolve(payload) {

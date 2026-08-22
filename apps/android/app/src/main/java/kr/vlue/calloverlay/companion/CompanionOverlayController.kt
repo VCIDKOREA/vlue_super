@@ -271,6 +271,18 @@ class CompanionOverlayController {
 
     private fun refreshPosition() {
         val resolved = OverlayPositionManager.resolve(context, state, screenState)
+        /*
+         * 풀 InCallUI(TOP)가 확정되면 핀 해제 — 이전 미니 수신 BELOW 핀이
+         * 전체 전화 UI 중앙에 빅푸시를 남기는 것을 막는다.
+         */
+        if (state == OverlayState.BIG_PUSH &&
+            context == OverlayContext.INCOMING_CALL_UI &&
+            resolved == OverlayPosition.TOP
+        ) {
+            ringingBelowMiniPinned = false
+            position = OverlayPosition.TOP
+            return
+        }
         position =
             if (ringingBelowMiniPinned &&
                 state == OverlayState.BIG_PUSH &&

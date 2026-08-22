@@ -228,13 +228,23 @@ class CompanionOverlayControllerTest {
         assertEquals(OverlayPosition.TOP, c.position)
     }
 
-    /** BELOW 로 붙은 뒤 context 재평가 TOP 오판 → 겹침 방지 */
+    /** BELOW 핀 후에도 풀 InCallUI 확정 시 TOP 복귀 */
     @Test
-    fun bigPush_pinsBelowAfterFirstBelow_evenIfContextFlipsToTop() {
+    fun bigPush_clearsBelowPin_whenFullIncomingCallUi() {
         val c = CompanionOverlayController()
         assertTrue(c.requestBigPush(OverlayContext.COMPACT_INCOMING, callAlreadyAnswered = false))
         assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
         c.updateContext(OverlayContext.INCOMING_CALL_UI)
+        assertEquals(OverlayPosition.TOP, c.position)
+    }
+
+    /** 미니 컨텍스트 유지 시 BELOW 유지 */
+    @Test
+    fun bigPush_staysBelow_whileCompactIncomingContext() {
+        val c = CompanionOverlayController()
+        assertTrue(c.requestBigPush(OverlayContext.COMPACT_INCOMING, callAlreadyAnswered = false))
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
+        c.updateContext(OverlayContext.HOME_SCREEN)
         assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
         c.onCallEnd()
         assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))

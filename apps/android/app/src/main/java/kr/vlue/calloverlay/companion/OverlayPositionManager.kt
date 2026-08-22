@@ -45,17 +45,20 @@ object OverlayPositionManager {
 
     /**
      * 링잉 빅푸시가 미니 수신 팝업 아래에 붙은 뒤에는 상단(TOP)으로 올리지 않는다.
-     * 조회가 끝나 상호가 채워질 때 InCallUI resume 오판으로 HUN 을 가리는 것을 막는다.
+     * 단, 삼성 전체 InCallUI(풀 수신)가 확정되면 반드시 TOP — BELOW면 화면 중앙에 떠 겹친다.
      */
     fun holdBelowCompactIncoming(
         previous: OverlayPosition,
         previousContext: OverlayContext,
         nextContext: OverlayContext,
         ringing: Boolean,
-        ourAppForeground: Boolean = false
+        ourAppForeground: Boolean = false,
+        confirmedFullInCall: Boolean = false
     ): OverlayContext {
         if (!ringing) return nextContext
         if (nextContext != OverlayContext.INCOMING_CALL_UI) return nextContext
+        /* 풀 수신 UI 확정 → hold 금지 (중간 위치 버그) */
+        if (confirmedFullInCall) return OverlayContext.INCOMING_CALL_UI
         if (previous == OverlayPosition.BELOW_COMPACT_INCOMING ||
             previousContext == OverlayContext.COMPACT_INCOMING ||
             ourAppForeground

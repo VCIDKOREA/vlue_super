@@ -1088,9 +1088,14 @@ class CallOverlayService : Service() {
                 ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER ->
                     OverlayContext.COMPACT_INCOMING
             }.let { resolved ->
+                /*
+                 * VLUE 전면 + task 가 전체 InCallUI 가 아니면 미니 — 단 resumed 가
+                 * InCallActivity 이면 풀 UI(TOP) 유지 (중앙 빅푸시 버그 방지).
+                 */
                 if (ourApp &&
                     resolved == OverlayContext.INCOMING_CALL_UI &&
-                    !OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg)
+                    !OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg) &&
+                    !OverlayContextDetector.isLikelyFullInCallUiPackage(resumedPkg)
                 ) {
                     OverlayContext.COMPACT_INCOMING
                 } else {
@@ -2612,12 +2617,17 @@ class CallOverlayService : Service() {
                     !activity.contains("(paused)", ignoreCase = true)
             }
         val detected = detectOverlayContext(forceRinging = forceRinging)
+        val tasksPkg = ForegroundPackageProbe.runningTaskPackage(this)
+        val confirmedFullInCall =
+            detected == OverlayContext.INCOMING_CALL_UI &&
+                OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg)
         val ctx = OverlayPositionManager.holdBelowCompactIncoming(
             previous = prevPos,
             previousContext = prevCtx,
             nextContext = detected,
             ringing = forceRinging,
-            ourAppForeground = ourAppForeground
+            ourAppForeground = ourAppForeground,
+            confirmedFullInCall = confirmedFullInCall
         )
         if (ctx != detected) {
             android.util.Log.i(

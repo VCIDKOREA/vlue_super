@@ -16,6 +16,7 @@ import { syncMemberIdentityToNative } from "../lib/showcaseSmsShare.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
 import { fetchFollowProfile } from "../lib/followApi.js";
+import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { resolveCallHistoryShowcasePeer } from "../lib/resolveCallHistoryShowcasePeer.js";
 import {
@@ -223,6 +224,45 @@ function buildUnverifiedOverlayCard(phone) {
 function overlayCardHasOrg(card) {
   if (!card || typeof card !== "object") return false;
   return Boolean(String(card.organization || card.companyName || "").trim());
+}
+
+/** Android OverlayCardOrgFill 와 동일 — CEO 상호를 조회 전에 즉시 채움 */
+function applyLocalOverlayCardDefaults(card, phoneHint = "") {
+  if (!card || typeof card !== "object") return card;
+  const next = { ...card };
+  const handle = String(next.publicHandle || next.loginId || next.vlueId || "")
+    .trim()
+    .replace(/^@/, "")
+    .toLowerCase();
+  const digits = String(next.phone || next.phoneE164 || phoneHint || "").replace(/\D/g, "");
+  const national = digits.startsWith("82") && digits.length >= 11 ? `0${digits.slice(2)}` : digits;
+  const isCeo =
+    handle === "ceo" || national === "01080144666" || digits === "821080144666";
+  if (isCeo) {
+    if (!String(next.organization || next.companyName || "").trim()) {
+      next.organization = "VCID KOREA";
+      next.companyName = "VCID KOREA";
+    }
+    if (!String(next.name || next.displayName || "").trim()) {
+      next.name = "이종근";
+      next.displayName = "이종근";
+    }
+    if (!isPaidLetteringTier(next.membershipTier)) {
+      next.membershipTier = "paid";
+    }
+  }
+  return next;
+}
+
+/**
+ * live 송출 플래그 도착 전 — 유료/상호가 있으면 바·쇼케이스 골격을 즉시 paid 로.
+ * live 가 OFF 면 enrich 결과가 덮어쓴다.
+ */
+function provisionalBroadcastStyle(card) {
+  if (isPaidLetteringTier(card?.membershipTier) || overlayCardHasOrg(card)) {
+    return { ...createDefaultShowcaseStyle(), includeDigitalCard: true };
+  }
+  return createPeerAuthOnlyShowcaseStyle();
 }
 
 function isDcpOverlayCard(card) {
@@ -522,18 +562,24 @@ function LetteringOverlayHostInner() {
           if (isDcpOverlayCard(mapped) && incoming && !dcpCardMatchesIncoming(mapped, incoming)) {
             return;
           }
-          const waitForLogo = isDcpOverlayCard(mapped);
-          matchedRef.current = !waitForLogo || Boolean(mapped.userId || mapped.name);
-          setCard((prev) => mergeDcpCard(prev, mapped));
+          const seeded = applyLocalOverlayCardDefaults(mapped, incoming);
+          const waitForLogo = isDcpOverlayCard(seeded);
+          matchedRef.current = !waitForLogo || Boolean(seeded.userId || seeded.name);
+          const provisional = provisionalBroadcastStyle(seeded);
+          setCard((prev) => ({
+            ...mergeDcpCard(prev, seeded),
+            showcaseStyle: provisional
+          }));
+          setShowcaseStyle(provisional);
           setVerified(true);
           setLoading(false);
-          if (!isDcpOverlayCard(mapped)) {
+          if (!isDcpOverlayCard(seeded)) {
             void reportLineCallEvent(
-              incoming || detail.phoneE164 || mapped.phone || "",
+              incoming || detail.phoneE164 || seeded.phone || "",
               direction === "outgoing" ? "out" : "in"
             );
           }
-          scheduleOverlayPeerEnrich(incoming || detail.phoneE164 || mapped.phone, mapped, (pack) => {
+          scheduleOverlayPeerEnrich(incoming || detail.phoneE164 || seeded.phone, seeded, (pack) => {
             setCard((prev) => ({
               ...(prev || {}),
               ...pack.card,
@@ -621,12 +667,18 @@ function LetteringOverlayHostInner() {
           const isDcp = isDcpOverlayCard(mapped);
           const staleDcp = isDcp && incoming && !dcpCardMatchesIncoming(mapped, incoming);
           if (!staleDcp) {
+            const seeded = applyLocalOverlayCardDefaults(mapped, incoming);
             matchedRef.current = true;
-            setCard((prev) => mergeDcpCard(prev, mapped));
+            const provisional = provisionalBroadcastStyle(seeded);
+            setCard((prev) => ({
+              ...mergeDcpCard(prev, seeded),
+              showcaseStyle: provisional
+            }));
+            setShowcaseStyle(provisional);
             setVerified(true);
             setLoading(false);
             if (!isDcp) {
-              scheduleOverlayPeerEnrich(incoming, mapped, (pack) => {
+              scheduleOverlayPeerEnrich(incoming, seeded, (pack) => {
                 if (cancelled) return;
                 setCard((prev) => ({ ...(prev || {}), ...pack.card, showcaseStyle: pack.showcaseStyle }));
                 setShowcaseStyle(pack.showcaseStyle);
@@ -674,7 +726,10 @@ function LetteringOverlayHostInner() {
       let nextCard = null;
       let nextVerified = false;
       if (lookup?.ok && lookup.matched) {
-        nextCard = mapLookupToLetteringCard(lookup, incoming);
+        nextCard = applyLocalOverlayCardDefaults(
+          mapLookupToLetteringCard(lookup, incoming),
+          incoming
+        );
         nextVerified = true;
         if (nextCard && !isDcpOverlayCard(nextCard)) {
           void reportLineCallEvent(incoming, direction === "outgoing" ? "out" : "in");
@@ -682,11 +737,12 @@ function LetteringOverlayHostInner() {
       }
 
       const isDcp = isDcpOverlayCard(nextCard);
-      const peerStyle = createDefaultShowcaseStyle();
+      const peerStyle = provisionalBroadcastStyle(nextCard);
 
       if (nextCard) {
         matchedRef.current = true;
         setCard((prev) => ({ ...mergeDcpCard(prev, nextCard), showcaseStyle: peerStyle }));
+        setShowcaseStyle(peerStyle);
         setVerified(nextVerified);
         setLoading(false);
         if (!isDcp && !isExpiredLineCard(nextCard)) {
@@ -1026,8 +1082,15 @@ function LetteringOverlayHostInner() {
           expanded={expanded}
           forceShowcaseBar={forceShowcaseBar}
           onExpandedChange={(next) => {
-            setExpanded(next);
             if (next) {
+              const style = styledCard?.showcaseStyle || showcaseStyle;
+              const hasBody =
+                overlayCardHasOrg(styledCard) ||
+                peerShowcaseBroadcastOn(style) ||
+                (Array.isArray(style?.pages) && style.pages.some((p) => p && typeof p === "object"));
+              /* 텅 빈 쇼케이스 펼침 방지 — 상호/페이지 준비될 때까지 바 유지 */
+              if (!hasBody && loading) return;
+              setExpanded(true);
               setForceShowcaseBar(false);
               try {
                 window.VlueLettering?.restoreShowcaseOverlay?.();
@@ -1035,7 +1098,9 @@ function LetteringOverlayHostInner() {
               } catch {
                 /* ignore */
               }
+              return;
             }
+            setExpanded(false);
           }}
           includeDigitalCard={Boolean(
             verified && peerShowcaseBroadcastOn(styledCard?.showcaseStyle || showcaseStyle)

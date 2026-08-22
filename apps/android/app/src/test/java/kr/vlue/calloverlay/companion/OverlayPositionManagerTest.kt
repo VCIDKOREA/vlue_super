@@ -194,6 +194,16 @@ class OverlayPositionManagerTest {
                 OverlayPosition.BELOW_COMPACT_INCOMING,
                 OverlayContext.COMPACT_INCOMING,
                 OverlayContext.INCOMING_CALL_UI,
+                ringing = true,
+                confirmedFullInCall = true
+            )
+        )
+        assertEquals(
+            OverlayContext.INCOMING_CALL_UI,
+            OverlayPositionManager.holdBelowCompactIncoming(
+                OverlayPosition.BELOW_COMPACT_INCOMING,
+                OverlayContext.COMPACT_INCOMING,
+                OverlayContext.INCOMING_CALL_UI,
                 ringing = false
             )
         )
