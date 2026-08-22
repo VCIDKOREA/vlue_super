@@ -100,7 +100,7 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
   const [profRes, live] = await Promise.all([
     fetchFollowProfile(userId, { purpose: "full" }),
     fetchPeerLiveStylePublic(userId, {
-      force: Boolean(opts.force),
+      force: true,
       number: phoneHint
     })
   ]);
@@ -118,7 +118,18 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
   );
 
   const tier = merged.membershipTier || "free";
-  const peerStyle = normalizeReplayStyle(live || createDefaultShowcaseStyle(), tier);
+  let peerStyle = normalizeReplayStyle(live || createDefaultShowcaseStyle(), tier);
+  /* live 에 페이지가 없으면 force 재시도 없이 byPhone 스타일 병합 */
+  if (
+    isPaidLetteringTier(tier) &&
+    !(Array.isArray(peerStyle.pages) && peerStyle.pages.some((p) => p && typeof p === "object")) &&
+    byPhone.card?.showcaseStyle
+  ) {
+    peerStyle = normalizeReplayStyle(
+      { ...peerStyle, ...byPhone.card.showcaseStyle },
+      tier
+    );
+  }
   const card = applyShowcaseStyleToCard(
     {
       ...merged,

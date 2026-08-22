@@ -3,6 +3,7 @@ package kr.vlue.calloverlay
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,5 +44,14 @@ class OverlayCardOrgFillTest {
     fun otherMember_withoutOrg_staysEmpty() {
         val raw = """{"matched":true,"displayName":"홍길동","publicHandle":"hong","companyName":""}"""
         assertFalse(OverlayCardOrgFill.hasOrganization(OverlayCardOrgFill.applyLocalDefaults(raw)))
+    }
+
+    @Test
+    fun seedIfPlatformCeoPhone_fillsVcidKorea() {
+        val seeded = OverlayCardOrgFill.seedIfPlatformCeoPhone("010-8014-4666")
+        assertNotNull(seeded)
+        assertTrue(OverlayCardOrgFill.hasOrganization(seeded!!))
+        assertTrue(seeded.contains("VCID KOREA"))
+        assertTrue(seeded.contains("이종근"))
     }
 }

@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { Phone, PhoneIncoming, PhoneOutgoing, ShieldCheck } from "lucide-react";
 import { CALL_SHOWCASE_HISTORY_CHANGED } from "../lib/callShowcaseHistory.js";
 import {
+  applyLocalKnownPeersToCallGroups,
   applyMemberDirectoryToCallGroups,
   buildCallHistoryList,
   fetchDeviceCallLogEntries,
@@ -121,29 +122,21 @@ function hasUsableLocalSnapshot(call) {
 }
 
 function snapshotIsCompleteEnough(call) {
-  if (call?.verified === true) {
-    const snap = call.cardSnapshot || {};
-    const hasName = Boolean(
-      String(snap.name || call.name || call.memberName || "").trim()
-    );
-    const hasOrg = Boolean(String(snap.organization || snap.companyName || "").trim());
-    const hasStyle = styleHasShowcaseContent(call.showcaseSnapshot);
-    /* 유료 상호·이름만 있어도 즉시 연다 — 페이지는 백그라운드 보강 */
-    if (hasOrg || hasStyle || (hasName && isPaidLetteringTier(call.membershipTier || snap.membershipTier))) {
-      return true;
-    }
-  }
   if (!hasUsableLocalSnapshot(call)) return false;
   const snap = call.cardSnapshot || {};
   const tier = call.membershipTier || snap.membershipTier || "free";
   if (!isPaidLetteringTier(tier)) {
     return Boolean(snap.name || snap.photoUrl);
   }
-  return Boolean(
-    String(snap.organization || "").trim() ||
-      String(snap.name || "").trim() ||
-      styleHasShowcaseContent(call.showcaseSnapshot)
-  );
+  /* 유료: 피드·BGM 있는 스타일 없으면 로딩 — DCC만 먼저 띄우지 않음 */
+  return styleHasShowcaseContent(call.showcaseSnapshot);
+}
+
+function styleHasPages(style) {
+  if (!style || typeof style !== "object") return false;
+  if (Array.isArray(style.pages) && style.pages.some((p) => p && typeof p === "object")) return true;
+  if (Array.isArray(style.gallery?.photos) && style.gallery.photos.length > 0) return true;
+  return false;
 }
 
 function peerPayloadFromResolve(payload) {
@@ -154,6 +147,13 @@ function peerPayloadFromResolve(payload) {
     phone: payload.phone,
     tier: payload.card?.membershipTier || "free"
   };
+}
+
+function cachePayloadIsUsable(pack) {
+  if (!pack?.card) return false;
+  const tier = pack.card.membershipTier || pack.tier || "free";
+  if (!isPaidLetteringTier(tier)) return Boolean(pack.verified);
+  return styleHasPages(pack.card.showcaseStyle || pack.showcaseStyle);
 }
 
 const CALL_HISTORY_LINE_KEY = "vlue_call_history_line_id";
@@ -260,25 +260,25 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     setListLoading(true);
     try {
       const raw = await fetchDeviceCallLogEntries(200);
-      const quickLine =
-        lineFilter && lineFilter !== "all"
-          ? lines.find((l) => l.id === lineFilter) || null
-          : "all";
-      setItems(
+      /* 1차: 기기 로그 + 로컬 히스토리 + CEO 시드 — 번호만 보이다가 이름 붙는 깜빡임 방지 */
+      const quick = applyLocalKnownPeersToCallGroups(
         buildCallHistoryList({
           deviceEntries: raw,
           lineEvents: [],
-          selectedLine: quickLine,
-          lines
+          selectedLine: "all",
+          lines: []
         })
       );
+      setItems(quick);
       setListLoading(false);
 
-      const [lineRows, lineEvents] = await Promise.all([
+      const phonesFromRaw = (Array.isArray(raw) ? raw : []).map((e) => e.phone).filter(Boolean);
+      const [lineRows, lineEvents, members] = await Promise.all([
         fetchDccLines()
           .then((d) => (Array.isArray(d.lines) ? d.lines : []))
           .catch(() => []),
-        fetchLineCallHistory(lineFilter).catch(() => [])
+        fetchLineCallHistory(lineFilter).catch(() => []),
+        fetchMemberNamesByNumbers(phonesFromRaw).catch(() => [])
       ]);
       setLines(lineRows);
       const selectedLine =
@@ -289,10 +289,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         selectedLine,
         lines: lineRows
       });
-      const members = await fetchMemberNamesByNumbers(merged.map((c) => c.phoneDisplay || c.phone)).catch(
-        () => []
+      setItems(
+        applyLocalKnownPeersToCallGroups(applyMemberDirectoryToCallGroups(merged, members))
       );
-      setItems(applyMemberDirectoryToCallGroups(merged, members));
       if (!raw.length && !lineEvents.length) {
         setLoadError(
           typeof window !== "undefined" &&
@@ -487,7 +486,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     }
 
     const cached = readCallHistoryPeerCache(phone);
-    if (cached?.card) {
+    if (cached?.card && cachePayloadIsUsable(cached)) {
       flushSync(() => {
         setSelected(call);
         setExpanded(true);

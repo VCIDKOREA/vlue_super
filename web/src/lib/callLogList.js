@@ -165,9 +165,38 @@ export function applyMemberDirectoryToCallGroups(groups, members) {
         phone: g.phoneDisplay || g.phone,
         membershipTier: hit.membershipTier || "free",
         photoUrl: hit.avatarUrl || "",
-        avatarUrl: hit.avatarUrl || ""
+        avatarUrl: hit.avatarUrl || "",
+        organization: hit.organization || hit.companyName || ""
       }
     };
+  });
+}
+
+/** API 전 — 로컬에 알려진 회원(CEO 등)을 즉시 붙여 번호→이름 깜빡임 제거 */
+export function applyLocalKnownPeersToCallGroups(groups) {
+  return (Array.isArray(groups) ? groups : []).map((g) => {
+    const key = g.phoneKey || callLogPhoneKey(g.phoneDisplay || g.phone);
+    if (key === "01080144666") {
+      const snap = g.cardSnapshot && typeof g.cardSnapshot === "object" ? g.cardSnapshot : {};
+      return {
+        ...g,
+        memberName: g.memberName || "이종근",
+        name: g.name || g.memberName || "이종근",
+        verified: true,
+        membershipTier: g.membershipTier || "paid",
+        userId: g.userId || "13c75cbe-206b-4eed-82d2-a54c7bc80c9c",
+        cardSnapshot: {
+          ...snap,
+          userId: snap.userId || g.userId || "13c75cbe-206b-4eed-82d2-a54c7bc80c9c",
+          name: snap.name || "이종근",
+          organization: snap.organization || "VCID KOREA",
+          companyName: snap.companyName || "VCID KOREA",
+          membershipTier: snap.membershipTier || "paid",
+          phone: g.phoneDisplay || g.phone
+        }
+      };
+    }
+    return g;
   });
 }
 

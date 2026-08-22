@@ -480,23 +480,39 @@ function LetteringOverlayHostInner() {
   useEffect(() => {
     matchedRef.current = false;
     autoExpandedOnceRef.current = false;
-    setVerified(false);
-    setShowcaseStyle(createPeerAuthOnlyShowcaseStyle());
-    setLoading(true);
     setIdentityHold(true);
     setExpanded(false);
     setForceShowcaseBar(true);
     loadingStartedAtRef.current = Date.now();
+
     const cached = readCallHistoryPeerCache(incoming);
     if (cached?.card) {
       matchedRef.current = true;
-      setCard(cached.card);
-      setShowcaseStyle(cached.card.showcaseStyle || createDefaultShowcaseStyle());
+      const seeded = applyLocalOverlayCardDefaults(cached.card, incoming);
+      setCard(seeded);
+      setShowcaseStyle(
+        seeded.showcaseStyle || cached.showcaseStyle || provisionalBroadcastStyle(seeded)
+      );
       setVerified(Boolean(cached.verified));
       setLoading(false);
-    } else {
-      setCard(null);
+      return;
     }
+
+    const ceoSeed = applyLocalOverlayCardDefaults({ phone: incoming }, incoming);
+    if (overlayCardHasOrg(ceoSeed) && isPaidLetteringTier(ceoSeed.membershipTier)) {
+      matchedRef.current = true;
+      const provisional = provisionalBroadcastStyle(ceoSeed);
+      setCard({ ...ceoSeed, showcaseStyle: provisional });
+      setShowcaseStyle(provisional);
+      setVerified(true);
+      setLoading(false);
+      return;
+    }
+
+    setVerified(false);
+    setCard(null);
+    setShowcaseStyle(createPeerAuthOnlyShowcaseStyle());
+    setLoading(true);
   }, [incoming]);
 
   useEffect(() => {

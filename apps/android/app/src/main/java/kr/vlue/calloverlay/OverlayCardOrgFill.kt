@@ -55,6 +55,15 @@ object OverlayCardOrgFill {
             json.put("companyName", "VCID KOREA")
             json.put("organization", "VCID KOREA")
         }
+        if (isPlatformCeo(json)) {
+            if (firstNonBlank(json.optString("name"), json.optString("displayName")).isBlank()) {
+                json.put("name", "이종근")
+                json.put("displayName", "이종근")
+            }
+            if (firstNonBlank(json.optString("publicHandle")).isBlank()) {
+                json.put("publicHandle", "ceo")
+            }
+        }
         val tier = json.optString("membershipTier").trim()
         if (tier.isEmpty() &&
             (json.optBoolean("is_premium_line", false) ||
@@ -63,6 +72,27 @@ object OverlayCardOrgFill {
         ) {
             json.put("membershipTier", "paid")
         }
+    }
+
+    /**
+     * API 조회 전 — CEO 번호면 즉시 VCID KOREA 카드 JSON (빅푸시 4~5초 공백 제거).
+     */
+    fun seedIfPlatformCeoPhone(phoneRaw: String): String? {
+        val digits = normalizeDigits(phoneRaw)
+        if (digits != "821080144666" && digits != "01080144666") return null
+        return JSONObject()
+            .put("matched", true)
+            .put("verified", true)
+            .put("is_verified", true)
+            .put("companyName", "VCID KOREA")
+            .put("organization", "VCID KOREA")
+            .put("name", "이종근")
+            .put("displayName", "이종근")
+            .put("publicHandle", "ceo")
+            .put("membershipTier", "paid")
+            .put("phoneE164", "+821080144666")
+            .put("userId", "13c75cbe-206b-4eed-82d2-a54c7bc80c9c")
+            .toString()
     }
 
     private fun isPlatformCeo(json: JSONObject): Boolean {

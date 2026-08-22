@@ -176,6 +176,7 @@ object LetteringCallCoordinator {
                             body
                         }
                     }
+                    ?: OverlayCardOrgFill.seedIfPlatformCeoPhone(raw)
             val overlayNumber = agency?.shortNumber ?: raw
             val overlayRoute =
                 when {
@@ -213,7 +214,9 @@ object LetteringCallCoordinator {
                 startOverlayService(
                     app,
                     overlayNumber,
-                    verified = agency != null || cachedMember?.verified == true,
+                    verified = agency != null ||
+                        cachedMember?.verified == true ||
+                        overlayJson != null && OverlayCardOrgFill.hasOrganization(overlayJson),
                     cardJson = overlayJson,
                     outgoing = outgoing,
                     dcpRoute = overlayRoute
