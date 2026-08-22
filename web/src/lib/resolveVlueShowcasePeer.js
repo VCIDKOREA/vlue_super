@@ -50,12 +50,26 @@ function mergePeerLiveStyle(base, live) {
  *   avatarUrl?: string,
  *   viewContext?: 'search'|'follow'|'full',
  */
+/** 통화기록 스냅샷 userId 오염 시 — 번호 조회가 SoT */
+async function reconcilePeerUserIdFromPhone(userId, phoneHint) {
+  const phone = String(phoneHint || "").trim();
+  if (!phone) return userId;
+  const byPhone = await resolveVlueShowcaseByPhone(phone);
+  const ownerId = String(byPhone.card?.userId || "").trim();
+  if (!UUID_RE.test(ownerId)) return userId;
+  if (UUID_RE.test(userId) && userId !== ownerId) return ownerId;
+  if (!UUID_RE.test(userId)) return ownerId;
+  return userId;
+}
+
 export async function resolveVlueShowcasePeer(input = {}) {
   let userId = String(input.userId || "").trim();
   const handle = String(input.handle || "")
     .replace(/^@+/, "")
     .trim();
   const phoneHint = String(input.phone || "").trim();
+
+  userId = await reconcilePeerUserIdFromPhone(userId, phoneHint);
 
   if (!UUID_RE.test(userId) && handle) {
     const looked = await lookupUserByHandle(handle);
@@ -140,7 +154,8 @@ export async function resolveVlueShowcasePeer(input = {}) {
     /* 캐시·auth 응답에 콘텐츠 페이지가 없으면 공개 라이브로 한 번 더 보강 */
     if (!styleHasShowcaseContent(live)) {
       const pub = await fetchPeerLiveStylePublic(userId, {
-        force: Boolean(input.forceStyle) || !live
+        force: Boolean(input.forceStyle) || !live,
+        number: phoneHint
       });
       if (pub && typeof pub === "object") {
         live = mergePeerLiveStyle(live, pub);

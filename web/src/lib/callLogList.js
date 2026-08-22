@@ -112,6 +112,7 @@ export function enrichCallLogGroupsWithShowcaseHistory(groups) {
   return groups.map((g) => {
     const meta = byKey.get(g.phoneKey);
     const agency = matchNationalAgency(g.phoneDisplay || g.phone);
+    const snapUserId = String(meta?.cardSnapshot?.userId || meta?.userId || "").trim();
     const memberName =
       String(g.memberName || "").trim() ||
       realMemberName(meta?.name || meta?.cardSnapshot?.name, g.phone, g.phoneKey, agency?.agencyName);
@@ -129,8 +130,10 @@ export function enrichCallLogGroupsWithShowcaseHistory(groups) {
       verified,
       membershipTier: g.membershipTier || meta?.membershipTier || null,
       avatarUrl: g.avatarUrl || resolveCallHistoryAvatar(meta || {}) || "",
+      userId: g.userId || snapUserId || "",
       cardSnapshot: g.cardSnapshot || meta?.cardSnapshot || null,
-      showcaseSnapshot: g.showcaseSnapshot || meta?.showcaseSnapshot || null,
+      showcaseSnapshot:
+        g.showcaseSnapshot || (snapUserId ? meta?.showcaseSnapshot || null : null),
       count: g.count || 1
     };
   });

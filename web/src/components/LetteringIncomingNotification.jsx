@@ -383,8 +383,15 @@ export default function LetteringIncomingNotification({
   const expiredDetail =
     String(c?.expiredDetail || "").trim() ||
     "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다.";
+  /** 실시간 수신 통화만 송출 ON/OFF 게이트 — 통화기록·공유·미리보기는 등록 정보 그대로 */
+  const livePeerCallOverlay = !previewMode && !fromCallHistory;
+  const peerStyleBroadcastOn = c?.showcaseStyle?.includeDigitalCard === true;
   const showDigitalCard =
-    isDcpCard || (Boolean(includeDigitalCard) && c?.showcaseStyle?.includeDigitalCard === true);
+    isDcpCard ||
+    (Boolean(includeDigitalCard) &&
+      (livePeerCallOverlay
+        ? peerStyleBroadcastOn && isPaidLetteringTier(c.membershipTier)
+        : isPaidLetteringTier(c.membershipTier) || peerStyleBroadcastOn));
   const onCall = callPhase === "active" || callPhase === "connected";
   useEffect(() => {
     if (!showDigitalCard && carouselSlideType === "card") {
@@ -533,13 +540,19 @@ export default function LetteringIncomingNotification({
    * 실통화: 상대가 쇼케이스/DCC 를 저장·ON 한 경우만 유료 쇼케이스.
    * (이전: verified+glassTent → 항상 paid → 미설정 회원에게 DCC가 잘못 노출)
    */
-  const peerBroadcastOn =
-    Boolean(includeDigitalCard) && c?.showcaseStyle?.includeDigitalCard === true;
+  const peerBroadcastOn = livePeerCallOverlay
+    ? Boolean(includeDigitalCard) && peerStyleBroadcastOn
+    : Boolean(includeDigitalCard) &&
+      (isPaidLetteringTier(c.membershipTier) || peerStyleBroadcastOn);
   const isPaidMember =
     !isExpiredLine &&
     (isDcp ||
-      (verified && isPaidLetteringTier(c.membershipTier) && peerBroadcastOn) ||
-      (verified && isGlassTent && peerBroadcastOn));
+      (verified &&
+        isPaidLetteringTier(c.membershipTier) &&
+        (livePeerCallOverlay ? peerBroadcastOn : true)) ||
+      (verified &&
+        isGlassTent &&
+        (livePeerCallOverlay ? peerBroadcastOn : isPaidLetteringTier(c.membershipTier))));
   const isFreeMember = !isExpiredLine && verified && !isPaidMember && !isDcp;
   const isUnverified = !isExpiredLine && !verified && !isDcp && !isContactSafeCare;
   const { setPlaybackPhase } = useShowcaseBgm();

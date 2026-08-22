@@ -286,7 +286,8 @@ letteringRoutes.get("/showcase/style/:userId", async (c) => {
   if (numberQ) {
     const { getLineShowcasePublicByPhone } = await import("../services/dcc/dccLineService.js");
     const lineLive = await getLineShowcasePublicByPhone(numberQ);
-    if (lineLive) {
+    /* 번호 회선 쇼케이스는 path userId 와 일치할 때만 — 다른 회원 스타일 혼입 방지 */
+    if (lineLive && String(lineLive.userId || "").trim() === userId) {
       return c.json(
         {
           ok: true,

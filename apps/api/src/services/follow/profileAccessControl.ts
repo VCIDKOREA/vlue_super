@@ -29,6 +29,7 @@ export type ViewerAccessContext = {
 
 export const MASKED_NAME = "비공개 회원";
 
+/** card lookup·follow profile — 마이그레이션 전 DB 호환 (DCC 주소 노출 컬럼 제외) */
 export const privacySelect = {
   id: true,
   isShowcasePrivate: true,
@@ -39,7 +40,11 @@ export const privacySelect = {
   isPhoneFollowersAllowed: true,
   isNameFollowersAllowed: true,
   isOrgFollowersAllowed: true,
-  isIdFollowersAllowed: true,
+  isIdFollowersAllowed: true
+} as const;
+
+/** DCC 주소 노출 설정 — 마이그레이션 적용 DB 전용 */
+export const privacySelectDccExposure = {
   isAddressSearchAllowed: true,
   isAddressFollowersAllowed: true,
   dccExposureConfigured: true

@@ -123,9 +123,8 @@ async function enrichOverlayPeerBundle(peerUserId, nextCard) {
     return {
       card: {
         ...enriched,
-        membershipTier: broadcastOn
-          ? enriched.membershipTier || nextCard?.membershipTier || "free"
-          : "free"
+        /* 통화기록 스냅샷용 — 송출 OFF여도 실제 등급 유지 */
+        membershipTier: enriched.membershipTier || nextCard?.membershipTier || "free"
       },
       style: broadcastOn ? style : { ...style, includeDigitalCard: false },
       broadcastOn
@@ -410,6 +409,7 @@ function LetteringOverlayHostInner() {
     autoExpandedOnceRef.current = false;
     setVerified(false);
     setCard(null);
+    setShowcaseStyle(createPeerAuthOnlyShowcaseStyle());
     setLoading(true);
     setIdentityHold(true);
     setExpanded(false);
@@ -818,8 +818,11 @@ function LetteringOverlayHostInner() {
 
   const cacheHistory = useCallback(
     (state) => {
+      const peerUserId = String(card?.userId || card?.ownerUserId || "").trim();
+      if (verified && !peerUserId) return;
       appendCallShowcaseHistory({
         phone: incoming,
+        userId: peerUserId,
         name: card?.name || card?.displayName || "",
         direction: direction === "outgoing" ? "out" : "in",
         durationSec: 0,

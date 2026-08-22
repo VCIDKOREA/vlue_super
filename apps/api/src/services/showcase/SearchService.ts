@@ -702,10 +702,7 @@ const privacySelectFields = {
   isNameSearchAllowed: true,
   isOrgSearchAllowed: true,
   isIdSearchAllowed: true,
-  isAddressSearchAllowed: true,
   isPhoneFollowersAllowed: true,
-  isAddressFollowersAllowed: true,
-  dccExposureConfigured: true,
   hasActiveShowcase: true
 } as const;
 

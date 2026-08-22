@@ -170,6 +170,7 @@ export function appendCallShowcaseHistory(entry) {
     id: entry.id || `call-${Date.now()}`,
     phone,
     phoneDisplay: formatLetteringPhoneDisplay(phone),
+    userId: String(entry.userId || entry.cardSnapshot?.userId || "").trim(),
     name: String(entry.name || "").trim() || formatLetteringPhoneDisplay(phone),
     direction: entry.direction === "out" ? "out" : "in",
     durationSec: Math.max(0, Number(entry.durationSec) || 0),

@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import ShowcaseCallCarousel from "./ShowcaseCallCarousel.jsx";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import { createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
+import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import { hasShowcaseBgmConfigured } from "../../lib/showcase/showcaseBgmPresets.js";
 import { extractShowcaseCoverUrl } from "../../lib/showcase/showcaseCover.js";
 import { apiUrl } from "../../lib/apiBase.js";
@@ -89,7 +90,10 @@ export default function PublicShowcaseStage({ card, onToast, onClose }) {
 
   const hasMedia = styleHasMedia(style);
   const canClose = typeof onClose === "function";
-  const includeDigitalCard = style?.includeDigitalCard !== false;
+  /* 공유 링크 — 유료 등록 명함은 송출 OFF와 무관하게 노출 */
+  const includeDigitalCard = isPaidLetteringTier(card?.membershipTier)
+    ? true
+    : style?.includeDigitalCard !== false;
 
   if (loadingStyle) {
     return (
