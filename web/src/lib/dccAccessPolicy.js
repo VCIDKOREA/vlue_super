@@ -8,7 +8,7 @@
 import {
   MINOR_DIGITAL_CARD_BLOCKED_MESSAGE,
   isMinorForParentalConsent
-} from "@vlue/shared/policy/minor-signup";
+} from "@vlue/shared";
 
 export const FAMILY_DCC_OWN_AUTH_REQUIRED_MESSAGE =
   "가족 혜택으로 이용 중인 계정은 디지털인증명함(DCC)을 쓰려면 본인 명의 1인 인증 결제가 필요합니다.";
