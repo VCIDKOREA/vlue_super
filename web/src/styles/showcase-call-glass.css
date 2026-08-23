@@ -3934,6 +3934,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.companion-mini-case__brand,
+.companion-mini-case__card {
+  pointer-events: none;
+}
+
 .companion-mini-case__expand {
   appearance: none;
   position: relative;

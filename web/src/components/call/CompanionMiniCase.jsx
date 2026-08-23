@@ -279,13 +279,10 @@ export default function CompanionMiniCase({
 
       if (moved <= DRAG_CLICK_MAX_PX) {
         if (wasPeek) {
-          /* EDGE_HIDDEN Tap → VISIBLE (Showcase 복원은 카드 Tap / onExpand) */
+          /* EDGE_HIDDEN Tap → VISIBLE (Showcase 복원은 「쇼케이스 돌아가기」 버튼만) */
           const revealed = revealPosFromPeek(final, cw, vw);
           applyPos(revealed, { commitVisibility: true });
           syncNativeVisibility(false);
-        } else if (!hideExpand) {
-          /* VISIBLE Tap → Showcase 복원 Request */
-          onExpand?.();
         }
         return;
       }
@@ -293,7 +290,7 @@ export default function CompanionMiniCase({
       /* Drag End → peek이면 EDGE_HIDDEN, 아니면 VISIBLE */
       applyPos(final, { commitVisibility: true });
     },
-    [applyPos, onExpand, syncNativeVisibility, hideExpand]
+    [applyPos, syncNativeVisibility]
   );
 
   const cssCardW = peekRight || peekLeft ? PEEK_W : resolveCardWidthCss(viewportRef.current.vw);
@@ -325,26 +322,14 @@ export default function CompanionMiniCase({
       className={`companion-mini-case${dragging ? " is-dragging" : ""}${
         peekRight ? " is-peek-right" : ""
       }${peekLeft ? " is-peek-left" : ""}`}
-      role="button"
-      tabIndex={0}
-      aria-label={hideExpand ? "VLUE 미니케이스 · 드래그로 위치 이동" : "Mini Case · 쇼케이스 돌아가기 · 드래그로 위치 이동"}
+      role="group"
+      tabIndex={-1}
+      aria-label={hideExpand ? "VLUE 미니케이스 · 드래그로 위치 이동" : "VLUE 미니케이스 · 드래그로 위치 이동 · 쇼케이스 복원은 하단 버튼"}
       style={style}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          if (peekRight || peekLeft) {
-            const revealed = revealPosFromPeek(posRef.current, cardSizeRef.current.w, viewportRef.current.vw);
-            applyPos(revealed, { commitVisibility: true });
-            syncNativeVisibility(false);
-          } else if (!hideExpand) {
-            onExpand?.();
-          }
-        }
-      }}
     >
       {peekRight || peekLeft ? (
         <div className="companion-mini-case__peek" aria-hidden>

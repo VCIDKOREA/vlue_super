@@ -415,7 +415,8 @@ class CallOverlayService : Service() {
         )
         /* 기존 Window 재사용 — remove+add 는 BadToken/흰화면 유발 */
         if (alreadyAttached) {
-            applyCompactRingingWindow()
+            bigPushPeeking = false
+            applyLayoutFromController(source = "bigPush_reuseWindow")
             val phoneChanged = overlayPhoneChanged(phone)
             currentPhone = phone
             pendingCardJson = cardJson

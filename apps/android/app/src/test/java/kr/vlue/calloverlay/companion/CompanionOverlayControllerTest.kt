@@ -225,7 +225,7 @@ class CompanionOverlayControllerTest {
         assertEquals(OverlayState.MINI_CASE, c.state)
         assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))
         assertEquals(OverlayState.BIG_PUSH, c.state)
-        assertEquals(OverlayPosition.TOP, c.position)
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
     }
 
     /** BELOW 핀 후에도 풀 InCallUI 확정 시 TOP 복귀 */

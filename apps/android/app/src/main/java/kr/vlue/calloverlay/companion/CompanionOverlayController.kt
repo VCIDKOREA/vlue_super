@@ -83,9 +83,14 @@ class CompanionOverlayController {
         ) {
             val prev = state
             state = OverlayState.IDLE
-            context = detectedContext
+            /*
+             * 연속 수신·통화 중 재수신: 직전 MINI/SHOWCASE 잔존 시 TOP 으로 올리면
+             * 삼성 미니 수신 UI 와 BigPush 가 겹친다 — BELOW 로 시작 후 풀 InCallUI 확정 시만 TOP.
+             */
+            context = OverlayContext.COMPACT_INCOMING
+            ringingBelowMiniPinned = true
             miniCaseVisibility = MiniCaseVisibility.VISIBLE
-            lastTransition = "requestBigPush: stale ${prev.name}→IDLE for new ringing"
+            lastTransition = "requestBigPush: stale ${prev.name}→IDLE below-first for new ringing"
             rejectedTransition = null
         }
         if (callAlreadyAnswered || state == OverlayState.SHOWCASE || state == OverlayState.MINI_CASE) {
