@@ -13,6 +13,10 @@ import {
   installShowcaseProximityBridge,
   subscribeShowcaseProximity
 } from "../lib/showcase/showcaseProximityBridge.js";
+import {
+  clearShowcaseBgmMediaSession,
+  syncShowcaseBgmMediaSession
+} from "../lib/showcase/showcaseBgmMediaSession.js";
 
 /** @typedef {'call_active' | 'replay' | 'preview' | 'settings_preview' | 'idle'} ShowcasePlaybackPhase */
 
@@ -34,6 +38,7 @@ export function ShowcaseBgmProvider({ children }) {
   const ownerRef = useRef("");
   const fadeGenRef = useRef(0);
   const styleConfigRef = useRef(null);
+  const peerDisplayRef = useRef(null);
   const phaseRef = useRef("idle");
   const userMutedRef = useRef(false);
   /** 셔플/순서 재생용 — tracks 인덱스 배열 */
@@ -49,6 +54,7 @@ export function ShowcaseBgmProvider({ children }) {
   const [trackIndex, setTrackIndex] = useState(0);
   const [playEpoch, setPlayEpoch] = useState(0);
   const [audioPlaying, setAudioPlaying] = useState(false);
+  const [peerDisplay, setPeerDisplay] = useState(null);
 
   const tracks = useMemo(() => resolvePlaylistTracks(styleConfig?.bgm), [styleConfig]);
   const canSkipTracks = tracks.length > 1;
@@ -126,6 +132,7 @@ export function ShowcaseBgmProvider({ children }) {
     visitKeyRef.current = "";
     setVisitSessionKey("");
     ownerRef.current = "";
+    clearShowcaseBgmMediaSession();
     const el = audioRef.current;
     if (el) {
       el.pause();
@@ -496,6 +503,38 @@ export function ShowcaseBgmProvider({ children }) {
     ]
   );
 
+  const bindBgmPeerDisplay = useCallback((peer) => {
+    if (!peer || typeof peer !== "object") {
+      peerDisplayRef.current = null;
+      setPeerDisplay(null);
+      return;
+    }
+    const next = {
+      name: String(peer.name || peer.displayName || "").trim(),
+      phone: String(peer.phone || "").trim(),
+      photoUrl: String(peer.photoUrl || peer.avatarUrl || "").trim(),
+      avatarUrl: String(peer.avatarUrl || peer.photoUrl || "").trim(),
+      handle: String(peer.handle || peer.publicHandle || "").trim()
+    };
+    peerDisplayRef.current = next;
+    setPeerDisplay(next);
+  }, []);
+
+  useEffect(() => {
+    if (!isAudible) {
+      clearShowcaseBgmMediaSession();
+      return undefined;
+    }
+    syncShowcaseBgmMediaSession({
+      peer: peerDisplay,
+      styleConfig,
+      trackIndex: safeIndex,
+      visitSessionKey,
+      playing: true
+    });
+    return () => clearShowcaseBgmMediaSession();
+  }, [isAudible, styleConfig, safeIndex, visitSessionKey, playEpoch, audioPlaying, peerDisplay]);
+
   const bindStyleConfig = useCallback((config, opts = {}) => {
     const owner = opts.owner != null ? String(opts.owner) : "";
     /* 설정 화면이 BGM 소유 중이면 캐러셀/케이스함 바인딩이 선택 곡을 덮어쓰지 않음 */
@@ -773,6 +812,7 @@ export function ShowcaseBgmProvider({ children }) {
       canSkipTracks,
       setPlaybackPhase,
       bindStyleConfig,
+      bindBgmPeerDisplay,
       unlockFromUserGesture,
       unlockAudioGesture,
       previewInSettings,
@@ -801,6 +841,7 @@ export function ShowcaseBgmProvider({ children }) {
       canSkipTracks,
       setPlaybackPhase,
       bindStyleConfig,
+      bindBgmPeerDisplay,
       unlockFromUserGesture,
       unlockAudioGesture,
       previewInSettings,
@@ -827,6 +868,7 @@ export function useShowcaseBgm() {
       phase: "idle",
       styleConfig: null,
       bindStyleConfig: () => {},
+      bindBgmPeerDisplay: () => {},
       setPlaybackPhase: () => {},
       unlockFromUserGesture: () => {},
       unlockAudioGesture: () => {},

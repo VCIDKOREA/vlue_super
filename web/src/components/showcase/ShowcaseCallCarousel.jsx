@@ -103,7 +103,8 @@ export default function ShowcaseCallCarousel({
   callChromeSafe = false
 }) {
   const styleConfig = showcaseStyle || card?.showcaseStyle || null;
-  const { bindStyleConfig, setPlaybackPhase, styleConfig: playingStyleConfig } = useShowcaseBgm();
+  const { bindStyleConfig, bindBgmPeerDisplay, setPlaybackPhase, styleConfig: playingStyleConfig } =
+    useShowcaseBgm();
   const [index, setIndex] = useState(0);
   const startX = useRef(0);
   const startY = useRef(0);
@@ -192,6 +193,28 @@ export default function ShowcaseCallCarousel({
   muteForLiveCallRef.current = muteForLiveCall;
   const prevSuppressBgmRef = useRef(suppressBgm);
   const bgmFpRef = useRef("");
+
+  useEffect(() => {
+    if (suppressBgm) return;
+    bindBgmPeerDisplay({
+      name: card?.name || card?.displayName || "",
+      phone: card?.phone || incomingNumber || "",
+      photoUrl: card?.photoUrl || card?.avatarUrl || "",
+      handle: card?.publicHandle || card?.loginId || card?.handle || ""
+    });
+  }, [
+    suppressBgm,
+    bindBgmPeerDisplay,
+    incomingNumber,
+    card?.name,
+    card?.displayName,
+    card?.phone,
+    card?.photoUrl,
+    card?.avatarUrl,
+    card?.publicHandle,
+    card?.loginId,
+    card?.handle
+  ]);
 
   const leaveCarouselBgm = () => {
     if (suppressBgmRef.current) return;
