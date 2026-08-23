@@ -33,7 +33,8 @@ import {
   isVerifyDocIssuedWithinLimit,
   prepareLetteringVerifyDocFromFile
 } from "../lib/letteringBizcardVerification.js";
-import { writeAvatar, writeProfilePhoto } from "../lib/vlueAvatar.js";
+import { writeAvatar } from "../lib/vlueAvatar.js";
+import { readProfilePhotoAvatar } from "../lib/vlueAvatar.js";
 import {
   DIGITAL_CARD_ACTIVE_KEY,
   DCC_BROADCAST_CHANGED_EVENT,
@@ -67,9 +68,6 @@ export default function LetteringBizcardSettingsView({
   const [logoFileName, setLogoFileName] = useState("");
   const [logoPreview, setLogoPreview] = useState("");
   const [pendingLogo, setPendingLogo] = useState(null);
-  const [photoFileName, setPhotoFileName] = useState("");
-  const [photoPreview, setPhotoPreview] = useState("");
-  const [pendingPhoto, setPendingPhoto] = useState(null);
   const [titlePhotoFileName, setTitlePhotoFileName] = useState("");
   const [titlePhotoPreview, setTitlePhotoPreview] = useState("");
   const [pendingTitlePhoto, setPendingTitlePhoto] = useState(null);
@@ -77,8 +75,6 @@ export default function LetteringBizcardSettingsView({
   const [previewTick, setPreviewTick] = useState(0);
   const [toast, setToast] = useState("");
   const [logoError, setLogoError] = useState("");
-  const [photoError, setPhotoError] = useState("");
-  const [noProfilePhoto, setNoProfilePhoto] = useState(false);
   const [noTitlePhoto, setNoTitlePhoto] = useState(false);
   const [photoFocus, setPhotoFocus] = useState("top");
   const [noCompanyLogo, setNoCompanyLogo] = useState(false);
@@ -108,7 +104,7 @@ export default function LetteringBizcardSettingsView({
       .replace(/^@/, "");
     const isCeo = handle === "ceo";
     try {
-      /* 로컬이 비어 있으면 full snapshot 복원 (재설치·캐시 유실) */
+      /* 濡쒖뺄�씠 鍮꾩뼱 �엳�쑝硫� full snapshot 蹂듭썝 (�옱�꽕移샕룹틦�떆 �쑀�떎) */
       if (needsDigitalCardLocalRestore()) {
         await restoreDigitalCardFromServer({ force: true });
       } else {
@@ -143,7 +139,7 @@ export default function LetteringBizcardSettingsView({
         });
       }
     } catch {
-      /* 비로그인·오프라인 — 로컬만 */
+      /* 鍮꾨줈洹몄씤쨌�삤�봽�씪�씤 ��� 濡쒖뺄留� */
     }
 
     if (isCeo) readLetteringFixedIdentity();
@@ -172,11 +168,8 @@ export default function LetteringBizcardSettingsView({
     setAddressDetail(addr.detail);
     setLogoFileName(ed.logoFileName);
     setLogoPreview(ed.logoDataUrl);
-    setPhotoFileName(ed.photoFileName || "");
-    setPhotoPreview(ed.photoDataUrl || "");
     setTitlePhotoFileName(ed.titlePhotoFileName || "");
     setTitlePhotoPreview(ed.titlePhotoDataUrl || "");
-    setNoProfilePhoto(Boolean(ed.noProfilePhoto));
     setNoTitlePhoto(Boolean(ed.noTitlePhoto));
     setPhotoFocus(normalizePhotoFocus(ed.photoFocus));
     setNoCompanyLogo(Boolean(ed.noCompanyLogo));
@@ -194,13 +187,12 @@ export default function LetteringBizcardSettingsView({
     setOrgChangeApprovalStatus(ed.orgChangeApprovalStatus || "");
     setOrgChangePendingName(ed.orgChangePendingName || "");
     setPendingLogo(null);
-    setPendingPhoto(null);
     setPreviewTick((n) => n + 1);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    /* 로그인 시 full hydrate 된 로컬본 사용 — 설정 진입마다 full snapshot GET 금지 */
+    /* 濡쒓렇�씤 �떆 full hydrate �맂 濡쒖뺄蹂� �궗�슜 ��� �꽕�젙 吏꾩엯留덈떎 full snapshot GET 湲덉�� */
     fetchDigitalCardMeta({ lite: true }).then((meta) => {
       if (cancelled) return;
       if (meta.cardId) setCardId(meta.cardId);
@@ -266,9 +258,7 @@ export default function LetteringBizcardSettingsView({
   const previewCard = useMemo(() => {
     const draft = buildUserLetteringCard({ membershipTier });
     const address = combineLetteringBizcardAddress(addressRoad, addressDetail);
-    const photoUrl = noProfilePhoto
-      ? ""
-      : pendingPhoto?.previewUrl || pendingPhoto?.dataUrl || photoPreview || "";
+    const photoUrl = readProfilePhotoAvatar() || "";
     const titlePhotoUrl = noTitlePhoto
       ? ""
       : pendingTitlePhoto?.previewUrl || pendingTitlePhoto?.dataUrl || titlePhotoPreview || "";
@@ -283,7 +273,6 @@ export default function LetteringBizcardSettingsView({
       companyIntro,
       customBackText,
       address,
-      noProfilePhoto,
       noTitlePhoto,
       noCompanyLogo,
       noFax,
@@ -304,12 +293,9 @@ export default function LetteringBizcardSettingsView({
     addressDetail,
     logoPreview,
     pendingLogo,
-    photoPreview,
-    pendingPhoto,
     titlePhotoPreview,
     pendingTitlePhoto,
     photoFocus,
-    noProfilePhoto,
     noTitlePhoto,
     noCompanyLogo,
     noFax,
@@ -318,9 +304,9 @@ export default function LetteringBizcardSettingsView({
   ]);
 
   const applyLabel = useMemo(() => {
-    if (titleDeptNeedsSubmit) return "신청 · 전체적용";
-    if (isFirstApply) return "신청 · 전체적용";
-    return "전체적용";
+    if (titleDeptNeedsSubmit) return "�떊泥� 쨌 �쟾泥댁쟻�슜";
+    if (isFirstApply) return "�떊泥� 쨌 �쟾泥댁쟻�슜";
+    return "�쟾泥댁쟻�슜";
   }, [titleDeptNeedsSubmit, isFirstApply]);
 
   const showToast = (msg) => {
@@ -328,13 +314,6 @@ export default function LetteringBizcardSettingsView({
     window.setTimeout(() => setToast(""), 4200);
   };
 
-  const handleNoProfilePhotoChange = (checked) => {
-    setNoProfilePhoto(checked);
-    if (checked) {
-      setPhotoError("");
-      setPendingPhoto(null);
-    }
-  };
 
   const handleNoTitlePhotoChange = (checked) => {
     setNoTitlePhoto(checked);
@@ -388,7 +367,7 @@ export default function LetteringBizcardSettingsView({
     const preview = String(result.dataUrl || "").trim();
     const persist = String(result.persistUrl || result.dataUrl || "").trim();
     if (!preview) {
-      setLogoError("로고 이미지를 읽지 못했습니다.");
+      setLogoError("濡쒓퀬 �씠誘몄��瑜� �씫吏� 紐삵뻽�뒿�땲�떎.");
       return;
     }
     setPendingLogo({ dataUrl: persist || preview, fileName: result.fileName, previewUrl: preview });
@@ -398,28 +377,6 @@ export default function LetteringBizcardSettingsView({
     if (result.uploadWarning) setToast(result.uploadWarning);
   };
 
-  const handlePhotoPick = async (e) => {
-    if (noProfilePhoto) return;
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    setPhotoError("");
-    const result = await prepareLetteringPhotoFromFile(file);
-    if (!result.ok) {
-      setPhotoError(result.error);
-      return;
-    }
-    const preview = String(result.dataUrl || "").trim();
-    const persist = String(result.persistUrl || result.dataUrl || "").trim();
-    if (!preview) {
-      setPhotoError("사진을 읽지 못했습니다.");
-      return;
-    }
-    setPendingPhoto({ dataUrl: persist || preview, fileName: result.fileName, previewUrl: preview });
-    setPhotoPreview(preview);
-    setPhotoFileName(result.fileName);
-    setNoProfilePhoto(false);
-    if (result.uploadWarning) setToast(result.uploadWarning);
-  };
 
   const handleTitlePhotoPick = async (e) => {
     if (noTitlePhoto) return;
@@ -434,7 +391,7 @@ export default function LetteringBizcardSettingsView({
     const preview = String(result.dataUrl || "").trim();
     const persist = String(result.persistUrl || result.dataUrl || "").trim();
     if (!preview) {
-      setTitlePhotoError("사진을 읽지 못했습니다.");
+      setTitlePhotoError("�궗吏꾩쓣 �씫吏� 紐삵뻽�뒿�땲�떎.");
       return;
     }
     setPendingTitlePhoto({ dataUrl: persist || preview, fileName: result.fileName, previewUrl: preview });
@@ -453,40 +410,40 @@ export default function LetteringBizcardSettingsView({
     const trimmedEmail = clampLetteringBizcardEmail(email).trim();
 
     if (!trimmedEmail) {
-      showToast("이메일은 필수입니다. 입력해 주세요.");
+      showToast("�씠硫붿씪��� �븘�닔�엯�땲�떎. �엯�젰�빐 二쇱꽭�슂.");
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      showToast("올바른 이메일 형식을 입력해 주세요.");
+      showToast("�삱諛붾Ⅸ �씠硫붿씪 �삎�떇�쓣 �엯�젰�빐 二쇱꽭�슂.");
       return;
     }
 
     if (!isDccExposureComplete(exposureChoice)) {
-      showToast("검색·팔로우 노출 설정을 모두 지정해야 저장됩니다.");
+      showToast("寃��깋쨌�뙏濡쒖슦 �끂異� �꽕�젙�쓣 紐⑤몢 吏��젙�빐�빞 ����옣�맗�땲�떎.");
       return;
     }
 
     const exposureSaved = await saveDccExposure(exposureChoice);
     if (!exposureSaved.ok) {
-      showToast(exposureSaved.message || "노출 설정을 저장하지 못했습니다.");
+      showToast(exposureSaved.message || "�끂異� �꽕�젙�쓣 ����옣�븯吏� 紐삵뻽�뒿�땲�떎.");
       return;
     }
 
     if (titleDeptNeedsSubmit) {
       if (!verifyDocKind) {
-        const msg = "서류 종류를 선택해 주세요.";
+        const msg = "�꽌瑜� 醫낅쪟瑜� �꽑�깮�빐 二쇱꽭�슂.";
         setVerifyDocError(msg);
         showToast(msg);
         return;
       }
       if (!verifyDocDataUrl || !verifyDocName) {
-        const msg = "직책·부서 확인 서류를 첨부해 주세요. 첨부 없이는 명함 변경이 저장되지 않습니다.";
+        const msg = "吏곸콉쨌遺��꽌 �솗�씤 �꽌瑜섎�� 泥⑤���빐 二쇱꽭�슂. 泥⑤�� �뾾�씠�뒗 紐낇븿 蹂�寃쎌씠 ����옣�릺吏� �븡�뒿�땲�떎.";
         setVerifyDocError(msg);
         showToast(msg);
         return;
       }
       if (!verifyDocIssuedAt || !isVerifyDocIssuedWithinLimit(verifyDocIssuedAt)) {
-        const msg = "발급일 기준 1개월 이내 서류만 제출할 수 있습니다.";
+        const msg = "諛쒓툒�씪 湲곗�� 1媛쒖썡 �씠�궡 �꽌瑜섎쭔 �젣異쒗븷 �닔 �엳�뒿�땲�떎.";
         setVerifyDocError(msg);
         showToast(msg);
         return;
@@ -505,7 +462,6 @@ export default function LetteringBizcardSettingsView({
       addressRoad: road,
       addressDetail: detail,
       address: combineLetteringBizcardAddress(road, detail),
-      noProfilePhoto,
       noTitlePhoto,
       noCompanyLogo,
       noFax,
@@ -513,8 +469,9 @@ export default function LetteringBizcardSettingsView({
       photoFocus: normalizePhotoFocus(photoFocus),
       logoDataUrl: noCompanyLogo ? "" : pendingLogo?.dataUrl || logoPreview || "",
       logoFileName: noCompanyLogo ? "" : pendingLogo?.fileName || logoFileName || "",
-      photoDataUrl: noProfilePhoto ? "" : pendingPhoto?.dataUrl || photoPreview || "",
-      photoFileName: noProfilePhoto ? "" : pendingPhoto?.fileName || photoFileName || "",
+      noProfilePhoto: false,
+      photoDataUrl: "",
+      photoFileName: "",
       titlePhotoDataUrl: noTitlePhoto ? "" : pendingTitlePhoto?.dataUrl || titlePhotoPreview || "",
       titlePhotoFileName: noTitlePhoto ? "" : pendingTitlePhoto?.fileName || titlePhotoFileName || ""
     };
@@ -531,7 +488,7 @@ export default function LetteringBizcardSettingsView({
           docDataUrl: verifyDocDataUrl
         });
       } catch (e) {
-        setVerifyDocError(e?.message || "서류 제출에 실패했습니다.");
+        setVerifyDocError(e?.message || "�꽌瑜� �젣異쒖뿉 �떎�뙣�뻽�뒿�땲�떎.");
         return;
       }
       writeResult = writeLetteringBizcardEditable({
@@ -546,7 +503,7 @@ export default function LetteringBizcardSettingsView({
         titleDeptSubmittedAt: new Date().toISOString()
       });
       if (!writeResult?.ok) {
-        showToast(writeResult?.error || "저장에 실패했습니다. 다시 시도해 주세요.");
+        showToast(writeResult?.error || "����옣�뿉 �떎�뙣�뻽�뒿�땲�떎. �떎�떆 �떆�룄�빐 二쇱꽭�슂.");
         return;
       }
       setTitleDeptApprovalStatus(TITLE_DEPT_APPROVAL.PENDING);
@@ -559,7 +516,7 @@ export default function LetteringBizcardSettingsView({
           trimmedTitle || trimmedDept ? TITLE_DEPT_APPROVAL.APPROVED : titleDeptApprovalStatus
       });
       if (!writeResult?.ok) {
-        showToast(writeResult?.error || "저장에 실패했습니다. 다시 시도해 주세요.");
+        showToast(writeResult?.error || "����옣�뿉 �떎�뙣�뻽�뒿�땲�떎. �떎�떆 �떆�룄�빐 二쇱꽭�슂.");
         return;
       }
       if (trimmedTitle || trimmedDept) {
@@ -572,21 +529,12 @@ export default function LetteringBizcardSettingsView({
     const saved = writeResult.data || readLetteringBizcardEditable();
     setLogoPreview(saved.logoDataUrl || "");
     setLogoFileName(saved.logoFileName || "");
-    setPhotoPreview(saved.photoDataUrl || "");
-    setPhotoFileName(saved.photoFileName || "");
     setTitlePhotoPreview(saved.titlePhotoDataUrl || "");
     setTitlePhotoFileName(saved.titlePhotoFileName || "");
     setPendingLogo(null);
-    setPendingPhoto(null);
     setPendingTitlePhoto(null);
 
     try {
-      /* primary/feed/chat = 프로필 사진, card = 회사 로고 — 슬롯 혼용 금지 */
-      if (saved.photoDataUrl && !saved.noProfilePhoto) {
-        writeProfilePhoto(saved.photoDataUrl);
-      } else if (saved.noProfilePhoto) {
-        writeProfilePhoto("");
-      }
       if (saved.logoDataUrl && !saved.noCompanyLogo) {
         writeAvatar("card", saved.logoDataUrl);
       } else if (saved.noCompanyLogo) {
@@ -609,26 +557,23 @@ export default function LetteringBizcardSettingsView({
       ...appliedCard,
       designTemplate: tpl,
       logoUrl: saved.noCompanyLogo ? "" : saved.logoDataUrl || appliedCard.logoUrl || "",
-      photoUrl: saved.noProfilePhoto ? "" : saved.photoDataUrl || appliedCard.photoUrl || "",
+      photoUrl: readProfilePhotoAvatar() || appliedCard.photoUrl || "",
       titlePhotoUrl: saved.noTitlePhoto ? "" : saved.titlePhotoDataUrl || appliedCard.titlePhotoUrl || ""
     });
     if (!syncResult?.ok) {
       showToast(
         syncResult?.error
-          ? `기기에 저장되었습니다. 서버 동기화 실패: ${syncResult.error}`
-          : "기기에 저장되었습니다. 서버 동기화에 실패했습니다. 네트워크 확인 후 다시 전체적용해 주세요."
+          ? `湲곌린�뿉 ����옣�릺�뿀�뒿�땲�떎. �꽌踰� �룞湲고솕 �떎�뙣: ${syncResult.error}`
+          : "湲곌린�뿉 ����옣�릺�뿀�뒿�땲�떎. �꽌踰� �룞湲고솕�뿉 �떎�뙣�뻽�뒿�땲�떎. �꽕�듃�썙�겕 �솗�씤 �썑 �떎�떆 �쟾泥댁쟻�슜�빐 二쇱꽭�슂."
       );
       setPreviewTick((n) => n + 1);
       onApplied?.();
       return;
     }
     if (syncResult?.mediaError) {
-      showToast(`명함은 저장됐지만 사진 클라우드 업로드에 문제가 있었습니다: ${syncResult.mediaError}`);
+      showToast(`紐낇븿��� ����옣�릱吏�留� �궗吏� �겢�씪�슦�뱶 �뾽濡쒕뱶�뿉 臾몄젣媛� �엳�뿀�뒿�땲�떎: ${syncResult.mediaError}`);
     }
-    /* 업로드된 https 로 미리보기 갱신 */
-    if (syncResult?.photoUrl) {
-      setPhotoPreview(syncResult.photoUrl);
-    }
+    /* �뾽濡쒕뱶�맂 https 濡� 誘몃━蹂닿린 媛깆떊 */
     if (syncResult?.titlePhotoUrl) {
       setTitlePhotoPreview(syncResult.titlePhotoUrl);
     }
@@ -653,10 +598,10 @@ export default function LetteringBizcardSettingsView({
     setPreviewTick((n) => n + 1);
     showToast(
       titleDeptNeedsSubmit
-        ? "직책·부서 변경 신청이 접수되었습니다. 서류 확인 후 승인됩니다."
+        ? "吏곸콉쨌遺��꽌 蹂�寃� �떊泥��씠 �젒�닔�릺�뿀�뒿�땲�떎. �꽌瑜� �솗�씤 �썑 �듅�씤�맗�땲�떎."
         : isFirstApply
-          ? "전체적용되었습니다. 디지털인증명함 신청이 완료되었고, 통화 수신 화면에 반영됩니다."
-          : "전체적용되었습니다. 입력하신 내용이 디지털인증명함·쇼케이스에 반영되었습니다."
+          ? "�쟾泥댁쟻�슜�릺�뿀�뒿�땲�떎. �뵒吏��꽭�씤利앸챸�븿 �떊泥��씠 �셿猷뚮릺�뿀怨�, �넻�솕 �닔�떊 �솕硫댁뿉 諛섏쁺�맗�땲�떎."
+          : "�쟾泥댁쟻�슜�릺�뿀�뒿�땲�떎. �엯�젰�븯�떊 �궡�슜�씠 �뵒吏��꽭�씤利앸챸�븿쨌�눥耳��씠�뒪�뿉 諛섏쁺�릺�뿀�뒿�땲�떎."
     );
     onApplied?.();
   };
@@ -667,11 +612,11 @@ export default function LetteringBizcardSettingsView({
         <BackButton variant="inline" onBack={onBack} isDarkMode={isDarkMode} />
         <div className="min-w-0 flex-1">
           <p className={`text-[17px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
-            {isFirstApply ? "디지털인증명함 만들기" : "디지털 인증 명함"}
+            {isFirstApply ? "�뵒吏��꽭�씤利앸챸�븿 留뚮뱾湲�" : "�뵒吏��꽭 �씤利� 紐낇븿"}
           </p>
           <p className={`text-[11px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-            한 화면에서 입력하고 수신 UI를 바로 확인하세요.
-            {!isPaid ? " · 유료 회원만 통화 중 상대에게 표시됩니다." : ""}
+            �븳 �솕硫댁뿉�꽌 �엯�젰�븯怨� �닔�떊 UI瑜� 諛붾줈 �솗�씤�븯�꽭�슂.
+            {!isPaid ? " 쨌 �쑀猷� �쉶�썝留� �넻�솕 以� �긽����뿉寃� �몴�떆�맗�땲�떎." : ""}
           </p>
         </div>
       </div>
@@ -684,7 +629,7 @@ export default function LetteringBizcardSettingsView({
         >
           <div className="min-w-0">
             <p className={`text-[13px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
-              디지털인증 명함 송출
+              �뵒吏��꽭�씤利� 紐낇븿 �넚異�
             </p>
             <p
               className={`mt-0.5 text-[11px] font-medium ${
@@ -695,7 +640,7 @@ export default function LetteringBizcardSettingsView({
                     : "text-gray-500"
               }`}
             >
-              {dccBroadcastOn ? "켜짐" : "꺼짐"}
+              {dccBroadcastOn ? "耳쒖쭚" : "爰쇱쭚"}
             </p>
           </div>
           <input
@@ -704,7 +649,7 @@ export default function LetteringBizcardSettingsView({
             className="peer sr-only"
             checked={dccBroadcastOn}
             aria-checked={dccBroadcastOn}
-            aria-label="디지털인증명함 쇼케이스 송출"
+            aria-label="�뵒吏��꽭�씤利앸챸�븿 �눥耳��씠�뒪 �넚異�"
             onChange={(e) => {
               const next = e.target.checked;
               setDccBroadcastOn(next);
@@ -750,13 +695,6 @@ export default function LetteringBizcardSettingsView({
           pendingLogo={pendingLogo}
           onLogoPick={handleLogoPick}
           logoError={logoError}
-          photoPreview={photoPreview}
-          photoFileName={photoFileName}
-          pendingPhoto={pendingPhoto}
-          onPhotoPick={handlePhotoPick}
-          photoError={photoError}
-          noProfilePhoto={noProfilePhoto}
-          setNoProfilePhoto={handleNoProfilePhotoChange}
           photoFocus={photoFocus}
           setPhotoFocus={setPhotoFocus}
           titlePhotoPreview={titlePhotoPreview}
@@ -798,7 +736,7 @@ export default function LetteringBizcardSettingsView({
         />
         {cardId ? (
           <p className={`mt-3 text-center text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-            카드 ID · {cardId}
+            移대뱶 ID 쨌 {cardId}
           </p>
         ) : null}
       </div>

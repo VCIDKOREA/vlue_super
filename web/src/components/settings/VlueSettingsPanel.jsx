@@ -13,7 +13,13 @@ import {
   writeDisplayNicknames,
   VLUE_NICKNAME_MAX
 } from "../../lib/memberCardStorage.js";
-import { fileToFittedAvatarDataUrl, writeAvatar } from "../../lib/vlueAvatar.js";
+import { readProfilePhotoAvatar, writeProfilePhoto } from "../../lib/vlueAvatar.js";
+import { ImagePlus, Upload } from "lucide-react";
+import {
+  LETTERING_PHOTO_RULES,
+  prepareLetteringPhotoFromFile
+} from "../../lib/letteringBizcardStorage.js";
+
 import {
   SettingsSection,
   SettingsDivider,
@@ -46,6 +52,113 @@ const BLOCKED_USER_DIRECTORY = [
   { id: "u-aron", name: "ARON", handle: "@aron" },
   { id: "u-hana", name: "하나", handle: "@hana" }
 ];
+
+
+function ProfilePhotoManageBlock({ isDarkMode, showSettingNotice }) {
+  const inputRef = useRef(null);
+  const [preview, setPreview] = useState(() => readProfilePhotoAvatar());
+  const [fileName, setFileName] = useState("");
+  const [error, setError] = useState("");
+  const [noPhoto, setNoPhoto] = useState(() => !readProfilePhotoAvatar());
+
+  useEffect(() => {
+    const refresh = () => {
+      const url = readProfilePhotoAvatar();
+      setPreview(url);
+      setNoPhoto(!url);
+    };
+    window.addEventListener("vlue-avatar-changed", refresh);
+    return () => window.removeEventListener("vlue-avatar-changed", refresh);
+  }, []);
+
+  const tile = isDarkMode
+    ? "flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/5"
+    : "flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50";
+  const btnCls = noPhoto
+    ? "inline-flex cursor-not-allowed items-center gap-1.5 rounded-xl bg-slate-400 px-3 py-2 text-[11px] font-bold text-white opacity-60"
+    : "inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-[11px] font-bold text-white active:scale-[0.99]";
+  const checkCls = isDarkMode
+    ? "mt-2 flex w-full cursor-pointer items-center gap-2 text-left text-[11px] font-semibold text-gray-300"
+    : "mt-2 flex w-full cursor-pointer items-center gap-2 text-left text-[11px] font-semibold text-slate-600";
+
+  const onPick = async (e) => {
+    if (noPhoto) return;
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setError("");
+    const result = await prepareLetteringPhotoFromFile(file);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    const previewUrl = String(result.dataUrl || "").trim();
+    const persist = String(result.persistUrl || result.dataUrl || "").trim();
+    if (!previewUrl) {
+      setError("사진을 불러오지 못했습니다.");
+      return;
+    }
+    writeProfilePhoto(persist || previewUrl);
+    setPreview(previewUrl);
+    setFileName(result.fileName);
+    setNoPhoto(false);
+    showSettingNotice?.("프로필 사진이 변경되었습니다.");
+  };
+
+  return (
+    <div className="mb-4">
+      <p className={`text-[11px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>프로필 사진</p>
+      <p className={`mt-0.5 text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+        {LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB · 초과 시 자동 맞춤 · DCC 미사용 회원도 등록 가능
+      </p>
+      <div className={`mt-2 flex items-center gap-3${noPhoto ? " opacity-40" : ""}`}>
+        <span className={tile}>
+          {preview && !noPhoto ? (
+            <img src={preview} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <ImagePlus className={`h-6 w-6 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <button type="button" disabled={noPhoto} onClick={() => inputRef.current?.click()} className={btnCls}>
+            <Upload className="h-3.5 w-3.5" />
+            {preview && !noPhoto ? "사진 변경" : "사진 업로드"}
+          </button>
+          <input ref={inputRef} type="file" accept={LETTERING_PHOTO_RULES.accept} onChange={onPick} className="hidden" disabled={noPhoto} />
+        </div>
+      </div>
+      {fileName && !noPhoto ? (
+        <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{fileName}</p>
+      ) : null}
+      {error ? <p className="mt-1 text-[10px] font-bold text-red-500">{error}</p> : null}
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={noPhoto}
+        className={checkCls}
+        onClick={() => {
+          const next = !noPhoto;
+          setNoPhoto(next);
+          if (next) {
+            writeProfilePhoto("");
+            setPreview("");
+            setFileName("");
+            setError("");
+            showSettingNotice?.("프로필 사진을 사용하지 않습니다.");
+          }
+        }}
+      >
+        <span
+          className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${
+            noPhoto ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300 bg-white"
+          }`}
+        >
+          {noPhoto ? "✓" : ""}
+        </span>
+        사진 업로드 없음
+      </button>
+    </div>
+  );
+}
 
 const APP_VERSION = "1.0.0";
 
@@ -194,7 +307,6 @@ export default function VlueSettingsPanel({
   const [feedNickInput, setFeedNickInput] = useState("");
   const [statusInput, setStatusInput] = useState("");
   const [showIdCopied, setShowIdCopied] = useState(false);
-  const avatarInputRef = useRef(null);
 
   useEffect(() => {
     if (subView === "profileManage") {
@@ -229,32 +341,7 @@ export default function VlueSettingsPanel({
         isDarkMode={isDarkMode}
       >
         <div className={`rounded-2xl border p-4 ${boxClass}`}>
-          <input
-            ref={avatarInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              try {
-                writeAvatar("primary", await fileToFittedAvatarDataUrl(f));
-                showSettingNotice?.("프로필 사진이 변경되었습니다.");
-              } catch {
-                showSettingNotice?.("사진을 불러오지 못했습니다.");
-              }
-              e.target.value = "";
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => avatarInputRef.current?.click()}
-            className={`w-full rounded-xl border py-2.5 text-[13px] font-bold ${
-              isDarkMode ? "border-white/15 bg-white/10 text-gray-200" : "border-gray-200 bg-gray-50 text-gray-800"
-            }`}
-          >
-            프로필 사진 변경
-          </button>
+          <ProfilePhotoManageBlock isDarkMode={isDarkMode} showSettingNotice={showSettingNotice} />
           <label className={`mt-3 block text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
             상태메시지
             <input
