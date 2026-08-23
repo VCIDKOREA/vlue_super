@@ -342,6 +342,7 @@ export default function VlueSettingsPanel({
       >
         <div className={`rounded-2xl border p-4 ${boxClass}`}>
           <ProfilePhotoManageBlock isDarkMode={isDarkMode} showSettingNotice={showSettingNotice} />
+          <label className={`mt-3 block text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
             상태메시지
             <input
               type="text"
