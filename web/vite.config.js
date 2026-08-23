@@ -62,13 +62,21 @@ export default defineConfig(({ mode }) => {
       exclude: ["tesseract.js", "@portone/browser-sdk"]
     },
     resolve: {
-      alias: {
-        "@vlue/shared": resolve(__dirname, "../packages/shared/src/index.ts"),
-        "@vlue/shared/signup/reservedIds": resolve(
-          __dirname,
-          "../packages/shared/src/signup/reservedIds.js"
-        )
-      }
+      alias: [
+        {
+          find: "@vlue/shared/policy/minor-signup",
+          replacement: resolve(__dirname, "../packages/shared/src/policy/minorSignupPolicy.js")
+        },
+        {
+          find: "@vlue/shared/signup/reservedIds",
+          replacement: resolve(__dirname, "../packages/shared/src/signup/reservedIds.js")
+        },
+        /* 루트만 매칭 — 서브패스가 index.ts/… 로 붙지 않도록 정확 일치 */
+        {
+          find: /^@vlue\/shared$/,
+          replacement: resolve(__dirname, "../packages/shared/src/index.ts")
+        }
+      ]
     },
     build: {
       outDir: "dist",
