@@ -1,8 +1,10 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Upload } from "lucide-react";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
+import LetteringBizcardScaledPreview from "./LetteringBizcardScaledPreview.jsx";
 import LetteringBizcardAddressField from "./LetteringBizcardAddressField.jsx";
 import LetteringBizcardTitleDeptVerifySection from "./LetteringBizcardTitleDeptVerifySection.jsx";
+import LetteringBizcardOrgChangeSection from "./LetteringBizcardOrgChangeSection.jsx";
 import {
   LETTERING_BIZCARD_EMAIL_MAX,
   LETTERING_BIZCARD_EMAIL_WARN,
@@ -11,35 +13,60 @@ import {
   clampLetteringBizcardEmail,
   isLetteringBizcardEmailLong,
   prepareLetteringLogoFromFile,
-  prepareLetteringPhotoFromFile
+  prepareLetteringPhotoFromFile,
+  PHOTO_FOCUS_OPTIONS,
+  normalizePhotoFocus,
+  photoFocusToCss
 } from "../lib/letteringBizcardStorage.js";
+import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 
 function Field({ label, hint, children, isDarkMode }) {
   const labelCls = isDarkMode ? "text-[11px] font-black text-gray-100" : "text-[11px] font-black text-gray-900";
   const hintCls = isDarkMode ? "mt-0.5 text-[10px] text-gray-400" : "mt-0.5 text-[10px] text-gray-500";
+  /* div ��� �궡遺� 泥댄겕諛뺤뒪 label 怨� 以묒꺽�릺硫� �겢由��씠 癒뱁넻�씠 �맖 */
   return (
-    <label className="block">
+    <div className="block">
       <span className={labelCls}>{label}</span>
       {hint ? <p className={hintCls}>{hint}</p> : null}
       {children}
-    </label>
+    </div>
   );
 }
 
 function OmitCheckbox({ checked, onChange, label, isDarkMode }) {
   const checkCls = isDarkMode
-    ? "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-gray-300"
-    : "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-slate-600";
+    ? "mt-2 flex w-full cursor-pointer items-center gap-2 text-left text-[11px] font-semibold text-gray-300"
+    : "mt-2 flex w-full cursor-pointer items-center gap-2 text-left text-[11px] font-semibold text-slate-600";
   return (
-    <label className={checkCls}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-      />
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      className={checkCls}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onChange(!checked);
+      }}
+    >
+      <span
+        aria-hidden
+        className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${
+          checked
+            ? "border-blue-600 bg-blue-600 text-white"
+            : isDarkMode
+              ? "border-gray-500 bg-transparent"
+              : "border-gray-300 bg-white"
+        }`}
+      >
+        {checked ? (
+          <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M2.5 6.2 4.8 8.5 9.5 3.5" />
+          </svg>
+        ) : null}
+      </span>
       {label}
-    </label>
+    </button>
   );
 }
 
@@ -52,7 +79,9 @@ function ImageUploadTile({
   disabled = false,
   omitChecked = false,
   onOmitChange,
-  omitLabel
+  omitLabel,
+  objectPosition,
+  objectFit = "cover"
 }) {
   const inputRef = useRef(null);
   const scrollSnapshot = useRef({ top: 0, el: null });
@@ -81,6 +110,7 @@ function ImageUploadTile({
   const openPicker = useCallback(
     (e) => {
       e.preventDefault();
+      e.stopPropagation();
       if (disabled || omitChecked) return;
       captureScroll();
       const onWindowFocus = () => {
@@ -113,16 +143,18 @@ function ImageUploadTile({
     : `inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold ${
         isDarkMode ? "bg-blue-600 text-white" : "bg-blue-600 text-white"
       } active:scale-[0.99]`;
-  const checkCls = isDarkMode
-    ? "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-gray-300"
-    : "mt-2 flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-slate-600";
 
   return (
     <div>
-      <div className={`flex items-center gap-3${disabled || omitChecked ? " pointer-events-none" : ""}`}>
+      <div className="flex items-center gap-3">
         <span className={tile}>
           {preview && !omitChecked ? (
-            <img src={preview} alt="" className="h-full w-full object-cover" />
+            <img
+              src={preview}
+              alt=""
+              className={`h-full w-full ${objectFit === "contain" ? "object-contain" : "object-cover"}`}
+              style={objectPosition ? { objectPosition } : undefined}
+            />
           ) : (
             <ImagePlus className={`h-6 w-6 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
           )}
@@ -145,22 +177,51 @@ function ImageUploadTile({
         </div>
       </div>
       {onOmitChange ? (
-        <label className={checkCls}>
-          <input
-            type="checkbox"
-            checked={omitChecked}
-            onChange={(e) => onOmitChange(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          {omitLabel}
-        </label>
+        <OmitCheckbox checked={omitChecked} onChange={onOmitChange} label={omitLabel} isDarkMode={isDarkMode} />
       ) : null}
     </div>
   );
 }
 
+function PhotoFocusBar({ photoFocus, setPhotoFocus, isDarkMode }) {
+  return (
+    <div className="mt-2" role="tablist" aria-label="諛곌꼍 �궗吏� �쐞移�">
+      <p className={`mb-1.5 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+        諛곌꼍 �궗吏� �쐞移� 쨌 �뼹援댁씠 �옒由щ㈃ �긽�떒/�븯�떒�쑝濡� 留욎떠 二쇱꽭�슂
+      </p>
+      <div
+        className={`grid grid-cols-3 gap-1 rounded-xl p-1 ${
+          isDarkMode ? "bg-slate-900/80" : "bg-gray-100"
+        }`}
+      >
+        {PHOTO_FOCUS_OPTIONS.map((opt) => {
+          const active = normalizePhotoFocus(photoFocus) === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={`rounded-lg px-2 py-2 text-[11px] font-bold transition ${
+                active
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : isDarkMode
+                    ? "text-gray-300 active:bg-white/10"
+                    : "text-slate-600 active:bg-white"
+              }`}
+              onClick={() => setPhotoFocus?.(opt.id)}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
- * 디지털 인증명함 — 한 화면 입력 + 실시간 수신 UI 미리보기
+ * �뵒吏��꽭 �씤利앸챸�븿 ��� �븳 �솕硫� �엯�젰 + �떎�떆媛� �닔�떊 UI 誘몃━蹂닿린
  */
 export default function LetteringBizcardQuickBuilder({
   fixed = {},
@@ -189,13 +250,16 @@ export default function LetteringBizcardQuickBuilder({
   pendingLogo,
   onLogoPick,
   logoError,
-  photoPreview,
-  photoFileName,
-  pendingPhoto,
-  onPhotoPick,
-  photoError,
-  noProfilePhoto,
-  setNoProfilePhoto,
+
+  photoFocus = "top",
+  setPhotoFocus,
+  titlePhotoPreview,
+  titlePhotoFileName,
+  pendingTitlePhoto,
+  onTitlePhotoPick,
+  titlePhotoError,
+  noTitlePhoto,
+  setNoTitlePhoto,
   noCompanyLogo,
   setNoCompanyLogo,
   noFax,
@@ -211,11 +275,27 @@ export default function LetteringBizcardQuickBuilder({
   setVerifyDocIssuedAt,
   onVerifyDocPick,
   verifyDocError,
+  orgChangeApprovalStatus = "",
+  orgChangePendingName = "",
+  onOrgChangeSubmitted,
+  onOrgChangeToast,
+  exposureSlot = null,
   onApply,
-  applyLabel = "적용",
+  applyLabel = "�쟾泥댁쟻�슜",
   toast = ""
 }) {
   const [previewFace, setPreviewFace] = useState("front");
+  const { setPlaybackPhase } = useShowcaseBgm();
+
+  /* 紐낇븿 �꽕�젙��� �닔�떊 UI 誘몃━蹂닿린留� ��� �눥耳��씠�뒪 BGM��� �옱�깮�븯吏� �븡�쓬 */
+  useEffect(() => {
+    setPlaybackPhase("idle", { owner: "settings", steal: true });
+    return () => {
+      setPlaybackPhase("idle", { steal: true });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only
+  }, []);
+
   const inputBase = isDarkMode
     ? "mt-1.5 w-full rounded-xl border border-white/15 bg-slate-900/90 px-3 py-2.5 text-[13px] text-gray-100 outline-none focus:border-blue-400"
     : "mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[13px] text-[#0f172a] outline-none focus:border-blue-400";
@@ -230,80 +310,141 @@ export default function LetteringBizcardQuickBuilder({
     <div className="lbq-builder space-y-4">
       <div className={panel}>
         <p className={`mb-2 text-[12px] font-black ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
-          수신 화면 미리보기
+          �닔�떊 �솕硫� 誘몃━蹂닿린
         </p>
-        <div className="lbq-preview-phone mx-auto max-w-[320px] rounded-[22px] border border-slate-200/80 bg-slate-950 shadow-lg">
-          <LetteringDigitalReception
-            card={previewCard}
-            verified
-            embeddedInPush
-            previewMode
-            face={previewFace}
-            onFaceChange={setPreviewFace}
-          />
+        <div className="lbq-preview-scale mx-auto w-full max-w-[240px]">
+          <LetteringBizcardScaledPreview isDarkMode={isDarkMode} designWidth={300}>
+            <div className="lbq-preview-phone lbq-preview-phone--compact rounded-[22px] border border-slate-200/80 bg-slate-950 shadow-lg">
+              <LetteringDigitalReception
+                card={previewCard}
+                verified
+                embeddedInPush
+                previewMode
+                face={previewFace}
+                onFaceChange={setPreviewFace}
+              />
+            </div>
+          </LetteringBizcardScaledPreview>
         </div>
         <p className={`mt-2 text-center text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-          통화 중 상대방에게 이렇게 표시됩니다 · 앞면/뒷면 탭으로 확인
+          �넻�솕 以� �긽��� �몴�떆 쨌 �븵硫�/�뮮硫� �꺆
         </p>
       </div>
 
       <div className={`grid gap-2 sm:grid-cols-3 ${identityChip}`}>
         <div>
-          <p className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>회사</p>
+          <p className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>�긽�샇</p>
           <p className={`truncate text-[12px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
-            {fixed.organization || "—"}
+            {fixed.organization || "���"}
           </p>
         </div>
         <div>
-          <p className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>이름</p>
+          <p className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>�꽦�븿</p>
           <p className={`truncate text-[12px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
-            {fixed.name || "—"}
+            {fixed.name || "���"}
           </p>
+          <p className={`mt-0.5 text-[9px] font-medium ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>�닔�젙 遺덇��</p>
         </div>
         <div>
-          <p className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>전화</p>
+          <p className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>�쟾�솕</p>
           <p className={`truncate text-[12px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
-            {fixed.phone || "—"}
+            {fixed.phone || "���"}
           </p>
         </div>
       </div>
 
+      {onOrgChangeSubmitted ? (
+        <LetteringBizcardOrgChangeSection
+          isDarkMode={isDarkMode}
+          inputBase={inputBase}
+          currentOrganization={fixed.organization || ""}
+          approvalStatus={orgChangeApprovalStatus}
+          pendingName={orgChangePendingName}
+          onSubmitted={onOrgChangeSubmitted}
+          onToast={onOrgChangeToast}
+        />
+      ) : null}
+
+      {exposureSlot}
+
       <div className={`${panel} space-y-4`}>
-        <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>프로필 · 이미지</p>
-        <Field label="프로필 사진" hint={`${LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB`} isDarkMode={isDarkMode}>
+        <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>�봽濡쒗븘 쨌 �씠誘몄��</p>
+        <Field
+          label="�봽濡쒗븘 �궗吏�"
+          hint={`${LETTERING_PHOTO_RULES.acceptLabel} 쨌 理쒕�� 1MB 쨌 珥덇낵 �떆 �옄�룞 留욎땄 쨌 踰덊샇 �븵�뿉 �몴�떆`}
+          isDarkMode={isDarkMode}
+        >
           <ImageUploadTile
-            preview={pendingPhoto?.dataUrl || photoPreview}
-            placeholder="사진 업로드"
+            preview={pendingPhoto?.previewUrl || pendingPhoto?.dataUrl || photoPreview}
+            placeholder="�궗吏� �뾽濡쒕뱶"
             onPick={onPhotoPick}
             acceptLabel={LETTERING_PHOTO_RULES.accept}
             isDarkMode={isDarkMode}
             omitChecked={noProfilePhoto}
             onOmitChange={setNoProfilePhoto}
-            omitLabel="사진 업로드 없음"
+            omitLabel="�궗吏� �뾽濡쒕뱶 �뾾�쓬"
           />
           {photoFileName && !noProfilePhoto ? (
             <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
               {photoFileName}
-              {pendingPhoto ? " (미적용)" : ""}
+              {pendingPhoto ? " (誘몄쟻�슜)" : ""}
             </p>
           ) : null}
           {photoError ? <p className="mt-1 text-[10px] font-bold text-red-500">{photoError}</p> : null}
         </Field>
-        <Field label="회사 로고" hint={`${LETTERING_LOGO_RULES.acceptLabel} · 512KB 이하`} isDarkMode={isDarkMode}>
+        <Field
+          label="DCC ����씠��� �궗吏�"
+          hint={`${LETTERING_PHOTO_RULES.acceptLabel} 쨌 理쒕�� 1MB 쨌 珥덇낵 �떆 �옄�룞 留욎땄 쨌 踰덊샇 �븵 �궗吏꾧낵 �뵲濡� �꽕�젙`}
+          isDarkMode={isDarkMode}
+        >
           <ImageUploadTile
-            preview={pendingLogo?.dataUrl || logoPreview}
-            placeholder="로고 업로드"
+            preview={pendingTitlePhoto?.previewUrl || pendingTitlePhoto?.dataUrl || titlePhotoPreview}
+            placeholder="����씠��� �뾽濡쒕뱶"
+            onPick={onTitlePhotoPick}
+            acceptLabel={LETTERING_PHOTO_RULES.accept}
+            isDarkMode={isDarkMode}
+            omitChecked={noTitlePhoto}
+            onOmitChange={setNoTitlePhoto}
+            omitLabel="DCC ����씠��� �궗吏� �뾾�쓬"
+            objectPosition={photoFocusToCss(photoFocus)}
+          />
+          {!noTitlePhoto ? (
+            <PhotoFocusBar photoFocus={photoFocus} setPhotoFocus={setPhotoFocus} isDarkMode={isDarkMode} />
+          ) : null}
+          {!noTitlePhoto &&
+          !(pendingTitlePhoto?.previewUrl || pendingTitlePhoto?.dataUrl || titlePhotoPreview) ? (
+            <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+              鍮꾩썙 �몢硫� �봽濡쒗븘 �궗吏꾩씠 ����씠����뿉 �궗�슜�맗�땲�떎
+            </p>
+          ) : null}
+          {titlePhotoFileName && !noTitlePhoto ? (
+            <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              {titlePhotoFileName}
+              {pendingTitlePhoto ? " (誘몄쟻�슜)" : ""}
+            </p>
+          ) : null}
+          {titlePhotoError ? <p className="mt-1 text-[10px] font-bold text-red-500">{titlePhotoError}</p> : null}
+        </Field>
+        <Field
+          label="�쉶�궗 濡쒓퀬"
+          hint={`${LETTERING_LOGO_RULES.acceptLabel} 쨌 512KB �씠�븯 쨌 珥덇낵 �떆 �옄�룞 留욎땄`}
+          isDarkMode={isDarkMode}
+        >
+          <ImageUploadTile
+            preview={pendingLogo?.previewUrl || pendingLogo?.dataUrl || logoPreview}
+            placeholder="濡쒓퀬 �뾽濡쒕뱶"
             onPick={onLogoPick}
             acceptLabel={LETTERING_LOGO_RULES.accept}
             isDarkMode={isDarkMode}
             omitChecked={noCompanyLogo}
             onOmitChange={setNoCompanyLogo}
-            omitLabel="회사 로고 없음"
+            omitLabel="�쉶�궗 濡쒓퀬 �뾾�쓬"
+            objectFit="contain"
           />
           {logoFileName && !noCompanyLogo ? (
             <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
               {logoFileName}
-              {pendingLogo ? " (미적용)" : ""}
+              {pendingLogo ? " (誘몄쟻�슜)" : ""}
             </p>
           ) : null}
           {logoError ? <p className="mt-1 text-[10px] font-bold text-red-500">{logoError}</p> : null}
@@ -311,10 +452,10 @@ export default function LetteringBizcardQuickBuilder({
       </div>
 
       <div className={`${panel} grid gap-3 sm:grid-cols-2`}>
-        <Field label="직책" isDarkMode={isDarkMode}>
+        <Field label="吏곸콉" isDarkMode={isDarkMode}>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={inputBase} />
         </Field>
-        <Field label="부서" isDarkMode={isDarkMode}>
+        <Field label="遺��꽌" isDarkMode={isDarkMode}>
           <input type="text" value={department} onChange={(e) => setDepartment(e.target.value)} className={inputBase} />
         </Field>
         <LetteringBizcardTitleDeptVerifySection
@@ -330,7 +471,7 @@ export default function LetteringBizcardQuickBuilder({
           docError={verifyDocError}
           needsSubmit={titleDeptNeedsSubmit}
         />
-        <Field label="이메일" isDarkMode={isDarkMode}>
+        <Field label="�씠硫붿씪 (�븘�닔)" hint="紐낇븿�뿉 諛섎뱶�떆 �몴�떆�맗�땲�떎" isDarkMode={isDarkMode}>
           <input
             type="email"
             value={email}
@@ -338,36 +479,40 @@ export default function LetteringBizcardQuickBuilder({
             onChange={(e) => setEmail(clampLetteringBizcardEmail(e.target.value))}
             className={inputBase}
             autoComplete="email"
+            required
+            placeholder="�씠硫붿씪�쓣 �엯�젰�븷 �닔 �엳�뒿�땲�떎."
           />
           {isLetteringBizcardEmailLong(email) ? (
             <p className="mt-1 text-[10px] font-bold text-amber-600">
-              이메일이 깁니다({email.length}/{LETTERING_BIZCARD_EMAIL_MAX}자). 미리보기를 확인하세요.
+              �씠硫붿씪�씠 源곷땲�떎({email.length}/{LETTERING_BIZCARD_EMAIL_MAX}�옄). 誘몃━蹂닿린瑜� �솗�씤�븯�꽭�슂.
             </p>
           ) : email.length >= LETTERING_BIZCARD_EMAIL_WARN ? (
             <p className={`mt-1 text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              {email.length}/{LETTERING_BIZCARD_EMAIL_MAX}자
+              {email.length}/{LETTERING_BIZCARD_EMAIL_MAX}�옄
             </p>
           ) : null}
         </Field>
-        <Field label="홈페이지" isDarkMode={isDarkMode}>
+        <Field label="�쎒�궗�씠�듃 (�꽑�깮)" hint="�엯�젰�븯吏� �븡�쑝硫� 紐낇븿�뿉 �몴�떆�릺吏� �븡�뒿�땲�떎" isDarkMode={isDarkMode}>
           <input
             type="text"
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
             disabled={noWebsite}
             className={`${inputBase}${noWebsite ? " cursor-not-allowed opacity-50" : ""}`}
+            placeholder="�쎒�궗�씠�듃瑜� �엯�젰�븷 �닔 �엳�뒿�땲�떎."
           />
-          <OmitCheckbox checked={noWebsite} onChange={setNoWebsite} label="홈페이지 없음" isDarkMode={isDarkMode} />
+          <OmitCheckbox checked={noWebsite} onChange={setNoWebsite} label="�쎒�궗�씠�듃 �뾾�쓬" isDarkMode={isDarkMode} />
         </Field>
-        <Field label="팩스" isDarkMode={isDarkMode}>
+        <Field label="�뙥�뒪 (�꽑�깮)" hint="�엯�젰�븯吏� �븡�쑝硫� 紐낇븿�뿉 �몴�떆�릺吏� �븡�뒿�땲�떎" isDarkMode={isDarkMode}>
           <input
             type="tel"
             value={fax}
             onChange={(e) => setFax(e.target.value)}
             disabled={noFax}
             className={`${inputBase}${noFax ? " cursor-not-allowed opacity-50" : ""}`}
+            placeholder="�뙥�뒪瑜� �엯�젰�븷 �닔 �엳�뒿�땲�떎."
           />
-          <OmitCheckbox checked={noFax} onChange={setNoFax} label="팩스 없음" isDarkMode={isDarkMode} />
+          <OmitCheckbox checked={noFax} onChange={setNoFax} label="�뙥�뒪 �뾾�쓬" isDarkMode={isDarkMode} />
         </Field>
         <LetteringBizcardAddressField
           addressRoad={addressRoad}
@@ -378,7 +523,7 @@ export default function LetteringBizcardQuickBuilder({
           inputBase={inputBase}
         />
         <div className="sm:col-span-2">
-          <Field label="소개 (앞면 프로필)" hint="통화 수신 시 앞면 탭에 표시됩니다" isDarkMode={isDarkMode}>
+          <Field label="�냼媛� (�븵硫� �봽濡쒗븘)" hint="�넻�솕 �닔�떊 �떆 �븵硫� �꺆�뿉 �몴�떆�맗�땲�떎" isDarkMode={isDarkMode}>
             <textarea
               value={companyIntro}
               onChange={(e) => setCompanyIntro(e.target.value)}
@@ -388,13 +533,13 @@ export default function LetteringBizcardQuickBuilder({
           </Field>
         </div>
         <div className="sm:col-span-2">
-          <Field label="추가 설명 (뒷면)" hint="통화 수신 시 뒷면 연락처 하단에 표시됩니다" isDarkMode={isDarkMode}>
+          <Field label="異붽�� �꽕紐� (�뮮硫�)" hint="�넻�솕 �닔�떊 �떆 �뮮硫� �뿰�씫泥� �븯�떒�뿉 �몴�떆�맗�땲�떎" isDarkMode={isDarkMode}>
             <textarea
               value={customBackText}
               onChange={(e) => setCustomBackText(e.target.value)}
               rows={3}
               className={inputBase}
-              placeholder="예: 상담 가능 시간, 방문 안내, 프로모션 문구 등"
+              placeholder="�삁: �긽�떞 媛��뒫 �떆媛�, 諛⑸Ц �븞�궡, �봽濡쒕え�뀡 臾멸뎄 �벑"
             />
           </Field>
         </div>
@@ -408,9 +553,18 @@ export default function LetteringBizcardQuickBuilder({
         {applyLabel}
       </button>
       {toast ? (
-        <p className={`text-center text-[11px] font-bold ${isDarkMode ? "text-cyan-300" : "text-blue-600"}`}>
-          {toast}
-        </p>
+        <div
+          className={`rounded-2xl border px-3 py-3 text-center ${
+            isDarkMode
+              ? "border-emerald-400/30 bg-emerald-950/40 text-emerald-200"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <p className="text-[12px] font-black">�쟾泥댁쟻�슜 �셿猷�</p>
+          <p className="mt-1 text-[11px] font-semibold leading-relaxed">{toast}</p>
+        </div>
       ) : null}
     </div>
   );
