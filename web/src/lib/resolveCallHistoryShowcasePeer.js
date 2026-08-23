@@ -10,6 +10,7 @@ import { createDefaultShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
 import { resolveVlueShowcaseByPhone } from "./resolveVlueShowcaseByPhone.js";
 import { isNationalAgencyDcpCard } from "./nationalAgencyDcpClient.js";
 import { applyShowcaseStyleToCard } from "./showcase/applyShowcaseStyleToCard.js";
+import { peerShowcaseBroadcastOn } from "./peerShowcaseContent.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -49,10 +50,18 @@ function mergeCardFromProfile(baseCard, profRes) {
   });
 }
 
-function normalizeReplayStyle(style, tier) {
-  const base = style && typeof style === "object" ? style : createDefaultShowcaseStyle();
-  if (!isPaidLetteringTier(tier)) return base;
-  return { ...base, includeDigitalCard: true };
+function authOnlyReplayStyle() {
+  return {
+    ...createDefaultShowcaseStyle(),
+    includeDigitalCard: false,
+    verifiedBadgeOn: true
+  };
+}
+
+/** 라이브 스타일 그대로 — 유료라도 includeDigitalCard 를 강제로 켜지 않음(송출 OFF 유지) */
+function normalizeReplayStyle(style) {
+  if (!style || typeof style !== "object") return authOnlyReplayStyle();
+  return style;
 }
 
 /**
@@ -76,7 +85,7 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
 
   const userId = String(byPhone.card?.userId || "").trim();
   if (!UUID_RE.test(userId)) {
-    const style = createDefaultShowcaseStyle();
+    const style = authOnlyReplayStyle();
     const tier = byPhone.card?.membershipTier || "free";
     const card = applyShowcaseStyleToCard(
       {
@@ -118,17 +127,24 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
   );
 
   const tier = merged.membershipTier || "free";
-  let peerStyle = normalizeReplayStyle(live || createDefaultShowcaseStyle(), tier);
-  /* live 에 페이지가 없으면 force 재시도 없이 byPhone 스타일 병합 */
+  /* live 없음 = 송출 미설정 → 인증 팝업. live.includeDigitalCard 가 송출 스위치 */
+  let peerStyle =
+    live && typeof live === "object" ? normalizeReplayStyle(live) : authOnlyReplayStyle();
   if (
-    isPaidLetteringTier(tier) &&
+    peerShowcaseBroadcastOn(peerStyle) &&
     !(Array.isArray(peerStyle.pages) && peerStyle.pages.some((p) => p && typeof p === "object")) &&
-    byPhone.card?.showcaseStyle
+    byPhone.card?.showcaseStyle &&
+    typeof byPhone.card.showcaseStyle === "object"
   ) {
-    peerStyle = normalizeReplayStyle(
-      { ...peerStyle, ...byPhone.card.showcaseStyle },
-      tier
-    );
+    const snap = byPhone.card.showcaseStyle;
+    peerStyle = normalizeReplayStyle({
+      ...peerStyle,
+      pages: snap.pages || peerStyle.pages,
+      gallery: snap.gallery || peerStyle.gallery,
+      bgm: snap.bgm || peerStyle.bgm,
+      /* 송출 플래그는 live 값 유지 */
+      includeDigitalCard: peerStyle.includeDigitalCard
+    });
   }
   const card = applyShowcaseStyleToCard(
     {

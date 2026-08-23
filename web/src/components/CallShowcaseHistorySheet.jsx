@@ -524,9 +524,10 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       return;
     }
 
-    /* 목록에서 이미 인증 + 콘텐츠 없음이 보이면 바로 인증 팝업 (무료·유료 공통) */
+    /* VLUE 회원 + 송출 콘텐츠 없음 → 즉시 인증 팝업 (무료·유료·송출 OFF 공통) */
+    const listLooksLikeMember = call.verified === true || Boolean(call.memberName);
     if (
-      call.verified === true &&
+      listLooksLikeMember &&
       !peerHasDccOrShowcaseContent(call.cardSnapshot, call.showcaseSnapshot)
     ) {
       const cachedEmpty = readCallHistoryPeerCache(phone);
@@ -648,6 +649,15 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     if (!selected) return { isKnownContact: false, matchedName: "", sources: [] };
     return resolveIsKnownContactSync(selected.phoneDisplay || selected.phone);
   }, [selected]);
+
+  /* 풀스크린으로 들어온 뒤에도 송출 OFF/무콘텐츠면 인증 팝업으로 교체 */
+  useEffect(() => {
+    if (!selected || !previewCard || loading) return;
+    if (isNationalAgencyDcpCard(previewCard)) return;
+    if (!previewVerified) return;
+    if (peerHasDccOrShowcaseContent(previewCard, previewCard.showcaseStyle)) return;
+    openAuthPopupForPeer(selected, previewCard);
+  }, [selected, previewCard, previewVerified, loading, openAuthPopupForPeer]);
 
   if (selected) {
     const tier = previewCard?.membershipTier || selected.membershipTier || "free";

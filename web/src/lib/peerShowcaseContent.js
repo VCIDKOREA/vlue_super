@@ -1,7 +1,13 @@
 /**
  * 통화·공유에서 상대가 DCC/쇼케이스 송출 콘텐츠가 있는지.
- * 없으면 VLUE 인증 팝업만 표시 (빈 쇼케이스 화면 금지).
+ * 송출 OFF 이거나 실콘텐츠 없으면 VLUE 인증 팝업만 (빈 쇼케이스 금지).
  */
+
+/** 라이브 송출 ON — LetteringOverlayHost 와 동일 (includeDigitalCard === true) */
+export function peerShowcaseBroadcastOn(style) {
+  return Boolean(style && typeof style === "object" && style.includeDigitalCard === true);
+}
+
 export function styleHasShowcaseMedia(style) {
   if (!style || typeof style !== "object") return false;
   if (Array.isArray(style.pages) && style.pages.some((p) => p && typeof p === "object")) {
@@ -31,8 +37,9 @@ export function styleHasShowcaseMedia(style) {
 
 export function cardHasDccBody(card) {
   if (!card || typeof card !== "object") return false;
+  /* 송출 플래그만 켜져 있고 명함 본문이 없으면 DCC로 보지 않음 */
   const styleOn = card.showcaseStyle?.includeDigitalCard === true || card.digitalCardActive === true;
-  if (!styleOn && !card.digitalCardIssued) return false;
+  if (!styleOn) return false;
   return Boolean(
     String(card.organization || card.companyName || "").trim() ||
       String(card.titlePhotoUrl || "").trim() ||
@@ -43,9 +50,13 @@ export function cardHasDccBody(card) {
   );
 }
 
-/** true = DCC 또는 쇼케이스 미디어가 있어 풀 화면 허용 */
+/**
+ * true = 풀 쇼케이스 허용 (송출 ON + DCC 본문 또는 쇼케이스 미디어)
+ * 무료/유료 무관 · 송출 꺼짐이면 false → 인증 팝업
+ */
 export function peerHasDccOrShowcaseContent(card, style) {
   const st = style || card?.showcaseStyle || null;
+  if (!peerShowcaseBroadcastOn(st)) return false;
   if (styleHasShowcaseMedia(st)) return true;
   if (cardHasDccBody({ ...card, showcaseStyle: st || card?.showcaseStyle })) return true;
   return false;

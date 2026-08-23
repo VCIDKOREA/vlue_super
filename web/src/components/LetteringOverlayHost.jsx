@@ -23,6 +23,8 @@ import {
   readCallHistoryPeerCache,
   writeCallHistoryPeerCache
 } from "../lib/callHistoryPeerCache.js";
+import { peerHasDccOrShowcaseContent } from "../lib/peerShowcaseContent.js";
+import VlueAuthMemberPopup from "./VlueAuthMemberPopup.jsx";
 
 /** 상대가 쇼케이스/DCC 를 송출 ON 으로 저장하지 않은 경우 — 인증 팝업만 */
 function createPeerAuthOnlyShowcaseStyle() {
@@ -357,6 +359,7 @@ function LetteringOverlayHostInner() {
   const [reportOpen, setReportOpen] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
   const [certPayload, setCertPayload] = useState(null);
+  const [authMemberPopupOpen, setAuthMemberPopupOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [callState, setCallState] = useState(() => {
     const queued = normalizeCallState(readQueuedNativeCallState());
@@ -529,14 +532,6 @@ function LetteringOverlayHostInner() {
   }, [loading, callState]);
 
   const identityReady = !loading && !identityHold;
-
-  useEffect(() => {
-    if (callState !== CALL_STATES.CONNECTED || !identityReady) return;
-    if (autoExpandedOnceRef.current) return;
-    autoExpandedOnceRef.current = true;
-    setForceShowcaseBar(false);
-    setExpanded(true);
-  }, [callState, identityReady]);
 
   useEffect(() => {
     const onNativeCard = (ev) => {
@@ -914,6 +909,33 @@ function LetteringOverlayHostInner() {
     );
   }, [card, showcaseStyle, membershipTier]);
 
+  const peerAuthPopupOnly = useMemo(() => {
+    if (!verified || !styledCard) return false;
+    if (String(styledCard.profileKind || "") === "contact_safe_care") return false;
+    if (matchNationalAgency(incoming)) return false;
+    return !peerHasDccOrShowcaseContent(styledCard, styledCard.showcaseStyle || showcaseStyle);
+  }, [verified, styledCard, showcaseStyle, incoming]);
+
+  useEffect(() => {
+    if (callState !== CALL_STATES.CONNECTED || !identityReady) return;
+    if (autoExpandedOnceRef.current) return;
+    autoExpandedOnceRef.current = true;
+    setForceShowcaseBar(false);
+    if (peerAuthPopupOnly) {
+      setExpanded(false);
+      setAuthMemberPopupOpen(true);
+      return;
+    }
+    setExpanded(true);
+  }, [callState, identityReady, peerAuthPopupOnly]);
+
+  /* 송출 조회 후 OFF/무콘텐츠로 확정되면 빈 쇼케이스 → 인증 팝업 */
+  useEffect(() => {
+    if (!peerAuthPopupOnly || loading) return;
+    setExpanded(false);
+    setAuthMemberPopupOpen(true);
+  }, [peerAuthPopupOnly, loading]);
+
   const reportTarget = useMemo(
     () => ({
       phone: incoming,
@@ -1099,6 +1121,10 @@ function LetteringOverlayHostInner() {
           forceShowcaseBar={forceShowcaseBar}
           onExpandedChange={(next) => {
             if (next) {
+              if (peerAuthPopupOnly) {
+                setAuthMemberPopupOpen(true);
+                return;
+              }
               const style = styledCard?.showcaseStyle || showcaseStyle;
               const hasBody =
                 overlayCardHasOrg(styledCard) ||
@@ -1121,10 +1147,7 @@ function LetteringOverlayHostInner() {
           includeDigitalCard={Boolean(
             verified && peerShowcaseBroadcastOn(styledCard?.showcaseStyle || showcaseStyle)
           )}
-          showcaseOffPreview={
-            Boolean(verified) &&
-            !peerShowcaseBroadcastOn(styledCard?.showcaseStyle || showcaseStyle)
-          }
+          showcaseOffPreview={Boolean(peerAuthPopupOnly)}
           digitalCardOnly={false}
           savedContactName={
             String(styledCard?.profileKind || "") === "contact_safe_care"
@@ -1160,6 +1183,13 @@ function LetteringOverlayHostInner() {
       />
 
       <LetteringCertModal open={certOpen} payload={certPayload} onClose={() => setCertOpen(false)} />
+      <VlueAuthMemberPopup
+        open={Boolean(authMemberPopupOpen && peerAuthPopupOnly)}
+        name={styledCard?.name || styledCard?.displayName || ""}
+        phone={incoming}
+        handle={styledCard?.publicHandle || ""}
+        onClose={() => setAuthMemberPopupOpen(false)}
+      />
     </div>
   );
 }
