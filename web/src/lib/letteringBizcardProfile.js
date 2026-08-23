@@ -27,7 +27,7 @@ function isPlatformCeoHandle() {
   }
 }
 
-/** 마케팅·문서용 데모 명함만. 실사용자 미리보기에는 절대 주입하지 않음. */
+/** 留덉���똿쨌臾몄꽌�슜 �뜲紐� 紐낇븿留�. �떎�궗�슜�옄 誘몃━蹂닿린�뿉�뒗 �젅��� 二쇱엯�븯吏� �븡�쓬. */
 export const LETTERING_MARKETING_DEMO_CARD = Object.freeze({
   name: "\uD64D\uAE38\uB3D9",
   title: "\uB300\uB9AC",
@@ -46,8 +46,8 @@ function cleanField(value) {
 }
 
 /**
- * 실사용자 미리보기용 — 빈 칸을 데모값으로 채우지 않음.
- * (과거 PREVIEW_FALLBACK이 삼성생명·설계팀을 넣어 출시 UX를 오염시킴)
+ * �떎�궗�슜�옄 誘몃━蹂닿린�슜 ��� 鍮� 移몄쓣 �뜲紐④컪�쑝濡� 梨꾩슦吏� �븡�쓬.
+ * (怨쇨굅 PREVIEW_FALLBACK�씠 �궪�꽦�깮紐끒룹꽕怨꾪���쓣 �꽔�뼱 異쒖떆 UX瑜� �삤�뿼�떆�궡)
  */
 export function withLetteringBizcardPreviewFallback(card = {}, opts = {}) {
   if (opts.fillMarketingDemo) {
@@ -109,7 +109,7 @@ function readUserId() {
 function purgePollutedLocalIdentity() {
   try {
     const org = String(localStorage.getItem("vlue_company_locked") || "").trim();
-    if (org === "VCID KOREA" || org === "삼성생명") {
+    if (org === "VCID KOREA" || org === "�궪�꽦�깮紐�") {
       localStorage.removeItem("vlue_company_locked");
       if (String(localStorage.getItem("myCardOrganization") || "").trim() === org) {
         localStorage.removeItem("myCardOrganization");
@@ -122,7 +122,7 @@ function purgePollutedLocalIdentity() {
       localStorage.removeItem("vlue_card_email");
     }
     const promo = String(localStorage.getItem("vlue_card_promo") || "").trim();
-    if (/보이스피싱|사칭사기|재산과 개인정보/i.test(promo)) {
+    if (/蹂댁씠�뒪�뵾�떛|�궗移��궗湲�|�옱�궛怨� 媛쒖씤�젙蹂�/i.test(promo)) {
       localStorage.removeItem("vlue_card_promo");
     }
   } catch {
@@ -130,7 +130,7 @@ function purgePollutedLocalIdentity() {
   }
 }
 
-/** 가입 고정값 + 사용자 편집 → Lettering 명함 카드 (미작성 필드는 빈 칸) */
+/** 媛��엯 怨좎젙媛� + �궗�슜�옄 �렪吏� �넂 Lettering 紐낇븿 移대뱶 (誘몄옉�꽦 �븘�뱶�뒗 鍮� 移�) */
 export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
   const isCeo = isPlatformCeoHandle();
   if (!isCeo) purgePollutedLocalIdentity();
@@ -195,9 +195,7 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       address: identity.address || "",
       logoUrl: ed.noCompanyLogo ? "" : String(ed.logoDataUrl || ed.logoUrl || "").trim(),
       logoFileName: ed.noCompanyLogo ? "" : String(ed.logoFileName || "").trim(),
-      photoUrl: ed.noProfilePhoto
-        ? ""
-        : String(ed.photoDataUrl || ed.photoUrl || readProfilePhotoAvatar() || "").trim(),
+      photoUrl: String(readProfilePhotoAvatar() || "").trim(),
       titlePhotoUrl: ed.noTitlePhoto ? "" : String(ed.titlePhotoDataUrl || ed.titlePhotoUrl || "").trim(),
       noTitlePhoto: Boolean(ed.noTitlePhoto),
       photoFocus: normalizePhotoFocus(ed.photoFocus),
