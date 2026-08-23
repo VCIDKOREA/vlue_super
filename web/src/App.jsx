@@ -183,6 +183,7 @@ import { runAndroidBackHandlers } from "./lib/androidBackStack.js";
 import { normalizeMembershipKind, isBillableMembershipKind } from "./lib/membershipBm.js";
 import { writePendingPayment, readPendingPayment } from "./lib/postSignupPayment.js";
 import { clearAccountScopedLocalStorage } from "./lib/clearAccountScopedLocalStorage.js";
+import { persistDccAccessHintsFromSession } from "./lib/dccAccessSession.js";
 
 const ONBOARDING_DONE_KEY = "vlue_onboarding_complete_v1";
 /** "1" 발급·활성, "0" 가입 시 미신청, 미설정은 기존 사용자용(온보딩 완료면 명함 있음으로 간주) */
@@ -2080,6 +2081,7 @@ function App() {
     if (data.publicHandle) localStorage.setItem("vlue_member_handle", `@${String(data.publicHandle)}`);
     if (data.legalName) localStorage.setItem("vlue_legal_name", String(data.legalName).trim());
     if (data.accountStatus != null) localStorage.setItem("vlue_account_status", String(data.accountStatus));
+    persistDccAccessHintsFromSession(data);
     localStorage.setItem(SESSION_KEY, "1");
     setIsLoggedIn(true);
     setCardFieldsTick((n) => n + 1);

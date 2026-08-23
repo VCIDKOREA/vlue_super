@@ -39,6 +39,8 @@ import {
   startInstagramLink
 } from "../../lib/instagramLinkApi.js";
 import { readDigitalCardActive, readDccBroadcastOn } from "../../lib/bizcardAccountSync.js";
+import { useDccFeatureAccess } from "../../hooks/useDccFeatureAccess.js";
+import { isDccSettingsDisabled } from "../../lib/dccAccessPolicy.js";
 import {
   LETTERING_BIZCARD_CHANGED_EVENT,
   LETTERING_OPEN_BIZCARD_SETTINGS_EVENT
@@ -221,7 +223,10 @@ export default function ShowcaseStyleSettingsPanel({
 }) {
   const isWebDesk = layout === "webDesk";
   const isPaid = isPaidLetteringTier(membershipTier);
-  const includeDigitalCard = isPaid && readDigitalCardActive() && readDccBroadcastOn();
+  const { access: dccAccess } = useDccFeatureAccess();
+  const dccBlocked = isDccSettingsDisabled(dccAccess);
+  const includeDigitalCard =
+    !dccBlocked && isPaid && readDigitalCardActive() && readDccBroadcastOn();
   const maxContentPages = maxShowcaseContentPagesForTier(membershipTier, { includeDigitalCard });
   const [config, setConfig] = useState(() => readShowcaseStyle());
   const [appliedFp, setAppliedFp] = useState(() => styleFingerprint(readShowcaseStyle()));

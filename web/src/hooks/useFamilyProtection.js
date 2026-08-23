@@ -14,6 +14,7 @@ import {
   getDemoFamilyGuardianLinks,
   mergeFamilyPeers
 } from "../lib/familyProtectionDemo.js";
+import { writeStoredFamilyWardRole } from "../lib/dccAccessSession.js";
 
 export function displayFamilyUser(u) {
   if (!u) return "회원";
@@ -75,6 +76,7 @@ export function useFamilyProtection() {
   const applyData = useCallback((d) => {
     setData(d);
     applySettingsFromRow(d.settings || {}, setters);
+    writeStoredFamilyWardRole(d.myActiveWardRole || "");
     window.dispatchEvent(
       new CustomEvent("vlue-family-ward-role", {
         detail: { wardRole: d.myActiveWardRole, familyRelation: d.myActiveFamilyRelation }

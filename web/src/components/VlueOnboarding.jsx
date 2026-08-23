@@ -797,6 +797,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
           }
         }
         if (data.legalName) localStorage.setItem("vlue_legal_name", data.legalName);
+        if (data.birthDate) {
+          const ymd = String(data.birthDate).replace(/\D/g, "").slice(0, 8);
+          if (ymd.length === 8) localStorage.setItem("vlue_birth_ymd", ymd);
+        }
         if (data.phoneE164) {
           localStorage.setItem("vlue_phone_e164", String(data.phoneE164));
           localStorage.setItem("myCardPhone", formatPhoneE164ForKoreaDisplay(data.phoneE164));

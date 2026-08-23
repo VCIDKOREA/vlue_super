@@ -39,6 +39,8 @@ import {
   isNationalAgencyDcpCard,
   matchNationalAgency
 } from "../lib/nationalAgencyDcpClient.js";
+import { peerHasDccOrShowcaseContent } from "../lib/peerShowcaseContent.js";
+import VlueAuthMemberPopup from "./VlueAuthMemberPopup.jsx";
 import "./friend-showcase-list.css";
 import "../styles/showcase-call-glass.css";
 import "../styles/incall-controls.css";
@@ -123,13 +125,8 @@ function hasUsableLocalSnapshot(call) {
 
 function snapshotIsCompleteEnough(call) {
   if (!hasUsableLocalSnapshot(call)) return false;
-  const snap = call.cardSnapshot || {};
-  const tier = call.membershipTier || snap.membershipTier || "free";
-  if (!isPaidLetteringTier(tier)) {
-    return Boolean(snap.name || snap.photoUrl);
-  }
-  /* 유료: 피드·BGM 있는 스타일 없으면 로딩 — DCC만 먼저 띄우지 않음 */
-  return styleHasShowcaseContent(call.showcaseSnapshot);
+  /* DCC·쇼케이스 미디어가 있을 때만 풀 화면 — 없으면 VLUE 인증 팝업 */
+  return peerHasDccOrShowcaseContent(call.cardSnapshot, call.showcaseSnapshot);
 }
 
 function styleHasPages(style) {
@@ -151,9 +148,20 @@ function peerPayloadFromResolve(payload) {
 
 function cachePayloadIsUsable(pack) {
   if (!pack?.card) return false;
-  const tier = pack.card.membershipTier || pack.tier || "free";
-  if (!isPaidLetteringTier(tier)) return Boolean(pack.verified);
-  return styleHasPages(pack.card.showcaseStyle || pack.showcaseStyle);
+  if (!pack.verified) return false;
+  return peerHasDccOrShowcaseContent(pack.card, pack.showcaseStyle || pack.card.showcaseStyle);
+}
+
+function buildAuthPopupFromCall(call, card = null) {
+  const phone = call?.phoneDisplay || call?.phone || card?.phone || "";
+  return {
+    open: true,
+    name:
+      String(card?.name || call?.memberName || call?.name || "").trim() ||
+      "",
+    phone,
+    handle: String(card?.publicHandle || call?.publicHandle || "").trim()
+  };
 }
 
 const CALL_HISTORY_LINE_KEY = "vlue_call_history_line_id";
@@ -247,8 +255,22 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const [rowMatrix, setRowMatrix] = useState({});
   const [busyId, setBusyId] = useState("");
   const [toast, setToast] = useState("");
+  const [authPopup, setAuthPopup] = useState({ open: false, name: "", phone: "", handle: "" });
   const openGenRef = useRef(0);
   const { unlockAudioGesture, setPlaybackPhase } = useShowcaseBgm();
+
+  const closeAuthPopup = useCallback(() => {
+    setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+  }, []);
+
+  const openAuthPopupForPeer = useCallback((call, card = null) => {
+    setSelected(null);
+    setPreviewCard(null);
+    setPreviewVerified(false);
+    setExpanded(true);
+    setLoading(false);
+    setAuthPopup(buildAuthPopupFromCall(call, card));
+  }, []);
 
   const showToast = useCallback((msg) => {
     setToast(String(msg || "").trim());
@@ -327,6 +349,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       setPreviewVerified(false);
       setExpanded(true);
       setLoading(false);
+      setAuthPopup({ open: false, name: "", phone: "", handle: "" });
       return undefined;
     }
     let cancelled = false;
@@ -375,26 +398,41 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     return undefined;
   }, [open, items]);
 
-  const applyPeerPayload = useCallback((payload, call, gen) => {
-    if (gen !== openGenRef.current || !payload?.card) return;
-    const tier = payload.card.membershipTier || call.membershipTier || "free";
-    setPreviewVerified(Boolean(payload.verified));
-    setPreviewCard(payload.card);
-    setLoading(false);
-    if (payload.verified && payload.card?.name) {
-      setSelected((prev) =>
-        prev
-          ? {
-              ...prev,
-              name: payload.card.name || prev.name,
-              verified: true,
-              membershipTier: tier,
-              avatarUrl: payload.card.photoUrl || payload.card.avatarUrl || prev.avatarUrl
-            }
-          : prev
+  const applyPeerPayload = useCallback(
+    (payload, call, gen) => {
+      if (gen !== openGenRef.current || !payload?.card) return;
+      const tier = payload.card.membershipTier || call.membershipTier || "free";
+      const verified = Boolean(payload.verified);
+      const hasContent = peerHasDccOrShowcaseContent(
+        payload.card,
+        payload.showcaseStyle || payload.card.showcaseStyle
       );
-    }
-  }, []);
+
+      /* 인증 회원인데 DCC·쇼케이스 없음 → 빈 풀스크린 대신 VLUE 인증 팝업 */
+      if (verified && !hasContent && !isNationalAgencyDcpCard(payload.card)) {
+        openAuthPopupForPeer(call, payload.card);
+        return;
+      }
+
+      setPreviewVerified(verified);
+      setPreviewCard(payload.card);
+      setLoading(false);
+      if (verified && payload.card?.name) {
+        setSelected((prev) =>
+          prev
+            ? {
+                ...prev,
+                name: payload.card.name || prev.name,
+                verified: true,
+                membershipTier: tier,
+                avatarUrl: payload.card.photoUrl || payload.card.avatarUrl || prev.avatarUrl
+              }
+            : prev
+        );
+      }
+    },
+    [openAuthPopupForPeer]
+  );
 
   const loadPeerPayload = useCallback(async (call, opts = {}) => {
     const phone = call.phoneDisplay || call.phone;
@@ -470,6 +508,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         { peerMode: true, style: silentShowcaseStyle() }
       );
       flushSync(() => {
+        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setSelected({
           ...call,
           name: agency.agencyName,
@@ -485,9 +524,60 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       return;
     }
 
+    /* 목록에서 이미 인증 + 콘텐츠 없음이 보이면 바로 인증 팝업 (무료·유료 공통) */
+    if (
+      call.verified === true &&
+      !peerHasDccOrShowcaseContent(call.cardSnapshot, call.showcaseSnapshot)
+    ) {
+      const cachedEmpty = readCallHistoryPeerCache(phone);
+      if (cachedEmpty?.card && cachePayloadIsUsable(cachedEmpty)) {
+        flushSync(() => {
+          setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+          setSelected(call);
+          setExpanded(true);
+          setPreviewVerified(Boolean(cachedEmpty.verified));
+          setPreviewCard(cachedEmpty.card);
+          setLoading(false);
+        });
+        void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
+        return;
+      }
+      if (
+        cachedEmpty?.verified &&
+        cachedEmpty?.card &&
+        !peerHasDccOrShowcaseContent(cachedEmpty.card, cachedEmpty.showcaseStyle)
+      ) {
+        openAuthPopupForPeer(call, cachedEmpty.card);
+        return;
+      }
+      openAuthPopupForPeer(call, call.cardSnapshot || cachedEmpty?.card || null);
+      void loadPeerPayload(call, { force: true }).then((payload) => {
+        if (openGenRef.current !== gen) return;
+        if (
+          payload?.verified &&
+          peerHasDccOrShowcaseContent(payload.card, payload.showcaseStyle)
+        ) {
+          flushSync(() => {
+            setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+            setSelected(call);
+            setExpanded(true);
+            setPreviewVerified(true);
+            setPreviewCard(payload.card);
+            setLoading(false);
+          });
+          return;
+        }
+        if (payload?.card) {
+          setAuthPopup(buildAuthPopupFromCall(call, payload.card));
+        }
+      });
+      return;
+    }
+
     const cached = readCallHistoryPeerCache(phone);
     if (cached?.card && cachePayloadIsUsable(cached)) {
       flushSync(() => {
+        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setSelected(call);
         setExpanded(true);
         setPreviewVerified(Boolean(cached.verified));
@@ -498,10 +588,20 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       return;
     }
 
+    if (
+      cached?.verified &&
+      cached?.card &&
+      !peerHasDccOrShowcaseContent(cached.card, cached.showcaseStyle)
+    ) {
+      openAuthPopupForPeer(call, cached.card);
+      return;
+    }
+
     /* 완전한 로컬 스냅샷만 즉시 표시 — 불완전 DCC 깜빡임 방지 */
     if (snapshotIsCompleteEnough(call)) {
       const optimistic = buildOptimisticHistoryCard(call);
       flushSync(() => {
+        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setSelected(call);
         setExpanded(true);
         setPreviewVerified(true);
@@ -513,6 +613,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     }
 
     flushSync(() => {
+      setAuthPopup({ open: false, name: "", phone: "", handle: "" });
       setSelected(call);
       setExpanded(true);
       setPreviewCard(null);
@@ -534,6 +635,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     setPreviewVerified(false);
     setExpanded(true);
     setLoading(false);
+    setAuthPopup({ open: false, name: "", phone: "", handle: "" });
   };
 
   useEffect(() => {
@@ -668,6 +770,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     ) : null;
 
   return (
+    <>
     <AppFullScreenView
       open={open}
       onClose={onClose}
@@ -732,5 +835,13 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         </ul>
       )}
     </AppFullScreenView>
+    <VlueAuthMemberPopup
+      open={Boolean(open && authPopup.open)}
+      name={authPopup.name}
+      phone={authPopup.phone}
+      handle={authPopup.handle}
+      onClose={closeAuthPopup}
+    />
+    </>
   );
 }

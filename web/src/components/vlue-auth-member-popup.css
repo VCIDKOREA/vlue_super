@@ -1,0 +1,81 @@
+.vlue-auth-member-popup-root {
+  position: fixed;
+  inset: 0;
+  z-index: 280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 18px;
+  background: rgba(2, 6, 23, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.vlue-auth-member-popup {
+  width: min(100%, 340px);
+  border-radius: 18px;
+  padding: 18px 16px 16px;
+  background: linear-gradient(165deg, #1e293b 0%, #0f172a 100%);
+  box-shadow:
+    0 0 0 1px rgba(148, 163, 184, 0.28),
+    0 18px 40px rgba(0, 0, 0, 0.45);
+  color: #f8fafc;
+}
+
+.vlue-auth-member-popup__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.vlue-auth-member-popup__msg {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #e2e8f0;
+}
+
+.vlue-auth-member-popup__name {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.vlue-auth-member-popup__phone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+  color: #7dd3fc;
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.vlue-auth-member-popup__ok {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.vlue-auth-member-popup__ok:active {
+  transform: scale(0.98);
+}

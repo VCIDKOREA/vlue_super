@@ -37,6 +37,8 @@ import {
   resolveActiveRegion
 } from "../lib/activeRegion.js";
 import { openNativeAppSettings } from "../lib/letteringSettings.js";
+import { useDccFeatureAccess } from "../hooks/useDccFeatureAccess.js";
+import { isDccSettingsDisabled } from "../lib/dccAccessPolicy.js";
 
 function tierLabelStyle(tier, isDarkMode, familyProtectionActive = false) {
   return membershipTierStyleClass(tier, isDarkMode, { familyProtectionActive });
@@ -162,6 +164,8 @@ function ProfilePanel({
     () => readCachedActiveRegion()?.label || "위치 확인 중…"
   );
   const [activeRegionBusy, setActiveRegionBusy] = useState(false);
+  const { access: dccAccess } = useDccFeatureAccess();
+  const dccBlocked = isDccSettingsDisabled(dccAccess);
 
   const reloadVirtualEmail = useCallback(() => {
     fetchEmailForwardingMapping().then((data) => {
@@ -275,6 +279,11 @@ function ProfilePanel({
       return;
     }
     if (initialView === "digitalCardApply" || initialView === "digitalCardEdit" || initialView === "letteringBizcard") {
+      if (dccBlocked) {
+        setPanelView("main");
+        setUpgradeOpen(false);
+        return;
+      }
       setPanelView("letteringBizcard");
       setUpgradeOpen(false);
       return;
@@ -299,7 +308,7 @@ function ProfilePanel({
     setPanelView("main");
     setDigitalCardMode("edit");
     setUpgradeOpen(false);
-  }, [open, initialView]);
+  }, [open, initialView, dccBlocked]);
 
   useEffect(() => {
     if (!open) return;
@@ -382,10 +391,6 @@ function ProfilePanel({
     scrubBrandAvatarsFromStorage();
     return readProfilePhotoAvatar();
   }, [avatarTick, open]);
-
-  const openLetteringBizcardHub = useCallback(() => {
-    setPanelView("letteringBizcard");
-  }, []);
 
   const handleHeaderClose = useCallback(() => {
     if (upgradeOpen) {
@@ -500,14 +505,26 @@ function ProfilePanel({
     showSettingNotice(next ? "통화 중 쇼케이스가 송출됩니다." : "통화 중 쇼케이스 송출이 꺼졌습니다.");
   };
 
+  const openLetteringBizcardHub = useCallback(() => {
+    if (dccBlocked) {
+      showSettingNotice(dccAccess?.message || "디지털인증명함을 이용할 수 없습니다.");
+      return;
+    }
+    setPanelView("letteringBizcard");
+  }, [dccBlocked, dccAccess?.message, showSettingNotice]);
+
   const handleApplyDigitalCard = useCallback(() => {
+    if (dccBlocked) {
+      showSettingNotice(dccAccess?.message || "디지털인증명함을 이용할 수 없습니다.");
+      return;
+    }
     if (!isPaidLetteringTier(membershipTier)) {
       setUpgradeOpen(true);
       showSettingNotice("디지털인증명함은 유료 회원만 신청할 수 있습니다. 등급을 변경해 주세요.");
       return;
     }
     openLetteringBizcardHub();
-  }, [membershipTier, openLetteringBizcardHub, showSettingNotice]);
+  }, [dccBlocked, dccAccess?.message, membershipTier, openLetteringBizcardHub, showSettingNotice]);
 
   const handleDarkModeToggle = (next) => {
     onToggleDarkMode?.(next);
@@ -818,6 +835,8 @@ function ProfilePanel({
             digitalCardActive={digitalCardActive}
             digitalCardIssued={digitalCardIssued}
             isVCIDOn={isVCIDOn}
+            dccBlocked={dccBlocked}
+            dccBlockMessage={dccAccess?.message || ""}
             onApplyDigitalCard={handleApplyDigitalCard}
             onEditLettering={openLetteringBizcardHub}
             onOpenShowcaseStyle={() => {

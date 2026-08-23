@@ -18,6 +18,8 @@ export default function MyPageDigitalLetteringSection({
   digitalCardIssued = true,
   isVCIDOn = false,
   isDarkMode = false,
+  dccBlocked = false,
+  dccBlockMessage = "",
   onApplyDigitalCard,
   onEditLettering,
   onOpenShowcaseStyle,
@@ -65,7 +67,23 @@ export default function MyPageDigitalLetteringSection({
 
   return (
     <section className="w-full">
-      {!isApproved ? (
+      {dccBlocked ? (
+        <div className="mypage-showcase-card mypage-showcase-card--apply mb-3" data-theme={isDarkMode ? "dark" : "light"}>
+          <p className="mypage-showcase-card__apply-copy">
+            {dccBlockMessage ||
+              "디지털인증명함(DCC)은 이 계정에서 이용할 수 없습니다. 쇼케이스는 계속 이용할 수 있습니다."}
+          </p>
+          <button
+            type="button"
+            className="mypage-showcase-card__apply-btn"
+            disabled
+            aria-disabled="true"
+            style={{ opacity: 0.55, cursor: "not-allowed" }}
+          >
+            디지털인증명함 비활성
+          </button>
+        </div>
+      ) : !isApproved ? (
         <div className="mypage-showcase-card mypage-showcase-card--apply mb-3" data-theme={isDarkMode ? "dark" : "light"}>
           <p className="mypage-showcase-card__apply-copy">
             유료 회원은 명함이 쇼케이스에 함께 표시됩니다. 무료 회원도 이름·VLUE ID·전화번호로 공유할 수 있습니다.
