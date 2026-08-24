@@ -5030,7 +5030,7 @@ function App() {
                   });
                 });
               }}
-              className="relative flex flex-col items-center justify-center w-full active:scale-95 transition-all"
+              className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -5055,11 +5055,6 @@ function App() {
                 <path d="M7 10h10M7 14h6" />
                 <path d="M21 12c0 4.97-4.03 9-9 9a9.9 9.9 0 0 1-4-.84L3 21l.84-5A9 9 0 1 1 21 12z" />
               </svg>
-              {totalUnread > 0 && activeBottomTab !== "chat" ? (
-                <span className="unread-badge unread-badge-tab" aria-label={`읽지 않은 채팅 ${totalUnread}건`}>
-                  {asBadgeText(totalUnread)}
-                </span>
-              ) : null}
             </button>
             ) : null}
 
@@ -5227,9 +5222,10 @@ function App() {
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
               {pushUnreadCount > 0 ? (
-                <span className="unread-badge unread-badge-tab" aria-label={`읽지 않은 알림 ${pushUnreadCount}건`}>
-                  {asBadgeText(pushUnreadCount)}
-                </span>
+                <span
+                  className="absolute right-[calc(50%-14px)] top-0 h-2.5 w-2.5 rounded-full bg-blue-500 shadow-[0_0_0_2px_rgba(255,255,255,0.95)]"
+                  aria-label={`읽지 않은 알림 ${pushUnreadCount}건`}
+                />
               ) : null}
             </button>
             ) : null}
@@ -5328,7 +5324,7 @@ function App() {
                 }
                 requireApp(() => navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null }));
               }}
-              className="relative flex flex-col items-center justify-center w-full active:scale-95 transition-all"
+              className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -5355,14 +5351,6 @@ function App() {
                 <path d="M19 8v6" />
                 <path d="M22 11h-6" />
               </svg>
-              {friendInboxRequests.length > 0 && activeBottomTab !== "home" ? (
-                <span
-                  className="unread-badge unread-badge-tab"
-                  aria-label={`받은 친구 요청 ${friendInboxRequests.length}건`}
-                >
-                  {asBadgeText(friendInboxRequests.length)}
-                </span>
-              ) : null}
             </button>
           </div>
         </nav>
