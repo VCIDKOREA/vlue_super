@@ -919,9 +919,9 @@ function resolveFamilyProtectionUiMode(
 
 async function listFamilyProtectionCore(userId: string) {
   const [paidRaw, settings, asGuardian, asWard, bankConsents] = await Promise.all([
-    canRegisterFamilyMembers(userId).catch((e) => {
+    canRegisterFamilyMembers(userId).catch((e): { ok: boolean; reason?: string } => {
       console.warn("[family-protection] paid gate check failed", e);
-      return { ok: true as const };
+      return { ok: true };
     }),
     getOrCreateSettings(userId),
     familyProtectionDb.familyProtectionLink.findMany({
