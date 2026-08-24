@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 /**
  * VLUE 인증 회원 · 공개 DCC/쇼케이스 없음 → 수화 후 「경로 검증 · 정상」스타일 팝업.
- * 링잉 빅푸시에서는 표시하지 않음 (웹 fixed 모달이 156dp 바에 끼어 깨지는 문제 방지).
+ * DCC·쇼케이스가 있으면(또는 불확실하면) 쇼케이스 경로를 우선한다 — CEO 등 오탐 방지.
  */
 object VlueAuthMemberPopupPolicy {
     const val MESSAGE =
@@ -27,13 +27,14 @@ object VlueAuthMemberPopupPolicy {
         if (profileKind == "expired_line") return false
         if (profileKind == "national_agency" || profileKind == "gov_agency") return false
         if (root.optBoolean("dcpAgency", false) || card.optBoolean("dcpAgency", false)) return false
-        /* 매칭된 VLUE 회원만 — unmatched/비회원 경로 제외 */
         val matched =
             root.optBoolean("matched", false) ||
                 jsonVerified(cardJson) ||
                 verified
         if (!matched) return false
-        return !hasPublicDccOrShowcase(root, card)
+        /* DCC·쇼케이스 있으면(또는 판단 불가하면) 인증-only 팝업 금지 */
+        if (hasPublicDccOrShowcase(root, card)) return false
+        return true
     }
 
     fun displayName(cardJson: String?, phoneFallback: String): String {
@@ -59,24 +60,60 @@ object VlueAuthMemberPopupPolicy {
     }
 
     private fun hasPublicDccOrShowcase(root: JSONObject, card: JSONObject): Boolean {
+        /* 디지털 인증명함 레코드가 있으면 쇼케이스/명함 경로 */
+        if (root.optBoolean("digitalCardActive", false) || card.optBoolean("digitalCardActive", false)) {
+            return true
+        }
         val style =
-            card.optJSONObject("showcaseStyle")
-                ?: root.optJSONObject("showcaseStyle")
-                ?: card.optJSONObject("showcase_style")
-        val broadcastOn =
-            style?.optBoolean("includeDigitalCard", false) == true ||
-                card.optBoolean("digitalCardActive", false) ||
-                root.optBoolean("digitalCardActive", false)
-        if (!broadcastOn) return false
+            when {
+                card.has("showcaseStyle") -> card.optJSONObject("showcaseStyle")
+                root.has("showcaseStyle") -> root.optJSONObject("showcaseStyle")
+                card.has("showcase_style") -> card.optJSONObject("showcase_style")
+                else -> null
+            }
+        val styleKeyPresent =
+            card.has("showcaseStyle") || root.has("showcaseStyle") || card.has("showcase_style")
         if (styleHasMedia(style)) return true
+        if (style?.optBoolean("includeDigitalCard", false) == true) return true
+
+        if (hasDccOrMediaHints(root, card)) return true
+
+        /*
+         * overlay cardLookup JSON 에는 showcaseStyle 이 없는 경우가 많음.
+         * 스타일 키가 아예 없으면 “없음”으로 단정하지 않고 쇼케이스 경로를 허용(웹이 재조회).
+         */
+        if (!styleKeyPresent && !root.has("digitalCardActive") && !card.has("digitalCardActive")) {
+            return true
+        }
+        return false
+    }
+
+    private fun hasDccOrMediaHints(root: JSONObject, card: JSONObject): Boolean {
         return firstNonBlank(
             card.optString("organization"),
+            root.optString("organization"),
             card.optString("companyName"),
+            root.optString("companyName"),
             card.optString("titlePhotoUrl"),
+            root.optString("titlePhotoUrl"),
             card.optString("email"),
+            root.optString("email"),
             card.optString("logoUrl"),
+            root.optString("logoUrl"),
+            card.optString("logo_url"),
+            root.optString("logo_url"),
             card.optString("website"),
-            card.optString("title")
+            root.optString("website"),
+            card.optString("title"),
+            root.optString("title"),
+            card.optString("jobTitle"),
+            root.optString("jobTitle"),
+            card.optString("image_url"),
+            root.optString("image_url"),
+            card.optString("photoUrl"),
+            root.optString("photoUrl"),
+            card.optString("avatarUrl"),
+            root.optString("avatarUrl")
         ) != null
     }
 

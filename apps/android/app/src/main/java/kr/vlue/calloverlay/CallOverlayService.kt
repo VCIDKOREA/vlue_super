@@ -82,6 +82,7 @@ class CallOverlayService : Service() {
     private val companion = CompanionOverlayController()
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pendingCardJson: String? = null
+    private var pendingVerified: Boolean = false
     private var currentPhone: String = ""
     private var currentOutgoing: Boolean = false
     private var currentDcpRoute: String = ""
@@ -421,6 +422,7 @@ class CallOverlayService : Service() {
             val phoneChanged = overlayPhoneChanged(phone)
             currentPhone = phone
             pendingCardJson = cardJson
+            pendingVerified = verified
             val wv = webView
             if (wv != null && !IncomingNumberResolver.isUnknown(phone)) {
                 loadOverlayDocument(wv, phone, verified, outgoing, cardJson, forceNewDocument = phoneChanged)
@@ -775,6 +777,7 @@ class CallOverlayService : Service() {
         currentPhone = phone
         currentOutgoing = outgoing
         pendingCardJson = cardJson
+        pendingVerified = verified
         wv.loadUrl(VlueLetteringConfig.overlayUrl(phone, verified, outgoing, currentDcpRoute))
         CompanionPerfTracker.noteWebViewLoadStart()
         if (!cardJson.isNullOrBlank()) {
@@ -835,7 +838,7 @@ class CallOverlayService : Service() {
             syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
             return
         }
-        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified = true)) {
+        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified = pendingVerified)) {
             remoteConnected = true
             companion.onAnswer(OverlayContext.IN_CALL)
             hideCompanionOverlayChrome()
@@ -1238,6 +1241,7 @@ class CallOverlayService : Service() {
             currentPhone = phone
             currentOutgoing = outgoing
             pendingCardJson = cardJson
+            pendingVerified = verified
             bindDcpRoute(phone, dcpRoute, cardJson)
             if (isContactSafeCare(cardJson)) {
                 hideCompanionOverlayChrome()
@@ -1386,7 +1390,11 @@ class CallOverlayService : Service() {
             attachDcpPopupWindow(spec)
             return
         }
-        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(cardJson, verified = true)) {
+        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(
+                cardJson,
+                verified = pendingVerified || parseIsVerified(cardJson)
+            )
+        ) {
             val show = VlueAuthMemberPopupPolicy.shouldShow(
                 overlayState = companion.state,
                 popupOnlyTest = dcpPopupOnly
@@ -1607,6 +1615,19 @@ class CallOverlayService : Service() {
 
     private fun isContactSafeCare(cardJson: String?): Boolean =
         parseProfileKind(cardJson) == ContactSafeCarePayload.PROFILE_KIND
+
+    private fun parseIsVerified(cardJson: String?): Boolean {
+        if (cardJson.isNullOrBlank()) return false
+        return try {
+            val json = org.json.JSONObject(cardJson)
+            json.optBoolean("is_verified", false) ||
+                json.optBoolean("verified", false) ||
+                json.optBoolean("matched", false) ||
+                json.optJSONObject("card")?.optBoolean("verified", false) == true
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     /**
      * 미인증 쇼케이스 대신 안심케어 팝업만 남긴다.
