@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { handleFamilyProtectionRouteError } from "../lib/familyProtectionRouteError.js";
 import { requireUserHeader } from "../middleware/cardGate.js";
-import { createProtectionLink } from "../services/familyProtection/familyProtectionEngine.js";
+import { createProtectionLink, parseFamilyRelation } from "../services/familyProtection/familyProtectionEngine.js";
 
 /** 스펙 별칭: POST /api/family/invite → 가족 보호 초대 */
 export const familyInviteRoutes = new Hono();
@@ -15,8 +15,7 @@ familyInviteRoutes.post("/invite", requireUserHeader, async (c) => {
       familyRelation?: string;
       guardianImpUid?: string;
     };
-    const familyRelation =
-      body.familyRelation === "child" || body.wardRole === "child" ? "child" : "parent";
+    const familyRelation = parseFamilyRelation(body.familyRelation || body.wardRole);
     const result = await createProtectionLink(
       me,
       String(body.wardHandle || ""),

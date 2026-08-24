@@ -1,6 +1,4 @@
-import { prisma } from "../../db/client.js";
-import { familyProtectionDb } from "../../db/familyProtectionDb.js";
-import { ssePublish } from "../../realtime/sseHub.js";
+import { expandFamilyAlertRecipients } from "./familyProtectionCircle.js";
 
 const ALERT_COOLDOWN_HOURS = 12;
 
@@ -81,5 +79,28 @@ export async function createFamilyAlertAndNotifyGuardians(opts: {
   for (const gid of opts.guardianUserIds) {
     await notifyFamilyGuardian(gid, opts.wardUserId, opts.kind, opts.title, opts.body, opts.payload);
   }
-  return { alerted: opts.guardianUserIds.length, skippedCooldown: false };
+
+  const allRecipients = await expandFamilyAlertRecipients(opts.guardianUserIds, opts.wardUserId);
+  const extraRecipients = allRecipients.filter((id) => !opts.guardianUserIds.includes(id));
+  for (const uid of extraRecipients) {
+    await prisma.ownerNotification.create({
+      data: {
+        ownerUserId: uid,
+        actorUserId: opts.wardUserId,
+        title: opts.title,
+        body: opts.body
+      }
+    });
+    ssePublish(uid, {
+      type: "vlue-family-protection-alert",
+      kind: opts.kind,
+      wardUserId: opts.wardUserId,
+      title: opts.title,
+      body: opts.body,
+      at: new Date().toISOString(),
+      ...opts.payload
+    });
+  }
+
+  return { alerted: allRecipients.length, skippedCooldown: false };
 }

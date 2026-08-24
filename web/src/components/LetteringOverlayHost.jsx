@@ -922,19 +922,22 @@ function LetteringOverlayHostInner() {
     autoExpandedOnceRef.current = true;
     setForceShowcaseBar(false);
     if (peerAuthPopupOnly) {
+      /* 수화 후만 — 네이티브가 별도 중앙 팝업(경로 검증 · 정상 스타일)을 띄움.
+         빅푸시(156dp) 안에서 웹 모달을 열면 레이아웃이 깨지므로 웹 팝업은 열지 않음. */
       setExpanded(false);
-      setAuthMemberPopupOpen(true);
+      setAuthMemberPopupOpen(false);
+      try {
+        window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
+        window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
+      } catch {
+        /* ignore */
+      }
       return;
     }
     setExpanded(true);
-  }, [callState, identityReady, peerAuthPopupOnly]);
+  }, [callState, identityReady, peerAuthPopupOnly, incoming]);
 
-  /* 송출 조회 후 OFF/무콘텐츠로 확정되면 빈 쇼케이스 → 인증 팝업 */
-  useEffect(() => {
-    if (!peerAuthPopupOnly || loading) return;
-    setExpanded(false);
-    setAuthMemberPopupOpen(true);
-  }, [peerAuthPopupOnly, loading]);
+  /* 수신 중(빅푸시)에는 인증 팝업을 열지 않음 — 카드 조회 완료(~수 초) 후에도 유지 */
 
   const reportTarget = useMemo(
     () => ({

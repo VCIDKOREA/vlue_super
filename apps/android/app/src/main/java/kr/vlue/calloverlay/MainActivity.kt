@@ -852,6 +852,19 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             }
         }
 
+        /** 가족 보호 초대 — 수락/거절 OS 알림 액션 */
+        @android.webkit.JavascriptInterface
+        fun showFamilyInviteNotification(title: String?, body: String?, linkId: String?) {
+            activity.runOnUiThread {
+                kr.vlue.calloverlay.family.FamilyProtectionNotificationHelper.showInvite(
+                    activity,
+                    title.orEmpty(),
+                    body.orEmpty(),
+                    linkId.orEmpty()
+                )
+            }
+        }
+
         /** 네이티브 FCM 등록 토큰 — 웹이 /api/auth/devices/fcm-token 에 전달 */
         @android.webkit.JavascriptInterface
         fun getFcmToken(): String {

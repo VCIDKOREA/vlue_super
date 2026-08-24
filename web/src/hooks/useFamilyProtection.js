@@ -3,6 +3,7 @@ import {
   acceptFamilyProtectionLink,
   createFamilyProtectionLink,
   fetchFamilyProtection,
+  rejectFamilyProtectionLink,
   requestBankConsent,
   respondBankConsent,
   revokeFamilyProtectionLink,
@@ -223,6 +224,17 @@ export function useFamilyProtection() {
         await load();
         notifyChanged();
         return "수락했습니다. 가족 보호가 시작됩니다.";
+      } finally {
+        setBusy(false);
+      }
+    },
+    async rejectLink(linkId) {
+      setBusy(true);
+      try {
+        await rejectFamilyProtectionLink(linkId);
+        await load();
+        notifyChanged();
+        return "거절했습니다.";
       } finally {
         setBusy(false);
       }

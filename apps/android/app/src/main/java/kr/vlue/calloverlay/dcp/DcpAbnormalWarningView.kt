@@ -29,6 +29,8 @@ object DcpAbnormalWarningView {
     const val CONTACT_NORMAL_MESSAGE =
         "기기에 저장된 번호입니다. VLUE 비회원 · 안심케어 정상 경로입니다."
 
+    const val VLUE_AUTH_MEMBER_MESSAGE = VlueAuthMemberPopupPolicy.MESSAGE
+
     const val ACTION_TAG = "dcp_action"
 
     data class Spec(
@@ -41,6 +43,8 @@ object DcpAbnormalWarningView {
         val expiredMessage: String = "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다.",
         val contactSafeCare: Boolean = false,
         val vlueNonMember: Boolean = false,
+        /** VLUE 인증 회원 · 공개 DCC/쇼케이스 없음 */
+        val vlueAuthMember: Boolean = false,
         val showShareShowcase: Boolean = false,
         val reasonLine: String = "",
         val pathVerify: Boolean = false
@@ -80,6 +84,7 @@ object DcpAbnormalWarningView {
                 text = when {
                     spec.expired -> "인증기간 만료"
                     spec.abnormal -> "경로 검증 · 비정상"
+                    spec.vlueAuthMember -> "경로 검증 · 정상"
                     else -> "경로 검증 · 정상"
                 }
                 setTextColor(
@@ -104,6 +109,7 @@ object DcpAbnormalWarningView {
                     spec.abnormal && spec.pathVerify ->
                         "비정상 경로로 확인된 전화입니다."
                     spec.abnormal -> NationalAgencyWhitelist.ABNORMAL_WARNING
+                    spec.vlueAuthMember -> VLUE_AUTH_MEMBER_MESSAGE
                     spec.contactSafeCare -> CONTACT_NORMAL_MESSAGE
                     else -> NORMAL_MESSAGE
                 }

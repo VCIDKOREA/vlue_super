@@ -6,29 +6,24 @@
   align-items: center;
   justify-content: center;
   padding: 24px 18px;
-  background: rgba(2, 6, 23, 0.55);
-  backdrop-filter: blur(6px);
+  background: transparent;
+  pointer-events: auto;
 }
 
 .vlue-auth-member-popup {
-  width: min(100%, 340px);
-  border-radius: 18px;
-  padding: 18px 16px 16px;
-  background: linear-gradient(165deg, #1e293b 0%, #0f172a 100%);
+  width: min(100%, 320px);
+  border-radius: 22px;
+  padding: 20px 20px 18px;
+  background: #1c1917;
   box-shadow:
-    0 0 0 1px rgba(148, 163, 184, 0.28),
+    0 0 0 1px rgba(96, 165, 250, 0.85),
     0 18px 40px rgba(0, 0, 0, 0.45);
   color: #f8fafc;
+  text-align: center;
 }
 
 .vlue-auth-member-popup__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   margin: 0 0 10px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.2);
   color: #93c5fd;
   font-size: 11px;
   font-weight: 800;
@@ -37,27 +32,28 @@
 
 .vlue-auth-member-popup__msg {
   margin: 0 0 14px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   line-height: 1.45;
-  color: #e2e8f0;
+  color: #fff;
 }
 
 .vlue-auth-member-popup__name {
   margin: 0 0 8px;
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: -0.03em;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: #fff;
 }
 
 .vlue-auth-member-popup__phone {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   margin: 0 0 18px;
-  color: #7dd3fc;
-  font-size: 15px;
+  color: #93c5fd;
+  font-size: 20px;
   font-weight: 800;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -71,7 +67,7 @@
   padding: 12px 14px;
   background: #2563eb;
   color: #fff;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
   cursor: pointer;
 }

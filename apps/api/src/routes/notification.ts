@@ -21,6 +21,29 @@ function inboxCategory(title: string, body: string, pinKind?: string | null) {
   return "앱";
 }
 
+function payloadRecord(payload: unknown): Record<string, unknown> | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  return payload as Record<string, unknown>;
+}
+
+function extractInboxLinkId(payload: unknown): string | null {
+  const p = payloadRecord(payload);
+  const linkId = p?.linkId;
+  return linkId != null ? String(linkId) : null;
+}
+
+function extractInboxKind(payload: unknown): string | null {
+  const p = payloadRecord(payload);
+  const kind = p?.kind;
+  return kind != null ? String(kind) : null;
+}
+
+function extractInboxFamilyRelation(payload: unknown): string | null {
+  const p = payloadRecord(payload);
+  const rel = p?.familyRelation;
+  return rel != null ? String(rel) : null;
+}
+
 /** 알림함 동기화 — OwnerNotification → 클라 수신함 */
 notificationRoutes.get("/inbox", requireUserHeader, async (c) => {
   const me = String(c.get("vlueUserId") || c.req.header("x-vlue-user-id") || "").trim();
@@ -41,7 +64,10 @@ notificationRoutes.get("/inbox", requireUserHeader, async (c) => {
       pinned: Boolean(row.pinKind),
       pinKind: row.pinKind || null,
       pinKey: row.pinKey || null,
-      payload: row.payloadJson || null
+      payload: row.payloadJson || null,
+      linkId: extractInboxLinkId(row.payloadJson),
+      kind: extractInboxKind(row.payloadJson),
+      familyRelation: extractInboxFamilyRelation(row.payloadJson)
     }))
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return c.json({

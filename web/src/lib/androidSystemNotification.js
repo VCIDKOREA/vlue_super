@@ -20,6 +20,26 @@ export function postAndroidSystemNotification(title, body, tag = "") {
   return false;
 }
 
+/** 가족 보호 초대 — 수락/거절 액션 버튼 포함 OS 알림 */
+export function postAndroidFamilyInviteNotification(title, body, linkId = "") {
+  try {
+    const t = String(title || "").trim() || "가족 보호 초대";
+    const b = String(body || "").trim() || t;
+    const id = String(linkId || "").trim();
+    if (window.Android?.showFamilyInviteNotification) {
+      window.Android.showFamilyInviteNotification(t, b, id);
+      return true;
+    }
+    if (window.VlueAndroid?.showFamilyInviteNotification) {
+      window.VlueAndroid.showFamilyInviteNotification(t, b, id);
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return postAndroidSystemNotification(title, body, linkId || "family-invite");
+}
+
 /** 가족보호·초대 등 중요 카테고리만 OS 푸시 */
 export function maybePostAndroidPushForInboxItem(item) {
   if (!item || item.isNew === false) return false;
@@ -31,5 +51,8 @@ export function maybePostAndroidPushForInboxItem(item) {
     /가족 보호|승인 요청|초대/.test(`${title} ${body}`);
   if (!family && category !== "팔로우" && category !== "결제") return false;
   const tag = String(item.serverId || item.id || title).slice(0, 64);
+  if (item.kind === "family_invite" && item.linkId) {
+    return postAndroidFamilyInviteNotification(title || category, body || title, item.linkId);
+  }
   return postAndroidSystemNotification(title || category, body || title, tag);
 }

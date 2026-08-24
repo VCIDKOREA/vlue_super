@@ -15,21 +15,22 @@ import {
   defaultFamilySettings,
   getOrCreateFamilySettings as getOrCreateSettingsFromHelper
 } from "./familyProtectionSettingsHelper.js";
+import { getFamilyCircleOverview, relationDisplayLabel } from "./familyProtectionCircle.js";
 
 export const DEFAULT_NO_APP_HOURS = 24;
 export const DEFAULT_MISSED_CALL_THRESHOLD = 3;
 const ALERT_COOLDOWN_HOURS = 12;
 
-type WardRole = "elder" | "child";
-type FamilyRelation = "parent" | "child";
+type WardRole = "elder" | "child" | "observer";
+type FamilyRelation = "parent" | "child" | "relative";
 type AlertKind = "elder_no_app_24h" | "elder_missed_calls" | "child_risky_site";
 
 export const USAGE_GUIDE = {
   summary:
     "유료 회원은 본인 포함 최대 4명(1:3)까지 가족 보호를 이용할 수 있습니다. 추가 인원(최대 8명)은 별도 요금이 필요합니다.",
   steps: [
-    "① 유료 회원: 가족 보호 N/4명 — VLUE 아이디로 초대 (내 부모 / 내 자녀)",
-    "② 가족 수락 후 보호 시작 — 부모·자녀 설정을 각각 켜기",
+    "① 유료 회원: 가족 보호 N/4명 — VLUE 아이디로 초대 (부모·자녀·가족)",
+    "② 가족 수락 후 보호 시작 — 부모·자녀 설정을 각각 켜기 (가족 분류는 알림만)",
     "③ 부모: 미접속·부재중·비회원 장통화·원격앱·정부기관 통화 알림",
     "④ 자녀: 유해·도박·VPN 사이트 + 계좌 동의 후 입출금 알림",
     "⑤ 네이티브 앱에서 통화·설치앱 연동 시 실시간 감지 (docs/FAMILY_PROTECTION.md)"
@@ -41,7 +42,58 @@ function hoursAgo(h: number) {
 }
 
 function relationToWardRole(relation: FamilyRelation): WardRole {
-  return relation === "child" ? "child" : "elder";
+  if (relation === "child") return "child";
+  if (relation === "relative") return "observer";
+  return "elder";
+}
+
+export function parseFamilyRelation(raw: string | undefined): FamilyRelation {
+  if (raw === "child") return "child";
+  if (raw === "relative" || raw === "family") return "relative";
+  return "parent";
+}
+
+async function notifyGuardianInviteResult(
+  guardianUserId: string,
+  wardUserId: string,
+  accepted: boolean
+) {
+  const wardName = await wardDisplayName(wardUserId);
+  const title = accepted ? "가족 보호 수락" : "가족 보호 거절";
+  const body = accepted
+    ? `${wardName} 님이 가족 보호 초대를 수락했습니다.`
+    : `${wardName} 님이 가족 보호 초대를 거절했습니다.`;
+
+  await prisma.ownerNotification.create({
+    data: {
+      ownerUserId: guardianUserId,
+      actorUserId: wardUserId,
+      title,
+      body,
+      payloadJson: {
+        kind: accepted ? "family_invite_accepted" : "family_invite_rejected",
+        linkId: null,
+        wardUserId
+      }
+    }
+  });
+
+  ssePublish(guardianUserId, {
+    type: accepted ? "vlue-family-protection-accepted" : "vlue-family-protection-rejected",
+    wardUserId,
+    title,
+    body,
+    at: new Date().toISOString()
+  });
+
+  try {
+    await sendFamilyProtectionPush(guardianUserId, title, body, {
+      type: accepted ? "vlue-family-protection-accepted" : "vlue-family-protection-rejected",
+      wardUserId
+    });
+  } catch (err) {
+    console.warn("[family-protection] invite_result_fcm_failed", err);
+  }
 }
 
 async function wardDisplayName(userId: string) {
@@ -370,7 +422,11 @@ export async function createProtectionLink(
 
   const wardRole = relationToWardRole(familyRelation);
   const guardianName = await guardianDisplayName(guardianUserId);
-  const relationLabel = familyRelation === "child" ? "자녀" : "부모(노부모)";
+  const relationLabel = relationDisplayLabel(familyRelation);
+  const protectionNote =
+    familyRelation === "relative"
+      ? "수락하면 가족 보호 이벤트 알림을 받을 수 있습니다."
+      : "수락하면 보호가 시작됩니다.";
 
   const link = await familyProtectionDb.familyProtectionLink.upsert({
     where: {
@@ -381,14 +437,22 @@ export async function createProtectionLink(
   });
 
   const inviteTitle = "가족 보호 초대";
-  const inviteBody = `${guardianName} 님이 회원님을 가족(${relationLabel})으로 등록했습니다. 수락하면 보호가 시작됩니다.`;
+  const inviteBody = `${guardianName} 님이 회원님을 ${relationLabel}(으)로 등록했습니다. ${protectionNote}`;
 
   await prisma.ownerNotification.create({
     data: {
       ownerUserId: ward.id,
       actorUserId: guardianUserId,
       title: inviteTitle,
-      body: inviteBody
+      body: inviteBody,
+      payloadJson: {
+        kind: "family_invite",
+        linkId: link.id,
+        guardianUserId,
+        familyRelation,
+        wardRole,
+        actions: ["accept", "reject"]
+      }
     }
   });
 
@@ -407,7 +471,8 @@ export async function createProtectionLink(
       type: "vlue-family-protection-invite",
       linkId: link.id,
       guardianUserId,
-      familyRelation
+      familyRelation,
+      actions: "accept,reject"
     }).then((push) => {
       if (push.skipped || push.sent === 0) {
         console.warn("[family-protection] invite_fcm_skipped", {
@@ -453,20 +518,25 @@ export async function acceptProtectionLink(wardUserId: string, linkId: string) {
     create: { wardUserId, lastAppAccessAt: new Date() }
   });
 
-  const wardName = await wardDisplayName(wardUserId);
-  await prisma.ownerNotification.create({
-    data: {
-      ownerUserId: link.guardianUserId,
-      actorUserId: wardUserId,
-      title: "가족 보호 수락",
-      body: `${wardName} 님이 가족 보호 초대를 수락했습니다.`
-    }
+  await notifyGuardianInviteResult(link.guardianUserId, wardUserId, true);
+
+  return { ok: true, link: updated };
+}
+
+export async function rejectProtectionLink(wardUserId: string, linkId: string) {
+  const link = await familyProtectionDb.familyProtectionLink.findFirst({
+    where: { id: linkId, wardUserId }
   });
-  ssePublish(link.guardianUserId, {
-    type: "vlue-family-protection-accepted",
-    linkId,
-    wardUserId
+  if (!link) return { error: "초대를 찾을 수 없습니다." };
+  if (link.status === "revoked") return { ok: true, link };
+  if (link.status === "active") return { error: "이미 수락된 연결입니다. 해지는 보호자에게 문의하세요." };
+
+  const updated = await familyProtectionDb.familyProtectionLink.update({
+    where: { id: linkId },
+    data: { status: "revoked" }
   });
+
+  await notifyGuardianInviteResult(link.guardianUserId, wardUserId, false);
 
   return { ok: true, link: updated };
 }
@@ -602,6 +672,7 @@ export async function listFamilyProtection(userId: string) {
       canInviteFamily: paid.ok && (memberSlots?.canInvite ?? false),
       inviteBlockReason: memberSlots?.blockReason ?? paid.reason ?? null,
       inviteBlockCode: memberSlots?.blockCode ?? null,
+      uiMode: "guide_only" as const,
       memberSlots,
       settings,
       asGuardian: [],
@@ -613,6 +684,19 @@ export async function listFamilyProtection(userId: string) {
       degraded: true
     };
   }
+}
+
+function resolveFamilyProtectionUiMode(
+  _userId: string,
+  canInvite: boolean,
+  asGuardian: Array<{ status: string }>,
+  asWard: Array<{ status: string }>
+): "guardian_full" | "ward_only" | "guide_only" {
+  const hasGuardianLinks = asGuardian.some((l) => l.status === "active" || l.status === "pending");
+  const hasWardLinks = asWard.some((l) => l.status === "active" || l.status === "pending");
+  if (canInvite || hasGuardianLinks) return "guardian_full";
+  if (hasWardLinks) return "ward_only";
+  return "guide_only";
 }
 
 async function listFamilyProtectionCore(
@@ -690,6 +774,7 @@ async function listFamilyProtectionCore(
     canInviteFamily: paid.ok && memberSlots.canInvite,
     inviteBlockReason: memberSlots.blockReason ?? paid.reason ?? null,
     inviteBlockCode: memberSlots.blockCode ?? null,
+    uiMode: resolveFamilyProtectionUiMode(userId, paid.ok && memberSlots.canInvite, asGuardian, asWard),
     memberSlots,
     settings,
     asGuardian,

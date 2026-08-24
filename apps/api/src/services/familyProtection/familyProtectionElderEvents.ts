@@ -3,6 +3,7 @@ import { familyProtectionDb } from "../../db/familyProtectionDb.js";
 import { matchGovernmentHotline, normalizePhoneDigits } from "../../lib/governmentHotlines.js";
 import { matchRemoteControlApp } from "../../lib/remoteControlApps.js";
 import { createFamilyAlertAndNotifyGuardians } from "./familyProtectionNotify.js";
+import { expandFamilyAlertRecipients } from "./familyProtectionCircle.js";
 import {
   fcmMessageElderGovernmentCall,
   fcmMessageElderLongCall,
@@ -87,7 +88,8 @@ export async function recordWardCallEvent(
 
   if (!r.skippedCooldown && r.alerted > 0) {
     const push = fcmMessageElderLongCall(Math.round(durationSec / 60));
-    void pushFamilyProtectionFcmToGuardians(guardianIds, push.title, push.body, {
+    const recipients = await expandFamilyAlertRecipients(guardianIds, wardUserId);
+    void pushFamilyProtectionFcmToGuardians(recipients, push.title, push.body, {
       wardUserId,
       ...push.data
     });
@@ -130,7 +132,8 @@ export async function recordWardGovernmentCall(
 
   if (!r.skippedCooldown && r.alerted > 0) {
     const push = fcmMessageElderGovernmentCall(label);
-    void pushFamilyProtectionFcmToGuardians(guardianIds, push.title, push.body, {
+    const recipients = await expandFamilyAlertRecipients(guardianIds, wardUserId);
+    void pushFamilyProtectionFcmToGuardians(recipients, push.title, push.body, {
       wardUserId,
       ...push.data
     });
@@ -169,7 +172,8 @@ export async function reportWardRemoteControlApp(wardUserId: string, packageOrLa
 
   if (!r.skippedCooldown && r.alerted > 0) {
     const push = fcmMessageElderRemoteApp(match.label);
-    void pushFamilyProtectionFcmToGuardians(guardianIds, push.title, push.body, {
+    const recipients = await expandFamilyAlertRecipients(guardianIds, wardUserId);
+    void pushFamilyProtectionFcmToGuardians(recipients, push.title, push.body, {
       wardUserId,
       ...push.data
     });

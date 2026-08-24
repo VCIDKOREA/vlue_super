@@ -85,9 +85,9 @@ export function countUnreadPush() {
  * @param {string} [opts.productName]
  * @param {string} [opts.productDetail]
  * @param {number} [opts.amountKrw]
- * @param {string} [opts.paymentId]
- * @param {boolean} [opts.needsPurchaseConfirm]
- * @param {string} [opts.serverId]
+ * @param {string} [opts.linkId]
+ * @param {string} [opts.familyRelation]
+ * @param {boolean} [opts.familyInvitePending]
  */
 export function addPushNotification({
   category = "기타",
@@ -96,6 +96,9 @@ export function addPushNotification({
   time,
   createdAt,
   kind,
+  linkId,
+  familyRelation,
+  familyInvitePending,
   productName,
   productDetail,
   amountKrw,
@@ -157,6 +160,9 @@ export function addPushNotification({
     read: Boolean(read) && !pinned,
     createdAt: at,
     kind: kind || null,
+    linkId: linkId ? String(linkId) : null,
+    familyRelation: familyRelation ? String(familyRelation) : null,
+    familyInvitePending: Boolean(familyInvitePending),
     productName: productName ? String(productName).slice(0, 120) : null,
     productDetail: productDetail ? String(productDetail).slice(0, 800) : null,
     amountKrw: Number.isFinite(Number(amountKrw)) ? Math.floor(Number(amountKrw)) : null,

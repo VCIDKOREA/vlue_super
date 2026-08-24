@@ -24,7 +24,11 @@ export async function syncOwnerInboxFromServer() {
         read: Boolean(item.read) && !item.pinned,
         pinned: Boolean(item.pinned),
         pinKind: item.pinKind || null,
-        pinKey: item.pinKey || null
+        pinKey: item.pinKey || null,
+        kind: item.kind || null,
+        linkId: item.linkId || null,
+        familyRelation: item.familyRelation || null,
+        familyInvitePending: item.kind === "family_invite"
       });
       if (entry?.isNew) {
         added += 1;

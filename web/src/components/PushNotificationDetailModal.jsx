@@ -3,8 +3,10 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import {
   buildRefundInquiryMailto,
-  confirmPushPurchase
+  confirmPushPurchase,
+  markPushRead
 } from "../lib/pushNotificationInbox.js";
+import { acceptFamilyProtectionLink, rejectFamilyProtectionLink } from "../lib/familyProtectionApi.js";
 import { marketingLegalUrl } from "../lib/legalPageLinks.js";
 
 const CATEGORY_STYLE = {
@@ -31,9 +33,12 @@ export default function PushNotificationDetailModal({
 }) {
   const [view, setView] = useState(item);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [familyBusy, setFamilyBusy] = useState(false);
+  const [familyDone, setFamilyDone] = useState("");
 
   useEffect(() => {
     setView(item);
+    setFamilyDone("");
   }, [item, open]);
 
   if (!open || !item || typeof document === "undefined") return null;
@@ -51,6 +56,43 @@ export default function PushNotificationDetailModal({
     )
       .replace(/^@/, "")
       .trim();
+
+  const isFamilyInvite =
+    current.kind === "family_invite" ||
+    Boolean(current.familyInvitePending && current.linkId);
+  const canFamilyRespond = isFamilyInvite && current.linkId && !familyDone;
+
+  const onFamilyAccept = async () => {
+    if (familyBusy || !canFamilyRespond) return;
+    setFamilyBusy(true);
+    try {
+      await acceptFamilyProtectionLink(current.linkId);
+      markPushRead(current.id);
+      setFamilyDone("accepted");
+      window.dispatchEvent(new CustomEvent("vlue-family-protection-changed"));
+      onUpdated?.({ ...current, read: true, familyInvitePending: false });
+    } catch (e) {
+      setFamilyDone(String(e?.message || "수락 실패"));
+    } finally {
+      setFamilyBusy(false);
+    }
+  };
+
+  const onFamilyReject = async () => {
+    if (familyBusy || !canFamilyRespond) return;
+    setFamilyBusy(true);
+    try {
+      await rejectFamilyProtectionLink(current.linkId);
+      markPushRead(current.id);
+      setFamilyDone("rejected");
+      window.dispatchEvent(new CustomEvent("vlue-family-protection-changed"));
+      onUpdated?.({ ...current, read: true, familyInvitePending: false });
+    } catch (e) {
+      setFamilyDone(String(e?.message || "거절 실패"));
+    } finally {
+      setFamilyBusy(false);
+    }
+  };
 
   const onConfirmPurchase = () => {
     if (confirmBusy || !canConfirm) return;
@@ -173,6 +215,21 @@ export default function PushNotificationDetailModal({
           >
             {current.body || "내용이 없습니다."}
           </p>
+          {familyDone === "accepted" ? (
+            <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] font-bold text-emerald-800">
+              가족 보호 초대를 수락했습니다.
+            </p>
+          ) : null}
+          {familyDone === "rejected" ? (
+            <p className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] font-bold text-gray-700">
+              가족 보호 초대를 거절했습니다.
+            </p>
+          ) : null}
+          {familyDone && familyDone !== "accepted" && familyDone !== "rejected" ? (
+            <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] font-bold text-red-700">
+              {familyDone}
+            </p>
+          ) : null}
           {current.purchaseConfirmed ? (
             <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] font-bold text-emerald-800">
               구매가 확정되었습니다. 이용해 주셔서 감사합니다.
@@ -203,6 +260,26 @@ export default function PushNotificationDetailModal({
         <div
           className={`shrink-0 space-y-2 border-t px-4 py-3 ${isDarkMode ? "border-white/10" : "border-slate-100"}`}
         >
+          {canFamilyRespond ? (
+            <>
+              <button
+                type="button"
+                disabled={familyBusy}
+                className="w-full rounded-xl bg-emerald-600 py-3 text-[14px] font-black text-white active:scale-[0.99] disabled:opacity-60"
+                onClick={onFamilyAccept}
+              >
+                {familyBusy ? "처리 중…" : "수락"}
+              </button>
+              <button
+                type="button"
+                disabled={familyBusy}
+                className="w-full rounded-xl border border-red-200 bg-red-50 py-3 text-[14px] font-black text-red-700 active:scale-[0.99] disabled:opacity-60"
+                onClick={onFamilyReject}
+              >
+                거절
+              </button>
+            </>
+          ) : null}
           {canConfirm ? (
             <button
               type="button"
@@ -229,7 +306,7 @@ export default function PushNotificationDetailModal({
           <button
             type="button"
             className={`w-full rounded-xl py-3 text-[14px] font-black active:scale-[0.99] ${
-              canConfirm || isPayment
+              canConfirm || isPayment || canFamilyRespond
                 ? isDarkMode
                   ? "bg-white/10 text-slate-100"
                   : "bg-slate-100 text-slate-700"
@@ -237,7 +314,7 @@ export default function PushNotificationDetailModal({
             }`}
             onClick={onClose}
           >
-            {canConfirm || isPayment ? "닫기" : "확인"}
+            {canConfirm || isPayment || canFamilyRespond ? "닫기" : "확인"}
           </button>
         </div>
       </div>

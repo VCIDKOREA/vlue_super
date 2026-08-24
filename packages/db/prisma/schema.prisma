@@ -1953,12 +1953,14 @@ model RefundQueue {
 enum FamilyWardRole {
   elder
   child
+  observer
 }
 
-/// 보호 등록 시 관계 — parent: 내 부모(노부모), child: 내 자녀
+/// 보호 등록 시 관계 — parent: 내 부모(노부모), child: 내 자녀, relative: 형제·자매·배우자 등(알림만)
 enum FamilyRelation {
   parent
   child
+  relative
 }
 
 enum FamilyProtectionLinkStatus {

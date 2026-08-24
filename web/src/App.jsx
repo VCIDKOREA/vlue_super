@@ -53,7 +53,7 @@ import {
 } from "./lib/chatRoomPrefsStorage.js";
 import { addPushNotification, countUnreadPush, PUSH_INBOX_CHANGED } from "./lib/pushNotificationInbox.js";
 import { syncOwnerInboxFromServer } from "./lib/ownerInboxSync.js";
-import { postAndroidSystemNotification } from "./lib/androidSystemNotification.js";
+import { postAndroidFamilyInviteNotification, postAndroidSystemNotification } from "./lib/androidSystemNotification.js";
 import Splash from "./components/Splash";
 import VlueOnboarding from "./components/VlueOnboarding";
 import PostSignupPaymentModal from "./components/PostSignupPaymentModal.jsx";
@@ -1230,10 +1230,26 @@ function App() {
         }
         if (data?.type === "vlue-family-protection-invite") {
           const body = String(data.body || "가족 보호 승인 요청이 도착했습니다.");
+          const title = String(data.title || "가족 보호 초대");
           setBottomToast(body);
           setTimeout(() => setBottomToast(""), 6000);
-          addPushNotification({ category: "가족보호", title: "가족 보호 초대", body });
-          postAndroidSystemNotification("가족 보호 초대", body, String(data.linkId || "family-invite"));
+          addPushNotification({
+            category: "가족보호",
+            title,
+            body,
+            kind: "family_invite",
+            linkId: data.linkId,
+            familyRelation: data.familyRelation,
+            familyInvitePending: true
+          });
+          postAndroidFamilyInviteNotification(title, body, String(data.linkId || ""));
+        }
+        if (data?.type === "vlue-family-protection-rejected") {
+          const body = String(data.body || "가족이 보호 초대를 거절했습니다.");
+          setBottomToast(body);
+          setTimeout(() => setBottomToast(""), 4000);
+          addPushNotification({ category: "가족보호", title: "가족 보호 거절", body });
+          postAndroidSystemNotification("가족 보호 거절", body, "family-rejected");
         }
         if (data?.type === "enterprise-group-chat" && data.message) {
           window.dispatchEvent(new CustomEvent("vlue-enterprise-chat", { detail: data }));
@@ -1249,11 +1265,12 @@ function App() {
           postAndroidSystemNotification("계좌 모니터링 동의", body, String(data.linkId || "bank-consent"));
         }
         if (data?.type === "vlue-family-protection-accepted") {
-          const body = "가족이 보호 초대를 수락했습니다.";
+          const body = String(data.body || "가족이 보호 초대를 수락했습니다.");
+          const title = String(data.title || "가족 보호 수락");
           setBottomToast(body);
           setTimeout(() => setBottomToast(""), 4000);
-          addPushNotification({ category: "가족보호", title: "가족 보호 연결", body });
-          postAndroidSystemNotification("가족 보호 연결", body, "family-accepted");
+          addPushNotification({ category: "가족보호", title, body });
+          postAndroidSystemNotification(title, body, "family-accepted");
         }
         if (data?.type === "vlue-parental-consent-request") {
           const body = String(data.body || "자녀 가입 승인 요청이 도착했습니다.");

@@ -49,6 +49,7 @@ import kr.vlue.calloverlay.dcp.CallPathReasonCopy
 import kr.vlue.calloverlay.dcp.CallPathSession
 import kr.vlue.calloverlay.dcp.ContactSafeCarePayload
 import kr.vlue.calloverlay.dcp.ContactSafeCarePolicy
+import kr.vlue.calloverlay.dcp.VlueAuthMemberPopupPolicy
 import kr.vlue.calloverlay.dcp.DcpAbnormalWarningView
 import kr.vlue.calloverlay.dcp.DcpPopupPolicy
 import kr.vlue.calloverlay.dcp.NationalAgencyWhitelist
@@ -834,6 +835,13 @@ class CallOverlayService : Service() {
             syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
             return
         }
+        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified = true)) {
+            remoteConnected = true
+            companion.onAnswer(OverlayContext.IN_CALL)
+            hideCompanionOverlayChrome()
+            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            return
+        }
         VlueBigPushTrace.milestone(
             "SHOWCASE_REQUESTED",
             "Showcase Requested",
@@ -1237,6 +1245,17 @@ class CallOverlayService : Service() {
                 LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
                 return@post
             }
+            if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(cardJson, verified) &&
+                (companion.state == OverlayState.SHOWCASE || isCallAlreadyAnswered())
+            ) {
+                if (companion.state != OverlayState.SHOWCASE) {
+                    companion.onAnswer(OverlayContext.IN_CALL)
+                }
+                hideCompanionOverlayChrome()
+                syncDcpRoutePopup(cardJson, currentDcpRoute)
+                LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
+                return@post
+            }
             val banner = nativeBanner
             if (banner != null) {
                 BigPushShowcaseBar.bind(banner, phone, verified, outgoing, cardJson)
@@ -1367,6 +1386,27 @@ class CallOverlayService : Service() {
             attachDcpPopupWindow(spec)
             return
         }
+        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(cardJson, verified = true)) {
+            val show = VlueAuthMemberPopupPolicy.shouldShow(
+                overlayState = companion.state,
+                popupOnlyTest = dcpPopupOnly
+            ) && !dismissing
+            if (!show) {
+                removeDcpPopupWindow()
+                return
+            }
+            val name = VlueAuthMemberPopupPolicy.displayName(cardJson, currentPhone)
+            val spec = DcpAbnormalWarningView.Spec(
+                abnormal = false,
+                agencyName = name,
+                shortNumber = parseDcpPhone(cardJson).ifBlank { currentPhone },
+                officialWebsite = "",
+                fromMock = dcpPopupOnly,
+                vlueAuthMember = true
+            )
+            attachDcpPopupWindow(spec)
+            return
+        }
         val route = NationalAgencyWhitelist.routeForCall(currentPhone, dcpRoute, parseDcpRoute(cardJson))
         val pathVerify = parsePathVerify(cardJson) ||
             (route == "abnormal" && NationalAgencyWhitelist.match(currentPhone) == null)
@@ -1447,7 +1487,7 @@ class CallOverlayService : Service() {
             this,
             spec,
             onConfirm = {
-                if (spec.contactSafeCare) {
+                if (spec.contactSafeCare || spec.vlueAuthMember) {
                     removeDcpPopupWindow()
                 } else if (spec.fromMock || dcpPopupOnly) {
                     dcpPopupOnly = false

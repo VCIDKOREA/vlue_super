@@ -5,8 +5,10 @@ import {
   acceptProtectionLink,
   createProtectionLink,
   listFamilyProtection,
+  parseFamilyRelation,
   recordWardHeartbeat,
   recordWardMissedCall,
+  rejectProtectionLink,
   reportWardRiskySite,
   revokeProtectionLink,
   runElderProtectionChecks,
@@ -21,6 +23,7 @@ import {
 } from "../services/familyProtection/familyProtectionChildBank.js";
 import { mapAgentPayloadToChildBankTransaction } from "../services/familyProtection/bankingAgentAdapter.js";
 import { verifyOpenBankingWebhookSecret } from "../services/familyProtection/openbankingWebhookAuth.js";
+import { getFamilyCircleOverview } from "../services/familyProtection/familyProtectionCircle.js";
 import { GOVERNMENT_HOTLINES } from "../lib/governmentHotlines.js";
 import { REMOTE_CONTROL_APPS } from "../lib/remoteControlApps.js";
 
@@ -54,8 +57,7 @@ async function handleFamilyInvite(c: import("hono").Context) {
     familyRelation?: string;
     guardianImpUid?: string;
   };
-  const familyRelation =
-    body.familyRelation === "child" || body.wardRole === "child" ? "child" : "parent";
+  const familyRelation = parseFamilyRelation(body.familyRelation || body.wardRole);
   const result = await createProtectionLink(
     me,
     String(body.wardHandle || ""),
@@ -83,6 +85,24 @@ familyProtectionRoutes.post("/links/:linkId/accept", requireUserHeader, async (c
   const result = await acceptProtectionLink(me, linkId);
   if ("error" in result && result.error) return c.json({ error: result.error }, 400);
   return c.json(result);
+});
+
+familyProtectionRoutes.post("/links/:linkId/reject", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId") as string;
+  const linkId = String(c.req.param("linkId") || "");
+  if (!linkId) return c.json({ error: "linkId 필요" }, 400);
+  const result = await rejectProtectionLink(me, linkId);
+  if ("error" in result && result.error) return c.json({ error: result.error }, 400);
+  return c.json(result);
+});
+
+familyProtectionRoutes.get("/circle", requireUserHeader, async (c) => {
+  try {
+    const me = c.get("vlueUserId") as string;
+    return c.json(await getFamilyCircleOverview(me));
+  } catch (err) {
+    return handleFamilyProtectionRouteError(c, "/circle", err);
+  }
 });
 
 familyProtectionRoutes.post("/links/:linkId/revoke", requireUserHeader, async (c) => {

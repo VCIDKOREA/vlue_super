@@ -1,11 +1,11 @@
 import { createPortal } from "react-dom";
-import { Phone, ShieldCheck } from "lucide-react";
+import { Phone } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import "./vlue-auth-member-popup.css";
 
 /**
- * DCC·쇼케이스 미설정 회원 — 빈 쇼케이스 대신 VLUE 인증 확인 팝업
- * (무료/유료 공통)
+ * DCC·쇼케이스 미설정 회원 — 「경로 검증 · 정상」스타일 (웹 폴백).
+ * 통화 오버레이(Android)는 네이티브 별도 창을 사용한다.
  */
 export default function VlueAuthMemberPopup({
   open = false,
@@ -32,10 +32,7 @@ export default function VlueAuthMemberPopup({
       }}
     >
       <article className="vlue-auth-member-popup">
-        <p className="vlue-auth-member-popup__badge">
-          <ShieldCheck size={14} strokeWidth={2.4} aria-hidden />
-          VLUE 인증 · 확인
-        </p>
+        <p className="vlue-auth-member-popup__badge">경로 검증 · 정상</p>
         <p className="vlue-auth-member-popup__msg">
           VLUE 인증 회원으로 확인되었습니다. 공개 설정된 디지털인증명함·쇼케이스가 없습니다.
         </p>

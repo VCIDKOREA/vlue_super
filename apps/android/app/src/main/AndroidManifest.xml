@@ -228,5 +228,14 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".family.FamilyInviteActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="kr.vlue.app.action.FAMILY_INVITE_ACCEPT" />
+                <action android:name="kr.vlue.app.action.FAMILY_INVITE_REJECT" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

@@ -57,6 +57,21 @@ export async function acceptFamilyProtectionLink(linkId) {
   return parseJson(res);
 }
 
+export async function rejectFamilyProtectionLink(linkId) {
+  const res = await vlueAuthFetch(apiUrl(`/api/family-protection/links/${linkId}/reject`), {
+    method: "POST",
+    headers: vlueAuthHeaders()
+  });
+  return parseJson(res);
+}
+
+export async function fetchFamilyCircle() {
+  const res = await vlueAuthFetch(apiUrl("/api/family-protection/circle"), {
+    headers: vlueAuthHeaders()
+  });
+  return parseJson(res);
+}
+
 export async function revokeFamilyProtectionLink(linkId) {
   const res = await vlueAuthFetch(apiUrl(`/api/family-protection/links/${linkId}/revoke`), {
     method: "POST",

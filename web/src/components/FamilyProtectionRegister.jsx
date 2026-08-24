@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { requestGuardianPassImpUid } from "../lib/parentalConsentApi.js";
 import { normalizeMembershipKind } from "../lib/membershipBm.js";
-import { FAMILY_MEMBER_DISPLAY_LABEL } from "../lib/familyProtectionDemo.js";
 import { displayFamilyUser, useFamilyProtection } from "../hooks/useFamilyProtection.js";
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
 import FamilySecurityDashboard from "./FamilySecurityDashboard.jsx";
+import FamilyMembersCircleModal from "./FamilyMembersCircleModal.jsx";
 
 const EXPAND_FAMILY_KEY = "vlue_expand_family_protection_v1";
 
@@ -15,6 +15,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
   const [familyRelation, setFamilyRelation] = useState("parent");
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [slotHint, setSlotHint] = useState("");
+  const [circleOpen, setCircleOpen] = useState(false);
 
   const fp = useFamilyProtection();
 
@@ -113,7 +114,16 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
 
   const activeCount = fp.asGuardian.filter((l) => l.status === "active").length;
   const guide = fp.guide;
+  const uiMode = fp.data?.uiMode || (fp.data?.canInviteFamily ? "guardian_full" : "guide_only");
+  const showGuardianPanel = uiMode === "guardian_full";
+  const showWardPanel = uiMode === "ward_only";
   const settingsBox = isDarkMode ? "border-white/10 bg-white/5" : "border-gray-100 bg-gray-50/90";
+
+  const relationLabel = (link) => {
+    if (link?.familyRelation === "child") return "자녀";
+    if (link?.familyRelation === "relative") return "가족";
+    return "부모(노부모)";
+  };
 
   return (
     <div className="mt-3">
@@ -193,6 +203,47 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             </div>
           ) : null}
 
+          <button
+            type="button"
+            onClick={() => setCircleOpen(true)}
+            className={`mt-3 w-full rounded-xl border py-2.5 text-[12px] font-black ${
+              isDarkMode ? "border-indigo-400/30 bg-indigo-500/15 text-indigo-100" : "border-indigo-200 bg-indigo-50 text-indigo-800"
+            }`}
+          >
+            구성원 확인
+          </button>
+
+          {showWardPanel ? (
+            <div className={`mt-3 rounded-xl border px-3 py-3 ${isDarkMode ? "border-emerald-500/25 bg-emerald-500/10" : "border-emerald-100 bg-emerald-50/90"}`}>
+              <p className={`text-[12px] font-black ${isDarkMode ? "text-emerald-100" : "text-emerald-900"}`}>가족 보호 수신 안내</p>
+              <p className={`mt-1.5 text-[11px] leading-relaxed ${sub}`}>
+                무료·유료 회원 모두 가족 보호 <span className="font-bold">초대를 받을 수</span> 있습니다.
+                초대 수락·거절은 <span className="font-bold">푸시 알림·알림함</span>에서 처리하세요.
+              </p>
+              <p className={`mt-1.5 text-[11px] leading-relaxed ${sub}`}>
+                가족을 <span className="font-bold">직접 등록·신청</span>하려면 유료 회원(VLUE 멤버십)이 필요합니다.
+              </p>
+            </div>
+          ) : null}
+
+          {!showGuardianPanel && uiMode === "guide_only" ? (
+            <div className={`mt-3 rounded-xl border px-3 py-3 ${isDarkMode ? "border-amber-500/25 bg-amber-500/10" : "border-amber-100 bg-amber-50/90"}`}>
+              <p className={`text-[12px] font-black ${isDarkMode ? "text-amber-100" : "text-amber-900"}`}>유료 회원 전용 — 가족 보호 신청</p>
+              <p className={`mt-1.5 text-[11px] leading-relaxed ${sub}`}>
+                부모·자녀·가족을 등록하고 보호 알림을 설정하려면 VLUE 유료 멤버십이 필요합니다.
+                초대를 받은 경우에는 알림함에서 수락·거절할 수 있습니다.
+              </p>
+              <button
+                type="button"
+                onClick={() => setUpgradeOpen(true)}
+                className="mt-2 w-full rounded-lg bg-violet-600 py-2.5 text-[12px] font-black text-white"
+              >
+                멤버십 안내
+              </button>
+            </div>
+          ) : null}
+
+          {showGuardianPanel ? (
           <div className={`mt-3 space-y-2.5`}>
             <div className={`rounded-xl border p-2.5 ${settingsBox}`}>
               <p className={`text-[11px] font-bold ${strong}`}>부모(노부모) 보호</p>
@@ -285,7 +336,10 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
               보호 설정 저장
             </button>
           </div>
+          ) : null}
 
+          {showGuardianPanel ? (
+          <>
           <p className={`mt-3 text-[11px] font-bold ${strong}`}>가족 등록</p>
           {!fp.data?.canInviteFamily && fp.data?.inviteBlockReason ? (
             <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-amber-300" : "text-amber-700"}`}>
@@ -293,7 +347,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             </p>
           ) : null}
 
-          <p className={`mt-2 text-[10px] font-semibold ${sub}`}>관계 선택</p>
+          <p className={`mt-2 text-[10px] font-semibold ${sub}`}>관계 선택 · 부모·자녀는 보호 기능, 가족은 알림만</p>
           <div className="mt-2 flex gap-1.5">
             <button
               type="button"
@@ -306,7 +360,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                     : "bg-gray-100 text-gray-500"
               }`}
             >
-              내 부모
+              부모
             </button>
             <button
               type="button"
@@ -319,7 +373,20 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                     : "bg-gray-100 text-gray-500"
               }`}
             >
-              내 자녀
+              자녀
+            </button>
+            <button
+              type="button"
+              onClick={() => setFamilyRelation("relative")}
+              className={`flex-1 rounded-xl py-2.5 text-[12px] font-black ${
+                familyRelation === "relative"
+                  ? "bg-emerald-600 text-white"
+                  : isDarkMode
+                    ? "bg-white/10 text-gray-400"
+                    : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              가족
             </button>
           </div>
 
@@ -338,8 +405,11 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             onClick={onAdd}
             className="mt-3 w-full rounded-xl bg-blue-600 py-3.5 text-[14px] font-black text-white shadow-sm disabled:opacity-50"
           >
-            {familyRelation === "child" ? "PASS 인증 후 자녀 초대" : "가족 초대 (승인 요청 보내기)"}
+            {familyRelation === "child" ? "PASS 인증 후 자녀 초대" : familyRelation === "relative" ? "가족 초대 (알림 수신)" : "가족 초대 (승인 요청 보내기)"}
           </button>
+
+            </>
+          ) : null}
 
           {fp.loading ? (
             <p className={`mt-3 text-center text-[11px] ${sub}`}>불러오는 중…</p>
@@ -364,6 +434,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
               {fp.asWard.length > 0 && (
                 <div className="mt-3">
                   <p className={`text-[11px] font-bold ${strong}`}>받은 가족 보호 요청</p>
+                  <p className={`mt-0.5 text-[10px] ${sub}`}>수락·거절은 푸시 알림 또는 알림함에서 처리하세요.</p>
                   {fp.asWard.map((link) => (
                     <div
                       key={link.id}
@@ -373,32 +444,21 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                     >
                       <div className="min-w-0">
                         <p className={`truncate text-[12px] font-bold ${strong}`}>
-                          {displayFamilyUser(link.guardianUser)} · {FAMILY_MEMBER_DISPLAY_LABEL}
+                          {displayFamilyUser(link.guardianUser)} · {relationLabel(link)}
                         </p>
-                        <p className={`text-[10px] ${sub}`}>{link.status === "pending" ? "승인 대기" : "보호 활성"}</p>
+                        <p className={`text-[10px] ${sub}`}>
+                          {link.status === "pending" ? "승인 대기 — 알림함에서 처리" : "보호 활성"}
+                        </p>
                       </div>
-                      {link.status === "pending" ? (
-                        <button
-                          type="button"
-                          disabled={fp.busy}
-                          onClick={async () => {
-                            try {
-                              toast(await fp.acceptLink(link.id));
-                            } catch (e) {
-                              toast(e?.message || "수락 실패");
-                            }
-                          }}
-                          className="shrink-0 rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white"
-                        >
-                          수락
-                        </button>
-                      ) : null}
+                      <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold ${isDarkMode ? "bg-white/10 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
+                        확인
+                      </span>
                     </div>
                   ))}
                 </div>
               )}
 
-              {fp.asGuardian.length > 0 && (
+              {showGuardianPanel && fp.asGuardian.length > 0 && (
                 <div className="mt-3">
                   <p className={`text-[11px] font-bold ${strong}`}>등록한 가족</p>
                   {fp.asGuardian.map((link) => (
@@ -410,9 +470,15 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                     >
                       <div className="min-w-0">
                         <p className={`truncate text-[12px] font-bold ${strong}`}>
-                          {displayFamilyUser(link.wardUser)} · {FAMILY_MEMBER_DISPLAY_LABEL}
+                          {displayFamilyUser(link.wardUser)} · {relationLabel(link)}
                         </p>
-                        <p className={`text-[10px] ${sub}`}>{link.status === "active" ? "보호 중" : "승인 대기"}</p>
+                        <p className={`text-[10px] ${sub}`}>
+                          {link.status === "active"
+                            ? link.familyRelation === "relative"
+                              ? "알림 연결됨"
+                              : "보호 중"
+                            : "승인 대기"}
+                        </p>
                       </div>
                       <div className="flex shrink-0 flex-col gap-1">
                         {link.status === "active" && link.familyRelation === "child" ? (
@@ -451,9 +517,11 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                 </div>
               )}
 
-              <FamilySecurityDashboard isDarkMode={isDarkMode} onToast={toast} />
+              {showGuardianPanel ? (
+                <FamilySecurityDashboard isDarkMode={isDarkMode} onToast={toast} />
+              ) : null}
 
-              {fp.alerts.length > 0 && (
+              {showGuardianPanel && fp.alerts.length > 0 && (
                 <div className="mt-3">
                   <p className={`text-[11px] font-bold ${strong}`}>최근 보호 알림</p>
                   {fp.alerts.slice(0, 6).map((a) => (
@@ -499,6 +567,8 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
           ) : null}
         </div>
       ) : null}
+
+      <FamilyMembersCircleModal open={circleOpen} onClose={() => setCircleOpen(false)} isDarkMode={isDarkMode} />
 
       <MembershipUpgradeModal
         open={upgradeOpen}
