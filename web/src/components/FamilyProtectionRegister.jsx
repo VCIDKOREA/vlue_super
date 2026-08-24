@@ -113,6 +113,9 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
   };
 
   const inviteTargetKey = (c) => String(c?.inviteKey || c?.publicHandle || "").trim();
+  const canInviteOrResend = (c) =>
+    Boolean(c) && (!c.alreadyLinked || c.linkStatus === "pending");
+  const inviteBlockedActive = (c) => Boolean(c?.alreadyLinked && c?.linkStatus !== "pending");
 
   const onInviteCandidate = async (candidate) => {
     const target = candidate || selectedCandidate;
@@ -121,8 +124,8 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
       setSlotHint("먼저 가족을 조회한 뒤 목록에서 선택해 주세요.");
       return;
     }
-    if (target?.alreadyLinked) {
-      setSlotHint("이미 등록·초대된 가족입니다.");
+    if (inviteBlockedActive(target)) {
+      setSlotHint("이미 등록된 가족입니다.");
       return;
     }
     setSlotHint("");
@@ -164,6 +167,15 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
     }
     setSlotHint("조회 후 목록에서 가족을 선택한 뒤 초대해 주세요.");
   };
+
+  const inviteSelection =
+    selectedCandidate || (candidates.length === 1 ? candidates[0] : null);
+  const inviteIsResend = inviteSelection?.linkStatus === "pending";
+  const inviteButtonDisabled =
+    fp.busy ||
+    searchBusy ||
+    !fp.data?.canInviteFamily ||
+    !canInviteOrResend(inviteSelection);
 
   const activeCount = fp.asGuardian.filter((l) => l.status === "active").length;
   const guide = fp.guide;
@@ -489,14 +501,15 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
               <p className={`text-[11px] font-bold ${strong}`}>조회 결과 · 초대할 가족을 선택</p>
               {candidates.map((c) => {
                 const selected = selectedCandidate?.userId === c.userId;
+                const blocked = Boolean(c.alreadyLinked && c.linkStatus !== "pending");
                 return (
                   <button
                     key={c.userId}
                     type="button"
-                    disabled={c.alreadyLinked}
+                    disabled={blocked}
                     onClick={() => setSelectedCandidate(c)}
                     className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition ${
-                      c.alreadyLinked
+                      blocked
                         ? isDarkMode
                           ? "border-white/5 bg-white/5 opacity-60"
                           : "border-gray-100 bg-gray-50 opacity-70"
@@ -518,7 +531,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                     </div>
                     <span
                       className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold ${
-                        c.alreadyLinked
+                        blocked
                           ? isDarkMode
                             ? "bg-white/10 text-gray-400"
                             : "bg-gray-100 text-gray-500"
@@ -531,7 +544,9 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                     >
                       {c.alreadyLinked
                         ? c.linkStatus === "pending"
-                          ? "초대 중"
+                          ? selected
+                            ? "재전송 선택"
+                            : "초대 중 · 재전송"
                           : "등록됨"
                         : selected
                           ? "선택됨"
@@ -545,22 +560,28 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
 
           <button
             type="button"
-            disabled={
-              fp.busy ||
-              searchBusy ||
-              !fp.data?.canInviteFamily ||
-              (!selectedCandidate && candidates.length !== 1) ||
-              Boolean(selectedCandidate?.alreadyLinked) ||
-              (candidates.length === 1 && candidates[0].alreadyLinked)
-            }
+            disabled={inviteButtonDisabled}
             onClick={() => void onAdd()}
-            className="mt-3 w-full rounded-xl bg-blue-600 py-3.5 text-[14px] font-black text-white shadow-sm disabled:opacity-50"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-[14px] font-black text-white shadow-sm transition active:scale-[0.99] disabled:opacity-50"
+            aria-busy={fp.busy}
           >
-            {familyRelation === "child"
-              ? "PASS 인증 후 자녀 초대"
-              : familyRelation === "relative"
-                ? "선택한 가족 초대 (알림 수신)"
-                : "선택한 가족 초대 (승인 요청)"}
+            {fp.busy ? (
+              <>
+                <span
+                  className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                  aria-hidden
+                />
+                <span>승인 요청 보내는 중…</span>
+              </>
+            ) : inviteIsResend ? (
+              "승인 요청 다시 보내기"
+            ) : familyRelation === "child" ? (
+              "PASS 인증 후 자녀 초대"
+            ) : familyRelation === "relative" ? (
+              "선택한 가족 초대 (알림 수신)"
+            ) : (
+              "선택한 가족 초대 (승인 요청)"
+            )}
           </button>
 
             </>

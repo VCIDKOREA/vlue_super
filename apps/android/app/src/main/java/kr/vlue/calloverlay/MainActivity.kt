@@ -96,6 +96,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         VlueBigPushTrace.bind(this)
         AppLockStore.init(this)
         VlueSystemNotifier.ensureChannel(this)
+        kr.vlue.calloverlay.family.FamilyProtectionNotificationHelper.ensureChannel(this)
         setContentView(R.layout.activity_main)
         mainRoot = findViewById(R.id.main_root)
         webView = findViewById(R.id.main_webview)

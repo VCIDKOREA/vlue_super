@@ -210,9 +210,13 @@ export function useFamilyProtection() {
       }
       setBusy(true);
       try {
-        await createFamilyProtectionLink(wardHandle.trim(), familyRelation, guardianImpUid);
-        await load();
+        const res = await createFamilyProtectionLink(wardHandle.trim(), familyRelation, guardianImpUid);
         notifyChanged();
+        /* 목록 재조회는 백그라운드 — 토스트를 FCM/전체로드에 묶지 않음 */
+        void load({ silent: true });
+        if (res?.resent) {
+          return "승인 요청 알림을 다시 보냈습니다.";
+        }
         return "가족에게 승인 요청 메시지를 보냈습니다. 수락 후 보호가 시작됩니다.";
       } catch (e) {
         if (e?.code === "FAMILY_SLOT_LIMIT" || e?.code === "FAMILY_SLOT_NEEDS_EXTENSION") {

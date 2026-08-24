@@ -145,15 +145,22 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
       setMsg('먼저 조회한 뒤 목록에서 가족을 선택해 주세요.');
       return;
     }
-    if (target?.alreadyLinked) {
-      setMsg('이미 등록·초대된 가족입니다.');
+    if (target?.alreadyLinked && target?.linkStatus !== 'pending') {
+      setMsg('이미 등록된 가족입니다.');
       return;
     }
     setBusy(true);
     setMsg('');
     try {
       try {
-        await createFamilyProtectionLink(key, familyRelation, undefined);
+        const res = (await createFamilyProtectionLink(key, familyRelation, undefined)) as {
+          resent?: boolean;
+        };
+        setMsg(
+          res?.resent
+            ? '승인 요청 알림을 다시 보냈습니다.'
+            : '초대를 보냈습니다. 상대가 앱에서 수락하면 보호가 시작됩니다.'
+        );
       } catch (first) {
         const fe = first as Error & { code?: string };
         if (familyRelation !== 'child' || fe?.code !== 'GUARDIAN_PASS_REQUIRED') {
@@ -161,13 +168,13 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
         }
         const guardianImpUid = await requestGuardianPassImpUid();
         await createFamilyProtectionLink(key, familyRelation, guardianImpUid);
+        setMsg('초대를 보냈습니다. 상대가 앱에서 수락하면 보호가 시작됩니다.');
       }
       setWardHandle('');
       setCandidates([]);
       setSelectedCandidate(null);
-      setMsg('초대를 보냈습니다. 상대가 앱에서 수락하면 보호가 시작됩니다.');
-      await load();
       window.dispatchEvent(new CustomEvent('vlue-family-protection-changed'));
+      void load();
     } catch (e) {
       const err = e as Error & { message?: string; code?: string };
       setMsg(err?.message || '등록에 실패했습니다.');
@@ -342,14 +349,15 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
                 <ul className="mt-3 space-y-2">
                   {candidates.map((c) => {
                     const selected = selectedCandidate?.userId === c.userId;
+                    const blocked = Boolean(c.alreadyLinked && c.linkStatus !== 'pending');
                     return (
                       <li key={c.userId}>
                         <button
                           type="button"
-                          disabled={Boolean(c.alreadyLinked)}
+                          disabled={blocked}
                           onClick={() => setSelectedCandidate(c)}
                           className={`flex w-full items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left ${
-                            c.alreadyLinked
+                            blocked
                               ? 'border-slate-100 bg-slate-50 opacity-70'
                               : selected
                                 ? 'border-indigo-300 bg-indigo-50'
@@ -364,7 +372,15 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
                             </p>
                           </div>
                           <span className="shrink-0 text-[11px] font-bold text-slate-500">
-                            {c.alreadyLinked ? (c.linkStatus === 'pending' ? '초대 중' : '등록됨') : selected ? '선택됨' : '선택'}
+                            {c.alreadyLinked
+                              ? c.linkStatus === 'pending'
+                                ? selected
+                                  ? '재전송 선택'
+                                  : '초대 중 · 재전송'
+                                : '등록됨'
+                              : selected
+                                ? '선택됨'
+                                : '선택'}
                           </span>
                         </button>
                       </li>
@@ -379,12 +395,30 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
                   busy ||
                   searchBusy ||
                   data?.canInviteFamily === false ||
-                  (!selectedCandidate && candidates.length !== 1) ||
-                  Boolean(selectedCandidate?.alreadyLinked)
+                  !(
+                    selectedCandidate ||
+                    (candidates.length === 1 &&
+                      (!candidates[0].alreadyLinked || candidates[0].linkStatus === 'pending'))
+                  ) ||
+                  Boolean(selectedCandidate?.alreadyLinked && selectedCandidate?.linkStatus !== 'pending')
                 }
-                className="mt-3 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 px-6 py-3 text-sm font-bold text-white"
+                aria-busy={busy}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 px-6 py-3 text-sm font-bold text-white"
               >
-                {busy ? '처리 중…' : '선택한 가족 초대'}
+                {busy ? (
+                  <>
+                    <span
+                      className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                      aria-hidden
+                    />
+                    승인 요청 보내는 중…
+                  </>
+                ) : selectedCandidate?.linkStatus === 'pending' ||
+                  (candidates.length === 1 && candidates[0].linkStatus === 'pending') ? (
+                  '승인 요청 다시 보내기'
+                ) : (
+                  '선택한 가족 초대'
+                )}
               </button>
               {data?.inviteBlockReason ? (
                 <p className="mt-2 text-xs text-amber-700">{data.inviteBlockReason}</p>

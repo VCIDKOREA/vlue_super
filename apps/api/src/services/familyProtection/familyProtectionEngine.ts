@@ -93,9 +93,13 @@ async function notifyGuardianInviteResult(
   });
 
   try {
-    await sendFamilyProtectionPush(guardianUserId, title, body, {
+    void sendFamilyProtectionPush(guardianUserId, title, body, {
       type: accepted ? "vlue-family-protection-accepted" : "vlue-family-protection-rejected",
-      wardUserId
+      wardUserId,
+      title,
+      body
+    }).catch((err) => {
+      console.warn("[family-protection] invite_result_fcm_failed", err);
     });
   } catch (err) {
     console.warn("[family-protection] invite_result_fcm_failed", err);
@@ -763,6 +767,14 @@ export async function createProtectionLink(
       ? "수락하면 가족 보호 이벤트 알림을 받을 수 있습니다."
       : "수락하면 보호가 시작됩니다.";
 
+  const existing = await familyProtectionDb.familyProtectionLink.findUnique({
+    where: {
+      guardianUserId_wardUserId: { guardianUserId, wardUserId: ward.id }
+    },
+    select: { id: true, status: true }
+  });
+  const resendPending = existing?.status === "pending";
+
   const link = await familyProtectionDb.familyProtectionLink.upsert({
     where: {
       guardianUserId_wardUserId: { guardianUserId, wardUserId: ward.id }
@@ -774,22 +786,24 @@ export async function createProtectionLink(
   const inviteTitle = "가족 보호 초대";
   const inviteBody = `${guardianName} 님이 회원님을 ${relationLabel}(으)로 등록했습니다. ${protectionNote}`;
 
-  await prisma.ownerNotification.create({
-    data: {
-      ownerUserId: ward.id,
-      actorUserId: guardianUserId,
-      title: inviteTitle,
-      body: inviteBody,
-      payloadJson: {
-        kind: "family_invite",
-        linkId: link.id,
-        guardianUserId,
-        familyRelation,
-        wardRole,
-        actions: ["accept", "reject"]
+  if (!resendPending) {
+    await prisma.ownerNotification.create({
+      data: {
+        ownerUserId: ward.id,
+        actorUserId: guardianUserId,
+        title: inviteTitle,
+        body: inviteBody,
+        payloadJson: {
+          kind: "family_invite",
+          linkId: link.id,
+          guardianUserId,
+          familyRelation,
+          wardRole,
+          actions: ["accept", "reject"]
+        }
       }
-    }
-  });
+    });
+  }
 
   ssePublish(ward.id, {
     type: "vlue-family-protection-invite",
@@ -801,29 +815,39 @@ export async function createProtectionLink(
     body: inviteBody
   });
 
-  try {
-    await sendFamilyProtectionPush(ward.id, inviteTitle, inviteBody, {
-      type: "vlue-family-protection-invite",
-      linkId: link.id,
-      guardianUserId,
-      familyRelation,
-      actions: "accept,reject"
-    }).then((push) => {
+  /* 친구신청과 동일 — FCM 대기는 초대 API 지연의 주원인. 실패해도 초대는 유지 */
+  void sendFamilyProtectionPush(ward.id, inviteTitle, inviteBody, {
+    type: "vlue-family-protection-invite",
+    linkId: link.id,
+    guardianUserId,
+    familyRelation,
+    actions: "accept,reject",
+    title: inviteTitle,
+    body: inviteBody
+  })
+    .then((push) => {
       if (push.skipped || push.sent === 0) {
         console.warn("[family-protection] invite_fcm_skipped", {
           wardUserId: ward.id,
           reason: push.reason || (push.sent === 0 ? "no_delivery" : "ok"),
           sent: push.sent,
-          failed: push.failed
+          failed: push.failed,
+          resend: resendPending
+        });
+      } else {
+        console.log("[family-protection] invite_fcm_sent", {
+          wardUserId: ward.id,
+          sent: push.sent,
+          failed: push.failed,
+          resend: resendPending
         });
       }
+    })
+    .catch((err) => {
+      console.warn("[family-protection] invite_fcm_failed", err);
     });
-  } catch (err) {
-    console.warn("[family-protection] invite_fcm_failed", err);
-    /* FCM 실패는 초대 자체를 막지 않음 */
-  }
 
-  if (familyRelation === "child") {
+  if (familyRelation === "child" && !resendPending) {
     try {
       await notifyParentalConsentAfterChildInvite(guardianUserId, ward.id);
     } catch (err) {
@@ -831,7 +855,7 @@ export async function createProtectionLink(
     }
   }
 
-  return { ok: true, link };
+  return { ok: true, link, resent: resendPending };
 }
 
 export async function acceptProtectionLink(wardUserId: string, linkId: string) {

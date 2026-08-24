@@ -21,20 +21,47 @@ async function ensureFirebaseApp(): Promise<FirebaseAdminModule | null> {
 
     if (admin.apps.length > 0) return admin;
 
-    const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
-    if (credPath) {
-      admin.initializeApp({ credential: admin.credential.applicationDefault() });
+    if (process.env.FCM_ENABLED === "0") {
+      console.warn("[fcm] disabled via FCM_ENABLED=0");
+      adminModule = null;
+      return null;
+    }
+
+    const gac = resolveGoogleCredential();
+    if (gac && "client_email" in gac && gac.client_email && gac.private_key) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: gac.project_id,
+          clientEmail: gac.client_email,
+          privateKey: resolvePrivateKey(gac.private_key)
+        })
+      });
       return admin;
     }
 
-    const projectId = process.env.FCM_PROJECT_ID?.trim();
-    const clientEmail = process.env.FCM_CLIENT_EMAIL?.trim();
-    const privateKey = resolvePrivateKey(process.env.FCM_PRIVATE_KEY);
+    const projectId = envTrim("FCM_PROJECT_ID", "FIREBASE_PROJECT_ID");
+    const clientEmail = envTrim("FCM_CLIENT_EMAIL", "FIREBASE_CLIENT_EMAIL");
+    const privateKey = resolvePrivateKey(
+      envTrim("FCM_PRIVATE_KEY", "FIREBASE_PRIVATE_KEY")
+    );
     if (projectId && clientEmail && privateKey) {
       admin.initializeApp({
         credential: admin.credential.cert({ projectId, clientEmail, privateKey })
       });
       return admin;
+    }
+
+    if (gac && "path" in gac && gac.path) {
+      try {
+        const { existsSync } = await import("node:fs");
+        if (existsSync(gac.path)) {
+          admin.initializeApp({ credential: admin.credential.applicationDefault() });
+          return admin;
+        }
+        console.warn("[fcm] GOOGLE_APPLICATION_CREDENTIALS path missing", gac.path);
+      } catch (err) {
+        console.warn("[fcm] application_default_failed", err);
+      }
     }
 
     console.warn("[fcm] credentials_not_configured — push skipped");
@@ -47,8 +74,16 @@ async function ensureFirebaseApp(): Promise<FirebaseAdminModule | null> {
   }
 }
 
-function stringifyDataPayload(dataPayload?: Record<string, unknown>): Record<string, string> {
-  const out: Record<string, string> = { channel: "family_protection" };
+function stringifyDataPayload(
+  dataPayload: Record<string, unknown> | undefined,
+  title: string,
+  body: string
+): Record<string, string> {
+  const out: Record<string, string> = {
+    channel: "family_protection",
+    title: String(title || "").slice(0, 200),
+    body: String(body || "").slice(0, 500)
+  };
   if (!dataPayload) return out;
   for (const [key, value] of Object.entries(dataPayload)) {
     if (value === undefined || value === null) continue;
@@ -57,10 +92,36 @@ function stringifyDataPayload(dataPayload?: Record<string, unknown>): Record<str
   return out;
 }
 
-/** 보호자(가족 계정)의 등록된 FCM 토큰 목록 — 승인된 기기만 */
+function envTrim(...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const v = process.env[key]?.trim();
+    if (v) return v;
+  }
+  return undefined;
+}
+
+/** GOOGLE_APPLICATION_CREDENTIALS 가 파일 경로 또는 JSON 본문인 경우 모두 처리 */
+function resolveGoogleCredential() {
+  const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
+  if (!raw) return null;
+  if (raw.startsWith("{")) {
+    try {
+      return JSON.parse(raw) as {
+        project_id?: string;
+        client_email?: string;
+        private_key?: string;
+      };
+    } catch {
+      return null;
+    }
+  }
+  return { path: raw };
+}
+
+/** 보호자(가족 계정)의 등록된 FCM 토큰 목록 — 승인된 기기 우선, 없으면 토큰 있는 기기 */
 export async function listFcmTokensForUser(protectorUserId: string): Promise<string[]> {
   try {
-    const rows = await prisma.userDevice.findMany({
+    const verified = await prisma.userDevice.findMany({
       where: {
         userId: protectorUserId,
         isVerified: true,
@@ -68,9 +129,23 @@ export async function listFcmTokensForUser(protectorUserId: string): Promise<str
       },
       select: { fcmToken: true }
     });
-    const tokens = rows
+    let tokens = verified
       .map((r) => String(r.fcmToken || "").trim())
       .filter((t) => t.length >= 20);
+    if (!tokens.length) {
+      const any = await prisma.userDevice.findMany({
+        where: {
+          userId: protectorUserId,
+          fcmToken: { not: null }
+        },
+        select: { fcmToken: true },
+        orderBy: { updatedAt: "desc" },
+        take: 8
+      });
+      tokens = any
+        .map((r) => String(r.fcmToken || "").trim())
+        .filter((t) => t.length >= 20);
+    }
     return [...new Set(tokens)];
   } catch (err) {
     console.warn("[fcm] token_lookup_failed", { protectorUserId, err });
@@ -109,17 +184,29 @@ async function sendMulticastPush(
     }
 
     const messaging = admin.messaging();
-    const data = stringifyDataPayload({
-      ...dataPayload,
-      type: String(dataPayload?.type || defaultType)
-    });
+    const data = stringifyDataPayload(
+      {
+        ...dataPayload,
+        type: String(dataPayload?.type || defaultType)
+      },
+      title,
+      body
+    );
     data.channel = channelId;
 
     const res = await messaging.sendEachForMulticast({
       tokens,
       notification: { title, body },
       data,
-      android: { priority: "high", notification: { channelId } },
+      android: {
+        priority: "high",
+        notification: {
+          channelId,
+          sound: "default",
+          priority: "high" as const,
+          defaultVibrateTimings: true
+        }
+      },
       apns: {
         headers: { "apns-priority": "10" },
         payload: { aps: { sound: "default", "content-available": 1 } }

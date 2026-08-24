@@ -301,8 +301,12 @@ export async function getAdminHealthStatus() {
   });
 
   const fcmOk = Boolean(
-    process.env.FIREBASE_PROJECT_ID ||
-      (process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.FCM_ENABLED !== "0")
+    process.env.FCM_ENABLED !== "0" &&
+      (process.env.FCM_PROJECT_ID ||
+        process.env.FIREBASE_PROJECT_ID ||
+        process.env.FCM_CLIENT_EMAIL ||
+        process.env.FIREBASE_CLIENT_EMAIL ||
+        process.env.GOOGLE_APPLICATION_CREDENTIALS)
   );
   checks.push({
     id: "fcm",
