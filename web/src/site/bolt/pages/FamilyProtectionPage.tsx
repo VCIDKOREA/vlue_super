@@ -11,6 +11,7 @@ import {
   acceptFamilyProtectionLink,
   createFamilyProtectionLink,
   fetchFamilyProtection,
+  lookupFamilyInviteCandidates,
   revokeFamilyProtectionLink,
 } from '../../../lib/familyProtectionApi.js';
 import { requestGuardianPassImpUid } from '../../../lib/parentalConsentApi.js';
@@ -54,13 +55,26 @@ type Props = {
   onNavigate: (view: View) => void;
 };
 
+type FamilyInviteCandidate = {
+  userId: string;
+  publicHandle?: string | null;
+  displayName?: string;
+  phoneMasked?: string | null;
+  inviteKey?: string;
+  alreadyLinked?: boolean;
+  linkStatus?: string | null;
+};
+
 export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [searchBusy, setSearchBusy] = useState(false);
   const [data, setData] = useState<FamilyData | null>(null);
   const [msg, setMsg] = useState('');
   const [wardHandle, setWardHandle] = useState('');
   const [familyRelation, setFamilyRelation] = useState<'parent' | 'child'>('parent');
+  const [candidates, setCandidates] = useState<FamilyInviteCandidate[]>([]);
+  const [selectedCandidate, setSelectedCandidate] = useState<FamilyInviteCandidate | null>(null);
 
   const load = useCallback(async () => {
     if (!user) {
@@ -95,26 +109,62 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
         : slots?.baseMaxMembers || 4;
   const slotCount = slots?.memberCount ?? (data?.asGuardian?.length ?? 0) + 1;
 
-  const onInvite = async () => {
-    const handle = wardHandle.trim().replace(/^@+/, '');
-    if (!handle) {
+  const onSearch = async () => {
+    const q = wardHandle.trim();
+    if (!q) {
       setMsg('가족 VLUE 아이디 또는 전화번호를 입력해 주세요.');
+      return;
+    }
+    setSearchBusy(true);
+    setMsg('');
+    setSelectedCandidate(null);
+    setCandidates([]);
+    try {
+      const res = (await lookupFamilyInviteCandidates(q)) as {
+        candidates?: FamilyInviteCandidate[];
+        message?: string;
+      };
+      const list = Array.isArray(res?.candidates) ? res.candidates : [];
+      setCandidates(list);
+      if (!list.length) {
+        setMsg(res?.message || '일치하는 회원을 찾지 못했습니다.');
+      } else if (list.length === 1 && !list[0].alreadyLinked) {
+        setSelectedCandidate(list[0]);
+      }
+    } catch (e) {
+      setMsg((e as Error)?.message || '조회에 실패했습니다.');
+    } finally {
+      setSearchBusy(false);
+    }
+  };
+
+  const onInvite = async () => {
+    const target = selectedCandidate || (candidates.length === 1 ? candidates[0] : null);
+    const key = String(target?.inviteKey || target?.publicHandle || '').trim();
+    if (!key) {
+      setMsg('먼저 조회한 뒤 목록에서 가족을 선택해 주세요.');
+      return;
+    }
+    if (target?.alreadyLinked) {
+      setMsg('이미 등록·초대된 가족입니다.');
       return;
     }
     setBusy(true);
     setMsg('');
     try {
       try {
-        await createFamilyProtectionLink(handle, familyRelation, undefined);
+        await createFamilyProtectionLink(key, familyRelation, undefined);
       } catch (first) {
         const fe = first as Error & { code?: string };
         if (familyRelation !== 'child' || fe?.code !== 'GUARDIAN_PASS_REQUIRED') {
           throw first;
         }
         const guardianImpUid = await requestGuardianPassImpUid();
-        await createFamilyProtectionLink(handle, familyRelation, guardianImpUid);
+        await createFamilyProtectionLink(key, familyRelation, guardianImpUid);
       }
       setWardHandle('');
+      setCandidates([]);
+      setSelectedCandidate(null);
       setMsg('초대를 보냈습니다. 상대가 앱에서 수락하면 보호가 시작됩니다.');
       await load();
       window.dispatchEvent(new CustomEvent('vlue-family-protection-changed'));
@@ -261,20 +311,81 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
                   inputMode="text"
                   autoComplete="tel"
                   value={wardHandle}
-                  onChange={(e) => setWardHandle(e.target.value)}
+                  onChange={(e) => {
+                    setWardHandle(e.target.value);
+                    setCandidates([]);
+                    setSelectedCandidate(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void onSearch();
+                    }
+                  }}
                   placeholder="예: honggildong, 010-1234-5678"
                   className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium focus:border-primary-400 focus:outline-none"
-                  disabled={busy || data?.canInviteFamily === false}
+                  disabled={busy || searchBusy || data?.canInviteFamily === false}
                 />
                 <button
                   type="button"
-                  onClick={onInvite}
-                  disabled={busy || data?.canInviteFamily === false}
-                  className="shrink-0 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 px-6 py-3 text-sm font-bold text-white"
+                  onClick={() => void onSearch()}
+                  disabled={busy || searchBusy || data?.canInviteFamily === false || !wardHandle.trim()}
+                  className="shrink-0 rounded-xl bg-slate-800 hover:bg-slate-900 disabled:opacity-50 px-6 py-3 text-sm font-bold text-white"
                 >
-                  {busy ? '처리 중…' : '초대 보내기'}
+                  {searchBusy ? '조회 중…' : '조회'}
                 </button>
               </div>
+              <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+                먼저 조회해 이름·아이디를 확인한 뒤 초대해 주세요.
+              </p>
+              {candidates.length > 0 ? (
+                <ul className="mt-3 space-y-2">
+                  {candidates.map((c) => {
+                    const selected = selectedCandidate?.userId === c.userId;
+                    return (
+                      <li key={c.userId}>
+                        <button
+                          type="button"
+                          disabled={Boolean(c.alreadyLinked)}
+                          onClick={() => setSelectedCandidate(c)}
+                          className={`flex w-full items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left ${
+                            c.alreadyLinked
+                              ? 'border-slate-100 bg-slate-50 opacity-70'
+                              : selected
+                                ? 'border-indigo-300 bg-indigo-50'
+                                : 'border-slate-200 bg-white'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-slate-900">{c.displayName || '회원'}</p>
+                            <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                              {c.publicHandle ? `@${c.publicHandle}` : '아이디 없음'}
+                              {c.phoneMasked ? ` · ${c.phoneMasked}` : ''}
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-[11px] font-bold text-slate-500">
+                            {c.alreadyLinked ? (c.linkStatus === 'pending' ? '초대 중' : '등록됨') : selected ? '선택됨' : '선택'}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void onInvite()}
+                disabled={
+                  busy ||
+                  searchBusy ||
+                  data?.canInviteFamily === false ||
+                  (!selectedCandidate && candidates.length !== 1) ||
+                  Boolean(selectedCandidate?.alreadyLinked)
+                }
+                className="mt-3 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 px-6 py-3 text-sm font-bold text-white"
+              >
+                {busy ? '처리 중…' : '선택한 가족 초대'}
+              </button>
               {data?.inviteBlockReason ? (
                 <p className="mt-2 text-xs text-amber-700">{data.inviteBlockReason}</p>
               ) : null}

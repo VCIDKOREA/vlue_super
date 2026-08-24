@@ -5,6 +5,7 @@ import {
   acceptProtectionLink,
   createProtectionLink,
   listFamilyProtection,
+  lookupFamilyInviteCandidates,
   parseFamilyRelation,
   recordWardHeartbeat,
   recordWardMissedCall,
@@ -29,6 +30,20 @@ import { GOVERNMENT_HOTLINES } from "../lib/governmentHotlines.js";
 import { REMOTE_CONTROL_APPS } from "../lib/remoteControlApps.js";
 
 export const familyProtectionRoutes = new Hono();
+
+familyProtectionRoutes.get("/lookup", requireUserHeader, async (c) => {
+  try {
+    const me = c.get("vlueUserId") as string;
+    const q = String(c.req.query("q") || c.req.query("query") || "").trim();
+    const result = await lookupFamilyInviteCandidates(me, q);
+    if ("error" in result && result.error) {
+      return c.json({ error: result.error }, 400);
+    }
+    return c.json(result);
+  } catch (err) {
+    return handleFamilyProtectionRouteError(c, "/lookup", err);
+  }
+});
 
 familyProtectionRoutes.get("/links", requireUserHeader, async (c) => {
   try {

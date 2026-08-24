@@ -46,6 +46,20 @@ export async function updateFamilyProtectionSettings(payload) {
   return parseJson(res);
 }
 
+export async function lookupFamilyInviteCandidates(query) {
+  const q = String(query || "").trim();
+  if (!q) {
+    const err = new Error("가족 VLUE 아이디 또는 전화번호를 입력해 주세요.");
+    err.status = 400;
+    throw err;
+  }
+  const res = await vlueAuthFetch(
+    apiUrl(`/api/family-protection/lookup?q=${encodeURIComponent(q)}`),
+    { headers: vlueAuthHeaders() }
+  );
+  return parseJson(res);
+}
+
 export async function createFamilyProtectionLink(wardHandle, familyRelation, guardianImpUid) {
   const res = await vlueAuthFetch(apiUrl("/api/family-protection/links"), {
     method: "POST",

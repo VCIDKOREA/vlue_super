@@ -568,6 +568,135 @@ async function resolveFamilyInviteTarget(rawInput: string) {
   });
 }
 
+function maskPhoneE164(phoneE164: string | null | undefined): string | null {
+  const digits = String(phoneE164 || "").replace(/\D/g, "");
+  if (!digits) return null;
+  let national = digits;
+  if (national.startsWith("82") && national.length >= 10) {
+    national = `0${national.slice(2)}`;
+  }
+  if (national.length < 10) return national;
+  return `${national.slice(0, 3)}-****-${national.slice(-4)}`;
+}
+
+type FamilyInviteCandidate = {
+  userId: string;
+  publicHandle: string | null;
+  displayName: string;
+  phoneMasked: string | null;
+  /** createProtectionLink에 넘길 키 (handle 또는 E.164) */
+  inviteKey: string;
+  match: "handle_exact" | "handle_prefix" | "phone";
+  alreadyLinked: boolean;
+  linkStatus: string | null;
+};
+
+/** 가족 초대 전 조회 — 아이디/전화번호로 후보 목록 */
+export async function lookupFamilyInviteCandidates(guardianUserId: string, rawQuery: string) {
+  const raw = String(rawQuery || "").trim();
+  if (!raw) return { error: "가족 VLUE 아이디 또는 전화번호를 입력해 주세요." };
+
+  const handle = raw.replace(/^@+/, "").trim().toLowerCase();
+  const digitCount = raw.replace(/\D/g, "").length;
+  const looksLikePhone = digitCount >= 8;
+  if (!looksLikePhone && handle.length < 2) {
+    return { error: "검색어가 너무 짧습니다. 아이디 2자 이상 또는 전화번호를 입력해 주세요." };
+  }
+
+  const found = new Map<string, FamilyInviteCandidate>();
+
+  const pushCandidate = (
+    user: {
+      id: string;
+      publicHandle: string | null;
+      legalName: string | null;
+      nickFeed: string | null;
+      phoneE164: string | null;
+    },
+    match: FamilyInviteCandidate["match"]
+  ) => {
+    if (!user?.id || user.id === guardianUserId) return;
+    if (found.has(user.id)) return;
+    found.set(user.id, {
+      userId: user.id,
+      publicHandle: user.publicHandle,
+      displayName: user.legalName || user.nickFeed || user.publicHandle || "회원",
+      phoneMasked: maskPhoneE164(user.phoneE164),
+      inviteKey: String(user.publicHandle || user.phoneE164 || "").trim(),
+      match,
+      alreadyLinked: false,
+      linkStatus: null
+    });
+  };
+
+  const userSelect = {
+    id: true,
+    publicHandle: true,
+    legalName: true,
+    nickFeed: true,
+    phoneE164: true
+  } as const;
+
+  if (handle && !looksLikePhone) {
+    const exact = await prisma.user.findFirst({
+      where: { publicHandle: handle },
+      select: userSelect
+    });
+    if (exact) pushCandidate(exact, "handle_exact");
+
+    if (found.size < 8) {
+      const prefix = await prisma.user.findMany({
+        where: {
+          publicHandle: { startsWith: handle, mode: "insensitive" },
+          id: { not: guardianUserId }
+        },
+        select: userSelect,
+        take: 8,
+        orderBy: { publicHandle: "asc" }
+      });
+      for (const u of prefix) pushCandidate(u, "handle_prefix");
+    }
+  }
+
+  if (looksLikePhone) {
+    const e164 = normalizeToE164KR(raw);
+    if (e164) {
+      const digits = e164.replace(/\D/g, "");
+      const byPhone = await prisma.user.findMany({
+        where: {
+          OR: [{ phoneE164: e164 }, { phoneE164: digits }, { phoneE164: `+${digits}` }],
+          id: { not: guardianUserId }
+        },
+        select: userSelect,
+        take: 5
+      });
+      for (const u of byPhone) pushCandidate(u, "phone");
+    }
+  }
+
+  const candidates = [...found.values()].filter((c) => Boolean(c.inviteKey)).slice(0, 10);
+  if (!candidates.length) {
+    return { ok: true as const, query: raw, candidates: [], message: "일치하는 회원을 찾지 못했습니다." };
+  }
+
+  const links = await familyProtectionDb.familyProtectionLink.findMany({
+    where: {
+      guardianUserId,
+      wardUserId: { in: candidates.map((c) => c.userId) },
+      status: { in: ["pending", "active"] }
+    },
+    select: { wardUserId: true, status: true }
+  });
+  const linkByWard = new Map(links.map((l) => [String(l.wardUserId), String(l.status)]));
+  for (const c of candidates) {
+    const st = linkByWard.get(c.userId) || null;
+    c.linkStatus = st;
+    c.alreadyLinked = Boolean(st);
+  }
+
+  return { ok: true as const, query: raw, candidates };
+}
+
 export async function createProtectionLink(
   guardianUserId: string,
   wardHandle: string,

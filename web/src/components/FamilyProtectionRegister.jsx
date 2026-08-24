@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { requestGuardianPassImpUid } from "../lib/parentalConsentApi.js";
 import { normalizeMembershipKind } from "../lib/membershipBm.js";
 import { displayFamilyUser, useFamilyProtection } from "../hooks/useFamilyProtection.js";
+import { lookupFamilyInviteCandidates } from "../lib/familyProtectionApi.js";
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
 import FamilySecurityDashboard from "./FamilySecurityDashboard.jsx";
 import FamilyMembersCircleModal from "./FamilyMembersCircleModal.jsx";
@@ -15,6 +16,10 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [slotHint, setSlotHint] = useState("");
   const [circleOpen, setCircleOpen] = useState(false);
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchHint, setSearchHint] = useState("");
+  const [candidates, setCandidates] = useState([]);
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
 
   const fp = useFamilyProtection();
 
@@ -80,16 +85,54 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
     });
   };
 
-  const onAdd = async () => {
+  const onSearch = async () => {
+    setSlotHint("");
+    setSearchHint("");
+    setSelectedCandidate(null);
+    setCandidates([]);
+    const q = wardHandle.trim();
+    if (!q) {
+      setSearchHint("아이디 또는 전화번호를 입력해 주세요.");
+      return;
+    }
+    setSearchBusy(true);
+    try {
+      const data = await lookupFamilyInviteCandidates(q);
+      const list = Array.isArray(data?.candidates) ? data.candidates : [];
+      setCandidates(list);
+      if (!list.length) {
+        setSearchHint(data?.message || "일치하는 회원을 찾지 못했습니다.");
+      } else if (list.length === 1 && !list[0].alreadyLinked) {
+        setSelectedCandidate(list[0]);
+      }
+    } catch (e) {
+      setSearchHint(e?.message || "조회에 실패했습니다.");
+    } finally {
+      setSearchBusy(false);
+    }
+  };
+
+  const inviteTargetKey = (c) => String(c?.inviteKey || c?.publicHandle || "").trim();
+
+  const onInviteCandidate = async (candidate) => {
+    const target = candidate || selectedCandidate;
+    const key = inviteTargetKey(target);
+    if (!key) {
+      setSlotHint("먼저 가족을 조회한 뒤 목록에서 선택해 주세요.");
+      return;
+    }
+    if (target?.alreadyLinked) {
+      setSlotHint("이미 등록·초대된 가족입니다.");
+      return;
+    }
     setSlotHint("");
     try {
-      /*
-       * 1차: PASS 없이 초대 시도 (seed_ QA 보호자·부모(노부모) 등록).
-       * 2차: 실계정 자녀 초대만 GUARDIAN_PASS_REQUIRED → 보호자 PASS.
-       */
       try {
-        const text = await fp.addLink(wardHandle, familyRelation, undefined);
+        const text = await fp.addLink(key, familyRelation, undefined);
         setWardHandle("");
+        setCandidates([]);
+        setSelectedCandidate(null);
+        setSearchHint("");
         toast(text);
         return;
       } catch (first) {
@@ -97,8 +140,11 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
           throw first;
         }
         const guardianImpUid = await requestGuardianPassImpUid();
-        const text = await fp.addLink(wardHandle, familyRelation, guardianImpUid);
+        const text = await fp.addLink(key, familyRelation, guardianImpUid);
         setWardHandle("");
+        setCandidates([]);
+        setSelectedCandidate(null);
+        setSearchHint("");
         toast(text);
       }
     } catch (e) {
@@ -109,6 +155,14 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
         setUpgradeOpen(true);
       }
     }
+  };
+
+  const onAdd = async () => {
+    if (selectedCandidate || candidates.length === 1) {
+      await onInviteCandidate(selectedCandidate || candidates[0]);
+      return;
+    }
+    setSlotHint("조회 후 목록에서 가족을 선택한 뒤 초대해 주세요.");
   };
 
   const activeCount = fp.asGuardian.filter((l) => l.status === "active").length;
@@ -390,23 +444,123 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
           </div>
 
           <label className={`mt-3 block text-[11px] font-bold ${strong}`}>가족 VLUE 아이디 · 전화번호</label>
-          <input
-            type="text"
-            inputMode="text"
-            autoComplete="tel"
-            value={wardHandle}
-            onChange={(e) => setWardHandle(e.target.value)}
-            placeholder="예: mom, @아이디, 010-1234-5678"
-            className={`mt-1.5 w-full rounded-xl border px-3 py-3 text-[13px] font-bold outline-none ${inputCls}`}
-          />
+          <div className="mt-1.5 flex gap-2">
+            <input
+              type="text"
+              inputMode="text"
+              autoComplete="tel"
+              value={wardHandle}
+              onChange={(e) => {
+                setWardHandle(e.target.value);
+                setSelectedCandidate(null);
+                setCandidates([]);
+                setSearchHint("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void onSearch();
+                }
+              }}
+              placeholder="예: mom, @아이디, 010-1234-5678"
+              className={`min-w-0 flex-1 rounded-xl border px-3 py-3 text-[13px] font-bold outline-none ${inputCls}`}
+            />
+            <button
+              type="button"
+              disabled={fp.busy || searchBusy || !wardHandle.trim() || !fp.data?.canInviteFamily}
+              onClick={() => void onSearch()}
+              className="shrink-0 rounded-xl bg-slate-800 px-4 text-[13px] font-black text-white disabled:opacity-50"
+            >
+              {searchBusy ? "조회 중…" : "조회"}
+            </button>
+          </div>
+          <p className={`mt-1.5 text-[10px] leading-relaxed ${sub}`}>
+            먼저 조회해 이름·아이디를 확인한 뒤 초대해 주세요. 잘못 초대되는 것을 막기 위함입니다.
+          </p>
+
+          {searchHint ? (
+            <p className={`mt-2 text-[11px] font-semibold ${isDarkMode ? "text-amber-300" : "text-amber-700"}`}>
+              {searchHint}
+            </p>
+          ) : null}
+
+          {candidates.length > 0 ? (
+            <div className="mt-2 space-y-1.5">
+              <p className={`text-[11px] font-bold ${strong}`}>조회 결과 · 초대할 가족을 선택</p>
+              {candidates.map((c) => {
+                const selected = selectedCandidate?.userId === c.userId;
+                return (
+                  <button
+                    key={c.userId}
+                    type="button"
+                    disabled={c.alreadyLinked}
+                    onClick={() => setSelectedCandidate(c)}
+                    className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition ${
+                      c.alreadyLinked
+                        ? isDarkMode
+                          ? "border-white/5 bg-white/5 opacity-60"
+                          : "border-gray-100 bg-gray-50 opacity-70"
+                        : selected
+                          ? isDarkMode
+                            ? "border-blue-400/50 bg-blue-500/20"
+                            : "border-blue-300 bg-blue-50"
+                          : isDarkMode
+                            ? "border-white/10 bg-white/5"
+                            : "border-gray-100 bg-white"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className={`truncate text-[13px] font-black ${strong}`}>{c.displayName}</p>
+                      <p className={`mt-0.5 truncate text-[11px] ${sub}`}>
+                        {c.publicHandle ? `@${c.publicHandle}` : "아이디 없음"}
+                        {c.phoneMasked ? ` · ${c.phoneMasked}` : ""}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold ${
+                        c.alreadyLinked
+                          ? isDarkMode
+                            ? "bg-white/10 text-gray-400"
+                            : "bg-gray-100 text-gray-500"
+                          : selected
+                            ? "bg-blue-600 text-white"
+                            : isDarkMode
+                              ? "bg-white/10 text-gray-300"
+                              : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {c.alreadyLinked
+                        ? c.linkStatus === "pending"
+                          ? "초대 중"
+                          : "등록됨"
+                        : selected
+                          ? "선택됨"
+                          : "선택"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
 
           <button
             type="button"
-            disabled={fp.busy || !wardHandle.trim() || !fp.data?.canInviteFamily}
-            onClick={onAdd}
+            disabled={
+              fp.busy ||
+              searchBusy ||
+              !fp.data?.canInviteFamily ||
+              (!selectedCandidate && candidates.length !== 1) ||
+              Boolean(selectedCandidate?.alreadyLinked) ||
+              (candidates.length === 1 && candidates[0].alreadyLinked)
+            }
+            onClick={() => void onAdd()}
             className="mt-3 w-full rounded-xl bg-blue-600 py-3.5 text-[14px] font-black text-white shadow-sm disabled:opacity-50"
           >
-            {familyRelation === "child" ? "PASS 인증 후 자녀 초대" : familyRelation === "relative" ? "가족 초대 (알림 수신)" : "가족 초대 (승인 요청 보내기)"}
+            {familyRelation === "child"
+              ? "PASS 인증 후 자녀 초대"
+              : familyRelation === "relative"
+                ? "선택한 가족 초대 (알림 수신)"
+                : "선택한 가족 초대 (승인 요청)"}
           </button>
 
             </>
