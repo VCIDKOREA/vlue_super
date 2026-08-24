@@ -98,7 +98,7 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
   const onInvite = async () => {
     const handle = wardHandle.trim().replace(/^@+/, '');
     if (!handle) {
-      setMsg('가족 VLUE 아이디를 입력해 주세요.');
+      setMsg('가족 VLUE 아이디 또는 전화번호를 입력해 주세요.');
       return;
     }
     setBusy(true);
@@ -254,13 +254,15 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
                   </button>
                 ))}
               </div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">가족 VLUE 아이디</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">가족 VLUE 아이디 · 전화번호</label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
+                  inputMode="text"
+                  autoComplete="tel"
                   value={wardHandle}
                   onChange={(e) => setWardHandle(e.target.value)}
-                  placeholder="예: honggildong"
+                  placeholder="예: honggildong, 010-1234-5678"
                   className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium focus:border-primary-400 focus:outline-none"
                   disabled={busy || data?.canInviteFamily === false}
                 />

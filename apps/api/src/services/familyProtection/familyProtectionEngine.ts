@@ -1,5 +1,6 @@
 import { prisma } from "../../db/client.js";
 import { familyProtectionDb } from "../../db/familyProtectionDb.js";
+import { normalizeToE164KR } from "../../lib/phoneE164.js";
 import { ssePublish } from "../../realtime/sseHub.js";
 import { isAdultForFamilyProtection } from "@vlue/shared/policy/minor-signup";
 import { sendFamilyProtectionPush } from "../fcmNotificationService.js";
@@ -34,7 +35,7 @@ export const USAGE_GUIDE = {
   summary:
     "유료 회원은 본인 포함 최대 4명(1:3)까지 가족 보호를 이용할 수 있습니다. 추가 인원(최대 8명)은 별도 요금이 필요합니다.",
   steps: [
-    "① 유료 회원: 가족 보호 N/4명 — VLUE 아이디로 초대 (부모·자녀·가족)",
+    "① 유료 회원: 가족 보호 N/4명 — VLUE 아이디·전화번호로 초대 (부모·자녀·가족)",
     "② 가족 수락 후 보호 시작 — 부모·자녀 설정을 각각 켜기 (가족 분류는 알림만)",
     "③ 부모: 미접속·부재중·비회원 장통화·원격앱·정부기관 통화 알림",
     "④ 자녀: 유해·도박·VPN 사이트 + 계좌 동의 후 입출금 알림",
@@ -542,6 +543,31 @@ export async function runMinorAdultProtectionExpiryChecks(asOf = new Date()) {
   return { checked: links.length, revoked, skippedNoBirthDate };
 }
 
+/** VLUE 아이디(@handle) 또는 휴대폰 번호로 초대 대상 회원 조회 */
+async function resolveFamilyInviteTarget(rawInput: string) {
+  const raw = String(rawInput || "").trim();
+  if (!raw) return null;
+
+  const handle = raw.replace(/^@+/, "").trim().toLowerCase();
+  if (handle) {
+    const byHandle = await prisma.user.findFirst({
+      where: { publicHandle: handle },
+      select: { id: true, publicHandle: true, birthDate: true }
+    });
+    if (byHandle) return byHandle;
+  }
+
+  const e164 = normalizeToE164KR(raw);
+  if (!e164) return null;
+  const digits = e164.replace(/\D/g, "");
+  return prisma.user.findFirst({
+    where: {
+      OR: [{ phoneE164: e164 }, { phoneE164: digits }, { phoneE164: `+${digits}` }]
+    },
+    select: { id: true, publicHandle: true, birthDate: true }
+  });
+}
+
 export async function createProtectionLink(
   guardianUserId: string,
   wardHandle: string,
@@ -551,14 +577,11 @@ export async function createProtectionLink(
   const paid = await canRegisterFamilyMembers(guardianUserId);
   if (!paid.ok) return { error: paid.reason, code: "FAMILY_FREE_TIER" };
 
-  const handle = String(wardHandle || "").trim().toLowerCase();
-  if (!handle) return { error: "가족 VLUE 아이디를 입력해 주세요." };
+  const raw = String(wardHandle || "").trim();
+  if (!raw) return { error: "가족 VLUE 아이디 또는 전화번호를 입력해 주세요." };
 
-  const ward = await prisma.user.findFirst({
-    where: { publicHandle: handle },
-    select: { id: true, publicHandle: true, birthDate: true }
-  });
-  if (!ward) return { error: "해당 아이디의 회원을 찾을 수 없습니다." };
+  const ward = await resolveFamilyInviteTarget(raw);
+  if (!ward) return { error: "해당 아이디·전화번호의 회원을 찾을 수 없습니다." };
   if (ward.id === guardianUserId) return { error: "본인은 가족으로 등록할 수 없습니다." };
 
   if (familyRelation === "child" && isAdultForFamilyProtection(ward.birthDate)) {

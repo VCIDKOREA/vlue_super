@@ -390,12 +390,14 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             </button>
           </div>
 
-          <label className={`mt-3 block text-[11px] font-bold ${strong}`}>가족 VLUE 아이디</label>
+          <label className={`mt-3 block text-[11px] font-bold ${strong}`}>가족 VLUE 아이디 · 전화번호</label>
           <input
             type="text"
+            inputMode="text"
+            autoComplete="tel"
             value={wardHandle}
             onChange={(e) => setWardHandle(e.target.value)}
-            placeholder="예: mom, brother, @아이디"
+            placeholder="예: mom, @아이디, 010-1234-5678"
             className={`mt-1.5 w-full rounded-xl border px-3 py-3 text-[13px] font-bold outline-none ${inputCls}`}
           />
 
