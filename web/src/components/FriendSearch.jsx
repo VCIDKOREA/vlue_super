@@ -3,6 +3,15 @@ import FamilyProtectionRegister from "./FamilyProtectionRegister.jsx";
 import ContactFriendsPanel from "./ContactFriendsPanel.jsx";
 import ScreenBackHeader from "./common/ScreenBackHeader";
 import { fetchContactFriendRequests } from "../lib/contactFriendsApi.js";
+import { EXPAND_FAMILY_KEY, OPEN_FAMILY_TAB_EVENT } from "../lib/posDashboardConstants.js";
+
+function shouldOpenFamilyTab() {
+  try {
+    return sessionStorage.getItem(EXPAND_FAMILY_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 function FriendSearch({
   inboxRequests = [],
@@ -19,7 +28,7 @@ function FriendSearch({
   onSendRequest
 }) {
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState("friends");
+  const [tab, setTab] = useState(() => (shouldOpenFamilyTab() ? "family" : "friends"));
   const [notice, setNotice] = useState("");
   const [sentRequests, setSentRequests] = useState(() =>
     Array.isArray(requests) ? requests.filter((r) => r.status === "pending") : []
@@ -49,6 +58,13 @@ function FriendSearch({
   useEffect(() => {
     if (tab === "sent" || tab === "inbox") void reloadFriendRequests();
   }, [tab, reloadFriendRequests]);
+
+  useEffect(() => {
+    const openFamilyTab = () => setTab("family");
+    if (shouldOpenFamilyTab()) openFamilyTab();
+    window.addEventListener(OPEN_FAMILY_TAB_EVENT, openFamilyTab);
+    return () => window.removeEventListener(OPEN_FAMILY_TAB_EVENT, openFamilyTab);
+  }, []);
 
   const tabs = [
     { id: "family", label: "가족 보호" },

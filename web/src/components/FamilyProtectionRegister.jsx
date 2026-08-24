@@ -5,8 +5,7 @@ import { displayFamilyUser, useFamilyProtection } from "../hooks/useFamilyProtec
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
 import FamilySecurityDashboard from "./FamilySecurityDashboard.jsx";
 import FamilyMembersCircleModal from "./FamilyMembersCircleModal.jsx";
-
-const EXPAND_FAMILY_KEY = "vlue_expand_family_protection_v1";
+import { EXPAND_FAMILY_KEY } from "../lib/posDashboardConstants.js";
 
 /** 친구검색 — 가족 보호 등록·알림 설정 (대버튼 탭 시 펼침) */
 export default function FamilyProtectionRegister({ isDarkMode = false, prefillHandle = "", onToast }) {

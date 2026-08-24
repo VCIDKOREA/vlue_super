@@ -24,7 +24,7 @@ import { LOCAL_MEMO_CHANGED } from "./lib/localMemoStorage.js";
 import { OPEN_CALENDAR_EVENT_KEY } from "./lib/calendarConstants.js";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "./lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "./lib/letteringBizcardStorage.js";
-import { EXPAND_FAMILY_KEY, OPEN_POS_DASHBOARD_KEY } from "./lib/posDashboardConstants.js";
+import { OPEN_POS_DASHBOARD_KEY, requestOpenFamilyProtectionTab } from "./lib/posDashboardConstants.js";
 import { publishCalendarAsRoomNotice } from "./lib/chatRoomNoticeService.js";
 import BetaLaunchGuide from "./components/BetaLaunchGuide.jsx";
 import Subscription from "./components/Subscription.jsx";
@@ -1349,10 +1349,10 @@ function App() {
           });
           try {
             sessionStorage.setItem(OPEN_POS_DASHBOARD_KEY, String(data.entryId || "1"));
-            sessionStorage.setItem(EXPAND_FAMILY_KEY, "1");
           } catch {
             /* ignore */
           }
+          requestOpenFamilyProtectionTab();
         }
       }
     });
@@ -3261,11 +3261,11 @@ function App() {
 
   const openPosSalesDashboard = useCallback(() => {
     try {
-      sessionStorage.setItem(EXPAND_FAMILY_KEY, "1");
       sessionStorage.setItem(OPEN_POS_DASHBOARD_KEY, "1");
     } catch {
       /* ignore */
     }
+    requestOpenFamilyProtectionTab();
     setPosBillToast({ message: "", entryId: "" });
     navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
   }, [activeTab, navigate]);
@@ -4455,11 +4455,7 @@ function App() {
               return;
             }
             if (featureId === "family-protection") {
-              try {
-                sessionStorage.setItem("vlue_expand_family_protection_v1", "1");
-              } catch {
-                /* ignore */
-              }
+              requestOpenFamilyProtectionTab();
               navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
               return;
             }
@@ -4480,11 +4476,7 @@ function App() {
           })}
           onOpenFamilyProtection={() =>
             requireAuth(() => {
-            try {
-              sessionStorage.setItem("vlue_expand_family_protection_v1", "1");
-            } catch {
-              /* ignore */
-            }
+            requestOpenFamilyProtectionTab();
             navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
           })}
           onOpenMyPageFeed={() =>
@@ -4653,11 +4645,7 @@ function App() {
               onUnreadChange={setPushUnreadCount}
               onOpenFamilyProtection={() =>
                 requireAuth(() => {
-                  try {
-                    sessionStorage.setItem("vlue_expand_family_protection_v1", "1");
-                  } catch {
-                    /* ignore */
-                  }
+                  requestOpenFamilyProtectionTab();
                   navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
                 })
               }
@@ -4946,11 +4934,7 @@ function App() {
             navigate({ nextPage: "main", nextTab: activeTab, nextRoomId: null });
           }}
           onOpenFamilyProtection={() => {
-            try {
-              sessionStorage.setItem("vlue_expand_family_protection_v1", "1");
-            } catch {
-              /* ignore */
-            }
+            requestOpenFamilyProtectionTab();
             navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
           }}
           onOpenMycase={() => navigate({ nextPage: "mycase", nextTab: activeTab, nextRoomId: null })}
@@ -4974,11 +4958,7 @@ function App() {
         isDarkMode={isDarkMode}
         onOpenFamilyProtection={() => {
           setAppNotificationOpen(false);
-          try {
-            sessionStorage.setItem("vlue_expand_family_protection_v1", "1");
-          } catch {
-            /* ignore */
-          }
+          requestOpenFamilyProtectionTab();
           navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
         }}
       />
@@ -5737,11 +5717,7 @@ function App() {
         myPhone={myCardProfile?.phone || DEFAULT_MY_PHONE}
         onOpenFamilyProtection={() => {
           setProfileOpen(false);
-          try {
-            sessionStorage.setItem("vlue_expand_family_protection_v1", "1");
-          } catch {
-            /* ignore */
-          }
+          requestOpenFamilyProtectionTab();
           navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
         }}
       />
