@@ -5,7 +5,10 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { apiRoutes } from "./routes/api.js";
 import { showcaseSharePrettyRoutes } from "./routes/showcaseSharePretty.js";
-import { runElderProtectionChecks } from "./services/familyProtection/familyProtectionEngine.js";
+import {
+  runElderProtectionChecks,
+  runMinorAdultProtectionExpiryChecks
+} from "./services/familyProtection/familyProtectionEngine.js";
 import { attachOfficeAgentWebSocket } from "./services/office/remoteControlHub.js";
 import { seedDemoCompanyLine } from "./services/office/companyLinesService.js";
 import type { Server } from "node:http";
@@ -131,6 +134,17 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
       })
       .catch((e) => console.warn("[family-protection] elder check failed", e));
   }, elderCheckMs);
+
+  const minorAdultExpiryMs = Number(process.env.FAMILY_MINOR_ADULT_EXPIRY_CHECK_MS) || 24 * 60 * 60 * 1000;
+  setInterval(() => {
+    runMinorAdultProtectionExpiryChecks()
+      .then((r) => {
+        if (r.revoked > 0) {
+          console.log(`[family-protection] adult expiry revoked: ${r.revoked}`);
+        }
+      })
+      .catch((e) => console.warn("[family-protection] adult expiry check failed", e));
+  }, minorAdultExpiryMs);
 
   startExternalMailSyncScheduler();
 });

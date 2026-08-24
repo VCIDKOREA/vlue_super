@@ -11,6 +11,7 @@ import {
   rejectProtectionLink,
   reportWardRiskySite,
   revokeProtectionLink,
+  runMinorAdultProtectionExpiryChecks,
   runElderProtectionChecks,
   updateProtectionSettings
 } from "../services/familyProtection/familyProtectionEngine.js";
@@ -293,4 +294,13 @@ familyProtectionRoutes.post("/cron/check-elder", async (c) => {
     return c.json({ error: "unauthorized" }, 401);
   }
   return c.json(await runElderProtectionChecks());
+});
+
+familyProtectionRoutes.post("/cron/check-minor-adult-expiry", async (c) => {
+  const secret = c.req.header("X-Family-Cron-Secret") || "";
+  const expected = process.env.FAMILY_CRON_SECRET || "";
+  if (expected && secret !== expected) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  return c.json(await runMinorAdultProtectionExpiryChecks());
 });

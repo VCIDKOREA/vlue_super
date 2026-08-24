@@ -334,17 +334,19 @@ export async function recordChildBankTransaction(
 
 export async function listBankConsentsForUser(userId: string) {
   try {
-    const asGuardian = await familyProtectionDb.familyBankConsent.findMany({
-      where: { guardianUserId: userId },
-      orderBy: { requestedAt: "desc" }
-    });
-    const asWard = await familyProtectionDb.familyBankConsent.findMany({
-      where: { wardUserId: userId, status: "pending" },
-      orderBy: { requestedAt: "desc" }
-    });
-    const accepted = await familyProtectionDb.familyBankConsent.findFirst({
-      where: { wardUserId: userId, status: "accepted" }
-    });
+    const [asGuardian, asWard, accepted] = await Promise.all([
+      familyProtectionDb.familyBankConsent.findMany({
+        where: { guardianUserId: userId },
+        orderBy: { requestedAt: "desc" }
+      }),
+      familyProtectionDb.familyBankConsent.findMany({
+        where: { wardUserId: userId, status: "pending" },
+        orderBy: { requestedAt: "desc" }
+      }),
+      familyProtectionDb.familyBankConsent.findFirst({
+        where: { wardUserId: userId, status: "accepted" }
+      })
+    ]);
     return {
       asGuardian,
       asWard,

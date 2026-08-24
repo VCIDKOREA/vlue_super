@@ -29,8 +29,8 @@ export default function FamilySecurityDashboard({ isDarkMode = false, onToast })
   const isOwner = posRole?.role === "OWNER";
   const canViewPos = Boolean(posRole?.canViewDashboard);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const [s, p, st, role] = await Promise.all([
         fetchFamilyCrossSecurityDashboard().catch(() => null),
@@ -51,7 +51,7 @@ export default function FamilySecurityDashboard({ isDarkMode = false, onToast })
     load();
     const tick = () => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      load();
+      load({ silent: true });
     };
     const t = setInterval(tick, 60000);
     return () => clearInterval(t);

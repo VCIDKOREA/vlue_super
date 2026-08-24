@@ -1,6 +1,7 @@
 import { prisma } from "../../db/client.js";
 import { familyProtectionDb } from "../../db/familyProtectionDb.js";
 import { ssePublish } from "../../realtime/sseHub.js";
+import { isAdultForFamilyProtection } from "@vlue/shared/policy/minor-signup";
 import { sendFamilyProtectionPush } from "../fcmNotificationService.js";
 import {
   notifyParentalConsentAfterChildInvite,
@@ -8,7 +9,11 @@ import {
   verifyGuardianPassCiMatchesUser
 } from "../auth/parentalConsentService.js";
 import { canRegisterFamilyMembers } from "./familyProtectionPaidGate.js";
-import { assertCanInviteFamilyMember, getFamilyProtectionSlots } from "./familyProtectionSlots.js";
+import {
+  assertCanInviteFamilyMember,
+  buildFamilyProtectionSlots,
+  getFamilyProtectionSlots
+} from "./familyProtectionSlots.js";
 import { matchRiskySite } from "./riskySiteMatcher.js";
 import { listBankConsentsForUser } from "./familyProtectionChildBank.js";
 import {
@@ -93,6 +98,95 @@ async function notifyGuardianInviteResult(
     });
   } catch (err) {
     console.warn("[family-protection] invite_result_fcm_failed", err);
+  }
+}
+
+async function notifyFamilyLinkRevoked(
+  link: {
+    id: string;
+    guardianUserId: string;
+    wardUserId: string;
+    familyRelation: FamilyRelation;
+    wardRole: WardRole;
+  },
+  actorUserId: string,
+  reason: "manual" | "aged_out"
+) {
+  const wardName = await wardDisplayName(link.wardUserId);
+  const isGuardianActor = actorUserId === link.guardianUserId;
+  const title = reason === "aged_out" ? "가족 보호 자동 종료" : "가족 보호 해지";
+  const body =
+    reason === "aged_out"
+      ? `${wardName} 님 계정이 성인이 되어 가족 보호가 자동 종료되었습니다.`
+      : `${wardName} 님 가족 보호 연결이 해지되었습니다.`;
+  const payload = {
+    kind: reason === "aged_out" ? "family_link_aged_out" : "family_link_revoked",
+    linkId: link.id,
+    wardUserId: link.wardUserId,
+    familyRelation: link.familyRelation,
+    wardRole: link.wardRole,
+    reason
+  };
+
+  await prisma.ownerNotification.createMany({
+    data: [
+      {
+        ownerUserId: link.guardianUserId,
+        actorUserId,
+        title,
+        body,
+        payloadJson: payload
+      },
+      {
+        ownerUserId: link.wardUserId,
+        actorUserId,
+        title,
+        body,
+        payloadJson: payload
+      }
+    ]
+  });
+
+  ssePublish(link.guardianUserId, {
+    type: "vlue-family-protection-revoked",
+    title,
+    body,
+    linkId: link.id,
+    wardUserId: link.wardUserId,
+    reason,
+    actorUserId,
+    at: new Date().toISOString()
+  });
+  ssePublish(link.wardUserId, {
+    type: "vlue-family-protection-revoked",
+    title,
+    body,
+    linkId: link.id,
+    wardUserId: link.wardUserId,
+    reason,
+    actorUserId,
+    at: new Date().toISOString()
+  });
+
+  try {
+    await Promise.all([
+      sendFamilyProtectionPush(link.guardianUserId, title, body, {
+        type: "vlue-family-protection-revoked",
+        linkId: link.id,
+        wardUserId: link.wardUserId,
+        reason,
+        actorSide: isGuardianActor ? "self" : "counterparty"
+      }),
+      sendFamilyProtectionPush(link.wardUserId, title, body, {
+        type: "vlue-family-protection-revoked",
+        linkId: link.id,
+        wardUserId: link.wardUserId,
+        reason,
+        actorSide: isGuardianActor ? "counterparty" : "self"
+      })
+    ]);
+  } catch (err) {
+    console.warn("[family-protection] revoke_fcm_failed", err);
   }
 }
 
@@ -191,6 +285,9 @@ async function notifyGuardian(
 /** 앱 포그라운드 진입 시만 기록 (5분 주기 없음) */
 export async function recordWardHeartbeat(wardUserId: string) {
   const now = new Date();
+  await expireChildProtectionIfAdult(wardUserId, now).catch((err) => {
+    console.warn("[family-protection] adult expiry on heartbeat failed", err);
+  });
   await familyProtectionDb.familyWardPresence.upsert({
     where: { wardUserId },
     update: {
@@ -366,6 +463,85 @@ export async function runElderProtectionChecks() {
   return { checked: links.length, alertsSent: sent };
 }
 
+async function expireChildProtectionIfAdult(wardUserId: string, asOf = new Date()) {
+  const ward = await prisma.user.findUnique({
+    where: { id: wardUserId },
+    select: { birthDate: true }
+  });
+  if (!isAdultForFamilyProtection(ward?.birthDate ?? null, asOf)) return { revoked: 0 };
+
+  const links = await familyProtectionDb.familyProtectionLink.findMany({
+    where: { wardUserId, wardRole: "child", status: { in: ["pending", "active"] } }
+  });
+  for (const link of links) {
+    await familyProtectionDb.familyProtectionLink.update({
+      where: { id: link.id },
+      data: { status: "revoked" }
+    });
+    await notifyFamilyLinkRevoked(
+      {
+        id: link.id,
+        guardianUserId: link.guardianUserId,
+        wardUserId: link.wardUserId,
+        familyRelation: link.familyRelation,
+        wardRole: link.wardRole
+      },
+      wardUserId,
+      "aged_out"
+    );
+  }
+  return { revoked: links.length };
+}
+
+export async function runMinorAdultProtectionExpiryChecks(asOf = new Date()) {
+  const links = await familyProtectionDb.familyProtectionLink.findMany({
+    where: { wardRole: "child", status: { in: ["pending", "active"] } },
+    select: {
+      id: true,
+      guardianUserId: true,
+      wardUserId: true,
+      familyRelation: true,
+      wardRole: true,
+      status: true,
+      wardUser: {
+        select: {
+          birthDate: true
+        }
+      }
+    }
+  });
+
+  let revoked = 0;
+  let skippedNoBirthDate = 0;
+
+  for (const link of links) {
+    const adult = isAdultForFamilyProtection(link.wardUser?.birthDate ?? null, asOf);
+    if (link.wardUser?.birthDate == null) {
+      skippedNoBirthDate += 1;
+    }
+    if (!adult) continue;
+
+    await familyProtectionDb.familyProtectionLink.update({
+      where: { id: link.id },
+      data: { status: "revoked" }
+    });
+    await notifyFamilyLinkRevoked(
+      {
+        id: link.id,
+        guardianUserId: link.guardianUserId,
+        wardUserId: link.wardUserId,
+        familyRelation: link.familyRelation,
+        wardRole: link.wardRole
+      },
+      link.wardUserId,
+      "aged_out"
+    );
+    revoked += 1;
+  }
+
+  return { checked: links.length, revoked, skippedNoBirthDate };
+}
+
 export async function createProtectionLink(
   guardianUserId: string,
   wardHandle: string,
@@ -380,10 +556,17 @@ export async function createProtectionLink(
 
   const ward = await prisma.user.findFirst({
     where: { publicHandle: handle },
-    select: { id: true, publicHandle: true }
+    select: { id: true, publicHandle: true, birthDate: true }
   });
   if (!ward) return { error: "해당 아이디의 회원을 찾을 수 없습니다." };
   if (ward.id === guardianUserId) return { error: "본인은 가족으로 등록할 수 없습니다." };
+
+  if (familyRelation === "child" && isAdultForFamilyProtection(ward.birthDate)) {
+    return {
+      error: "해당 계정은 이미 성인이라 자녀 가족 보호를 신청할 수 없습니다.",
+      code: "WARD_ADULT"
+    };
+  }
 
   if (familyRelation === "child") {
     const guardian = await prisma.user.findUnique({
@@ -507,6 +690,31 @@ export async function acceptProtectionLink(wardUserId: string, linkId: string) {
   if (link.status === "active") return { ok: true, link };
   if (link.status === "revoked") return { error: "해지된 가족 연결입니다." };
 
+  if (link.wardRole === "child") {
+    const ward = await prisma.user.findUnique({
+      where: { id: wardUserId },
+      select: { birthDate: true }
+    });
+    if (isAdultForFamilyProtection(ward?.birthDate ?? null)) {
+      await familyProtectionDb.familyProtectionLink.update({
+        where: { id: linkId },
+        data: { status: "revoked" }
+      });
+      await notifyFamilyLinkRevoked(
+        {
+          id: link.id,
+          guardianUserId: link.guardianUserId,
+          wardUserId: link.wardUserId,
+          familyRelation: link.familyRelation,
+          wardRole: link.wardRole
+        },
+        wardUserId,
+        "aged_out"
+      );
+      return { error: "성인이 된 계정은 자녀 가족 보호를 수락할 수 없습니다.", code: "WARD_ADULT" };
+    }
+  }
+
   const updated = await familyProtectionDb.familyProtectionLink.update({
     where: { id: linkId },
     data: { status: "active", wardAcceptedAt: new Date() }
@@ -549,11 +757,23 @@ export async function revokeProtectionLink(userId: string, linkId: string) {
     }
   });
   if (!link) return { error: "연결을 찾을 수 없습니다." };
+  if (link.status === "revoked") return { ok: true };
 
   await familyProtectionDb.familyProtectionLink.update({
     where: { id: linkId },
     data: { status: "revoked" }
   });
+  await notifyFamilyLinkRevoked(
+    {
+      id: link.id,
+      guardianUserId: link.guardianUserId,
+      wardUserId: link.wardUserId,
+      familyRelation: link.familyRelation,
+      wardRole: link.wardRole
+    },
+    userId,
+    "manual"
+  );
   return { ok: true };
 }
 
@@ -653,18 +873,16 @@ export async function updateProtectionSettings(
 }
 
 export async function listFamilyProtection(userId: string) {
-  let paid: { ok: boolean; reason?: string };
   try {
-    paid = await canRegisterFamilyMembers(userId);
-  } catch (e) {
-    console.warn("[family-protection] paid gate check failed", e);
-    paid = { ok: true };
-  }
-
-  try {
-    return await listFamilyProtectionCore(userId, paid);
+    return await listFamilyProtectionCore(userId);
   } catch (e) {
     console.error("[family-protection] list failed", e);
+    let paid: { ok: boolean; reason?: string } = { ok: true };
+    try {
+      paid = await canRegisterFamilyMembers(userId);
+    } catch {
+      paid = { ok: true };
+    }
     const settings = await getOrCreateSettings(userId).catch(() => defaultFamilySettings(userId));
     const memberSlots = await getFamilyProtectionSlots(userId).catch(() => null);
     return {
@@ -699,14 +917,13 @@ function resolveFamilyProtectionUiMode(
   return "guide_only";
 }
 
-async function listFamilyProtectionCore(
-  userId: string,
-  paid: { ok: boolean; reason?: string }
-) {
-  const memberSlots = await getFamilyProtectionSlots(userId);
-  const settings = await getOrCreateSettings(userId);
-
-  const [asGuardian, asWard, alerts] = await Promise.all([
+async function listFamilyProtectionCore(userId: string) {
+  const [paidRaw, settings, asGuardian, asWard, bankConsents] = await Promise.all([
+    canRegisterFamilyMembers(userId).catch((e) => {
+      console.warn("[family-protection] paid gate check failed", e);
+      return { ok: true as const };
+    }),
+    getOrCreateSettings(userId),
     familyProtectionDb.familyProtectionLink.findMany({
       where: { guardianUserId: userId, status: { not: "revoked" } },
       include: {
@@ -721,24 +938,31 @@ async function listFamilyProtectionCore(
       },
       orderBy: { createdAt: "desc" }
     }),
-    familyProtectionDb.familyProtectionAlert.findMany({
-      where: {
-        wardUserId: {
-          in: (
-            await familyProtectionDb.familyProtectionLink.findMany({
-              where: { guardianUserId: userId, status: "active" },
-              select: { wardUserId: true }
-            })
-          ).map((l: { wardUserId: string }) => String(l.wardUserId))
-        }
-      },
-      orderBy: { createdAt: "desc" },
-      take: 30
-    })
+    listBankConsentsForUser(userId)
   ]);
+  const paid = paidRaw;
+
+  const activeWardIds = asGuardian
+    .filter((l: { status: string }) => l.status === "active")
+    .map((l: { wardUserId: string }) => String(l.wardUserId));
+  const alerts = activeWardIds.length
+    ? await familyProtectionDb.familyProtectionAlert.findMany({
+        where: { wardUserId: { in: activeWardIds } },
+        orderBy: { createdAt: "desc" },
+        take: 30
+      })
+    : [];
+
+  const wardCount = asGuardian.filter(
+    (l: { status: string }) => l.status === "pending" || l.status === "active"
+  ).length;
+  const memberSlots = buildFamilyProtectionSlots({
+    paid,
+    wardCount,
+    extraMemberPackActive: Boolean((settings as { extraMemberPackActive?: boolean }).extraMemberPackActive)
+  });
 
   const activeWard = asWard.find((l: { status: string }) => l.status === "active");
-  const bankConsents = await listBankConsentsForUser(userId);
 
   const familyPeers: Array<{
     userId: string;

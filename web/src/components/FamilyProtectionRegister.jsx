@@ -411,7 +411,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             </>
           ) : null}
 
-          {fp.loading ? (
+          {fp.loading && !fp.data ? (
             <p className={`mt-3 text-center text-[11px] ${sub}`}>불러오는 중…</p>
           ) : (
             <>
@@ -517,7 +517,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                 </div>
               )}
 
-              {showGuardianPanel ? (
+              {showGuardianPanel && fp.data ? (
                 <FamilySecurityDashboard isDarkMode={isDarkMode} onToast={toast} />
               ) : null}
 

@@ -45,13 +45,16 @@ async function hasExtraMemberPack(guardianUserId: string): Promise<boolean> {
   }
 }
 
-/** 가족 보호 인원 현황 (보호자 기준) */
-export async function getFamilyProtectionSlots(guardianUserId: string): Promise<FamilyProtectionSlotSnapshot> {
-  const paid = await canRegisterFamilyMembers(guardianUserId);
-  const wardCount = await countGuardianWards(guardianUserId);
+export function buildFamilyProtectionSlots(input: {
+  paid: { ok: boolean; reason?: string };
+  wardCount: number;
+  extraMemberPackActive?: boolean;
+}): FamilyProtectionSlotSnapshot {
+  const paid = input.paid;
+  const wardCount = Math.max(0, Number(input.wardCount) || 0);
   const guardianCount = 1;
   const memberCount = guardianCount + wardCount;
-  const extraMemberPackActive = paid.ok ? await hasExtraMemberPack(guardianUserId) : false;
+  const extraMemberPackActive = paid.ok ? Boolean(input.extraMemberPackActive) : false;
   const maxMembers = extraMemberPackActive ? FAMILY_EXTENDED_MAX_MEMBERS : FAMILY_BASE_MAX_MEMBERS;
 
   if (!paid.ok) {
@@ -87,12 +90,10 @@ export async function getFamilyProtectionSlots(guardianUserId: string): Promise<
     blockCode = "FAMILY_SLOT_MAX";
   } else if (needsExtension) {
     canInvite = false;
-    blockReason =
-      "가족 보호 인원 한도(4명)를 초과했습니다. 추가 요금 결제가 필요합니다.";
+    blockReason = "가족 보호 인원 한도(4명)를 초과했습니다. 추가 요금 결제가 필요합니다.";
     blockCode = "FAMILY_SLOT_NEEDS_EXTENSION";
   } else if (!canInvite && isAtBaseLimit) {
-    blockReason =
-      "가족 보호 인원 한도(4명)를 초과했습니다. 추가 요금 결제가 필요합니다.";
+    blockReason = "가족 보호 인원 한도(4명)를 초과했습니다. 추가 요금 결제가 필요합니다.";
     blockCode = "FAMILY_SLOT_LIMIT";
   }
 
@@ -112,6 +113,16 @@ export async function getFamilyProtectionSlots(guardianUserId: string): Promise<
     blockCode,
     isPaid: true
   };
+}
+
+/** 가족 보호 인원 현황 (보호자 기준) */
+export async function getFamilyProtectionSlots(guardianUserId: string): Promise<FamilyProtectionSlotSnapshot> {
+  const [paid, wardCount, extraMemberPackActive] = await Promise.all([
+    canRegisterFamilyMembers(guardianUserId),
+    countGuardianWards(guardianUserId),
+    hasExtraMemberPack(guardianUserId)
+  ]);
+  return buildFamilyProtectionSlots({ paid, wardCount, extraMemberPackActive });
 }
 
 /** 초대 1건 추가 시 슬롯 여유 확인 (기존 동일 가족 재초대는 슬롯 미소모) */

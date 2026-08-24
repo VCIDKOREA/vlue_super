@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   acceptFamilyProtectionLink,
   createFamilyProtectionLink,
   fetchFamilyProtection,
+  peekFamilyProtectionCache,
   rejectFamilyProtectionLink,
   requestBankConsent,
   respondBankConsent,
@@ -39,8 +40,10 @@ function applySettingsFromRow(s, setters) {
 }
 
 export function useFamilyProtection() {
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState(null);
+  const cached = peekFamilyProtectionCache();
+  const [loading, setLoading] = useState(!cached);
+  const [data, setData] = useState(cached);
+  const hasDataRef = useRef(Boolean(cached));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -75,6 +78,7 @@ export function useFamilyProtection() {
   };
 
   const applyData = useCallback((d) => {
+    hasDataRef.current = true;
     setData(d);
     applySettingsFromRow(d.settings || {}, setters);
     writeStoredFamilyWardRole(d.myActiveWardRole || "");
@@ -90,8 +94,13 @@ export function useFamilyProtection() {
     );
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  useEffect(() => {
+    if (cached) applyData(cached);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate once from session cache
+  }, []);
+
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent && !hasDataRef.current) setLoading(true);
     try {
       const d = await fetchFamilyProtection();
       applyData({ ...d, offlineDemo: false });
@@ -111,7 +120,7 @@ export function useFamilyProtection() {
 
   useEffect(() => {
     load();
-    const onChanged = () => load();
+    const onChanged = () => load({ silent: true });
     window.addEventListener("vlue-family-protection-changed", onChanged);
     return () => window.removeEventListener("vlue-family-protection-changed", onChanged);
   }, [load]);

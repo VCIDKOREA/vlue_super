@@ -1,6 +1,7 @@
 /** 만 14세 미만 — 본인 휴대폰 PASS로 가입 가능 (쇼케이스 등). 사업자·디지털인증명함만 제한 */
 
 export const MIN_SIGNUP_AGE_YEARS = 14;
+export const FAMILY_PROTECTION_MINOR_AGE_YEARS = 19;
 
 /** @deprecated 부모 승인 필수 정책은 폐지. 호환용으로만 유지 */
 export const PARENTAL_CONSENT_REQUIRED_MESSAGE =
@@ -72,6 +73,24 @@ export function isAdultSignupAge(
   asOf: Date = new Date()
 ): boolean {
   return isMinorForParentalConsent(birthYmd, asOf) === false;
+}
+
+/** 가족 보호 자녀 정책 기준: 만 19세 미만 */
+export function isMinorForFamilyProtection(
+  birthYmd: string | null | undefined,
+  asOf: Date = new Date()
+): boolean | null {
+  const age = computeAgeFromBirthYmd(String(birthYmd ?? ""), asOf);
+  if (age === null) return null;
+  return age < FAMILY_PROTECTION_MINOR_AGE_YEARS;
+}
+
+/** 가족 보호 자녀 정책 기준: 만 19세 이상 */
+export function isAdultForFamilyProtection(
+  birthYmd: string | null | undefined,
+  asOf: Date = new Date()
+): boolean {
+  return isMinorForFamilyProtection(birthYmd, asOf) === false;
 }
 
 /** @deprecated — isAdultSignupAge 사용 */

@@ -18,7 +18,23 @@ export async function fetchFamilyProtection() {
   const res = await vlueAuthFetch(apiUrl("/api/family-protection/links"), {
     headers: vlueAuthHeaders()
   });
-  return parseJson(res);
+  const data = await parseJson(res);
+  try {
+    sessionStorage.setItem("vlue_family_protection_cache_v1", JSON.stringify(data));
+  } catch {
+    /* ignore */
+  }
+  return data;
+}
+
+export function peekFamilyProtectionCache() {
+  try {
+    const raw = sessionStorage.getItem("vlue_family_protection_cache_v1");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 export async function updateFamilyProtectionSettings(payload) {

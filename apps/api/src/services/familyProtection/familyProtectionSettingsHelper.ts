@@ -42,19 +42,31 @@ export function defaultFamilySettings(userId: string): FamilyProtectionSettingsR
   };
 }
 
-export async function getOrCreateFamilySettings(guardianUserId: string): Promise<FamilyProtectionSettingsRow> {
+export async function getOrCreateFamilySettings(guardianUserId: string): Promise<
+  FamilyProtectionSettingsRow & { extraMemberPackActive?: boolean }
+> {
+  try {
+    const existing = await familyProtectionDb.familyProtectionSettings.findUnique({
+      where: { userId: guardianUserId }
+    });
+    if (existing) return existing as FamilyProtectionSettingsRow & { extraMemberPackActive?: boolean };
+  } catch {
+    return defaultFamilySettings(guardianUserId);
+  }
+
   const user = await prisma.user.findUnique({ where: { id: guardianUserId }, select: { id: true } });
   if (!user) return defaultFamilySettings(guardianUserId);
 
   try {
-    const row = await familyProtectionDb.familyProtectionSettings.upsert({
-      where: { userId: guardianUserId },
-      update: {},
-      create: { userId: guardianUserId }
+    const row = await familyProtectionDb.familyProtectionSettings.create({
+      data: { userId: guardianUserId }
     });
-    return row as FamilyProtectionSettingsRow;
+    return row as FamilyProtectionSettingsRow & { extraMemberPackActive?: boolean };
   } catch {
-    return defaultFamilySettings(guardianUserId);
+    const raced = await familyProtectionDb.familyProtectionSettings
+      .findUnique({ where: { userId: guardianUserId } })
+      .catch(() => null);
+    return (raced as FamilyProtectionSettingsRow & { extraMemberPackActive?: boolean }) || defaultFamilySettings(guardianUserId);
   }
 }
 
