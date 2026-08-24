@@ -170,7 +170,8 @@ async function sendMulticastPush(
   body: string,
   dataPayload: Record<string, unknown> | undefined,
   defaultType: string,
-  channelId: string
+  channelId: string,
+  opts?: { dataOnly?: boolean }
 ): Promise<FamilyProtectionPushResult> {
   try {
     const tokens = await listFcmTokensForUser(userId);
@@ -184,34 +185,71 @@ async function sendMulticastPush(
     }
 
     const messaging = admin.messaging();
+    const type = String(dataPayload?.type || defaultType);
     const data = stringifyDataPayload(
       {
         ...dataPayload,
-        type: String(dataPayload?.type || defaultType)
+        type
       },
       title,
       body
     );
-    data.channel = channelId;
+    data.channel = "family_protection";
 
-    const res = await messaging.sendEachForMulticast({
+    /**
+     * 가족 초대는 data-only 로 보내야 백그라운드/종료 시에도
+     * onMessageReceived → 수락/거절 액션 알림이 표시됨.
+     * notification+data 혼합이면 OS가 한 줄 알림만 띄우고 액션 버튼이 없음.
+     */
+    const dataOnly =
+      Boolean(opts?.dataOnly) || type === "vlue-family-protection-invite";
+
+    const androidChannel =
+      type === "vlue-family-protection-invite" ? "family_protection_invite_v2" : channelId;
+
+    const message: {
+      tokens: string[];
+      data: Record<string, string>;
+      notification?: { title: string; body: string };
+      android: Record<string, unknown>;
+      apns: Record<string, unknown>;
+    } = {
       tokens,
-      notification: { title, body },
       data,
       android: {
         priority: "high",
-        notification: {
-          channelId,
-          sound: "default",
-          priority: "high" as const,
-          defaultVibrateTimings: true
-        }
+        ttl: 86400 * 1000
       },
       apns: {
-        headers: { "apns-priority": "10" },
-        payload: { aps: { sound: "default", "content-available": 1 } }
+        headers: { "apns-priority": "10", "apns-push-type": dataOnly ? "background" : "alert" },
+        payload: {
+          aps: dataOnly
+            ? { "content-available": 1, sound: "default" }
+            : { sound: "default", "content-available": 1 }
+        }
       }
-    });
+    };
+
+    if (!dataOnly) {
+      message.notification = { title, body };
+      message.android = {
+        ...message.android,
+        notification: {
+          channelId: androidChannel,
+          sound: "default",
+          priority: "high",
+          defaultVibrateTimings: true
+        }
+      };
+    } else {
+      /* data-only 도 Android 우선순위를 높여 백그라운드 전달 확률을 올림 */
+      message.android = {
+        ...message.android,
+        priority: "high"
+      };
+    }
+
+    const res = await messaging.sendEachForMulticast(message);
 
     const stale: string[] = [];
     res.responses.forEach((item: { success: boolean; error?: { code?: string } }, idx: number) => {

@@ -150,6 +150,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 injectAppLockBridgeBootstrap()
                 scanRemoteApps()
                 scanDangerousApps()
+                handleFamilyInviteIntent(intent)
             }
         }
 
@@ -334,6 +335,31 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         if (intent != null) {
             setIntent(intent)
             handleMemoShareIntent(intent)
+            handleFamilyInviteIntent(intent)
+        }
+    }
+
+    private fun handleFamilyInviteIntent(intent: Intent?) {
+        if (intent == null) return
+        val linkId = intent.getStringExtra("vlue_family_link_id")?.trim().orEmpty()
+        if (linkId.isEmpty()) return
+        val action = intent.getStringExtra("vlue_family_invite_action")?.trim().orEmpty().ifBlank { "open" }
+        if (!::webView.isInitialized) return
+        val safeLink = org.json.JSONObject.quote(linkId)
+        val safeAction = org.json.JSONObject.quote(action)
+        webView.post {
+            webView.evaluateJavascript(
+                """
+                (function(){
+                  try{
+                    window.dispatchEvent(new CustomEvent('vlue-family-invite-deep-link',{
+                      detail:{ linkId:$safeLink, action:$safeAction }
+                    }));
+                  }catch(e){}
+                })();
+                """.trimIndent(),
+                null
+            )
         }
     }
 
@@ -838,6 +864,21 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             if (CallOverlayService.isCompanionSurfaceVisible()) return "1"
             if (LetteringCallCoordinator.isIncomingRingingActive()) return "1"
             return "0"
+        }
+
+        /** 웹 로그인 세션 → 네이티브 (알림 수락/거절 API용) */
+        @android.webkit.JavascriptInterface
+        fun bindUserSession(userId: String?, accessToken: String?) {
+            LetteringPrefs.setSession(
+                activity,
+                userId?.trim()?.ifEmpty { null },
+                accessToken?.trim()?.ifEmpty { null }
+            )
+        }
+
+        @android.webkit.JavascriptInterface
+        fun clearUserSession() {
+            LetteringPrefs.setSession(activity, null, null)
         }
 
         /** 웹 SSE·알림함 → OS 상태바 푸시 (FCM 미등록 기기 보완) */

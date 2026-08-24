@@ -165,6 +165,7 @@ import {
   vlueAuthFetch,
   setVlueSessionTokens,
   clearVlueSessionTokens,
+  syncNativeAuthSession,
   getRefreshToken
 } from "./lib/vlueAuthHeaders.js";
 import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./lib/kakaoSocialLogin.js";
@@ -890,6 +891,7 @@ function App() {
   /** FCM — Android 앱은 네이티브 토큰, 웹은 Web Push */
   useEffect(() => {
     if (!isLoggedIn) return undefined;
+    syncNativeAuthSession();
     let cancelled = false;
     const unbindNative = bindNativeFcmTokenListener();
     (async () => {
@@ -913,6 +915,38 @@ function App() {
       cancelled = true;
       unbindNative();
     };
+  }, [isLoggedIn]);
+
+  /** 알림 수락/거절·딥링크 → 앱에서 수락 처리 */
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    const onDeepLink = async (e) => {
+      const linkId = String(e?.detail?.linkId || "").trim();
+      const action = String(e?.detail?.action || "open").trim();
+      if (!linkId) return;
+      void syncOwnerInboxFromServer();
+      window.dispatchEvent(new CustomEvent("vlue-family-protection-changed"));
+      if (action === "accept" || action === "reject") {
+        try {
+          const { acceptFamilyProtectionLink, rejectFamilyProtectionLink } = await import(
+            "./lib/familyProtectionApi.js"
+          );
+          if (action === "accept") await acceptFamilyProtectionLink(linkId);
+          else await rejectFamilyProtectionLink(linkId);
+          setBottomToast(
+            action === "accept" ? "가족 보호 초대를 수락했습니다." : "가족 보호 초대를 거절했습니다."
+          );
+          setTimeout(() => setBottomToast(""), 4000);
+          window.dispatchEvent(new CustomEvent("vlue-family-protection-changed"));
+          void syncOwnerInboxFromServer();
+        } catch (err) {
+          setBottomToast(err?.message || "가족 초대 처리에 실패했습니다.");
+          setTimeout(() => setBottomToast(""), 4500);
+        }
+      }
+    };
+    window.addEventListener("vlue-family-invite-deep-link", onDeepLink);
+    return () => window.removeEventListener("vlue-family-invite-deep-link", onDeepLink);
   }, [isLoggedIn]);
 
   useEffect(() => {

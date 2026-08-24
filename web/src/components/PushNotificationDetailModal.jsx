@@ -35,10 +35,12 @@ export default function PushNotificationDetailModal({
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [familyBusy, setFamilyBusy] = useState(false);
   const [familyDone, setFamilyDone] = useState("");
+  const [familyError, setFamilyError] = useState("");
 
   useEffect(() => {
     setView(item);
     setFamilyDone("");
+    setFamilyError("");
   }, [item, open]);
 
   if (!open || !item || typeof document === "undefined") return null;
@@ -60,11 +62,13 @@ export default function PushNotificationDetailModal({
   const isFamilyInvite =
     current.kind === "family_invite" ||
     Boolean(current.familyInvitePending && current.linkId);
-  const canFamilyRespond = isFamilyInvite && current.linkId && !familyDone;
+  const familyResolved = familyDone === "accepted" || familyDone === "rejected";
+  const canFamilyRespond = isFamilyInvite && Boolean(current.linkId) && !familyResolved;
 
   const onFamilyAccept = async () => {
     if (familyBusy || !canFamilyRespond) return;
     setFamilyBusy(true);
+    setFamilyError("");
     try {
       await acceptFamilyProtectionLink(current.linkId);
       markPushRead(current.id);
@@ -72,7 +76,7 @@ export default function PushNotificationDetailModal({
       window.dispatchEvent(new CustomEvent("vlue-family-protection-changed"));
       onUpdated?.({ ...current, read: true, familyInvitePending: false });
     } catch (e) {
-      setFamilyDone(String(e?.message || "수락 실패"));
+      setFamilyError(String(e?.message || "수락 실패"));
     } finally {
       setFamilyBusy(false);
     }
@@ -81,6 +85,7 @@ export default function PushNotificationDetailModal({
   const onFamilyReject = async () => {
     if (familyBusy || !canFamilyRespond) return;
     setFamilyBusy(true);
+    setFamilyError("");
     try {
       await rejectFamilyProtectionLink(current.linkId);
       markPushRead(current.id);
@@ -88,7 +93,7 @@ export default function PushNotificationDetailModal({
       window.dispatchEvent(new CustomEvent("vlue-family-protection-changed"));
       onUpdated?.({ ...current, read: true, familyInvitePending: false });
     } catch (e) {
-      setFamilyDone(String(e?.message || "거절 실패"));
+      setFamilyError(String(e?.message || "거절 실패"));
     } finally {
       setFamilyBusy(false);
     }
@@ -225,9 +230,9 @@ export default function PushNotificationDetailModal({
               가족 보호 초대를 거절했습니다.
             </p>
           ) : null}
-          {familyDone && familyDone !== "accepted" && familyDone !== "rejected" ? (
+          {familyError ? (
             <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] font-bold text-red-700">
-              {familyDone}
+              {familyError}
             </p>
           ) : null}
           {current.purchaseConfirmed ? (

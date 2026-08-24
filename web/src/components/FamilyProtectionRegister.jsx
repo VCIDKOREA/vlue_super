@@ -610,25 +610,61 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
               {fp.asWard.length > 0 && (
                 <div className="mt-3">
                   <p className={`text-[11px] font-bold ${strong}`}>받은 가족 보호 요청</p>
-                  <p className={`mt-0.5 text-[10px] ${sub}`}>수락·거절은 푸시 알림 또는 알림함에서 처리하세요.</p>
+                  <p className={`mt-0.5 text-[10px] ${sub}`}>아래에서 바로 수락·거절하거나 알림함에서도 처리할 수 있습니다.</p>
                   {fp.asWard.map((link) => (
                     <div
                       key={link.id}
-                      className={`mt-1.5 flex items-center justify-between rounded-xl border px-2.5 py-2 ${
+                      className={`mt-1.5 rounded-xl border px-2.5 py-2 ${
                         isDarkMode ? "border-white/10" : "border-gray-100"
                       }`}
                     >
-                      <div className="min-w-0">
-                        <p className={`truncate text-[12px] font-bold ${strong}`}>
-                          {displayFamilyUser(link.guardianUser)} · {relationLabel(link)}
-                        </p>
-                        <p className={`text-[10px] ${sub}`}>
-                          {link.status === "pending" ? "승인 대기 — 알림함에서 처리" : "보호 활성"}
-                        </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className={`truncate text-[12px] font-bold ${strong}`}>
+                            {displayFamilyUser(link.guardianUser)} · {relationLabel(link)}
+                          </p>
+                          <p className={`text-[10px] ${sub}`}>
+                            {link.status === "pending" ? "승인 대기" : "보호 활성"}
+                          </p>
+                        </div>
+                        {link.status !== "pending" ? (
+                          <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold ${isDarkMode ? "bg-white/10 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
+                            연결됨
+                          </span>
+                        ) : null}
                       </div>
-                      <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold ${isDarkMode ? "bg-white/10 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
-                        확인
-                      </span>
+                      {link.status === "pending" ? (
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={fp.busy}
+                            onClick={async () => {
+                              try {
+                                toast(await fp.acceptLink(link.id));
+                              } catch (e) {
+                                toast(e?.message || "수락 실패");
+                              }
+                            }}
+                            className="flex-1 rounded-lg bg-emerald-600 py-2 text-[11px] font-bold text-white disabled:opacity-50"
+                          >
+                            {fp.busy ? "처리 중…" : "수락"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={fp.busy}
+                            onClick={async () => {
+                              try {
+                                toast(await fp.rejectLink(link.id));
+                              } catch (e) {
+                                toast(e?.message || "거절 실패");
+                              }
+                            }}
+                            className="flex-1 rounded-lg border border-red-200 bg-red-50 py-2 text-[11px] font-bold text-red-700 disabled:opacity-50"
+                          >
+                            거절
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>

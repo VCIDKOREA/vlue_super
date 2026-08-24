@@ -13,6 +13,7 @@ export function setVlueSessionTokens(payload) {
   } catch {
     /* ignore */
   }
+  syncNativeAuthSession();
 }
 
 export function clearVlueSessionTokens() {
@@ -22,6 +23,36 @@ export function clearVlueSessionTokens() {
   } catch {
     /* ignore */
   }
+  try {
+    window.Android?.clearUserSession?.();
+    window.VlueAndroid?.clearUserSession?.();
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Android 알림 수락/거절용 — WebView 로그인 토큰을 네이티브에 복사 */
+export function syncNativeAuthSession() {
+  try {
+    const token = getAccessToken();
+    let userId = "";
+    try {
+      userId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
+    } catch {
+      /* ignore */
+    }
+    if (window.Android?.bindUserSession) {
+      window.Android.bindUserSession(userId, token);
+      return true;
+    }
+    if (window.VlueAndroid?.bindUserSession) {
+      window.VlueAndroid.bindUserSession(userId, token);
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
 }
 
 export function getAccessToken() {

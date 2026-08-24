@@ -234,8 +234,8 @@ export function useFamilyProtection() {
       setBusy(true);
       try {
         await acceptFamilyProtectionLink(linkId);
-        await load();
         notifyChanged();
+        void load({ silent: true });
         return "수락했습니다. 가족 보호가 시작됩니다.";
       } finally {
         setBusy(false);
@@ -245,8 +245,8 @@ export function useFamilyProtection() {
       setBusy(true);
       try {
         await rejectFamilyProtectionLink(linkId);
-        await load();
         notifyChanged();
+        void load({ silent: true });
         return "거절했습니다.";
       } finally {
         setBusy(false);
