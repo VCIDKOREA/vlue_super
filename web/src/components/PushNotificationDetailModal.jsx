@@ -4,7 +4,6 @@ import { X } from "lucide-react";
 import {
   buildRefundInquiryMailto,
   confirmPushPurchase,
-  markPushRead,
   resolveFamilyInvitePush
 } from "../lib/pushNotificationInbox.js";
 import { acceptFamilyProtectionLink, rejectFamilyProtectionLink } from "../lib/familyProtectionApi.js";
