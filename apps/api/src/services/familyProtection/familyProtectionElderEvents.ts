@@ -75,8 +75,9 @@ export async function recordWardCallEvent(
   }
 
   const name = await wardDisplayName(wardUserId);
-  const title = "[가족 보호] 장시간 통화";
-  const body = `${name} 님이 VLUE 비회원 번호(${maskPhone(phone)})와 ${Math.round(durationSec / 60)}분 이상 통화했습니다.`;
+  const minutes = Math.round(durationSec / 60);
+  const title = "[가족 보호] 모르는 번호 장시간 통화";
+  const body = `${name} 님이 저장되지 않은 모르는 번호(${maskPhone(phone)}, 내선·대표·휴대폰 등)와 ${minutes}분 이상 통화했습니다. (VLUE 비회원)`;
   const r = await createFamilyAlertAndNotifyGuardians({
     wardUserId,
     kind: "elder_long_call_unknown",
@@ -87,7 +88,7 @@ export async function recordWardCallEvent(
   });
 
   if (!r.skippedCooldown && r.alerted > 0) {
-    const push = fcmMessageElderLongCall(Math.round(durationSec / 60));
+    const push = fcmMessageElderLongCall(minutes);
     const recipients = await expandFamilyAlertRecipients(guardianIds, wardUserId);
     void pushFamilyProtectionFcmToGuardians(recipients, push.title, push.body, {
       wardUserId,
