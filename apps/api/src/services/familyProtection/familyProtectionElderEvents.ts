@@ -1,6 +1,6 @@
 import { prisma } from "../../db/client.js";
-import { familyProtectionDb } from "../../db/familyProtectionDb.js";
 import { matchGovernmentHotline, normalizePhoneDigits } from "../../lib/governmentHotlines.js";
+import { classifyKrPhoneKind, krPhoneKindLabel, type KrPhoneKind } from "../../lib/krPhoneKind.js";
 import { matchRemoteControlApp } from "../../lib/remoteControlApps.js";
 import { createFamilyAlertAndNotifyGuardians } from "./familyProtectionNotify.js";
 import { expandFamilyAlertRecipients } from "./familyProtectionCircle.js";
@@ -10,7 +10,6 @@ import {
   fcmMessageElderRemoteApp,
   pushFamilyProtectionFcmToGuardians
 } from "./familyProtectionFcmPush.js";
-import type { FamilyProtectionSettingsRow } from "./familyProtectionSettingsHelper.js";
 import { getGuardianElderLinks, getOrCreateFamilySettings, mergeLinkAlertConfig } from "./familyProtectionSettingsHelper.js";
 
 async function wardDisplayName(userId: string) {
@@ -42,6 +41,9 @@ export async function recordWardCallEvent(
     durationSec?: number;
     direction?: "in" | "out";
     peerIsVlueMember?: boolean;
+    /** 기기 주소록 저장 여부 — true면 장시간 알림 제외. 미전달 시 주소록 미확인으로 알림 제외 */
+    peerInContacts?: boolean;
+    phoneKind?: KrPhoneKind | string;
   }
 ) {
   const phone = String(input.phone || "").trim();
@@ -56,9 +58,20 @@ export async function recordWardCallEvent(
   const links = await getGuardianElderLinks(wardUserId);
   if (!links.length) return { ok: true, handled: false };
 
-  const peerVlue =
-    input.peerIsVlueMember === true ||
-    (input.peerIsVlueMember !== false && (await isVlueMemberByPhone(phone)));
+  // 서버 DB로 VLUE 회원 여부 확정 (클라이언트 false만 믿지 않음)
+  const peerVlue = input.peerIsVlueMember === true || (await isVlueMemberByPhone(phone));
+  // 저장되지 않은 모르는 번호만 — 주소록에 있거나 미확인이면 스킵
+  const peerInContacts = input.peerInContacts === true;
+  const contactsChecked = typeof input.peerInContacts === "boolean";
+  const unsavedUnknown = contactsChecked && input.peerInContacts === false;
+
+  const phoneKind: KrPhoneKind =
+    input.phoneKind === "mobile" ||
+    input.phoneKind === "representative" ||
+    input.phoneKind === "landline"
+      ? input.phoneKind
+      : classifyKrPhoneKind(phone);
+  const kindLabel = krPhoneKindLabel(phoneKind);
 
   const minSecDefault = 600;
   let minSec = minSecDefault;
@@ -70,25 +83,47 @@ export async function recordWardCallEvent(
     minSec = Math.min(minSec, Math.max(60, (cfg.longCallMinutes || 10) * 60));
     guardianIds.push(link.guardianUserId);
   }
-  if (!guardianIds.length || peerVlue || durationSec < minSec) {
-    return { ok: true, handled: true, alerted: 0, government: false };
+  if (!guardianIds.length || peerVlue || peerInContacts || !unsavedUnknown || durationSec < minSec) {
+    return {
+      ok: true,
+      handled: true,
+      alerted: 0,
+      government: false,
+      skipped: peerVlue
+        ? "vlue_member"
+        : peerInContacts
+          ? "in_contacts"
+          : !contactsChecked
+            ? "contacts_unknown"
+            : durationSec < minSec
+              ? "under_threshold"
+              : "disabled"
+    };
   }
 
   const name = await wardDisplayName(wardUserId);
   const minutes = Math.round(durationSec / 60);
   const title = "[가족 보호] 모르는 번호 장시간 통화";
-  const body = `${name} 님이 저장되지 않은 모르는 번호(${maskPhone(phone)}, 내선·대표·휴대폰 등)와 ${minutes}분 이상 통화했습니다. (VLUE 비회원)`;
+  const body = `${name} 님이 저장되지 않은 모르는 번호(${maskPhone(phone)}, ${kindLabel})와 ${minutes}분 이상 통화했습니다. (VLUE 비회원)`;
   const r = await createFamilyAlertAndNotifyGuardians({
     wardUserId,
     kind: "elder_long_call_unknown",
     title,
     body,
     guardianUserIds: guardianIds,
-    payload: { phone: maskPhone(phone), durationSec, direction }
+    payload: {
+      phone: maskPhone(phone),
+      durationSec,
+      direction,
+      phoneKind,
+      phoneKindLabel: kindLabel,
+      peerInContacts: false,
+      peerIsVlueMember: false
+    }
   });
 
   if (!r.skippedCooldown && r.alerted > 0) {
-    const push = fcmMessageElderLongCall(minutes);
+    const push = fcmMessageElderLongCall(minutes, kindLabel);
     const recipients = await expandFamilyAlertRecipients(guardianIds, wardUserId);
     void pushFamilyProtectionFcmToGuardians(recipients, push.title, push.body, {
       wardUserId,
@@ -96,7 +131,14 @@ export async function recordWardCallEvent(
     });
   }
 
-  return { ok: true, handled: true, alerted: r.alerted, government: false };
+  return {
+    ok: true,
+    handled: true,
+    alerted: r.alerted,
+    government: false,
+    phoneKind,
+    phoneKindLabel: kindLabel
+  };
 }
 
 export async function recordWardGovernmentCall(

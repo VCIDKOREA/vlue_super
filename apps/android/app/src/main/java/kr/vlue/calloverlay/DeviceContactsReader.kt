@@ -41,6 +41,35 @@ object DeviceContactsReader {
         return null
     }
 
+    /**
+     * 주소록 저장 여부.
+     * READ_CONTACTS 없으면 null(미확인) — 가족보호 장시간 알림은 서버에서 스킵.
+     */
+    fun isInContacts(context: Context, rawPhone: String): Boolean? {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            return null
+        }
+        if (ContactPhoneKeys.keys(rawPhone).isEmpty()) return false
+        val projection = arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER)
+        context.contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            projection,
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            val phoneIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            while (cursor.moveToNext()) {
+                val phone = cursor.getString(phoneIdx)?.trim().orEmpty()
+                if (phone.isEmpty()) continue
+                if (ContactPhoneKeys.matches(rawPhone, phone)) return true
+            }
+        }
+        return false
+    }
+
     fun readAsJson(context: Context): String {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS)
             != PackageManager.PERMISSION_GRANTED

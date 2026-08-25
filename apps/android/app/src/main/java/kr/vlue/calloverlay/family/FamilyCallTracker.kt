@@ -4,6 +4,8 @@ import android.content.Context
 import android.provider.CallLog
 import android.telephony.TelephonyManager
 import android.util.Log
+import kr.vlue.calloverlay.DeviceContactsReader
+import kr.vlue.calloverlay.KrPhoneKindClassifier
 
 /**
  * PHONE_STATE → 가족보호 브릿지 이벤트 (레터링과 독립 동작)
@@ -53,12 +55,7 @@ object FamilyCallTracker {
         if (snap.durationSec > 0 || wasOffhook) {
             val phone = snap.phone.ifEmpty { ringingNumber.orEmpty() }
             if (phone.isNotEmpty()) {
-                VlueFamilyBridge.dispatchCallEnded(
-                    phone = phone,
-                    durationSec = snap.durationSec.coerceAtLeast(0),
-                    direction = snap.direction,
-                    peerIsVlueMember = false
-                )
+                dispatchEnded(context, phone, snap.durationSec.coerceAtLeast(0), snap.direction)
             }
         }
     }
@@ -69,11 +66,19 @@ object FamilyCallTracker {
             VlueFamilyBridge.dispatchMissedCall()
             return
         }
+        dispatchEnded(context, snap.phone, snap.durationSec, snap.direction)
+    }
+
+    private fun dispatchEnded(context: Context, phone: String, durationSec: Int, direction: String) {
+        val inContacts = DeviceContactsReader.isInContacts(context, phone)
+        val kind = KrPhoneKindClassifier.classify(phone)
         VlueFamilyBridge.dispatchCallEnded(
-            phone = snap.phone,
-            durationSec = snap.durationSec,
-            direction = snap.direction,
-            peerIsVlueMember = false
+            phone = phone,
+            durationSec = durationSec,
+            direction = direction,
+            peerIsVlueMember = false,
+            peerInContacts = inContacts,
+            phoneKind = kind.wire
         )
     }
 }

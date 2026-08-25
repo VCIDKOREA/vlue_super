@@ -155,18 +155,34 @@ function normalizeCallEventBody(body: {
   durationSec?: number;
   direction?: string;
   peerIsVlueMember?: boolean;
+  peerInContacts?: boolean;
+  phoneKind?: string;
 }): {
   phone?: string;
   durationSec?: number;
   direction?: "out" | "in";
   peerIsVlueMember?: boolean;
+  peerInContacts?: boolean;
+  phoneKind?: string;
 } {
   const direction = body.direction === "out" || body.direction === "in" ? body.direction : undefined;
+  const peerInContacts =
+    typeof body.peerInContacts === "boolean"
+      ? body.peerInContacts
+      : undefined;
+  const phoneKind =
+    body.phoneKind === "mobile" ||
+    body.phoneKind === "representative" ||
+    body.phoneKind === "landline"
+      ? body.phoneKind
+      : undefined;
   return {
     phone: body.phone,
     durationSec: body.durationSec,
     direction,
-    peerIsVlueMember: body.peerIsVlueMember
+    peerIsVlueMember: body.peerIsVlueMember,
+    peerInContacts,
+    phoneKind
   };
 }
 
@@ -178,6 +194,8 @@ familyProtectionRoutes.post("/alert/call", requireUserHeader, async (c) => {
       durationSec?: number;
       direction?: string;
       peerIsVlueMember?: boolean;
+      peerInContacts?: boolean;
+      phoneKind?: string;
     }
   );
   try {
@@ -197,6 +215,8 @@ familyProtectionRoutes.post("/ward/call-event", requireUserHeader, async (c) => 
       durationSec?: number;
       direction?: string;
       peerIsVlueMember?: boolean;
+      peerInContacts?: boolean;
+      phoneKind?: string;
     }
   );
   try {

@@ -41,13 +41,17 @@ object VlueFamilyBridge {
         phone: String,
         durationSec: Int,
         direction: String,
-        peerIsVlueMember: Boolean = false
+        peerIsVlueMember: Boolean = false,
+        peerInContacts: Boolean? = null,
+        phoneKind: String? = null
     ) {
         val payload = JSONObject()
             .put("phone", phone)
             .put("durationSec", durationSec)
             .put("direction", direction)
             .put("peerIsVlueMember", peerIsVlueMember)
+        if (peerInContacts != null) payload.put("peerInContacts", peerInContacts)
+        if (!phoneKind.isNullOrBlank()) payload.put("phoneKind", phoneKind)
         dispatchJs("onCallEnded", payload)
     }
 
@@ -171,8 +175,17 @@ object VlueFamilyBridge {
                 val dur = payload.optInt("durationSec", 0)
                 val dir = jsQuote(payload.optString("direction", "in"))
                 val vlue = if (payload.optBoolean("peerIsVlueMember")) "true" else "false"
+                val contactsPart =
+                    if (payload.has("peerInContacts")) {
+                        ",peerInContacts:${if (payload.optBoolean("peerInContacts")) "true" else "false"}"
+                    } else {
+                        ""
+                    }
+                val kindRaw = payload.optString("phoneKind", "")
+                val kindPart =
+                    if (kindRaw.isNotBlank()) ",phoneKind:${jsQuote(kindRaw)}" else ""
                 "window.VlueFamilyBridge&&window.VlueFamilyBridge.onCallEnded&&" +
-                    "window.VlueFamilyBridge.onCallEnded({phone:$phone,durationSec:$dur,direction:$dir,peerIsVlueMember:$vlue});"
+                    "window.VlueFamilyBridge.onCallEnded({phone:$phone,durationSec:$dur,direction:$dir,peerIsVlueMember:$vlue$contactsPart$kindPart});"
             }
             else -> ""
         }

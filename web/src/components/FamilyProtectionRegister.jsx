@@ -339,7 +339,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                 <span className="min-w-0 flex-1 leading-snug">
                   비회원 장시간 통화 + 저장되지 않은 모르는 번호
                   <span className={`mt-0.5 block text-[9px] font-medium ${sub}`}>
-                    (일반내선·대표번호·휴대폰번호)
+                    (일반내선·대표번호·휴대폰번호 · 기기 주소록·통화기록 권한 필요)
                   </span>
                 </span>
                 <input

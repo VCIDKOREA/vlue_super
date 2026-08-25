@@ -26,12 +26,13 @@ export function fcmMessageElderGovernmentCall(agencyLabel: string) {
   };
 }
 
-export function fcmMessageElderLongCall(minutes: number) {
+export function fcmMessageElderLongCall(minutes: number, phoneKindLabel?: string) {
   const min = Math.max(1, Math.floor(minutes));
+  const kind = String(phoneKindLabel || "").trim() || "내선·대표·휴대폰";
   return {
     title: "[주의] 가족 보호",
-    body: `[주의] 부모님이 저장되지 않은 모르는 번호(내선·대표·휴대폰 등)와 ${min}분 이상 장시간 통화 중입니다. 확인이 필요합니다.`,
-    data: { kind: "elder_long_call_unknown", minutes: min }
+    body: `[주의] 부모님이 저장되지 않은 모르는 번호(${kind})와 ${min}분 이상 장시간 통화 중입니다. 확인이 필요합니다.`,
+    data: { kind: "elder_long_call_unknown", minutes: min, phoneKindLabel: kind }
   };
 }
 

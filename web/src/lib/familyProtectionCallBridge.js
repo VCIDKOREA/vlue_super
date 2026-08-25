@@ -31,10 +31,17 @@ export function registerFamilyCallBridge() {
         });
       }
     },
-    /** 통화 종료: { phone, durationSec, direction: 'in'|'out', peerIsVlueMember?: boolean } */
+    /** 통화 종료: { phone, durationSec, direction, peerIsVlueMember?, peerInContacts?, phoneKind? } */
     onCallEnded: (payload) => {
       const p = payload || {};
-      postFamilyAlertCall(p).catch(() => {});
+      postFamilyAlertCall({
+        phone: p.phone,
+        durationSec: p.durationSec,
+        direction: p.direction,
+        peerIsVlueMember: p.peerIsVlueMember,
+        peerInContacts: typeof p.peerInContacts === "boolean" ? p.peerInContacts : undefined,
+        phoneKind: p.phoneKind
+      }).catch(() => {});
       appendCallShowcaseHistory({
         phone: p.phone,
         name: p.name || p.peerName,
