@@ -4,7 +4,8 @@ import { X } from "lucide-react";
 import {
   buildRefundInquiryMailto,
   confirmPushPurchase,
-  markPushRead
+  markPushRead,
+  resolveFamilyInvitePush
 } from "../lib/pushNotificationInbox.js";
 import { acceptFamilyProtectionLink, rejectFamilyProtectionLink } from "../lib/familyProtectionApi.js";
 import { marketingLegalUrl } from "../lib/legalPageLinks.js";
@@ -39,8 +40,13 @@ export default function PushNotificationDetailModal({
 
   useEffect(() => {
     setView(item);
-    setFamilyDone("");
     setFamilyError("");
+    const resolved = String(item?.familyInviteResolved || "").trim();
+    if (resolved === "accepted" || resolved === "rejected") {
+      setFamilyDone(resolved);
+    } else {
+      setFamilyDone("");
+    }
   }, [item, open]);
 
   if (!open || !item || typeof document === "undefined") return null;
@@ -59,11 +65,18 @@ export default function PushNotificationDetailModal({
       .replace(/^@/, "")
       .trim();
 
-  const isFamilyInvite =
+  const inviteResolvedStatus =
+    familyDone === "accepted" || familyDone === "rejected"
+      ? familyDone
+      : current.familyInviteResolved === "accepted" || current.familyInviteResolved === "rejected"
+        ? current.familyInviteResolved
+        : "";
+  const inviteResolved = Boolean(inviteResolvedStatus);
+  const isFamilyInviteKind =
     current.kind === "family_invite" ||
-    Boolean(current.familyInvitePending && current.linkId);
-  const familyResolved = familyDone === "accepted" || familyDone === "rejected";
-  const canFamilyRespond = isFamilyInvite && Boolean(current.linkId) && !familyResolved;
+    Boolean(current.familyInvitePending) ||
+    Boolean(current.familyInviteResolved);
+  const canFamilyRespond = isFamilyInviteKind && Boolean(current.linkId) && !inviteResolved;
 
   const onFamilyAccept = async () => {
     if (familyBusy || !canFamilyRespond) return;
@@ -71,10 +84,17 @@ export default function PushNotificationDetailModal({
     setFamilyError("");
     try {
       await acceptFamilyProtectionLink(current.linkId);
-      markPushRead(current.id);
+      const next =
+        resolveFamilyInvitePush(current.id, "accepted") || {
+          ...current,
+          read: true,
+          familyInvitePending: false,
+          familyInviteResolved: "accepted"
+        };
+      setView(next);
       setFamilyDone("accepted");
       window.dispatchEvent(new CustomEvent("vlue-family-protection-changed"));
-      onUpdated?.({ ...current, read: true, familyInvitePending: false });
+      onUpdated?.(next);
     } catch (e) {
       setFamilyError(String(e?.message || "수락 실패"));
     } finally {
@@ -88,10 +108,17 @@ export default function PushNotificationDetailModal({
     setFamilyError("");
     try {
       await rejectFamilyProtectionLink(current.linkId);
-      markPushRead(current.id);
+      const next =
+        resolveFamilyInvitePush(current.id, "rejected") || {
+          ...current,
+          read: true,
+          familyInvitePending: false,
+          familyInviteResolved: "rejected"
+        };
+      setView(next);
       setFamilyDone("rejected");
       window.dispatchEvent(new CustomEvent("vlue-family-protection-changed"));
-      onUpdated?.({ ...current, read: true, familyInvitePending: false });
+      onUpdated?.(next);
     } catch (e) {
       setFamilyError(String(e?.message || "거절 실패"));
     } finally {
@@ -220,12 +247,12 @@ export default function PushNotificationDetailModal({
           >
             {current.body || "내용이 없습니다."}
           </p>
-          {familyDone === "accepted" ? (
+          {inviteResolvedStatus === "accepted" ? (
             <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] font-bold text-emerald-800">
               가족 보호 초대를 수락했습니다.
             </p>
           ) : null}
-          {familyDone === "rejected" ? (
+          {inviteResolvedStatus === "rejected" ? (
             <p className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] font-bold text-gray-700">
               가족 보호 초대를 거절했습니다.
             </p>
@@ -285,6 +312,15 @@ export default function PushNotificationDetailModal({
               </button>
             </>
           ) : null}
+          {inviteResolved ? (
+            <button
+              type="button"
+              className="w-full rounded-xl bg-blue-600 py-3 text-[14px] font-black text-white active:scale-[0.99]"
+              onClick={onClose}
+            >
+              확인
+            </button>
+          ) : null}
           {canConfirm ? (
             <button
               type="button"
@@ -308,19 +344,21 @@ export default function PushNotificationDetailModal({
               환불 문의
             </button>
           ) : null}
-          <button
-            type="button"
-            className={`w-full rounded-xl py-3 text-[14px] font-black active:scale-[0.99] ${
-              canConfirm || isPayment || canFamilyRespond
-                ? isDarkMode
-                  ? "bg-white/10 text-slate-100"
-                  : "bg-slate-100 text-slate-700"
-                : "bg-blue-600 text-white"
-            }`}
-            onClick={onClose}
-          >
-            {canConfirm || isPayment || canFamilyRespond ? "닫기" : "확인"}
-          </button>
+          {!inviteResolved ? (
+            <button
+              type="button"
+              className={`w-full rounded-xl py-3 text-[14px] font-black active:scale-[0.99] ${
+                canConfirm || isPayment || canFamilyRespond
+                  ? isDarkMode
+                    ? "bg-white/10 text-slate-100"
+                    : "bg-slate-100 text-slate-700"
+                  : "bg-blue-600 text-white"
+              }`}
+              onClick={onClose}
+            >
+              {canConfirm || isPayment || canFamilyRespond ? "닫기" : "확인"}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>,

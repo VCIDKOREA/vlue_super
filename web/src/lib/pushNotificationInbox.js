@@ -211,6 +211,28 @@ export function markPushRead(id) {
   writeList(list);
 }
 
+/**
+ * 가족 초대 수락/거절 후 알림함 항목 확정 — 다시 열어도 수락/거절 버튼이 안 뜨도록
+ * @param {string} id
+ * @param {"accepted"|"rejected"} status
+ */
+export function resolveFamilyInvitePush(id, status) {
+  const resolved = status === "rejected" ? "rejected" : "accepted";
+  let updated = null;
+  const list = readList().map((n) => {
+    if (n.id !== id) return n;
+    updated = {
+      ...n,
+      read: true,
+      familyInvitePending: false,
+      familyInviteResolved: resolved
+    };
+    return updated;
+  });
+  writeList(list);
+  return updated;
+}
+
 export function markAllPushRead() {
   writeList(readList().map((n) => ({ ...n, read: true })));
 }

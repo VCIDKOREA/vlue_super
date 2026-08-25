@@ -624,12 +624,12 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                             {displayFamilyUser(link.guardianUser)} · {relationLabel(link)}
                           </p>
                           <p className={`text-[10px] ${sub}`}>
-                            {link.status === "pending" ? "승인 대기" : "보호 활성"}
+                            {link.status === "pending" ? "승인 대기" : "보호 연결됨"}
                           </p>
                         </div>
                         {link.status !== "pending" ? (
-                          <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold ${isDarkMode ? "bg-white/10 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
-                            연결됨
+                          <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold ${isDarkMode ? "bg-emerald-500/20 text-emerald-300" : "bg-emerald-50 text-emerald-700"}`}>
+                            확인
                           </span>
                         ) : null}
                       </div>
