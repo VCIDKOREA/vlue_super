@@ -844,10 +844,15 @@ function LetteringOverlayHostInner() {
        * normalizeCallState("") → early-return 되면 하단 바가 풀쇼케이스/미니로 남음.
        */
       if (rawState === "big_push_bar") {
-        if (Date.now() >= restoreHoldUntilRef.current) {
-          setForceShowcaseBar(true);
-          setExpanded(false);
-        }
+        /*
+         * 연속 수신: 직전 answer/restore hold(3.5s) 가 남아 있으면 MiniCase 가
+         * big_push_bar 를 무시 → 삼성 미니 UI 와 VLUE 미니가 겹친다. hold 해제 필수.
+         */
+        restoreHoldUntilRef.current = 0;
+        autoExpandedOnceRef.current = false;
+        resetCompanionMiniCaseSessionPos();
+        setForceShowcaseBar(true);
+        setExpanded(false);
       } else if (
         rawState === "minimize_showcase" ||
         rawState === "reveal_system_call_ui"
@@ -876,8 +881,10 @@ function LetteringOverlayHostInner() {
           setExpanded(true);
         }
         if (next === CALL_STATES.RINGING) {
-          /* BigPush = 앱 쇼케이스바 */
+          /* BigPush = 앱 쇼케이스바 — 연속 수신 시 직전 MiniCase hold/좌표 제거 */
+          restoreHoldUntilRef.current = 0;
           autoExpandedOnceRef.current = false;
+          resetCompanionMiniCaseSessionPos();
           setForceShowcaseBar(true);
           setExpanded(false);
         }
@@ -889,6 +896,7 @@ function LetteringOverlayHostInner() {
         /ended|idle|dismiss/i.test(rawState);
       if (ended) {
         /* Mini Case 세션 좌표 초기화 — 다음 통화는 기본 위치. 앱은 종료하지 않음 */
+        restoreHoldUntilRef.current = 0;
         resetCompanionMiniCaseSessionPos();
         if (COMPANION_MVP_DELEGATE_CALL_UI) {
           try {

@@ -92,6 +92,18 @@ class CompanionOverlayController {
             miniCaseVisibility = MiniCaseVisibility.VISIBLE
             lastTransition = "requestBigPush: stale ${prev.name}→IDLE below-first for new ringing"
             rejectedTransition = null
+        } else if (!callAlreadyAnswered && state == OverlayState.BIG_PUSH) {
+            /*
+             * 창 재사용 연속 수신: 직전 TOP/미니 좌표가 남아 삼성 미니 UI 와 겹침 —
+             * BELOW 핀으로 재시작(풀 InCallUI 확정 시 refreshPosition 이 핀 해제).
+             */
+            ringingBelowMiniPinned = true
+            if (context == OverlayContext.INCOMING_CALL_UI) {
+                context = OverlayContext.COMPACT_INCOMING
+            }
+            miniCaseVisibility = MiniCaseVisibility.VISIBLE
+            lastTransition = "requestBigPush: re-ring pin BELOW (reuse)"
+            rejectedTransition = null
         }
         if (callAlreadyAnswered || state == OverlayState.SHOWCASE || state == OverlayState.MINI_CASE) {
             rejectedTransition = "requestBigPush rejected: answeredOrShowcase state=$state"

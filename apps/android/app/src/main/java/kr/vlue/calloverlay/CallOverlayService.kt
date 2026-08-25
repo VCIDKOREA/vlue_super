@@ -88,6 +88,46 @@ class CallOverlayService : Service() {
     private var currentDcpRoute: String = ""
     private var keypadOpen = false
     private var userMinimized = false
+    /**
+     * dismiss 중 들어온 다음 수신 — drop 하면 잔존 Mini/바 와 다음 콜이 어긋난다.
+     * removeOverlayImmediate 직후 재실행.
+     */
+    private var pendingShowAfterDismiss: PendingShowOverlay? = null
+    private data class PendingShowOverlay(
+        val phone: String,
+        val verified: Boolean,
+        val outgoing: Boolean,
+        val cardJson: String?,
+        val dcpRoute: String
+    )
+    private val bigPushSettle400 = Runnable {
+        if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
+            reevaluateForegroundContext("bigPush_settle_400")
+        }
+    }
+    private val bigPushSettle1200 = Runnable {
+        if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
+            reevaluateForegroundContext("bigPush_settle_1200")
+        }
+    }
+    private val bigPushSettle2500 = Runnable {
+        if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
+            reevaluateForegroundContext("bigPush_settle_2500")
+        }
+    }
+
+    private fun cancelBigPushSettle() {
+        mainHandler.removeCallbacks(bigPushSettle400)
+        mainHandler.removeCallbacks(bigPushSettle1200)
+        mainHandler.removeCallbacks(bigPushSettle2500)
+    }
+
+    private fun scheduleBigPushSettle() {
+        cancelBigPushSettle()
+        mainHandler.postDelayed(bigPushSettle400, 400L)
+        mainHandler.postDelayed(bigPushSettle1200, 1_200L)
+        mainHandler.postDelayed(bigPushSettle2500, 2_500L)
+    }
     private var screenStateDetector: ScreenStateDetector? = null
     /** Answer 직후 ContextWatch 가 OTHER_APP 로 쇼케이스를 깨지 않게 */
     private var showcaseHoldUntilElapsed: Long = 0L
@@ -247,9 +287,16 @@ class CallOverlayService : Service() {
         dcpRoute: String = ""
     ) {
         if (dismissing) {
-            CompanionRuntimeStabilityDiag.noteStaleEvent("SHOW_OVERLAY", "showOverlay", detail = "dismissing")
+            pendingShowAfterDismiss =
+                PendingShowOverlay(phone, verified, outgoing, cardJson, dcpRoute)
+            CompanionRuntimeStabilityDiag.noteStaleEvent(
+                "SHOW_OVERLAY",
+                "showOverlay",
+                detail = "dismissing→queued"
+            )
             return
         }
+        cancelBigPushSettle()
         val alreadyAttached = rootContainer?.isAttachedToWindow == true
         val answered = shouldEnterShowcaseNow(outgoing)
         val callState = telephonyCallState()
@@ -417,18 +464,31 @@ class CallOverlayService : Service() {
         )
         /* 기존 Window 재사용 — remove+add 는 BadToken/흰화면 유발 */
         if (alreadyAttached) {
+            /*
+             * 연속 수신: 직전 MiniCase/CONNECTED DOM 이 남으면 삼성 미니 UI 와 겹친다.
+             * 번호 동일 여부와 관계없이 문서·미니 세션을 강제 리셋하고 BigPush 바로 복귀.
+             */
+            userMinimized = false
             bigPushPeeking = false
             applyLayoutFromController(source = "bigPush_reuseWindow")
-            val phoneChanged = overlayPhoneChanged(phone)
             currentPhone = phone
             pendingCardJson = cardJson
             pendingVerified = verified
             val wv = webView
             if (wv != null && !IncomingNumberResolver.isUnknown(phone)) {
-                loadOverlayDocument(wv, phone, verified, outgoing, cardJson, forceNewDocument = phoneChanged)
+                loadOverlayDocument(
+                    wv,
+                    phone,
+                    verified,
+                    outgoing,
+                    cardJson,
+                    forceNewDocument = true
+                )
             }
             syncDcpRoutePopup(cardJson, currentDcpRoute)
             syncOverlayChromeForState(source = "bigPush_reuseWindow")
+            /* sync 전에 웹이 restoreHold 로 big_push 를 무시해도 idle→bar 로 MiniCase 해제 */
+            notifyWebCallState("big_push_bar")
         } else {
             attachOverlayWindow(
                 phone = phone,
@@ -442,21 +502,7 @@ class CallOverlayService : Service() {
          * InCallActivity ACTIVITY_RESUMED 가 FGS/알림보다 늦을 수 있음 (DUT usagestats).
          * 재평가로 전체 UI→TOP / 다른앱→BOTTOM 분리 보정.
          */
-        mainHandler.postDelayed({
-            if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
-                reevaluateForegroundContext("bigPush_settle_400")
-            }
-        }, 400L)
-        mainHandler.postDelayed({
-            if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
-                reevaluateForegroundContext("bigPush_settle_1200")
-            }
-        }, 1_200L)
-        mainHandler.postDelayed({
-            if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
-                reevaluateForegroundContext("bigPush_settle_2500")
-            }
-        }, 2_500L)
+        scheduleBigPushSettle()
     }
 
     /**
@@ -2524,11 +2570,13 @@ class CallOverlayService : Service() {
     fun dismissOverlay() {
         if (dismissing) return
         dismissing = true
+        cancelBigPushSettle()
         stopContextWatch()
         CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_CALL_END", "dismissOverlay")
         CompanionRuntimeStabilityDiag.endCallSession("dismissOverlay")
         companion.onCallEnd()
         remoteConnected = false
+        userMinimized = false
         bigPushPeeking = false
         overlayModal = false
         dcpPopupOnly = false
@@ -2541,10 +2589,26 @@ class CallOverlayService : Service() {
                 removeOverlayImmediate()
         CompanionRuntimeStabilityDiag.mark("OVERLAY_HIDE_COMPLETE", "dismissOverlay_immediate")
         LetteringRingingActivity.requestFinish(this)
+        val queued = pendingShowAfterDismiss
+        pendingShowAfterDismiss = null
+        if (queued != null) {
+            CompanionRuntimeStabilityDiag.mark("SHOW_OVERLAY_AFTER_DISMISS", "dismissOverlay")
+            mainHandler.post {
+                showOverlay(
+                    queued.phone,
+                    queued.verified,
+                    queued.outgoing,
+                    queued.cardJson,
+                    queued.dcpRoute
+                )
+            }
+            return
+        }
         stopSelfTraced("dismissOverlay_immediate")
     }
 
     private fun removeOverlayImmediate() {
+        cancelBigPushSettle()
         ShowcaseProximitySensor.detach()
         webView?.destroy()
         webView = null

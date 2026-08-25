@@ -228,6 +228,17 @@ class CompanionOverlayControllerTest {
         assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
     }
 
+    /** 연속 수신·창 재사용: 이미 BIG_PUSH 인데 다시 링잉 → BELOW 핀 (삼성 미니 겹침 방지) */
+    @Test
+    fun requestBigPush_reRingWhileBigPush_pinsBelow() {
+        val c = CompanionOverlayController()
+        assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))
+        assertEquals(OverlayPosition.TOP, c.position)
+        assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))
+        assertEquals(OverlayState.BIG_PUSH, c.state)
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
+    }
+
     /** BELOW 핀 후에도 풀 InCallUI 확정 시 TOP 복귀 */
     @Test
     fun bigPush_clearsBelowPin_whenFullIncomingCallUi() {
