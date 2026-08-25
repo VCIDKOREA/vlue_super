@@ -653,6 +653,24 @@ function LetteringOverlayHostInner() {
           setVerified(false);
           setLoading(false);
         }, 2200);
+      } else {
+        /* 알려진 번호도 조회 전엔 미인증으로 그리지 않음 */
+        setCard((prev) => {
+          if (prev && String(prev.profileKind || "") !== "lookup_pending" && prev.matched !== false) {
+            return prev;
+          }
+          if (prev && (prev.displayName || prev.name) && prev.profileKind !== "lookup_pending") {
+            return prev;
+          }
+          return {
+            ...buildUnverifiedOverlayCard(incoming),
+            profileKind: "lookup_pending",
+            name: "",
+            displayName: ""
+          };
+        });
+        setVerified(false);
+        setLoading(true);
       }
 
       void syncDeviceContactsFromNative().catch(() => {});
@@ -660,7 +678,7 @@ function LetteringOverlayHostInner() {
       const blockCheckPromise = Promise.race([
         checkLetteringPhoneBlocked(incoming),
         new Promise((resolve) => {
-          window.setTimeout(() => resolve({ blocked: false }), 800);
+          window.setTimeout(() => resolve({ blocked: false }), 300);
         })
       ]);
       if (cancelled) return;

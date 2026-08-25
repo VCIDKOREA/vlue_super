@@ -162,21 +162,19 @@ object LetteringCallCoordinator {
                     else -> null
                 }
             val cachedMember =
-                if (agency == null && !nextUnknown) CardLookupRepository.peekCached(raw) else null
+                if (agency == null && !nextUnknown) CardLookupRepository.peekCached(app, raw) else null
             val cachedJson = cachedMember?.rawJson?.let { OverlayCardOrgFill.applyLocalDefaults(it) }
             val overlayJson =
                 pathJson
                     ?: cachedJson?.let { cached ->
-                        val withOrg =
-                            if (OverlayCardOrgFill.hasOrganization(cached)) cached else null
-                        val body = withOrg ?: return@let null
                         if (dcpVerdict != null) {
-                            CallPathLookupMerge.merge(body, dcpVerdict, outgoing).json
+                            CallPathLookupMerge.merge(cached, dcpVerdict, outgoing).json
                         } else {
-                            body
+                            cached
                         }
                     }
                     ?: OverlayCardOrgFill.seedIfPlatformCeoPhone(raw)
+                    ?: if (!nextUnknown) lookupPendingJson(raw) else null
             val overlayNumber = agency?.shortNumber ?: raw
             val overlayRoute =
                 when {
@@ -211,12 +209,17 @@ object LetteringCallCoordinator {
             /* 1) Permission → Overlay 즉시 (diag/lookup 보다 먼저) */
             val canDraw = LetteringPermissionHelper.canDrawOverlays(app)
             if (canDraw) {
+                val hasMemberSeed =
+                    agency != null ||
+                        cachedMember?.matched == true ||
+                        cachedMember?.verified == true ||
+                        (overlayJson != null &&
+                            !overlayJson.contains("\"lookup_pending\"") &&
+                            OverlayCardOrgFill.hasOrganization(overlayJson))
                 startOverlayService(
                     app,
                     overlayNumber,
-                    verified = agency != null ||
-                        cachedMember?.verified == true ||
-                        overlayJson != null && OverlayCardOrgFill.hasOrganization(overlayJson),
+                    verified = hasMemberSeed,
                     cardJson = overlayJson,
                     outgoing = outgoing,
                     dcpRoute = overlayRoute
@@ -412,8 +415,9 @@ object LetteringCallCoordinator {
         )
         try {
             var lookup = CardLookupRepository.lookup(app, raw)
+            /* 네트워크 null(타임아웃)만 짧게 재시도 — matched:false 는 확정이므로 지연 금지 */
             if (lookup == null) {
-                delay(400L)
+                delay(120L)
                 lookup = CardLookupRepository.lookup(app, raw)
             }
             val elapsed = (SystemClock.elapsedRealtime() - started).coerceAtLeast(0L)
@@ -553,6 +557,17 @@ object LetteringCallCoordinator {
             .put("is_verified", false)
             .put("phoneE164", raw)
             .put("profileKind", "")
+            .toString()
+
+    /** 조회 완료 전 — 미인증 앰버 UI 깜빡임 방지 */
+    private fun lookupPendingJson(raw: String): String =
+        org.json.JSONObject()
+            .put("matched", false)
+            .put("is_verified", false)
+            .put("phoneE164", raw)
+            .put("profileKind", "lookup_pending")
+            .put("displayName", "")
+            .put("name", "")
             .toString()
 
     private fun applyContactSafeCareIfSaved(app: Context, raw: String, outgoing: Boolean): Boolean {

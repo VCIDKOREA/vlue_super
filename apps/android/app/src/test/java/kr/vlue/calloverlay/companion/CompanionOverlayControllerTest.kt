@@ -216,7 +216,7 @@ class CompanionOverlayControllerTest {
         assertEquals(OverlayContext.KEYPAD, c.context)
     }
 
-    /** 이전 통화 MINI 잔존 → 새 RINGING 시 BigPush 허용 */
+    /** 이전 통화 MINI 잔존 → 새 RINGING 시 BigPush 허용 (전체 UI면 TOP) */
     @Test
     fun requestBigPush_resetsStaleMiniForNewRinging() {
         val c = CompanionOverlayController()
@@ -225,17 +225,27 @@ class CompanionOverlayControllerTest {
         assertEquals(OverlayState.MINI_CASE, c.state)
         assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))
         assertEquals(OverlayState.BIG_PUSH, c.state)
-        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
+        assertEquals(OverlayPosition.TOP, c.position)
     }
 
-    /** 연속 수신·창 재사용: 이미 BIG_PUSH 인데 다시 링잉 → BELOW 핀 (삼성 미니 겹침 방지) */
+    /** 연속 수신·창 재사용: 전체 InCallUI 재링잉은 TOP 유지 (중앙 BELOW 버그 금지) */
     @Test
-    fun requestBigPush_reRingWhileBigPush_pinsBelow() {
+    fun requestBigPush_reRingFullInCall_staysTop() {
         val c = CompanionOverlayController()
         assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))
         assertEquals(OverlayPosition.TOP, c.position)
         assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI, callAlreadyAnswered = false))
         assertEquals(OverlayState.BIG_PUSH, c.state)
+        assertEquals(OverlayPosition.TOP, c.position)
+    }
+
+    /** 미니 수신 위 연속 링잉만 BELOW 핀 */
+    @Test
+    fun requestBigPush_reRingCompact_pinsBelow() {
+        val c = CompanionOverlayController()
+        assertTrue(c.requestBigPush(OverlayContext.COMPACT_INCOMING, callAlreadyAnswered = false))
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
+        assertTrue(c.requestBigPush(OverlayContext.COMPACT_INCOMING, callAlreadyAnswered = false))
         assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
     }
 

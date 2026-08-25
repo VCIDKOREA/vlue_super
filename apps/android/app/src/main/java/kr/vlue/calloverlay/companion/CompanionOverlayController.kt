@@ -84,25 +84,44 @@ class CompanionOverlayController {
             val prev = state
             state = OverlayState.IDLE
             /*
-             * 연속 수신·통화 중 재수신: 직전 MINI/SHOWCASE 잔존 시 TOP 으로 올리면
-             * 삼성 미니 수신 UI 와 BigPush 가 겹친다 — BELOW 로 시작 후 풀 InCallUI 확정 시만 TOP.
+             * 직전 MINI/SHOWCASE 잔존 시 BigPush 허용.
+             * 전체 InCallUI(INCOMING_CALL_UI)면 TOP — BELOW 강제 시 중앙에 떠 응답 버튼을 가림.
+             * 미니 수신·홈·타앱만 BELOW 핀.
              */
-            context = OverlayContext.COMPACT_INCOMING
-            ringingBelowMiniPinned = true
+            when (detectedContext) {
+                OverlayContext.INCOMING_CALL_UI -> {
+                    context = OverlayContext.INCOMING_CALL_UI
+                    ringingBelowMiniPinned = false
+                }
+                else -> {
+                    context = OverlayContext.COMPACT_INCOMING
+                    ringingBelowMiniPinned = true
+                }
+            }
             miniCaseVisibility = MiniCaseVisibility.VISIBLE
-            lastTransition = "requestBigPush: stale ${prev.name}→IDLE below-first for new ringing"
+            lastTransition =
+                "requestBigPush: stale ${prev.name}→IDLE ctx=${context.name} for new ringing"
             rejectedTransition = null
         } else if (!callAlreadyAnswered && state == OverlayState.BIG_PUSH) {
             /*
-             * 창 재사용 연속 수신: 직전 TOP/미니 좌표가 남아 삼성 미니 UI 와 겹침 —
-             * BELOW 핀으로 재시작(풀 InCallUI 확정 시 refreshPosition 이 핀 해제).
+             * 창 재사용 연속 수신: detected 를 존중.
+             * 전체 UI → TOP 유지. 미니/홈만 BELOW 핀 (INCOMING→COMPACT 로 덮어쓰지 않음).
              */
-            ringingBelowMiniPinned = true
-            if (context == OverlayContext.INCOMING_CALL_UI) {
-                context = OverlayContext.COMPACT_INCOMING
+            when (detectedContext) {
+                OverlayContext.INCOMING_CALL_UI -> {
+                    ringingBelowMiniPinned = false
+                    context = OverlayContext.INCOMING_CALL_UI
+                }
+                OverlayContext.COMPACT_INCOMING,
+                OverlayContext.HOME_SCREEN,
+                OverlayContext.OTHER_APP -> {
+                    ringingBelowMiniPinned = true
+                }
+                else -> { /* keep detected */ }
             }
             miniCaseVisibility = MiniCaseVisibility.VISIBLE
-            lastTransition = "requestBigPush: re-ring pin BELOW (reuse)"
+            lastTransition =
+                "requestBigPush: re-ring ctx=${context.name} pinBelow=$ringingBelowMiniPinned"
             rejectedTransition = null
         }
         if (callAlreadyAnswered || state == OverlayState.SHOWCASE || state == OverlayState.MINI_CASE) {

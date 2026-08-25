@@ -19,6 +19,8 @@ data class CardLookupResult(
 
 object CardLookupRepository {
     private const val CACHE_TTL_MS = 30L * 60L * 1000L
+    private const val DISK_TTL_MS = 7L * 24L * 60L * 60L * 1000L
+    private const val DISK_PREFS = "vlue_card_lookup_disk_v1"
     private val cache = java.util.concurrent.ConcurrentHashMap<String, CachedLookup>()
     private val bg by lazy { Executors.newSingleThreadExecutor() }
 
@@ -41,12 +43,27 @@ object CardLookupRepository {
         return null
     }
 
+    /** 메모리 → 디스크. 링잉 직후 인증명 즉시 표시용. */
+    fun peekCached(context: Context, rawNumber: String): CardLookupResult? {
+        peekCached(rawNumber)?.let { return it }
+        val fromDisk = readDisk(context, rawNumber) ?: return null
+        remember(rawNumber, fromDisk)
+        return fromDisk
+    }
+
     fun remember(rawNumber: String, result: CardLookupResult) {
         if (!result.matched) return
+        val now = System.currentTimeMillis()
         for (key in cacheKeys(rawNumber)) {
-            cache[key] = CachedLookup(result, System.currentTimeMillis())
+            cache[key] = CachedLookup(result, now)
         }
     }
+
+    fun remember(context: Context, rawNumber: String, result: CardLookupResult) {
+        remember(rawNumber, result)
+        if (result.matched) writeDisk(context, rawNumber, result)
+    }
+
     suspend fun lookup(
         context: Context,
         rawNumber: String,
@@ -56,9 +73,16 @@ object CardLookupRepository {
             val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: return@withContext null
             if (BlockedPhoneCache.isBlocked(context, e164)) return@withContext null
 
-            peekCached(rawNumber)?.let {
-                bg.execute { reportLineCallEvent(context, rawNumber) }
-                /* 캐시는 즉시 오버레이용. 조회는 매번 네트워크 — 상대 원격 실행 신호를 놓치지 않음 */
+            /*
+             * 캐시 히트면 즉시 반환 — 오버레이에 인증명이 바로 뜨게.
+             * 네트워크·line-call-event 는 백그라운드에서 갱신.
+             */
+            peekCached(context, rawNumber)?.let { cached ->
+                bg.execute {
+                    reportLineCallEvent(context, rawNumber)
+                    refreshInBackground(context, rawNumber, dcpRoute)
+                }
+                return@withContext cached
             }
 
             val base = BuildConfig.API_BASE_URL.trimEnd('/')
@@ -66,13 +90,31 @@ object CardLookupRepository {
             val numberParam = agency?.shortNumber ?: e164
             val result = lookupOnce(context, base, numberParam, dcpRoute)
             if (result != null && result.matched) {
-                val filled = result.copy(rawJson = OverlayCardOrgFill.fillIfMissing(context, result.rawJson))
-                remember(rawNumber, filled)
+                val filled =
+                    result.copy(rawJson = OverlayCardOrgFill.fillIfMissing(context, result.rawJson))
+                remember(context, rawNumber, filled)
                 bg.execute { reportLineCallEvent(context, rawNumber) }
                 return@withContext filled
             }
             return@withContext result
         }
+
+    private fun refreshInBackground(context: Context, rawNumber: String, dcpRoute: String?) {
+        try {
+            val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: return
+            val base = BuildConfig.API_BASE_URL.trimEnd('/')
+            val agency = NationalAgencyWhitelist.match(rawNumber)
+            val numberParam = agency?.shortNumber ?: e164
+            val result = lookupOnce(context, base, numberParam, dcpRoute, fast = false)
+            if (result != null && result.matched) {
+                val filled =
+                    result.copy(rawJson = OverlayCardOrgFill.fillIfMissing(context, result.rawJson))
+                remember(context, rawNumber, filled)
+            }
+        } catch (_: Exception) {
+            /* ignore */
+        }
+    }
 
     private fun cacheKeys(rawNumber: String): List<String> {
         val out = LinkedHashSet<String>()
@@ -86,11 +128,58 @@ object CardLookupRepository {
         return out.toList()
     }
 
+    private fun diskKey(rawNumber: String): String {
+        val canon = IncomingNumberResolver.canonicalDigits(rawNumber)
+        return if (canon.isNotEmpty()) canon
+        else CardLookupBridge.normalizeKr(rawNumber) ?: rawNumber.trim()
+    }
+
+    private fun writeDisk(context: Context, rawNumber: String, result: CardLookupResult) {
+        try {
+            val key = diskKey(rawNumber)
+            if (key.isBlank()) return
+            context.getSharedPreferences(DISK_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(key, result.rawJson)
+                .putLong("${key}_at", System.currentTimeMillis())
+                .putBoolean("${key}_verified", result.verified)
+                .putString("${key}_name", result.displayName)
+                .apply()
+        } catch (_: Exception) {
+            /* ignore */
+        }
+    }
+
+    private fun readDisk(context: Context, rawNumber: String): CardLookupResult? {
+        return try {
+            val key = diskKey(rawNumber)
+            if (key.isBlank()) return null
+            val prefs = context.getSharedPreferences(DISK_PREFS, Context.MODE_PRIVATE)
+            val at = prefs.getLong("${key}_at", 0L)
+            if (at <= 0L || System.currentTimeMillis() - at > DISK_TTL_MS) return null
+            val body = prefs.getString(key, null)?.trim().orEmpty()
+            if (body.isEmpty()) return null
+            val json = JSONObject(body)
+            if (!json.optBoolean("matched", false)) return null
+            CardLookupResult(
+                matched = true,
+                verified = prefs.getBoolean("${key}_verified", json.optBoolean("is_verified", true)),
+                displayName =
+                    prefs.getString("${key}_name", null)?.ifBlank { null }
+                        ?: json.optString("displayName", ""),
+                rawJson = body
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun lookupOnce(
         context: Context,
         base: String,
         numberParam: String,
-        dcpRoute: String? = null
+        dcpRoute: String? = null,
+        fast: Boolean = true
     ): CardLookupResult? {
         return try {
             val q = URLEncoder.encode(numberParam, "UTF-8")
@@ -104,9 +193,12 @@ object CardLookupRepository {
             val url = URL("$base/api/cards/by-number?number=$q&purpose=call_overlay$routeQ")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
-                /* 조회는 서버에서 짧게. 앱 대기는 넉넉히 — 2.5s 타임아웃으로 회원 미매칭 처리하지 않음 */
-                connectTimeout = 5000
-                readTimeout = 12000
+                /*
+                 * 콜 오버레이 첫 페인트용: 짧게 끊고 캐시/재시도로 보완.
+                 * 백그라운드 갱신(fast=false)은 여유 있게.
+                 */
+                connectTimeout = if (fast) 2_500 else 5_000
+                readTimeout = if (fast) 3_500 else 12_000
                 LetteringPrefs.getAccessToken(context)?.let {
                     setRequestProperty("Authorization", "Bearer $it")
                 }
