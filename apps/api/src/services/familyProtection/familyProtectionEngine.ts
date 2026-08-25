@@ -784,7 +784,11 @@ export async function createProtectionLink(
   });
 
   const inviteTitle = "가족 보호 초대";
-  const inviteBody = `${guardianName} 님이 회원님을 ${relationLabel}(으)로 등록했습니다. ${protectionNote}`;
+  const inviteBody = [
+    `${guardianName} 님이 회원님을 ${relationLabel}(으)로 등록했습니다.`,
+    protectionNote,
+    "아래에서 수락 또는 거절해 주세요."
+  ].join("\n");
 
   if (!resendPending) {
     await prisma.ownerNotification.create({

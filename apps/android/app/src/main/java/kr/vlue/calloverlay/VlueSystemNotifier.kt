@@ -54,13 +54,29 @@ object VlueSystemNotifier {
             NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(title.ifBlank { "VLUE" })
-                .setContentText(body.ifBlank { title })
-                .setStyle(NotificationCompat.BigTextStyle().bigText(body.ifBlank { title }))
+                .setContentText(body.ifBlank { title }.lineSequence().firstOrNull() ?: title)
+                .setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .setBigContentTitle(title.ifBlank { "VLUE" })
+                        .bigText(body.ifBlank { title })
+                )
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setAutoCancel(true)
                 .setContentIntent(pi)
                 .build()
+
+        /* 가족 초대 등 중요 알림 — 화면 꺼짐 시 잠깐 깨우기 */
+        val tagSafe = tag.orEmpty()
+        if (tagSafe.contains("family", ignoreCase = true) || title.contains("가족")) {
+            try {
+                kr.vlue.calloverlay.family.FamilyProtectionNotificationHelper.wakeScreenBriefly(app, 5_000L)
+            } catch (_: Exception) {
+                /* ignore */
+            }
+        }
         val id =
             if (!tag.isNullOrBlank()) {
                 (tag.hashCode() and 0x7fffffff) % 100_000 + 7200
