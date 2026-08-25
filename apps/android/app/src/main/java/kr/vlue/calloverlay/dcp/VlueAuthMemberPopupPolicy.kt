@@ -71,7 +71,7 @@ object VlueAuthMemberPopupPolicy {
         if (style != null && style.has("includeDigitalCard") && !style.optBoolean("includeDigitalCard", false)) {
             return false
         }
-        val broadcastOn = style?.optBoolean("includeDigitalCard", false) == true
+        const broadcastOn = style?.optBoolean("includeDigitalCard", false) == true
         if (!broadcastOn) {
             /*
              * 스타일 키 없음·digitalCardActive 만으로는 쇼케이스 경로로 단정하지 않음.
@@ -81,6 +81,16 @@ object VlueAuthMemberPopupPolicy {
         }
         if (styleHasMedia(style)) return true
         if (hasDccOrMediaHints(root, card)) return true
+        /* 송출 ON + 핸들만 있어도 바 크롬은 쇼케이스 — 인증-only 팝업 금지 */
+        if (firstNonBlank(
+                card.optString("publicHandle"),
+                root.optString("publicHandle"),
+                card.optString("loginId"),
+                root.optString("loginId")
+            ) != null
+        ) {
+            return true
+        }
         /* 송출 ON 이지만 실콘텐츠 없음 → 빈 쇼케이스 대신 인증 팝업 */
         return false
     }

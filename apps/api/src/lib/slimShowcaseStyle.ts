@@ -63,6 +63,7 @@ export function slimShowcaseStyleForPublic(value: unknown): unknown {
   if (s.commercial != null) keep.commercial = s.commercial;
   if (s.tags != null) keep.tags = s.tags;
   if (s.includeDigitalCard != null) keep.includeDigitalCard = s.includeDigitalCard;
+  if (s.showBroadcastName != null) keep.showBroadcastName = s.showBroadcastName;
   return keep;
 }
 

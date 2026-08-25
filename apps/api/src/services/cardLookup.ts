@@ -13,9 +13,21 @@ import {
   PEER_REMOTE_SUMMARY,
   readOutgoingCallPathSignal
 } from "./callPathPeerSignal.js";
+import { slimShowcaseStyleForPublic } from "../lib/slimShowcaseStyle.js";
 
 const EXPIRED_SUBTITLE = "인증기간이 만료된 번호입니다.";
 const EXPIRED_DETAIL = "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다.";
+
+/** 콜 오버레이 첫 페인트용 — live 우선, 없으면 editor. includeDigitalCard 포함 */
+function overlayShowcaseStyleFromUser(user: {
+  showcaseLiveStyleJson?: unknown;
+  showcaseStyleJson?: unknown;
+} | null | undefined): unknown | null {
+  if (!user) return null;
+  const raw = user.showcaseLiveStyleJson ?? user.showcaseStyleJson;
+  if (raw == null) return null;
+  return slimShowcaseStyleForPublic(raw);
+}
 
 function expiredLineLookupBody(opts: {
   phoneE164: string;
@@ -435,6 +447,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           phoneE164: true,
           identityVerified: true,
           isShowcasePrivate: true,
+          showcaseLiveStyleJson: true,
+          showcaseStyleJson: true,
           businessProfile: { select: { companyName: true, jobTitle: true } },
           digitalCard: {
             select: {
@@ -539,6 +553,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       userId: card.user.id
     });
     const authSub = card.user.subscriptions?.[0];
+    const showcaseStyle = overlayShowcaseStyleFromUser(card.user);
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -561,6 +576,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
           authCycleEndAt: authSub?.cycleEndAt ? authSub.cycleEndAt.toISOString() : null,
           authPaidAt: authSub?.cycleStartAt ? authSub.cycleStartAt.toISOString() : null,
+          digitalCardActive: Boolean(card.user.digitalCard),
+          showcaseStyle,
           image_url: imageUrl,
           logo_url:
             firstStr(
@@ -596,6 +613,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       identityVerified: true,
       isShowcasePrivate: true,
       phoneE164: true,
+      showcaseLiveStyleJson: true,
+      showcaseStyleJson: true,
       businessProfile: { select: { companyName: true, jobTitle: true } },
       digitalCard: {
         select: {
@@ -633,6 +652,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       userId: user.id
     });
     const sub = user.subscriptions?.[0];
+    const showcaseStyle = overlayShowcaseStyleFromUser(user);
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -658,6 +678,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
           authCycleEndAt: sub?.cycleEndAt ? sub.cycleEndAt.toISOString() : null,
           authPaidAt: sub?.cycleStartAt ? sub.cycleStartAt.toISOString() : null,
+          digitalCardActive: Boolean(user.digitalCard),
+          showcaseStyle,
           image_url: photo || (isCeo ? ceoDefaultBrandLogoUrl() : null),
           logo_url:
             firstStr(

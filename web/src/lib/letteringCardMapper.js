@@ -108,6 +108,12 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       (body.is_premium_line || body.digitalCardActive ? "paid" : "free"),
     digitalCardActive: Boolean(body.digitalCardActive || nested.digitalCardActive),
     isPremiumLine: Boolean(body.is_premium_line || nested.is_premium_line),
+    showcaseStyle:
+      body.showcaseStyle && typeof body.showcaseStyle === "object"
+        ? body.showcaseStyle
+        : nested.showcaseStyle && typeof nested.showcaseStyle === "object"
+          ? nested.showcaseStyle
+          : undefined,
     authPaidAt: body.authPaidAt || nested.authPaidAt || profile.authPaidAt || null,
     authCycleEndAt:
       body.authCycleEndAt ||

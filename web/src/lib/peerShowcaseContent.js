@@ -61,3 +61,20 @@ export function peerHasDccOrShowcaseContent(card, style) {
   if (cardHasDccBody({ ...card, showcaseStyle: st || card?.showcaseStyle })) return true;
   return false;
 }
+
+/**
+ * 접힌 빅푸시 바 크롬 (핸들 Showcase + 썸네일).
+ * 페이지 본문 없어도 사진·핸들만 있으면 이름표시(인증-only) 대신 쇼케이스 바.
+ */
+export function peerHasShowcaseBarChrome(card, style) {
+  const st = style || card?.showcaseStyle || null;
+  if (!peerShowcaseBroadcastOn(st)) return false;
+  if (peerHasDccOrShowcaseContent(card, st)) return true;
+  const handle = String(card?.publicHandle || card?.loginId || card?.vlueId || "")
+    .trim()
+    .replace(/^@/, "");
+  const photo = String(
+    card?.photoUrl || card?.image_url || card?.avatarUrl || card?.titlePhotoUrl || ""
+  ).trim();
+  return Boolean(handle || photo);
+}
