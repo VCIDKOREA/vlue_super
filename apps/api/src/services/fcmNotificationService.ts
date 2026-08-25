@@ -205,7 +205,7 @@ async function sendMulticastPush(
       Boolean(opts?.dataOnly) || type === "vlue-family-protection-invite";
 
     const androidChannel =
-      type === "vlue-family-protection-invite" ? "family_protection_invite_v2" : channelId;
+      type === "vlue-family-protection-invite" ? "family_protection_invite_v3" : channelId;
 
     const message: {
       tokens: string[];

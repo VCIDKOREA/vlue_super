@@ -10,8 +10,11 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
+import android.view.View
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.Person
 import kr.vlue.calloverlay.MainActivity
 import kr.vlue.calloverlay.R
 
@@ -181,17 +184,62 @@ object FamilyProtectionNotificationHelper {
                 piFlags
             )
 
-        val notification =
+        val lines =
+            multiBody
+                .lines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .take(3)
+                .ifEmpty { listOf(previewLine) }
+
+        /* MessagingStyle: 삼성 헤드업에서도 2~3줄 표시 (BigText는 펼쳐야만 여러 줄) */
+        val sender =
+            Person.Builder()
+                .setName("VLUE")
+                .setKey("vlue-family-invite")
+                .setImportant(true)
+                .build()
+        val messagingStyle =
+            NotificationCompat.MessagingStyle(sender)
+                .setConversationTitle(safeTitle)
+                .setGroupConversation(false)
+        val now = System.currentTimeMillis()
+        lines.forEachIndexed { idx, line ->
+            messagingStyle.addMessage(
+                NotificationCompat.MessagingStyle.Message(
+                    line,
+                    now - (lines.size - idx) * 800L,
+                    sender
+                )
+            )
+        }
+
+        val pkg = app.packageName
+        val collapsed = RemoteViews(pkg, R.layout.notification_family_invite)
+        collapsed.setTextViewText(R.id.notif_title, safeTitle)
+        collapsed.setTextViewText(R.id.notif_line1, lines.getOrElse(0) { previewLine })
+        if (lines.size > 1) {
+            collapsed.setViewVisibility(R.id.notif_line2, View.VISIBLE)
+            collapsed.setTextViewText(R.id.notif_line2, lines[1])
+        } else {
+            collapsed.setViewVisibility(R.id.notif_line2, View.GONE)
+        }
+        if (lines.size > 2) {
+            collapsed.setViewVisibility(R.id.notif_line3, View.VISIBLE)
+            collapsed.setTextViewText(R.id.notif_line3, lines[2])
+        } else {
+            collapsed.setViewVisibility(R.id.notif_line3, View.GONE)
+        }
+        val expanded = RemoteViews(pkg, R.layout.notification_family_invite_big)
+        expanded.setTextViewText(R.id.notif_title, safeTitle)
+        expanded.setTextViewText(R.id.notif_body, multiBody)
+
+        val builder =
             NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(safeTitle)
-                .setContentText(previewLine)
-                .setStyle(
-                    NotificationCompat.BigTextStyle()
-                        .setBigContentTitle(safeTitle)
-                        .bigText(multiBody)
-                        .setSummaryText("수락 또는 거절")
-                )
+                .setContentText(lines.joinToString("\n"))
+                .setStyle(messagingStyle)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -202,11 +250,19 @@ object FamilyProtectionNotificationHelper {
                 .setOngoing(true)
                 .setAutoCancel(false)
                 .setContentIntent(contentPi)
-                /* 잠금·화면 꺼짐일 때 시스템이 알림을 전면에 올리도록 유도 */
                 .setFullScreenIntent(fullScreenPi, true)
                 .addAction(0, "수락", acceptPi)
                 .addAction(0, "거절", rejectPi)
-                .build()
+
+        /* Android 11 이하·일부 OEM: 커스텀 뷰로 헤드업 여러 줄 보강 */
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            builder
+                .setCustomContentView(collapsed)
+                .setCustomBigContentView(expanded)
+                .setCustomHeadsUpContentView(collapsed)
+        }
+
+        val notification = builder.build()
 
         val id = notificationIdForLink(safeLinkId)
         try {
