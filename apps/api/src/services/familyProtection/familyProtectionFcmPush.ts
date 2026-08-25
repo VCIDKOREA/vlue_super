@@ -21,7 +21,7 @@ export function fcmMessageElderGovernmentCall(agencyLabel: string) {
   const agency = agencyLabel?.trim() || "정부기관";
   return {
     title: "[위험] 가족 보호",
-    body: `[위험] 부모님이 정부기관(${agency})과 통화 중입니다! 보이스피싱 사기 유도가 의심되니 즉시 확인하세요.`,
+    body: `부모님이 정부기관(${agency})과 통화 중.\n보이스피싱 의심 — 즉시 확인하세요.`,
     data: { kind: "elder_government_call", agency }
   };
 }
@@ -31,7 +31,7 @@ export function fcmMessageElderLongCall(minutes: number, phoneKindLabel?: string
   const kind = String(phoneKindLabel || "").trim() || "내선·대표·휴대폰";
   return {
     title: "[주의] 가족 보호",
-    body: `[주의] 부모님이 저장되지 않은 모르는 번호(${kind})와 ${min}분 이상 장시간 통화 중입니다. 확인이 필요합니다.`,
+    body: `저장되지 않은 모르는 번호(${kind})와 ${min}분 이상 통화 중.\n지금 확인해 주세요.`,
     data: { kind: "elder_long_call_unknown", minutes: min, phoneKindLabel: kind }
   };
 }
@@ -40,7 +40,7 @@ export function fcmMessageElderRemoteApp(appName: string) {
   const app = appName?.trim() || "원격제어 앱";
   return {
     title: "[긴급 위험] 가족 보호",
-    body: `[긴급 위험] 부모님 폰에 원격제어 앱(${app})이 실행되었습니다! 자금 탈취 위험이 있으니 즉시 조치하세요.`,
+    body: `부모님 폰에 원격제어 앱(${app}) 실행 감지.\n자금 탈취 위험 — 즉시 조치하세요.`,
     data: { kind: "elder_remote_control_app", appName: app }
   };
 }
@@ -49,7 +49,7 @@ export function fcmMessageChildBankThreshold(amountKrw: number) {
   const amt = Math.abs(Math.floor(amountKrw)).toLocaleString("ko-KR");
   return {
     title: "[주의] 가족 보호",
-    body: `[주의] 자녀 계좌에서 ${amt}원의 이체 거래가 발생했습니다. (설정 금액 이상)`,
+    body: `자녀 계좌에서 ${amt}원 이체 발생.\n설정 금액 이상 — 확인해 주세요.`,
     data: { kind: "child_bank_transaction", amountKrw: Math.abs(Math.floor(amountKrw)) }
   };
 }

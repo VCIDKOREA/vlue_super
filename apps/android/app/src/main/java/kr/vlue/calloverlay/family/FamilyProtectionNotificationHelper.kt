@@ -14,15 +14,17 @@ import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.app.Person
 import kr.vlue.calloverlay.MainActivity
 import kr.vlue.calloverlay.R
 
 /** 가족 보호 FCM·초대 OS 알림 — 앱 미실행 시에도 카카오톡처럼 표시 */
 object FamilyProtectionNotificationHelper {
-    /** v3: 2~3줄 BigText + 화면 깨우기용 HIGH 채널 */
-    const val CHANNEL_ID = "family_protection_invite_v3"
-    private const val CHANNEL_NAME = "가족 보호 초대"
+    /**
+     * v4: data-only FCM + 시스템 템플릿 2줄(title/text) + 커스텀/확장 본문.
+     * Android 12+ 는 헤드업 커스텀 뷰를 무시하므로 title=1줄·text=2줄로 맞춤.
+     */
+    const val CHANNEL_ID = "family_protection_invite_v4"
+    private const val CHANNEL_NAME = "가족 보호"
     const val ACTION_ACCEPT = "kr.vlue.app.action.FAMILY_INVITE_ACCEPT"
     const val ACTION_REJECT = "kr.vlue.app.action.FAMILY_INVITE_REJECT"
     const val EXTRA_LINK_ID = "linkId"
@@ -31,8 +33,11 @@ object FamilyProtectionNotificationHelper {
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        // 구버전 채널 정리(중요도·표시 정책이 바뀌면 새 ID 사용)
-        listOf("family_protection", "family_protection_invite_v2").forEach { old ->
+        listOf(
+            "family_protection",
+            "family_protection_invite_v2",
+            "family_protection_invite_v3"
+        ).forEach { old ->
             try {
                 nm.deleteNotificationChannel(old)
             } catch (_: Exception) {
@@ -49,7 +54,7 @@ object FamilyProtectionNotificationHelper {
         }
         val channel =
             NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "가족 보호 초대·수락·거절 — 화면이 꺼져 있어도 알림"
+                description = "가족 보호 초대·안심 알림 — 화면이 꺼져 있어도 표시"
                 enableVibration(true)
                 enableLights(true)
                 setShowBadge(true)
@@ -76,7 +81,7 @@ object FamilyProtectionNotificationHelper {
         }
     }
 
-    /** 푸시용 2~3줄 본문 (헤드업·확장 알림) */
+    /** 푸시용 2~3줄 본문 */
     fun formatInviteBodyLines(raw: String): String {
         val flat = raw.replace("\r\n", "\n").trim()
         if (flat.isEmpty()) {
@@ -87,23 +92,21 @@ object FamilyProtectionNotificationHelper {
         }
         val parts =
             flat
-                .split(Regex("(?<=[.。!！?？])\\s+|(?=수락하면)|(?=아래에서)"))
+                .split(Regex("(?<=[.。!！?？])\\s+|(?=수락하면)|(?=아래에서)|(?=지금 확인)"))
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
         return when {
-            parts.size >= 2 -> (parts.take(2) + listOf("아래에서 수락 또는 거절해 주세요.")).joinToString("\n")
-            flat.length > 36 -> {
-                val cut = flat.indexOf(' ', 28).takeIf { it in 20..48 } ?: 32.coerceAtMost(flat.length)
+            parts.size >= 2 -> parts.take(3).joinToString("\n")
+            flat.length > 28 -> {
+                val cut = flat.indexOf(' ', 22).takeIf { it in 16..40 } ?: 26.coerceAtMost(flat.length)
                 val a = flat.substring(0, cut).trim()
                 val b = flat.substring(cut).trim()
-                listOf(a, b.ifBlank { "수락하면 보호가 시작됩니다." }, "아래에서 수락 또는 거절해 주세요.")
-                    .joinToString("\n")
+                listOf(a, b.ifBlank { "확인해 주세요." }).joinToString("\n")
             }
-            else -> "$flat\n수락하면 보호가 시작됩니다.\n아래에서 수락 또는 거절해 주세요."
+            else -> "$flat\n확인해 주세요."
         }
     }
 
-    /** 화면 꺼짐 시 잠깐 켜기 (유튜브·쿠팡식 알림 노출) */
     fun wakeScreenBriefly(context: Context, holdMs: Long = 6_000L) {
         try {
             val app = context.applicationContext
@@ -131,6 +134,56 @@ object FamilyProtectionNotificationHelper {
         }
     }
 
+    private fun bodyLines(multiBody: String, fallback: String): List<String> =
+        multiBody
+            .lines()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .take(3)
+            .ifEmpty { listOf(fallback) }
+
+    private fun applyMultiLineRemoteViews(
+        app: Context,
+        builder: NotificationCompat.Builder,
+        shadeTitle: String,
+        lines: List<String>,
+        multiBody: String
+    ) {
+        val pkg = app.packageName
+        val collapsed = RemoteViews(pkg, R.layout.notification_family_invite)
+        collapsed.setTextViewText(R.id.notif_title, shadeTitle)
+        collapsed.setTextViewText(R.id.notif_line1, lines.getOrElse(0) { shadeTitle })
+        if (lines.size > 1) {
+            collapsed.setViewVisibility(R.id.notif_line2, View.VISIBLE)
+            collapsed.setTextViewText(R.id.notif_line2, lines[1])
+        } else {
+            collapsed.setViewVisibility(R.id.notif_line2, View.GONE)
+        }
+        if (lines.size > 2) {
+            collapsed.setViewVisibility(R.id.notif_line3, View.VISIBLE)
+            collapsed.setTextViewText(R.id.notif_line3, lines[2])
+        } else {
+            collapsed.setViewVisibility(R.id.notif_line3, View.GONE)
+        }
+        val expanded = RemoteViews(pkg, R.layout.notification_family_invite_big)
+        expanded.setTextViewText(R.id.notif_title, shadeTitle)
+        expanded.setTextViewText(R.id.notif_body, multiBody)
+
+        /*
+         * Android 12+(targetSdk 31+) 헤드업은 커스텀 뷰를 쓰지 않음.
+         * 시스템 템플릿 ContentTitle+ContentText 가 화면상 2줄 (호출부에서 설정).
+         * 알림창은 DecoratedCustomView 로 2~3줄.
+         */
+        builder
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(collapsed)
+            .setCustomBigContentView(expanded)
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            builder.setCustomHeadsUpContentView(collapsed)
+        }
+    }
+
     fun showInvite(context: Context, title: String, body: String, linkId: String) {
         val app = context.applicationContext
         ensureChannel(app)
@@ -138,9 +191,12 @@ object FamilyProtectionNotificationHelper {
         val safeLinkId = linkId.trim()
         val safeTitle = title.ifBlank { "가족 보호 초대" }
         val multiBody = formatInviteBodyLines(body)
-        val previewLine = multiBody.lineSequence().firstOrNull().orEmpty().ifBlank { safeTitle }
+        val lines = bodyLines(multiBody, safeTitle)
+        /* 헤드업 2줄: 1줄=본문 첫 문장, 2줄=둘째 문장 (시스템 템플릿) */
+        val hunTitle = lines.getOrElse(0) { safeTitle }
+        val hunText = lines.getOrElse(1) { "수락 또는 거절해 주세요." }
         if (safeLinkId.isEmpty()) {
-            kr.vlue.calloverlay.VlueSystemNotifier.show(app, safeTitle, multiBody, "family-invite")
+            showAlert(app, hunTitle, multiBody, "family-invite")
             return
         }
 
@@ -184,62 +240,12 @@ object FamilyProtectionNotificationHelper {
                 piFlags
             )
 
-        val lines =
-            multiBody
-                .lines()
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .take(3)
-                .ifEmpty { listOf(previewLine) }
-
-        /* MessagingStyle: 삼성 헤드업에서도 2~3줄 표시 (BigText는 펼쳐야만 여러 줄) */
-        val sender =
-            Person.Builder()
-                .setName("VLUE")
-                .setKey("vlue-family-invite")
-                .setImportant(true)
-                .build()
-        val messagingStyle =
-            NotificationCompat.MessagingStyle(sender)
-                .setConversationTitle(safeTitle)
-                .setGroupConversation(false)
-        val now = System.currentTimeMillis()
-        lines.forEachIndexed { idx, line ->
-            messagingStyle.addMessage(
-                NotificationCompat.MessagingStyle.Message(
-                    line,
-                    now - (lines.size - idx) * 800L,
-                    sender
-                )
-            )
-        }
-
-        val pkg = app.packageName
-        val collapsed = RemoteViews(pkg, R.layout.notification_family_invite)
-        collapsed.setTextViewText(R.id.notif_title, safeTitle)
-        collapsed.setTextViewText(R.id.notif_line1, lines.getOrElse(0) { previewLine })
-        if (lines.size > 1) {
-            collapsed.setViewVisibility(R.id.notif_line2, View.VISIBLE)
-            collapsed.setTextViewText(R.id.notif_line2, lines[1])
-        } else {
-            collapsed.setViewVisibility(R.id.notif_line2, View.GONE)
-        }
-        if (lines.size > 2) {
-            collapsed.setViewVisibility(R.id.notif_line3, View.VISIBLE)
-            collapsed.setTextViewText(R.id.notif_line3, lines[2])
-        } else {
-            collapsed.setViewVisibility(R.id.notif_line3, View.GONE)
-        }
-        val expanded = RemoteViews(pkg, R.layout.notification_family_invite_big)
-        expanded.setTextViewText(R.id.notif_title, safeTitle)
-        expanded.setTextViewText(R.id.notif_body, multiBody)
-
         val builder =
             NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(safeTitle)
-                .setContentText(lines.joinToString("\n"))
-                .setStyle(messagingStyle)
+                .setContentTitle(hunTitle)
+                .setContentText(hunText)
+                .setSubText(safeTitle)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -254,19 +260,11 @@ object FamilyProtectionNotificationHelper {
                 .addAction(0, "수락", acceptPi)
                 .addAction(0, "거절", rejectPi)
 
-        /* Android 11 이하·일부 OEM: 커스텀 뷰로 헤드업 여러 줄 보강 */
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            builder
-                .setCustomContentView(collapsed)
-                .setCustomBigContentView(expanded)
-                .setCustomHeadsUpContentView(collapsed)
-        }
-
-        val notification = builder.build()
+        applyMultiLineRemoteViews(app, builder, safeTitle, lines, multiBody)
 
         val id = notificationIdForLink(safeLinkId)
         try {
-            NotificationManagerCompat.from(app).notify(safeLinkId, id, notification)
+            NotificationManagerCompat.from(app).notify(safeLinkId, id, builder.build())
         } catch (_: SecurityException) {
             /* POST_NOTIFICATIONS 거부 */
         }
@@ -284,27 +282,30 @@ object FamilyProtectionNotificationHelper {
         val piFlags =
             PendingIntent.FLAG_UPDATE_CURRENT or
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-        val pi = PendingIntent.getActivity(app, 0, open, piFlags)
+        val pi = PendingIntent.getActivity(app, (tag ?: "alert").hashCode(), open, piFlags)
         val safeTitle = title.ifBlank { "VLUE" }
         val multiBody = formatInviteBodyLines(body.ifBlank { title })
-        val preview = multiBody.lineSequence().firstOrNull().orEmpty().ifBlank { safeTitle }
-        val notification =
+        val lines = bodyLines(multiBody, safeTitle)
+        val hunTitle = lines.getOrElse(0) { safeTitle }
+        val hunText = lines.getOrElse(1) {
+            if (safeTitle != hunTitle) safeTitle else "확인해 주세요."
+        }
+
+        val builder =
             NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(safeTitle)
-                .setContentText(preview)
-                .setStyle(
-                    NotificationCompat.BigTextStyle()
-                        .setBigContentTitle(safeTitle)
-                        .bigText(multiBody)
-                )
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentTitle(hunTitle)
+                .setContentText(hunText)
+                .setSubText(safeTitle)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setAutoCancel(true)
                 .setContentIntent(pi)
-                .build()
+
+        applyMultiLineRemoteViews(app, builder, safeTitle, lines, multiBody)
+
         val id =
             if (!tag.isNullOrBlank()) {
                 (tag.hashCode() and 0x7fffffff) % 100_000 + 8400
@@ -312,7 +313,7 @@ object FamilyProtectionNotificationHelper {
                 8400
             }
         try {
-            NotificationManagerCompat.from(app).notify(tag ?: "family-alert", id, notification)
+            NotificationManagerCompat.from(app).notify(tag ?: "family-alert", id, builder.build())
         } catch (_: SecurityException) {
             /* ignore */
         }

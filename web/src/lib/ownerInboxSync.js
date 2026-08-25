@@ -1,6 +1,10 @@
 import { apiUrl } from "./apiBase.js";
 import { vlueAuthFetch } from "./vlueAuthHeaders.js";
-import { addPushNotification, prunePinnedPushNotIn } from "./pushNotificationInbox.js";
+import {
+  addPushNotification,
+  isPushServerIdDeleted,
+  prunePinnedPushNotIn
+} from "./pushNotificationInbox.js";
 import { maybePostAndroidPushForInboxItem } from "./androidSystemNotification.js";
 
 /**
@@ -15,6 +19,7 @@ export async function syncOwnerInboxFromServer() {
     prunePinnedPushNotIn(pinKeys);
     let added = 0;
     for (const item of data.items) {
+      if (isPushServerIdDeleted(item.id)) continue;
       const entry = addPushNotification({
         category: item.category || "앱",
         title: item.title || "",
@@ -32,12 +37,38 @@ export async function syncOwnerInboxFromServer() {
       });
       if (entry?.isNew) {
         added += 1;
-        /* 앱 재오픈 시 신규 가족 초대 등은 OS 상태바에도 표시 */
         if (!item.read) maybePostAndroidPushForInboxItem(entry);
       }
     }
     return { ok: true, added };
   } catch {
     return { ok: false, added: 0 };
+  }
+}
+
+export async function deleteOwnerInboxItem(serverId) {
+  const id = String(serverId || "").trim();
+  if (!id) return { ok: false };
+  try {
+    const res = await vlueAuthFetch(apiUrl(`/api/notifications/inbox/${encodeURIComponent(id)}`), {
+      method: "DELETE"
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok && data.ok !== false, ...data };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function clearOwnerInboxOnServer({ keepPinned = true } = {}) {
+  try {
+    const q = keepPinned ? "keepPinned=1" : "keepPinned=0";
+    const res = await vlueAuthFetch(apiUrl(`/api/notifications/inbox?${q}`), {
+      method: "DELETE"
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok && data.ok !== false, ...data };
+  } catch {
+    return { ok: false };
   }
 }

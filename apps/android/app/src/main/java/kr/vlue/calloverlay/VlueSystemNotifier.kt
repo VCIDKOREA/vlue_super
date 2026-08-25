@@ -40,6 +40,25 @@ object VlueSystemNotifier {
         tag: String? = null
     ) {
         val app = context.applicationContext
+        val tagSafe = tag.orEmpty()
+        val isFamily =
+            tagSafe.contains("family", ignoreCase = true) ||
+                title.contains("가족") ||
+                body.contains("가족 보호")
+        if (isFamily) {
+            try {
+                kr.vlue.calloverlay.family.FamilyProtectionNotificationHelper.showAlert(
+                    app,
+                    title,
+                    body,
+                    tag
+                )
+                return
+            } catch (_: Exception) {
+                /* fall through */
+            }
+        }
+
         ensureChannel(app)
         val open =
             Intent(app, MainActivity::class.java).apply {
@@ -50,15 +69,28 @@ object VlueSystemNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT or
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         val pi = PendingIntent.getActivity(app, 0, open, piFlags)
+        val safeTitle = title.ifBlank { "VLUE" }
+        val fullBody = body.ifBlank { safeTitle }.trim()
+        val lines =
+            fullBody
+                .replace("\r\n", "\n")
+                .lines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+        val hunTitle = lines.getOrElse(0) { safeTitle }
+        val hunText =
+            lines.getOrElse(1) {
+                if (safeTitle != hunTitle) safeTitle else lines.getOrElse(0) { safeTitle }
+            }
         val notification =
             NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(title.ifBlank { "VLUE" })
-                .setContentText(body.ifBlank { title }.lineSequence().firstOrNull() ?: title)
+                .setContentTitle(hunTitle)
+                .setContentText(hunText)
                 .setStyle(
                     NotificationCompat.BigTextStyle()
-                        .setBigContentTitle(title.ifBlank { "VLUE" })
-                        .bigText(body.ifBlank { title })
+                        .setBigContentTitle(safeTitle)
+                        .bigText(fullBody)
                 )
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
@@ -68,15 +100,6 @@ object VlueSystemNotifier {
                 .setContentIntent(pi)
                 .build()
 
-        /* 가족 초대 등 중요 알림 — 화면 꺼짐 시 잠깐 깨우기 */
-        val tagSafe = tag.orEmpty()
-        if (tagSafe.contains("family", ignoreCase = true) || title.contains("가족")) {
-            try {
-                kr.vlue.calloverlay.family.FamilyProtectionNotificationHelper.wakeScreenBriefly(app, 5_000L)
-            } catch (_: Exception) {
-                /* ignore */
-            }
-        }
         val id =
             if (!tag.isNullOrBlank()) {
                 (tag.hashCode() and 0x7fffffff) % 100_000 + 7200

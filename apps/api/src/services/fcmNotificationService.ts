@@ -197,15 +197,19 @@ async function sendMulticastPush(
     data.channel = "family_protection";
 
     /**
-     * 가족 초대는 data-only 로 보내야 백그라운드/종료 시에도
-     * onMessageReceived → 수락/거절 액션 알림이 표시됨.
-     * notification+data 혼합이면 OS가 한 줄 알림만 띄우고 액션 버튼이 없음.
+     * 가족 보호는 전부 data-only.
+     * notification+data 혼합이면 백그라운드에서 OS가 한 줄 알림만 띄우고
+     * onMessageReceived(커스텀 2~3줄·액션)가 실행되지 않음.
      */
     const dataOnly =
-      Boolean(opts?.dataOnly) || type === "vlue-family-protection-invite";
+      Boolean(opts?.dataOnly) ||
+      type.startsWith("vlue-family-protection") ||
+      String(dataPayload?.channel || "") === "family_protection";
 
     const androidChannel =
-      type === "vlue-family-protection-invite" ? "family_protection_invite_v3" : channelId;
+      type === "vlue-family-protection-invite" || type.startsWith("vlue-family-protection")
+        ? "family_protection_invite_v4"
+        : channelId;
 
     const message: {
       tokens: string[];

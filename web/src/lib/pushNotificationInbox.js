@@ -1,6 +1,7 @@
 /** 푸시 알림 수신함 — 메인 화면 · 채팅 목록 「알림」 탭 */
 
 const KEY = "vlue_push_inbox_v3";
+const DELETED_SERVER_KEY = "vlue_push_inbox_deleted_srv_v1";
 
 export const PUSH_INBOX_CHANGED = "vlue-push-inbox-changed";
 
@@ -60,6 +61,39 @@ function writeList(list) {
   } catch {
     /* ignore */
   }
+}
+
+function readDeletedServerIds() {
+  try {
+    const raw = localStorage.getItem(DELETED_SERVER_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeDeletedServerIds(set) {
+  try {
+    localStorage.setItem(DELETED_SERVER_KEY, JSON.stringify([...set].slice(-500)));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 서버 동기화 시 로컬에서 지운 건 다시 안 넣기 */
+export function isPushServerIdDeleted(serverId) {
+  const sid = String(serverId || "").trim();
+  if (!sid) return false;
+  return readDeletedServerIds().has(sid);
+}
+
+export function rememberDeletedPushServerId(serverId) {
+  const sid = String(serverId || "").trim();
+  if (!sid) return;
+  const set = readDeletedServerIds();
+  set.add(sid);
+  writeDeletedServerIds(set);
 }
 
 export function readPushNotifications() {
@@ -235,6 +269,30 @@ export function resolveFamilyInvitePush(id, status) {
 
 export function markAllPushRead() {
   writeList(readList().map((n) => ({ ...n, read: true })));
+}
+
+/** 알림 1건 삭제 (로컬). serverId 있으면 호출부에서 서버 삭제도 병행 */
+export function removePushNotification(id) {
+  const target = String(id || "").trim();
+  if (!target) return null;
+  const list = readList();
+  const removed = list.find((n) => n.id === target) || null;
+  if (!removed) return null;
+  if (removed.serverId) rememberDeletedPushServerId(removed.serverId);
+  writeList(list.filter((n) => n.id !== target));
+  return removed;
+}
+
+/** 알림함 비우기 — pinned 유지 여부는 keepPinned */
+export function clearPushNotifications({ keepPinned = true } = {}) {
+  const list = readList();
+  const removed = keepPinned ? list.filter((n) => !n.pinned) : list;
+  removed.forEach((n) => {
+    if (n.serverId) rememberDeletedPushServerId(n.serverId);
+  });
+  const next = keepPinned ? list.filter((n) => n.pinned) : [];
+  writeList(next);
+  return { removed: removed.length };
 }
 
 /** 결제 알림 본문 — 감사 인사로 시작 + 상품 상세 */

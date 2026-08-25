@@ -29,7 +29,8 @@ export default function PushNotificationDetailModal({
   isDarkMode = false,
   memberHandle = "",
   onClose,
-  onUpdated
+  onUpdated,
+  onDelete
 }) {
   const [view, setView] = useState(item);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -356,6 +357,20 @@ export default function PushNotificationDetailModal({
               onClick={onClose}
             >
               {canConfirm || isPayment || canFamilyRespond ? "닫기" : "확인"}
+            </button>
+          ) : null}
+          {typeof onDelete === "function" ? (
+            <button
+              type="button"
+              className={`w-full rounded-xl py-3 text-[14px] font-black text-rose-600 active:scale-[0.99] ${
+                isDarkMode ? "bg-rose-500/15 ring-1 ring-rose-400/30" : "bg-rose-50 ring-1 ring-rose-100"
+              }`}
+              onClick={() => {
+                onDelete(current);
+                onClose();
+              }}
+            >
+              알림 삭제
             </button>
           ) : null}
         </div>

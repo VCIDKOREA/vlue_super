@@ -76,6 +76,34 @@ notificationRoutes.get("/inbox", requireUserHeader, async (c) => {
   });
 });
 
+/** 알림함 1건 삭제 */
+notificationRoutes.delete("/inbox/:id", requireUserHeader, async (c) => {
+  const me = String(c.get("vlueUserId") || c.req.header("x-vlue-user-id") || "").trim();
+  if (!me) return c.json({ ok: false, error: "auth required" }, 401);
+  const id = String(c.req.param("id") || "").trim();
+  if (!id) return c.json({ ok: false, error: "id required" }, 400);
+  const row = await prisma.ownerNotification.findFirst({
+    where: { id, ownerUserId: me },
+    select: { id: true }
+  });
+  if (!row) return c.json({ ok: false, error: "not found" }, 404);
+  await prisma.ownerNotification.delete({ where: { id: row.id } });
+  return c.json({ ok: true, id: row.id });
+});
+
+/** 알림함 전체 삭제 (고정 알림 제외 기본) */
+notificationRoutes.delete("/inbox", requireUserHeader, async (c) => {
+  const me = String(c.get("vlueUserId") || c.req.header("x-vlue-user-id") || "").trim();
+  if (!me) return c.json({ ok: false, error: "auth required" }, 401);
+  const keepPinned = String(c.req.query("keepPinned") || "1") !== "0";
+  const result = await prisma.ownerNotification.deleteMany({
+    where: keepPinned
+      ? { ownerUserId: me, pinKind: null }
+      : { ownerUserId: me }
+  });
+  return c.json({ ok: true, deleted: result.count, keepPinned });
+});
+
 const callEndedBody = z.object({
   peerPhone: z.string().min(6),
   durationSec: z.number().int().nonnegative().optional(),
