@@ -1,4 +1,4 @@
-package kr.vlue.calloverlay.dcp
+﻿package kr.vlue.calloverlay.dcp
 
 import kr.vlue.calloverlay.companion.OverlayState
 import org.json.JSONObject
@@ -71,7 +71,7 @@ object VlueAuthMemberPopupPolicy {
         if (style != null && style.has("includeDigitalCard") && !style.optBoolean("includeDigitalCard", false)) {
             return false
         }
-        const broadcastOn = style?.optBoolean("includeDigitalCard", false) == true
+        val broadcastOn = style?.optBoolean("includeDigitalCard", false) == true
         if (!broadcastOn) {
             /*
              * 스타일 키 없음·digitalCardActive 만으로는 쇼케이스 경로로 단정하지 않음.
