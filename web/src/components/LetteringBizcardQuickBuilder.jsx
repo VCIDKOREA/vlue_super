@@ -266,6 +266,13 @@ export default function LetteringBizcardQuickBuilder({
   setNoFax,
   noWebsite,
   setNoWebsite,
+  pendingPhoto = null,
+  photoPreview = "",
+  photoFileName = "",
+  photoError = "",
+  onPhotoPick = null,
+  noProfilePhoto = false,
+  setNoProfilePhoto = () => {},
   titleDeptApprovalStatus,
   titleDeptNeedsSubmit,
   verifyDocKind,
@@ -370,24 +377,30 @@ export default function LetteringBizcardQuickBuilder({
       <div className={`${panel} space-y-4`}>
         <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>�봽濡쒗븘 쨌 �씠誘몄��</p>
         <Field
-          label="�봽濡쒗븘 �궗吏�"
-          hint={`${LETTERING_PHOTO_RULES.acceptLabel} 쨌 理쒕�� 1MB 쨌 珥덇낵 �떆 �옄�룞 留욎땄 쨌 踰덊샇 �븵�뿉 �몴�떆`}
+          label="프로필 사진"
+          hint={`${LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB · 초과 시 자동 맞춤 · 번호 앞에 표시`}
           isDarkMode={isDarkMode}
         >
-          <ImageUploadTile
-            preview={pendingPhoto?.previewUrl || pendingPhoto?.dataUrl || photoPreview}
-            placeholder="�궗吏� �뾽濡쒕뱶"
-            onPick={onPhotoPick}
-            acceptLabel={LETTERING_PHOTO_RULES.accept}
-            isDarkMode={isDarkMode}
-            omitChecked={noProfilePhoto}
-            onOmitChange={setNoProfilePhoto}
-            omitLabel="�궗吏� �뾽濡쒕뱶 �뾾�쓬"
-          />
-          {photoFileName && !noProfilePhoto ? (
+          {typeof onPhotoPick === "function" ? (
+            <ImageUploadTile
+              preview={pendingPhoto?.previewUrl || pendingPhoto?.dataUrl || photoPreview}
+              placeholder="사진 업로드"
+              onPick={onPhotoPick}
+              acceptLabel={LETTERING_PHOTO_RULES.accept}
+              isDarkMode={isDarkMode}
+              omitChecked={noProfilePhoto}
+              onOmitChange={setNoProfilePhoto}
+              omitLabel="사진 업로드 없음"
+            />
+          ) : (
+            <p className={`text-[11px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              프로필 사진은 설정 → 프로필 관리에서 변경합니다.
+            </p>
+          )}
+          {photoFileName && !noProfilePhoto && typeof onPhotoPick === "function" ? (
             <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
               {photoFileName}
-              {pendingPhoto ? " (誘몄쟻�슜)" : ""}
+              {pendingPhoto ? " (미적용)" : ""}
             </p>
           ) : null}
           {photoError ? <p className="mt-1 text-[10px] font-bold text-red-500">{photoError}</p> : null}

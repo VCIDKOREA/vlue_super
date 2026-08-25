@@ -554,9 +554,14 @@ export default function LetteringIncomingNotification({
         isGlassTent &&
         (livePeerCallOverlay ? peerBroadcastOn : isPaidLetteringTier(c.membershipTier))));
   const isFreeMember = !isExpiredLine && verified && !isPaidMember && !isDcp;
-  const isUnverified = !isExpiredLine && !verified && !isDcp && !isContactSafeCare;
+  const isLookupPending = String(c.profileKind || "") === "lookup_pending";
+  const isUnverified =
+    !isExpiredLine && !verified && !isDcp && !isContactSafeCare && !isLookupPending;
   const { setPlaybackPhase } = useShowcaseBgm();
-  const canExpand = isPaidMember || isFreeMember || isUnverified || isExpiredLine;
+  const canExpand =
+    !isLookupPending &&
+    !showcaseOffPreview &&
+    (isPaidMember || isFreeMember || isUnverified || isExpiredLine);
   const [reportTick, setReportTick] = useState(0);
   const [walletTick, setWalletTick] = useState(0);
 
@@ -659,14 +664,9 @@ export default function LetteringIncomingNotification({
     return "번호 확인 중";
   }, [isUnverified, incoming]);
 
-  /* 통화 오버레이(피어): 상대 쇼케이스 스타일의 showBroadcastName=false 로 상호가 사라지지 않게 */
-  const peerOverlayLive = Boolean(
-    !previewMode && String(c.userId || c.ownerUserId || "").trim()
-  );
+  /* 쇼케이스 OFF + 이름 송출 OFF → VLUE 인증회원. 이름 송출 ON → 이름 표시 */
   const hideBroadcastName = Boolean(
-    showcaseOffPreview ||
-      c.hideBroadcastName ||
-      (!peerOverlayLive && c.showcaseStyle?.showBroadcastName === false)
+    c.hideBroadcastName || c.showcaseStyle?.showBroadcastName === false
   );
   const contactSavedName = String(savedContactName || knownContact.matchedName || "").trim();
 
@@ -677,6 +677,9 @@ export default function LetteringIncomingNotification({
   const collapsedPhoneDisplay = receptionLines?.phone
     ? formatLetteringPhoneDisplay(receptionLines.phone)
     : freeTierSummary?.phoneDisplay || formatLetteringPhoneDisplay(incoming) || "";
+  const peerVerifiedName =
+    String(c.name || c.displayName || receptionLines?.collapsedPrimary || "").trim() ||
+    contactSavedName;
   const previewShowcaseId = useMemo(() => {
     /* 미인증·실통화 오버레이는 수신자 로컬 핸들(ceo)을 붙이지 않음 */
     if (isUnverified) return "";
@@ -720,7 +723,9 @@ export default function LetteringIncomingNotification({
     : isUnverified
     ? null
     : showcaseOffPreview
-      ? collapsedPhoneDisplay || formatLetteringPhoneDisplay(incoming) || "—"
+      ? hideBroadcastName
+        ? "VLUE 인증회원"
+        : peerVerifiedName || collapsedPhoneDisplay || formatLetteringPhoneDisplay(incoming) || "—"
       : hideBroadcastName
         ? contactSavedName || collapsedPhoneDisplay || "—"
         : receptionLines?.collapsedPrimary ||
@@ -1222,7 +1227,13 @@ export default function LetteringIncomingNotification({
         <div className="lettering-live-bar__left">
           <LetteringLiveIndicator />
           <span className="lettering-live-bar__brand">
-            {previewShowcaseId ? `${previewShowcaseId} Showcase` : "VLUE Showcase"}
+            {isLookupPending
+              ? "번호 확인 중"
+              : showcaseOffPreview
+                ? "VLUE"
+                : previewShowcaseId
+                  ? `${previewShowcaseId} Showcase`
+                  : "VLUE Showcase"}
           </span>
         </div>
         {previewMode && showOwnerSettings ? (
@@ -1316,7 +1327,9 @@ export default function LetteringIncomingNotification({
                   </p>
                 ) : null}
                 {showcaseOffPreview && !isExpandedView ? (
-                  <p className="mt-0.5 text-[11px] font-semibold text-slate-400">VLUE 인증 번호</p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-slate-400">
+                    {hideBroadcastName ? "VLUE 인증 확인" : "VLUE 인증 · 이름 표시"}
+                  </p>
                 ) : null}
               </>
             )}

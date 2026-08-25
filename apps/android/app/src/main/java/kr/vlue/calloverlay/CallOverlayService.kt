@@ -845,6 +845,20 @@ class CallOverlayService : Service() {
             syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
             return
         }
+        /*
+         * 카드 미도착·조회 중·송출 콘텐츠 없음 → 빈 풀스크린 쇼케이스 금지.
+         * applyCallInfoUpdate 가 이후 인증 팝업 또는 실쇼케이스를 띄운다.
+         */
+        if (pendingCardJson.isNullOrBlank() ||
+            isLookupPendingCard(pendingCardJson) ||
+            (!pendingVerified && !parseIsVerified(pendingCardJson))
+        ) {
+            remoteConnected = true
+            companion.onAnswer(OverlayContext.IN_CALL)
+            hideCompanionOverlayChrome()
+            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            return
+        }
         VlueBigPushTrace.milestone(
             "SHOWCASE_REQUESTED",
             "Showcase Requested",
@@ -1615,6 +1629,9 @@ class CallOverlayService : Service() {
 
     private fun isContactSafeCare(cardJson: String?): Boolean =
         parseProfileKind(cardJson) == ContactSafeCarePayload.PROFILE_KIND
+
+    private fun isLookupPendingCard(cardJson: String?): Boolean =
+        parseProfileKind(cardJson) == "lookup_pending"
 
     private fun parseIsVerified(cardJson: String?): Boolean {
         if (cardJson.isNullOrBlank()) return false

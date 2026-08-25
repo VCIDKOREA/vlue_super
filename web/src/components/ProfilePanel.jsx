@@ -133,6 +133,7 @@ function ProfilePanel({
   onRequestTierChange,
 }) {
   const [isVCIDOn, setIsVCIDOn] = useState(false);
+  const [showBroadcastName, setShowBroadcastName] = useState(true);
   const [settingNotice, setSettingNotice] = useState("");
   const settingNoticeTimerRef = useRef(null);
   const [showCopied, setShowCopied] = useState(false);
@@ -219,8 +220,48 @@ function ProfilePanel({
   const hasDigitalCertCard = Boolean(digitalCardActive) && digitalCardIssued !== false;
 
   useEffect(() => {
-    setIsVCIDOn(localStorage.getItem("vcid") === "true");
+    let vcid = localStorage.getItem("vcid") === "true";
+    try {
+      /* DCC 송출 플래그와 vcid 토글 동기화 */
+      const raw = localStorage.getItem("vlue_dcc_broadcast_on");
+      if (raw === "0") vcid = false;
+      if (raw === "1") vcid = true;
+    } catch {
+      /* ignore */
+    }
+    setIsVCIDOn(vcid);
+    try {
+      import("../lib/showcase/showcaseStyleStorage.js").then((m) => {
+        const style = m.readShowcaseStyle?.() || m.readLiveShowcaseStyle?.() || {};
+        setShowBroadcastName(style.showBroadcastName !== false);
+      });
+    } catch {
+      setShowBroadcastName(true);
+    }
   }, [open, hasDigitalCertCard]);
+
+  const onToggleBroadcastName = (next) => {
+    const on = Boolean(next);
+    setShowBroadcastName(on);
+    try {
+      import("../lib/showcase/showcaseStyleStorage.js").then((m) => {
+        try {
+          m.writeShowcaseStyle?.({ showBroadcastName: on });
+          const live = m.readLiveShowcaseStyle?.();
+          if (live) m.writeLiveShowcaseStyle?.({ ...live, showBroadcastName: on });
+        } catch {
+          /* ignore */
+        }
+      });
+    } catch {
+      /* ignore */
+    }
+    showSettingNotice(
+      on
+        ? "이름 송출 ON — 빅푸시에 이름이 표시됩니다."
+        : "이름 송출 OFF — VLUE 인증회원으로만 표시됩니다."
+    );
+  };
 
   useEffect(() => {
     const h = () => setNickTick((n) => n + 1);
@@ -498,11 +539,35 @@ function ProfilePanel({
     setIsVCIDOn(next);
     localStorage.setItem("vcid", String(next));
     try {
+      import("../lib/bizcardAccountSync.js").then((m) => {
+        try {
+          m.writeDccBroadcastOn?.(Boolean(next));
+        } catch {
+          /* ignore */
+        }
+      });
+    } catch {
+      /* ignore */
+    }
+    try {
+      import("../lib/showcase/showcaseStyleStorage.js").then((m) => {
+        try {
+          m.writeShowcaseStyle?.({ includeDigitalCard: Boolean(next) });
+          const live = m.readLiveShowcaseStyle?.();
+          if (live) m.writeLiveShowcaseStyle?.({ ...live, includeDigitalCard: Boolean(next) });
+        } catch {
+          /* ignore */
+        }
+      });
+    } catch {
+      /* ignore */
+    }
+    try {
       window.dispatchEvent(new Event("vlue-vcid-changed"));
     } catch {
       /* ignore */
     }
-    showSettingNotice(next ? "통화 중 쇼케이스가 송출됩니다." : "통화 중 쇼케이스 송출이 꺼졌습니다.");
+    showSettingNotice(next ? "통화 중 쇼케이스가 송출됩니다." : "통화 중 쇼케이스 송출이 꺼졌습니다. 이름 표시만 선택할 수 있습니다.");
   };
 
   const openLetteringBizcardHub = useCallback(() => {
@@ -667,6 +732,8 @@ function ProfilePanel({
             isVCIDOn={isVCIDOn}
             hasDigitalCertCard={hasDigitalCertCard}
             onToggleVCID={onToggle}
+            showBroadcastName={showBroadcastName}
+            onToggleBroadcastName={onToggleBroadcastName}
             onMarkAllChatsRead={onMarkAllChatsRead}
             hasUnreadChats={hasUnreadChats}
             onLogout={() => setLogoutConfirmOpen(true)}

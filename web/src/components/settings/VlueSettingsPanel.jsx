@@ -285,6 +285,8 @@ export default function VlueSettingsPanel({
   isVCIDOn,
   hasDigitalCertCard,
   onToggleVCID,
+  showBroadcastName = true,
+  onToggleBroadcastName,
   onMarkAllChatsRead,
   hasUnreadChats,
   onLogout,
@@ -715,6 +717,22 @@ export default function VlueSettingsPanel({
             onChange={onToggleVCID}
             isDarkMode={isDarkMode}
           />
+          {!isVCIDOn ? (
+            <>
+              <SettingsDivider isDarkMode={isDarkMode} />
+              <SettingsToggleRow
+                label="이름 송출"
+                subtitle={
+                  showBroadcastName
+                    ? "빅푸시에 이름 표시 · 쇼케이스는 꺼진 상태"
+                    : "이름 숨김 · VLUE 인증회원으로만 표시"
+                }
+                checked={Boolean(showBroadcastName)}
+                onChange={(v) => onToggleBroadcastName?.(Boolean(v))}
+                isDarkMode={isDarkMode}
+              />
+            </>
+          ) : null}
         </SettingsSection>
 
         <SettingsSection title="보안" isDarkMode={isDarkMode}>

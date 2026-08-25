@@ -60,10 +60,6 @@ object VlueAuthMemberPopupPolicy {
     }
 
     private fun hasPublicDccOrShowcase(root: JSONObject, card: JSONObject): Boolean {
-        /* 디지털 인증명함 레코드가 있으면 쇼케이스/명함 경로 */
-        if (root.optBoolean("digitalCardActive", false) || card.optBoolean("digitalCardActive", false)) {
-            return true
-        }
         val style =
             when {
                 card.has("showcaseStyle") -> card.optJSONObject("showcaseStyle")
@@ -71,20 +67,21 @@ object VlueAuthMemberPopupPolicy {
                 card.has("showcase_style") -> card.optJSONObject("showcase_style")
                 else -> null
             }
-        val styleKeyPresent =
-            card.has("showcaseStyle") || root.has("showcaseStyle") || card.has("showcase_style")
-        if (styleHasMedia(style)) return true
-        if (style?.optBoolean("includeDigitalCard", false) == true) return true
-
-        if (hasDccOrMediaHints(root, card)) return true
-
-        /*
-         * overlay cardLookup JSON 에는 showcaseStyle 이 없는 경우가 많음.
-         * 스타일 키가 아예 없으면 “없음”으로 단정하지 않고 쇼케이스 경로를 허용(웹이 재조회).
-         */
-        if (!styleKeyPresent && !root.has("digitalCardActive") && !card.has("digitalCardActive")) {
-            return true
+        /* 송출 OFF 가 명시되면 빈 쇼케이스 금지 → 인증 팝업만 */
+        if (style != null && style.has("includeDigitalCard") && !style.optBoolean("includeDigitalCard", false)) {
+            return false
         }
+        val broadcastOn = style?.optBoolean("includeDigitalCard", false) == true
+        if (!broadcastOn) {
+            /*
+             * 스타일 키 없음·digitalCardActive 만으로는 쇼케이스 경로로 단정하지 않음.
+             * (예전: 키 없으면 true → 빈 VLUE Showcase 가 화면을 덮음)
+             */
+            return false
+        }
+        if (styleHasMedia(style)) return true
+        if (hasDccOrMediaHints(root, card)) return true
+        /* 송출 ON 이지만 실콘텐츠 없음 → 빈 쇼케이스 대신 인증 팝업 */
         return false
     }
 

@@ -31,7 +31,8 @@ function createPeerAuthOnlyShowcaseStyle() {
   return {
     ...createDefaultShowcaseStyle(),
     includeDigitalCard: false,
-    verifiedBadgeOn: true
+    verifiedBadgeOn: true,
+    showBroadcastName: true
   };
 }
 
@@ -257,12 +258,13 @@ function applyLocalOverlayCardDefaults(card, phoneHint = "") {
 }
 
 /**
- * live 송출 플래그 도착 전 — 유료/상호가 있으면 바·쇼케이스 골격을 즉시 paid 로.
- * live 가 OFF 면 enrich 결과가 덮어쓴다.
+ * live 송출 플래그 도착 전 — 송출 ON 이 확정된 경우에만 paid 골격.
+ * 추측으로 includeDigitalCard:true 하면 빈 쇼케이스가 화면을 덮는다.
  */
 function provisionalBroadcastStyle(card) {
-  if (isPaidLetteringTier(card?.membershipTier) || overlayCardHasOrg(card)) {
-    return { ...createDefaultShowcaseStyle(), includeDigitalCard: true };
+  const live = card?.showcaseStyle;
+  if (live && typeof live === "object" && live.includeDigitalCard === true) {
+    return { ...createDefaultShowcaseStyle(), ...live, includeDigitalCard: true };
   }
   return createPeerAuthOnlyShowcaseStyle();
 }
@@ -630,6 +632,15 @@ function LetteringOverlayHostInner() {
 
       const unknown = isUnknownIncoming(incoming);
       if (unknown) {
+        /* 조회 전 미인증 앰버 UI를 먼저 띄우지 않음 — 치명적 깜빡임 방지 */
+        setCard({
+          ...buildUnverifiedOverlayCard(incoming),
+          profileKind: "lookup_pending",
+          name: "",
+          displayName: ""
+        });
+        setVerified(false);
+        setLoading(true);
         unknownTimer = window.setTimeout(() => {
           if (cancelled || matchedRef.current) return;
           const deviceName = findDeviceContactName(incoming);
@@ -641,7 +652,7 @@ function LetteringOverlayHostInner() {
           }
           setVerified(false);
           setLoading(false);
-        }, 600);
+        }, 2200);
       }
 
       void syncDeviceContactsFromNative().catch(() => {});
