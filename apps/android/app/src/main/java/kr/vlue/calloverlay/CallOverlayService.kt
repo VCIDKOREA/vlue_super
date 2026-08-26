@@ -889,6 +889,7 @@ class CallOverlayService : Service() {
             companion.onAnswer(OverlayContext.IN_CALL)
             hideCompanionOverlayChrome()
             syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            notifyWebCallState("connected")
             return
         }
         /*
@@ -980,7 +981,12 @@ class CallOverlayService : Service() {
                 bigPushPeeking = false
                 bigPushPeekTab?.visibility = android.view.View.GONE
                 nativeBanner?.visibility = android.view.View.GONE
-                if (isContactSafeCare(pendingCardJson)) {
+                if (isContactSafeCare(pendingCardJson) ||
+                    VlueAuthMemberPopupPolicy.isAuthMemberOnly(
+                        pendingCardJson,
+                        verified = pendingVerified
+                    )
+                ) {
                     hideCompanionOverlayChrome()
                 } else {
                     webView?.visibility = android.view.View.VISIBLE
@@ -2559,6 +2565,37 @@ class CallOverlayService : Service() {
                     "window.VlueLettering&&window.VlueLettering.onNativeCallState&&window.VlueLettering.onNativeCallState('$safe');" +
                     "window.dispatchEvent(new CustomEvent('vlue-native-call-state',{detail:{callState:'$safe'}}));}catch(e){}"
             webView?.evaluateJavascript(js, null)
+        }
+    }
+
+    /**
+     * 웹 notifyVlueAuthMemberReady — 인증 회원·미송출 수화 시 중앙 팝업.
+     * 이름표시 빅푸시가 수화 후에도 남는 것 방지.
+     */
+    fun onVlueAuthMemberReadyFromWeb(phone: String) {
+        mainHandler.post {
+            if (dismissing) return@post
+            if (phone.isNotBlank() &&
+                !IncomingNumberResolver.isUnknown(phone) &&
+                currentPhone.isNotBlank() &&
+                !IncomingNumberResolver.sameCanonicalNumber(currentPhone, phone)
+            ) {
+                return@post
+            }
+            if (!VlueAuthMemberPopupPolicy.isAuthMemberOnly(
+                    pendingCardJson,
+                    verified = pendingVerified || parseIsVerified(pendingCardJson)
+                )
+            ) {
+                return@post
+            }
+            remoteConnected = true
+            if (companion.state != OverlayState.SHOWCASE) {
+                companion.onAnswer(OverlayContext.IN_CALL)
+            }
+            hideCompanionOverlayChrome()
+            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            CompanionRuntimeStabilityDiag.mark("AUTH_MEMBER_POPUP_WEB", "onVlueAuthMemberReadyFromWeb")
         }
     }
 

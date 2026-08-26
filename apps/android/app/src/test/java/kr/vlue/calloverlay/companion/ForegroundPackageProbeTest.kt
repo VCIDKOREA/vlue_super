@@ -207,10 +207,10 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun consecutiveCall_dialerRecents_staleInCallResume_nullTasks_isBelow() {
-        /* 다이얼러 최근기록 + 미니 수신: tasks 못 읽고 stale InCall resume 만 남을 때 TOP 금지 */
+    fun fullInCallUi_resumedInCall_nullTasks_isTop() {
+        /* 전면 수신 UI: tasks 못 읽어도 InCall resume 이면 TOP (중앙 BELOW 금지) */
         assertEquals(
-            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
             ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = null,
                 inCallImportance = fg,

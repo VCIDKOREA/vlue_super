@@ -319,6 +319,15 @@ class LetteringJavascriptBridge(
         service.startActivity(intent)
     }
 
+    /**
+     * 웹이 인증-only(쇼케이스·DCC 미송출) 수화를 알림 → 중앙 「경로 검증 · 정상」팝업.
+     * BigPush/이름바 크롬은 제거.
+     */
+    @JavascriptInterface
+    fun notifyVlueAuthMemberReady(phone: String?) {
+        service.onVlueAuthMemberReadyFromWeb(phone.orEmpty())
+    }
+
     companion object {
         const val INTERFACE_NAME = "Android"
         private const val TAG = "LetteringJsBridge"
@@ -356,6 +365,8 @@ class LetteringJavascriptBridge(
                 window.VlueLettering.requestLetteringPermissions = function(){ Android.requestLetteringPermissions(); };
                 window.VlueLettering.getLetteringPermissionStatusJson = function(){ return Android.getLetteringPermissionStatusJson(); };
                 window.VlueLettering.openCertInfo = function(msg){ Android.openVlueCertInfo(JSON.stringify(msg||{})); };
+                window.VlueLettering.notifyVlueAuthMemberReady = function(p){ try{ Android.notifyVlueAuthMemberReady(String(p||'')); }catch(e){} };
+                window.Android.notifyVlueAuthMemberReady = window.VlueLettering.notifyVlueAuthMemberReady;
                 window.VlueLettering.onNativeCallState = window.VlueLettering.onNativeCallState || function(){};
                 try { delete window.VlueLettering.setOverlayFullscreen; } catch (e) {}
             """.trimIndent()

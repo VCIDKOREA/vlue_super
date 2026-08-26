@@ -86,13 +86,13 @@ object ForegroundPackageProbe {
             return RingingSurface.HOME_OR_OTHER
         }
         /*
-         * 전체 InCallUI 확정은 tasksFull 필요.
-         * tasks=null + stale InCall resume 만으로 FULL/TOP 하면
-         * 다이얼러 최근기록 위 미니 수신에 VLUE 가 미니 UI 뒤로 깔린다 (연속 수신).
+         * 전체 InCallUI: resume 가 InCallActivity 이고 다이얼러/타앱 task 가 없으면 TOP.
+         * tasks=null 만으로 BELOW 하면 전면 수신 UI 중앙에 빅푸시가 뜬다.
+         * 연속·미니 수신은 tasksDialer / otherApp / ourApp 경로로 BELOW 유지.
          */
         if (resumedFull && ourApp && !tasksFull) return RingingSurface.HOME_OR_OTHER
         if (resumedFull && tasksFull) return RingingSurface.FULL_INCALL
-        if (resumedFull && !tasksFull) return RingingSurface.HOME_OR_OTHER
+        if (resumedFull && !tasksFull) return RingingSurface.FULL_INCALL
 
         if (OverlayContextDetector.isLikelyLauncherPackage(lastResumedPkg) ||
             isKnownOtherAppPackage(lastResumedPkg)

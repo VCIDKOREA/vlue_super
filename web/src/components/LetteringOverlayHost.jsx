@@ -258,9 +258,9 @@ function applyLocalOverlayCardDefaults(card, phoneHint = "") {
 }
 
 /**
- * live 송출 플래그 도착 전.
- * API 조회에 includeDigitalCard 가 오면 그대로 사용.
- * 없을 때만 digitalCardActive+사진/핸들로 바 크롬만 낙관적 ON (빈 풀스크린은 expand 가드).
+ * live 송출 플래그 도착 전 — 명시적 includeDigitalCard 만 신뢰.
+ * digitalCardActive 로 낙관적 ON 하면 이상춘처럼 송출 OFF 계정이
+ * 「sangchoon1 Showcase」로 깜빡인 뒤 이름표시로 바뀐다.
  */
 function provisionalBroadcastStyle(card) {
   const live = card?.showcaseStyle;
@@ -275,20 +275,6 @@ function provisionalBroadcastStyle(card) {
         includeDigitalCard: false
       };
     }
-  }
-  const handle = String(card?.publicHandle || card?.loginId || card?.vlueId || "")
-    .trim()
-    .replace(/^@/, "");
-  const photo = String(card?.photoUrl || card?.image_url || card?.avatarUrl || "").trim();
-  if (
-    (card?.digitalCardActive === true || card?.isPremiumLine === true) &&
-    (handle || photo)
-  ) {
-    return {
-      ...createDefaultShowcaseStyle(),
-      ...(typeof live === "object" && live ? live : {}),
-      includeDigitalCard: true
-    };
   }
   return createPeerAuthOnlyShowcaseStyle();
 }
@@ -406,6 +392,7 @@ function LetteringOverlayHostInner() {
   const autoExpandedOnceRef = useRef(false);
   /* 네이티브/웹 조회가 한 번 매칭되면 timeout·unmatched 로 되돌리지 않음 */
   const matchedRef = useRef(false);
+  const peerAuthPopupOnlyRef = useRef(false);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -928,16 +915,30 @@ function LetteringOverlayHostInner() {
       if (next) {
         setCallState(next);
         if (next === CALL_STATES.CONNECTED) {
-          /*
-           * Answer = always full Showcase.
-           * 링잉 중 Mini Case로 접은 뒤 수락해도 expanded=false 로 남으면
-           * 네이티브 FULLSCREEN(검정) + 웹 미니 UI 가 겹친다.
-           * 통화 중 다시 접기는 minimize_showcase 로만 한다.
-           */
           restoreHoldUntilRef.current = Date.now() + 3500;
-          autoExpandedOnceRef.current = true;
           setForceShowcaseBar(false);
-          setExpanded(true);
+          if (peerAuthPopupOnlyRef.current) {
+            /*
+             * DCC·쇼케이스 미송출(이상춘): 이름바/풀쇼케이스 유지 금지.
+             * 네이티브 중앙 「경로 검증 · 정상」팝업만.
+             */
+            autoExpandedOnceRef.current = false;
+            setExpanded(false);
+            try {
+              window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
+              window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
+            } catch {
+              /* ignore */
+            }
+          } else {
+            /*
+             * 송출 ON: 풀 쇼케이스.
+             * 링잉 중 Mini Case로 접은 뒤 수락해도 expanded=false 로 남으면
+             * 네이티브 FULLSCREEN + 웹 미니 UI 가 겹친다.
+             */
+            autoExpandedOnceRef.current = true;
+            setExpanded(true);
+          }
         }
         if (next === CALL_STATES.RINGING) {
           /* BigPush = 앱 쇼케이스바 — 연속 수신 시 직전 MiniCase hold/좌표 제거 */
@@ -991,9 +992,13 @@ function LetteringOverlayHostInner() {
     if (!verified || !styledCard) return false;
     if (String(styledCard.profileKind || "") === "contact_safe_care") return false;
     if (matchNationalAgency(incoming)) return false;
-    /* 접힌 빅푸시: 핸들·사진만 있어도 쇼케이스 바 (이름표시 3~5초 깜빡임 금지) */
-    return !peerHasShowcaseBarChrome(styledCard, styledCard.showcaseStyle || showcaseStyle);
+    /* 송출 OFF / 공개 DCC·쇼케이스 없음 → 수화 후 중앙 인증 팝업 */
+    return !peerHasDccOrShowcaseContent(styledCard, styledCard.showcaseStyle || showcaseStyle);
   }, [verified, styledCard, showcaseStyle, incoming]);
+
+  useEffect(() => {
+    peerAuthPopupOnlyRef.current = peerAuthPopupOnly;
+  }, [peerAuthPopupOnly]);
 
   useEffect(() => {
     if (callState !== CALL_STATES.CONNECTED || !identityReady) return;
@@ -1146,6 +1151,20 @@ function LetteringOverlayHostInner() {
     loading &&
     !(forceShowcaseBar && (styledCard || card || incoming)) &&
     !(identityHold && callState === CALL_STATES.CONNECTED && !expanded);
+
+  const isLookupPendingCard =
+    String(styledCard?.profileKind || card?.profileKind || "").trim() === "lookup_pending";
+
+  /* 「번호 확인 중」빅푸시 바는 내지 않음 — 조회 완료 전엔 투명만 */
+  if (isLookupPendingCard && callState !== CALL_STATES.CONNECTED) {
+    return (
+      <div
+        className="lettering-overlay-host lettering-overlay-host--tent lettering-overlay-host--loading"
+        style={{ background: "transparent", opacity: 0 }}
+        aria-hidden
+      />
+    );
+  }
 
   if (showLoadingChip) {
     /* FULLSCREEN 흰 바탕 점유 금지 — 투명 호스트 + 브랜드 확인 칩만 */
