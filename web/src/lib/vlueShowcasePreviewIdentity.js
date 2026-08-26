@@ -5,6 +5,7 @@ import {
 } from "./letteringBizcardStorage.js";
 import { readDigitalCardActive, readDccBroadcastOn } from "./bizcardAccountSync.js";
 import { scrubLetteringDemoPollution } from "./letteringDemoPollution.js";
+import { DCC_CERTIFIED_MEMBER_LABEL } from "./letteringPaidIdentityDisplay.js";
 
 /** 홈 쇼케이스 미리보기 — 설정 전 예시 브랜드 */
 export const VLUE_PREVIEW_EXAMPLE_BRAND = "VLUE";
@@ -12,8 +13,8 @@ export const VLUE_PREVIEW_EXAMPLE_BRAND = "VLUE";
 /** 접힘(첫화면) 미리보기에 반드시 노출 */
 export const VLUE_PREVIEW_CARD_APPLY_HINT = "명함 신청 시 반영됩니다";
 
-/** 직함·부서 미입력 시 자리 안내 (실제 값은 `formatTitleDeptLine`) */
-export const VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER = "직함 ㅣ 부서명";
+/** @deprecated 직함·부서 미입력 시 DCC와 동일 — `[VLUE 인증회원]` */
+export const VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER = DCC_CERTIFIED_MEMBER_LABEL;
 
 /** 앞면 주소 미입력 안내 (선택) — 미입력 시 행 자체 미표시 권장 */
 export const VLUE_PREVIEW_ADDRESS_PLACEHOLDER = "주소를 입력할 수 있습니다.";
@@ -49,12 +50,12 @@ function hasLetteringSavedAddress(ed = {}) {
   );
 }
 
-/** 직함 ㅣ 부서명 한 줄 — 비어 있으면 플레이스홀더 */
+/** 직함 ㅣ 부서명 한 줄 — 비어 있으면 `[VLUE 인증회원]` (DCC·미리보기·상대 쇼케이스 공통) */
 export function formatTitleDeptLine(title = "", department = "", opts = {}) {
   const t = String(title ?? "").trim();
   const d = String(department ?? "").trim();
   if (!t && !d) {
-    return opts.allowEmpty ? "" : VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER;
+    return opts.allowEmpty ? "" : DCC_CERTIFIED_MEMBER_LABEL;
   }
   if (t && d) return `${t} ㅣ ${d}`;
   return t || d;

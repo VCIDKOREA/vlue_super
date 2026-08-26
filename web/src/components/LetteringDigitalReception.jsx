@@ -11,13 +11,10 @@ import {
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { isMaskedPhoneDisplay } from "../lib/dccExposure.js";
-import { formatLetteringReceptionLines, isVlueBrandOrganization, resolveDccFrontIdentityLines, DCC_CERTIFIED_MEMBER_LABEL } from "../lib/letteringPaidIdentityDisplay.js";
+import { formatLetteringReceptionLines, resolveDccFrontIdentityLines, DCC_CERTIFIED_MEMBER_LABEL } from "../lib/letteringPaidIdentityDisplay.js";
 import { formatLetteringContactEmailDisplay, photoFocusToCss } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard, resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
-import {
-  VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER,
-  VLUE_PREVIEW_EMAIL_PLACEHOLDER
-} from "../lib/vlueShowcasePreviewIdentity.js";
+import { VLUE_PREVIEW_EMAIL_PLACEHOLDER } from "../lib/vlueShowcasePreviewIdentity.js";
 import {
   openEmailLink,
   openWebsiteLink,
@@ -593,17 +590,8 @@ function FrontPanel({
             ) : null}
           </div>
           {(() => {
+            /* 미니미리보기·상대 쇼케이스·실통화 DCC — 동일 resolveDccFrontIdentityLines */
             const { primary, secondary } = resolveDccFrontIdentityLines(card);
-            if (card.previewTitleDeptPlaceholder || card.previewExampleBrand) {
-              const rawOrg = String(card.organization || "").trim();
-              const org = isVlueBrandOrganization(rawOrg) ? "" : rawOrg;
-              const personName = org ? String(card.name || "").trim() : "";
-              return (
-                <p className="ldr-back-person-name ldr-back-person-name--row">
-                  {[personName, VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER].filter(Boolean).join(" ｜ ")}
-                </p>
-              );
-            }
             if (!secondary) return null;
             const canOpenCase =
               peerUserId &&
