@@ -727,7 +727,20 @@ class CallOverlayService : Service() {
                         /* Web Content Ready — state 전이 아님 (이미 Answer에서 connected 알림) */
                         notifyWebCallState("connected")
                     }
-                    OverlayState.MINI_CASE -> Unit
+                    OverlayState.MINI_CASE -> {
+                        /*
+                         * 팝업 확인 후 새 WebView 는 링잉 BigPush 로 부팅됨.
+                         * loadUrl 직후 notify 는 리스너 전에 사라져 사진1 바가 고착된다.
+                         * 페이지 준비 후 MiniCase(사진2) 상태로 재주입.
+                         */
+                        notifyWebCallState("minimize_showcase")
+                        notifyWebCallState("connected")
+                        webView?.evaluateJavascript(
+                            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&" +
+                                "window.VlueLettering.setExpanded(false);}catch(e){}",
+                            null
+                        )
+                    }
                     OverlayState.BIG_PUSH -> applyCompactRingingWindow()
                     OverlayState.IDLE -> Unit
                 }
@@ -899,7 +912,20 @@ class CallOverlayService : Service() {
         currentOutgoing = outgoing
         pendingCardJson = cardJson
         pendingVerified = verified
-        wv.loadUrl(VlueLetteringConfig.overlayUrl(phone, verified, outgoing, currentDcpRoute))
+        val forMiniCase =
+            !asBigPush &&
+                (userMinimized ||
+                    authPopupConfirmedToMini ||
+                    companion.state == OverlayState.MINI_CASE)
+        wv.loadUrl(
+            VlueLetteringConfig.overlayUrl(
+                phone,
+                verified,
+                outgoing,
+                currentDcpRoute,
+                miniCase = forMiniCase
+            )
+        )
         CompanionPerfTracker.noteWebViewLoadStart()
         if (!cardJson.isNullOrBlank()) {
             injectCardLookupJson(wv, cardJson)
@@ -1308,6 +1334,7 @@ class CallOverlayService : Service() {
         /*
          * minimize 를 먼저 — connected 가 웹 notifyVlueAuthMemberReady 를 다시 켜도
          * authPopupConfirmedToMini 가드가 팝업 재진입을 막는다.
+         * 새 WebView 는 onPageFinished 에서도 재주입 (리스너 레이스 대비).
          */
         notifyWebCallState("minimize_showcase")
         notifyWebCallState("connected")
@@ -1316,6 +1343,11 @@ class CallOverlayService : Service() {
                 "window.VlueLettering.setExpanded(false);}catch(e){}",
             null
         )
+        webView?.postDelayed({
+            if (dismissing || companion.state != OverlayState.MINI_CASE) return@postDelayed
+            notifyWebCallState("minimize_showcase")
+            notifyWebCallState("connected")
+        }, 350L)
         VlueBigPushTrace.lifecycle(
             "AUTH_POPUP_TO_MINI",
             "userMinimized=$userMinimized state=${companion.state.name} " +
@@ -2030,7 +2062,17 @@ class CallOverlayService : Service() {
             wv.evaluateJavascript("try{window.__VLUE_CARD_LOOKUP__=null;}catch(e){}", null)
         }
         wv.loadUrl(
-            VlueLetteringConfig.overlayUrl(phone, verified, outgoing, currentDcpRoute, nonce)
+            VlueLetteringConfig.overlayUrl(
+                phone,
+                verified,
+                outgoing,
+                currentDcpRoute,
+                nonce,
+                miniCase =
+                    userMinimized ||
+                        authPopupConfirmedToMini ||
+                        companion.state == OverlayState.MINI_CASE
+            )
         )
         if (!forceNewDocument && !cardJson.isNullOrBlank()) {
             injectCardLookupJson(wv, cardJson)
@@ -2039,6 +2081,16 @@ class CallOverlayService : Service() {
             wv.postDelayed({ injectCardLookupJson(wv, cardJson) }, 450L)
         }
         /* forceNewDocument 이면 onPageStarted 의 injectLetteringFlag 가 pendingCardJson 주입 */
+        if (userMinimized ||
+            authPopupConfirmedToMini ||
+            companion.state == OverlayState.MINI_CASE
+        ) {
+            wv.postDelayed({
+                if (dismissing || companion.state != OverlayState.MINI_CASE) return@postDelayed
+                notifyWebCallState("minimize_showcase")
+                notifyWebCallState("connected")
+            }, 200L)
+        }
     }
 
     private fun injectCardLookupJson(view: WebView?, cardJson: String) {
@@ -2163,6 +2215,19 @@ class CallOverlayService : Service() {
     fun onRestoreShowcaseRequestedFromWeb(source: String = "js.restoreShowcase") {
         if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
             CompanionRuntimeStabilityDiag.noteStaleEvent("RESTORE", source)
+            return
+        }
+        /*
+         * 인증-only MiniCase「쇼케이스 돌아가기」— 빈 풀쇼케이스 대신 기본 팝업 재표시.
+         */
+        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(
+                pendingCardJson,
+                verified = pendingVerified || parseIsVerified(pendingCardJson)
+            )
+        ) {
+            authPopupConfirmedToMini = false
+            userMinimized = false
+            presentCenterSafePopup(source = "restore_auth_from_mini", authMember = true)
             return
         }
         /*

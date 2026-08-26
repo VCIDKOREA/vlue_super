@@ -33,7 +33,9 @@ object VlueLetteringConfig {
         verified: Boolean,
         outgoing: Boolean,
         dcpRoute: String = "",
-        navigationNonce: Long = 0L
+        navigationNonce: Long = 0L,
+        /** 인증 팝업 확인 후 MiniCase — 웹이 BigPush 바로 부팅되지 않게 */
+        miniCase: Boolean = false
     ): String {
         val enc = java.net.URLEncoder.encode(phone, "UTF-8")
         val dir = if (outgoing) "outgoing" else "incoming"
@@ -44,8 +46,10 @@ object VlueLetteringConfig {
         val dcp = if (route == "normal" || route == "abnormal") "&dcp_route=$route" else ""
         /* 번호가 바뀌면 해시만 바꿔 loadUrl 해도 hashchange 가 안 나 이전 번호가 남는다 */
         val nav = if (navigationNonce > 0L) "&_n=$navigationNonce" else ""
+        val mini =
+            if (miniCase) "&mini=1&phase=connected" else ""
         return appUrl(
-            "lettering-overlay?incoming=$enc&platform=android&direction=$dir&verified=$ver&native=1&forceLettering=1&_ov=$bust$dcp$nav"
+            "lettering-overlay?incoming=$enc&platform=android&direction=$dir&verified=$ver&native=1&forceLettering=1&_ov=$bust$dcp$nav$mini"
         )
     }
 }

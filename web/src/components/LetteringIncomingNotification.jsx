@@ -931,13 +931,26 @@ export default function LetteringIncomingNotification({
   }, [setExpanded, onToast, previewMode]);
 
   const expandShowcaseFromMiniCase = useCallback(() => {
+    if (showcaseOffPreview) {
+      /* DCC 없음 — 팝업이 쇼케이스 대행. MiniCase → 인증 팝업 */
+      try {
+        nativeRestoreShowcaseOverlay();
+      } catch {
+        try {
+          window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
+        } catch {
+          /* ignore */
+        }
+      }
+      return;
+    }
     setExpanded(true);
     try {
       nativeRestoreShowcaseOverlay();
     } catch {
       /* ignore */
     }
-  }, [setExpanded]);
+  }, [setExpanded, showcaseOffPreview, incoming]);
 
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;
@@ -1152,11 +1165,18 @@ export default function LetteringIncomingNotification({
       unverifiedCollapsedPhone ||
       incoming ||
       "—";
+    /* MiniCase 는 DCC 유무와 동일 — 이름만 (빅푸시「VLUE 인증 ·」라벨 아님) */
     const nameDisp = isExpiredLine
       ? phoneDisp
       : isUnverified
-      ? phoneDisp
-      : String(displayLabel || receptionLines?.collapsedPrimary || "").trim() || phoneDisp;
+        ? phoneDisp
+        : String(
+            peerVerifiedName ||
+              receptionLines?.name ||
+              receptionLines?.collapsedPrimary ||
+              contactSavedName ||
+              ""
+          ).trim() || phoneDisp;
     const subPhone = isExpiredLine
       ? expiredSubtitle
       : receptionLines?.organization && phoneDisp

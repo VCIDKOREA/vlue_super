@@ -155,16 +155,19 @@ function parseOverlayParams() {
   const query = qIndex >= 0 ? hash.slice(qIndex + 1) : window.location.search.replace(/^\?/, "");
   const params = new URLSearchParams(query);
   const verifiedParam = String(params.get("verified") || "").trim();
+  const phase = params.get("phase") || "";
   return {
     incoming: params.get("incoming") || params.get("phone") || "",
     platform: params.get("platform") === "ios" ? "ios" : "android",
     direction: params.get("direction") === "outgoing" ? "outgoing" : "incoming",
     native: params.get("native") === "1",
     forceLettering: params.get("forceLettering") === "1",
-    phase: params.get("phase") || "",
+    phase,
     dcpRoute: params.get("dcp_route") || params.get("dcpRoute") || "",
     /* 네이티브 overlayUrl 이 verified=1 을 넣음 — 무시하면 부팅 시 미인증 고착 */
-    urlVerified: verifiedParam === "1" || verifiedParam === "true"
+    urlVerified: verifiedParam === "1" || verifiedParam === "true",
+    /* 인증 팝업 확인 후 MiniCase 문서 — BigPush 바로 부팅 금지 */
+    urlMiniCase: params.get("mini") === "1"
   };
 }
 
@@ -377,7 +380,7 @@ export default function LetteringOverlayHost() {
 }
 
 function LetteringOverlayHostInner() {
-  const [{ incoming, platform, direction, native, forceLettering, phase, dcpRoute, urlVerified }, setParams] =
+  const [{ incoming, platform, direction, native, forceLettering, phase, dcpRoute, urlVerified, urlMiniCase }, setParams] =
     useState(parseOverlayParams);
   const [card, setCard] = useState(() => {
     const boot = readBootNativeLookupCard(parseOverlayParams().incoming);
@@ -396,6 +399,10 @@ function LetteringOverlayHostInner() {
   const [authMemberPopupOpen, setAuthMemberPopupOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [callState, setCallState] = useState(() => {
+    const boot = parseOverlayParams();
+    if (boot.urlMiniCase || normalizeCallState(boot.phase) === CALL_STATES.CONNECTED) {
+      return CALL_STATES.CONNECTED;
+    }
     const queued = normalizeCallState(readQueuedNativeCallState());
     if (queued === CALL_STATES.CONNECTED) return CALL_STATES.CONNECTED;
     return normalizeCallState(phase) === CALL_STATES.CONNECTED
@@ -410,9 +417,9 @@ function LetteringOverlayHostInner() {
   });
   /* 수화 직후 신원 칩이 끝나기 전에는 풀 DCC를 펼치지 않음 */
   const [expanded, setExpanded] = useState(false);
-  /* Native BIG_PUSH 창 — 앱 쇼케이스바(접힘) 강제. MiniCase 금지 */
-  const [forceShowcaseBar, setForceShowcaseBar] = useState(true);
-  const [identityHold, setIdentityHold] = useState(true);
+  /* Native BIG_PUSH 창 — 앱 쇼케이스바(접힘) 강제. MiniCase 금지. mini=1 URL 은 MiniCase 부팅 */
+  const [forceShowcaseBar, setForceShowcaseBar] = useState(() => !parseOverlayParams().urlMiniCase);
+  const [identityHold, setIdentityHold] = useState(() => !parseOverlayParams().urlMiniCase);
   /* Mini→풀 복원 직후 늦게 도착하는 big_push_bar 로 다시 접히는 레이스 방지 */
   const restoreHoldUntilRef = useRef(0);
   const loadingStartedAtRef = useRef(Date.now());
@@ -420,6 +427,8 @@ function LetteringOverlayHostInner() {
   /* 네이티브/웹 조회가 한 번 매칭되면 timeout·unmatched 로 되돌리지 않음 */
   const matchedRef = useRef(Boolean(readBootNativeLookupCard(parseOverlayParams().incoming)));
   const peerAuthPopupOnlyRef = useRef(false);
+  const forceShowcaseBarRef = useRef(!parseOverlayParams().urlMiniCase);
+  forceShowcaseBarRef.current = forceShowcaseBar;
   const urlVerifiedRef = useRef(urlVerified);
   urlVerifiedRef.current = urlVerified;
 
@@ -1006,17 +1015,20 @@ function LetteringOverlayHostInner() {
         restoreHoldUntilRef.current = 0;
         autoExpandedOnceRef.current = false;
         resetCompanionMiniCaseSessionPos();
+        forceShowcaseBarRef.current = true;
         setForceShowcaseBar(true);
         setExpanded(false);
       } else if (
         rawState === "minimize_showcase" ||
         rawState === "reveal_system_call_ui"
       ) {
+        forceShowcaseBarRef.current = false;
         setForceShowcaseBar(false);
         setExpanded(false);
       } else if (rawState === "restore_showcase") {
         restoreHoldUntilRef.current = Date.now() + 3500;
         autoExpandedOnceRef.current = true;
+        forceShowcaseBarRef.current = false;
         setForceShowcaseBar(false);
         setExpanded(true);
       }
@@ -1024,20 +1036,24 @@ function LetteringOverlayHostInner() {
       if (next) {
         setCallState(next);
         if (next === CALL_STATES.CONNECTED) {
+          const wasShowcaseBar = forceShowcaseBarRef.current;
           restoreHoldUntilRef.current = Date.now() + 3500;
+          forceShowcaseBarRef.current = false;
           setForceShowcaseBar(false);
           if (peerAuthPopupOnlyRef.current) {
             /*
-             * DCC·쇼케이스 미송출(이상춘): 이름바/풀쇼케이스 유지 금지.
-             * 네이티브 중앙 「경로 검증 · 정상」팝업만.
+             * DCC·쇼케이스 미송출(이상춘): 풀쇼케이스 금지.
+             * MiniCase 확정(이미 bar off / mini=1) 후 connected 재알림은 팝업을 다시 열지 않음.
              */
             autoExpandedOnceRef.current = false;
             setExpanded(false);
-            try {
-              window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
-              window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
-            } catch {
-              /* ignore */
+            if (wasShowcaseBar && !parseOverlayParams().urlMiniCase) {
+              try {
+                window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
+                window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
+              } catch {
+                /* ignore */
+              }
             }
           } else {
             /*
@@ -1054,6 +1070,7 @@ function LetteringOverlayHostInner() {
           restoreHoldUntilRef.current = 0;
           autoExpandedOnceRef.current = false;
           resetCompanionMiniCaseSessionPos();
+          forceShowcaseBarRef.current = true;
           setForceShowcaseBar(true);
           setExpanded(false);
         }
@@ -1113,17 +1130,20 @@ function LetteringOverlayHostInner() {
     if (callState !== CALL_STATES.CONNECTED || !identityReady) return;
     if (autoExpandedOnceRef.current) return;
     autoExpandedOnceRef.current = true;
+    forceShowcaseBarRef.current = false;
     setForceShowcaseBar(false);
     if (peerAuthPopupOnly) {
       /* 수화 후만 — 네이티브가 별도 중앙 팝업(경로 검증 · 정상 스타일)을 띄움.
-         빅푸시(156dp) 안에서 웹 모달을 열면 레이아웃이 깨지므로 웹 팝업은 열지 않음. */
+         MiniCase(mini=1) 부팅은 팝업 대신 CompanionMiniCase 유지. */
       setExpanded(false);
       setAuthMemberPopupOpen(false);
-      try {
-        window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
-        window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
-      } catch {
-        /* ignore */
+      if (!urlMiniCase && !parseOverlayParams().urlMiniCase) {
+        try {
+          window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
+          window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
+        } catch {
+          /* ignore */
+        }
       }
       return;
     }
@@ -1134,7 +1154,7 @@ function LetteringOverlayHostInner() {
       return;
     }
     setExpanded(true);
-  }, [callState, identityReady, peerAuthPopupOnly, incoming, styledCard, showcaseStyle]);
+  }, [callState, identityReady, peerAuthPopupOnly, incoming, styledCard, showcaseStyle, urlMiniCase]);
 
   /* 수신 중(빅푸시)에는 인증 팝업을 열지 않음 — 카드 조회 완료(~수 초) 후에도 유지 */
 
