@@ -9,6 +9,31 @@ export function isVlueBrandOrganization(org) {
 /** 상호·직책 없는 DCC — 이름 아래 고정 표기 (이름 중복 금지) */
 export const DCC_CERTIFIED_MEMBER_LABEL = "[VLUE 인증회원]";
 
+/** 이름 미노출·쇼케이스만 — 상단 라이브바 */
+export const SHOWCASE_BAR_VLUE_ID_LABEL = "VLUE ID";
+
+/**
+ * 상단 「… Showcase」소유자 라벨
+ * - 상호 있음 → 상호
+ * - 상호 없음·이름 노출 → 이름
+ * - DCC 없이 쇼케이스만 / 이름 숨김 → VLUE ID
+ * (로그인 아이디·핸들은 쓰지 않음)
+ */
+export function resolveShowcaseBarOwnerLabel(card = {}, opts = {}) {
+  const hideName = Boolean(
+    opts.hideBroadcastName ??
+      (card.hideBroadcastName || card.showcaseStyle?.showBroadcastName === false)
+  );
+  const rawOrg = String(card.organization || card.companyName || "").trim();
+  const org = isVlueBrandOrganization(rawOrg) ? "" : rawOrg;
+  if (org) return org;
+  if (!hideName) {
+    const name = String(card.name || card.displayName || "").trim();
+    if (name) return name;
+  }
+  return SHOWCASE_BAR_VLUE_ID_LABEL;
+}
+
 /**
  * DCC 앞면 Digital ID 헤드라인 2줄
  * - 상호 있음: 1줄 상호 / 2줄 이름(＋직책·부서)

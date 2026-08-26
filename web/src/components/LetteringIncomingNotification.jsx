@@ -15,7 +15,7 @@ import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx
 import ShowcaseCallCarousel from "./showcase/ShowcaseCallCarousel.jsx";
 import FreeTierCallShowcase from "./showcase/FreeTierCallShowcase.jsx";
 import { getLetteringReportsForPhone } from "../lib/letteringPhoneReports.js";
-import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDisplay.js";
+import { formatLetteringReceptionLines, resolveShowcaseBarOwnerLabel } from "../lib/letteringPaidIdentityDisplay.js";
 import { LETTERING_DEMO_COMPANY_LOGO } from "../lib/letteringDemoAssets.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAvatar.js";
@@ -40,7 +40,6 @@ import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../lib/letteringBizcardStorage.js";
-import { getMemberHandle } from "../lib/memberCardStorage.js";
 import "../styles/showcase-call-glass.css";
 import "../styles/incall-controls.css";
 
@@ -681,41 +680,18 @@ export default function LetteringIncomingNotification({
     String(c.name || c.displayName || receptionLines?.name || "").trim() ||
     contactSavedName;
   const previewShowcaseId = useMemo(() => {
-    /* 미인증·실통화 오버레이는 수신자 로컬 핸들(ceo)을 붙이지 않음 */
+    /* 미인증은 수신자 로컬 핸들을 붙이지 않음. 상호→이름→VLUE ID (아이디 금지) */
     if (isUnverified) return "";
-    const fromPreview = String(c.previewShowcaseId || "").trim().replace(/^@+/, "");
-    if (fromPreview) return fromPreview;
-    const fromCard = String(c.loginId || c.publicHandle || c.handle || "").trim().replace(/^@+/, "");
-    if (fromCard) return fromCard;
-    if (!previewMode) {
-      const liveName = String(c.name || c.displayName || "").trim();
-      return liveName || "";
-    }
-    const peerId = String(c.userId || c.ownerUserId || "").trim();
-    let meId = "";
-    try {
-      meId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
-    } catch {
-      /* ignore */
-    }
-    const isPeer = Boolean(peerId && meId && peerId !== meId);
-    if (!isPeer) {
-      const handle = String(getMemberHandle() || "").trim().replace(/^@+/, "");
-      if (handle && handle !== "user") return handle;
-    }
-    const fromName = String(c.name || c.displayName || "").trim();
-    return fromName || "VLUE";
+    return resolveShowcaseBarOwnerLabel(c, { hideBroadcastName });
   }, [
     isUnverified,
-    previewMode,
-    c.previewShowcaseId,
-    c.loginId,
-    c.publicHandle,
-    c.handle,
+    hideBroadcastName,
+    c.organization,
+    c.companyName,
     c.name,
     c.displayName,
-    c.userId,
-    c.ownerUserId
+    c.hideBroadcastName,
+    c.showcaseStyle
   ]);
 
   const showcaseOffAuthLabel = useMemo(() => {
