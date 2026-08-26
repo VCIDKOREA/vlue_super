@@ -334,37 +334,7 @@ class CallOverlayService : Service() {
             "SHOW_OVERLAY_GATE",
             org.json.JSONObject().put("canDrawOverlays", canDraw)
         )
-        val detected = detectOverlayContext(forceRinging = !answered)
-        /*
-         * 첫 attach 전에 hold 적용 — settle(400ms+) 전에 TOP 으로 붙으면 미니 UI 뒤에 겹침.
-         * confirmedFull(tasks=InCallUI) 만 TOP 허용.
-         */
-        val ctx =
-            if (!answered && !outgoing) {
-                val tasksPkg = ForegroundPackageProbe.runningTaskPackage(this)
-                val confirmedFull = OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg)
-                val ourAppFg =
-                    VlueCallOverlayApp.currentActivityName.orEmpty().let { activity ->
-                        activity.contains("kr.vlue", ignoreCase = true) &&
-                            !activity.contains("(paused)", ignoreCase = true)
-                    }
-                OverlayPositionManager.holdBelowCompactIncoming(
-                    previous = OverlayPosition.BELOW_COMPACT_INCOMING,
-                    previousContext = OverlayContext.COMPACT_INCOMING,
-                    nextContext = detected,
-                    ringing = true,
-                    ourAppForeground = ourAppFg,
-                    confirmedFullInCall = confirmedFull
-                )
-            } else {
-                detected
-            }
-        if (ctx != detected) {
-            android.util.Log.i(
-                "VlueOverlayCtx",
-                "showOverlay holdBelow detected=${detected.name} → ${ctx.name}"
-            )
-        }
+        val ctx = detectOverlayContext(forceRinging = !answered)
         companion.onIncoming(ctx)
         CompanionBigPushDiag.noteOnIncoming(companion.snapshot())
         CompanionBigPushDiag.noteOverlayPermissionCheck(
@@ -1212,10 +1182,11 @@ class CallOverlayService : Service() {
         }
     }
 
-    /** 인증 팝업 「확인」→ MiniCase (링잉·수화 공통) */
+    /** 인증 팝업 「확인」→ MiniCase 유지 (ContextWatch 가 BigPush 로 되돌리지 않음) */
     private fun enterMiniCaseAfterAuthPopupConfirm() {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
-        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 3500L
+        /* hold 는 보조 — SoT 는 userMinimized (reeval collapse 가드) */
+        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
         if (companion.state != OverlayState.SHOWCASE && companion.state != OverlayState.MINI_CASE) {
             companion.onAnswer(OverlayContext.IN_CALL)
         }
@@ -1229,6 +1200,10 @@ class CallOverlayService : Service() {
             )
         }
         onMinimizeRequestedFromWeb(source = "authPopup_confirm")
+        VlueBigPushTrace.lifecycle(
+            "AUTH_POPUP_TO_MINI",
+            "userMinimized=$userMinimized state=${companion.state.name}"
+        )
     }
 
     private fun detectOverlayContext(forceRinging: Boolean): OverlayContext {
@@ -1421,6 +1396,23 @@ class CallOverlayService : Service() {
             }
             if (IncomingNumberResolver.isUnknown(phone) && cardJson.isNullOrBlank()) return@post
             val phoneChanged = overlayPhoneChanged(phone)
+            /*
+             * 동일 번호에 이미 인증 카드가 있는데 미인증/unmatched 로 덮으면 깜박임.
+             * 안심케어·기관 등 의도된 verified=false 는 허용.
+             */
+            if (!phoneChanged &&
+                !verified &&
+                !isContactSafeCare(cardJson) &&
+                parseProfileKind(cardJson) != "expired_line" &&
+                pendingVerified &&
+                parseIsVerified(pendingCardJson)
+            ) {
+                VlueBigPushTrace.lifecycle(
+                    "CALL_INFO_SKIP_DOWNGRADE",
+                    "keep verified overlay phone=${ReleaseDebugGate.maskPhoneForLog(phone)}"
+                )
+                return@post
+            }
             currentPhone = phone
             currentOutgoing = outgoing
             pendingCardJson = cardJson
@@ -2940,7 +2932,13 @@ class CallOverlayService : Service() {
             }
             val hold =
                 android.os.SystemClock.elapsedRealtime() < showcaseHoldUntilElapsed
+            /*
+             * 사용자가 팝업 확인/접기로 MiniCase 를 택한 뒤 ContextWatch 가
+             * InCallUI 를 OTHER_APP 으로 오판하면 collapse→BigPush 로 되돌린다.
+             * userMinimized 유지 중에는 MiniCase 를 빅푸시로 바꾸지 않는다.
+             */
             if (!hold &&
+                !userMinimized &&
                 (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN)
             ) {
                 /* 다른 앱/홈/삼성 미니푸시 — 하단 쇼케이스 바 (MiniCase 아님) */
@@ -2957,6 +2955,16 @@ class CallOverlayService : Service() {
                         .put("context", ctx.name)
                         .put("state", companion.state.name)
                         .put("position", companion.position.name)
+                )
+                return
+            }
+            if (companion.state == OverlayState.MINI_CASE) {
+                companion.updateContext(
+                    if (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN) {
+                        OverlayContext.MINIMIZED
+                    } else {
+                        OverlayContext.IN_CALL
+                    }
                 )
                 return
             }

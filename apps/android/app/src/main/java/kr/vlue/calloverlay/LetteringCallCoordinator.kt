@@ -445,6 +445,26 @@ object LetteringCallCoordinator {
                 )
                 Log.w(TAG, "lookup unmatched for $masked")
                 LetteringPrefs.setLastOverlayError(app, "lookup_unmatched:$masked")
+                /* API 미스매치여도 디스크/메모리 캐시가 있으면 미인증으로 덮지 않음 */
+                val cachedPositive = CardLookupRepository.peekCached(app, raw)
+                if (cachedPositive != null && cachedPositive.matched) {
+                    val mergedCached = CallPathLookupMerge.merge(
+                        cachedPositive.rawJson,
+                        CallPathSession.lastVerdict,
+                        outgoing
+                    )
+                    if (LetteringPermissionHelper.canDrawOverlays(app)) {
+                        CallOverlayService.updateCallInfo(
+                            app,
+                            raw,
+                            verified = cachedPositive.verified,
+                            cardJson = mergedCached.json,
+                            outgoing = outgoing,
+                            dcpRoute = mergedCached.route
+                        )
+                    }
+                    return
+                }
                 if (applyContactSafeCareIfSaved(app, raw, outgoing)) return
                 val merged = CallPathLookupMerge.merge(
                     lookup.rawJson,
