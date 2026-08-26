@@ -1229,7 +1229,13 @@ function LetteringOverlayHostInner() {
           onExpandedChange={(next) => {
             if (next) {
               if (peerAuthPopupOnly) {
-                setAuthMemberPopupOpen(true);
+                /* 웹 모달은 156dp 바 안에서 깨짐 — 네이티브 중앙 안심팝업 */
+                try {
+                  window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
+                  window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
+                } catch {
+                  /* ignore */
+                }
                 return;
               }
               const style = styledCard?.showcaseStyle || showcaseStyle;

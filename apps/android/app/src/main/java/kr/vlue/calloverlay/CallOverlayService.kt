@@ -878,18 +878,15 @@ class CallOverlayService : Service() {
             detail = source
         )
         if (isContactSafeCare(pendingCardJson)) {
-            remoteConnected = true
-            companion.onAnswer(OverlayContext.IN_CALL)
-            hideCompanionOverlayChrome()
-            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            presentCenterSafePopup(source = source, authMember = false)
             return
         }
-        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified = pendingVerified)) {
-            remoteConnected = true
-            companion.onAnswer(OverlayContext.IN_CALL)
-            hideCompanionOverlayChrome()
-            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
-            notifyWebCallState("connected")
+        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(
+                pendingCardJson,
+                verified = pendingVerified || parseIsVerified(pendingCardJson)
+            )
+        ) {
+            presentCenterSafePopup(source = source, authMember = true)
             return
         }
         /*
@@ -1108,10 +1105,74 @@ class CallOverlayService : Service() {
 
     /** BigPush 아무 곳 탭 → Showcase FULLSCREEN (텔레콤 Answer 와 무관, UI만) */
     private fun openShowcaseFromBigPushTap() {
-        if (dismissing || companion.state == OverlayState.SHOWCASE) return
+        if (dismissing) return
+        if (companion.state == OverlayState.SHOWCASE) {
+            /* 인증 팝업만 떠 있는 재탭 — 팝업 재부착 */
+            if (dcpPopupView?.isAttachedToWindow != true &&
+                VlueAuthMemberPopupPolicy.isAuthMemberOnly(
+                    pendingCardJson,
+                    verified = pendingVerified || parseIsVerified(pendingCardJson)
+                )
+            ) {
+                presentCenterSafePopup(source = "bigPush_bar_tap_retry", authMember = true)
+            }
+            return
+        }
         CompanionRuntimeStabilityDiag.mark("BIG_PUSH_BAR_TAP", "openShowcase")
         VlueBigPushTrace.lifecycle("BIG_PUSH_BAR_TAP", "open Showcase from bar tap")
         enterShowcaseFromAnswer(source = "bigPush_bar_tap")
+    }
+
+    /**
+     * 인증 회원·안심케어: 중앙 「경로 검증」팝업.
+     * 빅푸시 창을 먼저 지우면 WM 연속 remove/add 로 팝업 addView 가 실패하는 경우가 있어
+     * 팝업을 붙인 뒤 크롬을 제거한다. ContextWatch collapse 는 hold + 팝업 가드로 막는다.
+     */
+    private fun presentCenterSafePopup(source: String, authMember: Boolean) {
+        if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
+        remoteConnected = true
+        if (companion.state != OverlayState.SHOWCASE) {
+            companion.onAnswer(OverlayContext.IN_CALL)
+        }
+        publishCompanion(OverlayTriggerEvent.ANSWER)
+        /* 확인 전까지 OTHER_APP→하단바 collapse 금지 */
+        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
+        LetteringIncomingNotifier.cancel(this)
+        syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+        hideCompanionOverlayChrome()
+        if (dcpPopupView?.isAttachedToWindow != true) {
+            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+        }
+        CompanionRuntimeStabilityDiag.mark(
+            if (authMember) "AUTH_MEMBER_POPUP" else "SAFE_CARE_POPUP",
+            source
+        )
+        VlueBigPushTrace.lifecycle(
+            "CENTER_SAFE_POPUP",
+            "source=$source authMember=$authMember attached=${dcpPopupView?.isAttachedToWindow == true}"
+        )
+        if (authMember) {
+            notifyWebCallState("connected")
+        }
+    }
+
+    /** 인증 팝업 「확인」→ MiniCase (링잉·수화 공통) */
+    private fun enterMiniCaseAfterAuthPopupConfirm() {
+        if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
+        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 3500L
+        if (companion.state != OverlayState.SHOWCASE && companion.state != OverlayState.MINI_CASE) {
+            companion.onAnswer(OverlayContext.IN_CALL)
+        }
+        if (rootContainer == null || rootContainer?.isAttachedToWindow != true) {
+            attachOverlayWindow(
+                phone = currentPhone.ifBlank { "unknown" },
+                verified = pendingVerified || parseIsVerified(pendingCardJson),
+                outgoing = currentOutgoing,
+                cardJson = pendingCardJson,
+                asBigPush = false
+            )
+        }
+        onMinimizeRequestedFromWeb(source = "authPopup_confirm")
     }
 
     private fun detectOverlayContext(forceRinging: Boolean): OverlayContext {
@@ -1318,11 +1379,7 @@ class CallOverlayService : Service() {
             if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(cardJson, verified) &&
                 (companion.state == OverlayState.SHOWCASE || isCallAlreadyAnswered())
             ) {
-                if (companion.state != OverlayState.SHOWCASE) {
-                    companion.onAnswer(OverlayContext.IN_CALL)
-                }
-                hideCompanionOverlayChrome()
-                syncDcpRoutePopup(cardJson, currentDcpRoute)
+                presentCenterSafePopup(source = "applyCallInfoUpdate", authMember = true)
                 LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
                 return@post
             }
@@ -1466,6 +1523,8 @@ class CallOverlayService : Service() {
                 popupOnlyTest = dcpPopupOnly
             ) && !dismissing
             if (!show) {
+                /* ContextWatch 가 BIG_PUSH 로 접어도 이미 표시 중인 인증 팝업은 유지 */
+                if (dcpPopupView?.isAttachedToWindow == true) return
                 removeDcpPopupWindow()
                 return
             }
@@ -1561,7 +1620,11 @@ class CallOverlayService : Service() {
             this,
             spec,
             onConfirm = {
-                if (spec.contactSafeCare || spec.vlueAuthMember) {
+                if (spec.vlueAuthMember) {
+                    removeDcpPopupWindow()
+                    enterMiniCaseAfterAuthPopupConfirm()
+                } else if (spec.contactSafeCare) {
+                    showcaseHoldUntilElapsed = 0L
                     removeDcpPopupWindow()
                 } else if (spec.fromMock || dcpPopupOnly) {
                     dcpPopupOnly = false
@@ -2589,13 +2652,7 @@ class CallOverlayService : Service() {
             ) {
                 return@post
             }
-            remoteConnected = true
-            if (companion.state != OverlayState.SHOWCASE) {
-                companion.onAnswer(OverlayContext.IN_CALL)
-            }
-            hideCompanionOverlayChrome()
-            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
-            CompanionRuntimeStabilityDiag.mark("AUTH_MEMBER_POPUP_WEB", "onVlueAuthMemberReadyFromWeb")
+            presentCenterSafePopup(source = "onVlueAuthMemberReadyFromWeb", authMember = true)
         }
     }
 
@@ -2820,6 +2877,11 @@ class CallOverlayService : Service() {
             )
         }
         if (companion.state == OverlayState.SHOWCASE || companion.state == OverlayState.MINI_CASE) {
+            /* 중앙 안심/인증 팝업 표시 중 — 하단 바로 collapse 금지 (팝업 소실 방지) */
+            if (dcpPopupView?.isAttachedToWindow == true) {
+                companion.updateContext(OverlayContext.IN_CALL)
+                return
+            }
             val hold =
                 android.os.SystemClock.elapsedRealtime() < showcaseHoldUntilElapsed
             if (!hold &&
