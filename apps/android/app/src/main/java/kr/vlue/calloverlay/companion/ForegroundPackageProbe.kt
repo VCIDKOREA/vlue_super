@@ -86,11 +86,13 @@ object ForegroundPackageProbe {
             return RingingSurface.HOME_OR_OTHER
         }
         /*
-         * VLUE 전면 + 미니 수신 팝업: 직전 통화 InCallActivity resume 가 UsageEvents 에 남아
-         * resumedFull 로 오판 → 2번째 수신부터 TOP(겹침). task 가 전체 InCallUI 가 아니면 BELOW.
+         * 전체 InCallUI 확정은 tasksFull 필요.
+         * tasks=null + stale InCall resume 만으로 FULL/TOP 하면
+         * 다이얼러 최근기록 위 미니 수신에 VLUE 가 미니 UI 뒤로 깔린다 (연속 수신).
          */
         if (resumedFull && ourApp && !tasksFull) return RingingSurface.HOME_OR_OTHER
-        if (resumedFull) return RingingSurface.FULL_INCALL
+        if (resumedFull && tasksFull) return RingingSurface.FULL_INCALL
+        if (resumedFull && !tasksFull) return RingingSurface.HOME_OR_OTHER
 
         if (OverlayContextDetector.isLikelyLauncherPackage(lastResumedPkg) ||
             isKnownOtherAppPackage(lastResumedPkg)
@@ -110,7 +112,9 @@ object ForegroundPackageProbe {
         if (inCallImportance != null &&
             inCallImportance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
         ) {
-            return RingingSurface.FULL_INCALL
+            /* 미니 수신도 InCall FOREGROUND 유지 — tasksFull 없으면 FULL 금지 */
+            if (tasksFull) return RingingSurface.FULL_INCALL
+            return RingingSurface.HOME_OR_OTHER
         }
 
         if (otherForegroundPackages.isNotEmpty()) {

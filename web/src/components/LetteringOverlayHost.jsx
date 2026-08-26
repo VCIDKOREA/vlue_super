@@ -567,6 +567,21 @@ function LetteringOverlayHostInner() {
         if (detail.matched === false) {
           if (matchedRef.current) return;
           const phone = incoming || detail.phoneE164 || "";
+          /*
+           * lookup_pending 은 조회 중 — 미인증 앰버로 고정하면 전중희 등 회원이
+           * 수 초간 「신고·제보 이력」만 보인다. pending 유지하고 by-number 를 기다린다.
+           */
+          if (String(detail.profileKind || "") === "lookup_pending") {
+            setCard({
+              ...buildUnverifiedOverlayCard(phone),
+              profileKind: "lookup_pending",
+              name: "",
+              displayName: ""
+            });
+            setVerified(false);
+            setLoading(true);
+            return;
+          }
           if (String(detail.profileKind || "") === "contact_safe_care" || detail.dcp?.contactSafeCare) {
             matchedRef.current = true;
             setCard(
@@ -770,12 +785,14 @@ function LetteringOverlayHostInner() {
 
       scheduleOverlayPeerEnrich(incoming, null, (pack) => {
         if (cancelled || matchedRef.current) return;
+        /* 미매칭/미인증 번들로 matchedRef 를 잠그면 by-number 가 스킵되어 미인증 고착 */
+        if (!pack?.verified || !pack?.card) return;
         matchedRef.current = true;
         setCard(pack.card);
-        setVerified(Boolean(pack.verified));
+        setVerified(true);
         setShowcaseStyle(pack.showcaseStyle);
         setLoading(false);
-        if (pack.verified && !isDcpOverlayCard(pack.card)) {
+        if (!isDcpOverlayCard(pack.card)) {
           void reportLineCallEvent(incoming, direction === "outgoing" ? "out" : "in");
         }
       });

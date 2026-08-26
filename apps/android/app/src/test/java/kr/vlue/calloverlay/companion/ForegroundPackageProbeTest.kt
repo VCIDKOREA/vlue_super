@@ -207,6 +207,35 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
+    fun consecutiveCall_dialerRecents_staleInCallResume_nullTasks_isBelow() {
+        /* 다이얼러 최근기록 + 미니 수신: tasks 못 읽고 stale InCall resume 만 남을 때 TOP 금지 */
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = null,
+                inCallImportance = fg,
+                otherForegroundPackages = emptyList(),
+                ourApp = false,
+                lastResumedPkg = "com.samsung.android.incallui"
+            )
+        )
+    }
+
+    @Test
+    fun inCallForegroundAlone_nullTasks_isBelow_notFull() {
+        /* 미니 수신도 InCall FOREGROUND — FG alone ≠ 전체 UI */
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = null,
+                inCallImportance = fg,
+                otherForegroundPackages = emptyList(),
+                lastResumedPkg = null
+            )
+        )
+    }
+
+    @Test
     fun unknown_defaultsToTop() {
         assertEquals(
             ForegroundPackageProbe.RingingSurface.FULL_INCALL,

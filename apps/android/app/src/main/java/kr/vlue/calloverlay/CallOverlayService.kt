@@ -2761,15 +2761,13 @@ class CallOverlayService : Service() {
             }
         val detected = detectOverlayContext(forceRinging = forceRinging)
         val tasksPkg = ForegroundPackageProbe.runningTaskPackage(this)
-        val resumedPkg = ForegroundPackageProbe.lastResumedPackage(this)
         /*
-         * tasks 또는 resume 가 전체 InCallUI 이면 TOP 확정.
-         * tasks-only 확인은 늦거나 비어 BELOW(중앙)에 고착되는 경우가 많음.
+         * 풀 InCallUI 확정은 tasks 가 전체 InCall 일 때만.
+         * stale resume / detected==INCOMING 만으로 confirmed 하면
+         * BELOW 핀이 풀려 미니 수신 뒤로 TOP 겹침 (연속 수신·다이얼러 최근기록).
          */
         val confirmedFullInCall =
-            OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg) ||
-                OverlayContextDetector.isLikelyFullInCallUiPackage(resumedPkg) ||
-                detected == OverlayContext.INCOMING_CALL_UI
+            OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg)
         val ctx = OverlayPositionManager.holdBelowCompactIncoming(
             previous = prevPos,
             previousContext = prevCtx,
