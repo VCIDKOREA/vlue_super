@@ -862,25 +862,23 @@
 .lettering-overlay-host--tent.lettering-overlay-host--ringing {
   align-items: flex-start;
   background: transparent !important;
-  padding: 0 10px !important;
+  /* 상·하 포함 — 중앙 빅푸시에서도 아우라가 위쪽까지 보이도록 */
+  padding: 12px 10px !important;
+  overflow: visible !important;
 }
 
 .lettering-overlay-host--tent.lettering-overlay-host--ringing > .lettering-overlay-host__tent-shell {
   height: auto;
   max-height: none;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 20px;
-  /* 기존 — 통화 화면에 묻히던 회색 테두리
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.32);
-  */
-  /* 빅푸시 전용 — 블루 에메랄드 얇은 테두리 + 소프트 글로우 */
+  /* 빅푸시 전용 — 블루 에메랄드 얇은 테두리 + 전방향 소프트 글로우 */
   border: 1px solid rgba(45, 212, 191, 0.55);
   box-shadow:
-    0 0 0 1px rgba(56, 189, 248, 0.22),
-    0 0 20px rgba(34, 211, 238, 0.32),
-    0 0 36px rgba(45, 212, 191, 0.18),
-    0 14px 40px rgba(15, 23, 42, 0.4);
+    0 0 0 1px rgba(56, 189, 248, 0.28),
+    0 0 18px rgba(34, 211, 238, 0.4),
+    0 0 34px rgba(45, 212, 191, 0.22),
+    0 8px 28px rgba(15, 23, 42, 0.36);
   background:
     radial-gradient(120% 80% at 50% -10%, rgba(0, 210, 255, 0.08), transparent 55%),
     linear-gradient(180deg, #0f172a 0%, #0b1220 48%, #070b14 100%);
