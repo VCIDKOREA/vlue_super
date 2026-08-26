@@ -95,6 +95,11 @@ class CallOverlayService : Service() {
      */
     private var authPopupConfirmedToMini = false
     /**
+     * MiniCase「쇼케이스 돌아가기」→ 중앙 인증/비정상 팝업만 표시 중.
+     * MiniCase 창은 숨기고 ContextWatch 가 BigPush 로 접지 못하게 한다.
+     */
+    private var authPopupOnlyMode = false
+    /**
      * dismiss 중 들어온 다음 수신 — drop 하면 잔존 Mini/바 와 다음 콜이 어긋난다.
      * removeOverlayImmediate 직후 재실행.
      */
@@ -536,6 +541,7 @@ class CallOverlayService : Service() {
              */
             userMinimized = false
             authPopupConfirmedToMini = false
+            authPopupOnlyMode = false
             bigPushPeeking = false
             applyLayoutFromController(source = "bigPush_reuseWindow")
             val phoneChanged = overlayPhoneChanged(phone)
@@ -1280,6 +1286,9 @@ class CallOverlayService : Service() {
             return
         }
         remoteConnected = true
+        /* 팝업-only: Mini/BigPush 크롬 없이 중앙 팝업만 — ContextWatch BigPush 접기 금지 */
+        authPopupOnlyMode = true
+        hideCompanionOverlayChrome()
         if (companion.state != OverlayState.SHOWCASE) {
             companion.onAnswer(OverlayContext.IN_CALL)
         }
@@ -1299,23 +1308,28 @@ class CallOverlayService : Service() {
         VlueBigPushTrace.lifecycle(
             "CENTER_SAFE_POPUP",
             "source=$source authMember=$authMember force=$forceReopen " +
-                "attached=${dcpPopupView?.isAttachedToWindow == true}"
+                "popupOnly=$authPopupOnlyMode attached=${dcpPopupView?.isAttachedToWindow == true}"
         )
-        if (authMember) {
+        /* force reopen 시 WebView 는 이미 제거 — connected 주입하면 BigPush 웹이 다시 붙을 수 있음 */
+        if (authMember && !forceReopen && webView != null) {
             notifyWebCallState("connected")
         }
     }
 
     /**
-     * MiniCase「쇼케이스 돌아가기」→ 인증/비정상/안심케어 중앙 팝업 재표시.
-     * (빈 풀쇼케이스나 MINI_CASE 가드에 막히지 않도록 상태부터 SHOWCASE 로 올린다.)
+     * MiniCase「쇼케이스 돌아가기」→ 인증/비정상/안심케어 중앙 팝업만 재표시.
+     * MiniCase 와 팝업이 동시에 뜨지 않게 크롬을 먼저 제거한다.
      */
     private fun reopenCenterPopupFromMiniCase(source: String, authMember: Boolean) {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
+        authPopupOnlyMode = true
         authPopupConfirmedToMini = false
-        userMinimized = false
-        if (companion.state == OverlayState.MINI_CASE) {
-            companion.onRestoreShowcase(OverlayContext.IN_CALL)
+        /* ContextWatch collapse→BigPush 방지 — 팝업 표시 중에도 유지 */
+        userMinimized = true
+        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
+        hideCompanionOverlayChrome()
+        if (companion.state == OverlayState.MINI_CASE || companion.state == OverlayState.BIG_PUSH) {
+            companion.onAnswer(OverlayContext.IN_CALL)
         } else if (companion.state != OverlayState.SHOWCASE) {
             companion.onAnswer(OverlayContext.IN_CALL)
         }
@@ -1348,10 +1362,16 @@ class CallOverlayService : Service() {
      */
     private fun enterMiniCaseAfterAuthPopupConfirm() {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
+        /* 가드를 먼저 — 팝업 remove 직후 ContextWatch 가 BigPush 로 접지 못하게 */
         authPopupConfirmedToMini = true
         userMinimized = true
+        authPopupOnlyMode = false
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
-        if (companion.state != OverlayState.SHOWCASE && companion.state != OverlayState.MINI_CASE) {
+        removeDcpPopupWindow()
+        /* 레이스로 BIG_PUSH 가 됐다면 Mini 경로로 복구 */
+        if (companion.state == OverlayState.BIG_PUSH || companion.state == OverlayState.IDLE) {
+            companion.onAnswer(OverlayContext.IN_CALL)
+        } else if (companion.state != OverlayState.SHOWCASE && companion.state != OverlayState.MINI_CASE) {
             companion.onAnswer(OverlayContext.IN_CALL)
         }
         companion.onMinimize(
@@ -1785,16 +1805,17 @@ class CallOverlayService : Service() {
                 verified = pendingVerified || parseIsVerified(cardJson)
             )
         ) {
-            if (authPopupConfirmedToMini ||
-                userMinimized ||
-                companion.state == OverlayState.MINI_CASE
+            if (!authPopupOnlyMode &&
+                (authPopupConfirmedToMini ||
+                    userMinimized ||
+                    companion.state == OverlayState.MINI_CASE)
             ) {
                 removeDcpPopupWindow()
                 return
             }
             val show = VlueAuthMemberPopupPolicy.shouldShow(
                 overlayState = companion.state,
-                popupOnlyTest = dcpPopupOnly
+                popupOnlyTest = dcpPopupOnly || authPopupOnlyMode
             ) && !dismissing
             if (!show) {
                 /* ContextWatch 가 BIG_PUSH 로 접어도 이미 표시 중인 인증 팝업은 유지 */
@@ -1895,15 +1916,18 @@ class CallOverlayService : Service() {
             spec,
             onConfirm = {
                 if (spec.vlueAuthMember) {
-                    removeDcpPopupWindow()
+                    /* enterMini 가 가드 설정 후 팝업 제거 — remove 먼저 하면 BigPush 레이스 */
                     enterMiniCaseAfterAuthPopupConfirm()
                 } else if (spec.contactSafeCare) {
+                    authPopupOnlyMode = false
                     showcaseHoldUntilElapsed = 0L
                     removeDcpPopupWindow()
                 } else if (spec.fromMock || dcpPopupOnly) {
+                    authPopupOnlyMode = false
                     dcpPopupOnly = false
                     dismissOverlay()
                 } else {
+                    authPopupOnlyMode = false
                     removeDcpPopupWindow()
                 }
             },
@@ -2995,6 +3019,7 @@ class CallOverlayService : Service() {
         remoteConnected = false
         userMinimized = false
         authPopupConfirmedToMini = false
+        authPopupOnlyMode = false
         bigPushPeeking = false
         overlayModal = false
         dcpPopupOnly = false
@@ -3202,7 +3227,7 @@ class CallOverlayService : Service() {
         }
         if (companion.state == OverlayState.SHOWCASE || companion.state == OverlayState.MINI_CASE) {
             /* 중앙 안심/인증 팝업 표시 중 — 하단 바로 collapse 금지 (팝업 소실 방지) */
-            if (dcpPopupView?.isAttachedToWindow == true) {
+            if (dcpPopupView?.isAttachedToWindow == true || authPopupOnlyMode) {
                 companion.updateContext(OverlayContext.IN_CALL)
                 return
             }
