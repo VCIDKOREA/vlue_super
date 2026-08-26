@@ -299,6 +299,36 @@ class CallOverlayService : Service() {
         cancelBigPushSettle()
         val alreadyAttached = rootContainer?.isAttachedToWindow == true
         val answered = shouldEnterShowcaseNow(outgoing)
+        /*
+         * 팝업 확인 후 MiniCase 유지 중 — 카드 갱신/재진입이 BigPush 로 되돌리지 않음.
+         */
+        if (!answered &&
+            userMinimized &&
+            companion.state == OverlayState.MINI_CASE &&
+            CompanionRuntimeStabilityDiag.isCallSessionActive()
+        ) {
+            currentOutgoing = outgoing
+            pendingCardJson = cardJson ?: pendingCardJson
+            pendingVerified = verified || pendingVerified
+            bindDcpRoute(phone, dcpRoute, cardJson)
+            currentPhone = phone
+            if (!alreadyAttached) {
+                attachOverlayWindow(
+                    phone = phone,
+                    verified = pendingVerified,
+                    outgoing = outgoing,
+                    cardJson = pendingCardJson,
+                    asBigPush = false
+                )
+            } else if (webView != null && !cardJson.isNullOrBlank()) {
+                injectCardLookupJson(webView, cardJson)
+            }
+            applyLayoutFromController(source = "showOverlay_keep_mini")
+            notifyWebCallState("connected")
+            notifyWebCallState("minimize_showcase")
+            VlueBigPushTrace.lifecycle("SHOW_OVERLAY_KEEP_MINI", "phone=${ReleaseDebugGate.maskPhoneForLog(phone)}")
+            return
+        }
         val callState = telephonyCallState()
         currentOutgoing = outgoing
         dcpPopupOnly = false
@@ -1004,11 +1034,18 @@ class CallOverlayService : Service() {
                 bigPushPeeking = false
                 bigPushPeekTab?.visibility = android.view.View.GONE
                 nativeBanner?.visibility = android.view.View.GONE
-                if (isContactSafeCare(pendingCardJson) ||
-                    VlueAuthMemberPopupPolicy.isAuthMemberOnly(
-                        pendingCardJson,
-                        verified = pendingVerified
-                    )
+                /*
+                 * 인증/안심케어: 중앙 팝업이 떠 있을 때만 크롬 제거.
+                 * 팝업 확인 후 MiniCase 부착 직전 SHOWCASE sync 가 창을 지우면
+                 * Mini 레이아웃 실패 → 이후 showOverlay 가 BigPush 를 다시 붙인다.
+                 */
+                val popupUp = dcpPopupView?.isAttachedToWindow == true
+                if (popupUp &&
+                    (isContactSafeCare(pendingCardJson) ||
+                        VlueAuthMemberPopupPolicy.isAuthMemberOnly(
+                            pendingCardJson,
+                            verified = pendingVerified || parseIsVerified(pendingCardJson)
+                        ))
                 ) {
                     hideCompanionOverlayChrome()
                 } else {
@@ -1182,14 +1219,29 @@ class CallOverlayService : Service() {
         }
     }
 
-    /** 인증 팝업 「확인」→ MiniCase 유지 (ContextWatch 가 BigPush 로 되돌리지 않음) */
+    /**
+     * 인증 팝업 「확인」→ MiniCase.
+     * SHOWCASE 로 붙인 뒤 sync 가 auth 창을 지우면 Mini 실패 → BigPush 재부착이 난다.
+     * 상태를 MINI_CASE 로 먼저 고정한 다음 창을 붙인다.
+     */
     private fun enterMiniCaseAfterAuthPopupConfirm() {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
-        /* hold 는 보조 — SoT 는 userMinimized (reeval collapse 가드) */
+        userMinimized = true
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
         if (companion.state != OverlayState.SHOWCASE && companion.state != OverlayState.MINI_CASE) {
             companion.onAnswer(OverlayContext.IN_CALL)
         }
+        companion.onMinimize(
+            if (keypadOpen) OverlayContext.KEYPAD else OverlayContext.MINIMIZED
+        )
+        if (companion.state != OverlayState.MINI_CASE) {
+            VlueBigPushTrace.lifecycle(
+                "AUTH_POPUP_TO_MINI_REJECTED",
+                companion.rejectedTransition ?: "state=${companion.state.name}"
+            )
+            return
+        }
+        publishCompanion(OverlayTriggerEvent.HOME_CHANGED, userAction = true)
         if (rootContainer == null || rootContainer?.isAttachedToWindow != true) {
             attachOverlayWindow(
                 phone = currentPhone.ifBlank { "unknown" },
@@ -1199,10 +1251,21 @@ class CallOverlayService : Service() {
                 asBigPush = false
             )
         }
-        onMinimizeRequestedFromWeb(source = "authPopup_confirm")
+        applyLayoutFromController(source = "authPopup_confirm")
+        /*
+         * 새 WebView 는 URL 상 ringing — connected+minimize 없으면 빅푸시 바와 동일 크롬.
+         */
+        notifyWebCallState("connected")
+        notifyWebCallState("minimize_showcase")
+        webView?.evaluateJavascript(
+            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&" +
+                "window.VlueLettering.setExpanded(false);}catch(e){}",
+            null
+        )
         VlueBigPushTrace.lifecycle(
             "AUTH_POPUP_TO_MINI",
-            "userMinimized=$userMinimized state=${companion.state.name}"
+            "userMinimized=$userMinimized state=${companion.state.name} " +
+                "pos=${companion.position.name} attached=${rootContainer?.isAttachedToWindow == true}"
         )
     }
 
@@ -1450,7 +1513,21 @@ class CallOverlayService : Service() {
                     notifyWebCallState("connected")
                 }
             } else if (rootContainer == null) {
-                showOverlay(phone, verified, outgoing, cardJson, currentDcpRoute)
+                /* MiniCase 유지 중 카드 갱신 — showOverlay(BigPush) 재진입 금지 */
+                if (userMinimized && companion.state == OverlayState.MINI_CASE) {
+                    attachOverlayWindow(
+                        phone = phone,
+                        verified = verified,
+                        outgoing = outgoing,
+                        cardJson = cardJson,
+                        asBigPush = false
+                    )
+                    applyLayoutFromController(source = "applyCallInfo_reattach_mini")
+                    notifyWebCallState("connected")
+                    notifyWebCallState("minimize_showcase")
+                } else {
+                    showOverlay(phone, verified, outgoing, cardJson, currentDcpRoute)
+                }
             }
             syncDcpRoutePopup(cardJson, currentDcpRoute)
             LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
