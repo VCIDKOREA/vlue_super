@@ -6368,6 +6368,7 @@ body,
 .ldr-biz-logos__item.is-kakao {
   background: #facc15;
   color: #111827;
+  --kakao-openchat-gap: #facc15;
 }
 
 .ldr-biz-logos__tag {

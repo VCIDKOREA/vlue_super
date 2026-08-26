@@ -3294,6 +3294,7 @@
 .showcase-slide-chrome__social-btn.is-kakao {
   background: #facc15;
   color: #111827;
+  --kakao-openchat-gap: #facc15;
 }
 
 .showcase-slide-chrome__social-btn.is-fb {

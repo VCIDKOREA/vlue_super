@@ -8,6 +8,7 @@ import {
 } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { normalizeBusinessLink } from "../../lib/showcase/showcasePages.js";
 import FollowActionButton from "../follow/FollowActionButton.jsx";
+import { KakaoOpenChatGlyph, KakaoTalkGlyph } from "./KakaoOutlinkGlyphs.jsx";
 import "../follow/follow-action.css";
 
 function firstText(...values) {
@@ -304,12 +305,11 @@ function SocialGlyph({ kind }) {
       </svg>
     );
   }
-  if (kind === "kakao-open" || kind === "kakao-profile") {
-    return (
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>
-        <path d="M12 4C7.03 4 3 7.13 3 10.98c0 2.45 1.62 4.6 4.06 5.84-.13.48-.47 1.73-.54 2-.09.32.12.32.25.23.11-.07 1.72-1.17 2.41-1.64.6.09 1.21.13 1.82.13 4.97 0 9-3.13 9-6.98C21 7.13 16.97 4 12 4z" />
-      </svg>
-    );
+  if (kind === "kakao-open") {
+    return <KakaoOpenChatGlyph size={16} />;
+  }
+  if (kind === "kakao-profile") {
+    return <KakaoTalkGlyph size={16} />;
   }
   if (kind === "facebook") {
     return (

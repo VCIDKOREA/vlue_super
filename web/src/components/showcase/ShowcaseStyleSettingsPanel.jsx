@@ -55,6 +55,7 @@ import ShowcasePremiumGateModal from "./ShowcasePremiumGateModal.jsx";
 import ShowcaseBgmPicker from "./ShowcaseBgmPicker.jsx";
 import ShowcasePhotoEditor from "./ShowcasePhotoEditor.jsx";
 import ShowcasePullDownPreview from "./ShowcasePullDownPreview.jsx";
+import { KakaoOpenChatGlyph, KakaoTalkGlyph } from "./KakaoOutlinkGlyphs.jsx";
 import CallBigPushPreviewSection from "../CallBigPushPreviewSection.jsx";
 import DccLineSwitcher from "../dcc/DccLineSwitcher.jsx";
 import "./showcase-style-settings.css";
@@ -1218,7 +1219,7 @@ export default function ShowcaseStyleSettingsPanel({
                 }
               />
               <BusinessOutlinkRow
-                brand="kakao"
+                brand="kakao-open"
                 label="카카오 오픈채팅"
                 placeholder="https://open.kakao.com/…"
                 value={config.commercial.outlinks.kakaoOpenChat || ""}
@@ -1456,6 +1457,7 @@ export default function ShowcaseStyleSettingsPanel({
     </div>
   );
 }
+
 function BrandMark({ brand }) {
   if (brand === "instagram") {
     return (
@@ -1477,12 +1479,17 @@ function BrandMark({ brand }) {
       </span>
     );
   }
+  if (brand === "kakao-open") {
+    return (
+      <span className="showcase-brand-mark showcase-brand-mark--kakao showcase-brand-mark--kakao-open" aria-hidden>
+        <KakaoOpenChatGlyph size={18} />
+      </span>
+    );
+  }
   if (brand === "kakao") {
     return (
       <span className="showcase-brand-mark showcase-brand-mark--kakao" aria-hidden>
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-          <path d="M12 4C7.03 4 3 7.13 3 10.98c0 2.45 1.62 4.6 4.06 5.84-.13.48-.47 1.73-.54 2-.09.32.12.32.25.23.11-.07 1.72-1.17 2.41-1.64.6.09 1.21.13 1.82.13 4.97 0 9-3.13 9-6.98C21 7.13 16.97 4 12 4z" />
-        </svg>
+        <KakaoTalkGlyph size={18} />
       </span>
     );
   }

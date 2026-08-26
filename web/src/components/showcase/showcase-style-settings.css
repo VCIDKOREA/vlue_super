@@ -2601,6 +2601,11 @@
 .showcase-brand-mark--kakao {
   background: #fee500;
   color: #191919;
+  --kakao-openchat-gap: #fee500;
+}
+
+.showcase-brand-mark--kakao-open {
+  --kakao-openchat-gap: #fee500;
 }
 
 .showcase-style-settings--dark .showcase-business-outlink__brand {

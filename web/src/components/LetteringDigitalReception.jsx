@@ -30,6 +30,7 @@ import AgencyDcpCard from "./agency/AgencyDcpCard.jsx";
 import { isCeoSubjectCard } from "../lib/letteringDemoPollution.js";
 import VLUE_EYE_WATERMARK from "../assets/vlue-eye-watermark.svg?url";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
+import { KakaoOpenChatGlyph, KakaoTalkGlyph } from "./showcase/KakaoOutlinkGlyphs.jsx";
 
 const CEO_WATERMARK_SRC = VLUE_EYE_WATERMARK || VLUE_SHIELD_LOGO || "";
 
@@ -95,12 +96,11 @@ function SocialOutlinkGlyph({ kind }) {
       </svg>
     );
   }
-  if (kind === "kakao-open" || kind === "kakao-profile") {
-    return (
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden>
-        <path d="M12 4C7.03 4 3 7.13 3 10.98c0 2.45 1.62 4.6 4.06 5.84-.13.48-.47 1.73-.54 2-.09.32.12.32.25.23.11-.07 1.72-1.17 2.41-1.64.6.09 1.21.13 1.82.13 4.97 0 9-3.13 9-6.98C21 7.13 16.97 4 12 4z" />
-      </svg>
-    );
+  if (kind === "kakao-open") {
+    return <KakaoOpenChatGlyph size={18} />;
+  }
+  if (kind === "kakao-profile") {
+    return <KakaoTalkGlyph size={18} />;
   }
   if (kind === "facebook") {
     return (
