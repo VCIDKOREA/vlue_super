@@ -129,15 +129,24 @@ async function loadOverlayOrgByUserId(userId: string): Promise<string> {
   return firstStr(rows[0]?.org);
 }
 
+/** 시드·미리보기용 브랜드 자리표시 — 실제 상호로 송출하지 않음 */
+function isPlaceholderBrandOrg(org: string): boolean {
+  return /^vlue$/i.test(org.trim());
+}
+
 async function resolveOverlayCompanyName(opts: {
   lineCompany?: string | null;
   digitalOrg?: string | null;
   profileCompany?: string | null;
   userId: string;
 }): Promise<string> {
-  const ready = firstStr(opts.lineCompany, opts.digitalOrg, opts.profileCompany);
-  if (ready) return ready;
-  return loadOverlayOrgByUserId(opts.userId);
+  for (const candidate of [opts.lineCompany, opts.digitalOrg, opts.profileCompany]) {
+    const v = firstStr(candidate);
+    if (v && !isPlaceholderBrandOrg(v)) return v;
+  }
+  const fromDb = await loadOverlayOrgByUserId(opts.userId);
+  if (fromDb && !isPlaceholderBrandOrg(fromDb)) return fromDb;
+  return "";
 }
 
 function httpOnlyUrl(v: unknown): string {
@@ -510,14 +519,24 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       department: firstStr(lineSnap?.department, certified ? masterSnap?.department : ""),
       companyIntro: firstStr(lineSnap?.companyIntro, certified ? masterSnap?.companyIntro : ""),
       salesContent: firstStr(lineSnap?.salesContent, certified ? masterSnap?.salesContent : ""),
-      photoUrl: httpOnlyUrl(lineSnap?.photoUrl) || (certified ? masterSnap?.photoUrl || "" : ""),
-      titlePhotoUrl:
-        httpOnlyUrl(lineSnap?.titlePhotoUrl) || (certified ? masterSnap?.titlePhotoUrl || "" : ""),
+      photoUrl: certified
+        ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
+        : httpOnlyUrl(lineSnap?.photoUrl) || "",
+      /* 인증 번호: 마스터 DigitalCard가 타이틀·로고 정본 (라인 스냅 잔재 무시) */
+      titlePhotoUrl: certified
+        ? httpOnlyUrl(masterSnap?.titlePhotoUrl) || ""
+        : httpOnlyUrl(lineSnap?.titlePhotoUrl) || "",
       noTitlePhoto: Boolean(
-        lineSnap?.noTitlePhoto ?? (certified ? masterSnap?.noTitlePhoto : false)
+        certified ? masterSnap?.noTitlePhoto : (lineSnap?.noTitlePhoto ?? false)
       ),
-      logoUrl: httpOnlyUrl(lineSnap?.logoUrl) || (certified ? masterSnap?.logoUrl || "" : ""),
-      photoFocus: firstStr(lineSnap?.photoFocus, certified ? masterSnap?.photoFocus : "")
+      logoUrl: certified
+        ? httpOnlyUrl(masterSnap?.logoUrl) || ""
+        : httpOnlyUrl(lineSnap?.logoUrl) || "",
+      photoFocus: firstStr(
+        certified ? masterSnap?.photoFocus : lineSnap?.photoFocus,
+        lineSnap?.photoFocus,
+        masterSnap?.photoFocus
+      )
     };
     const profile = buildContactProfile({
       userEmail: certified ? card.user.email : null,
@@ -815,14 +834,24 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       department: firstStr(lineSnap?.department, certified ? masterSnap?.department : ""),
       companyIntro: firstStr(lineSnap?.companyIntro, certified ? masterSnap?.companyIntro : ""),
       salesContent: firstStr(lineSnap?.salesContent, certified ? masterSnap?.salesContent : ""),
-      photoUrl: httpOnlyUrl(lineSnap?.photoUrl) || (certified ? masterSnap?.photoUrl || "" : ""),
-      titlePhotoUrl:
-        httpOnlyUrl(lineSnap?.titlePhotoUrl) || (certified ? masterSnap?.titlePhotoUrl || "" : ""),
+      photoUrl: certified
+        ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
+        : httpOnlyUrl(lineSnap?.photoUrl) || "",
+      /* 인증 번호: 마스터 DigitalCard가 타이틀·로고 정본 (라인 스냅 잔재 무시) */
+      titlePhotoUrl: certified
+        ? httpOnlyUrl(masterSnap?.titlePhotoUrl) || ""
+        : httpOnlyUrl(lineSnap?.titlePhotoUrl) || "",
       noTitlePhoto: Boolean(
-        lineSnap?.noTitlePhoto ?? (certified ? masterSnap?.noTitlePhoto : false)
+        certified ? masterSnap?.noTitlePhoto : (lineSnap?.noTitlePhoto ?? false)
       ),
-      logoUrl: httpOnlyUrl(lineSnap?.logoUrl) || (certified ? masterSnap?.logoUrl || "" : ""),
-      photoFocus: firstStr(lineSnap?.photoFocus, certified ? masterSnap?.photoFocus : "")
+      logoUrl: certified
+        ? httpOnlyUrl(masterSnap?.logoUrl) || ""
+        : httpOnlyUrl(lineSnap?.logoUrl) || "",
+      photoFocus: firstStr(
+        certified ? masterSnap?.photoFocus : lineSnap?.photoFocus,
+        lineSnap?.photoFocus,
+        masterSnap?.photoFocus
+      )
     };
     const baseProfile = (card.profileJson as Record<string, unknown> | null) ?? null;
     const profile = buildContactProfile({

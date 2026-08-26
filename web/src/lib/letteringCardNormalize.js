@@ -1,11 +1,17 @@
 import { clampLetteringBizcardEmail, normalizePhotoFocus } from "./letteringBizcardStorage.js";
 
-/** DCC 카드 큰 배경(타이틀) — 미설정이면 기존 프로필 사진과 호환 */
+/**
+ * DCC 카드 큰 배경(타이틀 사진)만.
+ * 프로필 사진으로 대체하지 않음 — 미설정이면 빈 히어로.
+ * (타이틀=프로필 URL 동일은 과거 폴백 잔재로 보고 무시)
+ */
 export function resolveDccTitlePhotoUrl(card = {}) {
   if (Boolean(card?.noTitlePhoto)) return "";
   const dedicated = String(card?.titlePhotoUrl || card?.title_photo_url || "").trim();
-  if (dedicated) return dedicated;
-  return String(card?.photoUrl || "").trim();
+  if (!dedicated) return "";
+  const photo = String(card?.photoUrl || card?.image_url || "").trim();
+  if (photo && dedicated === photo) return "";
+  return dedicated;
 }
 
 /** Lettering·명함 카드 객체 정규화 — 빈 칸을 데모값으로 채우지 않음 */

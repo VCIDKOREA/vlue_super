@@ -6,6 +6,39 @@ export function isVlueBrandOrganization(org) {
   return /^vlue$/i.test(String(org || "").trim());
 }
 
+/** 상호·직책 없는 DCC — 이름 아래 고정 표기 (이름 중복 금지) */
+export const DCC_CERTIFIED_MEMBER_LABEL = "[VLUE 인증회원]";
+
+/**
+ * DCC 앞면 Digital ID 헤드라인 2줄
+ * - 상호 있음: 1줄 상호 / 2줄 이름(＋직책·부서)
+ * - 상호 없음·직책 있음: 1줄 이름 / 2줄 직책·부서
+ * - 상호·직책 없음: 1줄 이름 / 2줄 [VLUE 인증회원]
+ */
+export function resolveDccFrontIdentityLines(card = {}) {
+  const rawOrg = String(card.organization || card.companyName || "").trim();
+  const org = isVlueBrandOrganization(rawOrg) ? "" : rawOrg;
+  const name = String(card.name || card.displayName || "").trim();
+  const title = String(card.title || card.jobTitle || "").trim();
+  const department = String(card.department || "").trim();
+  const roleParts = [department, title].filter(Boolean);
+  const roleLine = roleParts.join(" ｜ ");
+
+  if (org) {
+    const secondary = [name, ...roleParts].filter(Boolean).join(" ｜ ");
+    return { primary: org, secondary };
+  }
+
+  if (roleLine) {
+    return { primary: name || "\u2014", secondary: roleLine };
+  }
+
+  return {
+    primary: name || "\u2014",
+    secondary: name ? DCC_CERTIFIED_MEMBER_LABEL : ""
+  };
+}
+
 export function formatLetteringPaidIdentity(card = {}) {
   const rawOrg = String(card.organization || card.companyName || "").trim();
   const organization = isVlueBrandOrganization(rawOrg) ? "" : rawOrg;

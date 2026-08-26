@@ -20,12 +20,12 @@ import {
 } from "../lib/letteringBizcardStorage.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 
-function Field({ label, hint, children, isDarkMode }) {
+function Field({ label, hint, children, isDarkMode, sectionId = "" }) {
   const labelCls = isDarkMode ? "text-[11px] font-black text-gray-100" : "text-[11px] font-black text-gray-900";
   const hintCls = isDarkMode ? "mt-0.5 text-[10px] text-gray-400" : "mt-0.5 text-[10px] text-gray-500";
   /* div — 내부 체크박스 label 과 중첩되면 클릭이 먹통이 됨 */
   return (
-    <div className="block">
+    <div className={`block${sectionId ? " scroll-mt-4" : ""}`} id={sectionId || undefined}>
       <span className={labelCls}>{label}</span>
       {hint ? <p className={hintCls}>{hint}</p> : null}
       {children}
@@ -288,7 +288,9 @@ export default function LetteringBizcardQuickBuilder({
   exposureSlot = null,
   onApply,
   applyLabel = "전체적용",
-  toast = ""
+  toast = "",
+  toastKind = "success",
+  hideApplyChrome = false
 }) {
   const [previewFace, setPreviewFace] = useState("front");
   const { setPlaybackPhase } = useShowcaseBgm();
@@ -371,7 +373,11 @@ export default function LetteringBizcardQuickBuilder({
         />
       ) : null}
 
-      {exposureSlot}
+      {exposureSlot ? (
+        <div id="dcc-settings-exposure" className="scroll-mt-4">
+          {exposureSlot}
+        </div>
+      ) : null}
 
       <div className={`${panel} space-y-4`}>
         <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>프로필 · 이미지</p>
@@ -408,6 +414,7 @@ export default function LetteringBizcardQuickBuilder({
           label="DCC 타이틀 사진"
           hint={`${LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB · 초과 시 자동 맞춤 · 번호 앞 사진과 따로 설정`}
           isDarkMode={isDarkMode}
+          sectionId="dcc-settings-title-photo"
         >
           <ImageUploadTile
             preview={pendingTitlePhoto?.previewUrl || pendingTitlePhoto?.dataUrl || titlePhotoPreview}
@@ -425,8 +432,8 @@ export default function LetteringBizcardQuickBuilder({
           ) : null}
           {!noTitlePhoto &&
           !(pendingTitlePhoto?.previewUrl || pendingTitlePhoto?.dataUrl || titlePhotoPreview) ? (
-            <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-              비워 두면 프로필 사진이 타이틀에 사용됩니다
+            <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-amber-400/90" : "text-amber-700"}`}>
+              필수 · 업로드하거나 「DCC 타이틀 사진 없음」을 선택하세요 (프로필 사진으로 대체되지 않습니다)
             </p>
           ) : null}
           {titlePhotoFileName && !noTitlePhoto ? (
@@ -470,20 +477,27 @@ export default function LetteringBizcardQuickBuilder({
         <Field label="부서" isDarkMode={isDarkMode}>
           <input type="text" value={department} onChange={(e) => setDepartment(e.target.value)} className={inputBase} />
         </Field>
-        <LetteringBizcardTitleDeptVerifySection
+        <div id="dcc-settings-verify-doc" className="scroll-mt-4 sm:col-span-2">
+          <LetteringBizcardTitleDeptVerifySection
+            isDarkMode={isDarkMode}
+            inputBase={inputBase}
+            approvalStatus={titleDeptApprovalStatus}
+            verifyDocKind={verifyDocKind}
+            setVerifyDocKind={setVerifyDocKind}
+            verifyDocName={verifyDocName}
+            verifyDocIssuedAt={verifyDocIssuedAt}
+            setVerifyDocIssuedAt={setVerifyDocIssuedAt}
+            onDocPick={onVerifyDocPick}
+            docError={verifyDocError}
+            needsSubmit={titleDeptNeedsSubmit}
+          />
+        </div>
+        <Field
+          label="이메일 (필수)"
+          hint="명함에 반드시 표시됩니다"
           isDarkMode={isDarkMode}
-          inputBase={inputBase}
-          approvalStatus={titleDeptApprovalStatus}
-          verifyDocKind={verifyDocKind}
-          setVerifyDocKind={setVerifyDocKind}
-          verifyDocName={verifyDocName}
-          verifyDocIssuedAt={verifyDocIssuedAt}
-          setVerifyDocIssuedAt={setVerifyDocIssuedAt}
-          onDocPick={onVerifyDocPick}
-          docError={verifyDocError}
-          needsSubmit={titleDeptNeedsSubmit}
-        />
-        <Field label="이메일 (필수)" hint="명함에 반드시 표시됩니다" isDarkMode={isDarkMode}>
+          sectionId="dcc-settings-email"
+        >
           <input
             type="email"
             value={email}
@@ -557,27 +571,37 @@ export default function LetteringBizcardQuickBuilder({
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={onApply}
-        className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 text-[14px] font-black text-white shadow-lg active:scale-[0.99]"
-      >
-        {applyLabel}
-      </button>
-      {toast ? (
-        <div
-          className={`rounded-2xl border px-3 py-3 text-center ${
-            isDarkMode
-              ? "border-emerald-400/30 bg-emerald-950/40 text-emerald-200"
-              : "border-emerald-200 bg-emerald-50 text-emerald-800"
-          }`}
-          role="status"
-          aria-live="polite"
-        >
-          <p className="text-[12px] font-black">전체적용 완료</p>
-          <p className="mt-1 text-[11px] font-semibold leading-relaxed">{toast}</p>
-        </div>
-      ) : null}
+      {hideApplyChrome ? null : (
+        <>
+          <button
+            type="button"
+            onClick={onApply}
+            className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 text-[14px] font-black text-white shadow-lg active:scale-[0.99]"
+          >
+            {applyLabel}
+          </button>
+          {toast ? (
+            <div
+              className={`rounded-2xl border px-3 py-3 text-center ${
+                toastKind === "guide"
+                  ? isDarkMode
+                    ? "border-amber-400/40 bg-amber-950/50 text-amber-100"
+                    : "border-amber-300 bg-amber-50 text-amber-900"
+                  : isDarkMode
+                    ? "border-emerald-400/30 bg-emerald-950/40 text-emerald-200"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-800"
+              }`}
+              role="status"
+              aria-live="polite"
+            >
+              <p className="text-[12px] font-black">
+                {toastKind === "guide" ? "필수 설정을 완료해 주세요" : "전체적용 완료"}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold leading-relaxed">{toast}</p>
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

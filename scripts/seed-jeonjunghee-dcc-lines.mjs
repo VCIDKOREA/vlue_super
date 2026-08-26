@@ -52,7 +52,7 @@ async function upsertLine(user, spec) {
       kind: spec.kind,
       phoneE164: spec.phoneE164,
       displayName: spec.agentName,
-      companyName: "VLUE",
+      companyName: "",
       isPremiumLine: spec.kind !== "mobile",
       verificationStatus: "approved"
     },

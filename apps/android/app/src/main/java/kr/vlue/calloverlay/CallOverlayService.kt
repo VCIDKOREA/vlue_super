@@ -1253,16 +1253,24 @@ class CallOverlayService : Service() {
      * 인증 회원·안심케어: 중앙 「경로 검증」팝업.
      * 빅푸시 창을 먼저 지우면 WM 연속 remove/add 로 팝업 addView 가 실패하는 경우가 있어
      * 팝업을 붙인 뒤 크롬을 제거한다. ContextWatch collapse 는 hold + 팝업 가드로 막는다.
+     *
+     * @param forceReopen MiniCase「쇼케이스 돌아가기」— MINI_CASE 가드를 건너뛰고 팝업 재표시
      */
-    private fun presentCenterSafePopup(source: String, authMember: Boolean) {
+    private fun presentCenterSafePopup(
+        source: String,
+        authMember: Boolean,
+        forceReopen: Boolean = false
+    ) {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
         /*
          * 확인→Mini 이후 웹 connected / 카드 갱신이 다시 여기로 오면
          * onAnswer+hideChrome 으로 Mini 가 사라지고 BigPush 가 재부착된다.
+         * forceReopen 은 사용자가 Mini 에서 팝업을 다시 연 경우만 허용.
          */
-        if (authPopupConfirmedToMini ||
-            userMinimized ||
-            companion.state == OverlayState.MINI_CASE
+        if (!forceReopen &&
+            (authPopupConfirmedToMini ||
+                userMinimized ||
+                companion.state == OverlayState.MINI_CASE)
         ) {
             VlueBigPushTrace.lifecycle(
                 "CENTER_SAFE_POPUP_SKIP",
@@ -1290,11 +1298,47 @@ class CallOverlayService : Service() {
         )
         VlueBigPushTrace.lifecycle(
             "CENTER_SAFE_POPUP",
-            "source=$source authMember=$authMember attached=${dcpPopupView?.isAttachedToWindow == true}"
+            "source=$source authMember=$authMember force=$forceReopen " +
+                "attached=${dcpPopupView?.isAttachedToWindow == true}"
         )
         if (authMember) {
             notifyWebCallState("connected")
         }
+    }
+
+    /**
+     * MiniCase「쇼케이스 돌아가기」→ 인증/비정상/안심케어 중앙 팝업 재표시.
+     * (빈 풀쇼케이스나 MINI_CASE 가드에 막히지 않도록 상태부터 SHOWCASE 로 올린다.)
+     */
+    private fun reopenCenterPopupFromMiniCase(source: String, authMember: Boolean) {
+        if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
+        authPopupConfirmedToMini = false
+        userMinimized = false
+        if (companion.state == OverlayState.MINI_CASE) {
+            companion.onRestoreShowcase(OverlayContext.IN_CALL)
+        } else if (companion.state != OverlayState.SHOWCASE) {
+            companion.onAnswer(OverlayContext.IN_CALL)
+        }
+        publishCompanion(OverlayTriggerEvent.USER_RESTORE, userAction = true)
+        presentCenterSafePopup(source = source, authMember = authMember, forceReopen = true)
+    }
+
+    /** Mini→팝업 복원 대상: 인증-only · 안심케어 · 기관 DCP · 경로 비정상 */
+    private fun shouldReopenCenterPopupFromMini(): Boolean {
+        val json = pendingCardJson
+        val verified = pendingVerified || parseIsVerified(json)
+        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified)) return true
+        if (isContactSafeCare(json)) return true
+        if (parseProfileKind(json) == "expired_line") return true
+        val route =
+            NationalAgencyWhitelist.routeForCall(
+                currentPhone,
+                currentDcpRoute,
+                parseDcpRoute(json)
+            )
+        if (route == "normal" || route == "abnormal") return true
+        if (parsePathVerify(json)) return true
+        return false
     }
 
     /**
@@ -2218,16 +2262,19 @@ class CallOverlayService : Service() {
             return
         }
         /*
-         * 인증-only MiniCase「쇼케이스 돌아가기」— 빈 풀쇼케이스 대신 기본 팝업 재표시.
+         * MiniCase「쇼케이스 돌아가기」— 인증/비정상/안심케어는 빈 풀쇼케이스 대신 중앙 팝업 재표시.
+         * (신고·재확인용. MINI_CASE 가드에 막히지 않도록 force reopen.)
          */
-        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(
-                pendingCardJson,
-                verified = pendingVerified || parseIsVerified(pendingCardJson)
+        if (shouldReopenCenterPopupFromMini()) {
+            val authMember =
+                VlueAuthMemberPopupPolicy.isAuthMemberOnly(
+                    pendingCardJson,
+                    verified = pendingVerified || parseIsVerified(pendingCardJson)
+                )
+            reopenCenterPopupFromMiniCase(
+                source = if (authMember) "restore_auth_from_mini" else "restore_popup_from_mini",
+                authMember = authMember
             )
-        ) {
-            authPopupConfirmedToMini = false
-            userMinimized = false
-            presentCenterSafePopup(source = "restore_auth_from_mini", authMember = true)
             return
         }
         /*

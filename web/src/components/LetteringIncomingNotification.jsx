@@ -931,16 +931,21 @@ export default function LetteringIncomingNotification({
   }, [setExpanded, onToast, previewMode]);
 
   const expandShowcaseFromMiniCase = useCallback(() => {
-    if (showcaseOffPreview) {
-      /* DCC 없음 — 팝업이 쇼케이스 대행. MiniCase → 인증 팝업 */
+    /* 인증-only / 미인증 / 만료 — 풀쇼케이스 대신 팝업·신고 UI 복원 */
+    if (showcaseOffPreview || isUnverified || isExpiredLine) {
       try {
         nativeRestoreShowcaseOverlay();
       } catch {
         try {
           window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
+          window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
         } catch {
           /* ignore */
         }
+      }
+      if (isUnverified || isExpiredLine) {
+        setExpanded(true);
+        if (isExpiredLine) setExpiredPopupOpen(true);
       }
       return;
     }
@@ -950,7 +955,7 @@ export default function LetteringIncomingNotification({
     } catch {
       /* ignore */
     }
-  }, [setExpanded, showcaseOffPreview, incoming]);
+  }, [setExpanded, showcaseOffPreview, isUnverified, isExpiredLine, incoming]);
 
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;

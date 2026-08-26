@@ -162,8 +162,8 @@ export function applyShowcasePreviewExampleIdentity(card = {}) {
     : name || VLUE_PREVIEW_EXAMPLE_BRAND;
 
   if (isBusiness) {
-    organization = organization || VLUE_PREVIEW_EXAMPLE_BRAND;
-    name = displayName;
+    /* 상호 미설정 시 VLUE로 채우지 않음 — 실통화·설정과 동일하게 이름만 */
+    name = organization || name || VLUE_PREVIEW_EXAMPLE_BRAND;
   } else {
     name = displayName;
     /* 일반회원 접힘 헤더는 실명 우선 — 오염된 상호는 숨김 */

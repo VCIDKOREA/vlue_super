@@ -11,11 +11,10 @@ import {
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { isMaskedPhoneDisplay } from "../lib/dccExposure.js";
-import { formatLetteringReceptionLines } from "../lib/letteringPaidIdentityDisplay.js";
+import { formatLetteringReceptionLines, isVlueBrandOrganization, resolveDccFrontIdentityLines, DCC_CERTIFIED_MEMBER_LABEL } from "../lib/letteringPaidIdentityDisplay.js";
 import { formatLetteringContactEmailDisplay, photoFocusToCss } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard, resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
 import {
-  formatNameDeptTitleLine,
   VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER,
   VLUE_PREVIEW_EMAIL_PLACEHOLDER
 } from "../lib/vlueShowcasePreviewIdentity.js";
@@ -568,42 +567,50 @@ function FrontPanel({
         <div className="ldr-back-head__copy">
           <p className="ldr-back-kicker">Digital ID · Profile</p>
           <div className="ldr-back-title-row">
-            {peerUserId ? (
-              <button
-                type="button"
-                className="ldr-back-title ldr-back-title--link"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  openPeerCaseArchive();
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                aria-label="케이스함 열기"
-              >
-                {String(card.organization || "").trim() || card.name}
-              </button>
-            ) : (
-              <h3 className="ldr-back-title">
-                {String(card.organization || "").trim() || card.name}
-              </h3>
-            )}
+            {(() => {
+              const { primary } = resolveDccFrontIdentityLines(card);
+              if (peerUserId) {
+                return (
+                  <button
+                    type="button"
+                    className="ldr-back-title ldr-back-title--link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openPeerCaseArchive();
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    aria-label="케이스함 열기"
+                  >
+                    {primary}
+                  </button>
+                );
+              }
+              return <h3 className="ldr-back-title">{primary}</h3>;
+            })()}
             {verified ? (
               <ShieldCheck className="ldr-name-shield" strokeWidth={2.35} aria-label="VLUE 인증됨" />
             ) : null}
           </div>
           {(() => {
-            const org = String(card.organization || "").trim();
-            const personName = org ? String(card.name || "").trim() : "";
+            const { primary, secondary } = resolveDccFrontIdentityLines(card);
             if (card.previewTitleDeptPlaceholder || card.previewExampleBrand) {
+              const rawOrg = String(card.organization || "").trim();
+              const org = isVlueBrandOrganization(rawOrg) ? "" : rawOrg;
+              const personName = org ? String(card.name || "").trim() : "";
               return (
                 <p className="ldr-back-person-name ldr-back-person-name--row">
                   {[personName, VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER].filter(Boolean).join(" ｜ ")}
                 </p>
               );
             }
-            const line = formatNameDeptTitleLine(personName || (!org ? card.name : ""), card.department, card.title);
-            if (!line) return null;
-            if (peerUserId && personName) {
+            if (!secondary) return null;
+            const canOpenCase =
+              peerUserId &&
+              secondary !== DCC_CERTIFIED_MEMBER_LABEL &&
+              String(card.name || "").trim() &&
+              primary !== String(card.name || "").trim();
+            if (canOpenCase) {
               return (
                 <button
                   type="button"
@@ -615,11 +622,11 @@ function FrontPanel({
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
                 >
-                  {line}
+                  {secondary}
                 </button>
               );
             }
-            return <p className="ldr-back-person-name ldr-back-person-name--row">{line}</p>;
+            return <p className="ldr-back-person-name ldr-back-person-name--row">{secondary}</p>;
           })()}
         </div>
       </div>

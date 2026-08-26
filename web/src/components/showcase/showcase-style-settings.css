@@ -56,6 +56,41 @@
   transition: transform 0.12s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
+.showcase-style-settings__save-btn--sticky {
+  margin: 8px 0 0;
+}
+
+.showcase-style-settings__footer-guide {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #fbbf24;
+  background: #fffbeb;
+  color: #78350f;
+  text-align: center;
+}
+.showcase-style-settings__footer-guide strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+}
+.showcase-style-settings__footer-guide span {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.showcase-style-settings__footer-guide.is-dark {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(120, 53, 15, 0.35);
+  color: #fef3c7;
+}
+
+.showcase-style-settings__sticky-footer .showcase-mycase-upload-check {
+  margin-bottom: 0;
+}
+
 .showcase-mycase-upload-check {
   display: flex;
   align-items: flex-start;

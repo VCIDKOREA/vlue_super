@@ -38,13 +38,17 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
     displayName: body.displayName || nested.displayName || nested.name || "",
     title: body.jobTitle || nested.jobTitle || nested.title || "",
     organization:
-      body.companyName ||
-      nested.companyName ||
-      body.organization ||
-      nested.organization ||
-      profile.companyName ||
-      profile.organization ||
-      (handle.toLowerCase() === "ceo" ? "VCID KOREA" : ""),
+      (() => {
+        const org =
+          body.companyName ||
+          nested.companyName ||
+          body.organization ||
+          nested.organization ||
+          profile.companyName ||
+          profile.organization ||
+          (handle.toLowerCase() === "ceo" ? "VCID KOREA" : "");
+        return /^vlue$/i.test(String(org || "").trim()) ? "" : org;
+      })(),
     publicHandle: handle,
     loginId: handle,
     vlueId: handle,

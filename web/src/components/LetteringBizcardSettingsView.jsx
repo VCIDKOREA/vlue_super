@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import {
   clampLetteringBizcardEmail,
@@ -74,7 +74,10 @@ export default function LetteringBizcardSettingsView({
   const [titlePhotoError, setTitlePhotoError] = useState("");
   const [previewTick, setPreviewTick] = useState(0);
   const [toast, setToast] = useState("");
+  const [toastKind, setToastKind] = useState("success");
   const [logoError, setLogoError] = useState("");
+  const scrollRef = useRef(null);
+  const guideClearTimerRef = useRef(0);
   const [noTitlePhoto, setNoTitlePhoto] = useState(false);
   const [photoFocus, setPhotoFocus] = useState("top");
   const [noCompanyLogo, setNoCompanyLogo] = useState(false);
@@ -309,9 +312,33 @@ export default function LetteringBizcardSettingsView({
     return "전체적용";
   }, [titleDeptNeedsSubmit, isFirstApply]);
 
-  const showToast = (msg) => {
+  const showToast = (msg, kind = "success") => {
+    if (guideClearTimerRef.current) {
+      window.clearTimeout(guideClearTimerRef.current);
+      guideClearTimerRef.current = 0;
+    }
+    setToastKind(kind);
     setToast(msg);
-    window.setTimeout(() => setToast(""), 4200);
+    if (kind === "success") {
+      guideClearTimerRef.current = window.setTimeout(() => setToast(""), 4200);
+    }
+  };
+
+  const focusRequiredSection = (sectionId, message) => {
+    showToast(message, "guide");
+    window.requestAnimationFrame(() => {
+      const el = document.getElementById(sectionId);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      try {
+        el.classList.add("ring-2", "ring-amber-400", "ring-offset-2");
+        window.setTimeout(() => {
+          el.classList.remove("ring-2", "ring-amber-400", "ring-offset-2");
+        }, 2200);
+      } catch {
+        /* ignore */
+      }
+    });
   };
 
 
@@ -374,7 +401,7 @@ export default function LetteringBizcardSettingsView({
     setLogoPreview(preview);
     setLogoFileName(result.fileName);
     setNoCompanyLogo(false);
-    if (result.uploadWarning) setToast(result.uploadWarning);
+    if (result.uploadWarning) showToast(result.uploadWarning, "guide");
   };
 
 
@@ -398,7 +425,8 @@ export default function LetteringBizcardSettingsView({
     setTitlePhotoPreview(preview);
     setTitlePhotoFileName(result.fileName);
     setNoTitlePhoto(false);
-    if (result.uploadWarning) setToast(result.uploadWarning);
+    if (toastKind === "guide") setToast("");
+    if (result.uploadWarning) showToast(result.uploadWarning, "guide");
   };
 
   const handleApply = async () => {
@@ -410,22 +438,40 @@ export default function LetteringBizcardSettingsView({
     const trimmedEmail = clampLetteringBizcardEmail(email).trim();
 
     if (!trimmedEmail) {
-      showToast("이메일은 필수입니다. 입력해 주세요.");
+      focusRequiredSection("dcc-settings-email", "이메일은 필수입니다. 입력해 주세요.");
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      showToast("올바른 이메일 형식을 입력해 주세요.");
+      focusRequiredSection("dcc-settings-email", "올바른 이메일 형식을 입력해 주세요.");
+      return;
+    }
+
+    const titlePhotoReady =
+      noTitlePhoto ||
+      Boolean(
+        String(pendingTitlePhoto?.dataUrl || titlePhotoPreview || "").trim()
+      );
+    if (!titlePhotoReady) {
+      const msg = "DCC 타이틀 사진은 필수입니다. 업로드하거나 「DCC 타이틀 사진 없음」을 선택해 주세요.";
+      setTitlePhotoError(msg);
+      focusRequiredSection("dcc-settings-title-photo", msg);
       return;
     }
 
     if (!isDccExposureComplete(exposureChoice)) {
-      showToast("검색·팔로우 노출 설정을 모두 지정해야 저장됩니다.");
+      focusRequiredSection(
+        "dcc-settings-exposure",
+        "검색과 팔로우 설정을 해야 적용이 됩니다."
+      );
       return;
     }
 
     const exposureSaved = await saveDccExposure(exposureChoice);
     if (!exposureSaved.ok) {
-      showToast(exposureSaved.message || "노출 설정을 저장하지 못했습니다.");
+      focusRequiredSection(
+        "dcc-settings-exposure",
+        exposureSaved.message || "노출 설정을 저장하지 못했습니다."
+      );
       return;
     }
 
@@ -433,19 +479,19 @@ export default function LetteringBizcardSettingsView({
       if (!verifyDocKind) {
         const msg = "서류 종류를 선택해 주세요.";
         setVerifyDocError(msg);
-        showToast(msg);
+        focusRequiredSection("dcc-settings-verify-doc", msg);
         return;
       }
       if (!verifyDocDataUrl || !verifyDocName) {
         const msg = "직책·부서 확인 서류를 첨부해 주세요. 첨부 없이는 명함 변경이 저장되지 않습니다.";
         setVerifyDocError(msg);
-        showToast(msg);
+        focusRequiredSection("dcc-settings-verify-doc", msg);
         return;
       }
       if (!verifyDocIssuedAt || !isVerifyDocIssuedWithinLimit(verifyDocIssuedAt)) {
         const msg = "발급일 기준 1개월 이내 서류만 제출할 수 있습니다.";
         setVerifyDocError(msg);
-        showToast(msg);
+        focusRequiredSection("dcc-settings-verify-doc", msg);
         return;
       }
     }
@@ -667,7 +713,10 @@ export default function LetteringBizcardSettingsView({
         </label>
       ) : null}
 
-      <div className="vlue-scroll-pad-profile-panel min-h-0 flex-1 overflow-y-auto px-4 py-4 no-scrollbar">
+      <div
+        ref={scrollRef}
+        className="vlue-scroll-pad-profile-panel min-h-0 flex-1 overflow-y-auto px-4 py-4 no-scrollbar"
+      >
         <LetteringBizcardQuickBuilder
           fixed={fixed}
           previewCard={previewCard}
@@ -726,19 +775,58 @@ export default function LetteringBizcardSettingsView({
           exposureSlot={
             <DccExposureSettingsPanel
               choice={exposureChoice}
-              onChange={setExposureChoice}
+              onChange={(next) => {
+                setExposureChoice(next);
+                if (toastKind === "guide" && isDccExposureComplete(next)) {
+                  setToast("");
+                }
+              }}
               isDarkMode={isDarkMode}
             />
           }
           onApply={handleApply}
           applyLabel={applyLabel}
-          toast={toast}
+          hideApplyChrome
         />
         {cardId ? (
           <p className={`mt-3 text-center text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-            移대뱶 ID 쨌 {cardId}
+            카드 ID · {cardId}
           </p>
         ) : null}
+      </div>
+
+      <div
+        className={`shrink-0 border-t px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 ${
+          isDarkMode ? "border-white/10 bg-slate-950/95" : "border-slate-200 bg-white/95"
+        }`}
+      >
+        {toast ? (
+          <div
+            className={`mb-2.5 rounded-2xl border px-3 py-2.5 text-center ${
+              toastKind === "guide"
+                ? isDarkMode
+                  ? "border-amber-400/40 bg-amber-950/55 text-amber-100"
+                  : "border-amber-300 bg-amber-50 text-amber-950"
+                : isDarkMode
+                  ? "border-emerald-400/30 bg-emerald-950/40 text-emerald-200"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-800"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            <p className="text-[12px] font-black">
+              {toastKind === "guide" ? "필수 설정을 완료해 주세요" : "전체적용 완료"}
+            </p>
+            <p className="mt-1 text-[11px] font-semibold leading-relaxed">{toast}</p>
+          </div>
+        ) : null}
+        <button
+          type="button"
+          onClick={handleApply}
+          className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 text-[14px] font-black text-white shadow-lg active:scale-[0.99]"
+        >
+          {applyLabel}
+        </button>
       </div>
     </div>
   );

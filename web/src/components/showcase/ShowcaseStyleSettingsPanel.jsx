@@ -252,6 +252,7 @@ export default function ShowcaseStyleSettingsPanel({
   const [alsoUploadToMycase, setAlsoUploadToMycase] = useState(false);
   const [lineBusy, setLineBusy] = useState(false);
   const [deskNotice, setDeskNotice] = useState("");
+  const [footerGuide, setFooterGuide] = useState("");
   const pages = useMemo(
     () => (Array.isArray(config.pages) ? config.pages.map(normalizeShowcasePage) : []),
     [config.pages]
@@ -273,6 +274,22 @@ export default function ShowcaseStyleSettingsPanel({
     const t = window.setTimeout(() => setDeskNotice(""), 5000);
     return () => window.clearTimeout(t);
   }, [deskNotice]);
+
+  useEffect(() => {
+    if (!footerGuide) return undefined;
+    const t = window.setTimeout(() => setFooterGuide(""), 6000);
+    return () => window.clearTimeout(t);
+  }, [footerGuide]);
+
+  const focusShowcaseSection = useCallback((sectionId, message) => {
+    const text = String(message || "").trim();
+    if (text) setFooterGuide(text);
+    window.requestAnimationFrame(() => {
+      const el = document.getElementById(sectionId);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, []);
 
   const refreshIgLink = useCallback(async () => {
     try {
@@ -645,9 +662,10 @@ export default function ShowcaseStyleSettingsPanel({
       .catch(() => {});
 
     if (includeDigitalCard && !hasProfilePhoto) {
-      notify(
-        "쇼케이스 설정은 저장됐습니다. 프로필 사진은 「1페이지 · 디지털인증명함 → 설정하러가기」에서 등록·저장해야 미리보기에 나옵니다."
-      );
+      const msg =
+        "프로필 사진은 「1페이지 · 디지털인증명함 → 설정하러가기」에서 등록·저장해야 미리보기에 나옵니다.";
+      focusShowcaseSection("showcase-settings-dcc", msg);
+      notify(`쇼케이스 설정은 저장됐습니다. ${msg}`);
       if (!alsoUploadToMycase) return;
     }
 
@@ -690,6 +708,7 @@ export default function ShowcaseStyleSettingsPanel({
   }, [
     alsoUploadToMycase,
     config,
+    focusShowcaseSection,
     includeDigitalCard,
     isPaid,
     membershipTier,
@@ -741,7 +760,7 @@ export default function ShowcaseStyleSettingsPanel({
       ) : null}
 
       {includeDigitalCard ? (
-        <div className="showcase-page-card showcase-page-card--digital">
+        <div id="showcase-settings-dcc" className="showcase-page-card showcase-page-card--digital scroll-mt-4">
           <div className="showcase-page-card__head">
             <div className="min-w-0 flex-1">
               <p className="showcase-page-card__title">1페이지 · 디지털인증명함</p>
@@ -770,7 +789,11 @@ export default function ShowcaseStyleSettingsPanel({
         const expanded = expandedPageId === page.id;
         const label = pageTypeLabel(page.type);
         return (
-          <div key={page.id} className={`showcase-page-card${expanded ? " is-open" : ""}`}>
+          <div
+            key={page.id}
+            id={`showcase-settings-page-${page.id}`}
+            className={`showcase-page-card scroll-mt-4${expanded ? " is-open" : ""}`}
+          >
             <button
               type="button"
               className="showcase-page-card__head showcase-page-card__head--btn"
@@ -1272,9 +1295,20 @@ export default function ShowcaseStyleSettingsPanel({
         </span>
       </label>
 
+      {footerGuide ? (
+        <p
+          className={`showcase-style-settings__footer-guide ${isDarkMode ? "is-dark" : ""}`}
+          role="status"
+          aria-live="polite"
+        >
+          <strong>확인이 필요합니다</strong>
+          <span>{footerGuide}</span>
+        </p>
+      ) : null}
+
       <button
         type="button"
-        className={`showcase-style-settings__save-btn${fullscreen && !isWebDesk ? " showcase-style-settings__save-btn--compact" : ""}`}
+        className={`showcase-style-settings__save-btn showcase-style-settings__save-btn--sticky${fullscreen && !isWebDesk ? " showcase-style-settings__save-btn--compact" : ""}`}
         onClick={commitApply}
       >
         적용하기
@@ -1354,8 +1388,8 @@ export default function ShowcaseStyleSettingsPanel({
             <div className="showcase-web-desk__settings-scroll" ref={settingsScrollRef}>
               {pagesSection}
               {commonSection}
-              {applyFooter}
             </div>
+            <div className="showcase-web-desk__settings-footer">{applyFooter}</div>
           </section>
         </div>
 
@@ -1399,10 +1433,21 @@ export default function ShowcaseStyleSettingsPanel({
       ) : null}
 
       <div className={`showcase-style-settings__split${fullscreen ? " showcase-style-settings__split--fullscreen" : " min-h-0 flex-1 overflow-hidden"}`}>
-        <div className={`showcase-style-settings__form overflow-y-auto px-4 py-3 ${fullscreen ? "min-h-0 flex-1" : "vlue-scroll-pad-profile-panel"}`}>
-          {pagesSection}
-          {commonSection}
-          {applyFooter}
+        <div className="showcase-style-settings__form-col flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div
+            ref={settingsScrollRef}
+            className={`showcase-style-settings__form overflow-y-auto px-4 py-3 ${fullscreen ? "min-h-0 flex-1" : "vlue-scroll-pad-profile-panel min-h-0 flex-1"}`}
+          >
+            {pagesSection}
+            {commonSection}
+          </div>
+          <div
+            className={`showcase-style-settings__sticky-footer shrink-0 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 ${
+              isDarkMode ? "border-t border-white/10 bg-slate-950/95" : "border-t border-slate-200 bg-white/95"
+            }`}
+          >
+            {applyFooter}
+          </div>
         </div>
       </div>
 
