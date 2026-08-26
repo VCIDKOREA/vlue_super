@@ -445,7 +445,6 @@ object LetteringCallCoordinator {
                 )
                 Log.w(TAG, "lookup unmatched for $masked")
                 LetteringPrefs.setLastOverlayError(app, "lookup_unmatched:$masked")
-                /* API 미스매치여도 디스크/메모리 캐시가 있으면 미인증으로 덮지 않음 */
                 val cachedPositive = CardLookupRepository.peekCached(app, raw)
                 if (cachedPositive != null && cachedPositive.matched) {
                     val mergedCached = CallPathLookupMerge.merge(
@@ -471,18 +470,22 @@ object LetteringCallCoordinator {
                     CallPathSession.lastVerdict,
                     outgoing
                 )
-                if (LetteringPermissionHelper.canDrawOverlays(app)) {
-                    CallOverlayService.updateCallInfo(
-                        app,
-                        raw,
-                        verified = false,
-                        cardJson = if (merged.route == "abnormal") merged.json else unmatchedLookupJson(raw),
-                        outgoing = outgoing,
-                        dcpRoute = merged.route
-                    )
-                    LetteringIncomingNotifier.cancel(app)
+                /* 경로 비정상만 즉시 반영. 일반 unmatched 는 lookup_pending 유지 —
+                 * 웹 by-number 가 회원 카드를 살릴 때까지 미인증「VLUE Showcase」금지 */
+                if (merged.route == "abnormal") {
+                    if (LetteringPermissionHelper.canDrawOverlays(app)) {
+                        CallOverlayService.updateCallInfo(
+                            app,
+                            raw,
+                            verified = false,
+                            cardJson = merged.json,
+                            outgoing = outgoing,
+                            dcpRoute = merged.route
+                        )
+                        LetteringIncomingNotifier.cancel(app)
+                    }
                 } else {
-                    LetteringIncomingNotifier.post(app, raw, outgoing, displayName = null)
+                    Log.i(TAG, "lookup unmatched — keep lookup_pending for web by-number ($masked)")
                 }
                 return
             }
@@ -559,15 +562,8 @@ object LetteringCallCoordinator {
                 dataSource = "error:${e.javaClass.simpleName}"
             )
             if (applyContactSafeCareIfSaved(app, raw, outgoing)) return
-            if (LetteringPermissionHelper.canDrawOverlays(app)) {
-                CallOverlayService.updateCallInfo(
-                    app,
-                    raw,
-                    verified = false,
-                    cardJson = unmatchedLookupJson(raw),
-                    outgoing = outgoing
-                )
-            }
+            /* 예외 시에도 unmatched 미인증 페인트 금지 — pending 유지, 웹 조회에 맡김 */
+            Log.w(TAG, "lookup error — keep lookup_pending ($masked)")
         }
     }
 

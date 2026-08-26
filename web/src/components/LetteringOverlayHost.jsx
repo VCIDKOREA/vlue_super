@@ -590,10 +590,18 @@ function LetteringOverlayHostInner() {
             setLoading(false);
             return;
           }
-          setCard((prev) =>
-            isResolvedOverlayCard(prev) ? prev : buildUnverifiedOverlayCard(phone)
-          );
-          setLoading(false);
+          /*
+           * 네이티브 unmatched 를 즉시 미인증으로 그리면 by-number 전에
+           * 「VLUE Showcase」앰버가 고정된다. pending 유지.
+           */
+          setCard({
+            ...buildUnverifiedOverlayCard(phone),
+            profileKind: "lookup_pending",
+            name: "",
+            displayName: ""
+          });
+          setVerified(false);
+          setLoading(true);
           return;
         }
         const mapped = mapLookupToLetteringCard(detail, incoming || detail.phoneE164 || "");
