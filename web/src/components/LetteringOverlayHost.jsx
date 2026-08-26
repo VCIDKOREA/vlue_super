@@ -1284,15 +1284,20 @@ function LetteringOverlayHostInner() {
   const isLookupPendingCard =
     String(styledCard?.profileKind || card?.profileKind || "").trim() === "lookup_pending";
 
-  /* 「번호 확인 중」빅푸시 바는 내지 않음 — 조회 완료 전엔 투명만 */
+  /*
+   * 조회 전 투명 대기는 수신 BigPush 만 느리게 느껴짐.
+   * 네이티브 바(forceShowcaseBar)면 「번호 확인 중」바로 즉시 표시 — 미인증 앰버 아님.
+   */
   if (isLookupPendingCard && callState !== CALL_STATES.CONNECTED) {
-    return (
-      <div
-        className="lettering-overlay-host lettering-overlay-host--tent lettering-overlay-host--loading"
-        style={{ background: "transparent", opacity: 0 }}
-        aria-hidden
-      />
-    );
+    if (!(forceShowcaseBar && (incoming || card))) {
+      return (
+        <div
+          className="lettering-overlay-host lettering-overlay-host--tent lettering-overlay-host--loading"
+          style={{ background: "transparent", opacity: 0 }}
+          aria-hidden
+        />
+      );
+    }
   }
 
   if (showLoadingChip) {

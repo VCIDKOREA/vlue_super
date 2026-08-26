@@ -147,80 +147,35 @@ object LetteringCallCoordinator {
             val raw = if (nextUnknown) "unknown" else resolved
             LetteringPrefs.setLastCallEvent(app, "ringing:$raw:out=$outgoing")
 
+            /*
+             * 수신 체감 지연: CallPathSession.verify(센서·패키지 스캔) 를 Overlay 앞에 두면
+             * 발신보다 BigPush 가 늦게 뜬다. 캐시/pending 으로 창을 먼저 붙이고
+             * 경로검증·API 는 백그라운드에서 올린다 (인터넷 대기 ≠ 창 대기).
+             */
             val agency = if (nextUnknown) null else NationalAgencyWhitelist.match(raw)
-            val dcpVerdict = if (nextUnknown) null else CallPathSession.consumeOrVerify(app)
-            if (dcpVerdict?.isAbnormal == true && outgoing) {
-                scope.launch(Dispatchers.IO) {
-                    CardLookupRepository.reportOutgoingCallPath(app, dcpVerdict.reasons)
-                }
-            }
-            val pathJson =
-                when {
-                    agency != null && dcpVerdict != null -> DcpLookupPayload.toJson(agency, dcpVerdict)
-                    dcpVerdict?.isAbnormal == true ->
-                        CallPathLookupMerge.placeholderJson(raw, dcpVerdict, outgoing)
-                    else -> null
-                }
             val cachedMember =
                 if (agency == null && !nextUnknown) CardLookupRepository.peekCached(app, raw) else null
             val cachedJson = cachedMember?.rawJson?.let { OverlayCardOrgFill.applyLocalDefaults(it) }
-            val overlayJson =
-                pathJson
-                    ?: cachedJson?.let { cached ->
-                        if (dcpVerdict != null) {
-                            CallPathLookupMerge.merge(cached, dcpVerdict, outgoing).json
-                        } else {
-                            cached
-                        }
-                    }
+            val overlayJsonFast =
+                cachedJson
                     ?: OverlayCardOrgFill.seedIfPlatformCeoPhone(raw)
                     ?: if (!nextUnknown) lookupPendingJson(raw) else null
             val overlayNumber = agency?.shortNumber ?: raw
-            val overlayRoute =
-                when {
-                    agency != null -> dcpVerdict?.routeQuery.orEmpty()
-                    dcpVerdict?.isAbnormal == true -> "abnormal"
-                    else -> ""
-                }
-            if (dcpVerdict != null && (agency != null || dcpVerdict.isAbnormal)) {
-                Log.i(
-                    TAG,
-                    "path-verify ${ReleaseDebugGate.maskPhoneForLog(overlayNumber)} " +
-                        "route=${dcpVerdict.routeQuery} reasons=${dcpVerdict.reasons} mock=${dcpVerdict.fromMock}"
-                )
-            }
+            val hasMemberSeed =
+                agency != null ||
+                    cachedMember?.matched == true ||
+                    cachedMember?.verified == true ||
+                    OverlayCardOrgFill.seedIfPlatformCeoPhone(raw) != null
 
-            /* 조회는 창 부착과 동시에 — WebView 로딩 동안 상호를 채운다 */
-            if (agency != null && dcpVerdict != null) {
-                scope.launch {
-                    enrichDcpLookup(app, agency, dcpVerdict, outgoing)
-                }
-            } else if (nextUnknown) {
-                val startedAt = lastRingAt
-                scope.launch {
-                    upgradeNumberAfterOverlay(app, outgoing, gen, startedAt)
-                }
-            } else {
-                scope.launch {
-                    enrichWithLookup(app, raw, outgoing)
-                }
-            }
-
-            /* 1) Permission → Overlay 즉시 (diag/lookup 보다 먼저) */
             val canDraw = LetteringPermissionHelper.canDrawOverlays(app)
             if (canDraw) {
-                val hasMemberSeed =
-                    agency != null ||
-                        cachedMember?.matched == true ||
-                        cachedMember?.verified == true ||
-                        OverlayCardOrgFill.seedIfPlatformCeoPhone(raw) != null
                 startOverlayService(
                     app,
                     overlayNumber,
                     verified = hasMemberSeed,
-                    cardJson = overlayJson,
+                    cardJson = overlayJsonFast,
                     outgoing = outgoing,
-                    dcpRoute = overlayRoute
+                    dcpRoute = ""
                 )
             } else {
                 val restrictHint =
@@ -239,7 +194,64 @@ object LetteringCallCoordinator {
                 VlueBigPushTrace.skip(3, "Overlay permission denied ($restrictHint)")
                 Log.w(TAG, "overlay permission missing — $restrictHint")
                 LetteringPrefs.setLastOverlayError(app, restrictHint)
-                /* Activity 폴백은 홈/뒤로가기를 가로챔 — 아래 HUN 만 사용 */
+            }
+
+            /* 경로검증·회원조회 — Overlay 기동 이후 (수신 첫 페인트와 병렬) */
+            if (agency != null) {
+                scope.launch(Dispatchers.Default) {
+                    val dcpVerdict = CallPathSession.consumeOrVerify(app)
+                    if (dcpVerdict.isAbnormal && outgoing) {
+                        launch(Dispatchers.IO) {
+                            CardLookupRepository.reportOutgoingCallPath(app, dcpVerdict.reasons)
+                        }
+                    }
+                    Log.i(
+                        TAG,
+                        "path-verify ${ReleaseDebugGate.maskPhoneForLog(overlayNumber)} " +
+                            "route=${dcpVerdict.routeQuery} reasons=${dcpVerdict.reasons} mock=${dcpVerdict.fromMock}"
+                    )
+                    enrichDcpLookup(app, agency, dcpVerdict, outgoing)
+                }
+            } else if (nextUnknown) {
+                val startedAt = lastRingAt
+                scope.launch {
+                    upgradeNumberAfterOverlay(app, outgoing, gen, startedAt)
+                }
+            } else {
+                scope.launch(Dispatchers.Default) {
+                    val dcpVerdict = CallPathSession.consumeOrVerify(app)
+                    if (dcpVerdict.isAbnormal) {
+                        if (outgoing) {
+                            launch(Dispatchers.IO) {
+                                CardLookupRepository.reportOutgoingCallPath(app, dcpVerdict.reasons)
+                            }
+                        }
+                        val placeholder =
+                            CallPathLookupMerge.placeholderJson(raw, dcpVerdict, outgoing)
+                        val mergedCached =
+                            cachedJson?.let {
+                                CallPathLookupMerge.merge(it, dcpVerdict, outgoing).json
+                            }
+                        if (canDraw) {
+                            withContext(Dispatchers.Main.immediate) {
+                                CallOverlayService.updateCallInfo(
+                                    app,
+                                    overlayNumber,
+                                    verified = hasMemberSeed,
+                                    cardJson = mergedCached ?: placeholder,
+                                    outgoing = outgoing,
+                                    dcpRoute = "abnormal"
+                                )
+                            }
+                        }
+                        Log.i(
+                            TAG,
+                            "path-verify abnormal ${ReleaseDebugGate.maskPhoneForLog(raw)} " +
+                                "reasons=${dcpVerdict.reasons}"
+                        )
+                    }
+                    enrichWithLookup(app, raw, outgoing)
+                }
             }
 
             /* 2) 세션/게이트 기록 — Overlay 시작 이후 (임계 경로 밖) */
@@ -303,7 +315,7 @@ object LetteringCallCoordinator {
         callStartedAt: Long
     ) {
         repeat(8) { attempt ->
-            delay(400L + attempt * 350L)
+            delay(if (attempt == 0) 120L else 280L + attempt * 220L)
             if (callGen.get() != gen) return
             val n = withContext(Dispatchers.IO) {
                 IncomingNumberResolver.resolveRecentNumber(
