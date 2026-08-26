@@ -719,17 +719,10 @@ export default function LetteringIncomingNotification({
   ]);
 
   const showcaseOffAuthLabel = useMemo(() => {
-    const phone =
-      collapsedPhoneDisplay || formatLetteringPhoneDisplay(incoming) || "";
-    if (hideBroadcastName) {
-      return phone ? `VLUE 인증 / ${phone}` : "VLUE 인증";
-    }
+    if (hideBroadcastName) return "VLUE 인증";
     const name = peerVerifiedName;
-    if (name && phone) return `VLUE 인증 · ${name} / ${phone}`;
-    if (name) return `VLUE 인증 · ${name}`;
-    if (phone) return `VLUE 인증 / ${phone}`;
-    return "VLUE 인증";
-  }, [hideBroadcastName, peerVerifiedName, collapsedPhoneDisplay, incoming]);
+    return name ? `VLUE 인증 · ${name}` : "VLUE 인증";
+  }, [hideBroadcastName, peerVerifiedName]);
 
   const displayLabel = isExpiredLine
     ? formatLetteringPhoneDisplay(incoming) || unverifiedCollapsedPhone || incoming || "—"
@@ -748,20 +741,15 @@ export default function LetteringIncomingNotification({
     Boolean(collapsedPhoneDisplay) &&
     normalizePhoneDigits(displayLabel) === normalizePhoneDigits(collapsedPhoneDisplay) &&
     Boolean(normalizePhoneDigits(collapsedPhoneDisplay));
-  const authLabelIncludesPhone =
-    showcaseOffPreview &&
-    Boolean(collapsedPhoneDisplay) &&
-    String(displayLabel || "").includes(collapsedPhoneDisplay);
   const showCollapsedOrg =
     !showcaseOffPreview &&
     !hideBroadcastName &&
     Boolean(receptionLines?.organization) &&
     String(receptionLines.organization).trim() !== String(displayLabel || "").trim();
+  /* 인증-only: 1줄 VLUE 인증 · 이름 / 2줄 번호 */
   const showCollapsedPhoneSubline =
-    !showcaseOffPreview &&
-    !authLabelIncludesPhone &&
-    Boolean(collapsedPhoneDisplay) &&
-    !phoneSameAsPrimary;
+    (showcaseOffPreview && Boolean(collapsedPhoneDisplay)) ||
+    (!showcaseOffPreview && Boolean(collapsedPhoneDisplay) && !phoneSameAsPrimary);
 
   const isInCallChromePreview = Boolean(previewMode && inCallChromePreview);
   const previewStatusLabel = previewMode ? "" : statusLabel;
