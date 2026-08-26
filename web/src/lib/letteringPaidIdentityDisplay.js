@@ -1,8 +1,14 @@
 /** 유료 Lettering·명함 — 회사명 / 직책·성명 표시 */
 import { formatLetteringPhoneDisplay, isUnknownPhoneToken } from "./letteringPhoneMatch.js";
 
+/** 브랜드명만 있는 상호 — 빅푸시에 「VLUE · 이름」처럼 붙이지 않음 */
+export function isVlueBrandOrganization(org) {
+  return /^vlue$/i.test(String(org || "").trim());
+}
+
 export function formatLetteringPaidIdentity(card = {}) {
-  const organization = String(card.organization || card.companyName || "").trim();
+  const rawOrg = String(card.organization || card.companyName || "").trim();
+  const organization = isVlueBrandOrganization(rawOrg) ? "" : rawOrg;
   const title = String(card.title || card.jobTitle || "").trim();
   const name = String(card.name || card.displayName || "").trim();
   const roleLine = [title, name].filter(Boolean).join(" / ");

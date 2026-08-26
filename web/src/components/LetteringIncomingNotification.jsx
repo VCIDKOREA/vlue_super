@@ -664,7 +664,7 @@ export default function LetteringIncomingNotification({
     return "번호 확인 중";
   }, [isUnverified, incoming]);
 
-  /* 쇼케이스 OFF + 이름 송출 OFF → VLUE 인증회원. 이름 송출 ON → 이름 표시 */
+  /* 쇼케이스 OFF — 저장 규칙만. 「이름 표시」안내 문구 금지 */
   const hideBroadcastName = Boolean(
     c.hideBroadcastName || c.showcaseStyle?.showBroadcastName === false
   );
@@ -678,7 +678,7 @@ export default function LetteringIncomingNotification({
     ? formatLetteringPhoneDisplay(receptionLines.phone)
     : freeTierSummary?.phoneDisplay || formatLetteringPhoneDisplay(incoming) || "";
   const peerVerifiedName =
-    String(c.name || c.displayName || receptionLines?.collapsedPrimary || "").trim() ||
+    String(c.name || c.displayName || receptionLines?.name || "").trim() ||
     contactSavedName;
   const previewShowcaseId = useMemo(() => {
     /* 미인증·실통화 오버레이는 수신자 로컬 핸들(ceo)을 붙이지 않음 */
@@ -718,32 +718,50 @@ export default function LetteringIncomingNotification({
     c.ownerUserId
   ]);
 
+  const showcaseOffAuthLabel = useMemo(() => {
+    const phone =
+      collapsedPhoneDisplay || formatLetteringPhoneDisplay(incoming) || "";
+    if (hideBroadcastName) {
+      return phone ? `VLUE 인증 / ${phone}` : "VLUE 인증";
+    }
+    const name = peerVerifiedName;
+    if (name && phone) return `VLUE 인증 · ${name} / ${phone}`;
+    if (name) return `VLUE 인증 · ${name}`;
+    if (phone) return `VLUE 인증 / ${phone}`;
+    return "VLUE 인증";
+  }, [hideBroadcastName, peerVerifiedName, collapsedPhoneDisplay, incoming]);
+
   const displayLabel = isExpiredLine
     ? formatLetteringPhoneDisplay(incoming) || unverifiedCollapsedPhone || incoming || "—"
     : isUnverified
     ? null
     : showcaseOffPreview
-      ? hideBroadcastName
-        ? "VLUE 인증회원"
-        : peerVerifiedName || collapsedPhoneDisplay || formatLetteringPhoneDisplay(incoming) || "—"
+      ? showcaseOffAuthLabel
       : hideBroadcastName
         ? contactSavedName || collapsedPhoneDisplay || "—"
-        : receptionLines?.collapsedPrimary ||
-          c.name ||
-          freeTierSummary?.primary ||
+        : /* 쇼케이스 ON 빅푸시 — 앱 미리보기와 동일: 이름 (브랜드 상호 VLUE 붙이지 않음) */
+          peerVerifiedName ||
+          receptionLines?.name ||
           contactSavedName ||
           "—";
   const phoneSameAsPrimary =
     Boolean(collapsedPhoneDisplay) &&
     normalizePhoneDigits(displayLabel) === normalizePhoneDigits(collapsedPhoneDisplay) &&
     Boolean(normalizePhoneDigits(collapsedPhoneDisplay));
+  const authLabelIncludesPhone =
+    showcaseOffPreview &&
+    Boolean(collapsedPhoneDisplay) &&
+    String(displayLabel || "").includes(collapsedPhoneDisplay);
   const showCollapsedOrg =
     !showcaseOffPreview &&
     !hideBroadcastName &&
     Boolean(receptionLines?.organization) &&
     String(receptionLines.organization).trim() !== String(displayLabel || "").trim();
   const showCollapsedPhoneSubline =
-    !showcaseOffPreview && Boolean(collapsedPhoneDisplay) && !phoneSameAsPrimary;
+    !showcaseOffPreview &&
+    !authLabelIncludesPhone &&
+    Boolean(collapsedPhoneDisplay) &&
+    !phoneSameAsPrimary;
 
   const isInCallChromePreview = Boolean(previewMode && inCallChromePreview);
   const previewStatusLabel = previewMode ? "" : statusLabel;
@@ -1324,11 +1342,6 @@ export default function LetteringIncomingNotification({
                     <span className="lettering-ongoing-phone-em font-bold text-blue-700">
                       {collapsedPhoneDisplay}
                     </span>
-                  </p>
-                ) : null}
-                {showcaseOffPreview && !isExpandedView ? (
-                  <p className="mt-0.5 text-[11px] font-semibold text-slate-400">
-                    {hideBroadcastName ? "VLUE 인증 확인" : "VLUE 인증 · 이름 표시"}
                   </p>
                 ) : null}
               </>
