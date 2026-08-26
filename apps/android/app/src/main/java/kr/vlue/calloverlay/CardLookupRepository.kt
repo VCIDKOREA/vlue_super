@@ -70,8 +70,27 @@ object CardLookupRepository {
         dcpRoute: String? = null
     ): CardLookupResult? =
         withContext(Dispatchers.IO) {
-            val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: return@withContext null
-            if (BlockedPhoneCache.isBlocked(context, e164)) return@withContext null
+            lookupInternal(context, rawNumber, dcpRoute, fast = true)
+        }
+
+    /** 첫 조회 타임아웃 후 — 캐시 미스 시 느린 연결로 한 번 더 */
+    suspend fun lookupSlow(
+        context: Context,
+        rawNumber: String,
+        dcpRoute: String? = null
+    ): CardLookupResult? =
+        withContext(Dispatchers.IO) {
+            lookupInternal(context, rawNumber, dcpRoute, fast = false)
+        }
+
+    private fun lookupInternal(
+        context: Context,
+        rawNumber: String,
+        dcpRoute: String?,
+        fast: Boolean
+    ): CardLookupResult? {
+            val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: return null
+            if (BlockedPhoneCache.isBlocked(context, e164)) return null
 
             /*
              * 캐시 히트면 즉시 반환 — 오버레이에 인증명이 바로 뜨게.
@@ -82,22 +101,22 @@ object CardLookupRepository {
                     reportLineCallEvent(context, rawNumber)
                     refreshInBackground(context, rawNumber, dcpRoute)
                 }
-                return@withContext cached
+                return cached
             }
 
             val base = BuildConfig.API_BASE_URL.trimEnd('/')
             val agency = NationalAgencyWhitelist.match(rawNumber)
             val numberParam = agency?.shortNumber ?: e164
-            val result = lookupOnce(context, base, numberParam, dcpRoute)
+            val result = lookupOnce(context, base, numberParam, dcpRoute, fast = fast)
             if (result != null && result.matched) {
                 val filled =
                     result.copy(rawJson = OverlayCardOrgFill.fillIfMissing(context, result.rawJson))
                 remember(context, rawNumber, filled)
                 bg.execute { reportLineCallEvent(context, rawNumber) }
-                return@withContext filled
+                return filled
             }
-            return@withContext result
-        }
+            return result
+    }
 
     private fun refreshInBackground(context: Context, rawNumber: String, dcpRoute: String?) {
         try {

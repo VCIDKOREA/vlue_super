@@ -415,10 +415,10 @@ object LetteringCallCoordinator {
         )
         try {
             var lookup = CardLookupRepository.lookup(app, raw)
-            /* 네트워크 null(타임아웃)만 짧게 재시도 — matched:false 는 확정이므로 지연 금지 */
+            /* 네트워크 null(타임아웃) — 느린 재시도. matched:false 는 확정 */
             if (lookup == null) {
-                delay(120L)
-                lookup = CardLookupRepository.lookup(app, raw)
+                delay(180L)
+                lookup = CardLookupRepository.lookupSlow(app, raw)
             }
             val elapsed = (SystemClock.elapsedRealtime() - started).coerceAtLeast(0L)
             if (lookup == null) {
@@ -430,7 +430,7 @@ object LetteringCallCoordinator {
                     dataSource = "api_timeout",
                     normalizedOk = normalized != null
                 )
-                Log.w(TAG, "lookup timeout for $masked — skip non-member popup")
+                Log.w(TAG, "lookup timeout for $masked — keep lookup_pending (no 미인증 paint)")
                 LetteringPrefs.setLastOverlayError(app, "lookup_timeout:$masked")
                 return
             }

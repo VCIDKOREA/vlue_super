@@ -207,15 +207,28 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun fullInCallUi_resumedInCall_nullTasks_isTop() {
-        /* 전면 수신 UI: tasks 못 읽어도 InCall resume 이면 TOP (중앙 BELOW 금지) */
+    fun staleInCallResume_nullTasks_inCallFg_isBelow_notTop() {
+        /* stale InCall resume + tasks 미확인 + FG → 미니 겹침 방지(BELOW). 전체 UI 는 tasksFull 로만 TOP */
         assertEquals(
-            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
             ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = null,
                 inCallImportance = fg,
                 otherForegroundPackages = emptyList(),
                 ourApp = false,
+                lastResumedPkg = "com.samsung.android.incallui"
+            )
+        )
+    }
+
+    @Test
+    fun resumedInCall_launcherTask_isBelow() {
+        assertEquals(
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.classifyRingingSurface(
+                tasksPkg = "com.sec.android.app.launcher",
+                inCallImportance = fg,
+                otherForegroundPackages = listOf("com.sec.android.app.launcher"),
                 lastResumedPkg = "com.samsung.android.incallui"
             )
         )

@@ -91,8 +91,16 @@ object ForegroundPackageProbe {
          * 연속·미니 수신은 tasksDialer / otherApp / ourApp 경로로 BELOW 유지.
          */
         if (resumedFull && ourApp && !tasksFull) return RingingSurface.HOME_OR_OTHER
+        /* 전체 UI 확정은 tasks 가 InCallUI 일 때만 — stale resume + null/타앱 task 로 TOP 금지(미니 겹침) */
         if (resumedFull && tasksFull) return RingingSurface.FULL_INCALL
-        if (resumedFull && !tasksFull) return RingingSurface.FULL_INCALL
+        if (resumedFull && !tasksFull) {
+            if (OverlayContextDetector.isLikelyLauncherPackage(tasksPkg) ||
+                isKnownOtherAppPackage(tasksPkg)
+            ) {
+                return RingingSurface.HOME_OR_OTHER
+            }
+            /* tasks=null: fall through — InCall FG alone 는 아래에서 BELOW */
+        }
 
         if (OverlayContextDetector.isLikelyLauncherPackage(lastResumedPkg) ||
             isKnownOtherAppPackage(lastResumedPkg)

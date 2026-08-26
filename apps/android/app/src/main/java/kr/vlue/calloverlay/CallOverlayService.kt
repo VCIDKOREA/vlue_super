@@ -334,7 +334,37 @@ class CallOverlayService : Service() {
             "SHOW_OVERLAY_GATE",
             org.json.JSONObject().put("canDrawOverlays", canDraw)
         )
-        val ctx = detectOverlayContext(forceRinging = !answered)
+        val detected = detectOverlayContext(forceRinging = !answered)
+        /*
+         * 첫 attach 전에 hold 적용 — settle(400ms+) 전에 TOP 으로 붙으면 미니 UI 뒤에 겹침.
+         * confirmedFull(tasks=InCallUI) 만 TOP 허용.
+         */
+        val ctx =
+            if (!answered && !outgoing) {
+                val tasksPkg = ForegroundPackageProbe.runningTaskPackage(this)
+                val confirmedFull = OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg)
+                val ourAppFg =
+                    VlueCallOverlayApp.currentActivityName.orEmpty().let { activity ->
+                        activity.contains("kr.vlue", ignoreCase = true) &&
+                            !activity.contains("(paused)", ignoreCase = true)
+                    }
+                OverlayPositionManager.holdBelowCompactIncoming(
+                    previous = OverlayPosition.BELOW_COMPACT_INCOMING,
+                    previousContext = OverlayContext.COMPACT_INCOMING,
+                    nextContext = detected,
+                    ringing = true,
+                    ourAppForeground = ourAppFg,
+                    confirmedFullInCall = confirmedFull
+                )
+            } else {
+                detected
+            }
+        if (ctx != detected) {
+            android.util.Log.i(
+                "VlueOverlayCtx",
+                "showOverlay holdBelow detected=${detected.name} → ${ctx.name}"
+            )
+        }
         companion.onIncoming(ctx)
         CompanionBigPushDiag.noteOnIncoming(companion.snapshot())
         CompanionBigPushDiag.noteOverlayPermissionCheck(
@@ -471,18 +501,20 @@ class CallOverlayService : Service() {
             userMinimized = false
             bigPushPeeking = false
             applyLayoutFromController(source = "bigPush_reuseWindow")
+            val phoneChanged = overlayPhoneChanged(phone)
             currentPhone = phone
             pendingCardJson = cardJson
             pendingVerified = verified
             val wv = webView
             if (wv != null && !IncomingNumberResolver.isUnknown(phone)) {
+                /* 번호 동일 재사용은 URL 리로드 금지 — pending 투명→페인트 깜박임 */
                 loadOverlayDocument(
                     wv,
                     phone,
                     verified,
                     outgoing,
                     cardJson,
-                    forceNewDocument = true
+                    forceNewDocument = phoneChanged
                 )
             }
             syncDcpRoutePopup(cardJson, currentDcpRoute)
@@ -699,8 +731,14 @@ class CallOverlayService : Service() {
         VlueBigPushTrace.dumpLayoutParams(params, "showOverlay LayoutParams pre-addView")
 
         val fromBottom = asBigPush && companion.position == OverlayPosition.BOTTOM
-        container.alpha = 0f
-        container.translationY = if (fromBottom) 120f else -120f
+        /* BigPush: 즉시 표시 — alpha/slide 애니면 pending 투명 프레임과 겹쳐 한 번 깜박임 */
+        if (asBigPush) {
+            container.alpha = 1f
+            container.translationY = 0f
+        } else {
+            container.alpha = 0f
+            container.translationY = if (fromBottom) 120f else -120f
+        }
         val attachPhase = if (asBigPush) "BIG_PUSH" else "SHOWCASE"
         OverlayDiagTracker.beginAttach(attachPhase)
         try {
@@ -832,28 +870,37 @@ class CallOverlayService : Service() {
         syncDcpRoutePopup(cardJson, currentDcpRoute)
 
         val animStart = android.os.SystemClock.elapsedRealtime()
-        container.animate()
-            .alpha(1f)
-            .translationY(0f)
-            .setDuration(320)
-            .setInterpolator(DecelerateInterpolator())
-            .withEndAction {
-                CompanionPerfTracker.recordAnimationMs(
-                    (android.os.SystemClock.elapsedRealtime() - animStart).coerceAtLeast(0L)
-                )
-                if (asBigPush && companion.state == OverlayState.BIG_PUSH) {
-                    CompanionBigPushDiag.noteBigPushVisible(
-                        companion.snapshot(),
-                        source = "post-animate"
-                    )
-                }
-                VlueBigPushTrace.dumpOverlayVisibility(
-                    rootContainer,
-                    layoutParams,
-                    reactHint = "post-animate alpha=${rootContainer?.alpha} webView=${webView != null}"
+        if (asBigPush) {
+            CompanionPerfTracker.recordAnimationMs(0L)
+            if (companion.state == OverlayState.BIG_PUSH) {
+                CompanionBigPushDiag.noteBigPushVisible(
+                    companion.snapshot(),
+                    source = "attach_no_anim"
                 )
             }
-            .start()
+            VlueBigPushTrace.dumpOverlayVisibility(
+                rootContainer,
+                layoutParams,
+                reactHint = "bigPush immediate alpha=1 webView=${webView != null}"
+            )
+        } else {
+            container.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(320)
+                .setInterpolator(DecelerateInterpolator())
+                .withEndAction {
+                    CompanionPerfTracker.recordAnimationMs(
+                        (android.os.SystemClock.elapsedRealtime() - animStart).coerceAtLeast(0L)
+                    )
+                    VlueBigPushTrace.dumpOverlayVisibility(
+                        rootContainer,
+                        layoutParams,
+                        reactHint = "post-animate alpha=${rootContainer?.alpha} webView=${webView != null}"
+                    )
+                }
+                .start()
+        }
     }
 
     /**
@@ -890,13 +937,22 @@ class CallOverlayService : Service() {
             return
         }
         /*
-         * 카드 미도착·조회 중·송출 콘텐츠 없음 → 빈 풀스크린 쇼케이스 금지.
-         * applyCallInfoUpdate 가 이후 인증 팝업 또는 실쇼케이스를 띄운다.
+         * 카드 미도착·조회 중·미인증.
+         * BigPush 바 탭: 창을 지우면 팝업/미니 없이 사라짐(e9ba0e 가 미인증 페인트에 무력화됨).
+         * 실제 Answer 만 빈 쇼케이스 금지용 hide.
          */
         if (pendingCardJson.isNullOrBlank() ||
             isLookupPendingCard(pendingCardJson) ||
             (!pendingVerified && !parseIsVerified(pendingCardJson))
         ) {
+            if (source.startsWith("bigPush_bar_tap")) {
+                VlueBigPushTrace.lifecycle(
+                    "BIG_PUSH_TAP_KEEP",
+                    "pendingOrUnverified — keep bar source=$source " +
+                        "pending=${isLookupPendingCard(pendingCardJson)} verified=$pendingVerified"
+                )
+                return
+            }
             remoteConnected = true
             companion.onAnswer(OverlayContext.IN_CALL)
             hideCompanionOverlayChrome()
