@@ -23,7 +23,7 @@ import {
   readCallHistoryPeerCache,
   writeCallHistoryPeerCache
 } from "../lib/callHistoryPeerCache.js";
-import { peerHasDccOrShowcaseContent, peerHasShowcaseBarChrome } from "../lib/peerShowcaseContent.js";
+import { peerHasDccOrShowcaseContent } from "../lib/peerShowcaseContent.js";
 import VlueAuthMemberPopup from "./VlueAuthMemberPopup.jsx";
 
 /** 상대가 쇼케이스/DCC 를 송출 ON 으로 저장하지 않은 경우 — 인증 팝업만 */
