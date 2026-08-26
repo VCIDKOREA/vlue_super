@@ -213,9 +213,7 @@ object LetteringCallCoordinator {
                     agency != null ||
                         cachedMember?.matched == true ||
                         cachedMember?.verified == true ||
-                        (overlayJson != null &&
-                            !overlayJson.contains("\"lookup_pending\"") &&
-                            OverlayCardOrgFill.hasOrganization(overlayJson))
+                        OverlayCardOrgFill.seedIfPlatformCeoPhone(raw) != null
                 startOverlayService(
                     app,
                     overlayNumber,

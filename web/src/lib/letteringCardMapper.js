@@ -1,8 +1,21 @@
 import { normalizePhotoFocus } from "./letteringBizcardStorage.js";
 
+/** 네이티브/API 조회 본문이 회원 매칭인지 — matched 누락·is_verified 만 있는 주입도 수용 */
+export function isLookupMatchedBody(body = {}) {
+  if (!body || typeof body !== "object") return false;
+  if (body.matched === false) return false;
+  if (body.matched === true) return true;
+  if (body.is_verified === true || body.verified === true) return true;
+  const nested = body.card && typeof body.card === "object" ? body.card : null;
+  if (nested && (nested.is_verified === true || nested.verified === true)) return true;
+  const name = String(body.displayName || body.name || nested?.displayName || nested?.name || "").trim();
+  const userId = String(body.userId || body.cardId || nested?.userId || "").trim();
+  return Boolean(name && userId);
+}
+
 /** GET /api/cards/by-number 응답 → LetteringIncomingNotification card */
 export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
-  if (!body?.matched) return null;
+  if (!isLookupMatchedBody(body)) return null;
 
   const profile = body.profile && typeof body.profile === "object" ? body.profile : {};
   const nested = body.card && typeof body.card === "object" ? body.card : {};

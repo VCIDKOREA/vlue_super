@@ -1490,6 +1490,10 @@ class CallOverlayService : Service() {
             if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(cardJson, verified) &&
                 (companion.state == OverlayState.SHOWCASE || isCallAlreadyAnswered())
             ) {
+                /* 팝업만 띄우고 카드를 주입하지 않으면 웹이 미인증으로 남는다 */
+                if (webView != null && !cardJson.isNullOrBlank()) {
+                    injectCardLookupJson(webView, cardJson)
+                }
                 presentCenterSafePopup(source = "applyCallInfoUpdate", authMember = true)
                 LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
                 return@post
@@ -1961,6 +1965,9 @@ class CallOverlayService : Service() {
         )
         if (!forceNewDocument && !cardJson.isNullOrBlank()) {
             injectCardLookupJson(wv, cardJson)
+            /* WebView 재사용 시 React 리스너 등록 전에 이벤트가 사라질 수 있음 — 재주입 */
+            wv.postDelayed({ injectCardLookupJson(wv, cardJson) }, 120L)
+            wv.postDelayed({ injectCardLookupJson(wv, cardJson) }, 450L)
         }
         /* forceNewDocument 이면 onPageStarted 의 injectLetteringFlag 가 pendingCardJson 주입 */
     }

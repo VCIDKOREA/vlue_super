@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getBusinessCardByNumber } from "../lib/getBusinessCardByNumber.js";
-import { mapLookupToLetteringCard } from "../lib/letteringCardMapper.js";
+import { isLookupMatchedBody, mapLookupToLetteringCard } from "../lib/letteringCardMapper.js";
 import { isUnknownPhoneToken } from "../lib/letteringPhoneMatch.js";
 import { checkLetteringPhoneBlocked } from "../lib/letteringApi.js";
 import { readLetteringEnabled } from "../lib/letteringSettings.js";
@@ -154,6 +154,7 @@ function parseOverlayParams() {
   const qIndex = hash.indexOf("?");
   const query = qIndex >= 0 ? hash.slice(qIndex + 1) : window.location.search.replace(/^\?/, "");
   const params = new URLSearchParams(query);
+  const verifiedParam = String(params.get("verified") || "").trim();
   return {
     incoming: params.get("incoming") || params.get("phone") || "",
     platform: params.get("platform") === "ios" ? "ios" : "android",
@@ -161,8 +162,21 @@ function parseOverlayParams() {
     native: params.get("native") === "1",
     forceLettering: params.get("forceLettering") === "1",
     phase: params.get("phase") || "",
-    dcpRoute: params.get("dcp_route") || params.get("dcpRoute") || ""
+    dcpRoute: params.get("dcp_route") || params.get("dcpRoute") || "",
+    /* 네이티브 overlayUrl 이 verified=1 을 넣음 — 무시하면 부팅 시 미인증 고착 */
+    urlVerified: verifiedParam === "1" || verifiedParam === "true"
   };
+}
+
+function readBootNativeLookupCard(incomingHint = "") {
+  try {
+    if (typeof window === "undefined") return null;
+    const detail = window.__VLUE_CARD_LOOKUP__;
+    if (!detail || !isLookupMatchedBody(detail)) return null;
+    return mapLookupToLetteringCard(detail, incomingHint || detail.phoneE164 || "");
+  } catch {
+    return null;
+  }
 }
 
 /** 웹 리스너 전에 도착한 네이티브 통화 상태 */
@@ -363,10 +377,18 @@ export default function LetteringOverlayHost() {
 }
 
 function LetteringOverlayHostInner() {
-  const [{ incoming, platform, direction, native, forceLettering, phase, dcpRoute }, setParams] = useState(parseOverlayParams);
-  const [card, setCard] = useState(null);
-  const [verified, setVerified] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [{ incoming, platform, direction, native, forceLettering, phase, dcpRoute, urlVerified }, setParams] =
+    useState(parseOverlayParams);
+  const [card, setCard] = useState(() => {
+    const boot = readBootNativeLookupCard(parseOverlayParams().incoming);
+    return boot ? applyLocalOverlayCardDefaults(boot, parseOverlayParams().incoming) : null;
+  });
+  const [verified, setVerified] = useState(() => {
+    const bootParams = parseOverlayParams();
+    if (readBootNativeLookupCard(bootParams.incoming)) return true;
+    return Boolean(bootParams.urlVerified);
+  });
+  const [loading, setLoading] = useState(() => !readBootNativeLookupCard(parseOverlayParams().incoming));
   const [blocked, setBlocked] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
@@ -380,7 +402,12 @@ function LetteringOverlayHostInner() {
       ? CALL_STATES.CONNECTED
       : CALL_STATES.RINGING;
   });
-  const [showcaseStyle, setShowcaseStyle] = useState(() => createPeerAuthOnlyShowcaseStyle());
+  const [showcaseStyle, setShowcaseStyle] = useState(() => {
+    const bootParams = parseOverlayParams();
+    const boot = readBootNativeLookupCard(bootParams.incoming);
+    if (boot) return provisionalBroadcastStyle(applyLocalOverlayCardDefaults(boot, bootParams.incoming));
+    return createPeerAuthOnlyShowcaseStyle();
+  });
   /* 수화 직후 신원 칩이 끝나기 전에는 풀 DCC를 펼치지 않음 */
   const [expanded, setExpanded] = useState(false);
   /* Native BIG_PUSH 창 — 앱 쇼케이스바(접힘) 강제. MiniCase 금지 */
@@ -391,8 +418,10 @@ function LetteringOverlayHostInner() {
   const loadingStartedAtRef = useRef(Date.now());
   const autoExpandedOnceRef = useRef(false);
   /* 네이티브/웹 조회가 한 번 매칭되면 timeout·unmatched 로 되돌리지 않음 */
-  const matchedRef = useRef(false);
+  const matchedRef = useRef(Boolean(readBootNativeLookupCard(parseOverlayParams().incoming)));
   const peerAuthPopupOnlyRef = useRef(false);
+  const urlVerifiedRef = useRef(urlVerified);
+  urlVerifiedRef.current = urlVerified;
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -501,15 +530,28 @@ function LetteringOverlayHostInner() {
     setForceShowcaseBar(true);
     loadingStartedAtRef.current = Date.now();
 
+    const bootNative = readBootNativeLookupCard(incoming);
+    if (bootNative) {
+      matchedRef.current = true;
+      const seeded = applyLocalOverlayCardDefaults(bootNative, incoming);
+      const provisional = provisionalBroadcastStyle(seeded);
+      setCard({ ...seeded, showcaseStyle: provisional });
+      setShowcaseStyle(provisional);
+      setVerified(true);
+      setLoading(false);
+      return;
+    }
+
+    /* 인증 캐시만 잠금 — 미인증 캐시로 matchedRef 를 잠그면 네이티브 회원 카드를 스킵한다 */
     const cached = readCallHistoryPeerCache(incoming);
-    if (cached?.card) {
+    if (cached?.card && cached.verified) {
       matchedRef.current = true;
       const seeded = applyLocalOverlayCardDefaults(cached.card, incoming);
       setCard(seeded);
       setShowcaseStyle(
         seeded.showcaseStyle || cached.showcaseStyle || provisionalBroadcastStyle(seeded)
       );
-      setVerified(Boolean(cached.verified));
+      setVerified(true);
       setLoading(false);
       return;
     }
@@ -525,11 +567,26 @@ function LetteringOverlayHostInner() {
       return;
     }
 
+    /* URL verified=1 이면 미인증 앰버로 내리지 않음 — 카드 주입/by-number 대기 */
+    if (urlVerified) {
+      matchedRef.current = false;
+      setVerified(true);
+      setCard({
+        ...buildUnverifiedOverlayCard(incoming),
+        profileKind: "lookup_pending",
+        name: "",
+        displayName: ""
+      });
+      setShowcaseStyle(createPeerAuthOnlyShowcaseStyle());
+      setLoading(true);
+      return;
+    }
+
     setVerified(false);
     setCard(null);
     setShowcaseStyle(createPeerAuthOnlyShowcaseStyle());
     setLoading(true);
-  }, [incoming]);
+  }, [incoming, urlVerified]);
 
   useEffect(() => {
     if (loading) return undefined;
@@ -551,8 +608,20 @@ function LetteringOverlayHostInner() {
       try {
         const detail = ev?.detail || window.__VLUE_CARD_LOOKUP__;
         if (!detail) return;
-        if (detail.matched === false) {
+        if (detail.matched === false && !isLookupMatchedBody(detail)) {
           if (matchedRef.current) return;
+          /* URL·네이티브가 인증으로 연 통화는 unmatched 주입으로 미인증 고착 금지 */
+          if (urlVerifiedRef.current) {
+            setCard({
+              ...buildUnverifiedOverlayCard(incoming || detail.phoneE164 || ""),
+              profileKind: "lookup_pending",
+              name: "",
+              displayName: ""
+            });
+            setVerified(true);
+            setLoading(true);
+            return;
+          }
           const phone = incoming || detail.phoneE164 || "";
           /*
            * lookup_pending 은 조회 중 — 미인증 앰버로 고정하면 전중희 등 회원이
@@ -667,14 +736,16 @@ function LetteringOverlayHostInner() {
       const unknown = isUnknownIncoming(incoming);
       if (unknown) {
         /* 조회 전 미인증 앰버 UI를 먼저 띄우지 않음 — 치명적 깜빡임 방지 */
-        setCard({
-          ...buildUnverifiedOverlayCard(incoming),
-          profileKind: "lookup_pending",
-          name: "",
-          displayName: ""
-        });
-        setVerified(false);
-        setLoading(true);
+        if (!matchedRef.current) {
+          setCard({
+            ...buildUnverifiedOverlayCard(incoming),
+            profileKind: "lookup_pending",
+            name: "",
+            displayName: ""
+          });
+          setVerified(Boolean(urlVerifiedRef.current));
+          setLoading(true);
+        }
         unknownTimer = window.setTimeout(() => {
           if (cancelled || matchedRef.current) return;
           const deviceName = findDeviceContactName(incoming);
@@ -687,8 +758,8 @@ function LetteringOverlayHostInner() {
           setVerified(false);
           setLoading(false);
         }, 2200);
-      } else {
-        /* 알려진 번호도 조회 전엔 미인증으로 그리지 않음 */
+      } else if (!matchedRef.current) {
+        /* 이미 네이티브/캐시로 매칭됐으면 verified 를 지우지 않음 — 미인증 고착 원인 */
         setCard((prev) => {
           if (prev && String(prev.profileKind || "") !== "lookup_pending" && prev.matched !== false) {
             return prev;
@@ -703,7 +774,7 @@ function LetteringOverlayHostInner() {
             displayName: ""
           };
         });
-        setVerified(false);
+        setVerified(Boolean(urlVerifiedRef.current));
         setLoading(true);
       }
 
@@ -724,7 +795,10 @@ function LetteringOverlayHostInner() {
         return;
       }
       if (unknown && !matchedRef.current) return;
-      if (matchedRef.current) return;
+      if (matchedRef.current) {
+        setLoading(false);
+        return;
+      }
 
       /*
        * 네이티브 card-lookup 이 이미 있으면 by-number 재조회 생략.
@@ -732,7 +806,7 @@ function LetteringOverlayHostInner() {
        */
       const nativeDetail =
         native || forceLettering ? window.__VLUE_CARD_LOOKUP__ : null;
-      if (nativeDetail && nativeDetail.matched !== false) {
+      if (nativeDetail && isLookupMatchedBody(nativeDetail)) {
         const mapped = mapLookupToLetteringCard(
           nativeDetail,
           incoming || nativeDetail.phoneE164 || ""
@@ -776,7 +850,10 @@ function LetteringOverlayHostInner() {
         }
       }
       if (cancelled) return;
-      if (matchedRef.current) return;
+      if (matchedRef.current) {
+        setLoading(false);
+        return;
+      }
 
       scheduleOverlayPeerEnrich(incoming, null, (pack) => {
         if (cancelled || matchedRef.current) return;
@@ -797,7 +874,10 @@ function LetteringOverlayHostInner() {
         forCallOverlay: true
       });
       if (cancelled) return;
-      if (matchedRef.current) return;
+      if (matchedRef.current) {
+        setLoading(false);
+        return;
+      }
 
       let nextCard = null;
       let nextVerified = false;
@@ -832,6 +912,27 @@ function LetteringOverlayHostInner() {
       }
 
       if (!matchedRef.current) {
+        /* 네이티브가 verified=1 로 연 경우 웹 조회 실패만으로 미인증 앰버 금지 */
+        if (urlVerifiedRef.current) {
+          setCard({
+            ...buildUnverifiedOverlayCard(incoming),
+            profileKind: "lookup_pending",
+            name: "",
+            displayName: ""
+          });
+          setVerified(true);
+          setLoading(true);
+          window.setTimeout(() => {
+            if (cancelled || matchedRef.current) return;
+            /* 네이티브 재주입 대기 후에도 카드가 없으면 인증 바만 (미인증 앰버 금지) */
+            matchedRef.current = true;
+            setCard(buildUnverifiedOverlayCard(incoming));
+            setVerified(true);
+            setShowcaseStyle(createPeerAuthOnlyShowcaseStyle());
+            setLoading(false);
+          }, 2800);
+          return;
+        }
         const deviceName = findDeviceContactName(incoming);
         if (deviceName) {
           matchedRef.current = true;
