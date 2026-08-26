@@ -2696,20 +2696,10 @@ class CallOverlayService : Service() {
             }
             applyBigPushPeekChrome(onRight = bigPushPeekOnRight)
         } else {
-            /* 웹 링잉 패딩(12dp)과 맞춰 아우라가 윈도우에 잘리지 않게 */
-            val auraPad = dp(12)
             params.width = WindowManager.LayoutParams.MATCH_PARENT
-            params.height = barH + auraPad * 2
+            params.height = barH
             params.x = 0
-            val baseY = compactBarY(pos, barH, sh)
-            params.y =
-                if (pos == OverlayPosition.TOP) {
-                    /* 상단 고정 — 아래로만 여유 (상태바 침범 금지) */
-                    baseY
-                } else {
-                    /* 중앙·하단 — 위·아래 아우라 여유 */
-                    (baseY - auraPad).coerceAtLeast(0)
-                }
+            params.y = compactBarY(pos, barH, sh)
             bigPushPeekTab?.visibility = android.view.View.GONE
             if (companion.state == OverlayState.BIG_PUSH) {
                 webView?.visibility = android.view.View.VISIBLE
