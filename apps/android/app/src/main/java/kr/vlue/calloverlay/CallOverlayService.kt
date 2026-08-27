@@ -1288,7 +1288,6 @@ class CallOverlayService : Service() {
         remoteConnected = true
         /* 팝업-only: Mini/BigPush 크롬 없이 중앙 팝업만 — ContextWatch BigPush 접기 금지 */
         authPopupOnlyMode = true
-        hideCompanionOverlayChrome()
         if (companion.state != OverlayState.SHOWCASE) {
             companion.onAnswer(OverlayContext.IN_CALL)
         }
@@ -1296,10 +1295,30 @@ class CallOverlayService : Service() {
         /* 확인 전까지 OTHER_APP→하단바 collapse 금지 */
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
         LetteringIncomingNotifier.cancel(this)
-        syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
-        hideCompanionOverlayChrome()
-        if (dcpPopupView?.isAttachedToWindow != true) {
+        if (forceReopen) {
+            /*
+             * MiniCase「쇼케이스 돌아가기」— WebView 를 먼저 지우면 addView 실패·좀비 Mini.
+             * 팝업 attach 확인 후에만 크롬 제거.
+             */
             syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            if (dcpPopupView?.isAttachedToWindow != true) {
+                syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            }
+            if (dcpPopupView?.isAttachedToWindow == true) {
+                hideCompanionOverlayChrome()
+            } else {
+                VlueBigPushTrace.lifecycle(
+                    "CENTER_SAFE_POPUP_REOPEN_FAIL",
+                    "source=$source authMember=$authMember state=${companion.state.name}"
+                )
+            }
+        } else {
+            hideCompanionOverlayChrome()
+            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            hideCompanionOverlayChrome()
+            if (dcpPopupView?.isAttachedToWindow != true) {
+                syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            }
         }
         CompanionRuntimeStabilityDiag.mark(
             if (authMember) "AUTH_MEMBER_POPUP" else "SAFE_CARE_POPUP",
@@ -1318,7 +1337,7 @@ class CallOverlayService : Service() {
 
     /**
      * MiniCase「쇼케이스 돌아가기」→ 인증/비정상/안심케어 중앙 팝업만 재표시.
-     * MiniCase 와 팝업이 동시에 뜨지 않게 크롬을 먼저 제거한다.
+     * 크롬 제거는 presentCenterSafePopup(forceReopen) 이 팝업 attach 후 수행.
      */
     private fun reopenCenterPopupFromMiniCase(source: String, authMember: Boolean) {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
@@ -1327,7 +1346,6 @@ class CallOverlayService : Service() {
         /* ContextWatch collapse→BigPush 방지 — 팝업 표시 중에도 유지 */
         userMinimized = true
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
-        hideCompanionOverlayChrome()
         if (companion.state == OverlayState.MINI_CASE || companion.state == OverlayState.BIG_PUSH) {
             companion.onAnswer(OverlayContext.IN_CALL)
         } else if (companion.state != OverlayState.SHOWCASE) {

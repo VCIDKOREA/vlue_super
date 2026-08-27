@@ -22,6 +22,7 @@ import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAv
 import { buildAuthValidityVerificationItems } from "../lib/authValidityPeriod.js";
 import { getLocalVlueUserId } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { nativeEndCall, nativeEndCallKeepOverlay, nativeRevealSystemCallUi, nativeRestoreShowcaseOverlay } from "../lib/call/nativeCallControl.js";
+import { peerHasDccOrShowcaseContent } from "../lib/peerShowcaseContent.js";
 import { resolveIsKnownContact } from "../lib/contacts/hybridKnownContact.js";
 import {
   resolveCallPeerMatrixSync,
@@ -561,6 +562,13 @@ export default function LetteringIncomingNotification({
     !isLookupPending &&
     !showcaseOffPreview &&
     (isPaidMember || isFreeMember || isUnverified || isExpiredLine);
+  /** MiniCase「쇼케이스 돌아가기」— 복원 대상 없으면 버튼 숨김 */
+  const canRestoreFromMiniCase = useMemo(() => {
+    if (showcaseOffPreview) return true;
+    if (isUnverified || isExpiredLine) return true;
+    if (isContactSafeCare || isDcp) return true;
+    return peerHasDccOrShowcaseContent(c, c?.showcaseStyle);
+  }, [showcaseOffPreview, isUnverified, isExpiredLine, isContactSafeCare, isDcp, c]);
   const [reportTick, setReportTick] = useState(0);
   const [walletTick, setWalletTick] = useState(0);
 
@@ -1176,6 +1184,7 @@ export default function LetteringIncomingNotification({
           durationLabel={companionDurationLabel}
           verified={Boolean(verified && !isUnverified && !isExpiredLine)}
           onExpand={expandShowcaseFromMiniCase}
+          hideExpand={!canRestoreFromMiniCase}
         />
         {isExpiredLine ? (
           <AgencyDcpMiniPopup
