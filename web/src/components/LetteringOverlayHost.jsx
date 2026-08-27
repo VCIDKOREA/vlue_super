@@ -275,9 +275,11 @@ function applyLocalOverlayCardDefaults(card, phoneHint = "") {
 }
 
 /**
- * live 송출 플래그 도착 전 — 명시적 includeDigitalCard 만 신뢰.
- * digitalCardActive 로 낙관적 ON 하면 이상춘처럼 송출 OFF 계정이
- * 「sangchoon1 Showcase」로 깜빡인 뒤 이름표시로 바뀐다.
+ * live 송출 플래그 도착 전.
+ * - includeDigitalCard===true → ON
+ * - ===false → OFF
+ * - 키 누락: 상호/로고/미디어면 낙관적 ON (CEO), 아니면 OFF (이슬기/이상춘)
+ *   digitalCardActive·email·handle 만으로 ON 하면 인증-only 가 빈 FULLSCREEN 이 됨.
  */
 function provisionalBroadcastStyle(card) {
   const live = card?.showcaseStyle;
@@ -292,6 +294,13 @@ function provisionalBroadcastStyle(card) {
         includeDigitalCard: false
       };
     }
+  }
+  if (peerHasDccOrShowcaseContent(card, live || null)) {
+    return {
+      ...createDefaultShowcaseStyle(),
+      ...(live && typeof live === "object" ? live : {}),
+      includeDigitalCard: true
+    };
   }
   return createPeerAuthOnlyShowcaseStyle();
 }

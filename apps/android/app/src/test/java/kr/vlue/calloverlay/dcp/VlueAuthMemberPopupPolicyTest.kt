@@ -24,8 +24,7 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
-    fun ceoWithDigitalCardActive_andContentHints_isNotAuthMemberOnly() {
-        /* 송출 플래그 없어도 상호·로고 등 DCC 실콘텐츠면 쇼케이스 경로 */
+    fun ceoWithOrgHint_withoutStyleKey_isNotAuthMemberOnly() {
         val json =
             """{"matched":true,"is_verified":true,"displayName":"이종근","digitalCardActive":true,"companyName":"VCID KOREA","logo_url":"https://www.vlue.kr/vlue-brand-logo.svg"}"""
         assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
@@ -39,10 +38,11 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
-    fun ceoLookupWithPhotoHint_withoutStyleKey_isNotAuthMemberOnly() {
+    fun photoOnly_withoutStyleKey_isAuthMemberOnly() {
+        /* 프로필 사진만으로 풀 쇼케이스 금지 */
         val json =
             """{"matched":true,"is_verified":true,"displayName":"이종근","phoneE164":"+821080144666","image_url":"https://x/a.png"}"""
-        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
     }
 
     @Test
@@ -81,9 +81,17 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
-    fun jeonjungheeStyleMissing_withEmailAndPhoto_isNotAuthMemberOnly() {
+    fun seulgi_emailAndHandle_withoutBroadcast_isAuthMemberOnly() {
+        /* rc33 회귀: email+handle+digitalCardActive 로 FULLSCREEN 빈화면 금지 */
         val json =
-            """{"matched":true,"is_verified":true,"displayName":"전중희","email":"test@vlue.kr","photoUrl":"https://x/tree.png","card":{"name":"전중희","email":"test@vlue.kr"}}"""
+            """{"matched":true,"is_verified":true,"displayName":"이슬기","publicHandle":"seulgi1","email":"a@b.c","digitalCardActive":true}"""
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+    }
+
+    @Test
+    fun jeonjungheeBroadcastOn_withPhoto_isNotAuthMemberOnly() {
+        val json =
+            """{"matched":true,"is_verified":true,"displayName":"전중희","showcaseStyle":{"includeDigitalCard":true},"photoUrl":"https://x/tree.png","email":"test@vlue.kr"}"""
         assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
     }
 }

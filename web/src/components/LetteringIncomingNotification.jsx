@@ -576,11 +576,16 @@ export default function LetteringIncomingNotification({
    */
   const [hadFullShowcaseThisCall, setHadFullShowcaseThisCall] = useState(false);
   const canRestoreFromMiniCase = useMemo(() => {
-    if (isLookupPending || showcaseOffPreview) return false;
+    if (isLookupPending) return false;
     if (isContactSafeCare || isDcp || isExpiredLine || isUnverified) return false;
+    /*
+     * 버튼 제거 후 탭 게이트 경로: 이 통화에서 풀 쇼케이스를 본 뒤에는
+     * provisional showcaseOffPreview 가 다시 true 여도 복원 허용.
+     * (예전 버튼은 expandOnTap 게이트 없이 onExpand 직행)
+     */
     if (hadFullShowcaseThisCall) return true;
+    if (showcaseOffPreview) return false;
     if (peerHasDccOrShowcaseContent(c, c?.showcaseStyle)) return true;
-    /* includeDigitalCard 누락이어도 인증+유료/무료면 Mini 탭 복원 (버튼 제거 후 게이트 경로) */
     return Boolean(verified && (isPaidMember || isFreeMember));
   }, [
     isLookupPending,

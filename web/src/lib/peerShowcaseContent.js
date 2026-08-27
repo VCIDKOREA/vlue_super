@@ -40,10 +40,17 @@ export function cardHasDccBody(card) {
   return Boolean(
     String(card.organization || card.companyName || "").trim() ||
       String(card.titlePhotoUrl || "").trim() ||
-      String(card.email || "").trim() ||
       String(card.logoUrl || card.logo_url || "").trim() ||
       String(card.website || "").trim() ||
-      String(card.title || card.jobTitle || "").trim() ||
+      String(card.title || card.jobTitle || "").trim()
+  );
+}
+
+/** 송출 ON 일 때만 쓰는 약한 힌트(이메일·프로필사진) */
+export function cardHasSoftIdentityHints(card) {
+  if (!card || typeof card !== "object") return false;
+  return Boolean(
+    String(card.email || "").trim() ||
       String(card.photoUrl || card.image_url || card.avatarUrl || "").trim()
   );
 }
@@ -51,27 +58,23 @@ export function cardHasDccBody(card) {
 /**
  * true = 풀 쇼케이스 허용.
  * 명시 includeDigitalCard:false → false.
- * 송출 키 누락이어도 DCC 실콘텐츠(이메일·사진·상호 등) 있으면 true (전중희 lookup 누락 대응).
+ * 송출 ON → 미디어·상호·약한힌트·핸들.
+ * 키 누락 → 상호/로고/미디어만 (이메일·사진·handle 단독 금지 — 이슬기 빈 FULLSCREEN 방지).
  */
 export function peerHasDccOrShowcaseContent(card, style) {
   const st = style || card?.showcaseStyle || null;
   if (st && typeof st === "object" && st.includeDigitalCard === false) return false;
   const media = styleHasShowcaseMedia(st);
   const body = cardHasDccBody(card);
-  if (peerShowcaseBroadcastOn(st)) {
-    if (media || body) return true;
-    const handle = String(card?.publicHandle || card?.loginId || card?.vlueId || "")
-      .trim()
-      .replace(/^@/, "");
-    return Boolean(handle);
-  }
-  /* 키 누락: 실콘텐츠면 쇼케이스 경로 (Android VlueAuthMemberPopupPolicy 와 동일) */
-  if (media || body) return true;
-  const digitalActive = card?.digitalCardActive === true;
+  const soft = cardHasSoftIdentityHints(card);
   const handle = String(card?.publicHandle || card?.loginId || card?.vlueId || "")
     .trim()
     .replace(/^@/, "");
-  return Boolean(digitalActive && handle);
+  if (peerShowcaseBroadcastOn(st)) {
+    if (media || body || soft || handle) return true;
+    return false;
+  }
+  return Boolean(media || body);
 }
 
 /**

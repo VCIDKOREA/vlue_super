@@ -72,11 +72,9 @@ object VlueAuthMemberPopupPolicy {
             return false
         }
         val broadcastOn = style?.optBoolean("includeDigitalCard", false) == true
-        val digitalActive =
-            card.optBoolean("digitalCardActive", false) ||
-                root.optBoolean("digitalCardActive", false)
         val media = styleHasMedia(style)
-        val hints = hasDccOrMediaHints(root, card)
+        val orgHints = hasBroadcastOrgHints(root, card)
+        val softHints = hasSoftIdentityHints(root, card)
         val handle =
             firstNonBlank(
                 card.optString("publicHandle"),
@@ -86,22 +84,23 @@ object VlueAuthMemberPopupPolicy {
             ) != null
 
         if (broadcastOn) {
-            if (media || hints || handle) return true
-            /* 송출 ON 이지만 실콘텐츠 없음 → 빈 쇼케이스 대신 인증 팝업 */
+            /* 송출 ON: 미디어·상호·로고·이메일·사진·핸들이면 쇼케이스 */
+            if (media || orgHints || softHints || handle) return true
             return false
         }
 
         /*
-         * includeDigitalCard 키 누락(전중희 lookup 등): DCC 실콘텐츠가 있으면
-         * 인증-only 팝업으로 떨어뜨리지 않음. (명시 OFF 는 위에서 이미 차단)
-         * digitalCardActive 단독 + hints 없으면 빈 쇼케이스 위험이 있어 false.
+         * includeDigitalCard 키 누락:
+         * - 상호/로고/타이틀사진/미디어만으로 쇼케이스 인정 (CEO·전중희 등)
+         * - email·profile photo·digitalCardActive·handle 단독은 인증-only
+         *   (이슬기/이상춘: digitalCardActive+email 만으로 FULLSCREEN 빈화면 금지)
          */
-        if (media || hints) return true
-        if (digitalActive && handle) return true
+        if (media || orgHints) return true
         return false
     }
 
-    private fun hasDccOrMediaHints(root: JSONObject, card: JSONObject): Boolean {
+    /** 공개 송출 실체(상호·로고·타이틀샷) — 프로필 사진/이메일과 구분 */
+    private fun hasBroadcastOrgHints(root: JSONObject, card: JSONObject): Boolean {
         return firstNonBlank(
             card.optString("organization"),
             root.optString("organization"),
@@ -109,8 +108,6 @@ object VlueAuthMemberPopupPolicy {
             root.optString("companyName"),
             card.optString("titlePhotoUrl"),
             root.optString("titlePhotoUrl"),
-            card.optString("email"),
-            root.optString("email"),
             card.optString("logoUrl"),
             root.optString("logoUrl"),
             card.optString("logo_url"),
@@ -120,7 +117,14 @@ object VlueAuthMemberPopupPolicy {
             card.optString("title"),
             root.optString("title"),
             card.optString("jobTitle"),
-            root.optString("jobTitle"),
+            root.optString("jobTitle")
+        ) != null
+    }
+
+    private fun hasSoftIdentityHints(root: JSONObject, card: JSONObject): Boolean {
+        return firstNonBlank(
+            card.optString("email"),
+            root.optString("email"),
             card.optString("image_url"),
             root.optString("image_url"),
             card.optString("photoUrl"),
@@ -128,6 +132,10 @@ object VlueAuthMemberPopupPolicy {
             card.optString("avatarUrl"),
             root.optString("avatarUrl")
         ) != null
+    }
+
+    private fun hasDccOrMediaHints(root: JSONObject, card: JSONObject): Boolean {
+        return hasBroadcastOrgHints(root, card) || hasSoftIdentityHints(root, card)
     }
 
     private fun styleHasMedia(style: JSONObject?): Boolean {
