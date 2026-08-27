@@ -143,6 +143,8 @@ class CallOverlayService : Service() {
     private var screenStateDetector: ScreenStateDetector? = null
     /** Answer 직후 ContextWatch 가 OTHER_APP 로 쇼케이스를 깨지 않게 */
     private var showcaseHoldUntilElapsed: Long = 0L
+    /** Mini→풀 직후 고스트 click 용 짧은 가드 (의도적 통화화면 보기는 막지 않음) */
+    private var restoreGhostGuardUntilElapsed: Long = 0L
     /** 발신: 상대 응답(STATE_ACTIVE / notifyConnected) 후에만 true — 다이얼 OFFHOOK 만으로는 Showcase 금지 */
     private var remoteConnected: Boolean = false
     /** BigPush 가장자리 피크 (MiniCase 패리티) — OverlayState 는 BIG_PUSH 유지 */
@@ -2271,6 +2273,19 @@ class CallOverlayService : Service() {
             CompanionRuntimeStabilityDiag.noteStaleEvent("MINI", source)
             return
         }
+        /*
+         * Mini→풀 복원 직후(~1s) 고스트 click 이 revealSystemCallUi 를 부르면
+         * 깜빡이고 Mini 로 돌아간다. 의도적 「통화화면 보기」는 1초 뒤 허용.
+         */
+        if (android.os.SystemClock.elapsedRealtime() < restoreGhostGuardUntilElapsed &&
+            companion.state == OverlayState.SHOWCASE
+        ) {
+            VlueBigPushTrace.lifecycle(
+                "MINIMIZE_SKIP_GHOST_GUARD",
+                "source=$source keep SHOWCASE"
+            )
+            return
+        }
         authPopupOnlyMode = false
         companion.onMinimize(
             if (keypadOpen) OverlayContext.KEYPAD else OverlayContext.MINIMIZED
@@ -2339,6 +2354,7 @@ class CallOverlayService : Service() {
          * BIG_PUSH 에서 onRestore 거절되면 웹만 expanded → 156dp 에 풀 UI 짤림.
          */
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
+        restoreGhostGuardUntilElapsed = android.os.SystemClock.elapsedRealtime() + 1_200L
         userMinimized = false
         authPopupOnlyMode = false
         bigPushPeeking = false

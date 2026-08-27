@@ -308,6 +308,10 @@ export default function LetteringIncomingNotification({
   );
 
   const toggle = () => {
+    if (Date.now() < expandFromMiniGuardUntilRef.current) {
+      /* Mini 탭 직후 고스트 click → 접힘 무시 */
+      return;
+    }
     if (isExpiredLine) {
       setExpiredPopupOpen(true);
       setExpanded(true);
@@ -334,6 +338,7 @@ export default function LetteringIncomingNotification({
     if (nativeOverlay) {
       try {
         if (next) {
+          expandFromMiniGuardUntilRef.current = Date.now() + 600;
           nativeRestoreShowcaseOverlay();
         } else if (liveOnCall) {
           nativeRevealSystemCallUi();
@@ -575,6 +580,8 @@ export default function LetteringIncomingNotification({
    * 안심팝업·DCP·미인증만 차단.
    */
   const [hadFullShowcaseThisCall, setHadFullShowcaseThisCall] = useState(false);
+  /** Mini 탭→풀 직후 같은 좌표 click 이 live-bar toggle 로 다시 접히는 것 방지 */
+  const expandFromMiniGuardUntilRef = useRef(0);
   const canRestoreFromMiniCase = useMemo(() => {
     if (isLookupPending) return false;
     if (isContactSafeCare || isDcp || isExpiredLine || isUnverified) return false;
@@ -936,6 +943,8 @@ export default function LetteringIncomingNotification({
   const showInCallControls = Boolean(showLegacyInCallControls || showCompanionSamsungCta);
 
   const expandShowcaseFromMiniCase = useCallback(() => {
+    /* pointerup 직후 남는 click 이 새 live-bar 에 떨어져 toggle→접힘 되는 것 차단 */
+    expandFromMiniGuardUntilRef.current = Date.now() + 700;
     setExpanded(true);
     setHadFullShowcaseThisCall(true);
     try {

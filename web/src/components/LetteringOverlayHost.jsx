@@ -1411,6 +1411,12 @@ function LetteringOverlayHostInner() {
               const style = styledCard?.showcaseStyle || showcaseStyle;
               /* 텅 빈 쇼케이스 펼침 방지 — DCC/미디어 준비될 때까지 바 유지 */
               if (!peerHasDccOrShowcaseContent(styledCard, style)) return;
+              /*
+               * Mini 탭 복원: userChoseMini 를 먼저 해제하지 않으면
+               * 직후 connected 재주입이 setExpanded(false) 로 다시 접어 깜빡임.
+               */
+              userChoseMiniRef.current = false;
+              restoreHoldUntilRef.current = Date.now() + 4500;
               setExpanded(true);
               setForceShowcaseBar(false);
               try {
@@ -1421,6 +1427,11 @@ function LetteringOverlayHostInner() {
               }
               return;
             }
+            /* restore hold 중 접힘(고스트 클릭·스퓨리어스 minimize) 무시 */
+            if (Date.now() < restoreHoldUntilRef.current) {
+              return;
+            }
+            userChoseMiniRef.current = true;
             setExpanded(false);
           }}
           includeDigitalCard={Boolean(
