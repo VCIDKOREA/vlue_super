@@ -37,29 +37,41 @@ export function styleHasShowcaseMedia(style) {
 
 export function cardHasDccBody(card) {
   if (!card || typeof card !== "object") return false;
-  /* 송출 플래그만 켜져 있고 명함 본문이 없으면 DCC로 보지 않음 */
-  const styleOn = card.showcaseStyle?.includeDigitalCard === true || card.digitalCardActive === true;
-  if (!styleOn) return false;
   return Boolean(
     String(card.organization || card.companyName || "").trim() ||
       String(card.titlePhotoUrl || "").trim() ||
       String(card.email || "").trim() ||
-      String(card.logoUrl || "").trim() ||
+      String(card.logoUrl || card.logo_url || "").trim() ||
       String(card.website || "").trim() ||
-      String(card.title || "").trim()
+      String(card.title || card.jobTitle || "").trim() ||
+      String(card.photoUrl || card.image_url || card.avatarUrl || "").trim()
   );
 }
 
 /**
- * true = 풀 쇼케이스 허용 (송출 ON + DCC 본문 또는 쇼케이스 미디어)
- * 무료/유료 무관 · 송출 꺼짐이면 false → 인증 팝업
+ * true = 풀 쇼케이스 허용.
+ * 명시 includeDigitalCard:false → false.
+ * 송출 키 누락이어도 DCC 실콘텐츠(이메일·사진·상호 등) 있으면 true (전중희 lookup 누락 대응).
  */
 export function peerHasDccOrShowcaseContent(card, style) {
   const st = style || card?.showcaseStyle || null;
-  if (!peerShowcaseBroadcastOn(st)) return false;
-  if (styleHasShowcaseMedia(st)) return true;
-  if (cardHasDccBody({ ...card, showcaseStyle: st || card?.showcaseStyle })) return true;
-  return false;
+  if (st && typeof st === "object" && st.includeDigitalCard === false) return false;
+  const media = styleHasShowcaseMedia(st);
+  const body = cardHasDccBody(card);
+  if (peerShowcaseBroadcastOn(st)) {
+    if (media || body) return true;
+    const handle = String(card?.publicHandle || card?.loginId || card?.vlueId || "")
+      .trim()
+      .replace(/^@/, "");
+    return Boolean(handle);
+  }
+  /* 키 누락: 실콘텐츠면 쇼케이스 경로 (Android VlueAuthMemberPopupPolicy 와 동일) */
+  if (media || body) return true;
+  const digitalActive = card?.digitalCardActive === true;
+  const handle = String(card?.publicHandle || card?.loginId || card?.vlueId || "")
+    .trim()
+    .replace(/^@/, "");
+  return Boolean(digitalActive && handle);
 }
 
 /**
@@ -68,8 +80,13 @@ export function peerHasDccOrShowcaseContent(card, style) {
  */
 export function peerHasShowcaseBarChrome(card, style) {
   const st = style || card?.showcaseStyle || null;
-  if (!peerShowcaseBroadcastOn(st)) return false;
+  if (st && typeof st === "object" && st.includeDigitalCard === false) return false;
   if (peerHasDccOrShowcaseContent(card, st)) return true;
+  if (!peerShowcaseBroadcastOn(st) && card?.digitalCardActive !== true) {
+    /* 송출 키·active 둘 다 없으면 바 크롬도 인증-only */
+    const body = cardHasDccBody(card);
+    if (!body) return false;
+  }
   const handle = String(card?.publicHandle || card?.loginId || card?.vlueId || "")
     .trim()
     .replace(/^@/, "");

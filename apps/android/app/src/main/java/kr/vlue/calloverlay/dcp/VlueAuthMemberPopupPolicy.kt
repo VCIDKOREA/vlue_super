@@ -72,26 +72,32 @@ object VlueAuthMemberPopupPolicy {
             return false
         }
         val broadcastOn = style?.optBoolean("includeDigitalCard", false) == true
-        if (!broadcastOn) {
-            /*
-             * 스타일 키 없음·digitalCardActive 만으로는 쇼케이스 경로로 단정하지 않음.
-             * (예전: 키 없으면 true → 빈 VLUE Showcase 가 화면을 덮음)
-             */
-            return false
-        }
-        if (styleHasMedia(style)) return true
-        if (hasDccOrMediaHints(root, card)) return true
-        /* 송출 ON + 핸들만 있어도 바 크롬은 쇼케이스 — 인증-only 팝업 금지 */
-        if (firstNonBlank(
+        val digitalActive =
+            card.optBoolean("digitalCardActive", false) ||
+                root.optBoolean("digitalCardActive", false)
+        val media = styleHasMedia(style)
+        val hints = hasDccOrMediaHints(root, card)
+        val handle =
+            firstNonBlank(
                 card.optString("publicHandle"),
                 root.optString("publicHandle"),
                 card.optString("loginId"),
                 root.optString("loginId")
             ) != null
-        ) {
-            return true
+
+        if (broadcastOn) {
+            if (media || hints || handle) return true
+            /* 송출 ON 이지만 실콘텐츠 없음 → 빈 쇼케이스 대신 인증 팝업 */
+            return false
         }
-        /* 송출 ON 이지만 실콘텐츠 없음 → 빈 쇼케이스 대신 인증 팝업 */
+
+        /*
+         * includeDigitalCard 키 누락(전중희 lookup 등): DCC 실콘텐츠가 있으면
+         * 인증-only 팝업으로 떨어뜨리지 않음. (명시 OFF 는 위에서 이미 차단)
+         * digitalCardActive 단독 + hints 없으면 빈 쇼케이스 위험이 있어 false.
+         */
+        if (media || hints) return true
+        if (digitalActive && handle) return true
         return false
     }
 

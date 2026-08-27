@@ -2262,20 +2262,41 @@ class CallOverlayService : Service() {
             CompanionRuntimeStabilityDiag.noteStaleEvent("MINI", source)
             return
         }
+        authPopupOnlyMode = false
         companion.onMinimize(
             if (keypadOpen) OverlayContext.KEYPAD else OverlayContext.MINIMIZED
         )
+        if (companion.state != OverlayState.MINI_CASE) {
+            /* BIG_PUSH 등에서 거부되면 Answer→Minimize 로 강제 */
+            companion.onAnswer(OverlayContext.IN_CALL)
+            companion.onMinimize(
+                if (keypadOpen) OverlayContext.KEYPAD else OverlayContext.MINIMIZED
+            )
+        }
         publishCompanion(OverlayTriggerEvent.HOME_CHANGED, userAction = true)
         userMinimized = true
-        /* 직전 restore hold 가 Mini collapse/connected 레이스를 막지 않게 */
-        showcaseHoldUntilElapsed = 0L
+        /* Mini 유지 — ContextWatch 가 BigPush 중간 바로 접지 못하게 홀드 */
+        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
+        if (rootContainer?.isAttachedToWindow != true) {
+            attachOverlayWindow(
+                phone = currentPhone.ifBlank { "unknown" },
+                verified = pendingVerified || parseIsVerified(pendingCardJson),
+                outgoing = currentOutgoing,
+                cardJson = pendingCardJson,
+                asBigPush = false
+            )
+        }
         applyLayoutFromController(source = source)
         notifyWebCallState("minimize_showcase")
-        /* connected 재주입 대비 — 웹 expanded 고정 */
         webView?.evaluateJavascript(
             "try{window.VlueLettering&&window.VlueLettering.setExpanded&&" +
                 "window.VlueLettering.setExpanded(false);}catch(e){}",
             null
+        )
+        VlueBigPushTrace.lifecycle(
+            "USER_MINIMIZE_TO_MINI",
+            "source=$source state=${companion.state.name} pos=${companion.position.name} " +
+                "h=${layoutParams?.height} userMinimized=$userMinimized"
         )
     }
 
@@ -3294,6 +3315,7 @@ class CallOverlayService : Service() {
                 return
             }
             if (companion.state == OverlayState.MINI_CASE) {
+                /* 사용자 Mini 유지 — BigPush 중간 바로 절대 접지 않음 */
                 companion.updateContext(
                     if (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN) {
                         OverlayContext.MINIMIZED
@@ -3301,6 +3323,11 @@ class CallOverlayService : Service() {
                         OverlayContext.IN_CALL
                     }
                 )
+                val h = layoutParams?.height ?: 0
+                if (userMinimized && (h <= 0 || h > dp(220))) {
+                    /* 창이 풀/바로 커져 있으면 Mini 레이아웃 재커밋 */
+                    applyLayoutFromController(source = "reeval:$source:pinMini")
+                }
                 return
             }
             if (companion.state == OverlayState.SHOWCASE) {

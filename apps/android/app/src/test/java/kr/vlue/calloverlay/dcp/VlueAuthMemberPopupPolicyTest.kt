@@ -24,11 +24,11 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
-    fun ceoWithDigitalCardActive_butBroadcastFlagMissing_isAuthMemberOnly() {
-        /* 송출 ON 플래그 없으면 빈 쇼케이스 금지 → 인증 팝업 */
+    fun ceoWithDigitalCardActive_andContentHints_isNotAuthMemberOnly() {
+        /* 송출 플래그 없어도 상호·로고 등 DCC 실콘텐츠면 쇼케이스 경로 */
         val json =
             """{"matched":true,"is_verified":true,"displayName":"이종근","digitalCardActive":true,"companyName":"VCID KOREA","logo_url":"https://www.vlue.kr/vlue-brand-logo.svg"}"""
-        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
     }
 
     @Test
@@ -39,10 +39,16 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
-    fun ceoLookupWithoutShowcaseStyleKey_isAuthMemberOnly_noEmptyShowcase() {
-        /* style 키 없음 → 빈 VLUE Showcase 금지, 수화 후 인증 팝업 */
+    fun ceoLookupWithPhotoHint_withoutStyleKey_isNotAuthMemberOnly() {
         val json =
             """{"matched":true,"is_verified":true,"displayName":"이종근","phoneE164":"+821080144666","image_url":"https://x/a.png"}"""
+        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+    }
+
+    @Test
+    fun verifiedNameOnly_withoutContent_isAuthMemberOnly() {
+        val json =
+            """{"matched":true,"is_verified":true,"displayName":"이상춘"}"""
         assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
     }
 
@@ -61,10 +67,10 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
-    fun verifiedWithoutStyleKey_isAuthMemberOnly_noEmptyShowcase() {
+    fun verifiedWithoutStyleKey_butOrgHint_isNotAuthMemberOnly() {
         val json =
             """{"matched":true,"is_verified":true,"displayName":"이상춘","card":{"name":"이상춘","organization":"테스트상호"}}"""
-        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
     }
 
     @Test
@@ -72,5 +78,12 @@ class VlueAuthMemberPopupPolicyTest {
         val json =
             """{"matched":true,"is_verified":true,"displayName":"이상춘","showcaseStyle":{"includeDigitalCard":false},"card":{"organization":"테스트","image_url":"https://x"}}"""
         assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+    }
+
+    @Test
+    fun jeonjungheeStyleMissing_withEmailAndPhoto_isNotAuthMemberOnly() {
+        val json =
+            """{"matched":true,"is_verified":true,"displayName":"전중희","email":"test@vlue.kr","photoUrl":"https://x/tree.png","card":{"name":"전중희","email":"test@vlue.kr"}}"""
+        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
     }
 }

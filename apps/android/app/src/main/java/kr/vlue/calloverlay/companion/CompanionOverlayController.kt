@@ -165,14 +165,21 @@ class CompanionOverlayController {
     }
 
     fun onMinimize(detectedContext: OverlayContext = OverlayContext.MINIMIZED) {
-        if (state != OverlayState.SHOWCASE && state != OverlayState.MINI_CASE) {
+        /*
+         * SHOWCASE·MINI 뿐 아니라 BIG_PUSH(중간 바)에서도 Mini 로 진입.
+         * 「통화화면 보기」시 BigPush 바에 고착되면 Mini 로 못 돌아가는 버그 방지.
+         */
+        if (state != OverlayState.SHOWCASE &&
+            state != OverlayState.MINI_CASE &&
+            state != OverlayState.BIG_PUSH
+        ) {
             rejectedTransition = "onMinimize rejected: from $state"
             return
         }
         context = detectedContext
         state = OverlayState.MINI_CASE
         miniCaseVisibility = MiniCaseVisibility.VISIBLE
-        lastTransition = "onMinimize → MINI_CASE"
+        lastTransition = "onMinimize → MINI_CASE from prior"
         rejectedTransition = null
         refreshPosition()
     }
