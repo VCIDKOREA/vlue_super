@@ -2276,10 +2276,10 @@ class CallOverlayService : Service() {
         /*
          * Mini→Showcase 직후 ContextWatch 가 OTHER_APP(삼성 인콜 UI)으로 오판하면
          * collapseToBottomShowcaseBar → 156dp 컴팩트 창이 된다.
-         * 웹은 restore 로 expanded=true(전화 화면 보기 CTA 포함)인데 네이티브 창만
-         * 접혀 CTA·하단이 잘리는 버그가 난다. Answer 와 동일하게 홀드로 보호.
+         * 웹은 restore 로 expanded=true 인데 네이티브 창만 Mini/바 높이면 상단만 짤린다.
+         * Answer 보다 길게 홀드 + FULLSCREEN 재확정.
          */
-        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 3500L
+        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
         companion.onRestoreShowcase(OverlayContext.IN_CALL)
         if (companion.rejectedTransition != null && companion.state != OverlayState.SHOWCASE) {
             OverlayDiagTracker.recordOverlayFailure(
@@ -2290,13 +2290,18 @@ class CallOverlayService : Service() {
         }
         publishCompanion(OverlayTriggerEvent.USER_RESTORE, userAction = true)
         userMinimized = false
-        applyLayoutFromController(source = source)
+        enterShowcaseLayout(source = source)
         notifyWebCallState("restore_showcase")
         webView?.evaluateJavascript(
             "try{window.VlueLettering&&window.VlueLettering.setExpanded&&window.VlueLettering.setExpanded(true);" +
                 "window.dispatchEvent(new CustomEvent('vlue-native-expand-showcase',{detail:{expanded:true}}));}catch(e){}",
             null
         )
+        /* Mini 창 높이(≈140dp)가 남는 레이스 — FULLSCREEN 재커밋 */
+        mainHandler.postDelayed({
+            if (dismissing || companion.state != OverlayState.SHOWCASE) return@postDelayed
+            commitFullscreenLayout(source = "restore_reaffirm")
+        }, 280L)
     }
 
     /**
