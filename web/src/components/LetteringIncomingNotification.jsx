@@ -322,13 +322,20 @@ export default function LetteringIncomingNotification({
     }
     const next = !expanded;
     setExpanded(next);
-    /* Companion: 통화 중 접기=Mini Case+삼성 UI, 펼치기=Showcase 복귀 (BigPush로 복귀하지 않음) */
+    /*
+     * Native overlay: 펼침은 항상 restore(FULLSCREEN).
+     * ringing BigPush 에서 liveOnCall=false 이면 restore 를 안 불러
+     * 웹만 expanded → 156dp 창에 풀 UI 가 짤림 (실기기 로그: RESTORE 0회).
+     * 접기는 통화 중(Mini)일 때만.
+     */
     const liveOnCall = callPhase === "active" || callPhase === "connected";
-    if (COMPANION_MVP_DELEGATE_CALL_UI && liveOnCall && !previewMode && !fromCallHistory) {
+    const nativeOverlay =
+      COMPANION_MVP_DELEGATE_CALL_UI && !previewMode && !fromCallHistory;
+    if (nativeOverlay) {
       try {
         if (next) {
           nativeRestoreShowcaseOverlay();
-        } else {
+        } else if (liveOnCall) {
           nativeRevealSystemCallUi();
         }
       } catch {
@@ -917,14 +924,14 @@ export default function LetteringIncomingNotification({
   }, [setExpanded, onToast, previewMode]);
 
   const expandShowcaseFromMiniCase = useCallback(() => {
-    if (!canRestoreFromMiniCase) return;
+    /* canRestore 가드와 무관하게 native FULLSCREEN 요청 — 게이트는 expandOnTap 쪽 */
     setExpanded(true);
     try {
       nativeRestoreShowcaseOverlay();
     } catch {
       /* ignore */
     }
-  }, [canRestoreFromMiniCase, setExpanded]);
+  }, [setExpanded]);
 
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;

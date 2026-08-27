@@ -129,11 +129,16 @@ class LetteringJavascriptBridge(
         }
     }
 
-    /** Restore Request — MINI_CASE → SHOWCASE/FULLSCREEN (Controller 판단) */
+    /** Restore Request — MINI_CASE / BIG_PUSH → SHOWCASE/FULLSCREEN (Controller 판단) */
     @JavascriptInterface
     fun restoreShowcaseOverlay() {
         CompanionPerfTracker.measureJsBridge("restoreShowcaseOverlay") {
             try {
+                Log.i(TAG, "restoreShowcaseOverlay invoked")
+                VlueBigPushTrace.lifecycle(
+                    "JS_RESTORE_REQUEST",
+                    "bridge restoreShowcaseOverlay"
+                )
                 service.onRestoreShowcaseRequestedFromWeb(source = "js.restoreShowcase")
             } catch (e: Exception) {
                 Log.e(TAG, "restoreShowcaseOverlay failed", e)
