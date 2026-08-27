@@ -137,14 +137,26 @@ object BigPushShowcaseBar {
             )
         }
         val brand = if (!handle.isNullOrBlank()) "$handle Showcase" else "VLUE Showcase"
-        /* 앱 미리보기와 동일: 1행 = 회사 · 이름 (직함 제외), 2행 = 회사 / 번호 */
+        /*
+         * 앱 미리보기·웹 빅푸시와 동일:
+         * 1행 = 상호(없으면 이름)
+         * 2행 = 상호 있으면 「이름 | 번호」 / 없으면 번호만
+         */
         val primary = when {
-            !org.isNullOrBlank() && !displayName.isNullOrBlank() -> "$org · $displayName"
+            !org.isNullOrBlank() -> org
             !displayName.isNullOrBlank() -> displayName
             else -> phoneDisp.ifBlank { "번호 확인 중…" }
         }
         val secondary = when {
-            !org.isNullOrBlank() && phoneDisp.isNotBlank() -> "$org / $phoneDisp"
+            !org.isNullOrBlank() -> {
+                val parts = listOfNotNull(
+                    displayName?.takeIf { it.isNotBlank() },
+                    phoneDisp.takeIf { it.isNotBlank() }
+                )
+                if (parts.isNotEmpty()) parts.joinToString(" | ")
+                else if (verified) "VLUE 인증 · 쇼케이스"
+                else "상대 번호 확인 중…"
+            }
             phoneDisp.isNotBlank() -> phoneDisp
             verified -> "VLUE 인증 · 쇼케이스"
             else -> "상대 번호 확인 중…"

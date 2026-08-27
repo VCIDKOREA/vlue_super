@@ -1,9 +1,10 @@
 import { ShieldCheck } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
+import { isVlueBrandOrganization } from "../../lib/letteringPaidIdentityDisplay.js";
 
 /**
  * 일반·유료(명함 미사용) 쇼케이스 — 좌측 하단 식별 정보
- * 상호·이름(설정에 따라) + 전화번호
+ * 빅푸시와 동일: 1줄 상호|이름 / 2줄 이름|전화 또는 전화
  */
 export default function ShowcaseIdentityCorner({
   name = "",
@@ -14,12 +15,17 @@ export default function ShowcaseIdentityCorner({
   hint = "",
   showName = true
 }) {
-  const org = String(organization || "").trim();
+  const rawOrg = String(organization || "").trim();
+  const org = isVlueBrandOrganization(rawOrg) ? "" : rawOrg;
   const nm = String(name || "").trim();
-  const phoneLabel = formatLetteringPhoneDisplay(phone) || String(phone || "").trim() || "—";
+  const phoneLabel = formatLetteringPhoneDisplay(phone) || String(phone || "").trim() || "";
   const showIdentity = showName !== false;
   const primary = showIdentity ? org || nm : "";
-  const secondary = showIdentity && org && nm ? nm : "";
+  const secondary = showIdentity
+    ? org
+      ? [nm, phoneLabel].filter(Boolean).join(" | ")
+      : phoneLabel
+    : phoneLabel;
 
   return (
     <div className="showcase-identity-corner">
@@ -33,7 +39,6 @@ export default function ShowcaseIdentityCorner({
         </p>
       ) : null}
       {secondary ? <p className="showcase-identity-corner__org">{secondary}</p> : null}
-      <p className="showcase-identity-corner__phone">{phoneLabel}</p>
       {hint ? <p className="showcase-identity-corner__hint">{hint}</p> : null}
     </div>
   );

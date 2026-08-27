@@ -9,6 +9,7 @@ import {
   X
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
+import { resolveCallOverlayIdentityLines } from "../../lib/letteringPaidIdentityDisplay.js";
 import { readActiveShowcaseStyle, createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 import { readShowcasePrivacyMode } from "../../lib/showcase/showcasePrivacyMode.js";
 import {
@@ -238,13 +239,36 @@ export default function TentShowcaseOverlay({
       card?.showcaseStyle?.showBroadcastName === false ||
       style?.showBroadcastName === false
   );
-  const titleName = exposeCustom
-    ? hideBroadcastName
-      ? known.matchedName || phoneLabel
-      : displayName || card?.name || card?.displayName || known.matchedName || phoneLabel
-    : phoneLabel;
-  const orgLine =
-    exposeCustom && isPaid && !hideBroadcastName ? organization || card?.organization || "" : "";
+  const overlayId = useMemo(() => {
+    if (!exposeCustom) {
+      return { primary: phoneLabel, secondary: "" };
+    }
+    if (hideBroadcastName) {
+      const saved = known.matchedName || phoneLabel;
+      return { primary: saved, secondary: saved === phoneLabel ? "" : phoneLabel };
+    }
+    return resolveCallOverlayIdentityLines(
+      {
+        ...(card || {}),
+        organization: organization || card?.organization || "",
+        name: displayName || card?.name || card?.displayName || "",
+        phone: peerPhone || card?.phone || ""
+      },
+      { incomingNumber: peerPhone || "" }
+    );
+  }, [
+    exposeCustom,
+    hideBroadcastName,
+    known.matchedName,
+    phoneLabel,
+    card,
+    organization,
+    displayName,
+    peerPhone,
+    isPaid
+  ]);
+  const titleName = overlayId.primary || phoneLabel;
+  const identitySecondary = overlayId.secondary || "";
 
   const photos = useMemo(() => {
     if (!exposeCustom) return [];
@@ -496,21 +520,24 @@ export default function TentShowcaseOverlay({
                   />
                 ) : null}
               </h1>
-              {orgLine ? <p className="tent-vlue__org">{orgLine}</p> : null}
-              {phoneLabel ? (
-                <button
-                  type="button"
-                  className="tent-vlue__phone tent-vlue__phone--link"
-                  onClick={() => {
-                    if (!linksEnabled) {
-                      showLinkToast("통화 연결 후 전화를 걸 수 있습니다.");
-                      return;
-                    }
-                    setDialOpen(true);
-                  }}
-                >
-                  {phoneLabel}
-                </button>
+              {identitySecondary ? (
+                identitySecondary === phoneLabel ? (
+                  <button
+                    type="button"
+                    className="tent-vlue__phone tent-vlue__phone--link"
+                    onClick={() => {
+                      if (!linksEnabled) {
+                        showLinkToast("통화 연결 후 전화를 걸 수 있습니다.");
+                        return;
+                      }
+                      setDialOpen(true);
+                    }}
+                  >
+                    {identitySecondary}
+                  </button>
+                ) : (
+                  <p className="tent-vlue__org">{identitySecondary}</p>
+                )
               ) : null}
             </div>
             {showFollow ? (

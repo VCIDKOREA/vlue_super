@@ -409,9 +409,9 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
       {personName || phoneDisplay || title ? (
         <p className="ldr-hero__contact">
           {personName ? <span className="ldr-hero__person">{personName}</span> : null}
-          {personName && (phoneDisplay || title) ? <span className="ldr-hero__contact-sep"> / </span> : null}
+          {personName && (phoneDisplay || title) ? <span className="ldr-hero__contact-sep"> | </span> : null}
           {phoneDisplay ? <span className="ldr-hero__phone">{phoneDisplay}</span> : null}
-          {phoneDisplay && title ? <span className="ldr-hero__contact-sep"> / </span> : null}
+          {phoneDisplay && title ? <span className="ldr-hero__contact-sep"> | </span> : null}
           {title ? <span className="ldr-hero__title">{title}</span> : null}
         </p>
       ) : null}

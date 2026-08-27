@@ -752,7 +752,8 @@ export default function LetteringIncomingNotification({
       ? showcaseOffAuthLabel
       : hideBroadcastName
         ? contactSavedName || collapsedPhoneDisplay || "—"
-        : /* 쇼케이스 ON 빅푸시 — 앱 미리보기와 동일: 이름 (브랜드 상호 VLUE 붙이지 않음) */
+        : /* 쇼케이스 ON 빅푸시: 상호 우선 → 없으면 이름 (CEO=VCID KOREA, 전중희=이름) */
+          receptionLines?.primary ||
           peerVerifiedName ||
           receptionLines?.name ||
           contactSavedName ||
@@ -761,14 +762,13 @@ export default function LetteringIncomingNotification({
     Boolean(collapsedPhoneDisplay) &&
     normalizePhoneDigits(displayLabel) === normalizePhoneDigits(collapsedPhoneDisplay) &&
     Boolean(normalizePhoneDigits(collapsedPhoneDisplay));
-  const showCollapsedOrg =
-    !showcaseOffPreview &&
-    !hideBroadcastName &&
-    Boolean(receptionLines?.organization) &&
-    String(receptionLines.organization).trim() !== String(displayLabel || "").trim();
-  /* 인증-only: 1줄 VLUE 인증 · 이름 / 2줄 번호 */
+  /* 2줄: 상호 있으면 「이름 | 전화」 / 없으면 전화만 */
+  const collapsedSecondaryLine = !showcaseOffPreview && !hideBroadcastName
+    ? String(receptionLines?.secondary || "").trim()
+    : "";
   const showCollapsedPhoneSubline =
     (showcaseOffPreview && Boolean(collapsedPhoneDisplay)) ||
+    Boolean(collapsedSecondaryLine) ||
     (!showcaseOffPreview && Boolean(collapsedPhoneDisplay) && !phoneSameAsPrimary);
 
   const isInCallChromePreview = Boolean(previewMode && inCallChromePreview);
@@ -1180,13 +1180,14 @@ export default function LetteringIncomingNotification({
       unverifiedCollapsedPhone ||
       incoming ||
       "—";
-    /* MiniCase 는 DCC 유무와 동일 — 이름만 (빅푸시「VLUE 인증 ·」라벨 아님) */
+    /* MiniCase — 빅푸시와 동일: 1줄 상호|이름 / 2줄 이름|전화 또는 전화 */
     const nameDisp = isExpiredLine
       ? phoneDisp
       : isUnverified
         ? phoneDisp
         : String(
-            peerVerifiedName ||
+            receptionLines?.primary ||
+              peerVerifiedName ||
               receptionLines?.name ||
               receptionLines?.collapsedPrimary ||
               contactSavedName ||
@@ -1194,9 +1195,7 @@ export default function LetteringIncomingNotification({
           ).trim() || phoneDisp;
     const subPhone = isExpiredLine
       ? expiredSubtitle
-      : receptionLines?.organization && phoneDisp
-        ? `${receptionLines.organization} / ${phoneDisp}`
-        : phoneDisp;
+      : String(receptionLines?.secondary || "").trim() || phoneDisp;
     return (
       <div
         className={`companion-mini-case-layer ${className || ""}`.trim()}
@@ -1357,15 +1356,19 @@ export default function LetteringIncomingNotification({
                 </p>
                 {showCollapsedPhoneSubline ? (
                   <p className="lettering-ongoing-subline mt-0.5 min-w-0">
-                    {showCollapsedOrg ? (
-                      <>
-                        <span className="font-medium text-slate-600">{receptionLines.organization}</span>
-                        <span className="text-slate-400"> / </span>
-                      </>
-                    ) : null}
-                    <span className="lettering-ongoing-phone-em font-bold text-blue-700">
-                      {collapsedPhoneDisplay}
-                    </span>
+                    {showcaseOffPreview ? (
+                      <span className="lettering-ongoing-phone-em font-bold text-blue-700">
+                        {collapsedPhoneDisplay}
+                      </span>
+                    ) : collapsedSecondaryLine ? (
+                      <span className="lettering-ongoing-phone-em font-bold text-blue-700">
+                        {collapsedSecondaryLine}
+                      </span>
+                    ) : (
+                      <span className="lettering-ongoing-phone-em font-bold text-blue-700">
+                        {collapsedPhoneDisplay}
+                      </span>
+                    )}
                   </p>
                 ) : null}
               </>

@@ -90,28 +90,48 @@ export function formatLetteringPaidIdentity(card = {}) {
   };
 }
 
-/** 빅푸시·수신 UI — 상호 / 번호·직함 한 줄 포맷 */
-export function formatLetteringReceptionLines(card = {}, { incomingNumber = "" } = {}) {
+/**
+ * 빅푸시·접힘 바·Mini·미리보기·공유 쇼케이스 공통 2줄
+ * 1줄: 상호 있으면 상호 / 없으면 이름
+ * 2줄: 상호 있으면 「이름 | 전화번호」 / 없으면 전화번호만
+ * (직책·부서는 DCC·풀 쇼케이스 본문에만 — 여기 넣지 않음)
+ */
+export function resolveCallOverlayIdentityLines(card = {}, { incomingNumber = "" } = {}) {
   const identity = formatLetteringPaidIdentity(card);
   const org = identity.organization;
   const name = identity.name;
-  const title = identity.title;
   const liveIncoming = isUnknownPhoneToken(incomingNumber) ? "" : String(incomingNumber || "").trim();
   const cardPhone = isUnknownPhoneToken(card.phone) ? "" : String(card.phone || "").trim();
   const phoneRaw = liveIncoming || cardPhone;
   const phone = formatLetteringPhoneDisplay(phoneRaw) || phoneRaw;
-  /* 디지털 인증명함 — 상호·이름 동시 표현 (사업자 상호 우선) */
-  const collapsedPrimary = identity.orgAndName || org || name || "\u2014";
-  const expandedOrgLine = org || name || "\u2014";
-  const expandedContactLine = [name && org ? name : null, phone, title].filter(Boolean).join(" / ");
-
+  const primary = org || name || "\u2014";
+  const secondary = org
+    ? [name, phone].filter(Boolean).join(" | ")
+    : phone || "";
   return {
     ...identity,
     phone,
     phoneRaw,
-    collapsedPrimary,
-    expandedOrgLine,
-    expandedContactLine,
-    collapsedHasOrgPhone: Boolean((org || name) && phone)
+    primary,
+    secondary,
+    hasOrganization: Boolean(org)
+  };
+}
+
+/** 빅푸시·수신 UI — 상호 / 번호 한 줄 포맷 (공통 resolveCallOverlayIdentityLines 기반) */
+export function formatLetteringReceptionLines(card = {}, { incomingNumber = "" } = {}) {
+  const lines = resolveCallOverlayIdentityLines(card, { incomingNumber });
+  const org = lines.organization;
+  const name = lines.name;
+  const phone = lines.phone;
+
+  return {
+    ...lines,
+    collapsedPrimary: lines.primary,
+    expandedOrgLine: lines.primary,
+    expandedContactLine: lines.secondary,
+    collapsedHasOrgPhone: Boolean((org || name) && phone),
+    bigPushPrimary: lines.primary,
+    bigPushSecondary: lines.secondary
   };
 }
