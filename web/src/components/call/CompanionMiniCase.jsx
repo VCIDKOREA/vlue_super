@@ -96,6 +96,7 @@ function revealPosFromPeek(pos, cardW, vw) {
  *
  * Position(MINI_CASE)과 Visibility(VISIBLE|EDGE_HIDDEN)는 분리.
  * 좌표: updateMiniOverlayFrame / Visibility: setMiniCaseVisibility.
+ * 「쇼케이스 돌아가기」버튼 없음 — expandOnTap 이면 카드 탭으로 풀쇼케이스 복원.
  */
 export default function CompanionMiniCase({
   displayName = "",
@@ -105,7 +106,8 @@ export default function CompanionMiniCase({
   verified = false,
   onExpand,
   customBody = null,
-  hideExpand = false,
+  /** true: DCC/쇼케이스 유저만 — 카드 탭으로 풀쇼케이스 복원. 안심팝업-only 는 false */
+  expandOnTap = false,
   locked = false,
   brandText = "VLUE LIVE"
 }) {
@@ -279,10 +281,15 @@ export default function CompanionMiniCase({
 
       if (moved <= DRAG_CLICK_MAX_PX) {
         if (wasPeek) {
-          /* EDGE_HIDDEN Tap → VISIBLE (Showcase 복원은 「쇼케이스 돌아가기」 버튼만) */
+          /* EDGE_HIDDEN Tap → VISIBLE */
           const revealed = revealPosFromPeek(final, cw, vw);
           applyPos(revealed, { commitVisibility: true });
           syncNativeVisibility(false);
+          return;
+        }
+        /* VISIBLE Tap → 풀쇼케이스 복원 (DCC/쇼케이스 계정만) */
+        if (expandOnTap) {
+          onExpand?.();
         }
         return;
       }
@@ -290,7 +297,7 @@ export default function CompanionMiniCase({
       /* Drag End → peek이면 EDGE_HIDDEN, 아니면 VISIBLE */
       applyPos(final, { commitVisibility: true });
     },
-    [applyPos, syncNativeVisibility]
+    [applyPos, expandOnTap, onExpand, syncNativeVisibility]
   );
 
   const cssCardW = peekRight || peekLeft ? PEEK_W : resolveCardWidthCss(viewportRef.current.vw);
@@ -324,7 +331,11 @@ export default function CompanionMiniCase({
       }${peekLeft ? " is-peek-left" : ""}`}
       role="group"
       tabIndex={-1}
-      aria-label={hideExpand ? "VLUE 미니케이스 · 드래그로 위치 이동" : "VLUE 미니케이스 · 드래그로 위치 이동 · 쇼케이스 복원은 하단 버튼"}
+      aria-label={
+        expandOnTap
+          ? "VLUE 미니케이스 · 탭하면 쇼케이스로 복원 · 드래그로 위치 이동"
+          : "VLUE 미니케이스 · 드래그로 위치 이동"
+      }
       style={style}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -366,31 +377,6 @@ export default function CompanionMiniCase({
                 <span className="companion-mini-case__phone">{phoneLabel || "—"}</span>
               </p>
             </div>
-          )}
-          {hideExpand ? null : (
-            <button
-              type="button"
-              className="companion-mini-case__expand"
-              onClick={(e) => {
-                e.stopPropagation();
-                onExpand?.();
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              <span className="companion-mini-case__expand-shine" aria-hidden="true" />
-              <span className="companion-mini-case__expand-icon" aria-hidden="true">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path
-                    d="M2.2 7.4L6 3.6l3.8 3.8"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-              <span className="companion-mini-case__expand-label">쇼케이스 돌아가기</span>
-            </button>
           )}
         </>
       )}

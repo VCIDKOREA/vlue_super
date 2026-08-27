@@ -562,13 +562,15 @@ export default function LetteringIncomingNotification({
     !isLookupPending &&
     !showcaseOffPreview &&
     (isPaidMember || isFreeMember || isUnverified || isExpiredLine);
-  /** MiniCase「쇼케이스 돌아가기」— 복원 대상 없으면 버튼 숨김 */
+  /**
+   * MiniCase 탭 → 풀쇼케이스 복원.
+   * DCC/쇼케이스 송출 계정만 허용. 안심팝업·인증-only·미인증 팝업은 Mini가 최종 UX.
+   */
   const canRestoreFromMiniCase = useMemo(() => {
-    if (showcaseOffPreview) return true;
-    if (isUnverified || isExpiredLine) return true;
-    if (isContactSafeCare || isDcp) return true;
+    if (isLookupPending || showcaseOffPreview) return false;
+    if (isContactSafeCare || isDcp || isExpiredLine) return false;
     return peerHasDccOrShowcaseContent(c, c?.showcaseStyle);
-  }, [showcaseOffPreview, isUnverified, isExpiredLine, isContactSafeCare, isDcp, c]);
+  }, [isLookupPending, showcaseOffPreview, isContactSafeCare, isDcp, isExpiredLine, c]);
   const [reportTick, setReportTick] = useState(0);
   const [walletTick, setWalletTick] = useState(0);
 
@@ -911,35 +913,18 @@ export default function LetteringIncomingNotification({
     } catch {
       /* ignore */
     }
-    /* 미니케이스와 겹치는 안내 토스트는 내지 않음 — 힌트는 MiniCase 하단 버튼으로 */
+    /* 미니케이스와 겹치는 안내 토스트는 내지 않음 */
   }, [setExpanded, onToast, previewMode]);
 
   const expandShowcaseFromMiniCase = useCallback(() => {
-    /* 인증-only / 미인증 / 만료 — 풀쇼케이스 대신 팝업·신고 UI 복원 */
-    if (showcaseOffPreview || isUnverified || isExpiredLine) {
-      try {
-        nativeRestoreShowcaseOverlay();
-      } catch {
-        try {
-          window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
-          window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
-        } catch {
-          /* ignore */
-        }
-      }
-      if (isUnverified || isExpiredLine) {
-        setExpanded(true);
-        if (isExpiredLine) setExpiredPopupOpen(true);
-      }
-      return;
-    }
+    if (!canRestoreFromMiniCase) return;
     setExpanded(true);
     try {
       nativeRestoreShowcaseOverlay();
     } catch {
       /* ignore */
     }
-  }, [setExpanded, showcaseOffPreview, isUnverified, isExpiredLine, incoming]);
+  }, [canRestoreFromMiniCase, setExpanded]);
 
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;
@@ -1184,7 +1169,7 @@ export default function LetteringIncomingNotification({
           durationLabel={companionDurationLabel}
           verified={Boolean(verified && !isUnverified && !isExpiredLine)}
           onExpand={expandShowcaseFromMiniCase}
-          hideExpand={!canRestoreFromMiniCase}
+          expandOnTap={canRestoreFromMiniCase}
         />
         {isExpiredLine ? (
           <AgencyDcpMiniPopup

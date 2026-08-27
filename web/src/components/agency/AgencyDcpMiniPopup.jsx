@@ -26,7 +26,7 @@ export default function AgencyDcpMiniPopup({
     <div className="agency-dcp-mini-layer" data-dcp-popup={variant}>
       <CompanionMiniCase
         brandText={expired ? "VLUE · 인증 만료" : abnormal ? "VLUE DCP · 비정상" : "VLUE DCP"}
-        hideExpand
+        expandOnTap={false}
         locked={abnormal || expired}
         customBody={
           <AgencyDcpCard
