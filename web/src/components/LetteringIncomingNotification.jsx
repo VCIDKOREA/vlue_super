@@ -571,13 +571,31 @@ export default function LetteringIncomingNotification({
     (isPaidMember || isFreeMember || isUnverified || isExpiredLine);
   /**
    * MiniCase 탭 → 풀쇼케이스 복원.
-   * DCC/쇼케이스 송출 계정만 허용. 안심팝업·인증-only·미인증 팝업은 Mini가 최종 UX.
+   * 이 통화에서 풀 쇼케이스를 한 번이라도 본 뒤에는 항상 허용 (송출 플래그 누락 대비).
+   * 안심팝업·DCP·미인증만 차단.
    */
+  const [hadFullShowcaseThisCall, setHadFullShowcaseThisCall] = useState(false);
   const canRestoreFromMiniCase = useMemo(() => {
     if (isLookupPending || showcaseOffPreview) return false;
-    if (isContactSafeCare || isDcp || isExpiredLine) return false;
-    return peerHasDccOrShowcaseContent(c, c?.showcaseStyle);
-  }, [isLookupPending, showcaseOffPreview, isContactSafeCare, isDcp, isExpiredLine, c]);
+    if (isContactSafeCare || isDcp || isExpiredLine || isUnverified) return false;
+    if (hadFullShowcaseThisCall) return true;
+    if (peerHasDccOrShowcaseContent(c, c?.showcaseStyle)) return true;
+    /* includeDigitalCard 누락이어도 인증+유료/무료면 Mini 탭 복원 (버튼 제거 후 게이트 경로) */
+    return Boolean(verified && (isPaidMember || isFreeMember));
+  }, [
+    isLookupPending,
+    showcaseOffPreview,
+    isContactSafeCare,
+    isDcp,
+    isExpiredLine,
+    isUnverified,
+    hadFullShowcaseThisCall,
+    c,
+    verified,
+    isPaidMember,
+    isFreeMember
+  ]);
+
   const [reportTick, setReportTick] = useState(0);
   const [walletTick, setWalletTick] = useState(0);
 
@@ -609,6 +627,10 @@ export default function LetteringIncomingNotification({
   const isExpandedView = expanded && canExpand && expandContent !== false;
   const showExpandedLayout = isExpandedView || keepExpandedLayout;
   const prevExpandedViewRef = useRef(isExpandedView);
+
+  useEffect(() => {
+    if (isExpandedView) setHadFullShowcaseThisCall(true);
+  }, [isExpandedView]);
 
   useLayoutEffect(() => {
     const wasExpanded = prevExpandedViewRef.current;
@@ -908,6 +930,24 @@ export default function LetteringIncomingNotification({
   );
   const showInCallControls = Boolean(showLegacyInCallControls || showCompanionSamsungCta);
 
+  const expandShowcaseFromMiniCase = useCallback(() => {
+    setExpanded(true);
+    setHadFullShowcaseThisCall(true);
+    try {
+      window.Android?.logBigPushTrace?.(
+        "MINI_TAP_EXPAND",
+        `canRestore=${canRestoreFromMiniCase}`
+      );
+    } catch {
+      /* ignore */
+    }
+    try {
+      nativeRestoreShowcaseOverlay();
+    } catch {
+      /* ignore */
+    }
+  }, [setExpanded, canRestoreFromMiniCase]);
+
   const openSamsungCallOptions = useCallback(() => {
     if (previewMode) {
       onToast?.("미리보기입니다. 실제 통화에서는 삼성 전화앱으로 이동합니다.");
@@ -920,18 +960,7 @@ export default function LetteringIncomingNotification({
     } catch {
       /* ignore */
     }
-    /* 미니케이스와 겹치는 안내 토스트는 내지 않음 */
   }, [setExpanded, onToast, previewMode]);
-
-  const expandShowcaseFromMiniCase = useCallback(() => {
-    /* canRestore 가드와 무관하게 native FULLSCREEN 요청 — 게이트는 expandOnTap 쪽 */
-    setExpanded(true);
-    try {
-      nativeRestoreShowcaseOverlay();
-    } catch {
-      /* ignore */
-    }
-  }, [setExpanded]);
 
   /** 홈 미리보기·마케팅 데모도 앱과 동일 풀 쇼케이스 캐러셀 */
   const useShowcaseCarousel = isGlassTent || previewMode;

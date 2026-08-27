@@ -287,9 +287,20 @@ export default function CompanionMiniCase({
           syncNativeVisibility(false);
           return;
         }
-        /* VISIBLE Tap → 풀쇼케이스 복원 (DCC/쇼케이스 계정만) */
+        /* VISIBLE Tap → 풀쇼케이스 복원 */
         if (expandOnTap) {
+          try {
+            window.Android?.logBigPushTrace?.("MINI_CASE_POINTER_TAP", "expandOnTap");
+          } catch {
+            /* ignore */
+          }
           onExpand?.();
+        } else {
+          try {
+            window.Android?.logBigPushTrace?.("MINI_CASE_POINTER_TAP", "expandOnTap=false blocked");
+          } catch {
+            /* ignore */
+          }
         }
         return;
       }
