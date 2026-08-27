@@ -1097,7 +1097,12 @@ class CallOverlayService : Service() {
                 } else {
                     bigPushPeekTab?.visibility = android.view.View.GONE
                     webView?.visibility = android.view.View.VISIBLE
-                    notifyWebCallState("big_push_bar")
+                    /* restore hold 중에는 웹을 다시 바로 접지 않음 */
+                    val hold =
+                        android.os.SystemClock.elapsedRealtime() < showcaseHoldUntilElapsed
+                    if (!hold) {
+                        notifyWebCallState("big_push_bar")
+                    }
                 }
             }
             OverlayState.SHOWCASE -> {
@@ -2263,10 +2268,10 @@ class CallOverlayService : Service() {
             return
         }
         /*
-         * 안심팝업·인증-only·DCP: MiniCase 가 최종 UX.
-         * 웹이 실수로 restore 를 호출해도 팝업 재오픈/BigPush 재부착 금지.
+         * 안심팝업·인증-only: MiniCase 유지.
+         * BIG_PUSH 바(상단 짤림)에서 탭한 복원은 항상 FULLSCREEN — 바→풀 전환 허용.
          */
-        if (isPopupOnlyMiniCaseSession()) {
+        if (isPopupOnlyMiniCaseSession() && companion.state == OverlayState.MINI_CASE) {
             VlueBigPushTrace.lifecycle(
                 "RESTORE_FROM_MINI_SKIP_POPUP_ONLY",
                 "keep MiniCase source=$source state=${companion.state.name}"
@@ -2274,13 +2279,18 @@ class CallOverlayService : Service() {
             return
         }
         /*
-         * Mini→Showcase 직후 ContextWatch 가 OTHER_APP(삼성 인콜 UI)으로 오판하면
-         * collapseToBottomShowcaseBar → 156dp 컴팩트 창이 된다.
-         * 웹은 restore 로 expanded=true 인데 네이티브 창만 Mini/바 높이면 상단만 짤린다.
-         * Answer 보다 길게 홀드 + FULLSCREEN 재확정.
+         * Mini / BigPush 바 → Showcase FULLSCREEN.
+         * BIG_PUSH 에서 onRestore 거절되면 웹만 expanded → 156dp 에 풀 UI 짤림.
          */
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
+        userMinimized = false
+        authPopupOnlyMode = false
+        bigPushPeeking = false
+        val fromState = companion.state.name
         companion.onRestoreShowcase(OverlayContext.IN_CALL)
+        if (companion.state != OverlayState.SHOWCASE) {
+            companion.onAnswer(OverlayContext.IN_CALL)
+        }
         if (companion.rejectedTransition != null && companion.state != OverlayState.SHOWCASE) {
             OverlayDiagTracker.recordOverlayFailure(
                 OverlayFailureReason.UNKNOWN,
@@ -2289,19 +2299,45 @@ class CallOverlayService : Service() {
             )
         }
         publishCompanion(OverlayTriggerEvent.USER_RESTORE, userAction = true)
-        userMinimized = false
-        enterShowcaseLayout(source = source)
+        LetteringIncomingNotifier.cancel(this)
+        nativeBanner?.visibility = android.view.View.GONE
+        webView?.visibility = android.view.View.VISIBLE
+        rootContainer?.setBackgroundColor(Color.parseColor("#0B101B"))
+        if (rootContainer?.isAttachedToWindow == true) {
+            enterShowcaseLayout(source = source)
+        } else {
+            attachOverlayWindow(
+                phone = currentPhone.ifBlank { "unknown" },
+                verified = pendingVerified || parseIsVerified(pendingCardJson),
+                outgoing = currentOutgoing,
+                cardJson = pendingCardJson,
+                asBigPush = false
+            )
+            enterShowcaseLayout(source = source)
+        }
+        syncOverlayChromeForState(source = source)
         notifyWebCallState("restore_showcase")
         webView?.evaluateJavascript(
             "try{window.VlueLettering&&window.VlueLettering.setExpanded&&window.VlueLettering.setExpanded(true);" +
                 "window.dispatchEvent(new CustomEvent('vlue-native-expand-showcase',{detail:{expanded:true}}));}catch(e){}",
             null
         )
-        /* Mini 창 높이(≈140dp)가 남는 레이스 — FULLSCREEN 재커밋 */
+        VlueBigPushTrace.lifecycle(
+            "RESTORE_SHOWCASE",
+            "source=$source from=$fromState → ${companion.state.name} " +
+                "pos=${companion.position.name} h=${layoutParams?.height}"
+        )
         mainHandler.postDelayed({
             if (dismissing || companion.state != OverlayState.SHOWCASE) return@postDelayed
             commitFullscreenLayout(source = "restore_reaffirm")
-        }, 280L)
+        }, 120L)
+        mainHandler.postDelayed({
+            if (dismissing || companion.state != OverlayState.SHOWCASE) return@postDelayed
+            val h = layoutParams?.height ?: 0
+            if (h > 0 && h < dp(400)) {
+                commitFullscreenLayout(source = "restore_reaffirm_h")
+            }
+        }, 450L)
     }
 
     /**

@@ -178,7 +178,14 @@ class CompanionOverlayController {
     }
 
     fun onRestoreShowcase(detectedContext: OverlayContext = OverlayContext.IN_CALL) {
-        if (state != OverlayState.MINI_CASE && state != OverlayState.SHOWCASE) {
+        /*
+         * MINI_CASE·SHOWCASE 뿐 아니라 BIG_PUSH(하단/상단 바)에서도 허용.
+         * 바만 남은 채 웹이 expanded=true 되면 156dp 창에 풀 UI가 짤린다.
+         */
+        if (state != OverlayState.MINI_CASE &&
+            state != OverlayState.SHOWCASE &&
+            state != OverlayState.BIG_PUSH
+        ) {
             rejectedTransition = "onRestoreShowcase rejected: from $state"
             return
         }

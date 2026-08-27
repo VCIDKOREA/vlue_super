@@ -1009,9 +1009,13 @@ function LetteringOverlayHostInner() {
        */
       if (rawState === "big_push_bar") {
         /*
-         * 연속 수신: 직전 answer/restore hold(3.5s) 가 남아 있으면 MiniCase 가
-         * big_push_bar 를 무시 → 삼성 미니 UI 와 VLUE 미니가 겹친다. hold 해제 필수.
+         * Mini/바 → 풀 복원 hold 중 ContextWatch 가 보내는 big_push_bar 는 무시.
+         * (무시 안 하면 156dp 바에 풀 쇼케이스 HTML 이 짤림)
+         * 연속 수신 RINGING 은 아래에서 hold 를 먼저 0 으로 지운 뒤 bar 로 간다.
          */
+        if (Date.now() < restoreHoldUntilRef.current) {
+          return;
+        }
         restoreHoldUntilRef.current = 0;
         autoExpandedOnceRef.current = false;
         resetCompanionMiniCaseSessionPos();
@@ -1026,7 +1030,7 @@ function LetteringOverlayHostInner() {
         setForceShowcaseBar(false);
         setExpanded(false);
       } else if (rawState === "restore_showcase") {
-        restoreHoldUntilRef.current = Date.now() + 3500;
+        restoreHoldUntilRef.current = Date.now() + 120_000;
         autoExpandedOnceRef.current = true;
         forceShowcaseBarRef.current = false;
         setForceShowcaseBar(false);

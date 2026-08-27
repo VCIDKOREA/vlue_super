@@ -144,6 +144,17 @@ class CompanionOverlayControllerTest {
     }
 
     @Test
+    fun restore_fromBigPushBar_goesFullscreenShowcase() {
+        val c = CompanionOverlayController()
+        c.updateContext(OverlayContext.INCOMING_CALL_UI)
+        assertTrue(c.requestBigPush(OverlayContext.INCOMING_CALL_UI))
+        assertEquals(OverlayState.BIG_PUSH, c.state)
+        c.onRestoreShowcase(OverlayContext.IN_CALL)
+        assertEquals(OverlayState.SHOWCASE, c.state)
+        assertEquals(OverlayPosition.FULLSCREEN, c.position)
+    }
+
+    @Test
     fun mini_visible_default_onMinimize() {
         val c = CompanionOverlayController()
         c.onAnswer(OverlayContext.IN_CALL)
