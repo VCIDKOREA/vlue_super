@@ -7,7 +7,11 @@ export function isVlueBrandOrganization(org) {
 }
 
 /** 상호·직책 없는 DCC — 이름 아래 고정 표기 (이름 중복 금지) */
-export const DCC_CERTIFIED_MEMBER_LABEL = "[VLUE 인증회원]";
+export const DCC_CERTIFIED_MEMBER_LABEL = "Verified Member";
+
+export function isDccCertifiedMemberLabel(value) {
+  return String(value || "").trim() === DCC_CERTIFIED_MEMBER_LABEL;
+}
 
 /** 이름 미노출·쇼케이스만 — 상단 라이브바 */
 export const SHOWCASE_BAR_VLUE_ID_LABEL = "VLUE ID";
@@ -38,7 +42,7 @@ export function resolveShowcaseBarOwnerLabel(card = {}, opts = {}) {
  * DCC 앞면 Digital ID 헤드라인 2줄
  * - 상호 있음: 1줄 상호 / 2줄 이름(＋직책·부서)
  * - 상호 없음·직책 있음: 1줄 이름 / 2줄 직책·부서
- * - 상호·직책 없음: 1줄 이름 / 2줄 [VLUE 인증회원]
+ * - 상호·직책 없음: 1줄 이름 / 2줄 Verified Member
  */
 export function resolveDccFrontIdentityLines(card = {}) {
   const rawOrg = String(card.organization || card.companyName || "").trim();

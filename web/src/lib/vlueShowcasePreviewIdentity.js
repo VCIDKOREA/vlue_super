@@ -13,7 +13,7 @@ export const VLUE_PREVIEW_EXAMPLE_BRAND = "VLUE";
 /** 접힘(첫화면) 미리보기에 반드시 노출 */
 export const VLUE_PREVIEW_CARD_APPLY_HINT = "명함 신청 시 반영됩니다";
 
-/** @deprecated 직함·부서 미입력 시 DCC와 동일 — `[VLUE 인증회원]` */
+/** @deprecated 직함·부서 미입력 시 DCC와 동일 — Verified Member */
 export const VLUE_PREVIEW_TITLE_DEPT_PLACEHOLDER = DCC_CERTIFIED_MEMBER_LABEL;
 
 /** 앞면 주소 미입력 안내 (선택) — 미입력 시 행 자체 미표시 권장 */
@@ -50,7 +50,7 @@ function hasLetteringSavedAddress(ed = {}) {
   );
 }
 
-/** 직함 ㅣ 부서명 한 줄 — 비어 있으면 `[VLUE 인증회원]` (DCC·미리보기·상대 쇼케이스 공통) */
+/** 직함 ㅣ 부서명 한 줄 — 비어 있으면 Verified Member (DCC·미리보기·상대 쇼케이스 공통) */
 export function formatTitleDeptLine(title = "", department = "", opts = {}) {
   const t = String(title ?? "").trim();
   const d = String(department ?? "").trim();

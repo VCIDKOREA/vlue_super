@@ -7860,6 +7860,47 @@ button.ldr-back-person-name--link:active {
   max-width: 100%;
 }
 
+.ldr-back-person-name--verified-member {
+  display: inline-block;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: linear-gradient(
+    105deg,
+    rgba(148, 163, 184, 0.92) 0%,
+    rgba(224, 242, 254, 1) 38%,
+    rgba(56, 189, 248, 1) 52%,
+    rgba(224, 242, 254, 1) 66%,
+    rgba(148, 163, 184, 0.92) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ldr-verified-member-shimmer 2.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.35));
+}
+
+@keyframes ldr-verified-member-shimmer {
+  0%,
+  100% {
+    background-position: 100% 0;
+    filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.28));
+  }
+  50% {
+    background-position: 0% 0;
+    filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.55));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ldr-back-person-name--verified-member {
+    animation: none;
+    color: #bae6fd;
+    background: none;
+    filter: none;
+  }
+}
+
 .ldr-back-sub {
   margin: 4px 0 0;
   font-size: 12px;

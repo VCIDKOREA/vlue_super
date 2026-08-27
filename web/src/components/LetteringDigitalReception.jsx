@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { isMaskedPhoneDisplay } from "../lib/dccExposure.js";
-import { formatLetteringReceptionLines, resolveDccFrontIdentityLines, DCC_CERTIFIED_MEMBER_LABEL } from "../lib/letteringPaidIdentityDisplay.js";
+import { formatLetteringReceptionLines, resolveDccFrontIdentityLines, isDccCertifiedMemberLabel } from "../lib/letteringPaidIdentityDisplay.js";
 import { formatLetteringContactEmailDisplay, photoFocusToCss } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard, resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
 import { VLUE_PREVIEW_EMAIL_PLACEHOLDER } from "../lib/vlueShowcasePreviewIdentity.js";
@@ -595,7 +595,7 @@ function FrontPanel({
             if (!secondary) return null;
             const canOpenCase =
               peerUserId &&
-              secondary !== DCC_CERTIFIED_MEMBER_LABEL &&
+              !isDccCertifiedMemberLabel(secondary) &&
               String(card.name || "").trim() &&
               primary !== String(card.name || "").trim();
             if (canOpenCase) {
@@ -612,6 +612,13 @@ function FrontPanel({
                 >
                   {secondary}
                 </button>
+              );
+            }
+            if (isDccCertifiedMemberLabel(secondary)) {
+              return (
+                <p className="ldr-back-person-name ldr-back-person-name--row">
+                  <span className="ldr-back-person-name--verified-member">{secondary}</span>
+                </p>
               );
             }
             return <p className="ldr-back-person-name ldr-back-person-name--row">{secondary}</p>;
