@@ -2250,14 +2250,23 @@ class CallOverlayService : Service() {
      * JS는 layout/state를 직접 바꾸지 않는다.
      */
     fun onAnswerRequestedFromWeb() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post { onAnswerRequestedFromWeb() }
+            return
+        }
         enterShowcaseFromAnswer(source = "js.answerCall")
     }
 
     /**
      * Web Minimize / Reveal System Call UI Request.
      * Controller → MINI_CASE → layout.
+     * JavascriptInterface 는 JavaBridge 스레드 — View/WebView 는 반드시 main.
      */
     fun onMinimizeRequestedFromWeb(source: String = "js.revealSystemCallUi") {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post { onMinimizeRequestedFromWeb(source) }
+            return
+        }
         if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
             CompanionRuntimeStabilityDiag.noteStaleEvent("MINI", source)
             return
@@ -2303,8 +2312,13 @@ class CallOverlayService : Service() {
     /**
      * Web Restore Showcase Request.
      * Controller → SHOWCASE/FULLSCREEN → layout.
+     * JavascriptInterface 는 JavaBridge 스레드 — View/WebView 는 반드시 main.
      */
     fun onRestoreShowcaseRequestedFromWeb(source: String = "js.restoreShowcase") {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post { onRestoreShowcaseRequestedFromWeb(source) }
+            return
+        }
         if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
             CompanionRuntimeStabilityDiag.noteStaleEvent("RESTORE", source)
             return
