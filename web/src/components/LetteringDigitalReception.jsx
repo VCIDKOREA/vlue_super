@@ -12,6 +12,7 @@ import {
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { isMaskedPhoneDisplay } from "../lib/dccExposure.js";
 import { formatLetteringReceptionLines, resolveDccFrontIdentityLines, isDccCertifiedMemberLabel } from "../lib/letteringPaidIdentityDisplay.js";
+import IdentitySecondaryText from "./IdentitySecondaryText.jsx";
 import { formatLetteringContactEmailDisplay, photoFocusToCss } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard, resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
 import { VLUE_PREVIEW_EMAIL_PLACEHOLDER } from "../lib/vlueShowcasePreviewIdentity.js";
@@ -610,7 +611,7 @@ function FrontPanel({
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
                 >
-                  {secondary}
+                  <IdentitySecondaryText text={secondary} />
                 </button>
               );
             }
@@ -621,7 +622,13 @@ function FrontPanel({
                 </p>
               );
             }
-            return <p className="ldr-back-person-name ldr-back-person-name--row">{secondary}</p>;
+            return (
+              <IdentitySecondaryText
+                text={secondary}
+                className="ldr-back-person-name ldr-back-person-name--row"
+                as="p"
+              />
+            );
           })()}
         </div>
       </div>

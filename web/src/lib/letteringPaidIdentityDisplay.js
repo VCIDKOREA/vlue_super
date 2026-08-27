@@ -118,6 +118,18 @@ export function resolveCallOverlayIdentityLines(card = {}, { incomingNumber = ""
   };
 }
 
+/**
+ * 「이름 | 전화」/「이름 ｜ CEO」를 cyan 구분선용으로 분리.
+ * @returns {{ plain: string, parts: string[]|null }|null}
+ */
+export function splitIdentityPipeParts(text) {
+  const plain = String(text || "").trim();
+  if (!plain) return null;
+  const parts = plain.split(/\s*[|｜]\s*/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return { plain, parts: null };
+  return { plain, parts };
+}
+
 /** 빅푸시·수신 UI — 상호 / 번호 한 줄 포맷 (공통 resolveCallOverlayIdentityLines 기반) */
 export function formatLetteringReceptionLines(card = {}, { incomingNumber = "" } = {}) {
   const lines = resolveCallOverlayIdentityLines(card, { incomingNumber });

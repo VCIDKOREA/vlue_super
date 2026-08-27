@@ -7013,8 +7013,11 @@ body,
   letter-spacing: -0.01em;
 }
 
-.ldr-hero__contact-sep {
-  color: rgba(148, 163, 184, 0.75);
+.ldr-hero__contact-sep,
+.lettering-identity-sep {
+  /* DCC DIGITAL ID · PROFILE / 아이콘과 동일 시안 */
+  color: #00d2ff;
+  font-weight: 700;
 }
 
 .ldr-hero__title {

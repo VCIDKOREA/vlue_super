@@ -16,6 +16,7 @@ import ShowcaseCallCarousel from "./showcase/ShowcaseCallCarousel.jsx";
 import FreeTierCallShowcase from "./showcase/FreeTierCallShowcase.jsx";
 import { getLetteringReportsForPhone } from "../lib/letteringPhoneReports.js";
 import { formatLetteringReceptionLines, resolveShowcaseBarOwnerLabel } from "../lib/letteringPaidIdentityDisplay.js";
+import IdentitySecondaryText from "./IdentitySecondaryText.jsx";
 import { LETTERING_DEMO_COMPANY_LOGO } from "../lib/letteringDemoAssets.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAvatar.js";
@@ -1370,9 +1371,10 @@ export default function LetteringIncomingNotification({
                         {collapsedPhoneDisplay}
                       </span>
                     ) : collapsedSecondaryLine ? (
-                      <span className="lettering-ongoing-phone-em font-bold text-blue-700">
-                        {collapsedSecondaryLine}
-                      </span>
+                      <IdentitySecondaryText
+                        text={collapsedSecondaryLine}
+                        className="lettering-ongoing-phone-em font-bold text-blue-700"
+                      />
                     ) : (
                       <span className="lettering-ongoing-phone-em font-bold text-blue-700">
                         {collapsedPhoneDisplay}

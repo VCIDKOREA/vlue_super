@@ -1,6 +1,7 @@
 import { ShieldCheck } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
 import { isVlueBrandOrganization } from "../../lib/letteringPaidIdentityDisplay.js";
+import IdentitySecondaryText from "../IdentitySecondaryText.jsx";
 
 /**
  * 일반·유료(명함 미사용) 쇼케이스 — 좌측 하단 식별 정보
@@ -38,7 +39,9 @@ export default function ShowcaseIdentityCorner({
           ) : null}
         </p>
       ) : null}
-      {secondary ? <p className="showcase-identity-corner__org">{secondary}</p> : null}
+      {secondary ? (
+        <IdentitySecondaryText text={secondary} className="showcase-identity-corner__org" as="p" />
+      ) : null}
       {hint ? <p className="showcase-identity-corner__hint">{hint}</p> : null}
     </div>
   );

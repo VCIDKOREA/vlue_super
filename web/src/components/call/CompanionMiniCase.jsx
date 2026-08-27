@@ -6,6 +6,7 @@ import {
   nativeSetMiniCaseVisibility,
   nativeUpdateMiniOverlayFrame
 } from "../../lib/call/nativeCallControl.js";
+import IdentitySecondaryText from "../IdentitySecondaryText.jsx";
 
 /** 통화 세션 동안 Mini Case 위치 유지 — 통화 종료 시 reset (앱 종료 아님) */
 let sessionMiniCasePos = null;
@@ -385,7 +386,10 @@ export default function CompanionMiniCase({
                 <span className="companion-mini-case__duration">{durationLabel}</span>
               </p>
               <p className="companion-mini-case__line2">
-                <span className="companion-mini-case__phone">{phoneLabel || "—"}</span>
+                <IdentitySecondaryText
+                  text={phoneLabel || "—"}
+                  className="companion-mini-case__phone"
+                />
               </p>
             </div>
           )}

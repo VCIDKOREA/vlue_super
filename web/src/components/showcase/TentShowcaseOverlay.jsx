@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
 import { resolveCallOverlayIdentityLines } from "../../lib/letteringPaidIdentityDisplay.js";
+import IdentitySecondaryText from "../IdentitySecondaryText.jsx";
 import { readActiveShowcaseStyle, createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 import { readShowcasePrivacyMode } from "../../lib/showcase/showcasePrivacyMode.js";
 import {
@@ -536,7 +537,11 @@ export default function TentShowcaseOverlay({
                     {identitySecondary}
                   </button>
                 ) : (
-                  <p className="tent-vlue__org">{identitySecondary}</p>
+                  <IdentitySecondaryText
+                    text={identitySecondary}
+                    className="tent-vlue__org"
+                    as="p"
+                  />
                 )
               ) : null}
             </div>

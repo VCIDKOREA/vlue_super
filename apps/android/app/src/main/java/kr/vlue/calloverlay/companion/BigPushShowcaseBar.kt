@@ -7,6 +7,9 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -45,6 +48,9 @@ object BigPushShowcaseBar {
 
     private val io by lazy { Executors.newSingleThreadExecutor() }
     private val main by lazy { Handler(Looper.getMainLooper()) }
+
+    /** DCC DIGITAL ID · PROFILE 시안 — 빅푸시 「이름 | 번호」 구분선 */
+    private val IDENTITY_SEP_CYAN = Color.parseColor("#00D2FF")
 
     data class Model(
         val brandLabel: String,
@@ -306,7 +312,7 @@ object BigPushShowcaseBar {
         textCol.addView(
             TextView(context).apply {
                 tag = TAG_SECONDARY
-                text = model.secondaryLine
+                text = styleSecondaryWithCyanPipe(model.secondaryLine)
                 setTextColor(Color.parseColor("#94A3B8"))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
                 maxLines = 1
@@ -325,7 +331,8 @@ object BigPushShowcaseBar {
         banner.findViewWithTag<TextView>(TAG_BRAND)?.text =
             if (outgoing) "VLUE 발신" else model.brandLabel
         banner.findViewWithTag<TextView>(TAG_PRIMARY)?.text = model.primaryLine
-        banner.findViewWithTag<TextView>(TAG_SECONDARY)?.text = model.secondaryLine
+        banner.findViewWithTag<TextView>(TAG_SECONDARY)?.text =
+            styleSecondaryWithCyanPipe(model.secondaryLine)
         banner.findViewWithTag<TextView>(TAG_VERIFIED)?.visibility =
             if (model.verified) View.VISIBLE else View.GONE
         banner.findViewWithTag<ImageView>(TAG_AVATAR)?.let {
@@ -435,4 +442,20 @@ object BigPushShowcaseBar {
 
     private fun firstNonBlank(vararg values: String?): String? =
         values.firstOrNull { !it.isNullOrBlank() && it != "null" }
+
+    /** 「이름 | 번호」에서 파이프(|)만 DCC 시안 */
+    private fun styleSecondaryWithCyanPipe(line: String): CharSequence {
+        val sep = " | "
+        val idx = line.indexOf(sep)
+        if (idx < 0) return line
+        val pipeAt = idx + 1
+        return SpannableString(line).apply {
+            setSpan(
+                ForegroundColorSpan(IDENTITY_SEP_CYAN),
+                pipeAt,
+                pipeAt + 1,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+    }
 }
