@@ -1655,6 +1655,19 @@ class CallOverlayService : Service() {
                 /* 이미 수화(SHOWCASE/MINI)일 때만 전체 쇼케이스 재알림 */
                 if (isInCallOverlayState()) {
                     notifyWebCallState("connected")
+                    /*
+                     * Mini 유지 중 connected 만 보내면 웹이 setExpanded(true) 하여
+                     * 두 번째 Mini→풀 복원이 140dp 창에 풀 UI 로 깨진다.
+                     * minimize 를 뒤에 다시 넣어 웹 expanded=false 를 고정.
+                     */
+                    if (userMinimized || companion.state == OverlayState.MINI_CASE) {
+                        notifyWebCallState("minimize_showcase")
+                        webView?.evaluateJavascript(
+                            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&" +
+                                "window.VlueLettering.setExpanded(false);}catch(e){}",
+                            null
+                        )
+                    }
                 }
             } else if (rootContainer == null) {
                 /* MiniCase 유지 중 카드 갱신 — showOverlay(BigPush) 재진입 금지 */
@@ -2254,8 +2267,16 @@ class CallOverlayService : Service() {
         )
         publishCompanion(OverlayTriggerEvent.HOME_CHANGED, userAction = true)
         userMinimized = true
+        /* 직전 restore hold 가 Mini collapse/connected 레이스를 막지 않게 */
+        showcaseHoldUntilElapsed = 0L
         applyLayoutFromController(source = source)
         notifyWebCallState("minimize_showcase")
+        /* connected 재주입 대비 — 웹 expanded 고정 */
+        webView?.evaluateJavascript(
+            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&" +
+                "window.VlueLettering.setExpanded(false);}catch(e){}",
+            null
+        )
     }
 
     /**

@@ -422,6 +422,12 @@ function LetteringOverlayHostInner() {
   const [identityHold, setIdentityHold] = useState(() => !parseOverlayParams().urlMiniCase);
   /* Mini→풀 복원 직후 늦게 도착하는 big_push_bar 로 다시 접히는 레이스 방지 */
   const restoreHoldUntilRef = useRef(0);
+  /**
+   * 사용자가 「통화화면 보기」로 Mini 를 택한 뒤.
+   * connected 재주입이 setExpanded(true) 하면 네이티브 Mini(≈140dp) 안에
+   * 풀 쇼케이스 HTML 이 끼어 두 번째 복원이 실패한다 (실기기 재현).
+   */
+  const userChoseMiniRef = useRef(Boolean(parseOverlayParams().urlMiniCase));
   const loadingStartedAtRef = useRef(Date.now());
   const autoExpandedOnceRef = useRef(false);
   /* 네이티브/웹 조회가 한 번 매칭되면 timeout·unmatched 로 되돌리지 않음 */
@@ -1017,6 +1023,7 @@ function LetteringOverlayHostInner() {
           return;
         }
         restoreHoldUntilRef.current = 0;
+        userChoseMiniRef.current = false;
         autoExpandedOnceRef.current = false;
         resetCompanionMiniCaseSessionPos();
         forceShowcaseBarRef.current = true;
@@ -1026,11 +1033,15 @@ function LetteringOverlayHostInner() {
         rawState === "minimize_showcase" ||
         rawState === "reveal_system_call_ui"
       ) {
+        /* Mini 확정 — 이후 connected 가 와도 풀로 되돌리지 않음 */
+        userChoseMiniRef.current = true;
+        restoreHoldUntilRef.current = 0;
         forceShowcaseBarRef.current = false;
         setForceShowcaseBar(false);
         setExpanded(false);
       } else if (rawState === "restore_showcase") {
-        restoreHoldUntilRef.current = Date.now() + 120_000;
+        userChoseMiniRef.current = false;
+        restoreHoldUntilRef.current = Date.now() + 3500;
         autoExpandedOnceRef.current = true;
         forceShowcaseBarRef.current = false;
         setForceShowcaseBar(false);
@@ -1041,7 +1052,6 @@ function LetteringOverlayHostInner() {
         setCallState(next);
         if (next === CALL_STATES.CONNECTED) {
           const wasShowcaseBar = forceShowcaseBarRef.current;
-          restoreHoldUntilRef.current = Date.now() + 3500;
           forceShowcaseBarRef.current = false;
           setForceShowcaseBar(false);
           if (peerAuthPopupOnlyRef.current) {
@@ -1050,6 +1060,7 @@ function LetteringOverlayHostInner() {
              * MiniCase 확정(이미 bar off / mini=1) 후 connected 재알림은 팝업을 다시 열지 않음.
              */
             autoExpandedOnceRef.current = false;
+            userChoseMiniRef.current = true;
             setExpanded(false);
             if (wasShowcaseBar && !parseOverlayParams().urlMiniCase) {
               try {
@@ -1059,12 +1070,23 @@ function LetteringOverlayHostInner() {
                 /* ignore */
               }
             }
+          } else if (userChoseMiniRef.current) {
+            /*
+             * 사용자가 Mini 유지 중 — connected(카드 enrich/onPageFinished)가
+             * setExpanded(true) 하면 140dp Mini 창에 풀 UI 가 끼어 두 번째 탭이 실패한다.
+             */
+            autoExpandedOnceRef.current = false;
+            setExpanded(false);
+            if (Date.now() < restoreHoldUntilRef.current) {
+              /* no-op: restore hold 직후 스퓨리어스 connected */
+            }
           } else {
             /*
              * 송출 ON: 풀 쇼케이스.
              * 링잉 중 Mini Case로 접은 뒤 수락해도 expanded=false 로 남으면
              * 네이티브 FULLSCREEN + 웹 미니 UI 가 겹친다.
              */
+            restoreHoldUntilRef.current = Date.now() + 3500;
             autoExpandedOnceRef.current = true;
             setExpanded(true);
           }
@@ -1072,6 +1094,7 @@ function LetteringOverlayHostInner() {
         if (next === CALL_STATES.RINGING) {
           /* BigPush = 앱 쇼케이스바 — 연속 수신 시 직전 MiniCase hold/좌표 제거 */
           restoreHoldUntilRef.current = 0;
+          userChoseMiniRef.current = false;
           autoExpandedOnceRef.current = false;
           resetCompanionMiniCaseSessionPos();
           forceShowcaseBarRef.current = true;
