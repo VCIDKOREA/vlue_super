@@ -1,13 +1,18 @@
 /**
  * 카카오 OAuth(서버 리다이렉트) 및 REST API 키.
- * KAKAO_CLIENT_ID 가 없으면 기존 KAKAO_REST_API_KEY 를 사용합니다.
+ * Client Secret 은 REST API 키에 묶이므로 OAuth client_id 도 REST API 키를 우선합니다.
  */
 export function getKakaoClientId(): string {
-  return String(process.env.KAKAO_CLIENT_ID ?? process.env.KAKAO_REST_API_KEY ?? "").trim();
+  const rest = String(process.env.KAKAO_REST_API_KEY ?? "").trim();
+  if (rest) return rest;
+  return String(process.env.KAKAO_CLIENT_ID ?? "").trim();
 }
 
+/** 따옴표·공백 제거 — Railway 복붙 시 흔한 오류 방지 */
 export function getKakaoClientSecret(): string {
-  return String(process.env.KAKAO_CLIENT_SECRET ?? "").trim();
+  const raw = String(process.env.KAKAO_CLIENT_SECRET ?? "").trim();
+  if (!raw) return "";
+  return raw.replace(/^['"]|['"]$/g, "").trim();
 }
 
 /** 카카오 개발자 콘솔에 등록한 Redirect URI — API 콜백 URL과 바이트 단위 일치 */

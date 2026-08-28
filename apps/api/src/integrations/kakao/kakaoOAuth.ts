@@ -87,25 +87,28 @@ export function buildKakaoAuthorizeUrl(state: string, purpose: KakaoOAuthPurpose
   return `${KAKAO_AUTH_BASE}?${params.toString()}`;
 }
 
-export async function exchangeKakaoCodeForAccessToken(code: string): Promise<string> {
-  const clientId = getKakaoClientId();
-  const clientSecret = getKakaoClientSecret();
-  const redirectUri = getKakaoOAuthRedirectUri();
-  if (!clientId) {
-    throw new Error("KAKAO_CLIENT_ID(또는 KAKAO_REST_API_KEY)가 설정되지 않았습니다.");
-  }
-  if (!clientSecret) {
-    throw new Error("KAKAO_CLIENT_SECRET이 설정되지 않았습니다.");
-  }
+function kakaoTokenErrorMessage(json: Record<string, unknown>, status: number): string {
+  const code = typeof json.error === "string" ? json.error : "";
+  const desc =
+    (typeof json.error_description === "string" && json.error_description) ||
+    code ||
+    `카카오 토큰 발급 실패 (${status})`;
 
-  const body = new URLSearchParams({
-    grant_type: "authorization_code",
-    client_id: clientId,
-    client_secret: clientSecret,
-    redirect_uri: redirectUri,
-    code: String(code || "").trim()
-  });
+  if (
+    code === "invalid_client" ||
+    /bad client credentials/i.test(desc) ||
+    /invalid client/i.test(desc)
+  ) {
+    return (
+      "카카오 REST API 키와 Client Secret이 일치하지 않습니다. " +
+      "카카오 콘솔 → 플랫폼 키 → REST API 키 → 클라이언트 시크릿에서 코드를 다시 생성·활성화한 뒤 " +
+      "Railway KAKAO_CLIENT_SECRET에 붙여넣고, KAKAO_CLIENT_ID가 REST 키와 다르면 삭제해 주세요."
+    );
+  }
+  return desc;
+}
 
+async function postKakaoToken(body: URLSearchParams): Promise<string> {
   const res = await fetch(KAKAO_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded;charset=utf-8" },
@@ -114,11 +117,7 @@ export async function exchangeKakaoCodeForAccessToken(code: string): Promise<str
 
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    const err =
-      (typeof json.error_description === "string" && json.error_description) ||
-      (typeof json.error === "string" && json.error) ||
-      `카카오 토큰 발급 실패 (${res.status})`;
-    throw new Error(err);
+    throw new Error(kakaoTokenErrorMessage(json, res.status));
   }
 
   const accessToken = typeof json.access_token === "string" ? json.access_token.trim() : "";
@@ -126,4 +125,41 @@ export async function exchangeKakaoCodeForAccessToken(code: string): Promise<str
     throw new Error("카카오 응답에 access_token이 없습니다.");
   }
   return accessToken;
+}
+
+export async function exchangeKakaoCodeForAccessToken(code: string): Promise<string> {
+  const clientId = getKakaoClientId();
+  const clientSecret = getKakaoClientSecret();
+  const redirectUri = getKakaoOAuthRedirectUri();
+  if (!clientId) {
+    throw new Error("KAKAO_REST_API_KEY(또는 KAKAO_CLIENT_ID)가 설정되지 않았습니다.");
+  }
+
+  const base = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    code: String(code || "").trim()
+  });
+
+  if (clientSecret) {
+    const withSecret = new URLSearchParams(base);
+    withSecret.set("client_secret", clientSecret);
+    try {
+      return await postKakaoToken(withSecret);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const badCreds = /일치하지 않습니다|bad client credentials|invalid_client/i.test(msg);
+      if (badCreds) {
+        try {
+          return await postKakaoToken(base);
+        } catch {
+          throw err;
+        }
+      }
+      throw err;
+    }
+  }
+
+  return postKakaoToken(base);
 }
