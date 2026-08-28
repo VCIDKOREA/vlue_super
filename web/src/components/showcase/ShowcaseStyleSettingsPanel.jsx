@@ -516,9 +516,6 @@ export default function ShowcaseStyleSettingsPanel({
     const incomingAvatar = String(kakaoLink.profileImageUrl || "").trim();
     const prevTitle = String(config.platformFeed?.kakaoProfileTitle || "").trim();
     const prevAvatar = String(config.platformFeed?.kakaoAvatarUrl || "").trim();
-    const prevTalkId = normalizeKakaoTalkId(config.platformFeed?.kakaoTalkId);
-    const guessTalkId = normalizeKakaoTalkId(incomingTitle);
-    const talkId = prevTalkId || guessTalkId;
     const title = incomingTitle || prevTitle || "카카오 인증";
     const avatar = incomingAvatar || prevAvatar;
     const channelUrl =
@@ -532,7 +529,6 @@ export default function ShowcaseStyleSettingsPanel({
       config.platformFeed?.kakaoUserId === userId &&
       config.platformFeed?.kakaoProfileTitle === title &&
       String(config.platformFeed?.kakaoAvatarUrl || "") === avatar &&
-      normalizeKakaoTalkId(config.platformFeed?.kakaoTalkId) === talkId &&
       normalizeKakaoProfilePageUrl(config.platformFeed?.kakaoChannelUrl) === channelUrl
     ) {
       return;
@@ -543,7 +539,6 @@ export default function ShowcaseStyleSettingsPanel({
         kakaoVerified: true,
         kakaoUserId: userId,
         kakaoProfileTitle: title,
-        kakaoTalkId: talkId,
         kakaoChannelUrl: channelUrl,
         kakaoProfileUrl: channelUrl,
         kakaoAvatarUrl: avatar
@@ -552,7 +547,6 @@ export default function ShowcaseStyleSettingsPanel({
         ...(config.commercial || {}),
         outlinks: {
           ...(config.commercial.outlinks || {}),
-          kakaoTalkId: talkId,
           kakaoChannel: channelUrl,
           kakaoProfile: channelUrl
         }
@@ -568,7 +562,6 @@ export default function ShowcaseStyleSettingsPanel({
     config.platformFeed?.kakaoProfileTitle,
     config.platformFeed?.kakaoUserId,
     config.platformFeed?.kakaoAvatarUrl,
-    config.platformFeed?.kakaoTalkId,
     config.platformFeed?.kakaoChannelUrl,
     persist
   ]);
@@ -1248,7 +1241,7 @@ export default function ShowcaseStyleSettingsPanel({
                   <span>비즈니스</span>
                   <span>쇼셜링크</span>
                 </span>
-                <HelpTip text="Instagram·카카오는 웹 로그인(OAuth)으로 SNS 인증합니다. 개인 1:1은 카카오톡 ID, 비즈니스는 카카오 채널 URL을 따로 입력합니다." />
+                <HelpTip text="Instagram·카카오는 웹 로그인(OAuth)으로 SNS 인증합니다. 카카오톡 ID는 카카오톡 설정에서 확인한 친구추가용 ID를 직접 입력하세요 (OAuth 닉네임과 다를 수 있음)." />
               </span>
             </span>
             <span className="showcase-profile-row__trail">
@@ -1363,13 +1356,13 @@ export default function ShowcaseStyleSettingsPanel({
                 }}
               />
               <BusinessOutlinkRow
-                brand="kakao"
+                brand="kakao-talk-id"
                 label="카카오톡 ID"
-                placeholder="친구추가용 ID (4~20자, 영문·숫자)"
+                placeholder="친구추가용 ID (예: vcid)"
                 value={config.platformFeed?.kakaoTalkId || config.commercial?.outlinks?.kakaoTalkId || ""}
                 inputCls={inputCls}
                 onChange={(v) => {
-                  const talkId = normalizeKakaoTalkId(v) || String(v || "").trim().replace(/^@+/, "");
+                  const talkId = String(v || "").trim().replace(/^@+/, "");
                   persist({
                     platformFeed: {
                       ...(config.platformFeed || {}),
@@ -1693,7 +1686,7 @@ function BrandMark({ brand }) {
       </span>
     );
   }
-  if (brand === "kakao") {
+  if (brand === "kakao" || brand === "kakao-talk-id") {
     return (
       <span className="showcase-brand-mark showcase-brand-mark--kakao" aria-hidden>
         <KakaoTalkGlyph size={18} />

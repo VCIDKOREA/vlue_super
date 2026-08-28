@@ -1,4 +1,4 @@
-import { apiUrl } from "../apiBase.js";
+import { resolvePublicShowcaseShareOrigin } from "../vlueViralLinks.js";
 import { openExternalHref } from "../showcase/showcaseContactActions.js";
 
 /** 카카오톡 친구추가용 ID (4~20자, 영문·숫자·- _ .) */
@@ -15,7 +15,8 @@ export function normalizeKakaoTalkId(raw) {
 export function buildKakaoTalkAddBridgeUrl(talkId) {
   const id = normalizeKakaoTalkId(talkId);
   if (!id) return "";
-  return apiUrl(`/api/v1/showcase/kakao-talk/${encodeURIComponent(id)}/add`);
+  const origin = resolvePublicShowcaseShareOrigin();
+  return `${origin}/api/v1/showcase/kakao-talk/${encodeURIComponent(id)}/add`;
 }
 
 function isAndroidUa() {

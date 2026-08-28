@@ -9,6 +9,7 @@ import {
   extractKakaoTalkIdFromShowcaseStyle
 } from "../integrations/kakao/kakaoTalkId.js";
 import { fetchKakaoUserFromAccessToken } from "../integrations/kakao/kakaoUserMe.js";
+import { getVlueShareOrigin } from "./bizcard/bizcardPublicUrls.js";
 
 async function resolveKakaoProfilePageUrlForUser(userId: string): Promise<string> {
   const user = await prisma.user.findUnique({
@@ -41,8 +42,8 @@ export async function resolveKakaoTalkAddBridgeUrl(userId: string): Promise<stri
   if (!talkId) return "";
   const path = buildKakaoTalkAddBridgePath(talkId);
   if (!path) return "";
-  const apiOrigin = String(process.env.API_PUBLIC_ORIGIN || "https://api.vlue.kr").replace(/\/$/, "");
-  return `${apiOrigin}${path}`;
+  const shareOrigin = getVlueShareOrigin();
+  return `${shareOrigin}${path}`;
 }
 
 export async function resolveKakaoProfilePageUrl(userId: string): Promise<string> {

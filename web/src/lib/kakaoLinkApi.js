@@ -2,7 +2,6 @@ import { apiUrl } from "./apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
 import { readShowcaseStyle, writeShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
 import { normalizeKakaoProfilePageUrl } from "./showcase/showcaseSocialOutlinks.js";
-import { normalizeKakaoTalkId } from "./kakao/kakaoPersonalLink.js";
 
 /** Kakao OAuth 시작 — 반환 URL로 이동 */
 export async function startKakaoLink() {
@@ -50,11 +49,13 @@ export function applyKakaoVerifiedLocal(nickname, opts = {}) {
   const style = readShowcaseStyle();
   const prevTitle = String(style.platformFeed?.kakaoProfileTitle || "").trim();
   const prevAvatar = String(style.platformFeed?.kakaoAvatarUrl || "").trim();
-  const prevTalkId = normalizeKakaoTalkId(style.platformFeed?.kakaoTalkId);
-  const guessTalkId = normalizeKakaoTalkId(incomingTitle);
+  const prevTalkId = String(
+    style.platformFeed?.kakaoTalkId || style.commercial?.outlinks?.kakaoTalkId || ""
+  )
+    .trim()
+    .replace(/^@+/, "");
   const title = incomingTitle || prevTitle || "카카오 인증";
   const avatar = picture || prevAvatar;
-  const talkId = prevTalkId || guessTalkId;
   const channelUrl =
     normalizeKakaoProfilePageUrl(style.platformFeed?.kakaoChannelUrl) ||
     normalizeKakaoProfilePageUrl(style.platformFeed?.kakaoProfileUrl) ||
@@ -69,7 +70,7 @@ export function applyKakaoVerifiedLocal(nickname, opts = {}) {
         kakaoVerified: true,
         kakaoUserId,
         kakaoProfileTitle: title,
-        kakaoTalkId: talkId,
+        ...(prevTalkId ? { kakaoTalkId: prevTalkId } : {}),
         kakaoChannelUrl: channelUrl,
         kakaoProfileUrl: channelUrl,
         kakaoAvatarUrl: avatar
@@ -78,7 +79,7 @@ export function applyKakaoVerifiedLocal(nickname, opts = {}) {
         ...style.commercial,
         outlinks: {
           ...style.commercial.outlinks,
-          kakaoTalkId: talkId,
+          ...(prevTalkId ? { kakaoTalkId: prevTalkId } : {}),
           kakaoChannel: channelUrl,
           kakaoProfile: channelUrl
         }
