@@ -150,3 +150,9 @@ export function instagramVerifiedLabel(styleConfig) {
   const handle = String(styleConfig?.platformFeed?.instagramHandle || "").trim();
   return handle ? `Instagram 인증완료✔ ${handle}` : "Instagram 인증완료✔";
 }
+
+/** SNS 인증 내역 — 화면용 한 줄 (확장 시 배열에 항목 추가) */
+export function listSnsVerificationHistory(styleConfig) {
+  if (!isInstagramVerified(styleConfig)) return [];
+  return ["[Instagram 인증완료]"];
+}

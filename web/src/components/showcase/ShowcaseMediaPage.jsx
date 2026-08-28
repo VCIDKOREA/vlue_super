@@ -10,7 +10,6 @@ import ShowcasePhotoTextOverlay from "./ShowcasePhotoTextOverlay.jsx";
 export default function ShowcaseMediaPage({
   photos = [],
   caption = "",
-  badge = "",
   onImageError,
   onDoubleTap
 }) {
@@ -199,7 +198,6 @@ export default function ShowcaseMediaPage({
         axis.current = null;
       }}
     >
-      {badge ? <p className="showcase-media-page__badge">{badge}</p> : null}
       <div className="showcase-media-page__frame">
         <img
           key={current.id || current.url}

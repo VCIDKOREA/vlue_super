@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Settings, X } from "lucide-react";
+import { BadgeCheck, Settings, X } from "lucide-react";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import RenderErrorGuard from "../RenderErrorGuard.jsx";
 import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
@@ -17,7 +17,7 @@ import {
   listInstagramShowcaseMedia,
   photosForInstagramMediaItem,
   isInstagramVerified,
-  instagramVerifiedLabel
+  listSnsVerificationHistory
 } from "../../lib/showcase/instagramEmbed.js";
 import { resolveInstagramMediaUrls } from "../../lib/instagramLinkApi.js";
 import { v1AppShell } from "../../lib/v1ReleaseScope.js";
@@ -172,7 +172,7 @@ export default function ShowcaseCallCarousel({
       : styleConfig;
   const showCornerIdentity = !showDigitalCard;
   const igVerified = isInstagramVerified(styleConfig);
-  const igBadge = instagramVerifiedLabel(styleConfig);
+  const snsCertLines = listSnsVerificationHistory(styleConfig);
   const igUsername = String(styleConfig?.platformFeed?.instagramHandle || "")
     .trim()
     .replace(/^@+/, "");
@@ -182,7 +182,7 @@ export default function ShowcaseCallCarousel({
       ""
   ).trim();
   const [igUrlMap, setIgUrlMap] = useState(() => new Map());
-
+  const [snsCertOpen, setSnsCertOpen] = useState(false);
   const bgmFingerprint = useMemo(
     () => showcaseBgmIdentityKey(styleConfig?.bgm),
     [styleConfig]
@@ -707,23 +707,19 @@ export default function ShowcaseCallCarousel({
 
   const renderSlideCornerAction = (kind, banner = false) => {
     if (keypadOpen) return null;
-    if (showPeerClose) {
-      return (
-        <button
-          type="button"
-          className={`showcase-call-carousel__slide-settings${banner ? " showcase-call-carousel__slide-settings--banner" : ""}`}
-          aria-label="닫기"
-          title="닫기"
-          onClick={handlePeerClose}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <X className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
-          닫기
-        </button>
-      );
-    }
-    if (!showOwnerSettings) return null;
-    return (
+    const settingsBtn = showPeerClose ? (
+      <button
+        type="button"
+        className={`showcase-call-carousel__slide-settings${banner ? " showcase-call-carousel__slide-settings--banner" : ""}`}
+        aria-label="닫기"
+        title="닫기"
+        onClick={handlePeerClose}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <X className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+        닫기
+      </button>
+    ) : showOwnerSettings ? (
       <button
         type="button"
         className={`showcase-call-carousel__slide-settings${banner ? " showcase-call-carousel__slide-settings--banner" : ""}`}
@@ -735,9 +731,34 @@ export default function ShowcaseCallCarousel({
         <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
         설정
       </button>
+    ) : null;
+    const certMark =
+      igVerified && snsCertLines.length > 0 ? (
+        <button
+          type="button"
+          className={`showcase-call-carousel__sns-cert-mark${banner ? " showcase-call-carousel__sns-cert-mark--banner" : ""}`}
+          aria-label="SNS 인증 내역"
+          title="SNS 인증"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setSnsCertOpen(true);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <BadgeCheck className="h-5 w-5" strokeWidth={2.35} aria-hidden />
+        </button>
+      ) : null;
+    if (!settingsBtn && !certMark) return null;
+    return (
+      <div
+        className={`showcase-call-carousel__slide-corner${banner ? " showcase-call-carousel__slide-corner--banner" : ""}`}
+      >
+        {settingsBtn}
+        {certMark}
+      </div>
     );
   };
-
   const cardAtEnd = Boolean(showDigitalCard && preferContentSlide);
   const photoIndexBase = showDigitalCard && !preferContentSlide ? 1 : 0;
   const showcaseSlideTotal = Math.max(1, count - (showDigitalCard ? 1 : 0));
@@ -944,7 +965,6 @@ export default function ShowcaseCallCarousel({
                             : []
                       }
                       caption={slide.caption || slide.overlayText || ""}
-                      badge={igVerified && igBadge ? "Instagram 인증완료✔" : ""}
                       onDoubleTap={() => {
                         window.dispatchEvent(
                           new CustomEvent("vlue-showcase-double-tap-like", {
@@ -1054,6 +1074,37 @@ export default function ShowcaseCallCarousel({
               onClose={() => onKeypadClose?.()}
               onToast={onKeypadToast}
             />
+          </div>
+        ) : null}
+
+        {snsCertOpen ? (
+          <div
+            className="showcase-sns-cert-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="SNS 인증 내역"
+          >
+            <button
+              type="button"
+              className="showcase-sns-cert-sheet__backdrop"
+              aria-label="닫기"
+              onClick={() => setSnsCertOpen(false)}
+            />
+            <div className="showcase-sns-cert-sheet__panel">
+              <p className="showcase-sns-cert-sheet__title">SNS 인증</p>
+              <ul className="showcase-sns-cert-sheet__list">
+                {snsCertLines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                className="showcase-sns-cert-sheet__close"
+                onClick={() => setSnsCertOpen(false)}
+              >
+                닫기
+              </button>
+            </div>
           </div>
         ) : null}
       </div>
