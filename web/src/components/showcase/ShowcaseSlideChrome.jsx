@@ -111,7 +111,10 @@ export default function ShowcaseSlideChrome({
     targetUserIdProp || resolveFollowTargetUserId(card, { fallbackToMe }) || ""
   ).trim();
 
-  const socialItems = listShowcaseSocialOutlinks(style, { ownerUserId: targetUserId });
+  const socialItems = listShowcaseSocialOutlinks(style, {
+    ownerUserId: targetUserId,
+    ownerDisplayName: firstText(card?.organization, profileName)
+  });
 
   const showBizLink = variant === "custom" && !hideBusinessLinks && Boolean(pageLink);
   const hasSocial = socialItems.length > 0;
@@ -188,7 +191,10 @@ export default function ShowcaseSlideChrome({
                 tabIndex={socialOpen ? 0 : -1}
                 onClick={(e) => {
                   e.stopPropagation();
-                  openShowcaseSocialItem(item);
+                  openShowcaseSocialItem(item, {
+                    onToast,
+                    ownerDisplayName: firstText(card?.organization, profileName)
+                  });
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
               >

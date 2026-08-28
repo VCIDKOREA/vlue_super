@@ -1,8 +1,4 @@
-import { apiUrl } from "../apiBase.js";
-import {
-  buildKakaoTalkAddBridgeUrl,
-  normalizeKakaoTalkId
-} from "../kakao/kakaoPersonalLink.js";
+import { normalizeKakaoTalkId } from "../kakao/kakaoPersonalLink.js";
 
 function firstText(...values) {
   for (const v of values) {
@@ -85,12 +81,12 @@ function resolveKakaoChannelUrl(feed, outlinks) {
 /**
  * 쇼케이스 비즈니스 쇼셜 아이콘 목록 (인스타·유튜브·카카오 개인/채널 등)
  * @param {object|null|undefined} style showcaseStyle
- * @param {{ ownerUserId?: string }} [opts]
+ * @param {{ ownerUserId?: string, ownerDisplayName?: string }} [opts]
  */
 export function listShowcaseSocialOutlinks(style, opts = {}) {
   const outlinks = style?.commercial?.outlinks || {};
   const feed = style?.platformFeed || {};
-  const ownerUserId = String(opts.ownerUserId || "").trim();
+  const ownerDisplayName = String(opts.ownerDisplayName || "").trim();
 
   const ig =
     firstText(outlinks.instagram, feed.instagramProfileUrl) ||
@@ -110,12 +106,11 @@ export function listShowcaseSocialOutlinks(style, opts = {}) {
   const facebook = firstText(outlinks.facebook);
   const youtube = firstText(outlinks.youtube);
 
-  const kakaoPersonalUrl =
-    kakaoTalkId
-      ? buildKakaoTalkAddBridgeUrl(kakaoTalkId)
-      : ownerUserId
-        ? apiUrl(`/api/v1/showcase/users/${encodeURIComponent(ownerUserId)}/kakao-profile`)
-        : "";
+  const kakaoOwnerName = firstText(
+    ownerDisplayName,
+    feed.kakaoProfileTitle,
+    kakaoTalkId ? `@${kakaoTalkId}` : ""
+  );
 
   return [
     ig ? { id: "instagram", label: "Instagram", url: ig, className: "is-ig" } : null,
@@ -128,8 +123,9 @@ export function listShowcaseSocialOutlinks(style, opts = {}) {
       ? {
           id: "kakao-personal",
           label: firstText(feed.kakaoProfileTitle, `@${kakaoTalkId}`, "카카오톡"),
-          url: kakaoPersonalUrl,
+          url: "",
           talkId: kakaoTalkId,
+          ownerName: kakaoOwnerName,
           className: "is-kakao"
         }
       : null,

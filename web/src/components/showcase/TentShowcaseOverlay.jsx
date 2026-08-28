@@ -12,7 +12,7 @@ import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
 import { resolveCallOverlayIdentityLines } from "../../lib/letteringPaidIdentityDisplay.js";
 import IdentitySecondaryText from "../IdentitySecondaryText.jsx";
 import { readActiveShowcaseStyle, createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
-import { normalizeKakaoTalkId, buildKakaoTalkAddBridgeUrl } from "../../lib/kakao/kakaoPersonalLink.js";
+import { normalizeKakaoTalkId, promptKakaoTalkPersonalLink } from "../../lib/kakao/kakaoPersonalLink.js";
 import { normalizeKakaoProfilePageUrl } from "../../lib/showcase/showcaseSocialOutlinks.js";
 import { readShowcasePrivacyMode } from "../../lib/showcase/showcasePrivacyMode.js";
 import {
@@ -78,7 +78,6 @@ function resolveSocialLinks(style, card) {
     outlinks.kakaoOpenChat || (/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : "") || ""
   ).trim();
   const kakaoTalkId = normalizeKakaoTalkId(feed.kakaoTalkId || outlinks.kakaoTalkId);
-  const kakaoPersonal = kakaoTalkId ? buildKakaoTalkAddBridgeUrl(kakaoTalkId) : "";
   const kakaoChannel = String(
     normalizeKakaoProfilePageUrl(
       feed.kakaoChannelUrl ||
@@ -91,7 +90,7 @@ function resolveSocialLinks(style, card) {
         ""
     ) || ""
   ).trim();
-  const kakao = kakaoOpenChat || kakaoPersonal || kakaoChannel;
+  const kakao = kakaoOpenChat || (kakaoTalkId ? `kakao-talk:${kakaoTalkId}` : "") || kakaoChannel;
   const instagram =
     outlinks.instagram ||
     feed.instagramProfileUrl ||
@@ -103,7 +102,6 @@ function resolveSocialLinks(style, card) {
   return {
     kakao: String(kakao || "").trim(),
     kakaoOpenChat,
-    kakaoPersonal,
     kakaoTalkId,
     kakaoChannel,
     instagram: String(instagram || "").trim(),
@@ -406,7 +404,16 @@ export default function TentShowcaseOverlay({
         icon: MessageCircle,
         label: "카카오톡",
         empty: !social.kakao,
-        onClick: () => openSocial(social.kakao, "카카오톡")
+        onClick: () => {
+          if (social.kakaoTalkId) {
+            void promptKakaoTalkPersonalLink(social.kakaoTalkId, {
+              ownerName: titleName,
+              onToast: showLinkToast
+            });
+            return;
+          }
+          openSocial(social.kakao, "카카오톡");
+        }
       }
     : social.website
       ? {

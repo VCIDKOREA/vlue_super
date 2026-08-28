@@ -57,7 +57,8 @@ function firstText(...values) {
 function listCardSocialOutlinks(card) {
   const style = card?.showcaseStyle && typeof card.showcaseStyle === "object" ? card.showcaseStyle : {};
   const ownerUserId = String(card?.userId || card?.ownerUserId || "").trim();
-  return listShowcaseSocialOutlinks(style, { ownerUserId });
+  const ownerDisplayName = String(card?.organization || card?.name || card?.displayName || "").trim();
+  return listShowcaseSocialOutlinks(style, { ownerUserId, ownerDisplayName });
 }
 
 function SocialOutlinkGlyph({ kind }) {
@@ -100,6 +101,7 @@ function SocialOutlinkGlyph({ kind }) {
 
 function FrontSocialOutlinkButtons({ card, enableContactLinks = true, visible = false }) {
   const items = listCardSocialOutlinks(card);
+  const ownerDisplayName = String(card?.organization || card?.name || card?.displayName || "").trim();
   if (!items.length) return null;
 
   return (
@@ -120,7 +122,7 @@ function FrontSocialOutlinkButtons({ card, enableContactLinks = true, visible = 
             e.preventDefault();
             e.stopPropagation();
             if (!enableContactLinks) return;
-            openShowcaseSocialItem(item);
+            openShowcaseSocialItem(item, { ownerDisplayName });
           }}
           onPointerDown={(e) => e.stopPropagation()}
         >

@@ -3,7 +3,6 @@ import { normalizeKakaoTalkId } from "../../integrations/kakao/kakaoTalkId.js";
 export function buildKakaoTalkAddBridgeHtml(talkId: string): string | null {
   const id = normalizeKakaoTalkId(talkId);
   if (!id) return null;
-  const enc = encodeURIComponent(id);
   const safeId = id.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   return `<!DOCTYPE html>
@@ -11,63 +10,78 @@ export function buildKakaoTalkAddBridgeHtml(talkId: string): string | null {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>카카오톡 친구 추가 — ${safeId}</title>
+  <title>카카오톡 — ${safeId}</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #f5f6f8; color: #191f28; }
-    .wrap { max-width: 420px; margin: 0 auto; padding: 32px 20px 40px; }
-    .card { background: #fff; border-radius: 16px; padding: 24px 20px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
-    h1 { font-size: 18px; margin: 0 0 8px; }
-    p { font-size: 14px; line-height: 1.5; color: #4e5968; margin: 0 0 16px; }
-    .id { display: inline-block; padding: 8px 12px; border-radius: 10px; background: #fee500; font-weight: 700; }
-    .btn { display: block; width: 100%; border: 0; border-radius: 12px; padding: 14px 16px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 10px; }
-    .btn-primary { background: #fee500; color: #191f28; }
-    .btn-ghost { background: #f2f4f6; color: #191f28; }
-    .hint { font-size: 12px; color: #8b95a1; margin-top: 14px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #f5f6f8; color: #4e5968; }
+    .wrap { max-width: 420px; margin: 0 auto; padding: 48px 20px; text-align: center; font-size: 14px; line-height: 1.6; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>카카오톡 친구 추가</h1>
-      <p>아래 ID로 친구를 검색해 추가할 수 있습니다.</p>
-      <div class="id">@${safeId}</div>
-      <button type="button" class="btn btn-primary" id="open-kakao">카카오톡에서 열기</button>
-      <button type="button" class="btn btn-ghost" id="copy-id">ID 복사</button>
-      <p class="hint">열리지 않으면 카카오톡 → 친구 → 친구 추가 → ID로 추가에서 직접 검색해 주세요.</p>
-    </div>
-  </div>
+  <div class="wrap" id="status">카카오톡 ID를 준비하고 있습니다…</div>
   <script>
     (function () {
       var id = ${JSON.stringify(id)};
-      var enc = ${JSON.stringify(enc)};
-      var androidIntent =
-        "intent://friend/search?query=" + enc +
-        "#Intent;scheme=kakaotalk;package=com.kakao.talk;end";
-      var iosScheme = "kakaotalk://friend/search?query=" + enc;
+      var enc = encodeURIComponent(id);
+      var scheme = "kakaotalk://friend/search?query=" + enc;
       var isAndroid = /Android/i.test(navigator.userAgent || "");
       var isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+      var status = document.getElementById("status");
 
-      document.getElementById("open-kakao").addEventListener("click", function () {
-        var href = isAndroid ? androidIntent : isIos ? iosScheme : "";
-        if (href) {
-          window.location.href = href;
-          return;
-        }
-        alert("모바일에서 카카오톡 앱으로 열어 주세요.");
-      });
-
-      document.getElementById("copy-id").addEventListener("click", function () {
-        var text = id;
+      function copyId() {
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(function () {
-            alert("ID를 복사했습니다.");
-          }).catch(function () {
-            prompt("ID를 복사해 주세요.", text);
-          });
+          return navigator.clipboard.writeText(id);
+        }
+        return new Promise(function (resolve, reject) {
+          try {
+            var ta = document.createElement("textarea");
+            ta.value = id;
+            ta.setAttribute("readonly", "");
+            ta.style.position = "fixed";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.select();
+            var ok = document.execCommand("copy");
+            document.body.removeChild(ta);
+            ok ? resolve() : reject();
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }
+
+      function openKakao() {
+        if (isAndroid) {
+          try {
+            window.location.href = scheme;
+            return;
+          } catch (e) {}
+          window.location.href =
+            "intent://friend/search?query=" + enc +
+            "#Intent;scheme=kakaotalk;package=com.kakao.talk;end";
           return;
         }
-        prompt("ID를 복사해 주세요.", text);
-      });
+        if (isIos) {
+          window.location.href = scheme;
+          return;
+        }
+        status.textContent = "ID가 복사되었습니다. 모바일 카카오톡에서 친구 추가 → ID로 추가를 이용해 주세요.";
+      }
+
+      copyId()
+        .then(function () {
+          var go = window.confirm(
+            "카카오톡 ID가 복사되었습니다.\\n카카오톡으로 이동하시겠습니까?"
+          );
+          if (!go) {
+            status.textContent = "ID(" + id + ")가 복사되었습니다.";
+            return;
+          }
+          openKakao();
+          status.textContent = "카카오톡을 여는 중입니다…";
+        })
+        .catch(function () {
+          status.textContent = "ID 복사에 실패했습니다. ID: " + id;
+        });
     })();
   </script>
 </body>
