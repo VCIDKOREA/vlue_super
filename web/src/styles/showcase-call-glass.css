@@ -297,7 +297,6 @@
 .lettering-ongoing--fullscreen-tent .lettering-vlue-verified-badge .vlue-cyan-verified-seal,
 .lettering-ongoing--fullscreen-tent .lettering-vlue-verified-badge--metal .vlue-cyan-verified-seal {
   display: block;
-  filter: drop-shadow(0 1px 4px rgba(0, 210, 255, 0.45));
 }
 
 /* ?? ? V?? � ??? overflow? ? ??? */
@@ -655,7 +654,6 @@
 
 .showcase-call-carousel__sns-cert-mark .vlue-cyan-verified-seal {
   display: block;
-  filter: drop-shadow(0 1px 5px rgba(0, 210, 255, 0.45));
 }
 
 .showcase-call-carousel__sns-cert-mark:active {

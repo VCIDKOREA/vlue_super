@@ -3461,7 +3461,7 @@ body,
 
 .lettering-vlue-verified-badge .vlue-cyan-verified-seal {
   display: block;
-  filter: drop-shadow(0 1px 4px rgba(0, 210, 255, 0.4));
+  flex-shrink: 0;
 }
 
 .lettering-call-screen {

@@ -1,8 +1,24 @@
 /** Instagram-style scalloped seal — VLUE 시안 채움 인증마크 */
-const SEAL_PATH =
-  "M19.998 3.094L14.638 3.39l-3.52-3.52c-1.222-.783-2.658-.6-3.52.618l-3.52 3.52L.98 3.094C.37 3.06-.203 3.633-.17 4.243l.306 5.36-3.52 3.52c-.783 1.222-.6 2.658.618 3.52l5.36.306.306 5.36c.034.61.606 1.183 1.216 1.15l5.36-.306 3.52 3.52c1.222.783 2.658.6 3.52-.618l.306-5.36 5.36-.306c.61-.034 1.183-.606 1.15-1.216l-.306-5.36 3.52-3.52c.783-1.222.6-2.658-.618-3.52l-5.36-.306-.306-5.36C39.17 3.633 38.597 3.06 37.987 3.094l-5.36.306-3.52-3.52C28.335-.203 26.899-.02 26.036.798l-3.52 3.52-5.36-.306c-.61-.034-1.183.606-1.216 1.216l-.306 5.36-5.36.306C9.056 11.564 8.273 13 9.056 14.222l3.52 3.52-.306 5.36c-.033.61.54 1.183 1.15 1.216l5.36.306 3.52 3.52c.862.818 2.298 1.001 3.52.618l5.36-.306.306 5.36c.034.61.606 1.183 1.216 1.15l5.36-.306 3.52 3.52c1.222.783 2.658.6 3.52-.618l.306-5.36 5.36-.306c.61-.034 1.183-.606 1.15-1.216l-.306-5.36 3.52-3.52c.783-1.222.6-2.658-.618-3.52l-5.36-.306-.306-5.36c-.034-.61-.606-1.183-1.216-1.15z";
 
-const CHECK_PATH = "m17.414 24.414-7-7 1.414-1.414 5.586 5.586L28.172 12l1.414 1.414z";
+const CYAN = "#00d2ff";
+
+/** 12톱니 스캘럽 원 — 경로 문자열 깨짐 방지용 프로그램 생성 */
+function buildScallopedSealPath(cx, cy, outerR, innerR, teeth = 12) {
+  const steps = teeth * 2;
+  const parts = [];
+  for (let i = 0; i <= steps; i++) {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / steps;
+    const r = i % 2 === 0 ? outerR : innerR;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    parts.push(i === 0 ? `M${x.toFixed(2)},${y.toFixed(2)}` : `L${x.toFixed(2)},${y.toFixed(2)}`);
+  }
+  return `${parts.join(" ")} Z`;
+}
+
+const SEAL_PATH = buildScallopedSealPath(12, 12, 10.6, 9.05, 12);
+/** 흰 체크 — 소형에서도 선명하게 (fill) */
+const CHECK_PATH = "M7.4 12.3 10.4 15.3 17.1 8.2 18.5 9.6 10.4 17.7 6.1 13.4Z";
 
 export default function VlueCyanVerifiedSeal({
   size = 18,
@@ -13,15 +29,17 @@ export default function VlueCyanVerifiedSeal({
     <svg
       width={size}
       height={size}
-      viewBox="0 0 40 40"
+      viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid meet"
+      shapeRendering="geometricPrecision"
       className={`vlue-cyan-verified-seal${className ? ` ${className}` : ""}`}
       role="img"
       aria-label={title}
     >
       <title>{title}</title>
-      <path d={SEAL_PATH} fill="#00d2ff" />
+      <path d={SEAL_PATH} fill={CYAN} />
       <path d={CHECK_PATH} fill="#ffffff" />
     </svg>
   );
