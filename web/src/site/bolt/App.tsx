@@ -36,6 +36,7 @@ import {
   vlueMarketingLogout,
   pingAuthSession,
 } from '../../lib/vlueAuthApi.js';
+import { consumeMarketingOAuthReturn } from '../../lib/marketingOAuthReturn.js';
 import { coerceWebViewForV1, isWebViewV1Enabled, v1WebShell } from '../../lib/v1ReleaseScope.js';
 
 const VALID_VIEWS: View[] = [
@@ -82,6 +83,20 @@ export default function App() {
   }, []);
 
   const [idleNotice, setIdleNotice] = useState(false);
+  const [oauthNotice, setOauthNotice] = useState('');
+
+  useEffect(() => {
+    const result = consumeMarketingOAuthReturn();
+    if (!result) return;
+    if (result.success) {
+      if (result.user) setUser(result.user as MarketingAuthUser);
+      setRoute({ view: 'showcase' });
+      window.location.hash = 'showcase';
+    }
+    setOauthNotice(result.message || (result.success ? '연동이 완료되었습니다.' : '연동에 실패했습니다.'));
+    const t = window.setTimeout(() => setOauthNotice(''), 5000);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     const restored = restoreMarketingAuthUser();
@@ -249,6 +264,11 @@ export default function App() {
         {idleNotice ? (
           <div className="mkt-site-toast" role="status">
             30분 동안 사용이 없어 로그아웃되었습니다.
+          </div>
+        ) : null}
+        {oauthNotice ? (
+          <div className="mkt-site-toast" role="status">
+            {oauthNotice}
           </div>
         ) : null}
         {view === 'home' && (

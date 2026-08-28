@@ -1,9 +1,10 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Monitor, Smartphone, Download, ArrowLeft, Store, Apple } from "lucide-react";
 import { VlueBrandLogo } from "./VlueBrandLogo.jsx";
 import { getVlueDownloadLinks } from "../lib/vlueClientAccess.js";
 import { openVlueDownload } from "../lib/vlueDownloadActions.js";
 import { isWebPcDownloadEnabled } from "../lib/v1ReleaseScope.js";
+import { relayAppOAuthToMarketing } from "../lib/marketingOAuthReturn.js";
 import "../site/bolt/index.css";
 
 /**
@@ -13,6 +14,10 @@ import "../site/bolt/index.css";
 export default function BrowserAppBlockedPage() {
   const links = useMemo(() => getVlueDownloadLinks(), []);
   const showPc = isWebPcDownloadEnabled();
+
+  useEffect(() => {
+    relayAppOAuthToMarketing();
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.remove("dark");
@@ -39,19 +44,27 @@ export default function BrowserAppBlockedPage() {
             className="text-2xl font-black tracking-tight text-gray-900 sm:text-[28px]"
             style={{ wordBreak: "keep-all", letterSpacing: "-0.03em" }}
           >
-            VLUE 앱은 브라우저에서 이용할 수 없습니다
+            VLUE 앱 전용 화면입니다
           </h1>
           <p
             className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-gray-600 sm:text-[15px]"
             style={{ wordBreak: "keep-all" }}
           >
-            홈페이지(www)에서는 검색·쇼핑·가입·AI 엑셀 등을 이용하세요. 통화 알림·명함·가족보호 등{" "}
-            <strong className="font-semibold text-gray-800">전체 앱 기능</strong>은{" "}
+            <strong className="font-semibold text-gray-800">쇼케이스·SNS 인증·간편 로그인</strong>은
+            홈페이지(www) <strong className="font-semibold text-gray-800">쇼케이스 관리</strong>에서
+            이용할 수 있습니다. 통화 알림·명함 오버레이·가족보호 등{" "}
+            <strong className="font-semibold text-gray-800">통화 중 앱 기능</strong>은{" "}
             {showPc ? "스토어 앱 또는 PC 설치형 프로그램" : "모바일 앱"}에서 동일 계정으로 이용합니다.
           </p>
         </div>
 
         <div className="mt-8 space-y-3">
+          <a
+            href={`${links.home.replace(/\/$/, "")}/#showcase`}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-3 text-[14px] font-bold text-blue-800 transition-colors hover:border-blue-300 hover:bg-blue-100"
+          >
+            쇼케이스·SNS 인증 (웹)
+          </a>
           <a
             href={links.downloadPage}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3.5 text-[15px] font-bold text-white shadow-md transition-colors hover:bg-blue-700 active:bg-blue-800"

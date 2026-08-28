@@ -40,20 +40,38 @@ function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
-function frontendRedirect(query: Record<string, string>, hash?: Record<string, string>): string {
-  /* 토큰을 소비하는 SPA 셸은 루트(마케팅)가 아니라 /app 이다 */
-  const base = `${getFrontendOrigin()}/app`;
+/** OAuth/SNS 콜백 — www 마케팅 셸(#showcase)로 복귀 (브라우저 /app 차단 회피) */
+function redirectWebMarketing(
+  query: Record<string, string>,
+  hash?: Record<string, string>,
+  hashView = "showcase"
+): string {
+  const origin = getFrontendOrigin().replace(/\/$/, "");
   const q = new URLSearchParams(query).toString();
-  const url = q ? `${base}?${q}` : base;
-  if (!hash || !Object.keys(hash).length) return url;
-  const h = new URLSearchParams(hash).toString();
-  return `${url}#${h}`;
+  if (hash && Object.keys(hash).length) {
+    const h = new URLSearchParams(hash).toString();
+    return q ? `${origin}/?${q}#${h}` : `${origin}/#${h}`;
+  }
+  return q ? `${origin}/?${q}#${hashView}` : `${origin}/#${hashView}`;
+}
+
+function redirectWebMarketingResponse(
+  query: Record<string, string>,
+  hash?: Record<string, string>,
+  hashView = "showcase"
+): Response {
+  return Response.redirect(redirectWebMarketing(query, hash, hashView), 302);
+}
+
+/** @deprecated — 신규 OAuth는 redirectWebMarketing 사용 */
+function frontendRedirect(query: Record<string, string>, hash?: Record<string, string>): string {
+  return redirectWebMarketing(query, hash, "showcase");
 }
 
 type OAuthProvider = "kakao" | "google" | "naver" | "instagram";
 
 function redirectAuthError(provider: OAuthProvider, message: string): Response {
-  const loc = frontendRedirect({
+  return redirectWebMarketingResponse({
     social_oauth: "error",
     oauth_provider: provider,
     // 하위 호환
@@ -66,7 +84,6 @@ function redirectAuthError(provider: OAuthProvider, message: string): Response {
           : { instagram_oauth: "error", instagram_error: message.slice(0, 240) }),
     oauth_error: message.slice(0, 240)
   });
-  return Response.redirect(loc, 302);
 }
 
 function redirectAuthSuccess(
@@ -80,7 +97,7 @@ function redirectAuthSuccess(
     accountStatus: string;
   }
 ): Response {
-  const loc = frontendRedirect(
+  return redirectWebMarketingResponse(
     {
       social_oauth: "success",
       oauth_provider: provider,
@@ -102,7 +119,6 @@ function redirectAuthSuccess(
       provider
     }
   );
-  return Response.redirect(loc, 302);
 }
 
 function setOAuthStateCookie(c: Parameters<typeof setCookie>[0], name: string, state: string) {
@@ -116,8 +132,7 @@ function setOAuthStateCookie(c: Parameters<typeof setCookie>[0], name: string, s
 }
 
 function redirectKakaoLink(query: Record<string, string>): Response {
-  const loc = frontendRedirect(query);
-  return Response.redirect(loc, 302);
+  return redirectWebMarketingResponse(query);
 }
 
 /** 카카오 인증 페이지로 리다이렉트 */
@@ -348,8 +363,7 @@ authV1Routes.get("/naver/callback", async (c) => {
 });
 
 function redirectInstagramLink(query: Record<string, string>): Response {
-  const loc = frontendRedirect(query);
-  return Response.redirect(loc, 302);
+  return redirectWebMarketingResponse(query);
 }
 
 /** Instagram 간편 로그인 (쇼케이스 연동과 동일 OAuth · state 쿠키). 미연동이면 가입하지 않음. */

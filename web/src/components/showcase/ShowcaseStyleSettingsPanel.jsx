@@ -1228,7 +1228,7 @@ export default function ShowcaseStyleSettingsPanel({
                   <span>비즈니스</span>
                   <span>쇼셜링크</span>
                 </span>
-                <HelpTip text="Instagram·카카오 프로필은 로그인(OAuth)으로 SNS 인증합니다. 오픈채팅·채널만 URL을 직접 넣을 수 있습니다." />
+                <HelpTip text="Instagram·카카오 프로필은 웹에서 로그인(OAuth)으로 SNS 인증합니다. 오픈채팅·채널만 URL을 직접 넣을 수 있습니다." />
               </span>
             </span>
             <span className="showcase-profile-row__trail">
@@ -1318,7 +1318,7 @@ export default function ShowcaseStyleSettingsPanel({
               <BusinessOutlinkRow
                 brand="kakao"
                 label="카카오 프로필"
-                placeholder="카카오 로그인으로 SNS 인증"
+                placeholder="카카오 로그인으로 SNS 인증 (웹)"
                 value={
                   kakaoLink.linked
                     ? config.platformFeed?.kakaoProfileTitle || kakaoLink.nickname || "카카오 인증됨"
