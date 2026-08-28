@@ -47,6 +47,36 @@ function hoursAgo(h: number) {
   return new Date(Date.now() - h * 60 * 60 * 1000);
 }
 
+function formatFamilyLastAccessAt(at: Date | null | undefined): string {
+  if (!at) return "마지막 접속 기록 없음";
+  try {
+    const d = new Date(at);
+    if (Number.isNaN(d.getTime())) return "마지막 접속 기록 없음";
+    const now = new Date();
+    const sameYear = d.getFullYear() === now.getFullYear();
+    const label = d.toLocaleString("ko-KR", {
+      ...(sameYear ? {} : { year: "numeric" }),
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true
+    });
+    return `마지막 접속: ${label}`;
+  } catch {
+    return "마지막 접속 기록 없음";
+  }
+}
+
+function buildElderNoAppBody(
+  name: string,
+  hours: number,
+  lastAt: Date | null | undefined
+): string {
+  const last = formatFamilyLastAccessAt(lastAt);
+  return `${name} 님은 ${hours}시간 이상 VLUE 앱에 접속하지 않았습니다. (${last})`;
+}
+
 function relationToWardRole(relation: FamilyRelation): WardRole {
   if (relation === "child") return "child";
   if (relation === "relative") return "observer";
@@ -418,12 +448,13 @@ export async function runElderProtectionChecks() {
       if (!presence?.lastAppAccessAt || presence.lastAppAccessAt < noAppSince) {
         if (!(await recentAlertExists(wardUserId, "elder_no_app_24h"))) {
           const hours = cfg.noAppHours;
+          const body = buildElderNoAppBody(name, hours, presence?.lastAppAccessAt ?? null);
           await familyProtectionDb.familyProtectionAlert.create({
             data: {
               wardUserId,
               kind: "elder_no_app_24h",
               title: "[가족 보호] 앱 미접속",
-              body: `${name} 님은 ${hours}시간 이상 VLUE 앱에 접속하지 않았습니다.`,
+              body,
               guardiansNotifiedAt: new Date()
             }
           });
@@ -432,7 +463,11 @@ export async function runElderProtectionChecks() {
             wardUserId,
             "elder_no_app_24h",
             "[가족 보호] 앱 미접속",
-            `${name} 님은 ${hours}시간 이상 VLUE 앱에 접속하지 않았습니다.`
+            body,
+            {
+              lastAppAccessAt: presence?.lastAppAccessAt?.toISOString() || null,
+              noAppHours: hours
+            }
           );
           sent += 1;
         }
