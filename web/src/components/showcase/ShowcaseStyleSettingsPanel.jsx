@@ -44,7 +44,6 @@ import {
   startKakaoLink
 } from "../../lib/kakaoLinkApi.js";
 import { normalizeKakaoProfilePageUrl } from "../../lib/showcase/showcaseSocialOutlinks.js";
-import { normalizeKakaoTalkId } from "../../lib/kakao/kakaoPersonalLink.js";
 import { readDigitalCardActive, readDccBroadcastOn } from "../../lib/bizcardAccountSync.js";
 import { useDccFeatureAccess } from "../../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../../lib/dccAccessPolicy.js";
