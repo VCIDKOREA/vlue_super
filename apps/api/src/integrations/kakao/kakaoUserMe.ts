@@ -43,14 +43,24 @@ export async function fetchKakaoUserFromAccessToken(accessToken: string): Promis
   const emailVerified = Boolean(ac.is_email_valid) && Boolean(ac.is_email_verified);
 
   const props = (j.properties as Record<string, unknown> | undefined) || {};
-  const nickFromProps = typeof props.nickname === "string" ? props.nickname.trim() : "";
   const prof = ac.profile as Record<string, unknown> | undefined;
-  const nickFromProfile = prof && typeof prof.nickname === "string" ? String(prof.nickname).trim() : "";
+  const nickNeedsAgreement = Boolean(prof?.nickname_needs_agreement);
+  const imgNeedsAgreement = Boolean(prof?.profile_image_needs_agreement);
+
+  const nickFromProps =
+    !nickNeedsAgreement && typeof props.nickname === "string" ? props.nickname.trim() : "";
+  const nickFromProfile =
+    !nickNeedsAgreement && prof && typeof prof.nickname === "string" ? String(prof.nickname).trim() : "";
   const nickname = nickFromProps || nickFromProfile || null;
+
   const imgFromProfile =
-    prof && typeof prof.profile_image_url === "string" ? String(prof.profile_image_url).trim() : "";
+    !imgNeedsAgreement && prof && typeof prof.profile_image_url === "string"
+      ? String(prof.profile_image_url).trim()
+      : "";
   const imgFromProps =
-    typeof props.profile_image === "string" ? String(props.profile_image).trim() : "";
+    !imgNeedsAgreement && typeof props.profile_image === "string"
+      ? String(props.profile_image).trim()
+      : "";
   const profileImageUrl = imgFromProfile || imgFromProps || null;
 
   return { id, email, nickname, emailVerified, profileImageUrl };

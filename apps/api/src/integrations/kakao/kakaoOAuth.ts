@@ -60,7 +60,17 @@ export function verifyKakaoLinkState(state: string): string | null {
   }
 }
 
-export function buildKakaoAuthorizeUrl(state: string): string {
+export type KakaoOAuthPurpose = "login" | "link";
+
+/** 콘솔에 등록·활성화된 동의 항목만 scope에 포함 (미설정 항목 → KOE205) */
+function resolveKakaoScopes(purpose: KakaoOAuthPurpose): string {
+  if (purpose === "link") {
+    return String(process.env.KAKAO_LINK_SCOPES || "profile_nickname").trim();
+  }
+  return String(process.env.KAKAO_LOGIN_SCOPES || "account_email profile_nickname").trim();
+}
+
+export function buildKakaoAuthorizeUrl(state: string, purpose: KakaoOAuthPurpose = "login"): string {
   const clientId = getKakaoClientId();
   if (!clientId) {
     throw new Error("KAKAO_CLIENT_ID(또는 KAKAO_REST_API_KEY)가 설정되지 않았습니다.");
@@ -70,9 +80,10 @@ export function buildKakaoAuthorizeUrl(state: string): string {
     response_type: "code",
     client_id: clientId,
     redirect_uri: redirectUri,
-    state,
-    scope: "account_email profile_nickname profile_image"
+    state
   });
+  const scope = resolveKakaoScopes(purpose);
+  if (scope) params.set("scope", scope);
   return `${KAKAO_AUTH_BASE}?${params.toString()}`;
 }
 

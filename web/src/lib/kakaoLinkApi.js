@@ -40,11 +40,17 @@ export async function disconnectKakaoLink() {
 
 /** 인증 성공 시 닉네임·프로필 이미지·인증 플래그 반영 (개인 프로필은 공유 URL 없음) */
 export function applyKakaoVerifiedLocal(nickname, opts = {}) {
-  const title = String(nickname || "").trim();
-  if (!title) return;
   const kakaoUserId = String(opts.kakaoUserId || opts.kakao_user_id || "").trim();
+  if (!kakaoUserId) return;
+
+  const incomingTitle = String(nickname || "").trim();
   const picture = String(opts.profileImageUrl || opts.profile_image_url || "").trim();
   const style = readShowcaseStyle();
+  const prevTitle = String(style.platformFeed?.kakaoProfileTitle || "").trim();
+  const prevAvatar = String(style.platformFeed?.kakaoAvatarUrl || "").trim();
+  const title = incomingTitle || prevTitle || "카카오 인증";
+  const avatar = picture || prevAvatar;
+
   writeShowcaseStyle(
     {
       ...style,
@@ -54,7 +60,7 @@ export function applyKakaoVerifiedLocal(nickname, opts = {}) {
         kakaoUserId,
         kakaoProfileTitle: title,
         kakaoProfileUrl: "",
-        kakaoAvatarUrl: picture || style.platformFeed?.kakaoAvatarUrl || ""
+        kakaoAvatarUrl: avatar
       },
       commercial: {
         ...style.commercial,
@@ -111,19 +117,21 @@ export function consumeKakaoLinkReturn() {
 
   const nickname = u.searchParams.get("kakao_nickname") || "";
   const kakaoUserId = u.searchParams.get("kakao_user_id") || "";
+  const profileImageUrl = u.searchParams.get("kakao_profile_image") || "";
   const error = u.searchParams.get("kakao_error") || "";
 
   u.searchParams.delete("kakao_oauth");
   u.searchParams.delete("kakao_nickname");
   u.searchParams.delete("kakao_user_id");
+  u.searchParams.delete("kakao_profile_image");
   u.searchParams.delete("kakao_error");
   window.history.replaceState({}, "", `${u.pathname}${u.search}${u.hash}`);
 
   if (mode === "success") {
-    if (nickname) {
-      applyKakaoVerifiedLocal(nickname, { kakaoUserId });
+    if (kakaoUserId) {
+      applyKakaoVerifiedLocal(nickname, { kakaoUserId, profileImageUrl });
     }
-    return { handled: true, success: true, nickname };
+    return { handled: true, success: true, nickname: nickname || "카카오 인증" };
   }
   return {
     handled: true,

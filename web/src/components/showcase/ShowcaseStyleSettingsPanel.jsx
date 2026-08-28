@@ -508,12 +508,19 @@ export default function ShowcaseStyleSettingsPanel({
   ]);
 
   useEffect(() => {
-    if (!kakaoLink.linked || !kakaoLink.nickname) return;
-    const title = String(kakaoLink.nickname).trim();
+    if (!kakaoLink.linked || !kakaoLink.kakaoUserId) return;
+    const userId = String(kakaoLink.kakaoUserId || "").trim();
+    const incomingTitle = String(kakaoLink.nickname || "").trim();
+    const incomingAvatar = String(kakaoLink.profileImageUrl || "").trim();
+    const prevTitle = String(config.platformFeed?.kakaoProfileTitle || "").trim();
+    const prevAvatar = String(config.platformFeed?.kakaoAvatarUrl || "").trim();
+    const title = incomingTitle || prevTitle || "카카오 인증";
+    const avatar = incomingAvatar || prevAvatar;
     if (
       config.platformFeed?.kakaoVerified === true &&
+      config.platformFeed?.kakaoUserId === userId &&
       config.platformFeed?.kakaoProfileTitle === title &&
-      config.platformFeed?.kakaoUserId === String(kakaoLink.kakaoUserId || "").trim()
+      String(config.platformFeed?.kakaoAvatarUrl || "") === avatar
     ) {
       return;
     }
@@ -521,13 +528,10 @@ export default function ShowcaseStyleSettingsPanel({
       platformFeed: {
         ...(config.platformFeed || {}),
         kakaoVerified: true,
-        kakaoUserId: String(kakaoLink.kakaoUserId || "").trim(),
+        kakaoUserId: userId,
         kakaoProfileTitle: title,
         kakaoProfileUrl: "",
-        kakaoAvatarUrl:
-          String(kakaoLink.profileImageUrl || "").trim() ||
-          config.platformFeed?.kakaoAvatarUrl ||
-          ""
+        kakaoAvatarUrl: avatar
       },
       commercial: {
         ...(config.commercial || {}),
@@ -545,6 +549,7 @@ export default function ShowcaseStyleSettingsPanel({
     config.platformFeed?.kakaoVerified,
     config.platformFeed?.kakaoProfileTitle,
     config.platformFeed?.kakaoUserId,
+    config.platformFeed?.kakaoAvatarUrl,
     persist
   ]);
 

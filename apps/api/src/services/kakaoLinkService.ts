@@ -5,20 +5,28 @@ import { fetchKakaoUserFromAccessToken } from "../integrations/kakao/kakaoUserMe
 export async function completeKakaoLinkForUser(userId: string, code: string) {
   const accessToken = await exchangeKakaoCodeForAccessToken(code);
   const profile = await fetchKakaoUserFromAccessToken(accessToken);
+  const prev = await prisma.userKakaoLink.findUnique({ where: { userId } });
+
+  const nickname =
+    String(profile.nickname || "").trim() ||
+    String(prev?.nickname || "").trim() ||
+    `카카오${profile.id.slice(-4)}`;
+  const profileImageUrl =
+    String(profile.profileImageUrl || "").trim() || String(prev?.profileImageUrl || "").trim() || null;
 
   const link = await prisma.userKakaoLink.upsert({
     where: { userId },
     create: {
       userId,
       kakaoUserId: profile.id,
-      nickname: profile.nickname || `카카오${profile.id.slice(-4)}`,
-      profileImageUrl: profile.profileImageUrl,
+      nickname,
+      profileImageUrl,
       accessToken
     },
     update: {
       kakaoUserId: profile.id,
-      nickname: profile.nickname || `카카오${profile.id.slice(-4)}`,
-      profileImageUrl: profile.profileImageUrl,
+      nickname,
+      profileImageUrl,
       accessToken
     }
   });

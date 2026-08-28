@@ -125,7 +125,7 @@ authV1Routes.get("/kakao", (c) => {
   try {
     const state = randomBytes(24).toString("base64url");
     setOAuthStateCookie(c, KAKAO_STATE_COOKIE, state);
-    const url = buildKakaoAuthorizeUrl(state);
+    const url = buildKakaoAuthorizeUrl(state, "login");
     return c.redirect(url, 302);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "카카오 로그인을 시작할 수 없습니다.";
@@ -166,11 +166,13 @@ authV1Routes.get("/kakao/callback", async (c) => {
   if (linkUserId) {
     try {
       const link = await completeKakaoLinkForUser(linkUserId, code);
-      return redirectKakaoLink({
+      const redirectQuery: Record<string, string> = {
         kakao_oauth: "success",
-        kakao_nickname: link.nickname,
         kakao_user_id: link.kakaoUserId
-      });
+      };
+      if (link.nickname) redirectQuery.kakao_nickname = link.nickname;
+      if (link.profileImageUrl) redirectQuery.kakao_profile_image = link.profileImageUrl;
+      return redirectKakaoLink(redirectQuery);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "카카오 연동 처리에 실패했습니다.";
       return redirectKakaoLink({
@@ -213,7 +215,7 @@ authV1Routes.post("/kakao/link/start", requireUserHeader, async (c) => {
   try {
     const userId = c.get("vlueUserId") as string;
     const state = createKakaoLinkState(userId);
-    const url = buildKakaoAuthorizeUrl(state);
+    const url = buildKakaoAuthorizeUrl(state, "link");
     return c.json({ url });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "카카오 연동을 시작할 수 없습니다.";
