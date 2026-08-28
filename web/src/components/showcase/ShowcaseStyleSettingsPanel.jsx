@@ -1352,8 +1352,8 @@ export default function ShowcaseStyleSettingsPanel({
               {kakaoLink.linked ? (
                 <BusinessOutlinkRow
                   brand="kakao"
-                  label="카카오 채널 URL"
-                  placeholder="https://pf.kakao.com/_… (쇼셜 아이콘에서 열림)"
+                  label="카카오 채널"
+                  placeholder="@검색용ID · _채널ID · pf.kakao.com URL"
                   value={
                     config.platformFeed?.kakaoProfileUrl ||
                     config.commercial.outlinks.kakaoProfile ||

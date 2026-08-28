@@ -8,12 +8,12 @@ function firstText(...values) {
   return "";
 }
 
-export function normalizeKakaoProfilePageUrl(raw) {
-  const s = String(raw ?? "").trim();
-  if (!s) return "";
-  const withProto = /^https?:\/\//i.test(s) ? s : `https://${s.replace(/^\/\//, "")}`;
+function normalizeKakaoHttpUrl(raw) {
+  const withProto = /^https?:\/\//i.test(raw) ? raw : "";
+  const candidate = withProto || (raw.includes(".") ? `https://${raw.replace(/^\/\//, "")}` : "");
+  if (!candidate) return "";
   try {
-    const u = new URL(withProto);
+    const u = new URL(candidate);
     const host = u.hostname.toLowerCase();
     if (host === "pf.kakao.com" || host === "open.kakao.com" || host.endsWith(".kakao.com")) {
       return u.href;
@@ -21,6 +21,37 @@ export function normalizeKakaoProfilePageUrl(raw) {
   } catch {
     return "";
   }
+  return "";
+}
+
+/** pf.kakao.com · open.kakao.com · 채널 ID/검색용 ID → 열 수 있는 URL */
+export function normalizeKakaoProfilePageUrl(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+
+  const asFull = normalizeKakaoHttpUrl(s);
+  if (asFull) return asFull;
+
+  if (/^pf\.kakao\.com\//i.test(s) || /^open\.kakao\.com\//i.test(s)) {
+    const withProto = normalizeKakaoHttpUrl(`https://${s.replace(/^\/\//, "")}`);
+    if (withProto) return withProto;
+  }
+
+  // 채널 프로필 ID (예: _ZeUTxl)
+  if (/^_[A-Za-z0-9]+$/.test(s)) {
+    return `https://pf.kakao.com/${s}`;
+  }
+
+  // 채널 검색용 ID (예: @vlue 또는 vlue)
+  const searchId = s.replace(/^@+/, "").trim();
+  if (searchId && !/[/?#]/.test(searchId)) {
+    const encoded = searchId
+      .split("/")
+      .map((part) => encodeURIComponent(part))
+      .join("/");
+    return `https://pf.kakao.com/@${encoded}`;
+  }
+
   return "";
 }
 
@@ -34,6 +65,7 @@ function resolveStoredKakaoProfileUrl(feed, outlinks) {
   const legacyKakao = firstText(outlinks.kakao);
   const raw = firstText(
     feed?.kakaoProfileUrl,
+    feed?.kakaoChannelId,
     outlinks.kakaoProfile,
     outlinks.kakaoOpenChat,
     /open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : "",
