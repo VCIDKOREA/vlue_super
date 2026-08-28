@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import VlueCyanVerifiedSeal from "../VlueCyanVerifiedSeal.jsx";
 import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
 import { isVlueBrandOrganization } from "../../lib/letteringPaidIdentityDisplay.js";
 import IdentitySecondaryText from "../IdentitySecondaryText.jsx";
@@ -35,7 +35,7 @@ export default function ShowcaseIdentityCorner({
         <p className="showcase-identity-corner__name">
           <span className="showcase-identity-corner__name-text">{primary}</span>
           {verified ? (
-            <ShieldCheck className="showcase-identity-corner__badge" strokeWidth={2.4} aria-label="VLUE 인증" />
+            <VlueCyanVerifiedSeal size={16} className="showcase-identity-corner__badge" />
           ) : null}
         </p>
       ) : null}

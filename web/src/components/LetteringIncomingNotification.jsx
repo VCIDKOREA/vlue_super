@@ -17,6 +17,7 @@ import FreeTierCallShowcase from "./showcase/FreeTierCallShowcase.jsx";
 import { getLetteringReportsForPhone } from "../lib/letteringPhoneReports.js";
 import { formatLetteringReceptionLines, resolveShowcaseBarOwnerLabel } from "../lib/letteringPaidIdentityDisplay.js";
 import IdentitySecondaryText from "./IdentitySecondaryText.jsx";
+import VlueCyanVerifiedSeal from "./VlueCyanVerifiedSeal.jsx";
 import { LETTERING_DEMO_COMPANY_LOGO } from "../lib/letteringDemoAssets.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAvatar.js";
@@ -38,7 +39,7 @@ import CompanionMiniCase, { resetCompanionMiniCaseSessionPos } from "./call/Comp
 import CompanionSamsungCallCta from "./call/CompanionSamsungCallCta.jsx";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
-import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
+import { Phone, PhoneOff, Settings } from "lucide-react";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../lib/letteringBizcardStorage.js";
@@ -81,14 +82,13 @@ export const LETTERING_EMOTIONAL_DEMO_CARD = {
   verificationItems: ["인증유효기간 : 2027.04.10"]
 };
 
-function VlueVerifiedBadge({ className = "" }) {
+function VlueVerifiedBadge({ className = "", size = 18 }) {
   return (
     <span
-      className={`lettering-vlue-verified-badge inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center text-[10px] font-black leading-none ${className}`.trim()}
-      title="VLUE \uC778\uC99D"
-      aria-label="VLUE \uC778\uC99D\uB428"
+      className={`lettering-vlue-verified-badge inline-flex shrink-0 items-center justify-center ${className}`.trim()}
+      title="VLUE 인증"
     >
-      {"\u2713"}
+      <VlueCyanVerifiedSeal size={size} />
     </span>
   );
 }
@@ -1335,7 +1335,7 @@ export default function LetteringIncomingNotification({
               title="VLUE 인증"
               aria-label="VLUE 인증됨"
             >
-              <ShieldCheck className="h-5 w-5" strokeWidth={2.4} aria-hidden />
+              <VlueCyanVerifiedSeal size={28} />
             </span>
           ) : null}
           <div className="min-w-0 flex-1 overflow-hidden">

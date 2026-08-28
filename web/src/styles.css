@@ -3453,13 +3453,15 @@ body,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9999px;
-  background: linear-gradient(145deg, #3b82f6 0%, #1d4ed8 55%, #1e40af 100%);
-  color: #fff;
-  box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.95),
-    0 0 0 3px rgba(37, 99, 235, 0.55),
-    0 2px 8px rgba(29, 78, 216, 0.45);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.lettering-vlue-verified-badge .vlue-cyan-verified-seal {
+  display: block;
+  filter: drop-shadow(0 1px 4px rgba(0, 210, 255, 0.4));
 }
 
 .lettering-call-screen {
@@ -5157,11 +5159,9 @@ body,
 }
 
 .lettering-vlue-verified-badge {
-  background: linear-gradient(145deg, #3b82f6 0%, #2563eb 55%, #1d4ed8 100%);
-  box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.95),
-    0 0 0 3px rgba(37, 99, 235, 0.35),
-    0 2px 8px rgba(37, 99, 235, 0.35);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .lettering-ongoing-scroll {

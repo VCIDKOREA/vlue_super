@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BadgeCheck, Settings, X } from "lucide-react";
+import { Settings, X } from "lucide-react";
+import VlueCyanVerifiedSeal from "../VlueCyanVerifiedSeal.jsx";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import RenderErrorGuard from "../RenderErrorGuard.jsx";
 import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
@@ -746,7 +747,7 @@ export default function ShowcaseCallCarousel({
           }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <BadgeCheck className="h-5 w-5" strokeWidth={2.35} aria-hidden />
+          <VlueCyanVerifiedSeal size={20} />
         </button>
       ) : null;
     if (!settingsBtn && !certMark) return null;
@@ -754,8 +755,8 @@ export default function ShowcaseCallCarousel({
       <div
         className={`showcase-call-carousel__slide-corner${banner ? " showcase-call-carousel__slide-corner--banner" : ""}`}
       >
-        {settingsBtn}
         {certMark}
+        {settingsBtn}
       </div>
     );
   };

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { formatLetteringPaidIdentity } from "../lib/letteringPaidIdentityDisplay.js";
+import VlueCyanVerifiedSeal from "./VlueCyanVerifiedSeal.jsx";
 import { clampLetteringBizcardEmail } from "../lib/letteringBizcardStorage.js";
 import { resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
 import { corporateBrandingStyleVars } from "../lib/b2bCorporateBranding.js";
@@ -55,11 +56,11 @@ function buildBizcardContactRows(card) {
 function VlueVerifiedBadge({ className = "" }) {
   return (
     <span
-      className={`lettering-vlue-verified-badge inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center text-[10px] font-black leading-none ${className}`.trim()}
+      className={`lettering-vlue-verified-badge inline-flex shrink-0 items-center justify-center ${className}`.trim()}
       title="VLUE 인증"
       aria-label="VLUE 인증됨"
     >
-      {"\u2713"}
+      <VlueCyanVerifiedSeal size={16} />
     </span>
   );
 }
