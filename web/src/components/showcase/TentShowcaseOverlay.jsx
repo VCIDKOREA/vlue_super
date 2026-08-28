@@ -83,7 +83,13 @@ function resolveSocialLinks(style, card) {
       (!/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : "") ||
       ""
   ).trim();
-  const kakao = kakaoOpenChat || kakaoProfile;
+  const kakaoOAuthLinked =
+    feed.kakaoVerified === true || Boolean(String(feed.kakaoUserId || "").trim());
+  const kakaoVerifiedOnly =
+    !kakaoProfile && !kakaoOpenChat && kakaoOAuthLinked
+      ? String(feed.kakaoProfileTitle || "").trim() || "kakao-verified"
+      : "";
+  const kakao = kakaoOpenChat || kakaoProfile || kakaoVerifiedOnly;
   const instagram =
     outlinks.instagram ||
     feed.instagramProfileUrl ||

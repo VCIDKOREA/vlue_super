@@ -1,15 +1,43 @@
 import { readDigitalCardActive } from "../bizcardAccountSync.js";
 import { readLetteringFixedIdentity } from "../letteringBizcardStorage.js";
 import { scrubLetteringDemoPollution } from "../letteringDemoPollution.js";
-import { readActiveShowcaseStyle } from "./showcaseStyleStorage.js";
+import { readActiveShowcaseStyle, readShowcaseStyle } from "./showcaseStyleStorage.js";
+
+/** 편집기에만 있는 카카오 OAuth — 적용 전 미리보기에도 쇼셜 아이콘 노출 */
+function mergeKakaoOAuthFromEditor(style) {
+  try {
+    const editor = readShowcaseStyle();
+    const ef = editor?.platformFeed;
+    if (!ef || (!ef.kakaoVerified && !ef.kakaoUserId)) return style;
+    const base = style && typeof style === "object" ? style : {};
+    const pf = base.platformFeed || {};
+    if (pf.kakaoVerified || pf.kakaoUserId) return style;
+    return {
+      ...base,
+      platformFeed: {
+        ...pf,
+        kakaoVerified: ef.kakaoVerified === true || Boolean(ef.kakaoUserId),
+        kakaoUserId: String(ef.kakaoUserId || pf.kakaoUserId || "").trim(),
+        kakaoProfileTitle: String(ef.kakaoProfileTitle || pf.kakaoProfileTitle || "").trim(),
+        kakaoProfileUrl: String(ef.kakaoProfileUrl || pf.kakaoProfileUrl || "").trim(),
+        kakaoAvatarUrl: String(ef.kakaoAvatarUrl || pf.kakaoAvatarUrl || "").trim()
+      }
+    };
+  } catch {
+    return style;
+  }
+}
 
 /** 통화 송출·미리보기용 카드 + 스타일 설정 병합 */
 export function applyShowcaseStyleToCard(card, membershipTier = "free", opts = {}) {
   const peerMode = Boolean(opts.peerMode || opts.skipFixedIdentity);
-  const style =
+  let style =
     opts.style ||
     (card?.showcaseStyle && typeof card.showcaseStyle === "object" ? card.showcaseStyle : null) ||
     (peerMode ? null : readActiveShowcaseStyle());
+  if (!peerMode) {
+    style = mergeKakaoOAuthFromEditor(style || readShowcaseStyle());
+  }
 
   /*
    * 통화 오버레이·피어 명함: 상대 DB 값을 그대로 송출.

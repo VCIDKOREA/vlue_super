@@ -9,6 +9,10 @@ import {
 import { normalizeBusinessLink } from "../../lib/showcase/showcasePages.js";
 import FollowActionButton from "../follow/FollowActionButton.jsx";
 import { KakaoOpenChatGlyph, KakaoTalkGlyph } from "./KakaoOutlinkGlyphs.jsx";
+import {
+  listShowcaseSocialOutlinks,
+  mergeShowcaseStyleForChrome
+} from "../../lib/showcase/showcaseSocialOutlinks.js";
 import "../follow/follow-action.css";
 
 function firstText(...values) {
@@ -45,6 +49,7 @@ function displayHost(url) {
  */
 export default function ShowcaseSlideChrome({
   card,
+  showcaseStyle = null,
   variant = "custom",
   /** 현재 슬라이드(페이지)의 비즈니스 링크 — 페이지당 1개 */
   businessLink = null,
@@ -57,8 +62,7 @@ export default function ShowcaseSlideChrome({
 }) {
   const [socialOpen, setSocialOpen] = useState(false);
   const [logoBroken, setLogoBroken] = useState(false);
-  const style = card?.showcaseStyle || {};
-  const outlinks = style?.commercial?.outlinks || {};
+  const style = mergeShowcaseStyleForChrome(card?.showcaseStyle, showcaseStyle);
   const pageLink = normalizeBusinessLink(businessLink);
   const logoSrc = !logoBroken && pageLink?.logoUrl ? pageLink.logoUrl : "";
   const logoInitial = String(pageLink?.name || "링").trim().slice(0, 1) || "링";
@@ -102,48 +106,7 @@ export default function ShowcaseSlideChrome({
     return { avatarUrl: "", letter: (profileName || "V").slice(0, 1).toUpperCase() };
   })();
 
-  const ig =
-    firstText(outlinks.instagram, style?.platformFeed?.instagramProfileUrl) ||
-    (style?.platformFeed?.instagramHandle
-      ? `https://instagram.com/${String(style.platformFeed.instagramHandle).replace(/^@/, "")}`
-      : "");
-  const legacyKakao = firstText(outlinks.kakao);
-  const kakaoOpen = firstText(
-    outlinks.kakaoOpenChat,
-    /open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : ""
-  );
-  const kakaoProfile = firstText(
-    outlinks.kakaoProfile,
-    style?.platformFeed?.kakaoProfileUrl,
-    legacyKakao && !/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : ""
-  );
-  const kakaoVerifiedProfile =
-    !kakaoProfile && style?.platformFeed?.kakaoVerified === true
-      ? String(style?.platformFeed?.kakaoProfileTitle || "").trim() || "카카오 프로필"
-      : "";
-  const facebook = firstText(outlinks.facebook);
-  const youtube = firstText(outlinks.youtube);
-
-  const socialItems = [
-    ig ? { id: "instagram", label: "Instagram", url: ig, className: "is-ig" } : null,
-    youtube ? { id: "youtube", label: "YouTube", url: youtube, className: "is-yt" } : null,
-    facebook ? { id: "facebook", label: "Facebook", url: facebook, className: "is-fb" } : null,
-    kakaoOpen
-      ? { id: "kakao-open", label: "카카오 오픈채팅", url: kakaoOpen, className: "is-kakao" }
-      : null,
-    kakaoProfile
-      ? { id: "kakao-profile", label: "카카오 프로필", url: kakaoProfile, className: "is-kakao" }
-      : null,
-    kakaoVerifiedProfile
-      ? {
-          id: "kakao-profile",
-          label: kakaoVerifiedProfile,
-          url: "",
-          verified: true,
-          className: "is-kakao"
-        }
-      : null
-  ].filter(Boolean);
+  const socialItems = listShowcaseSocialOutlinks(style);
 
   const showBizLink = variant === "custom" && !hideBusinessLinks && Boolean(pageLink);
   const hasSocial = socialItems.length > 0;
@@ -223,6 +186,10 @@ export default function ShowcaseSlideChrome({
                 tabIndex={socialOpen ? 0 : -1}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (item.verified && !item.url) {
+                    onToast?.(`${item.label} — 카카오 SNS 인증됨`);
+                    return;
+                  }
                   openUrl(item.url);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
@@ -321,7 +288,7 @@ function SocialGlyph({ kind }) {
   if (kind === "kakao-open") {
     return <KakaoOpenChatGlyph size={16} />;
   }
-  if (kind === "kakao-profile") {
+  if (kind === "kakao-profile" || kind === "kakao-profile-verified") {
     return <KakaoTalkGlyph size={16} />;
   }
   if (kind === "facebook") {

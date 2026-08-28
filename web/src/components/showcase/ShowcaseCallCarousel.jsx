@@ -945,6 +945,7 @@ export default function ShowcaseCallCarousel({
                     {socialOverlayEnabled && !keypadOpen ? (
                       <ShowcaseSlideChrome
                         card={card}
+                        showcaseStyle={styleConfig}
                         variant="instagram"
                         hideBusinessLinks
                         fallbackToMe={false}
@@ -983,6 +984,7 @@ export default function ShowcaseCallCarousel({
                       <>
                         <ShowcaseSlideChrome
                           card={card}
+                          showcaseStyle={styleConfig}
                           variant="custom"
                           businessLink={slide.businessLink || null}
                           fallbackToMe={false}

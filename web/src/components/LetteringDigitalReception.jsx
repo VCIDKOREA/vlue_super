@@ -33,6 +33,7 @@ import { isCeoSubjectCard } from "../lib/letteringDemoPollution.js";
 import VLUE_EYE_WATERMARK from "../assets/vlue-eye-watermark.svg?url";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
 import { KakaoOpenChatGlyph, KakaoTalkGlyph } from "./showcase/KakaoOutlinkGlyphs.jsx";
+import { listShowcaseSocialOutlinks } from "../lib/showcase/showcaseSocialOutlinks.js";
 
 const CEO_WATERMARK_SRC = VLUE_EYE_WATERMARK || VLUE_SHIELD_LOGO || "";
 
@@ -54,51 +55,7 @@ function firstText(...values) {
 /** 디지털 명함 — 비즈니스 쇼셜링크 (인스타·유튜브·페이스북·카카오채팅·카카오프로필) */
 function listCardSocialOutlinks(card) {
   const style = card?.showcaseStyle && typeof card.showcaseStyle === "object" ? card.showcaseStyle : {};
-  const outlinks = style.commercial?.outlinks || {};
-  const feed = style.platformFeed || {};
-
-  const ig =
-    firstText(outlinks.instagram, feed.instagramProfileUrl) ||
-    (feed.instagramHandle
-      ? `https://instagram.com/${String(feed.instagramHandle).replace(/^@/, "")}`
-      : "");
-  const legacyKakao = firstText(outlinks.kakao);
-  const kakaoOpen = firstText(
-    outlinks.kakaoOpenChat,
-    /open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : ""
-  );
-  const kakaoProfile = firstText(
-    outlinks.kakaoProfile,
-    feed.kakaoProfileUrl,
-    legacyKakao && !/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : ""
-  );
-  const kakaoVerifiedProfile =
-    !kakaoProfile && feed.kakaoVerified === true
-      ? String(feed.kakaoProfileTitle || "").trim() || "카카오 프로필"
-      : "";
-  const facebook = firstText(outlinks.facebook);
-  const youtube = firstText(outlinks.youtube);
-
-  return [
-    ig ? { id: "instagram", label: "Instagram", url: ig, className: "is-ig" } : null,
-    youtube ? { id: "youtube", label: "YouTube", url: youtube, className: "is-yt" } : null,
-    facebook ? { id: "facebook", label: "Facebook", url: facebook, className: "is-fb" } : null,
-    kakaoOpen
-      ? { id: "kakao-open", label: "카카오 오픈채팅", url: kakaoOpen, className: "is-kakao" }
-      : null,
-    kakaoProfile
-      ? { id: "kakao-profile", label: "카카오 프로필", url: kakaoProfile, className: "is-kakao" }
-      : null,
-    kakaoVerifiedProfile
-      ? {
-          id: "kakao-profile",
-          label: kakaoVerifiedProfile,
-          url: "",
-          verified: true,
-          className: "is-kakao"
-        }
-      : null
-  ].filter(Boolean);
+  return listShowcaseSocialOutlinks(style);
 }
 
 function SocialOutlinkGlyph({ kind }) {
@@ -114,7 +71,7 @@ function SocialOutlinkGlyph({ kind }) {
   if (kind === "kakao-open") {
     return <KakaoOpenChatGlyph size={18} />;
   }
-  if (kind === "kakao-profile") {
+  if (kind === "kakao-profile" || kind === "kakao-profile-verified") {
     return <KakaoTalkGlyph size={18} />;
   }
   if (kind === "facebook") {
@@ -157,6 +114,7 @@ function FrontSocialOutlinkButtons({ card, enableContactLinks = true, visible = 
             e.stopPropagation();
             if (!enableContactLinks) return;
             const href = formatWebHref(item.url) || String(item.url || "").trim();
+            if (item.verified && !href) return;
             if (href) openExternalHref(href);
           }}
           onPointerDown={(e) => e.stopPropagation()}
