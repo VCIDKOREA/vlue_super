@@ -734,7 +734,7 @@ export default function ShowcaseCallCarousel({
       </button>
     ) : null;
     const certMark =
-      igVerified && snsCertLines.length > 0 ? (
+      snsCertLines.length > 0 ? (
         <button
           type="button"
           className={`showcase-call-carousel__sns-cert-mark${banner ? " showcase-call-carousel__sns-cert-mark--banner" : ""}`}

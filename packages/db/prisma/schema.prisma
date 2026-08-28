@@ -406,6 +406,9 @@ model User {
   /// Instagram API (Instagram Login) — 쇼케이스 게시물 선택용 연동
   instagramLink UserInstagramLink?
 
+  /// Kakao Login OAuth — 쇼케이스 카카오 프로필 SNS 인증용
+  kakaoLink UserKakaoLink?
+
   userEmailMapping UserEmailMapping?
   emailForwardingNotifications EmailForwardingNotificationLog[]
   inappMailCaches InappMailCache[]
@@ -2429,6 +2432,25 @@ model UserInstagramLink {
 
   @@index([igUserId])
   @@map("user_instagram_links")
+}
+
+/// Kakao Login OAuth — VLUE 계정당 1개 카카오 계정 연동 (개인 프로필 SNS 인증)
+model UserKakaoLink {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @unique @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kakaoUserId     String  @map("kakao_user_id") @db.VarChar(80)
+  nickname        String  @map("nickname") @db.VarChar(120)
+  profileImageUrl String? @map("profile_image_url") @db.Text
+  accessToken     String  @map("access_token") @db.Text
+
+  linkedAt  DateTime @default(now()) @map("linked_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([kakaoUserId])
+  @@map("user_kakao_links")
 }
 
 // -----------------------------------------------------------------------------

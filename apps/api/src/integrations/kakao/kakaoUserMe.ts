@@ -7,6 +7,7 @@ export type KakaoUserProfile = {
   email: string | null;
   nickname: string | null;
   emailVerified: boolean;
+  profileImageUrl: string | null;
 };
 
 export async function fetchKakaoUserFromAccessToken(accessToken: string): Promise<KakaoUserProfile> {
@@ -46,6 +47,11 @@ export async function fetchKakaoUserFromAccessToken(accessToken: string): Promis
   const prof = ac.profile as Record<string, unknown> | undefined;
   const nickFromProfile = prof && typeof prof.nickname === "string" ? String(prof.nickname).trim() : "";
   const nickname = nickFromProps || nickFromProfile || null;
+  const imgFromProfile =
+    prof && typeof prof.profile_image_url === "string" ? String(prof.profile_image_url).trim() : "";
+  const imgFromProps =
+    typeof props.profile_image === "string" ? String(props.profile_image).trim() : "";
+  const profileImageUrl = imgFromProfile || imgFromProps || null;
 
-  return { id, email, nickname, emailVerified };
+  return { id, email, nickname, emailVerified, profileImageUrl };
 }

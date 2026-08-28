@@ -135,6 +135,9 @@ export function createDefaultShowcaseStyle() {
       /** Instagram Login 연동 완료 시 true */
       instagramVerified: false,
       instagramAvatarUrl: "",
+      /** Kakao Login 연동 완료 시 true — 개인 프로필은 공유 URL 없음 */
+      kakaoVerified: false,
+      kakaoUserId: "",
       kakaoProfileTitle: "",
       kakaoProfileUrl: "",
       kakaoAvatarUrl: "",
@@ -239,6 +242,7 @@ function mergeDeep(defaults, parsed) {
           ? merged.instagramMedia
           : [];
       merged.instagramVerified = parsed?.platformFeed?.instagramVerified === true;
+      merged.kakaoVerified = parsed?.platformFeed?.kakaoVerified === true;
       return merged;
     })(),
     caseTheme: { ...defaults.caseTheme, ...parsed?.caseTheme },

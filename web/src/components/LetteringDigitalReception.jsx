@@ -72,6 +72,10 @@ function listCardSocialOutlinks(card) {
     feed.kakaoProfileUrl,
     legacyKakao && !/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : ""
   );
+  const kakaoVerifiedProfile =
+    !kakaoProfile && feed.kakaoVerified === true
+      ? String(feed.kakaoProfileTitle || "").trim() || "카카오 프로필"
+      : "";
   const facebook = firstText(outlinks.facebook);
   const youtube = firstText(outlinks.youtube);
 
@@ -84,6 +88,15 @@ function listCardSocialOutlinks(card) {
       : null,
     kakaoProfile
       ? { id: "kakao-profile", label: "카카오 프로필", url: kakaoProfile, className: "is-kakao" }
+      : null,
+    kakaoVerifiedProfile
+      ? {
+          id: "kakao-profile",
+          label: kakaoVerifiedProfile,
+          url: "",
+          verified: true,
+          className: "is-kakao"
+        }
       : null
   ].filter(Boolean);
 }

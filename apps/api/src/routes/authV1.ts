@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { randomBytes } from "node:crypto";
 import { getCookie, setCookie } from "hono/cookie";
-import { buildKakaoAuthorizeUrl, exchangeKakaoCodeForAccessToken } from "../integrations/kakao/kakaoOAuth.js";
+import { buildKakaoAuthorizeUrl, createKakaoLinkState, exchangeKakaoCodeForAccessToken, verifyKakaoLinkState } from "../integrations/kakao/kakaoOAuth.js";
 import { getFrontendOrigin } from "../integrations/kakao/kakaoEnv.js";
 import { buildGoogleAuthorizeUrl, exchangeGoogleCodeForAccessToken } from "../integrations/google/googleOAuth.js";
 import { buildNaverAuthorizeUrl, exchangeNaverCodeForAccessToken } from "../integrations/naver/naverOAuth.js";
@@ -13,6 +13,11 @@ import {
   verifyInstagramLinkState
 } from "../integrations/instagram/instagramOAuth.js";
 import { completeSocialLogin, linkSocialAccountToUser } from "../services/socialAuthService.js";
+import {
+  completeKakaoLinkForUser,
+  disconnectKakaoLink,
+  getKakaoLinkStatus
+} from "../services/kakaoLinkService.js";
 import {
   completeInstagramLinkForUser,
   disconnectInstagramLink,
@@ -110,6 +115,11 @@ function setOAuthStateCookie(c: Parameters<typeof setCookie>[0], name: string, s
   });
 }
 
+function redirectKakaoLink(query: Record<string, string>): Response {
+  const loc = frontendRedirect(query);
+  return Response.redirect(loc, 302);
+}
+
 /** 카카오 인증 페이지로 리다이렉트 */
 authV1Routes.get("/kakao", (c) => {
   try {
@@ -123,26 +133,56 @@ authV1Routes.get("/kakao", (c) => {
   }
 });
 
-/** 카카오 OAuth 콜백 — JWT 발급 후 프론트로 리다이렉트 */
+/** 카카오 OAuth 콜백 — 쇼케이스 연동(signed state) 또는 VLUE 간편 로그인(cookie state) */
 authV1Routes.get("/kakao/callback", async (c) => {
   const kakaoErr = c.req.query("error");
   const kakaoErrDesc = c.req.query("error_description");
+  const state = c.req.query("state") || "";
   if (kakaoErr) {
     const msg =
       (kakaoErrDesc && String(kakaoErrDesc).trim()) ||
       (kakaoErr === "access_denied" ? "카카오 로그인이 취소되었습니다." : `카카오 인증 오류: ${kakaoErr}`);
+    if (verifyKakaoLinkState(state)) {
+      return redirectKakaoLink({
+        kakao_oauth: "error",
+        kakao_error: msg.slice(0, 240)
+      });
+    }
     return redirectAuthError("kakao", msg);
-  }
-
-  const state = c.req.query("state") || "";
-  const cookieState = getCookie(c, KAKAO_STATE_COOKIE) || "";
-  if (!state || !cookieState || state !== cookieState) {
-    return redirectAuthError("kakao", "로그인 요청이 만료되었거나 위조되었습니다. 다시 시도해 주세요.");
   }
 
   const code = c.req.query("code");
   if (!code) {
+    if (verifyKakaoLinkState(state)) {
+      return redirectKakaoLink({
+        kakao_oauth: "error",
+        kakao_error: "카카오 인가 코드가 없습니다."
+      });
+    }
     return redirectAuthError("kakao", "카카오 인가 코드가 없습니다.");
+  }
+
+  const linkUserId = verifyKakaoLinkState(state);
+  if (linkUserId) {
+    try {
+      const link = await completeKakaoLinkForUser(linkUserId, code);
+      return redirectKakaoLink({
+        kakao_oauth: "success",
+        kakao_nickname: link.nickname,
+        kakao_user_id: link.kakaoUserId
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "카카오 연동 처리에 실패했습니다.";
+      return redirectKakaoLink({
+        kakao_oauth: "error",
+        kakao_error: msg.slice(0, 240)
+      });
+    }
+  }
+
+  const cookieState = getCookie(c, KAKAO_STATE_COOKIE) || "";
+  if (!state || !cookieState || state !== cookieState) {
+    return redirectAuthError("kakao", "로그인 요청이 만료되었거나 위조되었습니다. 다시 시도해 주세요.");
   }
 
   try {
@@ -163,6 +203,34 @@ authV1Routes.get("/kakao/callback", async (c) => {
     const msg = e instanceof Error ? e.message : "카카오 로그인 처리에 실패했습니다.";
     return redirectAuthError("kakao", msg);
   }
+});
+
+/**
+ * 카카오 프로필 SNS 인증 시작 (쇼케이스).
+ * VLUE 로그인 필요 → authorize URL 반환 후 클라이언트가 리다이렉트.
+ */
+authV1Routes.post("/kakao/link/start", requireUserHeader, async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const state = createKakaoLinkState(userId);
+    const url = buildKakaoAuthorizeUrl(state);
+    return c.json({ url });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "카카오 연동을 시작할 수 없습니다.";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+authV1Routes.get("/kakao/status", requireUserHeader, async (c) => {
+  const userId = c.get("vlueUserId") as string;
+  const status = await getKakaoLinkStatus(userId);
+  return c.json(status);
+});
+
+authV1Routes.delete("/kakao/link", requireUserHeader, async (c) => {
+  const userId = c.get("vlueUserId") as string;
+  await disconnectKakaoLink(userId);
+  return c.json({ ok: true });
 });
 
 /** Google 인증 페이지로 리다이렉트 */

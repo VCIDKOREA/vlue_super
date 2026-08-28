@@ -38,6 +38,11 @@ import {
   fetchInstagramLinkStatus,
   startInstagramLink
 } from "../../lib/instagramLinkApi.js";
+import {
+  disconnectKakaoLink,
+  fetchKakaoLinkStatus,
+  startKakaoLink
+} from "../../lib/kakaoLinkApi.js";
 import { readDigitalCardActive, readDccBroadcastOn } from "../../lib/bizcardAccountSync.js";
 import { useDccFeatureAccess } from "../../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../../lib/dccAccessPolicy.js";
@@ -249,6 +254,8 @@ export default function ShowcaseStyleSettingsPanel({
   const settingsScrollRef = useRef(null);
   const [igLink, setIgLink] = useState({ linked: false });
   const [igLinkLoading, setIgLinkLoading] = useState(false);
+  const [kakaoLink, setKakaoLink] = useState({ linked: false });
+  const [kakaoLinkLoading, setKakaoLinkLoading] = useState(false);
   /** 적용 시 마이케이스에 새 게시물로 올릴지 (기본 꺼짐 — 사진 수정마다 쌓이는 것 방지) */
   const [alsoUploadToMycase, setAlsoUploadToMycase] = useState(false);
   const [lineBusy, setLineBusy] = useState(false);
@@ -301,6 +308,15 @@ export default function ShowcaseStyleSettingsPanel({
     }
   }, []);
 
+  const refreshKakaoLink = useCallback(async () => {
+    try {
+      const status = await fetchKakaoLinkStatus();
+      setKakaoLink(status);
+    } catch {
+      setKakaoLink({ linked: false });
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -309,6 +325,21 @@ export default function ShowcaseStyleSettingsPanel({
         if (!cancelled) setIgLink(status);
       } catch {
         if (!cancelled) setIgLink({ linked: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await fetchKakaoLinkStatus();
+        if (!cancelled) setKakaoLink(status);
+      } catch {
+        if (!cancelled) setKakaoLink({ linked: false });
       }
     })();
     return () => {
@@ -473,6 +504,47 @@ export default function ShowcaseStyleSettingsPanel({
     config.platformFeed?.instagramVerified,
     config.platformFeed?.instagramHandle,
     config.commercial?.outlinks?.instagram,
+    persist
+  ]);
+
+  useEffect(() => {
+    if (!kakaoLink.linked || !kakaoLink.nickname) return;
+    const title = String(kakaoLink.nickname).trim();
+    if (
+      config.platformFeed?.kakaoVerified === true &&
+      config.platformFeed?.kakaoProfileTitle === title &&
+      config.platformFeed?.kakaoUserId === String(kakaoLink.kakaoUserId || "").trim()
+    ) {
+      return;
+    }
+    persist({
+      platformFeed: {
+        ...(config.platformFeed || {}),
+        kakaoVerified: true,
+        kakaoUserId: String(kakaoLink.kakaoUserId || "").trim(),
+        kakaoProfileTitle: title,
+        kakaoProfileUrl: "",
+        kakaoAvatarUrl:
+          String(kakaoLink.profileImageUrl || "").trim() ||
+          config.platformFeed?.kakaoAvatarUrl ||
+          ""
+      },
+      commercial: {
+        ...(config.commercial || {}),
+        outlinks: {
+          ...(config.commercial?.outlinks || {}),
+          kakaoProfile: ""
+        }
+      }
+    });
+  }, [
+    kakaoLink.linked,
+    kakaoLink.nickname,
+    kakaoLink.kakaoUserId,
+    kakaoLink.profileImageUrl,
+    config.platformFeed?.kakaoVerified,
+    config.platformFeed?.kakaoProfileTitle,
+    config.platformFeed?.kakaoUserId,
     persist
   ]);
 
@@ -1151,7 +1223,7 @@ export default function ShowcaseStyleSettingsPanel({
                   <span>비즈니스</span>
                   <span>쇼셜링크</span>
                 </span>
-                <HelpTip text="Instagram은 로그인·회원가입·홍보 링크용입니다. 인증 시 프로필 URL이 자동 입력됩니다. 카카오는 오픈채팅·프로필을 따로 넣으세요." />
+                <HelpTip text="Instagram·카카오 프로필은 로그인(OAuth)으로 SNS 인증합니다. 오픈채팅·채널만 URL을 직접 넣을 수 있습니다." />
               </span>
             </span>
             <span className="showcase-profile-row__trail">
@@ -1241,23 +1313,66 @@ export default function ShowcaseStyleSettingsPanel({
               <BusinessOutlinkRow
                 brand="kakao"
                 label="카카오 프로필"
-                placeholder="https://pf.kakao.com/… 또는 카톡 프로필 URL"
-                value={config.commercial.outlinks.kakaoProfile || ""}
+                placeholder="카카오 로그인으로 SNS 인증"
+                value={
+                  kakaoLink.linked
+                    ? config.platformFeed?.kakaoProfileTitle || kakaoLink.nickname || "카카오 인증됨"
+                    : config.commercial.outlinks.kakaoProfile || ""
+                }
                 inputCls={inputCls}
-                onChange={(v) => {
-                  const kakaoProfile = String(v || "").trim();
-                  const kakaoOpenChat = String(config.commercial.outlinks.kakaoOpenChat || "").trim();
-                  persist({
-                    commercial: {
-                      outlinks: {
-                        ...config.commercial.outlinks,
-                        kakaoProfile,
-                        kakao: kakaoOpenChat || kakaoProfile || ""
-                      }
-                    }
-                  });
+                onChange={() => {}}
+                onBrandTap={async () => {
+                  if (kakaoLinkLoading) return;
+                  if (kakaoLink.linked) {
+                    notify(`${kakaoLink.nickname || "카카오"} 프로필이 인증되어 있습니다.`);
+                    return;
+                  }
+                  setKakaoLinkLoading(true);
+                  try {
+                    const url = await startKakaoLink();
+                    window.location.assign(url);
+                  } catch (e) {
+                    notify(e instanceof Error ? e.message : "카카오 연동을 시작할 수 없습니다.");
+                    setKakaoLinkLoading(false);
+                  }
                 }}
               />
+              {kakaoLink.linked ? (
+                <button
+                  type="button"
+                  className="showcase-bgm-picker__yt-btn mt-2"
+                  disabled={kakaoLinkLoading}
+                  onClick={async () => {
+                    if (!window.confirm("카카오 프로필 인증을 해제할까요?")) return;
+                    setKakaoLinkLoading(true);
+                    try {
+                      await disconnectKakaoLink();
+                      persist({
+                        platformFeed: {
+                          ...(config.platformFeed || {}),
+                          kakaoVerified: false,
+                          kakaoUserId: "",
+                          kakaoProfileTitle: "",
+                          kakaoProfileUrl: "",
+                          kakaoAvatarUrl: ""
+                        },
+                        commercial: {
+                          ...(config.commercial || {}),
+                          outlinks: { ...(config.commercial?.outlinks || {}), kakaoProfile: "" }
+                        }
+                      });
+                      await refreshKakaoLink();
+                      notify("카카오 인증이 해제되었습니다. 「적용하기」를 눌러 저장하세요.");
+                    } catch (e) {
+                      notify(e instanceof Error ? e.message : "연동 해제에 실패했습니다.");
+                    } finally {
+                      setKakaoLinkLoading(false);
+                    }
+                  }}
+                >
+                  카카오 인증 해제
+                </button>
+              ) : null}
               <p className="showcase-profile-block__sub mt-3 text-[11px] opacity-70">
                 홍보용 비즈니스 링크는 각 메인커스텀 페이지에서 페이지당 1개씩 설정합니다.
               </p>
@@ -1518,10 +1633,10 @@ function BusinessOutlinkRow({ brand, label, placeholder, value, inputCls, onChan
         className={`showcase-style-settings__input showcase-business-outlink__input ${inputCls}`}
         placeholder={placeholder}
         value={value}
-        readOnly={brand === "instagram" && !!onBrandTap}
+        readOnly={(brand === "instagram" || brand === "kakao") && !!onBrandTap}
         onChange={(e) => onChange?.(e.target.value.trim())}
         onFocus={(e) => {
-          if (brand === "instagram" && onBrandTap) {
+          if ((brand === "instagram" || brand === "kakao") && onBrandTap) {
             e.target.blur();
             onBrandTap();
           }

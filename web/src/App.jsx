@@ -171,6 +171,7 @@ import {
 import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./lib/kakaoSocialLogin.js";
 import { consumeSocialOAuthReturn } from "./lib/socialOAuthReturn.js";
 import { consumeInstagramLinkReturn } from "./lib/instagramLinkApi.js";
+import { consumeKakaoLinkReturn } from "./lib/kakaoLinkApi.js";
 import { formatSocialLoginError, isSnsUnlinkedError } from "./lib/socialLoginPolicy.js";
 import { VLUE_MARKETING_SIGNUP_KEY, withdrawVlueAccount } from "./lib/vlueAuthApi.js";
 import LetteringNotificationPreviewPage from "./components/LetteringNotificationPreviewPage.jsx";
@@ -2170,6 +2171,18 @@ function App() {
         setBottomToast(`${name} 인증완료 · 게시물 사진을 선택할 수 있습니다.`);
       } else {
         setBottomToast(ig.message || "Instagram 연동에 실패했습니다.");
+      }
+      const t = setTimeout(() => setBottomToast(""), 3200);
+      return () => clearTimeout(t);
+    }
+
+    const kakao = consumeKakaoLinkReturn();
+    if (kakao.handled) {
+      if (kakao.success) {
+        const name = kakao.nickname ? String(kakao.nickname) : "카카오";
+        setBottomToast(`${name} 카카오 프로필 인증이 완료되었습니다.`);
+      } else {
+        setBottomToast(kakao.message || "카카오 연동에 실패했습니다.");
       }
       const t = setTimeout(() => setBottomToast(""), 3200);
       return () => clearTimeout(t);

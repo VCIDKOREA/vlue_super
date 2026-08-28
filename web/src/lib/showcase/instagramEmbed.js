@@ -145,6 +145,10 @@ export function isInstagramVerified(styleConfig) {
   return styleConfig?.platformFeed?.instagramVerified === true;
 }
 
+export function isKakaoVerified(styleConfig) {
+  return styleConfig?.platformFeed?.kakaoVerified === true;
+}
+
 export function instagramVerifiedLabel(styleConfig) {
   if (!isInstagramVerified(styleConfig)) return "";
   const handle = String(styleConfig?.platformFeed?.instagramHandle || "").trim();
@@ -153,6 +157,8 @@ export function instagramVerifiedLabel(styleConfig) {
 
 /** SNS 인증 내역 — 화면용 한 줄 (확장 시 배열에 항목 추가) */
 export function listSnsVerificationHistory(styleConfig) {
-  if (!isInstagramVerified(styleConfig)) return [];
-  return ["[Instagram 인증완료]"];
+  const lines = [];
+  if (isInstagramVerified(styleConfig)) lines.push("[Instagram 인증확인]");
+  if (isKakaoVerified(styleConfig)) lines.push("[Kakao 인증확인]");
+  return lines;
 }

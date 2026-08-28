@@ -117,6 +117,10 @@ export default function ShowcaseSlideChrome({
     style?.platformFeed?.kakaoProfileUrl,
     legacyKakao && !/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : ""
   );
+  const kakaoVerifiedProfile =
+    !kakaoProfile && style?.platformFeed?.kakaoVerified === true
+      ? String(style?.platformFeed?.kakaoProfileTitle || "").trim() || "카카오 프로필"
+      : "";
   const facebook = firstText(outlinks.facebook);
   const youtube = firstText(outlinks.youtube);
 
@@ -129,6 +133,15 @@ export default function ShowcaseSlideChrome({
       : null,
     kakaoProfile
       ? { id: "kakao-profile", label: "카카오 프로필", url: kakaoProfile, className: "is-kakao" }
+      : null,
+    kakaoVerifiedProfile
+      ? {
+          id: "kakao-profile",
+          label: kakaoVerifiedProfile,
+          url: "",
+          verified: true,
+          className: "is-kakao"
+        }
       : null
   ].filter(Boolean);
 
