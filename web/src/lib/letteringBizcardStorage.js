@@ -19,8 +19,8 @@ export const LETTERING_BIZCARD_EMAIL_MAX = 26;
 export const LETTERING_BIZCARD_EMAIL_WARN = 22;
 /** 통화 DCC 앞면 「소개」— 화면 밀림 방지 */
 export const LETTERING_BIZCARD_INTRO_FRONT_MAX = 30;
-/** 통화 DCC 뒷면 「추가 설명」— 연락처 하단 약 3~4줄 */
-export const LETTERING_BIZCARD_BACK_NOTE_MAX = 100;
+/** 통화 DCC 뒷면 「추가 설명」— 연락처 하단 약 10~15줄 */
+export const LETTERING_BIZCARD_BACK_NOTE_MAX = 500;
 
 export function clampLetteringBizcardIntroFront(raw) {
   return String(raw ?? "").slice(0, LETTERING_BIZCARD_INTRO_FRONT_MAX);
