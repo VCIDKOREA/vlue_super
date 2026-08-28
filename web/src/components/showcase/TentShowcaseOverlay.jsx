@@ -12,6 +12,8 @@ import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
 import { resolveCallOverlayIdentityLines } from "../../lib/letteringPaidIdentityDisplay.js";
 import IdentitySecondaryText from "../IdentitySecondaryText.jsx";
 import { readActiveShowcaseStyle, createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
+import { normalizeKakaoTalkId, buildKakaoTalkAddBridgeUrl } from "../../lib/kakao/kakaoPersonalLink.js";
+import { normalizeKakaoProfilePageUrl } from "../../lib/showcase/showcaseSocialOutlinks.js";
 import { readShowcasePrivacyMode } from "../../lib/showcase/showcasePrivacyMode.js";
 import {
   areShowcaseLinksEnabled,
@@ -75,21 +77,21 @@ function resolveSocialLinks(style, card) {
   const kakaoOpenChat = String(
     outlinks.kakaoOpenChat || (/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : "") || ""
   ).trim();
-  const kakaoProfile = String(
-    outlinks.kakaoProfile ||
-      feed.kakaoProfileUrl ||
-      card?.kakaoUrl ||
-      card?.kakaoProfileUrl ||
-      (!/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : "") ||
-      ""
+  const kakaoTalkId = normalizeKakaoTalkId(feed.kakaoTalkId || outlinks.kakaoTalkId);
+  const kakaoPersonal = kakaoTalkId ? buildKakaoTalkAddBridgeUrl(kakaoTalkId) : "";
+  const kakaoChannel = String(
+    normalizeKakaoProfilePageUrl(
+      feed.kakaoChannelUrl ||
+        outlinks.kakaoChannel ||
+        feed.kakaoProfileUrl ||
+        outlinks.kakaoProfile ||
+        card?.kakaoUrl ||
+        card?.kakaoProfileUrl ||
+        (!/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : "") ||
+        ""
+    ) || ""
   ).trim();
-  const kakaoOAuthLinked =
-    feed.kakaoVerified === true || Boolean(String(feed.kakaoUserId || "").trim());
-  const kakaoVerifiedOnly =
-    !kakaoProfile && !kakaoOpenChat && kakaoOAuthLinked
-      ? String(feed.kakaoProfileTitle || "").trim() || "kakao-verified"
-      : "";
-  const kakao = kakaoOpenChat || kakaoProfile || kakaoVerifiedOnly;
+  const kakao = kakaoOpenChat || kakaoPersonal || kakaoChannel;
   const instagram =
     outlinks.instagram ||
     feed.instagramProfileUrl ||
@@ -101,7 +103,9 @@ function resolveSocialLinks(style, card) {
   return {
     kakao: String(kakao || "").trim(),
     kakaoOpenChat,
-    kakaoProfile,
+    kakaoPersonal,
+    kakaoTalkId,
+    kakaoChannel,
     instagram: String(instagram || "").trim(),
     website: String(website || "").trim(),
     facebook: String(outlinks.facebook || "").trim(),

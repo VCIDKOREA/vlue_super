@@ -4,6 +4,10 @@ import {
   extractKakaoProfilePageUrlFromShowcaseStyle,
   normalizeKakaoProfilePageUrl
 } from "../integrations/kakao/kakaoProfilePageUrl.js";
+import {
+  buildKakaoTalkAddBridgePath,
+  extractKakaoTalkIdFromShowcaseStyle
+} from "../integrations/kakao/kakaoTalkId.js";
 import { fetchKakaoUserFromAccessToken } from "../integrations/kakao/kakaoUserMe.js";
 
 async function resolveKakaoProfilePageUrlForUser(userId: string): Promise<string> {
@@ -19,7 +23,32 @@ async function resolveKakaoProfilePageUrlForUser(userId: string): Promise<string
   );
 }
 
+async function resolveKakaoTalkIdForUser(userId: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { showcaseStyleJson: true, showcaseLiveStyleJson: true }
+  });
+  if (!user) return "";
+  return (
+    extractKakaoTalkIdFromShowcaseStyle(user.showcaseLiveStyleJson) ||
+    extractKakaoTalkIdFromShowcaseStyle(user.showcaseStyleJson) ||
+    ""
+  );
+}
+
+export async function resolveKakaoTalkAddBridgeUrl(userId: string): Promise<string> {
+  const talkId = await resolveKakaoTalkIdForUser(userId);
+  if (!talkId) return "";
+  const path = buildKakaoTalkAddBridgePath(talkId);
+  if (!path) return "";
+  const apiOrigin = String(process.env.API_PUBLIC_ORIGIN || "https://api.vlue.kr").replace(/\/$/, "");
+  return `${apiOrigin}${path}`;
+}
+
 export async function resolveKakaoProfilePageUrl(userId: string): Promise<string> {
+  const talkBridge = await resolveKakaoTalkAddBridgeUrl(userId);
+  if (talkBridge) return talkBridge;
+
   const link = await prisma.userKakaoLink.findUnique({
     where: { userId },
     select: { profilePageUrl: true }

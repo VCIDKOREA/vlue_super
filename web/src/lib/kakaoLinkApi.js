@@ -2,6 +2,7 @@ import { apiUrl } from "./apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
 import { readShowcaseStyle, writeShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
 import { normalizeKakaoProfilePageUrl } from "./showcase/showcaseSocialOutlinks.js";
+import { normalizeKakaoTalkId } from "./kakao/kakaoPersonalLink.js";
 
 /** Kakao OAuth 시작 — 반환 URL로 이동 */
 export async function startKakaoLink() {
@@ -39,25 +40,26 @@ export async function disconnectKakaoLink() {
   return data;
 }
 
-/** 인증 성공 시 닉네임·프로필 이미지·채널 URL 반영 */
+/** 인증 성공 시 닉네임·프로필 이미지·카카오톡 ID 반영 */
 export function applyKakaoVerifiedLocal(nickname, opts = {}) {
   const kakaoUserId = String(opts.kakaoUserId || opts.kakao_user_id || "").trim();
   if (!kakaoUserId) return;
 
   const incomingTitle = String(nickname || "").trim();
   const picture = String(opts.profileImageUrl || opts.profile_image_url || "").trim();
-  const incomingUrl = normalizeKakaoProfilePageUrl(
-    opts.profilePageUrl || opts.profile_page_url || opts.kakao_profile_url || ""
-  );
   const style = readShowcaseStyle();
   const prevTitle = String(style.platformFeed?.kakaoProfileTitle || "").trim();
   const prevAvatar = String(style.platformFeed?.kakaoAvatarUrl || "").trim();
-  const prevUrl =
-    normalizeKakaoProfilePageUrl(style.platformFeed?.kakaoProfileUrl) ||
-    normalizeKakaoProfilePageUrl(style.commercial?.outlinks?.kakaoProfile);
+  const prevTalkId = normalizeKakaoTalkId(style.platformFeed?.kakaoTalkId);
+  const guessTalkId = normalizeKakaoTalkId(incomingTitle);
   const title = incomingTitle || prevTitle || "카카오 인증";
   const avatar = picture || prevAvatar;
-  const profileUrl = incomingUrl || prevUrl;
+  const talkId = prevTalkId || guessTalkId;
+  const channelUrl =
+    normalizeKakaoProfilePageUrl(style.platformFeed?.kakaoChannelUrl) ||
+    normalizeKakaoProfilePageUrl(style.platformFeed?.kakaoProfileUrl) ||
+    normalizeKakaoProfilePageUrl(style.commercial?.outlinks?.kakaoProfile) ||
+    normalizeKakaoProfilePageUrl(style.commercial?.outlinks?.kakaoChannel);
 
   writeShowcaseStyle(
     {
@@ -67,14 +69,18 @@ export function applyKakaoVerifiedLocal(nickname, opts = {}) {
         kakaoVerified: true,
         kakaoUserId,
         kakaoProfileTitle: title,
-        kakaoProfileUrl: profileUrl,
+        kakaoTalkId: talkId,
+        kakaoChannelUrl: channelUrl,
+        kakaoProfileUrl: channelUrl,
         kakaoAvatarUrl: avatar
       },
       commercial: {
         ...style.commercial,
         outlinks: {
           ...style.commercial.outlinks,
-          kakaoProfile: profileUrl
+          kakaoTalkId: talkId,
+          kakaoChannel: channelUrl,
+          kakaoProfile: channelUrl
         }
       }
     },
@@ -92,14 +98,14 @@ export function clearKakaoVerifiedLocal() {
         kakaoVerified: false,
         kakaoUserId: "",
         kakaoProfileTitle: "",
-        kakaoProfileUrl: "",
+        kakaoTalkId: "",
         kakaoAvatarUrl: ""
       },
       commercial: {
         ...style.commercial,
         outlinks: {
           ...style.commercial.outlinks,
-          kakaoProfile: ""
+          kakaoTalkId: ""
         }
       }
     },

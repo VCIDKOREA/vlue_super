@@ -64,8 +64,10 @@ export function extractKakaoProfilePageUrlFromShowcaseStyle(styleJson: unknown):
 
   const legacyKakao = String(outlinks.kakao ?? "").trim();
   const candidates = [
+    feed.kakaoChannelUrl,
     feed.kakaoProfileUrl,
     feed.kakaoChannelId,
+    outlinks.kakaoChannel,
     outlinks.kakaoProfile,
     outlinks.kakaoOpenChat,
     /open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : "",

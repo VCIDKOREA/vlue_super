@@ -13,6 +13,7 @@ import {
   listShowcaseSocialOutlinks,
   mergeShowcaseStyleForChrome
 } from "../../lib/showcase/showcaseSocialOutlinks.js";
+import { openShowcaseSocialItem } from "../../lib/showcase/openShowcaseSocialItem.js";
 import "../follow/follow-action.css";
 
 function firstText(...values) {
@@ -187,7 +188,7 @@ export default function ShowcaseSlideChrome({
                 tabIndex={socialOpen ? 0 : -1}
                 onClick={(e) => {
                   e.stopPropagation();
-                  openUrl(item.url);
+                  openShowcaseSocialItem(item);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
               >
@@ -285,7 +286,12 @@ function SocialGlyph({ kind }) {
   if (kind === "kakao-open") {
     return <KakaoOpenChatGlyph size={16} />;
   }
-  if (kind === "kakao-profile" || kind === "kakao-profile-verified") {
+  if (
+    kind === "kakao-personal" ||
+    kind === "kakao-channel" ||
+    kind === "kakao-profile" ||
+    kind === "kakao-profile-verified"
+  ) {
     return <KakaoTalkGlyph size={16} />;
   }
   if (kind === "facebook") {

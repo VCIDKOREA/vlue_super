@@ -27,6 +27,7 @@ import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
 import { openExternalHref, formatWebHref } from "../lib/showcase/showcaseContactActions.js";
+import { openShowcaseSocialItem } from "../lib/showcase/openShowcaseSocialItem.js";
 import { getLocalVlueUserId } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
 import AgencyDcpCard from "./agency/AgencyDcpCard.jsx";
 import { isCeoSubjectCard } from "../lib/letteringDemoPollution.js";
@@ -72,7 +73,12 @@ function SocialOutlinkGlyph({ kind }) {
   if (kind === "kakao-open") {
     return <KakaoOpenChatGlyph size={18} />;
   }
-  if (kind === "kakao-profile" || kind === "kakao-profile-verified") {
+  if (
+    kind === "kakao-personal" ||
+    kind === "kakao-channel" ||
+    kind === "kakao-profile" ||
+    kind === "kakao-profile-verified"
+  ) {
     return <KakaoTalkGlyph size={18} />;
   }
   if (kind === "facebook") {
@@ -114,8 +120,7 @@ function FrontSocialOutlinkButtons({ card, enableContactLinks = true, visible = 
             e.preventDefault();
             e.stopPropagation();
             if (!enableContactLinks) return;
-            const href = formatWebHref(item.url) || String(item.url || "").trim();
-            if (href) openExternalHref(href);
+            openShowcaseSocialItem(item);
           }}
           onPointerDown={(e) => e.stopPropagation()}
         >

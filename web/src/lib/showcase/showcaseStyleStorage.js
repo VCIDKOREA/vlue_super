@@ -7,6 +7,8 @@ import {
   syncLegacyFieldsFromPages
 } from "./showcasePages.js";
 import { hasPlayableShowcaseBgm, hasShowcaseBgmConfigured } from "./showcaseBgmPresets.js";
+import { normalizeKakaoTalkId } from "../kakao/kakaoPersonalLink.js";
+import { normalizeKakaoProfilePageUrl } from "./showcaseSocialOutlinks.js";
 
 export const SHOWCASE_STYLE_STORAGE_KEY = "vlue_showcase_style_v1";
 export const SHOWCASE_STYLE_CHANGED_EVENT = "vlue-showcase-style-changed";
@@ -117,7 +119,11 @@ export function createDefaultShowcaseStyle() {
         /** @deprecated → kakaoOpenChat */
         kakao: "",
         kakaoOpenChat: "",
-        kakaoProfile: ""
+        kakaoProfile: "",
+        /** 개인 카카오톡 ID */
+        kakaoTalkId: "",
+        /** 비즈니스 카카오 채널 */
+        kakaoChannel: ""
       },
       attachments: [],
       locationLabel: "",
@@ -135,10 +141,15 @@ export function createDefaultShowcaseStyle() {
       /** Instagram Login 연동 완료 시 true */
       instagramVerified: false,
       instagramAvatarUrl: "",
-      /** Kakao Login 연동 완료 시 true — 개인 프로필은 공유 URL 없음 */
+      /** Kakao Login 연동 완료 시 true */
       kakaoVerified: false,
       kakaoUserId: "",
       kakaoProfileTitle: "",
+      /** 개인 카카오톡 친구추가 ID (4~20자) */
+      kakaoTalkId: "",
+      /** 비즈니스 카카오 채널 URL */
+      kakaoChannelUrl: "",
+      /** @deprecated → kakaoChannelUrl */
       kakaoProfileUrl: "",
       kakaoAvatarUrl: "",
       avatarUrl: ""
@@ -318,8 +329,20 @@ function normalizeStoredStyle(parsed) {
   if (feed.instagramHandle === "@vlue.official" && !feed.instagramProfileUrl) {
     feed.instagramHandle = "";
   }
-  if (feed.kakaoProfileTitle === "VLUE 프로필" && !feed.kakaoProfileUrl) {
+  if (feed.kakaoProfileTitle === "VLUE 프로필" && !feed.kakaoProfileUrl && !feed.kakaoChannelUrl) {
     feed.kakaoProfileTitle = "";
+  }
+  const outlinks = merged.commercial?.outlinks || {};
+  const talkId = normalizeKakaoTalkId(feed.kakaoTalkId || outlinks.kakaoTalkId);
+  if (talkId) feed.kakaoTalkId = talkId;
+  const channelUrl =
+    normalizeKakaoProfilePageUrl(feed.kakaoChannelUrl) ||
+    normalizeKakaoProfilePageUrl(feed.kakaoProfileUrl) ||
+    normalizeKakaoProfilePageUrl(outlinks.kakaoChannel) ||
+    normalizeKakaoProfilePageUrl(outlinks.kakaoProfile);
+  if (channelUrl) {
+    feed.kakaoChannelUrl = channelUrl;
+    feed.kakaoProfileUrl = channelUrl;
   }
   merged.platformFeed = feed;
   if (!Object.prototype.hasOwnProperty.call(parsed, "pages")) {

@@ -1,4 +1,8 @@
 import { apiUrl } from "../apiBase.js";
+import {
+  buildKakaoTalkAddBridgeUrl,
+  normalizeKakaoTalkId
+} from "../kakao/kakaoPersonalLink.js";
 
 function firstText(...values) {
   for (const v of values) {
@@ -24,7 +28,7 @@ function normalizeKakaoHttpUrl(raw) {
   return "";
 }
 
-/** pf.kakao.com · open.kakao.com · 채널 ID/검색용 ID → 열 수 있는 URL */
+/** pf.kakao.com · 채널 ID/검색용 ID → 비즈니스 채널 URL */
 export function normalizeKakaoProfilePageUrl(raw) {
   const s = String(raw ?? "").trim();
   if (!s) return "";
@@ -61,30 +65,25 @@ export function isKakaoOAuthLinked(feed) {
   return Boolean(String(feed.kakaoUserId || "").trim());
 }
 
-function resolveStoredKakaoProfileUrl(feed, outlinks) {
+function resolveKakaoTalkId(feed, outlinks) {
+  return normalizeKakaoTalkId(firstText(feed?.kakaoTalkId, outlinks?.kakaoTalkId));
+}
+
+function resolveKakaoChannelUrl(feed, outlinks) {
   const legacyKakao = firstText(outlinks.kakao);
   const raw = firstText(
+    feed?.kakaoChannelUrl,
     feed?.kakaoProfileUrl,
     feed?.kakaoChannelId,
-    outlinks.kakaoProfile,
-    outlinks.kakaoOpenChat,
-    /open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : "",
+    outlinks?.kakaoChannel,
+    outlinks?.kakaoProfile,
     legacyKakao && !/open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : ""
   );
   return normalizeKakaoProfilePageUrl(raw);
 }
 
-function resolveKakaoOAuthOpenUrl(feed, outlinks, ownerUserId) {
-  const direct = resolveStoredKakaoProfileUrl(feed, outlinks);
-  if (direct) return direct;
-  if (!isKakaoOAuthLinked(feed)) return "";
-  const uid = String(ownerUserId || "").trim();
-  if (!uid) return "";
-  return apiUrl(`/api/v1/showcase/users/${encodeURIComponent(uid)}/kakao-profile`);
-}
-
 /**
- * 쇼케이스 비즈니스 쇼셜 아이콘 목록 (인스타·유튜브·카카오 OAuth 등)
+ * 쇼케이스 비즈니스 쇼셜 아이콘 목록 (인스타·유튜브·카카오 개인/채널 등)
  * @param {object|null|undefined} style showcaseStyle
  * @param {{ ownerUserId?: string }} [opts]
  */
@@ -105,11 +104,18 @@ export function listShowcaseSocialOutlinks(style, opts = {}) {
     /open\.kakao\.com/i.test(legacyKakao) ? legacyKakao : ""
   );
 
-  const kakaoOAuthUrl = resolveKakaoOAuthOpenUrl(feed, outlinks, ownerUserId);
-  const kakaoProfile = kakaoOAuthUrl && !kakaoOpen ? kakaoOAuthUrl : "";
+  const kakaoTalkId = resolveKakaoTalkId(feed, outlinks);
+  const kakaoChannelUrl = resolveKakaoChannelUrl(feed, outlinks);
 
   const facebook = firstText(outlinks.facebook);
   const youtube = firstText(outlinks.youtube);
+
+  const kakaoPersonalUrl =
+    kakaoTalkId
+      ? buildKakaoTalkAddBridgeUrl(kakaoTalkId)
+      : ownerUserId
+        ? apiUrl(`/api/v1/showcase/users/${encodeURIComponent(ownerUserId)}/kakao-profile`)
+        : "";
 
   return [
     ig ? { id: "instagram", label: "Instagram", url: ig, className: "is-ig" } : null,
@@ -118,11 +124,20 @@ export function listShowcaseSocialOutlinks(style, opts = {}) {
     kakaoOpen
       ? { id: "kakao-open", label: "카카오 오픈채팅", url: kakaoOpen, className: "is-kakao" }
       : null,
-    kakaoProfile
+    kakaoTalkId
       ? {
-          id: "kakao-profile",
-          label: firstText(feed.kakaoProfileTitle, "카카오 프로필"),
-          url: kakaoProfile,
+          id: "kakao-personal",
+          label: firstText(feed.kakaoProfileTitle, `@${kakaoTalkId}`, "카카오톡"),
+          url: kakaoPersonalUrl,
+          talkId: kakaoTalkId,
+          className: "is-kakao"
+        }
+      : null,
+    kakaoChannelUrl
+      ? {
+          id: "kakao-channel",
+          label: "카카오 채널",
+          url: kakaoChannelUrl,
           className: "is-kakao"
         }
       : null

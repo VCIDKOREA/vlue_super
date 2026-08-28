@@ -23,6 +23,8 @@ import {
 } from "../services/bizcard/bizcardPublicUrls.js";
 import { formatPhoneDisplayKR } from "../lib/phoneDisplay.js";
 import { resolveKakaoProfilePageUrl } from "../services/kakaoLinkService.js";
+import { buildKakaoTalkAddBridgeHtml } from "../services/showcase/kakaoTalkAddBridgePage.js";
+import { normalizeKakaoTalkId } from "../integrations/kakao/kakaoTalkId.js";
 
 /** 공개 쇼케이스 — 카카오 OG 랜딩 */
 export const showcasePublicRoutes = new Hono();
@@ -193,7 +195,7 @@ showcasePublicRoutes.on(["GET", "HEAD"], "/view/:phone", (c) => respondShowcaseO
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/** OAuth 인증 카카오 — pf.kakao.com 등 저장 URL로 리다이렉트 (쇼셜 아이콘용) */
+/** OAuth 인증 카카오 — 개인 ID 친구추가 또는 채널 URL로 리다이렉트 */
 showcasePublicRoutes.get("/users/:userId/kakao-profile", async (c) => {
   const userId = String(c.req.param("userId") || "").trim();
   if (!UUID_RE.test(userId)) {
@@ -201,7 +203,18 @@ showcasePublicRoutes.get("/users/:userId/kakao-profile", async (c) => {
   }
   const url = await resolveKakaoProfilePageUrl(userId);
   if (!url) {
-    return c.text("등록된 카카오 채널/프로필 링크가 없습니다.", 404);
+    return c.text("등록된 카카오톡 ID 또는 카카오 채널이 없습니다.", 404);
   }
   return c.redirect(url, 302);
+});
+
+/** 카카오톡 친구추가 브릿지 (웹·데스크톱 폴백) */
+showcasePublicRoutes.get("/kakao-talk/:talkId/add", (c) => {
+  const talkId = String(c.req.param("talkId") || "").trim();
+  if (!normalizeKakaoTalkId(talkId)) {
+    return c.text("유효한 카카오톡 ID가 아닙니다.", 400);
+  }
+  const html = buildKakaoTalkAddBridgeHtml(talkId);
+  if (!html) return c.text("유효한 카카오톡 ID가 아닙니다.", 400);
+  return c.html(html);
 });

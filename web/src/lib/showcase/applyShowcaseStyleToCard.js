@@ -19,7 +19,9 @@ function mergeKakaoOAuthFromEditor(style) {
         kakaoVerified: ef.kakaoVerified === true || Boolean(ef.kakaoUserId),
         kakaoUserId: String(ef.kakaoUserId || pf.kakaoUserId || "").trim(),
         kakaoProfileTitle: String(ef.kakaoProfileTitle || pf.kakaoProfileTitle || "").trim(),
-        kakaoProfileUrl: String(ef.kakaoProfileUrl || pf.kakaoProfileUrl || "").trim(),
+        kakaoTalkId: String(ef.kakaoTalkId || pf.kakaoTalkId || "").trim(),
+        kakaoChannelUrl: String(ef.kakaoChannelUrl || pf.kakaoChannelUrl || pf.kakaoProfileUrl || "").trim(),
+        kakaoProfileUrl: String(ef.kakaoProfileUrl || pf.kakaoProfileUrl || pf.kakaoChannelUrl || "").trim(),
         kakaoAvatarUrl: String(ef.kakaoAvatarUrl || pf.kakaoAvatarUrl || "").trim()
       }
     };

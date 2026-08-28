@@ -44,6 +44,7 @@ import {
   startKakaoLink
 } from "../../lib/kakaoLinkApi.js";
 import { normalizeKakaoProfilePageUrl } from "../../lib/showcase/showcaseSocialOutlinks.js";
+import { normalizeKakaoTalkId } from "../../lib/kakao/kakaoPersonalLink.js";
 import { readDigitalCardActive, readDccBroadcastOn } from "../../lib/bizcardAccountSync.js";
 import { useDccFeatureAccess } from "../../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../../lib/dccAccessPolicy.js";
@@ -515,10 +516,15 @@ export default function ShowcaseStyleSettingsPanel({
     const incomingAvatar = String(kakaoLink.profileImageUrl || "").trim();
     const prevTitle = String(config.platformFeed?.kakaoProfileTitle || "").trim();
     const prevAvatar = String(config.platformFeed?.kakaoAvatarUrl || "").trim();
+    const prevTalkId = normalizeKakaoTalkId(config.platformFeed?.kakaoTalkId);
+    const guessTalkId = normalizeKakaoTalkId(incomingTitle);
+    const talkId = prevTalkId || guessTalkId;
     const title = incomingTitle || prevTitle || "카카오 인증";
     const avatar = incomingAvatar || prevAvatar;
-    const profileUrl =
+    const channelUrl =
+      normalizeKakaoProfilePageUrl(config.platformFeed?.kakaoChannelUrl) ||
       normalizeKakaoProfilePageUrl(config.platformFeed?.kakaoProfileUrl) ||
+      normalizeKakaoProfilePageUrl(config.commercial?.outlinks?.kakaoChannel) ||
       normalizeKakaoProfilePageUrl(config.commercial?.outlinks?.kakaoProfile) ||
       normalizeKakaoProfilePageUrl(kakaoLink.profilePageUrl);
     if (
@@ -526,7 +532,8 @@ export default function ShowcaseStyleSettingsPanel({
       config.platformFeed?.kakaoUserId === userId &&
       config.platformFeed?.kakaoProfileTitle === title &&
       String(config.platformFeed?.kakaoAvatarUrl || "") === avatar &&
-      normalizeKakaoProfilePageUrl(config.platformFeed?.kakaoProfileUrl) === profileUrl
+      normalizeKakaoTalkId(config.platformFeed?.kakaoTalkId) === talkId &&
+      normalizeKakaoProfilePageUrl(config.platformFeed?.kakaoChannelUrl) === channelUrl
     ) {
       return;
     }
@@ -536,14 +543,18 @@ export default function ShowcaseStyleSettingsPanel({
         kakaoVerified: true,
         kakaoUserId: userId,
         kakaoProfileTitle: title,
-        kakaoProfileUrl: profileUrl,
+        kakaoTalkId: talkId,
+        kakaoChannelUrl: channelUrl,
+        kakaoProfileUrl: channelUrl,
         kakaoAvatarUrl: avatar
       },
       commercial: {
         ...(config.commercial || {}),
         outlinks: {
-          ...(config.commercial?.outlinks || {}),
-          kakaoProfile: profileUrl
+          ...(config.commercial.outlinks || {}),
+          kakaoTalkId: talkId,
+          kakaoChannel: channelUrl,
+          kakaoProfile: channelUrl
         }
       }
     });
@@ -557,6 +568,8 @@ export default function ShowcaseStyleSettingsPanel({
     config.platformFeed?.kakaoProfileTitle,
     config.platformFeed?.kakaoUserId,
     config.platformFeed?.kakaoAvatarUrl,
+    config.platformFeed?.kakaoTalkId,
+    config.platformFeed?.kakaoChannelUrl,
     persist
   ]);
 
@@ -1235,7 +1248,7 @@ export default function ShowcaseStyleSettingsPanel({
                   <span>비즈니스</span>
                   <span>쇼셜링크</span>
                 </span>
-                <HelpTip text="Instagram·카카오 프로필은 웹에서 로그인(OAuth)으로 SNS 인증합니다. 오픈채팅·채널만 URL을 직접 넣을 수 있습니다." />
+                <HelpTip text="Instagram·카카오는 웹 로그인(OAuth)으로 SNS 인증합니다. 개인 1:1은 카카오톡 ID, 비즈니스는 카카오 채널 URL을 따로 입력합니다." />
               </span>
             </span>
             <span className="showcase-profile-row__trail">
@@ -1324,19 +1337,19 @@ export default function ShowcaseStyleSettingsPanel({
               />
               <BusinessOutlinkRow
                 brand="kakao"
-                label="카카오 프로필"
+                label="카카오 (SNS 인증)"
                 placeholder="카카오 로그인으로 SNS 인증 (웹)"
                 value={
                   kakaoLink.linked
                     ? config.platformFeed?.kakaoProfileTitle || kakaoLink.nickname || "카카오 인증됨"
-                    : config.commercial.outlinks.kakaoProfile || ""
+                    : ""
                 }
                 inputCls={inputCls}
                 onChange={() => {}}
                 onBrandTap={async () => {
                   if (kakaoLinkLoading) return;
                   if (kakaoLink.linked) {
-                    notify(`${kakaoLink.nickname || "카카오"} 프로필이 인증되어 있습니다.`);
+                    notify(`${kakaoLink.nickname || "카카오"} 계정이 인증되어 있습니다.`);
                     return;
                   }
                   setKakaoLinkLoading(true);
@@ -1349,36 +1362,66 @@ export default function ShowcaseStyleSettingsPanel({
                   }
                 }}
               />
-              {kakaoLink.linked ? (
-                <BusinessOutlinkRow
-                  brand="kakao"
-                  label="카카오 채널"
-                  placeholder="@검색용ID · _채널ID · pf.kakao.com URL"
-                  value={
-                    config.platformFeed?.kakaoProfileUrl ||
-                    config.commercial.outlinks.kakaoProfile ||
-                    kakaoLink.profilePageUrl ||
-                    ""
-                  }
-                  inputCls={inputCls}
-                  onChange={(v) => {
-                    const url = normalizeKakaoProfilePageUrl(v) || String(v || "").trim();
-                    persist({
-                      platformFeed: {
-                        ...(config.platformFeed || {}),
-                        kakaoProfileUrl: url
-                      },
-                      commercial: {
-                        ...(config.commercial || {}),
-                        outlinks: {
-                          ...config.commercial.outlinks,
-                          kakaoProfile: url
-                        }
+              <BusinessOutlinkRow
+                brand="kakao"
+                label="카카오톡 ID"
+                placeholder="친구추가용 ID (4~20자, 영문·숫자)"
+                value={config.platformFeed?.kakaoTalkId || config.commercial?.outlinks?.kakaoTalkId || ""}
+                inputCls={inputCls}
+                onChange={(v) => {
+                  const talkId = normalizeKakaoTalkId(v) || String(v || "").trim().replace(/^@+/, "");
+                  persist({
+                    platformFeed: {
+                      ...(config.platformFeed || {}),
+                      kakaoTalkId: talkId
+                    },
+                    commercial: {
+                      ...(config.commercial || {}),
+                      outlinks: {
+                        ...config.commercial.outlinks,
+                        kakaoTalkId: talkId
                       }
-                    });
-                  }}
-                />
-              ) : null}
+                    }
+                  });
+                }}
+              />
+              <BusinessOutlinkRow
+                brand="kakao"
+                label="카카오 채널"
+                placeholder="@검색용ID · _채널ID · pf.kakao.com URL (선택)"
+                value={
+                  config.platformFeed?.kakaoChannelUrl ||
+                  config.platformFeed?.kakaoProfileUrl ||
+                  config.commercial.outlinks.kakaoChannel ||
+                  config.commercial.outlinks.kakaoProfile ||
+                  kakaoLink.profilePageUrl ||
+                  ""
+                }
+                inputCls={inputCls}
+                onChange={(v) => {
+                  const url = normalizeKakaoProfilePageUrl(v) || String(v || "").trim();
+                  persist({
+                    platformFeed: {
+                      ...(config.platformFeed || {}),
+                      kakaoChannelUrl: url,
+                      kakaoProfileUrl: url
+                    },
+                    commercial: {
+                      ...(config.commercial || {}),
+                      outlinks: {
+                        ...config.commercial.outlinks,
+                        kakaoChannel: url,
+                        kakaoProfile: url,
+                        kakao:
+                          config.commercial.outlinks.kakaoOpenChat ||
+                          url ||
+                          config.commercial.outlinks.kakaoTalkId ||
+                          ""
+                      }
+                    }
+                  });
+                }}
+              />
               {kakaoLink.linked ? (
                 <button
                   type="button"
@@ -1395,12 +1438,19 @@ export default function ShowcaseStyleSettingsPanel({
                           kakaoVerified: false,
                           kakaoUserId: "",
                           kakaoProfileTitle: "",
+                          kakaoTalkId: "",
                           kakaoProfileUrl: "",
+                          kakaoChannelUrl: "",
                           kakaoAvatarUrl: ""
                         },
                         commercial: {
                           ...(config.commercial || {}),
-                          outlinks: { ...(config.commercial?.outlinks || {}), kakaoProfile: "" }
+                          outlinks: {
+                            ...(config.commercial?.outlinks || {}),
+                            kakaoTalkId: "",
+                            kakaoProfile: "",
+                            kakaoChannel: ""
+                          }
                         }
                       });
                       await refreshKakaoLink();
