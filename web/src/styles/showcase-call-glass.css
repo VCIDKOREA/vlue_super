@@ -297,6 +297,7 @@
 .lettering-ongoing--fullscreen-tent .lettering-vlue-verified-badge .vlue-cyan-verified-seal,
 .lettering-ongoing--fullscreen-tent .lettering-vlue-verified-badge--metal .vlue-cyan-verified-seal {
   display: block;
+  overflow: visible;
 }
 
 /* ?? ? V?? � ??? overflow? ? ??? */
@@ -306,6 +307,7 @@
   min-width: 18px !important;
   min-height: 18px !important;
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .lettering-ongoing--fullscreen-tent .lettering-ongoing-name-row {
@@ -2138,6 +2140,7 @@
   width: 16px;
   height: 16px;
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .showcase-identity-corner__org {

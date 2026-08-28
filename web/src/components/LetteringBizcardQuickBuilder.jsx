@@ -8,9 +8,13 @@ import LetteringBizcardOrgChangeSection from "./LetteringBizcardOrgChangeSection
 import {
   LETTERING_BIZCARD_EMAIL_MAX,
   LETTERING_BIZCARD_EMAIL_WARN,
+  LETTERING_BIZCARD_INTRO_FRONT_MAX,
+  LETTERING_BIZCARD_BACK_NOTE_MAX,
   LETTERING_LOGO_RULES,
   LETTERING_PHOTO_RULES,
   clampLetteringBizcardEmail,
+  clampLetteringBizcardIntroFront,
+  clampLetteringBizcardBackNote,
   isLetteringBizcardEmailLong,
   prepareLetteringLogoFromFile,
   prepareLetteringPhotoFromFile,
@@ -549,24 +553,41 @@ export default function LetteringBizcardQuickBuilder({
           inputBase={inputBase}
         />
         <div className="sm:col-span-2">
-          <Field label="소개 (앞면 프로필)" hint="통화 수신 시 앞면 탭에 표시됩니다" isDarkMode={isDarkMode}>
+          <Field
+            label="소개 (앞면 프로필)"
+            hint={`통화 수신 시 앞면 탭에 표시됩니다 · 최대 ${LETTERING_BIZCARD_INTRO_FRONT_MAX}자`}
+            isDarkMode={isDarkMode}
+          >
             <textarea
               value={companyIntro}
-              onChange={(e) => setCompanyIntro(e.target.value)}
-              rows={3}
+              onChange={(e) => setCompanyIntro(clampLetteringBizcardIntroFront(e.target.value))}
+              maxLength={LETTERING_BIZCARD_INTRO_FRONT_MAX}
+              rows={2}
               className={inputBase}
+              placeholder="한 줄 소개 (30자 이내)"
             />
+            <p className={`mt-1 text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              {companyIntro.length}/{LETTERING_BIZCARD_INTRO_FRONT_MAX}자
+            </p>
           </Field>
         </div>
         <div className="sm:col-span-2">
-          <Field label="추가 설명 (뒷면)" hint="통화 수신 시 뒷면 연락처 하단에 표시됩니다" isDarkMode={isDarkMode}>
+          <Field
+            label="추가 설명 (뒷면)"
+            hint={`통화 수신 시 뒷면 연락처 하단에 표시됩니다 · 최대 ${LETTERING_BIZCARD_BACK_NOTE_MAX}자`}
+            isDarkMode={isDarkMode}
+          >
             <textarea
               value={customBackText}
-              onChange={(e) => setCustomBackText(e.target.value)}
+              onChange={(e) => setCustomBackText(clampLetteringBizcardBackNote(e.target.value))}
+              maxLength={LETTERING_BIZCARD_BACK_NOTE_MAX}
               rows={3}
               className={inputBase}
               placeholder="예: 상담 가능 시간, 방문 안내, 프로모션 문구 등"
             />
+            <p className={`mt-1 text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              {customBackText.length}/{LETTERING_BIZCARD_BACK_NOTE_MAX}자
+            </p>
           </Field>
         </div>
       </div>

@@ -7,7 +7,9 @@ import {
   combineLetteringBizcardAddress,
   readLetteringBizcardAddressFields,
   writeLetteringBizcardEditable,
-  normalizePhotoFocus
+  normalizePhotoFocus,
+  clampLetteringBizcardIntroFront,
+  clampLetteringBizcardBackNote
 } from "./letteringBizcardStorage.js";
 import { normalizeLetteringBizcardTemplate } from "./letteringBizcardTemplates.js";
 import { resolveDisplayTitleDepartment } from "./letteringBizcardVerification.js";
@@ -92,8 +94,8 @@ export function withLetteringBizcardPreviewFallback(card = {}, opts = {}) {
     photoUrl: scrubbed.noProfilePhoto ? "" : String(scrubbed.photoUrl || "").trim(),
     titlePhotoUrl: scrubbed.noTitlePhoto ? "" : String(scrubbed.titlePhotoUrl || "").trim(),
     noTitlePhoto: Boolean(scrubbed.noTitlePhoto),
-    customBackText: cleanField(scrubbed?.customBackText),
-    companyIntro: cleanField(scrubbed?.companyIntro),
+    customBackText: clampLetteringBizcardBackNote(cleanField(scrubbed?.customBackText)),
+    companyIntro: clampLetteringBizcardIntroFront(cleanField(scrubbed?.companyIntro)),
     address: cleanField(scrubbed?.address)
   };
 }

@@ -1358,7 +1358,7 @@ export default function LetteringIncomingNotification({
               </p>
             ) : (
               <>
-                <p className="lettering-ongoing-name-row flex min-w-0 items-center gap-1.5 overflow-hidden">
+                <p className="lettering-ongoing-name-row flex min-w-0 items-center gap-1.5">
                   <span className="lettering-ongoing-name min-w-0 font-semibold">
                     {displayLabel}
                   </span>

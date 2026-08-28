@@ -13,7 +13,7 @@ import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { isMaskedPhoneDisplay } from "../lib/dccExposure.js";
 import { formatLetteringReceptionLines, resolveDccFrontIdentityLines, isDccCertifiedMemberLabel } from "../lib/letteringPaidIdentityDisplay.js";
 import IdentitySecondaryText from "./IdentitySecondaryText.jsx";
-import { formatLetteringContactEmailDisplay, photoFocusToCss } from "../lib/letteringBizcardStorage.js";
+import { formatLetteringContactEmailDisplay, photoFocusToCss, clampLetteringBizcardIntroFront, clampLetteringBizcardBackNote } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard, resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
 import { VLUE_PREVIEW_EMAIL_PLACEHOLDER } from "../lib/vlueShowcasePreviewIdentity.js";
 import {
@@ -22,6 +22,7 @@ import {
   openPhoneDial
 } from "../lib/showcase/showcaseContactActions.js";
 import VluePushAuthSeal from "./VluePushAuthSeal.jsx";
+import VlueCyanVerifiedSeal from "./VlueCyanVerifiedSeal.jsx";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
@@ -438,7 +439,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
         <div className="ldr-hero__copy ldr-hero__copy--watermark">
           {verified ? (
             <span className="ldr-hero__badge ldr-hero__badge--inline">
-              <ShieldCheck className="h-3.5 w-3.5" />
+              <VlueCyanVerifiedSeal size={14} />
               VLUE 인증
             </span>
           ) : null}
@@ -468,7 +469,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
         {hasLogo ? <CompanyLogoBadge card={card} className="ldr-company-logo-badge--hero" /> : null}
         {verified ? (
           <span className="ldr-hero__badge">
-            <ShieldCheck className="h-3.5 w-3.5" />
+            <VlueCyanVerifiedSeal size={14} />
             VLUE 인증
           </span>
         ) : null}
@@ -479,7 +480,9 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
 }
 
 function resolveBackAdditionalNote(card) {
-  return String(card.customBackText || card.backNote || card.introBack || "").trim();
+  return clampLetteringBizcardBackNote(
+    String(card.customBackText || card.backNote || card.introBack || "").trim()
+  );
 }
 
 function FrontInfoRow({ icon: Icon, label, children, className = "" }) {
@@ -523,7 +526,7 @@ function FrontPanel({
   /* 통화 송출(피어): 빈 이메일은 숨김. 미리보기 편집만 플레이스홀더 */
   const emailValue = email || (embeddedInPush ? "" : VLUE_PREVIEW_EMAIL_PLACEHOLDER);
   const addressRaw = String(card.address || "").trim();
-  const intro = String(card.companyIntro || card.salesContent || "").trim();
+  const intro = clampLetteringBizcardIntroFront(String(card.companyIntro || card.salesContent || "").trim());
   const validityFromItems = (verificationItems || [])
     .map((line) => String(line || "").trim())
     .find((line) => /만료일|인증유효기간/.test(line));
@@ -587,7 +590,7 @@ function FrontPanel({
               return <h3 className="ldr-back-title">{primary}</h3>;
             })()}
             {verified ? (
-              <ShieldCheck className="ldr-name-shield" strokeWidth={2.35} aria-label="VLUE 인증됨" />
+              <VlueCyanVerifiedSeal size={16} className="ldr-title-verified-seal" aria-label="VLUE 인증됨" />
             ) : null}
           </div>
           {(() => {

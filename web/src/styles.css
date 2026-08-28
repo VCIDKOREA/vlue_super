@@ -3462,6 +3462,13 @@ body,
 .lettering-vlue-verified-badge .vlue-cyan-verified-seal {
   display: block;
   flex-shrink: 0;
+  overflow: visible;
+}
+
+.ldr-title-verified-seal {
+  flex-shrink: 0;
+  display: block;
+  overflow: visible;
 }
 
 .lettering-call-screen {

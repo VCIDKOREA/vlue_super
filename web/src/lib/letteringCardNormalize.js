@@ -1,4 +1,9 @@
-import { clampLetteringBizcardEmail, normalizePhotoFocus } from "./letteringBizcardStorage.js";
+import {
+  clampLetteringBizcardEmail,
+  clampLetteringBizcardIntroFront,
+  clampLetteringBizcardBackNote,
+  normalizePhotoFocus
+} from "./letteringBizcardStorage.js";
 
 /**
  * DCC 카드 큰 배경(타이틀 사진)만.
@@ -43,7 +48,7 @@ export function normalizeLetteringCard(raw = {}) {
     photoFocus: normalizePhotoFocus(raw.photoFocus || "center"),
     logoUrl,
     noCompanyLogo: Boolean(raw.noCompanyLogo) || !logoUrl,
-    companyIntro: String(raw.companyIntro || raw.intro || "").trim(),
+    companyIntro: clampLetteringBizcardIntroFront(String(raw.companyIntro || raw.intro || "").trim()),
     salesContent: String(raw.salesContent || raw.salesPitch || raw.pitch || "").trim(),
     feedId: String(raw.feedId || raw.userId || "").trim(),
     userId: String(raw.userId || raw.ownerUserId || "").trim(),
@@ -56,7 +61,7 @@ export function normalizeLetteringCard(raw = {}) {
     expiredSubtitle: String(raw.expiredSubtitle || "").trim(),
     expiredDetail: String(raw.expiredDetail || "").trim(),
     dcp: raw.dcp && typeof raw.dcp === "object" ? raw.dcp : null,
-    customBackText: String(raw.customBackText || "").trim(),
+    customBackText: clampLetteringBizcardBackNote(String(raw.customBackText || "").trim()),
     promo: String(raw.promo || "").trim(),
     address: String(
       raw.address || raw.businessAddress || raw.companyAddress || raw.officeAddress || ""

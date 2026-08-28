@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import {
   clampLetteringBizcardEmail,
+  clampLetteringBizcardIntroFront,
+  clampLetteringBizcardBackNote,
   combineLetteringBizcardAddress,
   prepareLetteringLogoFromFile,
   prepareLetteringPhotoFromFile,
@@ -164,8 +166,8 @@ export default function LetteringBizcardSettingsView({
     setFax(ed.fax || "");
     setEmail(clampLetteringBizcardEmail(ed.email || ""));
     setWebsite(ed.website);
-    setCompanyIntro(ed.companyIntro || "");
-    setCustomBackText(ed.customBackText || "");
+    setCompanyIntro(clampLetteringBizcardIntroFront(ed.companyIntro || ""));
+    setCustomBackText(clampLetteringBizcardBackNote(ed.customBackText || ""));
     const addr = readLetteringBizcardAddressFields(ed);
     setAddressRoad(addr.road);
     setAddressDetail(addr.detail);
@@ -503,8 +505,8 @@ export default function LetteringBizcardSettingsView({
       fax: noFax ? "" : fax.trim(),
       email: trimmedEmail,
       website: noWebsite ? "" : website.trim(),
-      companyIntro: companyIntro.trim(),
-      customBackText: customBackText.trim(),
+      companyIntro: clampLetteringBizcardIntroFront(companyIntro.trim()),
+      customBackText: clampLetteringBizcardBackNote(customBackText.trim()),
       addressRoad: road,
       addressDetail: detail,
       address: combineLetteringBizcardAddress(road, detail),
