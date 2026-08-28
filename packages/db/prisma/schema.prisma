@@ -2444,6 +2444,7 @@ model UserKakaoLink {
   kakaoUserId     String  @map("kakao_user_id") @db.VarChar(80)
   nickname        String  @map("nickname") @db.VarChar(120)
   profileImageUrl String? @map("profile_image_url") @db.Text
+  profilePageUrl  String? @map("profile_page_url") @db.Text
   accessToken     String  @map("access_token") @db.Text
 
   linkedAt  DateTime @default(now()) @map("linked_at") @db.Timestamptz(6)

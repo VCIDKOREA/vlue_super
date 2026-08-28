@@ -55,7 +55,8 @@ function firstText(...values) {
 /** 디지털 명함 — 비즈니스 쇼셜링크 (인스타·유튜브·페이스북·카카오채팅·카카오프로필) */
 function listCardSocialOutlinks(card) {
   const style = card?.showcaseStyle && typeof card.showcaseStyle === "object" ? card.showcaseStyle : {};
-  return listShowcaseSocialOutlinks(style);
+  const ownerUserId = String(card?.userId || card?.ownerUserId || "").trim();
+  return listShowcaseSocialOutlinks(style, { ownerUserId });
 }
 
 function SocialOutlinkGlyph({ kind }) {
@@ -114,7 +115,6 @@ function FrontSocialOutlinkButtons({ card, enableContactLinks = true, visible = 
             e.stopPropagation();
             if (!enableContactLinks) return;
             const href = formatWebHref(item.url) || String(item.url || "").trim();
-            if (item.verified && !href) return;
             if (href) openExternalHref(href);
           }}
           onPointerDown={(e) => e.stopPropagation()}

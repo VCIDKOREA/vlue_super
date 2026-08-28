@@ -1,6 +1,7 @@
 import { apiUrl } from "./apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
 import { readShowcaseStyle, writeShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
+import { normalizeKakaoProfilePageUrl } from "./showcase/showcaseSocialOutlinks.js";
 
 /** Kakao OAuth 시작 — 반환 URL로 이동 */
 export async function startKakaoLink() {
@@ -38,18 +39,25 @@ export async function disconnectKakaoLink() {
   return data;
 }
 
-/** 인증 성공 시 닉네임·프로필 이미지·인증 플래그 반영 (개인 프로필은 공유 URL 없음) */
+/** 인증 성공 시 닉네임·프로필 이미지·채널 URL 반영 */
 export function applyKakaoVerifiedLocal(nickname, opts = {}) {
   const kakaoUserId = String(opts.kakaoUserId || opts.kakao_user_id || "").trim();
   if (!kakaoUserId) return;
 
   const incomingTitle = String(nickname || "").trim();
   const picture = String(opts.profileImageUrl || opts.profile_image_url || "").trim();
+  const incomingUrl = normalizeKakaoProfilePageUrl(
+    opts.profilePageUrl || opts.profile_page_url || opts.kakao_profile_url || ""
+  );
   const style = readShowcaseStyle();
   const prevTitle = String(style.platformFeed?.kakaoProfileTitle || "").trim();
   const prevAvatar = String(style.platformFeed?.kakaoAvatarUrl || "").trim();
+  const prevUrl =
+    normalizeKakaoProfilePageUrl(style.platformFeed?.kakaoProfileUrl) ||
+    normalizeKakaoProfilePageUrl(style.commercial?.outlinks?.kakaoProfile);
   const title = incomingTitle || prevTitle || "카카오 인증";
   const avatar = picture || prevAvatar;
+  const profileUrl = incomingUrl || prevUrl;
 
   writeShowcaseStyle(
     {
@@ -59,14 +67,14 @@ export function applyKakaoVerifiedLocal(nickname, opts = {}) {
         kakaoVerified: true,
         kakaoUserId,
         kakaoProfileTitle: title,
-        kakaoProfileUrl: "",
+        kakaoProfileUrl: profileUrl,
         kakaoAvatarUrl: avatar
       },
       commercial: {
         ...style.commercial,
         outlinks: {
           ...style.commercial.outlinks,
-          kakaoProfile: ""
+          kakaoProfile: profileUrl
         }
       }
     },
@@ -118,18 +126,20 @@ export function consumeKakaoLinkReturn() {
   const nickname = u.searchParams.get("kakao_nickname") || "";
   const kakaoUserId = u.searchParams.get("kakao_user_id") || "";
   const profileImageUrl = u.searchParams.get("kakao_profile_image") || "";
+  const profilePageUrl = u.searchParams.get("kakao_profile_url") || "";
   const error = u.searchParams.get("kakao_error") || "";
 
   u.searchParams.delete("kakao_oauth");
   u.searchParams.delete("kakao_nickname");
   u.searchParams.delete("kakao_user_id");
   u.searchParams.delete("kakao_profile_image");
+  u.searchParams.delete("kakao_profile_url");
   u.searchParams.delete("kakao_error");
   window.history.replaceState({}, "", `${u.pathname}${u.search}${u.hash}`);
 
   if (mode === "success") {
     if (kakaoUserId) {
-      applyKakaoVerifiedLocal(nickname, { kakaoUserId, profileImageUrl });
+      applyKakaoVerifiedLocal(nickname, { kakaoUserId, profileImageUrl, profilePageUrl });
     }
     return { handled: true, success: true, nickname: nickname || "카카오 인증" };
   }

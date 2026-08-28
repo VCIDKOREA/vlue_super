@@ -22,6 +22,7 @@ import {
   kakaoFeedCardImageUrl
 } from "../services/bizcard/bizcardPublicUrls.js";
 import { formatPhoneDisplayKR } from "../lib/phoneDisplay.js";
+import { resolveKakaoProfilePageUrl } from "../services/kakaoLinkService.js";
 
 /** 공개 쇼케이스 — 카카오 OG 랜딩 */
 export const showcasePublicRoutes = new Hono();
@@ -188,3 +189,19 @@ export async function respondShowcaseOgCover(c: Context) {
 }
 
 showcasePublicRoutes.on(["GET", "HEAD"], "/view/:phone", (c) => respondShowcaseOgView(c));
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** OAuth 인증 카카오 — pf.kakao.com 등 저장 URL로 리다이렉트 (쇼셜 아이콘용) */
+showcasePublicRoutes.get("/users/:userId/kakao-profile", async (c) => {
+  const userId = String(c.req.param("userId") || "").trim();
+  if (!UUID_RE.test(userId)) {
+    return c.text("유효한 사용자 ID가 아닙니다.", 400);
+  }
+  const url = await resolveKakaoProfilePageUrl(userId);
+  if (!url) {
+    return c.text("등록된 카카오 채널/프로필 링크가 없습니다.", 404);
+  }
+  return c.redirect(url, 302);
+});

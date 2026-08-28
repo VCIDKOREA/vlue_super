@@ -106,14 +106,15 @@ export default function ShowcaseSlideChrome({
     return { avatarUrl: "", letter: (profileName || "V").slice(0, 1).toUpperCase() };
   })();
 
-  const socialItems = listShowcaseSocialOutlinks(style);
+  const targetUserId = String(
+    targetUserIdProp || resolveFollowTargetUserId(card, { fallbackToMe }) || ""
+  ).trim();
+
+  const socialItems = listShowcaseSocialOutlinks(style, { ownerUserId: targetUserId });
 
   const showBizLink = variant === "custom" && !hideBusinessLinks && Boolean(pageLink);
   const hasSocial = socialItems.length > 0;
 
-  const targetUserId = String(
-    targetUserIdProp || resolveFollowTargetUserId(card, { fallbackToMe }) || ""
-  ).trim();
   const showFollow = shouldShowShowcaseFollow(targetUserId, { hideFollow });
 
   const openCaseArchive = () => {
@@ -186,10 +187,6 @@ export default function ShowcaseSlideChrome({
                 tabIndex={socialOpen ? 0 : -1}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (item.verified && !item.url) {
-                    onToast?.(`${item.label} — 카카오 SNS 인증됨`);
-                    return;
-                  }
                   openUrl(item.url);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}

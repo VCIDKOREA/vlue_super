@@ -187,6 +187,7 @@ authV1Routes.get("/kakao/callback", async (c) => {
       };
       if (link.nickname) redirectQuery.kakao_nickname = link.nickname;
       if (link.profileImageUrl) redirectQuery.kakao_profile_image = link.profileImageUrl;
+      if (link.profilePageUrl) redirectQuery.kakao_profile_url = link.profilePageUrl;
       return redirectKakaoLink(redirectQuery);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "카카오 연동 처리에 실패했습니다.";

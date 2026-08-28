@@ -43,6 +43,7 @@ import {
   fetchKakaoLinkStatus,
   startKakaoLink
 } from "../../lib/kakaoLinkApi.js";
+import { normalizeKakaoProfilePageUrl } from "../../lib/showcase/showcaseSocialOutlinks.js";
 import { readDigitalCardActive, readDccBroadcastOn } from "../../lib/bizcardAccountSync.js";
 import { useDccFeatureAccess } from "../../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../../lib/dccAccessPolicy.js";
@@ -516,11 +517,16 @@ export default function ShowcaseStyleSettingsPanel({
     const prevAvatar = String(config.platformFeed?.kakaoAvatarUrl || "").trim();
     const title = incomingTitle || prevTitle || "카카오 인증";
     const avatar = incomingAvatar || prevAvatar;
+    const profileUrl =
+      normalizeKakaoProfilePageUrl(config.platformFeed?.kakaoProfileUrl) ||
+      normalizeKakaoProfilePageUrl(config.commercial?.outlinks?.kakaoProfile) ||
+      normalizeKakaoProfilePageUrl(kakaoLink.profilePageUrl);
     if (
       config.platformFeed?.kakaoVerified === true &&
       config.platformFeed?.kakaoUserId === userId &&
       config.platformFeed?.kakaoProfileTitle === title &&
-      String(config.platformFeed?.kakaoAvatarUrl || "") === avatar
+      String(config.platformFeed?.kakaoAvatarUrl || "") === avatar &&
+      normalizeKakaoProfilePageUrl(config.platformFeed?.kakaoProfileUrl) === profileUrl
     ) {
       return;
     }
@@ -530,14 +536,14 @@ export default function ShowcaseStyleSettingsPanel({
         kakaoVerified: true,
         kakaoUserId: userId,
         kakaoProfileTitle: title,
-        kakaoProfileUrl: "",
+        kakaoProfileUrl: profileUrl,
         kakaoAvatarUrl: avatar
       },
       commercial: {
         ...(config.commercial || {}),
         outlinks: {
           ...(config.commercial?.outlinks || {}),
-          kakaoProfile: ""
+          kakaoProfile: profileUrl
         }
       }
     });
@@ -546,6 +552,7 @@ export default function ShowcaseStyleSettingsPanel({
     kakaoLink.nickname,
     kakaoLink.kakaoUserId,
     kakaoLink.profileImageUrl,
+    kakaoLink.profilePageUrl,
     config.platformFeed?.kakaoVerified,
     config.platformFeed?.kakaoProfileTitle,
     config.platformFeed?.kakaoUserId,
@@ -1342,6 +1349,36 @@ export default function ShowcaseStyleSettingsPanel({
                   }
                 }}
               />
+              {kakaoLink.linked ? (
+                <BusinessOutlinkRow
+                  brand="kakao"
+                  label="카카오 채널 URL"
+                  placeholder="https://pf.kakao.com/_… (쇼셜 아이콘에서 열림)"
+                  value={
+                    config.platformFeed?.kakaoProfileUrl ||
+                    config.commercial.outlinks.kakaoProfile ||
+                    kakaoLink.profilePageUrl ||
+                    ""
+                  }
+                  inputCls={inputCls}
+                  onChange={(v) => {
+                    const url = normalizeKakaoProfilePageUrl(v) || String(v || "").trim();
+                    persist({
+                      platformFeed: {
+                        ...(config.platformFeed || {}),
+                        kakaoProfileUrl: url
+                      },
+                      commercial: {
+                        ...(config.commercial || {}),
+                        outlinks: {
+                          ...config.commercial.outlinks,
+                          kakaoProfile: url
+                        }
+                      }
+                    });
+                  }}
+                />
+              ) : null}
               {kakaoLink.linked ? (
                 <button
                   type="button"
