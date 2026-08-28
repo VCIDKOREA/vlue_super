@@ -290,14 +290,14 @@ object BigPushShowcaseBar {
             TextView(context).apply {
                 tag = TAG_VERIFIED
                 text = "✓"
-                setTextColor(Color.parseColor("#0F172A"))
+                setTextColor(IDENTITY_SEP_CYAN)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
                 setPadding(dp(5), dp(2), dp(5), dp(2))
                 background = roundedBg(
-                    fill = Color.parseColor("#E2E8F0"),
-                    stroke = Color.TRANSPARENT,
+                    fill = Color.parseColor("#B30F172A"),
+                    stroke = Color.argb(115, 0, 210, 255),
                     radiusDp = 999f,
                     density = density
                 )

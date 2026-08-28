@@ -288,12 +288,14 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.85);
   */
   /* ??? VLUE ?? ?? ?? */
-  background: linear-gradient(145deg, #60a5fa 0%, #3b82f6 42%, #1d4ed8 100%);
-  color: #fff;
-  box-shadow:
-    0 0 0 1px rgba(191, 219, 254, 0.85),
-    0 0 8px rgba(59, 130, 246, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  background: rgba(15, 23, 42, 0.72);
+  color: #00d2ff;
+  border: 1px solid rgba(0, 210, 255, 0.45);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+}
+
+.lettering-ongoing--fullscreen-tent .lettering-vlue-verified-badge--metal svg {
+  color: #00d2ff;
 }
 
 /* ?? ? V?? � ??? overflow? ? ??? */
@@ -2138,7 +2140,7 @@
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-  color: #7dd3fc;
+  color: #00d2ff;
 }
 
 .showcase-identity-corner__org {

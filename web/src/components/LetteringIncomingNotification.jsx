@@ -1331,11 +1331,11 @@ export default function LetteringIncomingNotification({
           {verified && !showcaseOffPreview ? <LetteringProfileThumb card={c} verified={verified} size="sm" /> : null}
           {verified && showcaseOffPreview ? (
             <span
-              className="lettering-vlue-verified-badge lettering-vlue-verified-badge--metal inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600/25 ring-1 ring-blue-300/35"
+              className="lettering-vlue-verified-badge lettering-vlue-verified-badge--metal inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
               title="VLUE 인증"
               aria-label="VLUE 인증됨"
             >
-              <ShieldCheck className="h-5 w-5 text-blue-200" strokeWidth={2.4} aria-hidden />
+              <ShieldCheck className="h-5 w-5" strokeWidth={2.4} aria-hidden />
             </span>
           ) : null}
           <div className="min-w-0 flex-1 overflow-hidden">
