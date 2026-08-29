@@ -11,6 +11,21 @@ function Invoke-Npx {
   if ($LASTEXITCODE -ne 0) { throw "npx failed: $Args" }
 }
 
+function Test-RailwayLoggedIn {
+  $npx = (Get-Command npx.cmd -ErrorAction SilentlyContinue).Source
+  if (-not $npx) { $npx = "npx.cmd" }
+  & $npx --yes @railway/cli whoami 2>$null | Out-Null
+  return $LASTEXITCODE -eq 0
+}
+
+if (-not (Test-RailwayLoggedIn)) {
+  Write-Host ""
+  Write-Host "Railway 로그인이 필요합니다." -ForegroundColor Red
+  Write-Host "  D:\dev\railway-login.cmd  또는  D:\dev\sync-fcm-railway.cmd 를 실행하세요." -ForegroundColor Yellow
+  Write-Host "  (sync-fcm-railway.cmd 는 로그인+연결+동기화를 한 번에 합니다)" -ForegroundColor Yellow
+  exit 1
+}
+
 $ScriptDir = $PSScriptRoot
 $RepoRoot = if (Test-Path (Join-Path $ScriptDir "..\apps\api")) {
   (Resolve-Path (Join-Path $ScriptDir "..")).Path
@@ -49,7 +64,6 @@ if (-not $projectId -or -not $clientEmail -or -not $privateKey) {
 }
 
 Write-Host "Railway @vlue/api FCM 변수 설정 (project: $projectId)" -ForegroundColor Cyan
-Write-Host "서비스 링크: cd $RepoRoot; npx.cmd @railway/cli link" -ForegroundColor Yellow
 
 Push-Location $RepoRoot
 try {

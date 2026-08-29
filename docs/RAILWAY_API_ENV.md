@@ -164,8 +164,8 @@ Windows 경로(`C:\Users\...\xxx.json`)는 Railway Linux에서 **동작하지 �
 **Windows PowerShell** 에서 `npx` 가 실행 정책 오류(`PSSecurityException`) 나면 **`npx.cmd`** 를 쓰거나 아래 `.cmd` 를 더블클릭하세요.
 
 ```text
-D:\dev\railway-login.cmd      ← Railway 로그인 + link
-D:\dev\sync-fcm-railway.cmd   ← FCM 변수 동기화
+D:\dev\sync-fcm-railway.cmd   ← 로그인 + link + FCM 동기화 (한 번에, 권장)
+D:\dev\railway-login.cmd      ← 로그인/link 만
 ```
 
 또는 CMD/PowerShell:
