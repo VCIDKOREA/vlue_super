@@ -1,6 +1,6 @@
 import { prisma } from "../../db/client.js";
 import { formatPhoneDisplayKR } from "../../lib/phoneDisplay.js";
-import { isFcmServerReady } from "../fcmNotificationService.js";
+import { getFcmServerDiagnostics } from "../fcmNotificationService.js";
 import { sseConnectionStats, ssePublishAllConnected } from "../../realtime/sseHub.js";
 import {
   createMarketingPopup,
@@ -301,23 +301,14 @@ export async function getAdminHealthStatus() {
     detail: `${sse.users} users · ${sse.connections} connections`
   });
 
-  const fcmReady = await isFcmServerReady();
-  const fcmEnvHint = Boolean(
-    process.env.FCM_PROJECT_ID ||
-      process.env.FIREBASE_PROJECT_ID ||
-      process.env.FCM_CLIENT_EMAIL ||
-      process.env.FIREBASE_CLIENT_EMAIL ||
-      process.env.GOOGLE_APPLICATION_CREDENTIALS
-  );
+  const fcmDiag = await getFcmServerDiagnostics();
   checks.push({
     id: "fcm",
     label: "푸시(FCM)",
-    ok: fcmReady,
-    detail: fcmReady
+    ok: fcmDiag.ready,
+    detail: fcmDiag.ready
       ? "Firebase Admin 연결됨"
-      : fcmEnvHint
-        ? "env 있으나 초기화 실패 — FCM_PRIVATE_KEY·JSON 형식 확인"
-        : "Railway @vlue/api 에 FCM_* 또는 GOOGLE_APPLICATION_CREDENTIALS(JSON) 필요"
+      : fcmDiag.detail || fcmDiag.reason
   });
 
   const scannerOk = Boolean(process.env.PORTONE_API_KEY || process.env.IAMPORT_IMP_CODE);

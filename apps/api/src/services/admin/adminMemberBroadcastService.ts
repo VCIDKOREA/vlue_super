@@ -1,6 +1,6 @@
 import { prisma } from "../../db/client.js";
 import { ssePublish } from "../../realtime/sseHub.js";
-import { sendAdminBroadcastPushBatch } from "../fcmNotificationService.js";
+import { sendAdminBroadcastPushBatch, getFcmServerDiagnostics } from "../fcmNotificationService.js";
 
 const PAID_TIERS = new Set(["paid", "standard", "premium", "b2b"]);
 const MAX_SEND = 5000;
@@ -273,7 +273,12 @@ export async function sendAdminMemberBroadcast(opts: {
   pushFailed = push.failed;
   pushUsersWithTokens = push.usersWithTokens;
   pushUsersWithoutTokens = push.usersWithoutTokens;
-  if (push.skipped && push.reason) pushSkipReason = push.reason;
+  if (push.skipped && push.reason) {
+    pushSkipReason =
+      push.reason === "fcm_not_configured"
+        ? (await getFcmServerDiagnostics()).detail || push.reason
+        : push.reason;
+  }
 
   return {
     ok: true,

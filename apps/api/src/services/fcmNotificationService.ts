@@ -6,14 +6,37 @@ let adminModule: FirebaseAdminModule | null | undefined;
 let initAttempted = false;
 
 function resolvePrivateKey(raw: string | undefined): string | undefined {
-  const v = String(raw || "").trim();
+  let v = String(raw || "").trim();
   if (!v) return undefined;
-  return v.replace(/\\n/g, "\n");
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1);
+  }
+  if (v.includes("\\n")) {
+    v = v.replace(/\\n/g, "\n");
+  }
+  return v;
 }
+
+export type FcmServerDiagnostics = {
+  ready: boolean;
+  reason:
+    | "ready"
+    | "disabled"
+    | "missing_credentials"
+    | "init_failed"
+    | "not_configured";
+  detail?: string;
+};
+
+let lastFcmInitError: string | null = null;
 
 async function ensureFirebaseApp(): Promise<FirebaseAdminModule | null> {
   if (initAttempted) return adminModule ?? null;
   initAttempted = true;
+  lastFcmInitError = null;
 
   try {
     const admin = await import("firebase-admin");
@@ -23,6 +46,7 @@ async function ensureFirebaseApp(): Promise<FirebaseAdminModule | null> {
 
     if (process.env.FCM_ENABLED === "0") {
       console.warn("[fcm] disabled via FCM_ENABLED=0");
+      lastFcmInitError = "disabled";
       adminModule = null;
       return null;
     }
@@ -65,9 +89,11 @@ async function ensureFirebaseApp(): Promise<FirebaseAdminModule | null> {
     }
 
     console.warn("[fcm] credentials_not_configured — push skipped");
+    lastFcmInitError = "missing_credentials";
     adminModule = null;
     return null;
   } catch (err) {
+    lastFcmInitError = err instanceof Error ? err.message : "init_failed";
     console.warn("[fcm] firebase_admin_init_failed", err);
     adminModule = null;
     return null;
@@ -76,9 +102,47 @@ async function ensureFirebaseApp(): Promise<FirebaseAdminModule | null> {
 
 /** Railway 등에서 FCM Admin SDK 초기화 가능 여부 (환경 변수 존재만이 아니라 실제 init) */
 export async function isFcmServerReady(): Promise<boolean> {
-  if (process.env.FCM_ENABLED === "0") return false;
+  const diag = await getFcmServerDiagnostics();
+  return diag.ready;
+}
+
+export async function getFcmServerDiagnostics(): Promise<FcmServerDiagnostics> {
+  if (process.env.FCM_ENABLED === "0") {
+    return { ready: false, reason: "disabled", detail: "FCM_ENABLED=0" };
+  }
+
+  const hasEnv = Boolean(
+    envTrim("FCM_PROJECT_ID", "FIREBASE_PROJECT_ID") &&
+      envTrim("FCM_CLIENT_EMAIL", "FIREBASE_CLIENT_EMAIL") &&
+      envTrim("FCM_PRIVATE_KEY", "FIREBASE_PRIVATE_KEY")
+  );
+  const gac = resolveGoogleCredential();
+  const hasJson =
+    Boolean(gac && "client_email" in gac && gac.client_email && gac.private_key) ||
+    Boolean(gac && "path" in gac && gac.path);
+
+  if (!hasEnv && !hasJson) {
+    return {
+      ready: false,
+      reason: "missing_credentials",
+      detail: "FCM_* 또는 GOOGLE_APPLICATION_CREDENTIALS(JSON) 필요"
+    };
+  }
+
   const admin = await ensureFirebaseApp();
-  return Boolean(admin);
+  if (admin) {
+    return { ready: true, reason: "ready" };
+  }
+
+  if (lastFcmInitError === "missing_credentials") {
+    return { ready: false, reason: "missing_credentials", detail: lastFcmInitError };
+  }
+
+  return {
+    ready: false,
+    reason: lastFcmInitError ? "init_failed" : "not_configured",
+    detail: lastFcmInitError || "Firebase Admin 초기화 실패 — FCM_PRIVATE_KEY 형식 확인"
+  };
 }
 
 function stringifyDataPayload(
