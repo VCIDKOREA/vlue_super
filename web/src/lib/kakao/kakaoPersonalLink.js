@@ -1,4 +1,4 @@
-/** 카카오톡 개인 ID — 복사 후 확인 팝업 → 앱 열기 */
+/** 카카오톡 개인 ID — 복사 토스트 → 카카오톡 친구검색 직행 */
 
 /** 카카오톡 친구추가용 ID (4~20자, 영문·숫자·- _ .) */
 export function isValidKakaoTalkId(raw) {
@@ -85,8 +85,11 @@ function resolveOwnerLabel(ownerName) {
   return name || "상대";
 }
 
+/** 모바일에서 토스트가 잠깐 보이도록 한 뒤 앱 전환 */
+const KAKAO_LAUNCH_DELAY_MS = 360;
+
 /**
- * 쇼셜 아이콘 탭 — ID 복사 → 확인 → 카카오톡 열기
+ * 쇼셜 아이콘 탭 — ID 복사 토스트 → (모바일) 카카오톡 친구 ID 검색 화면 직행
  * @returns {Promise<boolean>}
  */
 export async function promptKakaoTalkPersonalLink(talkId, { ownerName, onToast } = {}) {
@@ -103,17 +106,18 @@ export async function promptKakaoTalkPersonalLink(talkId, { ownerName, onToast }
     return false;
   }
 
-  const go = window.confirm(
-    `${label}님의 카카오톡 ID가 복사되었습니다.\n카카오톡으로 이동하시겠습니까?`
-  );
-  if (!go) return true;
-
   if (!isMobileUa()) {
-    onToast?.("모바일에서 카카오톡 앱으로 열어 주세요. ID는 복사되었습니다.");
+    onToast?.(
+      `${label}님의 카카오톡 ID가 복사되었습니다. PC에서는 카카오톡 앱을 열 수 없습니다. 모바일 카카오톡에서 친구 추가 → ID로 추가를 이용해 주세요.`
+    );
     return true;
   }
 
-  launchKakaoTalkForFriendAdd(id);
+  onToast?.(`${label}님의 카카오톡 ID가 복사되었습니다.`);
+
+  window.setTimeout(() => {
+    launchKakaoTalkForFriendAdd(id);
+  }, KAKAO_LAUNCH_DELAY_MS);
   return true;
 }
 

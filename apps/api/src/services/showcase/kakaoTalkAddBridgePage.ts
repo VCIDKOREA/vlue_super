@@ -64,20 +64,19 @@ export function buildKakaoTalkAddBridgeHtml(talkId: string): string | null {
           window.location.href = scheme;
           return;
         }
-        status.textContent = "ID가 복사되었습니다. 모바일 카카오톡에서 친구 추가 → ID로 추가를 이용해 주세요.";
+        status.textContent = "ID가 복사되었습니다. PC에서는 카카오톡 앱을 열 수 없습니다. 모바일 카카오톡에서 친구 추가 → ID로 추가를 이용해 주세요.";
       }
 
       copyId()
         .then(function () {
-          var go = window.confirm(
-            "카카오톡 ID가 복사되었습니다.\\n카카오톡으로 이동하시겠습니까?"
-          );
-          if (!go) {
-            status.textContent = "ID(" + id + ")가 복사되었습니다.";
+          status.textContent = "카카오톡 ID가 복사되었습니다. 카카오톡으로 이동합니다…";
+          if (!isAndroid && !isIos) {
+            status.textContent = "ID(" + id + ")가 복사되었습니다. PC에서는 카카오톡 앱을 열 수 없습니다. 모바일 카카오톡에서 친구 추가 → ID로 추가를 이용해 주세요.";
             return;
           }
-          openKakao();
-          status.textContent = "카카오톡을 여는 중입니다…";
+          window.setTimeout(function () {
+            openKakao();
+          }, 360);
         })
         .catch(function () {
           status.textContent = "ID 복사에 실패했습니다. ID: " + id;
