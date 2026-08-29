@@ -7,18 +7,11 @@ import { requiresPremium } from "../../lib/showcase/showcaseStylePermissions.js"
 import {
   SHOWCASE_STYLE_CHANGED_EVENT,
   readShowcaseStyle,
-  readLiveShowcaseStyle,
   writeShowcaseStyle,
   writeLiveShowcaseStyle,
   parseShowcaseTagsInput
 } from "../../lib/showcase/showcaseStyleStorage.js";
-import { archiveShowcaseToMycase } from "../../lib/mycaseApi.js";
 import { MYCASE_SHOWCASE_PICK_APPLY_EVENT } from "../../lib/mycase/mycaseShowcasePick.js";
-import { applyMycaseItemToLiveBroadcast } from "../../lib/showcase/syncMycaseLiveBroadcast.js";
-import {
-  extractShowcaseArchiveTitle,
-  extractShowcaseCoverUrl
-} from "../../lib/showcase/showcaseCover.js";
 import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { hasShowcaseBgmConfigured } from "../../lib/showcase/showcaseBgmPresets.js";
 import { PRIVACY_MODES, maxShowcaseContentPagesForTier } from "../../lib/showcase/tentShowcaseTypes.js";
@@ -258,8 +251,6 @@ export default function ShowcaseStyleSettingsPanel({
   const [igLinkLoading, setIgLinkLoading] = useState(false);
   const [kakaoLink, setKakaoLink] = useState({ linked: false });
   const [kakaoLinkLoading, setKakaoLinkLoading] = useState(false);
-  /** 적용 시 마이케이스에 새 게시물로 올릴지 (기본 꺼짐 — 사진 수정마다 쌓이는 것 방지) */
-  const [alsoUploadToMycase, setAlsoUploadToMycase] = useState(false);
   const [lineBusy, setLineBusy] = useState(false);
   const [deskNotice, setDeskNotice] = useState("");
   const [footerGuide, setFooterGuide] = useState("");
@@ -782,47 +773,11 @@ export default function ShowcaseStyleSettingsPanel({
         "프로필 사진은 「1페이지 · 디지털인증명함 → 설정하러가기」에서 등록·저장해야 미리보기에 나옵니다.";
       focusShowcaseSection("showcase-settings-dcc", msg);
       notify(`쇼케이스 설정은 저장됐습니다. ${msg}`);
-      if (!alsoUploadToMycase) return;
-    }
-
-    if (!alsoUploadToMycase) {
-      notify("적용되었습니다. (마이케이스에는 올리지 않음)");
       return;
     }
-    /* 체크한 경우에만 마이케이스에 새 게시물로 쌓고 메인 송출 반영 */
-    try {
-      const cover = extractShowcaseCoverUrl(latest);
-      const title = extractShowcaseArchiveTitle(latest);
-      void archiveShowcaseToMycase({
-        title,
-        thumbnailUrl: cover || null,
-        payloadJson: { style: latest, source: "showcase_apply" },
-        isPublic: latest?.privacyMode !== "friend_only",
-        promoteToMain: true
-      }).then((res) => {
-        if (res?.ok && res.item) {
-          applyMycaseItemToLiveBroadcast(res.item);
-          /* 게시물 hydrate 후에도 편집 BGM·source=editor 유지 — 새로고침 시 음원 보존 */
-          writeLiveShowcaseStyle(
-            { ...(readLiveShowcaseStyle() || latest), bgm: latest.bgm },
-            { source: "editor" }
-          );
-          notify(
-            hasProfilePhoto
-              ? "적용 · 마이케이스 저장 · 메인 송출 반영"
-              : "적용 · 마이케이스 저장. 프로필 사진은 디지털인증명함 설정에서 등록해 주세요."
-          );
-        } else if (res?.ok) {
-          notify("적용 · 마이케이스에 저장되었습니다.");
-        } else {
-          notify(res?.message || "적용되었습니다. (마이케이스 저장 실패)");
-        }
-      });
-    } catch {
-      notify("적용되었습니다.");
-    }
+
+    notify("적용되었습니다.");
   }, [
-    alsoUploadToMycase,
     config,
     focusShowcaseSection,
     includeDigitalCard,
@@ -1518,18 +1473,6 @@ export default function ShowcaseStyleSettingsPanel({
         {dirty ? " · 미적용 변경 있음" : ""}
       </p>
 
-      <label className={`showcase-mycase-upload-check ${isDarkMode ? "is-dark" : ""}`}>
-        <input
-          type="checkbox"
-          checked={alsoUploadToMycase}
-          onChange={(e) => setAlsoUploadToMycase(e.target.checked)}
-        />
-        <span>
-          <b>[마이케이스]</b> 함께 올리기
-          <em>체크한 경우에만 마이케이스에 새 게시물로 저장됩니다</em>
-        </span>
-      </label>
-
       {footerGuide ? (
         <p
           className={`showcase-style-settings__footer-guide ${isDarkMode ? "is-dark" : ""}`}
@@ -1649,9 +1592,7 @@ export default function ShowcaseStyleSettingsPanel({
           <BackButton variant="inline" onBack={requestClose} isDarkMode={isDarkMode} />
           <div className="min-w-0 flex-1">
             <p className={`text-[17px] font-black ${headText}`}>{VLUE_SHOWCASE.nameKo}</p>
-            <p className={`text-[11px] ${subText}`}>
-              {alsoUploadToMycase ? "적용 → 마이케이스 저장 · 자동 송출" : "적용 → 미리보기 반영 (마이케이스는 선택 시)"}
-            </p>
+            <p className={`text-[11px] ${subText}`}>적용 → 통화 미리보기·송출에 반영</p>
           </div>
           <button type="button" className="showcase-style-settings__done-btn" onClick={commitApply}>
             완료

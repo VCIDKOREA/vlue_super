@@ -990,6 +990,7 @@ export default function MyCaseGrid({
       {!accessDenied ? (
         <div className="ig-mycase__highlights" aria-label="메인 송출 하이라이트">
           {isMine ? (
+            <>
             <button
               type="button"
               className="ig-mycase__hl ig-mycase__hl--new"
@@ -1010,6 +1011,7 @@ export default function MyCaseGrid({
               </span>
               <span className="ig-mycase__hl-label">쇼케이스</span>
             </button>
+            </>
           ) : null}
           {highlightItems.map((item) => (
             <button
