@@ -9,6 +9,7 @@ import {
   resolvePushDisplayTime
 } from "../lib/pushNotificationInbox.js";
 import PushNotificationDetailModal from "./PushNotificationDetailModal.jsx";
+import ShowcaseNotificationBody from "./showcase/ShowcaseNotificationBody.jsx";
 
 const CATEGORY_STYLE = {
   가족보호: "bg-emerald-50 text-emerald-800 ring-emerald-100",
@@ -142,9 +143,14 @@ export default function HomeNotificationPanel({ onOpenFamilyProtection, classNam
                         </span>
                       </div>
                       <p className="text-[13px] font-bold leading-snug text-slate-900">{n.title}</p>
-                      <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-slate-600">
-                        {n.body}
-                      </p>
+                      <ShowcaseNotificationBody
+                        body={n.body}
+                        actorUserId={n.actorUserId}
+                        actorHandle={n.actorHandle}
+                        actorName={n.actorName}
+                        inline
+                        className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-slate-600"
+                      />
                       {when ? (
                         <time
                           className="mt-1.5 block text-[11px] font-semibold tabular-nums text-slate-400"

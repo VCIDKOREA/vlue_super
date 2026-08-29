@@ -194,7 +194,7 @@ async function sendMulticastPush(
       title,
       body
     );
-    data.channel = "family_protection";
+    data.channel = channelId;
 
     /**
      * 가족 보호는 전부 data-only.
@@ -209,7 +209,9 @@ async function sendMulticastPush(
     const androidChannel =
       type === "vlue-family-protection-invite" || type.startsWith("vlue-family-protection")
         ? "family_protection_invite_v4"
-        : channelId;
+        : channelId === "showcase_social"
+          ? "vlue_app_alerts"
+          : channelId;
 
     const message: {
       tokens: string[];

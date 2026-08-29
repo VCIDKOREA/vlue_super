@@ -44,6 +44,12 @@ function extractInboxFamilyRelation(payload: unknown): string | null {
   return rel != null ? String(rel) : null;
 }
 
+function extractPayloadString(payload: unknown, key: string): string | null {
+  const p = payloadRecord(payload);
+  const v = p?.[key];
+  return v != null ? String(v) : null;
+}
+
 /** 알림함 동기화 — OwnerNotification → 클라 수신함 */
 notificationRoutes.get("/inbox", requireUserHeader, async (c) => {
   const me = String(c.get("vlueUserId") || c.req.header("x-vlue-user-id") || "").trim();
@@ -51,7 +57,10 @@ notificationRoutes.get("/inbox", requireUserHeader, async (c) => {
   const rows = await prisma.ownerNotification.findMany({
     where: { ownerUserId: me },
     orderBy: [{ pinKind: "desc" }, { createdAt: "desc" }],
-    take: 80
+    take: 80,
+    include: {
+      actorUser: { select: { id: true, publicHandle: true, legalName: true } }
+    }
   });
   const items = rows
     .map((row) => ({
@@ -67,7 +76,19 @@ notificationRoutes.get("/inbox", requireUserHeader, async (c) => {
       payload: row.payloadJson || null,
       linkId: extractInboxLinkId(row.payloadJson),
       kind: extractInboxKind(row.payloadJson),
-      familyRelation: extractInboxFamilyRelation(row.payloadJson)
+      familyRelation: extractInboxFamilyRelation(row.payloadJson),
+      actorUserId:
+        row.actorUserId ||
+        extractPayloadString(row.payloadJson, "actorUserId") ||
+        null,
+      actorHandle:
+        extractPayloadString(row.payloadJson, "actorHandle") ||
+        String(row.actorUser?.publicHandle || "").replace(/^@+/, "").trim() ||
+        null,
+      actorName:
+        extractPayloadString(row.payloadJson, "actorName") ||
+        String(row.actorUser?.legalName || row.actorUser?.publicHandle || "").trim() ||
+        null
     }))
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return c.json({

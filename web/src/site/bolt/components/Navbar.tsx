@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Menu, X, User, ChevronDown, LogOut, MapPin, Lock, CreditCard, LayoutDashboard, Award, Sparkles } from 'lucide-react';
+import { Menu, X, User, ChevronDown, LogOut, MapPin, Lock, CreditCard, LayoutDashboard, Award, Sparkles, LayoutGrid } from 'lucide-react';
 import { VlueNavLogoMark, useVlueLogoBlink } from '../../../components/VlueNavLogoMark.jsx';
 import { readProfilePhotoAvatar } from '../../../lib/vlueAvatar.js';
 import { useWebIdleSession } from '../hooks/useWebIdleSession';
@@ -24,14 +24,17 @@ type NavItem = {
   mailPill?: boolean;
   /** AI엑셀에디터 — 웹 전용 눈에 띄는 CTA */
   featured?: boolean;
+  /** 케이스함 — 2x2 그리드 아이콘 */
+  gridIcon?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
   { label: '서비스소개', view: 'about' },
   { label: '인증신청', view: 'pricing' },
-  { label: '쇼케이스 관리', view: 'showcase', featured: true },
   { label: '개인케이스', view: 'resources' },
   { label: '고객지원', view: 'support' },
+  { label: '쇼케이스 관리', view: 'showcase', featured: true },
+  { label: '케이스함', view: 'casebox', gridIcon: true },
 ].filter((item) => isWebViewV1Enabled(item.view));
 
 const USER_MENU_ITEMS: { label: string; view: View; icon: typeof LayoutDashboard }[] = [
@@ -146,6 +149,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
               >
                 {item.mailPill && <Lock className="w-3 h-3" />}
                 {item.featured && <Sparkles className="w-3.5 h-3.5" />}
+                {item.gridIcon && <LayoutGrid className="w-3.5 h-3.5" strokeWidth={2.2} />}
                 {item.label}
               </button>
             ))}
@@ -294,6 +298,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
               }
             >
               {item.featured && <Sparkles className="w-4 h-4 flex-shrink-0" />}
+              {item.gridIcon && <LayoutGrid className="w-4 h-4 flex-shrink-0" strokeWidth={2.2} />}
               {item.label}
             </button>
           ))}

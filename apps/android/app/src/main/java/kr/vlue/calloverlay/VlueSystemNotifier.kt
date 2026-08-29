@@ -16,21 +16,32 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 object VlueSystemNotifier {
     private const val CHANNEL_ID = "vlue_app_alerts"
+    private const val SHOWCASE_CHANNEL_ID = "showcase_social"
     private const val CHANNEL_NAME = "VLUE 알림"
+    private const val SHOWCASE_CHANNEL_NAME = "쇼케이스 알림"
     private val nextId = AtomicInteger(7100)
 
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        val existing = nm.getNotificationChannel(CHANNEL_ID)
-        if (existing != null) return
-        val channel =
-            NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "가족 보호·초대·팔로우 등 앱 알림"
-                enableVibration(true)
-                setShowBadge(true)
-            }
-        nm.createNotificationChannel(channel)
+        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
+            val channel =
+                NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "가족 보호·초대·팔로우 등 앱 알림"
+                    enableVibration(true)
+                    setShowBadge(true)
+                }
+            nm.createNotificationChannel(channel)
+        }
+        if (nm.getNotificationChannel(SHOWCASE_CHANNEL_ID) == null) {
+            val showcase =
+                NotificationChannel(SHOWCASE_CHANNEL_ID, SHOWCASE_CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "쇼케이스 좋아요·댓글·공유 알림"
+                    enableVibration(true)
+                    setShowBadge(true)
+                }
+            nm.createNotificationChannel(showcase)
+        }
     }
 
     fun show(

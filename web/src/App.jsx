@@ -53,7 +53,7 @@ import {
 } from "./lib/chatRoomPrefsStorage.js";
 import { addPushNotification, countUnreadPush, PUSH_INBOX_CHANGED } from "./lib/pushNotificationInbox.js";
 import { syncOwnerInboxFromServer } from "./lib/ownerInboxSync.js";
-import { postAndroidFamilyInviteNotification, postAndroidSystemNotification } from "./lib/androidSystemNotification.js";
+import { deliverLocalPushNotification, postAndroidFamilyInviteNotification, postAndroidSystemNotification } from "./lib/androidSystemNotification.js";
 import Splash from "./components/Splash";
 import VlueOnboarding from "./components/VlueOnboarding";
 import PostSignupPaymentModal from "./components/PostSignupPaymentModal.jsx";
@@ -1044,8 +1044,12 @@ function App() {
           category: "쇼케이스",
           title,
           body,
-          serverId: data.notificationId
+          serverId: data.notificationId,
+          actorUserId: data.actorUserId,
+          actorHandle: data.actorHandle,
+          actorName: data.actorName
         });
+        deliverLocalPushNotification(title, body, String(data.notificationId || data.type || "showcase-like"));
         setBottomToast(body);
         setTimeout(() => setBottomToast(""), 4200);
       }
@@ -1213,8 +1217,12 @@ function App() {
             category: "쇼케이스",
             title,
             body,
-            serverId: data.notificationId
+            serverId: data.notificationId,
+            actorUserId: data.actorUserId,
+            actorHandle: data.actorHandle,
+            actorName: data.actorName
           });
+          deliverLocalPushNotification(title, body, String(data.notificationId || data.type || "showcase-social"));
         }
         if (data?.type === "vlue-payment-receipt") {
           const title = String(data.title || "결제 완료 · 구매확인 안내");

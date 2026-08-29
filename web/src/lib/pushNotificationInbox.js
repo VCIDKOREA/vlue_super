@@ -142,7 +142,10 @@ export function addPushNotification({
   read = false,
   pinned = false,
   pinKind = null,
-  pinKey = null
+  pinKey = null,
+  actorUserId,
+  actorHandle,
+  actorName
 } = {}) {
   const at = createdAt || new Date().toISOString();
   const sid = String(serverId || "").trim();
@@ -158,7 +161,12 @@ export function addPushNotification({
         pinned: Boolean(pinned),
         pinKind: pinKind || list[idx].pinKind || null,
         pinKey: key || list[idx].pinKey || null,
-        read: Boolean(pinned) ? false : list[idx].read
+        read: Boolean(pinned) ? false : list[idx].read,
+        actorUserId: actorUserId ? String(actorUserId) : list[idx].actorUserId || null,
+        actorHandle: actorHandle
+          ? String(actorHandle).replace(/^@+/, "").trim()
+          : list[idx].actorHandle || null,
+        actorName: actorName ? String(actorName).trim() : list[idx].actorName || null
       };
       const copy = [...list];
       copy[idx] = next;
@@ -175,7 +183,12 @@ export function addPushNotification({
         body: String(body || list[idx].body || "").slice(0, 1200),
         pinned: Boolean(pinned),
         pinKind: pinKind || list[idx].pinKind || null,
-        serverId: sid || list[idx].serverId || null
+        serverId: sid || list[idx].serverId || null,
+        actorUserId: actorUserId ? String(actorUserId) : list[idx].actorUserId || null,
+        actorHandle: actorHandle
+          ? String(actorHandle).replace(/^@+/, "").trim()
+          : list[idx].actorHandle || null,
+        actorName: actorName ? String(actorName).trim() : list[idx].actorName || null
       };
       const copy = [...list];
       copy[idx] = next;
@@ -206,7 +219,10 @@ export function addPushNotification({
     purchaseConfirmedAt: null,
     pinned: Boolean(pinned),
     pinKind: pinKind || null,
-    pinKey: key || null
+    pinKey: key || null,
+    actorUserId: actorUserId ? String(actorUserId) : null,
+    actorHandle: actorHandle ? String(actorHandle).replace(/^@+/, "").trim() : null,
+    actorName: actorName ? String(actorName).trim() : null
   };
   writeList([entry, ...list]);
   return { ...entry, isNew: true };

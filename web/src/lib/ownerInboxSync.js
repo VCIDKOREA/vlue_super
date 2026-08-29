@@ -33,7 +33,10 @@ export async function syncOwnerInboxFromServer() {
         kind: item.kind || null,
         linkId: item.linkId || null,
         familyRelation: item.familyRelation || null,
-        familyInvitePending: item.kind === "family_invite"
+        familyInvitePending: item.kind === "family_invite",
+        actorUserId: item.actorUserId || null,
+        actorHandle: item.actorHandle || null,
+        actorName: item.actorName || null
       });
       if (entry?.isNew) {
         added += 1;

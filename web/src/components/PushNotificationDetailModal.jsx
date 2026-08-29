@@ -8,6 +8,7 @@ import {
 } from "../lib/pushNotificationInbox.js";
 import { acceptFamilyProtectionLink, rejectFamilyProtectionLink } from "../lib/familyProtectionApi.js";
 import { marketingLegalUrl } from "../lib/legalPageLinks.js";
+import ShowcaseNotificationBody from "./showcase/ShowcaseNotificationBody.jsx";
 
 const CATEGORY_STYLE = {
   가족보호: "bg-emerald-50 text-emerald-700",
@@ -240,13 +241,16 @@ export default function PushNotificationDetailModal({
               ) : null}
             </div>
           ) : null}
-          <p
+          <ShowcaseNotificationBody
+            body={current.body || "내용이 없습니다."}
+            actorUserId={current.actorUserId}
+            actorHandle={current.actorHandle}
+            actorName={current.actorName}
+            onNavigate={onClose}
             className={`whitespace-pre-wrap break-words text-[14px] font-medium leading-relaxed ${
               isDarkMode ? "text-slate-200" : "text-slate-700"
             }`}
-          >
-            {current.body || "내용이 없습니다."}
-          </p>
+          />
           {inviteResolvedStatus === "accepted" ? (
             <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] font-bold text-emerald-800">
               가족 보호 초대를 수락했습니다.

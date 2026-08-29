@@ -20,6 +20,8 @@ export const MARKETING_VIEW_LABELS = {
   support: "고객지원",
   resources: "개인케이스",
   pricing: "인증신청",
+  showcase: "쇼케이스 관리",
+  casebox: "케이스함",
   jobs: "구인구직",
   shopping: "블루쇼핑",
   mail: "보안메일",

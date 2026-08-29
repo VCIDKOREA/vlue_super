@@ -25,6 +25,7 @@ import SupportPage from './pages/SupportPage';
 import ExcelEditorPage from './pages/ExcelEditorPage';
 import MyPage from './pages/MyPage';
 import BusinessCardPage from './pages/BusinessCardPage';
+import CaseBoxPage from './pages/CaseBoxPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import RefundPage from './pages/RefundPage';
@@ -42,15 +43,15 @@ import { coerceWebViewForV1, isWebViewV1Enabled, v1WebShell } from '../../lib/v1
 const VALID_VIEWS: View[] = [
   'home', 'search', 'shopping', 'auction', 'about', 'resources', 'pricing', 'safezone',
   'mail', 'mail-settings', 'download', 'news', 'events', 'jobs', 'support', 'exceleditor', 'family', 'mypage', 'bizcard',
-  'showcase', 'biz',
+  'showcase', 'casebox', 'biz',
   'terms', 'privacy', 'refund',
 ];
 
-/** /showcase · /biz 경로 → 해시 라우트로 정규화 (www.vlue.kr/showcase) */
+/** /showcase · /biz · /casebox 경로 → 해시 라우트로 정규화 */
 function normalizeShowcaseManagePathname() {
   if (typeof window === 'undefined') return;
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
-  if (path !== '/showcase' && path !== '/biz') return;
+  if (path !== '/showcase' && path !== '/biz' && path !== '/casebox') return;
   const view = path.slice(1);
   const search = window.location.search || '';
   window.history.replaceState(null, '', `/${search}#${view}`);
@@ -233,7 +234,7 @@ export default function App() {
     if (!user) {
       try {
         const current = readViewFromHash().view;
-        if (current === 'showcase' || current === 'biz' || current === 'family') {
+        if (current === 'showcase' || current === 'biz' || current === 'family' || current === 'casebox') {
           sessionStorage.setItem(AFTER_LOGIN_KEY, current);
         }
       } catch {
@@ -355,6 +356,13 @@ export default function App() {
           <BusinessCardPage
             user={user}
             mode="showcase"
+            onLoginClick={handleLoginRequired}
+            onBack={() => handleNavigate('home')}
+          />
+        )}
+        {view === 'casebox' && (
+          <CaseBoxPage
+            user={user}
             onLoginClick={handleLoginRequired}
             onBack={() => handleNavigate('home')}
           />

@@ -19,6 +19,7 @@ export type View =
   | "mypage"
   | "bizcard"
   | "showcase"
+  | "casebox"
   | "biz"
   | "terms"
   | "privacy"

@@ -79,18 +79,43 @@ function serializeAuthor(
   };
 }
 
-async function resolveActorLabel(userId: string): Promise<string> {
+async function resolveActorProfile(userId: string): Promise<{ name: string; handle: string }> {
   try {
     const u = await prisma.user.findUnique({
       where: { id: userId },
       select: authorSelect
     });
-    if (!u) return "회원";
+    if (!u) return { name: "회원", handle: "" };
     const lite = await loadAuthorLite([userId]);
-    return serializeAuthor(u, lite.get(userId)).name;
+    const author = serializeAuthor(u, lite.get(userId));
+    const handle = String(author.handle || "").replace(/^@+/, "").trim();
+    return {
+      name: String(author.name || handle || "회원").trim(),
+      handle
+    };
   } catch {
-    return "회원";
+    return { name: "회원", handle: "" };
   }
+}
+
+function actorAtLabel(profile: { name: string; handle: string }): string {
+  const handle = String(profile.handle || "").replace(/^@+/, "").trim();
+  if (handle) return `@${handle}`;
+  return String(profile.name || "회원").trim();
+}
+
+function showcaseActorData(
+  actorUserId: string | null | undefined,
+  profile: { name: string; handle: string },
+  extra: Record<string, unknown> = {}
+) {
+  const handle = String(profile.handle || "").replace(/^@+/, "").trim();
+  return {
+    ...extra,
+    actorUserId: actorUserId || "",
+    actorHandle: handle,
+    actorName: String(profile.name || handle || "회원").trim()
+  };
 }
 
 function clipPushBody(text: string): string {
@@ -150,7 +175,8 @@ function deliverShowcaseSocialNotice(opts: {
           ownerUserId: recipientUserId,
           actorUserId: opts.actorUserId || null,
           title,
-          body
+          body,
+          payloadJson: opts.data as Prisma.InputJsonValue
         }
       });
       notificationId = row.id;
@@ -260,19 +286,19 @@ export async function toggleShowcaseLike(opts: {
 
   /* 새로 좋아요 시에만 알림 — 취소·본인·이미 좋아요는 제외 */
   if (likedByMe && !existing && opts.ownerUserId !== opts.actorUserId) {
-    void resolveActorLabel(opts.actorUserId).then((actorName) => {
+    void resolveActorProfile(opts.actorUserId).then((actor) => {
+      const at = actorAtLabel(actor);
       deliverShowcaseSocialNotice({
         recipientUserId: opts.ownerUserId,
         actorUserId: opts.actorUserId,
         title: "새 좋아요",
-        body: `${actorName}님이 회원님의 쇼케이스를 좋아합니다.`,
-        data: {
+        body: `${at}님이 회원님의 쇼케이스를 좋아합니다.`,
+        data: showcaseActorData(opts.actorUserId, actor, {
           type: "vlue-showcase-like",
           ownerUserId: opts.ownerUserId,
-          actorUserId: opts.actorUserId,
           slideId,
           likeCount: String(likeCount)
-        }
+        })
       });
     });
   }
@@ -359,14 +385,18 @@ export async function createShowcaseComment(opts: {
   const authorLite = await loadAuthorLite([row.author.id]);
   const author = serializeAuthor(row.author, authorLite.get(row.author.id));
   const preview = clipPushBody(body);
-  const pushBase = {
+  const actorProfile = {
+    name: String(author.name || "").trim() || "회원",
+    handle: String(author.handle || "").replace(/^@+/, "").trim()
+  };
+  const at = actorAtLabel(actorProfile);
+  const pushBase = showcaseActorData(opts.authorUserId, actorProfile, {
     type: parentId ? "vlue-showcase-comment-reply" : "vlue-showcase-comment",
     ownerUserId: opts.ownerUserId,
-    actorUserId: opts.authorUserId,
     slideId,
     commentId: row.id,
     parentId: parentId || ""
-  };
+  });
 
   /* 쇼케이스 주인에게 알림 (본인 댓글 제외) */
   if (opts.ownerUserId !== opts.authorUserId) {
@@ -375,8 +405,8 @@ export async function createShowcaseComment(opts: {
       actorUserId: opts.authorUserId,
       title: parentId ? "새 답글" : "새 댓글",
       body: parentId
-        ? `${author.name}님이 회원님의 쇼케이스에 답글을 남겼습니다. ${preview}`
-        : `${author.name}님이 댓글을 남겼습니다. ${preview}`,
+        ? `${at}님이 회원님의 쇼케이스에 답글을 남겼습니다. ${preview}`
+        : `${at}님이 댓글을 남겼습니다. ${preview}`,
       data: pushBase
     });
   }
@@ -391,7 +421,7 @@ export async function createShowcaseComment(opts: {
       recipientUserId: parentAuthorUserId,
       actorUserId: opts.authorUserId,
       title: "새 답글",
-      body: `${author.name}님이 회원님의 댓글에 답글을 남겼습니다. ${preview}`,
+      body: `${at}님이 회원님의 댓글에 답글을 남겼습니다. ${preview}`,
       data: { ...pushBase, type: "vlue-showcase-comment-reply" }
     });
   }
