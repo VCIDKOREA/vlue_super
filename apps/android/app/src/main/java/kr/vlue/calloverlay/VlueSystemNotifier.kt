@@ -24,12 +24,20 @@ object VlueSystemNotifier {
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        val existing = nm.getNotificationChannel(CHANNEL_ID)
+        if (existing != null) {
+            if (existing.importance < NotificationManager.IMPORTANCE_HIGH) {
+                nm.deleteNotificationChannel(CHANNEL_ID)
+            }
+        }
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
             val channel =
                 NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "가족 보호·초대·팔로우 등 앱 알림"
+                    description = "공지·쇼케이스·관리자 알림 — 화면 꺼짐 시 깨움"
                     enableVibration(true)
+                    enableLights(true)
                     setShowBadge(true)
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
                 }
             nm.createNotificationChannel(channel)
         }
@@ -71,6 +79,12 @@ object VlueSystemNotifier {
         }
 
         ensureChannel(app)
+        /* 카카오톡형 — 화면 꺼짐 시 잠깐 켜서 헤드업 알림 표시 */
+        try {
+            kr.vlue.calloverlay.family.FamilyProtectionNotificationHelper.wakeScreenBriefly(app, 5_000L)
+        } catch (_: Exception) {
+            /* ignore */
+        }
         val open =
             Intent(app, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -103,10 +117,13 @@ object VlueSystemNotifier {
                         .setBigContentTitle(safeTitle)
                         .bigText(fullBody)
                 )
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setVibrate(longArrayOf(0, 380, 180, 380))
+                .setLights(0xFF2563EB.toInt(), 700, 500)
+                .setOnlyAlertOnce(false)
                 .setAutoCancel(true)
                 .setContentIntent(pi)
                 .build()

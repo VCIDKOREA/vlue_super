@@ -534,23 +534,17 @@ export async function sendAdminBroadcastPushBatch(
 
   for (let i = 0; i < allTokens.length; i += 500) {
     const chunk = allTokens.slice(i, i + 500);
+    /* data-only — 백그라운드에서도 onMessageReceived → 화면 깨움·커스텀 알림 */
     const message = {
       tokens: chunk,
       data,
-      notification: { title, body },
       android: {
         priority: "high" as const,
-        ttl: 86400 * 1000,
-        notification: {
-          channelId: "vlue_app_alerts",
-          sound: "default",
-          priority: "high" as const,
-          defaultVibrateTimings: true
-        }
+        ttl: 86400 * 1000
       },
       apns: {
-        headers: { "apns-priority": "10", "apns-push-type": "alert" },
-        payload: { aps: { sound: "default", "content-available": 1 } }
+        headers: { "apns-priority": "10", "apns-push-type": "background" },
+        payload: { aps: { "content-available": 1, sound: "default" } }
       }
     };
 
