@@ -1,6 +1,6 @@
 import { prisma } from "../../db/client.js";
 import { ssePublish } from "../../realtime/sseHub.js";
-import { sendOfficePushToUser } from "../fcmNotificationService.js";
+import { sendAdminBroadcastPushBatch } from "../fcmNotificationService.js";
 
 const PAID_TIERS = new Set(["paid", "standard", "premium", "b2b"]);
 const MAX_SEND = 5000;
@@ -218,6 +218,9 @@ export async function sendAdminMemberBroadcast(opts: {
       inboxSaved: 0,
       pushSent: 0,
       pushFailed: 0,
+      pushUsersWithTokens: 0,
+      pushUsersWithoutTokens: 0,
+      pushSkipReason: null,
       truncated: false
     };
   }
@@ -250,6 +253,9 @@ export async function sendAdminMemberBroadcast(opts: {
 
   let pushSent = 0;
   let pushFailed = 0;
+  let pushUsersWithTokens = 0;
+  let pushUsersWithoutTokens = 0;
+  let pushSkipReason: string | null = null;
   const payload = {
     type: "vlue-admin-broadcast",
     audience: opts.audience,
@@ -260,10 +266,14 @@ export async function sendAdminMemberBroadcast(opts: {
 
   for (const userId of sendIds) {
     ssePublish(userId, payload);
-    const push = await sendOfficePushToUser(userId, title, body, payload);
-    pushSent += push.sent;
-    pushFailed += push.failed;
   }
+
+  const push = await sendAdminBroadcastPushBatch(sendIds, title, body, payload);
+  pushSent = push.sent;
+  pushFailed = push.failed;
+  pushUsersWithTokens = push.usersWithTokens;
+  pushUsersWithoutTokens = push.usersWithoutTokens;
+  if (push.skipped && push.reason) pushSkipReason = push.reason;
 
   return {
     ok: true,
@@ -273,6 +283,9 @@ export async function sendAdminMemberBroadcast(opts: {
     inboxSaved,
     pushSent,
     pushFailed,
+    pushUsersWithTokens,
+    pushUsersWithoutTokens,
+    pushSkipReason,
     truncated,
     maxSend: MAX_SEND
   };

@@ -126,8 +126,15 @@ function MemberBroadcastTab({ onToast }) {
         confirm: true
       });
       const truncated = result.truncated ? ` (상한 ${result.maxSend}명)` : "";
+      const tokenHint =
+        result.pushUsersWithTokens != null
+          ? ` · 토큰 ${result.pushUsersWithTokens}명`
+          : "";
+      const skipHint = result.pushSkipReason
+        ? ` · ${result.pushSkipReason === "no_tokens" ? "FCM 토큰 없음" : result.pushSkipReason === "fcm_not_configured" ? "서버 FCM 미설정" : result.pushSkipReason}`
+        : "";
       onToast?.(
-        `발송 완료 · 대상 ${result.targeted}명 · 알림함 ${result.inboxSaved} · 푸시 ${result.pushSent}${truncated}`
+        `발송 완료 · 대상 ${result.targeted}명 · 알림함 ${result.inboxSaved} · 푸시 ${result.pushSent}${tokenHint}${skipHint}${truncated}`
       );
       void load();
     } catch (e) {

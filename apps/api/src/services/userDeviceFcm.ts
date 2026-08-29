@@ -26,7 +26,9 @@ export async function registerUserDeviceFcmToken(
       });
     }
 
-    if (!device && String(opts?.platform || "").toLowerCase() === "app") {
+    const platform = String(opts?.platform || "").toLowerCase();
+
+    if (!device && platform === "app") {
       device = await prisma.userDevice.create({
         data: {
           userId,
@@ -41,8 +43,28 @@ export async function registerUserDeviceFcmToken(
       });
     }
 
+    if (!device && platform === "web") {
+      device = await prisma.userDevice.upsert({
+        where: { userId_deviceToken: { userId, deviceToken: dt } },
+        create: {
+          userId,
+          deviceToken: dt,
+          isVerified: true,
+          verifiedAt: new Date(),
+          platform: "web",
+          label: "웹",
+          clientKind: "mobile"
+        },
+        update: {
+          isVerified: true,
+          verifiedAt: new Date()
+        },
+        select: { id: true, isVerified: true, platform: true }
+      });
+    }
+
     if (!device) return { ok: false, error: "등록된 기기를 찾을 수 없습니다." };
-    if (!device.isVerified && String(opts?.platform || "").toLowerCase() !== "app") {
+    if (!device.isVerified && platform !== "app" && platform !== "web") {
       return { ok: false, error: "승인된 기기에서만 FCM 토큰을 등록할 수 있습니다." };
     }
 

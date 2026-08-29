@@ -1067,6 +1067,16 @@ function App() {
         setBottomToast(body);
         setTimeout(() => setBottomToast(""), 4200);
       }
+      if (data.type === "vlue-admin-broadcast") {
+        const title = String(n.title || data.title || "VLUE 공지");
+        const body = String(n.body || data.body || data.message || title);
+        const category = String(data.category || "공지");
+        addPushNotification({ category, title, body });
+        deliverLocalPushNotification(title, body, `admin-broadcast-${data.audience || "all"}`);
+        setBottomToast(body);
+        setTimeout(() => setBottomToast(""), 5200);
+        void syncOwnerInboxFromServer();
+      }
     };
     window.addEventListener("vlue-fcm-foreground", onFcmForeground);
     return () => {
@@ -1180,6 +1190,16 @@ function App() {
             title: String(notice?.title || "시스템 공지"),
             body: noticeMsg
           });
+        }
+        if (data?.type === "vlue-admin-broadcast") {
+          const title = String(data.title || "VLUE 공지");
+          const body = String(data.body || data.message || title);
+          const category = String(data.category || "공지");
+          setBottomToast(body);
+          setTimeout(() => setBottomToast(""), 5200);
+          addPushNotification({ category, title, body });
+          deliverLocalPushNotification(title, body, `admin-broadcast-${data.audience || "all"}`);
+          void syncOwnerInboxFromServer();
         }
         if (data?.type === VLUE_SSE_CHAT_MESSAGE) {
           mergeIncomingServerChatMessage(data.message, {

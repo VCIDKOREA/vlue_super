@@ -118,39 +118,55 @@ function resolveGoogleCredential() {
   return { path: raw };
 }
 
-/** 보호자(가족 계정)의 등록된 FCM 토큰 목록 — 승인된 기기 우선, 없으면 토큰 있는 기기 */
+/** 사용자 등록 FCM 토큰 — 최근 갱신 기기 우선 */
 export async function listFcmTokensForUser(protectorUserId: string): Promise<string[]> {
   try {
-    const verified = await prisma.userDevice.findMany({
+    const rows = await prisma.userDevice.findMany({
       where: {
         userId: protectorUserId,
-        isVerified: true,
         fcmToken: { not: null }
       },
-      select: { fcmToken: true }
+      select: { fcmToken: true },
+      orderBy: [{ isVerified: "desc" }, { updatedAt: "desc" }],
+      take: 12
     });
-    let tokens = verified
+    const tokens = rows
       .map((r) => String(r.fcmToken || "").trim())
       .filter((t) => t.length >= 20);
-    if (!tokens.length) {
-      const any = await prisma.userDevice.findMany({
-        where: {
-          userId: protectorUserId,
-          fcmToken: { not: null }
-        },
-        select: { fcmToken: true },
-        orderBy: { updatedAt: "desc" },
-        take: 8
-      });
-      tokens = any
-        .map((r) => String(r.fcmToken || "").trim())
-        .filter((t) => t.length >= 20);
-    }
     return [...new Set(tokens)];
   } catch (err) {
     console.warn("[fcm] token_lookup_failed", { protectorUserId, err });
     return [];
   }
+}
+
+export async function listFcmTokensForUsers(userIds: string[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (!userIds.length) return out;
+  try {
+    const rows = await prisma.userDevice.findMany({
+      where: {
+        userId: { in: userIds },
+        fcmToken: { not: null }
+      },
+      select: { userId: true, fcmToken: true, isVerified: true, updatedAt: true },
+      orderBy: [{ isVerified: "desc" }, { updatedAt: "desc" }]
+    });
+    for (const row of rows) {
+      const token = String(row.fcmToken || "").trim();
+      if (token.length < 20) continue;
+      const list = out.get(row.userId) || [];
+      if (!list.includes(token)) list.push(token);
+      out.set(row.userId, list);
+    }
+    for (const uid of userIds) {
+      const list = out.get(uid) || [];
+      out.set(uid, list.slice(0, 8));
+    }
+  } catch (err) {
+    console.warn("[fcm] bulk_token_lookup_failed", { count: userIds.length, err });
+  }
+  return out;
 }
 
 export type FamilyProtectionPushResult = {
@@ -328,6 +344,177 @@ export async function sendOfficePushToUser(
     "vlue-office-push",
     "office_calendar"
   );
+}
+
+/** 관리자 회원 그룹 알림 — 앱 알림 채널(vlue_app_alerts) */
+export async function sendAdminBroadcastPushToUser(
+  userId: string,
+  title: string,
+  body: string,
+  dataPayload?: Record<string, unknown>
+): Promise<FamilyProtectionPushResult> {
+  return sendMulticastPush(
+    userId,
+    title,
+    body,
+    dataPayload,
+    "vlue-admin-broadcast",
+    "vlue_app_alerts"
+  );
+}
+
+export type AdminBroadcastPushBatchResult = {
+  ok: boolean;
+  sent: number;
+  failed: number;
+  usersWithTokens: number;
+  usersWithoutTokens: number;
+  skipped: boolean;
+  reason?: string;
+};
+
+/** 관리자 대량 알림 — 사용자별 토큰을 모아 멀티캐스트(최대 500토큰/회) */
+export async function sendAdminBroadcastPushBatch(
+  userIds: string[],
+  title: string,
+  body: string,
+  dataPayload?: Record<string, unknown>
+): Promise<AdminBroadcastPushBatchResult> {
+  if (!userIds.length) {
+    return {
+      ok: true,
+      sent: 0,
+      failed: 0,
+      usersWithTokens: 0,
+      usersWithoutTokens: 0,
+      skipped: true,
+      reason: "no_users"
+    };
+  }
+
+  const tokenMap = await listFcmTokensForUsers(userIds);
+  let usersWithTokens = 0;
+  let usersWithoutTokens = 0;
+  const tokenOwners = new Map<string, string>();
+  for (const userId of userIds) {
+    const tokens = tokenMap.get(userId) || [];
+    if (!tokens.length) {
+      usersWithoutTokens += 1;
+      continue;
+    }
+    usersWithTokens += 1;
+    for (const token of tokens) {
+      if (!tokenOwners.has(token)) tokenOwners.set(token, userId);
+    }
+  }
+
+  const allTokens = [...tokenOwners.keys()];
+  if (!allTokens.length) {
+    return {
+      ok: true,
+      sent: 0,
+      failed: 0,
+      usersWithTokens: 0,
+      usersWithoutTokens,
+      skipped: true,
+      reason: "no_tokens"
+    };
+  }
+
+  const admin = await ensureFirebaseApp();
+  if (!admin) {
+    return {
+      ok: true,
+      sent: 0,
+      failed: 0,
+      usersWithTokens,
+      usersWithoutTokens,
+      skipped: true,
+      reason: "fcm_not_configured"
+    };
+  }
+
+  const messaging = admin.messaging();
+  const type = String(dataPayload?.type || "vlue-admin-broadcast");
+  const data = stringifyDataPayload(
+    {
+      ...dataPayload,
+      type
+    },
+    title,
+    body
+  );
+  data.channel = "vlue_app_alerts";
+
+  let sent = 0;
+  let failed = 0;
+  const staleByUser = new Map<string, string[]>();
+
+  for (let i = 0; i < allTokens.length; i += 500) {
+    const chunk = allTokens.slice(i, i + 500);
+    const message = {
+      tokens: chunk,
+      data,
+      notification: { title, body },
+      android: {
+        priority: "high" as const,
+        ttl: 86400 * 1000,
+        notification: {
+          channelId: "vlue_app_alerts",
+          sound: "default",
+          priority: "high" as const,
+          defaultVibrateTimings: true
+        }
+      },
+      apns: {
+        headers: { "apns-priority": "10", "apns-push-type": "alert" },
+        payload: { aps: { sound: "default", "content-available": 1 } }
+      }
+    };
+
+    try {
+      const res = await messaging.sendEachForMulticast(message);
+      sent += res.successCount;
+      failed += res.failureCount;
+      res.responses.forEach((item: { success: boolean; error?: { code?: string } }, idx: number) => {
+        if (item.success) return;
+        const code = item.error?.code || "";
+        if (code !== "messaging/registration-token-not-registered" && code !== "messaging/invalid-registration-token") {
+          return;
+        }
+        const token = chunk[idx];
+        const userId = tokenOwners.get(token);
+        if (!userId) return;
+        const list = staleByUser.get(userId) || [];
+        list.push(token);
+        staleByUser.set(userId, list);
+      });
+    } catch (err) {
+      console.warn("[fcm] admin_broadcast_batch_failed", err);
+      failed += chunk.length;
+    }
+  }
+
+  for (const [userId, stale] of staleByUser.entries()) {
+    if (!stale.length) continue;
+    try {
+      await prisma.userDevice.updateMany({
+        where: { userId, fcmToken: { in: stale } },
+        data: { fcmToken: null }
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return {
+    ok: true,
+    sent,
+    failed,
+    usersWithTokens,
+    usersWithoutTokens,
+    skipped: false
+  };
 }
 
 /** 쇼케이스 좋아요·댓글 등 소셜 FCM */
