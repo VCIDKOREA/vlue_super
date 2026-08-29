@@ -74,6 +74,13 @@ async function ensureFirebaseApp(): Promise<FirebaseAdminModule | null> {
   }
 }
 
+/** Railway 등에서 FCM Admin SDK 초기화 가능 여부 (환경 변수 존재만이 아니라 실제 init) */
+export async function isFcmServerReady(): Promise<boolean> {
+  if (process.env.FCM_ENABLED === "0") return false;
+  const admin = await ensureFirebaseApp();
+  return Boolean(admin);
+}
+
 function stringifyDataPayload(
   dataPayload: Record<string, unknown> | undefined,
   title: string,

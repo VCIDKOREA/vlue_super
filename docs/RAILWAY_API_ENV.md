@@ -136,3 +136,39 @@ GET https://<api-host>/api/health
 ```
 
 `{"ok":true,"service":"vlue-api",...}` 이면 정상 기동입니다.
+
+## FCM 푸시 (관리자 회원 알림·쇼케이스·가족보호)
+
+**@vlue/api** 서비스에 Firebase **서비스 계정**이 없으면 알림함 저장은 되지만 **푸시 0 · 서버 FCM 미설정** 이 됩니다.
+
+### 방법 A — 개별 변수 (권장)
+
+Firebase 콘솔 → 프로젝트 설정 → 서비스 계정 → 새 비공개 키(JSON) 다운로드 후:
+
+| Variable | 값 |
+|----------|-----|
+| `FCM_PROJECT_ID` | JSON의 `project_id` (예: `vlue-c6c0b`) |
+| `FCM_CLIENT_EMAIL` | JSON의 `client_email` |
+| `FCM_PRIVATE_KEY` | JSON의 `private_key` 전체. 줄바꿈은 `\n` 으로 이스케이프 |
+
+### 방법 B — JSON 한 줄
+
+| Variable | 값 |
+|----------|-----|
+| `GOOGLE_APPLICATION_CREDENTIALS` | 서비스 계정 JSON **파일 내용 전체** (한 줄, `{` 로 시작) |
+
+Windows 경로(`C:\Users\...\xxx.json`)는 Railway Linux에서 **동작하지 않습니다.**
+
+### USB에서 Railway로 올리기
+
+```powershell
+cd D:\dev
+npx @railway/cli login
+.\sync-fcm-railway.ps1
+```
+
+`apps\api\.env` 의 `GOOGLE_APPLICATION_CREDENTIALS` 경로를 읽어 `@vlue/api` Variables 에 반영합니다.
+
+### 확인
+
+관리자 대시보드 → **상태 점검** → **푸시(FCM)** 가 **정상**이면 발송 가능합니다.
