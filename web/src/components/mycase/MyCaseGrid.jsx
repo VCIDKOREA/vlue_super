@@ -769,10 +769,11 @@ export default function MyCaseGrid({
       {titlePhotoUrl ? (
         <div className="ig-mycase__cover" aria-hidden>
           <img src={titlePhotoUrl} alt="" />
+          <div className="ig-mycase__cover-shade" aria-hidden />
         </div>
       ) : null}
 
-      <div className="ig-mycase__profile">
+      <div className={`ig-mycase__profile${titlePhotoUrl ? " ig-mycase__profile--with-cover" : ""}`}>
           <div className="ig-mycase__profile-row">
             <div
               className={`ig-mycase__avatar-wrap${

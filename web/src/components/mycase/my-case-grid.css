@@ -33,10 +33,35 @@
 .ig-mycase__cover {
   position: relative;
   width: 100%;
-  height: clamp(108px, 24vw, 180px);
+  height: clamp(120px, 28vw, 200px);
   overflow: hidden;
-  background: #fafafa;
+  background: transparent;
   flex-shrink: 0;
+  /* DCC 타이틀 사진과 동일 — 하단이 패널 배경으로 녹아듦 */
+  --ig-cover-feather-mask: linear-gradient(
+    180deg,
+    #000 0%,
+    #000 36%,
+    rgba(0, 0, 0, 0.92) 50%,
+    rgba(0, 0, 0, 0.62) 66%,
+    rgba(0, 0, 0, 0.28) 82%,
+    rgba(0, 0, 0, 0.06) 93%,
+    transparent 100%
+  );
+  --ig-cover-feather-shade: linear-gradient(
+    180deg,
+    transparent 28%,
+    rgba(255, 255, 255, 0.16) 48%,
+    rgba(255, 255, 255, 0.48) 68%,
+    rgba(255, 255, 255, 0.28) 86%,
+    transparent 100%
+  );
+  -webkit-mask-image: var(--ig-cover-feather-mask);
+  mask-image: var(--ig-cover-feather-mask);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
 .ig-mycase__cover img {
@@ -44,7 +69,26 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
+  object-position: center top;
+}
+
+.ig-mycase__cover-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--ig-cover-feather-shade);
+}
+
+.ig-mycase--dark .ig-mycase__cover {
+  --ig-cover-feather-shade: linear-gradient(
+    180deg,
+    transparent 28%,
+    rgba(7, 11, 20, 0.16) 48%,
+    rgba(7, 11, 20, 0.48) 68%,
+    rgba(7, 11, 20, 0.28) 86%,
+    transparent 100%
+  );
 }
 
 .ig-mycase__username {
@@ -97,6 +141,13 @@
 
 .ig-mycase__profile {
   padding: 16px 16px 12px;
+}
+
+.ig-mycase__profile--with-cover {
+  position: relative;
+  z-index: 2;
+  margin-top: -40px;
+  padding-top: 0;
 }
 
 .ig-mycase__profile-row {
