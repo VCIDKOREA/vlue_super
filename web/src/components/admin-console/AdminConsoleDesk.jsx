@@ -18,6 +18,7 @@ import {
   fetchAdminOnboardingStats,
   fetchAdminPosts,
   fetchAdminSignatureSounds,
+  fetchAdminBroadcastAudiences,
   fetchAdminOverdueLines,
   fetchAdminUsers,
   fetchAdminUser,
@@ -25,6 +26,7 @@ import {
   patchAdminUser,
   resolveAdminManualReview,
   reviewAdminEnterpriseDcc,
+  sendAdminBroadcast,
   testAdminNotification,
   testAdminScanner,
   updateAdminNotice,
@@ -39,6 +41,7 @@ const TABS = [
   { id: "agencies", label: "국가기관 DCP" },
   { id: "enterpriseDcc", label: "기업명함 승인" },
   { id: "health", label: "상태 점검" },
+  { id: "broadcast", label: "회원 알림" },
   { id: "pricing", label: "요금제 관리" },
   { id: "signature", label: "Signature Sound" },
   { id: "users", label: "회원 관리" },
@@ -75,6 +78,138 @@ function Table({ columns, rows, emptyLabel = "데이터 없음" }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function MemberBroadcastTab({ onToast }) {
+  const [audiences, setAudiences] = useState([]);
+  const [audience, setAudience] = useState("all");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [category, setCategory] = useState("공지");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await fetchAdminBroadcastAudiences();
+      setAudiences(data.audiences || []);
+    } catch (e) {
+      onToast?.(e?.message || "대상 그룹 조회 실패");
+    }
+  }, [onToast]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const selected = audiences.find((a) => a.id === audience);
+  const send = async () => {
+    if (!title.trim() || !body.trim()) {
+      onToast?.("제목과 내용을 입력해 주세요.");
+      return;
+    }
+    const label = selected?.label || audience;
+    const count = selected?.count ?? "?";
+    const ok = window.confirm(
+      `[${label}] 대상 약 ${count}명에게 알림을 보냅니다.\n\n제목: ${title.trim()}\n\n계속할까요?`
+    );
+    if (!ok) return;
+
+    setBusy(true);
+    try {
+      const result = await sendAdminBroadcast({
+        audience,
+        title: title.trim(),
+        body: body.trim(),
+        category: category.trim() || "공지",
+        confirm: true
+      });
+      const truncated = result.truncated ? ` (상한 ${result.maxSend}명)` : "";
+      onToast?.(
+        `발송 완료 · 대상 ${result.targeted}명 · 알림함 ${result.inboxSaved} · 푸시 ${result.pushSent}${truncated}`
+      );
+      void load();
+    } catch (e) {
+      onToast?.(e?.message || "발송 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[13px] font-black text-slate-800">회원 그룹별 알림 발송</p>
+        <button type="button" onClick={() => void load()} className="rounded-lg bg-slate-100 px-3 py-1.5 text-[12px] font-bold">
+          대상 수 새로고침
+        </button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {audiences.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => setAudience(a.id)}
+            className={`rounded-xl border p-3 text-left transition ${
+              audience === a.id
+                ? "border-blue-500 bg-blue-50 ring-1 ring-blue-200"
+                : "border-slate-200 bg-white hover:border-slate-300"
+            }`}
+          >
+            <p className="text-[12px] font-black text-slate-800">{a.label}</p>
+            <p className="mt-1 text-[18px] font-black text-blue-700">{a.count?.toLocaleString() ?? "—"}명</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <label className="block">
+          <span className="text-[11px] font-black text-slate-500">분류</span>
+          <input
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            maxLength={12}
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
+            placeholder="공지"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[11px] font-black text-slate-500">제목</span>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={120}
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
+            placeholder="알림 제목"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[11px] font-black text-slate-500">내용</span>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            maxLength={1200}
+            rows={5}
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
+            placeholder="알림 본문"
+          />
+        </label>
+        <p className="text-[11px] text-slate-500">
+          선택 그룹: <strong>{selected?.label || "—"}</strong>
+          {selected?.count != null ? ` · 약 ${selected.count.toLocaleString()}명` : null}
+          {" · "}알림함 저장 + 앱 푸시(FCM) · 1회 최대 5,000명
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void send()}
+          className="rounded-lg bg-blue-600 px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50"
+        >
+          {busy ? "발송 중…" : "알림 보내기"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -833,6 +968,7 @@ export default function AdminConsoleDesk({ user, onLogout }) {
         {tab === "agencies" ? <AdminAgencyDcpPanel onToast={showToast} /> : null}
         {tab === "enterpriseDcc" ? <EnterpriseDccAdminTab onToast={showToast} /> : null}
         {tab === "health" ? <HealthTab onToast={showToast} /> : null}
+        {tab === "broadcast" ? <MemberBroadcastTab onToast={showToast} /> : null}
         {tab === "pricing" ? <PricingManagerPanel onToast={showToast} /> : null}
         {tab === "signature" ? <SignatureSoundTab onToast={showToast} /> : null}
         {tab === "users" ? <UsersTab onToast={showToast} /> : null}

@@ -23,6 +23,12 @@ import {
 } from "../services/diagnostics/diagnosticsAdmin.js";
 import { isDiagnosticsRemoteEnabled } from "../services/diagnostics/diagnosticsFeatureFlags.js";
 import {
+  getAdminBroadcastAudienceCounts,
+  sendAdminMemberBroadcast,
+  type AdminBroadcastAudience,
+  ADMIN_BROADCAST_AUDIENCES
+} from "../services/admin/adminMemberBroadcastService.js";
+import {
   createMarketingPopup,
   deleteAdminFeedPost,
   deleteMarketingPopup,
@@ -326,6 +332,44 @@ authed.post("/health/test-notification", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { message?: string };
   const result = await testAdminNotificationBroadcast(String(body.message || "").trim());
   return c.json({ ok: true, ...result });
+});
+
+/** GET /api/admin/console/notifications/broadcast/audiences */
+authed.get("/notifications/broadcast/audiences", async (c) => {
+  const audiences = await getAdminBroadcastAudienceCounts();
+  return c.json({ ok: true, audiences });
+});
+
+/** POST /api/admin/console/notifications/broadcast */
+authed.post("/notifications/broadcast", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    audience?: string;
+    title?: string;
+    body?: string;
+    category?: string;
+    confirm?: boolean;
+  };
+  if (!body.confirm) {
+    return c.json({ error: "발송 확인(confirm)이 필요합니다." }, 400);
+  }
+  const audience = String(body.audience || "") as AdminBroadcastAudience;
+  if (!ADMIN_BROADCAST_AUDIENCES.includes(audience)) {
+    return c.json({ error: "대상 그룹을 선택해 주세요." }, 400);
+  }
+  try {
+    const admin = c.get("adminConsoleUser");
+    const result = await sendAdminMemberBroadcast({
+      audience,
+      title: String(body.title || ""),
+      body: String(body.body || ""),
+      category: body.category,
+      adminUserId: admin.id
+    });
+    return c.json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "발송 실패";
+    return c.json({ error: msg }, 400);
+  }
 });
 
 authed.post("/health/test-scanner", async (c) => {

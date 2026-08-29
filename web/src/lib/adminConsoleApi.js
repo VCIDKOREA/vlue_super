@@ -182,6 +182,22 @@ export async function testAdminNotification(message) {
   return parseJson(res);
 }
 
+export async function fetchAdminBroadcastAudiences() {
+  const res = await fetch(apiUrl("/api/admin/console/notifications/broadcast/audiences"), {
+    headers: adminHeaders()
+  });
+  return parseJson(res);
+}
+
+export async function sendAdminBroadcast({ audience, title, body, category, confirm }) {
+  const res = await fetch(apiUrl("/api/admin/console/notifications/broadcast"), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify({ audience, title, body, category, confirm })
+  });
+  return parseJson(res);
+}
+
 export async function testAdminScanner() {
   const res = await fetch(apiUrl("/api/admin/console/health/test-scanner"), {
     method: "POST",
