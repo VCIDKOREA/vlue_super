@@ -131,7 +131,16 @@ function MemberBroadcastTab({ onToast }) {
           ? ` · 토큰 ${result.pushUsersWithTokens}명`
           : "";
       const skipHint = result.pushSkipReason
-        ? ` · ${result.pushSkipReason === "no_tokens" ? "FCM 토큰 없음" : result.pushSkipReason === "fcm_not_configured" ? "서버 FCM 미설정" : result.pushSkipReason}`
+        ? ` · ${
+            result.pushSkipReason === "no_tokens"
+              ? "FCM 토큰 없음"
+              : result.pushSkipReason === "fcm_not_configured"
+                ? "서버 FCM 미설정"
+                : result.pushSkipReason.includes("private key") ||
+                    result.pushSkipReason.includes("Cannot read")
+                  ? "FCM 초기화 오류"
+                  : result.pushSkipReason
+          }`
         : "";
       onToast?.(
         `발송 완료 · 대상 ${result.targeted}명 · 알림함 ${result.inboxSaved} · 푸시 ${result.pushSent}${tokenHint}${skipHint}${truncated}`

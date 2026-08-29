@@ -5,6 +5,14 @@ type FirebaseAdminModule = typeof import("firebase-admin");
 let adminModule: FirebaseAdminModule | null | undefined;
 let initAttempted = false;
 
+/** Node ESM — firebase-admin(CJS)는 namespace.default 에 실제 모듈이 있음 */
+function resolveFirebaseAdminModule(
+  mod: FirebaseAdminModule & { default?: FirebaseAdminModule }
+): FirebaseAdminModule {
+  if (mod?.default && Array.isArray(mod.default.apps)) return mod.default;
+  return mod;
+}
+
 function resolvePrivateKey(raw: string | undefined): string | undefined {
   let v = String(raw || "").trim();
   if (!v) return undefined;
@@ -39,10 +47,13 @@ async function ensureFirebaseApp(): Promise<FirebaseAdminModule | null> {
   lastFcmInitError = null;
 
   try {
-    const admin = await import("firebase-admin");
+    const imported = await import("firebase-admin");
+    const admin = resolveFirebaseAdminModule(
+      imported as FirebaseAdminModule & { default?: FirebaseAdminModule }
+    );
     adminModule = admin;
 
-    if (admin.apps.length > 0) return admin;
+    if (Array.isArray(admin.apps) && admin.apps.length > 0) return admin;
 
     if (process.env.FCM_ENABLED === "0") {
       console.warn("[fcm] disabled via FCM_ENABLED=0");
