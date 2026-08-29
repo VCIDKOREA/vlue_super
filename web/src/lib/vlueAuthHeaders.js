@@ -1,5 +1,5 @@
 import { apiUrl } from "./apiBase.js";
-import { clientKindHeaders } from "./deviceAuth.js";
+import { clientKindHeaders, getDeviceToken } from "./deviceAuth.js";
 
 export const VLUE_ACCESS_TOKEN_KEY = "vlue_access_token";
 export const VLUE_REFRESH_TOKEN_KEY = "vlue_refresh_token";
@@ -31,22 +31,30 @@ export function clearVlueSessionTokens() {
   }
 }
 
-/** Android 알림 수락/거절용 — WebView 로그인 토큰을 네이티브에 복사 */
+/** Android 알림 수락/거절용 — WebView 로그인 토큰·기기 토큰을 네이티브에 복사 */
 export function syncNativeAuthSession() {
   try {
     const token = getAccessToken();
     let userId = "";
+    let deviceToken = "";
     try {
       userId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
     } catch {
       /* ignore */
     }
+    try {
+      deviceToken = String(getDeviceToken() || "").trim();
+    } catch {
+      /* ignore */
+    }
     if (window.Android?.bindUserSession) {
       window.Android.bindUserSession(userId, token);
+      if (deviceToken) window.Android.bindDeviceToken?.(deviceToken);
       return true;
     }
     if (window.VlueAndroid?.bindUserSession) {
       window.VlueAndroid.bindUserSession(userId, token);
+      if (deviceToken) window.VlueAndroid.bindDeviceToken?.(deviceToken);
       return true;
     }
   } catch {

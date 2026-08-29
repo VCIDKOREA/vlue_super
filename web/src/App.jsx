@@ -918,6 +918,20 @@ function App() {
     };
   }, [isLoggedIn]);
 
+  /** 앱 복귀 시 FCM 토큰·네이티브 세션 재동기화 (백그라운드 푸시 수신률) */
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      syncNativeAuthSession();
+      if (isNativeFcmAvailable()) {
+        void registerNativeFcmPushToken();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [isLoggedIn]);
+
   /** 알림 수락/거절·딥링크 → 앱에서 수락 처리 */
   useEffect(() => {
     if (!isLoggedIn) return undefined;

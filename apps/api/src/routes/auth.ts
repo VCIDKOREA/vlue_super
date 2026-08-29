@@ -932,10 +932,13 @@ authRoutes.post("/devices/fcm-token", requireUserHeader, async (c) => {
       fcmToken?: string;
     };
     const { registerUserDeviceFcmToken } = await import("../services/userDeviceFcm.js");
+    const { detectAuthPlatform } = await import("../lib/authPlatform.js");
+    const platform = detectAuthPlatform({ header: (n) => c.req.header(n) });
     const result = await registerUserDeviceFcmToken(
       uid,
       String(body.deviceToken || ""),
-      String(body.fcmToken || "")
+      String(body.fcmToken || ""),
+      { platform }
     );
     if (!result.ok) return c.json({ error: result.error }, 400);
     return c.json({ ok: true });

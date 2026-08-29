@@ -1,9 +1,11 @@
 package kr.vlue.calloverlay
 
 import android.annotation.SuppressLint
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.ContactsContract
 import android.provider.Settings
@@ -19,6 +21,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import kr.vlue.calloverlay.applock.AppLockStore
 import kr.vlue.calloverlay.applock.PinLockController
 import kr.vlue.calloverlay.family.FamilyPermissionHelper
@@ -90,6 +93,24 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             }
         }
 
+    private val pushNotificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            Log.i(TAG, "POST_NOTIFICATIONS granted=$granted")
+            if (granted) {
+                kr.vlue.calloverlay.push.VlueFcmRegistrar.syncTokenAsync(this, "notif_permission")
+            }
+        }
+
+    private fun ensurePushNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        pushNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -121,8 +142,12 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         VlueFamilyBridge.attachWebView(webView)
         kr.vlue.calloverlay.push.VlueFcmTokenStore.attachWebView(webView)
         Thread {
-            kr.vlue.calloverlay.push.VlueFcmTokenStore.fetchTokenBlocking(this)
+            val token = kr.vlue.calloverlay.push.VlueFcmTokenStore.fetchTokenBlocking(this)
+            if (token.isNotBlank()) {
+                kr.vlue.calloverlay.push.VlueFcmRegistrar.syncTokenAsync(this, "app_start")
+            }
         }.start()
+        ensurePushNotificationPermission()
 
         pinLock = PinLockController(
             activity = this,
@@ -874,11 +899,22 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 userId?.trim()?.ifEmpty { null },
                 accessToken?.trim()?.ifEmpty { null }
             )
+            activity.ensurePushNotificationPermission()
+            kr.vlue.calloverlay.push.VlueFcmRegistrar.syncTokenAsync(activity, "bindUserSession")
+        }
+
+        @android.webkit.JavascriptInterface
+        fun bindDeviceToken(deviceToken: String?) {
+            LetteringPrefs.setDeviceToken(activity, deviceToken)
+            kr.vlue.calloverlay.push.VlueFcmRegistrar.clearUploadCache(activity)
+            kr.vlue.calloverlay.push.VlueFcmRegistrar.syncTokenAsync(activity, "bindDeviceToken")
         }
 
         @android.webkit.JavascriptInterface
         fun clearUserSession() {
             LetteringPrefs.setSession(activity, null, null)
+            LetteringPrefs.setDeviceToken(activity, null)
+            kr.vlue.calloverlay.push.VlueFcmRegistrar.clearUploadCache(activity)
         }
 
         /** 웹 SSE·알림함 → OS 상태바 푸시 (FCM 미등록 기기 보완) */
@@ -923,7 +959,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 val token =
                     kr.vlue.calloverlay.push.VlueFcmTokenStore.fetchTokenBlocking(activity)
                 if (token.isNotBlank()) {
+                    kr.vlue.calloverlay.push.VlueFcmRegistrar.clearUploadCache(activity)
                     kr.vlue.calloverlay.push.VlueFcmTokenStore.notifyWebToken(activity, token)
+                    kr.vlue.calloverlay.push.VlueFcmRegistrar.syncTokenAsync(activity, "refreshFcmToken")
                 }
             }.start()
         }

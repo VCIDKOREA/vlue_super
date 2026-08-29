@@ -6,8 +6,6 @@ import { apiUrl } from "./apiBase.js";
 import { getDeviceToken } from "./deviceAuth.js";
 import { vlueAuthFetch } from "./vlueAuthHeaders.js";
 
-const CACHE_KEY = "vlue_native_fcm_registered_v1";
-
 function readNativeFcmToken() {
   try {
     const t = window.Android?.getFcmToken?.() || window.VlueAndroid?.getFcmToken?.() || "";
@@ -17,6 +15,18 @@ function readNativeFcmToken() {
   }
 }
 
+const CACHE_KEY = "vlue_native_fcm_registered_v1";
+
+function syncNativeDeviceToken() {
+  try {
+    const deviceToken = getDeviceToken();
+    if (!deviceToken) return;
+    window.Android?.bindDeviceToken?.(deviceToken);
+    window.VlueAndroid?.bindDeviceToken?.(deviceToken);
+  } catch {
+    /* ignore */
+  }
+}
 function isAndroidAppShell() {
   try {
     if (window.Android?.getFcmToken || window.Android?.showSystemNotification) return true;
@@ -38,6 +48,8 @@ export async function registerNativeFcmPushToken() {
   if (!isAndroidAppShell()) {
     return { ok: false, skipped: true, reason: "not_android_shell" };
   }
+
+  syncNativeDeviceToken();
 
   let fcmToken = readNativeFcmToken();
   if (fcmToken.length < 20) {
@@ -64,7 +76,9 @@ export async function registerNativeFcmPushToken() {
   }
   const cacheKey = userId ? `${userId}:${fcmToken}` : fcmToken;
   try {
-    if (localStorage.getItem(CACHE_KEY) === cacheKey) {
+    const prev = localStorage.getItem(CACHE_KEY);
+    if (prev === cacheKey) {
+      syncNativeDeviceToken();
       return { ok: true, cached: true };
     }
   } catch {

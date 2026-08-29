@@ -14,10 +14,14 @@ class VlueFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         Log.i(TAG, "onNewToken len=${token.length}")
         VlueFcmTokenStore.save(applicationContext, token)
+        VlueFcmRegistrar.clearUploadCache(applicationContext)
         VlueFcmTokenStore.notifyWebToken(applicationContext, token)
+        VlueFcmRegistrar.syncTokenAsync(applicationContext, "onNewToken")
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
+        VlueSystemNotifier.ensureChannel(applicationContext)
+        kr.vlue.calloverlay.family.FamilyProtectionNotificationHelper.ensureChannel(applicationContext)
         val data = message.data
         val type = data["type"] ?: ""
         val title =
