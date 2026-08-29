@@ -307,7 +307,7 @@ function WebBizcardHubInner({
   /* www #showcase — 미리보기|설정 2열. 명함 설정(edit)은 위에서 처리 */
   if (autoOpenShowcase) {
     return (
-      <div className="space-y-4">
+      <div>
         {floatingToast}
         <ShowcaseStyleSettingsPanel
           layout="webDesk"

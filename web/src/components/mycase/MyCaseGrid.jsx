@@ -28,6 +28,9 @@ import {
 } from "../../lib/showcase/showcaseCover.js";
 import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
+import { buildUserLetteringCard } from "../../lib/letteringBizcardProfile.js";
+import { resolveDccTitlePhotoUrl } from "../../lib/letteringCardNormalize.js";
+import { LETTERING_BIZCARD_CHANGED_EVENT } from "../../lib/letteringBizcardStorage.js";
 import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
 import { readStatusMessage } from "../../lib/vlueAppSettings.js";
 import {
@@ -124,6 +127,7 @@ export default function MyCaseGrid({
   const initialLoadDoneRef = useRef(false);
   const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
   const [styleTick, setStyleTick] = useState(0);
+  const [bizcardTick, setBizcardTick] = useState(0);
   const hasDigitalCard = isMine
     ? readDigitalCardActive()
     : Boolean(remoteProfile?.digitalCardIssued);
@@ -164,9 +168,29 @@ export default function MyCaseGrid({
           remoteProfile?.profile?.photoUrl ||
           remoteProfile?.photoUrl ||
           remoteProfile?.cardExport?.photoUrl ||
-          mainBroadcast[0]?.thumbnailUrl ||
           ""
       ).trim();
+  const titlePhotoUrl = useMemo(() => {
+    if (isMine) {
+      try {
+        return resolveDccTitlePhotoUrl(buildUserLetteringCard());
+      } catch {
+        return "";
+      }
+    }
+    const exp = remoteProfile?.cardExport || {};
+    const prof = remoteProfile?.profile || {};
+    return resolveDccTitlePhotoUrl({
+      ...exp,
+      noTitlePhoto: Boolean(exp.noTitlePhoto),
+      titlePhotoUrl:
+        exp.titlePhotoUrl ||
+        exp.title_photo_url ||
+        prof.titlePhotoUrl ||
+        remoteProfile?.titlePhotoUrl ||
+        ""
+    });
+  }, [isMine, remoteProfile, bizcardTick]);
   const storyOwnerId = isMine ? self.userId : String(ownerUserId || "").trim();
   const hasLiveBroadcast = !accessDenied && mainBroadcast.length > 0;
 
@@ -260,6 +284,17 @@ export default function MyCaseGrid({
     window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onChanged);
     return () => {
       window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onChanged);
+    };
+  }, [isMine]);
+
+  useEffect(() => {
+    if (!isMine) return undefined;
+    const onBizcard = () => setBizcardTick((n) => n + 1);
+    window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onBizcard);
+    window.addEventListener("vlue-digital-card-changed", onBizcard);
+    return () => {
+      window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onBizcard);
+      window.removeEventListener("vlue-digital-card-changed", onBizcard);
     };
   }, [isMine]);
 
@@ -703,37 +738,41 @@ export default function MyCaseGrid({
       aria-label="마이케이스"
       data-theme={isDarkMode ? "dark" : "light"}
     >
-      <div className="ig-mycase__hero">
-        {avatarUrl ? (
-          <>
-            <div className="ig-mycase__hero-bg" aria-hidden>
-              <img src={avatarUrl} alt="" />
-            </div>
-            <div className="ig-mycase__hero-fade" aria-hidden />
-          </>
-        ) : null}
-        <header className="ig-mycase__topbar">
-          <button type="button" className="ig-mycase__icon-btn" onClick={onBack} aria-label="뒤로">
-            <ChevronLeft size={26} strokeWidth={2} />
+      <header className="ig-mycase__topbar">
+        {onBack ? (
+          <button
+            type="button"
+            className="ig-mycase__icon-btn ig-mycase__icon-btn--overlay ig-mycase__icon-btn--left"
+            onClick={onBack}
+            aria-label="뒤로"
+          >
+            <ChevronLeft size={24} strokeWidth={2} />
           </button>
-          <h1 className="ig-mycase__username">{displayHandle}</h1>
-          {isMine ? (
-            <button
-              type="button"
-              className={`ig-mycase__icon-btn${manageMode ? " is-active" : ""}`}
-              aria-label={manageMode ? "송출 관리 종료" : "송출 관리"}
-              aria-pressed={manageMode}
-              title="송출 관리"
-              onClick={() => setManageMode((v) => !v)}
-            >
-              <MoreHorizontal size={22} strokeWidth={2} />
-            </button>
-          ) : (
-            <span className="ig-mycase__icon-btn ig-mycase__icon-btn--spacer" aria-hidden />
-          )}
-        </header>
+        ) : null}
+        <h1 className="ig-mycase__username">{displayHandle}</h1>
+        {isMine ? (
+          <button
+            type="button"
+            className={`ig-mycase__icon-btn ig-mycase__icon-btn--overlay ig-mycase__icon-btn--right${
+              manageMode ? " is-active" : ""
+            }`}
+            aria-label={manageMode ? "송출 관리 종료" : "송출 관리"}
+            aria-pressed={manageMode}
+            title="송출 관리"
+            onClick={() => setManageMode((v) => !v)}
+          >
+            <MoreHorizontal size={22} strokeWidth={2} />
+          </button>
+        ) : null}
+      </header>
 
-        <div className="ig-mycase__profile">
+      {titlePhotoUrl ? (
+        <div className="ig-mycase__cover" aria-hidden>
+          <img src={titlePhotoUrl} alt="" />
+        </div>
+      ) : null}
+
+      <div className="ig-mycase__profile">
           <div className="ig-mycase__profile-row">
             <div
               className={`ig-mycase__avatar-wrap${
@@ -867,7 +906,6 @@ export default function MyCaseGrid({
             </div>
           ) : null}
         </div>
-      </div>
 
       {!accessDenied ? (
         <div className="ig-mycase__highlights" aria-label="메인 송출 하이라이트">
