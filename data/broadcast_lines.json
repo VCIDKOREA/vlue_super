@@ -41,9 +41,24 @@
       "paidAt": "2026-07-25T06:17:30.269Z",
       "merchantUid": "platform_ceo_041eb932-5dc8-4039-ab28-4d24f69e83c9",
       "refundPolicyAgreedAt": "2026-07-25T06:17:30.269Z",
-      "verifiedAt": "2026-07-31T10:27:07.788Z",
+      "verifiedAt": "2026-08-02T16:05:08.675Z",
       "createdAt": "2026-07-25T06:17:30.269Z",
-      "updatedAt": "2026-07-31T10:27:07.788Z"
+      "updatedAt": "2026-08-02T16:05:08.675Z"
+    },
+    {
+      "userId": "13c75cbe-206b-4eed-82d2-a54c7bc80c9c",
+      "phoneE164": "+821080144666",
+      "phoneVerified": true,
+      "broadcastEnabled": true,
+      "status": "active",
+      "billingCycle": "monthly",
+      "amountKrw": 0,
+      "paidAt": "2026-08-05T11:50:41.403Z",
+      "merchantUid": "platform_ceo_13c75cbe-206b-4eed-82d2-a54c7bc80c9c",
+      "refundPolicyAgreedAt": "2026-08-05T11:50:41.403Z",
+      "verifiedAt": "2026-08-06T03:00:39.043Z",
+      "createdAt": "2026-08-05T11:50:41.403Z",
+      "updatedAt": "2026-08-06T03:00:39.043Z"
     }
   ]
 }

@@ -17,6 +17,6 @@
 - **admin** 만 `/api/admin/console`, `/api/admin/hq` 접근
 - **ceo** 는 일반 회원 로그인만 — 관리 콘솔/HQ 거부 (`CEO_NOT_SYSTEM_ADMIN`)
 
-시드 시각: 2026-07-24T10:19:29.605Z
-admin userId: 0ca6ad09-c39c-4bce-809d-a7090db707fc
-ceo userId: 041eb932-5dc8-4039-ab28-4d24f69e83c9
+시드 시각: 2026-08-05T09:08:17.356Z
+admin userId: 6393e24a-c05c-4d0d-b175-6e54fc6fe51c
+ceo userId: 13c75cbe-206b-4eed-82d2-a54c7bc80c9c

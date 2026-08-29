@@ -795,7 +795,7 @@ class CallOverlayService : Service() {
             container.alpha = 1f
             container.translationY = 0f
         } else {
-            container.alpha = 0f
+        container.alpha = 0f
             container.translationY = if (fromBottom) 120f else -120f
         }
         val attachPhase = if (asBigPush) "BIG_PUSH" else "SHOWCASE"
@@ -956,11 +956,11 @@ class CallOverlayService : Service() {
                 reactHint = "bigPush immediate alpha=1 webView=${webView != null}"
             )
         } else {
-            container.animate()
-                .alpha(1f)
-                .translationY(0f)
-                .setDuration(320)
-                .setInterpolator(DecelerateInterpolator())
+        container.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(320)
+            .setInterpolator(DecelerateInterpolator())
                 .withEndAction {
                     CompanionPerfTracker.recordAnimationMs(
                         (android.os.SystemClock.elapsedRealtime() - animStart).coerceAtLeast(0L)
@@ -971,7 +971,7 @@ class CallOverlayService : Service() {
                         reactHint = "post-animate alpha=${rootContainer?.alpha} webView=${webView != null}"
                     )
                 }
-                .start()
+            .start()
         }
     }
 
@@ -2649,10 +2649,10 @@ class CallOverlayService : Service() {
         val view = rootContainer ?: return
         val params = layoutParams ?: return
         params.gravity = Gravity.TOP or Gravity.START
-        params.width = WindowManager.LayoutParams.MATCH_PARENT
+                params.width = WindowManager.LayoutParams.MATCH_PARENT
         params.height = WindowManager.LayoutParams.MATCH_PARENT
         params.x = 0
-        params.y = 0
+                params.y = 0
         @Suppress("DEPRECATION")
         params.flags = (
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
@@ -2769,7 +2769,7 @@ class CallOverlayService : Service() {
         val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
         val topY = topBigPushOffsetY()
         /* TOP|START 고정 — 드래그/피크가 BOTTOM gravity 와 충돌하지 않게 */
-        params.gravity = Gravity.TOP or Gravity.START
+                params.gravity = Gravity.TOP or Gravity.START
         if (bigPushPeeking) {
             val keep = dp(32)
             val peekH = dp(112)
@@ -2780,8 +2780,8 @@ class CallOverlayService : Service() {
                 params.y = compactBarY(pos, peekH, sh)
             }
             applyBigPushPeekChrome(onRight = bigPushPeekOnRight)
-        } else {
-            params.width = WindowManager.LayoutParams.MATCH_PARENT
+            } else {
+                params.width = WindowManager.LayoutParams.MATCH_PARENT
             params.height = barH
             params.x = 0
             params.y = compactBarY(pos, barH, sh)

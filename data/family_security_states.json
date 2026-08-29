@@ -51,9 +51,50 @@
       "securityHealth": "ok",
       "openThreatCount": 0,
       "devicePlatform": "android",
-      "logHash": "636ba0baec6f26979c1b6e72609bd13b1599ecff129e7189c84c9da3285791f0",
-      "prevLogHash": "9a44b7c2828e9595a94ec96b584b6dfc9b981af293fff7d43f749881aab2bb9a",
-      "updatedAt": "2026-07-31T11:07:43.073Z"
+      "logHash": "e3089362df9a641de46c1e371a52ea64b08f57c5ca3803f44a3934bbb79c07e7",
+      "prevLogHash": "1501931abc27146f21327ef3c0be29e3277187f215ef1cd5cba5882ede3b69d5",
+      "updatedAt": "2026-08-02T16:05:06.141Z"
+    },
+    {
+      "userId": "114c0a2b-332e-44eb-ba5b-4334937d18f1",
+      "batteryPercent": 100,
+      "isCharging": false,
+      "securityHealth": "ok",
+      "openThreatCount": 0,
+      "devicePlatform": "android",
+      "logHash": "eb6bb5ab457718ab40f8662945a2976b0b70c50d83f169cad96400c67bfec8ef",
+      "updatedAt": "2026-08-05T12:20:56.714Z"
+    },
+    {
+      "userId": "d08ba57c-090f-4159-beff-2e6df67a4c1c",
+      "batteryPercent": 100,
+      "isCharging": false,
+      "securityHealth": "ok",
+      "openThreatCount": 0,
+      "devicePlatform": "android",
+      "logHash": "a6c979574d7cd4f5efdd6bcc2314e145c0ba90cdeaab20dbf40950cde250b420",
+      "updatedAt": "2026-08-05T12:21:24.960Z"
+    },
+    {
+      "userId": "e3d2ee11-095d-4eaf-a7e7-63601857ee4e",
+      "batteryPercent": 100,
+      "isCharging": false,
+      "securityHealth": "ok",
+      "openThreatCount": 0,
+      "devicePlatform": "android",
+      "logHash": "7ce09738c6093fb06a8fb7f1cdf7ca19c2b5bb00f53ce5449f75eb5895c14c07",
+      "updatedAt": "2026-08-05T12:21:43.326Z"
+    },
+    {
+      "userId": "13c75cbe-206b-4eed-82d2-a54c7bc80c9c",
+      "batteryPercent": 100,
+      "isCharging": false,
+      "securityHealth": "ok",
+      "openThreatCount": 0,
+      "devicePlatform": "android",
+      "logHash": "686b4ac45543103fbf2e2c64d9222a7e590e0341ec9580caae800a17bb38cbfe",
+      "prevLogHash": "c40e5d32119318bf1c8e2b60d1b3459f7d681fa1682f91a6a824cc685204a8b6",
+      "updatedAt": "2026-08-06T03:00:36.347Z"
     }
   ]
 }

@@ -297,9 +297,9 @@ export function ShowcaseBgmProvider({ children }) {
       /* 이미 같은 곡이 재생 중이면 load()/seek 하지 않음 — 미리듣기가 1초 만에 끊기던 주원인 */
       if (!alreadyPlaying) {
         if (!sameSrc) {
-          el.src = bgmUrl;
+      el.src = bgmUrl;
           try {
-            el.load();
+      el.load();
           } catch {
             /* ignore */
           }
@@ -328,7 +328,7 @@ export function ShowcaseBgmProvider({ children }) {
 
     const tryPlay = () => {
       el.volume = Math.max(0, Math.min(1, volumeGain));
-      el.play().catch(() => undefined);
+    el.play().catch(() => undefined);
     };
     tryPlay();
     el.addEventListener("canplay", tryPlay, { once: true });
@@ -464,8 +464,8 @@ export function ShowcaseBgmProvider({ children }) {
       }
     }
       if (next === "replay" || next === "preview" || next === "settings_preview") {
-        setTouchUnlocked(true);
-        setUserMuted(false);
+      setTouchUnlocked(true);
+      setUserMuted(false);
         const cfg = styleConfigRef.current;
         const url = resolveUrlFromConfig(cfg, playKey || "live", playIndex);
         if (url) {
