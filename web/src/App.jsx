@@ -4994,6 +4994,8 @@ function App() {
         <MyCaseScreen
           onGoMain={goBackStep}
           isDarkMode={isDarkMode}
+          showcasePickEnabled
+          showLineSwitcher
           onToast={(msg) => {
             setBottomToast(msg);
             setTimeout(() => setBottomToast(""), 2800);

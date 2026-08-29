@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
+import { DCC_PROFILE_PHOTO_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
 import {
   createDccAgentProfile,
   deleteDccAgentProfile,
@@ -283,6 +284,7 @@ export default function DccAgentManageModal({
                       }}
                     />
                   </label>
+                  <p className="dcc-agent-form__photo-hint">{DCC_PROFILE_PHOTO_IMAGE_GUIDE.uploadHint}</p>
                 </div>
                 <div className="dcc-agent-form__actions">
                   <button type="button" className="is-ghost" onClick={() => setFormOpen(false)} disabled={busy}>

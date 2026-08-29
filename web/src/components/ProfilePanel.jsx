@@ -20,6 +20,7 @@ import { isBillableMembershipKind, normalizeMembershipKind } from "../lib/member
 import { pricingNumbers } from "../lib/pricingConfig.js";
 import { probeEnterpriseSidebarAccess } from "../lib/enterpriseLineManageAccess.js";
 import { fileToFittedAvatarDataUrl, readProfilePhotoAvatar, writeAvatar, scrubBrandAvatarsFromStorage } from "../lib/vlueAvatar.js";
+import { AVATAR_IMAGE_GUIDE } from "../lib/fitImageFile.js";
 import UserProfileAvatar from "./UserProfileAvatar.jsx";
 import { getMemberHandle, getProfileHeaderName } from "../lib/memberCardStorage.js";
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
@@ -1128,6 +1129,9 @@ function ProfilePanel({
             <p className={`text-[12px] font-black ${headText}`}>프로필 이미지</p>
             <p className={`mt-0.5 text-[10px] ${subText}`}>
               프로필 사진은 헤더·쇼케이스·마이케이스에 함께 반영됩니다. 회사 로고는 디지털인증명함 설정에서 바꿔 주세요.
+            </p>
+            <p className={`mt-1 text-[10px] leading-snug ${subText}`} style={{ wordBreak: "keep-all" }}>
+              {AVATAR_IMAGE_GUIDE.uploadHint}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <label className={`cursor-pointer rounded-lg border px-2 py-1.5 text-[10px] font-bold ${isDarkMode ? "border-white/20 text-gray-200" : "border-gray-200 text-gray-700"}`}>

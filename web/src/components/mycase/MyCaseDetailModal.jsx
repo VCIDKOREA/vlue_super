@@ -1,167 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
-import LetteringIncomingNotification from "../LetteringIncomingNotification.jsx";
-import { readDigitalCardActive, readDccBroadcastOn, readMembershipTier } from "../../lib/bizcardAccountSync.js";
-import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
-import {
-  createDefaultShowcaseStyle,
-  readShowcaseStyle
-} from "../../lib/showcase/showcaseStyleStorage.js";
-import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
+import MyCaseIgPostViewer from "./MyCaseIgPostViewer.jsx";
+import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { fetchMycaseDetail } from "../../lib/mycaseApi.js";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
 import { trackShowcaseView } from "../../lib/productMetrics.js";
 import "./my-case-detail.css";
+import "./my-case-ig-post.css";
 
 function readPreviewIdentity() {
   let name = "";
-  let phone = "";
   let handle = "";
-  let org = "";
   try {
     name = String(localStorage.getItem("vlue_legal_name") || "").trim();
-    phone = String(localStorage.getItem("myCardPhone") || localStorage.getItem("vlue_phone_e164") || "").trim();
     handle = String(localStorage.getItem("vlue_member_handle") || "")
       .replace(/^@/, "")
       .trim();
-    org = String(localStorage.getItem("vlue_company_locked") || "").trim();
   } catch {
     /* ignore */
   }
-  return { name: name || handle || "VLUE", phone, handle, org };
-}
-
-function buildPreviewCard({ item, detail, owner, selfIdentity, peerIdentity, membershipTier, includeDigitalCard }) {
-  let userId = "";
-  try {
-    userId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
-  } catch {
-    /* ignore */
-  }
-
-  const payload = detail?.item?.payloadJson || item?.payloadJson || {};
-  const fromStyle = payload?.style;
-  let style = createDefaultShowcaseStyle();
-  if (fromStyle && typeof fromStyle === "object") {
-    style = { ...style, ...fromStyle };
-  } else if (owner) {
-    try {
-      style = readShowcaseStyle();
-    } catch {
-      /* ignore */
-    }
-  }
-
-  const identity = owner
-    ? selfIdentity
-    : {
-        name: String(peerIdentity?.name || item?.title || "VLUE").trim() || "VLUE",
-        phone: String(peerIdentity?.phone || "").trim(),
-        handle: String(peerIdentity?.handle || "").replace(/^@/, "").trim(),
-        org: String(peerIdentity?.organization || "").trim()
-      };
-  const photoUrl = String(peerIdentity?.photoUrl || item?.thumbnailUrl || "").trim();
-  const logoUrl = String(peerIdentity?.logoUrl || "").trim();
-  const base = {
-    name: identity.name,
-    displayName: identity.name,
-    phone: identity.phone,
-    organization: identity.org,
-    membershipTier,
-    showcaseStyle: style,
-    photoUrl: owner ? "" : photoUrl,
-    image_url: owner ? "" : photoUrl,
-    logoUrl: owner ? "" : logoUrl,
-    publicHandle: identity.handle,
-    loginId: identity.handle,
-    activityName: identity.name,
-    userId: owner ? userId : String(peerIdentity?.userId || item?.ownerUserId || ""),
-    ownerUserId: owner ? userId : String(peerIdentity?.userId || item?.ownerUserId || "")
-  };
-  return {
-    card: applyShowcaseStyleToCard(base, membershipTier, {
-      style,
-      digitalCardActive: Boolean(includeDigitalCard),
-      peerMode: !owner
-    }),
-    identity
-  };
-}
-
-function FeedSlide({
-  item,
-  detail,
-  loading,
-  owner,
-  selfIdentity,
-  peerIdentity,
-  membershipTier,
-  includeDigitalCard,
-  suppressBgm,
-  onToast,
-  active
-}) {
-  const { card, identity } = useMemo(
-    () =>
-      buildPreviewCard({
-        item,
-        detail,
-        owner,
-        selfIdentity,
-        peerIdentity,
-        membershipTier,
-        includeDigitalCard
-      }),
-    [item, detail, owner, selfIdentity, peerIdentity, membershipTier, includeDigitalCard]
-  );
-
-  if (!active) {
-    return <div className="my-case-feed__slide-inner my-case-feed__slide-inner--idle" aria-hidden />;
-  }
-
-  if (loading && !detail) {
-    return (
-      <div className="my-case-feed__slide-inner my-case-feed__slide-inner--loading">
-        <p>불러오는 중…</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="my-case-feed__slide-inner">
-      <div className="my-case-detail__broadcast-shell lettering-showcase-fs lettering-showcase-fs--history-embed">
-        <div className="lettering-showcase-fs__shell">
-          <LetteringIncomingNotification
-            className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--mycase-feed"
-            verified
-            previewMode
-            showOwnerSettings={false}
-            hideUnverifiedFooter
-            callPhase="connected"
-            platform="android"
-            isRecording={false}
-            callDurationSec={0}
-            recordingDurationSec={0}
-            incomingNumber={identity.phone}
-            savedContactName={identity.name}
-            isKnownContact
-            card={card}
-            includeDigitalCard={Boolean(includeDigitalCard)}
-            suppressBgm={suppressBgm}
-            expanded
-            onExpandedChange={() => {}}
-            onEndCall={() => {}}
-            onToast={onToast}
-          />
-        </div>
-      </div>
-    </div>
-  );
+  return { name: name || handle || "VLUE", handle: handle || "mycase" };
 }
 
 /**
- * 마이케이스 게시물 뷰어 — 인스타형 상·하 스와이프로 계정 게시물 연속 열람
- * suppressBgm=true 이면 케이스함 BGM을 끊지 않음
+ * 마이케이스 게시물 뷰어 — DCC 없이 쇼케이스·피드만 (인스타형)
  */
 export default function MyCaseDetailModal({
   open,
@@ -171,10 +34,12 @@ export default function MyCaseDetailModal({
   startIndex = 0,
   isOwner = false,
   peerIdentity = null,
-  suppressBgm = false,
+  layout = "mobile",
+  showcasePickEnabled = false,
   onClose,
   onToast
 }) {
+  const isDesktop = layout === "desktop";
   const feed = useMemo(() => {
     const list = Array.isArray(feedItems) && feedItems.length ? feedItems : item ? [item] : [];
     return list.filter((x) => x && x.id);
@@ -201,16 +66,15 @@ export default function MyCaseDetailModal({
 
   const owner = Boolean(isOwner || detail?.isOwner);
   const selfIdentity = useMemo(() => readPreviewIdentity(), [open]);
-  const membershipTier = useMemo(() => {
-    if (!owner && peerIdentity?.membershipTier) return peerIdentity.membershipTier;
-    return readMembershipTier();
-  }, [open, owner, peerIdentity]);
-
-  const includeDigitalCard = useMemo(() => {
-    if (!isPaidLetteringTier(membershipTier)) return false;
-    if (owner) return readDigitalCardActive() && readDccBroadcastOn();
-    return Boolean(peerIdentity?.digitalCardIssued);
-  }, [owner, membershipTier, peerIdentity, open]);
+  const displayName = owner
+    ? selfIdentity.name
+    : String(peerIdentity?.name || item?.title || "VLUE").trim() || "VLUE";
+  const displayHandle = owner
+    ? selfIdentity.handle
+    : String(peerIdentity?.handle || "").replace(/^@/, "").trim() || displayName;
+  const avatarUrl = owner
+    ? readProfilePhotoAvatar()
+    : String(peerIdentity?.photoUrl || item?.thumbnailUrl || "").trim();
 
   useEffect(() => {
     if (!open) return;
@@ -220,51 +84,54 @@ export default function MyCaseDetailModal({
       if (id && detail) return { ...prev, [id]: detail };
       return prev;
     });
-    ignoreScrollRef.current = true;
-    requestAnimationFrame(() => {
-      const root = scrollerRef.current;
-      if (root) {
-        const h = root.clientHeight || 1;
-        root.scrollTop = initialIdx * h;
-      }
-      window.setTimeout(() => {
-        ignoreScrollRef.current = false;
-      }, 80);
-    });
-  }, [open, initialIdx, item?.id, detail]);
-
-  const ensureDetail = useCallback(async (feedItem) => {
-    const id = String(feedItem?.id || "").trim();
-    if (!id) return;
-    /* 라이브 스타일 합성 항목 — API detail 불필요 */
-    if (feedItem?.isLiveStyle || id.startsWith("live-style-")) {
-      setDetailCache((prev) => ({
-        ...prev,
-        [id]: prev[id] || { ok: true, item: feedItem, isOwner: Boolean(isOwner) }
-      }));
-      return;
-    }
-    if (detailCacheRef.current[id] || fetchingRef.current.has(id)) return;
-    fetchingRef.current.add(id);
-    setLoadingIds((prev) => ({ ...prev, [id]: true }));
-    try {
-      const res = await fetchMycaseDetail(id);
-      if (res.ok) {
-        setDetailCache((prev) => ({ ...prev, [id]: res }));
-      }
-    } finally {
-      fetchingRef.current.delete(id);
-      setLoadingIds((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
+    if (!isDesktop) {
+      ignoreScrollRef.current = true;
+      requestAnimationFrame(() => {
+        const root = scrollerRef.current;
+        if (root) {
+          const h = root.clientHeight || 1;
+          root.scrollTop = initialIdx * h;
+        }
+        window.setTimeout(() => {
+          ignoreScrollRef.current = false;
+        }, 80);
       });
     }
-  }, [isOwner]);
+  }, [open, initialIdx, item?.id, detail, isDesktop]);
+
+  const ensureDetail = useCallback(
+    async (feedItem) => {
+      const id = String(feedItem?.id || "").trim();
+      if (!id) return;
+      if (feedItem?.isLiveStyle || id.startsWith("live-style-")) {
+        setDetailCache((prev) => ({
+          ...prev,
+          [id]: prev[id] || { ok: true, item: feedItem, isOwner: Boolean(isOwner) }
+        }));
+        return;
+      }
+      if (detailCacheRef.current[id] || fetchingRef.current.has(id)) return;
+      fetchingRef.current.add(id);
+      setLoadingIds((prev) => ({ ...prev, [id]: true }));
+      try {
+        const res = await fetchMycaseDetail(id);
+        if (res.ok) {
+          setDetailCache((prev) => ({ ...prev, [id]: res }));
+        }
+      } finally {
+        fetchingRef.current.delete(id);
+        setLoadingIds((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+    },
+    [isOwner]
+  );
 
   useEffect(() => {
     if (!open || !feed.length) return;
-    /* 이웃 ±1 prefetch 금지 — 현재 아이템만 detail GET (Pooler egress) */
     const current = feed[index];
     if (current) void ensureDetail(current);
   }, [open, feed, index, ensureDetail]);
@@ -275,11 +142,11 @@ export default function MyCaseDetailModal({
     trackShowcaseView(isOwner ? "mycase_detail" : "peer_case_detail", ownerId);
     const onKey = (e) => {
       if (e.key === "Escape") onClose?.();
-      if (e.key === "ArrowDown" || e.key === "PageDown") {
+      if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === "ArrowRight") {
         e.preventDefault();
         setIndex((i) => Math.min(feed.length - 1, i + 1));
       }
-      if (e.key === "ArrowUp" || e.key === "PageUp") {
+      if (e.key === "ArrowUp" || e.key === "PageUp" || e.key === "ArrowLeft") {
         e.preventDefault();
         setIndex((i) => Math.max(0, i - 1));
       }
@@ -294,7 +161,7 @@ export default function MyCaseDetailModal({
   }, [open, onClose, feed.length, item?.ownerUserId, peerIdentity?.userId, isOwner]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || isDesktop) return;
     const root = scrollerRef.current;
     if (!root) return;
     ignoreScrollRef.current = true;
@@ -303,10 +170,10 @@ export default function MyCaseDetailModal({
     window.setTimeout(() => {
       ignoreScrollRef.current = false;
     }, 320);
-  }, [index, open]);
+  }, [index, open, isDesktop]);
 
   const onScroll = () => {
-    if (ignoreScrollRef.current) return;
+    if (ignoreScrollRef.current || isDesktop) return;
     const root = scrollerRef.current;
     if (!root) return;
     const h = root.clientHeight || 1;
@@ -316,15 +183,69 @@ export default function MyCaseDetailModal({
 
   if (!open || !feed.length) return null;
 
+  const currentItem = feed[index];
+  const currentDetail = detailCache[currentItem?.id] || null;
+  const loading = Boolean(loadingIds[currentItem?.id]);
+
+  const viewerProps = {
+    item: currentItem,
+    detail: currentDetail,
+    owner,
+    displayName,
+    displayHandle,
+    avatarUrl,
+    onClose,
+    onToast,
+    showcasePickEnabled: showcasePickEnabled && owner
+  };
+
+  if (isDesktop) {
+    return (
+      <div className="my-case-ig-overlay" role="presentation">
+        <div className="my-case-ig-overlay__frame">
+          {index > 0 ? (
+            <button
+              type="button"
+              className="my-case-ig-overlay__post-nav my-case-ig-overlay__post-nav--prev"
+              onClick={() => setIndex((i) => Math.max(0, i - 1))}
+              aria-label="이전 게시물"
+            >
+              <ChevronLeft size={28} />
+            </button>
+          ) : null}
+          {index < feed.length - 1 ? (
+            <button
+              type="button"
+              className="my-case-ig-overlay__post-nav my-case-ig-overlay__post-nav--next"
+              onClick={() => setIndex((i) => Math.min(feed.length - 1, i + 1))}
+              aria-label="다음 게시물"
+            >
+              <ChevronRight size={28} />
+            </button>
+          ) : null}
+          {loading && !currentDetail ? (
+            <div className="my-case-ig-post my-case-ig-post--modal">
+              <div className="my-case-ig-post__empty" style={{ padding: 48 }}>
+                불러오는 중…
+              </div>
+            </div>
+          ) : (
+            <MyCaseIgPostViewer {...viewerProps} variant="modal" />
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <AppFullScreenView
       open={open}
       onClose={onClose}
       title=""
       hideHeader
-      showFloatingClose
+      showFloatingClose={false}
       coverBottomNav
-      className="my-case-detail my-case-detail--broadcast bg-[#0B101B]"
+      className="my-case-detail my-case-detail--broadcast bg-black"
     >
       <div
         ref={scrollerRef}
@@ -342,19 +263,28 @@ export default function MyCaseDetailModal({
               className="my-case-feed__slide"
               aria-label={`${i + 1} / ${feed.length}`}
             >
-              <FeedSlide
-                item={feedItem}
-                detail={cached}
-                loading={Boolean(loadingIds[feedItem.id])}
-                owner={owner || Boolean(cached?.isOwner)}
-                selfIdentity={selfIdentity}
-                peerIdentity={peerIdentity}
-                membershipTier={membershipTier}
-                includeDigitalCard={includeDigitalCard}
-                suppressBgm={suppressBgm}
-                onToast={onToast}
-                active={active}
-              />
+              {active ? (
+                loadingIds[feedItem.id] && !cached ? (
+                  <div className="my-case-feed__slide-inner my-case-feed__slide-inner--loading">
+                    <p>불러오는 중…</p>
+                  </div>
+                ) : (
+                  <MyCaseIgPostViewer
+                    item={feedItem}
+                    detail={cached}
+                    owner={owner || Boolean(cached?.isOwner)}
+                    displayName={displayName}
+                    displayHandle={displayHandle}
+                    avatarUrl={avatarUrl}
+                    onClose={onClose}
+                    onToast={onToast}
+                    showcasePickEnabled={showcasePickEnabled && (owner || Boolean(cached?.isOwner))}
+                    variant="fullscreen"
+                  />
+                )
+              ) : (
+                <div className="my-case-feed__slide-inner my-case-feed__slide-inner--idle" aria-hidden />
+              )}
               {feed.length > 1 ? (
                 <p className="my-case-feed__counter" aria-hidden>
                   {i + 1}/{feed.length}

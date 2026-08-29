@@ -1,0 +1,119 @@
+.my-case-pick-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid #dbdbdb;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.my-case-pick-tray--sidebar {
+  position: sticky;
+  top: 80px;
+  width: 200px;
+  flex-shrink: 0;
+}
+
+.my-case-pick-tray--sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+  z-index: 45;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.12);
+  max-height: 42vh;
+}
+
+.my-case-pick-tray__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.my-case-pick-tray__count {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0095f6;
+}
+
+.my-case-pick-tray__hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #8e8e8e;
+  word-break: keep-all;
+}
+
+.my-case-pick-tray__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.my-case-pick-tray--sheet .my-case-pick-tray__list {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding-bottom: 4px;
+}
+
+.my-case-pick-tray__item {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f3f4f6;
+  flex-shrink: 0;
+}
+
+.my-case-pick-tray__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.my-case-pick-tray__item--empty {
+  border: 1px dashed #d1d5db;
+}
+
+.my-case-pick-tray__order {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 1;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.my-case-pick-tray__done {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px;
+  background: #0095f6;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.my-case-pick-tray__done:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

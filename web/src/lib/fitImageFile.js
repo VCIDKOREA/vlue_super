@@ -70,7 +70,59 @@ export const SHOWCASE_CALL_IMAGE_GUIDE = {
   aspectLabel: "9:16",
   safeZoneHint:
     "하단은 키패드·음소거·스피커·통화종료 버튼에 가려질 수 있어요. 상품·문구는 위쪽 ⅔에 두세요.",
-  sizeHint: "권장 1080×1920px (9:16) · 최대 1920×2560px"
+  sizeHint: "권장 1080×1920px (9:16) · 최대 1920×2560px",
+  uploadHint:
+    "PNG, JPG, WEBP · 권장 1080×1920px (9:16) · 최대 1920×2560px · 초과 시 자동 맞춤 · 중요 내용은 위쪽 ⅔"
+};
+
+/** DCC·명함 프로필 사진 (photo kind) */
+export const DCC_PROFILE_PHOTO_IMAGE_GUIDE = {
+  recommendWidthPx: IMAGE_FIT_PHOTO.maxWidth,
+  recommendHeightPx: IMAGE_FIT_PHOTO.maxHeight,
+  aspectLabel: "1:1",
+  sizeHint: "권장 1920×1920px (1:1 정사각) · 최대 1920×1920px",
+  uploadHint:
+    "PNG, JPG, WEBP · 권장 1920×1920px (1:1 정사각) · 최대 900KB · 초과 시 자동 맞춤 · 원형 표시, 얼굴은 중앙"
+};
+
+/** DCC 타이틀 사진 · 케이스함 상단 배너 (photo kind, 가로 크롭) */
+export const DCC_TITLE_PHOTO_IMAGE_GUIDE = {
+  recommendWidthPx: 1920,
+  recommendHeightPx: 600,
+  aspectLabel: "가로형",
+  sizeHint: "권장 1920×600px 전후 가로형 · 최대 1920×1920px",
+  uploadHint:
+    "PNG, JPG, WEBP · 권장 1920×600px 전후 가로형 · 최대 900KB · 초과 시 자동 맞춤 · 중요 피사체는 위쪽(초점)"
+};
+
+/** DCC·쇼케이스 링크 회사 로고 (logo kind) */
+export const DCC_LOGO_IMAGE_GUIDE = {
+  recommendWidthPx: IMAGE_FIT_LOGO.maxWidth,
+  recommendHeightPx: IMAGE_FIT_LOGO.maxHeight,
+  aspectLabel: "1:1",
+  sizeHint: "권장 512×512px (1:1) · 최대 512×512px",
+  uploadHint:
+    "PNG, JPG, WEBP · 권장 512×512px (1:1, PNG 투명 권장) · 최대 400KB · 초과 시 자동 맞춤"
+};
+
+/** 앱 프로필 패널·VLUE PAGE (avatar kind) */
+export const AVATAR_IMAGE_GUIDE = {
+  recommendWidthPx: IMAGE_FIT_AVATAR.maxWidth,
+  recommendHeightPx: IMAGE_FIT_AVATAR.maxHeight,
+  aspectLabel: "1:1",
+  sizeHint: "권장 1200×1200px (1:1) · 최대 1200×1200px",
+  uploadHint:
+    "PNG, JPG, WEBP · 권장 1200×1200px (1:1) · 최대 700KB · 초과 시 자동 맞춤 · 얼굴은 중앙"
+};
+
+/** 카카오 피드·OG 커버 (cover kind) */
+export const COVER_IMAGE_GUIDE = {
+  recommendWidthPx: IMAGE_FIT_COVER.maxWidth,
+  recommendHeightPx: IMAGE_FIT_COVER.maxHeight,
+  aspectLabel: "1:1",
+  sizeHint: "권장 1600×1600px (1:1) · 최대 1600×1600px",
+  uploadHint:
+    "PNG, JPG, WEBP · 권장 1600×1600px (1:1) · 최대 800KB · 초과 시 자동 맞춤"
 };
 
 /** 채팅 전송 이미지 */

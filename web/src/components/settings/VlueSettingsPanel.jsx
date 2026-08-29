@@ -19,6 +19,7 @@ import {
   LETTERING_PHOTO_RULES,
   prepareLetteringPhotoFromFile
 } from "../../lib/letteringBizcardStorage.js";
+import { DCC_PROFILE_PHOTO_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
 
 import {
   SettingsSection,
@@ -108,7 +109,7 @@ function ProfilePhotoManageBlock({ isDarkMode, showSettingNotice }) {
     <div className="mb-4">
       <p className={`text-[11px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>프로필 사진</p>
       <p className={`mt-0.5 text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-        {LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB · 초과 시 자동 맞춤 · DCC 미사용 회원도 등록 가능
+        {DCC_PROFILE_PHOTO_IMAGE_GUIDE.uploadHint} · DCC 미사용 회원도 등록 가능
       </p>
       <div className={`mt-2 flex items-center gap-3${noPhoto ? " opacity-40" : ""}`}>
         <span className={tile}>

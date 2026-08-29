@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, Loader2, Settings2 } from "lucide-react";
 import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
+import { DCC_PROFILE_PHOTO_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
 import { agentOptionLabel } from "../../lib/dccAgentProfileState.js";
 import {
   readDccLinePreview,
@@ -284,6 +285,7 @@ export default function DccLineSwitcher({
           }}
         />
       </label>
+      <p className="dcc-agent-form__photo-hint">{DCC_PROFILE_PHOTO_IMAGE_GUIDE.uploadHint}</p>
     </div>
   ) : null;
 

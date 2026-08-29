@@ -1,0 +1,122 @@
+.my-case-composer {
+  padding: 16px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.my-case-composer__cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.my-case-composer__cat {
+  border: 1px solid #dbdbdb;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  cursor: pointer;
+}
+
+.my-case-composer__cat.is-active {
+  border-color: #0095f6;
+  background: rgba(0, 149, 246, 0.08);
+  color: #0095f6;
+}
+
+.my-case-composer__label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #262626;
+}
+
+.my-case-composer__label textarea {
+  border: 1px solid #dbdbdb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.my-case-composer__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.my-case-composer__cell,
+.my-case-composer__add {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+.my-case-composer__cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.my-case-composer__remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.my-case-composer__add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px dashed #c7c7c7;
+  color: #8e8e8e;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.my-case-composer__hint {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #8e8e8e;
+  line-height: 1.5;
+}
+
+.my-case-composer__submit {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #0095f6;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.my-case-composer__submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

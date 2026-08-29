@@ -41,6 +41,35 @@ function slimMycasePayload(input: unknown): object {
       ? (input as Record<string, unknown>)
       : {};
   const stripped = stripDataUrlsFromJson(raw) as Record<string, unknown>;
+  const postType = String(stripped.postType || "").trim();
+
+  if (postType === "feed") {
+    const imagesRaw = Array.isArray(stripped.images) ? stripped.images : [];
+    const images = imagesRaw
+      .map((ph, i) => {
+        if (!ph || typeof ph !== "object") return null;
+        const row = ph as { id?: string; url?: string };
+        const url = String(row.url || "").trim();
+        if (!url || url.startsWith("blob:") || url.startsWith("data:")) return null;
+        return {
+          id: String(row.id || `img-${i}`),
+          url
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 10);
+    const out: Record<string, unknown> = {
+      v: 3,
+      postType: "feed",
+      category: String(stripped.category || "daily").slice(0, 40),
+      caption: String(stripped.caption || "").trim().slice(0, 2000),
+      lineId: stripped.lineId ? String(stripped.lineId).trim() : null,
+      images
+    };
+    assertShowcaseStyleWithinLimit(out, "mycase feed");
+    return out;
+  }
+
   const styleRaw = stripped.style;
   const style = styleRaw
     ? (slimShowcaseStyleForPersist(styleRaw) as Record<string, unknown>)
@@ -89,7 +118,18 @@ function clampThumb(raw: string | null | undefined): string | null {
 
 function coverFromPayload(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
-  const style = (payload as { style?: unknown }).style;
+  const p = payload as {
+    postType?: string;
+    images?: Array<{ url?: string }>;
+    style?: unknown;
+  };
+  if (p.postType === "feed" && Array.isArray(p.images)) {
+    for (const ph of p.images) {
+      const u = clampThumb(ph?.url);
+      if (u) return u;
+    }
+  }
+  const style = p.style;
   if (!style || typeof style !== "object") return null;
   const st = style as {
     pages?: Array<{ gallery?: { photos?: Array<{ url?: string }> }; photos?: Array<{ url?: string }> }>;

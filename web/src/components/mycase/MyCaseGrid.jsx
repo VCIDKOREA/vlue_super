@@ -3,7 +3,7 @@
  * VLUE: 메인 송출 슬롯 = 하이라이트 / 핀 배지, 아카이브 = 3열 그리드
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Grid3X3, MoreHorizontal, Pin } from "lucide-react";
+import { ChevronLeft, Grid3X3, Layers, MoreHorizontal, Pin, Search } from "lucide-react";
 import {
   archiveShowcaseToMycase,
   deleteMycase,
@@ -48,6 +48,17 @@ import {
   showcaseBgmIdentityKey
 } from "../../lib/showcase/showcaseBgmPresets.js";
 import { SHOWCASE_BGM_OWNER_RELEASED_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
+import {
+  MYCASE_FEED_CATEGORIES,
+  parseMycasePostPayload
+} from "../../lib/mycase/mycasePostPayload.js";
+import {
+  DCC_LINE_CHANGED_EVENT,
+  readSelectedDccLineId
+} from "../../lib/dccLineState.js";
+import DccLineSwitcher from "../dcc/DccLineSwitcher.jsx";
+import MyCasePostComposer from "./MyCasePostComposer.jsx";
+import MyCaseSearchModal from "./MyCaseSearchModal.jsx";
 import "./my-case-grid.css";
 
 function readSelfProfile() {
@@ -89,6 +100,8 @@ function formatCount(n) {
  *   onBroadcastChanged?: (item: object, policy: object|null) => void,
  *   bgmEnabled?: boolean,
  *   isDarkMode?: boolean,
+ *   showSearch?: boolean,
+ *   showLineSwitcher?: boolean,
  *   className?: string
  * }} props
  */
@@ -102,6 +115,8 @@ export default function MyCaseGrid({
   onBroadcastChanged,
   bgmEnabled = true,
   isDarkMode = false,
+  showSearch = false,
+  showLineSwitcher = false,
   className = ""
 }) {
   const isMine = mode === "mine";
@@ -128,6 +143,10 @@ export default function MyCaseGrid({
   const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
   const [styleTick, setStyleTick] = useState(0);
   const [bizcardTick, setBizcardTick] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [lineId, setLineId] = useState(() => readSelectedDccLineId());
   const hasDigitalCard = isMine
     ? readDigitalCardActive()
     : Boolean(remoteProfile?.digitalCardIssued);
@@ -143,6 +162,33 @@ export default function MyCaseGrid({
     window.addEventListener("vlue-app-settings-changed", sync);
     return () => window.removeEventListener("vlue-app-settings-changed", sync);
   }, [isMine]);
+
+  useEffect(() => {
+    if (!isMine || !showLineSwitcher) return undefined;
+    const sync = () => setLineId(readSelectedDccLineId());
+    sync();
+    window.addEventListener(DCC_LINE_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(DCC_LINE_CHANGED_EVENT, sync);
+  }, [isMine, showLineSwitcher]);
+
+  const filteredItems = useMemo(() => {
+    let list = items;
+    if (isMine && showLineSwitcher && lineId) {
+      list = list.filter((item) => {
+        const parsed = parseMycasePostPayload(item?.payloadJson, item);
+        const itemLine = String(parsed.lineId || "").trim();
+        return !itemLine || itemLine === lineId;
+      });
+    }
+    if (categoryFilter !== "all") {
+      list = list.filter((item) => {
+        const parsed = parseMycasePostPayload(item?.payloadJson, item);
+        if (categoryFilter === "archive") return parsed.postType === "showcase";
+        return parsed.category === categoryFilter;
+      });
+    }
+    return list;
+  }, [items, isMine, showLineSwitcher, lineId, categoryFilter]);
 
   const toast = useCallback((msg) => {
     const fn = toastRef.current;
@@ -475,10 +521,10 @@ export default function MyCaseGrid({
           remoteProfile?.membershipTier || remoteProfile?.profile?.membershipTier || "premium"
         ),
         digitalCardIssued: Boolean(remoteProfile?.digitalCardIssued),
-        feedItems: items,
+        feedItems: filteredItems,
         startIndex: Math.max(
           0,
-          items.findIndex((x) => x.id === item.id)
+          filteredItems.findIndex((x) => x.id === item.id)
         )
       };
       onOpenDetail(item, { item, ok: true, isOwner: false }, peerMeta);
@@ -504,10 +550,10 @@ export default function MyCaseGrid({
         remoteProfile?.membershipTier || remoteProfile?.profile?.membershipTier || "premium"
       ),
       digitalCardIssued: Boolean(remoteProfile?.digitalCardIssued),
-      feedItems: items,
+      feedItems: filteredItems,
       startIndex: Math.max(
         0,
-        items.findIndex((x) => String(x.id) === caseId)
+        filteredItems.findIndex((x) => String(x.id) === caseId)
       )
     });
   };
@@ -687,7 +733,13 @@ export default function MyCaseGrid({
     window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
   };
 
-  /** 새로 만들기 / 쇼케이스 저장 → 블루 쇼케이스 설정(3번) */
+  /** 새로 만들기 → 케이스함 피드 게시물 작성 */
+  const goCreatePost = () => {
+    if (!isMine) return;
+    setComposerOpen(true);
+  };
+
+  /** 블루 쇼케이스 편집 */
   const goCreateOrEditShowcase = () => {
     if (!isMine) return;
     openShowcaseSettings();
@@ -711,10 +763,11 @@ export default function MyCaseGrid({
         ...style,
         bgm: createEmptyShowcaseBgm()
       });
+      const lineId = readSelectedDccLineId();
       const res = await archiveShowcaseToMycase({
         title,
         thumbnailUrl: cover || null,
-        payloadJson: { style: archiveStyle, source: "mycase_save" },
+        payloadJson: { style: archiveStyle, source: "mycase_save", lineId: lineId || null },
         isPublic: style?.privacyMode !== "friend_only"
       });
       if (!res.ok) {
@@ -728,7 +781,7 @@ export default function MyCaseGrid({
     }
   };
 
-  const postsCount = items.length;
+  const postsCount = filteredItems.length;
   const policyLine = isMine && policy ? formatCooldownHint(policy) : "";
   const highlightItems = mainBroadcast;
 
@@ -750,6 +803,16 @@ export default function MyCaseGrid({
           </button>
         ) : null}
         <h1 className="ig-mycase__username">{displayHandle}</h1>
+        {isMine && showSearch ? (
+          <button
+            type="button"
+            className="ig-mycase__icon-btn ig-mycase__icon-btn--overlay ig-mycase__icon-btn--search"
+            onClick={() => setSearchOpen(true)}
+            aria-label="케이스함 검색"
+          >
+            <Search size={22} strokeWidth={2} />
+          </button>
+        ) : null}
         {isMine ? (
           <button
             type="button"
@@ -836,6 +899,15 @@ export default function MyCaseGrid({
               <p className="ig-mycase__status">{statusMessage}</p>
             ) : null}
             <div className="ig-mycase__bio-meta">
+              {isMine && showLineSwitcher ? (
+                <div className="ig-mycase__line-switch">
+                  <p className="ig-mycase__line-hint">
+                    대표·내선 번호마다 케이스함이 따로 관리됩니다. 번호를 바꾸면 해당 계정의 게시물만
+                    보입니다.
+                  </p>
+                  <DccLineSwitcher variant="inline" compact onToast={toast} />
+                </div>
+              ) : null}
               {isMine ? (
                 <p className="ig-mycase__bio-text">
                   {policy
@@ -892,6 +964,13 @@ export default function MyCaseGrid({
               <button
                 type="button"
                 className="ig-mycase__btn ig-mycase__btn--secondary"
+                onClick={goCreatePost}
+              >
+                게시물 작성
+              </button>
+              <button
+                type="button"
+                className="ig-mycase__btn ig-mycase__btn--secondary"
                 disabled={busyId === "archive"}
                 onClick={saveCurrentToArchive}
               >
@@ -914,12 +993,22 @@ export default function MyCaseGrid({
             <button
               type="button"
               className="ig-mycase__hl ig-mycase__hl--new"
-              onClick={goCreateOrEditShowcase}
+              onClick={goCreatePost}
             >
               <span className="ig-mycase__hl-ring ig-mycase__hl-ring--dashed">
                 <span className="ig-mycase__hl-plus">+</span>
               </span>
               <span className="ig-mycase__hl-label">새로 만들기</span>
+            </button>
+            <button
+              type="button"
+              className="ig-mycase__hl ig-mycase__hl--settings"
+              onClick={goCreateOrEditShowcase}
+            >
+              <span className="ig-mycase__hl-ring ig-mycase__hl-ring--dashed">
+                <span className="ig-mycase__hl-plus">✦</span>
+              </span>
+              <span className="ig-mycase__hl-label">쇼케이스</span>
             </button>
           ) : null}
           {highlightItems.map((item) => (
@@ -945,6 +1034,33 @@ export default function MyCaseGrid({
         </div>
       ) : null}
 
+      <div className="ig-mycase__cats" role="tablist" aria-label="카테고리">
+        <button
+          type="button"
+          className={`ig-mycase__cat${categoryFilter === "all" ? " is-active" : ""}`}
+          onClick={() => setCategoryFilter("all")}
+        >
+          전체
+        </button>
+        {MYCASE_FEED_CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={`ig-mycase__cat${categoryFilter === c.id ? " is-active" : ""}`}
+            onClick={() => setCategoryFilter(c.id)}
+          >
+            {c.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={`ig-mycase__cat${categoryFilter === "archive" ? " is-active" : ""}`}
+          onClick={() => setCategoryFilter("archive")}
+        >
+          아카이브
+        </button>
+      </div>
+
       <div className="ig-mycase__tabs" role="tablist">
         <button type="button" className="ig-mycase__tab is-active" role="tab" aria-selected>
           <Grid3X3 size={22} strokeWidth={2} aria-hidden />
@@ -963,20 +1079,24 @@ export default function MyCaseGrid({
         </div>
       ) : loading ? (
         <p className="ig-mycase__empty">불러오는 중…</p>
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <div className="ig-mycase__empty-block">
           <p className="ig-mycase__empty-title">
             {isMine ? "아직 게시물이 없습니다" : "공개된 케이스가 없습니다"}
           </p>
           {isMine ? (
             <p className="ig-mycase__empty-desc">
-              「새로 만들기」로 블루 쇼케이스를 편집한 뒤 「적용하기」하면 여기에 쌓입니다.
+              「새로 만들기」로 사진 게시물을 올리거나, 「쇼케이스」에서 통화 송출용 화면을 꾸밀 수
+              있습니다.
             </p>
           ) : null}
         </div>
       ) : (
         <ul className="ig-mycase__grid">
-          {items.map((item) => (
+          {filteredItems.map((item) => {
+            const parsed = parseMycasePostPayload(item?.payloadJson, item);
+            const multi = parsed.images.length > 1;
+            return (
             <li key={item.id} className="ig-mycase__cell">
               <button
                 type="button"
@@ -1006,6 +1126,11 @@ export default function MyCaseGrid({
                     <Pin size={14} strokeWidth={2.5} fill="currentColor" />
                   </span>
                 ) : null}
+                {multi ? (
+                  <span className="ig-mycase__multi" title="여러 장">
+                    <Layers size={14} strokeWidth={2.2} />
+                  </span>
+                ) : null}
               </button>
               {manageMode && isMine ? (
                 <div className="ig-mycase__manage">
@@ -1028,9 +1153,24 @@ export default function MyCaseGrid({
                 </div>
               ) : null}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
+
+      <MyCasePostComposer
+        open={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        onToast={toast}
+        onCreated={() => void loadFirst()}
+      />
+
+      <MyCaseSearchModal
+        open={searchOpen}
+        items={filteredItems}
+        onClose={() => setSearchOpen(false)}
+        onSelectItem={(picked) => void openItem(picked)}
+      />
 
       {nextCursor && !accessDenied ? (
         <div ref={sentinelRef} className="ig-mycase__sentinel">

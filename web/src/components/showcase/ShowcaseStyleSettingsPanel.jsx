@@ -13,6 +13,7 @@ import {
   parseShowcaseTagsInput
 } from "../../lib/showcase/showcaseStyleStorage.js";
 import { archiveShowcaseToMycase } from "../../lib/mycaseApi.js";
+import { MYCASE_SHOWCASE_PICK_APPLY_EVENT } from "../../lib/mycase/mycaseShowcasePick.js";
 import { applyMycaseItemToLiveBroadcast } from "../../lib/showcase/syncMycaseLiveBroadcast.js";
 import {
   extractShowcaseArchiveTitle,
@@ -445,6 +446,31 @@ export default function ShowcaseStyleSettingsPanel({
     [persist]
   );
 
+  useEffect(() => {
+    const onPickApply = (e) => {
+      const picked = Array.isArray(e?.detail?.items) ? e.detail.items : [];
+      if (!picked.length) return;
+      const sorted = [...picked].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+      const nextPages = sorted.map((row, i) =>
+        createShowcasePage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM, {
+          id: `mycase-pick-${row.order || i + 1}`,
+          gallery: {
+            photos: [{ id: String(row.imageId || `pick-${i}`), url: String(row.imageUrl || "").trim() }]
+          },
+          richCustom: {
+            bodyText: String(row.caption || "").trim()
+          }
+        })
+      );
+      persistPages(nextPages.slice(0, maxContentPages));
+      const first = nextPages[0];
+      if (first?.id) setExpandedPageId(first.id);
+      notify("케이스함에서 선택한 사진이 쇼케이스 페이지에 반영되었습니다.");
+    };
+    window.addEventListener(MYCASE_SHOWCASE_PICK_APPLY_EVENT, onPickApply);
+    return () => window.removeEventListener(MYCASE_SHOWCASE_PICK_APPLY_EVENT, onPickApply);
+  }, [persistPages, maxContentPages, notify]);
+
   const updatePage = useCallback(
     (pageId, patch) => {
       const next = pages.map((p) => {
@@ -828,7 +854,7 @@ export default function ShowcaseStyleSettingsPanel({
             "디지털인증명함을 쓰면 1페이지는 항상 명함입니다.",
             "2페이지부터 메인커스텀 페이지를 추가할 수 있습니다.",
             `콘텐츠 페이지 최대 ${maxContentPages}장 · 커스텀은 사진 1장.`,
-            "추천 1080×1920(9:16) · 하단 1/3은 통화 UI에 가릴 수 있음 · 「통화화면 보기」로 확인",
+            `${SHOWCASE_CALL_IMAGE_GUIDE.sizeHint} · 하단 ⅓은 통화 UI에 가릴 수 있음 · 「통화화면 보기」로 확인`,
             isWebDesk
               ? "왼쪽 미리보기에서 실시간으로 확인하세요."
               : "오른쪽 사이드 탭(〈)을 누르면 통화 빅푸시 미리보기가 전체 화면으로 열립니다."
@@ -844,10 +870,19 @@ export default function ShowcaseStyleSettingsPanel({
           }`}
           style={{ wordBreak: "keep-all" }}
         >
-          사진 {SHOWCASE_CALL_IMAGE_GUIDE.sizeHint}. {SHOWCASE_CALL_IMAGE_GUIDE.safeZoneHint} 「통화화면 보기」로
-          실제 통화 옵션이 가리는 영역을 확인할 수 있습니다.
+          {SHOWCASE_CALL_IMAGE_GUIDE.uploadHint}. {SHOWCASE_CALL_IMAGE_GUIDE.safeZoneHint} 「통화화면 보기」로 실제
+          통화 옵션이 가리는 영역을 확인할 수 있습니다.
         </p>
-      ) : null}
+      ) : (
+        <p
+          className={`mb-3 text-[11px] font-semibold leading-snug ${
+            isDarkMode ? "text-blue-100/90" : "text-blue-900"
+          }`}
+          style={{ wordBreak: "keep-all" }}
+        >
+          {SHOWCASE_CALL_IMAGE_GUIDE.uploadHint}. {SHOWCASE_CALL_IMAGE_GUIDE.safeZoneHint}
+        </p>
+      )}
 
       {includeDigitalCard ? (
         <div id="showcase-settings-dcc" className="showcase-page-card showcase-page-card--digital scroll-mt-4">

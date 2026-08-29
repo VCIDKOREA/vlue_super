@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import MyCaseGrid from "./MyCaseGrid.jsx";
 import MyCaseDetailModal from "./MyCaseDetailModal.jsx";
+import MyCaseShowcasePickTray from "./MyCaseShowcasePickTray.jsx";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import LetteringIncomingNotification from "../LetteringIncomingNotification.jsx";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
@@ -18,7 +19,16 @@ import "./my-case-detail.css";
  * - 피드 탭 → 쇼케이스만
  * - 디지털인증명함 버튼 → 홈/쇼케이스 「미리보기」와 동일한 수신 UI (명함 페이지만)
  */
-export default function MyCaseScreen({ onGoMain, onToast, isDarkMode = false }) {
+export default function MyCaseScreen({
+  onGoMain,
+  onToast,
+  isDarkMode = false,
+  layout = "mobile",
+  showSearch = false,
+  showLineSwitcher = false,
+  showcasePickEnabled = false
+}) {
+  const isDesktop = layout === "desktop";
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [detailPayload, setDetailPayload] = useState(null);
@@ -28,7 +38,7 @@ export default function MyCaseScreen({ onGoMain, onToast, isDarkMode = false }) 
   const [cardExpanded, setCardExpanded] = useState(true);
   const [previewTick, setPreviewTick] = useState(0);
 
-  const caseBgmEnabled = !cardOpen;
+  const caseBgmEnabled = !cardOpen && !detailOpen;
 
   useEffect(() => {
     const bump = () => setPreviewTick((n) => n + 1);
@@ -79,6 +89,8 @@ export default function MyCaseScreen({ onGoMain, onToast, isDarkMode = false }) 
           onToast={onToast}
           bgmEnabled={caseBgmEnabled}
           isDarkMode={isDarkMode}
+          showSearch={showSearch}
+          showLineSwitcher={showLineSwitcher}
           onOpenDigitalCard={() => {
             if (!readDigitalCardActive()) {
               onToast?.("디지털인증명함이 없습니다.");
@@ -104,6 +116,10 @@ export default function MyCaseScreen({ onGoMain, onToast, isDarkMode = false }) 
         />
       </div>
 
+      {showcasePickEnabled && !isDesktop ? (
+        <MyCaseShowcasePickTray enabled variant="sheet" onToast={onToast} />
+      ) : null}
+
       <MyCaseDetailModal
         open={detailOpen}
         item={detailItem}
@@ -111,6 +127,8 @@ export default function MyCaseScreen({ onGoMain, onToast, isDarkMode = false }) 
         feedItems={feedItems}
         startIndex={feedStartIndex}
         isOwner
+        layout={isDesktop ? "desktop" : "mobile"}
+        showcasePickEnabled={showcasePickEnabled}
         suppressBgm
         onClose={() => {
           setDetailOpen(false);

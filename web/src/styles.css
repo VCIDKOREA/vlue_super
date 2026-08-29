@@ -8330,6 +8330,18 @@ button.ldr-back-person-name--link:active {
   color: #94a3b8;
   background: rgba(255, 255, 255, 0.04);
 }
+.vlue-kakao-feed-preview__cover-hint {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #64748b;
+  word-break: keep-all;
+}
+.vlue-kakao-feed-preview[data-theme="dark"] .vlue-kakao-feed-preview__cover-hint {
+  color: #94a3b8;
+}
 
 /* Showcase YouTube / SoundCloud BGM ??audio-only host */
 .showcase-bgm-yt-host,

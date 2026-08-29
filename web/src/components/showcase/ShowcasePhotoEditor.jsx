@@ -16,6 +16,7 @@ import ShowcasePhotoTextOverlay, {
   normalizeOneTextOverlay
 } from "./ShowcasePhotoTextOverlay.jsx";
 import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
+import { SHOWCASE_CALL_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
 
 function clampPercent(n) {
   return Math.min(100, Math.max(0, n));
@@ -546,8 +547,8 @@ export default function ShowcasePhotoEditor({
           </div>
           <p className="showcase-photo-editor__hint">
             {enableTextOverlay
-              ? "사진 추가 후 탭하면 여러 줄·여러 텍스트·글꼴을 설정합니다"
-              : "빈 칸을 눌러 추가 · 사진을 눌러 바꾸거나 삭제"}
+              ? `${SHOWCASE_CALL_IMAGE_GUIDE.sizeHint}. 사진 추가 후 탭하면 여러 줄·여러 텍스트·글꼴을 설정합니다`
+              : `${SHOWCASE_CALL_IMAGE_GUIDE.sizeHint}. 빈 칸을 눌러 추가 · 사진을 눌러 바꾸거나 삭제`}
           </p>
         </>
       ) : null}
@@ -562,7 +563,7 @@ export default function ShowcasePhotoEditor({
             >
               <ImagePlus size={36} strokeWidth={1.5} aria-hidden />
               <strong>사진 추가</strong>
-              <span>탭해서 1장 선택</span>
+              <span>{SHOWCASE_CALL_IMAGE_GUIDE.sizeHint}</span>
             </button>
           </div>
         ) : (

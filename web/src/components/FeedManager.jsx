@@ -12,7 +12,7 @@ import { generatePostDescription } from "../lib/vmingApi.js";
 import VlueStoreApplicationPanel from "./VlueStoreApplicationPanel.jsx";
 import VlueStoreProductManager from "./VlueStoreProductManager.jsx";
 import ScreenBackHeader from "./common/ScreenBackHeader";
-import { fitImageFileOrThrow, IMAGE_FIT_AVATAR } from "../lib/fitImageFile.js";
+import { fitImageFileOrThrow, IMAGE_FIT_AVATAR, AVATAR_IMAGE_GUIDE } from "../lib/fitImageFile.js";
 
 function FeedManager({ membershipTier = "free", onGoMain }) {
   const [feedName, setFeedName] = useState("");
@@ -191,6 +191,9 @@ function FeedManager({ membershipTier = "free", onGoMain }) {
 
               <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-4">
                 <p className="text-[12px] font-black text-gray-900">프로필 사진</p>
+                <p className="mt-1 text-[10px] leading-snug text-gray-500" style={{ wordBreak: "keep-all" }}>
+                  {AVATAR_IMAGE_GUIDE.uploadHint}
+                </p>
                 <div className="mt-3 flex items-center gap-4">
                   <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-gray-200 bg-white shadow-inner">
                     {pageProfileImageDataUrl ? (

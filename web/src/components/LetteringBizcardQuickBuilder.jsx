@@ -22,6 +22,11 @@ import {
   normalizePhotoFocus,
   photoFocusToCss
 } from "../lib/letteringBizcardStorage.js";
+import {
+  DCC_LOGO_IMAGE_GUIDE,
+  DCC_PROFILE_PHOTO_IMAGE_GUIDE,
+  DCC_TITLE_PHOTO_IMAGE_GUIDE
+} from "../lib/fitImageFile.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 
 function Field({ label, hint, children, isDarkMode, sectionId = "" }) {
@@ -387,7 +392,7 @@ export default function LetteringBizcardQuickBuilder({
         <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>프로필 · 이미지</p>
         <Field
           label="프로필 사진"
-          hint={`${LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB · 초과 시 자동 맞춤 · 번호 앞에 표시`}
+          hint={`${DCC_PROFILE_PHOTO_IMAGE_GUIDE.uploadHint} · 번호 앞에 표시`}
           isDarkMode={isDarkMode}
         >
           {typeof onPhotoPick === "function" ? (
@@ -416,7 +421,7 @@ export default function LetteringBizcardQuickBuilder({
         </Field>
         <Field
           label="DCC 타이틀 사진"
-          hint={`${LETTERING_PHOTO_RULES.acceptLabel} · 최대 1MB · 초과 시 자동 맞춤 · 번호 앞 사진과 따로 설정`}
+          hint={`${DCC_TITLE_PHOTO_IMAGE_GUIDE.uploadHint} · 프로필 사진과 별도`}
           isDarkMode={isDarkMode}
           sectionId="dcc-settings-title-photo"
         >
@@ -450,7 +455,7 @@ export default function LetteringBizcardQuickBuilder({
         </Field>
         <Field
           label="회사 로고"
-          hint={`${LETTERING_LOGO_RULES.acceptLabel} · 512KB 이하 · 초과 시 자동 맞춤`}
+          hint={DCC_LOGO_IMAGE_GUIDE.uploadHint}
           isDarkMode={isDarkMode}
         >
           <ImageUploadTile

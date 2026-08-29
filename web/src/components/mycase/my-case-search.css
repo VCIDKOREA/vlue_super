@@ -1,0 +1,102 @@
+.my-case-search {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 72px 16px 24px;
+}
+
+.my-case-search__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.my-case-search__panel {
+  position: relative;
+  width: min(100%, 420px);
+  max-height: min(70vh, 560px);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+.my-case-search__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid #efefef;
+}
+
+.my-case-search__head input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  font-size: 15px;
+}
+
+.my-case-search__close {
+  border: 0;
+  background: transparent;
+  color: #262626;
+  cursor: pointer;
+  display: inline-flex;
+}
+
+.my-case-search__results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+}
+
+.my-case-search__row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid #f3f4f6;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.my-case-search__row:hover {
+  background: #fafafa;
+}
+
+.my-case-search__row img,
+.my-case-search__ph {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #f3f4f6;
+  flex-shrink: 0;
+}
+
+.my-case-search__row strong {
+  display: block;
+  font-size: 14px;
+  color: #262626;
+}
+
+.my-case-search__row span {
+  font-size: 12px;
+  color: #8e8e8e;
+}
+
+.my-case-search__empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #8e8e8e;
+  font-size: 13px;
+}

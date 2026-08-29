@@ -17,6 +17,7 @@ import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import { compressAndUploadMediaImageOrThrow } from "../lib/mediaImageUpload.js";
+import { COVER_IMAGE_GUIDE } from "../lib/fitImageFile.js";
 
 function openExternalSafely(url) {
   if (!url) return false;
@@ -297,6 +298,7 @@ export default function KakaoBizcardFeedPreview({
             배경 제거
           </button>
         ) : null}
+        <p className="vlue-kakao-feed-preview__cover-hint">{COVER_IMAGE_GUIDE.uploadHint}</p>
       </div>
 
       {liveOpen && typeof document !== "undefined"
