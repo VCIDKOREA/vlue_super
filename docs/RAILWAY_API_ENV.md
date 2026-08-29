@@ -161,13 +161,21 @@ Windows 경로(`C:\Users\...\xxx.json`)는 Railway Linux에서 **동작하지 �
 
 ### USB에서 Railway로 올리기
 
-```powershell
-cd D:\dev
-npx @railway/cli login
-.\sync-fcm-railway.ps1
+**Windows PowerShell** 에서 `npx` 가 실행 정책 오류(`PSSecurityException`) 나면 **`npx.cmd`** 를 쓰거나 아래 `.cmd` 를 더블클릭하세요.
+
+```text
+D:\dev\railway-login.cmd      ← Railway 로그인 + link
+D:\dev\sync-fcm-railway.cmd   ← FCM 변수 동기화
 ```
 
-`apps\api\.env` 의 `GOOGLE_APPLICATION_CREDENTIALS` 경로를 읽어 `@vlue/api` Variables 에 반영합니다.
+또는 CMD/PowerShell:
+
+```powershell
+npx.cmd @railway/cli login
+cd D:\dev\vlue_super
+npx.cmd @railway/cli link
+powershell -ExecutionPolicy Bypass -File scripts\sync-fcm-railway.ps1
+```
 
 ### 확인
 

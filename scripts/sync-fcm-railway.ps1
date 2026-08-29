@@ -1,7 +1,15 @@
 # VLUE — 로컬 Firebase 서비스 계정 → Railway @vlue/api FCM 변수 동기화
-# 사용 (USB 루트):  cd D:\dev && npx @railway/cli login && .\sync-fcm-railway.ps1
-# 또는 (모노레포):   npx @railway/cli login && powershell -File scripts/sync-fcm-railway.ps1
+# Windows PowerShell 실행 정책 오류 시: D:\dev\sync-fcm-railway.cmd 더블클릭
+# 또는: npx.cmd @railway/cli login  후  powershell -ExecutionPolicy Bypass -File scripts/sync-fcm-railway.ps1
 $ErrorActionPreference = "Stop"
+
+function Invoke-Npx {
+  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
+  $npx = (Get-Command npx.cmd -ErrorAction SilentlyContinue).Source
+  if (-not $npx) { $npx = "npx.cmd" }
+  & $npx @Args
+  if ($LASTEXITCODE -ne 0) { throw "npx failed: $Args" }
+}
 
 $ScriptDir = $PSScriptRoot
 $RepoRoot = if (Test-Path (Join-Path $ScriptDir "..\apps\api")) {
@@ -41,14 +49,14 @@ if (-not $projectId -or -not $clientEmail -or -not $privateKey) {
 }
 
 Write-Host "Railway @vlue/api FCM 변수 설정 (project: $projectId)" -ForegroundColor Cyan
-Write-Host "서비스 링크: cd $RepoRoot; npx @railway/cli link" -ForegroundColor Yellow
+Write-Host "서비스 링크: cd $RepoRoot; npx.cmd @railway/cli link" -ForegroundColor Yellow
 
 Push-Location $RepoRoot
 try {
-  npx --yes @railway/cli variables set "FCM_PROJECT_ID=$projectId" --service "@vlue/api"
-  npx --yes @railway/cli variables set "FCM_CLIENT_EMAIL=$clientEmail" --service "@vlue/api"
+  Invoke-Npx --yes @railway/cli variables set "FCM_PROJECT_ID=$projectId" --service "@vlue/api"
+  Invoke-Npx --yes @railway/cli variables set "FCM_CLIENT_EMAIL=$clientEmail" --service "@vlue/api"
   $escapedKey = $privateKey -replace "`r?`n", '\n'
-  npx --yes @railway/cli variables set "FCM_PRIVATE_KEY=$escapedKey" --service "@vlue/api"
+  Invoke-Npx --yes @railway/cli variables set "FCM_PRIVATE_KEY=$escapedKey" --service "@vlue/api"
   Write-Host "완료. @vlue/api 재배포 후 관리자 > 상태 점검 > 푸시(FCM) 정상 확인." -ForegroundColor Green
 }
 finally {
