@@ -525,18 +525,18 @@ export async function recordShowcaseShare(opts: {
   if (!assertShareRate(opts.actorUserId, opts.ownerUserId)) {
     return { ok: true as const, notified: false };
   }
-  const actorName = await resolveActorLabel(opts.actorUserId);
+  const actor = await resolveActorProfile(opts.actorUserId);
+  const at = actorAtLabel(actor);
   deliverShowcaseSocialNotice({
     recipientUserId: opts.ownerUserId,
     actorUserId: opts.actorUserId,
     title: "새 공유",
-    body: `${actorName}님이 회원님의 쇼케이스를 공유했습니다.`,
-    data: {
+    body: `${at}님이 회원님의 쇼케이스를 공유했습니다.`,
+    data: showcaseActorData(opts.actorUserId, actor, {
       type: "vlue-showcase-share",
       ownerUserId: opts.ownerUserId,
-      actorUserId: opts.actorUserId,
       slideId: slideKey(opts.slideId)
-    }
+    })
   });
   return { ok: true as const, notified: true };
 }
