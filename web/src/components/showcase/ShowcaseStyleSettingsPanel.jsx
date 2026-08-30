@@ -254,6 +254,7 @@ export default function ShowcaseStyleSettingsPanel({
   const [lineBusy, setLineBusy] = useState(false);
   const [deskNotice, setDeskNotice] = useState("");
   const [footerGuide, setFooterGuide] = useState("");
+  const [photoGuideOpen, setPhotoGuideOpen] = useState(false);
   const pages = useMemo(
     () => (Array.isArray(config.pages) ? config.pages.map(normalizeShowcasePage) : []),
     [config.pages]
@@ -816,28 +817,41 @@ export default function ShowcaseStyleSettingsPanel({
           ].join(" ")}
         />
       </p>
-      {!isWebDesk ? (
-        <p
-          className={`mb-3 rounded-xl px-3 py-2 text-[11px] font-semibold leading-snug ${
-            isDarkMode
-              ? "border border-blue-400/25 bg-blue-500/10 text-blue-100"
-              : "border border-blue-100 bg-blue-50 text-blue-900"
+      <div className="showcase-photo-guide mb-3">
+        <button
+          type="button"
+          className={`showcase-photo-guide__btn${photoGuideOpen ? " is-open" : ""}${
+            isDarkMode ? " is-dark" : ""
           }`}
-          style={{ wordBreak: "keep-all" }}
+          onClick={() => setPhotoGuideOpen((v) => !v)}
+          aria-expanded={photoGuideOpen}
         >
-          {SHOWCASE_CALL_IMAGE_GUIDE.uploadHint}. {SHOWCASE_CALL_IMAGE_GUIDE.safeZoneHint} 「통화화면 보기」로 실제
-          통화 옵션이 가리는 영역을 확인할 수 있습니다.
-        </p>
-      ) : (
-        <p
-          className={`mb-3 text-[11px] font-semibold leading-snug ${
-            isDarkMode ? "text-blue-100/90" : "text-blue-900"
-          }`}
-          style={{ wordBreak: "keep-all" }}
-        >
-          {SHOWCASE_CALL_IMAGE_GUIDE.uploadHint}. {SHOWCASE_CALL_IMAGE_GUIDE.safeZoneHint}
-        </p>
-      )}
+          [사진파일 규격]
+        </button>
+        {photoGuideOpen ? (
+          <div
+            className={`showcase-photo-guide__panel${isDarkMode ? " is-dark" : ""}`}
+            role="region"
+            aria-label="사진 파일 규격 안내"
+          >
+            <p>
+              <strong>형식·크기</strong> {SHOWCASE_CALL_IMAGE_GUIDE.uploadHint}. 초과 시 자동 맞춤됩니다.
+            </p>
+            <p>
+              <strong>안전 영역</strong> {SHOWCASE_CALL_IMAGE_GUIDE.safeZoneHint}
+            </p>
+            {!isWebDesk ? (
+              <p className="showcase-photo-guide__panel-note">
+                「통화화면 보기」로 실제 통화 버튼이 가리는 영역을 확인할 수 있습니다.
+              </p>
+            ) : (
+              <p className="showcase-photo-guide__panel-note">
+                왼쪽 미리보기에서 통화 화면과 같은 비율로 확인하세요.
+              </p>
+            )}
+          </div>
+        ) : null}
+      </div>
 
       {includeDigitalCard ? (
         <div id="showcase-settings-dcc" className="showcase-page-card showcase-page-card--digital scroll-mt-4">
