@@ -253,6 +253,8 @@ export default function ShowcaseStyleSettingsPanel({
   const [kakaoLink, setKakaoLink] = useState({ linked: false });
   const [kakaoLinkLoading, setKakaoLinkLoading] = useState(false);
   const [lineBusy, setLineBusy] = useState(false);
+  const [styleReady, setStyleReady] = useState(false);
+  const pendingPickApplyRef = useRef(false);
   const [deskNotice, setDeskNotice] = useState("");
   const [footerGuide, setFooterGuide] = useState("");
   const [photoGuideOpen, setPhotoGuideOpen] = useState(false);
@@ -362,9 +364,11 @@ export default function ShowcaseStyleSettingsPanel({
           await m.hydrateShowcaseStyleFromServer({ forceServer: Boolean(isWebDesk) });
         }
         applyLocal();
+        setStyleReady(true);
       })
       .catch(() => {
         applyLocal();
+        setStyleReady(true);
       });
     return () => {
       cancelled = true;
@@ -441,26 +445,52 @@ export default function ShowcaseStyleSettingsPanel({
 
   const applyMycasePickItems = useCallback(
     (picked) => {
-      const rows = Array.isArray(picked) ? picked : [];
+      const rows = (Array.isArray(picked) ? picked : []).filter((row) =>
+        String(row?.imageUrl || "").trim()
+      );
       if (!rows.length) return;
       const sorted = [...rows].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
-      const nextPages = sorted.map((row, i) =>
-        createShowcasePage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM, {
-          id: mycaseSocialSlideId(row.caseId, row.imageId) || `mycase-pick-${row.order || i + 1}`,
-          gallery: {
-            photos: [{ id: String(row.imageId || `pick-${i}`), url: String(row.imageUrl || "").trim() }]
-          },
-          richCustom: {
-            bodyText: String(row.caption || "").trim()
-          }
-        })
-      );
-      persistPages(nextPages.slice(0, maxContentPages));
+      const currentPages = (Array.isArray(pages) ? pages : []).map(normalizeShowcasePage);
+      const nextPages = [];
+
+      for (let i = 0; i < maxContentPages; i++) {
+        const order = i + 1;
+        const pick = sorted.find((row) => Number(row.order) === order);
+        const existing = currentPages[i];
+        if (pick) {
+          nextPages.push(
+            createShowcasePage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM, {
+              id:
+                existing?.id ||
+                mycaseSocialSlideId(pick.caseId, pick.imageId) ||
+                `mycase-pick-${order}`,
+              gallery: {
+                photos: [
+                  {
+                    id: String(pick.imageId || `pick-${order}`),
+                    url: String(pick.imageUrl || "").trim()
+                  }
+                ]
+              },
+              richCustom: {
+                bodyText: String(pick.caption || existing?.richCustom?.bodyText || "").trim()
+              },
+              businessLink: existing?.businessLink || null,
+              caseTheme: existing?.caseTheme
+            })
+          );
+        } else if (existing) {
+          nextPages.push(existing);
+        }
+      }
+
+      if (!nextPages.length) return;
+      persistPages(nextPages);
       const first = nextPages[0];
       if (first?.id) setExpandedPageId(first.id);
       notify("케이스함에서 선택한 사진이 쇼케이스 페이지에 반영되었습니다.");
     },
-    [persistPages, maxContentPages, notify]
+    [persistPages, maxContentPages, notify, pages]
   );
 
   useEffect(() => {
@@ -472,10 +502,18 @@ export default function ShowcaseStyleSettingsPanel({
   }, [applyMycasePickItems]);
 
   useEffect(() => {
-    if (!consumeMycaseShowcasePickPendingApply()) return;
+    if (!pendingPickApplyRef.current) return;
+    if (!styleReady) return;
+    pendingPickApplyRef.current = false;
     const { items } = readMycaseShowcasePick();
     applyMycasePickItems(items);
-  }, [applyMycasePickItems]);
+  }, [styleReady, applyMycasePickItems]);
+
+  useEffect(() => {
+    if (consumeMycaseShowcasePickPendingApply()) {
+      pendingPickApplyRef.current = true;
+    }
+  }, []);
 
   const updatePage = useCallback(
     (pageId, patch) => {

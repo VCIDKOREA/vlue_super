@@ -150,10 +150,51 @@
   list-style: none;
 }
 
-.my-case-pick-tray--sheet .my-case-pick-tray__list {
+.my-case-pick-tray__list--slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.my-case-pick-tray--sheet .my-case-pick-tray__list--slots {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(52px, 1fr));
   overflow-x: auto;
   flex-wrap: nowrap;
-  padding-bottom: 4px;
+}
+
+.my-case-pick-tray__item.is-dragging {
+  opacity: 0.55;
+  outline: 2px dashed #0095f6;
+}
+
+.my-case-pick-tray__item[draggable="true"] {
+  cursor: grab;
+}
+
+.my-case-pick-tray__item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.my-case-pick-tray__drag {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  pointer-events: none;
+}
+
+.my-case-pick-tray--sidebar .my-case-pick-tray__list--slots .my-case-pick-tray__item {
+  width: 100%;
+  height: 72px;
 }
 
 .my-case-pick-tray__item {

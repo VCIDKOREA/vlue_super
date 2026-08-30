@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import {
   clampLetteringBizcardEmail,
@@ -77,6 +78,7 @@ export default function LetteringBizcardSettingsView({
   const [previewTick, setPreviewTick] = useState(0);
   const [toast, setToast] = useState("");
   const [toastKind, setToastKind] = useState("success");
+  const [applyBusy, setApplyBusy] = useState(false);
   const [logoError, setLogoError] = useState("");
   const scrollRef = useRef(null);
   const guideClearTimerRef = useRef(0);
@@ -468,6 +470,8 @@ export default function LetteringBizcardSettingsView({
       return;
     }
 
+    setApplyBusy(true);
+    try {
     const exposureSaved = await saveDccExposure(exposureChoice);
     if (!exposureSaved.ok) {
       focusRequiredSection(
@@ -652,6 +656,9 @@ export default function LetteringBizcardSettingsView({
           : "전체적용되었습니다. 입력하신 내용이 디지털인증명함·쇼케이스에 반영되었습니다."
     );
     onApplied?.();
+    } finally {
+      setApplyBusy(false);
+    }
   };
 
   return (
@@ -825,9 +832,20 @@ export default function LetteringBizcardSettingsView({
         <button
           type="button"
           onClick={handleApply}
-          className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 text-[14px] font-black text-white shadow-lg active:scale-[0.99]"
+          disabled={applyBusy}
+          aria-busy={applyBusy}
+          className={`w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 text-[14px] font-black text-white shadow-lg active:scale-[0.99] ${
+            applyBusy ? "cursor-wait opacity-90" : ""
+          }`}
         >
-          {applyLabel}
+          {applyBusy ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              적용중…
+            </span>
+          ) : (
+            applyLabel
+          )}
         </button>
       </div>
     </div>
