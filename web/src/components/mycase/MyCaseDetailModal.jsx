@@ -191,6 +191,16 @@ export default function MyCaseDetailModal({
     item: currentItem,
     detail: currentDetail,
     owner,
+    ownerUserId: owner
+      ? (() => {
+          try {
+            return String(localStorage.getItem("vlue_server_user_id") || "").trim();
+          } catch {
+            return "";
+          }
+        })()
+      : String(currentItem?.ownerUserId || peerIdentity?.userId || "").trim(),
+    peerPhone: String(peerIdentity?.phone || "").trim(),
     displayName,
     displayHandle,
     avatarUrl,
@@ -279,6 +289,18 @@ export default function MyCaseDetailModal({
                     item={feedItem}
                     detail={cached}
                     owner={owner || Boolean(cached?.isOwner)}
+                    ownerUserId={
+                      owner || Boolean(cached?.isOwner)
+                        ? (() => {
+                            try {
+                              return String(localStorage.getItem("vlue_server_user_id") || "").trim();
+                            } catch {
+                              return "";
+                            }
+                          })()
+                        : String(feedItem?.ownerUserId || peerIdentity?.userId || "").trim()
+                    }
+                    peerPhone={String(peerIdentity?.phone || "").trim()}
                     displayName={displayName}
                     displayHandle={displayHandle}
                     avatarUrl={avatarUrl}

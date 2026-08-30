@@ -15,6 +15,27 @@ export function mycaseCategoryLabel(id) {
   return hit?.label || "게시물";
 }
 
+/** 그리드 필터 옵션 (전체 + 피드 카테고리 + 아카이브) */
+export const MYCASE_CATEGORY_FILTER_OPTIONS = Object.freeze([
+  { id: "all", label: "전체" },
+  ...MYCASE_FEED_CATEGORIES,
+  { id: "archive", label: "아카이브" }
+]);
+
+export function mycaseCategoryFilterLabel(filterId) {
+  const hit = MYCASE_CATEGORY_FILTER_OPTIONS.find((c) => c.id === filterId);
+  return hit?.label || "전체";
+}
+
+/** 통화 쇼케이스·케이스함 게시물 소셜 slideId (좋아요·댓글·공유 연동) */
+export function mycaseSocialSlideId(caseId, imageId) {
+  const cid = String(caseId || "").trim();
+  const iid = String(imageId || "").trim();
+  if (!cid) return "";
+  const raw = iid ? `mycase-${cid}-${iid}` : `mycase-${cid}`;
+  return raw.slice(0, 80);
+}
+
 function tryUrl(u) {
   const s = String(u || "").trim();
   if (!s || s.startsWith("blob:") || s.startsWith("data:")) return "";

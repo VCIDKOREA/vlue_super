@@ -12,6 +12,7 @@ import {
   parseShowcaseTagsInput
 } from "../../lib/showcase/showcaseStyleStorage.js";
 import { MYCASE_SHOWCASE_PICK_APPLY_EVENT } from "../../lib/mycase/mycaseShowcasePick.js";
+import { mycaseSocialSlideId } from "../../lib/mycase/mycasePostPayload.js";
 import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { hasShowcaseBgmConfigured } from "../../lib/showcase/showcaseBgmPresets.js";
 import { PRIVACY_MODES, maxShowcaseContentPagesForTier } from "../../lib/showcase/tentShowcaseTypes.js";
@@ -445,7 +446,7 @@ export default function ShowcaseStyleSettingsPanel({
       const sorted = [...picked].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
       const nextPages = sorted.map((row, i) =>
         createShowcasePage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM, {
-          id: `mycase-pick-${row.order || i + 1}`,
+          id: mycaseSocialSlideId(row.caseId, row.imageId) || `mycase-pick-${row.order || i + 1}`,
           gallery: {
             photos: [{ id: String(row.imageId || `pick-${i}`), url: String(row.imageUrl || "").trim() }]
           },

@@ -665,12 +665,39 @@
 
 .ig-mycase__tabs {
   display: flex;
-  justify-content: center;
+  align-items: stretch;
   border-top: 1px solid var(--ig-border);
 }
 
+.ig-mycase__filter {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  height: 44px;
+  margin: 0;
+  padding: 0 14px;
+  border: 0;
+  border-top: 1px solid transparent;
+  margin-top: -1px;
+  background: transparent;
+  color: var(--ig-muted);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ig-mycase__filter.is-active {
+  color: var(--ig-blue);
+}
+
 .ig-mycase__tab {
-  flex: 1;
+  flex: 0 0 72px;
   display: flex;
   align-items: center;
   justify-content: center;

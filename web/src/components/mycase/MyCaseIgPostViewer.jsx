@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Heart, MessageCircle, Send, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { readMembershipTier } from "../../lib/bizcardAccountSync.js";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import {
   isMycaseShowcasePickSelected,
   toggleMycaseShowcasePick
 } from "../../lib/mycase/mycaseShowcasePick.js";
-import { mycaseCategoryLabel, parseMycasePostPayload } from "../../lib/mycase/mycasePostPayload.js";
+import {
+  mycaseCategoryLabel,
+  mycaseSocialSlideId,
+  parseMycasePostPayload
+} from "../../lib/mycase/mycasePostPayload.js";
 import ShowcaseCallCarousel from "../showcase/ShowcaseCallCarousel.jsx";
 import { createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
+import MyCaseIgPostSocial from "./MyCaseIgPostSocial.jsx";
 import "./my-case-ig-post.css";
 
 function formatPostDate(iso) {
@@ -31,6 +36,8 @@ export default function MyCaseIgPostViewer({
   item,
   detail,
   owner = false,
+  ownerUserId = "",
+  peerPhone = "",
   displayName = "VLUE",
   displayHandle = "",
   avatarUrl = "",
@@ -47,10 +54,16 @@ export default function MyCaseIgPostViewer({
 
   const [imgIndex, setImgIndex] = useState(0);
   const [pickTick, setPickTick] = useState(0);
+  const [commentMode, setCommentMode] = useState(false);
 
   useEffect(() => {
     setImgIndex(0);
+    setCommentMode(false);
   }, [item?.id]);
+
+  useEffect(() => {
+    setCommentMode(false);
+  }, [imgIndex]);
 
   useEffect(() => {
     const bump = () => setPickTick((n) => n + 1);
@@ -58,9 +71,35 @@ export default function MyCaseIgPostViewer({
     return () => window.removeEventListener("vlue-mycase-showcase-pick-changed", bump);
   }, []);
 
+  useEffect(() => {
+    if (variant === "modal" || !commentMode) return undefined;
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
+    const sync = () => {
+      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      document.documentElement.style.setProperty("--my-case-kb-offset", `${offset}px`);
+    };
+    sync();
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    return () => {
+      vv.removeEventListener("resize", sync);
+      vv.removeEventListener("scroll", sync);
+      document.documentElement.style.removeProperty("--my-case-kb-offset");
+    };
+  }, [commentMode, variant]);
+
   const images = parsed.images;
   const hasCarousel = images.length > 1;
   const current = images[imgIndex] || images[0] || null;
+  const slideId = useMemo(
+    () => mycaseSocialSlideId(item?.id, current?.id),
+    [item?.id, current?.id]
+  );
+  const resolvedOwnerUserId = useMemo(() => {
+    const raw = String(ownerUserId || item?.ownerUserId || "").trim();
+    return raw;
+  }, [ownerUserId, item?.ownerUserId]);
 
   const showcaseCard = useMemo(() => {
     if (parsed.postType !== "showcase" || !parsed.style) return null;
@@ -91,16 +130,36 @@ export default function MyCaseIgPostViewer({
     setPickTick((n) => n + 1);
   }, [owner, showcasePickEnabled, current, membershipTier, item?.id, parsed.caption, onToast]);
 
-  const picked = current
-    ? isMycaseShowcasePickSelected(item?.id, current.id, current.url)
-    : false;
+  const picked = useMemo(() => {
+    void pickTick;
+    return current
+      ? isMycaseShowcasePickSelected(item?.id, current.id, current.url)
+      : false;
+  }, [pickTick, current, item?.id]);
 
   const prevImg = () => setImgIndex((i) => Math.max(0, i - 1));
   const nextImg = () => setImgIndex((i) => Math.min(images.length - 1, i + 1));
 
+  const pickButton =
+    owner && showcasePickEnabled && current ? (
+      <button
+        type="button"
+        className={`my-case-ig-post__pick-btn${picked ? " is-active" : ""}`}
+        onClick={onTogglePick}
+      >
+        {picked
+          ? "쇼케이스 선택 해제"
+          : isPaidLetteringTier(membershipTier)
+            ? "통화 쇼케이스에 선택"
+            : "통화 쇼케이스에 선택 (1장)"}
+      </button>
+    ) : null;
+
   return (
     <div
-      className={`my-case-ig-post${variant === "modal" ? " my-case-ig-post--modal" : ""}`}
+      className={`my-case-ig-post${variant === "modal" ? " my-case-ig-post--modal" : ""}${
+        commentMode ? " is-comment-mode" : ""
+      }`}
       role="dialog"
       aria-modal="true"
       aria-label="게시물"
@@ -182,36 +241,17 @@ export default function MyCaseIgPostViewer({
             <time>{formatPostDate(item?.createdAt || detail?.item?.createdAt)}</time>
           </div>
 
-          <div className="my-case-ig-post__comments" aria-label="댓글 영역">
-            <p className="my-case-ig-post__comments-placeholder">댓글 기능은 준비 중입니다.</p>
-          </div>
-
-          <footer className="my-case-ig-post__foot">
-            <div className="my-case-ig-post__actions" aria-hidden>
-              <Heart size={24} strokeWidth={1.8} />
-              <MessageCircle size={24} strokeWidth={1.8} />
-              <Send size={24} strokeWidth={1.8} />
-            </div>
-
-            {owner && showcasePickEnabled && current && isPaidLetteringTier(membershipTier) ? (
-              <button
-                type="button"
-                className={`my-case-ig-post__pick-btn${picked ? " is-active" : ""}`}
-                onClick={onTogglePick}
-              >
-                {picked ? "쇼케이스 선택 해제" : "통화 쇼케이스에 선택"}
-              </button>
-            ) : null}
-            {owner && showcasePickEnabled && current && !isPaidLetteringTier(membershipTier) ? (
-              <button
-                type="button"
-                className={`my-case-ig-post__pick-btn${picked ? " is-active" : ""}`}
-                onClick={onTogglePick}
-              >
-                {picked ? "쇼케이스 선택 해제" : "통화 쇼케이스에 선택 (1장)"}
-              </button>
-            ) : null}
-          </footer>
+          <MyCaseIgPostSocial
+            ownerUserId={resolvedOwnerUserId}
+            slideId={slideId}
+            displayName={displayName}
+            peerPhone={peerPhone}
+            variant={variant}
+            commentMode={commentMode}
+            onCommentModeChange={setCommentMode}
+            onToast={onToast}
+            pickButton={pickButton}
+          />
         </aside>
       </div>
     </div>

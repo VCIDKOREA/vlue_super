@@ -31,6 +31,34 @@
   min-height: 0;
 }
 
+.my-case-ig-post:not(.my-case-ig-post--modal) .my-case-ig-post__layout {
+  height: 100%;
+}
+
+.my-case-ig-post:not(.my-case-ig-post--modal) .my-case-ig-post__media {
+  flex: 1 1 58%;
+  min-height: 52vh;
+  max-height: 68vh;
+}
+
+.my-case-ig-post:not(.my-case-ig-post--modal) .my-case-ig-post__side {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.my-case-ig-post:not(.my-case-ig-post--modal).is-comment-mode .my-case-ig-post__media {
+  flex: 0 0 auto;
+  min-height: 30vh;
+  max-height: 38vh;
+  transition: max-height 0.2s ease, min-height 0.2s ease;
+}
+
+.my-case-ig-post:not(.my-case-ig-post--modal).is-comment-mode .my-case-ig-post__side {
+  flex: 1 1 auto;
+}
+
 @media (min-width: 768px) {
   .my-case-ig-post--modal .my-case-ig-post__layout {
     flex-direction: row;
@@ -222,20 +250,99 @@
 
 .my-case-ig-post__comments {
   flex: 1 1 auto;
-  min-height: 80px;
+  min-height: 0;
   overflow: auto;
-  padding: 12px 14px;
+  padding: 0 14px 8px;
+  display: none;
 }
 
-.my-case-ig-post__comments-placeholder {
-  margin: 0;
+.my-case-ig-post__comments.is-open {
+  display: block;
+  min-height: 72px;
+}
+
+.my-case-ig-post--modal .my-case-ig-post__comments {
+  display: block;
+  min-height: 80px;
+}
+
+.my-case-ig-post__comments-empty {
+  margin: 8px 0 0;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.45);
 }
 
+.my-case-ig-post__comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.my-case-ig-post__comment {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.my-case-ig-post__comment--reply {
+  margin-left: 28px;
+}
+
+.my-case-ig-post__comment-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #262626;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #f5f5f5;
+}
+
+.my-case-ig-post__comment-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.my-case-ig-post__comment-body {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.my-case-ig-post__comment-meta {
+  margin: 0;
+}
+
+.my-case-ig-post__comment-meta strong {
+  margin-right: 6px;
+  font-size: 13px;
+}
+
+.my-case-ig-post__comment-text {
+  display: inline;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+}
+
+.my-case-ig-post__comment-text.showcase-comment-sheet__text {
+  display: inline;
+}
+
 .my-case-ig-post__foot {
-  padding: 10px 14px 14px;
+  margin-top: auto;
+  padding: 10px 14px max(14px, env(safe-area-inset-bottom, 0px));
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.my-case-ig-post__foot.is-commenting {
+  padding-bottom: max(14px, calc(env(safe-area-inset-bottom, 0px) + var(--my-case-kb-offset, 0px)));
 }
 
 .my-case-ig-post__actions {
@@ -243,6 +350,64 @@
   gap: 14px;
   margin-bottom: 10px;
   color: #f5f5f5;
+}
+
+.my-case-ig-post__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.my-case-ig-post__action.is-liked {
+  color: #ff3040;
+}
+
+.my-case-ig-post__composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.my-case-ig-post__composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 10px 0;
+  background: transparent;
+  color: #f5f5f5;
+  font-size: 14px;
+  outline: none;
+}
+
+.my-case-ig-post__composer-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.my-case-ig-post__composer-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #0095f6;
+  cursor: pointer;
+}
+
+.my-case-ig-post__composer-send:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .my-case-ig-post__pick-btn {

@@ -1,0 +1,101 @@
+.my-case-cat-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.my-case-cat-sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+.my-case-cat-sheet__panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 480px);
+  max-height: min(72vh, 520px);
+  border-radius: 16px 16px 0 0;
+  background: var(--ig-bg, #fff);
+  color: var(--ig-text, #111);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+  .my-case-cat-sheet {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .my-case-cat-sheet__panel {
+    border-radius: 16px;
+    max-height: min(80vh, 560px);
+    padding-bottom: 12px;
+  }
+}
+
+.my-case-cat-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--ig-border, #dbdbdb);
+}
+
+.my-case-cat-sheet__head strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.my-case-cat-sheet__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.my-case-cat-sheet__list {
+  margin: 0;
+  padding: 8px 12px 4px;
+  list-style: none;
+  overflow: auto;
+}
+
+.my-case-cat-sheet__opt {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.my-case-cat-sheet__opt.is-active {
+  background: rgba(0, 149, 246, 0.1);
+  color: #0095f6;
+}
+
+.ig-mycase--dark .my-case-cat-sheet__panel {
+  --ig-bg: #121212;
+  --ig-text: #f5f5f5;
+  --ig-border: rgba(255, 255, 255, 0.12);
+}

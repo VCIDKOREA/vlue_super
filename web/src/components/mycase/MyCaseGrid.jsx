@@ -49,9 +49,11 @@ import {
 } from "../../lib/showcase/showcaseBgmPresets.js";
 import { SHOWCASE_BGM_OWNER_RELEASED_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
 import {
-  MYCASE_FEED_CATEGORIES,
+  mycaseCategoryFilterLabel,
   parseMycasePostPayload
 } from "../../lib/mycase/mycasePostPayload.js";
+import MyCaseCategorySheet from "./MyCaseCategorySheet.jsx";
+import "./my-case-category-sheet.css";
 import {
   DCC_LINE_CHANGED_EVENT,
   readSelectedDccLineId
@@ -144,6 +146,7 @@ export default function MyCaseGrid({
   const [styleTick, setStyleTick] = useState(0);
   const [bizcardTick, setBizcardTick] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [lineId, setLineId] = useState(() => readSelectedDccLineId());
@@ -1043,39 +1046,30 @@ export default function MyCaseGrid({
         </div>
       ) : null}
 
-      <div className="ig-mycase__cats" role="tablist" aria-label="카테고리">
-        <button
-          type="button"
-          className={`ig-mycase__cat${categoryFilter === "all" ? " is-active" : ""}`}
-          onClick={() => setCategoryFilter("all")}
-        >
-          전체
-        </button>
-        {MYCASE_FEED_CATEGORIES.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className={`ig-mycase__cat${categoryFilter === c.id ? " is-active" : ""}`}
-            onClick={() => setCategoryFilter(c.id)}
-          >
-            {c.label}
-          </button>
-        ))}
-        <button
-          type="button"
-          className={`ig-mycase__cat${categoryFilter === "archive" ? " is-active" : ""}`}
-          onClick={() => setCategoryFilter("archive")}
-        >
-          아카이브
-        </button>
-      </div>
-
       <div className="ig-mycase__tabs" role="tablist">
+        <button
+          type="button"
+          className={`ig-mycase__filter${categoryFilter !== "all" ? " is-active" : ""}`}
+          onClick={() => setCategorySheetOpen(true)}
+          aria-haspopup="dialog"
+        >
+          아카이브 · {mycaseCategoryFilterLabel(categoryFilter)}
+        </button>
         <button type="button" className="ig-mycase__tab is-active" role="tab" aria-selected>
           <Grid3X3 size={22} strokeWidth={2} aria-hidden />
           <span className="sr-only">그리드</span>
         </button>
       </div>
+
+      <MyCaseCategorySheet
+        open={categorySheetOpen}
+        onClose={() => setCategorySheetOpen(false)}
+        value={categoryFilter}
+        onChange={(id) => {
+          setCategoryFilter(id);
+          setCategorySheetOpen(false);
+        }}
+      />
 
       {accessDenied ? (
         <div className="ig-mycase__locked">
