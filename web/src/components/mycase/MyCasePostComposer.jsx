@@ -101,6 +101,7 @@ export default function MyCasePostComposer({ open, onClose, onToast, onCreated }
             membershipTier={membershipTier}
             maxPhotos={MYCASE_FEED_MAX_IMAGES}
             enableTextOverlay
+            portraitPreview
           />
         </div>
 

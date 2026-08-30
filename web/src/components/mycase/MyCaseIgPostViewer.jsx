@@ -61,12 +61,14 @@ export default function MyCaseIgPostViewer({
   const [pickTick, setPickTick] = useState(0);
   const [commentOpen, setCommentOpen] = useState(false);
   const [likeBurst, setLikeBurst] = useState(0);
+  const [mediaAspect, setMediaAspect] = useState(16 / 9);
   const likeHandlerRef = useRef(null);
 
   useEffect(() => {
     setImgIndex(0);
     setCommentOpen(false);
     setLikeBurst(0);
+    setMediaAspect(16 / 9);
   }, [item?.id]);
 
   useEffect(() => {
@@ -184,6 +186,7 @@ export default function MyCaseIgPostViewer({
         index={imgIndex}
         onIndexChange={setImgIndex}
         onDoubleTap={handleMediaDoubleTap}
+        onMediaAspectChange={isFeedMobile ? setMediaAspect : undefined}
       />
     ) : (
       <div className="my-case-ig-post__empty">표시할 사진이 없습니다.</div>
@@ -207,7 +210,10 @@ export default function MyCaseIgPostViewer({
           </div>
         </header>
 
-        <div className="my-case-ig-post__media">
+        <div
+          className="my-case-ig-post__media"
+          style={{ "--feed-media-aspect": mediaAspect }}
+        >
           {mediaBlock}
           {likeBurstOverlay}
         </div>

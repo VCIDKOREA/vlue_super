@@ -1,9 +1,17 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import ShowcasePhotoTextOverlay from "../showcase/ShowcasePhotoTextOverlay.jsx";
 
 const DOUBLE_TAP_MS = 360;
 const DOUBLE_TAP_DIST = 44;
 const SWIPE_THRESHOLD = 48;
+const FEED_MEDIA_ASPECT_DEFAULT = 16 / 9;
+
+/** height/width — 세로 9:16 기본, 가로 16:9까지 프레임 허용 */
+function clampFeedMediaAspect(hw) {
+  const ratio = Number(hw);
+  if (!Number.isFinite(ratio) || ratio <= 0) return FEED_MEDIA_ASPECT_DEFAULT;
+  return Math.min(16 / 9, Math.max(9 / 16, ratio));
+}
 
 /**
  * 게시물 사진 — 좌우 스와이프 캐러셀 + 더블탭 좋아요 (인스타그램형)
@@ -12,13 +20,36 @@ export default function MyCaseImageCarousel({
   images = [],
   index = 0,
   onIndexChange,
-  onDoubleTap
+  onDoubleTap,
+  onMediaAspectChange
 }) {
   const gestureRef = useRef({ x: 0, y: 0, locked: null });
   const swipeMovedRef = useRef(false);
   const tapArmedRef = useRef(false);
   const lastTapRef = useRef({ t: 0, x: 0, y: 0, pointerId: -1 });
   const pointerStartRef = useRef({ x: 0, y: 0 });
+  const current = images[index] || images[0] || null;
+
+  useEffect(() => {
+    const url = String(current?.url || "").trim();
+    if (!url) {
+      onMediaAspectChange?.(FEED_MEDIA_ASPECT_DEFAULT);
+      return undefined;
+    }
+    let cancelled = false;
+    const probe = new Image();
+    probe.onload = () => {
+      if (cancelled) return;
+      onMediaAspectChange?.(clampFeedMediaAspect(probe.naturalHeight / probe.naturalWidth));
+    };
+    probe.onerror = () => {
+      if (!cancelled) onMediaAspectChange?.(FEED_MEDIA_ASPECT_DEFAULT);
+    };
+    probe.src = url;
+    return () => {
+      cancelled = true;
+    };
+  }, [current?.id, current?.url, onMediaAspectChange]);
 
   const go = useCallback(
     (delta) => {

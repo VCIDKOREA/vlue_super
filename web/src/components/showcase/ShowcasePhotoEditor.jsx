@@ -45,7 +45,9 @@ export default function ShowcasePhotoEditor({
   onChange,
   membershipTier = "paid",
   maxPhotos,
-  enableTextOverlay = true
+  enableTextOverlay = true,
+  /** 케이스함·쇼케이스 송출용 — 세로 9:16 프레임, 사진 전체 표시(크롭 없음) */
+  portraitPreview = false
 }) {
   const fileRef = useRef(null);
   const replaceRef = useRef(null);
@@ -535,7 +537,7 @@ export default function ShowcasePhotoEditor({
 
   return (
     <div
-      className={`showcase-photo-editor${singleMode ? " showcase-photo-editor--single showcase-photo-editor--studio" : " showcase-photo-editor--grid"}`}
+      className={`showcase-photo-editor${singleMode ? " showcase-photo-editor--single showcase-photo-editor--studio" : " showcase-photo-editor--grid"}${portraitPreview ? " showcase-photo-editor--portrait" : ""}`}
     >
       {!singleMode ? (
         <>

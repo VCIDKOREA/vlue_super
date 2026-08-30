@@ -3300,6 +3300,22 @@
   pointer-events: none;
 }
 
+/* ????�?? ??? ? 9:16 ???, ?? ?? ??(????) */
+.showcase-photo-editor--portrait .showcase-photo-editor__sheet-preview {
+  aspect-ratio: 9 / 16;
+  width: min(100%, calc(min(62vh, 560px) * 9 / 16));
+  max-height: min(62vh, 560px);
+  height: auto;
+  margin: 0 auto;
+  background: #0f172a;
+}
+
+.showcase-photo-editor--portrait .showcase-photo-editor__sheet-preview img {
+  object-fit: contain;
+  object-position: center;
+  background: #000;
+}
+
 /* 개인커스텀 1장 — 세로로 길게, 원본 전체 보이게 약간 축소 */
 .showcase-photo-editor__sheet-preview--large {
   aspect-ratio: auto;
