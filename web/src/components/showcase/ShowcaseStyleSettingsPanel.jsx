@@ -19,7 +19,6 @@ import { PRIVACY_MODES, maxShowcaseContentPagesForTier } from "../../lib/showcas
 import { SHOWCASE_CALL_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
 import {
   clampShowcasePages,
-  contentPageDisplayNumber,
   createShowcasePage,
   isPageConfigured,
   normalizeBusinessLink,
@@ -823,7 +822,7 @@ export default function ShowcaseStyleSettingsPanel({
 
     if (includeDigitalCard && !hasProfilePhoto) {
       const msg =
-        "프로필 사진은 「1페이지 · 디지털인증명함 → 설정하러가기」에서 등록·저장해야 미리보기에 나옵니다.";
+        "프로필 사진은 「디지털인증명함 → 설정하러가기」에서 등록·저장해야 미리보기에 나옵니다.";
       focusShowcaseSection("showcase-settings-dcc", msg);
       notify(`쇼케이스 설정은 저장됐습니다. ${msg}`);
       return;
@@ -909,7 +908,7 @@ export default function ShowcaseStyleSettingsPanel({
         <div id="showcase-settings-dcc" className="showcase-page-card showcase-page-card--digital scroll-mt-4">
           <div className="showcase-page-card__head">
             <div className="min-w-0 flex-1">
-              <p className="showcase-page-card__title">1페이지 · 디지털인증명함</p>
+              <p className="showcase-page-card__title">디지털인증명함</p>
               <p className={`showcase-page-card__status ${digitalCardReady && hasDigitalCardPhoto ? "is-ready" : ""}`}>
                 {!digitalCardReady
                   ? "미설정"
@@ -931,7 +930,7 @@ export default function ShowcaseStyleSettingsPanel({
       ) : null}
 
       {pages.map((page, idx) => {
-        const pageNum = contentPageDisplayNumber(idx, includeDigitalCard);
+        const pageNum = idx + 1;
         const expanded = expandedPageId === page.id;
         const label = pageTypeLabel(page.type);
         return (
@@ -1009,7 +1008,7 @@ export default function ShowcaseStyleSettingsPanel({
       {canAddPage ? (
         <button type="button" className="showcase-page-add-btn showcase-page-add-btn--solo" onClick={addPage}>
           <Plus size={16} aria-hidden />
-          {isWebDesk ? "메인커스텀 페이지" : "개인커스텀 페이지"}
+          쇼케이스 페이지
         </button>
       ) : (
         <p className={`text-[11px] ${subText}`}>콘텐츠 페이지 한도({maxContentPages})에 도달했습니다.</p>

@@ -100,7 +100,7 @@ export function pageTypeLabel(type) {
   const t = normalizePageType(type);
   if (t === SHOWCASE_PAGE_TYPES.INSTAGRAM) return "인스타그램";
   if (t === SHOWCASE_PAGE_TYPES.DEFAULT) return "기본형";
-  return "개인커스텀";
+  return "쇼케이스";
 }
 
 /**
