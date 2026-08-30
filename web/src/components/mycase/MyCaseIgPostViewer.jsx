@@ -16,6 +16,7 @@ import { createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStor
 import MyCaseIgPostSocial from "./MyCaseIgPostSocial.jsx";
 import MyCaseImageCarousel from "./MyCaseImageCarousel.jsx";
 import MyCaseIgCaption from "./MyCaseIgCaption.jsx";
+import "../../styles/showcase-call-glass.css";
 import "./my-case-ig-post.css";
 
 function formatPostDate(iso) {

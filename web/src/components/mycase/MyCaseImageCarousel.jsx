@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import ShowcasePhotoTextOverlay from "../showcase/ShowcasePhotoTextOverlay.jsx";
 
 const DOUBLE_TAP_MS = 360;
 const DOUBLE_TAP_DIST = 44;
@@ -111,6 +112,7 @@ export default function MyCaseImageCarousel({
         {images.map((img) => (
           <div key={img.id} className="my-case-carousel__slide">
             <img className="my-case-carousel__photo" src={img.url} alt="" draggable={false} />
+            <ShowcasePhotoTextOverlay photo={img} />
           </div>
         ))}
       </div>

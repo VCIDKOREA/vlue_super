@@ -1,3 +1,5 @@
+import { listPhotoTextOverlays } from "../../components/showcase/ShowcasePhotoTextOverlay.jsx";
+
 /** 케이스함 피드 게시물 카테고리 */
 export const MYCASE_FEED_CATEGORIES = Object.freeze([
   { id: "daily", label: "일상" },
@@ -46,10 +48,48 @@ function tryUrl(u) {
 export function normalizeMycaseImage(photo, idx = 0) {
   const url = tryUrl(photo?.url || photo?.src || photo);
   if (!url) return null;
-  return {
+  const out = {
     id: String(photo?.id || `img-${idx}`),
     url
   };
+  if (!photo || typeof photo !== "object") return out;
+  if (Array.isArray(photo.textOverlays) && photo.textOverlays.length) {
+    out.textOverlays = photo.textOverlays;
+  }
+  for (const key of [
+    "overlayText",
+    "overlayFont",
+    "overlayFontSize",
+    "overlayColor",
+    "overlayX",
+    "overlayY",
+    "overlayAnim",
+    "overlayBorder"
+  ]) {
+    if (photo[key] != null && photo[key] !== "") out[key] = photo[key];
+  }
+  return out;
+}
+
+function serializeMycaseImageForPayload(photo, idx = 0) {
+  const norm = normalizeMycaseImage(photo, idx);
+  if (!norm) return null;
+  const overlays = listPhotoTextOverlays(norm).map(
+    ({ id, text, font, fontSize, color, x, y, anim, border }) => ({
+      id,
+      text,
+      font,
+      fontSize,
+      color,
+      x,
+      y,
+      anim,
+      border
+    })
+  );
+  const out = { id: norm.id, url: norm.url };
+  if (overlays.length) out.textOverlays = overlays;
+  return out;
 }
 
 /**
@@ -118,7 +158,7 @@ export function extractImagesFromShowcaseStyle(style) {
 /** @param {object} input */
 export function buildFeedPostPayloadJson({ category, caption, images, lineId }) {
   const list = (Array.isArray(images) ? images : [])
-    .map((ph, i) => normalizeMycaseImage(ph, i))
+    .map((ph, i) => serializeMycaseImageForPayload(ph, i))
     .filter(Boolean)
     .slice(0, MYCASE_FEED_MAX_IMAGES);
   return {

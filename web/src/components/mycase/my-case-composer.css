@@ -2,6 +2,7 @@
   padding: 16px;
   max-width: 640px;
   margin: 0 auto;
+  padding-bottom: 32px;
 }
 
 .my-case-composer__cats {
@@ -51,6 +52,14 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.my-case-composer__photos {
+  margin-bottom: 12px;
+}
+
+.my-case-composer__photos .showcase-photo-editor--grid {
+  margin: 0;
 }
 
 .my-case-composer__cell,

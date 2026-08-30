@@ -1,4 +1,4 @@
-/* 인스타형 상·하 게시물 피드 — 기본 라이트, 다크모드만 어두움 */
+/* 인스타형 상·하 게시물 피드 — 게시물 상세는 항상 다크 */
 .my-case-detail--light {
   --feed-bg: #ffffff;
   --feed-bg-muted: #fafafa;
@@ -26,6 +26,24 @@
 }
 
 .my-case-detail--dark .my-case-ig-post--feed .my-case-ig-post__pick-btn {
+  background: transparent;
+}
+
+/* 게시물 탭 상세 — 앱 라이트모드여도 항상 블랙 배경 */
+.my-case-detail--post-viewer {
+  --feed-bg: #000000;
+  --feed-bg-muted: #121212;
+  --feed-text: #f5f5f5;
+  --feed-text-muted: rgba(255, 255, 255, 0.55);
+  --feed-border: rgba(255, 255, 255, 0.12);
+  --feed-media-bg: #000000;
+  --feed-pick-border: rgba(255, 255, 255, 0.35);
+  --feed-pick-text: #f5f5f5;
+  background: #000000 !important;
+  color: #f5f5f5;
+}
+
+.my-case-detail--post-viewer .my-case-ig-post--feed .my-case-ig-post__pick-btn {
   background: transparent;
 }
 

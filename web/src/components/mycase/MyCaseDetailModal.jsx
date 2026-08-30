@@ -232,7 +232,7 @@ export default function MyCaseDetailModal({
 
   if (isDesktop) {
     const overlay = (
-      <div className="my-case-ig-overlay" role="presentation">
+      <div className="my-case-ig-overlay my-case-detail--post-viewer" role="presentation">
         <button
           type="button"
           className="my-case-ig-overlay__backdrop"
@@ -276,7 +276,7 @@ export default function MyCaseDetailModal({
     return createPortal(overlay, document.body);
   }
 
-  const themeClass = isDarkMode ? "my-case-detail--dark" : "my-case-detail--light";
+  const themeClass = "my-case-detail--dark";
 
   return (
     <AppFullScreenView
@@ -286,8 +286,8 @@ export default function MyCaseDetailModal({
       hideHeader
       showFloatingClose={false}
       coverBottomNav
-      isDarkMode={isDarkMode}
-      className={`my-case-detail my-case-detail--feed ${themeClass}`}
+      isDarkMode
+      className={`my-case-detail my-case-detail--feed my-case-detail--post-viewer ${themeClass}`}
     >
       <header className="my-case-feed__topbar">
         <button type="button" className="my-case-feed__back" onClick={onClose} aria-label="뒤로">
