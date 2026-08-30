@@ -15,15 +15,108 @@
   flex-shrink: 0;
 }
 
+/* 앱 — 팔로우 쇼케이스형 접이식 하단 시트 */
 .my-case-pick-tray--sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+}
+
+.my-case-pick-tray__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.28);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.my-case-pick-tray__panel {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(52px + env(safe-area-inset-bottom, 0px));
-  z-index: 45;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
   border-radius: 16px 16px 0 0;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.12);
-  max-height: 42vh;
+  border-top: 1px solid #e5e7eb;
+  box-sizing: border-box;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.my-case-pick-tray--sheet.is-expanded .my-case-pick-tray__panel {
+  box-shadow: 0 -8px 28px rgba(15, 23, 42, 0.16);
+  max-height: min(72vh, 520px);
+}
+
+.my-case-pick-tray__toggle {
+  position: relative;
+  flex-shrink: 0;
+  min-height: 52px;
+  padding: 18px 14px 10px;
+}
+
+.my-case-pick-tray__handle {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: #d1d5db;
+}
+
+.my-case-pick-tray__toggle-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.my-case-pick-tray__toggle-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #191f28;
+}
+
+.my-case-pick-tray__toggle-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #8e8e8e;
+  flex-shrink: 0;
+}
+
+.my-case-pick-tray__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 0 14px 12px;
+  overflow: auto;
 }
 
 .my-case-pick-tray__head {

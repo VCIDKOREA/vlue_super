@@ -57,6 +57,7 @@ function applyLineToLocalPreview(bundle) {
 
 export default function DccLineSwitcher({
   variant = "inline",
+  layout = "stack",
   onToast,
   compact = false,
   onBusyChange
@@ -313,6 +314,18 @@ export default function DccLineSwitcher({
           </label>
         </div>
         {photoRow}
+        {modal}
+      </div>
+    );
+  }
+
+  if (layout === "row") {
+    return (
+      <div className="dcc-agent-bar dcc-agent-bar--row">
+        {lineSelect}
+        {agentSelect}
+        {manageBtn}
+        {loadingChip}
         {modal}
       </div>
     );

@@ -138,6 +138,30 @@
   right: 44px;
 }
 
+.ig-mycase__line-block {
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.ig-mycase__line-block__top {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+
+.ig-mycase__line-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.ig-mycase__line-row__switcher {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .ig-mycase__line-switch {
   width: 100%;
   margin-bottom: 10px;

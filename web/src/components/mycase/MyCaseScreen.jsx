@@ -82,7 +82,13 @@ export default function MyCaseScreen({
 
   return (
     <section className="mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden bg-white">
-      <div className="min-h-0 flex-1 overflow-y-auto pb-[calc(52px+env(safe-area-inset-bottom,0px))]">
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto ${
+          showcasePickEnabled && !isDesktop
+            ? "pb-[calc(104px+env(safe-area-inset-bottom,0px))]"
+            : "pb-[calc(52px+env(safe-area-inset-bottom,0px))]"
+        }`}
+      >
         <MyCaseGrid
           mode="mine"
           onBack={onGoMain}

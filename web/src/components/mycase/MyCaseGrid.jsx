@@ -898,16 +898,23 @@ export default function MyCaseGrid({
             {isMine && statusMessage ? (
               <p className="ig-mycase__status">{statusMessage}</p>
             ) : null}
+            {isMine && showLineSwitcher ? (
+              <div className="ig-mycase__line-block">
+                {hasDigitalCard ? (
+                  <div className="ig-mycase__line-block__top">
+                    <button
+                      type="button"
+                      className="ig-mycase__btn ig-mycase__btn--card"
+                      onClick={() => onOpenDigitalCard?.()}
+                    >
+                      디지털인증명함
+                    </button>
+                  </div>
+                ) : null}
+                <DccLineSwitcher layout="row" onToast={toast} />
+              </div>
+            ) : null}
             <div className="ig-mycase__bio-meta">
-              {isMine && showLineSwitcher ? (
-                <div className="ig-mycase__line-switch">
-                  <p className="ig-mycase__line-hint">
-                    대표·내선 번호마다 케이스함이 따로 관리됩니다. 번호를 바꾸면 해당 계정의 게시물만
-                    보입니다.
-                  </p>
-                  <DccLineSwitcher variant="inline" compact onToast={toast} />
-                </div>
-              ) : null}
               {isMine ? (
                 <p className="ig-mycase__bio-text">
                   {policy
@@ -933,7 +940,7 @@ export default function MyCaseGrid({
               ) : (
                 <p className="ig-mycase__bio-text">공개 케이스함</p>
               )}
-              {hasDigitalCard ? (
+              {hasDigitalCard && !(isMine && showLineSwitcher) ? (
                 <button
                   type="button"
                   className="ig-mycase__btn ig-mycase__btn--card"
