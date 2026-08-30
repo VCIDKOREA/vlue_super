@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import MyCaseIgPostViewer from "./MyCaseIgPostViewer.jsx";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
@@ -134,7 +134,20 @@ export default function MyCaseDetailModal({
     if (!open || !feed.length) return;
     const current = feed[index];
     if (current) void ensureDetail(current);
+    const prev = feed[index - 1];
+    const next = feed[index + 1];
+    if (prev) void ensureDetail(prev);
+    if (next) void ensureDetail(next);
   }, [open, feed, index, ensureDetail]);
+
+  useEffect(() => {
+    if (!open || !isDesktop || typeof document === "undefined") return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open, isDesktop]);
 
   const scrollToFeedIndex = useCallback(
     (nextIdx) => {
@@ -202,6 +215,14 @@ export default function MyCaseDetailModal({
     if (best !== index && best >= 0 && best < feed.length) setIndex(best);
   };
 
+  const goPrevPost = useCallback(() => {
+    setIndex((i) => Math.max(0, i - 1));
+  }, []);
+
+  const goNextPost = useCallback(() => {
+    setIndex((i) => Math.min(feed.length - 1, i + 1));
+  }, [feed.length]);
+
   if (!open || !feed.length) return null;
 
   const currentItem = feed[index];
@@ -232,42 +253,56 @@ export default function MyCaseDetailModal({
 
   if (isDesktop) {
     const overlay = (
-      <div className="my-case-ig-overlay my-case-detail--post-viewer" role="presentation">
+      <div className="my-case-ig-overlay" role="presentation">
         <button
           type="button"
           className="my-case-ig-overlay__backdrop"
           onClick={onClose}
           aria-label="닫기"
         />
-        <div className="my-case-ig-overlay__frame">
+        <button
+          type="button"
+          className="my-case-ig-overlay__close"
+          onClick={onClose}
+          aria-label="닫기"
+        >
+          <X size={28} strokeWidth={1.8} />
+        </button>
+        <div className="my-case-ig-overlay__stage">
           {index > 0 ? (
             <button
               type="button"
               className="my-case-ig-overlay__post-nav my-case-ig-overlay__post-nav--prev"
-              onClick={() => setIndex((i) => Math.max(0, i - 1))}
+              onClick={goPrevPost}
               aria-label="이전 게시물"
             >
               <ChevronLeft size={28} />
             </button>
-          ) : null}
+          ) : (
+            <span className="my-case-ig-overlay__post-nav-spacer" aria-hidden />
+          )}
+          <div className="my-case-ig-overlay__frame my-case-detail--post-viewer">
+            {loading && !currentDetail ? (
+              <div className="my-case-ig-post my-case-ig-post--modal">
+                <div className="my-case-ig-post__empty" style={{ padding: 48 }}>
+                  불러오는 중…
+                </div>
+              </div>
+            ) : (
+              <MyCaseIgPostViewer {...viewerProps} variant="modal" showClose={false} />
+            )}
+          </div>
           {index < feed.length - 1 ? (
             <button
               type="button"
               className="my-case-ig-overlay__post-nav my-case-ig-overlay__post-nav--next"
-              onClick={() => setIndex((i) => Math.min(feed.length - 1, i + 1))}
+              onClick={goNextPost}
               aria-label="다음 게시물"
             >
               <ChevronRight size={28} />
             </button>
-          ) : null}
-          {loading && !currentDetail ? (
-            <div className="my-case-ig-post my-case-ig-post--modal">
-              <div className="my-case-ig-post__empty" style={{ padding: 48 }}>
-                불러오는 중…
-              </div>
-            </div>
           ) : (
-            <MyCaseIgPostViewer {...viewerProps} variant="modal" />
+            <span className="my-case-ig-overlay__post-nav-spacer" aria-hidden />
           )}
         </div>
       </div>

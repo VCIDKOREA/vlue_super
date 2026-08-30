@@ -11,7 +11,7 @@ import {
   writeLiveShowcaseStyle,
   parseShowcaseTagsInput
 } from "../../lib/showcase/showcaseStyleStorage.js";
-import { MYCASE_SHOWCASE_PICK_APPLY_EVENT } from "../../lib/mycase/mycaseShowcasePick.js";
+import { MYCASE_SHOWCASE_PICK_APPLY_EVENT, consumeMycaseShowcasePickPendingApply, readMycaseShowcasePick } from "../../lib/mycase/mycaseShowcasePick.js";
 import { mycaseSocialSlideId } from "../../lib/mycase/mycasePostPayload.js";
 import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { hasShowcaseBgmConfigured } from "../../lib/showcase/showcaseBgmPresets.js";
@@ -439,11 +439,11 @@ export default function ShowcaseStyleSettingsPanel({
     [persist]
   );
 
-  useEffect(() => {
-    const onPickApply = (e) => {
-      const picked = Array.isArray(e?.detail?.items) ? e.detail.items : [];
-      if (!picked.length) return;
-      const sorted = [...picked].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  const applyMycasePickItems = useCallback(
+    (picked) => {
+      const rows = Array.isArray(picked) ? picked : [];
+      if (!rows.length) return;
+      const sorted = [...rows].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
       const nextPages = sorted.map((row, i) =>
         createShowcasePage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM, {
           id: mycaseSocialSlideId(row.caseId, row.imageId) || `mycase-pick-${row.order || i + 1}`,
@@ -459,10 +459,23 @@ export default function ShowcaseStyleSettingsPanel({
       const first = nextPages[0];
       if (first?.id) setExpandedPageId(first.id);
       notify("케이스함에서 선택한 사진이 쇼케이스 페이지에 반영되었습니다.");
+    },
+    [persistPages, maxContentPages, notify]
+  );
+
+  useEffect(() => {
+    const onPickApply = (e) => {
+      applyMycasePickItems(e?.detail?.items);
     };
     window.addEventListener(MYCASE_SHOWCASE_PICK_APPLY_EVENT, onPickApply);
     return () => window.removeEventListener(MYCASE_SHOWCASE_PICK_APPLY_EVENT, onPickApply);
-  }, [persistPages, maxContentPages, notify]);
+  }, [applyMycasePickItems]);
+
+  useEffect(() => {
+    if (!consumeMycaseShowcasePickPendingApply()) return;
+    const { items } = readMycaseShowcasePick();
+    applyMycasePickItems(items);
+  }, [applyMycasePickItems]);
 
   const updatePage = useCallback(
     (pageId, patch) => {

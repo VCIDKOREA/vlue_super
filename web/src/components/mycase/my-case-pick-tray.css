@@ -210,3 +210,73 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.my-case-pick-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.my-case-pick-confirm__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+}
+
+.my-case-pick-confirm__panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 360px);
+  border-radius: 16px;
+  background: #fff;
+  padding: 22px 20px 18px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.2);
+}
+
+.my-case-pick-confirm__lead {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #191f28;
+}
+
+.my-case-pick-confirm__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #191f28;
+  word-break: keep-all;
+}
+
+.my-case-pick-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.my-case-pick-confirm__btn {
+  min-width: 72px;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.my-case-pick-confirm__btn--ghost {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.my-case-pick-confirm__btn--ok {
+  background: #0095f6;
+  color: #fff;
+}

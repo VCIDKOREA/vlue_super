@@ -38,7 +38,9 @@ export default function BusinessCardPage({
         }`}
       >
         {isShowcase ? (
-          <BackButton variant="panel" onBack={handleBack} className="left-1 top-0 z-20" />
+          cardSubview === 'edit' ? null : (
+            <BackButton variant="panel" onBack={handleBack} className="left-1 top-0 z-20" />
+          )
         ) : cardSubview === 'edit' ? null : (
           <>
             <button

@@ -1,6 +1,9 @@
 import { isPaidLetteringTier } from "../letteringMembership.js";
+import { readLiveShowcaseStyle, readShowcaseStyle, SHOWCASE_OPEN_SETTINGS_EVENT } from "../showcase/showcaseStyleStorage.js";
+import { showcaseStyleHasContent } from "../showcase/showcaseStyleSync.js";
 
 const STORAGE_KEY = "vlue_mycase_showcase_pick_v1";
+const PENDING_APPLY_KEY = "vlue_mycase_showcase_pick_pending_v1";
 export const MYCASE_SHOWCASE_PICK_CHANGED_EVENT = "vlue-mycase-showcase-pick-changed";
 export const MYCASE_SHOWCASE_PICK_APPLY_EVENT = "vlue-mycase-showcase-pick-apply";
 
@@ -106,4 +109,48 @@ export function dispatchMycaseShowcasePickApply() {
       detail: { items: [...items] }
     })
   );
+}
+
+/** 편집 중·송출 중 쇼케이스에 실질 콘텐츠가 있는지 */
+export function readExistingShowcaseHasContent() {
+  return (
+    showcaseStyleHasContent(readShowcaseStyle()) || showcaseStyleHasContent(readLiveShowcaseStyle())
+  );
+}
+
+export function markMycaseShowcasePickPendingApply() {
+  try {
+    sessionStorage.setItem(PENDING_APPLY_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+export function consumeMycaseShowcasePickPendingApply() {
+  try {
+    const pending = sessionStorage.getItem(PENDING_APPLY_KEY) === "1";
+    sessionStorage.removeItem(PENDING_APPLY_KEY);
+    return pending;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 케이스함 선택 → 쇼케이스 설정 화면 이동 + 선택 사진 반영 예약
+ * @param {"web"|"app"} channel — www 케이스함(web) / 앱 하단 시트(app)
+ */
+export function goToShowcaseSettingsWithPick({ channel = "web" } = {}) {
+  const { items } = readMycaseShowcasePick();
+  if (!items.length) return false;
+  markMycaseShowcasePickPendingApply();
+  if (channel === "web") {
+    const search = window.location.search || "";
+    window.history.pushState(null, "", `/${search}#showcase`);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  } else {
+    window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
+    window.setTimeout(() => dispatchMycaseShowcasePickApply(), 350);
+  }
+  return true;
 }

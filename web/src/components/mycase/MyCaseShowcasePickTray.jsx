@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { readMembershipTier } from "../../lib/bizcardAccountSync.js";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import {
   MYCASE_SHOWCASE_PICK_CHANGED_EVENT,
-  dispatchMycaseShowcasePickApply,
+  goToShowcaseSettingsWithPick,
+  readExistingShowcaseHasContent,
   readMycaseShowcasePick,
   showcasePickLimitForTier
 } from "../../lib/mycase/mycaseShowcasePick.js";
-import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../../lib/showcase/showcaseStyleStorage.js";
 import "./my-case-pick-tray.css";
 
 function measureNavHeightPx() {
@@ -29,6 +30,7 @@ export default function MyCaseShowcasePickTray({
 }) {
   const [tick, setTick] = useState(0);
   const [expanded, setExpanded] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [navBottomPx, setNavBottomPx] = useState(() => measureNavHeightPx());
   const panelRef = useRef(null);
   const membershipTier = useMemo(() => readMembershipTier(), [tick]);
@@ -64,22 +66,68 @@ export default function MyCaseShowcasePickTray({
     };
   }, [variant, expanded, items.length]);
 
-  const onComplete = useCallback(() => {
+  const onRequestComplete = useCallback(() => {
     if (!items.length) {
       onToast?.("먼저 게시물에서 쇼케이스에 넣을 사진을 선택해 주세요.");
       return;
     }
+    setConfirmOpen(true);
+  }, [items.length, onToast]);
+
+  const onConfirmComplete = useCallback(() => {
+    setConfirmOpen(false);
     setExpanded(false);
-    window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
-    window.setTimeout(() => dispatchMycaseShowcasePickApply(), 120);
-    onToast?.(
-      isPaidLetteringTier(membershipTier)
-        ? `선택한 ${items.length}장을 쇼케이스 설정에 반영합니다.`
-        : "선택한 사진을 쇼케이스 설정에 반영합니다."
-    );
-  }, [items.length, membershipTier, onToast]);
+    const channel = variant === "sidebar" ? "web" : "app";
+    const ok = goToShowcaseSettingsWithPick({ channel });
+    if (!ok) {
+      onToast?.("선택한 사진을 불러오지 못했습니다. 다시 시도해 주세요.");
+    }
+  }, [variant, onToast]);
+
+  const hasExistingShowcase = useMemo(() => readExistingShowcaseHasContent(), [confirmOpen, tick]);
 
   if (!enabled) return null;
+
+  const confirmDialog =
+    confirmOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div className="my-case-pick-confirm" role="dialog" aria-modal="true" aria-labelledby="my-case-pick-confirm-title">
+            <button
+              type="button"
+              className="my-case-pick-confirm__backdrop"
+              aria-label="닫기"
+              onClick={() => setConfirmOpen(false)}
+            />
+            <div className="my-case-pick-confirm__panel">
+              {hasExistingShowcase ? (
+                <p className="my-case-pick-confirm__lead">기존 쇼케이스가 있습니다.</p>
+              ) : null}
+              <h2 id="my-case-pick-confirm-title" className="my-case-pick-confirm__title">
+                선택한 사진은 쇼케이스 저장이 필요합니다.
+                <br />
+                쇼케이스 설정 화면으로 이동하시겠습니까?
+              </h2>
+              <div className="my-case-pick-confirm__actions">
+                <button
+                  type="button"
+                  className="my-case-pick-confirm__btn my-case-pick-confirm__btn--ghost"
+                  onClick={() => setConfirmOpen(false)}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="my-case-pick-confirm__btn my-case-pick-confirm__btn--ok"
+                  onClick={onConfirmComplete}
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
 
   const tierHint = isPaidLetteringTier(membershipTier)
     ? `통화 쇼케이스는 최대 ${limit}장까지 선택할 수 있습니다.`
@@ -101,7 +149,7 @@ export default function MyCaseShowcasePickTray({
           </li>
         ))}
       </ul>
-      <button type="button" className="my-case-pick-tray__done" onClick={onComplete}>
+      <button type="button" className="my-case-pick-tray__done" onClick={onRequestComplete}>
         선택완료
       </button>
     </>
@@ -109,7 +157,9 @@ export default function MyCaseShowcasePickTray({
 
   if (variant === "sidebar") {
     return (
-      <aside
+      <>
+        {confirmDialog}
+        <aside
         className={`my-case-pick-tray my-case-pick-tray--sidebar${items.length ? " has-items" : ""}`}
         aria-label="쇼케이스 선택"
       >
@@ -121,11 +171,14 @@ export default function MyCaseShowcasePickTray({
         </div>
         {trayBody}
       </aside>
+      </>
     );
   }
 
   return (
-    <section
+    <>
+      {confirmDialog}
+      <section
       className={`my-case-pick-tray my-case-pick-tray--sheet${expanded ? " is-expanded" : " is-collapsed"}${
         items.length ? " has-items" : ""
       }`}
@@ -161,5 +214,6 @@ export default function MyCaseShowcasePickTray({
         {expanded ? <div className="my-case-pick-tray__body">{trayBody}</div> : null}
       </div>
     </section>
+    </>
   );
 }
