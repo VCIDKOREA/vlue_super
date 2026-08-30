@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { createMycase } from "../../lib/mycaseApi.js";
 import { readMembershipTier } from "../../lib/bizcardAccountSync.js";
 import {
@@ -13,12 +14,28 @@ import "../showcase/showcase-style-settings.css";
 import "../../styles/showcase-call-glass.css";
 import "./my-case-composer.css";
 
-export default function MyCasePostComposer({ open, onClose, onToast, onCreated }) {
+export default function MyCasePostComposer({
+  open,
+  onClose,
+  onToast,
+  onCreated,
+  layout = "mobile"
+}) {
+  const isWebDesktop = layout === "desktop";
   const [category, setCategory] = useState("daily");
   const [caption, setCaption] = useState("");
   const [images, setImages] = useState([]);
   const [busy, setBusy] = useState(false);
   const membershipTier = useMemo(() => readMembershipTier(), [open]);
+
+  useEffect(() => {
+    if (!open || !isWebDesktop || typeof document === "undefined") return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open, isWebDesktop]);
 
   const submit = useCallback(async () => {
     if (!images.length) {
@@ -61,15 +78,16 @@ export default function MyCasePostComposer({ open, onClose, onToast, onCreated }
 
   if (!open) return null;
 
-  return (
+  const shell = (
     <AppFullScreenView
       open={open}
       onClose={onClose}
       title="새 게시물"
-      reserveBottomNav
-      className="bg-white"
+      reserveBottomNav={!isWebDesktop}
+      className={`bg-white my-case-composer-shell${isWebDesktop ? " my-case-composer-shell--web" : ""}`}
     >
-      <div className="my-case-composer">
+      <div className="my-case-composer-viewport">
+        <div className="my-case-composer">
         <div className="my-case-composer__cats">
           {MYCASE_FEED_CATEGORIES.map((c) => (
             <button
@@ -113,9 +131,15 @@ export default function MyCasePostComposer({ open, onClose, onToast, onCreated }
         <button type="button" className="my-case-composer__submit" disabled={busy} onClick={() => void submit()}>
           {busy ? "저장 중…" : "게시물 등록"}
         </button>
+        </div>
       </div>
     </AppFullScreenView>
   );
+
+  if (isWebDesktop && typeof document !== "undefined") {
+    return createPortal(shell, document.body);
+  }
+  return shell;
 }
 
 function mycaseCategoryLabelFallback(category) {

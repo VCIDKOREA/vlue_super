@@ -97,6 +97,7 @@ export default function MyCaseScreen({
           isDarkMode={isDarkMode}
           showSearch={showSearch}
           showLineSwitcher={showLineSwitcher}
+          layout={layout}
           onOpenDigitalCard={() => {
             if (!readDigitalCardActive()) {
               onToast?.("디지털인증명함이 없습니다.");

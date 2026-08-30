@@ -119,6 +119,7 @@ export default function MyCaseGrid({
   isDarkMode = false,
   showSearch = false,
   showLineSwitcher = false,
+  layout = "mobile",
   className = ""
 }) {
   const isMine = mode === "mine";
@@ -1166,6 +1167,7 @@ export default function MyCaseGrid({
         onClose={() => setComposerOpen(false)}
         onToast={toast}
         onCreated={() => void loadFirst()}
+        layout={layout}
       />
 
       <MyCaseSearchModal
