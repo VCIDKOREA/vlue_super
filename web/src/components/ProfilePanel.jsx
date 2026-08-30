@@ -604,6 +604,7 @@ function ProfilePanel({
   };
   const withdrawUnlocked = withdrawGrantUntil > Date.now();
   const canSubmitWithdraw = agreeRefund && agreeReverify && agreeFinal;
+  const hideProfileTopChrome = panelView === "letteringBizcard";
 
   const submitPartnerInquiry = () => {
     if (!partnerInquiryBody.trim()) {
@@ -625,6 +626,7 @@ function ProfilePanel({
           isDarkMode ? "border-white/10 bg-[#111827]" : "border-gray-100 bg-white"
         } ${open ? "translate-x-0" : "translate-x-full"}`}
       >
+        {hideProfileTopChrome ? null : (
         <div
           className={`px-5 py-2.5 flex justify-between items-center shrink-0 border-b ${isDarkMode ? "border-white/10" : "border-gray-50"}`}
         >
@@ -654,6 +656,7 @@ function ProfilePanel({
             ✕
           </button>
         </div>
+        )}
 
         {panelView === "digitalCard" ? (
           <DigitalCardEditorView

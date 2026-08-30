@@ -1,11 +1,12 @@
 .my-case-ig-post--feed {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto !important;
   min-height: 0;
-  background: #000;
-  color: #f5f5f5;
-  overflow: hidden;
+  flex: 0 0 auto;
+  background: var(--feed-bg, #ffffff);
+  color: var(--feed-text, #262626);
+  overflow: visible;
 }
 
 .my-case-ig-post--feed .my-case-ig-post__profile {
@@ -21,15 +22,32 @@
   width: 100%;
   aspect-ratio: 1 / 1;
   max-height: min(72vw, 56vh);
-  background: #000;
+  background: var(--feed-media-bg, #000);
   overflow: hidden;
 }
 
 .my-case-ig-post--feed .my-case-ig-post__body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  overflow: visible;
   padding: 0 0 max(8px, env(safe-area-inset-bottom, 0px));
+}
+
+.my-case-ig-post--feed .my-case-ig-post__social-wrap {
+  order: 1;
+}
+
+.my-case-ig-post--feed .my-case-ig-post__caption-text {
+  order: 2;
+}
+
+.my-case-ig-post--feed .my-case-ig-post__time {
+  order: 3;
+}
+
+.my-case-ig-post--feed .my-case-ig-post__comment-preview {
+  order: 4;
 }
 
 .my-case-ig-post--feed .my-case-ig-post__foot {
@@ -43,7 +61,7 @@
   padding: 0 14px 6px;
   font-size: 14px;
   line-height: 1.45;
-  color: #f5f5f5;
+  color: var(--feed-text, #262626);
 }
 
 .my-case-ig-post__caption-text strong {
@@ -55,7 +73,7 @@
   padding: 0;
   margin-left: 4px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--feed-text-muted, #737373);
   font-size: 14px;
   font-weight: 400;
   cursor: pointer;
@@ -63,10 +81,50 @@
 
 .my-case-ig-post__time {
   display: block;
-  padding: 0 14px 12px;
+  padding: 0 14px 6px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--feed-text-muted, #737373);
   text-transform: uppercase;
+}
+
+.my-case-ig-post__comment-preview {
+  display: block;
+  width: calc(100% - 28px);
+  margin: 0 14px 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--feed-text, #262626);
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-case-ig-post__comment-preview strong {
+  margin-right: 6px;
+  font-weight: 700;
+}
+
+.my-case-ig-post__comment-preview span {
+  font-weight: 400;
+}
+
+.my-case-ig-post--feed .my-case-ig-post__category {
+  color: var(--feed-text-muted, #737373);
+}
+
+.my-case-ig-post--feed .my-case-ig-post__actions {
+  color: var(--feed-text, #262626);
+}
+
+.my-case-ig-post--feed .my-case-ig-post__pick-btn {
+  border-color: var(--feed-pick-border, #262626);
+  color: var(--feed-pick-text, #262626);
+  background: var(--feed-bg, #fff);
 }
 
 .my-case-carousel {

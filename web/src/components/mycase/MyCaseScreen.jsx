@@ -135,6 +135,7 @@ export default function MyCaseScreen({
         isOwner
         layout={isDesktop ? "desktop" : "mobile"}
         showcasePickEnabled={showcasePickEnabled}
+        isDarkMode={isDarkMode}
         suppressBgm
         onClose={() => {
           setDetailOpen(false);

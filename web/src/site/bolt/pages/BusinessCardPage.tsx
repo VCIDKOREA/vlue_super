@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ArrowLeft, LogIn } from 'lucide-react';
 import SensitiveRightClickGuard from '../components/SensitiveRightClickGuard';
 import WebBizcardHub from '../components/WebBizcardHub';
@@ -20,6 +20,7 @@ export default function BusinessCardPage({
   mode = 'bizcard',
 }: BusinessCardPageProps) {
   const isShowcase = mode === 'showcase';
+  const [cardSubview, setCardSubview] = useState<'hub' | 'edit'>('hub');
   const leaveGuardRef = useRef<(() => void) | null>(null);
   const handleBack = useCallback(() => {
     if (typeof leaveGuardRef.current === 'function') {
@@ -38,7 +39,7 @@ export default function BusinessCardPage({
       >
         {isShowcase ? (
           <BackButton variant="panel" onBack={handleBack} className="left-1 top-0 z-20" />
-        ) : (
+        ) : cardSubview === 'edit' ? null : (
           <>
             <button
               onClick={handleBack}
@@ -94,6 +95,7 @@ export default function BusinessCardPage({
             user={user}
             autoOpenShowcase={isShowcase}
             onLeave={onBack}
+            onCardSubviewChange={setCardSubview}
             onBindLeaveGuard={(fn) => {
               leaveGuardRef.current = fn;
             }}

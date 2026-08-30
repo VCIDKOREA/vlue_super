@@ -135,11 +135,13 @@ function WebBizcardHubInner({
   autoOpenShowcase = false,
   onBindLeaveGuard,
   onLeave,
+  onCardSubviewChange,
 }: {
   user: MarketingAuthUser;
   autoOpenShowcase?: boolean;
   onBindLeaveGuard?: (fn: (() => void) | null) => void;
   onLeave?: () => void;
+  onCardSubviewChange?: (sub: CardSubview) => void;
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>('card');
   const [cardSubview, setCardSubview] = useState<CardSubview>('hub');
@@ -214,6 +216,10 @@ function WebBizcardHubInner({
       setLoading(false);
     }
   }, [showToast]);
+
+  useEffect(() => {
+    onCardSubviewChange?.(cardSubview);
+  }, [cardSubview, onCardSubviewChange]);
 
   useEffect(() => {
     refreshAccount();
@@ -431,11 +437,13 @@ export default function WebBizcardHub({
   autoOpenShowcase = false,
   onBindLeaveGuard,
   onLeave,
+  onCardSubviewChange,
 }: {
   user: MarketingAuthUser;
   autoOpenShowcase?: boolean;
   onBindLeaveGuard?: (fn: (() => void) | null) => void;
   onLeave?: () => void;
+  onCardSubviewChange?: (sub: CardSubview) => void;
 }) {
   return (
     <B2bMembershipProvider enabled>
@@ -444,6 +452,7 @@ export default function WebBizcardHub({
         autoOpenShowcase={autoOpenShowcase}
         onBindLeaveGuard={onBindLeaveGuard}
         onLeave={onLeave}
+        onCardSubviewChange={onCardSubviewChange}
       />
     </B2bMembershipProvider>
   );

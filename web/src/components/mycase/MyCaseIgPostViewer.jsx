@@ -58,9 +58,11 @@ export default function MyCaseIgPostViewer({
 
   const [imgIndex, setImgIndex] = useState(0);
   const [pickTick, setPickTick] = useState(0);
+  const [commentOpen, setCommentOpen] = useState(false);
 
   useEffect(() => {
     setImgIndex(0);
+    setCommentOpen(false);
   }, [item?.id]);
 
   useEffect(() => {
@@ -75,6 +77,7 @@ export default function MyCaseIgPostViewer({
     () => mycaseSocialSlideId(item?.id, current?.id),
     [item?.id, current?.id]
   );
+
   const resolvedOwnerUserId = useMemo(() => {
     const raw = String(ownerUserId || item?.ownerUserId || "").trim();
     return raw;
@@ -183,6 +186,9 @@ export default function MyCaseIgPostViewer({
             variant={variant}
             onToast={onToast}
             pickButton={pickButton}
+            commentOpen={commentOpen}
+            onCommentOpenChange={setCommentOpen}
+            showFeedCommentPreview
           />
           <MyCaseIgCaption handle={handleLabel} text={captionText} />
           <time className="my-case-ig-post__time">

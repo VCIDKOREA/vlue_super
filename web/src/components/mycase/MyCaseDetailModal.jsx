@@ -35,6 +35,7 @@ export default function MyCaseDetailModal({
   isOwner = false,
   peerIdentity = null,
   layout = "mobile",
+  isDarkMode = false,
   showcasePickEnabled = false,
   onClose,
   onToast
@@ -88,11 +89,8 @@ export default function MyCaseDetailModal({
       ignoreScrollRef.current = true;
       requestAnimationFrame(() => {
         const root = scrollerRef.current;
-        if (root) {
-          const slide = root.querySelector(".my-case-feed__slide");
-          const step = slide?.offsetHeight || root.clientHeight || 1;
-          root.scrollTop = initialIdx * step;
-        }
+        const slides = root?.querySelectorAll(".my-case-feed__slide");
+        slides?.[initialIdx]?.scrollIntoView({ block: "start" });
         window.setTimeout(() => {
           ignoreScrollRef.current = false;
         }, 80);
@@ -137,6 +135,22 @@ export default function MyCaseDetailModal({
     if (current) void ensureDetail(current);
   }, [open, feed, index, ensureDetail]);
 
+  const scrollToFeedIndex = useCallback(
+    (nextIdx) => {
+      if (isDesktop) return;
+      ignoreScrollRef.current = true;
+      requestAnimationFrame(() => {
+        const root = scrollerRef.current;
+        const slides = root?.querySelectorAll(".my-case-feed__slide");
+        slides?.[nextIdx]?.scrollIntoView({ block: "start" });
+        window.setTimeout(() => {
+          ignoreScrollRef.current = false;
+        }, 80);
+      });
+    },
+    [isDesktop]
+  );
+
   useEffect(() => {
     if (!open) return undefined;
     const ownerId = String(item?.ownerUserId || peerIdentity?.userId || "").trim();
@@ -145,11 +159,19 @@ export default function MyCaseDetailModal({
       if (e.key === "Escape") onClose?.();
       if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === "ArrowRight") {
         e.preventDefault();
-        setIndex((i) => Math.min(feed.length - 1, i + 1));
+        setIndex((i) => {
+          const next = Math.min(feed.length - 1, i + 1);
+          if (!isDesktop) scrollToFeedIndex(next);
+          return next;
+        });
       }
       if (e.key === "ArrowUp" || e.key === "PageUp" || e.key === "ArrowLeft") {
         e.preventDefault();
-        setIndex((i) => Math.max(0, i - 1));
+        setIndex((i) => {
+          const next = Math.max(0, i - 1);
+          if (!isDesktop) scrollToFeedIndex(next);
+          return next;
+        });
       }
     };
     const onCloseOverlays = () => onClose?.();
@@ -159,34 +181,24 @@ export default function MyCaseDetailModal({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
     };
-  }, [open, onClose, feed.length, item?.ownerUserId, peerIdentity?.userId, isOwner]);
-
-  const slideStep = useCallback(() => {
-    const root = scrollerRef.current;
-    if (!root) return 1;
-    const slide = root.querySelector(".my-case-feed__slide");
-    return slide?.offsetHeight || root.clientHeight || 1;
-  }, []);
-
-  useEffect(() => {
-    if (!open || isDesktop) return;
-    const root = scrollerRef.current;
-    if (!root) return;
-    ignoreScrollRef.current = true;
-    const step = slideStep();
-    root.scrollTo({ top: index * step, behavior: "smooth" });
-    window.setTimeout(() => {
-      ignoreScrollRef.current = false;
-    }, 320);
-  }, [index, open, isDesktop, slideStep]);
+  }, [open, onClose, feed.length, item?.ownerUserId, peerIdentity?.userId, isOwner, isDesktop, scrollToFeedIndex]);
 
   const onScroll = () => {
     if (ignoreScrollRef.current || isDesktop) return;
     const root = scrollerRef.current;
     if (!root) return;
-    const step = slideStep();
-    const next = Math.round(root.scrollTop / step);
-    if (next !== index && next >= 0 && next < feed.length) setIndex(next);
+    const slides = root.querySelectorAll(".my-case-feed__slide");
+    const top = root.scrollTop;
+    let best = 0;
+    let bestDist = Infinity;
+    slides.forEach((el, i) => {
+      const dist = Math.abs(el.offsetTop - top);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = i;
+      }
+    });
+    if (best !== index && best >= 0 && best < feed.length) setIndex(best);
   };
 
   if (!open || !feed.length) return null;
@@ -261,6 +273,8 @@ export default function MyCaseDetailModal({
     );
   }
 
+  const themeClass = isDarkMode ? "my-case-detail--dark" : "my-case-detail--light";
+
   return (
     <AppFullScreenView
       open={open}
@@ -269,7 +283,8 @@ export default function MyCaseDetailModal({
       hideHeader
       showFloatingClose={false}
       coverBottomNav
-      className="my-case-detail my-case-detail--broadcast bg-black"
+      isDarkMode={isDarkMode}
+      className={`my-case-detail my-case-detail--feed ${themeClass}`}
     >
       <header className="my-case-feed__topbar">
         <button type="button" className="my-case-feed__back" onClick={onClose} aria-label="뒤로">
@@ -326,11 +341,6 @@ export default function MyCaseDetailModal({
                     showClose={false}
                   />
                 )
-              ) : (
-                <div className="my-case-feed__slide-inner my-case-feed__slide-inner--idle" aria-hidden />
-              )}
-              {feed.length > 1 && i < feed.length - 1 ? (
-                <div className="my-case-feed__peek" aria-hidden />
               ) : null}
             </section>
           );

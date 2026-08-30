@@ -84,6 +84,7 @@ export default function ShowcaseCommentSheet({
   previewMode = false,
   seedComments = [],
   onCountChange,
+  onCommentsChange,
   onToast,
   onHashtag,
   onMention
@@ -119,13 +120,27 @@ export default function ShowcaseCommentSheet({
       setLoading(false);
       if (res.ok) {
         setComments(res.comments);
-        onCountChange?.(res.comments.length);
+        publishComments(res.comments);
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [open, ownerUserId, slideId, previewMode, seedComments, onCountChange]);
+  }, [open, ownerUserId, slideId, previewMode, seedComments, onCountChange, onCommentsChange]);
+
+  const publishComments = (next) => {
+    const list = Array.isArray(next) ? next : [];
+    onCountChange?.(list.length);
+    onCommentsChange?.(list);
+  };
+
+  const replaceComments = (updater) => {
+    setComments((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      publishComments(next);
+      return next;
+    });
+  };
 
   const threads = useMemo(() => groupCommentsWithReplies(comments), [comments]);
   const totalCount = comments.length;
@@ -164,14 +179,12 @@ export default function ShowcaseCommentSheet({
     if (!window.confirm("이 댓글을 삭제할까요?")) return;
     const snapshot = comments;
     const next = comments.filter((row) => row.id !== c.id && row.parentId !== c.id);
-    setComments(next);
-    onCountChange?.(next.length);
+    replaceComments(next);
     if (editing?.id === c.id) cancelEdit();
     if (previewMode || !ownerUserId || String(c.id || "").startsWith("local-")) return;
     const res = await deleteShowcaseCommentApi(ownerUserId, c.id);
     if (!res.ok) {
-      setComments(snapshot);
-      onCountChange?.(snapshot.length);
+      replaceComments(snapshot);
       onToast?.(res.error || "댓글을 삭제하지 못했습니다.");
     }
   };
@@ -221,18 +234,18 @@ export default function ShowcaseCommentSheet({
     if (editing) {
       const editId = editing.id;
       const prevBody = String(editing.body || "");
-      setComments((prev) => prev.map((row) => (row.id === editId ? { ...row, body } : row)));
+      replaceComments((prev) => prev.map((row) => (row.id === editId ? { ...row, body } : row)));
       setDraft("");
       setEditing(null);
       if (previewMode || !ownerUserId || String(editId).startsWith("local-")) return;
       const res = await patchShowcaseComment(ownerUserId, editId, body);
       if (!res.ok) {
-        setComments((prev) => prev.map((row) => (row.id === editId ? { ...row, body: prevBody } : row)));
+        replaceComments((prev) => prev.map((row) => (row.id === editId ? { ...row, body: prevBody } : row)));
         onToast?.(res.error || "댓글을 수정하지 못했습니다.");
         return;
       }
       if (res.comment) {
-        setComments((prev) => prev.map((row) => (row.id === editId ? hydrate(res.comment) : row)));
+        replaceComments((prev) => prev.map((row) => (row.id === editId ? hydrate(res.comment) : row)));
       }
       return;
     }
@@ -246,11 +259,7 @@ export default function ShowcaseCommentSheet({
       mine: true,
       author: resolveMyCommentAuthor()
     };
-    setComments((prev) => {
-      const next = [local, ...prev];
-      onCountChange?.(next.length);
-      return next;
-    });
+    replaceComments((prev) => [local, ...prev]);
     setDraft("");
     setReplyTo(null);
     setEmojiOpen(false);
@@ -260,11 +269,7 @@ export default function ShowcaseCommentSheet({
       return;
     }
     if (!hasVlueLoggedInSession()) {
-      setComments((prev) => {
-        const next = prev.filter((row) => row.id !== tempId);
-        onCountChange?.(next.length);
-        return next;
-      });
+      replaceComments((prev) => prev.filter((row) => row.id !== tempId));
       setDraft(body);
       onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
       return;
@@ -272,11 +277,7 @@ export default function ShowcaseCommentSheet({
 
     const res = await postShowcaseComment(ownerUserId, body, { slideId, parentId });
     if (!res.ok) {
-      setComments((prev) => {
-        const next = prev.filter((row) => row.id !== tempId);
-        onCountChange?.(next.length);
-        return next;
-      });
+      replaceComments((prev) => prev.filter((row) => row.id !== tempId));
       setDraft(body);
       const msg = String(res.error || "");
       if (/failed to fetch/i.test(msg) || res.status === 401) {
@@ -290,7 +291,7 @@ export default function ShowcaseCommentSheet({
     }
     const comment = hydrate(res.comment);
     if (!comment) return;
-    setComments((prev) => prev.map((row) => (row.id === tempId ? comment : row)));
+    replaceComments((prev) => prev.map((row) => (row.id === tempId ? comment : row)));
   };
 
   const openAuthorCase = (author) => {

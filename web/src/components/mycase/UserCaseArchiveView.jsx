@@ -116,6 +116,7 @@ export default function UserCaseArchiveView({
         detail={detailPayload}
         feedItems={feedItems}
         startIndex={feedStartIndex}
+        isDarkMode={isDarkMode}
         peerIdentity={peerIdentity}
         suppressBgm
         onClose={() => {
