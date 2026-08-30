@@ -4,8 +4,15 @@ import {
   readShowcaseStyle,
   SHOWCASE_OPEN_SETTINGS_EVENT
 } from "../showcase/showcaseStyleStorage.js";
-import { migrateLegacyPages, normalizeShowcasePage } from "../showcase/showcasePages.js";
+import {
+  clampShowcasePages,
+  createShowcasePage,
+  migrateLegacyPages,
+  normalizeShowcasePage,
+  SHOWCASE_PAGE_TYPES
+} from "../showcase/showcasePages.js";
 import { showcaseStyleHasContent } from "../showcase/showcaseStyleSync.js";
+import { mycaseSocialSlideId } from "./mycasePostPayload.js";
 
 const STORAGE_KEY = "vlue_mycase_showcase_pick_v1";
 const SEED_KEY = "vlue_mycase_showcase_pick_seed_v1";
@@ -302,4 +309,67 @@ export function goToShowcaseSettingsWithPick({ channel = "web" } = {}) {
     window.setTimeout(() => dispatchMycaseShowcasePickApply(), 350);
   }
   return true;
+}
+
+/**
+ * 케이스함 선택 슬롯 → 쇼케이스 설정 초안 pages[] 병합 (슬롯 번호 = 콘텐츠 페이지 1~N)
+ * @param {object} style
+ * @param {object[]} picked
+ * @param {number} maxContentPages
+ * @param {string} membershipTier
+ * @param {{ includeDigitalCard?: boolean }} [opts]
+ */
+export function mergeMycasePickIntoShowcaseStyle(
+  style,
+  picked,
+  maxContentPages,
+  membershipTier,
+  opts = {}
+) {
+  const rows = (Array.isArray(picked) ? picked : []).filter((row) =>
+    String(row?.imageUrl || "").trim()
+  );
+  if (!rows.length || !style || typeof style !== "object") return style;
+
+  const sorted = [...rows].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  const currentPages = (
+    Array.isArray(style.pages) && style.pages.length
+      ? style.pages
+      : migrateLegacyPages(style)
+  ).map(normalizeShowcasePage);
+
+  const nextPages = [];
+  for (let i = 0; i < maxContentPages; i++) {
+    const order = i + 1;
+    const pick = sorted.find((row) => Number(row.order) === order);
+    const existing = currentPages[i];
+    if (pick) {
+      nextPages.push(
+        createShowcasePage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM, {
+          id:
+            existing?.id ||
+            mycaseSocialSlideId(pick.caseId, pick.imageId) ||
+            `mycase-pick-${order}`,
+          gallery: {
+            photos: [
+              {
+                id: String(pick.imageId || `pick-${order}`),
+                url: String(pick.imageUrl || "").trim()
+              }
+            ]
+          },
+          richCustom: {
+            bodyText: String(pick.caption || existing?.richCustom?.bodyText || "").trim()
+          },
+          businessLink: existing?.businessLink || null,
+          caseTheme: existing?.caseTheme
+        })
+      );
+    } else if (existing) {
+      nextPages.push(existing);
+    }
+  }
+
+  if (!nextPages.length) return style;
+  return clampShowcasePages({ ...style, pages: nextPages }, membershipTier, opts);
 }

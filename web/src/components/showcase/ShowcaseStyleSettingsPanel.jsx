@@ -11,8 +11,7 @@ import {
   writeLiveShowcaseStyle,
   parseShowcaseTagsInput
 } from "../../lib/showcase/showcaseStyleStorage.js";
-import { MYCASE_SHOWCASE_PICK_APPLY_EVENT, consumeMycaseShowcasePickPendingApply, readMycaseShowcasePick } from "../../lib/mycase/mycaseShowcasePick.js";
-import { mycaseSocialSlideId } from "../../lib/mycase/mycasePostPayload.js";
+import { MYCASE_SHOWCASE_PICK_APPLY_EVENT, consumeMycaseShowcasePickPendingApply, mergeMycasePickIntoShowcaseStyle, readMycaseShowcasePick } from "../../lib/mycase/mycaseShowcasePick.js";
 import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { hasShowcaseBgmConfigured } from "../../lib/showcase/showcaseBgmPresets.js";
 import { PRIVACY_MODES, maxShowcaseContentPagesForTier } from "../../lib/showcase/tentShowcaseTypes.js";
@@ -254,6 +253,7 @@ export default function ShowcaseStyleSettingsPanel({
   const [lineBusy, setLineBusy] = useState(false);
   const [styleReady, setStyleReady] = useState(false);
   const pendingPickApplyRef = useRef(false);
+  const draftDirtyRef = useRef(false);
   const [deskNotice, setDeskNotice] = useState("");
   const [footerGuide, setFooterGuide] = useState("");
   const [photoGuideOpen, setPhotoGuideOpen] = useState(false);
@@ -345,12 +345,39 @@ export default function ShowcaseStyleSettingsPanel({
 
   /* 설정 진입 시 서버/로컬 → 초안. 편집 중에는 storage·서버에 쓰지 않음 */
   useEffect(() => {
+    if (consumeMycaseShowcasePickPendingApply()) {
+      pendingPickApplyRef.current = true;
+    }
+
     let cancelled = false;
     const applyLocal = () => {
       if (cancelled) return;
-      const latest = readShowcaseStyle();
+      const serverBaseline = readShowcaseStyle();
+      let latest = serverBaseline;
+      const hadPendingPick = pendingPickApplyRef.current;
+      if (hadPendingPick) {
+        const { items } = readMycaseShowcasePick();
+        latest = mergeMycasePickIntoShowcaseStyle(
+          latest,
+          items,
+          maxContentPages,
+          membershipTier,
+          { includeDigitalCard }
+        );
+        pendingPickApplyRef.current = false;
+        const firstPick = [...items]
+          .filter((row) => String(row?.imageUrl || "").trim())
+          .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))[0];
+        if (firstPick) {
+          const mergedPages = Array.isArray(latest.pages) ? latest.pages : [];
+          const target =
+            mergedPages[Math.max(0, (Number(firstPick.order) || 1) - 1)] || mergedPages[0];
+          if (target?.id) setExpandedPageId(target.id);
+        }
+        notify("케이스함에서 선택한 사진이 쇼케이스 페이지에 반영되었습니다.");
+      }
       setConfig(latest);
-      setAppliedFp(styleFingerprint(latest));
+      setAppliedFp(styleFingerprint(serverBaseline));
       setTagInput((latest.tags || []).join(" "));
     };
     void import("../../lib/showcase/showcaseStyleSync.js")
@@ -372,7 +399,7 @@ export default function ShowcaseStyleSettingsPanel({
     return () => {
       cancelled = true;
     };
-  }, [isWebDesk]);
+  }, [isWebDesk, maxContentPages, membershipTier, includeDigitalCard, notify]);
 
   /* 명함 사진·신원 변경 시 미리보기 즉시 반영 */
   useEffect(() => {
@@ -448,48 +475,29 @@ export default function ShowcaseStyleSettingsPanel({
         String(row?.imageUrl || "").trim()
       );
       if (!rows.length) return;
-      const sorted = [...rows].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
-      const currentPages = (Array.isArray(pages) ? pages : []).map(normalizeShowcasePage);
-      const nextPages = [];
 
-      for (let i = 0; i < maxContentPages; i++) {
-        const order = i + 1;
-        const pick = sorted.find((row) => Number(row.order) === order);
-        const existing = currentPages[i];
-        if (pick) {
-          nextPages.push(
-            createShowcasePage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM, {
-              id:
-                existing?.id ||
-                mycaseSocialSlideId(pick.caseId, pick.imageId) ||
-                `mycase-pick-${order}`,
-              gallery: {
-                photos: [
-                  {
-                    id: String(pick.imageId || `pick-${order}`),
-                    url: String(pick.imageUrl || "").trim()
-                  }
-                ]
-              },
-              richCustom: {
-                bodyText: String(pick.caption || existing?.richCustom?.bodyText || "").trim()
-              },
-              businessLink: existing?.businessLink || null,
-              caseTheme: existing?.caseTheme
-            })
-          );
-        } else if (existing) {
-          nextPages.push(existing);
+      setConfig((prev) => {
+        const merged = mergeMycasePickIntoShowcaseStyle(
+          prev,
+          rows,
+          maxContentPages,
+          membershipTier,
+          { includeDigitalCard }
+        );
+        const first = [...rows].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))[0];
+        if (first?.order) {
+          const target =
+            (Array.isArray(merged.pages) ? merged.pages : [])[
+              Math.max(0, (Number(first.order) || 1) - 1)
+            ] || null;
+          if (target?.id) setExpandedPageId(target.id);
         }
-      }
+        return merged;
+      });
 
-      if (!nextPages.length) return;
-      persistPages(nextPages);
-      const first = nextPages[0];
-      if (first?.id) setExpandedPageId(first.id);
       notify("케이스함에서 선택한 사진이 쇼케이스 페이지에 반영되었습니다.");
     },
-    [persistPages, maxContentPages, notify, pages]
+    [maxContentPages, membershipTier, includeDigitalCard, notify]
   );
 
   useEffect(() => {
@@ -507,12 +515,6 @@ export default function ShowcaseStyleSettingsPanel({
     const { items } = readMycaseShowcasePick();
     applyMycasePickItems(items);
   }, [styleReady, applyMycasePickItems]);
-
-  useEffect(() => {
-    if (consumeMycaseShowcasePickPendingApply()) {
-      pendingPickApplyRef.current = true;
-    }
-  }, []);
 
   const updatePage = useCallback(
     (pageId, patch) => {
@@ -634,16 +636,6 @@ export default function ShowcaseStyleSettingsPanel({
     persist
   ]);
 
-  useEffect(() => {
-    const onExternal = () => {
-      const latest = readShowcaseStyle();
-      setConfig(latest);
-      setTagInput((latest.tags || []).join(" "));
-    };
-    window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onExternal);
-    return () => window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onExternal);
-  }, []);
-
   /* 한도 초과 페이지 잘라냄 */
   useEffect(() => {
     if (pages.length <= maxContentPages) return;
@@ -726,6 +718,21 @@ export default function ShowcaseStyleSettingsPanel({
     const draft = { ...config, tags: parseShowcaseTagsInput(tagInput) };
     return styleFingerprint(draft) !== appliedFp;
   }, [config, tagInput, appliedFp]);
+
+  useEffect(() => {
+    draftDirtyRef.current = dirty;
+  }, [dirty]);
+
+  useEffect(() => {
+    const onExternal = () => {
+      if (draftDirtyRef.current) return;
+      const latest = readShowcaseStyle();
+      setConfig(latest);
+      setTagInput((latest.tags || []).join(" "));
+    };
+    window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onExternal);
+    return () => window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onExternal);
+  }, []);
 
   const appliedPagesById = useMemo(() => {
     try {
