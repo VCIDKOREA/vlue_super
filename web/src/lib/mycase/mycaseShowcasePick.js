@@ -101,8 +101,8 @@ export function extractShowcasePickSlotsFromStyle(style, limit = SHOWCASE_PICK_L
     if (!url) continue;
     slots.push({
       order: i + 1,
-      caseId: `showcase-page-${String(page?.id || i + 1)}`,
-      imageId: String(photo?.id || url),
+      caseId: String(page?.mycaseCaseId || `showcase-page-${String(page?.id || i + 1)}`),
+      imageId: String(page?.mycaseImageId || photo?.id || url),
       imageUrl: url,
       caption: String(page?.richCustom?.bodyText || "").trim(),
       source: "showcase"
@@ -344,16 +344,25 @@ export function mergeMycasePickIntoShowcaseStyle(
     const pick = sorted.find((row) => Number(row.order) === order);
     const existing = currentPages[i];
     if (pick) {
+      const caseId = String(pick.caseId || "").trim();
+      const imageId = String(pick.imageId || `pick-${order}`).trim();
+      const socialSlideId =
+        (caseId && !caseId.startsWith("showcase-page-")
+          ? mycaseSocialSlideId(caseId, imageId)
+          : "") ||
+        String(existing?.socialSlideId || existing?.id || "").trim() ||
+        mycaseSocialSlideId(caseId, imageId) ||
+        `mycase-pick-${order}`;
       nextPages.push(
         createShowcasePage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM, {
-          id:
-            existing?.id ||
-            mycaseSocialSlideId(pick.caseId, pick.imageId) ||
-            `mycase-pick-${order}`,
+          id: socialSlideId,
+          socialSlideId,
+          mycaseCaseId: caseId.startsWith("showcase-page-") ? undefined : caseId || undefined,
+          mycaseImageId: imageId,
           gallery: {
             photos: [
               {
-                id: String(pick.imageId || `pick-${order}`),
+                id: imageId,
                 url: String(pick.imageUrl || "").trim()
               }
             ]

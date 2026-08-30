@@ -759,7 +759,7 @@ export default function LetteringIncomingNotification({
     : showcaseOffPreview
       ? showcaseOffAuthLabel
       : hideBroadcastName
-        ? contactSavedName || collapsedPhoneDisplay || "—"
+        ? resolveShowcaseBarOwnerLabel(c, { hideBroadcastName: true })
         : /* 쇼케이스 ON 빅푸시: 상호 우선 → 없으면 이름 (CEO=VCID KOREA, 전중희=이름) */
           receptionLines?.primary ||
           peerVerifiedName ||

@@ -124,6 +124,10 @@ object BigPushShowcaseBar {
             json?.optString("profileKind"),
             card?.optString("profileKind")
         )
+        val showcaseStyle = card?.optJSONObject("showcaseStyle") ?: json?.optJSONObject("showcaseStyle")
+        val hideBroadcastName =
+            card?.optBoolean("hideBroadcastName", false) == true ||
+                showcaseStyle?.optBoolean("showBroadcastName", true) == false
         val expired = profileKind == "expired_line" ||
             firstNonBlank(json?.optString("lineBillingStatus"), card?.optString("lineBillingStatus")) == "grace"
         val phoneDisp = formatPhone(
@@ -142,14 +146,22 @@ object BigPushShowcaseBar {
                 avatarKind = AvatarKind.SILHOUETTE
             )
         }
-        val brand = if (!handle.isNullOrBlank()) "$handle Showcase" else "VLUE Showcase"
+        val brand = when {
+            !org.isNullOrBlank() -> "$org Showcase"
+            !hideBroadcastName && !displayName.isNullOrBlank() -> "$displayName Showcase"
+            hideBroadcastName -> "VLUE ID Showcase"
+            !handle.isNullOrBlank() -> "$handle Showcase"
+            else -> "VLUE Showcase"
+        }
         /*
          * 앱 미리보기·웹 빅푸시와 동일:
-         * 1행 = 상호(없으면 이름)
+         * 1행 = 상호(없으면 이름, 이름 숨김이면 VLUE ID)
          * 2행 = 상호 있으면 「이름 | 번호」 / 없으면 번호만
          */
         val primary = when {
             !org.isNullOrBlank() -> org
+            !hideBroadcastName && !displayName.isNullOrBlank() -> displayName
+            hideBroadcastName -> "VLUE ID"
             !displayName.isNullOrBlank() -> displayName
             else -> phoneDisp.ifBlank { "번호 확인 중…" }
         }
@@ -283,7 +295,10 @@ object BigPushShowcaseBar {
                 typeface = Typeface.DEFAULT_BOLD
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
             }
         )
         nameRow.addView(

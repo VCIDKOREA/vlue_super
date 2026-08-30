@@ -14,6 +14,8 @@ import {
   mergeShowcaseStyleForChrome
 } from "../../lib/showcase/showcaseSocialOutlinks.js";
 import { openShowcaseSocialItem } from "../../lib/showcase/openShowcaseSocialItem.js";
+import { resolveShowcaseBarOwnerLabel } from "../../lib/letteringPaidIdentityDisplay.js";
+import ShowcaseIdentityCertMark from "./ShowcaseIdentityCertMark.jsx";
 import "../follow/follow-action.css";
 
 function firstText(...values) {
@@ -59,7 +61,10 @@ export default function ShowcaseSlideChrome({
   hideFollow = false,
   fallbackToMe = false,
   onToast,
-  onOpenCaseArchive
+  onOpenCaseArchive,
+  showSnsCert = false,
+  onOpenSnsCert,
+  verified = true
 }) {
   const [socialOpen, setSocialOpen] = useState(false);
   const [logoBroken, setLogoBroken] = useState(false);
@@ -73,28 +78,27 @@ export default function ShowcaseSlideChrome({
   }, [pageLink?.logoUrl, pageLink?.id]);
 
   /*
-   * VLUE 프로필 바 — 디지털 인증명함 성명 우선.
-   * activityName(피드 닉)을 앞에 두면 공유 링크에 "VCID" 등 활동명이 뜨고
-   * 앱 미리보기(성명)와 어긋난다.
+   * VLUE 프로필 바 라벨 — 상호 → 이름 → VLUE ID (이름 비공개 시)
    */
-  const profileName = firstText(
-    card?.name,
-    card?.displayName,
-    card?.legalName,
-    card?.personName,
-    card?.activityName,
-    card?.publicHandle,
-    card?.loginId,
-    card?.handle,
-    card?.memberId,
-    card?.organization
+  const hideBroadcastName = Boolean(
+    card?.hideBroadcastName || card?.showcaseStyle?.showBroadcastName === false
   );
+  const certIdentityLabel = resolveShowcaseBarOwnerLabel(card, { hideBroadcastName });
+  const profileName = certIdentityLabel;
 
   const { avatarUrl, letter } = (() => {
+    const displayForAvatar = firstText(
+      card?.name,
+      card?.displayName,
+      card?.legalName,
+      card?.personName,
+      card?.activityName,
+      card?.organization
+    );
     const peer = resolveShowcasePeerAvatar({
       style,
       card,
-      displayName: profileName,
+      displayName: displayForAvatar,
       exposeCustom: true
     });
     if (peer.type === "image" && peer.url && !isVlueBrandAssetUrl(peer.url)) {
@@ -225,7 +229,15 @@ export default function ShowcaseSlideChrome({
             </span>
             <span className="showcase-slide-chrome__vlue-meta">
               <span className="showcase-slide-chrome__vlue-label">VLUE 프로필</span>
-              <span className="showcase-slide-chrome__vlue-name">{profileName || "회원"}</span>
+              <span className="showcase-slide-chrome__vlue-name-row">
+                <span className="showcase-slide-chrome__vlue-name">{profileName || "회원"}</span>
+                <ShowcaseIdentityCertMark
+                  showSnsCert={showSnsCert}
+                  onOpenSnsCert={onOpenSnsCert}
+                  verified={verified}
+                  size={16}
+                />
+              </span>
             </span>
           </button>
           {(showFollow || hasSocial) ? (

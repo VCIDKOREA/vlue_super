@@ -35,6 +35,7 @@ import VLUE_EYE_WATERMARK from "../assets/vlue-eye-watermark.svg?url";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
 import { KakaoOpenChatGlyph, KakaoTalkGlyph } from "./showcase/KakaoOutlinkGlyphs.jsx";
 import { listShowcaseSocialOutlinks } from "../lib/showcase/showcaseSocialOutlinks.js";
+import ShowcaseIdentityCertMark from "./showcase/ShowcaseIdentityCertMark.jsx";
 
 const CEO_WATERMARK_SRC = VLUE_EYE_WATERMARK || VLUE_SHIELD_LOGO || "";
 
@@ -486,7 +487,9 @@ function FrontPanel({
   enableContactLinks = true,
   onRequestDial,
   hideFollow = false,
-  onToast
+  onToast,
+  showSnsCert = false,
+  onOpenSnsCert
 }) {
   const [socialOpen, setSocialOpen] = useState(false);
   const socialItems = listCardSocialOutlinks(card);
@@ -546,30 +549,37 @@ function FrontPanel({
         <div className="ldr-back-head__copy">
           <p className="ldr-back-kicker">Digital ID · Profile</p>
           <div className="ldr-back-title-row">
-            {(() => {
-              const { primary } = resolveDccFrontIdentityLines(card);
-              if (peerUserId) {
-                return (
-                  <button
-                    type="button"
-                    className="ldr-back-title ldr-back-title--link"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      openPeerCaseArchive();
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    aria-label="케이스함 열기"
-                  >
-                    {primary}
-                  </button>
-                );
-              }
-              return <h3 className="ldr-back-title">{primary}</h3>;
-            })()}
-            {verified ? (
-              <VlueCyanVerifiedSeal size={16} className="ldr-title-verified-seal" aria-label="VLUE 인증됨" />
-            ) : null}
+            <div className="ldr-back-title-primary">
+              {(() => {
+                const { primary } = resolveDccFrontIdentityLines(card);
+                if (peerUserId) {
+                  return (
+                    <button
+                      type="button"
+                      className="ldr-back-title ldr-back-title--link"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openPeerCaseArchive();
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      aria-label="케이스함 열기"
+                    >
+                      {primary}
+                    </button>
+                  );
+                }
+                return <h3 className="ldr-back-title">{primary}</h3>;
+              })()}
+              {showSnsCert || verified ? (
+                <ShowcaseIdentityCertMark
+                  showSnsCert={showSnsCert}
+                  onOpenSnsCert={onOpenSnsCert}
+                  verified={verified}
+                  size={16}
+                />
+              ) : null}
+            </div>
           </div>
           {(() => {
             /* 미니미리보기·상대 쇼케이스·실통화 DCC — 동일 resolveDccFrontIdentityLines */
@@ -803,7 +813,9 @@ export default function LetteringDigitalReception({
   onToast,
   hideFollow = false,
   /** 실통화 하단 통화옵션과 겹치지 않도록 토글 여백·크기 축소 */
-  callChromeSafe = false
+  callChromeSafe = false,
+  showSnsCert = false,
+  onOpenSnsCert
 }) {
   const card = useMemo(() => normalizeLetteringCard(cardRaw || {}), [cardRaw]);
   const isDcp = card?.profileKind === "dcp" || card?.dcp;
@@ -861,6 +873,8 @@ export default function LetteringDigitalReception({
       onRequestDial={requestDial}
       hideFollow={hideFollow}
       onToast={onToast}
+      showSnsCert={showSnsCert}
+      onOpenSnsCert={onOpenSnsCert}
     />
   );
   const back = (

@@ -12,6 +12,7 @@ import {
   parseShowcaseTagsInput
 } from "../../lib/showcase/showcaseStyleStorage.js";
 import { MYCASE_SHOWCASE_PICK_APPLY_EVENT, consumeMycaseShowcasePickPendingApply, mergeMycasePickIntoShowcaseStyle, readMycaseShowcasePick } from "../../lib/mycase/mycaseShowcasePick.js";
+import { mycaseSocialSlideId } from "../../lib/mycase/mycasePostPayload.js";
 import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { hasShowcaseBgmConfigured } from "../../lib/showcase/showcaseBgmPresets.js";
 import { PRIVACY_MODES, maxShowcaseContentPagesForTier } from "../../lib/showcase/tentShowcaseTypes.js";
@@ -522,6 +523,16 @@ export default function ShowcaseStyleSettingsPanel({
         if (p.id !== pageId) return p;
         const merged = normalizeShowcasePage({ ...p, ...patch });
         if (patch.gallery) merged.gallery = { photos: patch.gallery.photos || [] };
+        if (patch.gallery && merged.mycaseCaseId && !String(merged.mycaseCaseId).startsWith("showcase-page-")) {
+          const photo = (merged.gallery.photos || [])[0];
+          const imageId = String(photo?.id || merged.mycaseImageId || "").trim();
+          if (imageId) merged.mycaseImageId = imageId;
+          const linked = mycaseSocialSlideId(merged.mycaseCaseId, merged.mycaseImageId);
+          if (linked) {
+            merged.socialSlideId = linked;
+            merged.id = linked;
+          }
+        }
         if (patch.richCustom) merged.richCustom = { ...p.richCustom, ...patch.richCustom };
         if (patch.caseTheme) merged.caseTheme = { ...p.caseTheme, ...patch.caseTheme };
         if (patch.type) merged.type = patch.type;

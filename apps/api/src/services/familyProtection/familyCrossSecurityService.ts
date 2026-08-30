@@ -6,7 +6,7 @@ import {
   resolveCrossSecurityIncident,
   type CrossSecurityThreatKind
 } from "./familyCrossSecurityStore.js";
-import { pushFamilyProtectionFcmToGuardians, fcmMessageFamilyMalwareThreat } from "./familyCrossSecurityFcm.js";
+import { fcmMessageFamilyMalwareThreat } from "./familyCrossSecurityFcm.js";
 import { notifyFamilyGuardian } from "./familyProtectionNotify.js";
 
 async function familyGroupUserIds(wardUserId: string): Promise<string[]> {
@@ -61,13 +61,6 @@ export async function reportCrossFamilyThreat(
       subkind: "family_cross_security"
     });
   }
-
-  await pushFamilyProtectionFcmToGuardians(targets, fcm.title, fcm.body, {
-    ...fcm.data,
-    incidentId: incident.id,
-    packageName: packageName || "",
-    canDelete: packageName ? "1" : "0"
-  });
 
   return { incident, notified: targets.length };
 }

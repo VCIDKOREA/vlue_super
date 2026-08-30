@@ -2,6 +2,7 @@ import { prisma } from "../../db/client.js";
 import { familyProtectionDb } from "../../db/familyProtectionDb.js";
 import { ssePublish } from "../../realtime/sseHub.js";
 import { expandFamilyAlertRecipients } from "./familyProtectionCircle.js";
+import { pushFamilyProtectionFcmToGuardians } from "./familyProtectionFcmPush.js";
 
 const ALERT_COOLDOWN_HOURS = 12;
 
@@ -35,7 +36,8 @@ export async function notifyFamilyGuardian(
   kind: FamilyAlertKindKey,
   title: string,
   body: string,
-  payload?: Record<string, unknown>
+  payload?: Record<string, unknown>,
+  opts?: { skipFcm?: boolean }
 ) {
   await prisma.ownerNotification.create({
     data: {
@@ -54,6 +56,13 @@ export async function notifyFamilyGuardian(
     at: new Date().toISOString(),
     ...payload
   });
+  if (!opts?.skipFcm) {
+    void pushFamilyProtectionFcmToGuardians([guardianUserId], title, body, {
+      kind,
+      wardUserId,
+      ...payload
+    });
+  }
 }
 
 export async function createFamilyAlertAndNotifyGuardians(opts: {
@@ -63,6 +72,7 @@ export async function createFamilyAlertAndNotifyGuardians(opts: {
   body: string;
   guardianUserIds: string[];
   payload?: Record<string, unknown>;
+  skipFcm?: boolean;
 }) {
   if (await recentFamilyAlertExists(opts.wardUserId, opts.kind)) {
     return { alerted: 0, skippedCooldown: true };
@@ -80,7 +90,15 @@ export async function createFamilyAlertAndNotifyGuardians(opts: {
   });
 
   for (const gid of opts.guardianUserIds) {
-    await notifyFamilyGuardian(gid, opts.wardUserId, opts.kind, opts.title, opts.body, opts.payload);
+    await notifyFamilyGuardian(
+      gid,
+      opts.wardUserId,
+      opts.kind,
+      opts.title,
+      opts.body,
+      opts.payload,
+      { skipFcm: opts.skipFcm }
+    );
   }
 
   const allRecipients = await expandFamilyAlertRecipients(opts.guardianUserIds, opts.wardUserId);
@@ -103,6 +121,13 @@ export async function createFamilyAlertAndNotifyGuardians(opts: {
       at: new Date().toISOString(),
       ...opts.payload
     });
+    if (!opts.skipFcm) {
+      void pushFamilyProtectionFcmToGuardians([uid], opts.title, opts.body, {
+        kind: opts.kind,
+        wardUserId: opts.wardUserId,
+        ...opts.payload
+      });
+    }
   }
 
   return { alerted: allRecipients.length, skippedCooldown: false };

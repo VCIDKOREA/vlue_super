@@ -295,6 +295,7 @@ export async function recordChildBankTransaction(
       title,
       body,
       guardianUserIds: [link.guardianUserId],
+      skipFcm: true,
       payload: {
         transactionId: tx.id,
         amount,

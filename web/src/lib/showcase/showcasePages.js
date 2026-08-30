@@ -5,6 +5,7 @@
  */
 
 import { SHOWCASE_MAX_PHOTOS_PER_PAGE, maxShowcaseContentPagesForTier } from "./tentShowcaseTypes.js";
+import { mycaseSocialSlideId } from "../mycase/mycasePostPayload.js";
 
 /** @typedef {'instagram' | 'rich_custom' | 'default'} ShowcasePageType */
 
@@ -72,9 +73,13 @@ export function normalizeBusinessLink(raw) {
 export function createShowcasePage(type = SHOWCASE_PAGE_TYPES.RICH_CUSTOM, seed = {}) {
   const t = normalizePageType(type);
   const photoCap = t === SHOWCASE_PAGE_TYPES.RICH_CUSTOM ? 1 : SHOWCASE_MAX_PHOTOS_PER_PAGE;
-  return {
+  const page = {
     id: seed.id || uid("page"),
     type: t,
+    /** 케이스함 연동 — 좋아요·댓글 slideId */
+    socialSlideId: String(seed.socialSlideId || "").trim().slice(0, 80) || undefined,
+    mycaseCaseId: String(seed.mycaseCaseId || "").trim() || undefined,
+    mycaseImageId: String(seed.mycaseImageId || "").trim() || undefined,
     instagramMedia: t === SHOWCASE_PAGE_TYPES.INSTAGRAM ? seed.instagramMedia || null : null,
     gallery: {
       photos: Array.isArray(seed.gallery?.photos)
@@ -87,6 +92,20 @@ export function createShowcasePage(type = SHOWCASE_PAGE_TYPES.RICH_CUSTOM, seed 
     caseTheme: { ...createDefaultPageCaseTheme(), ...(seed.caseTheme || {}) },
     businessLink: normalizeBusinessLink(seed.businessLink)
   };
+  if (page.mycaseCaseId && !page.mycaseCaseId.startsWith("showcase-page-")) {
+    const imageId = String(
+      page.mycaseImageId || page.gallery?.photos?.[0]?.id || ""
+    ).trim();
+    if (imageId) page.mycaseImageId = imageId;
+    const linked = mycaseSocialSlideId(page.mycaseCaseId, page.mycaseImageId);
+    if (linked) {
+      page.socialSlideId = linked;
+      page.id = linked;
+    }
+  } else if (page.socialSlideId && !page.id) {
+    page.id = page.socialSlideId;
+  }
+  return page;
 }
 
 export function normalizePageType(type) {

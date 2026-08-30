@@ -9,6 +9,7 @@ import {
   recordShowcaseShareApi,
   toggleShowcaseLikeApi
 } from "../../lib/showcase/showcaseSocialApi.js";
+import { resolveShowcaseSocialSlideId } from "../../lib/showcase/resolveShowcaseSocialSlideId.js";
 import { scrapShowcaseToVault } from "../../lib/showcase/scrapShowcaseToVault.js";
 import { shareShowcaseInviteViaKakao } from "../../lib/call/shareShowcaseInviteKakao.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
@@ -63,7 +64,10 @@ export default function ShowcaseBannerSocialLayer({
   const style = card?.showcaseStyle || null;
   const commentsEnabled = style?.commentsEnabled !== false;
   const shareEnabled = style?.shareEnabled !== false;
-  const slideId = String(slide?.id || "").trim();
+  const slideId = useMemo(
+    () => resolveShowcaseSocialSlideId({ slide }),
+    [slide]
+  );
   const rawOwner = firstText(card?.userId, card?.ownerUserId, String(card?.feedId || "").replace(/^user-/i, ""));
   const ownerUserId = OWNER_UUID_RE.test(rawOwner) ? rawOwner : "";
   const phone = String(card?.phone || "").trim();

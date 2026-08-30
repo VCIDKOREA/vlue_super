@@ -111,6 +111,7 @@ export async function recordWardCallEvent(
     title,
     body,
     guardianUserIds: guardianIds,
+    skipFcm: true,
     payload: {
       phone: maskPhone(phone),
       durationSec,
@@ -170,6 +171,7 @@ export async function recordWardGovernmentCall(
     title,
     body,
     guardianUserIds: guardianIds,
+    skipFcm: true,
     payload: { phone: maskPhone(phone), agency: label, direction }
   });
 
@@ -210,6 +212,7 @@ export async function reportWardRemoteControlApp(wardUserId: string, packageOrLa
     title,
     body,
     guardianUserIds: guardianIds,
+    skipFcm: true,
     payload: { appId: match.id, appLabel: match.label, raw: packageOrLabel }
   });
 

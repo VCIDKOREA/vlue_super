@@ -6,7 +6,6 @@ import {
   upsertFamilySecurityState,
   type FamilySecurityHealth
 } from "./familySecurityStateStore.js";
-import { pushFamilyProtectionFcmToGuardians } from "./familyProtectionFcmPush.js";
 import { notifyFamilyGuardian } from "./familyProtectionNotify.js";
 
 const LOW_BATTERY_THRESHOLD = 15;
@@ -78,10 +77,6 @@ export async function syncFamilySecurityState(
         batteryPercent
       });
     }
-    await pushFamilyProtectionFcmToGuardians(targets, title, bodyText, {
-      kind: "family_battery_low",
-      batteryPercent: String(batteryPercent)
-    });
     lowBatteryNotified = true;
   }
 

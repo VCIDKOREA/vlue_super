@@ -57,9 +57,13 @@ export function postAndroidFamilyInviteNotification(title, body, linkId = "") {
   return postAndroidSystemNotification(title, body, linkId || "family-invite");
 }
 
-/** 알림함 신규 건 — 중요 카테고리 OS/브라우저 푸시 */
+/** 알림함 신규 건 — 중요 카테고리 OS/브라우저 푸시 (최근 건만; 오래된 건 FCM으로 이미 전달됐어야 함) */
 export function maybePostAndroidPushForInboxItem(item) {
   if (!item || item.isNew === false) return false;
+  const createdAt = item.createdAt ? new Date(item.createdAt).getTime() : NaN;
+  if (Number.isFinite(createdAt) && Date.now() - createdAt > 5 * 60 * 1000) {
+    return false;
+  }
   const category = String(item.category || "");
   const title = String(item.title || "");
   const body = String(item.body || "");

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Settings, X } from "lucide-react";
-import VlueCyanVerifiedSeal from "../VlueCyanVerifiedSeal.jsx";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import RenderErrorGuard from "../RenderErrorGuard.jsx";
 import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
@@ -34,6 +33,7 @@ import {
   resolveShowcaseCarouselPlaybackPhase
 } from "../../lib/showcase/showcaseBgmPresets.js";
 import { SHOWCASE_BGM_OWNER_RELEASED_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
+import { resolveShowcaseSocialSlideId } from "../../lib/showcase/resolveShowcaseSocialSlideId.js";
 import { readActiveShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 
 /** 갤러리 사진 → 슬라이드용 (텍스트 오버레이 필드 유지) */
@@ -174,6 +174,8 @@ export default function ShowcaseCallCarousel({
   const showCornerIdentity = !showDigitalCard;
   const igVerified = isInstagramVerified(styleConfig);
   const snsCertLines = listSnsVerificationHistory(styleConfig);
+  const showSnsCert = snsCertLines.length > 0;
+  const openSnsCertSheet = () => setSnsCertOpen(true);
   const igUsername = String(styleConfig?.platformFeed?.instagramHandle || "")
     .trim()
     .replace(/^@+/, "");
@@ -396,9 +398,14 @@ export default function ShowcaseCallCarousel({
           .slice(0, String(page?.type || "") === "rich_custom" ? 1 : photosPerPage)
           .map((ph) => pickPhotoSlideFields(ph));
         if (pagePhotos.length) {
+          const primaryPhoto = pagePhotos[0];
+          const socialSlideId = resolveShowcaseSocialSlideId({ page, photo: primaryPhoto });
           out.push({
             type: "media-page",
             id: page.id || `gallery-${out.length}`,
+            socialSlideId,
+            mycaseCaseId: page.mycaseCaseId,
+            mycaseImageId: page.mycaseImageId || primaryPhoto?.id,
             photos: pagePhotos,
             caption: "",
             businessLink: page.businessLink || null
@@ -733,29 +740,11 @@ export default function ShowcaseCallCarousel({
         설정
       </button>
     ) : null;
-    const certMark =
-      snsCertLines.length > 0 ? (
-        <button
-          type="button"
-          className={`showcase-call-carousel__sns-cert-mark${banner ? " showcase-call-carousel__sns-cert-mark--banner" : ""}`}
-          aria-label="SNS 인증 내역"
-          title="SNS 인증"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setSnsCertOpen(true);
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <VlueCyanVerifiedSeal size={20} />
-        </button>
-      ) : null;
-    if (!settingsBtn && !certMark) return null;
+    if (!settingsBtn) return null;
     return (
       <div
         className={`showcase-call-carousel__slide-corner${banner ? " showcase-call-carousel__slide-corner--banner" : ""}`}
       >
-        {certMark}
         {settingsBtn}
       </div>
     );
@@ -889,6 +878,8 @@ export default function ShowcaseCallCarousel({
                       keypadDemoMode={keypadDemoMode}
                       onToast={onKeypadToast}
                       callChromeSafe={callChromeSafe}
+                      showSnsCert={showSnsCert}
+                      onOpenSnsCert={openSnsCertSheet}
                     />
                     </RenderErrorGuard>
                   </div>
@@ -950,6 +941,9 @@ export default function ShowcaseCallCarousel({
                         hideBusinessLinks
                         fallbackToMe={false}
                         onToast={onKeypadToast}
+                        showSnsCert={showSnsCert}
+                        onOpenSnsCert={openSnsCertSheet}
+                        verified={verified}
                       />
                     ) : null}
                   </div>
@@ -989,6 +983,9 @@ export default function ShowcaseCallCarousel({
                           businessLink={slide.businessLink || null}
                           fallbackToMe={false}
                           onToast={onKeypadToast}
+                          showSnsCert={showSnsCert}
+                          onOpenSnsCert={openSnsCertSheet}
+                          verified={verified}
                         />
                         <ShowcaseBannerSocialLayer
                           card={card}

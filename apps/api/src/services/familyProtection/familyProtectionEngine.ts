@@ -22,6 +22,7 @@ import {
   getOrCreateFamilySettings as getOrCreateSettingsFromHelper
 } from "./familyProtectionSettingsHelper.js";
 import { getFamilyCircleOverview, relationDisplayLabel } from "./familyProtectionCircle.js";
+import { notifyFamilyGuardian } from "./familyProtectionNotify.js";
 
 export const DEFAULT_NO_APP_HOURS = 24;
 export const DEFAULT_MISSED_CALL_THRESHOLD = 3;
@@ -298,23 +299,7 @@ async function notifyGuardian(
   body: string,
   payload?: Record<string, unknown>
 ) {
-  await prisma.ownerNotification.create({
-    data: {
-      ownerUserId: guardianUserId,
-      actorUserId: wardUserId,
-      title,
-      body
-    }
-  });
-  ssePublish(guardianUserId, {
-    type: "vlue-family-protection-alert",
-    kind,
-    wardUserId,
-    title,
-    body,
-    at: new Date().toISOString(),
-    ...payload
-  });
+  await notifyFamilyGuardian(guardianUserId, wardUserId, kind, title, body, payload);
 }
 
 /** 앱 포그라운드 진입 시만 기록 (5분 주기 없음) */
