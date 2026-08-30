@@ -89,8 +89,9 @@ export default function MyCaseDetailModal({
       requestAnimationFrame(() => {
         const root = scrollerRef.current;
         if (root) {
-          const h = root.clientHeight || 1;
-          root.scrollTop = initialIdx * h;
+          const slide = root.querySelector(".my-case-feed__slide");
+          const step = slide?.offsetHeight || root.clientHeight || 1;
+          root.scrollTop = initialIdx * step;
         }
         window.setTimeout(() => {
           ignoreScrollRef.current = false;
@@ -160,24 +161,31 @@ export default function MyCaseDetailModal({
     };
   }, [open, onClose, feed.length, item?.ownerUserId, peerIdentity?.userId, isOwner]);
 
+  const slideStep = useCallback(() => {
+    const root = scrollerRef.current;
+    if (!root) return 1;
+    const slide = root.querySelector(".my-case-feed__slide");
+    return slide?.offsetHeight || root.clientHeight || 1;
+  }, []);
+
   useEffect(() => {
     if (!open || isDesktop) return;
     const root = scrollerRef.current;
     if (!root) return;
     ignoreScrollRef.current = true;
-    const h = root.clientHeight || 1;
-    root.scrollTo({ top: index * h, behavior: "smooth" });
+    const step = slideStep();
+    root.scrollTo({ top: index * step, behavior: "smooth" });
     window.setTimeout(() => {
       ignoreScrollRef.current = false;
     }, 320);
-  }, [index, open, isDesktop]);
+  }, [index, open, isDesktop, slideStep]);
 
   const onScroll = () => {
     if (ignoreScrollRef.current || isDesktop) return;
     const root = scrollerRef.current;
     if (!root) return;
-    const h = root.clientHeight || 1;
-    const next = Math.round(root.scrollTop / h);
+    const step = slideStep();
+    const next = Math.round(root.scrollTop / step);
     if (next !== index && next >= 0 && next < feed.length) setIndex(next);
   };
 
@@ -263,6 +271,13 @@ export default function MyCaseDetailModal({
       coverBottomNav
       className="my-case-detail my-case-detail--broadcast bg-black"
     >
+      <header className="my-case-feed__topbar">
+        <button type="button" className="my-case-feed__back" onClick={onClose} aria-label="뒤로">
+          <ChevronLeft size={26} strokeWidth={2} />
+        </button>
+        <span className="my-case-feed__topbar-title">게시물</span>
+        <span className="my-case-feed__topbar-handle">{displayHandle}</span>
+      </header>
       <div
         ref={scrollerRef}
         className="my-case-feed"
@@ -308,15 +323,14 @@ export default function MyCaseDetailModal({
                     onToast={onToast}
                     showcasePickEnabled={showcasePickEnabled && (owner || Boolean(cached?.isOwner))}
                     variant="fullscreen"
+                    showClose={false}
                   />
                 )
               ) : (
                 <div className="my-case-feed__slide-inner my-case-feed__slide-inner--idle" aria-hidden />
               )}
-              {feed.length > 1 ? (
-                <p className="my-case-feed__counter" aria-hidden>
-                  {i + 1}/{feed.length}
-                </p>
+              {feed.length > 1 && i < feed.length - 1 ? (
+                <div className="my-case-feed__peek" aria-hidden />
               ) : null}
             </section>
           );
