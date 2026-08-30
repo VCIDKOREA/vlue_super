@@ -202,6 +202,12 @@ export default function MyCaseDetailModal({
   if (isDesktop) {
     return (
       <div className="my-case-ig-overlay" role="presentation">
+        <button
+          type="button"
+          className="my-case-ig-overlay__backdrop"
+          onClick={onClose}
+          aria-label="닫기"
+        />
         <div className="my-case-ig-overlay__frame">
           {index > 0 ? (
             <button

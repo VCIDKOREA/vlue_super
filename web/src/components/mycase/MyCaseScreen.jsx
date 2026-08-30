@@ -38,7 +38,7 @@ export default function MyCaseScreen({
   const [cardExpanded, setCardExpanded] = useState(true);
   const [previewTick, setPreviewTick] = useState(0);
 
-  const caseBgmEnabled = !cardOpen && !detailOpen;
+  const caseBgmEnabled = !cardOpen;
 
   useEffect(() => {
     const bump = () => setPreviewTick((n) => n + 1);
