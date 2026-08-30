@@ -6,16 +6,13 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
-import android.os.PowerManager
 import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import kr.vlue.calloverlay.MainActivity
 import kr.vlue.calloverlay.R
+import kr.vlue.calloverlay.VlueNotificationWake
 
 /** 가족 보호 FCM·초대 OS 알림 — 앱 미실행 시에도 카카오톡처럼 표시 */
 object FamilyProtectionNotificationHelper {
@@ -108,30 +105,7 @@ object FamilyProtectionNotificationHelper {
     }
 
     fun wakeScreenBriefly(context: Context, holdMs: Long = 6_000L) {
-        try {
-            val app = context.applicationContext
-            val pm = app.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
-            if (pm.isInteractive) return
-            @Suppress("DEPRECATION")
-            val wl =
-                pm.newWakeLock(
-                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
-                        PowerManager.ACQUIRE_CAUSES_WAKEUP or
-                        PowerManager.ON_AFTER_RELEASE,
-                    "vlue:family_invite_wake"
-                )
-            wl.setReferenceCounted(false)
-            wl.acquire(holdMs)
-            Handler(Looper.getMainLooper()).postDelayed({
-                try {
-                    if (wl.isHeld) wl.release()
-                } catch (_: Exception) {
-                    /* ignore */
-                }
-            }, holdMs + 500L)
-        } catch (e: Exception) {
-            Log.w(TAG, "wakeScreenBriefly failed", e)
-        }
+        VlueNotificationWake.wakeScreenBriefly(context, holdMs)
     }
 
     private fun bodyLines(multiBody: String, fallback: String): List<String> =
@@ -200,25 +174,19 @@ object FamilyProtectionNotificationHelper {
             return
         }
 
-        val open =
-            Intent(app, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra("vlue_open_from_notification", true)
+        val contentPi =
+            VlueNotificationWake.activityPendingIntent(app, safeLinkId.hashCode()) {
+                putExtra("vlue_family_link_id", safeLinkId)
+                putExtra("vlue_family_invite_action", "open")
+            }
+        val fullScreenPi =
+            VlueNotificationWake.activityPendingIntent(app, ("fs-$safeLinkId").hashCode()) {
                 putExtra("vlue_family_link_id", safeLinkId)
                 putExtra("vlue_family_invite_action", "open")
             }
         val piFlags =
             PendingIntent.FLAG_UPDATE_CURRENT or
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-
-        val contentPi = PendingIntent.getActivity(app, safeLinkId.hashCode(), open, piFlags)
-        val fullScreenPi =
-            PendingIntent.getActivity(
-                app,
-                ("fs-$safeLinkId").hashCode(),
-                open,
-                piFlags
-            )
         val acceptPi =
             PendingIntent.getBroadcast(
                 app,
@@ -273,38 +241,24 @@ object FamilyProtectionNotificationHelper {
     fun showAlert(context: Context, title: String, body: String, tag: String?) {
         val app = context.applicationContext
         ensureChannel(app)
-        wakeScreenBriefly(app, 4_000L)
-        val open =
-            Intent(app, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                putExtra("vlue_open_from_notification", true)
-            }
-        val piFlags =
-            PendingIntent.FLAG_UPDATE_CURRENT or
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-        val pi = PendingIntent.getActivity(app, (tag ?: "alert").hashCode(), open, piFlags)
         val safeTitle = title.ifBlank { "VLUE" }
         val multiBody = formatInviteBodyLines(body.ifBlank { title })
-        val lines = bodyLines(multiBody, safeTitle)
-        val hunTitle = lines.getOrElse(0) { safeTitle }
-        val hunText = lines.getOrElse(1) {
-            if (safeTitle != hunTitle) safeTitle else "확인해 주세요."
-        }
-
+        val contentPi =
+            VlueNotificationWake.activityPendingIntent(app, (tag ?: "family-alert").hashCode())
         val builder =
             NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(hunTitle)
-                .setContentText(hunText)
-                .setSubText(safeTitle)
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setCategory(NotificationCompat.CATEGORY_STATUS)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setContentTitle(safeTitle)
+                .setContentText(multiBody.lines().firstOrNull()?.trim().orEmpty().ifBlank { safeTitle })
+                .setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .setBigContentTitle(safeTitle)
+                        .bigText(multiBody)
+                )
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setAutoCancel(true)
-                .setContentIntent(pi)
-
-        applyMultiLineRemoteViews(app, builder, safeTitle, lines, multiBody)
+                .setContentIntent(contentPi)
+        VlueNotificationWake.attachAlertSurface(app, builder, contentPi)
 
         val id =
             if (!tag.isNullOrBlank()) {

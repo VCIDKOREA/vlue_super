@@ -2,9 +2,7 @@ package kr.vlue.calloverlay
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -79,54 +77,24 @@ object VlueSystemNotifier {
         }
 
         ensureChannel(app)
-        /* 카카오톡형 — 화면 꺼짐 시 잠깐 켜서 헤드업 알림 표시 */
-        try {
-            kr.vlue.calloverlay.family.FamilyProtectionNotificationHelper.wakeScreenBriefly(app, 5_000L)
-        } catch (_: Exception) {
-            /* ignore */
-        }
-        val open =
-            Intent(app, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                putExtra("vlue_open_from_notification", true)
-            }
-        val piFlags =
-            PendingIntent.FLAG_UPDATE_CURRENT or
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-        val pi = PendingIntent.getActivity(app, 0, open, piFlags)
         val safeTitle = title.ifBlank { "VLUE" }
         val fullBody = body.ifBlank { safeTitle }.trim()
-        val lines =
-            fullBody
-                .replace("\r\n", "\n")
-                .lines()
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-        val hunTitle = lines.getOrElse(0) { safeTitle }
-        val hunText =
-            lines.getOrElse(1) {
-                if (safeTitle != hunTitle) safeTitle else lines.getOrElse(0) { safeTitle }
-            }
-        val notification =
+        val requestCode = if (!tag.isNullOrBlank()) tag.hashCode() else 7100
+        val contentPi = VlueNotificationWake.activityPendingIntent(app, requestCode)
+        val builder =
             NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(hunTitle)
-                .setContentText(hunText)
+                .setContentTitle(safeTitle)
+                .setContentText(fullBody.lines().firstOrNull()?.trim().orEmpty().ifBlank { safeTitle })
                 .setStyle(
                     NotificationCompat.BigTextStyle()
                         .setBigContentTitle(safeTitle)
                         .bigText(fullBody)
                 )
-                .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
-                .setVibrate(longArrayOf(0, 380, 180, 380))
-                .setLights(0xFF2563EB.toInt(), 700, 500)
-                .setOnlyAlertOnce(false)
                 .setAutoCancel(true)
-                .setContentIntent(pi)
-                .build()
+                .setContentIntent(contentPi)
+        VlueNotificationWake.attachAlertSurface(app, builder, contentPi)
 
         val id =
             if (!tag.isNullOrBlank()) {
@@ -135,7 +103,7 @@ object VlueSystemNotifier {
                 nextId.getAndIncrement()
             }
         try {
-            NotificationManagerCompat.from(app).notify(tag ?: "vlue", id, notification)
+            NotificationManagerCompat.from(app).notify(tag ?: "vlue", id, builder.build())
         } catch (_: SecurityException) {
             /* POST_NOTIFICATIONS 거부 */
         }

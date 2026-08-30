@@ -15,7 +15,7 @@
         android:layout_height="wrap_content"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textColor="#FF111827"
+        android:textColor="@color/notification_text_primary"
         android:textSize="15sp"
         android:textStyle="bold" />
 
@@ -26,7 +26,7 @@
         android:layout_marginTop="2dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textColor="#FF1F2937"
+        android:textColor="@color/notification_text_secondary"
         android:textSize="13sp" />
 
     <TextView
@@ -36,7 +36,7 @@
         android:layout_marginTop="1dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textColor="#FF374151"
+        android:textColor="@color/notification_text_tertiary"
         android:textSize="13sp"
         android:visibility="gone" />
 
@@ -47,7 +47,7 @@
         android:layout_marginTop="1dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textColor="#FF4B5563"
+        android:textColor="@color/notification_text_tertiary"
         android:textSize="12sp"
         android:visibility="gone" />
 </LinearLayout>

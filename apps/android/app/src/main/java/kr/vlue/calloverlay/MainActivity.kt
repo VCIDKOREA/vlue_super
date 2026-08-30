@@ -12,6 +12,7 @@ import android.provider.Settings
 import org.json.JSONObject
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -114,6 +115,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applyNotificationWakeFlags(intent)
         VlueBigPushTrace.bind(this)
         AppLockStore.init(this)
         VlueSystemNotifier.ensureChannel(this)
@@ -359,9 +361,23 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         super.onNewIntent(intent)
         if (intent != null) {
             setIntent(intent)
+            applyNotificationWakeFlags(intent)
             handleMemoShareIntent(intent)
             handleFamilyInviteIntent(intent)
         }
+    }
+
+    private fun applyNotificationWakeFlags(intent: Intent?) {
+        if (intent?.getBooleanExtra("vlue_open_from_notification", false) != true) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
+        window?.addFlags(
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        )
     }
 
     private fun handleFamilyInviteIntent(intent: Intent?) {

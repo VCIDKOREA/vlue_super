@@ -4,4 +4,7 @@
     <color name="ic_launcher_foreground">#FFFFFF</color>
     <color name="pin_dot_empty">#CBD5E1</color>
     <color name="pin_dot_filled">#2563EB</color>
+    <color name="notification_text_primary">#FF111827</color>
+    <color name="notification_text_secondary">#FF1F2937</color>
+    <color name="notification_text_tertiary">#FF374151</color>
 </resources>
