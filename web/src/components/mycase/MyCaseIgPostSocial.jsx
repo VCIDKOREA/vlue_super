@@ -71,7 +71,9 @@ export default function MyCaseIgPostSocial({
   commentOpen: commentOpenProp,
   onCommentOpenChange,
   onCommentsChange,
-  showFeedCommentPreview = false
+  showFeedCommentPreview = false,
+  likeHandlerRef = null,
+  onBurst = null
 }) {
   const ownerId = OWNER_UUID_RE.test(String(ownerUserId || "").trim()) ? String(ownerUserId).trim() : "";
   const sid = String(slideId || "").trim();
@@ -103,6 +105,10 @@ export default function MyCaseIgPostSocial({
     setLiked(nextLiked);
     setLikeCount(nextCount);
   }, []);
+
+  const popLikeBurst = useCallback(() => {
+    onBurst?.();
+  }, [onBurst]);
 
   const syncComments = useCallback(
     (list) => {
@@ -159,34 +165,51 @@ export default function MyCaseIgPostSocial({
 
   const threads = useMemo(() => groupCommentsWithReplies(seedComments), [seedComments]);
 
-  const onLike = useCallback(() => {
-    if (!localOnly && !hasVlueLoggedInSession()) {
-      onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
-      return;
-    }
-    const prevLiked = likedRef.current;
-    const prevCount = likeCountRef.current;
-    const nextLiked = !prevLiked;
-    const nextCount = nextLiked ? prevCount + 1 : Math.max(0, prevCount - 1);
-    applyLike(nextLiked, nextCount);
-    if (localOnly) return;
-
-    const gen = ++likeGenRef.current;
-    void toggleShowcaseLikeApi(ownerId, { slideId: sid, liked: nextLiked }).then((res) => {
-      if (gen !== likeGenRef.current) return;
-      if (res.ok) {
-        applyLike(res.likedByMe, res.likeCount);
-        return;
-      }
-      if (res.status === 401) {
-        applyLike(prevLiked, prevCount);
+  const onLike = useCallback(
+    (opts = {}) => {
+      const forceLike = Boolean(opts.forceLike);
+      if (!localOnly && !hasVlueLoggedInSession()) {
         onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
         return;
       }
-      applyLike(prevLiked, prevCount);
-      onToast?.(res.error || "좋아요에 실패했습니다.");
-    });
-  }, [ownerId, sid, localOnly, onToast, applyLike]);
+      if (forceLike && likedRef.current) {
+        popLikeBurst();
+        return;
+      }
+      const prevLiked = likedRef.current;
+      const prevCount = likeCountRef.current;
+      const nextLiked = forceLike ? true : !prevLiked;
+      const nextCount = nextLiked ? prevCount + 1 : Math.max(0, prevCount - 1);
+      applyLike(nextLiked, nextCount);
+      if (nextLiked) popLikeBurst();
+      if (localOnly) return;
+
+      const gen = ++likeGenRef.current;
+      void toggleShowcaseLikeApi(ownerId, { slideId: sid, liked: nextLiked }).then((res) => {
+        if (gen !== likeGenRef.current) return;
+        if (res.ok) {
+          applyLike(res.likedByMe, res.likeCount);
+          return;
+        }
+        if (res.status === 401) {
+          applyLike(prevLiked, prevCount);
+          onToast?.(VLUE_MEMBERSHIP_REQUIRED_MSG);
+          return;
+        }
+        applyLike(prevLiked, prevCount);
+        onToast?.(res.error || "좋아요에 실패했습니다.");
+      });
+    },
+    [ownerId, sid, localOnly, onToast, applyLike, popLikeBurst]
+  );
+
+  useEffect(() => {
+    if (!likeHandlerRef) return undefined;
+    likeHandlerRef.current = () => onLike({ forceLike: true });
+    return () => {
+      likeHandlerRef.current = null;
+    };
+  }, [likeHandlerRef, onLike]);
 
   const openComments = useCallback(() => {
     if (!localOnly && !hasVlueLoggedInSession()) {
@@ -308,7 +331,7 @@ export default function MyCaseIgPostSocial({
               className={`my-case-ig-post__action${liked ? " is-liked" : ""}`}
               aria-label="좋아요"
               aria-pressed={liked}
-              onClick={onLike}
+              onClick={() => onLike()}
             >
               <Heart size={24} strokeWidth={1.8} fill={liked ? "currentColor" : "none"} />
               {likeLabel ? <span>{likeLabel}</span> : null}

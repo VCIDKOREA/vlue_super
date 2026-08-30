@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, X, Heart } from "lucide-react";
 import { readMembershipTier } from "../../lib/bizcardAccountSync.js";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import {
@@ -59,10 +59,14 @@ export default function MyCaseIgPostViewer({
   const [imgIndex, setImgIndex] = useState(0);
   const [pickTick, setPickTick] = useState(0);
   const [commentOpen, setCommentOpen] = useState(false);
+  const [likeBurst, setLikeBurst] = useState(0);
+  const likeHandlerRef = useRef(null);
+  const lastDoubleTapAtRef = useRef(0);
 
   useEffect(() => {
     setImgIndex(0);
     setCommentOpen(false);
+    setLikeBurst(0);
   }, [item?.id]);
 
   useEffect(() => {
@@ -137,6 +141,32 @@ export default function MyCaseIgPostViewer({
   const captionText = parsed.caption || item?.title || "";
   const handleLabel = displayHandle || displayName;
 
+  const handleMediaDoubleTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastDoubleTapAtRef.current < 400) return;
+    lastDoubleTapAtRef.current = now;
+    likeHandlerRef.current?.();
+  }, []);
+
+  const likeBurstOverlay =
+    likeBurst > 0 && images.length ? (
+      <div key={likeBurst} className="my-case-like-burst" aria-hidden>
+        <Heart size={88} fill="currentColor" strokeWidth={1.2} />
+      </div>
+    ) : null;
+
+  const socialProps = {
+    ownerUserId: resolvedOwnerUserId,
+    slideId,
+    displayName,
+    peerPhone,
+    variant,
+    onToast,
+    pickButton,
+    likeHandlerRef,
+    onBurst: () => setLikeBurst((n) => n + 1)
+  };
+
   const mediaBlock =
     parsed.postType === "showcase" && showcaseCard && images.length === 0 ? (
       <div className="my-case-ig-post__showcase-wrap">
@@ -152,7 +182,12 @@ export default function MyCaseIgPostViewer({
         />
       </div>
     ) : images.length ? (
-      <MyCaseImageCarousel images={images} index={imgIndex} onIndexChange={setImgIndex} />
+      <MyCaseImageCarousel
+        images={images}
+        index={imgIndex}
+        onIndexChange={setImgIndex}
+        onDoubleTap={handleMediaDoubleTap}
+      />
     ) : (
       <div className="my-case-ig-post__empty">표시할 사진이 없습니다.</div>
     );
@@ -175,17 +210,14 @@ export default function MyCaseIgPostViewer({
           </div>
         </header>
 
-        <div className="my-case-ig-post__media">{mediaBlock}</div>
+        <div className="my-case-ig-post__media">
+          {mediaBlock}
+          {likeBurstOverlay}
+        </div>
 
         <div className="my-case-ig-post__body">
           <MyCaseIgPostSocial
-            ownerUserId={resolvedOwnerUserId}
-            slideId={slideId}
-            displayName={displayName}
-            peerPhone={peerPhone}
-            variant={variant}
-            onToast={onToast}
-            pickButton={pickButton}
+            {...socialProps}
             commentOpen={commentOpen}
             onCommentOpenChange={setCommentOpen}
             showFeedCommentPreview
@@ -213,7 +245,10 @@ export default function MyCaseIgPostViewer({
       ) : null}
 
       <div className="my-case-ig-post__layout">
-        <div className="my-case-ig-post__media">{mediaBlock}</div>
+        <div className="my-case-ig-post__media">
+          {mediaBlock}
+          {likeBurstOverlay}
+        </div>
 
         <aside className="my-case-ig-post__side">
           <header className="my-case-ig-post__head">
@@ -233,15 +268,7 @@ export default function MyCaseIgPostViewer({
             <time>{formatPostDate(item?.createdAt || detail?.item?.createdAt)}</time>
           </div>
 
-          <MyCaseIgPostSocial
-            ownerUserId={resolvedOwnerUserId}
-            slideId={slideId}
-            displayName={displayName}
-            peerPhone={peerPhone}
-            variant={variant}
-            onToast={onToast}
-            pickButton={pickButton}
-          />
+          <MyCaseIgPostSocial {...socialProps} />
         </aside>
       </div>
     </div>
