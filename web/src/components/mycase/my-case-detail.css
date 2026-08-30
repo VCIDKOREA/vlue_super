@@ -16,13 +16,17 @@
   --feed-bg: #000000;
   --feed-bg-muted: #121212;
   --feed-text: #f5f5f5;
-  --feed-text-muted: rgba(255, 255, 255, 0.45);
+  --feed-text-muted: rgba(255, 255, 255, 0.55);
   --feed-border: rgba(255, 255, 255, 0.12);
   --feed-media-bg: #000000;
-  --feed-pick-border: rgba(255, 255, 255, 0.25);
+  --feed-pick-border: rgba(255, 255, 255, 0.35);
   --feed-pick-text: #f5f5f5;
   background: var(--feed-bg);
   color: var(--feed-text);
+}
+
+.my-case-detail--dark .my-case-ig-post--feed .my-case-ig-post__pick-btn {
+  background: transparent;
 }
 
 .my-case-feed__topbar {

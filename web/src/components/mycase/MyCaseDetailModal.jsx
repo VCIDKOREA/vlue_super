@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import MyCaseIgPostViewer from "./MyCaseIgPostViewer.jsx";
@@ -230,7 +231,7 @@ export default function MyCaseDetailModal({
   };
 
   if (isDesktop) {
-    return (
+    const overlay = (
       <div className="my-case-ig-overlay" role="presentation">
         <button
           type="button"
@@ -271,6 +272,8 @@ export default function MyCaseDetailModal({
         </div>
       </div>
     );
+    if (typeof document === "undefined") return null;
+    return createPortal(overlay, document.body);
   }
 
   const themeClass = isDarkMode ? "my-case-detail--dark" : "my-case-detail--light";
