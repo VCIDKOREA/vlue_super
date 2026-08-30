@@ -1,8 +1,14 @@
 .my-case-composer {
-  padding: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 16px 28px;
   max-width: 640px;
   margin: 0 auto;
-  padding-bottom: 32px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .my-case-composer__cats {

@@ -145,6 +145,22 @@
   background: #0b101b;
 }
 
+/* 하단 네비·쇼케이스 선택 시트에 가리지 않도록 스크롤 여백 */
+:root {
+  --my-case-pick-tray-collapsed-h: 80px;
+}
+
+.my-case-scroll-pad-bottom {
+  padding-bottom: calc(var(--vlue-bottom-nav-offset, 56px) + 24px);
+  overflow-anchor: none;
+}
+
+.my-case-scroll-pad-bottom--pick-tray {
+  padding-bottom: calc(
+    var(--vlue-bottom-nav-offset, 56px) + var(--my-case-pick-tray-collapsed-h, 80px) + 32px
+  );
+}
+
 .my-case-detail__broadcast-shell {
   position: relative;
   flex: 1;

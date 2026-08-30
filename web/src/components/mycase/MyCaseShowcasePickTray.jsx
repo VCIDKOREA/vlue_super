@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { readMembershipTier } from "../../lib/bizcardAccountSync.js";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
@@ -30,6 +30,7 @@ export default function MyCaseShowcasePickTray({
   const [tick, setTick] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [navBottomPx, setNavBottomPx] = useState(() => measureNavHeightPx());
+  const panelRef = useRef(null);
   const membershipTier = useMemo(() => readMembershipTier(), [tick]);
   const limit = showcasePickLimitForTier(membershipTier);
   const { items } = useMemo(() => {
@@ -45,15 +46,23 @@ export default function MyCaseShowcasePickTray({
 
   useEffect(() => {
     if (variant !== "sheet") return undefined;
-    const sync = () => setNavBottomPx(measureNavHeightPx());
+    const sync = () => {
+      const nav = measureNavHeightPx();
+      setNavBottomPx(nav);
+      document.documentElement.style.setProperty("--vlue-bottom-nav-offset", `${nav}px`);
+      const toggle = panelRef.current?.querySelector(".my-case-pick-tray__toggle");
+      const trayH = toggle ? Math.ceil(toggle.getBoundingClientRect().height) : 80;
+      document.documentElement.style.setProperty("--my-case-pick-tray-collapsed-h", `${Math.max(72, trayH)}px`);
+    };
     sync();
     window.addEventListener("resize", sync);
     const t = window.setInterval(sync, 800);
     return () => {
       window.removeEventListener("resize", sync);
       window.clearInterval(t);
+      document.documentElement.style.removeProperty("--my-case-pick-tray-collapsed-h");
     };
-  }, [variant]);
+  }, [variant, expanded, items.length]);
 
   const onComplete = useCallback(() => {
     if (!items.length) {
@@ -130,7 +139,7 @@ export default function MyCaseShowcasePickTray({
           onClick={() => setExpanded(false)}
         />
       ) : null}
-      <div className="my-case-pick-tray__panel" style={{ paddingBottom: `${navBottomPx}px` }}>
+      <div ref={panelRef} className="my-case-pick-tray__panel" style={{ paddingBottom: `${navBottomPx}px` }}>
         <div className="my-case-pick-tray__toggle">
           <span className="my-case-pick-tray__handle" aria-hidden />
           <button

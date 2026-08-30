@@ -62,7 +62,13 @@ export default function MyCasePostComposer({ open, onClose, onToast, onCreated }
   if (!open) return null;
 
   return (
-    <AppFullScreenView open={open} onClose={onClose} title="새 게시물" className="bg-white">
+    <AppFullScreenView
+      open={open}
+      onClose={onClose}
+      title="새 게시물"
+      reserveBottomNav
+      className="bg-white"
+    >
       <div className="my-case-composer">
         <div className="my-case-composer__cats">
           {MYCASE_FEED_CATEGORIES.map((c) => (
