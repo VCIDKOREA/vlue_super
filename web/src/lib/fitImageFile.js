@@ -177,10 +177,101 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function detectImageMimeFromBytes(bytes) {
+  if (!bytes || bytes.length < 4) return "";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  return "";
+}
+
+function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("파일을 읽지 못했습니다."));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function arrayBufferToDataUrl(buffer, mime) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return `data:${mime};base64,${btoa(binary)}`;
+}
+
+/** 스크린샷·갤러리 — MIME 없이 octet-stream 으로 오는 파일도 디코드 */
+async function readFileAsImageDataUrl(file) {
+  const buffer = await readFileAsArrayBuffer(file);
+  const bytes = new Uint8Array(buffer);
+  const mime = detectImageMimeFromBytes(bytes) || guessImageContentType(file);
+  if (!mime || !mime.startsWith("image/")) {
+    throw new Error("이미지 형식이 올바르지 않습니다.");
+  }
+  return arrayBufferToDataUrl(buffer, mime);
+}
+
 function extForMime(mime) {
   if (mime === "image/png") return "png";
   if (mime === "image/webp") return "webp";
   return "jpg";
+}
+
+/** Android 갤러리·스크린샷 — MIME 이 비어 있거나 octet-stream 인 경우가 많음 */
+export function guessImageContentType(file) {
+  const type = String(file?.type || "").trim().toLowerCase();
+  if (type && type !== "application/octet-stream" && type.startsWith("image/")) {
+    return type === "image/jpg" ? "image/jpeg" : type;
+  }
+  const name = String(file?.name || "").toLowerCase();
+  if (name.endsWith(".png") || name.endsWith(".apng")) return "image/png";
+  if (name.endsWith(".webp")) return "image/webp";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  if (name.endsWith(".heic") || name.endsWith(".heif")) return "image/heic";
+  return "";
+}
+
+export function isLikelyImageFile(file) {
+  if (!file) return false;
+  if (guessImageContentType(file)) return true;
+  const name = String(file?.name || "").trim();
+  if (!name.includes(".") && Number(file.size) > 0) return true;
+  return false;
+}
+
+/** File.type 이 비어 있어도 업로드 파이프라인이 읽을 수 있게 보정 */
+export function coerceImageFile(file) {
+  if (!file) return null;
+  const guessed = guessImageContentType(file);
+  const current = String(file.type || "").trim().toLowerCase();
+  if (!guessed) return file;
+  if (current === guessed) return file;
+  const ext = extForMime(guessed);
+  const baseName = String(file.name || "image").replace(/\.[^.]+$/, "") || "image";
+  try {
+    return new File([file], `${baseName}.${ext}`, {
+      type: guessed,
+      lastModified: file.lastModified
+    });
+  } catch {
+    return file;
+  }
 }
 
 /**
@@ -252,8 +343,9 @@ export async function fitImageDataUrlToRules(dataUrl, rules, sourceType = "image
  */
 export async function fitImageFile(file, rules = IMAGE_FIT_GENERAL) {
   if (!file) return { ok: false, error: "파일을 선택해 주세요." };
-  const type = String(file.type || "").toLowerCase();
-  if (!type.startsWith("image/")) {
+  const normalized = coerceImageFile(file);
+  const type = guessImageContentType(normalized) || String(normalized?.type || "").toLowerCase();
+  if (!type.startsWith("image/") && !isLikelyImageFile(normalized)) {
     return { ok: false, error: "이미지 파일만 업로드할 수 있습니다." };
   }
   if (file.size > IMAGE_FIT_READ_MAX_BYTES) {
@@ -261,14 +353,11 @@ export async function fitImageFile(file, rules = IMAGE_FIT_GENERAL) {
   }
 
   try {
-    const raw = await readFileAsDataUrl(file);
-    if (!raw.startsWith("data:image/")) {
-      return { ok: false, error: "이미지 형식이 올바르지 않습니다." };
-    }
-    const fitted = await fitImageDataUrlToRules(raw, rules, type);
+    const raw = await readFileAsImageDataUrl(normalized);
+    const fitted = await fitImageDataUrlToRules(raw, rules, type || "image/jpeg");
     const prefix = String(rules.fileNamePrefix || "image").trim() || "image";
     const ext = extForMime(fitted.mime);
-    const base = String(file.name || prefix).replace(/\.[^.]+$/, "") || prefix;
+    const base = String(normalized.name || prefix).replace(/\.[^.]+$/, "") || prefix;
     return {
       ok: true,
       dataUrl: fitted.dataUrl,

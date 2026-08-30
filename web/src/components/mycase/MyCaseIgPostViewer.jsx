@@ -61,7 +61,6 @@ export default function MyCaseIgPostViewer({
   const [commentOpen, setCommentOpen] = useState(false);
   const [likeBurst, setLikeBurst] = useState(0);
   const likeHandlerRef = useRef(null);
-  const lastDoubleTapAtRef = useRef(0);
 
   useEffect(() => {
     setImgIndex(0);
@@ -142,9 +141,6 @@ export default function MyCaseIgPostViewer({
   const handleLabel = displayHandle || displayName;
 
   const handleMediaDoubleTap = useCallback(() => {
-    const now = Date.now();
-    if (now - lastDoubleTapAtRef.current < 400) return;
-    lastDoubleTapAtRef.current = now;
     likeHandlerRef.current?.();
   }, []);
 

@@ -138,7 +138,7 @@ export default function MyCasePostComposer({ open, onClose, onToast, onCreated }
         <input
           ref={fileRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/*"
           multiple
           className="hidden"
           onChange={onPickFiles}

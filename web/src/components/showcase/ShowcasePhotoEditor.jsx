@@ -16,7 +16,7 @@ import ShowcasePhotoTextOverlay, {
   normalizeOneTextOverlay
 } from "./ShowcasePhotoTextOverlay.jsx";
 import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
-import { SHOWCASE_CALL_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
+import { SHOWCASE_CALL_IMAGE_GUIDE, isLikelyImageFile } from "../../lib/fitImageFile.js";
 
 function clampPercent(n) {
   return Math.min(100, Math.max(0, n));
@@ -236,7 +236,7 @@ export default function ShowcasePhotoEditor({
 
     if (replacePhotoId) {
       const file = files[0];
-      if (!file || !/^image\//i.test(file.type)) return;
+      if (!file || !isLikelyImageFile(file)) return;
       try {
         const uploaded = await compressAndUploadMediaImageOrThrow(file, "showcase");
         onChange(photos.map((p) => (p.id === replacePhotoId ? { ...p, url: uploaded.url } : p)));
@@ -249,7 +249,7 @@ export default function ShowcasePhotoEditor({
     const next = [...photos];
     let lastId = "";
     for (const file of files.slice(0, limit - next.length)) {
-      if (!/^image\//i.test(file.type)) continue;
+      if (!isLikelyImageFile(file)) continue;
       try {
         const uploaded = await compressAndUploadMediaImageOrThrow(file, "showcase");
         const id = `ph-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
