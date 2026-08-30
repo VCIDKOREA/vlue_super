@@ -617,8 +617,14 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        dispatchWebCustomEvent("vlue-app-background", """{"reason":"pause"}""")
+    }
+
     override fun onResume() {
         super.onResume()
+        dispatchWebCustomEvent("vlue-app-foreground", """{"reason":"resume"}""")
         VlueFamilyBridge.attachWebView(webView)
         if (FamilyPermissionHelper.allGranted(this)) {
             scanRemoteApps()

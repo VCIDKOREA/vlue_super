@@ -293,14 +293,6 @@
   bottom: 26px;
 }
 
-.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-slide-chrome__dock {
-  bottom: max(96px, calc(88px + env(safe-area-inset-bottom, 0px)));
-}
-
-.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-social-rail {
-  bottom: max(100px, calc(92px + env(safe-area-inset-bottom, 0px)));
-}
-
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--carousel,
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--reception {
   flex: 1 1 auto;

@@ -3345,11 +3345,11 @@
 }
 
 /* ??? UI ???? ????? ????? ???? ??? */
-.lettering-home-push-embed.is-call-chrome .showcase-slide-chrome__dock {
+.lettering-home-push-embed.is-call-chrome:not(.lettering-home-push-embed--web-inline) .showcase-slide-chrome__dock {
   bottom: max(108px, calc(96px + env(safe-area-inset-bottom, 0px)));
 }
 
-.lettering-home-push-embed.is-call-chrome .showcase-social-rail {
+.lettering-home-push-embed.is-call-chrome:not(.lettering-home-push-embed--web-inline) .showcase-social-rail {
   bottom: max(112px, calc(100px + env(safe-area-inset-bottom, 0px)));
 }
 

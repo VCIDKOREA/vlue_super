@@ -45,6 +45,7 @@ export function ShowcaseBgmProvider({ children }) {
   const playOrderRef = useRef([0]);
   const playOrderPosRef = useRef(0);
   const advanceTrackRef = useRef(() => {});
+  const backgroundPausedRef = useRef(false);
   const [phase, setPhase] = useState("idle");
   const [styleConfig, setStyleConfig] = useState(null);
   const [userMuted, setUserMuted] = useState(false);
@@ -129,6 +130,7 @@ export function ShowcaseBgmProvider({ children }) {
   }, []);
 
   const applyIdleHard = useCallback(() => {
+    backgroundPausedRef.current = false;
     visitKeyRef.current = "";
     setVisitSessionKey("");
     ownerRef.current = "";
@@ -318,6 +320,11 @@ export function ShowcaseBgmProvider({ children }) {
       return undefined;
     }
 
+    if (backgroundPausedRef.current) {
+      el.pause();
+      return undefined;
+    }
+
     if (alreadyPlaying) return undefined;
 
     /* settings_preview 는 setPlaybackPhase→tryPlayNow 가 제스처 안에서 이미 play 함.
@@ -336,6 +343,61 @@ export function ShowcaseBgmProvider({ children }) {
       el.removeEventListener("canplay", tryPlay);
     };
   }, [bgmUrl, effectiveMuted, volumeGain, playEpoch, visitSessionKey, safeIndex, phase, ensureAudioEl]);
+
+  /** 앱·탭이 백그라운드로 가면 BGM 일시정지, 복귀 시 이어 재생 */
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+
+    const shouldResumePhase = (p) =>
+      p === "preview" || p === "replay" || p === "settings_preview";
+
+    const pauseForBackground = () => {
+      const p = phaseRef.current;
+      if (!shouldResumePhase(p)) return;
+      backgroundPausedRef.current = true;
+      cancelFade();
+      const el = audioRef.current;
+      if (el) {
+        el.pause();
+        setAudioPlaying(false);
+      }
+    };
+
+    const resumeFromBackground = () => {
+      if (!backgroundPausedRef.current) return;
+      backgroundPausedRef.current = false;
+      const p = phaseRef.current;
+      if (!shouldResumePhase(p) || userMutedRef.current) return;
+      ensureAudioEl();
+      const url = resolveUrlFromConfig(
+        styleConfigRef.current,
+        visitKeyRef.current,
+        safeIndexRef.current
+      );
+      if (!url) return;
+      void tryPlayNow(url, resolveBgmVolumeGain(styleConfigRef.current)).then((ok) => {
+        setAudioPlaying(Boolean(ok));
+      });
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") pauseForBackground();
+      else if (document.visibilityState === "visible") resumeFromBackground();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("vlue-app-background", pauseForBackground);
+    window.addEventListener("vlue-app-foreground", resumeFromBackground);
+    window.addEventListener("pagehide", pauseForBackground);
+    window.addEventListener("pageshow", resumeFromBackground);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("vlue-app-background", pauseForBackground);
+      window.removeEventListener("vlue-app-foreground", resumeFromBackground);
+      window.removeEventListener("pagehide", pauseForBackground);
+      window.removeEventListener("pageshow", resumeFromBackground);
+    };
+  }, [cancelFade, ensureAudioEl, resolveUrlFromConfig, tryPlayNow]);
 
   const bumpPlayEpoch = useCallback(() => {
     playEpochRef.current += 1;
