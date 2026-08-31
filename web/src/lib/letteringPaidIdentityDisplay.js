@@ -56,6 +56,22 @@ export function resolveShowcaseProfileBarLabel(card = {}, opts = {}) {
 }
 
 /**
+ * 저장된 케이스 목록 — 상호 아래 인물 줄
+ * - 이름 공개 → 이름 ｜ 직책·부서
+ * - 이름 비공개 → VLUE ID
+ */
+export function resolveSavedShowcasePersonLine(card = {}, opts = {}) {
+  const personLabel = resolveShowcaseProfileBarLabel(card, opts);
+  if (personLabel === SHOWCASE_BAR_VLUE_ID_LABEL) {
+    return personLabel;
+  }
+  const title = String(card.title || card.jobTitle || "").trim();
+  const department = String(card.department || "").trim();
+  const roleLine = [department, title].filter(Boolean).join(" · ");
+  return roleLine ? `${personLabel} ｜ ${roleLine}` : personLabel;
+}
+
+/**
  * DCC 앞면 Digital ID 헤드라인 2줄
  * - 상호 있음: 1줄 상호 / 2줄 이름(＋직책·부서)
  * - 상호 없음·직책 있음: 1줄 이름 / 2줄 직책·부서

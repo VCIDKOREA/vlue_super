@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { SHOWCASE_STYLE_TYPES } from "../lib/showcase/showcaseStyleTypes.js";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
+import {
+  isVlueBrandOrganization,
+  resolveSavedShowcasePersonLine
+} from "../lib/letteringPaidIdentityDisplay.js";
 import ShowcaseStylePreview from "./showcase/ShowcaseStylePreview.jsx";
 import "./showcase/showcase-style-settings.css";
 
@@ -20,11 +24,12 @@ export default function VaultSavedShowcaseRow({ item, onRemove, isDarkMode = fal
   const snap = item?.snapshot && typeof item.snapshot === "object" ? item.snapshot : {};
   const styleConfig = snap.showcaseStyle || {};
   const styleMeta = SHOWCASE_STYLE_TYPES[styleConfig.styleType] || SHOWCASE_STYLE_TYPES.default;
-  const org = String(snap.organization || "").trim();
-  const name = String(snap.name || "").trim();
-  const title = [snap.title, snap.department].filter(Boolean).join(" · ");
+  const rawOrg = String(snap.organization || snap.companyName || "").trim();
+  const org = isVlueBrandOrganization(rawOrg) ? "" : rawOrg;
+  const personLine = resolveSavedShowcasePersonLine(snap);
   const phone = formatLetteringPhoneDisplay(snap.phone) || String(snap.phone || "").trim();
-  const displayName = org || name || phone || "저장된 케이스";
+  const displayName = org || personLine || phone || "저장된 케이스";
+  const subtitle = org && personLine ? personLine : "";
   const savedLabel = formatSavedAt(item?.savedAt || styleConfig.scrapedAt);
 
   return (
@@ -52,8 +57,8 @@ export default function VaultSavedShowcaseRow({ item, onRemove, isDarkMode = fal
           <p className={`mt-0.5 text-[16px] font-black leading-snug ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
             {displayName}
           </p>
-          {title ? (
-            <p className={`mt-0.5 text-[12px] font-semibold ${isDarkMode ? "text-gray-300" : "text-slate-600"}`}>{title}</p>
+          {subtitle ? (
+            <p className={`mt-0.5 text-[12px] font-semibold ${isDarkMode ? "text-gray-300" : "text-slate-600"}`}>{subtitle}</p>
           ) : null}
           {phone ? (
             <p className={`mt-1 text-[13px] font-medium tabular-nums ${isDarkMode ? "text-gray-300" : "text-slate-700"}`}>
