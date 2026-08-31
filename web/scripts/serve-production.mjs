@@ -71,6 +71,8 @@ const LEGAL_STATIC_PAGES = new Map([
   ["/terms/", "terms/index.html"],
   ["/data-deletion", "data-deletion/index.html"],
   ["/data-deletion/", "data-deletion/index.html"],
+  ["/refund", "refund/index.html"],
+  ["/refund/", "refund/index.html"],
   ["/privacy/legal-article-6", "data-deletion/index.html"],
   ["/privacy/legal-article-6/", "data-deletion/index.html"]
 ]);

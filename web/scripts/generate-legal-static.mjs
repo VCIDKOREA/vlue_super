@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRIVACY_POLICY_ARTICLES, PRIVACY_POLICY_VERSION } from "../src/legal/vluePrivacyPolicy.js";
 import { TERMS_ARTICLES, TERMS_VERSION } from "../src/legal/vlueTermsArticles.js";
+import { REFUND_POLICY_ARTICLES, REFUND_POLICY_VERSION } from "../src/legal/vlueRefundPolicy.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
@@ -65,7 +66,7 @@ ${body}
 `;
 }
 
-for (const name of ["privacy", "terms", "data-deletion"]) {
+for (const name of ["privacy", "terms", "data-deletion", "refund"]) {
   mkdirSync(join(publicDir, name), { recursive: true });
 }
 
@@ -108,4 +109,13 @@ writeFileSync(
   })
 );
 
-console.log("[legal-static] wrote privacy/, terms/, data-deletion/");
+writeFileSync(
+  join(publicDir, "refund", "index.html"),
+  page({
+    title: "환불·청약철회 규정",
+    version: REFUND_POLICY_VERSION,
+    articles: REFUND_POLICY_ARTICLES
+  })
+);
+
+console.log("[legal-static] wrote privacy/, terms/, data-deletion/, refund/");
