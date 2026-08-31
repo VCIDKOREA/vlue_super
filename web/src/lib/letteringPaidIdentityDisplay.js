@@ -39,6 +39,23 @@ export function resolveShowcaseBarOwnerLabel(card = {}, opts = {}) {
 }
 
 /**
+ * 쇼케이스 하단 VLUE 프로필 바 — 상호 없음
+ * - 이름 공개 → 이름
+ * - 이름 비공개 → VLUE ID
+ */
+export function resolveShowcaseProfileBarLabel(card = {}, opts = {}) {
+  const hideName = Boolean(
+    opts.hideBroadcastName ??
+      (card.hideBroadcastName || card.showcaseStyle?.showBroadcastName === false)
+  );
+  if (!hideName) {
+    const name = String(card.name || card.displayName || card.legalName || "").trim();
+    if (name) return name;
+  }
+  return SHOWCASE_BAR_VLUE_ID_LABEL;
+}
+
+/**
  * DCC 앞면 Digital ID 헤드라인 2줄
  * - 상호 있음: 1줄 상호 / 2줄 이름(＋직책·부서)
  * - 상호 없음·직책 있음: 1줄 이름 / 2줄 직책·부서

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Phone,
   Mail,
@@ -230,6 +230,48 @@ function FaceTabs({ face, onFaceChange, hidden = false }) {
       </div>
     </div>
   );
+}
+
+const DCC_FACE_SWIPE_MIN_PX = 44;
+
+function useDccFaceSwipe(activeFace, onFaceChange) {
+  const pointerRef = useRef({ x: 0, y: 0, axis: null });
+
+  const reset = useCallback(() => {
+    pointerRef.current = { x: 0, y: 0, axis: null };
+  }, []);
+
+  const onPointerDown = useCallback((e) => {
+    if (e.button != null && e.button !== 0) return;
+    pointerRef.current = { x: e.clientX, y: e.clientY, axis: null };
+  }, []);
+
+  const onPointerMove = useCallback((e) => {
+    const st = pointerRef.current;
+    if (!st.x && !st.y) return;
+    const dx = e.clientX - st.x;
+    const dy = e.clientY - st.y;
+    if (!st.axis) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      st.axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+    }
+  }, []);
+
+  const onPointerUp = useCallback(
+    (e) => {
+      const st = pointerRef.current;
+      const dx = e.clientX - st.x;
+      const axis = st.axis;
+      reset();
+      if (axis !== "x" || Math.abs(dx) < DCC_FACE_SWIPE_MIN_PX) return;
+      e.stopPropagation();
+      if (dx < 0 && activeFace !== "back") onFaceChange?.("back");
+      else if (dx > 0 && activeFace !== "front") onFaceChange?.("front");
+    },
+    [activeFace, onFaceChange, reset]
+  );
+
+  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: reset };
 }
 
 /** CEO(@ceo / ceo@vlue.kr) 소유 명함 — 이 계정만 ‘로고 없음’과 동일 처리 */
@@ -821,13 +863,14 @@ export default function LetteringDigitalReception({
   const isDcp = card?.profileKind === "dcp" || card?.dcp;
   const items = verificationItems.length ? verificationItems : card.verificationItems;
   const panelWrapRef = useRef(null);
-  const useStackedPanels = embeddedInPush && !previewMode;
+  const useStackedPanels = embeddedInPush;
   const [dialTarget, setDialTarget] = useState(null);
   /* 부모가 onFaceChange 를 안 넘기면 탭이 먹통이 되므로 내부 상태로 폴백 */
   const [internalFace, setInternalFace] = useState(() => (face === "back" ? "back" : "front"));
   const faceControlled = typeof onFaceChange === "function";
   const activeFace = faceControlled ? (face === "back" ? "back" : "front") : internalFace;
   const setActiveFace = faceControlled ? onFaceChange : setInternalFace;
+  const faceSwipe = useDccFaceSwipe(activeFace, setActiveFace);
 
   useEffect(() => {
     if (!faceControlled) return;
@@ -896,7 +939,16 @@ export default function LetteringDigitalReception({
       } ${className}`.trim()}
       data-face={activeFace}
     >
-      <div className="ldr-panel-wrap" role="tabpanel" ref={panelWrapRef} aria-hidden={keypadOpen}>
+      <div
+        className="ldr-panel-wrap ldr-panel-wrap--swipeable"
+        role="tabpanel"
+        ref={panelWrapRef}
+        aria-hidden={keypadOpen}
+        onPointerDown={faceSwipe.onPointerDown}
+        onPointerMove={faceSwipe.onPointerMove}
+        onPointerUp={faceSwipe.onPointerUp}
+        onPointerCancel={faceSwipe.onPointerCancel}
+      >
         {useStackedPanels ? (
           <div className="ldr-panel-stage">
             {front}

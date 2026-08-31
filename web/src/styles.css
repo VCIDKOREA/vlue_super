@@ -6180,6 +6180,15 @@ body,
     linear-gradient(180deg, #0b1120 0%, #070b14 100%);
 }
 
+.ldr-reception--push .ldr-panel-wrap--swipeable {
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.ldr-reception--push .ldr-panel-wrap--swipeable:active {
+  cursor: grabbing;
+}
+
 .ldr-reception--push .ldr-panel-stage {
   position: relative;
   width: 100%;

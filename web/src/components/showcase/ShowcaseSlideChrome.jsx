@@ -14,7 +14,7 @@ import {
   mergeShowcaseStyleForChrome
 } from "../../lib/showcase/showcaseSocialOutlinks.js";
 import { openShowcaseSocialItem } from "../../lib/showcase/openShowcaseSocialItem.js";
-import { resolveShowcaseBarOwnerLabel } from "../../lib/letteringPaidIdentityDisplay.js";
+import { resolveShowcaseProfileBarLabel } from "../../lib/letteringPaidIdentityDisplay.js";
 import ShowcaseIdentityCertMark from "./ShowcaseIdentityCertMark.jsx";
 import "../follow/follow-action.css";
 
@@ -78,13 +78,12 @@ export default function ShowcaseSlideChrome({
   }, [pageLink?.logoUrl, pageLink?.id]);
 
   /*
-   * VLUE 프로필 바 라벨 — 상호 → 이름 → VLUE ID (이름 비공개 시)
+   * VLUE 프로필 바 — 상호 제외, 이름 공개 시 이름 / 비공개 시 VLUE ID
    */
   const hideBroadcastName = Boolean(
     card?.hideBroadcastName || card?.showcaseStyle?.showBroadcastName === false
   );
-  const certIdentityLabel = resolveShowcaseBarOwnerLabel(card, { hideBroadcastName });
-  const profileName = certIdentityLabel;
+  const profileName = resolveShowcaseProfileBarLabel(card, { hideBroadcastName });
 
   const { avatarUrl, letter } = (() => {
     const displayForAvatar = firstText(

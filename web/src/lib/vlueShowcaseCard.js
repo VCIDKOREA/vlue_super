@@ -60,9 +60,10 @@ export function applyDccLinePreviewOverlay(card = {}) {
     address: "",
     website: "",
     fax: "",
-    companyIntro: "",
-    customBackText: "",
-    previewShowcaseId: name || phone || ""
+    /* 앞면 소개·뒷면 추가설명은 명함 설정값 유지 */
+    companyIntro: card.companyIntro,
+    customBackText: card.customBackText,
+    previewShowcaseId: name || phone || card.previewShowcaseId || ""
   };
 }
 
