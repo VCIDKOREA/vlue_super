@@ -233,6 +233,10 @@ export default function LetteringIncomingNotification({
   onPeerClose,
   /** 쇼케이스 꺼짐 미리보기 — 이름 숨김, 번호+VLUE 인증만 */
   showcaseOffPreview = false,
+  /** 실통화 — 쇼케이스 꺼짐 탭 시 부모 VLUE 인증 팝업 */
+  onAuthPopupRequest,
+  /** true면 마운트 시 인증 팝업 자동 오픈 (사이드 미리보기) */
+  autoAuthPopup = false,
   /** true면 캐러셀 BGM 비활성 (케이스함 BGM과 중복 방지) */
   suppressBgm = false,
   /** www 데스크 — 접기/펼치기 「미리보기입니다…」 안내 생략 */
@@ -325,11 +329,12 @@ export default function LetteringIncomingNotification({
       setExpanded(true);
       return;
     }
-    if (showcaseOffAuthExpand && !expanded) {
+    if (showcaseOffPreview && verified && !expanded) {
       if (previewMode && !suppressExpandGuide) {
         showGuide("미리보기입니다. 실제 통화에서 VLUE 인증 팝업이 표시됩니다.");
       }
-      setAuthMemberPopupOpen(true);
+      if (onAuthPopupRequest) onAuthPopupRequest();
+      else if (previewMode) setAuthMemberPopupOpen(true);
       return;
     }
     if (previewMode && !suppressExpandGuide) {
@@ -586,10 +591,17 @@ export default function LetteringIncomingNotification({
     !isExpiredLine && !verified && !isDcp && !isContactSafeCare && !isLookupPending;
   const { setPlaybackPhase } = useShowcaseBgm();
   const showcaseOffAuthExpand = showcaseOffPreview && previewMode && verified;
+  const canTapForAuthPopup = showcaseOffPreview && verified;
   const canExpand =
     !isLookupPending &&
     (showcaseOffAuthExpand || !showcaseOffPreview) &&
     (isPaidMember || isFreeMember || isUnverified || isExpiredLine);
+
+  useEffect(() => {
+    if (!autoAuthPopup || !showcaseOffPreview || !verified) return;
+    if (onAuthPopupRequest) onAuthPopupRequest();
+    else if (previewMode) setAuthMemberPopupOpen(true);
+  }, [autoAuthPopup, showcaseOffPreview, verified, previewMode, onAuthPopupRequest]);
   /**
    * MiniCase 탭 → 풀쇼케이스 복원.
    * 이 통화에서 풀 쇼케이스를 한 번이라도 본 뒤에는 항상 허용 (송출 플래그 누락 대비).
@@ -1311,13 +1323,13 @@ export default function LetteringIncomingNotification({
         onClick={(e) => {
           /* ▽/△ 버튼 제거 — 바 탭으로 펼침/접힘 */
           if (e.target?.closest?.("button,a,input")) return;
-          if (!canExpand) return;
+          if (!canExpand && !canTapForAuthPopup) return;
           toggle();
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            if (canExpand) toggle();
+            if (canExpand || canTapForAuthPopup) toggle();
           }
         }}
         {...(dragHandleProps || {})}
@@ -1365,13 +1377,13 @@ export default function LetteringIncomingNotification({
           aria-label={isExpandedView ? "쇼케이스 접기" : "쇼케이스 열기"}
           onClick={(e) => {
             if (e.target?.closest?.("button,a,input")) return;
-            if (!canExpand) return;
+            if (!canExpand && !canTapForAuthPopup) return;
             toggle();
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              if (canExpand) toggle();
+              if (canExpand || canTapForAuthPopup) toggle();
             }
           }}
         >
@@ -1464,7 +1476,7 @@ export default function LetteringIncomingNotification({
           ) : null}
         </div>
 
-        {canExpand && (isFreeMember || showcaseOffAuthExpand) ? (
+        {canExpand && !showcaseOffPreview && (isFreeMember || showcaseOffAuthExpand) ? (
           <div
             ref={expandSlotRef}
             className={`lettering-ongoing-expand-slot lettering-ongoing-expand-slot--emotional${

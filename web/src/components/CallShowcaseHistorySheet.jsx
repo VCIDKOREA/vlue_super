@@ -529,6 +529,22 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       /* ignore */
     }
 
+    const cachedPeer = readCallHistoryPeerCache(phone);
+
+    /* 캐시된 인증 회원 + 송출 없음 → 즉시 VLUE 인증 팝업 */
+    if (
+      cachedPeer?.verified &&
+      cachedPeer?.card &&
+      !peerHasDccOrShowcaseContent(
+        cachedPeer.card,
+        cachedPeer.showcaseStyle || cachedPeer.card.showcaseStyle
+      )
+    ) {
+      openAuthPopupForPeer(call, cachedPeer.card);
+      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
+      return;
+    }
+
     const agency = matchNationalAgency(phone);
 
     if (agency) {
@@ -558,7 +574,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     }
 
     /* VLUE 회원 + 송출 콘텐츠 없음 → 즉시 인증 팝업 (무료·유료·송출 OFF 공통) */
-    const listLooksLikeMember = call.verified === true || Boolean(call.memberName);
+    const listLooksLikeMember =
+      call.verified === true ||
+      Boolean(call.memberName) ||
+      Boolean(call.userId) ||
+      Boolean(cachedPeer?.verified);
     if (
       listLooksLikeMember &&
       !peerHasDccOrShowcaseContent(call.cardSnapshot, call.showcaseSnapshot)

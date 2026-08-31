@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import LetteringIncomingNotification from "../LetteringIncomingNotification.jsx";
+import VlueAuthMemberPopup from "../VlueAuthMemberPopup.jsx";
 import { readVcidBroadcastOn } from "../../lib/bizcardAccountSync.js";
 import { canUseV1PaidDccFeatures } from "../../lib/v1PaidPackageGate.js";
 import { pushAndroidBackHandler } from "../../lib/androidBackStack.js";
@@ -20,6 +21,7 @@ export default function ShowcasePullDownPreview({
 }) {
   const [open, setOpen] = useState(false);
   const [entered, setEntered] = useState(false);
+  const [authPopupOpen, setAuthPopupOpen] = useState(false);
   const [broadcastOn, setBroadcastOn] = useState(() => readVcidBroadcastOn());
 
   useEffect(() => {
@@ -41,6 +43,14 @@ export default function ShowcasePullDownPreview({
 
   useEffect(() => {
     if (!open) {
+      setAuthPopupOpen(false);
+      return;
+    }
+    if (showcaseOffPreview) setAuthPopupOpen(true);
+  }, [open, showcaseOffPreview]);
+
+  useEffect(() => {
+    if (!open) {
       setEntered(false);
       return undefined;
     }
@@ -58,6 +68,24 @@ export default function ShowcasePullDownPreview({
 
   const close = useCallback(() => setOpen(false), []);
   const toggle = useCallback(() => setOpen((v) => !v), []);
+
+  const authPopupName = useMemo(() => {
+    const hideName = Boolean(
+      previewCard?.hideBroadcastName || previewCard?.showcaseStyle?.showBroadcastName === false
+    );
+    if (!hideName) {
+      return String(previewCard?.name || previewCard?.displayName || "").trim();
+    }
+    return "";
+  }, [previewCard]);
+
+  const authPopupHandle = useMemo(
+    () =>
+      String(previewCard?.publicHandle || previewCard?.loginId || previewCard?.feedId || "")
+        .replace(/^@+/, "")
+        .trim(),
+    [previewCard]
+  );
 
   if (typeof document === "undefined") return null;
 
@@ -110,6 +138,8 @@ export default function ShowcasePullDownPreview({
                   previewMode
                   showOwnerSettings={false}
                   showcaseOffPreview={showcaseOffPreview}
+                  suppressExpandGuide
+                  onAuthPopupRequest={() => setAuthPopupOpen(true)}
                   callPhase="connected"
                   platform="android"
                   isRecording={!showcaseOffPreview}
@@ -119,17 +149,28 @@ export default function ShowcasePullDownPreview({
                   card={previewCard}
                   includeDigitalCard={previewIncludeDigitalCard}
                   isKnownContact
-                  expanded={!showcaseOffPreview}
+                  expanded={false}
                   onExpandedChange={(isOpen) => {
                     if (!isOpen) close();
                   }}
                   onEndCall={close}
                   onToast={onToast}
-                  className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass"
+                  className={
+                    showcaseOffPreview
+                      ? "lettering-ongoing--on-call lettering-ongoing--home-glass lettering-ongoing--collapsed"
+                      : "lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass"
+                  }
                 />
               </div>
             </div>
           </aside>
+          <VlueAuthMemberPopup
+            open={Boolean(open && showcaseOffPreview && authPopupOpen)}
+            name={authPopupName}
+            phone={previewCard?.phone || ""}
+            handle={authPopupHandle}
+            onClose={() => setAuthPopupOpen(false)}
+          />
         </>
       ) : null}
     </div>,

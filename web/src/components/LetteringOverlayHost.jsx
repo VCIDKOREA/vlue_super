@@ -1072,6 +1072,7 @@ function LetteringOverlayHostInner() {
             userChoseMiniRef.current = true;
             setExpanded(false);
             if (wasShowcaseBar && !parseOverlayParams().urlMiniCase) {
+              setAuthMemberPopupOpen(true);
               try {
                 window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
                 window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
@@ -1158,6 +1159,16 @@ function LetteringOverlayHostInner() {
     return !peerHasDccOrShowcaseContent(styledCard, styledCard.showcaseStyle || showcaseStyle);
   }, [verified, styledCard, showcaseStyle, incoming]);
 
+  const openPeerAuthPopup = useCallback(() => {
+    setAuthMemberPopupOpen(true);
+    try {
+      window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
+      window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
+    } catch {
+      /* ignore */
+    }
+  }, [incoming]);
+
   useEffect(() => {
     peerAuthPopupOnlyRef.current = peerAuthPopupOnly;
   }, [peerAuthPopupOnly]);
@@ -1172,7 +1183,7 @@ function LetteringOverlayHostInner() {
       /* 수화 후만 — 네이티브가 별도 중앙 팝업(경로 검증 · 정상 스타일)을 띄움.
          MiniCase(mini=1) 부팅은 팝업 대신 CompanionMiniCase 유지. */
       setExpanded(false);
-      setAuthMemberPopupOpen(false);
+      setAuthMemberPopupOpen(true);
       if (!urlMiniCase && !parseOverlayParams().urlMiniCase) {
         try {
           window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
@@ -1399,13 +1410,7 @@ function LetteringOverlayHostInner() {
           onExpandedChange={(next) => {
             if (next) {
               if (peerAuthPopupOnly) {
-                /* 웹 모달은 156dp 바 안에서 깨짐 — 네이티브 중앙 안심팝업 */
-                try {
-                  window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
-                  window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
-                } catch {
-                  /* ignore */
-                }
+                openPeerAuthPopup();
                 return;
               }
               const style = styledCard?.showcaseStyle || showcaseStyle;
@@ -1438,6 +1443,7 @@ function LetteringOverlayHostInner() {
             verified && peerShowcaseBroadcastOn(styledCard?.showcaseStyle || showcaseStyle)
           )}
           showcaseOffPreview={Boolean(peerAuthPopupOnly)}
+          onAuthPopupRequest={openPeerAuthPopup}
           digitalCardOnly={false}
           savedContactName={
             String(styledCard?.profileKind || "") === "contact_safe_care"
