@@ -113,7 +113,8 @@ export function serializeShowcaseSound(
 }
 
 export async function getSoundQuotaStatus(userId: string) {
-  const paid = await isPaidMember(userId);
+  const paidGate = await isPaidMember(userId);
+  const paid = paidGate.ok;
   const yearMonth = yearMonthNow();
   const weekKey = isoWeekKey();
   const dayStart = startOfKoreaDayUtc();
@@ -184,8 +185,8 @@ export async function bumpRegisterQuota(userId: string) {
 }
 
 export async function bumpThemeChangeQuota(userId: string) {
-  const paid = await isPaidMember(userId);
-  if (paid) return { ok: true as const, skipped: true };
+  const paidGate = await isPaidMember(userId);
+  if (paidGate.ok) return { ok: true as const, skipped: true };
   const yearMonth = yearMonthNow();
   const weekKey = isoWeekKey();
   const row = await prisma.showcaseSoundQuotaMonth.findUnique({

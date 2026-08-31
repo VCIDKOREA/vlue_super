@@ -21,6 +21,9 @@ import {
 } from "../../lib/showcase/showcaseBgmPresets.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
 import { dispatchShowcaseBgmOwnerReleased } from "../../lib/showcase/closeShowcaseOverlays.js";
+import { resolveEffectiveMembershipTier } from "../../lib/effectiveMembership.js";
+import { readMembershipTier } from "../../lib/bizcardAccountSync.js";
+import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 
 const SIGNATURE_PAGE_SIZE = 10;
 
@@ -115,6 +118,7 @@ export default function ShowcaseBgmPicker({
   onChange,
   inputCls = "",
   memberHandle = "",
+  membershipTier = "",
   onToast,
   coexistWithPreview = false
 }) {
@@ -139,9 +143,12 @@ export default function ShowcaseBgmPicker({
   coexistWithPreviewRef.current = coexistWithPreview;
   const { setPlaybackPhase, stopSettingsPreview, hushMainAudio, bindStyleConfig } = useShowcaseBgm();
 
-  const paid = Boolean(quota?.paid);
+  const billingTier = resolveEffectiveMembershipTier(
+    membershipTier || readMembershipTier()
+  );
+  const paid = isPaidLetteringTier(billingTier);
   const playlist = Array.isArray(value?.playlist) ? value.playlist : [];
-  const playlistLimit = quota?.playlistSelectLimit || (paid ? 5 : 1);
+  const playlistLimit = paid ? quota?.playlistSelectLimit || 5 : 1;
   const volumeLevel = normalizeBgmVolumeLevel(value?.volumeLevel);
   const playMode = value?.playMode || "single";
   const selectedId = value?.soundId || "";
@@ -685,12 +692,17 @@ export default function ShowcaseBgmPicker({
         <p className="text-[11px] text-slate-500 mb-2">아래에서 곡을 선택하세요. 목록의 스피커로 미리들을 수 있습니다.</p>
       )}
 
-      {quota?.paid ? (
+      {paid ? (
         <p className="showcase-sound-picker__quota">
-          유료: 오늘 업로드 {quota.registerCount}/{quota.registerLimit} · 보관 {quota.ownedCount}/
-          {quota.libraryLimit} · 재생목록 {playlist.length}/{playlistLimit}
+          유료: 오늘 업로드 {quota?.registerCount ?? 0}/{quota?.registerLimit ?? 3} · 보관 {quota?.ownedCount ?? 0}/
+          {quota?.libraryLimit ?? 10} · 재생목록 {playlist.length}/{playlistLimit}
         </p>
-      ) : null}
+      ) : (
+        <p className="showcase-sound-picker__quota">
+          무료: BGM {playlist.length || (value?.mode && value.mode !== "none" ? 1 : 0)}/{playlistLimit} · 주 1회
+          변경 · Signature/퍼가기 선택
+        </p>
+      )}
 
       {tab === "signature" ? (
         <div className="showcase-sound-genre-search">

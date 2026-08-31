@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
-import { isPaidLetteringTier } from "../lib/letteringMembership.js";
+import { resolveEffectiveMembershipTier } from "../lib/effectiveMembership.js";
+import { canUseV1PaidDccFeatures } from "../lib/v1PaidPackageGate.js";
 import {
   resolveVlueShowcaseCard,
   VLUE_SHOWCASE_DEMO_RECORDING_SEC
@@ -48,9 +49,9 @@ export default function CallBigPushPreviewSection({
   const [liveCallOverlayActive, setLiveCallOverlayActive] = useState(false);
   const { unlockFromUserGesture } = useShowcaseBgm();
 
-  const paidTier = isPaidLetteringTier(membershipTier) ? membershipTier : "premium";
   const isOn = showcaseOn;
-  const effectiveTier = isOn ? paidTier : "free";
+  /** 무료 회원 미리보기에 premium tier를 주입하지 않음 — 실제 청구·가족플랜 effective tier 사용 */
+  const effectiveTier = isOn ? resolveEffectiveMembershipTier(membershipTier) : "free";
 
   useEffect(() => {
     const readActive = () => {
@@ -164,7 +165,7 @@ export default function CallBigPushPreviewSection({
     previewMode: true,
     showOwnerSettings: true,
     showcaseOffPreview: !isOn,
-    includeDigitalCard: isOn && digitalCardApplied,
+    includeDigitalCard: isOn && canUseV1PaidDccFeatures(membershipTier) && digitalCardApplied,
     callPhase: "connected",
     platform: "android",
     isRecording: isOn,

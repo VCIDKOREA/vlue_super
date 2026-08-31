@@ -3,6 +3,7 @@ import { getLetteringCallStatusLabel } from "../lib/letteringCallStatus.js";
 import { compareLetteringPhones, formatLetteringPhoneDisplay, isUnknownPhoneToken, normalizePhoneDigits } from "../lib/letteringPhoneMatch.js";
 import { openLetteringCertInVlueApp } from "../lib/letteringOpenVlueApp.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
+import { canUseV1PaidDccFeatures } from "../lib/v1PaidPackageGate.js";
 import { VLUE_CARD_CAUTION, VLUE_UNVERIFIED_REPORT_DISCLAIMER } from "../lib/vlueDigitalCardUi.js";
 import {
   resolveFreeTierSummary
@@ -404,12 +405,12 @@ export default function LetteringIncomingNotification({
   /** 실시간 수신 통화만 송출 ON/OFF 게이트 — 통화기록·공유·미리보기는 등록 정보 그대로 */
   const livePeerCallOverlay = !previewMode && !fromCallHistory;
   const peerStyleBroadcastOn = c?.showcaseStyle?.includeDigitalCard === true;
+  const dccEntitled = canUseV1PaidDccFeatures(c.membershipTier);
   const showDigitalCard =
     isDcpCard ||
-    (Boolean(includeDigitalCard) &&
-      (livePeerCallOverlay
-        ? peerStyleBroadcastOn && isPaidLetteringTier(c.membershipTier)
-        : isPaidLetteringTier(c.membershipTier) || peerStyleBroadcastOn));
+    (dccEntitled &&
+      Boolean(includeDigitalCard) &&
+      (livePeerCallOverlay ? peerStyleBroadcastOn : true));
   const onCall = callPhase === "active" || callPhase === "connected";
   useEffect(() => {
     if (!showDigitalCard && carouselSlideType === "card") {
@@ -559,9 +560,8 @@ export default function LetteringIncomingNotification({
    * (이전: verified+glassTent → 항상 paid → 미설정 회원에게 DCC가 잘못 노출)
    */
   const peerBroadcastOn = livePeerCallOverlay
-    ? Boolean(includeDigitalCard) && peerStyleBroadcastOn
-    : Boolean(includeDigitalCard) &&
-      (isPaidLetteringTier(c.membershipTier) || peerStyleBroadcastOn);
+    ? dccEntitled && Boolean(includeDigitalCard) && peerStyleBroadcastOn
+    : dccEntitled && Boolean(includeDigitalCard) && peerStyleBroadcastOn;
   const isPaidMember =
     !isExpiredLine &&
     (isDcp ||
@@ -576,9 +576,10 @@ export default function LetteringIncomingNotification({
   const isUnverified =
     !isExpiredLine && !verified && !isDcp && !isContactSafeCare && !isLookupPending;
   const { setPlaybackPhase } = useShowcaseBgm();
+  const showcaseOffAuthExpand = showcaseOffPreview && previewMode && verified;
   const canExpand =
     !isLookupPending &&
-    !showcaseOffPreview &&
+    (showcaseOffAuthExpand || !showcaseOffPreview) &&
     (isPaidMember || isFreeMember || isUnverified || isExpiredLine);
   /**
    * MiniCase 탭 → 풀쇼케이스 복원.
@@ -990,6 +991,7 @@ export default function LetteringIncomingNotification({
     Boolean(suppressBgm) ||
     isUnverified ||
     isExpiredLine ||
+    Boolean(showcaseOffPreview) ||
     Boolean(previewMode && !isExpandedView && !fromCallHistory);
   /** 실통화 풀쇼케이스 — 미니↔풀 전환으로 BGM이 다시 켜지지 않게 */
   const carouselMuteForLiveCall = Boolean(onCall && !previewMode && !fromCallHistory);
@@ -1422,7 +1424,7 @@ export default function LetteringIncomingNotification({
           ) : null}
         </div>
 
-        {canExpand && isFreeMember ? (
+        {canExpand && (isFreeMember || showcaseOffAuthExpand) ? (
           <div
             ref={expandSlotRef}
             className="lettering-ongoing-expand-slot lettering-ongoing-expand-slot--emotional"
@@ -1487,7 +1489,7 @@ export default function LetteringIncomingNotification({
           </div>
         ) : null}
 
-        {canExpand && isPaidMember ? (
+        {canExpand && isPaidMember && !showcaseOffPreview ? (
           <div
             ref={expandSlotRef}
             className="lettering-ongoing-expand-slot lettering-ongoing-expand-slot--reception"

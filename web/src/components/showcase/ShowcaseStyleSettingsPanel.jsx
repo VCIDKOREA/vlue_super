@@ -881,6 +881,10 @@ export default function ShowcaseStyleSettingsPanel({
   const subText = isDarkMode ? "text-gray-400" : "text-slate-500";
   const inputCls = isDarkMode ? "border-white/10 bg-white/5 text-gray-100" : "border-slate-200 bg-white text-slate-900";
   const configuredCount = pages.filter(isPageConfigured).length;
+  const bgmPlaylistLen = Array.isArray(config.bgm?.playlist) ? config.bgm.playlist.length : 0;
+  const bgmConfigured = hasShowcaseBgmConfigured({ bgm: config.bgm });
+  const bgmCount = bgmPlaylistLen > 0 ? bgmPlaylistLen : bgmConfigured ? 1 : 0;
+  const bgmLimit = isPaid ? 5 : 1;
   const digitalCardReady = includeDigitalCard;
   const hasDigitalCardPhoto = Boolean(
     includeDigitalCard && String(card?.photoUrl || "").trim()
@@ -1252,6 +1256,7 @@ export default function ShowcaseStyleSettingsPanel({
           <ShowcaseBgmPicker
             value={config.bgm}
             inputCls={inputCls}
+            membershipTier={effectiveTier}
             onChange={(bgm) => persist({ bgm: { ...config.bgm, ...bgm } })}
             onToast={onToast}
             coexistWithPreview={isWebDesk}
@@ -1584,7 +1589,8 @@ export default function ShowcaseStyleSettingsPanel({
     <>
       <p className={`text-center text-[11px] ${subText}`}>
         {includeDigitalCard ? "명함 1 · " : ""}
-        콘텐츠 {pages.length}페이지 · 설정됨 {configuredCount}
+        콘텐츠 {pages.length}페이지 · 설정됨 {configuredCount} · BGM{" "}
+        {bgmCount > 0 ? `${bgmCount}/${bgmLimit}` : "미설정"}
         {dirty ? " · 미적용 변경 있음" : ""}
       </p>
 
