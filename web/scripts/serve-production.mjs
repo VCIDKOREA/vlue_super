@@ -64,19 +64,19 @@ function isDownloadsRequest(pathname) {
   return pathname === "/downloads" || pathname === "/downloads/" || pathname.startsWith("/downloads/");
 }
 
-/** Meta 검수용 정적 약관 — SPA index.html 폴백보다 우선 */
+/** Meta 검수용 정적 약관 — SPA index.html 폴백보다 우선 (trailing slash 무시) */
 const LEGAL_STATIC_PAGES = new Map([
   ["/privacy", "privacy/index.html"],
-  ["/privacy/", "privacy/index.html"],
   ["/terms", "terms/index.html"],
-  ["/terms/", "terms/index.html"],
   ["/data-deletion", "data-deletion/index.html"],
-  ["/data-deletion/", "data-deletion/index.html"],
   ["/refund", "refund/index.html"],
-  ["/refund/", "refund/index.html"],
-  ["/privacy/legal-article-6", "data-deletion/index.html"],
-  ["/privacy/legal-article-6/", "data-deletion/index.html"]
+  ["/privacy/legal-article-6", "data-deletion/index.html"]
 ]);
+
+function resolveLegalStaticRel(pathname) {
+  const norm = String(pathname || "/").replace(/\/+$/, "") || "/";
+  return LEGAL_STATIC_PAGES.get(norm) || null;
+}
 
 /** serve-handler rewrites — 정적 약관을 SPA 폴백보다 먼저 */
 const LEGAL_STATIC_REWRITES = [
@@ -135,7 +135,7 @@ async function serveShowcaseOgShare(_request, response, phone) {
 }
 
 function serveLegalStatic(response, pathname) {
-  const rel = LEGAL_STATIC_PAGES.get(pathname);
+  const rel = resolveLegalStaticRel(pathname);
   if (!rel) return false;
   const filePath = join(dist, rel);
   if (!existsSync(filePath)) return false;

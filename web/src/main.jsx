@@ -29,7 +29,24 @@ function normalizeWwwShowcaseManagePath() {
   window.history.replaceState(null, "", `/${search}#${view}`);
 }
 
+/** /refund · /refund/ · /terms · /privacy → /#refund 등 */
+const WWW_LEGAL_PATH_VIEWS = {
+  "/terms": "terms",
+  "/privacy": "privacy",
+  "/refund": "refund"
+};
+
+function normalizeWwwLegalPathname() {
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  const view = WWW_LEGAL_PATH_VIEWS[path];
+  if (!view) return;
+  const search = window.location.search || "";
+  window.history.replaceState(null, "", `/${search}#${view}`);
+}
+
 normalizeWwwShowcaseManagePath();
+normalizeWwwLegalPathname();
 
 applyAppSettingsToDocument();
 logProductionEnvBinding();

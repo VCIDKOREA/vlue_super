@@ -47,7 +47,7 @@ const VALID_VIEWS: View[] = [
   'terms', 'privacy', 'refund',
 ];
 
-/** /showcase · /biz · /casebox 경로 → 해시 라우트로 정규화 */
+/** /showcase · /biz · /casebox · 약관 경로 → 해시 라우트로 정규화 */
 function normalizeShowcaseManagePathname() {
   if (typeof window === 'undefined') return;
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -57,8 +57,24 @@ function normalizeShowcaseManagePathname() {
   window.history.replaceState(null, '', `/${search}#${view}`);
 }
 
+const LEGAL_PATH_VIEWS: Record<string, View> = {
+  '/terms': 'terms',
+  '/privacy': 'privacy',
+  '/refund': 'refund'
+};
+
+function normalizeLegalPathname() {
+  if (typeof window === 'undefined') return;
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  const view = LEGAL_PATH_VIEWS[path];
+  if (!view) return;
+  const search = window.location.search || '';
+  window.history.replaceState(null, '', `/${search}#${view}`);
+}
+
 function readViewFromHash(): { view: View; legalScrollId?: string } {
   normalizeShowcaseManagePathname();
+  normalizeLegalPathname();
   const raw = (typeof window !== 'undefined' ? window.location.hash : '').replace(/^#/, '');
   const [viewPart, anchor] = raw.split('/');
   if (viewPart === 'email-settings' || viewPart === 'email') {
