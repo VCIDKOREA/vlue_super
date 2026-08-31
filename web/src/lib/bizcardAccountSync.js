@@ -127,6 +127,21 @@ export function syncDccBroadcastKeyFromStyle(style) {
   }
 }
 
+/** 서버 hydrate 후 프로필 「쇼케이스 켜짐/꺼짐」(vcid)를 live.includeDigitalCard 와 맞춤 */
+export function syncVcidBroadcastKeyFromStyle(style) {
+  if (!style || typeof style !== "object") return;
+  try {
+    const next = style.includeDigitalCard === true;
+    const cur = localStorage.getItem("vcid");
+    const nextStr = String(next);
+    if (cur === nextStr) return;
+    localStorage.setItem("vcid", nextStr);
+    window.dispatchEvent(new Event("vlue-vcid-changed"));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** 프로필 「쇼케이스 켜짐/꺼짐」 — localStorage vcid 만 신뢰 (명함 발급≠송출 ON) */
 export function readVcidBroadcastOn() {
   try {

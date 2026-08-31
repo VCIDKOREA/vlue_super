@@ -12,6 +12,8 @@ import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { getFeedDisplayName, getMemberHandle } from "../../lib/memberCardStorage.js";
 import ShowcaseCommentBody from "../showcase/ShowcaseCommentBody.jsx";
 import ShowcaseCommentSheet from "../showcase/ShowcaseCommentSheet.jsx";
+import ShowcaseLikeSummary from "../showcase/ShowcaseLikeSummary.jsx";
+import ShowcaseLikeSheet from "../showcase/ShowcaseLikeSheet.jsx";
 import {
   hasVlueLoggedInSession,
   VLUE_MEMBERSHIP_REQUIRED_MSG
@@ -89,6 +91,8 @@ export default function MyCaseIgPostSocial({
 
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [recentLiker, setRecentLiker] = useState(null);
+  const [likeSheetOpen, setLikeSheetOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(0);
   const [seedComments, setSeedComments] = useState([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -128,6 +132,7 @@ export default function MyCaseIgPostSocial({
     setDraft("");
     if (!ownerId) {
       applyLike(false, 0);
+      setRecentLiker(null);
       syncComments([]);
       setLoadingComments(false);
       return undefined;
@@ -139,6 +144,7 @@ export default function MyCaseIgPostSocial({
       if (!res.ok) return;
       if (likeGenRef.current === 0) {
         applyLike(res.likedByMe, res.likeCount);
+        setRecentLiker(res.recentLiker || null);
       }
       syncComments(Array.isArray(res.comments) ? res.comments : []);
     });
@@ -189,6 +195,9 @@ export default function MyCaseIgPostSocial({
         if (gen !== likeGenRef.current) return;
         if (res.ok) {
           applyLike(res.likedByMe, res.likeCount);
+          if (res.likedByMe) {
+            setRecentLiker((prev) => prev || resolveMyCommentAuthor());
+          }
           return;
         }
         if (res.status === 401) {
@@ -351,6 +360,16 @@ export default function MyCaseIgPostSocial({
             </button>
           </div>
 
+          {likeCount > 0 ? (
+            <div className="my-case-ig-post__like-summary">
+              <ShowcaseLikeSummary
+                likeCount={likeCount}
+                recentLiker={recentLiker}
+                onOpenLikers={() => setLikeSheetOpen(true)}
+              />
+            </div>
+          ) : null}
+
           {isModalDesktop && commentMode ? (
             <form
               className="my-case-ig-post__composer"
@@ -407,6 +426,12 @@ export default function MyCaseIgPostSocial({
           onToast={onToast}
         />
       ) : null}
+      <ShowcaseLikeSheet
+        open={likeSheetOpen}
+        onClose={() => setLikeSheetOpen(false)}
+        ownerUserId={ownerId}
+        slideId={sid}
+      />
     </>
   );
 }

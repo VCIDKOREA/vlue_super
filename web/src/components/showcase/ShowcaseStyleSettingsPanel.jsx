@@ -12,7 +12,7 @@ import {
   writeLiveShowcaseStyle,
   parseShowcaseTagsInput
 } from "../../lib/showcase/showcaseStyleStorage.js";
-import { MYCASE_SHOWCASE_PICK_APPLY_EVENT, consumeMycaseShowcasePickPendingApply, mergeMycasePickIntoShowcaseStyle, readMycaseShowcasePick } from "../../lib/mycase/mycaseShowcasePick.js";
+import { MYCASE_SHOWCASE_PICK_APPLY_EVENT, consumeMycaseShowcasePickPendingApply, mergeMycasePickIntoShowcaseStyle, readMycaseShowcasePick, syncMycaseShowcasePickFromStyle } from "../../lib/mycase/mycaseShowcasePick.js";
 import { mycaseSocialSlideId } from "../../lib/mycase/mycasePostPayload.js";
 import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist } from "../../lib/showcase/slimShowcaseStyleForPersist.js";
 import { hasShowcaseBgmConfigured } from "../../lib/showcase/showcaseBgmPresets.js";
@@ -849,6 +849,7 @@ export default function ShowcaseStyleSettingsPanel({
     setConfig(latest);
     setAppliedFp(styleFingerprint(latest));
     setTagInput((latest.tags || []).join(" "));
+    syncMycaseShowcasePickFromStyle(effectiveTier);
     if (isPaid) {
       void syncShowcaseTagsToServer(latest.tags || []);
     }

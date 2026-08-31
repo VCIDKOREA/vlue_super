@@ -56,7 +56,7 @@ export function useWebIdleSession({ enabled, onTimeout }: Opts) {
       setRemainingMs(remainingWebIdleMs(now));
     };
 
-    const tick = () => {
+    const fireTimeoutIfExpired = () => {
       if (timedOutRef.current) return;
       const left = remainingWebIdleMs();
       setRemainingMs(left);
@@ -68,10 +68,22 @@ export function useWebIdleSession({ enabled, onTimeout }: Opts) {
       }
     };
 
+    const tick = () => {
+      fireTimeoutIfExpired();
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      fireTimeoutIfExpired();
+    };
+
     window.addEventListener("click", onActivity, true);
     window.addEventListener("keydown", onActivity, true);
     window.addEventListener("touchstart", onActivity, { capture: true, passive: true });
     window.addEventListener("hashchange", onActivity);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    window.addEventListener("pageshow", onVisible);
     const id = window.setInterval(tick, 1000);
     tick();
 
@@ -80,6 +92,9 @@ export function useWebIdleSession({ enabled, onTimeout }: Opts) {
       window.removeEventListener("keydown", onActivity, true);
       window.removeEventListener("touchstart", onActivity, true);
       window.removeEventListener("hashchange", onActivity);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.removeEventListener("pageshow", onVisible);
       window.clearInterval(id);
     };
   }, [enabled]);

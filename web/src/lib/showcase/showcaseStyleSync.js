@@ -152,7 +152,10 @@ function applyServerBundle(bundle, { reason = "hydrate", clearMissing = false } 
     const prefer = liveHas ? live : editorHas ? editor : null;
     if (prefer) {
       import("../bizcardAccountSync.js")
-        .then((m) => m.syncDccBroadcastKeyFromStyle?.(prefer))
+        .then((m) => {
+          m.syncDccBroadcastKeyFromStyle?.(prefer);
+          m.syncVcidBroadcastKeyFromStyle?.(prefer);
+        })
         .catch(() => {});
     }
   } catch {

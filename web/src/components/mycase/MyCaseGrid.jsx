@@ -29,7 +29,7 @@ import { slimShowcaseStyleForPersistWithVersion as slimShowcaseStyleForPersist }
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { buildUserLetteringCard } from "../../lib/letteringBizcardProfile.js";
 import { resolveDccTitlePhotoUrl } from "../../lib/letteringCardNormalize.js";
-import { LETTERING_BIZCARD_CHANGED_EVENT } from "../../lib/letteringBizcardStorage.js";
+import { LETTERING_BIZCARD_CHANGED_EVENT, photoFocusToCss } from "../../lib/letteringBizcardStorage.js";
 import { readDigitalCardActive } from "../../lib/bizcardAccountSync.js";
 import { readStatusMessage } from "../../lib/vlueAppSettings.js";
 import {
@@ -256,6 +256,17 @@ export default function MyCaseGrid({
         remoteProfile?.titlePhotoUrl ||
         ""
     });
+  }, [isMine, remoteProfile, bizcardTick]);
+  const titlePhotoFocus = useMemo(() => {
+    if (isMine) {
+      try {
+        return buildUserLetteringCard().photoFocus || "center";
+      } catch {
+        return "center";
+      }
+    }
+    const exp = remoteProfile?.cardExport || {};
+    return String(exp.photoFocus || remoteProfile?.photoFocus || "center").trim() || "center";
   }, [isMine, remoteProfile, bizcardTick]);
   const storyOwnerId = isMine ? self.userId : String(ownerUserId || "").trim();
   const hasLiveBroadcast = !accessDenied && mainBroadcast.length > 0;
@@ -845,7 +856,11 @@ export default function MyCaseGrid({
 
       {titlePhotoUrl ? (
         <div className="ig-mycase__cover" aria-hidden>
-          <img src={titlePhotoUrl} alt="" />
+          <img
+            src={titlePhotoUrl}
+            alt=""
+            style={{ objectPosition: photoFocusToCss(titlePhotoFocus) }}
+          />
           <div className="ig-mycase__cover-shade" aria-hidden />
         </div>
       ) : null}

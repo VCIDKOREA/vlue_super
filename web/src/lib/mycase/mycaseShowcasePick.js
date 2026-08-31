@@ -111,11 +111,59 @@ export function extractShowcasePickSlotsFromStyle(style, limit = SHOWCASE_PICK_L
   return slots;
 }
 
+/**
+ * 쇼케이스 스타일·송출본의 빈 슬롯·showcase 슬롯을 pick 트레이와 동기화.
+ * source:"mycase" 선택은 유지하고, 나머지는 스타일 페이지로 채움.
+ */
+export function syncMycaseShowcasePickFromStyle(membershipTier) {
+  const limit = showcasePickLimitForTier(membershipTier);
+  const style = readShowcaseStyle();
+  const live = readLiveShowcaseStyle();
+  const styleSlots = extractShowcasePickSlotsFromStyle(style, limit);
+  const liveSlots = extractShowcasePickSlotsFromStyle(live, limit);
+
+  const slotByOrder = new Map();
+  for (const row of liveSlots) slotByOrder.set(row.order, row);
+  for (const row of styleSlots) slotByOrder.set(row.order, row);
+  const mergedStyleSlots = [...slotByOrder.values()].sort((a, b) => a.order - b.order);
+  if (!mergedStyleSlots.length) return readMycaseShowcasePick().items;
+
+  let items = [...readMycaseShowcasePick().items];
+  let changed = false;
+
+  for (let order = 1; order <= limit; order++) {
+    const existing = items.find((x) => x.order === order);
+    const fromStyle = mergedStyleSlots.find((x) => x.order === order);
+    if (!fromStyle?.imageUrl) continue;
+
+    if (existing?.source === "mycase" && String(existing.imageUrl || "").trim()) {
+      continue;
+    }
+
+    const same =
+      existing &&
+      existing.imageUrl === fromStyle.imageUrl &&
+      existing.source === "showcase";
+    if (same) continue;
+
+    items = items.filter((x) => x.order !== order);
+    items.push({ ...fromStyle, source: "showcase" });
+    changed = true;
+  }
+
+  if (changed) {
+    writeMycaseShowcasePick(items, limit);
+  }
+  return normalizeItems(items, limit);
+}
+
 /** 트레이 최초 진입 시 기존 쇼케이스 사진을 슬롯에 채움 */
 export function ensureMycaseShowcasePickSeeded(membershipTier) {
   const limit = showcasePickLimitForTier(membershipTier);
   const current = readMycaseShowcasePick().items;
-  if (current.length) return current;
+  if (current.length) {
+    return syncMycaseShowcasePickFromStyle(membershipTier);
+  }
 
   const style = readShowcaseStyle();
   const live = readLiveShowcaseStyle();

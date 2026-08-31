@@ -33,7 +33,8 @@
 .ig-mycase__cover {
   position: relative;
   width: 100%;
-  height: clamp(120px, 28vw, 200px);
+  height: 200px;
+  max-height: 200px;
   overflow: hidden;
   background: transparent;
   flex-shrink: 0;
@@ -69,7 +70,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center top;
+  /* object-position: DCC photoFocus 인라인 스타일 */
 }
 
 .ig-mycase__cover-shade {
