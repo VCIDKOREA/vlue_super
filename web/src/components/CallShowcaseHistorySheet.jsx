@@ -21,6 +21,12 @@ import {
   readCallHistoryPeerCache,
   writeCallHistoryPeerCache
 } from "../lib/callHistoryPeerCache.js";
+import {
+  CALL_HISTORY_LIST_WARMED,
+  readCallHistoryListCache,
+  warmCallHistoryList,
+  writeCallHistoryListCache
+} from "../lib/callHistoryListCache.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
@@ -242,7 +248,7 @@ function CallHistoryLoadingGuide({ syncing = false }) {
 }
 
 export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = false }) {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(() => readCallHistoryListCache() || []);
   const [lines, setLines] = useState([]);
   const [lineFilter, setLineFilter] = useState(() => readCallHistoryLineId() || "all");
   const [loadError, setLoadError] = useState("");
@@ -250,7 +256,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const [previewCard, setPreviewCard] = useState(null);
   const [previewVerified, setPreviewVerified] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [listLoading, setListLoading] = useState(false);
+  const [listLoading, setListLoading] = useState(() => !(readCallHistoryListCache()?.length));
+  const [listRefreshing, setListRefreshing] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [rowMatrix, setRowMatrix] = useState({});
   const [busyId, setBusyId] = useState("");
@@ -279,7 +286,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
   const refresh = useCallback(async () => {
     setLoadError("");
-    setListLoading(true);
+    const hasVisibleRows = Boolean(readCallHistoryListCache()?.length);
+    if (!hasVisibleRows) setListLoading(true);
+    else setListRefreshing(true);
     try {
       const raw = await fetchDeviceCallLogEntries(200);
       /* 1차: 기기 로그 + 로컬 히스토리 + CEO 시드 — 번호만 보이다가 이름 붙는 깜빡임 방지 */
@@ -292,15 +301,18 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         })
       );
       setItems(quick);
+      if (quick.length) writeCallHistoryListCache(quick);
       setListLoading(false);
 
-      const phonesFromRaw = (Array.isArray(raw) ? raw : []).map((e) => e.phone).filter(Boolean);
+      const phonesForLookup = [
+        ...new Set(quick.map((g) => g.phoneDisplay || g.phone).filter(Boolean))
+      ].slice(0, 48);
       const [lineRows, lineEvents, members] = await Promise.all([
         fetchDccLines()
           .then((d) => (Array.isArray(d.lines) ? d.lines : []))
           .catch(() => []),
         fetchLineCallHistory(lineFilter).catch(() => []),
-        fetchMemberNamesByNumbers(phonesFromRaw).catch(() => [])
+        fetchMemberNamesByNumbers(phonesForLookup).catch(() => [])
       ]);
       setLines(lineRows);
       const selectedLine =
@@ -311,9 +323,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         selectedLine,
         lines: lineRows
       });
-      setItems(
-        applyLocalKnownPeersToCallGroups(applyMemberDirectoryToCallGroups(merged, members))
+      const enriched = applyLocalKnownPeersToCallGroups(
+        applyMemberDirectoryToCallGroups(merged, members)
       );
+      setItems(enriched);
+      if (enriched.length) writeCallHistoryListCache(enriched);
       if (!raw.length && !lineEvents.length) {
         setLoadError(
           typeof window !== "undefined" &&
@@ -327,16 +341,38 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       setItems([]);
       setLoadError("통화기록을 불러오지 못했습니다.");
       setListLoading(false);
+    } finally {
+      setListRefreshing(false);
     }
   }, [lineFilter]);
 
   useEffect(() => {
+    void warmCallHistoryList();
+    const onWarmed = () => {
+      const cached = readCallHistoryListCache();
+      if (!cached?.length) return;
+      setItems(cached);
+      setListLoading(false);
+    };
+    window.addEventListener(CALL_HISTORY_LIST_WARMED, onWarmed);
+    return () => window.removeEventListener(CALL_HISTORY_LIST_WARMED, onWarmed);
+  }, []);
+
+  useEffect(() => {
     if (!open) return undefined;
-    refresh();
+    const cached = readCallHistoryListCache();
+    if (cached?.length) {
+      setItems(cached);
+      setListLoading(false);
+    }
+    const frame = requestAnimationFrame(() => {
+      void refresh();
+    });
     const onChange = () => refresh();
     window.addEventListener(CALL_SHOWCASE_HISTORY_CHANGED, onChange);
     window.addEventListener("vlue-card-wallet-changed", onChange);
     return () => {
+      window.cancelAnimationFrame(frame);
       window.removeEventListener(CALL_SHOWCASE_HISTORY_CHANGED, onChange);
       window.removeEventListener("vlue-card-wallet-changed", onChange);
     };
@@ -796,6 +832,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         </p>
       ) : null}
       {lineFilterBar}
+      {listRefreshing && items.length ? (
+        <p className="call-history-refresh-hint" role="status" aria-live="polite">
+          목록 갱신 중…
+        </p>
+      ) : null}
       {listLoading ? (
         <p className="px-4 py-16 text-center text-[13px] font-semibold text-slate-500">
           통화기록 불러오는 중…
