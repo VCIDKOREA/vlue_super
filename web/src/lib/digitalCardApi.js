@@ -253,7 +253,8 @@ export async function fetchDigitalCardMeta(opts = {}) {
         designTemplate: data?.designTemplate || null,
         issued: Boolean(data?.issued),
         exportSnapshot: lite ? null : data?.exportSnapshot || null,
-        subscription: data?.subscription || null
+        subscription: data?.subscription || null,
+        membershipTierSnapshot: data?.membershipTierSnapshot || null
       };
       digitalCardMetaCache.at = Date.now();
       if (lite) digitalCardMetaCache.lite = result;

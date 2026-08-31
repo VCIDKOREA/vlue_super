@@ -709,9 +709,34 @@ function App() {
       setSelectedRoomId(null);
       setIsSearchOpen(false);
       navHistoryRef.current = [];
-    } else {
-      setDigitalCardActive(readDigitalCardActive());
+      return undefined;
     }
+    setDigitalCardActive(readDigitalCardActive());
+    setMembershipTier(readMembershipTier());
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { syncBizcardAccountFromApi } = await import("./lib/bizcardAccountSync.js");
+        await syncBizcardAccountFromApi({ force: false });
+        if (!cancelled) setMembershipTier(readMembershipTier());
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    const syncTier = () => setMembershipTier(readMembershipTier());
+    window.addEventListener("vlue-membership-tier-changed", syncTier);
+    window.addEventListener("vlue-bizcard-account-synced", syncTier);
+    return () => {
+      window.removeEventListener("vlue-membership-tier-changed", syncTier);
+      window.removeEventListener("vlue-bizcard-account-synced", syncTier);
+    };
   }, [isLoggedIn]);
 
   useEffect(() => {
@@ -2164,6 +2189,36 @@ function App() {
     setCardFieldsTick((n) => n + 1);
   }, []);
 
+  /** 로그인·소셜 세션 — API billing tier → React state (무료 포함 항상 반영) */
+  const applyLoginMembershipTier = useCallback(
+    (data) => {
+      const handle = String(data?.publicHandle || "")
+        .trim()
+        .toLowerCase()
+        .replace(/^@/, "");
+      if (handle === "ceo") {
+        applyMembershipTierFromHub("paid");
+        return;
+      }
+      const er = String(data?.enterpriseRole || "").trim().toUpperCase();
+      if (er && er !== "NONE") {
+        applyMembershipTierFromHub("b2b");
+        return;
+      }
+      const raw = String(data?.membershipTier || data?.membershipKind || "")
+        .trim()
+        .toLowerCase();
+      if (raw === "standard" || raw === "premium" || raw === "paid") {
+        applyMembershipTierFromHub("paid");
+      } else if (raw === "b2b") {
+        applyMembershipTierFromHub("b2b");
+      } else {
+        applyMembershipTierFromHub("free");
+      }
+    },
+    [applyMembershipTierFromHub]
+  );
+
   const handleSignup = useCallback((intent = "general") => {
     const nextIntent = intent === "trust" ? "trust" : "general";
     setSignupIntent(nextIntent);
@@ -2267,6 +2322,7 @@ function App() {
       clearAccountScopedLocalStorage({ keepRememberLogin: false, keepOnboarding: true });
       persistAuthSessionAfterLogin(result.session);
       processTierChangeFromLoginData(result.session);
+      applyLoginMembershipTier(result.session);
       void (async () => {
         try {
           const { hydrateBizcardFromLoginPayload, syncBizcardAccountFromApi } = await import(
@@ -2325,7 +2381,7 @@ function App() {
     setBottomToast(formatted || "소셜 로그인에 실패했습니다. 다시 시도해 주세요.");
     const t = setTimeout(() => setBottomToast(""), 3200);
     return () => clearTimeout(t);
-  }, [persistAuthSessionAfterLogin, processTierChangeFromLoginData]);
+  }, [persistAuthSessionAfterLogin, processTierChangeFromLoginData, applyLoginMembershipTier]);
 
   const handleLogin = useCallback(
     async (payload) => {
@@ -2437,16 +2493,11 @@ function App() {
           } catch {
             /* ignore */
           }
-          const tierFromApi = String(data.membershipTier || "").trim().toLowerCase();
           const handle = String(data.publicHandle || id || "")
             .trim()
             .toLowerCase()
             .replace(/^@/, "");
-          if (tierFromApi === "paid" || tierFromApi === "premium" || tierFromApi === "standard" || tierFromApi === "b2b") {
-            applyMembershipTierFromHub(tierFromApi === "standard" || tierFromApi === "premium" ? "paid" : tierFromApi);
-          } else if (handle === "ceo") {
-            applyMembershipTierFromHub("paid");
-          }
+          applyLoginMembershipTier(data);
           if (data.phoneE164) localStorage.setItem("vlue_phone_e164", String(data.phoneE164));
           if (handle === "ceo") {
             localStorage.setItem("vlue_phone_e164", "+821080144666");
@@ -2483,10 +2534,6 @@ function App() {
           }
           if (data.enterpriseRole) {
             localStorage.setItem("vlue_enterprise_role", data.enterpriseRole);
-            const er = String(data.enterpriseRole).trim().toUpperCase();
-            if (er && er !== "NONE") {
-              applyMembershipTierFromHub("b2b");
-            }
           }
           if (data.lineType) localStorage.setItem("vlue_line_type", data.lineType);
           setCardFieldsTick((n) => n + 1);
@@ -2508,7 +2555,7 @@ function App() {
         return { ok: false, error: msg };
       }
     },
-    [persistAuthSessionAfterLogin, processTierChangeFromLoginData, applyMembershipTierFromHub]
+    [persistAuthSessionAfterLogin, processTierChangeFromLoginData, applyLoginMembershipTier]
   );
 
   const handleSocialLogin = useCallback(
@@ -2587,6 +2634,7 @@ function App() {
       }
       persistAuthSessionAfterLogin(data);
       processTierChangeFromLoginData(data);
+      applyLoginMembershipTier(data);
       try {
         const { hydrateBizcardFromLoginPayload, syncBizcardAccountFromApi } = await import(
           "./lib/bizcardAccountSync.js"
@@ -2624,7 +2672,7 @@ function App() {
       setTimeout(() => setBottomToast(""), 2200);
       return true;
     },
-    [persistAuthSessionAfterLogin, processTierChangeFromLoginData]
+    [persistAuthSessionAfterLogin, processTierChangeFromLoginData, applyLoginMembershipTier]
   );
 
   const handleRequestTierChange = useCallback(async (tier) => {

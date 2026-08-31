@@ -41,7 +41,8 @@ export async function resolveLoginMembershipTier(
   const snap = String(card?.membershipTierSnapshot || "").trim().toLowerCase();
   if (snap === "standard" || snap === "premium") return "paid";
   if (snap === "paid" || snap === "b2b" || snap === "free") return snap;
-  if (sub) return "paid";
+  /* 스냅샷 없음 = 관리자·빌링 기준 무료 (구독만으로 유료 승격하지 않음) */
+  if (card && sub) return "paid";
   return "free";
 }
 

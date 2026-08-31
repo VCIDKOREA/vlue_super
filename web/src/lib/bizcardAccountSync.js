@@ -7,6 +7,19 @@ import {
 import { formatPhoneE164ForKoreaDisplay } from "./phoneDisplay.js";
 import { normalizeMembershipKind } from "./membershipBm.js";
 
+export function writeMembershipTierLocal(tier) {
+  const normalized = normalizeMembershipKind(tier);
+  try {
+    localStorage.setItem("vlue_membership_kind", normalized);
+    localStorage.setItem("vlue_membership_tier", normalized);
+    localStorage.setItem("membershipTier", normalized);
+    window.dispatchEvent(new CustomEvent("vlue-membership-tier-changed", { detail: { tier: normalized } }));
+  } catch {
+    /* ignore */
+  }
+  return normalized;
+}
+
 export const DIGITAL_CARD_ACTIVE_KEY = "vlue_digital_card_active";
 /** 쇼케이스에 DCC(디지털인증명함) 송출 — 발급(active)과 별개 */
 export const DCC_BROADCAST_KEY = "vlue_dcc_broadcast_on";
@@ -146,9 +159,7 @@ function persistLoginProfileFields(data) {
     if (data.enterpriseRole) localStorage.setItem("vlue_enterprise_role", String(data.enterpriseRole));
     if (data.lineType) localStorage.setItem("vlue_line_type", String(data.lineType));
     if (data.membershipKind || data.membershipTier) {
-      const tier = normalizeMembershipKind(data.membershipKind || data.membershipTier);
-      localStorage.setItem("vlue_membership_kind", tier);
-      localStorage.setItem("membershipTier", tier);
+      writeMembershipTierLocal(data.membershipKind || data.membershipTier);
     }
   } catch {
     /* ignore */
@@ -220,6 +231,10 @@ export async function syncBizcardAccountFromApi(opts = {}) {
     } catch {
       /* ignore */
     }
+  }
+
+  if (meta?.membershipTierSnapshot) {
+    writeMembershipTierLocal(meta.membershipTierSnapshot);
   }
 
   window.dispatchEvent(new CustomEvent("vlue-bizcard-account-synced", { detail: { ctx, meta } }));
