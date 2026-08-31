@@ -53,8 +53,27 @@ export default function MyCaseIgPostViewer({
   const membershipTier = useMemo(() => readMembershipTier(), []);
   const isFeedMobile = variant === "fullscreen";
   const parsed = useMemo(() => {
-    const payload = detail?.item?.payloadJson || item?.payloadJson || {};
-    return parseMycasePostPayload(payload, detail?.item || item);
+    const listPayload = item?.payloadJson && typeof item.payloadJson === "object" ? item.payloadJson : {};
+    const detailPayload =
+      detail?.item?.payloadJson && typeof detail.item.payloadJson === "object"
+        ? detail.item.payloadJson
+        : {};
+    const payload =
+      Object.keys(detailPayload).length >= Object.keys(listPayload).length ? detailPayload : listPayload;
+    const base = parseMycasePostPayload(payload, detail?.item || item);
+    if (base.images.length > 0) return base;
+    const listParsed = parseMycasePostPayload(listPayload, item);
+    if (listParsed.images.length > base.images.length) {
+      return { ...base, images: listParsed.images, postType: listParsed.postType || base.postType };
+    }
+    const thumb = String(item?.thumbnailUrl || detail?.item?.thumbnailUrl || "").trim();
+    if (thumb) {
+      return {
+        ...base,
+        images: [{ id: "thumb-preview", url: thumb }]
+      };
+    }
+    return base;
   }, [detail, item]);
 
   const [imgIndex, setImgIndex] = useState(0);
@@ -178,6 +197,7 @@ export default function MyCaseIgPostViewer({
           digitalCardOnly={false}
           isKnownContact
           callPhase="connected"
+          suppressBgm
         />
       </div>
     ) : images.length ? (

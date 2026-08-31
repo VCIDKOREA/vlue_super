@@ -14,6 +14,7 @@ export default function UserCaseArchiveView({
   open,
   userId,
   displayName = "",
+  peerHandle = "",
   onClose,
   onToast,
   isDarkMode = false
@@ -21,6 +22,7 @@ export default function UserCaseArchiveView({
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [detailPayload, setDetailPayload] = useState(null);
+  const [detailBgmConfig, setDetailBgmConfig] = useState(null);
   const [peerIdentity, setPeerIdentity] = useState(null);
   const [feedItems, setFeedItems] = useState([]);
   const [feedStartIndex, setFeedStartIndex] = useState(0);
@@ -79,6 +81,8 @@ export default function UserCaseArchiveView({
           <MyCaseGrid
             mode="user"
             ownerUserId={userId}
+            peerHintName={displayName}
+            peerHintHandle={peerHandle}
             onBack={onClose}
             onToast={onToast}
             bgmEnabled={!cardOpen}
@@ -104,6 +108,7 @@ export default function UserCaseArchiveView({
               setDetailPayload(detail);
               setFeedItems(Array.isArray(meta?.feedItems) ? meta.feedItems : item ? [item] : []);
               setFeedStartIndex(Number.isFinite(meta?.startIndex) ? meta.startIndex : 0);
+              setDetailBgmConfig(meta?.bgmStyleConfig || null);
               setDetailOpen(true);
             }}
           />
@@ -118,11 +123,12 @@ export default function UserCaseArchiveView({
         startIndex={feedStartIndex}
         isDarkMode={isDarkMode}
         peerIdentity={peerIdentity}
-        suppressBgm
+        bgmStyleConfig={detailBgmConfig}
         onClose={() => {
           setDetailOpen(false);
           setDetailItem(null);
           setDetailPayload(null);
+          setDetailBgmConfig(null);
           setPeerIdentity(null);
           setFeedItems([]);
           setFeedStartIndex(0);

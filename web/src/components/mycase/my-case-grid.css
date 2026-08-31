@@ -923,3 +923,48 @@
 .my-case-grid {
   display: contents;
 }
+
+.ig-mycase__shell {
+  position: relative;
+}
+
+.ig-mycase__shell--loading .ig-mycase__profile,
+.ig-mycase__shell--loading .ig-mycase__actions,
+.ig-mycase__shell--loading .ig-mycase__grid,
+.ig-mycase__shell--loading .ig-mycase__empty-block {
+  filter: blur(10px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.ig-mycase__loading-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.ig-mycase--dark .ig-mycase__loading-veil {
+  background: rgba(11, 16, 27, 0.45);
+}
+
+.ig-mycase__loading-veil__text {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ig-text);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.ig-mycase--dark .ig-mycase__loading-veil__text {
+  color: #f5f5f5;
+  background: rgba(30, 36, 48, 0.92);
+}

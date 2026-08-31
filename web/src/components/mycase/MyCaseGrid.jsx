@@ -114,6 +114,8 @@ function formatCount(n) {
 export default function MyCaseGrid({
   mode = "mine",
   ownerUserId = null,
+  peerHintName = "",
+  peerHintHandle = "",
   onBack,
   onOpenDetail,
   onOpenDigitalCard,
@@ -208,15 +210,23 @@ export default function MyCaseGrid({
 
   const displayHandle = isMine
     ? self.handle
-    : String(remoteProfile?.profile?.publicHandle || "").replace(/^@/, "") || "member";
+    : String(remoteProfile?.profile?.publicHandle || peerHintHandle || "")
+        .replace(/^@+/, "")
+        .trim() ||
+      (loading && !remoteProfile
+        ? String(peerHintHandle || peerHintName || "").replace(/^@+/, "").trim() || "…"
+        : "");
   const displayName = isMine
     ? self.name
     : String(
         remoteProfile?.cardExport?.name ||
           remoteProfile?.profile?.displayName ||
           remoteProfile?.profile?.legalName ||
+          peerHintName ||
           ""
-      ).trim() || displayHandle;
+      ).trim() ||
+      displayHandle ||
+      (loading ? "…" : "");
   const avatarUrl = isMine
     ? self.avatarUrl
     : String(
@@ -274,16 +284,44 @@ export default function MyCaseGrid({
            여기서 apply 하면 STYLE 이벤트로 목록이 재귀 갱신될 수 있음. */
       } else {
         if (!ownerUserId) return;
-        const data = await fetchUserMycase(ownerUserId, { limit: 30 });
+        const [data, styleRes] = await Promise.all([
+          fetchUserMycase(ownerUserId, { limit: 30 }),
+          fetchPeerShowcaseStyleBundle(ownerUserId).catch(() => ({ ok: false }))
+        ]);
         if (!data.ok) {
           toast(data.message || "케이스함을 불러오지 못했습니다.");
           return;
         }
+        let liveStyle =
+          styleRes?.ok && styleRes.live && typeof styleRes.live === "object" ? styleRes.live : null;
+        if (liveStyle) setPeerLiveStyle(liveStyle);
+
         setRemoteProfile(data.profile || null);
         setAccessDenied(Boolean(data.accessDenied));
         setDenyReason(data.reason || null);
-        setMainBroadcast(data.mainBroadcast || []);
-        setItems(data.items || []);
+        let mains = data.mainBroadcast || [];
+        let list = data.items || [];
+        if (!data.accessDenied && mains.length === 0 && list.length === 0 && liveStyle) {
+          const cover = extractShowcaseCoverUrl(liveStyle);
+          const title = extractShowcaseArchiveTitle(liveStyle);
+          const synthetic = {
+            id: `live-style-${ownerUserId}`,
+            ownerUserId,
+            title: title || "쇼케이스",
+            thumbnailUrl: cover || "",
+            payloadJson: { style: liveStyle },
+            isPublic: true,
+            isMainBroadcast: true,
+            isLiveStyle: true,
+            slotIndex: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          mains = [synthetic];
+          list = [synthetic];
+        }
+        setMainBroadcast(mains);
+        setItems(list);
         setNextCursor(data.nextCursor || null);
         const counts = data.profile?.follow?.counts;
         if (counts) setFollowCounts(counts);
@@ -292,35 +330,6 @@ export default function MyCaseGrid({
           if (c.ok && c.counts) setFollowCounts(c.counts);
         }
         initialLoadDoneRef.current = true;
-
-        /* 라이브 스타일은 목록 표시를 막지 않고 백그라운드에서 합성 */
-        void fetchPeerShowcaseStyleBundle(ownerUserId).then((styleRes) => {
-          if (!styleRes.ok) return;
-          const liveStyle =
-            styleRes.live && typeof styleRes.live === "object" ? styleRes.live : null;
-          if (liveStyle) setPeerLiveStyle(liveStyle);
-          if (data.accessDenied || !liveStyle) return;
-          setItems((prev) => {
-            if (prev.length > 0) return prev;
-            const cover = extractShowcaseCoverUrl(liveStyle);
-            const title = extractShowcaseArchiveTitle(liveStyle);
-            const synthetic = {
-              id: `live-style-${ownerUserId}`,
-              ownerUserId,
-              title: title || "쇼케이스",
-              thumbnailUrl: cover || "",
-              payloadJson: { style: liveStyle },
-              isPublic: true,
-              isMainBroadcast: true,
-              isLiveStyle: true,
-              slotIndex: 0,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            };
-            setMainBroadcast([synthetic]);
-            return [synthetic];
-          });
-        });
       }
       initialLoadDoneRef.current = true;
     } finally {
@@ -549,7 +558,8 @@ export default function MyCaseGrid({
       ),
       digitalCardIssued: Boolean(remoteProfile?.digitalCardIssued),
       feedItems: filteredItems,
-      startIndex
+      startIndex,
+      bgmStyleConfig: caseHasBgm ? caseStyleConfig : null
     };
     /* 라이브 스타일 합성 항목 — API detail 없이 바로 열기 */
     if (item?.isLiveStyle || caseId.startsWith("live-style-")) {
@@ -787,6 +797,7 @@ export default function MyCaseGrid({
   const postsCount = filteredItems.length;
   const policyLine = isMine && policy ? formatCooldownHint(policy) : "";
   const highlightItems = mainBroadcast;
+  const peerProfileLoading = !isMine && loading;
 
   return (
     <section
@@ -838,6 +849,13 @@ export default function MyCaseGrid({
           <div className="ig-mycase__cover-shade" aria-hidden />
         </div>
       ) : null}
+
+      <div className={`ig-mycase__shell${peerProfileLoading ? " ig-mycase__shell--loading" : ""}`}>
+        {peerProfileLoading ? (
+          <div className="ig-mycase__loading-veil" role="status" aria-live="polite" aria-busy="true">
+            <p className="ig-mycase__loading-veil__text">불러오는 중…</p>
+          </div>
+        ) : null}
 
       <div className={`ig-mycase__profile${titlePhotoUrl ? " ig-mycase__profile--with-cover" : ""}`}>
           <div className="ig-mycase__profile-row">
@@ -1080,9 +1098,9 @@ export default function MyCaseGrid({
               : "열람 권한이 없습니다."}
           </p>
         </div>
-      ) : loading ? (
+      ) : loading && isMine ? (
         <p className="ig-mycase__empty">불러오는 중…</p>
-      ) : filteredItems.length === 0 ? (
+      ) : !peerProfileLoading && filteredItems.length === 0 ? (
         <div className="ig-mycase__empty-block">
           <p className="ig-mycase__empty-title">
             {isMine ? "아직 게시물이 없습니다" : "공개된 케이스가 없습니다"}
@@ -1161,6 +1179,13 @@ export default function MyCaseGrid({
         </ul>
       )}
 
+      {nextCursor && !accessDenied ? (
+        <div ref={sentinelRef} className="ig-mycase__sentinel">
+          {loadingMore ? "더 불러오는 중…" : ""}
+        </div>
+      ) : null}
+      </div>
+
       <MyCasePostComposer
         open={composerOpen}
         onClose={() => {
@@ -1179,12 +1204,6 @@ export default function MyCaseGrid({
         onClose={() => setSearchOpen(false)}
         onSelectItem={(picked) => void openItem(picked)}
       />
-
-      {nextCursor && !accessDenied ? (
-        <div ref={sentinelRef} className="ig-mycase__sentinel">
-          {loadingMore ? "더 불러오는 중…" : ""}
-        </div>
-      ) : null}
     </section>
   );
 }

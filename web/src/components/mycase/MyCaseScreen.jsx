@@ -45,6 +45,7 @@ export default function MyCaseScreen({
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [detailPayload, setDetailPayload] = useState(null);
+  const [detailBgmConfig, setDetailBgmConfig] = useState(null);
   const [feedItems, setFeedItems] = useState([]);
   const [feedStartIndex, setFeedStartIndex] = useState(0);
   const [cardOpen, setCardOpen] = useState(false);
@@ -73,6 +74,7 @@ export default function MyCaseScreen({
       setDetailOpen(false);
       setDetailItem(null);
       setDetailPayload(null);
+      setDetailBgmConfig(null);
       setFeedItems([]);
       setFeedStartIndex(0);
       setCardOpen(false);
@@ -98,6 +100,7 @@ export default function MyCaseScreen({
     setDetailOpen(false);
     setDetailItem(null);
     setDetailPayload(null);
+    setDetailBgmConfig(null);
     setFeedItems([]);
     setFeedStartIndex(0);
   }, []);
@@ -200,6 +203,7 @@ export default function MyCaseScreen({
             setDetailPayload(detail);
             setFeedItems(Array.isArray(meta?.feedItems) ? meta.feedItems : item ? [item] : []);
             setFeedStartIndex(Number.isFinite(meta?.startIndex) ? meta.startIndex : 0);
+            setDetailBgmConfig(meta?.bgmStyleConfig || null);
             setDetailOpen(true);
           }}
         />
@@ -219,7 +223,7 @@ export default function MyCaseScreen({
         layout={isDesktop ? "desktop" : "mobile"}
         showcasePickEnabled={showcasePickEnabled}
         isDarkMode={isDarkMode}
-        suppressBgm
+        bgmStyleConfig={detailBgmConfig}
         onClose={closeDetail}
         onToast={onToast}
         onEditPost={handleEditPost}

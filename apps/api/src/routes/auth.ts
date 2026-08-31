@@ -39,6 +39,16 @@ import {
   PasswordIdentityError
 } from "../services/auth/passwordIdentityChangeService.js";
 import {
+  changePhoneWithIdentity,
+  PhoneIdentityError
+} from "../services/auth/phoneIdentityChangeService.js";
+import {
+  findLoginIdWithEmailToken,
+  findLoginIdWithIdentity,
+  FindLoginIdError,
+  maskPublicHandle
+} from "../services/auth/findLoginIdService.js";
+import {
   sendSignupEmailOtp,
   verifySignupEmailOtp
 } from "../services/email/signupEmailVerifyService.js";
@@ -250,6 +260,28 @@ authRoutes.post("/send-code", async (c) => {
       });
     }
 
+    if (purpose === "find_id") {
+      const found = await resolvePasswordChangeEmail({ uid, loginId: body?.loginId });
+      if (!found) {
+        return c.json(
+          { error: `등록된 이메일이 없습니다. ${EMAIL_AUTH_SUPPORT}`, supportEmail: "support@vlue.kr" },
+          400
+        );
+      }
+      const sent = await sendEmailAuthCode({ purpose, emailRaw: found.email });
+      const ticket = await putPasswordGateTicket({ userId: found.userId, email: found.email });
+      return c.json({
+        ok: true,
+        purpose,
+        ticket,
+        maskedEmail: sent.maskedEmail,
+        expiresInSec: sent.expiresInSec,
+        supportEmail: "support@vlue.kr",
+        message: EMAIL_AUTH_SUPPORT,
+        ...(sent.devCode ? { devCode: sent.devCode } : {})
+      });
+    }
+
     if (purpose === "dcc_email") {
       if (!uid) return c.json({ error: "인증 필요" }, 401);
       const sent = await sendEmailAuthCode({ purpose, emailRaw: String(body?.email || "") });
@@ -335,6 +367,38 @@ authRoutes.post("/verify-code", async (c) => {
         ok: true,
         verified: true,
         token,
+        maskedEmail: maskEmail(verifiedEmail),
+        supportEmail: "support@vlue.kr"
+      });
+    }
+
+    if (purpose === "find_id") {
+      const gate = await readPasswordGateTicket(String(body?.ticket || ""));
+      const found = gate
+        ? { email: gate.email, userId: gate.userId }
+        : await resolvePasswordChangeEmail({ uid, loginId: undefined });
+      if (!found) {
+        return c.json({ error: "이메일 인증 요청이 만료되었습니다. 인증번호를 다시 받아 주세요." }, 400);
+      }
+      const verifiedEmail = await verifyEmailAuthCode({
+        purpose,
+        emailRaw: found.email,
+        codeRaw: code
+      });
+      const token = await issueVerifiedEmailTicket({
+        purpose,
+        email: verifiedEmail,
+        userId: found.userId
+      });
+      const user = await prisma.user.findUnique({
+        where: { id: found.userId },
+        select: { publicHandle: true }
+      });
+      return c.json({
+        ok: true,
+        verified: true,
+        token,
+        loginId: maskPublicHandle(user?.publicHandle),
         maskedEmail: maskEmail(verifiedEmail),
         supportEmail: "support@vlue.kr"
       });
@@ -782,6 +846,56 @@ authRoutes.post("/password/change-with-email", async (c) => {
     }
     return c.json({ ok: true });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+/** 로그인 상태 — PASS 본인인증으로 계정 휴대폰 번호 변경 (CI 동일 · 데이터 유지) */
+authRoutes.post("/phone/change-with-identity", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    if (!uid) return c.json({ error: "로그인이 필요합니다." }, 401);
+    const body = await c.req.json<{ impUid?: string; imp_uid?: string }>();
+    const impUid = String(body?.impUid || body?.imp_uid || "").trim();
+    const result = await changePhoneWithIdentity({ impUid, sessionUserId: uid });
+    return c.json(result);
+  } catch (e) {
+    if (e instanceof PhoneIdentityError) {
+      return c.json({ error: e.message }, e.status as 400 | 401 | 403 | 404 | 409);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+/** PASS 본인인증으로 가입 아이디 조회 (일부 마스킹) */
+authRoutes.post("/find-id-with-identity", async (c) => {
+  try {
+    const body = await c.req.json<{ impUid?: string; imp_uid?: string }>();
+    const impUid = String(body?.impUid || body?.imp_uid || "").trim();
+    const result = await findLoginIdWithIdentity(impUid);
+    return c.json(result);
+  } catch (e) {
+    if (e instanceof FindLoginIdError) {
+      return c.json({ error: e.message }, e.status as 400 | 403 | 404);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+/** 이메일 인증 토큰으로 가입 아이디 조회 (일부 마스킹) */
+authRoutes.post("/find-id-with-email", async (c) => {
+  try {
+    const body = await c.req.json<{ token?: string; ticket?: string }>();
+    const token = String(body?.token || body?.ticket || "").trim();
+    const result = await findLoginIdWithEmailToken(token);
+    return c.json(result);
+  } catch (e) {
+    if (e instanceof FindLoginIdError) {
+      return c.json({ error: e.message }, e.status as 400 | 403 | 404);
+    }
     const msg = e instanceof Error ? e.message : "unknown error";
     return c.json({ error: msg }, 400);
   }

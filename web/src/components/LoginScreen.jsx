@@ -36,11 +36,31 @@ function LoginScreen({
   const [pwEyeBlinkSeq, setPwEyeBlinkSeq] = useState(0);
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState("");
-  const [recoveryOpen, setRecoveryOpen] = useState(() => isPasswordChangeCertPending());
+  const [recoveryOpen, setRecoveryOpen] = useState(() => {
+    try {
+      return (
+        isPasswordChangeCertPending() || sessionStorage.getItem("vlue_open_account_recovery") === "1"
+      );
+    } catch {
+      return isPasswordChangeCertPending();
+    }
+  });
   const [recoveryDone, setRecoveryDone] = useState("");
   const [deviceEmailGate, setDeviceEmailGate] = useState(null);
   const [deviceEmailCode, setDeviceEmailCode] = useState("");
   const [deviceEmailHint, setDeviceEmailHint] = useState("");
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("vlue_open_account_recovery") === "1") {
+        setGeneralAuthOpen(true);
+        setRecoveryOpen(true);
+        sessionStorage.removeItem("vlue_open_account_recovery");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     try {

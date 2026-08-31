@@ -128,6 +128,7 @@ function ProfilePanel({
   onUnblockUser,
   onOpenFamilyProtection,
   myPhone = "",
+  onPhoneUpdated,
   /** "profileSettings" → 설정 화면으로 진입 */
   initialView = "main",
   onMembershipTierChange,
@@ -316,6 +317,13 @@ function ProfilePanel({
     if (initialView === "passwordChange") {
       setPanelView("settings");
       setSettingsSubView("passwordChange");
+      setDigitalCardMode("edit");
+      setUpgradeOpen(false);
+      return;
+    }
+    if (initialView === "phoneChange") {
+      setPanelView("settings");
+      setSettingsSubView("contactInfo");
       setDigitalCardMode("edit");
       setUpgradeOpen(false);
       return;
@@ -750,6 +758,7 @@ function ProfilePanel({
             blockedUserIds={blockedUserIds}
             onUnblockUser={onUnblockUser}
             myPhone={myPhone || myCard?.phone || ""}
+            onPhoneUpdated={onPhoneUpdated}
             myEmail={displayMailAddress}
             membershipTier={membershipTier}
             companyName={companyLockedName}

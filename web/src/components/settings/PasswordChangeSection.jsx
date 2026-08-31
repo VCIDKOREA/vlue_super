@@ -11,6 +11,7 @@ import {
   clearPasswordChangeCertPending,
   buildPasswordChangeSupportMailto
 } from "../../lib/passwordChangeApi.js";
+import { findLoginIdWithIdentity } from "../../lib/phoneChangeApi.js";
 import { sendAuthCode, verifyAuthCode, EMAIL_AUTH_SUPPORT } from "../../lib/emailAuthApi.js";
 
 function Field({ label, value, onChange, isDarkMode, autoComplete, placeholder }) {
@@ -53,6 +54,11 @@ export default function PasswordChangeSection({
   const [emailMasked, setEmailMasked] = useState("");
   const [emailVerifiedToken, setEmailVerifiedToken] = useState("");
   const [recoveryLoginId, setRecoveryLoginId] = useState(handle || "");
+  const [foundLoginId, setFoundLoginId] = useState("");
+  const [findIdEmailTicket, setFindIdEmailTicket] = useState("");
+  const [findIdEmailCode, setFindIdEmailCode] = useState("");
+  const [findIdEmailMasked, setFindIdEmailMasked] = useState("");
+  const [findIdBusy, setFindIdBusy] = useState(false);
 
   useEffect(() => {
     const redirect = consumeIamportCertRedirectResult();
@@ -65,6 +71,79 @@ export default function PasswordChangeSection({
       clearPasswordChangeCertPending();
     }
   }, []);
+
+  const runFindIdPass = useCallback(async () => {
+    setFindIdBusy(true);
+    setError("");
+    setNotice("");
+    setFoundLoginId("");
+    try {
+      markPasswordChangeCertPending("login");
+      const userCode = getPortoneUserCode();
+      const cert = await requestIamportCertification(userCode);
+      const uid = String(cert?.imp_uid || cert?.impUid || "").trim();
+      if (!uid) throw new Error("본인인증 결과를 확인하지 못했습니다.");
+      const data = await findLoginIdWithIdentity(uid);
+      setFoundLoginId(String(data.loginId || "").trim());
+      setRecoveryLoginId(String(data.loginId || recoveryLoginId || "").trim());
+      setNotice("아이디를 찾았습니다. 아래에서 비밀번호를 재설정할 수 있습니다.");
+      clearPasswordChangeCertPending();
+    } catch (e) {
+      clearPasswordChangeCertPending();
+      setError(e?.message || "아이디를 찾지 못했습니다.");
+    } finally {
+      setFindIdBusy(false);
+    }
+  }, [recoveryLoginId]);
+
+  const sendFindIdEmailCode = async () => {
+    setFindIdBusy(true);
+    setError("");
+    setNotice("");
+    setFoundLoginId("");
+    try {
+      const data = await sendAuthCode(
+        { purpose: "find_id", loginId: recoveryLoginId || handle },
+        { auth: false }
+      );
+      setFindIdEmailTicket(data.ticket || "");
+      setFindIdEmailMasked(data.maskedEmail || "");
+      setNotice(
+        data.devCode
+          ? `개발 모드 인증번호: ${data.devCode}`
+          : `${data.maskedEmail || "가입 이메일"} 로 인증번호를 보냈습니다.`
+      );
+    } catch (e) {
+      setError(e?.message || "인증번호를 보내지 못했습니다.");
+    } finally {
+      setFindIdBusy(false);
+    }
+  };
+
+  const verifyFindIdEmailCode = async () => {
+    if (!findIdEmailTicket || String(findIdEmailCode || "").trim().length !== 6) {
+      setError("인증번호 6자리를 입력해 주세요.");
+      return;
+    }
+    setFindIdBusy(true);
+    setError("");
+    try {
+      const data = await verifyAuthCode(
+        { purpose: "find_id", ticket: findIdEmailTicket, code: findIdEmailCode },
+        { auth: false }
+      );
+      const loginId = String(data.loginId || "").trim();
+      if (loginId) {
+        setFoundLoginId(loginId);
+        setRecoveryLoginId(loginId);
+      }
+      setNotice("아이디를 찾았습니다. 아래에서 비밀번호를 재설정할 수 있습니다.");
+    } catch (e) {
+      setError(e?.message || "인증번호가 올바르지 않습니다.");
+    } finally {
+      setFindIdBusy(false);
+    }
+  };
 
   const mailto = buildPasswordChangeSupportMailto({ handle, legalName, phone });
 
@@ -215,8 +294,76 @@ export default function PasswordChangeSection({
   };
 
   const boxClass = isDarkMode ? "border-white/10 bg-white/[0.04]" : "border-gray-100 bg-white";
+  const findIdBlock = !loggedIn ? (
+    <div className={`rounded-2xl border p-4 space-y-3 ${boxClass}`}>
+      <p className={`text-[13px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>아이디 찾기</p>
+      <p className={`text-[12px] leading-relaxed ${isDarkMode ? "text-gray-400" : "text-gray-600"}`} style={{ wordBreak: "keep-all" }}>
+        가입 휴대폰 PASS 본인인증 또는 등록 이메일 인증으로 아이디를 확인할 수 있습니다.
+      </p>
+      {foundLoginId ? (
+        <p className={`rounded-xl border px-3 py-3 text-[14px] font-black tabular-nums ${isDarkMode ? "border-emerald-400/30 text-emerald-300" : "border-emerald-200 text-emerald-700"}`}>
+          아이디: {foundLoginId}
+        </p>
+      ) : null}
+      <button
+        type="button"
+        disabled={busy || findIdBusy}
+        onClick={runFindIdPass}
+        className="w-full rounded-xl bg-blue-600 py-3 text-[13px] font-black text-white disabled:opacity-50"
+      >
+        {findIdBusy ? "확인 중…" : "휴대폰 본인인증으로 찾기"}
+      </button>
+      <label className={`block text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+        또는 가입 이메일 인증
+        <input
+          type="text"
+          value={recoveryLoginId}
+          onChange={(e) => setRecoveryLoginId(e.target.value)}
+          placeholder="가입 시 설정한 아이디 (선택)"
+          className={`mt-1 w-full rounded-lg border px-3 py-2.5 text-[13px] outline-none ${
+            isDarkMode ? "border-white/15 bg-[#1f2937] text-gray-100" : "border-gray-200 bg-white text-gray-900"
+          }`}
+        />
+      </label>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={findIdEmailCode}
+          onChange={(e) => setFindIdEmailCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          placeholder="인증번호 6자리"
+          className={`min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-[13px] outline-none ${
+            isDarkMode ? "border-white/15 bg-[#1f2937] text-gray-100" : "border-gray-200 bg-white text-gray-900"
+          }`}
+        />
+        <button
+          type="button"
+          disabled={busy || findIdBusy}
+          onClick={sendFindIdEmailCode}
+          className={`shrink-0 rounded-xl border px-3 py-2 text-[12px] font-bold disabled:opacity-50 ${
+            isDarkMode ? "border-white/15 text-gray-100" : "border-gray-200 text-gray-800"
+          }`}
+        >
+          {findIdEmailTicket ? "다시" : "인증번호"}
+        </button>
+        <button
+          type="button"
+          disabled={busy || findIdBusy}
+          onClick={verifyFindIdEmailCode}
+          className="shrink-0 rounded-xl bg-slate-800 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
+        >
+          확인
+        </button>
+      </div>
+      {findIdEmailMasked ? (
+        <p className={`text-[11px] ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>발송: {findIdEmailMasked}</p>
+      ) : null}
+    </div>
+  ) : null;
+
   const body = (
     <div className="space-y-4">
+      {findIdBlock}
       {loggedIn ? (
         <div className={`rounded-2xl border p-4 space-y-3 ${boxClass}`}>
           <p className={`text-[13px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
@@ -394,10 +541,10 @@ export default function PasswordChangeSection({
 
       <div className={`rounded-2xl border p-4 space-y-2 ${boxClass}`}>
         <p className={`text-[13px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
-          본인인증이 어려워요
+          본인인증·이메일로 해결되지 않을 때
         </p>
         <p className={`text-[12px] leading-relaxed ${isDarkMode ? "text-gray-400" : "text-gray-600"}`} style={{ wordBreak: "keep-all" }}>
-          고객센터 메일로 비밀번호 변경을 신청할 수 있습니다. 회원 ID와 가입 휴대폰을 적어 주세요.
+          위 방법으로 진행이 어려운 경우에만 고객센터로 문의해 주세요.
         </p>
         <a
           href={mailto}
@@ -421,7 +568,7 @@ export default function PasswordChangeSection({
           >
             ‹
           </button>
-          <p className="text-[17px] font-black text-[#191f28]">비밀번호 찾기</p>
+          <p className="text-[17px] font-black text-[#191f28]">아이디 / 비밀번호 찾기</p>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-4">{body}</div>
       </div>

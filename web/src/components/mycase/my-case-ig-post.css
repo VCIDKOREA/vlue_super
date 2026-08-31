@@ -176,7 +176,8 @@
   transform: translateX(-50%);
   display: flex;
   gap: 4px;
-  z-index: 2;
+  z-index: 8;
+  pointer-events: none;
 }
 
 .my-case-carousel__dots span {

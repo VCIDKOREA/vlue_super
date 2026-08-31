@@ -7,6 +7,11 @@ import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { fetchMycaseDetail } from "../../lib/mycaseApi.js";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
 import { trackShowcaseView } from "../../lib/productMetrics.js";
+import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
+import {
+  hasShowcaseBgmConfigured,
+  showcaseBgmIdentityKey
+} from "../../lib/showcase/showcaseBgmPresets.js";
 import "./my-case-detail.css";
 import "./my-case-ig-post.css";
 
@@ -38,6 +43,7 @@ export default function MyCaseDetailModal({
   layout = "mobile",
   isDarkMode = false,
   showcasePickEnabled = false,
+  bgmStyleConfig = null,
   onClose,
   onToast,
   onEditPost,
@@ -68,6 +74,35 @@ export default function MyCaseDetailModal({
   const detailCacheRef = useRef(detailCache);
   detailCacheRef.current = detailCache;
   const fetchingRef = useRef(new Set());
+  const { bindStyleConfig, setPlaybackPhase } = useShowcaseBgm();
+  const setPlaybackPhaseRef = useRef(setPlaybackPhase);
+  const bindStyleConfigRef = useRef(bindStyleConfig);
+  setPlaybackPhaseRef.current = setPlaybackPhase;
+  bindStyleConfigRef.current = bindStyleConfig;
+
+  const detailBgmFingerprint = useMemo(
+    () => (bgmStyleConfig ? showcaseBgmIdentityKey(bgmStyleConfig?.bgm) : ""),
+    [bgmStyleConfig]
+  );
+  const detailBgmFpRef = useRef("");
+
+  /* 게시물 상세에서도 케이스함 BGM 유지 — 홈 캐러셀 cleanup 이 끊지 못하게 재바인딩 */
+  useEffect(() => {
+    if (!open || !bgmStyleConfig || !hasShowcaseBgmConfigured(bgmStyleConfig)) {
+      detailBgmFpRef.current = "";
+      return undefined;
+    }
+    const fp = detailBgmFingerprint;
+    const changed = detailBgmFpRef.current !== fp;
+    detailBgmFpRef.current = fp;
+    bindStyleConfigRef.current(bgmStyleConfig, { owner: "casebox" });
+    setPlaybackPhaseRef.current("preview", {
+      forceRestart: changed,
+      owner: "casebox",
+      styleConfig: bgmStyleConfig
+    });
+    return undefined;
+  }, [open, bgmStyleConfig, detailBgmFingerprint]);
 
   const owner = Boolean(isOwner || detail?.isOwner);
   const selfIdentity = useMemo(() => readPreviewIdentity(), [open]);

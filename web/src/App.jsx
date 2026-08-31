@@ -70,6 +70,7 @@ import SignupErrorBoundary from "./components/SignupErrorBoundary.jsx";
 import LoginScreen from "./components/LoginScreen";
 import AppLockPinResetModal, { useAppLockResetListener } from "./components/AppLockPinResetModal.jsx";
 import { isPasswordChangeCertPending, readPasswordChangeResume } from "./lib/passwordChangeApi.js";
+import { isPhoneChangeCertPending, readPhoneChangeResume } from "./lib/phoneChangeApi.js";
 import { GUEST_PROTECTED_SUBHUB_TABS, runWithGuestAuthGate } from "./lib/guestAuthGate.js";
 import { VlueNavLogoMark } from "./components/VlueNavLogoMark.jsx";
 import BackButton from "./components/common/BackButton";
@@ -368,7 +369,7 @@ function App() {
   /** PASS 본인인증 redirect 복귀 시 온보딩 재오픈 */
   useEffect(() => {
     try {
-      if (isPasswordChangeCertPending()) return;
+      if (isPasswordChangeCertPending() || isPhoneChangeCertPending()) return;
       const hasDraft = Boolean(sessionStorage.getItem("vlue_pass_cert_draft_v1"));
       const q = new URLSearchParams(window.location.search || "");
       const hasCertReturn = Boolean(q.get("imp_uid") || q.get("impUid") || q.get("success"));
@@ -383,10 +384,24 @@ function App() {
   /** 비밀번호 변경 PASS redirect 복귀 — 설정 화면으로 */
   useEffect(() => {
     try {
+      if (isPhoneChangeCertPending()) return;
       if (!isPasswordChangeCertPending()) return;
       if (readPasswordChangeResume() !== "settings") return;
       setShowSplash(false);
       setProfileInitialView("passwordChange");
+      setProfileOpen(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  /** 전화번호 변경 PASS redirect 복귀 — 설정 > 전화번호 */
+  useEffect(() => {
+    try {
+      if (!isPhoneChangeCertPending()) return;
+      if (readPhoneChangeResume() !== "settings") return;
+      setShowSplash(false);
+      setProfileInitialView("phoneChange");
       setProfileOpen(true);
     } catch {
       /* ignore */
@@ -2483,8 +2498,11 @@ function App() {
   const handleSocialLogin = useCallback(
     async (provider) => {
       if (provider === "find_account") {
-        setBottomToast("아이디/비밀번호 찾기는 고객센터 또는 본인인증 안내 페이지로 연결됩니다.");
-        setTimeout(() => setBottomToast(""), 2800);
+        try {
+          sessionStorage.setItem("vlue_open_account_recovery", "1");
+        } catch {
+          /* ignore */
+        }
         return true;
       }
 
@@ -3412,7 +3430,10 @@ function App() {
       if (!id) return;
       setCaseArchiveUser({
         userId: id,
-        name: String(name || handle || "").trim() || "케이스함"
+        name: String(name || handle || "").trim() || "케이스함",
+        handle: String(handle || "")
+          .replace(/^@+/, "")
+          .trim()
       });
     };
 
@@ -5603,6 +5624,7 @@ function App() {
         open={Boolean(caseArchiveUser?.userId)}
         userId={caseArchiveUser?.userId || null}
         displayName={caseArchiveUser?.name || ""}
+        peerHandle={caseArchiveUser?.handle || ""}
         onClose={() => setCaseArchiveUser(null)}
         onToast={(msg) => {
           setBottomToast(String(msg || ""));
@@ -5806,6 +5828,7 @@ function App() {
         blockedUserIds={blockedFriendIds}
         onUnblockUser={(userId) => setBlockedFriendIds((prev) => prev.filter((id) => id !== userId))}
         myPhone={myCardProfile?.phone || DEFAULT_MY_PHONE}
+        onPhoneUpdated={() => setCardFieldsTick((n) => n + 1)}
         onOpenFamilyProtection={() => {
           setProfileOpen(false);
           requestOpenFamilyProtectionTab();

@@ -257,7 +257,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const [previewVerified, setPreviewVerified] = useState(false);
   const [loading, setLoading] = useState(false);
   const [listLoading, setListLoading] = useState(() => !(readCallHistoryListCache()?.length));
-  const [listRefreshing, setListRefreshing] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [rowMatrix, setRowMatrix] = useState({});
   const [busyId, setBusyId] = useState("");
@@ -286,9 +285,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
   const refresh = useCallback(async () => {
     setLoadError("");
-    const hasVisibleRows = Boolean(readCallHistoryListCache()?.length);
+    const hasVisibleRows = Boolean(readCallHistoryListCache()?.length || items.length);
     if (!hasVisibleRows) setListLoading(true);
-    else setListRefreshing(true);
     try {
       const raw = await fetchDeviceCallLogEntries(200);
       /* 1차: 기기 로그 + 로컬 히스토리 + CEO 시드 — 번호만 보이다가 이름 붙는 깜빡임 방지 */
@@ -342,7 +340,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       setLoadError("통화기록을 불러오지 못했습니다.");
       setListLoading(false);
     } finally {
-      setListRefreshing(false);
+      setListLoading(false);
     }
   }, [lineFilter]);
 
@@ -524,10 +522,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const gen = ++openGenRef.current;
     const phone = call.phoneDisplay || call.phone;
 
-    /* 제스처 unlock만 — 즉시 재생하지 않음. 기존 곡도 로딩 동안 정지 */
+    /* 제스처 unlock만 — 통화 열 때 BGM을 끊지 않음 (쇼케이스/케이스함이 이어서 재생) */
     try {
       unlockAudioGesture?.();
-      setPlaybackPhase?.("idle", { steal: true, owner: "call-history" });
     } catch {
       /* ignore */
     }
@@ -832,11 +829,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         </p>
       ) : null}
       {lineFilterBar}
-      {listRefreshing && items.length ? (
-        <p className="call-history-refresh-hint" role="status" aria-live="polite">
-          목록 갱신 중…
-        </p>
-      ) : null}
       {listLoading ? (
         <p className="px-4 py-16 text-center text-[13px] font-semibold text-slate-500">
           통화기록 불러오는 중…

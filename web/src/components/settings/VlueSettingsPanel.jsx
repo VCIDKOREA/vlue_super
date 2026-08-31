@@ -30,6 +30,7 @@ import {
   FontScalePicker
 } from "./VlueSettingsUi.jsx";
 import PasswordChangeSection from "./PasswordChangeSection.jsx";
+import PhoneChangeSection from "./PhoneChangeSection.jsx";
 import VlueEmailSettingsSection from "./VlueEmailSettingsSection.jsx";
 import { v1AppShell } from "../../lib/v1ReleaseScope.js";
 import { APP_LEGAL_LINKS, marketingLegalUrl } from "../../lib/legalPageLinks.js";
@@ -301,6 +302,7 @@ export default function VlueSettingsPanel({
   onUnblockUser,
   myPhone = "",
   myEmail = "user@vlue.kr",
+  onPhoneUpdated,
   membershipTier = "free",
   companyName = "",
   openLetteringBizcardHub
@@ -310,6 +312,11 @@ export default function VlueSettingsPanel({
   const [feedNickInput, setFeedNickInput] = useState("");
   const [statusInput, setStatusInput] = useState("");
   const [showIdCopied, setShowIdCopied] = useState(false);
+  const [phoneDisplay, setPhoneDisplay] = useState(myPhone);
+
+  useEffect(() => {
+    setPhoneDisplay(myPhone);
+  }, [myPhone]);
 
   useEffect(() => {
     if (subView === "profileManage") {
@@ -486,15 +493,17 @@ export default function VlueSettingsPanel({
   if (subView === "contactInfo") {
     return (
       <SettingsSubpageShell title="전화번호" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
-        <div className={`rounded-2xl border p-4 space-y-3 ${boxClass}`}>
-          <div>
-            <p className={`text-[11px] font-bold ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>휴대전화</p>
-            <p className={`mt-1 text-[15px] font-bold ${headText}`}>{myPhone || "(등록된 번호 없음)"}</p>
-          </div>
-          <p className={`text-[11px] leading-relaxed ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-            본인인증에 사용된 번호입니다. 번호 변경은 본인인증 후 고객센터를 통해 지원됩니다.
-          </p>
-        </div>
+        <PhoneChangeSection
+          currentPhone={phoneDisplay}
+          isDarkMode={isDarkMode}
+          onSuccess={(nextPhone) => {
+            const updated = String(nextPhone || "").trim();
+            if (updated) setPhoneDisplay(updated);
+            showSettingNotice?.("전화번호가 변경되었습니다.");
+            onPhoneUpdated?.(updated);
+          }}
+          onError={(msg) => showSettingNotice?.(msg)}
+        />
       </SettingsSubpageShell>
     );
   }
@@ -702,7 +711,7 @@ export default function VlueSettingsPanel({
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="VLUE ID 확인" value={getMemberHandle()} onClick={() => onSubView("vlueId")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
-          <SettingsRowButton label="전화번호" sublabel="본인인증 번호 · 변경 안내" onClick={() => onSubView("contactInfo")} isDarkMode={isDarkMode} />
+          <SettingsRowButton label="전화번호" sublabel="PASS 본인인증으로 변경" onClick={() => onSubView("contactInfo")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton
             label="멤버십 등급 및 업그레이드"
@@ -739,7 +748,7 @@ export default function VlueSettingsPanel({
         <SettingsSection title="보안" isDarkMode={isDarkMode}>
           <SettingsRowButton
             label="비밀번호 변경"
-            sublabel="기존 비밀번호 · PASS 본인인증 · 고객센터"
+            sublabel="기존 비밀번호 · PASS · 이메일 인증"
             onClick={() => onSubView("passwordChange")}
             isDarkMode={isDarkMode}
           />

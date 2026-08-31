@@ -99,7 +99,12 @@ function serializeMycaseImageForPayload(photo, idx = 0) {
  */
 export function parseMycasePostPayload(payloadJson, item = null) {
   const payload = payloadJson && typeof payloadJson === "object" ? payloadJson : {};
-  const postType = String(payload.postType || "").trim() || (payload.style ? "showcase" : "showcase");
+  let postType = String(payload.postType || "").trim();
+  if (!postType) {
+    if (Array.isArray(payload.images) && payload.images.length > 0) postType = "feed";
+    else if (payload.style && typeof payload.style === "object") postType = "showcase";
+    else postType = "feed";
+  }
 
   if (postType === "feed") {
     const images = (Array.isArray(payload.images) ? payload.images : [])
