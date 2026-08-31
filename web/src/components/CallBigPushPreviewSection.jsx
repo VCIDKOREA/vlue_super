@@ -49,7 +49,7 @@ export default function CallBigPushPreviewSection({
   const [callChromePreview, setCallChromePreview] = useState(false);
   const [previewTick, setPreviewTick] = useState(0);
   const [liveCallOverlayActive, setLiveCallOverlayActive] = useState(false);
-  const { unlockFromUserGesture } = useShowcaseBgm();
+  const { unlockFromUserGesture, setPlaybackPhase } = useShowcaseBgm();
 
   const isOn = showcaseOn;
   /** 무료 회원 미리보기에 premium tier를 주입하지 않음 — 실제 청구·가족플랜 effective tier 사용 */
@@ -86,6 +86,14 @@ export default function CallBigPushPreviewSection({
     window.addEventListener("vlue-vcid-changed", syncBroadcast);
     return () => window.removeEventListener("vlue-vcid-changed", syncBroadcast);
   }, []);
+
+  useEffect(() => {
+    if (isOn) return undefined;
+    setPlaybackPhase("idle", { steal: true, fade: true, owner: "home-showcase-off" });
+    return () => {
+      setPlaybackPhase("idle", { release: true, owner: "home-showcase-off" });
+    };
+  }, [isOn, setPlaybackPhase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,15 +151,7 @@ export default function CallBigPushPreviewSection({
       effectiveTier
     );
     if (isOn) return { ...base, membershipTier: effectiveTier };
-    return {
-      ...base,
-      membershipTier: "free",
-      hideBroadcastName: true,
-      showcaseStyle: {
-        ...(base.showcaseStyle || {}),
-        showBroadcastName: false
-      }
-    };
+    return { ...base, membershipTier: "free" };
   }, [effectiveTier, isOn, previewTick]);
 
   const digitalCardApplied = readShowcasePreviewDigitalCardApplied();

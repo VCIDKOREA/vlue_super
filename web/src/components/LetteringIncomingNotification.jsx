@@ -14,6 +14,7 @@ import AgencyDcpMiniPopup from "./agency/AgencyDcpMiniPopup.jsx";
 import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx";
 import ShowcaseCallCarousel from "./showcase/ShowcaseCallCarousel.jsx";
 import FreeTierCallShowcase from "./showcase/FreeTierCallShowcase.jsx";
+import VlueAuthMemberPopup from "./VlueAuthMemberPopup.jsx";
 import { getLetteringReportsForPhone } from "../lib/letteringPhoneReports.js";
 import { formatLetteringReceptionLines, resolveShowcaseBarOwnerLabel } from "../lib/letteringPaidIdentityDisplay.js";
 import IdentitySecondaryText from "./IdentitySecondaryText.jsx";
@@ -255,6 +256,7 @@ export default function LetteringIncomingNotification({
   /** 접힘 애니메이션 끝날 때까지 --expanded 레이아웃 유지 (뚝뚝 끊김 방지) */
   const [keepExpandedLayout, setKeepExpandedLayout] = useState(false);
   const [expiredPopupOpen, setExpiredPopupOpen] = useState(true);
+  const [authMemberPopupOpen, setAuthMemberPopupOpen] = useState(false);
   const expandSlotRef = useRef(null);
 
   const showGuide = useCallback(
@@ -321,6 +323,13 @@ export default function LetteringIncomingNotification({
     if (isExpiredLine) {
       setExpiredPopupOpen(true);
       setExpanded(true);
+      return;
+    }
+    if (showcaseOffAuthExpand && !expanded) {
+      if (previewMode && !suppressExpandGuide) {
+        showGuide("미리보기입니다. 실제 통화에서 VLUE 인증 팝업이 표시됩니다.");
+      }
+      setAuthMemberPopupOpen(true);
       return;
     }
     if (previewMode && !suppressExpandGuide) {
@@ -638,6 +647,14 @@ export default function LetteringIncomingNotification({
     };
   }, [isUnverified, setPlaybackPhase]);
 
+  useEffect(() => {
+    if (!showcaseOffPreview) return undefined;
+    setPlaybackPhase("idle", { steal: true, fade: true, owner: "showcase-off" });
+    return () => {
+      setPlaybackPhase("idle", { release: true, owner: "showcase-off" });
+    };
+  }, [showcaseOffPreview, setPlaybackPhase]);
+
   const phoneReports = useMemo(() => {
     if (!isUnverified) return [];
     return getLetteringReportsForPhone(incoming, { extra: reportHistory });
@@ -756,11 +773,30 @@ export default function LetteringIncomingNotification({
     c.showcaseStyle
   ]);
 
+  const peerPublicHandle = useMemo(
+    () =>
+      String(c.publicHandle || c.loginId || c.feedId || "")
+        .replace(/^@+/, "")
+        .trim(),
+    [c.publicHandle, c.loginId, c.feedId]
+  );
+
   const showcaseOffAuthLabel = useMemo(() => {
-    if (hideBroadcastName) return "VLUE 인증";
-    const name = peerVerifiedName;
-    return name ? `VLUE 인증 · ${name}` : "VLUE 인증";
-  }, [hideBroadcastName, peerVerifiedName]);
+    if (!hideBroadcastName) {
+      const name = peerVerifiedName;
+      if (name) return `VLUE 인증 · ${name}`;
+    }
+    if (peerPublicHandle) return `@${peerPublicHandle}`;
+    return "VLUE 인증";
+  }, [hideBroadcastName, peerVerifiedName, peerPublicHandle]);
+
+  const authPopupIdentity = useMemo(
+    () => ({
+      name: !hideBroadcastName ? peerVerifiedName : "",
+      handle: peerPublicHandle
+    }),
+    [hideBroadcastName, peerVerifiedName, peerPublicHandle]
+  );
 
   const displayLabel = isExpiredLine
     ? formatLetteringPhoneDisplay(incoming) || unverifiedCollapsedPhone || incoming || "—"
@@ -1373,7 +1409,7 @@ export default function LetteringIncomingNotification({
                   <span className="lettering-ongoing-name min-w-0 font-semibold">
                     {displayLabel}
                   </span>
-                  {verified ? <VlueVerifiedBadge /> : null}
+                  {verified && !showcaseOffPreview ? <VlueVerifiedBadge /> : null}
                 </p>
                 {showCollapsedPhoneSubline ? (
                   <p className="lettering-ongoing-subline mt-0.5 min-w-0">
@@ -1448,15 +1484,7 @@ export default function LetteringIncomingNotification({
                         : "lettering-ongoing-scroll--emotional"
                   }`}
                 >
-                  {showcaseOffPreview ? (
-                    <FreeTierCallShowcase
-                      isKnownContact={false}
-                      card={c}
-                      phone={incoming}
-                      verified={verified}
-                      showcaseOffPreview
-                    />
-                  ) : useShowcaseCarousel ? (
+                  {useShowcaseCarousel ? (
                     <ShowcaseCallCarousel
                       card={c}
                       verified={verified}
@@ -1643,6 +1671,13 @@ export default function LetteringIncomingNotification({
           onClose={() => setExpiredPopupOpen(false)}
         />
       ) : null}
+      <VlueAuthMemberPopup
+        open={Boolean(authMemberPopupOpen && showcaseOffPreview)}
+        name={authPopupIdentity.name}
+        phone={incoming}
+        handle={authPopupIdentity.handle}
+        onClose={() => setAuthMemberPopupOpen(false)}
+      />
     </article>
   );
 }

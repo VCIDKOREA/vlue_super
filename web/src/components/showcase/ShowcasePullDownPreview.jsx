@@ -31,15 +31,7 @@ export default function ShowcasePullDownPreview({
   const showcaseOffPreview = !broadcastOn;
   const previewCard = useMemo(() => {
     if (!showcaseOffPreview) return card;
-    return {
-      ...card,
-      membershipTier: "free",
-      hideBroadcastName: true,
-      showcaseStyle: {
-        ...(card?.showcaseStyle || {}),
-        showBroadcastName: false
-      }
-    };
+    return { ...card, membershipTier: "free" };
   }, [card, showcaseOffPreview]);
 
   const previewIncludeDigitalCard =
@@ -127,7 +119,7 @@ export default function ShowcasePullDownPreview({
                   card={previewCard}
                   includeDigitalCard={previewIncludeDigitalCard}
                   isKnownContact
-                  expanded
+                  expanded={!showcaseOffPreview}
                   onExpandedChange={(isOpen) => {
                     if (!isOpen) close();
                   }}
