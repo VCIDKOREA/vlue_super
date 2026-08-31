@@ -164,6 +164,7 @@ export default function ShowcaseCallCarousel({
   const isDcp = card?.profileKind === "dcp" || Boolean(card?.dcp);
   const isPaid = isDcp || tier === USER_TIERS.PAID;
   const photosPerPage = maxShowcasePhotosPerPage();
+  /* 무료는 includeDigitalCard prop 이 true 여도 DCC 슬라이드 금지 */
   const showDigitalCard = isDcp || (Boolean(includeDigitalCard) && isPaid);
   const maxIgPages = maxInstagramEmbedsForTier(tier, { includeDigitalCard: showDigitalCard });
   /** 게시물 열람(suppressBgm) 시에도 재생 중인 케이스함 음원 메타를 칩에 표시 */

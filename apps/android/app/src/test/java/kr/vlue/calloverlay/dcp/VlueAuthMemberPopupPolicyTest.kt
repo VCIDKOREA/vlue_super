@@ -24,10 +24,10 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
-    fun ceoWithOrgHint_withoutStyleKey_isNotAuthMemberOnly() {
+    fun ceoWithOrgHint_withoutStyleKey_isAuthMemberOnlyUntilBroadcastConfirmed() {
         val json =
             """{"matched":true,"is_verified":true,"displayName":"이종근","digitalCardActive":true,"companyName":"VCID KOREA","logo_url":"https://www.vlue.kr/vlue-brand-logo.svg"}"""
-        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
     }
 
     @Test
@@ -67,10 +67,10 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
-    fun verifiedWithoutStyleKey_butOrgHint_isNotAuthMemberOnly() {
+    fun verifiedWithoutStyleKey_butOrgHint_isAuthMemberOnlyUntilBroadcastOn() {
         val json =
             """{"matched":true,"is_verified":true,"displayName":"이상춘","card":{"name":"이상춘","organization":"테스트상호"}}"""
-        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
     }
 
     @Test

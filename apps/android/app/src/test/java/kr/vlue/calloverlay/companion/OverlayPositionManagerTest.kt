@@ -41,9 +41,9 @@ class OverlayPositionManagerTest {
     }
 
     @Test
-    fun bigPush_compactIncoming_isBelowMiniPopup() {
+    fun bigPush_compactIncoming_isHiddenDuringRinging() {
         assertEquals(
-            OverlayPosition.BELOW_COMPACT_INCOMING,
+            OverlayPosition.HIDDEN,
             OverlayPositionManager.resolve(
                 OverlayContext.COMPACT_INCOMING,
                 OverlayState.BIG_PUSH,

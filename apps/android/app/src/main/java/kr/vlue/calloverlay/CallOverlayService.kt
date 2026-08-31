@@ -3088,6 +3088,14 @@ class CallOverlayService : Service() {
         }
     }
 
+    /** 웹 VlueAuthMemberPopup 「확인」 — 네이티브 팝업과 동일 MiniCase 전환 */
+    fun onAuthMemberPopupConfirmFromWeb() {
+        mainHandler.post {
+            if (dismissing) return@post
+            enterMiniCaseAfterAuthPopupConfirm()
+        }
+    }
+
     /**
      * 통화 오버레이(WebView)만 닫고 이 서비스만 stopSelf.
      * MainActivity·LetteringCallMonitorService·앱 프로세스는 종료하지 않는다.

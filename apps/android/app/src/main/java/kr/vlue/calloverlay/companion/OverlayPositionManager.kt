@@ -34,8 +34,9 @@ object OverlayPositionManager {
         }
         return when (context) {
             OverlayContext.HOME_SCREEN,
-            OverlayContext.OTHER_APP,
-            OverlayContext.COMPACT_INCOMING -> OverlayPosition.BELOW_COMPACT_INCOMING
+            OverlayContext.OTHER_APP -> OverlayPosition.BELOW_COMPACT_INCOMING
+            /* 삼성 통화목록·미니 수신 — 빅푸시가 팝업 뒤에 겹침. 링잉 중 숨김, 수락 후 SHOWCASE */
+            OverlayContext.COMPACT_INCOMING -> OverlayPosition.HIDDEN
             OverlayContext.INCOMING_CALL_UI -> OverlayPosition.TOP
             OverlayContext.IN_CALL,
             OverlayContext.KEYPAD,

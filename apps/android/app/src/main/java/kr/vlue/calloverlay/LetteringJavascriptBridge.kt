@@ -333,6 +333,12 @@ class LetteringJavascriptBridge(
         service.onVlueAuthMemberReadyFromWeb(phone.orEmpty())
     }
 
+    /** 웹 정상 팝업 「확인」→ MiniCase (enterMiniCaseAfterAuthPopupConfirm) */
+    @JavascriptInterface
+    fun confirmVlueAuthMemberPopup() {
+        service.onAuthMemberPopupConfirmFromWeb()
+    }
+
     companion object {
         const val INTERFACE_NAME = "Android"
         private const val TAG = "LetteringJsBridge"
@@ -372,6 +378,8 @@ class LetteringJavascriptBridge(
                 window.VlueLettering.openCertInfo = function(msg){ Android.openVlueCertInfo(JSON.stringify(msg||{})); };
                 window.VlueLettering.notifyVlueAuthMemberReady = function(p){ try{ Android.notifyVlueAuthMemberReady(String(p||'')); }catch(e){} };
                 window.Android.notifyVlueAuthMemberReady = window.VlueLettering.notifyVlueAuthMemberReady;
+                window.VlueLettering.confirmVlueAuthMemberPopup = function(){ try{ Android.confirmVlueAuthMemberPopup(); }catch(e){} };
+                window.Android.confirmVlueAuthMemberPopup = window.VlueLettering.confirmVlueAuthMemberPopup;
                 window.VlueLettering.onNativeCallState = window.VlueLettering.onNativeCallState || function(){};
                 try { delete window.VlueLettering.setOverlayFullscreen; } catch (e) {}
             """.trimIndent()

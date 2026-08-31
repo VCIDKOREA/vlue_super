@@ -90,12 +90,9 @@ object VlueAuthMemberPopupPolicy {
         }
 
         /*
-         * includeDigitalCard 키 누락:
-         * - 상호/로고/타이틀사진/미디어만으로 쇼케이스 인정 (CEO·전중희 등)
-         * - email·profile photo·digitalCardActive·handle 단독은 인증-only
-         *   (이슬기/이상춘: digitalCardActive+email 만으로 FULLSCREEN 빈화면 금지)
+         * includeDigitalCard 키 누락 → 송출 OFF (캐시 pages·상호만으로 DCC/쇼케이스 금지).
+         * 명시 true 는 위 broadcastOn 분기에서 처리.
          */
-        if (media || orgHints) return true
         return false
     }
 

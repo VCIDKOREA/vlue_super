@@ -64,17 +64,16 @@ export function cardHasSoftIdentityHints(card) {
 export function peerHasDccOrShowcaseContent(card, style) {
   const st = style || card?.showcaseStyle || null;
   if (st && typeof st === "object" && st.includeDigitalCard === false) return false;
+  /* live.includeDigitalCard===true 만 풀 쇼케이스 — 키 누락·캐시 pages 로 DCC/쇼케이스 깜빡임 금지 */
+  if (!peerShowcaseBroadcastOn(st)) return false;
   const media = styleHasShowcaseMedia(st);
   const body = cardHasDccBody(card);
   const soft = cardHasSoftIdentityHints(card);
   const handle = String(card?.publicHandle || card?.loginId || card?.vlueId || "")
     .trim()
     .replace(/^@/, "");
-  if (peerShowcaseBroadcastOn(st)) {
-    if (media || body || soft || handle) return true;
-    return false;
-  }
-  return Boolean(media || body);
+  if (media || body || soft || handle) return true;
+  return false;
 }
 
 /**

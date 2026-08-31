@@ -271,11 +271,8 @@ function applyLocalOverlayCardDefaults(card, phoneHint = "") {
 }
 
 /**
- * live 송출 플래그 도착 전.
- * - includeDigitalCard===true → ON
- * - ===false → OFF
- * - 키 누락: 상호/로고/미디어면 낙관적 ON (CEO), 아니면 OFF (이슬기/이상춘)
- *   digitalCardActive·email·handle 만으로 ON 하면 인증-only 가 빈 FULLSCREEN 이 됨.
+ * live 송출 플래그 — 명시값만 신뢰.
+ * includeDigitalCard 키 누락 시 OFF (API enrich 전 DCC·쇼케이스 깜빡임·캐시 pages 오탐 방지).
  */
 function provisionalBroadcastStyle(card) {
   const live = card?.showcaseStyle;
@@ -290,13 +287,6 @@ function provisionalBroadcastStyle(card) {
         includeDigitalCard: false
       };
     }
-  }
-  if (peerHasDccOrShowcaseContent(card, live || null)) {
-    return {
-      ...createDefaultShowcaseStyle(),
-      ...(live && typeof live === "object" ? live : {}),
-      includeDigitalCard: true
-    };
   }
   return createPeerAuthOnlyShowcaseStyle();
 }
@@ -439,7 +429,10 @@ function LetteringOverlayHostInner() {
   const matchedRef = useRef(Boolean(readBootNativeLookupCard(parseOverlayParams().incoming)));
   const peerAuthPopupOnlyRef = useRef(false);
   const forceShowcaseBarRef = useRef(!parseOverlayParams().urlMiniCase);
+  const showcaseStyleRef = useRef(showcaseStyle);
+  const styledCardRef = useRef(null);
   forceShowcaseBarRef.current = forceShowcaseBar;
+  showcaseStyleRef.current = showcaseStyle;
   const urlVerifiedRef = useRef(urlVerified);
   urlVerifiedRef.current = urlVerified;
 
@@ -567,10 +560,13 @@ function LetteringOverlayHostInner() {
     if (cached?.card && cached.verified) {
       matchedRef.current = true;
       const seeded = applyLocalOverlayCardDefaults(cached.card, incoming);
-      setCard(seeded);
-      setShowcaseStyle(
-        seeded.showcaseStyle || cached.showcaseStyle || provisionalBroadcastStyle(seeded)
-      );
+      const cachedStyle = seeded.showcaseStyle || cached.showcaseStyle || null;
+      const style =
+        cachedStyle && cachedStyle.includeDigitalCard === true
+          ? { ...createDefaultShowcaseStyle(), ...cachedStyle, includeDigitalCard: true }
+          : createPeerAuthOnlyShowcaseStyle();
+      setCard({ ...seeded, showcaseStyle: style });
+      setShowcaseStyle(style);
       setVerified(true);
       setLoading(false);
       return;
@@ -1089,12 +1085,21 @@ function LetteringOverlayHostInner() {
           } else {
             /*
              * 송출 ON: 풀 쇼케이스.
-             * 링잉 중 Mini Case로 접은 뒤 수락해도 expanded=false 로 남으면
-             * 네이티브 FULLSCREEN + 웹 미니 UI 가 겹친다.
+             * includeDigitalCard!==true 이면 펼치지 않음 (캐시·낙관적 ON 레이스 방지).
              */
-            restoreHoldUntilRef.current = Date.now() + 3500;
-            autoExpandedOnceRef.current = true;
-            setExpanded(true);
+            const liveStyle =
+              styledCardRef.current?.showcaseStyle || showcaseStyleRef.current;
+            if (
+              !peerShowcaseBroadcastOn(liveStyle) ||
+              !peerHasDccOrShowcaseContent(styledCardRef.current, liveStyle)
+            ) {
+              autoExpandedOnceRef.current = false;
+              setExpanded(false);
+            } else {
+              restoreHoldUntilRef.current = Date.now() + 3500;
+              autoExpandedOnceRef.current = true;
+              setExpanded(true);
+            }
           }
         }
         if (next === CALL_STATES.RINGING) {
@@ -1147,6 +1152,8 @@ function LetteringOverlayHostInner() {
     );
   }, [card, showcaseStyle, membershipTier]);
 
+  styledCardRef.current = styledCard;
+
   const peerAuthPopupOnly = useMemo(() => {
     if (!verified || !styledCard) return false;
     if (String(styledCard.profileKind || "") === "contact_safe_care") return false;
@@ -1165,9 +1172,58 @@ function LetteringOverlayHostInner() {
     }
   }, [incoming]);
 
+  /** 정상 팝업 「확인」→ 네이티브 MiniCase (웹만 닫으면 깨진 바/빅푸시 잔존) */
+  const confirmPeerAuthPopup = useCallback(() => {
+    setAuthMemberPopupOpen(false);
+    userChoseMiniRef.current = true;
+    forceShowcaseBarRef.current = false;
+    setForceShowcaseBar(false);
+    setExpanded(false);
+    try {
+      window.Android?.confirmVlueAuthMemberPopup?.();
+      window.VlueLettering?.confirmVlueAuthMemberPopup?.();
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     peerAuthPopupOnlyRef.current = peerAuthPopupOnly;
   }, [peerAuthPopupOnly]);
+
+  /* API enrich 후 송출 OFF 확정 — 풀/DCC 잔존 접기 */
+  useEffect(() => {
+    if (callState !== CALL_STATES.CONNECTED || userChoseMiniRef.current) return;
+    const style = styledCard?.showcaseStyle || showcaseStyle;
+    if (peerAuthPopupOnly) {
+      if (expanded) setExpanded(false);
+      return;
+    }
+    if (
+      expanded &&
+      (!peerShowcaseBroadcastOn(style) || !peerHasDccOrShowcaseContent(styledCard, style))
+    ) {
+      setExpanded(false);
+      return;
+    }
+    if (
+      !expanded &&
+      !autoExpandedOnceRef.current &&
+      identityReady &&
+      peerShowcaseBroadcastOn(style) &&
+      peerHasDccOrShowcaseContent(styledCard, style)
+    ) {
+      autoExpandedOnceRef.current = true;
+      setExpanded(true);
+    }
+  }, [
+    callState,
+    peerAuthPopupOnly,
+    expanded,
+    styledCard,
+    showcaseStyle,
+    identityReady
+  ]);
 
   useEffect(() => {
     if (callState !== CALL_STATES.CONNECTED || !identityReady) return;
@@ -1190,9 +1246,9 @@ function LetteringOverlayHostInner() {
       }
       return;
     }
-    /* 바 크롬만 있고 본문(pages/DCC) 없으면 접힘 유지 — 빈 풀스크린 금지 */
+    /* 송출 OFF·미확정(includeDigitalCard!==true) — 풀 펼침·DCC 슬라이드 금지 */
     const style = styledCard?.showcaseStyle || showcaseStyle;
-    if (!peerHasDccOrShowcaseContent(styledCard, style)) {
+    if (!peerShowcaseBroadcastOn(style) || !peerHasDccOrShowcaseContent(styledCard, style)) {
       setExpanded(false);
       return;
     }
@@ -1490,7 +1546,7 @@ function LetteringOverlayHostInner() {
         name={styledCard?.name || styledCard?.displayName || ""}
         phone={incoming}
         handle={styledCard?.publicHandle || ""}
-        onClose={() => setAuthMemberPopupOpen(false)}
+        onClose={confirmPeerAuthPopup}
       />
     </div>
   );
