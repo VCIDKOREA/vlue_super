@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, CreditCard, Palette } from "lucide-react";
 import { LETTERING_BIZCARD_CHANGED_EVENT } from "../lib/letteringBizcardStorage.js";
 import { fetchDigitalCardMeta } from "../lib/digitalCardApi.js";
-import { isPaidLetteringTier } from "../lib/letteringMembership.js";
+import { canUseV1PaidDccFeatures, requestV1PaidPackageGate } from "../lib/v1PaidPackageGate.js";
+import { readEffectiveMembershipTier } from "../lib/effectiveMembership.js";
 import { resolveVlueShowcaseCard } from "../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { showcasePreviewLabel, VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
@@ -36,8 +37,11 @@ export default function MyPageDigitalLetteringSection({
     window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT));
   };
 
-  const isApproved = Boolean(digitalCardActive) && digitalCardIssued !== false;
-  const tier = isPaidLetteringTier(membershipTier) ? membershipTier : "free";
+  const canUseDcc = canUseV1PaidDccFeatures(membershipTier);
+  const effectiveTier = readEffectiveMembershipTier();
+  const isApproved =
+    canUseDcc && Boolean(digitalCardActive) && digitalCardIssued !== false;
+  const tier = canUseDcc ? effectiveTier : "free";
 
   const previewCard = useMemo(() => {
     const base = resolveVlueShowcaseCard({ membershipTier: tier, previewExample: true });
@@ -86,10 +90,22 @@ export default function MyPageDigitalLetteringSection({
       ) : !isApproved ? (
         <div className="mypage-showcase-card mypage-showcase-card--apply mb-3" data-theme={isDarkMode ? "dark" : "light"}>
           <p className="mypage-showcase-card__apply-copy">
-            유료 회원은 명함이 쇼케이스에 함께 표시됩니다. 무료 회원도 이름·VLUE ID·전화번호로 공유할 수 있습니다.
+            {canUseDcc
+              ? "유료 회원은 명함이 쇼케이스에 함께 표시됩니다. 무료 회원도 이름·VLUE ID·전화번호로 공유할 수 있습니다."
+              : "디지털인증명함(DCC)은 V1 유료 패키지 기능입니다. 버튼을 누르면 구독플랜으로 이동할 수 있습니다."}
           </p>
-          <button type="button" className="mypage-showcase-card__apply-btn" onClick={() => onApplyDigitalCard?.()}>
-            디지털인증명함 신청
+          <button
+            type="button"
+            className="mypage-showcase-card__apply-btn"
+            onClick={() => {
+              if (!canUseDcc) {
+                requestV1PaidPackageGate();
+                return;
+              }
+              onApplyDigitalCard?.();
+            }}
+          >
+            {canUseDcc ? "디지털인증명함 신청" : "디지털인증명함 설정"}
           </button>
         </div>
       ) : (

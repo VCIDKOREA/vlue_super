@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
-import { readMembershipTier } from "../../lib/bizcardAccountSync.js";
+import { readEffectiveMembershipTier } from "../../lib/effectiveMembership.js";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import {
   MYCASE_SHOWCASE_PICK_CHANGED_EVENT,
@@ -37,7 +37,7 @@ export default function MyCaseShowcasePickTray({
   const [dragOrder, setDragOrder] = useState(null);
   const [navBottomPx, setNavBottomPx] = useState(() => measureNavHeightPx());
   const panelRef = useRef(null);
-  const membershipTier = useMemo(() => readMembershipTier(), [tick]);
+  const membershipTier = useMemo(() => readEffectiveMembershipTier(), [tick]);
   const limit = showcasePickLimitForTier(membershipTier);
 
   useEffect(() => {

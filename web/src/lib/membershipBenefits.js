@@ -37,15 +37,39 @@ export const MEMBERSHIP_BENEFIT_ROWS = [
   },
   {
     label: "블루 쇼케이스",
-    free: "기본(연락처별)",
-    paid: "풀(명함+배너)",
-    b2b: "풀(회선)"
+    free: "1페이지",
+    paid: "5페이지",
+    b2b: "5페이지(회선)"
   },
   {
-    label: "디지털 인증명함",
+    label: "디지털 인증명함(DCC)",
     free: "—",
     paid: "제공",
     b2b: "CI·대표번호"
+  },
+  {
+    label: "비즈니스 링크(페이지당)",
+    free: "—",
+    paid: "제공",
+    b2b: "제공"
+  },
+  {
+    label: "쇼셜링크",
+    free: "제공",
+    paid: "제공",
+    b2b: "제공"
+  },
+  {
+    label: "케이스함",
+    free: "제공",
+    paid: "제공",
+    b2b: "제공"
+  },
+  {
+    label: "BGM",
+    free: "1곡",
+    paid: "풀",
+    b2b: "풀"
   },
   {
     label: "쇼케이스 스타일 설정",
@@ -62,20 +86,26 @@ export const MEMBERSHIP_BENEFIT_ROWS = [
   {
     label: "가족보호",
     free: "—",
-    paid: "1:3",
+    paid: "본인 포함 4인",
     b2b: "해당 없음"
+  },
+  {
+    label: "가족플랜 혜택",
+    free: "유료 보호자 등록 시 DCC·쇼케이스 등 유료 기능",
+    paid: "피보호자에게 상속",
+    b2b: "—"
   },
   {
     label: "추가번호 쇼케이스 송출",
     free: "—",
-    paid: `옵션 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}`,
+    paid: `02·053·1588 등 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(010 별도 9,900원)`,
     b2b: "대표 외 추가번호"
   },
   {
     label: "구독 요금",
     free: "무료",
     paid: `월 ${formatKrw(PAID_EVENT_MONTHLY_KRW)}`,
-    b2b: `직원 ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)}`
+    b2b: `대표 ${formatKrw(B2B_REP_LIST_MONTHLY_KRW)} + 직원 ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)}`
   }
 ];
 
@@ -88,7 +118,9 @@ export const MEMBERSHIP_PLAN_DETAILS = {
     headline: "통화 신원 확인 · 기본 쇼케이스",
     bullets: [
       "일반 통화 시 수신 화면에서 발신자 신원 확인 서비스를 이용합니다.",
-      "무료 티어 블루 쇼케이스: 등록 연락처는 맞춤 프로필, 미등록은 안전 VLUE 표시로 안내합니다.",
+      "블루 쇼케이스 1페이지 · BGM 1곡 · 케이스함·쇼셜링크는 유료와 동일합니다.",
+      "비즈니스 링크·디지털인증명함(DCC)은 V1 유료 패키지 전용입니다.",
+      "유료 보호자 가족플랜 등록 시 DCC·쇼케이스 5페이지 등 유료 기능을 이용할 수 있습니다.",
       "PASS·휴대폰 본인확인으로 안전한 이용 기반을 만듭니다."
     ]
   },

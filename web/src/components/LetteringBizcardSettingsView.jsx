@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import {
   clampLetteringBizcardEmail,
   clampLetteringBizcardIntroFront,
@@ -44,6 +43,10 @@ import {
   readDccBroadcastOn,
   writeDccBroadcastOn
 } from "../lib/bizcardAccountSync.js";
+import {
+  requestV1PaidPackageGate,
+  canUseV1PaidDccFeatures
+} from "../lib/v1PaidPackageGate.js";
 import DccExposureSettingsPanel from "./dcc/DccExposureSettingsPanel.jsx";
 import { emptyDccExposureChoice, isDccExposureComplete } from "../lib/dccExposure.js";
 import { fetchDccExposure, saveDccExposure } from "../lib/dccExposureApi.js";
@@ -56,7 +59,7 @@ export default function LetteringBizcardSettingsView({
   onApplied
 }) {
   const [fixed, setFixed] = useState(() => readLetteringFixedIdentity());
-  const isPaid = isPaidLetteringTier(membershipTier);
+  const isPaid = canUseV1PaidDccFeatures(membershipTier);
   const [dccBroadcastOn, setDccBroadcastOn] = useState(() => readDccBroadcastOn());
 
   const [title, setTitle] = useState("");
@@ -720,6 +723,31 @@ export default function LetteringBizcardSettingsView({
             <span className="vlue-broadcast-switch__knob" />
           </span>
         </label>
+      ) : !isFirstApply ? (
+        <div
+          className={`flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 ${
+            isDarkMode ? "border-white/10 bg-white/[0.03]" : "border-gray-100 bg-[#f8fafc]"
+          }`}
+          role="group"
+          aria-label="디지털인증명함 송출"
+        >
+          <div className="min-w-0">
+            <p className={`text-[13px] font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
+              디지털인증 명함 송출
+            </p>
+            <p className={`mt-0.5 text-[11px] font-medium ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+              V1 유료 패키지 전용
+            </p>
+          </div>
+          <button
+            type="button"
+            className="vlue-broadcast-switch opacity-45"
+            aria-label="디지털인증명함 송출 — V1 유료 패키지"
+            onClick={() => requestV1PaidPackageGate()}
+          >
+            <span className="vlue-broadcast-switch__knob" />
+          </button>
+        </div>
       ) : null}
 
       <div

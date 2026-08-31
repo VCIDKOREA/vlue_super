@@ -2025,6 +2025,8 @@ model FamilyProtectionLink {
   familyRelation FamilyRelation             @map("family_relation")
   status         FamilyProtectionLinkStatus @default(pending)
   wardAcceptedAt DateTime?                  @map("ward_accepted_at") @db.Timestamptz(6)
+  /// 가족플랜 활성화 시 관리자·감사용 멤버십 경로 라벨
+  membershipPathLabel String?              @map("membership_path_label") @db.VarChar(120)
   alertNoAppEnabled        Boolean? @map("alert_no_app_enabled")
   alertNoAppHours          Int?     @map("alert_no_app_hours")
   alertMissedCallEnabled   Boolean? @map("alert_missed_call_enabled")

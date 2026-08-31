@@ -20,6 +20,10 @@ import {
   mapManualReviewRows,
   resolveManualReview
 } from "../onboarding/automatedOnboardingService.js";
+import {
+  batchFamilyPlanPathLabels,
+  resolveMembershipPathLabel
+} from "../membership/familyPlanMembership.js";
 
 const ADMIN_MEMBER_SELECT = {
   id: true,
@@ -69,7 +73,8 @@ function formatGenderDisplay(raw: string | null | undefined): string {
   return "";
 }
 
-function serializeAdminMember(u: {
+function serializeAdminMember(
+  u: {
   id: string;
   publicHandle: string | null;
   legalName: string | null;
@@ -99,8 +104,11 @@ function serializeAdminMember(u: {
     membershipTierSnapshot: string | null;
     issuedAt: Date;
   } | null;
-}) {
+},
+  opts?: { membershipPathLabel?: string }
+) {
   const phone = u.phoneE164 || "";
+  const membershipTier = String(u.digitalCard?.membershipTierSnapshot || "free").toLowerCase();
   return {
     id: u.id,
     publicHandle: u.publicHandle || "",
@@ -120,7 +128,8 @@ function serializeAdminMember(u: {
     role: u.role,
     accountStatus: u.accountStatus,
     status: u.status,
-    membershipTier: String(u.digitalCard?.membershipTierSnapshot || "free").toLowerCase(),
+    membershipTier,
+    membershipPathLabel: opts?.membershipPathLabel || membershipTier,
     digitalCardIssued: Boolean(u.digitalCard),
     companyName: u.businessProfile?.companyName || "",
     jobTitle: u.businessProfile?.jobTitle || "",
@@ -161,8 +170,27 @@ export async function listAdminUsers(opts: { q?: string; limit?: number; offset?
     prisma.user.count({ where })
   ]);
 
+  const freeWardIds = users
+    .filter((u) => {
+      const t = String(u.digitalCard?.membershipTierSnapshot || "free").toLowerCase();
+      return t === "free" || !t;
+    })
+    .map((u) => u.id);
+  const familyPathMap = await batchFamilyPlanPathLabels(freeWardIds);
+
   return {
-    users: users.map(serializeAdminMember),
+    users: users.map((u) => {
+      const tier = String(u.digitalCard?.membershipTierSnapshot || "free").toLowerCase();
+      const familyPath = familyPathMap.get(u.id);
+      const pathLabel =
+        familyPath ||
+        (tier === "paid" || tier === "standard" || tier === "premium"
+          ? "유료"
+          : tier === "b2b"
+            ? "B2B"
+            : "무료");
+      return serializeAdminMember(u, { membershipPathLabel: pathLabel });
+    }),
     total,
     limit,
     offset
@@ -175,7 +203,9 @@ export async function getAdminUser(userId: string) {
     select: ADMIN_MEMBER_SELECT
   });
   if (!user) return null;
-  return serializeAdminMember(user);
+  const tier = String(user.digitalCard?.membershipTierSnapshot || "free").toLowerCase();
+  const pathLabel = await resolveMembershipPathLabel(userId, tier);
+  return serializeAdminMember(user, { membershipPathLabel: pathLabel });
 }
 
 export async function patchAdminUser(

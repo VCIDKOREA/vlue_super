@@ -10,6 +10,7 @@ import {
   verifyGuardianPassCiMatchesUser
 } from "../auth/parentalConsentService.js";
 import { canRegisterFamilyMembers } from "./familyProtectionPaidGate.js";
+import { resolveFamilyPlanBeneficiary, formatFamilyPlanPathLabel } from "../membership/familyPlanMembership.js";
 import {
   assertCanInviteFamilyMember,
   buildFamilyProtectionSlots,
@@ -915,9 +916,24 @@ export async function acceptProtectionLink(wardUserId: string, linkId: string) {
     }
   }
 
+  let membershipPathLabel: string | null = null;
+  const paid = await canRegisterFamilyMembers(link.guardianUserId);
+  if (paid.ok) {
+    const guardian = await prisma.user.findUnique({
+      where: { id: link.guardianUserId },
+      select: { legalName: true, nickFeed: true, publicHandle: true }
+    });
+    const guardianName =
+      guardian?.legalName?.trim() ||
+      guardian?.nickFeed?.trim() ||
+      guardian?.publicHandle?.trim() ||
+      "회원";
+    membershipPathLabel = formatFamilyPlanPathLabel(guardianName);
+  }
+
   const updated = await familyProtectionDb.familyProtectionLink.update({
     where: { id: linkId },
-    data: { status: "active", wardAcceptedAt: new Date() }
+    data: { status: "active", wardAcceptedAt: new Date(), membershipPathLabel }
   });
 
   await familyProtectionDb.familyWardPresence.upsert({
@@ -1163,6 +1179,7 @@ async function listFamilyProtectionCore(userId: string) {
   });
 
   const activeWard = asWard.find((l: { status: string }) => l.status === "active");
+  const familyPlanBeneficiary = await resolveFamilyPlanBeneficiary(userId);
 
   const familyPeers: Array<{
     userId: string;
@@ -1207,6 +1224,7 @@ async function listFamilyProtectionCore(userId: string) {
     familyPeers,
     myActiveWardRole: activeWard?.wardRole ?? null,
     myActiveFamilyRelation: activeWard?.familyRelation ?? null,
+    familyPlanBeneficiary,
     bankConsents,
     implementationNote:
       "1단계: VLUE 앱 이벤트(통화·사이트·동의). 2단계: Android/iOS 네이티브(CallLog·설치앱). 3단계: 오픈뱅킹 입출금 자동연동.",

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight, ChevronUp, HelpCircle, ImagePlus, Loader2, Music2, Plus, Trash2, X } from "lucide-react";
 import BackButton from "../common/BackButton";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
+import { resolveEffectiveMembershipTier } from "../../lib/effectiveMembership.js";
 import { requiresPremium } from "../../lib/showcase/showcaseStylePermissions.js";
 import {
   SHOWCASE_STYLE_CHANGED_EVENT,
@@ -41,6 +42,7 @@ import { normalizeKakaoProfilePageUrl } from "../../lib/showcase/showcaseSocialO
 import { readDigitalCardActive, readDccBroadcastOn } from "../../lib/bizcardAccountSync.js";
 import { useDccFeatureAccess } from "../../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../../lib/dccAccessPolicy.js";
+import { canUseV1PaidDccFeatures, requestV1PaidPackageGate } from "../../lib/v1PaidPackageGate.js";
 import {
   LETTERING_BIZCARD_CHANGED_EVENT,
   LETTERING_OPEN_BIZCARD_SETTINGS_EVENT
@@ -223,12 +225,26 @@ export default function ShowcaseStyleSettingsPanel({
   onBindCloseGuard
 }) {
   const isWebDesk = layout === "webDesk";
-  const isPaid = isPaidLetteringTier(membershipTier);
+  const [familyPlanTick, setFamilyPlanTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setFamilyPlanTick((n) => n + 1);
+    window.addEventListener("vlue-family-protection-changed", bump);
+    window.addEventListener("vlue-family-ward-role", bump);
+    return () => {
+      window.removeEventListener("vlue-family-protection-changed", bump);
+      window.removeEventListener("vlue-family-ward-role", bump);
+    };
+  }, []);
+  const effectiveTier = useMemo(
+    () => resolveEffectiveMembershipTier(membershipTier),
+    [membershipTier, familyPlanTick]
+  );
+  const isPaid = isPaidLetteringTier(effectiveTier);
   const { access: dccAccess } = useDccFeatureAccess();
   const dccBlocked = isDccSettingsDisabled(dccAccess);
   const includeDigitalCard =
     !dccBlocked && isPaid && readDigitalCardActive() && readDccBroadcastOn();
-  const maxContentPages = maxShowcaseContentPagesForTier(membershipTier, { includeDigitalCard });
+  const maxContentPages = maxShowcaseContentPagesForTier(effectiveTier, { includeDigitalCard });
   const [config, setConfig] = useState(() => readShowcaseStyle());
   const [appliedFp, setAppliedFp] = useState(() => styleFingerprint(readShowcaseStyle()));
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -362,7 +378,7 @@ export default function ShowcaseStyleSettingsPanel({
           latest,
           items,
           maxContentPages,
-          membershipTier,
+          effectiveTier,
           { includeDigitalCard }
         );
         pendingPickApplyRef.current = false;
@@ -400,7 +416,7 @@ export default function ShowcaseStyleSettingsPanel({
     return () => {
       cancelled = true;
     };
-  }, [isWebDesk, maxContentPages, membershipTier, includeDigitalCard, notify]);
+  }, [isWebDesk, maxContentPages, effectiveTier, includeDigitalCard, notify]);
 
   /* 명함 사진·신원 변경 시 미리보기 즉시 반영 */
   useEffect(() => {
@@ -425,13 +441,13 @@ export default function ShowcaseStyleSettingsPanel({
   }, []);
 
   const card = useMemo(() => {
-    const base = resolveVlueShowcaseCard({ membershipTier, previewExample: true });
+    const base = resolveVlueShowcaseCard({ membershipTier: effectiveTier, previewExample: true });
     /* 설정 미리보기는 편집 초안(config)만 사용 — 라이브/마이케이스와 섞지 않음 */
-    return applyShowcaseStyleToCard(base, membershipTier, {
+    return applyShowcaseStyleToCard(base, effectiveTier, {
       style: config,
       digitalCardActive: includeDigitalCard
     });
-  }, [membershipTier, config, includeDigitalCard, identityTick]);
+  }, [effectiveTier, config, includeDigitalCard, identityTick]);
 
   const persist = useCallback((patch) => {
     setConfig((prev) => {
@@ -457,11 +473,11 @@ export default function ShowcaseStyleSettingsPanel({
       if (patch.gallery) next.gallery = { ...prev.gallery, ...patch.gallery };
       if (patch.tags) next.tags = patch.tags;
       if (Array.isArray(patch.pages)) next.pages = patch.pages.map(normalizeShowcasePage);
-      next = clampShowcasePages(next, membershipTier, { includeDigitalCard });
+      next = clampShowcasePages(next, effectiveTier, { includeDigitalCard });
       /* 편집 중: React 초안만 — 로컬/서버 저장·PUT 없음 (적용하기에서만) */
       return next;
     });
-  }, [membershipTier, includeDigitalCard]);
+  }, [effectiveTier, includeDigitalCard]);
 
   const persistPages = useCallback(
     (nextPages) => {
@@ -482,7 +498,7 @@ export default function ShowcaseStyleSettingsPanel({
           prev,
           rows,
           maxContentPages,
-          membershipTier,
+          effectiveTier,
           { includeDigitalCard }
         );
         const first = [...rows].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))[0];
@@ -498,7 +514,7 @@ export default function ShowcaseStyleSettingsPanel({
 
       notify("케이스함에서 선택한 사진이 쇼케이스 페이지에 반영되었습니다.");
     },
-    [maxContentPages, membershipTier, includeDigitalCard, notify]
+    [maxContentPages, effectiveTier, includeDigitalCard, notify]
   );
 
   useEffect(() => {
@@ -550,8 +566,12 @@ export default function ShowcaseStyleSettingsPanel({
   );
 
   const openBizcardSettings = useCallback(() => {
+    if (!canUseV1PaidDccFeatures(membershipTier)) {
+      requestV1PaidPackageGate();
+      return;
+    }
     window.dispatchEvent(new Event(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT));
-  }, []);
+  }, [membershipTier]);
 
   useEffect(() => {
     if (!igLink.linked || !igLink.username || igLink.expired) return;
@@ -671,7 +691,7 @@ export default function ShowcaseStyleSettingsPanel({
   };
 
   const onTagsChange = (raw) => {
-    if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
+    if (gatePremium("hashtag", effectiveTier, setGateOpen)) return;
     setTagInput(raw);
     persist({ tags: parseShowcaseTagsInput(raw) });
   };
@@ -694,7 +714,7 @@ export default function ShowcaseStyleSettingsPanel({
   }, [isPaid]);
 
   const onSearchPrivacyToggle = (key, checked) => {
-    if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
+    if (gatePremium("hashtag", effectiveTier, setGateOpen)) return;
     const next = { ...searchPrivacy, [key]: checked };
     setSearchPrivacy(next);
     void saveShowcaseSearchPrivacy(next);
@@ -707,7 +727,7 @@ export default function ShowcaseStyleSettingsPanel({
     !searchPrivacy.isIdSearchAllowed;
 
   const onSearchPrivateToggle = (checked) => {
-    if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
+    if (gatePremium("hashtag", effectiveTier, setGateOpen)) return;
     const next = checked
       ? {
           isPhoneSearchAllowed: false,
@@ -806,7 +826,7 @@ export default function ShowcaseStyleSettingsPanel({
       tags: isPaid ? parseShowcaseTagsInput(tagInput) : config.tags || []
     };
     const latest = slimShowcaseStyleForPersist(
-      clampShowcasePages(withTags, membershipTier, { includeDigitalCard })
+      clampShowcasePages(withTags, effectiveTier, { includeDigitalCard })
     );
     try {
       writeShowcaseStyle(latest, { replace: true, skipSync: true });
@@ -822,7 +842,7 @@ export default function ShowcaseStyleSettingsPanel({
       void syncShowcaseTagsToServer(latest.tags || []);
     }
 
-    const previewCard = resolveVlueShowcaseCard({ membershipTier, previewExample: true });
+    const previewCard = resolveVlueShowcaseCard({ membershipTier: effectiveTier, previewExample: true });
     const hasProfilePhoto = Boolean(String(previewCard?.photoUrl || "").trim());
 
     /* 적용 즉시 서버에 확정 — 재설치·재로그인 복원의 기준본 */
@@ -852,7 +872,7 @@ export default function ShowcaseStyleSettingsPanel({
     focusShowcaseSection,
     includeDigitalCard,
     isPaid,
-    membershipTier,
+    membershipTier: effectiveTier,
     notify,
     tagInput
   ]);
@@ -922,17 +942,19 @@ export default function ShowcaseStyleSettingsPanel({
         ) : null}
       </div>
 
-      {includeDigitalCard ? (
+      {includeDigitalCard || !isPaid ? (
         <div id="showcase-settings-dcc" className="showcase-page-card showcase-page-card--digital scroll-mt-4">
           <div className="showcase-page-card__head">
             <div className="min-w-0 flex-1">
               <p className="showcase-page-card__title">디지털인증명함</p>
               <p className={`showcase-page-card__status ${digitalCardReady && hasDigitalCardPhoto ? "is-ready" : ""}`}>
-                {!digitalCardReady
-                  ? "미설정"
-                  : hasDigitalCardPhoto
-                    ? "설정완료 ✔"
-                    : "프로필 사진 미등록"}
+                {!isPaid
+                  ? "V1 유료 패키지"
+                  : !digitalCardReady
+                    ? "미설정"
+                    : hasDigitalCardPhoto
+                      ? "설정완료 ✔"
+                      : "프로필 사진 미등록"}
               </p>
             </div>
             <button type="button" className="showcase-page-card__cta" onClick={openBizcardSettings}>
@@ -983,7 +1005,7 @@ export default function ShowcaseStyleSettingsPanel({
                     onChange={(photos) =>
                       updatePage(page.id, { gallery: { photos: (photos || []).slice(0, 1) } })
                     }
-                    membershipTier={membershipTier}
+                    membershipTier={effectiveTier}
                     maxPhotos={1}
                     enableTextOverlay
                   />
@@ -991,21 +1013,31 @@ export default function ShowcaseStyleSettingsPanel({
                     <p className="showcase-profile-block__sub">
                       <span className="showcase-profile-row__label-text">
                         비즈니스 링크
-                        <HelpTip text="이 페이지에만 보이는 링크입니다. 페이지당 1개만 넣을 수 있습니다. 로고가 없으면 기본 버튼으로 표시됩니다." />
+                        <HelpTip text="이 페이지에만 보이는 링크입니다. 페이지당 1개만 넣을 수 있습니다. V1 유료 패키지 전용입니다." />
                       </span>
                     </p>
-                    <BizLinkEditor
-                      links={page.businessLink ? [page.businessLink] : []}
-                      maxCount={1}
-                      inputCls={inputCls}
-                      isDarkMode={isDarkMode}
-                      onToast={onToast}
-                      onChange={(links) =>
-                        updatePage(page.id, {
-                          businessLink: Array.isArray(links) && links[0] ? links[0] : null
-                        })
-                      }
-                    />
+                    {isPaid ? (
+                      <BizLinkEditor
+                        links={page.businessLink ? [page.businessLink] : []}
+                        maxCount={1}
+                        inputCls={inputCls}
+                        isDarkMode={isDarkMode}
+                        onToast={onToast}
+                        onChange={(links) =>
+                          updatePage(page.id, {
+                            businessLink: Array.isArray(links) && links[0] ? links[0] : null
+                          })
+                        }
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className={`showcase-page-card__cta w-full justify-center opacity-60 ${inputCls}`}
+                        onClick={() => requestV1PaidPackageGate()}
+                      >
+                        V1 유료 패키지 · 설정하려면 구독플랜으로 이동
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1234,7 +1266,7 @@ export default function ShowcaseStyleSettingsPanel({
           value={tagInput}
           readOnly={!isPaid}
           onFocus={() => {
-            if (gatePremium("hashtag", membershipTier, setGateOpen)) return;
+            if (gatePremium("hashtag", effectiveTier, setGateOpen)) return;
           }}
           onChange={(e) => onTagsChange(e.target.value)}
         />
@@ -1300,8 +1332,7 @@ export default function ShowcaseStyleSettingsPanel({
         </>
       ) : null}
 
-      {isPaid ? (
-        <>
+      <>
           <button
             type="button"
             className="showcase-profile-row showcase-profile-row--btn"
@@ -1531,8 +1562,9 @@ export default function ShowcaseStyleSettingsPanel({
                 </button>
               ) : null}
               <p className="showcase-profile-block__sub mt-3 text-[11px] opacity-70">
-                홍보용 비즈니스 링크는 각 메인커스텀 페이지에서 페이지당 1개씩 설정합니다.
+                홍보용 비즈니스 링크는 각 메인커스텀 페이지에서 페이지당 1개씩 설정합니다. (V1 유료 패키지)
               </p>
+              {isPaid ? (
               <label className="showcase-style-settings__check mt-3">
                 <input
                   type="checkbox"
@@ -1541,10 +1573,10 @@ export default function ShowcaseStyleSettingsPanel({
                 />
                 VLUE 인증 마크 표시
               </label>
+              ) : null}
             </div>
           ) : null}
         </>
-      ) : null}
     </section>
   );
 
@@ -1635,7 +1667,7 @@ export default function ShowcaseStyleSettingsPanel({
           <aside className="showcase-web-desk__preview-col" aria-label="미리보기">
             <p className="showcase-web-desk__preview-label">미리보기</p>
             <CallBigPushPreviewSection
-              membershipTier={membershipTier}
+              membershipTier={effectiveTier}
               isDarkMode={isDarkMode}
               onToast={onToast}
               expandMode="inline"

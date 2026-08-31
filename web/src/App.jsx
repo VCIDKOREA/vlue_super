@@ -39,6 +39,13 @@ import { dispatchCloseShowcaseOverlays } from "./lib/showcase/closeShowcaseOverl
 import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
 import PersonalFeed from "./components/PersonalFeed";
 import ProfilePanel from "./components/ProfilePanel";
+import V1PaidPackageGateModal from "./components/V1PaidPackageGateModal.jsx";
+import {
+  canUseV1PaidDccFeatures,
+  requestMembershipUpgradePanel,
+  V1_PAID_PACKAGE_GATE_EVENT
+} from "./lib/v1PaidPackageGate.js";
+import { readMembershipTier } from "./lib/bizcardAccountSync.js";
 import VlueEmailSettingsSection from "./components/settings/VlueEmailSettingsSection.jsx";
 import VluePillToast from "./components/VluePillToast.jsx";
 import PushNotificationInbox from "./components/PushNotificationInbox.jsx";
@@ -183,8 +190,9 @@ import { readLetteringFixedIdentity } from "./lib/letteringBizcardStorage.js";
 import { B2bMembershipProvider } from "./context/B2bMembershipContext.jsx";
 import { ShowcaseBgmProvider } from "./context/ShowcaseBgmContext.jsx";
 import { runAndroidBackHandlers } from "./lib/androidBackStack.js";
-import { normalizeMembershipKind, isBillableMembershipKind } from "./lib/membershipBm.js";
+import { normalizeMembershipKind, isBillableMembershipKind, PAID_EVENT_MONTHLY_KRW } from "./lib/membershipBm.js";
 import { writePendingPayment, readPendingPayment } from "./lib/postSignupPayment.js";
+import { readEffectiveMembershipTier } from "./lib/effectiveMembership.js";
 import { clearAccountScopedLocalStorage } from "./lib/clearAccountScopedLocalStorage.js";
 import { persistDccAccessHintsFromSession } from "./lib/dccAccessSession.js";
 
@@ -438,6 +446,7 @@ function App() {
   );
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileInitialView, setProfileInitialView] = useState("main");
+  const [v1PaidGateOpen, setV1PaidGateOpen] = useState(false);
   useEffect(() => {
     const openShowcaseSettings = () => {
       setAppNotificationOpen(false);
@@ -449,14 +458,21 @@ function App() {
       setAppNotificationOpen(false);
       setCallShowcaseSheetOpen(false);
       setShowcaseStyleSheetOpen(false);
+      if (!canUseV1PaidDccFeatures(readEffectiveMembershipTier())) {
+        setV1PaidGateOpen(true);
+        return;
+      }
       setProfileInitialView("letteringBizcard");
       setProfileOpen(true);
     };
+    const onV1PaidGate = () => setV1PaidGateOpen(true);
     window.addEventListener(SHOWCASE_OPEN_SETTINGS_EVENT, openShowcaseSettings);
     window.addEventListener(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT, openBizcardSettings);
+    window.addEventListener(V1_PAID_PACKAGE_GATE_EVENT, onV1PaidGate);
     return () => {
       window.removeEventListener(SHOWCASE_OPEN_SETTINGS_EVENT, openShowcaseSettings);
       window.removeEventListener(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT, openBizcardSettings);
+      window.removeEventListener(V1_PAID_PACKAGE_GATE_EVENT, onV1PaidGate);
     };
   }, []);
   const [parentalConsentRequest, setParentalConsentRequest] = useState(null);
@@ -5833,6 +5849,24 @@ function App() {
           setProfileOpen(false);
           requestOpenFamilyProtectionTab();
           navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
+        }}
+      />
+
+      <V1PaidPackageGateModal
+        open={v1PaidGateOpen}
+        onClose={() => setV1PaidGateOpen(false)}
+        isDarkMode={isDarkMode}
+        onGoSubscribe={() => {
+          setV1PaidGateOpen(false);
+          const pending = {
+            membershipKind: "paid",
+            billingCycle: "monthly",
+            amountKrw: PAID_EVENT_MONTHLY_KRW,
+            label: "유료 멤버십 (V1)"
+          };
+          writePendingPayment(pending);
+          setPostSignupPending(pending);
+          setPostSignupPaymentOpen(true);
         }}
       />
         </>

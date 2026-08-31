@@ -40,6 +40,13 @@ import {
 import { openNativeAppSettings } from "../lib/letteringSettings.js";
 import { useDccFeatureAccess } from "../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../lib/dccAccessPolicy.js";
+import {
+  canUseV1PaidDccFeatures,
+  requestV1PaidPackageGate,
+  V1_PAID_PACKAGE_UPGRADE_EVENT
+} from "../lib/v1PaidPackageGate.js";
+import { formatClientMembershipPathLabel, readFamilyPlanBeneficiary } from "../lib/effectiveMembership.js";
+import { readDccBroadcastOn } from "../lib/bizcardAccountSync.js";
 
 function tierLabelStyle(tier, isDarkMode, familyProtectionActive = false) {
   return membershipTierStyleClass(tier, isDarkMode, { familyProtectionActive });
@@ -134,7 +141,11 @@ function ProfilePanel({
   onMembershipTierChange,
   onRequestTierChange,
 }) {
-  const [isVCIDOn, setIsVCIDOn] = useState(false);
+  const [familyPlanPathLabel, setFamilyPlanPathLabel] = useState(() => {
+    const b = readFamilyPlanBeneficiary();
+    return b?.active && b.pathLabel ? b.pathLabel : "";
+  });
+  const [dccBroadcastOn, setDccBroadcastOn] = useState(() => readDccBroadcastOn());
   const [showBroadcastName, setShowBroadcastName] = useState(true);
   const [settingNotice, setSettingNotice] = useState("");
   const settingNoticeTimerRef = useRef(null);
@@ -219,7 +230,10 @@ function ProfilePanel({
     window.addEventListener("vlue-avatar-changed", a);
     return () => window.removeEventListener("vlue-avatar-changed", a);
   }, []);
-  const hasDigitalCertCard = Boolean(digitalCardActive) && digitalCardIssued !== false;
+  const hasDigitalCertCard =
+    canUseV1PaidDccFeatures(membershipTier) &&
+    Boolean(digitalCardActive) &&
+    digitalCardIssued !== false;
 
   useEffect(() => {
     let vcid = localStorage.getItem("vcid") === "true";
@@ -232,6 +246,7 @@ function ProfilePanel({
       /* ignore */
     }
     setIsVCIDOn(vcid);
+    setDccBroadcastOn(readDccBroadcastOn());
     try {
       import("../lib/showcase/showcaseStyleStorage.js").then((m) => {
         const style = m.readShowcaseStyle?.() || m.readLiveShowcaseStyle?.() || {};
@@ -241,6 +256,12 @@ function ProfilePanel({
       setShowBroadcastName(true);
     }
   }, [open, hasDigitalCertCard]);
+
+  useEffect(() => {
+    const syncDccBroadcast = () => setDccBroadcastOn(readDccBroadcastOn());
+    window.addEventListener("vlue-dcc-broadcast-changed", syncDccBroadcast);
+    return () => window.removeEventListener("vlue-dcc-broadcast-changed", syncDccBroadcast);
+  }, []);
 
   const onToggleBroadcastName = (next) => {
     const on = Boolean(next);
@@ -334,6 +355,12 @@ function ProfilePanel({
         setUpgradeOpen(false);
         return;
       }
+      if (!canUseV1PaidDccFeatures(membershipTier)) {
+        setPanelView("main");
+        setUpgradeOpen(false);
+        requestV1PaidPackageGate();
+        return;
+      }
       setPanelView("letteringBizcard");
       setUpgradeOpen(false);
       return;
@@ -384,8 +411,13 @@ function ProfilePanel({
       try {
         const d = await fetchFamilyProtection();
         applyPeers(familyPeersFromProtectionData(d));
+        const b = d?.familyPlanBeneficiary;
+        setFamilyPlanPathLabel(b?.active && b.pathLabel ? b.pathLabel : "");
       } catch {
-        if (!cancelled) setFamilyProtectionActive(false);
+        if (!cancelled) {
+          setFamilyProtectionActive(false);
+          setFamilyPlanPathLabel("");
+        }
       }
     };
     refresh();
@@ -401,10 +433,18 @@ function ProfilePanel({
   }, [open]);
 
   const broadcastMonthlyKrw = useMemo(() => pricingNumbers().broadcastMonthly, []);
-  const tierUi = useMemo(
-    () => tierLabelStyle(membershipTier, isDarkMode, familyProtectionActive),
-    [membershipTier, isDarkMode, familyProtectionActive]
-  );
+  const tierUi = useMemo(() => {
+    const base = tierLabelStyle(membershipTier, isDarkMode, familyProtectionActive);
+    const pathLabel = formatClientMembershipPathLabel(membershipTier);
+    if (pathLabel && pathLabel !== "유료" && pathLabel !== "무료" && pathLabel !== "B2B") {
+      return {
+        ...base,
+        label: pathLabel,
+        parts: { ...base.parts, base: pathLabel, label: pathLabel }
+      };
+    }
+    return base;
+  }, [membershipTier, isDarkMode, familyProtectionActive, familyPlanPathLabel]);
   const membershipKind = useMemo(() => normalizeMembershipKind(membershipTier), [membershipTier]);
   const canUseShoppingCartHub = useMemo(() => isBillableMembershipKind(membershipKind), [membershipKind]);
   const isCorporateAccount = useMemo(
@@ -544,13 +584,20 @@ function ProfilePanel({
     };
   }, [open]);
 
+  useEffect(() => {
+    const onUpgrade = () => setUpgradeOpen(true);
+    window.addEventListener(V1_PAID_PACKAGE_UPGRADE_EVENT, onUpgrade);
+    return () => window.removeEventListener(V1_PAID_PACKAGE_UPGRADE_EVENT, onUpgrade);
+  }, []);
+
   const onToggle = (next) => {
+    const paidDcc = canUseV1PaidDccFeatures(membershipTier);
     setIsVCIDOn(next);
     localStorage.setItem("vcid", String(next));
     try {
       import("../lib/bizcardAccountSync.js").then((m) => {
         try {
-          m.writeDccBroadcastOn?.(Boolean(next));
+          if (paidDcc) m.writeDccBroadcastOn?.(Boolean(next));
         } catch {
           /* ignore */
         }
@@ -561,9 +608,10 @@ function ProfilePanel({
     try {
       import("../lib/showcase/showcaseStyleStorage.js").then((m) => {
         try {
-          m.writeShowcaseStyle?.({ includeDigitalCard: Boolean(next) });
+          const patch = paidDcc ? { includeDigitalCard: Boolean(next) } : { includeDigitalCard: false };
+          m.writeShowcaseStyle?.(patch);
           const live = m.readLiveShowcaseStyle?.();
-          if (live) m.writeLiveShowcaseStyle?.({ ...live, includeDigitalCard: Boolean(next) });
+          if (live) m.writeLiveShowcaseStyle?.({ ...live, ...patch });
         } catch {
           /* ignore */
         }
@@ -579,22 +627,60 @@ function ProfilePanel({
     showSettingNotice(next ? "통화 중 쇼케이스가 송출됩니다." : "통화 중 쇼케이스 송출이 꺼졌습니다. 이름 표시만 선택할 수 있습니다.");
   };
 
+  const onToggleDccBroadcast = useCallback(
+    (next) => {
+      if (!canUseV1PaidDccFeatures(membershipTier)) {
+        requestV1PaidPackageGate();
+        return;
+      }
+      setDccBroadcastOn(Boolean(next));
+      try {
+        import("../lib/bizcardAccountSync.js").then((m) => {
+          m.writeDccBroadcastOn?.(Boolean(next));
+        });
+      } catch {
+        /* ignore */
+      }
+      try {
+        import("../lib/showcase/showcaseStyleStorage.js").then((m) => {
+          m.writeShowcaseStyle?.({ includeDigitalCard: Boolean(next) });
+          const live = m.readLiveShowcaseStyle?.();
+          if (live) m.writeLiveShowcaseStyle?.({ ...live, includeDigitalCard: Boolean(next) });
+        });
+      } catch {
+        /* ignore */
+      }
+      try {
+        window.dispatchEvent(new Event("vlue-vcid-changed"));
+      } catch {
+        /* ignore */
+      }
+      showSettingNotice(
+        next ? "디지털인증명함 송출이 켜졌습니다." : "디지털인증명함 송출이 꺼졌습니다."
+      );
+    },
+    [membershipTier, showSettingNotice]
+  );
+
   const openLetteringBizcardHub = useCallback(() => {
     if (dccBlocked) {
       showSettingNotice(dccAccess?.message || "디지털인증명함을 이용할 수 없습니다.");
       return;
     }
+    if (!canUseV1PaidDccFeatures(membershipTier)) {
+      requestV1PaidPackageGate();
+      return;
+    }
     setPanelView("letteringBizcard");
-  }, [dccBlocked, dccAccess?.message, showSettingNotice]);
+  }, [dccBlocked, dccAccess?.message, membershipTier, showSettingNotice]);
 
   const handleApplyDigitalCard = useCallback(() => {
     if (dccBlocked) {
       showSettingNotice(dccAccess?.message || "디지털인증명함을 이용할 수 없습니다.");
       return;
     }
-    if (!isPaidLetteringTier(membershipTier)) {
-      setUpgradeOpen(true);
-      showSettingNotice("디지털인증명함은 유료 회원만 신청할 수 있습니다. 등급을 변경해 주세요.");
+    if (!canUseV1PaidDccFeatures(membershipTier)) {
+      requestV1PaidPackageGate();
       return;
     }
     openLetteringBizcardHub();
@@ -743,6 +829,8 @@ function ProfilePanel({
             onOpenUpgrade={() => setUpgradeOpen(true)}
             isVCIDOn={isVCIDOn}
             hasDigitalCertCard={hasDigitalCertCard}
+            dccBroadcastOn={dccBroadcastOn}
+            onToggleDccBroadcast={onToggleDccBroadcast}
             onToggleVCID={onToggle}
             showBroadcastName={showBroadcastName}
             onToggleBroadcastName={onToggleBroadcastName}

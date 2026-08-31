@@ -31,6 +31,8 @@ import {
 } from "./VlueSettingsUi.jsx";
 import PasswordChangeSection from "./PasswordChangeSection.jsx";
 import PhoneChangeSection from "./PhoneChangeSection.jsx";
+import { requestV1PaidPackageGate } from "../../lib/v1PaidPackageGate.js";
+import { canUseV1PaidDccFeatures } from "../../lib/v1PaidPackageGate.js";
 import VlueEmailSettingsSection from "./VlueEmailSettingsSection.jsx";
 import { v1AppShell } from "../../lib/v1ReleaseScope.js";
 import { APP_LEGAL_LINKS, marketingLegalUrl } from "../../lib/legalPageLinks.js";
@@ -286,7 +288,9 @@ export default function VlueSettingsPanel({
   onOpenUpgrade,
   isVCIDOn,
   hasDigitalCertCard,
+  dccBroadcastOn = false,
   onToggleVCID,
+  onToggleDccBroadcast,
   showBroadcastName = true,
   onToggleBroadcastName,
   onMarkAllChatsRead,
@@ -328,6 +332,7 @@ export default function VlueSettingsPanel({
 
   const headText = isDarkMode ? "text-gray-100" : "text-gray-900";
   const boxClass = isDarkMode ? "border-white/10 bg-white/[0.04]" : "border-gray-100 bg-white";
+  const isPaidDcc = canUseV1PaidDccFeatures(membershipTier);
 
   const blockedUsers = useMemo(
     () => BLOCKED_USER_DIRECTORY.filter((u) => blockedUserIds.includes(u.id)),
@@ -722,9 +727,19 @@ export default function VlueSettingsPanel({
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsToggleRow
             label="통화 중 쇼케이스 송출"
-            subtitle={hasDigitalCertCard ? "디지털인증명함 · 쇼케이스" : "쇼케이스 · 프로필 사진 · 번호"}
+            subtitle={isPaidDcc ? "디지털인증명함 · 쇼케이스" : "쇼케이스 · 프로필 사진 · 번호"}
             checked={isVCIDOn}
             onChange={onToggleVCID}
+            isDarkMode={isDarkMode}
+          />
+          <SettingsDivider isDarkMode={isDarkMode} />
+          <SettingsToggleRow
+            label="디지털인증명함 송출"
+            subtitle={isPaidDcc ? "통화 수신 화면에 명함 표시" : "V1 유료 패키지 전용"}
+            checked={Boolean(dccBroadcastOn)}
+            disabled={!isPaidDcc}
+            onDisabledAttempt={requestV1PaidPackageGate}
+            onChange={(next) => onToggleDccBroadcast?.(next)}
             isDarkMode={isDarkMode}
           />
           {!isVCIDOn ? (

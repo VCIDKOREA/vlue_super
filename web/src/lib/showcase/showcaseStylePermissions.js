@@ -1,9 +1,11 @@
 import { isPaidLetteringTier } from "../letteringMembership.js";
+import { resolveEffectiveMembershipTier } from "../effectiveMembership.js";
 import { SHOWCASE_STYLE_TYPES } from "./showcaseStyleTypes.js";
 
-/** 등급별 Showcase 기능 권한 */
+/** 등급별 Showcase 기능 권한 (가족플랜 effective tier 반영) */
 export function getShowcasePermissions(membershipTier = "free") {
-  const isPaid = isPaidLetteringTier(membershipTier);
+  const effectiveTier = resolveEffectiveMembershipTier(membershipTier);
+  const isPaid = isPaidLetteringTier(effectiveTier);
 
   return {
     isPaid,
@@ -13,11 +15,15 @@ export function getShowcasePermissions(membershipTier = "free") {
     fileUpload: isPaid,
     /** 상업: 외부 아웃링크 버튼 */
     outlinkButtons: isPaid,
+    /** 페이지당 비즈니스 링크 (홍보 버튼) — 무료 불가 */
+    businessPageLink: isPaid,
+    /** 쇼셜링크 — 유·무료 동일 */
+    socialOutlinks: true,
     /** 상업: 위치·쿠폰·메뉴 */
     locationShare: isPaid,
     couponDownload: isPaid,
     menuWrite: isPaid,
-    /** BGM 유튜브 지정 */
+    /** BGM 유튜브 지정 · 다곡 — 유료 / 무료 1곡은 API 쿼터 */
     youtubeBgm: isPaid,
     /** V1 — 해시태그 등록·홈 검색 노출 (유료 전용) */
     hashtagRegister: isPaid,
@@ -57,7 +63,9 @@ export function requiresPremium(feature, membershipTier) {
     coupon: p.couponDownload,
     certificate: p.certificateStyle,
     verifiedBadge: p.verifiedBadgeToggle,
-    nameOrg: p.showNameOrg
+    nameOrg: p.showNameOrg,
+    businessLink: p.businessPageLink,
+    social: p.socialOutlinks === false
   };
   return map[feature] === false;
 }

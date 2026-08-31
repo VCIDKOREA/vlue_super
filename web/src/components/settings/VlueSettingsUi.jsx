@@ -70,12 +70,25 @@ export function SettingsRowButton({ label, sublabel, value, onClick, isDarkMode,
   );
 }
 
-export function SettingsToggleRow({ label, checked, onChange, isDarkMode, subtitle }) {
+export function SettingsToggleRow({
+  label,
+  checked,
+  onChange,
+  isDarkMode,
+  subtitle,
+  disabled = false,
+  onDisabledAttempt
+}) {
   return (
     <label
-      className={`flex cursor-pointer items-center justify-between gap-3 px-4 py-3.5 ${
-        isDarkMode ? "text-gray-100" : "text-gray-900"
-      }`}
+      className={`flex items-center justify-between gap-3 px-4 py-3.5 ${
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+      } ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}
+      onClick={(e) => {
+        if (!disabled) return;
+        e.preventDefault();
+        onDisabledAttempt?.();
+      }}
     >
       <span className="min-w-0">
         <span className="block text-[14px] font-medium">{label}</span>
@@ -88,8 +101,12 @@ export function SettingsToggleRow({ label, checked, onChange, isDarkMode, subtit
       <input
         type="checkbox"
         checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-5 w-5 shrink-0 accent-blue-600"
+        disabled={disabled}
+        onChange={(e) => {
+          if (disabled) return;
+          onChange(e.target.checked);
+        }}
+        className="h-5 w-5 shrink-0 accent-blue-600 disabled:cursor-not-allowed"
       />
     </label>
   );

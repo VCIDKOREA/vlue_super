@@ -408,8 +408,10 @@ function accountStatusLabel(status) {
   return s || "—";
 }
 
-function membershipLabel(tier) {
-  const t = String(tier || "free").toLowerCase();
+function membershipLabel(user) {
+  const path = user?.membershipPathLabel;
+  if (path) return path;
+  const t = String(user?.membershipTier || "free").toLowerCase();
   if (t === "paid" || t === "standard" || t === "premium") return "유료";
   if (t === "free") return "무료";
   return t || "무료";
@@ -442,7 +444,8 @@ function MemberDetail({ user, onClose }) {
     ["성별", user.genderDisplay || "—"],
     ["본인인증", user.identityVerified ? `완료${user.identityVerifiedAt ? ` · ${formatAdminDate(user.identityVerifiedAt)}` : ""}` : "미완료"],
     ["가입 경로", signupMethodLabel(user.signupMethod)],
-    ["멤버십", membershipLabel(user.membershipTier)],
+    ["멤버십", membershipLabel(user)],
+    ["멤버십 경로", user.membershipPathLabel || membershipLabel(user)],
     ["디지털명함", user.digitalCardIssued ? "발급" : "미발급"],
     ["상호", user.companyName || "—"],
     ["직함", user.jobTitle || "—"],
@@ -632,7 +635,7 @@ function UsersTab({ onToast }) {
           {
             key: "membership",
             label: "멤버십",
-            render: (r) => membershipLabel(r.membershipTier)
+            render: (r) => membershipLabel(r)
           },
           { key: "status", label: "상태", render: (r) => accountStatusLabel(r.accountStatus) },
           {

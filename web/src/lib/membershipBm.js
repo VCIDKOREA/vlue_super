@@ -6,7 +6,8 @@ function nums() {
   return pricingNumbers();
 }
 
-export const PERSONAL_COMBO_ADDON_MONTHLY_KRW = 5100;
+export const PERSONAL_COMBO_ADDON_MONTHLY_KRW = 4700;
+export const B2B_STAFF_PERSONAL_010_MONTHLY_KRW = 4700;
 export const PERSONAL_COMBO_ADDON_ANNUAL_KRW = 51000;
 export const B2B_SUBORDINATE_MONTHLY_KRW = 14700;
 export const B2B_STAFF_EVENT_MONTHLY_KRW = 5200;
@@ -19,7 +20,7 @@ export function personalComboPricingNote() {
 }
 
 export const PERSONAL_COMBO_PRICING_NOTE =
-  "회사 회선(정가 14,700원) + 개인 임직원 콤보(5,100원) = 19,800원. 개인 유료를 먼저 쓰다 회사 인증해도 다음 청구부터 5,100원으로 전환됩니다.";
+  "회사 회선(정가 14,700원) + 직원 개인 010(4,700원). 업무용 계정 생성·이메일 인증 후 개인 휴대폰 등록 시 적용됩니다.";
 
 export const ENTERPRISE_REFERRAL_POLICY_NOTE =
   "V1에서는 추천인 프로그램을 운영하지 않습니다.";

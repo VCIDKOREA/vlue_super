@@ -11,6 +11,7 @@ import {
 import { readDigitalCardActive } from "../lib/bizcardAccountSync.js";
 import { fetchDigitalCardMeta } from "../lib/digitalCardApi.js";
 import { fetchFamilyProtection } from "../lib/familyProtectionApi.js";
+import { readFamilyPlanBeneficiary } from "../lib/effectiveMembership.js";
 
 function resolveHasOwnAuthPayment(extraPaid) {
   if (extraPaid) return true;
@@ -29,19 +30,21 @@ function resolveHasOwnAuthPayment(extraPaid) {
   return false;
 }
 
-/**
- * 미성년자 DCC 전면 차단 · 가족 혜택(피보호) 계정은 본인 1인 인증결제 후에만 DCC
- */
+/** 미성년자 DCC 전면 차단 · 유료 가족플랜 피보호자는 DCC 포함 */
 export function useDccFeatureAccess() {
   const [birthYmd, setBirthYmd] = useState(() => readStoredBirthYmd());
   const [wardRole, setWardRole] = useState(() => readStoredFamilyWardRole());
   const [hasOwnAuthPayment, setHasOwnAuthPayment] = useState(() => resolveHasOwnAuthPayment(false));
+  const [familyPlanActive, setFamilyPlanActive] = useState(
+    () => Boolean(readFamilyPlanBeneficiary()?.active)
+  );
   const [tick, setTick] = useState(0);
 
   const refresh = useCallback(() => {
     setBirthYmd(readStoredBirthYmd());
     setWardRole(readStoredFamilyWardRole());
     setHasOwnAuthPayment(resolveHasOwnAuthPayment(false));
+    setFamilyPlanActive(Boolean(readFamilyPlanBeneficiary()?.active));
     setTick((n) => n + 1);
   }, []);
 
@@ -74,6 +77,7 @@ export function useDccFeatureAccess() {
         const role = d?.myActiveWardRole || null;
         writeStoredFamilyWardRole(role || "");
         setWardRole(String(role || "").trim().toLowerCase());
+        setFamilyPlanActive(Boolean(d?.familyPlanBeneficiary?.active));
       } catch {
         /* ignore — demo/offline */
       }
@@ -100,10 +104,9 @@ export function useDccFeatureAccess() {
     () =>
       resolveDccFeatureAccess({
         birthYmd,
-        familyWardRole: wardRole,
-        hasOwnAuthPayment
+        familyPlanActive
       }),
-    [birthYmd, wardRole, hasOwnAuthPayment]
+    [birthYmd, familyPlanActive]
   );
 
   return { access, refresh, birthYmd, wardRole, hasOwnAuthPayment };

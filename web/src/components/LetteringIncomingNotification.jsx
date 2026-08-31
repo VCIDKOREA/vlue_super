@@ -43,6 +43,7 @@ import { Phone, PhoneOff, Settings } from "lucide-react";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../lib/letteringBizcardStorage.js";
+import { canUseV1PaidDccFeatures, requestV1PaidPackageGate } from "../lib/v1PaidPackageGate.js";
 import "../styles/showcase-call-glass.css";
 import "../styles/incall-controls.css";
 
@@ -292,6 +293,10 @@ export default function LetteringIncomingNotification({
           : carouselSlideType === "card"
             ? "card"
             : "showcase";
+      if (settingsKind === "card" && !canUseV1PaidDccFeatures()) {
+        requestV1PaidPackageGate();
+        return;
+      }
       if (expanded) {
         if (typeof onExpandedChange === "function") onExpandedChange(false);
         else if (typeof onEndCall === "function") onEndCall();
