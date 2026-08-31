@@ -88,7 +88,12 @@ notificationRoutes.get("/inbox", requireUserHeader, async (c) => {
       actorName:
         extractPayloadString(row.payloadJson, "actorName") ||
         String(row.actorUser?.legalName || row.actorUser?.publicHandle || "").trim() ||
-        null
+        null,
+      showcaseNotifyType: extractPayloadString(row.payloadJson, "type"),
+      showcaseSlideId: extractPayloadString(row.payloadJson, "slideId"),
+      showcaseContentOrdinal:
+        Number(extractPayloadString(row.payloadJson, "contentOrdinal")) || null,
+      showcaseSlideLabel: extractPayloadString(row.payloadJson, "slideLabel")
     }))
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return c.json({

@@ -184,6 +184,7 @@ export function applyLocalKnownPeersToCallGroups(groups) {
         name: g.name || g.memberName || "이종근",
         verified: true,
         membershipTier: g.membershipTier || "paid",
+        avatarUrl: g.avatarUrl || snap.logoUrl || "/vlue-brand-logo.svg",
         userId: g.userId || "13c75cbe-206b-4eed-82d2-a54c7bc80c9c",
         cardSnapshot: {
           ...snap,
@@ -192,6 +193,7 @@ export function applyLocalKnownPeersToCallGroups(groups) {
           organization: snap.organization || "VCID KOREA",
           companyName: snap.companyName || "VCID KOREA",
           membershipTier: snap.membershipTier || "paid",
+          logoUrl: snap.logoUrl || "/vlue-brand-logo.svg",
           phone: g.phoneDisplay || g.phone
         }
       };

@@ -23,6 +23,7 @@ import {
   deleteShowcaseComment,
   getShowcaseSocialSummary,
   listShowcaseComments,
+  listShowcaseLikes,
   recordShowcaseShare,
   toggleShowcaseLike,
   updateShowcaseComment
@@ -405,9 +406,22 @@ letteringRoutes.post("/showcase/social/:ownerUserId/like", requireUserHeader, as
     ownerUserId,
     actorUserId: me,
     slideId: body?.slideId,
-    liked: typeof body?.liked === "boolean" ? body.liked : undefined
+    liked: typeof body?.liked === "boolean" ? body.liked : undefined,
+    contentOrdinal: Number(body?.contentOrdinal) || undefined
   });
   return c.json({ ok: true, ...result });
+});
+
+/** V2 — 좋아요 목록 */
+letteringRoutes.get("/showcase/social/:ownerUserId/likes", async (c) => {
+  const ownerUserId = String(c.req.param("ownerUserId") || "").trim();
+  if (!ownerUserId) return c.json({ ok: false, error: "owner required" }, 400);
+  const likes = await listShowcaseLikes({
+    ownerUserId,
+    slideId: c.req.query("slideId"),
+    limit: Number(c.req.query("limit") || 50)
+  });
+  return c.json({ ok: true, likes });
 });
 
 /** V2 — 댓글 목록 */

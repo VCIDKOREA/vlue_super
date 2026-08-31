@@ -31,6 +31,7 @@ import Subscription from "./components/Subscription.jsx";
 import WalletHubModal from "./components/WalletHubModal.jsx";
 import AppNotificationSheet from "./components/AppNotificationSheet.jsx";
 import ShowcaseStyleSettingsSheet from "./components/showcase/ShowcaseStyleSettingsSheet.jsx";
+import OwnShowcaseSlideOverlay from "./components/showcase/OwnShowcaseSlideOverlay.jsx";
 import HashtagSearchPopup from "./components/showcase/HashtagSearchPopup.jsx";
 import UserCaseArchiveView from "./components/mycase/UserCaseArchiveView.jsx";
 import CallShowcaseHistorySheet from "./components/CallShowcaseHistorySheet.jsx";
@@ -1115,9 +1116,14 @@ function App() {
           title,
           body,
           serverId: data.notificationId,
+          kind: data.type,
           actorUserId: data.actorUserId,
           actorHandle: data.actorHandle,
-          actorName: data.actorName
+          actorName: data.actorName,
+          showcaseNotifyType: data.type,
+          showcaseSlideId: data.slideId,
+          showcaseContentOrdinal: Number(data.contentOrdinal) || null,
+          showcaseSlideLabel: data.slideLabel
         });
         deliverLocalPushNotification(title, body, String(data.notificationId || data.type || "showcase-like"));
         setBottomToast(body);
@@ -1308,9 +1314,14 @@ function App() {
             title,
             body,
             serverId: data.notificationId,
+            kind: data.type,
             actorUserId: data.actorUserId,
             actorHandle: data.actorHandle,
-            actorName: data.actorName
+            actorName: data.actorName,
+            showcaseNotifyType: data.type,
+            showcaseSlideId: data.slideId,
+            showcaseContentOrdinal: Number(data.contentOrdinal) || null,
+            showcaseSlideLabel: data.slideLabel
           });
           deliverLocalPushNotification(title, body, String(data.notificationId || data.type || "showcase-social"));
         }
@@ -5148,6 +5159,12 @@ function App() {
           setProfileInitialView("upgrade");
           setProfileOpen(true);
         }}
+        onToast={(msg) => {
+          setBottomToast(msg);
+          setTimeout(() => setBottomToast(""), 2200);
+        }}
+      />
+      <OwnShowcaseSlideOverlay
         onToast={(msg) => {
           setBottomToast(msg);
           setTimeout(() => setBottomToast(""), 2200);

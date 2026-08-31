@@ -19,6 +19,7 @@ export async function fetchShowcaseSocial(ownerUserId, opts = {}) {
       ok: res.ok,
       likeCount: Number(data.likeCount) || 0,
       likedByMe: Boolean(data.likedByMe),
+      recentLiker: data.recentLiker || null,
       comments: Array.isArray(data.comments) ? data.comments : [],
       error: data.error
     };
@@ -36,7 +37,8 @@ export async function toggleShowcaseLikeApi(ownerUserId, opts = {}) {
       headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({
         slideId: opts.slideId || "",
-        ...(typeof opts.liked === "boolean" ? { liked: opts.liked } : {})
+        ...(typeof opts.liked === "boolean" ? { liked: opts.liked } : {}),
+        ...(opts.contentOrdinal ? { contentOrdinal: opts.contentOrdinal } : {})
       })
     });
     const data = await res.json().catch(() => ({}));
@@ -106,6 +108,27 @@ export async function recordShowcaseShareApi(ownerUserId, opts = {}) {
     return { ok: res.ok, error: data.error, status: res.status };
   } catch (e) {
     return { ok: false, error: e?.message };
+  }
+}
+
+export async function fetchShowcaseLikes(ownerUserId, opts = {}) {
+  const id = String(ownerUserId || "").trim();
+  if (!id) return { ok: false, likes: [] };
+  try {
+    const params = new URLSearchParams();
+    if (opts.slideId) params.set("slideId", String(opts.slideId));
+    const q = params.toString();
+    const res = await vlueAuthFetch(
+      apiUrl(`/api/lettering/showcase/social/${encodeURIComponent(id)}/likes${q ? `?${q}` : ""}`)
+    );
+    const data = await res.json().catch(() => ({}));
+    return {
+      ok: res.ok,
+      likes: Array.isArray(data.likes) ? data.likes : [],
+      error: data.error
+    };
+  } catch (e) {
+    return { ok: false, likes: [], error: e?.message };
   }
 }
 

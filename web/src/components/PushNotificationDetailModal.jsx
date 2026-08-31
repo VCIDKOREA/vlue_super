@@ -9,6 +9,10 @@ import {
 import { acceptFamilyProtectionLink, rejectFamilyProtectionLink } from "../lib/familyProtectionApi.js";
 import { marketingLegalUrl } from "../lib/legalPageLinks.js";
 import ShowcaseNotificationBody from "./showcase/ShowcaseNotificationBody.jsx";
+import {
+  openOwnShowcaseSlide,
+  showcaseLikeNavFromNotification
+} from "../lib/showcase/openOwnShowcaseSlide.js";
 
 const CATEGORY_STYLE = {
   가족보호: "bg-emerald-50 text-emerald-700",
@@ -78,6 +82,14 @@ export default function PushNotificationDetailModal({
     Boolean(current.familyInvitePending) ||
     Boolean(current.familyInviteResolved);
   const canFamilyRespond = isFamilyInviteKind && Boolean(current.linkId) && !inviteResolved;
+  const likeNav = showcaseLikeNavFromNotification(current);
+  const isLikeNotice = Boolean(likeNav);
+
+  const openLikedShowcase = () => {
+    if (!likeNav) return;
+    openOwnShowcaseSlide(likeNav);
+    onClose?.();
+  };
 
   const onFamilyAccept = async () => {
     if (familyBusy || !canFamilyRespond) return;
@@ -246,7 +258,10 @@ export default function PushNotificationDetailModal({
             actorUserId={current.actorUserId}
             actorHandle={current.actorHandle}
             actorName={current.actorName}
+            showcaseContentOrdinal={current.showcaseContentOrdinal}
+            showcaseSlideId={current.showcaseSlideId}
             onNavigate={onClose}
+            onOpenOwnSlide={() => openLikedShowcase()}
             className={`whitespace-pre-wrap break-words text-[14px] font-medium leading-relaxed ${
               isDarkMode ? "text-slate-200" : "text-slate-700"
             }`}
@@ -358,9 +373,19 @@ export default function PushNotificationDetailModal({
                     : "bg-slate-100 text-slate-700"
                   : "bg-blue-600 text-white"
               }`}
-              onClick={onClose}
+              onClick={() => {
+                if (isLikeNotice) {
+                  openLikedShowcase();
+                  return;
+                }
+                onClose();
+              }}
             >
-              {canConfirm || isPayment || canFamilyRespond ? "닫기" : "확인"}
+              {canConfirm || isPayment || canFamilyRespond
+                ? "닫기"
+                : isLikeNotice
+                  ? "쇼케이스 보기"
+                  : "확인"}
             </button>
           ) : null}
           {typeof onDelete === "function" ? (

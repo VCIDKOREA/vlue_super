@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { COMMENT_CASE_USER_EVENT } from "../../lib/showcase/commentRichText.js";
+import { openOwnShowcaseSlide } from "../../lib/showcase/openOwnShowcaseSlide.js";
 
 /** 알림 본문 — 선두 @아이디를 케이스함 링크로 렌더 */
 export function splitShowcaseNotificationActor(body, actorHandle, actorName) {
@@ -42,14 +43,44 @@ function openActorShowcase({ userId, handle, name, onNavigate }) {
   window.dispatchEvent(new CustomEvent(COMMENT_CASE_USER_EVENT, { detail }));
 }
 
+function renderTailWithSlideLink(tail, { contentOrdinal, slideId, onOpenOwnSlide }) {
+  const text = String(tail || "");
+  const m = text.match(/^(님이\s+회원님의\s+)(쇼케이스\s*\d+\s*번)(을\s+좋아합니다\.?)$/);
+  if (!m) return <span>{text}</span>;
+  const ordinalFromLabel = Number(String(m[2]).replace(/\D/g, "")) || contentOrdinal || 0;
+  return (
+    <>
+      <span>{m[1]}</span>
+      <button
+        type="button"
+        className="font-bold text-primary-600 underline underline-offset-2 hover:text-primary-700"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (typeof onOpenOwnSlide === "function") {
+            onOpenOwnSlide({ contentOrdinal: ordinalFromLabel, slideId });
+            return;
+          }
+          openOwnShowcaseSlide({ contentOrdinal: ordinalFromLabel, slideId });
+        }}
+      >
+        {m[2].trim()}
+      </button>
+      <span>{m[3]}</span>
+    </>
+  );
+}
+
 export default function ShowcaseNotificationBody({
   body,
   actorUserId = "",
   actorHandle = "",
   actorName = "",
+  showcaseContentOrdinal = 0,
+  showcaseSlideId = "",
   className = "",
   inline = false,
-  onNavigate
+  onNavigate,
+  onOpenOwnSlide
 }) {
   const split = useMemo(
     () => splitShowcaseNotificationActor(body, actorHandle, actorName),
@@ -83,7 +114,11 @@ export default function ShowcaseNotificationBody({
       >
         @{split.handle}
       </button>
-      <span>{split.tail}</span>
+      {renderTailWithSlideLink(split.tail, {
+        contentOrdinal: showcaseContentOrdinal,
+        slideId: showcaseSlideId,
+        onOpenOwnSlide
+      })}
     </Tag>
   );
 }

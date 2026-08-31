@@ -3,6 +3,8 @@ import { Heart } from "lucide-react";
 import ShowcaseSocialRail from "./ShowcaseSocialRail.jsx";
 import ShowcaseBannerFooter from "./ShowcaseBannerFooter.jsx";
 import ShowcaseCommentSheet from "./ShowcaseCommentSheet.jsx";
+import ShowcaseLikeSummary from "./ShowcaseLikeSummary.jsx";
+import ShowcaseLikeSheet from "./ShowcaseLikeSheet.jsx";
 import ShowcaseMoreMenu from "./ShowcaseMoreMenu.jsx";
 import {
   fetchShowcaseSocial,
@@ -56,6 +58,7 @@ function likeErrorMessage(res) {
 export default function ShowcaseBannerSocialLayer({
   card,
   slide,
+  contentOrdinal = 0,
   previewMode = false,
   onToast,
   onReport: onReportProp,
@@ -108,9 +111,11 @@ export default function ShowcaseBannerSocialLayer({
   const likeGenRef = useRef(0);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [recentLiker, setRecentLiker] = useState(null);
   const [commentCount, setCommentCount] = useState(0);
   const [seedComments, setSeedComments] = useState([]);
   const [commentOpen, setCommentOpen] = useState(false);
+  const [likeSheetOpen, setLikeSheetOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [likeBurst, setLikeBurst] = useState(0);
 
@@ -130,6 +135,7 @@ export default function ShowcaseBannerSocialLayer({
     likeGenRef.current = 0;
     if (!ownerUserId) {
       applyLike(false, 0);
+      setRecentLiker(null);
       setCommentCount(0);
       setSeedComments([]);
       return undefined;
@@ -137,6 +143,7 @@ export default function ShowcaseBannerSocialLayer({
     fetchShowcaseSocial(ownerUserId, { slideId }).then((res) => {
       if (cancelled || !res.ok || likeGenRef.current > 0) return;
       applyLike(res.likedByMe, res.likeCount);
+      setRecentLiker(res.recentLiker || null);
       setCommentCount(res.comments.length);
       setSeedComments(res.comments);
     });
@@ -165,7 +172,11 @@ export default function ShowcaseBannerSocialLayer({
       if (localOnly) return;
 
       const gen = ++likeGenRef.current;
-      void toggleShowcaseLikeApi(ownerUserId, { slideId, liked: nextLiked }).then((res) => {
+      void toggleShowcaseLikeApi(ownerUserId, {
+        slideId,
+        liked: nextLiked,
+        contentOrdinal: contentOrdinal > 0 ? contentOrdinal : undefined
+      }).then((res) => {
         if (gen !== likeGenRef.current) return;
         if (res.ok) {
           applyLike(res.likedByMe, res.likeCount);
@@ -184,7 +195,7 @@ export default function ShowcaseBannerSocialLayer({
         onToast?.(likeErrorMessage(res));
       });
     },
-    [ownerUserId, slideId, localOnly, onToast, applyLike, popLikeBurst]
+    [ownerUserId, slideId, contentOrdinal, localOnly, onToast, applyLike, popLikeBurst]
   );
 
   useEffect(() => {
@@ -236,6 +247,13 @@ export default function ShowcaseBannerSocialLayer({
 
   return (
     <>
+      {likeCount > 0 ? (
+        <ShowcaseLikeSummary
+          likeCount={likeCount}
+          recentLiker={recentLiker}
+          onOpenLikers={() => setLikeSheetOpen(true)}
+        />
+      ) : null}
       {!hideFooter ? (
         <ShowcaseBannerFooter
           avatarUrl={avatarUrl}
@@ -273,6 +291,12 @@ export default function ShowcaseBannerSocialLayer({
           onMention={() => setCommentOpen(false)}
         />
       ) : null}
+      <ShowcaseLikeSheet
+        open={likeSheetOpen}
+        onClose={() => setLikeSheetOpen(false)}
+        ownerUserId={ownerUserId}
+        slideId={slideId}
+      />
       <ShowcaseMoreMenu
         open={moreOpen}
         onClose={() => setMoreOpen(false)}

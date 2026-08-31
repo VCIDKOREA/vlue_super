@@ -196,6 +196,8 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
                     actorUserId={n.actorUserId}
                     actorHandle={n.actorHandle}
                     actorName={n.actorName}
+                    showcaseContentOrdinal={n.showcaseContentOrdinal}
+                    showcaseSlideId={n.showcaseSlideId}
                     inline
                     className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-gray-600"
                   />

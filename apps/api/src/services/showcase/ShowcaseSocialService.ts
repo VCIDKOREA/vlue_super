@@ -207,7 +207,7 @@ export async function getShowcaseSocialSummary(opts: {
   const slideId = slideKey(opts.slideId);
   const whereLike = { ownerUserId: opts.ownerUserId, type: "like", slideId };
 
-  const [likeCount, likedByMe, comments] = await Promise.all([
+  const [likeCount, likedByMe, recentLike, comments] = await Promise.all([
     prisma.showcaseReaction.count({ where: whereLike }),
     opts.actorUserId
       ? prisma.showcaseReaction
@@ -223,6 +223,11 @@ export async function getShowcaseSocialSummary(opts: {
           })
           .then((r) => Boolean(r))
       : Promise.resolve(false),
+    prisma.showcaseReaction.findFirst({
+      where: whereLike,
+      orderBy: { createdAt: "desc" },
+      include: { actor: { select: authorSelect } }
+    }),
     prisma.showcaseComment.findMany({
       where: {
         ownerUserId: opts.ownerUserId,
@@ -235,11 +240,17 @@ export async function getShowcaseSocialSummary(opts: {
     })
   ]);
 
-  const authorLites = await loadAuthorLite(comments.map((c) => c.author.id));
+  const authorLites = await loadAuthorLite([
+    ...comments.map((c) => c.author.id),
+    ...(recentLike ? [recentLike.actorUserId] : [])
+  ]);
 
   return {
     likeCount,
     likedByMe,
+    recentLiker: recentLike
+      ? serializeAuthor(recentLike.actor, authorLites.get(recentLike.actorUserId))
+      : null,
     comments: comments.map((c) => ({
       id: c.id,
       body: c.body,
@@ -251,11 +262,39 @@ export async function getShowcaseSocialSummary(opts: {
   };
 }
 
+export async function listShowcaseLikes(opts: {
+  ownerUserId: string;
+  slideId?: string | null;
+  limit?: number;
+}) {
+  const slideId = slideKey(opts.slideId);
+  const limit = Math.min(100, Math.max(1, opts.limit || 50));
+  const rows = await prisma.showcaseReaction.findMany({
+    where: { ownerUserId: opts.ownerUserId, type: "like", slideId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: { actor: { select: authorSelect } }
+  });
+  const authorLites = await loadAuthorLite(rows.map((r) => r.actorUserId));
+  return rows.map((r) => ({
+    id: r.id,
+    createdAt: r.createdAt.toISOString(),
+    author: serializeAuthor(r.actor, authorLites.get(r.actorUserId))
+  }));
+}
+
+function showcaseSlideLabel(contentOrdinal?: number | null): string {
+  const n = Math.floor(Number(contentOrdinal) || 0);
+  if (n > 0) return `쇼케이스 ${n}번`;
+  return "쇼케이스";
+}
+
 export async function toggleShowcaseLike(opts: {
   ownerUserId: string;
   actorUserId: string;
   slideId?: string | null;
   liked?: boolean | null;
+  contentOrdinal?: number | null;
 }) {
   const slideId = slideKey(opts.slideId);
   const key = {
@@ -288,15 +327,22 @@ export async function toggleShowcaseLike(opts: {
   if (likedByMe && !existing && opts.ownerUserId !== opts.actorUserId) {
     void resolveActorProfile(opts.actorUserId).then((actor) => {
       const at = actorAtLabel(actor);
+      const contentOrdinal = Math.max(0, Math.floor(Number(opts.contentOrdinal) || 0));
+      const slideLabel = showcaseSlideLabel(contentOrdinal);
       deliverShowcaseSocialNotice({
         recipientUserId: opts.ownerUserId,
         actorUserId: opts.actorUserId,
         title: "새 좋아요",
-        body: `${at}님이 회원님의 쇼케이스를 좋아합니다.`,
+        body:
+          contentOrdinal > 0
+            ? `${at}님이 회원님의 ${slideLabel}을 좋아합니다.`
+            : `${at}님이 회원님의 쇼케이스를 좋아합니다.`,
         data: showcaseActorData(opts.actorUserId, actor, {
           type: "vlue-showcase-like",
           ownerUserId: opts.ownerUserId,
           slideId,
+          contentOrdinal: contentOrdinal > 0 ? String(contentOrdinal) : "",
+          slideLabel,
           likeCount: String(likeCount)
         })
       });

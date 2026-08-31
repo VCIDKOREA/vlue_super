@@ -145,7 +145,11 @@ export function addPushNotification({
   pinKey = null,
   actorUserId,
   actorHandle,
-  actorName
+  actorName,
+  showcaseNotifyType,
+  showcaseSlideId,
+  showcaseContentOrdinal,
+  showcaseSlideLabel
 } = {}) {
   const at = createdAt || new Date().toISOString();
   const sid = String(serverId || "").trim();
@@ -166,7 +170,16 @@ export function addPushNotification({
         actorHandle: actorHandle
           ? String(actorHandle).replace(/^@+/, "").trim()
           : list[idx].actorHandle || null,
-        actorName: actorName ? String(actorName).trim() : list[idx].actorName || null
+        actorName: actorName ? String(actorName).trim() : list[idx].actorName || null,
+        showcaseNotifyType: showcaseNotifyType
+          ? String(showcaseNotifyType)
+          : list[idx].showcaseNotifyType || null,
+        showcaseSlideId: showcaseSlideId ? String(showcaseSlideId) : list[idx].showcaseSlideId || null,
+        showcaseContentOrdinal:
+          Number(showcaseContentOrdinal) || list[idx].showcaseContentOrdinal || null,
+        showcaseSlideLabel: showcaseSlideLabel
+          ? String(showcaseSlideLabel)
+          : list[idx].showcaseSlideLabel || null
       };
       const copy = [...list];
       copy[idx] = next;
@@ -188,7 +201,16 @@ export function addPushNotification({
         actorHandle: actorHandle
           ? String(actorHandle).replace(/^@+/, "").trim()
           : list[idx].actorHandle || null,
-        actorName: actorName ? String(actorName).trim() : list[idx].actorName || null
+        actorName: actorName ? String(actorName).trim() : list[idx].actorName || null,
+        showcaseNotifyType: showcaseNotifyType
+          ? String(showcaseNotifyType)
+          : list[idx].showcaseNotifyType || null,
+        showcaseSlideId: showcaseSlideId ? String(showcaseSlideId) : list[idx].showcaseSlideId || null,
+        showcaseContentOrdinal:
+          Number(showcaseContentOrdinal) || list[idx].showcaseContentOrdinal || null,
+        showcaseSlideLabel: showcaseSlideLabel
+          ? String(showcaseSlideLabel)
+          : list[idx].showcaseSlideLabel || null
       };
       const copy = [...list];
       copy[idx] = next;
@@ -222,7 +244,11 @@ export function addPushNotification({
     pinKey: key || null,
     actorUserId: actorUserId ? String(actorUserId) : null,
     actorHandle: actorHandle ? String(actorHandle).replace(/^@+/, "").trim() : null,
-    actorName: actorName ? String(actorName).trim() : null
+    actorName: actorName ? String(actorName).trim() : null,
+    showcaseNotifyType: showcaseNotifyType ? String(showcaseNotifyType) : null,
+    showcaseSlideId: showcaseSlideId ? String(showcaseSlideId) : null,
+    showcaseContentOrdinal: Number(showcaseContentOrdinal) || null,
+    showcaseSlideLabel: showcaseSlideLabel ? String(showcaseSlideLabel) : null
   };
   writeList([entry, ...list]);
   return { ...entry, isNew: true };

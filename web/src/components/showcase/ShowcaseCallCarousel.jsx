@@ -102,7 +102,10 @@ export default function ShowcaseCallCarousel({
   /** 실통화 — 미니↔풀 복원 시 BGM 재시작 금지 */
   muteForLiveCall = false,
   /** 실통화 하단 통화옵션과 겹치지 않게 */
-  callChromeSafe = false
+  callChromeSafe = false,
+  /** 알림·딥링크 — 해당 콘텐츠 슬라이드로 이동 */
+  focusContentOrdinal = 0,
+  focusSlideId = ""
 }) {
   const styleConfig = showcaseStyle || card?.showcaseStyle || null;
   const { bindStyleConfig, bindBgmPeerDisplay, setPlaybackPhase, styleConfig: playingStyleConfig } =
@@ -776,6 +779,28 @@ export default function ShowcaseCallCarousel({
               : "";
   const showMeta = Boolean(slideLabel) && !showcaseOffPreview;
 
+  useEffect(() => {
+    const wantOrdinal = Math.max(0, Math.floor(Number(focusContentOrdinal) || 0));
+    const wantSlideId = String(focusSlideId || "").trim();
+    if (!wantOrdinal && !wantSlideId) return;
+    if (!slides.length) return;
+    let target = -1;
+    if (wantSlideId) {
+      target = slides.findIndex((s) => {
+        const sid = resolveShowcaseSocialSlideId({ slide: s });
+        return sid === wantSlideId || String(s.id || "") === wantSlideId;
+      });
+    }
+    if (target < 0 && wantOrdinal > 0) {
+      slides.forEach((s, i) => {
+        if (s.type === "card") return;
+        const ord = cardAtEnd ? i + 1 : Math.max(1, i + 1 - photoIndexBase);
+        if (ord === wantOrdinal) target = i;
+      });
+    }
+    if (target >= 0) setIndex(target);
+  }, [focusContentOrdinal, focusSlideId, slides, cardAtEnd, photoIndexBase]);
+
   const cornerName = String(card?.name || card?.displayName || "").trim();
   const cornerOrg = String(card?.organization || "").trim();
   const cornerShowName =
@@ -849,6 +874,12 @@ export default function ShowcaseCallCarousel({
           >
             {slides.map((slide, slideIdx) => {
               const near = Math.abs(slideIdx - index) <= 1;
+              const slideContentOrdinal =
+                slide.type === "card"
+                  ? 0
+                  : cardAtEnd
+                    ? slideIdx + 1
+                    : Math.max(1, slideIdx + 1 - photoIndexBase);
               return (
               <article key={slide.id} className="showcase-call-carousel__slide">
                 {!near ? <div className="showcase-call-carousel__slide-placeholder" aria-hidden /> : null}
@@ -992,6 +1023,7 @@ export default function ShowcaseCallCarousel({
                         <ShowcaseBannerSocialLayer
                           card={card}
                           slide={slide}
+                          contentOrdinal={slideContentOrdinal}
                           previewMode={previewMode}
                           onToast={onKeypadToast}
                           onReport={onReport}

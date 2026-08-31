@@ -243,7 +243,10 @@ export default function LetteringIncomingNotification({
   suppressExpandGuide = false,
   /** 미리보기·액션 안내 토스트 */
   onToast,
-  className = ""
+  className = "",
+  /** 알림·딥링크 — 해당 콘텐츠 슬라이드로 이동 */
+  focusContentOrdinal = 0,
+  focusSlideId = ""
 }) {
   const [expandedInternal, setExpandedInternal] = useState(defaultExpanded);
   const [receptionFace, setReceptionFace] = useState("front");
@@ -1530,6 +1533,8 @@ export default function LetteringIncomingNotification({
                       showcaseStyle={showcaseStyleConfig}
                       suppressBgm={carouselSuppressBgm}
                       muteForLiveCall={carouselMuteForLiveCall}
+                      focusContentOrdinal={focusContentOrdinal}
+                      focusSlideId={focusSlideId}
                     />
                   ) : keypadOpen ? (
                     <InCallDtmfPad
@@ -1600,6 +1605,8 @@ export default function LetteringIncomingNotification({
                       suppressBgm={carouselSuppressBgm}
                       muteForLiveCall={carouselMuteForLiveCall}
                       callChromeSafe={showInCallControls}
+                      focusContentOrdinal={focusContentOrdinal}
+                      focusSlideId={focusSlideId}
                     />
                   ) : (
                     <RenderErrorGuard fallback={null}>
