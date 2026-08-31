@@ -15,10 +15,6 @@ function clampFeedMediaAspect(hw) {
   return Math.min(FEED_MEDIA_ASPECT_MAX, Math.max(FEED_MEDIA_ASPECT_MIN, ratio));
 }
 
-function isLandscapeAspect(hw) {
-  return Number(hw) > 0 && Number(hw) < 0.95;
-}
-
 /**
  * 게시물 사진 — 좌우 스와이프 캐러셀 + 더블탭 좋아요 (인스타그램형)
  */
@@ -35,42 +31,52 @@ export default function MyCaseImageCarousel({
   const tapArmedRef = useRef(false);
   const lastTapRef = useRef({ t: 0, x: 0, y: 0, pointerId: -1 });
   const pointerStartRef = useRef({ x: 0, y: 0 });
+  const probedIdsRef = useRef(new Set());
   const current = images[index] || images[0] || null;
 
+  /** 등록된 모든 사진 비율 선로드 — 세로/가로 혼합 시 슬라이드 전환 즉시 높이 맞춤 */
   useEffect(() => {
-    const url = String(current?.url || "").trim();
-    const id = String(current?.id || url || "").trim();
-    if (id && slideAspects[id]) {
-      onMediaAspectChange?.(slideAspects[id]);
-    }
-  }, [index, current?.id, current?.url, slideAspects, onMediaAspectChange]);
-
-  useEffect(() => {
-    const url = String(current?.url || "").trim();
-    const id = String(current?.id || url || "").trim();
-    if (!url) {
-      onMediaAspectChange?.(FEED_MEDIA_ASPECT_DEFAULT);
-      return undefined;
-    }
+    probedIdsRef.current = new Set();
+    setSlideAspects({});
     let cancelled = false;
-    const probe = new Image();
-    probe.onload = () => {
-      if (cancelled) return;
-      const aspect = clampFeedMediaAspect(probe.naturalHeight / probe.naturalWidth);
-      setSlideAspects((prev) => {
-        if (prev[id] === aspect) return prev;
-        return { ...prev, [id]: aspect };
-      });
-      onMediaAspectChange?.(aspect);
-    };
-    probe.onerror = () => {
-      if (!cancelled) onMediaAspectChange?.(FEED_MEDIA_ASPECT_DEFAULT);
-    };
-    probe.src = url;
+    for (const img of images) {
+      const url = String(img?.url || "").trim();
+      const id = String(img?.id || url || "").trim();
+      if (!url || !id || probedIdsRef.current.has(id)) continue;
+      probedIdsRef.current.add(id);
+      const probe = new Image();
+      probe.onload = () => {
+        if (cancelled) return;
+        const aspect = clampFeedMediaAspect(probe.naturalHeight / probe.naturalWidth);
+        setSlideAspects((prev) => {
+          if (prev[id] === aspect) return prev;
+          return { ...prev, [id]: aspect };
+        });
+      };
+      probe.onerror = () => {
+        if (cancelled) return;
+        setSlideAspects((prev) => {
+          if (prev[id]) return prev;
+          return { ...prev, [id]: FEED_MEDIA_ASPECT_DEFAULT };
+        });
+      };
+      probe.src = url;
+    }
     return () => {
       cancelled = true;
     };
-  }, [current?.id, current?.url, onMediaAspectChange]);
+  }, [images]);
+
+  useEffect(() => {
+    const id = String(current?.id || "").trim();
+    const cached = id ? slideAspects[id] : null;
+    if (cached) {
+      onMediaAspectChange?.(cached);
+      return;
+    }
+    /* 이전 슬라이드(세로) 높이 유지 금지 — 프로브 전까지 중립 비율 */
+    onMediaAspectChange?.(FEED_MEDIA_ASPECT_DEFAULT);
+  }, [index, current?.id, slideAspects, onMediaAspectChange]);
 
   const go = useCallback(
     (delta) => {
@@ -161,21 +167,17 @@ export default function MyCaseImageCarousel({
         className="my-case-carousel__track"
         style={{ transform: `translate3d(-${index * 100}%, 0, 0)` }}
       >
-        {images.map((img) => {
-          const aspect = slideAspects[img.id] || FEED_MEDIA_ASPECT_DEFAULT;
-          const landscape = isLandscapeAspect(aspect);
-          return (
+        {images.map((img) => (
           <div key={img.id} className="my-case-carousel__slide">
             <img
-              className={`my-case-carousel__photo${landscape ? " my-case-carousel__photo--landscape" : " my-case-carousel__photo--portrait"}`}
+              className="my-case-carousel__photo"
               src={img.url}
               alt=""
               draggable={false}
             />
             <ShowcasePhotoTextOverlay photo={img} />
           </div>
-          );
-        })}
+        ))}
       </div>
       {images.length > 1 ? (
         <div className="my-case-carousel__dots" aria-hidden>
