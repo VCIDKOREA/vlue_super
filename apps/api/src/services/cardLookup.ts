@@ -316,6 +316,13 @@ function buildContactProfile(opts: {
     (snap as ExportSnapLite).salesContent,
     (snap as Record<string, unknown>).salesContent
   );
+  const customBackText = firstStr(
+    pj.customBackText,
+    pj.backText,
+    pj.letteringBackText,
+    (snap as ExportSnapLite).customBackText,
+    (snap as Record<string, unknown>).customBackText
+  );
   return {
     ...pj,
     email,
@@ -329,6 +336,8 @@ function buildContactProfile(opts: {
     intro,
     companyIntro: intro,
     salesContent: sales,
+    customBackText,
+    backText: customBackText,
     photoUrl:
       firstStr(
         (snap as ExportSnapLite).photoUrl,
@@ -519,6 +528,10 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       department: firstStr(lineSnap?.department, certified ? masterSnap?.department : ""),
       companyIntro: firstStr(lineSnap?.companyIntro, certified ? masterSnap?.companyIntro : ""),
       salesContent: firstStr(lineSnap?.salesContent, certified ? masterSnap?.salesContent : ""),
+      customBackText: firstStr(
+        lineSnap?.customBackText,
+        certified ? masterSnap?.customBackText : ""
+      ),
       photoUrl: certified
         ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
         : httpOnlyUrl(lineSnap?.photoUrl) || "",
@@ -834,6 +847,10 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       department: firstStr(lineSnap?.department, certified ? masterSnap?.department : ""),
       companyIntro: firstStr(lineSnap?.companyIntro, certified ? masterSnap?.companyIntro : ""),
       salesContent: firstStr(lineSnap?.salesContent, certified ? masterSnap?.salesContent : ""),
+      customBackText: firstStr(
+        lineSnap?.customBackText,
+        certified ? masterSnap?.customBackText : ""
+      ),
       photoUrl: certified
         ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
         : httpOnlyUrl(lineSnap?.photoUrl) || "",

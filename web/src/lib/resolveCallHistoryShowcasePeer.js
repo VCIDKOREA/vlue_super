@@ -40,6 +40,16 @@ function mergeCardFromProfile(baseCard, profRes) {
     noTitlePhoto: Boolean(exp?.noTitlePhoto ?? baseCard?.noTitlePhoto),
     logoUrl: String(exp?.logoUrl || baseCard?.logoUrl || "").trim(),
     photoFocus: String(exp?.photoFocus || baseCard?.photoFocus || "center").trim(),
+    companyIntro: String(
+      exp?.companyIntro || profile.companyIntro || profile.intro || baseCard?.companyIntro || ""
+    ).trim(),
+    customBackText: String(
+      exp?.customBackText ||
+        profile.customBackText ||
+        profile.backText ||
+        baseCard?.customBackText ||
+        ""
+    ).trim(),
     publicHandle: String(profile.publicHandle || baseCard?.publicHandle || "")
       .replace(/^@/, "")
       .trim(),

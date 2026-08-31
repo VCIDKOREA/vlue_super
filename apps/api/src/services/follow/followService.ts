@@ -649,6 +649,8 @@ export async function getProfileForViewer(
           logo_url: string | null;
           photo_focus: string | null;
           no_title_photo: boolean | null;
+          company_intro: string | null;
+          custom_back_text: string | null;
         }>
       >`
         SELECT
@@ -671,7 +673,9 @@ export async function getProfileForViewer(
             WHEN export_snapshot_json ? 'noTitlePhoto'
               THEN (export_snapshot_json->>'noTitlePhoto')::boolean
             ELSE NULL
-          END AS no_title_photo
+          END AS no_title_photo,
+          NULLIF(TRIM(export_snapshot_json->>'companyIntro'), '') AS company_intro,
+          NULLIF(TRIM(export_snapshot_json->>'customBackText'), '') AS custom_back_text
         FROM digital_cards
         WHERE user_id = ${targetUserId}::uuid
         LIMIT 1
@@ -747,7 +751,9 @@ export async function getProfileForViewer(
         titlePhotoUrl,
         noTitlePhoto,
         logoUrl,
-        photoFocus
+        photoFocus,
+        companyIntro: String(s?.company_intro || "").trim(),
+        customBackText: String(s?.custom_back_text || "").trim()
       }
     : null;
 

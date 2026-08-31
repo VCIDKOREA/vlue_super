@@ -2,7 +2,7 @@ import { callLogPhoneKey } from "./callLogList.js";
 
 const TTL_MS = 30 * 60 * 1000;
 const MAX = 48;
-const STORAGE_KEY = "vlue_call_history_peer_v2";
+const STORAGE_KEY = "vlue_call_history_peer_v3";
 const mem = new Map();
 
 function keyFor(phone) {
