@@ -16,6 +16,7 @@ import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import {
   readShowcasePreviewDigitalCardApplied
 } from "../lib/vlueShowcasePreviewIdentity.js";
+import { readVcidBroadcastOn } from "../lib/bizcardAccountSync.js";
 import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
@@ -42,7 +43,8 @@ export default function CallBigPushPreviewSection({
 }) {
   const showTierTabs = v1AppShell.callBigPushTierTabs;
   const inlineExpand = expandMode === "inline";
-  const [showcaseOn, setShowcaseOn] = useState(true);
+  /** 프로필 「쇼케이스 켜짐/꺼짐」과 동일 — 꺼짐이면 미리보기도 VLUE 인증 팝업만 */
+  const [showcaseOn, setShowcaseOn] = useState(() => readVcidBroadcastOn());
   const [expanded, setExpanded] = useState(Boolean(defaultExpanded));
   const [callChromePreview, setCallChromePreview] = useState(false);
   const [previewTick, setPreviewTick] = useState(0);
@@ -77,6 +79,12 @@ export default function CallBigPushPreviewSection({
       window.removeEventListener("focus", onNative);
       window.removeEventListener("visibilitychange", onNative);
     };
+  }, []);
+
+  useEffect(() => {
+    const syncBroadcast = () => setShowcaseOn(readVcidBroadcastOn());
+    window.addEventListener("vlue-vcid-changed", syncBroadcast);
+    return () => window.removeEventListener("vlue-vcid-changed", syncBroadcast);
   }, []);
 
   useEffect(() => {

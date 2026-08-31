@@ -1725,6 +1725,7 @@ export default function ShowcaseStyleSettingsPanel({
         <ShowcasePullDownPreview
           card={card}
           includeDigitalCard={includeDigitalCard}
+          membershipTier={effectiveTier}
           onToast={onToast}
         />
       ) : null}

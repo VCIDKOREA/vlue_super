@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
+import { readVcidBroadcastOn } from "../lib/bizcardAccountSync.js";
+import { canUseV1PaidDccFeatures } from "../lib/v1PaidPackageGate.js";
 import { VLUE_SHOWCASE_DEMO_RECORDING_SEC } from "../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
@@ -18,8 +20,33 @@ export default function LetteringMypagePushInteractivePreview({
   onToast
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [broadcastOn, setBroadcastOn] = useState(() => readVcidBroadcastOn());
   const rootRef = useRef(null);
   const styledCard = applyShowcaseStyleToCard(card, card?.membershipTier || "free");
+
+  useEffect(() => {
+    const sync = () => setBroadcastOn(readVcidBroadcastOn());
+    window.addEventListener("vlue-vcid-changed", sync);
+    return () => window.removeEventListener("vlue-vcid-changed", sync);
+  }, []);
+
+  const showcaseOffPreview = !broadcastOn;
+  const previewCard = useMemo(() => {
+    if (!showcaseOffPreview) return styledCard;
+    return {
+      ...styledCard,
+      membershipTier: "free",
+      hideBroadcastName: true,
+      showcaseStyle: {
+        ...(styledCard?.showcaseStyle || {}),
+        showBroadcastName: false
+      }
+    };
+  }, [styledCard, showcaseOffPreview]);
+
+  const previewIncludeDigitalCard =
+    !showcaseOffPreview &&
+    canUseV1PaidDccFeatures(card?.membershipTier);
 
   useEffect(() => {
     if (!expanded || !rootRef.current) return;
@@ -37,17 +64,19 @@ export default function LetteringMypagePushInteractivePreview({
 
   const notificationProps = {
     verified: true,
-    card: styledCard,
+    card: previewCard,
     platform,
     callPhase: "active",
-    isRecording,
-    callDurationSec: VLUE_SHOWCASE_DEMO_RECORDING_SEC,
-    recordingDurationSec: VLUE_SHOWCASE_DEMO_RECORDING_SEC,
-    incomingNumber: styledCard?.phone || "",
+    isRecording: !showcaseOffPreview && isRecording,
+    callDurationSec: showcaseOffPreview ? 0 : VLUE_SHOWCASE_DEMO_RECORDING_SEC,
+    recordingDurationSec: showcaseOffPreview ? 0 : VLUE_SHOWCASE_DEMO_RECORDING_SEC,
+    incomingNumber: previewCard?.phone || "",
     expanded,
     onExpandedChange: setExpanded,
     hideUnverifiedFooter: true,
     previewMode: true,
+    showcaseOffPreview,
+    includeDigitalCard: previewIncludeDigitalCard,
     onEndCall: () => setExpanded(false),
     onToast
   };
