@@ -61,14 +61,14 @@ export default function MyCaseIgPostViewer({
   const [pickTick, setPickTick] = useState(0);
   const [commentOpen, setCommentOpen] = useState(false);
   const [likeBurst, setLikeBurst] = useState(0);
-  const [mediaAspect, setMediaAspect] = useState(16 / 9);
+  const [mediaAspect, setMediaAspect] = useState(9 / 16);
   const likeHandlerRef = useRef(null);
 
   useEffect(() => {
     setImgIndex(0);
     setCommentOpen(false);
     setLikeBurst(0);
-    setMediaAspect(16 / 9);
+    setMediaAspect(9 / 16);
   }, [item?.id]);
 
   useEffect(() => {

@@ -1,6 +1,6 @@
-/* VLUE Showcase 스타일 설정 — 오늘의 집 미니멀 */
+/* VLUE Showcase ì¤íì¼ ì¤ì  â ì¤ëì ì§ ë¯¸ëë© */
 
-/* 라운드 프레임 — CSS border-dashed는 곡선 모서리가 깨지므로 inset ring 사용 */
+/* ë¼ì´ë íë ì â CSS border-dashedë ê³¡ì  ëª¨ìë¦¬ê° ê¹¨ì§ë¯ë¡ inset ring ì¬ì© */
 .showcase-round-ring {
   border: none;
   box-shadow: inset 0 0 0 1.5px rgba(148, 163, 184, 0.45);
@@ -594,7 +594,7 @@
   color: #2b6ff0;
 }
 
-/* 디지털인증명함 — 하단 미리보기에 실제 디지털 명함 */
+/* ëì§í¸ì¸ì¦ëªí¨ â íë¨ ë¯¸ë¦¬ë³´ê¸°ì ì¤ì  ëì§í¸ ëªí¨ */
 .showcase-style-preview--certificate {
   width: 100%;
 }
@@ -681,7 +681,7 @@
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* ── Kakao/Instagram 탭 네비 ── */
+/* ââ Kakao/Instagram í­ ë¤ë¹ ââ */
 .showcase-style-settings__tabs {
   display: flex;
   gap: 4px;
@@ -753,7 +753,7 @@
   color: #64748b;
 }
 
-/* 스타일 선택 카드 — 아이콘·제목·설명이 한눈에 보이도록 */
+/* ì¤íì¼ ì í ì¹´ë â ìì´ì½Â·ì ëª©Â·ì¤ëªì´ íëì ë³´ì´ëë¡ */
 .showcase-style-settings__hint {
   margin: -4px 0 12px;
   font-size: 11px;
@@ -1109,7 +1109,7 @@
   color: transparent;
 }
 
-/* 마이페이지 인라인 — 세로 스택 + 하단 미리보기 */
+/* ë§ì´íì´ì§ ì¸ë¼ì¸ â ì¸ë¡ ì¤í + íë¨ ë¯¸ë¦¬ë³´ê¸° */
 .showcase-style-settings--fullscreen {
   min-height: 0;
   flex: 1;
@@ -1126,7 +1126,7 @@
 }
 
 @media (min-width: 720px) {
-  /* 미리보기는 하단 시트 고정 — 사이드 그리드 사용 안 함 */
+  /* ë¯¸ë¦¬ë³´ê¸°ë íë¨ ìí¸ ê³ ì  â ì¬ì´ë ê·¸ë¦¬ë ì¬ì© ì í¨ */
   .showcase-style-settings__split--fullscreen {
     display: flex;
     flex-direction: column;
@@ -1315,7 +1315,7 @@
   word-break: keep-all;
 }
 
-/* 전역 YouTube BGM — 화면 밖, 음향 전용 */
+/* ì ì­ YouTube BGM â íë©´ ë°, ìí¥ ì ì© */
 .showcase-bgm-yt-host {
   position: fixed;
   width: 1px;
@@ -1337,7 +1337,7 @@
   opacity: 1 !important;
 }
 
-/* 전역 SoundCloud BGM — 화면 밖, 음향 전용 */
+/* ì ì­ SoundCloud BGM â íë©´ ë°, ìí¥ ì ì© */
 .showcase-bgm-sc-host {
   position: fixed;
   width: 1px;
@@ -1384,7 +1384,7 @@
   color: #1d4ed8;
 }
 
-/* SoundCloud 미니앨범 그리드 */
+/* SoundCloud ë¯¸ëì¨ë² ê·¸ë¦¬ë */
 .showcase-bgm-picker__albums {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2299,7 +2299,7 @@
   color: #f1f5f9;
 }
 
-/* ── Profile-edit layout (Kakao / Instagram style) ── */
+/* ââ Profile-edit layout (Kakao / Instagram style) ââ */
 .showcase-style-settings--profile .showcase-style-settings__form {
   padding-top: 8px;
 }
@@ -2806,13 +2806,44 @@
   border-radius: 14px;
   background: #f8fafc;
   border: 1px solid #eef1f5;
+  --studio-bg: #ffffff;
+  --studio-panel: #f8fafc;
+  --studio-line: rgba(148, 163, 184, 0.35);
+  --studio-accent: #2b6ff0;
+  --studio-accent-soft: rgba(43, 111, 240, 0.12);
+  --studio-text: #0f172a;
+  --studio-muted: #64748b;
+  --studio-soft: #94a3b8;
+  --studio-input-bg: #ffffff;
+  --studio-chip-bg: #f1f5f9;
+  --studio-chip-text: #334155;
+  --studio-dock-bg: #f1f5f9;
+  --studio-tool-bg: #ffffff;
+  --studio-tool-text: #64748b;
+  --studio-action-bg: rgba(43, 111, 240, 0.1);
+  --studio-action-text: #1d4ed8;
+  --studio-action-border: rgba(43, 111, 240, 0.35);
+  --studio-danger-bg: rgba(239, 68, 68, 0.08);
+  --studio-danger-border: rgba(248, 113, 113, 0.4);
+  --studio-danger-text: #dc2626;
+}
+
+.showcase-photo-editor--single .showcase-photo-editor__overlay-tools .showcase-photo-studio__tool.is-on {
+  background: #2b6ff0;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(43, 111, 240, 0.35);
+}
+
+.showcase-photo-editor--single .showcase-photo-editor__overlay-tools .showcase-photo-studio__tool.is-on svg,
+.showcase-photo-editor--single .showcase-photo-editor__overlay-tools .showcase-photo-studio__tool.is-on .showcase-photo-studio__aa {
+  color: #ffffff;
 }
 
 .showcase-photo-editor--single .showcase-photo-editor__sheet-actions {
   margin-top: 8px;
 }
 
-/* —— VLUE 스튜디오 (개인커스텀 1장) — 기본: 화이트 / 다크모드: 미드나잇 —— */
+/* ââ VLUE ì¤íëì¤ (ê°ì¸ì»¤ì¤í 1ì¥) â ê¸°ë³¸: íì´í¸ / ë¤í¬ëª¨ë: ë¯¸ëëì ââ */
 .showcase-photo-studio {
   --studio-bg: #ffffff;
   --studio-panel: #f8fafc;
@@ -3069,7 +3100,7 @@
   font-weight: 600;
   line-height: 1.2;
   cursor: pointer;
-  /* 인라인 fontFamily 가 칩 라벨에 보이도록 유지 */
+  /* ì¸ë¼ì¸ fontFamily ê° ì¹© ë¼ë²¨ì ë³´ì´ëë¡ ì ì§ */
   font-synthesis: none;
 }
 
@@ -3229,6 +3260,105 @@
   }
 }
 
+.showcase-photo-editor__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.showcase-photo-editor__cell-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.showcase-photo-editor__cell-wrap.is-selected .showcase-photo-editor__cell {
+  box-shadow: 0 0 0 2px var(--studio-accent, #2b6ff0);
+}
+
+.showcase-photo-editor__cell-wrap.is-dragging {
+  opacity: 0.72;
+}
+
+.showcase-photo-editor__cell-grip {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.62);
+  color: #fff;
+  cursor: grab;
+  touch-action: none;
+}
+
+.showcase-photo-editor__cell-grip:active {
+  cursor: grabbing;
+}
+
+.showcase-photo-editor__overlay-tools {
+  --studio-bg: #ffffff;
+  --studio-panel: #f8fafc;
+  --studio-line: rgba(148, 163, 184, 0.35);
+  --studio-accent: #2b6ff0;
+  --studio-accent-soft: rgba(43, 111, 240, 0.12);
+  --studio-text: #0f172a;
+  --studio-muted: #64748b;
+  --studio-soft: #94a3b8;
+  --studio-input-bg: #ffffff;
+  --studio-chip-bg: #f1f5f9;
+  --studio-chip-text: #334155;
+  --studio-dock-bg: #f1f5f9;
+  --studio-tool-bg: #ffffff;
+  --studio-tool-text: #64748b;
+  --studio-action-bg: rgba(43, 111, 240, 0.1);
+  --studio-action-text: #1d4ed8;
+  --studio-action-border: rgba(43, 111, 240, 0.35);
+  --studio-danger-bg: rgba(239, 68, 68, 0.08);
+  --studio-danger-border: rgba(248, 113, 113, 0.4);
+  --studio-danger-text: #dc2626;
+}
+
+.showcase-photo-editor__overlay-tools .showcase-photo-studio__tool.is-on {
+  background: #2b6ff0;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(43, 111, 240, 0.35);
+}
+
+.showcase-photo-editor__overlay-tools .showcase-photo-studio__tool.is-on svg,
+.showcase-photo-editor__overlay-tools .showcase-photo-studio__tool.is-on .showcase-photo-studio__aa {
+  color: #ffffff;
+}
+
+.showcase-photo-editor__sheet-preview--adaptive {
+  aspect-ratio: auto;
+  width: 100%;
+  max-height: min(62vh, 560px);
+  margin: 0 auto;
+  background: #0f172a;
+}
+
+.showcase-photo-editor__sheet-preview--adaptive .showcase-photo-editor__sheet-img--portrait {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background: #000;
+}
+
+.showcase-photo-editor__sheet-preview--adaptive .showcase-photo-editor__sheet-img--landscape {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  background: #000;
+}
+
 .showcase-photo-editor__cell {
   position: relative;
   aspect-ratio: 1;
@@ -3300,7 +3430,7 @@
   pointer-events: none;
 }
 
-/* ????�?? ??? ? 9:16 ???, ?? ?? ??(????) */
+/* ????·?? ??? ? 9:16 ???, ?? ?? ??(????) */
 .showcase-photo-editor--portrait .showcase-photo-editor__sheet-preview {
   aspect-ratio: 9 / 16;
   width: min(100%, calc(min(62vh, 560px) * 9 / 16));
@@ -3316,7 +3446,7 @@
   background: #000;
 }
 
-/* 개인커스텀 1장 — 세로로 길게, 원본 전체 보이게 약간 축소 */
+/* ê°ì¸ì»¤ì¤í 1ì¥ â ì¸ë¡ë¡ ê¸¸ê², ìë³¸ ì ì²´ ë³´ì´ê² ì½ê° ì¶ì */
 .showcase-photo-editor__sheet-preview--large {
   aspect-ratio: auto;
   height: min(62vh, 520px);
@@ -3525,7 +3655,7 @@
 }
 
 
-/* 페이지별 쇼케이스 설정 카드 */
+/* íì´ì§ë³ ì¼ì¼ì´ì¤ ì¤ì  ì¹´ë */
 .showcase-page-card {
   margin-bottom: 10px;
   border-radius: 14px;
@@ -4060,7 +4190,7 @@
   border-radius: 10px; border: 1px solid #e2e8f0; padding: 8px 10px; background: #fff;
 }
 
-/* ������ �ڷΰ��� Ȯ�� */
+/* ¹ÌÀû¿ë µÚ·Î°¡±â È®ÀÎ */
 .showcase-leave-confirm {
   position: fixed;
   inset: 0;

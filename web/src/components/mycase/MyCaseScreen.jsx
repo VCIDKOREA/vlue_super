@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import MyCaseGrid from "./MyCaseGrid.jsx";
 import MyCaseDetailModal from "./MyCaseDetailModal.jsx";
 import MyCaseShowcasePickTray from "./MyCaseShowcasePickTray.jsx";
@@ -8,10 +8,23 @@ import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import { readDigitalCardActive, readMembershipTier } from "../../lib/bizcardAccountSync.js";
 import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../../lib/showcase/applyShowcaseStyleToCard.js";
+import { deleteMycase } from "../../lib/mycaseApi.js";
+import { notifyMycaseFeedMutated } from "../../lib/mycase/mycaseFeedEvents.js";
 import {
   LETTERING_BIZCARD_CHANGED_EVENT
 } from "../../lib/letteringBizcardStorage.js";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
+import {
+  clearLiveBroadcastMeta,
+  hydrateLiveBroadcastFromServer,
+  readLiveBroadcastMeta
+} from "../../lib/showcase/syncMycaseLiveBroadcast.js";
+import {
+  readLiveShowcaseStyle,
+  readShowcaseStyle,
+  writeShowcaseStyle
+} from "../../lib/showcase/showcaseStyleStorage.js";
+import { hasPlayableShowcaseBgm } from "../../lib/showcase/showcaseBgmPresets.js";
 import "./my-case-detail.css";
 
 /**
@@ -37,6 +50,7 @@ export default function MyCaseScreen({
   const [cardOpen, setCardOpen] = useState(false);
   const [cardExpanded, setCardExpanded] = useState(true);
   const [previewTick, setPreviewTick] = useState(0);
+  const [composerEditTarget, setComposerEditTarget] = useState(null);
 
   const caseBgmEnabled = !cardOpen;
 
@@ -80,6 +94,72 @@ export default function MyCaseScreen({
     setCardExpanded(true);
   };
 
+  const closeDetail = useCallback(() => {
+    setDetailOpen(false);
+    setDetailItem(null);
+    setDetailPayload(null);
+    setFeedItems([]);
+    setFeedStartIndex(0);
+  }, []);
+
+  const preserveCaseboxBgmBeforeClearLive = useCallback(() => {
+    try {
+      const editor = readShowcaseStyle();
+      if (hasPlayableShowcaseBgm(editor)) return;
+      const live = readLiveShowcaseStyle();
+      if (live && hasPlayableShowcaseBgm(live)) {
+        writeShowcaseStyle({ ...editor, bgm: live.bgm }, { skipSync: true, silent: true });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const handleEditPost = useCallback(
+    (item, activeDetail) => {
+      const caseId = String(item?.id || "").trim();
+      if (!caseId) return;
+      const payloadJson =
+        activeDetail?.item?.payloadJson ?? item?.payloadJson ?? activeDetail?.payloadJson ?? null;
+      closeDetail();
+      setComposerEditTarget({ caseId, item, payloadJson });
+    },
+    [closeDetail]
+  );
+
+  const handleDeletePost = useCallback(
+    async (item) => {
+      const caseId = String(item?.id || "").trim();
+      if (!caseId) {
+        onToast?.("게시물 정보가 올바르지 않습니다.");
+        return;
+      }
+      if (!window.confirm("게시물을 삭제할까요? 모든 기록이 삭제됩니다.")) return;
+      const liveMeta = readLiveBroadcastMeta();
+      const touchingLive =
+        Boolean(item.isMainBroadcast) || String(liveMeta?.caseId || "") === caseId;
+      try {
+        const res = await deleteMycase(caseId);
+        if (!res.ok) {
+          onToast?.(res.message || "삭제에 실패했습니다.");
+          if (res.error === "not_found") notifyMycaseFeedMutated();
+          return;
+        }
+        if (touchingLive) {
+          preserveCaseboxBgmBeforeClearLive();
+          clearLiveBroadcastMeta();
+          await hydrateLiveBroadcastFromServer();
+        }
+        notifyMycaseFeedMutated();
+        closeDetail();
+        onToast?.("게시물을 삭제했습니다.");
+      } catch {
+        onToast?.("삭제에 실패했습니다.");
+      }
+    },
+    [closeDetail, onToast, preserveCaseboxBgmBeforeClearLive]
+  );
+
   return (
     <section className="mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden bg-white">
       <div
@@ -98,6 +178,8 @@ export default function MyCaseScreen({
           showSearch={showSearch}
           showLineSwitcher={showLineSwitcher}
           layout={layout}
+          composerEditTarget={composerEditTarget}
+          onComposerEditTargetClear={() => setComposerEditTarget(null)}
           onOpenDigitalCard={() => {
             if (!readDigitalCardActive()) {
               onToast?.("디지털인증명함이 없습니다.");
@@ -138,14 +220,10 @@ export default function MyCaseScreen({
         showcasePickEnabled={showcasePickEnabled}
         isDarkMode={isDarkMode}
         suppressBgm
-        onClose={() => {
-          setDetailOpen(false);
-          setDetailItem(null);
-          setDetailPayload(null);
-          setFeedItems([]);
-          setFeedStartIndex(0);
-        }}
+        onClose={closeDetail}
         onToast={onToast}
+        onEditPost={handleEditPost}
+        onDeletePost={handleDeletePost}
       />
 
       <AppFullScreenView

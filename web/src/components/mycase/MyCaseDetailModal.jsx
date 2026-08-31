@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import MyCaseIgPostViewer from "./MyCaseIgPostViewer.jsx";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
@@ -39,7 +39,9 @@ export default function MyCaseDetailModal({
   isDarkMode = false,
   showcasePickEnabled = false,
   onClose,
-  onToast
+  onToast,
+  onEditPost,
+  onDeletePost
 }) {
   const isDesktop = layout === "desktop";
   const feed = useMemo(() => {
@@ -60,6 +62,7 @@ export default function MyCaseDetailModal({
     return {};
   });
   const [loadingIds, setLoadingIds] = useState({});
+  const [postMenuOpen, setPostMenuOpen] = useState(false);
   const scrollerRef = useRef(null);
   const ignoreScrollRef = useRef(false);
   const detailCacheRef = useRef(detailCache);
@@ -77,6 +80,14 @@ export default function MyCaseDetailModal({
   const avatarUrl = owner
     ? readProfilePhotoAvatar()
     : String(peerIdentity?.photoUrl || item?.thumbnailUrl || "").trim();
+
+  useEffect(() => {
+    if (!open) {
+      setPostMenuOpen(false);
+      return;
+    }
+    setPostMenuOpen(false);
+  }, [open, index]);
 
   useEffect(() => {
     if (!open) return;
@@ -223,6 +234,20 @@ export default function MyCaseDetailModal({
     setIndex((i) => Math.min(feed.length - 1, i + 1));
   }, [feed.length]);
 
+  useEffect(() => {
+    if (!postMenuOpen) return undefined;
+    const onDoc = (e) => {
+      if (e.target?.closest?.(".my-case-feed__topbar-menu-wrap")) return;
+      setPostMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onDoc);
+    return () => document.removeEventListener("pointerdown", onDoc);
+  }, [postMenuOpen]);
+
+  useEffect(() => {
+    setPostMenuOpen(false);
+  }, [index, open]);
+
   if (!open || !feed.length) return null;
 
   const currentItem = feed[index];
@@ -312,6 +337,21 @@ export default function MyCaseDetailModal({
   }
 
   const themeClass = "my-case-detail--dark";
+  const activeItem = feed[index] || item || null;
+  const activeDetail = activeItem ? detailCache[activeItem.id] || (activeItem.id === item?.id ? detail : null) : null;
+  const canManagePost = Boolean(owner && activeItem && !activeItem.isLiveStyle);
+
+  const handleEditPost = () => {
+    if (!canManagePost || typeof onEditPost !== "function") return;
+    setPostMenuOpen(false);
+    onEditPost(activeItem, activeDetail);
+  };
+
+  const handleDeletePost = () => {
+    if (!canManagePost || typeof onDeletePost !== "function") return;
+    setPostMenuOpen(false);
+    onDeletePost(activeItem, activeDetail);
+  };
 
   return (
     <AppFullScreenView
@@ -329,7 +369,36 @@ export default function MyCaseDetailModal({
           <ChevronLeft size={26} strokeWidth={2} />
         </button>
         <span className="my-case-feed__topbar-title">게시물</span>
-        <span className="my-case-feed__topbar-handle">{displayHandle}</span>
+        {canManagePost ? (
+          <div className="my-case-feed__topbar-menu-wrap">
+            <button
+              type="button"
+              className="my-case-feed__topbar-menu"
+              aria-label="게시물 옵션"
+              aria-expanded={postMenuOpen}
+              onClick={() => setPostMenuOpen((v) => !v)}
+            >
+              <Menu size={22} strokeWidth={2.2} aria-hidden />
+            </button>
+            {postMenuOpen ? (
+              <div className="my-case-feed__post-menu" role="menu">
+                <button type="button" role="menuitem" onClick={handleEditPost}>
+                  게시물 수정
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="is-danger"
+                  onClick={handleDeletePost}
+                >
+                  게시물 삭제
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <span className="my-case-feed__topbar-handle">{displayHandle}</span>
+        )}
       </header>
       <div
         ref={scrollerRef}

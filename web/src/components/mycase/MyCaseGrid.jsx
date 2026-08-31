@@ -52,6 +52,7 @@ import {
   mycaseCategoryFilterLabel,
   parseMycasePostPayload
 } from "../../lib/mycase/mycasePostPayload.js";
+import { MYCASE_FEED_MUTATED } from "../../lib/mycase/mycaseFeedEvents.js";
 import MyCaseCategorySheet from "./MyCaseCategorySheet.jsx";
 import "./my-case-category-sheet.css";
 import {
@@ -104,6 +105,9 @@ function formatCount(n) {
  *   isDarkMode?: boolean,
  *   showSearch?: boolean,
  *   showLineSwitcher?: boolean,
+ *   layout?: string,
+ *   composerEditTarget?: { caseId: string, item: object, payloadJson?: object|null }|null,
+ *   onComposerEditTargetClear?: () => void,
  *   className?: string
  * }} props
  */
@@ -120,6 +124,8 @@ export default function MyCaseGrid({
   showSearch = false,
   showLineSwitcher = false,
   layout = "mobile",
+  composerEditTarget = null,
+  onComposerEditTargetClear,
   className = ""
 }) {
   const isMine = mode === "mine";
@@ -323,6 +329,19 @@ export default function MyCaseGrid({
   useEffect(() => {
     void loadFirst();
   }, [loadFirst]);
+
+  useEffect(() => {
+    if (!isMine) return undefined;
+    const onMutated = () => {
+      void loadFirst();
+    };
+    window.addEventListener(MYCASE_FEED_MUTATED, onMutated);
+    return () => window.removeEventListener(MYCASE_FEED_MUTATED, onMutated);
+  }, [isMine, loadFirst]);
+
+  useEffect(() => {
+    if (composerEditTarget?.caseId) setComposerOpen(true);
+  }, [composerEditTarget?.caseId]);
 
   useEffect(() => {
     if (!isMine) return undefined;
@@ -740,6 +759,7 @@ export default function MyCaseGrid({
   /** 새로 만들기 → 케이스함 피드 게시물 작성 */
   const goCreatePost = () => {
     if (!isMine) return;
+    onComposerEditTargetClear?.();
     setComposerOpen(true);
   };
 
@@ -1164,10 +1184,14 @@ export default function MyCaseGrid({
 
       <MyCasePostComposer
         open={composerOpen}
-        onClose={() => setComposerOpen(false)}
+        onClose={() => {
+          setComposerOpen(false);
+          onComposerEditTargetClear?.();
+        }}
         onToast={toast}
         onCreated={() => void loadFirst()}
         layout={layout}
+        editTarget={composerEditTarget}
       />
 
       <MyCaseSearchModal

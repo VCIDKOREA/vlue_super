@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlignCenter, ImagePlus, Palette, Plus, Square, Trash2, Type, X } from "lucide-react";
+import { AlignCenter, GripVertical, ImagePlus, Palette, Plus, Square, Trash2, Type, X } from "lucide-react";
 import { SHOWCASE_MAX_PHOTOS } from "../../lib/showcase/showcaseStyleStorage.js";
 import { maxShowcasePhotosForTier } from "../../lib/showcase/tentShowcaseTypes.js";
 import { SHOWCASE_FONT_SETS } from "../../lib/showcase/showcaseStyleTypes.js";
@@ -64,6 +64,8 @@ export default function ShowcasePhotoEditor({
   /** 드래그 중 로컬 위치 — 부모 onChange 지연 없이 커서를 따라감 */
   const [dragPos, setDragPos] = useState(null);
   const [draggingId, setDraggingId] = useState("");
+  const [dragPhotoId, setDragPhotoId] = useState("");
+  const [previewAspect, setPreviewAspect] = useState(16 / 10);
   const limit = Math.max(1, Number(maxPhotos) || maxShowcasePhotosForTier(membershipTier) || SHOWCASE_MAX_PHOTOS);
   const singleMode = limit === 1;
   const selected = photos.find((p) => p.id === selectedId) || (singleMode ? photos[0] || null : null);
@@ -95,6 +97,42 @@ export default function ShowcasePhotoEditor({
       setSelectedOverlayId(list[0]?.id || "");
     }
   }, [selected?.id, selected?.textOverlays, selected?.overlayText, enableTextOverlay, selectedOverlayId]);
+
+  useEffect(() => {
+    const url = String(selected?.url || "").trim();
+    if (!url) {
+      setPreviewAspect(16 / 10);
+      return undefined;
+    }
+    let cancelled = false;
+    const probe = new Image();
+    probe.onload = () => {
+      if (cancelled) return;
+      const w = probe.naturalWidth;
+      const h = probe.naturalHeight;
+      if (w > 0 && h > 0) setPreviewAspect(w / h);
+    };
+    probe.onerror = () => {
+      if (!cancelled) setPreviewAspect(16 / 10);
+    };
+    probe.src = url;
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.url]);
+
+  const movePhoto = (fromId, toId) => {
+    const from = String(fromId || "").trim();
+    const to = String(toId || "").trim();
+    if (!from || !to || from === to) return;
+    const fromIdx = photos.findIndex((p) => p.id === from);
+    const toIdx = photos.findIndex((p) => p.id === to);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const next = [...photos];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    onChange(next);
+  };
 
   const commitPhoto = (nextPhoto) => {
     if (!selected) return;
@@ -633,16 +671,43 @@ export default function ShowcasePhotoEditor({
             <div className="showcase-photo-editor__grid" role="list">
               {cells.map((photo, index) =>
                 photo ? (
-                  <button
+                  <div
                     key={photo.id}
-                    type="button"
-                    className={`showcase-photo-editor__cell${selectedId === photo.id ? " is-selected" : ""}`}
+                    className={`showcase-photo-editor__cell-wrap${selectedId === photo.id ? " is-selected" : ""}${dragPhotoId === photo.id ? " is-dragging" : ""}`}
                     role="listitem"
-                    onClick={() => setSelectedId(photo.id)}
-                    aria-label={`사진 ${index + 1}`}
+                    onDragOver={(e) => {
+                      if (!dragPhotoId || dragPhotoId === photo.id) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      movePhoto(dragPhotoId, photo.id);
+                      setDragPhotoId("");
+                    }}
                   >
-                    <img src={photo.url} alt="" />
-                  </button>
+                    <button
+                      type="button"
+                      className="showcase-photo-editor__cell-grip"
+                      draggable
+                      aria-label={`사진 ${index + 1} 순서 변경`}
+                      onDragStart={(e) => {
+                        setDragPhotoId(photo.id);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => setDragPhotoId("")}
+                    >
+                      <GripVertical size={14} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      className={`showcase-photo-editor__cell${selectedId === photo.id ? " is-selected" : ""}`}
+                      onClick={() => setSelectedId(photo.id)}
+                      aria-label={`사진 ${index + 1}`}
+                    >
+                      <img src={photo.url} alt="" draggable={false} />
+                    </button>
+                  </div>
                 ) : (
                   <button
                     key="empty-add"
@@ -665,11 +730,21 @@ export default function ShowcasePhotoEditor({
               <div
                 ref={sheetCanvasRef}
                 role="img"
-                className={`showcase-photo-editor__sheet-preview${draggingId ? " is-dragging" : ""}`}
+                className={`showcase-photo-editor__sheet-preview${draggingId ? " is-dragging" : ""}${portraitPreview ? "" : " showcase-photo-editor__sheet-preview--adaptive"}`}
+                style={portraitPreview ? undefined : { aspectRatio: String(previewAspect) }}
                 onPointerUp={onCanvasBackgroundPointerUp}
                 aria-label="텍스트를 드래그해 위치를 조정하세요"
               >
-                <img src={selected.url} alt="" draggable={false} />
+                <img
+                  src={selected.url}
+                  alt=""
+                  draggable={false}
+                  className={
+                    previewAspect >= 1
+                      ? "showcase-photo-editor__sheet-img--portrait"
+                      : "showcase-photo-editor__sheet-img--landscape"
+                  }
+                />
                 {enableTextOverlay ? (
                   <ShowcasePhotoTextOverlay
                     photo={selected}

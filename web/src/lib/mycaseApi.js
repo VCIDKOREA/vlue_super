@@ -179,6 +179,22 @@ export async function setMycaseBroadcast(caseId, enabled) {
   }
 }
 
+/** @param {string} caseId @param {{ title?: string, thumbnailUrl?: string|null, payloadJson?: object, isPublic?: boolean }} body */
+export async function patchMycase(caseId, body = {}) {
+  try {
+    const res = await vlueAuthFetch(apiUrl(`/api/mycase/${encodeURIComponent(caseId)}`), {
+      method: "PATCH",
+      headers: vlueAuthHeaders(),
+      body: JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return errPayload(data, "update_failed");
+    return { ok: true, item: data.item };
+  } catch (e) {
+    return networkFail(e);
+  }
+}
+
 /** @param {string} caseId */
 export async function deleteMycase(caseId) {
   try {

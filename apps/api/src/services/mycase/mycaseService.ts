@@ -48,13 +48,36 @@ function slimMycasePayload(input: unknown): object {
     const images = imagesRaw
       .map((ph, i) => {
         if (!ph || typeof ph !== "object") return null;
-        const row = ph as { id?: string; url?: string };
+        const row = ph as Record<string, unknown>;
         const url = String(row.url || "").trim();
         if (!url || url.startsWith("blob:") || url.startsWith("data:")) return null;
-        return {
+        const out: Record<string, unknown> = {
           id: String(row.id || `img-${i}`),
           url
         };
+        const overlaysRaw = Array.isArray(row.textOverlays) ? row.textOverlays : [];
+        const textOverlays = overlaysRaw
+          .map((ov, j) => {
+            if (!ov || typeof ov !== "object") return null;
+            const o = ov as Record<string, unknown>;
+            const text = String(o.text || "").trim().slice(0, 240);
+            if (!text) return null;
+            return {
+              id: String(o.id || `tx-${i}-${j}`).slice(0, 64),
+              text,
+              font: String(o.font || "pretendard").slice(0, 40),
+              fontSize: Math.min(64, Math.max(12, Number(o.fontSize) || 28)),
+              color: String(o.color || "#ffffff").slice(0, 32),
+              x: Math.min(100, Math.max(0, Number(o.x) || 50)),
+              y: Math.min(100, Math.max(0, Number(o.y) || 50)),
+              anim: String(o.anim || "none").slice(0, 24),
+              border: String(o.border || "none").slice(0, 24)
+            };
+          })
+          .filter(Boolean)
+          .slice(0, 8);
+        if (textOverlays.length) out.textOverlays = textOverlays;
+        return out;
       })
       .filter(Boolean)
       .slice(0, 10);

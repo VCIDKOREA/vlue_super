@@ -1,16 +1,22 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ShowcasePhotoTextOverlay from "../showcase/ShowcasePhotoTextOverlay.jsx";
 
 const DOUBLE_TAP_MS = 360;
 const DOUBLE_TAP_DIST = 44;
 const SWIPE_THRESHOLD = 48;
-const FEED_MEDIA_ASPECT_DEFAULT = 16 / 9;
+const FEED_MEDIA_ASPECT_DEFAULT = 9 / 16;
+const FEED_MEDIA_ASPECT_MIN = 0.35;
+const FEED_MEDIA_ASPECT_MAX = 16 / 9;
 
-/** height/width — 세로 9:16 기본, 가로 16:9까지 프레임 허용 */
+/** height/width — 세로는 크롭 없이, 가로는 와이드까지 허용 */
 function clampFeedMediaAspect(hw) {
   const ratio = Number(hw);
   if (!Number.isFinite(ratio) || ratio <= 0) return FEED_MEDIA_ASPECT_DEFAULT;
-  return Math.min(16 / 9, Math.max(9 / 16, ratio));
+  return Math.min(FEED_MEDIA_ASPECT_MAX, Math.max(FEED_MEDIA_ASPECT_MIN, ratio));
+}
+
+function isLandscapeAspect(hw) {
+  return Number(hw) > 0 && Number(hw) < 0.95;
 }
 
 /**
@@ -23,6 +29,7 @@ export default function MyCaseImageCarousel({
   onDoubleTap,
   onMediaAspectChange
 }) {
+  const [slideAspects, setSlideAspects] = useState({});
   const gestureRef = useRef({ x: 0, y: 0, locked: null });
   const swipeMovedRef = useRef(false);
   const tapArmedRef = useRef(false);
@@ -32,6 +39,15 @@ export default function MyCaseImageCarousel({
 
   useEffect(() => {
     const url = String(current?.url || "").trim();
+    const id = String(current?.id || url || "").trim();
+    if (id && slideAspects[id]) {
+      onMediaAspectChange?.(slideAspects[id]);
+    }
+  }, [index, current?.id, current?.url, slideAspects, onMediaAspectChange]);
+
+  useEffect(() => {
+    const url = String(current?.url || "").trim();
+    const id = String(current?.id || url || "").trim();
     if (!url) {
       onMediaAspectChange?.(FEED_MEDIA_ASPECT_DEFAULT);
       return undefined;
@@ -40,7 +56,12 @@ export default function MyCaseImageCarousel({
     const probe = new Image();
     probe.onload = () => {
       if (cancelled) return;
-      onMediaAspectChange?.(clampFeedMediaAspect(probe.naturalHeight / probe.naturalWidth));
+      const aspect = clampFeedMediaAspect(probe.naturalHeight / probe.naturalWidth);
+      setSlideAspects((prev) => {
+        if (prev[id] === aspect) return prev;
+        return { ...prev, [id]: aspect };
+      });
+      onMediaAspectChange?.(aspect);
     };
     probe.onerror = () => {
       if (!cancelled) onMediaAspectChange?.(FEED_MEDIA_ASPECT_DEFAULT);
@@ -140,12 +161,21 @@ export default function MyCaseImageCarousel({
         className="my-case-carousel__track"
         style={{ transform: `translate3d(-${index * 100}%, 0, 0)` }}
       >
-        {images.map((img) => (
+        {images.map((img) => {
+          const aspect = slideAspects[img.id] || FEED_MEDIA_ASPECT_DEFAULT;
+          const landscape = isLandscapeAspect(aspect);
+          return (
           <div key={img.id} className="my-case-carousel__slide">
-            <img className="my-case-carousel__photo" src={img.url} alt="" draggable={false} />
+            <img
+              className={`my-case-carousel__photo${landscape ? " my-case-carousel__photo--landscape" : " my-case-carousel__photo--portrait"}`}
+              src={img.url}
+              alt=""
+              draggable={false}
+            />
             <ShowcasePhotoTextOverlay photo={img} />
           </div>
-        ))}
+          );
+        })}
       </div>
       {images.length > 1 ? (
         <div className="my-case-carousel__dots" aria-hidden>

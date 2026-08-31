@@ -20,7 +20,7 @@
 .my-case-ig-post--feed .my-case-ig-post__media {
   flex: 0 0 auto;
   width: 100%;
-  height: min(calc(100vw * var(--feed-media-aspect, 1.7777778)), 72vh, 680px);
+  height: min(calc(100vw * var(--feed-media-aspect, 0.5625)), 72vh, 680px);
   max-height: min(72vh, 680px);
   background: var(--feed-media-bg, #000);
   overflow: hidden;
@@ -157,12 +157,20 @@
 .my-case-carousel__photo {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  object-position: center;
   display: block;
   background: #000;
   user-select: none;
   -webkit-user-drag: none;
+}
+
+.my-case-carousel__photo--portrait {
+  object-fit: contain;
+  object-position: center;
+}
+
+.my-case-carousel__photo--landscape {
+  object-fit: cover;
+  object-position: center;
 }
 
 .my-case-carousel__dots {
