@@ -872,7 +872,7 @@ export default function ShowcaseStyleSettingsPanel({
     focusShowcaseSection,
     includeDigitalCard,
     isPaid,
-    membershipTier: effectiveTier,
+    effectiveTier,
     notify,
     tagInput
   ]);
