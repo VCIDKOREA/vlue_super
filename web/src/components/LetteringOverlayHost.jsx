@@ -16,7 +16,7 @@ import { syncMemberIdentityToNative } from "../lib/showcaseSmsShare.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
 import { fetchFollowProfile } from "../lib/followApi.js";
-import { isPaidLetteringTier } from "../lib/letteringMembership.js";
+import { isPaidLetteringTier, peerMayUsePaidCallFeatures } from "../lib/letteringMembership.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { resolveCallHistoryShowcasePeer } from "../lib/resolveCallHistoryShowcasePeer.js";
 import {
@@ -1433,7 +1433,7 @@ function LetteringOverlayHostInner() {
   const peerIncludeDccSlide = Boolean(
     verified &&
       peerBroadcastOn &&
-      isPaidLetteringTier(styledCard?.membershipTier || membershipTier || "free")
+      peerMayUsePaidCallFeatures(styledCard?.membershipTier || membershipTier || "free")
   );
 
   return (

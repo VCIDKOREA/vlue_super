@@ -122,7 +122,10 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       profile.membershipTier ||
       body.membershipTier ||
       nested.membershipTier ||
-      (body.is_premium_line || body.digitalCardActive ? "paid" : "free"),
+      profile.membershipKind ||
+      body.membershipKind ||
+      nested.membershipKind ||
+      (body.is_premium_line || nested.is_premium_line ? "paid" : "free"),
     digitalCardActive: Boolean(body.digitalCardActive || nested.digitalCardActive),
     isPremiumLine: Boolean(body.is_premium_line || nested.is_premium_line),
     showcaseStyle:

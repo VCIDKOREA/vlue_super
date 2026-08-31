@@ -214,7 +214,7 @@ object LetteringCallCoordinator {
                 }
             } else if (nextUnknown) {
                 val startedAt = lastRingAt
-                scope.launch {
+            scope.launch {
                     upgradeNumberAfterOverlay(app, outgoing, gen, startedAt)
                 }
             } else {

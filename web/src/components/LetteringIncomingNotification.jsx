@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { getLetteringCallStatusLabel } from "../lib/letteringCallStatus.js";
 import { compareLetteringPhones, formatLetteringPhoneDisplay, isUnknownPhoneToken, normalizePhoneDigits } from "../lib/letteringPhoneMatch.js";
 import { openLetteringCertInVlueApp } from "../lib/letteringOpenVlueApp.js";
-import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { VLUE_CARD_CAUTION, VLUE_UNVERIFIED_REPORT_DISCLAIMER } from "../lib/vlueDigitalCardUi.js";
 import {
   resolveFreeTierSummary
@@ -45,6 +44,7 @@ import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../lib/letteringBizcardStorage.js";
 import { canUseV1PaidDccFeatures, requestV1PaidPackageGate } from "../lib/v1PaidPackageGate.js";
+import { peerMayUsePaidCallFeatures } from "../lib/letteringMembership.js";
 import "../styles/showcase-call-glass.css";
 import "../styles/incall-controls.css";
 
@@ -345,21 +345,24 @@ export default function LetteringIncomingNotification({
       );
     }
     const next = !expanded;
-    setExpanded(next);
     /*
      * Native overlay: 펼침은 항상 restore(FULLSCREEN).
      * ringing BigPush 에서 liveOnCall=false 이면 restore 를 안 불러
      * 웹만 expanded → 156dp 창에 풀 UI 가 짤림 (실기기 로그: RESTORE 0회).
      * 접기는 통화 중(Mini)일 때만.
+     * Host 제어(expanded prop) 시 onExpandedChange 가 restore — 중복 호출 금지.
      */
     const liveOnCall = callPhase === "active" || callPhase === "connected";
     const nativeOverlay =
       COMPANION_MVP_DELEGATE_CALL_UI && !previewMode && !fromCallHistory;
+    const isControlledExpand = expandedProp !== undefined;
     if (nativeOverlay) {
       try {
         if (next) {
-          expandFromMiniGuardUntilRef.current = Date.now() + 600;
-          nativeRestoreShowcaseOverlay();
+          expandFromMiniGuardUntilRef.current = Date.now() + 700;
+          if (!isControlledExpand) {
+            nativeRestoreShowcaseOverlay();
+          }
         } else if (liveOnCall) {
           nativeRevealSystemCallUi();
         }
@@ -367,6 +370,7 @@ export default function LetteringIncomingNotification({
         /* ignore */
       }
     }
+    setExpanded(next);
     /* 실통화 펼침은 BGM 잠금 유지 — 미니→풀 복원 탭이 preview 재생을 열면 안 됨 */
     if (next && verified && !liveOnCall && typeof window !== "undefined" && window.__vlueUnlockShowcaseBgm) {
       window.__vlueUnlockShowcaseBgm();
@@ -418,7 +422,7 @@ export default function LetteringIncomingNotification({
   /** 실시간 수신 통화만 송출 ON/OFF 게이트 — 통화기록·공유·미리보기는 등록 정보 그대로 */
   const livePeerCallOverlay = !previewMode && !fromCallHistory;
   const peerStyleBroadcastOn = c?.showcaseStyle?.includeDigitalCard === true;
-  const dccEntitled = canUseV1PaidDccFeatures(c.membershipTier);
+  const dccEntitled = peerMayUsePaidCallFeatures(c.membershipTier);
   const showDigitalCard =
     isDcpCard ||
     (dccEntitled &&
@@ -580,11 +584,13 @@ export default function LetteringIncomingNotification({
     !isExpiredLine &&
     (isDcp ||
       (verified &&
-        isPaidLetteringTier(c.membershipTier) &&
+        peerMayUsePaidCallFeatures(c.membershipTier) &&
         (livePeerCallOverlay ? peerBroadcastOn : true)) ||
       (verified &&
         isGlassTent &&
-        (livePeerCallOverlay ? peerBroadcastOn : isPaidLetteringTier(c.membershipTier))));
+        (livePeerCallOverlay
+          ? peerBroadcastOn
+          : peerMayUsePaidCallFeatures(c.membershipTier))));
   const isFreeMember = !isExpiredLine && verified && !isPaidMember && !isDcp;
   const isLookupPending = String(c.profileKind || "") === "lookup_pending";
   const isUnverified =
@@ -1014,12 +1020,14 @@ export default function LetteringIncomingNotification({
     } catch {
       /* ignore */
     }
-    try {
-      nativeRestoreShowcaseOverlay();
-    } catch {
-      /* ignore */
+    if (expandedProp === undefined) {
+      try {
+        nativeRestoreShowcaseOverlay();
+      } catch {
+        /* ignore */
+      }
     }
-  }, [setExpanded, canRestoreFromMiniCase]);
+  }, [setExpanded, canRestoreFromMiniCase, expandedProp]);
 
   const openSamsungCallOptions = useCallback(() => {
     if (previewMode) {

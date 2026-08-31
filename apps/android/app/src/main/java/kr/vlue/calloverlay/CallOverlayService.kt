@@ -21,6 +21,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.view.animation.DecelerateInterpolator
 import kotlin.math.abs
 import android.webkit.WebSettings
@@ -153,6 +155,8 @@ class CallOverlayService : Service() {
     /** 피크 시 WebView 대신 동일한 좌/우 엣지 탭 */
     private var bigPushPeekTab: FrameLayout? = null
     private var bigPushPeekOnRight: Boolean = false
+    /** BIG_PUSH/Mini → FULLSCREEN 부드러운 전환 (웹 0.42s 와 동기) */
+    private var fullscreenExpandAnimator: ValueAnimator? = null
     /** DCP 정상/비정상 팝업 — BigPush 창과 분리(WRAP_CONTENT) */
     private var dcpPopupView: android.view.View? = null
     private var dcpPopupParams: WindowManager.LayoutParams? = null
@@ -778,6 +782,12 @@ class CallOverlayService : Service() {
 
         val params = if (asBigPush) {
             buildBigPushLayoutParams(companion.position)
+        } else if (
+            authPopupConfirmedToMini ||
+            userMinimized ||
+            companion.state == OverlayState.MINI_CASE
+        ) {
+            buildMiniCaseLayoutParams()
         } else {
             buildShowcaseLayoutParams()
         }
@@ -1053,6 +1063,11 @@ class CallOverlayService : Service() {
         userMinimized = false
         /* Answer 후 3초간 ContextWatch OTHER_APP→MINI 금지 — 전체 Showcase 유지 */
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 3000L
+        /* 웹 expand 먼저 — 네이티브 창 성장(420ms)과 CSS 슬롯 전환 동기 */
+        notifyWebExpandShowcase()
+        if (source.startsWith("bigPush_bar_tap")) {
+            notifyWebCallState("restore_showcase")
+        }
         if (rootContainer?.isAttachedToWindow == true) {
             enterShowcaseLayout(source = source)
         } else {
@@ -1071,12 +1086,6 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_APPLIED", source)
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_VISIBLE", source)
         notifyWebCallState("connected")
-        /* Mini Case 에서 수락해도 웹 expanded=true — 검정 FULLSCREEN + 미니 UI 불일치 방지 */
-        webView?.evaluateJavascript(
-            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&window.VlueLettering.setExpanded(true);" +
-                "window.dispatchEvent(new CustomEvent('vlue-native-expand-showcase',{detail:{expanded:true}}));}catch(e){}",
-            null
-        )
     }
 
     /**
@@ -1170,11 +1179,48 @@ class CallOverlayService : Service() {
         applyLayoutFromController(source = source)
     }
 
+    private fun cancelFullscreenExpandAnimator() {
+        fullscreenExpandAnimator?.cancel()
+        fullscreenExpandAnimator = null
+    }
+
+    private fun shouldForceInstantFullscreen(source: String): Boolean =
+        source.contains("reaffirm") ||
+            source.contains("reeval") ||
+            source.contains("onPageFinished")
+
+    private fun shouldAnimateToFullscreen(
+        params: WindowManager.LayoutParams,
+        view: android.view.View
+    ): Boolean {
+        val (sw, sh) = screenSizePx()
+        val currentH = when {
+            params.height == WindowManager.LayoutParams.MATCH_PARENT -> view.height
+            params.height > 0 -> params.height
+            else -> view.height
+        }
+        val currentW = when {
+            params.width == WindowManager.LayoutParams.MATCH_PARENT -> view.width
+            params.width > 0 -> params.width
+            else -> view.width
+        }
+        if (currentH <= 0 && currentW <= 0) return false
+        return currentH < sh - dp(32) || currentW < sw - dp(8)
+    }
+
+    private fun notifyWebExpandShowcase() {
+        webView?.evaluateJavascript(
+            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&window.VlueLettering.setExpanded(true);" +
+                "window.dispatchEvent(new CustomEvent('vlue-native-expand-showcase',{detail:{expanded:true}}));}catch(e){}",
+            null
+        )
+    }
+
     /**
      * FULLSCREEN commit — 기존 Window 유지, updateViewLayout만.
-     * 진입 애니(BigPush slide-in)는 취소하고 즉시 표시.
+     * BIG_PUSH/Mini → 풀 전환은 420ms 애니 (웹 expand 슬롯 과 동기).
      */
-    private fun commitFullscreenLayout(source: String) {
+    private fun commitFullscreenLayout(source: String, animate: Boolean? = null) {
         val apply = Runnable {
             val wm = windowManager
             val view = rootContainer
@@ -1187,55 +1233,141 @@ class CallOverlayService : Service() {
                 )
                 return@Runnable
             }
+            val doAnimate = when {
+                animate == false || shouldForceInstantFullscreen(source) -> false
+                animate == true -> true
+                else -> shouldAnimateToFullscreen(params, view)
+            }
+            if (!doAnimate) {
+                cancelFullscreenExpandAnimator()
+                commitFullscreenLayoutImmediate(source)
+                return@Runnable
+            }
+            cancelFullscreenExpandAnimator()
+            val (sw, sh) = screenSizePx()
+            val startH = (
+                if (params.height > 0) params.height else view.height
+                ).coerceAtLeast(dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP / 3))
+            val startW = (
+                if (params.width > 0) params.width else view.width
+                ).coerceAtLeast(1)
+            val startX = params.x
+            val startY = params.y
             view.animate().cancel()
             view.alpha = 1f
             view.translationY = 0f
             view.visibility = android.view.View.VISIBLE
             userMinimized = false
-                params.height = WindowManager.LayoutParams.MATCH_PARENT
-                params.width = WindowManager.LayoutParams.MATCH_PARENT
-            params.x = 0
-                params.y = 0
-                params.gravity = Gravity.TOP or Gravity.START
+            nativeBanner?.visibility = android.view.View.GONE
+            webView?.visibility = android.view.View.VISIBLE
             view.clipToOutline = false
             view.outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
             applyCapsuleClip(view, enabled = false)
             view.setBackgroundColor(Color.parseColor("#0B101B"))
             webView?.setBackgroundColor(Color.TRANSPARENT)
             applyPassThroughTouchFlags(params)
-            /* Showcase 터치 필요 — NOT_FOCUSABLE 유지하되 창은 full; HOME 시 MINI 로 축소 */
-                params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-            nativeBanner?.visibility = android.view.View.GONE
-            try {
-                CompanionPerfTracker.measureUpdateViewLayout {
-                    wm.updateViewLayout(view, params)
+            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+            params.gravity = Gravity.TOP or Gravity.START
+            VlueBigPushTrace.lifecycle(
+                "SHOWCASE_EXPAND_ANIM_BEGIN",
+                "source=$source from=${startW}x${startH}@($startX,$startY) → ${sw}x$sh"
+            )
+            fullscreenExpandAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = SHOWCASE_EXPAND_DURATION_MS
+                interpolator = DecelerateInterpolator(1.8f)
+                addUpdateListener { anim ->
+                    val t = anim.animatedValue as Float
+                    params.height = (startH + (sh - startH) * t).toInt()
+                    params.y = (startY * (1f - t)).toInt()
+                    if (startW < sw - dp(4)) {
+                        params.width = (startW + (sw - startW) * t).toInt()
+                        params.x = (startX * (1f - t)).toInt()
+                    } else {
+                        params.width = WindowManager.LayoutParams.MATCH_PARENT
+                        params.x = 0
+                    }
+                    try {
+                        wm.updateViewLayout(view, params)
+                    } catch (_: Exception) {
+                        /* frame drop — onAnimationEnd 에서 즉시 커밋 */
+                    }
                 }
-                OverlayDiagTracker.markShowcaseFullscreenCommit()
-                OverlayDiagTracker.markLayoutApplied("FULLSCREEN", OverlayPosition.FULLSCREEN.name)
-                VlueBigPushTrace.milestone(
-                    "OVERLAY_ATTACHED",
-                    "Overlay Attached",
-                    seq = 8,
-                    detail = "Showcase FULLSCREEN commit ($source) pos=${companion.position.name}"
-                )
-            } catch (e: Exception) {
-                val reason = OemDeviceProbe.classifyFailure(
-                    e,
-                    canDrawOverlays = LetteringPermissionHelper.canDrawOverlays(this@CallOverlayService)
-                )
-                OverlayDiagTracker.markLayoutFailed(reason, OverlayPosition.FULLSCREEN.name, e)
-                VlueBigPushTrace.lifecycle(
-                    "SHOWCASE_LAYOUT_FAIL",
-                    "${e.javaClass.simpleName}: ${e.message} ($source)"
-                )
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: android.animation.Animator) {
+                        fullscreenExpandAnimator = null
+                        commitFullscreenLayoutImmediate(source)
+                    }
+
+                    override fun onAnimationCancel(animation: android.animation.Animator) {
+                        fullscreenExpandAnimator = null
+                        commitFullscreenLayoutImmediate(source)
+                    }
+                })
+                start()
             }
-            publishCompanion(OverlayTriggerEvent.INTERNAL)
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
             apply.run()
-            } else {
+        } else {
             mainHandler.post(apply)
         }
+    }
+
+    private fun commitFullscreenLayoutImmediate(source: String) {
+        val wm = windowManager
+        val view = rootContainer
+        val params = layoutParams
+        if (wm == null || view == null || params == null) {
+            OverlayDiagTracker.markLayoutFailed(
+                OverlayFailureReason.UNKNOWN,
+                OverlayPosition.FULLSCREEN.name,
+                null
+            )
+            return
+        }
+        view.animate().cancel()
+        view.alpha = 1f
+        view.translationY = 0f
+        view.visibility = android.view.View.VISIBLE
+        userMinimized = false
+        params.height = WindowManager.LayoutParams.MATCH_PARENT
+        params.width = WindowManager.LayoutParams.MATCH_PARENT
+        params.x = 0
+        params.y = 0
+        params.gravity = Gravity.TOP or Gravity.START
+        view.clipToOutline = false
+        view.outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+        applyCapsuleClip(view, enabled = false)
+        view.setBackgroundColor(Color.parseColor("#0B101B"))
+        webView?.setBackgroundColor(Color.TRANSPARENT)
+        applyPassThroughTouchFlags(params)
+        /* Showcase 터치 필요 — NOT_FOCUSABLE 유지하되 창은 full; HOME 시 MINI 로 축소 */
+        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+        nativeBanner?.visibility = android.view.View.GONE
+        try {
+            CompanionPerfTracker.measureUpdateViewLayout {
+                wm.updateViewLayout(view, params)
+            }
+            OverlayDiagTracker.markShowcaseFullscreenCommit()
+            OverlayDiagTracker.markLayoutApplied("FULLSCREEN", OverlayPosition.FULLSCREEN.name)
+            VlueBigPushTrace.milestone(
+                "OVERLAY_ATTACHED",
+                "Overlay Attached",
+                seq = 8,
+                detail = "Showcase FULLSCREEN commit ($source) pos=${companion.position.name}"
+            )
+        } catch (e: Exception) {
+            val reason = OemDeviceProbe.classifyFailure(
+                e,
+                canDrawOverlays = LetteringPermissionHelper.canDrawOverlays(this@CallOverlayService)
+            )
+            OverlayDiagTracker.markLayoutFailed(reason, OverlayPosition.FULLSCREEN.name, e)
+            VlueBigPushTrace.lifecycle(
+                "SHOWCASE_LAYOUT_FAIL",
+                "${e.javaClass.simpleName}: ${e.message} ($source)"
+            )
+        }
+        publishCompanion(OverlayTriggerEvent.INTERNAL)
     }
 
     /** 링잉 BigPush ▾ 펼침 — 삭제됨. 바 탭 → Showcase */
@@ -1289,12 +1421,12 @@ class CallOverlayService : Service() {
             return
         }
         remoteConnected = true
-        /* 팝업-only: Mini/BigPush 크롬 없이 중앙 팝업만 — ContextWatch BigPush 접기 금지 */
+        /* 인증-only: SHOWCASE(풀스크린) 전이 금지 — 네이티브 중앙 팝업만 */
         authPopupOnlyMode = true
-        if (companion.state != OverlayState.SHOWCASE) {
+        if (!authMember && companion.state != OverlayState.SHOWCASE) {
             companion.onAnswer(OverlayContext.IN_CALL)
         }
-        publishCompanion(OverlayTriggerEvent.ANSWER)
+        publishCompanion(if (authMember) OverlayTriggerEvent.INCOMING else OverlayTriggerEvent.ANSWER)
         /* 확인 전까지 OTHER_APP→하단바 collapse 금지 */
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
         LetteringIncomingNotifier.cancel(this)
@@ -1352,12 +1484,7 @@ class CallOverlayService : Service() {
         authPopupOnlyMode = false
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
         removeDcpPopupWindow()
-        /* 레이스로 BIG_PUSH 가 됐다면 Mini 경로로 복구 */
-        if (companion.state == OverlayState.BIG_PUSH || companion.state == OverlayState.IDLE) {
-            companion.onAnswer(OverlayContext.IN_CALL)
-        } else if (companion.state != OverlayState.SHOWCASE && companion.state != OverlayState.MINI_CASE) {
-            companion.onAnswer(OverlayContext.IN_CALL)
-        }
+        /* auth-only: onAnswer(→SHOWCASE) 호출 금지 — BIG_PUSH/SHOWCASE 에서 바로 Mini */
         companion.onMinimize(
             if (keypadOpen) OverlayContext.KEYPAD else OverlayContext.MINIMIZED
         )
@@ -2375,6 +2502,9 @@ class CallOverlayService : Service() {
         nativeBanner?.visibility = android.view.View.GONE
         webView?.visibility = android.view.View.VISIBLE
         rootContainer?.setBackgroundColor(Color.parseColor("#0B101B"))
+        /* 웹 펼침을 먼저 — 네이티브 420ms 성장과 동기 */
+        notifyWebExpandShowcase()
+        notifyWebCallState("restore_showcase")
         if (rootContainer?.isAttachedToWindow == true) {
             enterShowcaseLayout(source = source)
         } else {
@@ -2388,28 +2518,11 @@ class CallOverlayService : Service() {
             enterShowcaseLayout(source = source)
         }
         syncOverlayChromeForState(source = source)
-        notifyWebCallState("restore_showcase")
-        webView?.evaluateJavascript(
-            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&window.VlueLettering.setExpanded(true);" +
-                "window.dispatchEvent(new CustomEvent('vlue-native-expand-showcase',{detail:{expanded:true}}));}catch(e){}",
-            null
-        )
         VlueBigPushTrace.lifecycle(
             "RESTORE_SHOWCASE",
             "source=$source from=$fromState → ${companion.state.name} " +
                 "pos=${companion.position.name} h=${layoutParams?.height}"
         )
-        mainHandler.postDelayed({
-            if (dismissing || companion.state != OverlayState.SHOWCASE) return@postDelayed
-            commitFullscreenLayout(source = "restore_reaffirm")
-        }, 120L)
-        mainHandler.postDelayed({
-            if (dismissing || companion.state != OverlayState.SHOWCASE) return@postDelayed
-            val h = layoutParams?.height ?: 0
-            if (h > 0 && h < dp(400)) {
-                commitFullscreenLayout(source = "restore_reaffirm_h")
-            }
-        }, 450L)
     }
 
     /**
@@ -2509,7 +2622,10 @@ class CallOverlayService : Service() {
         syncOverlayChromeForState(source = source)
         OverlayDiagTracker.beginLayout(pos.name, source = source)
         when (pos) {
-            OverlayPosition.FULLSCREEN -> commitFullscreenLayout(source = source)
+            OverlayPosition.FULLSCREEN -> commitFullscreenLayout(
+                source = source,
+                animate = if (shouldForceInstantFullscreen(source)) false else null
+            )
             OverlayPosition.MINI_CASE -> {
                 CompanionRuntimeStabilityDiag.mark("MINI_REQUEST", source)
                 commitMiniCaseLayout(source = source)
@@ -2529,6 +2645,7 @@ class CallOverlayService : Service() {
      */
     private fun commitHiddenLayout(source: String) {
         val apply = Runnable {
+            cancelFullscreenExpandAnimator()
             val view = rootContainer ?: run {
                 OverlayDiagTracker.markLayoutFailed(
                     OverlayFailureReason.UNKNOWN,
@@ -2554,6 +2671,7 @@ class CallOverlayService : Service() {
 
     private fun commitMiniCaseLayout(source: String) {
         val apply = Runnable {
+            cancelFullscreenExpandAnimator()
             val wm = windowManager
             val view = rootContainer
             val params = layoutParams
@@ -3104,6 +3222,7 @@ class CallOverlayService : Service() {
     fun dismissOverlay() {
         if (dismissing) return
         dismissing = true
+        cancelFullscreenExpandAnimator()
         cancelBigPushSettle()
         stopContextWatch()
         CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_CALL_END", "dismissOverlay")
@@ -3333,6 +3452,7 @@ class CallOverlayService : Service() {
              */
             if (!hold &&
                 !userMinimized &&
+                !authPopupConfirmedToMini &&
                 (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN)
             ) {
                 /* 다른 앱/홈/삼성 미니푸시 — 하단 쇼케이스 바 (MiniCase 아님) */
@@ -3471,6 +3591,38 @@ class CallOverlayService : Service() {
             width = WindowManager.LayoutParams.MATCH_PARENT
             gravity = Gravity.TOP or Gravity.START
         }
+
+    /** 인증 팝업 확인 후 MiniCase — 풀스크린 addView 금지 */
+    private fun buildMiniCaseLayoutParams(): WindowManager.LayoutParams {
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+        val (sw, _) = screenSizePx()
+        val w = (sw * 0.86f).toInt().coerceIn(dp(280), sw - dp(16))
+        val h = dp(140)
+        val x = ((sw - w) / 2).coerceAtLeast(dp(8))
+        val y = (statusBarHeightPx() + dp(48)).coerceAtLeast(dp(72))
+        return WindowManager.LayoutParams(
+            w,
+            h,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            this.x = x
+            this.y = y
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+    }
 
     /** @deprecated use buildBigPushLayoutParams — probe 호환 */
     private fun buildStandardOverlayLayoutParams(): WindowManager.LayoutParams =
@@ -3614,6 +3766,8 @@ class CallOverlayService : Service() {
         const val ACTION_NORMAL_OVERLAY_PROBE = "kr.vlue.calloverlay.NORMAL_OVERLAY_PROBE"
         private const val CHANNEL_ID = "vlue_lettering_overlay"
         private const val NOTIFICATION_ID = 41001
+        /** web --lettering-push-expand-duration: 0.42s */
+        private const val SHOWCASE_EXPAND_DURATION_MS = 420L
 
         @Volatile
         private var activeInstance: CallOverlayService? = null

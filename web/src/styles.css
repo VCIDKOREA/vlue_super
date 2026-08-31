@@ -4792,6 +4792,17 @@ body,
   min-height: 0;
   height: 100%;
   overflow: hidden;
+  will-change: opacity, transform;
+  transition:
+    opacity 0.38s var(--lettering-push-expand-ease),
+    transform var(--lettering-push-expand-duration) var(--lettering-push-expand-ease);
+  transform: translateY(8px);
+  opacity: 0.92;
+}
+
+.lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-expand-slot[data-open="true"] .lettering-ongoing-expand-slot__inner {
+  transform: translateY(0);
+  opacity: 1;
 }
 
 .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded .lettering-ongoing-expand-slot[data-open="true"] {

@@ -66,9 +66,7 @@ object OverlayCardOrgFill {
         }
         val tier = json.optString("membershipTier").trim()
         if (tier.isEmpty() &&
-            (json.optBoolean("is_premium_line", false) ||
-                json.optBoolean("digitalCardActive", false) ||
-                isPlatformCeo(json))
+            (json.optBoolean("is_premium_line", false) || isPlatformCeo(json))
         ) {
             json.put("membershipTier", "paid")
         }

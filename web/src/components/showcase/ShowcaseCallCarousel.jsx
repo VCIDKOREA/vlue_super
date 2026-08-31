@@ -7,6 +7,7 @@ import ShowcaseIdentityCorner from "./ShowcaseIdentityCorner.jsx";
 import ShowcaseBannerSocialLayer from "./ShowcaseBannerSocialLayer.jsx";
 import ShowcaseMediaPage from "./ShowcaseMediaPage.jsx";
 import InCallDtmfPad from "../call/InCallDtmfPad.jsx";
+import { isPaidLetteringTier, peerMayUsePaidCallFeatures } from "../../lib/letteringMembership.js";
 import {
   maxInstagramEmbedsForTier,
   maxShowcasePhotosPerPage,
@@ -162,7 +163,7 @@ export default function ShowcaseCallCarousel({
 
   const tier = normalizeUserTier(membershipTier || card?.membershipTier);
   const isDcp = card?.profileKind === "dcp" || Boolean(card?.dcp);
-  const isPaid = isDcp || tier === USER_TIERS.PAID;
+  const isPaid = isDcp || peerMayUsePaidCallFeatures(tier);
   const photosPerPage = maxShowcasePhotosPerPage();
   /* 무료는 includeDigitalCard prop 이 true 여도 DCC 슬라이드 금지 */
   const showDigitalCard = isDcp || (Boolean(includeDigitalCard) && isPaid);
