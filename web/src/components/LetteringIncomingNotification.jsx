@@ -562,6 +562,7 @@ export default function LetteringIncomingNotification({
     ? dccEntitled && Boolean(includeDigitalCard) && peerStyleBroadcastOn
     : dccEntitled && Boolean(includeDigitalCard) && peerStyleBroadcastOn;
   const isPaidMember =
+    !showcaseOffPreview &&
     !isExpiredLine &&
     (isDcp ||
       (verified &&
@@ -645,6 +646,10 @@ export default function LetteringIncomingNotification({
   const isExpandedView = expanded && canExpand && expandContent !== false;
   const showExpandedLayout = isExpandedView || keepExpandedLayout;
   const prevExpandedViewRef = useRef(isExpandedView);
+
+  useEffect(() => {
+    if (showcaseOffPreview) setHadFullShowcaseThisCall(false);
+  }, [showcaseOffPreview]);
 
   useEffect(() => {
     if (isExpandedView) setHadFullShowcaseThisCall(true);
@@ -1426,7 +1431,9 @@ export default function LetteringIncomingNotification({
         {canExpand && (isFreeMember || showcaseOffAuthExpand) ? (
           <div
             ref={expandSlotRef}
-            className="lettering-ongoing-expand-slot lettering-ongoing-expand-slot--emotional"
+            className={`lettering-ongoing-expand-slot lettering-ongoing-expand-slot--emotional${
+              showcaseOffPreview ? " lettering-ongoing-expand-slot--showcase-off" : ""
+            }`}
             data-open={isExpandedView ? "true" : "false"}
             aria-hidden={!isExpandedView}
           >
@@ -1434,12 +1441,22 @@ export default function LetteringIncomingNotification({
               <div className="lettering-ongoing-reception relative z-[2] flex min-h-0 flex-1 flex-col">
                 <div
                   className={`lettering-ongoing-scroll flex-1 min-h-0 ${
-                    useShowcaseCarousel
-                      ? "lettering-ongoing-scroll--carousel"
-                      : "lettering-ongoing-scroll--emotional"
+                    showcaseOffPreview
+                      ? "lettering-ongoing-scroll--emotional"
+                      : useShowcaseCarousel
+                        ? "lettering-ongoing-scroll--carousel"
+                        : "lettering-ongoing-scroll--emotional"
                   }`}
                 >
-                  {useShowcaseCarousel ? (
+                  {showcaseOffPreview ? (
+                    <FreeTierCallShowcase
+                      isKnownContact={false}
+                      card={c}
+                      phone={incoming}
+                      verified={verified}
+                      showcaseOffPreview
+                    />
+                  ) : useShowcaseCarousel ? (
                     <ShowcaseCallCarousel
                       card={c}
                       verified={verified}

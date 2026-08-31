@@ -127,12 +127,13 @@ export function syncDccBroadcastKeyFromStyle(style) {
   }
 }
 
+/** 프로필 「쇼케이스 켜짐/꺼짐」 — localStorage vcid 만 신뢰 (명함 발급≠송출 ON) */
 export function readVcidBroadcastOn() {
   try {
     const v = localStorage.getItem("vcid");
     if (v === "false") return false;
     if (v === "true") return true;
-    return readDigitalCardActive();
+    return false;
   } catch {
     return false;
   }

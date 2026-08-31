@@ -46,7 +46,7 @@ import {
   V1_PAID_PACKAGE_UPGRADE_EVENT
 } from "../lib/v1PaidPackageGate.js";
 import { formatClientMembershipPathLabel, readFamilyPlanBeneficiary } from "../lib/effectiveMembership.js";
-import { readDccBroadcastOn } from "../lib/bizcardAccountSync.js";
+import { readDccBroadcastOn, readVcidBroadcastOn } from "../lib/bizcardAccountSync.js";
 
 function tierLabelStyle(tier, isDarkMode, familyProtectionActive = false) {
   return membershipTierStyleClass(tier, isDarkMode, { familyProtectionActive });
@@ -237,16 +237,7 @@ function ProfilePanel({
     digitalCardIssued !== false;
 
   useEffect(() => {
-    let vcid = localStorage.getItem("vcid") === "true";
-    try {
-      /* DCC 송출 플래그와 vcid 토글 동기화 */
-      const raw = localStorage.getItem("vlue_dcc_broadcast_on");
-      if (raw === "0") vcid = false;
-      if (raw === "1") vcid = true;
-    } catch {
-      /* ignore */
-    }
-    setIsVCIDOn(vcid);
+    setIsVCIDOn(readVcidBroadcastOn());
     setDccBroadcastOn(readDccBroadcastOn());
     try {
       import("../lib/showcase/showcaseStyleStorage.js").then((m) => {
