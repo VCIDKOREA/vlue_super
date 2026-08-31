@@ -10,7 +10,8 @@ import { fileURLToPath } from "node:url";
 import handler from "serve-handler";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dist = join(__dirname, "..", "dist");
+const webRoot = join(__dirname, "..");
+const dist = process.env.VLUE_WEB_DIST?.trim() || join(webRoot, "dist");
 const downloadsRoot = normalize(join(dist, "downloads"));
 const port = Number(process.env.PORT || 8080);
 const installerName = "VLUE-Setup-1.0.0.exe";
@@ -76,6 +77,20 @@ const LEGAL_STATIC_PAGES = new Map([
   ["/privacy/legal-article-6", "data-deletion/index.html"],
   ["/privacy/legal-article-6/", "data-deletion/index.html"]
 ]);
+
+/** serve-handler rewrites — 정적 약관을 SPA 폴백보다 먼저 */
+const LEGAL_STATIC_REWRITES = [
+  { source: "/privacy", destination: "/privacy/index.html" },
+  { source: "/privacy/", destination: "/privacy/index.html" },
+  { source: "/terms", destination: "/terms/index.html" },
+  { source: "/terms/", destination: "/terms/index.html" },
+  { source: "/data-deletion", destination: "/data-deletion/index.html" },
+  { source: "/data-deletion/", destination: "/data-deletion/index.html" },
+  { source: "/refund", destination: "/refund/index.html" },
+  { source: "/refund/", destination: "/refund/index.html" },
+  { source: "/privacy/legal-article-6", destination: "/data-deletion/index.html" },
+  { source: "/privacy/legal-article-6/", destination: "/data-deletion/index.html" }
+];
 
 const VLUE_SHARE_ORIGIN = String(process.env.VLUE_SHARE_ORIGIN || "https://m.vlue.kr")
   .trim()
@@ -224,7 +239,7 @@ const server = createServer((request, response) => {
     cleanUrls: false,
     directoryListing: false,
     renderSingle: true,
-    rewrites: [{ source: "**", destination: "/index.html" }]
+    rewrites: [...LEGAL_STATIC_REWRITES, { source: "**", destination: "/index.html" }]
   });
 });
 
@@ -241,6 +256,11 @@ server.listen(port, "0.0.0.0", () => {
     /* ignore */
   }
   console.log(`[serve] http://0.0.0.0:${port}`);
+  console.log(`[serve] dist=${dist}`);
+  for (const [, rel] of LEGAL_STATIC_PAGES) {
+    const ok = existsSync(join(dist, rel));
+    console.log(`[serve] legal ${rel} ${ok ? "OK" : "MISSING"}`);
+  }
   console.log(
     `[serve] dist/downloads installer=${hasInstaller ? `ready ${size} bytes` : "MISSING"} files=[${dirListing}]`
   );
