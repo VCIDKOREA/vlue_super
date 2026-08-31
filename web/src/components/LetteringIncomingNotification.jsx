@@ -40,7 +40,7 @@ import CompanionMiniCase, { resetCompanionMiniCaseSessionPos } from "./call/Comp
 import CompanionSamsungCallCta from "./call/CompanionSamsungCallCta.jsx";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
-import { Phone, PhoneOff, Settings } from "lucide-react";
+import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../lib/letteringBizcardStorage.js";
@@ -1378,11 +1378,11 @@ export default function LetteringIncomingNotification({
           {verified && !showcaseOffPreview ? <LetteringProfileThumb card={c} verified={verified} size="sm" /> : null}
           {verified && showcaseOffPreview ? (
             <span
-              className="lettering-vlue-verified-badge lettering-vlue-verified-badge--metal inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+              className="lettering-auth-shield-mark"
               title="VLUE 인증"
               aria-label="VLUE 인증됨"
             >
-              <VlueCyanVerifiedSeal size={28} />
+              <ShieldCheck className="lettering-auth-shield-mark__icon" strokeWidth={2.2} aria-hidden />
             </span>
           ) : null}
           <div className="min-w-0 flex-1 overflow-hidden">
