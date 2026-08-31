@@ -1692,7 +1692,7 @@ export default function LetteringIncomingNotification({
         />
       ) : null}
       <VlueAuthMemberPopup
-        open={Boolean(authMemberPopupOpen && showcaseOffPreview)}
+        open={Boolean(authMemberPopupOpen && showcaseOffPreview && previewMode)}
         name={authPopupIdentity.name}
         phone={incoming}
         handle={authPopupIdentity.handle}

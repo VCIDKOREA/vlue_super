@@ -1063,13 +1063,23 @@ function LetteringOverlayHostInner() {
             autoExpandedOnceRef.current = false;
             userChoseMiniRef.current = true;
             setExpanded(false);
-            if (wasShowcaseBar && !parseOverlayParams().urlMiniCase) {
-              setAuthMemberPopupOpen(true);
-              try {
-                window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
-                window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
-              } catch {
-                /* ignore */
+            const miniBoot = parseOverlayParams().urlMiniCase;
+            if (wasShowcaseBar && !miniBoot) {
+              if (native) {
+                try {
+                  window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
+                  window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
+                } catch {
+                  /* ignore */
+                }
+              } else {
+                setAuthMemberPopupOpen(true);
+                try {
+                  window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
+                  window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
+                } catch {
+                  /* ignore */
+                }
               }
             }
           } else if (userChoseMiniRef.current) {
@@ -1162,8 +1172,7 @@ function LetteringOverlayHostInner() {
     return !peerHasDccOrShowcaseContent(styledCard, styledCard.showcaseStyle || showcaseStyle);
   }, [verified, styledCard, showcaseStyle, incoming]);
 
-  const openPeerAuthPopup = useCallback(() => {
-    setAuthMemberPopupOpen(true);
+  const notifyNativeAuthMemberReady = useCallback(() => {
     try {
       window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
       window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
@@ -1171,6 +1180,19 @@ function LetteringOverlayHostInner() {
       /* ignore */
     }
   }, [incoming]);
+
+  const openPeerAuthPopup = useCallback(() => {
+    /*
+     * 실통화 네이티브 오버레이: 중앙 팝업은 DcpAbnormalWarningView 전용.
+     * 웹 VlueAuthMemberPopup 은 156dp 빅푸시 WebView 에 깨져 보인다.
+     */
+    if (native) {
+      notifyNativeAuthMemberReady();
+      return;
+    }
+    setAuthMemberPopupOpen(true);
+    notifyNativeAuthMemberReady();
+  }, [incoming, native, notifyNativeAuthMemberReady]);
 
   /** 정상 팝업 「확인」→ 네이티브 MiniCase (웹만 닫으면 깨진 바/빅푸시 잔존) */
   const confirmPeerAuthPopup = useCallback(() => {
@@ -1231,19 +1253,19 @@ function LetteringOverlayHostInner() {
     autoExpandedOnceRef.current = true;
     forceShowcaseBarRef.current = false;
     setForceShowcaseBar(false);
+    const miniBoot = urlMiniCase || parseOverlayParams().urlMiniCase;
     if (peerAuthPopupOnly) {
-      /* 수화 후만 — 네이티브가 별도 중앙 팝업(경로 검증 · 정상 스타일)을 띄움.
-         MiniCase(mini=1) 부팅은 팝업 대신 CompanionMiniCase 유지. */
+      /* 수화 후 — 네이티브 중앙 팝업 또는 MiniCase(mini=1). 웹 팝업은 네이티브 창에서 깨짐 */
       setExpanded(false);
-      setAuthMemberPopupOpen(true);
-      if (!urlMiniCase && !parseOverlayParams().urlMiniCase) {
-        try {
-          window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
-          window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
-        } catch {
-          /* ignore */
-        }
+      if (miniBoot || userChoseMiniRef.current) {
+        return;
       }
+      if (native) {
+        notifyNativeAuthMemberReady();
+        return;
+      }
+      setAuthMemberPopupOpen(true);
+      notifyNativeAuthMemberReady();
       return;
     }
     /* 송출 OFF·미확정(includeDigitalCard!==true) — 풀 펼침·DCC 슬라이드 금지 */
@@ -1253,7 +1275,7 @@ function LetteringOverlayHostInner() {
       return;
     }
     setExpanded(true);
-  }, [callState, identityReady, peerAuthPopupOnly, incoming, styledCard, showcaseStyle, urlMiniCase]);
+  }, [callState, identityReady, peerAuthPopupOnly, incoming, styledCard, showcaseStyle, urlMiniCase, native, notifyNativeAuthMemberReady]);
 
   /* 수신 중(빅푸시)에는 인증 팝업을 열지 않음 — 카드 조회 완료(~수 초) 후에도 유지 */
 
@@ -1429,7 +1451,7 @@ function LetteringOverlayHostInner() {
   const miniCollapsed = onCall && !expanded;
   const peerLiveStyle = styledCard?.showcaseStyle || showcaseStyle;
   const peerBroadcastOn = peerShowcaseBroadcastOn(peerLiveStyle);
-  const authPopupOnlyUi = Boolean(peerAuthPopupOnly && authMemberPopupOpen);
+  const authPopupOnlyUi = Boolean(peerAuthPopupOnly && authMemberPopupOpen && !native);
   const peerIncludeDccSlide = Boolean(
     verified &&
       peerBroadcastOn &&
@@ -1542,7 +1564,7 @@ function LetteringOverlayHostInner() {
 
       <LetteringCertModal open={certOpen} payload={certPayload} onClose={() => setCertOpen(false)} />
       <VlueAuthMemberPopup
-        open={Boolean(authMemberPopupOpen && peerAuthPopupOnly)}
+        open={Boolean(authMemberPopupOpen && peerAuthPopupOnly && !native)}
         name={styledCard?.name || styledCard?.displayName || ""}
         phone={incoming}
         handle={styledCard?.publicHandle || ""}

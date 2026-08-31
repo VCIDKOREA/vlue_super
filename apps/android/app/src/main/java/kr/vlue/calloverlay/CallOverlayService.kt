@@ -1504,6 +1504,18 @@ class CallOverlayService : Service() {
                 cardJson = pendingCardJson,
                 asBigPush = false
             )
+        } else {
+            /* 빅푸시 WebView 재사용 — mini=1 문서로 교체해 CompanionMiniCase 부팅 */
+            webView?.let { wv ->
+                loadOverlayDocument(
+                    wv,
+                    phone = currentPhone.ifBlank { "unknown" },
+                    verified = pendingVerified || parseIsVerified(pendingCardJson),
+                    outgoing = currentOutgoing,
+                    cardJson = pendingCardJson,
+                    forceNewDocument = true
+                )
+            }
         }
         applyLayoutFromController(source = "authPopup_confirm")
         /*
@@ -1512,7 +1524,6 @@ class CallOverlayService : Service() {
          * 새 WebView 는 onPageFinished 에서도 재주입 (리스너 레이스 대비).
          */
         notifyWebCallState("minimize_showcase")
-        notifyWebCallState("connected")
         webView?.evaluateJavascript(
             "try{window.VlueLettering&&window.VlueLettering.setExpanded&&" +
                 "window.VlueLettering.setExpanded(false);}catch(e){}",
@@ -1521,7 +1532,6 @@ class CallOverlayService : Service() {
         webView?.postDelayed({
             if (dismissing || companion.state != OverlayState.MINI_CASE) return@postDelayed
             notifyWebCallState("minimize_showcase")
-            notifyWebCallState("connected")
         }, 350L)
         VlueBigPushTrace.lifecycle(
             "AUTH_POPUP_TO_MINI",
