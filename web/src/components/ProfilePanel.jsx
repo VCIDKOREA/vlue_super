@@ -145,6 +145,7 @@ function ProfilePanel({
     const b = readFamilyPlanBeneficiary();
     return b?.active && b.pathLabel ? b.pathLabel : "";
   });
+  const [isVCIDOn, setIsVCIDOn] = useState(false);
   const [dccBroadcastOn, setDccBroadcastOn] = useState(() => readDccBroadcastOn());
   const [showBroadcastName, setShowBroadcastName] = useState(true);
   const [settingNotice, setSettingNotice] = useState("");
