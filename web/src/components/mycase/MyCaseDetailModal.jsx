@@ -128,6 +128,8 @@ export default function MyCaseDetailModal({
         const res = await fetchMycaseDetail(id);
         if (res.ok) {
           setDetailCache((prev) => ({ ...prev, [id]: res }));
+        } else {
+          onToast?.(res.message || "게시물을 불러오지 못했습니다.");
         }
       } finally {
         fetchingRef.current.delete(id);
@@ -138,7 +140,7 @@ export default function MyCaseDetailModal({
         });
       }
     },
-    [isOwner]
+    [isOwner, onToast]
   );
 
   useEffect(() => {
@@ -361,6 +363,7 @@ export default function MyCaseDetailModal({
       hideHeader
       showFloatingClose={false}
       coverBottomNav
+      elevateAbovePeerArchive
       isDarkMode
       className={`my-case-detail my-case-detail--feed my-case-detail--post-viewer ${themeClass}`}
     >

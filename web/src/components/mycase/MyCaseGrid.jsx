@@ -7,7 +7,6 @@ import { ChevronLeft, Grid3X3, Layers, MoreHorizontal, Pin, Search } from "lucid
 import {
   archiveShowcaseToMycase,
   deleteMycase,
-  fetchMycaseDetail,
   fetchMyMycaseList,
   fetchUserMycase,
   formatCooldownHint,
@@ -54,6 +53,7 @@ import {
 } from "../../lib/mycase/mycasePostPayload.js";
 import { MYCASE_FEED_MUTATED } from "../../lib/mycase/mycaseFeedEvents.js";
 import MyCaseCategorySheet from "./MyCaseCategorySheet.jsx";
+import MyCaseIntroEditor from "./MyCaseIntroEditor.jsx";
 import "./my-case-category-sheet.css";
 import {
   DCC_LINE_CHANGED_EVENT,
@@ -282,36 +282,8 @@ export default function MyCaseGrid({
         setRemoteProfile(data.profile || null);
         setAccessDenied(Boolean(data.accessDenied));
         setDenyReason(data.reason || null);
-        let mains = data.mainBroadcast || [];
-        let list = data.items || [];
-        let liveStyle = null;
-        const styleRes = await fetchPeerShowcaseStyleBundle(ownerUserId);
-        if (styleRes.ok && styleRes.live && typeof styleRes.live === "object") {
-          liveStyle = styleRes.live;
-        }
-        setPeerLiveStyle(liveStyle);
-        /* 아카이브가 비어도 라이브 송출 스타일이 있으면 본인 마이케이스와 같이 보이게 */
-        if (!data.accessDenied && mains.length === 0 && list.length === 0 && liveStyle) {
-          const cover = extractShowcaseCoverUrl(liveStyle);
-          const title = extractShowcaseArchiveTitle(liveStyle);
-          const synthetic = {
-            id: `live-style-${ownerUserId}`,
-            ownerUserId,
-            title: title || "쇼케이스",
-            thumbnailUrl: cover || "",
-            payloadJson: { style: liveStyle },
-            isPublic: true,
-            isMainBroadcast: true,
-            isLiveStyle: true,
-            slotIndex: 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-          mains = [synthetic];
-          list = [synthetic];
-        }
-        setMainBroadcast(mains);
-        setItems(list);
+        setMainBroadcast(data.mainBroadcast || []);
+        setItems(data.items || []);
         setNextCursor(data.nextCursor || null);
         const counts = data.profile?.follow?.counts;
         if (counts) setFollowCounts(counts);
@@ -319,6 +291,36 @@ export default function MyCaseGrid({
           const c = await fetchFollowCounts(ownerUserId);
           if (c.ok && c.counts) setFollowCounts(c.counts);
         }
+        initialLoadDoneRef.current = true;
+
+        /* 라이브 스타일은 목록 표시를 막지 않고 백그라운드에서 합성 */
+        void fetchPeerShowcaseStyleBundle(ownerUserId).then((styleRes) => {
+          if (!styleRes.ok) return;
+          const liveStyle =
+            styleRes.live && typeof styleRes.live === "object" ? styleRes.live : null;
+          if (liveStyle) setPeerLiveStyle(liveStyle);
+          if (data.accessDenied || !liveStyle) return;
+          setItems((prev) => {
+            if (prev.length > 0) return prev;
+            const cover = extractShowcaseCoverUrl(liveStyle);
+            const title = extractShowcaseArchiveTitle(liveStyle);
+            const synthetic = {
+              id: `live-style-${ownerUserId}`,
+              ownerUserId,
+              title: title || "쇼케이스",
+              thumbnailUrl: cover || "",
+              payloadJson: { style: liveStyle },
+              isPublic: true,
+              isMainBroadcast: true,
+              isLiveStyle: true,
+              slotIndex: 0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            setMainBroadcast([synthetic]);
+            return [synthetic];
+          });
+        });
       }
       initialLoadDoneRef.current = true;
     } finally {
@@ -520,7 +522,7 @@ export default function MyCaseGrid({
     return () => io.disconnect();
   }, [loadMore, nextCursor]);
 
-  const openItem = async (item) => {
+  const openItem = (item) => {
     if (manageMode && isMine) return;
     if (!onOpenDetail) return;
     const caseId = String(item?.id || "").trim();
@@ -528,38 +530,11 @@ export default function MyCaseGrid({
       toast("게시물 정보가 올바르지 않습니다.");
       return;
     }
-    /* 라이브 스타일 합성 항목 — API detail 없이 바로 열기 */
-    if (item?.isLiveStyle || caseId.startsWith("live-style-")) {
-      const peerMeta = {
-        userId: String(ownerUserId || item.ownerUserId || "").trim(),
-        name: displayName,
-        handle: displayHandle,
-        phone: String(remoteProfile?.profile?.phoneE164 || "").trim(),
-        organization: String(
-          remoteProfile?.profile?.companyName || remoteProfile?.cardExport?.organization || ""
-        ).trim(),
-        photoUrl: avatarUrl,
-        logoUrl: String(remoteProfile?.cardExport?.logoUrl || "").trim(),
-        membershipTier: String(
-          remoteProfile?.membershipTier || remoteProfile?.profile?.membershipTier || "premium"
-        ),
-        digitalCardIssued: Boolean(remoteProfile?.digitalCardIssued),
-        feedItems: filteredItems,
-        startIndex: Math.max(
-          0,
-          filteredItems.findIndex((x) => x.id === item.id)
-        )
-      };
-      onOpenDetail(item, { item, ok: true, isOwner: false }, peerMeta);
-      return;
-    }
-    const detail = await fetchMycaseDetail(caseId);
-    if (!detail.ok) {
-      toast(detail.message || "마이케이스를 열 수 없습니다.");
-      if (detail.error === "not_found") void loadFirst();
-      return;
-    }
-    onOpenDetail(item, detail, {
+    const startIndex = Math.max(
+      0,
+      filteredItems.findIndex((x) => String(x.id) === caseId)
+    );
+    const peerMeta = {
       userId: storyOwnerId,
       name: displayName,
       handle: displayHandle,
@@ -574,11 +549,15 @@ export default function MyCaseGrid({
       ),
       digitalCardIssued: Boolean(remoteProfile?.digitalCardIssued),
       feedItems: filteredItems,
-      startIndex: Math.max(
-        0,
-        filteredItems.findIndex((x) => String(x.id) === caseId)
-      )
-    });
+      startIndex
+    };
+    /* 라이브 스타일 합성 항목 — API detail 없이 바로 열기 */
+    if (item?.isLiveStyle || caseId.startsWith("live-style-")) {
+      onOpenDetail(item, { item, ok: true, isOwner: false }, peerMeta);
+      return;
+    }
+    /* 상세는 MyCaseDetailModal.ensureDetail 에서 로드 — 탭 즉시 반응 */
+    onOpenDetail(item, null, peerMeta);
   };
 
   const openLiveBroadcastStory = async () => {
@@ -919,8 +898,8 @@ export default function MyCaseGrid({
                 </div>
               ) : null}
             </div>
-            {isMine && statusMessage ? (
-              <p className="ig-mycase__status">{statusMessage}</p>
+            {isMine ? (
+              <MyCaseIntroEditor value={statusMessage} onSaved={setStatusMessage} />
             ) : null}
             {isMine && showLineSwitcher ? (
               <div className="ig-mycase__line-block">

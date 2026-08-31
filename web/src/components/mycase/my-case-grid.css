@@ -489,7 +489,68 @@
   line-height: 1.4;
   font-weight: 400;
   color: var(--ig-text);
-  word-break: keep-all;
+  word-break: break-word;
+}
+
+.ig-mycase__status--linked a {
+  color: #0095f6;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.ig-mycase__status--linked a:hover {
+  text-decoration: underline;
+}
+
+.ig-mycase__intro {
+  margin: 6px 0 0;
+}
+
+.ig-mycase__intro-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--ig-border, #dbdbdb);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-family: inherit;
+  color: var(--ig-text);
+  background: var(--ig-surface, #fff);
+  resize: vertical;
+  min-height: 52px;
+}
+
+.ig-mycase__intro-input:focus {
+  outline: none;
+  border-color: #0095f6;
+}
+
+.ig-mycase__intro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.ig-mycase__intro-btn {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ig-muted, #737373);
+  cursor: pointer;
+}
+
+.ig-mycase__intro-btn--primary {
+  color: #0095f6;
+}
+
+.ig-mycase__intro-btn--danger {
+  color: #ed4956;
 }
 
 .ig-mycase__bio-text {
@@ -582,9 +643,12 @@
 }
 
 .ig-mycase__follow-slot .follow-action-btn--active,
-.ig-mycase__follow-slot .follow-action-btn--mutual {
+.ig-mycase__follow-slot .follow-action-btn--mutual,
+.ig-mycase__follow-btn.follow-action-btn--active,
+.ig-mycase__follow-btn.follow-action-btn--mutual {
   background: #efefef !important;
   color: #262626 !important;
+  border: 1px solid #dbdbdb !important;
 }
 
 .ig-mycase__highlights {

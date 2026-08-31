@@ -18,6 +18,8 @@ export default function AppFullScreenView({
   coverBottomNav = false,
   /** coverBottomNav보다 위에 올려 쇼케이스 포털 위에 표시 */
   elevateAboveShowcase = false,
+  /** peer 케이스함(z-320) 위에 게시물 상세 등을 표시 */
+  elevateAbovePeerArchive = false,
   /** reserveBottomNav일 때 CSS 변수 대신 쓸 실측 px (네비 높이) */
   bottomInsetPx = null,
   /** true면 타이틀 헤더 숨김 */
@@ -37,7 +39,13 @@ export default function AppFullScreenView({
 
   if (!open) return null;
 
-  const zClass = elevateAboveShowcase ? "z-[320]" : coverBottomNav ? "z-[220]" : "z-[140]";
+  const zClass = elevateAbovePeerArchive
+    ? "z-[340]"
+    : elevateAboveShowcase
+      ? "z-[320]"
+      : coverBottomNav
+        ? "z-[220]"
+        : "z-[140]";
   const closeBtnClass = `inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
     isDarkMode
       ? "bg-black/55 text-gray-100 ring-1 ring-white/20 backdrop-blur-md"
