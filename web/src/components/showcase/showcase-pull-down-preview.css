@@ -284,3 +284,11 @@
 .showcase-side-preview.is-open .showcase-side-preview__tab {
   z-index: 190;
 }
+
+.showcase-side-preview--auth-only .showcase-side-preview__scrim--auth-only {
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.showcase-side-preview--auth-only .vlue-auth-member-popup-root {
+  z-index: 200;
+}

@@ -91,7 +91,9 @@ export default function ShowcasePullDownPreview({
 
   return createPortal(
     <div
-      className={`showcase-side-preview${open ? " is-open" : ""}${entered ? " is-entered" : ""}`}
+      className={`showcase-side-preview${open ? " is-open" : ""}${entered ? " is-entered" : ""}${
+        showcaseOffPreview && open ? " showcase-side-preview--auth-only" : ""
+      }`}
       data-showcase-side-preview="1"
     >
       <button
@@ -108,7 +110,28 @@ export default function ShowcasePullDownPreview({
         </span>
       </button>
 
-      {open ? (
+      {open && showcaseOffPreview ? (
+        <>
+          <button
+            type="button"
+            className="showcase-side-preview__scrim showcase-side-preview__scrim--auth-only"
+            aria-label="미리보기 닫기"
+            onClick={close}
+          />
+          <VlueAuthMemberPopup
+            open={Boolean(authPopupOpen)}
+            name={authPopupName}
+            phone={previewCard?.phone || ""}
+            handle={authPopupHandle}
+            onClose={() => {
+              setAuthPopupOpen(false);
+              close();
+            }}
+          />
+        </>
+      ) : null}
+
+      {open && !showcaseOffPreview ? (
         <>
           <button
             type="button"
@@ -121,12 +144,10 @@ export default function ShowcasePullDownPreview({
             className="showcase-side-preview__panel"
             role="dialog"
             aria-modal="true"
-            aria-label={showcaseOffPreview ? "VLUE 인증 미리보기" : "쇼케이스 미리보기"}
+            aria-label="쇼케이스 미리보기"
           >
             <header className="showcase-side-preview__bar">
-              <p className="showcase-side-preview__bar-title">
-                {showcaseOffPreview ? "VLUE 인증 미리보기" : "미리보기"}
-              </p>
+              <p className="showcase-side-preview__bar-title">미리보기</p>
               <button type="button" className="showcase-side-preview__close" onClick={close}>
                 닫기
               </button>
@@ -137,40 +158,28 @@ export default function ShowcasePullDownPreview({
                   verified
                   previewMode
                   showOwnerSettings={false}
-                  showcaseOffPreview={showcaseOffPreview}
+                  showcaseOffPreview={false}
                   suppressExpandGuide
-                  onAuthPopupRequest={() => setAuthPopupOpen(true)}
                   callPhase="connected"
                   platform="android"
-                  isRecording={!showcaseOffPreview}
+                  isRecording
                   callDurationSec={0}
                   recordingDurationSec={0}
                   incomingNumber={previewCard?.phone || ""}
                   card={previewCard}
                   includeDigitalCard={previewIncludeDigitalCard}
                   isKnownContact
-                  expanded={false}
+                  expanded
                   onExpandedChange={(isOpen) => {
                     if (!isOpen) close();
                   }}
                   onEndCall={close}
                   onToast={onToast}
-                  className={
-                    showcaseOffPreview
-                      ? "lettering-ongoing--on-call lettering-ongoing--home-glass lettering-ongoing--collapsed"
-                      : "lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass"
-                  }
+                  className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass"
                 />
               </div>
             </div>
           </aside>
-          <VlueAuthMemberPopup
-            open={Boolean(open && showcaseOffPreview && authPopupOpen)}
-            name={authPopupName}
-            phone={previewCard?.phone || ""}
-            handle={authPopupHandle}
-            onClose={() => setAuthPopupOpen(false)}
-          />
         </>
       ) : null}
     </div>,

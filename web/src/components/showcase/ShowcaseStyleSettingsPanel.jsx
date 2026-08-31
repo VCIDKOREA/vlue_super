@@ -39,7 +39,11 @@ import {
   startKakaoLink
 } from "../../lib/kakaoLinkApi.js";
 import { normalizeKakaoProfilePageUrl } from "../../lib/showcase/showcaseSocialOutlinks.js";
-import { readDigitalCardActive, readDccBroadcastOn } from "../../lib/bizcardAccountSync.js";
+import {
+  readDigitalCardActive,
+  readDccBroadcastOn,
+  readVcidBroadcastOn
+} from "../../lib/bizcardAccountSync.js";
 import { useDccFeatureAccess } from "../../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../../lib/dccAccessPolicy.js";
 import { canUseV1PaidDccFeatures, requestV1PaidPackageGate } from "../../lib/v1PaidPackageGate.js";
@@ -242,9 +246,14 @@ export default function ShowcaseStyleSettingsPanel({
   const isPaid = isPaidLetteringTier(effectiveTier);
   const { access: dccAccess } = useDccFeatureAccess();
   const dccBlocked = isDccSettingsDisabled(dccAccess);
-  const includeDigitalCard =
+  /** 유료 DCC 슬라이드·명함 페이지 — 무료는 false */
+  const dccCarouselEnabled =
     !dccBlocked && isPaid && readDigitalCardActive() && readDccBroadcastOn();
-  const maxContentPages = maxShowcaseContentPagesForTier(effectiveTier, { includeDigitalCard });
+  /** 송출 ON/OFF — 프로필 「쇼케이스 켜짐/꺼짐」(vcid). 서버 live.includeDigitalCard 와 동일 */
+  const showcaseBroadcastOn = readVcidBroadcastOn();
+  const maxContentPages = maxShowcaseContentPagesForTier(effectiveTier, {
+    includeDigitalCard: dccCarouselEnabled
+  });
   const [config, setConfig] = useState(() => readShowcaseStyle());
   const [appliedFp, setAppliedFp] = useState(() => styleFingerprint(readShowcaseStyle()));
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -379,7 +388,7 @@ export default function ShowcaseStyleSettingsPanel({
           items,
           maxContentPages,
           effectiveTier,
-          { includeDigitalCard }
+          { includeDigitalCard: dccCarouselEnabled }
         );
         pendingPickApplyRef.current = false;
         const firstPick = [...items]
@@ -416,14 +425,14 @@ export default function ShowcaseStyleSettingsPanel({
     return () => {
       cancelled = true;
     };
-  }, [isWebDesk, maxContentPages, effectiveTier, includeDigitalCard, notify]);
+  }, [isWebDesk, maxContentPages, effectiveTier, dccCarouselEnabled, notify]);
 
   /* 명함 사진·신원 변경 시 미리보기 즉시 반영 */
   useEffect(() => {
     const bump = () => {
       setIdentityTick((n) => n + 1);
       setConfig((prev) => {
-        const on = readDccBroadcastOn();
+        const on = readVcidBroadcastOn();
         if (prev.includeDigitalCard === on) return prev;
         return { ...prev, includeDigitalCard: on };
       });
@@ -432,11 +441,13 @@ export default function ShowcaseStyleSettingsPanel({
     window.addEventListener("vlue-digital-card-changed", bump);
     window.addEventListener("vlue-avatar-changed", bump);
     window.addEventListener("vlue-dcc-line-changed", bump);
+    window.addEventListener("vlue-vcid-changed", bump);
     return () => {
       window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, bump);
       window.removeEventListener("vlue-digital-card-changed", bump);
       window.removeEventListener("vlue-avatar-changed", bump);
       window.removeEventListener("vlue-dcc-line-changed", bump);
+      window.removeEventListener("vlue-vcid-changed", bump);
     };
   }, []);
 
@@ -445,9 +456,9 @@ export default function ShowcaseStyleSettingsPanel({
     /* 설정 미리보기는 편집 초안(config)만 사용 — 라이브/마이케이스와 섞지 않음 */
     return applyShowcaseStyleToCard(base, effectiveTier, {
       style: config,
-      digitalCardActive: includeDigitalCard
+      digitalCardActive: dccCarouselEnabled
     });
-  }, [effectiveTier, config, includeDigitalCard, identityTick]);
+  }, [effectiveTier, config, dccCarouselEnabled, identityTick]);
 
   const persist = useCallback((patch) => {
     setConfig((prev) => {
@@ -473,11 +484,11 @@ export default function ShowcaseStyleSettingsPanel({
       if (patch.gallery) next.gallery = { ...prev.gallery, ...patch.gallery };
       if (patch.tags) next.tags = patch.tags;
       if (Array.isArray(patch.pages)) next.pages = patch.pages.map(normalizeShowcasePage);
-      next = clampShowcasePages(next, effectiveTier, { includeDigitalCard });
+      next = clampShowcasePages(next, effectiveTier, { includeDigitalCard: dccCarouselEnabled });
       /* 편집 중: React 초안만 — 로컬/서버 저장·PUT 없음 (적용하기에서만) */
       return next;
     });
-  }, [effectiveTier, includeDigitalCard]);
+  }, [effectiveTier, dccCarouselEnabled]);
 
   const persistPages = useCallback(
     (nextPages) => {
@@ -499,7 +510,7 @@ export default function ShowcaseStyleSettingsPanel({
           rows,
           maxContentPages,
           effectiveTier,
-          { includeDigitalCard }
+          { includeDigitalCard: dccCarouselEnabled }
         );
         const first = [...rows].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))[0];
         if (first?.order) {
@@ -514,7 +525,7 @@ export default function ShowcaseStyleSettingsPanel({
 
       notify("케이스함에서 선택한 사진이 쇼케이스 페이지에 반영되었습니다.");
     },
-    [maxContentPages, effectiveTier, includeDigitalCard, notify]
+    [maxContentPages, effectiveTier, dccCarouselEnabled, notify]
   );
 
   useEffect(() => {
@@ -822,11 +833,11 @@ export default function ShowcaseStyleSettingsPanel({
   const commitApply = useCallback(() => {
     const withTags = {
       ...config,
-      includeDigitalCard,
+      includeDigitalCard: showcaseBroadcastOn,
       tags: isPaid ? parseShowcaseTagsInput(tagInput) : config.tags || []
     };
     const latest = slimShowcaseStyleForPersist(
-      clampShowcasePages(withTags, effectiveTier, { includeDigitalCard })
+      clampShowcasePages(withTags, effectiveTier, { includeDigitalCard: dccCarouselEnabled })
     );
     try {
       writeShowcaseStyle(latest, { replace: true, skipSync: true });
@@ -858,7 +869,7 @@ export default function ShowcaseStyleSettingsPanel({
       })
       .catch(() => {});
 
-    if (includeDigitalCard && !hasProfilePhoto) {
+    if (dccCarouselEnabled && !hasProfilePhoto) {
       const msg =
         "프로필 사진은 「디지털인증명함 → 설정하러가기」에서 등록·저장해야 미리보기에 나옵니다.";
       focusShowcaseSection("showcase-settings-dcc", msg);
@@ -870,7 +881,8 @@ export default function ShowcaseStyleSettingsPanel({
   }, [
     config,
     focusShowcaseSection,
-    includeDigitalCard,
+    dccCarouselEnabled,
+    showcaseBroadcastOn,
     isPaid,
     effectiveTier,
     notify,
@@ -885,9 +897,9 @@ export default function ShowcaseStyleSettingsPanel({
   const bgmConfigured = hasShowcaseBgmConfigured({ bgm: config.bgm });
   const bgmCount = bgmPlaylistLen > 0 ? bgmPlaylistLen : bgmConfigured ? 1 : 0;
   const bgmLimit = isPaid ? 5 : 1;
-  const digitalCardReady = includeDigitalCard;
+  const digitalCardReady = dccCarouselEnabled;
   const hasDigitalCardPhoto = Boolean(
-    includeDigitalCard && String(card?.photoUrl || "").trim()
+    dccCarouselEnabled && String(card?.photoUrl || "").trim()
   );
 
   const pagesSection = (
@@ -946,7 +958,7 @@ export default function ShowcaseStyleSettingsPanel({
         ) : null}
       </div>
 
-      {includeDigitalCard || !isPaid ? (
+      {dccCarouselEnabled || !isPaid ? (
         <div id="showcase-settings-dcc" className="showcase-page-card showcase-page-card--digital scroll-mt-4">
           <div className="showcase-page-card__head">
             <div className="min-w-0 flex-1">
@@ -1169,7 +1181,7 @@ export default function ShowcaseStyleSettingsPanel({
         </div>
       ) : null}
 
-      {!includeDigitalCard ? (
+      {!dccCarouselEnabled ? (
         <label className="showcase-profile-row showcase-profile-row--toggle">
           <span className="showcase-profile-row__label">
             <span className="showcase-profile-row__label-text">
@@ -1588,7 +1600,7 @@ export default function ShowcaseStyleSettingsPanel({
   const applyFooter = (
     <>
       <p className={`text-center text-[11px] ${subText}`}>
-        {includeDigitalCard ? "명함 1 · " : ""}
+        {dccCarouselEnabled ? "명함 1 · " : ""}
         콘텐츠 {pages.length}페이지 · 설정됨 {configuredCount} · BGM{" "}
         {bgmCount > 0 ? `${bgmCount}/${bgmLimit}` : "미설정"}
         {dirty ? " · 미적용 변경 있음" : ""}
@@ -1724,7 +1736,7 @@ export default function ShowcaseStyleSettingsPanel({
       {fullscreen ? (
         <ShowcasePullDownPreview
           card={card}
-          includeDigitalCard={includeDigitalCard}
+          includeDigitalCard={dccCarouselEnabled}
           membershipTier={effectiveTier}
           onToast={onToast}
         />

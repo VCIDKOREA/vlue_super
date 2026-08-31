@@ -732,6 +732,16 @@
   pointer-events: none;
 }
 
+/* 송출 OFF + 인증 팝업 — 빅푸시 배경 없이 중앙 팝업만 */
+.lettering-overlay-host--tent.lettering-overlay-host--auth-popup-only {
+  background: transparent !important;
+  pointer-events: none;
+}
+
+.lettering-overlay-host--tent.lettering-overlay-host--auth-popup-only .vlue-auth-member-popup-root {
+  pointer-events: auto;
+}
+
 /* 조회 중 — HD Voice 바로 아래, 번호는 가리지 않는 브랜드 칩 */
 .lettering-overlay-host--tent.lettering-overlay-host--loading {
   align-items: flex-start !important;

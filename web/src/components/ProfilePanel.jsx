@@ -600,14 +600,22 @@ function ProfilePanel({
     try {
       import("../lib/showcase/showcaseStyleStorage.js").then((m) => {
         try {
-          const patch = paidDcc ? { includeDigitalCard: Boolean(next) } : { includeDigitalCard: false };
+          /* 무료·유료 공통 — includeDigitalCard = 송출 ON/OFF (DCC 슬라이드와 별개) */
+          const patch = { includeDigitalCard: Boolean(next) };
           m.writeShowcaseStyle?.(patch);
           const live = m.readLiveShowcaseStyle?.();
-          if (live) m.writeLiveShowcaseStyle?.({ ...live, ...patch });
+          if (live) m.writeLiveShowcaseStyle?.({ ...live, ...patch }, { source: "editor" });
         } catch {
           /* ignore */
         }
       });
+    } catch {
+      /* ignore */
+    }
+    try {
+      import("../lib/showcase/showcaseStyleSync.js")
+        .then((m) => m.pushShowcaseStyleBundle?.({ force: true }))
+        .catch(() => {});
     } catch {
       /* ignore */
     }

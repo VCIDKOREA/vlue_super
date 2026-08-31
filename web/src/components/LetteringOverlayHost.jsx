@@ -23,22 +23,8 @@ import {
   readCallHistoryPeerCache,
   writeCallHistoryPeerCache
 } from "../lib/callHistoryPeerCache.js";
-import { peerHasDccOrShowcaseContent } from "../lib/peerShowcaseContent.js";
+import { peerHasDccOrShowcaseContent, peerShowcaseBroadcastOn } from "../lib/peerShowcaseContent.js";
 import VlueAuthMemberPopup from "./VlueAuthMemberPopup.jsx";
-
-/** 상대가 쇼케이스/DCC 를 송출 ON 으로 저장하지 않은 경우 — 인증 팝업만 */
-function createPeerAuthOnlyShowcaseStyle() {
-  return {
-    ...createDefaultShowcaseStyle(),
-    includeDigitalCard: false,
-    verifiedBadgeOn: true,
-    showBroadcastName: true
-  };
-}
-
-function peerShowcaseBroadcastOn(style) {
-  return Boolean(style && typeof style === "object" && style.includeDigitalCard === true);
-}
 import { normalizePhotoFocus } from "../lib/letteringBizcardStorage.js";
 import { VlueBrandMark } from "./VlueBrandLogo.jsx";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
@@ -52,6 +38,16 @@ import { ShowcaseBgmProvider, useShowcaseBgm } from "../context/ShowcaseBgmConte
 import { dcpCardMatchesIncoming, dcpRouteForIncoming, matchNationalAgency } from "../lib/nationalAgencyDcpClient.js";
 import "../styles/tent-showcase.css";
 import "../styles/showcase-call-glass.css";
+
+/** 상대가 쇼케이스/DCC 를 송출 ON 으로 저장하지 않은 경우 — 인증 팝업만 */
+function createPeerAuthOnlyShowcaseStyle() {
+  return {
+    ...createDefaultShowcaseStyle(),
+    includeDigitalCard: false,
+    verifiedBadgeOn: true,
+    showBroadcastName: true
+  };
+}
 
 /** 네이티브 card-lookup + 웹 useEffect 가 같은 peer 를 동시에 때리지 않도록 */
 const overlayPeerEnrichInflight = new Map();
@@ -1375,17 +1371,28 @@ function LetteringOverlayHostInner() {
   const onCall = callState === CALL_STATES.CONNECTED;
   const callPhase = onCall ? "connected" : direction === "outgoing" ? "outgoing" : "ringing";
   const miniCollapsed = onCall && !expanded;
+  const peerLiveStyle = styledCard?.showcaseStyle || showcaseStyle;
+  const peerBroadcastOn = peerShowcaseBroadcastOn(peerLiveStyle);
+  const authPopupOnlyUi = Boolean(peerAuthPopupOnly && authMemberPopupOpen);
+  const peerIncludeDccSlide = Boolean(
+    verified &&
+      peerBroadcastOn &&
+      isPaidLetteringTier(styledCard?.membershipTier || membershipTier || "free")
+  );
 
   return (
     <div
       className={`lettering-overlay-host lettering-overlay-host--tent ${
         onCall ? "lettering-overlay-host--connected" : "lettering-overlay-host--ringing"
-      }${miniCollapsed ? " lettering-overlay-host--mini" : ""}`}
+      }${miniCollapsed ? " lettering-overlay-host--mini" : ""}${
+        authPopupOnlyUi ? " lettering-overlay-host--auth-popup-only" : ""
+      }`}
       data-call-phase={callPhase}
       data-expanded={expanded ? "true" : "false"}
       data-mini={miniCollapsed ? "true" : "false"}
     >
       <div className="lettering-overlay-host__tent-shell">
+        {!authPopupOnlyUi ? (
         <RenderErrorGuard
           fallback={
             <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 px-6 text-center">
@@ -1439,9 +1446,7 @@ function LetteringOverlayHostInner() {
             userChoseMiniRef.current = true;
             setExpanded(false);
           }}
-          includeDigitalCard={Boolean(
-            verified && peerShowcaseBroadcastOn(styledCard?.showcaseStyle || showcaseStyle)
-          )}
+          includeDigitalCard={peerIncludeDccSlide}
           showcaseOffPreview={Boolean(peerAuthPopupOnly)}
           onAuthPopupRequest={openPeerAuthPopup}
           digitalCardOnly={false}
@@ -1460,6 +1465,7 @@ function LetteringOverlayHostInner() {
           }}
         />
         </RenderErrorGuard>
+        ) : null}
       </div>
 
       {toast ? (
