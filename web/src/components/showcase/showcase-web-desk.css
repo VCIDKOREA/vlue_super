@@ -298,46 +298,17 @@
   bottom: max(92px, calc(80px + env(safe-area-inset-bottom, 0px)));
 }
 
-/* www 미리보기 + 통화화면 보기 — 초록 CTA가 다크 프레임 안에서 등장 (앱과 동일) */
+/* www 미리보기 + 통화화면 보기 — 캐러셀 높이 유지, 초록 CTA는 reception 안 */
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome {
   overflow: hidden;
 }
 
-.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing--home-glass.lettering-ongoing--expanded {
-  display: flex;
-  flex-direction: column;
-  max-height: min(82dvh, 760px);
-}
-
-.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot[data-open="true"] {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-}
-
-.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot__inner,
-.showcase-web-desk
-  .lettering-home-push-embed--web-inline.is-call-chrome
-  .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded
-  .lettering-ongoing-expand-slot__inner {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  height: 100% !important;
-}
-
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot__inner > .lettering-ongoing-reception {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: auto;
-  max-height: none;
+  display: flex;
+  flex-direction: column;
+  height: 704px;
+  max-height: 704px;
+  min-height: 704px;
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-actions-secondary--call {
