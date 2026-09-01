@@ -443,6 +443,17 @@ authRoutes.post("/verify-code", async (c) => {
       });
     }
 
+    if (purpose === "account_withdraw") {
+      if (!uid) return c.json({ error: "인증 필요" }, 401);
+      return c.json(
+        {
+          error: "회원 탈퇴는 /api/auth/account/withdraw/verify-email 을 이용해 주세요.",
+          code: "USE_WITHDRAW_VERIFY_ROUTE"
+        },
+        400
+      );
+    }
+
     const token = await verifySignupEmailOtp(String(body?.email || ""), code);
     return c.json({ ok: true, verified: true, token });
   } catch (e) {
@@ -588,25 +599,20 @@ authRoutes.post("/logout-all", async (c) => {
   }
 });
 
-/** 회원 탈퇴 — PII 파기·구독 해지·세션 무효화 (레거시 즉시 탈퇴) */
+/** 회원 탈퇴 — PII 파기·구독 해지·세션 무효화 (레거시 즉시 탈퇴, 사용 금지) */
 authRoutes.post("/account/withdraw", async (c) => {
   try {
     const uid = await resolveRequestUserId(c);
     if (!uid) return c.json({ error: "인증 필요" }, 401);
 
-    let body: { confirm?: boolean } = {};
-    try {
-      body = await c.req.json<{ confirm?: boolean }>();
-    } catch {
-      body = {};
-    }
-    if (!body.confirm) {
-      return c.json({ error: "confirm: true 가 필요합니다." }, 400);
-    }
-
-    await dissolveFamilyLinksForGuardianWithdrawal(uid);
-    await withdrawUserAccount(uid);
-    return c.json({ ok: true });
+    return c.json(
+      {
+        error:
+          "이메일·휴대폰 인증 또는 탈퇴 신청을 통해 탈퇴해 주세요. 설정 > 회원 탈퇴 메뉴를 이용해 주세요.",
+        code: "WITHDRAW_VERIFICATION_REQUIRED"
+      },
+      403
+    );
   } catch (e) {
     if (e instanceof AccountWithdrawalError) {
       return c.json({ error: e.message, code: e.code }, e.statusCode as 400 | 403 | 404 | 409);

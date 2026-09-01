@@ -81,6 +81,9 @@ export default function VlueEmailSettingsSection({
   const [connectingExternal, setConnectingExternal] = useState(false);
   const [extProvider, setExtProvider] = useState("naver");
   const [extEmail, setExtEmail] = useState("");
+  const [extOtp, setExtOtp] = useState("");
+  const [extOtpHint, setExtOtpHint] = useState("");
+  const [extVerifyToken, setExtVerifyToken] = useState("");
 
   const pricing = getPricingConfigSync();
   const freeEmailNote =
@@ -244,6 +247,49 @@ export default function VlueEmailSettingsSection({
     }
   };
 
+  const handleSendExternalOtp = async () => {
+    const email = String(extEmail || "").trim();
+    if (!email) {
+      showSettingNotice?.("연동할 메일 주소를 입력해 주세요.");
+      return;
+    }
+    setConnectingExternal(true);
+    try {
+      const data = await sendAuthCode({ purpose: "dcc_email", email }, { auth: true });
+      setExtVerifyToken("");
+      setExtOtpHint(
+        data.devCode
+          ? `개발 모드 인증번호: ${data.devCode}`
+          : `${data.maskedEmail || email} 로 인증번호를 보냈습니다. 5분 내에 입력해 주세요.`
+      );
+      showSettingNotice?.("인증번호를 발송했습니다.");
+    } catch (e) {
+      showSettingNotice?.(e.message || "인증번호 발송에 실패했습니다.");
+    } finally {
+      setConnectingExternal(false);
+    }
+  };
+
+  const handleVerifyExternalOtp = async () => {
+    const email = String(extEmail || "").trim();
+    const code = String(extOtp || "").trim();
+    if (!email || code.length !== 6) {
+      showSettingNotice?.("이메일과 인증번호 6자리를 입력해 주세요.");
+      return;
+    }
+    setConnectingExternal(true);
+    try {
+      const data = await verifyAuthCode({ purpose: "dcc_email", email, code }, { auth: true });
+      setExtVerifyToken(data.token || "");
+      setExtOtpHint("이메일 인증이 완료되었습니다. 연동을 눌러 등록해 주세요.");
+      showSettingNotice?.("이메일 인증이 완료되었습니다.");
+    } catch (e) {
+      showSettingNotice?.(e.message || "인증에 실패했습니다.");
+    } finally {
+      setConnectingExternal(false);
+    }
+  };
+
   const handleConnectExternal = async () => {
     if (!canUseBrand) {
       setUpgradeReason("external");
@@ -255,12 +301,19 @@ export default function VlueEmailSettingsSection({
       showSettingNotice?.("연동할 메일 주소를 입력해 주세요.");
       return;
     }
+    if (!extVerifyToken) {
+      showSettingNotice?.("먼저 이메일 인증번호를 확인해 주세요.");
+      return;
+    }
     setConnectingExternal(true);
     try {
-      await connectExternalMailAccount({ email, provider: extProvider });
+      await connectExternalMailAccount({ email, provider: extProvider, token: extVerifyToken });
       const ext = await fetchExternalMailAccounts();
       setExternalAccounts(ext.accounts || []);
       setExtEmail("");
+      setExtOtp("");
+      setExtOtpHint("");
+      setExtVerifyToken("");
       showSettingNotice?.("외부 메일 연동이 등록되었습니다.");
     } catch (e) {
       if (e.code === "PREMIUM_REQUIRED") {
@@ -483,34 +536,68 @@ export default function VlueEmailSettingsSection({
               <p className="vlue-type-body mt-3 text-center text-[#8b95a1]">연동된 외부 메일이 없습니다</p>
             ) : null}
 
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <select
-                value={extProvider}
-                onChange={(e) => setExtProvider(e.target.value)}
-                disabled={!canUseBrand}
-                className={`rounded-xl border px-3 py-2.5 vlue-type-body ${inputCls} disabled:opacity-50`}
-              >
-                <option value="naver">네이버</option>
-                <option value="google">구글</option>
-                <option value="kakao">카카오</option>
-                <option value="custom">기타 IMAP</option>
-              </select>
-              <input
-                type="email"
-                value={extEmail}
-                onChange={(e) => setExtEmail(e.target.value)}
-                disabled={!canUseBrand}
-                placeholder="example@gmail.com"
-                className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 vlue-type-body ${inputCls} disabled:opacity-50`}
-              />
-              <button
-                type="button"
-                onClick={handleConnectExternal}
-                disabled={connectingExternal}
-                className={`vlue-promo-card__cta shrink-0 !w-auto px-4 disabled:opacity-50 ${canUseBrand ? "vlue-promo-card__cta--primary" : ""}`}
-              >
-                {connectingExternal ? "…" : canUseBrand ? "연동" : "잠금"}
-              </button>
+            <div className="mt-3 flex flex-col gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <select
+                  value={extProvider}
+                  onChange={(e) => setExtProvider(e.target.value)}
+                  disabled={!canUseBrand}
+                  className={`rounded-xl border px-3 py-2.5 vlue-type-body ${inputCls} disabled:opacity-50`}
+                >
+                  <option value="naver">네이버</option>
+                  <option value="google">구글</option>
+                  <option value="kakao">카카오</option>
+                  <option value="custom">기타 IMAP</option>
+                </select>
+                <input
+                  type="email"
+                  value={extEmail}
+                  onChange={(e) => {
+                    setExtEmail(e.target.value);
+                    setExtVerifyToken("");
+                  }}
+                  disabled={!canUseBrand}
+                  placeholder="example@gmail.com"
+                  className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 vlue-type-body ${inputCls} disabled:opacity-50`}
+                />
+                <button
+                  type="button"
+                  onClick={handleSendExternalOtp}
+                  disabled={connectingExternal || !canUseBrand}
+                  className="vlue-promo-card__cta shrink-0 !w-auto px-3 disabled:opacity-50"
+                >
+                  {connectingExternal ? "…" : "인증번호"}
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={extOtp}
+                  onChange={(e) => setExtOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  disabled={!canUseBrand}
+                  placeholder="인증번호 6자리"
+                  className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 vlue-type-body ${inputCls} disabled:opacity-50`}
+                />
+                <button
+                  type="button"
+                  onClick={handleVerifyExternalOtp}
+                  disabled={connectingExternal || !canUseBrand}
+                  className="shrink-0 rounded-xl border border-[#e8eaed] px-3 py-2.5 text-[13px] font-bold disabled:opacity-50"
+                >
+                  확인
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConnectExternal}
+                  disabled={connectingExternal}
+                  className={`vlue-promo-card__cta shrink-0 !w-auto px-4 disabled:opacity-50 ${canUseBrand ? "vlue-promo-card__cta--primary" : ""}`}
+                >
+                  {connectingExternal ? "…" : canUseBrand ? "연동" : "잠금"}
+                </button>
+              </div>
+              {extOtpHint ? <p className="vlue-settings-card__hint">{extOtpHint}</p> : null}
+              <p className="vlue-settings-card__hint">{EMAIL_AUTH_SUPPORT}</p>
             </div>
           </section>
         </div>

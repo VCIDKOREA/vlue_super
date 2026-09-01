@@ -68,29 +68,28 @@ PowerShell:
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` / `PUBLIC_DATA_SERVICE_KEY` | `GET /api/v1/search/verify` 기관 검색 |
 | `DIRECT_URL` | Prisma direct URL (Supabase/Neon 사용 시) |
 
-## 이메일 인증번호 (AWS SES)
+## 이메일 인증번호 (Resend + SES 폴백)
 
-가입 · 앱 새 기기 로그인 · 비밀번호 변경 · DCC 수신 메일 등록에 공통 사용합니다.
+가입 · 앱 새 기기 · 비밀번호 · 아이디 찾기 · DCC 수신/외부 메일 · 회원 탈퇴 · 임직원 콤보 인증에 공통 사용합니다.
+운영 환경에서는 `sendEmailAuthCode` → `sendAuthEmail`(Resend 우선, SES 폴백) 경로로 발송됩니다.
 
 | Variable | 값 | 설명 |
 |----------|----|------|
-| `AWS_REGION` | `ap-northeast-2` | SES 리전 |
-| `AWS_ACCESS_KEY_ID` | IAM 액세스 키 | SES `ses:SendEmail` |
+| `AWS_REGION` | `ap-northeast-2` | SES 폴백 리전 (선택) |
+| `AWS_ACCESS_KEY_ID` | IAM 액세스 키 | SES 폴백용 (선택) |
 | `AWS_SECRET_ACCESS_KEY` | IAM 시크릿 | **Railway에만 저장. Git 금지** |
-| `SENDER_EMAIL` | `support@vlue.kr` | SES/Resend 발신 주소 (도메인 인증 필요) |
-| `SMTP_PROVIDER` | `resend` (권장) | `resend` 이면 Resend API로 OTP 발송 (SES 미인증 시 폴백) |
+| `SENDER_EMAIL` | `support@vlue.kr` | 발신 주소 (Resend/SES 도메인 인증 필요) |
+| `SMTP_PROVIDER` | `resend` (**권장**) | Resend API로 OTP 발송 |
 | `RESEND_API_KEY` | Resend API 키 | **Railway에만 저장. Git 금지** |
 | `VLUE_SIGNUP_FROM_EMAIL` | `noreply@vlue.kr` | (선택) OTP 발신 주소 — 없으면 `SENDER_EMAIL` |
 | `REDIS_URL` | Redis URL | OTP 5분 TTL. 없으면 프로세스 메모리 폴백 |
 
-엔드포인트: `POST /api/auth/send-code`, `POST /api/auth/verify-code` (`purpose`: `signup` / `login_device` / `password_change` / `dcc_email`).
+엔드포인트: `POST /api/auth/send-code`, `POST /api/auth/verify-code`
+(`purpose`: `signup` / `login_device` / `password_change` / `find_id` / `dcc_email` / `account_withdraw`)
 
-세션 정책:
+DCC 외부 IMAP 연동(`POST /api/email-forwarding/external-accounts`)도 `dcc_email` 인증 토큰이 필요합니다.
 
-- **웹 (`www.vlue.kr`)** — 중복 로그인 허용. 접속 IP·위치(`CF-IPCountry` 등)·User-Agent를 `user_devices` / `auth_refresh_sessions`에 기록.
-- **Android 앱 (`VLUE-Android-App`)** — 단일 활성 기기. 새 기기 로그인 시 가입 이메일로 6자리 코드를 보내고, 확인 후 기존 앱 세션을 즉시 만료.
-
-`POST /api/auth/signup-email/send` 는 위 SES 경로를 사용합니다. Resend SMTP는 가입 OTP에 더 이상 필요하지 않습니다.
+레거시 `POST /api/auth/account/withdraw`(confirm만)는 차단됩니다. 탈퇴는 `/account/withdraw/verify-email` 또는 `/verify-phone`을 사용합니다.
 
 임시 QA만 필요하면 가입에서 **「개인 아이디로 가입」** 트랙을 쓰면 이메일 OTP 없이 진행할 수 있습니다.
 

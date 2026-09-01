@@ -2,11 +2,14 @@ import { createHash, randomInt } from "node:crypto";
 import { prisma } from "../../db/client.js";
 import { verifyPassword } from "../../lib/passwordHash.js";
 import { assertBusinessEmailEligible } from "../email/emailDomainClassification.js";
+import {
+  sendEmailAuthCode,
+  verifyEmailAuthCode
+} from "../email/emailAuthCodeService.js";
 import { isStandalonePersonalAccount } from "../membership/personalComboPricing.js";
 import { attachEnterpriseReferralAttribution } from "../membership/enterpriseReferralAttribution.js";
 
 const OTP_TTL_MS = 10 * 60 * 1000;
-const OTP_COOLDOWN_MS = 60 * 1000;
 const REVVERIFY_MIN_DAYS = 30;
 const REVVERIFY_MAX_DAYS = 90;
 
@@ -139,36 +142,14 @@ export async function sendCorporateMailOtp(userId: string, emailRaw: string) {
 
   const email = assertBusinessEmailEligible(emailRaw);
 
-  const recent = await prisma.personalEnterpriseMailOtp.findFirst({
-    where: { userId, email },
-    orderBy: { createdAt: "desc" }
-  });
-  if (recent && Date.now() - recent.createdAt.getTime() < OTP_COOLDOWN_MS) {
-    throw new Error("잠시 후 다시 요청해 주세요.");
-  }
-
-  const otp = String(randomInt(100000, 999999));
-  const expiresAt = new Date(Date.now() + OTP_TTL_MS);
-
-  await prisma.personalEnterpriseMailOtp.create({
-    data: {
-      userId,
-      email,
-      otpHash: hashOtp(email, otp),
-      expiresAt
-    }
-  });
-
-  await dispatchCorporateMailOtp(email, otp);
-
-  const exposeDev =
-    process.env.NODE_ENV !== "production" || process.env.VLUE_DEV_EXPOSE_MAIL_OTP === "1";
+  const sent = await sendEmailAuthCode({ purpose: "corp_combo", emailRaw: email });
 
   return {
     ok: true as const,
     email,
-    expiresAt: expiresAt.toISOString(),
-    ...(exposeDev ? { devOtp: otp } : {})
+    expiresAt: new Date(Date.now() + OTP_TTL_MS).toISOString(),
+    maskedEmail: sent.maskedEmail,
+    ...(sent.devCode ? { devOtp: sent.devCode } : {})
   };
 }
 
@@ -181,28 +162,21 @@ export async function verifyCorporateMailOtp(userId: string, emailRaw: string, o
     throw new Error("이메일과 6자리 인증번호를 입력해 주세요.");
   }
 
-  const challenge = await prisma.personalEnterpriseMailOtp.findFirst({
-    where: { userId, email, verifiedAt: null },
-    orderBy: { createdAt: "desc" }
-  });
-  if (!challenge) {
-    throw new Error("인증 요청 내역이 없습니다. 다시 발송해 주세요.");
-  }
-  if (challenge.expiresAt.getTime() < Date.now()) {
-    throw new Error("인증번호가 만료되었습니다. 다시 발송해 주세요.");
-  }
-  if (challenge.otpHash !== hashOtp(email, otp)) {
-    throw new Error("인증번호가 일치하지 않습니다.");
-  }
+  await verifyEmailAuthCode({ purpose: "corp_combo", emailRaw: email, codeRaw: otp });
 
   const now = new Date();
   const nextCheck = new Date(now);
   nextCheck.setDate(nextCheck.getDate() + randomReverifyDays());
 
   await prisma.$transaction([
-    prisma.personalEnterpriseMailOtp.update({
-      where: { id: challenge.id },
-      data: { verifiedAt: now }
+    prisma.personalEnterpriseMailOtp.create({
+      data: {
+        userId,
+        email,
+        otpHash: hashOtp(email, otp),
+        expiresAt: now,
+        verifiedAt: now
+      }
     }),
     prisma.user.update({
       where: { id: userId },

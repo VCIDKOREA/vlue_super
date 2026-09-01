@@ -125,7 +125,11 @@ export default function PersonalComboPanel({ membershipTier = "free", onToast })
       if (res.devOtp) {
         onToast?.(`[개발] OTP: ${res.devOtp}`);
       } else {
-        onToast?.("회사 메일로 인증번호를 발송했습니다.");
+        onToast?.(
+          res.maskedEmail
+            ? `${res.maskedEmail} 로 인증번호를 보냈습니다.`
+            : "회사 메일로 인증번호를 발송했습니다."
+        );
       }
     } catch (e) {
       onToast?.(e instanceof Error ? e.message : "발송 실패");

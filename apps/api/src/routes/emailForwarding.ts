@@ -344,9 +344,20 @@ emailForwardingRoutes.get("/external-accounts", async (c) => {
 emailForwardingRoutes.post("/external-accounts", async (c) => {
   try {
     const userId = c.get("vlueUserId") as string;
-    const body = await c.req.json<{ email?: string; provider?: string; imapHost?: string }>();
+    const body = await c.req.json<{
+      email?: string;
+      provider?: string;
+      imapHost?: string;
+      token?: string;
+      ticket?: string;
+    }>();
     const email = String(body.email || "").trim();
     if (!email) return c.json({ error: "email is required" }, 400);
+    await consumeVerifiedEmailTicket(String(body.token || body.ticket || ""), {
+      purpose: "dcc_email",
+      email,
+      userId
+    });
     const account = await upsertExternalMailAccount({
       userId,
       email,

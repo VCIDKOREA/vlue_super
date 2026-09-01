@@ -17,7 +17,8 @@ export const EMAIL_AUTH_PURPOSES = [
   "password_change",
   "find_id",
   "dcc_email",
-  "account_withdraw"
+  "account_withdraw",
+  "corp_combo"
 ] as const;
 export type EmailAuthPurpose = (typeof EMAIL_AUTH_PURPOSES)[number];
 
@@ -221,19 +222,17 @@ export async function sendEmailAuthCode(opts: {
 
   const { subject, text, html } = otpHtml(code);
   const from = senderEmail();
-  const prodMail = process.env.NODE_ENV === "production" && process.env.ALLOW_DEV_IDENTITY !== "1";
 
-  if (prodMail) {
-    if (!isAuthEmailDeliveryConfigured()) {
-      throw new Error(
-        "이메일 발송이 아직 설정되지 않았습니다. 고객센터 support@vlue.kr 로 문의해 주세요."
-      );
-    }
+  if (isAuthEmailDeliveryConfigured()) {
     await sendAuthEmail({ from, to: email, subject, html, text });
-    return { ok: true, expiresInSec: EMAIL_OTP_TTL_SEC, maskedEmail: maskEmail(email) };
+  } else if (!allowDevOtp()) {
+    throw new Error(
+      "이메일 발송이 아직 설정되지 않았습니다. 고객센터 support@vlue.kr 로 문의해 주세요."
+    );
+  } else {
+    await sendEmailViaSesOrMock({ from, to: email, subject, html, text });
   }
 
-  await sendEmailViaSesOrMock({ from, to: email, subject, html, text });
   return {
     ok: true,
     expiresInSec: EMAIL_OTP_TTL_SEC,

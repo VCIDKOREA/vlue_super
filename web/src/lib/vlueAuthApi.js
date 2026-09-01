@@ -215,7 +215,7 @@ export function redirectToAppSignup(mode = "signup") {
   beginWebSignup(mode);
 }
 
-/** 회원 탈퇴 — 서버 PII 파기 + 로컬 세션 정리는 호출측에서 처리 */
+/** @deprecated 설정 > 회원 탈퇴(이메일/휴대폰 인증) 사용. 레거시 즉시 탈퇴 API는 차단됨 */
 export async function withdrawVlueAccount() {
   const res = await vlueAuthFetch(apiUrl("/api/auth/account/withdraw"), {
     method: "POST",
