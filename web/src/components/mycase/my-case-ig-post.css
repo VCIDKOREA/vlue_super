@@ -213,24 +213,70 @@
 
 .my-case-carousel__dots {
   position: absolute;
-  bottom: 10px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 4px;
-  z-index: 8;
-  pointer-events: none;
+  gap: 5px;
+  z-index: 9;
+  pointer-events: auto;
 }
 
-.my-case-carousel__dots span {
+.my-case-carousel__dot {
   width: 6px;
   height: 6px;
+  padding: 0;
+  margin: 0;
+  border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.45);
+  background: rgba(56, 189, 248, 0.38);
+  cursor: pointer;
+  transition: width 0.18s ease, background 0.18s ease;
 }
 
-.my-case-carousel__dots span.is-active {
-  background: #0095f6;
+.my-case-carousel__dot.is-active {
+  width: 14px;
+  background: #38bdf8;
+}
+
+.my-case-carousel__nav {
+  position: absolute;
+  top: 50%;
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.58);
+  color: #38bdf8;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.32);
+  transform: translateY(-50%);
+  cursor: pointer;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.my-case-carousel__nav--prev {
+  left: 8px;
+}
+
+.my-case-carousel__nav--next {
+  right: 8px;
+}
+
+.my-case-carousel__nav:disabled {
+  opacity: 0.22;
+  cursor: default;
+}
+
+.my-case-carousel__nav:not(:disabled):active {
+  transform: translateY(-50%) scale(0.94);
 }
 
 /* 풀화면·데스크톱 모달 전용 — 피드(--feed)는 테마 변수 사용 */
@@ -390,10 +436,10 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  border: 0;
+  border: 1px solid rgba(56, 189, 248, 0.55);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #111;
+  background: rgba(15, 23, 42, 0.58);
+  color: #38bdf8;
   cursor: pointer;
 }
 
@@ -418,11 +464,12 @@
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.45);
+  background: rgba(56, 189, 248, 0.38);
 }
 
 .my-case-ig-post__dots span.is-active {
-  background: #0095f6;
+  width: 14px;
+  background: #38bdf8;
 }
 
 .my-case-ig-post__side {

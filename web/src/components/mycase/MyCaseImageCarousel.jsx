@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import ShowcasePhotoTextOverlay from "../showcase/ShowcasePhotoTextOverlay.jsx";
 
 const DOUBLE_TAP_MS = 360;
@@ -154,9 +155,12 @@ export default function MyCaseImageCarousel({
 
   if (!images.length) return null;
 
+  const canSwipe = images.length > 1;
+  const safeIndex = Math.min(index, images.length - 1);
+
   return (
     <div
-      className="my-case-carousel"
+      className={`my-case-carousel${canSwipe ? " my-case-carousel--swipeable" : ""}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -165,7 +169,7 @@ export default function MyCaseImageCarousel({
     >
       <div
         className="my-case-carousel__track"
-        style={{ transform: `translate3d(-${index * 100}%, 0, 0)` }}
+        style={{ transform: `translate3d(-${safeIndex * 100}%, 0, 0)` }}
       >
         {images.map((img) => (
           <div key={img.id} className="my-case-carousel__slide">
@@ -179,12 +183,51 @@ export default function MyCaseImageCarousel({
           </div>
         ))}
       </div>
-      {images.length > 1 ? (
-        <div className="my-case-carousel__dots" aria-hidden>
-          {images.map((img, i) => (
-            <span key={img.id} className={i === index ? "is-active" : ""} />
-          ))}
-        </div>
+      {canSwipe ? (
+        <>
+          <button
+            type="button"
+            className="my-case-carousel__nav my-case-carousel__nav--prev"
+            aria-label="이전 사진"
+            disabled={safeIndex <= 0}
+            onClick={(e) => {
+              e.stopPropagation();
+              go(-1);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <ChevronLeft size={24} strokeWidth={2.4} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="my-case-carousel__nav my-case-carousel__nav--next"
+            aria-label="다음 사진"
+            disabled={safeIndex >= images.length - 1}
+            onClick={(e) => {
+              e.stopPropagation();
+              go(1);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <ChevronRight size={24} strokeWidth={2.4} aria-hidden />
+          </button>
+          <div className="my-case-carousel__dots" role="tablist" aria-label="사진">
+            {images.map((img, i) => (
+              <button
+                key={img.id}
+                type="button"
+                className={`my-case-carousel__dot${i === safeIndex ? " is-active" : ""}`}
+                aria-label={`사진 ${i + 1}`}
+                aria-selected={i === safeIndex}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (i !== safeIndex) onIndexChange?.(i);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+              />
+            ))}
+          </div>
+        </>
       ) : null}
     </div>
   );
