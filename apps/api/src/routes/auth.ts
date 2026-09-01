@@ -27,6 +27,15 @@ import {
   withdrawUserAccount
 } from "../services/auth/accountWithdrawalService.js";
 import {
+  applyManualWithdrawal,
+  cancelScheduledWithdrawal,
+  getAccountWithdrawalStatus,
+  sendWithdrawalEmailCode,
+  withdrawAccountWithEmailCode,
+  withdrawAccountWithPhone
+} from "../services/auth/accountWithdrawalFlowService.js";
+import { dissolveFamilyLinksForGuardianWithdrawal } from "../services/familyProtection/familyProtectionEngine.js";
+import {
   approveParentalConsentByGuardianSession,
   approveParentalConsentWithGuardianPass,
   listPendingParentalConsentsForGuardian,
@@ -285,6 +294,20 @@ authRoutes.post("/send-code", async (c) => {
     if (purpose === "dcc_email") {
       if (!uid) return c.json({ error: "인증 필요" }, 401);
       const sent = await sendEmailAuthCode({ purpose, emailRaw: String(body?.email || "") });
+      return c.json({
+        ok: true,
+        purpose,
+        maskedEmail: sent.maskedEmail,
+        expiresInSec: sent.expiresInSec,
+        supportEmail: "support@vlue.kr",
+        message: EMAIL_AUTH_SUPPORT,
+        ...(sent.devCode ? { devCode: sent.devCode } : {})
+      });
+    }
+
+    if (purpose === "account_withdraw") {
+      if (!uid) return c.json({ error: "인증 필요" }, 401);
+      const sent = await sendWithdrawalEmailCode(uid);
       return c.json({
         ok: true,
         purpose,
@@ -565,7 +588,7 @@ authRoutes.post("/logout-all", async (c) => {
   }
 });
 
-/** 회원 탈퇴 — PII 파기·구독 해지·세션 무효화 */
+/** 회원 탈퇴 — PII 파기·구독 해지·세션 무효화 (레거시 즉시 탈퇴) */
 authRoutes.post("/account/withdraw", async (c) => {
   try {
     const uid = await resolveRequestUserId(c);
@@ -581,6 +604,7 @@ authRoutes.post("/account/withdraw", async (c) => {
       return c.json({ error: "confirm: true 가 필요합니다." }, 400);
     }
 
+    await dissolveFamilyLinksForGuardianWithdrawal(uid);
     await withdrawUserAccount(uid);
     return c.json({ ok: true });
   } catch (e) {
@@ -589,6 +613,103 @@ authRoutes.post("/account/withdraw", async (c) => {
     }
     const msg = e instanceof Error ? e.message : "unknown error";
     return c.json({ error: msg }, 500);
+  }
+});
+
+/** 회원 탈퇴 — 예약 상태 조회 */
+authRoutes.get("/account/withdraw/status", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    if (!uid) return c.json({ error: "인증 필요" }, 401);
+    return c.json(await getAccountWithdrawalStatus(uid));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 500);
+  }
+});
+
+/** 회원 탈퇴 — 등록 이메일 인증번호 발송 */
+authRoutes.post("/account/withdraw/send-email", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    if (!uid) return c.json({ error: "인증 필요" }, 401);
+    return c.json(await sendWithdrawalEmailCode(uid));
+  } catch (e) {
+    if (e instanceof AccountWithdrawalError) {
+      return c.json({ error: e.message, code: e.code }, e.statusCode as 400 | 403 | 404 | 409);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+/** 회원 탈퇴 — 등록 이메일 인증 후 즉시 탈퇴 */
+authRoutes.post("/account/withdraw/verify-email", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    if (!uid) return c.json({ error: "인증 필요" }, 401);
+    const body = await c.req.json<{ code?: string }>();
+    return c.json(await withdrawAccountWithEmailCode(uid, String(body?.code || "")));
+  } catch (e) {
+    if (e instanceof AccountWithdrawalError) {
+      return c.json({ error: e.message, code: e.code }, e.statusCode as 400 | 403 | 404 | 409);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+/** 회원 탈퇴 — 가입 휴대폰 PASS 인증 후 즉시 탈퇴 */
+authRoutes.post("/account/withdraw/verify-phone", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    if (!uid) return c.json({ error: "인증 필요" }, 401);
+    const body = await c.req.json<{ impUid?: string; imp_uid?: string }>();
+    const impUid = String(body?.impUid || body?.imp_uid || "").trim();
+    return c.json(await withdrawAccountWithPhone(uid, impUid));
+  } catch (e) {
+    if (e instanceof AccountWithdrawalError) {
+      return c.json({ error: e.message, code: e.code }, e.statusCode as 400 | 403 | 404 | 409);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+/** 회원 탈퇴 — 수동 신청(24h 유예) */
+authRoutes.post("/account/withdraw/apply-manual", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    if (!uid) return c.json({ error: "인증 필요" }, 401);
+    const body = await c.req.json<{
+      loginId?: string;
+      password?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+    }>();
+    return c.json(await applyManualWithdrawal(uid, body));
+  } catch (e) {
+    if (e instanceof AccountWithdrawalError) {
+      return c.json({ error: e.message, code: e.code }, e.statusCode as 400 | 403 | 404 | 409);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
+  }
+});
+
+/** 회원 탈퇴 — 예약 취소(복구) */
+authRoutes.post("/account/withdraw/cancel", async (c) => {
+  try {
+    const uid = await resolveRequestUserId(c);
+    if (!uid) return c.json({ error: "인증 필요" }, 401);
+    return c.json(await cancelScheduledWithdrawal(uid));
+  } catch (e) {
+    if (e instanceof AccountWithdrawalError) {
+      return c.json({ error: e.message, code: e.code }, e.statusCode as 400 | 403 | 404 | 409);
+    }
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 400);
   }
 });
 

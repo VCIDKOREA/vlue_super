@@ -296,9 +296,7 @@ export default function VlueSettingsPanel({
   onMarkAllChatsRead,
   hasUnreadChats,
   onLogout,
-  onOpenWithdrawConsult,
-  withdrawUnlocked = false,
-  onOpenWithdrawTerms,
+  onOpenWithdraw,
   onOpenPartnerInquiry,
   onOpenCustomerCenter,
   onOpenFamilyProtection,
@@ -1028,13 +1026,7 @@ export default function VlueSettingsPanel({
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="로그아웃" onClick={() => onLogout?.()} isDarkMode={isDarkMode} destructive />
           <SettingsDivider isDarkMode={isDarkMode} />
-          <SettingsRowButton label="회원 탈퇴" onClick={() => onOpenWithdrawConsult?.()} isDarkMode={isDarkMode} destructive />
-          {withdrawUnlocked ? (
-            <>
-              <SettingsDivider isDarkMode={isDarkMode} />
-              <SettingsRowButton label="회원탈퇴 진행" onClick={() => onOpenWithdrawTerms?.()} isDarkMode={isDarkMode} destructive />
-            </>
-          ) : null}
+          <SettingsRowButton label="회원 탈퇴" onClick={() => onOpenWithdraw?.()} isDarkMode={isDarkMode} destructive />
         </SettingsSection>
       </div>
     </div>

@@ -147,17 +147,29 @@ async function notifyFamilyLinkRevoked(
     wardRole: WardRole;
   },
   actorUserId: string,
-  reason: "manual" | "aged_out"
+  reason: "manual" | "aged_out" | "guardian_withdrawal"
 ) {
   const wardName = await wardDisplayName(link.wardUserId);
   const isGuardianActor = actorUserId === link.guardianUserId;
-  const title = reason === "aged_out" ? "가족 보호 자동 종료" : "가족 보호 해지";
+  const title =
+    reason === "aged_out"
+      ? "가족 보호 자동 종료"
+      : reason === "guardian_withdrawal"
+        ? "가족플랜 해산"
+        : "가족 보호 해지";
   const body =
     reason === "aged_out"
       ? `${wardName} 님 계정이 성인이 되어 가족 보호가 자동 종료되었습니다.`
-      : `${wardName} 님 가족 보호 연결이 해지되었습니다.`;
+      : reason === "guardian_withdrawal"
+        ? `가족 대표 계정 탈퇴로 가족플랜이 해산되었습니다.`
+        : `${wardName} 님 가족 보호 연결이 해지되었습니다.`;
   const payload = {
-    kind: reason === "aged_out" ? "family_link_aged_out" : "family_link_revoked",
+    kind:
+      reason === "aged_out"
+        ? "family_link_aged_out"
+        : reason === "guardian_withdrawal"
+          ? "family_guardian_withdrawal"
+          : "family_link_revoked",
     linkId: link.id,
     wardUserId: link.wardUserId,
     familyRelation: link.familyRelation,
@@ -1230,4 +1242,37 @@ async function listFamilyProtectionCore(userId: string) {
       "1단계: VLUE 앱 이벤트(통화·사이트·동의). 2단계: Android/iOS 네이티브(CallLog·설치앱). 3단계: 오픈뱅킹 입출금 자동연동.",
     degraded: false
   };
+}
+
+/** 가족 대표(보호자) 탈퇴 시 연결된 가족 구성원 전원 해산 */
+export async function dissolveFamilyLinksForGuardianWithdrawal(guardianUserId: string) {
+  const uid = String(guardianUserId || "").trim();
+  if (!uid) return { revoked: 0 };
+
+  const links = await familyProtectionDb.familyProtectionLink.findMany({
+    where: {
+      guardianUserId: uid,
+      status: { in: ["active", "pending"] }
+    }
+  });
+
+  for (const link of links) {
+    await familyProtectionDb.familyProtectionLink.update({
+      where: { id: link.id },
+      data: { status: "revoked" }
+    });
+    await notifyFamilyLinkRevoked(
+      {
+        id: link.id,
+        guardianUserId: link.guardianUserId,
+        wardUserId: link.wardUserId,
+        familyRelation: link.familyRelation,
+        wardRole: link.wardRole
+      },
+      uid,
+      "guardian_withdrawal"
+    );
+  }
+
+  return { revoked: links.length };
 }

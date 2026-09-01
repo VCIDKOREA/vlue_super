@@ -75,7 +75,10 @@ export async function withdrawUserAccount(userId: string): Promise<{ ok: true }>
         nickFeed: null,
         socialProvider: null,
         socialId: null,
-        isVerified: false
+        isVerified: false,
+        withdrawalScheduledAt: null,
+        withdrawalRequestedAt: null,
+        withdrawalMethod: null
       }
     });
 

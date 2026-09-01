@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Menu, X, User, ChevronDown, LogOut, MapPin, Lock, CreditCard, LayoutDashboard, Award, Sparkles, LayoutGrid } from 'lucide-react';
+import { Menu, X, User, ChevronDown, LogOut, MapPin, Lock, CreditCard, LayoutDashboard, Award, Sparkles, LayoutGrid, UserX } from 'lucide-react';
 import { VlueNavLogoMark, useVlueLogoBlink } from '../../../components/VlueNavLogoMark.jsx';
 import { readProfilePhotoAvatar } from '../../../lib/vlueAvatar.js';
 import { useWebIdleSession } from '../hooks/useWebIdleSession';
@@ -12,6 +12,7 @@ interface NavbarProps {
   user: { email: string } | null;
   onLoginClick: () => void;
   onLogout: () => void;
+  onOpenWithdraw?: () => void;
   onIdleLogout?: () => void;
 }
 
@@ -84,7 +85,7 @@ function HeaderProfileMark({ photoUrl, sizeClass = 'w-7 h-7' }: { photoUrl: stri
   );
 }
 
-export default function Navbar({ currentView, onNavigate, user, onLoginClick, onLogout, onIdleLogout }: NavbarProps) {
+export default function Navbar({ currentView, onNavigate, user, onLoginClick, onLogout, onOpenWithdraw, onIdleLogout }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { blinkSeq: logoBlinkSeq, triggerBlink: triggerLogoBlink } = useVlueLogoBlink();
@@ -217,6 +218,18 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
                       안심영역 설정
                     </button>
                     ) : null}
+                    <div className="my-1 border-t border-gray-100" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        onOpenWithdraw?.();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <UserX className="w-4 h-4" />
+                      회원 탈퇴
+                    </button>
                     <button
                       onClick={() => { onLogout(); setUserMenuOpen(false); }}
                       className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -325,6 +338,19 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
                 {label}
               </button>
             ))}
+            {user ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  onOpenWithdraw?.();
+                }}
+                className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-all flex items-center gap-2.5"
+              >
+                <UserX className="w-4 h-4 flex-shrink-0" />
+                회원 탈퇴
+              </button>
+            ) : null}
           </div>
 
           <div className="pt-3 border-t border-gray-100 flex gap-2.5">

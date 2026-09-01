@@ -2739,13 +2739,16 @@ function App() {
     setBiometricSeq((s) => s + 1);
   }, []);
 
-  const handleWithdrawAccount = useCallback(async () => {
-    try {
-      await withdrawVlueAccount();
-    } catch (e) {
-      setBottomToast(e instanceof Error ? e.message : "탈퇴에 실패했습니다.");
-      setTimeout(() => setBottomToast(""), 3200);
-      return;
+  const handleWithdrawAccount = useCallback(async (opts = {}) => {
+    const skipApi = Boolean(opts?.skipApi);
+    if (!skipApi) {
+      try {
+        await withdrawVlueAccount();
+      } catch (e) {
+        setBottomToast(e instanceof Error ? e.message : "탈퇴에 실패했습니다.");
+        setTimeout(() => setBottomToast(""), 3200);
+        return;
+      }
     }
     clearVlueSessionTokens();
     try {

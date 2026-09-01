@@ -7,6 +7,7 @@ import VluerPartnerSection from "./VluerPartnerSection.jsx";
 import { useB2bMembership } from "../context/B2bMembershipContext.jsx";
 import VluerCodeChangeSidebar from "./VluerCodeChangeSidebar.jsx";
 import ModalCloseButton from "./common/ModalCloseButton";
+import AccountWithdrawalFlow from "./settings/AccountWithdrawalFlow.jsx";
 import VlueSettingsPanel from "./settings/VlueSettingsPanel.jsx";
 import { applyAppSettingsToDocument } from "../lib/vlueAppSettings.js";
 import WalletRevealCard from "./WalletRevealCard.jsx";
@@ -158,15 +159,10 @@ function ProfilePanel({
   const [avatarTick, setAvatarTick] = useState(0);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
-  const [withdrawConsultOpen, setWithdrawConsultOpen] = useState(false);
+  const [withdrawFlowOpen, setWithdrawFlowOpen] = useState(false);
   const [partnerInquiryOpen, setPartnerInquiryOpen] = useState(false);
   const [partnerInquiryBody, setPartnerInquiryBody] = useState("");
   const [partnerInquiryNotice, setPartnerInquiryNotice] = useState("");
-  const [withdrawTermsOpen, setWithdrawTermsOpen] = useState(false);
-  const [withdrawGrantUntil, setWithdrawGrantUntil] = useState(0);
-  const [agreeRefund, setAgreeRefund] = useState(false);
-  const [agreeReverify, setAgreeReverify] = useState(false);
-  const [agreeFinal, setAgreeFinal] = useState(false);
   const [enterpriseLineAccess, setEnterpriseLineAccess] = useState(false);
   const [isEnterpriseMember, setIsEnterpriseMember] = useState(false);
   const [enterpriseLineAccessChecked, setEnterpriseLineAccessChecked] = useState(false);
@@ -483,12 +479,8 @@ function ProfilePanel({
       setLogoutConfirmOpen(false);
       return;
     }
-    if (withdrawConsultOpen) {
-      setWithdrawConsultOpen(false);
-      return;
-    }
-    if (withdrawTermsOpen) {
-      setWithdrawTermsOpen(false);
+    if (withdrawFlowOpen) {
+      setWithdrawFlowOpen(false);
       return;
     }
     if (partnerInquiryOpen) {
@@ -507,8 +499,7 @@ function ProfilePanel({
   }, [
     upgradeOpen,
     logoutConfirmOpen,
-    withdrawConsultOpen,
-    withdrawTermsOpen,
+    withdrawFlowOpen,
     partnerInquiryOpen,
     panelView,
     settingsSubView,
@@ -696,8 +687,7 @@ function ProfilePanel({
       setTimeout(() => setShowCopied(false), 2000);
     });
   };
-  const withdrawUnlocked = withdrawGrantUntil > Date.now();
-  const canSubmitWithdraw = agreeRefund && agreeReverify && agreeFinal;
+  const memberLoginId = useMemo(() => readLocalLoginPrefix() || getMemberHandle() || "", [open, nickTick]);
   const hideProfileTopChrome = panelView === "letteringBizcard";
 
   const submitPartnerInquiry = () => {
@@ -837,9 +827,7 @@ function ProfilePanel({
             onMarkAllChatsRead={onMarkAllChatsRead}
             hasUnreadChats={hasUnreadChats}
             onLogout={() => setLogoutConfirmOpen(true)}
-            onOpenWithdrawConsult={() => setWithdrawConsultOpen(true)}
-            withdrawUnlocked={withdrawUnlocked}
-            onOpenWithdrawTerms={() => setWithdrawTermsOpen(true)}
+            onOpenWithdraw={() => setWithdrawFlowOpen(true)}
             onOpenPartnerInquiry={() => setPartnerInquiryOpen(true)}
             onOpenCustomerCenter={() => setPartnerInquiryOpen(true)}
             onOpenFamilyProtection={onOpenFamilyProtection}
@@ -1376,48 +1364,18 @@ function ProfilePanel({
           </div>
         </div>
       )}
-      {withdrawConsultOpen && (
-        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/45 px-6" onMouseDown={() => setWithdrawConsultOpen(false)}>
-          <div
-            className={`relative w-full max-w-sm rounded-2xl border p-4 pt-12 shadow-2xl ${
-              isDarkMode ? "border-white/10 bg-[#111827] text-gray-100" : "border-gray-100 bg-white text-gray-900"
-            }`}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <ModalCloseButton variant={isDarkMode ? "subtle" : "default"} onClick={() => setWithdrawConsultOpen(false)} />
-            <p className="text-[15px] font-black">AI 상담 확인</p>
-            <p className={`mt-1 text-[12px] leading-relaxed ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              회원탈퇴는 오탈퇴 방지를 위해 AI 상담 확인 후에만 진행할 수 있습니다.
-            </p>
-            <ul className={`mt-3 space-y-1 text-[12px] ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-              <li>• 탈퇴 시 계정 데이터는 복구되지 않을 수 있습니다.</li>
-              <li>• 환불은 결제 수단/결제사 정책에 따라 처리됩니다.</li>
-              <li>• 재가입 시 본인인증 및 인증명함 절차를 처음부터 다시 진행합니다.</li>
-            </ul>
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setWithdrawConsultOpen(false)}
-                className={`flex-1 rounded-xl py-2.5 text-[12px] font-bold ${
-                  isDarkMode ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-600"
-                }`}
-              >
-                닫기
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setWithdrawGrantUntil(Date.now() + 10 * 60 * 1000);
-                  setWithdrawConsultOpen(false);
-                }}
-                className="flex-1 rounded-xl bg-amber-500 py-2.5 text-[12px] font-black text-white"
-              >
-                상담 확인 완료
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AccountWithdrawalFlow
+        open={withdrawFlowOpen}
+        isDarkMode={isDarkMode}
+        loginId={memberLoginId}
+        onClose={() => setWithdrawFlowOpen(false)}
+        onWithdrawComplete={() => {
+          setWithdrawFlowOpen(false);
+          onWithdrawAccount?.({ skipApi: true });
+          onClose?.();
+        }}
+        onToast={showSettingNotice}
+      />
       {partnerInquiryOpen && (
         <div className="fixed inset-0 z-[97] flex items-center justify-center bg-black/45 px-6" onMouseDown={() => setPartnerInquiryOpen(false)}>
           <div
@@ -1477,62 +1435,6 @@ function ProfilePanel({
           </p>
         </div>
       ) : null}
-      {withdrawTermsOpen && (
-        <div className="fixed inset-0 z-[97] flex items-center justify-center bg-black/55 px-6" onMouseDown={() => setWithdrawTermsOpen(false)}>
-          <div
-            className={`relative w-full max-w-sm rounded-2xl border p-4 pt-12 shadow-2xl ${
-              isDarkMode ? "border-white/10 bg-[#111827] text-gray-100" : "border-gray-100 bg-white text-gray-900"
-            }`}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <ModalCloseButton variant={isDarkMode ? "subtle" : "default"} onClick={() => setWithdrawTermsOpen(false)} />
-            <p className="text-[15px] font-black text-red-500">회원탈퇴 약관 동의</p>
-            <p className={`mt-1 text-[12px] leading-relaxed ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              아래 항목 모두 동의해야 탈퇴가 진행됩니다.
-            </p>
-            <div className="mt-3 space-y-2 text-[12px]">
-              <label className="flex items-start gap-2">
-                <input type="checkbox" checked={agreeRefund} onChange={(e) => setAgreeRefund(e.target.checked)} className="mt-0.5" />
-                <span>환불은 결제 정책 및 사용 이력 검토 후 처리되는 것에 동의합니다.</span>
-              </label>
-              <label className="flex items-start gap-2">
-                <input type="checkbox" checked={agreeReverify} onChange={(e) => setAgreeReverify(e.target.checked)} className="mt-0.5" />
-                <span>재가입 시 본인인증/인증명함 발급 절차를 처음부터 다시 진행함에 동의합니다.</span>
-              </label>
-              <label className="flex items-start gap-2">
-                <input type="checkbox" checked={agreeFinal} onChange={(e) => setAgreeFinal(e.target.checked)} className="mt-0.5" />
-                <span>탈퇴 후 데이터 복구가 제한될 수 있음을 확인했습니다.</span>
-              </label>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setWithdrawTermsOpen(false)}
-                className={`flex-1 rounded-xl py-2.5 text-[12px] font-bold ${
-                  isDarkMode ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-600"
-                }`}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                disabled={!canSubmitWithdraw}
-                onClick={async () => {
-                  const { requirePinForSensitiveAction } = await import("../lib/appLockBridge.js");
-                  const auth = await requirePinForSensitiveAction("profile_edit");
-                  if (!auth.ok) return;
-                  setWithdrawTermsOpen(false);
-                  onWithdrawAccount?.();
-                  onClose?.();
-                }}
-                className="flex-1 rounded-xl bg-red-600 py-2.5 text-[12px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                탈퇴 진행
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       <MembershipUpgradeModal
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}

@@ -147,6 +147,18 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
   }, minorAdultExpiryMs);
 
   startExternalMailSyncScheduler();
+
+  const withdrawalCronMs = Number(process.env.WITHDRAWAL_CRON_MS) || 15 * 60 * 1000;
+  setInterval(() => {
+    import("./services/auth/accountWithdrawalFlowService.js")
+      .then(({ processDueScheduledWithdrawals }) => processDueScheduledWithdrawals())
+      .then((r) => {
+        if (r.processed > 0) {
+          console.log("[withdrawal-cron]", r);
+        }
+      })
+      .catch((e) => console.warn("[withdrawal-cron] failed", e));
+  }, withdrawalCronMs);
 });
 
 attachOfficeAgentWebSocket(server as Server);

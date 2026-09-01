@@ -10,7 +10,14 @@ export const EMAIL_VERIFIED_TTL_SEC = 10 * 60;
 export const EMAIL_AUTH_SUPPORT = "이메일이 기억나지 않으면 고객센터 support@vlue.kr 로 문의해 주세요.";
 export const SENDER_EMAIL_DEFAULT = "support@vlue.kr";
 
-export const EMAIL_AUTH_PURPOSES = ["signup", "login_device", "password_change", "find_id", "dcc_email"] as const;
+export const EMAIL_AUTH_PURPOSES = [
+  "signup",
+  "login_device",
+  "password_change",
+  "find_id",
+  "dcc_email",
+  "account_withdraw"
+] as const;
 export type EmailAuthPurpose = (typeof EMAIL_AUTH_PURPOSES)[number];
 
 export function isEmailAuthPurpose(v: string): v is EmailAuthPurpose {

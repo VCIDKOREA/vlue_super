@@ -270,6 +270,11 @@ model User {
   /// 매니페스트 status — ACTIVE / INACTIVE / DELETED (탈퇴 시 DELETED + PII 파기)
   status UserStatus @default(ACTIVE) @map("user_status")
 
+  /// 탈퇴 예약(수동 신청 24h 유예) — 복구 가능 기간
+  withdrawalScheduledAt DateTime? @map("withdrawal_scheduled_at") @db.Timestamptz(6)
+  withdrawalRequestedAt DateTime? @map("withdrawal_requested_at") @db.Timestamptz(6)
+  withdrawalMethod      String?   @map("withdrawal_method") @db.VarChar(32)
+
   /// 매니페스트 referrerCode — 가입 시 입력한 파트너 추천인 코드
   referrerCode String? @map("referrer_code") @db.VarChar(24)
 

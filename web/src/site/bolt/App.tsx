@@ -32,6 +32,7 @@ import RefundPage from './pages/RefundPage';
 import FamilyProtectionPage, { AFTER_LOGIN_KEY } from './pages/FamilyProtectionPage';
 import PremiumHeroSection from './components/PremiumHeroSection';
 import type { MarketingAuthUser } from './components/AuthModal';
+import AccountWithdrawalFlow from '../../components/settings/AccountWithdrawalFlow.jsx';
 import {
   restoreMarketingAuthUser,
   vlueMarketingLogout,
@@ -92,6 +93,8 @@ export default function App() {
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup' | 'signup_certified'>('login');
   const [authAutoStartSignup, setAuthAutoStartSignup] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
+  const [withdrawFlowOpen, setWithdrawFlowOpen] = useState(false);
+  const [withdrawNotice, setWithdrawNotice] = useState('');
 
   useEffect(() => {
     const onHash = () => setRoute(readViewFromHash());
@@ -273,11 +276,31 @@ export default function App() {
     handleNavigate('family');
   };
 
+  const handleWithdrawComplete = async () => {
+    setWithdrawFlowOpen(false);
+    await vlueMarketingLogout();
+    setUser(null);
+    setRoute({ view: 'home' });
+    window.location.hash = 'home';
+    setWithdrawNotice('회원탈퇴가 완료되었습니다. 재가입 시 본인인증부터 다시 진행됩니다.');
+    window.setTimeout(() => setWithdrawNotice(''), 5000);
+  };
+
+  const memberLoginId = user?.loginId || user?.email?.replace(/^@+/, '') || '';
+
   return (
     <div className="min-h-screen bg-blue-tint relative font-sans">
       <AnimatedBackground />
       <div className="relative z-10">
-        <Navbar currentView={view} onNavigate={handleNavigate} user={user} onLoginClick={() => { setAuthInitialMode('login'); setAuthAutoStartSignup(false); setShowAuth(true); }} onLogout={handleLogout} onIdleLogout={handleIdleLogout} />
+        <Navbar
+          currentView={view}
+          onNavigate={handleNavigate}
+          user={user}
+          onLoginClick={() => { setAuthInitialMode('login'); setAuthAutoStartSignup(false); setShowAuth(true); }}
+          onLogout={handleLogout}
+          onOpenWithdraw={() => setWithdrawFlowOpen(true)}
+          onIdleLogout={handleIdleLogout}
+        />
         {idleNotice ? (
           <div className="mkt-site-toast" role="status">
             30분 동안 사용이 없어 로그아웃되었습니다.
@@ -286,6 +309,11 @@ export default function App() {
         {oauthNotice ? (
           <div className="mkt-site-toast" role="status">
             {oauthNotice}
+          </div>
+        ) : null}
+        {withdrawNotice ? (
+          <div className="mkt-site-toast" role="status">
+            {withdrawNotice}
           </div>
         ) : null}
         {view === 'home' && (
@@ -414,6 +442,19 @@ export default function App() {
           onSuccess={handleAuthSuccess}
         />
       )}
+      {user ? (
+        <AccountWithdrawalFlow
+          open={withdrawFlowOpen}
+          isDarkMode={false}
+          loginId={memberLoginId}
+          onClose={() => setWithdrawFlowOpen(false)}
+          onWithdrawComplete={handleWithdrawComplete}
+          onToast={(msg) => {
+            setWithdrawNotice(String(msg || ''));
+            window.setTimeout(() => setWithdrawNotice(''), 5000);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
