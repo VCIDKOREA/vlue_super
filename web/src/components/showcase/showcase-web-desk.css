@@ -298,7 +298,7 @@
   bottom: max(92px, calc(80px + env(safe-area-inset-bottom, 0px)));
 }
 
-/* www 미리보기 + 통화화면 보기 — 캐러셀 높이 유지, 초록 CTA는 reception 안 */
+/* www 미리보기 + 통화화면 보기 — 프레임(620px) 안에서 캐러셀 축소 + 하단 CTA (앱과 동일) */
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome {
   overflow: hidden;
 }
@@ -306,14 +306,24 @@
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot__inner > .lettering-ongoing-reception {
   display: flex;
   flex-direction: column;
-  height: 704px;
-  max-height: 704px;
-  min-height: 704px;
+  height: 620px;
+  max-height: 620px;
+  min-height: 620px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--carousel,
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--reception {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none !important;
+  overflow: hidden;
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-actions-secondary--call {
-  flex-shrink: 0;
-  margin-top: auto;
+  flex: 0 0 auto;
+  margin-top: 0;
   background: linear-gradient(
     0deg,
     rgba(7, 11, 20, 0.96) 0%,
@@ -322,6 +332,19 @@
   ) !important;
   border-top: 0 !important;
   box-shadow: none !important;
+}
+
+/* 통화 CTA 공간 — 프로필 바·소셜 레일을 프레임 안으로 */
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-slide-chrome__dock {
+  bottom: max(72px, 64px);
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-social-rail {
+  bottom: max(76px, 68px);
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-like-summary {
+  bottom: max(148px, calc(92px + 64px));
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--carousel,
