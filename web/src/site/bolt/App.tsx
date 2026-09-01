@@ -33,6 +33,8 @@ import FamilyProtectionPage, { AFTER_LOGIN_KEY } from './pages/FamilyProtectionP
 import PremiumHeroSection from './components/PremiumHeroSection';
 import type { MarketingAuthUser } from './components/AuthModal';
 import AccountWithdrawalFlow from '../../components/settings/AccountWithdrawalFlow.jsx';
+import UserCaseArchiveView from '../../components/mycase/UserCaseArchiveView.jsx';
+import { useVlueCaseUserNav } from '../../lib/useVlueCaseUserNav.js';
 import {
   restoreMarketingAuthUser,
   vlueMarketingLogout,
@@ -104,6 +106,7 @@ export default function App() {
 
   const [idleNotice, setIdleNotice] = useState(false);
   const [oauthNotice, setOauthNotice] = useState('');
+  const [caseToast, setCaseToast] = useState('');
 
   useEffect(() => {
     const result = consumeMarketingOAuthReturn();
@@ -206,6 +209,18 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+
+  const showCaseToast = (msg: string) => {
+    const text = String(msg || '').trim();
+    if (!text) return;
+    setCaseToast(text);
+    window.setTimeout(() => setCaseToast(''), 3200);
+  };
+
+  const { caseArchiveUser, closeCaseArchive } = useVlueCaseUserNav({
+    onOpenSelf: () => handleNavigate('casebox'),
+    onToast: showCaseToast
+  });
 
   const handleLogout = async () => {
     await vlueMarketingLogout();
@@ -314,6 +329,11 @@ export default function App() {
         {withdrawNotice ? (
           <div className="mkt-site-toast" role="status">
             {withdrawNotice}
+          </div>
+        ) : null}
+        {caseToast ? (
+          <div className="mkt-site-toast" role="status">
+            {caseToast}
           </div>
         ) : null}
         {view === 'home' && (
@@ -455,6 +475,15 @@ export default function App() {
           }}
         />
       ) : null}
+      <UserCaseArchiveView
+        open={Boolean(caseArchiveUser?.userId)}
+        userId={caseArchiveUser?.userId || null}
+        displayName={caseArchiveUser?.name || ''}
+        peerHandle={caseArchiveUser?.handle || ''}
+        onClose={closeCaseArchive}
+        onToast={showCaseToast}
+        isDarkMode={false}
+      />
     </div>
   );
 }

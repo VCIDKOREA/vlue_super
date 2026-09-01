@@ -4771,6 +4771,13 @@
   padding: 12px;
 }
 
+.showcase-like-sheet__scrim--scoped {
+  position: absolute;
+  z-index: 48;
+  padding: 8px;
+  border-radius: inherit;
+}
+
 .showcase-like-sheet {
   width: 100%;
   max-width: 28rem;
@@ -4782,6 +4789,11 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.showcase-like-sheet__scrim--scoped .showcase-like-sheet {
+  max-width: 100%;
+  max-height: min(78%, 420px);
 }
 
 .showcase-like-sheet__head {

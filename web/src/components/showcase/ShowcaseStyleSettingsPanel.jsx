@@ -64,6 +64,7 @@ import ShowcasePullDownPreview from "./ShowcasePullDownPreview.jsx";
 import { KakaoOpenChatGlyph, KakaoTalkGlyph } from "./KakaoOutlinkGlyphs.jsx";
 import CallBigPushPreviewSection from "../CallBigPushPreviewSection.jsx";
 import DccLineSwitcher from "../dcc/DccLineSwitcher.jsx";
+import { ShowcaseOverlayPortalContext } from "../../context/ShowcaseOverlayPortalContext.jsx";
 import "./showcase-style-settings.css";
 import "./showcase-web-desk.css";
 import "../../styles/showcase-call-glass.css";
@@ -272,6 +273,7 @@ export default function ShowcaseStyleSettingsPanel({
   const [openSearch, setOpenSearch] = useState(false);
   const [expandedPageId, setExpandedPageId] = useState("");
   const settingsScrollRef = useRef(null);
+  const previewPortalRef = useRef(null);
   const [igLink, setIgLink] = useState({ linked: false });
   const [igLinkLoading, setIgLinkLoading] = useState(false);
   const [kakaoLink, setKakaoLink] = useState({ linked: false });
@@ -1683,15 +1685,21 @@ export default function ShowcaseStyleSettingsPanel({
         aria-busy={lineBusy ? "true" : undefined}
       >
         <div className="showcase-web-desk__body">
-          <aside className="showcase-web-desk__preview-col" aria-label="쇼케이스 미리보기">
-            <CallBigPushPreviewSection
-              membershipTier={effectiveTier}
-              isDarkMode={isDarkMode}
-              onToast={onToast}
-              expandMode="inline"
-              defaultExpanded
-              suppressExpandGuide
-            />
+          <aside
+            ref={previewPortalRef}
+            className="showcase-web-desk__preview-col"
+            aria-label="쇼케이스 미리보기"
+          >
+            <ShowcaseOverlayPortalContext.Provider value={previewPortalRef}>
+              <CallBigPushPreviewSection
+                membershipTier={effectiveTier}
+                isDarkMode={isDarkMode}
+                onToast={onToast}
+                expandMode="inline"
+                defaultExpanded
+                suppressExpandGuide
+              />
+            </ShowcaseOverlayPortalContext.Provider>
           </aside>
 
           <section className="showcase-web-desk__settings-col" aria-label="설정">

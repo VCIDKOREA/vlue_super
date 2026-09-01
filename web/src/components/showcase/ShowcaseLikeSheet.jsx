@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { fetchShowcaseLikes } from "../../lib/showcase/showcaseSocialApi.js";
-import { COMMENT_CASE_USER_EVENT } from "../../lib/showcase/commentRichText.js";
+import { dispatchCommentAuthor } from "../../lib/showcase/commentRichText.js";
+import { useShowcaseOverlayPortal } from "../../context/ShowcaseOverlayPortalContext.jsx";
 
 function LikeRow({ author, onOpen }) {
   const handle = String(author?.handle || "").replace(/^@+/, "").trim();
@@ -26,6 +27,7 @@ function LikeRow({ author, onOpen }) {
 }
 
 export default function ShowcaseLikeSheet({ open, onClose, ownerUserId = "", slideId = "" }) {
+  const portalRef = useShowcaseOverlayPortal();
   const [likes, setLikes] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -44,19 +46,21 @@ export default function ShowcaseLikeSheet({ open, onClose, ownerUserId = "", sli
   }, [open, ownerUserId, slideId]);
 
   const openUser = (author) => {
-    const detail = {
-      userId: String(author?.id || "").trim() || undefined,
-      handle: String(author?.handle || "").replace(/^@+/, "").trim(),
-      name: String(author?.name || "").trim()
-    };
-    window.dispatchEvent(new CustomEvent(COMMENT_CASE_USER_EVENT, { detail }));
+    dispatchCommentAuthor(author);
     onClose?.();
   };
 
   if (!open || typeof document === "undefined") return null;
 
+  const portalTarget = portalRef?.current || document.body;
+  const scoped = Boolean(portalRef?.current);
+
   return createPortal(
-    <div className="showcase-like-sheet__scrim" role="presentation" onClick={onClose}>
+    <div
+      className={`showcase-like-sheet__scrim${scoped ? " showcase-like-sheet__scrim--scoped" : ""}`}
+      role="presentation"
+      onClick={onClose}
+    >
       <div
         className="showcase-like-sheet"
         role="dialog"
@@ -81,6 +85,6 @@ export default function ShowcaseLikeSheet({ open, onClose, ownerUserId = "", sli
         </div>
       </div>
     </div>,
-    document.body
+    portalTarget
   );
 }
