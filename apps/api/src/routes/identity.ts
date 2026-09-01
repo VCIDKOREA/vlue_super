@@ -51,10 +51,8 @@ identityRoutes.post("/portone/complete", async (c) => {
         issuedAt?: string;
         dataUrl?: string;
       } | null;
-      signupTrack?: "business_email" | "vlue_id_only";
       businessEmail?: string | null;
       emailVerificationToken?: string | null;
-      virtualEmailPrefix?: string | null;
     }>();
     const impUid = body?.impUid?.trim();
     if (!impUid) {
@@ -115,16 +113,9 @@ identityRoutes.post("/portone/complete", async (c) => {
             dataUrl: body.digitalCardDoc.dataUrl
           }
         : null,
-      signupTrack:
-        body?.signupTrack === "business_email" || body?.signupTrack === "vlue_id_only"
-          ? body.signupTrack
-          : null,
       businessEmail: body?.businessEmail ? String(body.businessEmail).trim() : null,
       emailVerificationToken: body?.emailVerificationToken
         ? String(body.emailVerificationToken).trim()
-        : null,
-      virtualEmailPrefix: body?.virtualEmailPrefix
-        ? String(body.virtualEmailPrefix).trim()
         : null
     });
 

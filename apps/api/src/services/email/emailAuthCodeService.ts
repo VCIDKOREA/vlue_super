@@ -5,6 +5,7 @@ import { sendEmailViaSesOrMock } from "../mailTalk/sesMailSender.js";
 import { isAuthEmailDeliveryConfigured, sendAuthEmail } from "./authEmailSender.js";
 import { listMasterTargets } from "./userEmailMappingsStore.js";
 import { isValidEmailShape, normalizeBusinessEmail } from "./signupEmailProvision.js";
+import { isPlatformEmailDomain } from "./emailDomainClassification.js";
 
 export const EMAIL_OTP_TTL_SEC = 5 * 60;
 export const EMAIL_VERIFIED_TTL_SEC = 10 * 60;
@@ -210,6 +211,9 @@ export async function sendEmailAuthCode(opts: {
   const email = normalizeAuthEmail(opts.emailRaw);
   if (!isValidEmailShape(email)) {
     throw new Error("유효한 이메일 주소를 입력해 주세요.");
+  }
+  if (opts.purpose === "signup" && isPlatformEmailDomain(email)) {
+    throw new Error("@vlue.kr 주소는 가입에 사용할 수 없습니다. 개인 또는 회사 메일을 사용해 주세요.");
   }
 
   const last = await kvGet(rateKey(opts.purpose, email));

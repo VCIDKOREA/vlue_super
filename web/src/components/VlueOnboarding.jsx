@@ -220,19 +220,9 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const [signupPwConfirmEyeBlink, setSignupPwConfirmEyeBlink] = useState(0);
   /** idle | checking | ok | taken | invalid */
   const [idCheck, setIdCheck] = useState({ status: "idle", message: "" });
-  /** business_email | vlue_id_only — QA·일반은 아이디만(이메일 OTP 불필요) */
-  const [signupTrack, setSignupTrack] = useState("vlue_id_only");
-  const [businessEmail, setBusinessEmail] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
   const [emailVerify, setEmailVerify] = useState({ status: "idle", message: "", token: "" });
-  const [businessVirtualId, setBusinessVirtualId] = useState("");
-  const [needsCustomVirtualId, setNeedsCustomVirtualId] = useState(false);
-  const [virtualIdCheck, setVirtualIdCheck] = useState({
-    status: "idle",
-    message: "",
-    normalized: "",
-    fullVirtualEmail: ""
-  });
 
   const runCheckLoginId = useCallback(async (slug) => {
     const s = String(slug || "").trim();
@@ -258,49 +248,6 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       }
     } catch {
       setIdCheck({ status: "invalid", message: "중복 확인 요청에 실패했습니다." });
-    }
-  }, []);
-
-  const runCheckVirtualId = useCallback(async (slug) => {
-    const s = String(slug || "").trim();
-    if (!s) {
-      setVirtualIdCheck({
-        status: "invalid",
-        message: "비즈니스 메일 ID를 입력해 주세요.",
-        normalized: "",
-        fullVirtualEmail: ""
-      });
-      return;
-    }
-    setVirtualIdCheck({ status: "checking", message: "", normalized: "", fullVirtualEmail: "" });
-    try {
-      const res = await fetch(
-        apiUrl(`/api/auth/check-virtual-email-id?virtualId=${encodeURIComponent(s)}`)
-      );
-      const data = await res.json().catch(() => ({}));
-      if (data.available && data.normalized) {
-        setBusinessVirtualId(data.normalized);
-        setVirtualIdCheck({
-          status: "ok",
-          message: `사용 가능: ${data.fullVirtualEmail || `${data.normalized}@vlue.kr`}`,
-          normalized: data.normalized,
-          fullVirtualEmail: data.fullVirtualEmail || ""
-        });
-      } else {
-        setVirtualIdCheck({
-          status: data.code === "RESERVED" ? "error" : "conflict",
-          message: data.reason || "사용할 수 없는 ID입니다.",
-          normalized: data.normalized || "",
-          fullVirtualEmail: data.fullVirtualEmail || ""
-        });
-      }
-    } catch {
-      setVirtualIdCheck({
-        status: "error",
-        message: "중복 확인 요청에 실패했습니다.",
-        normalized: "",
-        fullVirtualEmail: ""
-      });
     }
   }, []);
 
@@ -331,7 +278,6 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       setStep("pass");
       setVerifyZone({ ok: true, text: "본인인증 확인 중…" });
       try {
-        const trackA = Boolean(draft.trackA);
         const allowBizCardOpts = Boolean(draft.allowBizCardOpts);
         const data = await postPortoneIdentityComplete({
           impUid: redirect.imp_uid,
@@ -350,11 +296,9 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
           billingCycle: draft.paidBillingCycle,
           referralCode: draft.referralCodeForApi || null,
           termsVersion: TERMS_VERSION,
-          desiredPublicHandle: trackA ? null : draft.slug,
-          signupTrack: draft.signupTrack,
-          businessEmail: trackA ? draft.businessEmail : null,
-          emailVerificationToken: trackA ? draft.emailVerificationToken : null,
-          virtualEmailPrefix: trackA ? draft.virtualEmailPrefix : null,
+          desiredPublicHandle: draft.slug,
+          businessEmail: draft.signupEmail,
+          emailVerificationToken: draft.emailVerificationToken,
           password: draft.password,
           groupSignup: draft.isB2b ? draft.groupSignup : null,
           ...(allowBizCardOpts && draft.passBusinessMember
@@ -400,10 +344,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
           setAuthMode("recommend");
           setRecPhase(1);
           setStep("recommend_detail");
-        } else if (
-          !isBillableMembershipKind(draft.membershipKind) &&
-          draft.signupTrack === "vlue_id_only"
-        ) {
+        } else if (!isBillableMembershipKind(draft.membershipKind)) {
           setAuthMode("direct");
           setStep("complete");
         } else {
@@ -425,7 +366,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
 
   useEffect(() => {
     /** PASS 이후 단계에서는 재조회로 상태를 깨뜨리지 않음 (이미 계정 단계에서 통과함) */
-    if (step !== "account" || signupTrack !== "vlue_id_only") return undefined;
+    if (step !== "account") return undefined;
     const slug = normalizeMemberHandleSlug(desiredMemberId);
     if (!slug) {
       setIdCheck({ status: "idle", message: "" });
@@ -439,7 +380,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       runCheckLoginId(slug);
     }, 450);
     return () => clearTimeout(t);
-  }, [desiredMemberId, runCheckLoginId, step, signupTrack]);
+  }, [desiredMemberId, runCheckLoginId, step]);
 
   const allArticlesAgreed = useMemo(() => TERMS_CHECKLIST_IDS.every((id) => agreedById[id]), [agreedById]);
   /** V1: 추천·리워드 동의는 미운영 — 체크 불필요 */
@@ -554,29 +495,6 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       return;
     }
 
-    if (signupTrack === "business_email") {
-      const email = String(businessEmail || "").trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        setVerifyZone({ ok: false, text: "비즈니스 메일 주소를 올바르게 입력해 주세요." });
-        return;
-      }
-      if (emailVerify.status !== "ok" || !emailVerify.token) {
-        setVerifyZone({ ok: false, text: "이메일 인증을 완료해 주세요." });
-        return;
-      }
-      if (virtualIdCheck.status !== "ok" || !virtualIdCheck.normalized) {
-        setVerifyZone({
-          ok: false,
-          text: needsCustomVirtualId
-            ? "나만의 비즈니스 메일 ID 중복확인을 완료해 주세요."
-            : "@vlue.kr 주소 확인을 기다려 주세요."
-        });
-        return;
-      }
-      setStep("pass");
-      return;
-    }
-
     const slug = normalizeMemberHandleSlug(desiredMemberId);
     if (!isValidMemberHandleSlug(slug)) {
       setVerifyZone({
@@ -592,6 +510,23 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       });
       return;
     }
+
+    const email = String(signupEmail || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setVerifyZone({ ok: false, text: "이메일 주소를 올바르게 입력해 주세요." });
+      return;
+    }
+    if (/@vlue\.kr$/i.test(email) || /\.vlue\.kr$/i.test(email.split("@")[1] || "")) {
+      setVerifyZone({
+        ok: false,
+        text: "@vlue.kr 주소는 가입에 사용할 수 없습니다. 개인 또는 회사 메일을 사용해 주세요."
+      });
+      return;
+    }
+    if (emailVerify.status !== "ok" || !emailVerify.token) {
+      setVerifyZone({ ok: false, text: "이메일 인증을 완료해 주세요." });
+      return;
+    }
     setStep("pass");
   };
 
@@ -599,23 +534,19 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
     setBusy(true);
     setVerifyZone(null);
     try {
-      const trackA = signupTrack === "business_email";
-      const slug = trackA ? "auto" : normalizeMemberHandleSlug(desiredMemberId);
-      if (!trackA) {
-        if (!isValidMemberHandleSlug(slug)) {
-          throw new Error("회원 ID는 영문 소문자로 시작하는 3~20자(소문자·숫자·_)이며 숫자를 한 글자 이상 포함해야 합니다.");
-        }
-        /**
-         * 계정 단계에서 이미 통과해도, 백그라운드 재조회가 idCheck를 idle/checking으로 바꿀 수 있음.
-         * PASS 직전 API로 최종 확인 (아래 recheck와 동일).
-         */
-        if (idCheck.status === "taken" || idCheck.status === "invalid") {
-          throw new Error(idCheck.message || "아이디를 다시 확인해 주세요. 이전 단계로 돌아가 「중복확인」을 눌러 주세요.");
-        }
-      } else if (emailVerify.status !== "ok" || !emailVerify.token) {
+      const slug = normalizeMemberHandleSlug(desiredMemberId);
+      if (!isValidMemberHandleSlug(slug)) {
+        throw new Error("회원 ID는 영문 소문자로 시작하는 3~20자(소문자·숫자·_)이며 숫자를 한 글자 이상 포함해야 합니다.");
+      }
+      if (idCheck.status === "taken" || idCheck.status === "invalid") {
+        throw new Error(idCheck.message || "아이디를 다시 확인해 주세요. 이전 단계로 돌아가 「중복확인」을 눌러 주세요.");
+      }
+      const email = String(signupEmail || "").trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new Error("이메일 주소를 올바르게 입력해 주세요.");
+      }
+      if (emailVerify.status !== "ok" || !emailVerify.token) {
         throw new Error("이메일 인증을 완료해 주세요.");
-      } else if (!virtualIdCheck.normalized || virtualIdCheck.status !== "ok") {
-        throw new Error("비즈니스 메일 @vlue.kr ID 확인을 완료해 주세요.");
       }
       const pw = String(signupPassword || "");
       if (!isValidMemberPassword(pw)) {
@@ -628,7 +559,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         typeof sessionStorage !== "undefined" && sessionStorage.getItem("vlue-admin-entry") === "1"
           ? localStorage.getItem("vlue-admin-device-key")
           : null;
-      if (!adminDeviceKeyPre && !trackA) {
+      if (!adminDeviceKeyPre) {
         const recheckRes = await fetch(
           apiUrl(`/api/auth/check-login-id?loginId=${encodeURIComponent(slug)}`)
         );
@@ -676,10 +607,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             "PASS 우회는 로컬 API에서만 됩니다. 지금 프론트가 운영 API(api.vlue.kr)에 연결되어 있어 거부됩니다. 「PASS 본인인증 시작」으로 실연동하거나, VITE_API_URL을 로컬 API로 바꾼 뒤 다시 시도하세요."
           );
         }
-        const devSlug =
-          trackA && businessEmail
-            ? String(businessEmail).split("@")[0].replace(/[^a-z0-9_]/gi, "").slice(0, 20) || "biz"
-            : slug;
+        const devSlug = slug;
         impUid = makeDevLocalImpUid(devSlug);
       } else {
         const allowBizCardOptsPre = isBillableMembershipKind(membershipKind);
@@ -689,7 +617,6 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             : null;
         if (shouldUseIamportCertRedirect()) {
           savePassCertDraft({
-            trackA,
             slug,
             password: pw,
             passBusinessMember,
@@ -701,10 +628,8 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             membershipKind,
             paidBillingCycle,
             referralCodeForApi: referralMeta.codeForApi || null,
-            signupTrack,
-            businessEmail: trackA ? String(businessEmail || "").trim() : null,
-            emailVerificationToken: trackA ? emailVerify.token : null,
-            virtualEmailPrefix: trackA ? virtualIdCheck.normalized : null,
+            signupEmail: email,
+            emailVerificationToken: emailVerify.token,
             isB2b,
             groupSignup: isB2b ? serializeGroupSignupForApi(groupSignupDraft) : null,
             passBusinessRegNo: String(passBusinessRegNo || "").replace(/\D/g, "").slice(0, 10),
@@ -744,11 +669,9 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         billingCycle: paidBillingCycle,
         referralCode: referralMeta.codeForApi || null,
         termsVersion: TERMS_VERSION,
-        desiredPublicHandle: trackA ? null : slug,
-        signupTrack,
-        businessEmail: trackA ? String(businessEmail || "").trim() : null,
-        emailVerificationToken: trackA ? emailVerify.token : null,
-        virtualEmailPrefix: trackA ? virtualIdCheck.normalized : null,
+        desiredPublicHandle: slug,
+        businessEmail: email,
+        emailVerificationToken: emailVerify.token,
         password: pw,
         groupSignup: isB2b ? serializeGroupSignupForApi(groupSignupDraft) : null,
         ...(allowBizCardOpts && passBusinessMember
@@ -845,7 +768,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         return;
       }
       /* 무료 + 아이디만 가입: 주소/직군 단계 생략 → 바로 완료 (이메일·Daum 주소 없이 QA 가능) */
-      if (!isBillableMembershipKind(membershipKind) && signupTrack === "vlue_id_only") {
+      if (!isBillableMembershipKind(membershipKind)) {
         setAuthMode("direct");
         setVerifyZone({ ok: true, text: "본인인증이 완료되었습니다. 가입을 마무리해 주세요." });
         setStep("complete");
@@ -1536,33 +1459,17 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
 
           {step === "account" && (
             <section className={sectionCls}>
-              <h2 className="text-[15px] font-bold text-slate-900 sm:text-[16px]">가입 방식 · 비밀번호</h2>
+              <h2 className="text-[15px] font-bold text-slate-900 sm:text-[16px]">아이디 · 이메일 · 비밀번호</h2>
               <p className="mt-2 text-[11px] font-normal leading-relaxed text-slate-600 sm:text-[12px]">
-                상황에 맞는 경로를 선택하세요. 비즈니스 메일 경로는 휴대폰·이메일 인증 후 가상 메일이 자동 생성됩니다.
+                VLUE ID와 이메일 인증을 완료한 뒤, 휴대폰 본인인증(PASS)으로 가입을 마무리합니다.
               </p>
               <TwoTrackSignupFields
-                signupTrack={signupTrack}
-                onSignupTrackChange={(t) => {
-                  setSignupTrack(t);
-                  setVerifyZone(null);
-                  setEmailVerify({ status: "idle", message: "", token: "" });
-                  setBusinessVirtualId("");
-                  setNeedsCustomVirtualId(false);
-                  setVirtualIdCheck({ status: "idle", message: "", normalized: "", fullVirtualEmail: "" });
-                }}
-                businessEmail={businessEmail}
-                onBusinessEmailChange={setBusinessEmail}
+                signupEmail={signupEmail}
+                onSignupEmailChange={setSignupEmail}
                 emailOtp={emailOtp}
                 onEmailOtpChange={setEmailOtp}
                 emailVerify={emailVerify}
                 onEmailVerifyChange={setEmailVerify}
-                businessVirtualId={businessVirtualId}
-                onBusinessVirtualIdChange={setBusinessVirtualId}
-                virtualIdCheck={virtualIdCheck}
-                onVirtualIdCheckChange={setVirtualIdCheck}
-                onRunCheckVirtualId={runCheckVirtualId}
-                needsCustomVirtualId={needsCustomVirtualId}
-                onNeedsCustomVirtualIdChange={setNeedsCustomVirtualId}
                 desiredMemberId={desiredMemberId}
                 onDesiredMemberIdChange={setDesiredMemberId}
                 idCheck={idCheck}

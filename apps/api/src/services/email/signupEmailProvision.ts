@@ -102,30 +102,15 @@ export async function provisionSignupEmailMapping(input: {
   });
 }
 
-export async function applySignupEmailBundle(params: {
+export async function applySignupEmailBundle(_params: {
   userId: string;
   signupTrack: SignupTrack;
   virtualEmailPrefix: string;
   businessEmail?: string | null;
   membershipStatus?: "FREE" | "PREMIUM";
 }): Promise<UserEmailMappingRow | null> {
-  if (params.signupTrack === "business_email") {
-    const email = normalizeBusinessEmail(params.businessEmail || "");
-    if (!email) throw new Error("비즈니스 메일 주소가 필요합니다.");
-    return provisionSignupEmailMapping({
-      userId: params.userId,
-      virtualEmailPrefix: params.virtualEmailPrefix,
-      targetMasterEmail: email,
-      membershipStatus: params.membershipStatus
-    });
-  }
-
-  return provisionSignupEmailMapping({
-    userId: params.userId,
-    virtualEmailPrefix: params.virtualEmailPrefix,
-    targetMasterEmail: null,
-    membershipStatus: params.membershipStatus
-  });
+  /** @vlue.kr 가상 메일 자동 발급은 더 이상 하지 않음 (가입 시 users.email 만 저장) */
+  return null;
 }
 
 export async function applyCompanyVerifiedIfEligible(userId: string, businessEmail: string | null) {

@@ -31,16 +31,13 @@ import {
 } from "@vlue/shared/policy/minor-signup";
 import { recordOnboardingDigitalCardDoc } from "./bizcard/titleDeptReviewService.js";
 import {
-  applySignupEmailBundle,
   applyCompanyVerifiedIfEligible,
-  normalizeBusinessEmail,
-  type SignupTrack
+  isValidEmailShape,
+  normalizeBusinessEmail
 } from "./email/signupEmailProvision.js";
+import { isPlatformEmailDomain } from "./email/emailDomainClassification.js";
 import { consumeSignupEmailToken } from "./email/signupEmailVerifyService.js";
-import {
-  assertVirtualEmailIdForSignup,
-  assertSignupLoginIdNotReserved
-} from "./email/virtualEmailIdService.js";
+import { assertSignupLoginIdNotReserved } from "./email/virtualEmailIdService.js";
 import { RESERVED_ID_MESSAGE, isReservedId } from "@vlue/shared/signup/reservedIds";
 
 /** Prisma Bytes 필드와 TS 제네릭 호환 */
@@ -232,14 +229,10 @@ export async function completePortoneIdentity(params: {
     issuedAt?: string;
     dataUrl?: string;
   } | null;
-  /** business_email | vlue_id_only — 투트랙 가입 */
-  signupTrack?: SignupTrack | null;
-  /** 경로 A: 기존 비즈니스/개인 메일 (로그인 ID·포워딩 타깃) */
+  /** 가입 시 인증된 개인/회사 메일 (비밀번호 찾기·계정 복구) */
   businessEmail?: string | null;
-  /** 경로 A: 이메일 OTP 검증 후 발급 토큰 */
+  /** 이메일 OTP 검증 후 발급 토큰 */
   emailVerificationToken?: string | null;
-  /** 경로 A: 확정된 @vlue.kr 접두사 (로그인 ID는 businessEmail) */
-  virtualEmailPrefix?: string | null;
 }): Promise<IdentityCompleteResult> {
   let parsed: Awaited<ReturnType<typeof fetchAndParseIamportCertification>>;
   if (isDevLocalImpUid(params.impUid)) {
@@ -305,10 +298,7 @@ export async function completePortoneIdentity(params: {
   }
 
   const desiredSlug = normalizeDesiredPublicHandle(params.desiredPublicHandle);
-  const signupTrack: SignupTrack =
-    params.signupTrack === "business_email" ? "business_email" : "vlue_id_only";
-  const businessEmailNorm =
-    signupTrack === "business_email" ? normalizeBusinessEmail(params.businessEmail || "") : "";
+  const signupEmailNorm = normalizeBusinessEmail(params.businessEmail || "");
   const bizDigits = params.isBusinessMember
     ? String(params.businessRegistrationNo || "").replace(/\D/g, "").slice(0, 10)
     : "";
@@ -343,24 +333,29 @@ export async function completePortoneIdentity(params: {
       desiredSlug
     );
   } else {
-    let publicHandleForCreate: string;
-    if (signupTrack === "business_email") {
-      if (!businessEmailNorm) {
-        throw new Error("비즈니스 메일 주소를 입력해 주세요.");
-      }
-      await consumeSignupEmailToken(businessEmailNorm, params.emailVerificationToken);
-      const virtualPrefix = await assertVirtualEmailIdForSignup(
-        String(params.virtualEmailPrefix || "")
-      );
-      publicHandleForCreate = virtualPrefix;
-    } else {
-      if (desiredSlug) {
-        await assertSignupLoginIdNotReserved(desiredSlug);
-      } else if (isReservedId(String(params.desiredPublicHandle || ""))) {
-        throw new Error(RESERVED_ID_MESSAGE);
-      }
-      publicHandleForCreate = await resolvePublicHandleForNewUser(prisma, desiredSlug);
+    if (!signupEmailNorm) {
+      throw new Error("이메일을 입력해 주세요.");
     }
+    if (!isValidEmailShape(signupEmailNorm)) {
+      throw new Error("올바른 이메일 형식을 입력해 주세요.");
+    }
+    if (isPlatformEmailDomain(signupEmailNorm)) {
+      throw new Error("@vlue.kr 주소는 가입에 사용할 수 없습니다. 개인 또는 회사 메일을 사용해 주세요.");
+    }
+    await consumeSignupEmailToken(signupEmailNorm, params.emailVerificationToken);
+    const emailTaken = await prisma.user.findFirst({
+      where: { email: signupEmailNorm },
+      select: { id: true }
+    });
+    if (emailTaken) {
+      throw new Error("이미 가입된 이메일입니다. 로그인해 주세요.");
+    }
+    if (desiredSlug) {
+      await assertSignupLoginIdNotReserved(desiredSlug);
+    } else if (isReservedId(String(params.desiredPublicHandle || ""))) {
+      throw new Error(RESERVED_ID_MESSAGE);
+    }
+    const publicHandleForCreate = await resolvePublicHandleForNewUser(prisma, desiredSlug);
     publicHandle = publicHandleForCreate;
     if (!adminBypass) {
       const pw = String(params.passwordPlain || "");
@@ -402,7 +397,7 @@ export async function completePortoneIdentity(params: {
         gender,
         publicHandle,
         signupMethod: "vlue_native",
-        ...(signupTrack === "business_email" && businessEmailNorm ? { email: businessEmailNorm } : {}),
+        email: signupEmailNorm,
         ...(passwordHash ? { passwordHash } : {}),
         status: "ACTIVE",
         currentDiscountRate: 30,
@@ -446,17 +441,9 @@ export async function completePortoneIdentity(params: {
     }
 
     try {
-      await applySignupEmailBundle({
-        userId,
-        signupTrack,
-        virtualEmailPrefix: publicHandle,
-        businessEmail: businessEmailNorm || null
-      });
-      if (signupTrack === "business_email") {
-        await applyCompanyVerifiedIfEligible(userId, businessEmailNorm);
-      }
+      await applyCompanyVerifiedIfEligible(userId, signupEmailNorm);
     } catch (e) {
-      console.error("[signup-email] provision failed", userId, e);
+      console.error("[signup-email] company verify flag failed", userId, e);
     }
   }
 
