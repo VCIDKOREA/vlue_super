@@ -344,7 +344,8 @@
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-like-summary {
-  bottom: max(148px, calc(92px + 64px));
+  /* dock(72px) 과 간격 유지 — 일반 모드(92-22=70px)와 동일 */
+  bottom: calc(max(72px, 64px) + 70px);
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--carousel,
