@@ -284,7 +284,7 @@ function WebBizcardHubInner({
     return (
       <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
         <Loader2 className="w-5 h-5 animate-spin" />
-        내 명함 정보 불러오는 중…
+        쇼케이스 정보 불러오는 중…
       </div>
     );
   }

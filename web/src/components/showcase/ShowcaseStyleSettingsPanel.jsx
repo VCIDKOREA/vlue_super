@@ -1683,8 +1683,7 @@ export default function ShowcaseStyleSettingsPanel({
         aria-busy={lineBusy ? "true" : undefined}
       >
         <div className="showcase-web-desk__body">
-          <aside className="showcase-web-desk__preview-col" aria-label="미리보기">
-            <p className="showcase-web-desk__preview-label">미리보기</p>
+          <aside className="showcase-web-desk__preview-col" aria-label="쇼케이스 미리보기">
             <CallBigPushPreviewSection
               membershipTier={effectiveTier}
               isDarkMode={isDarkMode}

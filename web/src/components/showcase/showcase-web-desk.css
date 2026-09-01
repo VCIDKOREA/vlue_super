@@ -293,6 +293,29 @@
   bottom: 26px;
 }
 
+.showcase-web-desk .lettering-home-push-embed--web-inline .showcase-like-summary {
+  bottom: max(92px, calc(80px + env(safe-area-inset-bottom, 0px)));
+}
+
+/* www 미리보기 + 통화화면 보기 — 하단 통화 UI만큼 캐러셀·프로필 바 여유 */
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot__inner > .lettering-ongoing-reception {
+  height: 704px;
+  max-height: 704px;
+  min-height: 704px;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-slide-chrome__dock {
+  bottom: max(108px, calc(96px + env(safe-area-inset-bottom, 0px)));
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-social-rail {
+  bottom: max(112px, calc(100px + env(safe-area-inset-bottom, 0px)));
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-like-summary {
+  bottom: max(172px, calc(160px + env(safe-area-inset-bottom, 0px)));
+}
+
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--carousel,
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--reception {
   flex: 1 1 auto;

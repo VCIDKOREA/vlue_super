@@ -4713,7 +4713,7 @@
   position: absolute;
   left: 12px;
   right: 58px;
-  bottom: max(78px, calc(66px + env(safe-area-inset-bottom, 0px)));
+  bottom: max(92px, calc(80px + env(safe-area-inset-bottom, 0px)));
   z-index: 7;
   margin: 0;
   padding: 0 2px;
@@ -4727,7 +4727,7 @@
 }
 
 .lettering-home-push-embed.is-call-chrome:not(.lettering-home-push-embed--web-inline) .showcase-like-summary {
-  bottom: max(168px, calc(156px + env(safe-area-inset-bottom, 0px)));
+  bottom: max(172px, calc(160px + env(safe-area-inset-bottom, 0px)));
 }
 
 .showcase-like-summary__accent {
