@@ -516,15 +516,48 @@
   font-weight: 400;
   color: var(--ig-text);
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
-.ig-mycase__status--linked a {
-  color: #0095f6;
+.ig-mycase__status--linked a,
+.ig-mycase__intro-link {
+  color: #38bdf8;
   text-decoration: none;
   word-break: break-all;
+  font: inherit;
+  line-height: inherit;
 }
 
-.ig-mycase__status--linked a:hover {
+.ig-mycase__intro-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+
+.ig-mycase__status--linked a:hover,
+.ig-mycase__intro-link:hover {
+  text-decoration: underline;
+}
+
+.ig-mycase__intro-more {
+  display: inline;
+  margin: 0 0 0 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #38bdf8;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+
+.ig-mycase__intro-more:hover {
   text-decoration: underline;
 }
 
