@@ -219,10 +219,12 @@ export default function ShowcaseMediaPage({
             aria-label="이전 사진"
             disabled={atStart}
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               go(-1);
             }}
             onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
           >
             <ChevronLeft className="h-5 w-5" strokeWidth={2.4} aria-hidden />
           </button>
@@ -232,10 +234,12 @@ export default function ShowcaseMediaPage({
             aria-label="다음 사진"
             disabled={atEnd}
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               go(1);
             }}
             onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
           >
             <ChevronRight className="h-5 w-5" strokeWidth={2.4} aria-hidden />
           </button>

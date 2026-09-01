@@ -4,7 +4,8 @@ import ShowcasePhotoTextOverlay from "../showcase/ShowcasePhotoTextOverlay.jsx";
 
 const DOUBLE_TAP_MS = 360;
 const DOUBLE_TAP_DIST = 44;
-const SWIPE_THRESHOLD = 48;
+const SWIPE_THRESHOLD = 36;
+const AXIS_LOCK_PX = 10;
 const FEED_MEDIA_ASPECT_DEFAULT = 9 / 16;
 const FEED_MEDIA_ASPECT_MIN = 0.35;
 const FEED_MEDIA_ASPECT_MAX = 16 / 9;
@@ -27,11 +28,13 @@ export default function MyCaseImageCarousel({
   onMediaAspectChange
 }) {
   const [slideAspects, setSlideAspects] = useState({});
-  const gestureRef = useRef({ x: 0, y: 0, locked: null });
+  const rootRef = useRef(null);
+  const draggingRef = useRef(false);
+  const axisRef = useRef(null);
   const swipeMovedRef = useRef(false);
   const tapArmedRef = useRef(false);
   const lastTapRef = useRef({ t: 0, x: 0, y: 0, pointerId: -1 });
-  const pointerStartRef = useRef({ x: 0, y: 0 });
+  const startRef = useRef({ x: 0, y: 0 });
   const probedIdsRef = useRef(new Set());
   const current = images[index] || images[0] || null;
 
@@ -75,7 +78,6 @@ export default function MyCaseImageCarousel({
       onMediaAspectChange?.(cached);
       return;
     }
-    /* 이전 슬라이드(세로) 높이 유지 금지 — 프로브 전까지 중립 비율 */
     onMediaAspectChange?.(FEED_MEDIA_ASPECT_DEFAULT);
   }, [index, current?.id, slideAspects, onMediaAspectChange]);
 
@@ -99,8 +101,8 @@ export default function MyCaseImageCarousel({
   );
 
   const noteTap = useCallback(
-    (clientX, clientY, pointerId = 0) => {
-      if (!onDoubleTap) return;
+    (clientX, clientY, pointerId = 0, moved = false) => {
+      if (!onDoubleTap || moved) return;
       const now = Date.now();
       const prev = lastTapRef.current;
       const dt = now - prev.t;
@@ -115,42 +117,136 @@ export default function MyCaseImageCarousel({
     [onDoubleTap, fireDoubleTap]
   );
 
+  const finishSwipe = useCallback(
+    (clientX, clientY) => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      const dx = clientX - startRef.current.x;
+      const dy = clientY - startRef.current.y;
+      const locked = axisRef.current;
+      axisRef.current = null;
+      if (locked !== "x") return;
+      if (Math.abs(dx) < SWIPE_THRESHOLD) return;
+      if (Math.abs(dx) < Math.abs(dy)) return;
+      if (dx < 0) go(1);
+      else go(-1);
+    },
+    [go]
+  );
+
+  const releaseCapture = useCallback((e) => {
+    try {
+      (e?.currentTarget || rootRef.current)?.releasePointerCapture?.(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const onPointerDown = (e) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (e.target?.closest?.("button, a")) return;
     swipeMovedRef.current = false;
     tapArmedRef.current = true;
-    pointerStartRef.current = { x: e.clientX, y: e.clientY };
-    gestureRef.current = { x: e.clientX, y: e.clientY, locked: null };
+    draggingRef.current = true;
+    axisRef.current = null;
+    startRef.current = { x: e.clientX, y: e.clientY };
   };
 
   const onPointerMove = (e) => {
-    const dx = e.clientX - pointerStartRef.current.x;
-    const dy = e.clientY - pointerStartRef.current.y;
-    const start = gestureRef.current;
-    if (!start) return;
-    if (start.locked == null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
-      gestureRef.current.locked = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-    }
-    if (gestureRef.current.locked === "x" && Math.abs(dx) > 10) {
+    if (!draggingRef.current) return;
+    const dx = e.clientX - startRef.current.x;
+    const dy = e.clientY - startRef.current.y;
+    if (Math.abs(dx) > AXIS_LOCK_PX || Math.abs(dy) > AXIS_LOCK_PX) {
       swipeMovedRef.current = true;
+    }
+    if (axisRef.current == null && (Math.abs(dx) > AXIS_LOCK_PX || Math.abs(dy) > AXIS_LOCK_PX)) {
+      axisRef.current = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+      if (axisRef.current === "x") {
+        e.stopPropagation();
+        try {
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+      } else {
+        draggingRef.current = false;
+      }
+    } else if (axisRef.current === "x") {
       e.stopPropagation();
+      if (e.cancelable) e.preventDefault();
     }
   };
 
   const onPointerUp = (e) => {
-    const start = gestureRef.current;
-    if (!start) return;
-    if (start.locked === "x") {
-      const dx = e.clientX - start.x;
-      if (dx < -SWIPE_THRESHOLD) go(1);
-      else if (dx > SWIPE_THRESHOLD) go(-1);
-    } else if (tapArmedRef.current && !swipeMovedRef.current) {
-      noteTap(e.clientX, e.clientY, e.pointerId);
-    }
-    gestureRef.current = { x: 0, y: 0, locked: null };
+    if (!draggingRef.current && axisRef.current == null) return;
+    const moved = swipeMovedRef.current || axisRef.current === "x";
+    if (axisRef.current === "x") e.stopPropagation();
+    releaseCapture(e);
+    finishSwipe(e.clientX, e.clientY);
+    noteTap(e.clientX, e.clientY, e.pointerId, moved);
+    draggingRef.current = false;
+    axisRef.current = null;
     swipeMovedRef.current = false;
     tapArmedRef.current = false;
+  };
+
+  const onPointerCancel = (e) => {
+    releaseCapture(e);
+    draggingRef.current = false;
+    axisRef.current = null;
+    swipeMovedRef.current = false;
+    tapArmedRef.current = false;
+  };
+
+  const onTouchStart = (e) => {
+    if (e.target?.closest?.("button, a")) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    draggingRef.current = true;
+    axisRef.current = null;
+    swipeMovedRef.current = false;
+    tapArmedRef.current = true;
+    startRef.current = { x: t.clientX, y: t.clientY };
+  };
+
+  const onTouchMove = (e) => {
+    if (!draggingRef.current) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    const dx = t.clientX - startRef.current.x;
+    const dy = t.clientY - startRef.current.y;
+    if (Math.abs(dx) > AXIS_LOCK_PX || Math.abs(dy) > AXIS_LOCK_PX) {
+      swipeMovedRef.current = true;
+    }
+    if (axisRef.current == null && (Math.abs(dx) > AXIS_LOCK_PX || Math.abs(dy) > AXIS_LOCK_PX)) {
+      axisRef.current = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+      if (axisRef.current === "y") draggingRef.current = false;
+    }
+    if (axisRef.current === "x") {
+      e.stopPropagation();
+      if (e.cancelable) e.preventDefault();
+    }
+  };
+
+  const onTouchEnd = (e) => {
+    if (!draggingRef.current && axisRef.current == null) return;
+    const t = e.changedTouches?.[0];
+    if (axisRef.current === "x") e.stopPropagation();
+    finishSwipe(t?.clientX ?? startRef.current.x, t?.clientY ?? startRef.current.y);
+    noteTap(
+      t?.clientX ?? startRef.current.x,
+      t?.clientY ?? startRef.current.y,
+      0,
+      swipeMovedRef.current || axisRef.current === "x"
+    );
+    swipeMovedRef.current = false;
+    tapArmedRef.current = false;
+  };
+
+  const onNavClick = (e, delta) => {
+    e.preventDefault();
+    e.stopPropagation();
+    go(delta);
   };
 
   if (!images.length) return null;
@@ -160,11 +256,16 @@ export default function MyCaseImageCarousel({
 
   return (
     <div
+      ref={rootRef}
       className={`my-case-carousel${canSwipe ? " my-case-carousel--swipeable" : ""}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onPointerCancel}
       onDoubleClick={fireDoubleTap}
     >
       <div
@@ -190,11 +291,9 @@ export default function MyCaseImageCarousel({
             className="my-case-carousel__nav my-case-carousel__nav--prev"
             aria-label="이전 사진"
             disabled={safeIndex <= 0}
-            onClick={(e) => {
-              e.stopPropagation();
-              go(-1);
-            }}
+            onClick={(e) => onNavClick(e, -1)}
             onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
           >
             <ChevronLeft size={24} strokeWidth={2.4} aria-hidden />
           </button>
@@ -203,11 +302,9 @@ export default function MyCaseImageCarousel({
             className="my-case-carousel__nav my-case-carousel__nav--next"
             aria-label="다음 사진"
             disabled={safeIndex >= images.length - 1}
-            onClick={(e) => {
-              e.stopPropagation();
-              go(1);
-            }}
+            onClick={(e) => onNavClick(e, 1)}
             onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
           >
             <ChevronRight size={24} strokeWidth={2.4} aria-hidden />
           </button>
@@ -220,10 +317,12 @@ export default function MyCaseImageCarousel({
                 aria-label={`사진 ${i + 1}`}
                 aria-selected={i === safeIndex}
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
                   if (i !== safeIndex) onIndexChange?.(i);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
               />
             ))}
           </div>

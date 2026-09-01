@@ -35,7 +35,11 @@ export default function ShowcaseInstagramPost({
   const [liked, setLiked] = useState(Boolean(likedProp));
   const [likeCount, setLikeCount] = useState(Number(likeCountProp) || 0);
   const startX = useRef(0);
+  const startY = useRef(0);
   const dragging = useRef(false);
+  const axis = useRef(null);
+  const movedRef = useRef(false);
+  const tapArmedRef = useRef(false);
   const lastTapRef = useRef({ t: 0, x: 0 });
   const handle = String(username || "").trim().replace(/^@+/, "") || "instagram";
   const canSwipe = list.length > 1;
@@ -92,30 +96,118 @@ export default function ShowcaseInstagramPost({
     onReport?.(ctx());
   };
 
+  const finishSwipe = useCallback(
+    (clientX, clientY) => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      const dx = clientX - startX.current;
+      const dy = clientY - startY.current;
+      const locked = axis.current;
+      axis.current = null;
+      if (locked !== "x" || !canSwipe) return;
+      if (Math.abs(dx) < 36) return;
+      if (Math.abs(dx) < Math.abs(dy)) return;
+      go(dx < 0 ? 1 : -1);
+      lastTapRef.current = { t: 0, x: 0 };
+    },
+    [canSwipe, go]
+  );
+
   const onPointerDown = (e) => {
     if (e.target?.closest?.("button, a")) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    movedRef.current = false;
+    tapArmedRef.current = true;
     dragging.current = true;
+    axis.current = null;
     startX.current = e.clientX;
+    startY.current = e.clientY;
+  };
+
+  const onPointerMove = (e) => {
+    if (!dragging.current) return;
+    const dx = e.clientX - startX.current;
+    const dy = e.clientY - startY.current;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) movedRef.current = true;
+    if (axis.current == null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+      axis.current = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+      if (axis.current === "x") {
+        e.stopPropagation();
+        try {
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+      } else {
+        dragging.current = false;
+      }
+    } else if (axis.current === "x") {
+      e.stopPropagation();
+      if (e.cancelable) e.preventDefault();
+    }
   };
 
   const onPointerUp = (e) => {
-    if (!dragging.current) return;
-    dragging.current = false;
-    const dx = e.clientX - startX.current;
-    if (canSwipe && Math.abs(dx) >= 40) {
-      go(dx < 0 ? 1 : -1);
-      lastTapRef.current = { t: 0, x: 0 };
-      return;
+    if (!dragging.current && axis.current == null) return;
+    const moved = movedRef.current || axis.current === "x";
+    if (axis.current === "x") e.stopPropagation();
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch {
+      /* ignore */
     }
-    const now = Date.now();
-    const prev = lastTapRef.current;
-    if (now - prev.t < 320 && Math.abs(e.clientX - prev.x) < 36) {
-      lastTapRef.current = { t: 0, x: 0 };
-      if (!liked) handleLike();
-      return;
+    finishSwipe(e.clientX, e.clientY);
+    if (tapArmedRef.current && !moved) {
+      const now = Date.now();
+      const prev = lastTapRef.current;
+      if (now - prev.t < 320 && Math.abs(e.clientX - prev.x) < 36) {
+        lastTapRef.current = { t: 0, x: 0 };
+        if (!liked) handleLike();
+      } else {
+        lastTapRef.current = { t: now, x: e.clientX };
+      }
     }
-    lastTapRef.current = { t: now, x: e.clientX };
+    tapArmedRef.current = false;
+    movedRef.current = false;
+  };
+
+  const onTouchStart = (e) => {
+    if (!canSwipe) return;
+    if (e.target?.closest?.("button, a")) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    dragging.current = true;
+    axis.current = null;
+    movedRef.current = false;
+    tapArmedRef.current = true;
+    startX.current = t.clientX;
+    startY.current = t.clientY;
+  };
+
+  const onTouchMove = (e) => {
+    if (!dragging.current || !canSwipe) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    const dx = t.clientX - startX.current;
+    const dy = t.clientY - startY.current;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) movedRef.current = true;
+    if (axis.current == null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+      axis.current = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+      if (axis.current === "y") dragging.current = false;
+    }
+    if (axis.current === "x") {
+      e.stopPropagation();
+      if (e.cancelable) e.preventDefault();
+    }
+  };
+
+  const onTouchEnd = (e) => {
+    if (!dragging.current && axis.current == null) return;
+    const t = e.changedTouches?.[0];
+    if (axis.current === "x") e.stopPropagation();
+    finishSwipe(t?.clientX ?? startX.current, t?.clientY ?? startY.current);
+    tapArmedRef.current = false;
+    movedRef.current = false;
   };
 
   if (!list.length) {
@@ -166,9 +258,22 @@ export default function ShowcaseInstagramPost({
       <div
         className={`showcase-ig-post__media${canSwipe ? " is-swipeable" : ""}`}
         onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={() => {
           dragging.current = false;
+          axis.current = null;
+          movedRef.current = false;
+          tapArmedRef.current = false;
+        }}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={() => {
+          dragging.current = false;
+          axis.current = null;
+          movedRef.current = false;
+          tapArmedRef.current = false;
         }}
       >
         {/* 현재 + 인접 사진만 로드 (lazy carousel) */}
@@ -200,10 +305,12 @@ export default function ShowcaseInstagramPost({
               aria-label="이전 사진"
               disabled={safeIndex <= 0}
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 go(-1);
               }}
               onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
             >
               <ChevronLeft className="h-5 w-5" strokeWidth={2.4} aria-hidden />
             </button>
@@ -213,10 +320,12 @@ export default function ShowcaseInstagramPost({
               aria-label="다음 사진"
               disabled={safeIndex >= list.length - 1}
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 go(1);
               }}
               onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
             >
               <ChevronRight className="h-5 w-5" strokeWidth={2.4} aria-hidden />
             </button>
@@ -229,10 +338,12 @@ export default function ShowcaseInstagramPost({
                   aria-label={`사진 ${i + 1}`}
                   aria-selected={i === safeIndex}
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     setIndex(i);
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
                 />
               ))}
             </div>

@@ -179,6 +179,17 @@
   background: #000;
 }
 
+.my-case-carousel--swipeable {
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.my-case-carousel--swipeable:active {
+  cursor: grabbing;
+}
+
 .my-case-carousel__track {
   display: flex;
   width: 100%;
@@ -209,32 +220,47 @@
   background: #000;
   user-select: none;
   -webkit-user-drag: none;
+  pointer-events: none;
 }
 
 .my-case-carousel__dots {
   position: absolute;
-  bottom: 12px;
+  bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 5px;
-  z-index: 9;
+  align-items: center;
+  gap: 2px;
+  z-index: 12;
   pointer-events: auto;
 }
 
 .my-case-carousel__dot {
-  width: 6px;
-  height: 6px;
+  position: relative;
+  width: 32px;
+  height: 32px;
   padding: 0;
   margin: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(56, 189, 248, 0.38);
+  background: transparent;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.my-case-carousel__dot::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.38);
   transition: width 0.18s ease, background 0.18s ease;
 }
 
-.my-case-carousel__dot.is-active {
+.my-case-carousel__dot.is-active::after {
   width: 14px;
   background: #38bdf8;
 }
@@ -242,12 +268,12 @@
 .my-case-carousel__nav {
   position: absolute;
   top: 50%;
-  z-index: 9;
+  z-index: 12;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   margin: 0;
   padding: 0;
   border: 1px solid rgba(56, 189, 248, 0.55);
@@ -259,15 +285,16 @@
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.32);
   transform: translateY(-50%);
   cursor: pointer;
+  touch-action: manipulation;
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
 .my-case-carousel__nav--prev {
-  left: 8px;
+  left: 4px;
 }
 
 .my-case-carousel__nav--next {
-  right: 8px;
+  right: 4px;
 }
 
 .my-case-carousel__nav:disabled {

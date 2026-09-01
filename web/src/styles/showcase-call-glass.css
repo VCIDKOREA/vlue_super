@@ -580,6 +580,15 @@
   touch-action: pan-x pan-y;
 }
 
+.showcase-call-carousel--ig-active .showcase-ig-post__media.is-swipeable {
+  touch-action: none;
+  cursor: grab;
+}
+
+.showcase-call-carousel--ig-active .showcase-ig-post__media.is-swipeable:active {
+  cursor: grabbing;
+}
+
 /* ?? ??? ?????? ??? ???????? ??? (???? ????? ???? ???????? ???) */
 .showcase-call-carousel--paid .showcase-call-carousel__card,
 .showcase-call-carousel--paid .ldr-reception--push,
@@ -1202,29 +1211,32 @@
 .showcase-ig-post__nav {
   position: absolute;
   top: 50%;
-  z-index: 4;
+  z-index: 10;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   margin: 0;
   padding: 0;
-  border: 1px solid rgba(226, 232, 240, 0.28);
+  border: 1px solid rgba(56, 189, 248, 0.55);
   border-radius: 9999px;
   background: rgba(15, 23, 42, 0.62);
-  color: #f8fafc;
+  color: #38bdf8;
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
   transform: translateY(-50%);
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 .showcase-ig-post__nav--prev {
-  left: 10px;
+  left: 6px;
 }
 
 .showcase-ig-post__nav--next {
-  right: 10px;
+  right: 6px;
 }
 
 .showcase-ig-post__nav:disabled {
@@ -1235,26 +1247,41 @@
 .showcase-ig-post__dots {
   position: absolute;
   left: 50%;
-  bottom: 12px;
-  z-index: 4;
+  bottom: 8px;
+  z-index: 10;
   display: flex;
-  gap: 5px;
+  align-items: center;
+  gap: 2px;
   transform: translateX(-50%);
 }
 
 .showcase-ig-post__dot {
-  width: 6px;
-  height: 6px;
+  position: relative;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.35);
+  background: transparent;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.showcase-ig-post__dot.is-active {
+.showcase-ig-post__dot::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.38);
+  transition: width 0.18s ease, background 0.18s ease;
+}
+
+.showcase-ig-post__dot.is-active::after {
   width: 14px;
-  background: #fff;
+  background: #38bdf8;
 }
 
 .showcase-ig-post__actions {
@@ -1397,32 +1424,33 @@
 .showcase-media-page__nav {
   position: absolute;
   top: 50%;
-  z-index: 8;
+  z-index: 10;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   margin: 0;
   padding: 0;
-  border: 1px solid rgba(226, 232, 240, 0.28);
+  border: 1px solid rgba(56, 189, 248, 0.55);
   border-radius: 9999px;
   background: rgba(15, 23, 42, 0.62);
-  color: #f8fafc;
+  color: #38bdf8;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
   transform: translateY(-50%);
   cursor: pointer;
+  touch-action: manipulation;
   transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
 }
 
 .showcase-media-page__nav--prev {
-  left: 10px;
+  left: 6px;
 }
 
 .showcase-media-page__nav--next {
-  right: 10px;
+  right: 6px;
 }
 
 .showcase-media-page__nav:disabled {
@@ -1467,26 +1495,41 @@
 .showcase-media-page__dots {
   position: absolute;
   left: 50%;
-  bottom: 18px;
-  z-index: 6;
+  bottom: 12px;
+  z-index: 10;
   display: flex;
-  gap: 5px;
+  align-items: center;
+  gap: 2px;
   transform: translateX(-50%);
 }
 
 .showcase-media-page__dot {
-  width: 6px;
-  height: 6px;
+  position: relative;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.35);
+  background: transparent;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.showcase-media-page__dot.is-active {
-  background: #fff;
+.showcase-media-page__dot::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.38);
+  transition: width 0.18s ease, background 0.18s ease;
+}
+
+.showcase-media-page__dot.is-active::after {
   width: 14px;
+  background: #38bdf8;
 }
 
 /* ??? ??Instagram ???????????*/
