@@ -3,7 +3,6 @@ import { prisma } from "../../db/client.js";
 import { kvDel, kvGet, kvSetEx } from "../../lib/redisKv.js";
 import { sendEmailViaSesOrMock } from "../mailTalk/sesMailSender.js";
 import { isAuthEmailDeliveryConfigured, sendAuthEmail } from "./authEmailSender.js";
-import { isPlatformEmailDomain } from "./emailDomainClassification.js";
 import { listMasterTargets } from "./userEmailMappingsStore.js";
 import { isValidEmailShape, normalizeBusinessEmail } from "./signupEmailProvision.js";
 
@@ -166,39 +165,23 @@ export async function consumeVerifiedEmailTicket(
   return parsed;
 }
 
-function isOtpDeliverableEmail(email: string): boolean {
-  const normalized = String(email || "").trim().toLowerCase();
-  if (!isValidEmailShape(normalized)) return false;
-  if (isPlatformEmailDomain(normalized)) return false;
-  if (normalized.endsWith("@vlue.internal")) return false;
-  return true;
-}
-
-export async function resolveUserNotifyEmail(
-  userId: string,
-  opts?: { deliverableOnly?: boolean }
-): Promise<string | null> {
-  const deliverableOnly = opts?.deliverableOnly === true;
+export async function resolveUserNotifyEmail(userId: string): Promise<string | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { email: true }
   });
   const direct = String(user?.email || "").trim().toLowerCase();
-  if (direct && isValidEmailShape(direct)) {
-    if (!deliverableOnly || isOtpDeliverableEmail(direct)) return direct;
+  if (direct && isValidEmailShape(direct) && !direct.endsWith("@vlue.kr")) {
+    return direct;
   }
   try {
     const masters = await listMasterTargets(userId);
-    for (const row of masters) {
-      const candidate = String(row.email || "").trim().toLowerCase();
-      if (!isValidEmailShape(candidate)) continue;
-      if (deliverableOnly && !isOtpDeliverableEmail(candidate)) continue;
-      return candidate;
-    }
+    const primary = masters.find((m) => m.is_primary)?.email || masters[0]?.email;
+    if (primary && isValidEmailShape(primary)) return String(primary).trim().toLowerCase();
   } catch {
     /* ignore */
   }
-  if (!deliverableOnly && direct && isValidEmailShape(direct)) return direct;
+  if (direct && isValidEmailShape(direct)) return direct;
   return null;
 }
 

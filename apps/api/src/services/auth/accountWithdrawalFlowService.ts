@@ -208,12 +208,12 @@ export async function getAccountWithdrawalStatus(userId: string) {
 export async function sendWithdrawalEmailCode(userId: string) {
   await ensureWithdrawalDbReady();
   await assertWithdrawalAllowed(userId);
-  const email = await resolveUserNotifyEmail(userId, { deliverableOnly: true });
+  const email = await resolveUserNotifyEmail(userId);
   if (!email) {
     throw new AccountWithdrawalError(
-      "인증번호를 받을 수 있는 외부 이메일이 없습니다. 가입 휴대폰 PASS 인증 또는 탈퇴 신청을 이용해 주세요.",
+      "등록된 이메일이 없습니다. 탈퇴 신청을 이용해 주세요.",
       400,
-      "NO_DELIVERABLE_EMAIL"
+      "NO_EMAIL"
     );
   }
   const sent = await sendEmailAuthCode({ purpose: "account_withdraw", emailRaw: email });
@@ -228,13 +228,9 @@ export async function sendWithdrawalEmailCode(userId: string) {
 export async function withdrawAccountWithEmailCode(userId: string, codeRaw: string) {
   await ensureWithdrawalDbReady();
   await assertWithdrawalAllowed(userId);
-  const email = await resolveUserNotifyEmail(userId, { deliverableOnly: true });
+  const email = await resolveUserNotifyEmail(userId);
   if (!email) {
-    throw new AccountWithdrawalError(
-      "인증번호를 받을 수 있는 외부 이메일이 없습니다.",
-      400,
-      "NO_DELIVERABLE_EMAIL"
-    );
+    throw new AccountWithdrawalError("등록된 이메일이 없습니다.", 400, "NO_EMAIL");
   }
   await verifyEmailAuthCode({ purpose: "account_withdraw", emailRaw: email, codeRaw });
   await dissolveFamilyLinksForGuardianWithdrawal(userId);
