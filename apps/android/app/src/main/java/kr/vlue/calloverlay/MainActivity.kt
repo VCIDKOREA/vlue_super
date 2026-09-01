@@ -323,6 +323,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             webView.visibility = View.VISIBLE
         }
 
+        clearWebCacheIfVersionBumped()
         webView.loadUrl(VlueLetteringConfig.appShellUrl)
 
         try {
@@ -365,6 +366,16 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             handleMemoShareIntent(intent)
             handleFamilyInviteIntent(intent)
         }
+    }
+
+    private fun clearWebCacheIfVersionBumped() {
+        val prefs = getSharedPreferences("vlue_web_shell", MODE_PRIVATE)
+        val last = prefs.getInt("web_cache_version", -1)
+        val current = BuildConfig.VERSION_CODE
+        if (last == current) return
+        webView.clearCache(true)
+        prefs.edit().putInt("web_cache_version", current).apply()
+        Log.i(TAG, "webview cache cleared for version $current (was $last)")
     }
 
     private fun applyNotificationWakeFlags(intent: Intent?) {
