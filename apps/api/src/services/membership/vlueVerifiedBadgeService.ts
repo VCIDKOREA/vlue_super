@@ -3,6 +3,21 @@ import { isPaidMember } from "./paidMemberGate.js";
 
 const FREE_SHARE_MIN = 10;
 
+const BADGE_FALLBACK = {
+  vlueVerifiedBadge: false,
+  showcaseShareCount: 0,
+  freeEligible: false
+};
+
+function isMissingBadgeColumnError(err: unknown): boolean {
+  const msg = String((err as Error)?.message || err || "");
+  return (
+    msg.includes("vlue_verified_badge_at") ||
+    msg.includes("showcase_share_count") ||
+    msg.includes("P2022")
+  );
+}
+
 type StyleJson = Record<string, unknown> | null;
 
 function asStyle(raw: unknown): StyleJson {
@@ -107,16 +122,22 @@ export function evaluateFreeVlueBadgeEligibility(user: VlueBadgeUserRow): boolea
 }
 
 export async function hasVlueVerifiedBadge(userId: string): Promise<boolean> {
-  const row = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { vlueVerifiedBadgeAt: true }
-  });
-  if (row?.vlueVerifiedBadgeAt) return true;
-  const evaluated = await evaluateAndGrantVlueVerifiedBadge(userId);
-  return evaluated.granted || evaluated.already;
+  try {
+    const row = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { vlueVerifiedBadgeAt: true }
+    });
+    if (row?.vlueVerifiedBadgeAt) return true;
+    const evaluated = await evaluateAndGrantVlueVerifiedBadge(userId);
+    return evaluated.granted || evaluated.already;
+  } catch (err) {
+    if (isMissingBadgeColumnError(err)) return false;
+    throw err;
+  }
 }
 
 export async function getVlueBadgeSnapshot(userId: string) {
+  try {
   let row = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -174,6 +195,10 @@ export async function getVlueBadgeSnapshot(userId: string) {
     showcaseShareCount: row.showcaseShareCount,
     freeEligible
   };
+  } catch (err) {
+    if (isMissingBadgeColumnError(err)) return { ...BADGE_FALLBACK };
+    throw err;
+  }
 }
 
 export async function evaluateAndGrantVlueVerifiedBadge(userId: string): Promise<{
@@ -181,6 +206,7 @@ export async function evaluateAndGrantVlueVerifiedBadge(userId: string): Promise
   already: boolean;
   eligible: boolean;
 }> {
+  try {
   const row = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -214,10 +240,15 @@ export async function evaluateAndGrantVlueVerifiedBadge(userId: string): Promise
     data: { vlueVerifiedBadgeAt: new Date() }
   });
   return { granted: true, already: false, eligible: true };
+  } catch (err) {
+    if (isMissingBadgeColumnError(err)) return { granted: false, already: false, eligible: false };
+    throw err;
+  }
 }
 
 /** 본인 쇼케이스 링크 공유(복사·카카오) 1회 기록 */
 export async function recordSelfShowcaseShare(userId: string) {
+  try {
   const row = await prisma.user.update({
     where: { id: userId },
     data: { showcaseShareCount: { increment: 1 } },
@@ -241,4 +272,10 @@ export async function recordSelfShowcaseShare(userId: string) {
     showcaseShareCount: row.showcaseShareCount,
     vlueVerifiedBadge
   };
+  } catch (err) {
+    if (isMissingBadgeColumnError(err)) {
+      return { showcaseShareCount: 0, vlueVerifiedBadge: false };
+    }
+    throw err;
+  }
 }

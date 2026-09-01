@@ -11,6 +11,6 @@ buildCommand = "npm ci && npm run build -w @vlue/db && npm run build -w @vlue/sh
 nixpacksConfigPath = "apps/api/nixpacks.toml"
 
 [deploy]
-startCommand = "npm run start -w @vlue/api"
+startCommand = "npm run db:deploy -w @vlue/db && npm run start -w @vlue/api"
 healthcheckPath = "/api/health"
 restartPolicyType = "ON_FAILURE"
