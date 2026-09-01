@@ -34,6 +34,11 @@ import { dccAgentProfileRoutes } from "./dccAgentProfiles.js";
 import { dccLineRoutes } from "./dccLines.js";
 import { mergeExportSnapshotMedia, isDataUrl } from "../lib/mediaUrlGuard.js";
 import { slimExportSnapshot, extractDigitalCardSlimMeta } from "../lib/digitalCardSlim.js";
+import { consumeVerifiedEmailTicket } from "../services/email/emailAuthCodeService.js";
+import {
+  isValidEmailShape,
+  normalizeBusinessEmail
+} from "../services/email/signupEmailProvision.js";
 import { Prisma } from "@prisma/client";
 
 export const cardsRoutes = new Hono();
@@ -601,6 +606,8 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     designTemplate?: string;
     exportSnapshot?: Record<string, unknown>;
+    emailVerifyToken?: string;
+    token?: string;
   };
   const tpl = String(body.designTemplate || body.exportSnapshot?.designTemplate || "").trim();
   if (tpl && !ALLOWED_DESIGN_TEMPLATES.has(tpl)) {
@@ -661,6 +668,22 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
       ...mergeExportSnapshotMedia(prevSnap, body.exportSnapshot),
       ...(tpl ? { designTemplate: tpl } : {})
     };
+    const nextEmail = normalizeBusinessEmail(String(merged.email || ""));
+    const prevEmail = normalizeBusinessEmail(String(prevSnap.email || ""));
+    if (nextEmail) {
+      if (!isValidEmailShape(nextEmail)) {
+        return c.json({ error: "올바른 이메일 형식을 입력해 주세요." }, 400);
+      }
+      if (nextEmail !== prevEmail) {
+        await consumeVerifiedEmailTicket(String(body.emailVerifyToken || body.token || ""), {
+          purpose: "dcc_email",
+          email: nextEmail,
+          userId: me
+        });
+      }
+    } else if (String(merged.email || "").trim()) {
+      return c.json({ error: "이메일은 필수입니다. 입력 후 인증해 주세요." }, 400);
+    }
     /* 서버에는 슬림 스냅만 유지 (전체 블롭 금지) */
     const slim = slimExportSnapshot(merged) || {};
     data.exportSnapshotJson = slim;

@@ -50,6 +50,7 @@ import {
 import DccExposureSettingsPanel from "./dcc/DccExposureSettingsPanel.jsx";
 import { emptyDccExposureChoice, isDccExposureComplete } from "../lib/dccExposure.js";
 import { fetchDccExposure, saveDccExposure } from "../lib/dccExposureApi.js";
+import { sendAuthCode, verifyAuthCode, EMAIL_AUTH_SUPPORT } from "../lib/emailAuthApi.js";
 
 export default function LetteringBizcardSettingsView({
   membershipTier = "free",
@@ -66,6 +67,11 @@ export default function LetteringBizcardSettingsView({
   const [department, setDepartment] = useState("");
   const [fax, setFax] = useState("");
   const [email, setEmail] = useState("");
+  const [initialEmail, setInitialEmail] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [emailOtpHint, setEmailOtpHint] = useState("");
+  const [emailVerifyToken, setEmailVerifyToken] = useState("");
+  const [verifiedEmailFor, setVerifiedEmailFor] = useState("");
   const [website, setWebsite] = useState("");
   const [companyIntro, setCompanyIntro] = useState("");
   const [customBackText, setCustomBackText] = useState("");
@@ -169,7 +175,13 @@ export default function LetteringBizcardSettingsView({
           : ed.department
     );
     setFax(ed.fax || "");
-    setEmail(clampLetteringBizcardEmail(ed.email || ""));
+    const loadedEmail = clampLetteringBizcardEmail(ed.email || "");
+    setEmail(loadedEmail);
+    setInitialEmail(loadedEmail);
+    setEmailOtp("");
+    setEmailOtpHint("");
+    setEmailVerifyToken("");
+    setVerifiedEmailFor("");
     setWebsite(ed.website);
     setCompanyIntro(clampLetteringBizcardIntroFront(ed.companyIntro || ""));
     setCustomBackText(clampLetteringBizcardBackNote(ed.customBackText || ""));
@@ -436,6 +448,54 @@ export default function LetteringBizcardSettingsView({
     if (result.uploadWarning) showToast(result.uploadWarning, "guide");
   };
 
+  const handleEmailChange = (value) => {
+    setEmail(value);
+    setEmailVerifyToken("");
+    setVerifiedEmailFor("");
+    setEmailOtpHint("");
+  };
+
+  const handleSendEmailOtp = async () => {
+    const target = clampLetteringBizcardEmail(email).trim();
+    if (!target) {
+      focusRequiredSection("dcc-settings-email", "이메일을 입력해 주세요.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
+      focusRequiredSection("dcc-settings-email", "올바른 이메일 형식을 입력해 주세요.");
+      return;
+    }
+    try {
+      const data = await sendAuthCode({ purpose: "dcc_email", email: target }, { auth: true });
+      setEmailVerifyToken("");
+      setVerifiedEmailFor("");
+      setEmailOtpHint(
+        data.devCode
+          ? `개발 모드 인증번호: ${data.devCode}`
+          : `${data.maskedEmail || target} 로 인증번호를 보냈습니다.`
+      );
+    } catch (e) {
+      showToast(e?.message || "인증번호 발송에 실패했습니다.", "guide");
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    const target = clampLetteringBizcardEmail(email).trim();
+    const code = String(emailOtp || "").trim();
+    if (!target || code.length !== 6) {
+      focusRequiredSection("dcc-settings-email", "이메일과 인증번호 6자리를 입력해 주세요.");
+      return;
+    }
+    try {
+      const data = await verifyAuthCode({ purpose: "dcc_email", email: target, code }, { auth: true });
+      setEmailVerifyToken(data.token || "");
+      setVerifiedEmailFor(target.toLowerCase());
+      setEmailOtpHint("이메일 인증이 완료되었습니다.");
+    } catch (e) {
+      showToast(e?.message || "이메일 인증에 실패했습니다.", "guide");
+    }
+  };
+
   const handleApply = async () => {
     const tpl = normalizeLetteringBizcardTemplate(designTemplate);
     const road = addressRoad.trim();
@@ -450,6 +510,15 @@ export default function LetteringBizcardSettingsView({
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       focusRequiredSection("dcc-settings-email", "올바른 이메일 형식을 입력해 주세요.");
+      return;
+    }
+    const emailChanged =
+      trimmedEmail.toLowerCase() !== String(initialEmail || "").trim().toLowerCase();
+    if (
+      emailChanged &&
+      (!emailVerifyToken || verifiedEmailFor.toLowerCase() !== trimmedEmail.toLowerCase())
+    ) {
+      focusRequiredSection("dcc-settings-email", "이메일 인증을 완료해 주세요.");
       return;
     }
 
@@ -608,13 +677,16 @@ export default function LetteringBizcardSettingsView({
 
     const appliedCard = buildUserLetteringCard({ membershipTier });
     void syncDigitalCardDesignTemplate(tpl);
-    const syncResult = await syncDigitalCardExportSnapshot({
-      ...appliedCard,
-      designTemplate: tpl,
-      logoUrl: saved.noCompanyLogo ? "" : saved.logoDataUrl || appliedCard.logoUrl || "",
-      photoUrl: readProfilePhotoAvatar() || appliedCard.photoUrl || "",
-      titlePhotoUrl: saved.noTitlePhoto ? "" : saved.titlePhotoDataUrl || appliedCard.titlePhotoUrl || ""
-    });
+    const syncResult = await syncDigitalCardExportSnapshot(
+      {
+        ...appliedCard,
+        designTemplate: tpl,
+        logoUrl: saved.noCompanyLogo ? "" : saved.logoDataUrl || appliedCard.logoUrl || "",
+        photoUrl: readProfilePhotoAvatar() || appliedCard.photoUrl || "",
+        titlePhotoUrl: saved.noTitlePhoto ? "" : saved.titlePhotoDataUrl || appliedCard.titlePhotoUrl || ""
+      },
+      emailChanged ? { emailVerifyToken } : {}
+    );
     if (!syncResult?.ok) {
       showToast(
         syncResult?.error
@@ -651,6 +723,11 @@ export default function LetteringBizcardSettingsView({
       }
     }
     setPreviewTick((n) => n + 1);
+    setInitialEmail(trimmedEmail);
+    setEmailVerifyToken("");
+    setVerifiedEmailFor("");
+    setEmailOtp("");
+    setEmailOtpHint("");
     showToast(
       titleDeptNeedsSubmit
         ? "직책·부서 변경 신청이 접수되었습니다. 서류 확인 후 승인됩니다."
@@ -765,7 +842,7 @@ export default function LetteringBizcardSettingsView({
           fax={fax}
           setFax={setFax}
           email={email}
-          setEmail={setEmail}
+          setEmail={handleEmailChange}
           website={website}
           setWebsite={setWebsite}
           companyIntro={companyIntro}
@@ -809,6 +886,13 @@ export default function LetteringBizcardSettingsView({
           orgChangePendingName={orgChangePendingName}
           onOrgChangeSubmitted={reload}
           onOrgChangeToast={showToast}
+          emailOtp={emailOtp}
+          setEmailOtp={setEmailOtp}
+          emailOtpHint={emailOtpHint}
+          emailVerifiedFor={verifiedEmailFor}
+          onSendEmailOtp={handleSendEmailOtp}
+          onVerifyEmailOtp={handleVerifyEmailOtp}
+          emailAuthSupport={EMAIL_AUTH_SUPPORT}
           exposureSlot={
             <DccExposureSettingsPanel
               choice={exposureChoice}

@@ -7,6 +7,14 @@ import { normalizeToE164KR } from "../../lib/phoneE164.js";
 import { verifyNtsBusinessStatus } from "../onboarding/ntsBusinessVerifyService.js";
 import { buildEnterpriseDccApprovalAlimtalk } from "../../lib/alimtalkTemplate.js";
 import { sendCallEndAlimtalk } from "../alimtalk/alimtalkSender.js";
+import {
+  consumeVerifiedEmailTicket,
+  resolveUserNotifyEmail,
+  sendEmailAuthCode,
+  verifyEmailAuthCode,
+  maskEmail
+} from "../email/emailAuthCodeService.js";
+import { isValidEmailShape, normalizeBusinessEmail } from "../email/signupEmailProvision.js";
 
 export type EnterpriseDccStatus =
   | "draft"
@@ -78,7 +86,8 @@ export function ensureEnterpriseDccTable() {
       await prisma.$executeRawUnsafe(`
         ALTER TABLE "enterprise_dcc_applications"
           ADD COLUMN IF NOT EXISTS "manage_login_id" VARCHAR(32),
-          ADD COLUMN IF NOT EXISTS "manage_password_hash" VARCHAR(256);
+          ADD COLUMN IF NOT EXISTS "manage_password_hash" VARCHAR(256),
+          ADD COLUMN IF NOT EXISTS "dcc_contact_email" VARCHAR(254);
       `);
     })()
       .then(() => undefined)
@@ -102,6 +111,7 @@ type AppRow = {
   department: string | null;
   contact_name: string | null;
   dcc_outbound_phone: string | null;
+  dcc_contact_email: string | null;
   manage_login_id: string | null;
   manage_password_hash: string | null;
   status: string;
@@ -125,6 +135,7 @@ function mapApp(row: AppRow) {
     department: row.department,
     contactName: row.contact_name,
     dccOutboundPhone: row.dcc_outbound_phone,
+    dccContactEmail: row.dcc_contact_email,
     manageLoginId: row.manage_login_id || "",
     hasManagePassword: Boolean(row.manage_password_hash),
     status: row.status as EnterpriseDccStatus,
@@ -182,23 +193,29 @@ export async function listRelatedPartiesForBizNo(businessRegistrationNo: string)
     take: 200
   });
 
-  const parties = profiles
-    .filter((p) => digitsOnly(String(p.businessRegistrationNo || "")) === bno)
-    .filter((p) => p.user?.status !== "DELETED")
-    .map((p) => {
-      const phone = String(p.user.phoneE164 || "");
-      const masked =
-        phone.length >= 4 ? `${phone.slice(0, Math.max(0, phone.length - 4)).replace(/\d/g, "*")}${phone.slice(-4)}` : "";
-      return {
-        userId: p.userId,
-        legalName: String(p.user.legalName || "").trim() || "관계자",
-        publicHandle: String(p.user.publicHandle || "").trim(),
-        jobTitle: String(p.jobTitle || "").trim(),
-        companyName: String(p.companyName || "").trim(),
-        hasDigitalCard: Boolean(p.user.digitalCard),
-        phoneMasked: masked
-      };
-    });
+  const parties = await Promise.all(
+    profiles
+      .filter((p) => digitsOnly(String(p.businessRegistrationNo || "")) === bno)
+      .filter((p) => p.user?.status !== "DELETED")
+      .map(async (p) => {
+        const phone = String(p.user.phoneE164 || "");
+        const masked =
+          phone.length >= 4
+            ? `${phone.slice(0, Math.max(0, phone.length - 4)).replace(/\d/g, "*")}${phone.slice(-4)}`
+            : "";
+        const notifyEmail = await resolveUserNotifyEmail(p.userId);
+        return {
+          userId: p.userId,
+          legalName: String(p.user.legalName || "").trim() || "관계자",
+          publicHandle: String(p.user.publicHandle || "").trim(),
+          jobTitle: String(p.jobTitle || "").trim(),
+          companyName: String(p.companyName || "").trim(),
+          hasDigitalCard: Boolean(p.user.digitalCard),
+          phoneMasked: masked,
+          emailMasked: notifyEmail ? maskEmail(notifyEmail) : ""
+        };
+      })
+  );
 
   const lockedCompanyName =
     parties.map((p) => p.companyName).find((n) => n) ||
@@ -341,12 +358,14 @@ export async function sendRelatedPartyOtp(input: {
     throw new Error("해당 사업자의 등록된 관계자만 선택할 수 있습니다.");
   }
 
-  const otp = String(randomInt(100000, 999999));
-  otpByAppId.set(app.id, {
-    hash: hashOtp(app.id, party.userId, otp),
-    relatedPartyUserId: party.userId,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-    code: exposeDevOtp() ? otp : undefined
+  const partyEmail = await resolveUserNotifyEmail(party.userId);
+  if (!partyEmail) {
+    throw new Error("관계자의 등록 이메일이 없습니다. 관계자가 이메일을 등록한 뒤 다시 시도해 주세요.");
+  }
+
+  const sent = await sendEmailAuthCode({
+    purpose: "enterprise_dcc_party",
+    emailRaw: partyEmail
   });
 
   await prisma.$executeRawUnsafe(
@@ -359,23 +378,16 @@ export async function sendRelatedPartyOtp(input: {
     party.userId
   );
 
-  const partyUser = await prisma.user.findUnique({
-    where: { id: party.userId },
-    select: { phoneE164: true, email: true, legalName: true }
-  });
-  console.info(
-    `[enterprise-dcc] OTP for app=${app.id} party=${party.userId} phone=${partyUser?.phoneE164 || "-"} code=${otp}`
-  );
-
   return {
     ok: true,
     sentTo: {
       userId: party.userId,
       legalName: party.legalName,
-      phoneMasked: party.phoneMasked
+      phoneMasked: party.phoneMasked,
+      emailMasked: sent.maskedEmail || maskEmail(partyEmail)
     },
-    expiresInSec: 600,
-    ...(exposeDevOtp() ? { devOtp: otp } : {})
+    expiresInSec: sent.expiresInSec,
+    ...(sent.devCode ? { devOtp: sent.devCode } : {})
   };
 }
 
@@ -389,21 +401,22 @@ export async function verifyRelatedPartyOtp(input: {
   if (!app || app.applicant_user_id !== input.applicantUserId) {
     throw new Error("신청 정보를 찾을 수 없습니다.");
   }
-  const challenge = otpByAppId.get(app.id);
-  if (!challenge || !app.related_party_user_id) {
+  if (!app.related_party_user_id) {
     throw new Error("인증번호를 먼저 발송해 주세요.");
   }
-  if (challenge.expiresAt < Date.now()) {
-    otpByAppId.delete(app.id);
-    throw new Error("인증번호가 만료되었습니다. 다시 발송해 주세요.");
-  }
-  const otp = String(input.otp || "").trim();
-  if (otp.length !== 6) throw new Error("6자리 인증번호를 입력해 주세요.");
-  if (challenge.hash !== hashOtp(app.id, app.related_party_user_id, otp)) {
-    throw new Error("인증번호가 일치하지 않습니다.");
+
+  const partyEmail = await resolveUserNotifyEmail(app.related_party_user_id);
+  if (!partyEmail) {
+    throw new Error("관계자 이메일을 확인하지 못했습니다. 다시 발송해 주세요.");
   }
 
-  otpByAppId.delete(app.id);
+  const otp = String(input.otp || "").trim();
+  await verifyEmailAuthCode({
+    purpose: "enterprise_dcc_party",
+    emailRaw: partyEmail,
+    codeRaw: otp
+  });
+
   await prisma.$executeRawUnsafe(
     `UPDATE enterprise_dcc_applications SET
        related_party_verified_at = NOW(),
@@ -425,6 +438,8 @@ export async function saveEnterpriseDccDetails(input: {
   applicantUserId: string;
   department: string;
   contactName: string;
+  contactEmail: string;
+  emailVerifyToken: string;
   dccOutboundPhone: string;
   manageLoginId: string;
   managePassword: string;
@@ -449,10 +464,21 @@ export async function saveEnterpriseDccDetails(input: {
 
   const department = String(input.department || "").trim().slice(0, 120);
   const contactName = String(input.contactName || "").trim().slice(0, 120);
+  const contactEmail = normalizeBusinessEmail(input.contactEmail);
   const dccOutboundPhone = digitsOnly(input.dccOutboundPhone);
   if (!department) throw new Error("부서 이름을 입력해 주세요.");
   if (!contactName) throw new Error("담당자 이름을 입력해 주세요.");
-  if (dccOutboundPhone.length < 8) throw new Error("DCC 발신 전화번호를 입력해 주세요.");
+  if (!isValidEmailShape(contactEmail)) {
+    throw new Error("DCC 담당 이메일을 올바르게 입력하고 인증해 주세요.");
+  }
+  await consumeVerifiedEmailTicket(String(input.emailVerifyToken || ""), {
+    purpose: "dcc_email",
+    email: contactEmail,
+    userId: input.applicantUserId
+  });
+  if (!dccOutboundPhone || dccOutboundPhone.length < 8) {
+    throw new Error("DCC 발신 전화번호를 입력해 주세요.");
+  }
 
   const manageLoginId = normalizeDesiredPublicHandle(input.manageLoginId);
   if (!manageLoginId) throw new Error("관리용 아이디를 입력해 주세요. (영문·숫자·밑줄 3~20자)");
@@ -476,8 +502,9 @@ export async function saveEnterpriseDccDetails(input: {
        department = $2,
        contact_name = $3,
        dcc_outbound_phone = $4,
-       manage_login_id = $5,
-       manage_password_hash = $6,
+       dcc_contact_email = $5,
+       manage_login_id = $6,
+       manage_password_hash = $7,
        status = 'details_ready',
        updated_at = NOW()
      WHERE id = $1::uuid`,
@@ -485,6 +512,7 @@ export async function saveEnterpriseDccDetails(input: {
     department,
     contactName,
     dccOutboundPhone,
+    contactEmail,
     manageLoginId,
     managePasswordHash
   );
@@ -639,6 +667,7 @@ export async function reviewEnterpriseDccApplication(input: {
           department: app.department,
           name: app.contact_name,
           phone: app.dcc_outbound_phone,
+          email: app.dcc_contact_email || "",
           companyLocked: true,
           enterpriseDccApplicationId: app.id,
           manageLoginId
@@ -654,6 +683,7 @@ export async function reviewEnterpriseDccApplication(input: {
           department: app.department,
           name: app.contact_name,
           phone: app.dcc_outbound_phone,
+          email: app.dcc_contact_email || "",
           companyLocked: true,
           enterpriseDccApplicationId: app.id,
           manageLoginId

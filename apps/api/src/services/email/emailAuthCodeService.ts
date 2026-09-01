@@ -18,7 +18,8 @@ export const EMAIL_AUTH_PURPOSES = [
   "find_id",
   "dcc_email",
   "account_withdraw",
-  "corp_combo"
+  "corp_combo",
+  "enterprise_dcc_party"
 ] as const;
 export type EmailAuthPurpose = (typeof EMAIL_AUTH_PURPOSES)[number];
 

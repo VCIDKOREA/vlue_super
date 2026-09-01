@@ -309,7 +309,7 @@ export async function syncDigitalCardDesignTemplate(templateId) {
 }
 
 /** OG 썸네일·서버 렌더·재로그인 복원용 명함 스냅샷 동기화 */
-export async function syncDigitalCardExportSnapshot(card) {
+export async function syncDigitalCardExportSnapshot(card, opts = {}) {
   const ed = readLetteringBizcardEditable();
   const { road, detail } = readLetteringBizcardAddressFields(ed);
   const address =
@@ -392,6 +392,7 @@ export async function syncDigitalCardExportSnapshot(card) {
       headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({
         designTemplate: normalizeLetteringBizcardTemplate(card?.designTemplate || ed.designTemplate),
+        emailVerifyToken: opts.emailVerifyToken || opts.token || undefined,
         exportSnapshot: {
           organization: card?.organization || "",
           name: card?.name || card?.displayName || "",

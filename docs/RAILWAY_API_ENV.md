@@ -85,7 +85,7 @@ PowerShell:
 | `REDIS_URL` | Redis URL | OTP 5분 TTL. 없으면 프로세스 메모리 폴백 |
 
 엔드포인트: `POST /api/auth/send-code`, `POST /api/auth/verify-code`
-(`purpose`: `signup` / `login_device` / `password_change` / `find_id` / `dcc_email` / `account_withdraw`)
+(`purpose`: `signup` / `login_device` / `password_change` / `find_id` / `dcc_email` / `account_withdraw` / `corp_combo` / `enterprise_dcc_party`)
 
 DCC 외부 IMAP 연동(`POST /api/email-forwarding/external-accounts`)도 `dcc_email` 인증 토큰이 필요합니다.
 

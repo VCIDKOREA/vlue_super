@@ -299,7 +299,14 @@ export default function LetteringBizcardQuickBuilder({
   applyLabel = "전체적용",
   toast = "",
   toastKind = "success",
-  hideApplyChrome = false
+  hideApplyChrome = false,
+  emailOtp = "",
+  setEmailOtp = () => {},
+  emailOtpHint = "",
+  emailVerifiedFor = "",
+  onSendEmailOtp = null,
+  onVerifyEmailOtp = null,
+  emailAuthSupport = ""
 }) {
   const [previewFace, setPreviewFace] = useState("front");
   const { setPlaybackPhase } = useShowcaseBgm();
@@ -503,7 +510,7 @@ export default function LetteringBizcardQuickBuilder({
         </div>
         <Field
           label="이메일 (필수)"
-          hint="명함에 반드시 표시됩니다"
+          hint="명함에 반드시 표시됩니다. 변경 시 이메일 인증이 필요합니다."
           isDarkMode={isDarkMode}
           sectionId="dcc-settings-email"
         >
@@ -517,6 +524,43 @@ export default function LetteringBizcardQuickBuilder({
             required
             placeholder="이메일을 입력할 수 있습니다."
           />
+          {onSendEmailOtp ? (
+            <div className="mt-2 space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={emailOtp}
+                  onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="인증번호 6자리"
+                  className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-[13px] ${inputBase.replace("mt-1.5 w-full ", "")}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => onSendEmailOtp?.()}
+                  className="shrink-0 rounded-xl bg-blue-600 px-3 py-2.5 text-[12px] font-bold text-white"
+                >
+                  인증번호
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onVerifyEmailOtp?.()}
+                  className={`shrink-0 rounded-xl border px-3 py-2.5 text-[12px] font-bold ${isDarkMode ? "border-white/15" : "border-slate-200"}`}
+                >
+                  확인
+                </button>
+              </div>
+              {emailOtpHint ? (
+                <p className={`text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{emailOtpHint}</p>
+              ) : null}
+              {emailVerifiedFor && emailVerifiedFor === String(email || "").trim().toLowerCase() ? (
+                <p className="text-[10px] font-bold text-emerald-600">이메일 인증 완료</p>
+              ) : null}
+              {emailAuthSupport ? (
+                <p className={`text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{emailAuthSupport}</p>
+              ) : null}
+            </div>
+          ) : null}
           {isLetteringBizcardEmailLong(email) ? (
             <p className="mt-1 text-[10px] font-bold text-amber-600">
               이메일이 깁니다({email.length}/{LETTERING_BIZCARD_EMAIL_MAX}자). 미리보기를 확인하세요.

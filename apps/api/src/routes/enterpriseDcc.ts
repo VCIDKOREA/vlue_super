@@ -95,6 +95,9 @@ enterpriseDccRoutes.post("/:id/details", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     department?: string;
     contactName?: string;
+    contactEmail?: string;
+    emailVerifyToken?: string;
+    token?: string;
     dccOutboundPhone?: string;
     manageLoginId?: string;
     managePassword?: string;
@@ -105,6 +108,8 @@ enterpriseDccRoutes.post("/:id/details", async (c) => {
       applicantUserId: userId,
       department: String(body.department || ""),
       contactName: String(body.contactName || ""),
+      contactEmail: String(body.contactEmail || ""),
+      emailVerifyToken: String(body.emailVerifyToken || body.token || ""),
       dccOutboundPhone: String(body.dccOutboundPhone || ""),
       manageLoginId: String(body.manageLoginId || ""),
       managePassword: String(body.managePassword || "")

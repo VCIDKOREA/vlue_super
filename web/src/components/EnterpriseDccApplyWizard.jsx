@@ -7,6 +7,7 @@ import {
   verifyEnterpriseDccBusiness,
   verifyEnterpriseDccOtp
 } from "../lib/enterpriseDccApi.js";
+import { sendAuthCode, verifyAuthCode, EMAIL_AUTH_SUPPORT } from "../lib/emailAuthApi.js";
 import { writeLetteringBizcardEditable } from "../lib/letteringBizcardStorage.js";
 import { DIGITAL_CARD_ACTIVE_KEY } from "../lib/bizcardAccountSync.js";
 
@@ -71,6 +72,10 @@ export default function EnterpriseDccApplyWizard({
   const [otp, setOtp] = useState("");
   const [department, setDepartment] = useState("");
   const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactEmailOtp, setContactEmailOtp] = useState("");
+  const [contactEmailHint, setContactEmailHint] = useState("");
+  const [contactEmailToken, setContactEmailToken] = useState("");
   const [dccPhone, setDccPhone] = useState("");
   const [manageLoginId, setManageLoginId] = useState("");
   const [managePassword, setManagePassword] = useState("");
@@ -93,6 +98,7 @@ export default function EnterpriseDccApplyWizard({
       setCompanyLocked(app.companyNameLocked || "");
       setDepartment(app.department || "");
       setContactName(app.contactName || "");
+      setContactEmail(app.dccContactEmail || "");
       setDccPhone(app.dccOutboundPhone || "");
       setBizNo(app.businessRegistrationNo || "");
       let first = false;
@@ -160,7 +166,8 @@ export default function EnterpriseDccApplyWizard({
       const res = await sendEnterpriseDccOtp(application.id, selectedPartyId);
       setDevOtp(res.devOtp || "");
       setStep("otp");
-      toast(`${res.sentTo?.legalName || "관계자"}에게 인증번호를 발송했습니다.`);
+      const emailHint = res.sentTo?.emailMasked ? ` (${res.sentTo.emailMasked})` : "";
+      toast(`${res.sentTo?.legalName || "관계자"} 등록 이메일${emailHint}로 인증번호를 발송했습니다.`);
     } catch (e) {
       setError(e?.message || "인증번호 발송 실패");
     } finally {
@@ -184,8 +191,59 @@ export default function EnterpriseDccApplyWizard({
     }
   };
 
+  const runSendContactEmailOtp = async () => {
+    const email = contactEmail.trim();
+    if (!email) {
+      setError("담당 이메일을 입력해 주세요.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const data = await sendAuthCode({ purpose: "dcc_email", email }, { auth: true });
+      setContactEmailToken("");
+      setContactEmailHint(
+        data.devCode
+          ? `개발 모드 인증번호: ${data.devCode}`
+          : `${data.maskedEmail || email} 로 인증번호를 보냈습니다.`
+      );
+    } catch (e) {
+      setError(e?.message || "이메일 인증번호 발송 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runVerifyContactEmailOtp = async () => {
+    const email = contactEmail.trim();
+    const code = contactEmailOtp.trim();
+    if (!email || code.length !== 6) {
+      setError("이메일과 인증번호 6자리를 입력해 주세요.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const data = await verifyAuthCode({ purpose: "dcc_email", email, code }, { auth: true });
+      setContactEmailToken(data.token || "");
+      setContactEmailHint("이메일 인증이 완료되었습니다.");
+    } catch (e) {
+      setError(e?.message || "이메일 인증 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const runSaveDetails = async () => {
     if (!application?.id) return;
+    if (!contactEmail.trim()) {
+      setError("DCC 담당 이메일을 입력하고 인증해 주세요.");
+      return;
+    }
+    if (!contactEmailToken) {
+      setError("담당 이메일 인증을 완료해 주세요.");
+      return;
+    }
     if (!manageLoginId.trim()) {
       setError("이 번호를 관리할 아이디를 입력해 주세요.");
       return;
@@ -200,6 +258,8 @@ export default function EnterpriseDccApplyWizard({
       const res = await saveEnterpriseDccDetails(application.id, {
         department,
         contactName,
+        contactEmail: contactEmail.trim(),
+        emailVerifyToken: contactEmailToken,
         dccOutboundPhone: dccPhone,
         manageLoginId,
         managePassword
@@ -387,6 +447,7 @@ export default function EnterpriseDccApplyWizard({
                       {p.jobTitle ? <span className={`ml-2 ${muted}`}>{p.jobTitle}</span> : null}
                       <span className={`mt-0.5 block text-[10px] ${muted}`}>
                         @{p.publicHandle || "—"} · {p.phoneMasked || "번호 비공개"}
+                        {p.emailMasked ? ` · ${p.emailMasked}` : ""}
                       </span>
                     </button>
                   </li>
@@ -406,7 +467,10 @@ export default function EnterpriseDccApplyWizard({
 
         {step === "otp" ? (
           <section className="space-y-2">
-            <p className={`text-[12px] ${muted}`}>선택된 관계자에게 발송된 6자리 인증번호를 입력하세요.</p>
+            <p className={`text-[12px] ${muted}`}>
+              선택된 관계자 등록 이메일로 발송된 6자리 인증번호를 입력하세요. 관계자에게 전달받은 번호를
+              입력해 주세요.
+            </p>
             {devOtp ? (
               <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700">
                 개발용 OTP: <strong>{devOtp}</strong>
@@ -462,6 +526,47 @@ export default function EnterpriseDccApplyWizard({
                 placeholder="김담당"
               />
             </label>
+            <label className="block text-[11px] font-bold">
+              DCC 담당 이메일 (필수 · 인증)
+              <input
+                className={`${inputCls} mt-1`}
+                type="email"
+                value={contactEmail}
+                onChange={(e) => {
+                  setContactEmail(e.target.value);
+                  setContactEmailToken("");
+                  setContactEmailHint("");
+                }}
+                placeholder="contact@company.com"
+              />
+            </label>
+            <div className="flex gap-2">
+              <input
+                className={inputCls}
+                value={contactEmailOtp}
+                onChange={(e) => setContactEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="인증번호 6자리"
+                inputMode="numeric"
+              />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void runSendContactEmailOtp()}
+                className="shrink-0 rounded-xl bg-blue-600 px-3 py-2.5 text-[12px] font-bold text-white disabled:opacity-50"
+              >
+                인증번호
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void runVerifyContactEmailOtp()}
+                className={`shrink-0 rounded-xl border px-3 py-2.5 text-[12px] font-bold disabled:opacity-50 ${isDarkMode ? "border-white/15" : "border-slate-200"}`}
+              >
+                확인
+              </button>
+            </div>
+            {contactEmailHint ? <p className={`text-[11px] ${muted}`}>{contactEmailHint}</p> : null}
+            <p className={`text-[10px] ${muted}`}>{EMAIL_AUTH_SUPPORT}</p>
             <label className="block text-[11px] font-bold">
               DCC 발신 전화번호
               <input
