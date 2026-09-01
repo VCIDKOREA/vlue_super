@@ -92,6 +92,15 @@
   );
 }
 
+.ig-mycase__topbar-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .ig-mycase__username {
   margin: 0;
   flex: 0 1 auto;
@@ -103,6 +112,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ig-mycase__verified-seal {
+  flex-shrink: 0;
+  overflow: visible;
 }
 
 .ig-mycase__icon-btn {
@@ -479,9 +493,20 @@
 }
 
 .ig-mycase__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin: 0;
+  min-width: 0;
   font-size: 14px;
   font-weight: 700;
+}
+
+.ig-mycase__name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ig-mycase__status {

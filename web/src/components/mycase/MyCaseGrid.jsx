@@ -60,6 +60,7 @@ import {
   readSelectedDccLineId
 } from "../../lib/dccLineState.js";
 import DccLineSwitcher from "../dcc/DccLineSwitcher.jsx";
+import VlueCyanVerifiedSeal from "../VlueCyanVerifiedSeal.jsx";
 import MyCasePostComposer from "./MyCasePostComposer.jsx";
 import MyCaseSearchModal from "./MyCaseSearchModal.jsx";
 import "./my-case-grid.css";
@@ -827,7 +828,12 @@ export default function MyCaseGrid({
             <ChevronLeft size={24} strokeWidth={2} />
           </button>
         ) : null}
-        <h1 className="ig-mycase__username">{displayHandle}</h1>
+        <div className="ig-mycase__topbar-title">
+          <h1 className="ig-mycase__username">{displayHandle}</h1>
+          {hasDigitalCard ? (
+            <VlueCyanVerifiedSeal size={14} className="ig-mycase__verified-seal" />
+          ) : null}
+        </div>
         {isMine && showSearch ? (
           <button
             type="button"
@@ -924,7 +930,12 @@ export default function MyCaseGrid({
 
           <div className="ig-mycase__bio">
             <div className="ig-mycase__bio-head">
-              <p className="ig-mycase__name">{displayName}</p>
+              <p className="ig-mycase__name">
+                <span className="ig-mycase__name-text">{displayName}</span>
+                {hasDigitalCard ? (
+                  <VlueCyanVerifiedSeal size={14} className="ig-mycase__verified-seal" />
+                ) : null}
+              </p>
               {!isMine ? (
                 <div className="ig-mycase__bio-actions">
                   <FollowActionButton targetUserId={ownerUserId} className="ig-mycase__follow-btn" />
