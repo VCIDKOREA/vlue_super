@@ -77,7 +77,10 @@ PowerShell:
 | `AWS_REGION` | `ap-northeast-2` | SES 리전 |
 | `AWS_ACCESS_KEY_ID` | IAM 액세스 키 | SES `ses:SendEmail` |
 | `AWS_SECRET_ACCESS_KEY` | IAM 시크릿 | **Railway에만 저장. Git 금지** |
-| `SENDER_EMAIL` | `support@vlue.kr` | SES에서 인증된 발신 주소 |
+| `SENDER_EMAIL` | `support@vlue.kr` | SES/Resend 발신 주소 (도메인 인증 필요) |
+| `SMTP_PROVIDER` | `resend` (권장) | `resend` 이면 Resend API로 OTP 발송 (SES 미인증 시 폴백) |
+| `RESEND_API_KEY` | Resend API 키 | **Railway에만 저장. Git 금지** |
+| `VLUE_SIGNUP_FROM_EMAIL` | `noreply@vlue.kr` | (선택) OTP 발신 주소 — 없으면 `SENDER_EMAIL` |
 | `REDIS_URL` | Redis URL | OTP 5분 TTL. 없으면 프로세스 메모리 폴백 |
 
 엔드포인트: `POST /api/auth/send-code`, `POST /api/auth/verify-code` (`purpose`: `signup` / `login_device` / `password_change` / `dcc_email`).
