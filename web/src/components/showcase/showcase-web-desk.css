@@ -75,7 +75,7 @@
   border: 1px solid #e2e8f0;
   background: #fff;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .showcase-web-desk__preview-col {
@@ -170,33 +170,9 @@
 
 .showcase-web-desk .lettering-home-push-embed--web-inline {
   width: 100%;
-  max-height: min(78dvh, 720px);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
   border-radius: 20px;
   overflow: hidden;
   background: transparent;
-}
-
-.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing--home-glass {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1 1 auto;
-  max-height: 100%;
-}
-
-.showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.showcase-web-desk .lettering-home-push-embed--web-inline.is-expanded .lettering-ongoing-expand-slot[data-open="true"] {
-  flex: 1 1 auto;
-  min-height: 0;
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-summary {
@@ -322,12 +298,11 @@
   bottom: max(92px, calc(80px + env(safe-area-inset-bottom, 0px)));
 }
 
-/* www 미리보기 + 통화화면 보기 — 캐러셀·하단 CTA가 틀 안에 들어가도록 flex 높이 분배 */
+/* www 미리보기 + 통화화면 보기 — 캐러셀 아래 통화 UI 공간 확보 (프로필 바는 캐러셀 하단 22px 고정) */
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot__inner > .lettering-ongoing-reception {
-  height: auto;
-  max-height: none;
-  min-height: 0;
-  flex: 1 1 auto;
+  height: 704px;
+  max-height: 704px;
+  min-height: 704px;
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--carousel,

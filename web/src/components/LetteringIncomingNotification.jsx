@@ -1035,7 +1035,6 @@ export default function LetteringIncomingNotification({
   const openSamsungCallOptions = useCallback(() => {
     if (previewMode) {
       onToast?.("미리보기입니다. 실제 통화에서는 삼성 전화앱으로 이동합니다.");
-      setExpanded(false);
       return;
     }
     setExpanded(false);
