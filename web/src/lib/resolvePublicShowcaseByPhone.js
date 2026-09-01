@@ -179,7 +179,7 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
 
   return {
     phone: phoneDisplay,
-    verified: Boolean(body.is_verified),
+    verified: Boolean(body.vlue_verified_badge ?? body.vlueVerifiedBadge ?? body.is_verified),
     source: "public",
     isPaid: isPaidLetteringTier(tier),
     showcaseStyle,

@@ -148,6 +148,16 @@ function applyServerBundle(bundle, { reason = "hydrate", clearMissing = false } 
 
   if (bundle.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.updatedAt);
   else if (clearMissing) writeLocalShowcaseStyleUpdatedAt(new Date(0).toISOString());
+  if (bundle.badge && typeof bundle.badge === "object") {
+    import("../vlueVerifiedBadgeApi.js")
+      .then((m) =>
+        m.writeVlueBadgeLocal?.({
+          vlueVerifiedBadge: Boolean(bundle.badge.vlueVerifiedBadge),
+          showcaseShareCount: Number(bundle.badge.showcaseShareCount) || 0
+        })
+      )
+      .catch(() => {});
+  }
   try {
     const prefer = liveHas ? live : editorHas ? editor : null;
     if (prefer) {

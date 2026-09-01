@@ -33,6 +33,10 @@ import {
   getUserShowcaseStyleBundle,
   putUserShowcaseStyleBundle
 } from "../services/showcase/showcaseStyleSyncService.js";
+import {
+  getVlueBadgeSnapshot,
+  recordSelfShowcaseShare
+} from "../services/membership/vlueVerifiedBadgeService.js";
 
 export const letteringRoutes = new Hono();
 
@@ -177,7 +181,8 @@ letteringRoutes.put("/showcase/tags", requireUserHeader, async (c) => {
 letteringRoutes.get("/showcase/search-privacy", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
   const privacy = await getSearchPrivacy(me);
-  return c.json({ ok: true, privacy });
+  const badge = await getVlueBadgeSnapshot(me);
+  return c.json({ ok: true, privacy, badge });
 });
 
 /** V1 — 검색 프라이버시 토글 저장 */
@@ -192,6 +197,20 @@ letteringRoutes.put("/showcase/search-privacy", requireUserHeader, async (c) => 
     isAddressSearchAllowed: body?.isAddressSearchAllowed
   });
   return c.json({ ok: true, privacy });
+});
+
+/** 본인 쇼케이스 링크 공유 1회 기록 + 배지 재평가 */
+letteringRoutes.post("/showcase/self-share", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const result = await recordSelfShowcaseShare(me);
+  return c.json({ ok: true, ...result });
+});
+
+/** VLUE 인증 배지 · 공유 횟수 스냅샷 */
+letteringRoutes.get("/showcase/badge", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const badge = await getVlueBadgeSnapshot(me);
+  return c.json({ ok: true, badge });
 });
 
 /** DCC 검색·팔로우 노출 4항목 — 전부 지정해야 저장 */

@@ -8,6 +8,7 @@ import { resolveVlueShowcaseCard } from "../lib/vlueShowcaseCard.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { showcasePreviewLabel, VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
 import { SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
+import { fetchVlueBadgeSnapshot } from "../lib/vlueVerifiedBadgeApi.js";
 import LetteringBizcardSharePanel from "./LetteringBizcardSharePanel.jsx";
 
 /**
@@ -64,6 +65,7 @@ export default function MyPageDigitalLetteringSection({
       if (cancelled) return;
       setCardIssuedAt(meta.issuedAt || null);
     });
+    void fetchVlueBadgeSnapshot();
     return () => {
       cancelled = true;
     };

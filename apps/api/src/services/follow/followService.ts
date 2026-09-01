@@ -776,6 +776,10 @@ export async function getProfileForViewer(
     follow: followState,
     digitalCardIssued: Boolean(user.digitalCard),
     membershipTier: user.digitalCard?.membershipTierSnapshot || "free",
+    vlueVerifiedBadge: await (async () => {
+      const { hasVlueVerifiedBadge } = await import("../membership/vlueVerifiedBadgeService.js");
+      return hasVlueVerifiedBadge(targetUserId);
+    })(),
     photoUrl,
     cardExport,
     authCycleEndAt: sub?.cycleEndAt ? sub.cycleEndAt.toISOString() : null,

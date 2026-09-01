@@ -175,6 +175,7 @@ export async function fetchFollowProfile(userId, opts = {}) {
         photoUrl: data.photoUrl || data.profile?.photoUrl || "",
         membershipTier: data.membershipTier || data.profile?.membershipTier || "",
         digitalCardIssued: Boolean(data.digitalCardIssued),
+        vlueVerifiedBadge: Boolean(data.vlueVerifiedBadge),
         cardExport: data.cardExport || null,
         authCycleEndAt: data.authCycleEndAt || null,
         authPaidAt: data.authPaidAt || null,

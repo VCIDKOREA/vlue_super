@@ -225,6 +225,11 @@ model User {
   /// 무료 회원 메인 송출 슬롯 변경 쿨다운 기준 시각
   mainBroadcastChangedAt DateTime? @map("main_broadcast_changed_at") @db.Timestamptz(6)
 
+  /// VLUE 시안 인증 배지 — 최초 부여 후 해제하지 않음
+  vlueVerifiedBadgeAt DateTime? @map("vlue_verified_badge_at") @db.Timestamptz(6)
+  /// 본인 쇼케이스 링크 공유(복사·카카오) 누적 횟수
+  showcaseShareCount Int @default(0) @map("showcase_share_count")
+
   /// 로그인 비밀번호(scrypt 해시). null 이면 비밀번호 로그인 불가(관리자·레거시 등).
   passwordHash String? @map("password_hash") @db.VarChar(256)
 

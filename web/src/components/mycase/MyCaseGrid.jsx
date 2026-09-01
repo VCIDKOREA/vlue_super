@@ -61,6 +61,10 @@ import {
 } from "../../lib/dccLineState.js";
 import DccLineSwitcher from "../dcc/DccLineSwitcher.jsx";
 import VlueCyanVerifiedSeal from "../VlueCyanVerifiedSeal.jsx";
+import {
+  shouldShowVlueVerifiedSeal,
+  VLUE_VERIFIED_BADGE_CHANGED_EVENT
+} from "../../lib/vlueVerifiedBadgeApi.js";
 import MyCasePostComposer from "./MyCasePostComposer.jsx";
 import MyCaseSearchModal from "./MyCaseSearchModal.jsx";
 import "./my-case-grid.css";
@@ -160,9 +164,26 @@ export default function MyCaseGrid({
   const [composerOpen, setComposerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [lineId, setLineId] = useState(() => readSelectedDccLineId());
+  const [badgeTick, setBadgeTick] = useState(0);
   const hasDigitalCard = isMine
     ? readDigitalCardActive()
     : Boolean(remoteProfile?.digitalCardIssued);
+  const showVerifiedSeal = useMemo(() => {
+    void badgeTick;
+    if (isMine) {
+      return shouldShowVlueVerifiedSeal({ hasDigitalCard });
+    }
+    return shouldShowVlueVerifiedSeal({
+      vlueVerifiedBadge: remoteProfile?.vlueVerifiedBadge,
+      digitalCardIssued: remoteProfile?.digitalCardIssued
+    });
+  }, [isMine, hasDigitalCard, remoteProfile, badgeTick]);
+
+  useEffect(() => {
+    const bump = () => setBadgeTick((n) => n + 1);
+    window.addEventListener(VLUE_VERIFIED_BADGE_CHANGED_EVENT, bump);
+    return () => window.removeEventListener(VLUE_VERIFIED_BADGE_CHANGED_EVENT, bump);
+  }, []);
 
   useEffect(() => {
     toastRef.current = onToast;
@@ -830,7 +851,7 @@ export default function MyCaseGrid({
         ) : null}
         <div className="ig-mycase__topbar-title">
           <h1 className="ig-mycase__username">{displayHandle}</h1>
-          {hasDigitalCard ? (
+          {showVerifiedSeal ? (
             <VlueCyanVerifiedSeal size={14} className="ig-mycase__verified-seal" />
           ) : null}
         </div>
@@ -932,7 +953,7 @@ export default function MyCaseGrid({
             <div className="ig-mycase__bio-head">
               <p className="ig-mycase__name">
                 <span className="ig-mycase__name-text">{displayName}</span>
-                {hasDigitalCard ? (
+                {showVerifiedSeal ? (
                   <VlueCyanVerifiedSeal size={14} className="ig-mycase__verified-seal" />
                 ) : null}
               </p>

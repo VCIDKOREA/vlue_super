@@ -3,6 +3,12 @@ import { copyShowcaseShareUrl, shareBizcardViaKakao } from "../lib/letteringBizc
 import { readLetteringFixedIdentity } from "../lib/letteringBizcardStorage.js";
 import { syncDigitalCardExportSnapshot, ensureDigitalCardId } from "../lib/digitalCardApi.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
+import {
+  fetchVlueBadgeSnapshot,
+  readShowcaseShareCountLocal,
+  recordSelfShowcaseShareApi,
+  VLUE_VERIFIED_BADGE_CHANGED_EVENT
+} from "../lib/vlueVerifiedBadgeApi.js";
 import KakaoBizcardFeedPreview from "./KakaoBizcardFeedPreview.jsx";
 import HelpTip from "./HelpTip.jsx";
 
@@ -32,7 +38,20 @@ export default function LetteringBizcardSharePanel({
 }) {
   const [busy, setBusy] = useState("");
   const [shareReady, setShareReady] = useState(false);
+  const [shareCount, setShareCount] = useState(() => readShowcaseShareCountLocal());
   const isPaid = isPaidLetteringTier(membershipTier);
+
+  useEffect(() => {
+    const sync = () => setShareCount(readShowcaseShareCountLocal());
+    sync();
+    void fetchVlueBadgeSnapshot().then((badge) => {
+      if (badge && Number.isFinite(Number(badge.showcaseShareCount))) {
+        setShareCount(Number(badge.showcaseShareCount));
+      }
+    });
+    window.addEventListener(VLUE_VERIFIED_BADGE_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(VLUE_VERIFIED_BADGE_CHANGED_EVENT, sync);
+  }, []);
 
   const sharePhone = useMemo(() => {
     const fixed = readLetteringFixedIdentity();
@@ -65,6 +84,10 @@ export default function LetteringBizcardSharePanel({
         return;
       }
       onToast?.("주소를 복사했습니다. 채팅방에 붙여넣으면 잠시 후 미리보기가 생길 수 있습니다.");
+      const recorded = await recordSelfShowcaseShareApi();
+      if (recorded && Number.isFinite(Number(recorded.showcaseShareCount))) {
+        setShareCount(Number(recorded.showcaseShareCount));
+      }
     } catch (e) {
       onToast?.(e?.message || "주소 복사에 실패했습니다.");
     } finally {
@@ -91,6 +114,10 @@ export default function LetteringBizcardSharePanel({
           ? `카카오톡 공유 창을 열었습니다. 버튼 주소: ${r.viewUrl}`
           : "카카오톡 공유 창을 열었습니다."
       );
+      const recorded = await recordSelfShowcaseShareApi();
+      if (recorded && Number.isFinite(Number(recorded.showcaseShareCount))) {
+        setShareCount(Number(recorded.showcaseShareCount));
+      }
     } catch (e) {
       onToast?.(e?.message || "카카오톡 공유에 실패했습니다.");
     } finally {
@@ -116,6 +143,13 @@ export default function LetteringBizcardSharePanel({
           쇼케이스 공유란
         </p>
         <HelpTip text={isPaid ? SHOWCASE_SHARE_HELP_PAID : SHOWCASE_SHARE_HELP_FREE} isDarkMode={isDarkMode} />
+        <span
+          className={`ml-auto shrink-0 text-[11px] font-bold tabular-nums ${
+            isDarkMode ? "text-cyan-300" : "text-cyan-600"
+          }`}
+        >
+          공유 ({shareCount})
+        </span>
       </div>
       <p className={`mt-1 text-[11px] font-normal leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
         아래는 <span className={isDarkMode ? "text-cyan-200/90" : "text-slate-600"}>카카오톡에 뜨는 링크 카드</span>와

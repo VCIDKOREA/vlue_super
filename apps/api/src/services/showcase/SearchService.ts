@@ -736,6 +736,8 @@ export async function updateSearchPrivacy(userId: string, patch: PrivacyPatch) {
     select: privacySelectFields
   });
   await markShowcaseActiveIfEligible(userId);
+  const { evaluateAndGrantVlueVerifiedBadge } = await import("../membership/vlueVerifiedBadgeService.js");
+  await evaluateAndGrantVlueVerifiedBadge(userId);
   return {
     ...updated,
     hasActiveShowcase: await refreshHasActiveShowcase(userId)

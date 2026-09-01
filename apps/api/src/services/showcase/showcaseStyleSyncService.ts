@@ -2,6 +2,10 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import { stripDataUrlsFromJson } from "../../lib/mediaUrlGuard.js";
 import {
+  evaluateAndGrantVlueVerifiedBadge,
+  getVlueBadgeSnapshot
+} from "../membership/vlueVerifiedBadgeService.js";
+import {
   assertShowcaseStyleWithinLimit,
   slimShowcaseStyleForPersist,
   slimShowcaseStyleForPublic
@@ -16,6 +20,10 @@ export type ShowcaseStyleBundle = {
   liveSource: ShowcaseLiveSource | null;
   updatedAt: string | null;
   unchanged?: boolean;
+  badge?: {
+    vlueVerifiedBadge: boolean;
+    showcaseShareCount: number;
+  };
 };
 
 function asObjectOrNull(value: unknown): Record<string, unknown> | null {
@@ -79,6 +87,7 @@ export async function getUserShowcaseStyleBundle(
     }
   });
   const updatedAt = row?.showcaseStyleUpdatedAt ? row.showcaseStyleUpdatedAt.toISOString() : null;
+  const badge = await getVlueBadgeSnapshot(userId);
   return {
     v: 2,
     editor: row?.showcaseStyleJson
@@ -88,7 +97,11 @@ export async function getUserShowcaseStyleBundle(
       ? slimShowcaseStyleForPersist(row.showcaseLiveStyleJson)
       : null,
     liveSource: normalizeLiveSource(row?.showcaseLiveSourceJson),
-    updatedAt
+    updatedAt,
+    badge: {
+      vlueVerifiedBadge: badge.vlueVerifiedBadge,
+      showcaseShareCount: badge.showcaseShareCount
+    }
   };
 }
 
@@ -223,6 +236,8 @@ export async function putUserShowcaseStyleBundle(
     where: { id: userId },
     data
   });
+
+  await evaluateAndGrantVlueVerifiedBadge(userId);
 
   return { ok: true, updatedAt: nextUpdatedAt.toISOString() };
 }
