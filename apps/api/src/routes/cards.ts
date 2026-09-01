@@ -664,12 +664,12 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
         );
       }
     }
-    const merged = {
+    const merged: Record<string, unknown> = {
       ...mergeExportSnapshotMedia(prevSnap, body.exportSnapshot),
       ...(tpl ? { designTemplate: tpl } : {})
     };
-    const nextEmail = normalizeBusinessEmail(String(merged.email || ""));
-    const prevEmail = normalizeBusinessEmail(String(prevSnap.email || ""));
+    const nextEmail = normalizeBusinessEmail(String(merged.email ?? ""));
+    const prevEmail = normalizeBusinessEmail(String(prevSnap.email ?? ""));
     if (nextEmail) {
       if (!isValidEmailShape(nextEmail)) {
         return c.json({ error: "올바른 이메일 형식을 입력해 주세요." }, 400);
@@ -681,7 +681,7 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
           userId: me
         });
       }
-    } else if (String(merged.email || "").trim()) {
+    } else if (String(merged.email ?? "").trim()) {
       return c.json({ error: "이메일은 필수입니다. 입력 후 인증해 주세요." }, 400);
     }
     /* 서버에는 슬림 스냅만 유지 (전체 블롭 금지) */
