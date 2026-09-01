@@ -1,4 +1,4 @@
-import { vlueAuthFetch } from "./vlueAuthApi.js";
+import { vlueAuthFetch } from "./vlueAuthHeaders.js";
 
 const STORAGE_KEY = "vlue_verified_badge_v1";
 const SHARE_COUNT_KEY = "vlue_showcase_share_count_v1";
