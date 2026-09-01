@@ -298,11 +298,59 @@
   bottom: max(92px, calc(80px + env(safe-area-inset-bottom, 0px)));
 }
 
-/* www 미리보기 + 통화화면 보기 — 캐러셀 아래 통화 UI 공간 확보 (프로필 바는 캐러셀 하단 22px 고정) */
+/* www 미리보기 + 통화화면 보기 — 초록 CTA가 다크 프레임 안에서 등장 (앱과 동일) */
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome {
+  overflow: hidden;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing--home-glass.lettering-ongoing--expanded {
+  display: flex;
+  flex-direction: column;
+  max-height: min(82dvh, 760px);
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot[data-open="true"] {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot__inner,
+.showcase-web-desk
+  .lettering-home-push-embed--web-inline.is-call-chrome
+  .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded
+  .lettering-ongoing-expand-slot__inner {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}
+
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot__inner > .lettering-ongoing-reception {
-  height: 704px;
-  max-height: 704px;
-  min-height: 704px;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+}
+
+.showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-actions-secondary--call {
+  flex-shrink: 0;
+  margin-top: auto;
+  background: linear-gradient(
+    0deg,
+    rgba(7, 11, 20, 0.96) 0%,
+    rgba(15, 23, 42, 0.72) 55%,
+    rgba(15, 23, 42, 0) 100%
+  ) !important;
+  border-top: 0 !important;
+  box-shadow: none !important;
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--carousel,
