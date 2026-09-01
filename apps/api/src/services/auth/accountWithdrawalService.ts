@@ -1,6 +1,7 @@
 import { prisma } from "../../db/client.js";
 import { revokeAllRefreshForUser } from "../authSessions.js";
 import { archiveAbusingProtectionOnAccountDelete } from "./abusingProtectionService.js";
+import { ensureWithdrawalScheduleSchema } from "./ensureWithdrawalScheduleSchema.js";
 
 export class AccountWithdrawalError extends Error {
   statusCode: number;
@@ -23,6 +24,7 @@ function tombstoneHandle(userId: string): string {
  * 회원 탈퇴 — PII 파기, 구독 해지, 세션 무효화, 재가입 방지 로그 보관
  */
 export async function withdrawUserAccount(userId: string): Promise<{ ok: true }> {
+  await ensureWithdrawalScheduleSchema();
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, status: true, role: true, publicHandle: true }

@@ -17,8 +17,22 @@ import {
   AccountWithdrawalError,
   withdrawUserAccount
 } from "./accountWithdrawalService.js";
+import {
+  ensureWithdrawalScheduleSchema
+} from "./ensureWithdrawalScheduleSchema.js";
 
 const WITHDRAWAL_GRACE_MS = 24 * 60 * 60 * 1000;
+
+async function ensureWithdrawalDbReady() {
+  const ok = await ensureWithdrawalScheduleSchema();
+  if (!ok) {
+    throw new AccountWithdrawalError(
+      "탈퇴 기능 DB 준비 중입니다. 잠시 후 다시 시도해 주세요.",
+      503,
+      "WITHDRAWAL_SCHEMA_NOT_READY"
+    );
+  }
+}
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -164,6 +178,7 @@ async function verifyPassMatchesAccount(userId: string, impUid: string) {
 }
 
 export async function getAccountWithdrawalStatus(userId: string) {
+  await ensureWithdrawalDbReady();
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -191,6 +206,7 @@ export async function getAccountWithdrawalStatus(userId: string) {
 }
 
 export async function sendWithdrawalEmailCode(userId: string) {
+  await ensureWithdrawalDbReady();
   await assertWithdrawalAllowed(userId);
   const email = await resolveUserNotifyEmail(userId);
   if (!email) {
@@ -210,6 +226,7 @@ export async function sendWithdrawalEmailCode(userId: string) {
 }
 
 export async function withdrawAccountWithEmailCode(userId: string, codeRaw: string) {
+  await ensureWithdrawalDbReady();
   await assertWithdrawalAllowed(userId);
   const email = await resolveUserNotifyEmail(userId);
   if (!email) {
@@ -222,6 +239,7 @@ export async function withdrawAccountWithEmailCode(userId: string, codeRaw: stri
 }
 
 export async function withdrawAccountWithPhone(userId: string, impUid: string) {
+  await ensureWithdrawalDbReady();
   await assertWithdrawalAllowed(userId);
   await verifyPassMatchesAccount(userId, impUid);
   await dissolveFamilyLinksForGuardianWithdrawal(userId);
@@ -239,6 +257,7 @@ export async function applyManualWithdrawal(
     address?: string;
   }
 ) {
+  await ensureWithdrawalDbReady();
   await assertWithdrawalAllowed(userId);
 
   const user = await prisma.user.findUnique({
@@ -307,6 +326,7 @@ export async function applyManualWithdrawal(
 }
 
 export async function cancelScheduledWithdrawal(userId: string) {
+  await ensureWithdrawalDbReady();
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, status: true, withdrawalScheduledAt: true }
@@ -331,6 +351,7 @@ export async function cancelScheduledWithdrawal(userId: string) {
 }
 
 export async function processDueScheduledWithdrawals(limit = 50) {
+  if (!(await ensureWithdrawalScheduleSchema())) return { processed: 0, scanned: 0 };
   const now = new Date();
   const due = await prisma.user.findMany({
     where: {

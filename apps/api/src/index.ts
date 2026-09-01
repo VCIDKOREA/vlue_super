@@ -18,6 +18,9 @@ import { egressLogMiddleware, startEgressSummaryTimer } from "./lib/egressLog.js
 
 assertProductionEnvLocked();
 await loadPricingConfig();
+await import("./services/auth/ensureWithdrawalScheduleSchema.js").then((m) =>
+  m.ensureWithdrawalScheduleSchema()
+);
 
 const app = new Hono();
 
