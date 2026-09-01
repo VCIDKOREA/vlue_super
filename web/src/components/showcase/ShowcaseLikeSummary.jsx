@@ -12,7 +12,8 @@ function likerHandle(author) {
 export default function ShowcaseLikeSummary({
   likeCount = 0,
   recentLiker = null,
-  onOpenLikers
+  onOpenLikers,
+  className = ""
 }) {
   const total = Math.max(0, Math.floor(Number(likeCount) || 0));
   if (total <= 0) return null;
@@ -22,7 +23,7 @@ export default function ShowcaseLikeSummary({
 
   if (total === 1) {
     return (
-      <p className="showcase-like-summary" aria-live="polite">
+      <p className={`showcase-like-summary${className ? ` ${className}` : ""}`} aria-live="polite">
         <span className="showcase-like-summary__accent">{firstLabel}</span>
         <span>님이 좋아합니다</span>
       </p>
@@ -30,7 +31,7 @@ export default function ShowcaseLikeSummary({
   }
 
   return (
-    <p className="showcase-like-summary" aria-live="polite">
+    <p className={`showcase-like-summary${className ? ` ${className}` : ""}`} aria-live="polite">
       <span className="showcase-like-summary__accent">{firstLabel}</span>
       <span>님 외 </span>
       <button

@@ -1008,28 +1008,18 @@ export default function ShowcaseCallCarousel({
                       }}
                     />
                     {socialOverlayEnabled && v1AppShell.showcaseSocialOverlay && !keypadOpen ? (
-                      <>
-                        <ShowcaseSlideChrome
-                          card={card}
-                          showcaseStyle={styleConfig}
-                          variant="custom"
-                          businessLink={slide.businessLink || null}
-                          fallbackToMe={false}
-                          onToast={onKeypadToast}
-                          showSnsCert={showSnsCert}
-                          onOpenSnsCert={openSnsCertSheet}
-                          verified={verified}
-                        />
-                        <ShowcaseBannerSocialLayer
-                          card={card}
-                          slide={slide}
-                          contentOrdinal={slideContentOrdinal}
-                          previewMode={previewMode}
-                          onToast={onKeypadToast}
-                          onReport={onReport}
-                          hideFooter
-                        />
-                      </>
+                      <ShowcaseBannerSlideSocialStack
+                        card={card}
+                        styleConfig={styleConfig}
+                        slide={slide}
+                        slideContentOrdinal={slideContentOrdinal}
+                        previewMode={previewMode}
+                        onKeypadToast={onKeypadToast}
+                        onReport={onReport}
+                        showSnsCert={showSnsCert}
+                        openSnsCertSheet={openSnsCertSheet}
+                        verified={verified}
+                      />
                     ) : null}
                   </div>
                 ) : null}
@@ -1147,5 +1137,47 @@ export default function ShowcaseCallCarousel({
         <p className="showcase-call-carousel__lock-hint">통화 연결 후 슬라이드할 수 있습니다</p>
       ) : null}
     </div>
+  );
+}
+
+function ShowcaseBannerSlideSocialStack({
+  card,
+  styleConfig,
+  slide,
+  slideContentOrdinal,
+  previewMode,
+  onKeypadToast,
+  onReport,
+  showSnsCert,
+  openSnsCertSheet,
+  verified
+}) {
+  const [socialDockOpen, setSocialDockOpen] = useState(false);
+
+  return (
+    <>
+      <ShowcaseSlideChrome
+        card={card}
+        showcaseStyle={styleConfig}
+        variant="custom"
+        businessLink={slide.businessLink || null}
+        fallbackToMe={false}
+        onToast={onKeypadToast}
+        showSnsCert={showSnsCert}
+        onOpenSnsCert={openSnsCertSheet}
+        verified={verified}
+        onSocialDockChange={setSocialDockOpen}
+      />
+      <ShowcaseBannerSocialLayer
+        card={card}
+        slide={slide}
+        contentOrdinal={slideContentOrdinal}
+        previewMode={previewMode}
+        onToast={onKeypadToast}
+        onReport={onReport}
+        hideFooter
+        hideLikeSummary={socialDockOpen}
+      />
+    </>
   );
 }

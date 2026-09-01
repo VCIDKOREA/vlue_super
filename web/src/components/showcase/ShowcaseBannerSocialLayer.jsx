@@ -62,7 +62,8 @@ export default function ShowcaseBannerSocialLayer({
   previewMode = false,
   onToast,
   onReport: onReportProp,
-  hideFooter = false
+  hideFooter = false,
+  hideLikeSummary = false
 }) {
   const style = card?.showcaseStyle || null;
   const commentsEnabled = style?.commentsEnabled !== false;
@@ -252,6 +253,7 @@ export default function ShowcaseBannerSocialLayer({
           likeCount={likeCount}
           recentLiker={recentLiker}
           onOpenLikers={() => setLikeSheetOpen(true)}
+          className={hideLikeSummary ? "is-social-hidden" : ""}
         />
       ) : null}
       {!hideFooter ? (

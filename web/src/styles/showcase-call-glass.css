@@ -3475,13 +3475,13 @@
   z-index: 6;
 }
 
-/* ??? UI ???? ????? ????? ???? ??? */
+/* 통화 UI 오버레이 — 프로필 바를 통화 제어바 바로 위에 */
 .lettering-home-push-embed.is-call-chrome:not(.lettering-home-push-embed--web-inline) .showcase-slide-chrome__dock {
-  bottom: max(108px, calc(96px + env(safe-area-inset-bottom, 0px)));
+  bottom: max(72px, calc(64px + env(safe-area-inset-bottom, 0px)));
 }
 
 .lettering-home-push-embed.is-call-chrome:not(.lettering-home-push-embed--web-inline) .showcase-social-rail {
-  bottom: max(112px, calc(100px + env(safe-area-inset-bottom, 0px)));
+  bottom: max(76px, calc(68px + env(safe-area-inset-bottom, 0px)));
 }
 
 .showcase-slide-chrome__social-dock {
@@ -4724,10 +4724,24 @@
   text-align: left;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
   pointer-events: auto;
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s ease,
+    visibility 0.24s ease;
+}
+
+/* 쇼셜 열림 — 좋아요 요약은 잠시 숨김, 닫으면 프로필 바 위에 복귀 */
+.showcase-call-carousel__banner:has(.showcase-slide-chrome__dock.is-open) .showcase-like-summary,
+.showcase-call-carousel__card:has(.showcase-slide-chrome__dock.is-open) .showcase-like-summary,
+.showcase-like-summary.is-social-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(6px);
 }
 
 .lettering-home-push-embed.is-call-chrome:not(.lettering-home-push-embed--web-inline) .showcase-like-summary {
-  bottom: max(172px, calc(160px + env(safe-area-inset-bottom, 0px)));
+  bottom: max(134px, calc(126px + env(safe-area-inset-bottom, 0px)));
 }
 
 .showcase-like-summary__accent {

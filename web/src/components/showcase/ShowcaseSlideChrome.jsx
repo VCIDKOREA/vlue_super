@@ -64,7 +64,8 @@ export default function ShowcaseSlideChrome({
   onOpenCaseArchive,
   showSnsCert = false,
   onOpenSnsCert,
-  verified = true
+  verified = true,
+  onSocialDockChange
 }) {
   const [socialOpen, setSocialOpen] = useState(false);
   const [logoBroken, setLogoBroken] = useState(false);
@@ -121,6 +122,10 @@ export default function ShowcaseSlideChrome({
 
   const showBizLink = variant === "custom" && !hideBusinessLinks && Boolean(pageLink);
   const hasSocial = socialItems.length > 0;
+
+  useEffect(() => {
+    onSocialDockChange?.(socialOpen && hasSocial);
+  }, [socialOpen, hasSocial, onSocialDockChange]);
 
   const showFollow = shouldShowShowcaseFollow(targetUserId, { hideFollow });
 
