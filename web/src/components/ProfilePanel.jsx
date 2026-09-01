@@ -305,8 +305,7 @@ function ProfilePanel({
       setDigitalCardMode("edit");
       setUpgradeOpen(false);
       setLogoutConfirmOpen(false);
-      setWithdrawConsultOpen(false);
-      setWithdrawTermsOpen(false);
+      setWithdrawFlowOpen(false);
       return;
     }
     if (initialView === "profileSettings" || initialView === "settings") {
