@@ -733,8 +733,8 @@
   width: 100%;
   max-width: none;
   margin: 0 auto;
-  min-height: 64px;
-  padding: 4px 12px max(12px, env(safe-area-inset-bottom, 0px));
+  min-height: 0;
+  padding: 2px 12px max(4px, env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
 }
 
@@ -748,8 +748,8 @@
   min-width: min(100%, 200px);
   max-width: min(100%, 280px);
   margin: 0 auto;
-  min-height: 48px;
-  padding: 0 20px;
+  min-height: 44px;
+  padding: 0 18px;
   border-radius: 14px;
   border: 0;
   background: #22c55e;

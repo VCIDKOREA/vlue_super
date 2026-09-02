@@ -295,7 +295,7 @@
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline .showcase-like-summary {
-  bottom: max(92px, calc(80px + env(safe-area-inset-bottom, 0px)));
+  bottom: calc(22px + var(--showcase-profile-dock-height, 56px) + 6px);
 }
 
 /* www 미리보기 + 통화화면 보기 — 프레임(620px) 안에서 캐러셀 축소 + 하단 CTA (앱과 동일) */
@@ -344,8 +344,7 @@
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .showcase-like-summary {
-  /* dock(72px) 과 간격 유지 — 일반 모드(92-22=70px)와 동일 */
-  bottom: calc(max(72px, 64px) + 70px);
+  bottom: calc(max(72px, 64px) + var(--showcase-profile-dock-height, 56px) + 6px);
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner .lettering-ongoing-scroll--carousel,
