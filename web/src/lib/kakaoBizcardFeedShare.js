@@ -223,6 +223,15 @@ export async function shareBizcardViaKakaoFeed(card) {
     };
   }
 
+  /* 카카오 CDN에 올린 URL만 Feed에 안정적으로 표시됨 (외부 URL 스크랩 실패 → 이미지 공백) */
+  const feedImageUrl = await resolveKakaoCdnImageUrl(Kakao, urls.buttonImageUrl);
+  if (!isKakaoPublicImageUrl(feedImageUrl)) {
+    return {
+      ok: false,
+      error: "타이틀 사진을 카카오에 올리지 못했습니다. 네트워크 확인 후 다시 공유해 주세요."
+    };
+  }
+
   const viewLink = { mobileWebUrl: urls.viewUrl, webUrl: urls.viewUrl };
   const createLink = { mobileWebUrl: urls.createUrl, webUrl: urls.createUrl };
 
@@ -231,7 +240,7 @@ export async function shareBizcardViaKakaoFeed(card) {
     content: {
       title: urls.feedTitle,
       description: urls.feedDescription,
-      imageUrl: urls.buttonImageUrl,
+      imageUrl: feedImageUrl,
       imageWidth: KAKAO_FEED_IMAGE_WIDTH,
       imageHeight: KAKAO_FEED_IMAGE_HEIGHT,
       link: viewLink
@@ -244,7 +253,7 @@ export async function shareBizcardViaKakaoFeed(card) {
 
   try {
     await Kakao.Share.sendDefault(payload);
-    return { ok: true, channel: "kakao_feed_card", viewUrl: urls.viewUrl, buttonImageUrl: urls.buttonImageUrl };
+    return { ok: true, channel: "kakao_feed_card", viewUrl: urls.viewUrl, buttonImageUrl: feedImageUrl };
   } catch (err) {
     const msg =
       err?.error_msg ||
@@ -263,4 +272,54 @@ export async function shareBizcardViaKakaoFeed(card) {
     }
     return { ok: false, error: msg };
   }
+}
+
+/**
+ * 외부 이미지 → 카카오 CDN URL.
+ * uploadImage(브라우저 fetch) 우선, 실패 시 scrapImage.
+ */
+async function resolveKakaoCdnImageUrl(Kakao, imageUrl) {
+  const src = String(imageUrl || "").trim();
+  if (!src) return "";
+  if (/kakaocdn\.net|kakao\.co\.kr|daumcdn\.net/i.test(src)) return src;
+
+  const pickHosted = (res) =>
+    String(
+      res?.infos?.original?.url ||
+        res?.infos?.[0]?.url ||
+        res?.infos?.url ||
+        res?.url ||
+        ""
+    ).trim();
+
+  if (typeof Kakao?.Share?.uploadImage === "function") {
+    try {
+      const fetched = await fetch(src, { mode: "cors", credentials: "omit" });
+      if (fetched.ok) {
+        const blob = await fetched.blob();
+        if (blob && blob.size > 32) {
+          const type = blob.type || "image/jpeg";
+          const ext = /png/i.test(type) ? "png" : /webp/i.test(type) ? "webp" : "jpg";
+          const file = new File([blob], `vlue-cover.${ext}`, { type });
+          const uploaded = await Kakao.Share.uploadImage({ file: [file] });
+          const hosted = pickHosted(uploaded);
+          if (isKakaoPublicImageUrl(hosted)) return hosted;
+        }
+      }
+    } catch {
+      /* scrapImage 로 폴백 */
+    }
+  }
+
+  if (typeof Kakao?.Share?.scrapImage === "function") {
+    try {
+      const scraped = await Kakao.Share.scrapImage({ imageUrl: src });
+      const hosted = pickHosted(scraped);
+      if (isKakaoPublicImageUrl(hosted)) return hosted;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return src;
 }
