@@ -22,7 +22,7 @@ export function buildKakaoTalkAddBridgeHtml(talkId: string): string | null {
     (function () {
       var id = ${JSON.stringify(id)};
       var enc = encodeURIComponent(id);
-      var scheme = "kakaotalk://friend/search?query=" + enc;
+      var scheme = "kakaotalk://launch";
       var isAndroid = /Android/i.test(navigator.userAgent || "");
       var isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
       var status = document.getElementById("status");
@@ -56,8 +56,7 @@ export function buildKakaoTalkAddBridgeHtml(talkId: string): string | null {
             return;
           } catch (e) {}
           window.location.href =
-            "intent://friend/search?query=" + enc +
-            "#Intent;scheme=kakaotalk;package=com.kakao.talk;end";
+            "intent://launch#Intent;scheme=kakaotalk;package=com.kakao.talk;end";
           return;
         }
         if (isIos) {
@@ -69,7 +68,7 @@ export function buildKakaoTalkAddBridgeHtml(talkId: string): string | null {
 
       copyId()
         .then(function () {
-          status.textContent = "카카오톡 ID가 복사되었습니다. 카카오톡으로 이동합니다…";
+          status.textContent = "카카오톡 ID가 복사되었습니다. 카카오톡 → 친구 추가 → ID로 추가에 붙여넣기 하세요…";
           if (!isAndroid && !isIos) {
             status.textContent = "ID(" + id + ")가 복사되었습니다. PC에서는 카카오톡 앱을 열 수 없습니다. 모바일 카카오톡에서 친구 추가 → ID로 추가를 이용해 주세요.";
             return;

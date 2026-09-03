@@ -540,6 +540,90 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     }
 
     /** intent:// · PASS · kakaolink · tel 등 커스텀 스킴 → 외부 앱 */
+    private fun isKakaoRelatedUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.startsWith("kakaotalk:") ||
+            lower.startsWith("kakaolink:") ||
+            lower.startsWith("kakao") ||
+            lower.contains("package=com.kakao.talk") ||
+            lower.contains("scheme=kakaotalk")
+    }
+
+    /** 카톡 전용: friend/search 등 폐기된 딥링크 → launch / 런처로 폴백 */
+    private fun openKakaoTalkApp(): Boolean {
+        val candidates = listOf(
+            Intent(Intent.ACTION_VIEW, Uri.parse("kakaotalk://launch")).setPackage("com.kakao.talk"),
+            packageManager.getLaunchIntentForPackage("com.kakao.talk"),
+            Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                setPackage("com.kakao.talk")
+            }
+        )
+        for (raw in candidates) {
+            if (raw == null) continue
+            try {
+                raw.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(raw)
+                return true
+            } catch (_: Exception) {
+                /* try next */
+            }
+        }
+        return false
+    }
+
+    private fun openExternalUrlInternal(u: String) {
+        val lower = u.lowercase()
+        // 폐기된 친구검색 딥링크는 바로 카톡 앱 실행
+        if (lower.contains("friend/search") || lower.contains("kakaotalk://friend")) {
+            if (openKakaoTalkApp()) return
+            throw IllegalStateException("KakaoTalk not installed")
+        }
+
+        val intent = when {
+            lower.startsWith("intent:") ->
+                Intent.parseUri(u, Intent.URI_INTENT_SCHEME)
+            else -> {
+                val view = Intent(Intent.ACTION_VIEW, Uri.parse(u))
+                val host = Uri.parse(u).host?.lowercase().orEmpty()
+                when {
+                    lower.startsWith("kakaotalk:") ||
+                        (lower.startsWith("kakao") && !host.contains("kakao.com")) ->
+                        view.setPackage("com.kakao.talk")
+                    lower.startsWith("instagram:") ||
+                        host.contains("instagram.com") || host.contains("instagr.am") ->
+                        view.setPackage("com.instagram.android")
+                    lower.startsWith("vnd.youtube:") ||
+                        host.contains("youtube.com") || host.contains("youtu.be") ->
+                        view.setPackage("com.google.android.youtube")
+                }
+                view
+            }
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            intent.`package` = null
+            val fallback = intent.getStringExtra("browser_fallback_url")
+            try {
+                if (!fallback.isNullOrBlank()) {
+                    startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(fallback))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                } else if (isKakaoRelatedUrl(u) && openKakaoTalkApp()) {
+                    return
+                } else {
+                    startActivity(intent)
+                }
+            } catch (e2: Exception) {
+                if (isKakaoRelatedUrl(u) && openKakaoTalkApp()) return
+                throw e2
+            }
+        }
+    }
+
     private fun handleSpecialUrl(url: String): Boolean {
         if (url.isBlank()) return false
         val lower = url.lowercase()
@@ -585,12 +669,22 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                     lower.startsWith("samsungpass:") || lower.startsWith("mbmobilebank:") -> {
                     // 실패해도 WebView에 커스텀 스킴을 넘기지 않음 (ERR_UNKNOWN_URL_SCHEME 방지)
                     try {
-                        startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        )
+                        if (lower.contains("friend/search") || lower.contains("kakaotalk://friend")) {
+                            if (!openKakaoTalkApp()) {
+                                Toast.makeText(this, "카카오톡을 열 수 없습니다.", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }
                     } catch (e: Exception) {
                         Log.e(TAG, "special url startActivity failed: $url", e)
-                        Toast.makeText(this, "연결할 앱을 찾을 수 없습니다.", Toast.LENGTH_SHORT).show()
+                        if (isKakaoRelatedUrl(url) && openKakaoTalkApp()) {
+                            /* ok */
+                        } else {
+                            Toast.makeText(this, "연결할 앱을 찾을 수 없습니다.", Toast.LENGTH_SHORT).show()
+                        }
                     }
                     true
                 }
@@ -1214,42 +1308,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             if (u.isEmpty()) return
             activity.runOnUiThread {
                 try {
-                    val lower = u.lowercase()
-                    val intent = when {
-                        lower.startsWith("intent:") ->
-                            Intent.parseUri(u, Intent.URI_INTENT_SCHEME)
-                        else -> {
-                            val view = Intent(Intent.ACTION_VIEW, Uri.parse(u))
-                            val host = Uri.parse(u).host?.lowercase().orEmpty()
-                            when {
-                                lower.startsWith("kakaotalk:") || lower.startsWith("kakao") ->
-                                    view.setPackage("com.kakao.talk")
-                                lower.startsWith("instagram:") ||
-                                    host.contains("instagram.com") || host.contains("instagr.am") ->
-                                    view.setPackage("com.instagram.android")
-                                lower.startsWith("vnd.youtube:") ||
-                                    host.contains("youtube.com") || host.contains("youtu.be") ->
-                                    view.setPackage("com.google.android.youtube")
-                            }
-                            view
-                        }
-                    }
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    try {
-                        activity.startActivity(intent)
-                    } catch (_: Exception) {
-                        // 패키지 고정 실패 시 시스템 기본 핸들러 / intent fallback
-                        intent.`package` = null
-                        val fallback = intent.getStringExtra("browser_fallback_url")
-                        if (!fallback.isNullOrBlank()) {
-                            activity.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(fallback))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
-                        } else {
-                            activity.startActivity(intent)
-                        }
-                    }
+                    activity.openExternalUrlInternal(u)
                 } catch (e: Exception) {
                     Log.e(TAG, "openExternalUrl failed: $u", e)
                     Toast.makeText(activity, "페이지를 열 수 없습니다.", Toast.LENGTH_SHORT).show()

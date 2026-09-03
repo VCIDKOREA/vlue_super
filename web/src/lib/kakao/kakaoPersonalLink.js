@@ -72,19 +72,17 @@ function openViaNativeBridge(url) {
   return false;
 }
 
-/** 카카오톡 앱 열기 (친구 ID 검색 화면 시도, Play 스토어 폴백 없음) */
+/** 카카오톡 앱 열기 — ID 검색 딥링크는 최신 카톡에서 제거됨 → launch + (복사된 ID로 수동 추가) */
 export function launchKakaoTalkForFriendAdd(talkId) {
   const id = normalizeKakaoTalkId(talkId);
   if (!id || typeof window === "undefined") return false;
 
-  const enc = encodeURIComponent(id);
-  const schemeHref = `kakaotalk://friend/search?query=${enc}`;
+  // friend/search 는 resolve 실패(ActivityNotFound). launch / 런처만 동작.
+  const schemeHref = "kakaotalk://launch";
   const intentHref =
-    `intent://friend/search?query=${enc}` +
-    "#Intent;scheme=kakaotalk;package=com.kakao.talk;end";
+    "intent://launch#Intent;scheme=kakaotalk;package=com.kakao.talk;end";
 
-  // WebView에 kakaotalk:// 을 load하면 ERR_UNKNOWN_URL_SCHEME — 네이티브 브릿지 우선
-  if (openViaNativeBridge(intentHref) || openViaNativeBridge(schemeHref)) {
+  if (openViaNativeBridge(schemeHref) || openViaNativeBridge(intentHref)) {
     return true;
   }
 
@@ -143,7 +141,9 @@ export async function promptKakaoTalkPersonalLink(talkId, { ownerName, onToast }
     return true;
   }
 
-  onToast?.(`${label}님의 카카오톡 ID가 복사되었습니다.`);
+  onToast?.(
+    `${label}님의 카카오톡 ID가 복사되었습니다. 카카오톡 → 친구 추가 → ID로 추가에 붙여넣기 하세요.`
+  );
 
   window.setTimeout(() => {
     launchKakaoTalkForFriendAdd(id);
