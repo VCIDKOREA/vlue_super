@@ -1,5 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { copyShowcaseShareUrl, shareBizcardViaKakao } from "../lib/letteringBizcardShare.js";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  copyShowcaseShareUrl,
+  prepareKakaoBizcardShare,
+  openPreparedKakaoBizcardShare
+} from "../lib/letteringBizcardShare.js";
 import { readLetteringFixedIdentity } from "../lib/letteringBizcardStorage.js";
 import { syncDigitalCardExportSnapshot, ensureDigitalCardId } from "../lib/digitalCardApi.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
@@ -38,7 +42,9 @@ export default function LetteringBizcardSharePanel({
 }) {
   const [busy, setBusy] = useState("");
   const [shareReady, setShareReady] = useState(false);
+  const [kakaoPrepared, setKakaoPrepared] = useState(null);
   const [shareCount, setShareCount] = useState(() => readShowcaseShareCountLocal());
+  const prepareGen = useRef(0);
   const isPaid = isPaidLetteringTier(membershipTier);
 
   useEffect(() => {
@@ -73,6 +79,35 @@ export default function LetteringBizcardSharePanel({
     };
   }, [card?.name, card?.organization, card?.phone, card?.title, card?.department, isPaid, sharePhone]);
 
+  /* 카톡 공유 페이로드 미리 준비 — 클릭 시 await 없이 sendDefault */
+  useEffect(() => {
+    if (!isPaid || !card || !sharePhone) {
+      setKakaoPrepared(null);
+      return undefined;
+    }
+    const gen = ++prepareGen.current;
+    let cancelled = false;
+    setKakaoPrepared(null);
+    (async () => {
+      const prepared = await prepareKakaoBizcardShare(card);
+      if (cancelled || gen !== prepareGen.current) return;
+      setKakaoPrepared(prepared);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isPaid,
+    sharePhone,
+    card?.name,
+    card?.organization,
+    card?.phone,
+    card?.title,
+    card?.department,
+    card?.titlePhotoUrl,
+    card?.shareCoverUrl
+  ]);
+
   const runCopy = async () => {
     if (busy) return;
     setBusy("copy");
@@ -95,34 +130,39 @@ export default function LetteringBizcardSharePanel({
     }
   };
 
-  const runKakao = async () => {
+  const runKakao = () => {
     if (busy) return;
     if (!isPaid) {
       onToast?.("카카오톡 카드 공유는 유료(인증명함) 회원만 사용할 수 있습니다. 주소 복사를 이용해 주세요.");
       return;
     }
-    setBusy("kakao");
-    try {
-      const r = await shareBizcardViaKakao(card);
-      if (r.cancelled) return;
-      if (!r.ok && r.error) {
-        onToast?.(r.error);
-        return;
+    if (!kakaoPrepared?.ok) {
+      onToast?.(kakaoPrepared?.error || "카카오 공유를 준비 중입니다. 잠시 후 다시 눌러 주세요.");
+      if (card) {
+        const gen = ++prepareGen.current;
+        void prepareKakaoBizcardShare(card).then((prepared) => {
+          if (gen !== prepareGen.current) return;
+          setKakaoPrepared(prepared);
+        });
       }
-      onToast?.(
-        r.viewUrl
-          ? `카카오톡 공유 창을 열었습니다. 버튼 주소: ${r.viewUrl}`
-          : "카카오톡 공유 창을 열었습니다."
-      );
-      const recorded = await recordSelfShowcaseShareApi();
+      return;
+    }
+    /* 클릭 동기 경로 — await 금지 (카카오 팝업 focus 요구) */
+    const r = openPreparedKakaoBizcardShare(kakaoPrepared);
+    if (!r.ok && r.error) {
+      onToast?.(r.error);
+      return;
+    }
+    onToast?.(
+      r.viewUrl
+        ? `카카오톡 공유 창을 열었습니다. 버튼 주소: ${r.viewUrl}`
+        : "카카오톡 공유 창을 열었습니다."
+    );
+    void recordSelfShowcaseShareApi().then((recorded) => {
       if (recorded && Number.isFinite(Number(recorded.showcaseShareCount))) {
         setShareCount(Number(recorded.showcaseShareCount));
       }
-    } catch (e) {
-      onToast?.(e?.message || "카카오톡 공유에 실패했습니다.");
-    } finally {
-      setBusy("");
-    }
+    });
   };
 
   const btnCopy =
@@ -135,6 +175,11 @@ export default function LetteringBizcardSharePanel({
     : `mt-3 rounded-2xl border p-3 ${isDarkMode ? "border-cyan-500/20 bg-slate-900/50" : "border-slate-200 bg-white"}`;
 
   const handleLabel = readVlueHandleDisplay();
+  const kakaoBusyLabel = !kakaoPrepared
+    ? "준비 중…"
+    : kakaoPrepared?.ok
+      ? "카카오톡으로 보내기"
+      : "다시 준비";
 
   return (
     <div className={wrapCls}>
@@ -174,8 +219,13 @@ export default function LetteringBizcardSharePanel({
 
       <div className="mt-2 space-y-2">
         {isPaid ? (
-          <button type="button" disabled={!!busy || !shareReady} className={btnCopy} onClick={() => void runKakao()}>
-            {busy === "kakao" ? "여는 중…" : "카카오톡으로 보내기"}
+          <button
+            type="button"
+            disabled={!!busy || !shareReady || !kakaoPrepared}
+            className={btnCopy}
+            onClick={runKakao}
+          >
+            {busy === "kakao" ? "여는 중…" : kakaoBusyLabel}
           </button>
         ) : null}
         <button

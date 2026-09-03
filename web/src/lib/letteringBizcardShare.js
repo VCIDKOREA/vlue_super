@@ -179,4 +179,8 @@ export async function copyBizcardShareUrl(card) {
 }
 
 /** @deprecated SDK Feed 공유 — 인증 오류로 copyBizcardShareUrl 권장 */
-export { shareBizcardViaKakaoFeed as shareBizcardViaKakao } from "./kakaoBizcardFeedShare.js";
+export {
+  shareBizcardViaKakaoFeed as shareBizcardViaKakao,
+  prepareKakaoBizcardShare,
+  openPreparedKakaoBizcardShare
+} from "./kakaoBizcardFeedShare.js";

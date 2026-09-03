@@ -168,8 +168,12 @@ function kakaoShareOriginBlockedMessage() {
 
 /**
  * 카카오톡 Feed — 개인화 명함 카드 PNG + VLUE 인증 버튼
+ *
+ * 중요: Kakao.Share.sendDefault 는 클릭 제스처 직후 동기 호출해야 함.
+ * await(동기화·이미지 업로드) 뒤에 호출하면 focus null / 팝업 차단으로 실패함.
+ * → prepareKakaoBizcardShare 로 미리 준비하고, openPreparedKakaoBizcardShare 로 즉시 연다.
  */
-export async function shareBizcardViaKakaoFeed(card) {
+export async function prepareKakaoBizcardShare(card) {
   const originBlock = kakaoShareOriginBlockedMessage();
   if (originBlock) {
     return { ok: false, error: originBlock };
@@ -223,13 +227,13 @@ export async function shareBizcardViaKakaoFeed(card) {
     };
   }
 
-  /* 카카오 CDN에 올린 URL만 Feed에 안정적으로 표시됨 (외부 URL 스크랩 실패 → 이미지 공백) */
-  const feedImageUrl = await resolveKakaoCdnImageUrl(Kakao, urls.buttonImageUrl);
-  if (!isKakaoPublicImageUrl(feedImageUrl)) {
-    return {
-      ok: false,
-      error: "타이틀 사진을 카카오에 올리지 못했습니다. 네트워크 확인 후 다시 공유해 주세요."
-    };
+  /* 가능하면 CDN 업로드. 실패해도 cover URL로 페이로드는 준비 (공유 자체는 열리게) */
+  let feedImageUrl = urls.buttonImageUrl;
+  try {
+    const hosted = await resolveKakaoCdnImageUrl(Kakao, urls.buttonImageUrl);
+    if (isKakaoPublicImageUrl(hosted)) feedImageUrl = hosted;
+  } catch {
+    /* keep cover url */
   }
 
   const viewLink = { mobileWebUrl: urls.viewUrl, webUrl: urls.viewUrl };
@@ -251,17 +255,46 @@ export async function shareBizcardViaKakaoFeed(card) {
     ]
   };
 
+  return {
+    ok: true,
+    payload,
+    viewUrl: urls.viewUrl,
+    buttonImageUrl: feedImageUrl
+  };
+}
+
+/**
+ * 클릭 핸들러에서 await 없이 호출. 준비된 페이로드로 카톡 공유 창만 연다.
+ * @returns {{ ok: boolean, cancelled?: boolean, error?: string, viewUrl?: string, buttonImageUrl?: string }}
+ */
+export function openPreparedKakaoBizcardShare(prepared) {
+  if (!prepared?.ok || !prepared?.payload) {
+    return { ok: false, error: prepared?.error || "카카오 공유 준비가 되지 않았습니다." };
+  }
+  const Kakao = typeof window !== "undefined" ? window.Kakao : null;
+  if (!Kakao?.Share?.sendDefault) {
+    return { ok: false, error: "카카오 Share API를 사용할 수 없습니다." };
+  }
   try {
-    await Kakao.Share.sendDefault(payload);
-    return { ok: true, channel: "kakao_feed_card", viewUrl: urls.viewUrl, buttonImageUrl: feedImageUrl };
+    Kakao.Share.sendDefault(prepared.payload);
+    return {
+      ok: true,
+      channel: "kakao_feed_card",
+      viewUrl: prepared.viewUrl,
+      buttonImageUrl: prepared.buttonImageUrl
+    };
   } catch (err) {
     const msg =
       err?.error_msg ||
       err?.message ||
       (typeof err === "string" ? err : "") ||
       "카카오톡 공유를 완료하지 못했습니다.";
-    if (/cancel|취소|abort/i.test(msg)) {
-      return { ok: false, cancelled: true };
+    if (/cancel|취소|abort|focus/i.test(msg)) {
+      return {
+        ok: false,
+        error:
+          "카카오톡 공유 창을 열지 못했습니다. 팝업 차단을 해제한 뒤, 버튼을 다시 눌러 주세요."
+      };
     }
     if (/인증|invalid request|잘못된 요청|KOE/i.test(msg)) {
       return {
@@ -272,6 +305,13 @@ export async function shareBizcardViaKakaoFeed(card) {
     }
     return { ok: false, error: msg };
   }
+}
+
+/** @deprecated 클릭 직후 긴 await 때문에 실패할 수 있음 — prepare + openPrepared 사용 */
+export async function shareBizcardViaKakaoFeed(card) {
+  const prepared = await prepareKakaoBizcardShare(card);
+  if (!prepared.ok) return prepared;
+  return openPreparedKakaoBizcardShare(prepared);
 }
 
 /**
