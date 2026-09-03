@@ -5,11 +5,18 @@ import android.content.Context
 import android.content.Intent
 import kr.vlue.calloverlay.push.VlueFcmRegistrar
 
-/** 재부팅 후 레터링 설정 유지 (리시버는 manifest 등록 상태) */
+/** 재부팅·앱 업데이트 후 레터링 자동 복구 */
 class LetteringBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
-        if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
+        val action = intent?.action ?: return
+        if (action != Intent.ACTION_BOOT_COMPLETED &&
+            action != Intent.ACTION_MY_PACKAGE_REPLACED &&
+            action != Intent.ACTION_PACKAGE_REPLACED
+        ) {
+            return
+        }
+        LetteringIntegration.ensureLetteringArmedIfReady(context)
         LetteringCallMonitorService.syncWithPrefs(context)
-        VlueFcmRegistrar.syncTokenAsync(context, "boot_completed")
+        VlueFcmRegistrar.syncTokenAsync(context, action)
     }
 }

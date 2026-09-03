@@ -6,7 +6,7 @@ import androidx.appcompat.app.AppCompatActivity
 
 /**
  * VLUE 메인 앱 진입점에서 호출 — 레터링 모듈 초기화·권한·세션
- * (기존 MainActivity에 merge 시 Application.onCreate + Activity.onResume 에 연결)
+ * 모든 유저·재설치 후 수동 맞춤 없이 통화 감지가 붙도록 자동 무장.
  */
 object LetteringIntegration {
     private const val TAG = "VlueLettering"
@@ -14,6 +14,7 @@ object LetteringIntegration {
     fun onApplicationCreate(app: Application) {
         try {
             Log.i(TAG, "lettering module ready api=${VlueLetteringConfig.apiBaseUrl} web=${VlueLetteringConfig.webBaseUrl}")
+            ensureLetteringArmedIfReady(app)
             LetteringCallMonitorService.syncWithPrefs(app)
         } catch (e: Exception) {
             Log.e(TAG, "onApplicationCreate failed", e)
@@ -22,10 +23,6 @@ object LetteringIntegration {
 
     fun onMainActivityReady(activity: AppCompatActivity) {
         try {
-            /*
-             * 재설치·세션만 남은 경우: 권한·로그인 있으면 통화 감지를 자동 ON.
-             * 웹 쇼케이스 토글과 무관하게 빅푸시가 동작해야 신뢰가 유지된다.
-             */
             ensureLetteringArmedIfReady(activity)
             if (LetteringPrefs.isLetteringEnabled(activity) &&
                 !LetteringPermissionHelper.allGranted(activity)
@@ -39,29 +36,46 @@ object LetteringIntegration {
     }
 
     /**
-     * 전화/오버레이 권한 + (세션 또는 멤버 번호) 있으면 lettering_enabled 을 켠다.
-     * 사용자가 매번 설정을 다시 맞추지 않아도 되게.
+     * 로그인·권한 준비 시 통화 감지 자동 ON.
+     * 사용자가 설정에서 명시적으로 끈 경우(opt-out)만 건너뛴다.
      */
     fun ensureLetteringArmedIfReady(context: android.content.Context) {
         val app = context.applicationContext
-        if (!LetteringPermissionHelper.hasCallOverlayReady(app)) return
-        val hasSession =
-            !LetteringPrefs.getUserId(app).isNullOrBlank() ||
-                LetteringPrefs.getMemberPhone(app).isNotBlank() ||
-                !LetteringPrefs.getAccessToken(app).isNullOrBlank()
-        if (!hasSession && !LetteringPrefs.isLetteringEnabled(app)) return
-        if (!LetteringPrefs.isLetteringEnabled(app)) {
-            Log.i(TAG, "auto-arm lettering (permissions ready + session)")
-            LetteringPrefs.setLetteringEnabled(app, true)
-        } else {
+        if (LetteringPrefs.isUserOptedOut(app)) {
             LetteringCallMonitorService.syncWithPrefs(app)
+            return
+        }
+        val ready = LetteringPermissionHelper.hasCallOverlayReady(app)
+        val hasSession = LetteringPrefs.hasAnySession(app)
+        when {
+            ready -> {
+                Log.i(TAG, "auto-arm lettering (permissions ready)")
+                LetteringPrefs.setLetteringEnabled(app, true)
+            }
+            hasSession -> {
+                Log.i(TAG, "auto-arm lettering flag (session, awaiting permissions)")
+                LetteringPrefs.setLetteringEnabled(app, true)
+            }
+            else -> LetteringCallMonitorService.syncWithPrefs(app)
         }
     }
 
     fun bindUserSession(activity: AppCompatActivity, userId: String?, accessToken: String?) {
         try {
             LetteringPrefs.setSession(activity, userId, accessToken)
+            /* 로그인 = 통화 감지 사용 의사 — opt-out 이 아니면 무조건 무장 시도 */
+            if (!LetteringPrefs.isUserOptedOut(activity)) {
+                LetteringPrefs.setLetteringEnabled(activity, true)
+            }
             ensureLetteringArmedIfReady(activity)
+            if (!LetteringPermissionHelper.hasCallOverlayReady(activity) &&
+                !LetteringPrefs.isUserOptedOut(activity) &&
+                activity is MainActivity
+            ) {
+                activity.runOnUiThread {
+                    activity.promptLetteringPermissions()
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "bindUserSession failed", e)
         }

@@ -1028,6 +1028,16 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
     }
 
+    fun injectLetteringEnabledLocalStorage() {
+        if (!::webView.isInitialized) return
+        webView.post {
+            webView.evaluateJavascript(
+                "(function(){try{localStorage.setItem('vlue_lettering_enabled','1');}catch(e){}})();",
+                null
+            )
+        }
+    }
+
     class MainJsBridge(private val activity: MainActivity) {
         @android.webkit.JavascriptInterface
         fun isCompanionOverlayActive(): String {
@@ -1036,16 +1046,27 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             return "0"
         }
 
-        /** 웹 로그인 세션 → 네이티브 (알림 수락/거절 API용) */
+        /** 웹 로그인 세션 → 네이티브 (알림·통화 감지 자동 무장) */
         @android.webkit.JavascriptInterface
         fun bindUserSession(userId: String?, accessToken: String?) {
-            LetteringPrefs.setSession(
+            LetteringIntegration.bindUserSession(
                 activity,
                 userId?.trim()?.ifEmpty { null },
                 accessToken?.trim()?.ifEmpty { null }
             )
             activity.ensurePushNotificationPermission()
             kr.vlue.calloverlay.push.VlueFcmRegistrar.syncTokenAsync(activity, "bindUserSession")
+            activity.runOnUiThread {
+                activity.notifyWebPermissionStatus()
+                /* 웹 localStorage 도 ON 으로 맞춤 — 재실행 시 false 로 덮어쓰지 않게 */
+                if (LetteringPrefs.isLetteringEnabled(activity)) {
+                    activity.dispatchWebCustomEvent(
+                        "vlue-lettering-settings-changed",
+                        """{"enabled":true}"""
+                    )
+                    activity.injectLetteringEnabledLocalStorage()
+                }
+            }
         }
 
         @android.webkit.JavascriptInterface

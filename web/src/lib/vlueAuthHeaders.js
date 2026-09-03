@@ -50,11 +50,21 @@ export function syncNativeAuthSession() {
     if (window.Android?.bindUserSession) {
       window.Android.bindUserSession(userId, token);
       if (deviceToken) window.Android.bindDeviceToken?.(deviceToken);
+      try {
+        localStorage.setItem("vlue_lettering_enabled", "1");
+      } catch {
+        /* ignore */
+      }
       return true;
     }
     if (window.VlueAndroid?.bindUserSession) {
       window.VlueAndroid.bindUserSession(userId, token);
       if (deviceToken) window.VlueAndroid.bindDeviceToken?.(deviceToken);
+      try {
+        localStorage.setItem("vlue_lettering_enabled", "1");
+      } catch {
+        /* ignore */
+      }
       return true;
     }
   } catch {

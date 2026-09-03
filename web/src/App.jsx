@@ -3099,21 +3099,26 @@ function App() {
 
   useEffect(() => {
     if (typeof window !== "undefined") window.VLUE_APP_MAIN = true;
-    /* 네이티브가 이미 ON 이면 웹이 false 로 덮어쓰지 않음 (권한 다이얼로그만 켠 경우) */
+    /* 네이티브 우선 동기화 — 빈 localStorage 로 native OFF 를 덮어쓰지 않음 */
     (async () => {
       try {
         const {
           readLetteringPermissionStatus,
           ensureCallDetectionForBroadcast,
-          healCallDetectionIfNeeded
+          healCallDetectionIfNeeded,
+          writeLetteringEnabled,
+          readLetteringEnabled
         } = await import("./lib/letteringSettings.js");
         const { readVcidBroadcastOn, readDccBroadcastOn } = await import("./lib/bizcardAccountSync.js");
         const st = readLetteringPermissionStatus();
-        if (st?.letteringEnabled && !readLetteringEnabled()) {
-          writeLetteringEnabled(true);
-          return;
+        /* 네이티브가 ON 이면 웹도 ON (재설치·타 유저 동일) */
+        if (st?.letteringEnabled) {
+          if (!readLetteringEnabled()) writeLetteringEnabled(true);
         }
-        /* 쇼케이스/명함 송출이 켜져 있으면 통화 감지 서비스도 반드시 ON */
+        /* 로그인 앱에서는 송출 여부와 무관하게 통화 감지 유지 시도 */
+        if (st?.callOverlayReady && st?.letteringUserOptedOut !== true) {
+          ensureCallDetectionForBroadcast(true);
+        }
         if (readVcidBroadcastOn() || readDccBroadcastOn()) {
           ensureCallDetectionForBroadcast(true);
           const health = healCallDetectionIfNeeded({
@@ -3126,17 +3131,16 @@ function App() {
             );
             setTimeout(() => setBottomToast(""), 4500);
           }
-          return;
         }
+        return;
       } catch {
         /* ignore */
       }
       const hash = window.location.hash || "";
       if (hash.includes("forceLettering=1") || hash.includes("native=1")) {
         writeLetteringEnabled(true);
-        return;
       }
-      writeLetteringEnabled(readLetteringEnabled());
+      /* 의도적으로 writeLetteringEnabled(false) 호출하지 않음 */
     })();
   }, []);
 
