@@ -786,21 +786,37 @@ export default function ShowcaseCallCarousel({
     const wantSlideId = String(focusSlideId || "").trim();
     if (!wantOrdinal && !wantSlideId) return;
     if (!slides.length) return;
-    let target = -1;
-    if (wantSlideId) {
-      target = slides.findIndex((s) => {
-        const sid = resolveShowcaseSocialSlideId({ slide: s });
-        return sid === wantSlideId || String(s.id || "") === wantSlideId;
-      });
+
+    const resolveTarget = () => {
+      let target = -1;
+      if (wantSlideId) {
+        target = slides.findIndex((s) => {
+          const sid = resolveShowcaseSocialSlideId({ slide: s });
+          return sid === wantSlideId || String(s.id || "") === wantSlideId;
+        });
+      }
+      if (target < 0 && wantOrdinal > 0) {
+        slides.forEach((s, i) => {
+          if (s.type === "card") return;
+          const ord = cardAtEnd ? i + 1 : Math.max(1, i + 1 - photoIndexBase);
+          if (ord === wantOrdinal) target = i;
+        });
+      }
+      return target;
+    };
+
+    let target = resolveTarget();
+    if (target >= 0) {
+      setIndex(target);
+      return undefined;
     }
-    if (target < 0 && wantOrdinal > 0) {
-      slides.forEach((s, i) => {
-        if (s.type === "card") return;
-        const ord = cardAtEnd ? i + 1 : Math.max(1, i + 1 - photoIndexBase);
-        if (ord === wantOrdinal) target = i;
-      });
-    }
-    if (target >= 0) setIndex(target);
+
+    /* 슬라이드 구성이 늦게 채워지는 경우 재시도 */
+    const t = window.setTimeout(() => {
+      const again = resolveTarget();
+      if (again >= 0) setIndex(again);
+    }, 120);
+    return () => window.clearTimeout(t);
   }, [focusContentOrdinal, focusSlideId, slides, cardAtEnd, photoIndexBase]);
 
   const cornerName = String(card?.name || card?.displayName || "").trim();

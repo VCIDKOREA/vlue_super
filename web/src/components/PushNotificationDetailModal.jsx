@@ -85,9 +85,10 @@ export default function PushNotificationDetailModal({
   const likeNav = showcaseLikeNavFromNotification(current);
   const isLikeNotice = Boolean(likeNav);
 
-  const openLikedShowcase = () => {
-    if (!likeNav) return;
-    openOwnShowcaseSlide(likeNav);
+  const openLikedShowcase = (nav) => {
+    const target = nav && (nav.contentOrdinal || nav.slideId) ? nav : likeNav;
+    if (!target) return;
+    openOwnShowcaseSlide(target);
     onClose?.();
   };
 
@@ -261,7 +262,7 @@ export default function PushNotificationDetailModal({
             showcaseContentOrdinal={current.showcaseContentOrdinal}
             showcaseSlideId={current.showcaseSlideId}
             onNavigate={onClose}
-            onOpenOwnSlide={() => openLikedShowcase()}
+            onOpenOwnSlide={(nav) => openLikedShowcase(nav)}
             className={`whitespace-pre-wrap break-words text-[14px] font-medium leading-relaxed ${
               isDarkMode ? "text-slate-200" : "text-slate-700"
             }`}

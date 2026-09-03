@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 import LetteringIncomingNotification from "../LetteringIncomingNotification.jsx";
 import { resolveVlueShowcaseCard } from "../../lib/vlueShowcaseCard.js";
 import { readEffectiveMembershipTier } from "../../lib/effectiveMembership.js";
@@ -36,16 +37,29 @@ export default function OwnShowcaseSlideOverlay({ onToast }) {
   }, [state.open, close]);
 
   const tier = readEffectiveMembershipTier();
-  const card = useMemo(() => resolveVlueShowcaseCard({ membershipTier: tier }), [tier, state.open]);
+  const card = useMemo(
+    () => resolveVlueShowcaseCard({ membershipTier: tier }),
+    [tier, state.open]
+  );
 
   if (!state.open || typeof document === "undefined") return null;
 
   return createPortal(
     <div className="own-showcase-slide-overlay fixed inset-0 z-[280] bg-[#0B101B]">
+      <button
+        type="button"
+        className="absolute right-3 top-3 z-[290] flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white shadow-lg backdrop-blur-sm active:scale-95"
+        aria-label="닫기"
+        onClick={close}
+      >
+        <X size={20} strokeWidth={2.4} aria-hidden />
+      </button>
       <LetteringIncomingNotification
         verified
         previewMode
         showOwnerSettings={false}
+        showPeerClose
+        onPeerClose={close}
         callPhase="connected"
         platform="android"
         isRecording
