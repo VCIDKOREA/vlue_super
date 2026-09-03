@@ -160,7 +160,9 @@ export async function respondShowcaseOgCover(c: Context) {
     const digits = phoneDigitsForUrl(rawPhone);
     if (!digits) return c.text("not found", 404);
 
-    const hit = getCachedOgCover(digits);
+    /* ?v= 캐시버스트 — 공유 직후 최신 타이틀사진 반영 */
+    const bust = String(c.req.query("v") || "").trim();
+    const hit = bust ? null : getCachedOgCover(digits);
     if (hit) {
       c.header("Cache-Control", "public, max-age=600");
       c.header("Content-Type", hit.contentType);

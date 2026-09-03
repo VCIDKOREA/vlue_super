@@ -166,6 +166,16 @@ export function setCachedOgCover(phone: string, bytes: Buffer, contentType: stri
   });
 }
 
+export function clearCachedOgCover(phone: string) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return;
+  coverCache.delete(digits);
+  const local = digits.startsWith("82") && digits.length >= 10 ? `0${digits.slice(2)}` : digits;
+  coverCache.delete(local);
+  htmlCache.delete(digits);
+  htmlCache.delete(local);
+}
+
 export function isAllowedOgImageHost(url: string): boolean {
   try {
     const host = new URL(url).hostname.toLowerCase();

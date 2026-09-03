@@ -6,7 +6,8 @@ import {
   getVlueViralLinks,
   isLocalDevHost,
   isLocalDevOrigin,
-  resolvePublicCardApiBase
+  resolvePublicCardApiBase,
+  resolvePublicShowcaseShareOrigin
 } from "./vlueViralLinks.js";
 import { withLetteringBizcardPreviewFallback } from "./letteringBizcardProfile.js";
 import { scrubLetteringDemoPollution } from "./letteringDemoPollution.js";
@@ -28,6 +29,29 @@ export function isKakaoPublicImageUrl(url) {
   } catch {
     return false;
   }
+}
+
+/** 전화번호를 010… 형태로 — 쇼케이스 cover 경로용 */
+function phoneDigitsLocal(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("82") && digits.length >= 10) return `0${digits.slice(2)}`;
+  return digits;
+}
+
+/**
+ * 카카오 Feed imageUrl — m.vlue.kr 프록시 cover만 사용.
+ * R2·data URL 직접 전달 시 카카오 스크래퍼가 실패해 이미지가 통째로 빠짐.
+ */
+export function getKakaoShowcaseCoverImageUrl(phone, cacheKey = "") {
+  const local = phoneDigitsLocal(phone);
+  if (!local) return "";
+  const origin = resolvePublicShowcaseShareOrigin();
+  const base = `${origin}/showcase/${encodeURIComponent(local)}/cover.jpg`;
+  const v = String(cacheKey || "")
+    .replace(/[^\w.-]/g, "")
+    .slice(-40);
+  return v ? `${base}?v=${encodeURIComponent(v)}` : base;
 }
 
 /** 카카오·OG가 접근할 공개 API 베이스 (실기기 공유용) — www SPA 금지 */
@@ -79,7 +103,6 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
           ed.titlePhotoUrl ||
           ""
       ).trim();
-  /* 전용 카톡 커버 → 타이틀사진(쇼케이스 대표) → Feed PNG */
   const coverHint = String(
     snap.shareCoverUrl ||
       card?.shareCoverUrl ||
@@ -91,14 +114,14 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
   const coverKey = coverHint
     ? coverHint.replace(/[^\w]/g, "").slice(-32)
     : String(Date.now());
-  /* 카카오가 긁을 수 있는 https 배경만 직접 전달 — localhost/data/http 는 Feed PNG로 */
-  const coverHttp = isKakaoPublicImageUrl(coverHint) ? coverHint : "";
-  const feedImageUrl =
-    coverHttp ||
-    (cardId ? getKakaoFeedCardPublicImageUrl(cardId, coverKey) : getKakaoShareButtonImageUrl());
   const phone = String(
     readLetteringFixedIdentity()?.phone || snap.phone || card?.phone || ""
   ).trim();
+  /* 카톡 SDK: 검증된 m.vlue.kr/cover.jpg 만 사용 (R2 직접 URL 금지) */
+  const showcaseCover = getKakaoShowcaseCoverImageUrl(phone, coverKey);
+  const feedImageUrl =
+    (isKakaoPublicImageUrl(showcaseCover) ? showcaseCover : "") ||
+    (cardId ? getKakaoFeedCardPublicImageUrl(cardId, coverKey) : getKakaoShareButtonImageUrl());
   /* 카카오 버튼은 www 도메인 공개 쇼케이스. api.vlue.kr 는 콘솔 미등록이라 홈으로 떨어짐 */
   const showcaseUrl = phone ? buildPublicShowcaseSpaUrl(phone) : "";
   const viewUrl = showcaseUrl || `${KAKAO_PUBLIC_ORIGIN}/s/`;
@@ -127,7 +150,7 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
     createUrl,
     feedTitle: `${String(snap.name || "회원").trim()}님의 VLUE 쇼케이스`,
     feedDescription: feedDescParts.slice(0, 3).join(" · ").slice(0, 100) || "VLUE 디지털 쇼케이스",
-    shareCoverUrl: coverHttp
+    shareCoverUrl: showcaseCover || feedImageUrl
   };
 }
 

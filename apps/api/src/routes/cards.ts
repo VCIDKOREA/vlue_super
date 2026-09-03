@@ -714,6 +714,20 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
     }
   }
 
+  /* 카톡/OG 커버 캐시 무효화 — 타이틀사진·커버 변경 즉시 반영 */
+  try {
+    const { clearCachedOgCover } = await import("../services/showcase/showcaseOgShareMeta.js");
+    const u = await prisma.user.findUnique({
+      where: { id: me },
+      select: { phoneE164: true }
+    });
+    if (u?.phoneE164) clearCachedOgCover(u.phoneE164);
+    const snapPhone = String(body.exportSnapshot?.phone || "").trim();
+    if (snapPhone) clearCachedOgCover(snapPhone);
+  } catch {
+    /* ignore */
+  }
+
   return c.json({
     ok: true,
     cardId: updated.id,
