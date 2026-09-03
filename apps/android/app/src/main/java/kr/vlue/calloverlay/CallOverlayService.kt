@@ -1019,22 +1019,25 @@ class CallOverlayService : Service() {
             return
         }
         /*
-         * 카드 미도착·조회 중·미인증.
-         * BigPush 바 탭: 창을 지우면 팝업/미니 없이 사라짐(e9ba0e 가 미인증 페인트에 무력화됨).
-         * 실제 Answer 만 빈 쇼케이스 금지용 hide.
+         * 카드 미도착·조회 중만 탭으로 풀쇼케이스 진입을 막는다.
+         * 미인증이라도 표시할 카드가 있으면 탭 → Showcase (이전: BIG_PUSH_TAP_KEEP 으로 무반응).
+         * 실제 Answer 자동 전이만 빈 쇼케이스 금지용 hide.
          */
-        if (pendingCardJson.isNullOrBlank() ||
-            isLookupPendingCard(pendingCardJson) ||
-            (!pendingVerified && !parseIsVerified(pendingCardJson))
-        ) {
+        if (pendingCardJson.isNullOrBlank() || isLookupPendingCard(pendingCardJson)) {
             if (source.startsWith("bigPush_bar_tap")) {
                 VlueBigPushTrace.lifecycle(
                     "BIG_PUSH_TAP_KEEP",
-                    "pendingOrUnverified — keep bar source=$source " +
-                        "pending=${isLookupPendingCard(pendingCardJson)} verified=$pendingVerified"
+                    "lookup pending/blank — keep bar source=$source"
                 )
                 return
             }
+            remoteConnected = true
+            companion.onAnswer(OverlayContext.IN_CALL)
+            hideCompanionOverlayChrome()
+            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            return
+        }
+        if (!pendingVerified && !parseIsVerified(pendingCardJson) && !source.startsWith("bigPush_bar_tap")) {
             remoteConnected = true
             companion.onAnswer(OverlayContext.IN_CALL)
             hideCompanionOverlayChrome()
@@ -2986,68 +2989,37 @@ class CallOverlayService : Service() {
     }
 
     /**
-     * BigPush MiniCase 패리티: 드래그 + 좌/우 가장자리 피크.
-     * OverlayState 는 BIG_PUSH 유지. ▾ 펼침은 계속 금지.
+     * BigPush: 드래그 금지(MiniCase만 이동 가능). 탭만 Showcase 진입.
+     * 이전 드래그 제스처가 미세 움직임으로 탭을 먹어 「반응 없음」·바가 화면 밖으로 빠지는 UX를 막는다.
      */
     private fun attachBigPushDragGestures(banner: View) {
         var downRawX = 0f
         var downRawY = 0f
-        var startX = 0
-        var startY = 0
-        var dragging = false
         var moved = false
         banner.setOnTouchListener { _, ev ->
             if (companion.state != OverlayState.BIG_PUSH) return@setOnTouchListener false
-            val wm = windowManager ?: return@setOnTouchListener false
-            val view = rootContainer ?: return@setOnTouchListener false
-            val params = layoutParams ?: return@setOnTouchListener false
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downRawX = ev.rawX
                     downRawY = ev.rawY
-                    ensureBigPushTopStartGravity(params)
-                    startX = params.x
-                    startY = params.y
-                    dragging = true
                     moved = false
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    if (!dragging) return@setOnTouchListener false
-                    val dx = (ev.rawX - downRawX).toInt()
-                    val dy = (ev.rawY - downRawY).toInt()
-                    if (abs(dx) > 10 || abs(dy) > 10) moved = true
-                    if (bigPushPeeking && moved) {
-                        expandBigPushFromPeekForDrag(params)
-                        startX = params.x
-                        startY = params.y
-                        downRawX = ev.rawX
-                        downRawY = ev.rawY
-                    }
-                    val (sw, sh) = screenSizePx()
-                    val keep = dp(28)
-                    val w = if (params.width > 0) params.width else sw
-                    val h = if (params.height > 0) params.height else dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
-                    params.x = (startX + dx).coerceIn(keep - w, sw - keep)
-                    params.y = (startY + dy).coerceIn(keep - h, sh - keep)
-            try {
-                wm.updateViewLayout(view, params)
-            } catch (_: Exception) {
-            }
+                    val dx = abs(ev.rawX - downRawX)
+                    val dy = abs(ev.rawY - downRawY)
+                    if (dx > 28f || dy > 28f) moved = true
+                    // 위치 갱신 없음 — 빅푸시는 고정
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    if (!dragging) return@setOnTouchListener false
-                    dragging = false
-                    if (!moved) {
+                    if (!moved && ev.actionMasked == MotionEvent.ACTION_UP) {
                         if (bigPushPeeking) {
                             restoreBigPushFromPeek()
                         } else {
                             openShowcaseFromBigPushTap()
                         }
-                        return@setOnTouchListener true
                     }
-                    snapBigPushEdgePeek(params)
                     true
                 }
                 else -> false

@@ -743,7 +743,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
     override fun onResume() {
         super.onResume()
-        /* 앱 복귀 시 통화 감지 FGS 재동기화 — 사용자가 모르게 꺼진 상태 복구 */
+        /* 앱 복귀 시 통화 감지 자동 무장 + FGS 재동기화 */
+        LetteringIntegration.ensureLetteringArmedIfReady(this)
         LetteringCallMonitorService.syncWithPrefs(this)
         val status = LetteringPermissionHelper.statusJson(this)
         dispatchWebCustomEvent("vlue-app-foreground", """{"reason":"resume","letteringStatus":$status}""")
