@@ -65,11 +65,11 @@ export default function CallDetectionStatusBanner({
       ? "border-rose-500/40 bg-rose-500/15 text-rose-100"
       : "border-rose-200 bg-rose-50 text-rose-900";
 
-  const title = ok ? "통화 감지 실행 중" : "통화 감지 중지 — 빅푸시가 표시되지 않습니다";
+  const title = ok ? "쇼케이스 정상 송출 중" : "통화 감지 중지 — 빅푸시가 표시되지 않습니다";
   const body = ok
     ? compact
-      ? "알림창에 「VLUE 통화 감지」가 있으면 정상입니다."
-      : "백그라운드에서 통화를 감지합니다. 알림창의 「VLUE 통화 감지」를 확인하세요. (삼성 백그라운드 목록에 없어도 정상일 수 있습니다.)"
+      ? "백그라운드 실행 중이면 정상 송출됩니다."
+      : "백그라운드 실행 중이면 정상 송출됩니다. (알림창에 없어도 「백그라운드 실행」목록에 VLUE가 있으면 됩니다.)"
     : health.issues[0] || "통화 감지를 다시 켜 주세요.";
 
   return (
