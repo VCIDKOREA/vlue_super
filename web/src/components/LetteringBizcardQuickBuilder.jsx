@@ -603,8 +603,8 @@ export default function LetteringBizcardQuickBuilder({
         />
         <div className="sm:col-span-2">
           <Field
-            label="소개 (앞면 프로필)"
-            hint={`통화 수신 시 앞면 탭에 표시됩니다 · 최대 ${LETTERING_BIZCARD_INTRO_FRONT_MAX}자`}
+            label="한줄소개 (뒷면 1)"
+            hint={`통화 수신 시 뒷면 상단에 표시됩니다 · 최대 ${LETTERING_BIZCARD_INTRO_FRONT_MAX}자`}
             isDarkMode={isDarkMode}
           >
             <textarea
@@ -622,8 +622,8 @@ export default function LetteringBizcardQuickBuilder({
         </div>
         <div className="sm:col-span-2">
           <Field
-            label="추가 설명 (뒷면)"
-            hint={`통화 수신 시 뒷면 연락처 하단에 표시됩니다 · 최대 ${LETTERING_BIZCARD_BACK_NOTE_MAX}자`}
+            label="추가설명 (뒷면 2)"
+            hint={`통화 수신 시 뒷면 하단에 표시됩니다 · 최대 ${LETTERING_BIZCARD_BACK_NOTE_MAX}자 · DCC 프레임 안에서만 표시`}
             isDarkMode={isDarkMode}
           >
             <textarea

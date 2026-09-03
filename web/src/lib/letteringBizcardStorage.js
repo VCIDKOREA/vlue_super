@@ -17,10 +17,10 @@ export const LETTERING_OPEN_BIZCARD_SETTINGS_EVENT = "vlue-open-lettering-bizcar
 /** 명함 앞면 E 한 줄 표시 기준 (초과 시 줄바꿈·밀림) */
 export const LETTERING_BIZCARD_EMAIL_MAX = 26;
 export const LETTERING_BIZCARD_EMAIL_WARN = 22;
-/** 통화 DCC 앞면 「소개」— 화면 밀림 방지 */
+/** 통화 DCC 뒷면 「한줄소개」— 프레임 밀림 방지 */
 export const LETTERING_BIZCARD_INTRO_FRONT_MAX = 30;
-/** 통화 DCC 뒷면 「추가 설명」— 연락처 하단 약 10~15줄 */
-export const LETTERING_BIZCARD_BACK_NOTE_MAX = 500;
+/** 통화 DCC 뒷면 「추가설명」— 스크롤 없는 프레임 안에 맞춤 */
+export const LETTERING_BIZCARD_BACK_NOTE_MAX = 350;
 
 export function clampLetteringBizcardIntroFront(raw) {
   return String(raw ?? "").slice(0, LETTERING_BIZCARD_INTRO_FRONT_MAX);

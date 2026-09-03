@@ -5,7 +5,6 @@ import {
   MapPin,
   Globe,
   Printer,
-  User,
   ShieldCheck,
   Check
 } from "lucide-react";
@@ -19,7 +18,8 @@ import { VLUE_PREVIEW_EMAIL_PLACEHOLDER } from "../lib/vlueShowcasePreviewIdenti
 import {
   openEmailLink,
   openWebsiteLink,
-  openPhoneDial
+  openPhoneDial,
+  openKakaoMapSearch
 } from "../lib/showcase/showcaseContactActions.js";
 import VluePushAuthSeal from "./VluePushAuthSeal.jsx";
 import VlueCyanVerifiedSeal from "./VlueCyanVerifiedSeal.jsx";
@@ -506,6 +506,12 @@ function resolveBackAdditionalNote(card) {
   );
 }
 
+function resolveBackIntroLine(card) {
+  return clampLetteringBizcardIntroFront(
+    String(card.companyIntro || card.salesContent || "").trim()
+  );
+}
+
 function FrontInfoRow({ icon: Icon, label, children, className = "" }) {
   return (
     <div className={`ldr-front-info-row${className ? ` ${className}` : ""}`.trim()}>
@@ -517,6 +523,58 @@ function FrontInfoRow({ icon: Icon, label, children, className = "" }) {
         </span>
       </span>
       <div className="ldr-front-info-row__value">{children}</div>
+    </div>
+  );
+}
+
+function AddressDetailPopup({ address, onClose, onToast }) {
+  if (!address) return null;
+
+  const copyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(address);
+      onToast?.("주소를 복사했습니다.");
+    } catch {
+      onToast?.("복사에 실패했습니다.");
+    }
+  };
+
+  return (
+    <div
+      className="ldr-address-popup"
+      role="dialog"
+      aria-modal="true"
+      aria-label="상세주소"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose?.();
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div
+        className="ldr-address-popup__sheet"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <p className="ldr-address-popup__title">상세주소</p>
+        <p className="ldr-address-popup__body">{address}</p>
+        <div className="ldr-address-popup__actions">
+          <button type="button" className="ldr-address-popup__btn" onClick={onClose}>
+            닫기
+          </button>
+          <button type="button" className="ldr-address-popup__btn" onClick={copyAddress}>
+            복사하기
+          </button>
+          <button
+            type="button"
+            className="ldr-address-popup__btn ldr-address-popup__btn--primary"
+            onClick={() => openKakaoMapSearch(address)}
+          >
+            지도보기
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -534,6 +592,7 @@ function FrontPanel({
   onOpenSnsCert
 }) {
   const [socialOpen, setSocialOpen] = useState(false);
+  const [addressOpen, setAddressOpen] = useState(false);
   const socialItems = listCardSocialOutlinks(card);
   const hasSocial = socialItems.length > 0;
   const phoneRaw = String(card.phone || "").trim();
@@ -549,7 +608,6 @@ function FrontPanel({
   /* 통화 송출(피어): 빈 이메일은 숨김. 미리보기 편집만 플레이스홀더 */
   const emailValue = email || (embeddedInPush ? "" : VLUE_PREVIEW_EMAIL_PLACEHOLDER);
   const addressRaw = String(card.address || "").trim();
-  const intro = clampLetteringBizcardIntroFront(String(card.companyIntro || card.salesContent || "").trim());
   const validityFromItems = (verificationItems || [])
     .map((line) => String(line || "").trim())
     .find((line) => /만료일|인증유효기간/.test(line));
@@ -691,29 +749,6 @@ function FrontPanel({
           </FrontInfoRow>
         ) : null}
 
-        {fax ? (
-          <FrontInfoRow icon={Printer} label="팩스">
-            <span className="ldr-front-info-row__text">
-              {enableContactLinks ? (
-                <button
-                  type="button"
-                  className="ldr-front-phone-link ldr-front-phone-link--btn"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onRequestDial?.(faxRaw, card.organization || card.name || "팩스");
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  {fax}
-                </button>
-              ) : (
-                fax
-              )}
-            </span>
-          </FrontInfoRow>
-        ) : null}
-
         {emailValue ? (
           <FrontInfoRow icon={Mail} label="이메일">
             <p
@@ -739,9 +774,43 @@ function FrontPanel({
           </FrontInfoRow>
         ) : null}
 
+        {fax ? (
+          <FrontInfoRow icon={Printer} label="팩스번호">
+            <span className="ldr-front-info-row__text">
+              {enableContactLinks ? (
+                <button
+                  type="button"
+                  className="ldr-front-phone-link ldr-front-phone-link--btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRequestDial?.(faxRaw, card.organization || card.name || "팩스");
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {fax}
+                </button>
+              ) : (
+                fax
+              )}
+            </span>
+          </FrontInfoRow>
+        ) : null}
+
         {addressRaw ? (
-          <FrontInfoRow icon={MapPin} label="주소">
-            <p className="ldr-front-info-row__text">{addressRaw}</p>
+          <FrontInfoRow icon={MapPin} label="등록한 주소">
+            <button
+              type="button"
+              className="ldr-front-address-detail-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setAddressOpen(true);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              상세보기
+            </button>
           </FrontInfoRow>
         ) : null}
 
@@ -765,12 +834,6 @@ function FrontPanel({
                 website
               )}
             </p>
-          </FrontInfoRow>
-        ) : null}
-
-        {intro ? (
-          <FrontInfoRow icon={User} label="소개">
-            <p className="ldr-front-info-row__text">{intro}</p>
           </FrontInfoRow>
         ) : null}
 
@@ -802,6 +865,14 @@ function FrontPanel({
           />
         </div>
       ) : null}
+
+      {addressOpen ? (
+        <AddressDetailPopup
+          address={addressRaw}
+          onClose={() => setAddressOpen(false)}
+          onToast={onToast}
+        />
+      ) : null}
     </div>
   );
 }
@@ -813,21 +884,37 @@ function BackPanel({
   enableContactLinks: _enableContactLinks = true,
   onRequestDial: _onRequestDial
 }) {
+  const introLine = resolveBackIntroLine(card);
   const additionalNote = resolveBackAdditionalNote(card);
-  const additionalPlaceholder = "명함 만들기에서 추가 설명을 입력할 수 있습니다.";
+  const introPlaceholder = embeddedInPush
+    ? "명함 만들기에서 한줄소개를 입력할 수 있습니다."
+    : "등록된 한줄소개가 없습니다.";
+  const notePlaceholder = embeddedInPush
+    ? "명함 만들기에서 추가설명을 입력할 수 있습니다."
+    : "등록된 추가설명이 없습니다.";
 
   return (
     <div className={`ldr-panel ldr-panel--back${embeddedInPush ? " ldr-panel--push" : ""}`}>
       <CompanyLogoWatermark card={card} />
-      <div className="ldr-contact-extra ldr-contact-extra--back-only">
-        <p className="ldr-contact-extra__label">추가 설명</p>
-        <p
-          className={`ldr-contact-extra__body${
-            !additionalNote ? " ldr-contact-extra__body--placeholder" : ""
-          }`.trim()}
-        >
-          {additionalNote || (embeddedInPush ? additionalPlaceholder : "등록된 추가 설명이 없습니다.")}
-        </p>
+      <div className="ldr-back-copy-stack">
+        <section className="ldr-back-copy-block ldr-back-copy-block--intro">
+          <p
+            className={`ldr-back-copy-block__text${
+              !introLine ? " ldr-back-copy-block__text--placeholder" : ""
+            }`.trim()}
+          >
+            {introLine || introPlaceholder}
+          </p>
+        </section>
+        <section className="ldr-back-copy-block ldr-back-copy-block--note">
+          <p
+            className={`ldr-back-copy-block__text${
+              !additionalNote ? " ldr-back-copy-block__text--placeholder" : ""
+            }`.trim()}
+          >
+            {additionalNote || notePlaceholder}
+          </p>
+        </section>
       </div>
     </div>
   );

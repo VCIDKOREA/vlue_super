@@ -82,6 +82,18 @@ export function openWebsiteLink(raw) {
   return href ? openExternalHref(href) : false;
 }
 
+/** 주소 문자열 → 카카오지도 검색 */
+export function formatKakaoMapSearchHref(addressRaw) {
+  const q = String(addressRaw || "").trim();
+  if (!q) return "";
+  return `https://map.kakao.com/link/search/${encodeURIComponent(q)}`;
+}
+
+export function openKakaoMapSearch(addressRaw) {
+  const href = formatKakaoMapSearchHref(addressRaw);
+  return href ? openExternalHref(href) : false;
+}
+
 /** 스냅샷에 링크용 연락처 필드 보존 */
 export function pickShowcaseContactFields(card = {}) {
   return {
