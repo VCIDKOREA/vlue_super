@@ -3,13 +3,14 @@ import { createPortal } from "react-dom";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { withLetteringBizcardPreviewFallback } from "../lib/letteringBizcardProfile.js";
 import { scrubLetteringDemoPollution } from "../lib/letteringDemoPollution.js";
-import { syncDigitalCardExportSnapshot } from "../lib/digitalCardApi.js";
+import { syncDigitalCardExportSnapshot, restoreDigitalCardFromServer } from "../lib/digitalCardApi.js";
 import { buildPublicShowcaseUrl } from "../lib/vlueViralLinks.js";
 import { readLetteringFixedIdentity } from "../lib/letteringBizcardStorage.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import {
   readLetteringBizcardEditable,
-  writeLetteringBizcardEditable
+  writeLetteringBizcardEditable,
+  LETTERING_BIZCARD_CHANGED_EVENT
 } from "../lib/letteringBizcardStorage.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { VLUE_SHOWCASE_DEMO_RECORDING_SEC } from "../lib/vlueShowcaseCard.js";
@@ -18,6 +19,7 @@ import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import { compressAndUploadMediaImageOrThrow } from "../lib/mediaImageUpload.js";
 import { COVER_IMAGE_GUIDE } from "../lib/fitImageFile.js";
+import { resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
 
 function openExternalSafely(url) {
   if (!url) return false;
@@ -98,8 +100,17 @@ export default function KakaoBizcardFeedPreview({
   const role = isPaid ? [title, dept].filter(Boolean).join(" · ") : title;
   const coverUrl = useMemo(() => {
     const ed = readLetteringBizcardEditable();
-    return String(ed.kakaoFeedBgDataUrl || snap.shareCoverUrl || "").trim();
-  }, [coverTick, snap.shareCoverUrl]);
+    const dedicated = String(ed.kakaoFeedBgDataUrl || snap.shareCoverUrl || "").trim();
+    if (dedicated) return dedicated;
+    /* 웹에서 타이틀사진만 지정한 경우 — 전용 배경과 동일하게 미리보기·공유에 사용 */
+    if (ed.noTitlePhoto || snap.noTitlePhoto) return "";
+    return (
+      resolveDccTitlePhotoUrl({
+        ...snap,
+        titlePhotoUrl: snap.titlePhotoUrl || ed.titlePhotoDataUrl || ed.titlePhotoUrl || ""
+      }) || ""
+    );
+  }, [coverTick, snap.shareCoverUrl, snap.titlePhotoUrl, snap.noTitlePhoto]);
   const displayName = name || "명함 미설정";
   const [viewUrl, setViewUrl] = useState("");
   const [liveOpen, setLiveOpen] = useState(false);
@@ -113,6 +124,28 @@ export default function KakaoBizcardFeedPreview({
       ),
     [snap, membershipTier]
   );
+
+  /* 웹에서 저장한 커버·타이틀사진을 앱 로컬로 복원 */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await restoreDigitalCardFromServer({ force: false });
+      } catch {
+        /* ignore */
+      }
+      if (!cancelled) setCoverTick((n) => n + 1);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onChanged = () => setCoverTick((n) => n + 1);
+    window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onChanged);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -194,8 +227,9 @@ export default function KakaoBizcardFeedPreview({
   const clearCover = async () => {
     writeLetteringBizcardEditable({ kakaoFeedBgDataUrl: "" });
     setCoverTick((n) => n + 1);
+    /* 전용 배경만 제거 — 타이틀사진은 유지되며 미리보기에 폴백 표시 */
     await syncDigitalCardExportSnapshot({ ...snap, shareCoverUrl: "" });
-    onToast?.("배경 썸네일을 제거했습니다.");
+    onToast?.("전용 배경을 제거했습니다. 타이틀사진이 있으면 그대로 사용됩니다.");
   };
 
   const phoneLine = String(snap.phone || readLetteringFixedIdentity().phone || "").trim();
