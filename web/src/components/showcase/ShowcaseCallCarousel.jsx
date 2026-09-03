@@ -36,7 +36,6 @@ import {
 import { SHOWCASE_BGM_OWNER_RELEASED_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
 import { resolveShowcaseSocialSlideId } from "../../lib/showcase/resolveShowcaseSocialSlideId.js";
 import { readActiveShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
-import { resolveDccTitlePhotoUrl } from "../../lib/letteringCardNormalize.js";
 
 /** 갤러리 사진 → 슬라이드용 (텍스트 오버레이 필드 유지) */
 function pickPhotoSlideFields(p = {}) {
@@ -55,31 +54,7 @@ function pickPhotoSlideFields(p = {}) {
   };
 }
 
-/** DCC 타이틀 사진 — 공유·통화 캐러셀 2번째 슬라이드 */
-function buildTitlePhotoSlide(card) {
-  const url = resolveDccTitlePhotoUrl(card);
-  if (!url) return null;
-  return {
-    type: "media-page",
-    id: "dcc-title-photo",
-    photos: [pickPhotoSlideFields({ id: "dcc-title-photo", url })],
-    caption: ""
-  };
-}
-
-function prependTitlePhotoSlide(capped, card) {
-  const titlePhotoSlide = buildTitlePhotoSlide(card);
-  if (!titlePhotoSlide) return capped;
-  const titleUrl = String(titlePhotoSlide.photos?.[0]?.url || "").trim();
-  const alreadyHas = capped.some((s) => {
-    if (s.type !== "media-page" && s.type !== "banner") return false;
-    const urls = (s.photos || []).map((p) => String(p?.url || "").trim());
-    if (urls.includes(titleUrl)) return true;
-    return String(s.url || "").trim() === titleUrl;
-  });
-  if (alreadyHas) return capped;
-  return [titlePhotoSlide, ...capped];
-}
+/* 타이틀 사진은 쇼케이스 pages에 이미 포함되어 캐러셀에 별도 삽입하지 않음 */
 
 /**
  * 통화 쇼케이스 시네마틱 캐러셀
@@ -493,7 +468,6 @@ export default function ShowcaseCallCarousel({
     }
 
     const capped = content.slice(0, maxIgPages);
-    const contentAfterCard = prependTitlePhotoSlide(capped, card);
 
     if (showDigitalCard && digitalCardOnly) {
       return [{ type: "card", id: "digital-card" }];
@@ -502,21 +476,21 @@ export default function ShowcaseCallCarousel({
     const cardSlide = { type: "card", id: "digital-card" };
 
     if (showDigitalCard) {
-      /* 콘텐츠 페이지가 없으면 명함(+ 타이틀 사진)만 — 빈 슬롯(2/2)을 만들지 않음 */
-      if (contentAfterCard.length === 0) {
+      /* 콘텐츠 페이지가 없으면 명함만 — 빈 슬롯(2/2)을 만들지 않음 */
+      if (capped.length === 0) {
         return [cardSlide];
       }
       /* preferContentSlide: 콘텐츠 먼저, 명함은 맨 뒤 (앱 내 일부 미리보기용) */
       if (preferContentSlide) {
-        return [...contentAfterCard, cardSlide];
+        return [...capped, cardSlide];
       }
-      /* 기본·카톡 공개 링크: 디지털인증명함 1페이지 → 2페이지 타이틀 사진 */
-      return [cardSlide, ...contentAfterCard];
+      /* 기본·카톡 공개 링크: 디지털인증명함이 1페이지 */
+      return [cardSlide, ...capped];
     }
-    if (contentAfterCard.length === 0) {
+    if (capped.length === 0) {
       return [{ type: "empty-slot", id: "empty-1", slot: 1, max: photosPerPage }];
     }
-    return contentAfterCard;
+    return capped;
   }, [
     isPaid,
     showcaseOffPreview,
@@ -531,8 +505,7 @@ export default function ShowcaseCallCarousel({
     photosPerPage,
     igUrlMap,
     igUsername,
-    igProfilePictureUrl,
-    card
+    igProfilePictureUrl
   ]);
 
   const count = slides.length;

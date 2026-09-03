@@ -205,7 +205,9 @@ export default function ShowcaseWebPage({ phone }) {
   }
 
   const { card, phone: phoneDisplay, verified, isPaid, attachments, outlinks } = payload;
-  const photo = String(card.photoUrl || "").trim();
+  const titlePhoto = String(card.titlePhotoUrl || "").trim();
+  const profilePhoto = String(card.photoUrl || "").trim();
+  const photo = (card.noTitlePhoto ? "" : titlePhoto) || profilePhoto;
   const moodText = String(card.companyIntro || "").trim();
   const displayName = String(card.name || "").trim();
   const vlueId = String(card.publicHandle || card.loginId || "").trim();
