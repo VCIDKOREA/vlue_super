@@ -575,6 +575,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                     true
                 }
                 lower.startsWith("kakaolink:") || lower.startsWith("kakao") ||
+                    lower.startsWith("instagram:") || lower.startsWith("vnd.youtube:") ||
                     lower.startsWith("tel:") || lower.startsWith("sms:") ||
                     lower.startsWith("mailto:") || lower.startsWith("market:") ||
                     lower.startsWith("ispmobile:") || lower.startsWith("tauthlink:") ||
@@ -582,21 +583,34 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                     lower.startsWith("cloudpay:") || lower.startsWith("nhappocardcert:") ||
                     lower.startsWith("lid:") || lower.startsWith("niceiphonecert:") ||
                     lower.startsWith("samsungpass:") || lower.startsWith("mbmobilebank:") -> {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    // 실패해도 WebView에 커스텀 스킴을 넘기지 않음 (ERR_UNKNOWN_URL_SCHEME 방지)
+                    try {
+                        startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    } catch (e: Exception) {
+                        Log.e(TAG, "special url startActivity failed: $url", e)
+                        Toast.makeText(this, "연결할 앱을 찾을 수 없습니다.", Toast.LENGTH_SHORT).show()
+                    }
                     true
                 }
                 else -> {
                     try {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
                         true
                     } catch (_: Exception) {
-                        false
+                        // 알 수 없는 스킴: WebView 로드 시도 시 에러 페이지만 나오므로 소비
+                        Toast.makeText(this, "연결할 앱을 찾을 수 없습니다.", Toast.LENGTH_SHORT).show()
+                        true
                     }
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "special url failed: $url", e)
-            false
+            Toast.makeText(this, "연결할 앱을 찾을 수 없습니다.", Toast.LENGTH_SHORT).show()
+            true
         }
     }
 
@@ -1193,14 +1207,49 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             activity.runOnUiThread { LetteringPermissionHelper.openAppSettings(activity) }
         }
 
-        /** https 명함/인증 페이지 — WebView 내 로드 대신 외부 브라우저/카톡 등으로 열어 /app 셸 유지 */
+        /** https·앱스킴 — WebView 내 로드 대신 외부 브라우저/네이티브 앱으로 열어 /app 셸 유지 */
         @android.webkit.JavascriptInterface
         fun openExternalUrl(url: String?) {
             val u = url?.trim().orEmpty()
             if (u.isEmpty()) return
             activity.runOnUiThread {
                 try {
-                    activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u)))
+                    val lower = u.lowercase()
+                    val intent = when {
+                        lower.startsWith("intent:") ->
+                            Intent.parseUri(u, Intent.URI_INTENT_SCHEME)
+                        else -> {
+                            val view = Intent(Intent.ACTION_VIEW, Uri.parse(u))
+                            val host = Uri.parse(u).host?.lowercase().orEmpty()
+                            when {
+                                lower.startsWith("kakaotalk:") || lower.startsWith("kakao") ->
+                                    view.setPackage("com.kakao.talk")
+                                lower.startsWith("instagram:") ||
+                                    host.contains("instagram.com") || host.contains("instagr.am") ->
+                                    view.setPackage("com.instagram.android")
+                                lower.startsWith("vnd.youtube:") ||
+                                    host.contains("youtube.com") || host.contains("youtu.be") ->
+                                    view.setPackage("com.google.android.youtube")
+                            }
+                            view
+                        }
+                    }
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    try {
+                        activity.startActivity(intent)
+                    } catch (_: Exception) {
+                        // 패키지 고정 실패 시 시스템 기본 핸들러 / intent fallback
+                        intent.`package` = null
+                        val fallback = intent.getStringExtra("browser_fallback_url")
+                        if (!fallback.isNullOrBlank()) {
+                            activity.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(fallback))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        } else {
+                            activity.startActivity(intent)
+                        }
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "openExternalUrl failed: $u", e)
                     Toast.makeText(activity, "페이지를 열 수 없습니다.", Toast.LENGTH_SHORT).show()

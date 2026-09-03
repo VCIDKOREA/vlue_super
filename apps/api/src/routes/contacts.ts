@@ -313,3 +313,141 @@ contactRoutes.get("/friend-requests", async (c) => {
 
   return c.json({ ok: true, sent, received });
 });
+
+function orderedPair(a: string, b: string) {
+  return a < b ? { low: a, high: b } : { low: b, high: a };
+}
+
+/** 받은 친구 신청 수락 — FriendRequest accepted + 1:1 채팅방 확보 */
+contactRoutes.post("/friend-requests/:id/accept", async (c) => {
+  const me = await resolveRequestUserId(c);
+  if (!me) return c.json({ error: "인증 필요" }, 401);
+  const id = c.req.param("id");
+
+  const fr = await prisma.friendRequest.findUnique({
+    where: { id },
+    include: {
+      fromUser: { select: { id: true, legalName: true, publicHandle: true, email: true } }
+    }
+  });
+  if (!fr) return c.json({ error: "not_found" }, 404);
+  if (fr.toUserId !== me) return c.json({ error: "forbidden" }, 403);
+  if (fr.status !== "pending") {
+    return c.json({ error: "not_pending", status: fr.status }, 400);
+  }
+
+  const pair = orderedPair(fr.fromUserId, fr.toUserId);
+  const fromName = fr.applicantLegalNameSnapshot || userDisplayName(fr.fromUser);
+
+  const { roomId } = await prisma.$transaction(async (tx) => {
+    await tx.friendRequest.update({
+      where: { id },
+      data: { status: "accepted" }
+    });
+
+    // 반대 방향 pending 있으면 정리
+    await tx.friendRequest.updateMany({
+      where: {
+        fromUserId: me,
+        toUserId: fr.fromUserId,
+        status: "pending"
+      },
+      data: { status: "cancelled" }
+    });
+
+    let room = await tx.chatRoom.findFirst({
+      where: { participantLow: pair.low, participantHigh: pair.high }
+    });
+    if (!room) {
+      room = await tx.chatRoom.create({
+        data: { participantLow: pair.low, participantHigh: pair.high }
+      });
+    }
+
+    await tx.chatMessage.create({
+      data: {
+        roomId: room.id,
+        senderId: null,
+        content: "친구가 되었습니다. 대화를 시작할 수 있습니다.",
+        messageType: "system"
+      }
+    });
+
+    return { roomId: room.id };
+  });
+
+  const meUser = await prisma.user.findUnique({
+    where: { id: me },
+    select: { legalName: true, publicHandle: true, email: true }
+  });
+  const accepterName = userDisplayName(
+    meUser || { legalName: null, publicHandle: null, email: null }
+  );
+  const title = "친구 수락";
+  const notifyBody = `${accepterName}님이 친구 신청을 수락했습니다.`;
+
+  try {
+    await prisma.ownerNotification.create({
+      data: {
+        ownerUserId: fr.fromUserId,
+        actorUserId: me,
+        title,
+        body: notifyBody
+      }
+    });
+  } catch (err) {
+    console.warn("[contacts] friend_accept ownerNotification_failed", err);
+  }
+  try {
+    ssePublish(fr.fromUserId, {
+      type: "vlue-friend-accepted",
+      title,
+      body: notifyBody,
+      message: notifyBody,
+      actorUserId: me,
+      actorName: accepterName,
+      requestId: id,
+      at: new Date().toISOString()
+    });
+  } catch (err) {
+    console.warn("[contacts] friend_accept sse_failed", err);
+  }
+  void sendShowcaseSocialPushToUser(fr.fromUserId, title, notifyBody, {
+    type: "vlue-friend-accepted",
+    actorUserId: me,
+    actorName: accepterName,
+    requestId: id
+  }).catch((err) => {
+    console.warn("[contacts] friend_accept fcm_failed", err);
+  });
+
+  return c.json({
+    ok: true,
+    id,
+    status: "accepted",
+    roomId,
+    fromUserId: fr.fromUserId,
+    fromUserName: fromName
+  });
+});
+
+/** 받은 친구 신청 거절 */
+contactRoutes.post("/friend-requests/:id/reject", async (c) => {
+  const me = await resolveRequestUserId(c);
+  if (!me) return c.json({ error: "인증 필요" }, 401);
+  const id = c.req.param("id");
+
+  const fr = await prisma.friendRequest.findUnique({ where: { id } });
+  if (!fr) return c.json({ error: "not_found" }, 404);
+  if (fr.toUserId !== me) return c.json({ error: "forbidden" }, 403);
+  if (fr.status !== "pending") {
+    return c.json({ error: "not_pending", status: fr.status }, 400);
+  }
+
+  await prisma.friendRequest.update({
+    where: { id },
+    data: { status: "rejected" }
+  });
+
+  return c.json({ ok: true, id, status: "rejected" });
+});

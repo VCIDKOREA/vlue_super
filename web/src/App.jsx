@@ -4733,17 +4733,30 @@ function App() {
               ];
             });
           }}
-          onApproveRequest={(requestId) => {
+          onApproveRequest={(requestId, reqHint) => {
             setFriendInboxRequests((prev) => {
-              const req = prev.find((r) => r.id === requestId);
-              if (req) ensureFriendRoom(req.fromUserId, req.fromUserName);
+              const req = reqHint || prev.find((r) => r.id === requestId);
+              if (req?.fromUserId) {
+                ensureFriendRoom(
+                  req.fromUserId,
+                  req.fromName || req.fromUserName || req.peerName || "친구"
+                );
+              }
               return prev.filter((r) => r.id !== requestId);
             });
-            setFriendRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status: "approved", approvedAt: new Date().toISOString() } : r)));
+            setFriendRequests((prev) =>
+              prev.map((r) =>
+                r.id === requestId
+                  ? { ...r, status: "approved", approvedAt: new Date().toISOString() }
+                  : r
+              )
+            );
           }}
           onRejectRequest={(requestId) => {
             setFriendInboxRequests((prev) => prev.filter((r) => r.id !== requestId));
-            setFriendRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status: "rejected" } : r)));
+            setFriendRequests((prev) =>
+              prev.map((r) => (r.id === requestId ? { ...r, status: "rejected" } : r))
+            );
           }}
           onBlockUser={(userId, requestId) => {
             setBlockedFriendIds((prev) => (prev.includes(userId) ? prev : [...prev, userId]));

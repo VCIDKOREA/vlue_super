@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { Search } from "lucide-react";
 import FamilyProtectionRegister from "./FamilyProtectionRegister.jsx";
 import ContactFriendsPanel from "./ContactFriendsPanel.jsx";
 import ScreenBackHeader from "./common/ScreenBackHeader";
-import { fetchContactFriendRequests } from "../lib/contactFriendsApi.js";
+import {
+  fetchContactFriendRequests,
+  respondContactFriendRequest
+} from "../lib/contactFriendsApi.js";
 import { EXPAND_FAMILY_KEY, OPEN_FAMILY_TAB_EVENT } from "../lib/posDashboardConstants.js";
 
 function shouldOpenFamilyTab() {
@@ -30,6 +34,7 @@ function FriendSearch({
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState(() => (shouldOpenFamilyTab() ? "family" : "friends"));
   const [notice, setNotice] = useState("");
+  const [busyRequestId, setBusyRequestId] = useState("");
   const [sentRequests, setSentRequests] = useState(() =>
     Array.isArray(requests) ? requests.filter((r) => r.status === "pending") : []
   );
@@ -69,16 +74,60 @@ function FriendSearch({
   const tabs = [
     { id: "family", label: "가족 보호" },
     { id: "friends", label: "주소록 친구" },
-    { id: "search", label: "검색" },
     { id: "inbox", label: `받은 요청 (${receivedRequests.length})` },
     { id: "sent", label: `보낸 요청 (${sentRequests.length})` }
   ];
 
   const listForTab = tab === "inbox" ? receivedRequests : sentRequests;
 
+  const handleRespond = async (req, action) => {
+    if (!req?.id || busyRequestId) return;
+    setBusyRequestId(req.id);
+    try {
+      await respondContactFriendRequest(req.id, action);
+      setReceivedRequests((prev) => prev.filter((r) => r.id !== req.id));
+      if (action === "accept") {
+        setNotice("친구 요청을 수락했습니다.");
+        onApproveRequest?.(req.id, req);
+      } else {
+        setNotice("친구 요청을 거절했습니다.");
+        onRejectRequest?.(req.id, req);
+      }
+    } catch (e) {
+      setNotice(String(e?.message || "처리에 실패했습니다."));
+      void reloadFriendRequests();
+    } finally {
+      setBusyRequestId("");
+    }
+  };
+
+  const searchHeaderBtn = (
+    <button
+      type="button"
+      aria-label="친구 검색"
+      aria-pressed={tab === "search"}
+      title="검색"
+      onClick={() => setTab((prev) => (prev === "search" ? "friends" : "search"))}
+      className={`flex h-9 w-9 items-center justify-center rounded-full ${
+        tab === "search"
+          ? "bg-blue-600 text-white"
+          : isDarkMode
+            ? "text-white/80 hover:bg-white/10"
+            : "text-slate-600 hover:bg-slate-100"
+      }`}
+    >
+      <Search className="h-[18px] w-[18px]" strokeWidth={2.4} aria-hidden />
+    </button>
+  );
+
   return (
     <section className="mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden">
-      <ScreenBackHeader title="친구" onBack={onGoMain} isDarkMode={isDarkMode} />
+      <ScreenBackHeader
+        title="친구"
+        onBack={onGoMain}
+        isDarkMode={isDarkMode}
+        right={searchHeaderBtn}
+      />
       <div className="flex-1 overflow-y-auto px-3 pb-24 pt-3">
         <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
           {tabs.map((t) => (
@@ -141,13 +190,15 @@ function FriendSearch({
           <>
             <div className="mt-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <p className="text-[12px] text-gray-500">
-                전화부 동기화 명단에서 검색합니다. VLUE 사용 중이면 <b>신청</b>, 아니면 <b>추천</b>(카톡·문자 공유)입니다.
+                전화부 동기화 명단에서 검색합니다. VLUE 사용 중이면 <b>신청</b>, 아니면 <b>추천</b>
+                (카톡·문자 공유)입니다.
               </p>
               <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="이름/아이디/번호로 검색"
+                  autoFocus
                   className="w-full bg-transparent text-[13px] outline-none"
                 />
               </div>
@@ -204,22 +255,17 @@ function FriendSearch({
                       <div className="mt-2 flex gap-2">
                         <button
                           type="button"
-                          onClick={() => {
-                            onApproveRequest?.(req.id);
-                            setReceivedRequests((prev) => prev.filter((r) => r.id !== req.id));
-                            setNotice("친구 요청을 수락했습니다.");
-                          }}
-                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white"
+                          disabled={busyRequestId === req.id}
+                          onClick={() => void handleRespond(req, "accept")}
+                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-60"
                         >
-                          수락
+                          {busyRequestId === req.id ? "처리 중…" : "수락"}
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            onRejectRequest?.(req.id);
-                            setReceivedRequests((prev) => prev.filter((r) => r.id !== req.id));
-                          }}
-                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-gray-600"
+                          disabled={busyRequestId === req.id}
+                          onClick={() => void handleRespond(req, "reject")}
+                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-gray-600 disabled:opacity-60"
                         >
                           거절
                         </button>

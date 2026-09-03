@@ -57,3 +57,19 @@ export async function fetchContactFriendRequests() {
     return { ok: false, sent: [], received: [], error: e?.message || "network" };
   }
 }
+
+/** @param {"accept"|"reject"} action */
+export async function respondContactFriendRequest(requestId, action) {
+  const id = String(requestId || "").trim();
+  if (!id) throw new Error("requestId required");
+  const path =
+    action === "reject"
+      ? `/api/contacts/friend-requests/${encodeURIComponent(id)}/reject`
+      : `/api/contacts/friend-requests/${encodeURIComponent(id)}/accept`;
+  const res = await vlueAuthFetch(apiUrl(path), { method: "POST" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || `친구 요청 처리 실패 (${res.status})`);
+  }
+  return { ok: true, ...data };
+}

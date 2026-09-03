@@ -47,12 +47,96 @@ export function formatWebHref(raw) {
   return `https://${u.replace(/^\/\//, "")}`;
 }
 
+/** Android WebView / VlueLettering / Electron — 외부 브라우저·앱으로 열기 */
+function openViaNativeBridge(url) {
+  const u = String(url || "").trim();
+  if (!u || typeof window === "undefined") return false;
+  try {
+    if (typeof window.Android?.openExternalUrl === "function") {
+      window.Android.openExternalUrl(u);
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (typeof window.VlueLettering?.openUrl === "function") {
+      window.VlueLettering.openUrl(u);
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (typeof window.vlueElectron?.openExternalUrl === "function") {
+      void window.vlueElectron.openExternalUrl(u);
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+/**
+ * 인스타/유튜브 https → 네이티브 앱 Intent (Android 브릿지용).
+ * WebView 안 window.open 대신 ACTION_VIEW로 앱 전환.
+ */
+export function preferNativeAppHref(href) {
+  const h = String(href || "").trim();
+  if (!h || !/^https?:\/\//i.test(h)) return h;
+  try {
+    const u = new URL(h);
+    const host = u.hostname.replace(/^www\./i, "").toLowerCase();
+    const path = u.pathname.replace(/\/+$/, "") || "";
+    const pathSeg = path.replace(/^\//, "");
+
+    if (host === "instagram.com" || host === "instagr.am") {
+      // 프로필·게시물 모두 Instagram 앱 Intent (없으면 https 폴백)
+      let intentPath = `${u.host}${u.pathname}${u.search}`;
+      if (pathSeg && !pathSeg.includes("/")) {
+        const user = decodeURIComponent(pathSeg.replace(/^@/, ""));
+        if (user && !/^(p|reel|reels|stories|explore|tv)$/i.test(user)) {
+          intentPath = `www.instagram.com/_u/${encodeURIComponent(user)}/`;
+        }
+      }
+      return (
+        `intent://${intentPath}#Intent;scheme=https;` +
+        `package=com.instagram.android;S.browser_fallback_url=${encodeURIComponent(h)};end`
+      );
+    }
+
+    if (
+      host === "youtube.com" ||
+      host === "m.youtube.com" ||
+      host === "youtu.be" ||
+      host === "music.youtube.com"
+    ) {
+      return (
+        `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=https;` +
+        `package=com.google.android.youtube;S.browser_fallback_url=${encodeURIComponent(h)};end`
+      );
+    }
+  } catch {
+    /* keep original */
+  }
+  return h;
+}
+
 export function openExternalHref(href) {
   const h = String(href || "").trim();
   if (!h) return false;
   try {
     if (h.startsWith("tel:") || h.startsWith("mailto:")) {
+      if (openViaNativeBridge(h)) return true;
       window.location.href = h;
+      return true;
+    }
+    const target = preferNativeAppHref(h);
+    if (openViaNativeBridge(target)) return true;
+    // 브릿지 없는 브라우저: 일반 탭 (앱 WebView의 window.open 팝업 회피)
+    if (typeof window.Android !== "undefined" || typeof window.VlueLettering !== "undefined") {
+      window.location.href = /^https?:\/\//i.test(h) ? h : target;
       return true;
     }
     window.open(h, "_blank", "noopener,noreferrer");

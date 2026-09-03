@@ -50,6 +50,28 @@ export async function copyKakaoTalkIdToClipboard(talkId) {
   }
 }
 
+function openViaNativeBridge(url) {
+  const u = String(url || "").trim();
+  if (!u || typeof window === "undefined") return false;
+  try {
+    if (typeof window.Android?.openExternalUrl === "function") {
+      window.Android.openExternalUrl(u);
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (typeof window.VlueLettering?.openUrl === "function") {
+      window.VlueLettering.openUrl(u);
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 /** 카카오톡 앱 열기 (친구 ID 검색 화면 시도, Play 스토어 폴백 없음) */
 export function launchKakaoTalkForFriendAdd(talkId) {
   const id = normalizeKakaoTalkId(talkId);
@@ -57,19 +79,27 @@ export function launchKakaoTalkForFriendAdd(talkId) {
 
   const enc = encodeURIComponent(id);
   const schemeHref = `kakaotalk://friend/search?query=${enc}`;
+  const intentHref =
+    `intent://friend/search?query=${enc}` +
+    "#Intent;scheme=kakaotalk;package=com.kakao.talk;end";
+
+  // WebView에 kakaotalk:// 을 load하면 ERR_UNKNOWN_URL_SCHEME — 네이티브 브릿지 우선
+  if (openViaNativeBridge(intentHref) || openViaNativeBridge(schemeHref)) {
+    return true;
+  }
 
   if (isAndroidUa()) {
     try {
-      window.location.assign(schemeHref);
+      window.location.assign(intentHref);
       return true;
     } catch {
-      /* intent without store fallback */
+      try {
+        window.location.assign(schemeHref);
+        return true;
+      } catch {
+        return false;
+      }
     }
-    const intent =
-      `intent://friend/search?query=${enc}` +
-      "#Intent;scheme=kakaotalk;package=com.kakao.talk;end";
-    window.location.assign(intent);
-    return true;
   }
 
   if (isIosUa()) {
