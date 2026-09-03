@@ -139,7 +139,8 @@ export function buildPublicShowcaseUrl(phone, cacheKey = "") {
   const v = String(cacheKey || "")
     .replace(/[^\w.-]/g, "")
     .slice(-40);
-  return v ? `${base}?v=${encodeURIComponent(v)}` : base;
+  /* 카카오 OG는 ?query 캐시 무시가 잦음 → /t/{token} 경로로 무효화 */
+  return v ? `${base}/t/${encodeURIComponent(v)}` : base;
 }
 
 /** SPA 쇼케이스 직접 경로 (알림톡 버튼·앱 웹뷰용 — OG 불필요) */

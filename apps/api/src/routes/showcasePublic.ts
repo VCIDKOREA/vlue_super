@@ -64,15 +64,18 @@ function shareUrlFor(digits: string, cacheKey = "") {
   const v = String(cacheKey || "")
     .replace(/[^\w.-]/g, "")
     .slice(-40);
-  return v ? `${base}?v=${encodeURIComponent(v)}` : base;
+  /* 카카오는 ?v= 쿼리를 무시하고 경로 단위로 OG 캐시하는 경우가 많음 → /t/{token} 경로 사용 */
+  return v ? `${base}/t/${encodeURIComponent(v)}` : base;
 }
 
 function coverUrlFor(digits: string, cacheKey = "") {
-  const base = `${getVlueShareOrigin()}/showcase/${encodeURIComponent(digits)}/cover.jpg`;
+  const base = `${getVlueShareOrigin()}/showcase/${encodeURIComponent(digits)}`;
   const v = String(cacheKey || "")
     .replace(/[^\w.-]/g, "")
     .slice(-40);
-  return v ? `${base}?v=${encodeURIComponent(v)}` : base;
+  return v
+    ? `${base}/t/${encodeURIComponent(v)}/cover.jpg`
+    : `${base}/cover.jpg`;
 }
 
 function coverCacheKey(meta: { shareCover?: string; photo?: string; cardId?: string }) {
@@ -149,6 +152,14 @@ export async function respondShowcaseOgView(c: Context) {
       return c.redirect(spaUrlFor(digits), 302);
     }
 
+    const token = String(c.req.param("token") || "").trim();
+    /* /t/{token} 요청은 항상 최신 OG (카카오 캐시 무효화 경로) */
+    if (token) {
+      const html = await buildOgHtml(digits);
+      setCachedOgHtml(digits, html);
+      return sendOgHtml(c, html);
+    }
+
     const cached = getCachedOgHtml(digits);
     if (cached) {
       if (cached.stale) {
@@ -175,8 +186,9 @@ export async function respondShowcaseOgCover(c: Context) {
     const digits = phoneDigitsForUrl(rawPhone);
     if (!digits) return c.text("not found", 404);
 
-    /* ?v= 캐시버스트 — 공유 직후 최신 타이틀사진 반영 */
-    const bust = String(c.req.query("v") || "").trim();
+    /* 토큰·?v= 있으면 메모리 캐시 스킵 — 타이틀사진 변경 즉시 반영 */
+    const bust =
+      String(c.req.param("token") || "").trim() || String(c.req.query("v") || "").trim();
     const hit = bust ? null : getCachedOgCover(digits);
     if (hit) {
       c.header("Cache-Control", "public, max-age=600");

@@ -47,11 +47,11 @@ export function getKakaoShowcaseCoverImageUrl(phone, cacheKey = "") {
   const local = phoneDigitsLocal(phone);
   if (!local) return "";
   const origin = resolvePublicShowcaseShareOrigin();
-  const base = `${origin}/showcase/${encodeURIComponent(local)}/cover.jpg`;
+  const base = `${origin}/showcase/${encodeURIComponent(local)}`;
   const v = String(cacheKey || "")
     .replace(/[^\w.-]/g, "")
     .slice(-40);
-  return v ? `${base}?v=${encodeURIComponent(v)}` : base;
+  return v ? `${base}/t/${encodeURIComponent(v)}/cover.jpg` : `${base}/cover.jpg`;
 }
 
 /** 카카오·OG가 접근할 공개 API 베이스 (실기기 공유용) — www SPA 금지 */

@@ -4,13 +4,26 @@ import { respondShowcaseOgCover, respondShowcaseOgView } from "./showcasePublic.
 /**
  * m.vlue.kr 공개 경로 — API 서비스에 붙인 모바일 공유 도메인.
  * `/showcase/010…` · `/s/010…` 가 OG HTML을 바로 내려준다.
+ * `/showcase/010…/t/{token}` — 타이틀사진 변경 시 카카오 OG 캐시 무효화용 신규 경로
  */
 export const showcaseSharePrettyRoutes = new Hono();
 
-for (const path of ["/showcase/:phone/cover.jpg", "/showcase/:phone/cover.jpeg"]) {
+for (const path of [
+  "/showcase/:phone/t/:token/cover.jpg",
+  "/showcase/:phone/t/:token/cover.jpeg",
+  "/showcase/:phone/cover.jpg",
+  "/showcase/:phone/cover.jpeg"
+]) {
   showcaseSharePrettyRoutes.on(["GET", "HEAD"], path, (c) => respondShowcaseOgCover(c));
 }
 
-for (const path of ["/showcase/:phone", "/showcase/:phone/", "/s/:phone", "/s/:phone/"]) {
+for (const path of [
+  "/showcase/:phone/t/:token",
+  "/showcase/:phone/t/:token/",
+  "/showcase/:phone",
+  "/showcase/:phone/",
+  "/s/:phone",
+  "/s/:phone/"
+]) {
   showcaseSharePrettyRoutes.on(["GET", "HEAD"], path, (c) => respondShowcaseOgView(c));
 }
