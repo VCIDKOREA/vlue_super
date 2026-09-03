@@ -10,9 +10,36 @@ import {
   isLocalDevOrigin
 } from "./vlueViralLinks.js";
 import { ensureDigitalCardId, syncDigitalCardExportSnapshot } from "./digitalCardApi.js";
-import { readLetteringFixedIdentity } from "./letteringBizcardStorage.js";
+import {
+  readLetteringFixedIdentity,
+  readLetteringBizcardEditable
+} from "./letteringBizcardStorage.js";
 import { isPaidLetteringTier } from "./letteringMembership.js";
 import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
+
+/** 공유 URL /t/{token} — 사진·명함 정보 바뀌면 토큰도 바뀌어 카카오 OG 캐시 우회 */
+export function buildShowcaseShareCacheKey(parts = {}) {
+  const media = String(
+    parts.titlePhotoUrl || parts.shareCoverUrl || parts.media || ""
+  ).trim();
+  const fingerprint = [
+    media,
+    parts.name || "",
+    parts.organization || parts.org || "",
+    parts.title || parts.role || "",
+    parts.handle || "",
+    parts.phone || ""
+  ].join("|");
+  let h = 2166136261;
+  for (let i = 0; i < fingerprint.length; i++) {
+    h ^= fingerprint.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const hash = (h >>> 0).toString(36);
+  const tail = media.replace(/[^\w.-]/g, "").slice(-28);
+  const key = `${hash}-${tail || "v"}`.replace(/[^\w.-]/g, "");
+  return key.slice(0, 48) || String(Date.now());
+}
 
 function canShareFiles(file) {
   if (typeof navigator === "undefined" || !navigator.share) return false;
@@ -118,33 +145,59 @@ export async function copyShowcaseShareUrl(card, opts = {}) {
     return { ok: false, error: "전화번호가 없습니다. 본인인증 후 다시 시도해 주세요." };
   }
 
-  let coverKey = "";
+  const ed = readLetteringBizcardEditable();
+  let titlePhotoUrl = String(
+    card?.titlePhotoUrl || ed.titlePhotoDataUrl || ed.titlePhotoUrl || ""
+  ).trim();
+  let shareCoverUrl = String(
+    card?.shareCoverUrl || ed.kakaoFeedBgDataUrl || ed.kakaoFeedBgUrl || ""
+  ).trim();
+  let name = String(card?.name || card?.displayName || "").trim();
+  let organization = String(card?.organization || "").trim();
+  let title = String(card?.title || ed.title || "").trim();
+
   const isPaid = isPaidLetteringTier(card?.membershipTier || opts.membershipTier || "free");
   if (isPaid && card) {
     try {
       const sync = await syncDigitalCardExportSnapshot(card);
-      coverKey = String(
-        sync?.titlePhotoUrl ||
-          sync?.shareCoverUrl ||
-          card?.titlePhotoUrl ||
-          card?.shareCoverUrl ||
-          ""
-      )
-        .replace(/[^\w.-]/g, "")
-        .slice(-40);
+      if (sync?.ok !== false) {
+        titlePhotoUrl = String(sync?.titlePhotoUrl || titlePhotoUrl).trim();
+        shareCoverUrl = String(sync?.shareCoverUrl || shareCoverUrl).trim();
+      }
     } catch {
       /* 쇼케이스 URL 복사는 스냅샷 실패와 무관 */
     }
   }
-  if (!coverKey) {
-    coverKey = String(card?.titlePhotoUrl || card?.shareCoverUrl || Date.now())
-      .replace(/[^\w.-]/g, "")
-      .slice(-40);
+
+  let handle = "";
+  try {
+    const raw = String(localStorage.getItem("vlue_member_handle") || "").trim();
+    if (raw) handle = raw.startsWith("@") ? raw : `@${raw}`;
+  } catch {
+    /* ignore */
   }
+
+  const coverKey = buildShowcaseShareCacheKey({
+    titlePhotoUrl: ed.noTitlePhoto ? "" : titlePhotoUrl,
+    shareCoverUrl,
+    name,
+    organization,
+    title,
+    handle: handle.replace(/^@/, ""),
+    phone: phone.replace(/\D/g, "").replace(/^82/, "0")
+  });
 
   const viewUrl = buildPublicShowcaseUrl(phone, coverKey);
   if (!viewUrl) {
     return { ok: false, error: "쇼케이스 주소를 만들지 못했습니다." };
+  }
+
+  /* 카카오 스크랩 전 서버 cover 워밍 — 첫 붙여넣기에서 옛 캐시 이미지 방지 */
+  try {
+    const coverWarm = viewUrl.replace(/\/?$/, "") + "/cover.jpg";
+    void fetch(coverWarm, { method: "GET", mode: "cors", credentials: "omit", cache: "reload" });
+  } catch {
+    /* ignore */
   }
 
   try {

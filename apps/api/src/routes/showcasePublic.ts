@@ -4,10 +4,8 @@ import {
   isUserDocumentNavigation
 } from "../services/showcase/showcaseOgLandingPage.js";
 import {
-  coalesceOgHtmlBuild,
   fetchOgCoverBytes,
   getCachedOgCover,
-  getCachedOgHtml,
   loadShowcaseOgShareMeta,
   setCachedOgCover,
   setCachedOgHtml,
@@ -78,20 +76,41 @@ function coverUrlFor(digits: string, cacheKey = "") {
     : `${base}/cover.jpg`;
 }
 
-function coverCacheKey(meta: { shareCover?: string; photo?: string; cardId?: string }) {
-  const raw = String(meta.shareCover || meta.photo || meta.cardId || "").trim();
-  if (!raw) return String(Date.now());
-  return raw.replace(/[^\w.-]/g, "").slice(-40) || String(Date.now());
+function coverCacheKey(meta: {
+  shareCover?: string;
+  photo?: string;
+  name?: string;
+  org?: string;
+  role?: string;
+  handle?: string;
+  phone?: string;
+}) {
+  const media = String(meta.shareCover || meta.photo || "").trim();
+  const fingerprint = [
+    media,
+    meta.name || "",
+    meta.org || "",
+    meta.role || "",
+    meta.handle || "",
+    meta.phone || ""
+  ].join("|");
+  let h = 2166136261;
+  for (let i = 0; i < fingerprint.length; i++) {
+    h ^= fingerprint.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const hash = (h >>> 0).toString(36);
+  const tail = media.replace(/[^\w.-]/g, "").slice(-28);
+  const key = `${hash}-${tail || "v"}`.replace(/[^\w.-]/g, "");
+  return key.slice(0, 48) || String(Date.now());
 }
 
 function sendOgHtml(c: Context, html: string) {
   c.header("Vary", "Accept-Encoding, Sec-Fetch-Mode, Sec-Fetch-User");
-  c.header(
-    "Cache-Control",
-    "public, max-age=120, s-maxage=600, stale-while-revalidate=86400"
-  );
-  c.header("CDN-Cache-Control", "public, max-age=600");
-  c.header("Cloudflare-CDN-Cache-Control", "public, max-age=600");
+  /* OG는 짧게 — 타이틀사진·명함 정보 변경 직후 스크랩 반영 */
+  c.header("Cache-Control", "public, max-age=60, s-maxage=60, must-revalidate");
+  c.header("CDN-Cache-Control", "public, max-age=60");
+  c.header("Cloudflare-CDN-Cache-Control", "public, max-age=60");
   c.header("Content-Type", "text/html; charset=utf-8");
   if (c.req.method === "HEAD") {
     c.header("Content-Length", String(Buffer.byteLength(html, "utf8")));
@@ -116,7 +135,7 @@ async function buildOgHtml(digits: string): Promise<string> {
   const phoneDisplay = formatPhoneDisplayKR(digits) || digits;
   const meta = await loadShowcaseOgShareMeta(digits);
   const name = meta.name || (meta.handle ? `@${meta.handle}` : phoneDisplay);
-  const v = coverCacheKey(meta);
+  const v = coverCacheKey({ ...meta, phone: digits });
   return buildShowcaseOgLandingPage({
     name,
     org: meta.org,
@@ -153,24 +172,23 @@ export async function respondShowcaseOgView(c: Context) {
     }
 
     const token = String(c.req.param("token") || "").trim();
-    /* /t/{token} 요청은 항상 최신 OG (카카오 캐시 무효화 경로) */
-    if (token) {
-      const html = await buildOgHtml(digits);
-      setCachedOgHtml(digits, html);
-      return sendOgHtml(c, html);
+    const meta = await loadShowcaseOgShareMeta(digits);
+    const currentToken = coverCacheKey({ ...meta, phone: digits });
+
+    /* 구 주소(/showcase/010…) 스크랩 → 최신 /t/{token} 로 보내 카카오 OG 캐시 우회 */
+    if (!token && currentToken) {
+      const dest = shareUrlFor(digits, currentToken);
+      c.header("Cache-Control", "no-store");
+      return c.redirect(dest, 302);
     }
 
-    const cached = getCachedOgHtml(digits);
-    if (cached) {
-      if (cached.stale) {
-        void coalesceOgHtmlBuild(digits, () => buildOgHtml(digits))
-          .then((html) => setCachedOgHtml(digits, html))
-          .catch(() => undefined);
-      }
-      return sendOgHtml(c, cached.html);
+    /* 토큰이 옛것이면 현재 토큰으로 정규화 */
+    if (token && currentToken && token !== currentToken) {
+      c.header("Cache-Control", "no-store");
+      return c.redirect(shareUrlFor(digits, currentToken), 302);
     }
 
-    const html = await coalesceOgHtmlBuild(digits, () => buildOgHtml(digits));
+    const html = await buildOgHtml(digits);
     setCachedOgHtml(digits, html);
     return sendOgHtml(c, html);
   } catch (err) {
@@ -191,7 +209,9 @@ export async function respondShowcaseOgCover(c: Context) {
       String(c.req.param("token") || "").trim() || String(c.req.query("v") || "").trim();
     const hit = bust ? null : getCachedOgCover(digits);
     if (hit) {
-      c.header("Cache-Control", "public, max-age=600");
+      c.header("Cache-Control", "public, max-age=60, must-revalidate");
+      c.header("CDN-Cache-Control", "public, max-age=60");
+      c.header("Cloudflare-CDN-Cache-Control", "public, max-age=60");
       c.header("Content-Type", hit.contentType);
       if (c.req.method === "HEAD") {
         c.header("Content-Length", String(hit.bytes.length));
@@ -206,7 +226,9 @@ export async function respondShowcaseOgCover(c: Context) {
       return c.redirect(target || getKakaoShareButtonImageUrl(getVluePublicOrigin()), 302);
     }
     setCachedOgCover(digits, fetched.bytes, fetched.contentType);
-    c.header("Cache-Control", "public, max-age=600");
+    c.header("Cache-Control", "public, max-age=60, must-revalidate");
+    c.header("CDN-Cache-Control", "public, max-age=60");
+    c.header("Cloudflare-CDN-Cache-Control", "public, max-age=60");
     c.header("Content-Type", fetched.contentType);
     if (c.req.method === "HEAD") {
       c.header("Content-Length", String(fetched.bytes.length));

@@ -4,7 +4,10 @@ import {
   prepareKakaoBizcardShare,
   openPreparedKakaoBizcardShare
 } from "../lib/letteringBizcardShare.js";
-import { readLetteringFixedIdentity } from "../lib/letteringBizcardStorage.js";
+import {
+  readLetteringFixedIdentity,
+  LETTERING_BIZCARD_CHANGED_EVENT
+} from "../lib/letteringBizcardStorage.js";
 import { syncDigitalCardExportSnapshot, ensureDigitalCardId } from "../lib/digitalCardApi.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import {
@@ -43,6 +46,7 @@ export default function LetteringBizcardSharePanel({
   const [busy, setBusy] = useState("");
   const [shareReady, setShareReady] = useState(false);
   const [kakaoPrepared, setKakaoPrepared] = useState(null);
+  const [prepTick, setPrepTick] = useState(0);
   const [shareCount, setShareCount] = useState(() => readShowcaseShareCountLocal());
   const prepareGen = useRef(0);
   const isPaid = isPaidLetteringTier(membershipTier);
@@ -57,6 +61,13 @@ export default function LetteringBizcardSharePanel({
     });
     window.addEventListener(VLUE_VERIFIED_BADGE_CHANGED_EVENT, sync);
     return () => window.removeEventListener(VLUE_VERIFIED_BADGE_CHANGED_EVENT, sync);
+  }, []);
+
+  /* 명함·타이틀사진·커버 변경 즉시 카톡 공유 페이로드 재준비 */
+  useEffect(() => {
+    const onBizcardChanged = () => setPrepTick((n) => n + 1);
+    window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onBizcardChanged);
+    return () => window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onBizcardChanged);
   }, []);
 
   const sharePhone = useMemo(() => {
@@ -77,7 +88,18 @@ export default function LetteringBizcardSharePanel({
     return () => {
       cancelled = true;
     };
-  }, [card?.name, card?.organization, card?.phone, card?.title, card?.department, isPaid, sharePhone]);
+  }, [
+    card?.name,
+    card?.organization,
+    card?.phone,
+    card?.title,
+    card?.department,
+    card?.titlePhotoUrl,
+    card?.shareCoverUrl,
+    isPaid,
+    sharePhone,
+    prepTick
+  ]);
 
   /* 카톡 공유 페이로드 미리 준비 — 클릭 시 await 없이 sendDefault */
   useEffect(() => {
@@ -99,13 +121,16 @@ export default function LetteringBizcardSharePanel({
   }, [
     isPaid,
     sharePhone,
+    prepTick,
     card?.name,
     card?.organization,
     card?.phone,
     card?.title,
     card?.department,
     card?.titlePhotoUrl,
-    card?.shareCoverUrl
+    card?.shareCoverUrl,
+    card?.companyIntro,
+    card?.customBackText
   ]);
 
   const runCopy = async () => {
@@ -118,7 +143,11 @@ export default function LetteringBizcardSharePanel({
         if (r.viewUrl) onToast?.(`주소: ${r.viewUrl}`);
         return;
       }
-      onToast?.("주소를 복사했습니다. 채팅방에 붙여넣으면 잠시 후 미리보기가 생길 수 있습니다.");
+      onToast?.(
+        r.viewUrl?.includes("/t/")
+          ? "최신 쇼케이스 주소를 복사했습니다. 채팅에 붙여넣으면 새 미리보기가 뜹니다."
+          : "주소를 복사했습니다. 채팅방에 붙여넣으면 잠시 후 미리보기가 생길 수 있습니다."
+      );
       const recorded = await recordSelfShowcaseShareApi();
       if (recorded && Number.isFinite(Number(recorded.showcaseShareCount))) {
         setShareCount(Number(recorded.showcaseShareCount));
