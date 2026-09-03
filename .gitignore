@@ -122,3 +122,8 @@ $RECYCLE.BIN/
 *.temp
 *.bak
 *.orig
+
+# local release secrets (never commit)
+vlue-release-keystore-SECRET.txt
+**/vlue-release-keystore-SECRET.txt
+
