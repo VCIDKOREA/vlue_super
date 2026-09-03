@@ -60,6 +60,8 @@ async function fetchPublicCardExport(userId) {
     address: String(exp?.address || "").trim(),
     activityName: String(exp?.activityName || "").trim(),
     photoFocus: exp?.photoFocus || "center",
+    companyIntro: String(exp?.companyIntro || "").trim(),
+    customBackText: String(exp?.customBackText || "").trim(),
     membershipTier: String(
       res.data.membershipTier || res.data.profile?.membershipTier || ""
     ).toLowerCase(),
@@ -145,6 +147,7 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
   const personName = String(
     exportSnap?.name || body.displayName || body.legalName || ""
   ).trim();
+  const profile = body.profile && typeof body.profile === "object" ? body.profile : {};
 
   const card = normalizeLetteringCard({
     userId,
@@ -159,6 +162,12 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
     website: exportSnap?.website || "",
     fax: exportSnap?.fax || "",
     address: exportSnap?.address || "",
+    companyIntro: String(
+      exportSnap?.companyIntro || profile.companyIntro || profile.intro || ""
+    ).trim(),
+    customBackText: String(
+      exportSnap?.customBackText || profile.customBackText || profile.backText || ""
+    ).trim(),
     /* 피드 닉은 유지하되, 비어 있으면 성명으로 — 크롬은 name 우선 */
     activityName: exportSnap?.activityName || personName,
     publicHandle: handle,
