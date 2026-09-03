@@ -130,12 +130,16 @@ export function resolvePublicShowcaseShareOrigin() {
 }
 
 /** 카카오·문자 등 외부 공유용 — m.vlue.kr/showcase/010… (API가 OG HTML 직접 서빙) */
-export function buildPublicShowcaseUrl(phone, _devOrigin = "") {
+export function buildPublicShowcaseUrl(phone, cacheKey = "") {
   const origin = resolvePublicShowcaseShareOrigin();
   const digits = String(phone || "").replace(/\D/g, "");
   const local = digits.startsWith("82") ? `0${digits.slice(2)}` : digits;
   if (!local) return "";
-  return `${origin}/showcase/${encodeURIComponent(local)}`;
+  const base = `${origin}/showcase/${encodeURIComponent(local)}`;
+  const v = String(cacheKey || "")
+    .replace(/[^\w.-]/g, "")
+    .slice(-40);
+  return v ? `${base}?v=${encodeURIComponent(v)}` : base;
 }
 
 /** SPA 쇼케이스 직접 경로 (알림톡 버튼·앱 웹뷰용 — OG 불필요) */

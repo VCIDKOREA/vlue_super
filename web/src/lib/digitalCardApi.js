@@ -363,8 +363,16 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
       pickHttp(card?.shareCoverUrl, ed.kakaoFeedBgDataUrl, ed.kakaoFeedBgUrl);
   }
 
-  /* 카톡 Feed/OG 썸네일: 전용 커버 없으면 타이틀사진 사용 */
-  if (!shareCoverUrl && titlePhotoUrl && !ed.noTitlePhoto) {
+  /* OG/카톡: 타이틀사진이 있으면 대표 썸네일로 맞춤(옛 shareCover·시가 사진 잔존 방지).
+   * 전용 카톡 배경(kakaoFeedBg)을 따로 올린 경우는 유지 */
+  const dedicatedKakaoCover = String(ed.kakaoFeedBgDataUrl || ed.kakaoFeedBgUrl || "").trim();
+  const hasDedicatedKakaoCover =
+    Boolean(dedicatedKakaoCover) &&
+    /^https?:\/\//i.test(dedicatedKakaoCover) &&
+    dedicatedKakaoCover !== titlePhotoUrl;
+  if (titlePhotoUrl && !ed.noTitlePhoto && !hasDedicatedKakaoCover) {
+    shareCoverUrl = titlePhotoUrl;
+  } else if (!shareCoverUrl && titlePhotoUrl && !ed.noTitlePhoto) {
     shareCoverUrl = titlePhotoUrl;
   }
 

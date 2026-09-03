@@ -140,7 +140,8 @@ export async function loadShowcaseOgShareMeta(digits: string): Promise<ShowcaseO
     handle: String(row.handle || "").trim().replace(/^@/, ""),
     cardId: String(row.card_id || "").trim(),
     photo: pickHttpUrl(row.photo_url),
-    shareCover: pickHttpUrl(row.share_cover, row.kakao_bg, row.title_photo)
+    /* 타이틀사진 우선 — 예전 카톡 커버(shareCover)가 남아 있어도 OG에 옛 사진이 고정되지 않게 */
+    shareCover: pickHttpUrl(row.title_photo, row.share_cover, row.kakao_bg)
   };
 }
 

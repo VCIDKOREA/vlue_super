@@ -59,12 +59,26 @@ function spaUrlFor(digits: string) {
   return `${getVluePublicOrigin()}/site/web/showcase/${encodeURIComponent(digits)}`;
 }
 
-function shareUrlFor(digits: string) {
-  return `${getVlueShareOrigin()}/showcase/${encodeURIComponent(digits)}`;
+function shareUrlFor(digits: string, cacheKey = "") {
+  const base = `${getVlueShareOrigin()}/showcase/${encodeURIComponent(digits)}`;
+  const v = String(cacheKey || "")
+    .replace(/[^\w.-]/g, "")
+    .slice(-40);
+  return v ? `${base}?v=${encodeURIComponent(v)}` : base;
 }
 
-function coverUrlFor(digits: string) {
-  return `${getVlueShareOrigin()}/showcase/${encodeURIComponent(digits)}/cover.jpg`;
+function coverUrlFor(digits: string, cacheKey = "") {
+  const base = `${getVlueShareOrigin()}/showcase/${encodeURIComponent(digits)}/cover.jpg`;
+  const v = String(cacheKey || "")
+    .replace(/[^\w.-]/g, "")
+    .slice(-40);
+  return v ? `${base}?v=${encodeURIComponent(v)}` : base;
+}
+
+function coverCacheKey(meta: { shareCover?: string; photo?: string; cardId?: string }) {
+  const raw = String(meta.shareCover || meta.photo || meta.cardId || "").trim();
+  if (!raw) return String(Date.now());
+  return raw.replace(/[^\w.-]/g, "").slice(-40) || String(Date.now());
 }
 
 function sendOgHtml(c: Context, html: string) {
@@ -99,14 +113,15 @@ async function buildOgHtml(digits: string): Promise<string> {
   const phoneDisplay = formatPhoneDisplayKR(digits) || digits;
   const meta = await loadShowcaseOgShareMeta(digits);
   const name = meta.name || (meta.handle ? `@${meta.handle}` : phoneDisplay);
+  const v = coverCacheKey(meta);
   return buildShowcaseOgLandingPage({
     name,
     org: meta.org,
     role: meta.role,
     handle: meta.handle,
     phoneDisplay,
-    ogImage: coverUrlFor(digits),
-    shareUrl: shareUrlFor(digits),
+    ogImage: coverUrlFor(digits, v),
+    shareUrl: shareUrlFor(digits, v),
     spaUrl: spaUrlFor(digits),
     createUrl: getVlueCreateUrl(),
     forScraper: true

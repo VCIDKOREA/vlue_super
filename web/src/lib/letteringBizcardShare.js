@@ -118,16 +118,31 @@ export async function copyShowcaseShareUrl(card, opts = {}) {
     return { ok: false, error: "전화번호가 없습니다. 본인인증 후 다시 시도해 주세요." };
   }
 
+  let coverKey = "";
   const isPaid = isPaidLetteringTier(card?.membershipTier || opts.membershipTier || "free");
   if (isPaid && card) {
     try {
-      await syncDigitalCardExportSnapshot(card);
+      const sync = await syncDigitalCardExportSnapshot(card);
+      coverKey = String(
+        sync?.titlePhotoUrl ||
+          sync?.shareCoverUrl ||
+          card?.titlePhotoUrl ||
+          card?.shareCoverUrl ||
+          ""
+      )
+        .replace(/[^\w.-]/g, "")
+        .slice(-40);
     } catch {
       /* 쇼케이스 URL 복사는 스냅샷 실패와 무관 */
     }
   }
+  if (!coverKey) {
+    coverKey = String(card?.titlePhotoUrl || card?.shareCoverUrl || Date.now())
+      .replace(/[^\w.-]/g, "")
+      .slice(-40);
+  }
 
-  const viewUrl = buildPublicShowcaseUrl(phone);
+  const viewUrl = buildPublicShowcaseUrl(phone, coverKey);
   if (!viewUrl) {
     return { ok: false, error: "쇼케이스 주소를 만들지 못했습니다." };
   }
