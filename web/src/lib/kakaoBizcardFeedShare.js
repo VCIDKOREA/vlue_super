@@ -70,8 +70,23 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
       : `${KAKAO_PUBLIC_ORIGIN}/membership`;
   const snap = scrubLetteringDemoPollution(withLetteringBizcardPreviewFallback(card || {}));
   const ed = readLetteringBizcardEditable();
+  const titlePhotoHint = ed.noTitlePhoto
+    ? ""
+    : String(
+        snap.titlePhotoUrl ||
+          card?.titlePhotoUrl ||
+          ed.titlePhotoDataUrl ||
+          ed.titlePhotoUrl ||
+          ""
+      ).trim();
+  /* 전용 카톡 커버 → 타이틀사진(쇼케이스 대표) → Feed PNG */
   const coverHint = String(
-    snap.shareCoverUrl || card?.shareCoverUrl || ed.kakaoFeedBgDataUrl || ed.kakaoFeedBgUrl || ""
+    snap.shareCoverUrl ||
+      card?.shareCoverUrl ||
+      ed.kakaoFeedBgDataUrl ||
+      ed.kakaoFeedBgUrl ||
+      titlePhotoHint ||
+      ""
   ).trim();
   const coverKey = coverHint
     ? coverHint.replace(/[^\w]/g, "").slice(-32)
@@ -169,7 +184,13 @@ export async function shareBizcardViaKakaoFeed(card) {
 
   const mergedCard = {
     ...(card || {}),
-    shareCoverUrl: sync?.shareCoverUrl || card?.shareCoverUrl || ""
+    shareCoverUrl:
+      sync?.shareCoverUrl ||
+      card?.shareCoverUrl ||
+      sync?.titlePhotoUrl ||
+      card?.titlePhotoUrl ||
+      "",
+    titlePhotoUrl: sync?.titlePhotoUrl || card?.titlePhotoUrl || ""
   };
   const urls = buildKakaoBizcardPublicUrls(cardId, mergedCard);
   if (!isKakaoPublicImageUrl(urls.buttonImageUrl)) {

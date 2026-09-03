@@ -154,11 +154,16 @@ function buildFeedCardSvg(
 export async function renderKakaoFeedCardPng(snapshot: BizcardClassicSnapshot): Promise<Buffer> {
   const logoUrl = String(snapshot.logoUrl || "").trim();
   const photoUrl = String(snapshot.photoUrl || "").trim();
-  const coverUrl = String(snapshot.shareCoverUrl || "").trim();
+  const titlePhotoUrl = String(snapshot.titlePhotoUrl || "").trim();
+  const coverUrl = String(snapshot.shareCoverUrl || titlePhotoUrl || "").trim();
 
   const coverBuf = coverUrl ? await fetchRemoteImage(coverUrl) : null;
-  const photoBuf = !coverBuf && photoUrl ? await fetchRemoteImage(photoUrl) : null;
-  const heroBuf = coverBuf || photoBuf;
+  const titleBuf =
+    !coverBuf && titlePhotoUrl && titlePhotoUrl !== coverUrl
+      ? await fetchRemoteImage(titlePhotoUrl)
+      : null;
+  const photoBuf = !coverBuf && !titleBuf && photoUrl ? await fetchRemoteImage(photoUrl) : null;
+  const heroBuf = coverBuf || titleBuf || photoBuf;
 
   /* 배경·사진이 있으면 풀블리드 — 한글 SVG 렌더(서버 폰트 누락 → □□□)를 피함 */
   if (heroBuf) {

@@ -12,6 +12,8 @@ export type BizcardClassicSnapshot = {
   logoUrl?: string;
   /** 프로필 얼굴 사진 — 카카오 피드 아바타 */
   photoUrl?: string;
+  /** DCC/쇼케이스 타이틀 사진 — 카톡 커버 폴백 */
+  titlePhotoUrl?: string;
   /** 카카오 피드 카드 헤더 배경(커버) — http(s) 또는 data:image */
   shareCoverUrl?: string;
   designTemplate?: string;

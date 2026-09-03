@@ -111,6 +111,7 @@ export async function loadShowcaseOgShareMeta(digits: string): Promise<ShowcaseO
       photo_url: string | null;
       share_cover: string | null;
       kakao_bg: string | null;
+      title_photo: string | null;
     }>
   >`
     SELECT
@@ -121,7 +122,8 @@ export async function loadShowcaseOgShareMeta(digits: string): Promise<ShowcaseO
       dc.id AS card_id,
       NULLIF(TRIM(dc.photo_url), '') AS photo_url,
       NULLIF(TRIM(dc.export_snapshot_json->>'shareCoverUrl'), '') AS share_cover,
-      NULLIF(TRIM(dc.export_snapshot_json->>'kakaoFeedBgUrl'), '') AS kakao_bg
+      NULLIF(TRIM(dc.export_snapshot_json->>'kakaoFeedBgUrl'), '') AS kakao_bg,
+      NULLIF(TRIM(dc.export_snapshot_json->>'titlePhotoUrl'), '') AS title_photo
     FROM users u
     LEFT JOIN digital_cards dc ON dc.user_id = u.id
     LEFT JOIN user_business_profiles bp ON bp.user_id = u.id
@@ -138,7 +140,7 @@ export async function loadShowcaseOgShareMeta(digits: string): Promise<ShowcaseO
     handle: String(row.handle || "").trim().replace(/^@/, ""),
     cardId: String(row.card_id || "").trim(),
     photo: pickHttpUrl(row.photo_url),
-    shareCover: pickHttpUrl(row.share_cover, row.kakao_bg)
+    shareCover: pickHttpUrl(row.share_cover, row.kakao_bg, row.title_photo)
   };
 }
 

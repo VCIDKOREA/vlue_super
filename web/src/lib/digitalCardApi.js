@@ -363,6 +363,11 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
       pickHttp(card?.shareCoverUrl, ed.kakaoFeedBgDataUrl, ed.kakaoFeedBgUrl);
   }
 
+  /* 카톡 Feed/OG 썸네일: 전용 커버 없으면 타이틀사진 사용 */
+  if (!shareCoverUrl && titlePhotoUrl && !ed.noTitlePhoto) {
+    shareCoverUrl = titlePhotoUrl;
+  }
+
   /* 업로드 성공한 https 는 로컬에도 반영 — 재설치 복원·재업로드 루프 방지 */
   try {
     const patch = {};
