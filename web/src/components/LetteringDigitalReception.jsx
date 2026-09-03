@@ -502,7 +502,10 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
 
 function resolveBackAdditionalNote(card) {
   return clampLetteringBizcardBackNote(
-    String(card.customBackText || card.backNote || card.introBack || "").trim()
+    String(card.customBackText || card.backNote || card.introBack || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
   );
 }
 
@@ -877,6 +880,13 @@ function FrontPanel({
   );
 }
 
+function resolveBackNoteDensity(note) {
+  const len = String(note || "").length;
+  if (len >= 280) return "is-dense";
+  if (len >= 180) return "is-compact";
+  return "is-roomy";
+}
+
 function BackPanel({
   card,
   verified: _verified,
@@ -886,6 +896,7 @@ function BackPanel({
 }) {
   const introLine = resolveBackIntroLine(card);
   const additionalNote = resolveBackAdditionalNote(card);
+  const noteDensity = resolveBackNoteDensity(additionalNote);
   const introPlaceholder = embeddedInPush
     ? "명함 만들기에서 한줄소개를 입력할 수 있습니다."
     : "등록된 한줄소개가 없습니다.";
@@ -894,9 +905,9 @@ function BackPanel({
     : "등록된 추가설명이 없습니다.";
 
   return (
-    <div className={`ldr-panel ldr-panel--back${embeddedInPush ? " ldr-panel--push" : ""}`}>
-      <CompanyLogoWatermark card={card} />
-      <div className="ldr-back-copy-stack">
+    <div className={`ldr-panel ldr-panel--back ldr-panel--back-copy${embeddedInPush ? " ldr-panel--push" : ""}`}>
+      {/* 뒷면은 본문 공간을 위해 워터마크 미표시 */}
+      <div className={`ldr-back-copy-stack ${noteDensity}`.trim()}>
         <section className="ldr-back-copy-block ldr-back-copy-block--intro">
           <p
             className={`ldr-back-copy-block__text${
@@ -906,7 +917,7 @@ function BackPanel({
             {introLine || introPlaceholder}
           </p>
         </section>
-        <section className="ldr-back-copy-block ldr-back-copy-block--note">
+        <section className={`ldr-back-copy-block ldr-back-copy-block--note ${noteDensity}`.trim()}>
           <p
             className={`ldr-back-copy-block__text${
               !additionalNote ? " ldr-back-copy-block__text--placeholder" : ""
