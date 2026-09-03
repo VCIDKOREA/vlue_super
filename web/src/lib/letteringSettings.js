@@ -39,6 +39,23 @@ export function syncLetteringEnabledToNative(enabled) {
   }
 }
 
+/**
+ * 쇼케이스/명함 송출 ON → 통화 감지(레터링) + 백그라운드 모니터도 함께 켠다.
+ * UI 토글만 켜고 lettering_enabled=false 이면 빅푸가 아예 안 뜸.
+ */
+export function ensureCallDetectionForBroadcast(on) {
+  if (!on) return;
+  writeLetteringEnabled(true);
+  try {
+    const st = readLetteringPermissionStatus();
+    if (st && st.callOverlayReady === false) {
+      requestLetteringPermissions();
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export function requestLetteringPermissions() {
   if (typeof window === "undefined") return { ok: false };
   try {

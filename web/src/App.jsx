@@ -3102,10 +3102,18 @@ function App() {
     /* 네이티브가 이미 ON 이면 웹이 false 로 덮어쓰지 않음 (권한 다이얼로그만 켠 경우) */
     (async () => {
       try {
-        const { readLetteringPermissionStatus } = await import("./lib/letteringSettings.js");
+        const { readLetteringPermissionStatus, ensureCallDetectionForBroadcast } = await import(
+          "./lib/letteringSettings.js"
+        );
+        const { readVcidBroadcastOn, readDccBroadcastOn } = await import("./lib/bizcardAccountSync.js");
         const st = readLetteringPermissionStatus();
         if (st?.letteringEnabled && !readLetteringEnabled()) {
           writeLetteringEnabled(true);
+          return;
+        }
+        /* 쇼케이스/명함 송출이 켜져 있으면 통화 감지 서비스도 반드시 ON */
+        if (readVcidBroadcastOn() || readDccBroadcastOn()) {
+          ensureCallDetectionForBroadcast(true);
           return;
         }
       } catch {

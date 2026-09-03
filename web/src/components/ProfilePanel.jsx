@@ -38,7 +38,7 @@ import {
   readCachedActiveRegion,
   resolveActiveRegion
 } from "../lib/activeRegion.js";
-import { openNativeAppSettings } from "../lib/letteringSettings.js";
+import { openNativeAppSettings, ensureCallDetectionForBroadcast } from "../lib/letteringSettings.js";
 import { useDccFeatureAccess } from "../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../lib/dccAccessPolicy.js";
 import {
@@ -576,6 +576,7 @@ function ProfilePanel({
     const paidDcc = canUseV1PaidDccFeatures(membershipTier);
     setIsVCIDOn(next);
     localStorage.setItem("vcid", String(next));
+    if (next) ensureCallDetectionForBroadcast(true);
     try {
       import("../lib/bizcardAccountSync.js").then((m) => {
         try {
@@ -624,6 +625,7 @@ function ProfilePanel({
         return;
       }
       setDccBroadcastOn(Boolean(next));
+      if (next) ensureCallDetectionForBroadcast(true);
       try {
         import("../lib/bizcardAccountSync.js").then((m) => {
           m.writeDccBroadcastOn?.(Boolean(next));
