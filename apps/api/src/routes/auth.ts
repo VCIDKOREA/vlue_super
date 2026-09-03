@@ -469,13 +469,21 @@ authRoutes.post("/login", async (c) => {
       password?: string;
       deviceToken?: string;
       platform?: string;
+      forceLogoutOther?: boolean;
     }>();
     const loginId = normalizeLoginPublicHandle(body?.loginId);
     const password = String(body?.password ?? "");
     if (!loginId || !password) {
       return c.json({ error: "아이디와 비밀번호를 입력해 주세요." }, 400);
     }
-    const result = await loginWithCredentials(loginId, password, body?.deviceToken, c, body?.platform);
+    const result = await loginWithCredentials(
+      loginId,
+      password,
+      body?.deviceToken,
+      c,
+      body?.platform,
+      Boolean(body?.forceLogoutOther)
+    );
     if (result.status === "device_pending") {
       return c.json(
         {
@@ -485,6 +493,18 @@ authRoutes.post("/login", async (c) => {
           message: result.message
         },
         403
+      );
+    }
+    if (result.status === "device_conflict") {
+      return c.json(
+        {
+          status: "device_conflict",
+          deviceToken: result.deviceToken,
+          activeDeviceLabel: result.activeDeviceLabel,
+          activeDevices: result.activeDevices,
+          message: result.message
+        },
+        409
       );
     }
     if (result.status === "email_code_required") {

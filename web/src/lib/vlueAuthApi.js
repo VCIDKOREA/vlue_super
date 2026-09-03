@@ -2,7 +2,7 @@
  * VLUE 통합 인증 — 마케팅 웹·슈퍼앱 동일 @vlue/api (/api/auth/*)
  */
 import { apiUrl } from "./apiBase.js";
-import { clientKindHeaders, getDeviceToken, saveDeviceToken } from "./deviceAuth.js";
+import { clientKindHeaders, detectAuthPlatform, getDeviceToken, saveDeviceToken } from "./deviceAuth.js";
 import {
   clearVlueSessionTokens,
   getAccessToken,
@@ -142,12 +142,25 @@ export async function vlueLoginWithCredentials(input) {
     body: JSON.stringify({
       loginId,
       password,
-      deviceToken: getDeviceToken()
+      deviceToken: getDeviceToken(),
+      platform: detectAuthPlatform(),
+      forceLogoutOther: Boolean(input.forceLogoutOther)
     })
   });
   const data = await res.json().catch(() => ({}));
 
-  if (data?.status === "device_pending" || (res.status === 403 && data?.deviceToken)) {
+  if (data?.status === "device_conflict") {
+    if (data.deviceToken) saveDeviceToken(data.deviceToken);
+    const label = data.activeDeviceLabel || "다른 모바일 기기";
+    const msg =
+      data.message || `다른 기기에서 접속 중입니다. (${label}) 로그아웃 하시겠습니까?`;
+    if (typeof window !== "undefined" && window.confirm(msg)) {
+      return vlueLoginWithCredentials({ ...input, forceLogoutOther: true });
+    }
+    return { ok: false, error: "로그인이 취소되었습니다.", deviceConflict: true };
+  }
+
+  if (data?.status === "device_pending" || (res.status === 403 && data?.deviceToken && !data?.ticket)) {
     if (data.deviceToken) saveDeviceToken(data.deviceToken);
     return {
       ok: false,

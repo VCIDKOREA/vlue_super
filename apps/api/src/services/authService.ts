@@ -2,13 +2,18 @@ import { randomBytes } from "node:crypto";
 import type { Context } from "hono";
 import { prisma } from "../db/client.js";
 import { verifyPassword } from "../lib/passwordHash.js";
-import { issueTokenPair, revokeOtherAndroidAppSessions } from "./authSessions.js";
+import {
+  issueTokenPair,
+  listOtherActiveMobileAppDevices,
+  revokeOtherMobileAppSessions
+} from "./authSessions.js";
 import { assertLineTypeAllowsClient, detectClientKind, type ClientKind } from "../middleware/enterpriseAccess.js";
 import { isDeviceAutoApproveHandle, isVlueSeedTestHandle } from "../lib/testAccounts.js";
 import { upsertEnterpriseDraft } from "./b2b/cartEngine.js";
 import { resolveLoginMembershipTier } from "./membership/platformCeoPremium.js";
 import {
   detectAuthPlatform,
+  mobileAppDeviceLabel,
   requestClientIp,
   requestGeoLabel,
   sessionClientKind,
@@ -62,6 +67,13 @@ export type LoginResult =
       deviceToken: string;
       message: string;
       pendingDeviceId: string;
+    }
+  | {
+      status: "device_conflict";
+      deviceToken: string;
+      activeDeviceLabel: string;
+      activeDevices: { label: string }[];
+      message: string;
     }
   | {
       status: "email_code_required";
@@ -172,15 +184,16 @@ export async function completeAppLoginFromGate(
 ): Promise<Extract<LoginResult, { status: "ok" }>> {
   const user = (await prisma.user.findUnique({ where: { id: userId } })) as LoginUserRow | null;
   if (!user) throw new Error("계정을 찾을 수 없습니다.");
+  const label = mobileAppDeviceLabel({ header: (n) => c.req.header(n) });
   await upsertTrackedDevice({
     userId,
     deviceToken,
     c,
     platform: "app",
     verified: true,
-    label: "Android 앱"
+    label
   });
-  await revokeOtherAndroidAppSessions(userId, deviceToken);
+  await revokeOtherMobileAppSessions(userId, deviceToken);
   return issueLoginOk(user, loginId, deviceToken, c, "app");
 }
 
@@ -189,7 +202,8 @@ export async function loginWithCredentials(
   password: string,
   deviceTokenInput: string | null | undefined,
   c: Context,
-  platformHint?: string | null
+  platformHint?: string | null,
+  forceLogoutOther = false
 ): Promise<LoginResult> {
   const loginIdNorm = String(loginId || "").trim().toLowerCase().replace(/^@/, "");
   const user = (await prisma.user.findFirst({
@@ -246,6 +260,7 @@ export async function loginWithCredentials(
   const clientKind = detectClientKind(c);
   assertLineTypeAllowsClient(user.lineType as "NONE" | "WIRED" | "MOBILE", clientKind);
   const platform = detectAuthPlatform({ header: (n) => c.req.header(n) }, platformHint);
+  const appLabel = mobileAppDeviceLabel({ header: (n) => c.req.header(n) });
 
   /**
    * QA 시드 계정: test_b2b 는 "대표(MASTER)"로 테스트할 수 있게 서버에서 자동 승격
@@ -291,7 +306,23 @@ export async function loginWithCredentials(
     return issueLoginOk(user, loginId, deviceToken, c, "web");
   }
 
-  /* Android 앱 — 이미 이 기기면 기존 앱 세션만 끊고 로그인 */
+  /* 휴대기기 앱(Android/iOS) — 다른 앱 기기 활성 시 확인 후 단일 세션 */
+  const otherMobile = await listOtherActiveMobileAppDevices(user.id, deviceToken);
+  if (otherMobile.length > 0 && !forceLogoutOther) {
+    const activeDeviceLabel = otherMobile[0]?.label || "다른 모바일 기기";
+    return {
+      status: "device_conflict",
+      deviceToken,
+      activeDeviceLabel,
+      activeDevices: otherMobile.map((d) => ({ label: d.label })),
+      message: `다른 기기에서 접속 중입니다. (${activeDeviceLabel}) 로그아웃 하시겠습니까?`
+    };
+  }
+  if (forceLogoutOther) {
+    await revokeOtherMobileAppSessions(user.id, deviceToken);
+  }
+
+  /* 이미 이 기기면 로그인 */
   if (existingDevice?.isVerified) {
     await upsertTrackedDevice({
       userId: user.id,
@@ -299,9 +330,9 @@ export async function loginWithCredentials(
       c,
       platform: "app",
       verified: true,
-      label: existingDevice.label || "Android 앱"
+      label: existingDevice.label || appLabel
     });
-    await revokeOtherAndroidAppSessions(user.id, deviceToken);
+    await revokeOtherMobileAppSessions(user.id, deviceToken);
     return issueLoginOk(user, loginId, deviceToken, c, "app");
   }
 
@@ -317,9 +348,9 @@ export async function loginWithCredentials(
       c,
       platform: "app",
       verified: true,
-      label: "Android 앱"
+      label: appLabel
     });
-    await revokeOtherAndroidAppSessions(user.id, deviceToken);
+    await revokeOtherMobileAppSessions(user.id, deviceToken);
     return issueLoginOk(user, loginId, deviceToken, c, "app");
   }
 
@@ -344,7 +375,7 @@ export async function loginWithCredentials(
     c,
     platform: "app",
     verified: false,
-    label: "Android 앱 (인증 대기)"
+    label: `${appLabel} (인증 대기)`
   });
 
   return {

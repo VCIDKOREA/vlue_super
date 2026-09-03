@@ -32,7 +32,7 @@ export function detectClientKind() {
 export function detectAuthPlatform() {
   if (typeof navigator === "undefined") return "web";
   const ua = String(navigator.userAgent || "");
-  if (ua.includes("VLUE-Android-App")) return "app";
+  if (ua.includes("VLUE-Android-App") || ua.includes("VLUE-iOS-App")) return "app";
   return "web";
 }
 

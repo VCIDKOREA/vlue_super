@@ -130,8 +130,18 @@ export async function revokeAllRefreshForUser(userId: string): Promise<number> {
   return res.count;
 }
 
-/** Android 앱 단일 활성 기기 — 다른 앱 세션만 즉시 만료 */
-export async function revokeOtherAndroidAppSessions(
+const MOBILE_APP_SESSION_OR = [
+  { platform: "app" },
+  { platform: "ios" },
+  { platform: "android" },
+  { clientKind: "android_app" },
+  { clientKind: "ios_app" },
+  { userAgent: { contains: "VLUE-Android-App" } },
+  { userAgent: { contains: "VLUE-iOS-App" } }
+] as const;
+
+/** 휴대기기(Android/iOS) 앱 단일 활성 — 다른 모바일 앱 세션만 즉시 만료 (웹 세션은 유지) */
+export async function revokeOtherMobileAppSessions(
   userId: string,
   keepDeviceToken: string
 ): Promise<number> {
@@ -141,11 +151,7 @@ export async function revokeOtherAndroidAppSessions(
     where: {
       userId,
       revokedAt: null,
-      OR: [
-        { platform: "app" },
-        { clientKind: "android_app" },
-        { userAgent: { contains: "VLUE-Android-App" } }
-      ],
+      OR: [...MOBILE_APP_SESSION_OR],
       ...(token ? { NOT: { deviceToken: token } } : {})
     },
     data: { revokedAt: now }
@@ -153,11 +159,82 @@ export async function revokeOtherAndroidAppSessions(
   await prisma.userDevice.updateMany({
     where: {
       userId,
-      platform: "app",
       isVerified: true,
+      OR: [{ platform: "app" }, { platform: "ios" }, { platform: "android" }],
       ...(token ? { NOT: { deviceToken: token } } : {})
     },
     data: { isVerified: false }
   });
   return res.count;
+}
+
+/** @deprecated use revokeOtherMobileAppSessions */
+export async function revokeOtherAndroidAppSessions(
+  userId: string,
+  keepDeviceToken: string
+): Promise<number> {
+  return revokeOtherMobileAppSessions(userId, keepDeviceToken);
+}
+
+/** 다른 휴대기기 앱에 활성 세션/검증 기기가 있는지 */
+export async function listOtherActiveMobileAppDevices(
+  userId: string,
+  keepDeviceToken: string
+): Promise<{ label: string; deviceToken: string | null }[]> {
+  const token = String(keepDeviceToken || "").trim();
+  const now = new Date();
+
+  const devices = await prisma.userDevice.findMany({
+    where: {
+      userId,
+      isVerified: true,
+      OR: [{ platform: "app" }, { platform: "ios" }, { platform: "android" }],
+      ...(token ? { NOT: { deviceToken: token } } : {})
+    },
+    select: { label: true, deviceToken: true, userAgent: true, platform: true },
+    orderBy: { updatedAt: "desc" },
+    take: 10
+  });
+
+  const sessions = await prisma.authRefreshSession.findMany({
+    where: {
+      userId,
+      revokedAt: null,
+      expiresAt: { gt: now },
+      OR: [...MOBILE_APP_SESSION_OR],
+      ...(token ? { NOT: { deviceToken: token } } : {})
+    },
+    select: { deviceToken: true, userAgent: true, platform: true, clientKind: true },
+    orderBy: { createdAt: "desc" },
+    take: 10
+  });
+
+  const byToken = new Map<string, { label: string; deviceToken: string | null }>();
+
+  const labelFromUa = (ua: string | null | undefined, platform: string | null | undefined) => {
+    const u = String(ua || "");
+    if (u.includes("VLUE-iOS-App") || platform === "ios") return "iOS 앱";
+    if (u.includes("VLUE-Android-App") || platform === "android" || platform === "app") {
+      return "Android 앱";
+    }
+    return "모바일 앱";
+  };
+
+  for (const d of devices) {
+    const key = d.deviceToken || `dev:${d.label || ""}`;
+    byToken.set(key, {
+      deviceToken: d.deviceToken,
+      label: String(d.label || "").trim() || labelFromUa(d.userAgent, d.platform)
+    });
+  }
+  for (const s of sessions) {
+    const key = s.deviceToken || `sess:${s.userAgent || ""}`;
+    if (byToken.has(key)) continue;
+    byToken.set(key, {
+      deviceToken: s.deviceToken,
+      label: labelFromUa(s.userAgent, s.platform || s.clientKind)
+    });
+  }
+
+  return [...byToken.values()];
 }

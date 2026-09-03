@@ -2428,11 +2428,23 @@ function App() {
               loginId: id,
               password,
               deviceToken,
-              platform: detectAuthPlatform()
+              platform: detectAuthPlatform(),
+              forceLogoutOther: Boolean(payload?.forceLogoutOther)
             })
           });
         }
         const data = await res.json().catch(() => ({}));
+        if (data?.status === "device_conflict") {
+          if (data.deviceToken) saveDeviceToken(data.deviceToken);
+          return {
+            ok: false,
+            deviceConflict: true,
+            activeDeviceLabel: data.activeDeviceLabel || "다른 모바일 기기",
+            message:
+              data.message ||
+              `다른 기기에서 접속 중입니다. (${data.activeDeviceLabel || "다른 기기"}) 로그아웃 하시겠습니까?`
+          };
+        }
         if (data?.status === "email_code_required") {
           if (data.deviceToken) saveDeviceToken(data.deviceToken);
           return {

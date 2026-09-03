@@ -49,6 +49,7 @@ function LoginScreen({
   const [deviceEmailGate, setDeviceEmailGate] = useState(null);
   const [deviceEmailCode, setDeviceEmailCode] = useState("");
   const [deviceEmailHint, setDeviceEmailHint] = useState("");
+  const [deviceConflict, setDeviceConflict] = useState(null);
 
   useEffect(() => {
     try {
@@ -83,7 +84,7 @@ function LoginScreen({
     setPasswordVisible((v) => !v);
   };
 
-  const handleSubmitLogin = async () => {
+  const handleSubmitLogin = async (opts = {}) => {
     const id = String(loginId || "").trim();
     const pw = String(password || "").trim();
     if (!id || !pw) {
@@ -101,10 +102,19 @@ function LoginScreen({
         id,
         password: pw,
         rememberLogin,
+        forceLogoutOther: Boolean(opts.forceLogoutOther),
         ...(deviceEmailGate
           ? { deviceEmailTicket: deviceEmailGate.ticket, emailCode: deviceEmailCode }
           : {})
       });
+      if (result?.deviceConflict) {
+        setDeviceConflict({
+          message: result.message,
+          activeDeviceLabel: result.activeDeviceLabel
+        });
+        setLoginError("");
+        return;
+      }
       if (result?.emailCodeRequired) {
         setDeviceEmailGate({
           ticket: result.ticket,
@@ -115,6 +125,7 @@ function LoginScreen({
         setDeviceEmailCode("");
         setDeviceEmailHint(result.message || "");
         setLoginError("");
+        setDeviceConflict(null);
         return;
       }
       if (result && result.ok === false) {
@@ -122,6 +133,7 @@ function LoginScreen({
       } else {
         setDeviceEmailGate(null);
         setDeviceEmailCode("");
+        setDeviceConflict(null);
       }
     } catch (e) {
       setLoginError(e instanceof Error ? e.message : "로그인할 수 없습니다.");
@@ -333,7 +345,7 @@ function LoginScreen({
               <div className="mt-4 w-full max-w-[300px]">
                 <button
                   type="button"
-                  onClick={handleSubmitLogin}
+                  onClick={() => void handleSubmitLogin()}
                   disabled={loginBusy}
                   className="w-full rounded-lg bg-blue-600 py-2 text-[13px] font-semibold text-white transition active:scale-[0.99] active:bg-blue-700 disabled:cursor-wait disabled:opacity-70"
                 >
@@ -397,6 +409,49 @@ function LoginScreen({
             >
               확인
             </button>
+          </div>
+        </div>
+      ) : null}
+
+      {deviceConflict ? (
+        <div
+          className="fixed inset-0 z-[35] flex items-center justify-center bg-black/45 px-6"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="device-conflict-title"
+        >
+          <div className="w-full max-w-[320px] rounded-2xl bg-white px-5 py-6 shadow-xl">
+            <p
+              id="device-conflict-title"
+              className="text-center text-[15px] font-bold leading-snug text-slate-900 [word-break:keep-all]"
+            >
+              다른 기기에서 접속 중
+            </p>
+            <p className="mt-3 text-center text-[13px] leading-relaxed text-slate-600 [word-break:keep-all]">
+              {deviceConflict.message ||
+                `다른 기기에서 접속 중입니다. (${deviceConflict.activeDeviceLabel || "다른 기기"}) 로그아웃 하시겠습니까?`}
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                disabled={loginBusy}
+                onClick={() => setDeviceConflict(null)}
+                className="flex-1 rounded-xl border border-slate-200 bg-white py-3 text-[14px] font-semibold text-slate-700"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={loginBusy}
+                onClick={() => {
+                  setDeviceConflict(null);
+                  void handleSubmitLogin({ forceLogoutOther: true });
+                }}
+                className="flex-1 rounded-xl bg-blue-600 py-3 text-[14px] font-semibold text-white disabled:opacity-70"
+              >
+                {loginBusy ? "처리 중…" : "로그아웃 후 로그인"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
