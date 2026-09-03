@@ -3102,9 +3102,11 @@ function App() {
     /* 네이티브가 이미 ON 이면 웹이 false 로 덮어쓰지 않음 (권한 다이얼로그만 켠 경우) */
     (async () => {
       try {
-        const { readLetteringPermissionStatus, ensureCallDetectionForBroadcast } = await import(
-          "./lib/letteringSettings.js"
-        );
+        const {
+          readLetteringPermissionStatus,
+          ensureCallDetectionForBroadcast,
+          healCallDetectionIfNeeded
+        } = await import("./lib/letteringSettings.js");
         const { readVcidBroadcastOn, readDccBroadcastOn } = await import("./lib/bizcardAccountSync.js");
         const st = readLetteringPermissionStatus();
         if (st?.letteringEnabled && !readLetteringEnabled()) {
@@ -3114,6 +3116,16 @@ function App() {
         /* 쇼케이스/명함 송출이 켜져 있으면 통화 감지 서비스도 반드시 ON */
         if (readVcidBroadcastOn() || readDccBroadcastOn()) {
           ensureCallDetectionForBroadcast(true);
+          const health = healCallDetectionIfNeeded({
+            broadcastOn: true,
+            nativeStatus: st
+          });
+          if (!health.healthy) {
+            setBottomToast(
+              health.issues[0] || "통화 감지가 꺼져 있습니다. 프로필에서 「지금 켜기」를 눌러 주세요."
+            );
+            setTimeout(() => setBottomToast(""), 4500);
+          }
           return;
         }
       } catch {
@@ -3126,6 +3138,28 @@ function App() {
       }
       writeLetteringEnabled(readLetteringEnabled());
     })();
+  }, []);
+
+  useEffect(() => {
+    const onFg = (e) => {
+      void (async () => {
+        try {
+          const m = await import("./lib/letteringSettings.js");
+          const { readVcidBroadcastOn, readDccBroadcastOn } = await import("./lib/bizcardAccountSync.js");
+          if (!(readVcidBroadcastOn() || readDccBroadcastOn())) return;
+          const st = e?.detail?.letteringStatus || m.readLetteringPermissionStatus();
+          const health = m.healCallDetectionIfNeeded({ broadcastOn: true, nativeStatus: st });
+          if (!health.healthy && health.issues[0]) {
+            setBottomToast(health.issues[0]);
+            setTimeout(() => setBottomToast(""), 4000);
+          }
+        } catch {
+          /* ignore */
+        }
+      })();
+    };
+    window.addEventListener("vlue-app-foreground", onFg);
+    return () => window.removeEventListener("vlue-app-foreground", onFg);
   }, []);
 
   /* 재설치 후 세션만 남은 경우 — 빈 로컬 명함·쇼케이스를 서버에서 복원 */

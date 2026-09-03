@@ -743,7 +743,10 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
     override fun onResume() {
         super.onResume()
-        dispatchWebCustomEvent("vlue-app-foreground", """{"reason":"resume"}""")
+        /* 앱 복귀 시 통화 감지 FGS 재동기화 — 사용자가 모르게 꺼진 상태 복구 */
+        LetteringCallMonitorService.syncWithPrefs(this)
+        val status = LetteringPermissionHelper.statusJson(this)
+        dispatchWebCustomEvent("vlue-app-foreground", """{"reason":"resume","letteringStatus":$status}""")
         VlueFamilyBridge.attachWebView(webView)
         if (FamilyPermissionHelper.allGranted(this)) {
             scanRemoteApps()

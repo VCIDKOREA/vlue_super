@@ -32,6 +32,7 @@ class LetteringCallMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        running = true
         VlueBigPushTrace.bind(this)
         createChannel()
         VlueForegroundHelper.start(this, NOTIFICATION_ID, buildNotification())
@@ -49,6 +50,7 @@ class LetteringCallMonitorService : Service() {
     }
 
     override fun onDestroy() {
+        running = false
         unregisterCallCallback()
         super.onDestroy()
     }
@@ -186,6 +188,12 @@ class LetteringCallMonitorService : Service() {
         private const val TAG = "LetteringCallMonitor"
         private const val CHANNEL_ID = "vlue_lettering_monitor"
         private const val NOTIFICATION_ID = 41002
+
+        @Volatile
+        var running: Boolean = false
+            private set
+
+        fun isRunning(): Boolean = running
 
         fun syncWithPrefs(context: Context) {
             val app = context.applicationContext

@@ -1,4 +1,5 @@
 export const LETTERING_ENABLED_KEY = "vlue_lettering_enabled";
+export const CALL_DETECTION_HEALTH_EVENT = "vlue-call-detection-health";
 
 export function readLetteringEnabled() {
   try {
@@ -51,6 +52,11 @@ export function ensureCallDetectionForBroadcast(on) {
     if (st && st.callOverlayReady === false) {
       requestLetteringPermissions();
     }
+  } catch {
+    /* ignore */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(CALL_DETECTION_HEALTH_EVENT));
   } catch {
     /* ignore */
   }
@@ -122,4 +128,61 @@ export function readLetteringPermissionStatus() {
   } catch {
     return null;
   }
+}
+
+/**
+ * 송출 ON인데 통화 감지가 꺼졌는지 — 사용자에게 보여줄 상태.
+ * @param {{ broadcastOn?: boolean, nativeStatus?: object|null }} [opts]
+ */
+export function getCallDetectionHealth(opts = {}) {
+  let broadcastOn = opts.broadcastOn;
+  if (broadcastOn == null) {
+    try {
+      const vcid = localStorage.getItem("vcid") === "true";
+      const dccRaw = localStorage.getItem("vlue_dcc_broadcast_on");
+      const dcc = dccRaw === "1" || dccRaw === "true";
+      broadcastOn = vcid || dcc;
+    } catch {
+      broadcastOn = false;
+    }
+  }
+  const st = opts.nativeStatus ?? readLetteringPermissionStatus();
+  const webLettering = readLetteringEnabled();
+  const letteringEnabled = st?.letteringEnabled === true || (st == null && webLettering);
+  const callOverlayReady = st == null ? true : st.callOverlayReady === true;
+  const callMonitorRunning = st?.callMonitorRunning === true;
+  const issues = [];
+  if (broadcastOn && !letteringEnabled) {
+    issues.push("통화 감지가 꺼져 있습니다. 빅푸시가 표시되지 않습니다.");
+  }
+  if (broadcastOn && letteringEnabled && st && !callOverlayReady) {
+    issues.push("전화·오버레이 권한이 필요합니다.");
+  }
+  if (broadcastOn && letteringEnabled && st && callOverlayReady && st.callMonitorRunning === false) {
+    issues.push("백그라운드 통화 감지가 중지되어 있습니다.");
+  }
+  const healthy =
+    !broadcastOn ||
+    (letteringEnabled &&
+      callOverlayReady &&
+      (st == null || callMonitorRunning || st.callMonitorRunning == null));
+  return {
+    broadcastOn: Boolean(broadcastOn),
+    letteringEnabled: Boolean(letteringEnabled),
+    callOverlayReady: Boolean(callOverlayReady),
+    callMonitorRunning: Boolean(callMonitorRunning),
+    healthy: Boolean(healthy),
+    issues,
+    nativeStatus: st
+  };
+}
+
+/** 문제 있으면 자동 복구 시도 후 health 반환 */
+export function healCallDetectionIfNeeded(opts = {}) {
+  const before = getCallDetectionHealth(opts);
+  if (!before.broadcastOn) return before;
+  if (!before.letteringEnabled || !before.callOverlayReady) {
+    ensureCallDetectionForBroadcast(true);
+  }
+  return getCallDetectionHealth(opts);
 }

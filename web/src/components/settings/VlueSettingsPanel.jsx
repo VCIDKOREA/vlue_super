@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import LetteringSettingsSection from "../LetteringSettingsSection.jsx";
+import CallDetectionStatusBanner from "../CallDetectionStatusBanner.jsx";
 import {
   readAppSettings,
   writeAppSettings,
@@ -740,6 +741,13 @@ export default function VlueSettingsPanel({
             onChange={(next) => onToggleDccBroadcast?.(next)}
             isDarkMode={isDarkMode}
           />
+          <div className="px-1 pb-2 pt-2">
+            <CallDetectionStatusBanner
+              isDarkMode={isDarkMode}
+              broadcastOn={Boolean(isVCIDOn || dccBroadcastOn)}
+              onNotice={showSettingNotice}
+            />
+          </div>
           {!isVCIDOn ? (
             <>
               <SettingsDivider isDarkMode={isDarkMode} />

@@ -39,6 +39,7 @@ import {
   resolveActiveRegion
 } from "../lib/activeRegion.js";
 import { openNativeAppSettings, ensureCallDetectionForBroadcast } from "../lib/letteringSettings.js";
+import CallDetectionStatusBanner from "./CallDetectionStatusBanner.jsx";
 import { useDccFeatureAccess } from "../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../lib/dccAccessPolicy.js";
 import {
@@ -895,6 +896,16 @@ function ProfilePanel({
               </label>
             </div>
           </div>
+          {isVCIDOn || dccBroadcastOn ? (
+            <div className="mt-3 px-1">
+              <CallDetectionStatusBanner
+                isDarkMode={isDarkMode}
+                broadcastOn
+                compact
+                onNotice={showSettingNotice}
+              />
+            </div>
+          ) : null}
           {v1AppShell.familyProtection && tierUi.parts?.familyStatus ? (
             <FamilyProtectionActionButton
               active={familyProtectionActive}

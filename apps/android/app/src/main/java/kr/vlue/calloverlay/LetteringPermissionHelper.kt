@@ -189,6 +189,7 @@ object LetteringPermissionHelper {
         )
         o.put("allRuntime", hasCallDetectPermissions(context))
         o.put("letteringEnabled", LetteringPrefs.isLetteringEnabled(context))
+        o.put("callMonitorRunning", LetteringCallMonitorService.isRunning())
         o.put("defaultDialer", kr.vlue.calloverlay.incall.DialerRoleHelper.isDefaultDialer(context))
         o.put("inCallBound", kr.vlue.calloverlay.incall.VlueInCallController.isDefaultDialerBound())
         o.put("lastCallEvent", LetteringPrefs.getLastCallEvent(context))

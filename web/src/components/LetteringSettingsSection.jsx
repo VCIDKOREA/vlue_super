@@ -4,6 +4,7 @@ import {
   requestLetteringPermissions,
   writeLetteringEnabled
 } from "../lib/letteringSettings.js";
+import CallDetectionStatusBanner from "./CallDetectionStatusBanner.jsx";
 
 /** 메인 앱 설정 — VLUE 레터링 켜기/끄기 + 권한 유도 */
 export default function LetteringSettingsSection({
@@ -36,7 +37,7 @@ export default function LetteringSettingsSection({
       setBusy(false);
       if (perm.ok) {
         onNotice?.(
-          "레터링이 켜졌습니다. 전화·통화기록·「다른 앱 위에 표시」권한을 허용해 주세요."
+          "레터링이 켜졌습니다. 전화·통화기록·「다른 앱 위에 표시」권한을 허용해 주세요. 알림창에 「통화 감지」가 뜨면 정상입니다."
         );
       } else {
         onNotice?.(
@@ -54,14 +55,17 @@ export default function LetteringSettingsSection({
   return (
     <div className={`rounded-2xl border p-3 ${border}`}>
       <p className={`mb-1 text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
-        VLUE 레터링
+        VLUE 레터링 · 통화 감지
       </p>
       <p className={`mb-3 text-[11px] leading-snug ${hint}`}>
         통화 수·발신 시 VLUE 인증 명함·쇼케이스를 표시합니다. 꺼두면 백그라운드 감시가 중지됩니다.
         <br />
-        ※ 「다른 앱 위에 표시」는 필수입니다. VLUE는 기본 전화 앱이 아니며, 삼성 전화 앱 위에 오버레이로
-        쇼케이스를 띄웁니다.
+        ※ 정상 동작 시 알림창에 「VLUE 통화 감지」가 나타납니다. 삼성 「백그라운드 실행」목록에 없어도 알림만
+        있으면 됩니다.
       </p>
+      <div className="mb-3">
+        <CallDetectionStatusBanner isDarkMode={isDarkMode} onNotice={onNotice} />
+      </div>
       <label className={`flex items-center justify-between text-[12px] font-semibold ${label}`}>
         레터링 기능 켜기
         <input
