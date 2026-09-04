@@ -57,20 +57,23 @@ function spaUrlFor(digits: string) {
   return `${getVluePublicOrigin()}/site/web/showcase/${encodeURIComponent(digits)}`;
 }
 
+function sanitizeShareToken(cacheKey = "") {
+  return String(cacheKey || "")
+    .replace(/\.(jpe?g|png|gif|webp|avif|bmp|svg)([?#].*)?$/i, "")
+    .replace(/[^\w-]/g, "")
+    .slice(0, 40);
+}
+
 function shareUrlFor(digits: string, cacheKey = "") {
   const base = `${getVlueShareOrigin()}/showcase/${encodeURIComponent(digits)}`;
-  const v = String(cacheKey || "")
-    .replace(/[^\w.-]/g, "")
-    .slice(-40);
+  const v = sanitizeShareToken(cacheKey);
   /* 카카오는 ?v= 쿼리를 무시하고 경로 단위로 OG 캐시하는 경우가 많음 → /t/{token} 경로 사용 */
   return v ? `${base}/t/${encodeURIComponent(v)}` : base;
 }
 
 function coverUrlFor(digits: string, cacheKey = "") {
   const base = `${getVlueShareOrigin()}/showcase/${encodeURIComponent(digits)}`;
-  const v = String(cacheKey || "")
-    .replace(/[^\w.-]/g, "")
-    .slice(-40);
+  const v = sanitizeShareToken(cacheKey);
   return v
     ? `${base}/t/${encodeURIComponent(v)}/cover.jpg`
     : `${base}/cover.jpg`;
@@ -100,9 +103,13 @@ function coverCacheKey(meta: {
     h = Math.imul(h, 16777619);
   }
   const hash = (h >>> 0).toString(36);
-  const tail = media.replace(/[^\w.-]/g, "").slice(-28);
-  const key = `${hash}-${tail || "v"}`.replace(/[^\w.-]/g, "");
-  return key.slice(0, 48) || String(Date.now());
+  /* 파일명 확장자(.jpg 등)를 토큰에 넣으면 카톡이 이미지 URL로 오인 */
+  const mediaStem = media
+    .replace(/\.[a-zA-Z0-9]{2,5}([?#].*)?$/, "")
+    .replace(/[^\w-]/g, "");
+  const tail = mediaStem.slice(-20);
+  const key = `${hash}${tail ? `-${tail}` : ""}`.replace(/[^\w-]/g, "");
+  return key.slice(0, 40) || String(Date.now());
 }
 
 function sendOgHtml(c: Context, html: string) {

@@ -136,9 +136,11 @@ export function buildPublicShowcaseUrl(phone, cacheKey = "") {
   const local = digits.startsWith("82") ? `0${digits.slice(2)}` : digits;
   if (!local) return "";
   const base = `${origin}/showcase/${encodeURIComponent(local)}`;
+  /* .jpg 등으로 끝나면 메신저가 이미지로 오인 — 확장자·점 제거 */
   const v = String(cacheKey || "")
-    .replace(/[^\w.-]/g, "")
-    .slice(-40);
+    .replace(/\.(jpe?g|png|gif|webp|avif|bmp|svg)([?#].*)?$/i, "")
+    .replace(/[^\w-]/g, "")
+    .slice(0, 40);
   /* 카카오 OG는 ?query 캐시 무시가 잦음 → /t/{token} 경로로 무효화 */
   return v ? `${base}/t/${encodeURIComponent(v)}` : base;
 }

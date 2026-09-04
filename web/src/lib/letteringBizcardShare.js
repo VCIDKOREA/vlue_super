@@ -17,7 +17,8 @@ import {
 import { isPaidLetteringTier } from "./letteringMembership.js";
 import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
 
-/** 공유 URL /t/{token} — 사진·명함 정보 바뀌면 토큰도 바뀌어 카카오 OG 캐시 우회 */
+/** 공유 URL /t/{token} — 사진·명함 정보 바뀌면 토큰도 바뀌어 카카오 OG 캐시 우회.
+ * 토큰에 .jpg 등이 붙으면 메신저가 이미지 URL로 오인하므로 확장자·점은 넣지 않는다. */
 export function buildShowcaseShareCacheKey(parts = {}) {
   const media = String(
     parts.titlePhotoUrl || parts.shareCoverUrl || parts.media || ""
@@ -36,9 +37,12 @@ export function buildShowcaseShareCacheKey(parts = {}) {
     h = Math.imul(h, 16777619);
   }
   const hash = (h >>> 0).toString(36);
-  const tail = media.replace(/[^\w.-]/g, "").slice(-28);
-  const key = `${hash}-${tail || "v"}`.replace(/[^\w.-]/g, "");
-  return key.slice(0, 48) || String(Date.now());
+  const mediaStem = media
+    .replace(/\.[a-zA-Z0-9]{2,5}([?#].*)?$/, "")
+    .replace(/[^\w-]/g, "");
+  const tail = mediaStem.slice(-20);
+  const key = `${hash}${tail ? `-${tail}` : ""}`.replace(/[^\w-]/g, "");
+  return key.slice(0, 40) || String(Date.now());
 }
 
 function canShareFiles(file) {
