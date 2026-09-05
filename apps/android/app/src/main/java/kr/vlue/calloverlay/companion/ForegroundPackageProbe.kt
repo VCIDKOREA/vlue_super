@@ -123,9 +123,23 @@ object ForegroundPackageProbe {
         if (inCallImportance != null &&
             inCallImportance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
         ) {
-            /* 미니 수신도 InCall FOREGROUND 유지 — tasksFull 없으면 FULL 금지 */
             if (tasksFull) return RingingSurface.FULL_INCALL
-            return RingingSurface.HOME_OR_OTHER
+            /* 최근 resume 가 전체 InCallActivity → 풀 수신 (tasks null 이어도 TOP) */
+            if (resumedFull && !tasksDialer) return RingingSurface.FULL_INCALL
+            if (resumedDialer || tasksDialer) return RingingSurface.COMPACT_DIALER
+            if (otherForegroundPackages.isNotEmpty()) return RingingSurface.HOME_OR_OTHER
+            if (OverlayContextDetector.isLikelyLauncherPackage(lastResumedPkg) ||
+                isKnownOtherAppPackage(lastResumedPkg) ||
+                OverlayContextDetector.isLikelyLauncherPackage(tasksPkg) ||
+                isKnownOtherAppPackage(tasksPkg)
+            ) {
+                return RingingSurface.HOME_OR_OTHER
+            }
+            /*
+             * InCall 만 FOREGROUND · 타앱 resume 없음 → 전체 수신 UI.
+             * (이전: tasksFull 없으면 무조건 HOME → 풀 UI 중앙 파란 줄)
+             */
+            return RingingSurface.FULL_INCALL
         }
 
         if (otherForegroundPackages.isNotEmpty()) {
@@ -146,8 +160,20 @@ object ForegroundPackageProbe {
 
         /* VLUE 전면 = 미니 팝업 위. 미확인(usage 없음)이어도 BELOW — TOP 이면 미니 UI 와 겹침 */
         if (ourApp) return RingingSurface.HOME_OR_OTHER
-        /* 미확인 → TOP. 하단이면 Samsung 전체 수신 UI 버튼을 가린다. */
-        return RingingSurface.FULL_INCALL
+        /*
+         * InCall 프로세스만 눈에 띄고 타앱/다이얼러 task 없으면 전체 수신 UI 가능성 → FULL.
+         * 완전 미확인(importance null)은 BELOW — 장기 등 타앱 위 미니에서 중앙 파란 줄 방지.
+         */
+        if (inCallImportance != null &&
+            inCallImportance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE &&
+            otherForegroundPackages.isEmpty() &&
+            !tasksDialer &&
+            tasksPkg == null &&
+            lastResumedPkg == null
+        ) {
+            return RingingSurface.FULL_INCALL
+        }
+        return RingingSurface.HOME_OR_OTHER
     }
 
     fun classifyRingingSurface(context: Context, ourApp: Boolean): RingingSurface {
@@ -292,6 +318,13 @@ object ForegroundPackageProbe {
         return p.contains("systemui") ||
             p.contains("permissioncontroller") ||
             p.contains("packageinstaller") ||
+            p.contains("biometrics") ||
+            p.contains("biometric") ||
+            p.contains("fingerprint") ||
+            p.contains("faceunlock") ||
+            p.contains("keyguard") ||
+            p.contains("samsungpass") ||
+            p.contains("authfw") ||
             p == "android" ||
             p.startsWith("com.android.systemui")
     }

@@ -1031,17 +1031,43 @@ class CallOverlayService : Service() {
                 )
                 return
             }
+            /*
+             * 조회 중 수화: onAnswer(SHOWCASE) 하면 빈 풀스크린. 주소록이면 즉시 안심케어 팝업.
+             * 아니면 빅푸시 유지 + hold — 이후 unmatched/timeout 이 contact_safe_care 로 승격.
+             */
             remoteConnected = true
-            companion.onAnswer(OverlayContext.IN_CALL)
-            hideCompanionOverlayChrome()
-            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 8_000L
+            val contactName = DeviceContactsReader.findDisplayName(this, currentPhone)
+            if (!contactName.isNullOrBlank()) {
+                val verdict = CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
+                val json = ContactSafeCarePayload.toJson(currentPhone, contactName, verdict)
+                pendingCardJson = json
+                pendingVerified = false
+                bindDcpRoute(currentPhone, verdict.routeQuery, json)
+                VlueBigPushTrace.lifecycle(
+                    "ANSWER_PROMOTE_CONTACT_SAFE_CARE",
+                    "pending→contact name=$contactName source=$source"
+                )
+                presentCenterSafePopup(source = source, authMember = false)
+                return
+            }
+            VlueBigPushTrace.lifecycle(
+                "ANSWER_KEEP_BIGPUSH_PENDING",
+                "lookup still pending — hold BigPush (no onAnswer) source=$source"
+            )
             return
         }
         if (!pendingVerified && !parseIsVerified(pendingCardJson) && !source.startsWith("bigPush_bar_tap")) {
+            if (isContactSafeCare(pendingCardJson)) {
+                presentCenterSafePopup(source = source, authMember = false)
+                return
+            }
             remoteConnected = true
-            companion.onAnswer(OverlayContext.IN_CALL)
-            hideCompanionOverlayChrome()
-            syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+            showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 8_000L
+            VlueBigPushTrace.lifecycle(
+                "ANSWER_KEEP_BIGPUSH_UNVERIFIED",
+                "unverified non-contact — hold BigPush (no onAnswer) source=$source"
+            )
             return
         }
         VlueBigPushTrace.milestone(
@@ -1146,15 +1172,14 @@ class CallOverlayService : Service() {
                 bigPushPeeking = false
                 bigPushPeekTab?.visibility = android.view.View.GONE
                 nativeBanner?.visibility = android.view.View.GONE
-                if (isContactSafeCare(pendingCardJson)) {
-                    hideCompanionOverlayChrome()
-                    syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
-                } else {
-                    webView?.visibility = android.view.View.VISIBLE
-                    rootContainer?.setBackgroundColor(Color.TRANSPARENT)
-                    webView?.setBackgroundColor(Color.TRANSPARENT)
-                    removeDcpPopupWindow()
-                }
+                /*
+                 * 안심케어 확인 후에도 인증회원과 동일하게 MiniCase WebView 유지.
+                 * (이전: contactSafeCare 이면 hideChrome → 검정 빈 창/종료 후에도 잔존)
+                 */
+                webView?.visibility = android.view.View.VISIBLE
+                rootContainer?.setBackgroundColor(Color.TRANSPARENT)
+                webView?.setBackgroundColor(Color.TRANSPARENT)
+                removeDcpPopupWindow()
             }
             OverlayState.IDLE -> {
                 bigPushPeeking = false
@@ -1557,11 +1582,12 @@ class CallOverlayService : Service() {
         val pausedOrGone = activity.isBlank() || activity.contains("(paused)", ignoreCase = true)
         val ourApp = activity.contains("kr.vlue", ignoreCase = true) && !pausedOrGone
 
-        /* RINGING: 전체 UI vs 홈·다른앱 — UsageEvents ACTIVITY_RESUMED 1차 (DUT 증거) */
+        /* RINGING: 미니 카드 → BELOW, 전체 수신 UI → TOP (앱 종류 무관) */
         if (phase == OverlayContextDetector.CallPhase.RINGING) {
             /*
-             * 삼성 통화 목록·다이얼러 발신은 항상 전체 InCallActivity.
-             * UsageStats 미허용·contacts last-resume 오판으로 BOTTOM 두면 종료 버튼을 가린다.
+             * 발신 다이얼링은 항상 전체 InCallUI.
+             * 수신: surface 로 미니/풀 구분 — tasks 만으로 confirmedFull 하면
+             * 삼성 전체 UI 에서 tasks=null → BELOW → 화면 중앙 파란 줄.
              */
             if (currentOutgoing) {
                 android.util.Log.i(
@@ -1587,17 +1613,13 @@ class CallOverlayService : Service() {
             val ctx = when (surface) {
                 ForegroundPackageProbe.RingingSurface.FULL_INCALL ->
                     OverlayContext.INCOMING_CALL_UI
-                /*
-                 * 미니 수신(다이얼러·HUN·VLUE/홈 위 팝업) → 팝업 바로 아래.
-                 * TOP 이면 삼성 미니 UI 뒤로 들어가 홈 미리보기만 보이므로 BELOW 고정.
-                 */
                 ForegroundPackageProbe.RingingSurface.COMPACT_DIALER,
                 ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER ->
                     OverlayContext.COMPACT_INCOMING
             }.let { resolved ->
                 /*
-                 * VLUE 전면 + task 가 전체 InCallUI 가 아니면 미니 — 단 resumed 가
-                 * InCallActivity 이면 풀 UI(TOP) 유지 (중앙 빅푸시 버그 방지).
+                 * VLUE 전면 + 전체 InCall task/resume 아님 → 미니(BELOW).
+                 * resumed 가 InCallActivity 이면 풀 UI(TOP) 유지.
                  */
                 if (ourApp &&
                     resolved == OverlayContext.INCOMING_CALL_UI &&
@@ -1614,14 +1636,7 @@ class CallOverlayService : Service() {
                     "resumed=$resumedPkg tasks=$tasksPkg inCallImp=${hints.inCallImportance} " +
                     "otherFg=${hints.otherForegroundPackages.joinToString(",")} " +
                     "usageAccess=${UsageAccessHelper.hasAccess(this)}"
-            /* Diagnostics 세션 없어도 반드시 남김 — TOP/BOTTOM 원인 추적 */
             android.util.Log.i("VlueOverlayCtx", detail)
-            if (!UsageAccessHelper.hasAccess(this)) {
-                android.util.Log.w(
-                    "VlueOverlayCtx",
-                    "PACKAGE_USAGE_STATS denied — InCallActivity resume unknown; BigPush defaults TOP"
-                )
-            }
             VlueBigPushTrace.lifecycle("OVERLAY_CONTEXT", detail)
             return ctx
         }
@@ -1756,8 +1771,44 @@ class CallOverlayService : Service() {
             pendingVerified = verified
             bindDcpRoute(phone, dcpRoute, cardJson)
             if (isContactSafeCare(cardJson)) {
-                hideCompanionOverlayChrome()
-                syncDcpRoutePopup(cardJson, currentDcpRoute)
+                /* 링잉: 빅푸시 바 유지(회원과 동일 페인트). 팝업만 수화 후. */
+                val banner = nativeBanner
+                if (banner != null) {
+                    BigPushShowcaseBar.bind(banner, phone, verified, outgoing, cardJson)
+                }
+                val wv = webView
+                if (wv != null && !IncomingNumberResolver.isUnknown(phone)) {
+                    if (phoneChanged || wv.url.isNullOrBlank()) {
+                        loadOverlayDocument(
+                            wv,
+                            phone,
+                            verified,
+                            outgoing,
+                            cardJson,
+                            forceNewDocument = phoneChanged
+                        )
+                    } else if (!cardJson.isNullOrBlank()) {
+                        injectCardLookupJson(wv, cardJson)
+                    }
+                    if (companion.state == OverlayState.BIG_PUSH) {
+                        notifyWebCallState("big_push_bar")
+                    }
+                }
+                if (isCallAlreadyAnswered() || companion.state == OverlayState.SHOWCASE) {
+                    if (authPopupConfirmedToMini ||
+                        userMinimized ||
+                        companion.state == OverlayState.MINI_CASE
+                    ) {
+                        LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
+                        return@post
+                    }
+                    presentCenterSafePopup(source = "applyCallInfoUpdate", authMember = false)
+                } else {
+                    VlueBigPushTrace.lifecycle(
+                        "CONTACT_SAFE_CARE_HOLD_BIGPUSH",
+                        "ringing — keep BigPush bar phone=${ReleaseDebugGate.maskPhoneForLog(phone)}"
+                    )
+                }
                 LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
                 return@post
             }
@@ -2056,9 +2107,8 @@ class CallOverlayService : Service() {
                     /* enterMini 가 가드 설정 후 팝업 제거 — remove 먼저 하면 BigPush 레이스 */
                     enterMiniCaseAfterAuthPopupConfirm()
                 } else if (spec.contactSafeCare) {
-                    authPopupOnlyMode = false
-                    showcaseHoldUntilElapsed = 0L
-                    removeDcpPopupWindow()
+                    /* 정상 팝업 확인 → MiniCase (인증회원과 동일 UX) */
+                    enterMiniCaseAfterAuthPopupConfirm()
                 } else if (spec.fromMock || dcpPopupOnly) {
                     authPopupOnlyMode = false
                     dcpPopupOnly = false
@@ -3404,7 +3454,13 @@ class CallOverlayService : Service() {
          * BELOW 핀이 풀려 미니 수신 뒤로 TOP 겹침 (연속 수신·다이얼러 최근기록).
          */
         val confirmedFullInCall =
-            OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg)
+            OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg) ||
+                (OverlayContextDetector.isLikelyFullInCallUiPackage(
+                    ForegroundPackageProbe.lastResumedPackage(this)
+                ) &&
+                    !OverlayContextDetector.isLikelyDialerPackage(tasksPkg) &&
+                    !OverlayContextDetector.isLikelyLauncherPackage(tasksPkg) &&
+                    !ourAppForeground)
         val ctx = OverlayPositionManager.holdBelowCompactIncoming(
             previous = prevPos,
             previousContext = prevCtx,

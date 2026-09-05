@@ -7,12 +7,34 @@ import org.junit.Test
 
 class ContactSafeCarePolicyTest {
     @Test
-    fun ringing_showsInsteadOfUnverified() {
-        assertTrue(
+    fun ringing_doesNotShowWhileBigPush() {
+        assertFalse(
             ContactSafeCarePolicy.shouldShow(
                 profileKind = ContactSafeCarePayload.PROFILE_KIND,
                 overlayState = OverlayState.BIG_PUSH,
                 popupOnly = false
+            )
+        )
+    }
+
+    @Test
+    fun answered_showsOnShowcase() {
+        assertTrue(
+            ContactSafeCarePolicy.shouldShow(
+                profileKind = ContactSafeCarePayload.PROFILE_KIND,
+                overlayState = OverlayState.SHOWCASE,
+                popupOnly = false
+            )
+        )
+    }
+
+    @Test
+    fun popupOnly_alwaysShows() {
+        assertTrue(
+            ContactSafeCarePolicy.shouldShow(
+                profileKind = ContactSafeCarePayload.PROFILE_KIND,
+                overlayState = OverlayState.BIG_PUSH,
+                popupOnly = true
             )
         )
     }

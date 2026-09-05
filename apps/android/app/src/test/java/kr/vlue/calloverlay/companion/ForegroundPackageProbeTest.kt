@@ -235,10 +235,10 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun inCallForegroundAlone_nullTasks_isBelow_notFull() {
-        /* 미니 수신도 InCall FOREGROUND — FG alone ≠ 전체 UI */
+    fun inCallForegroundAlone_nullTasks_isFullIncoming() {
+        /* InCall FG alone · resume/tasks 없음 → 전체 수신 UI (중앙 BELOW/파란줄 금지) */
         assertEquals(
-            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
+            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
             ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = null,
                 inCallImportance = fg,
@@ -249,9 +249,9 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun unknown_defaultsToTop() {
+    fun unknown_defaultsToBelowMini() {
         assertEquals(
-            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
+            ForegroundPackageProbe.RingingSurface.HOME_OR_OTHER,
             ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = null,
                 inCallImportance = null,

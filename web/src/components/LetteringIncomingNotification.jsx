@@ -1224,33 +1224,42 @@ export default function LetteringIncomingNotification({
   }
 
   if (isContactSafeCare) {
-    const contactName =
-      String(c.displayName || c.name || savedContactName || knownContact.matchedName || "").trim() ||
-      incoming;
-    return (
-      <AgencyDcpMiniPopup
-        open
-        card={{
-          ...c,
-          name: contactName,
-          displayName: contactName,
-          dcp: { ...(c.dcp || {}), contactSafeCare: true, contactName }
-        }}
-        incomingNumber={incoming}
-        abnormal={String(c?.dcp?.routeStatus || "") === "abnormal"}
-        contactSafeCare
-        warning={c?.dcp?.warning}
-        onClose={() => {
-          try {
-            window.Android?.dismissOverlay?.();
-            window.VlueLettering?.dismissOverlay?.();
-          } catch {
-            /* ignore */
-          }
-        }}
-        onShareShowcase={() => openShowcaseSmsCompose(incoming)}
-      />
-    );
+    /*
+     * 미리보기/웹 데모만 인라인 안심케어 팝업.
+     * 네이티브 BigPush(forceShowcaseBar)·통화 오버레이에서는 바 UI를 유지하고,
+     * 수화 후 정상 팝업은 네이티브 presentCenterSafePopup 이 담당한다.
+     * (이전: AgencyDcpMiniPopup 을 156dp 창에 포털 → 중앙 파란 줄)
+     */
+    if (previewMode && !forceShowcaseBar && !fromCallHistory) {
+      const contactName =
+        String(c.displayName || c.name || savedContactName || knownContact.matchedName || "").trim() ||
+        incoming;
+      return (
+        <AgencyDcpMiniPopup
+          open
+          card={{
+            ...c,
+            name: contactName,
+            displayName: contactName,
+            dcp: { ...(c.dcp || {}), contactSafeCare: true, contactName }
+          }}
+          incomingNumber={incoming}
+          abnormal={String(c?.dcp?.routeStatus || "") === "abnormal"}
+          contactSafeCare
+          warning={c?.dcp?.warning}
+          onClose={() => {
+            try {
+              window.Android?.dismissOverlay?.();
+              window.VlueLettering?.dismissOverlay?.();
+            } catch {
+              /* ignore */
+            }
+          }}
+          onShareShowcase={() => openShowcaseSmsCompose(incoming)}
+        />
+      );
+    }
+    /* 네이티브 링잉/통화 — 아래 live-bar 로 fall-through */
   }
 
   if (useCompanionDelegate && !isExpandedView) {
@@ -1317,9 +1326,11 @@ export default function LetteringIncomingNotification({
             ? "paid"
             : isFreeMember
               ? "free"
-              : isUnverified
-                ? "unverified"
-                : "none"
+              : isContactSafeCare
+                ? "contact"
+                : isUnverified
+                  ? "unverified"
+                  : "none"
       }
       aria-live="polite"
     >

@@ -139,13 +139,6 @@ class CompanionOverlayController {
         state = OverlayState.BIG_PUSH
         refreshPosition()
         if (position == OverlayPosition.HIDDEN) {
-            /* 삼성 미니 수신 — 링잉 중 겹침 방지. 세션·WebView는 유지, 수락 시 SHOWCASE */
-            if (context == OverlayContext.COMPACT_INCOMING) {
-                lastTransition =
-                    "requestBigPush → BIG_PUSH pos=HIDDEN compactIncoming (deferred visible)"
-                rejectedTransition = null
-                return true
-            }
             rejectedTransition =
                 "requestBigPush: position HIDDEN context=$context screen=${screenState.name}"
             state = OverlayState.IDLE

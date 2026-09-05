@@ -440,8 +440,9 @@ object LetteringCallCoordinator {
                     dataSource = "api_timeout",
                     normalizedOk = normalized != null
                 )
-                Log.w(TAG, "lookup timeout for $masked — keep lookup_pending (no 미인증 paint)")
+                Log.w(TAG, "lookup timeout for $masked — try contact safe-care then keep pending")
                 LetteringPrefs.setLastOverlayError(app, "lookup_timeout:$masked")
+                if (applyContactSafeCareIfSaved(app, raw, outgoing)) return
                 return
             }
             if (!lookup.matched) {

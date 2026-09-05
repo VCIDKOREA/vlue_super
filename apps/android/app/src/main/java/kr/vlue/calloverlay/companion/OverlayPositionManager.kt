@@ -34,9 +34,12 @@ object OverlayPositionManager {
         }
         return when (context) {
             OverlayContext.HOME_SCREEN,
-            OverlayContext.OTHER_APP -> OverlayPosition.BELOW_COMPACT_INCOMING
-            /* 삼성 통화목록·미니 수신 — 빅푸시가 팝업 뒤에 겹침. 링잉 중 숨김, 수락 후 SHOWCASE */
-            OverlayContext.COMPACT_INCOMING -> OverlayPosition.HIDDEN
+            OverlayContext.OTHER_APP,
+            /*
+             * 삼성 미니 수신(다른 앱·홈·다이얼러 위) — 팝업 바로 아래 유지.
+             * (이전 HIDDEN: 상단 잠깐 → ContextWatch COMPACT 후 소멸)
+             */
+            OverlayContext.COMPACT_INCOMING -> OverlayPosition.BELOW_COMPACT_INCOMING
             OverlayContext.INCOMING_CALL_UI -> OverlayPosition.TOP
             OverlayContext.IN_CALL,
             OverlayContext.KEYPAD,
@@ -46,7 +49,7 @@ object OverlayPositionManager {
 
     /**
      * 링잉 빅푸시가 미니 수신 팝업 아래에 붙은 뒤에는 상단(TOP)으로 올리지 않는다.
-     * 단, 삼성 전체 InCallUI(풀 수신)가 확정되면 반드시 TOP — BELOW면 화면 중앙에 떠 겹친다.
+     * 단, 삼성 전체 InCallUI(풀 수신)가 확정되면 반드시 TOP — BELOW면 화면 중앙 파란 줄.
      */
     fun holdBelowCompactIncoming(
         previous: OverlayPosition,
@@ -58,7 +61,7 @@ object OverlayPositionManager {
     ): OverlayContext {
         if (!ringing) return nextContext
         if (nextContext != OverlayContext.INCOMING_CALL_UI) return nextContext
-        /* 풀 수신 UI 확정 → hold 금지 (중간 위치 버그) */
+        /* 풀 수신 UI 확정 → hold 금지 (중앙 BELOW 버그) */
         if (confirmedFullInCall) return OverlayContext.INCOMING_CALL_UI
         if (previous == OverlayPosition.BELOW_COMPACT_INCOMING ||
             previousContext == OverlayContext.COMPACT_INCOMING ||

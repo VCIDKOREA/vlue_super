@@ -23,10 +23,10 @@ class CompanionOverlayControllerTest {
     }
 
     @Test
-    fun requestBigPush_compactIncoming_hiddenUntilAnswer() {
+    fun requestBigPush_compactIncoming_belowUntilAnswer() {
         val c = CompanionOverlayController()
         assertTrue(c.requestBigPush(OverlayContext.COMPACT_INCOMING, callAlreadyAnswered = false))
-        assertEquals(OverlayPosition.HIDDEN, c.position)
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
         assertEquals(OverlayState.BIG_PUSH, c.state)
     }
 
@@ -262,32 +262,32 @@ class CompanionOverlayControllerTest {
         assertEquals(OverlayPosition.TOP, c.position)
     }
 
-    /** 미니 수신 — 링잉 중 HIDDEN, 연속 링잉도 HIDDEN 유지 */
+    /** 미니 수신 — 링잉 중 팝업 바로 아래, 연속 링잉도 BELOW 유지 */
     @Test
-    fun requestBigPush_reRingCompact_staysHidden() {
+    fun requestBigPush_reRingCompact_staysBelow() {
         val c = CompanionOverlayController()
         assertTrue(c.requestBigPush(OverlayContext.COMPACT_INCOMING, callAlreadyAnswered = false))
-        assertEquals(OverlayPosition.HIDDEN, c.position)
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
         assertTrue(c.requestBigPush(OverlayContext.COMPACT_INCOMING, callAlreadyAnswered = false))
-        assertEquals(OverlayPosition.HIDDEN, c.position)
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
     }
 
-    /** HIDDEN 핀 후 풀 InCallUI 확정 시 TOP 복귀 */
+    /** BELOW 핀 후 풀 InCallUI 확정 시 TOP 복귀 */
     @Test
-    fun bigPush_clearsHiddenPin_whenFullIncomingCallUi() {
+    fun bigPush_clearsBelowPin_whenFullIncomingCallUi() {
         val c = CompanionOverlayController()
         assertTrue(c.requestBigPush(OverlayContext.COMPACT_INCOMING, callAlreadyAnswered = false))
-        assertEquals(OverlayPosition.HIDDEN, c.position)
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
         c.updateContext(OverlayContext.INCOMING_CALL_UI)
         assertEquals(OverlayPosition.TOP, c.position)
     }
 
-    /** COMPACT 컨텍스트 유지 시 HIDDEN 유지 */
+    /** COMPACT 컨텍스트 — 미니 수신 팝업 바로 아래 유지 */
     @Test
-    fun bigPush_staysHidden_whileCompactIncomingContext() {
+    fun bigPush_staysBelow_whileCompactIncomingContext() {
         val c = CompanionOverlayController()
         assertTrue(c.requestBigPush(OverlayContext.COMPACT_INCOMING, callAlreadyAnswered = false))
-        assertEquals(OverlayPosition.HIDDEN, c.position)
+        assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
         c.updateContext(OverlayContext.HOME_SCREEN)
         assertEquals(OverlayPosition.BELOW_COMPACT_INCOMING, c.position)
         c.onCallEnd()
