@@ -25,3 +25,25 @@ export async function postPortoneIdentityComplete(payload) {
   }
   return data;
 }
+
+/**
+ * 온보딩 국세청 사업자등록 상태조회 (가입 전)
+ * @returns {Promise<{ ok: true, message: string, statusCode: string, statusLabel: string, source: string }>}
+ */
+export async function postNtsBusinessStatusVerify(payload) {
+  const res = await fetch(apiUrl("/api/identity/nts-business-status"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {})
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.ok === false) {
+    const err = new Error(data?.error || `국세청 조회 실패 (${res.status})`);
+    err.status = res.status;
+    err.code = data?.code;
+    err.statusCode = data?.statusCode;
+    err.statusLabel = data?.statusLabel;
+    throw err;
+  }
+  return data;
+}

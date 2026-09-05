@@ -58,11 +58,14 @@ export async function runAutomatedBusinessOnboarding(
         matched: true,
         source: "mock" as const
       }
-    : await verifyNtsBusinessStatus({
-        businessRegistrationNo: bno,
-        representativeName: rep,
-        openDate
-      });
+    : await verifyNtsBusinessStatus(
+        {
+          businessRegistrationNo: bno,
+          representativeName: rep,
+          openDate
+        },
+        { allowSilentMock: true }
+      );
 
   const autoApproved = Boolean(whitelist || (nts.ok && nts.matched));
   const reviewStatus: OnboardingReviewStatus = autoApproved ? "AUTO_APPROVED" : "MANUAL_REVIEW";

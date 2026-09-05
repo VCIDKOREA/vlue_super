@@ -1586,8 +1586,8 @@ class CallOverlayService : Service() {
         if (phase == OverlayContextDetector.CallPhase.RINGING) {
             /*
              * 발신 다이얼링은 항상 전체 InCallUI.
-             * 수신: surface 로 미니/풀 구분 — tasks 만으로 confirmedFull 하면
-             * 삼성 전체 UI 에서 tasks=null → BELOW → 화면 중앙 파란 줄.
+             * 잠금화면 수신도 삼성 전체 전화 UI — 백그라운드에 앱이 있어도 미니 카드가 아님.
+             * (이전: OTHER_APP/COMPACT → BELOW → 잠금 전체 UI 중앙에 빅푸시)
              */
             if (currentOutgoing) {
                 android.util.Log.i(
@@ -1597,6 +1597,17 @@ class CallOverlayService : Service() {
                 VlueBigPushTrace.lifecycle(
                     "OVERLAY_CONTEXT",
                     "phase=RINGING outgoing=true ctx=INCOMING_CALL_UI"
+                )
+                return OverlayContext.INCOMING_CALL_UI
+            }
+            if (isDeviceKeyguardLocked()) {
+                android.util.Log.i(
+                    "VlueOverlayCtx",
+                    "phase=RINGING keyguardLocked → TOP (full lock-screen InCallUI)"
+                )
+                VlueBigPushTrace.lifecycle(
+                    "OVERLAY_CONTEXT",
+                    "phase=RINGING keyguard=true ctx=INCOMING_CALL_UI"
                 )
                 return OverlayContext.INCOMING_CALL_UI
             }
@@ -1701,6 +1712,16 @@ class CallOverlayService : Service() {
         /* 발신 다이얼 OFFHOOK 는 미연결 — Showcase/Answered 로 취급하지 않음 */
         if (currentOutgoing) return false
         return telephonyCallState() == TelephonyManager.CALL_STATE_OFFHOOK
+    }
+
+    /** 잠금화면(키가드) — 삼성 수신은 항상 전체 전화 UI */
+    private fun isDeviceKeyguardLocked(): Boolean {
+        return try {
+            val kg = getSystemService(KEYGUARD_SERVICE) as? android.app.KeyguardManager
+            kg?.isKeyguardLocked == true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun bannerPrimaryText(phone: String, cardJson: String?): String {
@@ -3454,7 +3475,8 @@ class CallOverlayService : Service() {
          * BELOW 핀이 풀려 미니 수신 뒤로 TOP 겹침 (연속 수신·다이얼러 최근기록).
          */
         val confirmedFullInCall =
-            OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg) ||
+            isDeviceKeyguardLocked() ||
+                OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg) ||
                 (OverlayContextDetector.isLikelyFullInCallUiPackage(
                     ForegroundPackageProbe.lastResumedPackage(this)
                 ) &&

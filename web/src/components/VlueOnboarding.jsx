@@ -6,7 +6,7 @@ import { REFERRAL_PRECAUTION_AGREE, REFERRAL_PRECAUTION_BULLETS, REFERRAL_PRECAU
 import { setVlueSessionTokens } from "../lib/vlueAuthHeaders.js";
 import { logTermsAgreement } from "../lib/termsLog.js";
 import { apiUrl, getApiBase } from "../lib/apiBase.js";
-import { makeDevLocalImpUid, postPortoneIdentityComplete } from "../lib/identityCompleteApi.js";
+import { makeDevLocalImpUid, postPortoneIdentityComplete, postNtsBusinessStatusVerify } from "../lib/identityCompleteApi.js";
 import { approveParentalConsentWithPass, requestParentalConsentToGuardian } from "../lib/parentalConsentApi.js";
 import { requestIamportCertification, consumeIamportCertRedirectResult, shouldUseIamportCertRedirect } from "../lib/iamportClient.js";
 import { getPortoneUserCode } from "../lib/portoneEnv.js";
@@ -156,6 +156,11 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const [passBusinessJobTitle, setPassBusinessJobTitle] = useState("");
   /** 사업자 가입 시 직책 미표시(명함에는 성명만) */
   const [passBusinessNoJobTitle, setPassBusinessNoJobTitle] = useState(false);
+  /** 국세청 대조 — 대표자명·개업일 */
+  const [passBusinessRepName, setPassBusinessRepName] = useState("");
+  const [passBusinessOpenDate, setPassBusinessOpenDate] = useState("");
+  const [bizVerified, setBizVerified] = useState(false);
+  const [bizVerifyBusy, setBizVerifyBusy] = useState(false);
   /** 가입 시 1회 확정(서버 unique). 영문 소문자 시작 3~20자 */
   const [desiredMemberId, setDesiredMemberId] = useState("");
   /** 체크 시 본인인증 완료 API에서 digital_cards 행 생성 */
@@ -190,8 +195,6 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
 
   const [jobType, setJobType] = useState("");
   const [companyLocked, setCompanyLocked] = useState("");
-  const [bizNumber, setBizNumber] = useState("");
-  const [bizVerified, setBizVerified] = useState(false);
   const [licenseNumber, setLicenseNumber] = useState("");
   const [licenseVerified, setLicenseVerified] = useState(false);
   const [creatorPlatform, setCreatorPlatform] = useState("youtube");
@@ -305,7 +308,9 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             ? {
                 businessRegistrationNo: draft.passBusinessRegNo,
                 businessJobTitle: draft.passBusinessNoJobTitle ? "" : draft.passBusinessJobTitle,
-                businessDeclaresNoJobTitle: Boolean(draft.passBusinessNoJobTitle)
+                businessDeclaresNoJobTitle: Boolean(draft.passBusinessNoJobTitle),
+                businessRepresentativeName: draft.passBusinessRepName || null,
+                businessOpenDate: draft.passBusinessOpenDate || null
               }
             : {}),
           ...(draft.adminDeviceKey ? { adminDeviceKey: draft.adminDeviceKey } : {})
@@ -577,6 +582,16 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         if (digits.length !== 10) {
           throw new Error("사업자등록번호 10자리를 입력해 주세요.");
         }
+        if (!String(passBusinessRepName || "").trim()) {
+          throw new Error("대표자명을 입력해 주세요.");
+        }
+        const openDigits = String(passBusinessOpenDate || "").replace(/\D/g, "");
+        if (openDigits.length !== 8) {
+          throw new Error("개업일자를 입력해 주세요.");
+        }
+        if (!bizVerified) {
+          throw new Error("「국세청 대조」로 사업자 인증을 완료해 주세요.");
+        }
         if (!passBusinessNoJobTitle && !String(passBusinessJobTitle || "").trim()) {
           throw new Error("직책을 입력하거나 「직책 없음」을 선택해 주세요.");
         }
@@ -635,6 +650,8 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             passBusinessRegNo: String(passBusinessRegNo || "").replace(/\D/g, "").slice(0, 10),
             passBusinessJobTitle: passBusinessNoJobTitle ? "" : String(passBusinessJobTitle || "").trim(),
             passBusinessNoJobTitle,
+            passBusinessRepName: String(passBusinessRepName || "").trim(),
+            passBusinessOpenDate: String(passBusinessOpenDate || "").replace(/\D/g, "").slice(0, 8),
             allowBizCardOpts: allowBizCardOptsPre,
             adminDeviceKey: adminDeviceKeyPreSave,
             signupIntent
@@ -678,7 +695,9 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
           ? {
               businessRegistrationNo: String(passBusinessRegNo || "").replace(/\D/g, "").slice(0, 10),
               businessJobTitle: passBusinessNoJobTitle ? "" : String(passBusinessJobTitle || "").trim(),
-              businessDeclaresNoJobTitle: passBusinessNoJobTitle
+              businessDeclaresNoJobTitle: passBusinessNoJobTitle,
+              businessRepresentativeName: String(passBusinessRepName || "").trim(),
+              businessOpenDate: String(passBusinessOpenDate || "").replace(/\D/g, "").slice(0, 8)
             }
           : {}),
         ...(adminDeviceKey ? { adminDeviceKey } : {})
@@ -797,15 +816,55 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
     setVerifyZone({ ok: true, text: "현재 사업장 명칭이 추출되어 프로필에 고정 저장됩니다. (데모)" });
   };
 
-  const runBizVerify = () => {
-    if (!String(bizNumber || "").replace(/\D/g, "").slice(0, 10)) {
+  const runBizVerify = async () => {
+    const digits = String(passBusinessRegNo || "").replace(/\D/g, "").slice(0, 10);
+    const rep = String(passBusinessRepName || "").trim();
+    const openDigits = String(passBusinessOpenDate || "").replace(/\D/g, "").slice(0, 8);
+    if (digits.length !== 10) {
       setBizVerified(false);
       setVerifyZone({ ok: false, text: "사업자등록번호 10자리를 입력해 주세요." });
       return;
     }
-    setBizVerified(true);
-    setVerifyZone({ ok: true, text: "국세청 API 대조: 대표자 실명과 PASS 실명 일치 (데모 · Green)" });
+    if (!rep) {
+      setBizVerified(false);
+      setVerifyZone({ ok: false, text: "대표자명을 입력해 주세요." });
+      return;
+    }
+    if (openDigits.length !== 8) {
+      setBizVerified(false);
+      setVerifyZone({ ok: false, text: "개업일자를 입력해 주세요." });
+      return;
+    }
+    setBizVerifyBusy(true);
+    setBizVerified(false);
+    setVerifyZone({ ok: true, text: "국세청 사업자 상태를 조회하는 중…" });
+    try {
+      const data = await postNtsBusinessStatusVerify({
+        businessRegistrationNo: digits,
+        representativeName: rep,
+        openDate: openDigits
+      });
+      setBizVerified(true);
+      const label = data.statusLabel ? ` (${data.statusLabel})` : "";
+      setVerifyZone({
+        ok: true,
+        text: `${data.message || "인증되었습니다."}${label}`
+      });
+    } catch (e) {
+      setBizVerified(false);
+      setVerifyZone({
+        ok: false,
+        text: e?.message || "국세청 조회에 실패했습니다. 잠시 후 다시 시도해 주세요."
+      });
+    } finally {
+      setBizVerifyBusy(false);
+    }
   };
+
+  const invalidateBizVerify = useCallback(() => {
+    setBizVerified(false);
+    setVerifyZone(null);
+  }, []);
 
   const runLicenseVerify = () => {
     if (!licenseNumber.trim()) {
@@ -1576,6 +1635,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                     if (!on) {
                       setPassBusinessNoJobTitle(false);
                       setPassBusinessJobTitle("");
+                      setPassBusinessRepName("");
+                      setPassBusinessOpenDate("");
+                      setBizVerified(false);
+                      setVerifyZone(null);
                     }
                   }}
                   className="mt-0.5 h-4 w-4 shrink-0 rounded border-amber-400 text-amber-700"
@@ -1592,11 +1655,78 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                       type="text"
                       inputMode="numeric"
                       value={passBusinessRegNo}
-                      onChange={(e) => setPassBusinessRegNo(e.target.value)}
+                      onChange={(e) => {
+                        setPassBusinessRegNo(e.target.value);
+                        invalidateBizVerify();
+                      }}
                       placeholder="10자리 (하이픈 생략 가능)"
                       className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[13px] outline-none focus:border-blue-400"
                     />
                   </FormRow>
+                  <FormRow icon={<IconUsers className="h-4 w-4 text-slate-500" />} label="대표자명">
+                    <input
+                      type="text"
+                      value={passBusinessRepName}
+                      onChange={(e) => {
+                        setPassBusinessRepName(e.target.value);
+                        invalidateBizVerify();
+                      }}
+                      placeholder="사업자등록증 대표자 성명"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[13px] outline-none focus:border-blue-400"
+                    />
+                  </FormRow>
+                  <FormRow icon={<IconBriefcase className="h-4 w-4 text-slate-500" />} label="개업일자">
+                    <input
+                      type="date"
+                      value={passBusinessOpenDate}
+                      onChange={(e) => {
+                        setPassBusinessOpenDate(e.target.value);
+                        invalidateBizVerify();
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[13px] outline-none focus:border-blue-400"
+                    />
+                  </FormRow>
+                  <button
+                    type="button"
+                    disabled={bizVerifyBusy || busy}
+                    onClick={runBizVerify}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-emerald-300 bg-emerald-50 py-2.5 text-[13px] font-black text-emerald-950 disabled:opacity-50"
+                  >
+                    {bizVerifyBusy ? (
+                      <>
+                        <span
+                          className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent"
+                          aria-hidden
+                        />
+                        국세청 조회 중…
+                      </>
+                    ) : (
+                      "국세청 대조"
+                    )}
+                  </button>
+                  {verifyZone && passBusinessMember ? (
+                    <div
+                      className={`rounded-xl px-3 py-2 text-[12px] font-bold ${
+                        verifyZone.ok && bizVerified
+                          ? "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200"
+                          : verifyZone.ok
+                            ? "bg-slate-50 text-slate-700"
+                            : "bg-red-50 text-red-800 ring-1 ring-red-200"
+                      }`}
+                      role="status"
+                    >
+                      {bizVerified ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white">
+                            인증됨
+                          </span>
+                          {verifyZone.text}
+                        </span>
+                      ) : (
+                        verifyZone.text
+                      )}
+                    </div>
+                  ) : null}
                   <FormRow icon={<IconUsers className="h-4 w-4 text-slate-500" />} label="직책">
                     <input
                       type="text"
@@ -1621,7 +1751,8 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                     <span>직책 없음 (명함에는 성명만 표시)</span>
                   </label>
                   <p className="text-[10px] leading-relaxed text-slate-500">
-                    직책이 있으면 입력해 주세요. 없으면 위 체크 후 본인인증을 진행하면 명함에는 이름만 나옵니다.
+                    국세청 대조로 계속사업자 인증 후 PASS 본인인증을 진행하세요. 직책이 있으면 입력하고, 없으면 위 체크를
+                    선택하세요.
                   </p>
                 </div>
               ) : null}
