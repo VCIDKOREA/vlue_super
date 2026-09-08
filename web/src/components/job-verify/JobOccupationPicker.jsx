@@ -4,7 +4,7 @@ import {
   groupJobOccupationsByInitial,
   isOtherJobOccupation,
   JOB_OCCUPATION_LIST
-} from "../lib/jobOccupationCatalog.js";
+} from "../../lib/jobOccupationCatalog.js";
 
 /**
  * 직업 선택 리스트 — ㄱ~ㅎ 그룹 + 행정사 아래 기타(직접입력)
