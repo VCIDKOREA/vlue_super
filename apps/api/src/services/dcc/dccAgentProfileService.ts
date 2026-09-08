@@ -160,6 +160,12 @@ export async function listDccAgentProfiles(
   profiles: DccAgentDto[];
   activeId: string | null;
   maxCount: number;
+  entitlement?: {
+    freeSlots: number;
+    paidSlots: number;
+    allowedSlots: number;
+    monthlyKrw: number;
+  };
 }> {
   try {
     let rows = await prisma.userDccAgentProfile.findMany({
@@ -179,10 +185,23 @@ export async function listDccAgentProfiles(
       if (line?.activeDccAgentProfileId) activeId = line.activeDccAgentProfileId;
     }
     const profiles = rows.map((row) => ({ ...toDto(row), isActive: row.id === activeId }));
+    let entitlement = {
+      freeSlots: 1,
+      paidSlots: 0,
+      allowedSlots: 1,
+      monthlyKrw: 4200
+    };
+    try {
+      const { getMultiDccSlotEntitlement } = await import("./multiDccSlotService.js");
+      entitlement = await getMultiDccSlotEntitlement(userId);
+    } catch {
+      /* ignore */
+    }
     return {
       profiles,
       activeId,
-      maxCount: DCC_AGENT_MAX_COUNT
+      maxCount: Math.min(DCC_AGENT_MAX_COUNT, entitlement.allowedSlots || DCC_AGENT_MAX_COUNT),
+      entitlement
     };
   } catch (e) {
     if (tableMissing(e)) {
@@ -208,6 +227,11 @@ export async function createDccAgentProfile(userId: string, body: DccAgentInput)
     const err = new Error(`담당자는 최대 ${DCC_AGENT_MAX_COUNT}명까지 등록할 수 있습니다.`);
     (err as Error & { status?: number }).status = 400;
     throw err;
+  }
+  /* 1슬롯(마스터) 무료 · 추가 멀티 DCC는 SOHO +4,200 권한 필요 */
+  if (count >= 1) {
+    const { assertCanCreateMultiDccSlot } = await import("./multiDccSlotService.js");
+    await assertCanCreateMultiDccSlot(userId, count);
   }
   const makeFirstActive = count === 0;
   const created = await prisma.userDccAgentProfile.create({

@@ -997,6 +997,7 @@ export default function LetteringBizcardSettingsView({
           onSendEmailOtp={handleSendEmailOtp}
           onVerifyEmailOtp={handleVerifyEmailOtp}
           emailAuthSupport={EMAIL_AUTH_SUPPORT}
+          onToast={showToast}
           exposureSlot={
             <DccExposureSettingsPanel
               choice={exposureChoice}

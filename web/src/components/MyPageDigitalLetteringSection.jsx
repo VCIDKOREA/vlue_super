@@ -10,6 +10,7 @@ import { showcasePreviewLabel, VLUE_SHOWCASE } from "../lib/vlueBrandSpaces.js";
 import { SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { fetchVlueBadgeSnapshot } from "../lib/vlueVerifiedBadgeApi.js";
 import LetteringBizcardSharePanel from "./LetteringBizcardSharePanel.jsx";
+import MultiDccPersonaBar from "./dcc/MultiDccPersonaBar.jsx";
 
 /**
  * 프로필 사이드바 — DCC(유료) · 블루 쇼케이스(무료 1페이지 포함) · 공유
@@ -114,6 +115,12 @@ export default function MyPageDigitalLetteringSection({
   return (
     <section className="w-full">
       {dccBlock}
+
+      {hasDigitalCertCard ? (
+        <div className="mb-3">
+          <MultiDccPersonaBar isDarkMode={isDarkMode} onToast={onToast} compact />
+        </div>
+      ) : null}
 
       <div
         role="button"

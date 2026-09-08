@@ -71,6 +71,11 @@ export function normalizeLetteringCard(raw = {}) {
     roadAddress: String(raw.roadAddress || raw.companyAddressRoad || "").trim(),
     addressDetail: String(raw.addressDetail || "").trim(),
     phoneDialEnabled: raw.phoneDialEnabled !== false && raw.phoneVisible !== false,
+    moderationStatus: String(raw.moderationStatus || "").trim(),
+    moderationGraceEndsAt: String(raw.moderationGraceEndsAt || "").trim(),
+    moderationBanner: String(raw.moderationBanner || "").trim(),
+    jobOccupationLabel: String(raw.jobOccupationLabel || "").trim(),
+    jobOccupationVerified: Boolean(raw.jobOccupationVerified),
     ...account
   };
 }

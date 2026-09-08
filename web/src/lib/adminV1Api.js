@@ -74,6 +74,22 @@ export async function resolveTitleDeptReview(reviewId, action, adminNote = "") {
   return parseJson(res);
 }
 
+export async function fetchJobOccupationPendingReviews() {
+  const res = await fetch(apiUrl("/api/v1/admin/job-occupation/pending"), {
+    headers: adminDeviceHeaders()
+  });
+  return parseJson(res);
+}
+
+export async function resolveJobOccupationReview(reviewId, action, adminNote = "") {
+  const res = await fetch(apiUrl("/api/v1/admin/job-occupation/resolve"), {
+    method: "POST",
+    headers: adminDeviceHeaders(),
+    body: JSON.stringify({ reviewId, action, adminNote: adminNote || undefined })
+  });
+  return parseJson(res);
+}
+
 export async function createMarketingPopup(payload) {
   const res = await fetch(apiUrl("/api/admin/marketing/popups"), {
     method: "POST",

@@ -1,0 +1,169 @@
+import { useCallback, useEffect, useState } from "react";
+import { Loader2, Plus } from "lucide-react";
+import { SOHO_BROADCAST_MONTHLY_KRW } from "../../lib/membershipBm.js";
+import {
+  completeMultiDccCheckout,
+  fetchMultiDccEntitlement
+} from "../../lib/jobOccupationVerifyApi.js";
+import { createDccAgentProfile, fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
+import DccAgentManageModal from "../dcc/DccAgentManageModal.jsx";
+
+/**
+ * 카카오톡 멀티프로필 스타일 — 멀티 DCC + (장당 SOHO +4,200)
+ * 계정(ID) 1개 · 페르소나 N개 · 케이스함/유료회원은 동일 계정으로 인식
+ */
+export default function MultiDccPersonaBar({
+  isDarkMode = false,
+  onToast,
+  compact = false
+}) {
+  const [profiles, setProfiles] = useState([]);
+  const [ent, setEnt] = useState(null);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+
+  const monthlyKrw = ent?.monthlyKrw || SOHO_BROADCAST_MONTHLY_KRW;
+
+  const reload = useCallback(async () => {
+    try {
+      const [p, e] = await Promise.all([fetchDccAgentProfiles(), fetchMultiDccEntitlement()]);
+      setProfiles(Array.isArray(p.profiles) ? p.profiles : []);
+      setEnt(e);
+    } catch (err) {
+      onToast?.(err instanceof Error ? err.message : "멀티 DCC 정보를 불러오지 못했습니다.");
+    }
+  }, [onToast]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const allowed = Number(ent?.allowedSlots) || 1;
+  const needPay = profiles.length >= allowed;
+
+  const startAdd = () => {
+    if (needPay) {
+      setPayOpen(true);
+      return;
+    }
+    setManageOpen(true);
+  };
+
+  const runPayAndCreate = async ({ devBypass = false } = {}) => {
+    setBusy(true);
+    try {
+      let userId = "";
+      try {
+        userId = localStorage.getItem("vlue_server_user_id") || "";
+      } catch {
+        /* ignore */
+      }
+      const merchant_uid = devBypass
+        ? `dev_multi_dcc_${Date.now()}`
+        : `multi_dcc_${Date.now()}`;
+      if (devBypass && !import.meta.env.DEV) {
+        throw new Error("개발 결제 우회는 로컬에서만 가능합니다.");
+      }
+      await completeMultiDccCheckout({
+        amountKrw: monthlyKrw,
+        billingCycle: "monthly",
+        merchant_uid,
+        customer_uid: userId ? `user_customer_${userId}` : undefined,
+        slotsToAdd: 1,
+        devBillingBypass: Boolean(devBypass)
+      });
+      await createDccAgentProfile({
+        displayName: "새 페르소나",
+        title: "",
+        department: "",
+        label: `그룹 ${profiles.length + 1}`
+      });
+      onToast?.(`멀티 DCC 슬롯이 추가되었습니다. (월 ${monthlyKrw.toLocaleString("ko-KR")}원)`);
+      setPayOpen(false);
+      await reload();
+      setManageOpen(true);
+    } catch (e) {
+      onToast?.(e instanceof Error ? e.message : "결제·추가에 실패했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const shell = isDarkMode
+    ? "rounded-2xl border border-white/10 bg-white/[0.04] p-3"
+    : "rounded-2xl border border-slate-200 bg-white p-3 shadow-sm";
+
+  return (
+    <div className={shell}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className={`text-[13px] font-black ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
+            멀티 DCC
+          </p>
+          {!compact ? (
+            <p className={`mt-0.5 text-[10px] leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
+              카카오톡 멀티프로필처럼 계정 1개에 페르소나 N개. 추가 슬롯 장당 SOHO +
+              {monthlyKrw.toLocaleString("ko-KR")}원 · 케이스함·유료회원은 동일 ID로 인식됩니다.
+            </p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={startAdd}
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-bold text-slate-800 shadow-sm"
+        >
+          <Plus size={14} />
+          멀티 DCC +
+        </button>
+      </div>
+      <p className={`mt-2 text-[10px] font-semibold ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
+        사용 중 {profiles.length}/{allowed} · 무료 {ent?.freeSlots ?? 1} · 결제 슬롯 {ent?.paidSlots ?? 0}
+      </p>
+
+      {payOpen ? (
+        <div
+          className={`mt-3 rounded-xl border p-3 ${
+            isDarkMode ? "border-white/10 bg-black/30" : "border-slate-200 bg-slate-50"
+          }`}
+        >
+          <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
+            멀티 DCC 추가 · 월 {monthlyKrw.toLocaleString("ko-KR")}원 (SOHO)
+          </p>
+          <p className={`mt-1 text-[10px] ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
+            결제한 슬롯의 페르소나도 동일 마스터 계정의 유료 회원으로 취급됩니다.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-60"
+              onClick={() => void runPayAndCreate({ devBypass: import.meta.env.DEV })}
+            >
+              {busy ? <Loader2 size={14} className="animate-spin" /> : null}
+              {import.meta.env.DEV ? "개발 결제 후 추가" : "결제 후 추가"}
+            </button>
+            <button
+              type="button"
+              className={`rounded-xl px-3 py-2 text-[12px] font-bold ${
+                isDarkMode ? "text-gray-400" : "text-slate-500"
+              }`}
+              onClick={() => setPayOpen(false)}
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <DccAgentManageModal
+        open={manageOpen}
+        profiles={profiles}
+        maxCount={allowed}
+        onClose={() => setManageOpen(false)}
+        onChanged={reload}
+        onToast={onToast}
+      />
+    </div>
+  );
+}

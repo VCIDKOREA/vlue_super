@@ -22,6 +22,19 @@ import {
   submitTitleDeptReview
 } from "../services/bizcard/titleDeptReviewService.js";
 import {
+  getJobOccupationStatusForUser,
+  submitJobOccupationReview
+} from "../services/bizcard/jobOccupationVerifyService.js";
+import {
+  completeMultiDccSlotPayment,
+  getMultiDccSlotEntitlement
+} from "../services/dcc/multiDccSlotService.js";
+import {
+  getDccModerationForUser,
+  startGracePeriod,
+  submitAppeal
+} from "../services/dcc/dccModerationService.js";
+import {
   createBizcardImageUploadUrl,
   isBizcardImageStorageConfigured
 } from "../services/bizcard/bizcardImageStorage.js";
@@ -740,6 +753,103 @@ cardsRoutes.get("/title-dept/status", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
   const status = await getTitleDeptStatusForUser(me);
   return c.json({ ok: true, ...status });
+});
+
+/** 직업인증 — 최신 검토 상태 */
+cardsRoutes.get("/job-occupation/status", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const status = await getJobOccupationStatusForUser(me);
+  return c.json({ ok: true, ...status });
+});
+
+/** 직업인증 — 증빙 서류 제출 */
+cardsRoutes.post("/job-occupation/submit", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = (await c.req.json().catch(() => ({}))) as {
+    occupationId?: string;
+    customLabel?: string;
+    docKind?: string;
+    docFileName?: string;
+    docDataUrl?: string;
+    docUrl?: string;
+  };
+  try {
+    const result = await submitJobOccupationReview(me, {
+      occupationId: String(body.occupationId || ""),
+      customLabel: body.customLabel,
+      docKind: String(body.docKind || ""),
+      docFileName: String(body.docFileName || ""),
+      docDataUrl: body.docDataUrl,
+      docUrl: body.docUrl
+    });
+    return c.json({ ok: true, ...result });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    const map: Record<string, string> = {
+      INVALID_OCCUPATION: "유효하지 않은 직업입니다.",
+      CUSTOM_LABEL_REQUIRED: "기타(직접입력) 직업을 입력해 주세요.",
+      INVALID_DOC_KIND: "유효하지 않은 서류 종류입니다.",
+      DOC_REQUIRED: "직업 증빙 서류를 첨부해 주세요."
+    };
+    return c.json({ error: map[msg] || msg }, 400);
+  }
+});
+
+/** 멀티 DCC 슬롯 권한 */
+cardsRoutes.get("/multi-dcc/entitlement", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const ent = await getMultiDccSlotEntitlement(me);
+  return c.json({ ok: true, ...ent });
+});
+
+/** 멀티 DCC 추가 슬롯 결제 완료 */
+cardsRoutes.post("/multi-dcc/checkout", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = (await c.req.json().catch(() => ({}))) as {
+    amountKrw?: number;
+    billingCycle?: string;
+    merchant_uid?: string;
+    customer_uid?: string;
+    slotsToAdd?: number;
+    devBillingBypass?: boolean;
+  };
+  if (body.devBillingBypass && process.env.NODE_ENV === "production") {
+    return c.json({ error: "개발 결제 우회는 사용할 수 없습니다." }, 403);
+  }
+  try {
+    const ent = await completeMultiDccSlotPayment({
+      userId: me,
+      amountKrw: Number(body.amountKrw) || 0,
+      billingCycle: body.billingCycle,
+      merchantUid: String(body.merchant_uid || ""),
+      customerUid: body.customer_uid,
+      slotsToAdd: body.slotsToAdd
+    });
+    return c.json({ ok: true, ...ent });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    return c.json({ error: msg === "INVALID_AMOUNT" ? "결제 금액이 올바르지 않습니다." : msg }, 400);
+  }
+});
+
+/** DCC 신고 완충(검토 중) 상태 */
+cardsRoutes.get("/moderation/status", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const mod = await getDccModerationForUser(me);
+  return c.json({ ok: true, ...mod });
+});
+
+cardsRoutes.post("/moderation/start-grace", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const mod = await startGracePeriod(me);
+  return c.json({ ok: true, ...mod });
+});
+
+cardsRoutes.post("/moderation/appeal", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  const body = (await c.req.json().catch(() => ({}))) as { note?: string };
+  const mod = await submitAppeal(me, String(body.note || ""));
+  return c.json({ ok: true, ...mod });
 });
 
 /** 직책·부서 변경 신청 (서류 첨부) */

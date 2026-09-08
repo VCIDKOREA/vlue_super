@@ -37,6 +37,10 @@ import {
   getVlueBadgeSnapshot,
   recordSelfShowcaseShare
 } from "../services/membership/vlueVerifiedBadgeService.js";
+import {
+  applyReportThresholdForPhone,
+  assertReporterCanFile
+} from "../services/dcc/dccModerationService.js";
 
 export const letteringRoutes = new Hono();
 
@@ -125,9 +129,17 @@ letteringRoutes.post("/blocks", requireUserHeader, async (c) => {
   return c.json({ ok: true, blocked: true, id: row.id, phoneE164: e164 }, 201);
 });
 
-/** 신고 접수 + 자동 차단 */
+/** 신고 접수 + 자동 차단 (피신고 DCC는 즉시 삭제하지 않음 · 임계값 시 under_review) */
 letteringRoutes.post("/reports", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
+  try {
+    await assertReporterCanFile(me);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "신고할 수 없습니다.";
+    const status = typeof (e as { status?: number })?.status === "number" ? (e as { status: number }).status : 403;
+    return c.json({ error: msg }, status as 403);
+  }
+
   const body = await c.req.json().catch(() => ({}));
   const raw = String(body.phone ?? body.number ?? "").trim();
   const e164 = normalizeToE164KR(raw);
@@ -161,7 +173,19 @@ letteringRoutes.post("/reports", requireUserHeader, async (c) => {
     }
   });
 
-  return c.json({ ok: true, reportId: report.id, phoneE164: e164, autoBlocked: true }, 201);
+  const moderation = await applyReportThresholdForPhone(e164).catch(() => null);
+
+  return c.json(
+    {
+      ok: true,
+      reportId: report.id,
+      phoneE164: e164,
+      autoBlocked: true,
+      targetDeleted: false,
+      moderation
+    },
+    201
+  );
 });
 
 /** V1 — 유료 회원 쇼케이스 #해시태그 등록 */

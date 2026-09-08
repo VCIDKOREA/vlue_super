@@ -6,6 +6,8 @@ import LetteringBizcardAddressField from "./LetteringBizcardAddressField.jsx";
 import LetteringBizcardAccountSection from "./LetteringBizcardAccountSection.jsx";
 import LetteringBizcardTitleDeptVerifySection from "./LetteringBizcardTitleDeptVerifySection.jsx";
 import LetteringBizcardOrgChangeSection from "./LetteringBizcardOrgChangeSection.jsx";
+import JobVerifyPanel from "./job-verify/JobVerifyPanel.jsx";
+import MultiDccPersonaBar from "./dcc/MultiDccPersonaBar.jsx";
 import {
   LETTERING_BIZCARD_EMAIL_MAX,
   LETTERING_BIZCARD_EMAIL_WARN,
@@ -319,7 +321,8 @@ export default function LetteringBizcardQuickBuilder({
   emailVerifiedFor = "",
   onSendEmailOtp = null,
   onVerifyEmailOtp = null,
-  emailAuthSupport = ""
+  emailAuthSupport = "",
+  onToast = null
 }) {
   const [previewFace, setPreviewFace] = useState("front");
   const { setPlaybackPhase } = useShowcaseBgm();
@@ -401,6 +404,18 @@ export default function LetteringBizcardQuickBuilder({
           onToast={onOrgChangeToast}
         />
       ) : null}
+
+      <MultiDccPersonaBar isDarkMode={isDarkMode} onToast={onToast || onOrgChangeToast} />
+
+      <JobVerifyPanel
+        isDarkMode={isDarkMode}
+        onToast={onToast || onOrgChangeToast}
+        onOpenBusinessAuth={() => {
+          onToast?.(
+            "사업자인증은 국세청 대조·사업자등록 경로입니다. 기업·대표번호 인증명함 신청을 이용해 주세요."
+          );
+        }}
+      />
 
       {exposureSlot ? (
         <div id="dcc-settings-exposure" className="scroll-mt-4">

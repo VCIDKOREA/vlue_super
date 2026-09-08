@@ -16,6 +16,10 @@ import {
   listTitleDeptPendingForAdmin,
   resolveTitleDeptReviewForAdmin
 } from "../services/bizcard/titleDeptReviewService.js";
+import {
+  listJobOccupationPendingForAdmin,
+  resolveJobOccupationReviewForAdmin
+} from "../services/bizcard/jobOccupationVerifyService.js";
 
 type AdminVars = { adminDevice: AdminDevice };
 
@@ -126,6 +130,36 @@ adminV1Routes.post("/title-dept/resolve", async (c) => {
   const adminDevice = c.get("adminDevice");
   try {
     const result = await resolveTitleDeptReviewForAdmin({
+      reviewId,
+      action,
+      adminDeviceId: adminDevice.id,
+      adminNote: body.adminNote
+    });
+    return c.json({ ok: true, ...result });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    return c.json({ error: msg }, msg === "REVIEW_NOT_FOUND" ? 404 : 400);
+  }
+});
+
+/** 직업인증 서류 검토 대기 */
+adminV1Routes.get("/job-occupation/pending", async (c) => {
+  const requests = await listJobOccupationPendingForAdmin();
+  return c.json({ ok: true, requests });
+});
+
+adminV1Routes.post("/job-occupation/resolve", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    reviewId?: string;
+    action?: "approve" | "reject";
+    adminNote?: string;
+  };
+  const reviewId = String(body.reviewId || "").trim();
+  const action = body.action === "reject" ? "reject" : "approve";
+  if (!reviewId) return c.json({ error: "reviewId 가 필요합니다." }, 400);
+  const adminDevice = c.get("adminDevice");
+  try {
+    const result = await resolveJobOccupationReviewForAdmin({
       reviewId,
       action,
       adminDeviceId: adminDevice.id,

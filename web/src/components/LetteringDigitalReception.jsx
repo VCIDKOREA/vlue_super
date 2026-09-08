@@ -636,6 +636,14 @@ function FrontPanel({
   const validityDisplay = validityFromItems
     ? validityFromItems.replace(/^(만료일|인증유효기간)\s*[:：]?\s*/, "").trim()
     : validityResolved?.line || "";
+  const moderationStatus = String(card.moderationStatus || "").trim().toLowerCase();
+  const moderationBanner =
+    moderationStatus === "under_review" || moderationStatus === "grace"
+      ? String(card.moderationBanner || "").trim() ||
+        (moderationStatus === "grace"
+          ? "소명 기간이 부여된 프로필입니다. 48시간 이내 소명 자료를 제출해 주세요."
+          : "검토 중인 프로필입니다. 신고가 접수되어 운영진이 확인 중입니다.")
+      : "";
 
   const openPeerCaseArchive = () => {
     if (!peerUserId) return;
@@ -736,6 +744,11 @@ function FrontPanel({
       </div>
 
       <div className="ldr-front-profile-stack">
+        {moderationBanner ? (
+          <p className="ldr-front-moderation-banner" role="status">
+            {moderationBanner}
+          </p>
+        ) : null}
         {phone ? (
           <FrontInfoRow icon={Phone} label="전화번호" className="ldr-front-info-row--phone">
             <span className="ldr-front-info-row__phone-line">

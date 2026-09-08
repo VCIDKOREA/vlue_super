@@ -12,6 +12,7 @@ import { agentOptionLabel } from "../../lib/dccAgentProfileState.js";
 import { isCertifiedLine } from "../../lib/dccLineLabel.js";
 
 const EMPTY_FORM = {
+  label: "",
   displayName: "",
   title: "",
   department: "",
@@ -54,6 +55,7 @@ export default function DccAgentManageModal({
   const startEdit = (profile) => {
     setEditingId(profile.id);
     setForm({
+      label: profile.label || "",
       displayName: profile.displayName || "",
       title: profile.title || "",
       department: profile.department || "",
@@ -87,6 +89,7 @@ export default function DccAgentManageModal({
     setBusy(true);
     try {
       const payload = {
+        label: String(form.label || "").trim(),
         displayName,
         title: String(form.title || "").trim(),
         department: String(form.department || "").trim(),
@@ -104,7 +107,12 @@ export default function DccAgentManageModal({
       setEditingId("");
       await onChanged?.();
     } catch (e) {
-      onToast?.(e instanceof Error ? e.message : "저장에 실패했습니다.");
+      const msg = e instanceof Error ? e.message : "저장에 실패했습니다.";
+      if (/멀티 DCC|4,200|4200|결제/i.test(msg)) {
+        onToast?.(`${msg} 「멀티 DCC +」에서 슬롯을 결제해 주세요.`);
+      } else {
+        onToast?.(msg);
+      }
     } finally {
       setBusy(false);
     }
@@ -134,10 +142,11 @@ export default function DccAgentManageModal({
         <div className="dcc-agent-modal__head">
           <div>
             <h2 id="dcc-agent-modal-title" className="dcc-agent-modal__title">
-              담당자 프로필
+              멀티 DCC · 페르소나
             </h2>
             <p className="dcc-agent-modal__sub">
-              번호마다 담당자를 지정합니다. 번호를 고르면 그 번호의 DCC·쇼케이스를 설정합니다.
+              계정 1개에 페르소나 N개(카카오 멀티프로필). 그룹 타이틀을 지정하고 상황별로 전환합니다. 추가 슬롯은
+              SOHO +4,200원/장입니다.
             </p>
           </div>
           <button type="button" className="dcc-agent-modal__close" onClick={onClose} aria-label="닫기">
@@ -235,6 +244,16 @@ export default function DccAgentManageModal({
 
             {formOpen ? (
               <div className="dcc-agent-form">
+                <label>
+                  그룹 · 타이틀
+                  <input
+                    type="text"
+                    value={form.label}
+                    maxLength={80}
+                    onChange={(e) => setForm((p) => ({ ...p, label: e.target.value }))}
+                    placeholder="예: 방송국 프리랜서 / 통닭집 대표"
+                  />
+                </label>
                 <label>
                   이름
                   <input

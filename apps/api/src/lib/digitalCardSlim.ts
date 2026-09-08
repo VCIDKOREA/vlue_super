@@ -114,5 +114,15 @@ export function slimExportSnapshot(snap: unknown): Record<string, unknown> | nul
     }
   }
 
+  const moderationStatus = text(s.moderationStatus, 32);
+  if (moderationStatus) out.moderationStatus = moderationStatus;
+  const grace = text(s.moderationGraceEndsAt, 40);
+  if (grace) out.moderationGraceEndsAt = grace;
+  const jobLabel = text(s.jobOccupationLabel, 120);
+  if (jobLabel) out.jobOccupationLabel = jobLabel;
+  if (typeof s.jobOccupationVerified === "boolean") {
+    out.jobOccupationVerified = s.jobOccupationVerified;
+  }
+
   return out;
 }

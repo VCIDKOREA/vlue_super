@@ -6638,6 +6638,17 @@ body,
   opacity: 0.62;
 }
 
+.ldr-front-moderation-banner {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #92400e;
+  background: rgba(251, 191, 36, 0.18);
+}
+
 .ldr-panel--push .ldr-front-account__disclaimer,
 .ldr-reception--push .ldr-front-account__disclaimer {
   font-size: 8px;
