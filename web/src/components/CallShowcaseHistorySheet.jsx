@@ -199,6 +199,10 @@ function writeCallHistoryLineId(id) {
 
 function CallHistoryAvatar({ call }) {
   const url = resolveCallHistoryAvatar(call);
+  const [broken, setBroken] = useState(false);
+  useEffect(() => {
+    setBroken(false);
+  }, [url]);
   const label = String(call?.memberName || call?.name || "").trim();
   const phoneDisp = String(call?.phoneDisplay || call?.phone || "").trim();
   const isPhoneLabel =
@@ -207,8 +211,15 @@ function CallHistoryAvatar({ call }) {
     label.replace(/\D/g, "") === phoneDisp.replace(/\D/g, "");
   const Icon = call.direction === "out" ? PhoneOutgoing : PhoneIncoming;
 
-  if (url) {
-    return <img className="friend-showcase-list__avatar" src={url} alt="" />;
+  if (url && !broken) {
+    return (
+      <img
+        className="friend-showcase-list__avatar"
+        src={url}
+        alt=""
+        onError={() => setBroken(true)}
+      />
+    );
   }
 
   if (label && !isPhoneLabel) {

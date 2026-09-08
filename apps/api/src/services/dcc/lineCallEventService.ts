@@ -1,6 +1,7 @@
 import { prisma } from "../../db/client.js";
 import { normalizeToE164KR } from "../../lib/phoneE164.js";
 import { formatPhoneDisplayKR } from "../../lib/phoneDisplay.js";
+import { isHttpMediaUrl } from "../../lib/mediaUrlGuard.js";
 
 const DEDUP_MS = 90_000;
 const HISTORY_LIMIT = 300;
@@ -17,6 +18,23 @@ function snapName(json: unknown): string {
   if (!json || typeof json !== "object") return "";
   const o = json as Record<string, unknown>;
   return firstStr(o.name, o.displayName);
+}
+
+/** follow 목록과 동일 — export_snapshot / photoUrl 중 https만 */
+function memberAvatarUrl(digitalCard: {
+  photoUrl?: string | null;
+  exportSnapshotJson?: unknown;
+} | null | undefined): string {
+  if (!digitalCard) return "";
+  const snap = digitalCard.exportSnapshotJson;
+  const fromSnap =
+    snap && typeof snap === "object"
+      ? String((snap as Record<string, unknown>).photoUrl || "").trim()
+      : "";
+  for (const c of [fromSnap, String(digitalCard.photoUrl || "").trim()]) {
+    if (isHttpMediaUrl(c)) return c.trim();
+  }
+  return "";
 }
 
 export async function recordOverlayLineCallEvent(opts: {
@@ -160,7 +178,14 @@ export async function lookupMemberNamesByNumbers(rawNumbers: string[]) {
         user: {
           select: {
             legalName: true,
-            digitalCard: { select: { displayName: true, membershipTierSnapshot: true, photoUrl: true } }
+            digitalCard: {
+              select: {
+                displayName: true,
+                membershipTierSnapshot: true,
+                photoUrl: true,
+                exportSnapshotJson: true
+              }
+            }
           }
         }
       }
@@ -174,7 +199,14 @@ export async function lookupMemberNamesByNumbers(rawNumbers: string[]) {
         id: true,
         phoneE164: true,
         legalName: true,
-        digitalCard: { select: { displayName: true, membershipTierSnapshot: true, photoUrl: true } }
+        digitalCard: {
+          select: {
+            displayName: true,
+            membershipTierSnapshot: true,
+            photoUrl: true,
+            exportSnapshotJson: true
+          }
+        }
       }
     })
   ]);
@@ -190,7 +222,7 @@ export async function lookupMemberNamesByNumbers(rawNumbers: string[]) {
       userId: u.id,
       verified: true,
       membershipTier: String(u.digitalCard?.membershipTierSnapshot || "free"),
-      avatarUrl: String(u.digitalCard?.photoUrl || "").trim()
+      avatarUrl: memberAvatarUrl(u.digitalCard)
     });
   }
   for (const c of cards) {
@@ -206,7 +238,7 @@ export async function lookupMemberNamesByNumbers(rawNumbers: string[]) {
       membershipTier: String(
         c.user?.digitalCard?.membershipTierSnapshot || prev.membershipTier || "free"
       ),
-      avatarUrl: String(c.user?.digitalCard?.photoUrl || prev.avatarUrl || "").trim()
+      avatarUrl: memberAvatarUrl(c.user?.digitalCard) || String(prev.avatarUrl || "").trim()
     });
   }
 

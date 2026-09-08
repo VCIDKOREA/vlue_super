@@ -213,14 +213,30 @@ export function formatCallWhen(iso) {
   return d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
 }
 
+/** blob/data/깨진 상대경로를 걸러 로드 가능한 아바타만 반환 */
+function loadableAvatarUrl(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (/^(data:|blob:)/i.test(s)) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/") && typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}${s}`;
+  }
+  return "";
+}
+
 /** 목록·다시보기용 아바타 URL (없으면 빈 문자열 → 이니셜) */
 export function resolveCallHistoryAvatar(call) {
-  return String(
-    call?.avatarUrl ||
-      call?.cardSnapshot?.avatarUrl ||
-      call?.cardSnapshot?.photoUrl ||
-      call?.showcaseSnapshot?.platformFeed?.kakaoAvatarUrl ||
-      call?.showcaseSnapshot?.platformFeed?.instagramAvatarUrl ||
-      ""
-  ).trim();
+  const candidates = [
+    call?.avatarUrl,
+    call?.cardSnapshot?.avatarUrl,
+    call?.cardSnapshot?.photoUrl,
+    call?.showcaseSnapshot?.platformFeed?.kakaoAvatarUrl,
+    call?.showcaseSnapshot?.platformFeed?.instagramAvatarUrl
+  ];
+  for (const c of candidates) {
+    const ok = loadableAvatarUrl(c);
+    if (ok) return ok;
+  }
+  return "";
 }
