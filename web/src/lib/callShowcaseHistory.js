@@ -182,6 +182,18 @@ export function appendCallShowcaseHistory(entry) {
     showcaseSnapshot: entry.showcaseSnapshot || null,
     cardSnapshot: entry.cardSnapshot || null
   };
+  /* data:/blob: 는 목록에서 https 회원 사진을 가리므로 저장하지 않음 */
+  if (/^(data:|blob:)/i.test(row.avatarUrl)) row.avatarUrl = "";
+  if (row.cardSnapshot && typeof row.cardSnapshot === "object") {
+    const snap = { ...row.cardSnapshot };
+    for (const k of ["photoUrl", "avatarUrl", "logoUrl"]) {
+      if (/^(data:|blob:)/i.test(String(snap[k] || ""))) snap[k] = "";
+    }
+    row.cardSnapshot = snap;
+    if (!row.avatarUrl) {
+      row.avatarUrl = String(snap.avatarUrl || snap.photoUrl || "").trim();
+    }
+  }
   const next = [row, ...readCallShowcaseHistory().filter((r) => r.id !== row.id)].slice(0, 80);
   try {
     localStorage.setItem(CALL_SHOWCASE_HISTORY_KEY, JSON.stringify(next));

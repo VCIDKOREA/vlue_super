@@ -11,6 +11,16 @@ import {
 } from "./callShowcaseHistory.js";
 import { matchNationalAgency } from "./nationalAgencyDcpClient.js";
 
+/** 목록 아바타 — https(또는 사이트 상대경로)만 채택. data:/blob: 는 API 사진을 가리지 않게 제외 */
+function pickListAvatarUrl(...candidates) {
+  for (const raw of candidates) {
+    const s = String(raw || "").trim();
+    if (!s || /^(data:|blob:)/i.test(s)) continue;
+    if (/^https?:\/\//i.test(s) || s.startsWith("/")) return s;
+  }
+  return "";
+}
+
 export function callLogPhoneKey(phone) {
   return toKoreaNationalDigits(phone) || normalizePhoneDigits(phone);
 }
@@ -129,7 +139,14 @@ export function enrichCallLogGroupsWithShowcaseHistory(groups) {
       name: memberName,
       verified,
       membershipTier: g.membershipTier || meta?.membershipTier || null,
-      avatarUrl: g.avatarUrl || resolveCallHistoryAvatar(meta || {}) || "",
+      avatarUrl:
+        pickListAvatarUrl(
+          g.avatarUrl,
+          resolveCallHistoryAvatar(meta || {}),
+          meta?.avatarUrl,
+          meta?.cardSnapshot?.photoUrl,
+          meta?.cardSnapshot?.avatarUrl
+        ) || "",
       userId: g.userId || snapUserId || "",
       cardSnapshot: g.cardSnapshot || meta?.cardSnapshot || null,
       showcaseSnapshot:
@@ -151,6 +168,11 @@ export function applyMemberDirectoryToCallGroups(groups, members) {
     const hit = byKey.get(g.phoneKey);
     if (!hit) return g;
     const memberName = String(hit.name || "").trim();
+    const hitAvatar = String(hit.avatarUrl || "").trim();
+    const avatarUrl =
+      pickListAvatarUrl(hitAvatar, g.avatarUrl, g.cardSnapshot?.photoUrl, g.cardSnapshot?.avatarUrl) ||
+      "";
+    const prevSnap = g.cardSnapshot && typeof g.cardSnapshot === "object" ? g.cardSnapshot : {};
     return {
       ...g,
       memberName,
@@ -158,15 +180,17 @@ export function applyMemberDirectoryToCallGroups(groups, members) {
       verified: true,
       membershipTier: hit.membershipTier || g.membershipTier || "free",
       userId: g.userId || hit.userId || "",
-      avatarUrl: g.avatarUrl || String(hit.avatarUrl || "").trim(),
-      cardSnapshot: g.cardSnapshot || {
-        userId: hit.userId || "",
+      avatarUrl,
+      cardSnapshot: {
+        ...prevSnap,
+        userId: prevSnap.userId || hit.userId || g.userId || "",
         name: memberName,
-        phone: g.phoneDisplay || g.phone,
-        membershipTier: hit.membershipTier || "free",
-        photoUrl: hit.avatarUrl || "",
-        avatarUrl: hit.avatarUrl || "",
-        organization: hit.organization || hit.companyName || ""
+        phone: prevSnap.phone || g.phoneDisplay || g.phone,
+        membershipTier: hit.membershipTier || prevSnap.membershipTier || "free",
+        photoUrl: pickListAvatarUrl(hitAvatar, prevSnap.photoUrl, prevSnap.avatarUrl) || "",
+        avatarUrl: pickListAvatarUrl(hitAvatar, prevSnap.avatarUrl, prevSnap.photoUrl) || "",
+        organization:
+          prevSnap.organization || hit.organization || hit.companyName || ""
       }
     };
   });

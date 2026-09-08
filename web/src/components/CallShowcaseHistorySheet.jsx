@@ -217,6 +217,7 @@ function CallHistoryAvatar({ call }) {
         className="friend-showcase-list__avatar"
         src={url}
         alt=""
+        referrerPolicy="no-referrer"
         onError={() => setBroken(true)}
       />
     );
