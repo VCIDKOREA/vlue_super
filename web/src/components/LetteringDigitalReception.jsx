@@ -6,10 +6,18 @@ import {
   Globe,
   Printer,
   ShieldCheck,
-  Check
+  Check,
+  Landmark,
+  Copy
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { isMaskedPhoneDisplay } from "../lib/dccExposure.js";
+import {
+  canShowDccAccountOnCard,
+  formatDccAccountCopyText,
+  DCC_ACCOUNT_DISCLAIMER,
+  digitsOnlyAccount
+} from "../lib/dccAccountFields.js";
 import { formatLetteringReceptionLines, resolveDccFrontIdentityLines, isDccCertifiedMemberLabel } from "../lib/letteringPaidIdentityDisplay.js";
 import IdentitySecondaryText from "./IdentitySecondaryText.jsx";
 import { formatLetteringContactEmailDisplay, photoFocusToCss, clampLetteringBizcardIntroFront, clampLetteringBizcardBackNote } from "../lib/letteringBizcardStorage.js";
@@ -837,6 +845,41 @@ function FrontPanel({
                 website
               )}
             </p>
+          </FrontInfoRow>
+        ) : null}
+
+        {canShowDccAccountOnCard(card) ? (
+          <FrontInfoRow icon={Landmark} label="계좌정보" className="ldr-front-info-row--account">
+            <div className="ldr-front-account">
+              <p className="ldr-front-info-row__text">{String(card.bankName || "").trim()}</p>
+              <div className="ldr-front-account__number-line">
+                <p className="ldr-front-info-row__text tabular-nums">
+                  {digitsOnlyAccount(card.accountNumber)}
+                </p>
+                <button
+                  type="button"
+                  className="ldr-front-account__copy"
+                  aria-label="계좌번호 복사"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const text = formatDccAccountCopyText(card);
+                    if (!text) return;
+                    try {
+                      await navigator.clipboard.writeText(text);
+                      onToast?.("계좌번호가 복사되었습니다.");
+                    } catch {
+                      onToast?.("복사에 실패했습니다.");
+                    }
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <Copy className="ldr-front-account__copy-icon" aria-hidden />
+                </button>
+              </div>
+              <p className="ldr-front-info-row__text">{String(card.accountHolder || "").trim()}</p>
+              <p className="ldr-front-account__disclaimer">{DCC_ACCOUNT_DISCLAIMER}</p>
+            </div>
           </FrontInfoRow>
         ) : null}
 

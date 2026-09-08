@@ -96,5 +96,23 @@ export function slimExportSnapshot(snap: unknown): Record<string, unknown> | nul
   if (typeof s.noTitlePhoto === "boolean") out.noTitlePhoto = s.noTitlePhoto;
   if (typeof s.noFax === "boolean") out.noFax = s.noFax;
   if (typeof s.noWebsite === "boolean") out.noWebsite = s.noWebsite;
+
+  /* DCC 계좌 — data URL 증빙은 저장하지 않음 */
+  const accountType = text(s.accountType, 16);
+  if (accountType === "PERSONAL" || accountType === "BUSINESS" || accountType === "GROUP") {
+    out.accountType = accountType;
+    const bankName = text(s.bankName, 40);
+    if (bankName) out.bankName = bankName;
+    const accountNumber = text(String(s.accountNumber || "").replace(/\D/g, ""), 30);
+    if (accountNumber) out.accountNumber = accountNumber;
+    const accountHolder = text(s.accountHolder, 80);
+    if (accountHolder) out.accountHolder = accountHolder;
+    out.isGroupVerified = accountType === "GROUP" ? Boolean(s.isGroupVerified) : false;
+    if (accountType === "GROUP") {
+      const docName = text(s.accountGroupDocName, 200);
+      if (docName) out.accountGroupDocName = docName;
+    }
+  }
+
   return out;
 }

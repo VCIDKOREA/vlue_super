@@ -175,7 +175,15 @@ const DEFAULT_EDITABLE = {
   orgChangeEvidenceKind: "",
   orgChangeEvidenceName: "",
   orgChangeEvidenceDataUrl: "",
-  orgChangeSubmittedAt: ""
+  orgChangeSubmittedAt: "",
+  /** DCC 계좌 (지갑 출금 계좌와 별개) */
+  accountType: "",
+  bankName: "",
+  accountNumber: "",
+  accountHolder: "",
+  isGroupVerified: false,
+  accountGroupDocName: "",
+  accountGroupDocDataUrl: ""
 };
 
 export const ORG_CHANGE_EVIDENCE_KINDS = [

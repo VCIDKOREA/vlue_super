@@ -3,6 +3,7 @@ import { ImagePlus, Upload } from "lucide-react";
 import LetteringDigitalReception from "./LetteringDigitalReception.jsx";
 import LetteringBizcardScaledPreview from "./LetteringBizcardScaledPreview.jsx";
 import LetteringBizcardAddressField from "./LetteringBizcardAddressField.jsx";
+import LetteringBizcardAccountSection from "./LetteringBizcardAccountSection.jsx";
 import LetteringBizcardTitleDeptVerifySection from "./LetteringBizcardTitleDeptVerifySection.jsx";
 import LetteringBizcardOrgChangeSection from "./LetteringBizcardOrgChangeSection.jsx";
 import {
@@ -246,6 +247,18 @@ export default function LetteringBizcardQuickBuilder({
   setEmail,
   website,
   setWebsite,
+  accountType = "",
+  setAccountType = () => {},
+  bankName = "",
+  setBankName = () => {},
+  accountNumber = "",
+  setAccountNumber = () => {},
+  accountHolder = "",
+  setAccountHolder = () => {},
+  accountGroupDocName = "",
+  onGroupDocPick = null,
+  groupDocError = "",
+  onClearAccount = null,
   companyIntro,
   setCompanyIntro,
   customBackText,
@@ -582,6 +595,23 @@ export default function LetteringBizcardQuickBuilder({
           />
           <OmitCheckbox checked={noWebsite} onChange={setNoWebsite} label="웹사이트 없음" isDarkMode={isDarkMode} />
         </Field>
+        <LetteringBizcardAccountSection
+          isDarkMode={isDarkMode}
+          inputBase={inputBase}
+          lockedLegalName={String(fixed?.name || "").trim()}
+          accountType={accountType}
+          setAccountType={setAccountType}
+          bankName={bankName}
+          setBankName={setBankName}
+          accountNumber={accountNumber}
+          setAccountNumber={setAccountNumber}
+          accountHolder={accountHolder}
+          setAccountHolder={setAccountHolder}
+          accountGroupDocName={accountGroupDocName}
+          onGroupDocPick={onGroupDocPick}
+          groupDocError={groupDocError}
+          onClearAccount={onClearAccount}
+        />
         <Field label="팩스 (선택)" hint="입력하지 않으면 명함에 표시되지 않습니다" isDarkMode={isDarkMode}>
           <input
             type="tel"

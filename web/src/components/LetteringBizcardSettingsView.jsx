@@ -51,6 +51,7 @@ import DccExposureSettingsPanel from "./dcc/DccExposureSettingsPanel.jsx";
 import { emptyDccExposureChoice, isDccExposureComplete } from "../lib/dccExposure.js";
 import { fetchDccExposure, saveDccExposure } from "../lib/dccExposureApi.js";
 import { sendAuthCode, verifyAuthCode, EMAIL_AUTH_SUPPORT } from "../lib/emailAuthApi.js";
+import { sanitizeDccAccountFields } from "../lib/dccAccountFields.js";
 
 export default function LetteringBizcardSettingsView({
   membershipTier = "free",
@@ -104,6 +105,14 @@ export default function LetteringBizcardSettingsView({
   const [verifyDocDataUrl, setVerifyDocDataUrl] = useState("");
   const [verifyDocIssuedAt, setVerifyDocIssuedAt] = useState("");
   const [verifyDocError, setVerifyDocError] = useState("");
+  const [accountType, setAccountType] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountHolder, setAccountHolder] = useState("");
+  const [isGroupVerified, setIsGroupVerified] = useState(false);
+  const [accountGroupDocName, setAccountGroupDocName] = useState("");
+  const [accountGroupDocDataUrl, setAccountGroupDocDataUrl] = useState("");
+  const [groupDocError, setGroupDocError] = useState("");
   const [designTemplate, setDesignTemplate] = useState("classic-light");
   const [cardId, setCardId] = useState("");
   const [orgChangeApprovalStatus, setOrgChangeApprovalStatus] = useState("");
@@ -205,6 +214,20 @@ export default function LetteringBizcardSettingsView({
     setVerifyDocDataUrl(ed.titleDeptVerifyDocDataUrl || "");
     setVerifyDocIssuedAt(ed.titleDeptVerifyDocIssuedAt || "");
     setVerifyDocError("");
+    {
+      const lockedName =
+        String(readLetteringFixedIdentity()?.name || "").trim() ||
+        String(localStorage.getItem("vlue_legal_name") || "").trim();
+      const acc = sanitizeDccAccountFields(ed, { lockedHolderName: lockedName });
+      setAccountType(acc.accountType);
+      setBankName(acc.bankName);
+      setAccountNumber(acc.accountNumber);
+      setAccountHolder(acc.accountHolder);
+      setIsGroupVerified(Boolean(acc.isGroupVerified));
+      setAccountGroupDocName(acc.accountGroupDocName || "");
+      setAccountGroupDocDataUrl(acc.accountGroupDocDataUrl || "");
+      setGroupDocError("");
+    }
     setDesignTemplate(normalizeLetteringBizcardTemplate(ed.designTemplate));
     setOrgChangeApprovalStatus(ed.orgChangeApprovalStatus || "");
     setOrgChangePendingName(ed.orgChangePendingName || "");
@@ -287,6 +310,19 @@ export default function LetteringBizcardSettingsView({
     const logoUrl = noCompanyLogo
       ? ""
       : pendingLogo?.previewUrl || pendingLogo?.dataUrl || logoPreview || "";
+    const lockedName = String(fixed?.name || "").trim();
+    const account = sanitizeDccAccountFields(
+      {
+        accountType,
+        bankName,
+        accountNumber,
+        accountHolder,
+        isGroupVerified,
+        accountGroupDocName,
+        accountGroupDocDataUrl
+      },
+      { lockedHolderName: lockedName }
+    );
     return withLetteringBizcardPreviewFallback({
       ...draft,
       fax: noFax ? "" : fax,
@@ -302,10 +338,12 @@ export default function LetteringBizcardSettingsView({
       logoUrl,
       photoUrl,
       titlePhotoUrl,
-      photoFocus
+      photoFocus,
+      ...account
     });
   }, [
     membershipTier,
+    fixed?.name,
     fax,
     email,
     website,
@@ -322,6 +360,13 @@ export default function LetteringBizcardSettingsView({
     noCompanyLogo,
     noFax,
     noWebsite,
+    accountType,
+    bankName,
+    accountNumber,
+    accountHolder,
+    isGroupVerified,
+    accountGroupDocName,
+    accountGroupDocDataUrl,
     previewTick
   ]);
 
@@ -398,6 +443,20 @@ export default function LetteringBizcardSettingsView({
     }
     setVerifyDocDataUrl(result.dataUrl);
     setVerifyDocName(result.fileName);
+  };
+
+  const handleGroupDocPick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setGroupDocError("");
+    const result = await prepareLetteringVerifyDocFromFile(file);
+    if (!result.ok) {
+      setGroupDocError(result.error);
+      return;
+    }
+    setAccountGroupDocDataUrl(result.dataUrl);
+    setAccountGroupDocName(result.fileName);
+    setIsGroupVerified(false);
   };
 
   const handleLogoPick = async (e) => {
@@ -574,6 +633,22 @@ export default function LetteringBizcardSettingsView({
       }
     }
 
+    const lockedName =
+      String(fixed?.name || "").trim() ||
+      String(localStorage.getItem("vlue_legal_name") || "").trim();
+    const accountPatch = sanitizeDccAccountFields(
+      {
+        accountType,
+        bankName,
+        accountNumber,
+        accountHolder,
+        isGroupVerified,
+        accountGroupDocName,
+        accountGroupDocDataUrl
+      },
+      { lockedHolderName: lockedName }
+    );
+
     const basePatch = {
       designTemplate: tpl,
       title: trimmedTitle,
@@ -597,7 +672,8 @@ export default function LetteringBizcardSettingsView({
       photoDataUrl: "",
       photoFileName: "",
       titlePhotoDataUrl: noTitlePhoto ? "" : pendingTitlePhoto?.dataUrl || titlePhotoPreview || "",
-      titlePhotoFileName: noTitlePhoto ? "" : pendingTitlePhoto?.fileName || titlePhotoFileName || ""
+      titlePhotoFileName: noTitlePhoto ? "" : pendingTitlePhoto?.fileName || titlePhotoFileName || "",
+      ...accountPatch
     };
 
     let writeResult;
@@ -655,6 +731,13 @@ export default function LetteringBizcardSettingsView({
     setLogoFileName(saved.logoFileName || "");
     setTitlePhotoPreview(saved.titlePhotoDataUrl || "");
     setTitlePhotoFileName(saved.titlePhotoFileName || "");
+    setAccountType(saved.accountType || "");
+    setBankName(saved.bankName || "");
+    setAccountNumber(saved.accountNumber || "");
+    setAccountHolder(saved.accountHolder || "");
+    setIsGroupVerified(Boolean(saved.isGroupVerified));
+    setAccountGroupDocName(saved.accountGroupDocName || "");
+    setAccountGroupDocDataUrl(saved.accountGroupDocDataUrl || "");
     setPendingLogo(null);
     setPendingTitlePhoto(null);
 
@@ -845,6 +928,27 @@ export default function LetteringBizcardSettingsView({
           setEmail={handleEmailChange}
           website={website}
           setWebsite={setWebsite}
+          accountType={accountType}
+          setAccountType={setAccountType}
+          bankName={bankName}
+          setBankName={setBankName}
+          accountNumber={accountNumber}
+          setAccountNumber={setAccountNumber}
+          accountHolder={accountHolder}
+          setAccountHolder={setAccountHolder}
+          accountGroupDocName={accountGroupDocName}
+          onGroupDocPick={handleGroupDocPick}
+          groupDocError={groupDocError}
+          onClearAccount={() => {
+            setAccountType("");
+            setBankName("");
+            setAccountNumber("");
+            setAccountHolder("");
+            setIsGroupVerified(false);
+            setAccountGroupDocName("");
+            setAccountGroupDocDataUrl("");
+            setGroupDocError("");
+          }}
           companyIntro={companyIntro}
           setCompanyIntro={setCompanyIntro}
           customBackText={customBackText}

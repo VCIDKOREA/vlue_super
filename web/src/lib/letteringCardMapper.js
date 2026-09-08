@@ -75,6 +75,15 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       profile.url ||
       profile.web ||
       "",
+    accountType: body.accountType || nested.accountType || profile.accountType || "",
+    bankName: body.bankName || nested.bankName || profile.bankName || "",
+    accountNumber: body.accountNumber || nested.accountNumber || profile.accountNumber || "",
+    accountHolder: body.accountHolder || nested.accountHolder || profile.accountHolder || "",
+    isGroupVerified: Boolean(
+      body.isGroupVerified || nested.isGroupVerified || profile.isGroupVerified
+    ),
+    accountGroupDocName:
+      body.accountGroupDocName || nested.accountGroupDocName || profile.accountGroupDocName || "",
     address:
       profile.address ||
       profile.businessAddress ||

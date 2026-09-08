@@ -4,6 +4,7 @@ import {
   clampLetteringBizcardBackNote,
   normalizePhotoFocus
 } from "./letteringBizcardStorage.js";
+import { sanitizeDccAccountFields } from "./dccAccountFields.js";
 
 /**
  * DCC 카드 큰 배경(타이틀 사진)만.
@@ -28,6 +29,7 @@ export function normalizeLetteringCard(raw = {}) {
   /* 회사 로고 없으면 비움(카카오 무지 스타일). VLUE 데모 로고로 채우지 않음 */
   const logoUrl = String(raw.logoUrl || "").trim();
   const noTitlePhoto = Boolean(raw.noTitlePhoto);
+  const account = sanitizeDccAccountFields(raw);
 
   return {
     ...merged,
@@ -68,6 +70,7 @@ export function normalizeLetteringCard(raw = {}) {
     ).trim(),
     roadAddress: String(raw.roadAddress || raw.companyAddressRoad || "").trim(),
     addressDetail: String(raw.addressDetail || "").trim(),
-    phoneDialEnabled: raw.phoneDialEnabled !== false && raw.phoneVisible !== false
+    phoneDialEnabled: raw.phoneDialEnabled !== false && raw.phoneVisible !== false,
+    ...account
   };
 }

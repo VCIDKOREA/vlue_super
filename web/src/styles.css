@@ -6589,6 +6589,60 @@ body,
   margin-top: 3px;
 }
 
+.ldr-front-account {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ldr-front-account__number-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ldr-front-account__copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.72;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ldr-front-account__copy:active {
+  opacity: 1;
+}
+
+.ldr-front-account__copy-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.ldr-front-account__disclaimer {
+  margin: 4px 0 0;
+  font-size: 9px;
+  line-height: 1.35;
+  font-weight: 500;
+  opacity: 0.62;
+}
+
+.ldr-panel--push .ldr-front-account__disclaimer,
+.ldr-reception--push .ldr-front-account__disclaimer {
+  font-size: 8px;
+}
+
 .ldr-reception--push .ldr-panel--front .ldr-front-profile-stack .ldr-back-section {
   margin-bottom: 0;
 }

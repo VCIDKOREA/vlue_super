@@ -123,7 +123,31 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
     displayName:
       force || !String(local.displayName || "").trim()
         ? String(snap.name || snap.displayName || "").trim()
-        : local.displayName
+        : local.displayName,
+    accountType:
+      force || !String(local.accountType || "").trim()
+        ? String(snap.accountType || "").trim()
+        : local.accountType,
+    bankName:
+      force || !String(local.bankName || "").trim()
+        ? String(snap.bankName || "").trim()
+        : local.bankName,
+    accountNumber:
+      force || !String(local.accountNumber || "").trim()
+        ? String(snap.accountNumber || "").replace(/\D/g, "")
+        : local.accountNumber,
+    accountHolder:
+      force || !String(local.accountHolder || "").trim()
+        ? String(snap.accountHolder || "").trim()
+        : local.accountHolder,
+    isGroupVerified:
+      force || snap.isGroupVerified != null
+        ? Boolean(snap.isGroupVerified)
+        : Boolean(local.isGroupVerified),
+    accountGroupDocName:
+      force || !String(local.accountGroupDocName || "").trim()
+        ? String(snap.accountGroupDocName || "").trim()
+        : local.accountGroupDocName
   };
 
   return writeLetteringBizcardEditable(patch)?.data ?? null;
@@ -431,7 +455,13 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
           noTitlePhoto: Boolean(ed.noTitlePhoto),
           shareCoverUrl,
           designTemplate: normalizeLetteringBizcardTemplate(card?.designTemplate || ed.designTemplate),
-          activityName: String(card?.activityName || readFeedNickname() || "").trim()
+          activityName: String(card?.activityName || readFeedNickname() || "").trim(),
+          accountType: String(card?.accountType || ed.accountType || "").trim(),
+          bankName: String(card?.bankName || ed.bankName || "").trim(),
+          accountNumber: String(card?.accountNumber || ed.accountNumber || "").replace(/\D/g, ""),
+          accountHolder: String(card?.accountHolder || ed.accountHolder || "").trim(),
+          isGroupVerified: Boolean(card?.isGroupVerified ?? ed.isGroupVerified),
+          accountGroupDocName: String(card?.accountGroupDocName || ed.accountGroupDocName || "").trim()
         }
       })
     });
