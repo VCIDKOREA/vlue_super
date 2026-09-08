@@ -713,6 +713,9 @@ object LetteringCallCoordinator {
             LetteringIncomingNotifier.cancel(app)
             LetteringRingingActivity.requestFinish(app)
 
+            /* 동기 제거 우선 — 홈에 BigPush/Showcase 고착 방지 */
+            CallOverlayService.dismissNow(app)
+
             if (CompanionMvpConfig.DELEGATE_CALL_UI) {
                 kr.vlue.calloverlay.incall.VlueInCallController.keepOverlayAfterHangup = false
                 dismissCallOverlayOnly(app)

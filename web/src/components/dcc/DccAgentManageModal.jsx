@@ -52,7 +52,8 @@ export default function DccAgentManageModal({
   onAssignAgent,
   onChanged,
   onToast,
-  onEditProfileBroadcast
+  onEditProfileBroadcast,
+  onSwitchProfile
 }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState("");
@@ -268,9 +269,9 @@ export default function DccAgentManageModal({
               멀티 DCC 프로필
             </h2>
             <p className="dcc-agent-modal__sub">
-              계정 1개에 프로필 N개. 각 프로필은 DCC부터 쇼케이스까지 따로 설정합니다. 번호를 지정하면 그
-              번호로 송출되고, 미지정·모르는 상대에게는 <b>대표 프로필</b>이 송출됩니다. 추가 슬롯 SOHO
-              +4,200원/장.
+              계정 1개에 프로필 N개. 목록에서 프로필을 누르면 즉시 그 프로필로 전환됩니다. 각 프로필은
+              DCC부터 쇼케이스까지 따로 설정하고, 번호를 지정하면 그 번호로 송출됩니다. 미지정·모르는
+              상대에게는 <b>대표 프로필</b>이 송출됩니다.
             </p>
           </div>
           <button type="button" className="dcc-agent-modal__close" onClick={onClose} aria-label="닫기">
@@ -289,9 +290,19 @@ export default function DccAgentManageModal({
                   className={`dcc-agent-row${selected ? " is-active" : ""}`}
                   role="button"
                   tabIndex={0}
-                  onClick={() => setSelectedProfileId(profile.id)}
+                  onClick={() => {
+                    setSelectedProfileId(profile.id);
+                    if (typeof onSwitchProfile === "function") {
+                      void onSwitchProfile(profile);
+                    }
+                  }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") setSelectedProfileId(profile.id);
+                    if (e.key === "Enter" || e.key === " ") {
+                      setSelectedProfileId(profile.id);
+                      if (typeof onSwitchProfile === "function") {
+                        void onSwitchProfile(profile);
+                      }
+                    }
                   }}
                 >
                   {profile.photoUrl ? (

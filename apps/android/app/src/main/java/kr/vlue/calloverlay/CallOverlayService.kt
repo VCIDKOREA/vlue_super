@@ -15,7 +15,10 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.TypedValue
+import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
+import java.util.concurrent.Executor
+import androidx.core.content.ContextCompat
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -114,6 +117,11 @@ class CallOverlayService : Service() {
         val cardJson: String?,
         val dcpRoute: String
     )
+    /** Call End 누락 시 홈에 오버레이 고착 방지 — 서비스 자체 IDLE 감시 */
+    private var idleTelephonyCallback: TelephonyCallback? = null
+    @Suppress("DEPRECATION")
+    private var idlePhoneStateListener: android.telephony.PhoneStateListener? = null
+    private var lastTelephonyStateForDismiss: Int = TelephonyManager.CALL_STATE_IDLE
     private val bigPushSettle400 = Runnable {
         if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
             reevaluateForegroundContext("bigPush_settle_400")
@@ -224,6 +232,7 @@ class CallOverlayService : Service() {
         startScreenStateDetector()
         startContextWatch()
         registerMemoryCallbackObserver()
+        registerIdleTelephonyWatch()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -352,19 +361,21 @@ class CallOverlayService : Service() {
         dcpPopupOnly = false
         bindDcpRoute(phone, dcpRoute, cardJson)
         /*
-         * Phase 6-G: Call End 이후 enrichWithLookup / queued FGS 가 IDLE 에서 showOverlay 를
-         * 다시 열면 Showcase 재등장이 난다. 세션이 이미 끝났고 IDLE 이면 무시.
+         * Call End 이후 enrich/queued FGS 가 IDLE 에서 showOverlay 를 다시 열면
+         * 홈 화면에 BigPush/Showcase 가 고착된다. IDLE 이면 무조건 제거.
          */
-        if (callState == TelephonyManager.CALL_STATE_IDLE &&
-            !answered &&
-            CompanionRuntimeStabilityDiag.shouldIgnorePostEndOverlayStart()
-        ) {
+        if (callState == TelephonyManager.CALL_STATE_IDLE) {
             CompanionRuntimeStabilityDiag.noteStaleEvent(
                 "SHOW_OVERLAY_WHILE_IDLE",
                 "showOverlay",
-                detail = "alreadyAttached=$alreadyAttached"
+                detail = "alreadyAttached=$alreadyAttached state=${companion.state.name}"
             )
-            if (!alreadyAttached) {
+            if (alreadyAttached ||
+                companion.state != OverlayState.IDLE ||
+                dcpPopupView?.isAttachedToWindow == true
+            ) {
+                dismissOverlay()
+            } else {
                 stopSelfTraced("staleShowOverlayAfterCallEnd")
             }
             return
@@ -1134,41 +1145,51 @@ class CallOverlayService : Service() {
      * (탭 없이 쇼케이스·정상팝업이 뜨도록)
      */
     private var answerUiResumeAttempt = 0
+    private var answerUiResumeRunnable: Runnable? = null
 
     private fun answerResumeAttemptFromSource(source: String): Int {
         val m = Regex("""answer_ui_resume_(\d+)""").find(source)
         return m?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
     }
 
+    private fun cancelAnswerUiResume() {
+        answerUiResumeRunnable?.let { mainHandler.removeCallbacks(it) }
+        answerUiResumeRunnable = null
+    }
+
     private fun scheduleAnswerUiResume(reason: String) {
         if (dismissing || !remoteConnected) return
         if (companion.state != OverlayState.BIG_PUSH) return
         if (authPopupConfirmedToMini || userMinimized) return
+        cancelAnswerUiResume()
         val attempt = ++answerUiResumeAttempt
         if (attempt > 8) {
-            /* 최종: 그래도 BIG_PUSH 면 쇼케이스 강제 */
             VlueBigPushTrace.lifecycle(
                 "ANSWER_UI_RESUME_EXHAUSTED",
                 "force showcase after $attempt attempts reason=$reason"
             )
-            mainHandler.post {
-                if (dismissing || !remoteConnected) return@post
-                if (companion.state != OverlayState.BIG_PUSH) return@post
+            val force = Runnable {
+                if (dismissing || !remoteConnected) return@Runnable
+                if (companion.state != OverlayState.BIG_PUSH) return@Runnable
                 enterShowcaseFromAnswer(source = "answer_ui_resume_$attempt")
             }
+            answerUiResumeRunnable = force
+            mainHandler.post(force)
             return
         }
         val delayMs = 280L + (attempt - 1) * 200L
-        mainHandler.postDelayed({
-            if (dismissing || !remoteConnected) return@postDelayed
-            if (companion.state != OverlayState.BIG_PUSH) return@postDelayed
-            if (authPopupConfirmedToMini || userMinimized) return@postDelayed
+        val retry = Runnable {
+            if (dismissing || !remoteConnected) return@Runnable
+            if (companion.state != OverlayState.BIG_PUSH) return@Runnable
+            if (authPopupConfirmedToMini || userMinimized) return@Runnable
             VlueBigPushTrace.lifecycle(
                 "ANSWER_UI_RESUME_RETRY",
                 "attempt=$attempt reason=$reason state=${companion.state.name}"
             )
             enterShowcaseFromAnswer(source = "answer_ui_resume_$attempt")
-        }, delayMs)
+        }
+        answerUiResumeRunnable = retry
+        mainHandler.postDelayed(retry, delayMs)
     }
 
     /**
@@ -1750,6 +1771,80 @@ class CallOverlayService : Service() {
             "phase=$phase ctx=${ctx.name} sysFg=$sysFg tasks=$tasksPkg inCall=$inCallUi ourApp=$ourApp"
         )
         return ctx
+    }
+
+    private fun registerIdleTelephonyWatch() {
+        if (idleTelephonyCallback != null || idlePhoneStateListener != null) return
+        val tm = getSystemService(TELEPHONY_SERVICE) as? TelephonyManager ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val executor: Executor = ContextCompat.getMainExecutor(this)
+                val cb = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
+                    override fun onCallStateChanged(state: Int) {
+                        onTelephonyStateForDismiss(state)
+                    }
+                }
+                tm.registerTelephonyCallback(executor, cb)
+                idleTelephonyCallback = cb
+            } else {
+                @Suppress("DEPRECATION")
+                val listener = object : android.telephony.PhoneStateListener() {
+                    @Deprecated("Deprecated in Java")
+                    override fun onCallStateChanged(state: Int, phoneNumber: String?) {
+                        onTelephonyStateForDismiss(state)
+                    }
+                }
+                @Suppress("DEPRECATION")
+                tm.listen(listener, android.telephony.PhoneStateListener.LISTEN_CALL_STATE)
+                idlePhoneStateListener = listener
+            }
+        } catch (e: Exception) {
+            VlueBigPushTrace.lifecycle(
+                "IDLE_TELEPHONY_WATCH_FAIL",
+                "${e.javaClass.simpleName}: ${e.message}"
+            )
+        }
+    }
+
+    private fun unregisterIdleTelephonyWatch() {
+        val tm = getSystemService(TELEPHONY_SERVICE) as? TelephonyManager
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                idleTelephonyCallback?.let { tm?.unregisterTelephonyCallback(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                idlePhoneStateListener?.let {
+                    tm?.listen(it, android.telephony.PhoneStateListener.LISTEN_NONE)
+                }
+            }
+        } catch (_: Exception) {
+            /* ignore */
+        }
+        idleTelephonyCallback = null
+        idlePhoneStateListener = null
+    }
+
+    private fun onTelephonyStateForDismiss(state: Int) {
+        val prev = lastTelephonyStateForDismiss
+        lastTelephonyStateForDismiss = state
+        if (state != TelephonyManager.CALL_STATE_IDLE) return
+        if (prev == TelephonyManager.CALL_STATE_IDLE) return
+        mainHandler.post {
+            if (dismissing) return@post
+            val attached = rootContainer?.isAttachedToWindow == true
+            val popupUp = dcpPopupView?.isAttachedToWindow == true
+            val activeUi =
+                companion.state == OverlayState.BIG_PUSH ||
+                    companion.state == OverlayState.SHOWCASE ||
+                    companion.state == OverlayState.MINI_CASE
+            if (attached || popupUp || activeUi) {
+                VlueBigPushTrace.lifecycle(
+                    "TELEPHONY_IDLE_FORCE_DISMISS",
+                    "prev=$prev state=${companion.state.name} attached=$attached"
+                )
+                dismissOverlay()
+            }
+        }
     }
 
     private fun telephonyCallState(): Int {
@@ -3351,6 +3446,7 @@ class CallOverlayService : Service() {
         dismissing = true
         cancelFullscreenExpandAnimator()
         cancelBigPushSettle()
+        cancelAnswerUiResume()
         stopContextWatch()
         CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_CALL_END", "dismissOverlay")
         CompanionRuntimeStabilityDiag.endCallSession("dismissOverlay")
@@ -3369,12 +3465,13 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.mark("WEB_CALL_STATE_IDLE", "dismissOverlay")
         CompanionRuntimeStabilityDiag.mark("OVERLAY_HIDE_BEGIN", "dismissOverlay")
         rootContainer?.animate()?.cancel()
-                removeOverlayImmediate()
+        removeOverlayImmediate()
         CompanionRuntimeStabilityDiag.mark("OVERLAY_HIDE_COMPLETE", "dismissOverlay_immediate")
         LetteringRingingActivity.requestFinish(this)
         val queued = pendingShowAfterDismiss
         pendingShowAfterDismiss = null
-        if (queued != null) {
+        /* 통화 종료(IDLE) 중에는 대기 중인 재표시를 버림 — 홈 고착 방지 */
+        if (queued != null && telephonyCallState() != TelephonyManager.CALL_STATE_IDLE) {
             CompanionRuntimeStabilityDiag.mark("SHOW_OVERLAY_AFTER_DISMISS", "dismissOverlay")
             mainHandler.post {
                 showOverlay(
@@ -3392,13 +3489,18 @@ class CallOverlayService : Service() {
 
     private fun removeOverlayImmediate() {
         cancelBigPushSettle()
+        cancelAnswerUiResume()
         ShowcaseProximitySensor.detach()
         webView?.destroy()
         webView = null
         rootContainer?.let { v ->
             try {
                 OverlayDiagTracker.onRemoveView()
-                windowManager?.removeView(v)
+                try {
+                    windowManager?.removeViewImmediate(v)
+                } catch (_: Exception) {
+                    windowManager?.removeView(v)
+                }
                 VlueBigPushTrace.lifecycle(
                     "REMOVE_VIEW",
                     "attachedWas=${v.isAttachedToWindow} ${OverlayDiagTracker.detailSuffix()}"
@@ -3436,6 +3538,7 @@ class CallOverlayService : Service() {
 
     override fun onDestroy() {
         CompanionRecoveryTracker.recordServiceLifecycle("ON_DESTROY")
+        unregisterIdleTelephonyWatch()
         unregisterMemoryCallbackObserver()
         stopContextWatch()
         stopScreenStateDetector()
@@ -3906,6 +4009,26 @@ class CallOverlayService : Service() {
         private var activeInstance: CallOverlayService? = null
 
         fun isRunning(): Boolean = activeInstance != null
+
+        /** 통화 종료 시 동기 제거 — startService(ACTION_DISMISS) 레이스 보완 */
+        fun dismissNow(context: android.content.Context? = null) {
+            val svc = activeInstance
+            if (svc != null) {
+                svc.mainHandler.post {
+                    if (!svc.dismissing) svc.dismissOverlay()
+                }
+                return
+            }
+            if (context == null) return
+            val intent = Intent(context.applicationContext, CallOverlayService::class.java).apply {
+                action = ACTION_DISMISS
+            }
+            try {
+                context.applicationContext.startService(intent)
+            } catch (_: Exception) {
+                /* ignore */
+            }
+        }
 
         /** BigPush/Showcase/Mini 가 화면에 있으면 HUN 폴백 금지 */
         fun isCompanionSurfaceVisible(): Boolean {

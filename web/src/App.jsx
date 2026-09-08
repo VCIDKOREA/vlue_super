@@ -88,6 +88,7 @@ const CsScannerScreen = lazy(() => import("./components/office/CsScannerScreen.j
 const BizcardScannerScreen = lazy(() => import("./components/office/BizcardScannerScreen.jsx"));
 const VlueUnifiedInboxScreen = lazy(() => import("./components/email/VlueUnifiedInboxScreen.jsx"));
 import UserProfileAvatar from "./components/UserProfileAvatar.jsx";
+import HeaderMultiProfileButton from "./components/dcc/HeaderMultiProfileButton.jsx";
 import { clearBiometricSessionOnly } from "./lib/webauthnBiometric";
 import {
   getDefaultMemberVlueEmail,
@@ -4532,6 +4533,20 @@ function App() {
                 <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
             </button>
+            ) : null}
+            {!isBrowseGuest ? (
+              <HeaderMultiProfileButton
+                requireAuth={requireAuth}
+                onToast={(msg) => {
+                  try {
+                    window.dispatchEvent(
+                      new CustomEvent("vlue-app-toast", { detail: { message: String(msg || "") } })
+                    );
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              />
             ) : null}
             {isBrowseGuest ? (
               <button
