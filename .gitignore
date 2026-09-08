@@ -127,3 +127,5 @@ $RECYCLE.BIN/
 vlue-release-keystore-SECRET.txt
 **/vlue-release-keystore-SECRET.txt
 
+
+apps/android/build-out.txt
