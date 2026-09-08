@@ -25,7 +25,7 @@ export default function ScreenBackHeader({
   const stickyCls = sticky ? "sticky top-0 z-10 shrink-0" : "shrink-0";
 
   return (
-    <header className={`flex items-center gap-1 border-b px-2 py-2 ${bar} ${stickyCls} ${className}`}>
+    <header className={`flex items-center gap-1 border-b px-2 py-2 vlue-top-safe ${bar} ${stickyCls} ${className}`}>
       <BackButton variant="inline" onBack={onBack} isDarkMode={isDarkMode} />
       {title != null && title !== "" ? (
         typeof title === "string" ? (

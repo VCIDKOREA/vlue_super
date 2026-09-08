@@ -68,19 +68,24 @@ body,
   --friend-sheet-collapsed-h: 52px;
   /* Android WebView 상태바 — 네이티브가 주입. 미주입 시 html.vlue-android-app 폴백 */
   --vlue-status-inset: 0px;
+  --vlue-safe-top: max(env(safe-area-inset-top, 0px), var(--vlue-status-inset, 0px));
 }
 
 /* 상단 고정 UI — safe-area + (선택) 네이티브 상태바 inset */
 .vlue-top-safe {
-  padding-top: max(env(safe-area-inset-top, 0px), var(--vlue-status-inset, 0px));
+  padding-top: var(--vlue-safe-top);
 }
 
 /*
  * Play 구버전(edge-to-edge · inset 미주입): 상태바와 겹침 방지.
  * 신버전 APK는 inset-ready + --vlue-status-inset:0 으로 이중 여백 없음.
  */
+html.vlue-android-app:not(.vlue-status-inset-ready) {
+  --vlue-safe-top: max(env(safe-area-inset-top, 0px), 28px);
+}
+
 html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
-  padding-top: max(env(safe-area-inset-top, 0px), 28px);
+  padding-top: var(--vlue-safe-top);
 }
 
 .vlue-scroll-pad-bottom-nav {

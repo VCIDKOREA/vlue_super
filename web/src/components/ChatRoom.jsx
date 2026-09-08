@@ -1197,7 +1197,7 @@ function ChatRoom({
     <section className="flex flex-col flex-1 min-h-0 h-full bg-[linear-gradient(180deg,#f4f8ff_0%,#f8fbff_48%,#fafdff_100%)] relative overflow-hidden">
       <div
         className={`relative flex min-h-[52px] shrink-0 items-center gap-1 border-b border-gray-100 bg-white/80 px-2 pb-2 backdrop-blur-md sticky top-0 z-[110] ${
-          readOnlyBroadcast ? "pt-[max(12px,env(safe-area-inset-top,0px))]" : "pt-[max(8px,env(safe-area-inset-top,0px))] py-2"
+          readOnlyBroadcast ? "pt-[max(12px,var(--vlue-safe-top,0px))]" : "pt-[max(8px,var(--vlue-safe-top,0px))] py-2"
         }`}
       >
         {isVmingChatRoom && vmingHeaderActive ? (

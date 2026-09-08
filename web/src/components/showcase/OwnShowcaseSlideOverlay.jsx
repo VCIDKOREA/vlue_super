@@ -48,7 +48,8 @@ export default function OwnShowcaseSlideOverlay({ onToast }) {
     <div className="own-showcase-slide-overlay fixed inset-0 z-[280] bg-[#0B101B]">
       <button
         type="button"
-        className="absolute right-3 top-3 z-[290] flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white shadow-lg backdrop-blur-sm active:scale-95"
+        className="absolute right-3 z-[290] flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white shadow-lg backdrop-blur-sm active:scale-95"
+        style={{ top: "max(12px, var(--vlue-safe-top, 12px))" }}
         aria-label="닫기"
         onClick={close}
       >

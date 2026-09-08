@@ -517,21 +517,19 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
         ? (card.dccSnapshotJson as Record<string, unknown>)
         : null;
     const certified = Boolean(card.user.phoneE164) && card.phoneE164 === card.user.phoneE164;
-    const masterSnap = certified ? await loadExportSnapLite(card.user.id) : null;
+    /* 연락·소개는 인증 여부와 무관하게 마스터 폴백 (내선 스냅이 비어 있어도 명함 정보 유지) */
+    const masterSnap = await loadExportSnapLite(card.user.id);
     const exportSnap = {
       name: firstStr(lineSnap?.name, lineSnap?.displayName, certified ? masterSnap?.name : ""),
       title: firstStr(lineSnap?.title, certified ? masterSnap?.title : ""),
-      email: firstStr(lineSnap?.email, certified ? masterSnap?.email : ""),
-      website: firstStr(lineSnap?.website, certified ? masterSnap?.website : ""),
-      fax: firstStr(lineSnap?.fax, certified ? masterSnap?.fax : ""),
-      address: firstStr(lineSnap?.address, certified ? masterSnap?.address : ""),
+      email: firstStr(lineSnap?.email, masterSnap?.email),
+      website: firstStr(lineSnap?.website, masterSnap?.website),
+      fax: firstStr(lineSnap?.fax, masterSnap?.fax),
+      address: firstStr(lineSnap?.address, masterSnap?.address),
       department: firstStr(lineSnap?.department, certified ? masterSnap?.department : ""),
-      companyIntro: firstStr(lineSnap?.companyIntro, certified ? masterSnap?.companyIntro : ""),
-      salesContent: firstStr(lineSnap?.salesContent, certified ? masterSnap?.salesContent : ""),
-      customBackText: firstStr(
-        lineSnap?.customBackText,
-        certified ? masterSnap?.customBackText : ""
-      ),
+      companyIntro: firstStr(lineSnap?.companyIntro, masterSnap?.companyIntro),
+      salesContent: firstStr(lineSnap?.salesContent, masterSnap?.salesContent),
+      customBackText: firstStr(lineSnap?.customBackText, masterSnap?.customBackText),
       photoUrl: certified
         ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
         : httpOnlyUrl(lineSnap?.photoUrl) || "",
@@ -544,7 +542,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       ),
       logoUrl: certified
         ? httpOnlyUrl(masterSnap?.logoUrl) || ""
-        : httpOnlyUrl(lineSnap?.logoUrl) || "",
+        : httpOnlyUrl(lineSnap?.logoUrl) || httpOnlyUrl(masterSnap?.logoUrl) || "",
       photoFocus: firstStr(
         certified ? masterSnap?.photoFocus : lineSnap?.photoFocus,
         lineSnap?.photoFocus,
@@ -836,21 +834,18 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         ? (card.dccSnapshotJson as Record<string, unknown>)
         : null;
     const certified = Boolean(card.user.phoneE164) && card.phoneE164 === card.user.phoneE164;
-    const masterSnap = certified ? await loadExportSnapLite(card.user.id) : null;
+    const masterSnap = await loadExportSnapLite(card.user.id);
     const exportSnap = {
       name: firstStr(lineSnap?.name, lineSnap?.displayName, certified ? masterSnap?.name : ""),
       title: firstStr(lineSnap?.title, certified ? masterSnap?.title : ""),
-      email: firstStr(lineSnap?.email, certified ? masterSnap?.email : ""),
-      website: firstStr(lineSnap?.website, certified ? masterSnap?.website : ""),
-      fax: firstStr(lineSnap?.fax, certified ? masterSnap?.fax : ""),
-      address: firstStr(lineSnap?.address, certified ? masterSnap?.address : ""),
+      email: firstStr(lineSnap?.email, masterSnap?.email),
+      website: firstStr(lineSnap?.website, masterSnap?.website),
+      fax: firstStr(lineSnap?.fax, masterSnap?.fax),
+      address: firstStr(lineSnap?.address, masterSnap?.address),
       department: firstStr(lineSnap?.department, certified ? masterSnap?.department : ""),
-      companyIntro: firstStr(lineSnap?.companyIntro, certified ? masterSnap?.companyIntro : ""),
-      salesContent: firstStr(lineSnap?.salesContent, certified ? masterSnap?.salesContent : ""),
-      customBackText: firstStr(
-        lineSnap?.customBackText,
-        certified ? masterSnap?.customBackText : ""
-      ),
+      companyIntro: firstStr(lineSnap?.companyIntro, masterSnap?.companyIntro),
+      salesContent: firstStr(lineSnap?.salesContent, masterSnap?.salesContent),
+      customBackText: firstStr(lineSnap?.customBackText, masterSnap?.customBackText),
       photoUrl: certified
         ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
         : httpOnlyUrl(lineSnap?.photoUrl) || "",
@@ -863,7 +858,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       ),
       logoUrl: certified
         ? httpOnlyUrl(masterSnap?.logoUrl) || ""
-        : httpOnlyUrl(lineSnap?.logoUrl) || "",
+        : httpOnlyUrl(lineSnap?.logoUrl) || httpOnlyUrl(masterSnap?.logoUrl) || "",
       photoFocus: firstStr(
         certified ? masterSnap?.photoFocus : lineSnap?.photoFocus,
         lineSnap?.photoFocus,

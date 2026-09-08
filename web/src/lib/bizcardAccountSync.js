@@ -2,7 +2,9 @@ import { fetchB2bMembershipUiContext } from "./b2bEnterpriseApi.js";
 import {
   fetchDigitalCardMeta,
   needsDigitalCardLocalRestore,
-  restoreDigitalCardFromServer
+  needsDigitalCardContactFill,
+  restoreDigitalCardFromServer,
+  fillEmptyDigitalCardFieldsFromServer
 } from "./digitalCardApi.js";
 import { formatPhoneE164ForKoreaDisplay } from "./phoneDisplay.js";
 import { normalizeMembershipKind } from "./membershipBm.js";
@@ -192,12 +194,15 @@ export async function syncBizcardAccountFromApi(opts = {}) {
   const force = Boolean(opts.force);
   /* 재설치·빈 로컬이면 반드시 full snapshot 복원 (lite 는 사진·이메일 생략) */
   const restoreNeeded = force || needsDigitalCardLocalRestore();
+  const fillNeeded = !restoreNeeded && needsDigitalCardContactFill();
 
   const [ctx, meta] = await Promise.all([
     fetchB2bMembershipUiContext().catch(() => null),
     restoreNeeded
       ? restoreDigitalCardFromServer({ force: true }).catch(() => ({ issued: false, cardId: null }))
-      : fetchDigitalCardMeta({ force, lite: true }).catch(() => ({ issued: false, cardId: null }))
+      : fillNeeded
+        ? fillEmptyDigitalCardFieldsFromServer().catch(() => ({ issued: false, cardId: null }))
+        : fetchDigitalCardMeta({ force, lite: true }).catch(() => ({ issued: false, cardId: null }))
   ]);
 
   if (ctx?.company?.company_name) {

@@ -121,7 +121,7 @@
   -webkit-backdrop-filter: blur(18px) saturate(1.15);
   border-bottom: 0 !important;
   box-shadow: none !important;
-  padding-top: max(10px, env(safe-area-inset-top, 0px));
+  padding-top: max(10px, var(--vlue-safe-top, env(safe-area-inset-top, 0px)));
 }
 
 .lettering-ongoing--fullscreen-tent > .lettering-live-bar::after,
@@ -2487,7 +2487,7 @@
 }
 
 .lettering-ongoing--history-replay > .lettering-live-bar {
-  padding-top: max(12px, env(safe-area-inset-top, 0px));
+  padding-top: max(12px, var(--vlue-safe-top, env(safe-area-inset-top, 0px)));
   padding-right: 52px;
 }
 

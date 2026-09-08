@@ -103,12 +103,52 @@ async function isCertifiedRow(userId: string, phoneE164: string) {
   return Boolean(phone) && phoneE164 === phone;
 }
 
+/** 라인 스냅에 비어 있는 연락·소개 필드는 마스터 명함으로 채운다 (신원·사진은 라인 우선). */
+function withMasterContactFallbacks(
+  lineSnap: Record<string, unknown>,
+  master: Record<string, unknown>
+): Record<string, unknown> {
+  const pick = (key: string) => {
+    const lineVal = String(lineSnap[key] ?? "").trim();
+    if (lineVal) return lineVal;
+    return String(master[key] ?? "").trim();
+  };
+  const contactKeys = [
+    "email",
+    "website",
+    "fax",
+    "address",
+    "addressRoad",
+    "addressDetail",
+    "companyIntro",
+    "salesContent",
+    "customBackText",
+    "organization",
+    "companyName",
+    "bankName",
+    "accountNumber",
+    "accountHolder",
+    "accountType"
+  ] as const;
+  const next: Record<string, unknown> = { ...lineSnap };
+  for (const key of contactKeys) {
+    const v = pick(key);
+    if (v) next[key] = v;
+  }
+  if (!String(next.logoUrl ?? "").trim() && String(master.logoUrl ?? "").trim()) {
+    next.logoUrl = master.logoUrl;
+  }
+  return next;
+}
+
 async function lineDccBase(userId: string, row: { phoneE164: string; dccSnapshotJson: unknown }) {
   const lineSnap = snapObj(row.dccSnapshotJson);
+  const master = await loadMasterExport(userId);
   if (await isCertifiedRow(userId, row.phoneE164)) {
-    return mergeExportSnapshotMedia(await loadMasterExport(userId), lineSnap);
+    return mergeExportSnapshotMedia(master, lineSnap);
   }
-  return lineSnap;
+  /* 내선·대표: 쇼케이스/사진은 라인 전용, 연락처·뒷면 문구는 마스터 폴백 */
+  return withMasterContactFallbacks(lineSnap, master);
 }
 
 async function loadMasterShowcase(userId: string) {

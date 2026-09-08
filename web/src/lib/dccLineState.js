@@ -82,7 +82,11 @@ export function writeDccLinePreviewFromBundle(bundle) {
     organization: String(
       dcc.organization || dcc.companyName || (keepSameLine ? prev?.organization : "") || ""
     ).trim(),
-    logoUrl: String(dcc.logoUrl || (keepSameLine ? prev?.logoUrl : "") || "").trim()
+    logoUrl: String(dcc.logoUrl || (keepSameLine ? prev?.logoUrl : "") || "").trim(),
+    companyIntro: String(dcc.companyIntro || (keepSameLine ? prev?.companyIntro : "") || "").trim(),
+    customBackText: String(
+      dcc.customBackText || dcc.salesContent || (keepSameLine ? prev?.customBackText : "") || ""
+    ).trim()
   });
 }
 

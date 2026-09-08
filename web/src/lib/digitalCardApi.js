@@ -167,6 +167,42 @@ export function needsDigitalCardLocalRestore() {
   }
 }
 
+/** 이메일만 있고 주소·웹·소개 등이 비어 서버 스냅으로 빈 칸만 채울지 */
+export function needsDigitalCardContactFill() {
+  try {
+    const ed = readLetteringBizcardEditable();
+    return !(
+      String(ed.email || "").trim() &&
+      String(ed.website || "").trim() &&
+      String(ed.address || ed.addressRoad || "").trim() &&
+      String(ed.fax || "").trim() &&
+      String(ed.companyIntro || "").trim() &&
+      String(ed.customBackText || "").trim()
+    );
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * 로컬에 이미 있는 값은 유지하고, 빈 연락·소개 칸만 서버 스냅으로 채운다.
+ */
+export async function fillEmptyDigitalCardFieldsFromServer() {
+  const meta = await fetchDigitalCardMeta({ force: true, lite: false });
+  if (meta?.exportSnapshot) {
+    hydrateLetteringEditableFromSnapshot(meta.exportSnapshot, { force: false });
+    hydrateAvatarsFromExportSnapshot(meta.exportSnapshot, { force: false });
+    try {
+      window.dispatchEvent(new CustomEvent("vlue-digital-card-changed"));
+      window.dispatchEvent(new CustomEvent("vlue-lettering-bizcard-changed"));
+      window.dispatchEvent(new Event("vlue-vcid-changed"));
+    } catch {
+      /* ignore */
+    }
+  }
+  return meta;
+}
+
 /**
  * 재설치·로그인 후 서버 exportSnapshot 전체 복원 (lite 금지)
  * @param {{ force?: boolean }} [opts]

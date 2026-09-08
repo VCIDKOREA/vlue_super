@@ -71,7 +71,7 @@ export default function AppFullScreenView({
     >
       {hideHeader ? null : (
         <header
-          className={`flex shrink-0 items-center gap-3 border-b px-3 pb-3 pt-[max(10px,env(safe-area-inset-top,0px))] ${
+          className={`flex shrink-0 items-center gap-3 border-b px-3 pb-3 vlue-top-safe ${
             isDarkMode ? "border-white/10" : "border-slate-100"
           }`}
         >
@@ -97,7 +97,7 @@ export default function AppFullScreenView({
           type="button"
           onClick={onClose}
           className={`pointer-events-auto absolute right-3 z-[300] ${closeBtnClass}`}
-          style={{ top: "max(12px, env(safe-area-inset-top, 0px))" }}
+          style={{ top: "max(12px, var(--vlue-safe-top, env(safe-area-inset-top, 0px)))" }}
           aria-label="닫기"
         >
           <X size={18} strokeWidth={2.4} aria-hidden />

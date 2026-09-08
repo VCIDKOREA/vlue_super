@@ -3174,11 +3174,17 @@ function App() {
       try {
         const uid = String(localStorage.getItem("vlue_server_user_id") || "").trim();
         if (!uid) return;
-        const { needsDigitalCardLocalRestore, restoreDigitalCardFromServer } = await import(
-          "./lib/digitalCardApi.js"
-        );
+        const {
+          needsDigitalCardLocalRestore,
+          needsDigitalCardContactFill,
+          restoreDigitalCardFromServer,
+          fillEmptyDigitalCardFieldsFromServer
+        } = await import("./lib/digitalCardApi.js");
         if (needsDigitalCardLocalRestore()) {
           await restoreDigitalCardFromServer({ force: true });
+        } else if (needsDigitalCardContactFill()) {
+          /* 이메일만 남아 있어도 주소·웹·소개 빈 칸은 서버 스냅으로 채움 */
+          await fillEmptyDigitalCardFieldsFromServer();
         }
         const showcase = await import("./lib/showcase/showcaseStyleSync.js");
         if (showcase.needsShowcaseStyleLocalRestore()) {

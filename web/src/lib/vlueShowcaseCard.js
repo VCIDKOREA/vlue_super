@@ -34,6 +34,18 @@ export function applyDccLinePreviewOverlay(card = {}) {
   const fax = String(line.fax || "").trim();
   const organization = String(line.organization || "").trim();
   const logoUrl = String(line.logoUrl || "").trim();
+  const companyIntro = String(line.companyIntro || "").trim();
+  const customBackText = String(line.customBackText || "").trim();
+  const contactPatch = {
+    email: email || card.email,
+    address: address || card.address,
+    website: website || card.website,
+    fax: fax || card.fax,
+    organization: organization || card.organization,
+    logoUrl: logoUrl || card.logoUrl,
+    companyIntro: companyIntro || card.companyIntro,
+    customBackText: customBackText || card.customBackText
+  };
   if (line.isCertified) {
     return {
       ...card,
@@ -46,18 +58,13 @@ export function applyDccLinePreviewOverlay(card = {}) {
       photoFocus: line.photoFocus || card.photoFocus,
       title: title || card.title,
       department: department || card.department,
-      email: email || card.email,
-      address: address || card.address,
-      website: website || card.website,
-      fax: fax || card.fax,
-      organization: organization || card.organization,
-      logoUrl: logoUrl || card.logoUrl,
+      ...contactPatch,
       previewShowcaseId: name || phone || card.previewShowcaseId || ""
     };
   }
   /*
    * 내선·대표: 송출 신원(이름·번호·직함·사진)만 라인 값으로 덮고,
-   * 이메일·주소·웹·팩스·상호·로고는 마스터 명함(또는 라인 DCC)을 유지한다.
+   * 이메일·주소·웹·팩스·상호·로고·뒷면 문구는 마스터 명함(또는 라인 DCC)을 유지한다.
    * (빈 문자열로 강제 지우면 앞면 입력 정보가 통째로 사라짐)
    */
   return {
@@ -71,14 +78,7 @@ export function applyDccLinePreviewOverlay(card = {}) {
     photoFocus: line.photoFocus || card.photoFocus || "center",
     title: title || card.title,
     department: department || card.department,
-    email: email || card.email,
-    address: address || card.address,
-    website: website || card.website,
-    fax: fax || card.fax,
-    organization: organization || card.organization,
-    logoUrl: logoUrl || card.logoUrl,
-    companyIntro: card.companyIntro,
-    customBackText: card.customBackText,
+    ...contactPatch,
     previewShowcaseId: name || phone || card.previewShowcaseId || ""
   };
 }

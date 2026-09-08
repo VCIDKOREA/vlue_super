@@ -23,8 +23,9 @@
   position: sticky;
   top: 0;
   z-index: 3;
-  height: 44px;
-  padding: 0 44px;
+  box-sizing: border-box;
+  min-height: calc(44px + var(--vlue-safe-top, 0px));
+  padding: var(--vlue-safe-top, 0px) 44px 0;
   border-bottom: 1px solid var(--ig-border);
   background: var(--ig-bg);
   isolation: isolate;
@@ -136,7 +137,7 @@
 
 .ig-mycase__icon-btn--overlay {
   position: absolute;
-  top: 50%;
+  top: calc(var(--vlue-safe-top, 0px) + 22px);
   transform: translateY(-50%);
   z-index: 1;
 }
