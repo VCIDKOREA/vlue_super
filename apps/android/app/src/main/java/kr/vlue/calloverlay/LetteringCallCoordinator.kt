@@ -704,7 +704,6 @@ object LetteringCallCoordinator {
         try {
             CallPathSession.clear()
             val app = context.applicationContext
-            CompanionRuntimeStabilityDiag.endCallSession("LetteringCallCoordinator.onCallEnded")
             VlueBigPushTrace.step(11, "Call End", "source=LetteringCallCoordinator.onCallEnded")
             LetteringPrefs.setLastCallEvent(app, "idle")
             incomingRingingActive = false
@@ -713,8 +712,9 @@ object LetteringCallCoordinator {
             LetteringIncomingNotifier.cancel(app)
             LetteringRingingActivity.requestFinish(app)
 
-            /* 동기 제거 우선 — 홈에 BigPush/Showcase 고착 방지 */
+            /* 창 제거를 세션 end 보다 먼저 — orphan ContextWatch 레이스 방지 */
             CallOverlayService.dismissNow(app)
+            CompanionRuntimeStabilityDiag.endCallSession("LetteringCallCoordinator.onCallEnded")
 
             if (CompanionMvpConfig.DELEGATE_CALL_UI) {
                 kr.vlue.calloverlay.incall.VlueInCallController.keepOverlayAfterHangup = false
@@ -730,6 +730,11 @@ object LetteringCallCoordinator {
             dismissCallOverlayOnly(app)
         } catch (e: Exception) {
             Log.e(TAG, "onCallEnded failed", e)
+            try {
+                CallOverlayService.dismissNow(context.applicationContext)
+            } catch (_: Exception) {
+                /* ignore */
+            }
         }
     }
 
