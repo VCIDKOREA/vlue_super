@@ -233,11 +233,8 @@ class CallOverlayService : Service() {
         startContextWatch()
         registerMemoryCallbackObserver()
         registerIdleTelephonyWatch()
-        /* 등록 시점 현재 상태 동기화 — OFFHOOK 미수신 후 IDLE 스킵 방지 */
+        /* 콜백 기준 상태만 동기화 — getCallState() IDLE 로 발신 직후 BigPush 를 죽이지 않음 */
         lastTelephonyStateForDismiss = telephonyCallState()
-        if (lastTelephonyStateForDismiss == TelephonyManager.CALL_STATE_IDLE) {
-            mainHandler.post { dismissIfPhoneIdle("onCreate_already_idle") }
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -366,10 +363,14 @@ class CallOverlayService : Service() {
         dcpPopupOnly = false
         bindDcpRoute(phone, dcpRoute, cardJson)
         /*
-         * Call End 이후 enrich/queued FGS 가 IDLE 에서 showOverlay 를 다시 열면
-         * 홈 화면에 BigPush/Showcase 가 고착된다. IDLE 이면 무조건 제거.
+         * Call End 이후 enrich/queued FGS 가 세션 없이 IDLE 에서 showOverlay 를 다시 열면
+         * 홈에 BigPush 가 고착된다.
+         * 단, 발신 NEW_OUTGOING_CALL 직후는 세션은 살아 있는데 getCallState() 가 잠깐 IDLE —
+         * 그 경우 BigPush 를 막으면 안 된다.
          */
-        if (callState == TelephonyManager.CALL_STATE_IDLE) {
+        if (callState == TelephonyManager.CALL_STATE_IDLE &&
+            !CompanionRuntimeStabilityDiag.isCallSessionActive()
+        ) {
             CompanionRuntimeStabilityDiag.noteStaleEvent(
                 "SHOW_OVERLAY_WHILE_IDLE",
                 "showOverlay",
@@ -1833,20 +1834,28 @@ class CallOverlayService : Service() {
         val prev = lastTelephonyStateForDismiss
         lastTelephonyStateForDismiss = state
         if (state != TelephonyManager.CALL_STATE_IDLE) return
-        /*
-         * prev==IDLE 이어도 스킵하지 않음.
-         * (콜백 등록 직후 OFFHOOK 를 못 본 채 IDLE 만 오면 고착 — 홈에 빅푸시 잔존)
-         */
-        mainHandler.post { dismissIfPhoneIdle("telephony_idle prev=$prev") }
+        mainHandler.post {
+            /*
+             * 실제 종료: RINGING/OFFHOOK → IDLE.
+             * 세션이 이미 끝났는데 창만 남은 orphan 도 제거.
+             * 세션 활성 + prev==IDLE(콜백 초기값/발신 레이스) 에서는 BigPush 를 죽이지 않음.
+             */
+            val realHangup =
+                prev == TelephonyManager.CALL_STATE_RINGING ||
+                    prev == TelephonyManager.CALL_STATE_OFFHOOK
+            val sessionActive = CompanionRuntimeStabilityDiag.isCallSessionActive()
+            if (realHangup || !sessionActive) {
+                dismissOrphanOverlayIfPresent("telephony_idle prev=$prev realHangup=$realHangup")
+            }
+        }
     }
 
     /**
-     * 통화가 이미 IDLE 인데 Companion 창이 남아 있으면 즉시 제거.
-     * ContextWatch 가 HOME 에서 collapse→BigPush 로 고착시키는 경로를 차단한다.
+     * 세션이 끝났거나 통화가 IDLE 로 확정된 뒤 Companion 창이 남으면 제거.
+     * 활성 통화 세션에서는 getCallState() IDLE 오판으로 BigPush 를 내리지 않는다.
      */
-    private fun dismissIfPhoneIdle(reason: String): Boolean {
+    private fun dismissOrphanOverlayIfPresent(reason: String): Boolean {
         if (dismissing) return false
-        if (telephonyCallState() != TelephonyManager.CALL_STATE_IDLE) return false
         val attached = rootContainer?.isAttachedToWindow == true
         val popupUp = dcpPopupView?.isAttachedToWindow == true
         val activeUi =
@@ -1855,8 +1864,9 @@ class CallOverlayService : Service() {
                 companion.state == OverlayState.MINI_CASE
         if (!attached && !popupUp && !activeUi) return false
         VlueBigPushTrace.lifecycle(
-            "IDLE_FORCE_DISMISS",
-            "reason=$reason state=${companion.state.name} attached=$attached"
+            "ORPHAN_OR_IDLE_DISMISS",
+            "reason=$reason state=${companion.state.name} attached=$attached " +
+                "session=${CompanionRuntimeStabilityDiag.isCallSessionActive()}"
         )
         LetteringIncomingNotifier.cancel(this)
         dismissOverlay()
@@ -1866,9 +1876,21 @@ class CallOverlayService : Service() {
     private fun telephonyCallState(): Int {
         return try {
             val tm = getSystemService(TELEPHONY_SERVICE) as? TelephonyManager
-            tm?.callState ?: TelephonyManager.CALL_STATE_IDLE
+            val raw = tm?.callState ?: TelephonyManager.CALL_STATE_IDLE
+            /*
+             * getCallState() 가 잠깐 IDLE 을 돌려도 TelephonyCallback 이 OFFHOOK/RINGING 을
+             * 이미 봤으면 그 값을 우선 — 발신 BigPush 가 showOverlay IDLE 게이트에 막히지 않게.
+             */
+            if (raw == TelephonyManager.CALL_STATE_IDLE &&
+                (lastTelephonyStateForDismiss == TelephonyManager.CALL_STATE_OFFHOOK ||
+                    lastTelephonyStateForDismiss == TelephonyManager.CALL_STATE_RINGING)
+            ) {
+                lastTelephonyStateForDismiss
+            } else {
+                raw
+            }
         } catch (_: Exception) {
-            TelephonyManager.CALL_STATE_IDLE
+            lastTelephonyStateForDismiss
         }
     }
 
@@ -3647,27 +3669,12 @@ class CallOverlayService : Service() {
      */
     private fun reevaluateForegroundContext(source: String) {
         if (dismissing) return
-        /* 통화 IDLE 이면 ContextWatch 레이아웃 금지 — 빅푸시 홈 고착 차단 */
-        if (dismissIfPhoneIdle("contextWatch:$source")) return
         /*
-         * Coordinator 가 endCallSession 을 dismiss 보다 먼저 호출하면
-         * 세션은 죽었는데 창만 남는 레이스가 난다 → 강제 제거.
+         * 세션 종료 후 창만 남은 orphan 만 제거.
+         * 활성 세션에서 getCallState()==IDLE 이라고 BigPush 를 내리면 발신 빅푸시가 사라진다.
          */
         if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
-            val orphan =
-                rootContainer?.isAttachedToWindow == true ||
-                    dcpPopupView?.isAttachedToWindow == true ||
-                    companion.state == OverlayState.BIG_PUSH ||
-                    companion.state == OverlayState.SHOWCASE ||
-                    companion.state == OverlayState.MINI_CASE
-            if (orphan) {
-                VlueBigPushTrace.lifecycle(
-                    "ORPHAN_OVERLAY_AFTER_SESSION_END",
-                    "source=$source state=${companion.state.name}"
-                )
-                LetteringIncomingNotifier.cancel(this)
-                dismissOverlay()
-            }
+            dismissOrphanOverlayIfPresent("contextWatch:$source")
             return
         }
         if (companion.state != OverlayState.SHOWCASE &&
@@ -3796,8 +3803,10 @@ class CallOverlayService : Service() {
     private val contextWatchRunnable = object : Runnable {
         override fun run() {
             if (dismissing) return
-            /* 통화 종료 후에도 창이 남으면 450ms 주기로 IDLE 검사 */
-            if (dismissIfPhoneIdle("contextWatch_tick")) return
+            /* 세션 종료 후 잔존 창만 주기적으로 수거 — 활성 통화 중엔 getCallState IDLE 로 내리지 않음 */
+            if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+                if (dismissOrphanOverlayIfPresent("contextWatch_tick")) return
+            }
             when (companion.state) {
                 OverlayState.BIG_PUSH, OverlayState.SHOWCASE, OverlayState.MINI_CASE -> {
                     reevaluateForegroundContext("contextWatch")
