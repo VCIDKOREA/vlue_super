@@ -4373,7 +4373,7 @@ function App() {
 
       {showAppShell && (
         <>
-      <header className={`sticky top-0 z-50 relative w-full backdrop-blur-lg border-b ${
+      <header className={`sticky top-0 z-50 relative w-full backdrop-blur-lg border-b pt-[env(safe-area-inset-top,0px)] ${
         isDarkMode ? "bg-[#111827]/95 border-white/10" : "bg-white/90 border-gray-100"
       } ${topHeaderVisible ? "block" : "hidden"}`}>
         <div className="flex h-[52px] w-full items-center justify-between gap-2 px-2.5">

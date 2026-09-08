@@ -28,6 +28,12 @@ export function applyDccLinePreviewOverlay(card = {}) {
   const photo = String(line.photoUrl || "").trim();
   const title = String(line.title || "").trim();
   const department = String(line.department || "").trim();
+  const email = String(line.email || "").trim();
+  const address = String(line.address || "").trim();
+  const website = String(line.website || "").trim();
+  const fax = String(line.fax || "").trim();
+  const organization = String(line.organization || "").trim();
+  const logoUrl = String(line.logoUrl || "").trim();
   if (line.isCertified) {
     return {
       ...card,
@@ -40,27 +46,37 @@ export function applyDccLinePreviewOverlay(card = {}) {
       photoFocus: line.photoFocus || card.photoFocus,
       title: title || card.title,
       department: department || card.department,
+      email: email || card.email,
+      address: address || card.address,
+      website: website || card.website,
+      fax: fax || card.fax,
+      organization: organization || card.organization,
+      logoUrl: logoUrl || card.logoUrl,
       previewShowcaseId: name || phone || card.previewShowcaseId || ""
     };
   }
+  /*
+   * 내선·대표: 송출 신원(이름·번호·직함·사진)만 라인 값으로 덮고,
+   * 이메일·주소·웹·팩스·상호·로고는 마스터 명함(또는 라인 DCC)을 유지한다.
+   * (빈 문자열로 강제 지우면 앞면 입력 정보가 통째로 사라짐)
+   */
   return {
     ...card,
     name: name || card.name,
     displayName: name || card.displayName,
     phone: phone || card.phone,
-    photoUrl: photo,
-    titlePhotoUrl: line.titlePhotoUrl || "",
-    noTitlePhoto: Boolean(line.noTitlePhoto),
-    photoFocus: line.photoFocus || "center",
-    title,
-    department,
-    email: "",
-    logoUrl: "",
-    organization: "",
-    address: "",
-    website: "",
-    fax: "",
-    /* 앞면 소개·뒷면 추가설명은 명함 설정값 유지 */
+    photoUrl: photo || card.photoUrl,
+    titlePhotoUrl: line.titlePhotoUrl || card.titlePhotoUrl,
+    noTitlePhoto: line.noTitlePhoto != null ? Boolean(line.noTitlePhoto) : Boolean(card.noTitlePhoto),
+    photoFocus: line.photoFocus || card.photoFocus || "center",
+    title: title || card.title,
+    department: department || card.department,
+    email: email || card.email,
+    address: address || card.address,
+    website: website || card.website,
+    fax: fax || card.fax,
+    organization: organization || card.organization,
+    logoUrl: logoUrl || card.logoUrl,
     companyIntro: card.companyIntro,
     customBackText: card.customBackText,
     previewShowcaseId: name || phone || card.previewShowcaseId || ""

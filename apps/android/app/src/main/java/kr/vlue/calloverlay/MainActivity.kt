@@ -23,6 +23,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import kr.vlue.calloverlay.applock.AppLockStore
 import kr.vlue.calloverlay.applock.PinLockController
 import kr.vlue.calloverlay.family.FamilyPermissionHelper
@@ -115,6 +116,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        /* Android 15+ edge-to-edge 기본값에서 WebView가 상태바 아래로 깔리면 헤더가 시계·배터리와 겹침 */
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         applyNotificationWakeFlags(intent)
         VlueBigPushTrace.bind(this)
         AppLockStore.init(this)

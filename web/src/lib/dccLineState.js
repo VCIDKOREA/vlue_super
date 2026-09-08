@@ -74,7 +74,15 @@ export function writeDccLinePreviewFromBundle(bundle) {
     photoFocus: String(line.photoFocus || dcc.photoFocus || (keepSameLine ? prev?.photoFocus : "") || "center").trim() || "center",
     kindLabel: String(line.kindLabel || (keepSameLine ? prev?.kindLabel : "") || "").trim(),
     isCertified: Boolean(line.isCertified),
-    agentId: String(line.agentId || agent.id || (keepSameLine ? prev?.agentId : "") || "").trim()
+    agentId: String(line.agentId || agent.id || (keepSameLine ? prev?.agentId : "") || "").trim(),
+    email: String(dcc.email || (keepSameLine ? prev?.email : "") || "").trim(),
+    address: String(dcc.address || (keepSameLine ? prev?.address : "") || "").trim(),
+    website: String(dcc.website || (keepSameLine ? prev?.website : "") || "").trim(),
+    fax: String(dcc.fax || (keepSameLine ? prev?.fax : "") || "").trim(),
+    organization: String(
+      dcc.organization || dcc.companyName || (keepSameLine ? prev?.organization : "") || ""
+    ).trim(),
+    logoUrl: String(dcc.logoUrl || (keepSameLine ? prev?.logoUrl : "") || "").trim()
   });
 }
 
