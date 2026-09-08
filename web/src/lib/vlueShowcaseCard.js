@@ -44,7 +44,12 @@ export function applyDccLinePreviewOverlay(card = {}) {
     organization: organization || card.organization,
     logoUrl: logoUrl || card.logoUrl,
     companyIntro: companyIntro || card.companyIntro,
-    customBackText: customBackText || card.customBackText
+    customBackText: customBackText || card.customBackText,
+    accountType: card.accountType,
+    bankName: card.bankName,
+    accountNumber: card.accountNumber,
+    accountHolder: card.accountHolder,
+    isGroupVerified: card.isGroupVerified
   };
   if (line.isCertified) {
     return {

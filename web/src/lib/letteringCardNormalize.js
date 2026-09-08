@@ -29,7 +29,10 @@ export function normalizeLetteringCard(raw = {}) {
   /* 회사 로고 없으면 비움(카카오 무지 스타일). VLUE 데모 로고로 채우지 않음 */
   const logoUrl = String(raw.logoUrl || "").trim();
   const noTitlePhoto = Boolean(raw.noTitlePhoto);
-  const account = sanitizeDccAccountFields(raw);
+  const account = sanitizeDccAccountFields(raw, {
+    lockedHolderName: name,
+    lockedCompanyName: String(raw.organization || raw.companyName || "").trim()
+  });
 
   return {
     ...merged,

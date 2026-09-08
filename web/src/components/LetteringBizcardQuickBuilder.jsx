@@ -327,6 +327,8 @@ export default function LetteringBizcardQuickBuilder({
   setEmailOtp = () => {},
   emailOtpHint = "",
   emailVerifiedFor = "",
+  emailReverifyOpen = false,
+  onStartEmailReverify = null,
   onSendEmailOtp = null,
   onVerifyEmailOtp = null,
   emailAuthSupport = "",
@@ -560,50 +562,79 @@ export default function LetteringBizcardQuickBuilder({
             autoComplete="email"
             required
             placeholder="이메일을 입력할 수 있습니다."
+            readOnly={Boolean(
+              emailVerifiedFor &&
+                emailVerifiedFor === String(email || "").trim().toLowerCase() &&
+                !emailReverifyOpen
+            )}
           />
           {onSendEmailOtp ? (
             <div className="mt-2 min-w-0 space-y-2">
-              <div className="flex min-w-0 flex-col gap-2 xs:flex-row sm:flex-row">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={emailOtp}
-                  onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="인증번호 6자리"
-                  className={`min-w-0 w-full flex-1 rounded-xl border px-3 py-2.5 text-[13px] outline-none ${
+              {emailVerifiedFor &&
+              emailVerifiedFor === String(email || "").trim().toLowerCase() &&
+              !emailReverifyOpen ? (
+                <div
+                  className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2.5 ${
                     isDarkMode
-                      ? "border-white/15 bg-slate-900/90 text-gray-100"
-                      : "border-gray-200 bg-white text-[#0f172a]"
+                      ? "bg-emerald-950/40 ring-1 ring-emerald-400/30"
+                      : "bg-emerald-50 ring-1 ring-emerald-200"
                   }`}
-                />
-                <div className="flex shrink-0 gap-2">
+                >
+                  <p className="text-[12px] font-black text-emerald-600">이메일 인증완료</p>
                   <button
                     type="button"
-                    onClick={() => onSendEmailOtp?.()}
-                    className="min-w-0 flex-1 rounded-xl bg-blue-600 px-3 py-2.5 text-[12px] font-bold text-white sm:flex-none"
-                  >
-                    인증번호
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onVerifyEmailOtp?.()}
-                    className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-[12px] font-bold sm:flex-none ${
-                      isDarkMode ? "border-white/15" : "border-slate-200"
+                    onClick={() => onStartEmailReverify?.()}
+                    className={`rounded-lg px-3 py-1.5 text-[11px] font-bold ${
+                      isDarkMode
+                        ? "bg-white/10 text-gray-100"
+                        : "bg-white text-slate-700 ring-1 ring-slate-200"
                     }`}
                   >
-                    확인
+                    수정
                   </button>
                 </div>
-              </div>
-              {emailOtpHint ? (
-                <p className={`text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{emailOtpHint}</p>
-              ) : null}
-              {emailVerifiedFor && emailVerifiedFor === String(email || "").trim().toLowerCase() ? (
-                <p className="text-[10px] font-bold text-emerald-600">이메일 인증 완료</p>
-              ) : null}
-              {emailAuthSupport ? (
-                <p className={`text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{emailAuthSupport}</p>
-              ) : null}
+              ) : (
+                <>
+                  <div className="flex min-w-0 flex-col gap-2 xs:flex-row sm:flex-row">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={emailOtp}
+                      onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="인증번호 6자리"
+                      className={`min-w-0 w-full flex-1 rounded-xl border px-3 py-2.5 text-[13px] outline-none ${
+                        isDarkMode
+                          ? "border-white/15 bg-slate-900/90 text-gray-100"
+                          : "border-gray-200 bg-white text-[#0f172a]"
+                      }`}
+                    />
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onSendEmailOtp?.()}
+                        className="min-w-0 flex-1 rounded-xl bg-blue-600 px-3 py-2.5 text-[12px] font-bold text-white sm:flex-none"
+                      >
+                        인증번호
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onVerifyEmailOtp?.()}
+                        className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-[12px] font-bold sm:flex-none ${
+                          isDarkMode ? "border-white/15" : "border-slate-200"
+                        }`}
+                      >
+                        확인
+                      </button>
+                    </div>
+                  </div>
+                  {emailOtpHint ? (
+                    <p className={`text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{emailOtpHint}</p>
+                  ) : null}
+                  {emailAuthSupport ? (
+                    <p className={`text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{emailAuthSupport}</p>
+                  ) : null}
+                </>
+              )}
             </div>
           ) : null}
           {isLetteringBizcardEmailLong(email) ? (

@@ -122,11 +122,18 @@ export default function LetteringBizcardAccountSection({
         <p className={`mt-2 text-[10px] font-semibold ${isDarkMode ? "text-amber-200" : "text-amber-700"}`}>
           사업자 탭: 사업자등록·상호 확인 후에만 활성화됩니다.
         </p>
-      ) : businessMatchLabel ? (
-        <p className={`mt-2 text-[10px] font-semibold ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>
-          {businessMatchLabel}
-        </p>
-      ) : null}
+      ) : (
+        <div
+          className={`mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 ${
+            isDarkMode ? "bg-emerald-950/35 ring-1 ring-emerald-400/25" : "bg-emerald-50 ring-1 ring-emerald-200"
+          }`}
+        >
+          <p className={`text-[11px] font-black ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>
+            사업자 인증완료
+            {businessMatchLabel ? ` · ${String(businessMatchLabel).replace(/^사업자등록 상호 대조 확인 완료\s*·?\s*/, "")}` : ""}
+          </p>
+        </div>
+      )}
 
       {primaryTab === "BUSINESS" && businessEligible ? (
         <label
@@ -147,7 +154,12 @@ export default function LetteringBizcardAccountSection({
               }
             }}
           />
-          <span>모임/단체 통장 (통장 사본 업로드 · 승인 후 송출)</span>
+          <span>
+            모임/단체 통장
+            <span className={`mt-0.5 block text-[10px] font-medium ${muted}`}>
+              설정 화면에서만 보이는 옵션입니다. 승인 후에만 상대 명함에 계좌가 표시됩니다.
+            </span>
+          </span>
         </label>
       ) : null}
 

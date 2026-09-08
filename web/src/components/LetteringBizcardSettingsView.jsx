@@ -74,6 +74,7 @@ export default function LetteringBizcardSettingsView({
   const [emailOtpHint, setEmailOtpHint] = useState("");
   const [emailVerifyToken, setEmailVerifyToken] = useState("");
   const [verifiedEmailFor, setVerifiedEmailFor] = useState("");
+  const [emailReverifyOpen, setEmailReverifyOpen] = useState(false);
   const [website, setWebsite] = useState("");
   const [companyIntro, setCompanyIntro] = useState("");
   const [customBackText, setCustomBackText] = useState("");
@@ -191,7 +192,9 @@ export default function LetteringBizcardSettingsView({
     setEmailOtp("");
     setEmailOtpHint("");
     setEmailVerifyToken("");
-    setVerifiedEmailFor("");
+    /* 이미 저장된 이메일은 인증 완료로 간주 — OTP UI 숨김 */
+    setVerifiedEmailFor(loadedEmail ? loadedEmail.toLowerCase() : "");
+    setEmailReverifyOpen(false);
     setWebsite(ed.website);
     setCompanyIntro(clampLetteringBizcardIntroFront(ed.companyIntro || ""));
     setCustomBackText(clampLetteringBizcardBackNote(ed.customBackText || ""));
@@ -558,6 +561,7 @@ export default function LetteringBizcardSettingsView({
     setEmailVerifyToken("");
     setVerifiedEmailFor("");
     setEmailOtpHint("");
+    setEmailReverifyOpen(true);
   };
 
   const handleSendEmailOtp = async () => {
@@ -596,6 +600,7 @@ export default function LetteringBizcardSettingsView({
       setEmailVerifyToken(data.token || "");
       setVerifiedEmailFor(target.toLowerCase());
       setEmailOtpHint("이메일 인증이 완료되었습니다.");
+      setEmailReverifyOpen(false);
     } catch (e) {
       showToast(e?.message || "이메일 인증에 실패했습니다.", "guide");
     }
@@ -904,9 +909,10 @@ export default function LetteringBizcardSettingsView({
     setPreviewTick((n) => n + 1);
     setInitialEmail(trimmedEmail);
     setEmailVerifyToken("");
-    setVerifiedEmailFor("");
+    setVerifiedEmailFor(trimmedEmail.toLowerCase());
     setEmailOtp("");
     setEmailOtpHint("");
+    setEmailReverifyOpen(false);
     showToast(
       titleDeptNeedsSubmit
         ? "직책·부서 변경 신청이 접수되었습니다. 서류 확인 후 승인됩니다."
@@ -1101,6 +1107,14 @@ export default function LetteringBizcardSettingsView({
           setEmailOtp={setEmailOtp}
           emailOtpHint={emailOtpHint}
           emailVerifiedFor={verifiedEmailFor}
+          emailReverifyOpen={emailReverifyOpen}
+          onStartEmailReverify={() => {
+            setEmailReverifyOpen(true);
+            setVerifiedEmailFor("");
+            setEmailVerifyToken("");
+            setEmailOtp("");
+            setEmailOtpHint("변경할 이메일로 인증번호를 받아 주세요.");
+          }}
           onSendEmailOtp={handleSendEmailOtp}
           onVerifyEmailOtp={handleVerifyEmailOtp}
           emailAuthSupport={EMAIL_AUTH_SUPPORT}

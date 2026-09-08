@@ -33,7 +33,7 @@ function str(v) {
 /**
  * 프로필 전환 — 전화번호·계정 이름만 유지, 그 외 DCC 필드는 번들로 교체(빈 값도 반영).
  */
-export function applyDccAgentBundleToLocalCard(profile, bundle = null) {
+export function applyDccAgentBundleToLocalCard(profile, bundle = null, opts = {}) {
   if (!profile || typeof profile !== "object") return null;
   const fixed = readLetteringFixedIdentity();
   const sharedName = str(fixed.name) || str(profile.displayName || profile.name);
@@ -85,6 +85,11 @@ export function applyDccAgentBundleToLocalCard(profile, bundle = null) {
   const address = str(dcc.address);
   const addressRoad = str(dcc.addressRoad);
   const addressDetail = str(dcc.addressDetail);
+  const dccHasAccount = Boolean(
+    str(dcc.accountType) || str(dcc.bankName) || str(dcc.accountNumber)
+  );
+  /* 멀티 프로필 전환(replaceAccount)이거나 번들에 계좌가 있을 때만 계좌 필드를 덮어씀 */
+  const replaceAccount = Boolean(opts.replaceAccount) || dccHasAccount;
 
   try {
     const org = str(dcc.organization || dcc.companyName);
@@ -121,10 +126,16 @@ export function applyDccAgentBundleToLocalCard(profile, bundle = null) {
     addressDetail,
     companyIntro: str(dcc.companyIntro),
     customBackText: str(dcc.customBackText || dcc.salesContent),
-    bankName: str(dcc.bankName),
-    accountNumber: str(dcc.accountNumber),
-    accountHolder: str(dcc.accountHolder),
-    accountType: str(dcc.accountType)
+    ...(replaceAccount
+      ? {
+          accountType: str(dcc.accountType),
+          bankName: str(dcc.bankName),
+          accountNumber: str(dcc.accountNumber).replace(/\D/g, ""),
+          accountHolder: str(dcc.accountHolder),
+          isGroupVerified: Boolean(dcc.isGroupVerified),
+          accountGroupDocName: str(dcc.accountGroupDocName)
+        }
+      : {})
   };
 
   const written = writeLetteringBizcardEditable(patch);

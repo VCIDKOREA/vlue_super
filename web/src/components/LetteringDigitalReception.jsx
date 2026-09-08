@@ -15,19 +15,21 @@ import { isMaskedPhoneDisplay } from "../lib/dccExposure.js";
 import {
   canShowDccAccountOnCard,
   formatDccAccountCopyText,
-  DCC_ACCOUNT_DISCLAIMER,
   digitsOnlyAccount
 } from "../lib/dccAccountFields.js";
-import { formatLetteringReceptionLines, resolveDccFrontIdentityLines, isDccCertifiedMemberLabel } from "../lib/letteringPaidIdentityDisplay.js";
-import IdentitySecondaryText from "./IdentitySecondaryText.jsx";
-import { formatLetteringContactEmailDisplay, photoFocusToCss, clampLetteringBizcardIntroFront, clampLetteringBizcardBackNote } from "../lib/letteringBizcardStorage.js";
-import { normalizeLetteringCard, resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
 import {
-  VLUE_PREVIEW_EMAIL_PLACEHOLDER,
-  VLUE_PREVIEW_ADDRESS_PLACEHOLDER,
-  VLUE_PREVIEW_WEBSITE_PLACEHOLDER,
-  VLUE_PREVIEW_FAX_PLACEHOLDER
-} from "../lib/vlueShowcasePreviewIdentity.js";
+  formatLetteringReceptionLines,
+  resolveDccFrontIdentityLines,
+  isDccCertifiedMemberLabel
+} from "../lib/letteringPaidIdentityDisplay.js";
+import IdentitySecondaryText from "./IdentitySecondaryText.jsx";
+import {
+  formatLetteringContactEmailDisplay,
+  photoFocusToCss,
+  clampLetteringBizcardIntroFront,
+  clampLetteringBizcardBackNote
+} from "../lib/letteringBizcardStorage.js";
+import { normalizeLetteringCard, resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
 import {
   openEmailLink,
   openWebsiteLink,
@@ -622,17 +624,12 @@ function FrontPanel({
   const website = formatWebsite(card.website);
   const emailRaw = String(card.email || "").trim();
   const email = emailRaw ? formatLetteringContactEmailDisplay(emailRaw) : "";
-  /* 통화 송출(피어): 빈 필드는 숨김. 본인 미리보기만 플레이스홀더 */
-  const showOwnerPlaceholders = Boolean(previewMode);
-  const emailValue = email || (showOwnerPlaceholders ? VLUE_PREVIEW_EMAIL_PLACEHOLDER : "");
-  const faxDisplay = fax || (showOwnerPlaceholders ? VLUE_PREVIEW_FAX_PLACEHOLDER : "");
+  /*
+   * 미입력 필드는 미리보기·실송출 모두 숨김 (플레이스홀더는 수신자·본인 미리보기에 노출하지 않음).
+   * 설정 화면에서만 입력 유도.
+   */
+  const emailValue = email;
   const addressRaw = String(card.address || "").trim();
-  const addressDisplay = addressRaw
-    ? null
-    : showOwnerPlaceholders
-      ? VLUE_PREVIEW_ADDRESS_PLACEHOLDER
-      : "";
-  const websiteDisplay = website || (showOwnerPlaceholders ? VLUE_PREVIEW_WEBSITE_PLACEHOLDER : "");
   const validityFromItems = (verificationItems || [])
     .map((line) => String(line || "").trim())
     .find((line) => /만료일|인증유효기간/.test(line));
@@ -812,12 +809,10 @@ function FrontPanel({
           </FrontInfoRow>
         ) : null}
 
-        {faxDisplay ? (
+        {fax ? (
           <FrontInfoRow icon={Printer} label="팩스번호">
-            <span
-              className={`ldr-front-info-row__text${!fax ? " ldr-front-info-row__text--placeholder" : ""}`.trim()}
-            >
-              {fax && enableContactLinks ? (
+            <span className="ldr-front-info-row__text">
+              {enableContactLinks ? (
                 <button
                   type="button"
                   className="ldr-front-phone-link ldr-front-phone-link--btn"
@@ -831,39 +826,33 @@ function FrontPanel({
                   {fax}
                 </button>
               ) : (
-                faxDisplay
+                fax
               )}
             </span>
           </FrontInfoRow>
         ) : null}
 
-        {addressRaw || addressDisplay ? (
+        {addressRaw ? (
           <FrontInfoRow icon={MapPin} label="등록한 주소">
-            {addressRaw ? (
-              <button
-                type="button"
-                className="ldr-front-address-detail-btn"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setAddressOpen(true);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                상세보기
-              </button>
-            ) : (
-              <p className="ldr-front-info-row__text ldr-front-info-row__text--placeholder">{addressDisplay}</p>
-            )}
+            <button
+              type="button"
+              className="ldr-front-address-detail-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setAddressOpen(true);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              상세보기
+            </button>
           </FrontInfoRow>
         ) : null}
 
-        {websiteDisplay ? (
+        {website ? (
           <FrontInfoRow icon={Globe} label="웹사이트">
-            <p
-              className={`ldr-front-info-row__text${!website ? " ldr-front-info-row__text--placeholder" : ""}`.trim()}
-            >
-              {website && enableContactLinks ? (
+            <p className="ldr-front-info-row__text">
+              {enableContactLinks ? (
                 <button
                   type="button"
                   className="ldr-front-phone-link ldr-front-phone-link--btn"
@@ -877,7 +866,7 @@ function FrontPanel({
                   {website}
                 </button>
               ) : (
-                websiteDisplay
+                website
               )}
             </p>
           </FrontInfoRow>
@@ -886,11 +875,11 @@ function FrontPanel({
         {canShowDccAccountOnCard(card) ? (
           <FrontInfoRow icon={Landmark} label="계좌정보" className="ldr-front-info-row--account">
             <div className="ldr-front-account">
-              <p className="ldr-front-info-row__text">{String(card.bankName || "").trim()}</p>
-              <div className="ldr-front-account__number-line">
-                <p className="ldr-front-info-row__text tabular-nums">
+              <p className="ldr-front-account__primary">
+                <span className="ldr-front-account__bank">{String(card.bankName || "").trim()}</span>
+                <span className="ldr-front-account__num tabular-nums">
                   {digitsOnlyAccount(card.accountNumber)}
-                </p>
+                </span>
                 <button
                   type="button"
                   className="ldr-front-account__copy"
@@ -911,9 +900,8 @@ function FrontPanel({
                 >
                   <Copy className="ldr-front-account__copy-icon" aria-hidden />
                 </button>
-              </div>
-              <p className="ldr-front-info-row__text">{String(card.accountHolder || "").trim()}</p>
-              <p className="ldr-front-account__disclaimer">{DCC_ACCOUNT_DISCLAIMER}</p>
+              </p>
+              <p className="ldr-front-account__holder">{String(card.accountHolder || "").trim()}</p>
             </div>
           </FrontInfoRow>
         ) : null}
