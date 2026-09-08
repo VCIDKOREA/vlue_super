@@ -44,14 +44,14 @@ val hasReleaseKeystore =
 
 android {
     namespace = "kr.vlue.calloverlay"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "kr.vlue.app"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 42
-        versionName = "1.0.0"
+        targetSdk = 36
+        versionCode = 43
+        versionName = "1.0.1"
         buildConfigField("String", "API_BASE_URL", "\"$vlueApiBase\"")
         buildConfigField("String", "WEB_BASE_URL", "\"$vlueWebBase\"")
     }
