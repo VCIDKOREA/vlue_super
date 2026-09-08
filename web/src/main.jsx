@@ -18,6 +18,15 @@ import "./styles.css";
 import { applyAppSettingsToDocument } from "./lib/vlueAppSettings.js";
 import { logProductionEnvBinding } from "./config.js";
 import { ensurePricingConfigLoaded } from "./lib/pricingConfig.js";
+import { VLUE_ANDROID_APP_UA_TOKEN } from "./lib/vlueClientAccess.js";
+
+try {
+  if (typeof navigator !== "undefined" && String(navigator.userAgent || "").includes(VLUE_ANDROID_APP_UA_TOKEN)) {
+    document.documentElement.classList.add("vlue-android-app");
+  }
+} catch {
+  /* ignore */
+}
 
 /** www.vlue.kr/showcase · /biz → /#showcase · /#biz (해시 라우팅) */
 function normalizeWwwShowcaseManagePath() {

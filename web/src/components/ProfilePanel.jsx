@@ -708,7 +708,7 @@ function ProfilePanel({
       <button className={`absolute inset-0 bg-black/30 transition ${open ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
       <aside
         id="profile-menu"
-        className={`absolute right-0 top-0 h-full w-[85%] max-w-[340px] shadow-2xl flex flex-col overflow-hidden transition-all duration-300 border-l ${
+        className={`absolute right-0 top-0 h-full w-[85%] max-w-[340px] shadow-2xl flex flex-col overflow-hidden transition-all duration-300 border-l vlue-top-safe ${
           isDarkMode ? "border-white/10 bg-[#111827]" : "border-gray-100 bg-white"
         } ${open ? "translate-x-0" : "translate-x-full"}`}
       >

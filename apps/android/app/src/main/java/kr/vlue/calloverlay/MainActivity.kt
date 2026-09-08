@@ -176,6 +176,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                injectStatusBarInsetCss()
                 injectFamilyBridgeBootstrap()
                 injectAppLockBridgeBootstrap()
                 scanRemoteApps()
@@ -825,6 +826,23 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     override fun reportLastCallFromLog() {
         if (!FamilyPermissionHelper.allGranted(this)) return
         kr.vlue.calloverlay.family.FamilyCallTracker.reportLastCallFromLog(this)
+    }
+
+    private fun injectStatusBarInsetCss() {
+        // setDecorFitsSystemWindows(true) 이면 WebView는 상태바 아래에 그려지므로
+        // CSS 추가 inset은 0. inset-ready로 구버전 28px 폴백만 끈다.
+        val script =
+            """
+            (function(){
+              try{
+                var r=document.documentElement;
+                r.classList.add('vlue-android-app');
+                r.classList.add('vlue-status-inset-ready');
+                r.style.setProperty('--vlue-status-inset','0px');
+              }catch(e){}
+            })();
+            """.trimIndent()
+        webView.evaluateJavascript(script, null)
     }
 
     private fun injectFamilyBridgeBootstrap() {
