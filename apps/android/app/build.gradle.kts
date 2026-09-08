@@ -50,8 +50,8 @@ android {
         applicationId = "kr.vlue.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 43
-        versionName = "1.0.1"
+        versionCode = 44
+        versionName = "1.0.2"
         buildConfigField("String", "API_BASE_URL", "\"$vlueApiBase\"")
         buildConfigField("String", "WEB_BASE_URL", "\"$vlueWebBase\"")
     }
@@ -72,8 +72,9 @@ android {
             isMinifyEnabled = false
         }
         getByName("release") {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            /* 저메모리 PC에서 R8 OOM 방지 — 상태바 핫픽스 AAB용. 이후 RAM 여유 시 다시 true */
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = if (hasReleaseKeystore) {
                 signingConfigs.getByName("release")
             } else {
