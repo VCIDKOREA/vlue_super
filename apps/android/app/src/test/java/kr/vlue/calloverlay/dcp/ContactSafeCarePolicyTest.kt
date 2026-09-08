@@ -12,7 +12,8 @@ class ContactSafeCarePolicyTest {
             ContactSafeCarePolicy.shouldShow(
                 profileKind = ContactSafeCarePayload.PROFILE_KIND,
                 overlayState = OverlayState.BIG_PUSH,
-                popupOnly = false
+                popupOnly = false,
+                callAnswered = false
             )
         )
     }
@@ -24,6 +25,18 @@ class ContactSafeCarePolicyTest {
                 profileKind = ContactSafeCarePayload.PROFILE_KIND,
                 overlayState = OverlayState.SHOWCASE,
                 popupOnly = false
+            )
+        )
+    }
+
+    @Test
+    fun answered_showsWhileStillBigPush() {
+        assertTrue(
+            ContactSafeCarePolicy.shouldShow(
+                profileKind = ContactSafeCarePayload.PROFILE_KIND,
+                overlayState = OverlayState.BIG_PUSH,
+                popupOnly = false,
+                callAnswered = true
             )
         )
     }

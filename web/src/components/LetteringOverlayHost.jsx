@@ -1092,16 +1092,27 @@ function LetteringOverlayHostInner() {
             if (Date.now() < restoreHoldUntilRef.current) {
               /* no-op: restore hold 직후 스퓨리어스 connected */
             }
+          } else if (wasShowcaseBar) {
+            /*
+             * BigPush → 수화: 네이티브가 SHOWCASE 로 올린 직후.
+             * broadcast 플래그로 다시 접히면 탭해야만 열리는 간헐 버그.
+             */
+            restoreHoldUntilRef.current = Date.now() + 3500;
+            autoExpandedOnceRef.current = true;
+            setExpanded(true);
           } else {
             /*
              * 송출 ON: 풀 쇼케이스.
-             * includeDigitalCard!==true 이면 펼치지 않음 (캐시·낙관적 ON 레이스 방지).
+             * 네이티브가 이미 expand 한 직후(connected)에는 broadcast 검사로 다시 접지 않음.
              */
             const liveStyle =
               styledCardRef.current?.showcaseStyle || showcaseStyleRef.current;
+            const alreadyExpandedByNative =
+              autoExpandedOnceRef.current || Date.now() < restoreHoldUntilRef.current;
             if (
-              !peerShowcaseBroadcastOn(liveStyle) ||
-              !peerHasDccOrShowcaseContent(styledCardRef.current, liveStyle)
+              !alreadyExpandedByNative &&
+              (!peerShowcaseBroadcastOn(liveStyle) ||
+                !peerHasDccOrShowcaseContent(styledCardRef.current, liveStyle))
             ) {
               autoExpandedOnceRef.current = false;
               setExpanded(false);

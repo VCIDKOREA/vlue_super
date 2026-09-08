@@ -44,7 +44,7 @@ export default function LetteringBizcardAccountSection({
     : "bg-white text-slate-600 hover:bg-slate-100";
 
   return (
-    <div id="dcc-settings-account" className={`scroll-mt-4 sm:col-span-2 ${panel}`}>
+    <div id="dcc-settings-account" className={`scroll-mt-4 box-border w-full max-w-full min-w-0 sm:col-span-2 ${panel}`}>
       <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
         계좌정보 (선택)
       </p>
@@ -53,7 +53,7 @@ export default function LetteringBizcardAccountSection({
       </p>
 
       <div
-        className={`mt-3 grid grid-cols-2 gap-1 rounded-xl p-1 ${
+        className={`mt-3 grid w-full max-w-full min-w-0 grid-cols-2 gap-1 rounded-xl p-1 ${
           isDarkMode ? "bg-black/30" : "bg-white ring-1 ring-slate-200"
         }`}
         role="tablist"
@@ -63,7 +63,7 @@ export default function LetteringBizcardAccountSection({
           type="button"
           role="tab"
           aria-selected={primaryTab === "PERSONAL"}
-          className={`rounded-lg px-3 py-2.5 text-[12px] font-bold transition ${
+          className={`min-w-0 rounded-lg px-2 py-2.5 text-[12px] font-bold transition sm:px-3 ${
             primaryTab === "PERSONAL" ? tabOn : tabOff
           }`}
           onClick={() => {
@@ -77,7 +77,7 @@ export default function LetteringBizcardAccountSection({
           type="button"
           role="tab"
           aria-selected={primaryTab === "BUSINESS"}
-          className={`rounded-lg px-3 py-2.5 text-[12px] font-bold transition ${
+          className={`min-w-0 rounded-lg px-2 py-2.5 text-[12px] font-bold transition sm:px-3 ${
             primaryTab === "BUSINESS" ? tabOn : tabOff
           }`}
           onClick={() => {

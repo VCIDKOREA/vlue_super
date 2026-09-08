@@ -1055,6 +1055,7 @@ class CallOverlayService : Service() {
                 "ANSWER_KEEP_BIGPUSH_PENDING",
                 "lookup still pending — hold BigPush (no onAnswer) source=$source"
             )
+            scheduleAnswerUiResume("pending_after_$source")
             return
         }
         if (!pendingVerified && !parseIsVerified(pendingCardJson) && !source.startsWith("bigPush_bar_tap")) {
@@ -1068,6 +1069,7 @@ class CallOverlayService : Service() {
                 "ANSWER_KEEP_BIGPUSH_UNVERIFIED",
                 "unverified non-contact — hold BigPush (no onAnswer) source=$source"
             )
+            scheduleAnswerUiResume("unverified_after_$source")
             return
         }
         VlueBigPushTrace.milestone(
@@ -1115,6 +1117,31 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_APPLIED", source)
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_VISIBLE", source)
         notifyWebCallState("connected")
+    }
+
+    /**
+     * 수화 시점 카드 미도착으로 BigPush 에 머문 뒤, 카드/연락처 승격이 오면 자동 재시도.
+     * (탭 없이 쇼케이스·정상팝업이 뜨도록)
+     */
+    private var answerUiResumeAttempt = 0
+
+    private fun scheduleAnswerUiResume(reason: String) {
+        if (dismissing || !remoteConnected) return
+        if (companion.state != OverlayState.BIG_PUSH) return
+        if (authPopupConfirmedToMini || userMinimized) return
+        val attempt = ++answerUiResumeAttempt
+        if (attempt > 8) return
+        val delayMs = 350L + (attempt - 1) * 250L
+        mainHandler.postDelayed({
+            if (dismissing || !remoteConnected) return@postDelayed
+            if (companion.state != OverlayState.BIG_PUSH) return@postDelayed
+            if (authPopupConfirmedToMini || userMinimized) return@postDelayed
+            VlueBigPushTrace.lifecycle(
+                "ANSWER_UI_RESUME_RETRY",
+                "attempt=$attempt reason=$reason state=${companion.state.name}"
+            )
+            enterShowcaseFromAnswer(source = "answer_ui_resume_$attempt")
+        }, delayMs)
     }
 
     /**
@@ -1882,6 +1909,25 @@ class CallOverlayService : Service() {
                             null
                         )
                     }
+                } else if (
+                    remoteConnected &&
+                    companion.state == OverlayState.BIG_PUSH &&
+                    !authPopupConfirmedToMini &&
+                    !userMinimized &&
+                    !cardJson.isNullOrBlank() &&
+                    !isLookupPendingCard(cardJson)
+                ) {
+                    /*
+                     * 발신 수화 후 카드가 늦게 도착한 경우 — BigPush 고착 해제.
+                     * 인증 회원 → 쇼케이스 / 안심케어는 위 분기에서 이미 return.
+                     */
+                    VlueBigPushTrace.lifecycle(
+                        "ANSWER_DEFERRED_CARD",
+                        "remoteConnected+BIG_PUSH → enterShowcase verified=$verified"
+                    )
+                    enterShowcaseFromAnswer(source = "applyCallInfoUpdate_deferred")
+                    LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
+                    return@post
                 }
             } else if (rootContainer == null) {
                 /* MiniCase 유지 중 카드 갱신 — showOverlay(BigPush) 재진입 금지 */
@@ -1977,7 +2023,8 @@ class CallOverlayService : Service() {
             val show = ContactSafeCarePolicy.shouldShow(
                 profileKind = ContactSafeCarePayload.PROFILE_KIND,
                 overlayState = companion.state,
-                popupOnly = dcpPopupOnly
+                popupOnly = dcpPopupOnly || authPopupOnlyMode,
+                callAnswered = remoteConnected || isCallAlreadyAnswered()
             ) && !dismissing
             if (!show) {
                 removeDcpPopupWindow()
@@ -3282,6 +3329,7 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.endCallSession("dismissOverlay")
         companion.onCallEnd()
         remoteConnected = false
+        answerUiResumeAttempt = 0
         userMinimized = false
         authPopupConfirmedToMini = false
         authPopupOnlyMode = false
@@ -3906,8 +3954,10 @@ class CallOverlayService : Service() {
                 CompanionRuntimeStabilityDiag.noteStaleEvent(
                     "CONNECTED",
                     "notifyConnected",
-                    detail = "session inactive — skip startService"
+                    detail = "session inactive — try activeInstance fallback"
                 )
+                /* 세션 플래그가 잠깐 꺼져도 활성 오버레이가 있으면 수화 UI 는 진행 */
+                activeInstance?.enterShowcaseFromAnswer(source = "notifyConnected_session_inactive")
                 return
             }
             try {

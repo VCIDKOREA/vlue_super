@@ -32,12 +32,15 @@ import {
 } from "../lib/fitImageFile.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 
-function Field({ label, hint, children, isDarkMode, sectionId = "" }) {
+function Field({ label, hint, children, isDarkMode, sectionId = "", className = "" }) {
   const labelCls = isDarkMode ? "text-[11px] font-black text-gray-100" : "text-[11px] font-black text-gray-900";
   const hintCls = isDarkMode ? "mt-0.5 text-[10px] text-gray-400" : "mt-0.5 text-[10px] text-gray-500";
   /* div — 내부 체크박스 label 과 중첩되면 클릭이 먹통이 됨 */
   return (
-    <div className={`block${sectionId ? " scroll-mt-4" : ""}`} id={sectionId || undefined}>
+    <div
+      className={`block min-w-0 max-w-full${sectionId ? " scroll-mt-4" : ""}${className ? ` ${className}` : ""}`}
+      id={sectionId || undefined}
+    >
       <span className={labelCls}>{label}</span>
       {hint ? <p className={hintCls}>{hint}</p> : null}
       {children}
@@ -347,7 +350,7 @@ export default function LetteringBizcardQuickBuilder({
     : "rounded-xl border border-gray-100 bg-gray-50 px-3 py-2";
 
   return (
-    <div className="lbq-builder space-y-4">
+    <div className="lbq-builder max-w-full min-w-0 space-y-4 overflow-x-hidden">
       <div className={panel}>
         <p className={`mb-2 text-[12px] font-black ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
           수신 화면 미리보기
@@ -514,14 +517,14 @@ export default function LetteringBizcardQuickBuilder({
         </Field>
       </div>
 
-      <div className={`${panel} grid gap-3 sm:grid-cols-2`}>
+      <div className={`${panel} grid max-w-full min-w-0 gap-3 sm:grid-cols-2`}>
         <Field label="직책" isDarkMode={isDarkMode}>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={inputBase} />
         </Field>
         <Field label="부서" isDarkMode={isDarkMode}>
           <input type="text" value={department} onChange={(e) => setDepartment(e.target.value)} className={inputBase} />
         </Field>
-        <div id="dcc-settings-verify-doc" className="scroll-mt-4 sm:col-span-2">
+        <div id="dcc-settings-verify-doc" className="scroll-mt-4 min-w-0 sm:col-span-2">
           <LetteringBizcardTitleDeptVerifySection
             isDarkMode={isDarkMode}
             inputBase={inputBase}
@@ -541,6 +544,7 @@ export default function LetteringBizcardQuickBuilder({
           hint="명함에 반드시 표시됩니다. 변경 시 이메일 인증이 필요합니다."
           isDarkMode={isDarkMode}
           sectionId="dcc-settings-email"
+          className="sm:col-span-2"
         >
           <input
             type="email"
@@ -553,30 +557,38 @@ export default function LetteringBizcardQuickBuilder({
             placeholder="이메일을 입력할 수 있습니다."
           />
           {onSendEmailOtp ? (
-            <div className="mt-2 space-y-2">
-              <div className="flex gap-2">
+            <div className="mt-2 min-w-0 space-y-2">
+              <div className="flex min-w-0 flex-col gap-2 xs:flex-row sm:flex-row">
                 <input
                   type="text"
                   inputMode="numeric"
                   value={emailOtp}
                   onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   placeholder="인증번호 6자리"
-                  className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-[13px] ${inputBase.replace("mt-1.5 w-full ", "")}`}
+                  className={`min-w-0 w-full flex-1 rounded-xl border px-3 py-2.5 text-[13px] outline-none ${
+                    isDarkMode
+                      ? "border-white/15 bg-slate-900/90 text-gray-100"
+                      : "border-gray-200 bg-white text-[#0f172a]"
+                  }`}
                 />
-                <button
-                  type="button"
-                  onClick={() => onSendEmailOtp?.()}
-                  className="shrink-0 rounded-xl bg-blue-600 px-3 py-2.5 text-[12px] font-bold text-white"
-                >
-                  인증번호
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onVerifyEmailOtp?.()}
-                  className={`shrink-0 rounded-xl border px-3 py-2.5 text-[12px] font-bold ${isDarkMode ? "border-white/15" : "border-slate-200"}`}
-                >
-                  확인
-                </button>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onSendEmailOtp?.()}
+                    className="min-w-0 flex-1 rounded-xl bg-blue-600 px-3 py-2.5 text-[12px] font-bold text-white sm:flex-none"
+                  >
+                    인증번호
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onVerifyEmailOtp?.()}
+                    className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-[12px] font-bold sm:flex-none ${
+                      isDarkMode ? "border-white/15" : "border-slate-200"
+                    }`}
+                  >
+                    확인
+                  </button>
+                </div>
               </div>
               {emailOtpHint ? (
                 <p className={`text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{emailOtpHint}</p>

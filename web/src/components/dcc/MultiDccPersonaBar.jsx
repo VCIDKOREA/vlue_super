@@ -91,13 +91,13 @@ export default function MultiDccPersonaBar({
   };
 
   const shell = isDarkMode
-    ? "rounded-2xl border border-white/10 bg-white/[0.04] p-3"
-    : "rounded-2xl border border-slate-200 bg-white p-3 shadow-sm";
+    ? "rounded-2xl border border-white/10 bg-white/[0.04] p-3 max-w-full min-w-0 overflow-hidden"
+    : "rounded-2xl border border-slate-200 bg-white p-3 shadow-sm max-w-full min-w-0 overflow-hidden";
 
   return (
     <div className={shell}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
           <p className={`text-[13px] font-black ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
             멀티 DCC
           </p>
@@ -111,7 +111,7 @@ export default function MultiDccPersonaBar({
         <button
           type="button"
           onClick={startAdd}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-bold text-slate-800 shadow-sm"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-800 shadow-sm sm:px-3 sm:text-[12px]"
         >
           <Plus size={14} />
           멀티 DCC +

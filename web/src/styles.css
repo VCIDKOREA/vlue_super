@@ -92,11 +92,19 @@ body,
 
 .lbq-builder {
   overflow-anchor: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 /* ????? ??? ? ?? ??????? + ???? ?? ??? ?? */
 .vlue-scroll-pad-profile-panel {
   padding-bottom: max(3.5rem, calc(env(safe-area-inset-bottom, 0px) + 3rem));
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 #profile-menu .vlue-scroll-pad-bottom-nav {

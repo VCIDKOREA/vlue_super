@@ -912,7 +912,7 @@ export default function LetteringBizcardSettingsView({
 
       <div
         ref={scrollRef}
-        className="vlue-scroll-pad-profile-panel min-h-0 flex-1 overflow-y-auto px-4 py-4 no-scrollbar"
+        className="vlue-scroll-pad-profile-panel min-h-0 max-w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 no-scrollbar sm:px-4"
       >
         <LetteringBizcardQuickBuilder
           fixed={fixed}
