@@ -260,6 +260,10 @@ export default function LetteringBizcardQuickBuilder({
   setAccountNumber = () => {},
   accountHolder = "",
   setAccountHolder = () => {},
+  lockedCompanyName = "",
+  businessEligible = false,
+  businessMatchLabel = "",
+  onBusinessBlocked = null,
   accountGroupDocName = "",
   onGroupDocPick = null,
   groupDocError = "",
@@ -627,6 +631,10 @@ export default function LetteringBizcardQuickBuilder({
           isDarkMode={isDarkMode}
           inputBase={inputBase}
           lockedLegalName={String(fixed?.name || "").trim()}
+          lockedCompanyName={lockedCompanyName}
+          businessEligible={businessEligible}
+          businessMatchLabel={businessMatchLabel}
+          onBusinessBlocked={onBusinessBlocked}
           accountType={accountType}
           setAccountType={setAccountType}
           bankName={bankName}

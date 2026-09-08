@@ -1,15 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Loader2, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
 import { DCC_PROFILE_PHOTO_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
 import {
+  activateDccAgentProfile,
+  assignLinesToDccProfile,
   createDccAgentProfile,
   deleteDccAgentProfile,
+  setRepresentativeDccProfile,
   updateDccAgentProfile
 } from "../../lib/dccAgentProfilesApi.js";
 import { agentOptionLabel } from "../../lib/dccAgentProfileState.js";
 import { isCertifiedLine } from "../../lib/dccLineLabel.js";
+import { writeSelectedDccLineId } from "../../lib/dccLineState.js";
 
 const EMPTY_FORM = {
   label: "",
@@ -20,6 +24,23 @@ const EMPTY_FORM = {
   photoFocus: "center"
 };
 
+const EDITING_PROFILE_KEY = "vlue_multi_dcc_editing_profile_id";
+
+export function writeEditingMultiDccProfileId(id) {
+  try {
+    if (id) localStorage.setItem(EDITING_PROFILE_KEY, String(id));
+    else localStorage.removeItem(EDITING_PROFILE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * 멀티 DCC 프로필 관리
+ * - 프로필 = DCC ~ 쇼케이스 전체 설정 단위
+ * - 번호 지정 → 그 번호로 송출
+ * - 미지정·모르는 상대 → 대표 프로필
+ */
 export default function DccAgentManageModal({
   open,
   lines = [],
@@ -30,21 +51,46 @@ export default function DccAgentManageModal({
   onSelectLine,
   onAssignAgent,
   onChanged,
-  onToast
+  onToast,
+  onEditProfileBroadcast
 }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [selectedProfileId, setSelectedProfileId] = useState("");
+  const [draftLineIds, setDraftLineIds] = useState([]);
+
+  const lineList = useMemo(() => (Array.isArray(lines) ? lines : []), [lines]);
 
   useEffect(() => {
     if (!open) {
       setFormOpen(false);
       setEditingId("");
       setForm(EMPTY_FORM);
+      setSelectedProfileId("");
+      setDraftLineIds([]);
+      return;
     }
-  }, [open]);
+    const preferred =
+      profiles.find((p) => p.isRepresentative)?.id ||
+      profiles.find((p) => p.isActive)?.id ||
+      profiles[0]?.id ||
+      "";
+    setSelectedProfileId(preferred);
+  }, [open, profiles]);
+
+  useEffect(() => {
+    if (!selectedProfileId) {
+      setDraftLineIds([]);
+      return;
+    }
+    const p = profiles.find((x) => x.id === selectedProfileId);
+    setDraftLineIds(Array.isArray(p?.assignedLineIds) ? [...p.assignedLineIds] : []);
+  }, [selectedProfileId, profiles]);
+
+  const selectedProfile = profiles.find((p) => p.id === selectedProfileId) || null;
 
   const startCreate = () => {
     setEditingId("");
@@ -54,6 +100,7 @@ export default function DccAgentManageModal({
 
   const startEdit = (profile) => {
     setEditingId(profile.id);
+    setSelectedProfileId(profile.id);
     setForm({
       label: profile.label || "",
       displayName: profile.displayName || "",
@@ -65,25 +112,28 @@ export default function DccAgentManageModal({
     setFormOpen(true);
   };
 
-  const onPickPhoto = useCallback(async (file) => {
-    if (!file) return;
-    setUploading(true);
-    try {
-      const uploaded = await compressAndUploadMediaImageOrThrow(file, "photo");
-      const next = String(uploaded?.url || "").trim();
-      if (!next) throw new Error("사진 업로드에 실패했습니다.");
-      setForm((prev) => ({ ...prev, photoUrl: next }));
-    } catch (e) {
-      onToast?.(e instanceof Error ? e.message : "사진 업로드에 실패했습니다.");
-    } finally {
-      setUploading(false);
-    }
-  }, [onToast]);
+  const onPickPhoto = useCallback(
+    async (file) => {
+      if (!file) return;
+      setUploading(true);
+      try {
+        const uploaded = await compressAndUploadMediaImageOrThrow(file, "photo");
+        const next = String(uploaded?.url || "").trim();
+        if (!next) throw new Error("사진 업로드에 실패했습니다.");
+        setForm((prev) => ({ ...prev, photoUrl: next }));
+      } catch (e) {
+        onToast?.(e instanceof Error ? e.message : "사진 업로드에 실패했습니다.");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [onToast]
+  );
 
   const saveForm = async () => {
     const displayName = String(form.displayName || "").trim();
     if (!displayName) {
-      onToast?.("담당자 이름을 입력해 주세요.");
+      onToast?.("프로필 이름을 입력해 주세요.");
       return;
     }
     setBusy(true);
@@ -98,10 +148,12 @@ export default function DccAgentManageModal({
       };
       if (editingId) {
         await updateDccAgentProfile(editingId, payload);
-        onToast?.("담당자 정보를 저장했습니다.");
+        onToast?.("프로필 기본 정보를 저장했습니다.");
       } else {
-        await createDccAgentProfile(payload);
-        onToast?.("담당자를 등록했습니다.");
+        const created = await createDccAgentProfile(payload);
+        const id = created?.profile?.id;
+        if (id) setSelectedProfileId(id);
+        onToast?.("멀티 프로필을 만들었습니다. 번호를 지정한 뒤 DCC·쇼케이스를 설정하세요.");
       }
       setFormOpen(false);
       setEditingId("");
@@ -119,11 +171,15 @@ export default function DccAgentManageModal({
   };
 
   const removeProfile = async (profile) => {
+    if (profile.isRepresentative) {
+      onToast?.("대표 프로필은 삭제할 수 없습니다. 다른 프로필을 대표로 지정한 뒤 삭제해 주세요.");
+      return;
+    }
     if (!window.confirm(`${agentOptionLabel(profile)} 프로필을 삭제할까요?`)) return;
     setBusy(true);
     try {
       await deleteDccAgentProfile(profile.id);
-      onToast?.("담당자를 삭제했습니다.");
+      onToast?.("프로필을 삭제했습니다.");
       await onChanged?.();
     } catch (e) {
       onToast?.(e instanceof Error ? e.message : "삭제에 실패했습니다.");
@@ -132,9 +188,76 @@ export default function DccAgentManageModal({
     }
   };
 
-  if (!open || typeof document === "undefined") return null;
+  const toggleLine = (lineId) => {
+    setDraftLineIds((prev) =>
+      prev.includes(lineId) ? prev.filter((x) => x !== lineId) : [...prev, lineId]
+    );
+  };
 
-  const showLines = Array.isArray(lines) && lines.length > 0;
+  const saveLineAssignments = async () => {
+    if (!selectedProfileId) return;
+    setBusy(true);
+    try {
+      await assignLinesToDccProfile(selectedProfileId, draftLineIds);
+      onToast?.(
+        draftLineIds.length
+          ? "지정한 번호에 이 프로필의 DCC·쇼케이스가 송출됩니다."
+          : "번호 지정을 해제했습니다. 미지정 번호는 대표 프로필이 송출됩니다."
+      );
+      await onChanged?.();
+      if (typeof onAssignAgent === "function" && draftLineIds[0]) {
+        await onAssignAgent(draftLineIds[0], selectedProfileId);
+      }
+    } catch (e) {
+      onToast?.(e instanceof Error ? e.message : "번호 배정에 실패했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const makeRepresentative = async (profile) => {
+    setBusy(true);
+    try {
+      await setRepresentativeDccProfile(profile.id);
+      onToast?.("대표 프로필로 지정했습니다. 미지정·모르는 번호 상대에게 이 설정이 송출됩니다.");
+      setSelectedProfileId(profile.id);
+      await onChanged?.();
+    } catch (e) {
+      onToast?.(e instanceof Error ? e.message : "대표 지정에 실패했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startBroadcastEdit = async (profile) => {
+    setBusy(true);
+    try {
+      const lineId =
+        (Array.isArray(profile.assignedLineIds) && profile.assignedLineIds[0]) ||
+        selectedLineId ||
+        lineList[0]?.id ||
+        "";
+      await activateDccAgentProfile(profile.id, lineId || undefined);
+      writeEditingMultiDccProfileId(profile.id);
+      if (lineId) {
+        writeSelectedDccLineId(lineId);
+        onSelectLine?.(lineId);
+      }
+      onToast?.(
+        lineId
+          ? `「${agentOptionLabel(profile)}」 편집 모드 — 지금 DCC·쇼케이스를 설정하면 지정 번호에 반영됩니다.`
+          : `「${agentOptionLabel(profile)}」 — 먼저 송출 번호를 지정한 뒤 DCC·쇼케이스를 설정하세요.`
+      );
+      onEditProfileBroadcast?.(profile, lineId);
+      onClose?.();
+    } catch (e) {
+      onToast?.(e instanceof Error ? e.message : "편집 모드 전환에 실패했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open || typeof document === "undefined") return null;
 
   return createPortal(
     <div className="dcc-agent-modal" role="dialog" aria-modal="true" aria-labelledby="dcc-agent-modal-title">
@@ -142,11 +265,12 @@ export default function DccAgentManageModal({
         <div className="dcc-agent-modal__head">
           <div>
             <h2 id="dcc-agent-modal-title" className="dcc-agent-modal__title">
-              멀티 DCC · 페르소나
+              멀티 DCC 프로필
             </h2>
             <p className="dcc-agent-modal__sub">
-              계정 1개에 페르소나 N개(카카오 멀티프로필). 그룹 타이틀을 지정하고 상황별로 전환합니다. 추가 슬롯은
-              SOHO +4,200원/장입니다.
+              계정 1개에 프로필 N개. 각 프로필은 DCC부터 쇼케이스까지 따로 설정합니다. 번호를 지정하면 그
+              번호로 송출되고, 미지정·모르는 상대에게는 <b>대표 프로필</b>이 송출됩니다. 추가 슬롯 SOHO
+              +4,200원/장.
             </p>
           </div>
           <button type="button" className="dcc-agent-modal__close" onClick={onClose} aria-label="닫기">
@@ -155,65 +279,21 @@ export default function DccAgentManageModal({
         </div>
 
         <div className="dcc-agent-modal__body">
-          {showLines ? (
-            <section className="dcc-agent-section">
-              <h3 className="dcc-agent-section__title">번호</h3>
-              {lines.map((line) => {
-                const selected = line.id === selectedLineId;
-                const agentName = String(line.displayName || "").trim();
-                return (
-                  <div
-                    key={line.id}
-                    className={`dcc-agent-row dcc-line-row${selected ? " is-active" : ""}`}
-                  >
-                    <button
-                      type="button"
-                      className="dcc-line-row__pick"
-                      onClick={() => onSelectLine?.(line.id)}
-                    >
-                      <p className="dcc-agent-row__name">
-                        {line.displayPhone}
-                        {isCertifiedLine(line) ? " (인증번호)" : ""}
-                        {agentName ? ` ${agentName}` : ""}
-                        {line.agentId || agentName ? <span className="dcc-agent-row__badge">사용 중</span> : null}
-                      </p>
-                      <p className="dcc-agent-row__meta">
-                        {line.kindLabel}
-                        {selected ? " · 이 번호 설정 중" : " · 눌러서 이 번호 설정"}
-                      </p>
-                    </button>
-                    <label className="dcc-line-row__agent">
-                      담당자
-                      <select
-                        value={line.agentId || ""}
-                        disabled={busy || profiles.length === 0}
-                        aria-label={`${line.displayPhone} 담당자`}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          if (next) void onAssignAgent?.(line.id, next);
-                        }}
-                      >
-                        {profiles.length === 0 ? <option value="">담당자 없음</option> : null}
-                        {!line.agentId ? <option value="">담당자 선택</option> : null}
-                        {profiles.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {agentOptionLabel(p)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                );
-              })}
-            </section>
-          ) : null}
-
           <section className="dcc-agent-section">
-            <h3 className="dcc-agent-section__title">담당자 프리셋</h3>
+            <h3 className="dcc-agent-section__title">프로필 목록</h3>
             {profiles.map((profile) => {
-              const usedOn = lines.filter((l) => l.agentId === profile.id);
+              const selected = profile.id === selectedProfileId;
               return (
-                <div key={profile.id} className="dcc-agent-row">
+                <div
+                  key={profile.id}
+                  className={`dcc-agent-row${selected ? " is-active" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedProfileId(profile.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") setSelectedProfileId(profile.id);
+                  }}
+                >
                   {profile.photoUrl ? (
                     <img className="dcc-agent-row__photo" src={profile.photoUrl} alt="" />
                   ) : (
@@ -222,19 +302,31 @@ export default function DccAgentManageModal({
                     </div>
                   )}
                   <div className="dcc-agent-row__text">
-                    <p className="dcc-agent-row__name">{profile.displayName || "이름 없음"}</p>
+                    <p className="dcc-agent-row__name">
+                      {profile.displayName || "이름 없음"}
+                      {profile.isRepresentative ? (
+                        <span className="dcc-agent-row__badge">대표</span>
+                      ) : null}
+                    </p>
                     <p className="dcc-agent-row__meta">
                       {[profile.title, profile.department].filter(Boolean).join(" · ") || "직급·부서 미입력"}
-                      {usedOn.length
-                        ? ` · ${usedOn.map((l) => l.displayPhone).join(", ")}`
-                        : ""}
+                      {profile.assignedPhones?.length
+                        ? ` · ${profile.assignedPhones.join(", ")}`
+                        : " · 번호 미지정"}
+                      {profile.hasDcc || profile.hasShowcase ? " · 설정됨" : " · DCC·쇼케이스 미설정"}
                     </p>
                   </div>
-                  <div className="dcc-agent-row__actions">
-                    <button type="button" onClick={() => startEdit(profile)} disabled={busy}>
+                  <div className="dcc-agent-row__actions" onClick={(e) => e.stopPropagation()}>
+                    <button type="button" title="기본 정보" onClick={() => startEdit(profile)} disabled={busy}>
                       <Pencil size={12} />
                     </button>
-                    <button type="button" className="is-danger" onClick={() => removeProfile(profile)} disabled={busy}>
+                    <button
+                      type="button"
+                      className="is-danger"
+                      title="삭제"
+                      onClick={() => void removeProfile(profile)}
+                      disabled={busy || profile.isRepresentative}
+                    >
                       <Trash2 size={12} />
                     </button>
                   </div>
@@ -245,13 +337,13 @@ export default function DccAgentManageModal({
             {formOpen ? (
               <div className="dcc-agent-form">
                 <label>
-                  그룹 · 타이틀
+                  프로필 타이틀
                   <input
                     type="text"
                     value={form.label}
                     maxLength={80}
                     onChange={(e) => setForm((p) => ({ ...p, label: e.target.value }))}
-                    placeholder="예: 방송국 프리랜서 / 통닭집 대표"
+                    placeholder="예: 회사 / 개인 / 사이드 프로젝트"
                   />
                 </label>
                 <label>
@@ -261,7 +353,7 @@ export default function DccAgentManageModal({
                     value={form.displayName}
                     maxLength={120}
                     onChange={(e) => setForm((p) => ({ ...p, displayName: e.target.value }))}
-                    placeholder="통화 화면에 보일 이름"
+                    placeholder="통화·명함에 보일 이름"
                   />
                 </label>
                 <label>
@@ -322,11 +414,95 @@ export default function DccAgentManageModal({
                 onClick={startCreate}
                 disabled={busy || profiles.length >= maxCount}
               >
-                <Plus size={14} /> 담당자 추가
-                {profiles.length >= maxCount ? ` (최대 ${maxCount}명)` : ""}
+                <Plus size={14} /> 프로필 추가
+                {profiles.length >= maxCount ? ` (최대 ${maxCount}개)` : ""}
               </button>
             )}
           </section>
+
+          {selectedProfile ? (
+            <section className="dcc-agent-section">
+              <h3 className="dcc-agent-section__title">
+                선택 프로필 · {selectedProfile.displayName || "이름 없음"}
+                {selectedProfile.isRepresentative ? " (대표)" : ""}
+              </h3>
+              <p className="dcc-agent-modal__sub" style={{ marginTop: 0 }}>
+                아래에서 송출 번호를 지정하고, DCC·쇼케이스는 「편집」으로 전체 설정합니다.
+              </p>
+
+              <div className="dcc-agent-form__actions" style={{ marginBottom: 12 }}>
+                {!selectedProfile.isRepresentative ? (
+                  <button
+                    type="button"
+                    className="is-ghost"
+                    disabled={busy}
+                    onClick={() => void makeRepresentative(selectedProfile)}
+                  >
+                    <Star size={14} /> 대표로 지정
+                  </button>
+                ) : (
+                  <span className="dcc-agent-row__meta">미지정·모르는 번호 → 이 대표 프로필 송출</span>
+                )}
+                <button
+                  type="button"
+                  className="is-primary"
+                  disabled={busy}
+                  onClick={() => void startBroadcastEdit(selectedProfile)}
+                >
+                  DCC · 쇼케이스 편집
+                </button>
+              </div>
+
+              <h4 className="dcc-agent-section__title">송출 번호 지정</h4>
+              {lineList.length === 0 ? (
+                <p className="dcc-agent-row__meta">등록된 번호가 없습니다. 인증 휴대폰·내선·대표번호를 먼저 연결하세요.</p>
+              ) : (
+                <div className="space-y-2">
+                  {lineList.map((line) => {
+                    const checked = draftLineIds.includes(line.id);
+                    const otherOwner = profiles.find(
+                      (p) => p.id !== selectedProfileId && (p.assignedLineIds || []).includes(line.id)
+                    );
+                    return (
+                      <label
+                        key={line.id}
+                        className={`dcc-agent-row${checked ? " is-active" : ""}`}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={busy}
+                          onChange={() => toggleLine(line.id)}
+                          style={{ marginRight: 8 }}
+                        />
+                        <div className="dcc-agent-row__text">
+                          <p className="dcc-agent-row__name">
+                            {line.displayPhone}
+                            {isCertifiedLine(line) ? " (인증번호)" : ""}
+                          </p>
+                          <p className="dcc-agent-row__meta">
+                            {line.kindLabel}
+                            {otherOwner ? ` · 현재 「${otherOwner.displayName}」에 배정됨` : ""}
+                          </p>
+                        </div>
+                        {checked ? <Check size={14} /> : null}
+                      </label>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    className="is-primary dcc-agent-modal__add"
+                    disabled={busy}
+                    onClick={() => void saveLineAssignments()}
+                  >
+                    {busy ? <Loader2 size={14} className="animate-spin" /> : null}
+                    번호 배정 저장
+                  </button>
+                </div>
+              )}
+            </section>
+          ) : null}
         </div>
       </div>
     </div>,

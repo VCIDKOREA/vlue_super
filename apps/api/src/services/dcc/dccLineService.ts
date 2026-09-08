@@ -298,29 +298,57 @@ export async function listDccLines(userId: string): Promise<{ lines: DccLineDto[
 
 export async function getDccLineBundle(userId: string, cardId: string) {
   const row = await requireOwnedLine(userId, cardId);
-  const agent = row.activeDccAgentProfileId
+  let agent = row.activeDccAgentProfileId
     ? await prisma.userDccAgentProfile.findFirst({
         where: { id: row.activeDccAgentProfileId, userId }
       })
     : null;
+  if (!agent) {
+    const { getRepresentativeProfile } = await import("./dccAgentProfileService.js");
+    agent = await getRepresentativeProfile(userId);
+  }
   const certified = await isCertifiedRow(userId, row.phoneE164);
-  const snap = await lineDccBase(userId, row);
+  let snap = await lineDccBase(userId, row);
+  if (!Object.keys(snap).length && agent) {
+    const profileDcc = snapObj(agent.dccSnapshotJson);
+    if (Object.keys(profileDcc).length) {
+      snap = mergeExportSnapshotMedia(profileDcc, {
+        name: agent.displayName,
+        displayName: agent.displayName,
+        title: agent.title,
+        department: agent.department
+      });
+    }
+  }
   const lineEditor = row.lineShowcaseStyleJson;
   const lineLive = row.lineShowcaseLiveStyleJson;
   const lineHas = showcaseHasContent(lineEditor) || showcaseHasContent(lineLive);
-  /* 인증번호만 대표계정 쇼케이스를 쓴다. 내선·대표번호는 비어 있으면 빈 쇼케이스. */
-  const master = !lineHas && certified ? await loadMasterShowcase(userId) : null;
+  const profileHas =
+    agent &&
+    (showcaseHasContent(agent.showcaseStyleJson) || showcaseHasContent(agent.showcaseLiveStyleJson));
+  /* 인증번호만 대표계정 쇼케이스를 쓴다. 미지정 회선은 대표 프로필 번들 폴백. */
+  const master = !lineHas && !profileHas && certified ? await loadMasterShowcase(userId) : null;
   const editor = lineHas
     ? lineEditor
-    : certified
-      ? master?.showcaseStyleJson || master?.showcaseLiveStyleJson || null
-      : null;
+    : profileHas
+      ? agent?.showcaseStyleJson || agent?.showcaseLiveStyleJson || null
+      : certified
+        ? master?.showcaseStyleJson || master?.showcaseLiveStyleJson || null
+        : null;
   const live = lineHas
     ? lineLive || lineEditor
-    : certified
-      ? master?.showcaseLiveStyleJson || master?.showcaseStyleJson || null
-      : null;
-  const updatedAt = lineHas ? row.lineShowcaseUpdatedAt : certified ? master?.showcaseStyleUpdatedAt : null;
+    : profileHas
+      ? agent?.showcaseLiveStyleJson || agent?.showcaseStyleJson || null
+      : certified
+        ? master?.showcaseLiveStyleJson || master?.showcaseStyleJson || null
+        : null;
+  const updatedAt = lineHas
+    ? row.lineShowcaseUpdatedAt
+    : profileHas
+      ? agent?.updatedAt || null
+      : certified
+        ? master?.showcaseStyleUpdatedAt
+        : null;
   return {
     line: await toOwnedLineDto(userId, row),
     agent: agent ? agentDto(agent) : null,
@@ -339,32 +367,51 @@ export async function assignAgentToLine(userId: string, cardId: string, agentId:
   const row = await requireOwnedLine(userId, cardId);
   const agent = await prisma.userDccAgentProfile.findFirst({ where: { id: agentId, userId } });
   if (!agent) {
-    const err = new Error("담당자 프로필을 찾을 수 없습니다.");
+    const err = new Error("멀티 프로필을 찾을 수 없습니다.");
     (err as Error & { status?: number }).status = 404;
     throw err;
   }
   const prev = await lineDccBase(userId, row);
-  const merged = mergeExportSnapshotMedia(prev, {
-    name: agent.displayName,
-    displayName: agent.displayName,
-    title: agent.title,
-    department: agent.department
-  });
+  const profileDcc = snapObj(agent.dccSnapshotJson);
+  const merged = mergeExportSnapshotMedia(
+    Object.keys(profileDcc).length ? mergeExportSnapshotMedia(prev, profileDcc) : prev,
+    {
+      name: agent.displayName,
+      displayName: agent.displayName,
+      title: agent.title,
+      department: agent.department,
+      ...(agent.photoUrl ? { photoUrl: agent.photoUrl, photoFocus: agent.photoFocus } : {})
+    }
+  );
   const slim = slimExportSnapshot(merged) || merged;
   const prevPj = snapObj(row.profileJson);
+  const showcaseEditor = agent.showcaseStyleJson;
+  const showcaseLive = agent.showcaseLiveStyleJson || agent.showcaseStyleJson;
+  const data: Prisma.BusinessCardUpdateInput = {
+    displayName: agent.displayName,
+    jobTitle: agent.title || null,
+    activeDccAgentProfileId: agent.id,
+    dccSnapshotJson: slim as Prisma.InputJsonValue,
+    profileJson: {
+      ...prevPj,
+      title: agent.title,
+      department: agent.department,
+      photoUrl: agent.photoUrl || prevPj.photoUrl,
+      photoFocus: agent.photoFocus || prevPj.photoFocus
+    } as Prisma.InputJsonValue
+  };
+  if (showcaseHasContent(showcaseEditor) || showcaseHasContent(showcaseLive)) {
+    if (showcaseHasContent(showcaseEditor)) {
+      data.lineShowcaseStyleJson = showcaseEditor as Prisma.InputJsonValue;
+    }
+    if (showcaseHasContent(showcaseLive)) {
+      data.lineShowcaseLiveStyleJson = showcaseLive as Prisma.InputJsonValue;
+    }
+    data.lineShowcaseUpdatedAt = new Date();
+  }
   const updated = await prisma.businessCard.update({
     where: { id: row.id },
-    data: {
-      displayName: agent.displayName,
-      jobTitle: agent.title || null,
-      activeDccAgentProfileId: agent.id,
-      dccSnapshotJson: slim as Prisma.InputJsonValue,
-      profileJson: {
-        ...prevPj,
-        title: agent.title,
-        department: agent.department
-      } as Prisma.InputJsonValue
-    }
+    data
   });
   return {
     line: await toOwnedLineDto(userId, updated),
@@ -403,6 +450,10 @@ export async function putDccLineSnapshot(
       } as Prisma.InputJsonValue
     }
   });
+  if (updated.activeDccAgentProfileId) {
+    const { mirrorLineContentToProfile } = await import("./dccAgentProfileService.js");
+    await mirrorLineContentToProfile(userId, updated.activeDccAgentProfileId, { dcc: slim });
+  }
   return { line: await toOwnedLineDto(userId, updated), dcc: slim };
 }
 
@@ -455,6 +506,13 @@ export async function putDccLineShowcase(
     where: { id: row.id },
     data
   });
+  if (updated.activeDccAgentProfileId) {
+    const { mirrorLineContentToProfile } = await import("./dccAgentProfileService.js");
+    await mirrorLineContentToProfile(userId, updated.activeDccAgentProfileId, {
+      showcaseEditor: updated.lineShowcaseStyleJson,
+      showcaseLive: updated.lineShowcaseLiveStyleJson
+    });
+  }
   return {
     ok: true as const,
     updatedAt: now.toISOString(),
@@ -472,6 +530,7 @@ export async function getLineShowcasePublicByPhone(rawNumber: string) {
       id: true,
       userId: true,
       phoneE164: true,
+      activeDccAgentProfileId: true,
       lineShowcaseLiveStyleJson: true,
       lineShowcaseStyleJson: true,
       lineShowcaseLiveSourceJson: true,
@@ -481,13 +540,30 @@ export async function getLineShowcasePublicByPhone(rawNumber: string) {
   });
   if (!card) return null;
   const certified = Boolean(card.user?.phoneE164) && card.phoneE164 === card.user.phoneE164;
-  const live = card.lineShowcaseLiveStyleJson || card.lineShowcaseStyleJson;
-  if (certified && !showcaseHasContent(live)) return null;
+  let live = card.lineShowcaseLiveStyleJson || card.lineShowcaseStyleJson;
+  let liveSource = card.lineShowcaseLiveSourceJson;
+  let updatedAt = card.lineShowcaseUpdatedAt;
+  if (!showcaseHasContent(live)) {
+    const { getRepresentativeProfile } = await import("./dccAgentProfileService.js");
+    const agent = card.activeDccAgentProfileId
+      ? await prisma.userDccAgentProfile.findFirst({
+          where: { id: card.activeDccAgentProfileId, userId: card.userId }
+        })
+      : await getRepresentativeProfile(card.userId);
+    const profileLive = agent?.showcaseLiveStyleJson || agent?.showcaseStyleJson;
+    if (showcaseHasContent(profileLive)) {
+      live = profileLive;
+      liveSource = null;
+      updatedAt = agent?.updatedAt || null;
+    } else if (certified) {
+      return null;
+    }
+  }
   if (!showcaseHasContent(live)) {
     return {
       cardId: card.id,
       userId: card.userId,
-      isCertified: false,
+      isCertified: certified,
       v: 2 as const,
       live: null,
       liveSource: null,
@@ -500,8 +576,8 @@ export async function getLineShowcasePublicByPhone(rawNumber: string) {
     isCertified: certified,
     v: 2 as const,
     live: slimShowcaseStyleForPublic(live),
-    liveSource: card.lineShowcaseLiveSourceJson || null,
-    updatedAt: card.lineShowcaseUpdatedAt ? card.lineShowcaseUpdatedAt.toISOString() : null
+    liveSource: liveSource || null,
+    updatedAt: updatedAt ? updatedAt.toISOString() : null
   };
 }
 

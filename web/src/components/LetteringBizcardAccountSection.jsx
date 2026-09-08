@@ -8,11 +8,18 @@ import {
 
 /**
  * DCC 설정 — 계좌번호 등록 (개인 / 사업자 / 모임·단체)
+ * - 개인: 예금주 = 본인인증 실명 고정
+ * - 사업자: 사업자등록·상호 확정 시에만 탭 활성, 예금주 = 상호 고정
+ * - 모임/단체: 통장 사본 + 관리자 승인
  */
 export default function LetteringBizcardAccountSection({
   isDarkMode = false,
   inputBase = "",
   lockedLegalName = "",
+  lockedCompanyName = "",
+  businessEligible = false,
+  businessMatchLabel = "",
+  onBusinessBlocked,
   accountType = "",
   setAccountType,
   bankName = "",
@@ -31,7 +38,14 @@ export default function LetteringBizcardAccountSection({
   const primaryTab = type === DCC_ACCOUNT_TYPES.PERSONAL ? "PERSONAL" : type ? "BUSINESS" : "";
   const isGroup = type === DCC_ACCOUNT_TYPES.GROUP;
   const isPersonal = type === DCC_ACCOUNT_TYPES.PERSONAL;
-  const holderLocked = isPersonal ? String(lockedLegalName || "").trim() : "";
+  const isBusiness = type === DCC_ACCOUNT_TYPES.BUSINESS;
+  const legalLock = String(lockedLegalName || "").trim();
+  const companyLock = String(lockedCompanyName || "").trim();
+  const holderLocked = isPersonal
+    ? legalLock
+    : isBusiness
+      ? companyLock
+      : "";
 
   const muted = isDarkMode ? "text-gray-400" : "text-gray-500";
   const panel = isDarkMode
@@ -43,6 +57,25 @@ export default function LetteringBizcardAccountSection({
   const tabOff = isDarkMode
     ? "bg-transparent text-gray-400 hover:bg-white/5"
     : "bg-white text-slate-600 hover:bg-slate-100";
+  const tabBlocked = isDarkMode
+    ? "bg-transparent text-gray-600 opacity-55"
+    : "bg-white text-slate-400 opacity-70";
+
+  const selectPersonal = () => {
+    setAccountType(DCC_ACCOUNT_TYPES.PERSONAL);
+    if (legalLock) setAccountHolder(legalLock);
+  };
+
+  const selectBusiness = () => {
+    if (!businessEligible) {
+      onBusinessBlocked?.(
+        "사업자등록증·상호가 확인된 회원만 사업자 계좌를 등록할 수 있습니다. 사업자 인증을 먼저 완료해 주세요."
+      );
+      return;
+    }
+    setAccountType(DCC_ACCOUNT_TYPES.BUSINESS);
+    if (companyLock) setAccountHolder(companyLock);
+  };
 
   return (
     <div id="dcc-settings-account" className={`scroll-mt-4 box-border w-full max-w-full min-w-0 sm:col-span-2 ${panel}`}>
@@ -50,7 +83,7 @@ export default function LetteringBizcardAccountSection({
         계좌정보 (선택)
       </p>
       <p className={`mt-1 text-[10px] leading-relaxed ${muted}`}>
-        명함 앞면 만료일 위에 표시됩니다. 송금 전 예금주 확인을 안내합니다.
+        개인·사업자 계좌는 전체적용 후 바로 명함 앞면에 표시됩니다. 모임/단체만 관리자 승인 후 표시됩니다.
       </p>
 
       <div
@@ -67,10 +100,7 @@ export default function LetteringBizcardAccountSection({
           className={`min-w-0 rounded-lg px-2 py-2.5 text-[12px] font-bold transition sm:px-3 ${
             primaryTab === "PERSONAL" ? tabOn : tabOff
           }`}
-          onClick={() => {
-            setAccountType(DCC_ACCOUNT_TYPES.PERSONAL);
-            if (holderLocked) setAccountHolder(holderLocked);
-          }}
+          onClick={selectPersonal}
         >
           개인
         </button>
@@ -78,20 +108,27 @@ export default function LetteringBizcardAccountSection({
           type="button"
           role="tab"
           aria-selected={primaryTab === "BUSINESS"}
+          aria-disabled={!businessEligible}
           className={`min-w-0 rounded-lg px-2 py-2.5 text-[12px] font-bold transition sm:px-3 ${
-            primaryTab === "BUSINESS" ? tabOn : tabOff
+            primaryTab === "BUSINESS" ? tabOn : businessEligible ? tabOff : tabBlocked
           }`}
-          onClick={() => {
-            if (type !== DCC_ACCOUNT_TYPES.GROUP) {
-              setAccountType(DCC_ACCOUNT_TYPES.BUSINESS);
-            }
-          }}
+          onClick={selectBusiness}
         >
           사업자
         </button>
       </div>
 
-      {primaryTab === "BUSINESS" ? (
+      {!businessEligible ? (
+        <p className={`mt-2 text-[10px] font-semibold ${isDarkMode ? "text-amber-200" : "text-amber-700"}`}>
+          사업자 탭: 사업자등록·상호 확인 후에만 활성화됩니다.
+        </p>
+      ) : businessMatchLabel ? (
+        <p className={`mt-2 text-[10px] font-semibold ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>
+          {businessMatchLabel}
+        </p>
+      ) : null}
+
+      {primaryTab === "BUSINESS" && businessEligible ? (
         <label
           className={`mt-2 flex cursor-pointer items-start gap-2 rounded-xl px-2.5 py-2 text-[11px] font-semibold ${
             isDarkMode ? "bg-white/5 text-gray-200" : "bg-white text-slate-800 ring-1 ring-slate-200"
@@ -101,9 +138,14 @@ export default function LetteringBizcardAccountSection({
             type="checkbox"
             className="mt-0.5 h-4 w-4 shrink-0"
             checked={isGroup}
-            onChange={(e) =>
-              setAccountType(e.target.checked ? DCC_ACCOUNT_TYPES.GROUP : DCC_ACCOUNT_TYPES.BUSINESS)
-            }
+            onChange={(e) => {
+              if (e.target.checked) {
+                setAccountType(DCC_ACCOUNT_TYPES.GROUP);
+              } else {
+                setAccountType(DCC_ACCOUNT_TYPES.BUSINESS);
+                if (companyLock) setAccountHolder(companyLock);
+              }
+            }}
           />
           <span>모임/단체 통장 (통장 사본 업로드 · 승인 후 송출)</span>
         </label>
@@ -139,30 +181,45 @@ export default function LetteringBizcardAccountSection({
           </label>
           <label className="block sm:col-span-2">
             <span className={`text-[11px] font-bold ${muted}`}>
-              예금주{isPersonal ? " (본인인증 실명 · 수정 불가)" : ""}
+              예금주
+              {isPersonal
+                ? " (본인인증 실명 · 자동 · 수정 불가)"
+                : isBusiness
+                  ? " (사업자 상호 · 자동 · 수정 불가)"
+                  : " (직접 입력)"}
             </span>
             <input
               type="text"
-              value={isPersonal ? holderLocked || accountHolder : accountHolder}
+              value={holderLocked || accountHolder}
               onChange={(e) => {
-                if (isPersonal) return;
+                if (isPersonal || isBusiness) return;
                 setAccountHolder(e.target.value);
               }}
-              readOnly={isPersonal}
+              readOnly={isPersonal || isBusiness}
               placeholder={
                 isPersonal
-                  ? holderLocked || "본인인증 실명"
-                  : isGroup
-                    ? "모임·단체 예금주명"
-                    : "상호/법인명 (짤림 가능 — 직접 입력)"
+                  ? legalLock || "본인인증 실명"
+                  : isBusiness
+                    ? companyLock || "사업자 상호"
+                    : "모임·단체 예금주명"
               }
               className={`mt-1.5 w-full ${inputBase}${
-                isPersonal ? " cursor-not-allowed opacity-80" : ""
+                isPersonal || isBusiness ? " cursor-not-allowed opacity-80" : ""
               }`}
             />
-            {isPersonal && !holderLocked ? (
-              <p className={`mt-1 text-[10px] font-semibold text-amber-600`}>
+            {isPersonal && !legalLock ? (
+              <p className="mt-1 text-[10px] font-semibold text-amber-600">
                 본인인증 실명을 확인할 수 없습니다. 로그인·본인인증 후 다시 열어 주세요.
+              </p>
+            ) : null}
+            {isBusiness && !companyLock ? (
+              <p className="mt-1 text-[10px] font-semibold text-amber-600">
+                사업자 상호를 확인할 수 없습니다. 사업자 인증을 완료해 주세요.
+              </p>
+            ) : null}
+            {isBusiness && companyLock ? (
+              <p className={`mt-1 text-[10px] font-semibold ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>
+                사업자등록 상호 대조 확인 완료
               </p>
             ) : null}
           </label>
@@ -178,7 +235,8 @@ export default function LetteringBizcardAccountSection({
                 </p>
               ) : (
                 <p className="rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] font-bold text-amber-800">
-                  승인 대기 중 · 관리자 콘솔 「계좌 승인」탭에서 승인하면 앞면에 표시됩니다
+                  승인 대기 중 · 관리자 콘솔 「계좌 승인」에서 승인하면 앞면에 표시됩니다. 모임 체크를 끄면
+                  사업자 계좌로 바로 표시할 수 있습니다.
                 </p>
               )}
               <label className="block">

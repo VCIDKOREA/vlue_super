@@ -73,7 +73,8 @@ export function writeDccLinePreviewFromBundle(bundle) {
         : Boolean(keepSameLine ? prev?.noTitlePhoto : false),
     photoFocus: String(line.photoFocus || dcc.photoFocus || (keepSameLine ? prev?.photoFocus : "") || "center").trim() || "center",
     kindLabel: String(line.kindLabel || (keepSameLine ? prev?.kindLabel : "") || "").trim(),
-    isCertified: Boolean(line.isCertified)
+    isCertified: Boolean(line.isCertified),
+    agentId: String(line.agentId || agent.id || (keepSameLine ? prev?.agentId : "") || "").trim()
   });
 }
 

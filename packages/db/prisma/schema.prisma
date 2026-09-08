@@ -644,6 +644,12 @@ model UserDccAgentProfile {
   photoUrl    String? @map("photo_url") @db.Text
   photoFocus  String  @default("center") @map("photo_focus") @db.VarChar(16)
   isActive    Boolean @default(false) @map("is_active")
+  /// 미지정·모르는 번호 상대에게 송출되는 대표 멀티 프로필
+  isRepresentative Boolean @default(false) @map("is_representative")
+  /// 이 프로필 전용 DCC 스냅샷 (지정 번호에 동기화)
+  dccSnapshotJson Json? @map("dcc_snapshot_json") @db.JsonB
+  showcaseStyleJson Json? @map("showcase_style_json") @db.JsonB
+  showcaseLiveStyleJson Json? @map("showcase_live_style_json") @db.JsonB
   sortOrder   Int     @default(0) @map("sort_order")
 
   assignedLines BusinessCard[]
@@ -652,6 +658,7 @@ model UserDccAgentProfile {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([userId, isActive])
+  @@index([userId, isRepresentative])
   @@index([userId, sortOrder])
   @@map("user_dcc_agent_profiles")
 }

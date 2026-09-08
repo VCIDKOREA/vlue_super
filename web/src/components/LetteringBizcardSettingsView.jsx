@@ -51,7 +51,8 @@ import DccExposureSettingsPanel from "./dcc/DccExposureSettingsPanel.jsx";
 import { emptyDccExposureChoice, isDccExposureComplete } from "../lib/dccExposure.js";
 import { fetchDccExposure, saveDccExposure } from "../lib/dccExposureApi.js";
 import { sendAuthCode, verifyAuthCode, EMAIL_AUTH_SUPPORT } from "../lib/emailAuthApi.js";
-import { sanitizeDccAccountFields } from "../lib/dccAccountFields.js";
+import { sanitizeDccAccountFields, normalizeDccAccountType, DCC_ACCOUNT_TYPES } from "../lib/dccAccountFields.js";
+import { readBusinessRegistrationEvidence } from "../lib/dccBusinessAccountGate.js";
 
 export default function LetteringBizcardSettingsView({
   membershipTier = "free",
@@ -215,10 +216,42 @@ export default function LetteringBizcardSettingsView({
     setVerifyDocIssuedAt(ed.titleDeptVerifyDocIssuedAt || "");
     setVerifyDocError("");
     {
+      const identity = readLetteringFixedIdentity();
       const lockedName =
-        String(readLetteringFixedIdentity()?.name || "").trim() ||
+        String(identity?.name || "").trim() ||
         String(localStorage.getItem("vlue_legal_name") || "").trim();
-      const acc = sanitizeDccAccountFields(ed, { lockedHolderName: lockedName });
+      const orgName = String(identity?.organization || ed.organization || "").trim();
+      if (orgName) {
+        try {
+          if (!String(localStorage.getItem("vlue_company_locked") || "").trim()) {
+            localStorage.setItem("vlue_company_locked", orgName);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      const hasBizDoc =
+        String(ed.titleDeptVerifyDocKind || "").trim() === "business_registration" &&
+        (ed.titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.APPROVED ||
+          ed.titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.PENDING);
+      const biz = readBusinessRegistrationEvidence({
+        companyName: orgName,
+        hasBizDoc
+      });
+      let acc = sanitizeDccAccountFields(ed, {
+        lockedHolderName: lockedName,
+        lockedCompanyName: biz.companyName
+      });
+      const t = normalizeDccAccountType(acc.accountType);
+      if (
+        !biz.eligible &&
+        (t === DCC_ACCOUNT_TYPES.BUSINESS || t === DCC_ACCOUNT_TYPES.GROUP)
+      ) {
+        acc = sanitizeDccAccountFields(
+          { ...acc, accountType: DCC_ACCOUNT_TYPES.PERSONAL },
+          { lockedHolderName: lockedName, lockedCompanyName: biz.companyName }
+        );
+      }
       setAccountType(acc.accountType);
       setBankName(acc.bankName);
       setAccountNumber(acc.accountNumber);
@@ -300,6 +333,15 @@ export default function LetteringBizcardSettingsView({
     [approvedTitle, approvedDepartment, titleDeptApprovalStatus, title, department]
   );
 
+  const businessEvidence = useMemo(() => {
+    const orgName = String(fixed?.organization || "").trim();
+    const hasBizDoc =
+      String(verifyDocKind || "").trim() === "business_registration" &&
+      (titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.APPROVED ||
+        titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.PENDING);
+    return readBusinessRegistrationEvidence({ companyName: orgName, hasBizDoc });
+  }, [fixed?.organization, verifyDocKind, titleDeptApprovalStatus]);
+
   const previewCard = useMemo(() => {
     const draft = buildUserLetteringCard({ membershipTier });
     const address = combineLetteringBizcardAddress(addressRoad, addressDetail);
@@ -321,7 +363,10 @@ export default function LetteringBizcardSettingsView({
         accountGroupDocName,
         accountGroupDocDataUrl
       },
-      { lockedHolderName: lockedName }
+      {
+        lockedHolderName: lockedName,
+        lockedCompanyName: businessEvidence.companyName
+      }
     );
     return withLetteringBizcardPreviewFallback({
       ...draft,
@@ -367,6 +412,7 @@ export default function LetteringBizcardSettingsView({
     isGroupVerified,
     accountGroupDocName,
     accountGroupDocDataUrl,
+    businessEvidence.companyName,
     previewTick
   ]);
 
@@ -636,9 +682,29 @@ export default function LetteringBizcardSettingsView({
     const lockedName =
       String(fixed?.name || "").trim() ||
       String(localStorage.getItem("vlue_legal_name") || "").trim();
+    const bizGate = readBusinessRegistrationEvidence({
+      companyName: String(fixed?.organization || "").trim(),
+      hasBizDoc:
+        String(verifyDocKind || "").trim() === "business_registration" &&
+        (titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.APPROVED ||
+          titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.PENDING ||
+          titleDeptNeedsSubmit)
+    });
+    let accountTypeForSave = accountType;
+    const tSave = normalizeDccAccountType(accountTypeForSave);
+    if (
+      !bizGate.eligible &&
+      (tSave === DCC_ACCOUNT_TYPES.BUSINESS || tSave === DCC_ACCOUNT_TYPES.GROUP)
+    ) {
+      showToast(
+        "사업자등록·상호가 확인되지 않아 사업자/모임 계좌는 저장할 수 없습니다. 개인 계좌로 전환하거나 사업자 인증을 완료해 주세요.",
+        "guide"
+      );
+      return;
+    }
     const accountPatch = sanitizeDccAccountFields(
       {
-        accountType,
+        accountType: accountTypeForSave,
         bankName,
         accountNumber,
         accountHolder,
@@ -646,8 +712,31 @@ export default function LetteringBizcardSettingsView({
         accountGroupDocName,
         accountGroupDocDataUrl
       },
-      { lockedHolderName: lockedName }
+      {
+        lockedHolderName: lockedName,
+        lockedCompanyName: bizGate.companyName
+      }
     );
+    if (accountPatch.accountType) {
+      if (!accountPatch.bankName || !accountPatch.accountNumber || !accountPatch.accountHolder) {
+        focusRequiredSection(
+          "dcc-settings-account",
+          "계좌를 등록하려면 은행·계좌번호·예금주를 모두 채워 주세요. 예금주는 자동 입력됩니다."
+        );
+        return;
+      }
+      if (
+        accountPatch.accountType === DCC_ACCOUNT_TYPES.GROUP &&
+        !accountPatch.accountGroupDocName &&
+        !accountPatch.isGroupVerified
+      ) {
+        focusRequiredSection(
+          "dcc-settings-account",
+          "모임/단체 통장은 통장 사본을 첨부한 뒤 전체적용해 주세요. (승인 후 명함에 표시)"
+        );
+        return;
+      }
+    }
 
     const basePatch = {
       designTemplate: tpl,
@@ -707,6 +796,13 @@ export default function LetteringBizcardSettingsView({
         return;
       }
       setTitleDeptApprovalStatus(TITLE_DEPT_APPROVAL.PENDING);
+      try {
+        if (String(verifyDocKind || "").trim() === "business_registration") {
+          localStorage.setItem("vlue_signup_doc_kind", "business_registration");
+        }
+      } catch {
+        /* ignore */
+      }
     } else {
       writeResult = writeLetteringBizcardEditable({
         ...basePatch,
@@ -814,9 +910,11 @@ export default function LetteringBizcardSettingsView({
     showToast(
       titleDeptNeedsSubmit
         ? "직책·부서 변경 신청이 접수되었습니다. 서류 확인 후 승인됩니다."
-        : isFirstApply
-          ? "전체적용되었습니다. 디지털인증명함 신청이 완료되었고, 통화 수신 화면에 반영됩니다."
-          : "전체적용되었습니다. 입력하신 내용이 디지털인증명함·쇼케이스에 반영되었습니다."
+        : accountPatch.accountType === DCC_ACCOUNT_TYPES.GROUP && !accountPatch.isGroupVerified
+          ? "전체적용되었습니다. 모임/단체 계좌는 관리자 「계좌 승인」 후 명함에 표시됩니다. (개인·사업자 계좌는 바로 표시)"
+          : isFirstApply
+            ? "전체적용되었습니다. 디지털인증명함 신청이 완료되었고, 통화 수신 화면에 반영됩니다."
+            : "전체적용되었습니다. 입력하신 내용이 디지털인증명함·쇼케이스에 반영되었습니다."
     );
     onApplied?.();
     } finally {
@@ -936,6 +1034,14 @@ export default function LetteringBizcardSettingsView({
           setAccountNumber={setAccountNumber}
           accountHolder={accountHolder}
           setAccountHolder={setAccountHolder}
+          lockedCompanyName={businessEvidence.companyName}
+          businessEligible={businessEvidence.eligible}
+          businessMatchLabel={
+            businessEvidence.eligible && businessEvidence.companyName
+              ? businessEvidence.matchLabel
+              : ""
+          }
+          onBusinessBlocked={(msg) => showToast(msg, "guide")}
           accountGroupDocName={accountGroupDocName}
           onGroupDocPick={handleGroupDocPick}
           groupDocError={groupDocError}

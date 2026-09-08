@@ -6,11 +6,55 @@ import {
   fetchMultiDccEntitlement
 } from "../../lib/jobOccupationVerifyApi.js";
 import { createDccAgentProfile, fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
-import DccAgentManageModal from "../dcc/DccAgentManageModal.jsx";
+import { fetchDccLines, fetchDccLineBundle } from "../../lib/dccLinesApi.js";
+import {
+  writeDccLinePreviewFromBundle,
+  writeSelectedDccLineId
+} from "../../lib/dccLineState.js";
+import {
+  createDefaultShowcaseStyle,
+  readLiveShowcaseStyle,
+  readShowcaseStyle,
+  writeLiveShowcaseStyle,
+  writeShowcaseStyle
+} from "../../lib/showcase/showcaseStyleStorage.js";
+import { showcaseStyleHasContent, writeLocalShowcaseStyleUpdatedAt } from "../../lib/showcase/showcaseStyleSync.js";
+import DccAgentManageModal from "./DccAgentManageModal.jsx";
+
+function applyLineToLocalPreview(bundle) {
+  const line = bundle?.line;
+  if (!line?.id) return;
+  writeDccLinePreviewFromBundle(bundle);
+  writeSelectedDccLineId(line.id);
+  const editor = bundle.showcase?.editor || bundle.showcase?.live || null;
+  const live = bundle.showcase?.live || editor;
+  const has = showcaseStyleHasContent(editor) || showcaseStyleHasContent(live);
+  if (has) {
+    writeShowcaseStyle(editor || live, { replace: true, skipSync: true });
+    writeLiveShowcaseStyle(live || editor, { source: "editor", skipSync: true });
+    if (bundle.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
+  } else if (
+    line.isCertified &&
+    (showcaseStyleHasContent(readShowcaseStyle()) || showcaseStyleHasContent(readLiveShowcaseStyle()))
+  ) {
+    /* keep master */
+  } else if (!line.isCertified) {
+    const empty = createDefaultShowcaseStyle();
+    writeShowcaseStyle(empty, { replace: true, skipSync: true });
+    writeLiveShowcaseStyle(empty, { source: "editor", skipSync: true });
+  }
+  try {
+    window.dispatchEvent(new Event("vlue-showcase-style-changed"));
+    window.dispatchEvent(new Event("vlue-showcase-live-style-changed"));
+    window.dispatchEvent(new Event("vlue-lettering-bizcard-changed"));
+  } catch {
+    /* ignore */
+  }
+}
 
 /**
- * 카카오톡 멀티프로필 스타일 — 멀티 DCC + (장당 SOHO +4,200)
- * 계정(ID) 1개 · 페르소나 N개 · 케이스함/유료회원은 동일 계정으로 인식
+ * 멀티 DCC 프로필 — 계정 1개 · 프로필 N개 (DCC~쇼케이스 전체)
+ * 번호 지정 송출 · 미지정/모르는 상대는 대표 프로필
  */
 export default function MultiDccPersonaBar({
   isDarkMode = false,
@@ -18,6 +62,7 @@ export default function MultiDccPersonaBar({
   compact = false
 }) {
   const [profiles, setProfiles] = useState([]);
+  const [lines, setLines] = useState([]);
   const [ent, setEnt] = useState(null);
   const [manageOpen, setManageOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -27,9 +72,14 @@ export default function MultiDccPersonaBar({
 
   const reload = useCallback(async () => {
     try {
-      const [p, e] = await Promise.all([fetchDccAgentProfiles(), fetchMultiDccEntitlement()]);
+      const [p, e, l] = await Promise.all([
+        fetchDccAgentProfiles(),
+        fetchMultiDccEntitlement(),
+        fetchDccLines().catch(() => ({ lines: [] }))
+      ]);
       setProfiles(Array.isArray(p.profiles) ? p.profiles : []);
       setEnt(e);
+      setLines(Array.isArray(l.lines) ? l.lines : []);
     } catch (err) {
       onToast?.(err instanceof Error ? err.message : "멀티 DCC 정보를 불러오지 못했습니다.");
     }
@@ -74,12 +124,12 @@ export default function MultiDccPersonaBar({
         devBillingBypass: Boolean(devBypass)
       });
       await createDccAgentProfile({
-        displayName: "새 페르소나",
+        displayName: "새 프로필",
         title: "",
         department: "",
-        label: `그룹 ${profiles.length + 1}`
+        label: `프로필 ${profiles.length + 1}`
       });
-      onToast?.(`멀티 DCC 슬롯이 추가되었습니다. (월 ${monthlyKrw.toLocaleString("ko-KR")}원)`);
+      onToast?.(`멀티 DCC 프로필 슬롯이 추가되었습니다. (월 ${monthlyKrw.toLocaleString("ko-KR")}원)`);
       setPayOpen(false);
       await reload();
       setManageOpen(true);
@@ -90,9 +140,21 @@ export default function MultiDccPersonaBar({
     }
   };
 
+  const onSelectLine = async (lineId) => {
+    if (!lineId) return;
+    try {
+      const bundle = await fetchDccLineBundle(lineId);
+      applyLineToLocalPreview(bundle);
+    } catch (e) {
+      onToast?.(e instanceof Error ? e.message : "번호 설정을 불러오지 못했습니다.");
+    }
+  };
+
   const shell = isDarkMode
     ? "rounded-2xl border border-white/10 bg-white/[0.04] p-3 max-w-full min-w-0 overflow-hidden"
     : "rounded-2xl border border-slate-200 bg-white p-3 shadow-sm max-w-full min-w-0 overflow-hidden";
+
+  const rep = profiles.find((p) => p.isRepresentative) || profiles[0];
 
   return (
     <div className={shell}>
@@ -103,8 +165,8 @@ export default function MultiDccPersonaBar({
           </p>
           {!compact ? (
             <p className={`mt-0.5 text-[10px] leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-              카카오톡 멀티프로필처럼 계정 1개에 페르소나 N개. 추가 슬롯 장당 SOHO +
-              {monthlyKrw.toLocaleString("ko-KR")}원 · 케이스함·유료회원은 동일 ID로 인식됩니다.
+              계정 1개에 프로필 N개. 각 프로필은 DCC~쇼케이스 전체 설정 · 번호 지정 송출 · 미지정/모르는
+              상대는 대표 프로필. 추가 슬롯 장당 SOHO +{monthlyKrw.toLocaleString("ko-KR")}원.
             </p>
           ) : null}
         </div>
@@ -119,7 +181,17 @@ export default function MultiDccPersonaBar({
       </div>
       <p className={`mt-2 text-[10px] font-semibold ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
         사용 중 {profiles.length}/{allowed} · 무료 {ent?.freeSlots ?? 1} · 결제 슬롯 {ent?.paidSlots ?? 0}
+        {rep ? ` · 대표 ${rep.displayName || "프로필"}` : ""}
       </p>
+      <button
+        type="button"
+        className={`mt-2 text-[11px] font-bold underline-offset-2 hover:underline ${
+          isDarkMode ? "text-cyan-300" : "text-blue-700"
+        }`}
+        onClick={() => setManageOpen(true)}
+      >
+        프로필 · 번호 배정 관리
+      </button>
 
       {payOpen ? (
         <div
@@ -128,10 +200,10 @@ export default function MultiDccPersonaBar({
           }`}
         >
           <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
-            멀티 DCC 추가 · 월 {monthlyKrw.toLocaleString("ko-KR")}원 (SOHO)
+            멀티 DCC 프로필 추가 · 월 {monthlyKrw.toLocaleString("ko-KR")}원 (SOHO)
           </p>
           <p className={`mt-1 text-[10px] ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-            결제한 슬롯의 페르소나도 동일 마스터 계정의 유료 회원으로 취급됩니다.
+            새 프로필마다 DCC·쇼케이스를 새로 설정하고, 송출할 번호를 지정합니다.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -159,10 +231,12 @@ export default function MultiDccPersonaBar({
       <DccAgentManageModal
         open={manageOpen}
         profiles={profiles}
+        lines={lines}
         maxCount={allowed}
         onClose={() => setManageOpen(false)}
         onChanged={reload}
         onToast={onToast}
+        onSelectLine={(id) => void onSelectLine(id)}
       />
     </div>
   );

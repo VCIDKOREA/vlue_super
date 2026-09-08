@@ -477,6 +477,54 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
     digitalCardMetaCache.at = 0;
     digitalCardMetaCache.lite = null;
     digitalCardMetaCache.full = null;
+
+    /* 멀티 프로필: 선택 회선이 있으면 동일 스냅샷을 회선(+연결된 프로필)에도 반영 */
+    try {
+      const { readSelectedDccLineId, readDccLinePreview } = await import("./dccLineState.js");
+      const { putDccLineDcc } = await import("./dccLinesApi.js");
+      const { putDccProfileBundle } = await import("./dccAgentProfilesApi.js");
+      const lineId = String(readSelectedDccLineId() || "").trim();
+      const preview = readDccLinePreview() || {};
+      const snap = {
+        organization: card?.organization || "",
+        name: card?.name || card?.displayName || "",
+        displayName: card?.name || card?.displayName || "",
+        title: card?.title || ed.title || "",
+        department: card?.department || ed.department || "",
+        phone: card?.phone || "",
+        email: clampLetteringBizcardEmail(card?.email || ed.email || ""),
+        website: ed.noWebsite ? "" : String(card?.website || ed.website || "").trim(),
+        fax: ed.noFax ? "" : String(card?.fax || ed.fax || "").trim(),
+        address,
+        companyIntro: String(ed.companyIntro || card?.companyIntro || "").trim(),
+        customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
+        logoUrl: ed.noCompanyLogo ? "" : logoUrl,
+        photoUrl: ed.noProfilePhoto ? "" : photoUrl,
+        titlePhotoUrl: ed.noTitlePhoto ? "" : titlePhotoUrl,
+        photoFocus: normalizePhotoFocus(card?.photoFocus || ed.photoFocus),
+        accountType: String(card?.accountType || ed.accountType || "").trim(),
+        bankName: String(card?.bankName || ed.bankName || "").trim(),
+        accountNumber: String(card?.accountNumber || ed.accountNumber || "").replace(/\D/g, ""),
+        accountHolder: String(card?.accountHolder || ed.accountHolder || "").trim(),
+        isGroupVerified: Boolean(card?.isGroupVerified ?? ed.isGroupVerified)
+      };
+      if (lineId && !preview.isCertified) {
+        await putDccLineDcc(lineId, snap);
+      }
+      let editingProfileId = "";
+      try {
+        editingProfileId = String(localStorage.getItem("vlue_multi_dcc_editing_profile_id") || "").trim();
+      } catch {
+        /* ignore */
+      }
+      const agentId = String(preview.agentId || editingProfileId || "").trim();
+      if (agentId) {
+        await putDccProfileBundle(agentId, { dcc: snap });
+      }
+    } catch {
+      /* 회선 동기화 실패해도 마스터 저장은 성공으로 유지 */
+    }
+
     return {
       ok: true,
       cardId: data.cardId,

@@ -70,6 +70,22 @@ export async function putShowcaseStyleBundle({
   if (lineId && !certified) {
     try {
       const data = await putDccLineShowcase(lineId, { editor, live, liveSource, clientUpdatedAt });
+      try {
+        const preview = readDccLinePreview() || {};
+        let editingProfileId = "";
+        try {
+          editingProfileId = String(localStorage.getItem("vlue_multi_dcc_editing_profile_id") || "").trim();
+        } catch {
+          /* ignore */
+        }
+        const agentId = String(preview.agentId || editingProfileId || "").trim();
+        if (agentId) {
+          const { putDccProfileBundle } = await import("../dccAgentProfilesApi.js");
+          await putDccProfileBundle(agentId, { showcase: { editor, live } });
+        }
+      } catch {
+        /* ignore */
+      }
       return { ok: true, updatedAt: data.updatedAt ?? null };
     } catch (e) {
       return { ok: false, error: e?.message || "save_failed" };
@@ -100,6 +116,22 @@ export async function putShowcaseStyleBundle({
     }
     if (!res.ok) {
       return { ok: false, error: data.error || "save_failed", status: res.status };
+    }
+    try {
+      const preview = readDccLinePreview() || {};
+      let editingProfileId = "";
+      try {
+        editingProfileId = String(localStorage.getItem("vlue_multi_dcc_editing_profile_id") || "").trim();
+      } catch {
+        /* ignore */
+      }
+      const agentId = String(preview.agentId || editingProfileId || "").trim();
+      if (agentId) {
+        const { putDccProfileBundle } = await import("../dccAgentProfilesApi.js");
+        await putDccProfileBundle(agentId, { showcase: { editor, live } });
+      }
+    } catch {
+      /* ignore */
     }
     return {
       ok: true,

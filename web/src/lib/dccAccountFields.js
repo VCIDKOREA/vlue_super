@@ -58,13 +58,19 @@ export function canShowDccAccountOnCard(card = {}) {
   return true;
 }
 
-export function sanitizeDccAccountFields(input = {}, { lockedHolderName = "" } = {}) {
+export function sanitizeDccAccountFields(
+  input = {},
+  { lockedHolderName = "", lockedCompanyName = "" } = {}
+) {
   const accountType = normalizeDccAccountType(input.accountType);
   const bankName = String(input.bankName || "").trim().slice(0, 40);
   const accountNumber = digitsOnlyAccount(input.accountNumber).slice(0, 30);
   let accountHolder = String(input.accountHolder || "").trim().slice(0, 80);
   if (accountType === DCC_ACCOUNT_TYPES.PERSONAL && lockedHolderName) {
     accountHolder = String(lockedHolderName).trim().slice(0, 80);
+  }
+  if (accountType === DCC_ACCOUNT_TYPES.BUSINESS && lockedCompanyName) {
+    accountHolder = String(lockedCompanyName).trim().slice(0, 80);
   }
   const isGroupVerified =
     accountType === DCC_ACCOUNT_TYPES.GROUP ? Boolean(input.isGroupVerified) : false;

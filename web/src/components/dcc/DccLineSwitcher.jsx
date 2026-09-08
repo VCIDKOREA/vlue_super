@@ -240,7 +240,7 @@ export default function DccLineSwitcher({
   const manageBtn = (
     <button type="button" className="dcc-agent-bar__manage" disabled={switching} onClick={() => setManageOpen(true)}>
       <Settings2 size={13} />
-      담당자 관리
+        담당자·프로필 관리
     </button>
   );
 

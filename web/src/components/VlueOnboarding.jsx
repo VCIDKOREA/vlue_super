@@ -720,6 +720,9 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         if (passBusinessMember) {
           try {
             localStorage.setItem("vlue_business_member", "1");
+            const brn = String(passBusinessRegNo || "").replace(/\D/g, "").slice(0, 10);
+            if (brn.length === 10) localStorage.setItem("vlue_business_reg_no", brn);
+            localStorage.setItem("vlue_signup_doc_kind", "business_registration");
             if (data.businessJobTitle) {
               localStorage.setItem("myCardJobTitle", String(data.businessJobTitle));
               localStorage.removeItem("vlue_card_no_job_title");

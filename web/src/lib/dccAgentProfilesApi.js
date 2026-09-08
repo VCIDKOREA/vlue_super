@@ -59,3 +59,38 @@ export async function activateDccAgentProfile(id, cardId) {
   );
   return parseJson(res);
 }
+
+export async function setRepresentativeDccProfile(id) {
+  const res = await vlueAuthFetch(
+    apiUrl(`${DCC_AGENT_PROFILES_PATH}/${encodeURIComponent(id)}/representative`),
+    {
+      method: "PUT",
+      headers: vlueAuthHeaders()
+    }
+  );
+  return parseJson(res);
+}
+
+export async function assignLinesToDccProfile(id, lineIds) {
+  const res = await vlueAuthFetch(
+    apiUrl(`${DCC_AGENT_PROFILES_PATH}/${encodeURIComponent(id)}/lines`),
+    {
+      method: "PUT",
+      headers: vlueAuthHeaders(),
+      body: JSON.stringify({ lineIds: Array.isArray(lineIds) ? lineIds : [] })
+    }
+  );
+  return parseJson(res);
+}
+
+export async function putDccProfileBundle(id, body) {
+  const res = await vlueAuthFetch(
+    apiUrl(`${DCC_AGENT_PROFILES_PATH}/${encodeURIComponent(id)}/bundle`),
+    {
+      method: "PUT",
+      headers: vlueAuthHeaders(),
+      body: JSON.stringify(body || {})
+    }
+  );
+  return parseJson(res);
+}
