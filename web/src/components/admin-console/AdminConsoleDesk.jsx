@@ -22,10 +22,12 @@ import {
   fetchAdminOverdueLines,
   fetchAdminUsers,
   fetchAdminUser,
+  fetchAdminGroupAccountPending,
   patchAdminSignatureSound,
   patchAdminUser,
   resolveAdminManualReview,
   reviewAdminEnterpriseDcc,
+  reviewAdminGroupAccount,
   sendAdminBroadcast,
   testAdminNotification,
   testAdminScanner,
@@ -40,6 +42,7 @@ const TABS = [
     : []),
   { id: "agencies", label: "국가기관 DCP" },
   { id: "enterpriseDcc", label: "기업명함 승인" },
+  { id: "groupAccount", label: "계좌 승인" },
   { id: "health", label: "상태 점검" },
   { id: "broadcast", label: "회원 알림" },
   { id: "pricing", label: "요금제 관리" },
@@ -394,6 +397,125 @@ function EnterpriseDccAdminTab({ onToast }) {
         ]}
         rows={items.map((r) => ({ ...r, _key: r.id }))}
         emptyLabel="승인 대기 신청 없음"
+      />
+    </div>
+  );
+}
+
+function GroupAccountAdminTab({ onToast }) {
+  const [items, setItems] = useState([]);
+  const [busyId, setBusyId] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const data = await fetchAdminGroupAccountPending();
+      setItems(data.items || []);
+    } catch (e) {
+      onToast?.(e?.message || "목록 조회 실패");
+    }
+  }, [onToast]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const review = async (cardId, action) => {
+    setBusyId(cardId);
+    try {
+      await reviewAdminGroupAccount(cardId, action);
+      onToast?.(
+        action === "approve"
+          ? "계좌 승인 · 명함 앞면에 표시됩니다"
+          : "계좌 반려 처리"
+      );
+      await load();
+    } catch (e) {
+      onToast?.(e?.message || "처리 실패");
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[13px] font-black text-slate-800">모임/단체 계좌 승인 대기</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            명함 설정에서 「모임/단체 통장」으로 등록·전체적용한 건만 표시됩니다. 승인 후 앞면에 계좌가 노출됩니다.
+          </p>
+        </div>
+        <button type="button" onClick={() => void load()} className="rounded-lg bg-slate-100 px-3 py-1.5 text-[12px] font-bold">
+          새로고침
+        </button>
+      </div>
+      <Table
+        columns={[
+          {
+            key: "member",
+            label: "회원",
+            render: (row) => (
+              <div>
+                <p className="font-bold">{row.legalName || row.publicHandle || "—"}</p>
+                <p className="text-[10px] text-slate-500">
+                  {row.organization || "—"} · {row.phoneE164 || "—"}
+                </p>
+                <p className="text-[10px] text-slate-400">card {String(row.cardId || "").slice(0, 8)}…</p>
+              </div>
+            )
+          },
+          {
+            key: "account",
+            label: "계좌",
+            render: (row) => (
+              <div className="text-[11px]">
+                <p className="font-semibold">{row.bankName}</p>
+                <p className="tabular-nums">{row.accountNumber}</p>
+                <p>{row.accountHolder}</p>
+                {row.accountGroupDocName ? (
+                  <p className="mt-1 text-[10px] text-blue-700">서류: {row.accountGroupDocName}</p>
+                ) : (
+                  <p className="mt-1 text-[10px] text-amber-700">통장 사본 파일명 없음</p>
+                )}
+              </div>
+            )
+          },
+          {
+            key: "when",
+            label: "신청",
+            render: (row) => (
+              <span className="text-[10px] text-slate-500">
+                {row.updatedAt ? new Date(row.updatedAt).toLocaleString("ko-KR") : "—"}
+              </span>
+            )
+          },
+          {
+            key: "actions",
+            label: "처리",
+            render: (row) => (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={busyId === row.cardId}
+                  onClick={() => void review(row.cardId, "approve")}
+                  className="rounded border border-emerald-300 px-2 py-1 text-[10px] font-bold text-emerald-700"
+                >
+                  승인
+                </button>
+                <button
+                  type="button"
+                  disabled={busyId === row.cardId}
+                  onClick={() => void review(row.cardId, "reject")}
+                  className="rounded border border-rose-300 px-2 py-1 text-[10px] font-bold text-rose-600"
+                >
+                  반려
+                </button>
+              </div>
+            )
+          }
+        ]}
+        rows={items.map((r) => ({ ...r, _key: r.cardId || r.id }))}
+        emptyLabel="승인 대기 계좌 없음"
       />
     </div>
   );
@@ -986,6 +1108,7 @@ export default function AdminConsoleDesk({ user, onLogout }) {
         ) : null}
         {tab === "agencies" ? <AdminAgencyDcpPanel onToast={showToast} /> : null}
         {tab === "enterpriseDcc" ? <EnterpriseDccAdminTab onToast={showToast} /> : null}
+        {tab === "groupAccount" ? <GroupAccountAdminTab onToast={showToast} /> : null}
         {tab === "health" ? <HealthTab onToast={showToast} /> : null}
         {tab === "broadcast" ? <MemberBroadcastTab onToast={showToast} /> : null}
         {tab === "pricing" ? <PricingManagerPanel onToast={showToast} /> : null}

@@ -24,7 +24,8 @@ export default function LetteringBizcardAccountSection({
   accountGroupDocName = "",
   onGroupDocPick,
   groupDocError = "",
-  onClearAccount
+  onClearAccount,
+  isGroupVerified = false
 }) {
   const type = normalizeDccAccountType(accountType);
   const primaryTab = type === DCC_ACCOUNT_TYPES.PERSONAL ? "PERSONAL" : type ? "BUSINESS" : "";
@@ -171,6 +172,15 @@ export default function LetteringBizcardAccountSection({
               <p className={`text-[10px] leading-relaxed ${muted}`}>
                 모임통장/단체 계좌의 경우 통장 사본(확인서) 업로드 및 승인 후 송출됩니다.
               </p>
+              {isGroupVerified ? (
+                <p className="rounded-lg bg-emerald-500/15 px-2.5 py-2 text-[11px] font-bold text-emerald-700">
+                  관리자 승인 완료 · 명함 앞면에 표시됩니다
+                </p>
+              ) : (
+                <p className="rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] font-bold text-amber-800">
+                  승인 대기 중 · 관리자 콘솔 「계좌 승인」탭에서 승인하면 앞면에 표시됩니다
+                </p>
+              )}
               <label className="block">
                 <span className={`text-[11px] font-bold ${muted}`}>통장 사본 · 확인서</span>
                 <input

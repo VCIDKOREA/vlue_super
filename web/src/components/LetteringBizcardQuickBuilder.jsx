@@ -264,6 +264,7 @@ export default function LetteringBizcardQuickBuilder({
   onGroupDocPick = null,
   groupDocError = "",
   onClearAccount = null,
+  isGroupVerified = false,
   companyIntro,
   setCompanyIntro,
   customBackText,
@@ -638,6 +639,7 @@ export default function LetteringBizcardQuickBuilder({
           onGroupDocPick={onGroupDocPick}
           groupDocError={groupDocError}
           onClearAccount={onClearAccount}
+          isGroupVerified={isGroupVerified}
         />
         <Field label="팩스 (선택)" hint="입력하지 않으면 명함에 표시되지 않습니다" isDarkMode={isDarkMode}>
           <input

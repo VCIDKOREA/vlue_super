@@ -310,6 +310,26 @@ export async function reviewAdminEnterpriseDcc(id, action, adminNote = "") {
   return parseJson(res);
 }
 
+/** 모임/단체 계좌 승인 대기 */
+export async function fetchAdminGroupAccountPending() {
+  const res = await fetch(apiUrl("/api/admin/console/group-account/pending"), {
+    headers: adminHeaders()
+  });
+  return parseJson(res);
+}
+
+export async function reviewAdminGroupAccount(cardId, action, adminNote = "") {
+  const res = await fetch(
+    apiUrl(`/api/admin/console/group-account/${encodeURIComponent(cardId)}/review`),
+    {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ action, adminNote })
+    }
+  );
+  return parseJson(res);
+}
+
 /** Diagnostics Framework — session list */
 export async function fetchAdminDiagnosticSessions({
   feature = "BIG_PUSH",

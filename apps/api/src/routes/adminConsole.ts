@@ -14,6 +14,7 @@ import {
 import { issueTokenPair } from "../services/authSessions.js";
 import { adminPricingConfigRoutes } from "./pricingConfig.js";
 import { enterpriseDccAdminRoutes } from "./enterpriseDcc.js";
+import { groupAccountAdminRoutes } from "./groupAccountAdmin.js";
 import {
   getAdminProductMetrics
 } from "../services/admin/adminProductMetrics.js";
@@ -537,4 +538,5 @@ authed.post("/agencies/:id/logo-upload-url", async (c) => {
 
 authed.route("/pricing-config", adminPricingConfigRoutes);
 authed.route("/enterprise-dcc", enterpriseDccAdminRoutes);
+authed.route("/group-account", groupAccountAdminRoutes);
 adminConsoleRoutes.route("/", authed);

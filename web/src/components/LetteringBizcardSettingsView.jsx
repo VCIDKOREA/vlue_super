@@ -939,6 +939,7 @@ export default function LetteringBizcardSettingsView({
           accountGroupDocName={accountGroupDocName}
           onGroupDocPick={handleGroupDocPick}
           groupDocError={groupDocError}
+          isGroupVerified={isGroupVerified}
           onClearAccount={() => {
             setAccountType("");
             setBankName("");
