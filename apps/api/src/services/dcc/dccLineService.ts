@@ -390,7 +390,7 @@ export async function assignAgentToLine(userId: string, cardId: string, agentId:
   const data: Prisma.BusinessCardUpdateInput = {
     displayName: agent.displayName,
     jobTitle: agent.title || null,
-    activeDccAgentProfileId: agent.id,
+    activeDccAgentProfile: { connect: { id: agent.id } },
     dccSnapshotJson: slim as Prisma.InputJsonValue,
     profileJson: {
       ...prevPj,
@@ -401,10 +401,10 @@ export async function assignAgentToLine(userId: string, cardId: string, agentId:
     } as Prisma.InputJsonValue
   };
   if (showcaseHasContent(showcaseEditor) || showcaseHasContent(showcaseLive)) {
-    if (showcaseHasContent(showcaseEditor)) {
+    if (showcaseHasContent(showcaseEditor) && showcaseEditor != null) {
       data.lineShowcaseStyleJson = showcaseEditor as Prisma.InputJsonValue;
     }
-    if (showcaseHasContent(showcaseLive)) {
+    if (showcaseHasContent(showcaseLive) && showcaseLive != null) {
       data.lineShowcaseLiveStyleJson = showcaseLive as Prisma.InputJsonValue;
     }
     data.lineShowcaseUpdatedAt = new Date();
@@ -551,7 +551,7 @@ export async function getLineShowcasePublicByPhone(rawNumber: string) {
         })
       : await getRepresentativeProfile(card.userId);
     const profileLive = agent?.showcaseLiveStyleJson || agent?.showcaseStyleJson;
-    if (showcaseHasContent(profileLive)) {
+    if (profileLive != null && showcaseHasContent(profileLive)) {
       live = profileLive;
       liveSource = null;
       updatedAt = agent?.updatedAt || null;

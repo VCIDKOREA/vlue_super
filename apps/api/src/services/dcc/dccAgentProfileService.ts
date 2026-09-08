@@ -566,7 +566,7 @@ export async function assignLinesToDccProfile(
     if (!wanted.includes(row.id)) {
       await prisma.businessCard.update({
         where: { id: row.id },
-        data: { activeDccAgentProfileId: null }
+        data: { activeDccAgentProfile: { disconnect: true } }
       });
     }
   }
