@@ -226,22 +226,27 @@
 .dcc-agent-modal {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 220;
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: center;
-  padding: max(1.25rem, env(safe-area-inset-top)) 16px 24px;
-  background: rgb(15 23 42 / 42%);
-  overflow: auto;
+  padding: max(0.75rem, var(--vlue-safe-top, env(safe-area-inset-top, 0px))) 12px
+    max(12px, env(safe-area-inset-bottom, 0px));
+  background: rgb(15 23 42 / 48%);
+  overflow: hidden;
 }
 
 .dcc-agent-modal__sheet {
   width: min(36rem, 100%);
-  margin-top: 2.5rem;
-  border-radius: 16px;
+  max-height: min(92dvh, calc(100dvh - var(--vlue-safe-top, 0px) - 24px));
+  margin: 0;
+  border-radius: 16px 16px 12px 12px;
   background: #fff;
   box-shadow: 0 24px 64px rgb(15 23 42 / 28%);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .dcc-agent-modal__head {
@@ -251,6 +256,7 @@
   gap: 12px;
   padding: 16px 16px 12px;
   border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
 }
 
 .dcc-agent-modal__title {
@@ -278,10 +284,20 @@
 }
 
 .dcc-agent-modal__body {
-  padding: 12px 16px 16px;
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.dcc-agent-form__readonly {
+  background: #f8fafc !important;
+  color: #475569 !important;
 }
 
 .dcc-agent-section {

@@ -13,18 +13,18 @@ import {
 } from "../../lib/dccLineState.js";
 import {
   createDefaultShowcaseStyle,
-  readLiveShowcaseStyle,
-  readShowcaseStyle,
   writeLiveShowcaseStyle,
   writeShowcaseStyle
 } from "../../lib/showcase/showcaseStyleStorage.js";
 import { showcaseStyleHasContent, writeLocalShowcaseStyleUpdatedAt } from "../../lib/showcase/showcaseStyleSync.js";
+import { switchToMultiDccProfile } from "../../lib/multiDccSwitch.js";
+import { readLetteringFixedIdentity } from "../../lib/letteringBizcardStorage.js";
 import DccAgentManageModal from "./DccAgentManageModal.jsx";
 
 function applyLineToLocalPreview(bundle) {
   const line = bundle?.line;
   if (!line?.id) return;
-  writeDccLinePreviewFromBundle(bundle);
+  writeDccLinePreviewFromBundle(bundle, { replaceMedia: true });
   writeSelectedDccLineId(line.id);
   const editor = bundle.showcase?.editor || bundle.showcase?.live || null;
   const live = bundle.showcase?.live || editor;
@@ -33,12 +33,7 @@ function applyLineToLocalPreview(bundle) {
     writeShowcaseStyle(editor || live, { replace: true, skipSync: true });
     writeLiveShowcaseStyle(live || editor, { source: "editor", skipSync: true });
     if (bundle.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
-  } else if (
-    line.isCertified &&
-    (showcaseStyleHasContent(readShowcaseStyle()) || showcaseStyleHasContent(readLiveShowcaseStyle()))
-  ) {
-    /* keep master */
-  } else if (!line.isCertified) {
+  } else {
     const empty = createDefaultShowcaseStyle();
     writeShowcaseStyle(empty, { replace: true, skipSync: true });
     writeLiveShowcaseStyle(empty, { source: "editor", skipSync: true });
@@ -56,11 +51,7 @@ function applyLineToLocalPreview(bundle) {
  * 멀티 DCC 프로필 — 계정 1개 · 프로필 N개 (DCC~쇼케이스 전체)
  * 번호 지정 송출 · 미지정/모르는 상대는 대표 프로필
  */
-export default function MultiDccPersonaBar({
-  isDarkMode = false,
-  onToast,
-  compact = false
-}) {
+export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compact = false }) {
   const [profiles, setProfiles] = useState([]);
   const [lines, setLines] = useState([]);
   const [ent, setEnt] = useState(null);
@@ -109,9 +100,7 @@ export default function MultiDccPersonaBar({
       } catch {
         /* ignore */
       }
-      const merchant_uid = devBypass
-        ? `dev_multi_dcc_${Date.now()}`
-        : `multi_dcc_${Date.now()}`;
+      const merchant_uid = devBypass ? `dev_multi_dcc_${Date.now()}` : `multi_dcc_${Date.now()}`;
       if (devBypass && !import.meta.env.DEV) {
         throw new Error("개발 결제 우회는 로컬에서만 가능합니다.");
       }
@@ -123,8 +112,9 @@ export default function MultiDccPersonaBar({
         slotsToAdd: 1,
         devBillingBypass: Boolean(devBypass)
       });
+      const fixedName = String(readLetteringFixedIdentity().name || "").trim() || "새 프로필";
       await createDccAgentProfile({
-        displayName: "새 프로필",
+        displayName: fixedName,
         title: "",
         department: "",
         label: `프로필 ${profiles.length + 1}`
@@ -165,8 +155,8 @@ export default function MultiDccPersonaBar({
           </p>
           {!compact ? (
             <p className={`mt-0.5 text-[10px] leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-              계정 1개에 프로필 N개. 각 프로필은 DCC~쇼케이스 전체 설정 · 번호 지정 송출 · 미지정/모르는
-              상대는 대표 프로필. 추가 슬롯 장당 SOHO +{monthlyKrw.toLocaleString("ko-KR")}원.
+              전화·이름만 공유. DCC·쇼케이스·BGM·상호·계좌는 프로필마다 새로. 추가 슬롯 장당 SOHO +
+              {monthlyKrw.toLocaleString("ko-KR")}원.
             </p>
           ) : null}
         </div>
@@ -203,7 +193,7 @@ export default function MultiDccPersonaBar({
             멀티 DCC 프로필 추가 · 월 {monthlyKrw.toLocaleString("ko-KR")}원 (SOHO)
           </p>
           <p className={`mt-1 text-[10px] ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-            새 프로필마다 DCC·쇼케이스를 새로 설정하고, 송출할 번호를 지정합니다.
+            새 프로필마다 DCC·쇼케이스·BGM을 새로 설정합니다. 전화번호와 이름만 공유됩니다.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -233,10 +223,22 @@ export default function MultiDccPersonaBar({
         profiles={profiles}
         lines={lines}
         maxCount={allowed}
+        allowedSlots={allowed}
+        monthlyKrw={monthlyKrw}
         onClose={() => setManageOpen(false)}
         onChanged={reload}
         onToast={onToast}
+        onRequestPayCreate={() => setPayOpen(true)}
         onSelectLine={(id) => void onSelectLine(id)}
+        onSwitchProfile={(profile) =>
+          void switchToMultiDccProfile(profile, { lines })
+            .then(() => {
+              onToast?.(`「${profile.label || profile.displayName || "프로필"}」로 전환했습니다.`);
+              setManageOpen(false);
+              return reload();
+            })
+            .catch((e) => onToast?.(e instanceof Error ? e.message : "프로필 전환에 실패했습니다."))
+        }
       />
     </div>
   );

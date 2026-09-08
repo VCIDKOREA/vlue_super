@@ -94,3 +94,13 @@ export async function putDccProfileBundle(id, body) {
   );
   return parseJson(res);
 }
+
+export async function fetchDccProfileBundle(id) {
+  const res = await vlueAuthFetch(
+    apiUrl(`${DCC_AGENT_PROFILES_PATH}/${encodeURIComponent(id)}/bundle`),
+    {
+      headers: vlueAuthHeaders()
+    }
+  );
+  return parseJson(res);
+}

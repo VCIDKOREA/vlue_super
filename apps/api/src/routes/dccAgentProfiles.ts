@@ -9,6 +9,7 @@ import {
   putDccProfileBundle,
   setRepresentativeDccProfile,
   updateDccAgentProfile,
+  getDccProfileBundle,
   type DccAgentInput
 } from "../services/dcc/dccAgentProfileService.js";
 
@@ -126,5 +127,16 @@ dccAgentProfileRoutes.put("/:id/bundle", async (c) => {
   } catch (e) {
     const { status, body: errBody } = httpError(e);
     return c.json(errBody, status);
+  }
+});
+
+/** GET /api/cards/dcc-agent-profiles/:id/bundle — 전환 시 DCC·쇼케이스 전체 로드 */
+dccAgentProfileRoutes.get("/:id/bundle", async (c) => {
+  try {
+    const data = await getDccProfileBundle(c.get("vlueUserId"), c.req.param("id"));
+    return c.json({ ok: true, ...data });
+  } catch (e) {
+    const { status, body } = httpError(e);
+    return c.json(body, status);
   }
 });

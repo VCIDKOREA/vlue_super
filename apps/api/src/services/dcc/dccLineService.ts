@@ -103,40 +103,19 @@ async function isCertifiedRow(userId: string, phoneE164: string) {
   return Boolean(phone) && phoneE164 === phone;
 }
 
-/** 라인 스냅에 비어 있는 연락·소개 필드는 마스터 명함으로 채운다 (신원·사진은 라인 우선). */
+/** 라인 스냅에 이름만 마스터 폴백. 연락·소개는 멀티 프로필마다 독립(빈 칸 유지). */
 function withMasterContactFallbacks(
   lineSnap: Record<string, unknown>,
   master: Record<string, unknown>
 ): Record<string, unknown> {
-  const pick = (key: string) => {
-    const lineVal = String(lineSnap[key] ?? "").trim();
-    if (lineVal) return lineVal;
-    return String(master[key] ?? "").trim();
-  };
-  const contactKeys = [
-    "email",
-    "website",
-    "fax",
-    "address",
-    "addressRoad",
-    "addressDetail",
-    "companyIntro",
-    "salesContent",
-    "customBackText",
-    "organization",
-    "companyName",
-    "bankName",
-    "accountNumber",
-    "accountHolder",
-    "accountType"
-  ] as const;
   const next: Record<string, unknown> = { ...lineSnap };
-  for (const key of contactKeys) {
-    const v = pick(key);
-    if (v) next[key] = v;
-  }
-  if (!String(next.logoUrl ?? "").trim() && String(master.logoUrl ?? "").trim()) {
-    next.logoUrl = master.logoUrl;
+  const lineName = String(next.name || next.displayName || "").trim();
+  if (!lineName) {
+    const masterName = String(master.name || master.displayName || "").trim();
+    if (masterName) {
+      next.name = masterName;
+      next.displayName = masterName;
+    }
   }
   return next;
 }
@@ -411,22 +390,25 @@ export async function assignAgentToLine(userId: string, cardId: string, agentId:
     (err as Error & { status?: number }).status = 404;
     throw err;
   }
-  const prev = await lineDccBase(userId, row);
   const profileDcc = snapObj(agent.dccSnapshotJson);
-  const merged = mergeExportSnapshotMedia(
-    Object.keys(profileDcc).length ? mergeExportSnapshotMedia(prev, profileDcc) : prev,
-    {
-      name: agent.displayName,
-      displayName: agent.displayName,
-      title: agent.title,
-      department: agent.department,
-      ...(agent.photoUrl ? { photoUrl: agent.photoUrl, photoFocus: agent.photoFocus } : {})
-    }
-  );
-  const slim = slimExportSnapshot(merged) || merged;
+  /* 프로필 번들로 교체 — 이전 회선 사진·연락처를 붙잡지 않음 */
+  const replaced: Record<string, unknown> = {
+    ...profileDcc,
+    name: agent.displayName,
+    displayName: agent.displayName,
+    title: agent.title,
+    department: agent.department,
+    photoUrl: agent.photoUrl || profileDcc.photoUrl || "",
+    photoFocus: normalizePhotoFocus(agent.photoFocus || profileDcc.photoFocus)
+  };
+  if (!String(replaced.photoUrl || "").trim()) {
+    delete replaced.photoUrl;
+  }
+  const slim = slimExportSnapshot(replaced) || replaced;
   const prevPj = snapObj(row.profileJson);
   const showcaseEditor = agent.showcaseStyleJson;
   const showcaseLive = agent.showcaseLiveStyleJson || agent.showcaseStyleJson;
+  const photoUrl = httpPhoto(slim.photoUrl) || agent.photoUrl || null;
   const data: Prisma.BusinessCardUpdateInput = {
     displayName: agent.displayName,
     jobTitle: agent.title || null,
@@ -436,8 +418,9 @@ export async function assignAgentToLine(userId: string, cardId: string, agentId:
       ...prevPj,
       title: agent.title,
       department: agent.department,
-      photoUrl: agent.photoUrl || prevPj.photoUrl,
-      photoFocus: agent.photoFocus || prevPj.photoFocus
+      photoUrl,
+      image_url: photoUrl,
+      photoFocus: slim.photoFocus || agent.photoFocus || "center"
     } as Prisma.InputJsonValue
   };
   if (showcaseHasContent(showcaseEditor) || showcaseHasContent(showcaseLive)) {
@@ -447,6 +430,10 @@ export async function assignAgentToLine(userId: string, cardId: string, agentId:
     if (showcaseHasContent(showcaseLive) && showcaseLive != null) {
       data.lineShowcaseLiveStyleJson = showcaseLive as Prisma.InputJsonValue;
     }
+    data.lineShowcaseUpdatedAt = new Date();
+  } else {
+    data.lineShowcaseStyleJson = Prisma.JsonNull;
+    data.lineShowcaseLiveStyleJson = Prisma.JsonNull;
     data.lineShowcaseUpdatedAt = new Date();
   }
   const updated = await prisma.businessCard.update({

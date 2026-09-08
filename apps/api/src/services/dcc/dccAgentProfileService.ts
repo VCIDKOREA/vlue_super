@@ -626,6 +626,31 @@ export async function putDccProfileBundle(
   return toDto(updated, { assignedLineIds: a?.ids || [], assignedPhones: a?.phones || [] });
 }
 
+/** 전환용 — 프로필 DCC·쇼케이스 번들 */
+export async function getDccProfileBundle(userId: string, profileId: string) {
+  await ensureMultiDccProfileBundleColumns();
+  const profile = await prisma.userDccAgentProfile.findFirst({ where: { id: profileId, userId } });
+  if (!profile) {
+    const err = new Error("멀티 프로필을 찾을 수 없습니다.");
+    (err as Error & { status?: number }).status = 404;
+    throw err;
+  }
+  const assignments = await loadAssignments(userId);
+  const a = assignments.get(profileId);
+  const dcc = snapObj(profile.dccSnapshotJson);
+  const editor = profile.showcaseStyleJson;
+  const live = profile.showcaseLiveStyleJson || profile.showcaseStyleJson;
+  return {
+    profile: toDto(profile, { assignedLineIds: a?.ids || [], assignedPhones: a?.phones || [] }),
+    dcc,
+    showcase: {
+      editor: editor || null,
+      live: live || null,
+      updatedAt: profile.updatedAt?.toISOString?.() || null
+    }
+  };
+}
+
 /** 회선 저장 시 연결된 프로필 번들도 갱신 */
 export async function mirrorLineContentToProfile(
   userId: string,

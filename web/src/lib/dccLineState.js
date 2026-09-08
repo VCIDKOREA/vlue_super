@@ -44,13 +44,18 @@ export function writeDccLinePreview(preview) {
   return next;
 }
 
-export function writeDccLinePreviewFromBundle(bundle) {
+export function writeDccLinePreviewFromBundle(bundle, opts = {}) {
   const line = bundle?.line;
   if (!line?.id) return null;
   const prev = readDccLinePreview();
   const agent = bundle?.agent || {};
   const dcc = bundle?.dcc && typeof bundle.dcc === "object" ? bundle.dcc : {};
-  const keepSameLine = prev?.id === line.id;
+  const keepSameLine = !opts.replaceMedia && prev?.id === line.id;
+  const photoUrl = String(
+    opts.replaceMedia
+      ? dcc.photoUrl || line.photoUrl || agent.photoUrl || ""
+      : line.photoUrl || dcc.photoUrl || (keepSameLine ? prev?.photoUrl : "") || ""
+  ).trim();
   return writeDccLinePreview({
     id: line.id,
     displayPhone:
@@ -61,31 +66,33 @@ export function writeDccLinePreviewFromBundle(bundle) {
     ).trim(),
     title: String(line.jobTitle || agent.title || dcc.title || "").trim(),
     department: String(line.department || agent.department || dcc.department || "").trim(),
-    photoUrl: String(
-      line.photoUrl || dcc.photoUrl || (keepSameLine ? prev?.photoUrl : "") || ""
-    ).trim(),
+    photoUrl,
     titlePhotoUrl: String(
-      dcc.titlePhotoUrl || (keepSameLine ? prev?.titlePhotoUrl : "") || ""
+      opts.replaceMedia
+        ? dcc.titlePhotoUrl || ""
+        : dcc.titlePhotoUrl || (keepSameLine ? prev?.titlePhotoUrl : "") || ""
     ).trim(),
     noTitlePhoto:
       dcc.noTitlePhoto != null
         ? Boolean(dcc.noTitlePhoto)
-        : Boolean(keepSameLine ? prev?.noTitlePhoto : false),
+        : Boolean(keepSameLine && !opts.replaceMedia ? prev?.noTitlePhoto : false),
     photoFocus: String(line.photoFocus || dcc.photoFocus || (keepSameLine ? prev?.photoFocus : "") || "center").trim() || "center",
     kindLabel: String(line.kindLabel || (keepSameLine ? prev?.kindLabel : "") || "").trim(),
     isCertified: Boolean(line.isCertified),
     agentId: String(line.agentId || agent.id || (keepSameLine ? prev?.agentId : "") || "").trim(),
-    email: String(dcc.email || (keepSameLine ? prev?.email : "") || "").trim(),
-    address: String(dcc.address || (keepSameLine ? prev?.address : "") || "").trim(),
-    website: String(dcc.website || (keepSameLine ? prev?.website : "") || "").trim(),
-    fax: String(dcc.fax || (keepSameLine ? prev?.fax : "") || "").trim(),
+    email: String(dcc.email || (keepSameLine && !opts.replaceMedia ? prev?.email : "") || "").trim(),
+    address: String(dcc.address || (keepSameLine && !opts.replaceMedia ? prev?.address : "") || "").trim(),
+    website: String(dcc.website || (keepSameLine && !opts.replaceMedia ? prev?.website : "") || "").trim(),
+    fax: String(dcc.fax || (keepSameLine && !opts.replaceMedia ? prev?.fax : "") || "").trim(),
     organization: String(
-      dcc.organization || dcc.companyName || (keepSameLine ? prev?.organization : "") || ""
+      dcc.organization || dcc.companyName || (keepSameLine && !opts.replaceMedia ? prev?.organization : "") || ""
     ).trim(),
-    logoUrl: String(dcc.logoUrl || (keepSameLine ? prev?.logoUrl : "") || "").trim(),
-    companyIntro: String(dcc.companyIntro || (keepSameLine ? prev?.companyIntro : "") || "").trim(),
+    logoUrl: String(dcc.logoUrl || (keepSameLine && !opts.replaceMedia ? prev?.logoUrl : "") || "").trim(),
+    companyIntro: String(
+      dcc.companyIntro || (keepSameLine && !opts.replaceMedia ? prev?.companyIntro : "") || ""
+    ).trim(),
     customBackText: String(
-      dcc.customBackText || dcc.salesContent || (keepSameLine ? prev?.customBackText : "") || ""
+      dcc.customBackText || dcc.salesContent || (keepSameLine && !opts.replaceMedia ? prev?.customBackText : "") || ""
     ).trim()
   });
 }

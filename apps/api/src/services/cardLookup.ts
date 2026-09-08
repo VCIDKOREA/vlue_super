@@ -15,10 +15,10 @@ import {
 } from "./callPathPeerSignal.js";
 import { slimShowcaseStyleForPublic } from "../lib/slimShowcaseStyle.js";
 
-const EXPIRED_SUBTITLE = "인증기간이 만료된 번호입니다.";
-const EXPIRED_DETAIL = "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다.";
+const EXPIRED_SUBTITLE = "?�증기간??만료??번호?�니??";
+const EXPIRED_DETAIL = "?�증기간??만료??번호?�니?? 직접 ?�인 부?�드립니??";
 
-/** 콜 오버레이 첫 페인트용 — live 우선, 없으면 editor. includeDigitalCard 포함 */
+/** �??�버?�이 �??�인?�용 ??live ?�선, ?�으�?editor. includeDigitalCard ?�함 */
 function overlayShowcaseStyleFromUser(user: {
   showcaseLiveStyleJson?: unknown;
   showcaseStyleJson?: unknown;
@@ -89,7 +89,7 @@ async function resolveLineBillingGate(e164: string) {
   return { gate: "ok" as const, card };
 }
 
-/** CEO 기본 VLUE 브랜드 로고 (업로드 없을 때) */
+/** CEO 기본 VLUE 브랜??로고 (?�로???�을 ?? */
 function ceoDefaultBrandLogoUrl(): string {
   return `${getVluePublicOrigin()}/vlue-brand-logo.svg`;
 }
@@ -112,8 +112,8 @@ function firstStr(...values: unknown[]): string {
 }
 
 /**
- * 오버레이 슬림 조회 — export_snapshot_json 통째 SELECT 없이 상호만 JSON path.
- * business_cards.company_name 이 비어 있는 CEO·개인명함(VCID KOREA 등) 보정.
+ * ?�버?�이 ?�림 조회 ??export_snapshot_json ?�째 SELECT ?�이 ?�호�?JSON path.
+ * business_cards.company_name ??비어 ?�는 CEO·개인명함(VCID KOREA ?? 보정.
  */
 async function loadOverlayOrgByUserId(userId: string): Promise<string> {
   const rows = await prisma.$queryRaw<Array<{ org: string | null }>>`
@@ -129,7 +129,7 @@ async function loadOverlayOrgByUserId(userId: string): Promise<string> {
   return firstStr(rows[0]?.org);
 }
 
-/** 시드·미리보기용 브랜드 자리표시 — 실제 상호로 송출하지 않음 */
+/** ?�드·미리보기??브랜???�리?�시 ???�제 ?�호�??�출?��? ?�음 */
 function isPlaceholderBrandOrg(org: string): boolean {
   return /^vlue$/i.test(org.trim());
 }
@@ -170,14 +170,14 @@ type ExportSnapLite = {
   photoUrl: string;
   titlePhotoUrl: string;
   logoUrl: string;
-  /** 히어로 배경 초점: top | center | bottom */
+  /** ?�어�?배경 초점: top | center | bottom */
   photoFocus: string;
   noTitlePhoto: boolean;
 };
 
 /**
- * export_snapshot_json 전체 SELECT 금지 — Shared Pooler egress 폭주 방지.
- * JSON path 로 짧은 텍스트 필드만 추출.
+ * export_snapshot_json ?�체 SELECT 금�? ??Shared Pooler egress ??�� 방�?.
+ * JSON path �?짧�? ?�스???�드�?추출.
  */
 async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null> {
   const rows = await prisma.$queryRaw<
@@ -249,7 +249,7 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
   };
 }
 
-/** 쇼케이스 송출용 연락처 — User.email + snap lite + profileJson */
+/** ?��??�스 ?�출???�락�???User.email + snap lite + profileJson */
 function buildContactProfile(opts: {
   userEmail?: string | null;
   exportSnap?: ExportSnapLite | Record<string, unknown> | null;
@@ -376,14 +376,14 @@ function buildContactProfile(opts: {
 type LookupOptions = {
   viewerId?: string | null;
   /**
-   * 공개 공유 링크(OG/카카오 스크래퍼)용.
-   * 검색·팔로워 비공개 마스킹을 적용하지 않고 명함 표기명을 그대로 노출한다.
-   * (링크를 보낸 사람은 이미 초대 전의 — 「비공개 회원」으로 가리면 안 됨)
+   * 공개 공유 링크(OG/카카???�크?�퍼)??
+   * 검?�·팔로워 비공�?마스?�을 ?�용?��? ?�고 명함 ?�기명을 그�?�??�출?�다.
+   * (링크�?보낸 ?�람?� ?��? 초�? ?�의 ???�비공개 ?�원?�으�?가리면 ????
    */
   forPublicOgShare?: boolean;
-  /** 통화 오버레이 — 기관 DB·export 스냅샷을 건너뛰고 최소 필드로 조회 */
+  /** ?�화 ?�버?�이 ??기�? DB·export ?�냅?�을 건너?�고 최소 ?�드�?조회 */
   forCallOverlay?: boolean;
-  /** 테스트 시뮬레이터 — normal | abnormal */
+  /** ?�스???��??�이????normal | abnormal */
   dcpRoute?: string | null;
 };
 
@@ -422,7 +422,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
             is_verified: false,
             source: "national_agency_dcp",
             profileKind: "dcp",
-            displayName: "비정상 발신",
+            displayName: "비정??발신",
             dcp: { routeStatus: "abnormal", warning: agencyRoute.warning }
           };
       return { status: 200 as const, body };
@@ -437,7 +437,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
 
   const e164 = normalizeToE164KR(String(raw || "").trim());
   if (!e164) {
-    return { status: 400 as const, body: { error: "유효한 번호 형식이 아닙니다.", matched: false } };
+    return { status: 400 as const, body: { error: "?�효??번호 ?�식???�닙?�다.", matched: false } };
   }
 
   const [peer, card] = await Promise.all([
@@ -517,23 +517,23 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
         ? (card.dccSnapshotJson as Record<string, unknown>)
         : null;
     const certified = Boolean(card.user.phoneE164) && card.phoneE164 === card.user.phoneE164;
-    /* 연락·소개는 인증 여부와 무관하게 마스터 폴백 (내선 스냅이 비어 있어도 명함 정보 유지) */
+    /* ?�락·?�개???�증 ?��??� 무�??�게 마스???�백 (?�선 ?�냅??비어 ?�어??명함 ?�보 ?��?) */
     const masterSnap = await loadExportSnapLite(card.user.id);
     const exportSnap = {
       name: firstStr(lineSnap?.name, lineSnap?.displayName, certified ? masterSnap?.name : ""),
       title: firstStr(lineSnap?.title, certified ? masterSnap?.title : ""),
-      email: firstStr(lineSnap?.email, masterSnap?.email),
-      website: firstStr(lineSnap?.website, masterSnap?.website),
-      fax: firstStr(lineSnap?.fax, masterSnap?.fax),
-      address: firstStr(lineSnap?.address, masterSnap?.address),
+      email: firstStr(lineSnap?.email, certified ? masterSnap?.email : ""),
+      website: firstStr(lineSnap?.website, certified ? masterSnap?.website : ""),
+      fax: firstStr(lineSnap?.fax, certified ? masterSnap?.fax : ""),
+      address: firstStr(lineSnap?.address, certified ? masterSnap?.address : ""),
       department: firstStr(lineSnap?.department, certified ? masterSnap?.department : ""),
-      companyIntro: firstStr(lineSnap?.companyIntro, masterSnap?.companyIntro),
-      salesContent: firstStr(lineSnap?.salesContent, masterSnap?.salesContent),
-      customBackText: firstStr(lineSnap?.customBackText, masterSnap?.customBackText),
+      companyIntro: firstStr(lineSnap?.companyIntro, certified ? masterSnap?.companyIntro : ""),
+      salesContent: firstStr(lineSnap?.salesContent, certified ? masterSnap?.salesContent : ""),
+      customBackText: firstStr(lineSnap?.customBackText, certified ? masterSnap?.customBackText : ""),
       photoUrl: certified
         ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
         : httpOnlyUrl(lineSnap?.photoUrl) || "",
-      /* 인증 번호: 마스터 DigitalCard가 타이틀·로고 정본 (라인 스냅 잔재 무시) */
+      /* ?�증 번호: 마스??DigitalCard가 ?�?��?·로고 ?�본 (?�인 ?�냅 ?�재 무시) */
       titlePhotoUrl: certified
         ? httpOnlyUrl(masterSnap?.titlePhotoUrl) || ""
         : httpOnlyUrl(lineSnap?.titlePhotoUrl) || "",
@@ -542,7 +542,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       ),
       logoUrl: certified
         ? httpOnlyUrl(masterSnap?.logoUrl) || ""
-        : httpOnlyUrl(lineSnap?.logoUrl) || httpOnlyUrl(masterSnap?.logoUrl) || "",
+        : httpOnlyUrl(lineSnap?.logoUrl) || "",
       photoFocus: firstStr(
         certified ? masterSnap?.photoFocus : lineSnap?.photoFocus,
         lineSnap?.photoFocus,
@@ -737,7 +737,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
   };
 }
 
-/** 번호 기준 조회 응답 본문 — GET /lookup · GET /by-number 공용 */
+/** 번호 기�? 조회 ?�답 본문 ??GET /lookup · GET /by-number 공용 */
 export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {}) {
   if (opts.forCallOverlay) {
     return lookupCardForCallOverlay(raw, opts);
@@ -756,7 +756,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           is_verified: false,
           source: "national_agency_dcp",
           profileKind: "dcp",
-          displayName: "비정상 발신",
+          displayName: "비정??발신",
           companyName: "",
           phoneE164: String(raw || "").replace(/\D/g, ""),
           website: "",
@@ -786,7 +786,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
 
   const e164 = normalizeToE164KR(raw.trim());
   if (!e164) {
-    return { status: 400 as const, body: { error: "유효한 번호 형식이 아닙니다.", matched: false } };
+    return { status: 400 as const, body: { error: "?�효??번호 ?�식???�닙?�다.", matched: false } };
   }
 
   const billingGate = await resolveLineBillingGate(e164);
@@ -802,7 +802,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
     };
   }
   if (billingGate.gate === "unmatched") {
-    /* 유예 경과·해지 회선은 일반 미인증으로 취급 — 아래 user/unmatched 분기로 */
+    /* ?�예 경과·?��? ?�선?� ?�반 미인증으�?취급 ???�래 user/unmatched 분기�?*/
   } else {
   const card = await prisma.businessCard.findFirst({
     where: { phoneE164: e164, verificationStatus: "approved" },
@@ -838,18 +838,18 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
     const exportSnap = {
       name: firstStr(lineSnap?.name, lineSnap?.displayName, certified ? masterSnap?.name : ""),
       title: firstStr(lineSnap?.title, certified ? masterSnap?.title : ""),
-      email: firstStr(lineSnap?.email, masterSnap?.email),
-      website: firstStr(lineSnap?.website, masterSnap?.website),
-      fax: firstStr(lineSnap?.fax, masterSnap?.fax),
-      address: firstStr(lineSnap?.address, masterSnap?.address),
+      email: firstStr(lineSnap?.email, certified ? masterSnap?.email : ""),
+      website: firstStr(lineSnap?.website, certified ? masterSnap?.website : ""),
+      fax: firstStr(lineSnap?.fax, certified ? masterSnap?.fax : ""),
+      address: firstStr(lineSnap?.address, certified ? masterSnap?.address : ""),
       department: firstStr(lineSnap?.department, certified ? masterSnap?.department : ""),
-      companyIntro: firstStr(lineSnap?.companyIntro, masterSnap?.companyIntro),
-      salesContent: firstStr(lineSnap?.salesContent, masterSnap?.salesContent),
-      customBackText: firstStr(lineSnap?.customBackText, masterSnap?.customBackText),
+      companyIntro: firstStr(lineSnap?.companyIntro, certified ? masterSnap?.companyIntro : ""),
+      salesContent: firstStr(lineSnap?.salesContent, certified ? masterSnap?.salesContent : ""),
+      customBackText: firstStr(lineSnap?.customBackText, certified ? masterSnap?.customBackText : ""),
       photoUrl: certified
         ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
         : httpOnlyUrl(lineSnap?.photoUrl) || "",
-      /* 인증 번호: 마스터 DigitalCard가 타이틀·로고 정본 (라인 스냅 잔재 무시) */
+      /* ?�증 번호: 마스??DigitalCard가 ?�?��?·로고 ?�본 (?�인 ?�냅 ?�재 무시) */
       titlePhotoUrl: certified
         ? httpOnlyUrl(masterSnap?.titlePhotoUrl) || ""
         : httpOnlyUrl(lineSnap?.titlePhotoUrl) || "",
@@ -858,7 +858,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       ),
       logoUrl: certified
         ? httpOnlyUrl(masterSnap?.logoUrl) || ""
-        : httpOnlyUrl(lineSnap?.logoUrl) || httpOnlyUrl(masterSnap?.logoUrl) || "",
+        : httpOnlyUrl(lineSnap?.logoUrl) || "",
       photoFocus: firstStr(
         certified ? masterSnap?.photoFocus : lineSnap?.photoFocus,
         lineSnap?.photoFocus,
@@ -967,7 +967,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
   if (billingGate.gate === "unmatched") {
     return {
       status: 404 as const,
-      body: { matched: false, message: "등록된 명함이 없습니다." }
+      body: { matched: false, message: "?�록??명함???�습?�다." }
     };
   }
 
@@ -1025,7 +1025,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       exportSnap?.logoUrl ||
       null;
     const isCeo = isPlatformCeoHandle(user.publicHandle);
-    /* 프로필 사진만 image_url. CEO 로고 슬롯만 VLUE 기본. 타인 빈 사진 → null(실루엣) */
+    /* ?�로???�진�?image_url. CEO 로고 ?�롯�?VLUE 기본. ?�??�??�진 ??null(?�루?? */
     const imageUrl = photoOnly || (isCeo ? ceoDefaultBrandLogoUrl() : null);
     const logoUrl = logoOnly || (isCeo ? ceoDefaultBrandLogoUrl() : null);
 
@@ -1105,6 +1105,6 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
 
   return {
     status: 404 as const,
-    body: { matched: false, message: "등록된 명함이 없습니다." }
+    body: { matched: false, message: "?�록??명함???�습?�다." }
   };
 }

@@ -11,9 +11,16 @@ import {
   setRepresentativeDccProfile,
   updateDccAgentProfile
 } from "../../lib/dccAgentProfilesApi.js";
-import { agentOptionLabel } from "../../lib/dccAgentProfileState.js";
+import {
+  agentOptionLabel,
+  cacheBustMediaUrl,
+  writeEditingMultiDccProfileId
+} from "../../lib/dccAgentProfileState.js";
+import { readLetteringFixedIdentity } from "../../lib/letteringBizcardStorage.js";
 import { isCertifiedLine } from "../../lib/dccLineLabel.js";
 import { writeSelectedDccLineId } from "../../lib/dccLineState.js";
+import { SOHO_BROADCAST_MONTHLY_KRW } from "../../lib/membershipBm.js";
+import "./dcc-agent-switcher.css";
 
 const EMPTY_FORM = {
   label: "",
@@ -24,22 +31,12 @@ const EMPTY_FORM = {
   photoFocus: "center"
 };
 
-const EDITING_PROFILE_KEY = "vlue_multi_dcc_editing_profile_id";
-
-export function writeEditingMultiDccProfileId(id) {
-  try {
-    if (id) localStorage.setItem(EDITING_PROFILE_KEY, String(id));
-    else localStorage.removeItem(EDITING_PROFILE_KEY);
-  } catch {
-    /* ignore */
-  }
-}
+export { writeEditingMultiDccProfileId };
 
 /**
  * 멀티 DCC 프로필 관리
- * - 프로필 = DCC ~ 쇼케이스 전체 설정 단위
- * - 번호 지정 → 그 번호로 송출
- * - 미지정·모르는 상대 → 대표 프로필
+ * - 전화·이름(계정)은 공유, 그 외 DCC·쇼케이스·BGM·상호·계좌 등은 프로필별
+ * - 2번째부터 결제 후 생성
  */
 export default function DccAgentManageModal({
   open,
@@ -47,13 +44,16 @@ export default function DccAgentManageModal({
   selectedLineId = "",
   profiles = [],
   maxCount = 20,
+  allowedSlots = 1,
+  monthlyKrw = SOHO_BROADCAST_MONTHLY_KRW,
   onClose,
   onSelectLine,
   onAssignAgent,
   onChanged,
   onToast,
   onEditProfileBroadcast,
-  onSwitchProfile
+  onSwitchProfile,
+  onRequestPayCreate
 }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState("");
@@ -64,6 +64,15 @@ export default function DccAgentManageModal({
   const [draftLineIds, setDraftLineIds] = useState([]);
 
   const lineList = useMemo(() => (Array.isArray(lines) ? lines : []), [lines]);
+  const slots = Number(allowedSlots) || Number(maxCount) || 1;
+  const needPayToCreate = profiles.length >= slots;
+  const sharedName = useMemo(() => {
+    try {
+      return String(readLetteringFixedIdentity().name || "").trim();
+    } catch {
+      return "";
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -94,8 +103,21 @@ export default function DccAgentManageModal({
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId) || null;
 
   const startCreate = () => {
+    if (needPayToCreate) {
+      if (typeof onRequestPayCreate === "function") {
+        onRequestPayCreate();
+        return;
+      }
+      onToast?.(
+        `멀티 프로필 추가에는 결제(월 ${Number(monthlyKrw).toLocaleString("ko-KR")}원)가 필요합니다. DCC·쇼케이스는 프로필마다 따로 설정됩니다.`
+      );
+      return;
+    }
     setEditingId("");
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+      displayName: sharedName || ""
+    });
     setFormOpen(true);
   };
 
@@ -104,7 +126,7 @@ export default function DccAgentManageModal({
     setSelectedProfileId(profile.id);
     setForm({
       label: profile.label || "",
-      displayName: profile.displayName || "",
+      displayName: sharedName || profile.displayName || "",
       title: profile.title || "",
       department: profile.department || "",
       photoUrl: profile.photoUrl || "",
@@ -132,9 +154,9 @@ export default function DccAgentManageModal({
   );
 
   const saveForm = async () => {
-    const displayName = String(form.displayName || "").trim();
+    const displayName = String(sharedName || form.displayName || "").trim();
     if (!displayName) {
-      onToast?.("프로필 이름을 입력해 주세요.");
+      onToast?.("계정 이름이 없습니다. 가입 실명을 확인해 주세요.");
       return;
     }
     setBusy(true);
@@ -154,15 +176,18 @@ export default function DccAgentManageModal({
         const created = await createDccAgentProfile(payload);
         const id = created?.profile?.id;
         if (id) setSelectedProfileId(id);
-        onToast?.("멀티 프로필을 만들었습니다. 번호를 지정한 뒤 DCC·쇼케이스를 설정하세요.");
+        onToast?.(
+          "멀티 프로필을 만들었습니다. 상호·이메일·계좌·DCC·쇼케이스·BGM은 이 프로필에서 새로 설정하세요."
+        );
       }
       setFormOpen(false);
       setEditingId("");
       await onChanged?.();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "저장에 실패했습니다.";
-      if (/멀티 DCC|4,200|4200|결제/i.test(msg)) {
-        onToast?.(`${msg} 「멀티 DCC +」에서 슬롯을 결제해 주세요.`);
+      if (/멀티 DCC|4,200|4200|결제|슬롯/i.test(msg)) {
+        onToast?.(msg);
+        onRequestPayCreate?.();
       } else {
         onToast?.(msg);
       }
@@ -246,7 +271,7 @@ export default function DccAgentManageModal({
       }
       onToast?.(
         lineId
-          ? `「${agentOptionLabel(profile)}」 편집 모드 — 지금 DCC·쇼케이스를 설정하면 지정 번호에 반영됩니다.`
+          ? `「${agentOptionLabel(profile)}」 편집 모드 — 지금 DCC·쇼케이스를 설정하면 이 프로필 전용으로 저장됩니다.`
           : `「${agentOptionLabel(profile)}」 — 먼저 송출 번호를 지정한 뒤 DCC·쇼케이스를 설정하세요.`
       );
       onEditProfileBroadcast?.(profile, lineId);
@@ -269,9 +294,8 @@ export default function DccAgentManageModal({
               멀티 DCC 프로필
             </h2>
             <p className="dcc-agent-modal__sub">
-              계정 1개에 프로필 N개. 목록에서 프로필을 누르면 즉시 그 프로필로 전환됩니다. 각 프로필은
-              DCC부터 쇼케이스까지 따로 설정하고, 번호를 지정하면 그 번호로 송출됩니다. 미지정·모르는
-              상대에게는 <b>대표 프로필</b>이 송출됩니다.
+              목록을 누르면 즉시 그 프로필로 전환됩니다. <b>전화번호·이름</b>만 공유하고, 상호·계좌·이메일·웹·사진·DCC·쇼케이스·BGM은
+              프로필마다 새로 설정합니다. 추가 프로필은 결제 후 생성됩니다.
             </p>
           </div>
           <button type="button" className="dcc-agent-modal__close" onClick={onClose} aria-label="닫기">
@@ -281,9 +305,12 @@ export default function DccAgentManageModal({
 
         <div className="dcc-agent-modal__body">
           <section className="dcc-agent-section">
-            <h3 className="dcc-agent-section__title">프로필 목록</h3>
+            <h3 className="dcc-agent-section__title">
+              프로필 목록 · {profiles.length}/{slots}
+            </h3>
             {profiles.map((profile) => {
               const selected = profile.id === selectedProfileId;
+              const photoSrc = cacheBustMediaUrl(profile.photoUrl, profile.updatedAt || profile.id);
               return (
                 <div
                   key={profile.id}
@@ -305,8 +332,8 @@ export default function DccAgentManageModal({
                     }
                   }}
                 >
-                  {profile.photoUrl ? (
-                    <img className="dcc-agent-row__photo" src={profile.photoUrl} alt="" />
+                  {photoSrc ? (
+                    <img className="dcc-agent-row__photo" src={photoSrc} alt="" />
                   ) : (
                     <div className="dcc-agent-row__photo dcc-agent-row__photo--empty" aria-hidden>
                       {(profile.displayName || "?").slice(0, 1)}
@@ -358,13 +385,14 @@ export default function DccAgentManageModal({
                   />
                 </label>
                 <label>
-                  이름
+                  이름 (계정 공유)
                   <input
                     type="text"
-                    value={form.displayName}
+                    value={sharedName || form.displayName}
                     maxLength={120}
-                    onChange={(e) => setForm((p) => ({ ...p, displayName: e.target.value }))}
-                    placeholder="통화·명함에 보일 이름"
+                    readOnly
+                    className="dcc-agent-form__readonly"
+                    placeholder="가입 실명"
                   />
                 </label>
                 <label>
@@ -389,12 +417,16 @@ export default function DccAgentManageModal({
                 </label>
                 <div className="dcc-agent-form__photo">
                   {form.photoUrl ? (
-                    <img className="dcc-agent-row__photo" src={form.photoUrl} alt="" />
+                    <img
+                      className="dcc-agent-row__photo"
+                      src={cacheBustMediaUrl(form.photoUrl, Date.now())}
+                      alt=""
+                    />
                   ) : (
                     <div className="dcc-agent-row__photo dcc-agent-row__photo--empty">사진</div>
                   )}
                   <label>
-                    프로필 사진
+                    프로필 사진 (이 프로필 전용)
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
@@ -423,10 +455,12 @@ export default function DccAgentManageModal({
                 type="button"
                 className="dcc-agent-modal__add"
                 onClick={startCreate}
-                disabled={busy || profiles.length >= maxCount}
+                disabled={busy}
               >
-                <Plus size={14} /> 프로필 추가
-                {profiles.length >= maxCount ? ` (최대 ${maxCount}개)` : ""}
+                <Plus size={14} />
+                {needPayToCreate
+                  ? `결제 후 프로필 추가 (월 ${Number(monthlyKrw).toLocaleString("ko-KR")}원)`
+                  : "프로필 추가"}
               </button>
             )}
           </section>
@@ -438,7 +472,7 @@ export default function DccAgentManageModal({
                 {selectedProfile.isRepresentative ? " (대표)" : ""}
               </h3>
               <p className="dcc-agent-modal__sub" style={{ marginTop: 0 }}>
-                아래에서 송출 번호를 지정하고, DCC·쇼케이스는 「편집」으로 전체 설정합니다.
+                아래에서 송출 번호를 지정하고, DCC·쇼케이스·BGM은 「편집」으로 이 프로필 전용으로 설정합니다.
               </p>
 
               <div className="dcc-agent-form__actions" style={{ marginBottom: 12 }}>
