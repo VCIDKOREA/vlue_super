@@ -64,9 +64,10 @@ class ForegroundPackageProbeTest {
     }
 
     @Test
-    fun staleInCallResume_withDialerTask_isCompact() {
+    fun resumedInCall_withDialerTask_isFullIncoming() {
+        /* 삼성 전체 삼선 UI: resume=InCallActivity 인데 task 가 dialer 로 남아도 TOP (중앙 BELOW 금지) */
         assertEquals(
-            ForegroundPackageProbe.RingingSurface.COMPACT_DIALER,
+            ForegroundPackageProbe.RingingSurface.FULL_INCALL,
             ForegroundPackageProbe.classifyRingingSurface(
                 tasksPkg = "com.samsung.android.dialer",
                 inCallImportance = fg,

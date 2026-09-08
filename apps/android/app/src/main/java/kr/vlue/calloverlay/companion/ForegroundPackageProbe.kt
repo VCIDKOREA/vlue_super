@@ -47,16 +47,13 @@ object ForegroundPackageProbe {
      * Pure — 단위 테스트용.
      *
      * 우선순위 (DUT usagestats):
-     * 1) 최근 resume 이 전화 앱(dialer) → 미니 수신 (팝업 바로 아래)
-     * 2) 최근 resume 이 InCallUI + task 가 dialer → compact InCall (팝업 바로 아래)
-     * 3) 최근 resume 이 InCallUI → TOP (전체 수신 UI)
-     * 4) 최근 ACTIVITY_RESUMED 가 홈/타앱 → 미니 수신 (팝업 바로 아래)
-     * 5) Tasks 가 dialer → 미니 수신
-     * 6) Tasks 가 InCallUI → TOP
-     * 7) InCall FOREGROUND → TOP
-     * 8) 타 앱 FOREGROUND → 미니 수신 (팝업 바로 아래)
-     * 9) InCall ≤ VISIBLE + 타앱 FG 없음 → TOP
-     * 10) 그 외(미확인·VLUE 전면) → TOP — 삼성 전체 UI 응답/종료 가림 방지
+     * 1) 타앱 task 위 미니 수신 → BELOW
+     * 2) 최근 resume 이 InCallActivity → TOP (전체 삼선 UI). dialer task 잔존만으로 BELOW 금지
+     * 3) 최근 resume 이 전화 앱(dialer) → 미니 수신
+     * 4) Tasks 가 dialer (resume 없음) → 미니 수신
+     * 5) Tasks 가 InCallUI → TOP
+     * 6) InCall FOREGROUND → TOP (타앱/다이얼러 없을 때)
+     * 7) 그 외 → 미니(BELOW) 기본
      */
     @Suppress("UNUSED_PARAMETER")
     fun classifyRingingSurface(
@@ -71,10 +68,6 @@ object ForegroundPackageProbe {
         val tasksDialer = OverlayContextDetector.isLikelyDialerPackage(tasksPkg)
         val tasksFull = OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg)
 
-        if (resumedDialer) return RingingSurface.COMPACT_DIALER
-        /* 최근기록이 전면이면 미니 수신 — 이전 InCallActivity resume 가 남아도 TOP 금지 */
-        if (tasksDialer) return RingingSurface.COMPACT_DIALER
-        if (resumedFull && tasksDialer) return RingingSurface.COMPACT_DIALER
         /*
          * 타앱(카톡·카카오내비 등) 위 미니 수신 팝업 — task 가 전체 InCallUI 가 아니면 BELOW.
          * 직전 통화 InCallActivity resume(stale) 가 남아도 TOP 금지 → 2번째 수신 겹침 방지.
@@ -85,25 +78,24 @@ object ForegroundPackageProbe {
         if (otherForegroundPackages.isNotEmpty() && !tasksFull) {
             return RingingSurface.HOME_OR_OTHER
         }
+
         /*
-         * 전체 InCallUI: resume 가 InCallActivity 이고 다이얼러/타앱 task 가 없으면 TOP.
-         * tasks=null 만으로 BELOW 하면 전면 수신 UI 중앙에 빅푸시가 뜬다.
-         * 연속·미니 수신은 tasksDialer / otherApp / ourApp 경로로 BELOW 유지.
+         * 전체 삼선 InCallUI: resume=InCallActivity 이면 TOP.
+         * 삼성에서 task 가 dialer 로 남아도 BELOW(화면 중앙) 금지 — 응답 버튼 가림.
+         * VLUE 전면 + InCall task 없음 = 미니 팝업 → BELOW 유지.
          */
-        if (resumedFull && ourApp && !tasksFull) return RingingSurface.HOME_OR_OTHER
-        if (resumedFull && tasksFull) return RingingSurface.FULL_INCALL
-        /*
-         * stale InCall resume + 홈/타앱 task → 미니(BELOW).
-         * tasks=null 은 전체 UI 일 수 있음 → TOP 유지 (중앙 BELOW 금지).
-         */
-        if (resumedFull && !tasksFull) {
+        if (resumedFull) {
             if (OverlayContextDetector.isLikelyLauncherPackage(tasksPkg) ||
                 isKnownOtherAppPackage(tasksPkg)
             ) {
                 return RingingSurface.HOME_OR_OTHER
             }
+            if (ourApp && !tasksFull) return RingingSurface.HOME_OR_OTHER
             return RingingSurface.FULL_INCALL
         }
+
+        if (resumedDialer) return RingingSurface.COMPACT_DIALER
+        if (tasksDialer) return RingingSurface.COMPACT_DIALER
 
         if (OverlayContextDetector.isLikelyLauncherPackage(lastResumedPkg) ||
             isKnownOtherAppPackage(lastResumedPkg)
@@ -111,7 +103,6 @@ object ForegroundPackageProbe {
             return RingingSurface.HOME_OR_OTHER
         }
 
-        if (tasksDialer) return RingingSurface.COMPACT_DIALER
         if (tasksFull) return RingingSurface.FULL_INCALL
 
         /*
@@ -124,8 +115,6 @@ object ForegroundPackageProbe {
             inCallImportance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
         ) {
             if (tasksFull) return RingingSurface.FULL_INCALL
-            /* 최근 resume 가 전체 InCallActivity → 풀 수신 (tasks null 이어도 TOP) */
-            if (resumedFull && !tasksDialer) return RingingSurface.FULL_INCALL
             if (resumedDialer || tasksDialer) return RingingSurface.COMPACT_DIALER
             if (otherForegroundPackages.isNotEmpty()) return RingingSurface.HOME_OR_OTHER
             if (OverlayContextDetector.isLikelyLauncherPackage(lastResumedPkg) ||
@@ -304,7 +293,7 @@ object ForegroundPackageProbe {
         )
     }
 
-    private fun isKnownOtherAppPackage(pkg: String?): Boolean {
+    internal fun isKnownOtherAppPackage(pkg: String?): Boolean {
         if (pkg.isNullOrBlank()) return false
         if (OverlayContextDetector.isLikelyInCallUiPackage(pkg)) return false
         if (OverlayContextDetector.isLikelyLauncherPackage(pkg)) return false

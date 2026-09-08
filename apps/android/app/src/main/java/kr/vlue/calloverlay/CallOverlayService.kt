@@ -1019,9 +1019,8 @@ class CallOverlayService : Service() {
             return
         }
         /*
-         * 카드 미도착·조회 중만 탭으로 풀쇼케이스 진입을 막는다.
-         * 미인증이라도 표시할 카드가 있으면 탭 → Showcase (이전: BIG_PUSH_TAP_KEEP 으로 무반응).
-         * 실제 Answer 자동 전이만 빈 쇼케이스 금지용 hide.
+         * 카드 미도착·조회 중만 짧게 빅푸시 유지 후 재시도.
+         * 모르는 번호(미인증)라도 수화 후에는 쇼케이스를 연다 — UNVERIFIED/PENDING 고착 금지.
          */
         if (pendingCardJson.isNullOrBlank() || isLookupPendingCard(pendingCardJson)) {
             if (source.startsWith("bigPush_bar_tap")) {
@@ -1032,8 +1031,8 @@ class CallOverlayService : Service() {
                 return
             }
             /*
-             * 조회 중 수화: onAnswer(SHOWCASE) 하면 빈 풀스크린. 주소록이면 즉시 안심케어 팝업.
-             * 아니면 빅푸시 유지 + hold — 이후 unmatched/timeout 이 contact_safe_care 로 승격.
+             * 조회 중 수화: 주소록이면 즉시 안심케어 팝업.
+             * 그 외는 짧게 재시도 후 쇼케이스 강제 오픈 (모르는 번호 포함).
              */
             remoteConnected = true
             showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 8_000L
@@ -1051,26 +1050,37 @@ class CallOverlayService : Service() {
                 presentCenterSafePopup(source = source, authMember = false)
                 return
             }
+            val resumeAttempt = answerResumeAttemptFromSource(source)
+            if (!source.startsWith("answer_ui_resume_")) {
+                VlueBigPushTrace.lifecycle(
+                    "ANSWER_KEEP_BIGPUSH_PENDING",
+                    "lookup still pending — brief hold then resume source=$source"
+                )
+                scheduleAnswerUiResume("pending_after_$source")
+                return
+            }
             VlueBigPushTrace.lifecycle(
-                "ANSWER_KEEP_BIGPUSH_PENDING",
-                "lookup still pending — hold BigPush (no onAnswer) source=$source"
+                "ANSWER_FORCE_SHOWCASE_PENDING",
+                "unknown/pending after resume — open showcase source=$source attempt=$resumeAttempt"
             )
-            scheduleAnswerUiResume("pending_after_$source")
-            return
-        }
-        if (!pendingVerified && !parseIsVerified(pendingCardJson) && !source.startsWith("bigPush_bar_tap")) {
+            /* fall through → showcase */
+        } else if (!pendingVerified &&
+            !parseIsVerified(pendingCardJson) &&
+            !source.startsWith("bigPush_bar_tap")
+        ) {
             if (isContactSafeCare(pendingCardJson)) {
                 presentCenterSafePopup(source = source, authMember = false)
                 return
             }
-            remoteConnected = true
-            showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 8_000L
+            /*
+             * 이전: ANSWER_KEEP_BIGPUSH_UNVERIFIED 로 쇼케이스 미오픈.
+             * 모르는 번호 수화 후에도 빅푸시만 상단 고정되는 버그 → 바로 쇼케이스.
+             */
             VlueBigPushTrace.lifecycle(
-                "ANSWER_KEEP_BIGPUSH_UNVERIFIED",
-                "unverified non-contact — hold BigPush (no onAnswer) source=$source"
+                "ANSWER_OPEN_SHOWCASE_UNVERIFIED",
+                "unverified/unknown — open showcase source=$source"
             )
-            scheduleAnswerUiResume("unverified_after_$source")
-            return
+            /* fall through → showcase */
         }
         VlueBigPushTrace.milestone(
             "SHOWCASE_REQUESTED",
@@ -1125,13 +1135,30 @@ class CallOverlayService : Service() {
      */
     private var answerUiResumeAttempt = 0
 
+    private fun answerResumeAttemptFromSource(source: String): Int {
+        val m = Regex("""answer_ui_resume_(\d+)""").find(source)
+        return m?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+    }
+
     private fun scheduleAnswerUiResume(reason: String) {
         if (dismissing || !remoteConnected) return
         if (companion.state != OverlayState.BIG_PUSH) return
         if (authPopupConfirmedToMini || userMinimized) return
         val attempt = ++answerUiResumeAttempt
-        if (attempt > 8) return
-        val delayMs = 350L + (attempt - 1) * 250L
+        if (attempt > 8) {
+            /* 최종: 그래도 BIG_PUSH 면 쇼케이스 강제 */
+            VlueBigPushTrace.lifecycle(
+                "ANSWER_UI_RESUME_EXHAUSTED",
+                "force showcase after $attempt attempts reason=$reason"
+            )
+            mainHandler.post {
+                if (dismissing || !remoteConnected) return@post
+                if (companion.state != OverlayState.BIG_PUSH) return@post
+                enterShowcaseFromAnswer(source = "answer_ui_resume_$attempt")
+            }
+            return
+        }
+        val delayMs = 280L + (attempt - 1) * 200L
         mainHandler.postDelayed({
             if (dismissing || !remoteConnected) return@postDelayed
             if (companion.state != OverlayState.BIG_PUSH) return@postDelayed
@@ -3518,18 +3545,16 @@ class CallOverlayService : Service() {
         val detected = detectOverlayContext(forceRinging = forceRinging)
         val tasksPkg = ForegroundPackageProbe.runningTaskPackage(this)
         /*
-         * 풀 InCallUI 확정은 tasks 가 전체 InCall 일 때만.
-         * stale resume / detected==INCOMING 만으로 confirmed 하면
-         * BELOW 핀이 풀려 미니 수신 뒤로 TOP 겹침 (연속 수신·다이얼러 최근기록).
+         * 풀 InCallUI 확정: tasks=InCall 또는 resume=InCallActivity(다이얼러 task 잔존 포함).
+         * dialer task 만으로 holdBelow 를 풀지 못하면 전체 삼선 UI 중앙에 빅푸시가 남는다.
          */
+        val lastResumed = ForegroundPackageProbe.lastResumedPackage(this)
         val confirmedFullInCall =
             isDeviceKeyguardLocked() ||
                 OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg) ||
-                (OverlayContextDetector.isLikelyFullInCallUiPackage(
-                    ForegroundPackageProbe.lastResumedPackage(this)
-                ) &&
-                    !OverlayContextDetector.isLikelyDialerPackage(tasksPkg) &&
+                (OverlayContextDetector.isLikelyFullInCallUiPackage(lastResumed) &&
                     !OverlayContextDetector.isLikelyLauncherPackage(tasksPkg) &&
+                    !ForegroundPackageProbe.isKnownOtherAppPackage(tasksPkg) &&
                     !ourAppForeground)
         val ctx = OverlayPositionManager.holdBelowCompactIncoming(
             previous = prevPos,
