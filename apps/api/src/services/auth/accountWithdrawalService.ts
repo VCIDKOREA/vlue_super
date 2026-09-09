@@ -70,7 +70,7 @@ export async function withdrawUserAccount(userId: string): Promise<{ ok: true }>
         identityVerified: false,
         identityVerifiedAt: null,
         portoneIdentityId: null,
-        ciHash: null,
+        /* ciHash 유지 — 동일 본인 재인증·재가입으로 즉시 로그인되는 것 방지 */
         birthDate: null,
         gender: null,
         nickChat: null,

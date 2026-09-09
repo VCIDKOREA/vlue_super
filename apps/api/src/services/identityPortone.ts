@@ -265,6 +265,7 @@ export async function completePortoneIdentity(params: {
       id: true,
       legalName: true,
       accountStatus: true,
+      status: true,
       phoneE164: true,
       publicHandle: true
     }
@@ -316,6 +317,11 @@ export async function completePortoneIdentity(params: {
   let publicHandle: string;
 
   if (existing) {
+    if (String(existing.status || "") === "DELETED") {
+      throw new Error(
+        "탈퇴 처리된 회원입니다. 동일 본인인증으로는 즉시 재가입·로그인할 수 없습니다. 재가입이 필요하면 고객센터로 문의해 주세요."
+      );
+    }
     const st = existing.accountStatus;
     const mapped: Extract<AccountStatus, "active" | "pending_approval"> =
       st === "pending_approval" ? "pending_approval" : "active";

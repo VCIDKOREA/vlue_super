@@ -5,7 +5,6 @@ import {
   MapPin,
   Globe,
   Printer,
-  ShieldCheck,
   Check
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
@@ -746,7 +745,6 @@ function FrontPanel({
     billingCycle: card.billingCycle || null,
     useLocalFallback: !isPeerCard && !peerUserId
   });
-  const validityLabel = "만료일";
   const validityDisplay = validityFromItems
     ? validityFromItems.replace(/^(만료일|인증유효기간)\s*[:：]?\s*/, "").trim()
     : validityResolved?.line || "";
@@ -1010,11 +1008,6 @@ function FrontPanel({
           </FrontInfoRow>
         ) : null}
 
-        {validityDisplay ? (
-          <FrontInfoRow icon={ShieldCheck} label={validityLabel} className="ldr-front-info-row--careers">
-            <p className="ldr-front-info-row__text tabular-nums">{validityDisplay}</p>
-          </FrontInfoRow>
-        ) : null}
       </div>
 
       {embeddedInPush && verified ? (
@@ -1035,6 +1028,7 @@ function FrontPanel({
             socialToggle={hasSocial}
             socialExpanded={socialOpen}
             onActivate={hasSocial ? () => setSocialOpen((v) => !v) : undefined}
+            expiryLine={validityDisplay}
           />
         </div>
       ) : null}

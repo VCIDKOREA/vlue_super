@@ -49,6 +49,16 @@ export async function requireUserHeader(c: Context, next: Next) {
   if (!me) {
     return c.json({ error: "인증이 필요합니다. (Authorization: Bearer … 또는 X-VLUE-User-Id)" }, 401);
   }
+  const row = await prisma.user.findUnique({
+    where: { id: me },
+    select: { status: true, accountStatus: true }
+  });
+  if (!row || row.status === "DELETED" || row.accountStatus === "suspended") {
+    return c.json(
+      { error: "탈퇴·정지된 계정입니다. 다시 로그인해 주세요.", code: "ACCOUNT_INACTIVE" },
+      401
+    );
+  }
   c.set("vlueUserId", me);
   await next();
 }

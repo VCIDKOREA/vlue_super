@@ -7824,6 +7824,13 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   text-overflow: ellipsis;
 }
 
+.vlue-push-auth-seal__sub--expiry {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #22d3ee;
+}
+
 .vlue-push-auth-seal__live {
   display: inline-flex;
   align-items: center;

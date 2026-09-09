@@ -1,12 +1,38 @@
 import { Share2, ShieldCheck } from "lucide-react";
 import { VLUE_VERIFIED_PUSH_CONFIRM } from "../lib/vlueDigitalCardUi.js";
+import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
 import FollowActionButton from "./follow/FollowActionButton.jsx";
-import { resolveFollowTargetUserId, shouldShowShowcaseFollow } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
+import {
+  resolveFollowTargetUserId,
+  shouldShowShowcaseFollow,
+  getLocalVlueUserId
+} from "../lib/showcase/resolveShowcaseOwnerUserId.js";
 import "./follow/follow-action.css";
 
+function resolveSealExpiryLine(card) {
+  const peerUserId = String(card?.userId || card?.ownerUserId || "").trim();
+  const meId = getLocalVlueUserId();
+  const isPeer = Boolean(peerUserId && (!meId || peerUserId !== meId));
+  const fromItems = (Array.isArray(card?.verificationItems) ? card.verificationItems : [])
+    .map((line) => String(line || "").trim())
+    .find((line) => /만료일|인증유효기간/.test(line));
+  if (fromItems) {
+    const cleaned = fromItems.replace(/^(만료일|인증유효기간)\s*[:：]?\s*/, "").trim();
+    if (cleaned) return cleaned;
+  }
+  const resolved = resolveAuthValidityPeriod({
+    paidAt: card?.authPaidAt || null,
+    cycleEndAt: card?.authCycleEndAt || card?.cycleEndAt || null,
+    validUntil: card?.authValidUntil || null,
+    billingCycle: card?.billingCycle || null,
+    useLocalFallback: !isPeer && !peerUserId
+  });
+  return resolved?.line || "";
+}
+
 /**
- * 빅푸시 펼침 — VLUE 실시간 인증 봉인
- * 팔로우 버튼 + 쇼셜 토글(구 LIVE 자리)
+ * 빅푸시 펼침 — VLUE 인증 봉인
+ * 부제: 만료일(시안블루). 팔로우 + 쇼셜 토글
  */
 export default function VluePushAuthSeal({
   className = "",
@@ -18,13 +44,16 @@ export default function VluePushAuthSeal({
   onToast,
   socialToggle = false,
   socialExpanded = false,
-  onActivate
+  onActivate,
+  /** 만료일 표시(미전달 시 card에서 계산) */
+  expiryLine = ""
 }) {
   const targetUserId = String(
     targetUserIdProp || resolveFollowTargetUserId(card, { fallbackToMe }) || ""
   ).trim();
   const showFollow = shouldShowShowcaseFollow(targetUserId, { hideFollow });
   const canToggleSocial = socialToggle && typeof onActivate === "function";
+  const expiry = String(expiryLine || resolveSealExpiryLine(card) || "").trim();
 
   return (
     <div
@@ -53,7 +82,11 @@ export default function VluePushAuthSeal({
             <span className="vlue-push-auth-seal__divider" aria-hidden />
             <span className="vlue-push-auth-seal__phrase">인증 확인</span>
           </p>
-          <p className="vlue-push-auth-seal__sub">실시간 검증되었습니다</p>
+          {expiry ? (
+            <p className="vlue-push-auth-seal__sub vlue-push-auth-seal__sub--expiry tabular-nums">
+              만료일 {expiry}
+            </p>
+          ) : null}
         </div>
 
         {showFollow ? (

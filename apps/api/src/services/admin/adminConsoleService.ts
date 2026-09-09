@@ -135,10 +135,16 @@ function serializeAdminMember(
   const recoverableUntil = pendingWithdrawal && u.withdrawalScheduledAt
     ? u.withdrawalScheduledAt.toISOString()
     : null;
+  const actionReason = u.accountActionReason || "";
+  const wasMatch = actionReason.match(/·\s*was:(.+)$/);
+  const withdrawnLabel = wasMatch ? String(wasMatch[1] || "").trim() : "";
+  const isDeleted = String(u.status || "") === "DELETED";
   return {
     id: u.id,
     publicHandle: u.publicHandle || "",
-    legalName: u.legalName || "",
+    legalName: isDeleted
+      ? withdrawnLabel.split(" · ")[0] || "탈퇴회원"
+      : u.legalName || "",
     email: u.email || "",
     phoneE164: phone,
     phoneDisplay: phone ? formatPhoneDisplayKR(phone) : "",
@@ -170,10 +176,11 @@ function serializeAdminMember(
     withdrawalRequestedAt: u.withdrawalRequestedAt ? u.withdrawalRequestedAt.toISOString() : null,
     withdrawalMethod: u.withdrawalMethod || "",
     recoverableUntil,
-    accountActionReason: u.accountActionReason || "",
+    accountActionReason: actionReason,
     accountActionAt: u.accountActionAt ? u.accountActionAt.toISOString() : null,
     accountActionBy: u.accountActionBy || "",
-    accountActionType: u.accountActionType || ""
+    accountActionType: u.accountActionType || "",
+    withdrawnWasLabel: withdrawnLabel
   };
 }
 
@@ -191,6 +198,7 @@ export async function listAdminUsers(opts: { q?: string; limit?: number; offset?
           { legalName: { contains: q, mode: "insensitive" as const } },
           { email: { contains: q, mode: "insensitive" as const } },
           { phoneE164: { contains: q } },
+          { accountActionReason: { contains: q, mode: "insensitive" as const } },
           { businessProfile: { companyName: { contains: q, mode: "insensitive" as const } } }
         ]
       }
@@ -391,11 +399,21 @@ export async function adminWithdrawUser(
   const mode = opts.mode === "immediate" ? "immediate" : "grace";
   await ensureAdminAccountActionSchema();
 
+  const before = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { legalName: true, publicHandle: true, phoneE164: true, status: true }
+  });
+  if (!before) throw new Error("회원을 찾을 수 없습니다.");
+  if (before.status === "DELETED") throw new Error("이미 탈퇴된 계정입니다.");
+  const wasLabel = [before.legalName, before.publicHandle ? `@${before.publicHandle}` : "", before.phoneE164]
+    .filter(Boolean)
+    .join(" · ");
+
   if (mode === "immediate") {
     await withdrawAccountByAdmin(userId);
     await writeAccountActionMeta(userId, {
       type: "withdraw_immediate",
-      reason,
+      reason: `${reason}${wasLabel ? ` · was:${wasLabel}` : ""}`,
       adminUserId: opts.adminUserId
     });
     return {
@@ -409,7 +427,7 @@ export async function adminWithdrawUser(
   const scheduled = await scheduleAdminWithdrawal(userId);
   await writeAccountActionMeta(userId, {
     type: "withdraw_grace",
-    reason,
+    reason: `${reason}${wasLabel ? ` · was:${wasLabel}` : ""}`,
     adminUserId: opts.adminUserId
   });
   /* 유예 기간 동안은 로그인·이용을 막아 두기 위해 정지도 병행 */
