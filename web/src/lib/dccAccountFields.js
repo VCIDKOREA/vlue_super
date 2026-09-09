@@ -68,7 +68,7 @@ export function sanitizeDccAccountFields(
   const accountNumber = digitsOnlyAccount(input.accountNumber).slice(0, 30);
   let accountHolder = String(input.accountHolder || "").trim().slice(0, 80);
 
-  /* 유형만 빠진 채 은행·계좌가 있으면 유실 방지 — 사업자/개인 추론 */
+  /* 유형만 빠진 채 은행·계좌가 있으면 유실 방지 — 개인 계좌로 확정 */
   if (!accountType && bankName && accountNumber) {
     accountType = lockedCompanyName ? DCC_ACCOUNT_TYPES.BUSINESS : DCC_ACCOUNT_TYPES.PERSONAL;
   }
@@ -78,6 +78,10 @@ export function sanitizeDccAccountFields(
   }
   if (accountType === DCC_ACCOUNT_TYPES.BUSINESS && lockedCompanyName) {
     accountHolder = String(lockedCompanyName).trim().slice(0, 80);
+  }
+  /* 예금주가 비어 있으면 잠금 실명으로 채움(전면 표시·복사용) */
+  if (accountType && bankName && accountNumber && !accountHolder && lockedHolderName) {
+    accountHolder = String(lockedHolderName).trim().slice(0, 80);
   }
   const isGroupVerified =
     accountType === DCC_ACCOUNT_TYPES.GROUP ? Boolean(input.isGroupVerified) : false;
@@ -90,7 +94,6 @@ export function sanitizeDccAccountFields(
       ? String(input.accountGroupDocDataUrl || "").trim()
       : "";
 
-  /* 유형이 없어도 입력값은 유지 — 빈 객체로 지우면 DCC에서 잠깐 보이다 사라짐 */
   if (!accountType) {
     return {
       accountType: "",

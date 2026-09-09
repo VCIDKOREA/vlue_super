@@ -24,7 +24,8 @@ import {
   formatLetteringContactEmailDisplay,
   photoFocusToCss,
   clampLetteringBizcardIntroFront,
-  clampLetteringBizcardBackNote
+  clampLetteringBizcardBackNote,
+  readLetteringBizcardEditable
 } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard, resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
 import {
@@ -655,8 +656,30 @@ function AccountViewPopup({ card, onClose, onToast }) {
   );
 }
 
+/** 미리보기 카드에 계좌가 빠졌을 때 로컬 편집값으로 보강(본인 DCC) */
+function withLocalDccAccountFallback(card = {}) {
+  if (canShowDccAccountOnCard(card)) return card;
+  try {
+    const ed = readLetteringBizcardEditable() || {};
+    const bank = String(ed.bankName || "").trim();
+    const num = String(ed.accountNumber || "").replace(/\D/g, "");
+    if (!bank || !num) return card;
+    return normalizeLetteringCard({
+      ...card,
+      accountType: ed.accountType || card.accountType || "",
+      bankName: bank,
+      accountNumber: num,
+      accountHolder: ed.accountHolder || card.accountHolder || "",
+      isGroupVerified:
+        ed.isGroupVerified != null ? Boolean(ed.isGroupVerified) : Boolean(card.isGroupVerified)
+    });
+  } catch {
+    return card;
+  }
+}
+
 function FrontPanel({
-  card,
+  card: cardProp,
   verified,
   verificationItems = [],
   embeddedInPush = false,
@@ -668,6 +691,7 @@ function FrontPanel({
   showSnsCert = false,
   onOpenSnsCert
 }) {
+  const card = withLocalDccAccountFallback(cardProp);
   const [socialOpen, setSocialOpen] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
