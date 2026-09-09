@@ -382,21 +382,27 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
   const [imgBroken, setImgBroken] = useState(false);
   const titlePhotoUrl = resolveDccTitlePhotoUrl(card);
   const logoUrl = resolveCardLogoUrl(card);
-  /* avatar = 회사 로고, hero = DCC 타이틀 사진 — 서로 대체하지 않음 */
-  const isLogo = variant === "logo" || variant === "avatar";
-  const src = isLogo ? logoUrl : titlePhotoUrl;
-  const focusCss = !isLogo ? photoFocusToCss(card.photoFocus) : undefined;
+  const profileUrl = String(card.photoUrl || card.image_url || card.imageUrl || "").trim();
+  /* avatar = 프로필 사진 우선(없으면 로고). logo = 회사 로고만. hero = 타이틀 사진 */
+  const isLogoOnly = variant === "logo";
+  const isAvatar = variant === "avatar";
+  const src = isLogoOnly ? logoUrl : isAvatar ? profileUrl || logoUrl : titlePhotoUrl;
+  const focusCss = !isLogoOnly && !isAvatar ? photoFocusToCss(card.photoFocus) : undefined;
 
-  /* 로고 없음 → 무지(슬롯 비움) */
-  if (isLogo && !logoUrl) return null;
+  if (isLogoOnly && !logoUrl) return null;
+  if (isAvatar && !src) return null;
 
   const fallback = (card.organization || card.name || "?").slice(0, 1);
 
   return (
     <div
       className={`ldr-profile-media ldr-profile-media--${variant}${
-        isLogo ? " ldr-profile-media--logo ldr-profile-media--link-logo" : ""
-      }${className ? ` ${className}` : ""}`.trim()}
+        isLogoOnly || (isAvatar && !profileUrl && logoUrl)
+          ? " ldr-profile-media--logo ldr-profile-media--link-logo"
+          : ""
+      }${isAvatar && profileUrl ? " ldr-profile-media--photo" : ""}${
+        className ? ` ${className}` : ""
+      }`.trim()}
     >
       {src && !imgBroken ? (
         <img
@@ -703,16 +709,38 @@ function FrontPanel({
   const canDialPhone =
     enableContactLinks && !phoneMasked && card.phoneDialEnabled !== false && Boolean(phoneRaw);
   const faxRaw = String(card.fax || "").trim();
-  const fax = faxRaw ? formatLetteringPhoneDisplay(faxRaw) : "";
-  const website = formatWebsite(card.website);
+  const websiteRaw = String(card.website || "").trim();
   const emailRaw = String(card.email || "").trim();
-  const email = emailRaw ? formatLetteringContactEmailDisplay(emailRaw) : "";
   const addressRaw = String(card.address || "").trim();
+  const peerUserId = String(card.userId || card.ownerUserId || "").trim();
+  const meId = getLocalVlueUserId();
+  const isPeerCard = Boolean(peerUserId && (!meId || peerUserId !== meId));
   /*
    * 본인 미리보기(previewMode): 빈 선택 필드는 입력 유도 플레이스홀더.
-   * 상대 실송출: 미입력 필드는 숨김.
+   * 상대 실송출·통화기록 다시보기: 미입력·플레이스홀더 문구는 숨김.
    */
-  const showOwnerPlaceholders = Boolean(previewMode);
+  const showOwnerPlaceholders = Boolean(previewMode) && !isPeerCard;
+  const scrubOwnerPlaceholder = (value) => {
+    const s = String(value || "").trim();
+    if (!s) return "";
+    if (
+      s === VLUE_PREVIEW_EMAIL_PLACEHOLDER ||
+      s === VLUE_PREVIEW_FAX_PLACEHOLDER ||
+      s === VLUE_PREVIEW_ADDRESS_PLACEHOLDER ||
+      s === VLUE_PREVIEW_WEBSITE_PLACEHOLDER ||
+      /입력할 수 있습니다\.?$/.test(s)
+    ) {
+      return showOwnerPlaceholders ? s : "";
+    }
+    return s;
+  };
+  const faxClean = scrubOwnerPlaceholder(faxRaw);
+  const websiteClean = scrubOwnerPlaceholder(websiteRaw);
+  const emailClean = scrubOwnerPlaceholder(emailRaw);
+  const addressClean = scrubOwnerPlaceholder(addressRaw);
+  const fax = faxClean ? formatLetteringPhoneDisplay(faxClean) : "";
+  const website = websiteClean ? formatWebsite(websiteClean) : "";
+  const email = emailClean ? formatLetteringContactEmailDisplay(emailClean) : "";
   const emailValue = email
     ? email
     : showOwnerPlaceholders
@@ -723,8 +751,8 @@ function FrontPanel({
     : showOwnerPlaceholders
       ? VLUE_PREVIEW_FAX_PLACEHOLDER
       : "";
-  const addressDisplay = addressRaw
-    ? addressRaw
+  const addressDisplay = addressClean
+    ? addressClean
     : showOwnerPlaceholders
       ? VLUE_PREVIEW_ADDRESS_PLACEHOLDER
       : "";
@@ -736,9 +764,6 @@ function FrontPanel({
   const validityFromItems = (verificationItems || [])
     .map((line) => String(line || "").trim())
     .find((line) => /만료일|인증유효기간/.test(line));
-  const peerUserId = String(card.userId || card.ownerUserId || "").trim();
-  const meId = getLocalVlueUserId();
-  const isPeerCard = Boolean(peerUserId && (!meId || peerUserId !== meId));
   const validityResolved = resolveAuthValidityPeriod({
     paidAt: card.authPaidAt || null,
     cycleEndAt: card.authCycleEndAt || card.cycleEndAt || null,

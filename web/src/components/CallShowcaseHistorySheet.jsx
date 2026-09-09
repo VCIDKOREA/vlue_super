@@ -202,12 +202,12 @@ function writeCallHistoryLineId(id) {
   }
 }
 
-function CallHistoryAvatar({ call }) {
+function CallHistoryAvatar({ call, cacheTick = 0 }) {
   const url = resolveCallHistoryAvatar(call);
   const [broken, setBroken] = useState(false);
   useEffect(() => {
     setBroken(false);
-  }, [url]);
+  }, [url, cacheTick]);
   const label = resolveCallDisplayName(call);
   const Icon = call.direction === "out" ? PhoneOutgoing : PhoneIncoming;
 
@@ -282,8 +282,15 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const [busyId, setBusyId] = useState("");
   const [toast, setToast] = useState("");
   const [authPopup, setAuthPopup] = useState({ open: false, name: "", phone: "", handle: "" });
+  const [peerAvatarTick, setPeerAvatarTick] = useState(0);
   const openGenRef = useRef(0);
   const { unlockAudioGesture, setPlaybackPhase } = useShowcaseBgm();
+
+  useEffect(() => {
+    const onPeerCache = () => setPeerAvatarTick((n) => n + 1);
+    window.addEventListener("vlue-call-history-peer-cache-changed", onPeerCache);
+    return () => window.removeEventListener("vlue-call-history-peer-cache-changed", onPeerCache);
+  }, []);
 
   const closeAuthPopup = useCallback(() => {
     setAuthPopup({ open: false, name: "", phone: "", handle: "" });
@@ -832,7 +839,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
               <div className="lettering-showcase-fs__shell">
                   <LetteringIncomingNotification
                   className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--history-replay"
-                  previewMode
+                  previewMode={false}
                   fromCallHistory
                   verified={isMember}
                   callPhase="connected"
@@ -953,7 +960,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
               <li key={call.id}>
                 <div className="friend-showcase-list__row call-history-row">
                   <button type="button" className="call-history-row__main" onClick={() => openCall(call)}>
-                    <CallHistoryAvatar call={call} />
+                    <CallHistoryAvatar call={call} cacheTick={peerAvatarTick} />
                     <div className="friend-showcase-list__meta">
                       <p className="friend-showcase-list__name">
                         {formatCallGroupLabel(call)}

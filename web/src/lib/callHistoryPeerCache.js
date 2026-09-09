@@ -65,6 +65,13 @@ export function writeCallHistoryPeerCache(phone, payload) {
   }
   mem.set(k, { at: Date.now(), payload });
   persistToStorage();
+  try {
+    window.dispatchEvent(
+      new CustomEvent("vlue-call-history-peer-cache-changed", { detail: { phone: k } })
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 const inflight = new Map();

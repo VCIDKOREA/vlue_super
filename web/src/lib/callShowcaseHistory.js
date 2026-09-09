@@ -1,5 +1,6 @@
 import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
 import { createDefaultShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
+import { readCallHistoryPeerCache } from "./callHistoryPeerCache.js";
 
 export const CALL_SHOWCASE_HISTORY_KEY = "vlue_call_showcase_history_v2";
 export const CALL_SHOWCASE_HISTORY_CHANGED = "vlue-call-showcase-history-changed";
@@ -249,6 +250,18 @@ export function resolveCallHistoryAvatar(call) {
   for (const c of candidates) {
     const ok = loadableAvatarUrl(c);
     if (ok) return ok;
+  }
+  /* 통화목록 prefetch 캐시 — VLUE 회원인데 스냅샷에 사진이 비어 있어도 표시 */
+  try {
+    const phone = call?.phoneDisplay || call?.phone || "";
+    const cached = readCallHistoryPeerCache(phone);
+    const card = cached?.card;
+    const fromCache = loadableAvatarUrl(
+      card?.photoUrl || card?.avatarUrl || card?.image_url || card?.logoUrl
+    );
+    if (fromCache) return fromCache;
+  } catch {
+    /* ignore */
   }
   return "";
 }
