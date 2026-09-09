@@ -88,6 +88,18 @@ export const SOHO_BROADCAST_MEMBERSHIP_SUBLINE =
 
 export const SOHO_BROADCAST_NO_DISCOUNT_NOTE = "할인 적용 안 됨";
 
+/** 멀티 프로필+ — SOHO와 동일 단가(+4,200원), 별도 슬롯 SKU */
+export const MULTI_PROFILE_ADDON_MONTHLY_KRW = SOHO_BROADCAST_MONTHLY_KRW;
+export const MULTI_PROFILE_ADDON_NO_DISCOUNT_NOTE = SOHO_BROADCAST_NO_DISCOUNT_NOTE;
+export const MULTI_PROFILE_ADDON_MEMBERSHIP_SUBLINE =
+  "기본 1프로필 포함 · 추가 프로필당 월 +4,200원(할인 적용 안 됨) · 프로필마다 DCC·쇼케이스·BGM 독립";
+export const MULTI_PROFILE_ADDON_FEATURES = [
+  "유료·B2B 본 요금과 별도 SKU (SOHO 송출과 동일 단가)",
+  "마스터 프로필 1개는 포함, 추가 슬롯부터 월 +4,200원",
+  "추가 프로필마다 DCC·쇼케이스·BGM·상호·계좌를 따로 설정",
+  "할인 미적용 · 월 4,200원 고정"
+];
+
 export const POST_SIGNUP_PAYMENT_NOTICE =
   "회원가입·본인인증이 완료되었습니다. 유료·기업 멤버십은 아래 결제창에서 첫 구독 요금을 결제해 주세요.";
 

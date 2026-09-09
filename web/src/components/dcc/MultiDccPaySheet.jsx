@@ -28,7 +28,9 @@ export default function MultiDccPaySheet({
           월 {Number(monthlyKrw).toLocaleString("ko-KR")}원
         </p>
         <p className="mt-3 text-[12px] leading-relaxed text-slate-500">
-          결제하면 슬롯 1개가 열립니다. 이어서 새 프로필 이름·사진·DCC를 직접 만듭니다.
+          유료·B2B 본 요금과 별도 SKU입니다. 기본 프로필 1개는 포함되며, 추가 슬롯당 월{" "}
+          {Number(monthlyKrw).toLocaleString("ko-KR")}원(할인 미적용 · SOHO 송출과 동일 단가)입니다. 결제 후 새
+          프로필의 이름·사진·DCC·쇼케이스를 직접 만듭니다.
         </p>
         <div className="mt-5 flex flex-col gap-2">
           <button

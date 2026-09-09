@@ -97,13 +97,17 @@ export default function PostSignupPaymentModal({ open, pending, onComplete, onSk
       onComplete?.({ membershipTier: isB2b ? "b2b" : "paid", billingCycle, testMode: useTestBypass });
     } catch (e) {
       const raw = e?.message || String(e);
-      const pgHint =
-        /PG모듈|등록되지 않은 PG/i.test(raw) && (testMode || import.meta.env.DEV)
-          ? " → 포트원 PG 채널 미등록. 테스트 모드(`VITE_PORTONE_TEST_MODE=true`)에서는 결제 버튼으로 Premium이 바로 부여됩니다."
-          : /PG모듈|등록되지 않은 PG/i.test(raw)
-            ? " → 결제 연동(포트원 정기결제 PG) 설정을 확인해 주세요."
-            : "";
-      setError(raw + pgHint);
+      let friendly = raw;
+      if (/pg 파라미터|잘못된 값.*pg|IMP\.request_pay/i.test(raw)) {
+        friendly =
+          "결제 연결(PG) 설정이 맞지 않아 카드 등록을 열 수 없습니다. 잠시 후 다시 시도하거나, 마이페이지에서 결제를 이어 주세요.";
+      } else if (/PG모듈|등록되지 않은 PG/i.test(raw)) {
+        friendly =
+          testMode || import.meta.env.DEV
+            ? `${raw} → 포트원 PG 채널 미등록. 테스트 모드에서는 결제 버튼으로 Premium이 바로 부여됩니다.`
+            : "결제 연동(포트원 정기결제 PG) 설정을 확인해 주세요.";
+      }
+      setError(friendly);
     } finally {
       setBusy(false);
     }

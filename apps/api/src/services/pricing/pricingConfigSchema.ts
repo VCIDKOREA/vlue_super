@@ -80,7 +80,7 @@ export const DEFAULT_PRICING_CONFIG: PricingConfigFile = {
       requiresPrimary: "soho_activity",
       features: ["showcase_extra_number"],
       description:
-        "월 +4,200원(부가세 포함, 할인 적용 안 됨). 대표자 계정 외 추가번호에 쇼케이스만 제공되는 기능."
+        "월 +4,200원(부가세 포함, 할인 적용 안 됨). 대표자 계정 외 추가번호에 쇼케이스만 제공되는 기능. 동일 단가로 멀티 프로필+ 추가 슬롯에도 적용됩니다."
     }
   },
   legacy: {

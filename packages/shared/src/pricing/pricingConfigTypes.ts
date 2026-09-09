@@ -70,7 +70,7 @@ export const DEFAULT_PRICING_CONFIG: PricingConfigFile = {
       requiresPrimary: "soho_activity",
       features: ["digital_card_broadcast", "outbound_caller_id_overlay", "info_card_secondary"],
       description:
-        "월 4,200원(부가세 포함) 추가. 등록·인증된 발신번호로 전화 시 수신 화면에 디지털인증명함 송출(Secondary)."
+        "월 4,200원(부가세 포함) 추가. 등록·인증된 발신번호로 전화 시 수신 화면에 디지털인증명함 송출(Secondary). 동일 단가로 멀티 프로필+ 추가 슬롯에도 적용."
     }
   },
   legacy: {

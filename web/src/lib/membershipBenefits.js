@@ -102,6 +102,12 @@ export const MEMBERSHIP_BENEFIT_ROWS = [
     b2b: "대표 외 추가번호"
   },
   {
+    label: "멀티 프로필+",
+    free: "—",
+    paid: `기본 1 + 추가 슬롯당 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원`,
+    b2b: `추가 슬롯당 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원`
+  },
+  {
     label: "구독 요금",
     free: "무료",
     paid: `월 ${formatKrw(PAID_EVENT_MONTHLY_KRW)}`,
@@ -136,7 +142,8 @@ export const MEMBERSHIP_PLAN_DETAILS = {
       FAMILY_PROTECTION_SUMMARY,
       `정가 월 ${formatKrw(PAID_LIST_PRICE_MONTHLY_KRW)} → 판매가 월 ${formatKrw(PAID_EVENT_MONTHLY_KRW)}. ${PAID_LAUNCH_DISCOUNT_NOTE}`,
       PAID_ANNUAL_BENEFIT_NOTE,
-      `SOHO 영업 송출 옵션: 대표자 계정 외 추가번호 쇼케이스만 +월 ${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}).`
+      `SOHO 영업 송출 옵션: 대표자 계정 외 추가번호 쇼케이스만 +월 ${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}).`,
+      `멀티 프로필+: 기본 1프로필 포함, 추가 프로필당 월 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}). 프로필마다 DCC·쇼케이스·BGM 독립.`
     ]
   },
   b2b: {
@@ -150,7 +157,8 @@ export const MEMBERSHIP_PLAN_DETAILS = {
       "유료와 동일한 블루 쇼케이스·디지털 인증명함을 회선 단위로 제공합니다.",
       "기업 CI/BI·회사 대표번호 연동 디지털 인증명함을 지원합니다.",
       FAMILY_PROTECTION_B2B_NOTE,
-      `SOHO 영업 송출 옵션: 대표자 외 추가번호 쇼케이스만 +월 ${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}).`
+      `SOHO 영업 송출 옵션: 대표자 외 추가번호 쇼케이스만 +월 ${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}).`,
+      `멀티 프로필+: 추가 프로필당 월 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}).`
     ]
   }
 };

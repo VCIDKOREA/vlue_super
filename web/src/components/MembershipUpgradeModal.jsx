@@ -16,7 +16,10 @@ import {
   B2B_EVENT_NOTE,
   SOHO_BROADCAST_MEMBERSHIP_SUBLINE,
   SOHO_BROADCAST_MONTHLY_KRW,
-  SOHO_BROADCAST_NO_DISCOUNT_NOTE
+  SOHO_BROADCAST_NO_DISCOUNT_NOTE,
+  MULTI_PROFILE_ADDON_MEMBERSHIP_SUBLINE,
+  MULTI_PROFILE_ADDON_MONTHLY_KRW,
+  MULTI_PROFILE_ADDON_NO_DISCOUNT_NOTE
 } from "../lib/membershipBm.js";
 
 const MEMBERSHIP_OPTIONS = [
@@ -197,6 +200,16 @@ export default function MembershipUpgradeModal({
             <p className={`mt-1 text-[11px] leading-snug ${textSub}`}>{SOHO_BROADCAST_MEMBERSHIP_SUBLINE}</p>
             <p className={`mt-1 text-[12px] font-black ${isDarkMode ? "text-violet-200" : "text-violet-800"}`}>
               +{SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원/월 ({SOHO_BROADCAST_NO_DISCOUNT_NOTE})
+            </p>
+          </div>
+
+          <div
+            className={`mt-3 rounded-xl border p-3 ${isDarkMode ? "border-white/10 bg-white/5" : "border-sky-100 bg-sky-50/80"}`}
+          >
+            <p className={`text-[12px] font-black ${textStrong}`}>멀티 프로필+</p>
+            <p className={`mt-1 text-[11px] leading-snug ${textSub}`}>{MULTI_PROFILE_ADDON_MEMBERSHIP_SUBLINE}</p>
+            <p className={`mt-1 text-[12px] font-black ${isDarkMode ? "text-sky-200" : "text-sky-800"}`}>
+              추가 슬롯 +{MULTI_PROFILE_ADDON_MONTHLY_KRW.toLocaleString("ko-KR")}원/월 ({MULTI_PROFILE_ADDON_NO_DISCOUNT_NOTE})
             </p>
           </div>
 

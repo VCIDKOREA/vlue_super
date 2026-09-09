@@ -142,8 +142,9 @@ export async function requestIamportCertification(userCode = getPortoneUserCode(
 function buildIamportBillingPg() {
   const raw =
     envTrim(typeof import.meta !== "undefined" ? import.meta.env?.VITE_IAMPORT_BILLING_PG : "") ||
-    "html5_inicis.bill";
+    "html5_inicis";
   const mid = envTrim(typeof import.meta !== "undefined" ? import.meta.env?.VITE_IAMPORT_BILLING_MID : "");
+  /* pg.MID 형식 — MID 없이 ".bill" 같은 가짜 접미사를 붙이면 PortOne이 pg 파라미터 오류를 냄 */
   if (!mid || raw.includes(".")) return raw;
   return `${raw}.${mid}`;
 }

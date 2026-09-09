@@ -20,6 +20,9 @@ import {
   B2B_EVENT_NOTE,
   SOHO_BROADCAST_MONTHLY_KRW,
   SOHO_BROADCAST_NO_DISCOUNT_NOTE,
+  MULTI_PROFILE_ADDON_MONTHLY_KRW,
+  MULTI_PROFILE_ADDON_FEATURES,
+  MULTI_PROFILE_ADDON_MEMBERSHIP_SUBLINE,
   broadcastAddonAmountKrw,
   sohoBroadcastPlanDescription,
   b2bPlanDescription,
@@ -87,6 +90,17 @@ export const MARKETING_PRICING_TIERS = [
     ],
     priceNote: `할인 미적용 · 월 ${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString('ko-KR')}원 고정`,
   },
+  {
+    id: 'multi_profile',
+    name: '멀티 프로필+',
+    price: MULTI_PROFILE_ADDON_MONTHLY_KRW,
+    listPrice: null as number | null,
+    period: '추가 슬롯/월',
+    description: MULTI_PROFILE_ADDON_MEMBERSHIP_SUBLINE,
+    color: 'purple' as const,
+    features: [...MULTI_PROFILE_ADDON_FEATURES],
+    priceNote: `할인 미적용 · 월 ${MULTI_PROFILE_ADDON_MONTHLY_KRW.toLocaleString('ko-KR')}원 고정 · SOHO 송출과 동일 단가`,
+  },
 ];
 
 /** @deprecated V1 미운영 — 빈 배열 유지(구 import 호환) */
@@ -124,6 +138,15 @@ export const MEMBERSHIP_PRICING_FEATURES: ServiceAccordionItem[] = [
       '대표자 계정 외 추가번호 쇼케이스만 제공',
       `월 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString('ko-KR')}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE})`,
       '유료·B2B 출시 할인과 별개 — 할인 미적용',
+    ],
+  },
+  {
+    id: 'plan-multi-profile',
+    title: '멀티 프로필+',
+    summary: MULTI_PROFILE_ADDON_MEMBERSHIP_SUBLINE,
+    detail: [
+      ...MULTI_PROFILE_ADDON_FEATURES,
+      '유료 본 구독(DCC 발급)과 별도 — 슬롯만 추가 결제',
     ],
   },
   {
