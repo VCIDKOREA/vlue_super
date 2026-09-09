@@ -10,6 +10,7 @@ import {
   resolveCallHistoryAvatar
 } from "./callShowcaseHistory.js";
 import { matchNationalAgency } from "./nationalAgencyDcpClient.js";
+import { resolveIsKnownContactSync } from "./contacts/hybridKnownContact.js";
 
 /** 목록 아바타 — https(또는 사이트 상대경로)만 채택. data:/blob: 는 API 사진을 가리지 않게 제외 */
 function pickListAvatarUrl(...candidates) {
@@ -34,9 +35,25 @@ function looksLikePhoneName(name, phone, phoneKey) {
   return n === disp;
 }
 
+/** CallLog CACHED_NAME / 주소록 이름 — 번호 문자열이면 무시 */
+function pickSavedContactName(rawName, phone, phoneKey) {
+  const name = String(rawName || "").trim();
+  if (!name || looksLikePhoneName(name, phone, phoneKey)) return "";
+  return name;
+}
+
+/** 목록 표시용 이름: VLUE 회원명 → 저장(주소록)명 */
+export function resolveCallDisplayName(call) {
+  const phone = call?.phoneDisplay || call?.phone || "";
+  const key = call?.phoneKey || callLogPhoneKey(phone);
+  const member = pickSavedContactName(call?.memberName, phone, key);
+  if (member) return member;
+  return pickSavedContactName(call?.contactName || call?.name, phone, key);
+}
+
 /**
  * 네이티브 시스템 CallLog JSON 로드.
- * @returns {Promise<Array<{id:string,phone:string,viaNumber:string,durationSec:number,direction:string,dateMs:number,callState:string}>>}
+ * @returns {Promise<Array<{id:string,phone:string,viaNumber:string,durationSec:number,direction:string,dateMs:number,callState:string,cachedName?:string}>>}
  */
 export async function fetchDeviceCallLogEntries(limit = 200) {
   try {
@@ -55,7 +72,8 @@ export async function fetchDeviceCallLogEntries(limit = 200) {
         durationSec: Math.max(0, Number(row?.durationSec) || 0),
         direction: row?.direction === "out" ? "out" : "in",
         dateMs: Number(row?.dateMs) || 0,
-        callState: String(row?.callState || "ended")
+        callState: String(row?.callState || "ended"),
+        cachedName: String(row?.cachedName || row?.name || "").trim()
       }))
       .filter((r) => r.phone.length >= 3);
   } catch {
@@ -73,10 +91,16 @@ export function groupConsecutiveCallLogEntries(rawEntries) {
   for (const entry of list) {
     const key = callLogPhoneKey(entry.phone);
     if (!key) continue;
+    const contactName = pickSavedContactName(
+      entry.cachedName || entry.contactName || entry.memberName || entry.name,
+      entry.phone,
+      key
+    );
     const last = groups[groups.length - 1];
     if (last && last.phoneKey === key) {
       last.count += 1;
       last.durationSec = Math.max(last.durationSec, entry.durationSec || 0);
+      if (!last.contactName && contactName) last.contactName = contactName;
       continue;
     }
     groups.push({
@@ -95,7 +119,8 @@ export function groupConsecutiveCallLogEntries(rawEntries) {
       viaNumber: entry.viaNumber || "",
       source: entry.source || "device",
       lineId: entry.lineId || "",
-      userId: entry.userId || ""
+      userId: entry.userId || "",
+      contactName
     });
   }
   return groups;
@@ -126,6 +151,9 @@ export function enrichCallLogGroupsWithShowcaseHistory(groups) {
     const memberName =
       String(g.memberName || "").trim() ||
       realMemberName(meta?.name || meta?.cardSnapshot?.name, g.phone, g.phoneKey, agency?.agencyName);
+    const contactName =
+      pickSavedContactName(g.contactName, g.phone, g.phoneKey) ||
+      pickSavedContactName(meta?.contactName, g.phone, g.phoneKey);
     const verified = agency
       ? true
       : g.verified === true || g.peerIsVlueMember === true
@@ -136,7 +164,8 @@ export function enrichCallLogGroupsWithShowcaseHistory(groups) {
     return {
       ...g,
       memberName,
-      name: memberName,
+      contactName,
+      name: memberName || contactName || g.name || "",
       verified,
       membershipTier: g.membershipTier || meta?.membershipTier || null,
       avatarUrl:
@@ -226,6 +255,32 @@ export function applyLocalKnownPeersToCallGroups(groups) {
   });
 }
 
+/**
+ * 기기 주소록·동기화 연락처 이름으로 목록 보강 (VLUE 회원명보다 우선하지 않음).
+ */
+export function applyKnownContactsToCallGroups(groups) {
+  return (Array.isArray(groups) ? groups : []).map((g) => {
+    const phone = g.phoneDisplay || g.phone;
+    const key = g.phoneKey || callLogPhoneKey(phone);
+    const existing = pickSavedContactName(g.contactName, phone, key);
+    if (existing) {
+      return {
+        ...g,
+        contactName: existing,
+        name: String(g.memberName || "").trim() || existing || g.name || ""
+      };
+    }
+    const known = resolveIsKnownContactSync(phone);
+    const matched = pickSavedContactName(known.matchedName, phone, key);
+    if (!matched) return g;
+    return {
+      ...g,
+      contactName: matched,
+      name: String(g.memberName || "").trim() || matched || g.name || ""
+    };
+  });
+}
+
 function lineEventsToRawEntries(events) {
   return (Array.isArray(events) ? events : []).map((ev) => ({
     id: ev.id,
@@ -249,14 +304,18 @@ function attachLineMeta(groups, events) {
   return groups.map((g) => {
     const ev = byId.get(g.id);
     if (!ev) return g;
-    const memberName = String(ev.memberName || ev.name || "").trim();
+    const memberName =
+      pickSavedContactName(ev.memberName || ev.name, g.phone, g.phoneKey) ||
+      String(g.memberName || "").trim();
+    const contactName = pickSavedContactName(g.contactName, g.phone, g.phoneKey);
     return {
       ...g,
       source: "line",
       lineId: ev.lineId || g.lineId,
       userId: ev.userId || g.userId,
       memberName,
-      name: memberName,
+      contactName,
+      name: memberName || contactName || g.name || "",
       verified: ev.verified === true,
       membershipTier: ev.membershipTier || g.membershipTier
     };
@@ -306,13 +365,15 @@ export function buildCallHistoryList({ deviceEntries, lineEvents, selectedLine, 
   return enrichCallLogGroupsWithShowcaseHistory(mergeDeviceAndLineCallGroups(deviceGroups, lineGroups));
 }
 
-/** VLUE 회원: 이름 + 번호. 비회원: 번호만. */
+/** VLUE 회원: 이름 + 번호. 저장 연락처: 저장 이름. 그 외: 번호만. */
 export function formatCallGroupLabel(call) {
   const phone = String(call?.phoneDisplay || call?.phone || "").trim() || "—";
-  const member = String(call?.memberName || "").trim();
   const key = call?.phoneKey || callLogPhoneKey(phone);
-  const showName = member && !looksLikePhoneName(member, phone, key);
-  const base = showName ? `${member}  ${phone}` : phone;
+  const member = pickSavedContactName(call?.memberName, phone, key);
+  const contact = pickSavedContactName(call?.contactName, phone, key);
+  let base = phone;
+  if (member) base = `${member}  ${phone}`;
+  else if (contact) base = contact;
   const n = Number(call?.count) || 1;
   if (n <= 1) return base;
   return `${base} (${n})`;

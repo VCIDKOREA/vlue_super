@@ -4,6 +4,7 @@ import {
   readLetteringFixedIdentity
 } from "./letteringBizcardStorage.js";
 import { TITLE_DEPT_APPROVAL } from "./letteringBizcardVerification.js";
+import { writeProfilePhoto } from "./vlueAvatar.js";
 
 export const DCC_AGENT_CHANGED_EVENT = "vlue-dcc-agent-changed";
 
@@ -42,7 +43,11 @@ export function applyDccAgentBundleToLocalCard(profile, bundle = null, opts = {}
     hasBundle && bundle.dcc && typeof bundle.dcc === "object" ? bundle.dcc : null;
   const title = str(profile.title ?? dcc?.title);
   const department = str(profile.department ?? dcc?.department);
-  const photoUrl = str(profile.photoUrl || dcc?.photoUrl);
+  /* 번들 DCC 사진이 있으면 컬럼(stale)보다 우선 — 예전 사진으로 덮어쓰는 버그 방지 */
+  const photoUrl =
+    hasBundle && dcc && Object.prototype.hasOwnProperty.call(dcc, "photoUrl")
+      ? str(dcc.photoUrl)
+      : str(profile.photoUrl || dcc?.photoUrl);
   const photoFocus = str(profile.photoFocus || dcc?.photoFocus || "center") || "center";
 
   try {
@@ -68,6 +73,8 @@ export function applyDccAgentBundleToLocalCard(profile, bundle = null, opts = {}
       noProfilePhoto: !photoUrl
     };
     const written = writeLetteringBizcardEditable(patchLite);
+    /* 헤더·쇼케이스는 avatar 슬롯을 읽음 — 프로필 전환 시 반드시 동기화 */
+    writeProfilePhoto(photoUrl, { skipServerSync: true });
     try {
       window.dispatchEvent(new Event(LETTERING_BIZCARD_CHANGED_EVENT));
       window.dispatchEvent(new Event("vlue-digital-card-changed"));
@@ -139,6 +146,7 @@ export function applyDccAgentBundleToLocalCard(profile, bundle = null, opts = {}
   };
 
   const written = writeLetteringBizcardEditable(patch);
+  writeProfilePhoto(photoUrl, { skipServerSync: true });
 
   try {
     window.dispatchEvent(new Event(LETTERING_BIZCARD_CHANGED_EVENT));

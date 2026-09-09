@@ -203,7 +203,9 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       accountGroupDocName: ed.accountGroupDocName || "",
       logoUrl: ed.noCompanyLogo ? "" : String(ed.logoDataUrl || ed.logoUrl || "").trim(),
       logoFileName: ed.noCompanyLogo ? "" : String(ed.logoFileName || "").trim(),
-      photoUrl: String(readProfilePhotoAvatar() || "").trim(),
+      photoUrl: ed.noProfilePhoto
+        ? ""
+        : String(ed.photoDataUrl || ed.photoUrl || readProfilePhotoAvatar() || "").trim(),
       titlePhotoUrl: ed.noTitlePhoto ? "" : String(ed.titlePhotoDataUrl || ed.titlePhotoUrl || "").trim(),
       noTitlePhoto: Boolean(ed.noTitlePhoto),
       photoFocus: normalizePhotoFocus(ed.photoFocus),

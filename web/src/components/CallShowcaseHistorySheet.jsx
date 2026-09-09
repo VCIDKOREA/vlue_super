@@ -5,11 +5,13 @@ import { CALL_SHOWCASE_HISTORY_CHANGED } from "../lib/callShowcaseHistory.js";
 import {
   applyLocalKnownPeersToCallGroups,
   applyMemberDirectoryToCallGroups,
+  applyKnownContactsToCallGroups,
   buildCallHistoryList,
   fetchDeviceCallLogEntries,
   formatCallDuration,
   formatCallGroupLabel,
   formatCallWhen,
+  resolveCallDisplayName,
   resolveCallHistoryAvatar
 } from "../lib/callLogList.js";
 import { fetchDccLines } from "../lib/dccLinesApi.js";
@@ -38,7 +40,10 @@ import {
 } from "../lib/call/callPeerMatrix.js";
 import { runCallPeerMatrixAction } from "../lib/call/runCallPeerMatrixAction.js";
 import { resolveIsKnownContactSync } from "../lib/contacts/hybridKnownContact.js";
-import { syncDeviceContactsFromNative } from "../lib/contacts/deviceContactsCache.js";
+import {
+  DEVICE_CONTACTS_CHANGED,
+  syncDeviceContactsFromNative
+} from "../lib/contacts/deviceContactsCache.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import {
   buildNationalAgencyDcpCard,
@@ -203,12 +208,7 @@ function CallHistoryAvatar({ call }) {
   useEffect(() => {
     setBroken(false);
   }, [url]);
-  const label = String(call?.memberName || call?.name || "").trim();
-  const phoneDisp = String(call?.phoneDisplay || call?.phone || "").trim();
-  const isPhoneLabel =
-    !label ||
-    label === phoneDisp ||
-    label.replace(/\D/g, "") === phoneDisp.replace(/\D/g, "");
+  const label = resolveCallDisplayName(call);
   const Icon = call.direction === "out" ? PhoneOutgoing : PhoneIncoming;
 
   if (url && !broken) {
@@ -223,7 +223,7 @@ function CallHistoryAvatar({ call }) {
     );
   }
 
-  if (label && !isPhoneLabel) {
+  if (label) {
     return (
       <span className="friend-showcase-list__avatar friend-showcase-list__avatar--initial" aria-hidden>
         {label.slice(0, 1)}
@@ -308,15 +308,19 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const hasVisibleRows = Boolean(readCallHistoryListCache()?.length || items.length);
     if (!hasVisibleRows) setListLoading(true);
     try {
+      /* 주소록 캐시를 먼저 맞춰 CallLog만으로도 저장 이름이 바로 붙게 */
+      await syncDeviceContactsFromNative().catch(() => {});
       const raw = await fetchDeviceCallLogEntries(200);
       /* 1차: 기기 로그 + 로컬 히스토리 + CEO 시드 — 번호만 보이다가 이름 붙는 깜빡임 방지 */
-      const quick = applyLocalKnownPeersToCallGroups(
-        buildCallHistoryList({
-          deviceEntries: raw,
-          lineEvents: [],
-          selectedLine: "all",
-          lines: []
-        })
+      const quick = applyKnownContactsToCallGroups(
+        applyLocalKnownPeersToCallGroups(
+          buildCallHistoryList({
+            deviceEntries: raw,
+            lineEvents: [],
+            selectedLine: "all",
+            lines: []
+          })
+        )
       );
       setItems(quick);
       if (quick.length) writeCallHistoryListCache(quick);
@@ -341,8 +345,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         selectedLine,
         lines: lineRows
       });
-      const enriched = applyLocalKnownPeersToCallGroups(
-        applyMemberDirectoryToCallGroups(merged, members)
+      const enriched = applyKnownContactsToCallGroups(
+        applyLocalKnownPeersToCallGroups(applyMemberDirectoryToCallGroups(merged, members))
       );
       setItems(enriched);
       if (enriched.length) writeCallHistoryListCache(enriched);
@@ -406,31 +410,46 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       setAuthPopup({ open: false, name: "", phone: "", handle: "" });
       return undefined;
     }
+    const next = {};
+    for (const call of items) {
+      const phone = call.phoneDisplay || call.phone;
+      const isVlueMember =
+        call.verified === true || Boolean(call.memberName) || Boolean(call.userId);
+      next[call.id] = resolveCallPeerMatrixSync({
+        phone,
+        isVlueMember,
+        verified: isVlueMember
+      });
+    }
+    setRowMatrix(next);
+    return undefined;
+  }, [open, items]);
+
+  useEffect(() => {
+    if (!open) return undefined;
     let cancelled = false;
-    const buildMatrix = () => {
-      const next = {};
-      for (const call of items) {
-        const phone = call.phoneDisplay || call.phone;
-        const isVlueMember =
-          call.verified === true || Boolean(call.memberName) || Boolean(call.userId);
-        next[call.id] = resolveCallPeerMatrixSync({
-          phone,
-          isVlueMember,
-          verified: isVlueMember
-        });
-      }
-      if (!cancelled) setRowMatrix(next);
+    const patchContactNames = () => {
+      if (cancelled) return;
+      setItems((prev) => {
+        const next = applyKnownContactsToCallGroups(prev);
+        const changed = next.some(
+          (row, i) =>
+            row.contactName !== prev[i]?.contactName || row.name !== prev[i]?.name
+        );
+        if (!changed) return prev;
+        writeCallHistoryListCache(next);
+        return next;
+      });
     };
-    buildMatrix();
     void syncDeviceContactsFromNative()
-      .then(() => {
-        if (!cancelled) buildMatrix();
-      })
+      .then(() => patchContactNames())
       .catch(() => {});
+    window.addEventListener(DEVICE_CONTACTS_CHANGED, patchContactNames);
     return () => {
       cancelled = true;
+      window.removeEventListener(DEVICE_CONTACTS_CHANGED, patchContactNames);
     };
-  }, [open, items]);
+  }, [open]);
 
   /* 목록에 보이는 VLUE 회원 쇼케이스 — 탭 전 미리 불러오기 */
   useEffect(() => {

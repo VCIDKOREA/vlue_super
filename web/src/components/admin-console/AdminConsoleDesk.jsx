@@ -25,6 +25,10 @@ import {
   fetchAdminGroupAccountPending,
   patchAdminSignatureSound,
   patchAdminUser,
+  adminSuspendUser,
+  adminActivateUser,
+  adminWithdrawUser,
+  adminRestoreUser,
   resolveAdminManualReview,
   reviewAdminEnterpriseDcc,
   reviewAdminGroupAccount,
@@ -521,13 +525,92 @@ function GroupAccountAdminTab({ onToast }) {
   );
 }
 
-function accountStatusLabel(status) {
-  const s = String(status || "");
+function accountStatusLabel(row) {
+  if (row?.status === "DELETED") return "탈퇴완료";
+  if (row?.pendingWithdrawal) {
+    const until = String(row.recoverableUntil || "").replace("T", " ").slice(0, 16);
+    return until ? `탈퇴예정 · ${until}까지 복구` : "탈퇴예정";
+  }
+  const s = String(row?.accountStatus || row || "");
   if (s === "active") return "활성";
   if (s === "suspended") return "정지";
   if (s === "pending_identity") return "본인인증 대기";
   if (s === "pending_approval") return "가입 승인 대기";
   return s || "—";
+}
+
+function MemberActionModal({ open, title, hint, confirmLabel, confirmClass, requireReason, showImmediate, onClose, onConfirm, busy }) {
+  const [reason, setReason] = useState("");
+  const [immediate, setImmediate] = useState(false);
+  useEffect(() => {
+    if (open) {
+      setReason("");
+      setImmediate(false);
+    }
+  }, [open]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
+        <p className="text-[15px] font-black text-slate-900">{title}</p>
+        {hint ? <p className="mt-2 text-[12px] leading-relaxed text-slate-500">{hint}</p> : null}
+        {requireReason ? (
+          <label className="mt-3 block text-[11px] font-bold text-slate-600">
+            사유 (필수)
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+              maxLength={500}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] font-medium text-slate-900"
+              placeholder="문의 내용·처리 근거를 입력하세요"
+            />
+          </label>
+        ) : (
+          <label className="mt-3 block text-[11px] font-bold text-slate-600">
+            메모 (선택)
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              maxLength={500}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] font-medium text-slate-900"
+              placeholder="복구 사유가 있으면 입력"
+            />
+          </label>
+        )}
+        {showImmediate ? (
+          <label className="mt-3 flex items-start gap-2 text-[12px] font-semibold text-rose-700">
+            <input
+              type="checkbox"
+              checked={immediate}
+              onChange={(e) => setImmediate(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>즉시 탈퇴(개인정보 파기 · 복구 불가). 체크하지 않으면 24시간 유예 후 자동 탈퇴되며 그사이 복구 가능합니다.</span>
+          </label>
+        ) : null}
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            className="rounded-lg px-3 py-2 text-[12px] font-bold text-slate-500"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            disabled={busy || (requireReason && reason.trim().length < 2)}
+            onClick={() => onConfirm({ reason: reason.trim(), immediate })}
+            className={`rounded-lg px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50 ${confirmClass || "bg-slate-900"}`}
+          >
+            {busy ? "처리 중…" : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function membershipLabel(user) {
@@ -574,7 +657,10 @@ function MemberDetail({ user, onClose }) {
     ["사업자번호", user.businessRegistrationNo || "—"],
     ["직장메일 인증", user.isCompanyVerified ? "완료" : "—"],
     ["추천인 코드", user.referrerCode || "—"],
-    ["계정 상태", `${accountStatusLabel(user.accountStatus)} / ${user.status || "—"}`],
+    ["계정 상태", `${accountStatusLabel(user)} / ${user.status || "—"}`],
+    ["탈퇴 예약", user.pendingWithdrawal ? `${formatAdminDate(user.recoverableUntil)}까지 복구 가능` : "—"],
+    ["최근 처리 사유", user.accountActionReason || "—"],
+    ["최근 처리", user.accountActionType ? `${user.accountActionType} · ${formatAdminDate(user.accountActionAt)}` : "—"],
     ["역할", user.role || "—"],
     ["약관 동의", formatAdminDate(user.termsAcceptedAt)]
   ];
@@ -672,6 +758,7 @@ function UsersTab({ onToast }) {
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState("");
   const [selected, setSelected] = useState(null);
+  const [action, setAction] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -700,11 +787,27 @@ function UsersTab({ onToast }) {
     }
   };
 
-  const suspend = async (userId) => {
-    setBusyId(userId);
+  const runAction = async ({ reason, immediate }) => {
+    if (!action?.userId || !action?.type) return;
+    setBusyId(action.userId);
     try {
-      await patchAdminUser(userId, { accountStatus: "suspended" });
-      onToast?.("활동 정지 처리");
+      if (action.type === "suspend") {
+        await adminSuspendUser(action.userId, { reason });
+        onToast?.("활동 정지 처리");
+      } else if (action.type === "activate") {
+        await adminActivateUser(action.userId, { reason });
+        onToast?.("계정 활성화");
+      } else if (action.type === "withdraw") {
+        const res = await adminWithdrawUser(action.userId, {
+          reason,
+          mode: immediate ? "immediate" : "grace"
+        });
+        onToast?.(res?.message || (immediate ? "즉시 탈퇴 처리" : "탈퇴 예약(24시간 복구 가능)"));
+      } else if (action.type === "restore") {
+        const res = await adminRestoreUser(action.userId, { reason });
+        onToast?.(res?.message || "복구 완료");
+      }
+      setAction(null);
       load();
     } catch (e) {
       onToast?.(e?.message || "처리 실패");
@@ -713,18 +816,52 @@ function UsersTab({ onToast }) {
     }
   };
 
-  const activate = async (userId) => {
-    setBusyId(userId);
-    try {
-      await patchAdminUser(userId, { accountStatus: "active", status: "ACTIVE" });
-      onToast?.("계정 활성화");
-      load();
-    } catch (e) {
-      onToast?.(e?.message || "처리 실패");
-    } finally {
-      setBusyId("");
+  const actionMeta = (() => {
+    if (!action) return null;
+    if (action.type === "suspend") {
+      return {
+        title: "회원 정지",
+        hint: "정지 사유를 남겨 주세요. 이후 「복구」로 다시 활성화할 수 있습니다.",
+        confirmLabel: "정지 처리",
+        confirmClass: "bg-rose-600",
+        requireReason: true,
+        showImmediate: false
+      };
     }
-  };
+    if (action.type === "withdraw") {
+      return {
+        title: "회원 탈퇴 처리",
+        hint: "고객 요청 탈퇴입니다. 기본은 24시간 유예(복구 가능)이며, 필요 시 즉시 탈퇴를 선택할 수 있습니다.",
+        confirmLabel: "탈퇴 처리",
+        confirmClass: "bg-rose-700",
+        requireReason: true,
+        showImmediate: true
+      };
+    }
+    if (action.type === "restore") {
+      return {
+        title: "계정 복구",
+        hint: action.pendingWithdrawal
+          ? "탈퇴 예약을 취소하고 계정을 다시 활성화합니다."
+          : "정지 상태를 해제하고 활성화합니다.",
+        confirmLabel: "복구",
+        confirmClass: "bg-emerald-600",
+        requireReason: false,
+        showImmediate: false
+      };
+    }
+    if (action.type === "activate") {
+      return {
+        title: "계정 활성화",
+        hint: "정지·대기 상태를 활성으로 바꿉니다.",
+        confirmLabel: "활성화",
+        confirmClass: "bg-emerald-600",
+        requireReason: false,
+        showImmediate: false
+      };
+    }
+    return null;
+  })();
 
   return (
     <div className="space-y-3">
@@ -739,8 +876,22 @@ function UsersTab({ onToast }) {
           검색
         </button>
       </div>
-      <p className="text-[11px] text-slate-500">총 {total}명 · 최신 가입순 · 「상세」에서 가입 정보를 확인합니다</p>
+      <p className="text-[11px] text-slate-500">
+        총 {total}명 · 정지/탈퇴는 사유 필수 · 탈퇴 기본 24시간 복구 가능 · 즉시 탈퇴는 복구 불가
+      </p>
       {selected ? <MemberDetail user={selected} onClose={() => setSelected(null)} /> : null}
+      <MemberActionModal
+        open={Boolean(actionMeta)}
+        title={actionMeta?.title}
+        hint={actionMeta?.hint}
+        confirmLabel={actionMeta?.confirmLabel}
+        confirmClass={actionMeta?.confirmClass}
+        requireReason={actionMeta?.requireReason}
+        showImmediate={actionMeta?.showImmediate}
+        busy={Boolean(busyId)}
+        onClose={() => setAction(null)}
+        onConfirm={(payload) => void runAction(payload)}
+      />
       <Table
         emptyLabel={loading ? "불러오는 중…" : "회원 없음"}
         columns={[
@@ -759,37 +910,68 @@ function UsersTab({ onToast }) {
             label: "멤버십",
             render: (r) => membershipLabel(r)
           },
-          { key: "status", label: "상태", render: (r) => accountStatusLabel(r.accountStatus) },
+          { key: "status", label: "상태", render: (r) => accountStatusLabel(r) },
           {
             key: "actions",
             label: "관리",
-            render: (r) => (
-              <div className="flex flex-wrap gap-1">
-                <button
-                  type="button"
-                  onClick={() => openDetail(r)}
-                  className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-700"
-                >
-                  상세
-                </button>
-                <button
-                  type="button"
-                  disabled={busyId === r.id}
-                  onClick={() => suspend(r.id)}
-                  className="rounded bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-600"
-                >
-                  정지
-                </button>
-                <button
-                  type="button"
-                  disabled={busyId === r.id}
-                  onClick={() => activate(r.id)}
-                  className="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700"
-                >
-                  활성
-                </button>
-              </div>
-            )
+            render: (r) => {
+              const deleted = r.status === "DELETED";
+              const pending = Boolean(r.pendingWithdrawal);
+              const suspended = r.accountStatus === "suspended" && !pending;
+              return (
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openDetail(r)}
+                    className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-700"
+                  >
+                    상세
+                  </button>
+                  {!deleted && !pending ? (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => setAction({ type: "suspend", userId: r.id })}
+                      className="rounded bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-600"
+                    >
+                      정지
+                    </button>
+                  ) : null}
+                  {!deleted && (pending || suspended) ? (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() =>
+                        setAction({ type: "restore", userId: r.id, pendingWithdrawal: pending })
+                      }
+                      className="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700"
+                    >
+                      복구
+                    </button>
+                  ) : null}
+                  {!deleted && !pending && !suspended ? (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => setAction({ type: "activate", userId: r.id })}
+                      className="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700"
+                    >
+                      활성
+                    </button>
+                  ) : null}
+                  {!deleted && !pending ? (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => setAction({ type: "withdraw", userId: r.id })}
+                      className="rounded bg-slate-900 px-2 py-1 text-[10px] font-bold text-white"
+                    >
+                      탈퇴
+                    </button>
+                  ) : null}
+                </div>
+              );
+            }
           }
         ]}
         rows={users.map((u) => ({ ...u, _key: u.id }))}

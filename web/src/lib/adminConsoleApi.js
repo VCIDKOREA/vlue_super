@@ -103,6 +103,42 @@ export async function patchAdminUser(userId, patch) {
   return parseJson(res);
 }
 
+export async function adminSuspendUser(userId, { reason }) {
+  const res = await fetch(apiUrl(`/api/admin/console/users/${userId}/suspend`), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify({ reason })
+  });
+  return parseJson(res);
+}
+
+export async function adminActivateUser(userId, { reason } = {}) {
+  const res = await fetch(apiUrl(`/api/admin/console/users/${userId}/activate`), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify({ reason: reason || "" })
+  });
+  return parseJson(res);
+}
+
+export async function adminWithdrawUser(userId, { reason, mode = "grace" }) {
+  const res = await fetch(apiUrl(`/api/admin/console/users/${userId}/withdraw`), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify({ reason, mode })
+  });
+  return parseJson(res);
+}
+
+export async function adminRestoreUser(userId, { reason } = {}) {
+  const res = await fetch(apiUrl(`/api/admin/console/users/${userId}/restore`), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify({ reason: reason || "" })
+  });
+  return parseJson(res);
+}
+
 export async function fetchAdminPosts() {
   const res = await fetch(apiUrl("/api/admin/console/posts"), { headers: adminHeaders() });
   return parseJson(res);

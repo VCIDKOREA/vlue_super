@@ -46,6 +46,8 @@ export default function DccAgentManageModal({
   maxCount = 20,
   allowedSlots = 1,
   monthlyKrw = SOHO_BROADCAST_MONTHLY_KRW,
+  openCreateForm = false,
+  onCreateFormConsumed,
   onClose,
   onSelectLine,
   onAssignAgent,
@@ -88,8 +90,24 @@ export default function DccAgentManageModal({
       profiles.find((p) => p.isActive)?.id ||
       profiles[0]?.id ||
       "";
-    setSelectedProfileId(preferred);
+    setSelectedProfileId((prev) => prev || preferred);
   }, [open, profiles]);
+
+  useEffect(() => {
+    if (!open || !openCreateForm) return;
+    if (needPayToCreate) {
+      onCreateFormConsumed?.();
+      onRequestPayCreate?.();
+      return;
+    }
+    setEditingId("");
+    setForm({
+      ...EMPTY_FORM,
+      displayName: sharedName || ""
+    });
+    setFormOpen(true);
+    onCreateFormConsumed?.();
+  }, [open, openCreateForm, needPayToCreate, sharedName, onCreateFormConsumed, onRequestPayCreate]);
 
   useEffect(() => {
     if (!selectedProfileId) {
@@ -291,11 +309,10 @@ export default function DccAgentManageModal({
         <div className="dcc-agent-modal__head">
           <div>
             <h2 id="dcc-agent-modal-title" className="dcc-agent-modal__title">
-              멀티 DCC 프로필
+              멀티 프로필
             </h2>
             <p className="dcc-agent-modal__sub">
-              목록을 누르면 즉시 그 프로필로 전환됩니다. <b>전화번호·이름</b>만 공유하고, 상호·계좌·이메일·웹·사진·DCC·쇼케이스·BGM은
-              프로필마다 새로 설정합니다. 추가 프로필은 결제 후 생성됩니다.
+              탭해서 선택 → 아래에서 편집·번호 배정. 전환은 「적용」을 누르세요.
             </p>
           </div>
           <button type="button" className="dcc-agent-modal__close" onClick={onClose} aria-label="닫기">
@@ -317,18 +334,11 @@ export default function DccAgentManageModal({
                   className={`dcc-agent-row${selected ? " is-active" : ""}`}
                   role="button"
                   tabIndex={0}
-                  onClick={() => {
-                    setSelectedProfileId(profile.id);
-                    if (typeof onSwitchProfile === "function") {
-                      void onSwitchProfile(profile);
-                    }
-                  }}
+                  onClick={() => setSelectedProfileId(profile.id)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
                       setSelectedProfileId(profile.id);
-                      if (typeof onSwitchProfile === "function") {
-                        void onSwitchProfile(profile);
-                      }
                     }
                   }}
                 >
@@ -453,41 +463,34 @@ export default function DccAgentManageModal({
             ) : (
               <button
                 type="button"
-                className="dcc-agent-modal__add"
+                className={`dcc-agent-modal__add${needPayToCreate ? " is-pay" : ""}`}
                 onClick={startCreate}
                 disabled={busy}
               >
                 <Plus size={14} />
                 {needPayToCreate
-                  ? `결제 후 프로필 추가 (월 ${Number(monthlyKrw).toLocaleString("ko-KR")}원)`
-                  : "프로필 추가"}
+                  ? `결제하고 프로필 추가 · 월 ${Number(monthlyKrw).toLocaleString("ko-KR")}원`
+                  : "+ 프로필 추가"}
               </button>
             )}
           </section>
 
-          {selectedProfile ? (
+          {selectedProfile && !formOpen ? (
             <section className="dcc-agent-section">
               <h3 className="dcc-agent-section__title">
-                선택 프로필 · {selectedProfile.displayName || "이름 없음"}
-                {selectedProfile.isRepresentative ? " (대표)" : ""}
+                {selectedProfile.label || selectedProfile.displayName || "선택 프로필"}
+                {selectedProfile.isRepresentative ? " · 대표" : ""}
               </h3>
-              <p className="dcc-agent-modal__sub" style={{ marginTop: 0 }}>
-                아래에서 송출 번호를 지정하고, DCC·쇼케이스·BGM은 「편집」으로 이 프로필 전용으로 설정합니다.
-              </p>
 
               <div className="dcc-agent-form__actions" style={{ marginBottom: 12 }}>
-                {!selectedProfile.isRepresentative ? (
-                  <button
-                    type="button"
-                    className="is-ghost"
-                    disabled={busy}
-                    onClick={() => void makeRepresentative(selectedProfile)}
-                  >
-                    <Star size={14} /> 대표로 지정
-                  </button>
-                ) : (
-                  <span className="dcc-agent-row__meta">미지정·모르는 번호 → 이 대표 프로필 송출</span>
-                )}
+                <button
+                  type="button"
+                  className="is-primary"
+                  disabled={busy || typeof onSwitchProfile !== "function"}
+                  onClick={() => void onSwitchProfile?.(selectedProfile)}
+                >
+                  이 프로필로 적용
+                </button>
                 <button
                   type="button"
                   className="is-primary"
@@ -496,11 +499,21 @@ export default function DccAgentManageModal({
                 >
                   DCC · 쇼케이스 편집
                 </button>
+                {!selectedProfile.isRepresentative ? (
+                  <button
+                    type="button"
+                    className="is-ghost"
+                    disabled={busy}
+                    onClick={() => void makeRepresentative(selectedProfile)}
+                  >
+                    <Star size={14} /> 대표로
+                  </button>
+                ) : null}
               </div>
 
-              <h4 className="dcc-agent-section__title">송출 번호 지정</h4>
+              <h4 className="dcc-agent-section__title">송출 번호</h4>
               {lineList.length === 0 ? (
-                <p className="dcc-agent-row__meta">등록된 번호가 없습니다. 인증 휴대폰·내선·대표번호를 먼저 연결하세요.</p>
+                <p className="dcc-agent-row__meta">등록된 번호가 없습니다.</p>
               ) : (
                 <div className="space-y-2">
                   {lineList.map((line) => {
@@ -524,11 +537,11 @@ export default function DccAgentManageModal({
                         <div className="dcc-agent-row__text">
                           <p className="dcc-agent-row__name">
                             {line.displayPhone}
-                            {isCertifiedLine(line) ? " (인증번호)" : ""}
+                            {isCertifiedLine(line) ? " (인증)" : ""}
                           </p>
                           <p className="dcc-agent-row__meta">
                             {line.kindLabel}
-                            {otherOwner ? ` · 현재 「${otherOwner.displayName}」에 배정됨` : ""}
+                            {otherOwner ? ` · 「${otherOwner.displayName}」에 배정됨` : ""}
                           </p>
                         </div>
                         {checked ? <Check size={14} /> : null}

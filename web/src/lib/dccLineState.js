@@ -51,11 +51,14 @@ export function writeDccLinePreviewFromBundle(bundle, opts = {}) {
   const agent = bundle?.agent || {};
   const dcc = bundle?.dcc && typeof bundle.dcc === "object" ? bundle.dcc : {};
   const keepSameLine = !opts.replaceMedia && prev?.id === line.id;
-  const photoUrl = String(
-    opts.replaceMedia
-      ? dcc.photoUrl || line.photoUrl || agent.photoUrl || ""
-      : line.photoUrl || dcc.photoUrl || (keepSameLine ? prev?.photoUrl : "") || ""
-  ).trim();
+  const resolvedPhoto = opts.replaceMedia
+    ? Object.prototype.hasOwnProperty.call(dcc, "photoUrl")
+      ? String(dcc.photoUrl || "").trim()
+      : String(line.photoUrl || agent.photoUrl || "").trim()
+    : String(
+        line.photoUrl || dcc.photoUrl || (keepSameLine ? prev?.photoUrl : "") || ""
+      ).trim();
+  const photoUrl = resolvedPhoto;
   return writeDccLinePreview({
     id: line.id,
     displayPhone:
@@ -67,6 +70,7 @@ export function writeDccLinePreviewFromBundle(bundle, opts = {}) {
     title: String(line.jobTitle || agent.title || dcc.title || "").trim(),
     department: String(line.department || agent.department || dcc.department || "").trim(),
     photoUrl,
+    noProfilePhoto: !photoUrl,
     titlePhotoUrl: String(
       opts.replaceMedia
         ? dcc.titlePhotoUrl || ""

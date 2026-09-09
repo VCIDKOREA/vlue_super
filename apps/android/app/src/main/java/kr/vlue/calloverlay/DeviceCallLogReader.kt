@@ -33,14 +33,16 @@ object DeviceCallLogReader {
             CallLog.Calls.DURATION,
             CallLog.Calls.TYPE,
             CallLog.Calls.DATE,
-            CallLog.Calls.VIA_NUMBER
+            CallLog.Calls.VIA_NUMBER,
+            CallLog.Calls.CACHED_NAME
         )
         val projectionBase = arrayOf(
             CallLog.Calls._ID,
             CallLog.Calls.NUMBER,
             CallLog.Calls.DURATION,
             CallLog.Calls.TYPE,
-            CallLog.Calls.DATE
+            CallLog.Calls.DATE,
+            CallLog.Calls.CACHED_NAME
         )
         var cursor: Cursor? = null
         val out = JSONArray()
@@ -63,6 +65,8 @@ object DeviceCallLogReader {
                 )
             }
             if (cursor == null) return out.toString()
+            val viaIdx = cursor.getColumnIndex(CallLog.Calls.VIA_NUMBER)
+            val nameIdx = cursor.getColumnIndex(CallLog.Calls.CACHED_NAME)
             var n = 0
             while (cursor.moveToNext() && n < limit) {
                 val id = cursor.getLong(0)
@@ -71,7 +75,8 @@ object DeviceCallLogReader {
                 val durationSec = cursor.getLong(2).toInt().coerceAtLeast(0)
                 val type = cursor.getInt(3)
                 val dateMs = cursor.getLong(4)
-                val viaNumber = if (cursor.columnCount > 5) cursor.getString(5).orEmpty().trim() else ""
+                val viaNumber = if (viaIdx >= 0) cursor.getString(viaIdx).orEmpty().trim() else ""
+                val cachedName = if (nameIdx >= 0) cursor.getString(nameIdx).orEmpty().trim() else ""
                 val direction = when (type) {
                     CallLog.Calls.OUTGOING_TYPE -> "out"
                     CallLog.Calls.INCOMING_TYPE -> "in"
@@ -80,17 +85,19 @@ object DeviceCallLogReader {
                 }
                 val callState =
                     if (type == CallLog.Calls.MISSED_TYPE || durationSec <= 0) "missed" else "ended"
-                out.put(
-                    JSONObject()
-                        .put("id", "clog-$id")
-                        .put("phone", number)
-                        .put("viaNumber", viaNumber)
-                        .put("durationSec", durationSec)
-                        .put("direction", direction)
-                        .put("type", type)
-                        .put("dateMs", dateMs)
-                        .put("callState", callState)
-                )
+                val row = JSONObject()
+                    .put("id", "clog-$id")
+                    .put("phone", number)
+                    .put("viaNumber", viaNumber)
+                    .put("durationSec", durationSec)
+                    .put("direction", direction)
+                    .put("type", type)
+                    .put("dateMs", dateMs)
+                    .put("callState", callState)
+                if (cachedName.isNotEmpty()) {
+                    row.put("cachedName", cachedName)
+                }
+                out.put(row)
                 n++
             }
             out.toString()

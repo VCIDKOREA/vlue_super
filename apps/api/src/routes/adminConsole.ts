@@ -45,12 +45,17 @@ import {
   listNotices,
   mapManualReviewRows,
   patchAdminUser,
+  adminSuspendUser,
+  adminActivateUser,
+  adminWithdrawUser,
+  adminRestoreUser,
   releaseNotice,
   resolveManualReview,
   testAdminNotificationBroadcast,
   updateMarketingPopup,
   updateNotice
 } from "../services/admin/adminConsoleService.js";
+import { AccountWithdrawalError } from "../services/auth/accountWithdrawalService.js";
 
 type AdminConsoleVars = { adminConsoleUser: AdminConsoleUserVar };
 
@@ -160,6 +165,69 @@ authed.patch("/users/:userId", async (c) => {
     return c.json({ ok: true, user });
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : "수정 실패" }, 400);
+  }
+});
+
+authed.post("/users/:userId/suspend", async (c) => {
+  const admin = c.get("adminConsoleUser");
+  const body = (await c.req.json().catch(() => ({}))) as { reason?: string };
+  try {
+    const user = await adminSuspendUser(c.req.param("userId"), {
+      reason: String(body.reason || ""),
+      adminUserId: admin.id
+    });
+    return c.json({ ok: true, user });
+  } catch (e) {
+    const status = e instanceof AccountWithdrawalError ? e.statusCode || 400 : 400;
+    return c.json({ error: e instanceof Error ? e.message : "정지 실패" }, status as 400);
+  }
+});
+
+authed.post("/users/:userId/activate", async (c) => {
+  const admin = c.get("adminConsoleUser");
+  const body = (await c.req.json().catch(() => ({}))) as { reason?: string };
+  try {
+    const user = await adminActivateUser(c.req.param("userId"), {
+      reason: String(body.reason || ""),
+      adminUserId: admin.id
+    });
+    return c.json({ ok: true, user });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "활성화 실패" }, 400);
+  }
+});
+
+authed.post("/users/:userId/withdraw", async (c) => {
+  const admin = c.get("adminConsoleUser");
+  const body = (await c.req.json().catch(() => ({}))) as {
+    reason?: string;
+    mode?: "grace" | "immediate";
+  };
+  try {
+    const result = await adminWithdrawUser(c.req.param("userId"), {
+      reason: String(body.reason || ""),
+      adminUserId: admin.id,
+      mode: body.mode === "immediate" ? "immediate" : "grace"
+    });
+    return c.json(result);
+  } catch (e) {
+    const status = e instanceof AccountWithdrawalError ? e.statusCode || 400 : 400;
+    return c.json({ error: e instanceof Error ? e.message : "탈퇴 처리 실패" }, status as 400);
+  }
+});
+
+authed.post("/users/:userId/restore", async (c) => {
+  const admin = c.get("adminConsoleUser");
+  const body = (await c.req.json().catch(() => ({}))) as { reason?: string };
+  try {
+    const result = await adminRestoreUser(c.req.param("userId"), {
+      reason: String(body.reason || ""),
+      adminUserId: admin.id
+    });
+    return c.json(result);
+  } catch (e) {
+    const status = e instanceof AccountWithdrawalError ? e.statusCode || 400 : 400;
+    return c.json({ error: e instanceof Error ? e.message : "복구 실패" }, status as 400);
   }
 });
 

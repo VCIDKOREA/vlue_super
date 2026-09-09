@@ -26,6 +26,8 @@ export function applyDccLinePreviewOverlay(card = {}) {
   const name = String(line.displayName || "").trim();
   const phone = formatLetteringPhoneDisplay(line.displayPhone) || String(line.displayPhone || "").trim();
   const photo = String(line.photoUrl || "").trim();
+  const lineClearsPhoto = Boolean(line.noProfilePhoto) || ("photoUrl" in line && !photo);
+  const resolvedPhoto = lineClearsPhoto ? "" : photo || card.photoUrl;
   const title = String(line.title || "").trim();
   const department = String(line.department || "").trim();
   const email = String(line.email || "").trim();
@@ -57,7 +59,7 @@ export function applyDccLinePreviewOverlay(card = {}) {
       name: name || card.name,
       displayName: name || card.displayName,
       phone: phone || card.phone,
-      photoUrl: photo || card.photoUrl,
+      photoUrl: resolvedPhoto,
       titlePhotoUrl: line.titlePhotoUrl || card.titlePhotoUrl,
       noTitlePhoto: line.noTitlePhoto != null ? Boolean(line.noTitlePhoto) : Boolean(card.noTitlePhoto),
       photoFocus: line.photoFocus || card.photoFocus,
@@ -77,7 +79,7 @@ export function applyDccLinePreviewOverlay(card = {}) {
     name: name || card.name,
     displayName: name || card.displayName,
     phone: phone || card.phone,
-    photoUrl: photo || card.photoUrl,
+    photoUrl: resolvedPhoto,
     titlePhotoUrl: line.titlePhotoUrl || card.titlePhotoUrl,
     noTitlePhoto: line.noTitlePhoto != null ? Boolean(line.noTitlePhoto) : Boolean(card.noTitlePhoto),
     photoFocus: line.photoFocus || card.photoFocus || "center",

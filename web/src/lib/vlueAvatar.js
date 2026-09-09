@@ -99,17 +99,43 @@ function readLetteringPhotoUrl() {
   }
 }
 
+function readLetteringNoProfilePhotoFlag() {
+  try {
+    const metaRaw = localStorage.getItem("vlue_lettering_bizcard_v1");
+    if (!metaRaw) return false;
+    return Boolean(JSON.parse(metaRaw)?.noProfilePhoto);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * primary / feed / chat / 명함 photoDataUrl 을 한 장으로 맞춤.
  * 우선순위: 명함 프로필 사진 → primary → feed → chat
+ * noProfilePhoto 이면 슬롯을 비움(이전 프로필 사진이 남지 않게).
  */
 export function unifyProfilePhotoSlots() {
   try {
     const migrateKey = "vlue_avatar_unify_photo_v1";
-    const letteringPhoto = readLetteringPhotoUrl();
     const primary = readRawSlot("primary");
     const feed = readRawSlot("feed");
     const chat = readRawSlot("chat");
+
+    if (readLetteringNoProfilePhotoFlag()) {
+      const hadAny = Boolean(primary || feed || chat);
+      if (hadAny) {
+        PHOTO_SLOTS.forEach((slot) => writeRawSlot(slot, ""));
+        try {
+          window.dispatchEvent(new Event("vlue-avatar-changed"));
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!localStorage.getItem(migrateKey)) localStorage.setItem(migrateKey, "1");
+      return "";
+    }
+
+    const letteringPhoto = readLetteringPhotoUrl();
     const canonical = letteringPhoto || primary || feed || chat;
     if (!canonical) {
       if (!localStorage.getItem(migrateKey)) localStorage.setItem(migrateKey, "1");

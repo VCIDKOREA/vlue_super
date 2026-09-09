@@ -24,6 +24,13 @@ import {
   batchFamilyPlanPathLabels,
   resolveMembershipPathLabel
 } from "../membership/familyPlanMembership.js";
+import { ensureAdminAccountActionSchema } from "./ensureAdminAccountActionSchema.js";
+import {
+  cancelScheduledWithdrawal,
+  scheduleAdminWithdrawal,
+  withdrawAccountByAdmin
+} from "../auth/accountWithdrawalFlowService.js";
+import { ensureWithdrawalScheduleSchema } from "../auth/ensureWithdrawalScheduleSchema.js";
 
 const ADMIN_MEMBER_SELECT = {
   id: true,
@@ -45,6 +52,13 @@ const ADMIN_MEMBER_SELECT = {
   updatedAt: true,
   termsAcceptedAt: true,
   pendingApprovalAt: true,
+  withdrawalScheduledAt: true,
+  withdrawalRequestedAt: true,
+  withdrawalMethod: true,
+  accountActionReason: true,
+  accountActionAt: true,
+  accountActionBy: true,
+  accountActionType: true,
   businessProfile: {
     select: {
       isBusiness: true,
@@ -94,6 +108,13 @@ function serializeAdminMember(
   updatedAt: Date;
   termsAcceptedAt: Date | null;
   pendingApprovalAt: Date | null;
+  withdrawalScheduledAt?: Date | null;
+  withdrawalRequestedAt?: Date | null;
+  withdrawalMethod?: string | null;
+  accountActionReason?: string | null;
+  accountActionAt?: Date | null;
+  accountActionBy?: string | null;
+  accountActionType?: string | null;
   businessProfile: {
     isBusiness: boolean;
     companyName: string | null;
@@ -109,6 +130,11 @@ function serializeAdminMember(
 ) {
   const phone = u.phoneE164 || "";
   const membershipTier = String(u.digitalCard?.membershipTierSnapshot || "free").toLowerCase();
+  const pendingWithdrawal =
+    Boolean(u.withdrawalScheduledAt) && String(u.status || "") !== "DELETED";
+  const recoverableUntil = pendingWithdrawal && u.withdrawalScheduledAt
+    ? u.withdrawalScheduledAt.toISOString()
+    : null;
   return {
     id: u.id,
     publicHandle: u.publicHandle || "",
@@ -138,11 +164,22 @@ function serializeAdminMember(
     createdAt: u.createdAt.toISOString(),
     updatedAt: u.updatedAt.toISOString(),
     termsAcceptedAt: u.termsAcceptedAt ? u.termsAcceptedAt.toISOString() : null,
-    pendingApprovalAt: u.pendingApprovalAt ? u.pendingApprovalAt.toISOString() : null
+    pendingApprovalAt: u.pendingApprovalAt ? u.pendingApprovalAt.toISOString() : null,
+    pendingWithdrawal,
+    withdrawalScheduledAt: u.withdrawalScheduledAt ? u.withdrawalScheduledAt.toISOString() : null,
+    withdrawalRequestedAt: u.withdrawalRequestedAt ? u.withdrawalRequestedAt.toISOString() : null,
+    withdrawalMethod: u.withdrawalMethod || "",
+    recoverableUntil,
+    accountActionReason: u.accountActionReason || "",
+    accountActionAt: u.accountActionAt ? u.accountActionAt.toISOString() : null,
+    accountActionBy: u.accountActionBy || "",
+    accountActionType: u.accountActionType || ""
   };
 }
 
 export async function listAdminUsers(opts: { q?: string; limit?: number; offset?: number }) {
+  await ensureWithdrawalScheduleSchema();
+  await ensureAdminAccountActionSchema();
   const q = String(opts.q || "").trim();
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
   const offset = Math.max(opts.offset ?? 0, 0);
@@ -162,7 +199,8 @@ export async function listAdminUsers(opts: { q?: string; limit?: number; offset?
   const [users, total] = await Promise.all([
     prisma.user.findMany({
       where,
-      select: ADMIN_MEMBER_SELECT,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      select: ADMIN_MEMBER_SELECT as any,
       orderBy: { createdAt: "desc" },
       take: limit,
       skip: offset
@@ -189,7 +227,9 @@ export async function listAdminUsers(opts: { q?: string; limit?: number; offset?
           : tier === "b2b"
             ? "B2B"
             : "무료");
-      return serializeAdminMember(u, { membershipPathLabel: pathLabel });
+      return serializeAdminMember(u as Parameters<typeof serializeAdminMember>[0], {
+        membershipPathLabel: pathLabel
+      });
     }),
     total,
     limit,
@@ -198,14 +238,19 @@ export async function listAdminUsers(opts: { q?: string; limit?: number; offset?
 }
 
 export async function getAdminUser(userId: string) {
+  await ensureWithdrawalScheduleSchema();
+  await ensureAdminAccountActionSchema();
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: ADMIN_MEMBER_SELECT
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    select: ADMIN_MEMBER_SELECT as any
   });
   if (!user) return null;
   const tier = String(user.digitalCard?.membershipTierSnapshot || "free").toLowerCase();
   const pathLabel = await resolveMembershipPathLabel(userId, tier);
-  return serializeAdminMember(user, { membershipPathLabel: pathLabel });
+  return serializeAdminMember(user as Parameters<typeof serializeAdminMember>[0], {
+    membershipPathLabel: pathLabel
+  });
 }
 
 export async function patchAdminUser(
@@ -245,6 +290,178 @@ export async function patchAdminUser(
     }
   });
   return user;
+}
+
+function requireReason(raw: unknown): string {
+  const reason = String(raw || "").trim();
+  if (reason.length < 2) throw new Error("사유를 입력해 주세요. (2자 이상)");
+  if (reason.length > 500) throw new Error("사유는 500자 이내로 입력해 주세요.");
+  return reason;
+}
+
+async function writeAccountActionMeta(
+  userId: string,
+  opts: { type: string; reason: string; adminUserId: string }
+) {
+  await ensureAdminAccountActionSchema();
+  const reason = opts.reason.slice(0, 500);
+  const adminId = String(opts.adminUserId || "").slice(0, 64);
+  const type = String(opts.type || "").slice(0, 32);
+  await prisma.$executeRawUnsafe(
+    `UPDATE users
+     SET account_action_reason = $1,
+         account_action_at = NOW(),
+         account_action_by = $2,
+         account_action_type = $3
+     WHERE id = $4::uuid`,
+    reason,
+    adminId || null,
+    type,
+    userId
+  );
+}
+
+export async function adminSuspendUser(
+  userId: string,
+  opts: { reason: string; adminUserId: string }
+) {
+  const reason = requireReason(opts.reason);
+  const existing = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, status: true }
+  });
+  if (!existing) throw new Error("회원을 찾을 수 없습니다.");
+  if (existing.status === "DELETED") throw new Error("이미 탈퇴된 계정입니다.");
+  if (existing.role === "admin") throw new Error("관리자 계정은 정지할 수 없습니다.");
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { accountStatus: "suspended" }
+  });
+  await writeAccountActionMeta(userId, {
+    type: "suspend",
+    reason,
+    adminUserId: opts.adminUserId
+  });
+  return getAdminUser(userId);
+}
+
+export async function adminActivateUser(
+  userId: string,
+  opts: { reason?: string; adminUserId: string }
+) {
+  const existing = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, status: true, withdrawalScheduledAt: true }
+  });
+  if (!existing) throw new Error("회원을 찾을 수 없습니다.");
+  if (existing.status === "DELETED") throw new Error("탈퇴 완료 계정은 활성화할 수 없습니다.");
+  if (existing.withdrawalScheduledAt) {
+    throw new Error("탈퇴 예정 계정입니다. 「복구」로 탈퇴 예약을 먼저 취소해 주세요.");
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { accountStatus: "active", status: "ACTIVE" }
+  });
+  const reason = String(opts.reason || "").trim() || "관리자 활성화";
+  await writeAccountActionMeta(userId, {
+    type: "activate",
+    reason,
+    adminUserId: opts.adminUserId
+  });
+  return getAdminUser(userId);
+}
+
+export async function adminWithdrawUser(
+  userId: string,
+  opts: { reason: string; adminUserId: string; mode?: "grace" | "immediate" }
+) {
+  const reason = requireReason(opts.reason);
+  const mode = opts.mode === "immediate" ? "immediate" : "grace";
+  await ensureAdminAccountActionSchema();
+
+  if (mode === "immediate") {
+    await withdrawAccountByAdmin(userId);
+    await writeAccountActionMeta(userId, {
+      type: "withdraw_immediate",
+      reason,
+      adminUserId: opts.adminUserId
+    });
+    return {
+      ok: true,
+      immediate: true,
+      user: await getAdminUser(userId),
+      message: "즉시 탈퇴 처리되었습니다. 개인정보는 파기되어 복구할 수 없습니다."
+    };
+  }
+
+  const scheduled = await scheduleAdminWithdrawal(userId);
+  await writeAccountActionMeta(userId, {
+    type: "withdraw_grace",
+    reason,
+    adminUserId: opts.adminUserId
+  });
+  /* 유예 기간 동안은 로그인·이용을 막아 두기 위해 정지도 병행 */
+  await prisma.user.update({
+    where: { id: userId },
+    data: { accountStatus: "suspended" }
+  });
+  return {
+    ok: true,
+    immediate: false,
+    ...scheduled,
+    user: await getAdminUser(userId),
+    message: `탈퇴 예약되었습니다. ${scheduled.recoverableUntil?.slice(0, 16).replace("T", " ")}까지 복구 가능합니다.`
+  };
+}
+
+export async function adminRestoreUser(
+  userId: string,
+  opts: { reason?: string; adminUserId: string }
+) {
+  const existing = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      status: true,
+      accountStatus: true,
+      withdrawalScheduledAt: true
+    }
+  });
+  if (!existing) throw new Error("회원을 찾을 수 없습니다.");
+  if (existing.status === "DELETED") {
+    throw new Error("탈퇴가 완료된 계정은 복구할 수 없습니다.");
+  }
+
+  let cancelledWithdrawal = false;
+  if (existing.withdrawalScheduledAt) {
+    await cancelScheduledWithdrawal(userId);
+    cancelledWithdrawal = true;
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { accountStatus: "active", status: "ACTIVE" }
+  });
+
+  const reason =
+    String(opts.reason || "").trim() ||
+    (cancelledWithdrawal ? "탈퇴 예약 취소·복구" : "정지 해제·복구");
+  await writeAccountActionMeta(userId, {
+    type: cancelledWithdrawal ? "restore_withdrawal" : "restore_suspend",
+    reason,
+    adminUserId: opts.adminUserId
+  });
+
+  return {
+    ok: true,
+    cancelledWithdrawal,
+    user: await getAdminUser(userId),
+    message: cancelledWithdrawal
+      ? "탈퇴 예약을 취소하고 계정을 복구했습니다."
+      : "정지 상태를 해제하고 활성화했습니다."
+  };
 }
 
 export async function listAdminFeedPosts(limit = 50) {

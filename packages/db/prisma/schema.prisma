@@ -275,6 +275,12 @@ model User {
   withdrawalRequestedAt DateTime? @map("withdrawal_requested_at") @db.Timestamptz(6)
   withdrawalMethod      String?   @map("withdrawal_method") @db.VarChar(32)
 
+  /// 관리자 정지·탈퇴·복구 사유 (최근 1건)
+  accountActionReason String?   @map("account_action_reason") @db.VarChar(500)
+  accountActionAt     DateTime? @map("account_action_at") @db.Timestamptz(6)
+  accountActionBy     String?   @map("account_action_by") @db.VarChar(64)
+  accountActionType   String?   @map("account_action_type") @db.VarChar(32)
+
   /// 매니페스트 referrerCode — 가입 시 입력한 파트너 추천인 코드
   referrerCode String? @map("referrer_code") @db.VarChar(24)
 

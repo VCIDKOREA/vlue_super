@@ -503,6 +503,13 @@
   color: #fff;
 }
 
+.dcc-agent-modal__add.is-pay {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 13px;
+  background: #1d4ed8;
+}
+
 .dcc-agent-form__actions .is-ghost {
   background: #e2e8f0;
   color: #334155;

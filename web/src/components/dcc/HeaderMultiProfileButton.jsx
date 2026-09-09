@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
 import { fetchDccLines, fetchDccLineBundle } from "../../lib/dccLinesApi.js";
 import { fetchMultiDccEntitlement, completeMultiDccCheckout } from "../../lib/jobOccupationVerifyApi.js";
-import { createDccAgentProfile } from "../../lib/dccAgentProfilesApi.js";
 import { switchToMultiDccProfile } from "../../lib/multiDccSwitch.js";
 import { writeDccLinePreviewFromBundle, writeSelectedDccLineId } from "../../lib/dccLineState.js";
 import {
@@ -13,8 +11,8 @@ import {
 } from "../../lib/showcase/showcaseStyleStorage.js";
 import { showcaseStyleHasContent, writeLocalShowcaseStyleUpdatedAt } from "../../lib/showcase/showcaseStyleSync.js";
 import { SOHO_BROADCAST_MONTHLY_KRW } from "../../lib/membershipBm.js";
-import { readLetteringFixedIdentity } from "../../lib/letteringBizcardStorage.js";
 import DccAgentManageModal from "./DccAgentManageModal.jsx";
+import MultiDccPaySheet from "./MultiDccPaySheet.jsx";
 
 function applyLineToLocalPreview(bundle) {
   const line = bundle?.line;
@@ -53,6 +51,7 @@ export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
   const [monthlyKrw, setMonthlyKrw] = useState(SOHO_BROADCAST_MONTHLY_KRW);
   const [payOpen, setPayOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [openCreateForm, setOpenCreateForm] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -91,7 +90,12 @@ export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
     }
   };
 
-  const runPayAndCreate = async ({ devBypass = false } = {}) => {
+  const requestPay = () => {
+    setOpen(false);
+    setPayOpen(true);
+  };
+
+  const runPayUnlockSlot = async ({ devBypass = false } = {}) => {
     setBusy(true);
     try {
       let userId = "";
@@ -112,18 +116,13 @@ export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
         slotsToAdd: 1,
         devBillingBypass: Boolean(devBypass)
       });
-      const fixedName = String(readLetteringFixedIdentity().name || "").trim() || "새 프로필";
-      await createDccAgentProfile({
-        displayName: fixedName,
-        title: "",
-        department: "",
-        label: `프로필 ${profiles.length + 1}`
-      });
-      onToast?.(`멀티 프로필 슬롯이 추가되었습니다. (월 ${monthlyKrw.toLocaleString("ko-KR")}원)`);
+      onToast?.("슬롯이 열렸습니다. 새 프로필을 만들어 주세요.");
       setPayOpen(false);
+      setOpenCreateForm(true);
       await reload();
+      setOpen(true);
     } catch (e) {
-      onToast?.(e instanceof Error ? e.message : "결제·추가에 실패했습니다.");
+      onToast?.(e instanceof Error ? e.message : "결제에 실패했습니다.");
     } finally {
       setBusy(false);
     }
@@ -136,7 +135,7 @@ export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
         onClick={() => requireAuth?.(() => setOpen(true)) ?? setOpen(true)}
         className="shrink-0 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-bold text-gray-800 shadow-sm active:scale-95"
         aria-label="멀티프로필"
-        title="멀티프로필 — 전화·이름 공유 · 그 외 프로필별 설정"
+        title="멀티프로필"
       >
         멀티프로필 +
       </button>
@@ -147,10 +146,15 @@ export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
         maxCount={allowedSlots}
         allowedSlots={allowedSlots}
         monthlyKrw={monthlyKrw}
-        onClose={() => setOpen(false)}
+        openCreateForm={openCreateForm}
+        onCreateFormConsumed={() => setOpenCreateForm(false)}
+        onClose={() => {
+          setOpen(false);
+          setOpenCreateForm(false);
+        }}
         onChanged={reload}
         onToast={onToast}
-        onRequestPayCreate={() => setPayOpen(true)}
+        onRequestPayCreate={requestPay}
         onSelectLine={(id) => {
           if (!id) return;
           void fetchDccLineBundle(id)
@@ -159,37 +163,13 @@ export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
         }}
         onSwitchProfile={(profile) => void switchToProfile(profile)}
       />
-      {payOpen ? (
-        <div className="fixed inset-0 z-[230] flex items-end justify-center bg-black/45 px-4 pb-8 sm:items-center">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl">
-            <p className="text-[15px] font-black text-slate-900">
-              멀티 프로필 추가 · 월 {monthlyKrw.toLocaleString("ko-KR")}원
-            </p>
-            <p className="mt-2 text-[12px] leading-relaxed text-slate-500">
-              DCC·쇼케이스·BGM 등 유료 콘텐츠를 프로필마다 따로 쓰려면 슬롯 결제가 필요합니다. 전화번호와
-              이름만 공유됩니다.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={busy}
-                className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-60"
-                onClick={() => void runPayAndCreate({ devBypass: import.meta.env.DEV })}
-              >
-                {busy ? <Loader2 size={14} className="animate-spin" /> : null}
-                {import.meta.env.DEV ? "개발 결제 후 추가" : "결제 후 추가"}
-              </button>
-              <button
-                type="button"
-                className="rounded-xl px-3 py-2 text-[12px] font-bold text-slate-500"
-                onClick={() => setPayOpen(false)}
-              >
-                취소
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <MultiDccPaySheet
+        open={payOpen}
+        monthlyKrw={monthlyKrw}
+        busy={busy}
+        onClose={() => setPayOpen(false)}
+        onConfirm={(opts) => void runPayUnlockSlot(opts)}
+      />
     </>
   );
 }

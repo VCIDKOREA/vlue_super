@@ -421,7 +421,17 @@ export async function updateDccAgentProfile(
   }
   const updated = await prisma.userDccAgentProfile.update({
     where: { id },
-    data: input
+    data: (() => {
+      const data: Prisma.UserDccAgentProfileUpdateInput = { ...input };
+      if (body.photoUrl !== undefined) {
+        const snap = snapObj(existing.dccSnapshotJson);
+        data.dccSnapshotJson = {
+          ...snap,
+          photoUrl: input.photoUrl || ""
+        } as Prisma.InputJsonValue;
+      }
+      return data;
+    })()
   });
   const { syncAssignedLinesForAgent } = await import("./dccLineService.js");
   await syncAssignedLinesForAgent(userId, updated);
@@ -600,6 +610,12 @@ export async function putDccProfileBundle(
       input.dcc && typeof input.dcc === "object"
         ? (input.dcc as Prisma.InputJsonValue)
         : Prisma.JsonNull;
+    /* 컬럼 photoUrl 과 dcc 스냅샷 동기화 — 전환 시 stale 컬럼이 새 사진을 덮지 않게 */
+    if (input.dcc && typeof input.dcc === "object" && "photoUrl" in input.dcc) {
+      const photoRaw = String((input.dcc as { photoUrl?: unknown }).photoUrl ?? "").trim();
+      data.photoUrl =
+        photoRaw && (isHttpMediaUrl(photoRaw) || photoRaw.startsWith("/")) ? photoRaw : null;
+    }
   }
   if (input.showcase !== undefined) {
     if (input.showcase?.editor !== undefined) {
@@ -676,7 +692,17 @@ export async function mirrorLineContentToProfile(
         ? (patch.showcaseLive as Prisma.InputJsonValue)
         : Prisma.JsonNull;
   }
+  if (patch.dcc && typeof patch.dcc === "object" && "photoUrl" in patch.dcc) {
+    const photoRaw = String((patch.dcc as { photoUrl?: unknown }).photoUrl ?? "").trim();
+    data.photoUrl =
+      photoRaw && (isHttpMediaUrl(photoRaw) || photoRaw.startsWith("/")) ? photoRaw : null;
+  }
   if (Object.keys(data).length === 0) return;
+  await prisma.userDccAgentProfile.updateMany({
+    where: { id: profileId, userId },
+    data
+  });
+}
   await prisma.userDccAgentProfile.updateMany({
     where: { id: profileId, userId },
     data

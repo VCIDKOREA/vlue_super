@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { SOHO_BROADCAST_MONTHLY_KRW } from "../../lib/membershipBm.js";
 import {
   completeMultiDccCheckout,
   fetchMultiDccEntitlement
 } from "../../lib/jobOccupationVerifyApi.js";
-import { createDccAgentProfile, fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
+import { fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
 import { fetchDccLines, fetchDccLineBundle } from "../../lib/dccLinesApi.js";
 import {
   writeDccLinePreviewFromBundle,
@@ -18,8 +18,8 @@ import {
 } from "../../lib/showcase/showcaseStyleStorage.js";
 import { showcaseStyleHasContent, writeLocalShowcaseStyleUpdatedAt } from "../../lib/showcase/showcaseStyleSync.js";
 import { switchToMultiDccProfile } from "../../lib/multiDccSwitch.js";
-import { readLetteringFixedIdentity } from "../../lib/letteringBizcardStorage.js";
 import DccAgentManageModal from "./DccAgentManageModal.jsx";
+import MultiDccPaySheet from "./MultiDccPaySheet.jsx";
 
 function applyLineToLocalPreview(bundle) {
   const line = bundle?.line;
@@ -49,7 +49,6 @@ function applyLineToLocalPreview(bundle) {
 
 /**
  * 멀티 DCC 프로필 — 계정 1개 · 프로필 N개 (DCC~쇼케이스 전체)
- * 번호 지정 송출 · 미지정/모르는 상대는 대표 프로필
  */
 export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compact = false }) {
   const [profiles, setProfiles] = useState([]);
@@ -58,6 +57,7 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
   const [manageOpen, setManageOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [openCreateForm, setOpenCreateForm] = useState(false);
 
   const monthlyKrw = ent?.monthlyKrw || SOHO_BROADCAST_MONTHLY_KRW;
 
@@ -88,10 +88,16 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
       setPayOpen(true);
       return;
     }
+    setOpenCreateForm(true);
     setManageOpen(true);
   };
 
-  const runPayAndCreate = async ({ devBypass = false } = {}) => {
+  const requestPay = () => {
+    setManageOpen(false);
+    setPayOpen(true);
+  };
+
+  const runPayUnlockSlot = async ({ devBypass = false } = {}) => {
     setBusy(true);
     try {
       let userId = "";
@@ -112,19 +118,13 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
         slotsToAdd: 1,
         devBillingBypass: Boolean(devBypass)
       });
-      const fixedName = String(readLetteringFixedIdentity().name || "").trim() || "새 프로필";
-      await createDccAgentProfile({
-        displayName: fixedName,
-        title: "",
-        department: "",
-        label: `프로필 ${profiles.length + 1}`
-      });
-      onToast?.(`멀티 DCC 프로필 슬롯이 추가되었습니다. (월 ${monthlyKrw.toLocaleString("ko-KR")}원)`);
+      onToast?.("슬롯이 열렸습니다. 새 프로필을 만들어 주세요.");
       setPayOpen(false);
+      setOpenCreateForm(true);
       await reload();
       setManageOpen(true);
     } catch (e) {
-      onToast?.(e instanceof Error ? e.message : "결제·추가에 실패했습니다.");
+      onToast?.(e instanceof Error ? e.message : "결제에 실패했습니다.");
     } finally {
       setBusy(false);
     }
@@ -155,8 +155,7 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
           </p>
           {!compact ? (
             <p className={`mt-0.5 text-[10px] leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-              전화·이름만 공유. DCC·쇼케이스·BGM·상호·계좌는 프로필마다 새로. 추가 슬롯 장당 SOHO +
-              {monthlyKrw.toLocaleString("ko-KR")}원.
+              전화·이름 공유 · 그 외 프로필별 · 추가 슬롯 월 {monthlyKrw.toLocaleString("ko-KR")}원
             </p>
           ) : null}
         </div>
@@ -166,11 +165,11 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
           className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-800 shadow-sm sm:px-3 sm:text-[12px]"
         >
           <Plus size={14} />
-          멀티 DCC +
+          {needPay ? "결제 후 추가" : "프로필 추가"}
         </button>
       </div>
       <p className={`mt-2 text-[10px] font-semibold ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
-        사용 중 {profiles.length}/{allowed} · 무료 {ent?.freeSlots ?? 1} · 결제 슬롯 {ent?.paidSlots ?? 0}
+        {profiles.length}/{allowed}
         {rep ? ` · 대표 ${rep.displayName || "프로필"}` : ""}
       </p>
       <button
@@ -180,43 +179,16 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
         }`}
         onClick={() => setManageOpen(true)}
       >
-        프로필 · 번호 배정 관리
+        프로필 관리
       </button>
 
-      {payOpen ? (
-        <div
-          className={`mt-3 rounded-xl border p-3 ${
-            isDarkMode ? "border-white/10 bg-black/30" : "border-slate-200 bg-slate-50"
-          }`}
-        >
-          <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
-            멀티 DCC 프로필 추가 · 월 {monthlyKrw.toLocaleString("ko-KR")}원 (SOHO)
-          </p>
-          <p className={`mt-1 text-[10px] ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-            새 프로필마다 DCC·쇼케이스·BGM을 새로 설정합니다. 전화번호와 이름만 공유됩니다.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-60"
-              onClick={() => void runPayAndCreate({ devBypass: import.meta.env.DEV })}
-            >
-              {busy ? <Loader2 size={14} className="animate-spin" /> : null}
-              {import.meta.env.DEV ? "개발 결제 후 추가" : "결제 후 추가"}
-            </button>
-            <button
-              type="button"
-              className={`rounded-xl px-3 py-2 text-[12px] font-bold ${
-                isDarkMode ? "text-gray-400" : "text-slate-500"
-              }`}
-              onClick={() => setPayOpen(false)}
-            >
-              취소
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <MultiDccPaySheet
+        open={payOpen}
+        monthlyKrw={monthlyKrw}
+        busy={busy}
+        onClose={() => setPayOpen(false)}
+        onConfirm={(opts) => void runPayUnlockSlot(opts)}
+      />
 
       <DccAgentManageModal
         open={manageOpen}
@@ -225,10 +197,15 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
         maxCount={allowed}
         allowedSlots={allowed}
         monthlyKrw={monthlyKrw}
-        onClose={() => setManageOpen(false)}
+        openCreateForm={openCreateForm}
+        onCreateFormConsumed={() => setOpenCreateForm(false)}
+        onClose={() => {
+          setManageOpen(false);
+          setOpenCreateForm(false);
+        }}
         onChanged={reload}
         onToast={onToast}
-        onRequestPayCreate={() => setPayOpen(true)}
+        onRequestPayCreate={requestPay}
         onSelectLine={(id) => void onSelectLine(id)}
         onSwitchProfile={(profile) =>
           void switchToMultiDccProfile(profile, { lines })

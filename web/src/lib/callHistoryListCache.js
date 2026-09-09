@@ -1,8 +1,10 @@
 import {
   applyLocalKnownPeersToCallGroups,
+  applyKnownContactsToCallGroups,
   buildCallHistoryList,
   fetchDeviceCallLogEntries
 } from "./callLogList.js";
+import { syncDeviceContactsFromNative } from "./contacts/deviceContactsCache.js";
 
 const STORAGE_KEY = "vlue_call_history_list_v1";
 const TTL_MS = 20 * 60 * 1000;
@@ -44,14 +46,17 @@ export function writeCallHistoryListCache(items) {
 export function warmCallHistoryList() {
   if (warmInflight) return warmInflight;
   warmInflight = (async () => {
+    await syncDeviceContactsFromNative().catch(() => {});
     const raw = await fetchDeviceCallLogEntries(200);
-    const quick = applyLocalKnownPeersToCallGroups(
-      buildCallHistoryList({
-        deviceEntries: raw,
-        lineEvents: [],
-        selectedLine: "all",
-        lines: []
-      })
+    const quick = applyKnownContactsToCallGroups(
+      applyLocalKnownPeersToCallGroups(
+        buildCallHistoryList({
+          deviceEntries: raw,
+          lineEvents: [],
+          selectedLine: "all",
+          lines: []
+        })
+      )
     );
     if (quick.length) {
       writeCallHistoryListCache(quick);

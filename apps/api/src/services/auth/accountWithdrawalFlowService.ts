@@ -21,7 +21,7 @@ import {
   ensureWithdrawalScheduleSchema
 } from "./ensureWithdrawalScheduleSchema.js";
 
-const WITHDRAWAL_GRACE_MS = 24 * 60 * 60 * 1000;
+export const WITHDRAWAL_GRACE_MS = 24 * 60 * 60 * 1000;
 
 async function ensureWithdrawalDbReady() {
   const ok = await ensureWithdrawalScheduleSchema();
@@ -348,6 +348,38 @@ export async function cancelScheduledWithdrawal(userId: string) {
   });
 
   return { ok: true as const };
+}
+
+/** 관리자 — 24시간 유예 탈퇴 예약 (고객 요청 대응) */
+export async function scheduleAdminWithdrawal(userId: string) {
+  await ensureWithdrawalDbReady();
+  await assertWithdrawalAllowed(userId);
+  const now = new Date();
+  const scheduledAt = new Date(now.getTime() + WITHDRAWAL_GRACE_MS);
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      withdrawalRequestedAt: now,
+      withdrawalScheduledAt: scheduledAt,
+      withdrawalMethod: "admin"
+    }
+  });
+  return {
+    ok: true as const,
+    immediate: false as const,
+    scheduledAt: scheduledAt.toISOString(),
+    recoverableUntil: scheduledAt.toISOString(),
+    graceHours: 24
+  };
+}
+
+/** 관리자 — 즉시 탈퇴(PII 파기, 복구 불가) */
+export async function withdrawAccountByAdmin(userId: string) {
+  await ensureWithdrawalDbReady();
+  await assertWithdrawalAllowed(userId);
+  await dissolveFamilyLinksForGuardianWithdrawal(userId);
+  await withdrawUserAccount(userId);
+  return { ok: true as const, immediate: true as const };
 }
 
 export async function processDueScheduledWithdrawals(limit = 50) {
