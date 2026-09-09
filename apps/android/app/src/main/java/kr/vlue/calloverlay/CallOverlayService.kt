@@ -991,8 +991,8 @@ class CallOverlayService : Service() {
     }
 
     /**
-     * Native Answer / OFFHOOK / ACTIVE → Controller.onAnswer → FULLSCREEN.
-     * 이후 notifyWebCallState("connected")는 Web Content Ready 알림만 (상태 전이 아님).
+     * Native Answer / OFFHOOK / ACTIVE → call UI phase per [CALL_OVERLAY_CONTRACT.md].
+     * Decisions go through [CallUiPhasePolicy] — do not add parallel open paths.
      */
     private fun enterShowcaseFromAnswer(source: String) {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) {
@@ -1003,18 +1003,16 @@ class CallOverlayService : Service() {
             )
             return
         }
-        /*
-         * 발신 「거는 중」오탐 차단 — InCall DIALING/CONNECTING 이면 수화 UI 금지.
-         * (오디오 MODE_IN_CALL 로 notifyConnected 가 와도 여기로 오면 팝업/빈케이스)
-         */
-        if (currentOutgoing &&
-            !remoteConnected &&
-            VlueInCallController.isDialingOrConnecting() &&
-            !VlueInCallController.hasConnectedActiveCall()
+        if (!CallUiPhasePolicy.mayAdvancePastBigPush(
+                outgoing = currentOutgoing,
+                remoteConnected = remoteConnected,
+                dialingOrConnecting = VlueInCallController.isDialingOrConnecting(),
+                hasActiveConnectedCall = VlueInCallController.hasConnectedActiveCall()
+            )
         ) {
             VlueBigPushTrace.lifecycle(
                 "ANSWER_HOLD_DIALING",
-                "source=$source keep BigPush — still dialing/connecting"
+                "source=$source keep BigPush — CallUiPhasePolicy dialing gate"
             )
             restartOutgoingPeerProbeIfNeeded()
             return
@@ -1022,7 +1020,6 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.mark("ANSWER_DETECTED", source)
         CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_ANSWER", source)
         OutgoingPeerConnectProbe.stop()
-        /* presentCenterSafePopup 게이트용 — 수화 확정 후에만 true */
         remoteConnected = true
         VlueBigPushTrace.milestone(
             "ANSWER_DETECTED",
@@ -1030,118 +1027,104 @@ class CallOverlayService : Service() {
             seq = 8,
             detail = source
         )
-        if (isContactSafeCare(pendingCardJson)) {
-            presentCenterSafePopup(source = source, authMember = false)
-            return
-        }
-        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(
-                pendingCardJson,
-                verified = pendingVerified || parseIsVerified(pendingCardJson)
-            )
+
+        if (authPopupConfirmedToMini ||
+            userMinimized ||
+            companion.state == OverlayState.MINI_CASE
         ) {
-            presentCenterSafePopup(source = source, authMember = true)
+            VlueBigPushTrace.lifecycle(
+                "ANSWER_KEEP_MINI_PHASE",
+                "source=$source state=${companion.state.name}"
+            )
             return
         }
-        /*
-         * 카드 미도착·조회 중만 짧게 빅푸시 유지 후 재시도.
-         * 모르는 번호(미인증)라도 수화 후에는 쇼케이스를 연다 — UNVERIFIED/PENDING 고착 금지.
-         */
-        if (pendingCardJson.isNullOrBlank() || isLookupPendingCard(pendingCardJson)) {
-            if (source.startsWith("bigPush_bar_tap")) {
-                VlueBigPushTrace.lifecycle(
-                    "BIG_PUSH_TAP_KEEP",
-                    "lookup pending/blank — keep bar source=$source"
+
+        val verified = pendingVerified || parseIsVerified(pendingCardJson)
+        val safeCare = isContactSafeCare(pendingCardJson)
+        val authOnly = VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified)
+        val pendingLookup =
+            pendingCardJson.isNullOrBlank() || isLookupPendingCard(pendingCardJson)
+        val contactName = DeviceContactsReader.findDisplayName(this, currentPhone)
+        val canPromote =
+            !safeCare && !contactName.isNullOrBlank() &&
+                (pendingLookup || !verified)
+        val hasBroadcastContent =
+            VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(pendingCardJson)
+
+        val phase =
+            CallUiPhasePolicy.decideAfterAnswer(
+                CallUiPhasePolicy.AnswerInput(
+                    alreadyMiniOrAuthConfirmed = false,
+                    isContactSafeCare = safeCare,
+                    isAuthMemberOnly = authOnly,
+                    hasBroadcastShowcaseContent = hasBroadcastContent,
+                    canPromoteContactSafeCare = canPromote
                 )
-                /* 탭 대기 중에도 발신 상대응답 감지는 유지 */
+            )
+        VlueBigPushTrace.lifecycle(
+            "CALL_UI_PHASE",
+            "source=$source phase=${phase.name} verified=$verified pending=$pendingLookup"
+        )
+
+        when (phase) {
+            CallUiPhasePolicy.Phase.MINI_CASE -> return
+            CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP -> {
+                if (!safeCare && canPromote) {
+                    val name = contactName.orEmpty()
+                    val verdict = CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
+                    val json = ContactSafeCarePayload.toJson(currentPhone, name, verdict)
+                    pendingCardJson = json
+                    pendingVerified = false
+                    bindDcpRoute(currentPhone, verdict.routeQuery, json)
+                    VlueBigPushTrace.lifecycle(
+                        "ANSWER_PROMOTE_CONTACT_SAFE_CARE",
+                        "name=$name source=$source"
+                    )
+                }
+                presentCenterSafePopup(source = source, authMember = false)
+                return
+            }
+            CallUiPhasePolicy.Phase.CENTER_AUTH_POPUP -> {
+                presentCenterSafePopup(source = source, authMember = true)
+                return
+            }
+            CallUiPhasePolicy.Phase.KEEP_BIG_PUSH,
+            CallUiPhasePolicy.Phase.BIG_PUSH -> {
+                if (source.startsWith("bigPush_bar_tap")) {
+                    VlueBigPushTrace.lifecycle(
+                        "BIG_PUSH_TAP_KEEP",
+                        "phase=${phase.name} source=$source"
+                    )
+                    restartOutgoingPeerProbeIfNeeded()
+                    return
+                }
+                if (pendingLookup && !source.startsWith("answer_ui_resume_")) {
+                    showcaseHoldUntilElapsed =
+                        android.os.SystemClock.elapsedRealtime() + 8_000L
+                    VlueBigPushTrace.lifecycle(
+                        "ANSWER_KEEP_BIGPUSH_PENDING",
+                        "lookup pending — resume source=$source"
+                    )
+                    scheduleAnswerUiResume("pending_after_$source")
+                    return
+                }
+                VlueBigPushTrace.lifecycle(
+                    "ANSWER_KEEP_BIGPUSH",
+                    "phase=${phase.name} source=$source — no empty FULLSCREEN"
+                )
                 restartOutgoingPeerProbeIfNeeded()
                 return
             }
-            /*
-             * 조회 중 수화: 주소록이면 즉시 안심케어 팝업.
-             * 그 외는 짧게 재시도 후 쇼케이스 강제 오픈 (모르는 번호 포함).
-             */
-            showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 8_000L
-            val contactName = DeviceContactsReader.findDisplayName(this, currentPhone)
-            if (!contactName.isNullOrBlank()) {
-                val verdict = CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
-                val json = ContactSafeCarePayload.toJson(currentPhone, contactName, verdict)
-                pendingCardJson = json
-                pendingVerified = false
-                bindDcpRoute(currentPhone, verdict.routeQuery, json)
-                VlueBigPushTrace.lifecycle(
-                    "ANSWER_PROMOTE_CONTACT_SAFE_CARE",
-                    "pending→contact name=$contactName source=$source"
-                )
-                presentCenterSafePopup(source = source, authMember = false)
-                return
+            CallUiPhasePolicy.Phase.FULL_SHOWCASE -> {
+                /* fall through to fullscreen showcase layout */
             }
-            val resumeAttempt = answerResumeAttemptFromSource(source)
-            if (!source.startsWith("answer_ui_resume_")) {
-                VlueBigPushTrace.lifecycle(
-                    "ANSWER_KEEP_BIGPUSH_PENDING",
-                    "lookup still pending — brief hold then resume source=$source"
-                )
-                scheduleAnswerUiResume("pending_after_$source")
-                return
-            }
-            /*
-             * 조회 실패·미등록 — 빈 다크 FULLSCREEN 금지. BigPush 유지.
-             * (이전 FORCE_SHOWCASE_PENDING 이 「빈케이스」 원인)
-             */
-            VlueBigPushTrace.lifecycle(
-                "ANSWER_KEEP_BIGPUSH_PENDING_EMPTY",
-                "no card/contact — keep BigPush source=$source attempt=$resumeAttempt"
-            )
-            restartOutgoingPeerProbeIfNeeded()
-            return
-        } else if (!pendingVerified &&
-            !parseIsVerified(pendingCardJson) &&
-            !source.startsWith("bigPush_bar_tap")
-        ) {
-            if (isContactSafeCare(pendingCardJson)) {
-                presentCenterSafePopup(source = source, authMember = false)
-                return
-            }
-            val contactName = DeviceContactsReader.findDisplayName(this, currentPhone)
-            if (!contactName.isNullOrBlank()) {
-                val verdict = CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
-                val json = ContactSafeCarePayload.toJson(currentPhone, contactName, verdict)
-                pendingCardJson = json
-                pendingVerified = false
-                bindDcpRoute(currentPhone, verdict.routeQuery, json)
-                VlueBigPushTrace.lifecycle(
-                    "ANSWER_PROMOTE_CONTACT_SAFE_CARE_UNVERIFIED",
-                    "unverified→contact name=$contactName source=$source"
-                )
-                presentCenterSafePopup(source = source, authMember = false)
-                return
-            }
-            /*
-             * 모르는 번호: 빈 쇼케이스 대신 BigPush 유지(탭으로 열기 가능).
-             */
-            VlueBigPushTrace.lifecycle(
-                "ANSWER_KEEP_BIGPUSH_UNVERIFIED",
-                "unverified/unknown — keep BigPush source=$source"
-            )
-            return
         }
-        /*
-         * 인증 회원인데 송출/DCC 없으면 풀 쇼케이스 금지 — 정상 팝업.
-         * (카드 enrich 레이스로 isAuthMemberOnly 가 늦게 true 되는 경우 대비 재검사)
-         */
-        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(
-                pendingCardJson,
-                verified = pendingVerified || parseIsVerified(pendingCardJson)
-            )
-        ) {
-            presentCenterSafePopup(source = source, authMember = true)
-            return
-        }
+
         VlueBigPushTrace.milestone(
             "SHOWCASE_REQUESTED",
             "Showcase Requested",
             seq = 8,
-            detail = "event-driven ($source), independent of BigPush"
+            detail = "event-driven ($source), phase=FULL_SHOWCASE"
         )
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_BEGIN", source)
         bigPushPeeking = false
@@ -1323,8 +1306,12 @@ class CallOverlayService : Service() {
 
     /** Controller position FULLSCREEN을 단일 Window에 updateViewLayout으로 반영 */
     private fun enterShowcaseLayout(source: String) {
+        if (!mayCommitFullscreenShowcase()) {
+            refuseEmptyFullscreen("enterLayout_$source")
+            return
+        }
         if (companion.state != OverlayState.SHOWCASE) {
-            companion.onRestoreShowcase(OverlayContext.IN_CALL)
+            companion.onAnswer(OverlayContext.IN_CALL)
         } else if (companion.position != OverlayPosition.FULLSCREEN) {
             companion.onRestoreShowcase(OverlayContext.IN_CALL)
         }
@@ -1370,10 +1357,73 @@ class CallOverlayService : Service() {
     }
 
     /**
+     * FULLSCREEN 허용 여부 — CallUiPhasePolicy / 계약 §3.
+     * false 면 빈 다크 창·터치 가로채기 금지.
+     */
+    private fun mayCommitFullscreenShowcase(): Boolean {
+        if (dismissing || authPopupOnlyMode || authPopupConfirmedToMini) return false
+        if (userMinimized && companion.state == OverlayState.MINI_CASE) return false
+        if (isContactSafeCare(pendingCardJson)) return false
+        val verified = pendingVerified || parseIsVerified(pendingCardJson)
+        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified)) return false
+        return VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(pendingCardJson)
+    }
+
+    /**
+     * 빈 FULLSCREEN 거부 — 팝업 또는 컴팩트 BigPush 로 되돌리고 터치 차단 해제.
+     */
+    private fun refuseEmptyFullscreen(source: String) {
+        VlueBigPushTrace.lifecycle(
+            "REFUSE_EMPTY_FULLSCREEN",
+            "source=$source state=${companion.state.name} — contract KEEP_BIG_PUSH/popup"
+        )
+        cancelFullscreenExpandAnimator()
+        val verified = pendingVerified || parseIsVerified(pendingCardJson)
+        if (isContactSafeCare(pendingCardJson) ||
+            VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified)
+        ) {
+            presentCenterSafePopup(
+                source = "refuse_empty_$source",
+                authMember = !isContactSafeCare(pendingCardJson)
+            )
+            return
+        }
+        val contactName = DeviceContactsReader.findDisplayName(this, currentPhone)
+        if (!contactName.isNullOrBlank() &&
+            (pendingCardJson.isNullOrBlank() ||
+                isLookupPendingCard(pendingCardJson) ||
+                !verified)
+        ) {
+            val verdict = CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
+            val json = ContactSafeCarePayload.toJson(currentPhone, contactName, verdict)
+            pendingCardJson = json
+            pendingVerified = false
+            bindDcpRoute(currentPhone, verdict.routeQuery, json)
+            presentCenterSafePopup(source = "refuse_empty_promote_$source", authMember = false)
+            return
+        }
+        companion.collapseToCompactBigPush(OverlayContext.IN_CALL)
+        authPopupOnlyMode = false
+        bigPushPeeking = false
+        rootContainer?.setBackgroundColor(Color.TRANSPARENT)
+        webView?.setBackgroundColor(Color.TRANSPARENT)
+        nativeBanner?.visibility = View.GONE
+        webView?.visibility = View.VISIBLE
+        applyCompactRingingWindow()
+        notifyWebCallState("big_push_bar")
+        publishCompanion(OverlayTriggerEvent.INTERNAL)
+    }
+
+    /**
      * FULLSCREEN commit — 기존 Window 유지, updateViewLayout만.
      * BIG_PUSH/Mini → 풀 전환은 420ms 애니 (웹 expand 슬롯 과 동기).
+     * 실콘텐츠 없으면 즉시 거부 (빈케이스·휴대폰 제어불가 방지).
      */
     private fun commitFullscreenLayout(source: String, animate: Boolean? = null) {
+        if (!mayCommitFullscreenShowcase()) {
+            refuseEmptyFullscreen(source)
+            return
+        }
         val apply = Runnable {
             val wm = windowManager
             val view = rootContainer
@@ -1384,6 +1434,11 @@ class CallOverlayService : Service() {
                     OverlayPosition.FULLSCREEN.name,
                     null
                 )
+                return@Runnable
+            }
+            /* 레이스: 애니 중 카드가 안심/인증-only 로 바뀌면 중단 */
+            if (!mayCommitFullscreenShowcase()) {
+                refuseEmptyFullscreen("$source:late_gate")
                 return@Runnable
             }
             val doAnimate = when {
@@ -1467,6 +1522,10 @@ class CallOverlayService : Service() {
     }
 
     private fun commitFullscreenLayoutImmediate(source: String) {
+        if (!mayCommitFullscreenShowcase()) {
+            refuseEmptyFullscreen("immediate_$source")
+            return
+        }
         val wm = windowManager
         val view = rootContainer
         val params = layoutParams
@@ -1581,11 +1640,12 @@ class CallOverlayService : Service() {
             )
             return
         }
-        /* 발신 다이얼 중에는 팝업 금지 — remoteConnected 를 여기서 올리면 「거는 중」오탐 */
+        /* 발신 다이얼 중에는 팝업 금지 — CallUiPhasePolicy §2 */
         if (currentOutgoing && !remoteConnected) {
             VlueBigPushTrace.lifecycle(
                 "CENTER_SAFE_POPUP_HOLD_DIALING",
-                "source=$source outgoing dialing — keep BigPush"
+                "source=$source outgoing dialing — keep BigPush " +
+                    "(mayShowCenterPopupWhileUnanswered=${CallUiPhasePolicy.mayShowCenterPopupWhileUnanswered()})"
             )
             restartOutgoingPeerProbeIfNeeded()
             return
@@ -2837,6 +2897,11 @@ class CallOverlayService : Service() {
                 "RESTORE_FROM_MINI_SKIP_POPUP_ONLY",
                 "keep MiniCase source=$source state=${companion.state.name}"
             )
+            return
+        }
+        /* 빈 FULLSCREEN 복원 금지 — 계약 §3 */
+        if (!mayCommitFullscreenShowcase()) {
+            refuseEmptyFullscreen("restore_$source")
             return
         }
         /*

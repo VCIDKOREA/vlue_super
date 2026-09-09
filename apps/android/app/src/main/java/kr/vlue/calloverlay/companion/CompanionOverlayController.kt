@@ -289,6 +289,25 @@ class CompanionOverlayController {
     }
 
     /**
+     * 빈/비허용 FULLSCREEN → 컴팩트 BigPush (터치 차단·빈 케이스 해제).
+     * BOTTOM 강제 접기와 달리 통화 중 IN_CALL 컨텍스트를 유지한다.
+     */
+    fun collapseToCompactBigPush(detectedContext: OverlayContext = OverlayContext.IN_CALL) {
+        if (state != OverlayState.SHOWCASE &&
+            state != OverlayState.MINI_CASE &&
+            state != OverlayState.BIG_PUSH
+        ) {
+            return
+        }
+        context = detectedContext
+        state = OverlayState.BIG_PUSH
+        miniCaseVisibility = MiniCaseVisibility.VISIBLE
+        lastTransition = "collapseToCompactBigPush → BIG_PUSH from prior"
+        rejectedTransition = null
+        refreshPosition()
+    }
+
+    /**
      * 다른 앱·홈·삼성 미니푸시 — 풀 쇼케이스 대신 하단 쇼케이스 바(BigPush chrome).
      * MiniCase 타원이 아님.
      */

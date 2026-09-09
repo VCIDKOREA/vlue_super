@@ -1517,6 +1517,15 @@ function LetteringOverlayHostInner() {
       peerBroadcastOn &&
       peerMayUsePaidCallFeatures(styledCard?.membershipTier || membershipTier || "free")
   );
+  const isSafeCareProfile =
+    String(styledCard?.profileKind || "").trim() === "contact_safe_care";
+  /* 수화 후에도 펼칠 콘텐츠 없으면 다크 풀스크린 호스트 금지 (빈케이스·터치 차단) */
+  const barOnlyConnected =
+    onCall &&
+    !expanded &&
+    (isSafeCareProfile ||
+      peerAuthPopupOnly ||
+      !peerHasDccOrShowcaseContent(styledCard, peerLiveStyle));
 
   return (
     <div
@@ -1524,7 +1533,7 @@ function LetteringOverlayHostInner() {
         onCall ? "lettering-overlay-host--connected" : "lettering-overlay-host--ringing"
       }${miniCollapsed ? " lettering-overlay-host--mini" : ""}${
         authPopupOnlyUi ? " lettering-overlay-host--auth-popup-only" : ""
-      }`}
+      }${barOnlyConnected ? " lettering-overlay-host--bar-only" : ""}`}
       data-call-phase={callPhase}
       data-expanded={expanded ? "true" : "false"}
       data-mini={miniCollapsed ? "true" : "false"}

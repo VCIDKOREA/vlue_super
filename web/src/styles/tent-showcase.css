@@ -929,6 +929,33 @@
   background: #070b14;
 }
 
+/*
+ * connected 이지만 펼칠 DCC/쇼케이스 없음 — 다크 풀스크린·터치 가로채기 금지.
+ * 링잉 BigPush 와 동일하게 투명 호스트 + 상단 바만.
+ */
+.lettering-overlay-host--tent.lettering-overlay-host--connected.lettering-overlay-host--bar-only {
+  align-items: flex-start;
+  background: transparent !important;
+}
+.lettering-overlay-host--tent.lettering-overlay-host--connected.lettering-overlay-host--bar-only
+  > .lettering-overlay-host__tent-shell {
+  height: auto !important;
+  max-height: none;
+  background: transparent !important;
+}
+.lettering-overlay-host--tent.lettering-overlay-host--connected.lettering-overlay-host--bar-only
+  .lettering-ongoing--fullscreen-tent {
+  background: transparent !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+.lettering-overlay-host--tent.lettering-overlay-host--connected.lettering-overlay-host--bar-only
+  .lettering-ongoing-expand-slot,
+.lettering-overlay-host--tent.lettering-overlay-host--connected.lettering-overlay-host--bar-only
+  .lettering-ongoing-body > :not(.lettering-ongoing-summary) {
+  display: none !important;
+}
+
 .lettering-overlay-host--tent.lettering-overlay-host--connected > .lettering-overlay-host__tent-shell {
   height: 100%;
   max-height: none;

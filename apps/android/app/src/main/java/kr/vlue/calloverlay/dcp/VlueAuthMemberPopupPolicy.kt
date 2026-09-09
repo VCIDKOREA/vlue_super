@@ -67,6 +67,21 @@ object VlueAuthMemberPopupPolicy {
             root.optBoolean("matched", false)
     }
 
+    /**
+     * 송출 ON + 공개 DCC/쇼케이스 실콘텐츠 여부.
+     * true 일 때만 FULLSCREEN Showcase 허용 (빈 다크 케이스·터치 차단 방지).
+     */
+    fun hasBroadcastShowcaseContent(cardJson: String?): Boolean {
+        if (cardJson.isNullOrBlank()) return false
+        val root = parse(cardJson) ?: return false
+        val card = root.optJSONObject("card") ?: root
+        val profileKind =
+            firstNonBlank(root.optString("profileKind"), card.optString("profileKind")).orEmpty()
+        if (profileKind == ContactSafeCarePayload.PROFILE_KIND) return false
+        if (profileKind == "expired_line") return false
+        return hasPublicDccOrShowcase(root, card)
+    }
+
     private fun hasPublicDccOrShowcase(root: JSONObject, card: JSONObject): Boolean {
         val style =
             when {

@@ -105,4 +105,25 @@ class VlueAuthMemberPopupPolicyTest {
             """{"matched":true,"is_verified":true,"displayName":"전중희","showcaseStyle":{"includeDigitalCard":true},"photoUrl":"https://x/tree.png","email":"test@vlue.kr"}"""
         assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
     }
+
+    @Test
+    fun broadcastOff_hasNoBroadcastContent() {
+        val json =
+            """{"matched":true,"is_verified":true,"displayName":"이상춘","showcaseStyle":{"includeDigitalCard":false}}"""
+        assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+    }
+
+    @Test
+    fun broadcastOnWithOrg_hasBroadcastContent() {
+        val json =
+            """{"matched":true,"is_verified":true,"displayName":"이상춘","showcaseStyle":{"includeDigitalCard":true},"card":{"organization":"테스트"}}"""
+        assertTrue(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+    }
+
+    @Test
+    fun contactSafeCare_hasNoBroadcastContent() {
+        val json =
+            """{"profileKind":"contact_safe_care","displayName":"김진현","matched":false}"""
+        assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+    }
 }
