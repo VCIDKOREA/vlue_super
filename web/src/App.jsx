@@ -178,6 +178,11 @@ import {
   syncNativeAuthSession,
   getRefreshToken
 } from "./lib/vlueAuthHeaders.js";
+import {
+  VLUE_FORCE_LOGOUT_EVENT,
+  forceLogoutInactiveAccount,
+  isInactiveAccountPayload
+} from "./lib/vlueSessionGuard.js";
 import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./lib/kakaoSocialLogin.js";
 import { consumeSocialOAuthReturn } from "./lib/socialOAuthReturn.js";
 import { consumeInstagramLinkReturn } from "./lib/instagramLinkApi.js";
@@ -773,8 +778,18 @@ function App() {
         const res = await vlueAuthFetch(apiUrl("/api/cards/me-context"), {
           headers: vlueAuthHeaders()
         });
-        const data = await res.json();
-        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (res.status === 401 && isInactiveAccountPayload(data)) {
+            forceLogoutInactiveAccount({
+              reason: String(data?.code || "ACCOUNT_INACTIVE"),
+              message:
+                String(data?.error || "").trim() ||
+                "계정이 없거나 탈퇴된 상태입니다. 다시 본인인증 후 가입해 주세요."
+            });
+          }
+          return;
+        }
         const granted = Boolean((data.memberships || []).length || (data.owned || []).length);
         setHasOfficeGrant(granted);
         if (!granted && appMode === "office") {
@@ -803,6 +818,28 @@ function App() {
     tick();
     return () => clearInterval(id);
   }, [isLoggedIn, appMode, activeOfficeCardId]);
+
+  /* DB에 없는·탈퇴 계정 고아 세션 → 강제 로그아웃 후 재인증/가입 */
+  useEffect(() => {
+    const onForceLogout = (ev) => {
+      const message =
+        String(ev?.detail?.message || "").trim() ||
+        "계정이 없거나 탈퇴된 상태입니다. 다시 본인인증 후 가입해 주세요.";
+      setIsLoggedIn(false);
+      setOnboardingComplete(false);
+      setDigitalCardActive(false);
+      setProfileOpen(false);
+      setPage("main");
+      setActiveTab(null);
+      setSelectedRoomId(null);
+      setIsSearchOpen(false);
+      navHistoryRef.current = [];
+      setBottomToast(message);
+      setTimeout(() => setBottomToast(""), 4200);
+    };
+    window.addEventListener(VLUE_FORCE_LOGOUT_EVENT, onForceLogout);
+    return () => window.removeEventListener(VLUE_FORCE_LOGOUT_EVENT, onForceLogout);
+  }, []);
 
   const refreshMailTalkRooms = useCallback(async () => {
     if (!isLoggedIn) {

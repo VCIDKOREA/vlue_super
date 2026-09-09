@@ -748,6 +748,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
   const user = await prisma.user.findFirst({
     where: {
       phoneE164: e164,
+      status: { not: "DELETED" },
+      NOT: { accountStatus: "suspended" },
       OR: [{ identityVerified: true }, { digitalCard: { isNot: null } }]
     },
     select: {
@@ -1097,6 +1099,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
   const user = await prisma.user.findFirst({
     where: {
       phoneE164: e164,
+      status: { not: "DELETED" },
+      NOT: { accountStatus: "suspended" },
       OR: [{ identityVerified: true }, { digitalCard: { isNot: null } }]
     },
     select: {

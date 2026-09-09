@@ -1,5 +1,6 @@
 import { apiUrl } from "./apiBase.js";
 import { clientKindHeaders, getDeviceToken } from "./deviceAuth.js";
+import { maybeForceLogoutFrom401, forceLogoutInactiveAccount } from "./vlueSessionGuard.js";
 
 export const VLUE_ACCESS_TOKEN_KEY = "vlue_access_token";
 export const VLUE_REFRESH_TOKEN_KEY = "vlue_refresh_token";
@@ -106,6 +107,7 @@ export function vlueAuthHeaders(extra) {
 
 /**
  * 401 시 refresh 1회 후 재시도. input 이 `/api/...` 이면 apiUrl 로 절대화.
+ * 탈퇴·삭제·정지 계정(ACCOUNT_INACTIVE)이면 로컬 세션 강제 해제 → 재가입 유도.
  */
 export async function vlueAuthFetch(input, init) {
   const url =
@@ -116,6 +118,9 @@ export async function vlueAuthFetch(input, init) {
   });
   let res = await fetch(url, merge());
   if (res.status !== 401) return res;
+  await maybeForceLogoutFrom401(res);
+  /* 이미 비활성으로 강제 로그아웃됐으면 refresh 불필요 */
+  if (!getRefreshToken() && !getAccessToken()) return res;
   const rt = getRefreshToken();
   if (!rt) return res;
   const r2 = await fetch(apiUrl("/api/auth/refresh"), {
@@ -127,6 +132,16 @@ export async function vlueAuthFetch(input, init) {
   if (r2.ok && dj.accessToken) {
     setVlueSessionTokens({ accessToken: dj.accessToken, refreshToken: dj.refreshToken || rt });
     res = await fetch(url, merge());
+    if (res.status === 401) await maybeForceLogoutFrom401(res);
+  } else if (r2.status === 401) {
+    await maybeForceLogoutFrom401(r2);
+    /* refresh 토큰 무효·계정 삭제 — 고아 로그인 세션 제거 */
+    if (getAccessToken() || getRefreshToken()) {
+      forceLogoutInactiveAccount({
+        reason: "REFRESH_FAILED",
+        message: "로그인이 만료되었거나 계정이 없습니다. 다시 본인인증 후 이용해 주세요."
+      });
+    }
   }
   return res;
 }

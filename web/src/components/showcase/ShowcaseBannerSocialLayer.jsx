@@ -47,7 +47,13 @@ function likeErrorMessage(res) {
   if (res?.status === 401 || res?.needsAuth) return VLUE_MEMBERSHIP_REQUIRED_MSG;
   if (isNetworkLikeError(res?.error)) return "서버에 연결할 수 없어 임시로 반영했습니다.";
   const raw = String(res?.error || "").trim();
-  if (raw && !/^failed to fetch$/i.test(raw)) return raw;
+  const code = raw.toLowerCase();
+  if (code === "user_not_found" || code === "user_required") {
+    /* 탈퇴·미가입 상대 — 영문 코드 노출 금지 */
+    return "회원 정보를 찾을 수 없습니다.";
+  }
+  if (raw && !/^failed to fetch$/i.test(raw) && !/^[a-z0-9_]+$/i.test(raw)) return raw;
+  if (raw && /^[a-z0-9_]+$/i.test(raw)) return "요청을 처리하지 못했습니다.";
   return "좋아요에 실패했습니다.";
 }
 
