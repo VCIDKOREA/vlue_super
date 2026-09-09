@@ -13,20 +13,16 @@ import {
   PEER_REMOTE_SUMMARY,
   readOutgoingCallPathSignal
 } from "./callPathPeerSignal.js";
-import { slimShowcaseStyleForPublic } from "../lib/slimShowcaseStyle.js";
+import { loadOverlayShowcaseStyleLite } from "../lib/overlayLookupLite.js";
 
 const EXPIRED_SUBTITLE = "??????????????????";
 const EXPIRED_DETAIL = "?????????????????? ?? ??? ????????";
 
-/** ???????? ???????? ??live ???, ?????editor. includeDigitalCard ??? */
-function overlayShowcaseStyleFromUser(user: {
-  showcaseLiveStyleJson?: unknown;
-  showcaseStyleJson?: unknown;
-} | null | undefined): unknown | null {
-  if (!user) return null;
-  const raw = user.showcaseLiveStyleJson ?? user.showcaseStyleJson;
-  if (raw == null) return null;
-  return slimShowcaseStyleForPublic(raw);
+/** 통화 오버레이 — 전체 showcase JSONB SELECT 금지 (풀러 egress) */
+async function overlayShowcaseStyleForUserId(userId: string | null | undefined): Promise<unknown | null> {
+  const id = String(userId || "").trim();
+  if (!id) return null;
+  return loadOverlayShowcaseStyleLite(id);
 }
 
 function expiredLineLookupBody(opts: {
@@ -574,8 +570,6 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           phoneE164: true,
           identityVerified: true,
           isShowcasePrivate: true,
-          showcaseLiveStyleJson: true,
-          showcaseStyleJson: true,
           businessProfile: { select: { companyName: true, jobTitle: true } },
           digitalCard: {
             select: {
@@ -692,7 +686,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       userId: card.user.id
     });
     const authSub = card.user.subscriptions?.[0];
-    const showcaseStyle = overlayShowcaseStyleFromUser(card.user);
+    const showcaseStyle = await overlayShowcaseStyleForUserId(card.user.id);
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -760,8 +754,6 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       identityVerified: true,
       isShowcasePrivate: true,
       phoneE164: true,
-      showcaseLiveStyleJson: true,
-      showcaseStyleJson: true,
       businessProfile: { select: { companyName: true, jobTitle: true } },
       digitalCard: {
         select: {
@@ -799,7 +791,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       userId: user.id
     });
     const sub = user.subscriptions?.[0];
-    const showcaseStyle = overlayShowcaseStyleFromUser(user);
+    const showcaseStyle = await overlayShowcaseStyleForUserId(user.id);
     return {
       status: 200 as const,
       body: attachPeerPath(

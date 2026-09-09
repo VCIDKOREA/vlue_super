@@ -2,6 +2,7 @@ import { prisma } from "../../db/client.js";
 import { normalizeToE164KR } from "../../lib/phoneE164.js";
 import { formatPhoneDisplayKR } from "../../lib/phoneDisplay.js";
 import { isHttpMediaUrl } from "../../lib/mediaUrlGuard.js";
+import { loadExportPhotoUrlsByUserIds } from "../../lib/overlayLookupLite.js";
 
 const DEDUP_MS = 90_000;
 const HISTORY_LIMIT = 300;
@@ -20,21 +21,11 @@ function snapName(json: unknown): string {
   return firstStr(o.name, o.displayName);
 }
 
-/** follow 목록과 동일 — export_snapshot / photoUrl 중 https만 */
-function memberAvatarUrl(digitalCard: {
-  photoUrl?: string | null;
-  exportSnapshotJson?: unknown;
-} | null | undefined): string {
+/** digital_cards.photo_url 컬럼만 — export_snapshot 전체 SELECT 금지 */
+function memberAvatarUrl(digitalCard: { photoUrl?: string | null } | null | undefined): string {
   if (!digitalCard) return "";
-  const snap = digitalCard.exportSnapshotJson;
-  const fromSnap =
-    snap && typeof snap === "object"
-      ? String((snap as Record<string, unknown>).photoUrl || "").trim()
-      : "";
-  for (const c of [fromSnap, String(digitalCard.photoUrl || "").trim()]) {
-    if (isHttpMediaUrl(c)) return c.trim();
-  }
-  return "";
+  const c = String(digitalCard.photoUrl || "").trim();
+  return isHttpMediaUrl(c) ? c : "";
 }
 
 export async function recordOverlayLineCallEvent(opts: {
@@ -81,8 +72,7 @@ export async function recordOverlayLineCallEvent(opts: {
       digitalCard: {
         select: {
           displayName: true,
-          membershipTierSnapshot: true,
-          exportSnapshotJson: true
+          membershipTierSnapshot: true
         }
       }
     }
@@ -90,11 +80,7 @@ export async function recordOverlayLineCallEvent(opts: {
   const peerPhone = String(viewer?.phoneE164 || "").trim();
   if (!peerPhone) return { ok: true, recorded: false, skipped: "no_peer_phone" };
 
-  const exportSnap =
-    viewer?.digitalCard?.exportSnapshotJson && typeof viewer.digitalCard.exportSnapshotJson === "object"
-      ? (viewer.digitalCard.exportSnapshotJson as Record<string, unknown>)
-      : null;
-  const peerName = firstStr(exportSnap?.name, viewer?.digitalCard?.displayName, viewer?.legalName);
+  const peerName = firstStr(viewer?.digitalCard?.displayName, viewer?.legalName);
   const tier = String(viewer?.digitalCard?.membershipTierSnapshot || "").trim() || "free";
 
   await prisma.lineCallEvent.create({
@@ -182,8 +168,7 @@ export async function lookupMemberNamesByNumbers(rawNumbers: string[]) {
               select: {
                 displayName: true,
                 membershipTierSnapshot: true,
-                photoUrl: true,
-                exportSnapshotJson: true
+                photoUrl: true
               }
             }
           }
@@ -193,6 +178,7 @@ export async function lookupMemberNamesByNumbers(rawNumbers: string[]) {
     prisma.user.findMany({
       where: {
         phoneE164: { in: e164s },
+        status: { not: "DELETED" },
         OR: [{ identityVerified: true }, { digitalCard: { isNot: null } }]
       },
       select: {
@@ -203,13 +189,18 @@ export async function lookupMemberNamesByNumbers(rawNumbers: string[]) {
           select: {
             displayName: true,
             membershipTierSnapshot: true,
-            photoUrl: true,
-            exportSnapshotJson: true
+            photoUrl: true
           }
         }
       }
     })
   ]);
+
+  const userIds = [
+    ...users.map((u) => u.id),
+    ...cards.map((c) => c.userId).filter(Boolean)
+  ] as string[];
+  const snapPhotos = await loadExportPhotoUrlsByUserIds(userIds);
 
   const byPhone = new Map<string, Record<string, unknown>>();
   for (const u of users) {
@@ -222,13 +213,14 @@ export async function lookupMemberNamesByNumbers(rawNumbers: string[]) {
       userId: u.id,
       verified: true,
       membershipTier: String(u.digitalCard?.membershipTierSnapshot || "free"),
-      avatarUrl: memberAvatarUrl(u.digitalCard)
+      avatarUrl: memberAvatarUrl(u.digitalCard) || snapPhotos.get(u.id) || ""
     });
   }
   for (const c of cards) {
     const phone = String(c.phoneE164 || "").trim();
     if (!phone) continue;
     const prev = byPhone.get(phone) || {};
+    const uid = String(c.userId || prev.userId || "");
     byPhone.set(phone, {
       phoneE164: phone,
       phoneDisplay: formatPhoneDisplayKR(phone),
@@ -238,7 +230,10 @@ export async function lookupMemberNamesByNumbers(rawNumbers: string[]) {
       membershipTier: String(
         c.user?.digitalCard?.membershipTierSnapshot || prev.membershipTier || "free"
       ),
-      avatarUrl: memberAvatarUrl(c.user?.digitalCard) || String(prev.avatarUrl || "").trim()
+      avatarUrl:
+        memberAvatarUrl(c.user?.digitalCard) ||
+        (uid ? snapPhotos.get(uid) : "") ||
+        String(prev.avatarUrl || "").trim()
     });
   }
 

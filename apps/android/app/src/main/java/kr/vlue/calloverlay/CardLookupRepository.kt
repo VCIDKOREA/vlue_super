@@ -98,8 +98,8 @@ object CardLookupRepository {
              */
             peekCached(context, rawNumber)?.let { cached ->
                 bg.execute {
+                    /* line-call-event 만 — 캐시 hit 시 전체 cardLookup 재조회는 풀러 egress 낭비 */
                     reportLineCallEvent(context, rawNumber)
-                    refreshInBackground(context, rawNumber, dcpRoute)
                 }
                 return cached
             }
@@ -116,23 +116,6 @@ object CardLookupRepository {
                 return filled
             }
             return result
-    }
-
-    private fun refreshInBackground(context: Context, rawNumber: String, dcpRoute: String?) {
-        try {
-            val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: return
-            val base = BuildConfig.API_BASE_URL.trimEnd('/')
-            val agency = NationalAgencyWhitelist.match(rawNumber)
-            val numberParam = agency?.shortNumber ?: e164
-            val result = lookupOnce(context, base, numberParam, dcpRoute, fast = false)
-            if (result != null && result.matched) {
-                val filled =
-                    result.copy(rawJson = OverlayCardOrgFill.fillIfMissing(context, result.rawJson))
-                remember(context, rawNumber, filled)
-            }
-        } catch (_: Exception) {
-            /* ignore */
-        }
     }
 
     private fun cacheKeys(rawNumber: String): List<String> {
