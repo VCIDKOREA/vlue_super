@@ -111,9 +111,53 @@ function firstStr(...values: unknown[]): string {
   return "";
 }
 
+/** ?? ?? + (?? ?? ????) master DigitalCard ?? ?? */
+function pickDccAccountFields(
+  lineSnap: Record<string, unknown> | null | undefined,
+  masterSnap: {
+    accountType?: string;
+    bankName?: string;
+    accountNumber?: string;
+    accountHolder?: string;
+    isGroupVerified?: boolean;
+    accountGroupDocName?: string;
+  } | null | undefined,
+  certified: boolean
+) {
+  const fromMaster = certified ? masterSnap : null;
+  const accountNumber = String(
+    firstStr(
+      typeof lineSnap?.accountNumber === "string" ? lineSnap.accountNumber : "",
+      fromMaster?.accountNumber
+    ) || ""
+  ).replace(/\D/g, "");
+  return {
+    accountType: firstStr(
+      typeof lineSnap?.accountType === "string" ? lineSnap.accountType : "",
+      fromMaster?.accountType
+    ),
+    bankName: firstStr(
+      typeof lineSnap?.bankName === "string" ? lineSnap.bankName : "",
+      fromMaster?.bankName
+    ),
+    accountNumber,
+    accountHolder: firstStr(
+      typeof lineSnap?.accountHolder === "string" ? lineSnap.accountHolder : "",
+      fromMaster?.accountHolder
+    ),
+    isGroupVerified: Boolean(
+      lineSnap?.isGroupVerified ?? fromMaster?.isGroupVerified ?? false
+    ),
+    accountGroupDocName: firstStr(
+      typeof lineSnap?.accountGroupDocName === "string" ? lineSnap.accountGroupDocName : "",
+      fromMaster?.accountGroupDocName
+    )
+  };
+}
+
 /**
  * ?????? ??? ?? ??export_snapshot_json ??? SELECT ??? ?????JSON path.
- * business_cards.company_name ???? ??? CEO·????(VCID KOREA ?? ??.
+ * business_cards.company_name ???? ??? CEO?????(VCID KOREA ?? ??.
  */
 async function loadOverlayOrgByUserId(userId: string): Promise<string> {
   const rows = await prisma.$queryRaw<Array<{ org: string | null }>>`
@@ -129,7 +173,7 @@ async function loadOverlayOrgByUserId(userId: string): Promise<string> {
   return firstStr(rows[0]?.org);
 }
 
-/** ???·???????????????? ????? ???????????? ??? */
+/** ???????????????????? ????? ???????????? ??? */
 function isPlaceholderBrandOrg(org: string): boolean {
   return /^vlue$/i.test(org.trim());
 }
@@ -442,11 +486,11 @@ type LookupOptions = {
   viewerId?: string | null;
   /**
    * ?? ?? ??(OG/??????????)??
-   * ???·??? ????????? ??????? ??? ?? ????? ???????????.
+   * ??????? ????????? ??????? ??? ?? ????? ???????????.
    * (?????? ????? ???? ??? ??? ??????? ??????????? ????
    */
   forPublicOgShare?: boolean;
-  /** ??? ?????? ????? DB·export ?????? ????? ?? ??????? */
+  /** ??? ?????? ????? DB?export ?????? ????? ?? ??????? */
   forCallOverlay?: boolean;
   /** ????????????????normal | abnormal */
   dcpRoute?: string | null;
@@ -582,8 +626,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
         ? (card.dccSnapshotJson as Record<string, unknown>)
         : null;
     const certified = Boolean(card.user.phoneE164) && card.phoneE164 === card.user.phoneE164;
-    /* ???·???????? ?????? ?????? ??????? (??? ??????? ??????? ??? ????) */
     const masterSnap = await loadExportSnapLite(card.user.id);
+    const accountFields = pickDccAccountFields(lineSnap, masterSnap, certified);
     const exportSnap = {
       name: firstStr(lineSnap?.name, lineSnap?.displayName, certified ? masterSnap?.name : ""),
       title: firstStr(lineSnap?.title, certified ? masterSnap?.title : ""),
@@ -598,7 +642,6 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       photoUrl: certified
         ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
         : httpOnlyUrl(lineSnap?.photoUrl) || "",
-      /* ??? ??: ????DigitalCard? ??????·?? ??? (??? ??? ??? ??) */
       titlePhotoUrl: certified
         ? httpOnlyUrl(masterSnap?.titlePhotoUrl) || ""
         : httpOnlyUrl(lineSnap?.titlePhotoUrl) || "",
@@ -612,7 +655,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
         certified ? masterSnap?.photoFocus : lineSnap?.photoFocus,
         lineSnap?.photoFocus,
         masterSnap?.photoFocus
-      )
+      ),
+      ...accountFields
     };
     const profile = buildContactProfile({
       userEmail: certified ? card.user.email : null,
@@ -669,6 +713,12 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
           titlePhotoUrl: firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
           noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
+          accountType: accountFields.accountType || undefined,
+          bankName: accountFields.bankName || undefined,
+          accountNumber: accountFields.accountNumber || undefined,
+          accountHolder: accountFields.accountHolder || undefined,
+          isGroupVerified: accountFields.isGroupVerified,
+          accountGroupDocName: accountFields.accountGroupDocName || undefined,
           authCycleEndAt: authSub?.cycleEndAt ? authSub.cycleEndAt.toISOString() : null,
           authPaidAt: authSub?.cycleStartAt ? authSub.cycleStartAt.toISOString() : null,
           digitalCardActive: Boolean(card.user.digitalCard),
@@ -771,6 +821,12 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
           titlePhotoUrl: firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
           noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
+          accountType: exportSnap?.accountType || undefined,
+          bankName: exportSnap?.bankName || undefined,
+          accountNumber: exportSnap?.accountNumber || undefined,
+          accountHolder: exportSnap?.accountHolder || undefined,
+          isGroupVerified: Boolean(exportSnap?.isGroupVerified),
+          accountGroupDocName: exportSnap?.accountGroupDocName || undefined,
           authCycleEndAt: sub?.cycleEndAt ? sub.cycleEndAt.toISOString() : null,
           authPaidAt: sub?.cycleStartAt ? sub.cycleStartAt.toISOString() : null,
           digitalCardActive: Boolean(user.digitalCard),
@@ -802,7 +858,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
   };
 }
 
-/** ?? ??? ?? ??? ?? ??GET /lookup · GET /by-number ?? */
+/** ?? ??? ?? ??? ?? ??GET /lookup ? GET /by-number ?? */
 export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {}) {
   if (opts.forCallOverlay) {
     return lookupCardForCallOverlay(raw, opts);
@@ -867,7 +923,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
     };
   }
   if (billingGate.gate === "unmatched") {
-    /* ??? ??·???? ????? ??? ???????? ????? user/unmatched ????*/
+    /* ??? ??????? ????? ??? ???????? ????? user/unmatched ????*/
   } else {
   const card = await prisma.businessCard.findFirst({
     where: { phoneE164: e164, verificationStatus: "approved" },
@@ -900,6 +956,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         : null;
     const certified = Boolean(card.user.phoneE164) && card.phoneE164 === card.user.phoneE164;
     const masterSnap = await loadExportSnapLite(card.user.id);
+    const accountFields = pickDccAccountFields(lineSnap, masterSnap, certified);
     const exportSnap = {
       name: firstStr(lineSnap?.name, lineSnap?.displayName, certified ? masterSnap?.name : ""),
       title: firstStr(lineSnap?.title, certified ? masterSnap?.title : ""),
@@ -914,7 +971,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       photoUrl: certified
         ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
         : httpOnlyUrl(lineSnap?.photoUrl) || "",
-      /* ??? ??: ????DigitalCard? ??????·?? ??? (??? ??? ??? ??) */
+      /* ??? ??: ????DigitalCard? ????????? ??? (??? ??? ??? ??) */
       titlePhotoUrl: certified
         ? httpOnlyUrl(masterSnap?.titlePhotoUrl) || ""
         : httpOnlyUrl(lineSnap?.titlePhotoUrl) || "",
@@ -928,7 +985,8 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         certified ? masterSnap?.photoFocus : lineSnap?.photoFocus,
         lineSnap?.photoFocus,
         masterSnap?.photoFocus
-      )
+      ),
+      ...accountFields
     };
     const baseProfile = (card.profileJson as Record<string, unknown> | null) ?? null;
     const profile = buildContactProfile({

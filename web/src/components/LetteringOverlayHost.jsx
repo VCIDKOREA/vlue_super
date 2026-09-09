@@ -88,6 +88,20 @@ async function enrichPeerCardFromProfile(peerUserId, nextCard) {
       String(nextCard?.department || "").trim() || String(exp?.department || "").trim(),
     logoUrl: String(nextCard?.logoUrl || "").trim() || String(exp?.logoUrl || "").trim(),
     photoFocus: normalizePhotoFocus(exp?.photoFocus || nextCard?.photoFocus || "center"),
+    accountType:
+      String(nextCard?.accountType || "").trim() || String(exp?.accountType || "").trim(),
+    bankName: String(nextCard?.bankName || "").trim() || String(exp?.bankName || "").trim(),
+    accountNumber:
+      String(nextCard?.accountNumber || "").replace(/\D/g, "") ||
+      String(exp?.accountNumber || "").replace(/\D/g, ""),
+    accountHolder:
+      String(nextCard?.accountHolder || "").trim() || String(exp?.accountHolder || "").trim(),
+    isGroupVerified: Boolean(
+      nextCard?.isGroupVerified || exp?.isGroupVerified
+    ),
+    accountGroupDocName:
+      String(nextCard?.accountGroupDocName || "").trim() ||
+      String(exp?.accountGroupDocName || "").trim(),
     publicHandle:
       String(nextCard?.publicHandle || nextCard?.loginId || "").trim() ||
       String(data.profile?.publicHandle || "").trim(),

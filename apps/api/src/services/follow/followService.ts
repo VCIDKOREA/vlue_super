@@ -651,6 +651,12 @@ export async function getProfileForViewer(
           no_title_photo: boolean | null;
           company_intro: string | null;
           custom_back_text: string | null;
+          account_type: string | null;
+          bank_name: string | null;
+          account_number: string | null;
+          account_holder: string | null;
+          is_group_verified: boolean | null;
+          account_group_doc_name: string | null;
         }>
       >`
         SELECT
@@ -675,7 +681,17 @@ export async function getProfileForViewer(
             ELSE NULL
           END AS no_title_photo,
           NULLIF(TRIM(export_snapshot_json->>'companyIntro'), '') AS company_intro,
-          NULLIF(TRIM(export_snapshot_json->>'customBackText'), '') AS custom_back_text
+          NULLIF(TRIM(export_snapshot_json->>'customBackText'), '') AS custom_back_text,
+          NULLIF(TRIM(export_snapshot_json->>'accountType'), '') AS account_type,
+          NULLIF(TRIM(export_snapshot_json->>'bankName'), '') AS bank_name,
+          NULLIF(TRIM(export_snapshot_json->>'accountNumber'), '') AS account_number,
+          NULLIF(TRIM(export_snapshot_json->>'accountHolder'), '') AS account_holder,
+          CASE
+            WHEN export_snapshot_json ? 'isGroupVerified'
+              THEN (export_snapshot_json->>'isGroupVerified')::boolean
+            ELSE NULL
+          END AS is_group_verified,
+          NULLIF(TRIM(export_snapshot_json->>'accountGroupDocName'), '') AS account_group_doc_name
         FROM digital_cards
         WHERE user_id = ${targetUserId}::uuid
         LIMIT 1
@@ -753,7 +769,13 @@ export async function getProfileForViewer(
         logoUrl,
         photoFocus,
         companyIntro: String(s?.company_intro || "").trim(),
-        customBackText: String(s?.custom_back_text || "").trim()
+        customBackText: String(s?.custom_back_text || "").trim(),
+        accountType: String(s?.account_type || "").trim(),
+        bankName: String(s?.bank_name || "").trim(),
+        accountNumber: String(s?.account_number || "").replace(/\D/g, ""),
+        accountHolder: String(s?.account_holder || "").trim(),
+        isGroupVerified: Boolean(s?.is_group_verified),
+        accountGroupDocName: String(s?.account_group_doc_name || "").trim()
       }
     : null;
 
