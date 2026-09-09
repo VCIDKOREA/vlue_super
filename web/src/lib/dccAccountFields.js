@@ -49,11 +49,13 @@ export function formatDccAccountCopyText({ bankName, accountNumber, accountHolde
 
 /** 뷰어 노출 가능 여부 — GROUP 은 승인 후에만 */
 export function canShowDccAccountOnCard(card = {}) {
-  const type = normalizeDccAccountType(card.accountType);
+  let type = normalizeDccAccountType(card.accountType);
   const bank = String(card.bankName || "").trim();
   const num = digitsOnlyAccount(card.accountNumber);
   const holder = String(card.accountHolder || "").trim();
-  if (!type || !bank || !num || !holder) return false;
+  if (!bank || !num || !holder) return false;
+  /* 유형만 비어 있어도 은행·계좌·예금주가 있으면 표시 (사라짐 방지) */
+  if (!type) type = DCC_ACCOUNT_TYPES.PERSONAL;
   if (type === DCC_ACCOUNT_TYPES.GROUP && !card.isGroupVerified) return false;
   return true;
 }
@@ -89,12 +91,13 @@ export function sanitizeDccAccountFields(
       ? String(input.accountGroupDocDataUrl || "").trim()
       : "";
 
+  /* 유형이 없어도 입력값은 유지 — 빈 객체로 지우면 DCC에서 잠깐 보이다 사라짐 */
   if (!accountType) {
     return {
       accountType: "",
-      bankName: "",
-      accountNumber: "",
-      accountHolder: "",
+      bankName,
+      accountNumber,
+      accountHolder,
       isGroupVerified: false,
       accountGroupDocName: "",
       accountGroupDocDataUrl: ""

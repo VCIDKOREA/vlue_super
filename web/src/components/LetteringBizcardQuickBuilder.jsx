@@ -628,10 +628,13 @@ export default function LetteringBizcardQuickBuilder({
                     </div>
                   </div>
                   {emailOtpHint ? (
-                    <p className={`text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{emailOtpHint}</p>
-                  ) : null}
-                  {emailAuthSupport ? (
-                    <p className={`text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{emailAuthSupport}</p>
+                    <p
+                      className={`text-[12px] font-bold ${
+                        isDarkMode ? "text-cyan-300" : "text-cyan-600"
+                      }`}
+                    >
+                      {emailOtpHint}
+                    </p>
                   ) : null}
                 </>
               )}

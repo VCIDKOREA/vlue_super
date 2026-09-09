@@ -99,10 +99,24 @@ export function mergeExportSnapshotMedia(
       continue;
     }
     const sanitized = sanitizeMediaUrl(patch[key], prev[key]);
-    if (sanitized) next[key] = sanitized;
-    else if (isDataUrl(patch[key]) || isBlobUrl(patch[key])) {
+    if (sanitized) {
+      next[key] = sanitized;
+    } else if (isDataUrl(patch[key]) || isBlobUrl(patch[key])) {
       if (isHttpMediaUrl(prev[key])) next[key] = prev[key];
       else delete next[key];
+    } else {
+      /* 빈 문자열 PATCH 가 기존 https 타이틀/프로필을 지우지 않게 — 명시적 no* 만 삭제 */
+      const explicitClear =
+        (key === "titlePhotoUrl" && patch.noTitlePhoto === true) ||
+        (key === "photoUrl" && patch.noProfilePhoto === true) ||
+        (key === "logoUrl" && patch.noCompanyLogo === true);
+      if (explicitClear) {
+        next[key] = "";
+      } else if (isHttpMediaUrl(prev[key])) {
+        next[key] = prev[key];
+      } else if (!String(patch[key] ?? "").trim()) {
+        delete next[key];
+      }
     }
   }
   return stripDataUrlsFromJson(next) as Record<string, unknown>;

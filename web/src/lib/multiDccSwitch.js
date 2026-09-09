@@ -38,7 +38,7 @@ export async function switchToMultiDccProfile(profile, opts = {}) {
     bundle = null;
   }
 
-  applyDccAgentBundleToLocalCard(profile, bundle, { replaceAccount: true });
+  applyDccAgentBundleToLocalCard(profile, bundle, { replaceAccount: false });
 
   const editor = bundle?.showcase?.editor || bundle?.showcase?.live || null;
   const live = bundle?.showcase?.live || editor;

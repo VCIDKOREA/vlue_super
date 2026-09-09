@@ -50,7 +50,7 @@ import {
 import DccExposureSettingsPanel from "./dcc/DccExposureSettingsPanel.jsx";
 import { emptyDccExposureChoice, isDccExposureComplete } from "../lib/dccExposure.js";
 import { fetchDccExposure, saveDccExposure } from "../lib/dccExposureApi.js";
-import { sendAuthCode, verifyAuthCode, EMAIL_AUTH_SUPPORT } from "../lib/emailAuthApi.js";
+import { sendAuthCode, verifyAuthCode } from "../lib/emailAuthApi.js";
 import { sanitizeDccAccountFields, normalizeDccAccountType, DCC_ACCOUNT_TYPES } from "../lib/dccAccountFields.js";
 import { readBusinessRegistrationEvidence } from "../lib/dccBusinessAccountGate.js";
 
@@ -1117,7 +1117,6 @@ export default function LetteringBizcardSettingsView({
           }}
           onSendEmailOtp={handleSendEmailOtp}
           onVerifyEmailOtp={handleVerifyEmailOtp}
-          emailAuthSupport={EMAIL_AUTH_SUPPORT}
           onToast={showToast}
           exposureSlot={
             <DccExposureSettingsPanel

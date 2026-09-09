@@ -861,6 +861,9 @@ class CallOverlayService : Service() {
                 )
                 OverlayDiagTracker.markBigPushVisibleCommit()
                 CompanionRuntimeStabilityDiag.mark("BIG_PUSH_VISIBLE", "addView_success")
+                if (outgoing) {
+                    OutgoingPeerConnectProbe.start(this)
+                }
             }
             VlueBigPushTrace.recordOverlayAddViewProbe(
                 context = this,
@@ -1017,6 +1020,7 @@ class CallOverlayService : Service() {
         }
         CompanionRuntimeStabilityDiag.mark("ANSWER_DETECTED", source)
         CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_ANSWER", source)
+        OutgoingPeerConnectProbe.stop()
         VlueBigPushTrace.milestone(
             "ANSWER_DETECTED",
             "Answer Detected",
@@ -1119,13 +1123,12 @@ class CallOverlayService : Service() {
         companion.onAnswer(OverlayContext.IN_CALL)
         publishCompanion(OverlayTriggerEvent.ANSWER)
         userMinimized = false
-        /* Answer 후 3초간 ContextWatch OTHER_APP→MINI 금지 — 전체 Showcase 유지 */
-        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 3000L
+        /* Answer 후 ContextWatch 가 OTHER_APP 으로 오판해 빅푸시로 되돌리지 않도록 충분히 유지 */
+        showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
         /* 웹 expand 먼저 — 네이티브 창 성장(420ms)과 CSS 슬롯 전환 동기 */
         notifyWebExpandShowcase()
-        if (source.startsWith("bigPush_bar_tap")) {
-            notifyWebCallState("restore_showcase")
-        }
+        /* 탭/자동 동일 — restore_showcase 없으면 웹이 바 상태로 남는 경우가 있음 */
+        notifyWebCallState("restore_showcase")
         if (rootContainer?.isAttachedToWindow == true) {
             enterShowcaseLayout(source = source)
         } else {
@@ -3485,6 +3488,7 @@ class CallOverlayService : Service() {
         cancelFullscreenExpandAnimator()
         cancelBigPushSettle()
         cancelAnswerUiResume()
+        OutgoingPeerConnectProbe.stop()
         stopContextWatch()
         CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_CALL_END", "dismissOverlay")
         CompanionRuntimeStabilityDiag.endCallSession("dismissOverlay")
@@ -3736,9 +3740,10 @@ class CallOverlayService : Service() {
             if (!hold &&
                 !userMinimized &&
                 !authPopupConfirmedToMini &&
+                !remoteConnected &&
                 (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN)
             ) {
-                /* 다른 앱/홈/삼성 미니푸시 — 하단 쇼케이스 바 (MiniCase 아님) */
+                /* 통화 미연결·다른 앱 — 하단 쇼케이스 바. remoteConnected 중에는 자동 collapse 금지 */
                 companion.collapseToBottomShowcaseBar(ctx)
                 userMinimized = false
                 publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
@@ -4064,6 +4069,10 @@ class CallOverlayService : Service() {
         private var activeInstance: CallOverlayService? = null
 
         fun isRunning(): Boolean = activeInstance != null
+
+        fun isRemoteConnectedPublic(): Boolean = activeInstance?.remoteConnected == true
+
+        fun isOutgoingPublic(): Boolean = activeInstance?.currentOutgoing == true
 
         /** 통화 종료 시 강제 제거 — IDLE 검사와 무관하게 창을 없앤다 */
         fun dismissNow(context: android.content.Context? = null) {

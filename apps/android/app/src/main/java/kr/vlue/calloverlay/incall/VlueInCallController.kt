@@ -51,6 +51,10 @@ object VlueInCallController {
 
     fun hasActiveCall(): Boolean = activeCall != null || calls.isNotEmpty()
 
+    /** 상대 응답(ACTIVE) 여부 — 발신 빅푸시→쇼케이스 자동 전환용 */
+    fun hasConnectedActiveCall(): Boolean =
+        calls.any { it.state == Call.STATE_ACTIVE } || activeCall?.state == Call.STATE_ACTIVE
+
     fun isDefaultDialerBound(): Boolean = inCallService != null
 
     fun extractPhoneNumber(call: Call? = activeCall): String {

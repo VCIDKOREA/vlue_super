@@ -41,6 +41,12 @@ import VlueCyanVerifiedSeal from "./VlueCyanVerifiedSeal.jsx";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
+import {
+  VLUE_PREVIEW_ADDRESS_PLACEHOLDER,
+  VLUE_PREVIEW_EMAIL_PLACEHOLDER,
+  VLUE_PREVIEW_FAX_PLACEHOLDER,
+  VLUE_PREVIEW_WEBSITE_PLACEHOLDER
+} from "../lib/vlueShowcasePreviewIdentity.js";
 import { openExternalHref, formatWebHref } from "../lib/showcase/showcaseContactActions.js";
 import { openShowcaseSocialItem } from "../lib/showcase/openShowcaseSocialItem.js";
 import { getLocalVlueUserId } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
@@ -624,12 +630,32 @@ function FrontPanel({
   const website = formatWebsite(card.website);
   const emailRaw = String(card.email || "").trim();
   const email = emailRaw ? formatLetteringContactEmailDisplay(emailRaw) : "";
-  /*
-   * 미입력 필드는 미리보기·실송출 모두 숨김 (플레이스홀더는 수신자·본인 미리보기에 노출하지 않음).
-   * 설정 화면에서만 입력 유도.
-   */
-  const emailValue = email;
   const addressRaw = String(card.address || "").trim();
+  /*
+   * 본인 미리보기(previewMode): 빈 선택 필드는 입력 유도 플레이스홀더.
+   * 상대 실송출: 미입력 필드는 숨김.
+   */
+  const showOwnerPlaceholders = Boolean(previewMode);
+  const emailValue = email
+    ? email
+    : showOwnerPlaceholders
+      ? VLUE_PREVIEW_EMAIL_PLACEHOLDER
+      : "";
+  const faxDisplay = fax
+    ? fax
+    : showOwnerPlaceholders
+      ? VLUE_PREVIEW_FAX_PLACEHOLDER
+      : "";
+  const addressDisplay = addressRaw
+    ? addressRaw
+    : showOwnerPlaceholders
+      ? VLUE_PREVIEW_ADDRESS_PLACEHOLDER
+      : "";
+  const websiteDisplay = website
+    ? website
+    : showOwnerPlaceholders
+      ? VLUE_PREVIEW_WEBSITE_PLACEHOLDER
+      : "";
   const validityFromItems = (verificationItems || [])
     .map((line) => String(line || "").trim())
     .find((line) => /만료일|인증유효기간/.test(line));
@@ -809,10 +835,12 @@ function FrontPanel({
           </FrontInfoRow>
         ) : null}
 
-        {fax ? (
+        {faxDisplay ? (
           <FrontInfoRow icon={Printer} label="팩스번호">
-            <span className="ldr-front-info-row__text">
-              {enableContactLinks ? (
+            <span
+              className={`ldr-front-info-row__text${!fax ? " ldr-front-info-row__text--placeholder" : ""}`.trim()}
+            >
+              {fax && enableContactLinks ? (
                 <button
                   type="button"
                   className="ldr-front-phone-link ldr-front-phone-link--btn"
@@ -823,36 +851,44 @@ function FrontPanel({
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
                 >
-                  {fax}
+                  {faxDisplay}
                 </button>
               ) : (
-                fax
+                faxDisplay
               )}
             </span>
           </FrontInfoRow>
         ) : null}
 
-        {addressRaw ? (
+        {addressDisplay ? (
           <FrontInfoRow icon={MapPin} label="등록한 주소">
-            <button
-              type="button"
-              className="ldr-front-address-detail-btn"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setAddressOpen(true);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              상세보기
-            </button>
+            {addressRaw ? (
+              <button
+                type="button"
+                className="ldr-front-address-detail-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setAddressOpen(true);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                상세보기
+              </button>
+            ) : (
+              <span className="ldr-front-info-row__text ldr-front-info-row__text--placeholder">
+                {addressDisplay}
+              </span>
+            )}
           </FrontInfoRow>
         ) : null}
 
-        {website ? (
+        {websiteDisplay ? (
           <FrontInfoRow icon={Globe} label="웹사이트">
-            <p className="ldr-front-info-row__text">
-              {enableContactLinks ? (
+            <p
+              className={`ldr-front-info-row__text${!website ? " ldr-front-info-row__text--placeholder" : ""}`.trim()}
+            >
+              {website && enableContactLinks ? (
                 <button
                   type="button"
                   className="ldr-front-phone-link ldr-front-phone-link--btn"
@@ -863,10 +899,10 @@ function FrontPanel({
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
                 >
-                  {website}
+                  {websiteDisplay}
                 </button>
               ) : (
-                website
+                websiteDisplay
               )}
             </p>
           </FrontInfoRow>

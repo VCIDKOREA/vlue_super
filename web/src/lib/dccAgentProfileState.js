@@ -120,9 +120,18 @@ export function applyDccAgentBundleToLocalCard(profile, bundle = null, opts = {}
     photoFocus,
     noProfilePhoto: !photoUrl,
     titlePhotoDataUrl: titlePhotoUrl,
-    noTitlePhoto: dcc.noTitlePhoto != null ? Boolean(dcc.noTitlePhoto) : !titlePhotoUrl,
+    ...(Object.prototype.hasOwnProperty.call(dcc, "noTitlePhoto") || titlePhotoUrl
+      ? {
+          noTitlePhoto:
+            dcc.noTitlePhoto != null ? Boolean(dcc.noTitlePhoto) : !titlePhotoUrl
+        }
+      : {}),
     logoDataUrl: logoUrl,
-    noCompanyLogo: dcc.noCompanyLogo != null ? Boolean(dcc.noCompanyLogo) : !logoUrl,
+    ...(Object.prototype.hasOwnProperty.call(dcc, "noCompanyLogo") || logoUrl
+      ? {
+          noCompanyLogo: dcc.noCompanyLogo != null ? Boolean(dcc.noCompanyLogo) : !logoUrl
+        }
+      : {}),
     email,
     website,
     noWebsite: dcc.noWebsite != null ? Boolean(dcc.noWebsite) : !website,
@@ -142,7 +151,16 @@ export function applyDccAgentBundleToLocalCard(profile, bundle = null, opts = {}
           isGroupVerified: Boolean(dcc.isGroupVerified),
           accountGroupDocName: str(dcc.accountGroupDocName)
         }
-      : {})
+      : dccHasAccount
+        ? {
+            accountType: str(dcc.accountType),
+            bankName: str(dcc.bankName),
+            accountNumber: str(dcc.accountNumber).replace(/\D/g, ""),
+            accountHolder: str(dcc.accountHolder),
+            isGroupVerified: Boolean(dcc.isGroupVerified),
+            accountGroupDocName: str(dcc.accountGroupDocName)
+          }
+        : {}),
   };
 
   const written = writeLetteringBizcardEditable(patch);

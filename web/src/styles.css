@@ -6626,22 +6626,31 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
 
 .ldr-front-account__primary {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 6px 8px;
+  gap: 6px;
   margin: 0;
   min-width: 0;
+  width: 100%;
   font-size: inherit;
   font-weight: 650;
-  line-height: 1.35;
+  line-height: 1.25;
 }
 
 .ldr-front-account__bank {
   flex-shrink: 0;
+  max-width: 38%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ldr-front-account__num {
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   letter-spacing: 0.02em;
 }
 
@@ -6665,12 +6674,12 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   opacity: 0.72;
