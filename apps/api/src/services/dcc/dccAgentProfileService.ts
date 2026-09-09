@@ -703,8 +703,3 @@ export async function mirrorLineContentToProfile(
     data
   });
 }
-  await prisma.userDccAgentProfile.updateMany({
-    where: { id: profileId, userId },
-    data
-  });
-}

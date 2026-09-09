@@ -196,7 +196,7 @@ export async function listAdminUsers(opts: { q?: string; limit?: number; offset?
       }
     : {};
 
-  const [users, total] = await Promise.all([
+  const [usersRaw, total] = await Promise.all([
     prisma.user.findMany({
       where,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -207,6 +207,11 @@ export async function listAdminUsers(opts: { q?: string; limit?: number; offset?
     }),
     prisma.user.count({ where })
   ]);
+  const users = usersRaw as unknown as Array<{
+    id: string;
+    digitalCard?: { membershipTierSnapshot?: string | null } | null;
+    [key: string]: unknown;
+  }>;
 
   const freeWardIds = users
     .filter((u) => {
@@ -240,12 +245,17 @@ export async function listAdminUsers(opts: { q?: string; limit?: number; offset?
 export async function getAdminUser(userId: string) {
   await ensureWithdrawalScheduleSchema();
   await ensureAdminAccountActionSchema();
-  const user = await prisma.user.findUnique({
+  const userRaw = await prisma.user.findUnique({
     where: { id: userId },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     select: ADMIN_MEMBER_SELECT as any
   });
-  if (!user) return null;
+  if (!userRaw) return null;
+  const user = userRaw as unknown as {
+    id: string;
+    digitalCard?: { membershipTierSnapshot?: string | null } | null;
+    [key: string]: unknown;
+  };
   const tier = String(user.digitalCard?.membershipTierSnapshot || "free").toLowerCase();
   const pathLabel = await resolveMembershipPathLabel(userId, tier);
   return serializeAdminMember(user as Parameters<typeof serializeAdminMember>[0], {
@@ -408,9 +418,9 @@ export async function adminWithdrawUser(
     data: { accountStatus: "suspended" }
   });
   return {
+    ...scheduled,
     ok: true,
     immediate: false,
-    ...scheduled,
     user: await getAdminUser(userId),
     message: `탈퇴 예약되었습니다. ${scheduled.recoverableUntil?.slice(0, 16).replace("T", " ")}까지 복구 가능합니다.`
   };
