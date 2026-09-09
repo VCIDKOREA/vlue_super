@@ -5,7 +5,8 @@ import {
   MapPin,
   Globe,
   Printer,
-  Check
+  Check,
+  Landmark
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { isMaskedPhoneDisplay } from "../lib/dccExposure.js";
@@ -871,6 +872,7 @@ function FrontPanel({
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
                   >
+                    <Landmark className="ldr-account-view-btn__icon" strokeWidth={2.4} aria-hidden />
                     계좌보기
                   </button>
                 ) : null}

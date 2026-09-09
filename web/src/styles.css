@@ -8250,13 +8250,17 @@ button.ldr-back-person-name--link:active {
 }
 
 .ldr-account-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   flex: 0 0 auto;
   margin: 0;
-  padding: 4px 10px;
+  padding: 5px 11px 5px 9px;
   border-radius: 999px;
-  border: 1px solid rgba(125, 211, 252, 0.65);
-  background: rgba(14, 165, 233, 0.28);
-  color: #f0f9ff;
+  border: 1px solid rgba(165, 243, 252, 0.55);
+  background: linear-gradient(135deg, #22d3ee 0%, #0284c7 100%);
+  color: #fff;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -8265,11 +8269,25 @@ button.ldr-back-person-name--link:active {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   z-index: 2;
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.2),
+    0 4px 12px rgba(8, 145, 178, 0.45);
+  text-shadow: 0 1px 0 rgba(8, 47, 73, 0.25);
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+
+.ldr-account-view-btn__icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
 }
 
 .ldr-account-view-btn:active {
-  opacity: 0.85;
-  background: rgba(14, 165, 233, 0.32);
+  transform: scale(0.96);
+  filter: brightness(1.06);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.35),
+    0 2px 8px rgba(8, 145, 178, 0.4);
 }
 
 .ldr-account-popup {
