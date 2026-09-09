@@ -30,7 +30,7 @@ function resolveHasOwnAuthPayment(extraPaid) {
   return false;
 }
 
-/** 미성년자 DCC 전면 차단 · 유료 가족플랜 피보호자는 DCC 포함 */
+/** 미성년자 DCC 전면 차단. 가족플랜은 DCC 미포함(본인 유료만). */
 export function useDccFeatureAccess() {
   const [birthYmd, setBirthYmd] = useState(() => readStoredBirthYmd());
   const [wardRole, setWardRole] = useState(() => readStoredFamilyWardRole());
@@ -103,10 +103,9 @@ export function useDccFeatureAccess() {
   const access = useMemo(
     () =>
       resolveDccFeatureAccess({
-        birthYmd,
-        familyPlanActive
+        birthYmd
       }),
-    [birthYmd, familyPlanActive]
+    [birthYmd]
   );
 
   return { access, refresh, birthYmd, wardRole, hasOwnAuthPayment };

@@ -247,9 +247,12 @@ export default function ShowcaseStyleSettingsPanel({
   const isPaid = isPaidLetteringTier(effectiveTier);
   const { access: dccAccess } = useDccFeatureAccess();
   const dccBlocked = isDccSettingsDisabled(dccAccess);
-  /** 유료 DCC 슬라이드·명함 페이지 — 무료는 false */
+  /** 유료 DCC 슬라이드·명함 페이지 — 본인 정식 유료만 (가족플랜 제외) */
   const dccCarouselEnabled =
-    !dccBlocked && isPaid && readDigitalCardActive() && readDccBroadcastOn();
+    !dccBlocked &&
+    canUseV1PaidDccFeatures(membershipTier) &&
+    readDigitalCardActive() &&
+    readDccBroadcastOn();
   /** 송출 ON/OFF — 프로필 「쇼케이스 켜짐/꺼짐」(vcid). 서버 live.includeDigitalCard 와 동일 */
   const showcaseBroadcastOn = readVcidBroadcastOn();
   const maxContentPages = maxShowcaseContentPagesForTier(effectiveTier, {

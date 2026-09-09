@@ -2,8 +2,9 @@
  * DCC(디지털인증명함) 접근 정책
  *
  * - 미성년자: DCC 전면 불가 (쇼케이스만)
- * - 유료 가족플랜 피보호자: 보호자 유료 혜택으로 DCC 포함 전체 V1 기능
- * - 그 외 유료·B2B: DCC 허용
+ * - DCC 발급·이용은 본인 정식 유료/B2B 구독만 (가족플랜 미포함)
+ *   → 유료 여부는 canUseV1PaidDccFeatures 에서 판정
+ * - 본 함수는 미성년자 차단 등 추가 제한만 담당
  */
 import {
   MINOR_DIGITAL_CARD_BLOCKED_MESSAGE,
@@ -13,8 +14,7 @@ import {
 /**
  * @param {{
  *   birthYmd?: string | null,
- *   isMinor?: boolean | null,
- *   familyPlanActive?: boolean
+ *   isMinor?: boolean | null
  * }} input
  */
 export function resolveDccFeatureAccess(input = {}) {
@@ -28,11 +28,6 @@ export function resolveDccFeatureAccess(input = {}) {
       reason: "minor",
       message: MINOR_DIGITAL_CARD_BLOCKED_MESSAGE
     };
-  }
-
-  /* 유료 가족플랜 피보호자 — 보호자 유료 혜택으로 DCC 포함 */
-  if (Boolean(input.familyPlanActive)) {
-    return { allowed: true, reason: "family_plan", message: "" };
   }
 
   return { allowed: true, reason: "", message: "" };

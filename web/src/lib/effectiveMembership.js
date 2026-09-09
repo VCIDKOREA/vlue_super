@@ -25,12 +25,14 @@ export function resolveEffectiveMembershipTier(rawTier, beneficiary) {
   return raw || "free";
 }
 
-/** 기능 권한 판단용 — DCC·쇼케이스 페이지·BGM 등 */
+/** 기능 권한 판단용 — 쇼케이스 페이지·BGM 등 (가족플랜 상속 포함). DCC는 canUseV1PaidDccFeatures. */
 export function readEffectiveMembershipTier() {
   return resolveEffectiveMembershipTier(readMembershipTier());
 }
 
 /**
+ * 쇼케이스 5페이지·BGM 풀 등 — 본인 유료 또는 가족플랜 피보호자.
+ * DCC는 포함하지 않음 (본인 정식 유료 결제만).
  * @param {string} [membershipTier] — 미전달 시 effective tier 사용
  */
 export function canUseV1PaidFeatures(membershipTier) {

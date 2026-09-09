@@ -1,6 +1,6 @@
 import { prisma } from "../db/client.js";
 import { resolveDigitalCardIdParam } from "./bizcard/resolveCardId.js";
-import { isPaidMember } from "./membership/paidMemberGate.js";
+import { isSelfPaidMember } from "./membership/paidMemberGate.js";
 
 export type CardValidateResult = {
   valid: boolean;
@@ -61,7 +61,7 @@ export async function validateDigitalCardForExport(cardIdOrHandle: string): Prom
     };
   }
 
-  const paid = await isPaidMember(row.userId);
+  const paid = await isSelfPaidMember(row.userId);
   if (!paid.ok) {
     return {
       valid: false,

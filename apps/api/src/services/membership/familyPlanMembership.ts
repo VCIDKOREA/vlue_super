@@ -22,7 +22,7 @@ export function formatFamilyPlanPathLabel(guardianName: string) {
   return `무료(가족플랜) 가족명: ${name}(유료)`;
 }
 
-/** 활성 가족보호 피보호자 + 유료 보호자 → V1 유료 패키지 혜택 상속 */
+/** 활성 가족보호 피보호자 + 유료 보호자 → 쇼케이스·BGM 등 유료 기능 상속 (DCC 제외) */
 export async function resolveFamilyPlanBeneficiary(wardUserId: string): Promise<FamilyPlanBeneficiary> {
   const link = await familyProtectionDb.familyProtectionLink.findFirst({
     where: { wardUserId, status: "active" },

@@ -194,7 +194,6 @@ import { ShowcaseBgmProvider } from "./context/ShowcaseBgmContext.jsx";
 import { runAndroidBackHandlers } from "./lib/androidBackStack.js";
 import { normalizeMembershipKind, isBillableMembershipKind, PAID_EVENT_MONTHLY_KRW } from "./lib/membershipBm.js";
 import { writePendingPayment, readPendingPayment } from "./lib/postSignupPayment.js";
-import { readEffectiveMembershipTier } from "./lib/effectiveMembership.js";
 import { clearAccountScopedLocalStorage } from "./lib/clearAccountScopedLocalStorage.js";
 import { persistDccAccessHintsFromSession } from "./lib/dccAccessSession.js";
 
@@ -460,7 +459,7 @@ function App() {
       setAppNotificationOpen(false);
       setCallShowcaseSheetOpen(false);
       setShowcaseStyleSheetOpen(false);
-      if (!canUseV1PaidDccFeatures(readEffectiveMembershipTier())) {
+      if (!canUseV1PaidDccFeatures()) {
         setV1PaidGateOpen(true);
         return;
       }
