@@ -146,7 +146,10 @@ object BigPushShowcaseBar {
                 avatarKind = AvatarKind.SILHOUETTE
             )
         }
+        /* 안심케어(비회원) — 인증 체크 배지 금지 */
+        val contactSafeCare = profileKind == "contact_safe_care"
         val brand = when {
+            contactSafeCare -> "VLUE 안심케어"
             !org.isNullOrBlank() -> "$org Showcase"
             !hideBroadcastName && !displayName.isNullOrBlank() -> "$displayName Showcase"
             hideBroadcastName -> "VLUE ID Showcase"
@@ -166,6 +169,7 @@ object BigPushShowcaseBar {
             else -> phoneDisp.ifBlank { "번호 확인 중…" }
         }
         val secondary = when {
+            contactSafeCare -> phoneDisp.ifBlank { "VLUE 비회원 · 안심케어" }
             !org.isNullOrBlank() -> {
                 val parts = listOfNotNull(
                     displayName?.takeIf { it.isNotBlank() },
@@ -184,10 +188,12 @@ object BigPushShowcaseBar {
             brandLabel = brand,
             primaryLine = primary,
             secondaryLine = secondary,
-            verified = verified ||
-                json?.optBoolean("is_verified", false) == true ||
-                json?.optBoolean("verified", false) == true ||
-                card?.optBoolean("verified", false) == true,
+            verified = !contactSafeCare && (
+                verified ||
+                    json?.optBoolean("is_verified", false) == true ||
+                    json?.optBoolean("verified", false) == true ||
+                    card?.optBoolean("verified", false) == true
+                ),
             avatarUrl = avatar,
             avatarKind = avatarKind
         )

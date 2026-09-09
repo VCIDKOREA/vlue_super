@@ -42,12 +42,25 @@ class ContactSafeCarePolicyTest {
     }
 
     @Test
-    fun popupOnly_alwaysShows() {
+    fun popupOnly_whileRingingBigPush_doesNotShow() {
+        assertFalse(
+            ContactSafeCarePolicy.shouldShow(
+                profileKind = ContactSafeCarePayload.PROFILE_KIND,
+                overlayState = OverlayState.BIG_PUSH,
+                popupOnly = true,
+                callAnswered = false
+            )
+        )
+    }
+
+    @Test
+    fun popupOnly_afterAnswer_showsOnBigPush() {
         assertTrue(
             ContactSafeCarePolicy.shouldShow(
                 profileKind = ContactSafeCarePayload.PROFILE_KIND,
                 overlayState = OverlayState.BIG_PUSH,
-                popupOnly = true
+                popupOnly = true,
+                callAnswered = true
             )
         )
     }

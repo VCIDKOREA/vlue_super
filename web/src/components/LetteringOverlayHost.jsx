@@ -1111,19 +1111,24 @@ function LetteringOverlayHostInner() {
           } else if (wasShowcaseBar) {
             /*
              * BigPush → 수화: 송출 ON + DCC 실콘텐츠일 때만 풀 쇼케이스.
-             * 송출 OFF·미설정은 정상(인증) 팝업 — 빈 쇼케이스 확대 금지.
+             * 안심케어·송출 OFF·미설정은 빈 쇼케이스 확대 금지.
+             * (안심케어는 네이티브 팝업 — notifyVlueAuthMemberReady 오용 금지)
              */
+            const liveCard = styledCardRef.current;
+            const isSafeCare =
+              String(liveCard?.profileKind || "").trim() === "contact_safe_care";
             const liveStyle =
-              styledCardRef.current?.showcaseStyle || showcaseStyleRef.current;
+              liveCard?.showcaseStyle || showcaseStyleRef.current;
             const canOpenFull =
+              !isSafeCare &&
               peerShowcaseBroadcastOn(liveStyle) &&
-              peerHasDccOrShowcaseContent(styledCardRef.current, liveStyle);
+              peerHasDccOrShowcaseContent(liveCard, liveStyle);
             if (!canOpenFull) {
               autoExpandedOnceRef.current = false;
               userChoseMiniRef.current = true;
               setExpanded(false);
               const miniBoot = parseOverlayParams().urlMiniCase;
-              if (!miniBoot) {
+              if (!miniBoot && !isSafeCare) {
                 try {
                   window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
                   window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
@@ -1295,13 +1300,20 @@ function LetteringOverlayHostInner() {
     identityReady
   ]);
 
-  useEffect(() => {
+    useEffect(() => {
     if (callState !== CALL_STATES.CONNECTED || !identityReady) return;
     if (autoExpandedOnceRef.current) return;
     autoExpandedOnceRef.current = true;
     forceShowcaseBarRef.current = false;
     setForceShowcaseBar(false);
     const miniBoot = urlMiniCase || parseOverlayParams().urlMiniCase;
+    const isSafeCare =
+      String(styledCard?.profileKind || "").trim() === "contact_safe_care";
+    if (isSafeCare) {
+      /* 안심케어 — 웹 확대·인증팝업 브리지 금지 (네이티브 경로 검증 팝업) */
+      setExpanded(false);
+      return;
+    }
     if (peerAuthPopupOnly) {
       /* 수화 후 — 네이티브 중앙 팝업 또는 MiniCase(mini=1). 웹 팝업은 네이티브 창에서 깨짐 */
       setExpanded(false);

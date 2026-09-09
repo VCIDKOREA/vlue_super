@@ -11,8 +11,16 @@ object VlueAuthMemberPopupPolicy {
     const val MESSAGE =
         "VLUE 인증 회원으로 확인되었습니다. 공개 설정된 디지털인증명함·쇼케이스가 없습니다."
 
-    fun shouldShow(overlayState: OverlayState, popupOnlyTest: Boolean = false): Boolean {
-        if (popupOnlyTest) return true
+    fun shouldShow(
+        overlayState: OverlayState,
+        popupOnlyTest: Boolean = false,
+        callAnswered: Boolean = true
+    ): Boolean {
+        /* 거는 중·링잉 BIG_PUSH 에서 popupOnly 만으로 팝업 금지 */
+        if (popupOnlyTest) {
+            if (!callAnswered && overlayState == OverlayState.BIG_PUSH) return false
+            return true
+        }
         return overlayState == OverlayState.SHOWCASE
     }
 

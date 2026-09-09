@@ -7,6 +7,17 @@ import org.junit.Test
 
 class VlueAuthMemberPopupPolicyTest {
     @Test
+    fun ringingBigPush_popupOnly_withoutAnswer_doesNotShow() {
+        assertFalse(
+            VlueAuthMemberPopupPolicy.shouldShow(
+                OverlayState.BIG_PUSH,
+                popupOnlyTest = true,
+                callAnswered = false
+            )
+        )
+    }
+
+    @Test
     fun ringingBigPush_doesNotShowPopup() {
         assertFalse(
             VlueAuthMemberPopupPolicy.shouldShow(OverlayState.BIG_PUSH, popupOnlyTest = false)

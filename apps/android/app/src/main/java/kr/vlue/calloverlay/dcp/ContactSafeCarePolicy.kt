@@ -15,7 +15,15 @@ object ContactSafeCarePolicy {
         callAnswered: Boolean = false
     ): Boolean {
         if (profileKind != ContactSafeCarePayload.PROFILE_KIND) return false
-        if (popupOnly) return true
+        /*
+         * popupOnly 단독으로 링잉(BIG_PUSH)·거는 중에 띄우지 않음.
+         * 수화 확정(callAnswered) 또는 이미 SHOWCASE/IDLE 일 때만.
+         */
+        if (popupOnly) {
+            if (callAnswered) return true
+            return overlayState == OverlayState.SHOWCASE ||
+                overlayState == OverlayState.IDLE
+        }
         /* 수화 확정 후에는 BIG_PUSH 잔류 상태에서도 정상팝업 허용 (카드 지연·정책 레이스) */
         if (callAnswered) {
             return overlayState == OverlayState.SHOWCASE ||

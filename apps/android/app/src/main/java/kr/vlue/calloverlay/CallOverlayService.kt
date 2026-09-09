@@ -59,6 +59,7 @@ import kr.vlue.calloverlay.dcp.DcpAbnormalWarningView
 import kr.vlue.calloverlay.dcp.DcpPopupPolicy
 import kr.vlue.calloverlay.dcp.NationalAgencyWhitelist
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
+import kr.vlue.calloverlay.incall.VlueInCallController
 import kr.vlue.calloverlay.diagnostics.CompanionRuntimeStabilityDiag
 import kr.vlue.calloverlay.diagnostics.DiagnosticsFeature
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
@@ -1002,9 +1003,27 @@ class CallOverlayService : Service() {
             )
             return
         }
+        /*
+         * 발신 「거는 중」오탐 차단 — InCall DIALING/CONNECTING 이면 수화 UI 금지.
+         * (오디오 MODE_IN_CALL 로 notifyConnected 가 와도 여기로 오면 팝업/빈케이스)
+         */
+        if (currentOutgoing &&
+            !remoteConnected &&
+            VlueInCallController.isDialingOrConnecting() &&
+            !VlueInCallController.hasConnectedActiveCall()
+        ) {
+            VlueBigPushTrace.lifecycle(
+                "ANSWER_HOLD_DIALING",
+                "source=$source keep BigPush — still dialing/connecting"
+            )
+            restartOutgoingPeerProbeIfNeeded()
+            return
+        }
         CompanionRuntimeStabilityDiag.mark("ANSWER_DETECTED", source)
         CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_ANSWER", source)
         OutgoingPeerConnectProbe.stop()
+        /* presentCenterSafePopup 게이트용 — 수화 확정 후에만 true */
+        remoteConnected = true
         VlueBigPushTrace.milestone(
             "ANSWER_DETECTED",
             "Answer Detected",
@@ -1041,7 +1060,6 @@ class CallOverlayService : Service() {
              * 조회 중 수화: 주소록이면 즉시 안심케어 팝업.
              * 그 외는 짧게 재시도 후 쇼케이스 강제 오픈 (모르는 번호 포함).
              */
-            remoteConnected = true
             showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 8_000L
             val contactName = DeviceContactsReader.findDisplayName(this, currentPhone)
             if (!contactName.isNullOrBlank()) {
@@ -1066,11 +1084,16 @@ class CallOverlayService : Service() {
                 scheduleAnswerUiResume("pending_after_$source")
                 return
             }
+            /*
+             * 조회 실패·미등록 — 빈 다크 FULLSCREEN 금지. BigPush 유지.
+             * (이전 FORCE_SHOWCASE_PENDING 이 「빈케이스」 원인)
+             */
             VlueBigPushTrace.lifecycle(
-                "ANSWER_FORCE_SHOWCASE_PENDING",
-                "unknown/pending after resume — open showcase source=$source attempt=$resumeAttempt"
+                "ANSWER_KEEP_BIGPUSH_PENDING_EMPTY",
+                "no card/contact — keep BigPush source=$source attempt=$resumeAttempt"
             )
-            /* fall through → showcase */
+            restartOutgoingPeerProbeIfNeeded()
+            return
         } else if (!pendingVerified &&
             !parseIsVerified(pendingCardJson) &&
             !source.startsWith("bigPush_bar_tap")
@@ -1079,15 +1102,40 @@ class CallOverlayService : Service() {
                 presentCenterSafePopup(source = source, authMember = false)
                 return
             }
+            val contactName = DeviceContactsReader.findDisplayName(this, currentPhone)
+            if (!contactName.isNullOrBlank()) {
+                val verdict = CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
+                val json = ContactSafeCarePayload.toJson(currentPhone, contactName, verdict)
+                pendingCardJson = json
+                pendingVerified = false
+                bindDcpRoute(currentPhone, verdict.routeQuery, json)
+                VlueBigPushTrace.lifecycle(
+                    "ANSWER_PROMOTE_CONTACT_SAFE_CARE_UNVERIFIED",
+                    "unverified→contact name=$contactName source=$source"
+                )
+                presentCenterSafePopup(source = source, authMember = false)
+                return
+            }
             /*
-             * 이전: ANSWER_KEEP_BIGPUSH_UNVERIFIED 로 쇼케이스 미오픈.
-             * 모르는 번호 수화 후에도 빅푸시만 상단 고정되는 버그 → 바로 쇼케이스.
+             * 모르는 번호: 빈 쇼케이스 대신 BigPush 유지(탭으로 열기 가능).
              */
             VlueBigPushTrace.lifecycle(
-                "ANSWER_OPEN_SHOWCASE_UNVERIFIED",
-                "unverified/unknown — open showcase source=$source"
+                "ANSWER_KEEP_BIGPUSH_UNVERIFIED",
+                "unverified/unknown — keep BigPush source=$source"
             )
-            /* fall through → showcase */
+            return
+        }
+        /*
+         * 인증 회원인데 송출/DCC 없으면 풀 쇼케이스 금지 — 정상 팝업.
+         * (카드 enrich 레이스로 isAuthMemberOnly 가 늦게 true 되는 경우 대비 재검사)
+         */
+        if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(
+                pendingCardJson,
+                verified = pendingVerified || parseIsVerified(pendingCardJson)
+            )
+        ) {
+            presentCenterSafePopup(source = source, authMember = true)
+            return
         }
         VlueBigPushTrace.milestone(
             "SHOWCASE_REQUESTED",
@@ -1096,7 +1144,6 @@ class CallOverlayService : Service() {
             detail = "event-driven ($source), independent of BigPush"
         )
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_BEGIN", source)
-        remoteConnected = true
         bigPushPeeking = false
         wakeScreenForCallOverlay()
         /* Answer: HUN(가짜 빅푸시) 제거 + Native banner 제거 → Showcase */
@@ -1484,6 +1531,14 @@ class CallOverlayService : Service() {
     /** BigPush 아무 곳 탭 → Showcase FULLSCREEN (텔레콤 Answer 와 무관, UI만) */
     private fun openShowcaseFromBigPushTap() {
         if (dismissing) return
+        /* 발신 「거는 중」— 탭으로 안심/정상 팝업·풀쇼케이스 금지 */
+        if (currentOutgoing && !remoteConnected) {
+            VlueBigPushTrace.lifecycle(
+                "BIG_PUSH_TAP_HOLD_DIALING",
+                "outgoing dialing — keep BigPush only"
+            )
+            return
+        }
         if (companion.state == OverlayState.SHOWCASE) {
             /* 인증 팝업만 떠 있는 재탭 — 팝업 재부착 */
             if (dcpPopupView?.isAttachedToWindow != true &&
@@ -1526,21 +1581,38 @@ class CallOverlayService : Service() {
             )
             return
         }
-        remoteConnected = true
+        /* 발신 다이얼 중에는 팝업 금지 — remoteConnected 를 여기서 올리면 「거는 중」오탐 */
+        if (currentOutgoing && !remoteConnected) {
+            VlueBigPushTrace.lifecycle(
+                "CENTER_SAFE_POPUP_HOLD_DIALING",
+                "source=$source outgoing dialing — keep BigPush"
+            )
+            restartOutgoingPeerProbeIfNeeded()
+            return
+        }
         /* 인증-only: SHOWCASE(풀스크린) 전이 금지 — 네이티브 중앙 팝업만 */
         authPopupOnlyMode = true
-        if (!authMember && companion.state != OverlayState.SHOWCASE) {
-            companion.onAnswer(OverlayContext.IN_CALL)
-        }
-        publishCompanion(if (authMember) OverlayTriggerEvent.INCOMING else OverlayTriggerEvent.ANSWER)
         /* 확인 전까지 OTHER_APP→하단바 collapse 금지 */
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
         LetteringIncomingNotifier.cancel(this)
-        hideCompanionOverlayChrome()
+        /* 팝업을 먼저 부착 — 실패 시 BigPush 유지(빈 다크 풀스크린 방지) */
         syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
-        hideCompanionOverlayChrome()
         if (dcpPopupView?.isAttachedToWindow != true) {
             syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+        }
+        if (dcpPopupView?.isAttachedToWindow == true) {
+            hideCompanionOverlayChrome()
+        } else {
+            authPopupOnlyMode = false
+            VlueBigPushTrace.lifecycle(
+                "CENTER_SAFE_POPUP_ATTACH_FAIL",
+                "source=$source keep BigPush — popup not attached"
+            )
+            if (companion.state == OverlayState.BIG_PUSH) {
+                applyLayoutFromController(source = "safe_popup_attach_fail")
+            }
+            restartOutgoingPeerProbeIfNeeded()
+            return
         }
         CompanionRuntimeStabilityDiag.mark(
             if (authMember) "AUTH_MEMBER_POPUP" else "SAFE_CARE_POPUP",
@@ -2228,7 +2300,8 @@ class CallOverlayService : Service() {
             }
             val show = VlueAuthMemberPopupPolicy.shouldShow(
                 overlayState = companion.state,
-                popupOnlyTest = dcpPopupOnly || authPopupOnlyMode
+                popupOnlyTest = dcpPopupOnly || authPopupOnlyMode,
+                callAnswered = remoteConnected || isCallAlreadyAnswered()
             ) && !dismissing
             if (!show) {
                 /* ContextWatch 가 BIG_PUSH 로 접어도 이미 표시 중인 인증 팝업은 유지 */
@@ -2622,10 +2695,12 @@ class CallOverlayService : Service() {
             val h = resources.getDimensionPixelSize(id)
             if (h > 0) return h
         }
+        /* 일부 OEM 리소스 0 — 최소 inset 보장 */
         return dp(28)
     }
 
-    private fun topBigPushOffsetY(): Int = statusBarHeightPx() + dp(4)
+    /** BigPush 최소 Y — 상태바+여백 (알림바 가림 방지) */
+    private fun topBigPushOffsetY(): Int = statusBarHeightPx() + dp(8)
 
     /** 삼성 미니 수신 팝업 바로 아래 (사진 3 "여기") */
     private fun compactIncomingBelowY(): Int =
@@ -3175,22 +3250,21 @@ class CallOverlayService : Service() {
         val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
         val topY = topBigPushOffsetY()
         /* TOP|START 고정 — 드래그/피크가 BOTTOM gravity 와 충돌하지 않게 */
-                params.gravity = Gravity.TOP or Gravity.START
+        params.gravity = Gravity.TOP or Gravity.START
         if (bigPushPeeking) {
             val keep = dp(32)
             val peekH = dp(112)
             params.width = keep
             params.height = peekH
             params.x = if (bigPushPeekOnRight) (sw - keep).coerceAtLeast(0) else 0
-            if (params.y < topY) {
-                params.y = compactBarY(pos, peekH, sh)
-            }
+            params.y = compactBarY(pos, peekH, sh).coerceAtLeast(topY)
             applyBigPushPeekChrome(onRight = bigPushPeekOnRight)
-            } else {
-                params.width = WindowManager.LayoutParams.MATCH_PARENT
+        } else {
+            params.width = WindowManager.LayoutParams.MATCH_PARENT
             params.height = barH
             params.x = 0
-            params.y = compactBarY(pos, barH, sh)
+            /* 상태바(시간·배터리) 아래 — y=0 고착으로 알림바에 가려지던 문제 */
+            params.y = compactBarY(pos, barH, sh).coerceAtLeast(topY)
             bigPushPeekTab?.visibility = android.view.View.GONE
             if (companion.state == OverlayState.BIG_PUSH) {
                 webView?.visibility = android.view.View.VISIBLE
@@ -3867,7 +3941,7 @@ class CallOverlayService : Service() {
             gravity = Gravity.TOP or Gravity.START
             val (_, sh) = screenSizePx()
             val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
-            y = compactBarY(position, barH, sh)
+            y = compactBarY(position, barH, sh).coerceAtLeast(topBigPushOffsetY())
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES

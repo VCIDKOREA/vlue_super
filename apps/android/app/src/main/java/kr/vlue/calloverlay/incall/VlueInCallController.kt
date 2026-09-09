@@ -55,6 +55,15 @@ object VlueInCallController {
     fun hasConnectedActiveCall(): Boolean =
         calls.any { it.state == Call.STATE_ACTIVE } || activeCall?.state == Call.STATE_ACTIVE
 
+    /** 발신 다이얼링·연결 중 — 오디오 휴리스틱으로 수화 오판 금지 */
+    fun isDialingOrConnecting(): Boolean {
+        val states =
+            calls.map { it.state } + listOfNotNull(activeCall?.state)
+        return states.any {
+            it == Call.STATE_DIALING || it == Call.STATE_CONNECTING || it == Call.STATE_SELECT_PHONE_ACCOUNT
+        }
+    }
+
     fun isDefaultDialerBound(): Boolean = inCallService != null
 
     fun extractPhoneNumber(call: Call? = activeCall): String {
