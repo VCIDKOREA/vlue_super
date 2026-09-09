@@ -10,7 +10,7 @@ import kr.vlue.calloverlay.incall.VlueInCallController
 /**
  * 발신 BigPush 중 상대 응답 감지 → [CallOverlayService.notifyConnected].
  * 1) InCallService STATE_ACTIVE (기본 전화앱일 때)
- * 2) 미바인딩 시 AudioManager 통화 모드가 유지되면 수화로 간주 (탭 대체)
+ * 2) AudioManager 통화 모드 유지 휴리스틱 (다이얼러 미연결 OEM · InCall ACTIVE 누락 대비)
  */
 object OutgoingPeerConnectProbe {
     private const val TAG = "OutgoingPeerConnect"
@@ -40,12 +40,21 @@ object OutgoingPeerConnectProbe {
                         stop()
                         return
                     }
-                    /* 다이얼러 미연결 OEM: 통화 오디오 모드가 일정 시간 유지되면 응답으로 본다 */
-                    if (elapsed >= 2_800L && !VlueInCallController.isDefaultDialerBound()) {
+                    /*
+                     * 다이얼러 미연결: 2.8s 후 오디오 모드.
+                     * 다이얼러 연결인데 ACTIVE 누락 OEM: 4.5s 후 동일 휴리스틱 (수신만 되고 발신이 안 열리는 주원인).
+                     */
+                    val audioGateMs =
+                        if (VlueInCallController.isDefaultDialerBound()) 4_500L else 2_800L
+                    if (elapsed >= audioGateMs) {
                         val am = app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                         val mode = am?.mode ?: AudioManager.MODE_NORMAL
                         if (mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION) {
-                            Log.i(TAG, "audio mode heuristic → notifyConnected mode=$mode elapsed=${elapsed}ms")
+                            Log.i(
+                                TAG,
+                                "audio mode heuristic → notifyConnected mode=$mode " +
+                                    "dialerBound=${VlueInCallController.isDefaultDialerBound()} elapsed=${elapsed}ms"
+                            )
                             CallOverlayService.notifyConnected(app)
                             stop()
                             return

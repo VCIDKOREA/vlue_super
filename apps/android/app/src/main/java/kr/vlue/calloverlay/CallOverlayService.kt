@@ -472,32 +472,12 @@ class CallOverlayService : Service() {
                 seq = 6,
                 detail = "answerBeforeBigPush outgoing=$outgoing remoteConnected=$remoteConnected"
             )
-            VlueBigPushTrace.milestone(
-                "SHOWCASE_REQUESTED",
-                "Showcase Requested",
-                seq = 6,
-                detail = "answerBeforeBigPush skip BigPush"
-            )
+            /*
+             * 인증-only·안심케어는 풀 SHOWCASE 금지 — enterShowcaseFromAnswer 와 동일 게이트.
+             * (이전: onAnswer+fullscreen 만 호출 → 송출 OFF 회원도 빈 쇼케이스로 열림)
+             */
             remoteConnected = true
-            companion.onAnswer(OverlayContext.IN_CALL)
-            publishCompanion(OverlayTriggerEvent.ANSWER)
-            LetteringIncomingNotifier.cancel(this)
-            LetteringRingingActivity.requestFinish(this)
-            if (alreadyAttached) {
-                /* 기존 Single Window morph — remove/add 금지 */
-                enterShowcaseLayout(source = "answerBeforeBigPush_reuseWindow")
-            } else {
-                attachOverlayWindow(
-                    phone = phone,
-                    verified = verified,
-                    outgoing = outgoing,
-                    cardJson = cardJson,
-                    asBigPush = false
-                )
-                enterShowcaseLayout(source = "answerBeforeBigPush_attach")
-            }
-            syncOverlayChromeForState(source = "answerBeforeBigPush")
-            notifyWebCallState("connected")
+            enterShowcaseFromAnswer("answerBeforeBigPush")
             return
         }
 
@@ -588,6 +568,10 @@ class CallOverlayService : Service() {
             syncOverlayChromeForState(source = "bigPush_reuseWindow")
             /* sync 전에 웹이 restoreHold 로 big_push 를 무시해도 idle→bar 로 MiniCase 해제 */
             notifyWebCallState("big_push_bar")
+            /* 재사용 경로에서도 발신 상대응답 프로브 유지 (addView 때만 start 하면 누락) */
+            if (outgoing && !remoteConnected) {
+                OutgoingPeerConnectProbe.start(this)
+            }
         } else {
             attachOverlayWindow(
                 phone = phone,
@@ -1049,6 +1033,8 @@ class CallOverlayService : Service() {
                     "BIG_PUSH_TAP_KEEP",
                     "lookup pending/blank — keep bar source=$source"
                 )
+                /* 탭 대기 중에도 발신 상대응답 감지는 유지 */
+                restartOutgoingPeerProbeIfNeeded()
                 return
             }
             /*
@@ -1155,6 +1141,14 @@ class CallOverlayService : Service() {
      */
     private var answerUiResumeAttempt = 0
     private var answerUiResumeRunnable: Runnable? = null
+
+    /** 발신 BigPush 유지 중 상대응답 프로브가 꺼져 있으면 재시작 */
+    private fun restartOutgoingPeerProbeIfNeeded() {
+        if (!currentOutgoing || remoteConnected || dismissing) return
+        if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) return
+        if (companion.state != OverlayState.BIG_PUSH && companion.state != OverlayState.SHOWCASE) return
+        OutgoingPeerConnectProbe.start(this)
+    }
 
     private fun answerResumeAttemptFromSource(source: String): Int {
         val m = Regex("""answer_ui_resume_(\d+)""").find(source)

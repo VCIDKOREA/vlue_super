@@ -208,7 +208,9 @@ const OVERLAY_IDENTITY_CHIP_MIN_MS = 0;
 function applyOverlayPeerPack(pack, setters) {
   if (!pack?.card) return;
   setters.setCard(pack.card);
-  setters.setShowcaseStyle(pack.card.showcaseStyle || pack.showcaseStyle || createDefaultShowcaseStyle());
+  setters.setShowcaseStyle(
+    pack.card.showcaseStyle || pack.showcaseStyle || createPeerAuthOnlyShowcaseStyle()
+  );
   setters.setVerified(Boolean(pack.verified));
   setters.setLoading(false);
 }
@@ -972,7 +974,7 @@ function LetteringOverlayHostInner() {
           setCard(buildUnverifiedOverlayCard(incoming));
           setVerified(false);
         }
-        setShowcaseStyle(createDefaultShowcaseStyle());
+        setShowcaseStyle(createPeerAuthOnlyShowcaseStyle());
       }
       setLoading(false);
     })();
@@ -1108,12 +1110,33 @@ function LetteringOverlayHostInner() {
             }
           } else if (wasShowcaseBar) {
             /*
-             * BigPush → 수화: 네이티브가 SHOWCASE 로 올린 직후.
-             * broadcast 플래그로 다시 접히면 탭해야만 열리는 간헐 버그.
+             * BigPush → 수화: 송출 ON + DCC 실콘텐츠일 때만 풀 쇼케이스.
+             * 송출 OFF·미설정은 정상(인증) 팝업 — 빈 쇼케이스 확대 금지.
              */
-            restoreHoldUntilRef.current = Date.now() + 3500;
-            autoExpandedOnceRef.current = true;
-            setExpanded(true);
+            const liveStyle =
+              styledCardRef.current?.showcaseStyle || showcaseStyleRef.current;
+            const canOpenFull =
+              peerShowcaseBroadcastOn(liveStyle) &&
+              peerHasDccOrShowcaseContent(styledCardRef.current, liveStyle);
+            if (!canOpenFull) {
+              autoExpandedOnceRef.current = false;
+              userChoseMiniRef.current = true;
+              setExpanded(false);
+              const miniBoot = parseOverlayParams().urlMiniCase;
+              if (!miniBoot) {
+                try {
+                  window.Android?.notifyVlueAuthMemberReady?.(incoming || "");
+                  window.VlueLettering?.notifyVlueAuthMemberReady?.(incoming || "");
+                } catch {
+                  /* ignore */
+                }
+                if (!native) setAuthMemberPopupOpen(true);
+              }
+            } else {
+              restoreHoldUntilRef.current = Date.now() + 3500;
+              autoExpandedOnceRef.current = true;
+              setExpanded(true);
+            }
           } else {
             /*
              * 송출 ON: 풀 쇼케이스.
