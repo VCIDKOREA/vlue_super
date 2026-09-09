@@ -15,10 +15,10 @@ import {
 } from "./callPathPeerSignal.js";
 import { slimShowcaseStyleForPublic } from "../lib/slimShowcaseStyle.js";
 
-const EXPIRED_SUBTITLE = "?¸ì¦ê¸°ê°„??ë§Œë£Œ??ë²ˆí˜¸?…ë‹ˆ??";
-const EXPIRED_DETAIL = "?¸ì¦ê¸°ê°„??ë§Œë£Œ??ë²ˆí˜¸?…ë‹ˆ?? ì§ì ‘ ?•ì¸ ë¶€?ë“œë¦½ë‹ˆ??";
+const EXPIRED_SUBTITLE = "??????????????????";
+const EXPIRED_DETAIL = "?????????????????? ?? ??? ????????";
 
-/** ì½??¤ë²„?ˆì´ ì²??˜ì¸?¸ìš© ??live ?°ì„ , ?†ìœ¼ë©?editor. includeDigitalCard ?¬í•¨ */
+/** ???????? ???????? ??live ???, ?????editor. includeDigitalCard ??? */
 function overlayShowcaseStyleFromUser(user: {
   showcaseLiveStyleJson?: unknown;
   showcaseStyleJson?: unknown;
@@ -89,7 +89,7 @@ async function resolveLineBillingGate(e164: string) {
   return { gate: "ok" as const, card };
 }
 
-/** CEO ê¸°ë³¸ VLUE ë¸Œëœ??ë¡œê³  (?…ë¡œ???†ì„ ?? */
+/** CEO ?? VLUE ?????? (???????? ?? */
 function ceoDefaultBrandLogoUrl(): string {
   return `${getVluePublicOrigin()}/vlue-brand-logo.svg`;
 }
@@ -112,8 +112,8 @@ function firstStr(...values: unknown[]): string {
 }
 
 /**
- * ?¤ë²„?ˆì´ ?¬ë¦¼ ì¡°íšŒ ??export_snapshot_json ?µì§¸ SELECT ?†ì´ ?í˜¸ë§?JSON path.
- * business_cards.company_name ??ë¹„ì–´ ?ˆëŠ” CEOÂ·ê°œì¸ëª…í•¨(VCID KOREA ?? ë³´ì •.
+ * ?????? ??? ?? ??export_snapshot_json ??? SELECT ??? ?????JSON path.
+ * business_cards.company_name ???? ??? CEO·????(VCID KOREA ?? ??.
  */
 async function loadOverlayOrgByUserId(userId: string): Promise<string> {
   const rows = await prisma.$queryRaw<Array<{ org: string | null }>>`
@@ -129,7 +129,7 @@ async function loadOverlayOrgByUserId(userId: string): Promise<string> {
   return firstStr(rows[0]?.org);
 }
 
-/** ?œë“œÂ·ë¯¸ë¦¬ë³´ê¸°??ë¸Œëœ???ë¦¬?œì‹œ ???¤ì œ ?í˜¸ë¡??¡ì¶œ?˜ì? ?ŠìŒ */
+/** ???·???????????????? ????? ???????????? ??? */
 function isPlaceholderBrandOrg(org: string): boolean {
   return /^vlue$/i.test(org.trim());
 }
@@ -170,14 +170,20 @@ type ExportSnapLite = {
   photoUrl: string;
   titlePhotoUrl: string;
   logoUrl: string;
-  /** ?ˆì–´ë¡?ë°°ê²½ ì´ˆì : top | center | bottom */
+  /** ??? ?? ??: top | center | bottom */
   photoFocus: string;
   noTitlePhoto: boolean;
+  accountType: string;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  isGroupVerified: boolean;
+  accountGroupDocName: string;
 };
 
 /**
- * export_snapshot_json ?„ì²´ SELECT ê¸ˆì? ??Shared Pooler egress ??£¼ ë°©ì?.
- * JSON path ë¡?ì§§ì? ?ìŠ¤???„ë“œë§?ì¶”ì¶œ.
+ * export_snapshot_json ?? SELECT ?? ? Shared Pooler egress ?? ??.
+ * JSON path ? ?? ??? ??? ??.
  */
 async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null> {
   const rows = await prisma.$queryRaw<
@@ -199,6 +205,12 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
       logo_url: string | null;
       photo_focus: string | null;
       no_title_photo: boolean | null;
+      account_type: string | null;
+      bank_name: string | null;
+      account_number: string | null;
+      account_holder: string | null;
+      is_group_verified: boolean | null;
+      account_group_doc_name: string | null;
     }>
   >`
     SELECT
@@ -222,7 +234,17 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
         WHEN export_snapshot_json ? 'noTitlePhoto'
           THEN (export_snapshot_json->>'noTitlePhoto')::boolean
         ELSE NULL
-      END AS no_title_photo
+      END AS no_title_photo,
+      NULLIF(TRIM(export_snapshot_json->>'accountType'), '') AS account_type,
+      NULLIF(TRIM(export_snapshot_json->>'bankName'), '') AS bank_name,
+      NULLIF(TRIM(export_snapshot_json->>'accountNumber'), '') AS account_number,
+      NULLIF(TRIM(export_snapshot_json->>'accountHolder'), '') AS account_holder,
+      CASE
+        WHEN export_snapshot_json ? 'isGroupVerified'
+          THEN (export_snapshot_json->>'isGroupVerified')::boolean
+        ELSE NULL
+      END AS is_group_verified,
+      NULLIF(TRIM(export_snapshot_json->>'accountGroupDocName'), '') AS account_group_doc_name
     FROM digital_cards
     WHERE user_id = ${userId}::uuid
     LIMIT 1
@@ -245,11 +267,17 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
     titlePhotoUrl: httpOnlyUrl(s.title_photo_url),
     logoUrl: httpOnlyUrl(s.logo_url),
     photoFocus: firstStr(s.photo_focus),
-    noTitlePhoto: Boolean(s.no_title_photo)
+    noTitlePhoto: Boolean(s.no_title_photo),
+    accountType: firstStr(s.account_type),
+    bankName: firstStr(s.bank_name),
+    accountNumber: String(s.account_number || "").replace(/\D/g, ""),
+    accountHolder: firstStr(s.account_holder),
+    isGroupVerified: Boolean(s.is_group_verified),
+    accountGroupDocName: firstStr(s.account_group_doc_name)
   };
 }
 
-/** ?¼ì??´ìŠ¤ ?¡ì¶œ???°ë½ì²???User.email + snap lite + profileJson */
+/** ??????? ????????????User.email + snap lite + profileJson */
 function buildContactProfile(opts: {
   userEmail?: string | null;
   exportSnap?: ExportSnapLite | Record<string, unknown> | null;
@@ -369,6 +397,43 @@ function buildContactProfile(opts: {
         (snap as ExportSnapLite).photoFocus,
         (snap as Record<string, unknown>).photoFocus,
         pj.photoFocus
+      ) || undefined,
+    accountType:
+      firstStr(
+        (snap as ExportSnapLite).accountType,
+        (snap as Record<string, unknown>).accountType,
+        pj.accountType
+      ) || undefined,
+    bankName:
+      firstStr(
+        (snap as ExportSnapLite).bankName,
+        (snap as Record<string, unknown>).bankName,
+        pj.bankName
+      ) || undefined,
+    accountNumber:
+      String(
+        firstStr(
+          (snap as ExportSnapLite).accountNumber,
+          (snap as Record<string, unknown>).accountNumber,
+          pj.accountNumber
+        ) || ""
+      ).replace(/\D/g, "") || undefined,
+    accountHolder:
+      firstStr(
+        (snap as ExportSnapLite).accountHolder,
+        (snap as Record<string, unknown>).accountHolder,
+        pj.accountHolder
+      ) || undefined,
+    isGroupVerified: Boolean(
+      (snap as ExportSnapLite).isGroupVerified ||
+        (snap as Record<string, unknown>).isGroupVerified ||
+        pj.isGroupVerified
+    ),
+    accountGroupDocName:
+      firstStr(
+        (snap as ExportSnapLite).accountGroupDocName,
+        (snap as Record<string, unknown>).accountGroupDocName,
+        pj.accountGroupDocName
       ) || undefined
   };
 }
@@ -376,14 +441,14 @@ function buildContactProfile(opts: {
 type LookupOptions = {
   viewerId?: string | null;
   /**
-   * ê³µê°œ ê³µìœ  ë§í¬(OG/ì¹´ì¹´???¤í¬?˜í¼)??
-   * ê²€?‰Â·íŒ”ë¡œì›Œ ë¹„ê³µê°?ë§ˆìŠ¤?¹ì„ ?ìš©?˜ì? ?Šê³  ëª…í•¨ ?œê¸°ëª…ì„ ê·¸ë?ë¡??¸ì¶œ?œë‹¤.
-   * (ë§í¬ë¥?ë³´ë‚¸ ?¬ëŒ?€ ?´ë? ì´ˆë? ?„ì˜ ???Œë¹„ê³µê°œ ?Œì›?ìœ¼ë¡?ê°€ë¦¬ë©´ ????
+   * ?? ?? ??(OG/??????????)??
+   * ???·??? ????????? ??????? ??? ?? ????? ???????????.
+   * (?????? ????? ???? ??? ??? ??????? ??????????? ????
    */
   forPublicOgShare?: boolean;
-  /** ?µí™” ?¤ë²„?ˆì´ ??ê¸°ê? DBÂ·export ?¤ëƒ…?·ì„ ê±´ë„ˆ?°ê³  ìµœì†Œ ?„ë“œë¡?ì¡°íšŒ */
+  /** ??? ?????? ????? DB·export ?????? ????? ?? ??????? */
   forCallOverlay?: boolean;
-  /** ?ŒìŠ¤???œë??ˆì´????normal | abnormal */
+  /** ????????????????normal | abnormal */
   dcpRoute?: string | null;
 };
 
@@ -422,7 +487,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
             is_verified: false,
             source: "national_agency_dcp",
             profileKind: "dcp",
-            displayName: "ë¹„ì •??ë°œì‹ ",
+            displayName: "??????",
             dcp: { routeStatus: "abnormal", warning: agencyRoute.warning }
           };
       return { status: 200 as const, body };
@@ -437,7 +502,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
 
   const e164 = normalizeToE164KR(String(raw || "").trim());
   if (!e164) {
-    return { status: 400 as const, body: { error: "? íš¨??ë²ˆí˜¸ ?•ì‹???„ë‹™?ˆë‹¤.", matched: false } };
+    return { status: 400 as const, body: { error: "??????? ???????????.", matched: false } };
   }
 
   const [peer, card] = await Promise.all([
@@ -517,7 +582,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
         ? (card.dccSnapshotJson as Record<string, unknown>)
         : null;
     const certified = Boolean(card.user.phoneE164) && card.phoneE164 === card.user.phoneE164;
-    /* ?°ë½Â·?Œê°œ???¸ì¦ ?¬ë??€ ë¬´ê??˜ê²Œ ë§ˆìŠ¤???´ë°± (?´ì„  ?¤ëƒ…??ë¹„ì–´ ?ˆì–´??ëª…í•¨ ?•ë³´ ? ì?) */
+    /* ???·???????? ?????? ?????? ??????? (??? ??????? ??????? ??? ????) */
     const masterSnap = await loadExportSnapLite(card.user.id);
     const exportSnap = {
       name: firstStr(lineSnap?.name, lineSnap?.displayName, certified ? masterSnap?.name : ""),
@@ -533,7 +598,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       photoUrl: certified
         ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
         : httpOnlyUrl(lineSnap?.photoUrl) || "",
-      /* ?¸ì¦ ë²ˆí˜¸: ë§ˆìŠ¤??DigitalCardê°€ ?€?´í?Â·ë¡œê³  ?•ë³¸ (?¼ì¸ ?¤ëƒ… ?”ì¬ ë¬´ì‹œ) */
+      /* ??? ??: ????DigitalCard? ??????·?? ??? (??? ??? ??? ??) */
       titlePhotoUrl: certified
         ? httpOnlyUrl(masterSnap?.titlePhotoUrl) || ""
         : httpOnlyUrl(lineSnap?.titlePhotoUrl) || "",
@@ -737,7 +802,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
   };
 }
 
-/** ë²ˆí˜¸ ê¸°ì? ì¡°íšŒ ?‘ë‹µ ë³¸ë¬¸ ??GET /lookup Â· GET /by-number ê³µìš© */
+/** ?? ??? ?? ??? ?? ??GET /lookup · GET /by-number ?? */
 export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {}) {
   if (opts.forCallOverlay) {
     return lookupCardForCallOverlay(raw, opts);
@@ -756,7 +821,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
           is_verified: false,
           source: "national_agency_dcp",
           profileKind: "dcp",
-          displayName: "ë¹„ì •??ë°œì‹ ",
+          displayName: "??????",
           companyName: "",
           phoneE164: String(raw || "").replace(/\D/g, ""),
           website: "",
@@ -786,7 +851,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
 
   const e164 = normalizeToE164KR(raw.trim());
   if (!e164) {
-    return { status: 400 as const, body: { error: "? íš¨??ë²ˆí˜¸ ?•ì‹???„ë‹™?ˆë‹¤.", matched: false } };
+    return { status: 400 as const, body: { error: "??????? ???????????.", matched: false } };
   }
 
   const billingGate = await resolveLineBillingGate(e164);
@@ -802,7 +867,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
     };
   }
   if (billingGate.gate === "unmatched") {
-    /* ? ì˜ˆ ê²½ê³¼Â·?´ì? ?Œì„ ?€ ?¼ë°˜ ë¯¸ì¸ì¦ìœ¼ë¡?ì·¨ê¸‰ ???„ë˜ user/unmatched ë¶„ê¸°ë¡?*/
+    /* ??? ??·???? ????? ??? ???????? ????? user/unmatched ????*/
   } else {
   const card = await prisma.businessCard.findFirst({
     where: { phoneE164: e164, verificationStatus: "approved" },
@@ -849,7 +914,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       photoUrl: certified
         ? httpOnlyUrl(masterSnap?.photoUrl) || httpOnlyUrl(lineSnap?.photoUrl) || ""
         : httpOnlyUrl(lineSnap?.photoUrl) || "",
-      /* ?¸ì¦ ë²ˆí˜¸: ë§ˆìŠ¤??DigitalCardê°€ ?€?´í?Â·ë¡œê³  ?•ë³¸ (?¼ì¸ ?¤ëƒ… ?”ì¬ ë¬´ì‹œ) */
+      /* ??? ??: ????DigitalCard? ??????·?? ??? (??? ??? ??? ??) */
       titlePhotoUrl: certified
         ? httpOnlyUrl(masterSnap?.titlePhotoUrl) || ""
         : httpOnlyUrl(lineSnap?.titlePhotoUrl) || "",
@@ -967,7 +1032,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
   if (billingGate.gate === "unmatched") {
     return {
       status: 404 as const,
-      body: { matched: false, message: "?±ë¡??ëª…í•¨???†ìŠµ?ˆë‹¤." }
+      body: { matched: false, message: "???????????????." }
     };
   }
 
@@ -1025,7 +1090,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       exportSnap?.logoUrl ||
       null;
     const isCeo = isPlatformCeoHandle(user.publicHandle);
-    /* ?„ë¡œ???¬ì§„ë§?image_url. CEO ë¡œê³  ?¬ë¡¯ë§?VLUE ê¸°ë³¸. ?€??ë¹??¬ì§„ ??null(?¤ë£¨?? */
+    /* ??????????image_url. CEO ?? ?????VLUE ??. ????????? ??null(????? */
     const imageUrl = photoOnly || (isCeo ? ceoDefaultBrandLogoUrl() : null);
     const logoUrl = logoOnly || (isCeo ? ceoDefaultBrandLogoUrl() : null);
 
@@ -1105,6 +1170,6 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
 
   return {
     status: 404 as const,
-    body: { matched: false, message: "?±ë¡??ëª…í•¨???†ìŠµ?ˆë‹¤." }
+    body: { matched: false, message: "???????????????." }
   };
 }

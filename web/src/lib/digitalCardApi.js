@@ -124,30 +124,36 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
       force || !String(local.displayName || "").trim()
         ? String(snap.name || snap.displayName || "").trim()
         : local.displayName,
-    accountType:
-      force || !String(local.accountType || "").trim()
-        ? String(snap.accountType || "").trim()
-        : local.accountType,
-    bankName:
-      force || !String(local.bankName || "").trim()
-        ? String(snap.bankName || "").trim()
-        : local.bankName,
-    accountNumber:
-      force || !String(local.accountNumber || "").trim()
-        ? String(snap.accountNumber || "").replace(/\D/g, "")
-        : local.accountNumber,
-    accountHolder:
-      force || !String(local.accountHolder || "").trim()
-        ? String(snap.accountHolder || "").trim()
-        : local.accountHolder,
+    accountType: (() => {
+      const fromSnap = String(snap.accountType || "").trim();
+      if (fromSnap) return fromSnap;
+      /* 서버 슬림 응답에 계좌키가 빠져 빈값으로 덮어쓰지 않음 */
+      return String(local.accountType || "").trim();
+    })(),
+    bankName: (() => {
+      const fromSnap = String(snap.bankName || "").trim();
+      if (fromSnap) return fromSnap;
+      return String(local.bankName || "").trim();
+    })(),
+    accountNumber: (() => {
+      const fromSnap = String(snap.accountNumber || "").replace(/\D/g, "");
+      if (fromSnap) return fromSnap;
+      return String(local.accountNumber || "").replace(/\D/g, "");
+    })(),
+    accountHolder: (() => {
+      const fromSnap = String(snap.accountHolder || "").trim();
+      if (fromSnap) return fromSnap;
+      return String(local.accountHolder || "").trim();
+    })(),
     isGroupVerified:
-      force || snap.isGroupVerified != null
+      snap.isGroupVerified != null
         ? Boolean(snap.isGroupVerified)
         : Boolean(local.isGroupVerified),
-    accountGroupDocName:
-      force || !String(local.accountGroupDocName || "").trim()
-        ? String(snap.accountGroupDocName || "").trim()
-        : local.accountGroupDocName
+    accountGroupDocName: (() => {
+      const fromSnap = String(snap.accountGroupDocName || "").trim();
+      if (fromSnap) return fromSnap;
+      return String(local.accountGroupDocName || "").trim();
+    })()
   };
 
   return writeLetteringBizcardEditable(patch)?.data ?? null;

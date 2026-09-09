@@ -201,13 +201,19 @@ authed.post("/users/:userId/withdraw", async (c) => {
   const admin = c.get("adminConsoleUser");
   const body = (await c.req.json().catch(() => ({}))) as {
     reason?: string;
-    mode?: "grace" | "immediate";
+    mode?: "grace" | "immediate" | "permanent_ban";
   };
   try {
+    const mode =
+      body.mode === "permanent_ban"
+        ? "permanent_ban"
+        : body.mode === "immediate"
+          ? "immediate"
+          : "grace";
     const result = await adminWithdrawUser(c.req.param("userId"), {
       reason: String(body.reason || ""),
       adminUserId: admin.id,
-      mode: body.mode === "immediate" ? "immediate" : "grace"
+      mode
     });
     return c.json(result);
   } catch (e) {

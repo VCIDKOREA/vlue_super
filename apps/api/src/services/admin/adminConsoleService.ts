@@ -393,10 +393,19 @@ export async function adminActivateUser(
 
 export async function adminWithdrawUser(
   userId: string,
-  opts: { reason: string; adminUserId: string; mode?: "grace" | "immediate" }
+  opts: {
+    reason: string;
+    adminUserId: string;
+    mode?: "grace" | "immediate" | "permanent_ban";
+  }
 ) {
   const reason = requireReason(opts.reason);
-  const mode = opts.mode === "immediate" ? "immediate" : "grace";
+  const mode =
+    opts.mode === "permanent_ban"
+      ? "permanent_ban"
+      : opts.mode === "immediate"
+        ? "immediate"
+        : "grace";
   await ensureAdminAccountActionSchema();
 
   const before = await prisma.user.findUnique({
@@ -409,8 +418,24 @@ export async function adminWithdrawUser(
     .filter(Boolean)
     .join(" · ");
 
+  if (mode === "permanent_ban") {
+    await withdrawAccountByAdmin(userId, { permanentBan: true });
+    await writeAccountActionMeta(userId, {
+      type: "permanent_ban",
+      reason: `${reason}${wasLabel ? ` · was:${wasLabel}` : ""}`,
+      adminUserId: opts.adminUserId
+    });
+    return {
+      ok: true,
+      immediate: true,
+      permanentBan: true,
+      user: await getAdminUser(userId),
+      message: "영구 추방 처리되었습니다. 동일 본인으로는 재가입할 수 없습니다."
+    };
+  }
+
   if (mode === "immediate") {
-    await withdrawAccountByAdmin(userId);
+    await withdrawAccountByAdmin(userId, { permanentBan: false });
     await writeAccountActionMeta(userId, {
       type: "withdraw_immediate",
       reason: `${reason}${wasLabel ? ` · was:${wasLabel}` : ""}`,
@@ -420,7 +445,8 @@ export async function adminWithdrawUser(
       ok: true,
       immediate: true,
       user: await getAdminUser(userId),
-      message: "즉시 탈퇴 처리되었습니다. 개인정보는 파기되어 복구할 수 없습니다."
+      message:
+        "즉시 탈퇴 처리되었습니다. 개인정보는 파기되어 복구할 수 없습니다. 재가입 시 본인인증부터 다시 진행됩니다."
     };
   }
 

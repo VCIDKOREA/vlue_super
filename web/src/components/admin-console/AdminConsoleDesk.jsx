@@ -526,7 +526,11 @@ function GroupAccountAdminTab({ onToast }) {
 }
 
 function accountStatusLabel(row) {
-  if (row?.status === "DELETED") return "탈퇴완료";
+  if (row?.status === "DELETED") {
+    const t = String(row?.accountActionType || "");
+    if (t === "permanent_ban" || t === "withdraw_permanent_ban") return "영구추방";
+    return "탈퇴완료";
+  }
   if (row?.pendingWithdrawal) {
     const until = String(row.recoverableUntil || "").replace("T", " ").slice(0, 16);
     return until ? `탈퇴예정 · ${until}까지 복구` : "탈퇴예정";
@@ -539,13 +543,26 @@ function accountStatusLabel(row) {
   return s || "—";
 }
 
-function MemberActionModal({ open, title, hint, confirmLabel, confirmClass, requireReason, showImmediate, onClose, onConfirm, busy }) {
+function MemberActionModal({
+  open,
+  title,
+  hint,
+  confirmLabel,
+  confirmClass,
+  requireReason,
+  showImmediate,
+  onClose,
+  onConfirm,
+  busy
+}) {
   const [reason, setReason] = useState("");
   const [immediate, setImmediate] = useState(false);
+  const [permanentBan, setPermanentBan] = useState(false);
   useEffect(() => {
     if (open) {
       setReason("");
       setImmediate(false);
+      setPermanentBan(false);
     }
   }, [open]);
   if (!open) return null;
@@ -580,15 +597,36 @@ function MemberActionModal({ open, title, hint, confirmLabel, confirmClass, requ
           </label>
         )}
         {showImmediate ? (
-          <label className="mt-3 flex items-start gap-2 text-[12px] font-semibold text-rose-700">
-            <input
-              type="checkbox"
-              checked={immediate}
-              onChange={(e) => setImmediate(e.target.checked)}
-              className="mt-0.5"
-            />
-            <span>즉시 탈퇴(개인정보 파기 · 복구 불가). 체크하지 않으면 24시간 유예 후 자동 탈퇴되며 그사이 복구 가능합니다.</span>
-          </label>
+          <>
+            <label className="mt-3 flex items-start gap-2 text-[12px] font-semibold text-rose-700">
+              <input
+                type="checkbox"
+                checked={immediate}
+                disabled={permanentBan}
+                onChange={(e) => {
+                  setImmediate(e.target.checked);
+                  if (e.target.checked) setPermanentBan(false);
+                }}
+                className="mt-0.5"
+              />
+              <span>
+                즉시 탈퇴(개인정보 파기 · 복구 불가 · 재가입 시 본인인증 필요). 체크하지 않으면 24시간 유예
+                후 자동 탈퇴되며 그사이 복구 가능합니다.
+              </span>
+            </label>
+            <label className="mt-2 flex items-start gap-2 text-[12px] font-semibold text-rose-900">
+              <input
+                type="checkbox"
+                checked={permanentBan}
+                onChange={(e) => {
+                  setPermanentBan(e.target.checked);
+                  if (e.target.checked) setImmediate(true);
+                }}
+                className="mt-0.5"
+              />
+              <span>영구 추방(동일 본인인증으로 재가입 불가). 사칭·악용 등 운영 차단용입니다.</span>
+            </label>
+          </>
         ) : null}
         <div className="mt-4 flex justify-end gap-2">
           <button
@@ -602,7 +640,7 @@ function MemberActionModal({ open, title, hint, confirmLabel, confirmClass, requ
           <button
             type="button"
             disabled={busy || (requireReason && reason.trim().length < 2)}
-            onClick={() => onConfirm({ reason: reason.trim(), immediate })}
+            onClick={() => onConfirm({ reason: reason.trim(), immediate, permanentBan })}
             className={`rounded-lg px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50 ${confirmClass || "bg-slate-900"}`}
           >
             {busy ? "처리 중…" : confirmLabel}
@@ -787,7 +825,7 @@ function UsersTab({ onToast }) {
     }
   };
 
-  const runAction = async ({ reason, immediate }) => {
+  const runAction = async ({ reason, immediate, permanentBan }) => {
     if (!action?.userId || !action?.type) return;
     setBusyId(action.userId);
     try {
@@ -798,11 +836,16 @@ function UsersTab({ onToast }) {
         await adminActivateUser(action.userId, { reason });
         onToast?.("계정 활성화");
       } else if (action.type === "withdraw") {
-        const res = await adminWithdrawUser(action.userId, {
-          reason,
-          mode: immediate ? "immediate" : "grace"
-        });
-        onToast?.(res?.message || (immediate ? "즉시 탈퇴 처리" : "탈퇴 예약(24시간 복구 가능)"));
+        const mode = permanentBan ? "permanent_ban" : immediate ? "immediate" : "grace";
+        const res = await adminWithdrawUser(action.userId, { reason, mode });
+        onToast?.(
+          res?.message ||
+            (permanentBan
+              ? "영구 추방 처리"
+              : immediate
+                ? "즉시 탈퇴 처리"
+                : "탈퇴 예약(24시간 복구 가능)")
+        );
       } else if (action.type === "restore") {
         const res = await adminRestoreUser(action.userId, { reason });
         onToast?.(res?.message || "복구 완료");
@@ -831,7 +874,7 @@ function UsersTab({ onToast }) {
     if (action.type === "withdraw") {
       return {
         title: "회원 탈퇴 처리",
-        hint: "고객 요청 탈퇴입니다. 기본은 24시간 유예(복구 가능)이며, 필요 시 즉시 탈퇴를 선택할 수 있습니다.",
+        hint: "고객 요청 탈퇴는 재가입(본인인증 다시)이 가능합니다. 사칭·악용은 「영구 추방」을 선택하세요.",
         confirmLabel: "탈퇴 처리",
         confirmClass: "bg-rose-700",
         requireReason: true,

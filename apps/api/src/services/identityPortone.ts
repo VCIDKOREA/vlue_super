@@ -259,7 +259,7 @@ export async function completePortoneIdentity(params: {
 
   const adminBypass = Boolean(params.adminDeviceKey);
 
-  const existing = await prisma.user.findFirst({
+  const existingRow = await prisma.user.findFirst({
     where: { ciHash: { equals: ciPrisma } },
     select: {
       id: true,
@@ -270,6 +270,35 @@ export async function completePortoneIdentity(params: {
       publicHandle: true
     }
   });
+
+  /** 탈퇴 tombstone 에 CI가 남은 경우 — 영구추방만 차단, 그 외는 CI 해제 후 신규 가입 */
+  let existing = existingRow;
+  if (existingRow && String(existingRow.status || "") === "DELETED") {
+    let actionType = "";
+    try {
+      const banRows = await prisma.$queryRaw<Array<{ account_action_type: string | null }>>`
+        SELECT account_action_type FROM users WHERE id = ${existingRow.id}::uuid LIMIT 1
+      `;
+      actionType = String(banRows[0]?.account_action_type || "");
+    } catch {
+      actionType = "";
+    }
+    const banned = actionType === "permanent_ban" || actionType === "withdraw_permanent_ban";
+    if (banned) {
+      throw new Error(
+        "영구 차단된 회원입니다. 동일 본인인증으로는 재가입할 수 없습니다. 고객센터로 문의해 주세요."
+      );
+    }
+    try {
+      await prisma.user.update({
+        where: { id: existingRow.id },
+        data: { ciHash: null }
+      });
+    } catch {
+      /* ignore */
+    }
+    existing = null;
+  }
 
   /**
    * 만 14세 미만: 본인 휴대폰 PASS로 일반 가입·로그인 가능 (쇼케이스).
@@ -317,11 +346,6 @@ export async function completePortoneIdentity(params: {
   let publicHandle: string;
 
   if (existing) {
-    if (String(existing.status || "") === "DELETED") {
-      throw new Error(
-        "탈퇴 처리된 회원입니다. 동일 본인인증으로는 즉시 재가입·로그인할 수 없습니다. 재가입이 필요하면 고객센터로 문의해 주세요."
-      );
-    }
     const st = existing.accountStatus;
     const mapped: Extract<AccountStatus, "active" | "pending_approval"> =
       st === "pending_approval" ? "pending_approval" : "active";

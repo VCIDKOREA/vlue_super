@@ -373,13 +373,16 @@ export async function scheduleAdminWithdrawal(userId: string) {
   };
 }
 
-/** 관리자 — 즉시 탈퇴(PII 파기, 복구 불가) */
-export async function withdrawAccountByAdmin(userId: string) {
+/** 관리자 — 즉시 탈퇴(PII 파기, 복구 불가). permanentBan 시 CI 유지로 재가입 차단 */
+export async function withdrawAccountByAdmin(
+  userId: string,
+  opts: { permanentBan?: boolean } = {}
+) {
   await ensureWithdrawalDbReady();
   await assertWithdrawalAllowed(userId);
   await dissolveFamilyLinksForGuardianWithdrawal(userId);
-  await withdrawUserAccount(userId);
-  return { ok: true as const, immediate: true as const };
+  await withdrawUserAccount(userId, { permanentBan: Boolean(opts.permanentBan) });
+  return { ok: true as const, immediate: true as const, permanentBan: Boolean(opts.permanentBan) };
 }
 
 export async function processDueScheduledWithdrawals(limit = 50) {

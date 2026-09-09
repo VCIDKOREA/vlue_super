@@ -488,6 +488,12 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
       no_title_photo: boolean | null;
       no_fax: boolean | null;
       no_website: boolean | null;
+      account_type: string | null;
+      bank_name: string | null;
+      account_number: string | null;
+      account_holder: string | null;
+      is_group_verified: boolean | null;
+      account_group_doc_name: string | null;
     }>
   >(Prisma.sql`
     SELECT
@@ -541,7 +547,17 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
         WHEN export_snapshot_json ? 'noWebsite'
           THEN (export_snapshot_json->>'noWebsite')::boolean
         ELSE NULL
-      END AS no_website
+      END AS no_website,
+      NULLIF(TRIM(export_snapshot_json->>'accountType'), '') AS account_type,
+      NULLIF(TRIM(export_snapshot_json->>'bankName'), '') AS bank_name,
+      NULLIF(TRIM(export_snapshot_json->>'accountNumber'), '') AS account_number,
+      NULLIF(TRIM(export_snapshot_json->>'accountHolder'), '') AS account_holder,
+      CASE
+        WHEN export_snapshot_json ? 'isGroupVerified'
+          THEN (export_snapshot_json->>'isGroupVerified')::boolean
+        ELSE NULL
+      END AS is_group_verified,
+      NULLIF(TRIM(export_snapshot_json->>'accountGroupDocName'), '') AS account_group_doc_name
     FROM digital_cards
     WHERE user_id = ${me}::uuid
     LIMIT 1
@@ -577,7 +593,13 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
     noCompanyLogo: row.no_company_logo,
     noTitlePhoto: row.no_title_photo,
     noFax: row.no_fax,
-    noWebsite: row.no_website
+    noWebsite: row.no_website,
+    accountType: row.account_type,
+    bankName: row.bank_name,
+    accountNumber: row.account_number,
+    accountHolder: row.account_holder,
+    isGroupVerified: row.is_group_verified,
+    accountGroupDocName: row.account_group_doc_name
   });
   return c.json({
     issued: true,

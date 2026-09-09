@@ -20,11 +20,25 @@ function tombstoneHandle(userId: string): string {
   return `del_${compact}`;
 }
 
+export type WithdrawUserAccountOptions = {
+  /**
+   * 영구 추방 — CI 유지로 동일 본인 재가입 차단.
+   * 일반/즉시 탈퇴는 CI를 파기해 본인인증 후 신규 가입 가능.
+   */
+  permanentBan?: boolean;
+};
+
 /**
- * 회원 탈퇴 — PII 파기, 구독 해지, 세션 무효화, 재가입 방지 로그 보관
+ * 회원 탈퇴 — PII 파기, 구독 해지, 세션 무효화.
+ * 일반 탈퇴: CI 파기 → 재가입 시 본인인증부터 다시.
+ * 영구 추방: CI 유지 → 동일 본인 재가입 불가.
  */
-export async function withdrawUserAccount(userId: string): Promise<{ ok: true }> {
+export async function withdrawUserAccount(
+  userId: string,
+  opts: WithdrawUserAccountOptions = {}
+): Promise<{ ok: true }> {
   await ensureWithdrawalScheduleSchema();
+  const permanentBan = Boolean(opts.permanentBan);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, status: true, role: true, publicHandle: true }
@@ -51,7 +65,7 @@ export async function withdrawUserAccount(userId: string): Promise<{ ok: true }>
       data: {
         status: "cancelled",
         cancelledAt: now,
-        cancelReason: "user_withdrawal",
+        cancelReason: permanentBan ? "permanent_ban" : "user_withdrawal",
         nextChargeAt: null
       }
     });
@@ -70,7 +84,8 @@ export async function withdrawUserAccount(userId: string): Promise<{ ok: true }>
         identityVerified: false,
         identityVerifiedAt: null,
         portoneIdentityId: null,
-        /* ciHash 유지 — 동일 본인 재인증·재가입으로 즉시 로그인되는 것 방지 */
+        /* 일반 탈퇴: CI 파기(재가입·재인증 가능). 영구 추방만 CI 유지 */
+        ...(permanentBan ? {} : { ciHash: null }),
         birthDate: null,
         gender: null,
         nickChat: null,
