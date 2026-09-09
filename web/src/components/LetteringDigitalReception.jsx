@@ -6,16 +6,13 @@ import {
   Globe,
   Printer,
   ShieldCheck,
-  Check,
-  Landmark,
-  Copy
+  Check
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { isMaskedPhoneDisplay } from "../lib/dccExposure.js";
 import {
   canShowDccAccountOnCard,
-  formatDccAccountCopyText,
-  digitsOnlyAccount
+  formatDccAccountCopyText
 } from "../lib/dccAccountFields.js";
 import {
   formatLetteringReceptionLines,
@@ -603,6 +600,61 @@ function AddressDetailPopup({ address, onClose, onToast }) {
   );
 }
 
+/** DCC 계좌 — 전면에 번호 미노출, 은행명 + 복사만 */
+function AccountViewPopup({ card, onClose, onToast }) {
+  const bank = String(card?.bankName || "").trim();
+  const copyAccount = async () => {
+    const text = formatDccAccountCopyText(card);
+    if (!text) {
+      onToast?.("복사할 계좌정보가 없습니다.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      onToast?.("계좌번호가 복사되었습니다.");
+    } catch {
+      onToast?.("복사에 실패했습니다.");
+    }
+  };
+
+  return (
+    <div
+      className="ldr-account-popup"
+      role="dialog"
+      aria-modal="true"
+      aria-label="계좌보기"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose?.();
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div
+        className="ldr-account-popup__sheet"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <p className="ldr-account-popup__bank">{bank || "등록된 은행"}</p>
+        <button
+          type="button"
+          className="ldr-account-popup__copy"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            copyAccount();
+          }}
+        >
+          계좌번호 복사하기
+        </button>
+        <button type="button" className="ldr-account-popup__close" onClick={onClose}>
+          닫기
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FrontPanel({
   card,
   verified,
@@ -618,6 +670,7 @@ function FrontPanel({
 }) {
   const [socialOpen, setSocialOpen] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const socialItems = listCardSocialOutlinks(card);
   const hasSocial = socialItems.length > 0;
   const phoneRaw = String(card.phone || "").trim();
@@ -740,41 +793,66 @@ function FrontPanel({
           {(() => {
             /* 미니미리보기·상대 쇼케이스·실통화 DCC — 동일 resolveDccFrontIdentityLines */
             const { primary, secondary } = resolveDccFrontIdentityLines(card);
-            if (!secondary) return null;
-            const canOpenCase =
-              peerUserId &&
-              !isDccCertifiedMemberLabel(secondary) &&
-              String(card.name || "").trim() &&
-              primary !== String(card.name || "").trim();
-            if (canOpenCase) {
-              return (
-                <button
-                  type="button"
-                  className="ldr-back-person-name ldr-back-person-name--row ldr-back-person-name--link"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openPeerCaseArchive();
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <IdentitySecondaryText text={secondary} />
-                </button>
-              );
+            const showAccountBtn = canShowDccAccountOnCard(card);
+            if (!secondary && !showAccountBtn) return null;
+
+            let nameNode = null;
+            if (secondary) {
+              const canOpenCase =
+                peerUserId &&
+                !isDccCertifiedMemberLabel(secondary) &&
+                String(card.name || "").trim() &&
+                primary !== String(card.name || "").trim();
+              if (canOpenCase) {
+                nameNode = (
+                  <button
+                    type="button"
+                    className="ldr-back-person-name ldr-back-person-name--row ldr-back-person-name--link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openPeerCaseArchive();
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <IdentitySecondaryText text={secondary} />
+                  </button>
+                );
+              } else if (isDccCertifiedMemberLabel(secondary)) {
+                nameNode = (
+                  <p className="ldr-back-person-name ldr-back-person-name--row">
+                    <span className="ldr-back-person-name--verified-member">{secondary}</span>
+                  </p>
+                );
+              } else {
+                nameNode = (
+                  <IdentitySecondaryText
+                    text={secondary}
+                    className="ldr-back-person-name ldr-back-person-name--row"
+                    as="p"
+                  />
+                );
+              }
             }
-            if (isDccCertifiedMemberLabel(secondary)) {
-              return (
-                <p className="ldr-back-person-name ldr-back-person-name--row">
-                  <span className="ldr-back-person-name--verified-member">{secondary}</span>
-                </p>
-              );
-            }
+
             return (
-              <IdentitySecondaryText
-                text={secondary}
-                className="ldr-back-person-name ldr-back-person-name--row"
-                as="p"
-              />
+              <div className="ldr-back-person-line">
+                {nameNode}
+                {showAccountBtn ? (
+                  <button
+                    type="button"
+                    className="ldr-account-view-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setAccountOpen(true);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    계좌보기
+                  </button>
+                ) : null}
+              </div>
             );
           })()}
         </div>
@@ -908,40 +986,6 @@ function FrontPanel({
           </FrontInfoRow>
         ) : null}
 
-        {canShowDccAccountOnCard(card) ? (
-          <FrontInfoRow icon={Landmark} label="계좌정보" className="ldr-front-info-row--account">
-            <div className="ldr-front-account">
-              <p className="ldr-front-account__primary">
-                <span className="ldr-front-account__bank">{String(card.bankName || "").trim()}</span>
-                <span className="ldr-front-account__num tabular-nums">
-                  {digitsOnlyAccount(card.accountNumber)}
-                </span>
-                <button
-                  type="button"
-                  className="ldr-front-account__copy"
-                  aria-label="계좌번호 복사"
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const text = formatDccAccountCopyText(card);
-                    if (!text) return;
-                    try {
-                      await navigator.clipboard.writeText(text);
-                      onToast?.("계좌번호가 복사되었습니다.");
-                    } catch {
-                      onToast?.("복사에 실패했습니다.");
-                    }
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <Copy className="ldr-front-account__copy-icon" aria-hidden />
-                </button>
-              </p>
-              <p className="ldr-front-account__holder">{String(card.accountHolder || "").trim()}</p>
-            </div>
-          </FrontInfoRow>
-        ) : null}
-
         {validityDisplay ? (
           <FrontInfoRow icon={ShieldCheck} label={validityLabel} className="ldr-front-info-row--careers">
             <p className="ldr-front-info-row__text tabular-nums">{validityDisplay}</p>
@@ -977,6 +1021,9 @@ function FrontPanel({
           onClose={() => setAddressOpen(false)}
           onToast={onToast}
         />
+      ) : null}
+      {accountOpen && canShowDccAccountOnCard(card) ? (
+        <AccountViewPopup card={card} onClose={() => setAccountOpen(false)} onToast={onToast} />
       ) : null}
     </div>
   );

@@ -47,14 +47,13 @@ export function formatDccAccountCopyText({ bankName, accountNumber, accountHolde
   return [bank, num, holder].filter(Boolean).join(" ");
 }
 
-/** 뷰어 노출 가능 여부 — GROUP 은 승인 후에만 */
+/** 뷰어 노출 가능 여부 — GROUP 은 승인 후에만. 은행·계좌번호만 있으면 표시(예금주 누락으로 숨김 방지) */
 export function canShowDccAccountOnCard(card = {}) {
   let type = normalizeDccAccountType(card.accountType);
   const bank = String(card.bankName || "").trim();
   const num = digitsOnlyAccount(card.accountNumber);
-  const holder = String(card.accountHolder || "").trim();
-  if (!bank || !num || !holder) return false;
-  /* 유형만 비어 있어도 은행·계좌·예금주가 있으면 표시 (사라짐 방지) */
+  if (!bank || !num) return false;
+  /* 유형만 비어 있어도 은행·계좌가 있으면 표시 */
   if (!type) type = DCC_ACCOUNT_TYPES.PERSONAL;
   if (type === DCC_ACCOUNT_TYPES.GROUP && !card.isGroupVerified) return false;
   return true;

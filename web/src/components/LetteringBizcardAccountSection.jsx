@@ -83,7 +83,7 @@ export default function LetteringBizcardAccountSection({
         계좌정보 (선택)
       </p>
       <p className={`mt-1 text-[10px] leading-relaxed ${muted}`}>
-        개인·사업자 계좌는 전체적용 후 바로 명함 앞면에 표시됩니다. 모임/단체만 관리자 승인 후 표시됩니다.
+        개인·사업자 계좌는 전체적용 후 「계좌보기」로 표시됩니다(번호는 복사만). 모임/단체만 관리자 승인 후 표시됩니다.
       </p>
 
       <div

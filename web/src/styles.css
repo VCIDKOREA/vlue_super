@@ -8228,6 +8228,98 @@ button.ldr-back-person-name--link:active {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  min-width: 0;
+  flex: 1;
+}
+
+.ldr-back-person-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  min-width: 0;
+  width: 100%;
+}
+
+.ldr-account-view-btn {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.55);
+  background: rgba(14, 165, 233, 0.18);
+  color: #e0f2fe;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ldr-account-view-btn:active {
+  opacity: 0.85;
+  background: rgba(14, 165, 233, 0.32);
+}
+
+.ldr-account-popup {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.ldr-account-popup__sheet {
+  width: min(100%, 280px);
+  border-radius: 16px;
+  padding: 16px 14px 12px;
+  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.ldr-account-popup__bank {
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.ldr-account-popup__copy {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 0;
+  background: #0284c7;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ldr-account-popup__copy:active {
+  opacity: 0.9;
+}
+
+.ldr-account-popup__close {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: rgba(203, 213, 225, 0.9);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .ldr-back-person-name--verified-member {
