@@ -3257,7 +3257,7 @@ function App() {
     return () => window.removeEventListener("vlue-app-foreground", onFg);
   }, []);
 
-  /* 재설치 후 세션만 남은 경우 — 빈 로컬 명함·쇼케이스를 서버에서 복원 */
+  /* 로그인 후 서버 명함 스냅샷을 항상 복원 — 재설치·캐시 유실 시 연락처 소실 방지 */
   useEffect(() => {
     if (!isLoggedIn) return undefined;
     let cancelled = false;
@@ -3265,18 +3265,9 @@ function App() {
       try {
         const uid = String(localStorage.getItem("vlue_server_user_id") || "").trim();
         if (!uid) return;
-        const {
-          needsDigitalCardLocalRestore,
-          needsDigitalCardContactFill,
-          restoreDigitalCardFromServer,
-          fillEmptyDigitalCardFieldsFromServer
-        } = await import("./lib/digitalCardApi.js");
-        if (needsDigitalCardLocalRestore()) {
-          await restoreDigitalCardFromServer({ force: true });
-        } else if (needsDigitalCardContactFill()) {
-          /* 이메일만 남아 있어도 주소·웹·소개 빈 칸은 서버 스냅으로 채움 */
-          await fillEmptyDigitalCardFieldsFromServer();
-        }
+        const { restoreDigitalCardFromServer } = await import("./lib/digitalCardApi.js");
+        /* force: 로컬이 비었거나 일부만 있어도 서버값을 빈 칸에 채움(비어 있는 서버값으로 지우지 않음은 hydrate 내부) */
+        await restoreDigitalCardFromServer({ force: true });
         const showcase = await import("./lib/showcase/showcaseStyleSync.js");
         if (showcase.needsShowcaseStyleLocalRestore()) {
           await showcase.restoreShowcaseStyleFromServer();
@@ -4479,8 +4470,8 @@ function App() {
       <header className={`sticky top-0 z-50 relative w-full backdrop-blur-lg border-b vlue-top-safe ${
         isDarkMode ? "bg-[#111827]/95 border-white/10" : "bg-white/90 border-gray-100"
       } ${topHeaderVisible ? "block" : "hidden"}`}>
-        <div className="flex h-[52px] w-full items-center justify-between gap-2 px-2.5">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex h-[52px] w-full items-center justify-between gap-2 overflow-visible px-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-visible">
             {subhubUtilBack ? (
               <BackButton variant="inline" onBack={() => setSubscriptionSubTab("all")} />
             ) : (

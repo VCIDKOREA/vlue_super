@@ -36,7 +36,27 @@ export function VlueNavLogoMark({
           <stop offset="100%" stopColor="#1d4ed8" />
         </linearGradient>
       </defs>
-      <rect width="128" height="128" rx="36.6" fill={`url(#${gradId})`} />
+      {/* 흰 테두리(어두운 배경) + 바깥 링(흰 헤더에서도 보이게) */}
+      <rect
+        x="5"
+        y="5"
+        width="118"
+        height="118"
+        rx="33"
+        fill={`url(#${gradId})`}
+        stroke="#ffffff"
+        strokeWidth="9"
+      />
+      <rect
+        x="1.5"
+        y="1.5"
+        width="125"
+        height="125"
+        rx="35.5"
+        fill="none"
+        stroke="rgba(37, 99, 235, 0.35)"
+        strokeWidth="3"
+      />
       <g
         transform="translate(0 -5.2)"
         className={[

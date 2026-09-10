@@ -1,83 +1,90 @@
 .vlue-brand-wordmark {
   display: inline-flex;
   align-items: center;
-  line-height: 1;
+  line-height: 1.25;
   white-space: nowrap;
   font-weight: inherit;
   letter-spacing: inherit;
   color: inherit;
+  overflow: visible;
 }
 
 .vlue-brand-wordmark__base {
   display: inline-flex;
-  align-items: baseline;
-  letter-spacing: -0.04em;
+  align-items: flex-end;
+  letter-spacing: -0.045em;
+  overflow: visible;
 }
 
 .vlue-brand-wordmark__e {
   position: relative;
   display: inline-block;
-  letter-spacing: -0.04em;
-  /* 악센트 공간 — 윗선이 잘리지 않게 */
-  padding-top: 0.18em;
-  margin-top: -0.18em;
+  letter-spacing: -0.045em;
+  /* 악센트가 헤더 overflow에 잘리지 않도록 */
+  padding-top: 0.42em;
+  margin-top: -0.42em;
+  overflow: visible;
 }
 
+/*
+ * 아큐트 악센트 — 얇은 점/막대 대신 굵고 기울어진 쐐기.
+ * (유니코드 É는 Pretendard에서 거의 안 보이거나 잘림)
+ */
 .vlue-brand-wordmark__accent {
   position: absolute;
-  left: 50%;
+  left: 54%;
   top: 0.02em;
-  width: 0.32em;
-  height: 0.14em;
-  transform: translateX(-42%) rotate(-22deg);
-  border-radius: 999px;
+  width: 0.38em;
+  height: 0.2em;
+  transform: translateX(-50%) rotate(-32deg);
+  border-radius: 3px;
   background: currentColor;
   box-shadow: 0 0 0 0.5px currentColor;
   pointer-events: none;
 }
 
-/* 헤더 큰 타이틀 */
 .vlue-app-brand-title.vlue-brand-wordmark {
   font-size: clamp(20px, 5.5vw, 26px);
   font-weight: 900;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.05em;
   color: #2563eb;
+  overflow: visible;
 }
 
 .vlue-app-brand-title .vlue-brand-wordmark__accent {
-  width: 0.36em;
-  height: 0.155em;
+  width: 0.42em;
+  height: 0.22em;
   top: 0;
 }
 
-/* 네비 로고 옆 */
 .mkt-nav-logo-text.vlue-brand-wordmark,
 .vlue-nav-wordmark.vlue-brand-wordmark {
   font-weight: 800;
   letter-spacing: -0.04em;
   color: #3182f6;
+  overflow: visible;
 }
 
 .mkt-nav-logo-text .vlue-brand-wordmark__accent,
 .vlue-nav-wordmark .vlue-brand-wordmark__accent {
-  width: 0.34em;
-  height: 0.145em;
+  width: 0.4em;
+  height: 0.2em;
 }
 
-/* 인증 봉인 등 작은 라벨 */
 .vlue-brand-wordmark--seal {
   font-weight: 900;
   letter-spacing: -0.03em;
   font-size: inherit;
+  overflow: visible;
 }
 
 .vlue-brand-wordmark--seal .vlue-brand-wordmark__e {
-  padding-top: 0.2em;
-  margin-top: -0.2em;
+  padding-top: 0.4em;
+  margin-top: -0.4em;
 }
 
 .vlue-brand-wordmark--seal .vlue-brand-wordmark__accent {
-  width: 0.3em;
-  height: 0.13em;
-  top: 0.01em;
+  width: 0.36em;
+  height: 0.18em;
+  top: 0.02em;
 }

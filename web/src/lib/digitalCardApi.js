@@ -44,7 +44,9 @@ export function writeStoredDigitalCardId(cardId) {
   }
 }
 
-/** 서버 exportSnapshot → 로컬 명함 편집 필드 복원 */
+/** 서버 스냅샷 → 로컬 명함 편집 필드 복원
+ * force=true 여도 서버 빈 값으로 로컬에 이미 있는 값을 지우지 않음 (연락처·소개)
+ */
 export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
   if (!snap || typeof snap !== "object") return null;
   const force = Boolean(opts.force);
@@ -52,11 +54,14 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
   const localEmail = String(local.email || "").trim();
   const localWebsite = String(local.website || "").trim();
   const localAddress = String(local.address || local.addressRoad || "").trim();
-  const hasLocalContent = Boolean(localEmail || localWebsite || localAddress);
+  const localFax = String(local.fax || "").trim();
 
-  if (hasLocalContent && !force) {
-    /* 로컬에 이미 값이 있으면 덮어쓰지 않되, 빈 칸만 서버로 채움 */
-  }
+  const pickText = (snapVal, localVal, { preferSnap = force } = {}) => {
+    const s = String(snapVal || "").trim();
+    const l = String(localVal || "").trim();
+    if (preferSnap) return s || l;
+    return l || s;
+  };
 
   const roadFromSnap = String(snap.addressRoad || "").trim();
   const detailFromSnap = String(snap.addressDetail || "").trim();
@@ -66,20 +71,28 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
   const { road: localRoad, detail: localDetail } = readLetteringBizcardAddressFields(local);
 
   const patch = {
-    email: force || !localEmail ? clampLetteringBizcardEmail(snap.email || "") : local.email,
-    website: force || !localWebsite ? String(snap.website || "").trim() : local.website,
-    fax: force || !String(local.fax || "").trim() ? String(snap.fax || "").trim() : local.fax,
-    addressRoad: force || !localRoad ? roadFromSnap || String(snap.address || "").trim() : localRoad,
-    addressDetail: force || !localDetail ? detailFromSnap : localDetail,
-    address: force || !localAddress ? addressCombined : local.address,
-    companyIntro:
-      force || !String(local.companyIntro || "").trim()
-        ? String(snap.companyIntro || "").trim()
-        : local.companyIntro,
-    customBackText:
-      force || !String(local.customBackText || "").trim()
-        ? String(snap.customBackText || "").trim()
-        : local.customBackText,
+    email: clampLetteringBizcardEmail(
+      pickText(snap.email, local.email, { preferSnap: force || !localEmail })
+    ),
+    website: pickText(snap.website, local.website, { preferSnap: force || !localWebsite }),
+    fax: pickText(snap.fax, local.fax, { preferSnap: force || !localFax }),
+    addressRoad: pickText(
+      roadFromSnap || String(snap.address || "").trim(),
+      localRoad,
+      { preferSnap: force || !localRoad }
+    ),
+    addressDetail: pickText(detailFromSnap, localDetail, {
+      preferSnap: force || !localDetail
+    }),
+    address: pickText(addressCombined, local.address, {
+      preferSnap: force || !localAddress
+    }),
+    companyIntro: pickText(snap.companyIntro, local.companyIntro, {
+      preferSnap: force || !String(local.companyIntro || "").trim()
+    }),
+    customBackText: pickText(snap.customBackText, local.customBackText, {
+      preferSnap: force || !String(local.customBackText || "").trim()
+    }),
     logoDataUrl: (() => {
       const fromSnap = String(snap.logoUrl || "").trim();
       const localLogo = String(local.logoDataUrl || local.logoUrl || "").trim();
@@ -89,7 +102,6 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
     photoDataUrl: (() => {
       const fromSnap = String(snap.photoUrl || "").trim();
       const localPhoto = String(local.photoDataUrl || local.photoUrl || "").trim();
-      /* force여도 서버에 사진이 없으면 빈 값으로 덮어 지우지 않음 */
       if (force) return fromSnap || localPhoto;
       return localPhoto ? localPhoto : fromSnap;
     })(),
@@ -108,26 +120,24 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
     noTitlePhoto: force && snap.noTitlePhoto != null ? Boolean(snap.noTitlePhoto) : Boolean(local.noTitlePhoto),
     noFax: force && snap.noFax != null ? Boolean(snap.noFax) : Boolean(local.noFax),
     noWebsite: force && snap.noWebsite != null ? Boolean(snap.noWebsite) : Boolean(local.noWebsite),
-    kakaoFeedBgDataUrl:
-      force || !String(local.kakaoFeedBgDataUrl || "").trim()
-        ? String(snap.shareCoverUrl || local.kakaoFeedBgDataUrl || "").trim()
-        : local.kakaoFeedBgDataUrl,
+    kakaoFeedBgDataUrl: pickText(snap.shareCoverUrl, local.kakaoFeedBgDataUrl, {
+      preferSnap: force || !String(local.kakaoFeedBgDataUrl || "").trim()
+    }),
     designTemplate: normalizeLetteringBizcardTemplate(
       snap.designTemplate || local.designTemplate || "classic-light"
     ),
-    title: force || !String(local.title || "").trim() ? String(snap.title || "").trim() : local.title,
-    department:
-      force || !String(local.department || "").trim()
-        ? String(snap.department || "").trim()
-        : local.department,
-    displayName:
-      force || !String(local.displayName || "").trim()
-        ? String(snap.name || snap.displayName || "").trim()
-        : local.displayName,
+    title: pickText(snap.title, local.title, {
+      preferSnap: force || !String(local.title || "").trim()
+    }),
+    department: pickText(snap.department, local.department, {
+      preferSnap: force || !String(local.department || "").trim()
+    }),
+    displayName: pickText(snap.name || snap.displayName, local.displayName, {
+      preferSnap: force || !String(local.displayName || "").trim()
+    }),
     accountType: (() => {
       const fromSnap = String(snap.accountType || "").trim();
       if (fromSnap) return fromSnap;
-      /* 서버 슬림 응답에 계좌키가 빠져 빈값으로 덮어쓰지 않음 */
       return String(local.accountType || "").trim();
     })(),
     bankName: (() => {

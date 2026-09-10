@@ -315,12 +315,13 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
 
 .vlue-app-brand-title {
   font-size: clamp(20px, 5.5vw, 26px);
-  line-height: 1;
+  line-height: 1.15;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   align-self: center;
   letter-spacing: -0.04em;
+  padding-top: 0.12em;
 }
 
 .vlue-fluid-header-line {
@@ -7745,11 +7746,12 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
 
 /* 쇼케이스 링크-로고와 동일 — 흰 테두리 */
 .ldr-company-logo-badge--link {
+  box-sizing: border-box;
   background: #1d4ed8;
-  border: 2px solid rgba(255, 255, 255, 0.95);
+  border: 2.5px solid #ffffff;
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(0, 0, 0, 0.2);
+    0 2px 10px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25);
 }
 
 .ldr-company-logo-badge__img {
@@ -7767,6 +7769,7 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   height: 28px;
   flex-shrink: 0;
   border-radius: 8px;
+  border-width: 2px;
 }
 
 .ldr-company-logo-badge--hero {
@@ -7776,6 +7779,8 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   width: 48px;
   height: 48px;
   z-index: 3;
+  border-width: 2.5px;
+  border-radius: 12px;
 }
 
 .ldr-hero__contact {
