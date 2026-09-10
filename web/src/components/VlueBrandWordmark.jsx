@@ -1,8 +1,9 @@
+import { VLUE_BRAND_WORDMARK } from "../lib/vlueBrandWordmark.js";
 import "./vlue-brand-wordmark.css";
 
 /**
- * VLUÉ 워드마크 — 유니코드 É가 폰트·자간에서 깨져 보이므로
- * E + 악센트를 분리 배치해 가독성·정렬을 맞춤.
+ * 상단/네비 브랜드 표기 — 웹과 동일한 유니코드 텍스트 "VLUÉ" 그대로 사용.
+ * (악센트를 CSS로 그리지 않음)
  */
 export default function VlueBrandWordmark({
   className = "",
@@ -11,19 +12,8 @@ export default function VlueBrandWordmark({
   ...rest
 }) {
   return (
-    <Tag
-      className={`vlue-brand-wordmark ${className}`.trim()}
-      style={style}
-      aria-label="VLUÉ"
-      {...rest}
-    >
-      <span className="vlue-brand-wordmark__base" aria-hidden>
-        VLU
-        <span className="vlue-brand-wordmark__e">
-          E
-          <span className="vlue-brand-wordmark__accent" />
-        </span>
-      </span>
+    <Tag className={`vlue-brand-wordmark ${className}`.trim()} style={style} {...rest}>
+      {VLUE_BRAND_WORDMARK}
     </Tag>
   );
 }
