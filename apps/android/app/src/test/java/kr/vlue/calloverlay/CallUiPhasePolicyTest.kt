@@ -17,7 +17,8 @@ class CallUiPhasePolicyTest {
                 outgoing = true,
                 remoteConnected = false,
                 dialingOrConnecting = true,
-                hasActiveConnectedCall = false
+                hasActiveConnectedCall = false,
+                trustedPeerConnected = false
             )
         )
     }
@@ -29,7 +30,8 @@ class CallUiPhasePolicyTest {
                 outgoing = true,
                 remoteConnected = false,
                 dialingOrConnecting = true,
-                hasActiveConnectedCall = false
+                hasActiveConnectedCall = false,
+                trustedPeerConnected = true
             )
         )
     }
@@ -41,7 +43,34 @@ class CallUiPhasePolicyTest {
                 outgoing = true,
                 remoteConnected = false,
                 dialingOrConnecting = false,
-                hasActiveConnectedCall = true
+                hasActiveConnectedCall = true,
+                trustedPeerConnected = false
+            )
+        )
+    }
+
+    @Test
+    fun trustedPeerConnected_allowsAdvanceWhenNotDialing() {
+        assertTrue(
+            CallUiPhasePolicy.mayAdvancePastBigPush(
+                outgoing = true,
+                remoteConnected = false,
+                dialingOrConnecting = false,
+                hasActiveConnectedCall = false,
+                trustedPeerConnected = true
+            )
+        )
+    }
+
+    @Test
+    fun notDialing_withoutTrustedOrActive_staysBlocked() {
+        assertFalse(
+            CallUiPhasePolicy.mayAdvancePastBigPush(
+                outgoing = true,
+                remoteConnected = false,
+                dialingOrConnecting = false,
+                hasActiveConnectedCall = false,
+                trustedPeerConnected = false
             )
         )
     }

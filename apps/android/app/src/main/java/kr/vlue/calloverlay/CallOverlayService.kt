@@ -261,7 +261,11 @@ class CallOverlayService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_CONNECTED -> {
-                enterShowcaseFromAnswer(source = "ACTION_CONNECTED")
+                val trusted = intent.getBooleanExtra(EXTRA_TRUSTED_PEER_CONNECTED, false)
+                enterShowcaseFromAnswer(
+                    source = if (trusted) "ACTION_CONNECTED_trusted" else "ACTION_CONNECTED",
+                    trustedPeerConnected = trusted
+                )
                 return START_NOT_STICKY
             }
             ACTION_ENDED_KEEP -> {
@@ -994,7 +998,10 @@ class CallOverlayService : Service() {
      * Native Answer / OFFHOOK / ACTIVE → call UI phase per [CALL_OVERLAY_CONTRACT.md].
      * Decisions go through [CallUiPhasePolicy] — do not add parallel open paths.
      */
-    private fun enterShowcaseFromAnswer(source: String) {
+    private fun enterShowcaseFromAnswer(
+        source: String,
+        trustedPeerConnected: Boolean = false
+    ) {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) {
             CompanionRuntimeStabilityDiag.noteStaleEvent(
                 "CONNECTED",
@@ -1007,12 +1014,14 @@ class CallOverlayService : Service() {
                 outgoing = currentOutgoing,
                 remoteConnected = remoteConnected,
                 dialingOrConnecting = VlueInCallController.isDialingOrConnecting(),
-                hasActiveConnectedCall = VlueInCallController.hasConnectedActiveCall()
+                hasActiveConnectedCall = VlueInCallController.hasConnectedActiveCall(),
+                trustedPeerConnected = trustedPeerConnected
             )
         ) {
             VlueBigPushTrace.lifecycle(
                 "ANSWER_HOLD_DIALING",
-                "source=$source keep BigPush — CallUiPhasePolicy dialing gate"
+                "source=$source keep BigPush — CallUiPhasePolicy dialing gate " +
+                    "trusted=$trustedPeerConnected"
             )
             restartOutgoingPeerProbeIfNeeded()
             return
@@ -4185,6 +4194,8 @@ class CallOverlayService : Service() {
         const val EXTRA_OUTGOING = "outgoing"
         const val EXTRA_CARD_JSON = "card_json"
         const val EXTRA_DCP_ROUTE = "dcp_route"
+        /** OutgoingPeerConnectProbe 오디오 휴리스틱 — 다이얼링 종료 후 trusted 수화 */
+        const val EXTRA_TRUSTED_PEER_CONNECTED = "trusted_peer_connected"
         const val ACTION_DISMISS = "kr.vlue.calloverlay.DISMISS"
         const val ACTION_CONNECTED = "kr.vlue.calloverlay.CONNECTED"
         const val ACTION_ENDED_KEEP = "kr.vlue.calloverlay.ENDED_KEEP"
@@ -4310,25 +4321,35 @@ class CallOverlayService : Service() {
             }
         }
 
-        fun notifyConnected(context: android.content.Context) {
+        fun notifyConnected(
+            context: android.content.Context,
+            trustedPeerConnected: Boolean = false
+        ) {
             /* Native Call Event (OFFHOOK/ACTIVE) → Controller.onAnswer — Web "connected" 알림과 역할 분리 */
             if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
                 CompanionRuntimeStabilityDiag.noteStaleEvent(
                     "CONNECTED",
                     "notifyConnected",
-                    detail = "session inactive — try activeInstance fallback"
+                    detail = "session inactive — try activeInstance fallback trusted=$trustedPeerConnected"
                 )
                 /* 세션 플래그가 잠깐 꺼져도 활성 오버레이가 있으면 수화 UI 는 진행 */
-                activeInstance?.enterShowcaseFromAnswer(source = "notifyConnected_session_inactive")
+                activeInstance?.enterShowcaseFromAnswer(
+                    source = "notifyConnected_session_inactive",
+                    trustedPeerConnected = trustedPeerConnected
+                )
                 return
             }
             try {
                 val intent = Intent(context, CallOverlayService::class.java).apply {
                     action = ACTION_CONNECTED
+                    putExtra(EXTRA_TRUSTED_PEER_CONNECTED, trustedPeerConnected)
                 }
                 context.startService(intent)
             } catch (_: Exception) {
-                activeInstance?.enterShowcaseFromAnswer(source = "notifyConnected_fallback")
+                activeInstance?.enterShowcaseFromAnswer(
+                    source = "notifyConnected_fallback",
+                    trustedPeerConnected = trustedPeerConnected
+                )
             }
         }
 

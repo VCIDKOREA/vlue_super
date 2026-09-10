@@ -39,17 +39,21 @@ object CallUiPhasePolicy {
 
     /**
      * 발신 미수화(다이얼링) 중 중앙 팝업·쇼케이스 금지.
+     *
+     * @param trustedPeerConnected 프로브가 확인한 상대 응답
+     *   (다이얼링 종료 후 MODE_IN_CALL 연속 확인 등 — OFFHOOK 단독 아님)
      */
     fun mayAdvancePastBigPush(
         outgoing: Boolean,
         remoteConnected: Boolean,
         dialingOrConnecting: Boolean,
-        hasActiveConnectedCall: Boolean
+        hasActiveConnectedCall: Boolean,
+        trustedPeerConnected: Boolean = false
     ): Boolean {
         if (!outgoing || remoteConnected) return true
         if (hasActiveConnectedCall) return true
         if (dialingOrConnecting) return false
-        return false
+        return trustedPeerConnected
     }
 
     /** 미수화 상태에서 중앙 팝업 허용 여부 — 항상 false (규격 §2). */

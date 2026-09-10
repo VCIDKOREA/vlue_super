@@ -32,7 +32,7 @@
 | BigPush bar tap while outgoing unanswered | **Ignore** (hold bar) |
 | Card lookup / Safe Care payload arrives while unanswered | Paint BigPush bar only — **no center popup** |
 
-`remoteConnected` may become true **only** after a real answer path (`enterShowcaseFromAnswer` / InCall `STATE_ACTIVE` / trusted connected).
+`remoteConnected` may become true **only** after a real answer path (`enterShowcaseFromAnswer` / InCall `STATE_ACTIVE` / **trusted peer-connected** from `OutgoingPeerConnectProbe`: sustained in-call audio **after** dialing/connecting ends — never raw dialing OFFHOOK).
 
 ---
 

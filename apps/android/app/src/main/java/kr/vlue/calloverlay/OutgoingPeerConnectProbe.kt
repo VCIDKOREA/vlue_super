@@ -12,7 +12,7 @@ import kr.vlue.calloverlay.incall.VlueInCallController
  *
  * 삼성 등 OEM 은 발신 링잉 중에도 AudioManager.MODE_IN_CALL 을 켜므로
  * 오디오 모드만으로 수화 판정하면 「거는 중」에 안심/정상 팝업이 뜬다.
- * → InCall STATE_ACTIVE 우선. 오디오 휴리스틱은 다이얼러 미연결 + 연속 확인 + 다이얼링 제외.
+ * → InCall STATE_ACTIVE 우선. 오디오 휴리스틱은 다이얼링/연결 중 제외 + 연속 확인.
  */
 object OutgoingPeerConnectProbe {
     private const val TAG = "OutgoingPeerConnect"
@@ -40,7 +40,7 @@ object OutgoingPeerConnectProbe {
                     val elapsed = android.os.SystemClock.elapsedRealtime() - startedAtMs
                     if (VlueInCallController.hasConnectedActiveCall()) {
                         Log.i(TAG, "InCall ACTIVE → notifyConnected elapsed=${elapsed}ms")
-                        CallOverlayService.notifyConnected(app)
+                        CallOverlayService.notifyConnected(app, trustedPeerConnected = false)
                         stop()
                         return
                     }
@@ -55,10 +55,11 @@ object OutgoingPeerConnectProbe {
                         return
                     }
                     /*
-                     * 기본 전화앱이 아닐 때만: MODE_IN_CALL 이 연속 3회(≈1s) + 최소 6초 경과.
-                     * (예전 2.8s 단일 판정은 「거는 중」오탐)
+                     * 다이얼링 종료 후: MODE_IN_CALL 연속 3회(≈1s) + 최소 6초 경과.
+                     * 기본 전화앱 여부 무관 — OEM 이 STATE_ACTIVE 를 놓쳐도 수화 전환.
+                     * (다이얼링 중에는 위에서 차단)
                      */
-                    if (!VlueInCallController.isDefaultDialerBound() && elapsed >= 6_000L) {
+                    if (elapsed >= 6_000L) {
                         val am = app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                         val mode = am?.mode ?: AudioManager.MODE_NORMAL
                         if (mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION) {
@@ -66,10 +67,10 @@ object OutgoingPeerConnectProbe {
                             if (audioModeHits >= 3) {
                                 Log.i(
                                     TAG,
-                                    "audio heuristic (non-dialer, hits=$audioModeHits) → notifyConnected " +
-                                        "mode=$mode elapsed=${elapsed}ms"
+                                    "trusted peer audio (hits=$audioModeHits) → notifyConnected " +
+                                        "mode=$mode elapsed=${elapsed}ms dialerBound=${VlueInCallController.isDefaultDialerBound()}"
                                 )
-                                CallOverlayService.notifyConnected(app)
+                                CallOverlayService.notifyConnected(app, trustedPeerConnected = true)
                                 stop()
                                 return
                             }
