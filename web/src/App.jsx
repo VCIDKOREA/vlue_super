@@ -1672,6 +1672,20 @@ function App() {
     };
   }, [isLoggedIn, page]);
 
+  /* 다른 화면으로 이동하면 편지 BGM 중지 (강제읽기·홈 메인은 유지) */
+  useEffect(() => {
+    if (!digitalLetterOpen) return;
+    if (page === "main") return;
+    try {
+      window.dispatchEvent(new CustomEvent("vlue-letter-bgm-pause"));
+    } catch {
+      /* ignore */
+    }
+    if (!digitalLetterForceRead) {
+      setDigitalLetterOpen(false);
+    }
+  }, [page, digitalLetterOpen, digitalLetterForceRead]);
+
   /** 가족 보호 — 포그라운드 접속 기록 · 자녀 URL 감시 · 통화 브릿지 */
   useEffect(() => {
     if (!isLoggedIn) return undefined;
@@ -3340,6 +3354,16 @@ function App() {
     resetAllScrollableToTop();
     requestAnimationFrame(resetAllScrollableToTop);
     setTimeout(resetAllScrollableToTop, 60);
+    /* 홈으로 이동 시 편지 BGM 중지 — 강제읽기 중이 아니면 편지도 닫음 */
+    try {
+      window.dispatchEvent(new CustomEvent("vlue-letter-bgm-pause"));
+    } catch {
+      /* ignore */
+    }
+    setDigitalLetterForceRead((force) => {
+      if (!force) setDigitalLetterOpen(false);
+      return force;
+    });
     setPage("main");
     setActiveTab(null);
     setSelectedRoomId(null);

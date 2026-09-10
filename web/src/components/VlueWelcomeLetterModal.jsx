@@ -133,6 +133,37 @@ export default function VlueWelcomeLetterModal({
     }
   }, [volume, bgmOn, open]);
 
+  /* 앱 백그라운드·홈 이탈 시 BGM 중지 (WebView에서 백그라운드 재생 방지) */
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const pauseLetterBgm = () => {
+      try {
+        const audio = audioRef.current;
+        if (!audio) return;
+        audio.pause();
+      } catch {
+        /* ignore */
+      }
+      setBgmPlaying(false);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") pauseLetterBgm();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("vlue-app-background", pauseLetterBgm);
+    window.addEventListener("pagehide", pauseLetterBgm);
+    window.addEventListener("vlue-letter-bgm-pause", pauseLetterBgm);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("vlue-app-background", pauseLetterBgm);
+      window.removeEventListener("pagehide", pauseLetterBgm);
+      window.removeEventListener("vlue-letter-bgm-pause", pauseLetterBgm);
+    };
+  }, [open]);
+
   if (!open || !letter) return null;
 
   const onScroll = () => {
