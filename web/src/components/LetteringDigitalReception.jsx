@@ -814,7 +814,11 @@ function FrontPanel({
       {embeddedInPush ? null : <ProfileHero card={card} verified={verified} />}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
       <div className={`ldr-back-head${resolveDccTitlePhotoUrl(card) && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
-        <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />
+        {resolveCardLogoUrl(card) ? (
+          <CompanyLogoBadge card={card} className="ldr-company-logo-badge--dcc-head" />
+        ) : (
+          <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />
+        )}
         <div className="ldr-back-head__copy">
           <p className="ldr-back-kicker">Digital ID · Profile</p>
           <div className="ldr-back-title-row">

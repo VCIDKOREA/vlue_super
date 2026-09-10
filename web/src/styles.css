@@ -7744,14 +7744,14 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   box-shadow: none;
 }
 
-/* 쇼케이스 링크-로고와 동일 — 흰 테두리 */
+/* 쇼케이스 링크-로고와 동일 — 흰 테두리 (box-shadow 링) */
 .ldr-company-logo-badge--link {
   box-sizing: border-box;
   background: #1d4ed8;
-  border: 2px solid #ffffff !important;
+  border: 0 !important;
   box-shadow:
-    0 2px 10px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(15, 23, 42, 0.25);
+    0 0 0 2px #ffffff,
+    0 2px 10px rgba(0, 0, 0, 0.55);
 }
 
 .ldr-company-logo-badge__img {
@@ -7779,8 +7779,34 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   width: 48px;
   height: 48px;
   z-index: 3;
-  border-width: 2.5px;
   border-radius: 12px;
+}
+
+/*
+ * DCC DIGITAL ID · PROFILE 회사 로고 — 캡처 시안과 동일 흰 테두리.
+ * border 단독은 다른 규칙에 덮일 수 있어 box-shadow 링으로 고정.
+ */
+.ldr-company-logo-badge--dcc-head {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  border-radius: 12px;
+  box-sizing: border-box;
+  background: #1d4ed8;
+  border: 0 !important;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 2px 10px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.ldr-company-logo-badge--dcc-head .ldr-company-logo-badge__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 .ldr-hero__contact {
@@ -8506,11 +8532,11 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   height: 48px;
   border-radius: 12px;
   box-sizing: border-box;
-  border: 2px solid #ffffff !important;
+  border: 0 !important;
   background: #1d4ed8;
   box-shadow:
-    0 2px 10px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(15, 23, 42, 0.25);
+    0 0 0 2px #ffffff,
+    0 2px 10px rgba(0, 0, 0, 0.55);
   overflow: hidden;
 }
 
