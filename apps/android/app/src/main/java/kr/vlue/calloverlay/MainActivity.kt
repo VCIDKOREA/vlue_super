@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -113,9 +114,11 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         pushNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint("SetJavaScriptEnabled", "SourceLockedOrientationActivity")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        /* 폰 가로 회전 차단 — 폴드 펼침은 세로 고정 + 넓은 폭으로 와이드 레이아웃 */
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         /* Android 15+ edge-to-edge 기본값에서 WebView가 상태바 아래로 깔리면 헤더가 시계·배터리와 겹침 */
         WindowCompat.setDecorFitsSystemWindows(window, true)
         applyNotificationWakeFlags(intent)

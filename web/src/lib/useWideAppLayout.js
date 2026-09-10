@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react";
 
 /**
- * 폴드 펼침·가로·태블릿 — 앱 셸 와이드 레이아웃 게이트.
- * (min-width: 720px) 또는 (landscape + min-width: 600px)
+ * 폴드 펼침·태블릿·PC — 앱 셸 와이드 레이아웃 게이트.
+ * 가로(landscape) 회전은 지원하지 않음. 넓은 세로(min-width)만 와이드로 취급.
  */
 export function matchWideAppLayout() {
   if (typeof window === "undefined") return false;
   try {
-    return (
-      window.matchMedia("(min-width: 720px)").matches ||
-      window.matchMedia("(orientation: landscape) and (min-width: 600px)").matches
-    );
+    return window.matchMedia("(min-width: 720px)").matches;
   } catch {
     return false;
   }
@@ -22,16 +19,13 @@ export function useWideAppLayout() {
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
     const mqWide = window.matchMedia("(min-width: 720px)");
-    const mqLand = window.matchMedia("(orientation: landscape) and (min-width: 600px)");
     const sync = () => setWide(matchWideAppLayout());
     sync();
     mqWide.addEventListener?.("change", sync);
-    mqLand.addEventListener?.("change", sync);
     window.addEventListener("resize", sync);
     window.addEventListener("orientationchange", sync);
     return () => {
       mqWide.removeEventListener?.("change", sync);
-      mqLand.removeEventListener?.("change", sync);
       window.removeEventListener("resize", sync);
       window.removeEventListener("orientationchange", sync);
     };

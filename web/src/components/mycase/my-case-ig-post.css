@@ -393,8 +393,8 @@
   }
 }
 
-/* 폴드·가로 — 풀스크린(앱)에서도 좌 미디어 / 우 댓글·옵션 */
-@media (min-width: 720px), (orientation: landscape) and (min-width: 600px) {
+/* 폴드·와이드 — 풀스크린(앱)에서도 좌 미디어 / 우 댓글·옵션 */
+@media (min-width: 720px) {
   .my-case-ig-post:not(.my-case-ig-post--modal):not(.my-case-ig-post--feed) .my-case-ig-post__layout {
     flex-direction: row;
     height: 100%;

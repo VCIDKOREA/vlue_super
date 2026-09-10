@@ -14,12 +14,14 @@ import { isAdminConsoleEntry } from "./lib/adminRoute.js";
 import { resolveSiteShell } from "./lib/siteMode.js";
 import BrowserAppBlockedPage from "./components/BrowserAppBlockedPage.jsx";
 import WwwStagingLockGate from "./components/WwwStagingLockGate.jsx";
+import VluePortraitGate from "./components/VluePortraitGate.jsx";
 import "./styles.css";
 import "./styles/vlue-wide-shell.css";
 import { applyAppSettingsToDocument } from "./lib/vlueAppSettings.js";
 import { logProductionEnvBinding } from "./config.js";
 import { ensurePricingConfigLoaded } from "./lib/pricingConfig.js";
 import { VLUE_ANDROID_APP_UA_TOKEN } from "./lib/vlueClientAccess.js";
+import { tryLockPortraitOrientation } from "./lib/portraitOrientation.js";
 
 try {
   if (typeof navigator !== "undefined" && String(navigator.userAgent || "").includes(VLUE_ANDROID_APP_UA_TOKEN)) {
@@ -61,6 +63,7 @@ normalizeWwwLegalPathname();
 applyAppSettingsToDocument();
 logProductionEnvBinding();
 ensurePricingConfigLoaded().catch(() => undefined);
+tryLockPortraitOrientation();
 
 function isPortoneV2PaymentCallbackPath(pathname = "") {
   const p = String(pathname || "").replace(/\/+$/, "") || "/";
@@ -103,15 +106,25 @@ if (!rootEl) {
     </WwwStagingLockGate>
   );
 
+  const withPortraitGate =
+    showAdminConsole || showHq || showAdminGate ? (
+      shellTree
+    ) : (
+      <>
+        <VluePortraitGate />
+        {shellTree}
+      </>
+    );
+
   createRoot(rootEl).render(
     <React.StrictMode>
       <AppRootErrorBoundary>
         {showPortoneV2Callback ? (
           <Suspense fallback={<div style={{ padding: 24, textAlign: "center" }}>결제 확인 중…</div>}>
-            {shellTree}
+            {withPortraitGate}
           </Suspense>
         ) : (
-          shellTree
+          withPortraitGate
         )}
       </AppRootErrorBoundary>
     </React.StrictMode>

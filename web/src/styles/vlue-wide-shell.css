@@ -1,11 +1,12 @@
 /**
- * 폴드·가로 와이드 — 앱/공개 쇼케이스 깨짐 방지
+ * 폴드·와이드 — 앱/공개 쇼케이스 깨짐 방지
  * - 명함(DCC): 폰 비율로 중앙 고정 (가로로 늘어나지 않음)
  * - 마이케이스 IG: 좌 미디어 / 우 댓글·옵션 (기존 모달 분할 활용)
+ * - 가로(landscape) 회전은 미지원 — min-width(폴드 펼침 세로)만 와이드
  */
 
 /* 와이드: 공개·풀스크린 쇼케이스 스테이지를 중앙 폰 프레임으로 */
-@media (min-width: 720px), (orientation: landscape) and (min-width: 600px) {
+@media (min-width: 720px) {
   html.vlue-wide-layout .showcase-web__fs-stage,
   html.vlue-wide-layout .public-showcase-stage {
     display: flex;
@@ -63,7 +64,7 @@
 }
 
 /* 앱 메인 셸 — 와이드에서 콘텐츠 과확장 완화 */
-@media (min-width: 720px), (orientation: landscape) and (min-width: 600px) {
+@media (min-width: 720px) {
   html.vlue-android-app.vlue-wide-layout #root > .flex,
   html.vlue-wide-layout .vlue-app-shell {
     max-width: 100%;

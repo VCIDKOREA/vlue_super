@@ -379,7 +379,7 @@
   height: 100%;
 }
 
-@media (min-width: 720px), (orientation: landscape) and (min-width: 600px) {
+@media (min-width: 720px) {
   /* 와이드 공개 쇼케이스: 스테이지를 가로로 쓰되 명함·미디어가 폰 비율을 유지 */
   .showcase-web--full-fs {
     background: #05070d;
@@ -413,7 +413,7 @@
 }
 
 /* 초와이드(폴드 펼침 데스크급): 좌우 분할 가능 폭 */
-@media (min-width: 960px) and (orientation: landscape) {
+@media (min-width: 960px) {
   .showcase-web__fs-stage .public-showcase-stage {
     width: min(100%, 980px) !important;
     max-width: 980px !important;
