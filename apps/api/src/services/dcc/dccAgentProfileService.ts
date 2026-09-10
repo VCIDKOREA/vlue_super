@@ -314,6 +314,38 @@ export async function listDccAgentProfiles(
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
       });
     }
+    /* 목록 조회 시 마스터 명함 사진 → 활성·대표 칸 동기화(옛 사진 잔존 해소) */
+    try {
+      const card = await prisma.digitalCard.findUnique({
+        where: { userId },
+        select: {
+          photoUrl: true,
+          displayName: true,
+          titleSnapshot: true,
+          departmentSnapshot: true,
+          exportSnapshotJson: true
+        }
+      });
+      const snap =
+        card?.exportSnapshotJson && typeof card.exportSnapshotJson === "object"
+          ? (card.exportSnapshotJson as Record<string, unknown>)
+          : {};
+      const masterPhoto = text(card?.photoUrl || snap.photoUrl, 1024);
+      if (masterPhoto && (isHttpMediaUrl(masterPhoto) || masterPhoto.startsWith("/"))) {
+        await syncMasterIdentityToPrimaryAgents(userId, {
+          photoUrl: masterPhoto,
+          displayName: text(card?.displayName || snap.name || snap.displayName, 120) || null,
+          title: text(card?.titleSnapshot || snap.title, 120) || null,
+          department: text(card?.departmentSnapshot || snap.department, 120) || null
+        });
+        rows = await prisma.userDccAgentProfile.findMany({
+          where: { userId },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        });
+      }
+    } catch {
+      /* ignore heal errors */
+    }
     let activeId = rows.find((p) => p.isActive)?.id || rows[0]?.id || null;
     if (cardId) {
       const line = await prisma.businessCard.findFirst({
@@ -702,4 +734,82 @@ export async function mirrorLineContentToProfile(
     where: { id: profileId, userId },
     data
   });
+}
+
+/**
+ * 마스터 디지털명함 사진·표시명을 활성·대표 멀티프로필에 반영
+ * — 예전 photoUrl 잔존으로 대표 칸에 옛 사진이 남는 문제 방지
+ */
+export async function syncMasterIdentityToPrimaryAgents(
+  userId: string,
+  opts: {
+    photoUrl?: string | null;
+    displayName?: string | null;
+    title?: string | null;
+    department?: string | null;
+  }
+) {
+  await ensureMultiDccProfileBundleColumns();
+  const rows = await prisma.userDccAgentProfile.findMany({
+    where: { userId },
+    select: {
+      id: true,
+      isActive: true,
+      isRepresentative: true,
+      photoUrl: true,
+      dccSnapshotJson: true
+    }
+  });
+  if (!rows.length) return { updated: 0 };
+
+  const photoRaw = String(opts.photoUrl ?? "").trim();
+  const photoUrl =
+    photoRaw && (isHttpMediaUrl(photoRaw) || photoRaw.startsWith("/")) ? photoRaw : null;
+  const displayName = text(opts.displayName, 120);
+  const title = text(opts.title, 120);
+  const department = text(opts.department, 120);
+
+  const targets = rows.filter((r) => r.isActive || r.isRepresentative);
+  /* 프로필이 하나뿐이면 그 칸을 마스터와 맞춤 */
+  const list = targets.length ? targets : rows.slice(0, 1);
+  let updated = 0;
+
+  for (const row of list) {
+    const data: Prisma.UserDccAgentProfileUpdateInput = {};
+    if (photoUrl !== null || opts.photoUrl === "") {
+      data.photoUrl = photoUrl;
+    }
+    if (displayName) data.displayName = displayName;
+    if (title) data.title = title;
+    if (department) data.department = department;
+
+    const prev = snapObj(row.dccSnapshotJson);
+    const nextSnap: Record<string, unknown> = { ...prev };
+    let snapChanged = false;
+    if (photoUrl !== null || opts.photoUrl === "") {
+      if (photoUrl) nextSnap.photoUrl = photoUrl;
+      else delete nextSnap.photoUrl;
+      snapChanged = true;
+    }
+    if (displayName) {
+      nextSnap.name = displayName;
+      nextSnap.displayName = displayName;
+      snapChanged = true;
+    }
+    if (title) {
+      nextSnap.title = title;
+      snapChanged = true;
+    }
+    if (department) {
+      nextSnap.department = department;
+      snapChanged = true;
+    }
+    if (snapChanged) {
+      data.dccSnapshotJson = nextSnap as Prisma.InputJsonValue;
+    }
+    if (Object.keys(data).length === 0) continue;
+    await prisma.userDccAgentProfile.update({ where: { id: row.id }, data });
+    updated += 1;
+  }
+  return { updated };
 }

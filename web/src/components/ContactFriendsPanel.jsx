@@ -70,7 +70,13 @@ export default function ContactFriendsPanel({
         return hay.includes(q);
       });
     }
-    all.sort((a, b) => compareContactNames(a.name, b.name));
+    /* 가입(VLUE 회원) 최상단 가나다순 → 그다음 비회원 추천 가나다순 */
+    all.sort((a, b) => {
+      const ak = a.kind === "registered" ? 0 : 1;
+      const bk = b.kind === "registered" ? 0 : 1;
+      if (ak !== bk) return ak - bk;
+      return compareContactNames(a.name, b.name);
+    });
     return all;
   }, [registered, unregistered, filterQuery]);
 

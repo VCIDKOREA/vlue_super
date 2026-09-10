@@ -86,8 +86,8 @@ export default function DccAgentManageModal({
       return;
     }
     const preferred =
-      profiles.find((p) => p.isRepresentative)?.id ||
       profiles.find((p) => p.isActive)?.id ||
+      profiles.find((p) => p.isRepresentative)?.id ||
       profiles[0]?.id ||
       "";
     setSelectedProfileId((prev) => prev || preferred);
@@ -361,7 +361,7 @@ export default function DccAgentManageModal({
                       {profile.assignedPhones?.length
                         ? ` · ${profile.assignedPhones.join(", ")}`
                         : " · 번호 미지정"}
-                      {profile.hasDcc || profile.hasShowcase ? " · 설정됨" : " · DCC·쇼케이스 미설정"}
+                      {profile.hasShowcase ? " · 쇼케이스" : ""}
                     </p>
                   </div>
                   <div className="dcc-agent-row__actions" onClick={(e) => e.stopPropagation()}>

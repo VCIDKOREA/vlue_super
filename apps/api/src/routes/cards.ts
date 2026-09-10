@@ -747,6 +747,19 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
     } catch {
       /* 마이그레이션 전 컬럼 없음 — JSON slim 만으로 충분 */
     }
+    try {
+      const { syncMasterIdentityToPrimaryAgents } = await import(
+        "../services/dcc/dccAgentProfileService.js"
+      );
+      await syncMasterIdentityToPrimaryAgents(me, {
+        photoUrl: slimMeta.photoUrl,
+        displayName: slimMeta.displayName,
+        title: slimMeta.title,
+        department: slimMeta.department
+      });
+    } catch (e) {
+      console.warn("[my-digital-card] sync primary agents", me, e);
+    }
   }
 
   /* 카톡/OG 커버 캐시 무효화 — 타이틀사진·커버 변경 즉시 반영 */

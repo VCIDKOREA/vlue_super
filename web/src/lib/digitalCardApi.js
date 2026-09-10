@@ -559,7 +559,16 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
       } catch {
         /* ignore */
       }
-      const agentId = String(preview.agentId || editingProfileId || "").trim();
+      let agentId = String(preview.agentId || editingProfileId || "").trim();
+      if (!agentId) {
+        try {
+          const { fetchDccAgentProfiles } = await import("./dccAgentProfilesApi.js");
+          const listed = await fetchDccAgentProfiles();
+          agentId = String(listed?.activeId || listed?.representativeId || "").trim();
+        } catch {
+          /* ignore */
+        }
+      }
       if (agentId) {
         await putDccProfileBundle(agentId, { dcc: snap });
       }
