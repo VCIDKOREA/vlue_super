@@ -548,8 +548,7 @@ export async function adminGrantPaidMembership(
       .toUpperCase()
       .slice(0, 24) || ADMIN_TESTER_PAID_COUPON;
   const reason =
-    String(opts.reason || "").trim() ||
-    `테스터 기본 쿠폰(${coupon}) 유료 업그레이드`;
+    String(opts.reason || "").trim() || "테스터 쿠폰";
   if (reason.length > 500) throw new Error("사유는 500자 이내로 입력해 주세요.");
 
   const existing = await prisma.user.findUnique({
@@ -569,7 +568,9 @@ export async function adminGrantPaidMembership(
   }
 
   const now = new Date();
-  const months = Math.min(36, Math.max(1, Number(opts.months) || 12));
+  const ALLOWED_MONTHS = new Set([1, 3, 6, 12]);
+  const requestedMonths = Number(opts.months);
+  const months = ALLOWED_MONTHS.has(requestedMonths) ? requestedMonths : 12;
   const cycleEnd = addMonthsAdmin(now, months);
 
   await prisma.userSubscription.updateMany({
@@ -629,7 +630,7 @@ export async function adminGrantPaidMembership(
 
   await writeAccountActionMeta(userId, {
     type: "grant_paid",
-    reason: `${reason} · coupon:${coupon}`,
+    reason: `${reason} · ${months}개월 · coupon:${coupon}`,
     adminUserId: opts.adminUserId
   });
 

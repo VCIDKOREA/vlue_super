@@ -615,16 +615,20 @@ function MemberActionModal({
   requireReason,
   showImmediate,
   forcePermanentBan = false,
+  showPaidMonths = false,
   onClose,
   onConfirm,
   busy
 }) {
+  const PAID_MONTH_OPTIONS = [1, 3, 6, 12];
   const [reason, setReason] = useState("");
+  const [months, setMonths] = useState(12);
   const [immediate, setImmediate] = useState(false);
   const [permanentBan, setPermanentBan] = useState(false);
   useEffect(() => {
     if (open) {
       setReason("");
+      setMonths(12);
       setImmediate(Boolean(forcePermanentBan));
       setPermanentBan(Boolean(forcePermanentBan));
     }
@@ -635,6 +639,39 @@ function MemberActionModal({
       <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
         <p className="text-[15px] font-black text-slate-900">{title}</p>
         {hint ? <p className="mt-2 text-[12px] leading-relaxed text-slate-500">{hint}</p> : null}
+        {showPaidMonths ? (
+          <fieldset className="mt-3">
+            <legend className="text-[11px] font-bold text-slate-600">부여 기간</legend>
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {PAID_MONTH_OPTIONS.map((m) => {
+                const active = months === m;
+                return (
+                  <label
+                    key={m}
+                    className={`cursor-pointer rounded-lg border px-2 py-2 text-center text-[12px] font-bold ${
+                      active
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-slate-200 bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="admin-paid-months"
+                      className="sr-only"
+                      checked={active}
+                      onChange={() => setMonths(m)}
+                    />
+                    {m}개월
+                  </label>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[11px] font-medium text-slate-500">
+              사유: <span className="font-bold text-slate-700">테스터 쿠폰</span>
+              {" · 쿠폰 코드 VLUE_TESTER"}
+            </p>
+          </fieldset>
+        ) : null}
         {requireReason ? (
           <label className="mt-3 block text-[11px] font-bold text-slate-600">
             사유 (필수)
@@ -649,14 +686,14 @@ function MemberActionModal({
           </label>
         ) : (
           <label className="mt-3 block text-[11px] font-bold text-slate-600">
-            메모 (선택)
+            {showPaidMonths ? "추가 메모 (선택)" : "메모 (선택)"}
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={2}
               maxLength={500}
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] font-medium text-slate-900"
-              placeholder="복구 사유가 있으면 입력"
+              placeholder={showPaidMonths ? "참고 메모가 있으면 입력" : "복구 사유가 있으면 입력"}
             />
           </label>
         )}
@@ -712,6 +749,7 @@ function MemberActionModal({
             onClick={() =>
               onConfirm({
                 reason: reason.trim(),
+                months,
                 immediate: forcePermanentBan ? true : immediate,
                 permanentBan: forcePermanentBan ? true : permanentBan
               })
@@ -906,7 +944,7 @@ function UsersTab({ onToast }) {
     }
   };
 
-  const runAction = async ({ reason, immediate, permanentBan }) => {
+  const runAction = async ({ reason, immediate, permanentBan, months }) => {
     if (!action?.userId || !action?.type) return;
     setBusyId(action.userId);
     try {
@@ -936,8 +974,14 @@ function UsersTab({ onToast }) {
         const res = await adminRestoreUser(action.userId, { reason });
         onToast?.(res?.message || "복구 완료");
       } else if (action.type === "grant_paid") {
-        const res = await adminGrantPaidUser(action.userId, { reason });
-        onToast?.(res?.message || "테스터 쿠폰으로 유료 업그레이드 완료");
+        const paidMonths = [1, 3, 6, 12].includes(Number(months)) ? Number(months) : 12;
+        const memo = String(reason || "").trim();
+        const paidReason = memo ? `테스터 쿠폰 · ${memo}` : "테스터 쿠폰";
+        const res = await adminGrantPaidUser(action.userId, {
+          reason: paidReason,
+          months: paidMonths
+        });
+        onToast?.(res?.message || `테스터 쿠폰으로 유료 ${paidMonths}개월 적용`);
       }
       setAction(null);
       load();
@@ -986,12 +1030,13 @@ function UsersTab({ onToast }) {
     if (action.type === "grant_paid") {
       return {
         title: "유료 업그레이드 (테스터 쿠폰)",
-        hint: "기본 쿠폰 VLUE_TESTER 로 결제 없이 유료 멤버십(12개월)을 부여합니다. 테스터·내부 검증용입니다.",
+        hint: "결제 없이 유료 멤버십을 부여합니다. 사유는 「테스터 쿠폰」으로 기록되며, 기간을 선택하세요.",
         confirmLabel: "유료 적용",
         confirmClass: "bg-blue-600",
         requireReason: false,
         showImmediate: false,
-        forcePermanentBan: false
+        forcePermanentBan: false,
+        showPaidMonths: true
       };
     }
     if (action.type === "restore") {
@@ -1048,6 +1093,7 @@ function UsersTab({ onToast }) {
         requireReason={actionMeta?.requireReason}
         showImmediate={actionMeta?.showImmediate}
         forcePermanentBan={actionMeta?.forcePermanentBan}
+        showPaidMonths={Boolean(actionMeta?.showPaidMonths)}
         busy={Boolean(busyId)}
         onClose={() => setAction(null)}
         onConfirm={(payload) => void runAction(payload)}
