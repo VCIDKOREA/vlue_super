@@ -132,6 +132,26 @@
   white-space: pre-wrap;
 }
 
+.vlue-letter-signoff {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  margin: -0.35em 2px 0.4em;
+  min-height: 52px;
+}
+
+.vlue-letter-signature {
+  display: block;
+  width: min(42%, 168px);
+  max-width: 168px;
+  height: auto;
+  object-fit: contain;
+  object-position: right bottom;
+  opacity: 0.92;
+  pointer-events: none;
+  user-select: none;
+}
+
 .vlue-letter-foot {
   margin: 18px 4px 8px;
   padding: 16px 12px 8px;

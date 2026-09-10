@@ -8,6 +8,7 @@ import {
   writeLetterBgmMuted,
   writeLetterBgmVolume
 } from "../lib/digitalLetter.js";
+import LEE_JONGGEUN_SIGNATURE from "../assets/lee-jonggeun-signature.png";
 import "./vlue-welcome-letter.css";
 
 /**
@@ -222,6 +223,14 @@ export default function VlueWelcomeLetterModal({
                 ))}
               </p>
             ))}
+            <div className="vlue-letter-signoff">
+              <img
+                src={LEE_JONGGEUN_SIGNATURE}
+                alt="이종근"
+                className="vlue-letter-signature"
+                draggable={false}
+              />
+            </div>
           </div>
 
           <footer className="vlue-letter-foot">
