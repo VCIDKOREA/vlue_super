@@ -39,7 +39,7 @@ export default function MarketingNavbar({ currentView, onNavigate }) {
                 letterSpacing: "-0.04em",
               }}
             >
-              VLUE
+              VLUÉ
             </span>
           </button>
 

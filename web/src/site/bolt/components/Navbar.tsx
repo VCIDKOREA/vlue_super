@@ -120,7 +120,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
               className="mkt-nav-logo-text font-bold tracking-tight"
               style={{ color: '#3182F6', fontFamily: "'Pretendard Variable', Pretendard, Inter, sans-serif", letterSpacing: '-0.04em' }}
             >
-              VLUE
+              VLUÉ
             </span>
           </button>
 

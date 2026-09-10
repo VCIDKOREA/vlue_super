@@ -4556,7 +4556,7 @@ function App() {
               </div>
             ) : (
               <span className="vlue-app-brand-title min-w-0 flex-1 select-none font-black tracking-tight text-blue-600 transition-opacity duration-150">
-                VLUE
+                VLUÉ
               </span>
             )}
           </div>
