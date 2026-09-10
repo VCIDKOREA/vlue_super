@@ -368,14 +368,24 @@ function CompanyLogoBadge({ card, className = "" }) {
   const [imgBroken, setImgBroken] = useState(false);
   const logoUrl = resolveCardLogoUrl(card);
   if (!logoUrl || imgBroken) return null;
-  return (
+  const isDccHead = /\bldr-company-logo-badge--dcc-head\b/.test(className);
+  const badge = (
     <span
       className={`ldr-company-logo-badge ldr-company-logo-badge--link${className ? ` ${className}` : ""}`.trim()}
-      aria-label="회사 로고"
+      aria-label={isDccHead ? undefined : "회사 로고"}
     >
       <img src={logoUrl} alt="" className="ldr-company-logo-badge__img" onError={() => setImgBroken(true)} />
     </span>
   );
+  /* DCC DIGITAL ID — 흰 테두리는 shadow가 아니라 래퍼 배경으로 고정 (덮어쓰기 방지) */
+  if (isDccHead) {
+    return (
+      <span className="ldr-dcc-logo-ring" aria-label="회사 로고">
+        {badge}
+      </span>
+    );
+  }
+  return badge;
 }
 
 function ProfileMedia({ card, className = "", variant = "avatar" }) {

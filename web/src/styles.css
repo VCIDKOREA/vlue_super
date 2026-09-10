@@ -7784,20 +7784,28 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
 
 /*
  * DCC DIGITAL ID · PROFILE 회사 로고 — 캡처 시안과 동일 흰 테두리.
- * border 단독은 다른 규칙에 덮일 수 있어 box-shadow 링으로 고정.
+ * 바깥 래퍼(#fff)가 테두리 역할. 안쪽 배지는 파란 타일만.
  */
+.ldr-dcc-logo-ring {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-self: flex-start;
+  padding: 2px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-sizing: border-box;
+  line-height: 0;
+}
+
 .ldr-company-logo-badge--dcc-head {
   width: 48px;
   height: 48px;
   flex-shrink: 0;
-  align-self: flex-start;
   border-radius: 12px;
   box-sizing: border-box;
-  background: #1d4ed8;
+  background: #1d4ed8 !important;
   border: 0 !important;
-  box-shadow:
-    0 0 0 2px #ffffff,
-    0 2px 10px rgba(0, 0, 0, 0.55);
+  box-shadow: none !important;
   overflow: hidden;
 }
 
