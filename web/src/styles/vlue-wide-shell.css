@@ -1,0 +1,71 @@
+/**
+ * 폴드·가로 와이드 — 앱/공개 쇼케이스 깨짐 방지
+ * - 명함(DCC): 폰 비율로 중앙 고정 (가로로 늘어나지 않음)
+ * - 마이케이스 IG: 좌 미디어 / 우 댓글·옵션 (기존 모달 분할 활용)
+ */
+
+/* 와이드: 공개·풀스크린 쇼케이스 스테이지를 중앙 폰 프레임으로 */
+@media (min-width: 720px), (orientation: landscape) and (min-width: 600px) {
+  html.vlue-wide-layout .showcase-web__fs-stage,
+  html.vlue-wide-layout .public-showcase-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0b101b;
+  }
+
+  html.vlue-wide-layout .showcase-web__fs-stage .public-showcase-stage,
+  html.vlue-wide-layout .public-showcase-stage > .showcase-call-carousel,
+  html.vlue-wide-layout .lettering-showcase-fs .showcase-call-carousel,
+  html.vlue-wide-layout .tent-showcase--fullscreen .showcase-call-carousel {
+    width: min(100%, 430px);
+    max-width: 430px;
+    height: min(100%, 100dvh);
+    max-height: 100%;
+    margin-inline: auto;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  }
+
+  /* 디지털 인증명함 — 가로로 퍼지지 않게 */
+  html.vlue-wide-layout .ldr-reception {
+    width: 100%;
+    max-width: 430px;
+    margin-inline: auto;
+    height: 100%;
+    max-height: 100%;
+  }
+
+  html.vlue-wide-layout .showcase-web__fs-stage .public-showcase-stage .ldr-reception,
+  html.vlue-wide-layout .public-showcase-stage .ldr-reception {
+    max-width: none;
+  }
+
+  /* 사진 미디어 — contain 유지 (늘어나는 cover 방지) */
+  html.vlue-wide-layout .showcase-call-carousel__slide img,
+  html.vlue-wide-layout .showcase-media-page img,
+  html.vlue-wide-layout .showcase-call-carousel__slide video {
+    object-fit: contain;
+  }
+}
+
+/*
+ * 더 넓은 폴드/데스크 (≥900px): 쇼케이스 미디어는 좌·우 분할
+ * (마이케이스 IG 모달이 주 경로; 콜/공개 캐러셀은 폰 프레임 유지)
+ */
+@media (min-width: 900px) {
+  html.vlue-wide-layout .showcase-web__fs-stage .public-showcase-stage > .showcase-call-carousel,
+  html.vlue-wide-layout .lettering-showcase-fs .showcase-call-carousel {
+    width: min(100%, 980px);
+    max-width: 980px;
+  }
+}
+
+/* 앱 메인 셸 — 와이드에서 콘텐츠 과확장 완화 */
+@media (min-width: 720px), (orientation: landscape) and (min-width: 600px) {
+  html.vlue-android-app.vlue-wide-layout #root > .flex,
+  html.vlue-wide-layout .vlue-app-shell {
+    max-width: 100%;
+  }
+}

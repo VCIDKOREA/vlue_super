@@ -17,7 +17,8 @@ export default function UserCaseArchiveView({
   peerHandle = "",
   onClose,
   onToast,
-  isDarkMode = false
+  isDarkMode = false,
+  layout = "mobile"
 }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
@@ -122,6 +123,7 @@ export default function UserCaseArchiveView({
         feedItems={feedItems}
         startIndex={feedStartIndex}
         isDarkMode={isDarkMode}
+        layout={layout === "desktop" ? "desktop" : "mobile"}
         peerIdentity={peerIdentity}
         bgmStyleConfig={detailBgmConfig}
         onClose={() => {

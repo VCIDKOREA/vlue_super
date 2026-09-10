@@ -2,12 +2,14 @@ import { useEffect, useMemo } from "react";
 import { parseShowcasePhoneFromPath } from "../../lib/showcaseWebRoute.js";
 import { ShowcaseBgmProvider } from "../../context/ShowcaseBgmContext.jsx";
 import ShowcaseWebPage from "./showcase/ShowcaseWebPage.jsx";
+import { useWideAppLayout } from "../../lib/useWideAppLayout.js";
 import "../../styles/tent-showcase.css";
 import "../../styles/showcase-call-glass.css";
 
 /** 알림톡 · 카톡 공개 링크 — /showcase/:phone · /s/:phone · /site/web/showcase/:phone */
 export default function ShowcaseWebApp() {
   const phone = useMemo(() => parseShowcasePhoneFromPath(window.location.pathname), []);
+  useWideAppLayout();
 
   useEffect(() => {
     document.documentElement.classList.remove("dark");

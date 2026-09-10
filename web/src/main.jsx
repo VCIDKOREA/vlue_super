@@ -15,6 +15,7 @@ import { resolveSiteShell } from "./lib/siteMode.js";
 import BrowserAppBlockedPage from "./components/BrowserAppBlockedPage.jsx";
 import WwwStagingLockGate from "./components/WwwStagingLockGate.jsx";
 import "./styles.css";
+import "./styles/vlue-wide-shell.css";
 import { applyAppSettingsToDocument } from "./lib/vlueAppSettings.js";
 import { logProductionEnvBinding } from "./config.js";
 import { ensurePricingConfigLoaded } from "./lib/pricingConfig.js";

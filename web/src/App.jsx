@@ -86,6 +86,7 @@ import ModalCloseButton from "./components/common/ModalCloseButton";
 const CsScannerScreen = lazy(() => import("./components/office/CsScannerScreen.jsx"));
 const BizcardScannerScreen = lazy(() => import("./components/office/BizcardScannerScreen.jsx"));
 const VlueUnifiedInboxScreen = lazy(() => import("./components/email/VlueUnifiedInboxScreen.jsx"));
+import { useWideAppLayout } from "./lib/useWideAppLayout.js";
 import UserProfileAvatar from "./components/UserProfileAvatar.jsx";
 import HeaderMultiProfileButton from "./components/dcc/HeaderMultiProfileButton.jsx";
 import { clearBiometricSessionOnly } from "./lib/webauthnBiometric";
@@ -445,6 +446,7 @@ function App() {
   const [isDesktopPd, setIsDesktopPd] = useState(() =>
     typeof window !== "undefined" ? window.matchMedia("(min-width: 900px)").matches : false
   );
+  const isWideApp = useWideAppLayout();
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileInitialView, setProfileInitialView] = useState("main");
   const [v1PaidGateOpen, setV1PaidGateOpen] = useState(false);
@@ -5247,6 +5249,7 @@ function App() {
         <MyCaseScreen
           onGoMain={goBackStep}
           isDarkMode={isDarkMode}
+          layout={isWideApp ? "desktop" : "mobile"}
           showcasePickEnabled
           showLineSwitcher
           onToast={(msg) => {
@@ -5863,6 +5866,7 @@ function App() {
         userId={caseArchiveUser?.userId || null}
         displayName={caseArchiveUser?.name || ""}
         peerHandle={caseArchiveUser?.handle || ""}
+        layout={isWideApp ? "desktop" : "mobile"}
         onClose={() => setCaseArchiveUser(null)}
         onToast={(msg) => {
           setBottomToast(String(msg || ""));
