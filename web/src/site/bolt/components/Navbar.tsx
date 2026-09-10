@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Menu, X, User, ChevronDown, LogOut, MapPin, Lock, CreditCard, LayoutDashboard, Award, Sparkles, LayoutGrid, UserX } from 'lucide-react';
 import { VlueNavLogoMark, useVlueLogoBlink } from '../../../components/VlueNavLogoMark.jsx';
+import VlueBrandWordmark from '../../../components/VlueBrandWordmark.jsx';
 import { readProfilePhotoAvatar } from '../../../lib/vlueAvatar.js';
 import { useWebIdleSession } from '../hooks/useWebIdleSession';
 import type { View } from '../types';
@@ -116,12 +117,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
               size={36}
               className="mkt-nav-logo-mark transition-opacity group-hover:opacity-90 group-active:scale-90"
             />
-            <span
-              className="mkt-nav-logo-text font-bold tracking-tight"
-              style={{ color: '#3182F6', fontFamily: "'Pretendard Variable', Pretendard, Inter, sans-serif", letterSpacing: '-0.04em' }}
-            >
-              VLUÉ
-            </span>
+            <VlueBrandWordmark className="mkt-nav-logo-text" />
           </button>
 
           <nav className="hidden xl:flex mkt-nav-items">

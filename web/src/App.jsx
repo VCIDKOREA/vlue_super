@@ -39,6 +39,7 @@ import { dispatchCloseShowcaseOverlays } from "./lib/showcase/closeShowcaseOverl
 import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
 import PersonalFeed from "./components/PersonalFeed";
 import ProfilePanel from "./components/ProfilePanel";
+import VlueBrandWordmark from "./components/VlueBrandWordmark.jsx";
 import V1PaidPackageGateModal from "./components/V1PaidPackageGateModal.jsx";
 import {
   canUseV1PaidDccFeatures,
@@ -3258,6 +3259,7 @@ function App() {
 
   /* 재설치 후 세션만 남은 경우 — 빈 로컬 명함·쇼케이스를 서버에서 복원 */
   useEffect(() => {
+    if (!isLoggedIn) return undefined;
     let cancelled = false;
     (async () => {
       try {
@@ -3279,7 +3281,15 @@ function App() {
         if (showcase.needsShowcaseStyleLocalRestore()) {
           await showcase.restoreShowcaseStyleFromServer();
         }
-        if (!cancelled) setCardFieldsTick((n) => n + 1);
+        if (!cancelled) {
+          setCardFieldsTick((n) => n + 1);
+          try {
+            window.dispatchEvent(new CustomEvent("vlue-digital-card-changed"));
+            window.dispatchEvent(new CustomEvent("vlue-lettering-bizcard-changed"));
+          } catch {
+            /* ignore */
+          }
+        }
       } catch {
         /* ignore */
       }
@@ -3287,7 +3297,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     const onHash = () => {
@@ -4556,9 +4566,7 @@ function App() {
                 </p>
               </div>
             ) : (
-              <span className="vlue-app-brand-title min-w-0 flex-1 select-none font-black tracking-tight text-blue-600 transition-opacity duration-150">
-                VLUÉ
-              </span>
+              <VlueBrandWordmark className="vlue-app-brand-title min-w-0 flex-1 select-none transition-opacity duration-150" />
             )}
           </div>
 

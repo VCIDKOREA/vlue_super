@@ -1,0 +1,83 @@
+.vlue-brand-wordmark {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  white-space: nowrap;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+
+.vlue-brand-wordmark__base {
+  display: inline-flex;
+  align-items: baseline;
+  letter-spacing: -0.04em;
+}
+
+.vlue-brand-wordmark__e {
+  position: relative;
+  display: inline-block;
+  letter-spacing: -0.04em;
+  /* 악센트 공간 — 윗선이 잘리지 않게 */
+  padding-top: 0.18em;
+  margin-top: -0.18em;
+}
+
+.vlue-brand-wordmark__accent {
+  position: absolute;
+  left: 50%;
+  top: 0.02em;
+  width: 0.32em;
+  height: 0.14em;
+  transform: translateX(-42%) rotate(-22deg);
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 0.5px currentColor;
+  pointer-events: none;
+}
+
+/* 헤더 큰 타이틀 */
+.vlue-app-brand-title.vlue-brand-wordmark {
+  font-size: clamp(20px, 5.5vw, 26px);
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  color: #2563eb;
+}
+
+.vlue-app-brand-title .vlue-brand-wordmark__accent {
+  width: 0.36em;
+  height: 0.155em;
+  top: 0;
+}
+
+/* 네비 로고 옆 */
+.mkt-nav-logo-text.vlue-brand-wordmark,
+.vlue-nav-wordmark.vlue-brand-wordmark {
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #3182f6;
+}
+
+.mkt-nav-logo-text .vlue-brand-wordmark__accent,
+.vlue-nav-wordmark .vlue-brand-wordmark__accent {
+  width: 0.34em;
+  height: 0.145em;
+}
+
+/* 인증 봉인 등 작은 라벨 */
+.vlue-brand-wordmark--seal {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  font-size: inherit;
+}
+
+.vlue-brand-wordmark--seal .vlue-brand-wordmark__e {
+  padding-top: 0.2em;
+  margin-top: -0.2em;
+}
+
+.vlue-brand-wordmark--seal .vlue-brand-wordmark__accent {
+  width: 0.3em;
+  height: 0.13em;
+  top: 0.01em;
+}

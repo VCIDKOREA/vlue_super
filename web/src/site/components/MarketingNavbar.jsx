@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Download, Lock, Menu, X } from "lucide-react";
 import { VlueNavLogoMark, useVlueLogoBlink } from "../../components/VlueNavLogoMark.jsx";
+import VlueBrandWordmark from "../../components/VlueBrandWordmark.jsx";
 import { MARKETING_NAV } from "../siteViews.js";
 import { appEntryUrl } from "../../lib/siteMode.js";
 
@@ -31,16 +32,7 @@ export default function MarketingNavbar({ currentView, onNavigate }) {
               size={32}
               className="transition-opacity group-hover:opacity-90 group-active:scale-90"
             />
-            <span
-              className="text-xl font-black tracking-tight"
-              style={{
-                color: "#3182F6",
-                fontFamily: "'Pretendard Variable', Pretendard, Inter, sans-serif",
-                letterSpacing: "-0.04em",
-              }}
-            >
-              VLUÉ
-            </span>
+            <VlueBrandWordmark className="vlue-nav-wordmark text-xl font-black tracking-tight" style={{ color: "#3182F6" }} />
           </button>
 
           <nav className="hidden flex-1 items-center gap-0.5 overflow-x-auto lg:flex">

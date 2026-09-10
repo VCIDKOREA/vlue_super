@@ -14,7 +14,7 @@ import {
   hydrateAvatarsFromExportSnapshot,
   pushLocalAvatarsIfServerMissing
 } from "./avatarServerSync.js";
-import { hydrateFeedNicknameFromSnapshot, readFeedNickname } from "./memberCardStorage.js";
+import { hydrateFeedNicknameFromSnapshot, readFeedNickname, writeCardFields } from "./memberCardStorage.js";
 
 const DIGITAL_CARD_ID_KEY = "vlue_digital_card_id";
 
@@ -156,7 +156,14 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
     })()
   };
 
-  return writeLetteringBizcardEditable(patch)?.data ?? null;
+  const written = writeLetteringBizcardEditable(patch)?.data ?? null;
+  if (written) {
+    writeCardFields({
+      email: String(written.email || "").trim(),
+      fax: String(written.fax || "").trim()
+    });
+  }
+  return written;
 }
 
 /** 로컬 명함 편집값이 비어 재설치·캐시 유실로 보이는지 */
@@ -167,7 +174,10 @@ export function needsDigitalCardLocalRestore() {
     const photo = String(ed.photoDataUrl || ed.photoUrl || "").trim();
     const website = String(ed.website || "").trim();
     const address = String(ed.address || ed.addressRoad || "").trim();
-    return !email && !photo && !website && !address;
+    const fax = String(ed.fax || "").trim();
+    const logo = String(ed.logoDataUrl || ed.logoUrl || "").trim();
+    /* 재설치 직후: 연락 필드·로고·사진이 비면 서버 full 복원 */
+    return !email && !photo && !website && !address && !fax && !logo;
   } catch {
     return true;
   }

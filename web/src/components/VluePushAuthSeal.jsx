@@ -2,6 +2,7 @@ import { Share2, ShieldCheck } from "lucide-react";
 import { VLUE_VERIFIED_PUSH_CONFIRM } from "../lib/vlueDigitalCardUi.js";
 import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
 import FollowActionButton from "./follow/FollowActionButton.jsx";
+import VlueBrandWordmark from "./VlueBrandWordmark.jsx";
 import {
   resolveFollowTargetUserId,
   shouldShowShowcaseFollow,
@@ -78,7 +79,7 @@ export default function VluePushAuthSeal({
 
         <div className="vlue-push-auth-seal__copy">
           <p className="vlue-push-auth-seal__headline">
-            <span className="vlue-push-auth-seal__brand">VLUÉ</span>
+            <VlueBrandWordmark className="vlue-push-auth-seal__brand vlue-brand-wordmark--seal" />
             <span className="vlue-push-auth-seal__divider" aria-hidden />
             <span className="vlue-push-auth-seal__phrase">인증 확인</span>
           </p>
