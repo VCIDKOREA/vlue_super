@@ -53,10 +53,11 @@
 
 .vlue-letter-title {
   margin: 0;
-  font-size: 17px;
-  font-weight: 800;
-  line-height: 1.45;
-  letter-spacing: -0.03em;
+  font-family: "Nanum Pen Script", "Gaegu", cursive;
+  font-size: clamp(22px, 5.5vw, 28px);
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
   color: #1e293b;
   word-break: keep-all;
 }
@@ -116,18 +117,32 @@
 }
 
 .vlue-letter-paper {
+  --vlue-letter-line: 2.05rem;
   margin: 0 auto;
-  padding: 8px 6px 4px;
+  padding: 10px 10px 8px 12px;
   max-width: 34rem;
+  border-radius: 10px;
+  background-color: rgba(255, 252, 247, 0.72);
+  /* 편지지 연한 가로줄 — line-height 와 주기 일치 */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--vlue-letter-line) - 1px),
+    rgba(147, 180, 220, 0.38) calc(var(--vlue-letter-line) - 1px),
+    rgba(147, 180, 220, 0.38) var(--vlue-letter-line)
+  );
+  background-attachment: local;
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.55);
 }
 
 .vlue-letter-p {
-  margin: 0 0 1.05em;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.85;
-  letter-spacing: -0.015em;
-  color: #334155;
+  margin: 0 0 var(--vlue-letter-line);
+  font-family: "Nanum Pen Script", "Gaegu", cursive;
+  font-size: clamp(1.2rem, 4.2vw, 1.45rem);
+  font-weight: 400;
+  line-height: var(--vlue-letter-line);
+  letter-spacing: 0.02em;
+  color: #1e293b;
   word-break: keep-all;
   white-space: pre-wrap;
 }
