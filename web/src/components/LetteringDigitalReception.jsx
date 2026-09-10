@@ -388,6 +388,20 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
   const isAvatar = variant === "avatar";
   const src = isLogoOnly ? logoUrl : isAvatar ? profileUrl || logoUrl : titlePhotoUrl;
   const focusCss = !isLogoOnly && !isAvatar ? photoFocusToCss(card.photoFocus) : undefined;
+  /*
+   * 회사 로고(또는 CEO 공식 로고)가 아바타 자리에 보일 때 — DIGITAL ID 캡처처럼 흰 테두리.
+   * photoUrl 이 로고와 동일/공식 로고면 --photo 로 분류되어 테두리가 빠지던 버그 수정.
+   */
+  const srcLooksLikeCompanyLogo = (() => {
+    const u = String(src || "").trim();
+    if (!u || !logoUrl) return false;
+    if (u === logoUrl) return true;
+    if (CEO_WATERMARK_SRC && u === CEO_WATERMARK_SRC) return true;
+    if (/vlue-shield-logo|vlue-eye|eye-watermark|ceo.?watermark/i.test(u)) return true;
+    return false;
+  })();
+  const showAsLinkLogo =
+    isLogoOnly || (isAvatar && Boolean(logoUrl) && (!profileUrl || srcLooksLikeCompanyLogo));
 
   if (isLogoOnly && !logoUrl) return null;
   if (isAvatar && !src) return null;
@@ -397,10 +411,8 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
   return (
     <div
       className={`ldr-profile-media ldr-profile-media--${variant}${
-        isLogoOnly || (isAvatar && !profileUrl && logoUrl)
-          ? " ldr-profile-media--logo ldr-profile-media--link-logo"
-          : ""
-      }${isAvatar && profileUrl ? " ldr-profile-media--photo" : ""}${
+        showAsLinkLogo ? " ldr-profile-media--logo ldr-profile-media--link-logo" : ""
+      }${isAvatar && profileUrl && !showAsLinkLogo ? " ldr-profile-media--photo" : ""}${
         className ? ` ${className}` : ""
       }`.trim()}
     >
