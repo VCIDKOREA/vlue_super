@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  openNativeAppSettings,
   readLetteringEnabled,
   requestLetteringPermissions,
   writeLetteringEnabled
@@ -48,6 +49,19 @@ export default function LetteringSettingsSection({
     [onNotice]
   );
 
+  const openAppPermissionSettings = useCallback(() => {
+    const r = openNativeAppSettings();
+    if (r?.ok) {
+      onNotice?.("「권한」에서 카메라·사진·위치 등을 허용으로 바꿔 주세요.");
+    } else {
+      onNotice?.("앱 설정을 열 수 없습니다. 기기 설정 → 앱 → VLUE → 권한으로 이동해 주세요.");
+    }
+  }, [onNotice]);
+
+  const canOpenAppSettings =
+    typeof window !== "undefined" &&
+    Boolean(window.Android?.openAppSettings || window.VlueLettering?.openAppSettings);
+
   const border = isDarkMode ? "border-white/10 bg-white/5" : "border-gray-100 bg-white";
   const label = isDarkMode ? "text-gray-200" : "text-gray-700";
   const hint = isDarkMode ? "text-gray-400" : "text-gray-500";
@@ -65,6 +79,21 @@ export default function LetteringSettingsSection({
       <div className="mb-3">
         <CallDetectionStatusBanner isDarkMode={isDarkMode} onNotice={onNotice} />
       </div>
+      {canOpenAppSettings ? (
+        <>
+          <button
+            type="button"
+            className="mb-3 w-full rounded-xl bg-blue-600 py-2.5 text-[12px] font-black text-white"
+            onClick={openAppPermissionSettings}
+          >
+            남은 권한 허용하기
+          </button>
+          <p className={`mb-3 text-[10px] leading-snug ${hint}`}>
+            한 번 누르면 VLUE 앱 설정으로 이동합니다. 「권한」에서 카메라·사진·위치 등을 허용으로 바꾸면
+            됩니다.
+          </p>
+        </>
+      ) : null}
       <label className={`flex items-center justify-between text-[12px] font-semibold ${label}`}>
         레터링 기능 켜기
         <input

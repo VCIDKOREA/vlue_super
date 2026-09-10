@@ -34,6 +34,7 @@ import PasswordChangeSection from "./PasswordChangeSection.jsx";
 import PhoneChangeSection from "./PhoneChangeSection.jsx";
 import { requestV1PaidPackageGate } from "../../lib/v1PaidPackageGate.js";
 import { canUseV1PaidDccFeatures } from "../../lib/v1PaidPackageGate.js";
+import { openNativeAppSettings } from "../../lib/letteringSettings.js";
 import VlueEmailSettingsSection from "./VlueEmailSettingsSection.jsx";
 import { v1AppShell } from "../../lib/v1ReleaseScope.js";
 import { APP_LEGAL_LINKS, marketingLegalUrl } from "../../lib/legalPageLinks.js";
@@ -748,6 +749,24 @@ export default function VlueSettingsPanel({
               onNotice={showSettingNotice}
             />
           </div>
+          <SettingsDivider isDarkMode={isDarkMode} />
+          <SettingsRowButton
+            label="앱 권한 허용"
+            sublabel="카메라 · 사진 · 위치 등 남은 권한을 설정에서 허용"
+            onClick={() => {
+              const r = openNativeAppSettings();
+              if (r?.ok) {
+                showSettingNotice?.(
+                  "VLUE 앱 정보 화면입니다. 「권한」에서 허용으로 바꿔 주세요."
+                );
+              } else {
+                showSettingNotice?.(
+                  "앱 설정을 열 수 없습니다. 기기 설정 → 앱 → VLUE → 권한으로 이동해 주세요."
+                );
+              }
+            }}
+            isDarkMode={isDarkMode}
+          />
           {!isVCIDOn ? (
             <>
               <SettingsDivider isDarkMode={isDarkMode} />

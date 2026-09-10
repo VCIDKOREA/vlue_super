@@ -10,7 +10,6 @@ import ChatRoom from "./components/ChatRoom";
 import BlueAIChat from "./components/BlueAIChat";
 import FriendSearch from "./components/FriendSearch";
 import ContactSyncConsentModal from "./components/ContactSyncConsentModal.jsx";
-import AppRuntimePermissionsModal from "./components/AppRuntimePermissionsModal.jsx";
 import FeedManager from "./components/FeedManager";
 import Home from "./components/Home";
 import MyPage from "./components/MyPage";
@@ -105,10 +104,6 @@ import {
   readContactMatchCache,
   shouldShowContactSyncPrompt
 } from "./lib/contactSyncStorage.js";
-import {
-  markRuntimePermissionsPending,
-  shouldShowRuntimePermissionsPrompt
-} from "./lib/appRuntimePermissions.js";
 import { upsertKnownPhonesFromFriends } from "./lib/contacts/knownPhonesIndex.js";
 import { syncDeviceContactsFromNative } from "./lib/contacts/deviceContactsCache.js";
 import { effectiveCardJobTitle } from "./lib/jobTitleVerify.js";
@@ -526,7 +521,6 @@ function App() {
   const [friendInboxRequests, setFriendInboxRequests] = useState([]);
   const [blockedFriendIds, setBlockedFriendIds] = useState([]);
   const [contactSyncModalOpen, setContactSyncModalOpen] = useState(false);
-  const [runtimePermsModalOpen, setRuntimePermsModalOpen] = useState(false);
   const [contactMatchData, setContactMatchData] = useState(() => readContactMatchCache());
   const [messagesByRoom, setMessagesByRoom] = useState(() => JSON.parse(JSON.stringify(seedMessages)));
   const [roomCatalog, setRoomCatalog] = useState(initialRoomCatalog);
@@ -2210,7 +2204,7 @@ function App() {
     }
     localStorage.setItem(ONBOARDING_DONE_KEY, "1");
     localStorage.setItem(SESSION_KEY, "1");
-    markRuntimePermissionsPending();
+    markContactSyncPending();
     setDigitalCardActive(readDigitalCardActive());
     setOnboardingComplete(true);
     setSignupOnboardingOpen(false);
@@ -4158,15 +4152,19 @@ function App() {
     !showSplash && !isLoggedIn && !signupOnboardingOpen && !showOnboardingFlow && !isBrowseGuest;
 
   useEffect(() => {
-    if (!shouldShowRuntimePermissionsPrompt({ isLoggedIn, showAppShell })) return;
-    setRuntimePermsModalOpen(true);
-  }, [isLoggedIn, showAppShell]);
-
-  useEffect(() => {
-    if (shouldShowRuntimePermissionsPrompt({ isLoggedIn, showAppShell })) return;
+    /* 예전 가입 직후 권한 사전 화면 pending → 연락처 동의로 넘김 */
+    try {
+      if (localStorage.getItem("vlue_runtime_perms_pending_v1") === "1") {
+        localStorage.removeItem("vlue_runtime_perms_pending_v1");
+        localStorage.setItem("vlue_runtime_perms_done_v1", "1");
+        markContactSyncPending();
+      }
+    } catch {
+      /* ignore */
+    }
     if (!shouldShowContactSyncPrompt({ isLoggedIn, showAppShell })) return;
     setContactSyncModalOpen(true);
-  }, [isLoggedIn, showAppShell, runtimePermsModalOpen]);
+  }, [isLoggedIn, showAppShell]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -4336,14 +4334,8 @@ function App() {
 
       <LineBillingGraceModal enabled={isLoggedIn && showAppShell} />
 
-      <AppRuntimePermissionsModal
-        open={runtimePermsModalOpen && isLoggedIn && showAppShell}
-        onClose={() => setRuntimePermsModalOpen(false)}
-        onContinueContacts={() => setContactSyncModalOpen(true)}
-      />
-
       <ContactSyncConsentModal
-        open={contactSyncModalOpen && isLoggedIn && showAppShell && !runtimePermsModalOpen}
+        open={contactSyncModalOpen && isLoggedIn && showAppShell}
         onClose={() => setContactSyncModalOpen(false)}
         onSynced={(result) => {
           setContactMatchData(result);
