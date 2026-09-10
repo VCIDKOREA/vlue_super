@@ -1160,12 +1160,29 @@ function App() {
         setBottomToast(body);
         setTimeout(() => setBottomToast(""), 4200);
       }
-      if (data.type === "vlue-admin-broadcast") {
+      if (data.type === "vlue-admin-broadcast" || data.type === "vlue-force-update") {
         const title = String(n.title || data.title || "VLUE 공지");
         const body = String(n.body || data.body || data.message || title);
         const category = String(data.category || "공지");
+        const forceUpdate =
+          data.type === "vlue-force-update" ||
+          data.forceUpdate === "1" ||
+          data.forceUpdate === true;
         addPushNotification({ category, title, body });
-        deliverLocalPushNotification(title, body, `admin-broadcast-${data.audience || "all"}`);
+        deliverLocalPushNotification(
+          title,
+          body,
+          forceUpdate
+            ? `force-update-${data.audience || "all"}`
+            : `admin-broadcast-${data.audience || "all"}`
+        );
+        if (forceUpdate) {
+          try {
+            window.Android?.promptAppUpdate?.(title, body);
+          } catch {
+            /* ignore */
+          }
+        }
         setBottomToast(body);
         setTimeout(() => setBottomToast(""), 5200);
         void syncOwnerInboxFromServer();
@@ -1284,14 +1301,31 @@ function App() {
             body: noticeMsg
           });
         }
-        if (data?.type === "vlue-admin-broadcast") {
+        if (data?.type === "vlue-admin-broadcast" || data?.type === "vlue-force-update") {
           const title = String(data.title || "VLUE 공지");
           const body = String(data.body || data.message || title);
           const category = String(data.category || "공지");
+          const forceUpdate =
+            data.type === "vlue-force-update" ||
+            data.forceUpdate === "1" ||
+            data.forceUpdate === true;
           setBottomToast(body);
           setTimeout(() => setBottomToast(""), 5200);
           addPushNotification({ category, title, body });
-          deliverLocalPushNotification(title, body, `admin-broadcast-${data.audience || "all"}`);
+          deliverLocalPushNotification(
+            title,
+            body,
+            forceUpdate
+              ? `force-update-${data.audience || "all"}`
+              : `admin-broadcast-${data.audience || "all"}`
+          );
+          if (forceUpdate) {
+            try {
+              window.Android?.promptAppUpdate?.(title, body);
+            } catch {
+              /* ignore */
+            }
+          }
           void syncOwnerInboxFromServer();
         }
         if (data?.type === VLUE_SSE_CHAT_MESSAGE) {

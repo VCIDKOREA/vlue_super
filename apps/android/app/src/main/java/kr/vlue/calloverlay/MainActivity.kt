@@ -119,6 +119,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         /* Android 15+ edge-to-edge 기본값에서 WebView가 상태바 아래로 깔리면 헤더가 시계·배터리와 겹침 */
         WindowCompat.setDecorFitsSystemWindows(window, true)
         applyNotificationWakeFlags(intent)
+        VlueAppUpdatePrompt.applyIntentExtras(intent, this)
         VlueBigPushTrace.bind(this)
         AppLockStore.init(this)
         VlueSystemNotifier.ensureChannel(this)
@@ -182,6 +183,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 scanRemoteApps()
                 scanDangerousApps()
                 handleFamilyInviteIntent(intent)
+                VlueAppUpdatePrompt.maybeShow(this@MainActivity)
             }
         }
 
@@ -369,6 +371,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             applyNotificationWakeFlags(intent)
             handleMemoShareIntent(intent)
             handleFamilyInviteIntent(intent)
+            VlueAppUpdatePrompt.applyIntentExtras(intent, this)
+            VlueAppUpdatePrompt.maybeShow(this)
         }
     }
 
@@ -425,7 +429,11 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             if (pinLock.shouldBlockLaunch() || AppLockStore.requiresIdentityReset()) {
                 webView.visibility = View.INVISIBLE
                 pinLock.showLaunchGateIfNeeded()
+            } else {
+                VlueAppUpdatePrompt.maybeShow(this)
             }
+        } else {
+            VlueAppUpdatePrompt.maybeShow(this)
         }
     }
 
@@ -1108,12 +1116,29 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         @android.webkit.JavascriptInterface
         fun showSystemNotification(title: String?, body: String?, tag: String?) {
             activity.runOnUiThread {
+                val tagSafe = tag.orEmpty()
+                val force =
+                    tagSafe.contains("force-update", ignoreCase = true) ||
+                        tagSafe.contains("vlue-force-update", ignoreCase = true)
                 VlueSystemNotifier.show(
                     activity,
                     title.orEmpty(),
                     body.orEmpty(),
-                    tag
+                    tag,
+                    forceUpdate = force,
+                    minVersionCode = 0
                 )
+                if (force) {
+                    VlueAppUpdatePrompt.maybeShow(activity)
+                }
+            }
+        }
+
+        /** 관리자 업데이트 알림 — 팝업 + 스토어 */
+        @android.webkit.JavascriptInterface
+        fun promptAppUpdate(title: String?, body: String?) {
+            activity.runOnUiThread {
+                VlueAppUpdatePrompt.checkServerAndMaybeShow(activity)
             }
         }
 

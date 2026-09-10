@@ -202,6 +202,8 @@ export async function sendAdminMemberBroadcast(opts: {
   title: string;
   body: string;
   category?: string;
+  forceUpdate?: boolean;
+  minVersionCode?: number;
   adminUserId?: string | null;
 }) {
   const title = String(opts.title || "").trim().slice(0, 120);
@@ -229,6 +231,14 @@ export async function sendAdminMemberBroadcast(opts: {
   const truncated = targeted > MAX_SEND;
   const sendIds = userIds.slice(0, MAX_SEND);
   const category = String(opts.category || "공지").slice(0, 12);
+  const forceUpdate =
+    Boolean(opts.forceUpdate) ||
+    category.includes("업데이트") ||
+    category.toLowerCase() === "update";
+  const minVersionCode =
+    Number.isFinite(Number(opts.minVersionCode)) && Number(opts.minVersionCode) > 0
+      ? Math.floor(Number(opts.minVersionCode))
+      : 0;
   const adminUserId = opts.adminUserId ? String(opts.adminUserId) : null;
 
   let inboxSaved = 0;
@@ -242,9 +252,12 @@ export async function sendAdminMemberBroadcast(opts: {
         title,
         body,
         payloadJson: {
-          type: "vlue-admin-broadcast",
+          type: forceUpdate ? "vlue-force-update" : "vlue-admin-broadcast",
           audience: opts.audience,
-          category
+          category,
+          ...(forceUpdate
+            ? { forceUpdate: true, minVersionCode: minVersionCode || undefined }
+            : {})
         }
       }))
     });
@@ -256,13 +269,17 @@ export async function sendAdminMemberBroadcast(opts: {
   let pushUsersWithTokens = 0;
   let pushUsersWithoutTokens = 0;
   let pushSkipReason: string | null = null;
-  const payload = {
-    type: "vlue-admin-broadcast",
+  const payload: Record<string, unknown> = {
+    type: forceUpdate ? "vlue-force-update" : "vlue-admin-broadcast",
     audience: opts.audience,
     category,
     title,
     body
   };
+  if (forceUpdate) {
+    payload.forceUpdate = "1";
+    if (minVersionCode > 0) payload.minVersionCode = String(minVersionCode);
+  }
 
   for (const userId of sendIds) {
     ssePublish(userId, payload);
@@ -292,6 +309,7 @@ export async function sendAdminMemberBroadcast(opts: {
     pushUsersWithoutTokens,
     pushSkipReason,
     truncated,
-    maxSend: MAX_SEND
+    maxSend: MAX_SEND,
+    forceUpdate
   };
 }

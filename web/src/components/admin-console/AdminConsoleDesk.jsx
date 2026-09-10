@@ -29,10 +29,13 @@ import {
   adminActivateUser,
   adminWithdrawUser,
   adminRestoreUser,
+  adminGrantPaidUser,
   resolveAdminManualReview,
   reviewAdminEnterpriseDcc,
   reviewAdminGroupAccount,
   sendAdminBroadcast,
+  fetchAdminAndroidVersion,
+  saveAdminAndroidVersion,
   testAdminNotification,
   testAdminScanner,
   updateAdminNotice,
@@ -96,6 +99,9 @@ function MemberBroadcastTab({ onToast }) {
   const [body, setBody] = useState("");
   const [category, setCategory] = useState("공지");
   const [busy, setBusy] = useState(false);
+  const [verCode, setVerCode] = useState("46");
+  const [verName, setVerName] = useState("1.0.4");
+  const [verBusy, setVerBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -103,6 +109,13 @@ function MemberBroadcastTab({ onToast }) {
       setAudiences(data.audiences || []);
     } catch (e) {
       onToast?.(e?.message || "대상 그룹 조회 실패");
+    }
+    try {
+      const ver = await fetchAdminAndroidVersion();
+      if (ver?.latestVersionCode) setVerCode(String(ver.latestVersionCode));
+      if (ver?.latestVersionName) setVerName(String(ver.latestVersionName));
+    } catch {
+      /* ignore */
     }
   }, [onToast]);
 
@@ -162,6 +175,56 @@ function MemberBroadcastTab({ onToast }) {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+        <p className="text-[13px] font-black text-slate-800">앱 버전 업데이트 안내 (알림 없이)</p>
+        <p className="text-[11px] leading-relaxed text-slate-600">
+          스토어에 새 APK를 올린 뒤 여기 최신 versionCode를 저장하세요. 그보다 낮은 앱이 실행되면
+          「새로운 버전이 있습니다. 업데이트 하시겠습니까?」 팝업 → 확인 시 스토어로 이동합니다.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-[11px] font-black text-slate-500">최신 versionCode</span>
+            <input
+              value={verCode}
+              onChange={(e) => setVerCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
+              placeholder="46"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] font-black text-slate-500">버전명</span>
+            <input
+              value={verName}
+              onChange={(e) => setVerName(e.target.value)}
+              maxLength={32}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
+              placeholder="1.0.4"
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          disabled={verBusy || !verCode}
+          onClick={() => {
+            setVerBusy(true);
+            void saveAdminAndroidVersion({
+              latestVersionCode: Number(verCode),
+              latestVersionName: verName.trim() || String(verCode)
+            })
+              .then((res) => {
+                onToast?.(
+                  `앱 최신 버전 저장: ${res.latestVersionName} (${res.latestVersionCode})`
+                );
+              })
+              .catch((e) => onToast?.(e?.message || "버전 저장 실패"))
+              .finally(() => setVerBusy(false));
+          }}
+          className="rounded-xl bg-emerald-600 px-4 py-2.5 text-[12px] font-black text-white disabled:opacity-50"
+        >
+          {verBusy ? "저장 중…" : "최신 버전 저장"}
+        </button>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[13px] font-black text-slate-800">회원 그룹별 알림 발송</p>
         <button type="button" onClick={() => void load()} className="rounded-lg bg-slate-100 px-3 py-1.5 text-[12px] font-bold">
@@ -551,6 +614,7 @@ function MemberActionModal({
   confirmClass,
   requireReason,
   showImmediate,
+  forcePermanentBan = false,
   onClose,
   onConfirm,
   busy
@@ -561,10 +625,10 @@ function MemberActionModal({
   useEffect(() => {
     if (open) {
       setReason("");
-      setImmediate(false);
-      setPermanentBan(false);
+      setImmediate(Boolean(forcePermanentBan));
+      setPermanentBan(Boolean(forcePermanentBan));
     }
-  }, [open]);
+  }, [open, forcePermanentBan]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4">
@@ -596,7 +660,7 @@ function MemberActionModal({
             />
           </label>
         )}
-        {showImmediate ? (
+        {showImmediate && !forcePermanentBan ? (
           <>
             <label className="mt-3 flex items-start gap-2 text-[12px] font-semibold text-rose-700">
               <input
@@ -628,6 +692,11 @@ function MemberActionModal({
             </label>
           </>
         ) : null}
+        {forcePermanentBan ? (
+          <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-[12px] font-semibold leading-snug text-rose-900">
+            동일 본인인증(CI)으로는 재가입할 수 없습니다. 개인정보는 파기되며 복구할 수 없습니다.
+          </p>
+        ) : null}
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
@@ -640,7 +709,13 @@ function MemberActionModal({
           <button
             type="button"
             disabled={busy || (requireReason && reason.trim().length < 2)}
-            onClick={() => onConfirm({ reason: reason.trim(), immediate, permanentBan })}
+            onClick={() =>
+              onConfirm({
+                reason: reason.trim(),
+                immediate: forcePermanentBan ? true : immediate,
+                permanentBan: forcePermanentBan ? true : permanentBan
+              })
+            }
             className={`rounded-lg px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50 ${confirmClass || "bg-slate-900"}`}
           >
             {busy ? "처리 중…" : confirmLabel}
@@ -657,7 +732,13 @@ function membershipLabel(user) {
   const t = String(user?.membershipTier || "free").toLowerCase();
   if (t === "paid" || t === "standard" || t === "premium") return "유료";
   if (t === "free") return "무료";
-  return t || "무료";
+  if (t === "b2b") return "B2B";
+  return t || "—";
+}
+
+function isFreeMembership(user) {
+  const t = String(user?.membershipTier || "free").toLowerCase();
+  return !t || t === "free" || t === "pending_payment";
 }
 
 function formatAdminDate(iso) {
@@ -835,12 +916,17 @@ function UsersTab({ onToast }) {
       } else if (action.type === "activate") {
         await adminActivateUser(action.userId, { reason });
         onToast?.("계정 활성화");
-      } else if (action.type === "withdraw") {
-        const mode = permanentBan ? "permanent_ban" : immediate ? "immediate" : "grace";
+      } else if (action.type === "withdraw" || action.type === "permanent_ban") {
+        const mode =
+          action.type === "permanent_ban" || permanentBan
+            ? "permanent_ban"
+            : immediate
+              ? "immediate"
+              : "grace";
         const res = await adminWithdrawUser(action.userId, { reason, mode });
         onToast?.(
           res?.message ||
-            (permanentBan
+            (mode === "permanent_ban"
               ? "영구 추방 처리"
               : immediate
                 ? "즉시 탈퇴 처리"
@@ -849,6 +935,9 @@ function UsersTab({ onToast }) {
       } else if (action.type === "restore") {
         const res = await adminRestoreUser(action.userId, { reason });
         onToast?.(res?.message || "복구 완료");
+      } else if (action.type === "grant_paid") {
+        const res = await adminGrantPaidUser(action.userId, { reason });
+        onToast?.(res?.message || "테스터 쿠폰으로 유료 업그레이드 완료");
       }
       setAction(null);
       load();
@@ -868,17 +957,41 @@ function UsersTab({ onToast }) {
         confirmLabel: "정지 처리",
         confirmClass: "bg-rose-600",
         requireReason: true,
-        showImmediate: false
+        showImmediate: false,
+        forcePermanentBan: false
       };
     }
     if (action.type === "withdraw") {
       return {
         title: "회원 탈퇴 처리",
-        hint: "고객 요청 탈퇴는 재가입(본인인증 다시)이 가능합니다. 사칭·악용은 「영구 추방」을 선택하세요.",
+        hint: "고객 요청 탈퇴는 재가입(본인인증 다시)이 가능합니다. 사칭·악용은 「영구 추방」 버튼을 사용하세요.",
         confirmLabel: "탈퇴 처리",
         confirmClass: "bg-rose-700",
         requireReason: true,
-        showImmediate: true
+        showImmediate: true,
+        forcePermanentBan: false
+      };
+    }
+    if (action.type === "permanent_ban") {
+      return {
+        title: "영구 추방",
+        hint: "사칭·악용 등 운영 차단용입니다. 동일 본인인증으로는 재가입할 수 없습니다.",
+        confirmLabel: "영구 추방 확정",
+        confirmClass: "bg-black",
+        requireReason: true,
+        showImmediate: false,
+        forcePermanentBan: true
+      };
+    }
+    if (action.type === "grant_paid") {
+      return {
+        title: "유료 업그레이드 (테스터 쿠폰)",
+        hint: "기본 쿠폰 VLUE_TESTER 로 결제 없이 유료 멤버십(12개월)을 부여합니다. 테스터·내부 검증용입니다.",
+        confirmLabel: "유료 적용",
+        confirmClass: "bg-blue-600",
+        requireReason: false,
+        showImmediate: false,
+        forcePermanentBan: false
       };
     }
     if (action.type === "restore") {
@@ -890,7 +1003,8 @@ function UsersTab({ onToast }) {
         confirmLabel: "복구",
         confirmClass: "bg-emerald-600",
         requireReason: false,
-        showImmediate: false
+        showImmediate: false,
+        forcePermanentBan: false
       };
     }
     if (action.type === "activate") {
@@ -900,7 +1014,8 @@ function UsersTab({ onToast }) {
         confirmLabel: "활성화",
         confirmClass: "bg-emerald-600",
         requireReason: false,
-        showImmediate: false
+        showImmediate: false,
+        forcePermanentBan: false
       };
     }
     return null;
@@ -920,7 +1035,8 @@ function UsersTab({ onToast }) {
         </button>
       </div>
       <p className="text-[11px] text-slate-500">
-        총 {total}명 · 정지/탈퇴는 사유 필수 · 탈퇴 기본 24시간 복구 가능 · 즉시 탈퇴는 복구 불가
+        총 {total}명 · 유료=테스터 쿠폰(VLUE_TESTER) · 정지/탈퇴/영구추방은 사유 필수 · 탈퇴 기본 24시간 복구 · 영구추방은
+        재가입 불가
       </p>
       {selected ? <MemberDetail user={selected} onClose={() => setSelected(null)} /> : null}
       <MemberActionModal
@@ -931,6 +1047,7 @@ function UsersTab({ onToast }) {
         confirmClass={actionMeta?.confirmClass}
         requireReason={actionMeta?.requireReason}
         showImmediate={actionMeta?.showImmediate}
+        forcePermanentBan={actionMeta?.forcePermanentBan}
         busy={Boolean(busyId)}
         onClose={() => setAction(null)}
         onConfirm={(payload) => void runAction(payload)}
@@ -961,6 +1078,7 @@ function UsersTab({ onToast }) {
               const deleted = r.status === "DELETED";
               const pending = Boolean(r.pendingWithdrawal);
               const suspended = r.accountStatus === "suspended" && !pending;
+              const canGrantPaid = !deleted && !pending && isFreeMembership(r);
               return (
                 <div className="flex flex-wrap gap-1">
                   <button
@@ -970,6 +1088,16 @@ function UsersTab({ onToast }) {
                   >
                     상세
                   </button>
+                  {canGrantPaid ? (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => setAction({ type: "grant_paid", userId: r.id })}
+                      className="rounded bg-blue-600 px-2 py-1 text-[10px] font-bold text-white"
+                    >
+                      유료
+                    </button>
+                  ) : null}
                   {!deleted && !pending ? (
                     <button
                       type="button"
@@ -1010,6 +1138,16 @@ function UsersTab({ onToast }) {
                       className="rounded bg-slate-900 px-2 py-1 text-[10px] font-bold text-white"
                     >
                       탈퇴
+                    </button>
+                  ) : null}
+                  {!deleted && !pending ? (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => setAction({ type: "permanent_ban", userId: r.id })}
+                      className="rounded bg-black px-2 py-1 text-[10px] font-bold text-white"
+                    >
+                      영구추방
                     </button>
                   ) : null}
                 </div>

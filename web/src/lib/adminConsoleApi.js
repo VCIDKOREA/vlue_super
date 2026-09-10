@@ -139,6 +139,20 @@ export async function adminRestoreUser(userId, { reason } = {}) {
   return parseJson(res);
 }
 
+/** 테스터 기본 쿠폰(VLUE_TESTER)으로 유료 멤버십 부여 */
+export async function adminGrantPaidUser(userId, { reason, couponCode, months } = {}) {
+  const res = await fetch(apiUrl(`/api/admin/console/users/${userId}/grant-paid`), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify({
+      reason: reason || "",
+      ...(couponCode ? { couponCode } : {}),
+      ...(months ? { months } : {})
+    })
+  });
+  return parseJson(res);
+}
+
 export async function fetchAdminPosts() {
   const res = await fetch(apiUrl("/api/admin/console/posts"), { headers: adminHeaders() });
   return parseJson(res);
@@ -225,11 +239,43 @@ export async function fetchAdminBroadcastAudiences() {
   return parseJson(res);
 }
 
-export async function sendAdminBroadcast({ audience, title, body, category, confirm }) {
+export async function sendAdminBroadcast({
+  audience,
+  title,
+  body,
+  category,
+  confirm
+}) {
   const res = await fetch(apiUrl("/api/admin/console/notifications/broadcast"), {
     method: "POST",
     headers: adminHeaders(),
-    body: JSON.stringify({ audience, title, body, category, confirm })
+    body: JSON.stringify({
+      audience,
+      title,
+      body,
+      category,
+      confirm
+    })
+  });
+  return parseJson(res);
+}
+
+export async function fetchAdminAndroidVersion() {
+  const res = await fetch(apiUrl("/api/admin/console/android-version"), {
+    headers: adminHeaders()
+  });
+  return parseJson(res);
+}
+
+export async function saveAdminAndroidVersion({ latestVersionCode, latestVersionName, message }) {
+  const res = await fetch(apiUrl("/api/admin/console/android-version"), {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify({
+      latestVersionCode: Number(latestVersionCode),
+      ...(latestVersionName ? { latestVersionName } : {}),
+      ...(message ? { message } : {})
+    })
   });
   return parseJson(res);
 }

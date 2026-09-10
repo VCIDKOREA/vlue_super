@@ -72,11 +72,13 @@ import { lineBillingRoutes } from "./lineBilling.js";
 import { publicBgmRoutes } from "./publicBgm.js";
 import { webRiskRoutes } from "./webRisk.js";
 import { showcasePublicRoutes } from "./showcasePublic.js";
+import { appPublicRoutes } from "./appPublic.js";
 
 /** `/api` 아래에 마운트되는 라우트 묶음 */
 export const apiRoutes = new Hono();
 
 apiRoutes.route("/", healthRoutes);
+apiRoutes.route("/app", appPublicRoutes);
 apiRoutes.route("/auth", authRoutes);
 apiRoutes.route("/v1/auth", authV1Routes);
 apiRoutes.route("/identity", identityRoutes);

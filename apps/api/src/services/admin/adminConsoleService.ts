@@ -518,6 +518,129 @@ export async function adminRestoreUser(
   };
 }
 
+/** 관리자 콘솔 — 테스터용 기본 쿠폰으로 유료 멤버십 부여 (결제 없음) */
+export const ADMIN_TESTER_PAID_COUPON = "VLUE_TESTER";
+
+function addMonthsAdmin(d: Date, months: number): Date {
+  const x = new Date(d.getTime());
+  x.setUTCMonth(x.getUTCMonth() + months);
+  return x;
+}
+
+function isPaidMembershipTier(tier: string | null | undefined): boolean {
+  const t = String(tier || "free").toLowerCase();
+  return t === "paid" || t === "standard" || t === "premium" || t === "b2b";
+}
+
+export async function adminGrantPaidMembership(
+  userId: string,
+  opts: {
+    reason?: string;
+    adminUserId: string;
+    couponCode?: string;
+    /** 기본 12개월(테스터 연간) */
+    months?: number;
+  }
+) {
+  const coupon =
+    String(opts.couponCode || ADMIN_TESTER_PAID_COUPON)
+      .trim()
+      .toUpperCase()
+      .slice(0, 24) || ADMIN_TESTER_PAID_COUPON;
+  const reason =
+    String(opts.reason || "").trim() ||
+    `테스터 기본 쿠폰(${coupon}) 유료 업그레이드`;
+  if (reason.length > 500) throw new Error("사유는 500자 이내로 입력해 주세요.");
+
+  const existing = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      status: true,
+      digitalCard: { select: { membershipTierSnapshot: true } }
+    }
+  });
+  if (!existing) throw new Error("회원을 찾을 수 없습니다.");
+  if (existing.status === "DELETED") {
+    throw new Error("탈퇴된 계정은 유료 업그레이드할 수 없습니다.");
+  }
+  if (isPaidMembershipTier(existing.digitalCard?.membershipTierSnapshot)) {
+    throw new Error("이미 유료(또는 B2B) 멤버십입니다.");
+  }
+
+  const now = new Date();
+  const months = Math.min(36, Math.max(1, Number(opts.months) || 12));
+  const cycleEnd = addMonthsAdmin(now, months);
+
+  await prisma.userSubscription.updateMany({
+    where: { userId, status: "pending_payment" },
+    data: {
+      status: "cancelled",
+      cancelledAt: now,
+      cancelReason: "admin_tester_coupon"
+    }
+  });
+
+  const activeSub = await prisma.userSubscription.findFirst({
+    where: { userId, status: "active" },
+    orderBy: { createdAt: "desc" }
+  });
+
+  if (activeSub) {
+    await prisma.userSubscription.update({
+      where: { id: activeSub.id },
+      data: {
+        plan: "b2c_annual",
+        amountKrw: 0,
+        listPriceKrw: 99000,
+        isDiscounted: true,
+        referralCodeUsed: coupon,
+        cycleStartAt: now,
+        cycleEndAt: cycleEnd,
+        nextChargeAt: cycleEnd,
+        cancelledAt: null,
+        cancelReason: null,
+        portoneCustomerUid: activeSub.portoneCustomerUid || `admin_coupon_${coupon.toLowerCase()}`
+      }
+    });
+  } else {
+    await prisma.userSubscription.create({
+      data: {
+        userId,
+        plan: "b2c_annual",
+        status: "active",
+        amountKrw: 0,
+        listPriceKrw: 99000,
+        isDiscounted: true,
+        referralCodeUsed: coupon,
+        cycleStartAt: now,
+        cycleEndAt: cycleEnd,
+        nextChargeAt: cycleEnd,
+        portoneCustomerUid: `admin_coupon_${coupon.toLowerCase()}`
+      }
+    });
+  }
+
+  await prisma.digitalCard.upsert({
+    where: { userId },
+    create: { userId, membershipTierSnapshot: "paid" },
+    update: { membershipTierSnapshot: "paid" }
+  });
+
+  await writeAccountActionMeta(userId, {
+    type: "grant_paid",
+    reason: `${reason} · coupon:${coupon}`,
+    adminUserId: opts.adminUserId
+  });
+
+  return {
+    ok: true,
+    coupon,
+    user: await getAdminUser(userId),
+    message: `테스터 쿠폰(${coupon})으로 유료 멤버십이 적용되었습니다. (${months}개월)`
+  };
+}
+
 export async function listAdminFeedPosts(limit = 50) {
   const posts = await prisma.cardFeedPost.findMany({
     take: limit,

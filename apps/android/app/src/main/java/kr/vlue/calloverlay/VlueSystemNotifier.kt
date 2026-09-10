@@ -54,7 +54,9 @@ object VlueSystemNotifier {
         context: Context,
         title: String,
         body: String,
-        tag: String? = null
+        tag: String? = null,
+        forceUpdate: Boolean = false,
+        minVersionCode: Int = 0
     ) {
         val app = context.applicationContext
         val tagSafe = tag.orEmpty()
@@ -76,11 +78,23 @@ object VlueSystemNotifier {
             }
         }
 
+        if (forceUpdate) {
+            VlueAppUpdatePrompt.markPending(app, title, body, minVersionCode)
+        }
+
         ensureChannel(app)
         val safeTitle = title.ifBlank { "VLUE" }
         val fullBody = body.ifBlank { safeTitle }.trim()
         val requestCode = if (!tag.isNullOrBlank()) tag.hashCode() else 7100
-        val contentPi = VlueNotificationWake.activityPendingIntent(app, requestCode)
+        val contentPi =
+            VlueNotificationWake.activityPendingIntent(app, requestCode) {
+                if (forceUpdate) {
+                    putExtra(VlueAppUpdatePrompt.EXTRA_FORCE_UPDATE, true)
+                    putExtra(VlueAppUpdatePrompt.EXTRA_UPDATE_TITLE, safeTitle)
+                    putExtra(VlueAppUpdatePrompt.EXTRA_UPDATE_BODY, fullBody)
+                    putExtra(VlueAppUpdatePrompt.EXTRA_MIN_VERSION_CODE, minVersionCode)
+                }
+            }
         val builder =
             NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)

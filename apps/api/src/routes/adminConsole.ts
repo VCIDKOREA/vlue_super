@@ -49,6 +49,7 @@ import {
   adminActivateUser,
   adminWithdrawUser,
   adminRestoreUser,
+  adminGrantPaidMembership,
   releaseNotice,
   resolveManualReview,
   testAdminNotificationBroadcast,
@@ -56,6 +57,10 @@ import {
   updateNotice
 } from "../services/admin/adminConsoleService.js";
 import { AccountWithdrawalError } from "../services/auth/accountWithdrawalService.js";
+import {
+  loadAndroidVersionConfig,
+  saveAndroidVersionConfig
+} from "../services/app/androidVersionConfig.js";
 
 type AdminConsoleVars = { adminConsoleUser: AdminConsoleUserVar };
 
@@ -237,6 +242,26 @@ authed.post("/users/:userId/restore", async (c) => {
   }
 });
 
+authed.post("/users/:userId/grant-paid", async (c) => {
+  const admin = c.get("adminConsoleUser");
+  const body = (await c.req.json().catch(() => ({}))) as {
+    reason?: string;
+    couponCode?: string;
+    months?: number;
+  };
+  try {
+    const result = await adminGrantPaidMembership(c.req.param("userId"), {
+      reason: String(body.reason || ""),
+      adminUserId: admin.id,
+      couponCode: body.couponCode,
+      months: body.months
+    });
+    return c.json(result);
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "유료 업그레이드 실패" }, 400);
+  }
+});
+
 authed.get("/posts", async (c) => {
   const [notices, popups, feedPosts, mediaCampaigns] = await Promise.all([
     listNotices(50),
@@ -403,6 +428,29 @@ authed.get("/health", async (c) => {
   return c.json(status);
 });
 
+authed.get("/android-version", async (c) => {
+  const cfg = await loadAndroidVersionConfig();
+  return c.json({ ok: true, ...cfg });
+});
+
+authed.patch("/android-version", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    latestVersionCode?: number;
+    latestVersionName?: string;
+    message?: string;
+  };
+  try {
+    const cfg = await saveAndroidVersionConfig({
+      latestVersionCode: Number(body.latestVersionCode),
+      latestVersionName: body.latestVersionName,
+      message: body.message
+    });
+    return c.json({ ok: true, ...cfg });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "버전 저장 실패" }, 400);
+  }
+});
+
 authed.post("/health/test-notification", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { message?: string };
   const result = await testAdminNotificationBroadcast(String(body.message || "").trim());
@@ -422,6 +470,8 @@ authed.post("/notifications/broadcast", async (c) => {
     title?: string;
     body?: string;
     category?: string;
+    forceUpdate?: boolean;
+    minVersionCode?: number;
     confirm?: boolean;
   };
   if (!body.confirm) {
@@ -438,6 +488,8 @@ authed.post("/notifications/broadcast", async (c) => {
       title: String(body.title || ""),
       body: String(body.body || ""),
       category: body.category,
+      forceUpdate: Boolean(body.forceUpdate),
+      minVersionCode: body.minVersionCode,
       adminUserId: admin.id
     });
     return c.json(result);

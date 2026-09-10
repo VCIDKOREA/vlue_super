@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kr.vlue.calloverlay.VlueSystemNotifier
+import kr.vlue.calloverlay.VlueAppUpdatePrompt
 import kr.vlue.calloverlay.family.FamilyProtectionNotificationHelper
 
 /**
@@ -46,7 +47,22 @@ class VlueFirebaseMessagingService : FirebaseMessagingService() {
             return
         }
 
-        VlueSystemNotifier.show(applicationContext, title, body, tag)
+        val forceUpdate = VlueAppUpdatePrompt.isForceUpdatePayload(data)
+        if (forceUpdate) {
+            VlueAppUpdatePrompt.markPendingFromData(applicationContext, data, title, body)
+        }
+        val minVc =
+            data["minVersionCode"]?.toIntOrNull()
+                ?: data["min_version_code"]?.toIntOrNull()
+                ?: 0
+        VlueSystemNotifier.show(
+            applicationContext,
+            title,
+            body,
+            tag,
+            forceUpdate = forceUpdate,
+            minVersionCode = minVc
+        )
     }
 
     companion object {
