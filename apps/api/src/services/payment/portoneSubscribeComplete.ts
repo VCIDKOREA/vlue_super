@@ -288,6 +288,20 @@ export async function completePortoneSubscribePayment(input: CompleteSubscribeIn
     console.error("[subscribe-complete] sync line", input.userId, e);
   }
 
+  try {
+    const { notifyPaidMembershipApplied } = await import("../membership/paidMembershipNotify.js");
+    const plan = String(sub.plan || "").toLowerCase();
+    const months =
+      cycle === "annual" || plan.includes("annual") || plan.includes("year") ? 12 : 1;
+    await notifyPaidMembershipApplied({
+      userId: input.userId,
+      source: "payment",
+      months
+    });
+  } catch (e) {
+    console.warn("[subscribe-complete] paid notify", input.userId, e);
+  }
+
   return {
     subscriptionId: sub.id,
     status: "active" as const,

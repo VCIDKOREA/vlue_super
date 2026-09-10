@@ -634,6 +634,17 @@ export async function adminGrantPaidMembership(
     adminUserId: opts.adminUserId
   });
 
+  try {
+    const { notifyPaidMembershipApplied } = await import("../membership/paidMembershipNotify.js");
+    await notifyPaidMembershipApplied({
+      userId,
+      source: "admin_tester",
+      months
+    });
+  } catch (e) {
+    console.warn("[admin-grant-paid] notify", userId, e);
+  }
+
   return {
     ok: true,
     coupon,
