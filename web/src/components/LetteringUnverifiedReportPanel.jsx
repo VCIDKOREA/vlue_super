@@ -274,6 +274,10 @@ export default function LetteringUnverifiedReportPanel({
         </div>
       )}
 
+      <p className="lettering-unverified-encourage">
+        {"당신의 제보가 또 다른 피해를 막을 수 있습니다."}
+      </p>
+
       <section className="lettering-unverified-analysis" aria-label="VLUE 분석결과">
         <p className="lettering-unverified-analysis__title">VLUE 분석결과</p>
         <p className="lettering-unverified-analysis__body">

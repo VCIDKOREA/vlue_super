@@ -5455,6 +5455,17 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   color: rgba(148, 163, 184, 0.95);
 }
 
+.lettering-unverified-encourage {
+  margin: 2px 2px 0;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  text-align: center;
+  color: rgba(103, 232, 249, 0.88);
+}
+
 .lettering-unverified-analysis {
   margin: 0;
   padding: 12px 12px 11px;
