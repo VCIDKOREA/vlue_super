@@ -15,6 +15,7 @@ import {
 } from "../services/office/emailWebhookService.js";
 import { listOfficeEmailSent, mapSentRowsForApi } from "../services/office/officeEmailSent.js";
 import { getActiveMarketingPopup } from "../services/office/marketingPopupService.js";
+import { getActiveDigitalLetter } from "../services/office/digitalLetterService.js";
 import { getLatestNotice } from "../services/office/noticeService.js";
 import {
   createOfficeCalendarEvent,
@@ -84,6 +85,16 @@ officeRoutes.get("/marketing/active-popup", async (c) => {
   try {
     const popup = await getActiveMarketingPopup();
     return c.json({ ok: true, popup });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+officeRoutes.get("/digital-letter/active", async (c) => {
+  try {
+    const letter = await getActiveDigitalLetter();
+    return c.json({ ok: true, letter });
   } catch (e) {
     const message = e instanceof Error ? e.message : "unknown error";
     return c.json({ error: message }, 400);

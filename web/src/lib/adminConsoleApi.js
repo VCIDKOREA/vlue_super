@@ -210,6 +210,24 @@ export async function deleteAdminPopup(id) {
   return parseJson(res);
 }
 
+export async function saveAdminDigitalLetter(payload) {
+  const res = await fetch(apiUrl("/api/admin/console/posts/letters"), {
+    method: "PUT",
+    headers: adminHeaders(),
+    body: JSON.stringify(payload)
+  });
+  return parseJson(res);
+}
+
+export async function setAdminDigitalLetterActive(id, isActive = true) {
+  const res = await fetch(apiUrl(`/api/admin/console/posts/letters/${id}/active`), {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify({ isActive })
+  });
+  return parseJson(res);
+}
+
 export async function deleteAdminFeedPost(id) {
   const res = await fetch(apiUrl(`/api/admin/console/posts/feed/${id}`), {
     method: "DELETE",

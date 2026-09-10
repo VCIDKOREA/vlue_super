@@ -1,0 +1,153 @@
+.vlue-letter-root {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: max(10px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+}
+
+.vlue-letter-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 214, 186, 0.55), transparent 55%),
+    radial-gradient(90% 70% at 100% 100%, rgba(186, 230, 253, 0.45), transparent 50%),
+    rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.vlue-letter-sheet {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 440px);
+  max-height: min(92vh, 760px);
+  margin: auto;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: linear-gradient(165deg, #fffaf5 0%, #fff7f0 40%, #f0f9ff 100%);
+  box-shadow:
+    0 24px 60px rgba(15, 23, 42, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.vlue-letter-head {
+  flex-shrink: 0;
+  padding: 18px 18px 12px;
+  text-align: center;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.18);
+}
+
+.vlue-letter-eyebrow {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.vlue-letter-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.45;
+  letter-spacing: -0.03em;
+  color: #1e293b;
+  word-break: keep-all;
+}
+
+.vlue-letter-bgm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.45);
+  background: rgba(224, 242, 254, 0.7);
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vlue-letter-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 14px 18px;
+}
+
+.vlue-letter-paper {
+  margin: 0 auto;
+  padding: 8px 6px 4px;
+  max-width: 34rem;
+}
+
+.vlue-letter-p {
+  margin: 0 0 1.05em;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.85;
+  letter-spacing: -0.015em;
+  color: #334155;
+  word-break: keep-all;
+  white-space: pre-wrap;
+}
+
+.vlue-letter-foot {
+  margin: 18px 4px 8px;
+  padding: 16px 12px 8px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.35);
+  text-align: center;
+}
+
+.vlue-letter-thanks {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0ea5e9;
+}
+
+.vlue-letter-confirm {
+  width: 100%;
+  margin: 0;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(165deg, #38bdf8 0%, #0ea5e9 55%, #0284c7 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.28);
+}
+
+.vlue-letter-confirm:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.vlue-letter-close-link {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

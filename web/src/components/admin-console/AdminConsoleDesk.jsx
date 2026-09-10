@@ -33,6 +33,8 @@ import {
   resolveAdminManualReview,
   reviewAdminEnterpriseDcc,
   reviewAdminGroupAccount,
+  saveAdminDigitalLetter,
+  setAdminDigitalLetterActive,
   sendAdminBroadcast,
   fetchAdminAndroidVersion,
   saveAdminAndroidVersion,
@@ -1208,15 +1210,34 @@ function UsersTab({ onToast }) {
 }
 
 function PostsTab({ onToast }) {
-  const [data, setData] = useState({ notices: [], popups: [], feedPosts: [], mediaCampaigns: [] });
+  const [data, setData] = useState({ notices: [], popups: [], feedPosts: [], mediaCampaigns: [], letters: [] });
   const [section, setSection] = useState("notices");
   const [form, setForm] = useState({ title: "", bodyText: "", highlightText: "", imageUrl: "", startsAt: "", endsAt: "" });
+  const [letterForm, setLetterForm] = useState({ id: "", title: "", body: "", bgmUrl: "", bgmSoundId: "", isActive: true });
+  const [signatureSounds, setSignatureSounds] = useState([]);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetchAdminPosts();
-      setData(res);
+      const [res, soundsRes] = await Promise.all([
+        fetchAdminPosts(),
+        fetchAdminSignatureSounds().catch(() => ({ items: [] }))
+      ]);
+      const sounds = Array.isArray(soundsRes?.items) ? soundsRes.items : [];
+      setSignatureSounds(sounds);
+      setData({ ...res, letters: res.letters || [] });
+      const active = (res.letters || []).find((l) => l.isActive) || (res.letters || [])[0];
+      if (active) {
+        const match = sounds.find((s) => s.audioUrl && s.audioUrl === active.bgmUrl);
+        setLetterForm({
+          id: active.id || "",
+          title: active.title || "",
+          body: active.body || "",
+          bgmUrl: active.bgmUrl || "",
+          bgmSoundId: match?.id || "",
+          isActive: active.isActive !== false
+        });
+      }
     } catch (e) {
       onToast?.(e?.message || "게시물 조회 실패");
     }
@@ -1261,14 +1282,40 @@ function PostsTab({ onToast }) {
     }
   };
 
+  const saveLetter = async () => {
+    if (!letterForm.body.trim()) {
+      onToast?.("편지 본문을 입력해 주세요");
+      return;
+    }
+    setBusy(true);
+    try {
+      const selected = signatureSounds.find((s) => s.id === letterForm.bgmSoundId);
+      await saveAdminDigitalLetter({
+        id: letterForm.id || undefined,
+        title: letterForm.title,
+        body: letterForm.body,
+        bgmUrl: selected?.audioUrl || "",
+        isActive: letterForm.isActive !== false
+      });
+      onToast?.("VLUE 편지 저장 완료 (버전↑ → 미확인 사용자에게 다시 표시)");
+      load();
+    } catch (e) {
+      onToast?.(e?.message || "편지 저장 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const rows =
     section === "notices"
       ? data.notices
       : section === "popups"
         ? data.popups
-        : section === "feed"
-          ? data.feedPosts
-          : data.mediaCampaigns;
+        : section === "letters"
+          ? data.letters || []
+          : section === "feed"
+            ? data.feedPosts
+            : data.mediaCampaigns;
 
   return (
     <div className="space-y-4">
@@ -1276,6 +1323,7 @@ function PostsTab({ onToast }) {
         {[
           { id: "notices", label: "공지사항" },
           { id: "popups", label: "마케팅 팝업" },
+          { id: "letters", label: "VLUE 편지" },
           { id: "feed", label: "피드 게시물" },
           { id: "media", label: "미디어 쇼핑" }
         ].map((t) => (
@@ -1317,6 +1365,72 @@ function PostsTab({ onToast }) {
         </div>
       ) : null}
 
+      {section === "letters" ? (
+        <div className="rounded-xl border border-amber-200/80 bg-gradient-to-br from-orange-50/80 via-white to-sky-50 p-4 space-y-2">
+          <p className="text-[13px] font-black text-slate-800">VLUE가 전하는 편지</p>
+          <p className="text-[11px] leading-relaxed text-slate-500">
+            첫 로그인 사용자에게 필독으로 표시됩니다. 저장 시 버전이 올라가면 아직 확인하지 않은 사용자·이전 버전만 본 사용자에게 다시 보입니다. BGM은{" "}
+            <strong className="font-bold text-slate-600">Signature Sound</strong>에 업로드된 곡에서 고릅니다.
+          </p>
+          <input
+            value={letterForm.title}
+            onChange={(e) => setLetterForm((f) => ({ ...f, title: e.target.value }))}
+            placeholder="편지 제목"
+            className="w-full rounded-lg border border-amber-100 bg-white px-3 py-2 text-[13px]"
+          />
+          <textarea
+            value={letterForm.body}
+            onChange={(e) => setLetterForm((f) => ({ ...f, body: e.target.value }))}
+            placeholder="편지 본문"
+            rows={12}
+            className="w-full rounded-lg border border-amber-100 bg-white px-3 py-2 text-[13px] leading-relaxed"
+          />
+          <label className="block text-[11px] font-bold text-slate-500">편지 BGM (Signature Sound)</label>
+          <select
+            value={letterForm.bgmSoundId || ""}
+            onChange={(e) => {
+              const id = e.target.value;
+              const selected = signatureSounds.find((s) => s.id === id);
+              setLetterForm((f) => ({
+                ...f,
+                bgmSoundId: id,
+                bgmUrl: selected?.audioUrl || ""
+              }));
+            }}
+            className="w-full rounded-lg border border-amber-100 bg-white px-3 py-2 text-[13px]"
+          >
+            <option value="">BGM 없음</option>
+            {signatureSounds.map((s) => (
+              <option key={s.id} value={s.id} disabled={!s.audioUrl}>
+                {(s.title || "제목 없음") +
+                  (s.artistName ? ` · ${s.artistName}` : "") +
+                  (s.isPublished ? "" : " (미게시)") +
+                  (s.audioUrl ? "" : " · URL없음")}
+              </option>
+            ))}
+          </select>
+          {!signatureSounds.length ? (
+            <p className="text-[11px] text-amber-700">
+              등록된 Signature Sound가 없습니다. 「Signature Sound」 탭에서 먼저 업로드해 주세요.
+            </p>
+          ) : letterForm.bgmSoundId && letterForm.bgmUrl ? (
+            <audio controls preload="none" src={letterForm.bgmUrl} className="w-full h-9" />
+          ) : null}
+          <label className="flex items-center gap-2 text-[12px] font-bold text-slate-600">
+            <input
+              type="checkbox"
+              checked={letterForm.isActive !== false}
+              onChange={(e) => setLetterForm((f) => ({ ...f, isActive: e.target.checked }))}
+            />
+            활성 (첫 방문 자동 표시)
+          </label>
+          <button type="button" disabled={busy} onClick={saveLetter} className="rounded-lg bg-sky-600 px-4 py-2 text-[12px] font-bold text-white">
+            편지 저장
+          </button>
+        </div>
+      ) : null}
+
+      {section !== "letters" ? (
       <Table
         emptyLabel="항목 없음"
         columns={
@@ -1407,6 +1521,52 @@ function PostsTab({ onToast }) {
         }
         rows={(rows || []).map((r) => ({ ...r, _key: r.id }))}
       />
+      ) : (
+        <Table
+          emptyLabel="저장된 편지 없음"
+          columns={[
+            { key: "title", label: "제목", render: (r) => (r.title || "").slice(0, 28) },
+            { key: "version", label: "ver" },
+            { key: "isActive", label: "활성", render: (r) => (r.isActive ? "Y" : "N") },
+            {
+              key: "act",
+              label: "",
+              render: (r) => (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLetterForm({
+                        id: r.id,
+                        title: r.title || "",
+                        body: r.body || "",
+                        bgmUrl: r.bgmUrl || "",
+                        bgmSoundId: signatureSounds.find((s) => s.audioUrl && s.audioUrl === r.bgmUrl)?.id || "",
+                        isActive: r.isActive !== false
+                      })
+                    }
+                    className="text-[10px] font-bold text-blue-600"
+                  >
+                    불러오기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await setAdminDigitalLetterActive(r.id, true);
+                      onToast?.("활성 편지로 설정");
+                      load();
+                    }}
+                    className="text-[10px] font-bold text-emerald-600"
+                  >
+                    활성화
+                  </button>
+                </div>
+              )
+            }
+          ]}
+          rows={(data.letters || []).map((r) => ({ ...r, _key: r.id }))}
+        />
+      )}
     </div>
   );
 }

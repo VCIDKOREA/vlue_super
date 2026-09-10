@@ -142,6 +142,8 @@ function ProfilePanel({
   initialView = "main",
   onMembershipTierChange,
   onRequestTierChange,
+  /** VLUE가 전하는 편지 다시 보기 */
+  onOpenDigitalLetter,
 }) {
   const [familyPlanPathLabel, setFamilyPlanPathLabel] = useState(() => {
     const b = readFamilyPlanBeneficiary();
@@ -1296,6 +1298,22 @@ function ProfilePanel({
 
           <div className="mt-8 mb-10 flex flex-col items-center justify-center gap-2">
             <div className="w-full h-[1px] bg-gray-100 mb-4 px-4"></div>
+            {onOpenDigitalLetter ? (
+              <button
+                type="button"
+                onClick={() => onOpenDigitalLetter()}
+                className={`mb-3 w-full max-w-[280px] rounded-2xl border px-4 py-3 text-center transition-all active:scale-[0.98] ${
+                  isDarkMode
+                    ? "border-sky-400/25 bg-sky-500/10 text-sky-100 hover:bg-sky-500/15"
+                    : "border-sky-100 bg-gradient-to-br from-orange-50 via-white to-sky-50 text-slate-700 shadow-sm hover:border-sky-200"
+                }`}
+              >
+                <span className="block text-[13px] font-black tracking-tight">VLUE가 전하는 편지</span>
+                <span className={`mt-0.5 block text-[10px] font-semibold ${isDarkMode ? "text-sky-200/70" : "text-slate-400"}`}>
+                  다시 읽어보기 💙
+                </span>
+              </button>
+            ) : null}
             <p className="text-[11px] font-bold text-gray-300 uppercase tracking-[0.2em]">Official Website</p>
             <a href="https://www.vlue.kr" target="_blank" rel="noreferrer" className="group flex items-center gap-1.5 active:scale-95 transition-all">
               <span className="text-[14px] font-black text-gray-400 group-hover:text-blue-500 transition-colors border-b border-gray-200 group-hover:border-blue-200">www.vlue.kr</span>

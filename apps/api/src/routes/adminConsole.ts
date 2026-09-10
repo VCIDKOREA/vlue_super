@@ -263,13 +263,15 @@ authed.post("/users/:userId/grant-paid", async (c) => {
 });
 
 authed.get("/posts", async (c) => {
-  const [notices, popups, feedPosts, mediaCampaigns] = await Promise.all([
+  const { listDigitalLetters } = await import("../services/office/digitalLetterService.js");
+  const [notices, popups, feedPosts, mediaCampaigns, letters] = await Promise.all([
     listNotices(50),
     listMarketingPopups(50),
     listAdminFeedPosts(50),
-    listAdminMediaCampaigns(50)
+    listAdminMediaCampaigns(50),
+    listDigitalLetters(20)
   ]);
-  return c.json({ ok: true, notices, popups, feedPosts, mediaCampaigns });
+  return c.json({ ok: true, notices, popups, feedPosts, mediaCampaigns, letters });
 });
 
 authed.post("/posts/notices", async (c) => {
@@ -318,6 +320,38 @@ authed.post("/posts/popups", async (c) => {
     endsAt: body.endsAt
   });
   return c.json({ ok: true, popup });
+});
+
+authed.put("/posts/letters", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    id?: string;
+    title?: string;
+    body?: string;
+    bodyText?: string;
+    bgmUrl?: string;
+    isActive?: boolean;
+  };
+  try {
+    const { upsertDigitalLetter } = await import("../services/office/digitalLetterService.js");
+    const letter = await upsertDigitalLetter({
+      id: body.id,
+      title: String(body.title || ""),
+      body: String(body.body || body.bodyText || ""),
+      bgmUrl: body.bgmUrl,
+      isActive: body.isActive
+    });
+    return c.json({ ok: true, letter });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "편지 저장 실패" }, 400);
+  }
+});
+
+authed.patch("/posts/letters/:id/active", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { isActive?: boolean };
+  const { setDigitalLetterActive } = await import("../services/office/digitalLetterService.js");
+  const letter = await setDigitalLetterActive(c.req.param("id"), body.isActive !== false);
+  if (!letter) return c.json({ error: "편지 없음" }, 404);
+  return c.json({ ok: true, letter });
 });
 
 authed.patch("/posts/popups/:id", async (c) => {

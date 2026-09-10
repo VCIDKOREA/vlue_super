@@ -111,6 +111,8 @@ import { effectiveCardJobTitle } from "./lib/jobTitleVerify.js";
 import { readAvatar, readProfilePhotoAvatar } from "./lib/vlueAvatar.js";
 import { fetchActiveMarketingPopup, fetchLatestNotice } from "./lib/vlueOfficeApi.js";
 import MarketingPopupModal, { shouldShowMarketingPopup } from "./components/marketing/MarketingPopupModal.jsx";
+import VlueWelcomeLetterModal from "./components/VlueWelcomeLetterModal.jsx";
+import { fetchActiveDigitalLetter, shouldAutoOpenDigitalLetter } from "./lib/digitalLetter.js";
 import NoticeDetailSheet, { NoticeReleaseToast } from "./components/marketing/NoticeReleaseUI.jsx";
 import VmingUpgradePromptModal from "./components/vming/VmingUpgradePromptModal.jsx";
 import {
@@ -505,6 +507,9 @@ function App() {
   );
   const [marketingPopup, setMarketingPopup] = useState(null);
   const [marketingPopupOpen, setMarketingPopupOpen] = useState(false);
+  const [digitalLetter, setDigitalLetter] = useState(null);
+  const [digitalLetterOpen, setDigitalLetterOpen] = useState(false);
+  const [digitalLetterForceRead, setDigitalLetterForceRead] = useState(false);
   const [noticeReleaseToastOpen, setNoticeReleaseToastOpen] = useState(false);
   const [noticeReleaseMessage, setNoticeReleaseMessage] = useState("");
   const [activeNotice, setActiveNotice] = useState(null);
@@ -1623,27 +1628,44 @@ function App() {
     return map;
   }, [calendarGroups]);
 
-  /** 홈 진입 시 활성 마케팅 팝업 */
+  /** 홈 진입 시 VLUE 편지(우선) → 마케팅 팝업 */
   useEffect(() => {
     if (!isLoggedIn || page !== "main") return undefined;
     let cancelled = false;
-    fetchActiveMarketingPopup()
-      .then((data) => {
+    (async () => {
+      let letterForceOpen = false;
+      try {
+        const letterData = await fetchActiveDigitalLetter();
+        if (cancelled) return;
+        const letter = letterData?.letter || null;
+        setDigitalLetter(letter);
+        if (letter && shouldAutoOpenDigitalLetter(letter)) {
+          setDigitalLetterForceRead(true);
+          setDigitalLetterOpen(true);
+          letterForceOpen = true;
+        }
+      } catch {
+        if (!cancelled) {
+          setDigitalLetter(null);
+        }
+      }
+      try {
+        const data = await fetchActiveMarketingPopup();
         if (cancelled) return;
         const popup = data.popup || null;
         setMarketingPopup(popup);
-        if (popup && shouldShowMarketingPopup(popup)) {
+        if (!letterForceOpen && popup && shouldShowMarketingPopup(popup)) {
           setMarketingPopupOpen(true);
         } else {
           setMarketingPopupOpen(false);
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) {
           setMarketingPopup(null);
           setMarketingPopupOpen(false);
         }
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -5813,9 +5835,24 @@ function App() {
           ))}
         </div>
       ) : null}
+      <VlueWelcomeLetterModal
+        letter={digitalLetter}
+        open={digitalLetterOpen && isLoggedIn}
+        forceRead={digitalLetterForceRead}
+        onClose={() => {
+          setDigitalLetterOpen(false);
+          setDigitalLetterForceRead(false);
+          if (marketingPopup && shouldShowMarketingPopup(marketingPopup) && page === "main") {
+            setMarketingPopupOpen(true);
+          }
+        }}
+        onAcknowledged={() => {
+          setDigitalLetterForceRead(false);
+        }}
+      />
       <MarketingPopupModal
         popup={marketingPopup}
-        open={marketingPopupOpen && page === "main"}
+        open={marketingPopupOpen && page === "main" && !digitalLetterOpen}
         onClose={() => setMarketingPopupOpen(false)}
         onOpenLink={handleMarketingPopupLink}
       />
@@ -6075,6 +6112,30 @@ function App() {
           setProfileOpen(false);
           requestOpenFamilyProtectionTab();
           navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
+        }}
+        onOpenDigitalLetter={() => {
+          setProfileOpen(false);
+          if (digitalLetter) {
+            setDigitalLetterForceRead(false);
+            setDigitalLetterOpen(true);
+            return;
+          }
+          fetchActiveDigitalLetter()
+            .then((data) => {
+              const letter = data?.letter || null;
+              setDigitalLetter(letter);
+              if (letter) {
+                setDigitalLetterForceRead(false);
+                setDigitalLetterOpen(true);
+              } else {
+                setBottomToast("아직 공개된 편지가 없습니다.");
+                setTimeout(() => setBottomToast(""), 2400);
+              }
+            })
+            .catch(() => {
+              setBottomToast("편지를 불러오지 못했습니다.");
+              setTimeout(() => setBottomToast(""), 2400);
+            });
         }}
       />
 
