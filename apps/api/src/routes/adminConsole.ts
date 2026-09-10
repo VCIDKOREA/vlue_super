@@ -329,6 +329,7 @@ authed.put("/posts/letters", async (c) => {
     body?: string;
     bodyText?: string;
     bgmUrl?: string;
+    bgmVolume?: number;
     isActive?: boolean;
   };
   try {
@@ -338,6 +339,7 @@ authed.put("/posts/letters", async (c) => {
       title: String(body.title || ""),
       body: String(body.body || body.bodyText || ""),
       bgmUrl: body.bgmUrl,
+      bgmVolume: body.bgmVolume,
       isActive: body.isActive
     });
     return c.json({ ok: true, letter });

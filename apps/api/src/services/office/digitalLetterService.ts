@@ -7,6 +7,7 @@ export type DigitalLetterRow = {
   title: string;
   body_text: string;
   bgm_url: string | null;
+  bgm_volume: number | null;
   is_active: boolean;
   version: number;
   updated_at: Date;
@@ -131,12 +132,16 @@ async function ensureTable() {
       title VARCHAR(240) NOT NULL DEFAULT '',
       body_text TEXT NOT NULL DEFAULT '',
       bgm_url TEXT,
+      bgm_volume REAL NOT NULL DEFAULT 0.45,
       is_active BOOLEAN NOT NULL DEFAULT true,
       version INT NOT NULL DEFAULT 1,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE vlue_digital_letters ADD COLUMN IF NOT EXISTS bgm_volume REAL NOT NULL DEFAULT 0.45;`
+  );
   await prisma.$executeRawUnsafe(
     "CREATE INDEX IF NOT EXISTS idx_vlue_digital_letters_active ON vlue_digital_letters(is_active, updated_at DESC);"
   );
@@ -149,13 +154,19 @@ async function ensureTable() {
   if (count === 0) {
     await prisma.$executeRawUnsafe(
       `
-        INSERT INTO vlue_digital_letters (title, body_text, bgm_url, is_active, version)
-        VALUES ($1, $2, NULL, true, 1);
+        INSERT INTO vlue_digital_letters (title, body_text, bgm_url, bgm_volume, is_active, version)
+        VALUES ($1, $2, NULL, 0.45, true, 1);
       `,
       DEFAULT_TITLE,
       DEFAULT_BODY
     );
   }
+}
+
+function clampVolume(v: unknown, fallback = 0.45) {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(1, Math.max(0, n));
 }
 
 function mapRow(row: DigitalLetterRow) {
@@ -164,6 +175,7 @@ function mapRow(row: DigitalLetterRow) {
     title: row.title,
     body: row.body_text,
     bgmUrl: row.bgm_url || "",
+    bgmVolume: clampVolume(row.bgm_volume, 0.45),
     isActive: row.is_active,
     version: Number(row.version) || 1,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at || ""),
@@ -204,6 +216,7 @@ export async function upsertDigitalLetter(input: {
   title: string;
   body: string;
   bgmUrl?: string;
+  bgmVolume?: number;
   isActive?: boolean;
 }) {
   await ensureTable();
@@ -211,6 +224,7 @@ export async function upsertDigitalLetter(input: {
   const body = String(input.body || "").trim();
   if (!body) throw new Error("편지 본문을 입력해 주세요.");
   const bgmUrl = String(input.bgmUrl || "").trim().slice(0, 2000) || null;
+  const bgmVolume = clampVolume(input.bgmVolume, 0.45);
   const isActive = input.isActive !== false;
   const id = String(input.id || "").trim();
 
@@ -227,7 +241,8 @@ export async function upsertDigitalLetter(input: {
         SET title = $2,
             body_text = $3,
             bgm_url = $4,
-            is_active = $5,
+            bgm_volume = $5,
+            is_active = $6,
             version = version + 1,
             updated_at = NOW()
         WHERE id = $1::uuid
@@ -237,6 +252,7 @@ export async function upsertDigitalLetter(input: {
       title,
       body,
       bgmUrl,
+      bgmVolume,
       isActive
     );
     if (!rows[0]) throw new Error("편지를 찾을 수 없습니다.");
@@ -249,13 +265,14 @@ export async function upsertDigitalLetter(input: {
 
   const rows = await prisma.$queryRawUnsafe<DigitalLetterRow[]>(
     `
-      INSERT INTO vlue_digital_letters (title, body_text, bgm_url, is_active, version)
-      VALUES ($1, $2, $3, $4, 1)
+      INSERT INTO vlue_digital_letters (title, body_text, bgm_url, bgm_volume, is_active, version)
+      VALUES ($1, $2, $3, $4, $5, 1)
       RETURNING *;
     `,
     title,
     body,
     bgmUrl,
+    bgmVolume,
     isActive
   );
   return mapRow(rows[0]);

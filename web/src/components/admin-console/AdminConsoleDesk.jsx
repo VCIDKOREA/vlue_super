@@ -1213,7 +1213,15 @@ function PostsTab({ onToast }) {
   const [data, setData] = useState({ notices: [], popups: [], feedPosts: [], mediaCampaigns: [], letters: [] });
   const [section, setSection] = useState("notices");
   const [form, setForm] = useState({ title: "", bodyText: "", highlightText: "", imageUrl: "", startsAt: "", endsAt: "" });
-  const [letterForm, setLetterForm] = useState({ id: "", title: "", body: "", bgmUrl: "", bgmSoundId: "", isActive: true });
+  const [letterForm, setLetterForm] = useState({
+    id: "",
+    title: "",
+    body: "",
+    bgmUrl: "",
+    bgmSoundId: "",
+    bgmVolume: 0.45,
+    isActive: true
+  });
   const [signatureSounds, setSignatureSounds] = useState([]);
   const [busy, setBusy] = useState(false);
 
@@ -1235,6 +1243,7 @@ function PostsTab({ onToast }) {
           body: active.body || "",
           bgmUrl: active.bgmUrl || "",
           bgmSoundId: match?.id || "",
+          bgmVolume: typeof active.bgmVolume === "number" ? active.bgmVolume : 0.45,
           isActive: active.isActive !== false
         });
       }
@@ -1295,6 +1304,7 @@ function PostsTab({ onToast }) {
         title: letterForm.title,
         body: letterForm.body,
         bgmUrl: selected?.audioUrl || "",
+        bgmVolume: letterForm.bgmVolume,
         isActive: letterForm.isActive !== false
       });
       onToast?.("VLUE 편지 저장 완료 (버전↑ → 미확인 사용자에게 다시 표시)");
@@ -1416,6 +1426,21 @@ function PostsTab({ onToast }) {
           ) : letterForm.bgmSoundId && letterForm.bgmUrl ? (
             <audio controls preload="none" src={letterForm.bgmUrl} className="w-full h-9" />
           ) : null}
+          <label className="block text-[11px] font-bold text-slate-500">
+            기본 음량 {Math.round((Number(letterForm.bgmVolume) || 0) * 100)}%
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round((Number(letterForm.bgmVolume) || 0) * 100)}
+            onChange={(e) =>
+              setLetterForm((f) => ({ ...f, bgmVolume: Math.min(1, Math.max(0, Number(e.target.value) / 100)) }))
+            }
+            className="w-full accent-sky-600"
+          />
+          <p className="text-[10px] text-slate-400">편지 저장 시 기본 음량으로 적용됩니다. 사용자는 편지 화면에서도 조절·기억됩니다.</p>
           <label className="flex items-center gap-2 text-[12px] font-bold text-slate-600">
             <input
               type="checkbox"
@@ -1542,6 +1567,7 @@ function PostsTab({ onToast }) {
                         body: r.body || "",
                         bgmUrl: r.bgmUrl || "",
                         bgmSoundId: signatureSounds.find((s) => s.audioUrl && s.audioUrl === r.bgmUrl)?.id || "",
+                        bgmVolume: typeof r.bgmVolume === "number" ? r.bgmVolume : 0.45,
                         isActive: r.isActive !== false
                       })
                     }
