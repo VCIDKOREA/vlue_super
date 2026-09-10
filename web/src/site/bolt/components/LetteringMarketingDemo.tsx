@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
 import LetteringIncomingNotification from '../../../components/LetteringIncomingNotification.jsx';
+import { DEMO_UNVERIFIED_REPORT_HISTORY } from '../../../lib/letteringPhoneReports.js';
+import { submitLetteringTip } from '../../../lib/letteringReport.js';
 import {
   MARKETING_DEMO_CARDS,
   MARKETING_DEMO_META,
@@ -69,6 +71,7 @@ function MarketingAppShowcasePhone({
   incomingNumber,
   expanded,
   setExpanded,
+  reportHistory = [],
 }: {
   platform: 'android' | 'ios';
   verified: boolean;
@@ -76,9 +79,30 @@ function MarketingAppShowcasePhone({
   incomingNumber: string;
   expanded: boolean;
   setExpanded: (next: boolean) => void;
+  reportHistory?: unknown[];
 }) {
-  const showToast = useCallback(() => {}, []);
+  const showToast = useCallback((msg?: string) => {
+    if (msg) console.info('[vlue-demo]', msg);
+  }, []);
   const isPaid = verified && Boolean(card);
+
+  const handleTipSubmit = useCallback(
+    async ({ label }: { label?: string }) => {
+      const tipLabel = String(label || '').trim();
+      if (!tipLabel) return { server: { ok: false, error: '제보 내용을 입력해 주세요.' } };
+      const result = await submitLetteringTip({
+        phone: incomingNumber,
+        label: tipLabel,
+      });
+      if (result?.server?.ok === false) {
+        showToast(String(result.server.error || '로그인 후 제보할 수 있습니다.'));
+        return result;
+      }
+      showToast('제보 완료 · VLUE에 반영됩니다');
+      return result;
+    },
+    [incomingNumber, showToast]
+  );
 
   return (
     <div
@@ -104,10 +128,13 @@ function MarketingAppShowcasePhone({
             savedContactName=""
             isKnownContact={verified}
             card={card || undefined}
+            reportHistory={reportHistory}
             expanded={expanded}
             onExpandedChange={setExpanded}
             onEndCall={() => setExpanded(false)}
             onToast={showToast}
+            onTipSubmit={verified ? undefined : handleTipSubmit}
+            onReport={() => showToast('데모 — 신고는 앱에서 이용해 주세요')}
             hideUnverifiedFooter
           />
         </div>
@@ -122,12 +149,14 @@ function MarketingShowcaseDual({
   incomingNumber,
   expanded,
   setExpanded,
+  reportHistory = [],
 }: {
   verified: boolean;
   card?: Record<string, unknown> | null;
   incomingNumber: string;
   expanded: boolean;
   setExpanded: (next: boolean) => void;
+  reportHistory?: unknown[];
 }) {
   return (
     <div className="vlue-marketing-dual">
@@ -140,6 +169,7 @@ function MarketingShowcaseDual({
             incomingNumber={incomingNumber}
             expanded={expanded}
             setExpanded={setExpanded}
+            reportHistory={reportHistory}
           />
         </div>
       ))}
@@ -223,9 +253,11 @@ export function LetteringUnverifiedBigPushPreview({
         incomingNumber={LETTERING_UNVERIFIED_SPOOF_NUMBER}
         expanded={expanded}
         setExpanded={(next) => setView(next ? 'card' : 'push')}
+        reportHistory={DEMO_UNVERIFIED_REPORT_HISTORY}
       />
       <p className="mt-4 max-w-[360px] text-center text-[11px] font-semibold text-red-200/80" style={{ wordBreak: 'keep-all' }}>
         VLUE 미등록 · <strong className="text-white">{LETTERING_UNVERIFIED_SPOOF_NUMBER}</strong>
+        {' · '}제보·신고 · 분석결과
       </p>
     </div>
   );

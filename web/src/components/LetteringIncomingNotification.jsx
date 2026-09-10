@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { getLetteringCallStatusLabel } from "../lib/letteringCallStatus.js";
 import { compareLetteringPhones, formatLetteringPhoneDisplay, isUnknownPhoneToken, normalizePhoneDigits } from "../lib/letteringPhoneMatch.js";
 import { openLetteringCertInVlueApp } from "../lib/letteringOpenVlueApp.js";
-import { VLUE_CARD_CAUTION, VLUE_UNVERIFIED_REPORT_DISCLAIMER } from "../lib/vlueDigitalCardUi.js";
+import { VLUE_CARD_CAUTION } from "../lib/vlueDigitalCardUi.js";
 import {
   resolveFreeTierSummary
 } from "../lib/letteringFreeTierDisplay.js";
@@ -14,7 +14,8 @@ import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx
 import ShowcaseCallCarousel from "./showcase/ShowcaseCallCarousel.jsx";
 import FreeTierCallShowcase from "./showcase/FreeTierCallShowcase.jsx";
 import VlueAuthMemberPopup from "./VlueAuthMemberPopup.jsx";
-import { getLetteringReportsForPhone } from "../lib/letteringPhoneReports.js";
+import { getLetteringReportsForPhone, summarizeLetteringTipsFromEntries } from "../lib/letteringPhoneReports.js";
+import { fetchLetteringTipSummary } from "../lib/letteringApi.js";
 import { formatLetteringReceptionLines, resolveShowcaseBarOwnerLabel } from "../lib/letteringPaidIdentityDisplay.js";
 import IdentitySecondaryText from "./IdentitySecondaryText.jsx";
 import VlueCyanVerifiedSeal from "./VlueCyanVerifiedSeal.jsx";
@@ -194,6 +195,8 @@ export default function LetteringIncomingNotification({
   onOpenFeed,
   onSaveCard,
   onReport,
+  /** 미인증 펼침 — 발신자 제보 제출 (OverlayHost 등) */
+  onTipSubmit,
   /** @deprecated */ onMemo,
   /** @deprecated */ onBlock,
   /** @deprecated */ fitBizcard = false,
@@ -647,6 +650,7 @@ export default function LetteringIncomingNotification({
 
   const [reportTick, setReportTick] = useState(0);
   const [walletTick, setWalletTick] = useState(0);
+  const [tipSummary, setTipSummary] = useState(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -659,6 +663,21 @@ export default function LetteringIncomingNotification({
       window.removeEventListener("vlue-card-wallet-changed", onWalletChanged);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isUnverified || !incoming) {
+      setTipSummary(null);
+      return undefined;
+    }
+    let cancelled = false;
+    fetchLetteringTipSummary(incoming).then((data) => {
+      if (cancelled || !data?.ok) return;
+      setTipSummary(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isUnverified, incoming, reportTick]);
 
   useEffect(() => {
     if (!isUnverified) return undefined;
@@ -680,6 +699,21 @@ export default function LetteringIncomingNotification({
     if (!isUnverified) return [];
     return getLetteringReportsForPhone(incoming, { extra: reportHistory });
   }, [isUnverified, incoming, reportHistory, reportTick]);
+
+  const localTipSummary = useMemo(
+    () => (isUnverified ? summarizeLetteringTipsFromEntries(phoneReports) : null),
+    [isUnverified, phoneReports]
+  );
+
+  const activeTipSummary = useMemo(() => {
+    if (!isUnverified) return null;
+    if (tipSummary?.topLabel || tipSummary?.tipCount > 0) return tipSummary;
+    if (localTipSummary?.topLabel || localTipSummary?.tipCount > 0) return localTipSummary;
+    return tipSummary || localTipSummary;
+  }, [isUnverified, tipSummary, localTipSummary]);
+
+  const tipBroadcastLabel = String(activeTipSummary?.topLabel || "").trim();
+  const tipBroadcastCount = Number(activeTipSummary?.topCount || activeTipSummary?.tipCount || 0);
 
   const isExpandedView = expanded && canExpand && expandContent !== false;
   const showExpandedLayout = isExpandedView || keepExpandedLayout;
@@ -1431,11 +1465,22 @@ export default function LetteringIncomingNotification({
                 </p>
               </>
             ) : isUnverified ? (
-              <p className="lettering-ongoing-name-row min-w-0">
-                <span className="lettering-unverified-collapsed-phone">
-                  {unverifiedCollapsedPhone || "\u2014"}
-                </span>
-              </p>
+              <>
+                <p className="lettering-ongoing-name-row min-w-0">
+                  <span className="lettering-unverified-collapsed-phone">
+                    {tipBroadcastLabel || unverifiedCollapsedPhone || "\u2014"}
+                  </span>
+                </p>
+                {tipBroadcastLabel ? (
+                  <p className="lettering-ongoing-unverified-hint mt-0.5 text-[10px] font-bold text-amber-800">
+                    {`제보 ${tipBroadcastCount}회 · ${unverifiedCollapsedPhone || "번호"}`}
+                  </p>
+                ) : (
+                  <p className="lettering-ongoing-unverified-hint mt-0.5 text-[10px] font-semibold text-amber-700/90">
+                    {"제보·신고하기 ▼"}
+                  </p>
+                )}
+              </>
             ) : (
               <>
                 <p className="lettering-ongoing-name-row flex min-w-0 items-center gap-1.5">
@@ -1467,16 +1512,6 @@ export default function LetteringIncomingNotification({
             {!isUnverified && !showCollapsedPhoneSubline && !phoneSameAsPrimary && receptionLines?.expandedContactLine ? (
               <p className="lettering-ongoing-subtitle mt-0.5 truncate text-[11px] font-medium leading-snug text-slate-500">
                 {receptionLines.expandedContactLine}
-              </p>
-            ) : null}
-            {isUnverified && phoneReports.length ? (
-              <p className="lettering-ongoing-unverified-hint mt-0.5 text-[10px] font-bold text-amber-800">
-                {`\uC2E0\uACE0\u00B7\uC81C\uBCF4 ${phoneReports.length}\uAC74 \u00B7 \u25BC \uD655\uC778`}
-              </p>
-            ) : null}
-            {isUnverified && !phoneReports.length ? (
-              <p className="lettering-ongoing-unverified-hint mt-0.5 text-[10px] font-semibold text-amber-700/90">
-                {"\u25BC \uC2E0\uACE0\u00B7\uC81C\uBCF4 \uC774\uB825 \uD655\uC778"}
               </p>
             ) : null}
           </div>
@@ -1662,21 +1697,22 @@ export default function LetteringIncomingNotification({
             <div className="lettering-ongoing-expand-slot__inner">
               <div className="lettering-unverified-expanded relative z-[2]">
                 <div className="lettering-unverified-expanded__scroll lettering-ongoing-scroll--unverified">
-                  <LetteringUnverifiedReportPanel incomingNumber={incoming} reportHistory={reportHistory} />
+                  <LetteringUnverifiedReportPanel
+                    incomingNumber={incoming}
+                    reportHistory={reportHistory}
+                    tipSummary={activeTipSummary}
+                    onReport={handleReport}
+                    onTipSubmit={onTipSubmit}
+                    onTipSummaryChange={setTipSummary}
+                  />
                 </div>
-                {hideUnverifiedFooter ? null : (
-                  <footer className="lettering-unverified-expanded__footer">
-                    <p className="lettering-unverified-footer-note">{VLUE_UNVERIFIED_REPORT_DISCLAIMER}</p>
-                    <button type="button" onClick={handleReport} className="lettering-action lettering-action--danger w-full">
-                      {"\uC2E0\uACE0/\uCC28\uB2E8"}
-                    </button>
-                    {showCompanionSamsungCta ? (
-                      <CompanionSamsungCallCta onOpen={openSamsungCallOptions} />
-                    ) : null}
+                {hideUnverifiedFooter ? null : showCompanionSamsungCta ? (
+                  <footer className="lettering-unverified-expanded__footer lettering-unverified-expanded__footer--minimal">
+                    <CompanionSamsungCallCta onOpen={openSamsungCallOptions} />
                   </footer>
-                )}
+                ) : null}
                 {hideUnverifiedFooter && showCompanionSamsungCta ? (
-                  <footer className="lettering-unverified-expanded__footer">
+                  <footer className="lettering-unverified-expanded__footer lettering-unverified-expanded__footer--minimal">
                     <CompanionSamsungCallCta onOpen={openSamsungCallOptions} />
                   </footer>
                 ) : null}

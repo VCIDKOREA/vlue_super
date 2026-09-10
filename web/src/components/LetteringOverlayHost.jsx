@@ -4,7 +4,7 @@ import { isLookupMatchedBody, mapLookupToLetteringCard } from "../lib/letteringC
 import { isUnknownPhoneToken } from "../lib/letteringPhoneMatch.js";
 import { checkLetteringPhoneBlocked } from "../lib/letteringApi.js";
 import { readLetteringEnabled } from "../lib/letteringSettings.js";
-import { submitLetteringReport } from "../lib/letteringReport.js";
+import { submitLetteringReport, submitLetteringTip } from "../lib/letteringReport.js";
 import { blockLetteringPhoneOnly } from "../lib/letteringPhoneBlock.js";
 import { SHOWCASE_LIVE_STYLE_CHANGED_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { CALL_STATES, normalizeCallState } from "../lib/showcase/tentShowcaseTypes.js";
@@ -1437,6 +1437,27 @@ function LetteringOverlayHostInner() {
     [incoming, card, verified, showToast]
   );
 
+  const handleTipSubmit = useCallback(
+    async ({ label, displayName, organization, note }) => {
+      const { tip, server, summary } = await submitLetteringTip({
+        phone: incoming,
+        label,
+        displayName,
+        organization,
+        note
+      });
+      if (server && server.ok === false) {
+        const msg =
+          String(server.error || "").trim() || "로그인 후 제보할 수 있습니다.";
+        showToast(msg);
+        return { tip, server, summary };
+      }
+      showToast("제보 완료 · VLUE에 반영됩니다");
+      return { tip, server, summary: summary || server?.summary || null };
+    },
+    [incoming, showToast]
+  );
+
   const handleBlockOnly = useCallback(async () => {
     const blockResult = await blockLetteringPhoneOnly(incoming, { cardName: card?.name || "" });
     if (!blockResult.ok) {
@@ -1606,6 +1627,7 @@ function LetteringOverlayHostInner() {
           onEndCall={onCall ? handleEnd : handleReject}
           onToast={showToast}
           onReport={() => setReportOpen(true)}
+          onTipSubmit={handleTipSubmit}
           onOpenFeed={(payload) => {
             setCertPayload(payload);
             setCertOpen(true);

@@ -5247,12 +5247,137 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   background: transparent;
 }
 
+
 .lettering-unverified-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   padding: 2px 0 4px;
 }
+
+.lettering-unverified-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 2px 0;
+}
+
+.lettering-unverified-hero__badge {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.lettering-unverified-hero__hint {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.lettering-unverified-broadcast {
+  margin: 0;
+  padding: 16px 14px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: linear-gradient(165deg, rgba(14, 165, 233, 0.18) 0%, rgba(15, 23, 42, 0.72) 70%);
+  text-align: center;
+}
+
+.lettering-unverified-broadcast__label {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  color: #f0f9ff;
+  word-break: keep-all;
+}
+
+.lettering-unverified-broadcast__meta {
+  margin: 6px 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgba(186, 230, 253, 0.92);
+}
+
+.lettering-unverified-broadcast__links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.lettering-unverified-broadcast__dot {
+  color: rgba(148, 163, 184, 0.7);
+  font-size: 12px;
+}
+
+.lettering-unverified-link {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgba(125, 211, 252, 0.95);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lettering-unverified-link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lettering-unverified-link--center {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  text-align: center;
+  text-decoration: none;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.lettering-unverified-analysis {
+  margin: 0;
+  padding: 12px 12px 11px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.lettering-unverified-analysis__title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: rgba(203, 213, 225, 0.95);
+}
+
+.lettering-unverified-analysis__body {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: rgba(148, 163, 184, 0.92);
+}
+
+.lettering-unverified-btn--block {
+  width: 100%;
+}
+
+.lettering-unverified-actions--solo {
+  grid-template-columns: 1fr;
+}
+
 
 .lettering-unverified-alert {
   margin: 0;
@@ -5347,12 +5472,51 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   color: #0f172a;
 }
 
-/* ?????????? ?? ? ?? ?? ?? */
 .lettering-ongoing--unverified.lettering-ongoing--on-call .lettering-unverified-collapsed-phone,
 .lettering-ongoing--fullscreen-tent .lettering-unverified-collapsed-phone,
 .lettering-showcase-fs .lettering-unverified-collapsed-phone,
 .lettering-call-screen--marketing-demo .lettering-unverified-collapsed-phone {
   color: #f8fafc;
+}
+
+.lettering-unverified-history {
+  margin: 0;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.lettering-unverified-history__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lettering-unverified-history__title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: rgba(241, 245, 249, 0.95);
+}
+
+.lettering-unverified-history__count {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.lettering-unverified-history__empty {
+  margin: 0;
+  padding: 10px 0 2px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: rgba(148, 163, 184, 0.88);
+  text-align: center;
 }
 
 .lettering-unverified-reports {
@@ -5380,7 +5544,7 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
 }
 
 .lettering-unverified-reports__list-scroll--bounded {
-  max-height: min(22vh, 168px);
+  max-height: min(18vh, 140px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
@@ -5415,6 +5579,124 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   line-height: 1.5;
   letter-spacing: -0.01em;
   color: rgba(148, 163, 184, 0.95);
+}
+
+.lettering-unverified-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 12px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  background: linear-gradient(165deg, rgba(14, 165, 233, 0.12) 0%, rgba(15, 23, 42, 0.55) 55%);
+}
+
+.lettering-unverified-tip__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f0f9ff;
+}
+
+.lettering-unverified-tip__sub {
+  margin: -2px 0 4px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: rgba(186, 230, 253, 0.85);
+}
+
+.lettering-unverified-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lettering-unverified-field__label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.lettering-unverified-field__input {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.72);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: #f8fafc;
+  outline: none;
+}
+
+.lettering-unverified-field__input::placeholder {
+  color: rgba(100, 116, 139, 0.95);
+}
+
+.lettering-unverified-field__input:focus {
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18);
+}
+
+.lettering-unverified-field__input:disabled {
+  opacity: 0.65;
+}
+
+.lettering-unverified-tip__error {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fca5a5;
+}
+
+.lettering-unverified-tip__ok {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #7dd3fc;
+}
+
+.lettering-unverified-actions {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.lettering-unverified-btn {
+  margin: 0;
+  padding: 12px 10px;
+  border-radius: 12px;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.lettering-unverified-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lettering-unverified-btn--tip {
+  color: #0f172a;
+  background: linear-gradient(165deg, #38bdf8 0%, #0ea5e9 55%, #0284c7 100%);
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.28);
+}
+
+.lettering-unverified-btn--report {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.35);
+  border: 1px solid rgba(248, 113, 113, 0.35);
 }
 
 .lettering-report-entry {
@@ -5461,13 +5743,13 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   font-size: 9px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: rgba(226, 232, 240, 0.9);
-  background: rgba(71, 85, 105, 0.55);
+  color: rgba(186, 230, 253, 0.98);
+  background: rgba(14, 165, 233, 0.22);
 }
 
 .lettering-report-entry__tag--report {
-  color: rgba(191, 219, 254, 0.98);
-  background: rgba(37, 99, 235, 0.28);
+  color: rgba(254, 202, 202, 0.98);
+  background: rgba(185, 28, 28, 0.28);
 }
 
 .lettering-caution--unverified-strong {
@@ -5492,7 +5774,7 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   flex: 0 1 auto;
   flex-direction: column;
   min-height: 0;
-  max-height: min(52vh, 420px);
+  max-height: min(62vh, 520px);
   overflow: hidden;
   margin: 0 2px 2px;
   border-radius: 16px;
@@ -5527,6 +5809,11 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   border-top: 1px solid rgba(148, 163, 184, 0.14);
   background: rgba(15, 23, 42, 0.88);
   box-shadow: none;
+}
+
+.lettering-unverified-expanded__footer--minimal {
+  padding-top: 10px;
+  gap: 8px;
 }
 
 .lettering-unverified-expanded__footer .lettering-action--danger {

@@ -54,16 +54,15 @@ const CARD_PART_GUIDE: Record<ShowcaseDemoGrade, { title: string; intro: string;
   },
   unverified: {
     title: '미인증자 — VLUE 미등록 번호',
-    intro: `${LETTERING_UNVERIFIED_SPOOF_NUMBER}처럼 VLUE에 등록되지 않은 번호는 디지털인증명함·풀 쇼케이스가 표시되지 않습니다. 앱과 동일한 미등록 UI만 노출됩니다.`,
+    intro: `${LETTERING_UNVERIFIED_SPOOF_NUMBER}처럼 VLUE에 등록되지 않은 번호는 디지털인증명함이 없고, 발신자 제보·신고·분석결과가 송출됩니다.`,
     parts: [
-      { label: '통화 화면 번호', desc: '실제 수신 번호만 표시 — 기관명·인증 마크 없음.' },
-      { label: '쇼케이스 바', desc: '「?」 아이콘과 번호, 신고·제보 이력 안내.' },
-      { label: '펼침', desc: '신고·제보 이력 패널(명함·캐러셀 없음).' },
-      { label: '신고/차단', desc: '사칭·스팸 신고 후 차단 — 앱과 동일.' },
+      { label: '쇼케이스 바', desc: '제보가 있으면 「삼성카드 · 제보 N회」처럼 바로 표시.' },
+      { label: '발신자 제보', desc: '한 줄 입력(예: 삼성카드) → 제보하기. 같은 내용 제보·신규·수정.' },
+      { label: 'VLUE 분석결과', desc: '자리 확보 — 현재는 「분석결과는 없습니다」.' },
+      { label: '신고', desc: '스팸·사기 신고 후 차단 — 앱과 동일.' },
     ],
   },
 };
-
 export default function PricingPage({ user, onLoginClick, onDownloadClick }: PricingPageProps) {
   const goAppForJoinPay = () => {
     if (onDownloadClick) {

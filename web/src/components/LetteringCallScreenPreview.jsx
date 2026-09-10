@@ -9,7 +9,7 @@ import { useDraggableY } from "../hooks/useDraggableY.js";
 import { saveLetteringCardToWallet } from "../lib/letteringCardWallet.js";
 import { getLetteringLayout, letteringLayoutStyle } from "../lib/letteringLayout.js";
 import { blockLetteringPhoneOnly } from "../lib/letteringPhoneBlock.js";
-import { submitLetteringReport } from "../lib/letteringReport.js";
+import { submitLetteringReport, submitLetteringTip } from "../lib/letteringReport.js";
 import { buildLetteringCertUniversalLink } from "../lib/letteringOpenVlueApp.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { DEMO_UNVERIFIED_REPORT_HISTORY } from "../lib/letteringPhoneReports.js";
@@ -157,6 +157,23 @@ export default function LetteringCallScreenPreview({
     setReportOpen(false);
   };
 
+  const handleTipSubmit = async ({ label }) => {
+    if (demoQuiet) {
+      showToast("데모 — 제보는 앱에서 이용해 주세요");
+      return { server: { ok: true } };
+    }
+    const { tip, server, summary } = await submitLetteringTip({
+      phone: incomingNumber,
+      label
+    });
+    if (server && server.ok === false) {
+      showToast(String(server.error || "").trim() || "로그인 후 제보할 수 있습니다.");
+      return { tip, server, summary };
+    }
+    showToast("제보 완료 · VLUE에 반영됩니다");
+    return { tip, server, summary };
+  };
+
   const shellTone = useNativeCallUi
     ? "lettering-call-screen--native"
     : "lettering-call-screen--photo";
@@ -255,6 +272,7 @@ export default function LetteringCallScreenPreview({
               }}
               onSaveCard={handleSaveCard}
               onReport={openReport}
+              onTipSubmit={verified ? undefined : handleTipSubmit}
             />
           </div>
         </div>

@@ -1,25 +1,68 @@
 import { apiUrl } from "./apiBase.js";
-import { readLetteringReports, LETTERING_REPORT_REASONS } from "./letteringReport.js";
+import {
+  readLetteringReports,
+  LETTERING_REPORT_REASONS,
+  LETTERING_TIP_REASON_ID
+} from "./letteringReport.js";
 import { formatLetteringPhoneDisplay, normalizePhoneDigits } from "./letteringPhoneMatch.js";
 import { LETTERING_REPORT_OVERLAY_PREVIEW } from "./letteringReportDetailUrl.js";
 
 export { LETTERING_REPORT_OVERLAY_PREVIEW };
 
 const REASON_LABEL_BY_ID = Object.fromEntries(LETTERING_REPORT_REASONS.map((r) => [r.id, r.label]));
+REASON_LABEL_BY_ID[LETTERING_TIP_REASON_ID] = "발신자 제보";
 
 /** 미인증 번호 펼침 — 신고·제보 이력 항목 정규화 */
 export function normalizeLetteringReportEntry(raw = {}) {
   const reasonId = String(raw.reasonId || "").trim();
+  const isTip = reasonId === LETTERING_TIP_REASON_ID || raw.source === "community";
+  const snap = raw.cardSnapshot && typeof raw.cardSnapshot === "object" ? raw.cardSnapshot : null;
+  const tipLabel = String(
+    raw.label ||
+      snap?.label ||
+      snap?.displayName ||
+      snap?.name ||
+      snap?.organization ||
+      snap?.note ||
+      ""
+  ).trim();
   return {
-    id: String(raw.id || raw.reportId || "").trim(),
+    id: String(raw.id || raw.reportId || raw.tipId || "").trim(),
     reasonId,
     reasonLabel:
       String(raw.reasonLabel || raw.reason || "").trim() ||
+      tipLabel ||
       REASON_LABEL_BY_ID[reasonId] ||
-      "기타",
+      (isTip ? "발신자 제보" : "기타"),
     detail: String(raw.detail || raw.summary || raw.content || "").trim(),
+    label: tipLabel || (isTip ? String(raw.reasonLabel || "").trim() : ""),
     createdAt: String(raw.createdAt || raw.reportedAt || "").trim(),
-    source: raw.source === "community" ? "community" : "report"
+    source: isTip ? "community" : "report"
+  };
+}
+
+/** 로컬·미리보기용 제보 집계 */
+export function summarizeLetteringTipsFromEntries(entries = []) {
+  const counts = new Map();
+  for (const raw of entries) {
+    const entry = normalizeLetteringReportEntry(raw);
+    if (entry.source !== "community") continue;
+    const label = String(entry.label || entry.reasonLabel || "").trim();
+    if (!label || label === "발신자 제보") continue;
+    const key = label.replace(/\s+/g, " ").toLowerCase();
+    const prev = counts.get(key);
+    if (prev) prev.count += 1;
+    else counts.set(key, { label, count: 1 });
+  }
+  const labels = [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "ko"));
+  const top = labels[0] || null;
+  const tipCount = entries.filter((e) => normalizeLetteringReportEntry(e).source === "community").length;
+  return {
+    tipCount,
+    topLabel: top?.label || "",
+    topCount: top?.count || 0,
+    labels,
+    analysis: { status: "none", message: "분석결과는 없습니다" }
   };
 }
 
@@ -49,7 +92,13 @@ export function getLetteringReportsForPhoneLocal(phone, { extra = [] } = {}) {
 
   const fromLocal = readLetteringReports()
     .filter((r) => !digits || normalizePhoneDigits(r.phone) === digits)
-    .map((r) => normalizeLetteringReportEntry({ ...r, source: "report" }));
+    .map((r) =>
+      normalizeLetteringReportEntry({
+        ...r,
+        source:
+          r.source === "community" || r.reasonId === LETTERING_TIP_REASON_ID ? "community" : "report"
+      })
+    );
 
   return mergeReportLists(extra, fromLocal);
 }
@@ -127,35 +176,47 @@ export function formatLetteringReportDate(iso) {
   return d.toLocaleDateString("ko-KR", { year: "numeric", month: "short", day: "numeric" });
 }
 
-/** 프리뷰·데모용 제보 이력 */
+/** 프리뷰·데모용 제보 이력 — 한 줄 라벨 집계 송출 예시 */
 export const DEMO_UNVERIFIED_REPORT_HISTORY = [
   {
-    id: "demo-1",
-    reasonLabel: "사기·피싱",
-    detail: "대출·투자 권유, 계좌·인증번호 요구",
+    id: "demo-tip-1",
+    reasonId: "community_tip",
+    reasonLabel: "삼성카드",
+    label: "삼성카드",
+    detail: "",
     createdAt: "2026-05-08T14:22:00.000Z",
-    source: "report"
+    source: "community",
+    cardSnapshot: { kind: "tip", label: "삼성카드" }
   },
   {
-    id: "demo-2",
-    reasonLabel: "스팸·광고",
-    detail: "보험·대출 상품 반복 안내 전화",
+    id: "demo-tip-2",
+    reasonId: "community_tip",
+    reasonLabel: "삼성카드",
+    label: "삼성카드",
+    detail: "",
     createdAt: "2026-04-15T09:10:00.000Z",
-    source: "community"
+    source: "community",
+    cardSnapshot: { kind: "tip", label: "삼성카드" }
   },
   {
-    id: "demo-3",
-    reasonLabel: "스팸·광고",
-    detail: "야간 시간대 반복 발신",
+    id: "demo-tip-3",
+    reasonId: "community_tip",
+    reasonLabel: "삼성카드",
+    label: "삼성카드",
+    detail: "",
     createdAt: "2026-03-20T11:00:00.000Z",
-    source: "community"
+    source: "community",
+    cardSnapshot: { kind: "tip", label: "삼성카드" }
   },
   {
-    id: "demo-4",
-    reasonLabel: "사기·피싱",
-    detail: "택배 미배송 사칭 문자·전화 연계",
+    id: "demo-tip-4",
+    reasonId: "community_tip",
+    reasonLabel: "삼성카드 고객센터",
+    label: "삼성카드 고객센터",
+    detail: "",
     createdAt: "2026-02-02T08:30:00.000Z",
-    source: "report"
+    source: "community",
+    cardSnapshot: { kind: "tip", label: "삼성카드 고객센터" }
   }
 ];
 

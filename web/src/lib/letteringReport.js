@@ -1,5 +1,5 @@
 import { blockLetteringPhone } from "./letteringPhoneBlock.js";
-import { postLetteringReport } from "./letteringApi.js";
+import { postLetteringReport, postLetteringTip } from "./letteringApi.js";
 import { normalizePhoneDigits } from "./letteringPhoneMatch.js";
 
 export const LETTERING_REPORTS_KEY = "vlue_lettering_reports";
@@ -10,6 +10,8 @@ export const LETTERING_REPORT_REASONS = [
   { id: "abuse", label: "욕설·협박" },
   { id: "other", label: "기타" }
 ];
+
+export const LETTERING_TIP_REASON_ID = "community_tip";
 
 export function readLetteringReports() {
   try {
@@ -62,7 +64,8 @@ export async function submitLetteringReport({ phone, reasonId, detail = "", card
         }
       : null,
     createdAt: new Date().toISOString(),
-    autoBlocked: true
+    autoBlocked: true,
+    source: "report"
   };
 
   const reports = [report, ...readLetteringReports()];
@@ -75,4 +78,48 @@ export async function submitLetteringReport({ phone, reasonId, detail = "", card
   });
 
   return { report, blockResult, server };
+}
+
+/**
+ * 발신자 제보 — 한 줄 라벨 DB 저장(차단 없음).
+ */
+export async function submitLetteringTip({
+  phone,
+  label = "",
+  displayName = "",
+  organization = "",
+  note = ""
+}) {
+  const digits = normalizePhoneDigits(phone);
+  const tipLabel = String(label || displayName || organization || note || "")
+    .trim()
+    .replace(/\s+/g, " ");
+
+  let server = { ok: false };
+  try {
+    server = await postLetteringTip({
+      phone: digits || phone,
+      label: tipLabel
+    });
+  } catch {
+    /* local fallback */
+  }
+
+  const tip = {
+    id: server.tipId || server.reportId || `lt-${Date.now()}`,
+    phone: digits,
+    phoneDisplay: String(phone || "").trim(),
+    reasonId: LETTERING_TIP_REASON_ID,
+    reasonLabel: tipLabel || "발신자 제보",
+    detail: "",
+    label: tipLabel,
+    verified: false,
+    cardSnapshot: { kind: "tip", label: tipLabel },
+    createdAt: new Date().toISOString(),
+    autoBlocked: false,
+    source: "community"
+  };
+
+  writeLetteringReports([tip, ...readLetteringReports()]);
+  return { tip, server, summary: server.summary || null };
 }

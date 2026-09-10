@@ -48,12 +48,74 @@ const REPORT_REASON_LABELS: Record<string, string> = {
   spam: "스팸·광고",
   fraud: "사기·피싱",
   abuse: "욕설·협박",
-  other: "기타"
+  other: "기타",
+  community_tip: "발신자 제보"
 };
+
+const COMMUNITY_TIP_REASON = "community_tip";
 
 function reasonLabel(reasonId: string) {
   return REPORT_REASON_LABELS[reasonId] || REPORT_REASON_LABELS.other;
 }
+
+function isCommunityTip(reasonId: string) {
+  return reasonId === COMMUNITY_TIP_REASON;
+}
+
+function tipLabelFromSnapshot(cardSnapshot: unknown, detail: string | null): string {
+  if (cardSnapshot && typeof cardSnapshot === "object") {
+    const snap = cardSnapshot as Record<string, unknown>;
+    const label = String(snap.label ?? "").trim();
+    if (label) return label;
+    const name = String(snap.displayName ?? snap.name ?? "").trim();
+    if (name) return name;
+    const org = String(snap.organization ?? "").trim();
+    if (org) return org;
+    const note = String(snap.note ?? "").trim();
+    if (note) return note;
+  }
+  const fromDetail = String(detail || "").trim();
+  if (fromDetail) {
+    const m = fromDetail.match(/(?:이름|상호|메모)\s*[:：]\s*([^·|]+)/);
+    if (m?.[1]) return m[1].trim();
+    return fromDetail;
+  }
+  return reasonLabel(COMMUNITY_TIP_REASON);
+}
+
+function normalizeTipLabelKey(label: string): string {
+  return String(label || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function buildTipSummary(rows: Array<{ cardSnapshot: unknown; detail: string | null }>) {
+  const counts = new Map<string, { label: string; count: number }>();
+  for (const row of rows) {
+    const label = tipLabelFromSnapshot(row.cardSnapshot, row.detail);
+    if (!label || label === reasonLabel(COMMUNITY_TIP_REASON)) continue;
+    const key = normalizeTipLabelKey(label);
+    if (!key) continue;
+    const prev = counts.get(key);
+    if (prev) prev.count += 1;
+    else counts.set(key, { label, count: 1 });
+  }
+  const labels = [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "ko"));
+  const tipCount = rows.length;
+  const top = labels[0] || null;
+  return {
+    tipCount,
+    topLabel: top?.label || "",
+    topCount: top?.count || 0,
+    labels,
+    analysis: {
+      status: "none" as const,
+      message: "분석결과는 없습니다"
+    }
+  };
+}
+
 
 /** 번호별 신고·제보 이력 (웹 상세·오버레이 미리보기 — 공개 조회) */
 letteringRoutes.get("/reports/by-phone", async (c) => {
@@ -79,19 +141,25 @@ letteringRoutes.get("/reports/by-phone", async (c) => {
         id: true,
         reasonId: true,
         detail: true,
+        cardSnapshot: true,
         createdAt: true
       }
     })
   ]);
 
-  const items = rows.map((row) => ({
-    id: row.id,
-    reasonId: row.reasonId,
-    reasonLabel: reasonLabel(row.reasonId),
-    detail: row.detail || "",
-    createdAt: row.createdAt.toISOString(),
-    source: "report"
-  }));
+  const items = rows.map((row) => {
+    const tip = isCommunityTip(row.reasonId);
+    const tipLabel = tip ? tipLabelFromSnapshot(row.cardSnapshot, row.detail) : "";
+    return {
+      id: row.id,
+      reasonId: row.reasonId,
+      reasonLabel: tip ? tipLabel : reasonLabel(row.reasonId),
+      detail: tip ? "" : row.detail || "",
+      createdAt: row.createdAt.toISOString(),
+      source: tip ? "community" : "report",
+      label: tip ? tipLabel : undefined
+    };
+  });
 
   return c.json({ ok: true, phoneE164: e164, total, items, limit, offset }, 200);
 });
@@ -186,6 +254,95 @@ letteringRoutes.post("/reports", requireUserHeader, async (c) => {
     },
     201
   );
+});
+
+/**
+ * 발신자 제보 (차단·모더레이션 임계값 제외)
+ * — 한 줄 라벨(예: 삼성카드)만 저장. 작성자는 reporterId로 추적.
+ */
+letteringRoutes.post("/tips", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId")!;
+  try {
+    await assertReporterCanFile(me);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "제보할 수 없습니다.";
+    const status = typeof (e as { status?: number })?.status === "number" ? (e as { status: number }).status : 403;
+    return c.json({ error: msg }, status as 403);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const raw = String(body.phone ?? body.number ?? "").trim();
+  const e164 = normalizeToE164KR(raw);
+  if (!e164) return c.json({ error: "유효한 번호가 아닙니다." }, 400);
+
+  const label = String(
+    body.label ?? body.displayName ?? body.name ?? body.organization ?? body.org ?? body.note ?? body.detail ?? ""
+  )
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!label) {
+    return c.json({ error: "제보 내용을 입력해 주세요." }, 400);
+  }
+  if (label.length > 40) {
+    return c.json({ error: "제보는 40자 이내로 입력해 주세요." }, 400);
+  }
+
+  const tip = await prisma.letteringPhoneReport.create({
+    data: {
+      reporterId: me,
+      phoneE164: e164,
+      reasonId: COMMUNITY_TIP_REASON,
+      detail: label,
+      cardSnapshot: { kind: "tip", label }
+    }
+  });
+
+  const tipRows = await prisma.letteringPhoneReport.findMany({
+    where: { phoneE164: e164, reasonId: COMMUNITY_TIP_REASON },
+    select: { cardSnapshot: true, detail: true }
+  });
+  const summary = buildTipSummary(tipRows);
+
+  return c.json(
+    {
+      ok: true,
+      tipId: tip.id,
+      reportId: tip.id,
+      phoneE164: e164,
+      label,
+      autoBlocked: false,
+      summary
+    },
+    201
+  );
+});
+
+/** 번호별 제보 집계 송출 (공개) — 쇼케이스 자동 표시용 */
+letteringRoutes.get("/tips/summary", async (c) => {
+  const raw = String(c.req.query("number") ?? c.req.query("phone") ?? "").trim();
+  const e164 = normalizeToE164KR(raw);
+  if (!e164) {
+    return c.json(
+      {
+        ok: true,
+        phoneE164: "",
+        tipCount: 0,
+        topLabel: "",
+        topCount: 0,
+        labels: [],
+        analysis: { status: "none", message: "분석결과는 없습니다" }
+      },
+      200
+    );
+  }
+
+  const tipRows = await prisma.letteringPhoneReport.findMany({
+    where: { phoneE164: e164, reasonId: COMMUNITY_TIP_REASON },
+    select: { cardSnapshot: true, detail: true }
+  });
+  const summary = buildTipSummary(tipRows);
+
+  return c.json({ ok: true, phoneE164: e164, ...summary }, 200);
 });
 
 /** V1 — 유료 회원 쇼케이스 #해시태그 등록 */

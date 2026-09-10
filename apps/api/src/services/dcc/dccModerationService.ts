@@ -125,7 +125,7 @@ export async function applyReportThresholdForPhone(phoneRaw: string) {
 
   const distinct = await prisma.letteringPhoneReport.groupBy({
     by: ["reporterId"],
-    where: { phoneE164: e164 },
+    where: { phoneE164: e164, reasonId: { not: "community_tip" } },
     _count: { _all: true }
   });
   const uniqueReporters = distinct.length;

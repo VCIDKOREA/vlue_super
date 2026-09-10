@@ -44,7 +44,7 @@ export default function LetteringNotificationPreviewPage() {
             ? "유료 회원 · 로고·상호·명함 펼침 · 뒷면(회사소개·꾸미기)"
             : verified
               ? "일반번호 · 010-1234-5678 + V · 유선 거래 주의"
-              : "미인증 · ▼ 펼치면 신고·제보 이력"}
+              : "미인증 · ▼ 펼치면 제보·신고·분석결과"}
         </p>
         {platform === "ios" ? (
           <p className="mt-1 text-[10px] font-semibold text-violet-200/90">
