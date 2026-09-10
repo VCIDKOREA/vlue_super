@@ -45,6 +45,14 @@ import {
 export const letteringRoutes = new Hono();
 
 const REPORT_REASON_LABELS: Record<string, string> = {
+  impersonation_vishing: "사칭 및 보이스피싱",
+  illegal_gambling: "불법 도박 및 사행성",
+  illegal_loan_fraud: "불법 대출 및 금융 사기",
+  smishing_malware: "스미싱 및 악성 링크",
+  adult_illegal_ads: "성인물 및 불법 광고",
+  real_estate_ads: "부동산 및 분양 광고",
+  other_commercial_ads: "기타 영리 목적 광고",
+  /* legacy */
   spam: "스팸·광고",
   fraud: "사기·피싱",
   abuse: "욕설·협박",
@@ -55,7 +63,7 @@ const REPORT_REASON_LABELS: Record<string, string> = {
 const COMMUNITY_TIP_REASON = "community_tip";
 
 function reasonLabel(reasonId: string) {
-  return REPORT_REASON_LABELS[reasonId] || REPORT_REASON_LABELS.other;
+  return REPORT_REASON_LABELS[reasonId] || REPORT_REASON_LABELS.other_commercial_ads;
 }
 
 function isCommunityTip(reasonId: string) {

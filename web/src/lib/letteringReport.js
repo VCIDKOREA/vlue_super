@@ -5,11 +5,18 @@ import { normalizePhoneDigits } from "./letteringPhoneMatch.js";
 export const LETTERING_REPORTS_KEY = "vlue_lettering_reports";
 
 export const LETTERING_REPORT_REASONS = [
-  { id: "spam", label: "스팸·광고" },
-  { id: "fraud", label: "사기·피싱" },
-  { id: "abuse", label: "욕설·협박" },
-  { id: "other", label: "기타" }
+  { id: "impersonation_vishing", label: "사칭 및 보이스피싱" },
+  { id: "illegal_gambling", label: "불법 도박 및 사행성" },
+  { id: "illegal_loan_fraud", label: "불법 대출 및 금융 사기" },
+  { id: "smishing_malware", label: "스미싱 및 악성 링크" },
+  { id: "adult_illegal_ads", label: "성인물 및 불법 광고" },
+  { id: "real_estate_ads", label: "부동산 및 분양 광고" },
+  { id: "other_commercial_ads", label: "기타 영리 목적 광고" }
 ];
+
+/** 경찰청 피싱안심SOS 제보 (외부) */
+export const PHISHING_SOS_REPORT_URL =
+  "https://www.counterscam112.go.kr/report/reportTerms.do?type=vop";
 
 export const LETTERING_TIP_REASON_ID = "community_tip";
 
@@ -37,7 +44,8 @@ function writeLetteringReports(items) {
  */
 export async function submitLetteringReport({ phone, reasonId, detail = "", card = null, verified = true }) {
   const digits = normalizePhoneDigits(phone);
-  const reason = LETTERING_REPORT_REASONS.find((r) => r.id === reasonId) || LETTERING_REPORT_REASONS[3];
+  const reason =
+    LETTERING_REPORT_REASONS.find((r) => r.id === reasonId) || LETTERING_REPORT_REASONS[0];
 
   let server = { ok: false };
   try {

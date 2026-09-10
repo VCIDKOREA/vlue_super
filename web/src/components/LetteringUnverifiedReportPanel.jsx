@@ -4,7 +4,8 @@ import {
   getLetteringReportsForPhone,
   summarizeLetteringTipsFromEntries
 } from "../lib/letteringPhoneReports.js";
-import { submitLetteringTip } from "../lib/letteringReport.js";
+import { PHISHING_SOS_REPORT_URL, submitLetteringTip } from "../lib/letteringReport.js";
+import { openExternalHref } from "../lib/showcase/showcaseContactActions.js";
 import { VLUE_UNVERIFIED_CAUTION } from "../lib/vlueDigitalCardUi.js";
 
 const EMPTY_SUMMARY = {
@@ -211,14 +212,15 @@ export default function LetteringUnverifiedReportPanel({
             </p>
           ) : null}
 
-          <div className="lettering-unverified-actions">
-            <button
-              type="submit"
-              className="lettering-unverified-btn lettering-unverified-btn--tip"
-              disabled={busy || !canSubmitTip}
-            >
-              {busy ? "저장 중…" : "제보하기"}
-            </button>
+          <button
+            type="submit"
+            className="lettering-unverified-btn lettering-unverified-btn--tip lettering-unverified-btn--block"
+            disabled={busy || !canSubmitTip}
+          >
+            {busy ? "저장 중…" : "제보하기"}
+          </button>
+
+          <div className="lettering-unverified-actions lettering-unverified-actions--report-row">
             <button
               type="button"
               className="lettering-unverified-btn lettering-unverified-btn--report"
@@ -226,6 +228,14 @@ export default function LetteringUnverifiedReportPanel({
               disabled={busy}
             >
               신고
+            </button>
+            <button
+              type="button"
+              className="lettering-unverified-btn lettering-unverified-btn--sos"
+              onClick={() => openExternalHref(PHISHING_SOS_REPORT_URL)}
+              disabled={busy}
+            >
+              피싱안심SOS
             </button>
           </div>
 
@@ -244,14 +254,22 @@ export default function LetteringUnverifiedReportPanel({
           ) : null}
         </form>
       ) : (
-        <div className="lettering-unverified-actions lettering-unverified-actions--solo">
+        <div className="lettering-unverified-actions lettering-unverified-actions--report-row">
           <button
             type="button"
-            className="lettering-unverified-btn lettering-unverified-btn--report lettering-unverified-btn--block"
+            className="lettering-unverified-btn lettering-unverified-btn--report"
             onClick={() => onReport?.()}
             disabled={busy}
           >
             신고
+          </button>
+          <button
+            type="button"
+            className="lettering-unverified-btn lettering-unverified-btn--sos"
+            onClick={() => openExternalHref(PHISHING_SOS_REPORT_URL)}
+            disabled={busy}
+          >
+            피싱안심SOS
           </button>
         </div>
       )}

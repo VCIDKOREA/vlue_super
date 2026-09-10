@@ -3336,12 +3336,12 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   display: flex;
   cursor: pointer;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
-  padding: 10px 12px;
-  font-size: 12px;
+  padding: 11px 12px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
   color: #334155;
@@ -3351,6 +3351,115 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   border-color: #fca5a5;
   background: #fef2f2;
   color: #991b1b;
+}
+
+.lettering-report-sheet__radio {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.lettering-report-sheet__radio-mark {
+  flex-shrink: 0;
+  width: 1.1em;
+  font-size: 14px;
+  line-height: 1;
+  color: #94a3b8;
+}
+
+.lettering-report-sheet__reason--active .lettering-report-sheet__radio-mark {
+  color: #dc2626;
+}
+
+.lettering-report-sheet__reason-label {
+  min-width: 0;
+  letter-spacing: -0.02em;
+}
+
+.lettering-report-sheet__detail {
+  display: block;
+  margin-top: 12px;
+}
+
+.lettering-report-sheet__textarea {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  resize: none;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 11px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #0f172a;
+  outline: none;
+}
+
+.lettering-report-sheet__textarea:focus {
+  border-color: #fca5a5;
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.18);
+}
+
+.lettering-report-sheet__textarea:disabled {
+  opacity: 0.6;
+}
+
+.lettering-report-sheet__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.lettering-report-sheet__btn {
+  margin: 0;
+  padding: 12px 10px;
+  border-radius: 12px;
+  border: none;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+}
+
+.lettering-report-sheet__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.lettering-report-sheet__btn--cancel {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+}
+
+.lettering-report-sheet__btn--confirm {
+  background: #dc2626;
+  color: #fff;
+}
+
+.lettering-report-sheet__block-link {
+  display: block;
+  width: 100%;
+  margin: 10px 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.lettering-report-sheet__block-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .lettering-call-screen--photo[data-report-open="true"] .lettering-call-screen__overlay-stage {
@@ -5670,6 +5779,10 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   margin-top: 4px;
 }
 
+.lettering-unverified-actions--report-row {
+  grid-template-columns: 1fr 1.35fr;
+}
+
 .lettering-unverified-btn {
   margin: 0;
   padding: 12px 10px;
@@ -5697,6 +5810,16 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   color: #fecaca;
   background: rgba(127, 29, 29, 0.35);
   border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.lettering-unverified-btn--sos {
+  color: #0f172a;
+  background: linear-gradient(165deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
 }
 
 .lettering-report-entry {
