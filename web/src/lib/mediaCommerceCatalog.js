@@ -5,7 +5,7 @@ export const MEDIA_FEED_TABS = [
   { id: "all", label: "전체" },
   { id: "page", label: "페이지쇼핑" },
   { id: "groupbuy", label: "공동구매" },
-  { id: "auction", label: "VLUE 경매" }
+  { id: "auction", label: "VLUÉ 경매" }
 ];
 
 const THUMB_POOL = [

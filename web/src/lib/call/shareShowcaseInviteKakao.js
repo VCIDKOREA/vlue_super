@@ -21,7 +21,7 @@ const FALLBACK_DOWNLOAD = "https://www.vlue.kr/download";
 export async function shareShowcaseInviteViaKakao(opts = {}) {
   const inviteeName = String(opts.inviteeName || "").trim();
   const text = buildVlueInviteMessage(inviteeName);
-  const title = `${getInviteSenderName()}님이 VLUE 쇼케이스를 보냅니다`;
+  const title = `${getInviteSenderName()}님이 VLUÉ 쇼케이스를 보냅니다`;
   const viral = getVlueViralLinks();
   const linkUrl =
     String(viral?.downloadUrl || viral?.createUrl || "").startsWith("http")
@@ -55,7 +55,7 @@ export async function shareShowcaseInviteViaKakao(opts = {}) {
             mobileWebUrl: linkUrl,
             webUrl: linkUrl
           },
-          buttonTitle: "VLUE 설치하기",
+          buttonTitle: "VLUÉ 설치하기",
           installTalk: true,
           callback: () => done()
         });

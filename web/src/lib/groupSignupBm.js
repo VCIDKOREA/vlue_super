@@ -48,7 +48,7 @@ export function emptyGroupSignupDraft() {
     repExtensionMain: "",
     repExtensionNo: "",
     carrier: "LGUPLUS",
-    /** 접수 회선 수(VLUE 인증번호 포함) — 10 이상 */
+    /** 접수 회선 수(VLUÉ 인증번호 포함) — 10 이상 */
     plannedLineCount: 10,
     vlueAuthPhoneHint: "",
     lines: []
@@ -62,7 +62,7 @@ export function countGroupBillableLines(draft) {
   return 1 + (draft.lines?.length || 0);
 }
 
-/** VLUE 인증 1회선 제외 — 직원 회선 입력 칸 수 */
+/** VLUÉ 인증 1회선 제외 — 직원 회선 입력 칸 수 */
 export function employeeLineSlotCount(plannedLineCount) {
   const planned = Math.max(GROUP_SIGNUP_MIN_LINES, Math.floor(Number(plannedLineCount) || 0));
   return Math.max(0, planned - 1);
@@ -138,7 +138,7 @@ export function buildGroupPaymentPreview(billingCycle, lineCount, { hasReferral 
     cycleLabel,
     badges: ["단체 B2B", `${lines}회선`, billingCycle === "annual" ? "2개월 무료" : null].filter(Boolean),
     detailLine: hasReferral
-      ? `VLUE 인증 1 + 직원 ${employeeCount} · 전 회선 단체 요금 · ${cycleLabel}`
+      ? `VLUÉ 인증 1 + 직원 ${employeeCount} · 전 회선 단체 요금 · ${cycleLabel}`
       : `대표 ${masterUnit.toLocaleString("ko-KR")}원 + 직원 ${employeeCount}×${subUnit.toLocaleString("ko-KR")}원(이벤트) · ${cycleLabel}`,
     hasReferral,
     canCheckout: lines >= GROUP_SIGNUP_MIN_LINES
@@ -169,7 +169,7 @@ export function validateGroupSignupDraft(draft) {
   if (lines.length !== slots) {
     return {
       ok: false,
-      message: `직원 회선은 ${slots}칸이어야 합니다. (접수 ${total}회선 = VLUE 1 + 직원 ${slots})`
+      message: `직원 회선은 ${slots}칸이어야 합니다. (접수 ${total}회선 = VLUÉ 1 + 직원 ${slots})`
     };
   }
   const roleV = validateLineEnterpriseRoles(lines);

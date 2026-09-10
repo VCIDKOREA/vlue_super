@@ -4,7 +4,7 @@ export const SUBSCRIBE_STORY_SHOPS = [
   { id: "s1", storyKey: "s1", name: "Soul Cafe", avatar: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=200&q=80", roomId: "subscribe:soul-cafe", hasNew: true },
   { id: "s2", storyKey: "s2", name: "블루정비", avatar: "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=200&q=80", roomId: "subscribe:blue-repair", hasNew: true },
   { id: "s3", storyKey: "s3", name: "커리어센터", avatar: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=200&q=80", roomId: "subscribe:career-center", hasNew: false },
-  { id: "s4", storyKey: "s4", name: "VLUE Store", avatar: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&q=80", roomId: "subscribe:soul-cafe", hasNew: true }
+  { id: "s4", storyKey: "s4", name: "VLUÉ Store", avatar: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&q=80", roomId: "subscribe:soul-cafe", hasNew: true }
 ];
 
 export const SUBSCRIBE_STORY_POSTS = [

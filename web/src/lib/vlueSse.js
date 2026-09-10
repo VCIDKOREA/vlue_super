@@ -1,5 +1,5 @@
 /**
- * VLUE 실시간 채널 (SSE) — §8 권한 회수 · §6 문의 알림 · 채팅 DM 푸시
+ * VLUÉ 실시간 채널 (SSE) — §8 권한 회수 · §6 문의 알림 · 채팅 DM 푸시
  * EventSource 는 Authorization 헤더를 지원하지 않아 fetch 스트리밍으로 수신
  */
 

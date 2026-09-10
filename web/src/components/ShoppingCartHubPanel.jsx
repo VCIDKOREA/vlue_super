@@ -294,7 +294,7 @@ export default function ShoppingCartHubPanel({
                         </span>
                       </div>
                       <p className={`text-[10px] ${subText}`}>
-                        {s.kind === "membership" ? "VLUE 요금제" : "정기구매"} · 다음 결제 {s.nextBillingDate} ·{" "}
+                        {s.kind === "membership" ? "VLUÉ 요금제" : "정기구매"} · 다음 결제 {s.nextBillingDate} ·{" "}
                         {s.status}
                       </p>
                     </li>

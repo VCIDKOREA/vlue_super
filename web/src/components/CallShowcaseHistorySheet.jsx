@@ -136,7 +136,7 @@ function hasUsableLocalSnapshot(call) {
 
 function snapshotIsCompleteEnough(call) {
   if (!hasUsableLocalSnapshot(call)) return false;
-  /* DCC·쇼케이스 미디어가 있을 때만 풀 화면 — 없으면 VLUE 인증 팝업 */
+  /* DCC·쇼케이스 미디어가 있을 때만 풀 화면 — 없으면 VLUÉ 인증 팝업 */
   return peerHasDccOrShowcaseContent(call.cardSnapshot, call.showcaseSnapshot);
 }
 
@@ -458,7 +458,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     };
   }, [open]);
 
-  /* 목록에 보이는 VLUE 회원 쇼케이스 — 탭 전 미리 불러오기 */
+  /* 목록에 보이는 VLUÉ 회원 쇼케이스 — 탭 전 미리 불러오기 */
   useEffect(() => {
     if (!open || !items.length) return undefined;
     const tops = items.filter((c) => c.verified === true).slice(0, 12);
@@ -485,7 +485,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         payload.showcaseStyle || payload.card.showcaseStyle
       );
 
-      /* 인증 회원인데 DCC·쇼케이스 없음 → 빈 풀스크린 대신 VLUE 인증 팝업 */
+      /* 인증 회원인데 DCC·쇼케이스 없음 → 빈 풀스크린 대신 VLUÉ 인증 팝업 */
       if (verified && !hasContent && !isNationalAgencyDcpCard(payload.card)) {
         openAuthPopupForPeer(call, payload.card);
         return;
@@ -640,7 +640,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       return;
     }
 
-    /* VLUE 회원 + 송출 콘텐츠 없음 → 즉시 인증 팝업 (무료·유료·송출 OFF 공통) */
+    /* VLUÉ 회원 + 송출 콘텐츠 없음 → 즉시 인증 팝업 (무료·유료·송출 OFF 공통) */
     const listLooksLikeMember =
       call.verified === true ||
       Boolean(call.memberName) ||
@@ -894,7 +894,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const emptyHint = (() => {
     if (loadError) return loadError;
     if (lineFilter !== "all") {
-      return "이 번호로 쌓인 통화가 없습니다. VLUE 앱에서 이 번호로 걸면 이 계정 목록에 표시됩니다.";
+      return "이 번호로 쌓인 통화가 없습니다. VLUÉ 앱에서 이 번호로 걸면 이 계정 목록에 표시됩니다.";
     }
     return "통화 기록이 없습니다. 전화·통화기록 권한을 확인해 주세요.";
   })();
@@ -969,7 +969,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                             size={15}
                             strokeWidth={2.4}
                             className="ml-1 inline-block align-[-2px] text-blue-600"
-                            aria-label="유료 · VLUE 보안 인증"
+                            aria-label="유료 · VLUÉ 보안 인증"
                           />
                         ) : null}
                       </p>

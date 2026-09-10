@@ -56,7 +56,7 @@ class LetteringRingingActivity : Activity() {
         }
         root.addView(
             TextView(this).apply {
-                text = if (outgoing) "VLUE 발신 레터링" else "VLUE 수신 빅푸시"
+                text = if (outgoing) "VLUÉ 발신 레터링" else "VLUÉ 수신 빅푸시"
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 typeface = Typeface.DEFAULT_BOLD

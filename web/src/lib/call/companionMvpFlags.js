@@ -16,7 +16,7 @@ export const COMPANION_MVP_DELEGATE_CALL_UI = true;
  * 위치: 드래그 좌표 유지 · 자동 가장자리 스냅 금지 · 완전 이탈 금지(~28px peek rail)
  * 통화 종료 시 제거 + 다음 통화는 기본 위치. Native Floating Window ↔ React 좌표 동기화.
  *
- * 통화 종료 ≠ 앱 종료. VLUE(MainActivity·CallMonitor)는 카톡처럼 상시 대기.
+ * 통화 종료 ≠ 앱 종료. VLUÉ(MainActivity·CallMonitor)는 카톡처럼 상시 대기.
  * 종료되는 것은 CallOverlay(Showcase/Mini Case) 통화 UI뿐이다.
  */
 export const MINI_CASE_EDGE_KEEP_PX = 28;

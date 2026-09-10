@@ -291,7 +291,7 @@ const seedMessages = {
     { id: "cc-1", type: "target", text: "상담팀이 접속했습니다. 원하시는 직무와 경력을 알려주세요." }
   ],
   "vlue:official": [
-    { id: "vo-sys", type: "system", text: "VLUE 공식 알림입니다. 서비스 공지·이벤트·보안 안내가 이 곳으로 모입니다." },
+    { id: "vo-sys", type: "system", text: "VLUÉ 공식 알림입니다. 서비스 공지·이벤트·보안 안내가 이 곳으로 모입니다." },
     { id: "vo-1", type: "target", text: "안녕하세요. 신뢰 인증(Vouch) 요청은 회원 목록에서 보내실 수 있고, 승인 결과는 별도 메시지로 안내드립니다." },
     { id: "vo-2", type: "target", text: "정기 점검이 예정되어 있으면 이 채널에서 먼저 공지드립니다." }
   ]
@@ -678,7 +678,7 @@ function App() {
   const serverDmCursorRef = useRef({});
   const serverDmEnabledRoomsRef = useRef(new Set());
   const [officialChannelMeta, setOfficialChannelMeta] = useState({
-    lastMsg: "VLUE 공식 알림을 확인해 주세요.",
+    lastMsg: "VLUÉ 공식 알림을 확인해 주세요.",
     time: "",
     pendingCount: 0
   });
@@ -1079,7 +1079,7 @@ function App() {
       }
       if (data.type === "vlue-payment-receipt") {
         const title = String(n.title || data.title || "결제 완료 · 구매확인 안내");
-        const productName = String(data.orderName || data.productName || "VLUE 상품");
+        const productName = String(data.orderName || data.productName || "VLUÉ 상품");
         const productDetail = String(
           data.productDetail || `${productName} 결제가 정상 처리되었습니다.`
         );
@@ -1168,7 +1168,7 @@ function App() {
         setTimeout(() => setBottomToast(""), 4200);
       }
       if (data.type === "vlue-admin-broadcast" || data.type === "vlue-force-update") {
-        const title = String(n.title || data.title || "VLUE 공지");
+        const title = String(n.title || data.title || "VLUÉ 공지");
         const body = String(n.body || data.body || data.message || title);
         const category = String(data.category || "공지");
         const forceUpdate =
@@ -1309,7 +1309,7 @@ function App() {
           });
         }
         if (data?.type === "vlue-admin-broadcast" || data?.type === "vlue-force-update") {
-          const title = String(data.title || "VLUE 공지");
+          const title = String(data.title || "VLUÉ 공지");
           const body = String(data.body || data.message || title);
           const category = String(data.category || "공지");
           const forceUpdate =
@@ -1399,10 +1399,10 @@ function App() {
         }
         if (data?.type === "vlue-payment-receipt") {
           const title = String(data.title || "결제 완료 · 구매확인 안내");
-          const productName = String(data.productName || data.orderName || "VLUE 상품");
+          const productName = String(data.productName || data.orderName || "VLUÉ 상품");
           const productDetail = String(
             data.productDetail ||
-              `${productName} 결제가 정상 처리되었습니다. 결제 내역은 VLUE 계정에 보관됩니다.`
+              `${productName} 결제가 정상 처리되었습니다. 결제 내역은 VLUÉ 계정에 보관됩니다.`
           );
           const amountTotal = Number(data.amountTotal || 0);
           const paymentId = String(data.paymentId || "");
@@ -1628,7 +1628,7 @@ function App() {
     return map;
   }, [calendarGroups]);
 
-  /** 홈 진입 시 VLUE 편지(우선) → 마케팅 팝업 */
+  /** 홈 진입 시 VLUÉ 편지(우선) → 마케팅 팝업 */
   useEffect(() => {
     if (!isLoggedIn || page !== "main") return undefined;
     let cancelled = false;
@@ -1896,13 +1896,13 @@ function App() {
     const officialEntry = {
       id: "official",
       roomId: "vlue:official",
-      name: "VLUE 공식 알림",
+      name: "VLUÉ 공식 알림",
       lastMsg: officialChannelMeta.lastMsg,
       time: officialChannelMeta.time || "—",
       membershipTier: "free",
       isOfficial: true,
-      cardName: "VLUE",
-      cardOrg: "VLUE",
+      cardName: "VLUÉ",
+      cardOrg: "VLUÉ",
       unreadCount: officialChannelMeta.pendingCount,
       isFavorite: favoriteRooms.has("vlue:official")
     };
@@ -1985,11 +1985,11 @@ function App() {
     if (!selectedRoomId) return defaults;
     if (selectedRoomId === "vlue:official") {
       return {
-        name: "VLUE 공식 알림",
+        name: "VLUÉ 공식 알림",
         membershipTier: "free",
-        cardName: "VLUE",
+        cardName: "VLUÉ",
         cardTitle: "",
-        cardOrg: "VLUE",
+        cardOrg: "VLUÉ",
         vcidLettering: false
       };
     }
@@ -2014,7 +2014,7 @@ function App() {
     const org = localStorage.getItem("myCardOrganization");
     const displayName = localStorage.getItem("myCardDisplayName");
     const effectiveJobTitle = effectiveCardJobTitle();
-    /* 미설정 시 VLUE 로고로 채우지 않음 — 프로필/로고 자리는 무지(빈) 상태 유지 */
+    /* 미설정 시 VLUÉ 로고로 채우지 않음 — 프로필/로고 자리는 무지(빈) 상태 유지 */
     const logoResolved = (readAvatar("card") || readAvatar("primary") || "").trim();
     const phone = readLetteringFixedIdentity().phone || localStorage.getItem("myCardPhone") || DEFAULT_MY_PHONE;
 
@@ -2031,7 +2031,7 @@ function App() {
         fax: "",
         backNote: "",
         introBack:
-          "가입 시 VLUE 명함 발급을 신청하지 않았습니다. 추후 고객센터·설정에서 발급 신청이 열리면 연결됩니다.",
+          "가입 시 VLUÉ 명함 발급을 신청하지 않았습니다. 추후 고객센터·설정에서 발급 신청이 열리면 연결됩니다.",
         logoUrl: logoResolved
       };
     }
@@ -2206,7 +2206,7 @@ function App() {
       });
     });
     if (floatingRoomIds.has("vlue:official")) {
-      byId.set("vlue:official", { roomId: "vlue:official", name: "VLUE 공식 알림" });
+      byId.set("vlue:official", { roomId: "vlue:official", name: "VLUÉ 공식 알림" });
     }
     return [...byId.values()];
   }, [floatingRoomIds, roomCatalog, chatPrefsTick]);
@@ -2983,7 +2983,8 @@ function App() {
     const createdAt = String(m?.createdAt || "");
     const content = String(m?.content || "");
     if (m?.messageType === "system") {
-      const isSecurityGuard = content.includes("[VLUE 보안 가드]");
+      const isSecurityGuard =
+        content.includes("[VLUÉ 보안 가드]") || content.includes("[VLUE 보안 가드]");
       return {
         id: `sv:${m.id}`,
         type: "system",
@@ -3830,7 +3831,7 @@ function App() {
         const prefs = readRoomPrefs(roomId);
         const [group, id] = roomId.split(":");
         const found =
-          roomId === "vlue:official" ? { name: "VLUE 공식 알림" } : (roomCatalog[group] || []).find((r) => r.id === id);
+          roomId === "vlue:official" ? { name: "VLUÉ 공식 알림" } : (roomCatalog[group] || []).find((r) => r.id === id);
         const current = prefs.displayName || found?.name || "";
         const next = window.prompt("채팅방 이름", current);
         if (next != null && next.trim()) {
@@ -4087,7 +4088,7 @@ function App() {
         roomId: null,
         name: myCardProfile.name || "내 활동",
         membershipTier,
-        organization: myCardProfile.organization || "VLUE",
+        organization: myCardProfile.organization || "VLUÉ",
         lastQrToken: code
       });
       navigate({ nextPage: "feed", nextTab: activeTab ?? "all", nextRoomId: null });
@@ -4230,7 +4231,7 @@ function App() {
     if (cached) setContactMatchData(cached);
   }, [isLoggedIn]);
 
-  /** 하이브리드 주소록 인덱스 — VLUE 친구 + 디바이스 주소록 동기화 */
+  /** 하이브리드 주소록 인덱스 — VLUÉ 친구 + 디바이스 주소록 동기화 */
   useEffect(() => {
     if (!showAppShell) return undefined;
     upsertKnownPhonesFromFriends({
@@ -4432,7 +4433,7 @@ function App() {
       {v1AppShell.guestBrowse && guestAuthOverlay && !isLoggedIn && (
         <div className="fixed inset-0 z-[220] bg-[#fafbfc]">
           <LoginScreen
-            browsePrompt="이 기능은 회원가입 후 이용할 수 있습니다. VLUE 인증을 시작해 주세요."
+            browsePrompt="이 기능은 회원가입 후 이용할 수 있습니다. VLUÉ 인증을 시작해 주세요."
             snsUnlinkedAlert={snsUnlinkedAlert}
             onDismissSnsAlert={() => setSnsUnlinkedAlert("")}
             onDismiss={closeGuestAuthOverlay}
@@ -4477,7 +4478,7 @@ function App() {
               type="button"
               onClick={goMainAndReset}
               className="shrink-0 overflow-visible border-0 bg-transparent p-0 shadow-none active:scale-90 transition-transform cursor-pointer"
-              aria-label="VLUE 홈"
+              aria-label="VLUÉ 홈"
               title="홈"
             >
               <VlueNavLogoMark blinkSeq={eyeNavSeq} size={36} className="shadow-md shrink-0" />
@@ -4508,7 +4509,7 @@ function App() {
             ) : page === "list" ? (
               <div className="flex min-w-0 flex-1 items-center gap-1">
                 <div className="min-w-0 flex-1 text-left leading-tight">
-                  <p className="vlue-fluid-header-line font-black text-gray-900">VLUE 채팅</p>
+                  <p className="vlue-fluid-header-line font-black text-gray-900">VLUÉ 채팅</p>
                   <p className="vlue-fluid-header-line font-semibold text-blue-600">대화 목록</p>
                 </div>
                 <button
@@ -4533,7 +4534,7 @@ function App() {
               </div>
             ) : page === "subhub" ? (
               <div className="min-w-0 flex-1 text-left leading-tight">
-                <p className="vlue-fluid-header-line font-black text-gray-900">VLUE 스토어</p>
+                <p className="vlue-fluid-header-line font-black text-gray-900">VLUÉ 스토어</p>
                 <p className="vlue-fluid-header-line font-semibold text-blue-600">
                   {subscriptionSubTab === "gifts"
                     ? "선물함 · 쿠폰 · 교환"
@@ -4581,8 +4582,8 @@ function App() {
               type="button"
               onClick={() => requireAuth(() => setCsScannerOpen(true))}
               className="shrink-0 rounded-full p-1.5 text-gray-500 active:scale-90 transition-transform"
-              aria-label="VLUE 스캐너"
-              title="VLUE 스캐너 — 일반 문서 / POS 빌지"
+              aria-label="VLUÉ 스캐너"
+              title="VLUÉ 스캐너 — 일반 문서 / POS 빌지"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 7h4l2-3h4l2 3h4v12H4z" />
@@ -5061,7 +5062,7 @@ function App() {
       {page === "room" && selectedRoomId === "vlue:official" && (
         <ChatRoom
           roomId="vlue:official"
-          roomName="VLUE 공식 알림"
+          roomName="VLUÉ 공식 알림"
           messages={messagesByRoom["vlue:official"] || []}
           appendOutgoingMessage={appendOutgoingMessage}
           readOnlyBroadcast
@@ -5073,9 +5074,9 @@ function App() {
           myPhone={myCardProfile.phone}
           peerMembershipTier="free"
           peerCard={{
-            name: "VLUE",
+            name: "VLUÉ",
             title: "공식 알림",
-            organization: "VLUE",
+            organization: "VLUÉ",
             phone: "",
             introBack: ""
           }}
@@ -5787,7 +5788,7 @@ function App() {
                 <input
                   type="text"
                   className="min-w-0 flex-1 rounded-lg border border-blue-100 px-2 py-2 text-[12px]"
-                  placeholder="QR 토큰 수동 입력 (예: VLUE-XXXX)"
+                  placeholder="QR 토큰 수동 입력 (예: VLUÉ-XXXX)"
                   value={qrManualValue}
                   onChange={(e) => setQrManualValue(e.target.value)}
                 />
@@ -6097,7 +6098,7 @@ function App() {
           setProfileOpen(false);
           setSubscriptionSubTab("cart");
           navigate({ nextPage: "subhub", nextTab: activeTab, nextRoomId: null });
-          setBottomToast("VLUE 스토어 장바구니로 이동했습니다.");
+          setBottomToast("VLUÉ 스토어 장바구니로 이동했습니다.");
           setTimeout(() => setBottomToast(""), 2200);
         }}
         onLogout={handleLogout}

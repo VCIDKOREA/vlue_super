@@ -31,7 +31,7 @@ export default function AuctionListSection({ onSelect, category = "전체" }) {
   }, [category]);
 
   if (loading) {
-    return <p className="py-16 text-center text-sm text-slate-500">VLUE 경매 목록을 불러오는 중…</p>;
+    return <p className="py-16 text-center text-sm text-slate-500">VLUÉ 경매 목록을 불러오는 중…</p>;
   }
 
   if (error) {
@@ -68,7 +68,7 @@ export default function AuctionListSection({ onSelect, category = "전체" }) {
                 </div>
               )}
               <span className="absolute left-2 top-2 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-black text-white">
-                VLUE 경매
+                VLUÉ 경매
               </span>
             </div>
             <div className="p-3">

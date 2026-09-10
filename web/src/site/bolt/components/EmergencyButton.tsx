@@ -103,7 +103,7 @@ export default function EmergencyButton({
                       <Bell className="w-4 h-4 text-white" />
                     </div>
                     <div className="text-left">
-                      <div className="text-sm font-bold text-primary-700">VLUE 피싱 경보</div>
+                      <div className="text-sm font-bold text-primary-700">VLUÉ 피싱 경보</div>
                       <div className="text-xs text-primary-500">실시간 위험 번호 신고</div>
                     </div>
                   </div>
@@ -121,7 +121,7 @@ export default function EmergencyButton({
                 </div>
                 <p className="font-bold text-gray-900 text-sm mb-1">피싱 경보 신고 완료</p>
                 <p className="text-xs text-gray-500" style={{ wordBreak: 'keep-all' }}>
-                  신고하신 번호는 즉시 VLUE 경보 데이터베이스에 등록됩니다
+                  신고하신 번호는 즉시 VLUÉ 경보 데이터베이스에 등록됩니다
                 </p>
               </div>
             )}

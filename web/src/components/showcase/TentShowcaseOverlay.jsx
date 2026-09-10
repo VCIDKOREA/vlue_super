@@ -370,7 +370,7 @@ export default function TentShowcaseOverlay({
     overlayCaption ||
     (exposeCustom
       ? "더 나은 내일을 디자인합니다.\nVLUE에서 만나요."
-      : "VLUE 인증 회원입니다.\n안심하고 통화하세요.");
+      : "VLUÉ 인증 회원입니다.\n안심하고 통화하세요.");
 
   const peerAvatar = useMemo(
     () =>
@@ -534,7 +534,7 @@ export default function TentShowcaseOverlay({
                   <ShieldCheck
                     size={22}
                     className="tent-vlue__name-badge"
-                    aria-label="VLUE 인증"
+                    aria-label="VLUÉ 인증"
                   />
                 ) : null}
               </h1>
@@ -606,7 +606,7 @@ export default function TentShowcaseOverlay({
             <nav className="tent-vlue__dock tent-vlue__dock--safe" aria-label="안심 쇼케이스">
               <div className="tent-vlue__dock-btn tent-vlue__dock-btn--static">
                 <ShieldCheck size={18} aria-hidden />
-                <span>VLUE 인증</span>
+                <span>VLUÉ 인증</span>
               </div>
               <span className="tent-vlue__dock-sep" aria-hidden />
               <div className="tent-vlue__dock-btn tent-vlue__dock-btn--static">

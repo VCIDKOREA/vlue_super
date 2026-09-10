@@ -35,7 +35,7 @@ export default function HqMasterLogin({ onSuccess }) {
       <form onSubmit={submit} className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-10 shadow-xl">
         <div className="mb-8 flex flex-col items-center text-center">
           <img src={VLUE_SHIELD_LOGO} alt="" className="h-16 w-16 rounded-2xl shadow-sm" />
-          <p className="mt-4 text-[12px] font-bold uppercase tracking-[0.2em] text-blue-600">VLUE HQ</p>
+          <p className="mt-4 text-[12px] font-bold uppercase tracking-[0.2em] text-blue-600">VLUÉ HQ</p>
           <h1 className="mt-2 text-[28px] font-black text-slate-900">본사 최고 관제소</h1>
           <p className="mt-2 text-[15px] font-semibold text-slate-500">SUPER_ADMIN 전용 마스터 로그인</p>
           <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-[12px] font-semibold text-slate-600">

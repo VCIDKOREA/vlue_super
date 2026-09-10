@@ -2,9 +2,9 @@ import VLUE_BRAND_LOGO from "../assets/vlue-shield-logo.svg?url";
 import { logoCornerRadiusPx } from "../lib/vlueSquareLogoSpec.js";
 
 /**
- * VLUE 공식 정사각 브랜드 마크 (`vlue-shield-logo.svg` — 3번 참고 이미지와 동일).
+ * VLUÉ 공식 정사각 브랜드 마크 (`vlue-shield-logo.svg` — 3번 참고 이미지와 동일).
  */
-export function VlueBrandLogo({ size = 32, className = "", alt = "VLUE" }) {
+export function VlueBrandLogo({ size = 32, className = "", alt = "VLUÉ" }) {
   return (
     <img
       src={VLUE_BRAND_LOGO}

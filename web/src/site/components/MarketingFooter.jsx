@@ -16,11 +16,11 @@ export default function MarketingFooter({ onNavigate }) {
             <div className="mb-3 flex items-center gap-2">
               <VlueBrandLogo size={32} />
               <span className="text-lg font-black text-primary-600" style={{ letterSpacing: "-0.04em" }}>
-                VLUE
+                VLUÉ
               </span>
             </div>
             <p className="max-w-sm text-sm leading-relaxed text-gray-500">
-              보이스피싱 예방을 위한 공공데이터 및 VLUE 인증 통합 검증 플랫폼
+              보이스피싱 예방을 위한 공공데이터 및 VLUÉ 인증 통합 검증 플랫폼
             </p>
           </div>
           <nav className="flex flex-wrap gap-x-8 gap-y-2">
@@ -37,7 +37,7 @@ export default function MarketingFooter({ onNavigate }) {
           </nav>
         </div>
         <p className="mt-8 border-t border-gray-100 pt-6 text-center text-xs text-gray-400">
-          © {new Date().getFullYear()} VLUE. All rights reserved.
+          © {new Date().getFullYear()} VLUÉ. All rights reserved.
         </p>
       </div>
     </footer>

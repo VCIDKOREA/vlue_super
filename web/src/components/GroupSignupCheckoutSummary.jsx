@@ -24,7 +24,7 @@ export default function GroupSignupCheckoutSummary({ draft, billingCycle, onEdit
       </div>
 
       <p className="text-[10px] leading-relaxed text-indigo-900/85">
-        VLUE 인증번호(본인인증 휴대폰) 1 + 추가 회선 {Math.max(0, lineCount - 1)} · 유선·휴대 등록 가능
+        VLUÉ 인증번호(본인인증 휴대폰) 1 + 추가 회선 {Math.max(0, lineCount - 1)} · 유선·휴대 등록 가능
       </p>
 
       <div className="rounded-lg border border-indigo-100 bg-white/90 px-3 py-2">

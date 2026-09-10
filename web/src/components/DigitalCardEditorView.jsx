@@ -155,7 +155,7 @@ export default function DigitalCardEditorView({ mode, myCard, isDarkMode = false
     onSaved?.();
   };
 
-  const title = mode === "apply" ? "VLUE 인증명함 신청" : "명함 내용 편집";
+  const title = mode === "apply" ? "VLUÉ 인증명함 신청" : "명함 내용 편집";
 
   const startPersonalFlow = () => {
     setUsePersonal(true);
@@ -338,7 +338,7 @@ export default function DigitalCardEditorView({ mode, myCard, isDarkMode = false
           <div className={emailBlock}>
             <p className={fieldLabel}>이메일</p>
             <p className={emailIntro}>
-              기본은 VLUE 회원용 <b className={isDarkMode ? "text-gray-200" : "text-gray-800"}>@member.vlue.kr</b> 주소입니다. 개인 메일은 인증 후 저장됩니다.
+              기본은 VLUÉ 회원용 <b className={isDarkMode ? "text-gray-200" : "text-gray-800"}>@member.vlue.kr</b> 주소입니다. 개인 메일은 인증 후 저장됩니다.
             </p>
             <div className={emailInner}>
               <p className={emailMuted}>현재 명함에 표시될 이메일</p>

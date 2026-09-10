@@ -15,7 +15,7 @@ export async function buildKakaoLoginDiagnosticsText() {
   const redirectUri = getKakaoOAuthRedirectUri();
   const key = getKakaoJavaScriptKey();
 
-  lines.push("=== VLUE 카카오 로그인 점검 ===");
+  lines.push("=== VLUÉ 카카오 로그인 점검 ===");
   lines.push(`현재 URL: ${href}`);
   lines.push(`Redirect URI (앱이 카카오에 보내는 값): ${redirectUri || "(없음)"}`);
   lines.push(

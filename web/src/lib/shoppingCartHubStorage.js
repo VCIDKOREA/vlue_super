@@ -77,8 +77,8 @@ export function readProductReservations() {
   return seedIfEmpty(RESERVATIONS_KEY, [
     {
       id: "res_1",
-      title: "VLUE 스마트 명함 리더기",
-      storeName: "VLUE 공식",
+      title: "VLUÉ 스마트 명함 리더기",
+      storeName: "VLUÉ 공식",
       status: "출시 예정",
       reserveDate: "2026-06-15",
       note: "출시 알림 예약"
@@ -113,7 +113,7 @@ export function readVisitBookings() {
   return seedIfEmpty(VISIT_BOOKINGS_KEY, [
     {
       id: "visit_1",
-      venueName: "역삼 VLUE 라운지",
+      venueName: "역삼 VLUÉ 라운지",
       visitType: "단체 식사",
       scheduledAt: "2026-06-01 18:30",
       partySize: 12,
@@ -136,12 +136,12 @@ export function addVisitBooking(item) {
   return row;
 }
 
-/** 구독 상품 + VLUE 요금제 */
+/** 구독 상품 + VLUÉ 요금제 */
 export function readHubSubscriptions() {
   return seedIfEmpty(SUBSCRIPTIONS_KEY, [
     {
       id: "sub_vlue",
-      title: "VLUE 유료 멤버십",
+      title: "VLUÉ 유료 멤버십",
       kind: "membership",
       cycle: "monthly",
       amountKrw: 19800,
@@ -192,8 +192,8 @@ export function buildExpenseCsvDemo(period) {
   const year = new Date().getFullYear();
   const rows = [
     ["일자", "구분", "상점", "품목", "금액(원)", "결제수단", "비고"],
-    [`${year}-01-15`, "쇼핑", "VLUE 입점몰 A", "사무용품", "45000", "통합결제", "프로모션 5%"],
-    [`${year}-02-03`, "구독", "VLUE", "월 구독료", "19800", "자동결제", "유료회원"],
+    [`${year}-01-15`, "쇼핑", "VLUÉ 입점몰 A", "사무용품", "45000", "통합결제", "프로모션 5%"],
+    [`${year}-02-03`, "구독", "VLUÉ", "월 구독료", "19800", "자동결제", "유료회원"],
     [`${year}-03-20`, "쇼핑", "관심상점 B", "기프트", "32000", "부분결제", "1/3회차"]
   ];
   if (period === "quarter") {

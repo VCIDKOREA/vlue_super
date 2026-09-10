@@ -30,7 +30,7 @@ import FriendShowcaseList from "./FriendShowcaseList.jsx";
 import HomeNotificationPanel from "./HomeNotificationPanel.jsx";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
 
-/** 상단 공식 광고 배너 — 샘플(이미지·문구는 교체 가능) / 배지 VLUE 공식 + 부가 라벨 */
+/** 상단 공식 광고 배너 — 샘플(이미지·문구는 교체 가능) / 배지 VLUÉ 공식 + 부가 라벨 */
 const OFFICIAL_BANNERS = [
   {
     id: "ad-myeonggyeong",
@@ -74,7 +74,7 @@ const UPDATE_SHOPS_BY_TAB = {
   { id: "s1", roomId: "soul-cafe", name: "Soul Cafe", avatar: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=200&q=80", hasNew: true },
   { id: "s2", roomId: "blue-repair", name: "블루정비", avatar: "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=200&q=80", hasNew: true },
   { id: "s3", roomId: "career-center", name: "커리어센터", avatar: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=200&q=80", hasNew: false },
-  { id: "s4", roomId: "soul-cafe", name: "VLUE Store", avatar: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&q=80", hasNew: true }
+  { id: "s4", roomId: "soul-cafe", name: "VLUÉ Store", avatar: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&q=80", hasNew: true }
   ],
   friends: [
     { id: "f1", roomId: "friend-kim", name: "김친구", avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&q=80", hasNew: true },
@@ -175,7 +175,7 @@ const TOP_INFO_BANNERS = [
   {
     id: "vlue-guide",
     badge: "서비스소개",
-    title: "VLUE 100% 활용법",
+    title: "VLUÉ 100% 활용법",
     desc: "",
     cta: "상세보기"
   },
@@ -199,7 +199,7 @@ const GUIDE_FEATURES = [
     id: "digital-bizcard",
     title: "디지털인증명함 (전화 한 통이 홍보가 되는 공간)",
     detail:
-      "통화 화면에 VLUE 인증 디지털명함이 노출되어 상대가 이름·직함·연락처·소개를 바로 확인합니다. 단순 전화가 신뢰 기반 홍보·상담 접점으로 이어지고, 사칭·피싱 의심을 줄이는 데도 도움이 됩니다.",
+      "통화 화면에 VLUÉ 인증 디지털명함이 노출되어 상대가 이름·직함·연락처·소개를 바로 확인합니다. 단순 전화가 신뢰 기반 홍보·상담 접점으로 이어지고, 사칭·피싱 의심을 줄이는 데도 도움이 됩니다.",
     actionLabel: "디지털인증명함 설정으로 이동"
   },
   {
@@ -868,7 +868,7 @@ function Home({
         lines: [
           "기관·금융사를 사칭해 앱 설치를 유도하는 사례가 늘고 있습니다.",
           "전화 중 링크 설치 요청은 즉시 종료하고, 공식 번호로 재확인하세요.",
-          "VLUE에서는 인증명함으로 상대 신뢰 정보를 먼저 확인하세요."
+          "VLUÉ에서는 인증명함으로 상대 신뢰 정보를 먼저 확인하세요."
         ]
       };
     }
@@ -884,7 +884,7 @@ function Home({
     }
     if (activeDetailId === "vlue-guide") {
       return {
-        title: "VLUE 100% 활용법",
+        title: "VLUÉ 100% 활용법",
         lines: []
       };
     }
@@ -1013,13 +1013,13 @@ function Home({
             >
               닫기
             </button>
-            <p className="truncate text-[13px] font-semibold text-gray-900">VLUE 100% 활용법</p>
-            <span className="text-[11px] font-semibold text-blue-600">VLUE</span>
+            <p className="truncate text-[13px] font-semibold text-gray-900">VLUÉ 100% 활용법</p>
+            <span className="text-[11px] font-semibold text-blue-600">VLUÉ</span>
           </div>
           <div className="vlue-scroll-pad-bottom-nav flex-1 overflow-y-auto px-3 py-3">
             <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-600">서비스소개</p>
-              <h3 className="mt-1 text-[16px] font-semibold text-slate-900">VLUE 100% 활용법</h3>
+              <h3 className="mt-1 text-[16px] font-semibold text-slate-900">VLUÉ 100% 활용법</h3>
               <p className="mt-1 text-[11px] text-slate-500">제목을 탭하면 상세 설명이 열립니다.</p>
               <div className="mt-3 space-y-2">
                 {GUIDE_FEATURES.map((item, idx) => {
@@ -1266,9 +1266,9 @@ function Home({
         </div>
       </section>
 
-      {/* 2. VLUE PICK */}
+      {/* 2. VLUÉ PICK */}
       <section className="mb-5">
-        <SectionHeader title="VLUE PICK" subtitle="VLUE 공식 파트너프로모션" />
+        <SectionHeader title="VLUÉ PICK" subtitle="VLUÉ 공식 파트너프로모션" />
         <div className="relative w-full min-w-0 max-w-full">
           <button
             type="button"
@@ -1312,7 +1312,7 @@ function Home({
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col px-3.5 pb-3 pt-2.5">
                   <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-md bg-blue-600 px-2 py-0.5 text-[10px] font-black text-white">VLUE 공식</span>
+                    <span className="rounded-md bg-blue-600 px-2 py-0.5 text-[10px] font-black text-white">VLUÉ 공식</span>
                     {b.subLabel && (
                       <span className="text-[10px] font-bold text-gray-400">{b.subLabel}</span>
                     )}
@@ -1355,10 +1355,10 @@ function Home({
         </div>
       </section>
 
-      {/* 3. VLUE AI 추천 콘텐츠 */}
+      {/* 3. VLUÉ AI 추천 콘텐츠 */}
       <section className="mb-5 w-full min-w-0">
         <SectionHeader
-          title="VLUE AI 추천 콘텐츠"
+          title="VLUÉ AI 추천 콘텐츠"
           subtitle="맞춤큐레이션"
           right={<span className="algorithm-chip rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-600">AI</span>}
         />

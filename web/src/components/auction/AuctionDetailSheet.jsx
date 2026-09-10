@@ -132,7 +132,7 @@ export default function AuctionDetailSheet({ auctionId, open, onClose, onToast, 
       <div className="relative w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-t-3xl sm:rounded-2xl bg-white p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-violet-600">VLUE 경매</p>
+            <p className="text-[10px] font-black uppercase tracking-wider text-violet-600">VLUÉ 경매</p>
             <h2 className="text-lg font-black text-slate-900">{auction?.title || "경매 상품"}</h2>
           </div>
           <ModalCloseButton onClose={onClose} />

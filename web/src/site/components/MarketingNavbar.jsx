@@ -24,7 +24,7 @@ export default function MarketingNavbar({ currentView, onNavigate }) {
               handleNav("home");
             }}
             className="group mr-6 flex shrink-0 items-center gap-1.5 focus:outline-none"
-            aria-label="VLUE 홈"
+            aria-label="VLUÉ 홈"
           >
             <VlueNavLogoMark
               blinkSeq={logoBlinkSeq}

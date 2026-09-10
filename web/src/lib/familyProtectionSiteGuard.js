@@ -18,7 +18,7 @@ function shouldInspectUrl(url) {
   return false;
 }
 
-/** VLUE 웹뷰·인앱 브라우저 — 링크 클릭·window.open 감시 */
+/** VLUÉ 웹뷰·인앱 브라우저 — 링크 클릭·window.open 감시 */
 export function installFamilySiteGuard() {
   if (typeof window === "undefined" || window.__vlueFamilySiteGuard) return;
   window.__vlueFamilySiteGuard = true;

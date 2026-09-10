@@ -88,7 +88,7 @@ export default function EventsPage({ onBack }: EventsPageProps) {
             <span className="text-white/80 text-sm font-semibold">전국 보안 캠페인</span>
           </div>
           <h1 className="text-3xl font-black text-white mb-1">지역 이벤트</h1>
-          <p className="text-white/70 text-sm mb-5">전국 각 지역의 보이스피싱 예방 행사 및 VLUE 인증 설명회를 확인하세요.</p>
+          <p className="text-white/70 text-sm mb-5">전국 각 지역의 보이스피싱 예방 행사 및 VLUÉ 인증 설명회를 확인하세요.</p>
           <div className="relative max-w-xl">
             <div className="flex items-center bg-white/15 backdrop-blur-sm border border-white/30 rounded-3xl overflow-hidden focus-within:bg-white/25 transition-all">
               <Search className="absolute left-4 w-4 h-4 text-white/70 pointer-events-none" />

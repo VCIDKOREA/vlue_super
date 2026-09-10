@@ -142,7 +142,7 @@ function ProfilePanel({
   initialView = "main",
   onMembershipTierChange,
   onRequestTierChange,
-  /** VLUE가 전하는 편지 다시 보기 */
+  /** VLUÉ가 전하는 편지 다시 보기 */
   onOpenDigitalLetter,
 }) {
   const [familyPlanPathLabel, setFamilyPlanPathLabel] = useState(() => {
@@ -273,7 +273,7 @@ function ProfilePanel({
     showSettingNotice(
       on
         ? "이름 송출 ON — 빅푸시에 이름이 표시됩니다."
-        : "이름 송출 OFF — VLUE 인증회원으로만 표시됩니다."
+        : "이름 송출 OFF — VLUÉ 인증회원으로만 표시됩니다."
     );
   };
 
@@ -466,7 +466,7 @@ function ProfilePanel({
       ? "text-blue-400"
       : "text-blue-600"
     : subText;
-  /** 사용자가 올린 프로필 사진만 — 회사 로고·VLUE 브랜드와 혼용하지 않음 */
+  /** 사용자가 올린 프로필 사진만 — 회사 로고·VLUÉ 브랜드와 혼용하지 않음 */
   const primaryAva = useMemo(() => {
     scrubBrandAvatarsFromStorage();
     return readProfilePhotoAvatar();
@@ -1308,7 +1308,7 @@ function ProfilePanel({
                     : "border-sky-100 bg-gradient-to-br from-orange-50 via-white to-sky-50 text-slate-700 shadow-sm hover:border-sky-200"
                 }`}
               >
-                <span className="block text-[13px] font-black tracking-tight">VLUE가 전하는 편지</span>
+                <span className="block text-[13px] font-black tracking-tight">VLUÉ가 전하는 편지</span>
                 <span className={`mt-0.5 block text-[10px] font-semibold ${isDarkMode ? "text-sky-200/70" : "text-slate-400"}`}>
                   다시 읽어보기 💙
                 </span>

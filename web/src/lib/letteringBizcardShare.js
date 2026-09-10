@@ -79,10 +79,10 @@ export async function downloadBizcardSvg(card) {
 function shareTextSummary(card, viewUrl = "") {
   const viral = getVlueViralLinks();
   return [
-    `[VLUE 인증명함] ${card.organization || ""} ${card.name || ""}`.trim(),
+    `[VLUÉ 인증명함] ${card.organization || ""} ${card.name || ""}`.trim(),
     card.phone ? `Tel ${formatLetteringPhoneDisplay(card.phone) || card.phone}` : "",
     "",
-    "VLUE 공식 기업 인증 보안 명함입니다. (SVG · 실시간 검증)",
+    "VLUÉ 공식 기업 인증 보안 명함입니다. (SVG · 실시간 검증)",
     viewUrl ? `명함 보기: ${viewUrl}` : "",
     `나도 만들기: ${viral.createUrl}`
   ]
@@ -102,7 +102,7 @@ export async function shareBizcardSvgNative(card) {
   if (canShareFiles(file)) {
     try {
       await navigator.share({
-        title: "VLUE 인증명함",
+        title: "VLUÉ 인증명함",
         files: [file]
       });
       return { ok: true, channel: "native_svg_file", localDev, viewUrl };
@@ -113,7 +113,7 @@ export async function shareBizcardSvgNative(card) {
 
   if (navigator.share) {
     try {
-      await navigator.share({ title: "VLUE 인증명함", text, url: viewUrl || viral.createUrl });
+      await navigator.share({ title: "VLUÉ 인증명함", text, url: viewUrl || viral.createUrl });
       return { ok: true, channel: "native_link", localDev, viewUrl };
     } catch (err) {
       if (err?.name === "AbortError") return { ok: false, cancelled: true };
@@ -133,14 +133,14 @@ export async function shareBizcardViaSms(card) {
 
 export async function shareBizcardViaEmail(card) {
   const { viewUrl } = await prepareBizcardSvgBundle(card);
-  const subject = encodeURIComponent(`VLUE 인증명함 — ${card.name || ""}`);
+  const subject = encodeURIComponent(`VLUÉ 인증명함 — ${card.name || ""}`);
   const body = encodeURIComponent(shareTextSummary(card, viewUrl));
   window.location.href = `mailto:?subject=${subject}&body=${body}`;
   return { ok: true, channel: "email" };
 }
 
 /**
- * VLUE 쇼케이스 고유 주소 복사 — 명함 유무와 관계없이 전화번호 기준
+ * VLUÉ 쇼케이스 고유 주소 복사 — 명함 유무와 관계없이 전화번호 기준
  */
 export async function copyShowcaseShareUrl(card, opts = {}) {
   const fixed = readLetteringFixedIdentity();

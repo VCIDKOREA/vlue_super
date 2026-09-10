@@ -5,7 +5,7 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 
 /**
- * Android 공유 시트 → VLUE 메모장
+ * Android 공유 시트 → VLUÉ 메모장
  */
 class ShareReceiverActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

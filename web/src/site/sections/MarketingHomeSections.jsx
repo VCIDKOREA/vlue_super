@@ -12,13 +12,13 @@ export function PhishingSection() {
           <h2 className="section-title">보이스피싱, 이렇게 예방하세요</h2>
         </div>
         <p className="section-subtitle max-w-2xl">
-          VLUE는 공공기관·금융사·의료기관 데이터와 자체 인증 DB를 교차 검증해, 통화 전에
+          VLUÉ는 공공기관·금융사·의료기관 데이터와 자체 인증 DB를 교차 검증해, 통화 전에
           사칭 여부를 빠르게 확인할 수 있도록 돕습니다.
         </p>
         <ul className="mt-8 grid gap-4 sm:grid-cols-3">
           {[
             "기관명·전화번호·사업자번호 통합 검색",
-            "VLUE 인증 기관 실시간 대조",
+            "VLUÉ 인증 기관 실시간 대조",
             "의심 번호 신고 및 가족 알림 연동",
           ].map((text) => (
             <li
@@ -36,7 +36,7 @@ export function PhishingSection() {
 
 export function NewsSection({ onNavigate }) {
   const items = [
-    { title: "VLUE, 전국 지역협력사 네트워크 확대", date: "2026.05.28" },
+    { title: "VLUÉ, 전국 지역협력사 네트워크 확대", date: "2026.05.28" },
     { title: "부모님 폰 보안 가족 케어 이벤트 안내", date: "2026.05.20" },
     { title: "블루쇼핑 인증 판매자 가이드 업데이트", date: "2026.05.12" },
   ];
@@ -48,7 +48,7 @@ export function NewsSection({ onNavigate }) {
             <Newspaper className="h-5 w-5" />
             <span className="text-sm font-bold">기업뉴스</span>
           </div>
-          <h2 className="section-title">VLUE 소식</h2>
+          <h2 className="section-title">VLUÉ 소식</h2>
         </div>
         <button
           type="button"
@@ -99,7 +99,7 @@ export function DownloadSection() {
           <Smartphone className="h-8 w-8 text-primary-600" />
         </div>
         <div className="flex-1">
-          <h2 className="section-title">VLUE 앱으로 더 안전하게</h2>
+          <h2 className="section-title">VLUÉ 앱으로 더 안전하게</h2>
           <p className="section-subtitle">
             블루 쇼케이스, 디지털 인증명함, 가족 보호는 모바일 앱에서 이용하세요.
           </p>

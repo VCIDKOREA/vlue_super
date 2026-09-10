@@ -98,7 +98,7 @@ export default function StoreShoppingCartPanel({ onToast }) {
               />
               <CartProductThumb item={it} />
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold text-blue-600">{it.sellerName || "VLUE 스토어"}</p>
+                <p className="text-[10px] font-semibold text-blue-600">{it.sellerName || "VLUÉ 스토어"}</p>
                 <p className="mt-0.5 text-[13px] font-bold leading-snug text-gray-900">{it.name}</p>
                 <p className="mt-1 text-[12px] text-gray-500">
                   {formatKrw(it.price)}
@@ -143,7 +143,7 @@ export default function StoreShoppingCartPanel({ onToast }) {
               <span className="font-black text-gray-800">선택 합계</span>
               <span className="text-[17px] font-black text-blue-600">{formatKrw(total)}</span>
             </div>
-            <p className="mt-1.5 text-[10px] text-gray-400">체크한 상품만 합산됩니다. VLUE 스토어 정산·배송 정책이 적용됩니다.</p>
+            <p className="mt-1.5 text-[10px] text-gray-400">체크한 상품만 합산됩니다. VLUÉ 스토어 정산·배송 정책이 적용됩니다.</p>
           </div>
 
           <p className="mt-2 text-[10px] leading-relaxed text-gray-500">

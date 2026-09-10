@@ -14,7 +14,7 @@ object VlueLetteringConfig {
     val webBaseUrl: String
         get() = BuildConfig.WEB_BASE_URL.trimEnd('/')
 
-    /** 메인 WebView 시작 URL — VLUE 슈퍼앱 셸 */
+    /** 메인 WebView 시작 URL — VLUÉ 슈퍼앱 셸 */
     val appShellUrl: String
         get() = "$webBaseUrl/app"
 

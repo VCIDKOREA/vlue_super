@@ -1,13 +1,13 @@
 /**
- * VLUE 확정 브랜드 공간 네이밍
- * @see 프로덕트 세계관 — VLUE Case / VLUE Showcase
+ * VLUÉ 확정 브랜드 공간 네이밍
+ * @see 프로덕트 세계관 — VLUÉ Case / VLUÉ Showcase
  */
 
 /** 앱 내부 개인 프로필·설정 공간 */
 export const VLUE_CASE = {
   id: "vlue-case",
   nameKo: "블루케이스",
-  nameEn: "VLUE Case",
+  nameEn: "VLUÉ Case",
   tagline: "스마트폰 안의 번호와 통신을 보이스피싱으로부터 보호하는 공간"
 };
 
@@ -15,7 +15,7 @@ export const VLUE_CASE = {
 export const VLUE_SHOWCASE = {
   id: "vlue-showcase",
   nameKo: "블루 쇼케이스",
-  nameEn: "VLUE Showcase",
+  nameEn: "VLUÉ Showcase",
   tagline: "통화 순간 전면을 장악하며 일상·명함을 공개하는 화면"
 };
 

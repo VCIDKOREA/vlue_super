@@ -88,7 +88,7 @@ export default function BroadcastAddonCheckoutModal({
           amount,
           billingCycle,
           merchantUid: merchant_uid,
-          name: `VLUE 영업 송출 옵션 (${billingCycle === "annual" ? "1년" : "1월"})`,
+          name: `VLUÉ 영업 송출 옵션 (${billingCycle === "annual" ? "1년" : "1월"})`,
           buyerName: localStorage.getItem("vlue_legal_name") || undefined,
           buyerTel
         });

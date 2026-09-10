@@ -39,7 +39,7 @@ export default function AppDownloadBar({ onNavigate, currentView, variant = 'top
           : 'mkt-download-bar mkt-download-bar--bottom'
       }
       role="region"
-      aria-label={showPc ? 'VLUE 앱 및 PC 프로그램 설치' : 'VLUE 모바일 앱 설치'}
+      aria-label={showPc ? 'VLUÉ 앱 및 PC 프로그램 설치' : 'VLUÉ 모바일 앱 설치'}
       aria-live="polite"
     >
       <div className="mkt-download-bar-wrap max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">

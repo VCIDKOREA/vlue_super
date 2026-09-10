@@ -16,7 +16,7 @@ const FamilySafety = () => {
       {/* 상단 상태 바 */}
       <div className="bg-blue-600 p-4 flex justify-between items-center text-white">
         <span className="font-bold flex items-center gap-2">
-          🛡️ VLUE AI 보안팀
+          🛡️ VLUÉ AI 보안팀
         </span>
         <span className="text-xs bg-blue-500 px-2 py-1 rounded-full animate-pulse">
           실시간 분석 중..

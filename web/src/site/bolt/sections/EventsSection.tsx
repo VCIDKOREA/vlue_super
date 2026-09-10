@@ -20,21 +20,21 @@ const FEATURED_ORGS = [
   {
     name: '명경채 요양병원',
     category: '의료기관',
-    desc: 'VLUE 인증 의료기관. 노인 요양 및 재활 전문.',
+    desc: 'VLUÉ 인증 의료기관. 노인 요양 및 재활 전문.',
     imageUrl: 'https://images.pexels.com/photos/305565/pexels-photo-305565.jpeg?auto=compress&cs=tinysrgb&w=300',
     region: '서울 강남구',
   },
   {
     name: '다다오피스',
     category: '공유오피스',
-    desc: 'VLUE 인증 프리미엄 공유오피스. 보안 비즈니스 환경 제공.',
+    desc: 'VLUÉ 인증 프리미엄 공유오피스. 보안 비즈니스 환경 제공.',
     imageUrl: 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=300',
     region: '서울 마포구',
   },
   {
     name: '한국신뢰금융',
     category: '금융기관',
-    desc: 'VLUE 인증 대출중개. 금융감독원 등록 합법 기관.',
+    desc: 'VLUÉ 인증 대출중개. 금융감독원 등록 합법 기관.',
     imageUrl: 'https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=300',
     region: '서울 중구',
   },
@@ -100,7 +100,7 @@ export default function EventsSection() {
               <Users className="w-3.5 h-3.5" />
               인증 업체 홍보
             </div>
-            <h2 className="section-title mb-1">VLUE 인증 기관</h2>
+            <h2 className="section-title mb-1">VLUÉ 인증 기관</h2>
             <p className="section-subtitle mb-6">검증된 기관과 안전하게 거래하세요.</p>
 
             <div className="space-y-3">

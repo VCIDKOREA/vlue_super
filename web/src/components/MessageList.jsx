@@ -157,7 +157,7 @@ const MessageList = forwardRef(function MessageList({
           const isFree = !isPremium && !isStandard;
           const tierKey = isPremium ? "premium" : isStandard ? "standard" : "free";
           const badge = digitalCardBadgeText(tierKey);
-          const org = (mergedCard.organization || "VLUE").trim();
+          const org = (mergedCard.organization || "VLUÉ").trim();
           const stdRoleLine = digitalCardRoleLine({
             title: mergedCard.title,
             name: mergedCard.name,
@@ -398,6 +398,7 @@ const MessageList = forwardRef(function MessageList({
             msg.intent_type === "generate_evidence" ||
             msg.risk_level === "high" ||
             msg.risk_level === "critical" ||
+            String(msg.text || "").includes("[VLUÉ 보안 가드]") ||
             String(msg.text || "").includes("[VLUE 보안 가드]");
           if (isSecurityGuardMessage) {
             const vaultHref = String(msg.securityVaultPath || "/mypage?tab=security-vault");
@@ -405,7 +406,7 @@ const MessageList = forwardRef(function MessageList({
               <div key={msg.id} className="mb-3 flex justify-center px-2">
                 <div className="w-full max-w-[95%] rounded-2xl border border-[#2f3440] bg-[#151922] p-3 text-left shadow-[0_8px_24px_rgba(15,23,42,0.45)]">
                   <p className="rounded-lg border border-red-500/40 bg-red-900/30 px-2 py-1 text-[11px] font-black text-red-200">
-                    🚨 [VLUE 보안 가드] 데이터 격리 및 불멸화 완료
+                    🚨 [VLUÉ 보안 가드] 데이터 격리 및 불멸화 완료
                   </p>
                   <p className="mt-2 text-[12px] leading-relaxed text-slate-100">
                     본 대화방의 안전한 거래 보장을 위해 법적 무결성 증거 패키지 보관이 완료되었습니다.

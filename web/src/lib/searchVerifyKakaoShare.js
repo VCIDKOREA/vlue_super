@@ -6,7 +6,7 @@ const SOURCE_LABELS = {
   kakao: "카카오 인증",
   naver: "네이버 인증",
   public: "공공·국세청",
-  vlue: "VLUE 인증"
+  vlue: "VLUÉ 인증"
 };
 
 function maskCeoName(raw) {
@@ -16,7 +16,7 @@ function maskCeoName(raw) {
   return first ? `${first}**` : "";
 }
 
-/** 카카오·문자 공유용 VLUE 검색 딥링크 */
+/** 카카오·문자 공유용 VLUÉ 검색 딥링크 */
 export function buildCrossVerifyShareUrl(query) {
   const { landing } = getVlueViralLinks();
   const base = String(landing || "https://www.vlue.kr").replace(/\/$/, "");
@@ -27,7 +27,7 @@ export function buildCrossVerifyShareUrl(query) {
 
 function buildShareLines(data, tab) {
   const query = String(data?.query || "").trim();
-  const footer = "✅ VLUE(www.vlue.kr) 통합 교차검증에서 공유된 정보입니다.";
+  const footer = "✅ VLUÉ(www.vlue.kr) 통합 교차검증에서 공유된 정보입니다.";
 
   if (tab === "kakao") {
     const k = data?.kakao || {};
@@ -76,8 +76,8 @@ function buildShareLines(data, tab) {
   const premium = Boolean(data?.is_registered);
   return [
     v.partner_name || query,
-    `출처: VLUE 인증`,
-    premium ? "VLUE PREMIUM PARTNER" : "VLUE 미등록 · 교차검증 요약",
+    `출처: VLUÉ 인증`,
+    premium ? "VLUÉ PREMIUM PARTNER" : "VLUÉ 미등록 · 교차검증 요약",
     v.category,
     v.status_text,
     premium && v.safety_score != null ? `안심지수 ${v.safety_score}` : "",
@@ -89,7 +89,7 @@ function buildShareLines(data, tab) {
 }
 
 function buildShareTitle(data, tab) {
-  const source = SOURCE_LABELS[tab] || "VLUE 인증";
+  const source = SOURCE_LABELS[tab] || "VLUÉ 인증";
   const query = String(data?.query || "").trim();
   let name = query;
 
@@ -100,11 +100,11 @@ function buildShareTitle(data, tab) {
     name = p?.candidates?.[0]?.store_name || p?.store_name || query;
   } else if (tab === "vlue") name = data?.vlue_auth?.partner_name || query;
 
-  return `[VLUE 교차검증·${source}] ${name}`.slice(0, 80);
+  return `[VLUÉ 교차검증·${source}] ${name}`.slice(0, 80);
 }
 
 /**
- * VLUE 통합 교차검증 — 카카오톡 Feed 공유 (탭별)
+ * VLUÉ 통합 교차검증 — 카카오톡 Feed 공유 (탭별)
  * @param {import('../site/bolt/components/SearchVerifyCrossTabs').CrossVerifyData} data
  * @param {'kakao'|'naver'|'public'|'vlue'} tab
  */
@@ -142,8 +142,8 @@ export async function shareCrossVerifyViaKakao(data, tab) {
       link
     },
     buttons: [
-      { title: "VLUE에서 교차검증", link },
-      { title: "VLUE 가입하기", link: createLink }
+      { title: "VLUÉ에서 교차검증", link },
+      { title: "VLUÉ 가입하기", link: createLink }
     ]
   };
 
@@ -166,9 +166,9 @@ export async function shareCrossVerifyViaKakao(data, tab) {
 export { SOURCE_LABELS };
 
 /**
- * VLUE 통합 교차검증 — 탭별 공유
+ * VLUÉ 통합 교차검증 — 탭별 공유
  * - 카카오: 카카오톡 Feed
- * - 네이버/공공/VLUE: Web Share API → 클립보드 → 카카오 폴백
+ * - 네이버/공공/VLUÉ: Web Share API → 클립보드 → 카카오 폴백
  */
 export async function shareCrossVerify(data, tab) {
   if (tab === "kakao") {

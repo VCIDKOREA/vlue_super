@@ -573,7 +573,7 @@ export default function FriendShowcaseList({
                 <input
                   type="search"
                   className="friend-showcase-list__hashtag-input"
-                  placeholder="카페, VLUE…"
+                  placeholder="카페, VLUÉ…"
                   value={hashtagQuery.replace(/^#/, "")}
                   onChange={(e) => setHashtagQuery(e.target.value.replace(/^#/, ""))}
                 />

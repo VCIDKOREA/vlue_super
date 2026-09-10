@@ -27,7 +27,7 @@ function ChevronLeftIcon() {
   );
 }
 
-/** VLUE 공통 뒤로가기 — 방향은 항상 좌측(chevron-left) */
+/** VLUÉ 공통 뒤로가기 — 방향은 항상 좌측(chevron-left) */
 export default function BackButton({
   onBack,
   hidden = false,

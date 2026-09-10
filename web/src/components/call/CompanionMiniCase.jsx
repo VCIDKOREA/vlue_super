@@ -110,7 +110,7 @@ export default function CompanionMiniCase({
   /** true: DCC/쇼케이스 유저만 — 카드 탭으로 풀쇼케이스 복원. 안심팝업-only 는 false */
   expandOnTap = false,
   locked = false,
-  brandText = "VLUE LIVE"
+  brandText = "VLUÉ LIVE"
 }) {
   const rootRef = useRef(null);
   const dragRef = useRef(null);
@@ -345,8 +345,8 @@ export default function CompanionMiniCase({
       tabIndex={-1}
       aria-label={
         expandOnTap
-          ? "VLUE 미니케이스 · 탭하면 쇼케이스로 복원 · 드래그로 위치 이동"
-          : "VLUE 미니케이스 · 드래그로 위치 이동"
+          ? "VLUÉ 미니케이스 · 탭하면 쇼케이스로 복원 · 드래그로 위치 이동"
+          : "VLUÉ 미니케이스 · 드래그로 위치 이동"
       }
       style={style}
       onPointerDown={onPointerDown}

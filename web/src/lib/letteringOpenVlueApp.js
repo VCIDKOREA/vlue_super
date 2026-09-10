@@ -1,5 +1,5 @@
 /**
- * Lettering 「인증정보」 → VLUE 앱 인증 상세 화면
+ * Lettering 「인증정보」 → VLUÉ 앱 인증 상세 화면
  * Android/iOS WebView 브리지 우선, 없으면 vlue:// + 유니버설 링크
  */
 

@@ -82,7 +82,7 @@ object ForegroundPackageProbe {
         /*
          * 전체 삼선 InCallUI: resume=InCallActivity 이면 TOP.
          * 삼성에서 task 가 dialer 로 남아도 BELOW(화면 중앙) 금지 — 응답 버튼 가림.
-         * VLUE 전면 + InCall task 없음 = 미니 팝업 → BELOW 유지.
+         * VLUÉ 전면 + InCall task 없음 = 미니 팝업 → BELOW 유지.
          */
         if (resumedFull) {
             if (OverlayContextDetector.isLikelyLauncherPackage(tasksPkg) ||
@@ -106,7 +106,7 @@ object ForegroundPackageProbe {
         if (tasksFull) return RingingSurface.FULL_INCALL
 
         /*
-         * InCall 프로세스만 FOREGROUND — VLUE/홈 위 미니 팝업. ourApp 미사용 시 카톡 등 타앱 전면.
+         * InCall 프로세스만 FOREGROUND — VLUÉ/홈 위 미니 팝업. ourApp 미사용 시 카톡 등 타앱 전면.
          */
         if (ourApp && !resumedFull && !tasksFull) {
             return RingingSurface.HOME_OR_OTHER
@@ -147,7 +147,7 @@ object ForegroundPackageProbe {
             return RingingSurface.HOME_OR_OTHER
         }
 
-        /* VLUE 전면 = 미니 팝업 위. 미확인(usage 없음)이어도 BELOW — TOP 이면 미니 UI 와 겹침 */
+        /* VLUÉ 전면 = 미니 팝업 위. 미확인(usage 없음)이어도 BELOW — TOP 이면 미니 UI 와 겹침 */
         if (ourApp) return RingingSurface.HOME_OR_OTHER
         /*
          * InCall 프로세스만 눈에 띄고 타앱/다이얼러 task 없으면 전체 수신 UI 가능성 → FULL.

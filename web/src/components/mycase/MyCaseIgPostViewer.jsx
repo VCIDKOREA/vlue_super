@@ -41,7 +41,7 @@ export default function MyCaseIgPostViewer({
   owner = false,
   ownerUserId = "",
   peerPhone = "",
-  displayName = "VLUE",
+  displayName = "VLUÉ",
   displayHandle = "",
   avatarUrl = "",
   onClose,

@@ -17,7 +17,7 @@ export default function ShowcaseWebApp() {
     document.body.style.fontFamily =
       "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif";
     document.body.style.backgroundColor = "#0B101B";
-    document.title = phone ? `VLUE Showcase · ${phone}` : "VLUE Showcase";
+    document.title = phone ? `VLUÉ Showcase · ${phone}` : "VLUÉ Showcase";
     return () => {
       delete document.body.dataset.vlueShell;
       document.body.style.fontFamily = "";

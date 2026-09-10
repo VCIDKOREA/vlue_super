@@ -3,7 +3,7 @@ import { Loader2, Music2, Search, Upload, Sparkles } from "lucide-react";
 import { verifyCopyrightRegistration } from "../../lib/showcase/showcaseSoundApi.js";
 
 /**
- * 한국저작권위원회 등록정보 검색 — 참고용 (VLUE 최종 인증 아님)
+ * 한국저작권위원회 등록정보 검색 — 참고용 (VLUÉ 최종 인증 아님)
  */
 export default function CopyrightVerifySearch({
   defaultTitle = "",
@@ -38,7 +38,7 @@ export default function CopyrightVerifySearch({
   return (
     <div className="showcase-sound-copyright">
       <p className="showcase-sound-copyright__hint">
-        저작권 등록정보 검색은 <strong>참고용</strong>입니다. VLUE가 저작권을 최종 인증하지 않습니다.
+        저작권 등록정보 검색은 <strong>참고용</strong>입니다. VLUÉ가 저작권을 최종 인증하지 않습니다.
       </p>
       <div className="showcase-sound-copyright__row">
         <input

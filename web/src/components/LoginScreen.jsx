@@ -15,7 +15,7 @@ const REMEMBER_KEY = "vlue_remember_login";
 
 /**
  * 앱 최초 진입용 로그인 화면
- * - 신규 가입은 휴대폰 본인인증(VLUE 회원가입)
+ * - 신규 가입은 휴대폰 본인인증(VLUÉ 회원가입)
  * - SNS는 가입 후 마이페이지 연동된 계정만 간편 로그인
  */
 function LoginScreen({
@@ -180,7 +180,7 @@ function LoginScreen({
           ) : null}
           <div className="flex w-full flex-col items-center px-1">
             <img src={VLUE_BRAND_LOGO} alt="" width={56} height={56} className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-sm ring-1 ring-blue-900/10" draggable={false} />
-            <h1 className="mt-4 text-[24px] font-bold tracking-tight text-slate-900">VLUE</h1>
+            <h1 className="mt-4 text-[24px] font-bold tracking-tight text-slate-900">VLUÉ</h1>
             <p className="mt-2 w-full max-w-[300px] text-center text-[13px] font-normal leading-snug text-slate-600 [text-wrap:pretty] [word-break:keep-all] sm:max-w-[320px] sm:text-[14px] sm:leading-relaxed">
               검증된 연결로 대화하고, 비즈니스를 이어갑니다.
             </p>
@@ -205,10 +205,10 @@ function LoginScreen({
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white shadow-sm" aria-hidden>
                   <img src={VLUE_BRAND_LOGO} alt="" className="h-5 w-5 rounded" />
                 </span>
-                <span>VLUE 로그인 · 회원가입</span>
+                <span>VLUÉ 로그인 · 회원가입</span>
               </button>
               <p className="mt-3 w-full text-center text-[11px] leading-snug text-slate-500 [word-break:keep-all]">
-                처음이라면 「VLUE 로그인 · 회원가입」에서 휴대폰 본인인증으로 가입해 주세요.
+                처음이라면 「VLUÉ 로그인 · 회원가입」에서 휴대폰 본인인증으로 가입해 주세요.
               </p>
             </div>
           ) : (
@@ -374,7 +374,7 @@ function LoginScreen({
         </div>
 
         <p className="shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-center text-[11px] font-medium leading-snug text-slate-400">
-          © 2026 VLUE Inc. · VCID KOREA
+          © 2026 VLUÉ Inc. · VCID KOREA
         </p>
       </div>
 

@@ -54,7 +54,7 @@ function JobCard({ job }: { job: JobPost }) {
       </div>
       <button className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100 border border-primary-200 rounded-xl transition-colors">
         <Download className="w-3.5 h-3.5" />
-        VLUE 이력서 즉시 지원
+        VLUÉ 이력서 즉시 지원
       </button>
     </div>
   );
@@ -118,11 +118,11 @@ export default function JobsPage({ user, onLoginClick, onBack }: JobsPageProps) 
                 <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
                   <Briefcase className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-white/80 text-sm font-semibold">VLUE 인증 기관 채용</span>
+                <span className="text-white/80 text-sm font-semibold">VLUÉ 인증 기관 채용</span>
               </div>
               <h1 className="text-3xl font-black text-white mb-1">공식 채용</h1>
               <p className="text-white/70 text-sm max-w-xl" style={{ wordBreak: 'keep-all' }}>
-                VLUE 인증 기관의 채용공고를 확인하고 VLUE 이력서로 즉시 지원하세요.
+                VLUÉ 인증 기관의 채용공고를 확인하고 VLUÉ 이력서로 즉시 지원하세요.
               </p>
             </div>
 
@@ -159,7 +159,7 @@ export default function JobsPage({ user, onLoginClick, onBack }: JobsPageProps) 
             </div>
             <h2 className="text-gray-900 font-black text-lg mb-1" style={{ letterSpacing: '-0.03em' }}>채용공고 리스트</h2>
             <p className="text-gray-500 text-sm" style={{ wordBreak: 'keep-all' }}>
-              VLUE 인증 기관의 채용 정보를 확인하세요. 모든 회원이 열람 가능합니다.
+              VLUÉ 인증 기관의 채용 정보를 확인하세요. 모든 회원이 열람 가능합니다.
             </p>
           </button>
           <button

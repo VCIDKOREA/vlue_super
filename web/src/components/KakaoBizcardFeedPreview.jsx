@@ -70,9 +70,9 @@ function buildOgDescription({ org, role, handle, phone }) {
     String(role || "").trim(),
     String(handle || "").trim(),
     String(phone || "").trim(),
-    "VLUE 인증 · 안심 통신 프로필"
+    "VLUÉ 인증 · 안심 통신 프로필"
   ].filter(Boolean);
-  return parts.slice(0, 3).join(" · ") || "VLUE 디지털 쇼케이스";
+  return parts.slice(0, 3).join(" · ") || "VLUÉ 디지털 쇼케이스";
 }
 
 /**
@@ -233,7 +233,7 @@ export default function KakaoBizcardFeedPreview({
   };
 
   const phoneLine = String(snap.phone || readLetteringFixedIdentity().phone || "").trim();
-  const ogTitle = `${displayName}님의 VLUE 쇼케이스`;
+  const ogTitle = `${displayName}님의 VLUÉ 쇼케이스`;
   const ogDescription = buildOgDescription({
     org,
     role,

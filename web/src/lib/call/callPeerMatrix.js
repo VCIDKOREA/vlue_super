@@ -1,7 +1,7 @@
 /**
  * V1 통화·통화목록 — 정제된 규제 매트릭스
  *
- * 판별축: VLUE 회원 / 기기 주소록 / 앱 보관함(쇼케이스 스크랩)
+ * 판별축: VLUÉ 회원 / 기기 주소록 / 앱 보관함(쇼케이스 스크랩)
  * 0.1초 내 동기 판별 → resolveCallPeerMatrixSync
  * 네이티브 주소록 갱신 → resolveCallPeerMatrix (async)
  */
@@ -51,7 +51,7 @@ export function isInShowcaseVault(phone) {
 }
 
 /**
- * 기기 실제 전화번호부(및 동기화 미가입 연락처)만 — VLUE 친구 인덱스는 제외
+ * 기기 실제 전화번호부(및 동기화 미가입 연락처)만 — VLUÉ 친구 인덱스는 제외
  * @param {string} phone
  * @param {{ sources?: string[], matchedName?: string } | null} [knownHint]
  */
@@ -121,7 +121,7 @@ export function resolveCallPeerMatrixSync(input = {}) {
   } else if (contacts.inContacts) {
     cta = CALL_PEER_CTA.KAKAO_SHARE;
     label = "카톡으로 쇼케이스 전달하기";
-    description = "VLUE 앱 미사용자입니다. 쇼케이스를 전달하세요.";
+    description = "VLUÉ 앱 미사용자입니다. 쇼케이스를 전달하세요.";
   }
 
   const elapsedMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
@@ -173,6 +173,6 @@ export function resolveInCallKakaoSlot(matrix) {
   return {
     visible: true,
     label: matrix.label || "카톡으로 쇼케이스 전달하기",
-    description: matrix.description || "VLUE 앱 미사용자입니다. 쇼케이스를 전달하세요."
+    description: matrix.description || "VLUÉ 앱 미사용자입니다. 쇼케이스를 전달하세요."
   };
 }

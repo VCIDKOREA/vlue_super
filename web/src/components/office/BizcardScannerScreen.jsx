@@ -404,7 +404,7 @@ export default function BizcardScannerScreen({ open, onClose, onToast }) {
         email: fields.email,
         website: fields.website,
         address: fields.address,
-        introBack: rawOcr ? `VLUE 명함스캔\n${rawOcr.slice(0, 400)}` : "VLUE 명함스캔"
+        introBack: rawOcr ? `VLUÉ 명함스캔\n${rawOcr.slice(0, 400)}` : "VLUÉ 명함스캔"
       });
       if (res?.cancelled) {
         onToast?.("저장이 취소되었습니다.");

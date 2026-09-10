@@ -26,7 +26,7 @@ object DcpLookupPayload {
             .put("organization", agency.agencyName)
             .put(
                 "verificationItems",
-                org.json.JSONArray().put("VLUE 디지털인증프로필").put("국가기관 공식 번호")
+                org.json.JSONArray().put("VLUÉ 디지털인증프로필").put("국가기관 공식 번호")
             )
         return JSONObject()
             .put("matched", true)

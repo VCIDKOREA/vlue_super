@@ -364,7 +364,7 @@ export default function B2BLineCartPanel({ onToast, onActivated }) {
             </div>
             {lineKind === "mobile" ? (
               <p className="mt-1 text-[10px] text-amber-800">
-                010 등록 시 VLUE·VLUER 회원은 자동으로 귀속 검증이 시작됩니다.
+                010 등록 시 VLUÉ·VLUER 회원은 자동으로 귀속 검증이 시작됩니다.
               </p>
             ) : null}
             <button

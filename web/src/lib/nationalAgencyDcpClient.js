@@ -104,7 +104,7 @@ export function buildNationalAgencyDcpCard(agency, extra = {}) {
     logoUrl,
     photoUrl: logoUrl,
     membershipTier: "paid",
-    verificationItems: ["VLUE 디지털인증프로필", "국가기관 공식 번호"],
+    verificationItems: ["VLUÉ 디지털인증프로필", "국가기관 공식 번호"],
     dcp
   };
 }

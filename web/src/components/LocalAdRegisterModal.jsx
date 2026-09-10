@@ -138,7 +138,7 @@ export default function LocalAdRegisterModal({
 
         <p className={`mt-3 text-[10px] font-semibold ${muted}`}>
           매장: {page.storeName}
-          {page.storeApproved ? " · 상점 피드" : " · VLUE PAGE 피드"}
+          {page.storeApproved ? " · 상점 피드" : " · VLUÉ PAGE 피드"}
         </p>
 
         <div className="mt-3 max-h-[min(42vh,320px)] overflow-y-auto rounded-xl border border-dashed border-violet-200/80 p-2">
@@ -186,7 +186,7 @@ export default function LocalAdRegisterModal({
                           <img src={post.imageUrl} alt="" className="h-full w-full object-cover" />
                         ) : (
                           <div className={`flex h-full w-full items-center justify-center text-[9px] font-bold ${muted}`}>
-                            VLUE
+                            VLUÉ
                           </div>
                         )}
                       </div>

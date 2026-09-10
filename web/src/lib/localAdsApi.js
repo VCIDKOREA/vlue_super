@@ -40,7 +40,7 @@ export function mapLocalAdToStoreCard(ad, index = 0) {
     rating: 4.9,
     likes: 120 + index * 17,
     img: ad.imageUrl || fallbackImg,
-    tag: "VLUE 광고",
+    tag: "VLUÉ 광고",
     roomId: null,
     location: ad.location,
     description: ad.description,

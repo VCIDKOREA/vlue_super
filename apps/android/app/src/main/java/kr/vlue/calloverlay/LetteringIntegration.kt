@@ -5,7 +5,7 @@ import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 
 /**
- * VLUE 메인 앱 진입점에서 호출 — 레터링 모듈 초기화·권한·세션
+ * VLUÉ 메인 앱 진입점에서 호출 — 레터링 모듈 초기화·권한·세션
  * 모든 유저·재설치 후 수동 맞춤 없이 통화 감지가 붙도록 자동 무장.
  */
 object LetteringIntegration {

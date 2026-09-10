@@ -23,8 +23,8 @@ import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 
 /**
- * VLUE Showcase — 홈 메인 통화 빅푸시(픽푸시) 미리보기
- * 켜짐/꺼짐 모두 접힘→전체화면 펼침. 꺼짐은 내용만 번호+VLUE 인증.
+ * VLUÉ Showcase — 홈 메인 통화 빅푸시(픽푸시) 미리보기
+ * 켜짐/꺼짐 모두 접힘→전체화면 펼침. 꺼짐은 내용만 번호+VLUÉ 인증.
  * 「통화화면」으로 실통화와 같은 하단 제어바 미리보기 가능.
  *
  * @param {"portal"|"inline"} [expandMode]
@@ -43,7 +43,7 @@ export default function CallBigPushPreviewSection({
 }) {
   const showTierTabs = v1AppShell.callBigPushTierTabs;
   const inlineExpand = expandMode === "inline";
-  /** 프로필 「쇼케이스 켜짐/꺼짐」과 동일 — 꺼짐이면 미리보기도 VLUE 인증 팝업만 */
+  /** 프로필 「쇼케이스 켜짐/꺼짐」과 동일 — 꺼짐이면 미리보기도 VLUÉ 인증 팝업만 */
   const [showcaseOn, setShowcaseOn] = useState(() => readVcidBroadcastOn());
   const [expanded, setExpanded] = useState(Boolean(defaultExpanded));
   const [callChromePreview, setCallChromePreview] = useState(false);

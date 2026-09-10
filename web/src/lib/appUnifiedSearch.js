@@ -109,7 +109,7 @@ function staticScreens(membershipTier) {
     {
       id: "scr-shop",
       category: "쇼핑·상점",
-      title: "VLUE 스토어 / 상점",
+      title: "VLUÉ 스토어 / 상점",
       subtitle: "입점 · 라이브 · 쇼핑",
       fields: [
         "쇼핑",
@@ -274,7 +274,7 @@ function collectRooms(roomCatalog, officialChannelMeta) {
   rows.unshift({
     id: "room-vlue-official",
     category: "채팅 · 공식",
-    title: "VLUE 공식 알림",
+    title: "VLUÉ 공식 알림",
     subtitle: officialChannelMeta?.lastMsg || "신뢰 인증 · 공지",
     fields: ["vlue", "공식", "알림", "인증", "신뢰", officialChannelMeta?.lastMsg],
     action: { type: "room", roomId: "vlue:official" }

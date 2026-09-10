@@ -1,6 +1,6 @@
 /**
  * 마이케이스 — 인스타그램 프로필형 레이아웃 (기본 라이트모드)
- * VLUE: 메인 송출 슬롯 = 하이라이트 / 핀 배지, 아카이브 = 3열 그리드
+ * VLUÉ: 메인 송출 슬롯 = 하이라이트 / 핀 배지, 아카이브 = 3열 그리드
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, Grid3X3, Layers, MoreHorizontal, Pin, Search } from "lucide-react";

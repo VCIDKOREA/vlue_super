@@ -15,7 +15,7 @@ export default function PremiumHeroSection({ onStartFamily }: Props) {
 
   const handleCopyLink = async () => {
     const shareUrl = `${window.location.origin}${window.location.pathname}#family`;
-    const shareText = `[VLUE] 가족 보호 시스템\n가족구성원 등록: ${shareUrl}`;
+    const shareText = `[VLUÉ] 가족 보호 시스템\n가족구성원 등록: ${shareUrl}`;
     try {
       await navigator.clipboard.writeText(shareText);
       setShowToast(true);
@@ -76,7 +76,7 @@ export default function PremiumHeroSection({ onStartFamily }: Props) {
               </span>
             </h4>
             <p className="text-slate-400 text-sm font-medium leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-              ADT캡스가 건물을 지키듯, VLUE AI 분석팀은
+              ADT캡스가 건물을 지키듯, VLUÉ AI 분석팀은
               <br />
               가장 취약한 가족의 휴대폰을 24시간 실시간 보안합니다.
             </p>
@@ -106,7 +106,7 @@ export default function PremiumHeroSection({ onStartFamily }: Props) {
               가족의 안전과 소중한 정보
               <br />
               <span className="text-blue-600 underline decoration-blue-100 decoration-8 underline-offset-8">
-                이제 VLUE로 지켜주세요
+                이제 VLUÉ로 지켜주세요
               </span>
             </h2>
 
@@ -153,7 +153,7 @@ export default function PremiumHeroSection({ onStartFamily }: Props) {
             <div className="w-28 h-28 bg-white p-3 rounded-2xl shadow-inner border border-slate-100 flex items-center justify-center shrink-0">
               <img
                 src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://vlue.co.kr/install"
-                alt="VLUE App Install QR"
+                alt="VLUÉ App Install QR"
                 className="w-full h-full"
               />
             </div>

@@ -4,7 +4,7 @@ const STORAGE_KEY = "vlue_b2b_pipeline_log_v1";
 export function logB2bPipeline(stage, detail = {}) {
   const entry = { stage, detail, at: new Date().toISOString() };
   if (typeof console !== "undefined" && console.info) {
-    console.info("[VLUE B2B Pipeline]", entry);
+    console.info("[VLUÉ B2B Pipeline]", entry);
   }
   try {
     const prev = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");

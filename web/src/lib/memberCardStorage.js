@@ -1,4 +1,4 @@
-/** VLUE 디지털 명함 편집 필드 — localStorage */
+/** VLUÉ 디지털 명함 편집 필드 — localStorage */
 
 export const VLUE_CARD_PROMO_MAX = 120;
 
@@ -76,7 +76,7 @@ export function getFeedDisplayName(fallbackName = "") {
   return fb || "회원";
 }
 
-/** 브랜드명(VLUE) 오염 — 사용자 이름으로 취급하지 않음 */
+/** 브랜드명(VLUÉ) 오염 — 사용자 이름으로 취급하지 않음 */
 export function isBrandDisplayName(name) {
   const s = String(name || "").trim();
   if (!s) return false;
@@ -90,7 +90,7 @@ export function scrubBrandDisplayName(name) {
 }
 
 /**
- * 프로필 패널 헤더용 — 실명/명함 이름 우선 (채팅 닉의 VLUE 오염 제외)
+ * 프로필 패널 헤더용 — 실명/명함 이름 우선 (채팅 닉의 VLUÉ 오염 제외)
  */
 export function getProfileHeaderName(fallbackName = "") {
   try {

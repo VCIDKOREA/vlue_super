@@ -12,7 +12,7 @@ export default class RenderErrorGuard extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error("[VLUE render]", error, info);
+    console.error("[VLUÉ render]", error, info);
   }
 
   render() {

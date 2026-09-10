@@ -176,7 +176,7 @@ class LetteringCallMonitorService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("VLUE 레터링 통화 감지 중")
+            .setContentTitle("VLUÉ 레터링 통화 감지 중")
             .setContentText("수신·발신 시 쇼케이스를 표시합니다")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pending)

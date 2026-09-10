@@ -41,7 +41,7 @@ export default function FamilyThreatAlertCard({ incident, onResolved, onToast })
       <p className="text-[12px] font-black text-rose-900">[위협] {label}</p>
       <p className="mt-0.5 text-[11px] text-rose-800">
         {incident.threatKind === "vlue_app_uninstalled"
-          ? "VLUE 앱 삭제가 감지되었습니다. 즉시 연락하세요."
+          ? "VLUÉ 앱 삭제가 감지되었습니다. 즉시 연락하세요."
           : "가족 기기에서 위험 앱이 탐지되었습니다."}
       </p>
       <div className="mt-2 flex gap-2">

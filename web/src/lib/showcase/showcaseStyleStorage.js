@@ -100,7 +100,7 @@ export function createDefaultShowcaseStyle() {
       bodyText: "",
       emoji: ""
     },
-    /** 디지털인증명함 「VLUE 인증」뱃지 표시 — 미등록 번호 UI와 무관 */
+    /** 디지털인증명함 「VLUÉ 인증」뱃지 표시 — 미등록 번호 UI와 무관 */
     verifiedBadgeOn: true,
     /** 쇼케이스 1페이지 DCC 송출 — false 면 콘텐츠만 */
     includeDigitalCard: true,
@@ -136,7 +136,7 @@ export function createDefaultShowcaseStyle() {
       instagramPostUrl: "",
       /** @deprecated URL 임베드 — instagramMedia 사용 */
       instagramPostUrls: [],
-      /** 연동 계정에서 고른 게시물 사진 (VLUE 재구성 뷰) */
+      /** 연동 계정에서 고른 게시물 사진 (VLUÉ 재구성 뷰) */
       instagramMedia: [],
       /** Instagram Login 연동 완료 시 true */
       instagramVerified: false,
@@ -329,7 +329,7 @@ function normalizeStoredStyle(parsed) {
   if (feed.instagramHandle === "@vlue.official" && !feed.instagramProfileUrl) {
     feed.instagramHandle = "";
   }
-  if (feed.kakaoProfileTitle === "VLUE 프로필" && !feed.kakaoProfileUrl && !feed.kakaoChannelUrl) {
+  if (feed.kakaoProfileTitle === "VLUÉ 프로필" && !feed.kakaoProfileUrl && !feed.kakaoChannelUrl) {
     feed.kakaoProfileTitle = "";
   }
   const outlinks = merged.commercial?.outlinks || {};

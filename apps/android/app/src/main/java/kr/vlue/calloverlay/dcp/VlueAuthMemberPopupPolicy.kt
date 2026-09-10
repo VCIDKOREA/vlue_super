@@ -4,12 +4,12 @@ import kr.vlue.calloverlay.companion.OverlayState
 import org.json.JSONObject
 
 /**
- * VLUE 인증 회원 · 공개 DCC/쇼케이스 없음 → 수화 후 「경로 검증 · 정상」스타일 팝업.
+ * VLUÉ 인증 회원 · 공개 DCC/쇼케이스 없음 → 수화 후 「경로 검증 · 정상」스타일 팝업.
  * DCC·쇼케이스가 있으면(또는 불확실하면) 쇼케이스 경로를 우선한다 — CEO 등 오탐 방지.
  */
 object VlueAuthMemberPopupPolicy {
     const val MESSAGE =
-        "VLUE 인증 회원으로 확인되었습니다. 공개 설정된 디지털인증명함·쇼케이스가 없습니다."
+        "VLUÉ 인증 회원으로 확인되었습니다. 공개 설정된 디지털인증명함·쇼케이스가 없습니다."
 
     fun shouldShow(
         overlayState: OverlayState,

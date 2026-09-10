@@ -13,7 +13,7 @@ object OverlayContextDetector {
 
     /**
      * @param callPhase 현재 통화 phase
-     * @param foregroundIsOurApp VLUE MainActivity 등이 전면
+     * @param foregroundIsOurApp VLUÉ MainActivity 등이 전면
      * @param foregroundIsLauncher 런처/홈이 전면으로 추정
      * @param foregroundIsInCallUi 시스템 전화(전체 InCallUI) 패키지가 전면으로 추정
      * @param foregroundIsCompactDialer 삼성 전화 앱(최근기록) 위 미니 수신 팝업
@@ -45,7 +45,7 @@ object OverlayContextDetector {
              * - 발신 다이얼 → 항상 TOP (삼성 전체 통화 UI)
              * - 전체 InCallUI → TOP
              * - 미니 수신 UI(전화앱·카톡·홈 포함) → 팝업 바로 아래
-             * - VLUE 전면·미확인 → TOP (삼성 전체 UI가 VLUE 위에 떠도 응답/종료 가림 방지)
+             * - VLUÉ 전면·미확인 → TOP (삼성 전체 UI가 VLUÉ 위에 떠도 응답/종료 가림 방지)
              */
             CallPhase.RINGING -> when {
                 outgoingDialing -> OverlayContext.INCOMING_CALL_UI

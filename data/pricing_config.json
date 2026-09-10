@@ -24,7 +24,7 @@
       "billingUnit": "per_account",
       "platforms": ["mobile", "web"],
       "features": ["showcase_full", "digital_cert_card", "family_protection"],
-      "description": "월 9,900원(부가세 포함). VLUE V1 출시 기념 파격 65% 특별 할인(종료 시까지!). 연간 구독 시 2개월 추가 무료 혜택: 연 99,000원. 디지털 인증명함·풀 쇼케이스·가족보호."
+      "description": "월 9,900원(부가세 포함). VLUÉ V1 출시 기념 파격 65% 특별 할인(종료 시까지!). 연간 구독 시 2개월 추가 무료 혜택: 연 99,000원. 디지털 인증명함·풀 쇼케이스·가족보호."
     },
     "soho_broadcast_addon": {
       "sku": "soho_broadcast_addon",

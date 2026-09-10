@@ -1,10 +1,10 @@
-/** VLUE PAGE 상점 입점·판매 약관 (팝업용) */
+/** VLUÉ PAGE 상점 입점·판매 약관 (팝업용) */
 export const VLUE_STORE_TERMS_VERSION = "store-seller-2026-05";
 
 export const VLUE_STORE_SELLER_TERMS = [
   {
     title: "제1조 (목적)",
-    body: "본 약관은 VLUE PAGE를 상점(스토어)으로 운영하며 상품을 판매하는 유료 회원(이하 「판매자」)과 VLUE(이하 「회사」) 간의 권리·의무를 정합니다."
+    body: "본 약관은 VLUÉ PAGE를 상점(스토어)으로 운영하며 상품을 판매하는 유료 회원(이하 「판매자」)과 VLUÉ(이하 「회사」) 간의 권리·의무를 정합니다."
   },
   {
     title: "제2조 (수수료)",
@@ -25,4 +25,4 @@ export const VLUE_STORE_SELLER_TERMS = [
 ];
 
 export const VLUE_STORE_FEE_SUMMARY =
-  "PG사 수수료(VAT 별도) + VLUE 판매 수수료 3.3%(VAT 별도)";
+  "PG사 수수료(VAT 별도) + VLUÉ 판매 수수료 3.3%(VAT 별도)";

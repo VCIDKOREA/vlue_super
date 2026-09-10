@@ -45,7 +45,7 @@ export function checkFrontendProductionEnv() {
 }
 
 export const PRODUCTION_READY_LOG =
-  "VLUE AI & CORE SERVICE ENGINE - PRODUCTION READY SUCCESS";
+  "VLUÉ AI & CORE SERVICE ENGINE - PRODUCTION READY SUCCESS";
 
 /** 앱 부트 시 1회 호출 (main.jsx) */
 export function logProductionEnvBinding() {

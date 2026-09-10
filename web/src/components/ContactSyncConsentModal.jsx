@@ -99,10 +99,10 @@ export default function ContactSyncConsentModal({ open, onClose, onSynced }) {
         </div>
 
         <h2 id="contact-sync-title" className="text-[18px] font-black text-gray-900" style={{ wordBreak: "keep-all" }}>
-          전화부를 동기화해 지인을 찾고 VLUE를 추천하세요
+          전화부를 동기화해 지인을 찾고 VLUÉ를 추천하세요
         </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-gray-500" style={{ wordBreak: "keep-all" }}>
-          휴대폰에 저장된 명단을 불러옵니다. VLUE를 쓰는 번호는 <b>신청</b>, 아직 미가입이면 <b>추천</b>으로
+          휴대폰에 저장된 명단을 불러옵니다. VLUÉ를 쓰는 번호는 <b>신청</b>, 아직 미가입이면 <b>추천</b>으로
           카톡·문자 공유가 가능합니다.
         </p>
 

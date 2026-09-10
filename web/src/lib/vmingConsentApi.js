@@ -2,7 +2,7 @@ import { apiUrl } from "./apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
 
 export const VMING_CONSENT_LEGAL =
-  "본 동의는 VLUE 개인정보처리방침에 따라 처리됩니다. 수집된 대화 내용은 AI 분석 후 즉시 파기되며 외부 서버에 저장되지 않습니다. 동의는 언제든지 철회 가능합니다.";
+  "본 동의는 VLUÉ 개인정보처리방침에 따라 처리됩니다. 수집된 대화 내용은 AI 분석 후 즉시 파기되며 외부 서버에 저장되지 않습니다. 동의는 언제든지 철회 가능합니다.";
 
 async function parseJson(res) {
   const data = await res.json().catch(() => ({}));

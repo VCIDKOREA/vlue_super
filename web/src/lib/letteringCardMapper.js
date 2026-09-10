@@ -161,7 +161,7 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
     verificationItems: Array.isArray(profile.verificationItems)
       ? profile.verificationItems
       : body.is_verified
-        ? ["VLUE \uC778\uC99D \uC0AC\uC6A9\uC790", "PASS \uBCF8\uC778\uC778\uC99D \uC644\uB8CC"]
+        ? ["VLUÉ \uC778\uC99D \uC0AC\uC6A9\uC790", "PASS \uBCF8\uC778\uC778\uC99D \uC644\uB8CC"]
         : []
   };
 }

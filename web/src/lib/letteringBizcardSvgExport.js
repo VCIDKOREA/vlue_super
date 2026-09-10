@@ -32,7 +32,7 @@ export function buildBizcardSvgFileName(card) {
     .replace(/\s+/g, "-")
     .replace(/[^\w\u3131-\uD79D-]/g, "")
     .slice(0, 24);
-  return `VLUE-${slug || "card"}.svg`;
+  return `VLUÉ-${slug || "card"}.svg`;
 }
 
 export function downloadBizcardSvgFile(svg, fileName) {
@@ -40,7 +40,7 @@ export function downloadBizcardSvgFile(svg, fileName) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = fileName || "VLUE-card.svg";
+  a.download = fileName || "VLUÉ-card.svg";
   a.rel = "noopener";
   document.body.appendChild(a);
   a.click();

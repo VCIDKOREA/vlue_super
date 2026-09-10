@@ -8,7 +8,7 @@ import { scrubLetteringDemoPollution } from "./letteringDemoPollution.js";
 import { DCC_CERTIFIED_MEMBER_LABEL } from "./letteringPaidIdentityDisplay.js";
 
 /** 홈 쇼케이스 미리보기 — 설정 전 예시 브랜드 */
-export const VLUE_PREVIEW_EXAMPLE_BRAND = "VLUE";
+export const VLUE_PREVIEW_EXAMPLE_BRAND = "VLUÉ";
 
 /** 접힘(첫화면) 미리보기에 반드시 노출 */
 export const VLUE_PREVIEW_CARD_APPLY_HINT = "명함 신청 시 반영됩니다";
@@ -29,7 +29,7 @@ export const VLUE_PREVIEW_WEBSITE_PLACEHOLDER = "웹사이트를 입력할 수 �
 export const VLUE_PREVIEW_FAX_PLACEHOLDER = "팩스를 입력할 수 있습니다.";
 
 const DEMO_ORG_POLLUTION = new Set(["VCID KOREA", "삼성생명"]);
-const DEMO_TITLE_POLLUTION = new Set(["CEO", "VLUE"]);
+const DEMO_TITLE_POLLUTION = new Set(["CEO", "VLUÉ"]);
 
 function readOnboardingAddress() {
   try {
@@ -107,8 +107,8 @@ export function isBusinessShowcaseMember() {
 
 /**
  * 미리보기 표시명
- * - 비즈니스: 상호(없으면 VLUE 예시)
- * - 일반: 가입 실명(없으면 VLUE 예시)
+ * - 비즈니스: 상호(없으면 VLUÉ 예시)
+ * - 일반: 가입 실명(없으면 VLUÉ 예시)
  */
 export function resolveShowcasePreviewDisplayName(card = {}, opts = {}) {
   const isBusiness = opts.isBusiness ?? isBusinessShowcaseMember();
@@ -128,7 +128,7 @@ function scrubDemoOrganization(org, isCeo) {
 }
 
 /**
- * 홈·미리보기용 카드 — 설정 전 필드는 VLUE 예시로 채움
+ * 홈·미리보기용 카드 — 설정 전 필드는 VLUÉ 예시로 채움
  * (실통화 수신 오버레이에는 적용하지 말 것)
  */
 export function applyShowcasePreviewExampleIdentity(card = {}) {
@@ -163,7 +163,7 @@ export function applyShowcasePreviewExampleIdentity(card = {}) {
     : name || VLUE_PREVIEW_EXAMPLE_BRAND;
 
   if (isBusiness) {
-    /* 상호 미설정 시 VLUE로 채우지 않음 — 실통화·설정과 동일하게 이름만 */
+    /* 상호 미설정 시 VLUÉ로 채우지 않음 — 실통화·설정과 동일하게 이름만 */
     name = organization || name || VLUE_PREVIEW_EXAMPLE_BRAND;
   } else {
     name = displayName;

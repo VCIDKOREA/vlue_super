@@ -7,7 +7,7 @@ function likerHandle(author) {
 }
 
 /**
- * 인스타그램형 — (VLUE ID)님 외 17.5만명이 좋아합니다
+ * 인스타그램형 — (VLUÉ ID)님 외 17.5만명이 좋아합니다
  */
 export default function ShowcaseLikeSummary({
   likeCount = 0,

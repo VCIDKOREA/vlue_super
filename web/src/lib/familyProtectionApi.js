@@ -49,7 +49,7 @@ export async function updateFamilyProtectionSettings(payload) {
 export async function lookupFamilyInviteCandidates(query) {
   const q = String(query || "").trim();
   if (!q) {
-    const err = new Error("가족 VLUE 아이디 또는 전화번호를 입력해 주세요.");
+    const err = new Error("가족 VLUÉ 아이디 또는 전화번호를 입력해 주세요.");
     err.status = 400;
     throw err;
   }

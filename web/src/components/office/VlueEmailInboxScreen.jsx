@@ -493,7 +493,7 @@ export default function VlueEmailInboxScreen({ open, onClose, onToast, onOpenPro
           <div className="hidden shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-3 lg:flex">
             <div>
               <p className="text-[16px] font-black text-slate-900">{folderTitle}</p>
-              <p className="text-[11px] text-slate-500">VLUE 스마트 오피스 · 통합 수발신</p>
+              <p className="text-[11px] text-slate-500">VLUÉ 스마트 오피스 · 통합 수발신</p>
             </div>
             <div className="flex gap-2">
               <button

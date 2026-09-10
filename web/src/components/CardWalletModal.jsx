@@ -43,7 +43,7 @@ export default function CardWalletModal({
                     <span className="inline-flex h-5 w-5 items-center justify-center overflow-hidden rounded-md border border-blue-200 bg-white text-[7px] font-black text-blue-600">
                       {profile.logoUrl ? <img src={profile.logoUrl} alt="" className="h-full w-full object-cover" /> : "LOGO"}
                     </span>
-                    <p className="text-[11px] font-black tracking-wide text-blue-600">{profile.organization || "VLUE"}</p>
+                    <p className="text-[11px] font-black tracking-wide text-blue-600">{profile.organization || "VLUÉ"}</p>
                   </div>
                   <p className="mt-1 text-[12px] font-black text-gray-900">{lineName}</p>
                   {legal && <p className="mt-0.5 text-[10px] font-semibold text-emerald-700">본인인증 완료: {legal}</p>}

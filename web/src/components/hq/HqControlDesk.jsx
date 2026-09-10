@@ -35,7 +35,7 @@ export default function HqControlDesk({ user, onLogout }) {
     <div className="flex h-[100dvh] flex-col bg-white">
       <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
         <div>
-          <p className="text-[12px] font-bold uppercase tracking-widest text-blue-600">VLUE HQ Control</p>
+          <p className="text-[12px] font-bold uppercase tracking-widest text-blue-600">VLUÉ HQ Control</p>
           <h1 className="text-[24px] font-black text-slate-900">본사 PC 웹 관제 데스크</h1>
         </div>
         <div className="flex items-center gap-4">

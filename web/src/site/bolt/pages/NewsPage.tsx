@@ -66,10 +66,10 @@ export default function NewsPage({ onBack }: NewsPageProps) {
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
               <Newspaper className="w-5 h-5 text-white" />
             </div>
-            <span className="text-white/80 text-sm font-semibold">VLUE 공식 채널</span>
+            <span className="text-white/80 text-sm font-semibold">VLUÉ 공식 채널</span>
           </div>
           <h1 className="text-3xl font-black text-white mb-1">기업뉴스 &amp; 광고</h1>
-          <p className="text-white/70 text-sm">최신 보안 뉴스, VLUE 공지, 보이스피싱 경보를 확인하세요.</p>
+          <p className="text-white/70 text-sm">최신 보안 뉴스, VLUÉ 공지, 보이스피싱 경보를 확인하세요.</p>
         </div>
       </div>
 
@@ -94,13 +94,13 @@ export default function NewsPage({ onBack }: NewsPageProps) {
         <div className="mt-10 bg-primary-600 rounded-3xl p-8 text-center">
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 mb-3 rounded-full bg-white/20 text-white text-xs font-semibold">
             <Tag className="w-3 h-3" />
-            VLUE 광고 배너
+            VLUÉ 광고 배너
           </div>
           <h2 className="text-white font-black text-xl mb-2" style={{ letterSpacing: '-0.03em' }}>
-            VLUE 인증으로 신뢰를 높이세요
+            VLUÉ 인증으로 신뢰를 높이세요
           </h2>
           <p className="text-white/70 text-sm mb-4" style={{ wordBreak: 'keep-all' }}>
-            VLUE 인증 기관은 고객에게 신뢰를 제공하고 보이스피싱 피해를 예방합니다.
+            VLUÉ 인증 기관은 고객에게 신뢰를 제공하고 보이스피싱 피해를 예방합니다.
           </p>
           <button className="px-6 py-2.5 bg-white text-primary-600 font-bold text-sm rounded-2xl hover:bg-primary-50 transition-colors">
             인증 신청하기

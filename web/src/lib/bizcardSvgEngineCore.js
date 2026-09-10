@@ -103,7 +103,7 @@ export function buildBizcardCardLayerSvg(data, opts = {}) {
   const sx = w / BIZCARD_CARD_W;
   const sy = h / BIZCARD_CARD_H;
   const pad = 36 * sx;
-  const org = truncate(data.organization || "VLUE", 28);
+  const org = truncate(data.organization || "VLUÉ", 28);
   const name = truncate(data.name || "—", 18);
   const title = truncate(data.title || "", 22);
   const dept = truncate(data.department || "", 24);
@@ -155,14 +155,14 @@ export function buildBizcardCardLayerSvg(data, opts = {}) {
   ${logoBlock}
   <text x="${pad + logoSize + 12 * sx}" y="${58 * sy}" font-family="Pretendard,Apple SD Gothic Neo,sans-serif" font-size="${20 * sy}" font-weight="900" fill="${pal.accent}">${esc(org)}</text>
   <rect x="${w - pad - 88 * sx}" y="${34 * sy}" width="${78 * sx}" height="${18 * sy}" rx="${9 * sy}" fill="rgba(15,23,42,0.5)"/>
-  <text x="${w - pad - 49 * sx}" y="${47 * sy}" text-anchor="middle" font-size="${8 * sy}" font-weight="900" fill="#e2e8f0" letter-spacing="0.12em">VLUE ✓</text>
+  <text x="${w - pad - 49 * sx}" y="${47 * sy}" text-anchor="middle" font-size="${8 * sy}" font-weight="900" fill="#e2e8f0" letter-spacing="0.12em">VLUÉ ✓</text>
   <text x="${pad}" y="${nameY}" font-family="Pretendard,Apple SD Gothic Neo,sans-serif" font-size="${44 * sy}" font-weight="900" fill="${pal.text}">${esc(name)}</text>
   ${roleLine ? `<text x="${pad}" y="${nameY + 36 * sy}" font-family="Pretendard,Apple SD Gothic Neo,sans-serif" font-size="${16 * sy}" font-weight="700" fill="${pal.sub}">${esc(roleLine)}</text>` : ""}
   ${contactSvg}
   <g id="vlue-holo" transform="translate(${w - pad - 72 * sx},${36 * sy})">
     <rect class="vlue-holo-badge" width="${64 * sx}" height="${22 * sy}" rx="${11 * sy}" fill="rgba(15,23,42,0.55)"/>
     <rect class="vlue-holo-shine" x="${-20 * sx}" y="0" width="${28 * sx}" height="${22 * sy}" rx="${8 * sy}" fill="url(#${holoId})" opacity="0.85"/>
-    <text x="${32 * sx}" y="${15 * sy}" text-anchor="middle" font-size="${8 * sy}" font-weight="900" fill="#fff" letter-spacing="0.1em">VLUE</text>
+    <text x="${32 * sx}" y="${15 * sy}" text-anchor="middle" font-size="${8 * sy}" font-weight="900" fill="#fff" letter-spacing="0.1em">VLUÉ</text>
   </g>
   <text id="vlue-live-ts" x="${w - pad}" y="${h - 16 * sy}" text-anchor="end" font-family="ui-monospace,monospace" font-size="${8 * sy}" font-weight="700" fill="${pal.sub}">LIVE</text>
 </g>`;
@@ -177,7 +177,7 @@ export function buildInvalidateCardLayerSvg(opts = {}) {
   <text x="50%" y="42%" text-anchor="middle" font-size="${Math.round(h * 0.1)}" font-weight="900" fill="#6b7280">⚠️</text>
   <text x="50%" y="54%" text-anchor="middle" font-family="Pretendard,Apple SD Gothic Neo,sans-serif" font-size="${Math.round(h * 0.048)}" font-weight="800" fill="#4b5563">유효기간이 만료되어</text>
   <text x="50%" y="66%" text-anchor="middle" font-family="Pretendard,Apple SD Gothic Neo,sans-serif" font-size="${Math.round(h * 0.048)}" font-weight="800" fill="#4b5563">폐기된 명함입니다.</text>
-  <text x="50%" y="78%" text-anchor="middle" font-family="Pretendard,Apple SD Gothic Neo,sans-serif" font-size="${Math.round(h * 0.04)}" font-weight="700" fill="#6b7280">(VLUE 실시간 검증 · 수정 불가)</text>
+  <text x="50%" y="78%" text-anchor="middle" font-family="Pretendard,Apple SD Gothic Neo,sans-serif" font-size="${Math.round(h * 0.04)}" font-weight="700" fill="#6b7280">(VLUÉ 실시간 검증 · 수정 불가)</text>
 </g>`;
 }
 
@@ -187,7 +187,7 @@ export function buildViralBannerSvg(createUrl, opts = {}) {
   const url = esc(createUrl || "https://www.vlue.kr/membership");
   return `<rect width="${w}" height="${h}" fill="#0f1419"/>
   <rect x="24" y="16" width="${w - 48}" height="${h - 32}" rx="14" fill="rgba(30,41,59,0.85)" stroke="rgba(56,189,248,0.25)" stroke-width="1"/>
-  <text x="48" y="44" font-family="Pretendard,Apple SD Gothic Neo,sans-serif" font-size="13" font-weight="800" fill="#e2e8f0">[VLUE 인증] 본 명함은 위조가 불가능한 유료 멤버십 보안 명함입니다.</text>
+  <text x="48" y="44" font-family="Pretendard,Apple SD Gothic Neo,sans-serif" font-size="13" font-weight="800" fill="#e2e8f0">[VLUÉ 인증] 본 명함은 위조가 불가능한 유료 멤버십 보안 명함입니다.</text>
   <a href="${url}" target="_blank" rel="noopener noreferrer">
     <rect x="48" y="58" width="168" height="36" rx="10" fill="#2563eb"/>
     <text x="132" y="81" text-anchor="middle" font-family="Pretendard,Apple SD Gothic Neo,sans-serif" font-size="14" font-weight="900" fill="#ffffff">앱 다운로드</text>
@@ -268,7 +268,7 @@ export function buildDynamicBizcardSvgDocument({ card, cardId, apiBase, createUr
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
   width="${BIZCARD_CANVAS_W}" height="${BIZCARD_CANVAS_H}" viewBox="0 0 ${BIZCARD_CANVAS_W} ${BIZCARD_CANVAS_H}">
-  <title>VLUE 인증명함 — ${esc(snap.name)}</title>
+  <title>VLUÉ 인증명함 — ${esc(snap.name)}</title>
   <style type="text/css"><![CDATA[${SVG_STYLES}]]></style>
   <rect width="100%" height="100%" fill="#16161c"/>
   <g id="vlue-stage">

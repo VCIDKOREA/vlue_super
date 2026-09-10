@@ -1,5 +1,5 @@
 /**
- * 통화 쇼케이스 신원 마크 — 상대 프로필 사진 / CEO VLUE 로고 / 카톡형 실루엣
+ * 통화 쇼케이스 신원 마크 — 상대 프로필 사진 / CEO VLUÉ 로고 / 카톡형 실루엣
  */
 
 const PERSON_SILHOUETTE = "/avatar-person-silhouette.svg";
@@ -59,7 +59,7 @@ export function resolveShowcasePeerAvatar({
   }
 
   if (isCeoCard(card)) {
-    /* 홈 쇼케이스 바와 동일: 프로필 사진이 있으면 사진, 없으면 VLUE 브랜드 */
+    /* 홈 쇼케이스 바와 동일: 프로필 사진이 있으면 사진, 없으면 VLUÉ 브랜드 */
     const photo = firstNonEmpty(
       card?.photoUrl,
       card?.avatarUrl,
@@ -92,7 +92,7 @@ export function resolveShowcasePeerAvatar({
     );
   }
 
-  /* 회사 로고·VLUE 눈으로 빈 프로필을 채우지 않음 */
+  /* 회사 로고·VLUÉ 눈으로 빈 프로필을 채우지 않음 */
   if (url) return { type: "image", url };
 
   return {

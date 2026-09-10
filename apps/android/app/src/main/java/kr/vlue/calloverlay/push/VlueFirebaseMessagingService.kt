@@ -28,7 +28,7 @@ class VlueFirebaseMessagingService : FirebaseMessagingService() {
         val title =
             message.notification?.title
                 ?: data["title"]
-                ?: "VLUE"
+                ?: "VLUÉ"
         val body =
             message.notification?.body
                 ?: data["body"]

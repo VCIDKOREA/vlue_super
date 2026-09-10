@@ -168,7 +168,7 @@ export default function ResourcesPage({ user }: ResourcesPageProps) {
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-white" />
             </div>
-            <span className="text-white/80 text-sm font-semibold">VLUE 개인케이스</span>
+            <span className="text-white/80 text-sm font-semibold">VLUÉ 개인케이스</span>
           </div>
           <h1 className="text-3xl font-black text-white mb-1">개인케이스</h1>
           <p className="text-white/70 text-sm">

@@ -1,9 +1,9 @@
 import { apiUrl } from "./apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
 
-/** 메인 퀵 메뉴 — VLUE 사용법·기능 안내 */
+/** 메인 퀵 메뉴 — VLUÉ 사용법·기능 안내 */
 export const VMING_QUICK_REPLIES = [
-  { id: "blue-guide", icon: "guide", label: "블루 사용법", message: "VLUE 블루 앱 사용법을 알려줘" },
+  { id: "blue-guide", icon: "guide", label: "블루 사용법", message: "VLUÉ 블루 앱 사용법을 알려줘" },
   { id: "referral", icon: "referral", label: "추천제 혜택", message: "추천제 혜택이 어떻게 되나요?" },
   { id: "family", icon: "shield", label: "가족보호시스템 사용법", message: "가족보호시스템 등록과 사용 방법을 알려줘" },
   { id: "ad-video", icon: "video", label: "15초짜리 광고 영상 만들기", message: "15초 홍보 영상 만드는 방법을 알려줘" },

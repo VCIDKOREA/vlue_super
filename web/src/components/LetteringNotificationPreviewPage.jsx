@@ -37,7 +37,7 @@ export default function LetteringNotificationPreviewPage() {
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-indigo-950/40 via-transparent to-[#050810]" aria-hidden />
 
       <div className="relative z-[1] px-4 pb-4 pt-8 text-center">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300/80">VLUE Lettering</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300/80">VLUÉ Lettering</p>
         <h1 className="mt-2 text-[18px] font-black text-white">실제 통화 화면 위 빅푸시</h1>
         <p className="mt-2 text-[11px] font-medium text-white/45">
           {isPaid

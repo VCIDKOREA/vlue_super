@@ -81,7 +81,7 @@ export default function B2bSignupFields({
       </div>
 
       <label className="block text-[10px] font-bold text-slate-600">
-        접수 회선 수 (VLUE 인증 1회선 포함, {GROUP_SIGNUP_MIN_LINES}회선 이상)
+        접수 회선 수 (VLUÉ 인증 1회선 포함, {GROUP_SIGNUP_MIN_LINES}회선 이상)
         <input
           type="number"
           min={GROUP_SIGNUP_MIN_LINES}

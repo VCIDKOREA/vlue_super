@@ -64,7 +64,7 @@ function collectIndexPhones() {
 }
 
 /**
- * 하이브리드 주소록 판별 — VLUE 친구 DB + 디바이스 주소록
+ * 하이브리드 주소록 판별 — VLUÉ 친구 DB + 디바이스 주소록
  * @param {string} peerPhone
  * @param {{ refreshDevice?: boolean }} [opts] refreshDevice=true 일 때만 네이티브 주소록 재동기화
  * @returns {Promise<{ isKnownContact: boolean, matchedName: string, sources: string[] }>}
@@ -101,7 +101,7 @@ export async function resolveIsKnownContact(peerPhone, opts = {}) {
 }
 
 /**
- * 기기 전화번호부에만 있는 이름 (VLUE 친구 DB 제외)
+ * 기기 전화번호부에만 있는 이름 (VLUÉ 친구 DB 제외)
  * @param {string} peerPhone
  */
 export function findDeviceContactName(peerPhone) {

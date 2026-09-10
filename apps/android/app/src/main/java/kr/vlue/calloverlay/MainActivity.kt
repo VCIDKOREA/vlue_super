@@ -37,7 +37,7 @@ import kr.vlue.calloverlay.family.ScreenSecureHelper
 import kr.vlue.calloverlay.family.VlueFamilyBridge
 
 /**
- * VLUE 메인 WebView + 레터링 + 가족보호 + 앱 PIN 잠금
+ * VLUÉ 메인 WebView + 레터링 + 가족보호 + 앱 PIN 잠금
  */
 class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     private lateinit var webView: WebView
@@ -876,7 +876,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                   familyStateShare:true
                 }
               });
-              console.info('[VLUE] Android VlueFamilyBridge attached');
+              console.info('[VLUÉ] Android VlueFamilyBridge attached');
             })();
             """.trimIndent()
         webView.evaluateJavascript(script, null)
@@ -971,7 +971,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             return
         }
         AlertDialog.Builder(this)
-            .setTitle("VLUE 레터링 권한")
+            .setTitle("VLUÉ 레터링 권한")
             .setMessage(
                 "통화 중 쇼케이스를 위해 다음이 필요합니다.\n" +
                     "· 다른 앱 위에 표시 (필수)\n" +
@@ -1009,7 +1009,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
     /**
      * 기본 전화 앱(ROLE_DIALER) 안내는 사용하지 않음.
-     * Companion MVP: VLUE는 전화 앱이 아니며 삼성 전화 앱 위 오버레이로 쇼케이스만 표시.
+     * Companion MVP: VLUÉ는 전화 앱이 아니며 삼성 전화 앱 위 오버레이로 쇼케이스만 표시.
      */
     fun promptDefaultDialerIfNeeded() {
         /* no-op */
@@ -1360,7 +1360,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                     val share = Intent(Intent.ACTION_SEND).apply {
                         type = "text/x-vcard"
                         putExtra(Intent.EXTRA_TEXT, body)
-                        putExtra(Intent.EXTRA_SUBJECT, filename ?: "VLUE-contact.vcf")
+                        putExtra(Intent.EXTRA_SUBJECT, filename ?: "VLUÉ-contact.vcf")
                     }
                     activity.startActivity(Intent.createChooser(share, "연락처 저장"))
                 } catch (e: Exception) {

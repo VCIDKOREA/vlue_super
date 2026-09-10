@@ -1,6 +1,6 @@
 import ModalCloseButton from "./common/ModalCloseButton";
 
-/** VLUE Store 입점 안내 — 팝업 + 오늘 하루 닫기 */
+/** VLUÉ Store 입점 안내 — 팝업 + 오늘 하루 닫기 */
 export default function VlueStoreNoticeModal({ open, isDarkMode = false, onClose, onDismissToday }) {
   if (!open) return null;
 
@@ -25,7 +25,7 @@ export default function VlueStoreNoticeModal({ open, isDarkMode = false, onClose
       <div className={`relative w-full max-w-sm rounded-2xl border p-4 pt-12 shadow-2xl ${shell} ${isDarkMode ? "border-white/10" : "border-gray-100"}`} onMouseDown={(e) => e.stopPropagation()}>
         <ModalCloseButton variant={isDarkMode ? "subtle" : "default"} onClick={onClose} />
         <p className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>
-          VLUE Store
+          VLUÉ Store
         </p>
         <h2 id="vlue-store-notice-title" className={`mt-0.5 text-[17px] font-black ${textStrong}`}>
           입점 스토어 · 공동 구매

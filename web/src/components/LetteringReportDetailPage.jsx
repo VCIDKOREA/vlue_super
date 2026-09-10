@@ -28,7 +28,7 @@ function ReportRow({ entry }) {
       {isCommunity ? (
         <span className="lettering-report-entry__tag">{"커뮤니티 제보"}</span>
       ) : (
-        <span className="lettering-report-entry__tag lettering-report-entry__tag--report">{"VLUE 신고"}</span>
+        <span className="lettering-report-entry__tag lettering-report-entry__tag--report">{"VLUÉ 신고"}</span>
       )}
     </li>
   );
@@ -108,10 +108,10 @@ export default function LetteringReportDetailPage() {
       <div className="lettering-report-detail-page__hero pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-indigo-950/50 to-transparent" aria-hidden />
 
       <div className="relative z-[1] mx-auto max-w-[480px] px-4 pb-10 pt-3">
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300/80">VLUE Lettering</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300/80">VLUÉ Lettering</p>
         <h1 className="mt-2 text-[20px] font-black text-white">{"신고·제보 상세 내역"}</h1>
         <p className="mt-2 text-[12px] font-semibold text-white/55">
-          {"웹에 저장된 커뮤니티·VLUE 신고 이력입니다."}
+          {"웹에 저장된 커뮤니티·VLUÉ 신고 이력입니다."}
         </p>
 
         <div className="lettering-report-detail-card mt-6">

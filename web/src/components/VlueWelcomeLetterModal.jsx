@@ -11,7 +11,7 @@ import {
 import "./vlue-welcome-letter.css";
 
 /**
- * VLUE가 전하는 편지 — 따뜻한 디지털 레터
+ * VLUÉ가 전하는 편지 — 따뜻한 디지털 레터
  * forceRead: 확인 전까지 닫기 불가 (첫 방문)
  */
 export default function VlueWelcomeLetterModal({
@@ -176,7 +176,7 @@ export default function VlueWelcomeLetterModal({
         <header className="vlue-letter-head">
           <p className="vlue-letter-eyebrow">Digital Letter</p>
           <h2 id="vlue-letter-title" className="vlue-letter-title">
-            {title || "VLUE가 전하는 편지"}
+            {title || "VLUÉ가 전하는 편지"}
           </h2>
           {bgmUrl ? (
             <div className="vlue-letter-bgm-row">

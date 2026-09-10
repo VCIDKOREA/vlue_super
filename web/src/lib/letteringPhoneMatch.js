@@ -78,7 +78,7 @@ export function formatLetteringPhoneDisplay(raw) {
 }
 
 /**
- * 걸려온 번호 vs VLUE 등록 번호 대조
+ * 걸려온 번호 vs VLUÉ 등록 번호 대조
  * 불일치 시에는 미인증 UI로 분기하므로 mismatch 문구·상태는 사용하지 않음.
  * @returns {{ matched: boolean, status: "match"|"unknown", incomingDisplay: string, registeredDisplay: string, summary: string } | null}
  */
@@ -107,6 +107,6 @@ export function compareLetteringPhones(incomingRaw, registeredRaw) {
     status: "match",
     incomingDisplay,
     registeredDisplay,
-    summary: "VLUE 인증 등록번호 입니다."
+    summary: "VLUÉ 인증 등록번호 입니다."
   };
 }

@@ -12,7 +12,7 @@ import kr.vlue.calloverlay.VlueBigPushTrace
 import kr.vlue.calloverlay.diagnostics.ReleaseDebugGate
 
 /**
- * 기본 전화앱 UI — 순정 다이얼러 대신 VLUE 쇼케이스 오버레이를 전면 노출.
+ * 기본 전화앱 UI — 순정 다이얼러 대신 VLUÉ 쇼케이스 오버레이를 전면 노출.
  * DTMF·disconnect·mute·스피커는 [VlueInCallController] 경유.
  */
 class VlueInCallService : InCallService() {

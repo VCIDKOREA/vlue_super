@@ -1594,7 +1594,7 @@ export default function ShowcaseStyleSettingsPanel({
                   checked={config.verifiedBadgeOn}
                   onChange={(e) => persist({ verifiedBadgeOn: e.target.checked })}
                 />
-                VLUE 인증 마크 표시
+                VLUÉ 인증 마크 표시
               </label>
               ) : null}
             </div>

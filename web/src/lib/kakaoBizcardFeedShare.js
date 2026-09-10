@@ -139,7 +139,7 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
     role,
     handle,
     phone,
-    "VLUE 인증 · 안심 통신 프로필"
+    "VLUÉ 인증 · 안심 통신 프로필"
   ].filter(Boolean);
   return {
     buttonImageUrl: feedImageUrl,
@@ -148,8 +148,8 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
       : getKakaoShareButtonImageUrl(),
     viewUrl,
     createUrl,
-    feedTitle: `${String(snap.name || "회원").trim()}님의 VLUE 쇼케이스`,
-    feedDescription: feedDescParts.slice(0, 3).join(" · ").slice(0, 100) || "VLUE 디지털 쇼케이스",
+    feedTitle: `${String(snap.name || "회원").trim()}님의 VLUÉ 쇼케이스`,
+    feedDescription: feedDescParts.slice(0, 3).join(" · ").slice(0, 100) || "VLUÉ 디지털 쇼케이스",
     shareCoverUrl: showcaseCover || feedImageUrl
   };
 }
@@ -167,7 +167,7 @@ function kakaoShareOriginBlockedMessage() {
 }
 
 /**
- * 카카오톡 Feed — 개인화 명함 카드 PNG + VLUE 인증 버튼
+ * 카카오톡 Feed — 개인화 명함 카드 PNG + VLUÉ 인증 버튼
  *
  * 중요: Kakao.Share.sendDefault 는 클릭 제스처 직후 동기 호출해야 함.
  * await(동기화·이미지 업로드) 뒤에 호출하면 focus null / 팝업 차단으로 실패함.
@@ -251,7 +251,7 @@ export async function prepareKakaoBizcardShare(card) {
     },
     buttons: [
       { title: "쇼케이스 열기", link: viewLink },
-      { title: "나도 VLUE 만들기", link: createLink }
+      { title: "나도 VLUÉ 만들기", link: createLink }
     ]
   };
 

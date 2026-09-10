@@ -75,7 +75,7 @@ export function applyShowcaseStyleToCard(card, membershipTier = "free", opts = {
     });
   }
 
-  /* 디지털인증명함 미사용 — VLUE 이름/상호 송출 OFF. 상대 전화부 저장 이름은 수신측에서 별도 표시 */
+  /* 디지털인증명함 미사용 — VLUÉ 이름/상호 송출 OFF. 상대 전화부 저장 이름은 수신측에서 별도 표시 */
   if (style?.showBroadcastName === false) {
     return {
       ...merged,

@@ -186,7 +186,7 @@ function AppLockSettingsBlock({ isDarkMode, boxClass, showSettingNotice }) {
 
   const onToggleLock = async (on) => {
     if (!native) {
-      showSettingNotice?.("앱 잠금은 VLUE Android 앱에서 사용할 수 있습니다.");
+      showSettingNotice?.("앱 잠금은 VLUÉ Android 앱에서 사용할 수 있습니다.");
       return;
     }
     setBusy(true);
@@ -211,7 +211,7 @@ function AppLockSettingsBlock({ isDarkMode, boxClass, showSettingNotice }) {
 
   const onChangePin = async () => {
     if (!native) {
-      showSettingNotice?.("PIN 변경은 VLUE Android 앱에서 가능합니다.");
+      showSettingNotice?.("PIN 변경은 VLUÉ Android 앱에서 가능합니다.");
       return;
     }
     setBusy(true);
@@ -255,7 +255,7 @@ function AppLockSettingsBlock({ isDarkMode, boxClass, showSettingNotice }) {
       </button>
       {!native ? (
         <p className={`px-1 text-[11px] ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-          이 화면은 브라우저입니다. Android VLUE 앱에서 앱 잠금을 설정하세요.
+          이 화면은 브라우저입니다. Android VLUÉ 앱에서 앱 잠금을 설정하세요.
         </p>
       ) : null}
     </div>
@@ -343,7 +343,7 @@ export default function VlueSettingsPanel({
     navigator.clipboard.writeText(getMemberHandle()).then(() => {
       setShowIdCopied(true);
       setTimeout(() => setShowIdCopied(false), 2000);
-      showSettingNotice?.("VLUE ID가 복사되었습니다.");
+      showSettingNotice?.("VLUÉ ID가 복사되었습니다.");
     });
   };
 
@@ -395,17 +395,17 @@ export default function VlueSettingsPanel({
                 className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-black ${
                   isDarkMode ? "bg-white/15 text-gray-200" : "bg-gray-200 text-gray-700"
                 }`}
-                title="VLUE 콘텐츠 활동에 사용되는 명칭입니다."
+                title="VLUÉ 콘텐츠 활동에 사용되는 명칭입니다."
                 aria-label="활동 닉네임 도움말"
                 onClick={() =>
-                  window.alert("VLUE 콘텐츠 활동에 사용되는 명칭입니다.")
+                  window.alert("VLUÉ 콘텐츠 활동에 사용되는 명칭입니다.")
                 }
               >
                 ?
               </button>
             </div>
             <p className={`mt-1 text-[10px] font-medium leading-snug ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-              VLUE 콘텐츠 활동에 사용되는 명칭입니다.
+              VLUÉ 콘텐츠 활동에 사용되는 명칭입니다.
             </p>
             <input
               type="text"
@@ -445,9 +445,9 @@ export default function VlueSettingsPanel({
 
   if (subView === "vlueId") {
     return (
-      <SettingsSubpageShell title="VLUE ID" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
+      <SettingsSubpageShell title="VLUÉ ID" onBack={() => onSubView(null)} isDarkMode={isDarkMode}>
         <div className={`rounded-2xl border p-4 text-center ${boxClass}`}>
-          <p className={`text-[12px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>내 VLUE ID</p>
+          <p className={`text-[12px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>내 VLUÉ ID</p>
           <p className={`mt-2 text-[20px] font-black tracking-tight ${headText}`}>{getMemberHandle()}</p>
           <button
             type="button"
@@ -532,7 +532,7 @@ export default function VlueSettingsPanel({
           />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsToggleRow
-            label="VLUE ID 검색 허용"
+            label="VLUÉ ID 검색 허용"
             checked={settings.allowSearchById}
             onChange={(v) => patchSettings({ allowSearchById: v })}
             isDarkMode={isDarkMode}
@@ -714,7 +714,7 @@ export default function VlueSettingsPanel({
         <SettingsSection title="내 계정" isDarkMode={isDarkMode}>
           <SettingsRowButton label="프로필 관리" sublabel="아바타 · 닉네임 · 상태메시지" onClick={() => onSubView("profileManage")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
-          <SettingsRowButton label="VLUE ID 확인" value={getMemberHandle()} onClick={() => onSubView("vlueId")} isDarkMode={isDarkMode} />
+          <SettingsRowButton label="VLUÉ ID 확인" value={getMemberHandle()} onClick={() => onSubView("vlueId")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="전화번호" sublabel="PASS 본인인증으로 변경" onClick={() => onSubView("contactInfo")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
@@ -757,11 +757,11 @@ export default function VlueSettingsPanel({
               const r = openNativeAppSettings();
               if (r?.ok) {
                 showSettingNotice?.(
-                  "VLUE 앱 정보 화면입니다. 「권한」에서 허용으로 바꿔 주세요."
+                  "VLUÉ 앱 정보 화면입니다. 「권한」에서 허용으로 바꿔 주세요."
                 );
               } else {
                 showSettingNotice?.(
-                  "앱 설정을 열 수 없습니다. 기기 설정 → 앱 → VLUE → 권한으로 이동해 주세요."
+                  "앱 설정을 열 수 없습니다. 기기 설정 → 앱 → VLUÉ → 권한으로 이동해 주세요."
                 );
               }
             }}
@@ -775,7 +775,7 @@ export default function VlueSettingsPanel({
                 subtitle={
                   showBroadcastName
                     ? "빅푸시에 이름 표시 · 쇼케이스는 꺼진 상태"
-                    : "이름 숨김 · VLUE 인증회원으로만 표시"
+                    : "이름 숨김 · VLUÉ 인증회원으로만 표시"
                 }
                 checked={Boolean(showBroadcastName)}
                 onChange={(v) => onToggleBroadcastName?.(Boolean(v))}
@@ -985,9 +985,9 @@ export default function VlueSettingsPanel({
               showSettingNotice?.("결제창을 여는 중…");
               try {
                 sessionStorage.setItem("vlue_v2_pay_amount", "1000");
-                sessionStorage.setItem("vlue_v2_pay_order_name", "VLUE V2 테스트");
+                sessionStorage.setItem("vlue_v2_pay_order_name", "VLUÉ V2 테스트");
                 const result = await requestPortoneV2Payment({
-                  orderName: "VLUE V2 테스트",
+                  orderName: "VLUÉ V2 테스트",
                   totalAmount: 1000,
                   payMethod: "CARD",
                   redirectUrl: defaultPortoneV2RedirectUrl(),
@@ -1000,7 +1000,7 @@ export default function VlueSettingsPanel({
                   );
                   const amount = Number(result.complete?.amountTotal || 1000);
                   const paymentId = String(result.complete?.paymentId || result.paymentId || "");
-                  const productName = "VLUE V2 테스트";
+                  const productName = "VLUÉ V2 테스트";
                   const productDetail =
                     "포트원 V2(KPN) 결제 연동 테스트 상품입니다. 실제 서비스 이용 금액이 아니며, 결제 승인·알림·구매확인 흐름 검증용으로 제공됩니다.";
                   addPushNotification({
@@ -1043,13 +1043,13 @@ export default function VlueSettingsPanel({
         <SettingsSection title="기타" isDarkMode={isDarkMode}>
           <SettingsRowButton
             label="공지사항"
-            onClick={() => showSettingNotice?.("VLUE 공식 알림 채널에서 공지를 확인할 수 있습니다.")}
+            onClick={() => showSettingNotice?.("VLUÉ 공식 알림 채널에서 공지를 확인할 수 있습니다.")}
             isDarkMode={isDarkMode}
           />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="고객센터 / 1:1 문의" onClick={() => onOpenCustomerCenter?.()} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
-          <SettingsRowButton label="앱 버전 정보" value={`v${APP_VERSION}`} onClick={() => showSettingNotice?.(`VLUE v${APP_VERSION}`)} isDarkMode={isDarkMode} />
+          <SettingsRowButton label="앱 버전 정보" value={`v${APP_VERSION}`} onClick={() => showSettingNotice?.(`VLUÉ v${APP_VERSION}`)} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="로그아웃" onClick={() => onLogout?.()} isDarkMode={isDarkMode} destructive />
           <SettingsDivider isDarkMode={isDarkMode} />

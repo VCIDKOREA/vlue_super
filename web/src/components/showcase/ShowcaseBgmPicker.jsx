@@ -36,7 +36,7 @@ const CREATE_TYPES = [
 
 const AI_SERVICES = ["Suno", "Udio", "기타"];
 const RIGHTS_TEXT =
-  "본인은 등록하는 음원에 대해 VLUE에서 공개·재생할 수 있는 적법한 권리 또는 이용 권한을 보유하고 있음을 확인합니다. AI 음악 생성 서비스의 이용약관 및 라이선스 조건을 확인하였으며, 해당 음원을 VLUE에서 공개·재생하는 것이 허용되는지 확인했습니다. 타인의 저작물, 가사, 음성, 음원 등을 무단으로 사용하거나 권리를 침해한 콘텐츠를 등록하지 않습니다. 허위 등록 또는 권리 침해로 발생하는 모든 책임은 등록자에게 있습니다.";
+  "본인은 등록하는 음원에 대해 VLUÉ에서 공개·재생할 수 있는 적법한 권리 또는 이용 권한을 보유하고 있음을 확인합니다. AI 음악 생성 서비스의 이용약관 및 라이선스 조건을 확인하였으며, 해당 음원을 VLUÉ에서 공개·재생하는 것이 허용되는지 확인했습니다. 타인의 저작물, 가사, 음성, 음원 등을 무단으로 사용하거나 권리를 침해한 콘텐츠를 등록하지 않습니다. 허위 등록 또는 권리 침해로 발생하는 모든 책임은 등록자에게 있습니다.";
 
 const ADD_ACTIONS = [
   { id: "library", label: "내 사운드에 담기" },
@@ -109,7 +109,7 @@ function PreviewSpeakerBtn({ soundId, active, playing, disabled, onPreview }) {
 }
 
 /**
- * A. VLUE Signature Sound / B. User Original Sound
+ * A. VLUÉ Signature Sound / B. User Original Sound
  * 설정 화면에서는 자동재생 없음 — 「BGM 미리듣기」만 재생
  * @param {boolean} [coexistWithPreview] www 쇼케이스 데스크 — 미리보기와 동시 마운트 시 소유권 양보
  */
@@ -381,7 +381,7 @@ export default function ShowcaseBgmPicker({
       ownerHandle: first.ownerHandle || "",
       sharedOwnerHandle: first.sharedOwnerHandle || "",
       linkBroken: false,
-      artistName: value.artistName || "VLUE"
+      artistName: value.artistName || "VLUÉ"
     });
   }, [value?.playlist?.length, value?.mode, value?.soundId, value?.audioUrl, onChange]);
 
@@ -531,7 +531,7 @@ export default function ShowcaseBgmPicker({
       patch.ownerHandle = entry.ownerHandle || "";
       patch.sharedOwnerHandle = entry.sharedOwnerHandle || "";
       patch.linkBroken = false;
-      patch.artistName = value?.artistName || "VLUE";
+      patch.artistName = value?.artistName || "VLUÉ";
     }
     if (nextPlaylist.length >= 2 && playMode === "single") {
       patch.playMode = "order";
@@ -594,7 +594,7 @@ export default function ShowcaseBgmPicker({
   return (
     <div className="showcase-sound-picker">
       <p className="showcase-sound-picker__policy">
-        VLUE는 음원을 판매하거나 저작권을 최종 인증하지 않습니다. 적법한 권리·이용 권한이 있는 음원을
+        VLUÉ는 음원을 판매하거나 저작권을 최종 인증하지 않습니다. 적법한 권리·이용 권한이 있는 음원을
         쇼케이스에 연결합니다.
       </p>
 
@@ -651,7 +651,7 @@ export default function ShowcaseBgmPicker({
           className={tab === "signature" ? "is-on" : ""}
           onClick={() => setTab("signature")}
         >
-          <Sparkles size={14} /> VLUE Signature Sound
+          <Sparkles size={14} /> VLUÉ Signature Sound
         </button>
         <button type="button" className={tab === "user" ? "is-on" : ""} onClick={() => setTab("user")}>
           <Upload size={14} /> User Original Sound
@@ -764,7 +764,7 @@ export default function ShowcaseBgmPicker({
               <button type="button" className="showcase-sound-list__item" onClick={() => applySound(s, "signature")}>
                 <span className="font-bold">{s.title}</span>
                 <span className="text-[11px] text-slate-500">
-                  {s.artistName || "VLUE"} · {s.attributionLabel}
+                  {s.artistName || "VLUÉ"} · {s.attributionLabel}
                 </span>
                 {selectedId === s.id ? <Check size={14} className="text-emerald-600" aria-hidden /> : null}
               </button>
@@ -843,7 +843,7 @@ export default function ShowcaseBgmPicker({
 
           <h4 className="showcase-sound-list__h">
             <span>{originalTrackLabel}</span>
-            <SoundHelp text="내가 VLUE에 등록·업로드한 내 음원입니다. 쇼케이스 배경음악으로 선택해 사용할 수 있습니다." />
+            <SoundHelp text="내가 VLUÉ에 등록·업로드한 내 음원입니다. 쇼케이스 배경음악으로 선택해 사용할 수 있습니다." />
           </h4>
           {(mine.owned || []).map((s) => (
             <div
@@ -900,7 +900,7 @@ export default function ShowcaseBgmPicker({
         ) : null}
 
           <h4 className="showcase-sound-list__h">
-            <span>VLUE Shared Track</span>
+            <span>VLUÉ Shared Track</span>
             <SoundHelp text="공개된 다른 쇼케이스 음원을 가져와(퍼와) 내 쇼케이스에 연결한 음원입니다." />
           </h4>
           {(mine.borrowed || []).map((b) => (
@@ -1163,7 +1163,7 @@ function UserSoundRegisterSheet({ inputCls, onClose, onRegistered }) {
       </label>
       <label className="flex gap-2 text-[11px] items-start">
         <input type="checkbox" checked={consentRights} onChange={(e) => setConsentRights(e.target.checked)} />
-        본인은 이 음원을 VLUE에 업로드하고 재생할 권리를 보유하고 있습니다.
+        본인은 이 음원을 VLUÉ에 업로드하고 재생할 권리를 보유하고 있습니다.
       </label>
       <label className="flex gap-2 text-[11px] items-start">
         <input type="checkbox" checked={consentThird} onChange={(e) => setConsentThird(e.target.checked)} />
@@ -1172,7 +1172,7 @@ function UserSoundRegisterSheet({ inputCls, onClose, onRegistered }) {
       {ai ? (
         <label className="flex gap-2 text-[11px] items-start">
           <input type="checkbox" checked={consentAi} onChange={(e) => setConsentAi(e.target.checked)} />
-          AI 생성 서비스 약관상 VLUE 공개·재생이 허용됨을 확인했습니다.
+          AI 생성 서비스 약관상 VLUÉ 공개·재생이 허용됨을 확인했습니다.
         </label>
       ) : null}
 

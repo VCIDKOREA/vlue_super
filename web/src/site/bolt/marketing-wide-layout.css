@@ -123,7 +123,7 @@
   }
 }
 
-/* 네비 — VLUE메일 / AI엑셀 간격 (데스크탑 xl 이상만 가로 메뉴) */
+/* 네비 — VLUÉ메일 / AI엑셀 간격 (데스크탑 xl 이상만 가로 메뉴) */
 @media (min-width: 1280px) {
   [data-vlue-site="marketing"] .mkt-nav-items {
     display: flex;

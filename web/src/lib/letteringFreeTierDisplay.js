@@ -1,7 +1,7 @@
 import { readCardWallet } from "./cardWalletStorage.js";
 import { formatLetteringPhoneDisplay, normalizePhoneDigits } from "./letteringPhoneMatch.js";
 
-/** 무료 회원(VLUE 일반번호) 접힘 — 주의 문구 */
+/** 무료 회원(VLUÉ 일반번호) 접힘 — 주의 문구 */
 export const VLUE_FREE_TIER_CAUTION =
   "주의: 유선상로 금전거래 또는 정보 유출에 주의바랍니다.";
 

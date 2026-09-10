@@ -21,7 +21,7 @@ export async function buildMyCardChatPayload(myCard, myCardUserId = "me") {
       userId: myCardUserId,
       digitalCardId: cardId,
       membershipTier: myCard?.membershipTier || "free",
-      organization: myCard?.organization || "VLUE",
+      organization: myCard?.organization || "VLUÉ",
       title: myCard?.title || "",
       name: myCard?.name || "",
       phone: myCard?.phone || "",

@@ -60,7 +60,7 @@ export default function HqHomeEditor({ layout, onChange, onPublish, publishing, 
       {publishMsg ? <p className="rounded-xl bg-blue-50 px-4 py-3 text-[14px] font-bold text-blue-800">{publishMsg}</p> : null}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="text-[18px] font-black text-slate-900">1. VLUE PICK 배너</h3>
+        <h3 className="text-[18px] font-black text-slate-900">1. VLUÉ PICK 배너</h3>
         <div className="mt-5 space-y-6">
           {layout.vluePick.map((b, i) => (
             <div key={b.id || i} className="rounded-xl border border-slate-100 bg-slate-50/80 p-5">

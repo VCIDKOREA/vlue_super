@@ -12,7 +12,7 @@ export default class AppRootErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error("[VLUE 앱 오류]", error, info);
+    console.error("[VLUÉ 앱 오류]", error, info);
   }
 
   render() {

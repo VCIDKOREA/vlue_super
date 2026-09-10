@@ -38,7 +38,7 @@ export default function VluePortraitGate() {
           세로 모드로 돌려 주세요
         </p>
         <p className="vlue-portrait-gate__desc">
-          VLUE는 세로 화면만 지원합니다. 폴드폰은 펼친 세로 상태에서 넓게 볼 수 있습니다.
+          VLUÉ는 세로 화면만 지원합니다. 폴드폰은 펼친 세로 상태에서 넓게 볼 수 있습니다.
         </p>
       </div>
     </div>

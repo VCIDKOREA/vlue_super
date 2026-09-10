@@ -10,7 +10,7 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 
-/** VLUE OS 알림 — 화면 깨우기·풀스크린 인텐트 공통 */
+/** VLUÉ OS 알림 — 화면 깨우기·풀스크린 인텐트 공통 */
 object VlueNotificationWake {
     private const val TAG = "VlueNotifWake"
 

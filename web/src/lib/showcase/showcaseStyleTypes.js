@@ -1,9 +1,9 @@
-/** VLUE Showcase 5대 스타일 타입 */
+/** VLUÉ Showcase 5대 스타일 타입 */
 export const SHOWCASE_STYLE_TYPES = {
   default: {
     id: "default",
     label: "기본형",
-    desc: "번호 + VLUE 안심 안내",
+    desc: "번호 + VLUÉ 안심 안내",
     shortDesc: "통화 화면에 번호·안심 문구만 표시",
     emoji: "📞",
     accent: "#2b6ff0",

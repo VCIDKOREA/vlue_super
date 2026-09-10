@@ -1,4 +1,4 @@
-/** 검색 교차검증 → VLUE 쇼핑 상점 프로필 이동 */
+/** 검색 교차검증 → VLUÉ 쇼핑 상점 프로필 이동 */
 export const PENDING_VLUE_STORE_KEY = "vlue_pending_store_profile_v1";
 
 export function navigateToVluePartnerStore(storeId) {

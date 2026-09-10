@@ -1,5 +1,5 @@
 /**
- * 쇼케이스 BGM — VLUE Signature / User Original / 퍼가기
+ * 쇼케이스 BGM — VLUÉ Signature / User Original / 퍼가기
  * SoundCloud·YouTube UI 경로 제거. 재생은 audioUrl(MP3 등) 직접 재생.
  */
 
@@ -83,7 +83,7 @@ export function resolveShowcaseBgmMarqueeText(styleConfig, visitSessionKey = "",
     return `${title}(${who}) Original Sound · Shared Track`;
   }
   if (mode === "signature") {
-    return `${title} · VLUE Signature Sound${attr ? ` · ${attr}` : ""}`;
+    return `${title} · VLUÉ Signature Sound${attr ? ` · ${attr}` : ""}`;
   }
   const id = own ? `@${own}` : "@user";
   const typeLabel = attr || "Original Sound";

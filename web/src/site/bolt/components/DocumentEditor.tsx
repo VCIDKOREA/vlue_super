@@ -91,7 +91,7 @@ export default function DocumentEditor({ title, category, fields, userName, onCl
           <div class="sign-box">검토자<div class="sign-line"></div></div>
           <div class="sign-box">결재자<div class="sign-line"></div></div>
         </div>
-        <div class="doc-footer">본 문서는 VLUE 자료실에서 작성되었습니다.</div>
+        <div class="doc-footer">본 문서는 VLUÉ 자료실에서 작성되었습니다.</div>
       </body>
       </html>
     `);

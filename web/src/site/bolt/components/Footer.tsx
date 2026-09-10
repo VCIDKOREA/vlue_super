@@ -54,7 +54,7 @@ export default function Footer({ onNavigate }: FooterProps) {
             <div className="flex items-center gap-2 mb-2 sm:mb-4">
               <VlueBrandLogo size={28} className="sm:hidden" />
               <VlueBrandLogo size={32} className="hidden sm:block" />
-              <span className="text-base sm:text-lg font-black text-white tracking-tight">VLUE</span>
+              <span className="text-base sm:text-lg font-black text-white tracking-tight">VLUÉ</span>
             </div>
             <p className="mkt-footer-tagline text-gray-400 text-xs leading-snug mb-3 sm:mb-5">
               보이스피싱 피해 예방을 위한 통합 인증 및 검증 플랫폼
@@ -103,7 +103,7 @@ export default function Footer({ onNavigate }: FooterProps) {
 
         <div className="mkt-footer-bottom pt-4 sm:pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
           <p className="text-gray-500 text-[0.625rem] sm:text-xs leading-snug">
-            © 2026 VLUE Inc. · VCID KOREA
+            © 2026 VLUÉ Inc. · VCID KOREA
           </p>
           <div className="mkt-footer-status flex flex-wrap items-center gap-x-3 gap-y-1">
             <div className="flex items-center gap-1.5">

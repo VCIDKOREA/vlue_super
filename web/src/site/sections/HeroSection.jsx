@@ -36,7 +36,7 @@ export default function HeroSection({ onSearch, onNavigate }) {
           className="hero-desc mx-auto text-gray-600"
           style={{ wordBreak: "keep-all", lineHeight: "1.8" }}
         >
-          전화·문자를 받기 전, 공공데이터와 VLUE 인증 데이터를 동시에 비교분석하여{" "}
+          전화·문자를 받기 전, 공공데이터와 VLUÉ 인증 데이터를 동시에 비교분석하여{" "}
           <span className="font-bold text-primary-500">
             실시간으로 사기 여부를 즉시 판별합니다.
           </span>
@@ -70,7 +70,7 @@ export default function HeroSection({ onSearch, onNavigate }) {
 
         <div className="hero-cta-wrap flex flex-wrap items-center justify-center">
           <button type="button" onClick={() => onNavigate("pricing")} className="btn-primary">
-            VLUE 인증 신청하기
+            VLUÉ 인증 신청하기
             <ChevronRight className="h-4 w-4" />
           </button>
           <button type="button" onClick={() => onNavigate("pricing")} className="btn-secondary">

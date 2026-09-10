@@ -44,7 +44,7 @@ export function buildFriendShowcaseEntries({ catalogFriends = [], contactMatchDa
       name,
       phone,
       phoneDisplay: phone ? formatLetteringPhoneDisplay(phone) : phone,
-      subtitle: u.publicHandle ? `${u.publicHandle} · VLUE 친구` : "VLUE 친구",
+      subtitle: u.publicHandle ? `${u.publicHandle} · VLUÉ 친구` : "VLUÉ 친구",
       membershipTier: "paid",
       avatarUrl: "",
       org: "",

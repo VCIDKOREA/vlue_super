@@ -8,7 +8,7 @@ export function buildMyPageCaptionFromSourcing(form) {
 }
 
 /** @returns {{ ok: true } | { ok: false, reason: string }} */
-export function publishSourcingToMyPage(form, { shopName = "VLUE PAGE", ownerKey = "" } = {}) {
+export function publishSourcingToMyPage(form, { shopName = "VLUÉ PAGE", ownerKey = "" } = {}) {
   const caption = buildMyPageCaptionFromSourcing(form);
   let previewUrl = "";
   let type = "image";

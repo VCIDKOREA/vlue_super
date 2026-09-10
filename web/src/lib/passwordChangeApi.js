@@ -103,7 +103,7 @@ export function readPasswordChangeResume() {
 }
 
 export function buildPasswordChangeSupportMailto({ handle = "", legalName = "", phone = "" } = {}) {
-  const subject = encodeURIComponent("[VLUE] 비밀번호 변경 신청");
+  const subject = encodeURIComponent("[VLUÉ] 비밀번호 변경 신청");
   const lines = [
     "안녕하세요. 비밀번호 변경을 신청합니다.",
     "",

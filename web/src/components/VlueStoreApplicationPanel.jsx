@@ -120,7 +120,7 @@ export default function VlueStoreApplicationPanel({ isPaid, onSubmitted }) {
     <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
       <p className="text-[13px] font-black text-indigo-950">상점으로 전환 신청</p>
       <p className="mt-1 text-[11px] leading-relaxed text-indigo-900/90">
-        VLUE PAGE는 기본 하나로 운영합니다. 상품 판매·결제를 원하면 서류 제출 후 승인 시 상점 기능이 켜집니다.
+        VLUÉ PAGE는 기본 하나로 운영합니다. 상품 판매·결제를 원하면 서류 제출 후 승인 시 상점 기능이 켜집니다.
       </p>
       <div className="mt-3 space-y-2">
         <input

@@ -156,9 +156,9 @@ export async function requestIamportCertification(userCode = getPortoneUserCode(
   const merchantUid = `vlue_cert_${Date.now()}`;
   const pg = buildIamportCertPg();
 
-  /** 이니시스 등 PG가 참고하는 상점/사이트 식별 — 문자열 "VLUE" 보다 실제 오리진이 안전한 경우가 많음 */
+  /** 이니시스 등 PG가 참고하는 상점/사이트 식별 — 문자열 "VLUÉ" 보다 실제 오리진이 안전한 경우가 많음 */
   const company =
-    typeof window !== "undefined" && window.location?.origin ? window.location.origin : "VLUE";
+    typeof window !== "undefined" && window.location?.origin ? window.location.origin : "VLUÉ";
 
   const envPopup =
     envTrim(typeof import.meta !== "undefined" ? import.meta.env?.VITE_IAMPORT_CERT_POPUP : "");
@@ -193,7 +193,7 @@ export async function requestIamportCertification(userCode = getPortoneUserCode(
   }
 
   if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
-    console.info("[VLUE 본인인증 요청]", {
+    console.info("[VLUÉ 본인인증 요청]", {
       pg,
       popup: usePopup,
       redirect: useRedirect,
@@ -203,7 +203,7 @@ export async function requestIamportCertification(userCode = getPortoneUserCode(
     });
   } else if (typeof console !== "undefined" && console.info) {
     /* 운영에서도 pg만 남겨 이니시스 일반 오류 원인 추적 (MID·키 전체는 미출력) */
-    console.info("[VLUE 본인인증 요청]", {
+    console.info("[VLUÉ 본인인증 요청]", {
       pg,
       popup: usePopup,
       company: String(company).slice(0, 64)
@@ -213,7 +213,7 @@ export async function requestIamportCertification(userCode = getPortoneUserCode(
   return new Promise((resolve, reject) => {
     IMP.certification(payload, (rsp) => {
       if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
-        console.info("[VLUE 본인인증 응답]", rsp);
+        console.info("[VLUÉ 본인인증 응답]", rsp);
       }
       if (rsp?.success) {
         resolve(rsp);
@@ -289,7 +289,7 @@ export async function requestIamportShopPay({
   const method = payMethod === "trans" ? "trans" : payMethod === "vbank" ? "vbank" : "card";
 
   if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
-    console.info("[VLUE 상점 결제 요청]", { pg, merchant_uid: merchantUid, amount: payAmount, pay_method: method });
+    console.info("[VLUÉ 상점 결제 요청]", { pg, merchant_uid: merchantUid, amount: payAmount, pay_method: method });
   }
 
   return new Promise((resolve, reject) => {
@@ -298,7 +298,7 @@ export async function requestIamportShopPay({
         pg,
         pay_method: method,
         merchant_uid: merchantUid,
-        name: name || "VLUE 상점 주문",
+        name: name || "VLUÉ 상점 주문",
         amount: payAmount,
         buyer_name: buyerName || undefined,
         buyer_tel: buyerTel || undefined,
@@ -306,7 +306,7 @@ export async function requestIamportShopPay({
       },
       (rsp) => {
         if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
-          console.info("[VLUE 상점 결제 응답]", rsp);
+          console.info("[VLUÉ 상점 결제 응답]", rsp);
         }
         if (rsp?.success) {
           resolve({
@@ -346,11 +346,11 @@ export async function requestIamportBillingPay({
   const merchant_uid = merchantUidOverride || `billing_${Date.now()}`;
   const pg = buildIamportBillingPg();
   const cycleLabel = billingCycle === "annual" ? "1년" : "1월";
-  const name = nameOverride || `VLUE 멤버십 구독 (${cycleLabel})`;
+  const name = nameOverride || `VLUÉ 멤버십 구독 (${cycleLabel})`;
   const payAmount = Math.max(0, Math.floor(Number(amount) || 0));
 
   if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
-    console.info("[VLUE 정기결제 요청]", { pg, merchant_uid, customer_uid, amount: payAmount, name });
+    console.info("[VLUÉ 정기결제 요청]", { pg, merchant_uid, customer_uid, amount: payAmount, name });
   }
 
   return new Promise((resolve, reject) => {
@@ -368,7 +368,7 @@ export async function requestIamportBillingPay({
       },
       (rsp) => {
         if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
-          console.info("[VLUE 정기결제 응답]", rsp);
+          console.info("[VLUÉ 정기결제 응답]", rsp);
         }
         if (rsp?.success) {
           resolve({

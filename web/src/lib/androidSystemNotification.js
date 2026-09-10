@@ -3,7 +3,7 @@
  */
 export function postAndroidSystemNotification(title, body, tag = "") {
   try {
-    const t = String(title || "").trim() || "VLUE";
+    const t = String(title || "").trim() || "VLUÉ";
     const b = String(body || "").trim() || t;
     const g = String(tag || "").trim();
     if (window.Android?.showSystemNotification) {
@@ -22,7 +22,7 @@ export function postAndroidSystemNotification(title, body, tag = "") {
 
 /** Android WebView 또는 브라우저 알림 권한으로 로컬 푸시 표시 */
 export function deliverLocalPushNotification(title, body, tag = "") {
-  const t = String(title || "").trim() || "VLUE";
+  const t = String(title || "").trim() || "VLUÉ";
   const b = String(body || "").trim() || t;
   const g = String(tag || t).slice(0, 64);
   if (postAndroidSystemNotification(t, b, g)) return true;

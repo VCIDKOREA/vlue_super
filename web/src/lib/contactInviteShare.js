@@ -7,10 +7,10 @@ export function getInviteSenderName() {
       localStorage.getItem("vlue_legal_name")?.trim() ||
       localStorage.getItem("myCardDisplayName")?.trim() ||
       localStorage.getItem("vlue_member_handle")?.replace(/^@/, "") ||
-      "VLUE 회원"
+      "VLUÉ 회원"
     );
   } catch {
-    return "VLUE 회원";
+    return "VLUÉ 회원";
   }
 }
 
@@ -25,7 +25,7 @@ export function getInviteSenderHandle() {
 }
 
 /**
- * VLUE 추천(초대) 공유 본문 템플릿
+ * VLUÉ 추천(초대) 공유 본문 템플릿
  * @param {string} [inviteeName]
  */
 export function buildVlueInviteMessage(inviteeName) {
@@ -35,9 +35,9 @@ export function buildVlueInviteMessage(inviteeName) {
   const target = inviteeName?.trim() ? `${inviteeName.trim()}님` : "지인분";
 
   return [
-    `[VLUE 추천] ${who}님이 ${target}을 VLUE로 초대했습니다.`,
+    `[VLUÉ 추천] ${who}님이 ${target}을 VLUÉ로 초대했습니다.`,
     "",
-    "VLUE는 통화 신원 확인·블루 쇼케이스·디지털 인증명함·가족보호로",
+    "VLUÉ는 통화 신원 확인·블루 쇼케이스·디지털 인증명함·가족보호로",
     "보이스피싱·기관 사칭을 줄이는 신뢰 플랫폼입니다.",
     "",
     "· 앱 설치: " + VLUE_DOWNLOAD_URL,
@@ -49,7 +49,7 @@ export function buildVlueInviteMessage(inviteeName) {
 
 export function buildVlueInviteShareTitle() {
   const sender = getInviteSenderName();
-  return `${sender}님이 VLUE로 초대합니다`;
+  return `${sender}님이 VLUÉ로 초대합니다`;
 }
 
 function toSmsPhone(phoneE164) {

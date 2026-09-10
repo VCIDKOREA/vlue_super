@@ -178,7 +178,7 @@ function FriendSearch({
                 });
                 onSendRequest?.(
                   { id: user.userId, name },
-                  `${name}님, VLUE에서 연결해요.`
+                  `${name}님, VLUÉ에서 연결해요.`
                 );
                 void reloadFriendRequests();
               }}
@@ -190,7 +190,7 @@ function FriendSearch({
           <>
             <div className="mt-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <p className="text-[12px] text-gray-500">
-                전화부 동기화 명단에서 검색합니다. VLUE 사용 중이면 <b>신청</b>, 아니면 <b>추천</b>
+                전화부 동기화 명단에서 검색합니다. VLUÉ 사용 중이면 <b>신청</b>, 아니면 <b>추천</b>
                 (카톡·문자 공유)입니다.
               </p>
               <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">

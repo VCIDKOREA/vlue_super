@@ -6,7 +6,7 @@ import type { View } from '../types';
 
 const FEATURES = [
   '수신 전화 디지털 인증명함·쇼케이스',
-  'VLUE 기관·번호 조회',
+  'VLUÉ 기관·번호 조회',
   '가족 보호',
   '개인케이스',
 ];
@@ -30,7 +30,7 @@ export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
             </div>
             <h2 className="text-3xl sm:text-4xl font-black text-white mb-4 leading-tight">
               언제 어디서나<br />
-              <span className="text-primary-200">VLUE와 함께</span>
+              <span className="text-primary-200">VLUÉ와 함께</span>
             </h2>
             <p className="text-white/70 text-base leading-relaxed mb-6">
               {showAiExcel
@@ -94,7 +94,7 @@ export default function DownloadSection({ onNavigate }: DownloadSectionProps) {
                 </div>
               </div>
               <p className="text-white/70 text-sm mb-4 leading-relaxed">
-                PC에서도 VLUE 데스크탑 앱으로 동일한 인증 조회와 보안 서비스를 이용하세요.
+                PC에서도 VLUÉ 데스크탑 앱으로 동일한 인증 조회와 보안 서비스를 이용하세요.
               </p>
               <div className="flex gap-2">
                 <button

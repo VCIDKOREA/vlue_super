@@ -19,7 +19,7 @@ import LetteringNativeCallScreen from "./LetteringNativeCallScreen.jsx";
 import LetteringReportSheet from "./LetteringReportSheet.jsx";
 
 /**
- * 사용자 제공 통화 화면 스크린샷 위에 VLUE 빅푸시만 오버레이 (이미지 자체는 수정하지 않음)
+ * 사용자 제공 통화 화면 스크린샷 위에 VLUÉ 빅푸시만 오버레이 (이미지 자체는 수정하지 않음)
  */
 export default function LetteringCallScreenPreview({
   verified,
@@ -121,7 +121,7 @@ export default function LetteringCallScreenPreview({
   const nativeBlockHint = (blockResult) =>
     blockResult?.native?.ok
       ? "휴대폰 차단 목록에 반영되었습니다."
-      : "앱 차단 목록에 등록되었습니다. 휴대폰 설정에서 VLUE 차단 권한을 허용해 주세요.";
+      : "앱 차단 목록에 등록되었습니다. 휴대폰 설정에서 VLUÉ 차단 권한을 허용해 주세요.";
 
   const handleBlockOnly = async () => {
     if (demoQuiet) {
@@ -170,7 +170,7 @@ export default function LetteringCallScreenPreview({
       showToast(String(server.error || "").trim() || "로그인 후 제보할 수 있습니다.");
       return { tip, server, summary };
     }
-    showToast("제보 완료 · VLUE에 반영됩니다");
+    showToast("제보 완료 · VLUÉ에 반영됩니다");
     return { tip, server, summary };
   };
 
@@ -261,14 +261,14 @@ export default function LetteringCallScreenPreview({
                   result?.channel?.startsWith("Android") ||
                   result?.channel?.startsWith("webkit")
                 ) {
-                  showToast("VLUE 앱 인증정보로 이동합니다");
+                  showToast("VLUÉ 앱 인증정보로 이동합니다");
                   return;
                 }
                 if (result?.ok) {
-                  showToast("VLUE 앱을 엽니다");
+                  showToast("VLUÉ 앱을 엽니다");
                   return;
                 }
-                showToast(`VLUE 앱을 설치하거나 로그인해 주세요 (${buildLetteringCertUniversalLink({ feedId, feedType })})`);
+                showToast(`VLUÉ 앱을 설치하거나 로그인해 주세요 (${buildLetteringCertUniversalLink({ feedId, feedType })})`);
               }}
               onSaveCard={handleSaveCard}
               onReport={openReport}

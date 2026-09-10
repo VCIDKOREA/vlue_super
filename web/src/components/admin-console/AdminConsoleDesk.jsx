@@ -789,7 +789,7 @@ function formatAdminDate(iso) {
 
 function signupMethodLabel(method) {
   const m = String(method || "");
-  if (m === "vlue_native") return "VLUE 앱";
+  if (m === "vlue_native") return "VLUÉ 앱";
   if (m === "social_kakao") return "카카오";
   if (m === "social_google") return "구글";
   if (m === "social_naver") return "네이버";
@@ -1307,7 +1307,7 @@ function PostsTab({ onToast }) {
         bgmVolume: letterForm.bgmVolume,
         isActive: letterForm.isActive !== false
       });
-      onToast?.("VLUE 편지 저장 완료 (버전↑ → 미확인 사용자에게 다시 표시)");
+      onToast?.("VLUÉ 편지 저장 완료 (버전↑ → 미확인 사용자에게 다시 표시)");
       load();
     } catch (e) {
       onToast?.(e?.message || "편지 저장 실패");
@@ -1333,7 +1333,7 @@ function PostsTab({ onToast }) {
         {[
           { id: "notices", label: "공지사항" },
           { id: "popups", label: "마케팅 팝업" },
-          { id: "letters", label: "VLUE 편지" },
+          { id: "letters", label: "VLUÉ 편지" },
           { id: "feed", label: "피드 게시물" },
           { id: "media", label: "미디어 쇼핑" }
         ].map((t) => (
@@ -1377,7 +1377,7 @@ function PostsTab({ onToast }) {
 
       {section === "letters" ? (
         <div className="rounded-xl border border-amber-200/80 bg-gradient-to-br from-orange-50/80 via-white to-sky-50 p-4 space-y-2">
-          <p className="text-[13px] font-black text-slate-800">VLUE가 전하는 편지</p>
+          <p className="text-[13px] font-black text-slate-800">VLUÉ가 전하는 편지</p>
           <p className="text-[11px] leading-relaxed text-slate-500">
             첫 로그인 사용자에게 필독으로 표시됩니다. 저장 시 버전이 올라가면 아직 확인하지 않은 사용자·이전 버전만 본 사용자에게 다시 보입니다. BGM은{" "}
             <strong className="font-bold text-slate-600">Signature Sound</strong>에 업로드된 곡에서 고릅니다.
@@ -1673,7 +1673,7 @@ export default function AdminConsoleDesk({ user, onLogout }) {
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white px-4 py-3">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div>
-            <p className="text-[15px] font-black text-slate-900">VLUE 관리자 대시보드</p>
+            <p className="text-[15px] font-black text-slate-900">VLUÉ 관리자 대시보드</p>
             <p className="text-[11px] text-slate-500">
               {user.legalName || user.publicHandle} · {user.role}
             </p>
@@ -1753,7 +1753,7 @@ function isLikelyAudioFile(file) {
 
 function SignatureSoundTab({ onToast }) {
   const [items, setItems] = useState([]);
-  const [artistName, setArtistName] = useState("VLUE");
+  const [artistName, setArtistName] = useState("VLUÉ");
   const [queue, setQueue] = useState([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
@@ -1856,7 +1856,7 @@ function SignatureSoundTab({ onToast }) {
     }
 
     setBusy(true);
-    const artist = artistName.trim() || "VLUE";
+    const artist = artistName.trim() || "VLUÉ";
     let okCount = 0;
     let failCount = 0;
 
@@ -1892,7 +1892,7 @@ function SignatureSoundTab({ onToast }) {
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="text-[14px] font-black text-slate-900">VLUE Signature Sound</h2>
+        <h2 className="text-[14px] font-black text-slate-900">VLUÉ Signature Sound</h2>
         <p className="mt-1 text-[12px] text-slate-500">
           여러 파일을 선택하거나 폴더 전체를 추가한 뒤 「일괄 업로드」를 누르세요. 제목은 파일명으로
           자동 입력됩니다. (R2 Presigned)

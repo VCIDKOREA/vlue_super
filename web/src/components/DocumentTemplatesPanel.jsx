@@ -191,7 +191,7 @@ export default function DocumentTemplatesPanel({
                 <h2 className={`text-[16px] font-black ${headText}`}>업무·일상 서류 양식</h2>
               ) : (
                 <p className={`mt-1 text-[12px] ${subText}`}>
-                  위임장 · 근로계약서 · 내용증명 등 VLUE 검수 서식을 다운로드합니다.
+                  위임장 · 근로계약서 · 내용증명 등 VLUÉ 검수 서식을 다운로드합니다.
                 </p>
               )}
             </div>

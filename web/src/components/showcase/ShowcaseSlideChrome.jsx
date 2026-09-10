@@ -44,9 +44,9 @@ function displayHost(url) {
 
 /**
  * 쇼케이스 슬라이드 공통 크롬
- * 1 하단: VLUE 프로필 + 팔로우 + 쇼셜 토글
+ * 1 하단: VLUÉ 프로필 + 팔로우 + 쇼셜 토글
  * 2 상단 좌측: 개인커스텀일 때 페이지 비즈니스 링크 (음원 칩은 캐러셀 메타 상단)
- * 3 쇼셜: 토글 시 VLUE 바 위에 표시
+ * 3 쇼셜: 토글 시 VLUÉ 바 위에 표시
  *
  * @param {"instagram"|"custom"} variant
  */
@@ -79,7 +79,7 @@ export default function ShowcaseSlideChrome({
   }, [pageLink?.logoUrl, pageLink?.id]);
 
   /*
-   * VLUE 프로필 바 — 상호 제외, 이름 공개 시 이름 / 비공개 시 VLUE ID
+   * VLUÉ 프로필 바 — 상호 제외, 이름 공개 시 이름 / 비공개 시 VLUÉ ID
    */
   const hideBroadcastName = Boolean(
     card?.hideBroadcastName || card?.showcaseStyle?.showBroadcastName === false
@@ -212,7 +212,7 @@ export default function ShowcaseSlideChrome({
           </div>
         ) : null}
 
-        <div className="showcase-slide-chrome__vlue" aria-label="VLUE 프로필">
+        <div className="showcase-slide-chrome__vlue" aria-label="VLUÉ 프로필">
           <button
             type="button"
             className="showcase-slide-chrome__vlue-profile"
@@ -232,7 +232,7 @@ export default function ShowcaseSlideChrome({
               )}
             </span>
             <span className="showcase-slide-chrome__vlue-meta">
-              <span className="showcase-slide-chrome__vlue-label">VLUE 프로필</span>
+              <span className="showcase-slide-chrome__vlue-label">VLUÉ 프로필</span>
               <span className="showcase-slide-chrome__vlue-name-row">
                 <span className="showcase-slide-chrome__vlue-name">{profileName || "회원"}</span>
                 <ShowcaseIdentityCertMark

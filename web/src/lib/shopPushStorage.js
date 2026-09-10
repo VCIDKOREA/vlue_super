@@ -135,9 +135,9 @@ export function ensureDemoPushSubscribers(ownerKey) {
   if (!owner || readPushSubscribersForOwner(owner).length > 0) return;
   const map = readAllSubscriberMap();
   map[owner] = [
-    { userId: "demo-sub-1", displayName: "김구독", shopName: "VLUE PAGE", enabledAt: new Date().toISOString() },
-    { userId: "demo-sub-2", displayName: "이알림", shopName: "VLUE PAGE", enabledAt: new Date().toISOString() },
-    { userId: "demo-sub-3", displayName: "박푸시", shopName: "VLUE PAGE", enabledAt: new Date().toISOString() }
+    { userId: "demo-sub-1", displayName: "김구독", shopName: "VLUÉ PAGE", enabledAt: new Date().toISOString() },
+    { userId: "demo-sub-2", displayName: "이알림", shopName: "VLUÉ PAGE", enabledAt: new Date().toISOString() },
+    { userId: "demo-sub-3", displayName: "박푸시", shopName: "VLUÉ PAGE", enabledAt: new Date().toISOString() }
   ];
   writeAllSubscriberMap(map);
 }

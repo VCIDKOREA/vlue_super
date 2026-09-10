@@ -37,7 +37,7 @@ function AdvertiserCard({ item, onVisit }: { item: StoreAdvertiser; onVisit: () 
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary-700 bg-primary-50 border border-primary-100 px-2 py-0.5 rounded-full">
             <BadgeCheck className="w-3 h-3" />
-            VLUE 인증
+            VLUÉ 인증
           </span>
           <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
             {item.category}
@@ -71,11 +71,11 @@ export default function StoreSection({ onNavigate }: Props) {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-3 rounded-full bg-gradient-to-r from-primary-50 to-indigo-50 border border-primary-200 text-primary-700 text-xs font-bold">
               <ShoppingBag className="w-3.5 h-3.5" />
-              VLUE 스토어
+              VLUÉ 스토어
             </div>
-            <h2 className="section-title">VLUE 스토어</h2>
+            <h2 className="section-title">VLUÉ 스토어</h2>
             <p className="section-subtitle" style={{ wordBreak: 'keep-all' }}>
-              앱과 동일한 쇼핑·페이지쇼핑·공동구매 피드를 웹에서 탐색하세요. VLUE 인증 판매자만 노출됩니다.
+              앱과 동일한 쇼핑·페이지쇼핑·공동구매 피드를 웹에서 탐색하세요. VLUÉ 인증 판매자만 노출됩니다.
             </p>
           </div>
           <button

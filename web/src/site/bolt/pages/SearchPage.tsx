@@ -126,7 +126,7 @@ export default function SearchPage({ initialQuery, onBack }: SearchPageProps) {
             <Shield className="w-4 h-4 text-primary-600" />
           </div>
           <div className="flex-1">
-            <h2 className="text-gray-900 font-bold text-sm" style={{ letterSpacing: '-0.02em' }}>VLUE 통합 교차검증</h2>
+            <h2 className="text-gray-900 font-bold text-sm" style={{ letterSpacing: '-0.02em' }}>VLUÉ 통합 교차검증</h2>
             <SearchVerifySourceList compact />
           </div>
           {verifyData ? (
@@ -140,7 +140,7 @@ export default function SearchPage({ initialQuery, onBack }: SearchPageProps) {
           <div className="mkt-search-loading">
             <Loader2 className="w-8 h-8 text-primary-400 mx-auto mb-3 animate-spin" />
             <p className="text-gray-500 text-sm font-medium">통합 교차검증 데이터를 조회 중…</p>
-            <p className="text-gray-400 text-xs mt-1">카카오 · 네이버 · 공공·국세청 · VLUE 인증</p>
+            <p className="text-gray-400 text-xs mt-1">카카오 · 네이버 · 공공·국세청 · VLUÉ 인증</p>
             <div className="mt-2 flex justify-center">
               <SearchVerifySourceList compact />
             </div>

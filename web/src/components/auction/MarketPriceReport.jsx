@@ -21,7 +21,7 @@ export default function MarketPriceReport({ market, currentBidKrw = 0, onOpenMod
 
       {!available ? (
         <p className="text-xs leading-relaxed text-slate-600">
-          해당 상품은 시중 비교 데이터가 없는 고유 상품입니다. VLUE 자체 경매 트렌드를 참고하여 입찰하세요.
+          해당 상품은 시중 비교 데이터가 없는 고유 상품입니다. VLUÉ 자체 경매 트렌드를 참고하여 입찰하세요.
         </p>
       ) : (
         <>

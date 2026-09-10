@@ -157,7 +157,7 @@ export default function LetteringBizcardOrgChangeSection({
               value={desiredName}
               onChange={(e) => setDesiredName(e.target.value)}
               className={inputBase}
-              placeholder="예: VLUE 카페 강남점"
+              placeholder="예: VLUÉ 카페 강남점"
             />
           </label>
 

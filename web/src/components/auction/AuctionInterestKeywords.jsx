@@ -51,7 +51,7 @@ export default function AuctionInterestKeywords({ isLoggedIn, onToast }) {
   return (
     <section className="mb-6 rounded-2xl border border-violet-100 bg-white p-4 shadow-sm">
       <p className="text-xs font-black uppercase tracking-wider text-violet-600">관심 키워드 알림</p>
-      <p className="mt-1 text-sm text-slate-500">등록한 키워드와 맞는 VLUE 경매가 시작되면 푸시로 알려드립니다.</p>
+      <p className="mt-1 text-sm text-slate-500">등록한 키워드와 맞는 VLUÉ 경매가 시작되면 푸시로 알려드립니다.</p>
 
       <div className="mt-3 flex gap-2">
         <input

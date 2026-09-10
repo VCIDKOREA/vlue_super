@@ -86,7 +86,7 @@ const DEMO_ENTRIES = [
       name: "지연",
       displayName: "지연",
       title: "마케터",
-      organization: "VLUE 파트너스",
+      organization: "VLUÉ 파트너스",
       phone: "010-7777-8888",
       membershipTier: "paid",
       photoUrl: AVATAR_JIYEON,
@@ -94,7 +94,7 @@ const DEMO_ENTRIES = [
       companyIntro: "브랜드 성장과 인증 커뮤니케이션",
       website: "https://vlue.partners",
       email: "jiyeon@vlue.partners",
-      verificationItems: ["VLUE 본인인증", "사업자 확인", "마케터 경력 5년"]
+      verificationItems: ["VLUÉ 본인인증", "사업자 확인", "마케터 경력 5년"]
     },
     showcaseSnapshot: baseStyle({
       styleType: "certificate",
@@ -251,7 +251,7 @@ export function resolveCallHistoryAvatar(call) {
     const ok = loadableAvatarUrl(c);
     if (ok) return ok;
   }
-  /* 통화목록 prefetch 캐시 — VLUE 회원인데 스냅샷에 사진이 비어 있어도 표시 */
+  /* 통화목록 prefetch 캐시 — VLUÉ 회원인데 스냅샷에 사진이 비어 있어도 표시 */
   try {
     const phone = call?.phoneDisplay || call?.phone || "";
     const cached = readCallHistoryPeerCache(phone);

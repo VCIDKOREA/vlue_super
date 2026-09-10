@@ -190,7 +190,7 @@ export default function PersonalComboPanel({ membershipTier = "free", onToast })
         amount,
         billingCycle,
         merchantUid,
-        name: `VLUE 임직원 콤보 (${billingCycle === "annual" ? "1년" : "1월"})`
+        name: `VLUÉ 임직원 콤보 (${billingCycle === "annual" ? "1년" : "1월"})`
       });
 
       await postSubscribeComplete({

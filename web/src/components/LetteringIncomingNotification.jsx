@@ -63,7 +63,7 @@ const DEMO_CARD = {
   photoUrl: "",
   image_url: "",
   companyIntro:
-    "\uC0BC\uC131\uC0DD\uBA85 \uBCF4\uD5D8 \uC804\uBB38 \uC0C1\uB2F4\uC785\uB2C8\uB2E4. VLUE \uC778\uC99D \uBA85\uD568\uC73C\uB85C \uACE0\uAC1D\uB2D8\uACFC \uC548\uC804\uD558\uAC8C \uC5F0\uACB0\uB429\uB2C8\uB2E4.",
+    "\uC0BC\uC131\uC0DD\uBA85 \uBCF4\uD5D8 \uC804\uBB38 \uC0C1\uB2F4\uC785\uB2C8\uB2E4. VLUÉ \uC778\uC99D \uBA85\uD568\uC73C\uB85C \uACE0\uAC1D\uB2D8\uACFC \uC548\uC804\uD558\uAC8C \uC5F0\uACB0\uB429\uB2C8\uB2E4.",
   feedId: "user-honggildong",
   feedType: "personal",
   membershipTier: "premium",
@@ -89,7 +89,7 @@ function VlueVerifiedBadge({ className = "", size = 18 }) {
   return (
     <span
       className={`lettering-vlue-verified-badge inline-flex shrink-0 items-center justify-center ${className}`.trim()}
-      title="VLUE 인증"
+      title="VLUÉ 인증"
     >
       <VlueCyanVerifiedSeal size={size} />
     </span>
@@ -117,7 +117,7 @@ function LetteringProfileThumb({ card, verified, size = "sm" }) {
     displayName: card?.name || card?.displayName || "",
     exposeCustom: true
   });
-  /* image | brand(CEO VLUE) | silhouette(카톡형) — 빈 자리에 VLUE 눈/회사로고 자동 삽입 금지 */
+  /* image | brand(CEO VLUÉ) | silhouette(카톡형) — 빈 자리에 VLUÉ 눈/회사로고 자동 삽입 금지 */
   const imgUrl =
     peer.type === "image" || peer.type === "brand" || peer.type === "silhouette"
       ? peer.url
@@ -234,9 +234,9 @@ export default function LetteringIncomingNotification({
   /** 상대 열람 — 설정 자리에 닫기 */
   showPeerClose = false,
   onPeerClose,
-  /** 쇼케이스 꺼짐 미리보기 — 이름 숨김, 번호+VLUE 인증만 */
+  /** 쇼케이스 꺼짐 미리보기 — 이름 숨김, 번호+VLUÉ 인증만 */
   showcaseOffPreview = false,
-  /** 실통화 — 쇼케이스 꺼짐 탭 시 부모 VLUE 인증 팝업 */
+  /** 실통화 — 쇼케이스 꺼짐 탭 시 부모 VLUÉ 인증 팝업 */
   onAuthPopupRequest,
   /** true면 마운트 시 인증 팝업 자동 오픈 (사이드 미리보기) */
   autoAuthPopup = false,
@@ -337,7 +337,7 @@ export default function LetteringIncomingNotification({
     }
     if (showcaseOffPreview && verified && !expanded) {
       if (previewMode && !suppressExpandGuide) {
-        showGuide("미리보기입니다. 실제 통화에서 VLUE 인증 팝업이 표시됩니다.");
+        showGuide("미리보기입니다. 실제 통화에서 VLUÉ 인증 팝업이 표시됩니다.");
       }
       if (onAuthPopupRequest) onAuthPopupRequest();
       else if (previewMode) setAuthMemberPopupOpen(true);
@@ -814,7 +814,7 @@ export default function LetteringIncomingNotification({
     String(c.name || c.displayName || receptionLines?.name || "").trim() ||
     contactSavedName;
   const previewShowcaseId = useMemo(() => {
-    /* 미인증은 수신자 로컬 핸들을 붙이지 않음. 상호→이름→VLUE ID (아이디 금지) */
+    /* 미인증은 수신자 로컬 핸들을 붙이지 않음. 상호→이름→VLUÉ ID (아이디 금지) */
     if (isUnverified) return "";
     return resolveShowcaseBarOwnerLabel(c, { hideBroadcastName });
   }, [
@@ -839,10 +839,10 @@ export default function LetteringIncomingNotification({
   const showcaseOffAuthLabel = useMemo(() => {
     if (!hideBroadcastName) {
       const name = peerVerifiedName;
-      if (name) return `VLUE 인증 · ${name}`;
+      if (name) return `VLUÉ 인증 · ${name}`;
     }
     if (peerPublicHandle) return `@${peerPublicHandle}`;
-    return "VLUE 인증";
+    return "VLUÉ 인증";
   }, [hideBroadcastName, peerVerifiedName, peerPublicHandle]);
 
   const authPopupIdentity = useMemo(
@@ -909,7 +909,7 @@ export default function LetteringIncomingNotification({
 
   const handleOpenFeed = () => {
     if (previewMode) {
-      showGuide("미리보기입니다. 실제 통화 중에는 VLUE 인증정보를 확인할 수 있습니다.");
+      showGuide("미리보기입니다. 실제 통화 중에는 VLUÉ 인증정보를 확인할 수 있습니다.");
       return;
     }
     const payload = {
@@ -1395,10 +1395,10 @@ export default function LetteringIncomingNotification({
             {isLookupPending
               ? "번호 확인 중"
               : showcaseOffPreview
-                ? "VLUE"
+                ? "VLUÉ"
                 : previewShowcaseId
                   ? `${previewShowcaseId} Showcase`
-                  : "VLUE Showcase"}
+                  : "VLUÉ Showcase"}
           </span>
         </div>
         {previewMode && showOwnerSettings ? (
@@ -1446,8 +1446,8 @@ export default function LetteringIncomingNotification({
           {verified && showcaseOffPreview ? (
             <span
               className="lettering-auth-shield-mark"
-              title="VLUE 인증"
-              aria-label="VLUE 인증됨"
+              title="VLUÉ 인증"
+              aria-label="VLUÉ 인증됨"
             >
               <ShieldCheck className="lettering-auth-shield-mark__icon" strokeWidth={2.2} aria-hidden />
             </span>

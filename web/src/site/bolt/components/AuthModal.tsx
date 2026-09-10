@@ -151,7 +151,7 @@ export default function AuthModal({
       if (billable && !webPayEnabled) {
         try {
           window.alert(
-            '가입이 완료되었습니다.\n유료 멤버십 결제는 VLUE 앱을 다운로드하여 진행해 주세요.'
+            '가입이 완료되었습니다.\n유료 멤버십 결제는 VLUÉ 앱을 다운로드하여 진행해 주세요.'
           );
         } catch {
           /* ignore */
@@ -257,7 +257,7 @@ export default function AuthModal({
             className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-sm ring-1 ring-blue-900/10"
             draggable={false}
           />
-          <h2 className="mt-4 text-[24px] font-bold tracking-tight text-slate-900">VLUE</h2>
+          <h2 className="mt-4 text-[24px] font-bold tracking-tight text-slate-900">VLUÉ</h2>
           <p className="mt-2 w-full max-w-[300px] text-center text-[13px] font-normal leading-snug text-slate-600 [text-wrap:pretty] [word-break:keep-all] sm:max-w-[320px] sm:text-[14px] sm:leading-relaxed">
             검증된 연결로 대화하고, 비즈니스를 이어갑니다.
           </p>
@@ -271,7 +271,7 @@ export default function AuthModal({
           {!generalAuthOpen ? (
             <div className="mt-7 flex w-full max-w-[300px] flex-col items-center">
               <p className="w-full text-center text-[12px] leading-relaxed text-slate-600 [word-break:keep-all]">
-                카카오 · Google · 네이버 · Instagram · VLUE 가입과 로그인이 가능합니다.
+                카카오 · Google · 네이버 · Instagram · VLUÉ 가입과 로그인이 가능합니다.
               </p>
               <div className="mt-4 flex w-full flex-col gap-2.5">
                 <KakaoLoginButton disabled={loading} />
@@ -290,10 +290,10 @@ export default function AuthModal({
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white shadow-sm" aria-hidden>
                   <img src={VLUE_BRAND_LOGO} alt="" className="h-5 w-5 rounded" />
                 </span>
-                <span>VLUE 로그인 · 회원가입</span>
+                <span>VLUÉ 로그인 · 회원가입</span>
               </button>
               <p className="mt-3 w-full text-center text-[11px] leading-snug text-slate-500 [word-break:keep-all]">
-                VLUE 내부 기능 중 본인인증이 필요할 수 있습니다.
+                VLUÉ 내부 기능 중 본인인증이 필요할 수 있습니다.
               </p>
             </div>
           ) : (

@@ -11,7 +11,7 @@ import "./showcase-pull-down-preview.css";
 /**
  * 블루 쇼케이스 설정 — 우측 사이드 탭 「미리보기」
  * 탭/왼쪽으로 스윽 → 전체 화면 미리보기
- * 쇼케이스 꺼짐 — VLUE 인증 팝업(번호+인증)만, BGM·콘텐츠 슬라이드 없음
+ * 쇼케이스 꺼짐 — VLUÉ 인증 팝업(번호+인증)만, BGM·콘텐츠 슬라이드 없음
  */
 export default function ShowcasePullDownPreview({
   card,

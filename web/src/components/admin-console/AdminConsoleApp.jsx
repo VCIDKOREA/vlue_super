@@ -31,7 +31,7 @@ function AdminConsoleLogin({ onSuccess }) {
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-slate-950 px-4">
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
-        <p className="text-center text-[11px] font-bold uppercase tracking-widest text-blue-400">VLUE Admin</p>
+        <p className="text-center text-[11px] font-bold uppercase tracking-widest text-blue-400">VLUÉ Admin</p>
         <h1 className="mt-2 text-center text-[20px] font-black text-white">관리자 대시보드</h1>
         <p className="mt-1 text-center text-[12px] text-slate-400">role=admin 계정만 접근할 수 있습니다.</p>
         <label className="mt-5 block text-[11px] font-bold text-slate-400">

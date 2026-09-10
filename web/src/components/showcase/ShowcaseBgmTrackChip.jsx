@@ -13,7 +13,7 @@ import {
 import { readShowcaseStyle, writeShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 
 const MODE_LABEL = {
-  signature: "VLUE Signature Sound",
+  signature: "VLUÉ Signature Sound",
   user: "User Original Sound",
   borrowed: "Shared Track",
   none: "미설정"
@@ -246,7 +246,7 @@ export default function ShowcaseBgmTrackChip({
               </div>
             </dl>
             <p className="showcase-bgm-sheet__note">
-              VLUE는 음원을 판매하거나 저작권을 최종 인증하지 않습니다. 등록자 권리·이용 권한 범위에서
+              VLUÉ는 음원을 판매하거나 저작권을 최종 인증하지 않습니다. 등록자 권리·이용 권한 범위에서
               소개·재생됩니다.
             </p>
             {actionMsg ? <p className="showcase-bgm-sheet__action-msg">{actionMsg}</p> : null}

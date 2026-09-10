@@ -1,5 +1,5 @@
 /**
- * 본인 VLUE 쇼케이스를 지인 번호로 문자 전달할 때 쓰는 링크·본문
+ * 본인 VLUÉ 쇼케이스를 지인 번호로 문자 전달할 때 쓰는 링크·본문
  */
 
 import { buildPublicShowcaseUrl } from "./vlueViralLinks.js";
@@ -9,7 +9,7 @@ import { toKoreaNationalDigits } from "./letteringPhoneMatch.js";
 export function buildShowcaseSmsBody(ownerPhone = "") {
   const url = buildPublicShowcaseUrl(ownerPhone);
   return [
-    "[VLUE]",
+    "[VLUÉ]",
     "인증 디지털 쇼케이스입니다.",
     "공식 주소 m.vlue.kr",
     "",

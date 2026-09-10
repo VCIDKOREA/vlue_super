@@ -1,5 +1,5 @@
 /**
- * VLUE PAGE 상점 신청·상품 (로컬 프로토타입 — 추후 API 연동)
+ * VLUÉ PAGE 상점 신청·상품 (로컬 프로토타입 — 추후 API 연동)
  */
 
 import { PAGE_PROFILE_CHANGED_EVENT } from "./pageProfileStorage.js";

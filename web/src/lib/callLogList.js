@@ -42,7 +42,7 @@ function pickSavedContactName(rawName, phone, phoneKey) {
   return name;
 }
 
-/** 목록 표시용 이름: VLUE 회원명 → 저장(주소록)명 */
+/** 목록 표시용 이름: VLUÉ 회원명 → 저장(주소록)명 */
 export function resolveCallDisplayName(call) {
   const phone = call?.phoneDisplay || call?.phone || "";
   const key = call?.phoneKey || callLogPhoneKey(phone);
@@ -256,7 +256,7 @@ export function applyLocalKnownPeersToCallGroups(groups) {
 }
 
 /**
- * 기기 주소록·동기화 연락처 이름으로 목록 보강 (VLUE 회원명보다 우선하지 않음).
+ * 기기 주소록·동기화 연락처 이름으로 목록 보강 (VLUÉ 회원명보다 우선하지 않음).
  */
 export function applyKnownContactsToCallGroups(groups) {
   return (Array.isArray(groups) ? groups : []).map((g) => {
@@ -365,7 +365,7 @@ export function buildCallHistoryList({ deviceEntries, lineEvents, selectedLine, 
   return enrichCallLogGroupsWithShowcaseHistory(mergeDeviceAndLineCallGroups(deviceGroups, lineGroups));
 }
 
-/** VLUE 회원: 이름 + 번호. 저장 연락처: 저장 이름. 그 외: 번호만. */
+/** VLUÉ 회원: 이름 + 번호. 저장 연락처: 저장 이름. 그 외: 번호만. */
 export function formatCallGroupLabel(call) {
   const phone = String(call?.phoneDisplay || call?.phone || "").trim() || "—";
   const key = call?.phoneKey || callLogPhoneKey(phone);

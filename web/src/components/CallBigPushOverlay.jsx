@@ -60,7 +60,7 @@ export default function CallBigPushOverlay({
       return {
         mode: "instagram",
         imageUrl: feed.imageUrl || "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&q=80",
-        caption: feed.caption || "오늘도 안전한 하루 ✨ VLUE와 함께해요",
+        caption: feed.caption || "오늘도 안전한 하루 ✨ VLUÉ와 함께해요",
         link: feed.creatorLink || "https://instagram.com",
         handle: feed.instagramHandle || "@vlue.official"
       };
@@ -127,7 +127,7 @@ export default function CallBigPushOverlay({
             <div className="vlue-call-big-push__bar-row">
               <span className="vlue-call-big-push__phone">{phoneLabel}</span>
               {verified ? (
-                <span className="vlue-call-big-push__badge" title="VLUE 인증">
+                <span className="vlue-call-big-push__badge" title="VLUÉ 인증">
                   <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
                   <span>인증</span>
                 </span>
@@ -198,7 +198,7 @@ export default function CallBigPushOverlay({
 
           {/* 유료 — 디지털 인증명함 (드롭다운 하단) */}
           {showBizcard ? (
-            <section className="vlue-call-big-push__bizcard" aria-label="VLUE 인증 명함">
+            <section className="vlue-call-big-push__bizcard" aria-label="VLUÉ 인증 명함">
               <div className="vlue-call-big-push__bizcard-label">
                 <BadgeCheck className="h-4 w-4 text-blue-600" aria-hidden />
                 <span>디지털 인증명함</span>
@@ -212,7 +212,7 @@ export default function CallBigPushOverlay({
           )}
 
           <p className="vlue-call-big-push__safety">
-            VLUE가 통화 상대를 백그라운드에서 검증 중입니다. 의심되면 통화를 끊고 번호를 검색해 보세요.
+            VLUÉ가 통화 상대를 백그라운드에서 검증 중입니다. 의심되면 통화를 끊고 번호를 검색해 보세요.
           </p>
         </div>
       </div>

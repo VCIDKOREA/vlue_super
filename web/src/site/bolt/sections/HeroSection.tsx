@@ -42,7 +42,7 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
 
         <p className="hero-desc hero-animate hero-animate--3 mx-auto text-slate-600" style={{ wordBreak: 'keep-all' }}>
           <span className="hidden md:inline">
-            전화·문자를 받기 전, 공공데이터와 VLUE 인증 데이터를 동시에 비교분석하여
+            전화·문자를 받기 전, 공공데이터와 VLUÉ 인증 데이터를 동시에 비교분석하여
             <br />
           </span>
           <span className="hero-desc-accent">기관·번호·사업자번호를 한 번에 검증합니다.</span>
@@ -80,12 +80,12 @@ export default function HeroSection({ onSearch, onNavigate }: HeroSectionProps) 
 
         <div className="flex flex-wrap items-center justify-center hero-cta-wrap hero-animate hero-animate--5">
           <button onClick={() => onNavigate('pricing')} className="btn-primary hero-cta-primary">
-            VLUE 인증 신청하기
+            VLUÉ 인증 신청하기
             <ChevronRight className="w-4 h-4" />
           </button>
           {showStoreCta ? (
             <button onClick={() => onNavigate('shopping')} className="btn-secondary hero-cta-secondary">
-              VLUE 스토어 바로가기
+              VLUÉ 스토어 바로가기
             </button>
           ) : (
             <button onClick={() => onNavigate('pricing')} className="btn-secondary hero-cta-secondary">

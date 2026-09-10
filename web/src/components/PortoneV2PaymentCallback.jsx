@@ -91,7 +91,7 @@ export default function PortoneV2PaymentCallback({
           const { addPushNotification, buildPaymentReceiptBody } = await import(
             "../lib/pushNotificationInbox.js"
           );
-          const productName = result.orderName || "VLUE 결제";
+          const productName = result.orderName || "VLUÉ 결제";
           const productDetail =
             /테스트/i.test(productName)
               ? "포트원 V2(KPN) 결제 연동 테스트 상품입니다. 실제 서비스 이용 금액이 아니며, 결제 승인·알림·구매확인 흐름 검증용으로 제공됩니다."
@@ -143,7 +143,7 @@ export default function PortoneV2PaymentCallback({
 
   const hint =
     status === "ok"
-      ? "VLUE에서 이어서 이용해 보세요."
+      ? "VLUÉ에서 이어서 이용해 보세요."
       : status === "cancelled"
         ? "설정 › 결제 테스트에서 다시 진행할 수 있습니다."
         : status === "error"
@@ -153,7 +153,7 @@ export default function PortoneV2PaymentCallback({
   return (
     <div className="portone-v2-cb" data-status={status}>
       <div className="portone-v2-cb__stage">
-        <p className="portone-v2-cb__brand">VLUE</p>
+        <p className="portone-v2-cb__brand">VLUÉ</p>
         <div className={`portone-v2-cb__mark portone-v2-cb__mark--${status}`} aria-hidden>
           <StatusIcon status={status} />
         </div>

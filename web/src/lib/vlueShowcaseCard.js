@@ -5,7 +5,7 @@ import { readDccLinePreview } from "./dccLineState.js";
 import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
 
 /**
- * VLUE Showcase · VLUE Case — 동일 명함/프로필 데이터 소스
+ * VLUÉ Showcase · VLUÉ Case — 동일 명함/프로필 데이터 소스
  * (홈 빅푸시 미리보기 ↔ 프로필 사이드바 미리보기)
  * @param {{ membershipTier?: string, previewExample?: boolean }} [opts]
  */

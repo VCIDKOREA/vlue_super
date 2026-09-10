@@ -42,7 +42,7 @@ export async function approveParentalConsentWithPass({ devBypass = false } = {})
   return parseJson(res);
 }
 
-/** 자녀 — 부모 VLUE 아이디로 승인 요청 푸시 */
+/** 자녀 — 부모 VLUÉ 아이디로 승인 요청 푸시 */
 export async function requestParentalConsentToGuardian(guardianHandle) {
   const handle = String(guardianHandle || "").trim().replace(/^@+/, "");
   const res = await vlueAuthFetch(apiUrl("/api/auth/parental-consent/request"), {

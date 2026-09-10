@@ -286,7 +286,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                 초대 수락·거절은 <span className="font-bold">푸시 알림·알림함</span>에서 처리하세요.
               </p>
               <p className={`mt-1.5 text-[11px] leading-relaxed ${sub}`}>
-                가족을 <span className="font-bold">직접 등록·신청</span>하려면 유료 회원(VLUE 멤버십)이 필요합니다.
+                가족을 <span className="font-bold">직접 등록·신청</span>하려면 유료 회원(VLUÉ 멤버십)이 필요합니다.
               </p>
             </div>
           ) : null}
@@ -295,7 +295,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             <div className={`mt-3 rounded-xl border px-3 py-3 ${isDarkMode ? "border-amber-500/25 bg-amber-500/10" : "border-amber-100 bg-amber-50/90"}`}>
               <p className={`text-[12px] font-black ${isDarkMode ? "text-amber-100" : "text-amber-900"}`}>유료 회원 전용 — 가족 보호 신청</p>
               <p className={`mt-1.5 text-[11px] leading-relaxed ${sub}`}>
-                부모·자녀·가족을 등록하고 보호 알림을 설정하려면 VLUE 유료 멤버십이 필요합니다.
+                부모·자녀·가족을 등록하고 보호 알림을 설정하려면 VLUÉ 유료 멤버십이 필요합니다.
                 초대를 받은 경우에는 알림함에서 수락·거절할 수 있습니다.
               </p>
               <button
@@ -313,7 +313,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             <div className={`rounded-xl border p-2.5 ${settingsBox}`}>
               <p className={`text-[11px] font-bold ${strong}`}>부모(노부모) 보호</p>
               <p className={`mt-0.5 text-[10px] leading-relaxed ${sub}`}>
-                VLUE 비회원·저장되지 않은 모르는 번호(내선·대표·휴대폰)와 장시간 통화, 원격제어 앱, 112·119·금감원 등 정부·공공기관 통화 시 알림 (네이티브 연동)
+                VLUÉ 비회원·저장되지 않은 모르는 번호(내선·대표·휴대폰)와 장시간 통화, 원격제어 앱, 112·119·금감원 등 정부·공공기관 통화 시 알림 (네이티브 연동)
               </p>
               <label className={`mt-2 flex items-center justify-between text-[11px] ${sub}`}>
                 <span>앱 미접속</span>
@@ -465,7 +465,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             </button>
           </div>
 
-          <label className={`mt-3 block text-[11px] font-bold ${strong}`}>가족 VLUE 아이디 · 전화번호</label>
+          <label className={`mt-3 block text-[11px] font-bold ${strong}`}>가족 VLUÉ 아이디 · 전화번호</label>
           <div className="mt-1.5 flex gap-2">
             <input
               type="text"

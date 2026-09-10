@@ -1,5 +1,5 @@
 /**
- * VLUE 클라이언트 접근 식별 — Electron UA 토큰 · 네이티브 셸 · 브라우저 차단
+ * VLUÉ 클라이언트 접근 식별 — Electron UA 토큰 · 네이티브 셸 · 브라우저 차단
  */
 
 import { buildSameOriginInstallerUrl } from "./vluePcInstaller.js";

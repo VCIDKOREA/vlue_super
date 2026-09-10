@@ -22,10 +22,10 @@ const MOCK_MAILS: MailItem[] = [
   {
     id: 'm1',
     from: '명경채 요양병원',
-    fromOrg: 'VLUE-MED-2024-0031',
+    fromOrg: 'VLUÉ-MED-2024-0031',
     subject: '[명경채 요양병원] 2024년 건강검진 안내',
     preview: '안녕하세요. 명경채 요양병원입니다. 2024년 연간 건강검진 일정을 안내드립니다...',
-    body: '안녕하세요. 명경채 요양병원입니다.\n\n2024년 연간 건강검진 일정을 안내드립니다.\n\n검진 일정: 2024년 12월 1일 ~ 2025년 1월 31일\n검진 항목: 기본 혈액 검사, 흉부 X-ray, 복부 초음파\n\n예약 문의: 02-1234-5678\n\n본 메일은 VLUE 인증 기관에서 발송된 안전한 메일입니다.',
+    body: '안녕하세요. 명경채 요양병원입니다.\n\n2024년 연간 건강검진 일정을 안내드립니다.\n\n검진 일정: 2024년 12월 1일 ~ 2025년 1월 31일\n검진 항목: 기본 혈액 검사, 흉부 X-ray, 복부 초음파\n\n예약 문의: 02-1234-5678\n\n본 메일은 VLUÉ 인증 기관에서 발송된 안전한 메일입니다.',
     time: '오전 10:24',
     date: '2024.12.15',
     read: false,
@@ -37,7 +37,7 @@ const MOCK_MAILS: MailItem[] = [
   {
     id: 'm2',
     from: '다다오피스',
-    fromOrg: 'VLUE-BIZ-2024-0087',
+    fromOrg: 'VLUÉ-BIZ-2024-0087',
     subject: '[다다오피스] 12월 이용 요금 청구서',
     preview: '다다오피스를 이용해 주셔서 감사합니다. 12월 이용 요금 청구서를 첨부합니다...',
     body: '다다오피스를 이용해 주셔서 감사합니다.\n\n12월 이용 요금 청구서를 안내드립니다.\n\n청구 기간: 2024년 12월 1일 ~ 12월 31일\n청구 금액: 55,000원 (VAT 포함)\n납부 기한: 2025년 1월 10일\n\n자동이체 계좌로 출금 예정입니다.\n\n문의: 1588-0000',
@@ -52,10 +52,10 @@ const MOCK_MAILS: MailItem[] = [
   {
     id: 'm3',
     from: '한국신뢰금융',
-    fromOrg: 'VLUE-FIN-2024-0012',
+    fromOrg: 'VLUÉ-FIN-2024-0012',
     subject: '[한국신뢰금융] 대출 상환 일정 안내',
     preview: '안녕하세요, 고객님. 대출 상환 일정과 관련하여 안내 말씀 드립니다...',
-    body: '안녕하세요, 고객님.\n\n대출 상환 일정과 관련하여 안내 말씀 드립니다.\n\n다음 달 상환 예정 금액: 350,000원\n상환 예정일: 2025년 1월 5일\n잔여 원금: 8,200,000원\n\n자세한 내용은 앱에서 확인 가능합니다.\n\n본 메일은 VLUE 인증 발신으로 안전한 공식 메일입니다.',
+    body: '안녕하세요, 고객님.\n\n대출 상환 일정과 관련하여 안내 말씀 드립니다.\n\n다음 달 상환 예정 금액: 350,000원\n상환 예정일: 2025년 1월 5일\n잔여 원금: 8,200,000원\n\n자세한 내용은 앱에서 확인 가능합니다.\n\n본 메일은 VLUÉ 인증 발신으로 안전한 공식 메일입니다.',
     time: '2일 전',
     date: '2024.12.13',
     read: true,
@@ -66,11 +66,11 @@ const MOCK_MAILS: MailItem[] = [
   },
   {
     id: 'm4',
-    from: 'VLUE 플랫폼',
+    from: 'VLUÉ 플랫폼',
     fromOrg: 'platform@vlue.kr',
-    subject: 'VLUE 보안 메일 서비스에 오신 것을 환영합니다!',
-    preview: 'VLUE 보안 메일 서비스를 이용해 주셔서 감사합니다. 인증 기관의 공식 메일만을...',
-    body: 'VLUE 보안 메일 서비스를 이용해 주셔서 감사합니다.\n\nVLUE 인증 기관의 공식 메일만을 안전하게 수신할 수 있습니다.\n\n주요 기능:\n• VLUE 인증 발신자 확인\n• 피싱 메일 자동 차단\n• 발신 기관 실시간 인증 조회\n• 메일 암호화 전송\n\n더 안전한 디지털 생활을 위해 VLUE와 함께하세요.',
+    subject: 'VLUÉ 보안 메일 서비스에 오신 것을 환영합니다!',
+    preview: 'VLUÉ 보안 메일 서비스를 이용해 주셔서 감사합니다. 인증 기관의 공식 메일만을...',
+    body: 'VLUÉ 보안 메일 서비스를 이용해 주셔서 감사합니다.\n\nVLUE 인증 기관의 공식 메일만을 안전하게 수신할 수 있습니다.\n\n주요 기능:\n• VLUÉ 인증 발신자 확인\n• 피싱 메일 자동 차단\n• 발신 기관 실시간 인증 조회\n• 메일 암호화 전송\n\n더 안전한 디지털 생활을 위해 VLUÉ와 함께하세요.',
     time: '1주 전',
     date: '2024.12.08',
     read: true,
@@ -126,7 +126,7 @@ export default function SecureMailPage({ onBack }: SecureMailPageProps) {
               <Mail className="w-5 h-5 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="text-white/70 text-xs font-medium mb-0.5">내 VLUE메일 주소</p>
+              <p className="text-white/70 text-xs font-medium mb-0.5">내 VLUÉ메일 주소</p>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-white font-bold text-base tracking-tight" style={{ letterSpacing: '-0.02em' }}>user@vlue.kr</span>
                 <span className="inline-flex items-center gap-1 text-xs text-white bg-white/20 border border-white/30 px-2 py-0.5 rounded-full font-semibold">
@@ -155,8 +155,8 @@ export default function SecureMailPage({ onBack }: SecureMailPageProps) {
               <Lock className="w-3.5 h-3.5 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-gray-900" style={{ letterSpacing: '-0.02em' }}>VLUE메일</h1>
-              <p className="text-gray-400 text-xs">VLUE 인증 기관 공식 메일만 수신됩니다</p>
+              <h1 className="text-sm font-bold text-gray-900" style={{ letterSpacing: '-0.02em' }}>VLUÉ메일</h1>
+              <p className="text-gray-400 text-xs">VLUÉ 인증 기관 공식 메일만 수신됩니다</p>
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -327,7 +327,7 @@ export default function SecureMailPage({ onBack }: SecureMailPageProps) {
                         {selected.certified && (
                           <span className="flex items-center gap-1 text-xs text-primary-600 bg-primary-50 border border-primary-100 px-2 py-0.5 rounded-full font-semibold">
                             <CheckCircle className="w-3 h-3" />
-                            VLUE 인증
+                            VLUÉ 인증
                           </span>
                         )}
                       </div>
@@ -346,7 +346,7 @@ export default function SecureMailPage({ onBack }: SecureMailPageProps) {
                   <div className="flex items-center gap-2 p-3 bg-primary-50 border border-primary-100 rounded-2xl mb-5">
                     <Lock className="w-4 h-4 text-primary-500 flex-shrink-0" />
                     <p className="text-primary-700 text-xs leading-relaxed">
-                      이 메일은 <strong>VLUE 인증 기관</strong>에서 발송된 공식 안전 메일입니다. 개인정보 피싱 위험이 없습니다.
+                      이 메일은 <strong>VLUÉ 인증 기관</strong>에서 발송된 공식 안전 메일입니다. 개인정보 피싱 위험이 없습니다.
                     </p>
                   </div>
                 )}

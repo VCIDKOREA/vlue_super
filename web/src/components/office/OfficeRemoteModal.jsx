@@ -60,7 +60,7 @@ export default function OfficeRemoteModal({ open, onClose, onToast, isDarkMode =
             <p className="py-10 text-center text-[12px] text-slate-400">불러오는 중…</p>
           ) : files.length === 0 ? (
             <p className="rounded-xl bg-slate-50 px-4 py-10 text-center text-[12px] text-slate-500">
-              저장된 문서가 없습니다. VLUE로 보낸 파일이 내 문서에 모입니다.
+              저장된 문서가 없습니다. VLUÉ로 보낸 파일이 내 문서에 모입니다.
             </p>
           ) : (
             <ul className="space-y-2">

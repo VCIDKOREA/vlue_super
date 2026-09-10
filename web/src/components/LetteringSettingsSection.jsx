@@ -7,7 +7,7 @@ import {
 } from "../lib/letteringSettings.js";
 import CallDetectionStatusBanner from "./CallDetectionStatusBanner.jsx";
 
-/** 메인 앱 설정 — VLUE 레터링 켜기/끄기 + 권한 유도 */
+/** 메인 앱 설정 — VLUÉ 레터링 켜기/끄기 + 권한 유도 */
 export default function LetteringSettingsSection({
   isDarkMode = false,
   onNotice,
@@ -28,7 +28,7 @@ export default function LetteringSettingsSection({
       if (!next) {
         writeLetteringEnabled(false);
         setEnabled(false);
-        onNotice?.("VLUE 레터링이 꺼졌습니다.");
+        onNotice?.("VLUÉ 레터링이 꺼졌습니다.");
         return;
       }
       setBusy(true);
@@ -42,7 +42,7 @@ export default function LetteringSettingsSection({
         );
       } else {
         onNotice?.(
-          "레터링이 켜졌습니다. VLUE 앱에서 전화·통화기록·다른 앱 위에 표시 권한을 허용해 주세요."
+          "레터링이 켜졌습니다. VLUÉ 앱에서 전화·통화기록·다른 앱 위에 표시 권한을 허용해 주세요."
         );
       }
     },
@@ -54,7 +54,7 @@ export default function LetteringSettingsSection({
     if (r?.ok) {
       onNotice?.("「권한」에서 카메라·사진·위치 등을 허용으로 바꿔 주세요.");
     } else {
-      onNotice?.("앱 설정을 열 수 없습니다. 기기 설정 → 앱 → VLUE → 권한으로 이동해 주세요.");
+      onNotice?.("앱 설정을 열 수 없습니다. 기기 설정 → 앱 → VLUÉ → 권한으로 이동해 주세요.");
     }
   }, [onNotice]);
 
@@ -69,12 +69,12 @@ export default function LetteringSettingsSection({
   return (
     <div className={`rounded-2xl border p-3 ${border}`}>
       <p className={`mb-1 text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
-        VLUE 레터링 · 통화 감지
+        VLUÉ 레터링 · 통화 감지
       </p>
       <p className={`mb-3 text-[11px] leading-snug ${hint}`}>
-        통화 수·발신 시 VLUE 인증 명함·쇼케이스를 표시합니다. 꺼두면 백그라운드 감시가 중지됩니다.
+        통화 수·발신 시 VLUÉ 인증 명함·쇼케이스를 표시합니다. 꺼두면 백그라운드 감시가 중지됩니다.
         <br />
-        ※ 정상 동작 시 「백그라운드 실행」목록에 VLUE가 있으면 됩니다. 알림창에 없어도 송출됩니다.
+        ※ 정상 동작 시 「백그라운드 실행」목록에 VLUÉ가 있으면 됩니다. 알림창에 없어도 송출됩니다.
       </p>
       <div className="mb-3">
         <CallDetectionStatusBanner isDarkMode={isDarkMode} onNotice={onNotice} />
@@ -89,7 +89,7 @@ export default function LetteringSettingsSection({
             남은 권한 허용하기
           </button>
           <p className={`mb-3 text-[10px] leading-snug ${hint}`}>
-            한 번 누르면 VLUE 앱 설정으로 이동합니다. 「권한」에서 카메라·사진·위치 등을 허용으로 바꾸면
+            한 번 누르면 VLUÉ 앱 설정으로 이동합니다. 「권한」에서 카메라·사진·위치 등을 허용으로 바꾸면
             됩니다.
           </p>
         </>
@@ -129,7 +129,7 @@ export default function LetteringSettingsSection({
               } catch {
                 /* ignore */
               }
-              onNotice?.("빅푸시 테스트는 VLUE Android 앱에서만 가능합니다.");
+              onNotice?.("빅푸시 테스트는 VLUÉ Android 앱에서만 가능합니다.");
             }}
           >
             빅푸시 테스트 (통화 없이)
@@ -149,7 +149,7 @@ export default function LetteringSettingsSection({
               } catch {
                 /* ignore */
               }
-              onNotice?.("DCP 테스트는 VLUE Android 앱에서만 가능합니다. 홈 화면 버튼으로도 미리볼 수 있습니다.");
+              onNotice?.("DCP 테스트는 VLUÉ Android 앱에서만 가능합니다. 홈 화면 버튼으로도 미리볼 수 있습니다.");
             }}
           >
             DCP 정상 테스트
@@ -169,7 +169,7 @@ export default function LetteringSettingsSection({
               } catch {
                 /* ignore */
               }
-              onNotice?.("DCP 테스트는 VLUE Android 앱에서만 가능합니다. 홈 화면 버튼으로도 미리볼 수 있습니다.");
+              onNotice?.("DCP 테스트는 VLUÉ Android 앱에서만 가능합니다. 홈 화면 버튼으로도 미리볼 수 있습니다.");
             }}
           >
             DCP 비정상 테스트

@@ -1,4 +1,4 @@
-/** VLUE 통합 이용약관 — 표시용 구조화 본문 (버전은 TERMS_VERSION과 함께 관리) */
+/** VLUÉ 통합 이용약관 — 표시용 구조화 본문 (버전은 TERMS_VERSION과 함께 관리) */
 
 export const TERMS_VERSION = "2026.09.01-ko-v9";
 

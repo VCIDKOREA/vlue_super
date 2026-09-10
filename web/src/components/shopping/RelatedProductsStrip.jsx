@@ -47,7 +47,7 @@ export default function RelatedProductsStrip({ currentItem, onOpen, isDarkMode =
     <section className={`mt-4 rounded-2xl border p-3 ${isDarkMode ? "border-white/10 bg-[#12151c]" : "border-slate-200 bg-slate-50"}`}>
       <div className="mb-2.5">
         <h3 className={`text-[15px] font-black ${titleCls}`}>함께 보면 좋을 상품</h3>
-        <p className={`mt-0.5 text-[11px] font-medium ${subCls}`}>이 상품과 비슷한 VLUE 추천</p>
+        <p className={`mt-0.5 text-[11px] font-medium ${subCls}`}>이 상품과 비슷한 VLUÉ 추천</p>
       </div>
 
       {loading ? (

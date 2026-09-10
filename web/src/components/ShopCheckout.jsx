@@ -9,7 +9,7 @@ import {
 } from "../lib/shopApi.js";
 
 /**
- * VLUE PAGE 상점 — 포트원 일반결제(단발) 체크아웃
+ * VLUÉ PAGE 상점 — 포트원 일반결제(단발) 체크아웃
  */
 export default function ShopCheckout({ product, sellerUserId, onClose, onPaid }) {
   const [payMethod, setPayMethod] = useState("card");

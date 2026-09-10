@@ -57,22 +57,22 @@ function VlueVerifiedBadge({ className = "" }) {
   return (
     <span
       className={`lettering-vlue-verified-badge inline-flex shrink-0 items-center justify-center ${className}`.trim()}
-      title="VLUE 인증"
-      aria-label="VLUE 인증됨"
+      title="VLUÉ 인증"
+      aria-label="VLUÉ 인증됨"
     >
       <VlueCyanVerifiedSeal size={16} />
     </span>
   );
 }
 
-/** 유료 명함 — 도용 방지 VLUE 홀로그램 (앞·뒷면 공통) */
+/** 유료 명함 — 도용 방지 VLUÉ 홀로그램 (앞·뒷면 공통) */
 function BizcardHologram() {
   return (
     <div className="lettering-bizcard__hologram" aria-hidden>
       <span className="lettering-bizcard__hologram-aurora" />
       <span className="lettering-bizcard__hologram-mesh" />
       <span className="lettering-bizcard__hologram-shine" />
-      <span className="lettering-bizcard__hologram-mark">VLUE</span>
+      <span className="lettering-bizcard__hologram-mark">VLUÉ</span>
     </div>
   );
 }
@@ -181,7 +181,7 @@ function CardFront({ card, securityOverlay }) {
       ) : null}
 
       <p className="lettering-bizcard__vlue-mark" aria-hidden>
-        VLUE
+        VLUÉ
       </p>
     </BizcardFace>
   );

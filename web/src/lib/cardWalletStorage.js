@@ -1,4 +1,4 @@
-/** VLUE 명함 지갑 — localStorage + 탭 간 동기 이벤트 */
+/** VLUÉ 명함 지갑 — localStorage + 탭 간 동기 이벤트 */
 
 export const CARD_WALLET_STORAGE_KEY = "vlue_card_wallet";
 

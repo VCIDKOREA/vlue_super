@@ -146,7 +146,7 @@ export default function VlueEmailSettingsSection({
 
   const handleSaveVirtual = async () => {
     if (!loginId) {
-      showSettingNotice?.("로그인 후 VLUE 아이디가 메일 주소로 자동 적용됩니다.");
+      showSettingNotice?.("로그인 후 VLUÉ 아이디가 메일 주소로 자동 적용됩니다.");
       return;
     }
     setSavingVirtual(true);
@@ -156,7 +156,7 @@ export default function VlueEmailSettingsSection({
         userCompanySlug: addressKind === "brand" ? companySlug : null
       });
       setConfiguredEmail(data.mapping?.fullVirtualEmail || preview);
-      showSettingNotice?.("VLUE 메일 주소가 적용되었습니다.");
+      showSettingNotice?.("VLUÉ 메일 주소가 적용되었습니다.");
     } catch (e) {
       if (e.code === "PREMIUM_REQUIRED") {
         setUpgradeOpen(true);
@@ -331,7 +331,7 @@ export default function VlueEmailSettingsSection({
 
   return (
     <SettingsSubpageShell
-      title="VLUE 메일"
+      title="VLUÉ 메일"
       subtitle="가상 주소 · 통합 메일함"
       onBack={onBack}
       isDarkMode={isDarkMode}
@@ -341,7 +341,7 @@ export default function VlueEmailSettingsSection({
       ) : (
         <div className="space-y-3 pb-2">
           <VluePromoCard
-            headline="VLUE 메일"
+            headline="VLUÉ 메일"
             headlineAccent="사업 메일함 속으로 쏙"
             floating={
               <VlueMailPreviewFloat
@@ -350,7 +350,7 @@ export default function VlueEmailSettingsSection({
                 snippet="견적서 보내드립니다"
               />
             }
-            bodyTitle="VLUE 메일 / 사업 메일함 속으로 쏙"
+            bodyTitle="VLUÉ 메일 / 사업 메일함 속으로 쏙"
             bodyIcon="📬"
             description="로그인 아이디가 곧 메일 주소입니다. 가상 @vlue.kr로 받은 메일은 대표 메일로 전달되고, 앱 통합 메일함에서 한눈에 확인하세요."
             ctaLabel={savingVirtual ? "저장 중…" : "메일 주소 적용"}
@@ -359,7 +359,7 @@ export default function VlueEmailSettingsSection({
           />
 
           <section className={`vlue-settings-card ${isDarkMode ? "!bg-[#151821]" : ""}`}>
-            <p className="vlue-settings-card__label">내 VLUE 메일 주소</p>
+            <p className="vlue-settings-card__label">내 VLUÉ 메일 주소</p>
             <p className="vlue-settings-card__hint">별도 아이디 입력 없이 로그인 ID가 적용됩니다.</p>
 
             <div className="mt-3 space-y-2">

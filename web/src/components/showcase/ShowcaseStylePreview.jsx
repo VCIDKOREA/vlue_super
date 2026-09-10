@@ -69,7 +69,7 @@ export default function ShowcaseStylePreview({
         <div className="showcase-style-preview__cert-shell">
           <div className="showcase-style-preview__cert-top">
             <span className="showcase-style-preview__trust">
-              <Check size={12} strokeWidth={3} /> VLUE 인증
+              <Check size={12} strokeWidth={3} /> VLUÉ 인증
             </span>
             <ShowcaseBgmMuteButton />
           </div>
@@ -109,7 +109,7 @@ export default function ShowcaseStylePreview({
       >
         <div className="showcase-style-preview__top">
           <span className="showcase-style-preview__trust">
-            <Check size={12} strokeWidth={3} /> VLUE 인증
+            <Check size={12} strokeWidth={3} /> VLUÉ 인증
           </span>
           <ShowcaseBgmMuteButton />
         </div>
@@ -119,7 +119,7 @@ export default function ShowcaseStylePreview({
         {style.id === "default" && (
           <div className="showcase-style-preview__body showcase-style-preview__body--default">
             <p className="showcase-style-preview__phone">{phone}</p>
-            <p className="showcase-style-preview__hint">VLUE 안심 통신 · 번호 위장에 속지 마세요</p>
+            <p className="showcase-style-preview__hint">VLUÉ 안심 통신 · 번호 위장에 속지 마세요</p>
           </div>
         )}
 

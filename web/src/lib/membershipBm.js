@@ -52,7 +52,7 @@ export const ANNUAL_FREE_MONTHS = 2;
 export const PAID_EVENT_MONTHLY_KRW = 9900;
 export const PAID_EVENT_ANNUAL_KRW = 99000;
 export const PAID_LAUNCH_DISCOUNT_NOTE =
-  "VLUE V1 출시 기념 파격 65% 특별 할인 (종료 시까지!)";
+  "VLUÉ V1 출시 기념 파격 65% 특별 할인 (종료 시까지!)";
 export const PAID_ANNUAL_BENEFIT_NOTE =
   "(연간 구독 시 2개월 추가 무료 혜택: 연 99,000원)";
 

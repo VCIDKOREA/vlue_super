@@ -9,9 +9,9 @@ const WELCOME = [
   {
     id: "push-welcome-signup-1",
     category: "앱",
-    title: "VLUE에 회원가입을 환영합니다",
+    title: "VLUÉ에 회원가입을 환영합니다",
     body:
-      "가입을 환영합니다. 통화 시 VLUE 쇼케이스·디지털 인증명함으로 신뢰를 전달하고, 친구·주소록 연동으로 지인을 찾을 수 있습니다. 가족보호·신고·제보 기능은 설정에서 켜 주세요. 유료 회원은 쇼케이스 스타일·명함 송출 등 혜택을 바로 이용할 수 있습니다. 민감 정보는 본인 기기·계정에서만 관리되며, 의심 통화는 신고해 주세요.",
+      "가입을 환영합니다. 통화 시 VLUÉ 쇼케이스·디지털 인증명함으로 신뢰를 전달하고, 친구·주소록 연동으로 지인을 찾을 수 있습니다. 가족보호·신고·제보 기능은 설정에서 켜 주세요. 유료 회원은 쇼케이스 스타일·명함 송출 등 혜택을 바로 이용할 수 있습니다. 민감 정보는 본인 기기·계정에서만 관리되며, 의심 통화는 신고해 주세요.",
     read: false,
     createdAt: new Date().toISOString()
   }
@@ -339,15 +339,15 @@ export function clearPushNotifications({ keepPinned = true } = {}) {
 
 /** 결제 알림 본문 — 감사 인사로 시작 + 상품 상세 */
 export function buildPaymentReceiptBody({
-  productName = "VLUE 상품",
+  productName = "VLUÉ 상품",
   productDetail = "",
   amountKrw = 0,
   paymentId = ""
 } = {}) {
-  const name = String(productName || "VLUE 상품").trim();
+  const name = String(productName || "VLUÉ 상품").trim();
   const detail =
     String(productDetail || "").trim() ||
-    `${name} 결제가 정상 처리되었습니다. 결제 내역은 VLUE 계정에 안전하게 보관됩니다.`;
+    `${name} 결제가 정상 처리되었습니다. 결제 내역은 VLUÉ 계정에 안전하게 보관됩니다.`;
   const amount = Math.max(0, Math.floor(Number(amountKrw) || 0)).toLocaleString("ko-KR");
   const lines = [
     "구매해 주셔서 진심으로 감사합니다.",
@@ -372,7 +372,7 @@ export function buildRefundInquiryMailto({
   paymentId = "",
   handle = ""
 } = {}) {
-  const subject = encodeURIComponent("[VLUE] 환불·청약철회 문의");
+  const subject = encodeURIComponent("[VLUÉ] 환불·청약철회 문의");
   const amountLabel =
     amountKrw != null && Number.isFinite(Number(amountKrw))
       ? `${Math.floor(Number(amountKrw)).toLocaleString("ko-KR")}원`

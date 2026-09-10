@@ -14,7 +14,7 @@ export default class SignupErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error("[VLUE 가입 화면 오류]", error, info);
+    console.error("[VLUÉ 가입 화면 오류]", error, info);
   }
 
   render() {

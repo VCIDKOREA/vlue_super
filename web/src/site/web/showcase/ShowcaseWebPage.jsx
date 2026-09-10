@@ -163,7 +163,7 @@ export default function ShowcaseWebPage({ phone }) {
       <div className="showcase-web showcase-web--full-fs" data-vlue-public-showcase="1">
         <div className="showcase-web__fs-topbar">
           <button type="button" className="showcase-web__fs-open-app" onClick={handleAppDownload}>
-            VLUE 앱에서 열기
+            VLUÉ 앱에서 열기
           </button>
         </div>
         <div className="showcase-web__fs-stage">
@@ -223,7 +223,7 @@ export default function ShowcaseWebPage({ phone }) {
           <Check strokeWidth={3} size={11} />
         </span>
         <span className="showcase-web__trust-text">
-          {verified ? "VLUE 인증 완료 번호" : "VLUE 번호 확인"}
+          {verified ? "VLUÉ 인증 완료 번호" : "VLUÉ 번호 확인"}
         </span>
       </header>
 
@@ -238,11 +238,11 @@ export default function ShowcaseWebPage({ phone }) {
 
           {isPaid && orgLine ? <p className="showcase-web__meta">{orgLine}</p> : null}
 
-          {!isPaid && !displayName && !vlueIdLabel ? <p className="showcase-web__meta">VLUE 일상 프로필</p> : null}
+          {!isPaid && !displayName && !vlueIdLabel ? <p className="showcase-web__meta">VLUÉ 일상 프로필</p> : null}
 
           {moodText ? <p className="showcase-web__intro">{moodText}</p> : null}
 
-          {verified ? <span className="showcase-web__badge-row">VLUE Showcase</span> : null}
+          {verified ? <span className="showcase-web__badge-row">VLUÉ Showcase</span> : null}
 
           {photo ? <img className="showcase-web__photo" src={photo} alt="" /> : null}
 

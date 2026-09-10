@@ -263,7 +263,7 @@
     letter-spacing: -0.02em;
   }
 
-  /* VLUE 스토어 — 탭 한 줄 가로 스크롤 */
+  /* VLUÉ 스토어 — 탭 한 줄 가로 스크롤 */
   [data-vlue-site="marketing"] .mkt-store__mobile-tabs,
   [data-vlue-site="marketing"] .mkt-store__tabs {
     flex-wrap: nowrap !important;

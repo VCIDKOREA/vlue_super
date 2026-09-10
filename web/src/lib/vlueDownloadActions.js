@@ -1,5 +1,5 @@
 /**
- * VLUE 앱·PC 다운로드 URL 및 클릭 핸들링 (마케팅 홈 · BrowserAppBlockedPage 공통)
+ * VLUÉ 앱·PC 다운로드 URL 및 클릭 핸들링 (마케팅 홈 · BrowserAppBlockedPage 공통)
  */
 
 import { getVlueDownloadLinks } from "./vlueClientAccess.js";
@@ -11,10 +11,10 @@ export const VLUE_APP_VERSION = "1.0.0";
 
 const UNAVAILABLE = {
   windows: isWebPcDownloadEnabled()
-    ? "VLUE PC(Windows) 설치 파일을 준비 중입니다.\n잠시 후 다시 시도해 주세요."
+    ? "VLUÉ PC(Windows) 설치 파일을 준비 중입니다.\n잠시 후 다시 시도해 주세요."
     : "PC 버전은 V2(채팅 연동) 업데이트에서 제공될 예정입니다.",
   mac: isWebPcDownloadEnabled()
-    ? "VLUE PC(macOS) 버전은 준비 중입니다."
+    ? "VLUÉ PC(macOS) 버전은 준비 중입니다."
     : "PC 버전은 V2(채팅 연동) 업데이트에서 제공될 예정입니다.",
   playStore: "Google Play 스토어 출시 준비 중입니다.",
   appStore: "App Store 출시 준비 중입니다."

@@ -7,7 +7,7 @@ export const DEMO_SHOWCASE_BANNERS = Object.freeze([
     id: "demo-showcase-1",
     url: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&q=80",
     caption: "프리미엄 오피스 · 브랜드 화보",
-    overlayText: "VLUE Showcase"
+    overlayText: "VLUÉ Showcase"
   },
   {
     id: "demo-showcase-2",

@@ -48,7 +48,7 @@ export default function ContactFriendsPanel({
       key: `reg:${user.userId}`,
       kind: "registered",
       name: user.displayName || user.contactName || "회원",
-      subtitle: [user.publicHandle, user.phoneDisplay || user.contactName].filter(Boolean).join(" · ") || "VLUE 가입",
+      subtitle: [user.publicHandle, user.phoneDisplay || user.contactName].filter(Boolean).join(" · ") || "VLUÉ 가입",
       user,
       bucket: contactNameBucket(user.displayName || user.contactName || "")
     }));
@@ -70,7 +70,7 @@ export default function ContactFriendsPanel({
         return hay.includes(q);
       });
     }
-    /* 가입(VLUE 회원) 최상단 가나다순 → 그다음 비회원 추천 가나다순 */
+    /* 가입(VLUÉ 회원) 최상단 가나다순 → 그다음 비회원 추천 가나다순 */
     all.sort((a, b) => {
       const ak = a.kind === "registered" ? 0 : 1;
       const bk = b.kind === "registered" ? 0 : 1;
@@ -160,7 +160,7 @@ export default function ContactFriendsPanel({
     try {
       const res = await sendContactFriendRequest(
         user.userId,
-        `${user.contactName || user.displayName}님, VLUE에서 연결해요.`
+        `${user.contactName || user.displayName}님, VLUÉ에서 연결해요.`
       );
       if (res.ok) {
         onFriendAdded?.({
@@ -228,7 +228,7 @@ export default function ContactFriendsPanel({
               ? "주소록 권한이 허용되어 있습니다. 동기화하면 휴대폰 명단이 표시됩니다."
               : "전화부를 동기화하면 휴대폰에 저장된 명단이 표시됩니다."}
           <br />
-          VLUE 사용 중이면 <span className="text-blue-700">신청</span>, 아니면{" "}
+          VLUÉ 사용 중이면 <span className="text-blue-700">신청</span>, 아니면{" "}
           <span className="text-violet-700">추천</span>으로 공유할 수 있습니다.
         </p>
         <button

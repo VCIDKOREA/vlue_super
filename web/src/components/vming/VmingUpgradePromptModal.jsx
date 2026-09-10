@@ -6,7 +6,7 @@ const DAILY_CHAT_EXCEEDED_MESSAGE = `오늘 저와 나눌 수 있는 무료 대�
 만약 내일까지 기다리지 않고 지금 바로 멈춤 없는 대화를 이어가거나, 대화방 요약·AI 엑셀 제작 등 심도 깊은 프로젝트 전용 기능을 제한 없이 담당하게 하고 싶으시다면 아래 링크를 확인해 보세요!`;
 
 const PROJECT_LIMIT_EXCEEDED_MESSAGE =
-  "오늘 제공된 무료 체험 한도를 모두 소모하셨습니다. 환율 상승에도 부담 없는 가격! 월 4,900원 무제한 패키지로 VLUE의 모든 AI 기능을 제한 없이 고용해 보세요!";
+  "오늘 제공된 무료 체험 한도를 모두 소모하셨습니다. 환율 상승에도 부담 없는 가격! 월 4,900원 무제한 패키지로 VLUÉ의 모든 AI 기능을 제한 없이 고용해 보세요!";
 
 export default function VmingUpgradePromptModal({
   open,

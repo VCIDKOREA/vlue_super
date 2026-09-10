@@ -138,7 +138,7 @@ aiRoutes.post("/chat", vmingConsentMiddleware, async (c) => {
     const intentType = intent?.intent_type || "general_chat";
     const shareTemplate =
       intentType === "generate_evidence"
-        ? "🚨 [VLUE 보안 가드] 본 대화방의 안전한 거래 보장을 위해, 현재까지의 대화록에 대한 법적 무결성 증거 패키지(PDF) 컴파일 및 격리 보관이 완료되었습니다."
+        ? "🚨 [VLUÉ 보안 가드] 본 대화방의 안전한 거래 보장을 위해, 현재까지의 대화록에 대한 법적 무결성 증거 패키지(PDF) 컴파일 및 격리 보관이 완료되었습니다."
         : `🤖 [브이밍 AI 비서] 대화방 멤버들을 위한 결과물 생성이 완료되었습니다.`;
 
     const clientRoomId = String(body.roomId || "").trim();

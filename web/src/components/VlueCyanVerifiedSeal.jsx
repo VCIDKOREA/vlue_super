@@ -1,4 +1,4 @@
-/** Instagram-style scalloped seal — VLUE 시안 채움 인증마크 */
+/** Instagram-style scalloped seal — VLUÉ 시안 채움 인증마크 */
 
 const CYAN = "#00d2ff";
 
@@ -27,7 +27,7 @@ const CHECK_PATH = "M7.4 12.3 10.4 15.3 17.1 8.2 18.5 9.6 10.4 17.7 6.1 13.4Z";
 export default function VlueCyanVerifiedSeal({
   size = 18,
   className = "",
-  title = "VLUE 인증됨"
+  title = "VLUÉ 인증됨"
 }) {
   return (
     <svg

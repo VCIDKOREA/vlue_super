@@ -34,7 +34,7 @@ export default function VlueAuthMemberPopup({
       <article className="vlue-auth-member-popup">
         <p className="vlue-auth-member-popup__badge">경로 검증 · 정상</p>
         <p className="vlue-auth-member-popup__msg">
-          VLUE 인증 회원으로 확인되었습니다. 공개 설정된 디지털인증명함·쇼케이스가 없습니다.
+          VLUÉ 인증 회원으로 확인되었습니다. 공개 설정된 디지털인증명함·쇼케이스가 없습니다.
         </p>
         <h1 id="vlue-auth-member-popup-title" className="vlue-auth-member-popup__name">
           {title}

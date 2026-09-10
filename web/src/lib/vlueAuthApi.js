@@ -1,5 +1,5 @@
 /**
- * VLUE 통합 인증 — 마케팅 웹·슈퍼앱 동일 @vlue/api (/api/auth/*)
+ * VLUÉ 통합 인증 — 마케팅 웹·슈퍼앱 동일 @vlue/api (/api/auth/*)
  */
 import { apiUrl } from "./apiBase.js";
 import { clientKindHeaders, detectAuthPlatform, getDeviceToken, saveDeviceToken } from "./deviceAuth.js";
@@ -34,7 +34,7 @@ function displayLabelFromSession(data) {
   if (handle) return handle.startsWith("@") ? handle : `@${handle}`;
   const name = String(data?.legalName || "").trim();
   if (name) return name;
-  return String(data?.loginId || "VLUE 회원");
+  return String(data?.loginId || "VLUÉ 회원");
 }
 
 /** API 로그인 응답 → localStorage + 반환 사용자 */
@@ -117,7 +117,7 @@ export function restoreMarketingAuthUser() {
     loginId: handle,
     legalName: legalName || undefined,
     accountStatus: localStorage.getItem("vlue_account_status") || undefined,
-    email: handle ? `@${handle}` : legalName || "VLUE 회원",
+    email: handle ? `@${handle}` : legalName || "VLUÉ 회원",
     grade: "basic"
   };
 }

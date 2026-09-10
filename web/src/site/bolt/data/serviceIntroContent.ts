@@ -15,7 +15,7 @@ export const ABOUT_HERO = {
   badge: '서비스소개',
   title: '믿을 수 있는 연결,\n안전한 일상',
   companyLead:
-    'VLUE(블루)는 보이스피싱·기관 사칭 피해를 줄이고, 검증된 기관과 사람이 안심하고 소통할 수 있도록 돕는 디지털 신뢰 플랫폼입니다. 공공데이터와 자체 인증을 결합해 “이 전화, 이 업체를 믿어도 될까?”에 답하고, 웹 검색과 설치형 앱의 통화 쇼케이스·인증명함·가족보호로 이어갑니다.',
+    'VLUÉ(블루)는 보이스피싱·기관 사칭 피해를 줄이고, 검증된 기관과 사람이 안심하고 소통할 수 있도록 돕는 디지털 신뢰 플랫폼입니다. 공공데이터와 자체 인증을 결합해 “이 전화, 이 업체를 믿어도 될까?”에 답하고, 웹 검색과 설치형 앱의 통화 쇼케이스·인증명함·가족보호로 이어갑니다.',
   companyPoweredBy: 'Powered by VCID KOREA',
   subtitle:
     'www.vlue.kr에서 기관을 확인하고, 모바일 앱에서 블루 쇼케이스·디지털 인증명함·가족보호를 이용하세요. 하나의 계정으로 개인케이스가 연결됩니다.',
@@ -29,7 +29,7 @@ export const COMPANY_PROFILE = {
     {
       id: 'trust',
       title: '신뢰 검증',
-      desc: '공공 DB + VLUE 인증 DB 이중 조회로 기관·번호 위험도를 표시합니다.',
+      desc: '공공 DB + VLUÉ 인증 DB 이중 조회로 기관·번호 위험도를 표시합니다.',
     },
     {
       id: 'protect',
@@ -109,7 +109,7 @@ export const PHISHING_TIPS = [
 export const VOICE_PHISHING_APP_LINES = [
   '기관·금융사를 사칭해 앱 설치를 유도하는 사례가 늘고 있습니다.',
   '전화 중 링크 설치 요청은 즉시 종료하고, 공식 번호로 재확인하세요.',
-  'VLUE에서는 인증명함으로 상대 신뢰 정보를 먼저 확인하세요.',
+  'VLUÉ에서는 인증명함으로 상대 신뢰 정보를 먼저 확인하세요.',
 ] as const;
 
 export const SOLUTION_STEPS = [
@@ -119,7 +119,7 @@ export const SOLUTION_STEPS = [
   },
   {
     title: '이중 교차 검증',
-    desc: '행정안전부·금융위 공공데이터 + VLUE 인증 DB 동시 조회.',
+    desc: '행정안전부·금융위 공공데이터 + VLUÉ 인증 DB 동시 조회.',
   },
   {
     title: 'AI 위험도 분석',
@@ -134,7 +134,7 @@ export const SOLUTION_STEPS = [
 export const ARCHITECTURE_FLOW = [
   { label: '조회', sub: '번호·기관' },
   { label: '공공 DB', sub: '행안부·금융위' },
-  { label: 'VLUE DB', sub: '인증·신고' },
+  { label: 'VLUÉ DB', sub: '인증·신고' },
   { label: 'AI 분석', sub: '위험도' },
   { label: '결과', sub: '안전/주의/위험' },
 ] as const;
@@ -144,7 +144,7 @@ export const WEB_EXCLUSIVE_FEATURES: ServiceAccordionItem[] = [
   {
     id: 'web-search',
     title: '통합 기관 검색',
-    summary: '공공+VLUE DB 동시 검증',
+    summary: '공공+VLUÉ DB 동시 검증',
     detail: [
       '기관명·전화번호·사업자번호를 한 번에 조회합니다.',
       '의심 연락을 받기 전 확인하면 피싱 예방에 효과적입니다.',
@@ -156,7 +156,7 @@ export const WEB_EXCLUSIVE_FEATURES: ServiceAccordionItem[] = [
     summary: '무료·유료·B2B 안내',
     detail: [
       '블루 쇼케이스·디지털 인증명함·가족보호 중심의 V1 요금제를 비교합니다.',
-      '가입·결제는 VLUE 앱에서 진행합니다.',
+      '가입·결제는 VLUÉ 앱에서 진행합니다.',
     ],
   },
 ];
@@ -181,8 +181,8 @@ export const INSTALL_EXCLUSIVE_FEATURES: ServiceAccordionItem[] = [
     title: '디지털 인증 명함 · 레터링',
     summary: '통화 화면 신뢰 카드',
     detail: [
-      '통화 중 VLUE 인증 명함·블루 쇼케이스가 수신 화면에 노출되어 사칭·피싱 의심을 줄이고, 홍보·상담 접점으로 활용합니다.',
-      'Android에서는 통화 화면을 VLUE가 보여 주기 위해 「기본 전화 앱」 설정을 안내할 수 있습니다. (자세한 내용은 「기본 전화 앱 설정」 항목 참고)',
+      '통화 중 VLUÉ 인증 명함·블루 쇼케이스가 수신 화면에 노출되어 사칭·피싱 의심을 줄이고, 홍보·상담 접점으로 활용합니다.',
+      'Android에서는 통화 화면을 VLUÉ가 보여 주기 위해 「기본 전화 앱」 설정을 안내할 수 있습니다. (자세한 내용은 「기본 전화 앱 설정」 항목 참고)',
     ],
   },
   {
@@ -190,12 +190,12 @@ export const INSTALL_EXCLUSIVE_FEATURES: ServiceAccordionItem[] = [
     title: '기본 전화 앱 설정 (Android)',
     summary: '목적 · 이유 · 설정 방법',
     detail: [
-      '목적: 수신·발신 통화 중 VLUE 디지털 인증명함·블루 쇼케이스가 통화 화면으로 표시되고, 키패드(ARS)·통화 종료가 안정적으로 동작하도록 합니다.',
-      '중요: VLUE를 기본 전화 앱으로 지정해도 통신사 일반 전화(발신·수신·음성통화)는 그대로 됩니다. 전화 회선·요금·상대방과의 통화 자체는 바뀌지 않습니다.',
-      '하는 일: Android가 VLUE를 「통화 중 화면(InCall)」 담당 앱으로 연결합니다. 연락처·최근기록 UI를 통째로 대체하는 것이 아니라, 통화가 연결되면 VLUE 쇼케이스·명함 화면이 뜨고 통화 제어(종료·키패드 등)를 돕습니다.',
+      '목적: 수신·발신 통화 중 VLUÉ 디지털 인증명함·블루 쇼케이스가 통화 화면으로 표시되고, 키패드(ARS)·통화 종료가 안정적으로 동작하도록 합니다.',
+      '중요: VLUÉ를 기본 전화 앱으로 지정해도 통신사 일반 전화(발신·수신·음성통화)는 그대로 됩니다. 전화 회선·요금·상대방과의 통화 자체는 바뀌지 않습니다.',
+      '하는 일: Android가 VLUÉ를 「통화 중 화면(InCall)」 담당 앱으로 연결합니다. 연락처·최근기록 UI를 통째로 대체하는 것이 아니라, 통화가 연결되면 VLUÉ 쇼케이스·명함 화면이 뜨고 통화 제어(종료·키패드 등)를 돕습니다.',
       '설정하지 않으면: 오버레이 권한만으로도 명함·쇼케이스를 띄울 수 있으나, 일부 기기에서 키패드·종료 제어가 약해질 수 있습니다.',
-      '설정 방법: ① VLUE 앱 설치 후 전화·오버레이 권한을 허용합니다. ② 앱이 안내하거나 전화기(전화) 버튼을 누르면 시스템의 「기본 전화 앱」 선택 창이 뜹니다. ③ 목록에서 VLUE를 선택합니다. ④ 설정 → 앱 → 기본 앱 → 전화 앱에서도 나중에 변경할 수 있습니다.',
-      'iPhone: 정책상 기본 전화 앱을 바꿀 수 없습니다. 통화 중 VLUE 오버레이로 명함·쇼케이스를 보여 주고, 필요 시 순정 통화 화면으로 전환해 사용합니다.',
+      '설정 방법: ① VLUÉ 앱 설치 후 전화·오버레이 권한을 허용합니다. ② 앱이 안내하거나 전화기(전화) 버튼을 누르면 시스템의 「기본 전화 앱」 선택 창이 뜹니다. ③ 목록에서 VLUÉ를 선택합니다. ④ 설정 → 앱 → 기본 앱 → 전화 앱에서도 나중에 변경할 수 있습니다.',
+      'iPhone: 정책상 기본 전화 앱을 바꿀 수 없습니다. 통화 중 VLUÉ 오버레이로 명함·쇼케이스를 보여 주고, 필요 시 순정 통화 화면으로 전환해 사용합니다.',
     ],
   },
   {
@@ -220,11 +220,11 @@ export const INSTALL_EXCLUSIVE_FEATURES: ServiceAccordionItem[] = [
 
 /** 인증신청·고객지원 공통 — 기본 전화 앱 안내 카드 */
 export const DEFAULT_DIALER_GUIDE = {
-  title: 'Android 「기본 전화 앱」으로 VLUE를 지정해도 일반 전화는 그대로입니다',
+  title: 'Android 「기본 전화 앱」으로 VLUÉ를 지정해도 일반 전화는 그대로입니다',
   bullets: [
-    '통신사 전화(걸기·받기·요금)는 변경되지 않습니다. VLUE는 통화 중 화면(명함·쇼케이스)과 통화 제어를 담당합니다.',
+    '통신사 전화(걸기·받기·요금)는 변경되지 않습니다. VLUÉ는 통화 중 화면(명함·쇼케이스)과 통화 제어를 담당합니다.',
     '설정 목적: 수신 시 디지털 인증명함·블루 쇼케이스가 안정적으로 보이고, ARS 키패드·통화 종료가 원활히 동작하도록 하기 위함입니다.',
-    '방법: 앱 설치 → 전화·오버레이 권한 허용 → 시스템 「기본 전화 앱」 창에서 VLUE 선택 (또는 휴대폰 설정 → 기본 앱 → 전화 앱).',
+    '방법: 앱 설치 → 전화·오버레이 권한 허용 → 시스템 「기본 전화 앱」 창에서 VLUÉ 선택 (또는 휴대폰 설정 → 기본 앱 → 전화 앱).',
     'iPhone은 기본 전화 앱을 바꿀 수 없으며, 오버레이 방식으로 동일 기능을 제공합니다.',
   ],
 } as const;
@@ -275,7 +275,7 @@ export const ABOUT_CATEGORIES: { id: AboutCategoryId; label: string; sectionId: 
   { id: 'company', label: '회사소개', sectionId: 'about-company' },
   { id: 'platform', label: '플랫폼', sectionId: 'about-platform' },
   { id: 'risk', label: '보이스피싱', sectionId: 'about-risk' },
-  { id: 'protect', label: 'VLUE 대응', sectionId: 'about-protect' },
+  { id: 'protect', label: 'VLUÉ 대응', sectionId: 'about-protect' },
   { id: 'web', label: '웹 전용', sectionId: 'about-web' },
   { id: 'install', label: '설치형 앱', sectionId: 'about-install' },
   { id: 'membership', label: '요금제', sectionId: 'about-pricing' },

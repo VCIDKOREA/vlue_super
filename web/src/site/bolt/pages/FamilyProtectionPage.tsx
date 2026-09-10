@@ -112,7 +112,7 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
   const onSearch = async () => {
     const q = wardHandle.trim();
     if (!q) {
-      setMsg('가족 VLUE 아이디 또는 전화번호를 입력해 주세요.');
+      setMsg('가족 VLUÉ 아이디 또는 전화번호를 입력해 주세요.');
       return;
     }
     setSearchBusy(true);
@@ -242,7 +242,7 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
           <div className="card p-8 text-center">
             <Users className="w-12 h-12 text-primary-500 mx-auto mb-4" />
             <p className="text-slate-800 font-bold mb-2">로그인 후 가족을 등록할 수 있습니다</p>
-            <p className="text-sm text-slate-500 mb-6">VLUE 계정(아이디·비밀번호)으로 로그인해 주세요.</p>
+            <p className="text-sm text-slate-500 mb-6">VLUÉ 계정(아이디·비밀번호)으로 로그인해 주세요.</p>
             <button type="button" onClick={onLoginClick} className="btn-primary">
               로그인
             </button>
@@ -311,7 +311,7 @@ export default function FamilyProtectionPage({ user, onLoginClick, onNavigate }:
                   </button>
                 ))}
               </div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">가족 VLUE 아이디 · 전화번호</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">가족 VLUÉ 아이디 · 전화번호</label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"

@@ -49,16 +49,16 @@ const CARD_PART_GUIDE: Record<ShowcaseDemoGrade, { title: string; intro: string;
       { label: '쇼케이스 바', desc: '기관명·1332가 요약으로 표시됩니다.' },
       { label: '금융감독원 · 1332', desc: '디지털인증명함에 기관·민원 정보가 송출됩니다.' },
       { label: '배너 캐러셀', desc: '밀어서 디지털 명함 · 쇼케이스 배너 전환.' },
-      { label: '사칭 경고', desc: '명함·쇼케이스 하단 VLUE 보안 안내 문구.' },
+      { label: '사칭 경고', desc: '명함·쇼케이스 하단 VLUÉ 보안 안내 문구.' },
     ],
   },
   unverified: {
-    title: '미인증자 — VLUE 미등록 번호',
-    intro: `${LETTERING_UNVERIFIED_SPOOF_NUMBER}처럼 VLUE에 등록되지 않은 번호는 디지털인증명함이 없고, 발신자 제보·신고·분석결과가 송출됩니다.`,
+    title: '미인증자 — VLUÉ 미등록 번호',
+    intro: `${LETTERING_UNVERIFIED_SPOOF_NUMBER}처럼 VLUÉ에 등록되지 않은 번호는 디지털인증명함이 없고, 발신자 제보·신고·분석결과가 송출됩니다.`,
     parts: [
       { label: '쇼케이스 바', desc: '제보가 있으면 「삼성카드 · 제보 N회」처럼 바로 표시.' },
       { label: '발신자 제보', desc: '한 줄 입력(예: 삼성카드) → 제보하기. 같은 내용 제보·신규·수정.' },
-      { label: 'VLUE 분석결과', desc: '자리 확보 — 현재는 「분석결과는 없습니다」.' },
+      { label: 'VLUÉ 분석결과', desc: '자리 확보 — 현재는 「분석결과는 없습니다」.' },
       { label: '신고', desc: '스팸·사기 신고 후 차단 — 앱과 동일.' },
     ],
   },
@@ -97,7 +97,7 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
             유료 월 9,900원(정가 28,300원 65% 특별 할인, 종료 시까지) · 연 99,000원(2개월 추가 무료).
           </p>
           <p className="mt-4 text-sm font-semibold text-primary-700 max-w-xl mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-            가입과 결제는 VLUE 앱을 다운로드하여 진행해 주세요. (웹 결제는 지원하지 않습니다)
+            가입과 결제는 VLUÉ 앱을 다운로드하여 진행해 주세요. (웹 결제는 지원하지 않습니다)
           </p>
         </div>
       </div>
@@ -333,7 +333,7 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
             </h2>
             <p className="text-gray-500 text-sm max-w-2xl mx-auto" style={{ wordBreak: 'keep-all' }}>
               등록된 <strong className="text-gray-800">112·1332</strong>만 앱과 동일한 풀 쇼케이스·디지털인증명함이 표시됩니다.
-              사칭은 <strong className="text-gray-800">{LETTERING_UNVERIFIED_SPOOF_NUMBER}</strong>처럼 VLUE 미등록 번호입니다.
+              사칭은 <strong className="text-gray-800">{LETTERING_UNVERIFIED_SPOOF_NUMBER}</strong>처럼 VLUÉ 미등록 번호입니다.
             </p>
           </div>
 
@@ -356,7 +356,7 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
               <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
                 <p className="text-white font-bold text-sm mb-2">명함에 담기는 정보</p>
                 <ul className="text-white/55 text-xs space-y-1.5">
-                  <li>· VLUE 인증 마크 + 공공/금융 구분</li>
+                  <li>· VLUÉ 인증 마크 + 공공/금융 구분</li>
                   <li>· 기관명(경찰청·금융감독원 등) · 대표번호</li>
                   <li>· LIVE 인증확인 · 쇼케이스 배너</li>
                   <li>· 사칭 경고 안내 문구</li>
@@ -407,7 +407,7 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
           <div className="flex items-start gap-2.5 max-w-2xl mx-auto">
             <VlueBrandMark size={16} className="mt-0.5 flex-shrink-0" />
             <p className="text-gray-600 text-xs leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-              <strong className="text-gray-800">보안 안내문구 자동 표시:</strong> 모든 디지털 명함 하단에 &ldquo;본 명함은 VLUE 인증 회원임을 증명합니다. 인증된 상태 중 어떠한 경우에도 유선상 송금이나 개인정보를 요구하지 않으니 사칭에 주의하십시오.&rdquo; 문구가 자동으로 포함됩니다.
+              <strong className="text-gray-800">보안 안내문구 자동 표시:</strong> 모든 디지털 명함 하단에 &ldquo;본 명함은 VLUÉ 인증 회원임을 증명합니다. 인증된 상태 중 어떠한 경우에도 유선상 송금이나 개인정보를 요구하지 않으니 사칭에 주의하십시오.&rdquo; 문구가 자동으로 포함됩니다.
             </p>
           </div>
         </div>

@@ -129,7 +129,7 @@ function VcidCard({ membershipTier, peerCard, vcidLetteringOn = true }) {
   }
 
   const cardInfo = getDigitalCardByTier(membershipTier, peerCard);
-  const orgLabel = peerCard?.organization || "VLUE";
+  const orgLabel = peerCard?.organization || "VLUÉ";
   const roleLine = digitalCardRoleLine({
     title: cardInfo.roleTop,
     name: cardInfo.roleName,
@@ -420,7 +420,7 @@ function ChatRoom({
   isFavoriteRoom = false,
   onToggleFavoriteRoom,
   onOpenPeerFeed,
-  /** VLUE 공식 알림처럼 채팅 UI만 쓰고 입력·통화는 막는 모드 */
+  /** VLUÉ 공식 알림처럼 채팅 UI만 쓰고 입력·통화는 막는 모드 */
   readOnlyBroadcast = false,
   isDarkMode = false,
   onOpenGroupCalendar,
@@ -1019,7 +1019,7 @@ function ChatRoom({
       return;
     }
     if (action === "more") {
-      setFavoriteNotice("블루AI 분석·번역은 VLUE Voice·블루AI에서 이용할 수 있습니다.");
+      setFavoriteNotice("블루AI 분석·번역은 VLUÉ Voice·블루AI에서 이용할 수 있습니다.");
       setTimeout(() => setFavoriteNotice(""), 2200);
       return;
     }
@@ -1393,7 +1393,7 @@ function ChatRoom({
         onOpenProfileMenu={openProfileMenu}
         myMembershipTier={membershipTier}
         myCardUserId={effectiveMyUserId}
-        cardOrganization={myCard?.organization || "VLUE"}
+        cardOrganization={myCard?.organization || "VLUÉ"}
         cardTitle={myCard?.title || ""}
         cardName={myCard?.name || ""}
         cardPhone={myPhone}
@@ -1466,7 +1466,7 @@ function ChatRoom({
       )}
       {readOnlyBroadcast ? (
         <div className="shrink-0 border-t border-slate-200/90 bg-white/95 px-3 py-3 text-center text-[12px] leading-snug text-slate-500">
-          공지 전용 채널입니다. 메시지는 VLUE에서 보낸 내용만 표시됩니다.
+          공지 전용 채널입니다. 메시지는 VLUÉ에서 보낸 내용만 표시됩니다.
         </div>
       ) : (
         <>

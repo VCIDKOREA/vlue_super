@@ -1,4 +1,4 @@
-﻿/* 홈 — 팔로우 쇼케이스 목록 (라이트 모드 기본 · VLUE 로고형 아바타) */
+﻿/* 홈 — 팔로우 쇼케이스 목록 (라이트 모드 기본 · VLUÉ 로고형 아바타) */
 .friend-showcase-list {
   margin: 0 auto;
   width: 100%;
@@ -173,7 +173,7 @@
   background: #f8fbff;
 }
 
-/* VLUE 로고형 스쿼클 — 인스타 원형 대신 */
+/* VLUÉ 로고형 스쿼클 — 인스타 원형 대신 */
 .friend-showcase-list__avatar {
   width: 48px;
   height: 48px;

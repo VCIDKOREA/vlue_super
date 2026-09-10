@@ -163,7 +163,7 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
       ownerUserId: userId,
       name: merged.name || opts.displayName || "",
       showcaseStyle: peerStyle,
-      verificationItems: ["VLUE 인증"]
+      verificationItems: ["VLUÉ 인증"]
     },
     isPaidLetteringTier(tier) ? tier : "free",
     { peerMode: true, style: peerStyle }

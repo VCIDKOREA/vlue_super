@@ -1,6 +1,6 @@
 /**
  * 카카오톡 스타일 무지(빈) 프로필 — 사용자 사진/로고 미설정 시 사용.
- * VLUE 브랜드 로고와 구분되도록 회색 원 + 사람 실루엣만 표시.
+ * VLUÉ 브랜드 로고와 구분되도록 회색 원 + 사람 실루엣만 표시.
  */
 export default function KakaoBlankAvatar({ className = "", title = "프로필 미설정" }) {
   return (

@@ -33,7 +33,7 @@ function formatLinkedAt(iso) {
 }
 
 /**
- * 마이페이지 — VLUE 순정 가입 후 카카오/네이버 사후 연동
+ * 마이페이지 — VLUÉ 순정 가입 후 카카오/네이버 사후 연동
  */
 export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) {
   const [links, setLinks] = useState(() => readCachedSocialLinks());
@@ -92,7 +92,7 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) 
     try {
       const token = await getKakaoAccessTokenWithLogin();
       await linkSocialAccount({ provider: "kakao", socialToken: token });
-      onToast?.("카카오 계정이 VLUE 마스터 계정에 연동되었습니다.");
+      onToast?.("카카오 계정이 VLUÉ 마스터 계정에 연동되었습니다.");
       await refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "카카오 연동에 실패했습니다.";
@@ -113,7 +113,7 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) 
         <div>
           <p className={`text-[14px] font-black ${titleCls}`}>소셜 로그인 연동</p>
           <p className={`mt-1 text-[11px] leading-relaxed [word-break:keep-all] ${bodyCls}`}>
-            VLUE는 <b>본인인증 회원가입</b>으로만 계정이 만들어집니다. 가입 후 여기서 카카오·네이버를
+            VLUÉ는 <b>본인인증 회원가입</b>으로만 계정이 만들어집니다. 가입 후 여기서 카카오·네이버를
             <b> 1:1로 연결</b>하면 다음부터 간편 로그인할 수 있습니다.
           </p>
         </div>
@@ -123,7 +123,7 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) 
       <ol className={`mt-4 space-y-2 text-[11px] leading-relaxed ${bodyCls}`}>
         <li className="flex gap-2">
           <span className={stepNumCls}>1</span>
-          <span>VLUE 회원가입(본인인증·아이디·비밀번호)으로 마스터 계정을 만듭니다.</span>
+          <span>VLUÉ 회원가입(본인인증·아이디·비밀번호)으로 마스터 계정을 만듭니다.</span>
         </li>
         <li className="flex gap-2">
           <span className={stepNumCls}>2</span>

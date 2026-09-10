@@ -17,8 +17,8 @@ export default function AuctionPage({ user, onLoginClick }: AuctionPageProps) {
     <main className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
-          <p className="text-xs font-black uppercase tracking-wider text-violet-600">VLUE Auction</p>
-          <h1 className="text-2xl font-black text-slate-900">VLUE 경매</h1>
+          <p className="text-xs font-black uppercase tracking-wider text-violet-600">VLUÉ Auction</p>
+          <h1 className="text-2xl font-black text-slate-900">VLUÉ 경매</h1>
           <p className="text-sm text-slate-500 mt-1">진행 중인 개인 경매만 모아봅니다. 마감 1시간 이내 상품은 빨간 타이머로 표시됩니다.</p>
         </div>
 

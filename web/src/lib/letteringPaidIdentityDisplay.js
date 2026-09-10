@@ -1,7 +1,7 @@
 /** 유료 Lettering·명함 — 회사명 / 직책·성명 표시 */
 import { formatLetteringPhoneDisplay, isUnknownPhoneToken } from "./letteringPhoneMatch.js";
 
-/** 브랜드명만 있는 상호 — 빅푸시에 「VLUE · 이름」처럼 붙이지 않음 */
+/** 브랜드명만 있는 상호 — 빅푸시에 「VLUÉ · 이름」처럼 붙이지 않음 */
 export function isVlueBrandOrganization(org) {
   return /^vlue$/i.test(String(org || "").trim());
 }
@@ -14,13 +14,13 @@ export function isDccCertifiedMemberLabel(value) {
 }
 
 /** 이름 미노출·쇼케이스만 — 상단 라이브바 */
-export const SHOWCASE_BAR_VLUE_ID_LABEL = "VLUE ID";
+export const SHOWCASE_BAR_VLUE_ID_LABEL = "VLUÉ ID";
 
 /**
  * 상단 「… Showcase」소유자 라벨
  * - 상호 있음 → 상호
  * - 상호 없음·이름 노출 → 이름
- * - DCC 없이 쇼케이스만 / 이름 숨김 → VLUE ID
+ * - DCC 없이 쇼케이스만 / 이름 숨김 → VLUÉ ID
  * (로그인 아이디·핸들은 쓰지 않음)
  */
 export function resolveShowcaseBarOwnerLabel(card = {}, opts = {}) {
@@ -39,9 +39,9 @@ export function resolveShowcaseBarOwnerLabel(card = {}, opts = {}) {
 }
 
 /**
- * 쇼케이스 하단 VLUE 프로필 바 — 상호 없음
+ * 쇼케이스 하단 VLUÉ 프로필 바 — 상호 없음
  * - 이름 공개 → 이름
- * - 이름 비공개 → VLUE ID
+ * - 이름 비공개 → VLUÉ ID
  */
 export function resolveShowcaseProfileBarLabel(card = {}, opts = {}) {
   const hideName = Boolean(
@@ -58,7 +58,7 @@ export function resolveShowcaseProfileBarLabel(card = {}, opts = {}) {
 /**
  * 저장된 케이스 목록 — 상호 아래 인물 줄
  * - 이름 공개 → 이름 ｜ 직책·부서
- * - 이름 비공개 → VLUE ID
+ * - 이름 비공개 → VLUÉ ID
  */
 export function resolveSavedShowcasePersonLine(card = {}, opts = {}) {
   const personLabel = resolveShowcaseProfileBarLabel(card, opts);

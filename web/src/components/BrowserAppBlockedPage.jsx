@@ -44,7 +44,7 @@ export default function BrowserAppBlockedPage() {
             className="text-2xl font-black tracking-tight text-gray-900 sm:text-[28px]"
             style={{ wordBreak: "keep-all", letterSpacing: "-0.03em" }}
           >
-            VLUE 앱 전용 화면입니다
+            VLUÉ 앱 전용 화면입니다
           </h1>
           <p
             className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-gray-600 sm:text-[15px]"
@@ -78,7 +78,7 @@ export default function BrowserAppBlockedPage() {
             className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-5 py-3 text-[14px] font-bold text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            VLUE 홈페이지로
+            VLUÉ 홈페이지로
           </a>
         </div>
 
@@ -91,7 +91,7 @@ export default function BrowserAppBlockedPage() {
               <p className="text-sm font-black text-gray-900">모바일</p>
             </div>
             <p className="mb-4 text-[12px] leading-relaxed text-gray-500">
-              Play 스토어 · App Store에서 VLUE 앱을 설치하세요.
+              Play 스토어 · App Store에서 VLUÉ 앱을 설치하세요.
             </p>
             <div className="space-y-2">
               <button

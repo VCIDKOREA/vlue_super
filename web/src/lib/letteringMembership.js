@@ -16,4 +16,4 @@ export function peerMayUsePaidCallFeatures(peerMembershipTier) {
 
 export { normalizeMembershipKind } from "./membershipBm.js";
 
-export const LETTERING_FREE_LABEL = "VLUE \uC77C\uBC18\uBC88\uD638";
+export const LETTERING_FREE_LABEL = "VLUÉ \uC77C\uBC18\uBC88\uD638";

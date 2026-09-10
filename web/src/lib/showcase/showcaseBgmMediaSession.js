@@ -49,16 +49,16 @@ export function syncShowcaseBgmMediaSession(input = {}) {
     .replace(/^@+/, "")
     .trim();
 
-  const title = name || (handle ? `@${handle}` : "") || "VLUE Showcase";
+  const title = name || (handle ? `@${handle}` : "") || "VLUÉ Showcase";
   const trackTitle = String(active.title || bgm?.title || "").trim();
-  const artist = trackTitle || phone || "VLUE Showcase BGM";
+  const artist = trackTitle || phone || "VLUÉ Showcase BGM";
   const photo = absMediaArtUrl(peer.photoUrl || peer.avatarUrl);
 
   /** @type {MediaMetadataInit} */
   const meta = {
     title,
     artist,
-    album: phone ? `VLUE Showcase · ${phone}` : "VLUE Showcase"
+    album: phone ? `VLUÉ Showcase · ${phone}` : "VLUÉ Showcase"
   };
 
   if (photo) {

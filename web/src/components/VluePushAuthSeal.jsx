@@ -31,7 +31,7 @@ function resolveSealExpiryLine(card) {
 }
 
 /**
- * 빅푸시 펼침 — VLUE 인증 봉인
+ * 빅푸시 펼침 — VLUÉ 인증 봉인
  * 부제: 만료일(시안블루). 팔로우 + 쇼셜 토글
  */
 export default function VluePushAuthSeal({
@@ -78,7 +78,7 @@ export default function VluePushAuthSeal({
 
         <div className="vlue-push-auth-seal__copy">
           <p className="vlue-push-auth-seal__headline">
-            <span className="vlue-push-auth-seal__brand">VLUE</span>
+            <span className="vlue-push-auth-seal__brand">VLUÉ</span>
             <span className="vlue-push-auth-seal__divider" aria-hidden />
             <span className="vlue-push-auth-seal__phrase">인증 확인</span>
           </p>

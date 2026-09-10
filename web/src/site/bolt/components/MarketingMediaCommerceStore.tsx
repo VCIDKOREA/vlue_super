@@ -452,12 +452,12 @@ export default function MarketingMediaCommerceStore({ user, onLoginClick }: Prop
       </div>
 
       <div className="mkt-store__layout">
-        <aside className="mkt-store__sidebar" aria-label="VLUE 스토어 탐색">
+        <aside className="mkt-store__sidebar" aria-label="VLUÉ 스토어 탐색">
           {sidebarNav}
         </aside>
 
         <div className="mkt-store__content-col">
-        <div className="mkt-store__mobile-rail" aria-label="VLUE 스토어 필터 (모바일)">
+        <div className="mkt-store__mobile-rail" aria-label="VLUÉ 스토어 필터 (모바일)">
           <div className="mkt-store__mobile-tabs-row">
             <div
               ref={scrollerRef}

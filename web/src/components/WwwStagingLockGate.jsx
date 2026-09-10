@@ -49,7 +49,7 @@ export default function WwwStagingLockGate({ children }) {
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#f7f8fa] px-6 py-16">
       <article className="vlue-promo-card w-full max-w-md">
         <div className="vlue-promo-card__hero !pb-10">
-          <p className="vlue-type-eyebrow text-white/80">VLUE</p>
+          <p className="vlue-type-eyebrow text-white/80">VLUÉ</p>
           <h1 className="vlue-promo-card__hero-title mt-2">Coming Soon</h1>
           <p className="mt-2 text-[15px] font-normal leading-relaxed text-white/90">
             2026년 정식 오픈을 준비하고 있어요
@@ -59,7 +59,7 @@ export default function WwwStagingLockGate({ children }) {
           <p className="vlue-type-body text-center leading-[1.75] text-[#4e5968]">
             멀리 있어도 마음은 닿을 수 있어요.
             <br />
-            VLUE는 그 거리를 조금 더 가깝게 이어 드리려고
+            VLUÉ는 그 거리를 조금 더 가깝게 이어 드리려고
             <br />
             지금, 조용히 준비하고 있습니다.
           </p>

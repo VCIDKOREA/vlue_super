@@ -47,7 +47,7 @@ function mapFollowingApiItem(item) {
     {
       id: `following:${userId}`,
       userId,
-      name: String(item.displayName || handle || "VLUE 회원").trim(),
+      name: String(item.displayName || handle || "VLUÉ 회원").trim(),
       subtitle: handle
         ? `@${handle}` === String(item.displayName || "").trim() || handle === String(item.displayName || "").trim()
           ? "팔로잉 중"
@@ -76,7 +76,7 @@ function mapSearchHit(hit, bucket) {
     {
       id: `${bucket}:${userId}`,
       userId,
-      name: String(hit.displayName || handle || "VLUE 회원").trim(),
+      name: String(hit.displayName || handle || "VLUÉ 회원").trim(),
       subtitle:
         bucket === "hashtag" && tagLabel
           ? `#${tagLabel}`
@@ -114,8 +114,8 @@ export function buildBaseRecommendPool({
         {
           id: `pool:${userId}`,
           userId,
-          name: String(u.displayName || u.contactName || handle || "VLUE 회원").trim(),
-          subtitle: handle ? `@${handle}` : "주소록 · VLUE 회원",
+          name: String(u.displayName || u.contactName || handle || "VLUÉ 회원").trim(),
+          subtitle: handle ? `@${handle}` : "주소록 · VLUÉ 회원",
           phone,
           phoneDisplay: phone ? formatLetteringPhoneDisplay(phone) : "",
           avatarUrl: String(u.photoUrl || u.avatarUrl || u.profilePhotoUrl || "").trim(),
@@ -138,7 +138,7 @@ export function buildBaseRecommendPool({
         {
           id: `pool:${userId}`,
           userId,
-          name: String(f.cardName || f.name || "VLUE 회원").trim(),
+          name: String(f.cardName || f.name || "VLUÉ 회원").trim(),
           subtitle: [f.cardOrg, f.cardTitle].filter(Boolean).join(" · ") || "추천",
           phone,
           phoneDisplay: phone ? formatLetteringPhoneDisplay(phone) : "",
@@ -286,7 +286,7 @@ export async function loadFollowShowcaseLists({
 
   let trendingHits = [];
   try {
-    const trendRes = await searchShowcaseByTag("#VLUE", { mode: "hashtag" });
+    const trendRes = await searchShowcaseByTag("#VLUÉ", { mode: "hashtag" });
     if (trendRes.ok) trendingHits = trendRes.items || [];
   } catch {
     /* ignore */

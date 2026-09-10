@@ -12,7 +12,7 @@ const KEYS = {
 
 const PHOTO_SLOTS = ["primary", "feed", "chat"];
 
-/** VLUE 공식 마크 — 경로·data URL·인라인 SVG 지문까지 차단 */
+/** VLUÉ 공식 마크 — 경로·data URL·인라인 SVG 지문까지 차단 */
 export function isVlueBrandAssetUrl(url) {
   const s = String(url || "").trim();
   if (!s) return false;
@@ -70,7 +70,7 @@ function readRawSlot(slot) {
 function writeRawSlot(slot, url) {
   try {
     const k = KEYS[slot] || KEYS.primary;
-    /* card = 회사 로고 — VLUE 실드도 회사 로고로 허용. 프로필 슬롯만 브랜드 마크 차단 */
+    /* card = 회사 로고 — VLUÉ 실드도 회사 로고로 허용. 프로필 슬롯만 브랜드 마크 차단 */
     const v =
       slot === "card" ? String(url || "").trim().replace(/^blob:.*/, "") || "" : sanitizeAvatarUrl(url);
     if (v) localStorage.setItem(k, v);
@@ -158,7 +158,7 @@ export function unifyProfilePhotoSlots() {
   }
 }
 
-/** 예전에 박힌 VLUE 로고·오염 아바타 제거 */
+/** 예전에 박힌 VLUÉ 로고·오염 아바타 제거 */
 export function scrubBrandAvatarsFromStorage() {
   try {
     Object.values(KEYS).forEach((k) => {

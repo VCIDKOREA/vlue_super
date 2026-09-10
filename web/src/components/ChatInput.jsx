@@ -6,7 +6,7 @@ import SpellingCorrectionField from "./spell/SpellingCorrectionField.jsx";
 import { useSpellingCheckMode } from "../hooks/useSpellingCheckMode.js";
 import { compressAndUploadMediaImageOrThrow } from "../lib/mediaImageUpload.js";
 
-/** 위챗 스타일 8칸 + VLUE 기존 확장 */
+/** 위챗 스타일 8칸 + VLUÉ 기존 확장 */
 const PRIMARY_ACTIONS = [
   { id: "camera", label: "카메라", emoji: "📷" },
   { id: "gallery", label: "앨범", emoji: "🖼️" },
@@ -143,7 +143,7 @@ const ChatInput = forwardRef(function ChatInput(
 
   const sendMyCardToChat = async () => {
     if (!digitalCardActive) {
-      setToast("VLUE 명함을 가입 시 신청하지 않았습니다.");
+      setToast("VLUÉ 명함을 가입 시 신청하지 않았습니다.");
       return;
     }
     const payload = await buildMyCardChatPayload(
@@ -272,7 +272,7 @@ const ChatInput = forwardRef(function ChatInput(
       return;
     }
     if (action.id === "transfer") {
-      onSend("[송금] VLUE 포인트 10,000원을 보냈습니다.");
+      onSend("[송금] VLUÉ 포인트 10,000원을 보냈습니다.");
       setOpenPlus(false);
       return;
     }
@@ -323,7 +323,7 @@ const ChatInput = forwardRef(function ChatInput(
         userId: profile.userId || "",
         digitalCardId: profile.digitalCardId || "",
         membershipTier: profile.membershipTier || "free",
-        organization: profile.organization || "VLUE",
+        organization: profile.organization || "VLUÉ",
         title: profile.title || "",
         name: profile.name || "",
         phone: profile.phone || "",
@@ -444,7 +444,7 @@ const ChatInput = forwardRef(function ChatInput(
             ))}
           </div>
           <p className={`mt-2 text-center text-[10px] font-bold ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-            VLUE 확장
+            VLUÉ 확장
           </p>
           <div className="mt-1.5 grid grid-cols-4 gap-2">
             {EXTRA_ACTIONS.map((action) => (
@@ -761,7 +761,7 @@ const ChatInput = forwardRef(function ChatInput(
               <button
                 type="button"
                 onClick={() => {
-                  onSend("[내 상점] 블루스토어 요약\n- 베스트상품: VLUE 인증 명함 템플릿\n- 이번주 쿠폰: VLUE10 (10%)\nhttps://shop.vlue.kr/my-store");
+                  onSend("[내 상점] 블루스토어 요약\n- 베스트상품: VLUÉ 인증 명함 템플릿\n- 이번주 쿠폰: VLUE10 (10%)\nhttps://shop.vlue.kr/my-store");
                   setShowProfileModal(false);
                 }}
                 className="rounded-xl bg-gray-100 py-2.5 text-[13px] font-bold text-gray-700"

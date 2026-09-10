@@ -119,7 +119,7 @@ const TABS: {
   { key: 'kakao', label: '카카오 인증', accent: 'sv-tab--kakao', Logo: KakaoSourceLogo },
   { key: 'naver', label: '네이버 인증', accent: 'sv-tab--naver', Logo: NaverSourceLogo },
   { key: 'public', label: '공공·국세청', accent: 'sv-tab--public', Logo: PublicSourceLogo },
-  { key: 'vlue', label: 'VLUE 인증', accent: 'sv-tab--vlue', Logo: VlueSourceLogo },
+  { key: 'vlue', label: 'VLUÉ 인증', accent: 'sv-tab--vlue', Logo: VlueSourceLogo },
 ];
 
 function buildMapExternalUrl(lat: number, lng: number, placeName?: string) {
@@ -564,9 +564,9 @@ function VluePanel({ data, isRegistered }: { data: CrossVerifyData; isRegistered
       <div className="sv-cross-panel sv-cross-panel--enter">
         <div className="sv-premium-badge">
           <Crown className="w-4 h-4" />
-          VLUE PREMIUM PARTNER
+          VLUÉ PREMIUM PARTNER
         </div>
-        <p className="sv-cross-source">출처: VLUE 보이스피싱 예방 센터</p>
+        <p className="sv-cross-source">출처: VLUÉ 보이스피싱 예방 센터</p>
         <h3 className="sv-cross-title sv-cross-title--premium">{auth.partner_name || data.query}</h3>
         {auth.category ? <p className="sv-cross-sub">{auth.category}</p> : null}
         <div className="sv-premium-hero">
@@ -577,13 +577,13 @@ function VluePanel({ data, isRegistered }: { data: CrossVerifyData; isRegistered
               ✓ 안전성 검증 완료
             </div>
             <p>
-              VLUE 보이스피싱 예방 센터의 사칭 유선 패턴 분석 알고리즘을 100% 통과하고 공식 신원 확인 서류 검증이 완료된 클린 파트너 기관입니다. 안심하고 통화 및 거래하셔도 좋습니다.
+              VLUÉ 보이스피싱 예방 센터의 사칭 유선 패턴 분석 알고리즘을 100% 통과하고 공식 신원 확인 서류 검증이 완료된 클린 파트너 기관입니다. 안심하고 통화 및 거래하셔도 좋습니다.
             </p>
           </div>
         </div>
         <div className="sv-cross-fields">
           <FieldRow icon={ShieldCheck} label="상태" value={auth.status_text} />
-          <FieldRow icon={Hash} label="VLUE 인증번호" value={auth.cert_number || ''} />
+          <FieldRow icon={Hash} label="VLUÉ 인증번호" value={auth.cert_number || ''} />
           <FieldRow icon={Phone} label="공식 연락처" value={auth.phone || ''} href={telHref(auth.phone || '') || undefined} highlight />
           <FieldRow icon={MapPin} label="등록 주소" value={auth.address || ''} />
         </div>
@@ -594,7 +594,7 @@ function VluePanel({ data, isRegistered }: { data: CrossVerifyData; isRegistered
             onClick={() => navigateToVluePartnerStore(auth.store_id!)}
           >
             <Store className="w-4 h-4" />
-            VLUE 인증 상점 방문하기
+            VLUÉ 인증 상점 방문하기
           </button>
         ) : null}
       </div>
@@ -605,9 +605,9 @@ function VluePanel({ data, isRegistered }: { data: CrossVerifyData; isRegistered
     <div className="sv-cross-panel sv-cross-panel--enter">
       <div className="sv-unregistered-badge">
         <AlertTriangle className="w-4 h-4" />
-        VLUE 미등록 상태
+        VLUÉ 미등록 상태
       </div>
-      <p className="sv-cross-source">출처: VLUE 예방 센터 교차 검증</p>
+      <p className="sv-cross-source">출처: VLUÉ 예방 센터 교차 검증</p>
       <div className="sv-standard-hero">
         <SafetyScoreRing score={auth.safety_score} premium={false} />
         <div>
@@ -656,10 +656,10 @@ function CrossVerifyShareBar({
     <div className="sv-cross-share">
       <p className="sv-cross-share-title">
         <Share2 className="w-4 h-4" aria-hidden />
-        VLUE 교차검증 결과 공유
+        VLUÉ 교차검증 결과 공유
       </p>
       <p className="sv-cross-share-hint">
-        카카오는 카카오톡, 나머지는 기기 공유(또는 복사)로 VLUE 검증 정보를 전달합니다.
+        카카오는 카카오톡, 나머지는 기기 공유(또는 복사)로 VLUÉ 검증 정보를 전달합니다.
       </p>
       <div className="sv-cross-share-grid">
         {TABS.map((tab) => {
@@ -704,7 +704,7 @@ export default function SearchVerifyCrossTabs({ data }: { data: CrossVerifyData 
 
   return (
     <div className={`sv-cross${isPremium ? ' sv-cross--premium' : ' sv-cross--standard'}`}>
-      <div className="sv-cross-tabs sv-cross-tabs--4" role="tablist" aria-label="VLUE 통합 교차검증">
+      <div className="sv-cross-tabs sv-cross-tabs--4" role="tablist" aria-label="VLUÉ 통합 교차검증">
         {TABS.map((tab) => {
           const active = activeTab === tab.key;
           const Logo = tab.Logo;

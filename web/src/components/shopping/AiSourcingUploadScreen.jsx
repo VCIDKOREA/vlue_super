@@ -224,7 +224,7 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
       if (saleType === "auction") {
         await postCreateAuction(auctionPayloadFromForm(form, media));
         clearSourcingDraft();
-        onToast?.("VLUE 개인 경매가 등록되었습니다.");
+        onToast?.("VLUÉ 개인 경매가 등록되었습니다.");
         onBack?.();
         return;
       }
@@ -681,7 +681,7 @@ export default function AiSourcingUploadScreen({ onBack, onToast, isDarkMode = f
                 patch({ tradeMethods: { ...form.tradeMethods, vluePay: e.target.checked } })
               }
             />
-            무조건 VLUE 안심결제
+            무조건 VLUÉ 안심결제
           </label>
 
           <label

@@ -62,7 +62,7 @@ function FeedManager({ membershipTier = "free", onGoMain }) {
     try {
       const { dataUrl } = await fitImageFileOrThrow(file, IMAGE_FIT_AVATAR);
       setPageProfileImageDataUrl(dataUrl);
-      setProfilePickInfo("프로필 사진 선택됨. 저장하면 MY VLUE PAGE에 반영됩니다.");
+      setProfilePickInfo("프로필 사진 선택됨. 저장하면 MY VLUÉ PAGE에 반영됩니다.");
     } catch (e) {
       setProfilePickInfo(e instanceof Error ? e.message : "이미지를 처리하지 못했습니다.");
     }
@@ -89,8 +89,8 @@ function FeedManager({ membershipTier = "free", onGoMain }) {
     }
     setSaveToast(
       markCreated
-        ? "VLUE PAGE가 생성되었습니다."
-        : "VLUE PAGE 설정이 저장되었습니다."
+        ? "VLUÉ PAGE가 생성되었습니다."
+        : "VLUÉ PAGE 설정이 저장되었습니다."
     );
     setTimeout(() => setSaveToast(""), 2200);
   };
@@ -121,13 +121,13 @@ function FeedManager({ membershipTier = "free", onGoMain }) {
       <div className="flex-1 overflow-y-auto px-3 pb-24 pt-3">
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <p className="mt-1 text-[12px] text-gray-500">
-            하나의 <b>VLUE PAGE</b>로 활동합니다.
+            하나의 <b>VLUÉ PAGE</b>로 활동합니다.
             {isPaid ? " 상품 판매는 입점 신청·승인 후 이용할 수 있습니다." : " 상점·상품 판매는 유료 회원 전용입니다."}
           </p>
 
           {!isPageCreatedFlag ? (
             <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3">
-              <p className="text-[13px] font-black text-blue-700">VLUE PAGE 생성</p>
+              <p className="text-[13px] font-black text-blue-700">VLUÉ PAGE 생성</p>
               <p className="mt-1 text-[11px] leading-relaxed text-blue-700/90">
                 페이지 이름·소개를 입력하고 생성하면 MY 프로필과 연동됩니다.
               </p>
@@ -135,7 +135,7 @@ function FeedManager({ membershipTier = "free", onGoMain }) {
                 <input
                   value={feedName}
                   onChange={(e) => setFeedName(e.target.value)}
-                  placeholder="VLUE PAGE 이름"
+                  placeholder="VLUÉ PAGE 이름"
                   className="w-full rounded-xl border border-gray-200 px-3 py-2 text-[13px] outline-none"
                 />
                 <textarea
@@ -165,14 +165,14 @@ function FeedManager({ membershipTier = "free", onGoMain }) {
                 }}
                 className="mt-3 w-full rounded-xl bg-blue-600 py-2.5 text-[13px] font-black text-white"
               >
-                VLUE PAGE 생성하기
+                VLUÉ PAGE 생성하기
               </button>
               {saveToast && <p className="mt-2 text-center text-[11px] font-bold text-blue-600">{saveToast}</p>}
             </div>
           ) : (
             <>
               <div className="mt-3 flex items-center gap-2">
-                <span className="rounded-full bg-blue-600 px-3 py-1 text-[11px] font-black text-white">VLUE PAGE</span>
+                <span className="rounded-full bg-blue-600 px-3 py-1 text-[11px] font-black text-white">VLUÉ PAGE</span>
                 {storeApproved && (
                   <span className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-[11px] font-black text-violet-800">
                     상점 운영
@@ -181,11 +181,11 @@ function FeedManager({ membershipTier = "free", onGoMain }) {
               </div>
 
               <div className="mt-3 rounded-xl bg-blue-50 p-3 text-[11px] leading-relaxed text-blue-700">
-                <p className="font-bold">VLUE PAGE 안내</p>
+                <p className="font-bold">VLUÉ PAGE 안내</p>
                 <p className="mt-0.5">
                   {isPaid
-                    ? "활동·프로필을 하나의 VLUE PAGE로 운영합니다. 상품 판매는 아래 입점 신청·승인 후 이용할 수 있습니다."
-                    : "무료 회원은 VLUE PAGE(활동·프로필)만 이용합니다. 상점·상품 판매는 유료 회원 가입 후 이용할 수 있습니다."}
+                    ? "활동·프로필을 하나의 VLUÉ PAGE로 운영합니다. 상품 판매는 아래 입점 신청·승인 후 이용할 수 있습니다."
+                    : "무료 회원은 VLUÉ PAGE(활동·프로필)만 이용합니다. 상점·상품 판매는 유료 회원 가입 후 이용할 수 있습니다."}
                 </p>
               </div>
 
@@ -214,7 +214,7 @@ function FeedManager({ membershipTier = "free", onGoMain }) {
                 <input
                   value={feedName}
                   onChange={(e) => setFeedName(e.target.value)}
-                  placeholder="VLUE PAGE 이름"
+                  placeholder="VLUÉ PAGE 이름"
                   className="w-full rounded-xl border border-gray-200 px-3 py-2 text-[13px] outline-none"
                 />
                 <textarea
@@ -256,7 +256,7 @@ function FeedManager({ membershipTier = "free", onGoMain }) {
                 onClick={() => saveConfig(false)}
                 className="mt-4 w-full rounded-xl bg-blue-600 py-2.5 text-[13px] font-black text-white"
               >
-                VLUE PAGE 저장 · MY 반영
+                VLUÉ PAGE 저장 · MY 반영
               </button>
 
               {isPaid && (

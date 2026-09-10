@@ -157,8 +157,8 @@ function PhoneCertBadge({ className = "" }) {
   return (
     <span
       className={`ldr-phone-cert-mark${className ? ` ${className}` : ""}`.trim()}
-      title="VLUE 인증 번호"
-      aria-label="VLUE 인증 번호"
+      title="VLUÉ 인증 번호"
+      aria-label="VLUÉ 인증 번호"
     >
       <Check className="ldr-phone-cert-mark__check" strokeWidth={3.2} aria-hidden />
     </span>
@@ -314,7 +314,7 @@ function isCeoOwnerCard(card) {
 
 /**
  * 등록한 회사 로고 URL
- * - CEO: 1번 캡처 VLUE 공식 로고 (업로드 PNG 대신)
+ * - CEO: 1번 캡처 VLUÉ 공식 로고 (업로드 PNG 대신)
  * - 그 외: 업로드 로고 (프로필·워터마크 동일 소스)
  */
 function resolveCardLogoUrl(card) {
@@ -330,7 +330,7 @@ function resolveCardLogoUrl(card) {
 
 /**
  * 뒷배경 워터마크 (크기·명도는 전 유저 동일)
- * - CEO: VLUE 공식 로고
+ * - CEO: VLUÉ 공식 로고
  * - 그 외: 프로필 로고와 동일 / 없으면 없음
  */
 function CompanyLogoWatermark({ card }) {
@@ -486,7 +486,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
           {verified ? (
             <span className="ldr-hero__badge ldr-hero__badge--inline">
               <VlueCyanVerifiedSeal size={14} />
-              VLUE 인증
+              VLUÉ 인증
             </span>
           ) : null}
           {identityCopy}
@@ -516,7 +516,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
         {verified ? (
           <span className="ldr-hero__badge">
             <VlueCyanVerifiedSeal size={14} />
-            VLUE 인증
+            VLUÉ 인증
           </span>
         ) : null}
       </div>

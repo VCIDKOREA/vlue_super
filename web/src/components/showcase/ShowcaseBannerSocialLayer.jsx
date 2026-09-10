@@ -249,7 +249,7 @@ export default function ShowcaseBannerSocialLayer({
       onReportProp({ card, phone });
       return;
     }
-    onToast?.("신고는 VLUE 앱 신고 화면에서 처리할 수 있습니다.");
+    onToast?.("신고는 VLUÉ 앱 신고 화면에서 처리할 수 있습니다.");
   }, [onReportProp, card, phone, onToast]);
 
   return (

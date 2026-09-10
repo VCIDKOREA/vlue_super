@@ -1,4 +1,4 @@
-/** VLUE public handle 비교용 정규화 */
+/** VLUÉ public handle 비교용 정규화 */
 export function normalizeFamilyHandle(handle) {
   return String(handle || "")
     .trim()

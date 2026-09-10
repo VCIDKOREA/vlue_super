@@ -1,4 +1,4 @@
-/** VLUE 스토어 장바구니 — UI 캐시만 로컬, 상품·가격은 서버 동기화 후 담기 */
+/** VLUÉ 스토어 장바구니 — UI 캐시만 로컬, 상품·가격은 서버 동기화 후 담기 */
 
 import { ensureStoreProductSynced, getServerUserId } from "./shopApi.js";
 import { getStoreProduct } from "./vlueStoreStorage.js";
@@ -53,7 +53,7 @@ function normalizeItem(raw) {
     checked: merged.checked !== false,
     imageUrl,
     shippingFeeKrw: merged.shippingFeeKrw,
-    sellerName: merged.sellerName || product?.sellerName || "VLUE 스토어"
+    sellerName: merged.sellerName || product?.sellerName || "VLUÉ 스토어"
   };
 }
 
@@ -177,7 +177,7 @@ export async function addProductToCart(product, { qty = 1, sellerName, checked =
       checked,
       imageUrl,
       shippingFeeKrw: product.shippingFeeKrw,
-      sellerName: sellerName || product.sellerName || "VLUE 입점"
+      sellerName: sellerName || product.sellerName || "VLUÉ 입점"
     }),
     ...items
   ]);

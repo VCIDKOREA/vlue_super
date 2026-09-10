@@ -66,7 +66,7 @@ export default function MarketPriceModal({ open, keyword, onClose, currentBidKrw
 
         {!loading && !error && !available ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
-            해당 상품은 시중 비교 데이터가 없는 고유 상품입니다. VLUE 자체 경매 트렌드를 참고하여 입찰하세요.
+            해당 상품은 시중 비교 데이터가 없는 고유 상품입니다. VLUÉ 자체 경매 트렌드를 참고하여 입찰하세요.
           </p>
         ) : null}
 

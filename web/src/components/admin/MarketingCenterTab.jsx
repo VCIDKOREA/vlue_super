@@ -22,7 +22,7 @@ function defaultRange() {
 
 export default function MarketingCenterTab({ onToast }) {
   const defaults = useMemo(() => defaultRange(), []);
-  const [title, setTitle] = useState("VLUE 스마트 오피스");
+  const [title, setTitle] = useState("VLUÉ 스마트 오피스");
   const [imageDataUrl, setImageDataUrl] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [linkType, setLinkType] = useState("external");

@@ -12,7 +12,7 @@ interface DownloadPageProps {
 const PC_FEATURES = [
   '실시간 전화번호·기관 사기 여부 조회',
   '공공데이터 연동 자동 검증',
-  'VLUE 인증 기관 데이터베이스 직접 연결',
+  'VLUÉ 인증 기관 데이터베이스 직접 연결',
   '피싱 사이트 URL 자동 탐지 알림',
   '보안 문서 열람 및 서명 기능',
   '대용량 기관 일괄 검증 (기업용)',
@@ -61,7 +61,7 @@ export default function DownloadPage({ onBack, onNavigate }: DownloadPageProps) 
             className="text-3xl sm:text-4xl font-black text-gray-900 mb-3"
             style={{ letterSpacing: '-0.04em', wordBreak: 'keep-all' }}
           >
-            VLUE 앱 다운로드
+            VLUÉ 앱 다운로드
           </h1>
           <p className="text-gray-500 text-sm sm:text-base max-w-xl mx-auto" style={{ wordBreak: 'keep-all' }}>
             {showPc
@@ -213,7 +213,7 @@ export default function DownloadPage({ onBack, onNavigate }: DownloadPageProps) 
           <div className="flex-1">
             <p className="font-bold text-gray-900 text-sm mb-0.5">앱 설치는 무료입니다</p>
             <p className="text-gray-500 text-xs" style={{ wordBreak: 'keep-all' }}>
-              가입·본인인증은 VLUE 앱에서 진행합니다. 디지털 인증명함·블루 쇼케이스·가족보호는 인증 플랜을 확인하세요.
+              가입·본인인증은 VLUÉ 앱에서 진행합니다. 디지털 인증명함·블루 쇼케이스·가족보호는 인증 플랜을 확인하세요.
             </p>
           </div>
           <button

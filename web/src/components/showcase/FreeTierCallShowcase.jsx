@@ -65,7 +65,7 @@ export default function FreeTierCallShowcase({
         phone={phone || card.phone || phoneLabel}
         verified={verified}
         showName={false}
-        kicker={verified ? "VLUE 인증 번호" : "미확인 번호"}
+        kicker={verified ? "VLUÉ 인증 번호" : "미확인 번호"}
         hint=""
       />
     </div>

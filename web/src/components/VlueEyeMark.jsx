@@ -1,5 +1,5 @@
 /**
- * VLUE 눈 마크 SVG
+ * VLUÉ 눈 마크 SVG
  * - `shield`: `vlue-shield-logo.svg`와 동일 도형 (Navbar·앱 홈, 3번 참고 이미지)
  * - `header`: 얇은 눈 (로그인 비밀번호 토글 등)
  */

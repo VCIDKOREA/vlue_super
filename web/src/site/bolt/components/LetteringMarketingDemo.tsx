@@ -20,7 +20,7 @@ export const PUSH_EXAMPLES = MARKETING_DEMO_META;
 export { LETTERING_UNVERIFIED_SPOOF_NUMBER };
 
 export const BIG_PUSH_FLOW_STEPS = [
-  { step: '1', title: '쇼케이스 바', desc: '통화 화면 위 VLUE 쇼케이스 요약.' },
+  { step: '1', title: '쇼케이스 바', desc: '통화 화면 위 VLUÉ 쇼케이스 요약.' },
   { step: '2', title: '풀 쇼케이스', desc: '앱과 동일 — 디지털인증명함·배너 캐러셀.' },
   { step: '3', title: 'Galaxy · iPhone', desc: 'OS별 동일 UX.' },
 ] as const;
@@ -98,7 +98,7 @@ function MarketingAppShowcasePhone({
         showToast(String(result.server.error || '로그인 후 제보할 수 있습니다.'));
         return result;
       }
-      showToast('제보 완료 · VLUE에 반영됩니다');
+      showToast('제보 완료 · VLUÉ에 반영됩니다');
       return result;
     },
     [incomingNumber, showToast]
@@ -256,7 +256,7 @@ export function LetteringUnverifiedBigPushPreview({
         reportHistory={DEMO_UNVERIFIED_REPORT_HISTORY}
       />
       <p className="mt-4 max-w-[360px] text-center text-[11px] font-semibold text-red-200/80" style={{ wordBreak: 'keep-all' }}>
-        VLUE 미등록 · <strong className="text-white">{LETTERING_UNVERIFIED_SPOOF_NUMBER}</strong>
+        VLUÉ 미등록 · <strong className="text-white">{LETTERING_UNVERIFIED_SPOOF_NUMBER}</strong>
         {' · '}제보·신고 · 분석결과
       </p>
     </div>

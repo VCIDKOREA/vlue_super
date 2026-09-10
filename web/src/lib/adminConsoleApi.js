@@ -348,7 +348,7 @@ export async function fetchAdminPricingRevenueStats({ planSku, from, to } = {}) 
   return parseJson(res);
 }
 
-/** VLUE Signature Sound 게시판 */
+/** VLUÉ Signature Sound 게시판 */
 export async function fetchAdminSignatureSounds() {
   const res = await fetch(apiUrl("/api/admin/console/signature-sounds"), { headers: adminHeaders() });
   return parseJson(res);

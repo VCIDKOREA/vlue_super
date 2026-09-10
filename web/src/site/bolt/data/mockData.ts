@@ -57,10 +57,10 @@ export const newsItems: NewsItem[] = [
   },
   {
     id: 'news-002',
-    title: 'VLUE 인증 기관 2분기 신규 등록 접수 시작',
+    title: 'VLUÉ 인증 기관 2분기 신규 등록 접수 시작',
     date: '2026-04-10',
     category: 'notice',
-    summary: '2026년 2분기(4월~6월) VLUE 인증 신청 접수가 시작됩니다. 의료기관, 금융기관, 공공기관 등 모든 업종 신청 가능합니다.',
+    summary: '2026년 2분기(4월~6월) VLUÉ 인증 신청 접수가 시작됩니다. 의료기관, 금융기관, 공공기관 등 모든 업종 신청 가능합니다.',
     imageUrl: 'https://images.pexels.com/photos/3184292/pexels-photo-3184292.jpeg?auto=compress&cs=tinysrgb&w=400',
   },
   {
@@ -73,18 +73,18 @@ export const newsItems: NewsItem[] = [
   },
   {
     id: 'news-004',
-    title: 'VLUE 플랫폼 API 연동 서비스 베타 출시',
+    title: 'VLUÉ 플랫폼 API 연동 서비스 베타 출시',
     date: '2026-03-28',
     category: 'notice',
-    summary: '기업 및 기관에서 VLUE 인증 데이터를 직접 조회할 수 있는 API 서비스가 베타 오픈되었습니다.',
+    summary: '기업 및 기관에서 VLUÉ 인증 데이터를 직접 조회할 수 있는 API 서비스가 베타 오픈되었습니다.',
     imageUrl: 'https://images.pexels.com/photos/1181271/pexels-photo-1181271.jpeg?auto=compress&cs=tinysrgb&w=400',
   },
   {
     id: 'news-005',
-    title: 'VLUE × 경찰청 보이스피싱 대응 MOU 체결',
+    title: 'VLUÉ × 경찰청 보이스피싱 대응 MOU 체결',
     date: '2026-03-20',
     category: 'news',
-    summary: 'VLUE와 경찰청 사이버수사국이 보이스피싱 신고 데이터 실시간 공유 MOU를 체결했습니다.',
+    summary: 'VLUÉ와 경찰청 사이버수사국이 보이스피싱 신고 데이터 실시간 공유 MOU를 체결했습니다.',
     imageUrl: 'https://images.pexels.com/photos/5668473/pexels-photo-5668473.jpeg?auto=compress&cs=tinysrgb&w=400',
   },
   {
@@ -92,7 +92,7 @@ export const newsItems: NewsItem[] = [
     title: '디지털 명함 서비스 정식 출시 — 사칭 원천 차단',
     date: '2026-03-15',
     category: 'notice',
-    summary: 'VLUE 인증 회원 전용 디지털 명함 서비스가 정식 출시되었습니다. 인증 마크와 보안 경고 문구가 포함되어 사칭 피해를 원천 차단합니다.',
+    summary: 'VLUÉ 인증 회원 전용 디지털 명함 서비스가 정식 출시되었습니다. 인증 마크와 보안 경고 문구가 포함되어 사칭 피해를 원천 차단합니다.',
     imageUrl: 'https://images.pexels.com/photos/3184418/pexels-photo-3184418.jpeg?auto=compress&cs=tinysrgb&w=400',
   },
   {
@@ -106,10 +106,10 @@ export const newsItems: NewsItem[] = [
   },
   {
     id: 'event-002',
-    title: '부산 해운대 VLUE 인증 설명회',
+    title: '부산 해운대 VLUÉ 인증 설명회',
     date: '2026-05-03',
     category: 'event',
-    summary: 'VLUE 인증 취득을 희망하는 부산 지역 기업 및 기관을 위한 설명회가 개최됩니다.',
+    summary: 'VLUÉ 인증 취득을 희망하는 부산 지역 기업 및 기관을 위한 설명회가 개최됩니다.',
     region: '부산 해운대구',
     imageUrl: 'https://images.pexels.com/photos/1181562/pexels-photo-1181562.jpeg?auto=compress&cs=tinysrgb&w=400',
   },
@@ -118,7 +118,7 @@ export const newsItems: NewsItem[] = [
     title: '대구 수성구 금융사기 예방 캠페인',
     date: '2026-05-10',
     category: 'event',
-    summary: '대구광역시와 공동 주관으로 금융사기 예방 캠페인 및 VLUE 서비스 체험 행사가 열립니다.',
+    summary: '대구광역시와 공동 주관으로 금융사기 예방 캠페인 및 VLUÉ 서비스 체험 행사가 열립니다.',
     region: '대구 수성구',
     imageUrl: 'https://images.pexels.com/photos/3184292/pexels-photo-3184292.jpeg?auto=compress&cs=tinysrgb&w=400',
   },
@@ -127,7 +127,7 @@ export const newsItems: NewsItem[] = [
     title: '인천 연수구 스마트 보안 세미나',
     date: '2026-05-17',
     category: 'event',
-    summary: '디지털 금융사기 예방을 위한 스마트 보안 세미나 및 VLUE 플랫폼 시연 행사입니다.',
+    summary: '디지털 금융사기 예방을 위한 스마트 보안 세미나 및 VLUÉ 플랫폼 시연 행사입니다.',
     region: '인천 연수구',
     imageUrl: 'https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=400',
   },
@@ -136,7 +136,7 @@ export const newsItems: NewsItem[] = [
     title: '광주 서구 청년 보안 창업 네트워킹',
     date: '2026-05-24',
     category: 'event',
-    summary: '보안 스타트업을 꿈꾸는 청년들을 위한 네트워킹 및 VLUE 파트너십 설명회입니다.',
+    summary: '보안 스타트업을 꿈꾸는 청년들을 위한 네트워킹 및 VLUÉ 파트너십 설명회입니다.',
     region: '광주 서구',
     imageUrl: 'https://images.pexels.com/photos/1181406/pexels-photo-1181406.jpeg?auto=compress&cs=tinysrgb&w=400',
   },
@@ -151,13 +151,13 @@ export const newsItems: NewsItem[] = [
   },
 ];
 
-/** 홈 VLUE 스토어 — 공식 광고업체 (인증 판매자) */
+/** 홈 VLUÉ 스토어 — 공식 광고업체 (인증 판매자) */
 export const storeAdvertisers: StoreAdvertiser[] = [
   {
     id: 'store-adv-001',
     name: '명경채 요양병원',
     category: '의료·요양',
-    tagline: 'VLUE 인증 의료기관 — 입원·재활·상담을 안심하고 이용하세요.',
+    tagline: 'VLUÉ 인증 의료기관 — 입원·재활·상담을 안심하고 이용하세요.',
     imageUrl: 'https://images.pexels.com/photos/305565/pexels-photo-305565.jpeg?auto=compress&cs=tinysrgb&w=600',
     region: '서울 강남구',
   },
@@ -165,7 +165,7 @@ export const storeAdvertisers: StoreAdvertiser[] = [
     id: 'store-adv-002',
     name: '다다오피스',
     category: '공유오피스',
-    tagline: '프리미엄 공유오피스·스타트업 입주 — VLUE 인증 비즈니스 공간.',
+    tagline: '프리미엄 공유오피스·스타트업 입주 — VLUÉ 인증 비즈니스 공간.',
     imageUrl: 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=600',
     region: '서울 마포구',
   },
@@ -179,9 +179,9 @@ export const storeAdvertisers: StoreAdvertiser[] = [
   },
   {
     id: 'store-adv-004',
-    name: 'VLUE 공식',
+    name: 'VLUÉ 공식',
     category: '교육·보안',
-    tagline: '보이스피싱 예방 교육·기업 보안 패키지 — VLUE 스토어 공식 채널.',
+    tagline: '보이스피싱 예방 교육·기업 보안 패키지 — VLUÉ 스토어 공식 채널.',
     imageUrl: 'https://images.pexels.com/photos/3184431/pexels-photo-3184431.jpeg?auto=compress&cs=tinysrgb&w=600',
     region: '전국',
   },
@@ -214,7 +214,7 @@ export const products: Product[] = [
   {
     id: 'prod-003',
     name: '보이스피싱 예방 기업 교육 패키지',
-    seller: 'VLUE 공식',
+    seller: 'VLUÉ 공식',
     price: 150000,
     category: '교육',
     imageUrl: 'https://images.pexels.com/photos/3184431/pexels-photo-3184431.jpeg?auto=compress&cs=tinysrgb&w=400',
@@ -290,7 +290,7 @@ export const templates: Template[] = [
     id: 'tmpl-001',
     name: '거래처 안전 확인서',
     category: '법무/계약',
-    description: '신규 거래처의 VLUE 인증 여부를 확인하고 안전 거래를 보장하는 공식 확인서 양식.',
+    description: '신규 거래처의 VLUÉ 인증 여부를 확인하고 안전 거래를 보장하는 공식 확인서 양식.',
     content: '[거래처 안전 확인서]',
     thumbnail: 'doc',
   },
@@ -304,10 +304,10 @@ export const templates: Template[] = [
   },
   {
     id: 'tmpl-003',
-    name: 'VLUE 인증 신청서',
+    name: 'VLUÉ 인증 신청서',
     category: '인증/등록',
-    description: 'VLUE 공식 인증을 신청하기 위한 표준 신청서 양식.',
-    content: '[VLUE 인증 신청서]',
+    description: 'VLUÉ 공식 인증을 신청하기 위한 표준 신청서 양식.',
+    content: '[VLUÉ 인증 신청서]',
     thumbnail: 'cert',
   },
 ];
@@ -329,7 +329,7 @@ export const jobPosts: JobPost[] = [
   {
     id: 'job-001',
     title: '보안 플랫폼 프론트엔드 개발자',
-    company: 'VLUE 공식',
+    company: 'VLUÉ 공식',
     location: '서울 강남구',
     type: '정규직',
     salary: '4,000~6,000만원',
@@ -373,7 +373,7 @@ export const jobPosts: JobPost[] = [
   {
     id: 'job-005',
     title: 'AI 보이스피싱 탐지 연구원',
-    company: 'VLUE 공식',
+    company: 'VLUÉ 공식',
     location: '서울 강남구',
     type: '정규직',
     salary: '5,000~8,000만원',

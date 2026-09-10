@@ -189,7 +189,7 @@ export async function resolveVlueShowcasePeer(input = {}) {
       authCycleEndAt,
       authPaidAt,
       cycleEndAt: authCycleEndAt,
-      verificationItems: ["VLUE 인증"],
+      verificationItems: ["VLUÉ 인증"],
       showcaseStyle
     });
 

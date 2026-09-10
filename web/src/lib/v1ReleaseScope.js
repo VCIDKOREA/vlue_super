@@ -1,5 +1,5 @@
 /**
- * VLUE V1 (MVP) 출시 범위 — V2 기능 격리 플래그
+ * VLUÉ V1 (MVP) 출시 범위 — V2 기능 격리 플래그
  * @see archive-v2/README.md
  */
 
@@ -132,7 +132,7 @@ export const v1WebShell = {
   download: true,
   /**
    * V1 — www 웹 구독 결제(PostSignupPaymentModal) 비활성.
-   * 가입·결제는 VLUE 앱에서만. 웹 결제는 V2.
+   * 가입·결제는 VLUÉ 앱에서만. 웹 결제는 V2.
    */
   webSubscribePayment: false,
   /** V2 — PC 설치형 (채팅 연동 시 지원 예정) */

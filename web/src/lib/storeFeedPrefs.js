@@ -1,4 +1,4 @@
-/** VLUE 스토어 — 웹(www) · 앱(/app) 공통 탭·카테고리 기억 */
+/** VLUÉ 스토어 — 웹(www) · 앱(/app) 공통 탭·카테고리 기억 */
 import { MEDIA_FEED_TABS } from "./mediaCommerceCatalog.js";
 import { normalizeShoppingCategory } from "./shoppingCategories.js";
 

@@ -11,7 +11,7 @@ import {
  * 사용 전 `.env`에 `VITE_PORTONE_V2_CHANNEL_KEY` 설정 필요.
  */
 export default function PortoneV2PayButton({
-  orderName = "VLUE 결제",
+  orderName = "VLUÉ 결제",
   totalAmount = 1000,
   payMethod = "CARD",
   className = "",

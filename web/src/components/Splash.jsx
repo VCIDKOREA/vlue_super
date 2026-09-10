@@ -374,7 +374,7 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
               />
             </div>
           </div>
-          <p className={`vlue-splash-tagline${lettersIn ? " vlue-splash-tagline--in" : ""}`}>VLUE로 눈을 뜨다.</p>
+          <p className={`vlue-splash-tagline${lettersIn ? " vlue-splash-tagline--in" : ""}`}>VLUÉ로 눈을 뜨다.</p>
         </div>
       </div>
     </div>

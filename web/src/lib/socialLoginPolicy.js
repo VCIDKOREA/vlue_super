@@ -7,7 +7,7 @@ export function isSnsUnlinkedError(raw) {
   const msg = String(raw || "");
   return (
     /연동되어 있지 않습니다/i.test(msg) ||
-    /연동된 VLUE 계정이 없습니다/i.test(msg) ||
+    /연동된 VLUÉ 계정이 없습니다/i.test(msg) ||
     /SOCIAL_NOT_LINKED/i.test(msg)
   );
 }

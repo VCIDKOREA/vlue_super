@@ -21,7 +21,7 @@ function asciiFilename(name) {
 
 /** 채팅·지갑 스냅샷 → vCard 3.0 (서버 없을 때 폴백) */
 export function buildLocalContactVcf(profile) {
-  const name = String(profile.name || profile.legalName || "VLUE").trim() || "VLUE";
+  const name = String(profile.name || profile.legalName || "VLUÉ").trim() || "VLUÉ";
   const org = String(profile.organization || "").trim();
   const title = [profile.title, profile.department].filter(Boolean).join(" · ");
   const phone = String(profile.phone || profile.landline || "").replace(/\s/g, "");
@@ -45,7 +45,7 @@ export function buildLocalContactVcf(profile) {
     website ? `URL:${escVcf(website)}` : "",
     address ? `ADR;TYPE=WORK:;;${escVcf(address)};;;;` : "",
     note ? `NOTE:${escVcf(note)}` : "",
-    "SOURCE:VLUE App",
+    "SOURCE:VLUÉ App",
     "END:VCARD"
   ].filter(Boolean);
 
@@ -77,7 +77,7 @@ async function fetchServerVcf(digitalCardId) {
   const vcf = await res.text();
   const filename =
     parseFilenameFromDisposition(res.headers.get("Content-Disposition")) ||
-    `VLUE-${asciiFilename(digitalCardId)}.vcf`;
+    `VLUÉ-${asciiFilename(digitalCardId)}.vcf`;
   return { vcf, filename };
 }
 
@@ -148,14 +148,14 @@ export async function saveProfileToDeviceContacts(profile) {
         return { ok: false, error: "서버에 등록된 디지털 명함이 없습니다. 지갑에 다시 저장해 주세요." };
       }
       vcf = buildLocalContactVcf(p);
-      filename = `VLUE-${asciiFilename(p.name)}.vcf`;
+      filename = `VLUÉ-${asciiFilename(p.name)}.vcf`;
     }
   } else {
     if (!p.name && !p.phone && !p.email) {
       return { ok: false, error: "저장할 연락처 정보가 없습니다." };
     }
     vcf = buildLocalContactVcf(p);
-    filename = `VLUE-${asciiFilename(p.name)}.vcf`;
+    filename = `VLUÉ-${asciiFilename(p.name)}.vcf`;
   }
 
   if (tryNativeContactBridge(vcf, filename, p)) {

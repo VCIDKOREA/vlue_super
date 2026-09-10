@@ -24,7 +24,7 @@ const FEED_ITEMS = [
   },
   {
     id: 4, type: 'news', img: 'https://images.pexels.com/photos/3184292/pexels-photo-3184292.jpeg?auto=compress&cs=tinysrgb&w=400',
-    title: 'VLUE × 경찰청 MOU', likes: 89, certified: false,
+    title: 'VLUÉ × 경찰청 MOU', likes: 89, certified: false,
   },
   {
     id: 5, type: 'product', img: 'https://images.pexels.com/photos/3184431/pexels-photo-3184431.jpeg?auto=compress&cs=tinysrgb&w=400',

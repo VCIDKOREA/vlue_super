@@ -693,7 +693,7 @@ function LetteringOverlayHostInner() {
           }
           /*
            * 네이티브 unmatched 를 즉시 미인증으로 그리면 by-number 전에
-           * 「VLUE Showcase」앰버가 고정된다. pending 유지.
+           * 「VLUÉ Showcase」앰버가 고정된다. pending 유지.
            */
           setCard({
             ...buildUnverifiedOverlayCard(phone),
@@ -1452,7 +1452,7 @@ function LetteringOverlayHostInner() {
         showToast(msg);
         return { tip, server, summary };
       }
-      showToast("제보 완료 · VLUE에 반영됩니다");
+      showToast("제보 완료 · VLUÉ에 반영됩니다");
       return { tip, server, summary: summary || server?.summary || null };
     },
     [incoming, showToast]
@@ -1514,7 +1514,7 @@ function LetteringOverlayHostInner() {
             <VlueBrandMark size={18} />
           </span>
           <span className="lettering-overlay-verify-chip__copy">
-            <span className="lettering-overlay-verify-chip__brand">VLUE</span>
+            <span className="lettering-overlay-verify-chip__brand">VLUÉ</span>
             <span className="lettering-overlay-verify-chip__label">신원 확인 중</span>
           </span>
           <span className="lettering-overlay-verify-chip__dots" aria-hidden>

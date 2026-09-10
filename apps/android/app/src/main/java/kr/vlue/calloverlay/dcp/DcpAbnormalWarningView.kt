@@ -27,7 +27,7 @@ object DcpAbnormalWarningView {
         "공식 국가기관 번호로 확인되었습니다. 디지털인증프로필을 확인하세요."
 
     const val CONTACT_NORMAL_MESSAGE =
-        "기기에 저장된 번호입니다. VLUE 비회원 · 안심케어 정상 경로입니다."
+        "기기에 저장된 번호입니다. VLUÉ 비회원 · 안심케어 정상 경로입니다."
 
     const val VLUE_AUTH_MEMBER_MESSAGE = VlueAuthMemberPopupPolicy.MESSAGE
 
@@ -43,7 +43,7 @@ object DcpAbnormalWarningView {
         val expiredMessage: String = "인증기간이 만료된 번호입니다. 직접 확인 부탁드립니다.",
         val contactSafeCare: Boolean = false,
         val vlueNonMember: Boolean = false,
-        /** VLUE 인증 회원 · 공개 DCC/쇼케이스 없음 */
+        /** VLUÉ 인증 회원 · 공개 DCC/쇼케이스 없음 */
         val vlueAuthMember: Boolean = false,
         val showShareShowcase: Boolean = false,
         val reasonLine: String = "",
@@ -149,7 +149,7 @@ object DcpAbnormalWarningView {
         if (spec.vlueNonMember) {
             card.addView(
                 TextView(ctx).apply {
-                    text = "VLUE 비회원"
+                    text = "VLUÉ 비회원"
                     setTextColor(Color.parseColor("#FDE047"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                     typeface = Typeface.DEFAULT_BOLD

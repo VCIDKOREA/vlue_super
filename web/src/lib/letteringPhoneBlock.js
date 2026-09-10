@@ -63,7 +63,7 @@ export function requestNativePhoneBlock(phoneDigits, meta = {}) {
   return { ok: false, needsNative: true };
 }
 
-/** VLUE 앱 차단 목록 + 서버 블랙리스트 + 네이티브 차단 요청 */
+/** VLUÉ 앱 차단 목록 + 서버 블랙리스트 + 네이티브 차단 요청 */
 export async function blockLetteringPhone(phoneRaw, meta = {}) {
   const digits = normalizePhoneDigits(phoneRaw);
   if (!digits) return { ok: false };

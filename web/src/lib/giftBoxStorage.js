@@ -44,8 +44,8 @@ export const DEFAULT_GIFT_ITEMS = [
   },
   {
     id: "g-3",
-    title: "VLUE 체험단 포인트 3,000P",
-    fromLabel: "VLUE",
+    title: "VLUÉ 체험단 포인트 3,000P",
+    fromLabel: "VLUÉ",
     kind: "voucher",
     status: "used",
     receivedAt: "2026-05-01T09:00:00",

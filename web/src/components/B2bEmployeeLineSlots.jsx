@@ -47,7 +47,7 @@ export default function B2bEmployeeLineSlots({ draft, onDraftChange }) {
   return (
     <section className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
       <p className="text-[12px] font-black text-emerald-950">
-        ③ 직원 회선 ({filledCount}/{slotCount}) · 총 {planned}회선 (VLUE 인증 1 포함)
+        ③ 직원 회선 ({filledCount}/{slotCount}) · 총 {planned}회선 (VLUÉ 인증 1 포함)
       </p>
       <p className="mt-1 text-[10px] text-emerald-900/80">
         접수 회선 수만큼 입력 칸이 <b>{slotCount}개</b> 고정됩니다. <b>경리·대리인</b>은 각 1명만 지정할 수

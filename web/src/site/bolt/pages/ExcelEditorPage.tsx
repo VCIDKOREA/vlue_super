@@ -23,7 +23,7 @@ export default function ExcelEditorPage({ onLoginClick, user, onNavigate }: Exce
           </h1>
           <p className="text-sm text-slate-600 max-w-3xl leading-relaxed" style={{ wordBreak: 'keep-all' }}>
             엑셀 장부·보고서는 <strong>이 웹 페이지</strong>에서 AI로 만들고 바로 수정·저장합니다.
-            VLUE는 브라우저 앱(/app)을 제공하지 않으며, PC·모바일은 <strong>설치형 프로그램</strong>만 제공합니다.
+            VLUÉ는 브라우저 앱(/app)을 제공하지 않으며, PC·모바일은 <strong>설치형 프로그램</strong>만 제공합니다.
             저장한 데이터는 설치형 앱의 쇼핑·메일·자료실과 동일 계정으로 연동됩니다.
           </p>
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 max-w-3xl">

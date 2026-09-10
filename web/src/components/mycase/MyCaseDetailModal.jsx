@@ -26,7 +26,7 @@ function readPreviewIdentity() {
   } catch {
     /* ignore */
   }
-  return { name: name || handle || "VLUE", handle: handle || "mycase" };
+  return { name: name || handle || "VLUÉ", handle: handle || "mycase" };
 }
 
 /**
@@ -108,7 +108,7 @@ export default function MyCaseDetailModal({
   const selfIdentity = useMemo(() => readPreviewIdentity(), [open]);
   const displayName = owner
     ? selfIdentity.name
-    : String(peerIdentity?.name || item?.title || "VLUE").trim() || "VLUE";
+    : String(peerIdentity?.name || item?.title || "VLUÉ").trim() || "VLUÉ";
   const displayHandle = owner
     ? selfIdentity.handle
     : String(peerIdentity?.handle || "").replace(/^@/, "").trim() || displayName;

@@ -46,7 +46,7 @@ export default function IdentityVerificationModal({
         <p className="mt-2 text-center text-[13px] leading-relaxed text-slate-600">
           이 기능을 이용하려면 신원 인증이 필요합니다.
           <br />
-          VLUE 인증을 시작하시겠습니까?
+          VLUÉ 인증을 시작하시겠습니까?
         </p>
 
         <div className="mt-6 flex flex-col gap-2">
@@ -55,7 +55,7 @@ export default function IdentityVerificationModal({
             onClick={onStartVerification}
             className="w-full rounded-xl bg-blue-600 py-3 text-[13px] font-black text-white shadow-md shadow-blue-200 active:scale-[0.98] transition-transform"
           >
-            VLUE 인증 시작
+            VLUÉ 인증 시작
           </button>
           <button
             type="button"

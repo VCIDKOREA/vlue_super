@@ -46,7 +46,7 @@ export default function HomeDesktopMirror({ layout }) {
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-10 py-4">
           <div className="flex items-center gap-4">
             <img src={VLUE_SHIELD_LOGO} alt="" className="h-11 w-11 rounded-xl" />
-            <span className="text-[28px] font-black tracking-tight text-blue-600">VLUE</span>
+            <span className="text-[28px] font-black tracking-tight text-blue-600">VLUÉ</span>
           </div>
           <div className="flex items-center gap-6 text-[15px] font-semibold text-slate-500">
             <span className="text-blue-600">홈</span>
@@ -60,8 +60,8 @@ export default function HomeDesktopMirror({ layout }) {
           <section className="mb-10">
             <div className="mb-4 flex items-end justify-between">
               <div>
-                <h2 className="text-[32px] font-black text-slate-900">VLUE PICK</h2>
-                <p className="text-[16px] font-semibold text-slate-500">VLUE 공식 파트너프로모션</p>
+                <h2 className="text-[32px] font-black text-slate-900">VLUÉ PICK</h2>
+                <p className="text-[16px] font-semibold text-slate-500">VLUÉ 공식 파트너프로모션</p>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-6">
@@ -70,7 +70,7 @@ export default function HomeDesktopMirror({ layout }) {
                   <div className="relative h-56">
                     <img src={b.imageUrl} alt="" className="h-full w-full object-cover" />
                     <span className="absolute left-4 top-4 rounded-md bg-blue-600 px-3 py-1 text-[13px] font-black text-white">
-                      VLUE 공식
+                      VLUÉ 공식
                     </span>
                   </div>
                   <div className="p-5">
@@ -89,7 +89,7 @@ export default function HomeDesktopMirror({ layout }) {
           <section className="mb-10">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-[32px] font-black text-slate-900">VLUE AI 추천 콘텐츠</h2>
+                <h2 className="text-[32px] font-black text-slate-900">VLUÉ AI 추천 콘텐츠</h2>
                 <p className="text-[16px] font-semibold text-slate-500">맞춤큐레이션</p>
               </div>
               <span className="rounded-full bg-blue-50 px-4 py-2 text-[14px] font-black text-blue-600">AI</span>

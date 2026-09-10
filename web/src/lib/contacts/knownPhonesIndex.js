@@ -1,5 +1,5 @@
 /**
- * VLUE 앱 친구·연락처 번호 인덱스 (오버레이 WebView 공유용 localStorage)
+ * VLUÉ 앱 친구·연락처 번호 인덱스 (오버레이 WebView 공유용 localStorage)
  */
 
 export const KNOWN_PHONES_INDEX_KEY = "vlue_known_phones_index_v1";

@@ -229,7 +229,7 @@ object CardLookupRepository {
         }
     }
 
-    /** 발신 폰에서 원격·악성앱이 실행 중일 때 — 수신 VLUE 회원이 비정상을 볼 수 있게 보고 */
+    /** 발신 폰에서 원격·악성앱이 실행 중일 때 — 수신 VLUÉ 회원이 비정상을 볼 수 있게 보고 */
     fun reportOutgoingCallPath(context: Context, reasons: List<String>) {
         if (reasons.isEmpty()) return
         val token = LetteringPrefs.getAccessToken(context)

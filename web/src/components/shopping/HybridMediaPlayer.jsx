@@ -32,7 +32,7 @@ function loadHlsJs() {
 
 /**
  * 하이브리드 비디오 플레이어 — 외부 임베드 / CDN mp4 / HLS 라이브
- * 비용 0원: 미디어 바이트는 YouTube·TikTok·CDN만 소모, VLUE 서버 트래픽 없음
+ * 비용 0원: 미디어 바이트는 YouTube·TikTok·CDN만 소모, VLUÉ 서버 트래픽 없음
  */
 export default function HybridMediaPlayer({
   videoUrl,

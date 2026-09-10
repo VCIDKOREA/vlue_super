@@ -237,7 +237,7 @@ export default function PushNotificationDetailModal({
               }`}
             >
               <p className="text-[11px] font-black uppercase tracking-wide text-sky-700">구매 상품</p>
-              <p className="mt-1 text-[15px] font-black">{current.productName || "VLUE 상품"}</p>
+              <p className="mt-1 text-[15px] font-black">{current.productName || "VLUÉ 상품"}</p>
               {current.productDetail ? (
                 <p
                   className={`mt-2 whitespace-pre-wrap text-[13px] leading-relaxed ${

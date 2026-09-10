@@ -691,7 +691,7 @@ export default function OfficeExcelWorkshop({ user, onLoginClick }: Props) {
                 <strong>{selectedTemplate.replace(/_v\d+$/, '')}</strong>
               </span>
               <span>
-                {demoMode ? '로컬 체험' : 'VLUE Office Excel'} · www 제작 → 앱 동기화
+                {demoMode ? '로컬 체험' : 'VLUÉ Office Excel'} · www 제작 → 앱 동기화
               </span>
             </div>
           </div>

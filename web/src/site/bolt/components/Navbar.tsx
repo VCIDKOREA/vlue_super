@@ -19,9 +19,9 @@ interface NavbarProps {
 type NavItem = {
   label: string;
   view: View;
-  /** VLUE 스토어 등 강조 링크 */
+  /** VLUÉ 스토어 등 강조 링크 */
   highlight?: boolean;
-  /** VLUE메일 — 보조 pill */
+  /** VLUÉ메일 — 보조 pill */
   mailPill?: boolean;
   /** AI엑셀에디터 — 웹 전용 눈에 띄는 CTA */
   featured?: boolean;
@@ -109,7 +109,7 @@ export default function Navbar({ currentView, onNavigate, user, onLoginClick, on
               handleNav('home');
             }}
             className="mkt-nav-logo-btn mr-6 flex-shrink-0 focus:outline-none group"
-            aria-label="VLUE 홈"
+            aria-label="VLUÉ 홈"
           >
             <VlueNavLogoMark
               blinkSeq={logoBlinkSeq}

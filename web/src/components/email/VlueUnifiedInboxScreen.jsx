@@ -23,7 +23,7 @@ function formatWhen(iso) {
 
 function sourceLabel(mailSource) {
   if (mailSource === "EXTERNAL_IMAP") return "외부";
-  return "VLUE";
+  return "VLUÉ";
 }
 
 function sourceBadgeClass(mailSource, isDarkMode) {

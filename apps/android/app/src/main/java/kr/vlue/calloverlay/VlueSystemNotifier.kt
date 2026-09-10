@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object VlueSystemNotifier {
     private const val CHANNEL_ID = "vlue_app_alerts"
     private const val SHOWCASE_CHANNEL_ID = "showcase_social"
-    private const val CHANNEL_NAME = "VLUE 알림"
+    private const val CHANNEL_NAME = "VLUÉ 알림"
     private const val SHOWCASE_CHANNEL_NAME = "쇼케이스 알림"
     private val nextId = AtomicInteger(7100)
 
@@ -83,7 +83,7 @@ object VlueSystemNotifier {
         }
 
         ensureChannel(app)
-        val safeTitle = title.ifBlank { "VLUE" }
+        val safeTitle = title.ifBlank { "VLUÉ" }
         val fullBody = body.ifBlank { safeTitle }.trim()
         val requestCode = if (!tag.isNullOrBlank()) tag.hashCode() else 7100
         val contentPi =

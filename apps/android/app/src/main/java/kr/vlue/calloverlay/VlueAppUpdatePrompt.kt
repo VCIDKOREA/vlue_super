@@ -103,9 +103,9 @@ object VlueAppUpdatePrompt {
         try {
             val title =
                 if (latestVersionName.isNotBlank()) {
-                    "VLUE 업데이트 ($latestVersionName)"
+                    "VLUÉ 업데이트 ($latestVersionName)"
                 } else {
-                    "VLUE 업데이트"
+                    "VLUÉ 업데이트"
                 }
             AlertDialog.Builder(activity)
                 .setTitle(title)

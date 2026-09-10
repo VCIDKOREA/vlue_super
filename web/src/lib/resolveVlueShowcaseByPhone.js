@@ -40,7 +40,7 @@ function dcpPayload(card, phoneDisplay, digits, source) {
 }
 
 /**
- * :phone 파라미터 → VLUE Showcase 웹뷰 페이로드
+ * :phone 파라미터 → VLUÉ Showcase 웹뷰 페이로드
  * API 매칭만 사용. 미매칭 시 데모/내 명함을 상대 카드로 넣지 않음.
  * 112 등 국가기관은 userId 없이도 DCP 쇼케이스.
  */

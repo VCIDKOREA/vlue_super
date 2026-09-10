@@ -84,7 +84,7 @@ function BlueAIChat({ onGoMain, onAssistantReply, isDarkMode = false }) {
       id: WELCOME_ID,
       role: "ai",
       at: new Date().toISOString(),
-      text: "안녕하세요, 브이밍(Vming)입니다. VLUE 일상 매니저예요. 아래에서 궁금한 항목을 고르거나 직접 질문해 주세요."
+      text: "안녕하세요, 브이밍(Vming)입니다. VLUÉ 일상 매니저예요. 아래에서 궁금한 항목을 고르거나 직접 질문해 주세요."
     }
   ]);
   const [showQuickReplies, setShowQuickReplies] = useState(true);
@@ -217,7 +217,7 @@ function BlueAIChat({ onGoMain, onAssistantReply, isDarkMode = false }) {
             <p className={`truncate text-[16px] font-black leading-tight ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
               브이밍 Vming
             </p>
-            <p className={`truncate text-[11px] font-medium ${headSub}`}>VLUE 공식 AI · 일상 매니저</p>
+            <p className={`truncate text-[11px] font-medium ${headSub}`}>VLUÉ 공식 AI · 일상 매니저</p>
           </div>
         }
         right={

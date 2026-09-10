@@ -26,7 +26,7 @@ function useDeviceTilt() {
   return tilt;
 }
 
-/** 앞면 — VLUE 홀로그램만 우상단 (QR·본문은 명함 레이아웃에 포함) */
+/** 앞면 — VLUÉ 홀로그램만 우상단 (QR·본문은 명함 레이아웃에 포함) */
 export function LetteringBizcardSecurityOverlayFront() {
   const tilt = useDeviceTilt();
 
@@ -40,7 +40,7 @@ export function LetteringBizcardSecurityOverlayFront() {
         className="lettering-bizcard-security-overlay__holo"
         style={{ transform: `rotateX(${tilt.y}deg) rotateY(${tilt.x}deg)` }}
       >
-        <span className="lettering-bizcard-security-overlay__holo-mark">VLUE</span>
+        <span className="lettering-bizcard-security-overlay__holo-mark">VLUÉ</span>
         <span className="lettering-bizcard-security-overlay__holo-shine" />
       </div>
     </div>
@@ -66,7 +66,7 @@ export function LetteringBizcardSecurityOverlayBack({ card, cardId = "", issuedA
       className="lettering-bizcard-security-overlay lettering-bizcard-security-overlay--back"
       aria-hidden={false}
       role="group"
-      aria-label="VLUE 보안 인증 (뒷면)"
+      aria-label="VLUÉ 보안 인증 (뒷면)"
     >
       <div className="lettering-bizcard-security-overlay__validity">
         <p className="lettering-bizcard-security-overlay__validity-label">사용유효기간</p>

@@ -1,6 +1,6 @@
 /**
  * 통화·공유에서 상대가 DCC/쇼케이스 송출 콘텐츠가 있는지.
- * 송출 OFF 이거나 실콘텐츠 없으면 VLUE 인증 팝업만 (빈 쇼케이스 금지).
+ * 송출 OFF 이거나 실콘텐츠 없으면 VLUÉ 인증 팝업만 (빈 쇼케이스 금지).
  */
 
 /** 라이브 송출 ON — LetteringOverlayHost 와 동일 (includeDigitalCard === true) */

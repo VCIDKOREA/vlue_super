@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import ShowcasePhotoTextOverlay from "./ShowcasePhotoTextOverlay.jsx";
 
 /**
- * 쇼케이스 한 페이지 — 최대 20장 사진을 VLUE 카드로 표시 (공식 Instagram 임베드 없음)
+ * 쇼케이스 한 페이지 — 최대 20장 사진을 VLUÉ 카드로 표시 (공식 Instagram 임베드 없음)
  * media_url 은 API/메타데이터 URL을 그대로 img src 에 사용 (파일 저장 없음)
  * 좌우 스와이프·화살표로 사진 전환 · 사진 위 텍스트 오버레이
  */

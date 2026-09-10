@@ -28,10 +28,10 @@ object LetteringIncomingNotifier {
         if (existing != null) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "VLUE 수신 빅푸시",
+            "VLUÉ 수신 빅푸시",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "수신 통화 시 VLUE 디지털 인증명함·쇼케이스"
+            description = "수신 통화 시 VLUÉ 디지털 인증명함·쇼케이스"
             setShowBadge(false)
             lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
         }
@@ -58,7 +58,7 @@ object LetteringIncomingNotifier {
             /* 재게시 전 취소 — HUN 깜빡임(보이다 사라졌다 다시 보임) 완화 */
             cancel(app)
             ensureChannel(app)
-            val title = if (outgoing) "VLUE 발신 레터링" else "VLUE 수신 빅푸시"
+            val title = if (outgoing) "VLUÉ 발신 레터링" else "VLUÉ 수신 빅푸시"
             val body = when {
                 !displayName.isNullOrBlank() -> displayName
                 phone.isBlank() || phone == "unknown" -> "번호 확인 중…"

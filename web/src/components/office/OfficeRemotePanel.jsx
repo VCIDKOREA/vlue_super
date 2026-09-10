@@ -78,7 +78,7 @@ export default function OfficeRemotePanel({
       </div>
       {agents.length === 0 ? (
         <p className="rounded-xl bg-slate-50 px-3 py-2.5 text-[12px] leading-relaxed text-slate-600">
-          VLUE PC에서 복합기를 먼저 연결해 주세요. 앱에서는 인쇄·팩스만 보냅니다.
+          VLUÉ PC에서 복합기를 먼저 연결해 주세요. 앱에서는 인쇄·팩스만 보냅니다.
         </p>
       ) : null}
       {loading ? (

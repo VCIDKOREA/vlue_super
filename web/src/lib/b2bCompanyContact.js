@@ -20,7 +20,7 @@ export const COMPANY_CONTACT_OPTIONS = [
   {
     id: COMPANY_CONTACT_TYPES.REP_MOBILE,
     title: "대표번호 없음 · 대표자 휴대로 안내",
-    sub: "PASS 본인인증 휴대폰이 VLUE 인증번호이자 고객에게 표시되는 연락처입니다."
+    sub: "PASS 본인인증 휴대폰이 VLUÉ 인증번호이자 고객에게 표시되는 연락처입니다."
   },
   {
     id: COMPANY_CONTACT_TYPES.REP_EXTENSION,

@@ -105,7 +105,7 @@ export const DCC_LOGO_IMAGE_GUIDE = {
     "PNG, JPG, WEBP · 권장 512×512px (1:1, PNG 투명 권장) · 최대 400KB · 초과 시 자동 맞춤"
 };
 
-/** 앱 프로필 패널·VLUE PAGE (avatar kind) */
+/** 앱 프로필 패널·VLUÉ PAGE (avatar kind) */
 export const AVATAR_IMAGE_GUIDE = {
   recommendWidthPx: IMAGE_FIT_AVATAR.maxWidth,
   recommendHeightPx: IMAGE_FIT_AVATAR.maxHeight,

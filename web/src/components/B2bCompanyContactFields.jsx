@@ -38,7 +38,7 @@ export default function B2bCompanyContactFields({ draft, onPatch, compact = fals
       ) : null}
 
       <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 px-2.5 py-2">
-        <p className="text-[10px] font-black text-indigo-950">① 대표자 VLUE 인증번호</p>
+        <p className="text-[10px] font-black text-indigo-950">① 대표자 VLUÉ 인증번호</p>
         <p className="mt-0.5 text-[10px] text-indigo-900/80">PASS 본인인증 휴대폰 · 1회선 · 변경 불가</p>
         <div className="mt-1.5 rounded-md border border-indigo-200/80 bg-white px-2 py-1.5 text-[12px] font-bold text-slate-600">
           {draft.vlueAuthPhoneHint || "본인인증 완료 후 자동 등록"}

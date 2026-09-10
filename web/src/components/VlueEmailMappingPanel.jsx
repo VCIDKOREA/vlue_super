@@ -34,7 +34,7 @@ export default function VlueEmailMappingPanel({
   if (loading) {
     return (
       <div className={`mt-4 rounded-2xl border p-4 text-[12px] ${sub} ${box}`}>
-        VLUE 메일 설정을 불러오는 중…
+        VLUÉ 메일 설정을 불러오는 중…
       </div>
     );
   }
@@ -42,12 +42,12 @@ export default function VlueEmailMappingPanel({
   return (
     <>
       <div className={`mt-4 rounded-2xl border p-4 shadow-sm ${box}`}>
-        <p className="text-[14px] font-black">VLUE 가상 메일 포워딩</p>
+        <p className="text-[14px] font-black">VLUÉ 가상 메일 포워딩</p>
         <p className={`mt-1 text-[11px] leading-relaxed ${sub}`}>
           로그인 아이디 @vlue.kr 로 받은 메일은 대표 수신 메일로 전달됩니다.
         </p>
         <div className={`mt-3 rounded-xl border px-3 py-2.5 text-[12px] ${isDarkMode ? "border-white/10 bg-white/[0.03]" : "border-gray-100 bg-gray-50"}`}>
-          <p className={`text-[10px] font-bold uppercase tracking-wide ${sub}`}>VLUE 메일</p>
+          <p className={`text-[10px] font-bold uppercase tracking-wide ${sub}`}>VLUÉ 메일</p>
           <p className="mt-0.5 font-bold">{mapping?.fullVirtualEmail || "(미설정)"}</p>
           <p className={`mt-2 text-[10px] font-bold uppercase tracking-wide ${sub}`}>대표 수신 메일</p>
           <p className="mt-0.5 font-semibold">{mapping?.targetMasterEmail || "(미연동)"}</p>

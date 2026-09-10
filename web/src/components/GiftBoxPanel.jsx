@@ -92,7 +92,7 @@ export default function GiftBoxPanel({ isDarkMode = false, onToast }) {
           </div>
           <div className="min-w-0 flex-1">
             <p className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? "text-rose-300" : "text-rose-600"}`}>
-              VLUE 선물함
+              VLUÉ 선물함
             </p>
             <h2 className={`mt-0.5 text-[17px] font-black ${textStrong}`}>받은 선물 · 쿠폰</h2>
             <p className={`mt-1.5 text-[12px] leading-relaxed ${textSub}`}>

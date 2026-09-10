@@ -416,7 +416,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
                 회사소개
               </span>
             }
-            title="VLUE가 하는 일"
+            title="VLUÉ가 하는 일"
             desc={COMPANY_PROFILE.mission}
           />
           <div className="grid sm:grid-cols-3 gap-4 mb-5">
@@ -446,7 +446,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
                 플랫폼
               </span>
             }
-            title="웹과 설치형, 하나의 VLUE"
+            title="웹과 설치형, 하나의 VLUÉ"
             desc={PLATFORM_SPLIT.syncNote}
           />
 
@@ -588,18 +588,18 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
         </div>
       </section>
 
-        {/* VLUE 대응 */}
+        {/* VLUÉ 대응 */}
         <section id="about-protect" className="mkt-scroll-section">
           <SectionHead
             tone="primary"
             badge={
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-600 bg-primary-50 border border-primary-100 px-2.5 py-1 rounded-full">
               <Zap className="w-3.5 h-3.5" />
-                VLUE 대응
+                VLUÉ 대응
               </span>
             }
             title="이중 검증으로 즉시 판별"
-            desc="공공데이터와 VLUE 인증 DB를 함께 조회해 위험도를 안내합니다."
+            desc="공공데이터와 VLUÉ 인증 DB를 함께 조회해 위험도를 안내합니다."
           />
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
@@ -631,7 +631,7 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
               </ul>
             </div>
             <div className="card p-5 flex flex-col justify-center">
-              <p className="text-sm font-bold text-gray-900 mb-4 text-center">VLUE 이중 검증 흐름</p>
+              <p className="text-sm font-bold text-gray-900 mb-4 text-center">VLUÉ 이중 검증 흐름</p>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 {ARCHITECTURE_FLOW.map((item, i) => (
                   <Fragment key={item.label}>

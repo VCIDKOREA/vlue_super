@@ -5,7 +5,7 @@ import android.app.Application
 import android.os.Bundle
 import android.util.Log
 
-/** VLUE 메인 Application — 레터링 백그라운드 모듈 부트스트랩 */
+/** VLUÉ 메인 Application — 레터링 백그라운드 모듈 부트스트랩 */
 class VlueCallOverlayApp : Application() {
     override fun onCreate() {
         super.onCreate()

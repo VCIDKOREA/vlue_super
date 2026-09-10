@@ -42,10 +42,10 @@ export function resolveLetteringDemoLogoUrl(card = {}) {
   if (logo) return logo;
   const org = String(card.organization || card.companyName || "").trim();
   const orgUp = org.toUpperCase();
-  /* VCID / VLUE — 본인 명함과 동일하게 브랜드 로고 */
+  /* VCID / VLUÉ — 본인 명함과 동일하게 브랜드 로고 */
   if (
     orgUp.includes("VCID") ||
-    orgUp.includes("VLUE") ||
+    orgUp.includes("VLUÉ") ||
     org.includes("\uBE14\uB8E8") /* 블루 */
   ) {
     return VLUE_SHIELD_LOGO;

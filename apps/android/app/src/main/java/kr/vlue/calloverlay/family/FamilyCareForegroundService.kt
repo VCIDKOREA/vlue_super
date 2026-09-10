@@ -54,7 +54,7 @@ class FamilyCareForegroundService : Service() {
     private fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val ch = NotificationChannel(CHANNEL_ID, "VLUE 가족 보호", NotificationManager.IMPORTANCE_LOW)
+        val ch = NotificationChannel(CHANNEL_ID, "VLUÉ 가족 보호", NotificationManager.IMPORTANCE_LOW)
         nm.createNotificationChannel(ch)
     }
 
@@ -67,7 +67,7 @@ class FamilyCareForegroundService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("VLUE 가족 보호")
+            .setContentTitle("VLUÉ 가족 보호")
             .setContentText("배터리·보안 상태를 가족과 공유 중입니다.")
             .setContentIntent(pi)
             .setOngoing(true)

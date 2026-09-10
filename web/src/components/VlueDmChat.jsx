@@ -262,7 +262,7 @@ export default function VlueDmChat() {
       <section className="min-h-0 w-full flex-1 overflow-y-auto pb-24">
         <div className="pt-2 pb-3 text-[12px] text-gray-500 space-y-1">
           <p>
-            <span className="font-normal text-gray-700">VLUE 회원 DM</span> — 가입된 사용자를 누르면 1:1 채팅이 열립니다. 오른쪽 「인증」으로 신뢰 인증(Vouch)을 요청할 수 있습니다.
+            <span className="font-normal text-gray-700">VLUÉ 회원 DM</span> — 가입된 사용자를 누르면 1:1 채팅이 열립니다. 오른쪽 「인증」으로 신뢰 인증(Vouch)을 요청할 수 있습니다.
           </p>
           {!myId && <p className="text-amber-700">로컬에 <code className="text-[11px]">vlue_server_user_id</code>가 없으면 전송·목록이 동작하지 않습니다.</p>}
           {!supabaseOk && <p className="text-amber-700">Supabase URL/anon 키가 없으면 Realtime은 꺼지고, API 저장만 됩니다 ( 환경변수 <code className="text-[11px]">VITE_SUPABASE_*</code> ).</p>}

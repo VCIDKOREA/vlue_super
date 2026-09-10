@@ -1848,7 +1848,7 @@ class CallOverlayService : Service() {
                     OverlayContext.COMPACT_INCOMING
             }.let { resolved ->
                 /*
-                 * VLUE 전면 + 전체 InCall task/resume 아님 → 미니(BELOW).
+                 * VLUÉ 전면 + 전체 InCall task/resume 아님 → 미니(BELOW).
                  * resumed 가 InCallActivity 이면 풀 UI(TOP) 유지.
                  */
                 if (ourApp &&
@@ -2058,7 +2058,7 @@ class CallOverlayService : Service() {
         val name = parseDisplayName(cardJson)
         return when {
             name != null && phone.isNotBlank() && phone != "unknown" -> phone
-            verified -> "VLUE 인증 · 쇼케이스 불러오는 중"
+            verified -> "VLUÉ 인증 · 쇼케이스 불러오는 중"
             phone.isBlank() || phone == "unknown" -> "상대 번호를 확인하는 중…"
             else -> "쇼케이스 불러오는 중…"
         }
@@ -3355,7 +3355,7 @@ class CallOverlayService : Service() {
         )
     }
 
-    /** 좌/우 동일 크롬 — 화면 밖 VLUE 탭 */
+    /** 좌/우 동일 크롬 — 화면 밖 VLUÉ 탭 */
     private fun buildBigPushPeekTab(): FrameLayout {
         val tab = FrameLayout(this).apply {
             setBackgroundColor(Color.TRANSPARENT)

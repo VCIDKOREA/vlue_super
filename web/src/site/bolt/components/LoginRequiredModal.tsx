@@ -45,7 +45,7 @@ export default function LoginRequiredModal({ onClose, onLogin }: LoginRequiredMo
           로그인이 필요한 서비스입니다
         </h2>
         <p className="text-sm text-gray-500 mb-7 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-          VLUE 회원이라면 지금 바로 로그인하고
+          VLUÉ 회원이라면 지금 바로 로그인하고
           <br />
           모든 서비스를 이용해보세요.
         </p>

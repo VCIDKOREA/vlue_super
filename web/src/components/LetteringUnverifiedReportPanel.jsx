@@ -151,7 +151,7 @@ export default function LetteringUnverifiedReportPanel({
       </header>
 
       {hasTips ? (
-        <section className="lettering-unverified-broadcast" aria-label="VLUE 제보 송출">
+        <section className="lettering-unverified-broadcast" aria-label="VLUÉ 제보 송출">
           <p className="lettering-unverified-broadcast__label">{summary.topLabel}</p>
           <p className="lettering-unverified-broadcast__meta">
             {`제보 ${summary.topCount || summary.tipCount}회`}
@@ -278,8 +278,8 @@ export default function LetteringUnverifiedReportPanel({
         {"당신의 제보가 또 다른 피해를 막을 수 있습니다."}
       </p>
 
-      <section className="lettering-unverified-analysis" aria-label="VLUE 분석결과">
-        <p className="lettering-unverified-analysis__title">VLUE 분석결과</p>
+      <section className="lettering-unverified-analysis" aria-label="VLUÉ 분석결과">
+        <p className="lettering-unverified-analysis__title">VLUÉ 분석결과</p>
         <p className="lettering-unverified-analysis__body">
           {summary.analysis?.message || "분석결과는 없습니다"}
         </p>

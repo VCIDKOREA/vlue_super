@@ -1,6 +1,6 @@
 import { VLUE_CARD_CAUTION, digitalCardBadgeText } from "../lib/vlueDigitalCardUi.js";
 
-/** 수신·채팅 공통: VLUE 인증된 번호 + 주의 문구 (이름·전화 없음) */
+/** 수신·채팅 공통: VLUÉ 인증된 번호 + 주의 문구 (이름·전화 없음) */
 export default function GeneralLetteringCard({ className = "" }) {
   const badge = digitalCardBadgeText("free");
   return (

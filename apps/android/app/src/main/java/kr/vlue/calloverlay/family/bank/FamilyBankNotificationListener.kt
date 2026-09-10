@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 
 /**
  * NotificationListenerService — 은행 입출금 푸시 감지·마스킹 후 가족 브릿지 전달
- * 설정 → 알림 접근 → VLUE 허용 필요
+ * 설정 → 알림 접근 → VLUÉ 허용 필요
  */
 class FamilyBankNotificationListener : NotificationListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

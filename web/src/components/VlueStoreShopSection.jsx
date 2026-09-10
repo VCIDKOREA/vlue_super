@@ -34,7 +34,7 @@ export default function VlueStoreShopSection({ isPaid = false, onManageProducts,
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [enterpriseRole, setEnterpriseRole] = useState("NONE");
   const [, setHubTick] = useState(0);
-  const storeName = "VLUE 공식 상점";
+  const storeName = "VLUÉ 공식 상점";
 
   useEffect(() => {
     const bump = () => setHubTick((n) => n + 1);
@@ -122,7 +122,7 @@ export default function VlueStoreShopSection({ isPaid = false, onManageProducts,
     <div className="mt-4 rounded-2xl border border-violet-100 bg-white p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <div>
-          <p className="text-[13px] font-black text-violet-950">VLUE 상점</p>
+          <p className="text-[13px] font-black text-violet-950">VLUÉ 상점</p>
           <p className="text-[10px] font-semibold text-violet-800/80">
             {enterpriseRole !== "NONE"
               ? canPay

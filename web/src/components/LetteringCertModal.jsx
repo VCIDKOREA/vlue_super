@@ -25,7 +25,7 @@ export default function LetteringCertModal({ open, payload, onClose }) {
         <div className="lettering-cert-modal__body">
           <header className="mb-3">
             <h2 id="lettering-cert-modal-title" className="text-[17px] font-black text-slate-900">
-              VLUE {"\uC778\uC99D\uC815\uBCF4"}
+              VLUÉ {"\uC778\uC99D\uC815\uBCF4"}
             </h2>
             <p className="mt-1 text-[12px] font-semibold text-slate-600">
               {card.name || "\u2014"}
@@ -35,7 +35,7 @@ export default function LetteringCertModal({ open, payload, onClose }) {
 
           {phoneMatched ? (
             <p className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-800">
-              VLUE {"\uC778\uC99D \uB4F1\uB85D\uBC88\uD638 \uC785\uB2C8\uB2E4."}
+              VLUÉ {"\uC778\uC99D \uB4F1\uB85D\uBC88\uD638 \uC785\uB2C8\uB2E4."}
             </p>
           ) : incoming ? (
             <p className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">

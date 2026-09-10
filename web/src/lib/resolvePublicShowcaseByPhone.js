@@ -182,7 +182,7 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
     authCycleEndAt: exportSnap?.authCycleEndAt || null,
     authPaidAt: exportSnap?.authPaidAt || null,
     cycleEndAt: exportSnap?.authCycleEndAt || null,
-    verificationItems: ["VLUE 인증"],
+    verificationItems: ["VLUÉ 인증"],
     showcaseStyle
   });
 

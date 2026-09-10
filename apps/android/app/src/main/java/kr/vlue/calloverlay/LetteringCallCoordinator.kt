@@ -482,7 +482,7 @@ object LetteringCallCoordinator {
                     outgoing
                 )
                 /* 경로 비정상만 즉시 반영. 일반 unmatched 는 lookup_pending 유지 —
-                 * 웹 by-number 가 회원 카드를 살릴 때까지 미인증「VLUE Showcase」금지 */
+                 * 웹 by-number 가 회원 카드를 살릴 때까지 미인증「VLUÉ Showcase」금지 */
                 if (merged.route == "abnormal") {
                     if (LetteringPermissionHelper.canDrawOverlays(app)) {
                         CallOverlayService.updateCallInfo(

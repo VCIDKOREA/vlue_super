@@ -8,7 +8,7 @@ const DEFAULT_WARNING =
 const NORMAL_MESSAGE =
   "공식 국가기관 번호로 확인되었습니다. 디지털인증프로필을 확인하세요.";
 const CONTACT_NORMAL_MESSAGE =
-  "기기에 저장된 번호입니다. VLUE 비회원 · 안심케어 정상 경로입니다.";
+  "기기에 저장된 번호입니다. VLUÉ 비회원 · 안심케어 정상 경로입니다.";
 
 function websiteLabel(url) {
   return String(url || "")
@@ -107,7 +107,7 @@ export default function AgencyDcpCard({
         </p>
       )}
       {expired ? null : contact ? (
-        <p className="agency-dcp-card__member">VLUE 비회원</p>
+        <p className="agency-dcp-card__member">VLUÉ 비회원</p>
       ) : webHref ? (
         <a
           className="agency-dcp-card__web"

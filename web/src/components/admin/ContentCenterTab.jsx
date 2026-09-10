@@ -67,7 +67,7 @@ export default function ContentCenterTab({ onToast }) {
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: VLUE 6.0 스마트 오피스 업데이트"
+              placeholder="예: VLUÉ 6.0 스마트 오피스 업데이트"
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
             />
           </label>

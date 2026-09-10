@@ -25,10 +25,10 @@ export default function MarketingPopupModal({ popup, open, onClose, onOpenLink }
         <ModalCloseButton variant="onDark" onClick={onClose} topClassName="top-2" rightClassName="right-2" />
         <div className="relative aspect-[4/5] max-h-[62vh] w-full bg-slate-100">
           {popup.imageUrl ? (
-            <img src={popup.imageUrl} alt={popup.title || "VLUE"} className="h-full w-full object-cover" />
+            <img src={popup.imageUrl} alt={popup.title || "VLUÉ"} className="h-full w-full object-cover" />
           ) : null}
           <span className="absolute left-3 top-3 rounded-full bg-blue-600 px-2.5 py-1 text-[10px] font-black text-white">
-            VLUE
+            VLUÉ
           </span>
         </div>
         <div className="p-4">

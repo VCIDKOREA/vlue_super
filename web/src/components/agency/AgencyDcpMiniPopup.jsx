@@ -7,7 +7,7 @@ const DEFAULT_WARNING =
   "🚨 현재 번호는 비정상 발신 번호로 의심됩니다! 즉시 통화를 종료하고 공식 정보를 확인하세요!!";
 
 /**
- * 국가기관 DCP — VLUE 미니케이스처럼 가장자리로 빼 두고 드래그 이동
+ * 국가기관 DCP — VLUÉ 미니케이스처럼 가장자리로 빼 두고 드래그 이동
  */
 export default function AgencyDcpMiniPopup({
   open = false,
@@ -25,7 +25,7 @@ export default function AgencyDcpMiniPopup({
   return createPortal(
     <div className="agency-dcp-mini-layer" data-dcp-popup={variant}>
       <CompanionMiniCase
-        brandText={expired ? "VLUE · 인증 만료" : abnormal ? "VLUE DCP · 비정상" : "VLUE DCP"}
+        brandText={expired ? "VLUÉ · 인증 만료" : abnormal ? "VLUÉ DCP · 비정상" : "VLUÉ DCP"}
         expandOnTap={false}
         locked={abnormal || expired}
         customBody={

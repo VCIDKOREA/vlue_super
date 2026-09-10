@@ -27,8 +27,8 @@ import java.util.concurrent.Executors
  * 앱 홈 미리보기와 동일 정보(회사·이름·직함·로고·인증)를 표시하되
  * 소유자 전용 「통화화면 보기」「설정」은 절대 노출하지 않는다.
  *
- * 아바타: CEO(@ceo) → VLUE 브랜드 마크 / 그 외 사진 없음 → 카톡형 실루엣
- * (빈 로고에 VLUE 눈을 자동 넣지 않음)
+ * 아바타: CEO(@ceo) → VLUÉ 브랜드 마크 / 그 외 사진 없음 → 카톡형 실루엣
+ * (빈 로고에 VLUÉ 눈을 자동 넣지 않음)
  */
 object BigPushShowcaseBar {
 
@@ -100,7 +100,7 @@ object BigPushShowcaseBar {
         val isCeo = handle == "ceo" ||
             firstNonBlank(json?.optString("phoneE164"), card?.optString("phoneE164"), phone)
                 ?.let { normalizeDigits(it) } == "821080144666"
-        /* 프로필 사진만 — 회사 로고·VLUE 눈을 빈 자리에 넣지 않음 */
+        /* 프로필 사진만 — 회사 로고·VLUÉ 눈을 빈 자리에 넣지 않음 */
         val photo = firstNonBlank(
             json?.optString("image_url"),
             card?.optString("image_url"),
@@ -135,7 +135,7 @@ object BigPushShowcaseBar {
         )
         if (expired) {
             return Model(
-                brandLabel = "VLUE",
+                brandLabel = "VLUÉ",
                 primaryLine = phoneDisp.ifBlank { "번호 확인 중…" },
                 secondaryLine = firstNonBlank(
                     json?.optString("expiredSubtitle"),
@@ -149,38 +149,38 @@ object BigPushShowcaseBar {
         /* 안심케어(비회원) — 인증 체크 배지 금지 */
         val contactSafeCare = profileKind == "contact_safe_care"
         val brand = when {
-            contactSafeCare -> "VLUE 안심케어"
+            contactSafeCare -> "VLUÉ 안심케어"
             !org.isNullOrBlank() -> "$org Showcase"
             !hideBroadcastName && !displayName.isNullOrBlank() -> "$displayName Showcase"
-            hideBroadcastName -> "VLUE ID Showcase"
+            hideBroadcastName -> "VLUÉ ID Showcase"
             !handle.isNullOrBlank() -> "$handle Showcase"
-            else -> "VLUE Showcase"
+            else -> "VLUÉ Showcase"
         }
         /*
          * 앱 미리보기·웹 빅푸시와 동일:
-         * 1행 = 상호(없으면 이름, 이름 숨김이면 VLUE ID)
+         * 1행 = 상호(없으면 이름, 이름 숨김이면 VLUÉ ID)
          * 2행 = 상호 있으면 「이름 | 번호」 / 없으면 번호만
          */
         val primary = when {
             !org.isNullOrBlank() -> org
             !hideBroadcastName && !displayName.isNullOrBlank() -> displayName
-            hideBroadcastName -> "VLUE ID"
+            hideBroadcastName -> "VLUÉ ID"
             !displayName.isNullOrBlank() -> displayName
             else -> phoneDisp.ifBlank { "번호 확인 중…" }
         }
         val secondary = when {
-            contactSafeCare -> phoneDisp.ifBlank { "VLUE 비회원 · 안심케어" }
+            contactSafeCare -> phoneDisp.ifBlank { "VLUÉ 비회원 · 안심케어" }
             !org.isNullOrBlank() -> {
                 val parts = listOfNotNull(
                     displayName?.takeIf { it.isNotBlank() },
                     phoneDisp.takeIf { it.isNotBlank() }
                 )
                 if (parts.isNotEmpty()) parts.joinToString(" | ")
-                else if (verified) "VLUE 인증 · 쇼케이스"
+                else if (verified) "VLUÉ 인증 · 쇼케이스"
                 else "상대 번호 확인 중…"
             }
             phoneDisp.isNotBlank() -> phoneDisp
-            verified -> "VLUE 인증 · 쇼케이스"
+            verified -> "VLUÉ 인증 · 쇼케이스"
             else -> "상대 번호 확인 중…"
         }
         /* jobTitle 은 펼침 쇼케이스 본문에만 사용 — 바에는 넣지 않음 */
@@ -250,7 +250,7 @@ object BigPushShowcaseBar {
         top.addView(
             TextView(context).apply {
                 tag = TAG_BRAND
-                text = if (outgoing) "VLUE 발신" else model.brandLabel
+                text = if (outgoing) "VLUÉ 발신" else model.brandLabel
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                 typeface = Typeface.DEFAULT_BOLD
@@ -350,7 +350,7 @@ object BigPushShowcaseBar {
     fun bind(banner: View, phone: String, verified: Boolean, outgoing: Boolean, cardJson: String?) {
         val model = parseModel(phone, verified, cardJson)
         banner.findViewWithTag<TextView>(TAG_BRAND)?.text =
-            if (outgoing) "VLUE 발신" else model.brandLabel
+            if (outgoing) "VLUÉ 발신" else model.brandLabel
         banner.findViewWithTag<TextView>(TAG_PRIMARY)?.text = model.primaryLine
         banner.findViewWithTag<TextView>(TAG_SECONDARY)?.text =
             styleSecondaryWithCyanPipe(model.secondaryLine)

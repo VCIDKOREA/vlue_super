@@ -104,7 +104,7 @@ export default function MyPageDigitalLetteringSection({
   ) : !hasDigitalCertCard ? (
     <div className="mypage-showcase-card mypage-showcase-card--apply mb-3" data-theme={isDarkMode ? "dark" : "light"}>
       <p className="mypage-showcase-card__apply-copy">
-        유료 회원은 명함이 쇼케이스에 함께 표시됩니다. 무료 회원도 이름·VLUE ID·전화번호로 공유할 수 있습니다.
+        유료 회원은 명함이 쇼케이스에 함께 표시됩니다. 무료 회원도 이름·VLUÉ ID·전화번호로 공유할 수 있습니다.
       </p>
       <button type="button" className="mypage-showcase-card__apply-btn" onClick={() => onApplyDigitalCard?.()}>
         디지털인증명함 신청
@@ -141,7 +141,7 @@ export default function MyPageDigitalLetteringSection({
             <span className="mypage-showcase-card__icon-core">V</span>
           </div>
           <div className="mypage-showcase-card__copy">
-            <p className="mypage-showcase-card__eyebrow">VLUE Showcase</p>
+            <p className="mypage-showcase-card__eyebrow">VLUÉ Showcase</p>
             <p className="mypage-showcase-card__title">{showcasePreviewLabel()}</p>
             <p className="mypage-showcase-card__desc">
               {canUseDcc

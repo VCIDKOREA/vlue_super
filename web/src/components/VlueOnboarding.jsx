@@ -929,7 +929,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const runSendParentRequest = async () => {
     const handle = guardianHandle.trim().replace(/^@+/, "");
     if (!handle) {
-      setVerifyZone({ ok: false, text: "부모 VLUE 아이디를 입력해 주세요." });
+      setVerifyZone({ ok: false, text: "부모 VLUÉ 아이디를 입력해 주세요." });
       return;
     }
     setBusy(true);
@@ -1074,7 +1074,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       if (!hasNativeAppLockBridge()) {
         // 브라우저·PC: 앱에서 PIN 등록 — 가입 플로우는 통과
         setBioRegistered(true);
-        setBioNote("모바일 VLUE 앱에서 6자리 PIN을 등록해 주세요. 지금은 가입을 계속할 수 있습니다.");
+        setBioNote("모바일 VLUÉ 앱에서 6자리 PIN을 등록해 주세요. 지금은 가입을 계속할 수 있습니다.");
         setBusy(false);
         return;
       }
@@ -1182,7 +1182,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             <BackButton variant="inline" onBack={goBack} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-[13px] font-bold text-slate-800">VLUE 가입 · 검증</p>
+                <p className="truncate text-[13px] font-bold text-slate-800">VLUÉ 가입 · 검증</p>
                 <span className="shrink-0 text-[10px] font-medium text-slate-400">{TERMS_VERSION}</span>
               </div>
             </div>
@@ -1523,7 +1523,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             <section className={sectionCls}>
               <h2 className="text-[15px] font-bold text-slate-900 sm:text-[16px]">아이디 · 이메일 · 비밀번호</h2>
               <p className="mt-2 text-[11px] font-normal leading-relaxed text-slate-600 sm:text-[12px]">
-                VLUE ID와 이메일 인증을 완료한 뒤, 휴대폰 본인인증(PASS)으로 가입을 마무리합니다.
+                VLUÉ ID와 이메일 인증을 완료한 뒤, 휴대폰 본인인증(PASS)으로 가입을 마무리합니다.
               </p>
               <TwoTrackSignupFields
                 signupEmail={signupEmail}
@@ -1647,7 +1647,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                   className="mt-0.5 h-4 w-4 shrink-0 rounded border-amber-400 text-amber-700"
                 />
                 <span>
-                  사업자(법인·개인사업자)로 VLUE에 가입합니다. (가입 직후 계정 상태: 승인 대기 · 실제 운영 시 승인까지 최대{" "}
+                  사업자(법인·개인사업자)로 VLUÉ에 가입합니다. (가입 직후 계정 상태: 승인 대기 · 실제 운영 시 승인까지 최대{" "}
                   <b>48시간</b>이 소요될 수 있습니다.)
                 </span>
               </label>
@@ -1926,11 +1926,11 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 </a>
               </p>
               <ul className="list-disc space-y-1 pl-4 text-[11px] text-slate-600 sm:text-xs">
-                <li>부모님이 이미 VLUE 회원이어야 합니다 (만 14세 이상).</li>
-                <li>부모 VLUE 아이디로 <strong>승인 요청 푸시</strong>를 보내거나, 이 기기에서 부모님 PASS로 연동할 수 있습니다.</li>
+                <li>부모님이 이미 VLUÉ 회원이어야 합니다 (만 14세 이상).</li>
+                <li>부모 VLUÉ 아이디로 <strong>승인 요청 푸시</strong>를 보내거나, 이 기기에서 부모님 PASS로 연동할 수 있습니다.</li>
                 <li>연동은 선택이며, 하지 않아도 가입·로그인이 가능합니다.</li>
               </ul>
-              <label className="mt-2 block text-[11px] font-bold text-slate-700">부모 VLUE 아이디</label>
+              <label className="mt-2 block text-[11px] font-bold text-slate-700">부모 VLUÉ 아이디</label>
               <input
                 type="text"
                 value={guardianHandle}
@@ -1971,7 +1971,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                   onClick={() => runGuardianPass({ devBypass: true })}
                   className="w-full rounded-2xl border border-dashed border-slate-300 py-3 text-[12px] font-bold text-slate-500"
                 >
-                  [DEV] 부모 인증 우회 (부모 VLUE 계정·CI 필요)
+                  [DEV] 부모 인증 우회 (부모 VLUÉ 계정·CI 필요)
                 </button>
               )}
             </section>
@@ -2226,7 +2226,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
               <p className="mt-2 text-[13px] leading-relaxed text-slate-600">
                 신청이 접수되었습니다. 최대 <b>24시간</b> 이내에 심사 결과를 알려드립니다.
                 {v1AppShell.referralProgram
-                  ? " VLUE 추천 안내 및 이용 정책이 적용됩니다."
+                  ? " VLUÉ 추천 안내 및 이용 정책이 적용됩니다."
                   : " 서비스 이용약관·개인정보 처리방침이 적용됩니다."}
               </p>
               <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px] text-slate-600">
@@ -2249,7 +2249,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                     {v1AppShell.referralProgram && !isB2b && referralMeta.verified && referralMeta.sponsorDisplayName
                       ? ` (${referralMeta.sponsorDisplayName})`
                       : ""}
-                    <span className="block text-indigo-800">→ VLUE 시작하기 후 결제창</span>
+                    <span className="block text-indigo-800">→ VLUÉ 시작하기 후 결제창</span>
                   </li>
                 ) : null}
                 {v1AppShell.referralProgram ? (
@@ -2264,7 +2264,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 onClick={() => persistAndComplete({ biometric: bioRegistered ? "registered" : "skipped" })}
                 className="mt-6 w-full rounded-2xl bg-slate-900 py-3.5 text-[14px] font-black text-white"
               >
-                VLUE 시작하기
+                VLUÉ 시작하기
               </button>
             </section>
           )}

@@ -2,13 +2,13 @@ import { ShieldCheck } from "lucide-react";
 import { TENT_THEME } from "../../lib/showcase/tentShowcaseTypes.js";
 
 /**
- * 매트 실버 / 플래티넘 VLUE 디지털 신원 인증 마크
+ * 매트 실버 / 플래티넘 VLUÉ 디지털 신원 인증 마크
  */
 export default function TentIdentityBadge({
   verified = true,
   premium = false,
   size = "md",
-  label = "VLUE 인증"
+  label = "VLUÉ 인증"
 }) {
   const dim = size === "lg" ? "tent-badge--lg" : size === "sm" ? "tent-badge--sm" : "tent-badge--md";
   if (!verified) {

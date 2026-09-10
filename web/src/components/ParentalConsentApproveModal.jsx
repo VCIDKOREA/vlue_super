@@ -39,7 +39,7 @@ export default function ParentalConsentApproveModal({
         <p className="text-[11px] font-black uppercase tracking-widest text-indigo-500">Family Protection</p>
         <h2 className="mt-1 text-[17px] font-black">자녀 가입 승인</h2>
         <p className={`mt-2 text-[12px] leading-relaxed ${sub}`}>
-          <strong>{request.wardLabel || "자녀"}</strong> 님의 VLUE 가입에 법정대리인 동의가 필요합니다.
+          <strong>{request.wardLabel || "자녀"}</strong> 님의 VLUÉ 가입에 법정대리인 동의가 필요합니다.
           보이스피싱·가족보호 정책에 따라 <strong>보호자 본인 PASS 인증</strong> 후 승인해 주세요.
         </p>
         {msg ? (

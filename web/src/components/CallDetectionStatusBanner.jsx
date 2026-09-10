@@ -69,7 +69,7 @@ export default function CallDetectionStatusBanner({
   const body = ok
     ? compact
       ? "백그라운드 실행 중이면 정상 송출됩니다."
-      : "백그라운드 실행 중이면 정상 송출됩니다. (알림창에 없어도 「백그라운드 실행」목록에 VLUE가 있으면 됩니다.)"
+      : "백그라운드 실행 중이면 정상 송출됩니다. (알림창에 없어도 「백그라운드 실행」목록에 VLUÉ가 있으면 됩니다.)"
     : health.issues[0] || "통화 감지를 다시 켜 주세요.";
 
   return (

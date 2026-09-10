@@ -174,7 +174,7 @@
         <activity
             android:name=".ShareReceiverActivity"
             android:exported="true"
-            android:label="VLUE 메모장"
+            android:label="VLUÉ 메모장"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.VlueCallOverlay">
             <intent-filter>
@@ -212,7 +212,7 @@
                 android:value="Telephony call-state monitor for lettering big-push" />
         </service>
 
-        <!-- VLUE 전면 통화 UI (기본 전화앱일 때 DTMF·disconnect) -->
+        <!-- VLUÉ 전면 통화 UI (기본 전화앱일 때 DTMF·disconnect) -->
         <service
             android:name=".incall.VlueInCallService"
             android:exported="true"

@@ -1,5 +1,5 @@
 /**
- * Instagram 게시물 → VLUE 쇼케이스용 미디어 메타데이터
+ * Instagram 게시물 → VLUÉ 쇼케이스용 미디어 메타데이터
  * - 이미지 파일은 서버에 저장하지 않음
  * - media_url 을 img src 에 직접 사용 (만료 시 resolve API로 갱신)
  */

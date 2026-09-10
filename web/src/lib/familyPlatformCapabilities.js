@@ -36,7 +36,7 @@ export const FAMILY_PLATFORM_MATRIX = {
   }
 };
 
-/** VLUE 앱 셸 플랫폼 — bridge 우선, 없으면 UA */
+/** VLUÉ 앱 셸 플랫폼 — bridge 우선, 없으면 UA */
 export function getVlueShellPlatform() {
   if (typeof window === "undefined") return "unknown";
   const bridge = window.VlueFamilyBridge || {};

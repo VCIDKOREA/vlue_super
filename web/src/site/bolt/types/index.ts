@@ -63,7 +63,7 @@ export interface NewsItem {
   region?: string;
 }
 
-/** VLUE 스토어 — 홈 공식 광고업체 슬롯 */
+/** VLUÉ 스토어 — 홈 공식 광고업체 슬롯 */
 export interface StoreAdvertiser {
   id: string;
   name: string;

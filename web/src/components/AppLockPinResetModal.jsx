@@ -74,7 +74,7 @@ export default function AppLockPinResetModal({ open, onClose, onPinResetReady })
   return (
     <div className="fixed inset-0 z-[420] flex items-end justify-center bg-black/50 px-3 pb-6 sm:items-center sm:pb-0">
       <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
-        <p className="text-[11px] font-black tracking-wide text-blue-600">VLUE 보안</p>
+        <p className="text-[11px] font-black tracking-wide text-blue-600">VLUÉ 보안</p>
         <h2 className="mt-1 text-[18px] font-black text-slate-900">PIN 재설정</h2>
         {step === "intro" ? (
           <>

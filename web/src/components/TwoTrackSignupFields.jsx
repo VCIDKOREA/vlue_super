@@ -16,7 +16,7 @@ function isPlatformSignupEmail(email) {
 }
 
 /**
- * 회원가입 — VLUE ID + 이메일 인증(필수) + 휴대폰 PASS(다음 단계)
+ * 회원가입 — VLUÉ ID + 이메일 인증(필수) + 휴대폰 PASS(다음 단계)
  */
 export default function TwoTrackSignupFields({
   signupEmail,
@@ -107,7 +107,7 @@ export default function TwoTrackSignupFields({
       </p>
 
       <div className="space-y-2">
-        <label className="block text-[11px] font-medium text-slate-600">VLUE ID</label>
+        <label className="block text-[11px] font-medium text-slate-600">VLUÉ ID</label>
         <input
           type="text"
           inputMode="text"
@@ -116,7 +116,7 @@ export default function TwoTrackSignupFields({
           spellCheck={false}
           value={desiredMemberId}
           onChange={(e) => onDesiredMemberIdChange(e.target.value)}
-          placeholder="원하는 VLUE ID (예: hong_gildong)"
+          placeholder="원하는 VLUÉ ID (예: hong_gildong)"
           className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] outline-none focus:border-[#191f28]"
         />
         <p className="text-[10px] text-slate-500">영문 소문자 시작 · 3~20자 · 숫자 1자 이상</p>

@@ -241,7 +241,7 @@ object FamilyProtectionNotificationHelper {
     fun showAlert(context: Context, title: String, body: String, tag: String?) {
         val app = context.applicationContext
         ensureChannel(app)
-        val safeTitle = title.ifBlank { "VLUE" }
+        val safeTitle = title.ifBlank { "VLUÉ" }
         val multiBody = formatInviteBodyLines(body.ifBlank { title })
         val contentPi =
             VlueNotificationWake.activityPendingIntent(app, (tag ?: "family-alert").hashCode())

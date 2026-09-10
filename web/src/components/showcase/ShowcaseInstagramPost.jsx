@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Heart, MessageCircle, Send, MoreHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 
 /**
- * Instagram API 메타데이터 → VLUE 커스텀 쇼케이스 카드
+ * Instagram API 메타데이터 → VLUÉ 커스텀 쇼케이스 카드
  * - embed / iframe 없음
  * - media_url 을 <img src> 에 직접 사용 (서버 파일 저장 없음)
  */
@@ -72,7 +72,7 @@ export default function ShowcaseInstagramPost({
     mediaUrl: list[index]?.url || ""
   });
 
-  /** placeholder — VLUE DB / Instagram Graph API 연동 지점 */
+  /** placeholder — VLUÉ DB / Instagram Graph API 연동 지점 */
   const handleLike = () => {
     const nextLiked = !liked;
     setLiked(nextLiked);
@@ -92,7 +92,7 @@ export default function ShowcaseInstagramPost({
   };
 
   const handleReport = () => {
-    // TODO: 신고/차단 플로우 · VLUE 신고 API
+    // TODO: 신고/차단 플로우 · VLUÉ 신고 API
     onReport?.(ctx());
   };
 
@@ -251,7 +251,7 @@ export default function ShowcaseInstagramPost({
               </span>
             ) : null}
           </p>
-          <p className="showcase-ig-post__badge">Instagram · VLUE</p>
+          <p className="showcase-ig-post__badge">Instagram · VLUÉ</p>
         </div>
       </header>
 

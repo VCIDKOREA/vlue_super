@@ -194,7 +194,7 @@ export default function AdminSecretApp() {
     <div className="min-h-[100dvh] bg-[#f0f4ff] text-gray-900 flex flex-col items-center px-4 py-10">
       <div className="w-full max-w-5xl space-y-6">
         <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
-          <h1 className="text-[18px] font-black text-blue-700 tracking-tight">VLUE 본사 관리자</h1>
+          <h1 className="text-[18px] font-black text-blue-700 tracking-tight">VLUÉ 본사 관리자</h1>
           <p className="mt-2 text-[12px] text-gray-500 leading-relaxed">
             자동 가입 승인 · 기기 승인 · 기업 귀속 · 마케팅 · 콘텐츠 배포
           </p>

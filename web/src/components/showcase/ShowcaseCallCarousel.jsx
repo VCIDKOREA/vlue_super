@@ -59,7 +59,7 @@ function pickPhotoSlideFields(p = {}) {
 /**
  * 통화 쇼케이스 시네마틱 캐러셀
  * - 상하 스와이프 / 마우스 휠: 페이지 이동 (디지털 인증명함 ↔ 쇼케이스)
- * - Instagram: API media_url → VLUE 커스텀 카드 (embed/iframe 없음)
+ * - Instagram: API media_url → VLUÉ 커스텀 카드 (embed/iframe 없음)
  * - 일반 사진: 페이지 안 좌우 최대 20장
  */
 export default function ShowcaseCallCarousel({
@@ -907,7 +907,7 @@ export default function ShowcaseCallCarousel({
                     <RenderErrorGuard
                       fallback={
                         <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-1 px-6 text-center text-slate-100">
-                          <p className="text-[15px] font-black">{card?.organization || card?.name || "VLUE"}</p>
+                          <p className="text-[15px] font-black">{card?.organization || card?.name || "VLUÉ"}</p>
                           {card?.name && card?.organization ? (
                             <p className="text-[13px] text-slate-300">{card.name}</p>
                           ) : null}
@@ -948,10 +948,10 @@ export default function ShowcaseCallCarousel({
                       permalink={slide.permalink || ""}
                       verified={igVerified}
                       onLike={(_ctx, _state) => {
-                        /* TODO: VLUE 좋아요 API / Instagram Graph */
+                        /* TODO: VLUÉ 좋아요 API / Instagram Graph */
                       }}
                       onComment={(ctx) => {
-                        /* TODO: 댓글 시트 + VLUE comments API */
+                        /* TODO: 댓글 시트 + VLUÉ comments API */
                         onKeypadToast?.(`@${ctx.username || "instagram"} 댓글`);
                       }}
                       onShare={async (ctx) => {
@@ -959,7 +959,7 @@ export default function ShowcaseCallCarousel({
                         try {
                           if (navigator.share && ctx.permalink) {
                             await navigator.share({
-                              title: "VLUE Showcase",
+                              title: "VLUÉ Showcase",
                               url: ctx.permalink
                             });
                           } else if (ctx.permalink) {
@@ -973,9 +973,9 @@ export default function ShowcaseCallCarousel({
                         }
                       }}
                       onReport={(ctx) => {
-                        /* TODO: VLUE 신고/차단 */
+                        /* TODO: VLUÉ 신고/차단 */
                         onReport?.({ card, phone: incomingNumber, mediaId: ctx.mediaId });
-                        onKeypadToast?.("신고는 VLUE 앱 신고 화면에서 처리할 수 있습니다.");
+                        onKeypadToast?.("신고는 VLUÉ 앱 신고 화면에서 처리할 수 있습니다.");
                       }}
                       onImageError={(broken) => {
                         const id = broken?.id;
@@ -983,7 +983,7 @@ export default function ShowcaseCallCarousel({
                         void resolveIgMediaSafe([id]);
                       }}
                     />
-                    {/* 인스타 게시물: 비즈니스 링크 숨김 · 소셜 로고 + VLUE 프로필만 */}
+                    {/* 인스타 게시물: 비즈니스 링크 숨김 · 소셜 로고 + VLUÉ 프로필만 */}
                     {socialOverlayEnabled && !keypadOpen ? (
                       <ShowcaseSlideChrome
                         card={card}

@@ -302,7 +302,7 @@ function MyPage({
       sessionStorage.removeItem(OPEN_MYPAGE_COMPOSER_STORE_KEY);
       if (!isPageCreated()) {
         onOpenManager?.();
-        setToast("VLUE PAGE를 먼저 만든 뒤 게시물을 올려 주세요.");
+        setToast("VLUÉ PAGE를 먼저 만든 뒤 게시물을 올려 주세요.");
         setTimeout(() => setToast(""), 3200);
         return;
       }
@@ -444,7 +444,7 @@ function MyPage({
     const postTitle = postCaption.trim() || "새 게시물";
     window.dispatchEvent(
       new CustomEvent(SHOP_OWNER_POSTED, {
-        detail: { ownerKey, title: postTitle, shopName: feedName || "VLUE PAGE" }
+        detail: { ownerKey, title: postTitle, shopName: feedName || "VLUÉ PAGE" }
       })
     );
     setTimeout(() => setToast(""), 2000);
@@ -616,7 +616,7 @@ function MyPage({
                 <input
                   value={postHashtags}
                   onChange={(e) => setPostHashtags(e.target.value)}
-                  placeholder="#VLUE #데일리 (공백으로 구분)"
+                  placeholder="#VLUÉ #데일리 (공백으로 구분)"
                   className="mt-1 w-full border-0 bg-transparent px-0 py-1 text-[13px] outline-none placeholder:text-gray-400"
                 />
               </div>
@@ -760,7 +760,7 @@ function MyPage({
 
               {isPaid && (
                 <div className="rounded-2xl border-2 border-indigo-100 bg-gradient-to-b from-indigo-50/90 to-white p-4">
-                  <p className="text-[13px] font-black text-indigo-950">VLUE PAGE · 상점</p>
+                  <p className="text-[13px] font-black text-indigo-950">VLUÉ PAGE · 상점</p>
                   <p className="mt-1 text-[11px] leading-relaxed text-indigo-900/80">
                     {isStoreApproved()
                       ? "상점 승인됨 — 아래 「상품 올리기」 또는 페이지 관리에서 상품을 등록하세요."
@@ -814,7 +814,7 @@ function MyPage({
               <p className={`mt-0.5 text-[11px] font-medium ${subCls}`}>{intro}</p>
               {canUseStore && (
                 <span className="mt-1 inline-block rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-black text-violet-800">
-                  VLUE 상점
+                  VLUÉ 상점
                 </span>
               )}
               <div className="mt-2 grid grid-cols-3 gap-2 text-center">

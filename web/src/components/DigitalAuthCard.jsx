@@ -39,7 +39,7 @@ const BackIcon = ({ type }) => {
 };
 
 /**
- * VLUE 디지털 인증 명함 — 일반(인증 번호) / 스탠다드(라이트 카드) / 프리미엄(다크·뒤집기·버튼)
+ * VLUÉ 디지털 인증 명함 — 일반(인증 번호) / 스탠다드(라이트 카드) / 프리미엄(다크·뒤집기·버튼)
  */
 export default function DigitalAuthCard({ membershipTier = "free", myCard = {}, digitalCardIssued = true }) {
   const [flipped, setFlipped] = useState(false);
@@ -51,7 +51,7 @@ export default function DigitalAuthCard({ membershipTier = "free", myCard = {}, 
   const isStandard = membershipTier === "standard";
   const tier = isPremium ? "premium" : isStandard ? "standard" : "free";
 
-  const org = String(myCard?.organization || "VLUE").trim();
+  const org = String(myCard?.organization || "VLUÉ").trim();
   const name = String(myCard?.name || "").trim();
   const titleRaw = String(myCard?.title || "").trim();
   /** 조직명과 동일하면 앞면 직책 줄 생략(스탠다드와 동일 규칙) */
@@ -77,7 +77,7 @@ export default function DigitalAuthCard({ membershipTier = "free", myCard = {}, 
   const cardWrap =
     "vcid-card relative mx-auto w-full max-w-[292px] overflow-hidden rounded-3xl border-2 text-center shadow-[0_12px_28px_rgba(37,99,235,0.14)]";
 
-  /* ---------- 일반: VLUE 인증된 번호 + 주의 문구만 (이름·전화 없음) ---------- */
+  /* ---------- 일반: VLUÉ 인증된 번호 + 주의 문구만 (이름·전화 없음) ---------- */
   if (tier === "free") {
     return (
       <div className="relative mx-auto w-full max-w-[292px]">
