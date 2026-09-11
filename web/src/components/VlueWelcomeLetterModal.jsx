@@ -104,7 +104,7 @@ export default function VlueWelcomeLetterModal({
     return () => window.clearTimeout(t);
   }, [open, letter?.id, letter?.version, letter?.bgmVolume, forceRead]);
 
-  /* 제목 한 줄 유지 — 넘치면 글자만 축소 */
+  /* 제목 한 줄 유지 — 넘치면 글자만 축소 (닫기 버튼 여백 반영) */
   useEffect(() => {
     if (!open) return undefined;
     const el = titleRef.current;
@@ -113,22 +113,48 @@ export default function VlueWelcomeLetterModal({
     const fit = () => {
       const parent = el.parentElement;
       if (!parent) return;
-      const maxW = Math.max(40, parent.clientWidth - 8);
+      const styles = getComputedStyle(parent);
+      const padL = parseFloat(styles.paddingLeft) || 0;
+      const padR = parseFloat(styles.paddingRight) || 0;
+      /* 좌우 닫기 버튼·여백을 빼고, 끝 글자 잘림 방지용 여유 4px */
+      const maxW = Math.max(48, parent.clientWidth - padL - padR - 4);
       el.style.transform = "none";
-      el.style.fontSize = "";
-      let size = 28;
-      el.style.fontSize = `${size}px`;
-      while (size > 11 && el.scrollWidth > maxW) {
-        size -= 0.5;
-        el.style.fontSize = `${size}px`;
+      el.style.fontSize = "26px";
+      el.style.width = "max-content";
+      el.style.maxWidth = "none";
+
+      let lo = 10;
+      let hi = 26;
+      for (let i = 0; i < 18; i += 1) {
+        const mid = (lo + hi) / 2;
+        el.style.fontSize = `${mid}px`;
+        if (el.scrollWidth <= maxW) lo = mid;
+        else hi = mid;
+      }
+      el.style.fontSize = `${lo}px`;
+
+      /* 최소 크기에서도 넘치면 scale로 한 줄 맞춤 */
+      const sw = el.scrollWidth;
+      if (sw > maxW) {
+        const scale = Math.max(0.55, maxW / sw);
+        el.style.transform = `scale(${scale})`;
+        el.style.transformOrigin = "center top";
       }
     };
 
     fit();
+    const t1 = window.setTimeout(fit, 50);
+    const t2 = window.setTimeout(fit, 220);
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(fit).catch(() => {});
+    }
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(fit) : null;
-    ro?.observe(el.parentElement || el);
+    const observeTarget = el.parentElement || el;
+    ro?.observe(observeTarget);
     window.addEventListener("resize", fit);
     return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
       ro?.disconnect();
       window.removeEventListener("resize", fit);
     };
