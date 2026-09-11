@@ -1227,7 +1227,7 @@ function PostsTab({ onToast }) {
     paperTheme: "cream-lined",
     seasonFx: "auto",
     showLines: true,
-    fxOpacity: 0.42,
+    fxOpacity: 0.55,
     showSignature: true,
     bodyFont: "myeongjo"
   });
@@ -1259,7 +1259,8 @@ function PostsTab({ onToast }) {
           paperTheme: decor.paperTheme || "cream-lined",
           seasonFx: decor.seasonFx || "auto",
           showLines: decor.showLines !== false,
-          fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.42,
+          fxOpacity:
+            typeof decor.fxOpacity === "number" ? Math.max(0.4, decor.fxOpacity) : 0.55,
           showSignature: decor.showSignature !== false,
           bodyFont: decor.bodyFont || "myeongjo"
         });
@@ -1327,7 +1328,7 @@ function PostsTab({ onToast }) {
           paperTheme: letterForm.paperTheme || "cream-lined",
           seasonFx: letterForm.seasonFx || "auto",
           showLines: letterForm.showLines !== false,
-          fxOpacity: Number(letterForm.fxOpacity) || 0.42,
+          fxOpacity: Math.max(0.4, Number(letterForm.fxOpacity) || 0.55),
           showSignature: letterForm.showSignature !== false,
           bodyFont: letterForm.bodyFont || "myeongjo"
         }
@@ -1528,7 +1529,6 @@ function PostsTab({ onToast }) {
                   <p className="text-[10px] text-slate-400">계절 연출 없음 — 저장 시 편지에 애니메이션이 표시되지 않습니다.</p>
                 );
               }
-              const count = 10;
               const label =
                 previewFx === "autumn"
                   ? "가을 낙엽"
@@ -1538,17 +1538,21 @@ function PostsTab({ onToast }) {
                       ? "여름 햇살"
                       : "겨울 눈";
               return (
-                <div className="relative h-[112px] overflow-hidden rounded-xl border border-amber-200 bg-gradient-to-br from-[#fff7ed] to-[#ffedd5]">
+                <div className="relative h-[140px] overflow-hidden rounded-xl border border-amber-200 bg-gradient-to-br from-[#fff7ed] to-[#ffedd5]">
                   <p className="relative z-[3] px-3 pt-2 text-[11px] font-bold text-slate-600">
                     연출 미리보기 · {label}
                     {letterForm.seasonFx === "auto" ? " (자동)" : ""}
                   </p>
                   <div
                     className={`vlue-letter-season-preview vlue-letter-season--${previewFx}`}
-                    style={{ ["--vlue-letter-fx-opacity"]: String(Math.max(0.35, Number(letterForm.fxOpacity) || 0.48)) }}
+                    style={{
+                      ["--vlue-letter-fx-opacity"]: String(
+                        Math.max(0.45, Number(letterForm.fxOpacity) || 0.55)
+                      )
+                    }}
                     aria-hidden
                   >
-                    {Array.from({ length: count }, (_, i) => (
+                    {Array.from({ length: 14 }, (_, i) => (
                       <span
                         key={i}
                         className={`vlue-letter-season__particle vlue-letter-season__particle--${i + 1}`}
@@ -1561,18 +1565,18 @@ function PostsTab({ onToast }) {
             {letterForm.seasonFx && letterForm.seasonFx !== "none" ? (
               <>
                 <label className="block text-[11px] font-bold text-slate-500">
-                  연출 농도 {Math.round((Number(letterForm.fxOpacity) || 0.42) * 100)}%
+                  연출 농도 {Math.round((Number(letterForm.fxOpacity) || 0.55) * 100)}%
                 </label>
                 <input
                   type="range"
-                  min={12}
-                  max={65}
+                  min={28}
+                  max={72}
                   step={1}
-                  value={Math.round((Number(letterForm.fxOpacity) || 0.42) * 100)}
+                  value={Math.round((Number(letterForm.fxOpacity) || 0.55) * 100)}
                   onChange={(e) =>
                     setLetterForm((f) => ({
                       ...f,
-                      fxOpacity: Math.min(0.65, Math.max(0.12, Number(e.target.value) / 100))
+                      fxOpacity: Math.min(0.72, Math.max(0.28, Number(e.target.value) / 100))
                     }))
                   }
                   className="w-full accent-amber-600"
@@ -1647,7 +1651,7 @@ function PostsTab({ onToast }) {
                 paperTheme: letterForm.paperTheme || "cream-lined",
                 seasonFx: letterForm.seasonFx || "auto",
                 showLines: letterForm.showLines !== false,
-                fxOpacity: Number(letterForm.fxOpacity) || 0.42,
+                fxOpacity: Math.max(0.4, Number(letterForm.fxOpacity) || 0.55),
                 showSignature: letterForm.showSignature !== false,
                 bodyFont: letterForm.bodyFont || "myeongjo"
               }
@@ -1775,7 +1779,8 @@ function PostsTab({ onToast }) {
                         paperTheme: decor.paperTheme || "cream-lined",
                         seasonFx: decor.seasonFx || "auto",
                         showLines: decor.showLines !== false,
-                        fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.42,
+                        fxOpacity:
+            typeof decor.fxOpacity === "number" ? Math.max(0.4, decor.fxOpacity) : 0.55,
                         showSignature: decor.showSignature !== false,
                         bodyFont: decor.bodyFont || "myeongjo"
                       });

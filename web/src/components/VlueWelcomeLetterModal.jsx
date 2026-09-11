@@ -28,6 +28,7 @@ export default function VlueWelcomeLetterModal({
   onAcknowledged
 }) {
   const scrollRef = useRef(null);
+  const titleRef = useRef(null);
   const audioRef = useRef(null);
   const [reachedEnd, setReachedEnd] = useState(!forceRead);
   const [bgmOn, setBgmOn] = useState(() => !readLetterBgmMuted());
@@ -67,6 +68,36 @@ export default function VlueWelcomeLetterModal({
     }, 80);
     return () => window.clearTimeout(t);
   }, [open, letter?.id, letter?.version, letter?.bgmVolume, forceRead]);
+
+  /* 제목 한 줄 유지 — 넘치면 글자만 축소 */
+  useEffect(() => {
+    if (!open) return undefined;
+    const el = titleRef.current;
+    if (!el) return undefined;
+
+    const fit = () => {
+      const parent = el.parentElement;
+      if (!parent) return;
+      const maxW = Math.max(40, parent.clientWidth - 8);
+      el.style.transform = "none";
+      el.style.fontSize = "";
+      let size = 28;
+      el.style.fontSize = `${size}px`;
+      while (size > 11 && el.scrollWidth > maxW) {
+        size -= 0.5;
+        el.style.fontSize = `${size}px`;
+      }
+    };
+
+    fit();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(fit) : null;
+    ro?.observe(el.parentElement || el);
+    window.addEventListener("resize", fit);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", fit);
+    };
+  }, [open, letter?.title, letter?.id, letter?.version]);
 
   useEffect(() => {
     if (!open || !bgmUrl) {
@@ -224,7 +255,10 @@ export default function VlueWelcomeLetterModal({
   const paperTheme = String(decor.paperTheme || "cream-lined");
   const seasonFx = resolveLetterSeasonFx(decor.seasonFx);
   const showLines = decor.showLines !== false;
-  const fxOpacity = typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.42;
+  const fxOpacity = Math.min(
+    0.72,
+    Math.max(0.38, typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.55)
+  );
   const showSignature = decor.showSignature !== false;
   const bodyFont = String(decor.bodyFont || "myeongjo");
   const paperClass = [
@@ -233,8 +267,7 @@ export default function VlueWelcomeLetterModal({
     `vlue-letter-paper--font-${bodyFont}`,
     showLines ? "vlue-letter-paper--lined" : "vlue-letter-paper--nolines"
   ].join(" ");
-  const seasonParticleCount =
-    seasonFx === "winter" || seasonFx === "summer" || seasonFx === "autumn" ? 10 : 7;
+  const seasonParticleCount = seasonFx === "none" ? 0 : 14;
   const effectiveForceRead = previewMode ? false : forceRead;
 
   return (
@@ -254,7 +287,7 @@ export default function VlueWelcomeLetterModal({
         ) : null}
         <header className="vlue-letter-head">
           <p className="vlue-letter-eyebrow">Digital Letter</p>
-          <h2 id="vlue-letter-title" className="vlue-letter-title">
+          <h2 id="vlue-letter-title" ref={titleRef} className="vlue-letter-title">
             {title || "VLUÉ가 전하는 편지"}
           </h2>
           {bgmUrl ? (

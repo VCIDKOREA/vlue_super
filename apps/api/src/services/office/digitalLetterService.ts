@@ -172,8 +172,8 @@ export function normalizeLetterDecor(raw: unknown): LetterDecor {
     seasonFx: SEASON_FX.has(seasonFx) ? seasonFx : "auto",
     showLines: o.showLines === false ? false : true,
     fxOpacity: Number.isFinite(fxOpacityRaw)
-      ? Math.min(0.65, Math.max(0.12, fxOpacityRaw))
-      : 0.42,
+      ? Math.min(0.72, Math.max(0.28, fxOpacityRaw))
+      : 0.55,
     showSignature: o.showSignature === false ? false : true,
     bodyFont: BODY_FONTS.has(bodyFont) ? bodyFont : "myeongjo"
   };
