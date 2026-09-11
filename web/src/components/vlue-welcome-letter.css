@@ -190,9 +190,9 @@
   background: linear-gradient(165deg, #fff8f0 0%, #fff4e8 40%, #fef3c7 100%);
 }
 
-/* 계절 연출 — 편지 전체 영역, top%로 길게 낙하 (translateY%는 자기 높이 기준이라 거의 안 움직임) */
+/* 계절 연출 — 연한 오버레이, top%로 길게 낙하 */
 .vlue-letter-season {
-  --vlue-letter-fx-opacity: 0.55;
+  --vlue-letter-fx-opacity: 0.2;
   position: absolute;
   inset: 0;
   width: 100%;
@@ -216,25 +216,58 @@
 }
 
 .vlue-letter-season--autumn .vlue-letter-season__particle {
-  width: 16px;
-  height: 12px;
-  border-radius: 60% 40% 60% 40%;
-  background: linear-gradient(135deg, #d97706 0%, #b45309 55%, #92400e 100%);
-  box-shadow: inset 0 0 0 1px rgba(120, 53, 15, 0.18);
+  width: 20px;
+  height: 24px;
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+  filter: saturate(0.72) brightness(1.06);
 }
 
 .vlue-letter-season--autumn .vlue-letter-season__particle--2,
 .vlue-letter-season--autumn .vlue-letter-season__particle--5,
-.vlue-letter-season--autumn .vlue-letter-season__particle--11 {
-  background: linear-gradient(135deg, #ea580c 0%, #c2410c 60%, #9a3412 100%);
+.vlue-letter-season--autumn .vlue-letter-season__particle--9 {
+  width: 16px;
+  height: 19px;
+  filter: saturate(0.65) brightness(1.1) hue-rotate(-6deg);
 }
 
 .vlue-letter-season--autumn .vlue-letter-season__particle--3,
 .vlue-letter-season--autumn .vlue-letter-season__particle--7,
-.vlue-letter-season--autumn .vlue-letter-season__particle--12 {
-  background: linear-gradient(135deg, #ca8a04 0%, #a16207 100%);
-  width: 12px;
-  height: 9px;
+.vlue-letter-season--autumn .vlue-letter-season__particle--11 {
+  width: 14px;
+  height: 17px;
+  filter: saturate(0.58) brightness(1.12) hue-rotate(8deg);
+}
+
+.vlue-letter-leaf-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.vlue-letter-close-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #475569;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.vlue-letter-close-x:hover {
+  background: #fff;
+  color: #0f172a;
 }
 
 .vlue-letter-season--spring .vlue-letter-season__particle {
@@ -292,18 +325,18 @@
 .vlue-letter-season__particle--13 { left: 32%; animation-duration: 9.2s; animation-delay: -4.1s; }
 .vlue-letter-season__particle--14 { left: 62%; animation-duration: 11.2s; animation-delay: -2.7s; }
 
-/* top% = 부모 기준 → 편지 전체 높이로 길게 낙하, 끝에서 희미해짐 */
+/* top% = 부모 기준 → 길게 낙하, 끝에서 희미해짐 (입자 피크도 살짝 유지) */
 @keyframes vlue-letter-fall {
   0% {
     top: -10%;
     transform: translate3d(0, 0, 0) rotate(0deg);
     opacity: 0;
   }
-  8% {
-    opacity: 1;
+  10% {
+    opacity: 0.85;
   }
-  72% {
-    opacity: 1;
+  68% {
+    opacity: 0.7;
   }
   100% {
     top: 108%;
@@ -321,7 +354,7 @@
   overflow: hidden;
   pointer-events: none;
   z-index: 2;
-  opacity: var(--vlue-letter-fx-opacity, 0.55);
+  opacity: var(--vlue-letter-fx-opacity, 0.2);
 }
 
 .vlue-letter-season-preview .vlue-letter-season__particle {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Music2, Volume2, VolumeX } from "lucide-react";
+import { Music2, Volume2, VolumeX, X } from "lucide-react";
 import {
   acknowledgeDigitalLetter,
   clampLetterBgmVolume,
@@ -15,9 +15,44 @@ import {
 import LEE_JONGGEUN_SIGNATURE from "../assets/lee-jonggeun-signature.png";
 import "./vlue-welcome-letter.css";
 
+/** 가을 낙엽 SVG — 줄기·잎맥이 있는 단풍잎 실루엣 */
+export function AutumnLeafSvg({ variant = 0 }) {
+  const fills = ["#c9a882", "#b8956c", "#d4b08a", "#a88968", "#cbb08e", "#b89a74"];
+  const fill = fills[variant % fills.length];
+  return (
+    <svg className="vlue-letter-leaf-svg" viewBox="0 0 32 36" aria-hidden focusable="false">
+      <path
+        fill={fill}
+        d="M16 2.2c-.4 2.4-2.2 4.2-4.6 5.6C7.2 10.2 4 13.4 3.4 18.2c-.5 4.2 1.8 8.2 5.6 10.2 1.4.7 2.7 1.6 3.4 3l.6 1.1c.3.5.9.8 1.5.7.6.1 1.2-.2 1.5-.7l.6-1.1c.7-1.4 2-2.3 3.4-3 3.8-2 6.1-6 5.6-10.2-.6-4.8-3.8-8-7.999-10.4C18.2 6.4 16.4 4.6 16 2.2z"
+      />
+      <path
+        fill="none"
+        stroke="rgba(92, 64, 40, 0.35)"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        d="M16 8.5v18.5"
+      />
+      <path
+        fill="none"
+        stroke="rgba(92, 64, 40, 0.28)"
+        strokeWidth="0.9"
+        strokeLinecap="round"
+        d="M16 14.5c-2.2 1.2-3.8 2.8-4.6 4.8M16 14.5c2.2 1.2 3.8 2.8 4.6 4.8M16 19.2c-1.8.9-3.1 2.1-3.8 3.6M16 19.2c1.8.9 3.1 2.1 3.8 3.6"
+      />
+      <path
+        fill="none"
+        stroke="rgba(92, 64, 40, 0.4)"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        d="M16 33.2v-2.6"
+      />
+    </svg>
+  );
+}
+
 /**
  * VLUÉ가 전하는 편지 — 따뜻한 디지털 레터
- * forceRead: 확인 전까지 닫기 불가 (첫 방문)
+ * forceRead: 첫 자동 표시 시 스크롤 유도 (닫기는 항상 가능, 닫으면 다시 안 뜸)
  */
 export default function VlueWelcomeLetterModal({
   letter,
@@ -220,15 +255,23 @@ export default function VlueWelcomeLetterModal({
     if (nearBottom) setReachedEnd(true);
   };
 
+  const handleDismiss = () => {
+    if (previewMode) {
+      onClose?.();
+      return;
+    }
+    acknowledgeDigitalLetter(letter);
+    onAcknowledged?.(letter);
+    onClose?.();
+  };
+
   const handleConfirm = () => {
     if (previewMode) {
       onClose?.();
       return;
     }
     if (forceRead && !reachedEnd) return;
-    acknowledgeDigitalLetter(letter);
-    onAcknowledged?.(letter);
-    onClose?.();
+    handleDismiss();
   };
 
   const toggleBgm = () => {
@@ -256,8 +299,8 @@ export default function VlueWelcomeLetterModal({
   const seasonFx = resolveLetterSeasonFx(decor.seasonFx);
   const showLines = decor.showLines !== false;
   const fxOpacity = Math.min(
-    0.72,
-    Math.max(0.38, typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.55)
+    0.55,
+    Math.max(0.05, typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.2)
   );
   const showSignature = decor.showSignature !== false;
   const bodyFont = String(decor.bodyFont || "myeongjo");
@@ -267,7 +310,7 @@ export default function VlueWelcomeLetterModal({
     `vlue-letter-paper--font-${bodyFont}`,
     showLines ? "vlue-letter-paper--lined" : "vlue-letter-paper--nolines"
   ].join(" ");
-  const seasonParticleCount = seasonFx === "none" ? 0 : 14;
+  const seasonParticleCount = seasonFx === "none" ? 0 : seasonFx === "autumn" ? 12 : 10;
   const effectiveForceRead = previewMode ? false : forceRead;
 
   return (
@@ -281,10 +324,20 @@ export default function VlueWelcomeLetterModal({
             aria-hidden
           >
             {Array.from({ length: seasonParticleCount }, (_, i) => (
-              <span key={i} className={`vlue-letter-season__particle vlue-letter-season__particle--${i + 1}`} />
+              <span key={i} className={`vlue-letter-season__particle vlue-letter-season__particle--${i + 1}`}>
+                {seasonFx === "autumn" ? <AutumnLeafSvg variant={i} /> : null}
+              </span>
             ))}
           </div>
         ) : null}
+        <button
+          type="button"
+          className="vlue-letter-close-x"
+          onClick={handleDismiss}
+          aria-label="편지 닫기"
+        >
+          <X size={18} strokeWidth={2.4} aria-hidden />
+        </button>
         <header className="vlue-letter-head">
           <p className="vlue-letter-eyebrow">Digital Letter</p>
           <h2 id="vlue-letter-title" ref={titleRef} className="vlue-letter-title">
@@ -362,8 +415,8 @@ export default function VlueWelcomeLetterModal({
                   ? "아래로 스크롤해 주세요"
                   : "확인"}
             </button>
-            {!effectiveForceRead && !previewMode ? (
-              <button type="button" className="vlue-letter-close-link" onClick={() => onClose?.()}>
+            {!previewMode ? (
+              <button type="button" className="vlue-letter-close-link" onClick={handleDismiss}>
                 닫기
               </button>
             ) : null}
