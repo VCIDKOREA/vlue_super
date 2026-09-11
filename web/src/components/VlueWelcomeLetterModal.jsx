@@ -219,14 +219,15 @@ export default function VlueWelcomeLetterModal({
   const paperTheme = String(decor.paperTheme || "cream-lined");
   const seasonFx = resolveLetterSeasonFx(decor.seasonFx);
   const showLines = decor.showLines !== false;
-  const fxOpacity = typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.32;
+  const fxOpacity = typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.42;
   const showSignature = decor.showSignature !== false;
   const paperClass = [
     "vlue-letter-paper",
     `vlue-letter-paper--${paperTheme}`,
     showLines ? "vlue-letter-paper--lined" : "vlue-letter-paper--nolines"
   ].join(" ");
-  const seasonParticleCount = seasonFx === "winter" || seasonFx === "summer" ? 10 : 7;
+  const seasonParticleCount =
+    seasonFx === "winter" || seasonFx === "summer" || seasonFx === "autumn" ? 10 : 7;
 
   return (
     <div className="vlue-letter-root" role="dialog" aria-modal="true" aria-labelledby="vlue-letter-title">

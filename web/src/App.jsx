@@ -4941,6 +4941,9 @@ function App() {
             ensureFriendRoom(user.userId, user.displayName || user.contactName);
             navigate({ nextPage: "list", nextTab: "friends", nextRoomId: `friends:${user.userId}` });
           }}
+          onFriendEstablished={(userId, userName) => {
+            ensureFriendRoom(userId, userName || "친구");
+          }}
           onFamilyToast={(text) => {
             setBottomToast(text);
             setTimeout(() => setBottomToast(""), 3200);

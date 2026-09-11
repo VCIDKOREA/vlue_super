@@ -151,10 +151,10 @@ export function defaultSeasonFx(date = new Date()): string {
 }
 
 export function resolveSeasonFx(raw: string, date = new Date()): string {
-  const s = String(raw || "").trim();
+  const s = String(raw || "").trim().toLowerCase();
   if (s === "none") return "none";
-  /* 공개 연출은 항상 달력 계절 (관리자 강제값은 미리보기·저장용) */
-  if (s === "auto" || SEASON_FX.has(s)) return defaultSeasonFx(date);
+  if (s === "spring" || s === "summer" || s === "autumn" || s === "winter") return s;
+  /* auto / 미지정 → 달력 계절 */
   return defaultSeasonFx(date);
 }
 

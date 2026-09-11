@@ -47,14 +47,31 @@ export async function fetchContactFriendRequests() {
   try {
     const res = await vlueAuthFetch(apiUrl("/api/contacts/friend-requests"));
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, sent: [], received: [], error: data.error };
+    if (!res.ok) {
+      return {
+        ok: false,
+        sent: [],
+        received: [],
+        acceptedFriendIds: [],
+        error: data.error
+      };
+    }
     return {
       ok: true,
       sent: Array.isArray(data.sent) ? data.sent : [],
-      received: Array.isArray(data.received) ? data.received : []
+      received: Array.isArray(data.received) ? data.received : [],
+      acceptedFriendIds: Array.isArray(data.acceptedFriendIds)
+        ? data.acceptedFriendIds.map((id) => String(id || "").trim()).filter(Boolean)
+        : []
     };
   } catch (e) {
-    return { ok: false, sent: [], received: [], error: e?.message || "network" };
+    return {
+      ok: false,
+      sent: [],
+      received: [],
+      acceptedFriendIds: [],
+      error: e?.message || "network"
+    };
   }
 }
 

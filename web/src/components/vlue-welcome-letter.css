@@ -205,8 +205,8 @@
 }
 
 .vlue-letter-season--autumn .vlue-letter-season__particle {
-  width: 11px;
-  height: 8px;
+  width: 14px;
+  height: 10px;
   border-radius: 60% 40% 60% 40%;
   background: linear-gradient(135deg, #d97706 0%, #b45309 55%, #92400e 100%);
   box-shadow: inset 0 0 0 1px rgba(120, 53, 15, 0.15);
@@ -220,8 +220,8 @@
 .vlue-letter-season--autumn .vlue-letter-season__particle--3,
 .vlue-letter-season--autumn .vlue-letter-season__particle--7 {
   background: linear-gradient(135deg, #ca8a04 0%, #a16207 100%);
-  width: 9px;
-  height: 7px;
+  width: 11px;
+  height: 8px;
 }
 
 .vlue-letter-season--spring .vlue-letter-season__particle {
@@ -294,8 +294,18 @@
 @media (prefers-reduced-motion: reduce) {
   .vlue-letter-season__particle {
     animation: none;
-    opacity: 0;
+    opacity: var(--vlue-letter-fx-opacity);
+    transform: translate3d(0, 42%, 0) rotate(28deg);
   }
+  .vlue-letter-season__particle--2 { transform: translate3d(6px, 58%, 0) rotate(-18deg); }
+  .vlue-letter-season__particle--3 { transform: translate3d(-4px, 28%, 0) rotate(52deg); }
+  .vlue-letter-season__particle--4 { transform: translate3d(8px, 72%, 0) rotate(-36deg); }
+  .vlue-letter-season__particle--5 { transform: translate3d(-10px, 48%, 0) rotate(12deg); }
+  .vlue-letter-season__particle--6 { transform: translate3d(4px, 22%, 0) rotate(-48deg); }
+  .vlue-letter-season__particle--7 { transform: translate3d(-6px, 66%, 0) rotate(40deg); }
+  .vlue-letter-season__particle--8 { transform: translate3d(2px, 36%, 0) rotate(-22deg); }
+  .vlue-letter-season__particle--9 { transform: translate3d(-8px, 80%, 0) rotate(18deg); }
+  .vlue-letter-season__particle--10 { transform: translate3d(10px, 54%, 0) rotate(-10deg); }
 }
 
 .vlue-letter-p {

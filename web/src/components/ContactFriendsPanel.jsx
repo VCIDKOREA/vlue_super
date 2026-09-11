@@ -30,7 +30,13 @@ export default function ContactFriendsPanel({
   onOpenChat,
   onResyncRequest,
   filterQuery = "",
-  compact = false
+  compact = false,
+  /** 채팅방 친구 목록 userId — 매칭 캐시가 늦어도 친구로 표시 */
+  approvedFriendIds = [],
+  /** 보낸 신청 pending 상대 userId */
+  pendingSentIds = [],
+  /** 받은 신청 pending 상대 userId */
+  pendingReceivedIds = []
 }) {
   const [busyId, setBusyId] = useState(null);
   const [resyncing, setResyncing] = useState(false);
@@ -41,6 +47,46 @@ export default function ContactFriendsPanel({
   const registered = matchData?.registered || [];
   const unregistered = matchData?.unregistered || [];
   const contactsGranted = Boolean(readLetteringPermissionStatus()?.contacts);
+
+  const friendIdSet = useMemo(
+    () => new Set((approvedFriendIds || []).map((id) => String(id || "").trim()).filter(Boolean)),
+    [approvedFriendIds]
+  );
+  const pendingSentSet = useMemo(
+    () => new Set((pendingSentIds || []).map((id) => String(id || "").trim()).filter(Boolean)),
+    [pendingSentIds]
+  );
+  const pendingReceivedSet = useMemo(
+    () => new Set((pendingReceivedIds || []).map((id) => String(id || "").trim()).filter(Boolean)),
+    [pendingReceivedIds]
+  );
+
+  const resolveRelation = (user) => {
+    const uid = String(user?.userId || "").trim();
+    if (!uid) return { isFriend: false, pending: null };
+    if (user.isFriend || friendIdSet.has(uid)) {
+      return { isFriend: true, pending: null };
+    }
+    if (user.friendRequestPending === "sent" || pendingSentSet.has(uid)) {
+      return { isFriend: false, pending: "sent" };
+    }
+    if (user.friendRequestPending === "received" || pendingReceivedSet.has(uid)) {
+      return { isFriend: false, pending: "received" };
+    }
+    return { isFriend: false, pending: null };
+  };
+
+  const patchRegisteredUser = (userId, patch) => {
+    if (!matchData || !onMatchUpdate) return;
+    const next = {
+      ...matchData,
+      registered: (matchData.registered || []).map((r) =>
+        r.userId === userId ? { ...r, ...patch } : r
+      )
+    };
+    saveContactMatchCache(next);
+    onMatchUpdate(next);
+  };
 
   const rows = useMemo(() => {
     const q = String(filterQuery || "").trim().toLowerCase();
@@ -156,29 +202,78 @@ export default function ContactFriendsPanel({
   };
 
   const handleFriendRequest = async (user) => {
-    setBusyId(user.userId);
+    const uid = String(user.userId || "").trim();
+    if (!uid || busyId) return;
+    const before = resolveRelation(user);
+    if (before.isFriend) {
+      setNotice("이미 친구입니다. 「채팅」으로 대화를 시작하세요.");
+      return;
+    }
+    if (before.pending === "sent") {
+      setNotice("이미 신청했습니다. 「보낸 신청」탭에서 대기 상태를 확인하세요.");
+      return;
+    }
+    if (before.pending === "received") {
+      setNotice("상대가 보낸 신청이 있습니다. 「받은 신청」탭에서 수락해 주세요.");
+      return;
+    }
+
+    setBusyId(uid);
+    setNotice("친구 신청 보내는 중…");
+    /* 즉시 「신청됨」으로 바꿔 빈 화면처럼 보이지 않게 */
+    patchRegisteredUser(uid, { friendRequestPending: "sent", isFriend: false });
+
     try {
       const res = await sendContactFriendRequest(
-        user.userId,
+        uid,
         `${user.contactName || user.displayName}님, VLUÉ에서 연결해요.`
       );
       if (res.ok) {
+        const accepted = Boolean(res.autoAccepted) || res.status === "accepted";
+        if (accepted) {
+          patchRegisteredUser(uid, { isFriend: true, friendRequestPending: null });
+          setNotice(`${user.displayName || user.contactName || "상대"}님과 친구가 되었습니다.`);
+          onFriendAdded?.({
+            ...user,
+            requestId: res.id,
+            status: "accepted",
+            autoAccepted: true
+          });
+        } else {
+          patchRegisteredUser(uid, { friendRequestPending: "sent", isFriend: false });
+          setNotice(
+            res.alreadyPending
+              ? "이미 신청한 상태입니다. 「보낸 신청」에서 확인할 수 있습니다."
+              : `${user.displayName || user.contactName || "상대"}님에게 신청을 보냈습니다.`
+          );
+          onFriendAdded?.({
+            ...user,
+            requestId: res.id,
+            status: res.status || "pending"
+          });
+        }
+      } else if (res.reason === "already_friend") {
+        patchRegisteredUser(uid, { isFriend: true, friendRequestPending: null });
+        setNotice("이미 친구입니다.");
         onFriendAdded?.({
           ...user,
           requestId: res.id,
-          status: res.status || "pending"
+          status: "accepted",
+          autoAccepted: true
         });
-        onMatchUpdate?.({
-          ...matchData,
-          registered: registered.map((r) =>
-            r.userId === user.userId ? { ...r, friendRequestPending: "sent" } : r
-          )
+      } else {
+        patchRegisteredUser(uid, {
+          friendRequestPending: before.pending,
+          isFriend: before.isFriend
         });
-      } else if (res.reason === "already_friend") {
-        window.alert("이미 친구입니다.");
+        setNotice("친구 신청에 실패했습니다. 잠시 후 다시 시도해 주세요.");
       }
     } catch (e) {
-      window.alert(e?.message || "친구 신청에 실패했습니다.");
+      patchRegisteredUser(uid, {
+        friendRequestPending: before.pending,
+        isFriend: before.isFriend
+      });
+      setNotice(e?.message || "친구 신청에 실패했습니다.");
     } finally {
       setBusyId(null);
     }
@@ -249,6 +344,11 @@ export default function ContactFriendsPanel({
 
   return (
     <div className="space-y-3">
+      {notice ? (
+        <p className="rounded-lg bg-blue-50 px-3 py-2 text-center text-[11px] font-bold text-blue-700">
+          {notice}
+        </p>
+      ) : null}
       {!compact ? (
         <div className="flex items-center justify-between gap-2">
           <p className="text-[12px] font-black text-gray-700">
@@ -265,8 +365,6 @@ export default function ContactFriendsPanel({
           </button>
         </div>
       ) : null}
-
-      {notice ? <p className="text-center text-[11px] font-bold text-blue-600">{notice}</p> : null}
 
       {rows.length === 0 ? (
         <p className="rounded-xl bg-gray-50 px-3 py-6 text-center text-[12px] text-gray-500">
@@ -286,24 +384,45 @@ export default function ContactFriendsPanel({
                     <p className="truncate text-[11px] text-gray-500">{item.subtitle}</p>
                   </div>
                   {item.kind === "registered" ? (
-                    item.user.isFriend ? (
-                      <button
-                        type="button"
-                        onClick={() => onOpenChat?.(item.user)}
-                        className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700"
-                      >
-                        채팅
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={busyId === item.user.userId || item.user.friendRequestPending === "sent"}
-                        onClick={() => handleFriendRequest(item.user)}
-                        className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50"
-                      >
-                        {item.user.friendRequestPending === "sent" ? "신청됨" : "신청"}
-                      </button>
-                    )
+                    (() => {
+                      const rel = resolveRelation(item.user);
+                      const busy = busyId === item.user.userId;
+                      if (rel.isFriend) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => onOpenChat?.(item.user)}
+                            className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700"
+                          >
+                            채팅
+                          </button>
+                        );
+                      }
+                      if (rel.pending === "sent") {
+                        return (
+                          <span className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-black text-slate-500">
+                            {busy ? "처리 중…" : "신청됨"}
+                          </span>
+                        );
+                      }
+                      if (rel.pending === "received") {
+                        return (
+                          <span className="shrink-0 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-black text-violet-700">
+                            받은 신청
+                          </span>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => handleFriendRequest(item.user)}
+                          className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-60"
+                        >
+                          {busy ? "신청 중…" : "신청"}
+                        </button>
+                      );
+                    })()
                   ) : (
                     <button
                       type="button"

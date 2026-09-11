@@ -43,6 +43,8 @@ import {
   updateAdminNotice,
   updateAdminPopup
 } from "../../lib/adminConsoleApi.js";
+import { resolveLetterSeasonFx } from "../../lib/digitalLetter.js";
+import "../vlue-welcome-letter.css";
 
 const TABS = [
   { id: "metrics", label: "DB 지표" },
@@ -1224,7 +1226,7 @@ function PostsTab({ onToast }) {
     paperTheme: "cream-lined",
     seasonFx: "auto",
     showLines: true,
-    fxOpacity: 0.32,
+    fxOpacity: 0.42,
     showSignature: true
   });
   const [signatureSounds, setSignatureSounds] = useState([]);
@@ -1254,7 +1256,7 @@ function PostsTab({ onToast }) {
           paperTheme: decor.paperTheme || "cream-lined",
           seasonFx: decor.seasonFx || "auto",
           showLines: decor.showLines !== false,
-          fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.32,
+          fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.42,
           showSignature: decor.showSignature !== false
         });
       }
@@ -1317,11 +1319,11 @@ function PostsTab({ onToast }) {
         bgmUrl: selected?.audioUrl || "",
         bgmVolume: letterForm.bgmVolume,
         isActive: letterForm.isActive !== false,
-        decor: {
+          decor: {
           paperTheme: letterForm.paperTheme || "cream-lined",
-          seasonFx: letterForm.seasonFx || "none",
+          seasonFx: letterForm.seasonFx || "auto",
           showLines: letterForm.showLines !== false,
-          fxOpacity: Number(letterForm.fxOpacity) || 0.32,
+          fxOpacity: Number(letterForm.fxOpacity) || 0.42,
           showSignature: letterForm.showSignature !== false
         }
       });
@@ -1485,22 +1487,66 @@ function PostsTab({ onToast }) {
             >
               <option value="auto">자동 (달력 계절)</option>
               <option value="none">없음</option>
-              <option value="spring">봄 꽃잎 (3–5월)</option>
-              <option value="summer">여름 햇살 (6–8월)</option>
-              <option value="autumn">가을 낙엽 (9–11월)</option>
-              <option value="winter">겨울 눈 (12–2월)</option>
+              <option value="spring">봄 꽃잎</option>
+              <option value="summer">여름 햇살</option>
+              <option value="autumn">가을 낙엽</option>
+              <option value="winter">겨울 눈</option>
             </select>
+            {(() => {
+              const previewFx = resolveLetterSeasonFx(letterForm.seasonFx || "auto");
+              if (previewFx === "none") {
+                return (
+                  <p className="text-[10px] text-slate-400">계절 연출 없음 — 저장 시 편지에 애니메이션이 표시되지 않습니다.</p>
+                );
+              }
+              const count = previewFx === "autumn" || previewFx === "winter" || previewFx === "summer" ? 10 : 7;
+              const label =
+                previewFx === "autumn"
+                  ? "가을 낙엽"
+                  : previewFx === "spring"
+                    ? "봄 꽃잎"
+                    : previewFx === "summer"
+                      ? "여름 햇살"
+                      : "겨울 눈";
+              return (
+                <div className="relative overflow-hidden rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-orange-50/80 p-3">
+                  <p className="relative z-[1] text-[11px] font-bold text-slate-600">
+                    미리보기 · {label}
+                    {letterForm.seasonFx === "auto" ? " (자동)" : ""}
+                  </p>
+                  <div
+                    className={`vlue-letter-season vlue-letter-season--${previewFx}`}
+                    style={{
+                      ["--vlue-letter-fx-opacity"]: String(Number(letterForm.fxOpacity) || 0.42),
+                      position: "absolute",
+                      inset: 0,
+                      width: "100%",
+                      height: "100%"
+                    }}
+                    aria-hidden
+                  >
+                    {Array.from({ length: count }, (_, i) => (
+                      <span
+                        key={i}
+                        className={`vlue-letter-season__particle vlue-letter-season__particle--${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="relative z-[1] mt-8 min-h-[72px]" />
+                </div>
+              );
+            })()}
             {letterForm.seasonFx && letterForm.seasonFx !== "none" ? (
               <>
                 <label className="block text-[11px] font-bold text-slate-500">
-                  연출 농도 {Math.round((Number(letterForm.fxOpacity) || 0.32) * 100)}%
+                  연출 농도 {Math.round((Number(letterForm.fxOpacity) || 0.42) * 100)}%
                 </label>
                 <input
                   type="range"
                   min={12}
                   max={65}
                   step={1}
-                  value={Math.round((Number(letterForm.fxOpacity) || 0.32) * 100)}
+                  value={Math.round((Number(letterForm.fxOpacity) || 0.42) * 100)}
                   onChange={(e) =>
                     setLetterForm((f) => ({
                       ...f,
@@ -1661,7 +1707,7 @@ function PostsTab({ onToast }) {
                         paperTheme: decor.paperTheme || "cream-lined",
                         seasonFx: decor.seasonFx || "auto",
                         showLines: decor.showLines !== false,
-                        fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.32,
+                        fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.42,
                         showSignature: decor.showSignature !== false
                       });
                     }}

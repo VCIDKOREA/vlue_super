@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import FamilyProtectionRegister from "./FamilyProtectionRegister.jsx";
 import ContactFriendsPanel from "./ContactFriendsPanel.jsx";
@@ -7,6 +7,7 @@ import {
   fetchContactFriendRequests,
   respondContactFriendRequest
 } from "../lib/contactFriendsApi.js";
+import { saveContactMatchCache } from "../lib/contactSyncStorage.js";
 import { EXPAND_FAMILY_KEY, OPEN_FAMILY_TAB_EVENT } from "../lib/posDashboardConstants.js";
 
 function shouldOpenFamilyTab() {
@@ -17,7 +18,29 @@ function shouldOpenFamilyTab() {
   }
 }
 
+function patchMatchRelations(matchData, { friendIds = [], pendingSent = [], pendingReceived = [] } = {}) {
+  if (!matchData || !Array.isArray(matchData.registered)) return matchData;
+  const friends = new Set((friendIds || []).map((id) => String(id || "").trim()).filter(Boolean));
+  const sent = new Set((pendingSent || []).map((id) => String(id || "").trim()).filter(Boolean));
+  const received = new Set((pendingReceived || []).map((id) => String(id || "").trim()).filter(Boolean));
+  let changed = false;
+  const registered = matchData.registered.map((row) => {
+    const uid = String(row?.userId || "").trim();
+    if (!uid) return row;
+    const isFriend = Boolean(row.isFriend) || friends.has(uid);
+    let friendRequestPending = null;
+    if (isFriend) friendRequestPending = null;
+    else if (sent.has(uid)) friendRequestPending = "sent";
+    else if (received.has(uid)) friendRequestPending = "received";
+    if (row.isFriend === isFriend && row.friendRequestPending === friendRequestPending) return row;
+    changed = true;
+    return { ...row, isFriend, friendRequestPending };
+  });
+  return changed ? { ...matchData, registered } : matchData;
+}
+
 function FriendSearch({
+  approvedFriendIds = [],
   inboxRequests = [],
   requests = [],
   contactMatchData = null,
@@ -29,7 +52,8 @@ function FriendSearch({
   onContactMatchUpdate,
   onContactResyncRequest,
   onOpenContactChat,
-  onSendRequest
+  onSendRequest,
+  onFriendEstablished
 }) {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState(() => (shouldOpenFamilyTab() ? "family" : "friends"));
@@ -41,15 +65,66 @@ function FriendSearch({
   const [receivedRequests, setReceivedRequests] = useState(() =>
     Array.isArray(inboxRequests) ? inboxRequests : []
   );
+  const [serverFriendIds, setServerFriendIds] = useState([]);
+  const [relationsReady, setRelationsReady] = useState(false);
   const [requestsLoading, setRequestsLoading] = useState(false);
+
+  const matchDataRef = useRef(contactMatchData);
+  const approvedIdsRef = useRef(approvedFriendIds);
+  const onMatchUpdateRef = useRef(onContactMatchUpdate);
+  matchDataRef.current = contactMatchData;
+  approvedIdsRef.current = approvedFriendIds;
+  onMatchUpdateRef.current = onContactMatchUpdate;
+
+  const pendingSentIds = useMemo(
+    () => sentRequests.map((r) => String(r.toUserId || "").trim()).filter(Boolean),
+    [sentRequests]
+  );
+  const pendingReceivedIds = useMemo(
+    () => receivedRequests.map((r) => String(r.fromUserId || "").trim()).filter(Boolean),
+    [receivedRequests]
+  );
+  const mergedFriendIds = useMemo(() => {
+    const set = new Set([
+      ...(approvedFriendIds || []).map((id) => String(id || "").trim()).filter(Boolean),
+      ...(serverFriendIds || []).map((id) => String(id || "").trim()).filter(Boolean)
+    ]);
+    return [...set];
+  }, [approvedFriendIds, serverFriendIds]);
 
   const reloadFriendRequests = useCallback(async () => {
     setRequestsLoading(true);
     try {
       const res = await fetchContactFriendRequests();
       if (res.ok) {
-        setSentRequests(res.sent || []);
-        setReceivedRequests(res.received || []);
+        const sent = res.sent || [];
+        const received = res.received || [];
+        const accepted = res.acceptedFriendIds || [];
+        setSentRequests(sent);
+        setReceivedRequests(received);
+        setServerFriendIds(accepted);
+        setRelationsReady(true);
+        const sentIds = sent.map((r) => String(r.toUserId || "").trim()).filter(Boolean);
+        const receivedIds = received.map((r) => String(r.fromUserId || "").trim()).filter(Boolean);
+        const friends = [
+          ...new Set([
+            ...(approvedIdsRef.current || []).map((id) => String(id || "").trim()).filter(Boolean),
+            ...accepted
+          ])
+        ];
+        const current = matchDataRef.current;
+        const update = onMatchUpdateRef.current;
+        if (current && update) {
+          const patched = patchMatchRelations(current, {
+            friendIds: friends,
+            pendingSent: sentIds,
+            pendingReceived: receivedIds
+          });
+          if (patched !== current) {
+            saveContactMatchCache(patched);
+            update(patched);
+          }
+        }
       }
     } finally {
       setRequestsLoading(false);
@@ -65,6 +140,26 @@ function FriendSearch({
   }, [tab, reloadFriendRequests]);
 
   useEffect(() => {
+    if (!relationsReady || !contactMatchData?.registered?.length) return;
+    const patched = patchMatchRelations(contactMatchData, {
+      friendIds: mergedFriendIds,
+      pendingSent: pendingSentIds,
+      pendingReceived: pendingReceivedIds
+    });
+    if (patched !== contactMatchData) {
+      saveContactMatchCache(patched);
+      onContactMatchUpdate?.(patched);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 서버 관계 로드 후 id 합집합만 반영
+  }, [
+    relationsReady,
+    mergedFriendIds.join("|"),
+    pendingSentIds.join("|"),
+    pendingReceivedIds.join("|"),
+    contactMatchData?.registered?.length
+  ]);
+
+  useEffect(() => {
     const openFamilyTab = () => setTab("family");
     if (shouldOpenFamilyTab()) openFamilyTab();
     window.addEventListener(OPEN_FAMILY_TAB_EVENT, openFamilyTab);
@@ -72,11 +167,44 @@ function FriendSearch({
   }, []);
 
   const tabs = [
-    { id: "family", label: "가족 보호" },
-    { id: "friends", label: "주소록 친구" },
-    { id: "inbox", label: `받은 요청 (${receivedRequests.length})` },
-    { id: "sent", label: `보낸 요청 (${sentRequests.length})` }
+    { id: "friends", label: "친구" },
+    { id: "inbox", label: "받은 신청" },
+    { id: "sent", label: "보낸 신청" },
+    { id: "family", label: "가족 보호" }
   ];
+
+  const handleFriendAdded = (user) => {
+    const uid = String(user.userId || "").trim();
+    const name = user.displayName || user.contactName || "상대";
+    if (user.status === "accepted" || user.autoAccepted) {
+      setNotice(`${name}님과 친구가 되었습니다.`);
+      if (uid) {
+        setServerFriendIds((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
+        onFriendEstablished?.(uid, name);
+      }
+    } else {
+      setNotice(`${name}님에게 친구 신청을 보냈습니다. 「보낸 신청」에서 확인할 수 있습니다.`);
+      const entry = {
+        id: user.requestId || `fr-${user.userId || Date.now()}`,
+        status: "pending",
+        direction: "sent",
+        toUserId: user.userId,
+        toUserName: name,
+        peerName: name,
+        fromName: name,
+        createdAt: new Date().toISOString()
+      };
+      setSentRequests((prev) => {
+        if (prev.some((r) => r.id === entry.id || r.toUserId === user.userId)) return prev;
+        return [entry, ...prev];
+      });
+      onSendRequest?.(
+        { id: user.userId, name },
+        `${name}님, VLUÉ에서 연결해요.`
+      );
+    }
+    void reloadFriendRequests();
+  };
 
   const listForTab = tab === "inbox" ? receivedRequests : sentRequests;
 
@@ -87,12 +215,19 @@ function FriendSearch({
       await respondContactFriendRequest(req.id, action);
       setReceivedRequests((prev) => prev.filter((r) => r.id !== req.id));
       if (action === "accept") {
-        setNotice("친구 요청을 수락했습니다.");
+        const peerId = String(req.fromUserId || "").trim();
+        const peerName = req.fromName || req.fromUserName || req.peerName || "친구";
+        setNotice(`${peerName}님과 친구가 되었습니다.`);
+        if (peerId) {
+          setServerFriendIds((prev) => (prev.includes(peerId) ? prev : [...prev, peerId]));
+          onFriendEstablished?.(peerId, peerName);
+        }
         onApproveRequest?.(req.id, req);
       } else {
         setNotice("친구 요청을 거절했습니다.");
         onRejectRequest?.(req.id, req);
       }
+      void reloadFriendRequests();
     } catch (e) {
       setNotice(String(e?.message || "처리에 실패했습니다."));
       void reloadFriendRequests();
@@ -145,7 +280,14 @@ function FriendSearch({
           ))}
         </div>
 
-        {notice ? <p className="mt-2 text-center text-[11px] font-bold text-blue-600">{notice}</p> : null}
+        {notice ? (
+          <p
+            role="status"
+            className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-center text-[12px] font-bold text-blue-700"
+          >
+            {notice}
+          </p>
+        ) : null}
 
         {tab === "family" ? (
           <div className="mt-3">
@@ -160,29 +302,10 @@ function FriendSearch({
               onMatchUpdate={onContactMatchUpdate}
               onResyncRequest={onContactResyncRequest}
               onOpenChat={onOpenContactChat}
-              onFriendAdded={(user) => {
-                const name = user.displayName || user.contactName || "상대";
-                setNotice(`${name}님에게 친구 신청을 보냈습니다.`);
-                const entry = {
-                  id: user.requestId || `fr-${user.userId || Date.now()}`,
-                  status: "pending",
-                  direction: "sent",
-                  toUserId: user.userId,
-                  toUserName: name,
-                  peerName: name,
-                  fromName: name,
-                  createdAt: new Date().toISOString()
-                };
-                setSentRequests((prev) => {
-                  if (prev.some((r) => r.id === entry.id || r.toUserId === user.userId)) return prev;
-                  return [entry, ...prev];
-                });
-                onSendRequest?.(
-                  { id: user.userId, name },
-                  `${name}님, VLUÉ에서 연결해요.`
-                );
-                void reloadFriendRequests();
-              }}
+              approvedFriendIds={mergedFriendIds}
+              pendingSentIds={pendingSentIds}
+              pendingReceivedIds={pendingReceivedIds}
+              onFriendAdded={handleFriendAdded}
             />
           </div>
         ) : null}
@@ -213,11 +336,10 @@ function FriendSearch({
                 onMatchUpdate={onContactMatchUpdate}
                 onResyncRequest={onContactResyncRequest}
                 onOpenChat={onOpenContactChat}
-                onFriendAdded={(user) => {
-                  const name = user.displayName || user.contactName || "상대";
-                  setNotice(`${name}님에게 친구 신청을 보냈습니다.`);
-                  void reloadFriendRequests();
-                }}
+                approvedFriendIds={mergedFriendIds}
+                pendingSentIds={pendingSentIds}
+                pendingReceivedIds={pendingReceivedIds}
+                onFriendAdded={handleFriendAdded}
               />
             </div>
           </>

@@ -44,9 +44,11 @@ export function calendarSeasonFx(date = new Date()) {
   return "winter";
 }
 
-/** none 제외하고 공개 편지는 달력 계절 */
+/** none / 명시 계절 유지, auto·빈값 → 달력 계절 */
 export function resolveLetterSeasonFx(stored) {
-  if (String(stored || "").trim() === "none") return "none";
+  const s = String(stored || "").trim().toLowerCase();
+  if (s === "none") return "none";
+  if (s === "spring" || s === "summer" || s === "autumn" || s === "winter") return s;
   return calendarSeasonFx();
 }
 
