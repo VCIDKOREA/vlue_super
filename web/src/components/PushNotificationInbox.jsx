@@ -137,81 +137,77 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
         {items.map((n) => (
           <li key={n.id}>
             <div
-              className={`relative flex w-full gap-2 border-b px-4 py-3.5 transition-colors ${
+              className={`border-b px-4 py-3 transition-colors ${
                 n.pinned
                   ? "border-amber-100 bg-amber-50/70"
                   : n.read
-                    ? "border-gray-50 opacity-70"
+                    ? "border-gray-50 opacity-80"
                     : "border-gray-50 bg-blue-50/40"
               }`}
             >
               <button
                 type="button"
-                className="min-w-0 flex-1 cursor-pointer gap-3 text-left hover:opacity-90 active:opacity-80"
+                className="w-full cursor-pointer text-left hover:opacity-90 active:opacity-80"
                 onClick={() => openDetail(n)}
               >
-                {!n.read ? (
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                  {!n.read ? (
+                    <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[9px] font-black text-white">
+                      NEW
+                    </span>
+                  ) : null}
+                  {n.pinned ? (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800">
+                      고정
+                    </span>
+                  ) : null}
                   <span
-                    className="absolute left-1.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-blue-500 shadow-[0_0_0_3px_rgba(43,111,240,0.2)]"
-                    aria-label="신규 알림"
-                  />
-                ) : null}
-                <div className="min-w-0 pl-2">
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
-                    {n.pinned ? (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800">
-                        고정
-                      </span>
-                    ) : null}
-                    {!n.read ? (
-                      <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-black text-white">
-                        NEW
-                      </span>
-                    ) : null}
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        CATEGORY_STYLE[n.category] || CATEGORY_STYLE.기타
-                      }`}
-                    >
-                      {n.category}
-                    </span>
-                    <span className="text-[10px] font-medium text-gray-400">
-                      {resolvePushDisplayTime(n)}
-                    </span>
-                    <span
-                      className={`ml-auto text-[11px] font-bold ${
-                        n.purchaseConfirmed
-                          ? "text-emerald-600"
-                          : n.read
-                            ? "text-slate-400"
-                            : "text-blue-600"
-                      }`}
-                    >
-                      {n.purchaseConfirmed ? "구매확정" : n.read ? "확인" : "미확인"}
-                    </span>
-                  </div>
-                  <p className="text-[13px] font-bold text-gray-900">{n.title}</p>
-                  <ShowcaseNotificationBody
-                    body={n.body}
-                    actorUserId={n.actorUserId}
-                    actorHandle={n.actorHandle}
-                    actorName={n.actorName}
-                    showcaseContentOrdinal={n.showcaseContentOrdinal}
-                    showcaseSlideId={n.showcaseSlideId}
-                    inline
-                    className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-gray-600"
-                  />
+                    className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                      CATEGORY_STYLE[n.category] || CATEGORY_STYLE.기타
+                    }`}
+                  >
+                    {n.category}
+                  </span>
+                  <span className="text-[10px] font-medium text-gray-400">
+                    {resolvePushDisplayTime(n)}
+                  </span>
                 </div>
+                <p className="text-[13px] font-bold text-gray-900">{n.title}</p>
+                <ShowcaseNotificationBody
+                  body={n.body}
+                  actorUserId={n.actorUserId}
+                  actorHandle={n.actorHandle}
+                  actorName={n.actorName}
+                  showcaseContentOrdinal={n.showcaseContentOrdinal}
+                  showcaseSlideId={n.showcaseSlideId}
+                  inline
+                  className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-gray-600"
+                />
               </button>
-              <button
-                type="button"
-                className="shrink-0 self-center rounded-lg px-2 py-1.5 text-[11px] font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-40"
-                disabled={busyId === n.id}
-                aria-label="알림 삭제"
-                onClick={(e) => void deleteOne(n, e)}
-              >
-                삭제
-              </button>
+              <div className="mt-2 flex items-center justify-end gap-2">
+                {!n.read ? (
+                  <button
+                    type="button"
+                    className="rounded-lg bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markPushRead(n.id);
+                      refresh();
+                    }}
+                  >
+                    확인
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="rounded-lg bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-600 hover:bg-rose-100 disabled:opacity-40"
+                  disabled={busyId === n.id}
+                  aria-label="알림 삭제"
+                  onClick={(e) => void deleteOne(n, e)}
+                >
+                  삭제
+                </button>
+              </div>
             </div>
           </li>
         ))}

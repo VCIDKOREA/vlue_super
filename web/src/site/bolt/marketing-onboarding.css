@@ -4,7 +4,7 @@
  */
 
 [data-vlue-onboarding="marketing"] {
-  --mkt-onb-container: min(1280px, 94vw);
+  --mkt-onb-container: min(1120px, 92vw);
   --mkt-onb-body: 0.9375rem;
   --mkt-onb-body-lg: 1rem;
   --mkt-onb-caption: 0.75rem;

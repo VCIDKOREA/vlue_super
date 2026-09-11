@@ -202,7 +202,7 @@ export async function fetchOgCoverBytes(
   try {
     const res = await fetch(target, {
       redirect: "follow",
-      signal: AbortSignal.timeout(2500),
+      signal: AbortSignal.timeout(8000),
       headers: { Accept: "image/jpeg,image/png,image/webp,image/*" }
     });
     if (!res.ok) return null;

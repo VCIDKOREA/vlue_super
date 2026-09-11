@@ -189,14 +189,20 @@ export function applyMemberDirectoryToCallGroups(groups, members) {
   const byKey = new Map();
   for (const row of Array.isArray(members) ? members : []) {
     const key = callLogPhoneKey(row.phoneDisplay || row.phoneE164 || row.phone);
+    if (!key) continue;
     const name = String(row.name || "").trim();
-    if (!key || !name || looksLikePhoneName(name, row.phoneDisplay || row.phoneE164, key)) continue;
-    byKey.set(key, row);
+    const usableName = name && !looksLikePhoneName(name, row.phoneDisplay || row.phoneE164, key) ? name : "";
+    /* 이름만 이상해도 avatarUrl 은 붙일 수 있게 저장 */
+    byKey.set(key, { ...row, name: usableName || name });
   }
   return groups.map((g) => {
     const hit = byKey.get(g.phoneKey);
     if (!hit) return g;
-    const memberName = String(hit.name || "").trim();
+    const memberName =
+      String(hit.name || "").trim() &&
+      !looksLikePhoneName(hit.name, g.phoneDisplay || g.phone, g.phoneKey)
+        ? String(hit.name).trim()
+        : String(g.memberName || "").trim();
     const hitAvatar = String(hit.avatarUrl || "").trim();
     const avatarUrl =
       pickListAvatarUrl(hitAvatar, g.avatarUrl, g.cardSnapshot?.photoUrl, g.cardSnapshot?.avatarUrl) ||
@@ -204,16 +210,16 @@ export function applyMemberDirectoryToCallGroups(groups, members) {
     const prevSnap = g.cardSnapshot && typeof g.cardSnapshot === "object" ? g.cardSnapshot : {};
     return {
       ...g,
-      memberName,
-      name: memberName,
-      verified: true,
+      memberName: memberName || g.memberName || "",
+      name: memberName || g.name || "",
+      verified: Boolean(hit.userId) || g.verified === true || Boolean(hit.verified),
       membershipTier: hit.membershipTier || g.membershipTier || "free",
       userId: g.userId || hit.userId || "",
       avatarUrl,
       cardSnapshot: {
         ...prevSnap,
         userId: prevSnap.userId || hit.userId || g.userId || "",
-        name: memberName,
+        name: memberName || prevSnap.name || "",
         phone: prevSnap.phone || g.phoneDisplay || g.phone,
         membershipTier: hit.membershipTier || prevSnap.membershipTier || "free",
         photoUrl: pickListAvatarUrl(hitAvatar, prevSnap.photoUrl, prevSnap.avatarUrl) || "",

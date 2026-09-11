@@ -35,10 +35,14 @@ export function getVlueCreateUrl() {
 
 /** 카카오 Feed — 정지 명함 대신 공용 버튼 (개인 thumb 미사용) */
 export function getKakaoShareButtonImageUrl(origin?: string) {
-  const base = (origin || getVluePublicOrigin()).replace(/\/$/, "");
   const custom = process.env.VLUE_KAKAO_SHARE_BUTTON_IMAGE?.trim();
   if (custom?.startsWith("http")) return custom;
-  return `${base}/images/btn_view_secure_card.png`;
+  /* www SPA 는 /images/*.png 를 HTML 로 떨어뜨림 — API 동적 PNG 사용 */
+  const apiBase = (origin && /api\.vlue\.kr|railway\.app|localhost|127\.0\.0\.1/i.test(origin)
+    ? origin
+    : getVluePublicApiOrigin()
+  ).replace(/\/$/, "");
+  return `${apiBase}/api/v1/card/share-button.png`;
 }
 
 /** 정적 CDN 경로 (프로덕션 nginx → 동일 PNG 미러 시) */

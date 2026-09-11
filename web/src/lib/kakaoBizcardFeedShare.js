@@ -12,6 +12,7 @@ import {
 import { withLetteringBizcardPreviewFallback } from "./letteringBizcardProfile.js";
 import { scrubLetteringDemoPollution } from "./letteringDemoPollution.js";
 import { readLetteringFixedIdentity, readLetteringBizcardEditable } from "./letteringBizcardStorage.js";
+import { buildShowcaseShareCacheKey } from "./letteringBizcardShare.js";
 
 const KAKAO_PUBLIC_ORIGIN = "https://www.vlue.kr";
 export const KAKAO_FEED_IMAGE_WIDTH = 800;
@@ -65,7 +66,8 @@ export function getCardPublicApiBase() {
 export function getKakaoShareButtonImageUrl() {
   const fromEnv = String(import.meta.env.VITE_KAKAO_BIZCARD_BUTTON_IMAGE ?? "").trim();
   if (isKakaoPublicImageUrl(fromEnv)) return fromEnv;
-  return `${KAKAO_PUBLIC_ORIGIN}/images/btn_view_secure_card.png`;
+  /* www 정적 PNG 는 SPA HTML 폴백 → API 동적 PNG */
+  return `${getCardPublicApiBase()}/api/v1/card/share-button.png`;
 }
 
 /** 앱 미리보기·동일 오리진 PNG (Vite 프록시 → API) */
@@ -111,12 +113,18 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
       titlePhotoHint ||
       ""
   ).trim();
-  const coverKey = coverHint
-    ? coverHint.replace(/[^\w]/g, "").slice(-32)
-    : String(Date.now());
   const phone = String(
     readLetteringFixedIdentity()?.phone || snap.phone || card?.phone || ""
   ).trim();
+  /* Date.now() 금지 — 카카오가 매번 새 URL 스크랩하다 실패 로그가 쌓임 */
+  const coverKey = buildShowcaseShareCacheKey({
+    titlePhotoUrl: titlePhotoHint,
+    shareCoverUrl: coverHint,
+    name: snap.name || card?.name,
+    organization: snap.organization || card?.organization,
+    title: snap.title || card?.title,
+    phone
+  });
   /* 카톡 SDK: 검증된 m.vlue.kr/cover.jpg 만 사용 (R2 직접 URL 금지) */
   const showcaseCover = getKakaoShowcaseCoverImageUrl(phone, coverKey);
   const feedImageUrl =

@@ -74,6 +74,10 @@ export function maybePostAndroidPushForInboxItem(item) {
   if (!family && !showcase && category !== "팔로우" && category !== "결제" && category !== "친구") {
     return false;
   }
+  /* 친구 알림은 FCM 으로 이미 OS 푸시됨 — 알림함 동기화로 중복 빅푸시 금지 */
+  if (category === "친구" && (item.serverId || item.kind === "friend_request" || item.kind === "friend_accepted")) {
+    return false;
+  }
   const tag = String(item.serverId || item.id || title).slice(0, 64);
   if (item.kind === "family_invite" && item.linkId) {
     return postAndroidFamilyInviteNotification(title || category, body || title, item.linkId);

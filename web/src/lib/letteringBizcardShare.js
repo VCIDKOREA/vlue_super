@@ -42,7 +42,7 @@ export function buildShowcaseShareCacheKey(parts = {}) {
     .replace(/[^\w-]/g, "");
   const tail = mediaStem.slice(-20);
   const key = `${hash}${tail ? `-${tail}` : ""}`.replace(/[^\w-]/g, "");
-  return key.slice(0, 40) || String(Date.now());
+  return key.slice(0, 40) || "static";
 }
 
 function canShareFiles(file) {

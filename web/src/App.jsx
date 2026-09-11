@@ -1129,15 +1129,44 @@ function App() {
         setTimeout(() => setBottomToast(""), 4200);
       }
       if (data.type === "vlue-friend-request") {
-        const title = String(n.title || data.title || "친구 신청");
+        const myId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
+        const actorId = String(data.actorUserId || "").trim();
+        /* 내가 보낸 신청이 내게「신청 수신」으로 뜨는 경로 차단 */
+        if (myId && actorId && actorId === myId) {
+          /* skip */
+        } else {
+          const title = String(n.title || data.title || "친구 신청");
+          const body = String(
+            n.body || data.body || data.message || "새 친구 신청이 있습니다."
+          );
+          addPushNotification({
+            category: "친구",
+            title,
+            body,
+            kind: "friend_request",
+            serverId: data.notificationId || n.notificationId,
+            pinKey: data.requestId ? `friend-req:${data.requestId}` : "",
+            actorUserId: actorId || undefined,
+            actorName: data.actorName || undefined
+          });
+          setBottomToast(body);
+          setTimeout(() => setBottomToast(""), 4200);
+        }
+      }
+      if (data.type === "vlue-friend-accepted") {
+        const title = String(n.title || data.title || "친구 수락");
         const body = String(
-          n.body || data.body || data.message || "새 친구 신청이 있습니다."
+          n.body || data.body || data.message || "친구 신청이 수락되었습니다."
         );
         addPushNotification({
           category: "친구",
           title,
           body,
-          kind: "friend_request"
+          kind: "friend_accepted",
+          serverId: data.notificationId || n.notificationId,
+          pinKey: data.requestId ? `friend-acc:${data.requestId}` : "",
+          actorUserId: data.actorUserId || undefined,
+          actorName: data.actorName || undefined
         });
         setBottomToast(body);
         setTimeout(() => setBottomToast(""), 4200);
@@ -1360,16 +1389,39 @@ function App() {
           addPushNotification({ category: "팔로우", title, body });
         }
         if (data?.type === "vlue-friend-request") {
-          const title = String(data.title || "친구 신청");
-          const body = String(data.body || data.message || "새 친구 신청이 있습니다.");
+          const myId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
+          const actorId = String(data.actorUserId || "").trim();
+          if (!(myId && actorId && actorId === myId)) {
+            const title = String(data.title || "친구 신청");
+            const body = String(data.body || data.message || "새 친구 신청이 있습니다.");
+            setBottomToast(body);
+            setTimeout(() => setBottomToast(""), 4200);
+            addPushNotification({
+              category: "친구",
+              title,
+              body,
+              kind: "friend_request",
+              serverId: data.notificationId,
+              pinKey: data.requestId ? `friend-req:${data.requestId}` : "",
+              actorUserId: actorId || undefined,
+              actorName: data.actorName || undefined
+            });
+          }
+        }
+        if (data?.type === "vlue-friend-accepted") {
+          const title = String(data.title || "친구 수락");
+          const body = String(data.body || data.message || "친구 신청이 수락되었습니다.");
           setBottomToast(body);
           setTimeout(() => setBottomToast(""), 4200);
           addPushNotification({
             category: "친구",
             title,
             body,
-            kind: "friend_request",
-            serverId: data.notificationId
+            kind: "friend_accepted",
+            serverId: data.notificationId,
+            pinKey: data.requestId ? `friend-acc:${data.requestId}` : "",
+            actorUserId: data.actorUserId || undefined,
+            actorName: data.actorName || undefined
           });
         }
         if (
@@ -4875,6 +4927,7 @@ function App() {
         </div>
       )}
       {page === "friendSearch" && (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <FriendSearch
           approvedFriendIds={(roomCatalog.friends || []).map((f) => f.id)}
           requests={friendRequests}
@@ -4942,6 +4995,7 @@ function App() {
             setFriendRequests((prev) => prev.map((r) => (r.toUserId === userId ? { ...r, status: "rejected" } : r)));
           }}
         />
+        </div>
       )}
       {page === "list" && (
         <>

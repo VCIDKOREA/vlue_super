@@ -35,6 +35,21 @@ export function clampLetterBgmVolume(v, fallback = 0.45) {
   return Math.min(1, Math.max(0, n));
 }
 
+/** 봄 3–5 · 여름 6–8 · 가을 9–11 · 겨울 12–2 */
+export function calendarSeasonFx(date = new Date()) {
+  const m = date.getMonth() + 1;
+  if (m >= 3 && m <= 5) return "spring";
+  if (m >= 6 && m <= 8) return "summer";
+  if (m >= 9 && m <= 11) return "autumn";
+  return "winter";
+}
+
+/** none 제외하고 공개 편지는 달력 계절 */
+export function resolveLetterSeasonFx(stored) {
+  if (String(stored || "").trim() === "none") return "none";
+  return calendarSeasonFx();
+}
+
 /** 사용자 볼륨 저장값 우선, 없으면 편지(관리자) 기본 볼륨 */
 export function readLetterBgmVolume(letterDefault) {
   const fallback = clampLetterBgmVolume(letterDefault, 0.45);

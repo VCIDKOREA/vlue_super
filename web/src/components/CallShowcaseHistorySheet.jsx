@@ -287,10 +287,64 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const { unlockAudioGesture, setPlaybackPhase } = useShowcaseBgm();
 
   useEffect(() => {
-    const onPeerCache = () => setPeerAvatarTick((n) => n + 1);
+    const onPeerCache = () => {
+      setPeerAvatarTick((n) => n + 1);
+      /* peer 캐시에 사진이 생기면 목록 row 에도 바로 반영 (이니셜 고착 방지) */
+      setItems((prev) => {
+        let changed = false;
+        const next = prev.map((call) => {
+          if (resolveCallHistoryAvatar(call)) return call;
+          const phone = call.phoneDisplay || call.phone;
+          const cached = readCallHistoryPeerCache(phone);
+          const url = String(
+            cached?.card?.photoUrl || cached?.card?.avatarUrl || cached?.card?.image_url || ""
+          ).trim();
+          if (!url || !/^https?:\/\//i.test(url)) return call;
+          changed = true;
+          return {
+            ...call,
+            avatarUrl: url,
+            cardSnapshot: {
+              ...(call.cardSnapshot && typeof call.cardSnapshot === "object" ? call.cardSnapshot : {}),
+              photoUrl: url,
+              avatarUrl: url
+            }
+          };
+        });
+        if (changed) writeCallHistoryListCache(next);
+        return changed ? next : prev;
+      });
+    };
     window.addEventListener("vlue-call-history-peer-cache-changed", onPeerCache);
     return () => window.removeEventListener("vlue-call-history-peer-cache-changed", onPeerCache);
   }, []);
+
+  /* 목록에 보이는 VLUÉ 회원 — 사진 없는 행만 가벼운 prefetch (상위 8) */
+  useEffect(() => {
+    if (!open || !items.length) return undefined;
+    const tops = items
+      .filter(
+        (c) =>
+          (c.verified === true || c.userId || c.memberName) &&
+          !resolveCallHistoryAvatar(c)
+      )
+      .slice(0, 8);
+    for (const call of tops) {
+      const phone = call.phoneDisplay || call.phone;
+      if (!phone) continue;
+      const cached = readCallHistoryPeerCache(phone);
+      if (cached?.card && resolveCallHistoryAvatar({ ...call, ...cached, cardSnapshot: cached.card })) {
+        continue;
+      }
+      prefetchCallHistoryPeer(phone, () =>
+        resolveCallHistoryShowcasePeer(phone, {
+          displayName: call.name || call.memberName || "",
+          avatarUrl: call.avatarUrl || ""
+        }).then((payload) => peerPayloadFromResolve(payload))
+      );
+    }
+    return undefined;
+  }, [open, items]);
 
   const closeAuthPopup = useCallback(() => {
     setAuthPopup({ open: false, name: "", phone: "", handle: "" });
@@ -457,23 +511,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       window.removeEventListener(DEVICE_CONTACTS_CHANGED, patchContactNames);
     };
   }, [open]);
-
-  /* 목록에 보이는 VLUÉ 회원 쇼케이스 — 탭 전 미리 불러오기 */
-  useEffect(() => {
-    if (!open || !items.length) return undefined;
-    const tops = items.filter((c) => c.verified === true).slice(0, 12);
-    for (const call of tops) {
-      const phone = call.phoneDisplay || call.phone;
-      if (!phone || readCallHistoryPeerCache(phone)) continue;
-      prefetchCallHistoryPeer(phone, () =>
-        resolveCallHistoryShowcasePeer(phone, {
-          displayName: call.name || call.memberName || "",
-          avatarUrl: call.avatarUrl || ""
-        }).then((payload) => peerPayloadFromResolve(payload))
-      );
-    }
-    return undefined;
-  }, [open, items]);
 
   const applyPeerPayload = useCallback(
     (payload, call, gen) => {

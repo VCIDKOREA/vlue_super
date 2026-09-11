@@ -18,7 +18,7 @@ export type DigitalLetterRow = {
 export type LetterDecor = {
   /** cream-lined | warm-lined | ivory | kraft | sky */
   paperTheme: string;
-  /** none | autumn | spring | winter */
+  /** auto | none | autumn | spring | summer | winter */
   seasonFx: string;
   /** 가로줄 표시 */
   showLines: boolean;
@@ -139,14 +139,23 @@ VLUÉ는 그런 마음에서 시작했습니다.
 VLUÉ였습니다. 💙`;
 
 const PAPER_THEMES = new Set(["cream-lined", "warm-lined", "ivory", "kraft", "sky"]);
-const SEASON_FX = new Set(["none", "autumn", "spring", "winter"]);
+const SEASON_FX = new Set(["auto", "none", "autumn", "spring", "summer", "winter"]);
 
-function defaultSeasonFx(): string {
-  const m = new Date().getMonth() + 1;
-  if (m >= 9 && m <= 11) return "autumn";
+/** 봄 3–5 · 여름 6–8 · 가을 9–11 · 겨울 12–2 */
+export function defaultSeasonFx(date = new Date()): string {
+  const m = date.getMonth() + 1;
   if (m >= 3 && m <= 5) return "spring";
-  if (m === 12 || m <= 2) return "winter";
-  return "none";
+  if (m >= 6 && m <= 8) return "summer";
+  if (m >= 9 && m <= 11) return "autumn";
+  return "winter";
+}
+
+export function resolveSeasonFx(raw: string, date = new Date()): string {
+  const s = String(raw || "").trim();
+  if (s === "none") return "none";
+  /* 공개 연출은 항상 달력 계절 (관리자 강제값은 미리보기·저장용) */
+  if (s === "auto" || SEASON_FX.has(s)) return defaultSeasonFx(date);
+  return defaultSeasonFx(date);
 }
 
 export function normalizeLetterDecor(raw: unknown): LetterDecor {
@@ -156,7 +165,7 @@ export function normalizeLetterDecor(raw: unknown): LetterDecor {
   const fxOpacityRaw = typeof o.fxOpacity === "number" ? o.fxOpacity : Number(o.fxOpacity);
   return {
     paperTheme: PAPER_THEMES.has(paperTheme) ? paperTheme : "cream-lined",
-    seasonFx: SEASON_FX.has(seasonFx) ? seasonFx : defaultSeasonFx(),
+    seasonFx: SEASON_FX.has(seasonFx) ? seasonFx : "auto",
     showLines: o.showLines === false ? false : true,
     fxOpacity: Number.isFinite(fxOpacityRaw)
       ? Math.min(0.65, Math.max(0.12, fxOpacityRaw))
@@ -196,7 +205,7 @@ async function ensureTable() {
   );
   const count = Number(countRows[0]?.c || 0);
   if (count === 0) {
-    const decor = JSON.stringify(normalizeLetterDecor({ seasonFx: "autumn" }));
+    const decor = JSON.stringify(normalizeLetterDecor({ seasonFx: "auto" }));
     await prisma.$executeRawUnsafe(
       `
         INSERT INTO vlue_digital_letters (title, body_text, bgm_url, bgm_volume, decor_json, is_active, version)
@@ -215,14 +224,17 @@ function clampVolume(v: unknown, fallback = 0.45) {
   return Math.min(1, Math.max(0, n));
 }
 
-function mapRow(row: DigitalLetterRow) {
+function mapRow(row: DigitalLetterRow, opts: { resolveSeason?: boolean } = {}) {
+  const decor = normalizeLetterDecor(row.decor_json);
   return {
     id: row.id,
     title: row.title,
     body: row.body_text,
     bgmUrl: row.bgm_url || "",
     bgmVolume: clampVolume(row.bgm_volume, 0.45),
-    decor: normalizeLetterDecor(row.decor_json),
+    decor: opts.resolveSeason
+      ? { ...decor, seasonFx: resolveSeasonFx(decor.seasonFx) }
+      : decor,
     isActive: row.is_active,
     version: Number(row.version) || 1,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at || ""),
@@ -241,7 +253,8 @@ export async function getActiveDigitalLetter() {
       LIMIT 1;
     `
   );
-  return rows[0] ? mapRow(rows[0]) : null;
+  /* 공개 편지: none 제외하고 달력 계절 애니메이션 적용 */
+  return rows[0] ? mapRow(rows[0], { resolveSeason: true }) : null;
 }
 
 export async function listDigitalLetters(limit = 20) {

@@ -109,7 +109,7 @@ function coverCacheKey(meta: {
     .replace(/[^\w-]/g, "");
   const tail = mediaStem.slice(-20);
   const key = `${hash}${tail ? `-${tail}` : ""}`.replace(/[^\w-]/g, "");
-  return key.slice(0, 40) || String(Date.now());
+  return key.slice(0, 40) || "static";
 }
 
 function sendOgHtml(c: Context, html: string) {
@@ -128,13 +128,12 @@ function sendOgHtml(c: Context, html: string) {
 
 async function resolveUpstreamCoverUrl(c: Context, digits: string): Promise<string> {
   const meta = await loadShowcaseOgShareMeta(digits);
-  const webOrigin = getVluePublicOrigin();
   const imageApiBase = imageApiBaseFromRequest(c);
   return (
     toAsciiOgImageUrl(meta.shareCover) ||
     (meta.cardId ? kakaoFeedCardImageUrl(imageApiBase, meta.cardId) : "") ||
     toAsciiOgImageUrl(meta.photo) ||
-    getKakaoShareButtonImageUrl(webOrigin)
+    getKakaoShareButtonImageUrl(imageApiBase)
   );
 }
 
@@ -228,9 +227,13 @@ export async function respondShowcaseOgCover(c: Context) {
     }
 
     const target = await resolveUpstreamCoverUrl(c, digits);
-    const fetched = await fetchOgCoverBytes(target);
+    let fetched = await fetchOgCoverBytes(target);
     if (!fetched) {
-      return c.redirect(target || getKakaoShareButtonImageUrl(getVluePublicOrigin()), 302);
+      const fallback = getKakaoShareButtonImageUrl(imageApiBaseFromRequest(c));
+      fetched = await fetchOgCoverBytes(fallback);
+      if (!fetched) {
+        return c.redirect(fallback, 302);
+      }
     }
     setCachedOgCover(digits, fetched.bytes, fetched.contentType);
     c.header("Cache-Control", "public, max-age=60, must-revalidate");
@@ -244,7 +247,7 @@ export async function respondShowcaseOgCover(c: Context) {
     return c.body(new Uint8Array(fetched.bytes));
   } catch (err) {
     console.warn("[showcase-og-cover] failed", err);
-    return c.redirect(getKakaoShareButtonImageUrl(getVluePublicOrigin()), 302);
+    return c.redirect(getKakaoShareButtonImageUrl(imageApiBaseFromRequest(c)), 302);
   }
 }
 

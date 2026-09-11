@@ -240,6 +240,32 @@
   box-shadow: 0 0 4px rgba(186, 230, 253, 0.8);
 }
 
+.vlue-letter-season--summer .vlue-letter-season__particle {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #fde68a 0%, #fbbf24 55%, #f59e0b 100%);
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.45);
+}
+
+.vlue-letter-season--summer .vlue-letter-season__particle--2,
+.vlue-letter-season--summer .vlue-letter-season__particle--5,
+.vlue-letter-season--summer .vlue-letter-season__particle--8 {
+  width: 4px;
+  height: 4px;
+  background: radial-gradient(circle, #fef3c7 0%, #fcd34d 100%);
+  opacity: calc(var(--vlue-letter-fx-opacity) * 0.85);
+}
+
+.vlue-letter-season--summer .vlue-letter-season__particle--3,
+.vlue-letter-season--summer .vlue-letter-season__particle--7 {
+  width: 9px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.7), transparent);
+  box-shadow: none;
+}
+
 .vlue-letter-season__particle--1 { left: 12%; animation-duration: 11s; animation-delay: 0s; }
 .vlue-letter-season__particle--2 { left: 28%; animation-duration: 13.5s; animation-delay: -2s; }
 .vlue-letter-season__particle--3 { left: 44%; animation-duration: 10s; animation-delay: -4.5s; }

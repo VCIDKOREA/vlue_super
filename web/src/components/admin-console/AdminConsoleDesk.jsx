@@ -1222,7 +1222,7 @@ function PostsTab({ onToast }) {
     bgmVolume: 0.45,
     isActive: true,
     paperTheme: "cream-lined",
-    seasonFx: "autumn",
+    seasonFx: "auto",
     showLines: true,
     fxOpacity: 0.32,
     showSignature: true
@@ -1252,7 +1252,7 @@ function PostsTab({ onToast }) {
           bgmVolume: typeof active.bgmVolume === "number" ? active.bgmVolume : 0.45,
           isActive: active.isActive !== false,
           paperTheme: decor.paperTheme || "cream-lined",
-          seasonFx: decor.seasonFx || "autumn",
+          seasonFx: decor.seasonFx || "auto",
           showLines: decor.showLines !== false,
           fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.32,
           showSignature: decor.showSignature !== false
@@ -1479,14 +1479,16 @@ function PostsTab({ onToast }) {
             </select>
             <label className="block text-[11px] font-bold text-slate-500">계절 연출 (상단 우측)</label>
             <select
-              value={letterForm.seasonFx || "autumn"}
+              value={letterForm.seasonFx || "auto"}
               onChange={(e) => setLetterForm((f) => ({ ...f, seasonFx: e.target.value }))}
               className="w-full rounded-lg border border-amber-100 bg-white px-3 py-2 text-[13px]"
             >
+              <option value="auto">자동 (달력 계절)</option>
               <option value="none">없음</option>
-              <option value="autumn">가을 낙엽 (은근히)</option>
-              <option value="spring">봄 꽃잎</option>
-              <option value="winter">겨울 눈</option>
+              <option value="spring">봄 꽃잎 (3–5월)</option>
+              <option value="summer">여름 햇살 (6–8월)</option>
+              <option value="autumn">가을 낙엽 (9–11월)</option>
+              <option value="winter">겨울 눈 (12–2월)</option>
             </select>
             {letterForm.seasonFx && letterForm.seasonFx !== "none" ? (
               <>
@@ -1657,7 +1659,7 @@ function PostsTab({ onToast }) {
                         bgmVolume: typeof r.bgmVolume === "number" ? r.bgmVolume : 0.45,
                         isActive: r.isActive !== false,
                         paperTheme: decor.paperTheme || "cream-lined",
-                        seasonFx: decor.seasonFx || "autumn",
+                        seasonFx: decor.seasonFx || "auto",
                         showLines: decor.showLines !== false,
                         fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.32,
                         showSignature: decor.showSignature !== false

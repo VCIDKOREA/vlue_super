@@ -2,12 +2,14 @@
 
 const KEY = "vlue_push_inbox_v3";
 const DELETED_SERVER_KEY = "vlue_push_inbox_deleted_srv_v1";
+const WELCOME_ID = "push-welcome-signup-1";
+const WELCOME_DISMISSED_PREFIX = "vlue_push_welcome_dismissed_v1";
 
 export const PUSH_INBOX_CHANGED = "vlue-push-inbox-changed";
 
 const WELCOME = [
   {
-    id: "push-welcome-signup-1",
+    id: WELCOME_ID,
     category: "앱",
     title: "VLUÉ에 회원가입을 환영합니다",
     body:
@@ -16,6 +18,42 @@ const WELCOME = [
     createdAt: new Date().toISOString()
   }
 ];
+
+function welcomeDismissedKey() {
+  try {
+    const uid = String(localStorage.getItem("vlue_server_user_id") || "").trim();
+    return uid ? `${WELCOME_DISMISSED_PREFIX}_${uid}` : WELCOME_DISMISSED_PREFIX;
+  } catch {
+    return WELCOME_DISMISSED_PREFIX;
+  }
+}
+
+function isWelcomeDismissed() {
+  try {
+    if (localStorage.getItem(welcomeDismissedKey()) === "1") return true;
+    /* 계정 id 없이 지운 경우도 존중 */
+    if (localStorage.getItem(WELCOME_DISMISSED_PREFIX) === "1") return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function dismissWelcomePush() {
+  try {
+    localStorage.setItem(welcomeDismissedKey(), "1");
+    localStorage.setItem(WELCOME_DISMISSED_PREFIX, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+function seedWelcomeIfNeeded(list) {
+  const base = Array.isArray(list) ? list : [];
+  if (isWelcomeDismissed()) return base.filter((n) => n?.id !== WELCOME_ID);
+  if (base.some((n) => n?.id === WELCOME_ID)) return base;
+  return [{ ...WELCOME[0], createdAt: new Date().toISOString() }, ...base];
+}
 
 /** 알림 목록용 날짜·시간 (예: 7월 6일 오후 3:24) */
 export function formatPushNotificationDateTime(iso) {
@@ -46,11 +84,13 @@ export function resolvePushDisplayTime(item) {
 function readList() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return [...WELCOME];
+    if (!raw) return seedWelcomeIfNeeded([]);
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length ? parsed : [...WELCOME];
+    if (!Array.isArray(parsed)) return seedWelcomeIfNeeded([]);
+    /* 빈 배열([])이어도 환영을 다시 넣지 않음 — 삭제 후 재시드 버그 수정 */
+    return seedWelcomeIfNeeded(parsed);
   } catch {
-    return [...WELCOME];
+    return seedWelcomeIfNeeded([]);
   }
 }
 
@@ -283,7 +323,13 @@ export function confirmPushPurchase(id) {
 }
 
 export function markPushRead(id) {
-  const list = readList().map((n) => (n.id === id ? { ...n, read: true } : n));
+  const list = readList().map((n) => {
+    if (n.id !== id) return n;
+    if (n.id === WELCOME_ID || String(n.title || "").includes("회원가입을 환영")) {
+      dismissWelcomePush();
+    }
+    return { ...n, read: true };
+  });
   writeList(list);
 }
 
@@ -321,6 +367,9 @@ export function removePushNotification(id) {
   const removed = list.find((n) => n.id === target) || null;
   if (!removed) return null;
   if (removed.serverId) rememberDeletedPushServerId(removed.serverId);
+  if (removed.id === WELCOME_ID || String(removed.title || "").includes("회원가입을 환영")) {
+    dismissWelcomePush();
+  }
   writeList(list.filter((n) => n.id !== target));
   return removed;
 }
@@ -331,6 +380,9 @@ export function clearPushNotifications({ keepPinned = true } = {}) {
   const removed = keepPinned ? list.filter((n) => !n.pinned) : list;
   removed.forEach((n) => {
     if (n.serverId) rememberDeletedPushServerId(n.serverId);
+    if (n.id === WELCOME_ID || String(n.title || "").includes("회원가입을 환영")) {
+      dismissWelcomePush();
+    }
   });
   const next = keepPinned ? list.filter((n) => n.pinned) : [];
   writeList(next);

@@ -12,8 +12,10 @@ import { sanitizeDccAccountFields } from "./dccAccountFields.js";
  * (동일 URL이어도 타이틀로 등록된 값은 유지 — 프로필 수정이 타이틀을 지우지 않게)
  */
 export function resolveDccTitlePhotoUrl(card = {}) {
+  const url = String(card?.titlePhotoUrl || card?.title_photo_url || "").trim();
+  if (url) return url;
   if (Boolean(card?.noTitlePhoto)) return "";
-  return String(card?.titlePhotoUrl || card?.title_photo_url || "").trim();
+  return "";
 }
 
 /** Lettering·명함 카드 객체 정규화 — 빈 칸을 데모값으로 채우지 않음 */
@@ -24,7 +26,7 @@ export function normalizeLetteringCard(raw = {}) {
   const merged = { ...raw, name };
   /* 회사 로고 없으면 비움(카카오 무지 스타일). VLUÉ 데모 로고로 채우지 않음 */
   const logoUrl = String(raw.logoUrl || "").trim();
-  const noTitlePhoto = Boolean(raw.noTitlePhoto);
+  const noTitlePhoto = Boolean(raw.noTitlePhoto) && !titlePhotoUrl;
   const account = sanitizeDccAccountFields(raw, {
     lockedHolderName: name,
     lockedCompanyName: String(raw.organization || raw.companyName || "").trim()

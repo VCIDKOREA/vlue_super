@@ -6,6 +6,7 @@ import {
   restoreDigitalCardFromServer,
   fillEmptyDigitalCardFieldsFromServer
 } from "./digitalCardApi.js";
+import { clearStaleAutoOmitFlags } from "./letteringBizcardStorage.js";
 import { formatPhoneE164ForKoreaDisplay } from "./phoneDisplay.js";
 import { normalizeMembershipKind } from "./membershipBm.js";
 
@@ -192,6 +193,11 @@ export function hydrateBizcardFromLoginPayload(data) {
 /** 웹 명함 설정 진입 시 서버 프로필·기업·명함 메타 동기화 */
 export async function syncBizcardAccountFromApi(opts = {}) {
   const force = Boolean(opts.force);
+  try {
+    clearStaleAutoOmitFlags();
+  } catch {
+    /* ignore */
+  }
   /* 재설치·빈 로컬이면 반드시 full snapshot 복원 (lite 는 사진·이메일 생략) */
   const restoreNeeded = force || needsDigitalCardLocalRestore();
   const fillNeeded = !restoreNeeded && needsDigitalCardContactFill();

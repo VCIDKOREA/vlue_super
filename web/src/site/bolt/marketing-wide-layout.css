@@ -1,13 +1,14 @@
 /**
- * www 마케팅 전용 — 와이드·큼직한 UI (앱 /app 과 분리)
+ * www 마케팅 — 포털형 가운데 칼럼 (네이버·피터팬식 좌우 여백)
  * [data-vlue-site="marketing"] 하위만 적용
  */
 
 [data-vlue-site="marketing"] {
-  --mkt-container: min(1720px, 96vw);
-  --mkt-container-narrow: min(1280px, 94vw);
-  --mkt-hero-inner: min(1080px, 92vw);
-  --mkt-hero-search: min(52rem, 90vw);
+  /* 본문 칼럼 ≈ 1120px — 와이드 모니터에서도 좌우 여백이 남도록 */
+  --mkt-container: min(1120px, 92vw);
+  --mkt-container-narrow: min(960px, 90vw);
+  --mkt-hero-inner: min(720px, 88vw);
+  --mkt-hero-search: min(40rem, 88vw);
   /* 고정 헤더: 네비 + 설치 안내 바 (컴팩트·가독 균형) */
   --mkt-nav-h: 3.75rem;
   --mkt-download-bar-h: 3.375rem;
@@ -255,18 +256,22 @@
   scroll-margin-top: var(--mkt-scroll-anchor);
 }
 
-/* 레이아웃 컨테이너 확장 */
+/* 레이아웃 컨테이너 — 포털형 가운데 정렬 */
 [data-vlue-site="marketing"] .max-w-7xl,
 [data-vlue-site="marketing"] .max-w-6xl {
   max-width: var(--mkt-container) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 [data-vlue-site="marketing"] .max-w-5xl {
   max-width: var(--mkt-container-narrow) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 [data-vlue-site="marketing"] .max-w-4xl {
-  max-width: min(1120px, 92vw) !important;
+  max-width: min(880px, 90vw) !important;
 }
 
 [data-vlue-site="marketing"] .max-w-3xl {
@@ -274,7 +279,7 @@
 }
 
 [data-vlue-site="marketing"] .max-w-2xl {
-  max-width: min(840px, 88vw) !important;
+  max-width: min(640px, 88vw) !important;
 }
 
 [data-vlue-site="marketing"] .max-w-xl {
@@ -314,7 +319,9 @@
 }
 
 [data-vlue-site="marketing"] .hero-inner {
-  max-width: min(52rem, 94vw) !important;
+  max-width: var(--mkt-hero-inner) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 [data-vlue-site="marketing"] .card {
@@ -853,12 +860,14 @@
 
 @media (min-width: 1536px) {
   [data-vlue-site="marketing"] {
-    --mkt-container: min(1800px, 97vw);
-    --mkt-hero-inner: min(1200px, 94vw);
-    --mkt-hero-search: min(56rem, 92vw);
+    /* 초대형 모니터에서도 본문은 1200px 상한 — 좌우 여백 유지 */
+    --mkt-container: min(1200px, 88vw);
+    --mkt-container-narrow: min(1040px, 86vw);
+    --mkt-hero-inner: min(760px, 84vw);
+    --mkt-hero-search: min(42rem, 84vw);
   }
 
   [data-vlue-site="marketing"] .hero-title {
-    font-size: clamp(2.5rem, 3.2vw, 3.75rem);
+    font-size: clamp(2.25rem, 2.6vw, 3.25rem);
   }
 }

@@ -365,31 +365,46 @@ export default function PushNotificationDetailModal({
             </button>
           ) : null}
           {!inviteResolved ? (
-            <button
-              type="button"
-              className={`w-full rounded-xl py-3 text-[14px] font-black active:scale-[0.99] ${
-                canConfirm || isPayment || canFamilyRespond
-                  ? isDarkMode
-                    ? "bg-white/10 text-slate-100"
-                    : "bg-slate-100 text-slate-700"
-                  : "bg-blue-600 text-white"
-              }`}
-              onClick={() => {
-                if (isLikeNotice) {
-                  openLikedShowcase();
-                  return;
-                }
-                onClose();
-              }}
-            >
-              {canConfirm || isPayment || canFamilyRespond
-                ? "닫기"
-                : isLikeNotice
-                  ? "쇼케이스 보기"
-                  : "확인"}
-            </button>
-          ) : null}
-          {typeof onDelete === "function" ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={`min-w-0 flex-1 rounded-xl py-3 text-[14px] font-black active:scale-[0.99] ${
+                  canConfirm || isPayment || canFamilyRespond
+                    ? isDarkMode
+                      ? "bg-white/10 text-slate-100"
+                      : "bg-slate-100 text-slate-700"
+                    : "bg-blue-600 text-white"
+                }`}
+                onClick={() => {
+                  if (isLikeNotice) {
+                    openLikedShowcase();
+                    return;
+                  }
+                  onClose();
+                }}
+              >
+                {canConfirm || isPayment || canFamilyRespond
+                  ? "닫기"
+                  : isLikeNotice
+                    ? "쇼케이스 보기"
+                    : "확인"}
+              </button>
+              {typeof onDelete === "function" ? (
+                <button
+                  type="button"
+                  className={`min-w-0 flex-1 rounded-xl py-3 text-[14px] font-black text-rose-600 active:scale-[0.99] ${
+                    isDarkMode ? "bg-rose-500/15 ring-1 ring-rose-400/30" : "bg-rose-50 ring-1 ring-rose-100"
+                  }`}
+                  onClick={() => {
+                    onDelete(current);
+                    onClose();
+                  }}
+                >
+                  삭제
+                </button>
+              ) : null}
+            </div>
+          ) : typeof onDelete === "function" ? (
             <button
               type="button"
               className={`w-full rounded-xl py-3 text-[14px] font-black text-rose-600 active:scale-[0.99] ${
@@ -400,7 +415,7 @@ export default function PushNotificationDetailModal({
                 onClose();
               }}
             >
-              알림 삭제
+              삭제
             </button>
           ) : null}
         </div>

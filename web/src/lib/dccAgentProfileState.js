@@ -69,8 +69,7 @@ export function applyDccAgentBundleToLocalCard(profile, bundle = null, opts = {}
       titleDeptPendingDepartment: "",
       photoDataUrl: photoUrl,
       photoUrl,
-      photoFocus,
-      noProfilePhoto: !photoUrl
+      photoFocus
     };
     const written = writeLetteringBizcardEditable(patchLite);
     /* 헤더·쇼케이스는 avatar 슬롯을 읽음 — 프로필 전환 시 반드시 동기화 */
@@ -118,25 +117,33 @@ export function applyDccAgentBundleToLocalCard(profile, bundle = null, opts = {}
     photoDataUrl: photoUrl,
     photoUrl,
     photoFocus,
-    noProfilePhoto: !photoUrl,
+    /* 빈 URL 로「없음」을 자동 ON 하지 않음 — 명시적 no* 만 반영 */
+    noProfilePhoto: photoUrl
+      ? false
+      : dcc.noProfilePhoto != null
+        ? Boolean(dcc.noProfilePhoto)
+        : false,
     titlePhotoDataUrl: titlePhotoUrl,
-    ...(Object.prototype.hasOwnProperty.call(dcc, "noTitlePhoto") || titlePhotoUrl
-      ? {
-          noTitlePhoto:
-            dcc.noTitlePhoto != null ? Boolean(dcc.noTitlePhoto) : !titlePhotoUrl
-        }
-      : {}),
+    noTitlePhoto: titlePhotoUrl
+      ? false
+      : dcc.noTitlePhoto != null
+        ? Boolean(dcc.noTitlePhoto)
+        : false,
     logoDataUrl: logoUrl,
-    ...(Object.prototype.hasOwnProperty.call(dcc, "noCompanyLogo") || logoUrl
-      ? {
-          noCompanyLogo: dcc.noCompanyLogo != null ? Boolean(dcc.noCompanyLogo) : !logoUrl
-        }
-      : {}),
+    noCompanyLogo: logoUrl
+      ? false
+      : dcc.noCompanyLogo != null
+        ? Boolean(dcc.noCompanyLogo)
+        : false,
     email,
     website,
-    noWebsite: dcc.noWebsite != null ? Boolean(dcc.noWebsite) : !website,
+    noWebsite: website
+      ? false
+      : dcc.noWebsite != null
+        ? Boolean(dcc.noWebsite)
+        : false,
     fax,
-    noFax: dcc.noFax != null ? Boolean(dcc.noFax) : !fax,
+    noFax: fax ? false : dcc.noFax != null ? Boolean(dcc.noFax) : false,
     address: address || [addressRoad, addressDetail].filter(Boolean).join(" "),
     addressRoad: addressRoad || address,
     addressDetail,

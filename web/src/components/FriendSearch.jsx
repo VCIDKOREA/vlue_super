@@ -121,14 +121,15 @@ function FriendSearch({
   );
 
   return (
-    <section className="mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden">
+    <section className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden pt-[max(12px,var(--vlue-safe-top,env(safe-area-inset-top,0px)))]">
       <ScreenBackHeader
         title="친구"
         onBack={onGoMain}
         isDarkMode={isDarkMode}
         right={searchHeaderBtn}
+        className="!pt-2"
       />
-      <div className="flex-1 overflow-y-auto px-3 pb-24 pt-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-[calc(54px+env(safe-area-inset-bottom,0px)+12px)]">
         <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
           {tabs.map((t) => (
             <button

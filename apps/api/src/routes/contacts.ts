@@ -159,6 +159,78 @@ contactRoutes.post("/match", async (c) => {
   });
 });
 
+/** 서로 신청 알림이 꼬이지 않게 — 특정 actor→owner 의「친구 신청」알림 제거 */
+async function purgeFriendRequestNotices(ownerUserId: string, actorUserId: string) {
+  try {
+    await prisma.ownerNotification.deleteMany({
+      where: {
+        ownerUserId,
+        actorUserId,
+        title: { contains: "친구 신청" }
+      }
+    });
+  } catch (err) {
+    console.warn("[contacts] purgeFriendRequestNotices_failed", err);
+  }
+}
+
+async function deliverFriendNotice(opts: {
+  ownerUserId: string;
+  actorUserId: string;
+  title: string;
+  body: string;
+  sseType: "vlue-friend-request" | "vlue-friend-accepted";
+  requestId: string;
+  actorName: string;
+}) {
+  let notificationId = "";
+  try {
+    const row = await prisma.ownerNotification.create({
+      data: {
+        ownerUserId: opts.ownerUserId,
+        actorUserId: opts.actorUserId,
+        title: opts.title,
+        body: opts.body,
+        payloadJson: {
+          type: opts.sseType,
+          requestId: opts.requestId,
+          actorUserId: opts.actorUserId,
+          actorName: opts.actorName
+        }
+      }
+    });
+    notificationId = row.id;
+  } catch (err) {
+    console.warn("[contacts] friend ownerNotification_failed", err);
+  }
+  const payload = {
+    type: opts.sseType,
+    title: opts.title,
+    body: opts.body,
+    message: opts.body,
+    actorUserId: opts.actorUserId,
+    actorName: opts.actorName,
+    requestId: opts.requestId,
+    notificationId,
+    at: new Date().toISOString()
+  };
+  try {
+    ssePublish(opts.ownerUserId, payload);
+  } catch (err) {
+    console.warn("[contacts] friend sse_failed", err);
+  }
+  void sendShowcaseSocialPushToUser(opts.ownerUserId, opts.title, opts.body, {
+    type: opts.sseType,
+    actorUserId: opts.actorUserId,
+    actorName: opts.actorName,
+    requestId: opts.requestId,
+    notificationId
+  }).catch((err) => {
+    console.warn("[contacts] friend fcm_failed", err);
+  });
+  return notificationId;
+}
+
 /** 주소록에서 발견한 VLUE 회원에게 친구 신청 */
 contactRoutes.post("/friend-request", async (c) => {
   const me = await resolveRequestUserId(c);
@@ -201,6 +273,87 @@ contactRoutes.post("/friend-request", async (c) => {
     );
   }
 
+  /* 상대가 이미 나한테 신청한 상태 → 즉시 상호 수락 (신청+수락 알림 꼬임 방지) */
+  const reversePending = await prisma.friendRequest.findFirst({
+    where: {
+      fromUserId: toUserId,
+      toUserId: me,
+      status: "pending"
+    },
+    include: {
+      fromUser: { select: { id: true, legalName: true, publicHandle: true, email: true } }
+    }
+  });
+
+  if (reversePending) {
+    const pair = orderedPair(me, toUserId);
+    const peerName =
+      reversePending.applicantLegalNameSnapshot || userDisplayName(reversePending.fromUser);
+    const { roomId } = await prisma.$transaction(async (tx) => {
+      await tx.friendRequest.update({
+        where: { id: reversePending.id },
+        data: { status: "accepted" }
+      });
+      await tx.friendRequest.updateMany({
+        where: {
+          OR: [
+            { fromUserId: me, toUserId, status: "pending" },
+            { fromUserId: toUserId, toUserId: me, status: "pending" }
+          ]
+        },
+        data: { status: "cancelled" }
+      });
+      let room = await tx.chatRoom.findFirst({
+        where: { participantLow: pair.low, participantHigh: pair.high }
+      });
+      if (!room) {
+        room = await tx.chatRoom.create({
+          data: { participantLow: pair.low, participantHigh: pair.high }
+        });
+      }
+      await tx.chatMessage.create({
+        data: {
+          roomId: room.id,
+          senderId: null,
+          content: "친구가 되었습니다. 대화를 시작할 수 있습니다.",
+          messageType: "system"
+        }
+      });
+      return { roomId: room.id };
+    });
+
+    await purgeFriendRequestNotices(me, toUserId);
+    await purgeFriendRequestNotices(toUserId, me);
+
+    const connectedTitle = "친구 수락";
+    await deliverFriendNotice({
+      ownerUserId: me,
+      actorUserId: toUserId,
+      title: connectedTitle,
+      body: `${peerName}님과 친구가 되었습니다.`,
+      sseType: "vlue-friend-accepted",
+      requestId: reversePending.id,
+      actorName: peerName
+    });
+    await deliverFriendNotice({
+      ownerUserId: toUserId,
+      actorUserId: me,
+      title: connectedTitle,
+      body: `${snapshot}님과 친구가 되었습니다.`,
+      sseType: "vlue-friend-accepted",
+      requestId: reversePending.id,
+      actorName: snapshot
+    });
+
+    return c.json({
+      id: reversePending.id,
+      status: "accepted",
+      autoAccepted: true,
+      roomId,
+      createdAt: reversePending.createdAt.toISOString()
+    });
+  }
+
   const created = await prisma.friendRequest.create({
     data: {
       fromUserId: me,
@@ -213,42 +366,15 @@ contactRoutes.post("/friend-request", async (c) => {
     }
   });
 
-  /* 수신자 알림함(SSE+FCM) + OwnerNotification — 실패해도 신청 결과는 유지 */
-  const title = "친구 신청";
-  const bodyText = `${snapshot}님이 친구 신청을 보냈습니다.`;
-  try {
-    await prisma.ownerNotification.create({
-      data: {
-        ownerUserId: toUserId,
-        actorUserId: me,
-        title,
-        body: bodyText
-      }
-    });
-  } catch (err) {
-    console.warn("[contacts] friend_request ownerNotification_failed", err);
-  }
-  try {
-    ssePublish(toUserId, {
-      type: "vlue-friend-request",
-      title,
-      body: bodyText,
-      message: bodyText,
-      actorUserId: me,
-      actorName: snapshot,
-      requestId: created.id,
-      at: new Date().toISOString()
-    });
-  } catch (err) {
-    console.warn("[contacts] friend_request sse_failed", err);
-  }
-  void sendShowcaseSocialPushToUser(toUserId, title, bodyText, {
-    type: "vlue-friend-request",
+  /* 수신자(to)에게만「신청 수신」— 보낸 사람(me)에게는 보내지 않음 */
+  await deliverFriendNotice({
+    ownerUserId: toUserId,
     actorUserId: me,
-    actorName: snapshot,
-    requestId: created.id
-  }).catch((err) => {
-    console.warn("[contacts] friend_request fcm_failed", err);
+    title: "친구 신청",
+    body: `${snapshot}님이 친구 신청을 보냈습니다.`,
+    sseType: "vlue-friend-request",
+    requestId: created.id,
+    actorName: snapshot
   });
 
   return c.json({
@@ -386,39 +512,19 @@ contactRoutes.post("/friend-requests/:id/accept", async (c) => {
   const title = "친구 수락";
   const notifyBody = `${accepterName}님이 친구 신청을 수락했습니다.`;
 
-  try {
-    await prisma.ownerNotification.create({
-      data: {
-        ownerUserId: fr.fromUserId,
-        actorUserId: me,
-        title,
-        body: notifyBody
-      }
-    });
-  } catch (err) {
-    console.warn("[contacts] friend_accept ownerNotification_failed", err);
-  }
-  try {
-    ssePublish(fr.fromUserId, {
-      type: "vlue-friend-accepted",
-      title,
-      body: notifyBody,
-      message: notifyBody,
-      actorUserId: me,
-      actorName: accepterName,
-      requestId: id,
-      at: new Date().toISOString()
-    });
-  } catch (err) {
-    console.warn("[contacts] friend_accept sse_failed", err);
-  }
-  void sendShowcaseSocialPushToUser(fr.fromUserId, title, notifyBody, {
-    type: "vlue-friend-accepted",
+  /* 반대방향 잔여「신청」알림 제거 — 보낸 사람에게 신청+수락이 동시에 남지 않게 */
+  await purgeFriendRequestNotices(fr.fromUserId, me);
+  await purgeFriendRequestNotices(me, fr.fromUserId);
+
+  /* 원래 신청한 사람(from)에게만 수락 알림 — 수락한 본인(me)에게는 보내지 않음 */
+  await deliverFriendNotice({
+    ownerUserId: fr.fromUserId,
     actorUserId: me,
-    actorName: accepterName,
-    requestId: id
-  }).catch((err) => {
-    console.warn("[contacts] friend_accept fcm_failed", err);
+    title,
+    body: notifyBody,
+    sseType: "vlue-friend-accepted",
+    requestId: id,
+    actorName: accepterName
   });
 
   return c.json({

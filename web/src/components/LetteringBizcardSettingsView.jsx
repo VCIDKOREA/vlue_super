@@ -11,7 +11,8 @@ import {
   readLetteringBizcardEditable,
   readLetteringFixedIdentity,
   writeLetteringBizcardEditable,
-  normalizePhotoFocus
+  normalizePhotoFocus,
+  clearStaleAutoOmitFlags
 } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringBizcardTemplate } from "../lib/letteringBizcardTemplates.js";
 import {
@@ -130,6 +131,11 @@ export default function LetteringBizcardSettingsView({
       .toLowerCase()
       .replace(/^@/, "");
     const isCeo = handle === "ceo";
+    try {
+      clearStaleAutoOmitFlags();
+    } catch {
+      /* ignore */
+    }
     try {
       /* 로컬이 비어 있으면 full snapshot 복원 (재설치·웹뷰 시 유리) */
       if (needsDigitalCardLocalRestore()) {

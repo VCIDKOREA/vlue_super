@@ -16,7 +16,8 @@ const KEEP_DEVICE_KEYS = new Set([
   "vlue_app_lock_pin_v1",
   "vlue_app_lock_enabled_v1",
   "vlue_runtime_permissions_v1",
-  "vlue_device_avatar_scrub_brand_v5"
+  "vlue_device_avatar_scrub_brand_v5",
+  "vlue_push_welcome_dismissed_v1"
 ]);
 
 const EXTRA_ACCOUNT_KEYS = [
@@ -76,6 +77,8 @@ export function clearAccountScopedLocalStorage(opts = {}) {
       if (!k.startsWith("vlue_")) return;
       if (keepRemember && REMEMBER_KEYS.has(k)) return;
       if (KEEP_DEVICE_KEYS.has(k)) return;
+      /* 환영 알림 1회 확인/삭제 — 재로그인·재설치 후에도 유지 */
+      if (k.startsWith("vlue_push_welcome_dismissed_v1")) return;
       if (keepOnboarding && k === "vlue_onboarding_complete_v1") return;
       try {
         localStorage.removeItem(k);

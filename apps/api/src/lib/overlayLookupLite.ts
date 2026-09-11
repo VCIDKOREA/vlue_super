@@ -143,7 +143,13 @@ export async function loadExportPhotoUrlsByUserIds(
   const rows = await prisma.$queryRaw<Array<{ user_id: string; photo_url: string | null }>>`
     SELECT
       user_id::text AS user_id,
-      NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url
+      COALESCE(
+        NULLIF(TRIM(photo_url), ''),
+        NULLIF(TRIM(export_snapshot_json->>'photoUrl'), ''),
+        NULLIF(TRIM(export_snapshot_json->>'avatarUrl'), ''),
+        NULLIF(TRIM(export_snapshot_json->>'image_url'), ''),
+        NULLIF(TRIM(export_snapshot_json->>'imageUrl'), '')
+      ) AS photo_url
     FROM digital_cards
     WHERE user_id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})
   `;

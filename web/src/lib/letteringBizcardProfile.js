@@ -189,9 +189,12 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       title: isCeo ? titleDept.title : titleDept.title === "CEO" ? "" : titleDept.title,
       department: titleDept.department,
       titleDeptPending: titleDept.pending,
-      fax: ed.noFax ? "" : ed.fax,
+      fax: ed.noFax && !String(ed.fax || "").trim() ? "" : String(ed.fax || "").trim(),
       email: identity.email || "",
-      website: ed.noWebsite ? "" : identity.website || "",
+      website:
+        ed.noWebsite && !String(identity.website || ed.website || "").trim()
+          ? ""
+          : identity.website || String(ed.website || "").trim(),
       companyIntro: identity.companyIntro || "",
       customBackText: identity.customBackText || "",
       address: identity.address || "",
@@ -206,8 +209,13 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       photoUrl: ed.noProfilePhoto
         ? ""
         : String(ed.photoDataUrl || ed.photoUrl || readProfilePhotoAvatar() || "").trim(),
-      titlePhotoUrl: ed.noTitlePhoto ? "" : String(ed.titlePhotoDataUrl || ed.titlePhotoUrl || "").trim(),
-      noTitlePhoto: Boolean(ed.noTitlePhoto),
+      titlePhotoUrl:
+        ed.noTitlePhoto && !String(ed.titlePhotoDataUrl || ed.titlePhotoUrl || "").trim()
+          ? ""
+          : String(ed.titlePhotoDataUrl || ed.titlePhotoUrl || "").trim(),
+      noTitlePhoto:
+        Boolean(ed.noTitlePhoto) &&
+        !String(ed.titlePhotoDataUrl || ed.titlePhotoUrl || "").trim(),
       photoFocus: normalizePhotoFocus(ed.photoFocus),
       membershipTier,
       userId: userId || "",

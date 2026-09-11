@@ -436,6 +436,43 @@ export function readLetteringBizcardEditable() {
 }
 
 /**
+ * 예전에「빈 값 → 없음 자동 체크」버그로 켜진 noFax/noWebsite/noTitlePhoto 를
+ * 한 번 풀어 준다. (값이 있으면 플래그만 끄고, 빈 채 플래그만 true 인 것도 해제)
+ */
+export function clearStaleAutoOmitFlags() {
+  const KEY = "vlue_omit_flags_uncheck_v2";
+  try {
+    if (localStorage.getItem(KEY) === "1") return false;
+  } catch {
+    /* continue */
+  }
+  const ed = readLetteringBizcardEditable();
+  const patch = {};
+  if (Boolean(ed.noFax)) patch.noFax = false;
+  if (Boolean(ed.noWebsite)) patch.noWebsite = false;
+  if (Boolean(ed.noTitlePhoto) && !String(ed.titlePhotoDataUrl || ed.titlePhotoUrl || "").trim()) {
+    patch.noTitlePhoto = false;
+  }
+  if (Boolean(ed.noCompanyLogo) && !String(ed.logoDataUrl || ed.logoUrl || "").trim()) {
+    patch.noCompanyLogo = false;
+  }
+  if (Boolean(ed.noProfilePhoto) && !String(ed.photoDataUrl || ed.photoUrl || "").trim()) {
+    patch.noProfilePhoto = false;
+  }
+  let changed = false;
+  if (Object.keys(patch).length) {
+    writeLetteringBizcardEditable(patch);
+    changed = true;
+  }
+  try {
+    localStorage.setItem(KEY, "1");
+  } catch {
+    /* ignore */
+  }
+  return changed;
+}
+
+/**
  * @returns {{ ok: boolean, data: object, error?: string }}
  */
 export function writeLetteringBizcardEditable(patch = {}) {

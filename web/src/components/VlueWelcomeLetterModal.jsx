@@ -7,6 +7,7 @@ import {
   preloadLetterBgm,
   readLetterBgmMuted,
   readLetterBgmVolume,
+  resolveLetterSeasonFx,
   startLetterBgm,
   writeLetterBgmMuted,
   writeLetterBgmVolume
@@ -216,7 +217,7 @@ export default function VlueWelcomeLetterModal({
   const volumePct = Math.round(clampLetterBgmVolume(volume) * 100);
   const decor = letter?.decor && typeof letter.decor === "object" ? letter.decor : {};
   const paperTheme = String(decor.paperTheme || "cream-lined");
-  const seasonFx = String(decor.seasonFx || "autumn");
+  const seasonFx = resolveLetterSeasonFx(decor.seasonFx);
   const showLines = decor.showLines !== false;
   const fxOpacity = typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.32;
   const showSignature = decor.showSignature !== false;
@@ -225,6 +226,7 @@ export default function VlueWelcomeLetterModal({
     `vlue-letter-paper--${paperTheme}`,
     showLines ? "vlue-letter-paper--lined" : "vlue-letter-paper--nolines"
   ].join(" ");
+  const seasonParticleCount = seasonFx === "winter" || seasonFx === "summer" ? 10 : 7;
 
   return (
     <div className="vlue-letter-root" role="dialog" aria-modal="true" aria-labelledby="vlue-letter-title">
@@ -236,7 +238,7 @@ export default function VlueWelcomeLetterModal({
             style={{ ["--vlue-letter-fx-opacity"]: String(fxOpacity) }}
             aria-hidden
           >
-            {Array.from({ length: seasonFx === "winter" ? 10 : 7 }, (_, i) => (
+            {Array.from({ length: seasonParticleCount }, (_, i) => (
               <span key={i} className={`vlue-letter-season__particle vlue-letter-season__particle--${i + 1}`} />
             ))}
           </div>

@@ -166,6 +166,26 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
     })()
   };
 
+  /* 값이 복원됐으면 no* 플래그가 UI·동기화에서 가리지 않게 */
+  if (String(patch.fax || "").trim() || String(snap.fax || "").trim()) {
+    patch.noFax = false;
+  }
+  if (String(patch.website || "").trim() || String(snap.website || "").trim()) {
+    patch.noWebsite = false;
+  }
+  if (
+    String(patch.titlePhotoDataUrl || "").trim() ||
+    String(snap.titlePhotoUrl || "").trim()
+  ) {
+    patch.noTitlePhoto = false;
+  }
+  if (String(patch.photoDataUrl || "").trim() || String(snap.photoUrl || "").trim()) {
+    patch.noProfilePhoto = false;
+  }
+  if (String(patch.logoDataUrl || "").trim() || String(snap.logoUrl || "").trim()) {
+    patch.noCompanyLogo = false;
+  }
+
   const written = writeLetteringBizcardEditable(patch)?.data ?? null;
   if (written) {
     /* URL 이 복원됐으면 no* 플래그가 가리지 않게 */
@@ -178,6 +198,12 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
     }
     if (String(written.logoDataUrl || written.logoUrl || "").trim()) {
       fixFlags.noCompanyLogo = false;
+    }
+    if (String(written.fax || "").trim()) {
+      fixFlags.noFax = false;
+    }
+    if (String(written.website || "").trim()) {
+      fixFlags.noWebsite = false;
     }
     if (Object.keys(fixFlags).length) {
       writeLetteringBizcardEditable(fixFlags);
@@ -205,6 +231,19 @@ export function needsDigitalCardLocalRestore() {
     if (!email && !photo && !website && !address && !fax && !logo) return true;
     /* 멀티프로필 오삭제로 타이틀·프로필이 같이 지워진 경우 */
     if (!titlePhoto && Boolean(ed.noTitlePhoto) && !photo) return true;
+    /* emptyDccSnapshot 패턴: 타이틀+팩스+웹이 플래그로 같이 비움 */
+    if (
+      !titlePhoto &&
+      Boolean(ed.noTitlePhoto) &&
+      !fax &&
+      Boolean(ed.noFax) &&
+      !website &&
+      Boolean(ed.noWebsite)
+    ) {
+      return true;
+    }
+    /* 이메일은 있는데 타이틀만 noTitlePhoto 로 가려진 부분 삭제 */
+    if (email && !titlePhoto && Boolean(ed.noTitlePhoto)) return true;
     return false;
   } catch {
     return true;
@@ -253,6 +292,12 @@ export async function fillEmptyDigitalCardFieldsFromServer() {
  */
 export async function restoreDigitalCardFromServer(opts = {}) {
   const force = opts.force !== false;
+  try {
+    const { clearStaleAutoOmitFlags } = await import("./letteringBizcardStorage.js");
+    clearStaleAutoOmitFlags();
+  } catch {
+    /* ignore */
+  }
   const meta = await fetchDigitalCardMeta({ force: true, lite: false });
   if (meta?.exportSnapshot) {
     hydrateLetteringEditableFromSnapshot(meta.exportSnapshot, { force });
@@ -482,9 +527,50 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
   }
 
   /* 빈 로컬로 서버 타이틀/사진을 지우지 않음 — URL 이 있을 때만 no* 반영 */
-  const noTitlePhoto = Boolean(ed.noTitlePhoto) && !titlePhotoUrl;
+  let faxValue = String(card?.fax || ed.fax || "").trim();
+  let websiteValue = String(card?.website || ed.website || "").trim();
+  let noTitlePhoto = Boolean(ed.noTitlePhoto) && !titlePhotoUrl;
   const noProfilePhoto = Boolean(ed.noProfilePhoto) && !photoUrl;
   const noCompanyLogo = Boolean(ed.noCompanyLogo) && !logoUrl;
+  let noFax = Boolean(ed.noFax) && !faxValue;
+  let noWebsite = Boolean(ed.noWebsite) && !websiteValue;
+
+  /* 로컬이 오삭제 패턴(여러 no* + 빈 값)일 때만 서버 스냅으로 채움 — 의도적 단일 필드 삭제 보존 */
+  const looksPartialWipe =
+    (Boolean(ed.noTitlePhoto) && !titlePhotoUrl && Boolean(ed.noFax) && !faxValue) ||
+    (Boolean(ed.noTitlePhoto) && !titlePhotoUrl && Boolean(ed.noWebsite) && !websiteValue) ||
+    (Boolean(ed.noFax) && !faxValue && Boolean(ed.noWebsite) && !websiteValue && Boolean(ed.noTitlePhoto));
+  if (looksPartialWipe) {
+    try {
+      const meta = await fetchDigitalCardMeta({ force: true, lite: false });
+      const snap = meta?.exportSnapshot && typeof meta.exportSnapshot === "object" ? meta.exportSnapshot : {};
+      if (!faxValue) faxValue = String(snap.fax || "").trim();
+      if (!websiteValue) websiteValue = String(snap.website || "").trim();
+      if (!titlePhotoUrl) {
+        const fromSnap = String(snap.titlePhotoUrl || "").trim();
+        if (/^https?:\/\//i.test(fromSnap)) titlePhotoUrl = fromSnap;
+      }
+      if (faxValue) noFax = false;
+      if (websiteValue) noWebsite = false;
+      if (titlePhotoUrl) noTitlePhoto = false;
+      const heal = {};
+      if (faxValue) {
+        heal.fax = faxValue;
+        heal.noFax = false;
+      }
+      if (websiteValue) {
+        heal.website = websiteValue;
+        heal.noWebsite = false;
+      }
+      if (titlePhotoUrl) {
+        heal.titlePhotoDataUrl = titlePhotoUrl;
+        heal.noTitlePhoto = false;
+      }
+      if (Object.keys(heal).length) writeLetteringBizcardEditable(heal);
+    } catch {
+      /* ignore */
+    }
+  }
 
   /* OG/카톡: 타이틀사진이 있으면 대표 썸네일로 맞춤(옛 shareCover·시가 사진 잔존 방지).
    * 전용 카톡 배경(kakaoFeedBg)을 따로 올린 경우는 유지 */
@@ -536,10 +622,10 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
           department: card?.department || ed.department || "",
           phone: card?.phone || "",
           email: clampLetteringBizcardEmail(card?.email || ed.email || ""),
-          website: ed.noWebsite ? "" : String(card?.website || ed.website || "").trim(),
-          noWebsite: Boolean(ed.noWebsite),
-          fax: ed.noFax ? "" : String(card?.fax || ed.fax || "").trim(),
-          noFax: Boolean(ed.noFax),
+          website: noWebsite ? "" : websiteValue,
+          noWebsite,
+          fax: noFax ? "" : faxValue,
+          noFax,
           address,
           addressRoad: road || String(ed.addressRoad || "").trim(),
           addressDetail: detail || String(ed.addressDetail || "").trim(),
@@ -592,8 +678,8 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
         department: card?.department || ed.department || "",
         phone: card?.phone || "",
         email: clampLetteringBizcardEmail(card?.email || ed.email || ""),
-        website: ed.noWebsite ? "" : String(card?.website || ed.website || "").trim(),
-        fax: ed.noFax ? "" : String(card?.fax || ed.fax || "").trim(),
+        website: noWebsite ? "" : websiteValue,
+        fax: noFax ? "" : faxValue,
         address,
         companyIntro: String(ed.companyIntro || card?.companyIntro || "").trim(),
         customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
