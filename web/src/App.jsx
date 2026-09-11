@@ -113,7 +113,7 @@ import { readAvatar, readProfilePhotoAvatar } from "./lib/vlueAvatar.js";
 import { fetchActiveMarketingPopup, fetchLatestNotice } from "./lib/vlueOfficeApi.js";
 import MarketingPopupModal, { shouldShowMarketingPopup } from "./components/marketing/MarketingPopupModal.jsx";
 import VlueWelcomeLetterModal from "./components/VlueWelcomeLetterModal.jsx";
-import { fetchActiveDigitalLetter, shouldAutoOpenDigitalLetter } from "./lib/digitalLetter.js";
+import { fetchActiveDigitalLetter, shouldAutoOpenDigitalLetter, preloadLetterBgm } from "./lib/digitalLetter.js";
 import NoticeDetailSheet, { NoticeReleaseToast } from "./components/marketing/NoticeReleaseUI.jsx";
 import VmingUpgradePromptModal from "./components/vming/VmingUpgradePromptModal.jsx";
 import {
@@ -1640,6 +1640,7 @@ function App() {
         if (cancelled) return;
         const letter = letterData?.letter || null;
         setDigitalLetter(letter);
+        if (letter?.bgmUrl) preloadLetterBgm(letter.bgmUrl);
         if (letter && shouldAutoOpenDigitalLetter(letter)) {
           setDigitalLetterForceRead(true);
           setDigitalLetterOpen(true);
@@ -6140,6 +6141,7 @@ function App() {
         onOpenDigitalLetter={() => {
           setProfileOpen(false);
           if (digitalLetter) {
+            if (digitalLetter.bgmUrl) preloadLetterBgm(digitalLetter.bgmUrl);
             setDigitalLetterForceRead(false);
             setDigitalLetterOpen(true);
             return;
@@ -6149,6 +6151,7 @@ function App() {
               const letter = data?.letter || null;
               setDigitalLetter(letter);
               if (letter) {
+                if (letter.bgmUrl) preloadLetterBgm(letter.bgmUrl);
                 setDigitalLetterForceRead(false);
                 setDigitalLetterOpen(true);
               } else {

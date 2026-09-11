@@ -3,8 +3,11 @@ import { Music2, Volume2, VolumeX } from "lucide-react";
 import {
   acknowledgeDigitalLetter,
   clampLetterBgmVolume,
+  pauseLetterBgm,
+  preloadLetterBgm,
   readLetterBgmMuted,
   readLetterBgmVolume,
+  startLetterBgm,
   writeLetterBgmMuted,
   writeLetterBgmVolume
 } from "../lib/digitalLetter.js";
@@ -32,6 +35,12 @@ export default function VlueWelcomeLetterModal({
   const title = String(letter?.title || "").trim();
   const body = String(letter?.body || "").trim();
   const bgmUrl = String(letter?.bgmUrl || "").trim();
+
+  /* 편지 데이터만 있어도 BGM 미리 받아 두기 (모달 열리기 전) */
+  useEffect(() => {
+    if (!bgmUrl) return;
+    preloadLetterBgm(bgmUrl);
+  }, [bgmUrl]);
 
   useEffect(() => {
     if (!open) {
@@ -68,14 +77,19 @@ export default function VlueWelcomeLetterModal({
       return undefined;
     }
 
-    const audio = new Audio();
-    audio.preload = "auto";
+    const muted = readLetterBgmMuted();
+    const vol = readLetterBgmVolume(letter?.bgmVolume);
+    const wantPlay = !muted;
+
+    const audio = wantPlay
+      ? startLetterBgm(bgmUrl, vol)
+      : preloadLetterBgm(bgmUrl);
+    if (!audio) return undefined;
+
     audio.loop = true;
-    audio.src = bgmUrl;
-    audio.volume = bgmOn ? clampLetterBgmVolume(volume) : 0;
     audioRef.current = audio;
 
-    const restart = () => {
+    const onEnded = () => {
       try {
         audio.currentTime = 0;
         void audio.play().then(() => setBgmPlaying(true)).catch(() => setBgmPlaying(false));
@@ -83,19 +97,20 @@ export default function VlueWelcomeLetterModal({
         setBgmPlaying(false);
       }
     };
-
-    const onEnded = () => {
-      /* 일부 WebView에서 loop 미동작 → 수동 연속 재생 */
-      restart();
-    };
     const onPlay = () => setBgmPlaying(true);
     const onPause = () => setBgmPlaying(false);
+    const onCanPlay = () => {
+      if (!wantPlay || !audio.paused) return;
+      void audio.play().then(() => setBgmPlaying(true)).catch(() => setBgmPlaying(false));
+    };
 
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
+    audio.addEventListener("canplay", onCanPlay);
+    audio.addEventListener("loadeddata", onCanPlay);
 
-    if (bgmOn) {
+    if (wantPlay && audio.paused) {
       void audio.play().then(() => setBgmPlaying(true)).catch(() => setBgmPlaying(false));
     }
 
@@ -103,26 +118,26 @@ export default function VlueWelcomeLetterModal({
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("canplay", onCanPlay);
+      audio.removeEventListener("loadeddata", onCanPlay);
       try {
+        /* 캐시는 유지 — src 제거하지 않음 (재오픈 시 즉시 재생) */
         audio.pause();
-        audio.removeAttribute("src");
-        audio.load();
       } catch {
         /* ignore */
       }
       if (audioRef.current === audio) audioRef.current = null;
       setBgmPlaying(false);
     };
-    // volume/bgmOn은 별도 effect에서 반영 (재생 끊김 방지)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, bgmUrl, letter?.id]);
+  }, [open, bgmUrl, letter?.id, letter?.bgmVolume]);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const audio = audioRef.current || (bgmUrl ? preloadLetterBgm(bgmUrl) : null);
+    if (!audio || !open) return;
     const vol = clampLetterBgmVolume(volume);
     try {
       audio.volume = bgmOn ? vol : 0;
+      audio.muted = !bgmOn || vol <= 0;
       if (bgmOn && audio.paused) {
         void audio.play().then(() => setBgmPlaying(true)).catch(() => setBgmPlaying(false));
       } else if (!bgmOn && !audio.paused) {
@@ -131,17 +146,16 @@ export default function VlueWelcomeLetterModal({
     } catch {
       /* ignore */
     }
-  }, [volume, bgmOn, open]);
+  }, [volume, bgmOn, open, bgmUrl]);
 
   /* 앱 백그라운드·홈 이탈 시 BGM 중지 (WebView에서 백그라운드 재생 방지) */
   useEffect(() => {
     if (!open) return undefined;
 
-    const pauseLetterBgm = () => {
+    const pauseNow = () => {
       try {
-        const audio = audioRef.current;
-        if (!audio) return;
-        audio.pause();
+        if (bgmUrl) pauseLetterBgm(bgmUrl);
+        else audioRef.current?.pause();
       } catch {
         /* ignore */
       }
@@ -149,20 +163,20 @@ export default function VlueWelcomeLetterModal({
     };
 
     const onVisibility = () => {
-      if (document.visibilityState === "hidden") pauseLetterBgm();
+      if (document.visibilityState === "hidden") pauseNow();
     };
 
     document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("vlue-app-background", pauseLetterBgm);
-    window.addEventListener("pagehide", pauseLetterBgm);
-    window.addEventListener("vlue-letter-bgm-pause", pauseLetterBgm);
+    window.addEventListener("vlue-app-background", pauseNow);
+    window.addEventListener("pagehide", pauseNow);
+    window.addEventListener("vlue-letter-bgm-pause", pauseNow);
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("vlue-app-background", pauseLetterBgm);
-      window.removeEventListener("pagehide", pauseLetterBgm);
-      window.removeEventListener("vlue-letter-bgm-pause", pauseLetterBgm);
+      window.removeEventListener("vlue-app-background", pauseNow);
+      window.removeEventListener("pagehide", pauseNow);
+      window.removeEventListener("vlue-letter-bgm-pause", pauseNow);
     };
-  }, [open]);
+  }, [open, bgmUrl]);
 
   if (!open || !letter) return null;
 
