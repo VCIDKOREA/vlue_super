@@ -168,6 +168,20 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
 
   const written = writeLetteringBizcardEditable(patch)?.data ?? null;
   if (written) {
+    /* URL 이 복원됐으면 no* 플래그가 가리지 않게 */
+    const fixFlags = {};
+    if (String(written.titlePhotoDataUrl || written.titlePhotoUrl || "").trim()) {
+      fixFlags.noTitlePhoto = false;
+    }
+    if (String(written.photoDataUrl || written.photoUrl || "").trim()) {
+      fixFlags.noProfilePhoto = false;
+    }
+    if (String(written.logoDataUrl || written.logoUrl || "").trim()) {
+      fixFlags.noCompanyLogo = false;
+    }
+    if (Object.keys(fixFlags).length) {
+      writeLetteringBizcardEditable(fixFlags);
+    }
     writeCardFields({
       email: String(written.email || "").trim(),
       fax: String(written.fax || "").trim()
@@ -176,18 +190,22 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
   return written;
 }
 
-/** 로컬 명함 편집값이 비어 재설치·캐시 유실로 보이는지 */
+/** 로컬 명함 편집값이 비어 재설치·캐시 유실·멀티프로필 오삭제 로 보이는지 */
 export function needsDigitalCardLocalRestore() {
   try {
     const ed = readLetteringBizcardEditable();
     const email = String(ed.email || "").trim();
     const photo = String(ed.photoDataUrl || ed.photoUrl || "").trim();
+    const titlePhoto = String(ed.titlePhotoDataUrl || ed.titlePhotoUrl || "").trim();
     const website = String(ed.website || "").trim();
     const address = String(ed.address || ed.addressRoad || "").trim();
     const fax = String(ed.fax || "").trim();
     const logo = String(ed.logoDataUrl || ed.logoUrl || "").trim();
-    /* 재설치 직후: 연락 필드·로고·사진이 비면 서버 full 복원 */
-    return !email && !photo && !website && !address && !fax && !logo;
+    /* 재설치·오삭제: 연락/미디어가 비면 서버 full 복원 */
+    if (!email && !photo && !website && !address && !fax && !logo) return true;
+    /* 멀티프로필 오삭제로 타이틀·프로필이 같이 지워진 경우 */
+    if (!titlePhoto && Boolean(ed.noTitlePhoto) && !photo) return true;
+    return false;
   } catch {
     return true;
   }
@@ -396,6 +414,20 @@ export async function syncDigitalCardDesignTemplate(templateId) {
 
 /** OG 썸네일·서버 렌더·재로그인 복원용 명함 스냅샷 동기화 */
 export async function syncDigitalCardExportSnapshot(card, opts = {}) {
+  /* 멀티프로필 오삭제로 로컬이 비었으면 서버로 덮어쓰지 말고 먼저 복원 */
+  try {
+    const ed0 = readLetteringBizcardEditable();
+    const looksWiped =
+      !String(ed0.email || "").trim() &&
+      !String(ed0.titlePhotoDataUrl || ed0.titlePhotoUrl || "").trim() &&
+      Boolean(ed0.noTitlePhoto);
+    if (looksWiped || needsDigitalCardLocalRestore()) {
+      await restoreDigitalCardFromServer({ force: true });
+    }
+  } catch {
+    /* continue sync with whatever local has */
+  }
+
   const ed = readLetteringBizcardEditable();
   const { road, detail } = readLetteringBizcardAddressFields(ed);
   const address =
@@ -449,6 +481,11 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
       pickHttp(card?.shareCoverUrl, ed.kakaoFeedBgDataUrl, ed.kakaoFeedBgUrl);
   }
 
+  /* 빈 로컬로 서버 타이틀/사진을 지우지 않음 — URL 이 있을 때만 no* 반영 */
+  const noTitlePhoto = Boolean(ed.noTitlePhoto) && !titlePhotoUrl;
+  const noProfilePhoto = Boolean(ed.noProfilePhoto) && !photoUrl;
+  const noCompanyLogo = Boolean(ed.noCompanyLogo) && !logoUrl;
+
   /* OG/카톡: 타이틀사진이 있으면 대표 썸네일로 맞춤(옛 shareCover·시가 사진 잔존 방지).
    * 전용 카톡 배경(kakaoFeedBg)을 따로 올린 경우는 유지 */
   const dedicatedKakaoCover = String(ed.kakaoFeedBgDataUrl || ed.kakaoFeedBgUrl || "").trim();
@@ -456,9 +493,9 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
     Boolean(dedicatedKakaoCover) &&
     /^https?:\/\//i.test(dedicatedKakaoCover) &&
     dedicatedKakaoCover !== titlePhotoUrl;
-  if (titlePhotoUrl && !ed.noTitlePhoto && !hasDedicatedKakaoCover) {
+  if (titlePhotoUrl && !noTitlePhoto && !hasDedicatedKakaoCover) {
     shareCoverUrl = titlePhotoUrl;
-  } else if (!shareCoverUrl && titlePhotoUrl && !ed.noTitlePhoto) {
+  } else if (!shareCoverUrl && titlePhotoUrl && !noTitlePhoto) {
     shareCoverUrl = titlePhotoUrl;
   }
 
@@ -508,13 +545,13 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
           addressDetail: detail || String(ed.addressDetail || "").trim(),
           companyIntro: String(ed.companyIntro || card?.companyIntro || "").trim(),
           customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
-          logoUrl: ed.noCompanyLogo ? "" : logoUrl,
-          photoUrl: ed.noProfilePhoto ? "" : photoUrl,
-          titlePhotoUrl: ed.noTitlePhoto ? "" : titlePhotoUrl,
+          logoUrl: noCompanyLogo ? "" : logoUrl,
+          photoUrl: noProfilePhoto ? "" : photoUrl,
+          titlePhotoUrl: noTitlePhoto ? "" : titlePhotoUrl,
           photoFocus: normalizePhotoFocus(card?.photoFocus || ed.photoFocus),
-          noCompanyLogo: Boolean(ed.noCompanyLogo),
-          noProfilePhoto: Boolean(ed.noProfilePhoto),
-          noTitlePhoto: Boolean(ed.noTitlePhoto),
+          noCompanyLogo,
+          noProfilePhoto,
+          noTitlePhoto,
           shareCoverUrl,
           designTemplate: normalizeLetteringBizcardTemplate(card?.designTemplate || ed.designTemplate),
           activityName: String(card?.activityName || readFeedNickname() || "").trim(),
@@ -560,9 +597,9 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
         address,
         companyIntro: String(ed.companyIntro || card?.companyIntro || "").trim(),
         customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
-        logoUrl: ed.noCompanyLogo ? "" : logoUrl,
-        photoUrl: ed.noProfilePhoto ? "" : photoUrl,
-        titlePhotoUrl: ed.noTitlePhoto ? "" : titlePhotoUrl,
+        logoUrl: noCompanyLogo ? "" : logoUrl,
+        photoUrl: noProfilePhoto ? "" : photoUrl,
+        titlePhotoUrl: noTitlePhoto ? "" : titlePhotoUrl,
         photoFocus: normalizePhotoFocus(card?.photoFocus || ed.photoFocus),
         accountType: String(card?.accountType || ed.accountType || "").trim(),
         bankName: String(card?.bankName || ed.bankName || "").trim(),
@@ -589,7 +626,13 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
           /* ignore */
         }
       }
-      if (agentId) {
+      /* 로컬이 비어 보이는 상태에서는 프로필 번들에 빈 스냅을 쓰지 않음 */
+      const snapHasContent =
+        Boolean(String(snap.email || "").trim()) ||
+        Boolean(String(snap.photoUrl || "").trim()) ||
+        Boolean(String(snap.titlePhotoUrl || "").trim()) ||
+        Boolean(String(snap.organization || "").trim());
+      if (agentId && snapHasContent) {
         await putDccProfileBundle(agentId, { dcc: snap });
       }
     } catch {

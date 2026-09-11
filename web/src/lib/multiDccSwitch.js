@@ -56,9 +56,37 @@ function emptyDccSnapshot(sharedName) {
   };
 }
 
+function bundleHasDcc(bundle) {
+  const dcc = bundle?.dcc;
+  if (!dcc || typeof dcc !== "object") return false;
+  return Object.keys(dcc).some((k) => {
+    const v = dcc[k];
+    if (v == null) return false;
+    if (typeof v === "string") return Boolean(v.trim());
+    if (typeof v === "boolean") return true;
+    return true;
+  });
+}
+
+async function restoreMasterDigitalCardLocally() {
+  try {
+    const { restoreDigitalCardFromServer } = await import("./digitalCardApi.js");
+    await restoreDigitalCardFromServer({ force: true });
+  } catch {
+    /* ignore */
+  }
+  try {
+    const { hydrateShowcaseStyleFromServer } = await import("./showcase/showcaseStyleSync.js");
+    await hydrateShowcaseStyleFromServer({ forceServer: true });
+  } catch {
+    /* optional */
+  }
+}
+
 /**
  * 멀티 프로필 전환 — 전화·이름만 유지, DCC·쇼케이스·BGM·상호·계좌 등은 프로필 번들로 교체.
- * 빈 프로필이면 로컬을 깨끗이 비운다.
+ * forceClean=true 일 때만 로컬을 비운다 (새 프로필 생성).
+ * 대표/기존 프로필에 번들이 비면 마스터 디지털명함에서 복원한다 (절대 지우지 않음).
  */
 export async function switchToMultiDccProfile(profile, opts = {}) {
   if (!profile?.id) return null;
@@ -81,11 +109,13 @@ export async function switchToMultiDccProfile(profile, opts = {}) {
 
   const fixed = readLetteringFixedIdentity();
   const sharedName = String(fixed.name || profile.displayName || "").trim();
-  const forceClean =
-    Boolean(opts.forceClean) ||
-    (!profile.hasDcc && !profile.hasShowcase) ||
-    !bundle?.dcc ||
-    (bundle.dcc && typeof bundle.dcc === "object" && Object.keys(bundle.dcc).length === 0);
+  /* 새 프로필 생성에서만 명시적으로 비움 — 빈 번들만으로 대표 계정을 지우지 않음 */
+  const forceClean = Boolean(opts.forceClean);
+  const hasDcc = bundleHasDcc(bundle) || Boolean(profile.hasDcc);
+  const hasShowcase =
+    showcaseStyleHasContent(bundle?.showcase?.editor) ||
+    showcaseStyleHasContent(bundle?.showcase?.live) ||
+    Boolean(profile.hasShowcase);
 
   if (forceClean) {
     applyDccAgentBundleToLocalCard(
@@ -96,6 +126,21 @@ export async function switchToMultiDccProfile(profile, opts = {}) {
     const empty = createDefaultShowcaseStyle();
     writeShowcaseStyle(empty, { replace: true, skipSync: true });
     writeLiveShowcaseStyle(empty, { source: "editor", skipSync: true });
+  } else if (!hasDcc && !hasShowcase) {
+    if (profile.isRepresentative) {
+      /* 대표 계정 스냅샷이 비어 있으면 마스터에서 복원 — 로컬 타이틀/사진을 절대 비우지 않음 */
+      await restoreMasterDigitalCardLocally();
+    } else {
+      /* 아직 내용 없는 추가 프로필로 전환 */
+      applyDccAgentBundleToLocalCard(
+        { ...profile, title: "", department: "", photoUrl: null },
+        { dcc: emptyDccSnapshot(sharedName), showcase: { editor: null, live: null } },
+        { replaceAccount: true }
+      );
+      const empty = createDefaultShowcaseStyle();
+      writeShowcaseStyle(empty, { replace: true, skipSync: true });
+      writeLiveShowcaseStyle(empty, { source: "editor", skipSync: true });
+    }
   } else {
     applyDccAgentBundleToLocalCard(profile, bundle, { replaceAccount: true });
     const editor = bundle?.showcase?.editor || bundle?.showcase?.live || null;
@@ -104,6 +149,8 @@ export async function switchToMultiDccProfile(profile, opts = {}) {
       writeShowcaseStyle(editor || live, { replace: true, skipSync: true });
       writeLiveShowcaseStyle(live || editor, { source: "editor", skipSync: true });
       if (bundle?.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
+    } else if (profile.isRepresentative) {
+      await restoreMasterDigitalCardLocally();
     } else {
       const empty = createDefaultShowcaseStyle();
       writeShowcaseStyle(empty, { replace: true, skipSync: true });
@@ -115,7 +162,7 @@ export async function switchToMultiDccProfile(profile, opts = {}) {
     writeSelectedDccLineId(lineId);
     try {
       const lineBundle = await fetchDccLineBundle(lineId);
-      if (!forceClean) {
+      if (!forceClean && (hasDcc || hasShowcase || profile.isRepresentative)) {
         writeDccLinePreviewFromBundle(lineBundle, { replaceMedia: true });
       }
     } catch {
@@ -169,7 +216,7 @@ export async function createCleanMultiDccProfileAndSwitch(opts = {}) {
   }
 
   await switchToMultiDccProfile(
-    { ...profile, hasDcc: false, hasShowcase: false },
+    { ...profile, hasDcc: false, hasShowcase: false, isRepresentative: false },
     { ...opts, forceClean: true }
   );
   return profile;

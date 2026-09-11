@@ -872,10 +872,22 @@ export default function LetteringBizcardSettingsView({
       emailChanged ? { emailVerifyToken } : {}
     );
     if (!syncResult?.ok) {
+      let restored = false;
+      try {
+        if (needsDigitalCardLocalRestore()) {
+          await restoreDigitalCardFromServer({ force: true });
+          restored = true;
+          reload();
+        }
+      } catch {
+        /* ignore */
+      }
       showToast(
-        syncResult?.error
-          ? `기기에 저장되었습니다. 서버 동기화 실패: ${syncResult.error}`
-          : "기기에 저장되었습니다. 서버 동기화에 실패했습니다. 네트워크 확인 후 다시 전체적용해 주세요."
+        restored
+          ? "로컬 명함이 비어 서버에서 복원했습니다. 내용을 확인한 뒤 다시 전체적용해 주세요."
+          : syncResult?.error
+            ? `기기에 저장되었습니다. 서버 동기화 실패: ${syncResult.error}`
+            : "기기에 저장되었습니다. 서버 동기화에 실패했습니다. 네트워크 확인 후 다시 전체적용해 주세요."
       );
       setPreviewTick((n) => n + 1);
       onApplied?.();

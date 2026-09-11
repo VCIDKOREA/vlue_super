@@ -604,11 +604,11 @@ export async function setRepresentativeDccProfile(userId: string, id: string): P
       data: { isActive: false }
     });
   });
-  /* 이름·전화 검색 노출은 대표 프로필 쇼케이스·사진을 따름 */
+  /* 이름·전화 검색 노출은 대표 프로필 쇼케이스·사진을 따름 — 빈 프로필로 마스터를 덮지 않음 */
   try {
     const dcc = snapObj(target.dccSnapshotJson);
     const live = target.showcaseLiveStyleJson || target.showcaseStyleJson;
-    if (live != null) {
+    if (live != null && showcaseHasContent(live)) {
       await prisma.user.update({
         where: { id: userId },
         data: {
@@ -617,14 +617,14 @@ export async function setRepresentativeDccProfile(userId: string, id: string): P
         }
       });
     }
-    if (target.photoUrl || Object.keys(dcc).length) {
+    const titlePhoto = text(dcc.titlePhotoUrl, 1024);
+    const org = text(dcc.organization || dcc.companyName, 200);
+    if (target.photoUrl || titlePhoto || org || target.title || target.department) {
       await prisma.digitalCard.updateMany({
         where: { userId },
         data: {
           ...(target.photoUrl ? { photoUrl: target.photoUrl } : {}),
-          ...(text(dcc.organization || dcc.companyName, 200)
-            ? { organization: text(dcc.organization || dcc.companyName, 200) }
-            : {}),
+          ...(org ? { organization: org } : {}),
           ...(target.title ? { titleSnapshot: target.title } : {}),
           ...(target.department ? { departmentSnapshot: target.department } : {})
         }
