@@ -268,7 +268,7 @@ export async function listDigitalLetters(limit = 20) {
     `,
     Math.min(50, Math.max(1, limit))
   );
-  return rows.map(mapRow);
+  return rows.map((row) => mapRow(row));
 }
 
 export async function upsertDigitalLetter(input: {
