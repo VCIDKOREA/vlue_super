@@ -19,13 +19,13 @@ object CallUiPhasePolicy {
         /** 인증 회원 · 송출 OFF 중앙 팝업 */
         CENTER_AUTH_POPUP,
 
-        /** 송출 ON + 실콘텐츠 풀 쇼케이스 */
+        /** 송출 ON + 실콘텐츠 풀 쇼케이스 (또는 미인증 신고 패널) */
         FULL_SHOWCASE,
 
         /** 팝업 확인 후 / 사용자 Mini */
         MINI_CASE,
 
-        /** 수화했지만 빈 FULLSCREEN 금지 — 바 유지 */
+        /** 수화했지만 조회 중·빈 경로 — 바 유지, 빈 FULLSCREEN 금지 */
         KEEP_BIG_PUSH
     }
 
@@ -34,7 +34,9 @@ object CallUiPhasePolicy {
         val isContactSafeCare: Boolean,
         val isAuthMemberOnly: Boolean,
         val hasBroadcastShowcaseContent: Boolean,
-        val canPromoteContactSafeCare: Boolean
+        val canPromoteContactSafeCare: Boolean,
+        /** 조회 완료 · 비회원 · 미인증 신고 패널 대상 */
+        val isUnverifiedResolved: Boolean = false
     )
 
     /**
@@ -68,6 +70,7 @@ object CallUiPhasePolicy {
         if (input.isAuthMemberOnly) return Phase.CENTER_AUTH_POPUP
         if (input.hasBroadcastShowcaseContent) return Phase.FULL_SHOWCASE
         if (input.canPromoteContactSafeCare) return Phase.CENTER_SAFE_POPUP
+        if (input.isUnverifiedResolved) return Phase.FULL_SHOWCASE
         return Phase.KEEP_BIG_PUSH
     }
 }

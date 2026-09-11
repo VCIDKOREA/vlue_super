@@ -624,7 +624,9 @@ export default function LetteringIncomingNotification({
   const expandFromMiniGuardUntilRef = useRef(0);
   const canRestoreFromMiniCase = useMemo(() => {
     if (isLookupPending) return false;
-    if (isContactSafeCare || isDcp || isExpiredLine || isUnverified) return false;
+    if (isContactSafeCare || isDcp || isExpiredLine) return false;
+    /* 미인증 신고 패널도 Mini→풀 복원 허용 */
+    if (isUnverified) return true;
     /*
      * 버튼 제거 후 탭 게이트 경로: 이 통화에서 풀 쇼케이스를 본 뒤에는
      * provisional showcaseOffPreview 가 다시 true 여도 복원 허용.

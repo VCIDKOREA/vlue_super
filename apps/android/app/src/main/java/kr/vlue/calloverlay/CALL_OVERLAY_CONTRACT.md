@@ -44,9 +44,13 @@ Decision order (first match wins):
 2. `profileKind == contact_safe_care` → `CENTER_SAFE_POPUP`
 3. Auth-member-only (verified + no public DCC/showcase) → `CENTER_AUTH_POPUP`
 4. Broadcast ON **and** real DCC/showcase content → `FULL_SHOWCASE`
-5. Else (pending lookup, unknown, empty, unverified without contact promote) → `KEEP_BIG_PUSH`
+5. Resolved unverified (lookup done, `matched:false`, not pending, not safe-care, no device-contact promote) → `FULL_SHOWCASE` (**미인증 신고 패널**)
+6. Else (pending lookup / blank) → `KEEP_BIG_PUSH`
 
 Contact promote: if lookup pending/blank **and** device contact name exists → treat as Safe Care (`CENTER_SAFE_POPUP`).
+
+**BigPush bar tap (after answer):** same decision table. Resolved unverified must open 미인증 fullscreen (not `BIG_PUSH_TAP_KEEP`).  
+**BigPush bar tap while outgoing dialing:** still Ignore for popup/auth — **except** resolved unverified may open 미인증 report fullscreen (useful while waiting for answer).
 
 ---
 
@@ -56,8 +60,9 @@ Contact promote: if lookup pending/blank **and** device contact name exists → 
 - Center popups are separate overlay windows; attach popup **before** tearing down BigPush chrome when possible
 - Safe Care / auth-only: **never** leave a blank dark `FULLSCREEN` Showcase
 - Web host must not `setExpanded(true)` or `notifyVlueAuthMemberReady` for `contact_safe_care`
-- **Hard gate:** `commitFullscreenLayout` / `enterShowcaseLayout` / `restoreShowcase` require `VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent` — otherwise `refuseEmptyFullscreen` → popup or compact BigPush (releases touch blockade)
-- Web: connected + no expand content → `lettering-overlay-host--bar-only` (transparent host, not `#070b14` full bleed)
+- **Hard gate:** `commitFullscreenLayout` / `enterShowcaseLayout` / `restoreShowcase` require `hasBroadcastShowcaseContent` **or** resolved unverified (`isUnverifiedResolved`) — otherwise `refuseEmptyFullscreen` → popup or compact BigPush (releases touch blockade)
+- Web: connected + no expand content → `lettering-overlay-host--bar-only` (transparent host, not `#070b14` full bleed) — **exception:** resolved unverified may expand to 미인증 panel
+- Native unmatched after API confirm: inject `profileKind=unverified` (do not leave `lookup_pending` forever)
 
 ---
 
@@ -77,8 +82,9 @@ Do not add parallel “open showcase” / “open popup” helpers that skip thi
 ## 6. Regression checklist (manual)
 
 - [ ] Outgoing to address-book non-member: dialing → BigPush only; answer → Safe Care popup; Confirm → Mini
-- [ ] Outgoing still “거는 중”: no center popup
-- [ ] Answered empty/unknown: BigPush remains — no blank dark case
+- [ ] Outgoing still “거는 중”: no center popup (auth/safe-care)
+- [ ] Outgoing unknown (not in contacts): lookup done → 미인증 BigPush; tap or answer → 미인증 fullscreen report panel
+- [ ] Answered pending lookup: BigPush remains until resolve — no blank dark case
 - [ ] BigPush not covered by status bar clock/battery
 - [ ] Auth member broadcast OFF: center auth popup, not empty Showcase
 - [ ] Auth member broadcast ON + content: full Showcase

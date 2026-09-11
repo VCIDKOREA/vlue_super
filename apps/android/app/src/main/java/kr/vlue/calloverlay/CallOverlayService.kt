@@ -1059,6 +1059,12 @@ class CallOverlayService : Service() {
                 (pendingLookup || !verified)
         val hasBroadcastContent =
             VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(pendingCardJson)
+        val unverifiedResolved =
+            !pendingLookup &&
+                !safeCare &&
+                !verified &&
+                !authOnly &&
+                VlueAuthMemberPopupPolicy.isUnverifiedResolved(pendingCardJson)
 
         val phase =
             CallUiPhasePolicy.decideAfterAnswer(
@@ -1067,12 +1073,13 @@ class CallOverlayService : Service() {
                     isContactSafeCare = safeCare,
                     isAuthMemberOnly = authOnly,
                     hasBroadcastShowcaseContent = hasBroadcastContent,
-                    canPromoteContactSafeCare = canPromote
+                    canPromoteContactSafeCare = canPromote,
+                    isUnverifiedResolved = unverifiedResolved
                 )
             )
         VlueBigPushTrace.lifecycle(
             "CALL_UI_PHASE",
-            "source=$source phase=${phase.name} verified=$verified pending=$pendingLookup"
+            "source=$source phase=${phase.name} verified=$verified pending=$pendingLookup unverified=$unverifiedResolved"
         )
 
         when (phase) {
@@ -1375,7 +1382,9 @@ class CallOverlayService : Service() {
         if (isContactSafeCare(pendingCardJson)) return false
         val verified = pendingVerified || parseIsVerified(pendingCardJson)
         if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified)) return false
-        return VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(pendingCardJson)
+        if (VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(pendingCardJson)) return true
+        /* 미인증 신고 패널 — 빈 다크 케이스가 아님 */
+        return VlueAuthMemberPopupPolicy.isUnverifiedResolved(pendingCardJson)
     }
 
     /**
@@ -1599,8 +1608,11 @@ class CallOverlayService : Service() {
     /** BigPush 아무 곳 탭 → Showcase FULLSCREEN (텔레콤 Answer 와 무관, UI만) */
     private fun openShowcaseFromBigPushTap() {
         if (dismissing) return
-        /* 발신 「거는 중」— 탭으로 안심/정상 팝업·풀쇼케이스 금지 */
-        if (currentOutgoing && !remoteConnected) {
+        val unverified =
+            VlueAuthMemberPopupPolicy.isUnverifiedResolved(pendingCardJson)
+        /* 발신 「거는 중」— 안심/정상 팝업·회원 풀쇼케이스 금지.
+         * 미인증 확정 후에는 신고 패널 펼침 허용 (탭 무반응 해소). */
+        if (currentOutgoing && !remoteConnected && !unverified) {
             VlueBigPushTrace.lifecycle(
                 "BIG_PUSH_TAP_HOLD_DIALING",
                 "outgoing dialing — keep BigPush only"
@@ -1620,7 +1632,10 @@ class CallOverlayService : Service() {
             return
         }
         CompanionRuntimeStabilityDiag.mark("BIG_PUSH_BAR_TAP", "openShowcase")
-        VlueBigPushTrace.lifecycle("BIG_PUSH_BAR_TAP", "open Showcase from bar tap")
+        VlueBigPushTrace.lifecycle(
+            "BIG_PUSH_BAR_TAP",
+            "open Showcase from bar tap unverified=$unverified"
+        )
         enterShowcaseFromAnswer(source = "bigPush_bar_tap")
     }
 

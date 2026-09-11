@@ -126,4 +126,19 @@ class VlueAuthMemberPopupPolicyTest {
             """{"profileKind":"contact_safe_care","displayName":"김진현","matched":false}"""
         assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
     }
+
+    @Test
+    fun unverifiedResolved_isDetected() {
+        val json =
+            """{"matched":false,"is_verified":false,"source":"unmatched","profileKind":"unverified","phoneE164":"+821012345678"}"""
+        assertTrue(VlueAuthMemberPopupPolicy.isUnverifiedResolved(json))
+        assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+    }
+
+    @Test
+    fun lookupPending_isNotUnverifiedResolved() {
+        val json =
+            """{"matched":false,"is_verified":false,"profileKind":"lookup_pending"}"""
+        assertFalse(VlueAuthMemberPopupPolicy.isUnverifiedResolved(json))
+    }
 }

@@ -82,6 +82,29 @@ object VlueAuthMemberPopupPolicy {
         return hasPublicDccOrShowcase(root, card)
     }
 
+    /**
+     * 조회 완료 · VLUÉ 비회원 · 미인증 신고 패널 대상.
+     * lookup_pending / 안심케어 / 인증 회원은 false.
+     */
+    fun isUnverifiedResolved(cardJson: String?): Boolean {
+        if (cardJson.isNullOrBlank()) return false
+        val root = parse(cardJson) ?: return false
+        val card = root.optJSONObject("card") ?: root
+        val profileKind =
+            firstNonBlank(root.optString("profileKind"), card.optString("profileKind")).orEmpty()
+        if (profileKind == "lookup_pending") return false
+        if (profileKind == ContactSafeCarePayload.PROFILE_KIND) return false
+        if (profileKind == "expired_line") return false
+        if (profileKind == "national_agency" || profileKind == "gov_agency") return false
+        if (root.optBoolean("dcpAgency", false) || card.optBoolean("dcpAgency", false)) return false
+        if (jsonVerified(cardJson)) return false
+        if (root.optBoolean("matched", false)) return false
+        /* profileKind=unverified 또는 matched:false 확정 */
+        if (profileKind == "unverified") return true
+        val source = firstNonBlank(root.optString("source"), card.optString("source")).orEmpty()
+        return source == "unmatched" || profileKind.isEmpty()
+    }
+
     private fun hasPublicDccOrShowcase(root: JSONObject, card: JSONObject): Boolean {
         val style =
             when {

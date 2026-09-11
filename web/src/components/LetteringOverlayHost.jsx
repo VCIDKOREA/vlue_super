@@ -249,8 +249,23 @@ function buildUnverifiedOverlayCard(phone) {
     phone: String(phone || "").trim(),
     membershipTier: "free",
     verificationItems: [],
-    profileKind: ""
+    profileKind: "unverified",
+    matched: false,
+    source: "unmatched"
   };
+}
+
+/** 조회 완료 미인증 — 풀 미인증 패널 허용 (빈 DCC 게이트 예외) */
+function isResolvedUnverifiedOverlayCard(card, verifiedFlag) {
+  if (verifiedFlag) return false;
+  if (!card || typeof card !== "object") return false;
+  const kind = String(card.profileKind || "").trim();
+  if (kind === "lookup_pending" || kind === "contact_safe_care") return false;
+  if (kind === "expired_line" || kind === "national_agency" || kind === "gov_agency") return false;
+  if (card.matched === true) return false;
+  if (kind === "unverified") return true;
+  if (String(card.source || "").trim() === "unmatched") return true;
+  return kind === "" && card.matched === false;
 }
 
 function overlayCardHasOrg(card) {
@@ -692,8 +707,21 @@ function LetteringOverlayHostInner() {
             return;
           }
           /*
-           * 네이티브 unmatched 를 즉시 미인증으로 그리면 by-number 전에
-           * 「VLUÉ Showcase」앰버가 고정된다. pending 유지.
+           * 네이티브가 미인증 확정(profileKind=unverified / source=unmatched)하면
+           * pending 으로 되돌리지 않고 미인증 바·패널을 연다.
+           * by-number 가 나중에 회원 매칭하면 matchedRef 로 승격.
+           */
+          if (
+            String(detail.profileKind || "") === "unverified" ||
+            String(detail.source || "") === "unmatched"
+          ) {
+            setCard(buildUnverifiedOverlayCard(phone));
+            setVerified(false);
+            setLoading(false);
+            return;
+          }
+          /*
+           * 그 외 matched:false — by-number 대기 (회원 앰버 깜빡임 방지)
            */
           setCard({
             ...buildUnverifiedOverlayCard(phone),
@@ -1121,8 +1149,9 @@ function LetteringOverlayHostInner() {
               liveCard?.showcaseStyle || showcaseStyleRef.current;
             const canOpenFull =
               !isSafeCare &&
-              peerShowcaseBroadcastOn(liveStyle) &&
-              peerHasDccOrShowcaseContent(liveCard, liveStyle);
+              (isResolvedUnverifiedOverlayCard(liveCard, false) ||
+                (peerShowcaseBroadcastOn(liveStyle) &&
+                  peerHasDccOrShowcaseContent(liveCard, liveStyle)));
             if (!canOpenFull) {
               autoExpandedOnceRef.current = false;
               userChoseMiniRef.current = true;
@@ -1151,8 +1180,10 @@ function LetteringOverlayHostInner() {
               styledCardRef.current?.showcaseStyle || showcaseStyleRef.current;
             const alreadyExpandedByNative =
               autoExpandedOnceRef.current || Date.now() < restoreHoldUntilRef.current;
+            const unverifiedOk = isResolvedUnverifiedOverlayCard(styledCardRef.current, false);
             if (
               !alreadyExpandedByNative &&
+              !unverifiedOk &&
               (!peerShowcaseBroadcastOn(liveStyle) ||
                 !peerHasDccOrShowcaseContent(styledCardRef.current, liveStyle))
             ) {
@@ -1274,8 +1305,10 @@ function LetteringOverlayHostInner() {
       if (expanded) setExpanded(false);
       return;
     }
+    const unverifiedOk = isResolvedUnverifiedOverlayCard(styledCard, verified);
     if (
       expanded &&
+      !unverifiedOk &&
       (!peerShowcaseBroadcastOn(style) || !peerHasDccOrShowcaseContent(styledCard, style))
     ) {
       setExpanded(false);
@@ -1285,8 +1318,8 @@ function LetteringOverlayHostInner() {
       !expanded &&
       !autoExpandedOnceRef.current &&
       identityReady &&
-      peerShowcaseBroadcastOn(style) &&
-      peerHasDccOrShowcaseContent(styledCard, style)
+      (unverifiedOk ||
+        (peerShowcaseBroadcastOn(style) && peerHasDccOrShowcaseContent(styledCard, style)))
     ) {
       autoExpandedOnceRef.current = true;
       setExpanded(true);
@@ -1297,7 +1330,8 @@ function LetteringOverlayHostInner() {
     expanded,
     styledCard,
     showcaseStyle,
-    identityReady
+    identityReady,
+    verified
   ]);
 
     useEffect(() => {
@@ -1328,14 +1362,19 @@ function LetteringOverlayHostInner() {
       notifyNativeAuthMemberReady();
       return;
     }
-    /* 송출 OFF·미확정(includeDigitalCard!==true) — 풀 펼침·DCC 슬라이드 금지 */
+    /* 송출 OFF·미확정(includeDigitalCard!==true) — 풀 펼침·DCC 슬라이드 금지
+     * 미인증 신고 패널은 예외로 펼침 */
     const style = styledCard?.showcaseStyle || showcaseStyle;
+    if (isResolvedUnverifiedOverlayCard(styledCard, verified)) {
+      setExpanded(true);
+      return;
+    }
     if (!peerShowcaseBroadcastOn(style) || !peerHasDccOrShowcaseContent(styledCard, style)) {
       setExpanded(false);
       return;
     }
     setExpanded(true);
-  }, [callState, identityReady, peerAuthPopupOnly, incoming, styledCard, showcaseStyle, urlMiniCase, native, notifyNativeAuthMemberReady]);
+  }, [callState, identityReady, peerAuthPopupOnly, incoming, styledCard, showcaseStyle, urlMiniCase, native, notifyNativeAuthMemberReady, verified]);
 
   /* 수신 중(빅푸시)에는 인증 팝업을 열지 않음 — 카드 조회 완료(~수 초) 후에도 유지 */
 
@@ -1540,10 +1579,13 @@ function LetteringOverlayHostInner() {
   );
   const isSafeCareProfile =
     String(styledCard?.profileKind || "").trim() === "contact_safe_care";
-  /* 수화 후에도 펼칠 콘텐츠 없으면 다크 풀스크린 호스트 금지 (빈케이스·터치 차단) */
+  const isUnverifiedResolvedUi = isResolvedUnverifiedOverlayCard(styledCard, verified);
+  /* 수화 후에도 펼칠 콘텐츠 없으면 다크 풀스크린 호스트 금지 (빈케이스·터치 차단)
+   * 미인증은 신고 패널이 있으므로 bar-only 예외 */
   const barOnlyConnected =
     onCall &&
     !expanded &&
+    !isUnverifiedResolvedUi &&
     (isSafeCareProfile ||
       peerAuthPopupOnly ||
       !peerHasDccOrShowcaseContent(styledCard, peerLiveStyle));
@@ -1589,8 +1631,9 @@ function LetteringOverlayHostInner() {
                 return;
               }
               const style = styledCard?.showcaseStyle || showcaseStyle;
-              /* 텅 빈 쇼케이스 펼침 방지 — DCC/미디어 준비될 때까지 바 유지 */
-              if (!peerHasDccOrShowcaseContent(styledCard, style)) return;
+              const allowUnverified = isResolvedUnverifiedOverlayCard(styledCard, verified);
+              /* 텅 빈 쇼케이스 펼침 방지 — 미인증 신고 패널은 예외 */
+              if (!allowUnverified && !peerHasDccOrShowcaseContent(styledCard, style)) return;
               /*
                * Mini 탭 복원: userChoseMini 를 먼저 해제하지 않으면
                * 직후 connected 재주입이 setExpanded(false) 로 다시 접어 깜빡임.

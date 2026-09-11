@@ -481,22 +481,23 @@ object LetteringCallCoordinator {
                     CallPathSession.lastVerdict,
                     outgoing
                 )
-                /* 경로 비정상만 즉시 반영. 일반 unmatched 는 lookup_pending 유지 —
-                 * 웹 by-number 가 회원 카드를 살릴 때까지 미인증「VLUÉ Showcase」금지 */
-                if (merged.route == "abnormal") {
-                    if (LetteringPermissionHelper.canDrawOverlays(app)) {
-                        CallOverlayService.updateCallInfo(
-                            app,
-                            raw,
-                            verified = false,
-                            cardJson = merged.json,
-                            outgoing = outgoing,
-                            dcpRoute = merged.route
-                        )
-                        LetteringIncomingNotifier.cancel(app)
-                    }
-                } else {
-                    Log.i(TAG, "lookup unmatched — keep lookup_pending for web by-number ($masked)")
+                /* 경로 비정상 · 일반 unmatched → 미인증 확정 (lookup_pending 고착 금지) */
+                if (LetteringPermissionHelper.canDrawOverlays(app)) {
+                    val cardJson =
+                        if (merged.route == "abnormal") {
+                            merged.json
+                        } else {
+                            unmatchedLookupJson(raw)
+                        }
+                    CallOverlayService.updateCallInfo(
+                        app,
+                        raw,
+                        verified = false,
+                        cardJson = cardJson,
+                        outgoing = outgoing,
+                        dcpRoute = merged.route
+                    )
+                    LetteringIncomingNotifier.cancel(app)
                 }
                 return
             }
@@ -583,7 +584,8 @@ object LetteringCallCoordinator {
             .put("matched", false)
             .put("is_verified", false)
             .put("phoneE164", raw)
-            .put("profileKind", "")
+            .put("source", "unmatched")
+            .put("profileKind", "unverified")
             .toString()
 
     /** 조회 완료 전 — 미인증 앰버 UI 깜빡임 방지 */

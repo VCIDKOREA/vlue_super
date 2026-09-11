@@ -138,7 +138,25 @@ class CallUiPhasePolicyTest {
                     isContactSafeCare = false,
                     isAuthMemberOnly = false,
                     hasBroadcastShowcaseContent = false,
-                    canPromoteContactSafeCare = false
+                    canPromoteContactSafeCare = false,
+                    isUnverifiedResolved = false
+                )
+            )
+        )
+    }
+
+    @Test
+    fun afterAnswer_unverifiedResolved_isFullShowcase() {
+        assertEquals(
+            CallUiPhasePolicy.Phase.FULL_SHOWCASE,
+            CallUiPhasePolicy.decideAfterAnswer(
+                CallUiPhasePolicy.AnswerInput(
+                    alreadyMiniOrAuthConfirmed = false,
+                    isContactSafeCare = false,
+                    isAuthMemberOnly = false,
+                    hasBroadcastShowcaseContent = false,
+                    canPromoteContactSafeCare = false,
+                    isUnverifiedResolved = true
                 )
             )
         )
