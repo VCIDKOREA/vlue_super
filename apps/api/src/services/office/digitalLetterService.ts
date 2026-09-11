@@ -26,6 +26,8 @@ export type LetterDecor = {
   fxOpacity: number;
   /** 서명 이미지 표시 */
   showSignature: boolean;
+  /** myeongjo | serif | sans | brush | batang */
+  bodyFont: string;
 };
 
 const DEFAULT_TITLE = "VLUÉ가 처음 만난 당신에게 💙 그동안 전하지 못한 편지";
@@ -140,6 +142,7 @@ VLUÉ였습니다. 💙`;
 
 const PAPER_THEMES = new Set(["cream-lined", "warm-lined", "ivory", "kraft", "sky"]);
 const SEASON_FX = new Set(["auto", "none", "autumn", "spring", "summer", "winter"]);
+const BODY_FONTS = new Set(["myeongjo", "serif", "sans", "brush", "batang"]);
 
 /** 봄 3–5 · 여름 6–8 · 가을 9–11 · 겨울 12–2 */
 export function defaultSeasonFx(date = new Date()): string {
@@ -162,6 +165,7 @@ export function normalizeLetterDecor(raw: unknown): LetterDecor {
   const o = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const paperTheme = String(o.paperTheme || "cream-lined").trim();
   const seasonFx = String(o.seasonFx || "").trim();
+  const bodyFont = String(o.bodyFont || "myeongjo").trim();
   const fxOpacityRaw = typeof o.fxOpacity === "number" ? o.fxOpacity : Number(o.fxOpacity);
   return {
     paperTheme: PAPER_THEMES.has(paperTheme) ? paperTheme : "cream-lined",
@@ -169,8 +173,9 @@ export function normalizeLetterDecor(raw: unknown): LetterDecor {
     showLines: o.showLines === false ? false : true,
     fxOpacity: Number.isFinite(fxOpacityRaw)
       ? Math.min(0.65, Math.max(0.12, fxOpacityRaw))
-      : 0.32,
-    showSignature: o.showSignature === false ? false : true
+      : 0.42,
+    showSignature: o.showSignature === false ? false : true,
+    bodyFont: BODY_FONTS.has(bodyFont) ? bodyFont : "myeongjo"
   };
 }
 

@@ -1,7 +1,7 @@
 .vlue-letter-root {
   position: fixed;
   inset: 0;
-  z-index: 220;
+  z-index: 520;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -318,6 +318,80 @@
   color: #1e293b;
   word-break: keep-all;
   white-space: pre-wrap;
+}
+
+.vlue-letter-paper--font-myeongjo .vlue-letter-p {
+  font-family: "Nanum Myeongjo", "Noto Serif KR", "Batang", serif;
+}
+
+.vlue-letter-paper--font-serif .vlue-letter-p {
+  font-family: "Noto Serif KR", "Nanum Myeongjo", "Batang", serif;
+}
+
+.vlue-letter-paper--font-sans .vlue-letter-p {
+  font-family: "Noto Sans KR", Pretendard, "Apple SD Gothic Neo", sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.vlue-letter-paper--font-brush .vlue-letter-p {
+  font-family: "Nanum Brush Script", "Nanum Myeongjo", cursive;
+  font-size: clamp(1.15rem, 4.2vw, 1.35rem);
+  line-height: 1.55;
+}
+
+.vlue-letter-paper--font-batang .vlue-letter-p {
+  font-family: "Batang", "Apple Myungjo", "Nanum Myeongjo", "궁서", serif;
+}
+
+/* 관리자 미니 미리보기 — 처음부터 낙엽이 보이도록 */
+.vlue-letter-season-preview {
+  position: absolute !important;
+  inset: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.vlue-letter-season-preview .vlue-letter-season__particle {
+  top: -8%;
+  animation-name: vlue-letter-fall-preview;
+  animation-duration: 5.2s !important;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  opacity: var(--vlue-letter-fx-opacity);
+}
+
+@keyframes vlue-letter-fall-preview {
+  0% {
+    transform: translate3d(0, 0%, 0) rotate(0deg);
+    opacity: var(--vlue-letter-fx-opacity);
+  }
+  100% {
+    transform: translate3d(-22px, 125%, 0) rotate(170deg);
+    opacity: var(--vlue-letter-fx-opacity);
+  }
+}
+
+.vlue-letter-season-preview .vlue-letter-season__particle--1 { animation-delay: 0s; }
+.vlue-letter-season-preview .vlue-letter-season__particle--2 { animation-delay: -0.7s; }
+.vlue-letter-season-preview .vlue-letter-season__particle--3 { animation-delay: -1.4s; }
+.vlue-letter-season-preview .vlue-letter-season__particle--4 { animation-delay: -2.1s; }
+.vlue-letter-season-preview .vlue-letter-season__particle--5 { animation-delay: -2.8s; }
+.vlue-letter-season-preview .vlue-letter-season__particle--6 { animation-delay: -3.5s; }
+.vlue-letter-season-preview .vlue-letter-season__particle--7 { animation-delay: -4.2s; }
+.vlue-letter-season-preview .vlue-letter-season__particle--8 { animation-delay: -1.1s; }
+.vlue-letter-season-preview .vlue-letter-season__particle--9 { animation-delay: -2.5s; }
+.vlue-letter-season-preview .vlue-letter-season__particle--10 { animation-delay: -3.8s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vlue-letter-season-preview .vlue-letter-season__particle {
+    animation: none;
+    opacity: var(--vlue-letter-fx-opacity);
+  }
 }
 
 .vlue-letter-signoff {

@@ -23,6 +23,7 @@ export default function VlueWelcomeLetterModal({
   letter,
   open,
   forceRead = false,
+  previewMode = false,
   onClose,
   onAcknowledged
 }) {
@@ -189,6 +190,10 @@ export default function VlueWelcomeLetterModal({
   };
 
   const handleConfirm = () => {
+    if (previewMode) {
+      onClose?.();
+      return;
+    }
     if (forceRead && !reachedEnd) return;
     acknowledgeDigitalLetter(letter);
     onAcknowledged?.(letter);
@@ -221,13 +226,16 @@ export default function VlueWelcomeLetterModal({
   const showLines = decor.showLines !== false;
   const fxOpacity = typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.42;
   const showSignature = decor.showSignature !== false;
+  const bodyFont = String(decor.bodyFont || "myeongjo");
   const paperClass = [
     "vlue-letter-paper",
     `vlue-letter-paper--${paperTheme}`,
+    `vlue-letter-paper--font-${bodyFont}`,
     showLines ? "vlue-letter-paper--lined" : "vlue-letter-paper--nolines"
   ].join(" ");
   const seasonParticleCount =
     seasonFx === "winter" || seasonFx === "summer" || seasonFx === "autumn" ? 10 : 7;
+  const effectiveForceRead = previewMode ? false : forceRead;
 
   return (
     <div className="vlue-letter-root" role="dialog" aria-modal="true" aria-labelledby="vlue-letter-title">
@@ -306,16 +314,22 @@ export default function VlueWelcomeLetterModal({
           </div>
 
           <footer className="vlue-letter-foot">
-            <p className="vlue-letter-thanks">끝까지 읽어 주셔서 감사합니다</p>
+            <p className="vlue-letter-thanks">
+              {previewMode ? "관리자 미리보기" : "끝까지 읽어 주셔서 감사합니다"}
+            </p>
             <button
               type="button"
               className="vlue-letter-confirm"
-              disabled={forceRead && !reachedEnd}
+              disabled={effectiveForceRead && !reachedEnd}
               onClick={handleConfirm}
             >
-              {forceRead && !reachedEnd ? "아래로 스크롤해 주세요" : "확인"}
+              {previewMode
+                ? "미리보기 닫기"
+                : effectiveForceRead && !reachedEnd
+                  ? "아래로 스크롤해 주세요"
+                  : "확인"}
             </button>
-            {!forceRead ? (
+            {!effectiveForceRead && !previewMode ? (
               <button type="button" className="vlue-letter-close-link" onClick={() => onClose?.()}>
                 닫기
               </button>

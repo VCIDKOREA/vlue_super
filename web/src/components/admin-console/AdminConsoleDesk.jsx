@@ -44,6 +44,7 @@ import {
   updateAdminPopup
 } from "../../lib/adminConsoleApi.js";
 import { resolveLetterSeasonFx } from "../../lib/digitalLetter.js";
+import VlueWelcomeLetterModal from "../VlueWelcomeLetterModal.jsx";
 import "../vlue-welcome-letter.css";
 
 const TABS = [
@@ -1227,10 +1228,12 @@ function PostsTab({ onToast }) {
     seasonFx: "auto",
     showLines: true,
     fxOpacity: 0.42,
-    showSignature: true
+    showSignature: true,
+    bodyFont: "myeongjo"
   });
   const [signatureSounds, setSignatureSounds] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [letterPreviewOpen, setLetterPreviewOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -1257,7 +1260,8 @@ function PostsTab({ onToast }) {
           seasonFx: decor.seasonFx || "auto",
           showLines: decor.showLines !== false,
           fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.42,
-          showSignature: decor.showSignature !== false
+          showSignature: decor.showSignature !== false,
+          bodyFont: decor.bodyFont || "myeongjo"
         });
       }
     } catch (e) {
@@ -1324,7 +1328,8 @@ function PostsTab({ onToast }) {
           seasonFx: letterForm.seasonFx || "auto",
           showLines: letterForm.showLines !== false,
           fxOpacity: Number(letterForm.fxOpacity) || 0.42,
-          showSignature: letterForm.showSignature !== false
+          showSignature: letterForm.showSignature !== false,
+          bodyFont: letterForm.bodyFont || "myeongjo"
         }
       });
       onToast?.("VLUÉ 편지 저장 완료 (버전↑ → 미확인 사용자에게 다시 표시)");
@@ -1479,6 +1484,30 @@ function PostsTab({ onToast }) {
               <option value="kraft">크라프트지</option>
               <option value="sky">하늘빛</option>
             </select>
+            <label className="block text-[11px] font-bold text-slate-500">본문 글씨체</label>
+            <select
+              value={letterForm.bodyFont || "myeongjo"}
+              onChange={(e) => setLetterForm((f) => ({ ...f, bodyFont: e.target.value }))}
+              className="w-full rounded-lg border border-amber-100 bg-white px-3 py-2 text-[13px]"
+              style={{
+                fontFamily:
+                  letterForm.bodyFont === "serif"
+                    ? '"Noto Serif KR", serif'
+                    : letterForm.bodyFont === "sans"
+                      ? '"Noto Sans KR", sans-serif'
+                      : letterForm.bodyFont === "brush"
+                        ? '"Nanum Brush Script", cursive'
+                        : letterForm.bodyFont === "batang"
+                          ? "Batang, serif"
+                          : '"Nanum Myeongjo", serif'
+              }}
+            >
+              <option value="myeongjo">나눔명조 (기본)</option>
+              <option value="serif">본명조 (Noto Serif)</option>
+              <option value="sans">고딕 (Noto Sans)</option>
+              <option value="brush">붓글씨 (나눔손글씨)</option>
+              <option value="batang">바탕 / 궁서</option>
+            </select>
             <label className="block text-[11px] font-bold text-slate-500">계절 연출 (상단 우측)</label>
             <select
               value={letterForm.seasonFx || "auto"}
@@ -1499,7 +1528,7 @@ function PostsTab({ onToast }) {
                   <p className="text-[10px] text-slate-400">계절 연출 없음 — 저장 시 편지에 애니메이션이 표시되지 않습니다.</p>
                 );
               }
-              const count = previewFx === "autumn" || previewFx === "winter" || previewFx === "summer" ? 10 : 7;
+              const count = 10;
               const label =
                 previewFx === "autumn"
                   ? "가을 낙엽"
@@ -1509,20 +1538,14 @@ function PostsTab({ onToast }) {
                       ? "여름 햇살"
                       : "겨울 눈";
               return (
-                <div className="relative overflow-hidden rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-orange-50/80 p-3">
-                  <p className="relative z-[1] text-[11px] font-bold text-slate-600">
-                    미리보기 · {label}
+                <div className="relative h-[112px] overflow-hidden rounded-xl border border-amber-200 bg-gradient-to-br from-[#fff7ed] to-[#ffedd5]">
+                  <p className="relative z-[3] px-3 pt-2 text-[11px] font-bold text-slate-600">
+                    연출 미리보기 · {label}
                     {letterForm.seasonFx === "auto" ? " (자동)" : ""}
                   </p>
                   <div
-                    className={`vlue-letter-season vlue-letter-season--${previewFx}`}
-                    style={{
-                      ["--vlue-letter-fx-opacity"]: String(Number(letterForm.fxOpacity) || 0.42),
-                      position: "absolute",
-                      inset: 0,
-                      width: "100%",
-                      height: "100%"
-                    }}
+                    className={`vlue-letter-season-preview vlue-letter-season--${previewFx}`}
+                    style={{ ["--vlue-letter-fx-opacity"]: String(Math.max(0.35, Number(letterForm.fxOpacity) || 0.48)) }}
                     aria-hidden
                   >
                     {Array.from({ length: count }, (_, i) => (
@@ -1532,7 +1555,6 @@ function PostsTab({ onToast }) {
                       />
                     ))}
                   </div>
-                  <div className="relative z-[1] mt-8 min-h-[72px]" />
                 </div>
               );
             })()}
@@ -1583,9 +1605,55 @@ function PostsTab({ onToast }) {
             />
             활성 (첫 방문 자동 표시)
           </label>
-          <button type="button" disabled={busy} onClick={saveLetter} className="rounded-lg bg-sky-600 px-4 py-2 text-[12px] font-bold text-white">
-            편지 저장
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={saveLetter}
+              className="rounded-lg bg-sky-600 px-4 py-2 text-[12px] font-bold text-white"
+            >
+              편지 저장
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!String(letterForm.body || "").trim()) {
+                  onToast?.("미리볼 본문을 먼저 입력해 주세요");
+                  return;
+                }
+                setLetterPreviewOpen(true);
+              }}
+              className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-2 text-[12px] font-bold text-sky-700"
+            >
+              전체 미리보기
+            </button>
+          </div>
+          <VlueWelcomeLetterModal
+            open={letterPreviewOpen}
+            previewMode
+            forceRead={false}
+            letter={{
+              id: letterForm.id || "admin-preview",
+              version: 0,
+              title: letterForm.title || "VLUÉ가 전하는 편지",
+              body: letterForm.body || "",
+              bgmUrl:
+                signatureSounds.find((s) => s.id === letterForm.bgmSoundId)?.audioUrl ||
+                letterForm.bgmUrl ||
+                "",
+              bgmVolume: letterForm.bgmVolume,
+              isActive: true,
+              decor: {
+                paperTheme: letterForm.paperTheme || "cream-lined",
+                seasonFx: letterForm.seasonFx || "auto",
+                showLines: letterForm.showLines !== false,
+                fxOpacity: Number(letterForm.fxOpacity) || 0.42,
+                showSignature: letterForm.showSignature !== false,
+                bodyFont: letterForm.bodyFont || "myeongjo"
+              }
+            }}
+            onClose={() => setLetterPreviewOpen(false)}
+          />
         </div>
       ) : null}
 
@@ -1708,7 +1776,8 @@ function PostsTab({ onToast }) {
                         seasonFx: decor.seasonFx || "auto",
                         showLines: decor.showLines !== false,
                         fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.42,
-                        showSignature: decor.showSignature !== false
+                        showSignature: decor.showSignature !== false,
+                        bodyFont: decor.bodyFont || "myeongjo"
                       });
                     }}
                     className="text-[10px] font-bold text-blue-600"
