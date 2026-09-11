@@ -137,11 +137,11 @@
 
 .vlue-letter-p {
   margin: 0 0 var(--vlue-letter-line);
-  font-family: "Nanum Pen Script", "Gaegu", cursive;
-  font-size: clamp(1.2rem, 4.2vw, 1.45rem);
+  font-family: "Nanum Myeongjo", "Noto Serif KR", "Batang", "궁서", "Gungsuh", serif;
+  font-size: clamp(0.95rem, 3.6vw, 1.05rem);
   font-weight: 400;
   line-height: var(--vlue-letter-line);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   color: #1e293b;
   word-break: keep-all;
   white-space: pre-wrap;

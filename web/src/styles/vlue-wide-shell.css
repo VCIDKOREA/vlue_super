@@ -1,9 +1,47 @@
 /**
- * 폴드·와이드 — 앱/공개 쇼케이스 깨짐 방지
- * - 명함(DCC): 폰 비율로 중앙 고정 (가로로 늘어나지 않음)
- * - 마이케이스 IG: 좌 미디어 / 우 댓글·옵션 (기존 모달 분할 활용)
- * - 가로(landscape) 회전은 미지원 — min-width(폴드 펼침 세로)만 와이드
+ * 폴드·와이드·가로 — 레이아웃 규칙
+ * - Big Push: 기기 방향 그대로 (가로/세로), 콘텐츠만 과도하게 가로로 안 늘어나게
+ * - Showcase / DCC: 세로 폰 프레임 유지 (가로 모드여도 폭 제한)
  */
+
+/* 폰을 가로로 눕혀도 쇼케이스는 세로 카드로 송출 (안내 맨트 없음) */
+@media (orientation: landscape) and (max-height: 560px) {
+  .showcase-web__fs-stage,
+  .public-showcase-stage,
+  .lettering-showcase-fs,
+  .tent-showcase--fullscreen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .showcase-web__fs-stage .public-showcase-stage,
+  .public-showcase-stage > .showcase-call-carousel,
+  .lettering-showcase-fs .showcase-call-carousel,
+  .tent-showcase--fullscreen .showcase-call-carousel,
+  .lettering-ongoing--fullscreen-tent .showcase-call-carousel {
+    width: min(100%, 400px);
+    max-width: 400px;
+    height: min(100%, 100dvh);
+    max-height: 100%;
+    margin-inline: auto;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .ldr-reception {
+    width: 100%;
+    max-width: 400px;
+    margin-inline: auto;
+  }
+
+  /* Big Push(링잉 바) — 가로로 퍼지지 않게 상단 바 폭만 제한 */
+  .lettering-overlay-host--ringing .lettering-ongoing--fullscreen-tent,
+  .lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing {
+    max-width: min(100%, 560px);
+    margin-inline: auto;
+  }
+}
 
 /* 와이드: 공개·풀스크린 쇼케이스 스테이지를 중앙 폰 프레임으로 */
 @media (min-width: 720px) {

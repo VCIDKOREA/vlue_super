@@ -10,8 +10,8 @@ export type AndroidVersionConfig = {
 };
 
 const DEFAULT: AndroidVersionConfig = {
-  latestVersionCode: 49,
-  latestVersionName: "1.0.7",
+  latestVersionCode: 50,
+  latestVersionName: "1.0.8",
   message: "새로운 버전이 있습니다. 업데이트 하시겠습니까?",
   updatedAt: null
 };

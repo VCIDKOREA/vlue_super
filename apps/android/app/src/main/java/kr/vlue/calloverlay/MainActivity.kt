@@ -114,11 +114,11 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         pushNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    @SuppressLint("SetJavaScriptEnabled", "SourceLockedOrientationActivity")
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        /* 폰 가로 회전 차단 — 폴드 펼침은 세로 고정 + 넓은 폭으로 와이드 레이아웃 */
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        /* Big Push·통화 UI는 기기 방향 따름. 쇼케이스는 웹 CSS로 세로 프레임 유지 */
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         /* Android 15+ edge-to-edge 기본값에서 WebView가 상태바 아래로 깔리면 헤더가 시계·배터리와 겹침 */
         WindowCompat.setDecorFitsSystemWindows(window, true)
         applyNotificationWakeFlags(intent)
