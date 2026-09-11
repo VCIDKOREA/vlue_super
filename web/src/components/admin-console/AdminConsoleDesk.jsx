@@ -1220,7 +1220,12 @@ function PostsTab({ onToast }) {
     bgmUrl: "",
     bgmSoundId: "",
     bgmVolume: 0.45,
-    isActive: true
+    isActive: true,
+    paperTheme: "cream-lined",
+    seasonFx: "autumn",
+    showLines: true,
+    fxOpacity: 0.32,
+    showSignature: true
   });
   const [signatureSounds, setSignatureSounds] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -1237,6 +1242,7 @@ function PostsTab({ onToast }) {
       const active = (res.letters || []).find((l) => l.isActive) || (res.letters || [])[0];
       if (active) {
         const match = sounds.find((s) => s.audioUrl && s.audioUrl === active.bgmUrl);
+        const decor = active.decor && typeof active.decor === "object" ? active.decor : {};
         setLetterForm({
           id: active.id || "",
           title: active.title || "",
@@ -1244,7 +1250,12 @@ function PostsTab({ onToast }) {
           bgmUrl: active.bgmUrl || "",
           bgmSoundId: match?.id || "",
           bgmVolume: typeof active.bgmVolume === "number" ? active.bgmVolume : 0.45,
-          isActive: active.isActive !== false
+          isActive: active.isActive !== false,
+          paperTheme: decor.paperTheme || "cream-lined",
+          seasonFx: decor.seasonFx || "autumn",
+          showLines: decor.showLines !== false,
+          fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.32,
+          showSignature: decor.showSignature !== false
         });
       }
     } catch (e) {
@@ -1305,7 +1316,14 @@ function PostsTab({ onToast }) {
         body: letterForm.body,
         bgmUrl: selected?.audioUrl || "",
         bgmVolume: letterForm.bgmVolume,
-        isActive: letterForm.isActive !== false
+        isActive: letterForm.isActive !== false,
+        decor: {
+          paperTheme: letterForm.paperTheme || "cream-lined",
+          seasonFx: letterForm.seasonFx || "none",
+          showLines: letterForm.showLines !== false,
+          fxOpacity: Number(letterForm.fxOpacity) || 0.32,
+          showSignature: letterForm.showSignature !== false
+        }
       });
       onToast?.("VLUÉ 편지 저장 완료 (버전↑ → 미확인 사용자에게 다시 표시)");
       load();
@@ -1441,6 +1459,74 @@ function PostsTab({ onToast }) {
             className="w-full accent-sky-600"
           />
           <p className="text-[10px] text-slate-400">편지 저장 시 기본 음량으로 적용됩니다. 사용자는 편지 화면에서도 조절·기억됩니다.</p>
+
+          <div className="mt-3 rounded-lg border border-amber-100/90 bg-white/80 p-3 space-y-2">
+            <p className="text-[12px] font-black text-slate-700">편지지 꾸미기</p>
+            <p className="text-[10px] leading-relaxed text-slate-500">
+              편지지 테마·계절 연출(낙엽 등)·줄무늬·서명 표시를 설정합니다. 저장 후 활성 편지에 바로 반영됩니다.
+            </p>
+            <label className="block text-[11px] font-bold text-slate-500">편지지 테마</label>
+            <select
+              value={letterForm.paperTheme || "cream-lined"}
+              onChange={(e) => setLetterForm((f) => ({ ...f, paperTheme: e.target.value }))}
+              className="w-full rounded-lg border border-amber-100 bg-white px-3 py-2 text-[13px]"
+            >
+              <option value="cream-lined">크림 + 파란 가로줄</option>
+              <option value="warm-lined">따뜻한 베이지 + 갈색 줄</option>
+              <option value="ivory">아이보리 (담백)</option>
+              <option value="kraft">크라프트지</option>
+              <option value="sky">하늘빛</option>
+            </select>
+            <label className="block text-[11px] font-bold text-slate-500">계절 연출 (상단 우측)</label>
+            <select
+              value={letterForm.seasonFx || "autumn"}
+              onChange={(e) => setLetterForm((f) => ({ ...f, seasonFx: e.target.value }))}
+              className="w-full rounded-lg border border-amber-100 bg-white px-3 py-2 text-[13px]"
+            >
+              <option value="none">없음</option>
+              <option value="autumn">가을 낙엽 (은근히)</option>
+              <option value="spring">봄 꽃잎</option>
+              <option value="winter">겨울 눈</option>
+            </select>
+            {letterForm.seasonFx && letterForm.seasonFx !== "none" ? (
+              <>
+                <label className="block text-[11px] font-bold text-slate-500">
+                  연출 농도 {Math.round((Number(letterForm.fxOpacity) || 0.32) * 100)}%
+                </label>
+                <input
+                  type="range"
+                  min={12}
+                  max={65}
+                  step={1}
+                  value={Math.round((Number(letterForm.fxOpacity) || 0.32) * 100)}
+                  onChange={(e) =>
+                    setLetterForm((f) => ({
+                      ...f,
+                      fxOpacity: Math.min(0.65, Math.max(0.12, Number(e.target.value) / 100))
+                    }))
+                  }
+                  className="w-full accent-amber-600"
+                />
+              </>
+            ) : null}
+            <label className="flex items-center gap-2 text-[12px] font-bold text-slate-600">
+              <input
+                type="checkbox"
+                checked={letterForm.showLines !== false}
+                onChange={(e) => setLetterForm((f) => ({ ...f, showLines: e.target.checked }))}
+              />
+              편지지 가로줄 표시
+            </label>
+            <label className="flex items-center gap-2 text-[12px] font-bold text-slate-600">
+              <input
+                type="checkbox"
+                checked={letterForm.showSignature !== false}
+                onChange={(e) => setLetterForm((f) => ({ ...f, showSignature: e.target.checked }))}
+              />
+              서명 이미지 표시
+            </label>
+          </div>
+
           <label className="flex items-center gap-2 text-[12px] font-bold text-slate-600">
             <input
               type="checkbox"
@@ -1560,7 +1646,8 @@ function PostsTab({ onToast }) {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      const decor = r.decor && typeof r.decor === "object" ? r.decor : {};
                       setLetterForm({
                         id: r.id,
                         title: r.title || "",
@@ -1568,9 +1655,14 @@ function PostsTab({ onToast }) {
                         bgmUrl: r.bgmUrl || "",
                         bgmSoundId: signatureSounds.find((s) => s.audioUrl && s.audioUrl === r.bgmUrl)?.id || "",
                         bgmVolume: typeof r.bgmVolume === "number" ? r.bgmVolume : 0.45,
-                        isActive: r.isActive !== false
-                      })
-                    }
+                        isActive: r.isActive !== false,
+                        paperTheme: decor.paperTheme || "cream-lined",
+                        seasonFx: decor.seasonFx || "autumn",
+                        showLines: decor.showLines !== false,
+                        fxOpacity: typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.32,
+                        showSignature: decor.showSignature !== false
+                      });
+                    }}
                     className="text-[10px] font-bold text-blue-600"
                   >
                     불러오기

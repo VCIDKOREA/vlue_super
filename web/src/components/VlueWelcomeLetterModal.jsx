@@ -214,11 +214,33 @@ export default function VlueWelcomeLetterModal({
 
   const paragraphs = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
   const volumePct = Math.round(clampLetterBgmVolume(volume) * 100);
+  const decor = letter?.decor && typeof letter.decor === "object" ? letter.decor : {};
+  const paperTheme = String(decor.paperTheme || "cream-lined");
+  const seasonFx = String(decor.seasonFx || "autumn");
+  const showLines = decor.showLines !== false;
+  const fxOpacity = typeof decor.fxOpacity === "number" ? decor.fxOpacity : 0.32;
+  const showSignature = decor.showSignature !== false;
+  const paperClass = [
+    "vlue-letter-paper",
+    `vlue-letter-paper--${paperTheme}`,
+    showLines ? "vlue-letter-paper--lined" : "vlue-letter-paper--nolines"
+  ].join(" ");
 
   return (
     <div className="vlue-letter-root" role="dialog" aria-modal="true" aria-labelledby="vlue-letter-title">
       <div className="vlue-letter-backdrop" aria-hidden />
-      <div className="vlue-letter-sheet">
+      <div className={`vlue-letter-sheet vlue-letter-sheet--${paperTheme}`}>
+        {seasonFx !== "none" ? (
+          <div
+            className={`vlue-letter-season vlue-letter-season--${seasonFx}`}
+            style={{ ["--vlue-letter-fx-opacity"]: String(fxOpacity) }}
+            aria-hidden
+          >
+            {Array.from({ length: seasonFx === "winter" ? 10 : 7 }, (_, i) => (
+              <span key={i} className={`vlue-letter-season__particle vlue-letter-season__particle--${i + 1}`} />
+            ))}
+          </div>
+        ) : null}
         <header className="vlue-letter-head">
           <p className="vlue-letter-eyebrow">Digital Letter</p>
           <h2 id="vlue-letter-title" className="vlue-letter-title">
@@ -257,7 +279,7 @@ export default function VlueWelcomeLetterModal({
           className="vlue-letter-scroll"
           onScroll={onScroll}
         >
-          <div className="vlue-letter-paper">
+          <div className={paperClass}>
             {paragraphs.map((block, i) => (
               <p key={`${i}-${block.slice(0, 12)}`} className="vlue-letter-p">
                 {block.split("\n").map((line, j) => (
@@ -268,14 +290,16 @@ export default function VlueWelcomeLetterModal({
                 ))}
               </p>
             ))}
-            <div className="vlue-letter-signoff">
-              <img
-                src={LEE_JONGGEUN_SIGNATURE}
-                alt="이종근"
-                className="vlue-letter-signature"
-                draggable={false}
-              />
-            </div>
+            {showSignature ? (
+              <div className="vlue-letter-signoff">
+                <img
+                  src={LEE_JONGGEUN_SIGNATURE}
+                  alt="이종근"
+                  className="vlue-letter-signature"
+                  draggable={false}
+                />
+              </div>
+            ) : null}
           </div>
 
           <footer className="vlue-letter-foot">

@@ -8,10 +8,24 @@ export type DigitalLetterRow = {
   body_text: string;
   bgm_url: string | null;
   bgm_volume: number | null;
+  decor_json?: unknown;
   is_active: boolean;
   version: number;
   updated_at: Date;
   created_at: Date;
+};
+
+export type LetterDecor = {
+  /** cream-lined | warm-lined | ivory | kraft | sky */
+  paperTheme: string;
+  /** none | autumn | spring | winter */
+  seasonFx: string;
+  /** 가로줄 표시 */
+  showLines: boolean;
+  /** 낙엽·꽃잎 농도 0.15–0.6 */
+  fxOpacity: number;
+  /** 서명 이미지 표시 */
+  showSignature: boolean;
 };
 
 const DEFAULT_TITLE = "VLUÉ가 처음 만난 당신에게 💙 그동안 전하지 못한 편지";
@@ -124,6 +138,33 @@ VLUÉ는 그런 마음에서 시작했습니다.
 처음 만나 반갑습니다.
 VLUÉ였습니다. 💙`;
 
+const PAPER_THEMES = new Set(["cream-lined", "warm-lined", "ivory", "kraft", "sky"]);
+const SEASON_FX = new Set(["none", "autumn", "spring", "winter"]);
+
+function defaultSeasonFx(): string {
+  const m = new Date().getMonth() + 1;
+  if (m >= 9 && m <= 11) return "autumn";
+  if (m >= 3 && m <= 5) return "spring";
+  if (m === 12 || m <= 2) return "winter";
+  return "none";
+}
+
+export function normalizeLetterDecor(raw: unknown): LetterDecor {
+  const o = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const paperTheme = String(o.paperTheme || "cream-lined").trim();
+  const seasonFx = String(o.seasonFx || "").trim();
+  const fxOpacityRaw = typeof o.fxOpacity === "number" ? o.fxOpacity : Number(o.fxOpacity);
+  return {
+    paperTheme: PAPER_THEMES.has(paperTheme) ? paperTheme : "cream-lined",
+    seasonFx: SEASON_FX.has(seasonFx) ? seasonFx : defaultSeasonFx(),
+    showLines: o.showLines === false ? false : true,
+    fxOpacity: Number.isFinite(fxOpacityRaw)
+      ? Math.min(0.65, Math.max(0.12, fxOpacityRaw))
+      : 0.32,
+    showSignature: o.showSignature === false ? false : true
+  };
+}
+
 async function ensureTable() {
   if (initialized) return;
   await prisma.$executeRawUnsafe(`
@@ -143,6 +184,9 @@ async function ensureTable() {
     `ALTER TABLE vlue_digital_letters ADD COLUMN IF NOT EXISTS bgm_volume REAL NOT NULL DEFAULT 0.45;`
   );
   await prisma.$executeRawUnsafe(
+    `ALTER TABLE vlue_digital_letters ADD COLUMN IF NOT EXISTS decor_json JSONB;`
+  );
+  await prisma.$executeRawUnsafe(
     "CREATE INDEX IF NOT EXISTS idx_vlue_digital_letters_active ON vlue_digital_letters(is_active, updated_at DESC);"
   );
   initialized = true;
@@ -152,13 +196,15 @@ async function ensureTable() {
   );
   const count = Number(countRows[0]?.c || 0);
   if (count === 0) {
+    const decor = JSON.stringify(normalizeLetterDecor({ seasonFx: "autumn" }));
     await prisma.$executeRawUnsafe(
       `
-        INSERT INTO vlue_digital_letters (title, body_text, bgm_url, bgm_volume, is_active, version)
-        VALUES ($1, $2, NULL, 0.45, true, 1);
+        INSERT INTO vlue_digital_letters (title, body_text, bgm_url, bgm_volume, decor_json, is_active, version)
+        VALUES ($1, $2, NULL, 0.45, $3::jsonb, true, 1);
       `,
       DEFAULT_TITLE,
-      DEFAULT_BODY
+      DEFAULT_BODY,
+      decor
     );
   }
 }
@@ -176,6 +222,7 @@ function mapRow(row: DigitalLetterRow) {
     body: row.body_text,
     bgmUrl: row.bgm_url || "",
     bgmVolume: clampVolume(row.bgm_volume, 0.45),
+    decor: normalizeLetterDecor(row.decor_json),
     isActive: row.is_active,
     version: Number(row.version) || 1,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at || ""),
@@ -217,6 +264,7 @@ export async function upsertDigitalLetter(input: {
   body: string;
   bgmUrl?: string;
   bgmVolume?: number;
+  decor?: unknown;
   isActive?: boolean;
 }) {
   await ensureTable();
@@ -225,6 +273,8 @@ export async function upsertDigitalLetter(input: {
   if (!body) throw new Error("편지 본문을 입력해 주세요.");
   const bgmUrl = String(input.bgmUrl || "").trim().slice(0, 2000) || null;
   const bgmVolume = clampVolume(input.bgmVolume, 0.45);
+  const decor = normalizeLetterDecor(input.decor);
+  const decorJson = JSON.stringify(decor);
   const isActive = input.isActive !== false;
   const id = String(input.id || "").trim();
 
@@ -242,7 +292,8 @@ export async function upsertDigitalLetter(input: {
             body_text = $3,
             bgm_url = $4,
             bgm_volume = $5,
-            is_active = $6,
+            decor_json = $6::jsonb,
+            is_active = $7,
             version = version + 1,
             updated_at = NOW()
         WHERE id = $1::uuid
@@ -253,6 +304,7 @@ export async function upsertDigitalLetter(input: {
       body,
       bgmUrl,
       bgmVolume,
+      decorJson,
       isActive
     );
     if (!rows[0]) throw new Error("편지를 찾을 수 없습니다.");
@@ -265,14 +317,15 @@ export async function upsertDigitalLetter(input: {
 
   const rows = await prisma.$queryRawUnsafe<DigitalLetterRow[]>(
     `
-      INSERT INTO vlue_digital_letters (title, body_text, bgm_url, bgm_volume, is_active, version)
-      VALUES ($1, $2, $3, $4, $5, 1)
+      INSERT INTO vlue_digital_letters (title, body_text, bgm_url, bgm_volume, decor_json, is_active, version)
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1)
       RETURNING *;
     `,
     title,
     body,
     bgmUrl,
     bgmVolume,
+    decorJson,
     isActive
   );
   return mapRow(rows[0]);

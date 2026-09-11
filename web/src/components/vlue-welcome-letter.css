@@ -123,7 +123,10 @@
   max-width: 34rem;
   border-radius: 10px;
   background-color: rgba(255, 252, 247, 0.72);
-  /* 편지지 연한 가로줄 — line-height 와 주기 일치 */
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.55);
+}
+
+.vlue-letter-paper--lined {
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
@@ -132,7 +135,141 @@
     rgba(147, 180, 220, 0.38) var(--vlue-letter-line)
   );
   background-attachment: local;
-  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.55);
+}
+
+.vlue-letter-paper--nolines {
+  background-image: none;
+}
+
+.vlue-letter-paper--warm-lined.vlue-letter-paper--lined {
+  background-color: rgba(255, 248, 240, 0.88);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--vlue-letter-line) - 1px),
+    rgba(214, 168, 120, 0.32) calc(var(--vlue-letter-line) - 1px),
+    rgba(214, 168, 120, 0.32) var(--vlue-letter-line)
+  );
+}
+
+.vlue-letter-paper--ivory {
+  background-color: rgba(255, 253, 248, 0.92);
+}
+
+.vlue-letter-paper--kraft {
+  background-color: rgba(245, 230, 211, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(180, 140, 100, 0.28);
+}
+
+.vlue-letter-paper--kraft .vlue-letter-p {
+  color: #3f2e1e;
+}
+
+.vlue-letter-paper--sky {
+  background-color: rgba(240, 249, 255, 0.9);
+}
+
+.vlue-letter-sheet--kraft {
+  background: linear-gradient(165deg, #f7efe4 0%, #f3e6d4 45%, #e8f4fc 100%);
+}
+
+.vlue-letter-sheet--sky {
+  background: linear-gradient(165deg, #f0f9ff 0%, #e0f2fe 40%, #fffaf5 100%);
+}
+
+.vlue-letter-sheet--warm-lined {
+  background: linear-gradient(165deg, #fff8f0 0%, #fff4e8 40%, #fef3c7 100%);
+}
+
+/* 계절 연출 — 상단 우측, 은근히 */
+.vlue-letter-season {
+  --vlue-letter-fx-opacity: 0.32;
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(52%, 220px);
+  height: min(42%, 280px);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.vlue-letter-season__particle {
+  position: absolute;
+  top: -12%;
+  opacity: var(--vlue-letter-fx-opacity);
+  will-change: transform;
+  animation-name: vlue-letter-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.vlue-letter-season--autumn .vlue-letter-season__particle {
+  width: 11px;
+  height: 8px;
+  border-radius: 60% 40% 60% 40%;
+  background: linear-gradient(135deg, #d97706 0%, #b45309 55%, #92400e 100%);
+  box-shadow: inset 0 0 0 1px rgba(120, 53, 15, 0.15);
+}
+
+.vlue-letter-season--autumn .vlue-letter-season__particle--2,
+.vlue-letter-season--autumn .vlue-letter-season__particle--5 {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 60%, #9a3412 100%);
+}
+
+.vlue-letter-season--autumn .vlue-letter-season__particle--3,
+.vlue-letter-season--autumn .vlue-letter-season__particle--7 {
+  background: linear-gradient(135deg, #ca8a04 0%, #a16207 100%);
+  width: 9px;
+  height: 7px;
+}
+
+.vlue-letter-season--spring .vlue-letter-season__particle {
+  width: 8px;
+  height: 8px;
+  border-radius: 50% 0 50% 50%;
+  background: linear-gradient(135deg, #fda4af 0%, #fb7185 70%, #f43f5e 100%);
+  transform: rotate(25deg);
+}
+
+.vlue-letter-season--winter .vlue-letter-season__particle {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 4px rgba(186, 230, 253, 0.8);
+}
+
+.vlue-letter-season__particle--1 { left: 12%; animation-duration: 11s; animation-delay: 0s; }
+.vlue-letter-season__particle--2 { left: 28%; animation-duration: 13.5s; animation-delay: -2s; }
+.vlue-letter-season__particle--3 { left: 44%; animation-duration: 10s; animation-delay: -4.5s; }
+.vlue-letter-season__particle--4 { left: 58%; animation-duration: 14s; animation-delay: -1s; }
+.vlue-letter-season__particle--5 { left: 72%; animation-duration: 12s; animation-delay: -6s; }
+.vlue-letter-season__particle--6 { left: 84%; animation-duration: 15s; animation-delay: -3s; }
+.vlue-letter-season__particle--7 { left: 36%; animation-duration: 16s; animation-delay: -8s; }
+.vlue-letter-season__particle--8 { left: 66%; animation-duration: 12.5s; animation-delay: -5s; }
+.vlue-letter-season__particle--9 { left: 20%; animation-duration: 14.5s; animation-delay: -7s; }
+.vlue-letter-season__particle--10 { left: 50%; animation-duration: 11.5s; animation-delay: -9s; }
+
+@keyframes vlue-letter-fall {
+  0% {
+    transform: translate3d(0, -10%, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: var(--vlue-letter-fx-opacity);
+  }
+  100% {
+    transform: translate3d(-18px, 118%, 0) rotate(160deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vlue-letter-season__particle {
+    animation: none;
+    opacity: 0;
+  }
 }
 
 .vlue-letter-p {
