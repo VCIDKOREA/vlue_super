@@ -8,6 +8,7 @@ import {
   listDccAgentProfiles,
   putDccProfileBundle,
   setRepresentativeDccProfile,
+  setRoutedContactPhones,
   updateDccAgentProfile,
   getDccProfileBundle,
   type DccAgentInput
@@ -107,6 +108,22 @@ dccAgentProfileRoutes.put("/:id/lines", async (c) => {
       c.get("vlueUserId"),
       c.req.param("id"),
       Array.isArray(body.lineIds) ? body.lineIds : []
+    );
+    return c.json({ ok: true, profile });
+  } catch (e) {
+    const { status, body: errBody } = httpError(e);
+    return c.json(errBody, status);
+  }
+});
+
+/** PUT /api/cards/dcc-agent-profiles/:id/contacts — 카카오톡형 연락처(상대 전화) 지정 */
+dccAgentProfileRoutes.put("/:id/contacts", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { phones?: unknown };
+  try {
+    const profile = await setRoutedContactPhones(
+      c.get("vlueUserId"),
+      c.req.param("id"),
+      body.phones
     );
     return c.json({ ok: true, profile });
   } catch (e) {

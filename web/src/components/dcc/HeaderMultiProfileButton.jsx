@@ -1,47 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
-import { fetchDccLines, fetchDccLineBundle } from "../../lib/dccLinesApi.js";
+import { fetchDccLines } from "../../lib/dccLinesApi.js";
 import { fetchMultiDccEntitlement, completeMultiDccCheckout } from "../../lib/jobOccupationVerifyApi.js";
-import { switchToMultiDccProfile } from "../../lib/multiDccSwitch.js";
-import { writeDccLinePreviewFromBundle, writeSelectedDccLineId } from "../../lib/dccLineState.js";
 import {
-  createDefaultShowcaseStyle,
-  writeLiveShowcaseStyle,
-  writeShowcaseStyle
-} from "../../lib/showcase/showcaseStyleStorage.js";
-import { showcaseStyleHasContent, writeLocalShowcaseStyleUpdatedAt } from "../../lib/showcase/showcaseStyleSync.js";
+  createCleanMultiDccProfileAndSwitch,
+  switchToMultiDccProfile
+} from "../../lib/multiDccSwitch.js";
 import { SOHO_BROADCAST_MONTHLY_KRW } from "../../lib/membershipBm.js";
 import DccAgentManageModal from "./DccAgentManageModal.jsx";
 import MultiDccPaySheet from "./MultiDccPaySheet.jsx";
 
-function applyLineToLocalPreview(bundle) {
-  const line = bundle?.line;
-  if (!line?.id) return;
-  writeDccLinePreviewFromBundle(bundle, { replaceMedia: true });
-  writeSelectedDccLineId(line.id);
-  const editor = bundle.showcase?.editor || bundle.showcase?.live || null;
-  const live = bundle.showcase?.live || editor;
-  const has = showcaseStyleHasContent(editor) || showcaseStyleHasContent(live);
-  if (has) {
-    writeShowcaseStyle(editor || live, { replace: true, skipSync: true });
-    writeLiveShowcaseStyle(live || editor, { source: "editor", skipSync: true });
-    if (bundle.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
-  } else {
-    const empty = createDefaultShowcaseStyle();
-    writeShowcaseStyle(empty, { replace: true, skipSync: true });
-    writeLiveShowcaseStyle(empty, { source: "editor", skipSync: true });
-  }
-  try {
-    window.dispatchEvent(new Event("vlue-showcase-style-changed"));
-    window.dispatchEvent(new Event("vlue-showcase-live-style-changed"));
-    window.dispatchEvent(new Event("vlue-lettering-bizcard-changed"));
-  } catch {
-    /* ignore */
-  }
-}
-
 /**
- * 홈 상단 「멀티프로필 +」 — 결제 게이트 · 즉시 전환 · 프로필별 DCC/쇼케이스.
+ * 홈 상단 「멀티프로필 +」 — 계정 전환 / 즉시 생성·전환.
  */
 export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
   const [open, setOpen] = useState(false);
@@ -90,6 +60,19 @@ export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
     }
   };
 
+  const createAndSwitch = async () => {
+    const profile = await createCleanMultiDccProfileAndSwitch({
+      lines,
+      nextIndex: profiles.length + 1,
+      profiles
+    });
+    onToast?.(
+      `「${profile.label || "새 프로필"}」로 전환했습니다. 이름·전화 외 정보는 새로 입력하세요.`
+    );
+    setOpen(false);
+    await reload();
+  };
+
   const requestPay = () => {
     setOpen(false);
     setPayOpen(true);
@@ -116,10 +99,10 @@ export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
         slotsToAdd: 1,
         devBillingBypass: Boolean(devBypass)
       });
-      onToast?.("슬롯이 열렸습니다. 새 프로필을 만들어 주세요.");
+      onToast?.("슬롯이 열렸습니다. 새 프로필을 만듭니다…");
       setPayOpen(false);
-      setOpenCreateForm(true);
       await reload();
+      setOpenCreateForm(true);
       setOpen(true);
     } catch (e) {
       onToast?.(e instanceof Error ? e.message : "결제에 실패했습니다.");
@@ -155,13 +138,8 @@ export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
         onChanged={reload}
         onToast={onToast}
         onRequestPayCreate={requestPay}
-        onSelectLine={(id) => {
-          if (!id) return;
-          void fetchDccLineBundle(id)
-            .then(applyLineToLocalPreview)
-            .catch((e) => onToast?.(e instanceof Error ? e.message : "번호 로드 실패"));
-        }}
         onSwitchProfile={(profile) => void switchToProfile(profile)}
+        onCreateAndSwitch={createAndSwitch}
       />
       <MultiDccPaySheet
         open={payOpen}

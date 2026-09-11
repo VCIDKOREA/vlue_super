@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "../db/client.js";
 import { normalizeToE164KR } from "../lib/phoneE164.js";
+import { resolveRequestUserId } from "../lib/authContext.js";
 import { requireUserHeader } from "../middleware/cardGate.js";
 import { SearchAuthInterceptor } from "../middleware/SearchAuthInterceptor.js";
 import {
@@ -495,7 +496,21 @@ letteringRoutes.get("/showcase/style/:userId", async (c) => {
   const numberQ = String(c.req.query("number") || c.req.query("phone") || "").trim();
   if (numberQ) {
     const { getLineShowcasePublicByPhone } = await import("../services/dcc/dccLineService.js");
-    const lineLive = await getLineShowcasePublicByPhone(numberQ);
+    let viewerId: string | null = null;
+    try {
+      viewerId = (await resolveRequestUserId?.(c)) || null;
+    } catch {
+      viewerId = null;
+    }
+    if (!viewerId) {
+      try {
+        const hdr = String(c.req.header("X-VLUE-User-Id") || "").trim();
+        viewerId = hdr || null;
+      } catch {
+        viewerId = null;
+      }
+    }
+    const lineLive = await getLineShowcasePublicByPhone(numberQ, { viewerId });
     /* 번호 회선 쇼케이스는 path userId 와 일치할 때만 — 다른 회원 스타일 혼입 방지 */
     if (lineLive && String(lineLive.userId || "").trim() === userId) {
       return c.json(

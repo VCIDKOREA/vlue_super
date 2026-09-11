@@ -547,7 +547,10 @@ export async function putDccLineShowcase(
   };
 }
 
-export async function getLineShowcasePublicByPhone(rawNumber: string) {
+export async function getLineShowcasePublicByPhone(
+  rawNumber: string,
+  opts?: { viewerPhone?: string | null; viewerId?: string | null }
+) {
   const { normalizeToE164KR } = await import("../../lib/phoneE164.js");
   const e164 = normalizeToE164KR(String(rawNumber || "").trim());
   if (!e164) return null;
@@ -570,19 +573,33 @@ export async function getLineShowcasePublicByPhone(rawNumber: string) {
   let live = card.lineShowcaseLiveStyleJson || card.lineShowcaseStyleJson;
   let liveSource = card.lineShowcaseLiveSourceJson;
   let updatedAt = card.lineShowcaseUpdatedAt;
-  if (!showcaseHasContent(live)) {
-    const { getRepresentativeProfile } = await import("./dccAgentProfileService.js");
-    const agent = card.activeDccAgentProfileId
-      ? await prisma.userDccAgentProfile.findFirst({
-          where: { id: card.activeDccAgentProfileId, userId: card.userId }
-        })
-      : await getRepresentativeProfile(card.userId);
+  /* 연락처 지정 프로필 우선 → 회선 배정 → 대표 */
+  {
+    const { resolveAgentProfileForPeer, getRepresentativeProfile } = await import(
+      "./dccAgentProfileService.js"
+    );
+    let viewerPhone = opts?.viewerPhone || null;
+    if (!viewerPhone && opts?.viewerId) {
+      const viewer = await prisma.user.findUnique({
+        where: { id: opts.viewerId },
+        select: { phoneE164: true }
+      });
+      viewerPhone = viewer?.phoneE164 || null;
+    }
+    const resolved = await resolveAgentProfileForPeer(card.userId, viewerPhone);
+    const agent = resolved?.viaContact
+      ? resolved.profile
+      : card.activeDccAgentProfileId
+        ? await prisma.userDccAgentProfile.findFirst({
+            where: { id: card.activeDccAgentProfileId, userId: card.userId }
+          })
+        : resolved?.profile || (await getRepresentativeProfile(card.userId));
     const profileLive = agent?.showcaseLiveStyleJson || agent?.showcaseStyleJson;
     if (profileLive != null && showcaseHasContent(profileLive)) {
       live = profileLive;
       liveSource = null;
       updatedAt = agent?.updatedAt || null;
-    } else if (certified) {
+    } else if (!showcaseHasContent(live) && certified) {
       return null;
     }
   }

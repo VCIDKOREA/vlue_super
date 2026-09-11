@@ -686,7 +686,78 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       userId: card.user.id
     });
     const authSub = card.user.subscriptions?.[0];
-    const showcaseStyle = await overlayShowcaseStyleForUserId(card.user.id);
+    /* 멀티프로필 연락처 지정 — 조회자 번호가 지정돼 있을 때만 해당 프로필로 송출 */
+    let routedAgent: {
+      id?: string;
+      photoUrl?: string | null;
+      title?: string;
+      department?: string;
+      dccSnapshotJson?: unknown;
+      showcaseLiveStyleJson?: unknown;
+      showcaseStyleJson?: unknown;
+    } | null = null;
+    try {
+      const viewerId = opts.viewerId || null;
+      let viewerPhone: string | null = null;
+      if (viewerId) {
+        const viewer = await prisma.user.findUnique({
+          where: { id: viewerId },
+          select: { phoneE164: true }
+        });
+        viewerPhone = viewer?.phoneE164 || null;
+      }
+      const { resolveAgentProfileForPeer } = await import("./dcc/dccAgentProfileService.js");
+      const resolved = await resolveAgentProfileForPeer(card.user.id, viewerPhone);
+      if (resolved?.viaContact) routedAgent = resolved.profile;
+    } catch {
+      routedAgent = null;
+    }
+    const agentDcc =
+      routedAgent?.dccSnapshotJson && typeof routedAgent.dccSnapshotJson === "object"
+        ? (routedAgent.dccSnapshotJson as Record<string, unknown>)
+        : null;
+    const routedTitle = routedAgent
+      ? firstStr(routedAgent?.title, agentDcc?.title, rawTitle)
+      : rawTitle;
+    const routedDisplayName = routedAgent
+      ? firstStr(agentDcc?.name, agentDcc?.displayName, displayName)
+      : displayName;
+    const routedPhoto = routedAgent
+      ? httpOnlyUrl(agentDcc?.photoUrl) ||
+        (typeof routedAgent?.photoUrl === "string" ? httpOnlyUrl(routedAgent.photoUrl) : "") ||
+        imageUrl
+      : imageUrl;
+    const routedLogo = routedAgent
+      ? httpOnlyUrl(agentDcc?.logoUrl) ||
+        firstStr(card.user.digitalCard?.logoUrl, pickProfileString(profile, ["logoUrl", "logo_url"])) ||
+        (isCeo ? ceoDefaultBrandLogoUrl() : "")
+      : firstStr(
+          card.user.digitalCard?.logoUrl,
+          pickProfileString(profile, ["logoUrl", "logo_url"])
+        ) || (isCeo ? ceoDefaultBrandLogoUrl() : "");
+    let showcaseStyle = await overlayShowcaseStyleForUserId(card.user.id);
+    if (routedAgent) {
+      const live = routedAgent.showcaseLiveStyleJson || routedAgent.showcaseStyleJson;
+      if (live && typeof live === "object") {
+        const s = live as Record<string, unknown>;
+        showcaseStyle = {
+          includeDigitalCard: Boolean(s.includeDigitalCard),
+          showBroadcastName: s.showBroadcastName !== false,
+          hasPages: Array.isArray(s.pages) && s.pages.length > 0,
+          hasGallery:
+            Boolean(s.gallery) &&
+            typeof s.gallery === "object" &&
+            Array.isArray((s.gallery as { photos?: unknown }).photos) &&
+            ((s.gallery as { photos: unknown[] }).photos?.length || 0) > 0,
+          hasBgm: Boolean(
+            s.bgm &&
+              typeof s.bgm === "object" &&
+              String((s.bgm as { mode?: unknown }).mode || "") !== "none"
+          ),
+          agentProfileId: routedAgent.id || undefined
+        };
+      }
+    }
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -697,16 +768,26 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           userId: card.user.id,
           cardId: card.id,
           kind: card.kind,
-          displayName,
-          jobTitle: rawTitle,
-          companyName,
+          displayName: routedDisplayName,
+          jobTitle: routedTitle,
+          companyName: routedAgent
+            ? firstStr(agentDcc?.organization, agentDcc?.companyName, companyName)
+            : companyName,
           membershipTier: "paid",
           email,
           profile,
-          website: firstStr(profile.website),
-          photoFocus: firstStr(profile.photoFocus, exportSnap?.photoFocus),
-          titlePhotoUrl: firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
-          noTitlePhoto: Boolean(profile.noTitlePhoto || exportSnap?.noTitlePhoto),
+          website: routedAgent ? firstStr(agentDcc?.website, profile.website) : firstStr(profile.website),
+          photoFocus: routedAgent
+            ? firstStr(agentDcc?.photoFocus, profile.photoFocus, exportSnap?.photoFocus)
+            : firstStr(profile.photoFocus, exportSnap?.photoFocus),
+          titlePhotoUrl: routedAgent
+            ? firstStr(agentDcc?.titlePhotoUrl, profile.titlePhotoUrl, exportSnap?.titlePhotoUrl)
+            : firstStr(profile.titlePhotoUrl, exportSnap?.titlePhotoUrl),
+          noTitlePhoto: Boolean(
+            routedAgent
+              ? (agentDcc?.noTitlePhoto ?? profile.noTitlePhoto ?? exportSnap?.noTitlePhoto)
+              : profile.noTitlePhoto || exportSnap?.noTitlePhoto
+          ),
           accountType: accountFields.accountType || undefined,
           bankName: accountFields.bankName || undefined,
           accountNumber: accountFields.accountNumber || undefined,
@@ -717,12 +798,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           authPaidAt: authSub?.cycleStartAt ? authSub.cycleStartAt.toISOString() : null,
           digitalCardActive: Boolean(card.user.digitalCard),
           showcaseStyle,
-          image_url: imageUrl,
-          logo_url:
-            firstStr(
-              card.user.digitalCard?.logoUrl,
-              pickProfileString(profile, ["logoUrl", "logo_url"])
-            ) || (isCeo ? ceoDefaultBrandLogoUrl() : ""),
+          image_url: routedPhoto,
+          logo_url: routedLogo,
           voice_url: null,
           phoneE164: card.phoneE164,
           publicHandle: card.user.publicHandle || "",

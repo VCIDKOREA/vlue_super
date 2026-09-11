@@ -530,3 +530,276 @@
     max-width: none;
   }
 }
+
+/* 계정 전환 — YouTube형 */
+.dcc-switcher-sheet {
+  position: relative;
+}
+
+.dcc-switcher-master {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 2px 8px;
+}
+
+.dcc-switcher-master__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #64748b;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.dcc-switcher-master__name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.dcc-switcher-master__phone {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.dcc-switcher-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 4px 0 8px;
+}
+
+.dcc-switcher-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dcc-switcher-list > li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dcc-switcher-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.dcc-switcher-row:hover,
+.dcc-switcher-row.is-active {
+  background: #f1f5f9;
+}
+
+.dcc-switcher-row__photo {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+  background: #e2e8f0;
+  flex-shrink: 0;
+}
+
+.dcc-switcher-row__photo--empty {
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #94a3b8;
+}
+
+.dcc-switcher-row__text {
+  min-width: 0;
+  flex: 1;
+}
+
+.dcc-switcher-row__name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dcc-switcher-row__badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.dcc-switcher-row__meta {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.dcc-switcher-row__check {
+  flex-shrink: 0;
+  color: #0f172a;
+}
+
+.dcc-switcher-row__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 8px 6px 60px;
+}
+
+.dcc-switcher-row__tools button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+}
+
+.dcc-switcher-row__tools button.is-danger {
+  color: #b91c1c;
+}
+
+.dcc-switcher-add {
+  margin-top: 12px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 14px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.dcc-switcher-add.is-pay {
+  border-style: solid;
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.dcc-switcher-hint {
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #64748b;
+  word-break: keep-all;
+}
+
+.dcc-contacts-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: #fff;
+  border-radius: inherit;
+}
+
+.dcc-contacts-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dcc-contacts-sheet__head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.dcc-contacts-sheet__head button {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.dcc-contacts-sheet__sub {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #64748b;
+  word-break: keep-all;
+}
+
+.dcc-contacts-sheet__input {
+  width: 100%;
+  flex: 1;
+  min-height: 8rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  resize: vertical;
+}
+
+.dcc-contacts-sheet__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dcc-contacts-sheet__actions button {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dcc-contacts-sheet__actions .is-ghost {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.dcc-contacts-sheet__actions .is-primary {
+  background: #0f172a;
+  color: #fff;
+}

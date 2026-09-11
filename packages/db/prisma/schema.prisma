@@ -656,6 +656,8 @@ model UserDccAgentProfile {
   dccSnapshotJson Json? @map("dcc_snapshot_json") @db.JsonB
   showcaseStyleJson Json? @map("showcase_style_json") @db.JsonB
   showcaseLiveStyleJson Json? @map("showcase_live_style_json") @db.JsonB
+  /// 카카오톡 친구관리형 — 이 프로필로 소통할 상대 전화번호(E.164) 목록
+  routedContactPhones Json? @map("routed_contact_phones") @db.JsonB
   sortOrder   Int     @default(0) @map("sort_order")
 
   assignedLines BusinessCard[]

@@ -21,6 +21,7 @@ import { showcaseStyleHasContent, writeLocalShowcaseStyleUpdatedAt } from "../..
 import { assignDccLineAgent, fetchDccLineBundle, fetchDccLines, putDccLineDcc } from "../../lib/dccLinesApi.js";
 import { fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
 import { dccLineOptionLabel } from "../../lib/dccLineLabel.js";
+import { switchToMultiDccProfile } from "../../lib/multiDccSwitch.js";
 import DccAgentManageModal from "./DccAgentManageModal.jsx";
 import "./dcc-agent-switcher.css";
 
@@ -240,7 +241,7 @@ export default function DccLineSwitcher({
   const manageBtn = (
     <button type="button" className="dcc-agent-bar__manage" disabled={switching} onClick={() => setManageOpen(true)}>
       <Settings2 size={13} />
-        담당자·프로필 관리
+        계정 전환
     </button>
   );
 
@@ -259,10 +260,17 @@ export default function DccLineSwitcher({
       profiles={profiles}
       maxCount={maxCount}
       onClose={() => setManageOpen(false)}
-      onSelectLine={(id) => void selectLine(id)}
-      onAssignAgent={(id, nextAgentId) => void onChangeAgentForLine(id, nextAgentId)}
       onChanged={() => void refreshAfterManage()}
       onToast={onToast}
+      onSwitchProfile={(profile) =>
+        void switchToMultiDccProfile(profile, { lines, preferredLineId: lineId })
+          .then(() => {
+            onToast?.(`「${profile.label || profile.displayName || "프로필"}」로 전환했습니다.`);
+            setManageOpen(false);
+            return refreshAfterManage();
+          })
+          .catch((e) => onToast?.(e instanceof Error ? e.message : "프로필 전환에 실패했습니다."))
+      }
     />
   );
 

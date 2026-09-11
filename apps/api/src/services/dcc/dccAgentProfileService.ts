@@ -30,6 +30,8 @@ export type DccAgentDto = {
   hasShowcase: boolean;
   assignedLineIds: string[];
   assignedPhones: string[];
+  /** 이 프로필로 소통할 상대 전화번호(표시용) */
+  contactPhones: string[];
 };
 
 const PHOTO_FOCUS = new Set(["top", "center", "bottom"]);
@@ -44,7 +46,8 @@ export async function ensureMultiDccProfileBundleColumns() {
         ADD COLUMN IF NOT EXISTS "is_representative" BOOLEAN NOT NULL DEFAULT FALSE,
         ADD COLUMN IF NOT EXISTS "dcc_snapshot_json" JSONB,
         ADD COLUMN IF NOT EXISTS "showcase_style_json" JSONB,
-        ADD COLUMN IF NOT EXISTS "showcase_live_style_json" JSONB;
+        ADD COLUMN IF NOT EXISTS "showcase_live_style_json" JSONB,
+        ADD COLUMN IF NOT EXISTS "routed_contact_phones" JSONB;
     `);
     await prisma.$executeRawUnsafe(`
       CREATE INDEX IF NOT EXISTS "user_dcc_agent_profiles_user_id_is_representative_idx"
@@ -147,7 +150,21 @@ type AgentRow = {
   dccSnapshotJson?: unknown;
   showcaseStyleJson?: unknown;
   showcaseLiveStyleJson?: unknown;
+  routedContactPhones?: unknown;
 };
+
+function parseRoutedContactPhones(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const e164 = String(item || "").trim();
+    if (!e164 || seen.has(e164)) continue;
+    seen.add(e164);
+    out.push(e164);
+  }
+  return out;
+}
 
 export function toDto(
   row: AgentRow,
@@ -156,6 +173,7 @@ export function toDto(
   const hasDcc = Object.keys(snapObj(row.dccSnapshotJson)).length > 0;
   const hasShowcase =
     showcaseHasContent(row.showcaseStyleJson) || showcaseHasContent(row.showcaseLiveStyleJson);
+  const contactE164 = parseRoutedContactPhones(row.routedContactPhones);
   return {
     id: row.id,
     label: row.label || defaultAgentLabel(row.displayName, row.title),
@@ -171,7 +189,8 @@ export function toDto(
     hasDcc,
     hasShowcase,
     assignedLineIds: extras?.assignedLineIds || [],
-    assignedPhones: extras?.assignedPhones || []
+    assignedPhones: extras?.assignedPhones || [],
+    contactPhones: contactE164.map(displayPhone)
   };
 }
 
@@ -414,10 +433,27 @@ export async function createDccAgentProfile(userId: string, body: DccAgentInput)
     await assertCanCreateMultiDccSlot(userId, count);
   }
   const makeFirst = count === 0;
+  const label =
+    text(input.label, 80) ||
+    (makeFirst ? defaultAgentLabel(input.displayName, input.title) : `프로필 ${count + 1}`);
   const created = await prisma.userDccAgentProfile.create({
     data: {
       userId,
-      ...input,
+      label,
+      displayName: input.displayName,
+      /* 추가 프로필은 이름만 유지 — 직함·사진·DCC·쇼케이스는 빈 계정 */
+      title: makeFirst ? input.title : "",
+      department: makeFirst ? input.department : "",
+      photoUrl: makeFirst ? input.photoUrl : null,
+      photoFocus: input.photoFocus || "center",
+      ...(makeFirst
+        ? {}
+        : {
+            dccSnapshotJson: {} as Prisma.InputJsonValue,
+            showcaseStyleJson: {} as Prisma.InputJsonValue,
+            showcaseLiveStyleJson: {} as Prisma.InputJsonValue,
+            routedContactPhones: [] as Prisma.InputJsonValue
+          }),
       isActive: makeFirst,
       isRepresentative: makeFirst,
       sortOrder: count
@@ -568,12 +604,123 @@ export async function setRepresentativeDccProfile(userId: string, id: string): P
       data: { isActive: false }
     });
   });
+  /* 이름·전화 검색 노출은 대표 프로필 쇼케이스·사진을 따름 */
+  try {
+    const dcc = snapObj(target.dccSnapshotJson);
+    const live = target.showcaseLiveStyleJson || target.showcaseStyleJson;
+    if (live != null) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          showcaseStyleJson: (target.showcaseStyleJson as Prisma.InputJsonValue) || undefined,
+          showcaseLiveStyleJson: (live as Prisma.InputJsonValue) || undefined
+        }
+      });
+    }
+    if (target.photoUrl || Object.keys(dcc).length) {
+      await prisma.digitalCard.updateMany({
+        where: { userId },
+        data: {
+          ...(target.photoUrl ? { photoUrl: target.photoUrl } : {}),
+          ...(text(dcc.organization || dcc.companyName, 200)
+            ? { organization: text(dcc.organization || dcc.companyName, 200) }
+            : {}),
+          ...(target.title ? { titleSnapshot: target.title } : {}),
+          ...(target.department ? { departmentSnapshot: target.department } : {})
+        }
+      });
+    }
+  } catch {
+    /* non-fatal */
+  }
   const assignments = await loadAssignments(userId);
   const a = assignments.get(id);
   return toDto({ ...target, isRepresentative: true, isActive: true }, {
     assignedLineIds: a?.ids || [],
     assignedPhones: a?.phones || []
   });
+}
+
+/**
+ * 카카오톡 친구관리형 — 상대 전화번호를 이 멀티 프로필에 지정.
+ * 지정된 상대와 통화 시 이 프로필 쇼케이스가 송출된다.
+ */
+export async function setRoutedContactPhones(
+  userId: string,
+  profileId: string,
+  phonesRaw: unknown
+): Promise<DccAgentDto> {
+  await ensureMultiDccProfileBundleColumns();
+  const profile = await prisma.userDccAgentProfile.findFirst({ where: { id: profileId, userId } });
+  if (!profile) {
+    const err = new Error("멀티 프로필을 찾을 수 없습니다.");
+    (err as Error & { status?: number }).status = 404;
+    throw err;
+  }
+  const { normalizeToE164KR } = await import("../../lib/phoneE164.js");
+  const list = Array.isArray(phonesRaw) ? phonesRaw : [];
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+  for (const item of list) {
+    const e164 = normalizeToE164KR(String(item || "").trim());
+    if (!e164 || seen.has(e164)) continue;
+    seen.add(e164);
+    normalized.push(e164);
+    if (normalized.length >= 200) break;
+  }
+  /* 같은 번호는 한 프로필에만 — 다른 프로필에서 제거 */
+  const siblings = await prisma.userDccAgentProfile.findMany({
+    where: { userId, NOT: { id: profileId } },
+    select: { id: true, routedContactPhones: true }
+  });
+  await prisma.$transaction(async (tx) => {
+    await tx.userDccAgentProfile.update({
+      where: { id: profileId },
+      data: { routedContactPhones: normalized as Prisma.InputJsonValue }
+    });
+    for (const sib of siblings) {
+      const prev = parseRoutedContactPhones(sib.routedContactPhones);
+      const next = prev.filter((p) => !seen.has(p));
+      if (next.length !== prev.length) {
+        await tx.userDccAgentProfile.update({
+          where: { id: sib.id },
+          data: { routedContactPhones: next as Prisma.InputJsonValue }
+        });
+      }
+    }
+  });
+  const refreshed = await prisma.userDccAgentProfile.findFirst({ where: { id: profileId, userId } });
+  const assignments = await loadAssignments(userId);
+  const a = assignments.get(profileId);
+  return toDto(refreshed || profile, {
+    assignedLineIds: a?.ids || [],
+    assignedPhones: a?.phones || []
+  });
+}
+
+/** 상대 전화번호 → 송출할 멀티 프로필 (연락처 지정 우선, 없으면 대표) */
+export async function resolveAgentProfileForPeer(
+  ownerUserId: string,
+  peerPhoneRaw?: string | null
+): Promise<{ profile: AgentRow & { id: string }; viaContact: boolean } | null> {
+  await ensureMultiDccProfileBundleColumns();
+  const rows = await prisma.userDccAgentProfile.findMany({
+    where: { userId: ownerUserId },
+    orderBy: [{ isRepresentative: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }]
+  });
+  if (!rows.length) return null;
+  const { normalizeToE164KR } = await import("../../lib/phoneE164.js");
+  const peer = peerPhoneRaw ? normalizeToE164KR(String(peerPhoneRaw).trim()) : null;
+  if (peer) {
+    for (const row of rows) {
+      if (parseRoutedContactPhones(row.routedContactPhones).includes(peer)) {
+        return { profile: row, viaContact: true };
+      }
+    }
+  }
+  const fallback =
+    rows.find((r) => r.isRepresentative) || rows.find((r) => r.isActive) || rows[0] || null;
+  return fallback ? { profile: fallback, viaContact: false } : null;
 }
 
 /** 프로필에 회선(전화번호) 배정 — 지정된 번호에만 이 프로필 DCC·쇼케이스 송출 */

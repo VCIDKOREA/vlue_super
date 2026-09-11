@@ -6,49 +6,16 @@ import {
   fetchMultiDccEntitlement
 } from "../../lib/jobOccupationVerifyApi.js";
 import { fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
-import { fetchDccLines, fetchDccLineBundle } from "../../lib/dccLinesApi.js";
+import { fetchDccLines } from "../../lib/dccLinesApi.js";
 import {
-  writeDccLinePreviewFromBundle,
-  writeSelectedDccLineId
-} from "../../lib/dccLineState.js";
-import {
-  createDefaultShowcaseStyle,
-  writeLiveShowcaseStyle,
-  writeShowcaseStyle
-} from "../../lib/showcase/showcaseStyleStorage.js";
-import { showcaseStyleHasContent, writeLocalShowcaseStyleUpdatedAt } from "../../lib/showcase/showcaseStyleSync.js";
-import { switchToMultiDccProfile } from "../../lib/multiDccSwitch.js";
+  createCleanMultiDccProfileAndSwitch,
+  switchToMultiDccProfile
+} from "../../lib/multiDccSwitch.js";
 import DccAgentManageModal from "./DccAgentManageModal.jsx";
 import MultiDccPaySheet from "./MultiDccPaySheet.jsx";
 
-function applyLineToLocalPreview(bundle) {
-  const line = bundle?.line;
-  if (!line?.id) return;
-  writeDccLinePreviewFromBundle(bundle, { replaceMedia: true });
-  writeSelectedDccLineId(line.id);
-  const editor = bundle.showcase?.editor || bundle.showcase?.live || null;
-  const live = bundle.showcase?.live || editor;
-  const has = showcaseStyleHasContent(editor) || showcaseStyleHasContent(live);
-  if (has) {
-    writeShowcaseStyle(editor || live, { replace: true, skipSync: true });
-    writeLiveShowcaseStyle(live || editor, { source: "editor", skipSync: true });
-    if (bundle.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
-  } else {
-    const empty = createDefaultShowcaseStyle();
-    writeShowcaseStyle(empty, { replace: true, skipSync: true });
-    writeLiveShowcaseStyle(empty, { source: "editor", skipSync: true });
-  }
-  try {
-    window.dispatchEvent(new Event("vlue-showcase-style-changed"));
-    window.dispatchEvent(new Event("vlue-showcase-live-style-changed"));
-    window.dispatchEvent(new Event("vlue-lettering-bizcard-changed"));
-  } catch {
-    /* ignore */
-  }
-}
-
 /**
- * 멀티 DCC 프로필 — 계정 1개 · 프로필 N개 (DCC~쇼케이스 전체)
+ * 멀티 프로필 — 계정 전환 진입
  */
 export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compact = false }) {
   const [profiles, setProfiles] = useState([]);
@@ -72,7 +39,7 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
       setEnt(e);
       setLines(Array.isArray(l.lines) ? l.lines : []);
     } catch (err) {
-      onToast?.(err instanceof Error ? err.message : "멀티 DCC 정보를 불러오지 못했습니다.");
+      onToast?.(err instanceof Error ? err.message : "멀티 프로필을 불러오지 못했습니다.");
     }
   }, [onToast]);
 
@@ -82,6 +49,8 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
 
   const allowed = Number(ent?.allowedSlots) || 1;
   const needPay = profiles.length >= allowed;
+  const active = profiles.find((p) => p.isActive) || profiles[0];
+  const rep = profiles.find((p) => p.isRepresentative) || profiles[0];
 
   const startAdd = () => {
     if (needPay) {
@@ -118,7 +87,7 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
         slotsToAdd: 1,
         devBillingBypass: Boolean(devBypass)
       });
-      onToast?.("슬롯이 열렸습니다. 새 프로필을 만들어 주세요.");
+      onToast?.("슬롯이 열렸습니다. 새 프로필을 만듭니다…");
       setPayOpen(false);
       setOpenCreateForm(true);
       await reload();
@@ -130,32 +99,33 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
     }
   };
 
-  const onSelectLine = async (lineId) => {
-    if (!lineId) return;
-    try {
-      const bundle = await fetchDccLineBundle(lineId);
-      applyLineToLocalPreview(bundle);
-    } catch (e) {
-      onToast?.(e instanceof Error ? e.message : "번호 설정을 불러오지 못했습니다.");
-    }
+  const createAndSwitch = async () => {
+    const profile = await createCleanMultiDccProfileAndSwitch({
+      lines,
+      nextIndex: profiles.length + 1,
+      profiles
+    });
+    onToast?.(
+      `「${profile.label || "새 프로필"}」로 전환했습니다. 이름·전화 외 정보는 새로 입력하세요.`
+    );
+    setManageOpen(false);
+    await reload();
   };
 
   const shell = isDarkMode
     ? "rounded-2xl border border-white/10 bg-white/[0.04] p-3 max-w-full min-w-0 overflow-hidden"
     : "rounded-2xl border border-slate-200 bg-white p-3 shadow-sm max-w-full min-w-0 overflow-hidden";
 
-  const rep = profiles.find((p) => p.isRepresentative) || profiles[0];
-
   return (
     <div className={shell}>
       <div className="flex min-w-0 items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className={`text-[13px] font-black ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
-            멀티 DCC
+            멀티프로필 +
           </p>
           {!compact ? (
             <p className={`mt-0.5 text-[10px] leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-              전화·이름 공유 · 그 외 프로필별 · 추가 슬롯 월 {monthlyKrw.toLocaleString("ko-KR")}원
+              이름·전화만 공유 · 나머지는 프로필마다 새로 설정
             </p>
           ) : null}
         </div>
@@ -165,12 +135,13 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
           className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-800 shadow-sm sm:px-3 sm:text-[12px]"
         >
           <Plus size={14} />
-          {needPay ? "결제 후 추가" : "프로필 추가"}
+          {needPay ? "결제 후 추가" : "새 프로필"}
         </button>
       </div>
       <p className={`mt-2 text-[10px] font-semibold ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
         {profiles.length}/{allowed}
-        {rep ? ` · 대표 ${rep.displayName || "프로필"}` : ""}
+        {active ? ` · 사용 중 ${active.label || active.displayName}` : ""}
+        {rep ? ` · 대표 ${rep.label || rep.displayName}` : ""}
       </p>
       <button
         type="button"
@@ -179,7 +150,7 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
         }`}
         onClick={() => setManageOpen(true)}
       >
-        프로필 관리
+        계정 전환
       </button>
 
       <MultiDccPaySheet
@@ -206,7 +177,7 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
         onChanged={reload}
         onToast={onToast}
         onRequestPayCreate={requestPay}
-        onSelectLine={(id) => void onSelectLine(id)}
+        onCreateAndSwitch={createAndSwitch}
         onSwitchProfile={(profile) =>
           void switchToMultiDccProfile(profile, { lines })
             .then(() => {

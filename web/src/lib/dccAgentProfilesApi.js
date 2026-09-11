@@ -104,3 +104,15 @@ export async function fetchDccProfileBundle(id) {
   );
   return parseJson(res);
 }
+
+export async function setDccProfileContacts(id, phones) {
+  const res = await vlueAuthFetch(
+    apiUrl(`${DCC_AGENT_PROFILES_PATH}/${encodeURIComponent(id)}/contacts`),
+    {
+      method: "PUT",
+      headers: vlueAuthHeaders(),
+      body: JSON.stringify({ phones: Array.isArray(phones) ? phones : [] })
+    }
+  );
+  return parseJson(res);
+}
