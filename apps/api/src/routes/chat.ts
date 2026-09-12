@@ -58,11 +58,28 @@ chatRoutes.get("/peers", async (c) => {
   const excluded = await mutualBlockSet(me);
   excluded.add(me);
 
+  /* 전체 회원 스캔(300) 금지 → 수락 친구만 (Shared Pooler egress) */
+  const friendRows = await prisma.friendRequest.findMany({
+    where: {
+      status: "accepted",
+      OR: [{ fromUserId: me }, { toUserId: me }]
+    },
+    select: { fromUserId: true, toUserId: true },
+    take: 400
+  });
+  const peerIds = [
+    ...new Set(
+      friendRows
+        .map((r) => (r.fromUserId === me ? r.toUserId : r.fromUserId))
+        .filter((id) => id && !excluded.has(id))
+    )
+  ].slice(0, 100);
+
+  if (!peerIds.length) return c.json({ users: [] });
+
   const users = await prisma.user.findMany({
-    where: { id: { notIn: [...excluded] } },
-    select: { id: true, legalName: true, email: true },
-    orderBy: { createdAt: "desc" },
-    take: 300
+    where: { id: { in: peerIds } },
+    select: { id: true, legalName: true, email: true }
   });
 
   return c.json({

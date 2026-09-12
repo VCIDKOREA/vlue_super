@@ -816,7 +816,7 @@ function App() {
         /* ignore */
       }
     };
-    const id = setInterval(tick, 30000);
+    const id = setInterval(tick, 120000);
     tick();
     return () => clearInterval(id);
   }, [isLoggedIn, appMode, activeOfficeCardId]);

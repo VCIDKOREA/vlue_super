@@ -168,11 +168,19 @@ function parseRoutedContactPhones(raw: unknown): string[] {
 
 export function toDto(
   row: AgentRow,
-  extras?: { assignedLineIds?: string[]; assignedPhones?: string[]; isActiveOverride?: boolean }
+  extras?: {
+    assignedLineIds?: string[];
+    assignedPhones?: string[];
+    isActiveOverride?: boolean;
+    hasDcc?: boolean;
+    hasShowcase?: boolean;
+  }
 ): DccAgentDto {
-  const hasDcc = Object.keys(snapObj(row.dccSnapshotJson)).length > 0;
+  const hasDcc =
+    extras?.hasDcc ?? Object.keys(snapObj(row.dccSnapshotJson)).length > 0;
   const hasShowcase =
-    showcaseHasContent(row.showcaseStyleJson) || showcaseHasContent(row.showcaseLiveStyleJson);
+    extras?.hasShowcase ??
+    (showcaseHasContent(row.showcaseStyleJson) || showcaseHasContent(row.showcaseLiveStyleJson));
   const contactE164 = parseRoutedContactPhones(row.routedContactPhones);
   return {
     id: row.id,
@@ -298,6 +306,45 @@ export async function getRepresentativeProfile(userId: string) {
   return row;
 }
 
+const AGENT_LIST_SELECT = {
+  id: true,
+  label: true,
+  displayName: true,
+  title: true,
+  department: true,
+  photoUrl: true,
+  photoFocus: true,
+  isActive: true,
+  isRepresentative: true,
+  sortOrder: true,
+  updatedAt: true,
+  routedContactPhones: true
+} as const;
+
+/** 목록 조회 시 마스터→프로필 사진 heal 쓰로틀 (Shared Pooler egress 절감) */
+const masterHealAtByUser = new Map<string, number>();
+const MASTER_HEAL_TTL_MS = 10 * 60 * 1000;
+
+async function loadAgentContentFlags(userId: string): Promise<Map<string, { hasDcc: boolean; hasShowcase: boolean }>> {
+  const flagRows = await prisma.$queryRaw<
+    Array<{ id: string; has_dcc: boolean; has_sc: boolean }>
+  >`
+    SELECT id::text AS id,
+      (dcc_snapshot_json IS NOT NULL AND dcc_snapshot_json::text NOT IN ('null','{}','[]')) AS has_dcc,
+      (
+        (showcase_style_json IS NOT NULL AND showcase_style_json::text NOT IN ('null','{}','[]'))
+        OR (showcase_live_style_json IS NOT NULL AND showcase_live_style_json::text NOT IN ('null','{}','[]'))
+      ) AS has_sc
+    FROM user_dcc_agent_profiles
+    WHERE user_id = ${userId}
+  `;
+  const map = new Map<string, { hasDcc: boolean; hasShowcase: boolean }>();
+  for (const r of flagRows) {
+    map.set(String(r.id), { hasDcc: Boolean(r.has_dcc), hasShowcase: Boolean(r.has_sc) });
+  }
+  return map;
+}
+
 export async function listDccAgentProfiles(
   userId: string,
   cardId?: string | null
@@ -317,11 +364,18 @@ export async function listDccAgentProfiles(
     await ensureMultiDccProfileBundleColumns();
     let rows = await prisma.userDccAgentProfile.findMany({
       where: { userId },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: AGENT_LIST_SELECT
     });
     if (rows.length === 0) {
       const seeded = await seedFromDigitalCard(userId);
-      if (seeded) rows = [seeded];
+      if (seeded) {
+        rows = await prisma.userDccAgentProfile.findMany({
+          where: { userId },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: AGENT_LIST_SELECT
+        });
+      }
     }
     if (rows.length && !rows.some((r) => r.isRepresentative)) {
       await prisma.userDccAgentProfile.update({
@@ -330,40 +384,42 @@ export async function listDccAgentProfiles(
       });
       rows = await prisma.userDccAgentProfile.findMany({
         where: { userId },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        select: AGENT_LIST_SELECT
       });
     }
-    /* 목록 조회 시 마스터 명함 사진 → 활성·대표 칸 동기화(옛 사진 잔존 해소) */
-    try {
-      const card = await prisma.digitalCard.findUnique({
-        where: { userId },
-        select: {
-          photoUrl: true,
-          displayName: true,
-          titleSnapshot: true,
-          departmentSnapshot: true,
-          exportSnapshotJson: true
-        }
-      });
-      const snap =
-        card?.exportSnapshotJson && typeof card.exportSnapshotJson === "object"
-          ? (card.exportSnapshotJson as Record<string, unknown>)
-          : {};
-      const masterPhoto = text(card?.photoUrl || snap.photoUrl, 1024);
-      if (masterPhoto && (isHttpMediaUrl(masterPhoto) || masterPhoto.startsWith("/"))) {
-        await syncMasterIdentityToPrimaryAgents(userId, {
-          photoUrl: masterPhoto,
-          displayName: text(card?.displayName || snap.name || snap.displayName, 120) || null,
-          title: text(card?.titleSnapshot || snap.title, 120) || null,
-          department: text(card?.departmentSnapshot || snap.department, 120) || null
-        });
-        rows = await prisma.userDccAgentProfile.findMany({
+    /* 마스터 사진 동기화 — 전체 exportSnapshotJson 로드 금지, 10분에 1회만 */
+    const now = Date.now();
+    const lastHeal = masterHealAtByUser.get(userId) || 0;
+    if (now - lastHeal >= MASTER_HEAL_TTL_MS) {
+      masterHealAtByUser.set(userId, now);
+      try {
+        const card = await prisma.digitalCard.findUnique({
           where: { userId },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+          select: {
+            photoUrl: true,
+            displayName: true,
+            titleSnapshot: true,
+            departmentSnapshot: true
+          }
         });
+        const masterPhoto = text(card?.photoUrl, 1024);
+        if (masterPhoto && (isHttpMediaUrl(masterPhoto) || masterPhoto.startsWith("/"))) {
+          await syncMasterIdentityToPrimaryAgents(userId, {
+            photoUrl: masterPhoto,
+            displayName: text(card?.displayName, 120) || null,
+            title: text(card?.titleSnapshot, 120) || null,
+            department: text(card?.departmentSnapshot, 120) || null
+          });
+          rows = await prisma.userDccAgentProfile.findMany({
+            where: { userId },
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+            select: AGENT_LIST_SELECT
+          });
+        }
+      } catch {
+        /* ignore heal errors */
       }
-    } catch {
-      /* ignore heal errors */
     }
     let activeId = rows.find((p) => p.isActive)?.id || rows[0]?.id || null;
     if (cardId) {
@@ -373,14 +429,20 @@ export async function listDccAgentProfiles(
       });
       if (line?.activeDccAgentProfileId) activeId = line.activeDccAgentProfileId;
     }
-    const assignments = await loadAssignments(userId);
+    const [assignments, flags] = await Promise.all([
+      loadAssignments(userId),
+      loadAgentContentFlags(userId)
+    ]);
     const representativeId = rows.find((p) => p.isRepresentative)?.id || activeId;
     const profiles = rows.map((row) => {
       const a = assignments.get(row.id);
-      return toDto(row, {
+      const f = flags.get(row.id);
+      return toDto(row as AgentRow, {
         assignedLineIds: a?.ids || [],
         assignedPhones: a?.phones || [],
-        isActiveOverride: row.id === activeId
+        isActiveOverride: row.id === activeId,
+        hasDcc: f?.hasDcc,
+        hasShowcase: f?.hasShowcase
       });
     });
     let entitlement = {
@@ -698,15 +760,39 @@ export async function setRoutedContactPhones(
   });
 }
 
-/** 상대 전화번호 → 송출할 멀티 프로필 (연락처 지정 우선, 없으면 대표) */
+/** 상대 전화번호 → 송출할 멀티 프로필 (연락처 지정 우선, 없으면 대표) — showcase JSON 미로드 */
 export async function resolveAgentProfileForPeer(
   ownerUserId: string,
   peerPhoneRaw?: string | null
-): Promise<{ profile: AgentRow & { id: string }; viaContact: boolean } | null> {
+): Promise<{
+  profile: {
+    id: string;
+    photoUrl?: string | null;
+    title?: string;
+    department?: string;
+    displayName?: string;
+    dccSnapshotJson?: unknown;
+    showcaseLiveStyleJson?: unknown;
+    showcaseStyleJson?: unknown;
+  };
+  viaContact: boolean;
+} | null> {
   await ensureMultiDccProfileBundleColumns();
   const rows = await prisma.userDccAgentProfile.findMany({
     where: { userId: ownerUserId },
-    orderBy: [{ isRepresentative: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }]
+    orderBy: [{ isRepresentative: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      isRepresentative: true,
+      isActive: true,
+      routedContactPhones: true,
+      photoUrl: true,
+      title: true,
+      department: true,
+      displayName: true,
+      dccSnapshotJson: true
+      /* showcase*Json 제외 — 오버레이는 플래그만 필요, 풀 JSON은 Shared Pooler egress 폭증 */
+    }
   });
   if (!rows.length) return null;
   const { normalizeToE164KR } = await import("../../lib/phoneE164.js");
@@ -903,8 +989,7 @@ export async function syncMasterIdentityToPrimaryAgents(
       id: true,
       isActive: true,
       isRepresentative: true,
-      photoUrl: true,
-      dccSnapshotJson: true
+      photoUrl: true
     }
   });
   if (!rows.length) return { updated: 0 };
@@ -929,31 +1014,7 @@ export async function syncMasterIdentityToPrimaryAgents(
     if (displayName) data.displayName = displayName;
     if (title) data.title = title;
     if (department) data.department = department;
-
-    const prev = snapObj(row.dccSnapshotJson);
-    const nextSnap: Record<string, unknown> = { ...prev };
-    let snapChanged = false;
-    if (photoUrl !== null || opts.photoUrl === "") {
-      if (photoUrl) nextSnap.photoUrl = photoUrl;
-      else delete nextSnap.photoUrl;
-      snapChanged = true;
-    }
-    if (displayName) {
-      nextSnap.name = displayName;
-      nextSnap.displayName = displayName;
-      snapChanged = true;
-    }
-    if (title) {
-      nextSnap.title = title;
-      snapChanged = true;
-    }
-    if (department) {
-      nextSnap.department = department;
-      snapChanged = true;
-    }
-    if (snapChanged) {
-      data.dccSnapshotJson = nextSnap as Prisma.InputJsonValue;
-    }
+    /* dccSnapshotJson 재기록 생략 — 목록 heal에서 풀 JSON R/W 는 Shared Pooler egress 폭증 */
     if (Object.keys(data).length === 0) continue;
     await prisma.userDccAgentProfile.update({ where: { id: row.id }, data });
     updated += 1;

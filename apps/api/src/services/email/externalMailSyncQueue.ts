@@ -4,7 +4,7 @@ import { insertInappMailCache } from "./inappMailCacheStore.js";
 import { userHasPremiumTier } from "../../middleware/cardGate.js";
 
 const BATCH_SIZE = Number(process.env.VLUE_IMAP_SYNC_BATCH_SIZE || 50);
-const TICK_MS = Number(process.env.VLUE_IMAP_SYNC_TICK_MS || 30_000);
+const TICK_MS = Number(process.env.VLUE_IMAP_SYNC_TICK_MS || 120_000);
 
 export type ExternalMailAccountRow = {
   id: string;
