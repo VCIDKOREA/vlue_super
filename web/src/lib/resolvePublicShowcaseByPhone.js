@@ -62,6 +62,11 @@ async function fetchPublicCardExport(userId) {
     photoFocus: exp?.photoFocus || "center",
     companyIntro: String(exp?.companyIntro || "").trim(),
     customBackText: String(exp?.customBackText || "").trim(),
+    accountType: String(exp?.accountType || "").trim(),
+    bankName: String(exp?.bankName || "").trim(),
+    accountNumber: String(exp?.accountNumber || "").replace(/\D/g, ""),
+    accountHolder: String(exp?.accountHolder || "").trim(),
+    isGroupVerified: Boolean(exp?.isGroupVerified),
     membershipTier: String(
       res.data.membershipTier || res.data.profile?.membershipTier || ""
     ).toLowerCase(),
@@ -178,6 +183,11 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
     noTitlePhoto: Boolean(exportSnap?.noTitlePhoto || body.noTitlePhoto),
     photoFocus: exportSnap?.photoFocus || "center",
     logoUrl: exportSnap?.logoUrl || "",
+    accountType: String(exportSnap?.accountType || "").trim(),
+    bankName: String(exportSnap?.bankName || "").trim(),
+    accountNumber: String(exportSnap?.accountNumber || "").replace(/\D/g, ""),
+    accountHolder: String(exportSnap?.accountHolder || "").trim(),
+    isGroupVerified: Boolean(exportSnap?.isGroupVerified),
     membershipTier: tier,
     authCycleEndAt: exportSnap?.authCycleEndAt || null,
     authPaidAt: exportSnap?.authPaidAt || null,

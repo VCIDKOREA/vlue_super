@@ -43,8 +43,8 @@ const ACCOUNTS = [
   {
     publicHandle: "jajaksl123",
     passwordEnv: "VLUE_QA_PASS_JAJAKSL123",
-    legalName: "QA테스터1",
-    phoneE164: "+821099880001",
+    legalName: "김진현",
+    phoneE164: "+821025816466",
     portoneIdentityId: "qa_seed_jajaksl123_v1"
   },
   {

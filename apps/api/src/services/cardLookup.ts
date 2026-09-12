@@ -67,7 +67,11 @@ function expiredLineLookupBody(opts: {
 
 async function resolveLineBillingGate(e164: string) {
   const card = await prisma.businessCard.findFirst({
-    where: { phoneE164: e164 },
+    where: {
+      phoneE164: e164,
+      /* 탈퇴 계정 명함은 회선 게이트·조회에서 제외 — ACTIVE 소유자만 */
+      user: { status: "ACTIVE" }
+    },
     select: {
       id: true,
       userId: true,
@@ -548,7 +552,11 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
   const [peer, card] = await Promise.all([
     readOutgoingCallPathSignal(e164),
     prisma.businessCard.findFirst({
-    where: { phoneE164: e164 },
+    where: {
+      phoneE164: e164,
+      /* DELETED/INACTIVE 소유 명함은 무시 — 재가입 ACTIVE 유저.phoneE164 폴백으로 넘김 */
+      user: { status: "ACTIVE" }
+    },
     select: {
       id: true,
       userId: true,
@@ -570,6 +578,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           phoneE164: true,
           identityVerified: true,
           isShowcasePrivate: true,
+          status: true,
           businessProfile: { select: { companyName: true, jobTitle: true } },
           digitalCard: {
             select: {

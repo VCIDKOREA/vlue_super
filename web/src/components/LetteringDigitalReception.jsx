@@ -684,8 +684,12 @@ function AccountViewPopup({ card, onClose, onToast }) {
   );
 }
 
-/** 미리보기 카드에 계좌가 빠졌을 때 로컬 편집값으로 보강(본인 DCC) */
-function withLocalDccAccountFallback(card = {}) {
+/**
+ * 미리보기 카드에 계좌가 빠졌을 때 로컬 편집값으로 보강 — 본인 DCC만.
+ * 상대 명함에 적용하면 뷰어(예: CEO) 계좌가 상대 계좌처럼 노출됨.
+ */
+function withLocalDccAccountFallback(card = {}, { isOwnCard = false } = {}) {
+  if (!isOwnCard) return card;
   if (canShowDccAccountOnCard(card)) return card;
   try {
     const ed = readLetteringBizcardEditable() || {};
@@ -719,7 +723,14 @@ function FrontPanel({
   showSnsCert = false,
   onOpenSnsCert
 }) {
-  const card = withLocalDccAccountFallback(cardProp);
+  const peerUserId = String(cardProp?.userId || cardProp?.ownerUserId || "").trim();
+  const meId = getLocalVlueUserId();
+  const isPeerCard = Boolean(peerUserId && (!meId || peerUserId !== meId));
+  /* 로컬 계좌 보강은 본인만 — userId 없는 상대 카드에 CEO 계좌가 붙지 않게 */
+  const isOwnCard = peerUserId
+    ? Boolean(meId && peerUserId === meId)
+    : Boolean(previewMode);
+  const card = withLocalDccAccountFallback(cardProp, { isOwnCard });
   const [socialOpen, setSocialOpen] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -734,9 +745,6 @@ function FrontPanel({
   const websiteRaw = String(card.website || "").trim();
   const emailRaw = String(card.email || "").trim();
   const addressRaw = String(card.address || "").trim();
-  const peerUserId = String(card.userId || card.ownerUserId || "").trim();
-  const meId = getLocalVlueUserId();
-  const isPeerCard = Boolean(peerUserId && (!meId || peerUserId !== meId));
   /*
    * 본인 미리보기(previewMode): 빈 선택 필드는 입력 유도 플레이스홀더.
    * 상대 실송출·통화기록 다시보기: 미입력·플레이스홀더 문구는 숨김.

@@ -53,6 +53,14 @@ function mergeCardFromProfile(baseCard, profRes) {
     publicHandle: String(profile.publicHandle || baseCard?.publicHandle || "")
       .replace(/^@/, "")
       .trim(),
+    accountType: String(exp?.accountType || baseCard?.accountType || "").trim(),
+    bankName: String(exp?.bankName || baseCard?.bankName || "").trim(),
+    accountNumber: String(exp?.accountNumber || baseCard?.accountNumber || "").replace(/\D/g, ""),
+    accountHolder: String(exp?.accountHolder || baseCard?.accountHolder || "").trim(),
+    isGroupVerified:
+      exp?.isGroupVerified != null
+        ? Boolean(exp.isGroupVerified)
+        : Boolean(baseCard?.isGroupVerified),
     membershipTier: tier,
     authCycleEndAt: profRes.authCycleEndAt || baseCard?.authCycleEndAt || null,
     authPaidAt: profRes.authPaidAt || baseCard?.authPaidAt || null,

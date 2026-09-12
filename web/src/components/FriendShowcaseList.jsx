@@ -413,7 +413,7 @@ export default function FriendShowcaseList({
     else goCollapsed();
   }, [refreshAnchors, sheetTopPx, goFull, goMid, goCollapsed]);
 
-  const openPreview = async (row, kind) => {
+  const openPreview = useCallback(async (row, kind) => {
     /* 탭 제스처 unlock만 — 재생은 미리보기 마운트 후 캐러셀이 담당 */
     try {
       unlockAudioGesture?.();
@@ -443,8 +443,8 @@ export default function FriendShowcaseList({
         displayName: row.name || "",
         membershipTier: row.membershipTier || "free",
         avatarUrl: row.avatarUrl || "",
-        /* 팔로우 목록 열람은 항상 최신 라이브 스타일 */
-        forceStyle: true,
+        /* UUID 있으면 전화 reconcile 생략 — 캐시 허용으로 체감 속도 개선 */
+        forceStyle: false,
         viewContext: activeTab === "following" ? "follow" : "search"
       });
       const tier = payload.card?.membershipTier || row.membershipTier || "free";
@@ -485,7 +485,7 @@ export default function FriendShowcaseList({
     } finally {
       setPreviewLoading(false);
     }
-  };
+  }, [activeTab, unlockAudioGesture, setPlaybackPhase]);
 
   useEffect(() => {
     const onOpen = (ev) => {

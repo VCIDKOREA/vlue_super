@@ -4953,7 +4953,7 @@ function App() {
                 avatarUrl: user.avatarUrl || user.photoUrl,
                 membershipTier: user.membershipTier
               });
-            }, 120);
+            }, 0);
           }}
           onFriendEstablished={(userId, userName) => {
             ensureFriendRoom(userId, userName || "친구");

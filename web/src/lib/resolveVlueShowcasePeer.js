@@ -50,8 +50,12 @@ function mergePeerLiveStyle(base, live) {
  *   avatarUrl?: string,
  *   viewContext?: 'search'|'follow'|'full',
  */
-/** 통화기록 스냅샷 userId 오염 시 — 번호 조회가 SoT */
-async function reconcilePeerUserIdFromPhone(userId, phoneHint) {
+/**
+ * 통화기록 스냅샷 userId 오염 시 — 번호 조회가 SoT.
+ * 친구/팔로우처럼 UUID가 이미 있으면 생략 (추가 RTT 제거).
+ */
+async function reconcilePeerUserIdFromPhone(userId, phoneHint, { force = false } = {}) {
+  if (UUID_RE.test(userId) && !force) return userId;
   const phone = String(phoneHint || "").trim();
   if (!phone) return userId;
   const byPhone = await resolveVlueShowcaseByPhone(phone);
@@ -69,7 +73,9 @@ export async function resolveVlueShowcasePeer(input = {}) {
     .trim();
   const phoneHint = String(input.phone || "").trim();
 
-  userId = await reconcilePeerUserIdFromPhone(userId, phoneHint);
+  userId = await reconcilePeerUserIdFromPhone(userId, phoneHint, {
+    force: Boolean(input.forcePhoneReconcile)
+  });
 
   if (!UUID_RE.test(userId) && handle) {
     const looked = await lookupUserByHandle(handle);
@@ -105,112 +111,146 @@ export async function resolveVlueShowcasePeer(input = {}) {
       fetchPeerShowcaseStyleBundle(userId, { force: Boolean(input.forceStyle) })
     ]);
 
-    if (profRes.ok) {
-      const profile = profRes.profile || {};
-      const exp = profRes.cardExport && typeof profRes.cardExport === "object" ? profRes.cardExport : null;
-
-      name =
-        String(exp?.name || profile.displayName || profile.legalName || "").trim() ||
-        (profile.publicHandle ? `@${String(profile.publicHandle).replace(/^@/, "")}` : "") ||
-        name;
-      if (profile.phoneE164) {
-        phoneDisplay = formatLetteringPhoneDisplay(profile.phoneE164) || phoneDisplay;
-      } else if (profile.phoneDisplay) {
-        phoneDisplay = String(profile.phoneDisplay).trim() || phoneDisplay;
+    /* 탈퇴·고아 UUID(연락처/명함 잔존) — 번호·핸들로 ACTIVE 계정 재해석 후 1회 재시도 */
+    if (!profRes.ok && /user_not_found/i.test(String(profRes.error || ""))) {
+      let recovered = "";
+      if (phoneHint) {
+        recovered = await reconcilePeerUserIdFromPhone("", phoneHint, { force: true });
       }
-      if (typeof profile.phoneDialEnabled === "boolean") {
-        phoneDialEnabled = profile.phoneDialEnabled;
-      } else if (profile.phoneVisible === false) {
-        phoneDialEnabled = false;
+      if ((!UUID_RE.test(recovered) || recovered === userId) && handle) {
+        const looked = await lookupUserByHandle(handle);
+        if (looked.ok && looked.user?.id) recovered = String(looked.user.id).trim();
       }
-      organization =
-        String(exp?.organization || profile.companyName || "").trim() || organization;
-      title = String(exp?.title || profile.jobTitle || "").trim() || title;
-      department = String(exp?.department || "").trim();
-      email = String(exp?.email || "").trim();
-      website = String(exp?.website || "").trim();
-      fax = String(exp?.fax || "").trim();
-      address = String(profile.address || exp?.address || "").trim() || address;
-      publicHandle = String(profile.publicHandle || handle || "")
-        .replace(/^@/, "")
-        .trim();
-      logoUrl = String(exp?.logoUrl || "").trim();
-      photoFocus = String(exp?.photoFocus || "center").trim() || "center";
-      activityName = String(exp?.activityName || "").trim();
-      /* photo ≠ logo — 로고를 프로필 사진으로 쓰지 않음 */
-      photoUrl =
-        String(exp?.photoUrl || profile.photoUrl || photoUrl).trim() || photoUrl;
-      titlePhotoUrl = String(exp?.titlePhotoUrl || "").trim();
-      noTitlePhoto = Boolean(exp?.noTitlePhoto);
-      if (profile.membershipTier || profRes.membershipTier) {
-        tier = String(profile.membershipTier || profRes.membershipTier).toLowerCase();
+      if (UUID_RE.test(recovered) && recovered !== userId && !input._recoveredStaleUserId) {
+        return resolveVlueShowcasePeer({
+          ...input,
+          userId: recovered,
+          forcePhoneReconcile: false,
+          _recoveredStaleUserId: true
+        });
       }
-      authCycleEndAt = profRes.authCycleEndAt || null;
-      authPaidAt = profRes.authPaidAt || null;
-    }
+      /* 복구 실패 시 전화 폴백으로 이어감 */
+      userId = "";
+    } else {
+      let exp = null;
+      if (profRes.ok) {
+        const profile = profRes.profile || {};
+        exp = profRes.cardExport && typeof profRes.cardExport === "object" ? profRes.cardExport : null;
 
-    let live =
-      styleRes.ok && styleRes.live && typeof styleRes.live === "object" ? styleRes.live : null;
-    /* 캐시·auth 응답에 콘텐츠 페이지가 없으면 공개 라이브로 한 번 더 보강 */
-    if (!styleHasShowcaseContent(live)) {
-      const pub = await fetchPeerLiveStylePublic(userId, {
-        force: Boolean(input.forceStyle) || !live,
-        number: phoneHint
-      });
-      if (pub && typeof pub === "object") {
-        live = mergePeerLiveStyle(live, pub);
+        name =
+          String(exp?.name || profile.displayName || profile.legalName || "").trim() ||
+          (profile.publicHandle ? `@${String(profile.publicHandle).replace(/^@/, "")}` : "") ||
+          name;
+        if (profile.phoneE164) {
+          phoneDisplay = formatLetteringPhoneDisplay(profile.phoneE164) || phoneDisplay;
+        } else if (profile.phoneDisplay) {
+          phoneDisplay = String(profile.phoneDisplay).trim() || phoneDisplay;
+        }
+        if (typeof profile.phoneDialEnabled === "boolean") {
+          phoneDialEnabled = profile.phoneDialEnabled;
+        } else if (profile.phoneVisible === false) {
+          phoneDialEnabled = false;
+        }
+        organization =
+          String(exp?.organization || profile.companyName || "").trim() || organization;
+        title = String(exp?.title || profile.jobTitle || "").trim() || title;
+        department = String(exp?.department || "").trim();
+        email = String(exp?.email || "").trim();
+        website = String(exp?.website || "").trim();
+        fax = String(exp?.fax || "").trim();
+        address = String(profile.address || exp?.address || "").trim() || address;
+        publicHandle = String(profile.publicHandle || handle || "")
+          .replace(/^@/, "")
+          .trim();
+        logoUrl = String(exp?.logoUrl || "").trim();
+        photoFocus = String(exp?.photoFocus || "center").trim() || "center";
+        activityName = String(exp?.activityName || "").trim();
+        /* photo ≠ logo — 로고를 프로필 사진으로 쓰지 않음 */
+        photoUrl =
+          String(exp?.photoUrl || profile.photoUrl || photoUrl).trim() || photoUrl;
+        titlePhotoUrl = String(exp?.titlePhotoUrl || "").trim();
+        noTitlePhoto = Boolean(exp?.noTitlePhoto);
+        if (profile.membershipTier || profRes.membershipTier) {
+          tier = String(profile.membershipTier || profRes.membershipTier).toLowerCase();
+        }
+        authCycleEndAt = profRes.authCycleEndAt || null;
+        authPaidAt = profRes.authPaidAt || null;
       }
-    }
-    const showcaseStyle = live || createDefaultShowcaseStyle();
 
-    const card = normalizeLetteringCard({
-      userId,
-      ownerUserId: userId,
-      name,
-      title,
-      department,
-      organization,
-      phone: phoneDisplay,
-      phoneDialEnabled,
-      email,
-      website,
-      fax,
-      address,
-      publicHandle,
-      loginId: publicHandle,
-      handle: publicHandle,
-      activityName: activityName || name,
-      photoUrl,
-      titlePhotoUrl,
-      noTitlePhoto,
-      photoFocus,
-      logoUrl,
-      membershipTier: tier,
-      authCycleEndAt,
-      authPaidAt,
-      cycleEndAt: authCycleEndAt,
-      verificationItems: ["VLUÉ 인증"],
-      showcaseStyle
-    });
+      const accountType = String(exp?.accountType || "").trim();
+      const bankName = String(exp?.bankName || "").trim();
+      const accountNumber = String(exp?.accountNumber || "").replace(/\D/g, "");
+      const accountHolder = String(exp?.accountHolder || "").trim();
+      const isGroupVerified = Boolean(exp?.isGroupVerified);
 
-    return {
-      phone: phoneDisplay,
-      verified: true,
-      source: "peer",
-      isPaid: isPaidLetteringTier(tier),
-      card: {
-        ...card,
+      let live =
+        styleRes.ok && styleRes.live && typeof styleRes.live === "object" ? styleRes.live : null;
+      /* 캐시·auth 응답에 콘텐츠 페이지가 없으면 공개 라이브로 한 번 더 보강 */
+      if (!styleHasShowcaseContent(live)) {
+        const pub = await fetchPeerLiveStylePublic(userId, {
+          force: Boolean(input.forceStyle) || !live,
+          number: phoneHint
+        });
+        if (pub && typeof pub === "object") {
+          live = mergePeerLiveStyle(live, pub);
+        }
+      }
+      const showcaseStyle = live || createDefaultShowcaseStyle();
+
+      const card = normalizeLetteringCard({
         userId,
         ownerUserId: userId,
-        showcaseStyle,
-        photoFocus: card.photoFocus,
-        logoUrl: card.logoUrl,
+        name,
+        title,
+        department,
+        organization,
+        phone: phoneDisplay,
+        phoneDialEnabled,
+        email,
+        website,
+        fax,
+        address,
+        publicHandle,
+        loginId: publicHandle,
+        handle: publicHandle,
+        activityName: activityName || name,
+        photoUrl,
+        titlePhotoUrl,
+        noTitlePhoto,
+        photoFocus,
+        logoUrl,
+        accountType,
+        bankName,
+        accountNumber,
+        accountHolder,
+        isGroupVerified,
+        membershipTier: tier,
         authCycleEndAt,
         authPaidAt,
-        cycleEndAt: authCycleEndAt
-      },
-      showcaseStyle
-    };
+        cycleEndAt: authCycleEndAt,
+        verificationItems: ["VLUÉ 인증"],
+        showcaseStyle
+      });
+
+      return {
+        phone: phoneDisplay,
+        verified: true,
+        source: "peer",
+        isPaid: isPaidLetteringTier(tier),
+        card: {
+          ...card,
+          userId,
+          ownerUserId: userId,
+          showcaseStyle,
+          photoFocus: card.photoFocus,
+          logoUrl: card.logoUrl,
+          authCycleEndAt,
+          authPaidAt,
+          cycleEndAt: authCycleEndAt
+        },
+        showcaseStyle
+      };
+    }
   }
 
   /* userId 없으면 전화 폴백 — 112 등 DCP는 UUID 없이 쇼케이스 */
