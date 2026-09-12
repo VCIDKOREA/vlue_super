@@ -20,8 +20,12 @@ export type EnterpriseDccStatus =
   | "draft"
   | "biz_verified"
   | "awaiting_related_otp"
+  | "awaiting_owner_approval"
   | "related_verified"
+  | "docs_submitted"
   | "details_ready"
+  | "awaiting_security_gate"
+  | "security_verified"
   | "pending_approval"
   | "approved"
   | "rejected"
@@ -87,7 +91,22 @@ export function ensureEnterpriseDccTable() {
         ALTER TABLE "enterprise_dcc_applications"
           ADD COLUMN IF NOT EXISTS "manage_login_id" VARCHAR(32),
           ADD COLUMN IF NOT EXISTS "manage_password_hash" VARCHAR(256),
-          ADD COLUMN IF NOT EXISTS "dcc_contact_email" VARCHAR(254);
+          ADD COLUMN IF NOT EXISTS "dcc_contact_email" VARCHAR(254),
+          ADD COLUMN IF NOT EXISTS "scenario" VARCHAR(32),
+          ADD COLUMN IF NOT EXISTS "workplace_address" TEXT,
+          ADD COLUMN IF NOT EXISTS "workplace_lat" DOUBLE PRECISION,
+          ADD COLUMN IF NOT EXISTS "workplace_lng" DOUBLE PRECISION,
+          ADD COLUMN IF NOT EXISTS "docs_json" JSONB,
+          ADD COLUMN IF NOT EXISTS "security_attested_at" TIMESTAMPTZ(6),
+          ADD COLUMN IF NOT EXISTS "owner_reject_reason" TEXT;
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "dcc_create_bans" (
+          "user_id" UUID PRIMARY KEY,
+          "reason" TEXT NOT NULL DEFAULT '',
+          "source_application_id" UUID,
+          "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
       `);
     })()
       .then(() => undefined)
@@ -118,6 +137,13 @@ type AppRow = {
   admin_note: string | null;
   reviewed_at: Date | null;
   reviewed_by_user_id: string | null;
+  scenario?: string | null;
+  workplace_address?: string | null;
+  workplace_lat?: number | null;
+  workplace_lng?: number | null;
+  docs_json?: unknown;
+  security_attested_at?: Date | null;
+  owner_reject_reason?: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -142,6 +168,13 @@ function mapApp(row: AppRow) {
     adminNote: row.admin_note,
     reviewedAt: row.reviewed_at,
     reviewedByUserId: row.reviewed_by_user_id,
+    scenario: row.scenario || null,
+    workplaceAddress: row.workplace_address || "",
+    workplaceLat: row.workplace_lat ?? null,
+    workplaceLng: row.workplace_lng ?? null,
+    docs: row.docs_json && typeof row.docs_json === "object" ? row.docs_json : null,
+    securityAttestedAt: row.security_attested_at || null,
+    ownerRejectReason: row.owner_reject_reason || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -252,6 +285,9 @@ export async function verifyBusinessAndStartApplication(input: {
   const openDate = digitsOnly(input.openDate);
 
   if (!applicantUserId) throw new Error("로그인이 필요합니다.");
+  if (await isDccCreateBanned(applicantUserId)) {
+    throw new Error("DCC 생성 권한이 영구 차단된 계정입니다. 고객지원에 문의해 주세요.");
+  }
   if (bno.length !== 10) throw new Error("사업자등록번호 10자리를 입력해 주세요.");
   if (!rep) throw new Error("대표자 성명을 입력해 주세요.");
   if (openDate.length !== 8) throw new Error("개업연월일(YYYYMMDD)을 입력해 주세요.");
@@ -453,8 +489,8 @@ export async function saveEnterpriseDccDetails(input: {
   const { parties } = await listRelatedPartiesForBizNo(app.business_registration_no);
   const needsOtp = parties.length > 0;
   const allowed = needsOtp
-    ? ["related_verified", "details_ready", "pending_approval"].includes(app.status)
-    : ["biz_verified", "related_verified", "details_ready", "pending_approval"].includes(app.status);
+    ? ["related_verified", "docs_submitted", "details_ready", "pending_approval", "security_verified", "awaiting_security_gate"].includes(app.status)
+    : ["biz_verified", "related_verified", "docs_submitted", "details_ready", "pending_approval", "security_verified", "awaiting_security_gate"].includes(app.status);
   if (!allowed) {
     throw new Error(needsOtp ? "관계자 인증을 먼저 완료해 주세요." : "사업자 인증을 먼저 완료해 주세요.");
   }
@@ -517,21 +553,27 @@ export async function saveEnterpriseDccDetails(input: {
     managePasswordHash
   );
   const next = await getApp(app.id);
-  return { ok: true, application: next ? mapApp(next) : null, nextStep: "submit" };
+  return { ok: true, application: next ? mapApp(next) : null, nextStep: "security_gate" };
 }
 
-/** 6단계: 승인 대기 제출 */
+/** 6단계: 승인 대기 제출 — 위치·보안 인증 완료 필수 */
 export async function submitEnterpriseDccForApproval(input: {
   applicationId: string;
   applicantUserId: string;
 }) {
   await ensureEnterpriseDccTable();
+  if (await isDccCreateBanned(input.applicantUserId)) {
+    throw new Error("DCC 생성 권한이 영구 차단된 계정입니다.");
+  }
   const app = await getApp(input.applicationId);
   if (!app || app.applicant_user_id !== input.applicantUserId) {
     throw new Error("신청 정보를 찾을 수 없습니다.");
   }
-  if (app.status !== "details_ready" && app.status !== "pending_approval") {
-    throw new Error("상세 정보를 먼저 저장해 주세요.");
+  if (app.status !== "security_verified" && app.status !== "pending_approval") {
+    throw new Error("위치·보안 환경 인증을 먼저 완료해 주세요.");
+  }
+  if (!app.security_attested_at && app.status !== "pending_approval") {
+    throw new Error("위치 인증이 필요합니다.");
   }
   await prisma.$executeRawUnsafe(
     `UPDATE enterprise_dcc_applications SET status = 'pending_approval', updated_at = NOW() WHERE id = $1::uuid`,
@@ -772,3 +814,430 @@ export async function markEnterpriseDccPaid(applicationId: string, applicantUser
   });
   return { ok: true };
 }
+
+/** DCC 생성 영구 차단 여부 */
+export async function isDccCreateBanned(userId: string): Promise<boolean> {
+  await ensureEnterpriseDccTable();
+  const rows = await prisma.$queryRawUnsafe<Array<{ user_id: string }>>(
+    `SELECT user_id FROM dcc_create_bans WHERE user_id = $1::uuid LIMIT 1`,
+    userId
+  );
+  return Boolean(rows[0]);
+}
+
+async function banDccCreate(userId: string, reason: string, applicationId?: string) {
+  await ensureEnterpriseDccTable();
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO dcc_create_bans (user_id, reason, source_application_id, created_at)
+     VALUES ($1::uuid, $2, $3::uuid, NOW())
+     ON CONFLICT (user_id) DO UPDATE SET reason = EXCLUDED.reason, source_application_id = EXCLUDED.source_application_id`,
+    userId,
+    String(reason || "owner_reject_impersonation").slice(0, 500),
+    applicationId || null
+  );
+}
+
+/**
+ * 시나리오 A — 등록 기업 대표/관계자에게 승인 요청 푸시
+ */
+export async function requestOwnerApproval(input: {
+  applicationId: string;
+  applicantUserId: string;
+  relatedPartyUserId: string;
+  department?: string;
+  contactName?: string;
+  confirmAcknowledged?: boolean;
+}) {
+  await ensureEnterpriseDccTable();
+  if (await isDccCreateBanned(input.applicantUserId)) {
+    throw new Error("DCC 생성 권한이 영구 차단된 계정입니다. 고객지원에 문의해 주세요.");
+  }
+  if (!input.confirmAcknowledged) {
+    throw new Error("대표자 인증 알림 전송에 동의해 주세요.");
+  }
+  const app = await getApp(input.applicationId);
+  if (!app || app.applicant_user_id !== input.applicantUserId) {
+    throw new Error("신청 정보를 찾을 수 없습니다.");
+  }
+  if (!["biz_verified", "awaiting_related_otp", "awaiting_owner_approval"].includes(app.status)) {
+    throw new Error("사업자 인증을 먼저 완료해 주세요.");
+  }
+
+  const { parties } = await listRelatedPartiesForBizNo(app.business_registration_no);
+  const party = parties.find((p) => p.userId === input.relatedPartyUserId);
+  if (!party) throw new Error("등록된 기업 관계자만 선택할 수 있습니다. 임의 상호 입력은 불가합니다.");
+
+  const applicant = await prisma.user.findUnique({
+    where: { id: input.applicantUserId },
+    select: { legalName: true, publicHandle: true }
+  });
+  const applicantName =
+    String(input.contactName || applicant?.legalName || "").trim() || "신청자";
+  const dept = String(input.department || app.department || "").trim() || "부서 미입력";
+  const titleBody = `${app.company_name_locked || "회사"} 직장으로 인증 요청이 왔습니다.`;
+  const body = `[${applicantName}]님께서 [${dept}]으로 대표자 인증을 요청하였습니다. 승인하시겠습니까? (거절 / 승인)`;
+
+  await prisma.$executeRawUnsafe(
+    `UPDATE enterprise_dcc_applications SET
+       related_party_user_id = $2::uuid,
+       department = COALESCE(NULLIF($3, ''), department),
+       contact_name = COALESCE(NULLIF($4, ''), contact_name),
+       scenario = 'owner_registered',
+       status = 'awaiting_owner_approval',
+       updated_at = NOW()
+     WHERE id = $1::uuid`,
+    app.id,
+    party.userId,
+    dept.slice(0, 120),
+    applicantName.slice(0, 120)
+  );
+
+  let notificationId = "";
+  try {
+    const { ssePublish } = await import("../../realtime/sseHub.js");
+    const { sendShowcaseSocialPushToUser } = await import("../fcmNotificationService.js");
+    const row = await prisma.ownerNotification.create({
+      data: {
+        ownerUserId: party.userId,
+        actorUserId: input.applicantUserId,
+        title: titleBody.slice(0, 120),
+        body: body.slice(0, 4000),
+        payloadJson: {
+          type: "vlue-dcc-owner-approval",
+          applicationId: app.id,
+          companyName: app.company_name_locked,
+          applicantUserId: input.applicantUserId,
+          applicantName,
+          department: dept
+        }
+      }
+    });
+    notificationId = row.id;
+    ssePublish(party.userId, {
+      type: "vlue-dcc-owner-approval",
+      title: titleBody,
+      body,
+      applicationId: app.id,
+      notificationId,
+      at: new Date().toISOString()
+    });
+    void sendShowcaseSocialPushToUser(party.userId, titleBody, body.slice(0, 180), {
+      type: "vlue-dcc-owner-approval",
+      applicationId: app.id
+    });
+  } catch (e) {
+    console.warn("[enterprise-dcc] owner approval notify failed", e);
+  }
+
+  const next = await getApp(app.id);
+  return {
+    ok: true,
+    application: next ? mapApp(next) : null,
+    sentTo: {
+      userId: party.userId,
+      legalName: party.legalName,
+      phoneMasked: party.phoneMasked
+    },
+    confirmMessage: `선택하신 업체 대표자(예: ${maskLegalName(party.legalName)})에게 인증 알림을 전송합니다. 진행하시겠습니까?`,
+    notificationId,
+    nextStep: "await_owner"
+  };
+}
+
+function maskLegalName(name: string) {
+  const n = String(name || "").trim();
+  if (n.length <= 1) return "*";
+  if (n.length === 2) return `${n[0]}*`;
+  return `${n[0]}*${n.slice(-1)}`;
+}
+
+/** 대표자 — 대기 중인 DCC 승인 요청 */
+export async function listOwnerPendingDccApprovals(ownerUserId: string) {
+  await ensureEnterpriseDccTable();
+  const rows = await prisma.$queryRawUnsafe<AppRow[]>(
+    `SELECT * FROM enterprise_dcc_applications
+     WHERE related_party_user_id = $1::uuid
+       AND status = 'awaiting_owner_approval'
+     ORDER BY updated_at DESC
+     LIMIT 40`,
+    ownerUserId
+  );
+  return {
+    items: await Promise.all(
+      rows.map(async (r) => {
+        const applicant = await prisma.user.findUnique({
+          where: { id: r.applicant_user_id },
+          select: { legalName: true, publicHandle: true }
+        });
+        return {
+          ...mapApp(r),
+          applicantName: String(applicant?.legalName || r.contact_name || "신청자").trim(),
+          applicantHandle: String(applicant?.publicHandle || "").trim()
+        };
+      })
+    )
+  };
+}
+
+/**
+ * 대표자 승인/거절.
+ * 거절 + 사칭 신고 시 신청자 DCC 생성 영구 차단.
+ */
+export async function reviewOwnerDccApproval(input: {
+  applicationId: string;
+  ownerUserId: string;
+  action: "approve" | "reject";
+  rejectReason?: string;
+  reportImpersonation?: boolean;
+}) {
+  await ensureEnterpriseDccTable();
+  const app = await getApp(input.applicationId);
+  if (!app || app.related_party_user_id !== input.ownerUserId) {
+    throw new Error("승인 권한이 없거나 신청을 찾을 수 없습니다.");
+  }
+  if (app.status !== "awaiting_owner_approval") {
+    throw new Error("이미 처리된 요청입니다.");
+  }
+
+  if (input.action === "approve") {
+    await prisma.$executeRawUnsafe(
+      `UPDATE enterprise_dcc_applications SET
+         related_party_verified_at = NOW(),
+         status = 'related_verified',
+         updated_at = NOW()
+       WHERE id = $1::uuid`,
+      app.id
+    );
+    const next = await getApp(app.id);
+    try {
+      const { ssePublish } = await import("../../realtime/sseHub.js");
+      ssePublish(app.applicant_user_id, {
+        type: "vlue-dcc-owner-approved",
+        applicationId: app.id,
+        title: "대표자 인증 승인",
+        body: "대표자가 DCC 직장 인증을 승인했습니다. 위치·보안 인증을 진행해 주세요.",
+        at: new Date().toISOString()
+      });
+    } catch {
+      /* ignore */
+    }
+    return { ok: true, status: "related_verified" as const, application: next ? mapApp(next) : null, nextStep: "details" };
+  }
+
+  const reason = String(input.rejectReason || "").trim().slice(0, 500);
+  await prisma.$executeRawUnsafe(
+    `UPDATE enterprise_dcc_applications SET
+       status = 'rejected',
+       owner_reject_reason = $2,
+       admin_note = $3,
+       reviewed_at = NOW(),
+       reviewed_by_user_id = $4::uuid,
+       updated_at = NOW()
+     WHERE id = $1::uuid`,
+    app.id,
+    reason || "owner_rejected",
+    input.reportImpersonation ? `impersonation_report:${reason || "사칭 신고"}` : `owner_reject:${reason || "거절"}`,
+    input.ownerUserId
+  );
+
+  if (input.reportImpersonation) {
+    await banDccCreate(
+      app.applicant_user_id,
+      reason || "대표자 거절·사칭 신고",
+      app.id
+    );
+  }
+
+  try {
+    const { ssePublish } = await import("../../realtime/sseHub.js");
+    ssePublish(app.applicant_user_id, {
+      type: "vlue-dcc-owner-rejected",
+      applicationId: app.id,
+      title: "대표자 인증 거절",
+      body: input.reportImpersonation
+        ? "대표자가 거절하고 사칭 신고를 접수했습니다. DCC 생성 권한이 차단될 수 있습니다."
+        : "대표자가 직장 인증 요청을 거절했습니다.",
+      at: new Date().toISOString()
+    });
+  } catch {
+    /* ignore */
+  }
+
+  return {
+    ok: true,
+    status: "rejected" as const,
+    banned: Boolean(input.reportImpersonation),
+    nextStep: "done"
+  };
+}
+
+/** 시나리오 B — 중소기업 증빙 서류 */
+export async function saveEnterpriseDccDocuments(input: {
+  applicationId: string;
+  applicantUserId: string;
+  businessRegistrationNo?: string;
+  documents: Array<{ kind: string; url: string; fileName?: string }>;
+  workplaceAddress?: string;
+}) {
+  await ensureEnterpriseDccTable();
+  if (await isDccCreateBanned(input.applicantUserId)) {
+    throw new Error("DCC 생성 권한이 영구 차단된 계정입니다.");
+  }
+  const app = await getApp(input.applicationId);
+  if (!app || app.applicant_user_id !== input.applicantUserId) {
+    throw new Error("신청 정보를 찾을 수 없습니다.");
+  }
+  const required = new Set([
+    "employment_certificate",
+    "insurance_enrollment",
+    "tax_clearance"
+  ]);
+  const docs = (input.documents || [])
+    .map((d) => ({
+      kind: String(d.kind || "").trim(),
+      url: String(d.url || "").trim(),
+      fileName: String(d.fileName || "").trim()
+    }))
+    .filter((d) => d.kind && d.url);
+  const kinds = new Set(docs.map((d) => d.kind));
+  for (const k of required) {
+    if (!kinds.has(k)) {
+      throw new Error(
+        "재직증명서·4대보험 가입자 가입내역 확인서·납세증명서를 모두 업로드해 주세요."
+      );
+    }
+  }
+  const addr = String(input.workplaceAddress || app.workplace_address || "").trim();
+  let lat = app.workplace_lat;
+  let lng = app.workplace_lng;
+  if (addr && (lat == null || lng == null)) {
+    try {
+      const { geocodeDccAddress } = await import("../../integrations/kakao/kakaoAddressGeocode.js");
+      const point = await geocodeDccAddress(addr);
+      lat = point?.lat ?? null;
+      lng = point?.lng ?? null;
+    } catch {
+      /* geocode optional at upload; security gate retries */
+    }
+  }
+  await prisma.$executeRawUnsafe(
+    `UPDATE enterprise_dcc_applications SET
+       docs_json = $2::jsonb,
+       workplace_address = COALESCE(NULLIF($3, ''), workplace_address),
+       workplace_lat = COALESCE($4, workplace_lat),
+       workplace_lng = COALESCE($5, workplace_lng),
+       scenario = 'sme_docs',
+       status = 'docs_submitted',
+       updated_at = NOW()
+     WHERE id = $1::uuid`,
+    app.id,
+    JSON.stringify({ items: docs, uploadedAt: new Date().toISOString() }),
+    addr.slice(0, 500),
+    lat,
+    lng
+  );
+  const next = await getApp(app.id);
+  return { ok: true, application: next ? mapApp(next) : null, nextStep: "details" };
+}
+
+/** 사업장 주소 저장 (위치 인증용) */
+export async function saveEnterpriseWorkplace(input: {
+  applicationId: string;
+  applicantUserId: string;
+  workplaceAddress: string;
+  workplaceLat?: number | null;
+  workplaceLng?: number | null;
+}) {
+  await ensureEnterpriseDccTable();
+  const app = await getApp(input.applicationId);
+  if (!app || app.applicant_user_id !== input.applicantUserId) {
+    throw new Error("신청 정보를 찾을 수 없습니다.");
+  }
+  const addr = String(input.workplaceAddress || "").trim();
+  if (!addr) throw new Error("사업장 주소를 입력해 주세요.");
+  let lat = input.workplaceLat;
+  let lng = input.workplaceLng;
+  if (lat == null || lng == null) {
+    const { geocodeDccAddress } = await import("../../integrations/kakao/kakaoAddressGeocode.js");
+    const point = await geocodeDccAddress(addr);
+    lat = point?.lat ?? null;
+    lng = point?.lng ?? null;
+  }
+  await prisma.$executeRawUnsafe(
+    `UPDATE enterprise_dcc_applications SET
+       workplace_address = $2,
+       workplace_lat = $3,
+       workplace_lng = $4,
+       updated_at = NOW()
+     WHERE id = $1::uuid`,
+    app.id,
+    addr.slice(0, 500),
+    lat,
+    lng
+  );
+  const next = await getApp(app.id);
+  return { ok: true, application: next ? mapApp(next) : null };
+}
+
+/** 최종 위치·보안 환경 검증 */
+export async function attestEnterpriseDccSecurity(input: {
+  applicationId: string;
+  applicantUserId: string;
+  lat: number;
+  lng: number;
+  networkType: string;
+  vpnActive?: boolean;
+  installedPackages?: string[];
+}) {
+  await ensureEnterpriseDccTable();
+  if (await isDccCreateBanned(input.applicantUserId)) {
+    throw new Error("DCC 생성 권한이 영구 차단된 계정입니다.");
+  }
+  const app = await getApp(input.applicationId);
+  if (!app || app.applicant_user_id !== input.applicantUserId) {
+    throw new Error("신청 정보를 찾을 수 없습니다.");
+  }
+  const allowed = new Set([
+    "related_verified",
+    "docs_submitted",
+    "details_ready",
+    "awaiting_security_gate",
+    "security_verified"
+  ]);
+  if (!allowed.has(app.status)) {
+    throw new Error("대표자 승인 또는 서류 제출 후 위치 인증을 진행할 수 있습니다.");
+  }
+
+  const { evaluateDccSecurityGate } = await import("../dcc/dccCreateSecurityGateService.js");
+  const gate = await evaluateDccSecurityGate({
+    lat: input.lat,
+    lng: input.lng,
+    networkType: input.networkType,
+    vpnActive: input.vpnActive,
+    installedPackages: input.installedPackages,
+    workplaceAddress: app.workplace_address || undefined,
+    workplaceLat: app.workplace_lat,
+    workplaceLng: app.workplace_lng
+  });
+
+  if (!gate.canActivateButton) {
+    return { ok: false, ...gate, application: mapApp(app) };
+  }
+
+  await prisma.$executeRawUnsafe(
+    `UPDATE enterprise_dcc_applications SET
+       security_attested_at = NOW(),
+       status = 'security_verified',
+       updated_at = NOW()
+     WHERE id = $1::uuid`,
+    app.id
+  );
+  const next = await getApp(app.id);
+  return {
+    ok: true,
+    ...gate,
+    application: next ? mapApp(next) : null,
+    nextStep: "submit"
+  };
+}
+

@@ -224,6 +224,25 @@ object VlueFamilyBridge {
             host.runOnUi { host.scanDangerousApps() }
         }
 
+        /**
+         * DCC 최종 보안 게이트용 동기 스냅샷.
+         * { networkType, vpnActive, wifi, cellular, remotePackages[] }
+         */
+        @android.webkit.JavascriptInterface
+        fun getDccSecuritySnapshot(): String {
+            return try {
+                DccSecuritySnapshot.collect(host.appContext())
+            } catch (e: Exception) {
+                Log.e(TAG, "getDccSecuritySnapshot failed", e)
+                JSONObject()
+                    .put("networkType", "unknown")
+                    .put("vpnActive", false)
+                    .put("remotePackages", org.json.JSONArray())
+                    .put("error", e.message ?: "snapshot_failed")
+                    .toString()
+            }
+        }
+
         @android.webkit.JavascriptInterface
         fun requestDeletePackage(packageName: String) {
             host.runOnUi { host.requestDeletePackage(packageName) }

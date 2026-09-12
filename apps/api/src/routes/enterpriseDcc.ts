@@ -5,13 +5,20 @@ import {
   getMyEnterpriseDccApplication,
   listPendingEnterpriseDccApplications,
   listRelatedPartiesForBizNo,
+  listOwnerPendingDccApprovals,
   markEnterpriseDccPaid,
   reviewEnterpriseDccApplication,
+  reviewOwnerDccApproval,
+  requestOwnerApproval,
   saveEnterpriseDccDetails,
+  saveEnterpriseDccDocuments,
+  saveEnterpriseWorkplace,
+  attestEnterpriseDccSecurity,
   sendRelatedPartyOtp,
   submitEnterpriseDccForApproval,
   verifyBusinessAndStartApplication,
-  verifyRelatedPartyOtp
+  verifyRelatedPartyOtp,
+  isDccCreateBanned
 } from "../services/bizcard/enterpriseDccApplyService.js";
 
 type Vars = { vlueUserId: string; adminConsoleUser?: { id: string } };
@@ -31,6 +38,13 @@ enterpriseDccRoutes.get("/mine", async (c) => {
 enterpriseDccRoutes.get("/related-parties", async (c) => {
   const bno = String(c.req.query("bno") || "");
   const data = await listRelatedPartiesForBizNo(bno);
+  return c.json({ ok: true, ...data });
+});
+
+/** GET /api/cards/enterprise-dcc/owner-pending — 대표자 대기함 (반드시 /:id 보다 위) */
+enterpriseDccRoutes.get("/owner-pending", async (c) => {
+  const userId = c.get("vlueUserId");
+  const data = await listOwnerPendingDccApprovals(userId);
   return c.json({ ok: true, ...data });
 });
 
@@ -117,6 +131,123 @@ enterpriseDccRoutes.post("/:id/details", async (c) => {
     return c.json(result);
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : "저장 실패" }, 400);
+  }
+});
+
+/** POST /api/cards/enterprise-dcc/:id/request-owner-approval — 시나리오 A */
+enterpriseDccRoutes.post("/:id/request-owner-approval", async (c) => {
+  const userId = c.get("vlueUserId");
+  const body = (await c.req.json().catch(() => ({}))) as {
+    relatedPartyUserId?: string;
+    department?: string;
+    contactName?: string;
+    confirmAcknowledged?: boolean;
+  };
+  try {
+    const result = await requestOwnerApproval({
+      applicationId: c.req.param("id"),
+      applicantUserId: userId,
+      relatedPartyUserId: String(body.relatedPartyUserId || ""),
+      department: body.department,
+      contactName: body.contactName,
+      confirmAcknowledged: Boolean(body.confirmAcknowledged)
+    });
+    return c.json(result);
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "요청 실패" }, 400);
+  }
+});
+
+/** POST /api/cards/enterprise-dcc/:id/owner-review — 대표자 승인/거절 */
+enterpriseDccRoutes.post("/:id/owner-review", async (c) => {
+  const userId = c.get("vlueUserId");
+  const body = (await c.req.json().catch(() => ({}))) as {
+    action?: string;
+    rejectReason?: string;
+    reportImpersonation?: boolean;
+  };
+  try {
+    const result = await reviewOwnerDccApproval({
+      applicationId: c.req.param("id"),
+      ownerUserId: userId,
+      action: body.action === "reject" ? "reject" : "approve",
+      rejectReason: body.rejectReason,
+      reportImpersonation: Boolean(body.reportImpersonation)
+    });
+    return c.json(result);
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "처리 실패" }, 400);
+  }
+});
+
+/** POST /api/cards/enterprise-dcc/:id/documents — 시나리오 B 서류 */
+enterpriseDccRoutes.post("/:id/documents", async (c) => {
+  const userId = c.get("vlueUserId");
+  const body = (await c.req.json().catch(() => ({}))) as {
+    documents?: Array<{ kind: string; url: string; fileName?: string }>;
+    workplaceAddress?: string;
+  };
+  try {
+    const result = await saveEnterpriseDccDocuments({
+      applicationId: c.req.param("id"),
+      applicantUserId: userId,
+      documents: Array.isArray(body.documents) ? body.documents : [],
+      workplaceAddress: body.workplaceAddress
+    });
+    return c.json(result);
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "서류 저장 실패" }, 400);
+  }
+});
+
+/** POST /api/cards/enterprise-dcc/:id/workplace */
+enterpriseDccRoutes.post("/:id/workplace", async (c) => {
+  const userId = c.get("vlueUserId");
+  const body = (await c.req.json().catch(() => ({}))) as {
+    workplaceAddress?: string;
+    workplaceLat?: number;
+    workplaceLng?: number;
+  };
+  try {
+    const result = await saveEnterpriseWorkplace({
+      applicationId: c.req.param("id"),
+      applicantUserId: userId,
+      workplaceAddress: String(body.workplaceAddress || ""),
+      workplaceLat: body.workplaceLat,
+      workplaceLng: body.workplaceLng
+    });
+    return c.json(result);
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "주소 저장 실패" }, 400);
+  }
+});
+
+/** POST /api/cards/enterprise-dcc/:id/security-attest — 위치·보안 게이트 */
+enterpriseDccRoutes.post("/:id/security-attest", async (c) => {
+  const userId = c.get("vlueUserId");
+  const body = (await c.req.json().catch(() => ({}))) as {
+    lat?: number;
+    lng?: number;
+    networkType?: string;
+    vpnActive?: boolean;
+    installedPackages?: string[];
+  };
+  try {
+    if (await isDccCreateBanned(userId)) {
+      return c.json({ error: "DCC 생성 권한이 영구 차단된 계정입니다." }, 403);
+    }
+    const result = await attestEnterpriseDccSecurity({
+      applicationId: c.req.param("id"),
+      applicantUserId: userId,
+      lat: Number(body.lat),
+      lng: Number(body.lng),
+      networkType: String(body.networkType || "unknown"),
+      vpnActive: Boolean(body.vpnActive),
+      installedPackages: Array.isArray(body.installedPackages) ? body.installedPackages : []
+    });
+    return c.json(result);
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "인증 실패" }, 400);
   }
 });
 

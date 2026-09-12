@@ -1,41 +1,75 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchMyEnterpriseDccApplication,
+  requestEnterpriseDccOwnerApproval,
   saveEnterpriseDccDetails,
   sendEnterpriseDccOtp,
   submitEnterpriseDccApplication,
+  uploadEnterpriseDccDocuments,
   verifyEnterpriseDccBusiness,
   verifyEnterpriseDccOtp
 } from "../lib/enterpriseDccApi.js";
 import { sendAuthCode, verifyAuthCode, EMAIL_AUTH_SUPPORT } from "../lib/emailAuthApi.js";
 import { writeLetteringBizcardEditable } from "../lib/letteringBizcardStorage.js";
 import { DIGITAL_CARD_ACTIVE_KEY } from "../lib/bizcardAccountSync.js";
+import DccSecurityLocationGate from "./DccSecurityLocationGate.jsx";
+import { VLUE_SSE_APP_EVENT } from "../lib/vlueSse.js";
 
 const STEPS = [
   { id: "start", label: "신청 시작" },
   { id: "biz", label: "사업자 인증" },
-  { id: "party", label: "관계자 인증" },
-  { id: "otp", label: "인증번호" },
+  { id: "party", label: "직장 선택" },
+  { id: "docs", label: "서류 제출" },
+  { id: "owner_wait", label: "대표 승인" },
   { id: "details", label: "상세 입력" },
+  { id: "security", label: "위치·보안" },
   { id: "pending", label: "승인 대기" },
   { id: "payment", label: "발급·결제" }
 ];
+
+const SME_DOC_SLOTS = [
+  { kind: "employment_certificate", label: "재직증명서" },
+  { kind: "insurance_enrollment", label: "4대보험 가입자 가입내역 확인서" },
+  { kind: "tax_clearance", label: "납세증명서" }
+];
+
+function maskLegalName(name) {
+  const n = String(name || "").trim();
+  if (n.length <= 1) return "*";
+  if (n.length === 2) return `${n[0]}*`;
+  return `${n[0]}*${n.slice(-1)}`;
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("파일 읽기 실패"));
+    reader.readAsDataURL(file);
+  });
+}
 
 function statusToStep(status, isFirstRegistrant) {
   switch (status) {
     case "draft":
       return "start";
     case "biz_verified":
-      return isFirstRegistrant ? "details" : "party";
+      return isFirstRegistrant ? "docs" : "party";
     case "awaiting_related_otp":
       return "otp";
+    case "awaiting_owner_approval":
+      return "owner_wait";
+    case "docs_submitted":
     case "related_verified":
-    case "details_ready":
       return "details";
+    case "details_ready":
+    case "awaiting_security_gate":
+      return "security";
+    case "security_verified":
+      return "security";
     case "pending_approval":
       return "pending";
     case "approved":
-      return "payment";
     case "paid":
       return "payment";
     case "rejected":
@@ -80,6 +114,10 @@ export default function EnterpriseDccApplyWizard({
   const [manageLoginId, setManageLoginId] = useState("");
   const [managePassword, setManagePassword] = useState("");
   const [managePassword2, setManagePassword2] = useState("");
+  const [ownerConfirmOpen, setOwnerConfirmOpen] = useState(false);
+  const [docFiles, setDocFiles] = useState({});
+  const [workplaceAddress, setWorkplaceAddress] = useState("");
+  const [docBusyKind, setDocBusyKind] = useState("");
 
   const panelCls = isDarkMode ? "bg-[#0f172a] text-slate-100" : "bg-white text-slate-900";
   const inputCls = isDarkMode
@@ -101,6 +139,7 @@ export default function EnterpriseDccApplyWizard({
       setContactEmail(app.dccContactEmail || "");
       setDccPhone(app.dccOutboundPhone || "");
       setBizNo(app.businessRegistrationNo || "");
+      setWorkplaceAddress(app.workplaceAddress || "");
       let first = false;
       if (app.businessRegistrationNo) {
         try {
@@ -124,6 +163,22 @@ export default function EnterpriseDccApplyWizard({
     void hydrate();
   }, [hydrate]);
 
+  useEffect(() => {
+    const onSse = (ev) => {
+      const t = ev?.detail?.type;
+      if (t === "vlue-dcc-owner-approved" || t === "vlue-dcc-owner-rejected") {
+        void hydrate();
+        if (t === "vlue-dcc-owner-approved") {
+          onToast?.("대표자가 승인했습니다. 상세 입력·위치 인증을 진행해 주세요.");
+        } else {
+          onToast?.("대표자가 인증 요청을 거절했습니다.");
+        }
+      }
+    };
+    window.addEventListener(VLUE_SSE_APP_EVENT, onSse);
+    return () => window.removeEventListener(VLUE_SSE_APP_EVENT, onSse);
+  }, [hydrate, onToast]);
+
   const toast = (msg) => {
     onToast?.(msg);
   };
@@ -143,13 +198,49 @@ export default function EnterpriseDccApplyWizard({
       setIsFirstRegistrant(Boolean(res.isFirstRegistrant));
       setCompanyLocked(res.companyNameLocked || res.application?.companyNameLocked || "");
       if (res.nextStep === "details") {
-        setStep("details");
+        setStep("docs");
       } else {
         setStep("party");
       }
       toast("사업자번호 인증이 완료되었습니다.");
     } catch (e) {
       setError(e?.message || "사업자 인증 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const selectedParty = useMemo(
+    () => parties.find((p) => p.userId === selectedPartyId) || null,
+    [parties, selectedPartyId]
+  );
+
+  const openOwnerConfirm = () => {
+    if (!application?.id || !selectedPartyId) {
+      setError("등록된 직장을 선택해 주세요. 임의 상호 입력은 불가합니다.");
+      return;
+    }
+    setError("");
+    setOwnerConfirmOpen(true);
+  };
+
+  const runRequestOwnerApproval = async () => {
+    if (!application?.id || !selectedPartyId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await requestEnterpriseDccOwnerApproval(application.id, {
+        relatedPartyUserId: selectedPartyId,
+        department: department || undefined,
+        contactName: contactName || undefined,
+        confirmAcknowledged: true
+      });
+      setApplication(res.application);
+      setOwnerConfirmOpen(false);
+      setStep("owner_wait");
+      toast("대표자에게 인증 알림을 전송했습니다.");
+    } catch (e) {
+      setError(e?.message || "대표자 인증 요청 실패");
     } finally {
       setBusy(false);
     }
@@ -188,6 +279,51 @@ export default function EnterpriseDccApplyWizard({
       setError(e?.message || "인증 실패");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const runSubmitDocs = async () => {
+    if (!application?.id) return;
+    const missing = SME_DOC_SLOTS.filter((s) => !docFiles[s.kind]?.url);
+    if (missing.length) {
+      setError(`${missing.map((m) => m.label).join("·")}를 모두 업로드해 주세요.`);
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const res = await uploadEnterpriseDccDocuments(application.id, {
+        documents: SME_DOC_SLOTS.map((s) => ({
+          kind: s.kind,
+          url: docFiles[s.kind].url,
+          fileName: docFiles[s.kind].fileName
+        })),
+        workplaceAddress: workplaceAddress.trim() || undefined
+      });
+      setApplication(res.application);
+      setStep("details");
+      toast("증빙 서류가 접수되었습니다.");
+    } catch (e) {
+      setError(e?.message || "서류 제출 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onPickDoc = async (kind, file) => {
+    if (!file) return;
+    setDocBusyKind(kind);
+    setError("");
+    try {
+      const url = await fileToDataUrl(file);
+      setDocFiles((prev) => ({
+        ...prev,
+        [kind]: { url, fileName: file.name || `${kind}.pdf` }
+      }));
+    } catch (e) {
+      setError(e?.message || "파일 읽기 실패");
+    } finally {
+      setDocBusyKind("");
     }
   };
 
@@ -265,12 +401,27 @@ export default function EnterpriseDccApplyWizard({
         managePassword
       });
       setApplication(res.application);
-      await submitEnterpriseDccApplication(application.id);
-      setApplication((prev) => (prev ? { ...prev, status: "pending_approval" } : prev));
+      setStep("security");
+      toast("상세 정보가 저장되었습니다. 위치·보안 인증을 진행해 주세요.");
+    } catch (e) {
+      setError(e?.message || "저장 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runAfterSecurityPassed = async (attestRes) => {
+    if (attestRes?.application) setApplication(attestRes.application);
+    if (!application?.id) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await submitEnterpriseDccApplication(application.id);
+      setApplication(res.application || { ...application, status: "pending_approval" });
       setStep("pending");
       toast("승인 요청이 접수되었습니다.");
     } catch (e) {
-      setError(e?.message || "저장 실패");
+      setError(e?.message || "제출 실패");
     } finally {
       setBusy(false);
     }
@@ -315,7 +466,7 @@ export default function EnterpriseDccApplyWizard({
         </button>
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-black">기업·대표번호 인증명함</p>
-          <p className={`text-[10px] ${muted}`}>사업자 검증 → 관계자 인증 → 승인 → 발급·결제</p>
+          <p className={`text-[10px] ${muted}`}>사업자 검증 → 대표 승인/서류 → 위치·보안 → 승인 → 발급</p>
         </div>
       </header>
 
@@ -352,9 +503,9 @@ export default function EnterpriseDccApplyWizard({
               발급됩니다. 상호는 대표자가 등록한 명칭으로 고정됩니다.
             </p>
             <ol className={`list-decimal space-y-1 pl-4 text-[12px] ${muted}`}>
-              <li>사업자번호 공식 검증</li>
-              <li>등록된 관계자 선택 · 인증번호</li>
-              <li>상호 고정 · 부서·담당자·DCC 번호</li>
+              <li>사업자번호 공식 검증 (드롭다운 직장만 선택)</li>
+              <li>대표자 승인 또는 중소기업 증빙 서류</li>
+              <li>사업장 위치·모바일 데이터·VPN/원격 차단 검증</li>
               <li>관리자 승인 후 발급·결제</li>
             </ol>
             <button
@@ -421,12 +572,12 @@ export default function EnterpriseDccApplyWizard({
         {step === "party" ? (
           <section className="space-y-2">
             <p className={`text-[12px] ${muted}`}>
-              상호 <strong className="text-blue-600">{companyLocked}</strong> 의 등록된 관계자만 선택할 수
-              있습니다. 허위 신청 방지를 위해 선택된 관계자에게만 인증번호가 발송됩니다.
+              상호 <strong className="text-blue-600">{companyLocked}</strong> 의 등록된 직장(관계자)만 선택할 수
+              있습니다. 임의 상호 입력은 불가하며, 선택 시 대표자에게 인증 알림이 전송됩니다.
             </p>
             {!parties.length ? (
               <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-[12px] text-amber-700">
-                등록된 관계자가 없습니다. 이전 단계에서 최초 사업자로 상세 입력을 진행하세요.
+                등록된 관계자가 없습니다. 이전 단계에서 중소기업 서류 제출 경로로 진행하세요.
               </p>
             ) : (
               <ul className="space-y-2">
@@ -457,10 +608,132 @@ export default function EnterpriseDccApplyWizard({
             <button
               type="button"
               disabled={busy || !selectedPartyId}
-              onClick={() => void runSendOtp()}
+              onClick={openOwnerConfirm}
               className="w-full rounded-xl bg-blue-600 py-3 text-[13px] font-black text-white disabled:opacity-50"
             >
-              {busy ? "발송 중…" : "인증번호 발송"}
+              대표자 인증 요청
+            </button>
+            {ownerConfirmOpen ? (
+              <div
+                className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4"
+                role="dialog"
+                aria-modal="true"
+              >
+                <div
+                  className={`w-full max-w-sm space-y-3 rounded-2xl p-4 shadow-xl ${
+                    isDarkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"
+                  }`}
+                >
+                  <p className="text-[14px] font-black">대표자 인증 알림</p>
+                  <p className={`text-[12px] leading-relaxed ${muted}`}>
+                    선택하신 업체 대표자(예: 대표자 {maskLegalName(selectedParty?.legalName)})에게 인증 알림을
+                    전송합니다. 진행하시겠습니까?
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void runRequestOwnerApproval()}
+                      className="flex-1 rounded-xl bg-blue-600 py-2.5 text-[12px] font-black text-white disabled:opacity-50"
+                    >
+                      {busy ? "전송 중…" : "진행"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setOwnerConfirmOpen(false)}
+                      className={`flex-1 rounded-xl py-2.5 text-[12px] font-bold ${
+                        isDarkMode ? "bg-white/10" : "bg-slate-100"
+                      }`}
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {step === "docs" ? (
+          <section className="space-y-2">
+            <p className={`text-[12px] ${muted}`}>
+              대표자가 아직 미가입인 중소기업 경로입니다. 사업자등록번호 검증 후 공식 증빙 서류 3종을
+              업로드해 주세요.
+            </p>
+            <label className="block text-[11px] font-bold">
+              사업장 주소 (위치 인증용)
+              <input
+                className={`${inputCls} mt-1`}
+                value={workplaceAddress}
+                onChange={(e) => setWorkplaceAddress(e.target.value)}
+                placeholder="예: 서울특별시 …"
+              />
+            </label>
+            {SME_DOC_SLOTS.map((slot) => {
+              const uploaded = docFiles[slot.kind];
+              return (
+                <div
+                  key={slot.kind}
+                  className={`rounded-xl border px-3 py-2.5 ${
+                    uploaded
+                      ? "border-emerald-200 bg-emerald-50/70"
+                      : isDarkMode
+                        ? "border-white/10"
+                        : "border-dashed border-slate-300"
+                  }`}
+                >
+                  <p className="text-[11px] font-black">
+                    {uploaded ? "✓ " : ""}
+                    {slot.label}
+                  </p>
+                  <label className="mt-2 flex cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white/80 py-2.5">
+                    <span className="text-[10px] font-semibold text-slate-700">
+                      {docBusyKind === slot.kind
+                        ? "처리 중…"
+                        : uploaded
+                          ? "파일 교체"
+                          : "PDF·이미지 선택"}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp"
+                      className="sr-only"
+                      disabled={Boolean(docBusyKind)}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void onPickDoc(slot.kind, f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void runSubmitDocs()}
+              className="w-full rounded-xl bg-blue-600 py-3 text-[13px] font-black text-white disabled:opacity-50"
+            >
+              {busy ? "제출 중…" : "서류 제출 후 계속"}
+            </button>
+          </section>
+        ) : null}
+
+        {step === "owner_wait" ? (
+          <section className="space-y-3 text-center">
+            <p className="text-[15px] font-black">대표자 승인 대기</p>
+            <p className={`text-[12px] leading-relaxed ${muted}`}>
+              선택하신 직장 대표자에게 인증 요청을 보냈습니다. 대표자가 승인하면 상세 입력·위치 인증으로
+              이어집니다. 거절·사칭 신고 시 DCC 생성 권한이 영구 차단될 수 있습니다.
+            </p>
+            <button
+              type="button"
+              onClick={() => void hydrate()}
+              className={`rounded-xl px-4 py-2 text-[12px] font-bold ${isDarkMode ? "bg-white/10" : "bg-slate-100"}`}
+            >
+              상태 새로고침
             </button>
           </section>
         ) : null}
@@ -616,7 +889,7 @@ export default function EnterpriseDccApplyWizard({
             </div>
             {isFirstRegistrant ? (
               <p className={`text-[11px] ${muted}`}>
-                최초 사업자 경로입니다. 관계자 OTP 없이 승인 대기로 제출됩니다.
+                중소기업(대표자 미가입) 경로입니다. 서류 제출 후 상세 입력을 진행 중입니다.
               </p>
             ) : null}
             <button
@@ -625,8 +898,30 @@ export default function EnterpriseDccApplyWizard({
               onClick={() => void runSaveDetails()}
               className="w-full rounded-xl bg-blue-600 py-3 text-[13px] font-black text-white disabled:opacity-50"
             >
-              {busy ? "제출 중…" : "승인 요청 제출"}
+              {busy ? "저장 중…" : "저장 후 위치·보안 인증"}
             </button>
+          </section>
+        ) : null}
+
+        {step === "security" ? (
+          <section className="space-y-3">
+            <DccSecurityLocationGate
+              applicationId={application?.id}
+              workplaceAddress={workplaceAddress || application?.workplaceAddress || ""}
+              isDarkMode={isDarkMode}
+              onToast={toast}
+              onPassed={(res) => void runAfterSecurityPassed(res)}
+            />
+            {application?.status === "security_verified" ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void runAfterSecurityPassed({ application })}
+                className="w-full rounded-xl bg-blue-600 py-3 text-[13px] font-black text-white disabled:opacity-50"
+              >
+                {busy ? "제출 중…" : "관리자 승인 요청 제출"}
+              </button>
+            ) : null}
           </section>
         ) : null}
 

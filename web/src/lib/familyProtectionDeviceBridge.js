@@ -5,11 +5,25 @@
 import { postWardRemoteApp } from "./familyProtectionApi.js";
 import { reportFamilyCrossThreat, syncFamilySecurityState } from "./familyCrossSecurityApi.js";
 import { getDevicePlatformForSync, isIosShell } from "./familyPlatformCapabilities.js";
+import { rememberDccSecurityPackage } from "./dccSecurityAttestation.js";
 
 function syncPlatformState(extra = {}) {
   const devicePlatform = getDevicePlatformForSync();
   if (!devicePlatform) return;
   syncFamilySecurityState({ devicePlatform, ...extra }).catch(() => {});
+}
+
+function emitDetectedPackage(kind, packageOrLabel, extra = {}) {
+  const pkg = String(packageOrLabel || "").trim();
+  if (!pkg) return;
+  rememberDccSecurityPackage(pkg);
+  try {
+    window.dispatchEvent(
+      new CustomEvent(kind, { detail: { packageName: pkg, pkg, ...extra } })
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 export function registerFamilyDeviceBridge() {
@@ -21,6 +35,7 @@ export function registerFamilyDeviceBridge() {
     platform: prev.platform || (isIosShell() ? "ios" : prev.platform),
     onRemoteAppDetected: (packageOrLabel) => {
       if (!packageOrLabel) return;
+      emitDetectedPackage("vlue-remote-app-detected", packageOrLabel);
       postWardRemoteApp(String(packageOrLabel)).catch(() => {});
       reportFamilyCrossThreat({
         threatKind: "remote_control_app",
@@ -30,6 +45,10 @@ export function registerFamilyDeviceBridge() {
     },
     onDangerousAppDetected: (hit) => {
       if (!hit?.packageName) return;
+      emitDetectedPackage("vlue-dangerous-app-detected", hit.packageName, {
+        appLabel: hit.appLabel,
+        threatKind: hit.threatKind
+      });
       reportFamilyCrossThreat({
         threatKind: hit.threatKind || "dangerous_permission_app",
         packageName: hit.packageName,
