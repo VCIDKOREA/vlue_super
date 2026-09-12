@@ -15,22 +15,15 @@ object ContactSafeCarePolicy {
         callAnswered: Boolean = false
     ): Boolean {
         if (profileKind != ContactSafeCarePayload.PROFILE_KIND) return false
-        /*
-         * popupOnly 단독으로 링잉(BIG_PUSH)·거는 중에 띄우지 않음.
-         * 수화 확정(callAnswered) 또는 이미 SHOWCASE/IDLE 일 때만.
-         */
+        /* 미수화 — 정상 팝업 금지 (BigPush만) */
+        if (!callAnswered) return false
         if (popupOnly) {
-            if (callAnswered) return true
-            return overlayState == OverlayState.SHOWCASE ||
-                overlayState == OverlayState.IDLE
-        }
-        /* 수화 확정 후에는 BIG_PUSH 잔류 상태에서도 정상팝업 허용 (카드 지연·정책 레이스) */
-        if (callAnswered) {
             return overlayState == OverlayState.SHOWCASE ||
                 overlayState == OverlayState.IDLE ||
                 overlayState == OverlayState.BIG_PUSH
         }
         return overlayState == OverlayState.SHOWCASE ||
-            overlayState == OverlayState.IDLE
+            overlayState == OverlayState.IDLE ||
+            overlayState == OverlayState.BIG_PUSH
     }
 }

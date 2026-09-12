@@ -50,12 +50,13 @@ object CallUiPhasePolicy {
         remoteConnected: Boolean,
         dialingOrConnecting: Boolean,
         hasActiveConnectedCall: Boolean,
-        trustedPeerConnected: Boolean = false
+        @Suppress("UNUSED_PARAMETER") trustedPeerConnected: Boolean = false
     ): Boolean {
         if (!outgoing || remoteConnected) return true
-        if (hasActiveConnectedCall) return true
+        /* 거는 중 — 중앙 팝업·풀쇼케이스 금지 */
         if (dialingOrConnecting) return false
-        return trustedPeerConnected
+        /* InCall ACTIVE(상대 응답) 만 통과. 오디오 trusted 단독 통과 금지(OEM MODE_IN_CALL 오판). */
+        return hasActiveConnectedCall
     }
 
     /** 미수화 상태에서 중앙 팝업 허용 여부 — 항상 false (규격 §2). */

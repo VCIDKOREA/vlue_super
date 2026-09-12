@@ -52,6 +52,7 @@ function FriendSearch({
   onContactMatchUpdate,
   onContactResyncRequest,
   onOpenContactChat,
+  onOpenContactShowcase,
   onSendRequest,
   onFriendEstablished
 }) {
@@ -302,6 +303,7 @@ function FriendSearch({
               onMatchUpdate={onContactMatchUpdate}
               onResyncRequest={onContactResyncRequest}
               onOpenChat={onOpenContactChat}
+              onOpenShowcase={onOpenContactShowcase || onOpenContactChat}
               approvedFriendIds={mergedFriendIds}
               pendingSentIds={pendingSentIds}
               pendingReceivedIds={pendingReceivedIds}
@@ -336,6 +338,7 @@ function FriendSearch({
                 onMatchUpdate={onContactMatchUpdate}
                 onResyncRequest={onContactResyncRequest}
                 onOpenChat={onOpenContactChat}
+                onOpenShowcase={onOpenContactShowcase || onOpenContactChat}
                 approvedFriendIds={mergedFriendIds}
                 pendingSentIds={pendingSentIds}
                 pendingReceivedIds={pendingReceivedIds}

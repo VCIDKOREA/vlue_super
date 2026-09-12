@@ -16,11 +16,9 @@ object VlueAuthMemberPopupPolicy {
         popupOnlyTest: Boolean = false,
         callAnswered: Boolean = true
     ): Boolean {
-        /* 거는 중·링잉 BIG_PUSH 에서 popupOnly 만으로 팝업 금지 */
-        if (popupOnlyTest) {
-            if (!callAnswered && overlayState == OverlayState.BIG_PUSH) return false
-            return true
-        }
+        /* 미수화(거는 중·링잉) — 중앙 정상 팝업 금지 */
+        if (!callAnswered) return false
+        if (popupOnlyTest) return true
         return overlayState == OverlayState.SHOWCASE
     }
 

@@ -20,6 +20,7 @@ import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import VLUE_BRAND_LOGO from "../assets/vlue-shield-eye-logo.svg?url";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
+import { VLUE_OPEN_FRIEND_SHOWCASE_EVENT } from "../lib/openFriendShowcase.js";
 import "./friend-showcase-list.css";
 import "../styles/tent-showcase.css";
 
@@ -226,7 +227,6 @@ export default function FriendShowcaseList({
     window.addEventListener(FRIEND_SHOWCASE_ACTIVITY_EVENT, onActivity);
     return () => window.removeEventListener(FRIEND_SHOWCASE_ACTIVITY_EVENT, onActivity);
   }, []);
-
   useEffect(() => {
     const q = hashtagQuery.trim();
     if (!q || q.length < 1) {
@@ -486,6 +486,42 @@ export default function FriendShowcaseList({
       setPreviewLoading(false);
     }
   };
+
+  useEffect(() => {
+    const onOpen = (ev) => {
+      const d = ev?.detail || {};
+      const userId = String(d.userId || "").trim();
+      const handle = String(d.publicHandle || "").replace(/^@/, "").trim();
+      const phone = String(d.phone || "").trim();
+      if (!userId && !handle && !phone) return;
+      const fromFollowing = following.find(
+        (r) =>
+          (userId && String(r.userId || r.id || "") === userId) ||
+          (handle && String(r.publicHandle || "").replace(/^@/, "") === handle) ||
+          (phone && String(r.phone || r.phoneDisplay || "") === phone)
+      );
+      const row =
+        fromFollowing ||
+        {
+          id: userId || handle || phone,
+          userId: userId || "",
+          publicHandle: handle,
+          name: String(d.displayName || handle || phone || "친구").trim(),
+          phone,
+          phoneDisplay: phone,
+          avatarUrl: String(d.avatarUrl || "").trim(),
+          membershipTier: String(d.membershipTier || "free").trim() || "free",
+          updatedAt: Date.now()
+        };
+      setActiveTab("following");
+      if (isHome) {
+        setSheetLevel("mid");
+      }
+      void openPreview(row, "showcase");
+    };
+    window.addEventListener(VLUE_OPEN_FRIEND_SHOWCASE_EVENT, onOpen);
+    return () => window.removeEventListener(VLUE_OPEN_FRIEND_SHOWCASE_EVENT, onOpen);
+  }, [following, isHome, openPreview]);
 
   const closePreview = () => {
     try {

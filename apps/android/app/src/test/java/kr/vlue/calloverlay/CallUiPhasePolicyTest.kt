@@ -50,8 +50,8 @@ class CallUiPhasePolicyTest {
     }
 
     @Test
-    fun trustedPeerConnected_allowsAdvanceWhenNotDialing() {
-        assertTrue(
+    fun trustedPeerConnected_alone_doesNotAdvance_whileOutgoing() {
+        assertFalse(
             CallUiPhasePolicy.mayAdvancePastBigPush(
                 outgoing = true,
                 remoteConnected = false,

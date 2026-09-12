@@ -10,6 +10,7 @@ import ChatRoom from "./components/ChatRoom";
 import BlueAIChat from "./components/BlueAIChat";
 import FriendSearch from "./components/FriendSearch";
 import ContactSyncConsentModal from "./components/ContactSyncConsentModal.jsx";
+import { openFriendShowcase } from "./lib/openFriendShowcase.js";
 import FeedManager from "./components/FeedManager";
 import Home from "./components/Home";
 import MyPage from "./components/MyPage";
@@ -4940,6 +4941,19 @@ function App() {
           onOpenContactChat={(user) => {
             ensureFriendRoom(user.userId, user.displayName || user.contactName);
             navigate({ nextPage: "list", nextTab: "friends", nextRoomId: `friends:${user.userId}` });
+          }}
+          onOpenContactShowcase={(user) => {
+            navigate({ nextPage: "main" });
+            window.setTimeout(() => {
+              openFriendShowcase({
+                userId: user.userId,
+                publicHandle: user.publicHandle,
+                displayName: user.displayName || user.contactName || user.name,
+                phone: user.phone || user.phoneE164 || user.phoneDisplay,
+                avatarUrl: user.avatarUrl || user.photoUrl,
+                membershipTier: user.membershipTier
+              });
+            }, 120);
           }}
           onFriendEstablished={(userId, userName) => {
             ensureFriendRoom(userId, userName || "친구");

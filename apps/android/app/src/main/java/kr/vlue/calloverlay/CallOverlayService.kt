@@ -2156,6 +2156,15 @@ class CallOverlayService : Service() {
                     }
                 }
                 if (isCallAlreadyAnswered() || companion.state == OverlayState.SHOWCASE) {
+                    /* 발신 미연결 — 카드 enrich 로 정상 팝업 금지 */
+                    if (currentOutgoing && !remoteConnected) {
+                        VlueBigPushTrace.lifecycle(
+                            "CONTACT_SAFE_CARE_HOLD_BIGPUSH",
+                            "outgoing unanswered — keep BigPush phone=${ReleaseDebugGate.maskPhoneForLog(phone)}"
+                        )
+                        LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
+                        return@post
+                    }
                     if (authPopupConfirmedToMini ||
                         userMinimized ||
                         companion.state == OverlayState.MINI_CASE
@@ -2176,6 +2185,24 @@ class CallOverlayService : Service() {
             if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(cardJson, verified) &&
                 (companion.state == OverlayState.SHOWCASE || isCallAlreadyAnswered())
             ) {
+                if (currentOutgoing && !remoteConnected) {
+                    VlueBigPushTrace.lifecycle(
+                        "AUTH_MEMBER_HOLD_BIGPUSH",
+                        "outgoing unanswered — keep BigPush phone=${ReleaseDebugGate.maskPhoneForLog(phone)}"
+                    )
+                    if (webView != null && !cardJson.isNullOrBlank()) {
+                        injectCardLookupJson(webView, cardJson)
+                    }
+                    val bannerHold = nativeBanner
+                    if (bannerHold != null) {
+                        BigPushShowcaseBar.bind(bannerHold, phone, verified, outgoing, cardJson)
+                    }
+                    if (companion.state == OverlayState.BIG_PUSH) {
+                        notifyWebCallState("big_push_bar")
+                    }
+                    LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
+                    return@post
+                }
                 /* 팝업만 띄우고 카드를 주입하지 않으면 웹이 미인증으로 남는다 */
                 if (webView != null && !cardJson.isNullOrBlank()) {
                     injectCardLookupJson(webView, cardJson)
@@ -2337,7 +2364,7 @@ class CallOverlayService : Service() {
                 profileKind = ContactSafeCarePayload.PROFILE_KIND,
                 overlayState = companion.state,
                 popupOnly = dcpPopupOnly || authPopupOnlyMode,
-                callAnswered = remoteConnected || isCallAlreadyAnswered()
+                callAnswered = if (currentOutgoing) remoteConnected else (remoteConnected || isCallAlreadyAnswered())
             ) && !dismissing
             if (!show) {
                 removeDcpPopupWindow()
@@ -2385,7 +2412,7 @@ class CallOverlayService : Service() {
             val show = VlueAuthMemberPopupPolicy.shouldShow(
                 overlayState = companion.state,
                 popupOnlyTest = dcpPopupOnly || authPopupOnlyMode,
-                callAnswered = remoteConnected || isCallAlreadyAnswered()
+                callAnswered = if (currentOutgoing) remoteConnected else (remoteConnected || isCallAlreadyAnswered())
             ) && !dismissing
             if (!show) {
                 /* ContextWatch 가 BIG_PUSH 로 접어도 이미 표시 중인 인증 팝업은 유지 */

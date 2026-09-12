@@ -28,6 +28,7 @@ export default function ContactFriendsPanel({
   onMatchUpdate,
   onFriendAdded,
   onOpenChat,
+  onOpenShowcase,
   onResyncRequest,
   filterQuery = "",
   compact = false,
@@ -206,7 +207,7 @@ export default function ContactFriendsPanel({
     if (!uid || busyId) return;
     const before = resolveRelation(user);
     if (before.isFriend) {
-      setNotice("이미 친구입니다. 「채팅」으로 대화를 시작하세요.");
+      setNotice("이미 친구입니다. 「쇼케이스」로 상대 쇼케이스를 볼 수 있습니다.");
       return;
     }
     if (before.pending === "sent") {
@@ -391,10 +392,13 @@ export default function ContactFriendsPanel({
                         return (
                           <button
                             type="button"
-                            onClick={() => onOpenChat?.(item.user)}
-                            className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700"
+                            onClick={() => {
+                              if (onOpenShowcase) onOpenShowcase(item.user);
+                              else onOpenChat?.(item.user);
+                            }}
+                            className="shrink-0 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-black text-violet-700"
                           >
-                            채팅
+                            쇼케이스
                           </button>
                         );
                       }
