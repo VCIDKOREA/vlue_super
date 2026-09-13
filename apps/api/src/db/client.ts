@@ -1,19 +1,28 @@
 /**
- * Prisma 단일 인스턴스 — Shared Pooler(PgBouncer)용 connection_limit=1 권장.
+ * Prisma 단일 인스턴스 — Supabase Shared Pooler(PgBouncer)용.
  * DATABASE_URL 은 루트 또는 apps/api/.env 에서 로드.
+ *
+ * connection_limit=1 + pool_timeout=8 은 로그인까지 막힘
+ * (Timed out fetching a new connection from the connection pool).
+ * 프로세스당 소량 풀 + 충분한 대기시간으로 유지.
  */
 import { PrismaClient } from "@vlue/db";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-/** Supabase Shared Pooler egress/연결 폭주 완화 — Prisma 프로세스당 풀 1 */
 function withPoolerClientLimits(url: string | undefined): string | undefined {
   if (!url || typeof url !== "string") return url;
   try {
     const u = new URL(url);
-    if (!u.searchParams.has("connection_limit")) u.searchParams.set("connection_limit", "1");
-    /* 풀 대기 20초는 담당자 UI 타임아웃(12초)보다 김 → 빨리 실패해 캐시/재시도 */
-    if (!u.searchParams.has("pool_timeout")) u.searchParams.set("pool_timeout", "8");
+    const limit = Number(u.searchParams.get("connection_limit") || "0");
+    /* 1은 백그라운드 작업과 로그인 경쟁 시 즉시 고갈 */
+    if (!u.searchParams.has("connection_limit") || limit < 2) {
+      u.searchParams.set("connection_limit", "5");
+    }
+    const poolTimeout = Number(u.searchParams.get("pool_timeout") || "0");
+    if (!u.searchParams.has("pool_timeout") || poolTimeout < 15) {
+      u.searchParams.set("pool_timeout", "20");
+    }
     return u.toString();
   } catch {
     return url;
