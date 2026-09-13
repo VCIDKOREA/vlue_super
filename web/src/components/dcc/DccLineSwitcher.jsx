@@ -11,8 +11,6 @@ import {
   writeSelectedDccLineId
 } from "../../lib/dccLineState.js";
 import {
-  readLiveShowcaseStyle,
-  readShowcaseStyle,
   writeLiveShowcaseStyle,
   writeShowcaseStyle
 } from "../../lib/showcase/showcaseStyleStorage.js";
@@ -23,6 +21,34 @@ import { dccLineOptionLabel } from "../../lib/dccLineLabel.js";
 import { switchToMultiDccProfile } from "../../lib/multiDccSwitch.js";
 import DccAgentManageModal from "./DccAgentManageModal.jsx";
 import "./dcc-agent-switcher.css";
+
+const LOAD_TIMEOUT_MS = 25_000;
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    promise.finally(() => {
+      if (timer) window.clearTimeout(timer);
+    }),
+    new Promise((_, reject) => {
+      timer = window.setTimeout(() => {
+        reject(new Error(`${label} 응답이 너무 늦습니다. 다시 시도해 주세요.`));
+      }, ms);
+    })
+  ]);
+}
+
+async function fetchWithRetry(fn, label, attempts = 2) {
+  let lastErr;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await withTimeout(fn(), LOAD_TIMEOUT_MS, label);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(`${label}에 실패했습니다.`);
+}
 
 function applyLineToLocalPreview(bundle) {
   const line = bundle?.line;
@@ -36,11 +62,6 @@ function applyLineToLocalPreview(bundle) {
     writeShowcaseStyle(editor || live, { replace: true, skipSync: true });
     writeLiveShowcaseStyle(live || editor, { source: "editor", skipSync: true });
     if (bundle.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
-  } else {
-    /*
-     * 회선 번들이 비어도 로컬에 있는 쇼케이스·DCC를 절대 지우지 않음.
-     * (담당자/회선 API 지연·실패·빈 응답 시 설정 화면이 통째로 비는 사고 방지)
-     */
   }
   try {
     window.dispatchEvent(new Event("vlue-showcase-style-changed"));
@@ -66,6 +87,7 @@ export default function DccLineSwitcher({
   const [photoUrl, setPhotoUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [manageOpen, setManageOpen] = useState(false);
   const switching = loading || busy;
   const onToastRef = useRef(onToast);
@@ -75,25 +97,39 @@ export default function DccLineSwitcher({
     onBusyChange?.(switching);
   }, [switching, onBusyChange]);
 
-  const loadAgents = useCallback(async (cardId) => {
-    const data = await fetchDccAgentProfiles(cardId);
-    const list = Array.isArray(data.profiles) ? data.profiles : [];
+  const applyAgents = useCallback((data) => {
+    const list = Array.isArray(data?.profiles) ? data.profiles : [];
     setProfiles(list);
-    setAgentId(data.activeId || list.find((p) => p.isActive)?.id || "");
-    if (data.maxCount) setMaxCount(data.maxCount);
+    setAgentId(data?.activeId || list.find((p) => p.isActive)?.id || "");
+    if (data?.maxCount) setMaxCount(data.maxCount);
     return data;
   }, []);
+
+  const loadAgents = useCallback(
+    async (cardId) => {
+      const data = await fetchWithRetry(() => fetchDccAgentProfiles(cardId), "담당자 목록");
+      return applyAgents(data);
+    },
+    [applyAgents]
+  );
 
   const selectLine = useCallback(
     async (nextId, { silent } = {}) => {
       if (!nextId) return;
       setBusy(true);
       try {
-        const bundle = await fetchDccLineBundle(nextId);
+        const bundle = await fetchWithRetry(() => fetchDccLineBundle(nextId), "번호 DCC");
         setLineId(bundle.line.id);
         setPhotoUrl(bundle.line.photoUrl || "");
         applyLineToLocalPreview(bundle);
-        await loadAgents(bundle.line.id);
+        try {
+          await loadAgents(bundle.line.id);
+        } catch (agentErr) {
+          /* 번호는 됐는데 담당자만 실패 — 전체 로드 실패로 보지 않음 */
+          onToastRef.current?.(
+            agentErr instanceof Error ? agentErr.message : "담당자를 불러오지 못했습니다."
+          );
+        }
         if (!silent) {
           onToastRef.current?.(
             `${bundle.line.kindLabel} ${bundle.line.displayPhone} — 이 번호의 DCC·쇼케이스를 설정합니다. 담당자만 드롭다운으로 바꿉니다.`
@@ -110,26 +146,58 @@ export default function DccLineSwitcher({
   );
 
   const reload = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
     try {
-      const data = await fetchDccLines();
-      const list = Array.isArray(data.lines) ? data.lines : [];
-      setLines(list);
-      const preferred = readSelectedDccLineId() || list[0]?.id || "";
-      if (preferred && list.some((l) => l.id === preferred)) {
-        await selectLine(preferred, { silent: true });
-      } else {
+      /* 담당자는 회선 번들과 무관하게 먼저/병렬로 — 회선 지연으로 담당자 UI가 비지 않게 */
+      const agentsPromise = fetchWithRetry(() => fetchDccAgentProfiles(), "담당자 목록").then(
+        (data) => {
+          applyAgents(data);
+          return data;
+        }
+      );
+      const linesPromise = fetchWithRetry(() => fetchDccLines(), "번호 목록");
+
+      const [agentsResult, linesResult] = await Promise.allSettled([agentsPromise, linesPromise]);
+
+      if (agentsResult.status === "rejected") {
+        const msg =
+          agentsResult.reason instanceof Error
+            ? agentsResult.reason.message
+            : "담당자를 불러오지 못했습니다.";
+        setLoadError(msg);
+        onToastRef.current?.(msg);
+      }
+
+      if (linesResult.status === "fulfilled") {
+        const data = linesResult.value;
+        const list = Array.isArray(data.lines) ? data.lines : [];
+        setLines(list);
+        const preferred = readSelectedDccLineId() || list[0]?.id || "";
+        if (preferred && list.some((l) => l.id === preferred)) {
+          await selectLine(preferred, { silent: true });
+          return;
+        }
         writeSelectedDccLineId("");
-        setLoading(false);
+      } else {
+        const msg =
+          linesResult.reason instanceof Error
+            ? linesResult.reason.message
+            : "번호 목록을 불러오지 못했습니다.";
+        setLoadError((prev) => prev || msg);
+        onToastRef.current?.(msg);
       }
     } catch (e) {
-      onToastRef.current?.(e instanceof Error ? e.message : "번호 목록을 불러오지 못했습니다.");
+      const msg = e instanceof Error ? e.message : "담당자·번호를 불러오지 못했습니다.";
+      setLoadError(msg);
+      onToastRef.current?.(msg);
+    } finally {
       setLoading(false);
     }
-  }, [selectLine]);
+  }, [applyAgents, selectLine]);
 
   useEffect(() => {
     void reload();
-    // 최초 1회 — 번호 목록·선택 회선 DCC/쇼케이스 로드
   }, []);
 
   const onChangeLine = (nextId) => {
@@ -173,6 +241,7 @@ export default function DccLineSwitcher({
     const list = Array.isArray(data.lines) ? data.lines : [];
     setLines(list);
     if (lineId) await loadAgents(lineId);
+    else await loadAgents();
   };
 
   const onPickPhoto = async (file) => {
@@ -193,6 +262,12 @@ export default function DccLineSwitcher({
       setBusy(false);
     }
   };
+
+  const retryBtn = loadError && !switching ? (
+    <button type="button" className="dcc-agent-bar__manage" onClick={() => void reload()}>
+      다시 불러오기
+    </button>
+  ) : null;
 
   const lineSelect = (
     <div className="dcc-agent-bar__select-wrap">
@@ -246,6 +321,10 @@ export default function DccLineSwitcher({
     <span className="dcc-agent-bar__status" role="status" aria-live="polite">
       <Loader2 size={14} className="dcc-agent-bar__status-spin" aria-hidden />
       불러오는 중…
+    </span>
+  ) : loadError ? (
+    <span className="dcc-agent-bar__status" role="status">
+      {loadError}
     </span>
   ) : null;
 
@@ -315,6 +394,7 @@ export default function DccLineSwitcher({
               {agentSelect}
               {loadingChip}
               {manageBtn}
+              {retryBtn}
             </div>
           </label>
         </div>
@@ -330,6 +410,7 @@ export default function DccLineSwitcher({
         {lineSelect}
         {agentSelect}
         {manageBtn}
+        {retryBtn}
         {loadingChip}
         {modal}
       </div>
@@ -350,8 +431,10 @@ export default function DccLineSwitcher({
               {agentSelect}
               {loadingChip}
               {manageBtn}
+              {retryBtn}
             </div>
           </label>
+          {photoRow}
         </>
       ) : (
         <>
@@ -359,6 +442,8 @@ export default function DccLineSwitcher({
           {agentSelect}
           {loadingChip}
           {manageBtn}
+          {retryBtn}
+          {photoRow}
         </>
       )}
       {modal}

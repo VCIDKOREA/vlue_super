@@ -2517,15 +2517,17 @@ function App() {
         try {
           const { restoreDigitalCardFromServer } = await import("./lib/digitalCardApi.js");
           const meta = await restoreDigitalCardFromServer({ force: true });
-          if (meta?.issued) {
+          if (meta?.fetchFailed) {
+            /* 서버 실패 시 기존 발급 상태 유지 */
+          } else if (meta?.issued) {
             localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
             setDigitalCardActive(true);
-          } else {
+          } else if (meta?.issued === false) {
             localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "0");
             setDigitalCardActive(false);
           }
         } catch {
-          /* ignore */
+          /* ignore — 네트워크 실패 시 명함 플래그 유지 */
         }
         setCardFieldsTick((n) => n + 1);
       })();
@@ -2702,10 +2704,15 @@ function App() {
           try {
             const { restoreDigitalCardFromServer } = await import("./lib/digitalCardApi.js");
             const meta = await restoreDigitalCardFromServer({ force: true });
-            if (meta?.issued || handle === "ceo") {
+            if (meta?.fetchFailed) {
+              if (handle === "ceo") {
+                localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
+                setDigitalCardActive(true);
+              }
+            } else if (meta?.issued || handle === "ceo") {
               localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
               setDigitalCardActive(true);
-            } else {
+            } else if (meta?.issued === false) {
               localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "0");
               setDigitalCardActive(false);
             }
@@ -2844,15 +2851,17 @@ function App() {
       try {
         const { restoreDigitalCardFromServer } = await import("./lib/digitalCardApi.js");
         const meta = await restoreDigitalCardFromServer({ force: true });
-        if (meta?.issued) {
+        if (meta?.fetchFailed) {
+          /* 서버 실패 시 기존 발급 상태 유지 */
+        } else if (meta?.issued) {
           localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
           setDigitalCardActive(true);
-        } else {
+        } else if (meta?.issued === false) {
           localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "0");
           setDigitalCardActive(false);
         }
       } catch {
-        /* ignore */
+        /* ignore — 네트워크 실패 시 명함 플래그 유지 */
       }
       setBottomToast(`${labels.kakao}로 로그인되었습니다.`);
       setTimeout(() => setBottomToast(""), 2200);
@@ -3349,6 +3358,14 @@ function App() {
         const { restoreDigitalCardFromServer } = await import("./lib/digitalCardApi.js");
         /* force: 로컬이 비었거나 일부만 있어도 서버값을 빈 칸에 채움(비어 있는 서버값으로 지우지 않음은 hydrate 내부) */
         await restoreDigitalCardFromServer({ force: true });
+        try {
+          const { healDigitalCardActiveFromLocalEvidence } = await import(
+            "./lib/vlueShowcasePreviewIdentity.js"
+          );
+          healDigitalCardActiveFromLocalEvidence();
+        } catch {
+          /* ignore */
+        }
         const showcase = await import("./lib/showcase/showcaseStyleSync.js");
         if (showcase.needsShowcaseStyleLocalRestore()) {
           await showcase.restoreShowcaseStyleFromServer();

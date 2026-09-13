@@ -41,7 +41,8 @@ let columnsReady = false;
 export async function ensureMultiDccProfileBundleColumns() {
   if (columnsReady) return;
   try {
-    await prisma.$executeRawUnsafe(`
+    const alter = (async () => {
+      await prisma.$executeRawUnsafe(`
       ALTER TABLE "user_dcc_agent_profiles"
         ADD COLUMN IF NOT EXISTS "is_representative" BOOLEAN NOT NULL DEFAULT FALSE,
         ADD COLUMN IF NOT EXISTS "dcc_snapshot_json" JSONB,
@@ -49,17 +50,24 @@ export async function ensureMultiDccProfileBundleColumns() {
         ADD COLUMN IF NOT EXISTS "showcase_live_style_json" JSONB,
         ADD COLUMN IF NOT EXISTS "routed_contact_phones" JSONB;
     `);
-    await prisma.$executeRawUnsafe(`
+      await prisma.$executeRawUnsafe(`
       CREATE INDEX IF NOT EXISTS "user_dcc_agent_profiles_user_id_is_representative_idx"
         ON "user_dcc_agent_profiles" ("user_id", "is_representative");
     `);
-    await prisma.$executeRawUnsafe(`
+      await prisma.$executeRawUnsafe(`
       CREATE UNIQUE INDEX IF NOT EXISTS "user_dcc_agent_profiles_one_representative_idx"
         ON "user_dcc_agent_profiles" ("user_id")
         WHERE "is_representative" = TRUE;
     `);
+    })();
+    await Promise.race([
+      alter,
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("ensureMultiDccProfileBundleColumns timeout")), 4000);
+      })
+    ]);
   } catch {
-    /* table may not exist yet — list will surface 503 */
+    /* table may not exist yet / DB busy — list will surface errors; do not retry ALTER forever */
   }
   columnsReady = true;
 }

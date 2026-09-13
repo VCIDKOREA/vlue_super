@@ -44,6 +44,7 @@ import {
   readDccBroadcastOn,
   readVcidBroadcastOn
 } from "../../lib/bizcardAccountSync.js";
+import { healDigitalCardActiveFromLocalEvidence } from "../../lib/vlueShowcasePreviewIdentity.js";
 import { useDccFeatureAccess } from "../../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../../lib/dccAccessPolicy.js";
 import { canUseV1PaidDccFeatures, requestV1PaidPackageGate } from "../../lib/v1PaidPackageGate.js";
@@ -434,6 +435,9 @@ export default function ShowcaseStyleSettingsPanel({
 
   /* 명함 사진·신원 변경 시 미리보기 즉시 반영 */
   useEffect(() => {
+    if (healDigitalCardActiveFromLocalEvidence()) {
+      setIdentityTick((n) => n + 1);
+    }
     const bump = () => {
       setIdentityTick((n) => n + 1);
       setConfig((prev) => {

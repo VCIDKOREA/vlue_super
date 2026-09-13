@@ -365,11 +365,13 @@ export async function fetchDigitalCardMeta(opts = {}) {
         headers: vlueAuthHeaders()
       });
       if (!res.ok) {
+        /* 실패를 issued:false 로 위장하면 로컬 발급 플래그가 꺼져 DCC/명함설정이 사라짐 */
         return {
           cardId: cached || null,
           issuedAt: null,
           designTemplate: null,
-          issued: false,
+          issued: null,
+          fetchFailed: true,
           exportSnapshot: null
         };
       }
@@ -414,7 +416,8 @@ export async function fetchDigitalCardMeta(opts = {}) {
         cardId: cached || null,
         issuedAt: null,
         designTemplate: null,
-        issued: false,
+        issued: null,
+        fetchFailed: true,
         exportSnapshot: null
       };
     }

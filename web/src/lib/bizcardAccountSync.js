@@ -205,10 +205,22 @@ export async function syncBizcardAccountFromApi(opts = {}) {
   const [ctx, meta] = await Promise.all([
     fetchB2bMembershipUiContext().catch(() => null),
     restoreNeeded
-      ? restoreDigitalCardFromServer({ force: true }).catch(() => ({ issued: false, cardId: null }))
+      ? restoreDigitalCardFromServer({ force: true }).catch(() => ({
+          issued: null,
+          cardId: null,
+          fetchFailed: true
+        }))
       : fillNeeded
-        ? fillEmptyDigitalCardFieldsFromServer().catch(() => ({ issued: false, cardId: null }))
-        : fetchDigitalCardMeta({ force, lite: true }).catch(() => ({ issued: false, cardId: null }))
+        ? fillEmptyDigitalCardFieldsFromServer().catch(() => ({
+            issued: null,
+            cardId: null,
+            fetchFailed: true
+          }))
+        : fetchDigitalCardMeta({ force, lite: true }).catch(() => ({
+            issued: null,
+            cardId: null,
+            fetchFailed: true
+          }))
   ]);
 
   if (ctx?.company?.company_name) {
@@ -246,13 +258,15 @@ export async function syncBizcardAccountFromApi(opts = {}) {
     }
   }
 
-  if (meta?.issued && meta?.cardId) {
+  if (meta?.fetchFailed) {
+    /* API/DB 실패 시 발급 플래그를 끄지 않음 — DCC·명함설정 버튼 소실 방지 */
+  } else if (meta?.issued && meta?.cardId) {
     try {
       localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
     } catch {
       /* ignore */
     }
-  } else if (force) {
+  } else if (force && meta?.issued === false) {
     try {
       localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "0");
     } catch {

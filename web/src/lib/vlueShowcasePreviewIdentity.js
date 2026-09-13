@@ -3,7 +3,26 @@ import {
   readLetteringBizcardEditable,
   readLetteringFixedIdentity
 } from "./letteringBizcardStorage.js";
-import { readDigitalCardActive, readDccBroadcastOn } from "./bizcardAccountSync.js";
+import { readDigitalCardActive, readDccBroadcastOn, DIGITAL_CARD_ACTIVE_KEY } from "./bizcardAccountSync.js";
+
+/** API 실패로 발급 플래그만 꺼진 경우 — 로컬 명함 ID가 있으면 복구 */
+export function healDigitalCardActiveFromLocalEvidence() {
+  if (readDigitalCardActive()) return false;
+  try {
+    const cardId = String(localStorage.getItem("vlue_digital_card_id") || "").trim();
+    if (!cardId) return false;
+    localStorage.setItem(DIGITAL_CARD_ACTIVE_KEY, "1");
+    window.dispatchEvent(new CustomEvent("vlue-digital-card-changed"));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function readShowcasePreviewDigitalCardApplied() {
+  healDigitalCardActiveFromLocalEvidence();
+  return readDigitalCardActive() && readDccBroadcastOn();
+}
 import { scrubLetteringDemoPollution } from "./letteringDemoPollution.js";
 import { DCC_CERTIFIED_MEMBER_LABEL } from "./letteringPaidIdentityDisplay.js";
 
@@ -208,8 +227,4 @@ export function applyShowcasePreviewExampleIdentity(card = {}) {
     },
     { isCeo }
   );
-}
-
-export function readShowcasePreviewDigitalCardApplied() {
-  return readDigitalCardActive() && readDccBroadcastOn();
 }

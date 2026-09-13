@@ -14,6 +14,7 @@ import { hydrateLiveBroadcastFromServer } from "../lib/showcase/syncMycaseLiveBr
 import { LETTERING_BIZCARD_CHANGED_EVENT } from "../lib/letteringBizcardStorage.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import {
+  healDigitalCardActiveFromLocalEvidence,
   readShowcasePreviewDigitalCardApplied
 } from "../lib/vlueShowcasePreviewIdentity.js";
 import { readVcidBroadcastOn } from "../lib/bizcardAccountSync.js";
