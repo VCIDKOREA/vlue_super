@@ -950,6 +950,9 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
     body: attachPeerPath({ matched: false, phoneE164: e164, source: "unmatched" }, peer)
   };
 }
+
+/** 번호 → 명함/회원 조회 (GET /lookup · GET /by-number) */
+export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {}) {
   if (opts.forCallOverlay) {
     return lookupCardForCallOverlay(raw, opts);
   }
