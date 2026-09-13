@@ -18,7 +18,7 @@ import BroadcastLineSetupPanel from "./BroadcastLineSetupPanel.jsx";
 import EnterpriseDccApplyWizard from "./EnterpriseDccApplyWizard.jsx";
 import DccOwnerApprovalInbox from "./DccOwnerApprovalInbox.jsx";
 import BackButton from "./common/BackButton";
-import { isBillableMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
+import { isBillableMembershipKind, isB2bMembershipKind, isPaidMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
 import { pricingNumbers } from "../lib/pricingConfig.js";
 import { probeEnterpriseSidebarAccess } from "../lib/enterpriseLineManageAccess.js";
 import { fileToFittedAvatarDataUrl, readProfilePhotoAvatar, writeAvatar, scrubBrandAvatarsFromStorage } from "../lib/vlueAvatar.js";
@@ -32,7 +32,7 @@ import { fetchEmailForwardingMapping, readLocalLoginPrefix } from "../lib/vlueEm
 import { membershipTierStyleClass, isFamilyProtectionActiveFromPeers } from "../lib/membershipTierDisplay.js";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
-import { fetchFamilyProtection } from "../lib/familyProtectionApi.js";
+import { fetchFamilyProtection, peekFamilyProtectionCache } from "../lib/familyProtectionApi.js";
 import { familyPeersFromProtectionData } from "../lib/familyProtectionPeers.js";
 import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
 import {
@@ -405,27 +405,42 @@ function ProfilePanel({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    const paidFromTier = (() => {
+      const kind = normalizeMembershipKind(membershipTier);
+      return isB2bMembershipKind(kind) || isPaidMembershipKind(kind);
+    })();
     const applyPeers = (peers) => {
       if (!cancelled) setFamilyProtectionActive(isFamilyProtectionActiveFromPeers(peers));
     };
+    const applyPayload = (d) => {
+      if (!d || cancelled) return;
+      applyPeers(familyPeersFromProtectionData(d));
+      setFamilyProtectionEligible(
+        Boolean(d?.canInviteFamily) ||
+          d?.uiMode === "guardian_full" ||
+          d?.memberSlots?.isPaid === true ||
+          paidFromTier
+      );
+      const b = d?.familyPlanBeneficiary;
+      setFamilyPlanPathLabel(b?.active && b.pathLabel ? b.pathLabel : "");
+    };
+    /* API 지연·장애 시에도 유료 티어면 '유료전용'으로 떨어지지 않게 */
+    if (paidFromTier) setFamilyProtectionEligible(true);
+    const cached = peekFamilyProtectionCache?.();
+    if (cached) applyPayload(cached);
+
     const refresh = async () => {
       try {
         const d = await fetchFamilyProtection();
-        applyPeers(familyPeersFromProtectionData(d));
-        if (!cancelled) {
-          setFamilyProtectionEligible(
-            Boolean(d?.canInviteFamily) ||
-              d?.uiMode === "guardian_full" ||
-              d?.memberSlots?.isPaid === true
-          );
-        }
-        const b = d?.familyPlanBeneficiary;
-        setFamilyPlanPathLabel(b?.active && b.pathLabel ? b.pathLabel : "");
+        applyPayload(d);
       } catch {
         if (!cancelled) {
-          setFamilyProtectionActive(false);
-          setFamilyProtectionEligible(false);
-          setFamilyPlanPathLabel("");
+          /* 네트워크/DB 장애 ≠ 무료. 유료면 이용가능 유지, 활성 여부만 캐시·미확인 */
+          setFamilyProtectionEligible(paidFromTier);
+          if (!peekFamilyProtectionCache?.()) {
+            setFamilyProtectionActive(false);
+            setFamilyPlanPathLabel("");
+          }
         }
       }
     };
@@ -439,7 +454,7 @@ function ProfilePanel({
       window.removeEventListener("vlue-family-peers-updated", onPeers);
       window.removeEventListener("vlue-family-protection-changed", onChanged);
     };
-  }, [open]);
+  }, [open, membershipTier]);
 
   const broadcastMonthlyKrw = useMemo(() => pricingNumbers().broadcastMonthly, []);
   const tierUi = useMemo(() => {

@@ -39,18 +39,20 @@
 
 ## 3. After answer (`remoteConnected == true`)
 
-### 3a. Incoming (unchanged)
+### 3a. Incoming (unchanged except public directory)
 
 Decision order (first match wins):
 
 1. User already Mini / auth confirmed → stay `MINI_CASE` (no re-open popup/showcase)
-2. `profileKind == contact_safe_care` → `CENTER_SAFE_POPUP`
+2. `profileKind == contact_safe_care` **or** `public_directory_safe` → `CENTER_SAFE_POPUP` (안심팝업 · 신고/제보 없음)
 3. Auth-member-only (verified + no public DCC/showcase) → `CENTER_AUTH_POPUP`
 4. Broadcast ON **and** real DCC/showcase content → `FULL_SHOWCASE`
 5. Resolved unverified (lookup done, `matched:false`, not pending, not safe-care, no device-contact promote) → `FULL_SHOWCASE` (**미인증 신고 패널**)
 6. Else (pending lookup / blank) → `KEEP_BIG_PUSH`
 
 Contact promote: if lookup pending/blank **and** device contact name exists → treat as Safe Care (`CENTER_SAFE_POPUP`).
+
+**Public directory:** 학교·우체국·공공기관 등 DB 전화 매칭 → `public_directory_safe` 안심팝업. 미매칭 → 기존 미인증 쇼케이스.
 
 **BigPush bar tap (after answer):** same decision table. Resolved unverified must open 미인증 fullscreen (not `BIG_PUSH_TAP_KEEP`).
 

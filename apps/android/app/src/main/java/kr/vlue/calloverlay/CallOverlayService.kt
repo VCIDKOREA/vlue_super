@@ -54,6 +54,7 @@ import kr.vlue.calloverlay.dcp.CallPathReasonCopy
 import kr.vlue.calloverlay.dcp.CallPathSession
 import kr.vlue.calloverlay.dcp.ContactSafeCarePayload
 import kr.vlue.calloverlay.dcp.ContactSafeCarePolicy
+import kr.vlue.calloverlay.dcp.PublicDirectorySafePayload
 import kr.vlue.calloverlay.dcp.VlueAuthMemberPopupPolicy
 import kr.vlue.calloverlay.dcp.DcpAbnormalWarningView
 import kr.vlue.calloverlay.dcp.DcpPopupPolicy
@@ -2697,8 +2698,11 @@ class CallOverlayService : Service() {
         }
     }
 
-    private fun isContactSafeCare(cardJson: String?): Boolean =
-        parseProfileKind(cardJson) == ContactSafeCarePayload.PROFILE_KIND
+    private fun isContactSafeCare(cardJson: String?): Boolean {
+        val kind = parseProfileKind(cardJson)
+        return kind == ContactSafeCarePayload.PROFILE_KIND ||
+            kind == PublicDirectorySafePayload.PROFILE_KIND
+    }
 
     private fun isLookupPendingCard(cardJson: String?): Boolean =
         parseProfileKind(cardJson) == "lookup_pending"

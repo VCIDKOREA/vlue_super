@@ -123,6 +123,14 @@ $RECYCLE.BIN/
 *.bak
 *.orig
 
+# --- 공공·상권 원본 데이터 (USB/로컬만, GitHub 금지) ---
+/data/*.csv
+/data/*.CSV
+/data/*.xlsx
+/data/*.xls
+/data/*.pdf
+scripts/public_directory/_*.py
+
 # local release secrets (never commit)
 vlue-release-keystore-SECRET.txt
 **/vlue-release-keystore-SECRET.txt

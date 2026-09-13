@@ -10,6 +10,7 @@ import { lookupNtsBusinessByNumber } from "../../integrations/publicData/ntsBusi
 import { searchBusinessesByTradeName, type TradeNameBusinessCandidate } from "../../integrations/publicData/businessTradeNameSearch.js";
 import { findSmallBusinessStore } from "../../integrations/publicData/smallBusinessStoreSearch.js";
 import { findVluePartner } from "./vluePartnerRegistry.js";
+import { searchPublicDirectory } from "./publicDirectoryService.js";
 
 export type KakaoSourceData = {
   place_name: string;
@@ -86,6 +87,15 @@ export type CrossVerifyData = {
   naver: NaverSourceData;
   public: PublicSourceData;
   vlue_auth: VlueAuthData;
+  /** VLUE 적재 공공·상권 디렉터리 히트 (카카오/네이버/국세청과 병행 표시) */
+  vlue_directory?: Array<{
+    id: string;
+    sourceKind: string;
+    displayName: string;
+    phoneE164: string;
+    category: string;
+    address: string;
+  }>;
   place_branches: PlaceBranchItem[];
   location_sorted: boolean;
 };
@@ -401,11 +411,25 @@ function buildVlueAuth(
   partner: ReturnType<typeof findVluePartner>,
   publicData: PublicSourceData,
   kakao: KakaoSourceData,
-  naver: NaverSourceData
+  naver: NaverSourceData,
+  directoryName = ""
 ): VlueAuthData {
+  if (directoryName) {
+    return {
+      status_text: "VLUE 인증",
+      safety_score: 88,
+      partner_name: directoryName,
+      partner_id: "",
+      store_id: "",
+      cert_number: "",
+      category: "공공·상권 디렉터리",
+      phone: "",
+      address: ""
+    };
+  }
   if (is_registered && partner) {
     return {
-      status_text: "VLUE 보이스피싱 예방 센터 교차 검증 완료",
+      status_text: "VLUE 인증",
       safety_score: partner.safety_score,
       partner_name: partner.name,
       partner_id: partner.id,
@@ -425,7 +449,7 @@ function buildVlueAuth(
   else if (!publicData.matched && (kakao.place_name || naver.title)) score += 8;
 
   return {
-    status_text: "VLUE 예방 센터 교차 검증 진행 중",
+    status_text: publicData.matched ? "VLUE 인증" : "VLUE 예방 센터 교차 검증 진행 중",
     safety_score: Math.min(Math.max(score, 35), 78),
     partner_name: "",
     partner_id: "",
@@ -445,9 +469,10 @@ export async function runSearchVerify(
   if (!q) return { status: "error", message: "검색어(keyword)가 필요합니다." };
 
   const userCenter = userSearchCenter(options);
-  const [kakaoList, naverList] = await Promise.all([
+  const [kakaoList, naverList, directoryHits] = await Promise.all([
     searchKakaoLocalList(q, 15, userCenter),
-    searchNaverLocalList(q, 5)
+    searchNaverLocalList(q, 5),
+    searchPublicDirectory({ query: q, limit: 8 }).catch(() => [])
   ]);
 
   let kakaoResolved: Awaited<ReturnType<typeof searchKakaoLocalDetailed>> = {
@@ -464,18 +489,21 @@ export async function runSearchVerify(
     }
   }
 
-  if (!kakaoResolved.item && !naverBest) {
-    return { status: "error", message: "카카오·네이버 지역 검색 결과를 찾을 수 없습니다." };
+  const directoryBest = directoryHits[0] || null;
+
+  if (!kakaoResolved.item && !naverBest && !directoryBest) {
+    return { status: "error", message: "카카오·네이버·VLUE 디렉터리에서 결과를 찾을 수 없습니다." };
   }
 
   const kakaoBest = kakaoResolved.item;
-  const matchName = kakaoBest?.place_name || naverBest?.title || q;
-  const matchPhone = kakaoBest?.telephone || "";
+  const matchName = kakaoBest?.place_name || naverBest?.title || directoryBest?.displayName || q;
+  const matchPhone = kakaoBest?.telephone || directoryBest?.phoneE164 || "";
   const matchAddress =
     kakaoBest?.road_address ||
     kakaoBest?.address ||
     naverBest?.roadAddress ||
     naverBest?.address ||
+    directoryBest?.address ||
     "";
 
   const [publicData, partner] = await Promise.all([
@@ -484,21 +512,28 @@ export async function runSearchVerify(
       matchName,
       matchPhone,
       matchAddress,
-      matchCategory: kakaoBest?.category || naverBest?.category || "",
+      matchCategory: kakaoBest?.category || naverBest?.category || directoryBest?.category || "",
       latitude: kakaoBest?.latitude ?? naverBest?.latitude ?? null,
       longitude: kakaoBest?.longitude ?? naverBest?.longitude ?? null,
       extraNames: kakaoList.map((item) => item.place_name).filter(Boolean),
-      hasExternalPlace: Boolean(kakaoBest || naverBest)
+      hasExternalPlace: Boolean(kakaoBest || naverBest || directoryBest)
     }),
     Promise.resolve(findVluePartner(q, matchName))
   ]);
 
   const forceRegistered = String(process.env.VLUE_SEARCH_FORCE_REGISTERED || "").trim() === "1";
-  const is_registered = forceRegistered || Boolean(partner);
+  const is_registered = forceRegistered || Boolean(partner) || Boolean(directoryBest);
 
   const kakao = mapKakao(kakaoResolved);
   const naver = mapNaver(naverBest);
-  const vlue_auth = buildVlueAuth(is_registered, partner, publicData, kakao, naver);
+  const vlue_auth = buildVlueAuth(
+    is_registered,
+    partner,
+    publicData,
+    kakao,
+    naver,
+    directoryBest?.displayName || ""
+  );
 
   return {
     status: "success",
@@ -509,6 +544,7 @@ export async function runSearchVerify(
       naver,
       public: publicData,
       vlue_auth,
+      vlue_directory: directoryHits,
       place_branches: mapPlaceBranches(kakaoList),
       location_sorted: Boolean(userCenter)
     }

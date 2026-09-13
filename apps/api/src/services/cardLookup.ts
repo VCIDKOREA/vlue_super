@@ -14,6 +14,10 @@ import {
   readOutgoingCallPathSignal
 } from "./callPathPeerSignal.js";
 import { loadOverlayShowcaseStyleLite } from "../lib/overlayLookupLite.js";
+import {
+  buildPublicDirectorySafeLookupBody,
+  lookupPublicDirectoryByPhone
+} from "./search/publicDirectoryService.js";
 
 const EXPIRED_SUBTITLE = "??????????????????";
 const EXPIRED_DETAIL = "?????????????????? ?? ??? ????????";
@@ -932,14 +936,20 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
     };
   }
 
+  /* VLUÉ 비회원 — 공공·학교·우체국 등 디렉터리 매칭 시 안심팝업 */
+  const directoryHit = await lookupPublicDirectoryByPhone(e164).catch(() => null);
+  if (directoryHit) {
+    return {
+      status: 200 as const,
+      body: attachPeerPath(buildPublicDirectorySafeLookupBody(directoryHit), peer)
+    };
+  }
+
   return {
     status: 200 as const,
     body: attachPeerPath({ matched: false, phoneE164: e164, source: "unmatched" }, peer)
   };
 }
-
-/** ?? ??? ?? ??? ?? ??GET /lookup ? GET /by-number ?? */
-export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {}) {
   if (opts.forCallOverlay) {
     return lookupCardForCallOverlay(raw, opts);
   }
@@ -1168,6 +1178,13 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
   }
 
   if (billingGate.gate === "unmatched") {
+    const directoryHit = await lookupPublicDirectoryByPhone(e164).catch(() => null);
+    if (directoryHit) {
+      return {
+        status: 200 as const,
+        body: buildPublicDirectorySafeLookupBody(directoryHit)
+      };
+    }
     return {
       status: 404 as const,
       body: { matched: false, message: "???????????????." }
@@ -1305,6 +1322,15 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         access: masked.access,
         visibility: masked.visibility
       }
+    };
+  }
+
+  /* 비회원 일반 조회 — 디렉터리 히트면 안심 프로필 반환 */
+  const directoryHit = await lookupPublicDirectoryByPhone(e164).catch(() => null);
+  if (directoryHit) {
+    return {
+      status: 200 as const,
+      body: buildPublicDirectorySafeLookupBody(directoryHit)
     };
   }
 

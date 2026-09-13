@@ -125,6 +125,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         VlueAppUpdatePrompt.applyIntentExtras(intent, this)
         VlueBigPushTrace.bind(this)
         AppLockStore.init(this)
+        PublicDirectoryPhoneCache.scheduleSyncIfStale(this)
         VlueSystemNotifier.ensureChannel(this)
         kr.vlue.calloverlay.family.FamilyProtectionNotificationHelper.ensureChannel(this)
         setContentView(R.layout.activity_main)

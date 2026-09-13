@@ -104,6 +104,24 @@ object CardLookupRepository {
                 return cached
             }
 
+            /* 공공 디렉터리 로컬 인덱스 — 네트워크 전에 안심팝업 JSON 합성 */
+            PublicDirectoryPhoneCache.peek(context, rawNumber)?.let { hit ->
+                val json = buildPublicDirectorySafeJson(rawNumber, hit.displayName)
+                val synth = CardLookupResult(
+                    matched = true,
+                    verified = true,
+                    displayName = hit.displayName,
+                    rawJson = json
+                )
+                remember(context, rawNumber, synth)
+                bg.execute {
+                    PublicDirectoryPhoneCache.scheduleSyncIfStale(context)
+                    reportLineCallEvent(context, rawNumber)
+                }
+                return synth
+            }
+            PublicDirectoryPhoneCache.scheduleSyncIfStale(context)
+
             val base = BuildConfig.API_BASE_URL.trimEnd('/')
             val agency = NationalAgencyWhitelist.match(rawNumber)
             val numberParam = agency?.shortNumber ?: e164
@@ -112,10 +130,46 @@ object CardLookupRepository {
                 val filled =
                     result.copy(rawJson = OverlayCardOrgFill.fillIfMissing(context, result.rawJson))
                 remember(context, rawNumber, filled)
+                /* API 가 디렉터리 히트면 로컬 인덱스에도 적재 */
+                try {
+                    val pj = JSONObject(filled.rawJson)
+                    if (pj.optString("profileKind") == "public_directory_safe") {
+                        PublicDirectoryPhoneCache.remember(
+                            pj.optString("phoneE164").ifBlank { rawNumber },
+                            filled.displayName
+                        )
+                    }
+                } catch (_: Exception) {
+                }
                 bg.execute { reportLineCallEvent(context, rawNumber) }
                 return filled
             }
             return result
+    }
+
+    private fun buildPublicDirectorySafeJson(rawNumber: String, displayName: String): String {
+        val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: rawNumber
+        return JSONObject()
+            .put("matched", true)
+            .put("is_verified", true)
+            .put("source", "public_directory_local")
+            .put("profileKind", "public_directory_safe")
+            .put("displayName", displayName)
+            .put("companyName", displayName)
+            .put("phoneE164", e164)
+            .put("membershipTier", "free")
+            .put(
+                "directory",
+                JSONObject().put("vlueAuthLabel", "VLUE 인증")
+            )
+            .put(
+                "dcp",
+                JSONObject()
+                    .put("routeStatus", "normal")
+                    .put("publicDirectorySafe", true)
+                    .put("contactName", displayName)
+            )
+            .toString()
     }
 
     private fun cacheKeys(rawNumber: String): List<String> {

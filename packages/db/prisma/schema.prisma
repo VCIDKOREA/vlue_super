@@ -3435,3 +3435,38 @@ model NationalAgencyProfile {
   @@index([enabled, sortOrder])
   @@map("national_agency_profiles")
 }
+
+/// 공공·상권·학교·우체국 등 오프라인 적재 디렉터리 (안심팝업·통합검색 VLUE 인증)
+model PublicDirectoryEntry {
+  id              String   @id @default(uuid()) @db.Uuid
+  /// school | post_office | public_agency | police | commerce | nadeul | mailorder
+  sourceKind      String   @map("source_kind") @db.VarChar(32)
+  /// 원본 파일 내 고유키 (상가업소번호·행정표준코드 등)
+  externalId      String   @default("") @map("external_id") @db.VarChar(80)
+  displayName     String   @map("display_name") @db.VarChar(240)
+  /// 공백·기호 제거 소문자 정규화명 (검색용)
+  nameNorm        String   @map("name_norm") @db.VarChar(240)
+  /// +82… E.164 (없으면 빈 문자열 — 상권·경찰 등 전화 미제공 원본)
+  phoneE164       String   @default("") @map("phone_e164") @db.VarChar(24)
+  /// 숫자만 (국내 0 포함 형태 매칭용)
+  phoneDigits     String   @default("") @map("phone_digits") @db.VarChar(24)
+  businessNumber  String   @default("") @map("business_number") @db.VarChar(16)
+  category        String   @default("") @db.VarChar(120)
+  address         String   @default("") @db.VarChar(400)
+  region          String   @default("") @db.VarChar(40)
+  latitude        Float?
+  longitude       Float?
+  sourceFile      String   @default("") @map("source_file") @db.VarChar(255)
+  metaJson        Json     @default("{}") @map("meta_json")
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([sourceKind, externalId], map: "public_directory_entries_source_ext_uid")
+  @@index([phoneE164], map: "public_directory_entries_phone_e164_idx")
+  @@index([phoneDigits], map: "public_directory_entries_phone_digits_idx")
+  @@index([displayName], map: "public_directory_entries_display_name_idx")
+  @@index([nameNorm], map: "public_directory_entries_name_norm_idx")
+  @@index([businessNumber], map: "public_directory_entries_biz_no_idx")
+  @@index([sourceKind, region], map: "public_directory_entries_kind_region_idx")
+  @@map("public_directory_entries")
+}

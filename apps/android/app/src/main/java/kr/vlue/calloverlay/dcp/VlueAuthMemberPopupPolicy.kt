@@ -30,6 +30,7 @@ object VlueAuthMemberPopupPolicy {
         val profileKind =
             firstNonBlank(root.optString("profileKind"), card.optString("profileKind")).orEmpty()
         if (profileKind == ContactSafeCarePayload.PROFILE_KIND) return false
+        if (profileKind == PublicDirectorySafePayload.PROFILE_KIND) return false
         if (profileKind == "expired_line") return false
         if (profileKind == "national_agency" || profileKind == "gov_agency") return false
         if (root.optBoolean("dcpAgency", false) || card.optBoolean("dcpAgency", false)) return false
@@ -76,6 +77,7 @@ object VlueAuthMemberPopupPolicy {
         val profileKind =
             firstNonBlank(root.optString("profileKind"), card.optString("profileKind")).orEmpty()
         if (profileKind == ContactSafeCarePayload.PROFILE_KIND) return false
+        if (profileKind == PublicDirectorySafePayload.PROFILE_KIND) return false
         if (profileKind == "expired_line") return false
         return hasPublicDccOrShowcase(root, card)
     }
@@ -92,6 +94,7 @@ object VlueAuthMemberPopupPolicy {
             firstNonBlank(root.optString("profileKind"), card.optString("profileKind")).orEmpty()
         if (profileKind == "lookup_pending") return false
         if (profileKind == ContactSafeCarePayload.PROFILE_KIND) return false
+        if (profileKind == PublicDirectorySafePayload.PROFILE_KIND) return false
         if (profileKind == "expired_line") return false
         if (profileKind == "national_agency" || profileKind == "gov_agency") return false
         if (root.optBoolean("dcpAgency", false) || card.optBoolean("dcpAgency", false)) return false

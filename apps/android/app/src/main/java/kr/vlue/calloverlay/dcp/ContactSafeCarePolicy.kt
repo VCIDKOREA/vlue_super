@@ -14,7 +14,11 @@ object ContactSafeCarePolicy {
         popupOnly: Boolean,
         callAnswered: Boolean = false
     ): Boolean {
-        if (profileKind != ContactSafeCarePayload.PROFILE_KIND) return false
+        if (profileKind != ContactSafeCarePayload.PROFILE_KIND &&
+            profileKind != PublicDirectorySafePayload.PROFILE_KIND
+        ) {
+            return false
+        }
         /* 미수화 — 정상 팝업 금지 (BigPush만) */
         if (!callAnswered) return false
         if (popupOnly) {
