@@ -47,16 +47,26 @@ Android 도 `PublicDirectoryPhoneCache.ENABLE_DIRECTORY_SYNC = false` 로 sync �
 
 ## 0.5GB 안에서 일부만 남기고 테스트
 
-**완전 중지가 아닙니다.** 한도 초과면 DB 전체가 느려져 로그인·담당자까지 영향이 납니다.  
-대용량(`food`/`mailorder` 등)만 지우고 `school`·`post_office`·`public_agency`만 남기면 용량 안에서 안심팝업을 테스트할 수 있습니다.
+**완전 중지가 아닙니다.** 한도 초과면 DB 전체가 느려져 로그인·담당자까지 영향이 납니다.
+
+### 필수 테스트 소스 (요청 기준)
+| 한글 | source_kind | 비고 |
+|------|-------------|------|
+| 통신판매 | `mailorder` | 대용량 → **상한 15,000건** 권장 |
+| 병원 | `hospital` (+없으면 `health_center`) | 상한 15,000건 |
+| 관공서 | `public_agency` | 상한 5,000건 |
+
+우체국·학교는 **지금은 제외** (필요하면 나중에 소량만 추가).
 
 ```text
-scripts/public_directory/keep_under_500mb.sql
+scripts/public_directory/keep_test_sources.sql
 ```
 
-1. SQL 0→1→2→3 실행  
-2. `table_total` 이 충분히 작아진 뒤 Railway에만 잠깐 `PUBLIC_DIRECTORY_LOOKUP=1`  
-3. 테스트 후 변수 다시 제거
+1. SQL 실행 후 `table_total` 확인  
+2. 여유 있으면 Railway에만 잠깐 `PUBLIC_DIRECTORY_LOOKUP=1`  
+3. 테스트 후 변수 제거  
+
+구버전(학교·우체국·관공서만): `keep_under_500mb.sql`
 
 ## SQL 용량 회수 (Supabase Free 초과)
 
