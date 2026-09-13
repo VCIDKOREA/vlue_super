@@ -53,7 +53,20 @@ async function fetchWithRetry(fn, label, attempts = 2) {
 function applyLineToLocalPreview(bundle) {
   const line = bundle?.line;
   if (!line?.id) return;
-  writeDccLinePreviewFromBundle(bundle);
+  const dcc = bundle?.dcc && typeof bundle.dcc === "object" ? bundle.dcc : null;
+  const dccHasFields = Boolean(
+    dcc &&
+      Object.values(dcc).some((v) => {
+        if (v == null) return false;
+        if (typeof v === "string") return Boolean(v.trim());
+        if (typeof v === "object") return Object.keys(v).length > 0;
+        return true;
+      })
+  );
+  /* 빈 DCC 스냅으로 미리보기/설정 필드를 덮어쓰지 않음 */
+  if (dccHasFields || bundle?.agent) {
+    writeDccLinePreviewFromBundle(bundle);
+  }
   writeSelectedDccLineId(line.id);
   const editor = bundle.showcase?.editor || bundle.showcase?.live || null;
   const live = bundle.showcase?.live || editor;

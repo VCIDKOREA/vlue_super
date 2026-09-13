@@ -337,14 +337,21 @@ const masterHealAtByUser = new Map<string, number>();
 const MASTER_HEAL_TTL_MS = 10 * 60 * 1000;
 
 async function loadAgentContentFlags(userId: string): Promise<Map<string, { hasDcc: boolean; hasShowcase: boolean }>> {
+  /* jsonb 전체 ::text 캐스팅 금지 — 대용량 스냅샷에서 pooler 지연·타임아웃 유발 */
   const flagRows = await prisma.$queryRaw<
     Array<{ id: string; has_dcc: boolean; has_sc: boolean }>
   >`
     SELECT id::text AS id,
-      (dcc_snapshot_json IS NOT NULL AND dcc_snapshot_json::text NOT IN ('null','{}','[]')) AS has_dcc,
+      (dcc_snapshot_json IS NOT NULL
+        AND jsonb_typeof(dcc_snapshot_json) = 'object'
+        AND dcc_snapshot_json <> '{}'::jsonb) AS has_dcc,
       (
-        (showcase_style_json IS NOT NULL AND showcase_style_json::text NOT IN ('null','{}','[]'))
-        OR (showcase_live_style_json IS NOT NULL AND showcase_live_style_json::text NOT IN ('null','{}','[]'))
+        (showcase_style_json IS NOT NULL
+          AND jsonb_typeof(showcase_style_json) = 'object'
+          AND showcase_style_json <> '{}'::jsonb)
+        OR (showcase_live_style_json IS NOT NULL
+          AND jsonb_typeof(showcase_live_style_json) = 'object'
+          AND showcase_live_style_json <> '{}'::jsonb)
       ) AS has_sc
     FROM user_dcc_agent_profiles
     WHERE user_id = ${userId}
@@ -399,38 +406,35 @@ export async function listDccAgentProfiles(
         select: AGENT_LIST_SELECT
       });
     }
-    /* 마스터 사진 동기화 — 전체 exportSnapshotJson 로드 금지, 10분에 1회만 */
+    /* 마스터 사진 동기화 — 목록 응답을 막지 않음 (백그라운드) */
     const now = Date.now();
     const lastHeal = masterHealAtByUser.get(userId) || 0;
     if (now - lastHeal >= MASTER_HEAL_TTL_MS) {
       masterHealAtByUser.set(userId, now);
-      try {
-        const card = await prisma.digitalCard.findUnique({
-          where: { userId },
-          select: {
-            photoUrl: true,
-            displayName: true,
-            titleSnapshot: true,
-            departmentSnapshot: true
-          }
-        });
-        const masterPhoto = text(card?.photoUrl, 1024);
-        if (masterPhoto && (isHttpMediaUrl(masterPhoto) || masterPhoto.startsWith("/"))) {
-          await syncMasterIdentityToPrimaryAgents(userId, {
-            photoUrl: masterPhoto,
-            displayName: text(card?.displayName, 120) || null,
-            title: text(card?.titleSnapshot, 120) || null,
-            department: text(card?.departmentSnapshot, 120) || null
-          });
-          rows = await prisma.userDccAgentProfile.findMany({
+      void (async () => {
+        try {
+          const card = await prisma.digitalCard.findUnique({
             where: { userId },
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-            select: AGENT_LIST_SELECT
+            select: {
+              photoUrl: true,
+              displayName: true,
+              titleSnapshot: true,
+              departmentSnapshot: true
+            }
           });
+          const masterPhoto = text(card?.photoUrl, 1024);
+          if (masterPhoto && (isHttpMediaUrl(masterPhoto) || masterPhoto.startsWith("/"))) {
+            await syncMasterIdentityToPrimaryAgents(userId, {
+              photoUrl: masterPhoto,
+              displayName: text(card?.displayName, 120) || null,
+              title: text(card?.titleSnapshot, 120) || null,
+              department: text(card?.departmentSnapshot, 120) || null
+            });
+          }
+        } catch {
+          /* ignore heal errors */
         }
-      } catch {
-        /* ignore heal errors */
-      }
+      })();
     }
     let activeId = rows.find((p) => p.isActive)?.id || rows[0]?.id || null;
     if (cardId) {
@@ -441,8 +445,10 @@ export async function listDccAgentProfiles(
       if (line?.activeDccAgentProfileId) activeId = line.activeDccAgentProfileId;
     }
     const [assignments, flags] = await Promise.all([
-      loadAssignments(userId),
-      loadAgentContentFlags(userId)
+      loadAssignments(userId).catch(() => new Map()),
+      loadAgentContentFlags(userId).catch(
+        () => new Map<string, { hasDcc: boolean; hasShowcase: boolean }>()
+      )
     ]);
     const representativeId = rows.find((p) => p.isRepresentative)?.id || activeId;
     const profiles = rows.map((row) => {
