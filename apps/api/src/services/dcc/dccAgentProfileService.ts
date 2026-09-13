@@ -332,10 +332,6 @@ const AGENT_LIST_SELECT = {
   routedContactPhones: true
 } as const;
 
-/** 목록 조회 시 마스터→프로필 사진 heal 쓰로틀 (Shared Pooler egress 절감) */
-const masterHealAtByUser = new Map<string, number>();
-const MASTER_HEAL_TTL_MS = 10 * 60 * 1000;
-
 async function loadAgentContentFlags(userId: string): Promise<Map<string, { hasDcc: boolean; hasShowcase: boolean }>> {
   /* jsonb 전체 ::text 캐스팅 금지 — 대용량 스냅샷에서 pooler 지연·타임아웃 유발 */
   const flagRows = await prisma.$queryRaw<
@@ -363,6 +359,45 @@ async function loadAgentContentFlags(userId: string): Promise<Map<string, { hasD
   return map;
 }
 
+async function seedLiteFromDigitalCard(userId: string) {
+  /* 목록 복구용 — exportSnapshot/쇼케이스 JSON 로드 금지 (pooler 지연) */
+  const [user, card] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { legalName: true }
+    }),
+    prisma.digitalCard.findUnique({
+      where: { userId },
+      select: {
+        displayName: true,
+        titleSnapshot: true,
+        departmentSnapshot: true,
+        photoUrl: true
+      }
+    })
+  ]);
+  const displayName = text(card?.displayName || user?.legalName, 120);
+  if (!displayName) return null;
+  const title = text(card?.titleSnapshot, 120);
+  const department = text(card?.departmentSnapshot, 120);
+  const photoRaw = text(card?.photoUrl, 1024);
+  const photoUrl = photoRaw && (isHttpMediaUrl(photoRaw) || photoRaw.startsWith("/")) ? photoRaw : null;
+  return prisma.userDccAgentProfile.create({
+    data: {
+      userId,
+      label: defaultAgentLabel(displayName, title),
+      displayName,
+      title,
+      department,
+      photoUrl,
+      photoFocus: "center",
+      isActive: true,
+      isRepresentative: true,
+      sortOrder: 0
+    }
+  });
+}
+
 export async function listDccAgentProfiles(
   userId: string,
   cardId?: string | null
@@ -379,107 +414,74 @@ export async function listDccAgentProfiles(
   };
 }> {
   try {
-    await ensureMultiDccProfileBundleColumns();
+    /* 목록은 ALTER/heal/flags/entitlement 생략 — 드롭다운이 DB 부하에 안 막히게 */
     let rows = await prisma.userDccAgentProfile.findMany({
       where: { userId },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       select: AGENT_LIST_SELECT
     });
     if (rows.length === 0) {
-      const seeded = await seedFromDigitalCard(userId);
+      const seeded = await seedLiteFromDigitalCard(userId).catch(() => null);
       if (seeded) {
-        rows = await prisma.userDccAgentProfile.findMany({
-          where: { userId },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          select: AGENT_LIST_SELECT
-        });
+        rows = [
+          {
+            id: seeded.id,
+            label: seeded.label,
+            displayName: seeded.displayName,
+            title: seeded.title,
+            department: seeded.department,
+            photoUrl: seeded.photoUrl,
+            photoFocus: seeded.photoFocus,
+            isActive: seeded.isActive,
+            isRepresentative: Boolean(seeded.isRepresentative),
+            sortOrder: seeded.sortOrder,
+            updatedAt: seeded.updatedAt,
+            routedContactPhones: seeded.routedContactPhones
+          }
+        ];
       }
     }
     if (rows.length && !rows.some((r) => r.isRepresentative)) {
-      await prisma.userDccAgentProfile.update({
-        where: { id: rows[0].id },
-        data: { isRepresentative: true }
-      });
-      rows = await prisma.userDccAgentProfile.findMany({
-        where: { userId },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        select: AGENT_LIST_SELECT
-      });
+      const firstId = rows[0].id;
+      rows = rows.map((r, i) => (i === 0 ? { ...r, isRepresentative: true } : r));
+      void prisma.userDccAgentProfile
+        .update({ where: { id: firstId }, data: { isRepresentative: true } })
+        .catch(() => {});
     }
-    /* 마스터 사진 동기화 — 목록 응답을 막지 않음 (백그라운드) */
-    const now = Date.now();
-    const lastHeal = masterHealAtByUser.get(userId) || 0;
-    if (now - lastHeal >= MASTER_HEAL_TTL_MS) {
-      masterHealAtByUser.set(userId, now);
-      void (async () => {
-        try {
-          const card = await prisma.digitalCard.findUnique({
-            where: { userId },
-            select: {
-              photoUrl: true,
-              displayName: true,
-              titleSnapshot: true,
-              departmentSnapshot: true
-            }
-          });
-          const masterPhoto = text(card?.photoUrl, 1024);
-          if (masterPhoto && (isHttpMediaUrl(masterPhoto) || masterPhoto.startsWith("/"))) {
-            await syncMasterIdentityToPrimaryAgents(userId, {
-              photoUrl: masterPhoto,
-              displayName: text(card?.displayName, 120) || null,
-              title: text(card?.titleSnapshot, 120) || null,
-              department: text(card?.departmentSnapshot, 120) || null
-            });
-          }
-        } catch {
-          /* ignore heal errors */
-        }
-      })();
-    }
+
     let activeId = rows.find((p) => p.isActive)?.id || rows[0]?.id || null;
     if (cardId) {
-      const line = await prisma.businessCard.findFirst({
-        where: { id: cardId, userId },
-        select: { activeDccAgentProfileId: true }
-      });
+      const line = await prisma.businessCard
+        .findFirst({
+          where: { id: cardId, userId },
+          select: { activeDccAgentProfileId: true }
+        })
+        .catch(() => null);
       if (line?.activeDccAgentProfileId) activeId = line.activeDccAgentProfileId;
     }
-    const [assignments, flags] = await Promise.all([
-      loadAssignments(userId).catch(() => new Map()),
-      loadAgentContentFlags(userId).catch(
-        () => new Map<string, { hasDcc: boolean; hasShowcase: boolean }>()
-      )
-    ]);
+
     const representativeId = rows.find((p) => p.isRepresentative)?.id || activeId;
-    const profiles = rows.map((row) => {
-      const a = assignments.get(row.id);
-      const f = flags.get(row.id);
-      return toDto(row as AgentRow, {
-        assignedLineIds: a?.ids || [],
-        assignedPhones: a?.phones || [],
+    const profiles = rows.map((row) =>
+      toDto(row as AgentRow, {
+        assignedLineIds: [],
+        assignedPhones: [],
         isActiveOverride: row.id === activeId,
-        hasDcc: f?.hasDcc,
-        hasShowcase: f?.hasShowcase
-      });
-    });
-    let entitlement = {
-      freeSlots: 1,
-      paidSlots: 0,
-      allowedSlots: 1,
-      monthlyKrw: 4200
-    };
-    try {
-      const { getMultiDccSlotEntitlement } = await import("./multiDccSlotService.js");
-      entitlement = await getMultiDccSlotEntitlement(userId);
-    } catch {
-      /* ignore */
-    }
+        hasDcc: true,
+        hasShowcase: true
+      })
+    );
+
     return {
       profiles,
       activeId,
       representativeId,
-      maxCount: Math.min(DCC_AGENT_MAX_COUNT, entitlement.allowedSlots || DCC_AGENT_MAX_COUNT),
-      entitlement
+      maxCount: DCC_AGENT_MAX_COUNT,
+      entitlement: {
+        freeSlots: 1,
+        paidSlots: Math.max(0, DCC_AGENT_MAX_COUNT - 1),
+        allowedSlots: DCC_AGENT_MAX_COUNT,
+        monthlyKrw: 4200
+      }
     };
   } catch (e) {
     if (tableMissing(e)) {

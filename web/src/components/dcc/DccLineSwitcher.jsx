@@ -22,7 +22,8 @@ import { switchToMultiDccProfile } from "../../lib/multiDccSwitch.js";
 import DccAgentManageModal from "./DccAgentManageModal.jsx";
 import "./dcc-agent-switcher.css";
 
-const LOAD_TIMEOUT_MS = 25_000;
+const LOAD_TIMEOUT_MS = 12_000;
+const AGENTS_CACHE_KEY = "vlue_dcc_agents_cache_v1";
 
 function withTimeout(promise, ms, label) {
   let timer;
@@ -48,6 +49,34 @@ async function fetchWithRetry(fn, label, attempts = 2) {
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(`${label}에 실패했습니다.`);
+}
+
+function readAgentsCache() {
+  try {
+    const raw = sessionStorage.getItem(AGENTS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.profiles)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeAgentsCache(data) {
+  try {
+    sessionStorage.setItem(
+      AGENTS_CACHE_KEY,
+      JSON.stringify({
+        profiles: Array.isArray(data?.profiles) ? data.profiles : [],
+        activeId: data?.activeId || "",
+        maxCount: data?.maxCount || 20,
+        at: Date.now()
+      })
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 function applyLineToLocalPreview(bundle) {
@@ -115,19 +144,32 @@ export default function DccLineSwitcher({
     setProfiles(list);
     setAgentId(data?.activeId || list.find((p) => p.isActive)?.id || "");
     if (data?.maxCount) setMaxCount(data.maxCount);
+    if (list.length) writeAgentsCache(data);
     return data;
   }, []);
 
   const loadAgents = useCallback(
-    async (cardId) => {
-      const data = await fetchWithRetry(() => fetchDccAgentProfiles(cardId), "담당자 목록");
-      return applyAgents(data);
+    async (cardId, { allowCache } = {}) => {
+      try {
+        const data = await fetchWithRetry(() => fetchDccAgentProfiles(cardId), "담당자 목록");
+        return applyAgents(data);
+      } catch (e) {
+        if (allowCache) {
+          const cached = readAgentsCache();
+          if (cached?.profiles?.length) {
+            applyAgents(cached);
+            onToastRef.current?.("서버가 느려 저장된 담당자 목록을 표시합니다.");
+            return cached;
+          }
+        }
+        throw e;
+      }
     },
     [applyAgents]
   );
 
   const selectLine = useCallback(
-    async (nextId, { silent } = {}) => {
+    async (nextId, { silent, skipAgents } = {}) => {
       if (!nextId) return;
       setBusy(true);
       try {
@@ -135,13 +177,15 @@ export default function DccLineSwitcher({
         setLineId(bundle.line.id);
         setPhotoUrl(bundle.line.photoUrl || "");
         applyLineToLocalPreview(bundle);
-        try {
-          await loadAgents(bundle.line.id);
-        } catch (agentErr) {
-          /* 번호는 됐는데 담당자만 실패 — 전체 로드 실패로 보지 않음 */
-          onToastRef.current?.(
-            agentErr instanceof Error ? agentErr.message : "담당자를 불러오지 못했습니다."
-          );
+        if (bundle.agent?.id) setAgentId(bundle.agent.id);
+        if (!skipAgents) {
+          try {
+            await loadAgents(bundle.line.id, { allowCache: true });
+          } catch (agentErr) {
+            onToastRef.current?.(
+              agentErr instanceof Error ? agentErr.message : "담당자를 불러오지 못했습니다."
+            );
+          }
         }
         if (!silent) {
           onToastRef.current?.(
@@ -162,13 +206,7 @@ export default function DccLineSwitcher({
     setLoading(true);
     setLoadError("");
     try {
-      /* 담당자는 회선 번들과 무관하게 먼저/병렬로 — 회선 지연으로 담당자 UI가 비지 않게 */
-      const agentsPromise = fetchWithRetry(() => fetchDccAgentProfiles(), "담당자 목록").then(
-        (data) => {
-          applyAgents(data);
-          return data;
-        }
-      );
+      const agentsPromise = loadAgents(undefined, { allowCache: true });
       const linesPromise = fetchWithRetry(() => fetchDccLines(), "번호 목록");
 
       const [agentsResult, linesResult] = await Promise.allSettled([agentsPromise, linesPromise]);
@@ -188,7 +226,8 @@ export default function DccLineSwitcher({
         setLines(list);
         const preferred = readSelectedDccLineId() || list[0]?.id || "";
         if (preferred && list.some((l) => l.id === preferred)) {
-          await selectLine(preferred, { silent: true });
+          /* 담당자는 위에서 이미 로드 — 회선 전환 시 재요청하지 않음 */
+          await selectLine(preferred, { silent: true, skipAgents: true });
           return;
         }
         writeSelectedDccLineId("");
@@ -207,7 +246,7 @@ export default function DccLineSwitcher({
     } finally {
       setLoading(false);
     }
-  }, [applyAgents, selectLine]);
+  }, [loadAgents, selectLine]);
 
   useEffect(() => {
     void reload();
