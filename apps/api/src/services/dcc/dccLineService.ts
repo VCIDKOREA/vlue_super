@@ -281,38 +281,78 @@ async function ensureCertifiedLine(userId: string) {
 }
 
 export async function listDccLines(userId: string): Promise<{ lines: DccLineDto[] }> {
-  const certified = await ensureCertifiedLine(userId);
-  const certifiedPhone = certified?.phoneE164 || (await userCertifiedPhone(userId)).phone;
-  const rows = await prisma.businessCard.findMany({
-    where: {
-      userId,
-      OR: [{ kind: { in: [...LINE_KINDS] } }, ...(certifiedPhone ? [{ phoneE164: certifiedPhone }] : [])]
+  try {
+    /*
+     * 목록은 JSON 스냅샷(dcc/showcase)을 절대 SELECT 하지 않음.
+     * ensureCertifiedLine(생성·다중 조회)도 응답 경로에서 제외 — DB 부하 시 타임아웃 유발.
+     */
+    const [rows, user] = await Promise.all([
+      prisma.businessCard.findMany({
+        where: { userId, kind: { in: [...LINE_KINDS] } },
+        select: {
+          id: true,
+          kind: true,
+          phoneE164: true,
+          displayName: true,
+          jobTitle: true,
+          activeDccAgentProfileId: true,
+          updatedAt: true,
+          lineShowcaseUpdatedAt: true,
+          createdAt: true
+        },
+        orderBy: { createdAt: "asc" },
+        take: 40
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { phoneE164: true, legalName: true }
+      })
+    ]);
+
+    const certifiedPhone = String(user?.phoneE164 || "").trim();
+    if (certifiedPhone && !rows.some((r) => r.phoneE164 === certifiedPhone)) {
+      /* 응답 후 백그라운드에서만 인증번호 회선 보장 — 목록을 막지 않음 */
+      void ensureCertifiedLine(userId).catch(() => {});
     }
-  });
-  if (certified && !rows.some((row) => row.id === certified.id)) {
-    rows.unshift(certified);
+
+    rows.sort((a, b) => {
+      const aCert = certifiedPhone && a.phoneE164 === certifiedPhone ? 0 : 1;
+      const bCert = certifiedPhone && b.phoneE164 === certifiedPhone ? 0 : 1;
+      return (
+        aCert - bCert ||
+        (KIND_RANK[a.kind] ?? 9) - (KIND_RANK[b.kind] ?? 9) ||
+        a.createdAt.getTime() - b.createdAt.getTime()
+      );
+    });
+
+    return {
+      lines: rows.map((row) => {
+        const isCertified = Boolean(certifiedPhone) && row.phoneE164 === certifiedPhone;
+        return {
+          id: row.id,
+          kind: row.kind === "rep_number" ? "rep_number" : row.kind === "mobile" ? "mobile" : "extension",
+          kindLabel: kindLabel(row.kind, isCertified),
+          isCertified,
+          phoneE164: row.phoneE164,
+          displayPhone: displayPhone(row.phoneE164),
+          displayName: text(row.displayName || (isCertified ? user?.legalName : ""), 120),
+          jobTitle: text(row.jobTitle, 120),
+          department: "",
+          photoUrl: null,
+          photoFocus: "center",
+          agentId: row.activeDccAgentProfileId,
+          hasShowcase: Boolean(row.lineShowcaseUpdatedAt),
+          hasDcc: Boolean(row.displayName || row.jobTitle),
+          updatedAt: (row.lineShowcaseUpdatedAt || row.updatedAt).toISOString(),
+          billingStatus: "none",
+          graceEndsAt: null
+        } satisfies DccLineDto;
+      })
+    };
+  } catch (e) {
+    console.error("[listDccLines]", e instanceof Error ? e.message : e);
+    return { lines: [] };
   }
-  rows.sort((a, b) => {
-    const aCert = certifiedPhone && a.phoneE164 === certifiedPhone ? 0 : 1;
-    const bCert = certifiedPhone && b.phoneE164 === certifiedPhone ? 0 : 1;
-    return aCert - bCert || (KIND_RANK[a.kind] ?? 9) - (KIND_RANK[b.kind] ?? 9) || a.createdAt.getTime() - b.createdAt.getTime();
-  });
-  const subs = await prisma.lineSubscription.findMany({
-    where: { userId, businessCardId: { in: rows.map((r) => r.id) } },
-    select: { businessCardId: true, status: true, graceEndsAt: true }
-  });
-  const subByCard = new Map(subs.map((s) => [s.businessCardId, s]));
-  return {
-    lines: rows.map((row) => {
-      const dto = toLineDto(row, certifiedPhone);
-      const sub = subByCard.get(row.id);
-      if (sub) {
-        dto.billingStatus = sub.status;
-        dto.graceEndsAt = sub.graceEndsAt?.toISOString() || null;
-      }
-      return dto;
-    })
-  };
 }
 
 export async function getDccLineBundle(userId: string, cardId: string) {

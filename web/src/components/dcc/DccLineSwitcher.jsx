@@ -23,7 +23,9 @@ import DccAgentManageModal from "./DccAgentManageModal.jsx";
 import "./dcc-agent-switcher.css";
 
 const LOAD_TIMEOUT_MS = 12_000;
+const LINES_TIMEOUT_MS = 18_000;
 const AGENTS_CACHE_KEY = "vlue_dcc_agents_cache_v1";
+const LINES_CACHE_KEY = "vlue_dcc_lines_cache_v1";
 
 function withTimeout(promise, ms, label) {
   let timer;
@@ -39,11 +41,11 @@ function withTimeout(promise, ms, label) {
   ]);
 }
 
-async function fetchWithRetry(fn, label, attempts = 2) {
+async function fetchWithRetry(fn, label, attempts = 2, timeoutMs = LOAD_TIMEOUT_MS) {
   let lastErr;
   for (let i = 0; i < attempts; i += 1) {
     try {
-      return await withTimeout(fn(), LOAD_TIMEOUT_MS, label);
+      return await withTimeout(fn(), timeoutMs, label);
     } catch (e) {
       lastErr = e;
     }
@@ -71,6 +73,32 @@ function writeAgentsCache(data) {
         profiles: Array.isArray(data?.profiles) ? data.profiles : [],
         activeId: data?.activeId || "",
         maxCount: data?.maxCount || 20,
+        at: Date.now()
+      })
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function readLinesCache() {
+  try {
+    const raw = sessionStorage.getItem(LINES_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.lines)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeLinesCache(data) {
+  try {
+    sessionStorage.setItem(
+      LINES_CACHE_KEY,
+      JSON.stringify({
+        lines: Array.isArray(data?.lines) ? data.lines : [],
         at: Date.now()
       })
     );
@@ -207,7 +235,20 @@ export default function DccLineSwitcher({
     setLoadError("");
     try {
       const agentsPromise = loadAgents(undefined, { allowCache: true });
-      const linesPromise = fetchWithRetry(() => fetchDccLines(), "번호 목록");
+      const linesPromise = (async () => {
+        try {
+          const data = await fetchWithRetry(() => fetchDccLines(), "번호 목록", 2, LINES_TIMEOUT_MS);
+          if (Array.isArray(data?.lines) && data.lines.length) writeLinesCache(data);
+          return data;
+        } catch (e) {
+          const cached = readLinesCache();
+          if (cached?.lines?.length) {
+            onToastRef.current?.("서버가 느려 저장된 번호 목록을 표시합니다.");
+            return cached;
+          }
+          throw e;
+        }
+      })();
 
       const [agentsResult, linesResult] = await Promise.allSettled([agentsPromise, linesPromise]);
 
@@ -226,8 +267,12 @@ export default function DccLineSwitcher({
         setLines(list);
         const preferred = readSelectedDccLineId() || list[0]?.id || "";
         if (preferred && list.some((l) => l.id === preferred)) {
-          /* 담당자는 위에서 이미 로드 — 회선 전환 시 재요청하지 않음 */
-          await selectLine(preferred, { silent: true, skipAgents: true });
+          /* 초기 진입: 무거운 회선 번들 GET 생략 — 로컬 쇼케이스·담당자 유지 */
+          setLineId(preferred);
+          writeSelectedDccLineId(preferred);
+          const row = list.find((l) => l.id === preferred);
+          if (row?.photoUrl) setPhotoUrl(row.photoUrl);
+          if (row?.agentId) setAgentId(row.agentId);
           return;
         }
         writeSelectedDccLineId("");
@@ -246,7 +291,7 @@ export default function DccLineSwitcher({
     } finally {
       setLoading(false);
     }
-  }, [loadAgents, selectLine]);
+  }, [loadAgents]);
 
   useEffect(() => {
     void reload();
