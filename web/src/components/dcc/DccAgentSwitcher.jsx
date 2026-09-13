@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Settings2 } from "lucide-react";
 import { fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
 import { agentOptionLabel } from "../../lib/dccAgentProfileState.js";
@@ -17,6 +17,8 @@ export default function DccAgentSwitcher({
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const onToastRef = useRef(onToast);
+  onToastRef.current = onToast;
 
   const reload = useCallback(async () => {
     try {
@@ -26,11 +28,11 @@ export default function DccAgentSwitcher({
       setActiveId(data.activeId || list.find((p) => p.isActive)?.id || "");
       if (data.maxCount) setMaxCount(data.maxCount);
     } catch (e) {
-      onToast?.(e instanceof Error ? e.message : "계정 목록을 불러오지 못했습니다.");
+      onToastRef.current?.(e instanceof Error ? e.message : "계정 목록을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
-  }, [onToast]);
+  }, []);
 
   useEffect(() => {
     void reload();

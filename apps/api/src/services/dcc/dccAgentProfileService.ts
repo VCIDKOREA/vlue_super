@@ -193,7 +193,10 @@ export function toDto(
     isActive: extras?.isActiveOverride ?? row.isActive,
     isRepresentative: Boolean(row.isRepresentative),
     sortOrder: row.sortOrder,
-    updatedAt: row.updatedAt.toISOString(),
+    updatedAt:
+      row.updatedAt instanceof Date && !Number.isNaN(row.updatedAt.getTime())
+        ? row.updatedAt.toISOString()
+        : new Date().toISOString(),
     hasDcc,
     hasShowcase,
     assignedLineIds: extras?.assignedLineIds || [],

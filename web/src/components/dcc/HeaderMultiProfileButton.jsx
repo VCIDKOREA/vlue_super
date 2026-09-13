@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDccAgentProfiles } from "../../lib/dccAgentProfilesApi.js";
 import { fetchDccLines } from "../../lib/dccLinesApi.js";
 import { fetchMultiDccEntitlement, completeMultiDccCheckout } from "../../lib/jobOccupationVerifyApi.js";
@@ -22,6 +22,8 @@ export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
   const [payOpen, setPayOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [openCreateForm, setOpenCreateForm] = useState(false);
+  const onToastRef = useRef(onToast);
+  onToastRef.current = onToast;
 
   const reload = useCallback(async () => {
     try {
@@ -40,9 +42,9 @@ export default function HeaderMultiProfileButton({ requireAuth, onToast }) {
       setMonthlyKrw(Number(e?.monthlyKrw) || SOHO_BROADCAST_MONTHLY_KRW);
       setLines(Array.isArray(l.lines) ? l.lines : []);
     } catch (err) {
-      onToast?.(err instanceof Error ? err.message : "멀티 프로필을 불러오지 못했습니다.");
+      onToastRef.current?.(err instanceof Error ? err.message : "멀티 프로필을 불러오지 못했습니다.");
     }
-  }, [onToast]);
+  }, []);
 
   useEffect(() => {
     if (open) void reload();

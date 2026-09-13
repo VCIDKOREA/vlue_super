@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Loader2, Settings2 } from "lucide-react";
 import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
 import { DCC_PROFILE_PHOTO_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
@@ -73,6 +73,8 @@ export default function DccLineSwitcher({
   const [busy, setBusy] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const switching = loading || busy;
+  const onToastRef = useRef(onToast);
+  onToastRef.current = onToast;
 
   useEffect(() => {
     onBusyChange?.(switching);
@@ -98,18 +100,18 @@ export default function DccLineSwitcher({
         applyLineToLocalPreview(bundle);
         await loadAgents(bundle.line.id);
         if (!silent) {
-          onToast?.(
+          onToastRef.current?.(
             `${bundle.line.kindLabel} ${bundle.line.displayPhone} — 이 번호의 DCC·쇼케이스를 설정합니다. 담당자만 드롭다운으로 바꿉니다.`
           );
         }
       } catch (e) {
-        onToast?.(e instanceof Error ? e.message : "번호를 불러오지 못했습니다.");
+        onToastRef.current?.(e instanceof Error ? e.message : "번호를 불러오지 못했습니다.");
       } finally {
         setBusy(false);
         setLoading(false);
       }
     },
-    [loadAgents, onToast]
+    [loadAgents]
   );
 
   const reload = useCallback(async () => {
@@ -125,10 +127,10 @@ export default function DccLineSwitcher({
         setLoading(false);
       }
     } catch (e) {
-      onToast?.(e instanceof Error ? e.message : "번호 목록을 불러오지 못했습니다.");
+      onToastRef.current?.(e instanceof Error ? e.message : "번호 목록을 불러오지 못했습니다.");
       setLoading(false);
     }
-  }, [onToast, selectLine]);
+  }, [selectLine]);
 
   useEffect(() => {
     void reload();

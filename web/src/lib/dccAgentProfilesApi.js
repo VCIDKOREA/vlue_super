@@ -6,7 +6,11 @@ export const DCC_AGENT_PROFILES_PATH = "/api/cards/dcc-agent-profiles";
 async function parseJson(res) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = new Error(data.error || "담당자 프로필 요청에 실패했습니다.");
+    const fallback =
+      res.status >= 500
+        ? "서버 오류로 담당자 프로필을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+        : "담당자 프로필 요청에 실패했습니다.";
+    const err = new Error(data.error || fallback);
     err.status = res.status;
     err.payload = data;
     throw err;

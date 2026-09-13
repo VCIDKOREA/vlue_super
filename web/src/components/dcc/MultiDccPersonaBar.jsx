@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { SOHO_BROADCAST_MONTHLY_KRW } from "../../lib/membershipBm.js";
 import {
@@ -25,6 +25,8 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
   const [busy, setBusy] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [openCreateForm, setOpenCreateForm] = useState(false);
+  const onToastRef = useRef(onToast);
+  onToastRef.current = onToast;
 
   const monthlyKrw = ent?.monthlyKrw || SOHO_BROADCAST_MONTHLY_KRW;
 
@@ -32,16 +34,16 @@ export default function MultiDccPersonaBar({ isDarkMode = false, onToast, compac
     try {
       const [p, e, l] = await Promise.all([
         fetchDccAgentProfiles(),
-        fetchMultiDccEntitlement(),
+        fetchMultiDccEntitlement().catch(() => null),
         fetchDccLines().catch(() => ({ lines: [] }))
       ]);
       setProfiles(Array.isArray(p.profiles) ? p.profiles : []);
       setEnt(e);
       setLines(Array.isArray(l.lines) ? l.lines : []);
     } catch (err) {
-      onToast?.(err instanceof Error ? err.message : "멀티 프로필을 불러오지 못했습니다.");
+      onToastRef.current?.(err instanceof Error ? err.message : "멀티 프로필을 불러오지 못했습니다.");
     }
-  }, [onToast]);
+  }, []);
 
   useEffect(() => {
     void reload();

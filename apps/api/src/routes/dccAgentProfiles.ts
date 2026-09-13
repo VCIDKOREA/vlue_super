@@ -21,9 +21,17 @@ export const dccAgentProfileRoutes = new Hono<{ Variables: Vars }>();
 dccAgentProfileRoutes.use("*", requireUserHeader);
 
 function httpError(e: unknown) {
-  const status = typeof (e as { status?: number })?.status === "number" ? (e as { status: number }).status : 400;
+  const rawStatus = (e as { status?: number })?.status;
+  const status =
+    typeof rawStatus === "number" && rawStatus >= 400 && rawStatus < 600 ? rawStatus : 500;
   const message = e instanceof Error ? e.message : "요청을 처리하지 못했습니다.";
-  return { status: status as 400 | 402 | 404 | 503, body: { ok: false as const, error: message } };
+  if (status >= 500) {
+    console.error("[dcc-agent-profiles]", message, e);
+  }
+  return {
+    status: status as 400 | 401 | 402 | 403 | 404 | 500 | 503,
+    body: { ok: false as const, error: message }
+  };
 }
 
 /** GET /api/cards/dcc-agent-profiles */
