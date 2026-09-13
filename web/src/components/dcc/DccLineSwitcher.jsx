@@ -11,7 +11,6 @@ import {
   writeSelectedDccLineId
 } from "../../lib/dccLineState.js";
 import {
-  createDefaultShowcaseStyle,
   readLiveShowcaseStyle,
   readShowcaseStyle,
   writeLiveShowcaseStyle,
@@ -37,15 +36,11 @@ function applyLineToLocalPreview(bundle) {
     writeShowcaseStyle(editor || live, { replace: true, skipSync: true });
     writeLiveShowcaseStyle(live || editor, { source: "editor", skipSync: true });
     if (bundle.showcase?.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.showcase.updatedAt);
-  } else if (
-    line.isCertified &&
-    (showcaseStyleHasContent(readShowcaseStyle()) || showcaseStyleHasContent(readLiveShowcaseStyle()))
-  ) {
-    /* 인증번호 쇼케이스는 계정 서버본. 회선 번들이 비어도 로컬 BGM·사진을 지우지 않음 */
-  } else if (!line.isCertified) {
-    const empty = createDefaultShowcaseStyle();
-    writeShowcaseStyle(empty, { replace: true, skipSync: true });
-    writeLiveShowcaseStyle(empty, { source: "editor", skipSync: true });
+  } else {
+    /*
+     * 회선 번들이 비어도 로컬에 있는 쇼케이스·DCC를 절대 지우지 않음.
+     * (담당자/회선 API 지연·실패·빈 응답 시 설정 화면이 통째로 비는 사고 방지)
+     */
   }
   try {
     window.dispatchEvent(new Event("vlue-showcase-style-changed"));
