@@ -7,10 +7,14 @@ import ShowcaseLikeSummary from "./ShowcaseLikeSummary.jsx";
 import ShowcaseLikeSheet from "./ShowcaseLikeSheet.jsx";
 import ShowcaseMoreMenu from "./ShowcaseMoreMenu.jsx";
 import {
-  fetchShowcaseSocial,
   recordShowcaseShareApi,
   toggleShowcaseLikeApi
 } from "../../lib/showcase/showcaseSocialApi.js";
+import {
+  getCachedShowcaseSocial,
+  prefetchShowcaseSocial,
+  setCachedShowcaseSocial
+} from "../../lib/showcase/showcaseSocialCache.js";
 import { resolveShowcaseSocialSlideId } from "../../lib/showcase/resolveShowcaseSocialSlideId.js";
 import { scrapShowcaseToVault } from "../../lib/showcase/scrapShowcaseToVault.js";
 import { shareShowcaseInviteViaKakao } from "../../lib/call/shareShowcaseInviteKakao.js";
@@ -147,8 +151,21 @@ export default function ShowcaseBannerSocialLayer({
       setSeedComments([]);
       return undefined;
     }
-    fetchShowcaseSocial(ownerUserId, { slideId }).then((res) => {
+    const cached = getCachedShowcaseSocial(ownerUserId, slideId);
+    if (cached?.ok) {
+      applyLike(cached.likedByMe, cached.likeCount);
+      setRecentLiker(cached.recentLiker || null);
+      setCommentCount(cached.comments.length);
+      setSeedComments(cached.comments);
+    } else {
+      applyLike(false, 0);
+      setRecentLiker(null);
+      setCommentCount(0);
+      setSeedComments([]);
+    }
+    prefetchShowcaseSocial(ownerUserId, slideId).then((res) => {
       if (cancelled || !res.ok || likeGenRef.current > 0) return;
+      setCachedShowcaseSocial(ownerUserId, slideId, res);
       applyLike(res.likedByMe, res.likeCount);
       setRecentLiker(res.recentLiker || null);
       setCommentCount(res.comments.length);

@@ -60,8 +60,11 @@ function MembershipTierLabelText({ parts, className = "" }) {
   return <span className={className}>{parts?.base || parts?.label || ""}</span>;
 }
 
-/** 가족보호 상태 버튼 — 신청가능(앰버) ↔ 작동중(초록) */
-function FamilyProtectionActionButton({ active, isDarkMode, onClick }) {
+/** 가족보호 상태 버튼 — 작동중 / 이용가능(유료) / 유료전용(무료) */
+function FamilyProtectionActionButton({ status = "locked", isDarkMode, onClick }) {
+  const active = status === "active";
+  const eligible = status === "eligible";
+  const label = active ? "가족보호 작동중" : eligible ? "가족보호 이용가능" : "가족보호 유료전용";
   return (
     <button
       type="button"
@@ -71,17 +74,23 @@ function FamilyProtectionActionButton({ active, isDarkMode, onClick }) {
           ? isDarkMode
             ? "bg-emerald-500 text-white ring-1 ring-emerald-300/50"
             : "bg-emerald-500 text-white shadow-emerald-500/25"
-          : isDarkMode
-            ? "bg-amber-500 text-white ring-1 ring-amber-200/50"
-            : "bg-amber-500 text-white shadow-amber-500/25"
+          : eligible
+            ? isDarkMode
+              ? "bg-amber-500 text-white ring-1 ring-amber-200/50"
+              : "bg-amber-500 text-white shadow-amber-500/25"
+            : isDarkMode
+              ? "bg-slate-600 text-slate-200 ring-1 ring-slate-500/40"
+              : "bg-slate-200 text-slate-600"
       }`}
-      aria-label={active ? "가족보호 작동중" : "가족보호 신청가능"}
+      aria-label={label}
     >
       <span
-        className={`h-2 w-2 shrink-0 rounded-full ${active ? "bg-white/95" : "bg-white animate-pulse"}`}
+        className={`h-2 w-2 shrink-0 rounded-full ${
+          active ? "bg-white/95" : eligible ? "bg-white animate-pulse" : "bg-slate-400"
+        }`}
         aria-hidden
       />
-      {active ? "가족보호 작동중" : "가족보호 신청가능"}
+      {label}
     </button>
   );
 }
@@ -171,6 +180,7 @@ function ProfilePanel({
   const [isEnterpriseMember, setIsEnterpriseMember] = useState(false);
   const [enterpriseLineAccessChecked, setEnterpriseLineAccessChecked] = useState(false);
   const [familyProtectionActive, setFamilyProtectionActive] = useState(false);
+  const [familyProtectionEligible, setFamilyProtectionEligible] = useState(false);
   const { vluerLocked, membershipCtx } = useB2bMembership();
   const mainPanelScrollRef = useRef(null);
   const [virtualEmail, setVirtualEmail] = useState(null);
@@ -402,11 +412,19 @@ function ProfilePanel({
       try {
         const d = await fetchFamilyProtection();
         applyPeers(familyPeersFromProtectionData(d));
+        if (!cancelled) {
+          setFamilyProtectionEligible(
+            Boolean(d?.canInviteFamily) ||
+              d?.uiMode === "guardian_full" ||
+              d?.memberSlots?.isPaid === true
+          );
+        }
         const b = d?.familyPlanBeneficiary;
         setFamilyPlanPathLabel(b?.active && b.pathLabel ? b.pathLabel : "");
       } catch {
         if (!cancelled) {
           setFamilyProtectionActive(false);
+          setFamilyProtectionEligible(false);
           setFamilyPlanPathLabel("");
         }
       }
@@ -911,7 +929,9 @@ function ProfilePanel({
           ) : null}
           {v1AppShell.familyProtection && tierUi.parts?.familyStatus ? (
             <FamilyProtectionActionButton
-              active={familyProtectionActive}
+              status={
+                familyProtectionActive ? "active" : familyProtectionEligible ? "eligible" : "locked"
+              }
               isDarkMode={isDarkMode}
               onClick={() => {
                 onClose?.();

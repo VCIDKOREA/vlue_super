@@ -250,6 +250,11 @@ class LetteringJavascriptBridge(
     }
 
     @JavascriptInterface
+    fun expandOutgoingShowcase() {
+        service.onOutgoingLogoTapFromWeb()
+    }
+
+    @JavascriptInterface
     fun syncMemberPhone(phone: String?) {
         LetteringPrefs.setMemberPhone(service, phone)
     }
@@ -371,6 +376,8 @@ class LetteringJavascriptBridge(
                 window.VlueLettering.getDeviceContactsJson = function(){ return Android.getDeviceContactsJson(); };
                 window.VlueLettering.syncMemberPhone = function(p){ Android.syncMemberPhone(String(p||'')); };
                 window.VlueLettering.openShowcaseSms = function(p){ Android.openShowcaseSms(String(p||'')); };
+                window.VlueLettering.expandOutgoingShowcase = function(){ try{ Android.expandOutgoingShowcase(); }catch(e){} };
+                window.Android.expandOutgoingShowcase = window.VlueLettering.expandOutgoingShowcase;
                 window.VlueLettering.blockPhoneNumber = function(p){ Android.blockPhoneNumber(p); };
                 window.VlueLettering.setLetteringEnabled = function(v){ Android.setLetteringEnabled(v ? '1' : '0'); };
                 window.VlueLettering.requestLetteringPermissions = function(){ Android.requestLetteringPermissions(); };

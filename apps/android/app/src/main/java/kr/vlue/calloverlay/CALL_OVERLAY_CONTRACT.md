@@ -13,12 +13,13 @@
 
 | Phase | Meaning |
 |-------|---------|
-| `BIG_PUSH` | Compact top bar only (ringing or dialing) |
+| `BIG_PUSH` | Compact top bar only (**incoming** ringing) |
+| `OUTGOING_LOGO` | Outgoing-only: center VLUÉ logo (no peer BigPush bar) until user tap |
 | `CENTER_SAFE_POPUP` | 경로 검증 · 안심케어 (비회원 주소록) |
 | `CENTER_AUTH_POPUP` | 경로 검증 · 인증 회원 (송출 OFF / DCC 없음) |
 | `FULL_SHOWCASE` | Fullscreen peer showcase (실콘텐츠 + 송출 ON) |
 | `MINI_CASE` | After popup Confirm (or user minimize) |
-| `KEEP_BIG_PUSH` | Answered but no safe content path — stay on bar, **no empty fullscreen** |
+| `KEEP_BIG_PUSH` | Answered but no safe content path — stay on bar, **no empty fullscreen** (incoming) |
 
 ---
 
@@ -27,16 +28,18 @@
 | Event | UI |
 |-------|-----|
 | Incoming ringing | `BIG_PUSH` only |
-| Outgoing dialing / connecting | `BIG_PUSH` only |
+| Outgoing dialing / connecting | `OUTGOING_LOGO` only — **skip peer BigPush / identity fetch UI** |
 | Audio `MODE_IN_CALL` while still dialing | **Ignore** — must not open popup/showcase |
-| BigPush bar tap while outgoing unanswered | **Ignore** (hold bar) |
-| Card lookup / Safe Care payload arrives while unanswered | Paint BigPush bar only — **no center popup** |
+| Logo / bar tap while outgoing unanswered | **Ignore** (hold logo) — except resolved unverified may open 미인증 report |
+| Card lookup / Safe Care payload arrives while unanswered | Incoming: paint BigPush only. Outgoing: keep logo — **no center popup** |
 
 `remoteConnected` may become true **only** after a real answer path (`enterShowcaseFromAnswer` / InCall `STATE_ACTIVE` after dialing/connecting). Audio `MODE_IN_CALL` alone must **never** open popup/showcase (OEM false positive while still ringing).
 
 ---
 
 ## 3. After answer (`remoteConnected == true`)
+
+### 3a. Incoming (unchanged)
 
 Decision order (first match wins):
 
@@ -49,8 +52,18 @@ Decision order (first match wins):
 
 Contact promote: if lookup pending/blank **and** device contact name exists → treat as Safe Care (`CENTER_SAFE_POPUP`).
 
-**BigPush bar tap (after answer):** same decision table. Resolved unverified must open 미인증 fullscreen (not `BIG_PUSH_TAP_KEEP`).  
-**BigPush bar tap while outgoing dialing:** still Ignore for popup/auth — **except** resolved unverified may open 미인증 report fullscreen (useful while waiting for answer).
+**BigPush bar tap (after answer):** same decision table. Resolved unverified must open 미인증 fullscreen (not `BIG_PUSH_TAP_KEEP`).
+
+### 3b. Outgoing (manual expand only)
+
+| Event | UI |
+|-------|-----|
+| Peer answers / `ACTION_CONNECTED` / card arrives | Mark `remoteConnected` — **keep `OUTGOING_LOGO`**. Do **not** auto-open popup/showcase |
+| User taps center VLUÉ logo (after answer) | Same decision table as §3a (blink anim on web → expand) |
+| Confirm on popup / 전화화면 보기 | `MINI_CASE` (same as incoming) |
+| Mini tap restore | Showcase / popup again (same as incoming) |
+
+`CallUiPhasePolicy.mayAutoExpandAfterAnswer(outgoing, expandRequestedByUser)` must be false for outgoing until the user taps.
 
 ---
 
@@ -81,10 +94,11 @@ Do not add parallel “open showcase” / “open popup” helpers that skip thi
 
 ## 6. Regression checklist (manual)
 
-- [ ] Outgoing to address-book non-member: dialing → BigPush only; answer → Safe Care popup; Confirm → Mini
-- [ ] Outgoing still “거는 중”: no center popup (auth/safe-care)
-- [ ] Outgoing unknown (not in contacts): lookup done → 미인증 BigPush; tap or answer → 미인증 fullscreen report panel
-- [ ] Answered pending lookup: BigPush remains until resolve — no blank dark case
+- [ ] Outgoing: dialing → center VLUÉ logo (no peer BigPush); answer → logo stays; tap logo → Safe Care / auth popup / showcase; Confirm → Mini
+- [ ] Outgoing still “거는 중”: no center popup (auth/safe-care); logo tap ignored until answer
+- [ ] Outgoing unknown: logo until user tap after answer → 미인증 fullscreen report panel (no auto on answer)
+- [ ] Incoming: BigPush → answer → immediate showcase/popup → Confirm → Mini (unchanged)
+- [ ] Answered pending lookup (incoming): BigPush remains until resolve — no blank dark case
 - [ ] BigPush not covered by status bar clock/battery
 - [ ] Auth member broadcast OFF: center auth popup, not empty Showcase
 - [ ] Auth member broadcast ON + content: full Showcase

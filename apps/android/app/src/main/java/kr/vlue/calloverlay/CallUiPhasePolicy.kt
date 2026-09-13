@@ -63,6 +63,18 @@ object CallUiPhasePolicy {
     fun mayShowCenterPopupWhileUnanswered(): Boolean = false
 
     /**
+     * 수화 후 자동 팝업/쇼케이스 진입 허용.
+     * 수신: 즉시 true. 발신: 사용자가 중앙 로고를 탭한 뒤에만 true (규격 §3b).
+     */
+    fun mayAutoExpandAfterAnswer(
+        outgoing: Boolean,
+        expandRequestedByUser: Boolean
+    ): Boolean {
+        if (!outgoing) return true
+        return expandRequestedByUser
+    }
+
+    /**
      * 수화 확정 후 UI. first-match 규격 §3.
      */
     fun decideAfterAnswer(input: AnswerInput): Phase {

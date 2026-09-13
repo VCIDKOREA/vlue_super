@@ -32,6 +32,7 @@ import LetteringReportSheet from "./LetteringReportSheet.jsx";
 import LetteringCertModal from "./LetteringCertModal.jsx";
 import RenderErrorGuard from "./RenderErrorGuard.jsx";
 import { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
+import OutgoingCallLogo from "./call/OutgoingCallLogo.jsx";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
 import { ShowcaseBgmProvider, useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
@@ -445,6 +446,11 @@ function LetteringOverlayHostInner() {
   const [expanded, setExpanded] = useState(false);
   /* Native BIG_PUSH 창 — 앱 쇼케이스바(접힘) 강제. MiniCase 금지. mini=1 URL 은 MiniCase 부팅 */
   const [forceShowcaseBar, setForceShowcaseBar] = useState(() => !parseOverlayParams().urlMiniCase);
+  /** 발신 전용 — peer BigPush 생략, 중앙 VLUÉ 로고 */
+  const [outgoingLogoMode, setOutgoingLogoMode] = useState(() => {
+    const boot = parseOverlayParams();
+    return boot.direction === "outgoing" && !boot.urlMiniCase;
+  });
   const [identityHold, setIdentityHold] = useState(() => !parseOverlayParams().urlMiniCase);
   /* Mini→풀 복원 직후 늦게 도착하는 big_push_bar 로 다시 접히는 레이스 방지 */
   const restoreHoldUntilRef = useRef(0);
@@ -460,9 +466,13 @@ function LetteringOverlayHostInner() {
   const matchedRef = useRef(Boolean(readBootNativeLookupCard(parseOverlayParams().incoming)));
   const peerAuthPopupOnlyRef = useRef(false);
   const forceShowcaseBarRef = useRef(!parseOverlayParams().urlMiniCase);
+  const outgoingLogoModeRef = useRef(outgoingLogoMode);
+  const directionRef = useRef(direction);
   const showcaseStyleRef = useRef(showcaseStyle);
   const styledCardRef = useRef(null);
   forceShowcaseBarRef.current = forceShowcaseBar;
+  outgoingLogoModeRef.current = outgoingLogoMode;
+  directionRef.current = direction;
   showcaseStyleRef.current = showcaseStyle;
   const urlVerifiedRef = useRef(urlVerified);
   urlVerifiedRef.current = urlVerified;
@@ -1058,6 +1068,34 @@ function LetteringOverlayHostInner() {
        * big_push_bar / minimize / restore 는 CallState 가 아님.
        * normalizeCallState("") → early-return 되면 하단 바가 풀쇼케이스/미니로 남음.
        */
+      if (rawState === "outgoing_logo") {
+        if (Date.now() < restoreHoldUntilRef.current) {
+          return;
+        }
+        restoreHoldUntilRef.current = 0;
+        userChoseMiniRef.current = false;
+        autoExpandedOnceRef.current = false;
+        resetCompanionMiniCaseSessionPos();
+        outgoingLogoModeRef.current = true;
+        setOutgoingLogoMode(true);
+        forceShowcaseBarRef.current = false;
+        setForceShowcaseBar(false);
+        setExpanded(false);
+        return;
+      }
+      if (rawState === "outgoing_connected") {
+        /*
+         * 발신 수화 — callState 만 CONNECTED. 로고 유지, 자동 쇼케이스/팝업 금지.
+         */
+        setCallState(CALL_STATES.CONNECTED);
+        if (outgoingLogoModeRef.current) {
+          autoExpandedOnceRef.current = false;
+          forceShowcaseBarRef.current = false;
+          setForceShowcaseBar(false);
+          setExpanded(false);
+        }
+        return;
+      }
       if (rawState === "big_push_bar") {
         /*
          * Mini/바 → 풀 복원 hold 중 ContextWatch 가 보내는 big_push_bar 는 무시.
@@ -1071,6 +1109,8 @@ function LetteringOverlayHostInner() {
         userChoseMiniRef.current = false;
         autoExpandedOnceRef.current = false;
         resetCompanionMiniCaseSessionPos();
+        outgoingLogoModeRef.current = false;
+        setOutgoingLogoMode(false);
         forceShowcaseBarRef.current = true;
         setForceShowcaseBar(true);
         setExpanded(false);
@@ -1081,6 +1121,8 @@ function LetteringOverlayHostInner() {
         /* Mini 확정 — 이후 connected 가 와도 풀로 되돌리지 않음 */
         userChoseMiniRef.current = true;
         restoreHoldUntilRef.current = 0;
+        outgoingLogoModeRef.current = false;
+        setOutgoingLogoMode(false);
         forceShowcaseBarRef.current = false;
         setForceShowcaseBar(false);
         setExpanded(false);
@@ -1088,6 +1130,8 @@ function LetteringOverlayHostInner() {
         userChoseMiniRef.current = false;
         restoreHoldUntilRef.current = Date.now() + 3500;
         autoExpandedOnceRef.current = true;
+        outgoingLogoModeRef.current = false;
+        setOutgoingLogoMode(false);
         forceShowcaseBarRef.current = false;
         setForceShowcaseBar(false);
         setExpanded(true);
@@ -1097,6 +1141,17 @@ function LetteringOverlayHostInner() {
         setCallState(next);
         if (next === CALL_STATES.CONNECTED) {
           const wasShowcaseBar = forceShowcaseBarRef.current;
+          /* 발신 로고 단계 — connected 재주입으로 자동 expand/팝업 금지 */
+          if (
+            outgoingLogoModeRef.current &&
+            directionRef.current === "outgoing" &&
+            !userChoseMiniRef.current
+          ) {
+            autoExpandedOnceRef.current = false;
+            forceShowcaseBarRef.current = false;
+            setForceShowcaseBar(false);
+            setExpanded(false);
+          } else {
           forceShowcaseBarRef.current = false;
           setForceShowcaseBar(false);
           if (peerAuthPopupOnlyRef.current) {
@@ -1195,6 +1250,7 @@ function LetteringOverlayHostInner() {
               setExpanded(true);
             }
           }
+          }
         }
         if (next === CALL_STATES.RINGING) {
           /* BigPush = 앱 쇼케이스바 — 연속 수신 시 직전 MiniCase hold/좌표 제거 */
@@ -1202,8 +1258,17 @@ function LetteringOverlayHostInner() {
           userChoseMiniRef.current = false;
           autoExpandedOnceRef.current = false;
           resetCompanionMiniCaseSessionPos();
-          forceShowcaseBarRef.current = true;
-          setForceShowcaseBar(true);
+          if (directionRef.current === "outgoing") {
+            outgoingLogoModeRef.current = true;
+            setOutgoingLogoMode(true);
+            forceShowcaseBarRef.current = false;
+            setForceShowcaseBar(false);
+          } else {
+            outgoingLogoModeRef.current = false;
+            setOutgoingLogoMode(false);
+            forceShowcaseBarRef.current = true;
+            setForceShowcaseBar(true);
+          }
           setExpanded(false);
         }
       }
@@ -1528,9 +1593,12 @@ function LetteringOverlayHostInner() {
   /*
    * 조회 전 투명 대기는 수신 BigPush 만 느리게 느껴짐.
    * 네이티브 바(forceShowcaseBar)면 「번호 확인 중」바로 즉시 표시 — 미인증 앰버 아님.
+   * 발신 로고 단계는 로고 UI를 바로 그림.
    */
   if (isLookupPendingCard && callState !== CALL_STATES.CONNECTED) {
-    if (!(forceShowcaseBar && (incoming || card))) {
+    if (outgoingLogoMode) {
+      /* fall through — logo UI */
+    } else if (!(forceShowcaseBar && (incoming || card))) {
       return (
         <div
           className="lettering-overlay-host lettering-overlay-host--tent lettering-overlay-host--loading"
@@ -1541,7 +1609,7 @@ function LetteringOverlayHostInner() {
     }
   }
 
-  if (showLoadingChip) {
+  if (showLoadingChip && !outgoingLogoMode) {
     /* FULLSCREEN 흰 바탕 점유 금지 — 투명 호스트 + 브랜드 확인 칩만 */
     return (
       <div
@@ -1585,10 +1653,37 @@ function LetteringOverlayHostInner() {
   const barOnlyConnected =
     onCall &&
     !expanded &&
+    !outgoingLogoMode &&
     !isUnverifiedResolvedUi &&
     (isSafeCareProfile ||
       peerAuthPopupOnly ||
       !peerHasDccOrShowcaseContent(styledCard, peerLiveStyle));
+
+  if (outgoingLogoMode && !expanded && !authPopupOnlyUi) {
+    return (
+      <div
+        className={`lettering-overlay-host lettering-overlay-host--tent lettering-overlay-host--outgoing-logo ${
+          onCall ? "lettering-overlay-host--connected" : "lettering-overlay-host--ringing"
+        }`}
+        data-call-phase={callPhase}
+        data-expanded="false"
+        data-mini="false"
+      >
+        <OutgoingCallLogo
+          connected={onCall}
+          onExpand={() => {
+            outgoingLogoModeRef.current = false;
+            setOutgoingLogoMode(false);
+          }}
+        />
+        {toast ? (
+          <p className="lettering-overlay-toast" role="status">
+            {toast}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div

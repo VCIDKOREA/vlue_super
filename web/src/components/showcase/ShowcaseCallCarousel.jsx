@@ -35,6 +35,10 @@ import {
 } from "../../lib/showcase/showcaseBgmPresets.js";
 import { SHOWCASE_BGM_OWNER_RELEASED_EVENT } from "../../lib/showcase/closeShowcaseOverlays.js";
 import { resolveShowcaseSocialSlideId } from "../../lib/showcase/resolveShowcaseSocialSlideId.js";
+import {
+  prefetchShowcaseImages,
+  prefetchShowcaseSocialMany
+} from "../../lib/showcase/showcaseSocialCache.js";
 import { readActiveShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 
 /** 갤러리 사진 → 슬라이드용 (텍스트 오버레이 필드 유지) */
@@ -514,6 +518,36 @@ export default function ShowcaseCallCarousel({
   const outerNavEnabled = canScroll;
 
   useEffect(() => {
+    const rawOwner = String(card?.userId || card?.ownerUserId || "").trim();
+    const ownerOk =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        rawOwner
+      );
+    const nearSlides = slides.filter((_, i) => Math.abs(i - index) <= 2);
+    const slideIds = nearSlides
+      .map((s) => resolveShowcaseSocialSlideId({ slide: s }))
+      .filter(Boolean);
+    if (ownerOk && socialOverlayEnabled) {
+      prefetchShowcaseSocialMany(rawOwner, slideIds);
+    }
+    const urls = [];
+    for (const s of nearSlides) {
+      if (s?.url) urls.push(s.url);
+      if (Array.isArray(s?.photos)) {
+        for (const p of s.photos) {
+          if (p?.url) urls.push(p.url);
+        }
+      }
+      if (Array.isArray(s?.items)) {
+        for (const p of s.items) {
+          if (p?.url) urls.push(p.url);
+        }
+      }
+    }
+    prefetchShowcaseImages(urls);
+  }, [card?.userId, card?.ownerUserId, slides, index, socialOverlayEnabled]);
+
+  useEffect(() => {
     setIndex(0);
   }, [card?.phone, count, isPaid, isKnownContact, preferContentSlide, showDigitalCard]);
 
@@ -891,7 +925,7 @@ export default function ShowcaseCallCarousel({
             style={{ transform: `translate3d(0, -${index * 100}%, 0)` }}
           >
             {slides.map((slide, slideIdx) => {
-              const near = Math.abs(slideIdx - index) <= 1;
+              const near = Math.abs(slideIdx - index) <= 2;
               const slideContentOrdinal =
                 slide.type === "card"
                   ? 0

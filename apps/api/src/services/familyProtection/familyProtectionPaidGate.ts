@@ -1,24 +1,15 @@
 import { prisma } from "../../db/client.js";
 import { isPlatformCeoHandle } from "../admin/platformAccountRoles.js";
+import { isSelfPaidMember } from "../membership/paidMemberGate.js";
 
-const PAID_TIERS = new Set(["paid", "standard", "premium", "b2b"]);
-
-/** 유료(스탠다드/프리미엄 명함 또는 활성 B2C 구독) 회원만 가족 초대 가능 */
+/** 유료(스탠다드/프리미엄 명함·활성 B2C 구독·B2B) 회원만 가족 초대 가능 — isSelfPaidMember 와 동일 기준 */
 export async function canRegisterFamilyMembers(userId: string): Promise<{
   ok: boolean;
   reason?: string;
 }> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: {
-      publicHandle: true,
-      digitalCard: { select: { membershipTierSnapshot: true } },
-      subscriptions: {
-        where: { status: "active", cycleEndAt: { gt: new Date() } },
-        select: { id: true },
-        take: 1
-      }
-    }
+    select: { publicHandle: true }
   });
   if (!user) {
     return {
@@ -27,9 +18,9 @@ export async function canRegisterFamilyMembers(userId: string): Promise<{
     };
   }
   if (isPlatformCeoHandle(user.publicHandle)) return { ok: true };
-  const snap = user.digitalCard?.membershipTierSnapshot;
-  if (snap && PAID_TIERS.has(String(snap))) return { ok: true };
-  if (user.subscriptions.length > 0) return { ok: true };
+
+  const paid = await isSelfPaidMember(userId);
+  if (paid.ok) return { ok: true };
 
   return {
     ok: false,

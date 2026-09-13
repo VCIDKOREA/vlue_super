@@ -81,6 +81,32 @@ class CallUiPhasePolicyTest {
     }
 
     @Test
+    fun outgoing_autoExpand_requiresUserTap() {
+        assertFalse(
+            CallUiPhasePolicy.mayAutoExpandAfterAnswer(
+                outgoing = true,
+                expandRequestedByUser = false
+            )
+        )
+        assertTrue(
+            CallUiPhasePolicy.mayAutoExpandAfterAnswer(
+                outgoing = true,
+                expandRequestedByUser = true
+            )
+        )
+    }
+
+    @Test
+    fun incoming_autoExpand_alwaysAllowed() {
+        assertTrue(
+            CallUiPhasePolicy.mayAutoExpandAfterAnswer(
+                outgoing = false,
+                expandRequestedByUser = false
+            )
+        )
+    }
+
+    @Test
     fun afterAnswer_safeCare_isCenterPopup() {
         assertEquals(
             CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP,

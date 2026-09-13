@@ -158,6 +158,11 @@ class CallOverlayService : Service() {
     private var restoreGhostGuardUntilElapsed: Long = 0L
     /** 발신: 상대 응답(STATE_ACTIVE / notifyConnected) 후에만 true — 다이얼 OFFHOOK 만으로는 Showcase 금지 */
     private var remoteConnected: Boolean = false
+    /**
+     * 발신: 중앙 VLUÉ 로고 탭 후에만 팝업/쇼케이스 자동 경로 허용 (규격 §3b).
+     * 수신은 항상 무시(정책이 incoming 을 즉시 허용).
+     */
+    private var outgoingExpandRequestedByUser: Boolean = false
     /** BigPush 가장자리 피크 (MiniCase 패리티) — OverlayState 는 BIG_PUSH 유지 */
     private var bigPushPeeking: Boolean = false
     private var overlayModal: Boolean = false
@@ -365,6 +370,9 @@ class CallOverlayService : Service() {
         }
         val callState = telephonyCallState()
         currentOutgoing = outgoing
+        if (outgoing && !answered) {
+            outgoingExpandRequestedByUser = false
+        }
         dcpPopupOnly = false
         bindDcpRoute(phone, dcpRoute, cardJson)
         /*
@@ -572,7 +580,7 @@ class CallOverlayService : Service() {
             syncDcpRoutePopup(cardJson, currentDcpRoute)
             syncOverlayChromeForState(source = "bigPush_reuseWindow")
             /* sync 전에 웹이 restoreHold 로 big_push 를 무시해도 idle→bar 로 MiniCase 해제 */
-            notifyWebCallState("big_push_bar")
+            notifyCompactCallChrome()
             /* 재사용 경로에서도 발신 상대응답 프로브 유지 (addView 때만 start 하면 누락) */
             if (outgoing && !remoteConnected) {
                 OutgoingPeerConnectProbe.start(this)
@@ -700,9 +708,10 @@ class CallOverlayService : Service() {
          * NONE 이면 테두리 유지.
          */
         wv.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
-        /* BigPush도 앱 쇼케이스바(Web) — Native 바 숨김 */
+        /* BigPush도 앱 쇼케이스바(Web) — Native 바 숨김.
+         * 발신 로고 단계는 웹 탭(깜빡임)만 사용 — WebView 제스처가 click 을 가로채지 않게 함. */
         wv.visibility = android.view.View.VISIBLE
-        if (asBigPush) {
+        if (asBigPush && !outgoing) {
             attachBigPushDragGestures(wv)
         }
         wv.webChromeClient = object : android.webkit.WebChromeClient() {
@@ -782,11 +791,13 @@ class CallOverlayService : Service() {
             )
         )
         bigPushPeekTab = peekTab
-        if (asBigPush) {
+        if (asBigPush && !outgoing) {
             attachBigPushDragGestures(peekTab)
         }
 
-        val params = if (asBigPush) {
+        val params = if (asBigPush && outgoing) {
+            buildOutgoingLogoLayoutParams()
+        } else if (asBigPush) {
             buildBigPushLayoutParams(companion.position)
         } else if (
             authPopupConfirmedToMini ||
@@ -1037,6 +1048,23 @@ class CallOverlayService : Service() {
             detail = source
         )
 
+        /* 발신: 수화 후에도 중앙 로고 유지 — 사용자 탭 전까지 팝업/쇼케이스 금지 (§3b) */
+        if (!CallUiPhasePolicy.mayAutoExpandAfterAnswer(
+                outgoing = currentOutgoing,
+                expandRequestedByUser = outgoingExpandRequestedByUser
+            )
+        ) {
+            cancelAnswerUiResume()
+            ensureOutgoingLogoWindowLayout()
+            notifyWebCallState("outgoing_logo")
+            notifyWebCallState("outgoing_connected")
+            VlueBigPushTrace.lifecycle(
+                "OUTGOING_LOGO_HOLD",
+                "source=$source — wait user logo tap"
+            )
+            return
+        }
+
         if (authPopupConfirmedToMini ||
             userMinimized ||
             companion.state == OverlayState.MINI_CASE
@@ -1208,6 +1236,8 @@ class CallOverlayService : Service() {
 
     private fun scheduleAnswerUiResume(reason: String) {
         if (dismissing || !remoteConnected) return
+        /* 발신 로고 단계 — 카드 도착으로 자동 재시도 금지 */
+        if (currentOutgoing && !outgoingExpandRequestedByUser) return
         if (companion.state != OverlayState.BIG_PUSH) return
         if (authPopupConfirmedToMini || userMinimized) return
         cancelAnswerUiResume()
@@ -1265,7 +1295,7 @@ class CallOverlayService : Service() {
                     val hold =
                         android.os.SystemClock.elapsedRealtime() < showcaseHoldUntilElapsed
                     if (!hold) {
-                        notifyWebCallState("big_push_bar")
+                        notifyCompactCallChrome()
                     }
                 }
             }
@@ -1428,7 +1458,10 @@ class CallOverlayService : Service() {
         nativeBanner?.visibility = View.GONE
         webView?.visibility = View.VISIBLE
         applyCompactRingingWindow()
-        notifyWebCallState("big_push_bar")
+        notifyCompactCallChrome()
+        if (currentOutgoing && !outgoingExpandRequestedByUser) {
+            ensureOutgoingLogoWindowLayout()
+        }
         publishCompanion(OverlayTriggerEvent.INTERNAL)
     }
 
@@ -1615,7 +1648,7 @@ class CallOverlayService : Service() {
         if (currentOutgoing && !remoteConnected && !unverified) {
             VlueBigPushTrace.lifecycle(
                 "BIG_PUSH_TAP_HOLD_DIALING",
-                "outgoing dialing — keep BigPush only"
+                "outgoing dialing — keep logo only"
             )
             return
         }
@@ -1631,12 +1664,22 @@ class CallOverlayService : Service() {
             }
             return
         }
+        if (currentOutgoing) {
+            outgoingExpandRequestedByUser = true
+        }
         CompanionRuntimeStabilityDiag.mark("BIG_PUSH_BAR_TAP", "openShowcase")
         VlueBigPushTrace.lifecycle(
             "BIG_PUSH_BAR_TAP",
-            "open Showcase from bar tap unverified=$unverified"
+            "open Showcase from bar/logo tap unverified=$unverified outgoing=$currentOutgoing"
         )
         enterShowcaseFromAnswer(source = "bigPush_bar_tap")
+    }
+
+    /** 웹 발신 중앙 로고 탭 (눈 깜빡임 후) */
+    fun onOutgoingLogoTapFromWeb() {
+        mainHandler.post {
+            openShowcaseFromBigPushTap()
+        }
     }
 
     /**
@@ -1668,10 +1711,18 @@ class CallOverlayService : Service() {
         if (currentOutgoing && !remoteConnected) {
             VlueBigPushTrace.lifecycle(
                 "CENTER_SAFE_POPUP_HOLD_DIALING",
-                "source=$source outgoing dialing — keep BigPush " +
+                "source=$source outgoing dialing — keep logo " +
                     "(mayShowCenterPopupWhileUnanswered=${CallUiPhasePolicy.mayShowCenterPopupWhileUnanswered()})"
             )
             restartOutgoingPeerProbeIfNeeded()
+            return
+        }
+        /* 발신: 로고 탭 전 중앙 팝업 금지 (§3b) */
+        if (currentOutgoing && !outgoingExpandRequestedByUser) {
+            VlueBigPushTrace.lifecycle(
+                "CENTER_SAFE_POPUP_HOLD_OUTGOING_LOGO",
+                "source=$source wait user logo tap"
+            )
             return
         }
         /* 인증-only: SHOWCASE(풀스크린) 전이 금지 — 네이티브 중앙 팝업만 */
@@ -2152,7 +2203,7 @@ class CallOverlayService : Service() {
                         injectCardLookupJson(wv, cardJson)
                     }
                     if (companion.state == OverlayState.BIG_PUSH) {
-                        notifyWebCallState("big_push_bar")
+                        notifyCompactCallChrome()
                     }
                 }
                 if (isCallAlreadyAnswered() || companion.state == OverlayState.SHOWCASE) {
@@ -2198,7 +2249,7 @@ class CallOverlayService : Service() {
                         BigPushShowcaseBar.bind(bannerHold, phone, verified, outgoing, cardJson)
                     }
                     if (companion.state == OverlayState.BIG_PUSH) {
-                        notifyWebCallState("big_push_bar")
+                        notifyCompactCallChrome()
                     }
                     LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
                     return@post
@@ -2255,10 +2306,12 @@ class CallOverlayService : Service() {
                     !authPopupConfirmedToMini &&
                     !userMinimized &&
                     !cardJson.isNullOrBlank() &&
-                    !isLookupPendingCard(cardJson)
+                    !isLookupPendingCard(cardJson) &&
+                    /* 발신: 카드 지연 도착으로 자동 쇼케이스 금지 — 로고 탭만 */
+                    !(currentOutgoing && !outgoingExpandRequestedByUser)
                 ) {
                     /*
-                     * 발신 수화 후 카드가 늦게 도착한 경우 — BigPush 고착 해제.
+                     * 수신 수화 후 카드가 늦게 도착한 경우 — BigPush 고착 해제.
                      * 인증 회원 → 쇼케이스 / 안심케어는 위 분기에서 이미 return.
                      */
                     VlueBigPushTrace.lifecycle(
@@ -2268,6 +2321,14 @@ class CallOverlayService : Service() {
                     enterShowcaseFromAnswer(source = "applyCallInfoUpdate_deferred")
                     LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
                     return@post
+                } else if (
+                    remoteConnected &&
+                    currentOutgoing &&
+                    !outgoingExpandRequestedByUser &&
+                    companion.state == OverlayState.BIG_PUSH
+                ) {
+                    notifyWebCallState("outgoing_logo")
+                    notifyWebCallState("outgoing_connected")
                 }
             } else if (rootContainer == null) {
                 /* MiniCase 유지 중 카드 갱신 — showOverlay(BigPush) 재진입 금지 */
@@ -3618,6 +3679,38 @@ class CallOverlayService : Service() {
         }
     }
 
+    /** 수신 BigPush 바 / 발신 중앙 로고 — compact chrome 동기 */
+    private fun notifyCompactCallChrome() {
+        if (currentOutgoing && !outgoingExpandRequestedByUser) {
+            notifyWebCallState("outgoing_logo")
+            if (remoteConnected) {
+                notifyWebCallState("outgoing_connected")
+            }
+        } else {
+            notifyWebCallState("big_push_bar")
+        }
+    }
+
+    /** 발신 로고 단계 — 전체 화면 투명 창 (중앙 로고 탭 영역) */
+    private fun ensureOutgoingLogoWindowLayout() {
+        if (!currentOutgoing || outgoingExpandRequestedByUser) return
+        if (companion.state != OverlayState.BIG_PUSH) return
+        val params = layoutParams ?: return
+        val root = rootContainer ?: return
+        params.width = WindowManager.LayoutParams.MATCH_PARENT
+        params.height = WindowManager.LayoutParams.MATCH_PARENT
+        params.x = 0
+        params.y = 0
+        params.gravity = Gravity.TOP or Gravity.START
+        root.setBackgroundColor(Color.TRANSPARENT)
+        webView?.visibility = android.view.View.VISIBLE
+        nativeBanner?.visibility = android.view.View.GONE
+        try {
+            windowManager?.updateViewLayout(root, params)
+        } catch (_: Exception) {
+        }
+    }
+
     /**
      * 웹 notifyVlueAuthMemberReady — 인증 회원·미송출 수화 시 중앙 팝업.
      * 이름표시 빅푸시가 수화 후에도 남는 것 방지.
@@ -3630,6 +3723,14 @@ class CallOverlayService : Service() {
                 currentPhone.isNotBlank() &&
                 !IncomingNumberResolver.sameCanonicalNumber(currentPhone, phone)
             ) {
+                return@post
+            }
+            /* 발신 로고 단계 — 웹 connected 경로의 auth ready 로 자동 팝업 금지 */
+            if (currentOutgoing && !outgoingExpandRequestedByUser) {
+                VlueBigPushTrace.lifecycle(
+                    "AUTH_READY_HOLD_OUTGOING_LOGO",
+                    "phone=${ReleaseDebugGate.maskPhoneForLog(phone)}"
+                )
                 return@post
             }
             if (!VlueAuthMemberPopupPolicy.isAuthMemberOnly(
@@ -3678,6 +3779,7 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.endCallSession("dismissOverlay")
         companion.onCallEnd()
         remoteConnected = false
+        outgoingExpandRequestedByUser = false
         answerUiResumeAttempt = 0
         userMinimized = false
         authPopupConfirmedToMini = false
@@ -3925,6 +4027,8 @@ class CallOverlayService : Service() {
                 !userMinimized &&
                 !authPopupConfirmedToMini &&
                 !remoteConnected &&
+                /* 발신 로고 단계는 하단 컴팩트 바로 접지 않음 */
+                !(currentOutgoing && !outgoingExpandRequestedByUser) &&
                 (ctx == OverlayContext.OTHER_APP || ctx == OverlayContext.HOME_SCREEN)
             ) {
                 /* 통화 미연결·다른 앱 — 하단 쇼케이스 바. remoteConnected 중에는 자동 collapse 금지 */
@@ -3933,7 +4037,7 @@ class CallOverlayService : Service() {
                 publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
                 syncOverlayChromeForState(source = "reeval:$source:bottomBar")
                 applyLayoutFromController(source = "reeval:$source:bottomBar")
-                notifyWebCallState("big_push_bar")
+                notifyCompactCallChrome()
                 CompanionRuntimeStabilityDiag.mark(
                     "HOME_CONTEXT_REEVAL",
                     source,
@@ -3974,7 +4078,7 @@ class CallOverlayService : Service() {
             publishCompanion(OverlayTriggerEvent.HOME_CHANGED)
             applyLayoutFromController(source = "reeval:$source")
             if (companion.state == OverlayState.BIG_PUSH) {
-                notifyWebCallState("big_push_bar")
+                notifyCompactCallChrome()
             }
             CompanionRuntimeStabilityDiag.mark(
                 "HOME_CONTEXT_REEVAL",
@@ -4064,6 +4168,16 @@ class CallOverlayService : Service() {
             }
         }
     }
+
+    /** 발신: 중앙 VLUÉ 로고 — 풀스크린 투명 (peer BigPush 생략) */
+    private fun buildOutgoingLogoLayoutParams(): WindowManager.LayoutParams =
+        buildBigPushLayoutParams(OverlayPosition.TOP).apply {
+            height = WindowManager.LayoutParams.MATCH_PARENT
+            width = WindowManager.LayoutParams.MATCH_PARENT
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
+        }
 
     private fun buildShowcaseLayoutParams(): WindowManager.LayoutParams =
         buildBigPushLayoutParams(OverlayPosition.TOP).apply {
