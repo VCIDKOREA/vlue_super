@@ -45,6 +45,19 @@ PUBLIC_DIRECTORY_LOOKUP=1
 **용량 초과 시:** Railway 에서 `PUBLIC_DIRECTORY_LOOKUP` 이 **없어야** 합니다 (1로 켜 두지 말 것).  
 Android 도 `PublicDirectoryPhoneCache.ENABLE_DIRECTORY_SYNC = false` 로 sync 중단.
 
+## 0.5GB 안에서 일부만 남기고 테스트
+
+**완전 중지가 아닙니다.** 한도 초과면 DB 전체가 느려져 로그인·담당자까지 영향이 납니다.  
+대용량(`food`/`mailorder` 등)만 지우고 `school`·`post_office`·`public_agency`만 남기면 용량 안에서 안심팝업을 테스트할 수 있습니다.
+
+```text
+scripts/public_directory/keep_under_500mb.sql
+```
+
+1. SQL 0→1→2→3 실행  
+2. `table_total` 이 충분히 작아진 뒤 Railway에만 잠깐 `PUBLIC_DIRECTORY_LOOKUP=1`  
+3. 테스트 후 변수 다시 제거
+
 ## SQL 용량 회수 (Supabase Free 초과)
 
 배너 **EXCEEDING USAGE LIMITS** / `public_directory_entries` ~561MB 일 때:
