@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import {
+  isPublicDirectoryRuntimeEnabled,
   lookupPublicDirectoryByPhone,
   searchPublicDirectory,
   listPublicDirectoryPhoneSync
@@ -11,8 +12,16 @@ const CACHE_HEADERS = {
   "Cache-Control": "public, max-age=60, stale-while-revalidate=300"
 } as const;
 
+const OFF_HEADERS = {
+  "Cache-Control": "public, max-age=300",
+  "X-VLUE-Directory": "off"
+} as const;
+
 /** GET /api/v1/directory/lookup?phone=02-416-4658 */
 directoryV1Routes.get("/lookup", async (c) => {
+  if (!isPublicDirectoryRuntimeEnabled()) {
+    return c.json({ status: "success", matched: false, data: null, disabled: true }, 200, OFF_HEADERS);
+  }
   const phone = c.req.query("phone")?.trim() || c.req.query("q")?.trim() || "";
   if (!phone) {
     return c.json({ status: "error", message: "phone 쿼리가 필요합니다." }, 400);
@@ -43,6 +52,13 @@ directoryV1Routes.get("/lookup", async (c) => {
  * min 2 chars, max 30 results — 통합검증 검색창용 (과도한 트래픽 방지)
  */
 directoryV1Routes.get("/search", async (c) => {
+  if (!isPublicDirectoryRuntimeEnabled()) {
+    return c.json(
+      { status: "success", query: "", count: 0, results: [], disabled: true },
+      200,
+      OFF_HEADERS
+    );
+  }
   const q = c.req.query("q")?.trim() || c.req.query("keyword")?.trim() || "";
   if (q.length < 2) {
     return c.json({ status: "error", message: "검색어는 2자 이상이어야 합니다." }, 400);
@@ -72,6 +88,13 @@ directoryV1Routes.get("/search", async (c) => {
  * 전화 있는 행만 페이지네이션 — 앱 로컬 캐시 동기화
  */
 directoryV1Routes.get("/sync", async (c) => {
+  if (!isPublicDirectoryRuntimeEnabled()) {
+    return c.json(
+      { status: "success", entries: [], nextCursor: null, hasMore: false, disabled: true },
+      200,
+      { "Cache-Control": "private, max-age=600", "X-VLUE-Directory": "off" }
+    );
+  }
   const sinceRaw = c.req.query("since")?.trim() || "";
   const cursor = c.req.query("cursor")?.trim() || null;
   const limit = Number(c.req.query("limit") || 2000);

@@ -42,7 +42,41 @@ python scripts/public_directory/ingest_public_directory.py --purge-phoneless
 PUBLIC_DIRECTORY_LOOKUP=1
 ```
 
-## SQL 정제 (Supabase SQL Editor)
+**용량 초과 시:** Railway 에서 `PUBLIC_DIRECTORY_LOOKUP` 이 **없어야** 합니다 (1로 켜 두지 말 것).  
+Android 도 `PublicDirectoryPhoneCache.ENABLE_DIRECTORY_SYNC = false` 로 sync 중단.
+
+## SQL 용량 회수 (Supabase Free 초과)
+
+배너 **EXCEEDING USAGE LIMITS** / `public_directory_entries` ~561MB 일 때:
+
+1. Supabase → SQL Editor
+2. `scripts/public_directory/reclaim_storage.sql` 을 **0 → 1 → 2-A → 3** 순으로 실행
+3. 그래도 용량이 안 줄면 `TRUNCATE` (2-B) 후 `VACUUM FULL`
+
+빠른 원샷 (대용량 소스 삭제 + trigram 인덱스 제거):
+
+```sql
+DROP INDEX IF EXISTS public_directory_entries_name_norm_trgm_idx;
+DROP INDEX IF EXISTS public_directory_entries_display_name_trgm_idx;
+DROP INDEX IF EXISTS public_directory_entries_display_name_idx;
+DROP INDEX IF EXISTS public_directory_entries_name_norm_idx;
+
+DELETE FROM public_directory_entries
+WHERE source_kind IN (
+  'food','mailorder','telesales','hospital','health_center','health','nadeul','commerce','police'
+);
+
+VACUUM (ANALYZE) public_directory_entries;
+```
+
+완전 비우기:
+
+```sql
+TRUNCATE TABLE public_directory_entries;
+VACUUM FULL public_directory_entries;
+```
+
+## SQL 정제 (무전화)
 
 `scripts/public_directory/purge_phoneless.sql` 참고:
 
@@ -53,4 +87,5 @@ WHERE phone_e164 IS NULL OR phone_e164 = '';
 
 ## 인덱스
 
-`phone_e164`, `phone_digits`, `display_name`, `name_norm`, `business_number` (+ 가능 시 `pg_trgm` GIN).
+`phone_e164`, `phone_digits` (+ 선택적 이름 btree).  
+`pg_trgm` GIN 은 용량·부하가 커서 무료 플랜에서는 **제거 권장** (`reclaim_storage.sql` 1단계).

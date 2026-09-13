@@ -14,9 +14,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  * 공공 디렉터리 전화→상호 로컬 인덱스.
  * 수신 시 매번 Supabase 풀스캔 대신: 메모리/디스크 캐시 → (미스 시) 기존 card lookup API.
  * 백그라운드에서 /api/v1/directory/sync 로 전화 있는 행만 증분 동기화.
+ *
+ * Supabase 용량/부하 대응: 서버 PUBLIC_DIRECTORY_LOOKUP 기본 OFF + 클라이언트 sync 기본 비활성.
+ * 다시 켤 때: ENABLE_DIRECTORY_SYNC = true 그리고 Railway PUBLIC_DIRECTORY_LOOKUP=1
  */
 object PublicDirectoryPhoneCache {
     private const val TAG = "PublicDirPhoneCache"
+    /** 임시 OFF — 대량 적재로 DB 초과 시 sync/lookup 로컬 경로 중단 */
+    private const val ENABLE_DIRECTORY_SYNC = false
     private const val PREFS = "vlue_public_directory_phone_v1"
     private const val KEY_MAP = "phone_map_json"
     private const val KEY_SYNCED_AT = "synced_at_ms"
@@ -52,6 +57,7 @@ object PublicDirectoryPhoneCache {
     }
 
     fun scheduleSyncIfStale(context: Context) {
+        if (!ENABLE_DIRECTORY_SYNC) return
         bg.execute {
             try {
                 val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -65,6 +71,10 @@ object PublicDirectoryPhoneCache {
     }
 
     fun syncNow(context: Context) {
+        if (!ENABLE_DIRECTORY_SYNC) {
+            Log.i(TAG, "directory sync disabled (Supabase storage safeguard)")
+            return
+        }
         if (!syncing.compareAndSet(false, true)) return
         try {
             ensureLoaded(context)
