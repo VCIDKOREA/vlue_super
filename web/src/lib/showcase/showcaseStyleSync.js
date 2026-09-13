@@ -253,7 +253,8 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
     }
 
     if (forceServer) {
-      const applied = applyServerBundle(remote, { reason: "forceServer", clearMissing: true });
+      /* clearMissing 금지 — 빈 서버 응답으로 로컬(또는 방금 복원분)을 날리지 않음 */
+      const applied = applyServerBundle(remote, { reason: "forceServer", clearMissing: false });
       lastHydrateOkAt = Date.now();
       try {
         window.dispatchEvent(new CustomEvent("vlue-showcase-style-changed"));

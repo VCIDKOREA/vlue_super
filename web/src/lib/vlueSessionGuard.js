@@ -30,7 +30,7 @@ export function forceLogoutInactiveAccount(detail = {}) {
   forceLogoutInFlight = true;
   try {
     clearVlueSessionTokens();
-    clearAccountScopedLocalStorage({ keepRememberLogin: true, keepOnboarding: false });
+    clearAccountScopedLocalStorage({ mode: "full", keepRememberLogin: true, keepOnboarding: false });
     try {
       localStorage.setItem(VLUE_APP_SESSION_KEY, "0");
       localStorage.setItem(VLUE_MARKETING_SESSION_KEY, "0");

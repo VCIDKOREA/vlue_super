@@ -199,7 +199,7 @@ import { ShowcaseBgmProvider } from "./context/ShowcaseBgmContext.jsx";
 import { runAndroidBackHandlers } from "./lib/androidBackStack.js";
 import { normalizeMembershipKind, isBillableMembershipKind, PAID_EVENT_MONTHLY_KRW } from "./lib/membershipBm.js";
 import { writePendingPayment, readPendingPayment } from "./lib/postSignupPayment.js";
-import { clearAccountScopedLocalStorage } from "./lib/clearAccountScopedLocalStorage.js";
+import { clearAccountScopedLocalStorage, clearLocalStorageForLogin, rememberLocalContentUserId } from "./lib/clearAccountScopedLocalStorage.js";
 import { persistDccAccessHintsFromSession } from "./lib/dccAccessSession.js";
 
 const ONBOARDING_DONE_KEY = "vlue_onboarding_complete_v1";
@@ -2488,7 +2488,8 @@ function App() {
     const result = consumeSocialOAuthReturn();
     if (!result.handled) return;
     if (result.success && result.session) {
-      clearAccountScopedLocalStorage({ keepRememberLogin: false, keepOnboarding: true });
+      const nextUid = String(result.session.userId || result.session.id || "").trim();
+      clearLocalStorageForLogin(nextUid, { keepRememberLogin: false, keepOnboarding: true });
       persistAuthSessionAfterLogin(result.session);
       processTierChangeFromLoginData(result.session);
       applyLoginMembershipTier(result.session);
@@ -2647,8 +2648,9 @@ function App() {
         } catch {
           /* ignore */
         }
-        /* 이전 계정 로컬 잔여 제거 후 서버 세션·hydrate */
-        clearAccountScopedLocalStorage({ keepRememberLogin: true, keepOnboarding: true });
+        /* 같은 계정이면 쇼케이스·DCC·아바타 보존, 다른 계정만 wipe 후 hydrate */
+        const nextUid = String(data.userId || data.id || "").trim();
+        clearLocalStorageForLogin(nextUid, { keepRememberLogin: true, keepOnboarding: true });
         persistAuthSessionAfterLogin(data);
         if (data.deviceToken) saveDeviceToken(data.deviceToken);
         try {
@@ -2807,7 +2809,10 @@ function App() {
       } catch {
         /* ignore */
       }
-      clearAccountScopedLocalStorage({ keepRememberLogin: false, keepOnboarding: true });
+      clearLocalStorageForLogin(String(data.userId || data.id || "").trim(), {
+        keepRememberLogin: false,
+        keepOnboarding: true
+      });
       try {
         localStorage.setItem("vlue_social_login_provider", "kakao");
       } catch {
@@ -2883,6 +2888,12 @@ function App() {
 
   const handleLogout = useCallback(() => {
     try {
+      const uid = localStorage.getItem("vlue_server_user_id") || "";
+      if (uid) rememberLocalContentUserId(uid);
+    } catch {
+      /* ignore */
+    }
+    try {
       const rt = getRefreshToken();
       if (rt) {
         fetch(apiUrl("/api/auth/logout"), {
@@ -2895,10 +2906,12 @@ function App() {
       /* ignore */
     }
     clearVlueSessionTokens();
-    clearAccountScopedLocalStorage({ keepRememberLogin: true, keepOnboarding: true });
+    /* 일반 로그아웃: 쇼케이스·DCC·아바타 로컬 보존 (재로그인 hydrate 실패 대비) */
+    clearAccountScopedLocalStorage({ mode: "session", keepRememberLogin: true, keepOnboarding: true });
     localStorage.setItem(SESSION_KEY, "0");
     clearBiometricSessionOnly();
-    setDigitalCardActive(false);
+    /* 발급 여부 UI만 세션 종료 — 로컬 명함 데이터는 유지 */
+    setDigitalCardActive(readDigitalCardActive());
     setIsLoggedIn(false);
     setProfileOpen(false);
     setPage("main");
