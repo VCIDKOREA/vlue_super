@@ -17,6 +17,7 @@ import { startExternalMailSyncScheduler } from "./services/email/externalMailSyn
 import { egressLogMiddleware, startEgressSummaryTimer } from "./lib/egressLog.js";
 
 assertProductionEnvLocked();
+await import("./lib/safeRedis.js").then((m) => m.initRedisFromEnv());
 await loadPricingConfig();
 await import("./services/auth/ensureWithdrawalScheduleSchema.js").then((m) =>
   m.ensureWithdrawalScheduleSchema()

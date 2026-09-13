@@ -12,7 +12,8 @@ function withPoolerClientLimits(url: string | undefined): string | undefined {
   try {
     const u = new URL(url);
     if (!u.searchParams.has("connection_limit")) u.searchParams.set("connection_limit", "1");
-    if (!u.searchParams.has("pool_timeout")) u.searchParams.set("pool_timeout", "20");
+    /* 풀 대기 20초는 담당자 UI 타임아웃(12초)보다 김 → 빨리 실패해 캐시/재시도 */
+    if (!u.searchParams.has("pool_timeout")) u.searchParams.set("pool_timeout", "8");
     return u.toString();
   } catch {
     return url;

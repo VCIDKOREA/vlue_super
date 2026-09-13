@@ -413,43 +413,75 @@ export async function listDccAgentProfiles(
     monthlyKrw: number;
   };
 }> {
+  const empty = {
+    profiles: [] as DccAgentDto[],
+    activeId: null as string | null,
+    representativeId: null as string | null,
+    maxCount: DCC_AGENT_MAX_COUNT,
+    entitlement: {
+      freeSlots: 1,
+      paidSlots: Math.max(0, DCC_AGENT_MAX_COUNT - 1),
+      allowedSlots: DCC_AGENT_MAX_COUNT,
+      monthlyKrw: 4200
+    }
+  };
+
   try {
-    /* 목록은 ALTER/heal/flags/entitlement 생략 — 드롭다운이 DB 부하에 안 막히게 */
-    let rows = await prisma.userDccAgentProfile.findMany({
-      where: { userId },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      select: AGENT_LIST_SELECT
-    });
-    if (rows.length === 0) {
+    /*
+     * Prisma select(isRepresentative) 는 컬럼 미적용/풀러 지연 시 500.
+     * 기본 컬럼만 raw SELECT — 드롭다운용으로 충분.
+     */
+    type LiteRow = {
+      id: string;
+      label: string;
+      display_name: string;
+      title: string;
+      department: string;
+      photo_url: string | null;
+      photo_focus: string | null;
+      is_active: boolean;
+      sort_order: number;
+      updated_at: Date;
+    };
+
+    let lite = await prisma.$queryRaw<LiteRow[]>`
+      SELECT id::text AS id,
+             label,
+             display_name,
+             title,
+             department,
+             photo_url,
+             photo_focus,
+             is_active,
+             sort_order,
+             updated_at
+      FROM user_dcc_agent_profiles
+      WHERE user_id = ${userId}
+      ORDER BY sort_order ASC, created_at ASC
+      LIMIT 30
+    `;
+
+    if (!lite.length) {
       const seeded = await seedLiteFromDigitalCard(userId).catch(() => null);
       if (seeded) {
-        rows = [
+        lite = [
           {
             id: seeded.id,
             label: seeded.label,
-            displayName: seeded.displayName,
+            display_name: seeded.displayName,
             title: seeded.title,
             department: seeded.department,
-            photoUrl: seeded.photoUrl,
-            photoFocus: seeded.photoFocus,
-            isActive: seeded.isActive,
-            isRepresentative: Boolean(seeded.isRepresentative),
-            sortOrder: seeded.sortOrder,
-            updatedAt: seeded.updatedAt,
-            routedContactPhones: seeded.routedContactPhones
+            photo_url: seeded.photoUrl,
+            photo_focus: seeded.photoFocus,
+            is_active: seeded.isActive,
+            sort_order: seeded.sortOrder,
+            updated_at: seeded.updatedAt
           }
         ];
       }
     }
-    if (rows.length && !rows.some((r) => r.isRepresentative)) {
-      const firstId = rows[0].id;
-      rows = rows.map((r, i) => (i === 0 ? { ...r, isRepresentative: true } : r));
-      void prisma.userDccAgentProfile
-        .update({ where: { id: firstId }, data: { isRepresentative: true } })
-        .catch(() => {});
-    }
 
-    let activeId = rows.find((p) => p.isActive)?.id || rows[0]?.id || null;
+    let activeId = lite.find((p) => p.is_active)?.id || lite[0]?.id || null;
     if (cardId) {
       const line = await prisma.businessCard
         .findFirst({
@@ -460,28 +492,37 @@ export async function listDccAgentProfiles(
       if (line?.activeDccAgentProfileId) activeId = line.activeDccAgentProfileId;
     }
 
-    const representativeId = rows.find((p) => p.isRepresentative)?.id || activeId;
-    const profiles = rows.map((row) =>
-      toDto(row as AgentRow, {
-        assignedLineIds: [],
-        assignedPhones: [],
-        isActiveOverride: row.id === activeId,
-        hasDcc: true,
-        hasShowcase: true
-      })
+    const profiles = lite.map((row, idx) =>
+      toDto(
+        {
+          id: row.id,
+          label: row.label,
+          displayName: row.display_name,
+          title: row.title || "",
+          department: row.department || "",
+          photoUrl: row.photo_url,
+          photoFocus: row.photo_focus || "center",
+          isActive: Boolean(row.is_active),
+          isRepresentative: idx === 0,
+          sortOrder: row.sort_order,
+          updatedAt: row.updated_at
+        } as AgentRow,
+        {
+          assignedLineIds: [],
+          assignedPhones: [],
+          isActiveOverride: row.id === activeId,
+          hasDcc: true,
+          hasShowcase: true
+        }
+      )
     );
 
     return {
       profiles,
       activeId,
-      representativeId,
+      representativeId: profiles[0]?.id || activeId,
       maxCount: DCC_AGENT_MAX_COUNT,
-      entitlement: {
-        freeSlots: 1,
-        paidSlots: Math.max(0, DCC_AGENT_MAX_COUNT - 1),
-        allowedSlots: DCC_AGENT_MAX_COUNT,
-        monthlyKrw: 4200
-      }
+      entitlement: empty.entitlement
     };
   } catch (e) {
     if (tableMissing(e)) {
@@ -491,7 +532,9 @@ export async function listDccAgentProfiles(
       (err as Error & { status?: number }).status = 503;
       throw err;
     }
-    throw e;
+    /* DB 지연·일시 오류 — 500 대신 빈 목록(클라이언트가 캐시/재시도) */
+    console.error("[listDccAgentProfiles]", e instanceof Error ? e.message : e);
+    return empty;
   }
 }
 
