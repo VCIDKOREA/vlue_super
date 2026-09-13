@@ -109,6 +109,9 @@ export default function CallBigPushPreviewSection({
   }, []);
 
   useEffect(() => {
+    if (healDigitalCardActiveFromLocalEvidence()) {
+      setPreviewTick((n) => n + 1);
+    }
     const bump = () => setPreviewTick((n) => n + 1);
     window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, bump);
     window.addEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, bump);
