@@ -764,7 +764,7 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
 
           {fp.data?.degraded && !fp.data?.offlineDemo ? (
             <p className={`mt-2 rounded-lg border px-2 py-1.5 text-[10px] font-semibold ${isDarkMode ? "border-amber-500/30 bg-amber-500/10 text-amber-200" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
-              서버 일부 데이터를 불러오지 못했습니다. 데모 가족(엄마·동생)은 계속 표시됩니다.
+              서버 응답이 지연되어 일부 데이터만 불러왔습니다. 잠시 후 새로고침해 주세요.
             </p>
           ) : null}
 

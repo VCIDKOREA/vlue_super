@@ -2,7 +2,22 @@ import { apiUrl } from "./apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
 
 async function parseJson(res) {
-  const data = await res.json().catch(() => ({}));
+  const ct = String(res.headers?.get?.("content-type") || "").toLowerCase();
+  const text = await res.text().catch(() => "");
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = {};
+    }
+  }
+  if (ct.includes("text/html") || (text && text.trimStart().startsWith("<"))) {
+    const err = new Error("API 서버 응답이 올바르지 않습니다. 앱을 완전히 종료한 뒤 다시 로그인해 주세요.");
+    err.status = res.status || 502;
+    err.code = "FAMILY_BAD_GATEWAY_HTML";
+    throw err;
+  }
   if (!res.ok) {
     const err = new Error(data.error || `요청 실패 (${res.status})`);
     err.status = res.status;

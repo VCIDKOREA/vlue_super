@@ -101,21 +101,48 @@ export function useFamilyProtection() {
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent && !hasDataRef.current) setLoading(true);
-    try {
-      const d = await fetchFamilyProtection();
-      applyData({ ...d, offlineDemo: false });
-      setMsg("");
-    } catch (e) {
-      const fallback = buildDemoFamilyProtectionApiFallback();
-      applyData(fallback);
-      const hint =
-        e?.status === 503
-          ? "서버 DB 준비 중입니다. 아래는 데모 가족(엄마·동생) 표시입니다."
-          : "서버 연결에 문제가 있어 데모 가족(엄마·동생)을 표시합니다.";
-      setMsg(hint);
-    } finally {
-      setLoading(false);
+    const maxAttempts = 3;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const d = await fetchFamilyProtection();
+        applyData({ ...d, offlineDemo: false, degraded: Boolean(d?.degraded) });
+        setMsg(
+          d?.degraded
+            ? "서버 응답이 지연되어 일부만 표시합니다. 잠시 후 새로고침해 주세요."
+            : ""
+        );
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        const status = Number(e?.status) || 0;
+        /* 401·4xx 는 재시도 무의미 */
+        if (status && status < 500 && status !== 0) break;
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 400 * attempt));
+        }
+      }
     }
+    if (lastErr) {
+      const status = Number(lastErr?.status) || 0;
+      const cachedOk = peekFamilyProtectionCache();
+      if (cachedOk && !cachedOk.offlineDemo) {
+        applyData({ ...cachedOk, offlineDemo: false });
+      } else {
+        applyData(buildDemoFamilyProtectionApiFallback());
+      }
+      if (status === 401) {
+        setMsg("로그인이 만료되었습니다. 다시 로그인한 뒤 가족 보호를 열어 주세요.");
+      } else if (status === 503 || lastErr?.code === "FAMILY_SCHEMA_NOT_READY") {
+        setMsg("서버 DB 준비 중입니다. 잠시 후 다시 시도해 주세요.");
+      } else if (status >= 500) {
+        setMsg("서버가 일시적으로 응답하지 않습니다. 잠시 후 다시 시도해 주세요.");
+      } else {
+        setMsg("서버에 연결하지 못했습니다. 네트워크 확인 후 다시 시도해 주세요.");
+      }
+    }
+    setLoading(false);
   }, [applyData]);
 
   useEffect(() => {
