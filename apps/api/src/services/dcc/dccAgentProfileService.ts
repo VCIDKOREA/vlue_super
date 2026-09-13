@@ -215,7 +215,11 @@ export function toDto(
 
 function tableMissing(e: unknown): boolean {
   const msg = e instanceof Error ? e.message : String(e || "");
-  return /user_dcc_agent_profiles|does not exist|P2021|P2010/i.test(msg);
+  const code =
+    e && typeof e === "object" && "code" in e ? String((e as { code?: unknown }).code || "") : "";
+  /* P2010(raw 실패)·타임아웃을 "테이블 없음"으로 오인하지 말 것 */
+  if (code === "P2021") return true;
+  return /relation ["']?user_dcc_agent_profiles["']? does not exist/i.test(msg);
 }
 
 function displayPhone(e164: string): string {
@@ -427,61 +431,46 @@ export async function listDccAgentProfiles(
   };
 
   try {
-    /*
-     * Prisma select(isRepresentative) 는 컬럼 미적용/풀러 지연 시 500.
-     * 기본 컬럼만 raw SELECT — 드롭다운용으로 충분.
-     */
-    type LiteRow = {
-      id: string;
-      label: string;
-      display_name: string;
-      title: string;
-      department: string;
-      photo_url: string | null;
-      photo_focus: string | null;
-      is_active: boolean;
-      sort_order: number;
-      updated_at: Date;
-    };
+    /* Prisma findMany — raw P2010 타임아웃을 "마이그레이션 필요"로 오인하던 경로 회피 */
+    let rows = await prisma.userDccAgentProfile.findMany({
+      where: { userId },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        label: true,
+        displayName: true,
+        title: true,
+        department: true,
+        photoUrl: true,
+        photoFocus: true,
+        isActive: true,
+        sortOrder: true,
+        updatedAt: true
+      },
+      take: 30
+    });
 
-    let lite = await prisma.$queryRaw<LiteRow[]>`
-      SELECT id::text AS id,
-             label,
-             display_name,
-             title,
-             department,
-             photo_url,
-             photo_focus,
-             is_active,
-             sort_order,
-             updated_at
-      FROM user_dcc_agent_profiles
-      WHERE user_id = ${userId}
-      ORDER BY sort_order ASC, created_at ASC
-      LIMIT 30
-    `;
-
-    if (!lite.length) {
+    if (!rows.length) {
       const seeded = await seedLiteFromDigitalCard(userId).catch(() => null);
       if (seeded) {
-        lite = [
+        rows = [
           {
             id: seeded.id,
             label: seeded.label,
-            display_name: seeded.displayName,
+            displayName: seeded.displayName,
             title: seeded.title,
             department: seeded.department,
-            photo_url: seeded.photoUrl,
-            photo_focus: seeded.photoFocus,
-            is_active: seeded.isActive,
-            sort_order: seeded.sortOrder,
-            updated_at: seeded.updatedAt
+            photoUrl: seeded.photoUrl,
+            photoFocus: seeded.photoFocus,
+            isActive: seeded.isActive,
+            sortOrder: seeded.sortOrder,
+            updatedAt: seeded.updatedAt
           }
         ];
       }
     }
 
-    let activeId = lite.find((p) => p.is_active)?.id || lite[0]?.id || null;
+    let activeId = rows.find((p) => p.isActive)?.id || rows[0]?.id || null;
     if (cardId) {
       const line = await prisma.businessCard
         .findFirst({
@@ -492,20 +481,20 @@ export async function listDccAgentProfiles(
       if (line?.activeDccAgentProfileId) activeId = line.activeDccAgentProfileId;
     }
 
-    const profiles = lite.map((row, idx) =>
+    const profiles = rows.map((row, idx) =>
       toDto(
         {
           id: row.id,
           label: row.label,
-          displayName: row.display_name,
+          displayName: row.displayName,
           title: row.title || "",
           department: row.department || "",
-          photoUrl: row.photo_url,
-          photoFocus: row.photo_focus || "center",
-          isActive: Boolean(row.is_active),
+          photoUrl: row.photoUrl,
+          photoFocus: row.photoFocus || "center",
+          isActive: Boolean(row.isActive),
           isRepresentative: idx === 0,
-          sortOrder: row.sort_order,
-          updatedAt: row.updated_at
+          sortOrder: row.sortOrder,
+          updatedAt: row.updatedAt
         } as AgentRow,
         {
           assignedLineIds: [],
@@ -532,9 +521,13 @@ export async function listDccAgentProfiles(
       (err as Error & { status?: number }).status = 503;
       throw err;
     }
-    /* DB 지연·일시 오류 — 500 대신 빈 목록(클라이언트가 캐시/재시도) */
+    /* DB 지연·일시 오류 — 마이그레이션 문구 금지 */
     console.error("[listDccAgentProfiles]", e instanceof Error ? e.message : e);
-    return empty;
+    const err = new Error(
+      "담당자 목록을 잠시 불러오지 못했습니다. DB가 바빠서 생긴 일시 오류일 수 있습니다. 다시 불러오기를 눌러 주세요."
+    );
+    (err as Error & { status?: number }).status = 503;
+    throw err;
   }
 }
 
