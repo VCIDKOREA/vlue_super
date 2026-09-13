@@ -1221,7 +1221,7 @@ export async function attestEnterpriseDccSecurity(input: {
   });
 
   if (!gate.canActivateButton) {
-    return { ok: false, ...gate, application: mapApp(app) };
+    return { ...gate, ok: false, application: mapApp(app) };
   }
 
   await prisma.$executeRawUnsafe(
@@ -1234,8 +1234,8 @@ export async function attestEnterpriseDccSecurity(input: {
   );
   const next = await getApp(app.id);
   return {
-    ok: true,
     ...gate,
+    ok: true,
     application: next ? mapApp(next) : null,
     nextStep: "submit"
   };

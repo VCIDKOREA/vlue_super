@@ -771,6 +771,7 @@ export async function resolveAgentProfileForPeer(
     title?: string;
     department?: string;
     displayName?: string;
+    updatedAt?: Date;
     dccSnapshotJson?: unknown;
     showcaseLiveStyleJson?: unknown;
     showcaseStyleJson?: unknown;
@@ -790,6 +791,7 @@ export async function resolveAgentProfileForPeer(
       title: true,
       department: true,
       displayName: true,
+      updatedAt: true,
       dccSnapshotJson: true
       /* showcase*Json 제외 — 오버레이는 플래그만 필요, 풀 JSON은 Shared Pooler egress 폭증 */
     }

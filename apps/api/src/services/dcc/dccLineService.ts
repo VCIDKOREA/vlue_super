@@ -598,7 +598,11 @@ export async function getLineShowcasePublicByPhone(
     if (profileLive != null && showcaseHasContent(profileLive)) {
       live = profileLive;
       liveSource = null;
-      updatedAt = agent?.updatedAt || null;
+      const agentUpdatedAt =
+        agent && "updatedAt" in agent
+          ? ((agent as { updatedAt?: Date | null }).updatedAt ?? null)
+          : null;
+      updatedAt = agentUpdatedAt || null;
     } else if (!showcaseHasContent(live) && certified) {
       return null;
     }
