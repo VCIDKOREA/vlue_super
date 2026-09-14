@@ -1,11 +1,13 @@
 # VLUE Call Overlay Contract (Freeze)
 
 **Status:** FROZEN — behavior changes require matrix + tests first.  
+**Verified PASS (device):** outgoing logo → Safe Care/auth popup → Mini (v1.0.15 / 57).  
 **Owner path:** `kr.vlue.calloverlay` + `web/src/components/LetteringOverlayHost.jsx`  
 **Executable lock:** `CallUiPhasePolicy`
 
-이 문서는 BigPush / Showcase / 중앙 팝업의 **유일한 UX 규격**이다.  
-코드에 예외를 먼저 넣지 말고, 여기 표를 고친 뒤 Policy·테스트를 맞춘다.
+이 문서는 BigPush / Showcase / 중앙 팝업 / 발신 로고의 **유일한 UX 규격**이다.  
+코드에 예외를 먼저 넣지 말고, 여기 표를 고친 뒤 Policy·테스트를 맞춘다.  
+**필요할 때만** 수정·보강한다. 핫픽스·우회 분기 금지.
 
 ---
 
@@ -96,7 +98,8 @@ Do not add parallel “open showcase” / “open popup” helpers that skip thi
 
 ## 6. Regression checklist (manual)
 
-- [ ] Outgoing: dialing → center VLUÉ logo (no peer BigPush); answer → logo stays; tap logo → Safe Care / auth popup / showcase; Confirm → Mini
+- [x] Outgoing: dialing → center VLUÉ logo (no peer BigPush); answer → logo stays; tap logo → Safe Care / auth popup / showcase; Confirm → Mini — **PASS 2026-09-14**
+- [x] Incoming never shows outgoing center logo — **PASS**
 - [ ] Outgoing still “거는 중”: no center popup (auth/safe-care); logo tap ignored until answer
 - [ ] Outgoing unknown: logo until user tap after answer → 미인증 fullscreen report panel (no auto on answer)
 - [ ] Incoming: BigPush → answer → immediate showcase/popup → Confirm → Mini (unchanged)
