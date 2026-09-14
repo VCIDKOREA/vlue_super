@@ -10,7 +10,7 @@ export function isLookupMatchedBody(body = {}) {
   if (nested && (nested.is_verified === true || nested.verified === true)) return true;
   const name = String(body.displayName || body.name || nested?.displayName || nested?.name || "").trim();
   const userId = String(body.userId || body.cardId || nested?.userId || "").trim();
-  return Boolean(name && userId);
+  return Boolean(name && name !== "—" && name !== "-" && userId);
 }
 
 /** GET /api/cards/by-number 응답 → LetteringIncomingNotification card */
@@ -19,6 +19,11 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
 
   const profile = body.profile && typeof body.profile === "object" ? body.profile : {};
   const nested = body.card && typeof body.card === "object" ? body.card : {};
+  const exportSnap =
+    (body.exportSnapshot && typeof body.exportSnapshot === "object" && body.exportSnapshot) ||
+    (nested.exportSnapshot && typeof nested.exportSnapshot === "object" && nested.exportSnapshot) ||
+    (body.cardExport && typeof body.cardExport === "object" && body.cardExport) ||
+    {};
   const feedId = String(body.userId || body.cardId || nested.userId || "").trim();
   const phone = body.phoneE164 || nested.phoneE164 || incomingPhone || "";
   const handle = String(
@@ -33,10 +38,24 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
     .trim()
     .replace(/^@+/, "");
 
+  const resolvedName = String(
+    body.displayName ||
+      body.name ||
+      nested.displayName ||
+      nested.name ||
+      exportSnap.displayName ||
+      exportSnap.name ||
+      profile.displayName ||
+      profile.name ||
+      ""
+  ).trim();
+  /* 「—」를 name 에 넣으면 빅푸시가 폴백(전화·상호) 없이 대시만 고착됨 */
+  const safeName = resolvedName === "—" || resolvedName === "-" ? "" : resolvedName;
+
   return {
-    name: body.displayName || nested.displayName || nested.name || "\u2014",
-    displayName: body.displayName || nested.displayName || nested.name || "",
-    title: body.jobTitle || nested.jobTitle || nested.title || "",
+    name: safeName,
+    displayName: safeName,
+    title: body.jobTitle || nested.jobTitle || nested.title || exportSnap.jobTitle || "",
     organization:
       (() => {
         const org =
@@ -44,10 +63,14 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
           nested.companyName ||
           body.organization ||
           nested.organization ||
+          exportSnap.organization ||
+          exportSnap.companyName ||
           profile.companyName ||
           profile.organization ||
           (handle.toLowerCase() === "ceo" ? "VCID KOREA" : "");
-        return /^vlue$/i.test(String(org || "").trim()) ? "" : org;
+        const t = String(org || "").trim();
+        if (!t || t === "—" || t === "-" || /^vlue$/i.test(t)) return "";
+        return t;
       })(),
     publicHandle: handle,
     loginId: handle,

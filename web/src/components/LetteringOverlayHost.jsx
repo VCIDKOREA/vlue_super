@@ -1101,8 +1101,16 @@ function LetteringOverlayHostInner() {
          * Mini/바 → 풀 복원 hold 중 ContextWatch 가 보내는 big_push_bar 는 무시.
          * (무시 안 하면 156dp 바에 풀 쇼케이스 HTML 이 짤림)
          * 연속 수신 RINGING 은 아래에서 hold 를 먼저 0 으로 지운 뒤 bar 로 간다.
+         * 발신 로고 단계 — compact 동기 오발 big_push_bar 로 로고를 덮지 않음.
          */
         if (Date.now() < restoreHoldUntilRef.current) {
+          return;
+        }
+        if (
+          outgoingLogoModeRef.current &&
+          directionRef.current === "outgoing" &&
+          !userChoseMiniRef.current
+        ) {
           return;
         }
         restoreHoldUntilRef.current = 0;

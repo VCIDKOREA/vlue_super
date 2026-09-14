@@ -812,9 +812,11 @@ export default function LetteringIncomingNotification({
   const collapsedPhoneDisplay = receptionLines?.phone
     ? formatLetteringPhoneDisplay(receptionLines.phone)
     : freeTierSummary?.phoneDisplay || formatLetteringPhoneDisplay(incoming) || "";
-  const peerVerifiedName =
-    String(c.name || c.displayName || receptionLines?.name || "").trim() ||
-    contactSavedName;
+  const peerVerifiedName = (() => {
+    const raw = String(c.name || c.displayName || receptionLines?.name || "").trim();
+    if (!raw || raw === "—" || raw === "-" || raw === "\u2014") return contactSavedName;
+    return raw || contactSavedName;
+  })();
   const previewShowcaseId = useMemo(() => {
     /* 미인증은 수신자 로컬 핸들을 붙이지 않음. 상호→이름→VLUÉ ID (아이디 금지) */
     if (isUnverified) return "";
@@ -856,7 +858,7 @@ export default function LetteringIncomingNotification({
   );
 
   const displayLabel = isExpiredLine
-    ? formatLetteringPhoneDisplay(incoming) || unverifiedCollapsedPhone || incoming || "—"
+    ? formatLetteringPhoneDisplay(incoming) || unverifiedCollapsedPhone || incoming || "번호 확인 중…"
     : isUnverified
     ? null
     : showcaseOffPreview
@@ -864,11 +866,19 @@ export default function LetteringIncomingNotification({
       : hideBroadcastName
         ? resolveShowcaseBarOwnerLabel(c, { hideBroadcastName: true })
         : /* 쇼케이스 ON 빅푸시: 상호 우선 → 없으면 이름 (CEO=VCID KOREA, 전중희=이름) */
-          receptionLines?.primary ||
-          peerVerifiedName ||
-          receptionLines?.name ||
-          contactSavedName ||
-          "—";
+          (() => {
+            const pick = [
+              receptionLines?.primary,
+              peerVerifiedName,
+              receptionLines?.name,
+              contactSavedName,
+              collapsedPhoneDisplay,
+              formatLetteringPhoneDisplay(incoming)
+            ]
+              .map((v) => String(v || "").trim())
+              .find((v) => v && v !== "—" && v !== "-" && v !== "\u2014");
+            return pick || "번호 확인 중…";
+          })();
   const phoneSameAsPrimary =
     Boolean(collapsedPhoneDisplay) &&
     normalizePhoneDigits(displayLabel) === normalizePhoneDigits(collapsedPhoneDisplay) &&
@@ -1305,7 +1315,7 @@ export default function LetteringIncomingNotification({
       incoming ||
       "—";
     /* MiniCase — 빅푸시와 동일: 1줄 상호|이름 / 2줄 이름|전화 또는 전화 */
-    const nameDisp = isExpiredLine
+        val nameDisp = isExpiredLine
       ? phoneDisp
       : isUnverified
         ? phoneDisp
@@ -1316,7 +1326,11 @@ export default function LetteringIncomingNotification({
               receptionLines?.collapsedPrimary ||
               contactSavedName ||
               ""
-          ).trim() || phoneDisp;
+          ).trim();
+    const nameDispSafe =
+      !nameDisp || nameDisp === "—" || nameDisp === "-" || nameDisp === "\u2014"
+        ? phoneDisp
+        : nameDisp;
     const subPhone = isExpiredLine
       ? expiredSubtitle
       : String(receptionLines?.secondary || "").trim() || phoneDisp;
@@ -1327,7 +1341,7 @@ export default function LetteringIncomingNotification({
         data-platform={platform}
       >
         <CompanionMiniCase
-          displayName={nameDisp}
+          displayName={nameDispSafe}
           phoneLabel={subPhone}
           statusLabel={isExpiredLine ? "인증 만료" : isUnverified ? "미인증" : verified ? "인증" : "미인증"}
           durationLabel={companionDurationLabel}

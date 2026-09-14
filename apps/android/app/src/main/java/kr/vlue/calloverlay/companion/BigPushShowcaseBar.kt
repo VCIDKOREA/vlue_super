@@ -167,6 +167,10 @@ object BigPushShowcaseBar {
             hideBroadcastName -> "VLUÉ ID"
             !displayName.isNullOrBlank() -> displayName
             else -> phoneDisp.ifBlank { "번호 확인 중…" }
+        }.let { line ->
+            if (line == "—" || line == "-" || line == "\u2014") {
+                phoneDisp.ifBlank { "번호 확인 중…" }
+            } else line
         }
         val secondary = when {
             contactSafeCare -> phoneDisp.ifBlank { "VLUÉ 비회원 · 안심케어" }

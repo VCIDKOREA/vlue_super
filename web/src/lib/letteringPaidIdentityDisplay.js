@@ -6,6 +6,12 @@ export function isVlueBrandOrganization(org) {
   return /^vlue$/i.test(String(org || "").trim());
 }
 
+/** 빈 신원·플레이스홀더 대시 — 폴백(전화 등)을 막지 않도록 */
+export function isBlankCallIdentityLabel(value) {
+  const s = String(value || "").trim();
+  return !s || s === "—" || s === "-" || s === "\u2014" || s === "–";
+}
+
 /** 상호·직책 없는 DCC — 이름 아래 고정 표기 (이름 중복 금지) */
 export const DCC_CERTIFIED_MEMBER_LABEL = "Verified Member";
 
@@ -29,11 +35,11 @@ export function resolveShowcaseBarOwnerLabel(card = {}, opts = {}) {
       (card.hideBroadcastName || card.showcaseStyle?.showBroadcastName === false)
   );
   const rawOrg = String(card.organization || card.companyName || "").trim();
-  const org = isVlueBrandOrganization(rawOrg) ? "" : rawOrg;
+  const org = isVlueBrandOrganization(rawOrg) || isBlankCallIdentityLabel(rawOrg) ? "" : rawOrg;
   if (org) return org;
   if (!hideName) {
     const name = String(card.name || card.displayName || "").trim();
-    if (name) return name;
+    if (!isBlankCallIdentityLabel(name)) return name;
   }
   return SHOWCASE_BAR_VLUE_ID_LABEL;
 }
@@ -103,9 +109,11 @@ export function resolveDccFrontIdentityLines(card = {}) {
 
 export function formatLetteringPaidIdentity(card = {}) {
   const rawOrg = String(card.organization || card.companyName || "").trim();
-  const organization = isVlueBrandOrganization(rawOrg) ? "" : rawOrg;
+  const organization =
+    isVlueBrandOrganization(rawOrg) || isBlankCallIdentityLabel(rawOrg) ? "" : rawOrg;
   const title = String(card.title || card.jobTitle || "").trim();
-  const name = String(card.name || card.displayName || "").trim();
+  const rawName = String(card.name || card.displayName || "").trim();
+  const name = isBlankCallIdentityLabel(rawName) ? "" : rawName;
   const roleLine = [title, name].filter(Boolean).join(" / ");
   const personLine = [name, title].filter(Boolean).join(" / ");
   const orgAndName = [organization, name].filter(Boolean).join(" · ");
@@ -137,10 +145,16 @@ export function resolveCallOverlayIdentityLines(card = {}, { incomingNumber = ""
   const cardPhone = isUnknownPhoneToken(card.phone) ? "" : String(card.phone || "").trim();
   const phoneRaw = liveIncoming || cardPhone;
   const phone = formatLetteringPhoneDisplay(phoneRaw) || phoneRaw;
-  const primary = org || name || "\u2014";
+  /*
+   * 「—」를 primary 로 넣으면 displayLabel 이 전화·저장명 폴백을 타지 못함.
+   * 조회 중·필드 누락 시 번호 / 「번호 확인 중…」.
+   */
+  const primary = org || name || phone || "번호 확인 중…";
   const secondary = org
     ? [name, phone].filter(Boolean).join(" | ")
-    : phone || "";
+    : name && phone
+      ? phone
+      : "";
   return {
     ...identity,
     phone,

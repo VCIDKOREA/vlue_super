@@ -1,8 +1,11 @@
 import { useCallback, useRef } from "react";
 import { VlueNavLogoMark, useVlueLogoBlink } from "../VlueNavLogoMark.jsx";
 
+/** 발신 중앙 로고 — 네비 타일보다 조금 큰 탭 타깃, 과대(96) 금지 */
+const OUTGOING_LOGO_SIZE = 48;
+
 /**
- * 발신 통화 — BigPush 대신 중앙 VLUÉ 로고.
+ * 발신 통화 — BigPush 대신 중앙 VLUÉ 로고(흰 테두리).
  * 탭 시 눈 깜빡임 후 네이티브 expandOutgoingShowcase.
  */
 export default function OutgoingCallLogo({ connected = false, onExpand }) {
@@ -33,8 +36,13 @@ export default function OutgoingCallLogo({ connected = false, onExpand }) {
         aria-label={connected ? "쇼케이스 열기" : "통화 연결 대기"}
         onClick={handleTap}
       >
-        <VlueNavLogoMark blinkSeq={blinkSeq} size={96} className="outgoing-call-logo__mark" />
-        <span className="outgoing-call-logo__brand">VLUÉ</span>
+        <span className="outgoing-call-logo__mark-wrap">
+          <VlueNavLogoMark
+            blinkSeq={blinkSeq}
+            size={OUTGOING_LOGO_SIZE}
+            className="outgoing-call-logo__mark"
+          />
+        </span>
         <span className="outgoing-call-logo__hint">
           {connected ? "탭하여 쇼케이스 보기" : "연결 중"}
         </span>

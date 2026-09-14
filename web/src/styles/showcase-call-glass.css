@@ -4901,13 +4901,14 @@
   color: #94a3b8;
 }
 
-/* 발신 통화 ? BigPush 대체 중앙 VLUE 로고 */
+/* ?? ?? ? BigPush ?? ?? VLUE ?? (? ?? ?? + ? ???) */
 .lettering-overlay-host--outgoing-logo {
   background: transparent !important;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100%;
+  height: 100%;
   width: 100%;
 }
 .outgoing-call-logo {
@@ -4915,30 +4916,39 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 100%;
   pointer-events: auto;
 }
 .outgoing-call-logo__btn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 20px 28px;
+  gap: 10px;
+  padding: 12px;
   border: 0;
   background: transparent;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.outgoing-call-logo__brand {
-  font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  color: #f8fafc;
-  text-shadow: 0 1px 8px rgba(15, 23, 42, 0.45);
+.outgoing-call-logo__mark-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  border-radius: 14px;
+  border: 2px solid #ffffff;
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+}
+.outgoing-call-logo__mark {
+  display: block;
+  box-shadow: none !important;
 }
 .outgoing-call-logo__hint {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: rgba(226, 232, 240, 0.72);

@@ -770,7 +770,18 @@ class CallOverlayService : Service() {
                             null
                         )
                     }
-                    OverlayState.BIG_PUSH -> applyCompactRingingWindow()
+                    OverlayState.BIG_PUSH -> {
+                        /*
+                         * 발신 로고 단계 — compact TOP(156dp) 로 줄이면
+                         * 중앙 로고가 상단에 잘려 보이고 BigPush 바로 바뀐 것처럼 보인다.
+                         */
+                        if (currentOutgoing && !outgoingExpandRequestedByUser) {
+                            ensureOutgoingLogoWindowLayout()
+                            notifyCompactCallChrome()
+                        } else {
+                            applyCompactRingingWindow()
+                        }
+                    }
                     OverlayState.IDLE -> Unit
                 }
             }
@@ -1458,10 +1469,12 @@ class CallOverlayService : Service() {
         webView?.setBackgroundColor(Color.TRANSPARENT)
         nativeBanner?.visibility = View.GONE
         webView?.visibility = View.VISIBLE
-        applyCompactRingingWindow()
-        notifyCompactCallChrome()
         if (currentOutgoing && !outgoingExpandRequestedByUser) {
             ensureOutgoingLogoWindowLayout()
+            notifyCompactCallChrome()
+        } else {
+            applyCompactRingingWindow()
+            notifyCompactCallChrome()
         }
         publishCompanion(OverlayTriggerEvent.INTERNAL)
     }
@@ -3177,7 +3190,14 @@ class CallOverlayService : Service() {
             }
             OverlayPosition.TOP,
             OverlayPosition.BOTTOM,
-            OverlayPosition.BELOW_COMPACT_INCOMING -> applyCompactRingingWindow()
+            OverlayPosition.BELOW_COMPACT_INCOMING -> {
+                if (currentOutgoing && !outgoingExpandRequestedByUser) {
+                    ensureOutgoingLogoWindowLayout()
+                    notifyCompactCallChrome()
+                } else {
+                    applyCompactRingingWindow()
+                }
+            }
             OverlayPosition.HIDDEN -> commitHiddenLayout(source = source)
         }
         publishCompanion(OverlayTriggerEvent.INTERNAL)
@@ -3426,6 +3446,11 @@ class CallOverlayService : Service() {
     }
 
     private fun applyCompactRingingWindowLocked(params: WindowManager.LayoutParams) {
+        /* 발신 로고 — TOP compact 로 덮어쓰지 않음 */
+        if (currentOutgoing && !outgoingExpandRequestedByUser) {
+            ensureOutgoingLogoWindowLayout()
+            return
+        }
         val pos = companion.position
         val (sw, sh) = screenSizePx()
         val barH = dp(BigPushShowcaseBar.WINDOW_HEIGHT_DP)
@@ -3706,11 +3731,17 @@ class CallOverlayService : Service() {
         params.x = 0
         params.y = 0
         params.gravity = Gravity.TOP or Gravity.START
+        /* compact TOP 바 잔여 clip 제거 */
+        applyCapsuleClip(root, enabled = false)
+        bigPushPeeking = false
+        bigPushPeekTab?.visibility = android.view.View.GONE
         root.setBackgroundColor(Color.TRANSPARENT)
+        webView?.setBackgroundColor(Color.TRANSPARENT)
         webView?.visibility = android.view.View.VISIBLE
         nativeBanner?.visibility = android.view.View.GONE
         try {
             windowManager?.updateViewLayout(root, params)
+            layoutParams = params
         } catch (_: Exception) {
         }
     }
@@ -4093,7 +4124,12 @@ class CallOverlayService : Service() {
                     .put("position", companion.position.name)
             )
         } else if (companion.state == OverlayState.BIG_PUSH) {
-            applyCompactRingingWindow()
+            if (currentOutgoing && !outgoingExpandRequestedByUser) {
+                ensureOutgoingLogoWindowLayout()
+                notifyCompactCallChrome()
+            } else {
+                applyCompactRingingWindow()
+            }
         }
     }
 
