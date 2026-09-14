@@ -1,0 +1,48 @@
+---
+description: Freeze BigPush / Showcase / call popup — no ad-hoc patches
+globs: "**/calloverlay/**/*.{kt,java},**/LetteringOverlayHost.jsx,**/peerShowcaseContent.js,**/VlueAuthMemberPopup*,**/BigPushShowcaseBar*"
+alwaysApply: false
+---
+
+# Call Overlay Freeze (BigPush · Showcase · Popup)
+
+통화 오버레이는 **규격 문서 + 결정 함수** 밖 예외 분기를 추가하지 않는다.
+마구잡이 핫픽스 금지. 깨지면 규격을 고치고 테스트부터 갱신한다.
+
+## Source of truth
+- Spec: `apps/android/app/src/main/java/kr/vlue/calloverlay/CALL_OVERLAY_CONTRACT.md`
+- Decision: `CallUiPhasePolicy.decideAfterAnswer(...)` (및 관련 Policy 객체)
+- Tests: `CallUiPhasePolicyTest`, `ContactSafeCarePolicyTest`, `VlueAuthMemberPopupPolicyTest`
+
+## Locked matrix (Answer / connected)
+
+| Condition | Allowed UI |
+|-----------|------------|
+| Outgoing dialing / connecting / answered-until-tap | **`OUTGOING_LOGO` only** — never peer BigPush, never incoming logo |
+| Outgoing logo tap (after answer) | Safe Care / auth popup / showcase → Confirm → **Mini** (not peer top bar) |
+| Incoming ringing | **BigPush only** — never outgoing logo |
+| Answered + `contact_safe_care` | Center Safe Care popup → Confirm → Mini |
+| Answered + auth-member-only (verified, no public DCC/showcase) | Center auth popup → Confirm → Mini |
+| Answered + broadcast ON + real DCC/showcase content | Full Showcase |
+| Incoming answered + otherwise (pending/unknown/empty) | **Keep BigPush** — never blank dark FULLSCREEN |
+
+## Hard bans
+- Do **not** show outgoing center logo on incoming (web + native direction gate)
+- Do **not** emit `big_push_bar` / peer top bar after outgoing logo tap — keep logo chrome until popup/showcase, then Mini
+- Do **not** set `remoteConnected = true` inside popup helpers to “force” UI during dialing (except logo-tap expand path after answer)
+- Do **not** open FULLSCREEN Showcase when content is empty / broadcast off / Safe Care
+- Do **not** use `notifyVlueAuthMemberReady` for `contact_safe_care`
+- Do **not** let `popupOnly=true` alone show popups while ringing/dialing (`BIG_PUSH` / logo + unanswered)
+- Do **not** add a second entry that bypasses `enterShowcaseFromAnswer` / `presentCenterSafePopup` without updating the contract + tests
+- BigPush `y` must stay `>= statusBarHeight + inset` (never under the system status bar)
+- Outgoing logo window stays small centered (~120dp) — do not restore fullscreen MATCH_PARENT for logo phase
+
+## Change protocol
+1. Edit `CALL_OVERLAY_CONTRACT.md` matrix first (if behavior must change)
+2. Update `CallUiPhasePolicy` + unit tests — tests must fail before code pass
+3. Only then touch `CallOverlayService` / `LetteringOverlayHost` / probe
+4. Prefer sideload APK for native; web overlay needs Railway only for host JS
+5. If the change is unrelated (DCC fields, auth seal, withdraw, etc.) — **do not** edit calloverlay layout/state paths
+
+## When user reports overlay bugs
+Reproduce against the matrix row. Fix the **policy/contract**, not a one-off `if` in a random call site.
