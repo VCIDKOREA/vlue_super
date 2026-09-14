@@ -92,6 +92,8 @@ class CallOverlayService : Service() {
     private var pendingVerified: Boolean = false
     private var currentPhone: String = ""
     private var currentOutgoing: Boolean = false
+    /** 직전에 load 한 오버레이 발신 여부 — 방향 바뀌면 문서 강제 리로드 */
+    private var lastLoadedOutgoing: Boolean? = null
     private var currentDcpRoute: String = ""
     private var keypadOpen = false
     private var userMinimized = false
@@ -164,6 +166,8 @@ class CallOverlayService : Service() {
      * 수신은 항상 무시(정책이 incoming 을 즉시 허용).
      */
     private var outgoingExpandRequestedByUser: Boolean = false
+    /** 발신 중앙 로고 오버레이 창 한 변 (dp) — 전체화면 금지 */
+    private val outgoingLogoWindowDp: Int = 120
     /** BigPush 가장자리 피크 (MiniCase 패리티) — OverlayState 는 BIG_PUSH 유지 */
     private var bigPushPeeking: Boolean = false
     private var overlayModal: Boolean = false
@@ -1658,8 +1662,13 @@ class CallOverlayService : Service() {
         val unverified =
             VlueAuthMemberPopupPolicy.isUnverifiedResolved(pendingCardJson)
         /* 발신 「거는 중」— 안심/정상 팝업·회원 풀쇼케이스 금지.
-         * 미인증 확정 후에는 신고 패널 펼침 허용 (탭 무반응 해소). */
-        if (currentOutgoing && !remoteConnected && !unverified) {
+         * 미인증 확정 후에는 신고 패널 펼침 허용 (탭 무반응 해소).
+         * 사용자 로고 탭(outgoingExpandRequestedByUser) 은 예외 — 탭 무반응 금지. */
+        if (currentOutgoing &&
+            !remoteConnected &&
+            !unverified &&
+            !outgoingExpandRequestedByUser
+        ) {
             VlueBigPushTrace.lifecycle(
                 "BIG_PUSH_TAP_HOLD_DIALING",
                 "outgoing dialing — keep logo only"
@@ -1692,6 +1701,12 @@ class CallOverlayService : Service() {
     /** 웹 발신 중앙 로고 탭 (눈 깜빡임 후) */
     fun onOutgoingLogoTapFromWeb() {
         mainHandler.post {
+            if (dismissing || !currentOutgoing) return@post
+            /* 탭 즉시 expand 의도 확정 — dialing hold / auto-expand 게이트 통과 */
+            outgoingExpandRequestedByUser = true
+            if (!remoteConnected && VlueInCallController.hasConnectedActiveCall()) {
+                remoteConnected = true
+            }
             openShowcaseFromBigPushTap()
         }
     }
@@ -2799,9 +2814,16 @@ class CallOverlayService : Service() {
         cardJson: String?,
         forceNewDocument: Boolean
     ) {
-        val nonce = if (forceNewDocument) System.currentTimeMillis() else 0L
-        if (forceNewDocument) {
-            wv.evaluateJavascript("try{window.__VLUE_CARD_LOOKUP__=null;}catch(e){}", null)
+        val directionChanged =
+            lastLoadedOutgoing != null && lastLoadedOutgoing != outgoing
+        val forceDoc = forceNewDocument || directionChanged
+        lastLoadedOutgoing = outgoing
+        val nonce = if (forceDoc) System.currentTimeMillis() else 0L
+        if (forceDoc) {
+            wv.evaluateJavascript(
+                "try{window.__VLUE_CARD_LOOKUP__=null;window.__VLUE_LAST_CALL_STATE__='';}catch(e){}",
+                null
+            )
         }
         wv.loadUrl(
             VlueLetteringConfig.overlayUrl(
@@ -2816,7 +2838,7 @@ class CallOverlayService : Service() {
                         companion.state == OverlayState.MINI_CASE
             )
         )
-        if (!forceNewDocument && !cardJson.isNullOrBlank()) {
+        if (!forceDoc && !cardJson.isNullOrBlank()) {
             injectCardLookupJson(wv, cardJson)
             /* WebView 재사용 시 React 리스너 등록 전에 이벤트가 사라질 수 있음 — 재주입 */
             wv.postDelayed({ injectCardLookupJson(wv, cardJson) }, 120L)
@@ -3720,18 +3742,22 @@ class CallOverlayService : Service() {
         }
     }
 
-    /** 발신 로고 단계 — 전체 화면 투명 창 (중앙 로고 탭 영역) */
+    /** 발신 로고 단계 — 중앙 작은 창만 (전체화면이면 종료 버튼 터치 불가) */
     private fun ensureOutgoingLogoWindowLayout() {
         if (!currentOutgoing || outgoingExpandRequestedByUser) return
         if (companion.state != OverlayState.BIG_PUSH) return
         val params = layoutParams ?: return
         val root = rootContainer ?: return
-        params.width = WindowManager.LayoutParams.MATCH_PARENT
-        params.height = WindowManager.LayoutParams.MATCH_PARENT
+        val size = dp(outgoingLogoWindowDp)
+        params.width = size
+        params.height = size
         params.x = 0
         params.y = 0
-        params.gravity = Gravity.TOP or Gravity.START
-        /* compact TOP 바 잔여 clip 제거 */
+        params.gravity = Gravity.CENTER
+        params.flags = params.flags or
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
         applyCapsuleClip(root, enabled = false)
         bigPushPeeking = false
         bigPushPeekTab?.visibility = android.view.View.GONE
@@ -3815,6 +3841,7 @@ class CallOverlayService : Service() {
         companion.onCallEnd()
         remoteConnected = false
         outgoingExpandRequestedByUser = false
+        lastLoadedOutgoing = null
         answerUiResumeAttempt = 0
         userMinimized = false
         authPopupConfirmedToMini = false
@@ -4209,15 +4236,33 @@ class CallOverlayService : Service() {
         }
     }
 
-    /** 발신: 중앙 VLUÉ 로고 — 풀스크린 투명 (peer BigPush 생략) */
-    private fun buildOutgoingLogoLayoutParams(): WindowManager.LayoutParams =
-        buildBigPushLayoutParams(OverlayPosition.TOP).apply {
-            height = WindowManager.LayoutParams.MATCH_PARENT
-            width = WindowManager.LayoutParams.MATCH_PARENT
-            gravity = Gravity.TOP or Gravity.START
+    /** 발신: 중앙 VLUÉ 로고 — 작은 창만 (시스템 종료 버튼 터치 통과) */
+    private fun buildOutgoingLogoLayoutParams(): WindowManager.LayoutParams {
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+        val size = dp(outgoingLogoWindowDp)
+        return WindowManager.LayoutParams(
+            size,
+            size,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.CENTER
             x = 0
             y = 0
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
         }
+    }
 
     private fun buildShowcaseLayoutParams(): WindowManager.LayoutParams =
         buildBigPushLayoutParams(OverlayPosition.TOP).apply {

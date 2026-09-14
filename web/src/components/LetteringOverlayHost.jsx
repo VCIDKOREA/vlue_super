@@ -576,12 +576,32 @@ function LetteringOverlayHostInner() {
 
   const { setPlaybackPhase } = useShowcaseBgm();
 
+  /* 수신이면 발신 로고 절대 금지 — 번호 동일·WebView 재사용 시에도 direction 으로 강제 해제 */
+  useEffect(() => {
+    if (direction === "outgoing") return undefined;
+    outgoingLogoModeRef.current = false;
+    setOutgoingLogoMode(false);
+    if (!urlMiniCase) {
+      forceShowcaseBarRef.current = true;
+      setForceShowcaseBar(true);
+    }
+    return undefined;
+  }, [direction, urlMiniCase]);
+
   useEffect(() => {
     matchedRef.current = false;
     autoExpandedOnceRef.current = false;
     setIdentityHold(true);
     setExpanded(false);
     setForceShowcaseBar(true);
+    /* incoming 변경 시에도 발신 로고 잔상 제거 (direction 은 별도 effect) */
+    if (direction !== "outgoing") {
+      outgoingLogoModeRef.current = false;
+      setOutgoingLogoMode(false);
+    } else if (!urlMiniCase) {
+      outgoingLogoModeRef.current = true;
+      setOutgoingLogoMode(true);
+    }
     loadingStartedAtRef.current = Date.now();
 
     const bootNative = readBootNativeLookupCard(incoming);
@@ -643,7 +663,7 @@ function LetteringOverlayHostInner() {
     setCard(null);
     setShowcaseStyle(createPeerAuthOnlyShowcaseStyle());
     setLoading(true);
-  }, [incoming, urlVerified]);
+  }, [incoming, urlVerified, direction, urlMiniCase]);
 
   useEffect(() => {
     if (loading) return undefined;
@@ -1069,6 +1089,15 @@ function LetteringOverlayHostInner() {
        * normalizeCallState("") → early-return 되면 하단 바가 풀쇼케이스/미니로 남음.
        */
       if (rawState === "outgoing_logo") {
+        /* 수신 오버레이에는 발신 로고 상태 절대 적용 금지 */
+        if (directionRef.current !== "outgoing") {
+          outgoingLogoModeRef.current = false;
+          setOutgoingLogoMode(false);
+          forceShowcaseBarRef.current = true;
+          setForceShowcaseBar(true);
+          setExpanded(false);
+          return;
+        }
         if (Date.now() < restoreHoldUntilRef.current) {
           return;
         }
@@ -1087,6 +1116,12 @@ function LetteringOverlayHostInner() {
         /*
          * 발신 수화 — callState 만 CONNECTED. 로고 유지, 자동 쇼케이스/팝업 금지.
          */
+        if (directionRef.current !== "outgoing") {
+          setCallState(CALL_STATES.CONNECTED);
+          outgoingLogoModeRef.current = false;
+          setOutgoingLogoMode(false);
+          return;
+        }
         setCallState(CALL_STATES.CONNECTED);
         if (outgoingLogoModeRef.current) {
           autoExpandedOnceRef.current = false;
@@ -1101,14 +1136,14 @@ function LetteringOverlayHostInner() {
          * Mini/바 → 풀 복원 hold 중 ContextWatch 가 보내는 big_push_bar 는 무시.
          * (무시 안 하면 156dp 바에 풀 쇼케이스 HTML 이 짤림)
          * 연속 수신 RINGING 은 아래에서 hold 를 먼저 0 으로 지운 뒤 bar 로 간다.
-         * 발신 로고 단계 — compact 동기 오발 big_push_bar 로 로고를 덮지 않음.
+         * 발신 로고 단계만 big_push_bar 오발을 무시 — 수신은 항상 바로 적용.
          */
         if (Date.now() < restoreHoldUntilRef.current) {
           return;
         }
         if (
-          outgoingLogoModeRef.current &&
           directionRef.current === "outgoing" &&
+          outgoingLogoModeRef.current &&
           !userChoseMiniRef.current
         ) {
           return;
@@ -1604,7 +1639,7 @@ function LetteringOverlayHostInner() {
    * 발신 로고 단계는 로고 UI를 바로 그림.
    */
   if (isLookupPendingCard && callState !== CALL_STATES.CONNECTED) {
-    if (outgoingLogoMode) {
+    if (direction === "outgoing" && outgoingLogoMode) {
       /* fall through — logo UI */
     } else if (!(forceShowcaseBar && (incoming || card))) {
       return (
@@ -1617,7 +1652,7 @@ function LetteringOverlayHostInner() {
     }
   }
 
-  if (showLoadingChip && !outgoingLogoMode) {
+  if (showLoadingChip && !(direction === "outgoing" && outgoingLogoMode)) {
     /* FULLSCREEN 흰 바탕 점유 금지 — 투명 호스트 + 브랜드 확인 칩만 */
     return (
       <div
@@ -1667,7 +1702,13 @@ function LetteringOverlayHostInner() {
       peerAuthPopupOnly ||
       !peerHasDccOrShowcaseContent(styledCard, peerLiveStyle));
 
-  if (outgoingLogoMode && !expanded && !authPopupOnlyUi) {
+  /* 발신 전용 — direction 가드 없으면 수신에 로고가 잔존·장악함 */
+  if (
+    direction === "outgoing" &&
+    outgoingLogoMode &&
+    !expanded &&
+    !authPopupOnlyUi
+  ) {
     return (
       <div
         className={`lettering-overlay-host lettering-overlay-host--tent lettering-overlay-host--outgoing-logo ${
@@ -1677,13 +1718,8 @@ function LetteringOverlayHostInner() {
         data-expanded="false"
         data-mini="false"
       >
-        <OutgoingCallLogo
-          connected={onCall}
-          onExpand={() => {
-            outgoingLogoModeRef.current = false;
-            setOutgoingLogoMode(false);
-          }}
-        />
+        {/* 로고 모드는 네이티브 expand 성공 후 해제 — 탭 직후 지우면 쇼케이스/팝업이 안 뜸 */}
+        <OutgoingCallLogo connected={onCall} />
         {toast ? (
           <p className="lettering-overlay-toast" role="status">
             {toast}

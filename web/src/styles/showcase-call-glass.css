@@ -4901,13 +4901,13 @@
   color: #94a3b8;
 }
 
-/* Outgoing call logo ? true viewport center + white border */
+/* Outgoing logo only — fill small native centered window; never block full screen */
 .lettering-overlay-host.lettering-overlay-host--outgoing-logo,
 .lettering-overlay-host--tent.lettering-overlay-host--outgoing-logo,
 .lettering-overlay-host--tent.lettering-overlay-host--outgoing-logo.lettering-overlay-host--ringing,
 .lettering-overlay-host--tent.lettering-overlay-host--outgoing-logo.lettering-overlay-host--connected {
-  position: fixed !important;
-  inset: 0 !important;
+  position: relative !important;
+  inset: auto !important;
   width: 100% !important;
   height: 100% !important;
   min-height: 100% !important;
@@ -4921,8 +4921,8 @@
   pointer-events: none !important;
 }
 .outgoing-call-logo {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  inset: auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4965,11 +4965,11 @@
 }
 .outgoing-call-logo__hint {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: rgba(226, 232, 240, 0.72);
