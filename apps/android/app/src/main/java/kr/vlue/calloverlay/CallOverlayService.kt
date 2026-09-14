@@ -1191,6 +1191,11 @@ class CallOverlayService : Service() {
                     return
                 }
                 if (pendingLookup && !source.startsWith("answer_ui_resume_")) {
+                    if (!currentOutgoing &&
+                        promoteIncomingContactSafeCareAndPopup("${source}_pending_lookup")
+                    ) {
+                        return
+                    }
                     showcaseHoldUntilElapsed =
                         android.os.SystemClock.elapsedRealtime() + 8_000L
                     VlueBigPushTrace.lifecycle(
@@ -1198,6 +1203,11 @@ class CallOverlayService : Service() {
                         "lookup pending — resume source=$source"
                     )
                     scheduleAnswerUiResume("pending_after_$source")
+                    return
+                }
+                if (!currentOutgoing &&
+                    promoteIncomingContactSafeCareAndPopup("${source}_keep_bigpush")
+                ) {
                     return
                 }
                 VlueBigPushTrace.lifecycle(
@@ -1208,6 +1218,12 @@ class CallOverlayService : Service() {
                 return
             }
             CallUiPhasePolicy.Phase.FULL_SHOWCASE -> {
+                if (!currentOutgoing &&
+                    !isContactSafeCare(pendingCardJson) &&
+                    promoteIncomingContactSafeCareAndPopup("${source}_before_showcase")
+                ) {
+                    return
+                }
                 /* fall through to fullscreen showcase layout */
             }
         }
@@ -2275,6 +2291,36 @@ class CallOverlayService : Service() {
                 )
                 return@post
             }
+            /*
+             * API unmatched 가 늦게 오면 contact_safe_care 를 unverified 로 덮어
+             * 수화 후 미인증 풀화면으로 가고 정상(안심) 팝업이 안 뜬다.
+             */
+            if (!phoneChanged &&
+                isContactSafeCare(pendingCardJson) &&
+                !isContactSafeCare(cardJson) &&
+                !verified
+            ) {
+                val kind = parseProfileKind(cardJson)
+                if (kind == "unverified" || kind == "lookup_pending") {
+                    VlueBigPushTrace.lifecycle(
+                        "CALL_INFO_SKIP_SAFE_CARE_DOWNGRADE",
+                        "phone=${ReleaseDebugGate.maskPhoneForLog(phone)}"
+                    )
+                    if (dcpRoute.isNotBlank()) {
+                        bindDcpRoute(phone, dcpRoute, pendingCardJson)
+                    }
+                    if (isCallAlreadyAnswered() &&
+                        companion.state == OverlayState.BIG_PUSH &&
+                        !authPopupConfirmedToMini &&
+                        !userMinimized &&
+                        dcpPopupView?.isAttachedToWindow != true
+                    ) {
+                        promoteIncomingContactSafeCareAndPopup("applyCallInfoUpdate_safe_care_hold")
+                    }
+                    LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
+                    return@post
+                }
+            }
             currentPhone = phone
             currentOutgoing = outgoing
             pendingCardJson = cardJson
@@ -2793,6 +2839,47 @@ class CallOverlayService : Service() {
         } catch (_: Exception) {
             ""
         }
+    }
+
+    /**
+     * 수신 · 기기 주소록 저장 번호 → 안심케어 정상 팝업.
+     * API unmatched/미인증 확정보다 우선 (저장 연락처 UX).
+     */
+    private fun promoteIncomingContactSafeCareAndPopup(source: String): Boolean {
+        if (currentOutgoing || dismissing) return false
+        if (authPopupConfirmedToMini || userMinimized) return false
+        if (!CallUiPhasePolicy.mayAutoExpandAfterAnswer(
+                outgoing = false,
+                expandRequestedByUser = outgoingExpandRequestedByUser
+            )
+        ) {
+            return false
+        }
+        if (isContactSafeCare(pendingCardJson)) {
+            presentCenterSafePopup(source = source, authMember = false)
+            return dcpPopupView?.isAttachedToWindow == true
+        }
+        val name = DeviceContactsReader.findDisplayName(this, currentPhone)?.trim().orEmpty()
+        if (name.isBlank()) return false
+        val verdict = CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
+        val safeJson = ContactSafeCarePayload.toJson(currentPhone, name, verdict)
+        pendingCardJson = safeJson
+        pendingVerified = false
+        bindDcpRoute(currentPhone, verdict.routeQuery, safeJson)
+        VlueBigPushTrace.lifecycle(
+            "INCOMING_PROMOTE_CONTACT_SAFE",
+            "name=$name source=$source"
+        )
+        webView?.let { wv ->
+            if (!wv.url.isNullOrBlank()) {
+                injectCardLookupJson(wv, safeJson)
+            }
+            if (companion.state == OverlayState.BIG_PUSH) {
+                notifyCompactCallChrome()
+            }
+        }
+        presentCenterSafePopup(source = source, authMember = false)
+        return dcpPopupView?.isAttachedToWindow == true
     }
 
     private fun isContactSafeCare(cardJson: String?): Boolean {

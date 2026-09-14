@@ -159,6 +159,7 @@ object LetteringCallCoordinator {
             val overlayJsonFast =
                 cachedJson
                     ?: OverlayCardOrgFill.seedIfPlatformCeoPhone(raw)
+                    ?: contactSafeCareSeedJson(app, raw)
                     ?: if (!nextUnknown) lookupPendingJson(raw) else null
             val overlayNumber = agency?.shortNumber ?: raw
             val hasMemberSeed =
@@ -598,6 +599,14 @@ object LetteringCallCoordinator {
             .put("displayName", "")
             .put("name", "")
             .toString()
+
+    /** 링잉 첫 페인트 — API·경로검증 전 주소록 이름·안심케어 카드 */
+    private fun contactSafeCareSeedJson(app: Context, raw: String): String? {
+        val contactName = DeviceContactsReader.findDisplayName(app, raw) ?: return null
+        if (contactName.isBlank()) return null
+        val verdict = CallPathSession.lastVerdict ?: CallPathVerdict.normal()
+        return ContactSafeCarePayload.toJson(raw, contactName, verdict)
+    }
 
     private fun applyContactSafeCareIfSaved(app: Context, raw: String, outgoing: Boolean): Boolean {
         val contactName = DeviceContactsReader.findDisplayName(app, raw) ?: return false

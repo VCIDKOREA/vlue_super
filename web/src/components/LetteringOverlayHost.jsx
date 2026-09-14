@@ -705,6 +705,16 @@ function LetteringOverlayHostInner() {
            * 수 초간 「신고·제보 이력」만 보인다. pending 유지하고 by-number 를 기다린다.
            */
           if (String(detail.profileKind || "") === "lookup_pending") {
+            const deviceNamePending = findDeviceContactName(phone);
+            if (deviceNamePending) {
+              matchedRef.current = true;
+              setCard(
+                buildContactSafeCareCard(phone, deviceNamePending, detail.dcp?.routeStatus || dcpRoute)
+              );
+              setVerified(false);
+              setLoading(false);
+              return;
+            }
             setCard({
               ...buildUnverifiedOverlayCard(phone),
               profileKind: "lookup_pending",
@@ -745,6 +755,14 @@ function LetteringOverlayHostInner() {
             String(detail.profileKind || "") === "unverified" ||
             String(detail.source || "") === "unmatched"
           ) {
+            const deviceNameUnmatched = findDeviceContactName(phone);
+            if (deviceNameUnmatched) {
+              matchedRef.current = true;
+              setCard(buildContactSafeCareCard(phone, deviceNameUnmatched, dcpRoute));
+              setVerified(false);
+              setLoading(false);
+              return;
+            }
             setCard(buildUnverifiedOverlayCard(phone));
             setVerified(false);
             setLoading(false);
@@ -823,10 +841,24 @@ function LetteringOverlayHostInner() {
         return;
       }
 
+      await syncDeviceContactsFromNative().catch(() => {});
+      if (cancelled) return;
+
+      const paintContactSafeFromDevice = () => {
+        if (!incoming || matchedRef.current) return false;
+        const deviceName = findDeviceContactName(incoming);
+        if (!deviceName) return false;
+        matchedRef.current = true;
+        setCard(buildContactSafeCareCard(incoming, deviceName, dcpRoute));
+        setVerified(false);
+        setLoading(false);
+        return true;
+      };
+
       const unknown = isUnknownIncoming(incoming);
       if (unknown) {
         /* 조회 전 미인증 앰버 UI를 먼저 띄우지 않음 — 치명적 깜빡임 방지 */
-        if (!matchedRef.current) {
+        if (!matchedRef.current && !paintContactSafeFromDevice()) {
           setCard({
             ...buildUnverifiedOverlayCard(incoming),
             profileKind: "lookup_pending",
@@ -835,40 +867,35 @@ function LetteringOverlayHostInner() {
           });
           setVerified(Boolean(urlVerifiedRef.current));
           setLoading(true);
-        }
-        unknownTimer = window.setTimeout(() => {
-          if (cancelled || matchedRef.current) return;
-          const deviceName = findDeviceContactName(incoming);
-          if (deviceName) {
-            matchedRef.current = true;
-            setCard(buildContactSafeCareCard(incoming, deviceName, dcpRoute));
-          } else {
+          unknownTimer = window.setTimeout(() => {
+            if (cancelled || matchedRef.current) return;
+            if (paintContactSafeFromDevice()) return;
             setCard(buildUnverifiedOverlayCard(incoming));
-          }
-          setVerified(false);
-          setLoading(false);
-        }, 2200);
+            setVerified(false);
+            setLoading(false);
+          }, 600);
+        }
       } else if (!matchedRef.current) {
-        /* 이미 네이티브/캐시로 매칭됐으면 verified 를 지우지 않음 — 미인증 고착 원인 */
-        setCard((prev) => {
-          if (prev && String(prev.profileKind || "") !== "lookup_pending" && prev.matched !== false) {
-            return prev;
-          }
-          if (prev && (prev.displayName || prev.name) && prev.profileKind !== "lookup_pending") {
-            return prev;
-          }
-          return {
-            ...buildUnverifiedOverlayCard(incoming),
-            profileKind: "lookup_pending",
-            name: "",
-            displayName: ""
-          };
-        });
-        setVerified(Boolean(urlVerifiedRef.current));
-        setLoading(true);
+        if (!paintContactSafeFromDevice()) {
+          /* 이미 네이티브/캐시로 매칭됐으면 verified 를 지우지 않음 — 미인증 고착 원인 */
+          setCard((prev) => {
+            if (prev && String(prev.profileKind || "") !== "lookup_pending" && prev.matched !== false) {
+              return prev;
+            }
+            if (prev && (prev.displayName || prev.name) && prev.profileKind !== "lookup_pending") {
+              return prev;
+            }
+            return {
+              ...buildUnverifiedOverlayCard(incoming),
+              profileKind: "lookup_pending",
+              name: "",
+              displayName: ""
+            };
+          });
+          setVerified(Boolean(urlVerifiedRef.current));
+          setLoading(true);
+        }
       }
-
-      void syncDeviceContactsFromNative().catch(() => {});
 
       const blockCheckPromise = Promise.race([
         checkLetteringPhoneBlocked(incoming),
