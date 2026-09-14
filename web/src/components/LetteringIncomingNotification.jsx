@@ -1315,7 +1315,7 @@ export default function LetteringIncomingNotification({
       incoming ||
       "—";
     /* MiniCase — 빅푸시와 동일: 1줄 상호|이름 / 2줄 이름|전화 또는 전화 */
-        val nameDisp = isExpiredLine
+    const nameDisp = isExpiredLine
       ? phoneDisp
       : isUnverified
         ? phoneDisp
