@@ -1150,7 +1150,39 @@ class CallOverlayService : Service() {
             }
             CallUiPhasePolicy.Phase.KEEP_BIG_PUSH,
             CallUiPhasePolicy.Phase.BIG_PUSH -> {
-                if (source.startsWith("bigPush_bar_tap")) {
+                val fromOutgoingLogoTap = source == "outgoing_logo_tap"
+                val fromBarTap = source.startsWith("bigPush_bar_tap")
+                if (fromOutgoingLogoTap || (fromBarTap && currentOutgoing)) {
+                    /*
+                     * 발신 로고 탭인데 조회 중/빈 경로 — peer 상단 바로 바꾸지 않음.
+                     * 주소록 있으면 안심 팝업 승격, 없으면 중앙 로고 유지.
+                     */
+                    val name = DeviceContactsReader.findDisplayName(this, currentPhone)
+                    if (!name.isNullOrBlank() && !safeCare) {
+                        val verdict =
+                            CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
+                        val json = ContactSafeCarePayload.toJson(currentPhone, name, verdict)
+                        pendingCardJson = json
+                        pendingVerified = false
+                        bindDcpRoute(currentPhone, verdict.routeQuery, json)
+                        VlueBigPushTrace.lifecycle(
+                            "OUTGOING_LOGO_TAP_PROMOTE_SAFE",
+                            "name=$name source=$source"
+                        )
+                        presentCenterSafePopup(source = source, authMember = false)
+                        return
+                    }
+                    VlueBigPushTrace.lifecycle(
+                        "OUTGOING_LOGO_TAP_KEEP_LOGO",
+                        "phase=${phase.name} source=$source — no peer big_push_bar"
+                    )
+                    ensureOutgoingLogoWindowLayout()
+                    notifyWebCallState("outgoing_logo")
+                    if (remoteConnected) notifyWebCallState("outgoing_connected")
+                    restartOutgoingPeerProbeIfNeeded()
+                    return
+                }
+                if (fromBarTap) {
                     VlueBigPushTrace.lifecycle(
                         "BIG_PUSH_TAP_KEEP",
                         "phase=${phase.name} source=$source"
@@ -1698,16 +1730,39 @@ class CallOverlayService : Service() {
         enterShowcaseFromAnswer(source = "bigPush_bar_tap")
     }
 
-    /** 웹 발신 중앙 로고 탭 (눈 깜빡임 후) */
+    /** 웹 발신 중앙 로고 탭 (눈 깜빡임 후) → 정상/비정상·인증 팝업 또는 쇼케이스 */
     fun onOutgoingLogoTapFromWeb() {
         mainHandler.post {
             if (dismissing || !currentOutgoing) return@post
-            /* 탭 즉시 expand 의도 확정 — dialing hold / auto-expand 게이트 통과 */
             outgoingExpandRequestedByUser = true
-            if (!remoteConnected && VlueInCallController.hasConnectedActiveCall()) {
-                remoteConnected = true
+            /*
+             * 팝업 shouldShow(callAnswered) 는 발신에서 remoteConnected 만 본다.
+             * 탭 시 실제 ACTIVE 이면 플래그를 올려 정상/비정상 팝업이 붙게 한다.
+             * 아직 거는 중이면 로고 유지 (규격 §2).
+             */
+            if (!remoteConnected) {
+                when {
+                    VlueInCallController.hasConnectedActiveCall() -> remoteConnected = true
+                    VlueInCallController.isDialingOrConnecting() -> {
+                        VlueBigPushTrace.lifecycle(
+                            "OUTGOING_LOGO_TAP_HOLD_DIALING",
+                            "still dialing — keep center logo"
+                        )
+                        ensureOutgoingLogoWindowLayout()
+                        notifyWebCallState("outgoing_logo")
+                        return@post
+                    }
+                    else -> {
+                        /* OEM: dialing 종료됐는데 remoteConnected 미반영 */
+                        remoteConnected = true
+                    }
+                }
             }
-            openShowcaseFromBigPushTap()
+            VlueBigPushTrace.lifecycle(
+                "OUTGOING_LOGO_TAP",
+                "remoteConnected=$remoteConnected → enterShowcaseFromAnswer"
+            )
+            enterShowcaseFromAnswer(source = "outgoing_logo_tap")
         }
     }
 
@@ -1736,15 +1791,22 @@ class CallOverlayService : Service() {
             )
             return
         }
-        /* 발신 다이얼 중에는 팝업 금지 — CallUiPhasePolicy §2 */
+        /* 발신 다이얼 중에는 팝업 금지 — 단, 사용자 로고 탭 후 수화 확정이면 허용 */
         if (currentOutgoing && !remoteConnected) {
-            VlueBigPushTrace.lifecycle(
-                "CENTER_SAFE_POPUP_HOLD_DIALING",
-                "source=$source outgoing dialing — keep logo " +
-                    "(mayShowCenterPopupWhileUnanswered=${CallUiPhasePolicy.mayShowCenterPopupWhileUnanswered()})"
-            )
-            restartOutgoingPeerProbeIfNeeded()
-            return
+            if (outgoingExpandRequestedByUser &&
+                (VlueInCallController.hasConnectedActiveCall() ||
+                    !VlueInCallController.isDialingOrConnecting())
+            ) {
+                remoteConnected = true
+            } else {
+                VlueBigPushTrace.lifecycle(
+                    "CENTER_SAFE_POPUP_HOLD_DIALING",
+                    "source=$source outgoing dialing — keep logo " +
+                        "(mayShowCenterPopupWhileUnanswered=${CallUiPhasePolicy.mayShowCenterPopupWhileUnanswered()})"
+                )
+                restartOutgoingPeerProbeIfNeeded()
+                return
+            }
         }
         /* 발신: 로고 탭 전 중앙 팝업 금지 (§3b) */
         if (currentOutgoing && !outgoingExpandRequestedByUser) {
@@ -1773,7 +1835,14 @@ class CallOverlayService : Service() {
                 "source=$source keep BigPush — popup not attached"
             )
             if (companion.state == OverlayState.BIG_PUSH) {
-                applyLayoutFromController(source = "safe_popup_attach_fail")
+                if (currentOutgoing && outgoingExpandRequestedByUser) {
+                    /* 상단 peer 바로 떨어지지 않게 중앙 로고 유지 */
+                    ensureOutgoingLogoWindowLayout()
+                    notifyWebCallState("outgoing_logo")
+                    if (remoteConnected) notifyWebCallState("outgoing_connected")
+                } else {
+                    applyLayoutFromController(source = "safe_popup_attach_fail")
+                }
             }
             restartOutgoingPeerProbeIfNeeded()
             return
@@ -3213,7 +3282,10 @@ class CallOverlayService : Service() {
             OverlayPosition.TOP,
             OverlayPosition.BOTTOM,
             OverlayPosition.BELOW_COMPACT_INCOMING -> {
-                if (currentOutgoing && !outgoingExpandRequestedByUser) {
+                if (currentOutgoing &&
+                    (!outgoingExpandRequestedByUser ||
+                        (companion.state == OverlayState.BIG_PUSH && !authPopupOnlyMode))
+                ) {
                     ensureOutgoingLogoWindowLayout()
                     notifyCompactCallChrome()
                 } else {
@@ -3468,8 +3540,11 @@ class CallOverlayService : Service() {
     }
 
     private fun applyCompactRingingWindowLocked(params: WindowManager.LayoutParams) {
-        /* 발신 로고 — TOP compact 로 덮어쓰지 않음 */
-        if (currentOutgoing && !outgoingExpandRequestedByUser) {
+        /* 발신 로고 — TOP compact(peer 바) 로 덮어쓰지 않음 */
+        if (currentOutgoing &&
+            (!outgoingExpandRequestedByUser ||
+                (companion.state == OverlayState.BIG_PUSH && !authPopupOnlyMode))
+        ) {
             ensureOutgoingLogoWindowLayout()
             return
         }
@@ -3732,7 +3807,14 @@ class CallOverlayService : Service() {
 
     /** 수신 BigPush 바 / 발신 중앙 로고 — compact chrome 동기 */
     private fun notifyCompactCallChrome() {
-        if (currentOutgoing && !outgoingExpandRequestedByUser) {
+        if (currentOutgoing &&
+            (!outgoingExpandRequestedByUser ||
+                (companion.state == OverlayState.BIG_PUSH && !authPopupOnlyMode))
+        ) {
+            /*
+             * 로고 탭 직후 expandRequested=true 여도 팝업 부착 전에는
+             * peer big_push_bar 로 바꾸면 상단 이상 텍스트가 뜬다 — 로고 유지.
+             */
             notifyWebCallState("outgoing_logo")
             if (remoteConnected) {
                 notifyWebCallState("outgoing_connected")
@@ -4151,7 +4233,9 @@ class CallOverlayService : Service() {
                     .put("position", companion.position.name)
             )
         } else if (companion.state == OverlayState.BIG_PUSH) {
-            if (currentOutgoing && !outgoingExpandRequestedByUser) {
+            if (currentOutgoing &&
+                (!outgoingExpandRequestedByUser || !authPopupOnlyMode)
+            ) {
                 ensureOutgoingLogoWindowLayout()
                 notifyCompactCallChrome()
             } else {
