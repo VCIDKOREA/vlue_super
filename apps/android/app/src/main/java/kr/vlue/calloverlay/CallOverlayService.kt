@@ -1505,7 +1505,7 @@ class CallOverlayService : Service() {
         webView?.setBackgroundColor(Color.TRANSPARENT)
         nativeBanner?.visibility = View.GONE
         webView?.visibility = View.VISIBLE
-        if (currentOutgoing && !outgoingExpandRequestedByUser) {
+        if (currentOutgoing) {
             ensureOutgoingLogoWindowLayout()
             notifyCompactCallChrome()
         } else {
