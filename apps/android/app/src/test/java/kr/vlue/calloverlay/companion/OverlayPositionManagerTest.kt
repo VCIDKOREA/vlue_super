@@ -65,9 +65,9 @@ class OverlayPositionManagerTest {
     }
 
     @Test
-    fun bigPush_inCall_isHidden() {
+    fun bigPush_inCall_staysTop_untilShowcase() {
         assertEquals(
-            OverlayPosition.HIDDEN,
+            OverlayPosition.TOP,
             OverlayPositionManager.resolve(
                 OverlayContext.IN_CALL,
                 OverlayState.BIG_PUSH,

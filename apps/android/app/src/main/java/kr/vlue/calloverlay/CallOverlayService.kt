@@ -1380,7 +1380,7 @@ class CallOverlayService : Service() {
                             verified = pendingVerified || parseIsVerified(pendingCardJson)
                         ))
                 ) {
-                    hideCompanionOverlayChrome()
+                    softHideCompanionOverlayChrome()
                 } else {
                     webView?.visibility = android.view.View.VISIBLE
                 }
@@ -1843,7 +1843,11 @@ class CallOverlayService : Service() {
             syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
         }
         if (dcpPopupView?.isAttachedToWindow == true) {
-            hideCompanionOverlayChrome()
+            /*
+             * 창을 remove 하면 삼성 풀 InCall 중 Mini 재부착이 OEM 거부로 실패한다.
+             * 기존 Window 는 유지하고 GONE 만 — 미니 전화 UI 경로와 동일 창 재사용.
+             */
+            softHideCompanionOverlayChrome()
         } else {
             authPopupOnlyMode = false
             VlueBigPushTrace.lifecycle(
@@ -2929,6 +2933,21 @@ class CallOverlayService : Service() {
         webView = null
         nativeBanner = null
         bigPushPeekTab = null
+    }
+
+    /**
+     * 중앙 팝업 표시 중 빅푸시/쇼케이스 크롬만 숨김 — Window 유지.
+     * 삼성 풀 InCall 중 removeView 후 Mini 재부착이 OEM 거부로 실패하는 것을 방지.
+     */
+    private fun softHideCompanionOverlayChrome() {
+        nativeBanner?.visibility = View.GONE
+        webView?.visibility = View.GONE
+        bigPushPeekTab?.visibility = View.GONE
+        rootContainer?.visibility = View.GONE
+        VlueBigPushTrace.lifecycle(
+            "SOFT_HIDE_CHROME",
+            "keepAttached=${rootContainer?.isAttachedToWindow == true}"
+        )
     }
 
     private fun parseExpiredDetail(cardJson: String?): String {
@@ -4240,6 +4259,28 @@ class CallOverlayService : Service() {
                 "VlueOverlayCtx",
                 "holdBelowHun source=$source prevPos=$prevPos detected=${detected.name} held=${ctx.name}"
             )
+        }
+        /*
+         * 수화 후 BIG_PUSH 잔존(풀 InCall) — HIDDEN 하지 말고 팝업/쇼케이스 재진입.
+         * 미니 전화 UI(OTHER_APP)는 이미 enterShowcase 가 성공하는 경로 — 여기도 안전.
+         */
+        if (companion.state == OverlayState.BIG_PUSH &&
+            remoteConnected &&
+            !authPopupConfirmedToMini &&
+            !userMinimized &&
+            !(currentOutgoing && !outgoingExpandRequestedByUser) &&
+            dcpPopupView?.isAttachedToWindow != true
+        ) {
+            VlueBigPushTrace.lifecycle(
+                "REEVAL_ANSWERED_BIGPUSH",
+                "source=$source ctx=${ctx.name} → enterShowcaseFromAnswer"
+            )
+            enterShowcaseFromAnswer(source = "reeval_answered_$source")
+            if (companion.state != OverlayState.BIG_PUSH ||
+                dcpPopupView?.isAttachedToWindow == true
+            ) {
+                return
+            }
         }
         if (companion.state == OverlayState.SHOWCASE || companion.state == OverlayState.MINI_CASE) {
             /* 중앙 안심/인증 팝업 표시 중 — 하단 바로 collapse 금지 (팝업 소실 방지) */

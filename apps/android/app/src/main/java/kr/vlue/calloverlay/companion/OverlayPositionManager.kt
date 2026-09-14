@@ -41,9 +41,15 @@ object OverlayPositionManager {
              */
             OverlayContext.COMPACT_INCOMING -> OverlayPosition.BELOW_COMPACT_INCOMING
             OverlayContext.INCOMING_CALL_UI -> OverlayPosition.TOP
+            /*
+             * 수화 직후 전체 InCall(삼성 풀 전화 UI)에서도 BIG_PUSH 유지.
+             * HIDDEN 이면 ContextWatch 가 바만 끄고 쇼케이스/안심팝업 전환이
+             * 실패·지연될 때 화면이 비게 된다. (미니 전화 UI는 OTHER_APP→BELOW)
+             * SHOWCASE/MINI_CASE 전이가 오면 이 분기는 타지 않는다.
+             */
             OverlayContext.IN_CALL,
             OverlayContext.KEYPAD,
-            OverlayContext.MINIMIZED -> OverlayPosition.HIDDEN
+            OverlayContext.MINIMIZED -> OverlayPosition.TOP
         }
     }
 
