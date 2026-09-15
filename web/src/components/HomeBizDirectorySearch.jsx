@@ -16,12 +16,24 @@ import AppFullScreenView from "./AppFullScreenView.jsx";
 import { VlueBrandLogo } from "./VlueBrandLogo.jsx";
 import VLUE_BRAND_LOGO from "../assets/vlue-shield-eye-logo.svg?url";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
+import { isVlueBrandAssetUrl } from "../lib/vlueAvatar.js";
 import "./friend-showcase-list.css";
 
 /**
  * 앱 홈 검색 — 키워드는 #해시태그 쇼케이스 프로필 목록 (웹 공공사업자 표는 미사용)
  * 인기순 / 거리순. 거리순 = 검색 당시 기기 위치 → DCC 등록 주소. 검색자는 본인인증 로그인만 있으면 됨.
  */
+
+function pickPeerProfileAvatar(...candidates) {
+  for (const raw of candidates) {
+    const s = String(raw || "").trim();
+    if (!s || s.startsWith("blob:")) continue;
+    if (isVlueBrandAssetUrl(s)) continue;
+    if (/vlue-brand-logo|vlue-shield/i.test(s)) continue;
+    return s;
+  }
+  return "";
+}
 
 function BizSearchBar({ query, onQueryChange, onSubmit, logoSize = 22 }) {
   return (
@@ -166,7 +178,7 @@ function mapHitToRow(hit, i, tagLabel, idLabel = "") {
     phone: hit.phoneVisible ? hit.phone || "" : hit.phone || "",
     phoneDisplay: hit.phone || "",
     phoneDialEnabled: hit.phoneDialEnabled !== false && hit.phoneVisible !== false,
-    avatarUrl: String(hit.photoUrl || hit.avatarUrl || hit.logoUrl || "").trim(),
+    avatarUrl: pickPeerProfileAvatar(hit.photoUrl, hit.avatarUrl),
     publicHandle: handle,
     membershipTier: tier,
     hasShowcase: true,
@@ -357,7 +369,8 @@ export default function HomeBizDirectorySearch({
         phone: payload.phone || row.phoneDisplay || row.phone || "",
         phoneDialEnabled: payload.card?.phoneDialEnabled !== false && row.phoneDialEnabled !== false,
         membershipTier: tier,
-        photoUrl: payload.card?.photoUrl || row.avatarUrl || "",
+        photoUrl: payload.card?.photoUrl || "",
+        avatarUrl: payload.card?.avatarUrl || payload.card?.photoUrl || "",
         email: payload.card?.email || "",
         organization: payload.card?.organization || "",
         website: payload.card?.website || "",

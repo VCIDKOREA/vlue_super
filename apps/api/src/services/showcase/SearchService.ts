@@ -147,6 +147,7 @@ function snapOf(u: UserSearchRow): Record<string, unknown> {
   if (!lite) return {};
   return {
     logoUrl: lite.logoUrl,
+    photoUrl: lite.photoUrl,
     name: lite.name,
     displayName: lite.displayName,
     phone: lite.phone,
@@ -157,7 +158,8 @@ function snapOf(u: UserSearchRow): Record<string, unknown> {
     activityName: lite.activityName,
     activityDisplayName: lite.activityDisplayName,
     nickname: lite.nickname,
-    handle: lite.handle
+    handle: lite.handle,
+    address: lite.address
   };
 }
 

@@ -104,9 +104,10 @@ export default function ShowcaseSlideChrome({
     if (peer.type === "image" && peer.url && !isVlueBrandAssetUrl(peer.url)) {
       return { avatarUrl: peer.url, letter: profileName };
     }
-    const logo = firstText(card?.photoUrl, card?.logoUrl, style?.platformFeed?.avatarUrl);
-    if (logo && !isVlueBrandAssetUrl(logo)) {
-      return { avatarUrl: logo, letter: profileName };
+    /* 회사 로고(logoUrl)로 사람 아바타를 채우지 않음 — 프로필 사진만 */
+    const photo = firstText(card?.photoUrl, card?.avatarUrl, style?.platformFeed?.avatarUrl);
+    if (photo && !isVlueBrandAssetUrl(photo)) {
+      return { avatarUrl: photo, letter: profileName };
     }
     return { avatarUrl: "", letter: (profileName || "V").slice(0, 1).toUpperCase() };
   })();

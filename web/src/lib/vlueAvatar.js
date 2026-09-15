@@ -23,6 +23,7 @@ export function isVlueBrandAssetUrl(url) {
   if (
     low.includes("vlue-shield-logo") ||
     low.includes("vlue-shield-eye") ||
+    low.includes("vlue-brand-logo") ||
     low.includes("vlue_brand") ||
     low.includes("/assets/vlue-") ||
     (low.includes("vlue") && low.includes("shield") && low.includes("logo"))

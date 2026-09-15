@@ -1,6 +1,7 @@
 import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
 import { createDefaultShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
 import { readCallHistoryPeerCache } from "./callHistoryPeerCache.js";
+import { isVlueBrandAssetUrl } from "./vlueAvatar.js";
 
 export const CALL_SHOWCASE_HISTORY_KEY = "vlue_call_showcase_history_v2";
 export const CALL_SHOWCASE_HISTORY_CHANGED = "vlue-call-showcase-history-changed";
@@ -226,11 +227,13 @@ export function formatCallWhen(iso) {
   return d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
 }
 
-/** blob/data/깨진 상대경로를 걸러 로드 가능한 아바타만 반환 */
+/** blob/data/깨진 상대경로·브랜드 마크를 걸러 로드 가능한 프로필 사진만 반환 */
 function loadableAvatarUrl(raw) {
   const s = String(raw || "").trim();
   if (!s) return "";
   if (/^(data:|blob:)/i.test(s)) return "";
+  if (isVlueBrandAssetUrl(s)) return "";
+  if (/vlue-brand-logo|vlue-shield/i.test(s)) return "";
   if (/^https?:\/\//i.test(s)) return s;
   if (s.startsWith("/") && typeof window !== "undefined" && window.location?.origin) {
     return `${window.location.origin}${s}`;
@@ -242,8 +245,8 @@ function loadableAvatarUrl(raw) {
 export function resolveCallHistoryAvatar(call) {
   const candidates = [
     call?.avatarUrl,
-    call?.cardSnapshot?.avatarUrl,
     call?.cardSnapshot?.photoUrl,
+    call?.cardSnapshot?.avatarUrl,
     call?.showcaseSnapshot?.platformFeed?.kakaoAvatarUrl,
     call?.showcaseSnapshot?.platformFeed?.instagramAvatarUrl
   ];
@@ -251,14 +254,12 @@ export function resolveCallHistoryAvatar(call) {
     const ok = loadableAvatarUrl(c);
     if (ok) return ok;
   }
-  /* 통화목록 prefetch 캐시 — VLUÉ 회원인데 스냅샷에 사진이 비어 있어도 표시 */
+  /* 통화목록 prefetch 캐시 — 프로필 사진만 (회사 logoUrl 제외) */
   try {
     const phone = call?.phoneDisplay || call?.phone || "";
     const cached = readCallHistoryPeerCache(phone);
     const card = cached?.card;
-    const fromCache = loadableAvatarUrl(
-      card?.photoUrl || card?.avatarUrl || card?.image_url || card?.logoUrl
-    );
+    const fromCache = loadableAvatarUrl(card?.photoUrl || card?.avatarUrl || card?.image_url);
     if (fromCache) return fromCache;
   } catch {
     /* ignore */

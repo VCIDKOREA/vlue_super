@@ -1,12 +1,21 @@
-import { callLogPhoneKey } from "./callLogList.js";
+import { normalizePhoneDigits, toKoreaNationalDigits } from "./letteringPhoneMatch.js";
 
 const TTL_MS = 30 * 60 * 1000;
 const MAX = 48;
 const STORAGE_KEY = "vlue_call_history_peer_v3";
 const mem = new Map();
 
+/**
+ * callLogList 를 import 하지 않음 —
+ * callShowcaseHistory → peerCache → callLogList → callShowcaseHistory 순환으로
+ * 통화목록 아바타 resolve 가 TDZ/undefined 에러 나던 경로를 끊는다.
+ */
 function keyFor(phone) {
-  return callLogPhoneKey(phone) || String(phone || "").replace(/\D/g, "");
+  return (
+    toKoreaNationalDigits(phone) ||
+    normalizePhoneDigits(phone) ||
+    String(phone || "").replace(/\D/g, "")
+  );
 }
 
 function hydrateFromStorage() {

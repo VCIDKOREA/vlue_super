@@ -461,8 +461,8 @@ export default function FriendShowcaseList({
         phone: payload.phone || row.phoneDisplay || row.phone || "",
         phoneDialEnabled: payload.card?.phoneDialEnabled !== false,
         membershipTier: tier,
-        photoUrl: payload.card?.photoUrl || row.avatarUrl || "",
-        avatarUrl: payload.card?.avatarUrl || row.avatarUrl || "",
+        photoUrl: payload.card?.photoUrl || "",
+        avatarUrl: payload.card?.avatarUrl || payload.card?.photoUrl || "",
         email: payload.card?.email || "",
         organization: payload.card?.organization || "",
         website: payload.card?.website || "",
@@ -472,9 +472,13 @@ export default function FriendShowcaseList({
         showcaseStyle
       };
       setPreviewCard(nextCard);
-      /* 목록 아바타도 즉시 반영 */
-      if (nextCard.photoUrl || nextCard.avatarUrl) {
-        const av = nextCard.photoUrl || nextCard.avatarUrl;
+      /* 목록 아바타도 즉시 반영 — 프로필 사진만 (로고·브랜드 제외) */
+      const av = String(nextCard.photoUrl || nextCard.avatarUrl || "").trim();
+      const avOk =
+        av &&
+        !/vlue-brand-logo|vlue-shield/i.test(av) &&
+        av !== String(nextCard.logoUrl || "").trim();
+      if (avOk) {
         const patch = (list) =>
           list.map((r) => (r.id === row.id || r.userId === row.userId ? { ...r, avatarUrl: av } : r));
         setNearby(patch);

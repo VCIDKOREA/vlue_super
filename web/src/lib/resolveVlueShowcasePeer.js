@@ -165,9 +165,28 @@ export async function resolveVlueShowcasePeer(input = {}) {
         logoUrl = String(exp?.logoUrl || "").trim();
         photoFocus = String(exp?.photoFocus || "center").trim() || "center";
         activityName = String(exp?.activityName || "").trim();
-        /* photo ≠ logo — 로고를 프로필 사진으로 쓰지 않음 */
-        photoUrl =
-          String(exp?.photoUrl || profile.photoUrl || photoUrl).trim() || photoUrl;
+        /* photo ≠ logo — 로고·브랜드 마크를 프로필 사진으로 쓰지 않음 */
+        const resolvedPhoto = String(exp?.photoUrl || profile.photoUrl || "").trim();
+        const seedPhoto = String(photoUrl || "").trim();
+        const logo = logoUrl;
+        const pickPhoto = (...vals) => {
+          for (const v of vals) {
+            const s = String(v || "").trim();
+            if (!s) continue;
+            if (logo && s === logo) continue;
+            const low = s.toLowerCase();
+            if (
+              low.includes("vlue-brand-logo") ||
+              low.includes("vlue-shield-logo") ||
+              low.includes("vlue-shield-eye")
+            ) {
+              continue;
+            }
+            return s;
+          }
+          return "";
+        };
+        photoUrl = pickPhoto(resolvedPhoto, seedPhoto) || "";
         titlePhotoUrl = String(exp?.titlePhotoUrl || "").trim();
         noTitlePhoto = Boolean(exp?.noTitlePhoto);
         if (profile.membershipTier || profRes.membershipTier) {

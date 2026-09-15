@@ -107,10 +107,7 @@ export default function ShowcaseBannerSocialLayer({
     if (peer.type === "image" && peer.url && !isVlueBrandAssetUrl(peer.url)) {
       return { avatarUrl: peer.url, logoLetter: displayName };
     }
-    const logo = firstText(card?.logoUrl);
-    if (logo && !isVlueBrandAssetUrl(logo)) {
-      return { avatarUrl: logo, logoLetter: displayName };
-    }
+    /* 회사 로고로 사람 아바타를 채우지 않음 */
     return { avatarUrl: "", logoLetter: peer.initial || displayName };
   }, [style, card, displayName]);
 

@@ -12,11 +12,12 @@ import {
 import { matchNationalAgency } from "./nationalAgencyDcpClient.js";
 import { resolveIsKnownContactSync } from "./contacts/hybridKnownContact.js";
 
-/** 목록 아바타 — https(또는 사이트 상대경로)만 채택. data:/blob: 는 API 사진을 가리지 않게 제외 */
+/** 목록 아바타 — https(또는 사이트 상대경로)만. data/blob·브랜드 마크·회사로고 제외 */
 function pickListAvatarUrl(...candidates) {
   for (const raw of candidates) {
     const s = String(raw || "").trim();
     if (!s || /^(data:|blob:)/i.test(s)) continue;
+    if (/vlue-brand-logo|vlue-shield/i.test(s)) continue;
     if (/^https?:\/\//i.test(s) || s.startsWith("/")) return s;
   }
   return "";
@@ -203,7 +204,7 @@ export function applyMemberDirectoryToCallGroups(groups, members) {
       !looksLikePhoneName(hit.name, g.phoneDisplay || g.phone, g.phoneKey)
         ? String(hit.name).trim()
         : String(g.memberName || "").trim();
-    const hitAvatar = String(hit.avatarUrl || "").trim();
+    const hitAvatar = String(hit.avatarUrl || hit.photoUrl || "").trim();
     const avatarUrl =
       pickListAvatarUrl(hitAvatar, g.avatarUrl, g.cardSnapshot?.photoUrl, g.cardSnapshot?.avatarUrl) ||
       "";
@@ -243,7 +244,7 @@ export function applyLocalKnownPeersToCallGroups(groups) {
         name: g.name || g.memberName || "이종근",
         verified: true,
         membershipTier: g.membershipTier || "paid",
-        avatarUrl: g.avatarUrl || snap.logoUrl || "/vlue-brand-logo.svg",
+        avatarUrl: pickListAvatarUrl(g.avatarUrl, snap.photoUrl, snap.avatarUrl) || "",
         userId: g.userId || "13c75cbe-206b-4eed-82d2-a54c7bc80c9c",
         cardSnapshot: {
           ...snap,
@@ -253,6 +254,7 @@ export function applyLocalKnownPeersToCallGroups(groups) {
           companyName: snap.companyName || "VCID KOREA",
           membershipTier: snap.membershipTier || "paid",
           logoUrl: snap.logoUrl || "/vlue-brand-logo.svg",
+          photoUrl: pickListAvatarUrl(snap.photoUrl, snap.avatarUrl, g.avatarUrl) || "",
           phone: g.phoneDisplay || g.phone
         }
       };

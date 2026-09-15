@@ -208,7 +208,12 @@ function writeCallHistoryLineId(id) {
 }
 
 function CallHistoryAvatar({ call, cacheTick = 0 }) {
-  const url = resolveCallHistoryAvatar(call);
+  let url = "";
+  try {
+    url = typeof resolveCallHistoryAvatar === "function" ? resolveCallHistoryAvatar(call) : "";
+  } catch {
+    url = "";
+  }
   const [broken, setBroken] = useState(false);
   useEffect(() => {
     setBroken(false);

@@ -3,11 +3,29 @@ import { getLocalVlueUserId } from "./showcase/resolveShowcaseOwnerUserId.js";
 import { fetchFollowing, fetchFollowProfile } from "./followApi.js";
 import { searchShowcaseByTag } from "./showcase/showcaseTagsApi.js";
 import { isPaidLetteringTier } from "./letteringMembership.js";
+import { isVlueBrandAssetUrl } from "./vlueAvatar.js";
 
 const OWNER_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isUuid(id) {
   return OWNER_UUID_RE.test(String(id || "").trim());
+}
+
+/** 사람 아바타만 — 회사 로고·VLUÉ 브랜드 마크 제외 */
+function pickPeerProfileAvatar(...candidates) {
+  for (const raw of candidates) {
+    const s = String(raw || "").trim();
+    if (!s || s.startsWith("blob:")) continue;
+    if (isVlueBrandAssetUrl(s)) continue;
+    const low = s.toLowerCase();
+    if (low.includes("vlue-brand-logo") || low.includes("vlue-shield")) continue;
+    return s;
+  }
+  return "";
+}
+
+function needsAvatarHydrate(avatarUrl) {
+  return !pickPeerProfileAvatar(avatarUrl);
 }
 
 /**
@@ -55,7 +73,7 @@ function mapFollowingApiItem(item) {
         : "팔로잉 중",
       phone: "",
       phoneDisplay: "",
-      avatarUrl: String(item.photoUrl || "").trim(),
+      avatarUrl: pickPeerProfileAvatar(item.photoUrl, item.avatarUrl),
       publicHandle: handle,
       bucket: "following",
       relation: item.relation || "following",
@@ -85,7 +103,7 @@ function mapSearchHit(hit, bucket) {
             : hit.organization || "쇼케이스",
       phone: String(hit.phone || "").trim(),
       phoneDisplay: hit.phone ? formatLetteringPhoneDisplay(hit.phone) : "",
-      avatarUrl: String(hit.photoUrl || hit.avatarUrl || hit.logoUrl || "").trim(),
+      avatarUrl: pickPeerProfileAvatar(hit.photoUrl, hit.avatarUrl),
       publicHandle: handle,
       bucket,
       tags
@@ -118,7 +136,7 @@ export function buildBaseRecommendPool({
           subtitle: handle ? `@${handle}` : "주소록 · VLUÉ 회원",
           phone,
           phoneDisplay: phone ? formatLetteringPhoneDisplay(phone) : "",
-          avatarUrl: String(u.photoUrl || u.avatarUrl || u.profilePhotoUrl || "").trim(),
+          avatarUrl: pickPeerProfileAvatar(u.photoUrl, u.avatarUrl, u.profilePhotoUrl),
           publicHandle: handle,
           bucket: "nearby",
           tags: []
@@ -142,7 +160,7 @@ export function buildBaseRecommendPool({
           subtitle: [f.cardOrg, f.cardTitle].filter(Boolean).join(" · ") || "추천",
           phone,
           phoneDisplay: phone ? formatLetteringPhoneDisplay(phone) : "",
-          avatarUrl: String(f.avatarUrl || f.avatar || "").trim(),
+          avatarUrl: pickPeerProfileAvatar(f.avatarUrl, f.avatar, f.photoUrl),
           publicHandle: "",
           bucket: "trending",
           tags: []
@@ -177,7 +195,12 @@ export function mergeFollowingEntries(apiItems = [], catalogFriends = [], contac
             name: prev.name || String(f.cardName || f.name || "").trim(),
             phone: prev.phone || phone,
             phoneDisplay: prev.phoneDisplay || (phone ? formatLetteringPhoneDisplay(phone) : ""),
-            avatarUrl: prev.avatarUrl || String(f.avatarUrl || f.avatar || "").trim(),
+            avatarUrl: pickPeerProfileAvatar(
+              prev.avatarUrl,
+              f.avatarUrl,
+              f.avatar,
+              f.photoUrl
+            ),
             subtitle:
               prev.subtitle ||
               [f.cardOrg, f.cardTitle].filter(Boolean).join(" · ") ||
@@ -315,7 +338,7 @@ async function hydrateMissingAvatars(rows = [], limit = 12) {
   const needIdx = [];
   for (let i = 0; i < list.length && needIdx.length < limit; i += 1) {
     const row = list[i];
-    if (row?.userId && isUuid(row.userId) && !String(row.avatarUrl || "").trim()) {
+    if (row?.userId && isUuid(row.userId) && needsAvatarHydrate(row.avatarUrl)) {
       needIdx.push(i);
     }
   }
@@ -331,12 +354,11 @@ async function hydrateMissingAvatars(rows = [], limit = 12) {
         try {
           const prof = await fetchFollowProfile(row.userId, { purpose: "follow" });
           if (!prof?.ok) return;
-          const url = String(
-            prof.photoUrl ||
-              prof.profile?.photoUrl ||
-              prof.cardExport?.photoUrl ||
-              ""
-          ).trim();
+          const url = pickPeerProfileAvatar(
+            prof.photoUrl,
+            prof.profile?.photoUrl,
+            prof.cardExport?.photoUrl
+          );
           if (url) out[idx] = { ...row, avatarUrl: url };
         } catch {
           /* ignore */
