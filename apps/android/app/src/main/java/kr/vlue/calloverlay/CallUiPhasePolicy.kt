@@ -36,7 +36,12 @@ object CallUiPhasePolicy {
         val hasBroadcastShowcaseContent: Boolean,
         val canPromoteContactSafeCare: Boolean,
         /** 조회 완료 · 비회원 · 미인증 신고 패널 대상 */
-        val isUnverifiedResolved: Boolean = false
+        val isUnverifiedResolved: Boolean = false,
+        /**
+         * 경로 검증 비정상 — FULL_SHOWCASE 금지, 안심 팝업만.
+         * 회원 DCC/쇼케이스·미인증 신고 패널보다 우선.
+         */
+        val isPathAbnormal: Boolean = false
     )
 
     /**
@@ -79,6 +84,8 @@ object CallUiPhasePolicy {
      */
     fun decideAfterAnswer(input: AnswerInput): Phase {
         if (input.alreadyMiniOrAuthConfirmed) return Phase.MINI_CASE
+        /* 비정상 → 쇼케이스 금지 · 안심 팝업만 (DCC/송출 ON 포함) */
+        if (input.isPathAbnormal) return Phase.CENTER_SAFE_POPUP
         if (input.isContactSafeCare) return Phase.CENTER_SAFE_POPUP
         if (input.isAuthMemberOnly) return Phase.CENTER_AUTH_POPUP
         if (input.hasBroadcastShowcaseContent) return Phase.FULL_SHOWCASE

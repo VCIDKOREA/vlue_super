@@ -46,11 +46,12 @@
 Decision order (first match wins):
 
 1. User already Mini / auth confirmed → stay `MINI_CASE` (no re-open popup/showcase)
-2. `profileKind == contact_safe_care` **or** `public_directory_safe` → `CENTER_SAFE_POPUP` (안심팝업 · 신고/제보 없음)
-3. Auth-member-only (verified + no public DCC/showcase) → `CENTER_AUTH_POPUP`
-4. Broadcast ON **and** real DCC/showcase content → `FULL_SHOWCASE`
-5. Resolved unverified (lookup done, `matched:false`, not pending, not safe-care, no device-contact promote) → `FULL_SHOWCASE` (**미인증 신고 패널**)
-6. Else (pending lookup / blank) → `KEEP_BIG_PUSH`
+2. **Path abnormal** (`dcp_route=abnormal` / `pathVerify` / `CallPathSession` 비정상) → `CENTER_SAFE_POPUP` only — **FULL_SHOWCASE 금지** (회원 DCC·쇼케이스·미인증 신고 패널 포함)
+3. `profileKind == contact_safe_care` **or** `public_directory_safe` → `CENTER_SAFE_POPUP` (안심팝업 · 신고/제보 없음)
+4. Auth-member-only (verified + no public DCC/showcase) → `CENTER_AUTH_POPUP`
+5. Broadcast ON **and** real DCC/showcase content → `FULL_SHOWCASE`
+6. Resolved unverified (lookup done, `matched:false`, not pending, not safe-care, no device-contact promote) → `FULL_SHOWCASE` (**미인증 신고 패널**)
+7. Else (pending lookup / blank) → `KEEP_BIG_PUSH`
 
 Contact promote: if lookup pending/blank **and** device contact name exists → treat as Safe Care (`CENTER_SAFE_POPUP`).
 
@@ -76,8 +77,9 @@ Contact promote: if lookup pending/blank **and** device contact name exists → 
 - BigPush window `y >= statusBarHeightPx + 8dp` (never under system status bar)
 - Center popups are separate overlay windows; attach popup **before** tearing down BigPush chrome when possible
 - Safe Care / auth-only: **never** leave a blank dark `FULLSCREEN` Showcase
+- **Path abnormal:** never `FULL_SHOWCASE` — center 안심 팝업 only (even if peer has DCC/showcase)
 - Web host must not `setExpanded(true)` or `notifyVlueAuthMemberReady` for `contact_safe_care`
-- **Hard gate:** `commitFullscreenLayout` / `enterShowcaseLayout` / `restoreShowcase` require `hasBroadcastShowcaseContent` **or** resolved unverified (`isUnverifiedResolved`) — otherwise `refuseEmptyFullscreen` → popup or compact BigPush (releases touch blockade)
+- **Hard gate:** `commitFullscreenLayout` / `enterShowcaseLayout` / `restoreShowcase` require `hasBroadcastShowcaseContent` **or** resolved unverified (`isUnverifiedResolved`), and must fail when path is abnormal — otherwise `refuseEmptyFullscreen` → popup or compact BigPush (releases touch blockade)
 - Web: connected + no expand content → `lettering-overlay-host--bar-only` (transparent host, not `#070b14` full bleed) — **exception:** resolved unverified may expand to 미인증 panel
 - Native unmatched after API confirm: inject `profileKind=unverified` (do not leave `lookup_pending` forever)
 
@@ -107,6 +109,8 @@ Do not add parallel “open showcase” / “open popup” helpers that skip thi
 - [ ] BigPush not covered by status bar clock/battery
 - [ ] Auth member broadcast OFF: center auth popup, not empty Showcase
 - [ ] Auth member broadcast ON + content: full Showcase
+- [ ] Path abnormal + member showcase: 안심 팝업 only (no FULL_SHOWCASE)
+- [ ] Call history row「안심 저장」→ next call uses local PublicDirectory/CardLookup cache (ENABLE_DIRECTORY_SYNC remains false)
 
 ---
 

@@ -14,6 +14,11 @@ import {
   resolveCallDisplayName,
   resolveCallHistoryAvatar
 } from "../lib/callLogList.js";
+import {
+  applySafeCareLocalToCallGroups,
+  needsSafeCareSave,
+  saveSafeCareOneClick
+} from "../lib/safeCareLocalCache.js";
 import { fetchDccLines } from "../lib/dccLinesApi.js";
 import { dccLineOptionLabel } from "../lib/dccLineLabel.js";
 import { fetchLineCallHistory, fetchMemberNamesByNumbers } from "../lib/lineCallHistoryApi.js";
@@ -255,6 +260,25 @@ function HistoryRowCta({ call, matrix, busy, onAction }) {
   );
 }
 
+function HistorySafeCareSave({ call, busy, onSave }) {
+  if (!needsSafeCareSave(call)) return null;
+  const phone = String(call?.phoneDisplay || call?.phone || "").trim();
+  if (!phone || phone === "—") return null;
+  return (
+    <button
+      type="button"
+      className="call-history-row__safe"
+      disabled={busy}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSave(call);
+      }}
+    >
+      {busy ? "…" : "안심 저장"}
+    </button>
+  );
+}
+
 function CallHistoryLoadingGuide({ syncing = false }) {
   return (
     <div className="call-history-loading" role="status" aria-live="polite">
@@ -373,14 +397,16 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       await syncDeviceContactsFromNative().catch(() => {});
       const raw = await fetchDeviceCallLogEntries(200);
       /* 1차: 기기 로그 + 로컬 히스토리 + CEO 시드 — 번호만 보이다가 이름 붙는 깜빡임 방지 */
-      const quick = applyKnownContactsToCallGroups(
-        applyLocalKnownPeersToCallGroups(
-          buildCallHistoryList({
-            deviceEntries: raw,
-            lineEvents: [],
-            selectedLine: "all",
-            lines: []
-          })
+      const quick = applySafeCareLocalToCallGroups(
+        applyKnownContactsToCallGroups(
+          applyLocalKnownPeersToCallGroups(
+            buildCallHistoryList({
+              deviceEntries: raw,
+              lineEvents: [],
+              selectedLine: "all",
+              lines: []
+            })
+          )
         )
       );
       setItems(quick);
@@ -406,8 +432,10 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         selectedLine,
         lines: lineRows
       });
-      const enriched = applyKnownContactsToCallGroups(
-        applyLocalKnownPeersToCallGroups(applyMemberDirectoryToCallGroups(merged, members))
+      const enriched = applySafeCareLocalToCallGroups(
+        applyKnownContactsToCallGroups(
+          applyLocalKnownPeersToCallGroups(applyMemberDirectoryToCallGroups(merged, members))
+        )
       );
       setItems(enriched);
       if (enriched.length) writeCallHistoryListCache(enriched);
@@ -492,10 +520,12 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const patchContactNames = () => {
       if (cancelled) return;
       setItems((prev) => {
-        const next = applyKnownContactsToCallGroups(prev);
+        const next = applySafeCareLocalToCallGroups(applyKnownContactsToCallGroups(prev));
         const changed = next.some(
           (row, i) =>
-            row.contactName !== prev[i]?.contactName || row.name !== prev[i]?.name
+            row.contactName !== prev[i]?.contactName ||
+            row.name !== prev[i]?.name ||
+            row.safeCareCached !== prev[i]?.safeCareCached
         );
         if (!changed) return prev;
         writeCallHistoryListCache(next);
@@ -593,6 +623,26 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         onToast: showToast
       });
       refresh();
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  const saveSafeCare = (call) => {
+    const id = call?.id || "";
+    setBusyId(id ? `safe:${id}` : "");
+    try {
+      const result = saveSafeCareOneClick(call);
+      if (!result.ok) {
+        showToast("저장할 번호·이름이 없습니다.");
+        return;
+      }
+      setItems((prev) => {
+        const next = applySafeCareLocalToCallGroups(prev);
+        writeCallHistoryListCache(next);
+        return next;
+      });
+      showToast("안심 저장 완료 — 다음 통화부터 기기에서 바로 표시됩니다.");
     } finally {
       setBusyId("");
     }
@@ -1018,12 +1068,19 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                       {formatCallWhen(call.endedAt)}
                     </span>
                   </button>
-                  <HistoryRowCta
-                    call={call}
-                    matrix={matrix}
-                    busy={busyId === call.id}
-                    onAction={runRowAction}
-                  />
+                  <div className="call-history-row__actions">
+                    <HistorySafeCareSave
+                      call={call}
+                      busy={busyId === `safe:${call.id}`}
+                      onSave={saveSafeCare}
+                    />
+                    <HistoryRowCta
+                      call={call}
+                      matrix={matrix}
+                      busy={busyId === call.id}
+                      onAction={runRowAction}
+                    />
+                  </div>
                 </div>
               </li>
             );

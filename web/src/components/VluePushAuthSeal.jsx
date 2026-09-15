@@ -1,5 +1,8 @@
 import { Share2, ShieldCheck } from "lucide-react";
-import { VLUE_VERIFIED_PUSH_CONFIRM } from "../lib/vlueDigitalCardUi.js";
+import {
+  VLUE_PUSH_AUTH_SEAL_PHRASE,
+  VLUE_VERIFIED_PUSH_CONFIRM
+} from "../lib/vlueDigitalCardUi.js";
 import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
 import FollowActionButton from "./follow/FollowActionButton.jsx";
 import VlueBrandWordmark from "./VlueBrandWordmark.jsx";
@@ -32,8 +35,10 @@ function resolveSealExpiryLine(card) {
 }
 
 /**
- * 빅푸시 펼침 — VLUÉ 인증 봉인
- * 부제: 만료일(시안블루). 팔로우 + 쇼셜 토글
+ * DCC/쇼케이스 하단 — VLUÉ 발신 경로 봉인
+ * 정상: 「발신상태 정상」(경로 검증 통과 시 쇼케이스와 함께 표시)
+ * 비정상: 쇼케이스 대신 안심 팝업만 (네이티브 경로)
+ * 부제: 만료일. 팔로우 + 쇼셜 토글
  */
 export default function VluePushAuthSeal({
   className = "",
@@ -81,7 +86,7 @@ export default function VluePushAuthSeal({
           <p className="vlue-push-auth-seal__headline">
             <VlueBrandWordmark className="vlue-push-auth-seal__brand vlue-brand-wordmark--seal" />
             <span className="vlue-push-auth-seal__divider" aria-hidden />
-            <span className="vlue-push-auth-seal__phrase">인증 확인</span>
+            <span className="vlue-push-auth-seal__phrase">{VLUE_PUSH_AUTH_SEAL_PHRASE}</span>
           </p>
           {expiry ? (
             <p className="vlue-push-auth-seal__sub vlue-push-auth-seal__sub--expiry tabular-nums">

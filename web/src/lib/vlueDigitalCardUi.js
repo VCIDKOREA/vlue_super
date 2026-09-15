@@ -1,8 +1,11 @@
 /** VLUÉ 디지털 명함 — 등급별 카피·안내 (UI 공통) */
 export const VLUE_CARD_CAUTION = "주의: 개인정보 요구에 유의하세요";
 
-/** 유료·인증 빅푸시 펼침 — 앞면 하단 확인 문구 */
-export const VLUE_VERIFIED_PUSH_CONFIRM = "VLUÉ 인증이 확인되었습니다.";
+/** 유료·인증 빅푸시/DCC 하단 봉인 — 발신 경로 정상 표시 */
+export const VLUE_VERIFIED_PUSH_CONFIRM = "VLUÉ | 발신상태 정상";
+
+/** DCC 하단 봉인 문구 (브랜드 워드마크 옆) */
+export const VLUE_PUSH_AUTH_SEAL_PHRASE = "발신상태 정상";
 
 /** 미인증 발신 — 펼침·통화 중 주의 */
 export const VLUE_UNVERIFIED_CAUTION = "금전·계좌 요구에 주의하세요.";

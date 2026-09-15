@@ -50,6 +50,7 @@ import kr.vlue.calloverlay.companion.OverlayTriggerEvent
 import kr.vlue.calloverlay.companion.ScreenState
 import kr.vlue.calloverlay.companion.ScreenStateDetector
 import kr.vlue.calloverlay.companion.UsageAccessHelper
+import kr.vlue.calloverlay.dcp.CallPathLookupMerge
 import kr.vlue.calloverlay.dcp.CallPathReasonCopy
 import kr.vlue.calloverlay.dcp.CallPathSession
 import kr.vlue.calloverlay.dcp.ContactSafeCarePayload
@@ -1103,6 +1104,7 @@ class CallOverlayService : Service() {
                 (pendingLookup || !verified)
         val hasBroadcastContent =
             VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(pendingCardJson)
+        val pathAbnormal = isCurrentPathAbnormal(pendingCardJson)
         val unverifiedResolved =
             !pendingLookup &&
                 !safeCare &&
@@ -1118,17 +1120,54 @@ class CallOverlayService : Service() {
                     isAuthMemberOnly = authOnly,
                     hasBroadcastShowcaseContent = hasBroadcastContent,
                     canPromoteContactSafeCare = canPromote,
-                    isUnverifiedResolved = unverifiedResolved
+                    isUnverifiedResolved = unverifiedResolved,
+                    isPathAbnormal = pathAbnormal
                 )
             )
         VlueBigPushTrace.lifecycle(
             "CALL_UI_PHASE",
-            "source=$source phase=${phase.name} verified=$verified pending=$pendingLookup unverified=$unverifiedResolved"
+            "source=$source phase=${phase.name} verified=$verified pending=$pendingLookup " +
+                "unverified=$unverifiedResolved pathAbnormal=$pathAbnormal"
         )
 
         when (phase) {
             CallUiPhasePolicy.Phase.MINI_CASE -> return
             CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP -> {
+                if (pathAbnormal) {
+                    val verdict =
+                        CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
+                    if (!safeCare && canPromote) {
+                        val name = contactName.orEmpty()
+                        val json = ContactSafeCarePayload.toJson(currentPhone, name, verdict)
+                        pendingCardJson = json
+                        pendingVerified = false
+                        bindDcpRoute(currentPhone, verdict.routeQuery, json)
+                        VlueBigPushTrace.lifecycle(
+                            "ANSWER_PROMOTE_CONTACT_SAFE_CARE_ABNORMAL",
+                            "name=$name source=$source"
+                        )
+                    } else {
+                        val raw = pendingCardJson.orEmpty()
+                        if (raw.isNotBlank()) {
+                            val merged =
+                                CallPathLookupMerge.merge(raw, verdict, currentOutgoing)
+                            pendingCardJson = merged.json
+                            bindDcpRoute(
+                                currentPhone,
+                                merged.route.ifBlank { "abnormal" },
+                                pendingCardJson
+                            )
+                        } else {
+                            bindDcpRoute(currentPhone, "abnormal", pendingCardJson)
+                        }
+                        VlueBigPushTrace.lifecycle(
+                            "ANSWER_PATH_ABNORMAL_SAFE_POPUP",
+                            "source=$source — showcase blocked"
+                        )
+                    }
+                    presentCenterSafePopup(source = source, authMember = false)
+                    return
+                }
                 if (!safeCare && canPromote) {
                     val name = contactName.orEmpty()
                     val verdict = CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
@@ -1473,6 +1512,8 @@ class CallOverlayService : Service() {
     private fun mayCommitFullscreenShowcase(): Boolean {
         if (dismissing || authPopupOnlyMode || authPopupConfirmedToMini) return false
         if (userMinimized && companion.state == OverlayState.MINI_CASE) return false
+        /* 비정상 경로 — 쇼케이스 금지 (안심 팝업만) */
+        if (isCurrentPathAbnormal(pendingCardJson)) return false
         if (isContactSafeCare(pendingCardJson)) return false
         val verified = pendingVerified || parseIsVerified(pendingCardJson)
         if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified)) return false
@@ -1491,12 +1532,14 @@ class CallOverlayService : Service() {
         )
         cancelFullscreenExpandAnimator()
         val verified = pendingVerified || parseIsVerified(pendingCardJson)
-        if (isContactSafeCare(pendingCardJson) ||
+        if (isCurrentPathAbnormal(pendingCardJson) ||
+            isContactSafeCare(pendingCardJson) ||
             VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified)
         ) {
             presentCenterSafePopup(
                 source = "refuse_empty_$source",
-                authMember = !isContactSafeCare(pendingCardJson)
+                authMember = !isContactSafeCare(pendingCardJson) &&
+                    !isCurrentPathAbnormal(pendingCardJson)
             )
             return
         }
@@ -2810,6 +2853,18 @@ class CallOverlayService : Service() {
         } catch (_: Exception) {
             false
         }
+    }
+
+    /**
+     * 경로 검증 비정상 — 쇼케이스 차단·안심 팝업 전용.
+     * route / card pathVerify / 세션 verdict 중 하나라도 비정상이면 true.
+     */
+    private fun isCurrentPathAbnormal(cardJson: String? = pendingCardJson): Boolean {
+        if (currentDcpRoute.equals("abnormal", ignoreCase = true)) return true
+        if (parseDcpRoute(cardJson).equals("abnormal", ignoreCase = true)) return true
+        if (parsePathVerify(cardJson)) return true
+        if (CallPathSession.lastVerdict?.isAbnormal == true) return true
+        return false
     }
 
     private fun parseDcpAgencyName(cardJson: String?): String {

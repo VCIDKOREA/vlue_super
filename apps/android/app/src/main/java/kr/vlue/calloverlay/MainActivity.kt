@@ -922,6 +922,14 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                     return '[]';
                   }catch(e){return '[]';}
                 },
+                saveSafeCareCache:function(phone,name){
+                  try{
+                    if(window.Android&&window.Android.saveSafeCareCache){
+                      return window.Android.saveSafeCareCache(String(phone||''),String(name||''));
+                    }
+                    return JSON.stringify({ok:false,error:'no_bridge'});
+                  }catch(e){return JSON.stringify({ok:false,error:String(e&&e.message||e)});}
+                },
                 getLetteringPermissionStatusJson:function(){
                   try{return window.Android&&window.Android.getLetteringPermissionStatusJson?window.Android.getLetteringPermissionStatusJson():null;}
                   catch(e){return null;}
@@ -1283,6 +1291,26 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         fun getDeviceCallLogJson(limit: String?): String {
             val n = limit?.toIntOrNull() ?: 200
             return DeviceCallLogReader.readAsJson(activity, n)
+        }
+
+        /**
+         * 통화목록「안심 저장」— 기기 로컬에 번호+상호 캐시.
+         * PublicDirectoryPhoneCache + CardLookup 디스크 (ENABLE_DIRECTORY_SYNC 와 무관).
+         */
+        @android.webkit.JavascriptInterface
+        fun saveSafeCareCache(phone: String?, displayName: String?): String {
+            return try {
+                val p = phone?.trim().orEmpty()
+                val n = displayName?.trim().orEmpty()
+                if (p.isEmpty() || n.isEmpty()) {
+                    return """{"ok":false,"error":"empty"}"""
+                }
+                val ok = CardLookupRepository.rememberSafeCareLocal(activity, p, n)
+                if (ok) """{"ok":true}""" else """{"ok":false,"error":"persist"}"""
+            } catch (e: Exception) {
+                Log.e(TAG, "saveSafeCareCache failed", e)
+                """{"ok":false,"error":"${e.message?.replace("\"", "") ?: "fail"}"}"""
+            }
         }
 
         /** 종이 명함 스캔 → 시스템 연락처 추가 화면 (Insert Intent) */

@@ -559,14 +559,43 @@
 
 .call-history-row__cta {
   align-self: stretch;
-  margin: 0 16px 12px;
+  margin: 0;
   min-height: 36px;
+  flex: 1;
   border-radius: 10px;
   border: 1px solid rgba(59, 130, 246, 0.35);
   background: rgba(37, 99, 235, 0.12);
   color: #93c5fd;
   font-size: 12px;
   font-weight: 700;
+}
+
+.call-history-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 16px 12px;
+}
+
+.call-history-row__safe {
+  flex: 1;
+  min-height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: rgba(6, 95, 70, 0.28);
+  color: #6ee7b7;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.call-history-row__safe:disabled {
+  opacity: 0.75;
+}
+
+.call-history-row__safe--saved {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(51, 65, 85, 0.35);
+  color: #94a3b8;
 }
 
 .call-history-toast {

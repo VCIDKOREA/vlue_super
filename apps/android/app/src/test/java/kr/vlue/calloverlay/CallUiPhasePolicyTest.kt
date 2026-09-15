@@ -155,6 +155,76 @@ class CallUiPhasePolicyTest {
     }
 
     @Test
+    fun afterAnswer_pathAbnormal_blocksShowcase_evenWithBroadcast() {
+        assertEquals(
+            CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP,
+            CallUiPhasePolicy.decideAfterAnswer(
+                CallUiPhasePolicy.AnswerInput(
+                    alreadyMiniOrAuthConfirmed = false,
+                    isContactSafeCare = false,
+                    isAuthMemberOnly = false,
+                    hasBroadcastShowcaseContent = true,
+                    canPromoteContactSafeCare = false,
+                    isUnverifiedResolved = false,
+                    isPathAbnormal = true
+                )
+            )
+        )
+    }
+
+    @Test
+    fun afterAnswer_pathAbnormal_blocksUnverifiedShowcase() {
+        assertEquals(
+            CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP,
+            CallUiPhasePolicy.decideAfterAnswer(
+                CallUiPhasePolicy.AnswerInput(
+                    alreadyMiniOrAuthConfirmed = false,
+                    isContactSafeCare = false,
+                    isAuthMemberOnly = false,
+                    hasBroadcastShowcaseContent = false,
+                    canPromoteContactSafeCare = false,
+                    isUnverifiedResolved = true,
+                    isPathAbnormal = true
+                )
+            )
+        )
+    }
+
+    @Test
+    fun afterAnswer_pathAbnormal_prefersSafePopup_overAuthOnly() {
+        assertEquals(
+            CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP,
+            CallUiPhasePolicy.decideAfterAnswer(
+                CallUiPhasePolicy.AnswerInput(
+                    alreadyMiniOrAuthConfirmed = false,
+                    isContactSafeCare = false,
+                    isAuthMemberOnly = true,
+                    hasBroadcastShowcaseContent = false,
+                    canPromoteContactSafeCare = false,
+                    isPathAbnormal = true
+                )
+            )
+        )
+    }
+
+    @Test
+    fun afterAnswer_pathAbnormal_stillRespectsMini() {
+        assertEquals(
+            CallUiPhasePolicy.Phase.MINI_CASE,
+            CallUiPhasePolicy.decideAfterAnswer(
+                CallUiPhasePolicy.AnswerInput(
+                    alreadyMiniOrAuthConfirmed = true,
+                    isContactSafeCare = false,
+                    isAuthMemberOnly = false,
+                    hasBroadcastShowcaseContent = true,
+                    canPromoteContactSafeCare = false,
+                    isPathAbnormal = true
+                )
+            )
+        )
+    }
+
+    @Test
     fun afterAnswer_empty_keepsBigPush_neverBlankFullscreen() {
         assertEquals(
             CallUiPhasePolicy.Phase.KEEP_BIG_PUSH,

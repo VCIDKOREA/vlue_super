@@ -56,6 +56,17 @@ object PublicDirectoryPhoneCache {
         }
     }
 
+    /**
+     * 유저「안심 저장」— 메모리 + SharedPreferences 영속.
+     * ENABLE_DIRECTORY_SYNC 와 무관 (대량 sync 는 계속 OFF).
+     */
+    fun rememberAndPersist(context: Context, phoneDigitsOrE164: String, displayName: String) {
+        ensureLoaded(context)
+        remember(phoneDigitsOrE164, displayName)
+        persist(context)
+        Log.i(TAG, "rememberAndPersist keys=${digitKeys(phoneDigitsOrE164).size}")
+    }
+
     fun scheduleSyncIfStale(context: Context) {
         if (!ENABLE_DIRECTORY_SYNC) return
         bg.execute {

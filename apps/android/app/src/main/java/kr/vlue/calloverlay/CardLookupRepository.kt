@@ -64,6 +64,51 @@ object CardLookupRepository {
         if (result.matched) writeDisk(context, rawNumber, result)
     }
 
+    /**
+     * 통화목록「안심 저장」— 로컬 디렉터리 인덱스 + card lookup 디스크 캐시.
+     * 이후 동일 번호 조회 시 네트워크 전에 즉시 안심팝업 JSON 반환.
+     */
+    fun rememberSafeCareLocal(context: Context, rawNumber: String, displayName: String): Boolean {
+        val name = displayName.trim()
+        if (name.isEmpty()) return false
+        val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: rawNumber.trim()
+        if (e164.isBlank()) return false
+        PublicDirectoryPhoneCache.rememberAndPersist(context, e164, name)
+        /*
+         * 이미 VLUE 회원·기관 등 강한 카드가 있으면 CardLookup 을 덮지 않음.
+         * PublicDirectory 인덱스만 갱신 → 캐시 만료 후 폴백용.
+         */
+        peekCached(context, e164)?.let { existing ->
+            if (existing.matched) {
+                try {
+                    val kind = JSONObject(existing.rawJson).optString("profileKind")
+                    if (kind.isNotBlank() &&
+                        kind != "public_directory_safe" &&
+                        kind != "contact_safe_care" &&
+                        kind != "lookup_pending" &&
+                        kind != "unverified" &&
+                        kind != "path_verify"
+                    ) {
+                        return true
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        }
+        val json = buildPublicDirectorySafeJson(e164, name)
+        remember(
+            context,
+            e164,
+            CardLookupResult(
+                matched = true,
+                verified = true,
+                displayName = name,
+                rawJson = json
+            )
+        )
+        return true
+    }
+
     suspend fun lookup(
         context: Context,
         rawNumber: String,
