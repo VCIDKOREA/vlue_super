@@ -110,6 +110,13 @@ export type CrossVerifyData = {
 
 type TabKey = 'kakao' | 'naver' | 'public' | 'vlue';
 
+function preferredTabFor(data: CrossVerifyData): TabKey {
+  if (data.kakao.place_name?.trim()) return 'kakao';
+  if (data.naver.title?.trim()) return 'naver';
+  if (data.public.matched || data.public.candidates?.length) return 'public';
+  return 'vlue';
+}
+
 const TABS: {
   key: TabKey;
   label: string;
@@ -363,7 +370,7 @@ function KakaoPanel({ data }: { data: KakaoSourceData }) {
   );
 }
 
-function NaverPanel({ data }: { data: NaverSourceData }) {
+function NaverPanel({ data, isPrimaryFallback }: { data: NaverSourceData; isPrimaryFallback: boolean }) {
   if (!data.title) {
     return <p className="sv-cross-empty">네이버 지역 검색 결과가 없습니다.</p>;
   }
@@ -372,6 +379,13 @@ function NaverPanel({ data }: { data: NaverSourceData }) {
 
   return (
     <div className="sv-cross-panel sv-cross-panel--enter">
+      <div className="sv-provider-highlight sv-provider-highlight--naver">
+        <NaverSourceLogo className="sv-provider-highlight__logo" />
+        <div>
+          <strong>네이버 검색 결과</strong>
+          {isPrimaryFallback ? <span>카카오 검색 결과가 없어 네이버 정보를 우선 표시합니다.</span> : null}
+        </div>
+      </div>
       <p className="sv-cross-source">출처: 네이버 지역 검색 API</p>
       <h3 className="sv-cross-title">{data.title}</h3>
       {data.category ? <p className="sv-cross-sub">{data.category}</p> : null}
@@ -699,8 +713,9 @@ function CrossVerifyShareBar({
 }
 
 export default function SearchVerifyCrossTabs({ data }: { data: CrossVerifyData }) {
-  const [activeTab, setActiveTab] = useState<TabKey>('kakao');
+  const [activeTab, setActiveTab] = useState<TabKey>(() => preferredTabFor(data));
   const isPremium = data.is_registered;
+  const naverIsPrimaryFallback = !data.kakao.place_name?.trim() && Boolean(data.naver.title?.trim());
 
   return (
     <div className={`sv-cross${isPremium ? ' sv-cross--premium' : ' sv-cross--standard'}`}>
@@ -730,7 +745,7 @@ export default function SearchVerifyCrossTabs({ data }: { data: CrossVerifyData 
 
       <div className="sv-cross-body" role="tabpanel">
         {activeTab === 'kakao' ? <KakaoPanel data={data.kakao} /> : null}
-        {activeTab === 'naver' ? <NaverPanel data={data.naver} /> : null}
+        {activeTab === 'naver' ? <NaverPanel data={data.naver} isPrimaryFallback={naverIsPrimaryFallback} /> : null}
         {activeTab === 'public' ? <PublicPanel key={`public-${data.query}-${data.public.candidates?.length || 0}`} data={data.public} /> : null}
         {activeTab === 'vlue' ? <VluePanel data={data} isRegistered={isPremium} /> : null}
         <CrossVerifyShareBar data={data} activeTab={activeTab} />
