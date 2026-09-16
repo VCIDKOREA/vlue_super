@@ -30,14 +30,29 @@ class DcpPopupPolicyTest {
             DcpPopupPolicy.shouldShow(
                 route = "normal",
                 overlayState = OverlayState.SHOWCASE,
-                popupOnlyTest = false
+                popupOnlyTest = false,
+                callAnswered = true
             )
         )
         assertTrue(
             DcpPopupPolicy.shouldShow(
                 route = "abnormal",
                 overlayState = OverlayState.SHOWCASE,
-                popupOnlyTest = false
+                popupOnlyTest = false,
+                callAnswered = true
+            )
+        )
+    }
+
+    @Test
+    fun answeredBigPush_allowsAtomicPopupTransition() {
+        assertTrue(
+            DcpPopupPolicy.shouldShow(
+                route = "abnormal",
+                overlayState = OverlayState.BIG_PUSH,
+                popupOnlyTest = false,
+                pathVerifyAbnormal = true,
+                callAnswered = true
             )
         )
     }
@@ -76,13 +91,14 @@ class DcpPopupPolicyTest {
     }
 
     @Test
-    fun pathVerifyAbnormal_showsAtRinging() {
-        assertTrue(
+    fun pathVerifyAbnormal_doesNotOverlapRingingBigPush() {
+        assertFalse(
             DcpPopupPolicy.shouldShow(
                 route = "abnormal",
                 overlayState = OverlayState.BIG_PUSH,
                 popupOnlyTest = false,
-                pathVerifyAbnormal = true
+                pathVerifyAbnormal = true,
+                callAnswered = false
             )
         )
         assertFalse(

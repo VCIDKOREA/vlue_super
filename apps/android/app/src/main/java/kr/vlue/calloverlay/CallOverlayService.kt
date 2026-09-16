@@ -107,7 +107,7 @@ class CallOverlayService : Service() {
     /**
      * MiniCase「쇼케이스 돌아가기」→ 중앙 인증/비정상 팝업만 표시 중.
      * MiniCase 창은 숨기고 ContextWatch 가 BigPush 로 접지 못하게 한다.
-     * (Mini 탭 복원은 DCC/쇼케이스만 — 팝업-only 는 Mini 가 최종 UX)
+     * Mini 탭은 직전 쇼케이스 또는 팝업으로 복원한다.
      */
     private var authPopupOnlyMode = false
     /**
@@ -1283,7 +1283,11 @@ class CallOverlayService : Service() {
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_BEGIN", source)
         bigPushPeeking = false
         wakeScreenForCallOverlay()
-        /* Answer: HUN(가짜 빅푸시) 제거 + Native banner 제거 → Showcase */
+        /*
+         * Answer: 이전 DCP/안심 팝업과 HUN을 먼저 제거하고 단일 Showcase로 전환.
+         * 별도 팝업 Window가 남은 채 같은 root를 펼쳐 겹치는 상태를 금지한다.
+         */
+        removeDcpPopupWindow()
         LetteringIncomingNotifier.cancel(this)
         LetteringRingingActivity.requestFinish(this)
         rootContainer?.animate()?.cancel()
@@ -1865,16 +1869,18 @@ class CallOverlayService : Service() {
      */
     private fun presentCenterSafePopup(
         source: String,
-        authMember: Boolean
+        authMember: Boolean,
+        allowFromMiniRestore: Boolean = false
     ) {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
         /*
          * 확인→Mini 이후 웹 connected / 카드 갱신이 다시 여기로 오면
          * onAnswer+hideChrome 으로 Mini 가 사라지고 BigPush 가 재부착된다.
          */
-        if (authPopupConfirmedToMini ||
-            userMinimized ||
-            companion.state == OverlayState.MINI_CASE
+        if (!allowFromMiniRestore &&
+            (authPopupConfirmedToMini ||
+                userMinimized ||
+                companion.state == OverlayState.MINI_CASE)
         ) {
             VlueBigPushTrace.lifecycle(
                 "CENTER_SAFE_POPUP_SKIP",
@@ -2723,8 +2729,11 @@ class CallOverlayService : Service() {
         val show = DcpPopupPolicy.shouldShow(
             route = route,
             overlayState = companion.state,
-            popupOnlyTest = dcpPopupOnly,
-            pathVerifyAbnormal = pathVerify
+            popupOnlyTest = dcpPopupOnly || authPopupOnlyMode,
+            pathVerifyAbnormal = pathVerify,
+            callAnswered =
+                if (currentOutgoing) remoteConnected
+                else (remoteConnected || isCallAlreadyAnswered())
         ) && !dismissing
         if (!show) {
             removeDcpPopupWindow()
@@ -3303,13 +3312,26 @@ class CallOverlayService : Service() {
             return
         }
         /*
-         * 안심팝업·인증-only: MiniCase 유지.
-         * BIG_PUSH 바(상단 짤림)에서 탭한 복원은 항상 FULLSCREEN — 바→풀 전환 허용.
+         * 안심팝업·인증-only·DCP: Mini 탭 → 직전 중앙 팝업 복원.
+         * 팝업은 별도 Window로 붙이고 Mini 크롬은 soft-hide하여 겹침을 막는다.
          */
         if (isPopupOnlyMiniCaseSession() && companion.state == OverlayState.MINI_CASE) {
+            authPopupConfirmedToMini = false
+            userMinimized = false
+            showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
+            val verified = pendingVerified || parseIsVerified(pendingCardJson)
+            val authMember =
+                !isCurrentPathAbnormal(pendingCardJson) &&
+                    !isContactSafeCare(pendingCardJson) &&
+                    VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified)
             VlueBigPushTrace.lifecycle(
-                "RESTORE_FROM_MINI_SKIP_POPUP_ONLY",
-                "keep MiniCase source=$source state=${companion.state.name}"
+                "RESTORE_FROM_MINI_TO_POPUP",
+                "source=$source authMember=$authMember state=${companion.state.name}"
+            )
+            presentCenterSafePopup(
+                source = "restore_$source",
+                authMember = authMember,
+                allowFromMiniRestore = true
             )
             return
         }

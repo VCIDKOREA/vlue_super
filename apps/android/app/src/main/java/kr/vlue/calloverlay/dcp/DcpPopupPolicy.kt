@@ -12,16 +12,19 @@ object DcpPopupPolicy {
         route: String,
         overlayState: OverlayState,
         popupOnlyTest: Boolean,
-        pathVerifyAbnormal: Boolean = false
+        @Suppress("UNUSED_PARAMETER")
+        pathVerifyAbnormal: Boolean = false,
+        callAnswered: Boolean = false
     ): Boolean {
         if (route != "normal" && route != "abnormal") return false
         if (popupOnlyTest) return true
-        if (pathVerifyAbnormal && route == "abnormal") {
-            return overlayState == OverlayState.BIG_PUSH ||
-                overlayState == OverlayState.SHOWCASE ||
-                overlayState == OverlayState.IDLE
-        }
-        /* 국가기관 DCP 정상은 수화 후. 링잉 빅푸시·다른앱 미니는 화면을 잠그지 않음 */
-        return overlayState == OverlayState.SHOWCASE
+        /*
+         * 정상/비정상 모두 수화 전에는 BigPush만.
+         * pathVerify 비정상도 링잉 중 별도 팝업을 붙이지 않는다.
+         */
+        if (!callAnswered) return false
+        /* 수화 직후 Controller가 아직 BIG_PUSH여도 팝업으로 원자적 전환 허용 */
+        return overlayState == OverlayState.BIG_PUSH ||
+            overlayState == OverlayState.SHOWCASE
     }
 }

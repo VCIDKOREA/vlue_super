@@ -37,6 +37,9 @@
 
 `remoteConnected` may become true **only** after a real answer path (`enterShowcaseFromAnswer` / InCall `STATE_ACTIVE` after dialing/connecting). Audio `MODE_IN_CALL` alone must **never** open popup/showcase (OEM false positive while still ringing).
 
+Path abnormal also follows this rule: before answer it remains **BigPush only**.
+Never attach a center popup over a ringing BigPush.
+
 ---
 
 ## 3. After answer (`remoteConnected == true`)
@@ -81,6 +84,8 @@ never remain permanently in `KEEP_BIG_PUSH`. Path-abnormal sessions remain
 
 - BigPush window `y >= statusBarHeightPx + 8dp` (never under system status bar)
 - Center popups are separate overlay windows; attach popup **before** tearing down BigPush chrome when possible
+- Once a center popup attaches, BigPush chrome must be soft-hidden; popup and BigPush must never remain visibly stacked
+- Mini tap restores the session’s prior destination: Showcase sessions → `FULL_SHOWCASE`, popup-only sessions → the same center popup
 - Safe Care / auth-only: **never** leave a blank dark `FULLSCREEN` Showcase
 - **Path abnormal:** never `FULL_SHOWCASE` — center 안심 팝업 only (even if peer has DCC/showcase)
 - Web host must not `setExpanded(true)` or `notifyVlueAuthMemberReady` for `contact_safe_care`
