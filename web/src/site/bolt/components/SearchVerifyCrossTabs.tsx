@@ -123,10 +123,10 @@ const TABS: {
   accent: string;
   Logo: typeof KakaoSourceLogo;
 }[] = [
-  { key: 'kakao', label: '카카오 인증', accent: 'sv-tab--kakao', Logo: KakaoSourceLogo },
-  { key: 'naver', label: '네이버 인증', accent: 'sv-tab--naver', Logo: NaverSourceLogo },
+  { key: 'kakao', label: '카카오', accent: 'sv-tab--kakao', Logo: KakaoSourceLogo },
+  { key: 'naver', label: '네이버', accent: 'sv-tab--naver', Logo: NaverSourceLogo },
   { key: 'public', label: '공공·국세청', accent: 'sv-tab--public', Logo: PublicSourceLogo },
-  { key: 'vlue', label: 'VLUÉ 인증', accent: 'sv-tab--vlue', Logo: VlueSourceLogo },
+  { key: 'vlue', label: 'VLUE', accent: 'sv-tab--vlue', Logo: VlueSourceLogo },
 ];
 
 function buildMapExternalUrl(lat: number, lng: number, placeName?: string) {
@@ -716,28 +716,59 @@ export default function SearchVerifyCrossTabs({ data }: { data: CrossVerifyData 
   const [activeTab, setActiveTab] = useState<TabKey>(() => preferredTabFor(data));
   const isPremium = data.is_registered;
   const naverIsPrimaryFallback = !data.kakao.place_name?.trim() && Boolean(data.naver.title?.trim());
+  const sourceStates: Record<TabKey, { summary: string; found: boolean }> = {
+    kakao: {
+      summary: data.kakao.place_name?.trim() ? '장소 일치' : '결과 없음',
+      found: Boolean(data.kakao.place_name?.trim()),
+    },
+    naver: {
+      summary: data.naver.title?.trim() ? '장소 일치' : '결과 없음',
+      found: Boolean(data.naver.title?.trim()),
+    },
+    public: {
+      summary: data.public.matched || data.public.candidates?.length ? '사업자 확인' : '등록 미확인',
+      found: Boolean(data.public.matched || data.public.candidates?.length),
+    },
+    vlue: {
+      summary: isPremium ? '인증 확인' : '미등록',
+      found: isPremium,
+    },
+  };
 
   return (
     <div className={`sv-cross${isPremium ? ' sv-cross--premium' : ' sv-cross--standard'}`}>
+      <div className="sv-cross-guide">
+        <span className="sv-cross-guide__icon">
+          <Sparkles aria-hidden />
+        </span>
+        <span className="sv-cross-guide__copy">
+          <strong>AI 교차검증 리포트</strong>
+          <span>4개 출처 조회 완료 · 아래 카드를 눌러 출처별 상세 결과를 확인하세요.</span>
+        </span>
+      </div>
       <div className="sv-cross-tabs sv-cross-tabs--4" role="tablist" aria-label="VLUÉ 통합 교차검증">
         {TABS.map((tab) => {
           const active = activeTab === tab.key;
           const Logo = tab.Logo;
+          const state = sourceStates[tab.key];
           return (
             <button
               key={tab.key}
               type="button"
               role="tab"
               aria-selected={active}
+              aria-label={`${tab.label} ${state.summary}${active ? ', 현재 보는 결과' : ', 상세 결과 보기'}`}
               className={`sv-tab ${tab.accent}${active ? ' sv-tab--active' : ''}`}
               onClick={() => setActiveTab(tab.key)}
             >
-              <span className="sv-tab-inner">
+              <span className="sv-tab-main">
                 <Logo className="sv-tab-logo" />
-                <span>{tab.label}</span>
+                <span className="sv-tab-copy">
+                  <strong>{tab.label}</strong>
+                  <small className={state.found ? 'sv-tab-status--found' : undefined}>{state.summary}</small>
+                </span>
               </span>
-              {tab.key === 'kakao' && data.kakao.telephone ? <span className="sv-tab-dot sv-tab-dot--kakao" /> : null}
-              {tab.key === 'vlue' && isPremium ? <span className="sv-tab-dot sv-tab-dot--premium" /> : null}
+              <span className="sv-tab-action">{active ? '현재 보는 결과' : '상세 보기 ›'}</span>
             </button>
           );
         })}
