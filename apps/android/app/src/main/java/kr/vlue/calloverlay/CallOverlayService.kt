@@ -1229,18 +1229,25 @@ class CallOverlayService : Service() {
                     restartOutgoingPeerProbeIfNeeded()
                     return
                 }
-                if (pendingLookup && !source.startsWith("answer_ui_resume_")) {
+                if (pendingLookup) {
                     if (!currentOutgoing &&
                         promoteIncomingContactSafeCareAndPopup("${source}_pending_lookup")
                     ) {
                         return
                     }
-                    showcaseHoldUntilElapsed =
-                        android.os.SystemClock.elapsedRealtime() + 8_000L
-                    VlueBigPushTrace.lifecycle(
-                        "ANSWER_KEEP_BIGPUSH_PENDING",
-                        "lookup pending — resume source=$source"
-                    )
+                    if (!source.startsWith("answer_ui_resume_")) {
+                        showcaseHoldUntilElapsed =
+                            android.os.SystemClock.elapsedRealtime() + 8_000L
+                        VlueBigPushTrace.lifecycle(
+                            "ANSWER_KEEP_BIGPUSH_PENDING",
+                            "lookup pending — resume source=$source"
+                        )
+                    }
+                    /*
+                     * 재시도에서도 다음 재시도를 예약해야 한다.
+                     * 이전에는 answer_ui_resume_* 에서 예약 없이 return해
+                     * 수화 후 BigPush가 영구 고착됐다.
+                     */
                     scheduleAnswerUiResume("pending_after_$source")
                     return
                 }
@@ -1348,11 +1355,37 @@ class CallOverlayService : Service() {
         if (attempt > 8) {
             VlueBigPushTrace.lifecycle(
                 "ANSWER_UI_RESUME_EXHAUSTED",
-                "force showcase after $attempt attempts reason=$reason"
+                "resolve pending lookup after $attempt attempts reason=$reason"
             )
             val force = Runnable {
                 if (dismissing || !remoteConnected) return@Runnable
                 if (companion.state != OverlayState.BIG_PUSH) return@Runnable
+                /*
+                 * 조회 응답이 끝내 오지 않아도 BigPush에 영구 고착하지 않는다.
+                 * 비정상 경로는 기존 정책대로 안심 팝업으로 보내고, 정상·미확정
+                 * 빈 조회만 미인증 확정으로 승격해 기존 신고 패널로 전환한다.
+                 */
+                if (!isCurrentPathAbnormal(pendingCardJson) &&
+                    (pendingCardJson.isNullOrBlank() || isLookupPendingCard(pendingCardJson))
+                ) {
+                    val fallback =
+                        org.json.JSONObject()
+                            .put("matched", false)
+                            .put("is_verified", false)
+                            .put("verified", false)
+                            .put("source", "unmatched")
+                            .put("profileKind", "unverified")
+                            .put("displayName", "")
+                            .put("phoneE164", currentPhone)
+                            .toString()
+                    pendingCardJson = fallback
+                    pendingVerified = false
+                    webView?.let { injectCardLookupJson(it, fallback) }
+                    VlueBigPushTrace.lifecycle(
+                        "ANSWER_LOOKUP_TIMEOUT_UNVERIFIED",
+                        "phone=${ReleaseDebugGate.maskPhoneForLog(currentPhone)}"
+                    )
+                }
                 enterShowcaseFromAnswer(source = "answer_ui_resume_$attempt")
             }
             answerUiResumeRunnable = force

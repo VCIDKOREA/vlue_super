@@ -55,6 +55,11 @@ Decision order (first match wins):
 
 Contact promote: if lookup pending/blank **and** device contact name exists → treat as Safe Care (`CENTER_SAFE_POPUP`).
 
+Pending lookup must retry continuously after answer. After the bounded retry window
+(about 8 seconds), it must resolve to the existing unverified report panel; it must
+never remain permanently in `KEEP_BIG_PUSH`. Path-abnormal sessions remain
+`CENTER_SAFE_POPUP` and are not promoted to unverified.
+
 **Public directory:** 학교·우체국·공공기관 등 DB 전화 매칭 → `public_directory_safe` 안심팝업. 미매칭 → 기존 미인증 쇼케이스.
 
 **BigPush bar tap (after answer):** same decision table. Resolved unverified must open 미인증 fullscreen (not `BIG_PUSH_TAP_KEEP`).
