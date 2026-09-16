@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { ChevronDown } from "lucide-react";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import { resolveEffectiveMembershipTier } from "../lib/effectiveMembership.js";
 import { canUseV1PaidDccFeatures } from "../lib/v1PaidPackageGate.js";
@@ -262,13 +263,31 @@ export default function CallBigPushPreviewSection({
       }}
     >
       {showTierTabs ? (
-        <div className="mb-1.5 flex justify-end">
+        <div className="mb-1.5 flex min-w-0 items-center justify-between gap-2">
+          <div
+            className={`flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden whitespace-nowrap [font-size:clamp(8px,2.4vw,10px)] font-bold tracking-[-0.025em] ${
+              isDarkMode ? "text-slate-400" : "text-slate-500"
+            }`}
+            title="탭하여 현재 상태 확인"
+          >
+            <span
+              className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                isDarkMode ? "bg-blue-500/15 text-blue-300" : "bg-blue-50 text-blue-600"
+              }`}
+              aria-hidden
+            >
+              <ChevronDown size={13} strokeWidth={2.6} />
+            </span>
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+              탭하여 현재 상태 확인
+            </span>
+          </div>
           <button
             type="button"
             role="switch"
             aria-checked={isOn}
             aria-label={`쇼케이스 송출 ${isOn ? "켜짐" : "꺼짐"}`}
-            className={`inline-flex min-h-8 items-center gap-2 rounded-full border px-2.5 py-1.5 shadow-sm transition active:scale-[0.98] ${
+            className={`inline-flex min-h-8 shrink-0 items-center gap-2 rounded-full border px-2.5 py-1.5 shadow-sm transition active:scale-[0.98] ${
               isOn
                 ? isDarkMode
                   ? "border-blue-400/40 bg-blue-500/20 text-blue-100"
