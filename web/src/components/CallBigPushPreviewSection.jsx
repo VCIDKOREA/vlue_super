@@ -17,7 +17,12 @@ import {
   healDigitalCardActiveFromLocalEvidence,
   readShowcasePreviewDigitalCardApplied
 } from "../lib/vlueShowcasePreviewIdentity.js";
-import { readVcidBroadcastOn } from "../lib/bizcardAccountSync.js";
+import {
+  readVcidBroadcastOn,
+  writeDccBroadcastOn,
+  writeVcidBroadcastOn
+} from "../lib/bizcardAccountSync.js";
+import { ensureCallDetectionForBroadcast } from "../lib/letteringSettings.js";
 import { pushAndroidBackHandler } from "../lib/androidBackStack.js";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
@@ -166,6 +171,31 @@ export default function CallBigPushPreviewSection({
     setExpanded(next);
   };
 
+  const handleShowcaseToggle = (next) => {
+    const enabled = Boolean(next);
+    setShowcaseOn(enabled);
+    setExpanded(false);
+    setCallChromePreview(false);
+    writeVcidBroadcastOn(enabled);
+    if (canUseV1PaidDccFeatures(membershipTier)) {
+      writeDccBroadcastOn(enabled);
+    }
+    if (enabled) ensureCallDetectionForBroadcast(true);
+
+    import("../lib/showcase/showcaseStyleStorage.js")
+      .then((storage) => {
+        const patch = { includeDigitalCard: enabled };
+        storage.writeShowcaseStyle?.(patch);
+        const live = storage.readLiveShowcaseStyle?.();
+        if (live) storage.writeLiveShowcaseStyle?.({ ...live, ...patch }, { source: "editor" });
+        return import("../lib/showcase/showcaseStyleSync.js");
+      })
+      .then((sync) => sync.pushShowcaseStyleBundle?.({ force: true }))
+      .catch(() => {});
+
+    onToast?.(enabled ? "통화 중 쇼케이스 송출을 켰습니다." : "통화 중 쇼케이스 송출을 껐습니다.");
+  };
+
   useEffect(() => {
     if (expanded) return undefined;
     const t = window.setTimeout(() => setCallChromePreview(false), 520);
@@ -198,14 +228,6 @@ export default function CallBigPushPreviewSection({
     onToast,
     suppressExpandGuide: Boolean(suppressExpandGuide || inlineExpand)
   };
-
-  const tabTrackCls = isDarkMode ? "flex gap-1 rounded-full bg-slate-800 p-1" : "flex gap-1 rounded-full bg-slate-100 p-1";
-  const statusOnCls = isDarkMode
-    ? "border border-blue-400/35 bg-blue-500/20 text-blue-100"
-    : "border border-blue-100 bg-blue-50 text-blue-900";
-  const statusOffCls = isDarkMode
-    ? "border border-slate-600 bg-slate-800 text-slate-200"
-    : "border border-slate-200 bg-slate-50 text-slate-700";
 
   const embedClass = [
     "lettering-home-push-embed",
@@ -240,53 +262,38 @@ export default function CallBigPushPreviewSection({
       }}
     >
       {showTierTabs ? (
-        <div className="mb-1.5 space-y-1.5">
-          <div className={tabTrackCls} role="tablist" aria-label="쇼케이스 켜짐 꺼짐">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={isOn}
-              className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
-                isOn
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : isDarkMode
-                    ? "text-slate-400 hover:text-slate-200"
-                    : "text-slate-500 hover:text-slate-700"
-              }`}
-              onClick={() => {
-                setShowcaseOn(true);
-                setExpanded(false);
-                setCallChromePreview(false);
-              }}
-            >
-              쇼케이스 켜짐
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={!isOn}
-              className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
-                !isOn
-                  ? "bg-slate-700 text-white shadow-sm"
-                  : isDarkMode
-                    ? "text-slate-400 hover:text-slate-200"
-                    : "text-slate-500 hover:text-slate-700"
-              }`}
-              onClick={() => {
-                setShowcaseOn(false);
-                setExpanded(false);
-                setCallChromePreview(false);
-              }}
-            >
-              쇼케이스 꺼짐
-            </button>
-          </div>
-          <p
-            className={`rounded-xl px-3 py-2 text-[10px] font-semibold leading-snug ${isOn ? statusOnCls : statusOffCls}`}
-            style={{ wordBreak: "keep-all" }}
+        <div className="mb-1.5 flex justify-end">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isOn}
+            aria-label={`쇼케이스 송출 ${isOn ? "켜짐" : "꺼짐"}`}
+            className={`inline-flex min-h-8 items-center gap-2 rounded-full border px-2.5 py-1.5 shadow-sm transition active:scale-[0.98] ${
+              isOn
+                ? isDarkMode
+                  ? "border-blue-400/40 bg-blue-500/20 text-blue-100"
+                  : "border-blue-200 bg-blue-50 text-blue-700"
+                : isDarkMode
+                  ? "border-slate-600 bg-slate-800 text-slate-300"
+                  : "border-slate-200 bg-white text-slate-500"
+            }`}
+            onClick={() => handleShowcaseToggle(!isOn)}
           >
-            {isOn ? "켜짐 · 쇼케이스 전면" : "꺼짐 · 번호·인증만"}
-          </p>
+            <span className="text-[10px] font-bold">쇼케이스</span>
+            <span
+              className={`relative h-4 w-8 rounded-full transition-colors ${
+                isOn ? "bg-blue-600" : isDarkMode ? "bg-slate-600" : "bg-slate-300"
+              }`}
+              aria-hidden
+            >
+              <span
+                className={`absolute left-0 top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
+                  isOn ? "translate-x-[18px]" : "translate-x-0.5"
+                }`}
+              />
+            </span>
+            <strong className="min-w-5 text-left text-[10px] font-black">{isOn ? "켜짐" : "꺼짐"}</strong>
+          </button>
         </div>
       ) : null}
 
