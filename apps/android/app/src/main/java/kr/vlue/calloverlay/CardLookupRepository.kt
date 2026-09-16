@@ -65,6 +65,26 @@ object CardLookupRepository {
     }
 
     /**
+     * 로컬 안심 저장/공공 디렉터리는 즉시 표시용 provisional 데이터다.
+     * 서버의 VLUE 회원·쇼케이스 카드보다 우선 확정하면 회원도 비회원 팝업으로 고착된다.
+     */
+    internal fun requiresAuthoritativeRefresh(result: CardLookupResult): Boolean {
+        return try {
+            val json = JSONObject(result.rawJson)
+            val kind = json.optString("profileKind").trim()
+            val source = json.optString("source").trim()
+            source == "public_directory_local" ||
+                kind == "public_directory_safe" ||
+                kind == "contact_safe_care" ||
+                kind == "lookup_pending" ||
+                kind == "unverified" ||
+                kind == "path_verify"
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
      * 통화목록「안심 저장」— 로컬 디렉터리 인덱스 + card lookup 디스크 캐시.
      * 이후 동일 번호 조회 시 네트워크 전에 즉시 안심팝업 JSON 반환.
      */
@@ -79,20 +99,8 @@ object CardLookupRepository {
          * PublicDirectory 인덱스만 갱신 → 캐시 만료 후 폴백용.
          */
         peekCached(context, e164)?.let { existing ->
-            if (existing.matched) {
-                try {
-                    val kind = JSONObject(existing.rawJson).optString("profileKind")
-                    if (kind.isNotBlank() &&
-                        kind != "public_directory_safe" &&
-                        kind != "contact_safe_care" &&
-                        kind != "lookup_pending" &&
-                        kind != "unverified" &&
-                        kind != "path_verify"
-                    ) {
-                        return true
-                    }
-                } catch (_: Exception) {
-                }
+            if (existing.matched && !requiresAuthoritativeRefresh(existing)) {
+                return true
             }
         }
         val json = buildPublicDirectorySafeJson(e164, name)
@@ -136,34 +144,34 @@ object CardLookupRepository {
     ): CardLookupResult? {
             val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: return null
             if (BlockedPhoneCache.isBlocked(context, e164)) return null
+            var localSafeFallback: CardLookupResult? = null
 
             /*
-             * 캐시 히트면 즉시 반환 — 오버레이에 인증명이 바로 뜨게.
-             * 네트워크·line-call-event 는 백그라운드에서 갱신.
+             * 강한 회원 카드는 즉시 확정한다. 로컬 안심 데이터는 링잉 UI에는 이미
+             * peekCached 로 먼저 표시됐으므로 여기서는 서버 회원 카드를 재확인한다.
              */
             peekCached(context, rawNumber)?.let { cached ->
-                bg.execute {
-                    /* line-call-event 만 — 캐시 hit 시 전체 cardLookup 재조회는 풀러 egress 낭비 */
-                    reportLineCallEvent(context, rawNumber)
+                if (requiresAuthoritativeRefresh(cached)) {
+                    localSafeFallback = cached
+                } else {
+                    bg.execute { reportLineCallEvent(context, rawNumber) }
+                    return cached
                 }
-                return cached
             }
 
-            /* 공공 디렉터리 로컬 인덱스 — 네트워크 전에 안심팝업 JSON 합성 */
-            PublicDirectoryPhoneCache.peek(context, rawNumber)?.let { hit ->
-                val json = buildPublicDirectorySafeJson(rawNumber, hit.displayName)
-                val synth = CardLookupResult(
-                    matched = true,
-                    verified = true,
-                    displayName = hit.displayName,
-                    rawJson = json
-                )
-                remember(context, rawNumber, synth)
-                bg.execute {
-                    PublicDirectoryPhoneCache.scheduleSyncIfStale(context)
-                    reportLineCallEvent(context, rawNumber)
+            /* 공공 디렉터리 로컬 인덱스 — 서버 회원 조회 실패 때 사용할 폴백 */
+            if (localSafeFallback == null) {
+                PublicDirectoryPhoneCache.peek(context, rawNumber)?.let { hit ->
+                    val json = buildPublicDirectorySafeJson(rawNumber, hit.displayName)
+                    val synth = CardLookupResult(
+                        matched = true,
+                        verified = true,
+                        displayName = hit.displayName,
+                        rawJson = json
+                    )
+                    remember(context, rawNumber, synth)
+                    localSafeFallback = synth
                 }
-                return synth
             }
             PublicDirectoryPhoneCache.scheduleSyncIfStale(context)
 
@@ -186,10 +194,14 @@ object CardLookupRepository {
                     }
                 } catch (_: Exception) {
                 }
-                bg.execute { reportLineCallEvent(context, rawNumber) }
+                bg.execute {
+                    reportLineCallEvent(context, rawNumber)
+                }
                 return filled
             }
-            return result
+            /* fast 타임아웃은 null 유지 → coordinator가 lookupSlow를 한 번 더 수행 */
+            if (result == null && fast) return null
+            return localSafeFallback ?: result
     }
 
     private fun buildPublicDirectorySafeJson(rawNumber: String, displayName: String): String {

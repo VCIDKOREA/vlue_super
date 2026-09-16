@@ -1299,10 +1299,7 @@ class CallOverlayService : Service() {
         userMinimized = false
         /* Answer 후 ContextWatch 가 OTHER_APP 으로 오판해 빅푸시로 되돌리지 않도록 충분히 유지 */
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
-        /* 웹 expand 먼저 — 네이티브 창 성장(420ms)과 CSS 슬롯 전환 동기 */
-        notifyWebExpandShowcase()
-        /* 탭/자동 동일 — restore_showcase 없으면 웹이 바 상태로 남는 경우가 있음 */
-        notifyWebCallState("restore_showcase")
+        /* 네이티브 창 성장을 먼저 시작해 작은 바 안에서 풀 UI가 잘리는 첫 프레임을 없앤다. */
         if (rootContainer?.isAttachedToWindow == true) {
             enterShowcaseLayout(source = source)
         } else {
@@ -1316,6 +1313,9 @@ class CallOverlayService : Service() {
             )
             enterShowcaseLayout(source = source)
         }
+        notifyWebExpandShowcase()
+        /* 탭/자동 동일 — restore_showcase 없으면 웹이 바 상태로 남는 경우가 있음 */
+        notifyWebCallState("restore_showcase")
         syncOverlayChromeForState(source = source)
         syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_APPLIED", source)
@@ -3379,9 +3379,7 @@ class CallOverlayService : Service() {
         nativeBanner?.visibility = android.view.View.GONE
         webView?.visibility = android.view.View.VISIBLE
         rootContainer?.setBackgroundColor(Color.parseColor("#0B101B"))
-        /* 웹 펼침을 먼저 — 네이티브 420ms 성장과 동기 */
-        notifyWebExpandShowcase()
-        notifyWebCallState("restore_showcase")
+        /* Mini 창을 먼저 성장시킨 뒤 웹 콘텐츠를 펼쳐 잘린 풀 UI 노출을 방지한다. */
         if (rootContainer?.isAttachedToWindow == true) {
             enterShowcaseLayout(source = source)
         } else {
@@ -3394,6 +3392,8 @@ class CallOverlayService : Service() {
             )
             enterShowcaseLayout(source = source)
         }
+        notifyWebExpandShowcase()
+        notifyWebCallState("restore_showcase")
         syncOverlayChromeForState(source = source)
         VlueBigPushTrace.lifecycle(
             "RESTORE_SHOWCASE",

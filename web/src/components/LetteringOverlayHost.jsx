@@ -1809,8 +1809,11 @@ function LetteringOverlayHostInner() {
               setExpanded(true);
               setForceShowcaseBar(false);
               try {
-                window.VlueLettering?.restoreShowcaseOverlay?.();
-                window.Android?.restoreShowcaseOverlay?.();
+                if (typeof window.VlueLettering?.restoreShowcaseOverlay === "function") {
+                  window.VlueLettering.restoreShowcaseOverlay();
+                } else {
+                  window.Android?.restoreShowcaseOverlay?.();
+                }
               } catch {
                 /* ignore */
               }

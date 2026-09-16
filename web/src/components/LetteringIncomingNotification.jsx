@@ -721,10 +721,7 @@ export default function LetteringIncomingNotification({
   const showExpandedLayout = isExpandedView || keepExpandedLayout;
   const prevExpandedViewRef = useRef(isExpandedView);
 
-  useEffect(() => {
-    if (showcaseOffPreview) setHadFullShowcaseThisCall(false);
-  }, [showcaseOffPreview]);
-
+  /* 한 번 열린 풀쇼케이스 기록은 늦은 provisional 카드 갱신으로 지우지 않는다. */
   useEffect(() => {
     if (isExpandedView) setHadFullShowcaseThisCall(true);
   }, [isExpandedView]);

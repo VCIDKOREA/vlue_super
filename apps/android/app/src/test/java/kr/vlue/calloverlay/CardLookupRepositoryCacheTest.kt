@@ -1,7 +1,9 @@
 package kr.vlue.calloverlay
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CardLookupRepositoryCacheTest {
@@ -27,5 +29,31 @@ class CardLookupRepositoryCacheTest {
             CardLookupResult(matched = false, verified = false, displayName = "", rawJson = "{}")
         )
         assertNull(CardLookupRepository.peekCached("01000000000"))
+    }
+
+    @Test
+    fun localSafeCache_requiresAuthoritativeMemberRefresh() {
+        val result = CardLookupResult(
+            matched = true,
+            verified = true,
+            displayName = "광덕형님",
+            rawJson =
+                """{"matched":true,"source":"public_directory_local","profileKind":"public_directory_safe"}"""
+        )
+
+        assertTrue(CardLookupRepository.requiresAuthoritativeRefresh(result))
+    }
+
+    @Test
+    fun businessCardCache_remainsAuthoritative() {
+        val result = CardLookupResult(
+            matched = true,
+            verified = true,
+            displayName = "김광덕",
+            rawJson =
+                """{"matched":true,"source":"business_card","membershipTier":"paid","showcaseStyle":{"v":2}}"""
+        )
+
+        assertFalse(CardLookupRepository.requiresAuthoritativeRefresh(result))
     }
 }
