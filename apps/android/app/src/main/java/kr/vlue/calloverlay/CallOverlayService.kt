@@ -1914,6 +1914,19 @@ class CallOverlayService : Service() {
             )
             return
         }
+        /*
+         * Samsung에서 Receiver/Telecom/InCall 경로가 같은 수화를 연속 통지한다.
+         * 이미 전환 완료된 팝업을 remove/add 하면 BigPush가 순간 재노출되거나
+         * 팝업과 겹쳐 보이므로 현재 팝업을 그대로 유지한다.
+         */
+        if (authPopupOnlyMode && dcpPopupView?.isAttachedToWindow == true) {
+            softHideCompanionOverlayChrome()
+            VlueBigPushTrace.lifecycle(
+                "CENTER_SAFE_POPUP_ALREADY_VISIBLE",
+                "source=$source — duplicate connected ignored"
+            )
+            return
+        }
         /* 인증-only: SHOWCASE(풀스크린) 전이 금지 — 네이티브 중앙 팝업만 */
         authPopupOnlyMode = true
         /* 확인 전까지 OTHER_APP→하단바 collapse 금지 */
