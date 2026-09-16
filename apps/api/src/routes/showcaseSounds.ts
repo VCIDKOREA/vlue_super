@@ -6,6 +6,7 @@ import {
   isShowcaseSoundStorageConfigured
 } from "../services/showcase/showcaseSoundStorage.js";
 import {
+  assertCanRegisterSound,
   borrowShowcaseSound,
   bumpThemeChangeQuota,
   createUserOriginalSound,
@@ -70,6 +71,15 @@ showcaseSoundRoutes.get("/upload/status", requireUserHeader, (c) =>
 showcaseSoundRoutes.post("/upload-url", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
   const body = await c.req.json().catch(() => ({}));
+  try {
+    /* Presign 단계부터 유료·가족플랜 권한과 일일/보관 한도를 강제한다. */
+    await assertCanRegisterSound(me);
+  } catch (e) {
+    return c.json(
+      { ok: false, error: e instanceof Error ? e.message : "upload_not_allowed" },
+      403
+    );
+  }
   try {
     const result = await createShowcaseSoundUploadUrl({
       userId: me,
